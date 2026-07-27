@@ -26,6 +26,8 @@ export interface ImportState {
   insertedCount: number;
   /** Rows skipped as duplicates (same file or already imported for this tent). */
   duplicateCount: number;
+  /** Earlier batches committed before a later batch failed. */
+  partialWrite: boolean;
   errorCode: string | null;
   errorMessage: string | null;
 }
@@ -35,6 +37,7 @@ export const INITIAL_IMPORT_STATE: ImportState = {
   parsed: null,
   insertedCount: 0,
   duplicateCount: 0,
+  partialWrite: false,
   errorCode: null,
   errorMessage: null,
 };

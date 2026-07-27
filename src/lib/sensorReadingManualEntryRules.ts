@@ -177,6 +177,7 @@ export interface ManualReadingPayload {
   value: number;
   source: "manual";
   ts: string;
+  captured_at: string;
   quality: "ok";
   /**
    * Optional `manual:<note>` device id capturing where the grower took
@@ -207,6 +208,7 @@ export function buildManualReadingPayloads(args: {
       value: m.value,
       source: "manual",
       ts,
+      captured_at: ts,
       quality: "ok",
     };
     if (deviceId) row.device_id = deviceId;

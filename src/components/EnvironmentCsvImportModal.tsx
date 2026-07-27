@@ -40,6 +40,7 @@ import {
   CSV_IMPORT_HISTORICAL_CONTEXT_NOTE,
   CSV_IMPORT_READING_COPY,
   CSV_IMPORT_VIEW_HISTORY_LABEL,
+  buildCsvImportFailureMessage,
   formatCsvPreviewRow,
 } from "@/lib/environmentCsvPreviewCopyRules";
 
@@ -51,6 +52,8 @@ export interface EnvironmentCsvImportModalProps {
     /** Rows skipped as duplicates (same file or already imported). Optional
      *  for callers that predate duplicate-aware import. */
     duplicateCount?: number;
+    /** Earlier atomic batches committed before a later batch failed. */
+    partialWrite?: boolean;
     error: string | null;
   }>;
   /**
@@ -123,7 +126,10 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
         ...prev,
         phase: "error",
         errorCode: "insert_failed",
-        errorMessage: res.error,
+        errorMessage: null,
+        insertedCount: res.insertedCount,
+        duplicateCount: res.duplicateCount ?? 0,
+        partialWrite: res.partialWrite === true || res.insertedCount > 0,
       }));
       return;
     }
@@ -275,7 +281,9 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
           <div data-testid="csv-import-error" className="space-y-2">
             <p className="text-sm text-destructive">
               {(state.errorCode && ERROR_COPY[state.errorCode]) ||
-                state.errorMessage ||
+                (state.errorCode === "insert_failed"
+                  ? buildCsvImportFailureMessage(state.insertedCount, state.partialWrite)
+                  : state.errorMessage) ||
                 "Something went wrong."}
             </p>
             <DialogFooter>

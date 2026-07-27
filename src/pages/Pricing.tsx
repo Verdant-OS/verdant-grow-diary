@@ -98,11 +98,11 @@ const COMPARISON_ROWS: Row[] = [
   { label: "Photo logs", free: true, pro: true, craft: true, founder: true },
   { label: "Manual sensor snapshots", free: true, pro: true, craft: true, founder: true },
   {
-    label: "Timeline history",
-    free: "Basic",
-    pro: "Extended",
-    craft: "Extended",
-    founder: "Extended",
+    label: "Diary & timeline history",
+    free: "Kept forever",
+    pro: "Kept forever",
+    craft: "Kept forever",
+    founder: "Kept forever",
   },
   {
     label: "Cultivation calendar (history-aware)",
@@ -134,10 +134,15 @@ const COMPARISON_ROWS: Row[] = [
     craft: true,
     founder: true,
   },
-  { label: "Sensor snapshot history", free: false, pro: true, craft: true, founder: true },
-  { label: "Better timeline filtering", free: false, pro: true, craft: true, founder: true },
   {
-    label: "Future Pro features as they stabilize",
+    label: "Sensor snapshot history",
+    free: "90 days",
+    pro: "Full history",
+    craft: "Full history",
+    founder: "Full history",
+  },
+  {
+    label: "Advanced timeline filtering & jump tools",
     free: false,
     pro: true,
     craft: true,
@@ -315,7 +320,7 @@ export default function Pricing() {
   usePageSeo({
     title: "Pricing — Free, Pro & Craft | Verdant Grow Diary",
     description:
-      "Free grow diary forever. Pro adds multi-tent support, sensor history and advanced exports. Craft adds the live Pro Blueprint that scores every reading against your per-stage SOP.",
+      "Free grow diary forever. Pro adds multi-tent support, full sensor history, advanced timeline tools and advanced exports. Craft adds the live Pro Blueprint that scores every reading against your per-stage SOP.",
     path: "/pricing",
   });
 
@@ -390,11 +395,11 @@ export default function Pricing() {
       ],
       [
         "Is the Free tier really free?",
-        "Yes. Plant profiles, the basic grow diary, photo logs, manual notes, the basic timeline, and manual sensor entries are all included on Free. You can run a real grow on Free without paying.",
+        "Yes. Plant profiles, the grow diary and timeline history, photo logs, manual notes, and manual sensor entries are all included on Free. You can run a real grow on Free without paying.",
       ],
       [
         "What do I actually get with Pro?",
-        "Multi-tent support, advanced exports including date-range diary reports, sensor snapshot history, longer grow history, advanced timeline filtering, and post-grow learning reports.",
+        "Multi-tent support, advanced exports including date-range diary reports, full sensor snapshot history, advanced timeline filtering and jump tools, and post-grow learning reports.",
       ],
       [
         "Do I need specific hardware?",
@@ -429,7 +434,7 @@ export default function Pricing() {
           "@type": "Product",
           name: "Verdant Pro",
           description:
-            "Multi-tent grow memory, 100 AI Doctor credits/month, advanced exports, and sensor snapshot history.",
+            "Multi-tent grow memory, 100 AI Doctor credits/month, advanced exports, and full sensor snapshot history.",
           brand: { "@type": "Brand", name: "Verdant Grow Diary" },
           offers: [
             {
@@ -1042,7 +1047,8 @@ export default function Pricing() {
             : "Compare Free, Pro and Craft"}
         </h2>
         <p className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto">
-          Free is genuinely useful for starting a grow diary. Pro adds deeper history, advanced
+          Free is genuinely useful for starting a grow diary, with diary and timeline history kept
+          forever. Pro adds full sensor history, advanced filtering and jump tools, advanced
           exports, and multi-tent support. Craft adds the live Pro Blueprint that scores every
           reading against your per-stage SOP. Founder Lifetime is a limited early-supporter offer
           that includes full Pro access and the Pro Blueprint.
@@ -1138,18 +1144,18 @@ export default function Pricing() {
           <AccordionItem value="free-forever">
             <AccordionTrigger>Is the Free tier really free?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              Yes. Plant profiles, the basic grow diary, photo logs, manual notes, the basic
-              timeline, and manual sensor entries are all included on Free. You can run a real grow
-              on Free without paying.
+              Yes. Plant profiles, the grow diary and timeline history, photo logs, manual notes,
+              and manual sensor entries are all included on Free. You can run a real grow on Free
+              without paying.
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="pro-what">
             <AccordionTrigger>What do I actually get with Pro?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              Multi-tent support, advanced exports including date-range diary reports, sensor
-              snapshot history, longer grow history, advanced timeline filtering, and post-grow
-              learning reports. Pro features ship over time, only as they stabilize.
+              Multi-tent support, advanced exports including date-range diary reports, full sensor
+              snapshot history, advanced timeline filtering and jump tools, and post-grow learning
+              reports.
             </AccordionContent>
           </AccordionItem>
 

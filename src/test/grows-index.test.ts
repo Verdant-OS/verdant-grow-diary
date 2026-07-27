@@ -57,6 +57,19 @@ describe("Grows index page", () => {
     expect(PAGE).toMatch(/g\.is_archived[\s\S]{0,200}archived/);
   });
 
+  it("reports archive persistence failures before refreshing or claiming success", () => {
+    const archiveBody = PAGE.match(/async function archive\([\s\S]*?\n {2}\}/)?.[0];
+    expect(archiveBody).toBeTruthy();
+    expect(archiveBody).toMatch(/\{\s*error:\s*archiveError\s*\}/);
+    expect(archiveBody).toMatch(/if\s*\(archiveError\)/);
+    expect(archiveBody!.indexOf("if (archiveError)")).toBeLessThan(
+      archiveBody!.indexOf("await refresh()"),
+    );
+    expect(archiveBody!.indexOf("await refresh()")).toBeLessThan(
+      archiveBody!.indexOf('toast.success("Archived")'),
+    );
+  });
+
   it("introduces no ai-coach call", () => {
     expect(PAGE).not.toMatch(/["']ai-coach["']/);
     expect(PAGE).not.toMatch(/functions\.invoke/);

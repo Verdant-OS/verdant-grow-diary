@@ -11,6 +11,7 @@
  *  - Missing / malformed input must not crash — empty state is preserved.
  */
 import { useMemo, useState, useCallback, useRef, useEffect } from "react";
+import { flushSync } from "react-dom";
 import type { DiagnosisResult } from "@/lib/aiDoctorEngine";
 import {
   adaptDiagnosisResultToViewModel,
@@ -51,10 +52,8 @@ import {
   PREMIUM_EXPORT_PAYWALL_COPY,
 } from "@/hooks/usePremiumExportServerGate";
 
-export const AI_DOCTOR_DIAGNOSIS_EMPTY_COPY =
-  "No AI Doctor 2.0 diagnosis available yet.";
-export const AI_DOCTOR_DIAGNOSIS_LOADING_COPY =
-  "Preparing AI Doctor 2.0 diagnosis…";
+export const AI_DOCTOR_DIAGNOSIS_EMPTY_COPY = "No AI Doctor 2.0 diagnosis available yet.";
+export const AI_DOCTOR_DIAGNOSIS_LOADING_COPY = "Preparing AI Doctor 2.0 diagnosis…";
 export const AI_DOCTOR_DIAGNOSIS_FALLBACK_CONFIDENCE_COPY =
   "Automated confidence is using a conservative fallback.";
 export const AI_DOCTOR_DIAGNOSIS_REVIEW_FIRST_COPY =
@@ -107,9 +106,7 @@ export default function AiDoctorDiagnosisPanel({
     evidenceAlignment.posture === "insufficient_context";
   const [basisOpen, setBasisOpen] = useState<boolean>(postureDefaultsOpen);
 
-  const [activeCitation, setActiveCitation] = useState<EvidenceCitation | null>(
-    null,
-  );
+  const [activeCitation, setActiveCitation] = useState<EvidenceCitation | null>(null);
   const citationTriggerRef = useRef<HTMLButtonElement | null>(null);
   const handleOpenCitation = useCallback(
     (c: EvidenceCitation, trigger: HTMLButtonElement | null) => {
@@ -154,18 +151,14 @@ export default function AiDoctorDiagnosisPanel({
   }, [view, citedRecs]);
 
   const [packageMessage, setPackageMessage] = useState<string | null>(null);
-  const [pendingExport, setPendingExport] = useState<
-    null | "report" | "csv" | "package"
-  >(null);
+  const [pendingExport, setPendingExport] = useState<null | "report" | "csv" | "package">(null);
+  const [printAuthorized, setPrintAuthorized] = useState(false);
   const exportInFlightRef = useRef(false);
 
   const runGated = useCallback(
     async (
       kind: "report" | "csv" | "package",
-      feature:
-        | "ai_doctor_report"
-        | "ai_doctor_evidence_csv"
-        | "ai_doctor_report_package",
+      feature: "ai_doctor_report" | "ai_doctor_evidence_csv" | "ai_doctor_report_package",
       onAllowed: () => Promise<void> | void,
     ) => {
       if (exportInFlightRef.current) return;
@@ -203,6 +196,24 @@ export default function AiDoctorDiagnosisPanel({
     });
   }, [view, reportInput, buildRecsForReport, runGated]);
 
+  const handlePrintReport = useCallback(async () => {
+    if (!view || !reportInput) return;
+    await runGated("report", "ai_doctor_report", () => {
+      if (typeof window === "undefined") return;
+      try {
+        // The global print stylesheet hides this preview unless the
+        // server-authorized path marks it printable. flushSync guarantees
+        // Chrome snapshots the authorized DOM before opening Print.
+        flushSync(() => setPrintAuthorized(true));
+        window.print();
+      } catch {
+        /* ignore — print is best-effort after the entitlement preflight */
+      } finally {
+        flushSync(() => setPrintAuthorized(false));
+      }
+    });
+  }, [view, reportInput, runGated]);
+
   const handleDownloadCsv = useCallback(async () => {
     if (!view || !reportInput) return;
     await runGated("csv", "ai_doctor_evidence_csv", () => {
@@ -228,10 +239,11 @@ export default function AiDoctorDiagnosisPanel({
     const full = buildFullReportInput();
     if (!full) return;
     await runGated("package", "ai_doctor_report_package", async () => {
-      let zipCtor: any = null;
+      let zipCtor: NonNullable<Parameters<typeof downloadAiDoctorReportPackage>[1]>["zipCtor"] =
+        null;
       try {
         const mod = await import("jszip");
-        zipCtor = (mod as any).default ?? (mod as any).JSZip ?? null;
+        zipCtor = mod.default;
       } catch {
         zipCtor = null;
       }
@@ -241,6 +253,10 @@ export default function AiDoctorDiagnosisPanel({
   }, [buildFullReportInput, runGated]);
 
   const [previewOpen, setPreviewOpen] = useState<boolean>(false);
+  const handleClosePreview = useCallback(() => {
+    if (pendingExport !== null) return;
+    setPreviewOpen(false);
+  }, [pendingExport]);
   const previewInput = useMemo(
     () => (previewOpen ? buildFullReportInput() : null),
     [previewOpen, buildFullReportInput],
@@ -265,8 +281,8 @@ export default function AiDoctorDiagnosisPanel({
         label: isDerivedVpd
           ? "Derived VPD context"
           : m.statusLabel === "Accepted"
-          ? `Env Check: ${m.key}`
-          : `Env Check (weak): ${m.key}`,
+            ? `Env Check: ${m.key}`
+            : `Env Check (weak): ${m.key}`,
         metricKey: m.key,
         status: m.statusLabel,
         sourceLabel: "Test/Local validation",
@@ -274,8 +290,8 @@ export default function AiDoctorDiagnosisPanel({
         citationKind: isDerivedVpd
           ? "env_metric_derived"
           : m.statusLabel === "Accepted"
-          ? "env_metric"
-          : "env_metric_weak",
+            ? "env_metric"
+            : "env_metric_weak",
       });
     });
     citationContext.missingMetrics.forEach((k) => {
@@ -309,16 +325,12 @@ export default function AiDoctorDiagnosisPanel({
         <p
           className="text-xs text-muted-foreground"
           data-testid={
-            isLoading
-              ? tid("ai-doctor-diagnosis-loading")
-              : tid("ai-doctor-diagnosis-empty")
+            isLoading ? tid("ai-doctor-diagnosis-loading") : tid("ai-doctor-diagnosis-empty")
           }
           role={isLoading ? "status" : undefined}
           aria-live={isLoading ? "polite" : undefined}
         >
-          {isLoading
-            ? AI_DOCTOR_DIAGNOSIS_LOADING_COPY
-            : AI_DOCTOR_DIAGNOSIS_EMPTY_COPY}
+          {isLoading ? AI_DOCTOR_DIAGNOSIS_LOADING_COPY : AI_DOCTOR_DIAGNOSIS_EMPTY_COPY}
         </p>
       </section>
     );
@@ -352,10 +364,7 @@ export default function AiDoctorDiagnosisPanel({
         </span>
       </header>
 
-      <p
-        className="text-sm"
-        data-testid={tid("ai-doctor-diagnosis-summary")}
-      >
+      <p className="text-sm" data-testid={tid("ai-doctor-diagnosis-summary")}>
         {view.summary}
       </p>
 
@@ -380,9 +389,7 @@ export default function AiDoctorDiagnosisPanel({
           className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs space-y-1"
           data-testid={tid("ai-doctor-diagnosis-conflicts")}
         >
-          <p className="font-semibold text-amber-200">
-            Conflicts detected
-          </p>
+          <p className="font-semibold text-amber-200">Conflicts detected</p>
           <ul className="list-disc pl-4 space-y-0.5">
             {view.confidence.conflicts.map((c, i) => (
               <li
@@ -412,10 +419,7 @@ export default function AiDoctorDiagnosisPanel({
           role="region"
         >
           <div className="flex flex-wrap items-center gap-2">
-            <h3
-              id={tid("ai-doctor-diagnosis-evidence-heading")}
-              className="text-xs font-semibold"
-            >
+            <h3 id={tid("ai-doctor-diagnosis-evidence-heading")} className="text-xs font-semibold">
               Evidence basis
             </h3>
             <span
@@ -607,14 +611,10 @@ export default function AiDoctorDiagnosisPanel({
           data-testid={tid("ai-doctor-diagnosis-audit-raw-model-confidence")}
           data-raw-model-confidence={view.audit.raw_model_confidence_level}
         >
-          Raw model confidence (not used as final):{" "}
-          {view.audit.raw_model_confidence_level}
+          Raw model confidence (not used as final): {view.audit.raw_model_confidence_level}
         </p>
         {view.audit.automated_downgraded_model ? (
-          <p
-            className="mt-0.5"
-            data-testid={tid("ai-doctor-diagnosis-audit-downgrade")}
-          >
+          <p className="mt-0.5" data-testid={tid("ai-doctor-diagnosis-audit-downgrade")}>
             Automated layer downgraded the raw model confidence.
           </p>
         ) : null}
@@ -640,9 +640,12 @@ export default function AiDoctorDiagnosisPanel({
       {previewOpen && previewInput ? (
         <ReportPreviewPanel
           input={previewInput}
-          onClose={() => setPreviewOpen(false)}
+          onClose={handleClosePreview}
+          onPrint={handlePrintReport}
           onDownloadPdf={handleDownloadReport}
           onDownloadCsv={handleDownloadCsv}
+          exportPending={pendingExport !== null}
+          printAuthorized={printAuthorized}
           testId={tid("ai-doctor-diagnosis-preview")}
         />
       ) : null}
@@ -669,8 +672,7 @@ function CitationDetailModal({
   searchItems: readonly EvidenceSearchItem[];
   testId: string;
 }) {
-  const [selectedCitation, setSelectedCitation] =
-    useState<EvidenceCitation>(citation);
+  const [selectedCitation, setSelectedCitation] = useState<EvidenceCitation>(citation);
   // Reset selection when triggering citation changes (new open).
   useEffect(() => setSelectedCitation(citation), [citation]);
 
@@ -704,9 +706,7 @@ function CitationDetailModal({
 
   const breadcrumb =
     `AI Doctor › ${postureLabel}` +
-    (recommendationIndex != null
-      ? ` › Recommendation ${recommendationIndex + 1}`
-      : "") +
+    (recommendationIndex != null ? ` › Recommendation ${recommendationIndex + 1}` : "") +
     ` › ${detail.citation.label}`;
 
   function handleSelectSearchItem(item: EvidenceSearchItem) {
@@ -744,10 +744,7 @@ function CitationDetailModal({
           {breadcrumb}
         </nav>
         <div className="flex items-start justify-between gap-2">
-          <h3
-            className="text-sm font-semibold"
-            data-testid={`${testId}-label`}
-          >
+          <h3 className="text-sm font-semibold" data-testid={`${testId}-label`}>
             {detail.citation.label}
           </h3>
           <div className="flex items-center gap-1">
@@ -773,10 +770,7 @@ function CitationDetailModal({
           </div>
         </div>
 
-        <label
-          htmlFor={`${testId}-search`}
-          className="block text-[11px] font-medium"
-        >
+        <label htmlFor={`${testId}-search`} className="block text-[11px] font-medium">
           {EVIDENCE_SEARCH_INPUT_LABEL}
         </label>
         <input
@@ -811,33 +805,20 @@ function CitationDetailModal({
                 >
                   <span className="font-medium">{it.label}</span>
                   {it.metricKey ? (
-                    <span className="text-muted-foreground">
-                      {" "}
-                      · {it.metricKey}
-                    </span>
+                    <span className="text-muted-foreground"> · {it.metricKey}</span>
                   ) : null}
-                  {it.status ? (
-                    <span className="text-muted-foreground"> · {it.status}</span>
-                  ) : null}
+                  {it.status ? <span className="text-muted-foreground"> · {it.status}</span> : null}
                   {it.sourceLabel ? (
-                    <span className="text-muted-foreground">
-                      {" "}
-                      · {it.sourceLabel}
-                    </span>
+                    <span className="text-muted-foreground"> · {it.sourceLabel}</span>
                   ) : null}
-                  {it.reason ? (
-                    <span className="text-muted-foreground"> — {it.reason}</span>
-                  ) : null}
+                  {it.reason ? <span className="text-muted-foreground"> — {it.reason}</span> : null}
                 </button>
               </li>
             ))
           )}
         </ul>
 
-        <dl
-          className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1"
-          data-testid={`${testId}-details`}
-        >
+        <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1" data-testid={`${testId}-details`}>
           <dt className="text-muted-foreground">Evidence type</dt>
           <dd data-testid={`${testId}-kind`}>{detail.kindLabel}</dd>
           <dt className="text-muted-foreground">Source</dt>
@@ -873,10 +854,7 @@ function CitationDetailModal({
             </>
           ) : null}
         </dl>
-        <p
-          className="text-[11px] text-muted-foreground"
-          data-testid={`${testId}-honesty`}
-        >
+        <p className="text-[11px] text-muted-foreground" data-testid={`${testId}-honesty`}>
           {detail.sourceHonestyNote}
         </p>
         <div className="flex justify-end gap-2 pt-1">
@@ -905,20 +883,23 @@ function safeSlug(s: string): string {
 function ReportPreviewPanel({
   input,
   onClose,
+  onPrint,
   onDownloadPdf,
   onDownloadCsv,
+  exportPending,
+  printAuthorized,
   testId,
 }: {
   input: AiDoctorReportInput;
   onClose: () => void;
-  onDownloadPdf: () => void;
-  onDownloadCsv: () => void;
+  onPrint: () => void | Promise<void>;
+  onDownloadPdf: () => void | Promise<void>;
+  onDownloadCsv: () => void | Promise<void>;
+  exportPending: boolean;
+  printAuthorized: boolean;
   testId: string;
 }) {
-  const metricRows: PerMetricReportRow[] = useMemo(
-    () => buildPerMetricStatusTable(input),
-    [input],
-  );
+  const metricRows: PerMetricReportRow[] = useMemo(() => buildPerMetricStatusTable(input), [input]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -931,20 +912,12 @@ function ReportPreviewPanel({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  function handlePrint() {
-    if (typeof window === "undefined") return;
-    try {
-      window.print();
-    } catch {
-      /* ignore — print is best-effort, client-side only */
-    }
-  }
-
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-label="AI Doctor report preview"
+      aria-busy={exportPending}
       data-testid={testId}
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 overflow-auto"
       onClick={onClose}
@@ -953,43 +926,49 @@ function ReportPreviewPanel({
         onClick={(e) => e.stopPropagation()}
         className="max-w-2xl w-full bg-background text-foreground border border-border rounded-lg p-6 space-y-4 print:max-w-none print:border-0 print:p-0"
         data-testid={`${testId}-body`}
+        data-print-section={printAuthorized ? "ai-doctor-report" : undefined}
       >
         <header className="flex items-start justify-between gap-2 print:hidden">
           <h2 className="text-base font-semibold">AI Doctor — Report preview</h2>
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={handlePrint}
+              onClick={onPrint}
+              disabled={exportPending}
+              aria-busy={exportPending}
               data-testid={`${testId}-print`}
               aria-label="Print AI Doctor Report"
-              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
             >
               Print
             </button>
             <button
               type="button"
               onClick={onDownloadPdf}
+              disabled={exportPending}
               data-testid={`${testId}-pdf`}
               aria-label="Download PDF"
-              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
             >
               Download PDF
             </button>
             <button
               type="button"
               onClick={onDownloadCsv}
+              disabled={exportPending}
               data-testid={`${testId}-csv`}
               aria-label="Download Evidence CSV"
-              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
             >
               Download Evidence CSV
             </button>
             <button
               type="button"
               onClick={onClose}
+              disabled={exportPending}
               data-testid={`${testId}-close`}
               aria-label="Close preview"
-              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
             >
               Close
             </button>
@@ -998,10 +977,7 @@ function ReportPreviewPanel({
 
         <section>
           <h3 className="text-sm font-semibold">Diagnosis summary</h3>
-          <p
-            className="text-sm"
-            data-testid={`${testId}-summary`}
-          >
+          <p className="text-sm" data-testid={`${testId}-summary`}>
             {input.summary || "(no summary)"}
           </p>
         </section>
@@ -1013,16 +989,11 @@ function ReportPreviewPanel({
             </h3>
             <p className="text-xs">{input.alignment.postureCopy}</p>
             <h4 className="text-xs font-semibold mt-2">Evidence basis</h4>
-            <ul
-              className="list-disc pl-4 text-xs"
-              data-testid={`${testId}-basis`}
-            >
+            <ul className="list-disc pl-4 text-xs" data-testid={`${testId}-basis`}>
               {input.alignment.basisCopy.length === 0 ? (
                 <li>(no basis lines)</li>
               ) : (
-                input.alignment.basisCopy.map((b, i) => (
-                  <li key={`${i}-${b}`}>{b}</li>
-                ))
+                input.alignment.basisCopy.map((b, i) => <li key={`${i}-${b}`}>{b}</li>)
               )}
             </ul>
           </section>
@@ -1040,9 +1011,7 @@ function ReportPreviewPanel({
               input.recommendations.map((r, i) => (
                 <li key={i}>
                   <span>{r.text}</span>{" "}
-                  <span className="text-muted-foreground">
-                    [{r.citation.label}]
-                  </span>
+                  <span className="text-muted-foreground">[{r.citation.label}]</span>
                 </li>
               ))
             )}
@@ -1067,10 +1036,7 @@ function ReportPreviewPanel({
             </thead>
             <tbody>
               {metricRows.map((r) => (
-                <tr
-                  key={r.metric}
-                  data-testid={`${testId}-metric-row-${r.metric}`}
-                >
+                <tr key={r.metric} data-testid={`${testId}-metric-row-${r.metric}`}>
                   <td className="px-2 py-1">{r.metric}</td>
                   <td className="px-2 py-1">{r.status}</td>
                   <td className="px-2 py-1">{r.citationType}</td>
@@ -1086,10 +1052,7 @@ function ReportPreviewPanel({
         {input.checklist.length > 0 ? (
           <section>
             <h3 className="text-sm font-semibold">More Data Needed</h3>
-            <ul
-              className="text-xs space-y-0.5"
-              data-testid={`${testId}-checklist`}
-            >
+            <ul className="text-xs space-y-0.5" data-testid={`${testId}-checklist`}>
               {input.checklist.map((c) => (
                 <li key={c.key}>
                   {c.state === "complete" ? "[x] " : "[ ] "}
@@ -1104,14 +1067,10 @@ function ReportPreviewPanel({
           className="text-[11px] text-muted-foreground border-t border-border/60 pt-2 space-y-0.5"
           data-testid={`${testId}-honesty`}
         >
-          <p>
-            Source honesty: Local Environment Check evidence is not live
-            telemetry.
-          </p>
+          <p>Source honesty: Local Environment Check evidence is not live telemetry.</p>
           <p>Derived VPD is context only — not a raw sensor reading.</p>
           <p>
-            Weak evidence should not drive aggressive nutrient, irrigation, or
-            equipment changes.
+            Weak evidence should not drive aggressive nutrient, irrigation, or equipment changes.
           </p>
           <p>Generated: {input.generatedAt}</p>
         </footer>
@@ -1154,10 +1113,7 @@ function CitedSection({
     citation: EvidenceCitation;
   }>;
   testId: string;
-  onOpenCitation: (
-    c: EvidenceCitation,
-    trigger: HTMLButtonElement | null,
-  ) => void;
+  onOpenCitation: (c: EvidenceCitation, trigger: HTMLButtonElement | null) => void;
 }) {
   if (!items || items.length === 0) return null;
   return (
@@ -1175,12 +1131,7 @@ function CitedSection({
               data-citation-target={it.citation.targetId}
               aria-label={it.citation.ariaLabel}
               aria-haspopup="dialog"
-              onClick={(e) =>
-                onOpenCitation(
-                  it.citation,
-                  e.currentTarget as HTMLButtonElement,
-                )
-              }
+              onClick={(e) => onOpenCitation(it.citation, e.currentTarget as HTMLButtonElement)}
               className={
                 "inline-flex items-center rounded border px-1 py-0 text-[10px] font-medium align-middle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 " +
                 (it.citation.healthy

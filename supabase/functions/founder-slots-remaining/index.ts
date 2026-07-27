@@ -78,25 +78,41 @@ interface Deps {
 }
 
 let depsPromise: Promise<Deps> | null = null;
+let depsLoaderOverride: (() => Promise<Deps>) | null = null;
+
+/**
+ * Test-only hook. Lets suites simulate module-load/import failures
+ * (bad npm subpath, network hiccup, ESM parse error) without having to
+ * actually break the real dynamic imports. Pass `null` to restore the
+ * default behavior.
+ */
+export function __setDepsLoaderForTesting(
+  loader: (() => Promise<Deps>) | null,
+): void {
+  depsLoaderOverride = loader;
+  depsPromise = null;
+}
 
 function loadDeps(): Promise<Deps> {
   if (depsPromise) return depsPromise;
+  const loader = depsLoaderOverride ?? (async () => {
+    const [{ createClient }, { buildFounderSlotsPayload }] = await Promise.all([
+      import("npm:@supabase/supabase-js@2"),
+      import("./contract.ts"),
+    ]);
+    return { createClient, buildFounderSlotsPayload };
+  });
   depsPromise = (async () => {
     try {
-      const [{ createClient }, { buildFounderSlotsPayload }] = await Promise.all([
-        import("npm:@supabase/supabase-js@2"),
-        import("./contract.ts"),
-      ]);
+      const deps = await loader();
       log({ event: "startup_imports_loaded", severity: "info" });
-      return { createClient, buildFounderSlotsPayload };
+      return deps;
     } catch (err) {
       // Reset so a transient failure (e.g. cold-boot registry blip) can
       // retry on the next request instead of pinning the failure state.
       depsPromise = null;
       const message = err instanceof Error ? err.message : String(err);
       const name = err instanceof Error ? err.name : "UnknownError";
-      // Counter is defined below in the metrics block; the reference
-      // resolves at call-time (post-boot), so incrementing here is safe.
       counters.startup_import_failed = (counters.startup_import_failed ?? 0) + 1;
       log({
         event: "startup_import_failed",
@@ -109,6 +125,7 @@ function loadDeps(): Promise<Deps> {
   })();
   return depsPromise;
 }
+
 
 log({ event: "boot", severity: "info" });
 

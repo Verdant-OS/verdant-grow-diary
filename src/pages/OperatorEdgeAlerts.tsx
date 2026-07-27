@@ -753,7 +753,20 @@ export default function OperatorEdgeAlerts() {
                 </TableHeader>
                 <TableBody>
                   {pagedDispatches.map((r) => (
-                    <TableRow key={`${r.fn}::${r.metric}`}>
+                    <TableRow
+                      key={`${r.fn}::${r.metric}`}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => openDrilldown(r.fn, r.metric)}
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`View breach details for ${r.fn} ${r.metric}`}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          openDrilldown(r.fn, r.metric);
+                        }
+                      }}
+                    >
                       <TableCell className="font-mono text-xs">{r.fn}</TableCell>
                       <TableCell>{metricLabel(r.metric)}</TableCell>
                       <TableCell className="text-right">{r.fire_count ?? "—"}</TableCell>

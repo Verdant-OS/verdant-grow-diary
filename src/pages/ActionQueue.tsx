@@ -1029,49 +1029,7 @@ export default function ActionQueue() {
           icon={<ListChecks className="h-5 w-5" aria-hidden="true" />}
           actions={
             <div className="flex items-center gap-2">
-              {(() => {
-                const pillClass =
-                  rpcAvailability === "unavailable"
-                    ? "border-destructive/40 bg-destructive/10 text-destructive"
-                    : rpcAvailability === "available"
-                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                      : "border-muted-foreground/30 bg-muted/40 text-muted-foreground";
-                const pillTitle =
-                  rpcAvailability === "unavailable"
-                    ? ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.title
-                    : rpcAvailability === "available"
-                      ? ACTION_QUEUE_TRANSITION_RPC_AVAILABLE_COPY.title
-                      : ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY.title;
-                const pillLabel =
-                  rpcAvailability === "unavailable"
-                    ? "Transitions unavailable"
-                    : rpcAvailability === "available"
-                      ? ACTION_QUEUE_TRANSITION_RPC_AVAILABLE_COPY.label
-                      : ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY.label;
-                return (
-                  <span
-                    role="status"
-                    aria-live="polite"
-                    aria-busy={rpcAvailability === "unknown"}
-                    data-testid="action-queue-transition-rpc-status-pill"
-                    data-state={rpcAvailability}
-                    title={pillTitle}
-                    className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${pillClass}`}
-                  >
-                    {rpcAvailability === "unavailable" ? (
-                      <AlertTriangle className="h-3 w-3" aria-hidden="true" />
-                    ) : rpcAvailability === "available" ? (
-                      <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
-                    ) : (
-                      <Loader2
-                        className="h-3 w-3 animate-spin"
-                        aria-hidden="true"
-                      />
-                    )}
-                    <span>{pillLabel}</span>
-                  </span>
-                );
-              })()}
+              <ActionQueueRpcStatusPill availability={rpcAvailability} />
               <Button
                 size="sm"
                 variant="ghost"

@@ -1,4 +1,4 @@
-name: TypeScript typecheck
+name: Paddle preflight renderer tests
 
 on:
   pull_request:
@@ -6,10 +6,10 @@ on:
     branches: [main]
 
 jobs:
-  typecheck:
-    name: tsc --noEmit
+  renderer-tests:
+    name: node --test (renderer)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -29,5 +29,8 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: TypeScript typecheck (app)
-        run: bun run typecheck
+      # Full renderer suite for scripts/render-paddle-craft-preflight-comment.mjs.
+      # Runs `node --test` (no vitest) so it can't hang the full-suite runner,
+      # and fails the build on any regression in the comment/verdict rules.
+      - name: Run renderer test suite
+        run: bun run test:paddle-craft-preflight-renderer

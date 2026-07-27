@@ -1,4 +1,4 @@
-name: TypeScript typecheck
+name: ESLint
 
 on:
   pull_request:
@@ -6,8 +6,8 @@ on:
     branches: [main]
 
 jobs:
-  typecheck:
-    name: tsc --noEmit
+  lint:
+    name: eslint
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -29,5 +29,5 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: TypeScript typecheck (app)
-        run: bun run typecheck
+      - name: Run ESLint (fail on any error)
+        run: bun run lint

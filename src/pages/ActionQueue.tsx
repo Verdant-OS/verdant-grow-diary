@@ -90,6 +90,12 @@ import {
 } from "@/lib/actionQueueTransitions";
 import { safeActionQueueFailureCopy } from "@/lib/actionQueueFailureCopy";
 import {
+  isMissingActionQueueTransitionRpcError,
+  ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY,
+} from "@/lib/actionQueueRpcAvailability";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertTriangle } from "lucide-react";
+import {
   ACTION_QUEUE_SOURCE_VALUES,
   getActionQueueSourceLabel,
   isAlertDerived,
@@ -415,6 +421,10 @@ export default function ActionQueue() {
     kind: ActionQueueTraceKind;
   } | null>(null);
   const [retryingTrace, setRetryingTrace] = useState(false);
+  // True when the `action_queue_transition` RPC is missing / renamed / not in
+  // the PostgREST schema cache. Surfaces a persistent banner so the grower
+  // isn't stuck retrying an approve/reject that can never land.
+  const [rpcUnavailable, setRpcUnavailable] = useState(false);
 
   // Load existing approve/reject diary trace rows for the open drawer
   // row. Pure read; never inserts.
@@ -731,6 +741,27 @@ export default function ActionQueue() {
     )("action_queue_transition", rpcArgs);
     const result = parseActionQueueTransitionRpcResult(data, rpcArgs);
     if (error || !result || result.ok !== true) {
+      // Distinguish "backend RPC missing" from a normal transient failure so
+      // the grower gets a persistent, accurate banner instead of a looping
+      // generic toast.
+      if (isMissingActionQueueTransitionRpcError(error)) {
+        setRpcUnavailable(true);
+        console.warn(
+          JSON.stringify({
+            event: "action_queue_transition_rpc_unavailable",
+            severity: "critical",
+            surface: "action_queue",
+            transition: kind,
+          }),
+        );
+        toast.error(ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.title, {
+          id: "action-queue-transition-rpc-unavailable",
+          description: ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.body,
+          duration: 10000,
+        });
+        setBusyId(null);
+        return false;
+      }
       const shouldReload =
         result?.ok === false &&
         (result.reason === "status_conflict" || result.reason === "action_not_found");
@@ -750,6 +781,8 @@ export default function ActionQueue() {
       else setTraceFailure((prev) => (prev?.actionId === row.id ? null : prev));
     }
     setBusyId(null);
+    // Successful transition proves the RPC is reachable again.
+    if (rpcUnavailable) setRpcUnavailable(false);
     await load();
     if (drawerRow && drawerRow.id === row.id) {
       await loadDrawerHistory(row);
@@ -931,6 +964,31 @@ export default function ActionQueue() {
         current="Action Queue"
         section="actions"
       />
+      {rpcUnavailable && (
+        <Alert
+          variant="destructive"
+          className="mb-4"
+          role="alert"
+          data-testid="action-queue-transition-rpc-unavailable-banner"
+        >
+          <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+          <AlertTitle>{ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.title}</AlertTitle>
+          <AlertDescription className="mt-1 space-y-2">
+            <p>{ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.body}</p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setRpcUnavailable(false);
+                void load();
+              }}
+              data-testid="action-queue-transition-rpc-unavailable-retry"
+            >
+              Refresh queue
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
       {/*
         One-Tent Loop landing framing. Presenter-only. Makes the /actions
         surface read clearly as the approval-required Action Queue step.

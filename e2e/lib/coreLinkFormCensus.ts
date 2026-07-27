@@ -1,0 +1,402 @@
+export type FieldExercisePolicy = "fill-safe-fields" | "audit-only";
+
+export type CoreCensusRoute = {
+  path: string;
+  expectedPathname?: string;
+  label: string;
+  fieldPolicy: FieldExercisePolicy;
+};
+
+export const PRIVILEGED_ROUTE_PREFIXES = [
+  "/admin",
+  "/diagnostics",
+  "/ingest-inspector",
+  "/internal",
+  "/leads",
+  "/one-tent-loop-proof",
+  "/operator",
+  "/pi-ingest-status",
+  "/sensors/ecowitt-audit",
+  "/sensors/ingest-normalizer",
+  "/demo/one-tent-live-proof",
+] as const;
+
+export const PUBLIC_CORE_CENSUS_ROUTES = [
+  { path: "/welcome", label: "Welcome", fieldPolicy: "audit-only" },
+  { path: "/auth", label: "Authentication", fieldPolicy: "fill-safe-fields" },
+  { path: "/pricing", label: "Pricing", fieldPolicy: "audit-only" },
+  { path: "/founder", label: "Founder Lifetime", fieldPolicy: "fill-safe-fields" },
+  {
+    path: "/checkout/success",
+    label: "Checkout success return",
+    fieldPolicy: "audit-only",
+  },
+  {
+    path: "/checkout/cancel",
+    label: "Checkout cancellation return",
+    fieldPolicy: "audit-only",
+  },
+  { path: "/contact", label: "Contact", fieldPolicy: "fill-safe-fields" },
+  { path: "/feedback", label: "Feedback", fieldPolicy: "fill-safe-fields" },
+  { path: "/cultivars", label: "Cultivar library", fieldPolicy: "fill-safe-fields" },
+  {
+    path: "/cultivars/sour-stomper",
+    label: "Cultivar detail",
+    fieldPolicy: "fill-safe-fields",
+  },
+  { path: "/guides", label: "Grower guides", fieldPolicy: "audit-only" },
+  {
+    path: "/guides/cronk-nutrients-grow-diary",
+    label: "CRONK nutrient diary guide",
+    fieldPolicy: "audit-only",
+  },
+  {
+    path: "/guides/grow-stage-care-guide",
+    label: "Grow-stage care guide",
+    fieldPolicy: "fill-safe-fields",
+  },
+  {
+    path: "/hardware-integrations",
+    label: "Hardware integrations",
+    fieldPolicy: "audit-only",
+  },
+  {
+    path: "/how-ai-doctor-works",
+    label: "AI Doctor explainer",
+    fieldPolicy: "audit-only",
+  },
+  { path: "/glossary", label: "Glossary", fieldPolicy: "fill-safe-fields" },
+  { path: "/quick-log", label: "Public Quick Log", fieldPolicy: "fill-safe-fields" },
+  {
+    path: "/sensors/csv-preview",
+    label: "Local sensor CSV preview",
+    fieldPolicy: "fill-safe-fields",
+  },
+  {
+    path: "/partners/csv-preview",
+    label: "Partner CSV preview",
+    fieldPolicy: "audit-only",
+  },
+  {
+    path: "/tools/vpd-calculator",
+    label: "VPD calculator",
+    fieldPolicy: "fill-safe-fields",
+  },
+  {
+    path: "/ai-doctor-readiness-check",
+    label: "AI Doctor readiness check",
+    fieldPolicy: "fill-safe-fields",
+  },
+  { path: "/docs/mcp-api", label: "MCP API docs", fieldPolicy: "audit-only" },
+  { path: "/breeder-beta", label: "Breeder beta", fieldPolicy: "fill-safe-fields" },
+  { path: "/creator-beta", label: "Creator beta", fieldPolicy: "fill-safe-fields" },
+  {
+    path: "/pheno-comparison",
+    label: "Public Pheno Comparison",
+    fieldPolicy: "fill-safe-fields",
+  },
+  {
+    path: "/pheno-expression-showcase",
+    label: "Pheno expression showcase",
+    fieldPolicy: "fill-safe-fields",
+  },
+  {
+    path: "/internal/contextual-pheno-comparison-demo",
+    label: "Contextual Pheno Comparison demo",
+    fieldPolicy: "fill-safe-fields",
+  },
+  {
+    path: "/pheno-hunts/55555555-5555-4555-8555-555555555555/compare",
+    label: "Public Pheno Hunt comparison",
+    fieldPolicy: "fill-safe-fields",
+  },
+  {
+    path: "/pheno-hunts/55555555-5555-4555-8555-555555555555/showcase",
+    label: "Public Pheno Hunt showcase",
+    fieldPolicy: "fill-safe-fields",
+  },
+  { path: "/reset-password", label: "Reset password", fieldPolicy: "fill-safe-fields" },
+  { path: "/unsubscribe", label: "Unsubscribe", fieldPolicy: "fill-safe-fields" },
+  { path: "/terms", label: "Terms", fieldPolicy: "audit-only" },
+  { path: "/privacy", label: "Privacy", fieldPolicy: "audit-only" },
+  { path: "/refund", label: "Refund policy", fieldPolicy: "audit-only" },
+] as const satisfies readonly CoreCensusRoute[];
+
+export const AUTHENTICATED_CORE_CENSUS_ROUTES = [
+  { path: "/dashboard", label: "Dashboard", fieldPolicy: "fill-safe-fields" },
+  {
+    path: "/daily-check?plantId=33333333-3333-4333-8333-333333333333&growId=11111111-1111-4111-8111-111111111111",
+    expectedPathname: "/daily-check",
+    label: "Daily Grow Check",
+    fieldPolicy: "fill-safe-fields",
+  },
+  { path: "/grows", label: "My Grows", fieldPolicy: "fill-safe-fields" },
+  { path: "/tents", label: "Tents", fieldPolicy: "fill-safe-fields" },
+  { path: "/plants", label: "Plants", fieldPolicy: "fill-safe-fields" },
+  { path: "/timeline", label: "Timeline", fieldPolicy: "fill-safe-fields" },
+  { path: "/sensors", label: "Sensors", fieldPolicy: "fill-safe-fields" },
+  { path: "/actions", label: "Action Queue", fieldPolicy: "fill-safe-fields" },
+  { path: "/alerts", label: "Alerts", fieldPolicy: "fill-safe-fields" },
+  { path: "/doctor", label: "AI Doctor", fieldPolicy: "fill-safe-fields" },
+  {
+    path: "/doctor/sessions",
+    label: "AI Doctor history",
+    fieldPolicy: "fill-safe-fields",
+  },
+  { path: "/reports", label: "Reports", fieldPolicy: "fill-safe-fields" },
+  {
+    path: "/reports/diary-range",
+    label: "Diary range report",
+    fieldPolicy: "fill-safe-fields",
+  },
+  {
+    path: "/diary/environment-summary",
+    label: "Environment summary",
+    fieldPolicy: "fill-safe-fields",
+  },
+  { path: "/settings", label: "Settings", fieldPolicy: "audit-only" },
+  {
+    path: "/settings/agent-integrations",
+    label: "Agent integrations",
+    fieldPolicy: "audit-only",
+  },
+  {
+    path: "/account/preferences",
+    label: "Account preferences",
+    fieldPolicy: "audit-only",
+  },
+  { path: "/invite", label: "Grower invite", fieldPolicy: "fill-safe-fields" },
+  { path: "/breeding", label: "Breeding programs", fieldPolicy: "fill-safe-fields" },
+  {
+    path: "/breeding/new",
+    label: "New breeding program",
+    fieldPolicy: "fill-safe-fields",
+  },
+  { path: "/genetics", label: "Genetics library", fieldPolicy: "fill-safe-fields" },
+  { path: "/pheno-hunts", label: "Pheno Hunts", fieldPolicy: "fill-safe-fields" },
+  {
+    path: "/pheno-hunts/new?growId=11111111-1111-4111-8111-111111111111&tentId=22222222-2222-4222-8222-222222222222",
+    expectedPathname: "/pheno-hunts/new",
+    label: "New Pheno Hunt",
+    fieldPolicy: "fill-safe-fields",
+  },
+  {
+    path: "/pheno-hunts/55555555-5555-4555-8555-555555555555/workspace",
+    label: "Pheno Hunt workspace",
+    fieldPolicy: "fill-safe-fields",
+  },
+  {
+    path: "/pheno-hunts/55555555-5555-4555-8555-555555555555/keepers",
+    label: "Pheno Hunt keepers",
+    fieldPolicy: "fill-safe-fields",
+  },
+  { path: "/grow-lineage", label: "Grow lineage", fieldPolicy: "audit-only" },
+  { path: "/onboarding", label: "Onboarding", fieldPolicy: "fill-safe-fields" },
+  { path: "/health", label: "App health", fieldPolicy: "audit-only" },
+] as const satisfies readonly CoreCensusRoute[];
+
+export type LinkDisposition =
+  | "navigate"
+  | "excluded-privileged"
+  | "external"
+  | "fragment"
+  | "contact"
+  | "download"
+  | "unsafe"
+  | "unknown-route";
+
+export type LinkClassification = {
+  disposition: LinkDisposition;
+  href: string;
+  pathname?: string;
+  reason?: string;
+};
+
+export type LinkDescriptor = {
+  href: string | null;
+  download?: boolean;
+};
+
+const READ_ONLY_EDGE_FUNCTIONS = new Set([
+  "environment-summary-report-entitlement",
+  "founder-slots-remaining",
+  "premium-export-entitlement",
+]);
+
+export function isReadOnlyEdgeFunction(functionName: string): boolean {
+  return (
+    /^(check-|count-|get-|health|list-|preview-|resolve-|status)/.test(functionName) ||
+    READ_ONLY_EDGE_FUNCTIONS.has(functionName)
+  );
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function routePatternToRegExp(pattern: string): RegExp {
+  const segments = pattern.split("/").map((segment) => {
+    if (segment.startsWith(":")) return "[^/]+";
+    return escapeRegExp(segment);
+  });
+  return new RegExp(`^${segments.join("/")}/?$`);
+}
+
+export function matchesKnownAppRoute(
+  pathname: string,
+  manifestPatterns: readonly string[],
+): boolean {
+  return manifestPatterns
+    .filter((pattern) => pattern !== "*")
+    .some((pattern) => routePatternToRegExp(pattern).test(pathname));
+}
+
+export function isPrivilegedRoute(pathname: string): boolean {
+  return PRIVILEGED_ROUTE_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
+
+export function classifyLink(
+  descriptor: LinkDescriptor,
+  manifestPatterns: readonly string[],
+  appOrigin = "http://localhost:5173",
+): LinkClassification {
+  const href = descriptor.href?.trim() ?? "";
+  if (!href) {
+    return { disposition: "unsafe", href, reason: "empty href" };
+  }
+  if (descriptor.download) {
+    return { disposition: "download", href };
+  }
+  if (href.startsWith("#")) {
+    return { disposition: "fragment", href };
+  }
+  if (/^(mailto|tel):/i.test(href)) {
+    return { disposition: "contact", href };
+  }
+  if (/^(javascript|data|vbscript):/i.test(href)) {
+    return { disposition: "unsafe", href, reason: "unsafe URL scheme" };
+  }
+
+  let target: URL;
+  let origin: URL;
+  try {
+    origin = new URL(appOrigin);
+    target = new URL(href, origin);
+  } catch {
+    return { disposition: "unsafe", href, reason: "malformed URL" };
+  }
+
+  if (!["http:", "https:"].includes(target.protocol)) {
+    return { disposition: "unsafe", href, reason: "unsupported URL scheme" };
+  }
+  if (target.origin !== origin.origin) {
+    return { disposition: "external", href };
+  }
+
+  const pathname = target.pathname;
+  if (isPrivilegedRoute(pathname)) {
+    return { disposition: "excluded-privileged", href, pathname };
+  }
+  if (!matchesKnownAppRoute(pathname, manifestPatterns)) {
+    return {
+      disposition: "unknown-route",
+      href,
+      pathname,
+      reason: "same-origin link does not match the app route manifest",
+    };
+  }
+  return { disposition: "navigate", href, pathname };
+}
+
+export type CensusFieldDescriptor = {
+  type: string;
+  accessibleName: string;
+  min?: string | null;
+  max?: string | null;
+  step?: string | null;
+};
+
+const NON_FILLABLE_FIELD_TYPES = new Set([
+  "button",
+  "checkbox",
+  "color",
+  "file",
+  "hidden",
+  "image",
+  "radio",
+  "range",
+  "reset",
+  "submit",
+]);
+
+export function isSafelyFillableFieldType(type: string): boolean {
+  return !NON_FILLABLE_FIELD_TYPES.has(type.toLowerCase());
+}
+
+function boundedNumberValue(
+  minValue: string | null | undefined,
+  maxValue: string | null | undefined,
+  stepValue: string | null | undefined,
+): string {
+  const min = Number.parseFloat(minValue ?? "");
+  const max = Number.parseFloat(maxValue ?? "");
+  const step = Number.parseFloat(stepValue ?? "");
+  const safeMin = Number.isFinite(min) ? min : 0;
+  const safeStep = Number.isFinite(step) && step > 0 ? step : 1;
+  const candidate = safeMin + safeStep;
+  const bounded = Number.isFinite(max) ? Math.min(candidate, max) : candidate;
+  return String(bounded);
+}
+
+function clampPreferredNumber(
+  preferred: number,
+  minValue: string | null | undefined,
+  maxValue: string | null | undefined,
+): string {
+  const min = Number.parseFloat(minValue ?? "");
+  const max = Number.parseFloat(maxValue ?? "");
+  const lowerBounded = Number.isFinite(min) ? Math.max(preferred, min) : preferred;
+  return String(Number.isFinite(max) ? Math.min(lowerBounded, max) : lowerBounded);
+}
+
+export function placeholderValueForField(field: CensusFieldDescriptor): string {
+  const type = field.type.toLowerCase();
+  const name = field.accessibleName.toLowerCase();
+
+  if (type === "email") return "verdant-census@example.invalid";
+  if (type === "password") return "Verdant-Census-Only-123!";
+  if (type === "tel") return "5550100199";
+  if (type === "url") return "https://example.invalid/verdant-census";
+  if (type === "date") return "2026-07-01";
+  if (type === "datetime-local") return "2026-07-01T12:00";
+  if (type === "month") return "2026-07";
+  if (type === "time") return "12:00";
+  if (type === "week") return "2026-W27";
+  if (type === "number") {
+    if (name.includes("humidity")) return clampPreferredNumber(55, field.min, field.max);
+    if (name.includes("temperature") || name.includes("temp")) {
+      return clampPreferredNumber(75, field.min, field.max);
+    }
+    if (name.includes("ppm")) return clampPreferredNumber(750, field.min, field.max);
+    if (name.includes("ec")) return clampPreferredNumber(1.5, field.min, field.max);
+    if (name.includes("ph")) return clampPreferredNumber(6.3, field.min, field.max);
+    return boundedNumberValue(field.min, field.max, field.step);
+  }
+  if (type === "search" || name.includes("search") || name.includes("filter")) {
+    return "Cronk nutrients";
+  }
+  if (name.includes("email")) return "verdant-census@example.invalid";
+  if (name.includes("name")) return "Verdant Census Grower";
+  if (name.includes("subject")) return "Browser census check";
+  if (
+    name.includes("note") ||
+    name.includes("observation") ||
+    name.includes("message") ||
+    name.includes("feedback")
+  ) {
+    return "Mocked browser census observation. No live data.";
+  }
+  return "Verdant browser census";
+}

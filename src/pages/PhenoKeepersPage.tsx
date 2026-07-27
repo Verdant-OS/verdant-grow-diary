@@ -321,6 +321,7 @@ export default function PhenoKeepersPage() {
         <div className="flex flex-wrap items-center gap-2">
           <select
             data-testid="keepers-promote-plant"
+            aria-label="Candidate to name as keeper"
             value={promotePlant}
             onChange={(e) => setPromotePlant(e.target.value)}
             className="rounded border border-border bg-background px-2 py-1 text-sm"

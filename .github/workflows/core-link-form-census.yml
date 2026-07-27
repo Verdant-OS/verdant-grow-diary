@@ -1,0 +1,101 @@
+name: Core Link and Form Census
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "e2e/core-link-form-census.spec.ts"
+      - "e2e/lib/coreLinkFormCensus.ts"
+      - "playwright.config.ts"
+      - ".github/workflows/core-link-form-census.yml"
+  push:
+    branches:
+      - verdant-grow-diary
+    paths:
+      - "src/**"
+      - "e2e/core-link-form-census.spec.ts"
+      - "e2e/lib/coreLinkFormCensus.ts"
+      - "playwright.config.ts"
+      - ".github/workflows/core-link-form-census.yml"
+  schedule:
+    - cron: "35 8 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-link-form-census-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-rules:
+    name: Census rules and accessibility regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Run focused rules and Pheno accessibility tests
+        run: >-
+          bunx vitest run
+          src/test/core-link-form-census-rules.test.ts
+          src/test/pheno-keepers-page.test.tsx
+          --reporter=dot
+
+  browser-census:
+    name: Browser census (${{ matrix.lane }})
+    needs: focused-rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lane: public
+            grep: scheduled public
+          - lane: authenticated
+            grep: scheduled authenticated
+    env:
+      PLAYWRIGHT_RETRIES: "0"
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+      - name: Cache Bun packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock', 'bun.lockb', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+      - name: Cache Playwright browsers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('bun.lock', 'bun.lockb', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: bun run e2e:install:ci
+      - name: Run hermetic ${{ matrix.lane }} census
+        run: >-
+          bunx playwright test
+          --project=chromium-mocked
+          e2e/core-link-form-census.spec.ts
+          --grep "${{ matrix.grep }}"
+          --reporter=list
+      - name: Upload failure evidence
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: core-link-form-census-${{ matrix.lane }}-failure
+          path: test-results
+          if-no-files-found: warn

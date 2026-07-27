@@ -429,4 +429,4 @@ Deno.serve(async (req) => {
 });
 
 
-export const __internals = { evaluate, loadThresholds, partitionByCooldown };
+export const __internals = { evaluate, loadThresholds, partitionByCooldown, postWebhook, log };

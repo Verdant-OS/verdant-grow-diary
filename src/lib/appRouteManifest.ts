@@ -310,12 +310,6 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Operator edge-function metric trend charts (read-only).",
   },
   {
-    path: "/operator/ggs-real-payload-ingest",
-    access: "operator",
-    description:
-      "Operator-gated GGS real-payload commit through the authenticated Edge boundary calling the validated ingest RPC, plus a read-only Sentinel verdict.",
-  },
-  {
     path: "/operator/one-tent-live-proof",
     access: "operator",
     description: "Operator one-tent live proof page.",

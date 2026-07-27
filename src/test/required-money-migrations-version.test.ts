@@ -21,6 +21,12 @@ import {
 } from "../../scripts/required-money-migrations.mjs";
 
 describe("migrationVersion()", () => {
+  it("requires the final AI-credit service contract repair in every deploy target", () => {
+    expect(REQUIRED_MONEY_MIGRATIONS).toContain(
+      "20260727050000_ai_credit_service_contract_forward_reassert.sql",
+    );
+  });
+
   it("extracts the 14-digit prefix from a well-formed filename", () => {
     expect(migrationVersion("20260721103000_ai_credit_grants.sql")).toBe(
       "20260721103000",

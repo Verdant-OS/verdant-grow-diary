@@ -30,6 +30,11 @@ export const REQUIRED_MONEY_MIGRATIONS = [
   // merged — the gap that previously left plants.candidate_number undeployed
   // while the code depending on it shipped.
   "20260725220000_craft_pheno_tracker_entitlement.sql",
+  // Final service-only AI credit spend/refund contract. A later immutable
+  // export reintroduced stale overload bodies, so production must carry this
+  // forward reassertion or paid pack overflow, idempotent result replay, grow
+  // ownership, and service-role-only execution can silently regress.
+  "20260727050000_ai_credit_service_contract_forward_reassert.sql",
 ];
 
 /**

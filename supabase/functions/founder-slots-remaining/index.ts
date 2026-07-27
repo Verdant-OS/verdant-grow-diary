@@ -250,11 +250,34 @@ export async function handleFounderSlotsRequest(req: Request): Promise<Response>
     outcome = o;
     return resp;
   };
-  const fail = (o: Outcome, body: Record<string, unknown> = {}) =>
+  // Stable machine-readable error taxonomy. `error` is retained as the
+  // top-level category ("slots_unavailable") for back-compat with existing
+  // callers; `error_code` is the specific reason and is safe to switch on.
+  const fail = (
+    code: Extract<
+      Outcome,
+      | "startup_dependencies_unavailable"
+      | "env_missing"
+      | "rpc_error"
+      | "rpc_invalid_payload"
+      | "handler_unhandled_error"
+    >,
+    body: Record<string, unknown> = {},
+  ) =>
     done(
-      json(503, { error: "slots_unavailable", request_id: requestId, ...body }, requestHeaders),
-      o,
+      json(
+        503,
+        {
+          error: "slots_unavailable",
+          error_code: code,
+          request_id: requestId,
+          ...body,
+        },
+        requestHeaders,
+      ),
+      code,
     );
+
 
   try {
     if (req.method !== "GET" && req.method !== "POST") {

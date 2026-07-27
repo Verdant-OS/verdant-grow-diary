@@ -164,6 +164,13 @@ describe("Quick Log dual-timestamp harness — local-only safety", () => {
     expect(harness.src).toMatch(/anon has no EXECUTE on manual RPC/);
     expect(harness.src).toMatch(/\(spoofRows \?\? \[\]\)\.length === 2/);
   });
+
+  it("keeps the cross-grow fixture outside the Free active-grow allowance", () => {
+    expect(harness.src).toMatch(
+      /async function seedExtraGrow\(client:\s*SupabaseClient,\s*uid:\s*string\)[\s\S]{0,500}is_archived:\s*true/,
+    );
+    expect(harness.src).toMatch(/seedExtraGrow\(clientA,\s*uidA\)/);
+  });
 });
 
 describe("Quick Log RPC scripts — wired into package.json", () => {

@@ -123,6 +123,13 @@ function check(name: string, ok: boolean, detail?: string): void {
   console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ""}`);
 }
 
+function isSameInstant(actual: unknown, expected: string): boolean {
+  if (typeof actual !== "string") return false;
+  const actualMs = Date.parse(actual);
+  const expectedMs = Date.parse(expected);
+  return Number.isFinite(actualMs) && Number.isFinite(expectedMs) && actualMs === expectedMs;
+}
+
 async function createUser(email: string): Promise<string> {
   const { data, error } = await admin.auth.admin.createUser({
     email,
@@ -275,14 +282,15 @@ async function main(): Promise<void> {
     const free = await readOwnHistory(clients.free, userIds.free!);
     check(
       "Free sees recent sensor history",
-      free.error == null && free.data?.some((row) => row.captured_at === RECENT_AT) === true,
+      free.error == null &&
+        free.data?.some((row) => isSameInstant(row.captured_at, RECENT_AT)) === true,
       free.error?.message,
     );
     check(
       "Free cannot read sensor history older than 90 days",
       free.error == null &&
         free.data?.length === 1 &&
-        free.data.every((row) => row.captured_at !== OLD_AT),
+        free.data.every((row) => !isSameInstant(row.captured_at, OLD_AT)),
       free.error?.message,
     );
 
@@ -297,7 +305,7 @@ async function main(): Promise<void> {
         name,
         result.error == null &&
           result.data?.length === 2 &&
-          result.data.some((row) => row.captured_at === OLD_AT),
+          result.data.some((row) => isSameInstant(row.captured_at, OLD_AT)),
         result.error?.message,
       );
     }
@@ -307,7 +315,7 @@ async function main(): Promise<void> {
       "Expired paid row resolves to the Free history window",
       expired.error == null &&
         expired.data?.length === 1 &&
-        expired.data[0]?.captured_at === RECENT_AT,
+        isSameInstant(expired.data[0]?.captured_at, RECENT_AT),
       expired.error?.message,
     );
 
@@ -326,7 +334,7 @@ async function main(): Promise<void> {
       "service_role can still read all stored sensor history",
       adminFree.error == null &&
         adminFree.data?.length === 2 &&
-        adminFree.data.some((row) => row.captured_at === OLD_AT),
+        adminFree.data.some((row) => isSameInstant(row.captured_at, OLD_AT)),
       adminFree.error?.message,
     );
 

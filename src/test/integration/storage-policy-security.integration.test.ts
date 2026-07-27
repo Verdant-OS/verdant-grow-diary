@@ -78,6 +78,42 @@ function expectSanitizedStorageError(err: unknown): void {
   }
 }
 
+async function readStorageObjectText(data: Blob): Promise<string> {
+  const runtimeText = (data as Blob & { text?: () => Promise<string> }).text;
+  if (typeof runtimeText === "function") {
+    return runtimeText.call(data);
+  }
+
+  // jsdom's Blob implementation does not expose Blob.text() on every
+  // supported Node/Windows combination. FileReader is the portable DOM
+  // fallback and still exercises the bytes returned by the Storage API.
+  if (typeof FileReader === "undefined") {
+    throw new TypeError("storage download payload cannot be read as text");
+  }
+
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("storage payload read failed"));
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new TypeError("storage download payload did not decode as text"));
+    };
+    reader.readAsText(data);
+  });
+}
+
+describe("storage download payload portability", () => {
+  it("reads Blob payloads when Blob.text() is unavailable", async () => {
+    const payload = new Blob(["portable-storage-payload"], { type: "text/plain" });
+    Object.defineProperty(payload, "text", { configurable: true, value: undefined });
+
+    await expect(readStorageObjectText(payload)).resolves.toBe("portable-storage-payload");
+  });
+});
+
 interface TestUser {
   id: string;
   email: string;
@@ -145,7 +181,7 @@ d("diary-photos storage policy boundaries (local DB)", () => {
   it("a user can read back their own object", async () => {
     const { data, error } = await alice.client.storage.from(BUCKET).download(alicePath);
     expect(error).toBeNull();
-    expect(await data!.text()).toBe("alice-owns-this");
+    expect(await readStorageObjectText(data!)).toBe("alice-owns-this");
   });
 
   it("uploading into another user's folder is denied", async () => {
@@ -190,7 +226,9 @@ d("diary-photos storage policy boundaries (local DB)", () => {
     await bob.client.storage.from(BUCKET).remove([alicePath]);
     const { data, error } = await admin.storage.from(BUCKET).download(alicePath);
     expect(error).toBeNull();
-    expect(await data!.text(), "object must survive cross-user delete").toBe("alice-owns-this");
+    expect(await readStorageObjectText(data!), "object must survive cross-user delete").toBe(
+      "alice-owns-this",
+    );
   });
 
   it("a user can delete their own object", async () => {

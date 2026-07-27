@@ -80,6 +80,9 @@ describe("PhenoKeepersPage — base flows", () => {
 
   it("promotes a candidate to a named keeper", () => {
     const { promoteToKeeper } = renderAt({});
+    expect(
+      screen.getByRole("combobox", { name: "Candidate to name as keeper" }),
+    ).toBeInTheDocument();
     fireEvent.change(screen.getByTestId("keepers-promote-plant"), { target: { value: "p1" } });
     fireEvent.change(screen.getByTestId("keepers-promote-name"), {
       target: { value: "Gas Keeper" },

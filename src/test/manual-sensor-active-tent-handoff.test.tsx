@@ -52,6 +52,10 @@ vi.mock("@/hooks/useInsertSensorReading", () => ({
   useInsertSensorReading: () => ({ mutateAsync: insertReading, isPending: false }),
 }));
 
+vi.mock("@/hooks/useInsertSensorReadings", () => ({
+  useInsertSensorReadings: () => ({ mutateAsync: insertReading, isPending: false }),
+}));
+
 vi.mock("@/components/EnvironmentCsvImportLauncher", () => ({
   default: ({ growId, tentId }: { growId?: string | null; tentId?: string | null }) => (
     <div data-testid="csv-import-writer" data-grow-id={growId ?? ""} data-tent-id={tentId ?? ""} />

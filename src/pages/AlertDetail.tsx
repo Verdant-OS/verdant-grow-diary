@@ -65,6 +65,7 @@ import {
   hasPendingActionsForClosedAlert,
   isActionDerivedFromAlert,
   isAiDoctorDerived,
+  reconcileRelatedActionRows,
 } from "@/lib/actionQueueProvenanceRules";
 import {
   pickLatestOutcomeForAction,
@@ -253,7 +254,7 @@ export default function AlertDetail() {
           if (tb !== ta) return tb - ta;
           return a.id.localeCompare(b.id);
         });
-      setRelatedActions(matched);
+      setRelatedActions((current) => reconcileRelatedActionRows(current, matched));
       setRelatedLoaded(true);
     })();
     return () => {

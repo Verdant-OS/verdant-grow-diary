@@ -1008,6 +1008,24 @@ export default function OperatorEdgeAlerts() {
           )}
         </CardContent>
       </Card>
+
+      <EdgeAlertsBreachDrilldownDialog
+        open={drilldown !== null}
+        onOpenChange={(o) => {
+          if (!o) setDrilldown(null);
+        }}
+        fn={drilldown?.fn ?? null}
+        metric={drilldown?.metric ?? null}
+        dispatch={drilldownDispatch}
+        attempts={drilldownAttempts}
+        liveBreaches={drilldownLiveBreaches}
+        cooldownMinutes={cooldownMinutes}
+        now={now}
+        metricLabel={metricLabel}
+        formatValue={formatValue}
+        formatAbsolute={formatAbsolute}
+        formatRelative={formatRelative}
+      />
     </div>
   );
 }

@@ -95,6 +95,9 @@ function loadDeps(): Promise<Deps> {
       depsPromise = null;
       const message = err instanceof Error ? err.message : String(err);
       const name = err instanceof Error ? err.name : "UnknownError";
+      // Counter is defined below in the metrics block; the reference
+      // resolves at call-time (post-boot), so incrementing here is safe.
+      counters.startup_import_failed = (counters.startup_import_failed ?? 0) + 1;
       log({
         event: "startup_import_failed",
         severity: "critical",

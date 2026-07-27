@@ -14,6 +14,7 @@
  *  - ALERT_RPC_ERROR_RATE         default 0.2 (share of requests, 0..1)
  *  - ALERT_STARTUP_FAILURE_THRESHOLD default 1
  *  - ALERT_MIN_REQUESTS           default 10  (skip rate check below this)
+ *  - ALERT_COOLDOWN_MINUTES       default 60  (dedupe window per fn+metric)
  *  - ALERT_WEBHOOK_URL            Slack-compatible incoming webhook. If
  *                                 unset, the function only reports JSON.
  *  - ALERT_WEBHOOK_TIMEOUT_MS     default 5000
@@ -25,6 +26,10 @@
  *    counts.
  *  - Webhook payload contains counts + fn names + env — never PII, never
  *    request IDs.
+ *  - Cooldown state lives in `public.edge_metrics_alert_dispatches`
+ *    (service-role only). While a (fn, metric) is inside its cooldown
+ *    window it is reported as `suppressed` and NOT posted to the
+ *    webhook, preventing repeat firing on the same breach condition.
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2";

@@ -98,6 +98,7 @@ interface Thresholds {
   rpcErrorRate: number;
   startupFailureCount: number;
   minRequests: number;
+  cooldownMinutes: number;
 }
 
 function loadThresholds(): Thresholds {
@@ -107,6 +108,7 @@ function loadThresholds(): Thresholds {
     rpcErrorRate: numEnv("ALERT_RPC_ERROR_RATE", 0.2),
     startupFailureCount: numEnv("ALERT_STARTUP_FAILURE_THRESHOLD", 1),
     minRequests: numEnv("ALERT_MIN_REQUESTS", 10),
+    cooldownMinutes: numEnv("ALERT_COOLDOWN_MINUTES", 60),
   };
 }
 

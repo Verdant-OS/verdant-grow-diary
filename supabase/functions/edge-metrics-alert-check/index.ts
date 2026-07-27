@@ -18,6 +18,9 @@
  *  - ALERT_WEBHOOK_URL            Slack-compatible incoming webhook. If
  *                                 unset, the function only reports JSON.
  *  - ALERT_WEBHOOK_TIMEOUT_MS     default 5000
+ *  - ALERT_WEBHOOK_MAX_ATTEMPTS   default 4    (initial try + retries)
+ *  - ALERT_WEBHOOK_BASE_DELAY_MS  default 500  (exponential backoff base)
+ *  - ALERT_WEBHOOK_MAX_DELAY_MS   default 8000 (cap per-attempt delay)
  *
  * SAFETY:
  *  - Reads with the service-role client (aggregate counts only, no PII).

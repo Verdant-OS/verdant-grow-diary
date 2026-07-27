@@ -223,9 +223,18 @@ function remedyForFailRow(row) {
     // The inverse of "missing": the price EXISTS and is active, but the app
     // does not know it is sellable. Telling an operator to create a price they
     // are looking at sends them the wrong way entirely.
+    // Pointing only at the allowlists would turn THIS gate green while the SKU
+    // still could not be sold or fulfilled: checkout needs a SERVER_PRICE_CONFIG
+    // entry + env var, a pack needs a CREDIT_PACK_CREDITS amount, and the UI
+    // needs a definition in constants/pricing.ts. The full chain is already
+    // asserted by src/test/sellable-tier-chain.test.ts, so send operators there
+    // rather than enumerating a checklist that can drift from it.
     return (
       "Active in Paddle but not sellable by the app — add this external_id to " +
-      "`PAID_PLAN_IDS` in src/lib/paidPlanAllowlist.ts (and to `CREDIT_PACK_IDS` if it is a pack)."
+      "`PAID_PLAN_IDS` in src/lib/paidPlanAllowlist.ts, then run " +
+      "`bunx vitest run src/test/sellable-tier-chain.test.ts`, which fails until " +
+      "the whole chain is wired (CREDIT_PACK_IDS + CREDIT_PACK_CREDITS for a pack, " +
+      "SERVER_PRICE_CONFIG + PADDLE_PRICE_* env for checkout, and the UI definition)."
     );
   }
   if (cause.kind === "enumeration_error") {

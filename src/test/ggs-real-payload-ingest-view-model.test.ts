@@ -19,7 +19,7 @@ const CTX = {
 
 const REAL_PAYLOAD = JSON.stringify({
   timestamp: "2026-06-17T18:30:00Z",
-  sensor_id: "REAL_GGS_PROBE_ID",
+  sensor_id: CTX.deviceId,
   soil_moisture_pct: 42.5,
   soil_temp_c: 22.3,
   soil_ec: 0.85,
@@ -100,7 +100,7 @@ describe("buildGgsRealPayloadIngestViewModel", () => {
     expect(vm.reason).toBe("payload_unparseable");
   });
 
-  it("propagates forbidden declared source refusal", () => {
+  it("propagates strict declared-source refusal", () => {
     const bad = JSON.stringify({
       ...JSON.parse(REAL_PAYLOAD),
       source: "ggs_live",
@@ -113,7 +113,7 @@ describe("buildGgsRealPayloadIngestViewModel", () => {
     });
     expect(vm.status).toBe("refused");
     if (vm.status !== "refused") return;
-    expect(vm.reason).toBe("forbidden_declared_source");
+    expect(vm.reason).toBe("declared_source_not_allowed");
   });
 
   it("refuses when device id is missing in context", () => {
@@ -139,8 +139,10 @@ describe("buildGgsRealPayloadIngestViewModel", () => {
       "bridge_id_missing",
       "tent_id_missing",
       "device_id_missing",
+      "payload_device_id_missing",
+      "payload_device_id_mismatch",
       "captured_at_missing_or_malformed",
-      "forbidden_declared_source",
+      "declared_source_not_allowed",
       "non_finite_value",
       "soil_temp_out_of_range",
       "soil_ec_unit_mismatch_suspected",

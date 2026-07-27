@@ -66,6 +66,10 @@ const STATE_TO_TONE: Readonly<Record<MetricFreshnessState, FreshnessTone>> = {
 const VERDICT_PILL_LABELS: Readonly<Record<SentinelState, { label: string; tone: FreshnessTone }>> =
   {
     PASS_LIVE_SENTINEL_READY: { label: "Live · Sentinel ready", tone: "primary" },
+    PASS_OPERATOR_ATTESTED_SENTINEL_READY: {
+      label: "Operator-attested payload · Sentinel ready",
+      tone: "warning",
+    },
     BLOCKED_NO_GGS_ROWS: { label: "Blocked · no GGS rows", tone: "destructive" },
     BLOCKED_NO_SOIL_TEMP_C: { label: "Blocked · no soil temperature (C)", tone: "destructive" },
     BLOCKED_NO_EC: { label: "Blocked · no soil EC", tone: "destructive" },
@@ -78,6 +82,14 @@ const VERDICT_PILL_LABELS: Readonly<Record<SentinelState, { label: string; tone:
     BLOCKED_VALIDATION_ERROR: { label: "Blocked · validation error", tone: "destructive" },
     BLOCKED_RAW_PAYLOAD_RENDER_RISK: {
       label: "Blocked · raw payload render risk",
+      tone: "destructive",
+    },
+    BLOCKED_OPERATOR_ATTESTATION_MISSING: {
+      label: "Blocked · operator attestation missing",
+      tone: "destructive",
+    },
+    BLOCKED_COHORT_INCOHERENT: {
+      label: "Blocked · payload cohort incoherent",
       tone: "destructive",
     },
   };

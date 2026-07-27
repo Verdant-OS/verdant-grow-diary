@@ -125,11 +125,21 @@ describe("OperatorGgsRealPayloadIngest wiring", () => {
 
     expect(state.from).toHaveBeenCalledWith("sensor_readings");
     expect(state.chainCalls).toEqual([
-      ["select", "metric,value,source,quality,captured_at,raw_payload"],
+      ["select", "metric,value,source,quality,device_id,captured_at,raw_payload"],
       ["eq", "tent_id", "33333333-3333-4333-8333-333333333333"],
       ["eq", "source", "live"],
-      ["eq", "quality", "ok"],
-      ["contains", "raw_payload", { source_app: "spider_farmer_ggs" }],
+      [
+        "contains",
+        "raw_payload",
+        {
+          source_app: "spider_farmer_ggs",
+          provenance: "operator_attested_real_payload",
+          operator_attestation: {
+            attested: true,
+            boundary: "operator-ggs-real-payload-commit",
+          },
+        },
+      ],
       ["in", "metric", ["soil_moisture_pct", "ec", "soil_temp_c"]],
       ["order", "captured_at", { ascending: false }],
       ["limit", 50],
@@ -148,6 +158,9 @@ describe("OperatorGgsRealPayloadIngest wiring", () => {
       screen.getByText(
         /Commit validated, attested Spider Farmer GGS readings.*read-only Sentinel verdict/i,
       ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/not presented as independently verified live telemetry/i),
     ).toBeInTheDocument();
   });
 });

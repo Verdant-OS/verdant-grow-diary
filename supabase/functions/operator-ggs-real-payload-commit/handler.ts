@@ -9,6 +9,9 @@
  */
 import {
   buildGgsRealPayloadCommitInput,
+  buildGgsRealPayloadCohortId,
+  GGS_OPERATOR_ATTESTATION_BOUNDARY,
+  GGS_OPERATOR_ATTESTED_PROVENANCE,
   GGS_REAL_PAYLOAD_SOURCE,
   GGS_REAL_PAYLOAD_SOURCE_APP,
   type GgsRealPayloadCommitRow,
@@ -22,6 +25,7 @@ const ALLOWED_ORIGINS = new Set([
   "https://verdantgrowdiary.com",
   "https://www.verdantgrowdiary.com",
   "https://verdantgrowdiary-com.lovable.app",
+  "https://id-preview--66255e7b-892c-4be5-8686-ab1cfc3666db.lovable.app",
   "http://localhost:5173",
   "http://localhost:3000",
   "http://localhost:8080",
@@ -184,12 +188,25 @@ function isActiveSameOwnerTentBridgeTokenContext(
   return Number.isFinite(expiresAt) && expiresAt > now.getTime();
 }
 
-function rowsAreTrusted(rows: readonly GgsRealPayloadCommitRow[]): boolean {
+function rowsAreTrusted(
+  rows: readonly GgsRealPayloadCommitRow[],
+  deviceId: string,
+  attestedAt: Date,
+): boolean {
   return rows.every(
     (row) =>
       row.source === GGS_REAL_PAYLOAD_SOURCE &&
       row.quality === "ok" &&
+      row.device_id === deviceId &&
       row.raw_payload?.source_app === GGS_REAL_PAYLOAD_SOURCE_APP &&
+      row.raw_payload?.sensor_id === deviceId &&
+      row.raw_payload?.device_id === deviceId &&
+      row.raw_payload?.captured_at === row.captured_at &&
+      row.raw_payload?.cohort_id === buildGgsRealPayloadCohortId(deviceId, row.captured_at) &&
+      row.raw_payload?.provenance === GGS_OPERATOR_ATTESTED_PROVENANCE &&
+      row.raw_payload?.operator_attestation?.attested === true &&
+      row.raw_payload?.operator_attestation?.attested_at === attestedAt.toISOString() &&
+      row.raw_payload?.operator_attestation?.boundary === GGS_OPERATOR_ATTESTATION_BOUNDARY &&
       Number.isFinite(row.value),
   );
 }
@@ -275,9 +292,10 @@ export async function handleOperatorGgsRealPayloadCommit(
       bridgeId,
       tentId,
       deviceId,
+      operatorAttested: true,
       now: requestNow,
     });
-    if (!plan.ok || !rowsAreTrusted(plan.rows)) {
+    if (!plan.ok || !rowsAreTrusted(plan.rows, deviceId, requestNow)) {
       return json(req, 400, { error: "payload_rejected" });
     }
 

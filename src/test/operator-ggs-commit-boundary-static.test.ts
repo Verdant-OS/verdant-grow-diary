@@ -93,4 +93,18 @@ describe("operator GGS Edge boundary static fence", () => {
     expect(handler).not.toMatch(/body\.user_id/);
     expect(handler).not.toMatch(/body\.rows/);
   });
+
+  it("wires both Deno boundary suites into package scripts and blocking CI", () => {
+    const packageJson = JSON.parse(read("package.json")) as {
+      scripts?: Record<string, string>;
+    };
+    const command = packageJson.scripts?.["test:edge:operator-ggs-real-payload-commit"] ?? "";
+    expect(command).toContain(`${EDGE_DIR}/handler.test.ts`);
+    expect(command).toContain(`${EDGE_DIR}/productionDeps.test.ts`);
+
+    const ci = read(".github/workflows/ci.yml");
+    expect(ci).toContain("Operator GGS real-payload boundary tests (Deno)");
+    expect(ci).toContain(`${EDGE_DIR}/handler.test.ts`);
+    expect(ci).toContain(`${EDGE_DIR}/productionDeps.test.ts`);
+  });
 });

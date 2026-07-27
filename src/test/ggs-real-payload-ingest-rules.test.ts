@@ -23,7 +23,8 @@ const CTX = {
   userId: "user-uuid-aaaa",
   bridgeId: "bridge-uuid-bbbb",
   tentId: TENT,
-  deviceId: "ggs-probe-serial-001",
+  deviceId: "GGS-PRO-1234567",
+  operatorAttested: true,
   now: NOW,
 };
 
@@ -62,6 +63,14 @@ describe("buildGgsRealPayloadCommitInput", () => {
       expect(row.raw_payload.source_app).toBe(GGS_REAL_PAYLOAD_SOURCE_APP);
       expect(row.raw_payload.source_app).toBe("spider_farmer_ggs");
       expect(row.raw_payload.sensor_id).toBe("GGS-PRO-1234567");
+      expect(row.raw_payload.device_id).toBe("GGS-PRO-1234567");
+      expect(row.raw_payload.cohort_id).toBe(`ggs:GGS-PRO-1234567:${row.captured_at}`);
+      expect(row.raw_payload.provenance).toBe("operator_attested_real_payload");
+      expect(row.raw_payload.operator_attestation).toEqual({
+        attested: true,
+        attested_at: NOW.toISOString(),
+        boundary: "operator-ggs-real-payload-commit",
+      });
       expect(row.raw_payload.original_units?.soil_ec).toBe("mS/cm");
       expect(new Date(row.captured_at).toISOString()).toBe(new Date(FRESH_TS).toISOString());
       expect(row.device_id).toBe(CTX.deviceId);
@@ -81,7 +90,7 @@ describe("buildGgsRealPayloadCommitInput", () => {
 
   it("refuses an explicit declared source of demo", () => {
     const plan = buildGgsRealPayloadCommitInput({ ...realLookingPayload(), source: "demo" }, CTX);
-    expect(refusalReason(plan)).toBe("forbidden_declared_source");
+    expect(refusalReason(plan)).toBe("declared_source_not_allowed");
   });
 
   it.each([
@@ -94,9 +103,74 @@ describe("buildGgsRealPayloadCommitInput", () => {
     "fixture",
     "test",
     "sample",
-  ])("refuses forbidden declared source %s", (src) => {
+    "unknown_device_source",
+    "synthetic",
+  ])("refuses every explicit source outside the strict allowlist: %s", (src) => {
     const plan = buildGgsRealPayloadCommitInput({ ...realLookingPayload(), source: src }, CTX);
-    expect(refusalReason(plan)).toBe("forbidden_declared_source");
+    expect(refusalReason(plan)).toBe("declared_source_not_allowed");
+  });
+
+  it("overwrites client-forged provenance with the server-authored outer envelope", () => {
+    const plan = buildGgsRealPayloadCommitInput(
+      {
+        ...realLookingPayload(),
+        source_app: "forged_vendor",
+        cohort_id: "forged-cohort",
+        provenance: "independently_verified_live",
+        operator_attestation: { attested: false, boundary: "forged" },
+      },
+      CTX,
+    );
+    if (plan.ok === false) throw new Error(`expected ok, got ${plan.reason}`);
+    for (const row of plan.rows) {
+      expect(row.raw_payload.source_app).toBe("spider_farmer_ggs");
+      expect(row.raw_payload.cohort_id).toBe(`ggs:${CTX.deviceId}:${row.captured_at}`);
+      expect(row.raw_payload.provenance).toBe("operator_attested_real_payload");
+      expect(row.raw_payload.operator_attestation.attested).toBe(true);
+      expect(row.raw_payload.payload).toMatchObject({
+        source_app: "forged_vendor",
+        cohort_id: "forged-cohort",
+        provenance: "independently_verified_live",
+      });
+    }
+  });
+
+  it.each(["live", "spider_farmer_ggs"])("allows explicit real source %s", (source) => {
+    const plan = buildGgsRealPayloadCommitInput({ ...realLookingPayload(), source }, CTX);
+    expect(plan.ok).toBe(true);
+  });
+
+  it("refuses a missing or mismatched payload device identity", () => {
+    const missing = realLookingPayload();
+    delete missing.sensor_id;
+    expect(refusalReason(buildGgsRealPayloadCommitInput(missing, CTX))).toBe(
+      "payload_device_id_missing",
+    );
+
+    expect(
+      refusalReason(
+        buildGgsRealPayloadCommitInput(
+          { ...realLookingPayload(), sensor_id: "OTHER-GGS-PROBE" },
+          CTX,
+        ),
+      ),
+    ).toBe("payload_device_id_mismatch");
+
+    expect(
+      refusalReason(
+        buildGgsRealPayloadCommitInput(
+          { ...realLookingPayload(), device_id: "CONFLICTING-GGS-PROBE" },
+          CTX,
+        ),
+      ),
+    ).toBe("payload_device_id_mismatch");
+  });
+
+  it("accepts a controller_id-only payload when it exactly matches request deviceId", () => {
+    const controllerOnly = realLookingPayload();
+    delete controllerOnly.sensor_id;
+    controllerOnly.controller_id = CTX.deviceId;
+    expect(buildGgsRealPayloadCommitInput(controllerOnly, CTX).ok).toBe(true);
   });
 
   it("refuses when timestamp is missing", () => {
@@ -129,7 +203,7 @@ describe("buildGgsRealPayloadCommitInput", () => {
     );
     const allBad = buildGgsRealPayloadCommitInput(
       {
-        sensor_id: "x",
+        sensor_id: CTX.deviceId,
         tent_id: TENT,
         timestamp: FRESH_TS,
         soil_moisture_pct: "wet",

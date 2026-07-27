@@ -30,6 +30,7 @@ type GgsSensorBodyKey = typeof RAW_SENSOR_BODY_KEY;
 
 export type GgsSentinelState =
   | "PASS_LIVE_SENTINEL_READY"
+  | "PASS_OPERATOR_ATTESTED_SENTINEL_READY"
   | "BLOCKED_NO_GGS_ROWS"
   | "BLOCKED_NO_SOIL_TEMP_C"
   | "BLOCKED_NO_EC"
@@ -37,6 +38,8 @@ export type GgsSentinelState =
   | "BLOCKED_SOURCE_NOT_CANONICAL"
   | "BLOCKED_STALE_READING"
   | "BLOCKED_RAW_PAYLOAD_RENDER_RISK"
+  | "BLOCKED_OPERATOR_ATTESTATION_MISSING"
+  | "BLOCKED_COHORT_INCOHERENT"
   | "BLOCKED_VALIDATION_ERROR";
 
 /** Minimal row shape consumed by the evaluator. Pulled from sensor readings. */
@@ -45,6 +48,7 @@ export type GgsSentinelInputRow = {
   value: number | null;
   source: string | null;
   quality?: string | null;
+  device_id?: string | null;
   captured_at: string;
 } & Record<GgsSensorBodyKey, unknown>;
 
@@ -326,7 +330,7 @@ export function evaluateGgsSentinelReadiness(
     const quality = (row.quality ?? "").trim();
     if (quality === "stale") {
       staleQualityFor = metric;
-    } else if (quality !== "ok") {
+    } else if (quality && quality !== "ok") {
       untrustedQualityFor = metric;
     }
     if (!Number.isFinite(Date.parse(row.captured_at))) {
@@ -373,7 +377,7 @@ export function evaluateGgsSentinelReadiness(
       staleQualityFor
         ? `stale quality for ${staleQualityFor}`
         : untrustedQualityFor
-          ? `missing/unsafe quality for ${untrustedQualityFor}`
+          ? `unsafe quality for ${untrustedQualityFor}`
           : undefined,
     ),
   );

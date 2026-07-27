@@ -18,6 +18,14 @@ function row(): GgsRealPayloadCommitRow {
     raw_payload: {
       source_app: "spider_farmer_ggs",
       sensor_id: "device",
+      device_id: "device",
+      cohort_id: "ggs:device:2026-07-25T11:59:00.000Z",
+      provenance: "operator_attested_real_payload",
+      operator_attestation: {
+        attested: true,
+        attested_at: "2026-07-25T12:00:00.000Z",
+        boundary: "operator-ggs-real-payload-commit",
+      },
       captured_at: "2026-07-25T11:59:00.000Z",
       payload: {},
     },

@@ -17,16 +17,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import GgsRealPayloadIngestPanel from "@/components/GgsRealPayloadIngestPanel";
 import { GgsSentinelSmokeRunnerPanel } from "@/components/GgsSentinelSmokeRunnerPanel";
-import {
-  evaluateGgsSentinelReadiness,
-  type GgsSentinelInputRow,
-} from "@/lib/ggsSentinelSmokeRunner";
+import type { GgsSentinelInputRow } from "@/lib/ggsSentinelSmokeRunner";
 import { buildGgsSentinelEvaluationPanelViewModel } from "@/lib/ggsSentinelSmokeRunnerViewModel";
 import {
   GGS_OPERATOR_SENTINEL_METRICS,
-  GGS_OPERATOR_SENTINEL_QUALITY,
   GGS_OPERATOR_SENTINEL_SOURCE,
-  GGS_OPERATOR_SENTINEL_VENDOR_CONTAINS,
+  GGS_OPERATOR_SENTINEL_PROVENANCE_CONTAINS,
+  evaluateGgsOperatorAttestedSentinelReadiness,
 } from "@/lib/ggsOperatorRealPayloadSentinelRules";
 
 const ROW_FETCH_LIMIT = 50;
@@ -46,11 +43,10 @@ export default function OperatorGgsRealPayloadIngest() {
     queryFn: async (): Promise<GgsSentinelInputRow[]> => {
       const { data, error } = await supabase
         .from("sensor_readings")
-        .select("metric,value,source,quality,captured_at,raw_payload")
+        .select("metric,value,source,quality,device_id,captured_at,raw_payload")
         .eq("tent_id", selectedTentId)
         .eq("source", GGS_OPERATOR_SENTINEL_SOURCE)
-        .eq("quality", GGS_OPERATOR_SENTINEL_QUALITY)
-        .contains("raw_payload", GGS_OPERATOR_SENTINEL_VENDOR_CONTAINS)
+        .contains("raw_payload", GGS_OPERATOR_SENTINEL_PROVENANCE_CONTAINS)
         .in("metric", [...GGS_OPERATOR_SENTINEL_METRICS])
         .order("captured_at", { ascending: false })
         .limit(ROW_FETCH_LIMIT);
@@ -61,7 +57,7 @@ export default function OperatorGgsRealPayloadIngest() {
 
   const verdict = useMemo(
     () =>
-      evaluateGgsSentinelReadiness({
+      evaluateGgsOperatorAttestedSentinelReadiness({
         rows: ggsRowsQ.data ?? [],
         snapshot: null,
         now: new Date(),
@@ -79,7 +75,8 @@ export default function OperatorGgsRealPayloadIngest() {
         <h1 className="text-2xl font-semibold tracking-tight">GGS Real-Payload Ingest</h1>
         <p className="text-sm text-muted-foreground">
           Operator Mode · Commit validated, attested Spider Farmer GGS readings through the gated
-          Edge boundary, then review the read-only Sentinel verdict.
+          Edge boundary, then review the read-only Sentinel verdict. Operator attestation is
+          preserved and is not presented as independently verified live telemetry.
         </p>
       </header>
 

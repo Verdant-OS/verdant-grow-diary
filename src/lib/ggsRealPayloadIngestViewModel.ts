@@ -83,7 +83,9 @@ const METRIC_LABEL: Record<GgsRealPayloadMetric, { label: string; unit: string }
 
 function parsePayload(
   text: string,
-): { ok: true; value: unknown } | { ok: false; reason: "payload_blank" | "payload_unparseable"; details?: string } {
+):
+  | { ok: true; value: unknown }
+  | { ok: false; reason: "payload_blank" | "payload_unparseable"; details?: string } {
   if (typeof text !== "string" || text.trim().length === 0) {
     return { ok: false, reason: "payload_blank" };
   }
@@ -108,6 +110,7 @@ export function buildGgsRealPayloadIngestViewModel(
 
   const planned: GgsRealPayloadCommitInput = buildGgsRealPayloadCommitInput(parsed.value, {
     ...input.context,
+    operatorAttested: input.attested,
     now: input.now ?? input.context.now,
   });
 
@@ -189,8 +192,12 @@ export function describeRefusal(reason: GgsRealPayloadIngestRefusalReason): stri
       return "Provide the physical probe / sensor id.";
     case "captured_at_missing_or_malformed":
       return "Payload is missing a valid timestamp.";
-    case "forbidden_declared_source":
-      return "Payload declares a non-canonical source. Refuse: only physical live readings are allowed.";
+    case "declared_source_not_allowed":
+      return "Payload declares an unknown or synthetic source. Operator attestation cannot override it.";
+    case "payload_device_id_missing":
+      return "Payload must include its physical sensor or device id.";
+    case "payload_device_id_mismatch":
+      return "Payload sensor id must exactly match the selected physical probe / sensor id.";
     case "non_finite_value":
       return "Payload contains non-numeric or NaN/Infinity values.";
     case "soil_temp_out_of_range":

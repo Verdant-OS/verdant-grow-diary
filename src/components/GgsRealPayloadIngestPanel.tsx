@@ -70,6 +70,11 @@ export default function GgsRealPayloadIngestPanel({
   const [committing, setCommitting] = useState(false);
   const [result, setResult] = useState<GgsRealPayloadCommitResult | null>(null);
 
+  function resetAttestationForEvidenceChange() {
+    setAttested(false);
+    setResult(null);
+  }
+
   const { data: bridgeTokens = [] } = useQuery({
     queryKey: ["ggs-real-payload-bridge-tokens", tentId],
     enabled: !!tentId,
@@ -136,7 +141,10 @@ export default function GgsRealPayloadIngestPanel({
           <p>
             Do not use invented or hand-crafted values with <code>source: "live"</code>.
           </p>
-          <p>Fixture/demo data cannot clear Sentinel live sign-off.</p>
+          <p>
+            This path records your operator attestation. It does not independently verify live
+            device delivery.
+          </p>
         </AlertDescription>
       </Alert>
 
@@ -156,6 +164,7 @@ export default function GgsRealPayloadIngestPanel({
             <Select
               value={tentId}
               onValueChange={(v) => {
+                resetAttestationForEvidenceChange();
                 onSelectedTentIdChange(v);
                 setBridgeId("");
               }}
@@ -175,7 +184,14 @@ export default function GgsRealPayloadIngestPanel({
 
           <div className="space-y-2">
             <Label>Bridge token</Label>
-            <Select value={bridgeId} onValueChange={setBridgeId} disabled={!tentId}>
+            <Select
+              value={bridgeId}
+              onValueChange={(value) => {
+                resetAttestationForEvidenceChange();
+                setBridgeId(value);
+              }}
+              disabled={!tentId}
+            >
               <SelectTrigger>
                 <SelectValue placeholder={tentId ? "Select bridge token" : "Pick a tent first"} />
               </SelectTrigger>
@@ -201,7 +217,10 @@ export default function GgsRealPayloadIngestPanel({
               id="ggs-device-id"
               placeholder="e.g. GGS-PROBE-A1B2"
               value={deviceId}
-              onChange={(e) => setDeviceId(e.target.value)}
+              onChange={(e) => {
+                resetAttestationForEvidenceChange();
+                setDeviceId(e.target.value);
+              }}
             />
           </div>
         </CardContent>
@@ -219,7 +238,10 @@ export default function GgsRealPayloadIngestPanel({
         <CardContent className="space-y-3">
           <Textarea
             value={payloadText}
-            onChange={(e) => setPayloadText(e.target.value)}
+            onChange={(e) => {
+              resetAttestationForEvidenceChange();
+              setPayloadText(e.target.value);
+            }}
             placeholder={EXAMPLE_PAYLOAD}
             rows={10}
             className="font-mono text-xs"
@@ -311,8 +333,9 @@ function PreviewCard({ vm }: { vm: ReturnType<typeof buildGgsRealPayloadIngestVi
         {vm && vm.status === "ok" && (
           <div className="space-y-3 text-sm">
             <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary">source: {vm.preview.source}</Badge>
+              <Badge variant="secondary">stored source: {vm.preview.source}</Badge>
               <Badge variant="secondary">vendor: {vm.preview.vendor}</Badge>
+              <Badge variant="outline">provenance: operator-attested</Badge>
               <Badge variant="outline">rows: {vm.preview.rowCount}</Badge>
               <Badge variant="outline">age: {vm.preview.ageSeconds}s</Badge>
             </div>

@@ -82,7 +82,9 @@ describe("static safety — GGS Sentinel page", () => {
     });
   }
   it("page selects raw_payload only for safe vendor provenance and never renders it", () => {
-    expect(SENTINEL_PAGE).toContain("metric,value,source,quality,captured_at,raw_payload");
+    expect(SENTINEL_PAGE).toContain(
+      "metric,value,source,quality,device_id,captured_at,raw_payload",
+    );
     expect(SENTINEL_PAGE).not.toMatch(/\{[^}]*raw_payload[^}]*\}/);
     expect(SENTINEL_PAGE).not.toMatch(/JSON\.stringify\([^)]*raw_payload/);
   });
@@ -127,9 +129,10 @@ describe("evaluator priority unchanged — explanatory note pinned verbatim", ()
       "Freshness guidance does not change Sentinel result priority. It only explains why each metric is fresh, aging, stale, or missing.",
     );
   });
-  it("rules module's verdict ladder includes all and only the 9 documented states", () => {
+  it("rules module's verdict ladder includes every documented state", () => {
     const expected = [
       "PASS_LIVE_SENTINEL_READY",
+      "PASS_OPERATOR_ATTESTED_SENTINEL_READY",
       "BLOCKED_NO_GGS_ROWS",
       "BLOCKED_NO_SOIL_TEMP_C",
       "BLOCKED_NO_EC",
@@ -138,6 +141,8 @@ describe("evaluator priority unchanged — explanatory note pinned verbatim", ()
       "BLOCKED_STALE_READING",
       "BLOCKED_VALIDATION_ERROR",
       "BLOCKED_RAW_PAYLOAD_RENDER_RISK",
+      "BLOCKED_OPERATOR_ATTESTATION_MISSING",
+      "BLOCKED_COHORT_INCOHERENT",
     ];
     for (const code of expected) {
       expect(SENTINEL_RULES).toContain(code);
@@ -154,6 +159,7 @@ describe("operator GGS real-payload ingest — static safety", () => {
   it("visible route copy discloses both attested commit capability and read-only Sentinel review", () => {
     expect(REAL_PAYLOAD_PAGE).toContain("Commit validated, attested Spider Farmer GGS readings");
     expect(REAL_PAYLOAD_PAGE).toContain("read-only Sentinel verdict");
+    expect(REAL_PAYLOAD_PAGE).toContain("not presented as independently verified live telemetry");
   });
 
   it("panel never renders raw_payload body fields", () => {

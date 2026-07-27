@@ -126,6 +126,19 @@ Deno.test("OPTIONS succeeds without auth or database access", async () => {
   assertFalse(touched);
 });
 
+Deno.test("Lovable editor preview receives its exact CORS origin", async () => {
+  const origin = "https://id-preview--66255e7b-892c-4be5-8686-ab1cfc3666db.lovable.app";
+  const response = await handleOperatorGgsRealPayloadCommit(
+    new Request("https://example.test", {
+      method: "OPTIONS",
+      headers: { origin },
+    }),
+    deps().value,
+  );
+  assertEquals(response.status, 204);
+  assertEquals(response.headers.get("access-control-allow-origin"), origin);
+});
+
 Deno.test("missing JWT is rejected before auth dependencies", async () => {
   let touched = false;
   const d = deps({
@@ -350,6 +363,35 @@ Deno.test("declared non-live payload is rejected with zero writes", async () => 
   assertEquals(d.committed.length, 0);
 });
 
+Deno.test("unknown or synthetic declared source cannot be promoted by attestation", async () => {
+  for (const source of ["synthetic", "unknown_device_source"]) {
+    const d = deps();
+    const response = await handleOperatorGgsRealPayloadCommit(
+      request(body({ payload: payload({ source }) })),
+      d.value,
+    );
+    assertEquals(response.status, 400);
+    assertEquals(await responseJson(response), { error: "payload_rejected" });
+    assertEquals(d.committed.length, 0);
+  }
+});
+
+Deno.test("request deviceId is bound to the payload sensor identity", async () => {
+  for (const payloadValue of [
+    payload({ sensor_id: "OTHER-GGS-PROBE" }),
+    payload({ sensor_id: undefined }),
+  ]) {
+    const d = deps();
+    const response = await handleOperatorGgsRealPayloadCommit(
+      request(body({ payload: payloadValue })),
+      d.value,
+    );
+    assertEquals(response.status, 400);
+    assertEquals(await responseJson(response), { error: "payload_rejected" });
+    assertEquals(d.committed.length, 0);
+  }
+});
+
 Deno.test(
   "verified UID overrides client userId and private commit occurs exactly once",
   async () => {
@@ -377,7 +419,15 @@ Deno.test(
         (row) =>
           row.source === "live" &&
           row.quality === "ok" &&
-          row.raw_payload.source_app === "spider_farmer_ggs",
+          row.device_id === "GGS-PROBE-001" &&
+          row.raw_payload.source_app === "spider_farmer_ggs" &&
+          row.raw_payload.device_id === "GGS-PROBE-001" &&
+          row.raw_payload.sensor_id === "GGS-PROBE-001" &&
+          row.raw_payload.provenance === "operator_attested_real_payload" &&
+          row.raw_payload.operator_attestation.attested === true &&
+          row.raw_payload.operator_attestation.attested_at === NOW.toISOString() &&
+          row.raw_payload.operator_attestation.boundary === "operator-ggs-real-payload-commit" &&
+          row.raw_payload.cohort_id === `ggs:GGS-PROBE-001:${row.captured_at}`,
       ),
       true,
     );

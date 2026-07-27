@@ -6,10 +6,11 @@ import {
 } from "@/lib/ggsRealPayloadIngestRules";
 import {
   GGS_OPERATOR_SENTINEL_METRICS,
+  GGS_OPERATOR_SENTINEL_PROVENANCE,
+  GGS_OPERATOR_SENTINEL_PROVENANCE_CONTAINS,
   GGS_OPERATOR_SENTINEL_QUALITY,
   GGS_OPERATOR_SENTINEL_SOURCE,
   GGS_OPERATOR_SENTINEL_VENDOR,
-  GGS_OPERATOR_SENTINEL_VENDOR_CONTAINS,
   isTrustedGgsOperatorSentinelRow,
 } from "@/lib/ggsOperatorRealPayloadSentinelRules";
 import type { GgsSentinelInputRow } from "@/lib/ggsSentinelSmokeRunner";
@@ -32,6 +33,7 @@ function writerPlan() {
       bridgeId: "55555555-5555-4555-8555-555555555555",
       tentId: TENT_ID,
       deviceId: "GGS-PROBE-001",
+      operatorAttested: true,
       now: NOW,
     },
   );
@@ -45,14 +47,21 @@ describe("operator GGS writer / Sentinel cross-contract", () => {
 
     expect(GGS_OPERATOR_SENTINEL_SOURCE).toBe(GGS_REAL_PAYLOAD_SOURCE);
     expect(GGS_OPERATOR_SENTINEL_VENDOR).toBe(GGS_REAL_PAYLOAD_SOURCE_APP);
-    expect(GGS_OPERATOR_SENTINEL_VENDOR_CONTAINS).toEqual({
+    expect(GGS_OPERATOR_SENTINEL_PROVENANCE_CONTAINS).toEqual({
       source_app: "spider_farmer_ggs",
+      provenance: "operator_attested_real_payload",
+      operator_attestation: {
+        attested: true,
+        boundary: "operator-ggs-real-payload-commit",
+      },
     });
+    expect(GGS_OPERATOR_SENTINEL_PROVENANCE).toBe("operator_attested_real_payload");
     expect(plan.rows.map((row) => row.metric)).toEqual([...GGS_OPERATOR_SENTINEL_METRICS]);
     for (const row of plan.rows) {
       expect(row.source).toBe(GGS_OPERATOR_SENTINEL_SOURCE);
       expect(row.quality).toBe(GGS_OPERATOR_SENTINEL_QUALITY);
       expect(row.raw_payload.source_app).toBe(GGS_OPERATOR_SENTINEL_VENDOR);
+      expect(row.raw_payload.operator_attestation.attested).toBe(true);
       expect(isTrustedGgsOperatorSentinelRow(row)).toBe(true);
     }
   });

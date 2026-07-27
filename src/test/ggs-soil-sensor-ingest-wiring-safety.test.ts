@@ -11,14 +11,8 @@ import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const ROOT = process.cwd();
-const NORMALIZER = readFileSync(
-  resolve(ROOT, "src/lib/ggsSoilSensorReadingNormalizer.ts"),
-  "utf8",
-);
-const ATTACH = readFileSync(
-  resolve(ROOT, "src/lib/ggsSoilSensorSnapshotAttach.ts"),
-  "utf8",
-);
+const NORMALIZER = readFileSync(resolve(ROOT, "src/lib/ggsSoilSensorReadingNormalizer.ts"), "utf8");
+const ATTACH = readFileSync(resolve(ROOT, "src/lib/ggsSoilSensorSnapshotAttach.ts"), "utf8");
 const TARGETS = [NORMALIZER, ATTACH];
 
 describe("GGS soil sensor — slice purity", () => {
@@ -48,9 +42,7 @@ describe("GGS soil sensor — slice purity", () => {
       expect(src).not.toMatch(/\bvbt_[A-Za-z0-9]/);
       expect(src).not.toMatch(/bridge[_-]?token/i);
       expect(src).not.toMatch(/Bearer\s+[A-Za-z0-9]/);
-      expect(src).not.toMatch(
-        /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,
-      );
+      expect(src).not.toMatch(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/);
     }
   });
 
@@ -81,13 +73,11 @@ describe("GGS soil sensor — ingest path reuse", () => {
     expect(NORMALIZER).toMatch(/@\/lib\/spiderFarmerGgsMappingRules/);
   });
 
-  it("does not introduce a new edge function for GGS soil ingest", () => {
+  it("allows only the reviewed operator GGS commit boundary, not a parallel device ingest path", () => {
     const fnDir = resolve(ROOT, "supabase/functions");
     if (!existsSync(fnDir)) return;
-    const dirs = readdirSync(fnDir).filter((n) =>
-      /ggs|soil.*sensor|three.in.one/i.test(n),
-    );
-    expect(dirs).toEqual([]);
+    const dirs = readdirSync(fnDir).filter((n) => /ggs|soil.*sensor|three.in.one/i.test(n));
+    expect(dirs).toEqual(["operator-ggs-real-payload-commit"]);
   });
 
   it("emits only canonical Verdant source kinds (live|manual|stale|invalid)", () => {

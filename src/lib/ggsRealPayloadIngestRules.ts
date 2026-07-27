@@ -34,19 +34,19 @@ export const GGS_REAL_PAYLOAD_SOURCE = "live" as const;
 /** Vendor identity stored under raw_payload.source_app. */
 export const GGS_REAL_PAYLOAD_SOURCE_APP = GGS_SOIL_SENSOR_PROVIDER; // "spider_farmer_ggs"
 
-/** Sources we explicitly refuse, even if the operator tries to pass them. */
-const FORBIDDEN_DECLARED_SOURCES = new Set<string>([
-  "demo",
-  "fixture",
-  "ggs_live",
-  "ggs_csv",
-  "manual",
-  "csv",
-  "stale",
-  "invalid",
-  "test",
-  "sample",
+/**
+ * Explicit source declarations fail closed. An operator attestation can
+ * confirm provenance for a payload with no declaration, but it can never
+ * override an explicit unknown/synthetic declaration.
+ */
+export const GGS_ALLOWED_REAL_PAYLOAD_DECLARED_SOURCES = new Set<string>([
+  "live",
+  GGS_REAL_PAYLOAD_SOURCE_APP,
 ]);
+
+/** Server-authored provenance stamped on every operator-boundary row. */
+export const GGS_OPERATOR_ATTESTED_PROVENANCE = "operator_attested_real_payload" as const;
+export const GGS_OPERATOR_ATTESTATION_BOUNDARY = "operator-ggs-real-payload-commit" as const;
 
 export interface GgsRealPayloadContext {
   /** Server-resolved owner UUID. Required. */
@@ -61,6 +61,12 @@ export interface GgsRealPayloadContext {
    * idempotency table is keyed on it.
    */
   deviceId: string;
+  /**
+   * Whether the operator checked the real-device attestation for this exact
+   * payload/context tuple. The Edge handler re-establishes this from the
+   * request after auth/role/ownership checks; client previews are not trusted.
+   */
+  operatorAttested?: boolean;
   /** Caller-injected clock for deterministic tests. */
   now?: Date;
 }
@@ -80,7 +86,17 @@ export interface GgsRealPayloadCommitRow {
 export interface GgsRealPayloadAuditEnvelope {
   /** Canonical vendor identity. UI must NEVER render this envelope. */
   source_app: typeof GGS_REAL_PAYLOAD_SOURCE_APP;
-  sensor_id: string | null;
+  /** Physical identity copied only after exact request/payload binding. */
+  sensor_id: string;
+  device_id: string;
+  /** Stable server-derived identity shared by every row from one payload. */
+  cohort_id: string;
+  provenance: typeof GGS_OPERATOR_ATTESTED_PROVENANCE;
+  operator_attestation: {
+    attested: boolean;
+    attested_at: string | null;
+    boundary: typeof GGS_OPERATOR_ATTESTATION_BOUNDARY;
+  };
   captured_at: string;
   /** Per-metric unit annotation, when conversion was applied. */
   original_units?: Record<string, string>;
@@ -96,8 +112,10 @@ export type GgsRealPayloadRefusalReason =
   | "bridge_id_missing"
   | "tent_id_missing"
   | "device_id_missing"
+  | "payload_device_id_missing"
+  | "payload_device_id_mismatch"
   | "captured_at_missing_or_malformed"
-  | "forbidden_declared_source"
+  | "declared_source_not_allowed"
   | "non_finite_value"
   | "soil_temp_out_of_range"
   | "soil_ec_unit_mismatch_suspected"
@@ -135,13 +153,29 @@ function readDeclaredSource(raw: Record<string, unknown>): string | null {
   return null;
 }
 
-function readSensorId(raw: Record<string, unknown>): string | null {
-  for (const k of ["sensor_id", "sensorId", "probe_id", "probeId", "serial"] as const) {
+function readSensorIds(raw: Record<string, unknown>): string[] {
+  const identities: string[] = [];
+  for (const k of [
+    "sensor_id",
+    "sensorId",
+    "probe_id",
+    "probeId",
+    "serial",
+    "device_id",
+    "deviceId",
+    "ggs_id",
+    "controller_id",
+    "controllerId",
+  ] as const) {
     const v = raw[k];
-    if (typeof v === "string" && v.trim()) return v.trim();
-    if (typeof v === "number" && Number.isFinite(v)) return String(v);
+    if (typeof v === "string" && v.trim()) identities.push(v.trim());
+    if (typeof v === "number" && Number.isFinite(v)) identities.push(String(v));
   }
-  return null;
+  return identities;
+}
+
+export function buildGgsRealPayloadCohortId(deviceId: string, capturedAt: string): string {
+  return `ggs:${deviceId}:${capturedAt}`;
 }
 
 function readOriginalUnits(raw: Record<string, unknown>): Record<string, string> | undefined {
@@ -177,8 +211,8 @@ export function buildGgsRealPayloadCommitInput(
   const raw = payload as Record<string, unknown>;
 
   const declared = readDeclaredSource(raw);
-  if (declared && FORBIDDEN_DECLARED_SOURCES.has(declared)) {
-    return refuse("forbidden_declared_source", declared);
+  if (declared && !GGS_ALLOWED_REAL_PAYLOAD_DECLARED_SOURCES.has(declared)) {
+    return refuse("declared_source_not_allowed", declared);
   }
 
   // Run the existing pure normalizer to validate units, ranges, freshness,
@@ -216,13 +250,31 @@ export function buildGgsRealPayloadCommitInput(
     return refuse("soil_temp_out_of_range");
   }
 
-  const sensorId = readSensorId(raw);
+  const sensorIds = readSensorIds(raw);
+  if (sensorIds.length === 0) return refuse("payload_device_id_missing");
+  const sensorId = ctx.deviceId.trim();
+  if (sensorIds.some((identity) => identity !== sensorId)) {
+    return refuse(
+      "payload_device_id_mismatch",
+      "payload sensor identity does not match request deviceId",
+    );
+  }
   const originalUnits = readOriginalUnits(raw);
-  const capturedAt = draft.captured_at;
+  const capturedAt = new Date(draft.captured_at).toISOString();
+  const cohortId = buildGgsRealPayloadCohortId(sensorId, capturedAt);
+  const operatorAttested = ctx.operatorAttested === true;
 
   const envelope: GgsRealPayloadAuditEnvelope = {
     source_app: GGS_REAL_PAYLOAD_SOURCE_APP,
     sensor_id: sensorId,
+    device_id: sensorId,
+    cohort_id: cohortId,
+    provenance: GGS_OPERATOR_ATTESTED_PROVENANCE,
+    operator_attestation: {
+      attested: operatorAttested,
+      attested_at: operatorAttested ? (ctx.now ?? new Date()).toISOString() : null,
+      boundary: GGS_OPERATOR_ATTESTATION_BOUNDARY,
+    },
     captured_at: capturedAt,
     ...(originalUnits ? { original_units: originalUnits } : {}),
     payload: raw,
@@ -231,7 +283,7 @@ export function buildGgsRealPayloadCommitInput(
   const quality: "ok" | "degraded" = draft.status === "accepted" ? "ok" : "degraded";
 
   const rows: GgsRealPayloadCommitRow[] = [];
-  const idKeyPrefix = `ggs:${ctx.deviceId}:${capturedAt}`;
+  const idKeyPrefix = cohortId;
 
   const orderedMetrics: Array<[GgsRealPayloadMetric, number | undefined]> = [
     ["soil_moisture_pct", r.soil_moisture_pct],
@@ -242,7 +294,7 @@ export function buildGgsRealPayloadCommitInput(
     if (typeof value !== "number" || !Number.isFinite(value)) continue;
     rows.push({
       idempotency_key: `${idKeyPrefix}:${metric}`,
-      device_id: ctx.deviceId,
+      device_id: sensorId,
       metric,
       value,
       captured_at: capturedAt,

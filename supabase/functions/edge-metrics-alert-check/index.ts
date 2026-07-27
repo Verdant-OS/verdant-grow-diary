@@ -18,6 +18,9 @@
  *  - ALERT_WEBHOOK_URL            Slack-compatible incoming webhook. If
  *                                 unset, the function only reports JSON.
  *  - ALERT_WEBHOOK_TIMEOUT_MS     default 5000
+ *  - ALERT_WEBHOOK_MAX_ATTEMPTS   default 4    (initial try + retries)
+ *  - ALERT_WEBHOOK_BASE_DELAY_MS  default 500  (exponential backoff base)
+ *  - ALERT_WEBHOOK_MAX_DELAY_MS   default 8000 (cap per-attempt delay)
  *
  * SAFETY:
  *  - Reads with the service-role client (aggregate counts only, no PII).
@@ -227,29 +230,148 @@ function partitionByCooldown(
 
 
 
-async function postWebhook(breaches: Breach[], t: Thresholds): Promise<{ posted: boolean; status?: number; error?: string }> {
+interface WebhookAttempt {
+  attempt: number;
+  status?: number;
+  ok: boolean;
+  transient: boolean;
+  error?: string;
+  delay_before_ms: number;
+  duration_ms: number;
+}
+
+interface WebhookResult {
+  posted: boolean;
+  status?: number;
+  error?: string;
+  attempts: WebhookAttempt[];
+  gave_up_transient?: boolean;
+}
+
+function isTransientStatus(status: number): boolean {
+  // 408 Request Timeout, 425 Too Early, 429 Too Many Requests, and any 5xx.
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
+function computeBackoffMs(attempt: number, baseMs: number, maxMs: number): number {
+  // Exponential backoff with full jitter: random in [0, min(max, base * 2^(attempt-1))].
+  const exp = baseMs * Math.pow(2, Math.max(0, attempt - 1));
+  const capped = Math.min(maxMs, exp);
+  return Math.floor(Math.random() * (capped + 1));
+}
+
+async function sleep(ms: number): Promise<void> {
+  if (ms <= 0) return;
+  await new Promise((r) => setTimeout(r, ms));
+}
+
+async function postWebhook(
+  breaches: Breach[],
+  t: Thresholds,
+  logger: (severity: "info" | "warn" | "error", event: string, extra?: Record<string, unknown>) => void = log,
+  requestId?: string,
+): Promise<WebhookResult> {
   const url = Deno.env.get("ALERT_WEBHOOK_URL");
-  if (!url) return { posted: false };
+  if (!url) return { posted: false, attempts: [] };
   const timeout = numEnv("ALERT_WEBHOOK_TIMEOUT_MS", 5000);
+  const maxAttempts = Math.max(1, numEnv("ALERT_WEBHOOK_MAX_ATTEMPTS", 4));
+  const baseDelay = numEnv("ALERT_WEBHOOK_BASE_DELAY_MS", 500);
+  const maxDelay = numEnv("ALERT_WEBHOOK_MAX_DELAY_MS", 8000);
   const lines = breaches.map((b) =>
     `• *${b.fn}* — ${b.metric}: ${b.value} (threshold ${b.threshold}, requests ${b.requests_in_window})`,
   );
   const text = `:rotating_light: Verdant edge alert — ${breaches.length} breach(es) in last ${t.windowMinutes}m\n${lines.join("\n")}`;
-  const controller = new AbortController();
-  const to = setTimeout(() => controller.abort(), timeout);
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, breaches, window_minutes: t.windowMinutes }),
-      signal: controller.signal,
-    });
-    return { posted: true, status: res.status };
-  } catch (err) {
-    return { posted: false, error: err instanceof Error ? err.message : String(err) };
-  } finally {
-    clearTimeout(to);
+  const body = JSON.stringify({ text, breaches, window_minutes: t.windowMinutes });
+
+  const attempts: WebhookAttempt[] = [];
+  let lastError: string | undefined;
+  let lastStatus: number | undefined;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const delayBefore = attempt === 1 ? 0 : computeBackoffMs(attempt - 1, baseDelay, maxDelay);
+    if (delayBefore > 0) {
+      logger("info", "webhook_retry_scheduled", {
+        request_id: requestId,
+        attempt,
+        delay_ms: delayBefore,
+        previous_status: lastStatus,
+        previous_error: lastError,
+      });
+      await sleep(delayBefore);
+    }
+    const controller = new AbortController();
+    const to = setTimeout(() => controller.abort(), timeout);
+    const startedAt = Date.now();
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+        signal: controller.signal,
+      });
+      const duration = Date.now() - startedAt;
+      const ok = res.status >= 200 && res.status < 300;
+      const transient = !ok && isTransientStatus(res.status);
+      attempts.push({ attempt, status: res.status, ok, transient, delay_before_ms: delayBefore, duration_ms: duration });
+      lastStatus = res.status;
+      lastError = undefined;
+      if (ok) {
+        logger("info", "webhook_delivered", {
+          request_id: requestId,
+          attempt,
+          status: res.status,
+          duration_ms: duration,
+        });
+        return { posted: true, status: res.status, attempts };
+      }
+      if (!transient) {
+        logger("warn", "webhook_permanent_failure", {
+          request_id: requestId,
+          attempt,
+          status: res.status,
+          duration_ms: duration,
+        });
+        return { posted: false, status: res.status, error: `http_${res.status}`, attempts };
+      }
+      logger("warn", "webhook_transient_failure", {
+        request_id: requestId,
+        attempt,
+        status: res.status,
+        duration_ms: duration,
+        attempts_remaining: maxAttempts - attempt,
+      });
+    } catch (err) {
+      const duration = Date.now() - startedAt;
+      const msg = err instanceof Error ? err.message : String(err);
+      // Network/timeout/abort errors are treated as transient.
+      attempts.push({ attempt, ok: false, transient: true, error: msg, delay_before_ms: delayBefore, duration_ms: duration });
+      lastError = msg;
+      lastStatus = undefined;
+      logger("warn", "webhook_transient_failure", {
+        request_id: requestId,
+        attempt,
+        error: msg,
+        duration_ms: duration,
+        attempts_remaining: maxAttempts - attempt,
+      });
+    } finally {
+      clearTimeout(to);
+    }
   }
+
+  logger("error", "webhook_retries_exhausted", {
+    request_id: requestId,
+    attempts: attempts.length,
+    last_status: lastStatus,
+    last_error: lastError,
+  });
+  return {
+    posted: false,
+    status: lastStatus,
+    error: lastError ?? (lastStatus ? `http_${lastStatus}` : "unknown"),
+    attempts,
+    gave_up_transient: true,
+  };
 }
 
 async function requireOperator(
@@ -365,36 +487,46 @@ Deno.serve(async (req) => {
     }
   }
 
-  let webhook: Awaited<ReturnType<typeof postWebhook>> = { posted: false };
+  let webhook: Awaited<ReturnType<typeof postWebhook>> = { posted: false, attempts: [] };
   if (toFire.length > 0) {
-    webhook = await postWebhook(toFire, thresholds);
+    webhook = await postWebhook(toFire, thresholds, log, requestId);
     log("warn", "alert_fired", {
       request_id: requestId,
       breach_count: toFire.length,
       suppressed_count: suppressed.length,
       webhook_posted: webhook.posted,
       webhook_status: webhook.status,
+      webhook_attempts: webhook.attempts.length,
+      webhook_gave_up_transient: webhook.gave_up_transient ?? false,
     });
-    // Record dispatch state only for breaches we actually fired on.
-    // Failures here are non-fatal — the next cron pass will retry, and
-    // in the worst case one extra webhook message goes out.
-    const nowIso = new Date().toISOString();
-    const upsertRows = toFire.map((b) => ({
-      fn: b.fn,
-      metric: b.metric,
-      last_fired_at: nowIso,
-      last_value: b.value,
-      last_threshold: b.threshold,
-      last_requests_in_window: b.requests_in_window,
-      updated_at: nowIso,
-    }));
-    const { error: upsertErr } = await supa
-      .from("edge_metrics_alert_dispatches")
-      .upsert(upsertRows, { onConflict: "fn,metric" });
-    if (upsertErr) {
-      log("warn", "cooldown_upsert_failed", {
+    // Only record cooldown for breaches whose webhook actually delivered.
+    // If delivery failed transiently and we exhausted retries, leave the
+    // dispatch row untouched so the next cron pass can retry immediately
+    // instead of being silently suppressed by cooldown.
+    if (webhook.posted || !webhook.gave_up_transient) {
+      const nowIso = new Date().toISOString();
+      const upsertRows = toFire.map((b) => ({
+        fn: b.fn,
+        metric: b.metric,
+        last_fired_at: nowIso,
+        last_value: b.value,
+        last_threshold: b.threshold,
+        last_requests_in_window: b.requests_in_window,
+        updated_at: nowIso,
+      }));
+      const { error: upsertErr } = await supa
+        .from("edge_metrics_alert_dispatches")
+        .upsert(upsertRows, { onConflict: "fn,metric" });
+      if (upsertErr) {
+        log("warn", "cooldown_upsert_failed", {
+          request_id: requestId,
+          code: upsertErr.code,
+        });
+      }
+    } else {
+      log("warn", "cooldown_skipped_after_transient_failure", {
         request_id: requestId,
-        code: upsertErr.code,
+        breach_count: toFire.length,
       });
     }
   } else if (suppressed.length > 0) {

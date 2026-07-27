@@ -73,7 +73,7 @@ Deno.test("postWebhook: no-op when ALERT_WEBHOOK_URL unset", async () => {
       [{ fn: "f1", metric: "rpc_error_count", value: 7, threshold: 5, requests_in_window: 10 }],
       baseThresholds,
     );
-    assertEquals(res, { posted: false });
+    assertEquals(res, { posted: false, attempts: [] });
   } finally {
     if (prev) Deno.env.set("ALERT_WEBHOOK_URL", prev);
   }
@@ -178,5 +178,101 @@ Deno.test("integration: breach detection triggers webhook POST and alert_fired l
     globalThis.fetch = origFetch;
     console.warn = origWarn;
     Deno.env.delete("ALERT_WEBHOOK_URL");
+  }
+});
+
+const breachFixture = [
+  { fn: "f1", metric: "rpc_error_count" as const, value: 7, threshold: 5, requests_in_window: 10 },
+];
+
+Deno.test("postWebhook: retries transient 5xx with exponential backoff, then succeeds", async () => {
+  const origFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = ((_input: string | URL | Request, _init?: RequestInit) => {
+    calls += 1;
+    if (calls < 3) return Promise.resolve(new Response("boom", { status: 503 }));
+    return Promise.resolve(new Response("ok", { status: 200 }));
+  }) as typeof fetch;
+  Deno.env.set("ALERT_WEBHOOK_URL", "https://hooks.example.test/verdant");
+  Deno.env.set("ALERT_WEBHOOK_BASE_DELAY_MS", "1");
+  Deno.env.set("ALERT_WEBHOOK_MAX_DELAY_MS", "2");
+  Deno.env.set("ALERT_WEBHOOK_MAX_ATTEMPTS", "5");
+  try {
+    const res = await postWebhook(breachFixture, baseThresholds);
+    assertEquals(res.posted, true);
+    assertEquals(res.status, 200);
+    assertEquals(calls, 3);
+    assertEquals(res.attempts.length, 3);
+    assertEquals(res.attempts[0].transient, true);
+    assertEquals(res.attempts[0].delay_before_ms, 0);
+    assert(res.attempts[1].delay_before_ms >= 0);
+    assertEquals(res.attempts[2].ok, true);
+    assertEquals(res.gave_up_transient, undefined);
+  } finally {
+    globalThis.fetch = origFetch;
+    Deno.env.delete("ALERT_WEBHOOK_URL");
+    Deno.env.delete("ALERT_WEBHOOK_BASE_DELAY_MS");
+    Deno.env.delete("ALERT_WEBHOOK_MAX_DELAY_MS");
+    Deno.env.delete("ALERT_WEBHOOK_MAX_ATTEMPTS");
+  }
+});
+
+Deno.test("postWebhook: 4xx is permanent, no retries", async () => {
+  const origFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = (() => {
+    calls += 1;
+    return Promise.resolve(new Response("bad", { status: 404 }));
+  }) as typeof fetch;
+  Deno.env.set("ALERT_WEBHOOK_URL", "https://hooks.example.test/verdant");
+  Deno.env.set("ALERT_WEBHOOK_MAX_ATTEMPTS", "5");
+  try {
+    const res = await postWebhook(breachFixture, baseThresholds);
+    assertEquals(res.posted, false);
+    assertEquals(res.status, 404);
+    assertEquals(calls, 1);
+    assertEquals(res.attempts[0].transient, false);
+    assertEquals(res.gave_up_transient, undefined);
+  } finally {
+    globalThis.fetch = origFetch;
+    Deno.env.delete("ALERT_WEBHOOK_URL");
+    Deno.env.delete("ALERT_WEBHOOK_MAX_ATTEMPTS");
+  }
+});
+
+Deno.test("postWebhook: exhausted transient retries mark gave_up_transient and log retries", async () => {
+  const origFetch = globalThis.fetch;
+  const origWarn = console.warn;
+  const origError = console.error;
+  const origInfo = console.log;
+  const events: string[] = [];
+  const capture = (msg: unknown) => events.push(String(msg));
+  console.warn = capture;
+  console.error = capture;
+  console.log = capture;
+  globalThis.fetch = (() =>
+    Promise.reject(new Error("network down"))) as typeof fetch;
+  Deno.env.set("ALERT_WEBHOOK_URL", "https://hooks.example.test/verdant");
+  Deno.env.set("ALERT_WEBHOOK_BASE_DELAY_MS", "1");
+  Deno.env.set("ALERT_WEBHOOK_MAX_DELAY_MS", "2");
+  Deno.env.set("ALERT_WEBHOOK_MAX_ATTEMPTS", "3");
+  try {
+    const res = await postWebhook(breachFixture, baseThresholds);
+    assertEquals(res.posted, false);
+    assertEquals(res.gave_up_transient, true);
+    assertEquals(res.attempts.length, 3);
+    for (const a of res.attempts) assertEquals(a.transient, true);
+    assert(events.some((l) => l.includes('"event":"webhook_retry_scheduled"')));
+    assert(events.some((l) => l.includes('"event":"webhook_transient_failure"')));
+    assert(events.some((l) => l.includes('"event":"webhook_retries_exhausted"')));
+  } finally {
+    globalThis.fetch = origFetch;
+    console.warn = origWarn;
+    console.error = origError;
+    console.log = origInfo;
+    Deno.env.delete("ALERT_WEBHOOK_URL");
+    Deno.env.delete("ALERT_WEBHOOK_BASE_DELAY_MS");
+    Deno.env.delete("ALERT_WEBHOOK_MAX_DELAY_MS");
+    Deno.env.delete("ALERT_WEBHOOK_MAX_ATTEMPTS");
   }
 });

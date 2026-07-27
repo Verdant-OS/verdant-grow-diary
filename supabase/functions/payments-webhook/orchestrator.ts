@@ -145,6 +145,29 @@ export interface Deps {
     environment: PaddleEnv;
   }): Promise<CreditPackAllocationResult>;
   /**
+   * Settlement-time spendability probe for a credit-pack buyer.
+   *
+   * get-paddle-price gates packs at price-resolution time, but the money is
+   * taken later: a buyer who was entitled when they clicked can lapse before
+   * the transaction settles. `ai_credit_spend` only reads pack balance when
+   * the scope is per_month, so those credits sit dormant.
+   *
+   * Deliberately does NOT gate the grant. Withholding credits someone paid
+   * for is worse than granting dormant ones — packs never expire, so they
+   * activate the moment the buyer has a plan again. This exists to make the
+   * mismatch VISIBLE rather than to police it.
+   *
+   * `known: false` means we could not read the entitlement; that must never
+   * be reported as a mismatch, only as unknown.
+   *
+   * Optional, so every existing fixture and the subscription paths are
+   * unaffected when it is absent.
+   */
+  probeCreditPackSpendable?(input: {
+    user_id: string;
+    environment: PaddleEnv;
+  }): Promise<{ known: boolean; spendable: boolean }>;
+  /**
    * Double-bill fix: after a Founder Lifetime grant, cancel the buyer's
    * OTHER active recurring provider subscriptions (effective at the next
    * billing period — they keep what they already paid for). Without this,
@@ -280,6 +303,11 @@ export async function handleVerifiedEvent(
 
   // 3) Write.
   let writeRes: IoResult;
+  // Set when a credit pack was granted to someone who cannot currently spend
+  // it (they lapsed between price resolution and settlement). Surfaced in the
+  // return reason so it is greppable in logs, rather than abusing an audit
+  // column meant for failures — the grant itself succeeded.
+  let packSettledUnspendable = false;
   // Set when the post-grant provider cancellation fails; recorded on the
   // processed mark's last_error for operator reconciliation. Never blocks
   // the grant or the 200.
@@ -388,6 +416,21 @@ export async function handleVerifiedEvent(
         return { httpStatus: 500, reason: `write_failed:${redactError(err)}` };
       }
       writeRes = { ok: true };
+      // Grant already succeeded above. This only annotates the outcome.
+      if (deps.probeCreditPackSpendable) {
+        try {
+          const probe = await deps.probeCreditPackSpendable({
+            user_id: decision.userId,
+            environment: decision.env,
+          });
+          if (probe.known && !probe.spendable) {
+            packSettledUnspendable = true;
+          }
+        } catch {
+          // A probe failure must never affect a completed grant, and must
+          // never be reported as a mismatch — we simply do not know.
+        }
+      }
     } else {
       // Dep NOT wired. Previously this returned a silent no-op success, which
       // marked a paid credit-pack purchase "processed" with no grant written
@@ -463,6 +506,11 @@ export async function handleVerifiedEvent(
     httpStatus: 200,
     reason: providerCancelError
       ? `processed:${decision.kind};provider_cancel_failed`
-      : `processed:${decision.kind}`,
+      : packSettledUnspendable
+        ? // Granted on purpose — never withhold credits someone paid for.
+          // Packs do not expire, so these activate the moment the buyer has a
+          // plan again; this marker just makes the dormant balance findable.
+          `processed:${decision.kind};unspendable_at_settlement`
+        : `processed:${decision.kind}`,
   };
 }

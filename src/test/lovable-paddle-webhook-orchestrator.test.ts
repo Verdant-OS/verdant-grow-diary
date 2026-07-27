@@ -593,6 +593,76 @@ describe("handleVerifiedEvent — AI credit-pack grant", () => {
     expect(grant).toHaveBeenCalledTimes(1);
   });
 
+  it("grants a pack the buyer cannot yet spend, and flags it", async () => {
+    // Founder decision: never withhold credits someone paid for. The money is
+    // taken before this runs, and packs do not expire — so a buyer who lapsed
+    // between price resolution and settlement gets the credits, which activate
+    // when they have a plan again. The flag makes that dormant balance
+    // findable instead of silent.
+    const f = makeFixture();
+    const grant = vi.fn(async () => ({ ok: true }) as Awaited<ReturnType<PackDep>>);
+    (f.deps as Deps).allocateCreditPack = grant;
+    (f.deps as Deps).probeCreditPackSpendable = vi.fn(async () => ({
+      known: true,
+      spendable: false,
+    }));
+
+    const res = await handleVerifiedEvent(
+      f.deps,
+      packTxEvent("credit_pack_50", "evt_pack_unspendable"),
+      "sandbox",
+      NOW,
+      {},
+    );
+
+    expect(res.httpStatus).toBe(200);
+    // Granted — the assertion that matters most.
+    expect(grant).toHaveBeenCalledTimes(1);
+    expect(res.reason).toContain("processed:grant_credit_pack");
+    expect(res.reason).toContain("unspendable_at_settlement");
+    expect(f.markCalls.at(-1)?.patch.processing_status).toBe("processed");
+  });
+
+  it("does not flag a spendable buyer, and never lets a probe failure touch the grant", async () => {
+    // Non-triviality + blast-radius guard: the probe is annotation only. A
+    // spendable buyer must be unmarked, and a throwing probe must not turn a
+    // completed grant into a failure or a false mismatch.
+    const f = makeFixture();
+    const grant = vi.fn(async () => ({ ok: true }) as Awaited<ReturnType<PackDep>>);
+    (f.deps as Deps).allocateCreditPack = grant;
+    (f.deps as Deps).probeCreditPackSpendable = vi.fn(async () => ({
+      known: true,
+      spendable: true,
+    }));
+    const ok = await handleVerifiedEvent(
+      f.deps,
+      packTxEvent("credit_pack_50", "evt_pack_ok"),
+      "sandbox",
+      NOW,
+      {},
+    );
+    expect(ok.reason).toBe("processed:grant_credit_pack");
+    expect(ok.reason).not.toContain("unspendable");
+
+    const f2 = makeFixture();
+    const grant2 = vi.fn(async () => ({ ok: true }) as Awaited<ReturnType<PackDep>>);
+    (f2.deps as Deps).allocateCreditPack = grant2;
+    (f2.deps as Deps).probeCreditPackSpendable = vi.fn(async () => {
+      throw new Error("entitlement read exploded");
+    });
+    const boom = await handleVerifiedEvent(
+      f2.deps,
+      packTxEvent("credit_pack_50", "evt_pack_probe_boom"),
+      "sandbox",
+      NOW,
+      {},
+    );
+    expect(boom.httpStatus).toBe(200);
+    expect(grant2).toHaveBeenCalledTimes(1);
+    // Unknown is NOT a mismatch.
+    expect(boom.reason).not.toContain("unspendable");
+  });
+
   it("grant dep not wired: still 200, but NEVER reports a grant it did not make", async () => {
     // This previously asserted `processed:grant_credit_pack` — i.e. the money
     // path reporting a successful grant that never happened. In production an

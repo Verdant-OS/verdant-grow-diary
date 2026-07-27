@@ -172,6 +172,61 @@ function evaluate(rows: EventRow[], t: Thresholds): Breach[] {
   return breaches;
 }
 
+interface DispatchRow {
+  fn: string;
+  metric: string;
+  last_fired_at: string;
+}
+
+interface SuppressedBreach extends Breach {
+  last_fired_at: string;
+  next_eligible_at: string;
+  cooldown_remaining_seconds: number;
+}
+
+function partitionByCooldown(
+  breaches: Breach[],
+  existing: DispatchRow[],
+  now: Date,
+  cooldownMinutes: number,
+): { toFire: Breach[]; suppressed: SuppressedBreach[] } {
+  if (cooldownMinutes <= 0) return { toFire: breaches, suppressed: [] };
+  const cooldownMs = cooldownMinutes * 60_000;
+  const key = (fn: string, metric: string) => `${fn}::${metric}`;
+  const lastByKey = new Map<string, string>();
+  for (const row of existing) {
+    lastByKey.set(key(row.fn, row.metric), row.last_fired_at);
+  }
+  const toFire: Breach[] = [];
+  const suppressed: SuppressedBreach[] = [];
+  for (const b of breaches) {
+    const last = lastByKey.get(key(b.fn, b.metric));
+    if (!last) {
+      toFire.push(b);
+      continue;
+    }
+    const lastMs = Date.parse(last);
+    if (!Number.isFinite(lastMs)) {
+      toFire.push(b);
+      continue;
+    }
+    const nextMs = lastMs + cooldownMs;
+    if (nextMs <= now.getTime()) {
+      toFire.push(b);
+    } else {
+      suppressed.push({
+        ...b,
+        last_fired_at: last,
+        next_eligible_at: new Date(nextMs).toISOString(),
+        cooldown_remaining_seconds: Math.max(0, Math.ceil((nextMs - now.getTime()) / 1000)),
+      });
+    }
+  }
+  return { toFire, suppressed };
+}
+
+
+
 async function postWebhook(breaches: Breach[], t: Thresholds): Promise<{ posted: boolean; status?: number; error?: string }> {
   const url = Deno.env.get("ALERT_WEBHOOK_URL");
   if (!url) return { posted: false };

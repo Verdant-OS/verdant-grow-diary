@@ -1025,6 +1025,7 @@ export type Database = {
           event_type: string
           fn: string
           id: number
+          idempotency_key: string | null
           observed_at: string
           outcome: string | null
           request_id: string | null
@@ -1042,6 +1043,7 @@ export type Database = {
           event_type: string
           fn: string
           id?: number
+          idempotency_key?: string | null
           observed_at?: string
           outcome?: string | null
           request_id?: string | null
@@ -1059,6 +1061,7 @@ export type Database = {
           event_type?: string
           fn?: string
           id?: number
+          idempotency_key?: string | null
           observed_at?: string
           outcome?: string | null
           request_id?: string | null

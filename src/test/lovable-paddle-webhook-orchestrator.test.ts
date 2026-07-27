@@ -593,12 +593,20 @@ describe("handleVerifiedEvent — AI credit-pack grant", () => {
     expect(grant).toHaveBeenCalledTimes(1);
   });
 
-  it("grants a pack the buyer cannot yet spend, and flags it", async () => {
+  it("grants a pack the buyer cannot yet spend, and PERSISTS the flag to the audit row", async () => {
     // Founder decision: never withhold credits someone paid for. The money is
     // taken before this runs, and packs do not expire — so a buyer who lapsed
     // between price resolution and settlement gets the credits, which activate
     // when they have a plan again. The flag makes that dormant balance
     // findable instead of silent.
+    //
+    // Codex (P2): my first version put the marker ONLY in the response
+    // `reason` — a transient string that logs expire and that a future
+    // duplicate delivery of the same event never recomputes (it short-circuits
+    // to `duplicate_processed` before this code runs again). So the marker was
+    // findable exactly once, in a log line, never in the durable
+    // lovable_paddle_events row an operator would actually query months later.
+    // It now also lands in the persisted last_error column.
     const f = makeFixture();
     const grant = vi.fn(async () => ({ ok: true }) as Awaited<ReturnType<PackDep>>);
     (f.deps as Deps).allocateCreditPack = grant;
@@ -620,7 +628,13 @@ describe("handleVerifiedEvent — AI credit-pack grant", () => {
     expect(grant).toHaveBeenCalledTimes(1);
     expect(res.reason).toContain("processed:grant_credit_pack");
     expect(res.reason).toContain("unspendable_at_settlement");
-    expect(f.markCalls.at(-1)?.patch.processing_status).toBe("processed");
+    // The durable row, not just the transient response — this is the part
+    // Codex's finding was actually about.
+    expect(f.markCalls.at(-1)?.patch).toMatchObject({
+      processing_status: "processed",
+      processed_ok: true,
+      last_error: expect.stringContaining("unspendable_at_settlement"),
+    });
   });
 
   it("does not flag a spendable buyer, and never lets a probe failure touch the grant", async () => {

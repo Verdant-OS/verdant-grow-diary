@@ -497,16 +497,49 @@ export async function handleVerifiedEvent(
     return { httpStatus: 500, reason: `write_failed:${redactError(err)}` };
   }
 
-  // 4) Mark processed. A failed post-grant provider cancellation rides on
-  // last_error (processed_ok stays true — the grant itself succeeded) so
-  // the operator audit surface can reconcile the double-bill risk.
+  // 4) Mark processed. Two anomalies can ride alongside a successful grant —
+  // a failed post-grant provider cancellation (double-bill risk) and a
+  // credit pack settling for a buyer who cannot yet spend it — and BOTH must
+  // reach the durable last_error column, not just this response's `reason`.
+  //
+  // Codex (P2): my first version put unspendable_at_settlement ONLY in the
+  // return reason. That string lives in the function's transient response —
+  // logs expire, and any future delivery of this SAME event short-circuits to
+  // `duplicate_processed` at the top of this function without ever
+  // recomputing it. So the marker this branch exists to make "findable" was
+  // findable exactly once, in a log line, and never again. Querying
+  // lovable_paddle_events — the actual audit surface an operator would use
+  // months later — could not see it at all.
+  //
+  // They are mutually exclusive by decision kind today (a provider-cancel
+  // failure only follows a founder_lifetime/record_lifetime grant; the pack
+  // probe only follows grant_credit_pack) but composed as a list rather than
+  // an if/else so that stays true by construction, not by assumption, if a
+  // future decision kind ever produces both.
+  // Two string lists on purpose, not one: `reason` (the terse response) and
+  // last_error (the persisted, detailed audit trail) have different existing
+  // shapes for provider_cancel_failed — the response omits the underlying
+  // error text, last_error carries it. Reusing one joined string for both
+  // would either leak error detail into the response or drop it from the
+  // audit row; this preserves each pre-existing shape and adds
+  // unspendable_at_settlement — a plain flag, no detail to omit — to both.
+  const anomalyFlags: string[] = [];
+  const anomalyDetails: string[] = [];
+  if (providerCancelError) {
+    anomalyFlags.push("provider_cancel_failed");
+    anomalyDetails.push(`provider_cancel_failed:${providerCancelError}`);
+  }
+  if (packSettledUnspendable) {
+    anomalyFlags.push("unspendable_at_settlement");
+    anomalyDetails.push("unspendable_at_settlement");
+  }
+  const lastError = anomalyDetails.length > 0 ? redactError(anomalyDetails.join(";")) : null;
+
   const mark = await deps.markEvent(paddleEventId, {
     processing_status: "processed",
     processed_ok: true,
     skip_reason: null,
-    last_error: providerCancelError
-      ? redactError(`provider_cancel_failed:${providerCancelError}`)
-      : null,
+    last_error: lastError,
   });
   if ("error" in mark) {
     // Subscription upsert is idempotent (unique paddle_subscription_id), so
@@ -516,13 +549,9 @@ export async function handleVerifiedEvent(
 
   return {
     httpStatus: 200,
-    reason: providerCancelError
-      ? `processed:${decision.kind};provider_cancel_failed`
-      : packSettledUnspendable
-        ? // Granted on purpose — never withhold credits someone paid for.
-          // Packs do not expire, so these activate the moment the buyer has a
-          // plan again; this marker just makes the dormant balance findable.
-          `processed:${decision.kind};unspendable_at_settlement`
+    reason:
+      anomalyFlags.length > 0
+        ? `processed:${decision.kind};${anomalyFlags.join(";")}`
         : `processed:${decision.kind}`,
   };
 }

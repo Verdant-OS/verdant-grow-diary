@@ -37,6 +37,8 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/operator/ecowitt-bridge-debug",
   "/operator/ecowitt-live-bringup",
   "/operator/ecowitt-tent-preview",
+  "/operator/edge-alerts",
+  "/operator/edge-metrics",
   "/demo/one-tent-live-proof",
   "/operator/one-tent-live-proof",
   "/operator/one-tent-loop-smoke-test",

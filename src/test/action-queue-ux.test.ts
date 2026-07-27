@@ -156,7 +156,12 @@ describe("ActionQueue — transition/audit flow preserved", () => {
   });
 
   it("transition() uses the atomic transition-and-audit RPC", () => {
-    expect(PAGE).toMatch(/supabase\.rpc\(\s*["']action_queue_transition["']/);
+    // Tolerates the runtime-availability cast used to invoke the RPC before
+    // its generated typing lands (see actionQueueRpcAvailability):
+    //   (supabase.rpc as unknown as (...) => ...)("action_queue_transition", ...)
+    // as well as a direct supabase.rpc("action_queue_transition", ...). Same
+    // pattern as action-detail.test.ts.
+    expect(PAGE).toMatch(/supabase\.rpc\b[\s\S]{0,200}?["']action_queue_transition["']/);
     expect(PAGE).not.toMatch(/\.from\(\s*["']action_queue_events["']\s*\)[\s\S]{0,200}\.insert\(/);
   });
 
@@ -167,7 +172,7 @@ describe("ActionQueue — transition/audit flow preserved", () => {
     expect(m).not.toBeNull();
     expect(m![1]).not.toMatch(/\buser_id\b|\bgrow_id\b|\bevent_type\b|\bnew_status\b/);
     expect(PAGE).toMatch(
-      /supabase\.rpc\(\s*["']action_queue_transition["']\s*,\s*rpcArgs\s*,?\s*\)/,
+      /supabase\.rpc\b[\s\S]{0,200}?["']action_queue_transition["']\s*,\s*rpcArgs\s*,?\s*\)/,
     );
   });
 });

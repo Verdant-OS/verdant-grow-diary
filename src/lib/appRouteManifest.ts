@@ -299,6 +299,17 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "EcoWitt per-tent preview (read-only).",
   },
   {
+    path: "/operator/edge-alerts",
+    access: "operator",
+    description:
+      "Operator edge-function alert breach state — live evaluation plus cooldown dispatch history (read-only).",
+  },
+  {
+    path: "/operator/edge-metrics",
+    access: "operator",
+    description: "Operator edge-function metric trend charts (read-only).",
+  },
+  {
     path: "/operator/one-tent-live-proof",
     access: "operator",
     description: "Operator one-tent live proof page.",

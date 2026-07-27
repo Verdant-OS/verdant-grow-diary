@@ -40,7 +40,12 @@ describe("ActionQueue — URL growId filter", () => {
   });
 
   it("preserves transition/audit flow through the atomic RPC", () => {
-    expect(PAGE).toMatch(/supabase\.rpc\(\s*["']action_queue_transition["']/);
+    // Tolerates the runtime-availability cast used to invoke the RPC before
+    // its generated typing lands (see actionQueueRpcAvailability):
+    //   (supabase.rpc as unknown as (...) => ...)("action_queue_transition", ...)
+    // as well as a direct supabase.rpc("action_queue_transition", ...). Same
+    // pattern as action-detail.test.ts.
+    expect(PAGE).toMatch(/supabase\.rpc\b[\s\S]{0,200}?["']action_queue_transition["']/);
     expect(PAGE).toMatch(/buildActionQueueTransitionRpcArgs/);
     expect(PAGE).not.toMatch(/from\(\s*["']action_queue_events["']\s*\)\s*\.insert/);
   });

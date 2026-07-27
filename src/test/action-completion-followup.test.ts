@@ -289,7 +289,12 @@ describe("ActionDetail — follow-up wiring (static)", () => {
   });
 
   it("uses the atomic transition-and-audit RPC", () => {
-    expect(ACTION_DETAIL).toMatch(/supabase\.rpc\(\s*"action_queue_transition"/);
+    // Tolerates the runtime-availability cast used to invoke the RPC before
+    // its generated typing lands (see actionQueueRpcAvailability):
+    //   (supabase.rpc as unknown as (...) => ...)("action_queue_transition", ...)
+    // as well as a direct supabase.rpc("action_queue_transition", ...). Same
+    // pattern as action-detail.test.ts.
+    expect(ACTION_DETAIL).toMatch(/supabase\.rpc\b[\s\S]{0,200}?["']action_queue_transition["']/);
     expect(ACTION_DETAIL).toMatch(/parseActionQueueTransitionRpcResult\(data,\s*rpcArgs\)/);
     expect(ACTION_DETAIL).not.toMatch(/\.from\("action_queue_events"\)\.insert\(/);
   });

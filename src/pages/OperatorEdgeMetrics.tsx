@@ -97,6 +97,7 @@ function tooltipLabelFormatter(bucket: "hour" | "day") {
 
 export default function OperatorEdgeMetrics() {
   usePageSeo({
+    path: "/operator/edge-metrics",
     title: "Edge function metrics — operator",
     description: "Internal analytics for edge function request and snapshot trends.",
     noindex: true,

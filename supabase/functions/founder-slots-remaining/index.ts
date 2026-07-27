@@ -362,14 +362,27 @@ function maybeEmitSnapshot(): void {
   const mean = requestsSinceSnapshot === 0
     ? 0
     : Math.round((durationSumMsSinceSnapshot / requestsSinceSnapshot) * 100) / 100;
+  const maxRounded = Math.round(durationMaxMsSinceSnapshot * 100) / 100;
+  const countersSnapshot = { ...counters };
   log({
     event: "metric_snapshot",
     severity: "info",
     window_ms: SNAPSHOT_INTERVAL_MS,
     requests_in_window: requestsSinceSnapshot,
     duration_ms_mean_in_window: mean,
-    duration_ms_max_in_window: Math.round(durationMaxMsSinceSnapshot * 100) / 100,
-    counters: { ...counters },
+    duration_ms_max_in_window: maxRounded,
+    counters: countersSnapshot,
+    deploy_version: releaseProvenance.deploy_version,
+    supabase_env: releaseProvenance.supabase_env,
+  });
+  schedulePersist({
+    fn: FN,
+    event_type: "metric_snapshot",
+    window_ms: SNAPSHOT_INTERVAL_MS,
+    requests_in_window: requestsSinceSnapshot,
+    duration_ms_mean_in_window: mean,
+    duration_ms_max_in_window: maxRounded,
+    counters: countersSnapshot,
     deploy_version: releaseProvenance.deploy_version,
     supabase_env: releaseProvenance.supabase_env,
   });
@@ -377,6 +390,7 @@ function maybeEmitSnapshot(): void {
   durationSumMsSinceSnapshot = 0;
   durationMaxMsSinceSnapshot = 0;
 }
+
 
 
 

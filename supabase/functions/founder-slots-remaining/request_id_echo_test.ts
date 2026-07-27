@@ -17,8 +17,14 @@ Deno.env.set("FOUNDER_SLOTS_SKIP_SERVE", "1");
 import { assert, assertEquals, assertMatch } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   __setDepsLoaderForTesting,
+  __setMetricPersistorForTesting,
   handleFounderSlotsRequest,
 } from "./index.ts";
+
+// Install a no-op metric persistor for every test in this file so the
+// fire-and-forget metric write (which normally POSTs to Supabase over the
+// network) does not leak fetch handles across Deno tests.
+__setMetricPersistorForTesting(async () => {});
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;

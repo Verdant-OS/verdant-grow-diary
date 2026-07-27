@@ -411,17 +411,45 @@ export default function OperatorEdgeAlerts() {
         </div>
       </header>
 
-      <Card>
-        <CardHeader className="pb-3">
+      <Card className="sticky top-0 z-30 -mx-2 rounded-none border-x-0 bg-background/95 px-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/75 sm:static sm:mx-0 sm:rounded-lg sm:border-x sm:px-0 sm:bg-card sm:shadow-none sm:backdrop-blur-none">
+        <CardHeader className="hidden pb-3 sm:block">
           <CardTitle className="text-base">Filters</CardTitle>
           <CardDescription>
             Narrow by function name, metric, cooldown status, or time range. Applies to fired,
             suppressed, and cooldown tables.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <div className="grid gap-1.5 lg:col-span-2">
+        <CardContent className="space-y-3 py-3 sm:py-6">
+          {/* Mobile: compact row with search + toggle */}
+          <div className="flex items-center gap-2 sm:hidden">
+            <Input
+              id="edge-alerts-search-mobile"
+              placeholder="Search function…"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setDispatchPage(0);
+              }}
+              className="h-11 flex-1"
+              inputMode="search"
+            />
+            <Button
+              variant={mobileFiltersOpen || filtersActive ? "default" : "outline"}
+              size="icon"
+              aria-label={mobileFiltersOpen ? "Hide filters" : "Show filters"}
+              aria-expanded={mobileFiltersOpen}
+              className="h-11 w-11 shrink-0"
+              onClick={() => setMobileFiltersOpen((v) => !v)}
+            >
+              <SlidersHorizontal className="h-5 w-5" />
+            </Button>
+          </div>
+
+          {/* Full filter grid: always on desktop, toggled on mobile */}
+          <div
+            className={`${mobileFiltersOpen ? "grid" : "hidden"} gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-5`}
+          >
+            <div className="hidden gap-1.5 sm:grid lg:col-span-2">
               <Label htmlFor="edge-alerts-search" className="text-xs">
                 Function / rule
               </Label>
@@ -444,7 +472,7 @@ export default function OperatorEdgeAlerts() {
                   setDispatchPage(0);
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-11 sm:h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -464,7 +492,7 @@ export default function OperatorEdgeAlerts() {
                   setDispatchPage(0);
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-11 sm:h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -483,7 +511,7 @@ export default function OperatorEdgeAlerts() {
                   setDispatchPage(0);
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-11 sm:h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -497,19 +525,20 @@ export default function OperatorEdgeAlerts() {
             </div>
           </div>
           {filtersActive ? (
-            <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
               <span>
-                Showing {filteredDispatches.length} of {dispatchesWithExpiry.length} dispatch rows
+                {filteredDispatches.length}/{dispatchesWithExpiry.length} dispatch
                 {" · "}
                 {filteredFired.length} fired · {filteredSuppressed.length} suppressed
               </span>
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                <X className="mr-1 h-3 w-3" /> Clear filters
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9">
+                <X className="mr-1 h-3 w-3" /> Clear
               </Button>
             </div>
           ) : null}
         </CardContent>
       </Card>
+
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>

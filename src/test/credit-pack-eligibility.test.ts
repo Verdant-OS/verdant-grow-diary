@@ -86,10 +86,24 @@ describe("credit pack server gate", () => {
     expect(PRICE_FN).toMatch(/creditPackIsSpendable[\s\S]{0,120}creditPackEligibility/);
   });
 
-  it("fails closed if the entitlement cannot be read", () => {
-    // "We couldn't check" must never resolve to "sell".
-    const block = PRICE_FN.slice(PRICE_FN.indexOf("CREDIT_PACK_IDS as readonly string[]"));
-    expect(block.slice(0, 900)).toMatch(/catch[\s\S]{0,200}packSpendable = false/);
+  it("fails closed on BOTH failure shapes, and says so honestly", () => {
+    // "We couldn't check" must never resolve to "sell" — but it must also not
+    // resolve to "your plan is wrong". loadUnionEntitlement does NOT throw on a
+    // failed subscriptions query; it returns lookupFailed with a FREE fallback,
+    // so a try/catch alone would tell a PAYING buyer their plan uses per-grow
+    // credits. Both shapes must refuse, and the transient one must report as
+    // transient.
+    const block = PRICE_FN.slice(PRICE_FN.indexOf("CREDIT_PACK_IDS as readonly string[]")).slice(
+      0,
+      1800,
+    );
+    // Soft failure is read, not ignored.
+    expect(block).toMatch(/lookupFailed/);
+    expect(block).toMatch(/packSpendable = !lookupFailed && creditPackIsSpendable/);
+    // Thrown failure still refuses.
+    expect(block).toMatch(/catch[\s\S]{0,160}packSpendable = false/);
+    // And an unknown entitlement reports transient, NOT the plan-shaped refusal.
+    expect(block).toMatch(/packEntitlementUnknown[\s\S]{0,400}price_resolution_unavailable/);
   });
 
   it("surfaces the refusal as a typed catalog reason, not a raw error", () => {

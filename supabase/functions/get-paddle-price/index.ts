@@ -184,17 +184,35 @@ Deno.serve(async (req) => {
     //     shared with the client rather than duplicated.
     if ((CREDIT_PACK_IDS as readonly string[]).includes(requested)) {
       let packSpendable = false;
+      let packEntitlementUnknown = false;
       try {
-        const { entitlement } = await loadUnionEntitlement(
+        const { entitlement, lookupFailed } = await loadUnionEntitlement(
           supabase,
           resolveServerBillingEnvironment(),
           new Date(),
         );
-        packSpendable = creditPackIsSpendable(entitlement);
+        // loadUnionEntitlement does NOT throw on a failed subscriptions query —
+        // it returns lookupFailed with a FREE fallback entitlement. Ignoring
+        // that flag would hand a paying buyer `pack_requires_monthly_plan`,
+        // whose copy states their plan uses per-grow credits. That is a false
+        // statement to a customer, not just an unhelpful one, so a transient
+        // failure must be reported as transient.
+        packEntitlementUnknown = lookupFailed;
+        packSpendable = !lookupFailed && creditPackIsSpendable(entitlement);
       } catch {
-        // Fail CLOSED: if we cannot confirm the buyer can spend the pack, we
-        // must not sell it. An unusable purchase is worse than a retry.
+        packEntitlementUnknown = true;
         packSpendable = false;
+      }
+      if (packEntitlementUnknown) {
+        // Fail CLOSED, but honestly: we still refuse the sale (an unusable
+        // purchase is worse than a retry), we just do not assert anything
+        // about the buyer's plan.
+        logCatalogUnavailable({
+          plan: requested,
+          reason: "price_resolution_unavailable",
+          stage: "entitlement",
+        });
+        return json(503, { error: "price_resolution_unavailable" });
       }
       if (!packSpendable) {
         logCatalogUnavailable({

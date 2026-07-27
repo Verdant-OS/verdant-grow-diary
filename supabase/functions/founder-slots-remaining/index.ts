@@ -95,6 +95,9 @@ function loadDeps(): Promise<Deps> {
       depsPromise = null;
       const message = err instanceof Error ? err.message : String(err);
       const name = err instanceof Error ? err.name : "UnknownError";
+      // Counter is defined below in the metrics block; the reference
+      // resolves at call-time (post-boot), so incrementing here is safe.
+      counters.startup_import_failed = (counters.startup_import_failed ?? 0) + 1;
       log({
         event: "startup_import_failed",
         severity: "critical",
@@ -108,6 +111,96 @@ function loadDeps(): Promise<Deps> {
 }
 
 log({ event: "boot", severity: "info" });
+
+// ---------------------------------------------------------------------------
+// In-process counters + timers. These live for the lifetime of one edge
+// worker instance (they reset on cold boot / restart), which is fine —
+// Lovable Cloud spawns many short-lived instances, so we intentionally
+// emit both:
+//   - `request_metric` (per request, carries outcome + duration_ms) —
+//     the source of truth for latency histograms / rate calculations in
+//     the log aggregator.
+//   - `metric_snapshot` (throttled, carries the counter table) — a
+//     lightweight sanity check that lets you eyeball per-instance
+//     totals without joining every `request_metric` row.
+// Neither replaces the existing per-outcome logs; they add trendable
+// numeric surfaces on top of them.
+// ---------------------------------------------------------------------------
+
+type Outcome =
+  | "success"
+  | "rpc_error"
+  | "rpc_invalid_payload"
+  | "env_missing"
+  | "startup_dependencies_unavailable"
+  | "handler_unhandled_error"
+  | "method_not_allowed";
+
+const counters: Record<string, number> = {
+  requests_total: 0,
+  success: 0,
+  rpc_error: 0,
+  rpc_invalid_payload: 0,
+  env_missing: 0,
+  startup_dependencies_unavailable: 0,
+  startup_import_failed: 0,
+  handler_unhandled_error: 0,
+  method_not_allowed: 0,
+};
+
+// Running latency accumulator (ms) for a cheap mean + max per snapshot
+// window. `_since_snapshot` fields reset every time we emit a snapshot
+// so the values reflect the window, not the instance lifetime.
+let durationSumMsSinceSnapshot = 0;
+let durationMaxMsSinceSnapshot = 0;
+let requestsSinceSnapshot = 0;
+
+const SNAPSHOT_INTERVAL_MS = 30_000;
+let lastSnapshotAt = 0;
+
+function recordRequestMetric(
+  outcome: Outcome,
+  durationMs: number,
+  requestId: string,
+): void {
+  counters.requests_total += 1;
+  counters[outcome] = (counters[outcome] ?? 0) + 1;
+  requestsSinceSnapshot += 1;
+  durationSumMsSinceSnapshot += durationMs;
+  if (durationMs > durationMaxMsSinceSnapshot) {
+    durationMaxMsSinceSnapshot = durationMs;
+  }
+  log({
+    event: "request_metric",
+    severity: "info",
+    request_id: requestId,
+    outcome,
+    duration_ms: Math.round(durationMs * 100) / 100,
+  });
+  maybeEmitSnapshot();
+}
+
+function maybeEmitSnapshot(): void {
+  const now = Date.now();
+  if (now - lastSnapshotAt < SNAPSHOT_INTERVAL_MS) return;
+  lastSnapshotAt = now;
+  const mean = requestsSinceSnapshot === 0
+    ? 0
+    : Math.round((durationSumMsSinceSnapshot / requestsSinceSnapshot) * 100) / 100;
+  log({
+    event: "metric_snapshot",
+    severity: "info",
+    window_ms: SNAPSHOT_INTERVAL_MS,
+    requests_in_window: requestsSinceSnapshot,
+    duration_ms_mean_in_window: mean,
+    duration_ms_max_in_window: Math.round(durationMaxMsSinceSnapshot * 100) / 100,
+    counters: { ...counters },
+  });
+  requestsSinceSnapshot = 0;
+  durationSumMsSinceSnapshot = 0;
+  durationMaxMsSinceSnapshot = 0;
+}
+
 
 // RFC 4122 v4 UUID regex — used to sanitize any client-supplied
 // `x-request-id` header so log/response IDs stay compact and predictable
@@ -132,86 +225,107 @@ Deno.serve(async (req) => {
   // every structured log entry it produced.
   const rlog = (fields: LogFields) => log({ ...fields, request_id: requestId });
   const requestHeaders: Record<string, string> = { "x-request-id": requestId };
-  const fail = (body: Record<string, unknown> = {}) =>
-    json(503, { error: "slots_unavailable", request_id: requestId, ...body }, requestHeaders);
-
-  if (req.method !== "GET" && req.method !== "POST") {
-    return json(
-      405,
-      { error: "method_not_allowed", request_id: requestId },
-      requestHeaders,
+  const startedAt = performance.now();
+  // Track outcome so the `finally` block can stamp exactly one
+  // `request_metric` per handler invocation.
+  let outcome: Outcome = "success";
+  const done = <T,>(resp: T, o: Outcome): T => {
+    outcome = o;
+    return resp;
+  };
+  const fail = (o: Outcome, body: Record<string, unknown> = {}) =>
+    done(
+      json(503, { error: "slots_unavailable", request_id: requestId, ...body }, requestHeaders),
+      o,
     );
-  }
-
-  let deps: Deps;
-  try {
-    deps = await loadDeps();
-  } catch (err) {
-    // loadDeps already logged startup_import_failed (module-scoped, no
-    // request_id). Emit a request-scoped companion so the 503 can be
-    // traced back to this request.
-    const message = err instanceof Error ? err.message : String(err);
-    const name = err instanceof Error ? err.name : "UnknownError";
-    rlog({
-      event: "startup_dependencies_unavailable",
-      severity: "critical",
-      error_name: name,
-      error_message: message,
-    });
-    return fail();
-  }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!supabaseUrl || !serviceRoleKey) {
+    if (req.method !== "GET" && req.method !== "POST") {
+      return done(
+        json(
+          405,
+          { error: "method_not_allowed", request_id: requestId },
+          requestHeaders,
+        ),
+        "method_not_allowed",
+      );
+    }
+
+    let deps: Deps;
+    try {
+      deps = await loadDeps();
+    } catch (err) {
+      // loadDeps already logged startup_import_failed (module-scoped, no
+      // request_id) and bumped the counter. Emit a request-scoped
+      // companion so the 503 can be traced back to this request.
+      const message = err instanceof Error ? err.message : String(err);
+      const name = err instanceof Error ? err.name : "UnknownError";
       rlog({
-        event: "env_missing",
+        event: "startup_dependencies_unavailable",
         severity: "critical",
-        has_url: Boolean(supabaseUrl),
-        has_service_role: Boolean(serviceRoleKey),
+        error_name: name,
+        error_message: message,
       });
-      return fail();
+      return fail("startup_dependencies_unavailable");
     }
-    const sb = deps.createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false },
-    });
-    const { data, error } = await sb.rpc("founder_lifetime_slots_remaining");
-    if (error) {
+
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (!supabaseUrl || !serviceRoleKey) {
+        rlog({
+          event: "env_missing",
+          severity: "critical",
+          has_url: Boolean(supabaseUrl),
+          has_service_role: Boolean(serviceRoleKey),
+        });
+        return fail("env_missing");
+      }
+      const sb = deps.createClient(supabaseUrl, serviceRoleKey, {
+        auth: { persistSession: false },
+      });
+      const { data, error } = await sb.rpc("founder_lifetime_slots_remaining");
+      if (error) {
+        rlog({
+          event: "rpc_error",
+          severity: "error",
+          code: error.code ?? null,
+          message: error.message ?? null,
+        });
+        return fail("rpc_error");
+      }
+      const payload = deps.buildFounderSlotsPayload(data);
+      if (!payload) {
+        rlog({
+          event: "rpc_invalid_payload",
+          severity: "error",
+          data_type: typeof data,
+        });
+        return fail("rpc_invalid_payload");
+      }
+      return done(
+        json(
+          200,
+          { ...payload, request_id: requestId },
+          {
+            ...requestHeaders,
+            "Cache-Control": `public, max-age=${CACHE_SECONDS}`,
+          },
+        ),
+        "success",
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const name = err instanceof Error ? err.name : "UnknownError";
       rlog({
-        event: "rpc_error",
-        severity: "error",
-        code: error.code ?? null,
-        message: error.message ?? null,
+        event: "handler_unhandled_error",
+        severity: "critical",
+        error_name: name,
+        error_message: message,
       });
-      return fail();
+      return fail("handler_unhandled_error");
     }
-    const payload = deps.buildFounderSlotsPayload(data);
-    if (!payload) {
-      rlog({
-        event: "rpc_invalid_payload",
-        severity: "error",
-        data_type: typeof data,
-      });
-      return fail();
-    }
-    return json(
-      200,
-      { ...payload, request_id: requestId },
-      {
-        ...requestHeaders,
-        "Cache-Control": `public, max-age=${CACHE_SECONDS}`,
-      },
-    );
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    const name = err instanceof Error ? err.name : "UnknownError";
-    rlog({
-      event: "handler_unhandled_error",
-      severity: "critical",
-      error_name: name,
-      error_message: message,
-    });
-    return fail();
+  } finally {
+    recordRequestMetric(outcome, performance.now() - startedAt, requestId);
   }
 });

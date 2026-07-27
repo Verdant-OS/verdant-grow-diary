@@ -216,6 +216,21 @@ describe("ActionDetail header — Linked alert link", () => {
 // --- Static safety scans ----------------------------------------------------
 const DETAIL_SRC = readFileSync(resolve(__dirname, "../..", "src/pages/ActionDetail.tsx"), "utf8");
 
+// Tolerates the runtime-availability cast used to invoke the RPC before its
+// generated typing lands (see actionQueueRpcAvailability):
+//   (supabase.rpc as unknown as (...) => ...)("action_queue_transition", ...)
+// as well as a direct supabase.rpc("action_queue_transition", ...). Same
+// pattern as action-detail.test.ts.
+//
+// The negative lookahead forbids the lazy gap from crossing a SECOND
+// "supabase.rpc" occurrence. Without it, a dynamic-name call placed before
+// the canonical call — supabase.rpc(name, args); ... supabase.rpc("action_
+// queue_transition", rpcArgs) — would let the first match's lazy [\s\S]{0,
+// 200}? skip straight past the unreviewed call and "borrow" the second
+// call's string literal, silently absorbing it into a single reported name
+// and hiding the unreviewed RPC entirely (Codex P2).
+const RPC_NAME_PATTERN = /supabase\.rpc\b(?:(?!supabase\.rpc)[\s\S]){0,200}?["']([^"']+)["']/g;
+
 describe("ActionDetail Linked alert — static safety", () => {
   it("introduces no new write paths into action_queue or alerts", () => {
     const lower = DETAIL_SRC.toLowerCase();
@@ -226,15 +241,33 @@ describe("ActionDetail Linked alert — static safety", () => {
     expect(lower).not.toMatch(
       /from\(["']alerts["'][\s\S]{0,200}?\.(insert|update|delete|upsert)\(/,
     );
-    // Tolerates the runtime-availability cast used to invoke the RPC before
-    // its generated typing lands (see actionQueueRpcAvailability):
-    //   (supabase.rpc as unknown as (...) => ...)("action_queue_transition", ...)
-    // as well as a direct supabase.rpc("action_queue_transition", ...). Same
-    // pattern as action-detail.test.ts.
-    const rpcNames = [...lower.matchAll(/supabase\.rpc\b[\s\S]{0,200}?["']([^"']+)["']/g)].map(
-      (match) => match[1],
-    );
+    const rpcCallSiteCount = (lower.match(/supabase\.rpc\b/g) ?? []).length;
+    const rpcNames = [...lower.matchAll(RPC_NAME_PATTERN)].map((match) => match[1]);
+    // Every call site must independently resolve a literal name — a
+    // dynamic/unnamed call site would leave this short rather than silently
+    // merging into the canonical name.
+    expect(rpcNames.length).toBe(rpcCallSiteCount);
     expect(rpcNames).toEqual(["action_queue_transition"]);
+  });
+
+  it("does not let a preceding dynamic RPC call absorb the canonical call's name (Codex P2 regression guard)", () => {
+    // Reproduces the flagged shape: an unreviewed dynamic-name RPC call
+    // ahead of the canonical cast-wrapped call. The fixed pattern must not
+    // merge the two into a single reported name — the dynamic call must
+    // fail to resolve, which the count check above turns into a hard
+    // failure on the real source.
+    const adversarial = `
+      supabase.rpc(somedynamicname, payload);
+      // unrelated code in between
+      const { data, error } = await (
+        supabase.rpc as unknown as (fn: string, args: unknown) => promise<{ data: unknown; error: unknown }>
+      )("action_queue_transition", rpcargs);
+    `;
+    const callSiteCount = (adversarial.match(/supabase\.rpc\b/g) ?? []).length;
+    const names = [...adversarial.matchAll(RPC_NAME_PATTERN)].map((match) => match[1]);
+    expect(callSiteCount).toBe(2);
+    expect(names).toEqual(["action_queue_transition"]);
+    expect(names.length).not.toBe(callSiteCount);
   });
 
   it("uses the shared route helper and pure extractor", () => {

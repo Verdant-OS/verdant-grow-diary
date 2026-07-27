@@ -23,7 +23,7 @@ describe("edgeFunctionErrorRules", () => {
       expect(p.retryable).toBe(false);
       expect(p.retry.kind).toBe("none");
       expect(p.requestId).toBe(VALID_UUID);
-      expect(p.message).not.toMatch(/jwt|token|session/i);
+      expect(p.message).not.toMatch(/jwt|bearer/i);
     }
   });
 

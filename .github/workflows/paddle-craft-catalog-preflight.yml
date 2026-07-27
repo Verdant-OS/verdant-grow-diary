@@ -26,6 +26,14 @@ on:
       - "supabase/functions/payments-webhook/**"
       - "scripts/verify-paddle-craft-catalog.ts"
       - "scripts/render-paddle-craft-preflight-comment.mjs"
+      # The two .mjs suites this job runs, and the package.json scripts that
+      # define them. Without these the wiring is only half a gate: vitest
+      # discovers src/test only, so a PR could edit or disable either suite and
+      # start NO workflow that runs it. Editing the thing under test has to be
+      # able to trigger the test.
+      - "scripts/render-paddle-craft-preflight-comment.test.mjs"
+      - "scripts/verify-paddle-craft-catalog.report.test.mjs"
+      - "package.json"
       - ".github/workflows/paddle-craft-catalog-preflight.yml"
   workflow_dispatch:
   schedule:

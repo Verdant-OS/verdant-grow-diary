@@ -12,15 +12,19 @@ import {
   type PlantQuickLogPrefill,
   type PlantQuickLogPrefillInput,
 } from "@/lib/plantQuickLogPrefillRules";
+import { plantDetailPath, plantsPath } from "@/lib/routes";
+import { PLANT_DETAIL_SECTION_ANCHORS } from "@/lib/plantDetailSectionAnchors";
 
-export type PlantSensorContextCtaKind = "none" | "add" | "refresh" | "inert";
+export type PlantSensorContextCtaKind = "none" | "add" | "refresh" | "recovery";
 
 export interface PlantSensorContextCtaView {
   kind: PlantSensorContextCtaKind;
   /** Visible button label. Empty for "none". */
   label: string;
-  /** Inert fallback copy when no safe handler/identity context exists. */
-  inertMessage: string | null;
+  /** Honest next step when identity or the mounted handler is incomplete. */
+  recoveryMessage: string | null;
+  /** Existing internal route that can resolve the missing context. */
+  recoveryHref: string | null;
   /** Identity-only prefill — never any sensor values. null when no CTA. */
   prefill: (PlantQuickLogPrefill & { source: "manual" }) | null;
 }
@@ -35,11 +39,79 @@ export interface PlantSensorContextCtaInput {
 const NO_CTA: PlantSensorContextCtaView = {
   kind: "none",
   label: "",
-  inertMessage: null,
+  recoveryMessage: null,
+  recoveryHref: null,
   prefill: null,
 };
 
-const INERT_COPY = "Manual sensor entry is not wired here yet.";
+function plantOverviewPath(plantId: string): string {
+  return `${plantDetailPath(plantId)}#${PLANT_DETAIL_SECTION_ANCHORS.overview}`;
+}
+
+function manualSnapshotNoun(status: PlantSensorContextStatus): string {
+  return status === "stale" ? "a fresh manual sensor snapshot" : "a manual sensor snapshot";
+}
+
+function buildRecovery(
+  status: PlantSensorContextStatus,
+  identity: PlantQuickLogPrefillInput | null | undefined,
+  hasOpenHandler: boolean,
+): PlantSensorContextCtaView {
+  const snapshot = manualSnapshotNoun(status);
+  const plantId = identity?.plantId ?? null;
+  const growId = identity?.growId ?? null;
+  const tentId = identity?.tentId ?? null;
+
+  if (!plantId) {
+    return {
+      kind: "recovery",
+      label: "Choose a plant",
+      recoveryMessage: `Choose a plant before adding ${snapshot}.`,
+      recoveryHref: plantsPath(growId),
+      prefill: null,
+    };
+  }
+
+  if (!growId) {
+    return {
+      kind: "recovery",
+      label: "Review grow setup",
+      recoveryMessage: `This plant needs a grow assignment before you can add ${snapshot}.`,
+      recoveryHref: "/grows",
+      prefill: null,
+    };
+  }
+
+  if (!tentId) {
+    return {
+      kind: "recovery",
+      label: "Assign plant to a tent",
+      recoveryMessage: `Assign this plant to a tent before adding ${snapshot}.`,
+      recoveryHref: plantOverviewPath(plantId),
+      prefill: null,
+    };
+  }
+
+  if (!hasOpenHandler) {
+    return {
+      kind: "recovery",
+      label: "Open plant Quick Log",
+      recoveryMessage: `Open the plant overview and use Quick Log to add ${snapshot}.`,
+      recoveryHref: plantOverviewPath(plantId),
+      prefill: null,
+    };
+  }
+
+  // Defensive fallback: buildPlantQuickLogPrefill rejects any identity that
+  // cannot safely target the existing Quick Log surface.
+  return {
+    kind: "recovery",
+    label: "Review plant setup",
+    recoveryMessage: `Review this plant's grow and tent assignments before adding ${snapshot}.`,
+    recoveryHref: plantOverviewPath(plantId),
+    prefill: null,
+  };
+}
 
 export function buildPlantSensorContextAuditCta(
   input: PlantSensorContextCtaInput,
@@ -47,25 +119,18 @@ export function buildPlantSensorContextAuditCta(
   const { status } = input;
   if (status !== "missing" && status !== "stale") return NO_CTA;
 
-  const label =
-    status === "missing"
-      ? "Add manual sensor snapshot"
-      : "Add fresh sensor snapshot";
+  const label = status === "missing" ? "Add manual sensor snapshot" : "Add fresh sensor snapshot";
 
   const prefill = buildPlantQuickLogPrefill(input.identity ?? null);
   if (!input.hasOpenHandler || !prefill) {
-    return {
-      kind: "inert",
-      label,
-      inertMessage: INERT_COPY,
-      prefill: null,
-    };
+    return buildRecovery(status, input.identity, input.hasOpenHandler);
   }
 
   return {
     kind: status === "missing" ? "add" : "refresh",
     label,
-    inertMessage: null,
+    recoveryMessage: null,
+    recoveryHref: null,
     // Identity + manual source label only. No sensor values.
     prefill: { ...prefill, source: "manual" },
   };

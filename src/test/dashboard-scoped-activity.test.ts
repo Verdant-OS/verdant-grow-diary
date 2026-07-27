@@ -121,7 +121,7 @@ describe("Dashboard — scoped Recent Activity & Pending Actions cards", () => {
 
 describe("route helpers used by the scoped Dashboard", () => {
   it("logsPath / actionsPath / actionDetailPath shape", () => {
-    expect(logsPath("g1")).toBe("/logs?growId=g1");
+    expect(logsPath("g1")).toBe("/timeline?growId=g1");
     expect(actionsPath("g1")).toBe("/actions?growId=g1");
     expect(actionDetailPath("a1")).toBe("/actions/a1");
   });

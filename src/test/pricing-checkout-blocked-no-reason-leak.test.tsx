@@ -5,9 +5,9 @@
  * to be the calm, grower-facing message produced by
  * `getPaddleCheckoutCatalogMessage(...)`. The sanitized reason enum tokens
  * (`unknown_plan`, `price_not_configured`, `price_resolution_unavailable`,
- * `plan_sold_out`, plus the env-unavailable telemetry token
- * `checkout_env_unavailable`) are telemetry-only and must never appear in the
- * rendered DOM.
+ * `plan_sold_out`, `pack_requires_monthly_plan`, plus the env-unavailable
+ * telemetry token `checkout_env_unavailable`) are telemetry-only and must
+ * never appear in the rendered DOM.
  *
  * This test drives the Pricing page through every catalog reason and asserts:
  *   1. The recovery panel is rendered.
@@ -18,10 +18,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import {
-  getPaddleCheckoutCatalogMessage,
-  type PaddleCheckoutCatalogReason,
-} from "@/lib/paddle";
+import { getPaddleCheckoutCatalogMessage, type PaddleCheckoutCatalogReason } from "@/lib/paddle";
 
 const openCheckoutMock = vi.fn(async () => {});
 const dismissBlockedMock = vi.fn();
@@ -41,6 +38,37 @@ vi.mock("@/hooks/usePaddleCheckout", () => ({
 }));
 
 vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => {} }));
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "paid-grower" }, session: null, loading: false }),
+}));
+vi.mock("@/hooks/useMyEntitlements", () => ({
+  useMyEntitlements: () => ({
+    loading: false,
+    lookupFailed: false,
+    entitlement: {
+      effectivePlanId: "pro_monthly",
+      displayPlanId: "pro_monthly",
+      status: "active",
+      isActive: true,
+      capabilities: {
+        maxActiveGrows: null,
+        aiCreditsPerGrow: null,
+        aiMonthlyCredits: 100,
+        liveSensors: true,
+        advancedExports: true,
+        multiTent: true,
+        sensorHistoryDays: null,
+        prioritySupport: true,
+        blueprint: false,
+      },
+      degraded: false,
+      degradedReason: null,
+      isStaff: false,
+      source: "lovable_paddle_subscription",
+    },
+    refetch: vi.fn(async () => false),
+  }),
+}));
 vi.mock("@/hooks/useFounderSlotsRemaining", () => ({
   useFounderSlotsRemaining: () => ({
     status: "ready" as const,
@@ -59,6 +87,7 @@ const REASON_TOKENS: readonly string[] = [
   "price_not_configured",
   "price_resolution_unavailable",
   "plan_sold_out",
+  "pack_requires_monthly_plan",
   "checkout_env_unavailable",
   "runtime_failure",
   "environment_unavailable",
@@ -69,6 +98,7 @@ const CATALOG_REASONS: readonly PaddleCheckoutCatalogReason[] = [
   "price_not_configured",
   "price_resolution_unavailable",
   "plan_sold_out",
+  "pack_requires_monthly_plan",
 ];
 
 function renderPricing() {
@@ -81,10 +111,9 @@ function renderPricing() {
 
 function assertNoReasonTokensLeaked(html: string) {
   for (const token of REASON_TOKENS) {
-    expect(
-      html,
-      `sanitized reason token "${token}" leaked into blocked checkout UI`,
-    ).not.toContain(token);
+    expect(html, `sanitized reason token "${token}" leaked into blocked checkout UI`).not.toContain(
+      token,
+    );
   }
 }
 

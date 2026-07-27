@@ -8,10 +8,9 @@
  * classified through the centralized `sensorSourceSummaryRules` so we
  * never re-derive source classification in two different places.
  *
- * Click-through: navigates to the all-grow Timeline filtered to the
- * selected source. Timeline does not yet support plant-scoped filtering
- * via URL params, so per-plant click-through is intentionally omitted
- * here (tracked as a follow-up).
+ * Click-through: navigates to Timeline filtered to both the selected
+ * source and this plant. Timeline applies the opaque plant id only to
+ * rows already scoped to the authenticated grower and active grow.
  *
  * Safety contract:
  *   - No writes. No alerts. No queued actions. No AI calls. Read-only.
@@ -52,10 +51,7 @@ function extractSnapshot(details: unknown): SensorSourceSummaryReading | null {
   const raw = d.sensor_snapshot ?? d.sensor;
   if (!raw || typeof raw !== "object") return null;
   const snap = raw as { source?: unknown; ts?: unknown };
-  const source =
-    typeof snap.source === "string" && snap.source.trim() !== ""
-      ? snap.source
-      : null;
+  const source = typeof snap.source === "string" && snap.source.trim() !== "" ? snap.source : null;
   const ts = typeof snap.ts === "string" && snap.ts ? snap.ts : null;
   return { source, captured_at: ts };
 }
@@ -78,7 +74,6 @@ export function buildPlantSensorSourceReadings(
   }
   return out;
 }
-
 
 export const PLANT_SENSOR_SOURCE_HISTORY_LIMIT = 200;
 
@@ -130,9 +125,7 @@ export default function PlantSensorSourceBreakdownCard({
       {summary.isEmpty ? (
         <div className="rounded-2xl border border-border/50 bg-secondary/20 p-4">
           <div className="mb-2 flex items-center justify-between gap-2 flex-wrap">
-            <h3 className="text-sm font-semibold text-foreground">
-              Sensor sources for this plant
-            </h3>
+            <h3 className="text-sm font-semibold text-foreground">Sensor sources for this plant</h3>
           </div>
           <p
             className="text-xs text-muted-foreground"
@@ -157,11 +150,7 @@ export default function PlantSensorSourceBreakdownCard({
                 }
               : null
           }
-          // Timeline does not yet support plant-scoped URL filtering, so
-          // the click-through opens the Timeline filtered to the source
-          // without a `plantId` constraint. (Follow-up: thread plantId
-          // through Timeline filters once it is safe to do so.)
-          plantId={null}
+          plantId={plantId}
         />
       )}
     </section>

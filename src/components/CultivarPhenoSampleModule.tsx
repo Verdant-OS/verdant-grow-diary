@@ -1,5 +1,5 @@
 /**
- * CultivarPhenoSampleModule — public /cultivars/:slug pheno comparison stub.
+ * CultivarPhenoSampleModule — public /cultivars/:slug illustrative sample.
  *
  * Presenter only. Renders 2 illustrative phenos side-by-side with a loud
  * "Sample data" label. Never real grower diary rows, never sensor readings,

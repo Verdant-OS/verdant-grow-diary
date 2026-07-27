@@ -15,6 +15,7 @@
  * removed). Callers must pass what they already have.
  */
 import { sensorsPath } from "@/lib/routes";
+import { buildSensorsTentRouteHref, SENSORS_TENT_ROUTE } from "@/lib/sensorRouteTentIntentRules";
 import { QUICK_LOG_ACTIVITY_DEFINITIONS } from "@/constants/quickLogActivityTypes";
 import {
   buildPlantQuickLogPrefill,
@@ -111,6 +112,12 @@ export function buildPlantDetailQuickActions(
   const tentId = input.tentId ?? null;
   const tentName = input.tentName ?? null;
   const hasTimelineSection = input.hasTimelineSection ?? true;
+  const tentScopedSensorsHref = buildSensorsTentRouteHref(tentId, {
+    requireExactMatch: true,
+  });
+  const manualSensorSnapshotHref = `${
+    tentScopedSensorsHref === SENSORS_TENT_ROUTE ? sensorsPath(growId) : tentScopedSensorsHref
+  }#manual-reading`;
 
   const quickLogPayload = buildPlantQuickLogPrefill({
     plantId,
@@ -138,10 +145,10 @@ export function buildPlantDetailQuickActions(
     {
       kind: "manual_sensor_snapshot",
       ...LABELS.manual_sensor_snapshot,
-      // The /sensors route does not yet accept a `tentId` query, so we
-      // safely fall back to the grow-scoped sensors view when growId is
-      // known, otherwise plain `/sensors`.
-      href: sensorsPath(growId),
+      // Exact tent intent is revalidated against the authenticated tent rows
+      // by /sensors and fails closed instead of selecting another tent. When
+      // no persisted tent is available, retain the existing grow-level route.
+      href: manualSensorSnapshotHref,
       testId: "plant-detail-quick-action-manual-sensor-snapshot",
     },
     {

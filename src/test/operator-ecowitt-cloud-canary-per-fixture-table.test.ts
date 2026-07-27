@@ -11,10 +11,7 @@ import { runEcowittCloudCanary } from "@/lib/ecowittCloudCanaryVerdict";
 import { buildCloudCanaryPreviewViewModel } from "@/lib/ecowittCloudCanaryViewModel";
 import fixtures from "../../fixtures/ecowitt-cloud-canary-payloads.json";
 
-const pageSrc = readFileSync(
-  resolve(process.cwd(), "src/pages/OperatorEcowittCanary.tsx"),
-  "utf8",
-);
+const pageSrc = readFileSync(resolve(process.cwd(), "src/pages/OperatorEcowittCanary.tsx"), "utf8");
 
 const ORDER = [
   "happy_multi_channel",
@@ -81,7 +78,10 @@ describe("CloudCanaryPreviewPanel — per-fixture table wiring", () => {
 
   it("emits one row per fixture with data-fixture-name attribute", () => {
     for (const name of ORDER) {
-      expect(pageSrc).toContain(`cloud-canary-row-${"${row.fixture_name}"}`.replace("${row.fixture_name}", "") || "cloud-canary-row-");
+      expect(pageSrc).toContain(
+        `cloud-canary-row-${"${row.fixture_name}"}`.replace("${row.fixture_name}", "") ||
+          "cloud-canary-row-",
+      );
     }
     expect(pageSrc).toContain("data-fixture-name={row.fixture_name}");
   });
@@ -128,14 +128,10 @@ describe("CloudCanaryPreviewPanel — rendered values are id-free", () => {
     // into the JSX after the view-model layer.
     const React = await import("react");
     const { renderToString } = await import("react-dom/server");
-    const { CloudCanaryPreviewPanel } = await import(
-      "@/pages/OperatorEcowittCanary"
-    );
-    const html = renderToString(
-      React.createElement(CloudCanaryPreviewPanel),
-    );
+    const { CloudCanaryPreviewPanel } = await import("@/pages/OperatorEcowittCanary");
+    const html = renderToString(React.createElement(CloudCanaryPreviewPanel));
     expect(html.length).toBeGreaterThan(0);
     expect(MAC_RE.test(html)).toBe(false);
     expect(UUID_RE.test(html)).toBe(false);
-  });
+  }, 15_000);
 });

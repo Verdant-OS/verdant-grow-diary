@@ -14,11 +14,16 @@ export type ActionQueueFailureOperation = "load" | "transition" | "audit" | "out
 
 const SAFE_COPY: Readonly<Record<ActionQueueFailureOperation, string>> = {
   load: "We couldn't load the Action Queue. Try again.",
-  transition: "Action status couldn't be saved. The action was not changed. Try again.",
+  transition: "Action status couldn't be saved. No new transition was recorded. Try again.",
   audit: "The status was saved, but its audit entry could not be recorded.",
   outcome: "No outcome was saved. Try again.",
   followup: "The action remains completed; only the follow-up note is missing.",
 };
+
+const TRANSITION_REASON_COPY = {
+  status_conflict: "This action changed elsewhere. The latest status has been reloaded.",
+  action_not_found: "This action is no longer available. The queue has been reloaded.",
+} as const;
 
 /**
  * Return deterministic, grower-safe copy without echoing any part of `error`.
@@ -31,6 +36,15 @@ export function safeActionQueueFailureCopy(
   operation: ActionQueueFailureOperation,
   error: unknown,
 ): string {
-  void error;
+  if (operation === "transition" && error && typeof error === "object" && !Array.isArray(error)) {
+    const row = error as Record<string, unknown>;
+    if (row.ok === false && row.reason === "status_conflict") {
+      return TRANSITION_REASON_COPY.status_conflict;
+    }
+    if (row.ok === false && row.reason === "action_not_found") {
+      return TRANSITION_REASON_COPY.action_not_found;
+    }
+  }
+
   return SAFE_COPY[operation];
 }

@@ -11,28 +11,29 @@
  *
  * Hard constraints (Slice P1):
  *   - Pure data + pure helpers. No React, no component imports.
- *   - No pricing-tier behavior. `protected-tier` / `requiredTier` are
- *     intentionally NOT introduced here — they need product decisions about
- *     which routes are tier-gated and where the current tier comes from.
- *   - `access` reflects today's actual routing behavior only.
+ *   - `access` models routing topology, not billing plans or tiers.
+ *   - Capability-gated presentation is represented by the canonical
+ *     `requiredFeature` key; raw plan metadata and `requiredTier` stay out.
  *   - Deterministic ordering: entries are sorted by `path` ascending.
  */
+
+import type { FeatureKey } from "@/lib/featureEntitlements";
 
 /**
  * What kind of access gate the App router currently applies to a route.
  *
  *  - `public`    — mounted outside `<RequireAuth>` and renders a real page
  *                  (e.g. `/welcome`, `/pricing`, `/auth`, `*` NotFound).
- *  - `auth`      — mounted inside `<RequireAuth>`; available to any signed-in
- *                  user regardless of tier. Today this covers the entire
- *                  product surface (no tier-gating yet).
+ *  - `auth`      — mounted inside `<RequireAuth>`; may also declare a
+ *                  `requiredFeature` when the router applies a presentation
+ *                  capability gate.
  *  - `operator`  — mounted inside `<RequireAuth>` but intended for operator /
  *                  diagnostic use (e.g. `/operator/ecowitt`, `/diagnostics`,
  *                  `/sensors/ecowitt-audit`). Not exposed in normal user nav.
  *  - `internal`  — mounted inside `<RequireAuth>` for internal admin/support
  *                  flows (e.g. `/admin/leads`, `/leads`, `/grow-lineage`).
- *  - `redirect`  — a `<Navigate>` alias to another route (e.g. `/login` →
- *                  `/auth`). Carries no page of its own.
+ *  - `redirect`  — an alias to another route (e.g. `/login` → `/auth`).
+ *                  Carries no page of its own.
  */
 export type AppRouteAccess = "public" | "auth" | "operator" | "internal" | "redirect";
 
@@ -49,6 +50,8 @@ export interface AppRouteEntry {
   path: string;
   /** Current routing gate — see `AppRouteAccess`. */
   access: AppRouteAccess;
+  /** Canonical presentation capability required by the current router. */
+  requiredFeature?: FeatureKey;
   /** Optional short human label. Required when `showInNav` is true. */
   label?: string;
   /** Whether this route is intended for the user-facing primary navigation. */
@@ -101,7 +104,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/breeder-beta", access: "public", description: "Breeder beta landing page." },
   { path: "/breeding", access: "auth", description: "Breeding programs index." },
   { path: "/breeding/:programId", access: "auth", description: "Breeding program detail." },
-  { path: "/breeding/new", access: "auth", description: "New breeding event entry." },
+  {
+    path: "/breeding/log/new",
+    access: "auth",
+    description: "Log a grow-scoped breeding event.",
+  },
+  { path: "/breeding/new", access: "auth", description: "Create a new breeding program." },
   { path: "/checkout/cancel", access: "public", description: "Checkout cancellation return." },
   { path: "/checkout/success", access: "public", description: "Checkout success return." },
   { path: "/contact", access: "public", description: "Public support contact page." },
@@ -111,16 +119,6 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     path: "/cultivars/:slug",
     access: "public",
     description: "Public per-cultivar guide page (evergreen best-practice content).",
-  },
-  {
-    path: "/customer/:shareId",
-    access: "public",
-    description: "Customer Mode QR guide shell (read-only, no private grow data).",
-  },
-  {
-    path: "/customer/:shareId/cannabis-care",
-    access: "public",
-    description: "Customer Mode cannabis plant care FAQ page (read-only).",
   },
   { path: "/daily-check", access: "auth" },
   {
@@ -301,12 +299,6 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "EcoWitt per-tent preview (read-only).",
   },
   {
-    path: "/operator/ggs-real-payload-ingest",
-    access: "operator",
-    description:
-      "Operator-gated GGS real-payload commit through the validated ingest RPC, plus a read-only Sentinel verdict.",
-  },
-  {
     path: "/operator/one-tent-live-proof",
     access: "operator",
     description: "Operator one-tent live proof page.",
@@ -368,6 +360,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   {
     path: "/pheno-hunts",
     access: "auth",
+    requiredFeature: "pheno_tracker",
     description: "Pheno hunts index (the grower's own hunts).",
   },
   {
@@ -375,15 +368,30 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "public",
     description: "Read-only per-hunt comparison with graceful unauthenticated state.",
   },
-  { path: "/pheno-hunts/:id/keepers", access: "auth", description: "Pheno keeper selection." },
+  {
+    path: "/pheno-hunts/:id/keepers",
+    access: "auth",
+    requiredFeature: "pheno_tracker",
+    description: "Pheno keeper selection.",
+  },
   {
     path: "/pheno-hunts/:id/showcase",
     access: "public",
     description:
       "Read-only per-hunt showcase (pack, contenders, fight, cure, family tree) with graceful demo fallback.",
   },
-  { path: "/pheno-hunts/:id/workspace", access: "auth", description: "Pheno hunt workspace." },
-  { path: "/pheno-hunts/new", access: "auth", description: "New pheno hunt entry." },
+  {
+    path: "/pheno-hunts/:id/workspace",
+    access: "auth",
+    requiredFeature: "pheno_tracker",
+    description: "Pheno hunt workspace.",
+  },
+  {
+    path: "/pheno-hunts/new",
+    access: "auth",
+    requiredFeature: "pheno_tracker",
+    description: "New pheno hunt entry.",
+  },
   { path: "/pi-ingest-status", access: "operator" },
   { path: "/plants", access: "auth" },
   { path: "/plants/:id", access: "auth" },

@@ -18,13 +18,14 @@
  *   node scripts/generate-ecowitt-config-schema-docs.mjs         # write
  *   node scripts/generate-ecowitt-config-schema-docs.mjs --check # drift gate
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "..");
 const SCHEMA_PATH = resolve(ROOT, "docs/schemas/ecowitt-soil-channel-map.schema.json");
+const PUBLIC_SCHEMA_PATH = resolve(ROOT, "public/schemas/ecowitt-soil-channel-map.schema.json");
 const CLI_PATH = resolve(ROOT, "scripts/ecowitt-live-soil-bridge.ts");
 const OUT_PATH = resolve(ROOT, "docs/ecowitt-bridge-config-schema.md");
 
@@ -80,8 +81,7 @@ const ENV_VARS = [
     type: "JSON object (see schema section)",
     required: true,
     default: "—",
-    validator:
-      "assertEcowittSoilChannelMapJsonEnv (schema) + assertSingleTentSoilChannelMap",
+    validator: "assertEcowittSoilChannelMapJsonEnv (schema) + assertSingleTentSoilChannelMap",
     description:
       "Maps `soilmoisture<N>` channel keys to the single tent this bridge serves. Full shape, ranges, and per-field docs come from the JSON Schema below.",
     example:
@@ -113,7 +113,8 @@ const ENV_VARS = [
     required: false,
     default: "127.0.0.1",
     validator: "runMqttBridge (used only when `ECOWITT_MQTT_URL` is unset)",
-    description: "MQTT broker hostname. Combined with `ECOWITT_MQTT_PORT` to form the connection URL.",
+    description:
+      "MQTT broker hostname. Combined with `ECOWITT_MQTT_PORT` to form the connection URL.",
     example: "broker.local",
   },
   {
@@ -161,6 +162,15 @@ function loadSchema() {
   return JSON.parse(readFileSync(SCHEMA_PATH, "utf8"));
 }
 
+function publicSchemaIsCurrent(schema) {
+  try {
+    const published = JSON.parse(readFileSync(PUBLIC_SCHEMA_PATH, "utf8"));
+    return JSON.stringify(published) === JSON.stringify(schema);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Verify every env var listed above is actually referenced in the CLI
  * source. This is the drift gate: a rename in the validator that isn't
@@ -185,9 +195,7 @@ function verifyEnvRegistryAgainstCli() {
   while ((m = re.exec(cli)) !== null) referenced.add(m[1]);
   const knownIrrelevant = new Set(); // none right now
   const undocumented = [...referenced].filter(
-    (n) =>
-      !ENV_VARS.some((v) => v.name === n) &&
-      !knownIrrelevant.has(n),
+    (n) => !ENV_VARS.some((v) => v.name === n) && !knownIrrelevant.has(n),
   );
   if (undocumented.length > 0) {
     throw new Error(
@@ -199,22 +207,19 @@ function verifyEnvRegistryAgainstCli() {
 }
 
 function renderEnvRow(v) {
-  const req =
-    v.required === true ? "yes" : v.required === false ? "no" : v.required;
+  const req = v.required === true ? "yes" : v.required === false ? "no" : v.required;
   return `| \`${v.name}\` | ${v.type} | ${req} | ${v.default} | ${v.validator} |`;
 }
 
 function renderChannelMapFields(schema) {
-  const entry =
-    schema.patternProperties["^soilmoisture([1-9]|[1-9][0-9])$"];
+  const entry = schema.patternProperties["^soilmoisture([1-9]|[1-9][0-9])$"];
   const rows = [];
   for (const [name, def] of Object.entries(entry.properties)) {
     const required = entry.required.includes(name) ? "yes" : "no";
     const types = Array.isArray(def.type) ? def.type.join(" \\| ") : def.type;
     const constraints = [];
     if (def.pattern) constraints.push(`pattern \`${def.pattern}\``);
-    if (typeof def.maxLength === "number")
-      constraints.push(`maxLength ${def.maxLength}`);
+    if (typeof def.maxLength === "number") constraints.push(`maxLength ${def.maxLength}`);
     rows.push(
       `| \`${name}\` | ${types} | ${required} | ${
         constraints.join(", ") || "—"
@@ -258,9 +263,9 @@ ${envRows}
 ### Details
 
 ${ENV_VARS.map(
-    (v) =>
-      `#### \`${v.name}\`\n\n${v.description}\n\n**Example:**\n\n\`\`\`bash\n${v.name}='${v.example}'\n\`\`\`\n`,
-  ).join("\n")}
+  (v) =>
+    `#### \`${v.name}\`\n\n${v.description}\n\n**Example:**\n\n\`\`\`bash\n${v.name}='${v.example}'\n\`\`\`\n`,
+).join("\n")}
 
 ---
 
@@ -330,6 +335,7 @@ For the full error-code catalog and machine-readable envelope shape, see [\`docs
 function main() {
   const check = process.argv.includes("--check");
   verifyEnvRegistryAgainstCli();
+  const schema = loadSchema();
   const next = render();
   if (check) {
     let current = "";
@@ -340,18 +346,28 @@ function main() {
     }
     // The generatedAt timestamp changes every run; normalize before diff.
     const normalize = (s) =>
-      s.replace(/Generated at: `[^`]*`/g, "Generated at: `<ts>`");
+      s.replace(/\r\n/g, "\n").replace(/Generated at: `[^`]*`/g, "Generated at: `<ts>`");
     if (normalize(current) !== normalize(next)) {
       console.error(
         `[check] ${OUT_PATH} is stale. Run:\n  node scripts/generate-ecowitt-config-schema-docs.mjs`,
       );
       process.exit(1);
     }
+    if (!publicSchemaIsCurrent(schema)) {
+      console.error(
+        `[check] ${PUBLIC_SCHEMA_PATH} is missing or stale. Run:\n  node scripts/generate-ecowitt-config-schema-docs.mjs`,
+      );
+      process.exit(1);
+    }
     console.log(`[check] ${OUT_PATH} is up to date`);
+    console.log(`[check] ${PUBLIC_SCHEMA_PATH} is up to date`);
     return;
   }
   writeFileSync(OUT_PATH, next, "utf8");
+  mkdirSync(dirname(PUBLIC_SCHEMA_PATH), { recursive: true });
+  writeFileSync(PUBLIC_SCHEMA_PATH, `${JSON.stringify(schema, null, 2)}\n`, "utf8");
   console.log(`wrote ${OUT_PATH}`);
+  console.log(`wrote ${PUBLIC_SCHEMA_PATH}`);
 }
 
 main();

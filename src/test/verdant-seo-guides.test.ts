@@ -10,7 +10,6 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
-  VERDANT_CUSTOMER_GUIDE_PATH,
   VERDANT_CUSTOMER_MODE_GROWER_FAQ,
   VERDANT_GROWER_GUIDE_FAQ,
   VERDANT_GUIDES_BREADCRUMB_ITEMS,
@@ -175,6 +174,21 @@ describe("Verdant SEO guide pages (20)", () => {
     }
   });
 
+  it("makes Action Queue handoff explicitly grower-initiated", () => {
+    const publicContent = JSON.stringify({
+      faq: VERDANT_GROWER_GUIDE_FAQ,
+      guides: VERDANT_SEO_GUIDES,
+    });
+
+    expect(publicContent).toMatch(/only when the grower chooses to add it/i);
+    expect(publicContent).not.toMatch(
+      /drop(?:s|ped)? (?:it|them|actions?) into (?:an |the )?Action Queue/i,
+    );
+    expect(publicContent).not.toMatch(
+      /(?:recommended action stays in|equipment change is grower-approved through|stays with the grower through) (?:an |the )?(?:approval-required )?Action Queue/i,
+    );
+  });
+
   it("no guide content markets Verdant as ERP / seed-to-sale / compliance", () => {
     const surface = [GUIDES_INDEX, GUIDE_PAGE, CONTENT_TS].join("\n").toLowerCase();
     for (const forbidden of [
@@ -263,15 +277,15 @@ describe("Landing and Pricing OG/Twitter metadata", () => {
   });
 });
 
-describe("Customer Guide route remains available without a misleading public CTA", () => {
-  it("Customer Guide path resolves to the real /customer/:shareId route", () => {
-    expect(VERDANT_CUSTOMER_GUIDE_PATH.startsWith("/customer/")).toBe(true);
-    expect(APP_TSX).toMatch(/path="\/customer\/:shareId"/);
+describe("retired Customer Mode routes stay absent from the public guide funnel", () => {
+  it("does not mount an unbacked Customer Mode share route", () => {
+    expect(APP_TSX).not.toMatch(/path="\/customer\/:shareId"/);
+    expect(CONTENT_TS).not.toContain('"/customer/guide"');
   });
 
-  it("GuidePage and GuidesIndex neither import nor reference the placeholder path", () => {
-    expect(GUIDE_PAGE).not.toContain("VERDANT_CUSTOMER_GUIDE_PATH");
-    expect(GUIDES_INDEX).not.toContain("VERDANT_CUSTOMER_GUIDE_PATH");
+  it("GuidePage and GuidesIndex neither import nor promote Customer Mode", () => {
+    expect(GUIDE_PAGE).not.toMatch(/\/customer\//);
+    expect(GUIDES_INDEX).not.toMatch(/\/customer\//);
     expect(GUIDE_PAGE).not.toMatch(/Start with the Customer Guide/i);
     expect(GUIDES_INDEX).not.toMatch(/start with the Customer Guide/i);
   });

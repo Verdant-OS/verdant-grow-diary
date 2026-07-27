@@ -9,13 +9,7 @@
 import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { resolve, join } from "node:path";
-import {
-  actionsPath,
-  alertsPath,
-  dashboardPath,
-  logsPath,
-  timelinePath,
-} from "@/lib/routes";
+import { actionsPath, alertsPath, dashboardPath, logsPath, timelinePath } from "@/lib/routes";
 
 const ROOT = resolve(__dirname, "../..");
 const DIRS = ["src/pages", "src/components"];
@@ -37,7 +31,7 @@ describe("Core list route helper migration", () => {
   it("helpers return canonical base paths", () => {
     expect(alertsPath()).toBe("/alerts");
     expect(actionsPath()).toBe("/actions");
-    expect(logsPath()).toBe("/logs");
+    expect(logsPath()).toBe("/timeline");
     expect(timelinePath()).toBe("/timeline");
     expect(dashboardPath()).toBe("/dashboard");
   });
@@ -58,8 +52,7 @@ describe("Core list route helper migration", () => {
     const offenders: string[] = [];
     for (const f of FILES) {
       const src = readFileSync(f, "utf8");
-      const uses =
-        /\b(alertsPath|actionsPath|logsPath|timelinePath|dashboardPath)\(/.test(src);
+      const uses = /\b(alertsPath|actionsPath|logsPath|timelinePath|dashboardPath)\(/.test(src);
       if (uses && !/from\s+["']@\/lib\/routes["']/.test(src)) offenders.push(f);
     }
     expect(offenders).toEqual([]);

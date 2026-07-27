@@ -44,15 +44,12 @@ interface Props {
  * ONLY `plants.tent_id`. RLS enforces ownership. The client never sets
  * user_id / grow_id / strain / stage / notes.
  *
- * Out of scope: diary entries, sensor readings, alerts, Action Queue,
- * automation, device control — no writes to those tables.
+ * After a successful assignment, one diary entry records the movement. That
+ * secondary evidence write never rolls back or obscures the assignment.
+ * Sensor readings, alerts, Action Queue, automation, and device control remain
+ * out of scope.
  */
-export default function AssignTentDialog({
-  plantId,
-  growId,
-  currentTentId,
-  trigger,
-}: Props) {
+export default function AssignTentDialog({ plantId, growId, currentTentId, trigger }: Props) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -109,10 +106,7 @@ export default function AssignTentDialog({
     setBusy(true);
     // ONLY update tent_id. RLS scopes the row to the owning user; we
     // never touch user_id / grow_id / strain / stage / notes here.
-    const { error } = await supabase
-      .from("plants")
-      .update({ tent_id: selected })
-      .eq("id", plantId);
+    const { error } = await supabase.from("plants").update({ tent_id: selected }).eq("id", plantId);
     if (error) {
       setBusy(false);
       toast.error(error.message);
@@ -124,33 +118,47 @@ export default function AssignTentDialog({
     // No sensor_readings, alerts, or action_queue writes happen here.
     const prevName = current[0]?.name ?? null;
     const nextName = others.find((t) => t.id === selected)?.name ?? null;
+    let timelineRecordFailed = false;
     if (growId) {
-      const { error: diaryErr } = await supabase
-        .from("diary_entries")
-        .insert({
-          user_id: user.id,
-          grow_id: growId,
-          plant_id: plantId,
-          tent_id: selected,
-          note: formatPlantTentMovementNote({
-            previousTentName: prevName,
-            nextTentName: nextName,
-          }),
-          details: buildPlantTentMovementDetails({
-            previousTentId: currentTentId ?? null,
-            nextTentId: selected,
-            previousTentName: prevName,
-            nextTentName: nextName,
-          }) as unknown as Record<string, never>,
-        });
+      const { error: diaryErr } = await supabase.from("diary_entries").insert({
+        user_id: user.id,
+        grow_id: growId,
+        plant_id: plantId,
+        tent_id: selected,
+        note: formatPlantTentMovementNote({
+          previousTentName: prevName,
+          nextTentName: nextName,
+        }),
+        details: buildPlantTentMovementDetails({
+          previousTentId: currentTentId ?? null,
+          nextTentId: selected,
+          previousTentName: prevName,
+          nextTentName: nextName,
+        }) as unknown as Record<string, never>,
+      });
       if (diaryErr) {
+        timelineRecordFailed = true;
         console.error("[AssignTentDialog] movement diary insert failed", diaryErr);
-        // Non-fatal: the plant has been moved successfully.
+        // Non-fatal: the plant has been moved successfully. Do not offer an
+        // automatic retry here: this direct insert has no idempotency fence, so
+        // an ambiguous transport failure could produce a duplicate timeline row.
       }
     }
 
     setBusy(false);
-    toast.success(isMove ? "Plant moved to new current tent" : "Plant assigned to tent");
+    if (timelineRecordFailed) {
+      toast.warning(
+        isMove
+          ? "Plant moved, but its timeline entry was not recorded"
+          : "Plant assigned, but its timeline entry was not recorded",
+        {
+          description:
+            "The tent assignment is saved. Use Quick Log to add a manual note if you need this change in the plant timeline.",
+        },
+      );
+    } else {
+      toast.success(isMove ? "Plant moved to new current tent" : "Plant assigned to tent");
+    }
     qc.invalidateQueries({ queryKey: ["plants"] });
     qc.invalidateQueries({ queryKey: ["grow", "plants"] });
     qc.invalidateQueries({ queryKey: ["grow", "plant", plantId] });
@@ -178,10 +186,7 @@ export default function AssignTentDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent
-        className="glass max-w-md"
-        data-testid="assign-tent-dialog"
-      >
+      <DialogContent className="glass max-w-md" data-testid="assign-tent-dialog">
         <DialogHeader>
           <DialogTitle className="font-display">
             {isMove ? "Move Plant" : "Assign to tent"}
@@ -189,19 +194,13 @@ export default function AssignTentDialog({
         </DialogHeader>
 
         {!hasGrowContext ? (
-          <p
-            className="text-sm text-muted-foreground"
-            data-testid="assign-tent-no-grow"
-          >
+          <p className="text-sm text-muted-foreground" data-testid="assign-tent-no-grow">
             Unable to load tents because this plant is missing grow context.
           </p>
         ) : isLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : others.length === 0 && current.length === 0 ? (
-          <p
-            className="text-sm text-muted-foreground"
-            data-testid="assign-tent-empty"
-          >
+          <p className="text-sm text-muted-foreground" data-testid="assign-tent-empty">
             No tents available in this grow.
           </p>
         ) : (

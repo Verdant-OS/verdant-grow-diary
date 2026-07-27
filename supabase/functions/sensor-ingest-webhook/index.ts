@@ -16,6 +16,9 @@ import { authenticateBearer, tentScopeMatches } from "./auth.ts";
 import { sanitizeForResponse, safeLog } from "./sanitize.ts";
 import { buildStoredRow, classifyInsertError } from "./storageMapping.ts";
 import { classifyIngestTimestampFreshness } from "../_shared/sensorIngestFreshness.ts";
+import { requireLiveSensorEntitlement } from "../_shared/liveSensorEntitlementGate.ts";
+import { resolveServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
+import type { LovableBillingEnvironment } from "../_shared/lib/lib/entitlements/lovablePaddleAdapter.ts";
 
 export interface SensorWebhookAdminClient {
   // Supabase's generated query-builder type resolves untyped Edge schemas to
@@ -30,6 +33,8 @@ export interface SensorWebhookHandlerDeps {
   admin?: SensorWebhookAdminClient;
   /** One request clock shared by auth, validation, and storage freshness. */
   now?: () => Date;
+  /** Test-only server environment override; never read from request input. */
+  expectedBillingEnvironment?: LovableBillingEnvironment;
 }
 
 // Centralized CORS handling. Allowed origins are explicit — no wildcard is
@@ -162,6 +167,20 @@ async function handle(req: Request, deps: SensorWebhookHandlerDeps): Promise<Res
     return json(req, { error: "bridge_required" }, 403);
   }
   const auth = authRes.auth;
+
+  // Re-check entitlement on every use of an existing token. A downgrade,
+  // expiration, or lookup failure therefore closes live ingest immediately;
+  // the bridge token alone is authentication, never billing authority.
+  const liveSensorAccess = await requireLiveSensorEntitlement(
+    admin,
+    auth.userId,
+    deps.expectedBillingEnvironment ?? resolveServerBillingEnvironment(),
+    requestNow,
+  );
+  if (!liveSensorAccess.ok) {
+    const status = liveSensorAccess.reason === "entitlement_lookup_failed" ? 503 : 403;
+    return json(req, { error: liveSensorAccess.reason }, status);
+  }
 
   let body: WebhookIngestPayload;
   try {

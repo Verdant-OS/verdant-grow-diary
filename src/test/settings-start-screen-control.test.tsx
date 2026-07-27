@@ -1,8 +1,13 @@
 // Settings start-screen control — user-scoped localStorage preference UI.
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { clearLocalStorageForTest, getLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  ensureLocalStorageForTest,
+  getLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({
@@ -14,10 +19,7 @@ vi.mock("@/store/auth", () => ({
 }));
 
 import Settings from "@/pages/Settings";
-import {
-  getStartScreenChoice,
-  DEFAULT_START_SCREEN,
-} from "@/lib/startScreenPreferences";
+import { getStartScreenChoice, DEFAULT_START_SCREEN } from "@/lib/startScreenPreferences";
 
 beforeEach(() => {
   try {
@@ -25,6 +27,10 @@ beforeEach(() => {
   } catch {
     /* ignore */
   }
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 function renderSettings() {
@@ -61,6 +67,34 @@ describe("Settings start-screen control", () => {
     expect(screen.getByTestId("start-screen-saved")).toHaveAttribute("role", "status");
   });
 
+  it("shows an honest storage error and recovers when Save is retried", () => {
+    renderSettings();
+    fireEvent.click(screen.getByTestId("start-screen-option-timeline"));
+
+    const storage = ensureLocalStorageForTest();
+    const storagePrototype = Object.getPrototypeOf(storage) as Storage;
+    const setItem = storagePrototype.setItem;
+    vi.spyOn(storagePrototype, "setItem")
+      .mockImplementationOnce(() => {
+        throw new Error("storage blocked");
+      })
+      .mockImplementation(function (this: Storage, key, value) {
+        setItem.call(this, key, value);
+      });
+
+    fireEvent.click(screen.getByTestId("start-screen-save"));
+    expect(screen.getByTestId("start-screen-saved")).toHaveAttribute("role", "alert");
+    expect(screen.getByTestId("start-screen-saved")).toHaveTextContent(
+      /couldn't save.+on this device.+try again/i,
+    );
+    expect(getLocalStorageItemForTest("verdant:startScreen:user-settings-1")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("start-screen-save"));
+    expect(screen.getByTestId("start-screen-saved")).toHaveAttribute("role", "status");
+    expect(screen.getByTestId("start-screen-saved")).toHaveTextContent(/saved/i);
+    expect(getStartScreenChoice("user-settings-1")).toBe("timeline");
+  });
+
   it("welcome option stores safe internal value", () => {
     renderSettings();
     fireEvent.click(screen.getByTestId("start-screen-option-welcome"));
@@ -75,6 +109,25 @@ describe("Settings start-screen control", () => {
     expect(getLocalStorageItemForTest("verdant:startScreen:user-settings-1")).toBeNull();
     const quick = screen.getByTestId("start-screen-option-quickLog") as HTMLInputElement;
     expect(quick.checked).toBe(true);
+  });
+
+  it("keeps the current choice and explains when Reset cannot clear storage", () => {
+    setLocalStorageItemForTest("verdant:startScreen:user-settings-1", "timeline");
+    renderSettings();
+    const storage = ensureLocalStorageForTest();
+    const storagePrototype = Object.getPrototypeOf(storage) as Storage;
+    vi.spyOn(storagePrototype, "removeItem").mockImplementation(() => {
+      throw new Error("storage blocked");
+    });
+
+    fireEvent.click(screen.getByTestId("start-screen-reset"));
+
+    expect(screen.getByTestId("start-screen-option-timeline")).toBeChecked();
+    expect(screen.getByTestId("start-screen-saved")).toHaveAttribute("role", "alert");
+    expect(screen.getByTestId("start-screen-saved")).toHaveTextContent(
+      /couldn't reset.+current choice is unchanged.+try again/i,
+    );
+    expect(getStartScreenChoice("user-settings-1")).toBe("timeline");
   });
 
   it("never stores tokens/sessions/grow data under the start-screen key", () => {

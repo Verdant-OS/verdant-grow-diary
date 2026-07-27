@@ -61,8 +61,9 @@ describe("BrandLogo component", () => {
     expect(BRAND).toMatch(/hidden\s+min-\[380px\]:inline\s+whitespace-nowrap/);
   });
 
-  it("leaves a TODO for a simplified favicon variant", () => {
-    expect(BRAND).toMatch(/TODO\(favicon\)/);
+  it("documents the purpose-built favicon variant", () => {
+    expect(BRAND).toMatch(/purpose-built[\s\S]*public\/favicon\.svg/i);
+    expect(BRAND).not.toMatch(/TODO\(favicon\)/);
   });
 });
 
@@ -92,8 +93,14 @@ describe("BrandLogo placement", () => {
 describe("safety: landing page stays public-safe", () => {
   it("landing page does not query private tables or call edge functions", () => {
     const privateTables = [
-      "grows", "plants", "tents", "sensor_readings",
-      "alerts", "alert_events", "action_queue", "action_queue_events",
+      "grows",
+      "plants",
+      "tents",
+      "sensor_readings",
+      "alerts",
+      "alert_events",
+      "action_queue",
+      "action_queue_events",
       "diary_entries",
     ];
     for (const t of privateTables) {

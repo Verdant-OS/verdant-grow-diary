@@ -38,6 +38,12 @@ import {
   calculateRasterPhotoCoverCrop,
   isRasterPhotoPreviewBitmapWithinBounds,
 } from "@/lib/rasterPhotoPreviewRules";
+import {
+  buildAiCoachRequestSignature,
+  resolveAiCoachPendingRequest,
+  shouldRetainAiCoachPendingRequest,
+  type PendingAiCoachRequest,
+} from "@/lib/aiCoachRequestRecoveryRules";
 
 type Mode = "diagnose" | "next_steps";
 type PhotoPreviewStatus = "empty" | "loading" | "ready" | "unavailable";
@@ -93,6 +99,7 @@ export default function Coach() {
   const [creditDenial, setCreditDenial] = useState<AiCreditDenial | null>(null);
   const [upstreamCreditExhausted, setUpstreamCreditExhausted] = useState(false);
   const diagnosisSeqRef = useRef(0);
+  const pendingCoachRequestRef = useRef<PendingAiCoachRequest | null>(null);
 
   // --- Real grow context for AI sufficiency evaluation (presenter only) ---
   const { data: ctxPlants = [] } = useGrowPlants(undefined, activeGrowId ?? undefined);
@@ -256,14 +263,45 @@ export default function Coach() {
   async function ask(mode: Mode) {
     if (!user) return;
     const seq = ++diagnosisSeqRef.current;
+    const normalizedQuestion = question.trim();
+    const requestSignature = buildAiCoachRequestSignature({
+      mode,
+      growId: activeGrowId ?? null,
+      question: normalizedQuestion,
+      photo:
+        mode === "diagnose" && photoFile
+          ? {
+              name: photoFile.name,
+              size: photoFile.size,
+              type: photoFile.type,
+              lastModified: photoFile.lastModified,
+            }
+          : null,
+    });
+    const { request: selectedRequest } = resolveAiCoachPendingRequest(
+      pendingCoachRequestRef.current,
+      requestSignature,
+      () => crypto.randomUUID(),
+    );
+    pendingCoachRequestRef.current = selectedRequest;
+    const idempotencyKey = selectedRequest.idempotencyKey;
+    let invocationStarted = false;
+    const clearPendingRequest = () => {
+      if (pendingCoachRequestRef.current?.idempotencyKey === idempotencyKey) {
+        pendingCoachRequestRef.current = null;
+      }
+    };
+
     setBusy(true);
     setResult(null);
     setPersistedSessionId(null);
     setCreditDenial(null);
     setUpstreamCreditExhausted(false);
     try {
-      let photoUrl: string | undefined;
-      if (mode === "diagnose" && photoFile) {
+      // An unresolved identical request reuses both its UUID and signed photo
+      // URL. A changed grow, question, mode, or photo receives a fresh key.
+      let photoUrl = selectedRequest.photoUrl;
+      if (mode === "diagnose" && photoFile && !photoUrl) {
         const photoValidation = validatePlantProfilePhotoFile(photoFile);
         if (photoValidation.ok === false) {
           setPhotoFile(null);
@@ -280,9 +318,19 @@ export default function Coach() {
           .createSignedUrl(path, 600);
         if (sErr) throw sErr;
         photoUrl = signed.signedUrl;
+        if (pendingCoachRequestRef.current?.idempotencyKey === idempotencyKey) {
+          pendingCoachRequestRef.current = { ...selectedRequest, photoUrl };
+        }
       }
+      invocationStarted = true;
       const { data, error } = await supabase.functions.invoke("ai-coach", {
-        body: { mode, growId: activeGrowId, photoUrl, question: question.trim() || undefined },
+        body: {
+          mode,
+          growId: activeGrowId,
+          photoUrl,
+          question: normalizedQuestion || undefined,
+          idempotencyKey,
+        },
       });
       if (error) {
         // Credit denials are now HTTP 200 business envelopes (handled
@@ -294,6 +342,13 @@ export default function Coach() {
       // pass-through (Coach has its own sanitizers downstream).
       const outcome = adaptCreditedAiResponse<CoachResponse>(data);
       if (outcome.ok === false) {
+        if (shouldRetainAiCoachPendingRequest(outcome.reason)) {
+          toast.info("Your AI Doctor result is still being confirmed.", {
+            description: "Retry the same request in a moment. Verdant will reuse its request key.",
+          });
+          return;
+        }
+        clearPendingRequest();
         if (outcome.reason === "credit_denied") {
           if (outcome.credit) setCreditDenial(outcome.credit);
           return;
@@ -304,6 +359,7 @@ export default function Coach() {
         }
         throw new Error(outcome.reason);
       }
+      clearPendingRequest();
       const d = outcome.result as CoachResponse | null;
       if (d?.error) throw new Error(d.error);
       setResult(d ?? null);
@@ -348,6 +404,7 @@ export default function Coach() {
         });
       }
     } catch (e: unknown) {
+      if (!invocationStarted) clearPendingRequest();
       toast.error(e instanceof Error ? e.message : "Coach failed");
     } finally {
       setBusy(false);

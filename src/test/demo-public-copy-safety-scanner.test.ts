@@ -57,7 +57,10 @@ const BANNED_PHRASES: ReadonlyArray<{ label: string; pattern: RegExp }> = [
   { label: "verified sample/demo", pattern: /\bverified\s+(sample|demo)\b/i },
   { label: "production data", pattern: /\bproduction\s+(data|readings)\b/i },
   { label: "certain diagnosis", pattern: /\bcertain\s+diagnosis\b/i },
-  { label: "connected sensor (demo context)", pattern: /\bconnected\s+sensors?\b\s+(in\s+)?(this\s+)?(demo|sample|preview)/i },
+  {
+    label: "connected sensor (demo context)",
+    pattern: /\bconnected\s+sensors?\b\s+(in\s+)?(this\s+)?(demo|sample|preview)/i,
+  },
 ];
 
 /**
@@ -97,10 +100,8 @@ describe("public/demo copy safety scanner (Requirement 9)", () => {
 });
 
 describe("intentional /demo redirect is preserved", () => {
-  it("App.tsx redirects /demo → /welcome", () => {
+  it("App.tsx redirects /demo → /welcome while preserving URL context", () => {
     const app = readFileSync(resolve(REPO_ROOT, "src/App.tsx"), "utf8");
-    expect(app).toMatch(
-      /path="\/demo"\s+element=\{<Navigate\s+to="\/welcome"\s+replace\s*\/>\}/,
-    );
+    expect(app).toMatch(/path="\/demo"\s+element=\{<RouteAliasRedirect\s+to="\/welcome"\s*\/>\}/);
   });
 });

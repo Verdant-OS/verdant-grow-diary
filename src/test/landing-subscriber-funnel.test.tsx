@@ -153,6 +153,34 @@ describe("landing subscriber funnel", () => {
     );
   });
 
+  it("preserves a protected deep link through every signup entry point", () => {
+    const returnTo = "/plants/plant-123?tentId=tent-1#plant-ai-doctor-review";
+    render(
+      <MemoryRouter initialEntries={[`/welcome?redirectTo=${encodeURIComponent(returnTo)}`]}>
+        <Landing />
+      </MemoryRouter>,
+    );
+
+    const expectedSignupPath =
+      "/auth?mode=signup&redirectTo=%2Fplants%2Fplant-123%3FtentId%3Dtent-1%23plant-ai-doctor-review&utm_source=landing_page&utm_medium=owned&utm_campaign=paid_launch";
+    expect(screen.getByTestId("landing-signup-cta-hero")).toHaveAttribute(
+      "href",
+      expectedSignupPath,
+    );
+    expect(screen.getByTestId("landing-signup-cta-final")).toHaveAttribute(
+      "href",
+      expectedSignupPath,
+    );
+    expect(screen.getByTestId("public-one-tent-tour-signup-cta")).toHaveAttribute(
+      "href",
+      expectedSignupPath,
+    );
+    expect(screen.getByTestId("landing-signin-cta-header")).toHaveAttribute(
+      "href",
+      `/auth?redirectTo=${encodeURIComponent(returnTo)}`,
+    );
+  });
+
   it("sends every AppShell auth check to the public landing, never directly to auth", () => {
     // Both session checks share one signed-out destination built by
     // buildSignedOutRedirect, which always lands on /welcome (optionally

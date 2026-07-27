@@ -35,20 +35,21 @@ vi.mock("@/hooks/usePhenoEvidencePackets", () => ({
   }),
 }));
 
-
 function renderAt(state: Partial<UsePhenoHuntWorkspaceState>) {
   const saveScore = state.saveScore ?? vi.fn().mockResolvedValue(true);
   const saveDecision = state.saveDecision ?? vi.fn().mockResolvedValue(true);
   const saveRound = state.saveRound ?? vi.fn().mockResolvedValue(true);
   const saveSex = state.saveSex ?? vi.fn().mockResolvedValue(true);
-  hookMock.mockReturnValue({
+  let currentState: UsePhenoHuntWorkspaceState = {
     status: "ok",
     hunt: { id: "h1", name: "Blue Dream Hunt", growId: "g1", tentId: "t1" },
     candidates: [],
     totalCandidateCount: state.candidates?.length ?? 0,
     loadingMore: false,
+    loadMoreError: null,
     hasMore: false,
     loadNextPage: state.loadNextPage ?? vi.fn(),
+    reload: state.reload ?? vi.fn(),
     filters: {},
     setFilter: state.setFilter ?? vi.fn(),
     resetFilters: state.resetFilters ?? vi.fn(),
@@ -56,6 +57,13 @@ function renderAt(state: Partial<UsePhenoHuntWorkspaceState>) {
     scoresByPlant: {},
     decisionsByPlant: {},
     roundsByKey: {},
+    roundLoadStates: {
+      veg: { status: "ready", error: null },
+      early_flower: { status: "ready", error: null },
+      mid_flower: { status: "ready", error: null },
+      late_flower: { status: "ready", error: null },
+      post_cure: { status: "ready", error: null },
+    },
     decisionHistoryByPlant: {},
     sexByPlant: {},
     reversedPlantIds: new Set<string>(),
@@ -75,15 +83,21 @@ function renderAt(state: Partial<UsePhenoHuntWorkspaceState>) {
     saveSmokeTest: state.saveSmokeTest ?? vi.fn().mockResolvedValue(true),
     saveLabResult: state.saveLabResult ?? vi.fn().mockResolvedValue(true),
     ...state,
-  });
-  const utils = render(
+  };
+  hookMock.mockImplementation(() => currentState);
+  const routeTree = () => (
     <MemoryRouter initialEntries={["/pheno-hunts/h1/workspace"]}>
       <Routes>
         <Route path="/pheno-hunts/:id/workspace" element={<PhenoHuntWorkspace />} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
-  return { ...utils, saveScore, saveDecision, saveRound };
+  const utils = render(routeTree());
+  const rerenderState = (patch: Partial<UsePhenoHuntWorkspaceState>) => {
+    currentState = { ...currentState, ...patch };
+    utils.rerender(routeTree());
+  };
+  return { ...utils, saveScore, saveDecision, saveRound, saveSex, rerenderState };
 }
 
 beforeEach(() => hookMock.mockReset());
@@ -97,6 +111,7 @@ describe("PhenoHuntWorkspace", () => {
   it("shows an error state", () => {
     renderAt({ status: "error", error: "Pheno hunt not found." });
     expect(screen.getByTestId("pheno-workspace-error")).toHaveTextContent(/not found/i);
+    expect(screen.queryByRole("button", { name: /^save$/i })).toBeNull();
   });
 
   it("renders candidates with loud trait inputs and a keeper-decision select", () => {
@@ -301,5 +316,77 @@ describe("PhenoHuntWorkspace", () => {
     });
     expect(screen.getByTestId("workspace-trait-p1-vigor")).toHaveValue(3);
     expect(screen.getByTestId("workspace-aroma-p1")).toHaveValue("grape");
+  });
+
+  it("does not mount an editable round until delayed stored values are ready", () => {
+    const { rerenderState, saveScore, saveDecision, saveRound, saveSex } = renderAt({
+      candidates: [{ candidateId: "p1", candidateLabel: "BD #1" }],
+      roundLoadStates: {
+        late_flower: { status: "loading", error: null },
+      },
+    });
+
+    fireEvent.change(screen.getByTestId("workspace-round-select"), {
+      target: { value: "late_flower" },
+    });
+    expect(screen.getByTestId("workspace-round-loading")).toBeInTheDocument();
+    expect(screen.getByTestId("workspace-round-save-disabled")).toBeDisabled();
+    expect(screen.queryByTestId("pheno-workspace-candidate-p1")).toBeNull();
+
+    rerenderState({
+      roundLoadStates: {
+        late_flower: { status: "ready", error: null },
+      },
+      roundsByKey: {
+        "p1:late_flower": {
+          plantId: "p1",
+          round: "late_flower",
+          traits: {},
+          loudTraits: { vigor: 4 },
+          aromaDescriptors: ["grape"],
+          noseNote: "sweet",
+          note: "stored",
+          observedAt: "2026-07-01T00:00:00Z",
+        },
+      },
+    });
+
+    expect(screen.getByTestId("workspace-trait-p1-vigor")).toHaveValue(4);
+    expect(screen.getByTestId("workspace-aroma-p1")).toHaveValue("grape");
+    expect(screen.getByTestId("workspace-nose-note-p1")).toHaveValue("sweet");
+    expect(screen.getByTestId("workspace-note-p1")).toHaveValue("stored");
+    expect(screen.getByTestId("workspace-save-p1")).toBeEnabled();
+    expect(saveScore).not.toHaveBeenCalled();
+    expect(saveDecision).not.toHaveBeenCalled();
+    expect(saveRound).not.toHaveBeenCalled();
+    expect(saveSex).not.toHaveBeenCalled();
+  });
+
+  it("shows a retryable round-read error with Save disabled and performs zero writes", async () => {
+    const loadRound = vi.fn().mockResolvedValue(undefined);
+    const { saveScore, saveDecision, saveRound, saveSex } = renderAt({
+      candidates: [{ candidateId: "p1", candidateLabel: "BD #1" }],
+      loadRound,
+      roundLoadStates: {
+        mid_flower: {
+          status: "error",
+          error: "Could not load this scoring round.",
+        },
+      },
+    });
+
+    fireEvent.change(screen.getByTestId("workspace-round-select"), {
+      target: { value: "mid_flower" },
+    });
+
+    expect(screen.getByTestId("workspace-round-error")).toHaveTextContent(/could not load/i);
+    expect(screen.getByTestId("workspace-round-save-disabled")).toBeDisabled();
+    expect(screen.queryByTestId("pheno-workspace-candidate-p1")).toBeNull();
+    fireEvent.click(screen.getByTestId("workspace-round-retry"));
+    await waitFor(() => expect(loadRound).toHaveBeenCalledTimes(2));
+    expect(saveScore).not.toHaveBeenCalled();
+    expect(saveDecision).not.toHaveBeenCalled();
+    expect(saveRound).not.toHaveBeenCalled();
+    expect(saveSex).not.toHaveBeenCalled();
   });
 });

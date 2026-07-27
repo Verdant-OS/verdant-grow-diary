@@ -13,6 +13,7 @@ import {
   type GlossaryCategory,
   type GlossaryTerm,
 } from "@/constants/glossaryTerms";
+import PublicPageRecoveryNav from "@/components/PublicPageRecoveryNav";
 import { usePageSeo } from "@/hooks/usePageSeo";
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
@@ -41,10 +42,7 @@ export default function Glossary() {
     return GLOSSARY_TERMS.filter((t) => {
       if (category !== "All" && t.category !== category) return false;
       if (!q) return true;
-      return (
-        t.term.toLowerCase().includes(q) ||
-        t.definition.toLowerCase().includes(q)
-      );
+      return t.term.toLowerCase().includes(q) || t.definition.toLowerCase().includes(q);
     });
   }, [query, category]);
 
@@ -62,10 +60,7 @@ export default function Glossary() {
   const activeLetters = new Set(grouped.keys());
 
   return (
-    <main
-      data-testid="glossary-page"
-      className="container mx-auto max-w-4xl px-4 py-6"
-    >
+    <main data-testid="glossary-page" className="container mx-auto max-w-4xl px-4 py-6">
       <header className="space-y-2">
         <h1 className="text-2xl font-semibold">Cannabis Cultivation &amp; Breeding Glossary</h1>
         <p className="text-sm text-muted-foreground">{GLOSSARY_DISCLAIMER}</p>
@@ -85,10 +80,7 @@ export default function Glossary() {
           />
         </label>
 
-        <div
-          data-testid="glossary-categories"
-          className="flex flex-wrap gap-1.5 text-xs"
-        >
+        <div data-testid="glossary-categories" className="flex flex-wrap gap-1.5 text-xs">
           {(["All", ...GLOSSARY_CATEGORIES] as const).map((c) => {
             const active = c === category;
             return (
@@ -136,23 +128,14 @@ export default function Glossary() {
       </section>
 
       {filtered.length === 0 ? (
-        <p
-          data-testid="glossary-empty"
-          className="mt-6 text-sm text-muted-foreground"
-        >
+        <p data-testid="glossary-empty" className="mt-6 text-sm text-muted-foreground">
           No terms match “{query}”.
         </p>
       ) : (
         <div className="mt-6 space-y-6">
           {ALPHABET.filter((l) => grouped.has(l)).map((letter) => (
-            <section
-              key={letter}
-              id={slugFor(letter)}
-              data-testid={`glossary-section-${letter}`}
-            >
-              <h2 className="mb-2 text-lg font-semibold text-muted-foreground">
-                {letter}
-              </h2>
+            <section key={letter} id={slugFor(letter)} data-testid={`glossary-section-${letter}`}>
+              <h2 className="mb-2 text-lg font-semibold text-muted-foreground">{letter}</h2>
               <ul className="grid gap-3 sm:grid-cols-2">
                 {grouped.get(letter)!.map((t) => (
                   <li
@@ -166,9 +149,7 @@ export default function Glossary() {
                         {t.category}
                       </span>
                     </div>
-                    <p className="mt-1 text-sm text-foreground/90">
-                      {t.definition}
-                    </p>
+                    <p className="mt-1 text-sm text-foreground/90">{t.definition}</p>
                     {t.seeAlso && t.seeAlso.length > 0 && (
                       <p
                         data-testid={`glossary-seealso-${t.term}`}
@@ -196,6 +177,7 @@ export default function Glossary() {
           ))}
         </div>
       )}
+      <PublicPageRecoveryNav className="mt-8 border-t border-border pt-4" />
     </main>
   );
 }

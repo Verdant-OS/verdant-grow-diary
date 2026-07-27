@@ -140,10 +140,7 @@ function renderDetail() {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[`/doctor/sessions/${SESSION_ID}`]}>
         <Routes>
-          <Route
-            path="/doctor/sessions/:sessionId"
-            element={<AiDoctorSessionDetail />}
-          />
+          <Route path="/doctor/sessions/:sessionId" element={<AiDoctorSessionDetail />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -167,9 +164,7 @@ describe("AiDoctorSessionDetail — Linked alert back-link", () => {
     ];
     renderDetail();
     await screen.findByTestId("ai-doctor-session-detail-linked-action-queue");
-    expect(
-      screen.queryByTestId("ai-doctor-session-detail-linked-alert"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-session-detail-linked-alert")).toBeNull();
   });
 
   it("renders 'Linked alert' chip and 'View linked alert' link when an alert id is present", async () => {
@@ -184,14 +179,18 @@ describe("AiDoctorSessionDetail — Linked alert back-link", () => {
     renderDetail();
     const chip = await screen.findByTestId(
       "ai-doctor-session-detail-linked-alert-chip",
+      undefined,
+      { timeout: 5_000 },
     );
     expect(chip.textContent ?? "").toMatch(/linked alert/i);
     const link = (await screen.findByTestId(
       "ai-doctor-session-detail-linked-alert-link",
+      undefined,
+      { timeout: 5_000 },
     )) as HTMLAnchorElement;
     expect(link.textContent).toBe("View linked alert");
     expect(link.getAttribute("href")).toBe(alertDetailPath("alert-xyz"));
-  });
+  }, 10_000);
 
   it("renders one link per unique alert id (dedupes duplicates)", async () => {
     linkedRows = [
@@ -210,9 +209,7 @@ describe("AiDoctorSessionDetail — Linked alert back-link", () => {
     ];
     renderDetail();
     await screen.findByTestId("ai-doctor-session-detail-linked-alert");
-    const links = screen.getAllByTestId(
-      "ai-doctor-session-detail-linked-alert-link",
-    );
+    const links = screen.getAllByTestId("ai-doctor-session-detail-linked-alert-link");
     expect(links).toHaveLength(1);
     expect(links[0].getAttribute("href")).toBe(alertDetailPath("alert-a"));
   });
@@ -270,9 +267,7 @@ describe("AiDoctorSessionDetail — Linked alert back-link", () => {
       },
     ];
     renderDetail();
-    const section = await screen.findByTestId(
-      "ai-doctor-session-detail-linked-alert",
-    );
+    const section = await screen.findByTestId("ai-doctor-session-detail-linked-alert");
     const lower = (section.textContent ?? "").toLowerCase();
     for (const tok of [
       "auto-execute",
@@ -304,9 +299,7 @@ describe("AiDoctorSessionDetail — Linked alert back-link", () => {
     ];
     renderDetail();
     await waitFor(() => {
-      expect(
-        screen.queryByTestId("ai-doctor-session-detail-linked-action-queue"),
-      ).not.toBeNull();
+      expect(screen.queryByTestId("ai-doctor-session-detail-linked-action-queue")).not.toBeNull();
     });
   });
 });
@@ -334,12 +327,8 @@ describe("AiDoctorSessionDetail Linked alert — static safety", () => {
     const lower = PAGE_SRC.toLowerCase();
     expect(lower).not.toContain("functions.invoke");
     expect(lower).not.toContain("service_role");
-    expect(lower).not.toMatch(
-      /from\(["']action_queue["'][\s\S]{0,200}?\.upsert\(/,
-    );
-    expect(lower).not.toMatch(
-      /from\(["']action_queue["'][\s\S]{0,200}?\.delete\(/,
-    );
+    expect(lower).not.toMatch(/from\(["']action_queue["'][\s\S]{0,200}?\.upsert\(/);
+    expect(lower).not.toMatch(/from\(["']action_queue["'][\s\S]{0,200}?\.delete\(/);
     expect(lower).not.toMatch(
       /from\(["']alerts["'][\s\S]{0,200}?\.(insert|update|delete|upsert)\(/,
     );

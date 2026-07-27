@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { resolvePricingPlanPreselect } from "@/lib/pricingPlanPreselect";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
@@ -14,7 +14,7 @@ import {
   FileText,
   Printer,
   FileSpreadsheet,
-  HandCoins,
+  Filter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/BrandLogo";
@@ -51,6 +51,10 @@ import {
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 import { buildCheckoutTrustCopy } from "@/lib/checkoutTrustCopyRules";
 import { useFounderSlotsRemaining } from "@/hooks/useFounderSlotsRemaining";
+import { useAuth } from "@/store/auth";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { creditPackBlockedCopy, resolveCreditPackPurchaseGate } from "@/lib/creditPackEligibility";
+import { isReducedMotionPreferred } from "@/lib/useTimelineHighlightAutoScroll";
 
 type BillingPeriod = "monthly" | "annual";
 
@@ -94,11 +98,11 @@ const COMPARISON_ROWS: Row[] = [
   { label: "Photo logs", free: true, pro: true, craft: true, founder: true },
   { label: "Manual sensor snapshots", free: true, pro: true, craft: true, founder: true },
   {
-    label: "Timeline history",
-    free: "Basic",
-    pro: "Extended",
-    craft: "Extended",
-    founder: "Extended",
+    label: "Diary & timeline history",
+    free: "Kept forever",
+    pro: "Kept forever",
+    craft: "Kept forever",
+    founder: "Kept forever",
   },
   {
     label: "Cultivation calendar (history-aware)",
@@ -130,11 +134,15 @@ const COMPARISON_ROWS: Row[] = [
     craft: true,
     founder: true,
   },
-  { label: "Sensor snapshot history", free: false, pro: true, craft: true, founder: true },
-  { label: "Better timeline filtering", free: false, pro: true, craft: true, founder: true },
-  { label: "Priority support", free: false, pro: true, craft: true, founder: true },
   {
-    label: "Future Pro features as they stabilize",
+    label: "Sensor snapshot history",
+    free: "90 days",
+    pro: "Full history",
+    craft: "Full history",
+    founder: "Full history",
+  },
+  {
+    label: "Advanced timeline filtering & jump tools",
     free: false,
     pro: true,
     craft: true,
@@ -150,7 +158,20 @@ const COMPARISON_ROWS: Row[] = [
 ];
 
 export default function Pricing() {
+  const location = useLocation();
   const [searchParams] = useSearchParams();
+  const { user, loading: authLoading } = useAuth();
+  const {
+    entitlement,
+    loading: entitlementLoading,
+    lookupFailed: entitlementLookupFailed,
+  } = useMyEntitlements();
+  const creditPackGate = resolveCreditPackPurchaseGate({
+    entitlement,
+    entitlementVerified: !entitlementLookupFailed,
+    loading: authLoading || entitlementLoading,
+    signedIn: user != null,
+  });
   // Canonical `?plan=` preselect (see resolvePricingPlanPreselect).
   // Legacy `/billing/:plan` redirects here with this exact contract.
   // NEVER auto-opens Paddle — the grower must click a Pricing CTA.
@@ -188,6 +209,8 @@ export default function Pricing() {
   interestPlanRef.current = interestPlan;
   const [recoveryRequested, setRecoveryRequested] = useState(false);
   const recoveryRef = useRef<HTMLElement>(null);
+  const creditPacksRef = useRef<HTMLElement>(null);
+  const handledCreditPacksHashRef = useRef<string | null>(null);
   const {
     openCheckout,
     loading: checkoutLoading,
@@ -270,6 +293,10 @@ export default function Pricing() {
   // plan-intent state and opens checkout for the pack SKU directly. Same
   // canonical checkout hook — this stays inside Pricing.tsx (checkout ownership).
   function handleBuyPack(sku: string) {
+    // Presentation is not the authority (get-paddle-price repeats this gate),
+    // but never start a checkout the current verified entitlement cannot use.
+    if (creditPackGate.kind !== "allowed") return;
+
     // Record the SKU and arm the recovery panel, exactly as handlePaidIntent
     // does. Both were missing here. Without the first, "Try again" retried
     // lastCheckoutPlanRef — which a pack click never writes — so it still held
@@ -293,7 +320,7 @@ export default function Pricing() {
   usePageSeo({
     title: "Pricing — Free, Pro & Craft | Verdant Grow Diary",
     description:
-      "Free grow diary forever. Pro adds multi-tent support, sensor history and advanced exports. Craft adds the live Pro Blueprint that scores every reading against your per-stage SOP.",
+      "Free grow diary forever. Pro adds multi-tent support, full sensor history, advanced timeline tools and advanced exports. Craft adds the live Pro Blueprint that scores every reading against your per-stage SOP.",
     path: "/pricing",
   });
 
@@ -301,6 +328,41 @@ export default function Pricing() {
     trackPricingEvent("pricing_page_view");
     trackFunnelEvent("paywall_viewed", { surface: "pricing" });
   }, []);
+
+  useEffect(() => {
+    if (location.hash !== "#buy-credits") {
+      handledCreditPacksHashRef.current = null;
+      return;
+    }
+    if (handledCreditPacksHashRef.current === location.hash) return;
+    const target = creditPacksRef.current;
+    if (!target) return;
+
+    handledCreditPacksHashRef.current = location.hash;
+    if (typeof target.scrollIntoView === "function") {
+      try {
+        target.scrollIntoView({
+          behavior: isReducedMotionPreferred() ? "auto" : "smooth",
+          block: "start",
+        });
+      } catch {
+        try {
+          target.scrollIntoView();
+        } catch {
+          // Presentation-only fallback; focus still identifies the destination.
+        }
+      }
+    }
+    try {
+      target.focus({ preventScroll: true });
+    } catch {
+      try {
+        target.focus();
+      } catch {
+        // A failed focus must not turn an in-page navigation aid into an error.
+      }
+    }
+  }, [location.hash]);
 
   useEffect(() => {
     if (!blockedReason) {
@@ -333,11 +395,11 @@ export default function Pricing() {
       ],
       [
         "Is the Free tier really free?",
-        "Yes. Plant profiles, the basic grow diary, photo logs, manual notes, the basic timeline, and manual sensor entries are all included on Free. You can run a real grow on Free without paying.",
+        "Yes. Plant profiles, the grow diary and timeline history, photo logs, manual notes, and manual sensor entries are all included on Free. You can run a real grow on Free without paying.",
       ],
       [
         "What do I actually get with Pro?",
-        "Multi-tent support, advanced exports including date-range diary reports, sensor snapshot history, longer grow history, advanced timeline filtering, priority support, and post-grow learning reports.",
+        "Multi-tent support, advanced exports including date-range diary reports, full sensor snapshot history, advanced timeline filtering and jump tools, and post-grow learning reports.",
       ],
       [
         "Do I need specific hardware?",
@@ -372,7 +434,7 @@ export default function Pricing() {
           "@type": "Product",
           name: "Verdant Pro",
           description:
-            "Multi-tent grow memory, 100 AI Doctor credits/month, advanced exports, and sensor snapshot history.",
+            "Multi-tent grow memory, 100 AI Doctor credits/month, advanced exports, and full sensor snapshot history.",
           brand: { "@type": "Brand", name: "Verdant Grow Diary" },
           offers: [
             {
@@ -647,47 +709,47 @@ export default function Pricing() {
             stays in planCatalog, PAID_PLAN_IDS and every gate, so existing
             holders keep exactly what they bought. */}
         {showFounderOffer && (
-        <PricingCard
-          testId="pricing-card-founder"
-          name={PRICING.founder.name}
-          subtitle={PRICING.founder.subtitle}
-          price={`$${PRICING.founder.price}`}
-          cadence={` ${PRICING.founder.cadence}`}
-          description={PRICING.founder.description}
-          features={PRICING.founder.features}
-          badge={
-            founderSlots.status === "ready" && founderSlots.claimed !== null
-              ? `${founderSlots.claimed} of ${founderSlots.total} claimed`
-              : PRICING.founder.badge
-          }
-          footnote={
-            founderSoldOut
-              ? "Founder Lifetime is currently sold out. Additional slots may open if a purchase is refunded."
-              : `Founder Lifetime is limited; availability may close manually when the first ${PRICING.founder.limit} are claimed.`
-          }
-          cta={
-            <Button
-              size="lg"
-              className="w-full h-auto min-h-11 whitespace-normal"
-              disabled={checkoutLoading || founderSoldOut}
-              data-testid="pricing-cta-founder-lifetime"
-              data-founder-remaining={founderSlots.remaining ?? ""}
-              onClick={() => {
-                handlePaidIntent(
-                  "founder_lifetime",
-                  "pricing_cta_founder_lifetime_clicked",
-                  "plan_card",
-                );
-              }}
-            >
-              {founderSoldOut
-                ? "Founder Lifetime sold out"
-                : isSkuBlocked("founder_lifetime")
-                  ? "Join the Founder launch list"
-                  : `Claim Founder Lifetime — $${PRICING.founder.price}`}
-            </Button>
-          }
-        />
+          <PricingCard
+            testId="pricing-card-founder"
+            name={PRICING.founder.name}
+            subtitle={PRICING.founder.subtitle}
+            price={`$${PRICING.founder.price}`}
+            cadence={` ${PRICING.founder.cadence}`}
+            description={PRICING.founder.description}
+            features={PRICING.founder.features}
+            badge={
+              founderSlots.status === "ready" && founderSlots.claimed !== null
+                ? `${founderSlots.claimed} of ${founderSlots.total} claimed`
+                : PRICING.founder.badge
+            }
+            footnote={
+              founderSoldOut
+                ? "Founder Lifetime is currently sold out. Additional slots may open if a purchase is refunded."
+                : `Founder Lifetime is limited; availability may close manually when the first ${PRICING.founder.limit} are claimed.`
+            }
+            cta={
+              <Button
+                size="lg"
+                className="w-full h-auto min-h-11 whitespace-normal"
+                disabled={checkoutLoading || founderSoldOut}
+                data-testid="pricing-cta-founder-lifetime"
+                data-founder-remaining={founderSlots.remaining ?? ""}
+                onClick={() => {
+                  handlePaidIntent(
+                    "founder_lifetime",
+                    "pricing_cta_founder_lifetime_clicked",
+                    "plan_card",
+                  );
+                }}
+              >
+                {founderSoldOut
+                  ? "Founder Lifetime sold out"
+                  : isSkuBlocked("founder_lifetime")
+                    ? "Join the Founder launch list"
+                    : `Claim Founder Lifetime — $${PRICING.founder.price}`}
+              </Button>
+            }
+          />
         )}
       </section>
 
@@ -741,7 +803,9 @@ export default function Pricing() {
                   size="sm"
                   data-testid="pricing-checkout-choose-another-plan"
                   onClick={() => {
-                    const plan = sanitizeCheckoutRecoveryPlanSlug(lastCheckoutSkuRef.current ?? interestPlan);
+                    const plan = sanitizeCheckoutRecoveryPlanSlug(
+                      lastCheckoutSkuRef.current ?? interestPlan,
+                    );
                     trackPricingEvent("pricing_checkout_recovery_choose_another_plan", {
                       plan,
                       source: "recovery_panel",
@@ -765,7 +829,9 @@ export default function Pricing() {
                   size="sm"
                   data-testid="pricing-checkout-dismiss"
                   onClick={() => {
-                    const plan = sanitizeCheckoutRecoveryPlanSlug(lastCheckoutSkuRef.current ?? interestPlan);
+                    const plan = sanitizeCheckoutRecoveryPlanSlug(
+                      lastCheckoutSkuRef.current ?? interestPlan,
+                    );
                     trackPricingEvent("pricing_checkout_recovery_dismissed", {
                       plan,
                       source: "recovery_panel",
@@ -808,16 +874,34 @@ export default function Pricing() {
       {/* Top up AI Doctor credits — one-time packs (the canonical checkout
           surface for the out-of-credits buy-CTA elsewhere in the app). */}
       <section
+        ref={creditPacksRef}
         id="buy-credits"
+        aria-labelledby="pricing-credit-packs-heading"
+        tabIndex={-1}
         data-testid="pricing-credit-packs"
         className="px-6 pb-12 max-w-4xl mx-auto scroll-mt-24"
       >
-        <h2 className="font-display text-2xl md:text-3xl font-semibold text-center">
+        <h2
+          id="pricing-credit-packs-heading"
+          className="font-display text-2xl md:text-3xl font-semibold text-center"
+        >
           Top up AI Doctor credits
         </h2>
         <p className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto">
           Out of monthly credits? Buy a one-time pack. Packs never expire and are spent only after
           your included monthly allowance.
+        </p>
+        <p
+          data-testid="pricing-credit-pack-gate"
+          data-gate-kind={creditPackGate.kind}
+          className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto"
+          role={creditPackGate.kind === "blocked" ? "status" : undefined}
+        >
+          {creditPackGate.kind === "pending"
+            ? "Checking your plan before showing top-up options…"
+            : creditPackGate.kind === "blocked"
+              ? creditPackBlockedCopy(creditPackGate.reason)
+              : "Available for your current paid plan."}
         </p>
         <div className="mt-8 grid gap-6 sm:grid-cols-2">
           {CREDIT_PACKS.map((pack) => (
@@ -832,13 +916,17 @@ export default function Pricing() {
               <Button
                 size="lg"
                 className="mt-5 w-full h-auto min-h-11 whitespace-normal"
-                disabled={checkoutLoading}
+                disabled={checkoutLoading || creditPackGate.kind !== "allowed"}
                 data-testid={`pricing-cta-${pack.sku}`}
                 onClick={() => handleBuyPack(pack.sku)}
               >
-                {isSkuBlocked(pack.sku)
-                  ? "Checkout unavailable"
-                  : `Buy ${pack.credits} credits — $${pack.priceUsd}`}
+                {creditPackGate.kind === "pending"
+                  ? "Checking plan…"
+                  : creditPackGate.kind === "blocked"
+                    ? "Credit packs unavailable"
+                    : isSkuBlocked(pack.sku)
+                      ? "Checkout unavailable"
+                      : `Buy ${pack.credits} credits — $${pack.priceUsd}`}
               </Button>
             </div>
           ))}
@@ -890,9 +978,9 @@ export default function Pricing() {
             body="CSV imports stay labeled as CSV. Manual, demo, stale, and invalid readings stay clearly labeled so Verdant does not pretend weak data is live data."
           />
           <ProofCallout
-            icon={<HandCoins className="h-5 w-5" />}
-            title="Approval-required actions"
-            body="Verdant can suggest next steps, but the grower decides. No blind automation. No device commands. The Action Queue stays grower-approved by design."
+            icon={<Filter className="h-5 w-5" />}
+            title="Advanced timeline filtering"
+            body="Focus a grow history by date range and jump to the next missing action without changing or hiding the underlying diary evidence."
           />
         </div>
       </section>
@@ -900,55 +988,55 @@ export default function Pricing() {
       {/* Founder Lifetime highlight band — retired from the public page along
           with the grid card; shown only on an explicit deep link. */}
       {showFounderOffer && (
-      <section className="px-6 py-10 max-w-5xl mx-auto">
-        <div className="rounded-2xl border border-primary/40 bg-primary/5 p-6 md:p-8 flex flex-col md:flex-row gap-6 md:items-center">
-          <div className="h-12 w-12 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
-            <Sparkles className="h-6 w-6" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="font-display text-xl md:text-2xl font-semibold">
-              Founder Lifetime Offer — ${FOUNDER_LIFETIME_PRICE_USD} once, full Pro forever
-            </h2>
-            <p className="mt-2 text-sm md:text-base text-muted-foreground">
-              Verdant is founder-built. This is a limited early-supporter offer for the first{" "}
-              {FOUNDER_LIFETIME_LIMIT} growers who back the product early. Pay once, get full Pro
-              access for the life of the product, and help shape what ships next. No hype, no
-              countdown gimmicks — when the first {FOUNDER_LIFETIME_LIMIT} are claimed, the offer
-              ends.
-            </p>
-            <Link
-              to="/founder"
-              className="mt-3 inline-flex text-sm font-medium text-primary underline underline-offset-4"
-              onClick={() =>
-                trackPricingEvent("pricing_founder_details_clicked", {
-                  source: "highlight_band",
-                })
-              }
+        <section className="px-6 py-10 max-w-5xl mx-auto">
+          <div className="rounded-2xl border border-primary/40 bg-primary/5 p-6 md:p-8 flex flex-col md:flex-row gap-6 md:items-center">
+            <div className="h-12 w-12 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="font-display text-xl md:text-2xl font-semibold">
+                Founder Lifetime Offer — ${FOUNDER_LIFETIME_PRICE_USD} once, full Pro forever
+              </h2>
+              <p className="mt-2 text-sm md:text-base text-muted-foreground">
+                Verdant is founder-built. This is a limited early-supporter offer for the first{" "}
+                {FOUNDER_LIFETIME_LIMIT} growers who back the product early. Pay once, get full Pro
+                access for the life of the product, and help shape what ships next. No hype, no
+                countdown gimmicks — when the first {FOUNDER_LIFETIME_LIMIT} are claimed, the offer
+                ends.
+              </p>
+              <Link
+                to="/founder"
+                className="mt-3 inline-flex text-sm font-medium text-primary underline underline-offset-4"
+                onClick={() =>
+                  trackPricingEvent("pricing_founder_details_clicked", {
+                    source: "highlight_band",
+                  })
+                }
+              >
+                See exactly what Founder includes
+              </Link>
+            </div>
+            <Button
+              size="lg"
+              className="shrink-0"
+              disabled={checkoutLoading || founderSoldOut}
+              data-testid="pricing-cta-founder-highlight"
+              onClick={() => {
+                handlePaidIntent(
+                  "founder_lifetime",
+                  "pricing_cta_founder_lifetime_clicked",
+                  "highlight_band",
+                );
+              }}
             >
-              See exactly what Founder includes
-            </Link>
+              {founderSoldOut
+                ? "Founder Lifetime sold out"
+                : isSkuBlocked("founder_lifetime")
+                  ? "Join the Founder launch list"
+                  : "Claim Founder Lifetime"}
+            </Button>
           </div>
-          <Button
-            size="lg"
-            className="shrink-0"
-            disabled={checkoutLoading || founderSoldOut}
-            data-testid="pricing-cta-founder-highlight"
-            onClick={() => {
-              handlePaidIntent(
-                "founder_lifetime",
-                "pricing_cta_founder_lifetime_clicked",
-                "highlight_band",
-              );
-            }}
-          >
-            {founderSoldOut
-              ? "Founder Lifetime sold out"
-              : isSkuBlocked("founder_lifetime")
-                ? "Join the Founder launch list"
-                : "Claim Founder Lifetime"}
-          </Button>
-        </div>
-      </section>
+        </section>
       )}
 
       {/* Comparison table */}
@@ -959,7 +1047,8 @@ export default function Pricing() {
             : "Compare Free, Pro and Craft"}
         </h2>
         <p className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto">
-          Free is genuinely useful for starting a grow diary. Pro adds deeper history, advanced
+          Free is genuinely useful for starting a grow diary, with diary and timeline history kept
+          forever. Pro adds full sensor history, advanced filtering and jump tools, advanced
           exports, and multi-tent support. Craft adds the live Pro Blueprint that scores every
           reading against your per-stage SOP. Founder Lifetime is a limited early-supporter offer
           that includes full Pro access and the Pro Blueprint.
@@ -1055,18 +1144,18 @@ export default function Pricing() {
           <AccordionItem value="free-forever">
             <AccordionTrigger>Is the Free tier really free?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              Yes. Plant profiles, the basic grow diary, photo logs, manual notes, the basic
-              timeline, and manual sensor entries are all included on Free. You can run a real grow
-              on Free without paying.
+              Yes. Plant profiles, the grow diary and timeline history, photo logs, manual notes,
+              and manual sensor entries are all included on Free. You can run a real grow on Free
+              without paying.
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="pro-what">
             <AccordionTrigger>What do I actually get with Pro?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              Multi-tent support, advanced exports including date-range diary reports, sensor
-              snapshot history, longer grow history, advanced timeline filtering, priority support,
-              and post-grow learning reports. Pro features ship over time, only as they stabilize.
+              Multi-tent support, advanced exports including date-range diary reports, full sensor
+              snapshot history, advanced timeline filtering and jump tools, and post-grow learning
+              reports.
             </AccordionContent>
           </AccordionItem>
 

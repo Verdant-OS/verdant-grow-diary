@@ -27,12 +27,24 @@ describe("Action Queue owner decision guard", () => {
     expect(MIGRATION).not.toMatch(/mqtt|home[_ -]?assistant|relay|actuator|device[_ -]?command/i);
   });
 
-  it("shows simulation success only after the row transition succeeds", () => {
+  it("shows simulation success only after the atomic RPC transition succeeds", () => {
     expect(ACTION_DETAIL).toMatch(
-      /const success = await transition\([\s\S]*?if \(success && kind === "simulate"\)[\s\S]*?toast\.message\("Simulated/,
+      /const success = await transition\(row,\s*kind,\s*note\)[\s\S]*?if \(success && kind === "simulate"\)[\s\S]*?toast\.message\("Simulated/,
     );
     expect(ACTION_QUEUE).toMatch(
-      /const success = await transition\([\s\S]*?if \(success && kind === "simulate"\)[\s\S]*?toast\.message\("Simulated/,
+      /const success = await transition\(row,\s*kind,\s*note\)[\s\S]*?if \(success && kind === "simulate"\)[\s\S]*?toast\.message\("Simulated/,
+    );
+  });
+
+  it("reconciles an open drawer after reload and uses exact transition guards", () => {
+    expect(ACTION_QUEUE).toMatch(
+      /setDrawerRow\(\(current\)\s*=>\s*current\s*\?\s*\(?\s*list\.find\(\(row\)\s*=>\s*row\.id\s*===\s*current\.id\)\s*\?\?\s*null\s*\)?\s*:\s*null/,
+    );
+    expect(ACTION_QUEUE).toMatch(
+      /canApprove=\{!!drawerRow\s*&&\s*canApproveAction\(drawerRow\.status\)\}/,
+    );
+    expect(ACTION_QUEUE).toMatch(
+      /canReject=\{!!drawerRow\s*&&\s*canRejectAction\(drawerRow\.status\)\}/,
     );
   });
 });

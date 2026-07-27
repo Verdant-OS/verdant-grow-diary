@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -21,6 +22,7 @@ interface BreedingEventFormData {
   plantId: string;
   subType: BreedingEventType;
   details: unknown;
+  requestActionQueueSuggestions: boolean;
 }
 
 interface Props {
@@ -44,6 +46,7 @@ export function BreedingEventForm({ plants, busy, onSubmit, onCancel }: Props) {
   const [subType, setSubType] = useState<BreedingEventType | "">("");
   const [method, setMethod] = useState<string>("");
   const [intensity, setIntensity] = useState<string>("");
+  const [requestActionQueueSuggestions, setRequestActionQueueSuggestions] = useState(false);
 
   // These inputs feed the deterministic follow-up advisor: reversal `method`
   // and pollen-shed `intensity` change which reminders (and timing) are queued.
@@ -58,7 +61,12 @@ export function BreedingEventForm({ plants, busy, onSubmit, onCancel }: Props) {
     const details: Record<string, string> = {};
     if (showMethod && method) details.method = method;
     if (showIntensity && intensity) details.intensity = intensity;
-    onSubmit({ plantId, subType: subType as BreedingEventType, details });
+    onSubmit({
+      plantId,
+      subType: subType as BreedingEventType,
+      details,
+      requestActionQueueSuggestions,
+    });
   };
 
   return (
@@ -137,6 +145,28 @@ export function BreedingEventForm({ plants, busy, onSubmit, onCancel }: Props) {
           </p>
         </div>
       ) : null}
+
+      <div className="flex items-start gap-3 rounded-md border border-border/70 p-3">
+        <Checkbox
+          id="breeding-action-queue-opt-in"
+          checked={requestActionQueueSuggestions}
+          onCheckedChange={(checked) => setRequestActionQueueSuggestions(checked === true)}
+          disabled={busy}
+          data-testid="breeding-action-queue-opt-in"
+        />
+        <div className="space-y-1">
+          <Label
+            htmlFor="breeding-action-queue-opt-in"
+            className="cursor-pointer text-sm font-medium leading-none"
+          >
+            Create approval-required follow-up suggestions
+          </Label>
+          <p className="text-xs text-muted-foreground">
+            Optional. Adds pending items for your review; Verdant will not execute equipment
+            changes.
+          </p>
+        </div>
+      </div>
 
       <div className="flex gap-2 justify-end pt-2">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={busy}>

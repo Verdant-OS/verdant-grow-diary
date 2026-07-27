@@ -4,6 +4,7 @@
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { handleRequest, type SensorWebhookAdminClient } from "./index.ts";
 import type { BridgeTokenRow } from "./auth.ts";
+import type { LovableSubscriptionRow } from "../_shared/lib/lib/entitlements/lovablePaddleAdapter.ts";
 
 const ENDPOINT = "https://example.test/functions/v1/sensor-ingest-webhook";
 const NOW = new Date("2026-07-18T12:00:00.000Z");
@@ -18,6 +19,9 @@ const VALID_TOKEN = `vbt_${"a".repeat(40)}`;
 interface FakeState {
   bridgeRow: BridgeTokenRow | null;
   bridgeLookups: number;
+  subscriptionRows: LovableSubscriptionRow[];
+  subscriptionError: unknown;
+  subscriptionFilters: Array<{ column: string; value: string }>;
   persistedRows: Array<Record<string, unknown>>;
   auditRows: Array<Record<string, unknown>>;
   rpcCalls: Array<{ name: string; args: Record<string, unknown> }>;
@@ -34,10 +38,31 @@ function bridgeRow(overrides: Partial<BridgeTokenRow> = {}): BridgeTokenRow {
   };
 }
 
+function paidSubscription(overrides: Partial<LovableSubscriptionRow> = {}): LovableSubscriptionRow {
+  return {
+    user_id: USER_ID,
+    paddle_subscription_id: "sub_sensor_pro",
+    paddle_customer_id: "ctm_sensor_pro",
+    product_id: "verdant_pro",
+    price_id: "pro_monthly",
+    status: "active",
+    current_period_start: "2026-07-01T00:00:00.000Z",
+    current_period_end: "2026-08-01T00:00:00.000Z",
+    cancel_at_period_end: false,
+    environment: "live",
+    created_at: "2026-07-01T00:00:00.000Z",
+    updated_at: "2026-07-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
 function makeState(row: BridgeTokenRow | null = bridgeRow()): FakeState {
   return {
     bridgeRow: row,
     bridgeLookups: 0,
+    subscriptionRows: [paidSubscription()],
+    subscriptionError: null,
+    subscriptionFilters: [],
     persistedRows: [],
     auditRows: [],
     rpcCalls: [],
@@ -62,6 +87,61 @@ function makeAdmin(state: FakeState): SensorWebhookAdminClient {
             };
           },
         };
+      }
+      if (table === "billing_subscriptions") {
+        const builder = {
+          select() {
+            return builder;
+          },
+          eq(column: string, value: string) {
+            state.subscriptionFilters.push({ column, value });
+            return builder;
+          },
+          limit() {
+            return builder;
+          },
+          then(resolve: (result: { data: unknown[]; error: null }) => void) {
+            resolve({ data: [], error: null });
+          },
+        };
+        return builder;
+      }
+      if (table === "subscriptions") {
+        const filters: Array<{ column: string; value: string }> = [];
+        const builder = {
+          select() {
+            return builder;
+          },
+          eq(column: string, value: string) {
+            filters.push({ column, value });
+            state.subscriptionFilters.push({ column, value });
+            return builder;
+          },
+          order() {
+            return builder;
+          },
+          limit() {
+            return builder;
+          },
+          then(
+            resolve: (result: { data: LovableSubscriptionRow[] | null; error: unknown }) => void,
+          ) {
+            if (state.subscriptionError) {
+              resolve({ data: null, error: state.subscriptionError });
+              return;
+            }
+            resolve({
+              data: state.subscriptionRows.filter((candidate) =>
+                filters.every(
+                  ({ column, value }) =>
+                    String(candidate[column as keyof LovableSubscriptionRow]) === value,
+                ),
+              ),
+              error: null,
+            });
+          },
+        };
+        return builder;
       }
       if (table === "sensor_readings") {
         return {
@@ -142,6 +222,7 @@ Deno.test(
     const response = await handleRequest(post("ey.fake.user.jwt"), {
       admin: makeAdmin(state),
       now: () => NOW,
+      expectedBillingEnvironment: "live",
     });
 
     assertEquals(response.status, 403);
@@ -158,6 +239,7 @@ Deno.test(
     const response = await handleRequest(post(VALID_TOKEN), {
       admin: makeAdmin(state),
       now: () => NOW,
+      expectedBillingEnvironment: "live",
     });
     const body = await responseBody(response);
 
@@ -166,6 +248,12 @@ Deno.test(
     assertEquals(body.auth, "bridge");
     assertEquals(body.inserted, 3);
     assertEquals(state.persistedRows.length, 3);
+    assertEquals(
+      state.subscriptionFilters.some(
+        (filter) => filter.column === "user_id" && filter.value === USER_ID,
+      ),
+      true,
+    );
     for (const row of state.persistedRows) {
       assertEquals(row.user_id, USER_ID);
       assertEquals(row.tent_id, TENT_ID);
@@ -197,6 +285,7 @@ Deno.test(
     const freshResponse = await handleRequest(post(VALID_TOKEN), {
       admin,
       now: () => NOW,
+      expectedBillingEnvironment: "live",
     });
     assertEquals(freshResponse.status, 200);
     assertEquals((await responseBody(freshResponse)).inserted, 3);
@@ -207,6 +296,7 @@ Deno.test(
     const staleResponse = await handleRequest(post(VALID_TOKEN), {
       admin,
       now: () => new Date("2026-07-18T12:26:00.000Z"),
+      expectedBillingEnvironment: "live",
     });
     const staleBody = await responseBody(staleResponse);
 
@@ -228,6 +318,7 @@ Deno.test("sensor webhook handler rejects a revoked bridge without writing", asy
   const response = await handleRequest(post(VALID_TOKEN), {
     admin: makeAdmin(state),
     now: () => NOW,
+    expectedBillingEnvironment: "live",
   });
 
   assertEquals(response.status, 401);
@@ -240,6 +331,7 @@ Deno.test("sensor webhook handler rejects an expired bridge without writing", as
   const response = await handleRequest(post(VALID_TOKEN), {
     admin: makeAdmin(state),
     now: () => NOW,
+    expectedBillingEnvironment: "live",
   });
 
   assertEquals(response.status, 401);
@@ -252,6 +344,7 @@ Deno.test("sensor webhook handler denies a payload for another tent with zero wr
   const response = await handleRequest(post(VALID_TOKEN, payload(OTHER_TENT_ID)), {
     admin: makeAdmin(state),
     now: () => NOW,
+    expectedBillingEnvironment: "live",
   });
 
   assertEquals(response.status, 403);
@@ -259,4 +352,56 @@ Deno.test("sensor webhook handler denies a payload for another tent with zero wr
   assertEquals(state.persistedRows.length, 0);
   assertEquals(state.rpcCalls.length, 0);
   assertEquals(state.auditRows.length, 0);
+});
+
+Deno.test("sensor webhook handler denies a Free token owner before persistence", async () => {
+  const state = makeState();
+  state.subscriptionRows = [];
+
+  const response = await handleRequest(post(VALID_TOKEN), {
+    admin: makeAdmin(state),
+    now: () => NOW,
+    expectedBillingEnvironment: "live",
+  });
+
+  assertEquals(response.status, 403);
+  assertEquals((await responseBody(response)).error, "upgrade_required");
+  assertEquals(state.persistedRows.length, 0);
+  assertEquals(state.rpcCalls.length, 0);
+  assertEquals(state.auditRows.length, 0);
+});
+
+Deno.test("sensor webhook handler denies a degraded paid token owner", async () => {
+  const state = makeState();
+  state.subscriptionRows = [
+    paidSubscription({
+      status: "canceled",
+      current_period_end: "2026-07-17T12:00:00.000Z",
+    }),
+  ];
+
+  const response = await handleRequest(post(VALID_TOKEN), {
+    admin: makeAdmin(state),
+    now: () => NOW,
+    expectedBillingEnvironment: "live",
+  });
+
+  assertEquals(response.status, 403);
+  assertEquals((await responseBody(response)).error, "upgrade_required");
+  assertEquals(state.persistedRows.length, 0);
+});
+
+Deno.test("sensor webhook handler fails closed when entitlement is unverifiable", async () => {
+  const state = makeState();
+  state.subscriptionError = { message: "database unavailable" };
+
+  const response = await handleRequest(post(VALID_TOKEN), {
+    admin: makeAdmin(state),
+    now: () => NOW,
+    expectedBillingEnvironment: "live",
+  });
+
+  assertEquals(response.status, 503);
+  assertEquals((await responseBody(response)).error, "entitlement_lookup_failed");
+  assertEquals(state.persistedRows.length, 0);
 });

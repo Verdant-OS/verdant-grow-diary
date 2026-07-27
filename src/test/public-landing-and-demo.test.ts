@@ -28,7 +28,7 @@ describe("Demo page + route removal", () => {
     expect(APP).not.toMatch(/element=\{<Demo\s*\/>\}/);
   });
   it("/demo redirects to the public landing (no broken bookmark)", () => {
-    expect(APP).toMatch(/path="\/demo"\s+element=\{<Navigate\s+to="\/welcome"\s+replace\s*\/>\}/);
+    expect(APP).toMatch(/path="\/demo"\s+element=\{<RouteAliasRedirect\s+to="\/welcome"\s*\/>\}/);
   });
 });
 

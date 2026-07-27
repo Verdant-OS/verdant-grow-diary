@@ -1,4 +1,3 @@
-import { useId } from "react";
 import { X } from "lucide-react";
 import {
   Sheet,
@@ -27,8 +26,7 @@ import {
   type SensorSnapshotDrawerCsvRow,
 } from "@/lib/sensorSnapshotDetailsDrawerCsvExport";
 
-export const SNAPSHOT_DRAWER_CLOSE_LABEL =
-  "Close sensor snapshot details" as const;
+export const SNAPSHOT_DRAWER_CLOSE_LABEL = "Close sensor snapshot details" as const;
 
 export interface SensorSnapshotDetailsDrawerData {
   snapshotId: string;
@@ -71,10 +69,7 @@ function fmtNum(v: number | null, suffix = ""): string {
  * conversion happens exactly once, here. The celsius preference renders
  * the legacy string unchanged; missing/invalid stays "Not available".
  */
-function fmtAirTemp(
-  v: number | null,
-  unit: TemperatureUnitPreference,
-): string {
+function fmtAirTemp(v: number | null, unit: TemperatureUnitPreference): string {
   if (typeof v !== "number" || !Number.isFinite(v)) return "Not available";
   if (unit === "celsius") return `${v}°C`;
   return `${celsiusToFahrenheit(v).toFixed(1)}°F`;
@@ -107,21 +102,20 @@ export default function SensorSnapshotDetailsDrawer({
   relatedCandidates,
   csvExport,
 }: SensorSnapshotDetailsDrawerProps) {
-  const titleId = useId();
-  const descriptionId = useId();
   const temperatureUnit = useTemperatureUnitPreference();
   const linkAttempt = describeSnapshotDiaryLinkAttempt();
-  const relatedLinks = data && relatedCandidates
-    ? matchSnapshotDiaryLinks({
-        snapshot: {
-          snapshotId: data.snapshotId,
-          tentId: data.tentId,
-          plantId: data.plantId,
-          capturedAt: data.capturedAt,
-        },
-        candidates: relatedCandidates,
-      })
-    : [];
+  const relatedLinks =
+    data && relatedCandidates
+      ? matchSnapshotDiaryLinks({
+          snapshot: {
+            snapshotId: data.snapshotId,
+            tentId: data.tentId,
+            plantId: data.plantId,
+            capturedAt: data.capturedAt,
+          },
+          candidates: relatedCandidates,
+        })
+      : [];
   const showRelatedSection =
     Array.isArray(relatedCandidates) && relatedCandidates.length >= 0 && !!data;
 
@@ -150,18 +144,12 @@ export default function SensorSnapshotDetailsDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        data-testid="sensor-snapshot-details-drawer"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={descriptionId}
-      >
+      <SheetContent side="right" data-testid="sensor-snapshot-details-drawer" aria-modal="true">
         {data ? (
           <>
             <SheetHeader>
-              <SheetTitle id={titleId}>Sensor snapshot</SheetTitle>
-              <SheetDescription id={descriptionId}>
+              <SheetTitle>Sensor snapshot</SheetTitle>
+              <SheetDescription>
                 Matched fields only. Raw payload and unsafe identifiers are never shown here.
               </SheetDescription>
             </SheetHeader>
@@ -302,10 +290,8 @@ export default function SensorSnapshotDetailsDrawer({
         ) : (
           <>
             <SheetHeader>
-              <SheetTitle id={titleId}>Sensor snapshot</SheetTitle>
-              <SheetDescription id={descriptionId}>
-                Sensor snapshot details panel.
-              </SheetDescription>
+              <SheetTitle>Sensor snapshot</SheetTitle>
+              <SheetDescription>Sensor snapshot details panel.</SheetDescription>
             </SheetHeader>
             <p className="text-xs text-muted-foreground" data-testid="snapshot-drawer-empty">
               Sensor snapshot not linked.

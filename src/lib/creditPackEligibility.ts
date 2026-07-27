@@ -1,0 +1,90 @@
+/**
+ * Who can actually SPEND a one-time AI credit pack.
+ *
+ * Packs top up the MONTHLY credit bucket. `ai_credit_spend` only consults pack
+ * balance under `IF v_scope = 'per_month'`, and `v_scope` is `'per_grow'`
+ * whenever `ai_credit_allowance` returns a non-null `per_grow`
+ * (20260721104000_ai_credit_spend_pack_overflow.sql). Free is `per_grow = 3`,
+ * so a free grower's purchased pack lands in `ai_credit_grants` and no spend
+ * path ever reads it.
+ *
+ * `Capabilities.aiCreditsPerGrow` is the TS mirror of that same column
+ * (`null` = "n/a; uses the monthly bucket"), so `=== null` here is exactly the
+ * SQL's `per_month` branch rather than a parallel list of paid plan ids.
+ *
+ * Pure: no React, no Supabase, no time reads.
+ */
+import type { ResolvedEntitlement } from "@/lib/entitlements/types";
+
+export type CreditPackPurchaseGate =
+  /** Entitlement still loading, so checkout must remain unavailable. */
+  | { kind: "pending" }
+  /** Packs are spendable; show enabled buy buttons. */
+  | { kind: "allowed" }
+  /**
+   * Packs would be unspendable for this viewer. The reason selects honest,
+   * calm recovery copy without exposing provider or account details.
+   */
+  | { kind: "blocked"; reason: "signed_out" | "no_monthly_bucket" | "unverified" };
+
+const PAID_BILLING_SOURCES: ReadonlySet<NonNullable<ResolvedEntitlement["source"]>> = new Set([
+  "byo_paddle",
+  "lovable_paddle_subscription",
+  "lovable_paddle_lifetime",
+]);
+
+/**
+ * The core predicate shared by the client and the edge function.
+ *
+ * Both a monthly credit bucket and paid billing provenance are required.
+ * Provenance matters because a verified staff role can lift browser
+ * capabilities to Pro for presentation while remaining source="free"; staff
+ * presentation must never authorize a cost-bearing pack purchase.
+ */
+export function creditPackIsSpendable(entitlement: ResolvedEntitlement): boolean {
+  return (
+    entitlement.isActive &&
+    entitlement.source !== undefined &&
+    PAID_BILLING_SOURCES.has(entitlement.source) &&
+    entitlement.capabilities.aiCreditsPerGrow === null
+  );
+}
+
+export interface CreditPackGateInput {
+  entitlement: ResolvedEntitlement;
+  /** False when the relevant entitlement authority could not be read. */
+  entitlementVerified: boolean;
+  loading: boolean;
+  signedIn: boolean;
+}
+
+/**
+ * Can this viewer spend pack credits if they buy them?
+ *
+ * Uncertain states fail closed: loading stays pending and an unverified
+ * entitlement stays blocked. Selling a pack we cannot prove is spendable is
+ * the failure this gate prevents.
+ */
+export function resolveCreditPackPurchaseGate(input: CreditPackGateInput): CreditPackPurchaseGate {
+  if (input.loading) return { kind: "pending" };
+  if (!input.signedIn) return { kind: "blocked", reason: "signed_out" };
+  if (!input.entitlementVerified) return { kind: "blocked", reason: "unverified" };
+  if (!creditPackIsSpendable(input.entitlement)) {
+    return { kind: "blocked", reason: "no_monthly_bucket" };
+  }
+  return { kind: "allowed" };
+}
+
+/** Grower-facing explanation for each blocked reason. Never blames the user. */
+export function creditPackBlockedCopy(
+  reason: Extract<CreditPackPurchaseGate, { kind: "blocked" }>["reason"],
+): string {
+  switch (reason) {
+    case "signed_out":
+      return "Credit packs top up a paid plan's monthly AI allowance. Sign in to see your top-up options.";
+    case "no_monthly_bucket":
+      return "Credit packs top up the monthly AI allowance that comes with Pro, Craft and Founder Lifetime. Free grows include 3 AI Doctor checks per grow instead, so a pack would have nothing to add to yet.";
+    case "unverified":
+      return "We couldn't confirm your plan just now, so we're not showing top-up options. Reload in a moment, or check your plan in Settings.";
+  }
+}

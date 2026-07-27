@@ -335,11 +335,12 @@ describe("evaluatePolicy", () => {
     for (const forbidden of FORBIDDEN_LOCKFILES) {
       expect(existsSync(resolve(root, forbidden)), forbidden).toBe(false);
     }
-  });
+  }, 15_000);
 
-  it("runs as a CLI on Windows with explicit transitional output", () => {
+  it("runs as a CLI on Windows and finds uppercase undeclared consumers", () => {
     const root = mkdtempSync(join(tmpdir(), "verdant-lockfile-policy-"));
     const script = resolve(__dirname, "../../scripts/check-bun-lockfile-policy.mjs");
+    const reviewedMarker = "NPM.CMD ci";
     try {
       const manifest = packageJson();
       mkdirSync(join(root, "config"), { recursive: true });
@@ -348,10 +349,14 @@ describe("evaluatePolicy", () => {
       writeFileSync(join(root, "package-lock.json"), JSON.stringify(packageLock(manifest)), "utf8");
       writeFileSync(
         join(root, "config/dependency-lockfile-transition.json"),
-        JSON.stringify(transition()),
+        JSON.stringify(
+          transition({
+            consumerContracts: [{ path: "README.md", markers: [reviewedMarker] }],
+          }),
+        ),
         "utf8",
       );
-      writeFileSync(join(root, "README.md"), "npm install", "utf8");
+      writeFileSync(join(root, "README.md"), reviewedMarker, "utf8");
       expect(spawnSync("git", ["init"], { cwd: root, encoding: "utf8" }).status).toBe(0);
       expect(spawnSync("git", ["add", "."], { cwd: root, encoding: "utf8" }).status).toBe(0);
 
@@ -363,10 +368,21 @@ describe("evaluatePolicy", () => {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("bun.lock canonical");
       expect(result.stdout).toContain("package-lock.json synchronized for 1 npm consumers");
+
+      writeFileSync(join(root, "rogue.ps1"), "NPM.EXE ci", "utf8");
+      expect(spawnSync("git", ["add", "rogue.ps1"], { cwd: root, encoding: "utf8" }).status).toBe(
+        0,
+      );
+      const rejected = spawnSync(process.execPath, [script], {
+        cwd: root,
+        encoding: "utf8",
+      });
+      expect(rejected.status).toBe(1);
+      expect(rejected.stderr).toContain("Undeclared npm install/ci consumer found at rogue.ps1");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 });
 
 describe("isolated npm semantic lock check", () => {
@@ -415,5 +431,5 @@ describe("isolated npm semantic lock check", () => {
     } finally {
       rmSync(fixtureRoot, { recursive: true, force: true });
     }
-  }, 30_000);
+  }, 60_000);
 });

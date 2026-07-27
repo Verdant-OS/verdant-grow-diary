@@ -15,6 +15,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 
 import AiDoctorContextReadinessPanel from "@/components/AiDoctorContextReadinessPanel";
 import PlantDetailAiDoctorContextReadinessMount from "@/components/PlantDetailAiDoctorContextReadinessMount";
@@ -423,7 +424,7 @@ describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
     expect(sessionStorageSetSpy).not.toHaveBeenCalled();
   });
 
-  it("Add Feeding dispatches the same navigation-only event payload shape", () => {
+  it("Add Feeding opens the feeding editor with the exact plant target", () => {
     recentActivityState = { data: [], isLoading: false };
     manualLogsState = { data: [], isLoading: false };
 
@@ -454,10 +455,12 @@ describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
 
     expect(events).toHaveLength(1);
     expect(events[0].type).toBe("verdant:open-quicklog");
-    expect(events[0].detail).toEqual({
+    expect(events[0].detail).toMatchObject({
       plantId: "p2",
       growId: "g2",
       tentId: "t2",
+      eventType: "feeding",
+      activityId: "feeding",
     });
   });
 
@@ -489,10 +492,12 @@ describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
     }
 
     expect(events).toHaveLength(1);
-    expect(events[0].detail).toEqual({
+    expect(events[0].detail).toMatchObject({
       plantId: "p-photo",
       growId: "g-photo",
       tentId: "t-photo",
+      eventType: "photo",
+      activityId: "photo",
     });
     expect(fetchSpy).not.toHaveBeenCalled();
   });
@@ -549,12 +554,14 @@ describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
 
     try {
       render(
-        <PlantDetailAiDoctorContextReadinessMount
-          plantId="p1"
-          growId={null}
-          tentId={null}
-          plantName="Plant A"
-        />,
+        <MemoryRouter>
+          <PlantDetailAiDoctorContextReadinessMount
+            plantId="p1"
+            growId={null}
+            tentId={null}
+            plantName="Plant A"
+          />
+        </MemoryRouter>,
       );
       const button = screen.getByTestId(
         "ai-doctor-context-readiness-panel-quick-action-add-watering",
@@ -571,12 +578,14 @@ describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
 
   it("renders every contextual quick action unavailable when grow or tent scope is missing", () => {
     render(
-      <PlantDetailAiDoctorContextReadinessMount
-        plantId="p1"
-        growId={null}
-        tentId={null}
-        plantName="Plant A"
-      />,
+      <MemoryRouter>
+        <PlantDetailAiDoctorContextReadinessMount
+          plantId="p1"
+          growId={null}
+          tentId={null}
+          plantName="Plant A"
+        />
+      </MemoryRouter>,
     );
     for (const action of ["fast-add-photo", "add-watering", "add-feeding", "add-sensor-snapshot"]) {
       const button = screen.getByTestId(

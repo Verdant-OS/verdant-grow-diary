@@ -1,7 +1,8 @@
 name: AI Doctor freshness gate e2e (mocked)
 
 # Non-destructive Playwright boundary proof for the AI Doctor 48h
-# snapshot-freshness gate on Plant Detail's Ask Doctor dialog.
+# snapshot-freshness gate on Plant Detail's canonical context and cautious
+# live-review surfaces.
 #
 # SAFETY:
 #  - Mocked/non-destructive only. Every Supabase /auth/v1/** and
@@ -22,13 +23,12 @@ on:
     branches: [verdant-grow-diary]
     paths:
       - "e2e/ai-doctor-freshness-gate.spec.ts"
-      - "src/components/PlantDetailDoctorLaunchDialog.tsx"
-      - "src/components/PlantDetailDoctorContextPreview.tsx"
-      - "src/lib/aiDoctorSnapshotStalenessExplanationViewModel.ts"
+      - "src/pages/PlantDetail.tsx"
+      - "src/components/PlantDetailAiDoctorContextPanel.tsx"
+      - "src/components/PlantDetailAiDoctorLiveReview.tsx"
       - "src/lib/aiDoctorContextRules.ts"
       - "src/lib/aiDoctorContextViewModel.ts"
-      - "src/lib/aiDoctorReadinessGateViewModel.ts"
-      - "src/constants/aiDoctorContextReadiness.ts"
+      - "src/lib/aiDoctorReviewEligibilityRules.ts"
       - "src/hooks/useTimelineMemory.ts"
       - "src/lib/manualSnapshotDiaryAdapter.ts"
       - "playwright.config.ts"

@@ -30,6 +30,20 @@ export const SENSOR_RANGE_FROM_PARAM = "from";
 export const SENSOR_RANGE_TO_PARAM = "to";
 export const SENSOR_PLANT_PARAM = "plantId";
 
+/**
+ * Normalize the optional opaque plant scope carried by Timeline links.
+ *
+ * A missing/blank value means "all plants". Any non-blank value stays
+ * exact (apart from surrounding whitespace) so an unknown or
+ * unauthorized id fails closed when it is matched against the
+ * owner/grow-scoped Timeline rows; it is never coerced to another plant.
+ */
+export function parseTimelinePlantIdParam(raw: string | null | undefined): string | null {
+  if (typeof raw !== "string") return null;
+  const value = raw.trim();
+  return value === "" ? null : value;
+}
+
 /** Parse the `sensorSources` query param value into canonical kinds. */
 export function parseSensorSourcesParam(
   raw: string | null | undefined,
@@ -67,9 +81,7 @@ export function encodeSensorSourcesParam(
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Validate a plain YYYY-MM-DD date string, returning null otherwise. */
-export function parseDateRangeParam(
-  raw: string | null | undefined,
-): string | null {
+export function parseDateRangeParam(raw: string | null | undefined): string | null {
   if (typeof raw !== "string") return null;
   const v = raw.trim();
   if (!ISO_DATE_RE.test(v)) return null;
@@ -102,9 +114,8 @@ export function buildTimelineFilterUrl(input: BuildTimelineFilterUrlInput): stri
   if (from) params.set(SENSOR_RANGE_FROM_PARAM, from);
   const to = parseDateRangeParam(input.to ?? null);
   if (to) params.set(SENSOR_RANGE_TO_PARAM, to);
-  if (typeof input.plantId === "string" && input.plantId.trim()) {
-    params.set(SENSOR_PLANT_PARAM, input.plantId.trim());
-  }
+  const plantId = parseTimelinePlantIdParam(input.plantId);
+  if (plantId) params.set(SENSOR_PLANT_PARAM, plantId);
   if (typeof input.growId === "string" && input.growId.trim()) {
     params.set("growId", input.growId.trim());
   }

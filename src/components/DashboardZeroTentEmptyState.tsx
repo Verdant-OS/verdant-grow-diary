@@ -32,7 +32,7 @@ export default function DashboardZeroTentEmptyState({ growId }: { growId?: strin
         className="mt-3 text-xs text-muted-foreground"
         data-testid="dashboard-zero-tent-expectation-reset"
       >
-        This is your real workspace — demo data stays in <code>/demo</code>.
+        This is your real workspace — only data you add or connect appears here.
       </p>
       <div className="mt-5 flex justify-center">
         <Link to={tentsPath(growId)}>

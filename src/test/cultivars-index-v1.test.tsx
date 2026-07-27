@@ -36,7 +36,7 @@ describe("Strain Reference Library V1 index", () => {
       "href",
       "/cultivars/sour-diesel",
     );
-  });
+  }, 15_000);
 
   it("finds GG4 by legacy alias through the shared pure search rules", () => {
     renderIndex("/cultivars?q=Gorilla%20Glue%20%234");

@@ -13,7 +13,7 @@
  *    a single semantic element (not <a><button>), keyboard-focusable, with
  *    an sr-only "(opens in new tab)" hint for external targets.
  *  - Internal fallback CTAs remain keyboard-accessible links.
- *  - Secondary CTA is an in-page <a href="#watch-demo"> — no focus-trap
+ *  - Secondary CTA is an in-page <a href="#watch-demo"> to the written walkthrough
  *    modal to manage.
  *  - Card list items use semantic <ul>/<li>; the "•" bullet is
  *    aria-hidden so screen readers don't read it.
@@ -202,9 +202,9 @@ export default function BetaLanding({ variant, copy, currentSearch }: BetaLandin
             <a
               href="#watch-demo"
               data-testid={`${testIdRoot}-cta-secondary`}
-              aria-label="Jump to the demo walkthrough section"
+              aria-label="Jump to the written demo walkthrough section"
             >
-              Watch demo walkthrough
+              Read demo walkthrough
             </a>
           </Button>
         </div>
@@ -254,14 +254,14 @@ export default function BetaLanding({ variant, copy, currentSearch }: BetaLandin
               id="watch-demo-heading"
               className="text-xl font-semibold leading-none tracking-tight"
             >
-              Watch demo walkthrough
+              Read demo walkthrough
             </h2>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <p className="text-muted-foreground">
-              The walkthrough is a short guided tour of a real grow — no staged data, no
-              auto-suggestions posing as decisions. It shows how Verdant records evidence and how
-              the grower stays in control of every action.
+              This written walkthrough outlines the evidence path through a representative grow
+              scenario. It is not a video or a live grow. It shows how Verdant records evidence and
+              how the grower stays in control of every action.
             </p>
             <ol
               className="space-y-2 text-muted-foreground list-decimal pl-5"
@@ -272,8 +272,8 @@ export default function BetaLanding({ variant, copy, currentSearch }: BetaLandin
               ))}
             </ol>
             <p className="text-xs text-muted-foreground">
-              After the walkthrough, testers share feedback through the intake form linked above.
-              Everything stays grower-approved.
+              After reading the walkthrough, testers share feedback through the intake form linked
+              above. Everything stays grower-approved.
             </p>
           </CardContent>
         </Card>

@@ -6,22 +6,34 @@
  *   - UI: empty state, save, apply, delete, label conflicts.
  *   - Static safety: no writes, no AI invocation, no device strings.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { clearLocalStorageForTest, getLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 // supabase noop mock
 const rangeSpy = vi.fn(() => Promise.resolve({ data: [], error: null }));
 const orderSpy = vi.fn(() => ({ range: rangeSpy }));
 const chain: any = {
-  eq: vi.fn(function () { return chain; }),
-  not: vi.fn(function () { return chain; }),
-  gte: vi.fn(function () { return chain; }),
-  or: vi.fn(function () { return chain; }),
+  eq: vi.fn(function () {
+    return chain;
+  }),
+  not: vi.fn(function () {
+    return chain;
+  }),
+  gte: vi.fn(function () {
+    return chain;
+  }),
+  or: vi.fn(function () {
+    return chain;
+  }),
   order: orderSpy,
 };
 vi.mock("@/integrations/supabase/client", () => ({
@@ -59,7 +71,10 @@ function renderAt(initialEntry: string) {
   });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[initialEntry]}>
+      <MemoryRouter
+        initialEntries={[initialEntry]}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <Routes>
           <Route
             path="/doctor/sessions"
@@ -78,6 +93,10 @@ function renderAt(initialEntry: string) {
 
 beforeEach(() => {
   clearLocalStorageForTest();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 // ---------------- pure helpers ----------------
@@ -156,14 +175,20 @@ describe("aiDoctorSessionsSavedViewsRules — pure helpers", () => {
     expect(parseSavedViews("{")).toEqual([]);
     expect(parseSavedViews("null")).toEqual([]);
     expect(parseSavedViews('{"a":1}')).toEqual([]);
-    expect(parseSavedViews("[{\"bad\":true}]")).toEqual([]);
+    expect(parseSavedViews('[{"bad":true}]')).toEqual([]);
     expect(parseSavedViews("")).toEqual([]);
     expect(parseSavedViews(null)).toEqual([]);
   });
 
   it("viewSignature is stable and order-independent across filters object key order", () => {
-    const a = viewSignature({ ...DEFAULT_FILTERS, risk: "high", hasActions: "yes", dateRange: "7d" }, 1);
-    const b = viewSignature({ ...DEFAULT_FILTERS, dateRange: "7d", risk: "high", hasActions: "yes" }, 1);
+    const a = viewSignature(
+      { ...DEFAULT_FILTERS, risk: "high", hasActions: "yes", dateRange: "7d" },
+      1,
+    );
+    const b = viewSignature(
+      { ...DEFAULT_FILTERS, dateRange: "7d", risk: "high", hasActions: "yes" },
+      1,
+    );
     expect(a).toBe(b);
   });
 
@@ -203,9 +228,7 @@ describe("aiDoctorSessionsSavedViewsRules — pure helpers", () => {
       },
     ];
     writeSavedViews(list);
-    expect(getLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY)).toBe(
-      serializeSavedViews(list),
-    );
+    expect(getLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY)).toBe(serializeSavedViews(list));
     expect(readSavedViews()).toEqual(list);
   });
 
@@ -217,6 +240,39 @@ describe("aiDoctorSessionsSavedViewsRules — pure helpers", () => {
 
 // ---------------- UI integration ----------------
 describe("AiDoctorSessionsIndex — saved views UI", () => {
+  it("discloses that custom saved views stay on this device", async () => {
+    renderAt("/doctor/sessions");
+    expect(
+      await screen.findByTestId("ai-doctor-sessions-saved-views-storage-disclosure"),
+    ).toHaveTextContent(/this device.*not synced to your account/i);
+  });
+
+  it("does not claim an unsaved view when browser storage rejects the write", async () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Storage is unavailable", "QuotaExceededError");
+    });
+
+    renderAt("/doctor/sessions?risk=high");
+    fireEvent.click(await screen.findByTestId("ai-doctor-sessions-saved-views-open"));
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-label-input"), {
+      target: { value: "High risk" },
+    });
+    fireEvent.click(screen.getByTestId("ai-doctor-sessions-saved-views-confirm"));
+
+    expect(
+      await screen.findByTestId("ai-doctor-sessions-saved-views-persistence-error"),
+    ).toHaveTextContent(/couldn't save.*browser storage/i);
+    expect(screen.getByTestId("ai-doctor-sessions-saved-views-form")).toBeInTheDocument();
+    expect(screen.getByTestId("ai-doctor-sessions-saved-views-label-input")).toHaveValue(
+      "High risk",
+    );
+
+    const select = screen.getByTestId("ai-doctor-sessions-saved-views-select") as HTMLSelectElement;
+    expect(Array.from(select.options).some((option) => option.textContent === "High risk")).toBe(
+      false,
+    );
+  });
+
   it("renders built-in saved view in the selector when no user views exist", async () => {
     renderAt("/doctor/sessions");
     const select = (await screen.findByTestId(
@@ -321,6 +377,45 @@ describe("AiDoctorSessionsIndex — saved views UI", () => {
     });
   });
 
+  it("keeps a saved view visible when browser storage rejects deletion", async () => {
+    const seed: SavedView[] = [
+      {
+        id: "v-keep",
+        label: "Keep me",
+        filters: { ...DEFAULT_FILTERS, risk: "low" },
+        page: 0,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+    ];
+    const serializedSeed = serializeSavedViews(seed);
+    setLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY, serializedSeed);
+    renderAt("/doctor/sessions");
+
+    const select = (await screen.findByTestId(
+      "ai-doctor-sessions-saved-views-select",
+    )) as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "v-keep" } });
+    fireEvent.click(await screen.findByTestId("ai-doctor-sessions-saved-views-delete"));
+
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Storage is unavailable", "QuotaExceededError");
+    });
+    fireEvent.click(
+      await screen.findByTestId("ai-doctor-sessions-saved-views-delete-dialog-confirm"),
+    );
+
+    expect(
+      await screen.findByTestId("ai-doctor-sessions-saved-views-persistence-error"),
+    ).toHaveTextContent(/couldn't save.*browser storage/i);
+    expect(Array.from(select.options).some((option) => option.textContent === "Keep me")).toBe(
+      true,
+    );
+    expect(getLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY)).toBe(serializedSeed);
+    expect(
+      screen.queryByTestId("ai-doctor-sessions-saved-views-delete-dialog"),
+    ).not.toBeInTheDocument();
+  });
+
   it("shows a duplicate-label error when saving a name that already exists", async () => {
     const seed: SavedView[] = [
       {
@@ -338,9 +433,7 @@ describe("AiDoctorSessionsIndex — saved views UI", () => {
       target: { value: "mine" },
     });
     fireEvent.click(screen.getByTestId("ai-doctor-sessions-saved-views-confirm"));
-    expect(
-      await screen.findByTestId("ai-doctor-sessions-saved-views-error"),
-    ).toBeInTheDocument();
+    expect(await screen.findByTestId("ai-doctor-sessions-saved-views-error")).toBeInTheDocument();
   });
 });
 

@@ -5,6 +5,7 @@ import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.t
 import { handleEcoWittIngestRequest, type EcoWittIngestAdminClient } from "./index.ts";
 import { computeEcoWittPasskeyFingerprint } from "../_shared/ecowittPasskeyFingerprint.ts";
 import type { BridgeTokenRow } from "../_shared/sensorIngestAuth.ts";
+import type { LovableSubscriptionRow } from "../_shared/lib/lib/entitlements/lovablePaddleAdapter.ts";
 
 const ENDPOINT = "https://example.test/functions/v1/ecowitt-ingest";
 const NOW = new Date("2026-07-18T12:00:00.000Z");
@@ -28,6 +29,9 @@ interface FakeState {
   bridgeRow: BridgeTokenRow | null;
   tentRows: TentFixtureRow[];
   bridgeLookups: number;
+  subscriptionRows: LovableSubscriptionRow[];
+  subscriptionError: unknown;
+  subscriptionFilters: Array<{ column: string; value: string }>;
   tentQueries: number;
   tentFilters: Array<{ column: string; value: unknown }>;
   persistedRows: Array<Record<string, unknown>>;
@@ -60,6 +64,24 @@ function tentRow(id: string, fingerprint: string): TentFixtureRow {
   };
 }
 
+function paidSubscription(overrides: Partial<LovableSubscriptionRow> = {}): LovableSubscriptionRow {
+  return {
+    user_id: USER_ID,
+    paddle_subscription_id: "sub_sensor_pro",
+    paddle_customer_id: "ctm_sensor_pro",
+    product_id: "verdant_pro",
+    price_id: "pro_monthly",
+    status: "active",
+    current_period_start: "2026-07-01T00:00:00.000Z",
+    current_period_end: "2026-08-01T00:00:00.000Z",
+    cancel_at_period_end: false,
+    environment: "live",
+    created_at: "2026-07-01T00:00:00.000Z",
+    updated_at: "2026-07-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
 function makeState(
   input: {
     row?: BridgeTokenRow | null;
@@ -70,6 +92,9 @@ function makeState(
     bridgeRow: input.row === undefined ? bridgeRow() : input.row,
     tentRows: input.tents ?? [],
     bridgeLookups: 0,
+    subscriptionRows: [paidSubscription()],
+    subscriptionError: null,
+    subscriptionFilters: [],
     tentQueries: 0,
     tentFilters: [],
     persistedRows: [],
@@ -95,6 +120,61 @@ function makeAdmin(state: FakeState): EcoWittIngestAdminClient {
             };
           },
         };
+      }
+      if (table === "billing_subscriptions") {
+        const builder = {
+          select() {
+            return builder;
+          },
+          eq(column: string, value: string) {
+            state.subscriptionFilters.push({ column, value });
+            return builder;
+          },
+          limit() {
+            return builder;
+          },
+          then(resolve: (result: { data: unknown[]; error: null }) => void) {
+            resolve({ data: [], error: null });
+          },
+        };
+        return builder;
+      }
+      if (table === "subscriptions") {
+        const filters: Array<{ column: string; value: string }> = [];
+        const builder = {
+          select() {
+            return builder;
+          },
+          eq(column: string, value: string) {
+            filters.push({ column, value });
+            state.subscriptionFilters.push({ column, value });
+            return builder;
+          },
+          order() {
+            return builder;
+          },
+          limit() {
+            return builder;
+          },
+          then(
+            resolve: (result: { data: LovableSubscriptionRow[] | null; error: unknown }) => void,
+          ) {
+            if (state.subscriptionError) {
+              resolve({ data: null, error: state.subscriptionError });
+              return;
+            }
+            resolve({
+              data: state.subscriptionRows.filter((candidate) =>
+                filters.every(
+                  ({ column, value }) =>
+                    String(candidate[column as keyof LovableSubscriptionRow]) === value,
+                ),
+              ),
+              error: null,
+            });
+          },
+        };
+        return builder;
       }
       if (table === "tents") {
         const filters: Array<{ column: string; value: unknown }> = [];
@@ -189,6 +269,7 @@ Deno.test(
     const response = await handleEcoWittIngestRequest(post("ey.fake.user.jwt"), {
       admin: makeAdmin(state),
       now: () => NOW,
+      expectedBillingEnvironment: "live",
     });
 
     assertEquals(response.status, 403);
@@ -208,6 +289,7 @@ Deno.test(
     const response = await handleEcoWittIngestRequest(post(VALID_TOKEN), {
       admin: makeAdmin(state),
       now: () => NOW,
+      expectedBillingEnvironment: "live",
     });
     const body = await responseBody(response);
 
@@ -239,6 +321,11 @@ Deno.test(
     }
     assertEquals(state.rpcCalls.length, 1);
     assertEquals(state.rpcCalls[0].name, "bump_bridge_token_usage");
+    assert(
+      state.subscriptionFilters.some(
+        (filter) => filter.column === "user_id" && filter.value === USER_ID,
+      ),
+    );
     assert(state.tentFilters.some((filter) => filter.column === "id" && filter.value === TENT_ID));
   },
 );
@@ -257,6 +344,7 @@ Deno.test(
     const response = await handleEcoWittIngestRequest(post(VALID_TOKEN, ENDPOINT, stalePayload), {
       admin: makeAdmin(state),
       now: () => NOW,
+      expectedBillingEnvironment: "live",
     });
     const body = await responseBody(response);
 
@@ -276,6 +364,7 @@ Deno.test("direct EcoWitt handler rejects a revoked bridge without writing", asy
   const response = await handleEcoWittIngestRequest(post(VALID_TOKEN), {
     admin: makeAdmin(state),
     now: () => NOW,
+    expectedBillingEnvironment: "live",
   });
 
   assertEquals(response.status, 401);
@@ -291,6 +380,7 @@ Deno.test("direct EcoWitt handler rejects an expired bridge without writing", as
   const response = await handleEcoWittIngestRequest(post(VALID_TOKEN), {
     admin: makeAdmin(state),
     now: () => NOW,
+    expectedBillingEnvironment: "live",
   });
 
   assertEquals(response.status, 401);
@@ -312,6 +402,7 @@ Deno.test(
       {
         admin: makeAdmin(state),
         now: () => NOW,
+        expectedBillingEnvironment: "live",
       },
     );
     const body = await responseBody(response);
@@ -327,3 +418,56 @@ Deno.test(
     );
   },
 );
+
+Deno.test("direct EcoWitt handler denies a Free token owner before tent lookup", async () => {
+  const state = makeState();
+  state.subscriptionRows = [];
+
+  const response = await handleEcoWittIngestRequest(post(VALID_TOKEN), {
+    admin: makeAdmin(state),
+    now: () => NOW,
+    expectedBillingEnvironment: "live",
+  });
+
+  assertEquals(response.status, 403);
+  assertEquals((await responseBody(response)).error, "upgrade_required");
+  assertEquals(state.tentQueries, 0);
+  assertEquals(state.persistedRows.length, 0);
+});
+
+Deno.test("direct EcoWitt handler denies a degraded paid token owner", async () => {
+  const state = makeState();
+  state.subscriptionRows = [
+    paidSubscription({
+      status: "canceled",
+      current_period_end: "2026-07-17T12:00:00.000Z",
+    }),
+  ];
+
+  const response = await handleEcoWittIngestRequest(post(VALID_TOKEN), {
+    admin: makeAdmin(state),
+    now: () => NOW,
+    expectedBillingEnvironment: "live",
+  });
+
+  assertEquals(response.status, 403);
+  assertEquals((await responseBody(response)).error, "upgrade_required");
+  assertEquals(state.tentQueries, 0);
+  assertEquals(state.persistedRows.length, 0);
+});
+
+Deno.test("direct EcoWitt handler fails closed when entitlement is unverifiable", async () => {
+  const state = makeState();
+  state.subscriptionError = { message: "database unavailable" };
+
+  const response = await handleEcoWittIngestRequest(post(VALID_TOKEN), {
+    admin: makeAdmin(state),
+    now: () => NOW,
+    expectedBillingEnvironment: "live",
+  });
+
+  assertEquals(response.status, 503);
+  assertEquals((await responseBody(response)).error, "entitlement_lookup_failed");
+  assertEquals(state.tentQueries, 0);
+  assertEquals(state.persistedRows.length, 0);
+});

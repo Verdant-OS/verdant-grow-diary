@@ -8,7 +8,10 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { isActionDerivedFromAlert } from "@/lib/actionQueueProvenanceRules";
+import {
+  isActionDerivedFromAlert,
+  reconcileRelatedActionRows,
+} from "@/lib/actionQueueProvenanceRules";
 
 const ROOT = resolve(__dirname, "../..");
 const ALERT_DETAIL = readFileSync(resolve(ROOT, "src/pages/AlertDetail.tsx"), "utf8");
@@ -61,6 +64,50 @@ describe("isActionDerivedFromAlert", () => {
     // determinism
     const a = { source: "environment_alert", reason: "x [alert:zzz]" };
     expect(isActionDerivedFromAlert(a, "zzz")).toBe(isActionDerivedFromAlert(a, "zzz"));
+  });
+});
+
+describe("reconcileRelatedActionRows", () => {
+  const optimistic = {
+    id: "action-new",
+    status: "pending_approval",
+    suggested_change: "Review the alert",
+  };
+  const historical = {
+    id: "action-old",
+    status: "completed",
+    suggested_change: "Historical action",
+  };
+
+  it("preserves a current optimistic row missing from an older fetched snapshot", () => {
+    expect(reconcileRelatedActionRows([optimistic], [])).toEqual([optimistic]);
+  });
+
+  it("keeps current-only rows first while preserving fetched server order", () => {
+    expect(reconcileRelatedActionRows([optimistic], [historical])).toEqual([
+      optimistic,
+      historical,
+    ]);
+  });
+
+  it("uses the fetched server representation when both inputs contain the same id", () => {
+    const persisted = { ...optimistic, suggested_change: "Persisted server value" };
+    expect(reconcileRelatedActionRows([optimistic], [persisted])).toEqual([persisted]);
+  });
+
+  it("is null-safe, deterministic, and does not mutate either input", () => {
+    expect(reconcileRelatedActionRows(null, undefined)).toEqual([]);
+
+    const current = [optimistic];
+    const fetched = [historical];
+    const currentBefore = [...current];
+    const fetchedBefore = [...fetched];
+    const first = reconcileRelatedActionRows(current, fetched);
+    const second = reconcileRelatedActionRows(current, fetched);
+
+    expect(first).toEqual(second);
+    expect(current).toEqual(currentBefore);
+    expect(fetched).toEqual(fetchedBefore);
   });
 });
 

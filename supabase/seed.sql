@@ -57,6 +57,55 @@ BEGIN
   END IF;
 END $$;
 
+-- AI result and evidence sidecars are server-readable but may only be written
+-- through their SECURITY DEFINER finalizers. The production migrations revoke
+-- even service_role direct DML; reapply that exact contract after the blanket
+-- local parity grant.
+DO $$
+DECLARE
+  obj text;
+BEGIN
+  FOREACH obj IN ARRAY ARRAY[
+    'ai_credit_spend_results',
+    'ai_doctor_review_evidence_receipts'
+  ] LOOP
+    IF to_regclass('public.' || obj) IS NOT NULL THEN
+      EXECUTE format(
+        'REVOKE ALL ON TABLE public.%I FROM PUBLIC, anon, authenticated, service_role',
+        obj
+      );
+      EXECUTE format(
+        'GRANT SELECT ON TABLE public.%I TO service_role',
+        obj
+      );
+    END IF;
+  END LOOP;
+END $$;
+
+-- Paid-return cohort membership and validated AI Doctor completion rows are
+-- private server ledgers. service_role keeps its migration-defined DML access;
+-- browser roles keep no table privileges.
+DO $$
+DECLARE
+  obj text;
+BEGIN
+  FOREACH obj IN ARRAY ARRAY[
+    'paid_return_cohort_memberships',
+    'ai_doctor_review_completions'
+  ] LOOP
+    IF to_regclass('public.' || obj) IS NOT NULL THEN
+      EXECUTE format(
+        'REVOKE ALL ON TABLE public.%I FROM PUBLIC, anon, authenticated',
+        obj
+      );
+      EXECUTE format(
+        'GRANT ALL ON TABLE public.%I TO service_role',
+        obj
+      );
+    END IF;
+  END LOOP;
+END $$;
+
 -- Irrigation event history is browser-read-only. The canonical write path is
 -- quicklog_save_event / quicklog_save_manual; direct client DML was revoked by
 -- the production migration. Reapply that deny boundary after the blanket local

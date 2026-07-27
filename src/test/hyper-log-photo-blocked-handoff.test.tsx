@@ -1,10 +1,9 @@
 /**
- * HyperLog → Quick Log photo handoff e2e (presenter-only).
+ * Isolated HyperLog prototype → Quick Log photo mapping coverage.
  *
  * Confirms:
- *  - When HyperLog commits with locally attached photos, the dispatched
- *    Quick Log prefill never serializes a blob: URL, object URL, File
- *    reference, or image preview string.
+ *  - The retired prototype mapper never serializes a blob URL, object URL,
+ *    File reference, or image preview string.
  *  - The existing Quick Log editor renders the photo-blocked copy
  *    "Photo preview only — attach/save through Quick Log." once the
  *    prefill is mounted with photoCount > 0.
@@ -12,17 +11,17 @@
  *
  * Hard rules: no new write path, no Supabase calls, no Action Queue.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, within, act } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { MemoryRouter } from "react-router-dom";
-import GlobalFastAddButton from "@/components/GlobalFastAddButton";
-import QuickLog, { type QuickLogPrefill } from "@/components/QuickLog";
+import QuickLog from "@/components/QuickLog";
 import { QUICK_LOG_DRAFT_PHOTO_BLOCKED_COPY } from "@/lib/quickLogDraftPreviewViewModel";
+import { buildHyperLogQuickLogPrefill } from "@/lib/hyperLogDraftRules";
+import type { HyperLogDemoFormState } from "@/components/HyperLogModal";
 
 if (typeof (globalThis as { ResizeObserver?: unknown }).ResizeObserver === "undefined") {
   (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class {
@@ -31,12 +30,6 @@ if (typeof (globalThis as { ResizeObserver?: unknown }).ResizeObserver === "unde
     disconnect() {}
   };
 }
-
-// Stub URL.createObjectURL so HyperLog can build local previews safely.
-(URL as unknown as { createObjectURL: (f: unknown) => string }).createObjectURL =
-  () => "blob:hyperlog-test";
-(URL as unknown as { revokeObjectURL: (u: string) => void }).revokeObjectURL =
-  () => undefined;
 
 // ---- Minimal QuickLog mocks (mirrors quick-log-environment-check.test.tsx)
 const saveMock = vi.fn().mockResolvedValue({ ok: true, eventId: "ev-1" });
@@ -82,49 +75,46 @@ function renderWithClient(ui: ReactElement) {
   return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
 }
 
-type Dispatched = { name: string; detail: QuickLogPrefill };
-const captured: Dispatched[] = [];
-const handler = (e: Event) => {
-  const ce = e as CustomEvent<QuickLogPrefill>;
-  captured.push({ name: e.type, detail: ce.detail });
+const EMPTY_FORM: HyperLogDemoFormState = {
+  waterAmount: "",
+  waterUnit: "ml",
+  waterNote: "",
+  feedAmount: "",
+  feedNutrient: "",
+  feedNote: "",
+  defoliateIntensity: "",
+  defoliateNote: "",
+  freeformNote: "",
+  envTemp: "",
+  envHumidity: "",
+  envVpd: "",
+  envCo2: "",
+  envNote: "",
 };
 
-beforeEach(() => {
-  captured.length = 0;
-  window.addEventListener("verdant:open-quicklog", handler as EventListener);
-});
-afterEach(() => {
-  window.removeEventListener("verdant:open-quicklog", handler as EventListener);
-});
-
-describe("HyperLog → Quick Log photo handoff", () => {
-  it("commits with a local photo without leaking File/blob refs into the dispatched prefill", () => {
-    render(
-      <MemoryRouter initialEntries={["/plants/plant-1"]}>
-        <GlobalFastAddButton />
-      </MemoryRouter>,
-    );
-    fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
-    fireEvent.click(screen.getByTestId("global-fast-add-hyperlog-note"));
-
-    const file = new File(["x"], "leaf.jpg", { type: "image/jpeg" });
-    const input = screen.getByTestId("hyperlog-photo-input") as HTMLInputElement;
-    act(() => {
-      fireEvent.change(input, { target: { files: [file] } });
+describe("isolated HyperLog prototype → Quick Log photo mapping", () => {
+  it("keeps local photo data out of the mapped prefill", () => {
+    const detail = buildHyperLogQuickLogPrefill({
+      action: "note",
+      form: { ...EMPTY_FORM, freeformNote: "leaf check" },
+      photoCount: 1,
+      context: {
+        plantId: "plant-1",
+        plantName: "Plant",
+        growId: "grow-1",
+        tentId: "tent-1",
+        tentName: "Tent",
+      },
     });
 
-    act(() => {
-      fireEvent.click(screen.getByTestId("hyperlog-commit"));
-    });
-
-    expect(captured).toHaveLength(1);
-    const json = JSON.stringify(captured[0].detail);
+    expect(detail).not.toBeNull();
+    const json = JSON.stringify(detail);
     expect(json).not.toMatch(/blob:/i);
     expect(json).not.toMatch(/File\(/);
     expect(json).not.toMatch(/object\s*url/i);
     expect(json).not.toMatch(/leaf\.jpg/);
     // photoCount is the only photo info that may travel — never URLs or files.
-    expect(captured[0].detail.photoCount).toBe(1);
+    expect(detail?.photoCount).toBe(1);
   });
 
   it("Quick Log shows the photo-blocked copy when a HyperLog prefill carries photoCount > 0", () => {
@@ -150,10 +140,7 @@ describe("HyperLog → Quick Log photo handoff", () => {
   });
 
   it("HyperLogModal source does not import Supabase/client/write helpers", () => {
-    const src = readFileSync(
-      resolve(process.cwd(), "src/components/HyperLogModal.tsx"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(process.cwd(), "src/components/HyperLogModal.tsx"), "utf8");
     expect(src).not.toMatch(/@\/integrations\/supabase\/client/);
     expect(src).not.toMatch(/quicklog_save_manual/);
     expect(src).not.toMatch(/\.rpc\(/);

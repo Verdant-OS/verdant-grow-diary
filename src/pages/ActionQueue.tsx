@@ -80,11 +80,12 @@ import {
   type ActionEventType,
   type TransitionKind,
   isTerminalStatus,
+  canApprove as canApproveAction,
+  canReject as canRejectAction,
   canComplete,
   canCancel,
-  buildTransitionPatch,
-  eventTypeFor,
-  nextStatusFor,
+  buildActionQueueTransitionRpcArgs,
+  parseActionQueueTransitionRpcResult,
   normalizeNote,
 } from "@/lib/actionQueueTransitions";
 import { safeActionQueueFailureCopy } from "@/lib/actionQueueFailureCopy";
@@ -545,6 +546,14 @@ export default function ActionQueue() {
     }
     const list = (data ?? []) as ActionRow[];
     setRows(list);
+    if (!error) {
+      // Keep the open drawer aligned with the newly fetched row. This closes
+      // it if the row is no longer RLS-visible and prevents stale controls
+      // after a successful transition or compare-and-swap conflict.
+      setDrawerRow((current) =>
+        current ? (list.find((row) => row.id === current.id) ?? null) : null,
+      );
+    }
 
     if (list.length) {
       const ids = list.map((r) => r.id);
@@ -624,31 +633,6 @@ export default function ActionQueue() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, statusFilter, traceExtraFilter, page, pageSize]);
-
-  // SECURITY: never sends device commands. Inserts an audit row ONLY.
-  // user_id is left to DB default auth.uid(). No privileged backend role.
-  async function logEvent(
-    row: ActionRow,
-    event_type: EventType,
-    new_status: Status,
-    note?: string,
-  ): Promise<boolean> {
-    const { error } = await supabase.from("action_queue_events").insert({
-      action_queue_id: row.id,
-      grow_id: row.grow_id,
-      event_type,
-      previous_status: row.status,
-      new_status,
-      note: note ?? null,
-    });
-    if (error) {
-      toast.warning("Status updated, but audit log failed", {
-        description: safeActionQueueFailureCopy("audit", error),
-      });
-      return false;
-    }
-    return true;
-  }
 
   /**
    * Idempotent timeline trace for approve/reject transitions.
@@ -731,24 +715,30 @@ export default function ActionQueue() {
     }
   }
 
-  async function transition(
-    row: ActionRow,
-    next: Partial<ActionRow>,
-    event_type: EventType,
-    new_status: Status,
-    note?: string,
-  ): Promise<boolean> {
+  async function transition(row: ActionRow, kind: TransitionKind, note?: string): Promise<boolean> {
     setBusyId(row.id);
-    const { error } = await supabase.from("action_queue").update(next).eq("id", row.id);
-    if (error) {
+    const rpcArgs = buildActionQueueTransitionRpcArgs({
+      actionQueueId: row.id,
+      transition: kind,
+      expectedStatus: row.status,
+      note,
+    });
+    const { data, error } = await supabase.rpc("action_queue_transition", rpcArgs);
+    const result = parseActionQueueTransitionRpcResult(data, rpcArgs);
+    if (error || !result || result.ok !== true) {
+      const shouldReload =
+        result?.ok === false &&
+        (result.reason === "status_conflict" || result.reason === "action_not_found");
+      if (shouldReload) await load();
       setBusyId(null);
-      toast.error(safeActionQueueFailureCopy("transition", error));
+      toast.error(safeActionQueueFailureCopy("transition", error ?? result));
       return false;
     }
-    await logEvent(row, event_type, new_status, note);
+
+    const newStatus = result.new_status;
     let traceKind: ActionQueueTraceKind | null = null;
-    if (new_status === "approved") traceKind = "approved";
-    else if (new_status === "rejected") traceKind = "rejected";
+    if (newStatus === "approved") traceKind = "approved";
+    else if (newStatus === "rejected") traceKind = "rejected";
     if (traceKind) {
       const ok = await writeTimelineTrace(row, traceKind);
       if (!ok) reportTraceFailure(row, traceKind);
@@ -777,8 +767,7 @@ export default function ActionQueue() {
     setNoteDialog(null);
     setNoteDraft("");
 
-    const patch = buildTransitionPatch(kind);
-    const success = await transition(row, patch, eventTypeFor(kind), nextStatusFor(kind), note);
+    const success = await transition(row, kind, note);
     if (success && kind === "simulate") {
       // Simulation NEVER sends device commands. Status + audit only.
       toast.message("Simulated (no device command sent)", {
@@ -1925,8 +1914,8 @@ export default function ActionQueue() {
         }}
         busy={!!drawerRow && busyId === drawerRow.id}
         loading={drawerHistoryLoading && drawerHistory === null}
-        canApprove={!!drawerRow && !isTerminalStatus(drawerRow.status)}
-        canReject={!!drawerRow && drawerRow.status === "pending_approval"}
+        canApprove={!!drawerRow && canApproveAction(drawerRow.status)}
+        canReject={!!drawerRow && canRejectAction(drawerRow.status)}
         statusHistory={drawerHistory ?? []}
         traceFailed={!!drawerRow && traceFailure?.actionId === drawerRow.id}
         retrying={retryingTrace}

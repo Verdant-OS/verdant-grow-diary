@@ -75,7 +75,8 @@ describe("Pricing — proof polish copy", () => {
     expect(block.textContent).toContain("Post-Grow Learning Report");
     expect(block.textContent).toContain("Print / Save PDF export");
     expect(block.textContent).toContain("Sensor truth");
-    expect(block.textContent).toContain("Approval-required actions");
+    expect(block.textContent).toContain("Advanced timeline filtering");
+    expect(block.textContent).not.toContain("Approval-required actions");
     expect(screen.getAllByTestId("pricing-proof-callout")).toHaveLength(4);
   });
 

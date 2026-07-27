@@ -51,6 +51,11 @@ interface TileProps {
   children: React.ReactNode;
 }
 
+interface PreferenceFeedback {
+  kind: "success" | "error";
+  message: string;
+}
+
 function Tile({ name, state, children }: TileProps) {
   const badge = describeSettingsTile(state);
   return (
@@ -80,20 +85,36 @@ function Tile({ name, state, children }: TileProps) {
 
 function StartScreenTile({ userId }: { userId: string }) {
   const [choice, setChoice] = useState<StartScreenChoice>(DEFAULT_START_SCREEN);
-  const [saved, setSaved] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<PreferenceFeedback | null>(null);
 
   useEffect(() => {
     setChoice(getStartScreenChoiceOrDefault(userId));
   }, [userId]);
 
   function onSave() {
-    setStartScreenChoice(userId, choice);
-    setSaved("Start screen preference saved.");
+    const persisted = setStartScreenChoice(userId, choice);
+    setFeedback(
+      persisted
+        ? { kind: "success", message: "Start screen preference saved." }
+        : {
+            kind: "error",
+            message:
+              "Couldn't save the start screen preference on this device. Check browser storage access and try again.",
+          },
+    );
   }
   function onReset() {
-    clearStartScreenChoice(userId);
-    setChoice(DEFAULT_START_SCREEN);
-    setSaved("Reverted to diary-first default.");
+    const cleared = clearStartScreenChoice(userId);
+    if (cleared) {
+      setChoice(DEFAULT_START_SCREEN);
+      setFeedback({ kind: "success", message: "Reverted to diary-first default." });
+      return;
+    }
+    setFeedback({
+      kind: "error",
+      message:
+        "Couldn't reset the start screen preference on this device. Your current choice is unchanged. Check browser storage access and try again.",
+    });
   }
 
   return (
@@ -116,7 +137,7 @@ function StartScreenTile({ userId }: { userId: string }) {
               checked={choice === opt.key}
               onChange={() => {
                 setChoice(opt.key);
-                setSaved(null);
+                setFeedback(null);
               }}
               data-testid={`start-screen-option-${opt.key}`}
               className="mt-1"
@@ -141,14 +162,18 @@ function StartScreenTile({ userId }: { userId: string }) {
           Use diary-first default
         </Button>
       </div>
-      {saved ? (
+      {feedback ? (
         <p
-          role="status"
-          aria-live="polite"
+          role={feedback.kind === "error" ? "alert" : "status"}
+          aria-live={feedback.kind === "error" ? "assertive" : "polite"}
           data-testid="start-screen-saved"
-          className="text-xs text-muted-foreground mt-3"
+          className={
+            feedback.kind === "error"
+              ? "text-xs text-destructive mt-3"
+              : "text-xs text-muted-foreground mt-3"
+          }
         >
-          {saved}
+          {feedback.message}
         </p>
       ) : null}
     </Tile>
@@ -157,20 +182,36 @@ function StartScreenTile({ userId }: { userId: string }) {
 
 function TemperatureUnitTile() {
   const [choice, setChoice] = useState<TemperatureUnitPreference>(DEFAULT_TEMPERATURE_UNIT);
-  const [saved, setSaved] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<PreferenceFeedback | null>(null);
 
   useEffect(() => {
     setChoice(loadTemperatureUnitPreference());
   }, []);
 
   function onSave() {
-    saveTemperatureUnitPreference(choice);
-    setSaved("Display temperature preference saved.");
+    const persisted = saveTemperatureUnitPreference(choice);
+    setFeedback(
+      persisted
+        ? { kind: "success", message: "Display temperature preference saved." }
+        : {
+            kind: "error",
+            message:
+              "Couldn't save the temperature preference on this device. Check browser storage access and try again.",
+          },
+    );
   }
   function onReset() {
-    clearTemperatureUnitPreference();
-    setChoice(DEFAULT_TEMPERATURE_UNIT);
-    setSaved("Reverted to Fahrenheit default.");
+    const cleared = clearTemperatureUnitPreference();
+    if (cleared) {
+      setChoice(DEFAULT_TEMPERATURE_UNIT);
+      setFeedback({ kind: "success", message: "Reverted to Fahrenheit default." });
+      return;
+    }
+    setFeedback({
+      kind: "error",
+      message:
+        "Couldn't reset the temperature preference on this device. Your current choice is unchanged. Check browser storage access and try again.",
+    });
   }
 
   return (
@@ -192,7 +233,7 @@ function TemperatureUnitTile() {
               checked={choice === opt.key}
               onChange={() => {
                 setChoice(opt.key);
-                setSaved(null);
+                setFeedback(null);
               }}
               data-testid={`temperature-unit-option-${opt.key}`}
               className="mt-1"
@@ -222,14 +263,18 @@ function TemperatureUnitTile() {
           Use Fahrenheit default
         </Button>
       </div>
-      {saved ? (
+      {feedback ? (
         <p
-          role="status"
-          aria-live="polite"
+          role={feedback.kind === "error" ? "alert" : "status"}
+          aria-live={feedback.kind === "error" ? "assertive" : "polite"}
           data-testid="temperature-unit-saved"
-          className="text-xs text-muted-foreground mt-3"
+          className={
+            feedback.kind === "error"
+              ? "text-xs text-destructive mt-3"
+              : "text-xs text-muted-foreground mt-3"
+          }
         >
-          {saved}
+          {feedback.message}
         </p>
       ) : null}
     </Tile>
@@ -241,9 +286,9 @@ function TemperatureUnitTile() {
  *
  * Reads the caller's entitlement via useMyEntitlements (RLS-protected select-own).
  * Features are read from PRICING_TIERS (single source of truth).
- * Manage/Cancel buttons are placeholders — they never call Paddle, never call
- * the billing API, and never write account status. They open an informational
- * dialog only.
+ * Recurring paid plans open a fresh, server-minted Paddle customer-portal
+ * session. The browser never receives provider credentials and never writes
+ * billing status directly.
  */
 function SubscriptionTile() {
   const { loading, lookupFailed, entitlement, refetch } = useMyEntitlements();

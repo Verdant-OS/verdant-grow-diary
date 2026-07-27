@@ -290,6 +290,10 @@ describe("CheckoutSuccess returnTo handling", () => {
     ["//evil.com"],
     ["javascript:alert(1)"],
     ["/%2F%2Fevil.com"],
+    ["/not-a-verdant-route"],
+    ["/checkout/success"],
+    ["/checkout/success/"],
+    ["/auth?redirectTo=%2Fplants"],
   ])("does not redirect for unsafe returnTo=%s", async (raw) => {
     mode.current = "confirmed";
     renderAt(`/checkout/success?returnTo=${encodeURIComponent(raw)}`);

@@ -86,19 +86,21 @@ describe("keyword search", () => {
 
 describe("dimension filters", () => {
   it("plant filter narrows to that plant id", () => {
-    expect(
-      filterTimelineEvidenceRows(ROWS, { plantId: "p1" }).map((r) => r.id),
-    ).toEqual(["r1", "r3"]);
+    expect(filterTimelineEvidenceRows(ROWS, { plantId: "p1" }).map((r) => r.id)).toEqual([
+      "r1",
+      "r3",
+    ]);
   });
   it("tent filter narrows to that tent id", () => {
-    expect(
-      filterTimelineEvidenceRows(ROWS, { tentId: "t1" }).map((r) => r.id),
-    ).toEqual(["r1", "r2"]);
+    expect(filterTimelineEvidenceRows(ROWS, { tentId: "t1" }).map((r) => r.id)).toEqual([
+      "r1",
+      "r2",
+    ]);
   });
   it("log type filter narrows to that event_type", () => {
-    expect(
-      filterTimelineEvidenceRows(ROWS, { eventType: "note" }).map((r) => r.id),
-    ).toEqual(["r3"]);
+    expect(filterTimelineEvidenceRows(ROWS, { eventType: "note" }).map((r) => r.id)).toEqual([
+      "r3",
+    ]);
   });
   it("combined filters AND-narrow results", () => {
     expect(
@@ -114,6 +116,48 @@ describe("dimension filters", () => {
     const reordered = [ROWS[2], ROWS[0], ROWS[1], ROWS[3]];
     const out = filterTimelineEvidenceRows(reordered, { plantId: "p1" });
     expect(out.map((r) => r.id)).toEqual(["r3", "r1"]);
+  });
+
+  it("keeps only the requested plant when two plants share one sensor source", () => {
+    const sameSourceRows = [
+      {
+        ...ROWS[0],
+        id: "plant-a-csv",
+        plant_id: "plant-a",
+        details: {
+          event_type: "sensor_snapshot",
+          sensor_snapshot: { source: "csv" },
+        },
+      },
+      {
+        ...ROWS[1],
+        id: "plant-b-csv",
+        plant_id: "plant-b",
+        details: {
+          event_type: "sensor_snapshot",
+          sensor_snapshot: { source: "csv" },
+        },
+      },
+    ];
+
+    expect(
+      filterTimelineEvidenceRows(sameSourceRows, {
+        plantId: "plant-a",
+        sensorSources: ["csv"],
+      }).map((row) => row.id),
+    ).toEqual(["plant-a-csv"]);
+    expect(
+      filterTimelineEvidenceRows(sameSourceRows, {
+        plantId: "unknown-plant",
+        sensorSources: ["csv"],
+      }),
+    ).toEqual([]);
+    expect(
+      filterTimelineEvidenceRows(sameSourceRows, {
+        plantId: null,
+        sensorSources: ["csv"],
+      }).map((row) => row.id),
+    ).toEqual(["plant-a-csv", "plant-b-csv"]);
   });
 });
 
@@ -133,22 +177,12 @@ describe("safe search scope", () => {
         },
       },
     ];
-    expect(
-      filterTimelineEvidenceRows(rows, { query: "PASSKEY" }),
-    ).toHaveLength(0);
-    expect(
-      filterTimelineEvidenceRows(rows, { query: "vbt_" }),
-    ).toHaveLength(0);
-    expect(
-      filterTimelineEvidenceRows(rows, { query: "Bearer" }),
-    ).toHaveLength(0);
-    expect(
-      filterTimelineEvidenceRows(rows, { query: "bridge.example.com" }),
-    ).toHaveLength(0);
+    expect(filterTimelineEvidenceRows(rows, { query: "PASSKEY" })).toHaveLength(0);
+    expect(filterTimelineEvidenceRows(rows, { query: "vbt_" })).toHaveLength(0);
+    expect(filterTimelineEvidenceRows(rows, { query: "Bearer" })).toHaveLength(0);
+    expect(filterTimelineEvidenceRows(rows, { query: "bridge.example.com" })).toHaveLength(0);
     // The safe field still matches.
-    expect(
-      filterTimelineEvidenceRows(rows, { query: "safe note" }),
-    ).toHaveLength(1);
+    expect(filterTimelineEvidenceRows(rows, { query: "safe note" })).toHaveLength(1);
   });
 });
 
@@ -208,8 +242,6 @@ describe("timelineEvidenceRowMatches — direct predicate", () => {
 describe("exported copy", () => {
   it("placeholder and empty copy are stable", () => {
     expect(TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER).toBe("Search timeline");
-    expect(TIMELINE_EVIDENCE_EMPTY_DESC).toBe(
-      "No timeline entries match these filters.",
-    );
+    expect(TIMELINE_EVIDENCE_EMPTY_DESC).toBe("No timeline entries match these filters.");
   });
 });

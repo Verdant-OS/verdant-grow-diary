@@ -44,9 +44,7 @@ describe("EnvironmentCsvImportModal UI", () => {
         onConfirm={async () => ({ insertedCount: 0, error: null })}
       />,
     );
-    await uploadCsv(
-      "Timestamp,Temperature,RH\n2026-06-01T10:00:00Z,25,50\n",
-    );
+    await uploadCsv("Timestamp,Temperature,RH\n2026-06-01T10:00:00Z,25,50\n");
     expect(screen.getByTestId("csv-import-unit-confirm")).toBeTruthy();
     fireEvent.click(screen.getByTestId("csv-import-unit-c"));
     expect(screen.getByTestId("csv-import-preview")).toBeTruthy();
@@ -93,33 +91,21 @@ describe("EnvironmentCsvImportModal UI", () => {
         onConfirm={async () => ({ insertedCount: 0, error: null })}
       />,
     );
-    await uploadCsv(
-      "Timestamp,Temp(°C),RH\n2026-06-01T10:00:00Z,25,50\nbad,25,50\n",
-    );
+    await uploadCsv("Timestamp,Temp(°C),RH\n2026-06-01T10:00:00Z,25,50\nbad,25,50\n");
     expect(screen.getByTestId("csv-import-partial-banner")).toBeTruthy();
   });
 
   it("confirm is the only insert path; cancel does not insert (tests 24, 25)", async () => {
     const onConfirm = vi.fn(async () => ({ insertedCount: 1, error: null }));
     const { unmount } = render(
-      <EnvironmentCsvImportModal
-        open
-        onOpenChange={() => {}}
-        onConfirm={onConfirm}
-      />,
+      <EnvironmentCsvImportModal open onOpenChange={() => {}} onConfirm={onConfirm} />,
     );
     await uploadCsv("Timestamp,Temp(°C),RH\n2026-06-01T10:00:00Z,25,50\n");
     fireEvent.click(screen.getByTestId("csv-import-cancel"));
     expect(onConfirm).not.toHaveBeenCalled();
     unmount();
 
-    render(
-      <EnvironmentCsvImportModal
-        open
-        onOpenChange={() => {}}
-        onConfirm={onConfirm}
-      />,
-    );
+    render(<EnvironmentCsvImportModal open onOpenChange={() => {}} onConfirm={onConfirm} />);
     await uploadCsv("Timestamp,Temp(°C),RH\n2026-06-01T10:00:00Z,25,50\n");
     fireEvent.click(screen.getByTestId("csv-import-confirm"));
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
@@ -134,9 +120,32 @@ describe("EnvironmentCsvImportModal UI", () => {
       />,
     );
     await uploadCsv("hi", "notes.txt");
-    expect(screen.getByTestId("csv-import-error").textContent).toMatch(
-      /not a CSV/i,
+    expect(screen.getByTestId("csv-import-error").textContent).toMatch(/not a CSV/i);
+  });
+
+  it("discloses a partial write without exposing the raw database error", async () => {
+    render(
+      <EnvironmentCsvImportModal
+        open
+        onOpenChange={() => {}}
+        onConfirm={async () => ({
+          insertedCount: 2,
+          duplicateCount: 0,
+          partialWrite: true,
+          error: "raw postgres secret relation detail",
+        })}
+      />,
     );
+    await uploadCsv(
+      "Timestamp,Temp(°C),RH\n" + "2026-06-01T10:00:00Z,25,50\n" + "2026-06-01T10:01:00Z,25,50\n",
+    );
+    fireEvent.click(screen.getByTestId("csv-import-confirm"));
+
+    await waitFor(() => expect(screen.getByTestId("csv-import-error")).toBeTruthy());
+    const copy = screen.getByTestId("csv-import-error").textContent ?? "";
+    expect(copy).toMatch(/2 .*saved/i);
+    expect(copy).toMatch(/review imported history before retrying/i);
+    expect(copy).not.toContain("raw postgres");
   });
 });
 

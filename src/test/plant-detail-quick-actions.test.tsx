@@ -141,19 +141,29 @@ describe("buildPlantDetailQuickActions · payloads and routes", () => {
     },
   );
 
-  it("Manual Sensor Snapshot links to grow-scoped /sensors when growId is known", () => {
+  it("Manual Sensor Snapshot preserves the exact assigned tent and opens the manual form", () => {
+    const tentId = "22222222-2222-4222-8222-222222222222";
+    const e = buildPlantDetailQuickActions({
+      plantId: "p1",
+      growId: "g1",
+      tentId,
+    }).find((entry) => entry.kind === "manual_sensor_snapshot")!;
+    expect(e.href).toBe(`/sensors?tentId=${tentId}&tentIntent=required#manual-reading`);
+  });
+
+  it("Manual Sensor Snapshot falls back to grow-scoped /sensors when no tent is assigned", () => {
     const e = buildPlantDetailQuickActions({
       plantId: "p1",
       growId: "g1",
     }).find((e) => e.kind === "manual_sensor_snapshot")!;
-    expect(e.href).toBe("/sensors?growId=g1");
+    expect(e.href).toBe("/sensors?growId=g1#manual-reading");
   });
 
   it("Manual Sensor Snapshot falls back to plain /sensors when no growId", () => {
     const e = buildPlantDetailQuickActions({ plantId: "p1" }).find(
       (e) => e.kind === "manual_sensor_snapshot",
     )!;
-    expect(e.href).toBe("/sensors");
+    expect(e.href).toBe("/sensors#manual-reading");
   });
 
   it("Ask Doctor targets the scoped plant review when context is available", () => {
@@ -299,20 +309,20 @@ describe("PlantDetailQuickActions · render", () => {
     window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
   });
 
-  it("Manual Sensor Snapshot renders as a link to /sensors with growId", () => {
+  it("Manual Sensor Snapshot renders as a link to the manual form with growId", () => {
     const { container } = render(<PlantDetailQuickActions plantId="p1" growId="g1" tentId="t1" />);
     const link = container.querySelector(
       'a[data-testid="plant-detail-quick-action-manual-sensor-snapshot"], [data-testid="plant-detail-quick-action-manual-sensor-snapshot"] a',
     ) as HTMLAnchorElement | null;
-    expect(link?.getAttribute("href")).toBe("/sensors?growId=g1");
+    expect(link?.getAttribute("href")).toBe("/sensors?growId=g1#manual-reading");
   });
 
-  it("Manual Sensor Snapshot safely falls back to /sensors when growId missing", () => {
+  it("Manual Sensor Snapshot safely falls back to the unscoped manual form", () => {
     const { container } = render(<PlantDetailQuickActions plantId="p1" />);
     const link = container.querySelector(
       'a[data-testid="plant-detail-quick-action-manual-sensor-snapshot"], [data-testid="plant-detail-quick-action-manual-sensor-snapshot"] a',
     ) as HTMLAnchorElement | null;
-    expect(link?.getAttribute("href")).toBe("/sensors");
+    expect(link?.getAttribute("href")).toBe("/sensors#manual-reading");
   });
 
   it("Ask Doctor click scrolls to and focuses the scoped review anchor", () => {
@@ -435,7 +445,7 @@ describe("PlantDetailQuickActions · render", () => {
     const link = container.querySelector(
       'a[data-testid="plant-detail-quick-action-manual-sensor-snapshot"]',
     ) as HTMLAnchorElement | null;
-    expect(link?.getAttribute("href")).toBe("/sensors");
+    expect(link?.getAttribute("href")).toBe("/sensors#manual-reading");
   });
 
   it("disabled View Timeline does not scroll when hasTimelineSection is false", () => {

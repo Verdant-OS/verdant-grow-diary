@@ -97,7 +97,14 @@ export default function Grows() {
 
   async function archive(id: string) {
     if (!confirm("Archive this grow? Entries stay saved.")) return;
-    await supabase.from("grows").update({ is_archived: true }).eq("id", id);
+    const { error: archiveError } = await supabase
+      .from("grows")
+      .update({ is_archived: true })
+      .eq("id", id);
+    if (archiveError) {
+      toast.error("Unable to archive this grow. Please try again.");
+      return;
+    }
     await refresh();
     toast.success("Archived");
   }

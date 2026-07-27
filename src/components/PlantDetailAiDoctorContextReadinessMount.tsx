@@ -25,6 +25,7 @@ import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import type { ManualSensorLog } from "@/lib/manualSensorChronologyDeltaRules";
 import type { PlantRowLike } from "@/lib/aiDoctorContextCompiler";
 import { QUICK_LOG_V2_OPEN_EVENT, buildQuickLogV2OpenIntent } from "@/lib/quickLogV2OpenIntent";
+import { resolveFastAddIntent, type FastAddActionId } from "@/lib/fastAddActionRules";
 
 export interface PlantDetailAiDoctorContextReadinessMountProps {
   plantId: string;
@@ -146,6 +147,22 @@ export default function PlantDetailAiDoctorContextReadinessMount({
     window.dispatchEvent(new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, { detail: intent }));
   }, [plantId, tentId]);
 
+  const openQuickLogActivity = useCallback(
+    (actionId: Extract<FastAddActionId, "photo" | "feeding">) => {
+      if (typeof window === "undefined" || !growId || !tentId) return;
+      const intent = resolveFastAddIntent(actionId, {
+        plantId,
+        plantName: plantName ?? null,
+        growId,
+        tentId,
+        tentName: null,
+      });
+      if (intent.kind !== "open-quicklog") return;
+      window.dispatchEvent(new CustomEvent(intent.eventName, { detail: intent.prefill }));
+    },
+    [growId, plantId, plantName, tentId],
+  );
+
   const openEnvironmentSnapshot = useCallback(() => {
     if (typeof window === "undefined" || !growId || !tentId) return;
     window.dispatchEvent(
@@ -192,15 +209,9 @@ export default function PlantDetailAiDoctorContextReadinessMount({
 
   const auditLogs = (manualLogs.data ?? []) as ReadonlyArray<ManualSensorLog>;
 
-  const safeOpenQuickLog =
-    growId && tentId
-      ? () =>
-          openManualSensorEntry({
-            plantId,
-            growId,
-            tentId,
-          })
-      : undefined;
+  const safeOpenPhoto = growId && tentId ? () => openQuickLogActivity("photo") : undefined;
+  const safeOpenFeeding = growId && tentId ? () => openQuickLogActivity("feeding") : undefined;
+  const safeOpenManualSensorEntry = growId && tentId ? openManualSensorEntry : undefined;
   const safeOpenStructuredWater = growId && tentId ? openStructuredWater : undefined;
   const safeOpenEnvironmentSnapshot = growId && tentId ? openEnvironmentSnapshot : undefined;
 
@@ -212,16 +223,16 @@ export default function PlantDetailAiDoctorContextReadinessMount({
         quickActions={{
           // Every action routes into an existing Quick Log surface; the
           // grower still reviews and saves. Dispatching never writes.
-          onFastAddPhoto: safeOpenQuickLog,
+          onFastAddPhoto: safeOpenPhoto,
           onAddWatering: safeOpenStructuredWater,
-          onAddFeeding: safeOpenQuickLog,
+          onAddFeeding: safeOpenFeeding,
           onAddSensorSnapshot: safeOpenEnvironmentSnapshot,
         }}
       />
       <PlantSensorContextAuditPanel
         logs={auditLogs}
         identity={auditIdentity}
-        onOpenManualSensorEntry={openManualSensorEntry}
+        onOpenManualSensorEntry={safeOpenManualSensorEntry}
       />
       <AiDoctorCheckInPreviewPanel context={built.context} />
     </div>

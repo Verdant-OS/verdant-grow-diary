@@ -9,12 +9,14 @@ function HandoffHarness({
   hash,
   ready,
   mountTarget,
+  mountAlias = false,
   prefersReducedMotion = false,
   onScroll,
 }: {
   hash: string;
   ready: boolean;
   mountTarget: boolean;
+  mountAlias?: boolean;
   prefersReducedMotion?: boolean;
   onScroll: ReturnType<typeof vi.fn>;
 }) {
@@ -22,11 +24,18 @@ function HandoffHarness({
 
   return mountTarget ? (
     <li
-      id="timeline-entry-grow-event-42"
+      id={mountAlias ? "timeline-entry-diary-entry-42" : "timeline-entry-grow-event-42"}
       ref={(node) => {
         if (node) node.scrollIntoView = onScroll;
       }}
     >
+      {mountAlias ? (
+        <span
+          id="timeline-entry-grow-event-42"
+          data-timeline-entry-alias-for="timeline-entry-diary-entry-42"
+          hidden
+        />
+      ) : null}
       Saved feeding
     </li>
   ) : null;
@@ -93,6 +102,68 @@ describe("Timeline async hash-anchor handoff", () => {
     const target = document.getElementById("timeline-entry-grow-event-42");
     expect(scroll).toHaveBeenCalledWith({ behavior: "auto", block: "start" });
     expect(document.activeElement).toBe(target);
+  });
+
+  it("resolves a linked grow-event alias to the visible diary Timeline row", () => {
+    const scroll = vi.fn();
+    render(
+      <HandoffHarness
+        hash="#timeline-entry-grow-event-42"
+        ready={true}
+        mountTarget={true}
+        mountAlias={true}
+        onScroll={scroll}
+      />,
+    );
+
+    const visibleRow = document.getElementById("timeline-entry-diary-entry-42");
+    expect(scroll).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+    expect(visibleRow).toHaveAttribute("tabindex", "-1");
+    expect(document.activeElement).toBe(visibleRow);
+  });
+
+  it("retries when an alias mounts later while readiness remains true", () => {
+    const scroll = vi.fn();
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    const view = render(
+      <HandoffHarness
+        hash="#timeline-entry-grow-event-42"
+        ready={true}
+        mountTarget={false}
+        mountAlias={true}
+        onScroll={scroll}
+      />,
+    );
+
+    expect(scroll).not.toHaveBeenCalled();
+
+    view.rerender(
+      <HandoffHarness
+        hash="#timeline-entry-grow-event-42"
+        ready={true}
+        mountTarget={true}
+        mountAlias={true}
+        onScroll={scroll}
+      />,
+    );
+
+    const visibleRow = document.getElementById("timeline-entry-diary-entry-42");
+    expect(scroll).toHaveBeenCalledTimes(1);
+    expect(scroll).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+    expect(visibleRow).toHaveAttribute("tabindex", "-1");
+    expect(document.activeElement).toBe(visibleRow);
+    expect(setTimeoutSpy).not.toHaveBeenCalled();
+
+    view.rerender(
+      <HandoffHarness
+        hash="#timeline-entry-grow-event-42"
+        ready={true}
+        mountTarget={true}
+        mountAlias={true}
+        onScroll={scroll}
+      />,
+    );
+    expect(scroll).toHaveBeenCalledTimes(1);
   });
 
   it("rejects unrelated, empty, and malformed fragments", () => {

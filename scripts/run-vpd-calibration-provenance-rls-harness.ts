@@ -885,6 +885,19 @@ async function main(): Promise<void> {
       provenanceDeleteError?.code ?? provenanceDeleteReadbackError?.code,
     );
 
+    // The Free plan permits one active tent. All owner-scoped provenance
+    // assertions above are complete, so archive the first fixture before
+    // creating the separate tent-delete cascade fixture.
+    const { data: archivedOwnerTent, error: archiveOwnerTentError } = await ownerClient
+      .from("tents")
+      .update({ is_archived: true })
+      .eq("id", ownerTentId)
+      .select("id,is_archived")
+      .single();
+    if (archiveOwnerTentError || archivedOwnerTent?.is_archived !== true) {
+      throw new Error(`free_tent_slot_release_${archiveOwnerTentError?.code ?? "failed"}`);
+    }
+
     const cascadeTentId = await seedTent(ownerClient, owner.id, "tent delete cascade");
     tentIds.push(cascadeTentId);
     const { data: cascadeTentCalibration, error: cascadeTentCalibrationError } = await ownerClient

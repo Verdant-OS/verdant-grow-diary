@@ -7,7 +7,8 @@
  *  - Business logic lives in `buildPlantSensorContextAuditView`.
  */
 import { useMemo } from "react";
-import { Activity, Plus } from "lucide-react";
+import { Activity, ArrowRight, Plus } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,11 +29,9 @@ export interface PlantSensorContextAuditPanelProps {
   identity?: PlantQuickLogPrefillInput | null;
   /**
    * Optional handler invoked with the identity-only prefill (no sensor
-   * values). When omitted, the CTA falls back to an inert message.
+   * values). When omitted, the CTA routes to an existing recovery surface.
    */
-  onOpenManualSensorEntry?: (
-    prefill: NonNullable<PlantSensorContextCtaView["prefill"]>,
-  ) => void;
+  onOpenManualSensorEntry?: (prefill: NonNullable<PlantSensorContextCtaView["prefill"]>) => void;
 }
 
 function statusVariant(
@@ -86,47 +85,32 @@ export default function PlantSensorContextAuditPanel({
           <Activity className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           <h3 className="text-sm font-semibold">Sensor context for AI Doctor</h3>
         </div>
-        <Badge
-          variant={statusVariant(view.status)}
-          data-testid="plant-sensor-context-audit-status"
-        >
+        <Badge variant={statusVariant(view.status)} data-testid="plant-sensor-context-audit-status">
           {statusLabel(view.status)}
         </Badge>
       </header>
 
-      <p
-        className="text-xs text-muted-foreground"
-        data-testid="plant-sensor-context-audit-message"
-      >
+      <p className="text-xs text-muted-foreground" data-testid="plant-sensor-context-audit-message">
         {view.message}
       </p>
 
       <dl className="grid grid-cols-2 gap-2 text-xs">
         <div>
           <dt className="text-muted-foreground">Recent manual logs</dt>
-          <dd
-            className="font-medium"
-            data-testid="plant-sensor-context-audit-count"
-          >
+          <dd className="font-medium" data-testid="plant-sensor-context-audit-count">
             {view.recentLogCount}
           </dd>
         </div>
         <div>
           <dt className="text-muted-foreground">Latest snapshot</dt>
-          <dd
-            className="font-medium"
-            data-testid="plant-sensor-context-audit-latest"
-          >
+          <dd className="font-medium" data-testid="plant-sensor-context-audit-latest">
             {view.latestCapturedAt ?? "None"}
           </dd>
         </div>
       </dl>
 
       {view.metrics.length > 0 && (
-        <div
-          className="flex flex-wrap gap-1"
-          data-testid="plant-sensor-context-audit-metrics"
-        >
+        <div className="flex flex-wrap gap-1" data-testid="plant-sensor-context-audit-metrics">
           {view.metrics.map((m) => (
             <Badge
               key={m.key}
@@ -141,10 +125,7 @@ export default function PlantSensorContextAuditPanel({
       )}
 
       {view.sources.length > 0 && (
-        <div
-          className="flex flex-wrap gap-1"
-          data-testid="plant-sensor-context-audit-sources"
-        >
+        <div className="flex flex-wrap gap-1" data-testid="plant-sensor-context-audit-sources">
           {view.sources.map((s) => (
             <Badge
               key={s}
@@ -177,13 +158,27 @@ export default function PlantSensorContextAuditPanel({
         </div>
       ) : null}
 
-      {cta.kind === "inert" ? (
-        <p
-          className="text-xs text-muted-foreground"
-          data-testid="plant-sensor-context-audit-cta-inert"
-        >
-          {cta.inertMessage}
-        </p>
+      {cta.kind === "recovery" ? (
+        <div className="min-w-0 space-y-2" data-testid="plant-sensor-context-audit-cta-recovery">
+          <p className="text-xs text-muted-foreground">{cta.recoveryMessage}</p>
+          {cta.recoveryHref ? (
+            <Button
+              asChild
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-auto min-h-11 min-w-0 w-full whitespace-normal sm:h-9 sm:min-h-9 sm:w-auto"
+            >
+              <Link
+                to={cta.recoveryHref}
+                data-testid="plant-sensor-context-audit-cta-recovery-link"
+              >
+                {cta.label}
+                <ArrowRight className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+            </Button>
+          ) : null}
+        </div>
       ) : null}
     </section>
   );

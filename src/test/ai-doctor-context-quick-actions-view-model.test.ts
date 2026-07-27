@@ -63,6 +63,12 @@ describe("buildAiDoctorContextQuickActions", () => {
     expect(actions[0].kind).toBe("add_plant_photo");
     expect(actions[0].label).toBe("Add photo");
     expect(actions[0].target.kind).toBe("event");
+    if (actions[0].target.kind === "event") {
+      expect(actions[0].target.payload).toMatchObject({
+        eventType: "photo",
+        activityId: "photo",
+      });
+    }
   });
 
   it("produces no action for unknown / warning-context codes", () => {
@@ -95,10 +101,6 @@ describe("buildAiDoctorContextQuickActions", () => {
       missing: ["plant-photo", "stage", "recent-manual-sensor-snapshot", "strain"],
       ...base,
     }).map((x) => x.kind);
-    expect(a).toEqual([
-      "update_plant_profile",
-      "add_manual_sensor_snapshot",
-      "add_plant_photo",
-    ]);
+    expect(a).toEqual(["update_plant_profile", "add_manual_sensor_snapshot", "add_plant_photo"]);
   });
 });

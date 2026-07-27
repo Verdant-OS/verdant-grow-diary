@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import RouteAliasRedirect from "@/components/RouteAliasRedirect";
-import { buildRouteAliasTarget } from "@/lib/routeAliasRules";
+import { buildLegacyStrainSlugAliasTarget, buildRouteAliasTarget } from "@/lib/routeAliasRules";
 
 const ROOT = resolve(__dirname, "../..");
 const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
@@ -35,6 +35,60 @@ function renderAlias(from: string, path: string, to: string) {
 afterEach(() => cleanup());
 
 describe("route alias scope preservation", () => {
+  it.each([
+    {
+      from: "/features?ref=pricing#plans",
+      path: "/features",
+      to: "/welcome",
+      expected: "/welcome?ref=pricing#plans",
+    },
+    {
+      from: "/demo?ref=partner#proof",
+      path: "/demo",
+      to: "/welcome",
+      expected: "/welcome?ref=partner#proof",
+    },
+    {
+      from: "/ai-doctor?growId=g1&plantId=p1#review",
+      path: "/ai-doctor",
+      to: "/doctor",
+      expected: "/doctor?growId=g1&plantId=p1#review",
+    },
+    {
+      from: "/strains?ref=legacy#directory",
+      path: "/strains",
+      to: "/cultivars",
+      expected: "/cultivars?ref=legacy#directory",
+    },
+    {
+      from: "/refunds?source=footer#eligibility",
+      path: "/refunds",
+      to: "/refund",
+      expected: "/refund?source=footer#eligibility",
+    },
+    {
+      from: "/refund-policy?source=footer#eligibility",
+      path: "/refund-policy",
+      to: "/refund",
+      expected: "/refund?source=footer#eligibility",
+    },
+    {
+      from: "/terms-of-service?source=footer#rights",
+      path: "/terms-of-service",
+      to: "/terms",
+      expected: "/terms?source=footer#rights",
+    },
+    {
+      from: "/privacy-policy?source=footer#choices",
+      path: "/privacy-policy",
+      to: "/privacy",
+      expected: "/privacy?source=footer#choices",
+    },
+  ])("redirects $path while preserving query and hash", async ({ from, path, to, expected }) => {
+    renderAlias(from, path, to);
+    expect(await screen.findByTestId("route-alias-location")).toHaveTextContent(expected);
+  });
+
   it("redirects /logs while preserving grow scope and hash", async () => {
     renderAlias("/logs?growId=g1#entry", "/logs", "/timeline");
     expect(await screen.findByTestId("route-alias-location")).toHaveTextContent(
@@ -57,6 +111,25 @@ describe("route alias scope preservation", () => {
     expect(
       buildRouteAliasTarget("/timeline", "?growId=a%2Fb+room%26cycle%3D1", "#entry%2Fraw%20anchor"),
     ).toBe("/timeline?growId=a%2Fb+room%26cycle%3D1#entry%2Fraw%20anchor");
+  });
+
+  it("encodes a decoded legacy strain slug as one segment and preserves query/hash", () => {
+    expect(
+      buildLegacyStrainSlugAliasTarget(
+        "blue/dream & haze",
+        "?ref=legacy%2Fguide",
+        "#feeding%20notes",
+      ),
+    ).toBe("/cultivars/blue%2Fdream%20%26%20haze?ref=legacy%2Fguide#feeding%20notes");
+  });
+
+  it("fails malformed or path-traversal strain slugs to the cultivar index", () => {
+    expect(buildLegacyStrainSlugAliasTarget("..", "?ref=legacy", "#top")).toBe(
+      "/cultivars?ref=legacy#top",
+    );
+    expect(buildLegacyStrainSlugAliasTarget("\ud800", "?ref=legacy", "#top")).toBe(
+      "/cultivars?ref=legacy#top",
+    );
   });
 
   it("merges a canonical destination query before incoming signup context", () => {
@@ -95,6 +168,26 @@ describe("route alias scope preservation", () => {
 });
 
 describe("stateful alias wiring", () => {
+  it.each([
+    { path: "/features", to: "/welcome" },
+    { path: "/demo", to: "/welcome" },
+    { path: "/ai-doctor", to: "/doctor" },
+    { path: "/strains", to: "/cultivars" },
+    { path: "/refunds", to: "/refund" },
+    { path: "/refund-policy", to: "/refund" },
+    { path: "/terms-of-service", to: "/terms" },
+    { path: "/privacy-policy", to: "/privacy" },
+  ])("routes $path through the query-preserving alias", ({ path, to }) => {
+    const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const escapedTarget = to.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    expect(APP).toMatch(
+      new RegExp(
+        `path="${escapedPath}"\\s+element=\\{<RouteAliasRedirect\\s+to="${escapedTarget}"\\s*\\/>\\}`,
+      ),
+    );
+  });
+
   it("routes login, signup, and register through the shared context-preserving alias", () => {
     expect(APP).toMatch(/path="\/login"\s+element=\{<RouteAliasRedirect\s+to="\/auth"\s*\/>\}/);
     expect(APP).toMatch(
@@ -107,11 +200,15 @@ describe("stateful alias wiring", () => {
 
   it("routes grow-room, tasks, and action-queue through the query-preserving alias", () => {
     expect(APP).toMatch(/path="\/grow-room"\s+element=\{<RouteAliasRedirect\s+to="\/"\s*\/>\}/);
-    expect(APP).toMatch(
-      /path="\/tasks"\s+element=\{<RouteAliasRedirect\s+to="\/actions"\s*\/>\}/,
-    );
+    expect(APP).toMatch(/path="\/tasks"\s+element=\{<RouteAliasRedirect\s+to="\/actions"\s*\/>\}/);
     expect(APP).toMatch(
       /path="\/action-queue"\s+element=\{<RouteAliasRedirect\s+to="\/actions"\s*\/>\}/,
+    );
+  });
+
+  it("routes a dynamic legacy strain slug through the encoded preserving helper", () => {
+    expect(APP).toMatch(
+      /buildLegacyStrainSlugAliasTarget\(\s*slug,\s*location\.search,\s*location\.hash,?\s*\)/,
     );
   });
 });

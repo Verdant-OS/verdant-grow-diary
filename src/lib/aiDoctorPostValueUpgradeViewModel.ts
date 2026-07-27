@@ -84,7 +84,7 @@ export function buildAiDoctorPostValueUpgradeViewModel(
       title: "Keep AI Doctor available for future checks",
       description: `This grow has used its ${AI_DOCTOR_FREE_CREDITS_PER_GROW} included AI credits. Pro adds a shared pool of ${AI_DOCTOR_PRO_CREDITS_PER_MONTH} AI credits per month across every grow.`,
       unlockBullets: [
-        `${AI_DOCTOR_PRO_CREDITS_PER_MONTH} shared AI credits each month for AI Doctor and AI Coach`,
+        `${AI_DOCTOR_PRO_CREDITS_PER_MONTH} shared AI credits each month for AI Doctor`,
         "Unlimited grows and full grow history",
         "Advanced timeline filtering and sensor snapshot history",
         "Exports and backups of your grow data",

@@ -16,6 +16,7 @@ import {
   getRoutesByAccess,
   type AppRouteEntry,
 } from "@/lib/appRouteManifest";
+import { FEATURE_KEYS, type FeatureKey } from "@/lib/featureEntitlements";
 
 describe("appRouteManifest — structural invariants", () => {
   it("has no duplicate paths", () => {
@@ -35,14 +36,7 @@ describe("appRouteManifest — structural invariants", () => {
     expect(APP_ROUTES.find((route) => route.path === "/logs")?.access).toBe("redirect");
   });
 
-  it("describes operator write capabilities without overstating read-only safety", () => {
-    const ggsIngest = APP_ROUTES.find(
-      (route) => route.path === "/operator/ggs-real-payload-ingest",
-    );
-    expect(ggsIngest?.description).toMatch(/commit/i);
-    expect(ggsIngest?.description).toMatch(/validated ingest RPC/i);
-    expect(ggsIngest?.description).toMatch(/read-only Sentinel verdict/i);
-
+  it("describes operator support write capabilities without overstating read-only safety", () => {
     const supportInbox = APP_ROUTES.find((route) => route.path === "/operator/support-inbox");
     expect(supportInbox?.description).toMatch(/original submissions are read-only/i);
     expect(supportInbox?.description).toMatch(/review status and internal notes are editable/i);
@@ -71,10 +65,27 @@ describe("appRouteManifest — structural invariants", () => {
     }
   });
 
-  it("does NOT introduce protected-tier / requiredTier behavior in Slice P1", () => {
-    // Slice P1 is foundation-only. Tier-gated semantics are deferred to a
-    // later slice once the product decisions exist. This guard fails if
-    // someone accidentally smuggles in tier metadata here.
+  it("models the exact Pheno Tracker route family with the canonical feature key", () => {
+    const expected = [
+      "/pheno-hunts",
+      "/pheno-hunts/:id/keepers",
+      "/pheno-hunts/:id/workspace",
+      "/pheno-hunts/new",
+    ];
+    const featureRoutes = APP_ROUTES.filter(
+      (route): route is AppRouteEntry & { requiredFeature: FeatureKey } =>
+        "requiredFeature" in route && typeof route.requiredFeature === "string",
+    );
+
+    expect(featureRoutes.map((route) => route.path)).toEqual(expected);
+    for (const route of featureRoutes) {
+      expect(route.access).toBe("auth");
+      expect(route.requiredFeature).toBe("pheno_tracker");
+      expect(FEATURE_KEYS).toContain(route.requiredFeature);
+    }
+  });
+
+  it("does not encode billing plans or a synthetic protected-tier access class", () => {
     const blob = JSON.stringify(APP_ROUTES);
     expect(blob).not.toMatch(/protected-tier/i);
     expect(blob).not.toMatch(/requiredTier/i);

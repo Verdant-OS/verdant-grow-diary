@@ -28,8 +28,6 @@ import {
   defaultBrowserHarness,
   getVerifyStatusGuidance,
   isHarnessUsable,
-  HARNESS_UNAVAILABLE_LABEL,
-  HARNESS_UNAVAILABLE_DESCRIPTION,
   NOT_CHECKED_LABEL,
   NOT_CHECKED_DESCRIPTION,
   type HarnessAdapter,
@@ -149,20 +147,13 @@ export default function AgentIntegrations({
     }
   }, [verifyHarness]);
 
-  // Without a usable harness (the production default — the browser has no
-  // safe way to probe MCP without exposing tokens) the Verify button could
-  // only ever answer "harness unavailable", so render that as a static
-  // status instead of an interactive dead end.
+  // BrowserConnectPanel owns production OAuth verification. Keep this
+  // auxiliary panel only for an explicitly injected, usable test/dev harness;
+  // the browser-safe default must not create a contradictory dead surface.
   const harnessUsable = isHarnessUsable(verifyHarness);
-  const panelStatus = harnessUsable
-    ? (verifyResult?.status ?? "not_checked")
-    : "harness_unavailable";
-  const panelLabel = harnessUsable
-    ? (verifyResult?.label ?? NOT_CHECKED_LABEL)
-    : HARNESS_UNAVAILABLE_LABEL;
-  const panelDescription = harnessUsable
-    ? (verifyResult?.description ?? NOT_CHECKED_DESCRIPTION)
-    : HARNESS_UNAVAILABLE_DESCRIPTION;
+  const panelStatus = verifyResult?.status ?? "not_checked";
+  const panelLabel = verifyResult?.label ?? NOT_CHECKED_LABEL;
+  const panelDescription = verifyResult?.description ?? NOT_CHECKED_DESCRIPTION;
   const panelGuidance = getVerifyStatusGuidance(panelStatus);
 
   const [manifestModalOpen, setManifestModalOpen] = useState(false);
@@ -307,14 +298,14 @@ export default function AgentIntegrations({
 
         <BrowserConnectPanel />
 
-        <section
-          aria-label="Verify tool access"
-          className="glass rounded-2xl border p-5 space-y-3"
-          data-testid="verify-tool-access"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">Verify tool access</h2>
-            {harnessUsable ? (
+        {harnessUsable ? (
+          <section
+            aria-label="Verify tool access"
+            className="glass rounded-2xl border p-5 space-y-3"
+            data-testid="verify-tool-access"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold">Verify tool access</h2>
               <Button
                 onClick={onVerify}
                 disabled={verifyBusy}
@@ -323,51 +314,47 @@ export default function AgentIntegrations({
               >
                 {verifyBusy ? "Verifying…" : "Verify tool access"}
               </Button>
-            ) : (
-              <Badge variant="secondary" data-testid="verify-harness-unavailable-badge">
-                Unavailable in this build
-              </Badge>
-            )}
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Runs a read-only <code className="font-mono">list_grows</code> check against the local
-            verification harness when available. Never exposes tokens, secrets, or raw response
-            rows.
-          </p>
-          <div
-            className="rounded-lg border p-3 text-sm space-y-1"
-            role="status"
-            aria-live="polite"
-            data-testid="verify-tool-access-result"
-            data-status={panelStatus}
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="font-medium" data-testid="verify-label">
-                {panelLabel}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Runs a read-only <code className="font-mono">list_grows</code> check against the local
+              verification harness when available. Never exposes tokens, secrets, or raw response
+              rows.
+            </p>
+            <div
+              className="rounded-lg border p-3 text-sm space-y-1"
+              role="status"
+              aria-live="polite"
+              data-testid="verify-tool-access-result"
+              data-status={panelStatus}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="font-medium" data-testid="verify-label">
+                  {panelLabel}
+                </div>
+                <Badge
+                  variant="outline"
+                  className="text-[10px] uppercase"
+                  data-testid="verify-tool-checked"
+                >
+                  tool: list_grows
+                </Badge>
               </div>
-              <Badge
-                variant="outline"
-                className="text-[10px] uppercase"
-                data-testid="verify-tool-checked"
-              >
-                tool: list_grows
-              </Badge>
-            </div>
-            <div className="text-muted-foreground" data-testid="verify-description">
-              {panelDescription}
-            </div>
-            {typeof verifyResult?.growCount === "number" ? (
-              <div className="text-xs text-muted-foreground" data-testid="verify-grow-count">
-                {verifyResult.growCount === 0
-                  ? "0 grows found (authorized empty state)."
-                  : `${verifyResult.growCount} grow(s) visible to the signed-in grower.`}
+              <div className="text-muted-foreground" data-testid="verify-description">
+                {panelDescription}
               </div>
-            ) : null}
-            <div className="text-xs text-foreground" data-testid="verify-next-step">
-              {panelGuidance}
+              {typeof verifyResult?.growCount === "number" ? (
+                <div className="text-xs text-muted-foreground" data-testid="verify-grow-count">
+                  {verifyResult.growCount === 0
+                    ? "0 grows found (authorized empty state)."
+                    : `${verifyResult.growCount} grow(s) visible to the signed-in grower.`}
+                </div>
+              ) : null}
+              <div className="text-xs text-foreground" data-testid="verify-next-step">
+                {panelGuidance}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        ) : null}
 
         <section
           aria-label="Connect an agent"

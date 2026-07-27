@@ -5,8 +5,8 @@
  *   - Migration creates public.action_queue_events with required columns,
  *     CHECK on event_type, RLS enabled, and owner-locked policies that
  *     also verify the referenced action_queue and grow belong to auth.uid().
- *   - ActionQueue.tsx writes an audit row on approve/simulate/reject and
- *     never sends device commands.
+ *   - ActionQueue.tsx uses the transactional owner-scoped RPC for every
+ *     decision and never sends equipment commands.
  *   - No service_role / device-control surface introduced anywhere new.
  */
 import { describe, it, expect } from "vitest";
@@ -28,10 +28,12 @@ const MIG = allMigrations();
 
 function aqeMigration(): string {
   const dir = resolve(ROOT, "supabase/migrations");
-  return readdirSync(dir)
-    .filter((n) => n.endsWith(".sql"))
-    .map((n) => readFileSync(join(dir, n), "utf8"))
-    .find((sql) => /CREATE\s+TABLE\s+public\.action_queue_events/i.test(sql)) ?? "";
+  return (
+    readdirSync(dir)
+      .filter((n) => n.endsWith(".sql"))
+      .map((n) => readFileSync(join(dir, n), "utf8"))
+      .find((sql) => /CREATE\s+TABLE\s+public\.action_queue_events/i.test(sql)) ?? ""
+  );
 }
 const AQE = aqeMigration();
 
@@ -52,7 +54,13 @@ describe("action_queue_events — schema & RLS", () => {
 
   it("CHECK constrains event_type to the allowed set", () => {
     for (const t of [
-      "created","simulated","approved","rejected","completed","cancelled","note",
+      "created",
+      "simulated",
+      "approved",
+      "rejected",
+      "completed",
+      "cancelled",
+      "note",
     ]) {
       expect(AQE).toMatch(new RegExp(`'${t}'`));
     }
@@ -87,18 +95,22 @@ describe("action_queue_events — schema & RLS", () => {
 });
 
 describe("ActionQueue page — audit wiring", () => {
-  it("inserts an event row on transitions", () => {
+  it("uses the transactional transition-and-audit RPC", () => {
     expect(PAGE).toMatch(
-      /\.from\(\s*["']action_queue_events["']\s*\)[\s\S]{0,200}\.insert\(/,
+      /supabase\.rpc\(\s*["']action_queue_transition["']\s*,\s*rpcArgs\s*,?\s*\)/,
     );
+    expect(PAGE).toMatch(/parseActionQueueTransitionRpcResult\(data,\s*rpcArgs\)/);
   });
 
-  it("event insert never sends user_id from the client", () => {
+  it("transition input never sends identity or server-derived lifecycle fields", () => {
     const m = PAGE.match(
-      /\.from\(\s*["']action_queue_events["']\s*\)\s*\.insert\(\s*\{([\s\S]*?)\}\s*\)/,
+      /const\s+rpcArgs\s*=\s*buildActionQueueTransitionRpcArgs\(\s*\{([\s\S]*?)\}\s*\)/,
     );
     expect(m).not.toBeNull();
-    expect(m![1]).not.toMatch(/\buser_id\s*:/);
+    expect(m![1]).not.toMatch(
+      /\buser_id\b|\bgrow_id\b|\bevent_type\b|\bnew_status\b|\btransitioned_at\b/,
+    );
+    expect(PAGE).not.toMatch(/\.from\(\s*["']action_queue_events["']\s*\)\s*\.insert\(/);
   });
 
   it("approve / reject / simulate each go through the transition helper (via dialog confirm)", () => {
@@ -107,9 +119,8 @@ describe("ActionQueue page — audit wiring", () => {
     expect(PAGE).toMatch(/function\s+reject[\s\S]*?openNoteDialog\(/);
     expect(PAGE).toMatch(/function\s+simulate[\s\S]*?openNoteDialog\(/);
     expect(PAGE).toMatch(/function\s+confirmNoteDialog[\s\S]*?transition\(/);
-    // each transition call passes an event_type AND new_status that match
-    expect(PAGE).toMatch(/transition\(row,\s*patch,\s*eventTypeFor\(kind\),\s*nextStatusFor\(kind\),\s*note\)/);
-    expect(PAGE).toMatch(/buildTransitionPatch\(kind\)/);
+    expect(PAGE).toMatch(/transition\(row,\s*kind,\s*note\)/);
+    expect(PAGE).toMatch(/buildActionQueueTransitionRpcArgs\(\s*\{/);
     expect(PAGE).toMatch(/from "@\/lib\/actionQueueTransitions"/);
   });
 
@@ -123,8 +134,11 @@ describe("ActionQueue page — audit wiring", () => {
     );
   });
 
-  it("audit insert failure shows a warning toast (does not silently swallow)", () => {
-    expect(PAGE).toMatch(/toast\.warning\([\s\S]{0,80}audit log failed/i);
+  it("reports one calm failure when the atomic write does not succeed", () => {
+    expect(PAGE).toMatch(
+      /if \(error \|\| !result \|\| result\.ok !== true\)[\s\S]*?safeActionQueueFailureCopy\("transition"/,
+    );
+    expect(PAGE).not.toMatch(/Status updated, but audit log failed/i);
   });
 
   it("renders an event history section", () => {

@@ -2,12 +2,11 @@
  * oauthPostAuthRedirectRules — one-shot, same-origin OAuth continuation.
  *
  * OAuth returns to the configured public app origin, not the transient
- * /auth URL. Keep only the fixed CSV-onboarding destination in sessionStorage
- * so that explicit acquisition intent survives that round trip. This stores
- * no identity, token, grow, plant, tent, billing, or arbitrary query data.
+ * /auth URL. Keep the manifest-validated destination in sessionStorage so an
+ * explicit protected deep link survives that round trip. This stores no
+ * identity, token, grow, plant, tent, billing, or arbitrary off-route data.
  */
 import { resolveKnownRouteReturnTo } from "@/lib/authRedirectRules";
-import { buildCsvHistoryOnboardingPath } from "@/lib/csvHistoryOnboardingIntentRules";
 
 export const OAUTH_POST_AUTH_REDIRECT_STORAGE_KEY = "verdant:oauth-post-auth-redirect:v1" as const;
 export const OAUTH_POST_AUTH_REDIRECT_TTL_MS = 30 * 60 * 1_000;
@@ -17,10 +16,24 @@ interface PendingOAuthPostAuthRedirect {
   readonly startedAt: number;
 }
 
+const BLOCKED_OAUTH_POST_AUTH_PATHS = new Set([
+  "/",
+  "/auth",
+  "/checkout/cancel",
+  "/checkout/success",
+  "/login",
+  "/reset-password",
+  "/signup",
+  "/welcome",
+]);
+
 function resolveAllowedOAuthPostAuthRedirect(value: unknown): string | null {
   const redirectTo = resolveKnownRouteReturnTo(value);
-  const csvOnboarding = buildCsvHistoryOnboardingPath();
-  return redirectTo === csvOnboarding ? csvOnboarding : null;
+  if (!redirectTo) return null;
+  const pathname = redirectTo.split("?")[0].split("#")[0];
+  const canonicalPathname =
+    pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+  return BLOCKED_OAUTH_POST_AUTH_PATHS.has(canonicalPathname) ? null : redirectTo;
 }
 
 function removePending(storage: Storage | null): void {
@@ -42,7 +55,7 @@ export function resolveOAuthPostAuthSessionStorage(): Storage | null {
 }
 
 /**
- * Persist only the fixed CSV onboarding route. Rejected values clear stale
+ * Persist one known, non-transitional app route. Rejected values clear stale
  * state so a later unrelated sign-in cannot inherit an old request.
  */
 export function savePendingOAuthPostAuthRedirect(
@@ -75,7 +88,7 @@ export function clearPendingOAuthPostAuthRedirect(
 
 /**
  * Consume, rather than merely read, the one-shot target. Stale, malformed,
- * and non-CSV routes are removed and never navigated to.
+ * unknown, and transitional routes are removed and never navigated to.
  */
 export function consumePendingOAuthPostAuthRedirect(
   storage: Storage | null = resolveOAuthPostAuthSessionStorage(),

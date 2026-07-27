@@ -96,6 +96,18 @@ describe("release workbook manifest", () => {
     }
   });
 
+  it("pins generated text artifacts to LF for byte-stable hashes across Git checkouts", () => {
+    const attributesPath = join(process.cwd(), ".gitattributes");
+    expect(existsSync(attributesPath), ".gitattributes must define artifact EOL policy").toBe(true);
+    if (!existsSync(attributesPath)) return;
+
+    const attributes = readFileSync(attributesPath, "utf8").replace(/\r\n?/g, "\n");
+    expect(attributes).toMatch(/^docs\/artifacts\/\*\.csv text eol=lf$/m);
+    expect(attributes).toMatch(/^docs\/artifacts\/\*\.md text eol=lf$/m);
+    expect(attributes).toMatch(/^docs\/artifacts\/\*\.json text eol=lf$/m);
+    expect(attributes).toMatch(/^docs\/artifacts\/\*\.xlsx -text$/m);
+  });
+
   it("manifest SHA256 for every generated file matches actual file hash on disk", () => {
     const m = JSON.parse(readFileSync(MANIFEST, "utf8"));
     for (const f of m.files) {

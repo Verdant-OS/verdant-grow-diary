@@ -1,9 +1,8 @@
 /**
- * Static guardrail tests for the pi-ingest-readings Edge Function contract.
+ * Static guardrail tests for the implemented pi-ingest-readings contract.
  *
- * This is a DOCS + STATIC TESTS ONLY scope. The Edge Function must not
- * exist yet, no service_role usage may be added, no schema migration
- * may be added, and no alert / action_queue write path may be added.
+ * Repository presence is distinct from deployment proof. These checks pin the
+ * documented implementation identity and the ingestion-only safety fences.
  */
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -29,8 +28,12 @@ describe("pi-ingest-readings contract doc — existence & identity", () => {
     expect(DOC).toMatch(/pi-ingest-readings/);
   });
 
-  it("declares docs/tests only — no implementation yet", () => {
-    expect(DOC).toMatch(/docs.*tests.*only|no\s+implementation\s+yet|contract\s*\+\s*static/i);
+  it("documents implemented repository status without claiming deployment", () => {
+    expect(DOC).toMatch(/repository status:[\s\S]{0,80}implemented/i);
+    expect(DOC).toContain("supabase/functions/pi-ingest-readings/index.ts");
+    expect(DOC).toMatch(/repository presence does not prove/i);
+    expect(DOC).toMatch(/confirm migration history[\s\S]{0,160}deployed smoke test/i);
+    expect(DOC).not.toMatch(/no\s+implementation\s+yet/i);
   });
 });
 
@@ -47,13 +50,7 @@ describe("pi-ingest-readings contract doc — scope/safety rules", () => {
 });
 
 describe("pi-ingest-readings contract doc — metrics whitelist", () => {
-  const CURRENT = [
-    "temperature_c",
-    "humidity_pct",
-    "vpd_kpa",
-    "co2_ppm",
-    "soil_moisture_pct",
-  ];
+  const CURRENT = ["temperature_c", "humidity_pct", "vpd_kpa", "co2_ppm", "soil_moisture_pct"];
   const UNSUPPORTED = ["ppfd", "dli", "soil_ec", "soil_temp", "reservoir_ec", "reservoir_ph"];
 
   it("lists current allowed metrics exactly", () => {
@@ -70,7 +67,10 @@ describe("pi-ingest-readings contract doc — validation rules", () => {
     ["requires tent_id", /`?tent_id`?\s+required/i],
     ["requires device_id", /`?device_id`?\s+required/i],
     ["requires captured_at", /`?captured_at`?\s+required/i],
-    ["rejects captured_at >5min in future", /captured_at[\s\S]{0,80}5\s*minutes?\s+in\s+the\s+future/i],
+    [
+      "rejects captured_at >5min in future",
+      /captured_at[\s\S]{0,80}5\s*minutes?\s+in\s+the\s+future/i,
+    ],
     ["no silent timestamp clamping", /no\s+silent\s+timestamp\s+clamping/i],
     ["all-or-nothing batch", /all-or-nothing/i],
     ["rejects unknown metrics", /reject\s+unknown\s+metrics/i],
@@ -86,10 +86,17 @@ describe("pi-ingest-readings contract doc — validation rules", () => {
 
 describe("pi-ingest-readings contract doc — auth/security", () => {
   it.each([
-    ["requires token/HMAC style auth", /signed\s+bridge\s+token\s+or\s+HMAC/i],
+    ["requires timestamped HMAC auth", /timestamped\s+HMAC\s+signature/i],
     ["no unauthenticated writes", /no\s+unauthenticated\s+writes/i],
     ["no client-provided user_id", /no\s+client-provided\s+`?user_id`?/i],
-    ["service_role only after token verification", /service_role[\s\S]{0,120}after[\s\S]{0,40}verif/i],
+    [
+      "service_role pre-auth scope is credential lookup only",
+      /service_role[\s\S]{0,180}before[\s\S]{0,80}limited[\s\S]{0,100}credential lookup/i,
+    ],
+    [
+      "all service_role writes are post-verification",
+      /every write[\s\S]{0,60}only after verification/i,
+    ],
     ["failed auth inserts zero rows", /401[\s\S]{0,60}zero\s+rows/i],
     ["invalid payload inserts zero rows", /400[\s\S]{0,60}zero\s+rows/i],
   ])("documents auth rule: %s", (_label, re) => {
@@ -104,8 +111,8 @@ describe("pi-ingest-readings contract doc — stop-ship", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Repo-level static guardrails: this task must NOT add the Edge Function,
-// service_role usage, schema migrations, alert writes, or action_queue writes.
+// Repo-level static guardrails: the implemented Edge Function must retain its
+// fail-closed auth path and must not write alerts or action_queue rows.
 // ---------------------------------------------------------------------------
 
 function walk(dir: string, acc: string[] = []): string[] {
@@ -120,12 +127,12 @@ function walk(dir: string, acc: string[] = []): string[] {
   return acc;
 }
 
-describe("pi-ingest-readings — repo guardrails (fail-closed skeleton allowed)", () => {
+describe("pi-ingest-readings — implemented repo guardrails", () => {
   const FN = resolve(ROOT, "supabase/functions/pi-ingest-readings/index.ts");
   const SRC = existsSync(FN) ? readFileSync(FN, "utf8") : "";
 
-  it("pi-ingest-readings Edge Function, if present, retains fail-closed failure paths", () => {
-    if (!existsSync(FN)) return;
+  it("pi-ingest-readings Edge Function exists and retains fail-closed failure paths", () => {
+    expect(existsSync(FN)).toBe(true);
     expect(SRC).toMatch(/(secret_resolver_not_implemented|internal_failure)/);
     expect(SRC).toMatch(/(status:\s*(503|501)|jsonResponse\s*\(\s*(503|501))/);
     // Success path only via commit helper, must include inserted/rejected.
@@ -135,15 +142,18 @@ describe("pi-ingest-readings — repo guardrails (fail-closed skeleton allowed)"
       expect(SRC).toMatch(/commitPiIngestBatch/);
     }
   });
-
-
-  it("no migration mentioning pi_ingest / pi-ingest-readings exists", () => {
+  it("versioned migrations provide the pi-ingest credential, idempotency, and commit foundation", () => {
     const dir = resolve(ROOT, "supabase/migrations");
-    if (!existsSync(dir)) return;
-    for (const f of readdirSync(dir)) {
-      const text = readFileSync(join(dir, f), "utf8");
-      expect(text).not.toMatch(/pi[_-]?ingest[_-]?readings/i);
-    }
+    expect(existsSync(dir)).toBe(true);
+    const migrationText = readdirSync(dir)
+      .map((f) => readFileSync(join(dir, f), "utf8"))
+      .join("\n");
+    expect(migrationText).toMatch(/CREATE TABLE public\.pi_ingest_bridge_credentials/i);
+    expect(migrationText).toMatch(/CREATE TABLE public\.pi_ingest_idempotency_keys/i);
+    expect(migrationText).toMatch(/FUNCTION public\.pi_ingest_commit_batch/i);
+    expect(migrationText).toMatch(
+      /GRANT EXECUTE ON FUNCTION public\.pi_ingest_commit_batch[\s\S]{0,160}service_role/i,
+    );
   });
 
   it("no source file invokes a pi-ingest-readings function (no client wiring)", () => {

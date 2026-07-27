@@ -1,0 +1,6 @@
+# Release workbook hashes are byte-level contracts. Keep generated text
+# artifacts on LF across every checkout; XLSX files must remain binary.
+docs/artifacts/*.csv text eol=lf
+docs/artifacts/*.md text eol=lf
+docs/artifacts/*.json text eol=lf
+docs/artifacts/*.xlsx -text

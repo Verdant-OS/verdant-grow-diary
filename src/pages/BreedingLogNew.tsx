@@ -19,10 +19,10 @@ interface GrowInfo {
 }
 
 /**
- * /breeding/new — log a breeding crossing-workflow event scoped to a grow.
+ * /breeding/log/new — log a breeding crossing-workflow event scoped to a grow.
  * Mirrors PhenoHuntNew: loads the grow + its plants, then renders the
  * BreedingLogContainer. The container saves via the breeding_log_save_event
- * RPC and requests approval-required follow-ups in the Action Queue.
+ * RPC; approval-required Action Queue follow-ups are a separate grower opt-in.
  */
 export default function BreedingLogNew() {
   const navigate = useNavigate();
@@ -45,10 +45,7 @@ export default function BreedingLogNew() {
       // grow_id matches OR it lives in one of the grow's tents, so
       // orphan-attributed plants (tent in grow, plant.grow_id null) can still
       // be logged against. Tent ids are fetched first for the OR filter.
-      const { data: tentRows } = await supabase
-        .from("tents")
-        .select("id")
-        .eq("grow_id", growId);
+      const { data: tentRows } = await supabase.from("tents").select("id").eq("grow_id", growId);
       if (cancelled) return;
       const tentIds = ((tentRows ?? []) as { id?: string | null }[])
         .map((t) => t.id ?? "")
@@ -113,10 +110,10 @@ export default function BreedingLogNew() {
           <h1 className="text-xl font-display font-bold">Log Breeding Event</h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          Record a crossing-workflow event in{" "}
-          <span className="font-medium">{grow.name}</span>
-          {tentId ? " (this tent)" : ""}. Verdant will suggest approval-required
-          follow-ups in your Action Queue.
+          Record a crossing-workflow event in <span className="font-medium">{grow.name}</span>
+          {tentId ? " (this tent)" : ""}. Action Queue follow-up suggestions are optional and
+          created only when you select them. Every suggestion is approval-required; Verdant never
+          controls devices.
         </p>
       </header>
 

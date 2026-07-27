@@ -18,8 +18,31 @@ describe("Action Queue failure copy", () => {
     );
     const copy = safeActionQueueFailureCopy("transition", raw);
 
-    expect(copy).toBe("Action status couldn't be saved. The action was not changed. Try again.");
+    expect(copy).toBe(
+      "Action status couldn't be saved. No new transition was recorded. Try again.",
+    );
     expect(copy).not.toMatch(/action_queue|approved_at|rejected_at|operators/i);
+  });
+
+  it("uses accurate, reason-whitelisted copy for stale or missing actions", () => {
+    expect(
+      safeActionQueueFailureCopy("transition", {
+        ok: false,
+        reason: "status_conflict",
+      }),
+    ).toBe("This action changed elsewhere. The latest status has been reloaded.");
+    expect(
+      safeActionQueueFailureCopy("transition", {
+        ok: false,
+        reason: "action_not_found",
+      }),
+    ).toBe("This action is no longer available. The queue has been reloaded.");
+    expect(
+      safeActionQueueFailureCopy("transition", {
+        ok: false,
+        reason: "attacker-supplied-detail",
+      }),
+    ).toBe("Action status couldn't be saved. No new transition was recorded. Try again.");
   });
 
   it.each<ActionQueueFailureOperation>(["load", "transition", "audit", "outcome", "followup"])(
@@ -46,13 +69,18 @@ describe("Action Queue failure copy", () => {
 describe("Action Queue failure-copy wiring", () => {
   it("routes queue and detail transition failures through the sanitizer", () => {
     for (const page of [ACTION_QUEUE, ACTION_DETAIL]) {
-      expect(page).toMatch(/toast\.error\(safeActionQueueFailureCopy\("transition", error\)\)/);
+      expect(page).toMatch(
+        /toast\.error\(safeActionQueueFailureCopy\("transition", error \?\? result\)\)/,
+      );
+      expect(page).toMatch(
+        /result\?\.ok\s*===\s*false[\s\S]*?status_conflict[\s\S]*?action_not_found[\s\S]*?await load\(\)/,
+      );
     }
   });
 
-  it("sanitizes queue loads and secondary write failures", () => {
+  it("sanitizes queue loads and remaining secondary write failures", () => {
     expect(ACTION_QUEUE).toMatch(/safeActionQueueFailureCopy\("load", error\)/);
-    expect(ACTION_QUEUE).toMatch(/safeActionQueueFailureCopy\("audit", error\)/);
+    expect(ACTION_QUEUE).not.toMatch(/safeActionQueueFailureCopy\("audit",/);
     expect(ACTION_DETAIL).toMatch(/safeActionQueueFailureCopy\("outcome", error\)/);
     expect(ACTION_DETAIL).toMatch(/safeActionQueueFailureCopy\("followup", insErr\)/);
   });

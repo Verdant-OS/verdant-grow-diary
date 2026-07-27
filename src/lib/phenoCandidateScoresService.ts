@@ -10,6 +10,7 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { phenoDb } from "@/integrations/supabase/phenoTables";
+import { PhenoEvidenceReadError } from "@/lib/phenoEvidenceReadError";
 
 export interface CandidateScoreRow {
   readonly plantId: string;
@@ -61,7 +62,7 @@ export async function listCandidateScoresForHunt(
   // Page-scoped read: fetch only the visible candidates' scores at scale.
   if (plantIds && plantIds.length > 0) query = query.in("plant_id", plantIds as string[]);
   const { data, error } = await query;
-  if (error || !data) return {};
+  if (error || !data) throw new PhenoEvidenceReadError("candidate_scores");
   const map: Record<string, CandidateScoreRow> = {};
   for (const row of data) {
     if (!row.plant_id) continue;

@@ -5,10 +5,10 @@
  * these builders so that the wire contract has exactly one source of
  * truth.
  *
- * Every builder returns `ok: false`. The endpoint stays fail-closed for
- * ingestion: even the post-auth success branch returns
- * `auth_ok_pipeline_not_implemented` until the sensor insert pipeline
- * ships behind its own gates.
+ * Every builder returns `ok: false`. Two legacy wire codes retain their
+ * original names for client compatibility, but their messages must describe
+ * current runtime state rather than claiming shipped resolvers or pipelines
+ * are still unimplemented.
  */
 
 export const PI_INGEST_METHOD_NOT_ALLOWED_ERROR = "method_not_allowed" as const;
@@ -24,16 +24,13 @@ export const PI_INGEST_METHOD_NOT_ALLOWED_MESSAGE =
   "pi-ingest-readings only accepts POST requests." as const;
 
 export const PI_INGEST_SECRET_RESOLVER_NOT_IMPLEMENTED_MESSAGE =
-  "pi-ingest-readings is intentionally disabled until the server-only bridge secret resolver is implemented inside this Edge Function." as const;
+  "pi-ingest-readings is unavailable because required server configuration is unavailable." as const;
 
-export const PI_INGEST_UNAUTHORIZED_MESSAGE =
-  "Bridge authentication failed." as const;
+export const PI_INGEST_UNAUTHORIZED_MESSAGE = "Bridge authentication failed." as const;
 
-export const PI_INGEST_INVALID_REQUEST_MESSAGE =
-  "Request payload was rejected." as const;
+export const PI_INGEST_INVALID_REQUEST_MESSAGE = "Request payload was rejected." as const;
 
-export const PI_INGEST_INTERNAL_FAILURE_MESSAGE =
-  "Request could not be processed." as const;
+export const PI_INGEST_INTERNAL_FAILURE_MESSAGE = "Request could not be processed." as const;
 
 export const PI_INGEST_AUTH_OK_PIPELINE_NOT_IMPLEMENTED_MESSAGE =
   "Bridge authentication succeeded, but ingest pipeline is not enabled yet." as const;

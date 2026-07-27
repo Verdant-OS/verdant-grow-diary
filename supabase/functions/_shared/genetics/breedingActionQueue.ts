@@ -86,7 +86,7 @@ export function buildBreedingActionQueuePayloads(
       // Privacy-safe back-reference: only id, type, source, occurred_at —
       // no raw notes, no user_id, no device data, no secret-like fields.
       // Mirrors the browser copy (src/lib/genetics/breedingActionQueue.ts) so
-      // the /breeding/new production write path (create-breeding-suggestions)
+      // the /breeding/log/new production write path (create-breeding-suggestions)
       // links each follow-up back to its originating timeline event —
       // adaptActionQueueRowsToBreedingCycleTimelinePoints skips rows without it.
       originating_timeline_events: [

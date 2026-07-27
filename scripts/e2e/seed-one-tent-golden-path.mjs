@@ -12,11 +12,9 @@
  *    The seed only writes for the authenticated managed user.
  *  - Never writes an Action Queue item or a Quick Log — those must be
  *    created by the browser walk.
- *  - Never uses service_role in browser code (this script runs in Node,
- *    out-of-band; if SUPABASE_SERVICE_ROLE_KEY is provided in the shell
- *    it is used ONLY here, never referenced from the app bundle). If
- *    the service key is not provided, the script falls back to the
- *    managed user's own JWT and inserts rows under RLS as that user.
+ *  - Never uses service_role. This out-of-band script authenticates only
+ *    with the managed user's injected JWT, so normal ownership RLS remains
+ *    part of the fixture proof.
  *  - Every seeded row is tagged with the golden-path test marker in a
  *    name field so it can be recognized and reconciled on later runs
  *    without duplicating.
@@ -249,42 +247,67 @@ async function main() {
   }
 
   // ---------- Manual sensor snapshot ----------
-  // Written as source="manual" — never live. Reconciled by a golden
-  // marker in raw_payload so repeated runs update instead of duplicate.
+  // Written as source="manual" — never live. Reconciled by marker +
+  // metric so repeated runs preserve the insert-only RLS boundary and
+  // add only missing rows to the same captured snapshot.
   {
     const marker = "golden-path-manual-snapshot";
-    const { data: existing } = await supabase
+    const metricValues = [
+      {
+        metric: "temperature_c",
+        value: Math.round((FIXTURE.snapshotAirTempF - 32) * (5 / 9) * 100) / 100,
+      },
+      { metric: "humidity_pct", value: FIXTURE.snapshotHumidityPct },
+      { metric: "vpd_kpa", value: FIXTURE.snapshotVpdKpa },
+    ];
+
+    const { data: existing, error: lookupError } = await supabase
       .from("sensor_readings")
-      .select("id")
+      .select("metric,captured_at")
       .eq("user_id", userId)
       .eq("tent_id", tent.id)
       .eq("source", "manual")
       .contains("raw_payload", { golden_marker: marker })
-      .maybeSingle();
-    const payload = {
-      tent_id: tent.id,
-      plant_id: plant.id,
-      source: "manual",
-      captured_at: new Date().toISOString(),
-      confidence: "medium",
-      air_temp_f: FIXTURE.snapshotAirTempF,
-      humidity_pct: FIXTURE.snapshotHumidityPct,
-      vpd_kpa: FIXTURE.snapshotVpdKpa,
-      raw_payload: {
-        entered_by: "grower",
-        unit_system: "imperial",
-        golden_marker: marker,
-      },
-    };
-    if (existing) {
-      const upd = await supabase.from("sensor_readings").update(payload).eq("id", existing.id);
-      if (upd.error) console.log(`Manual snapshot: skipped (${upd.error.message})`);
-      else console.log("Manual snapshot: resolved");
-    } else {
-      const ins = await supabase.from("sensor_readings").insert(payload);
-      if (ins.error) console.log(`Manual snapshot: skipped (${ins.error.message})`);
-      else console.log("Manual snapshot: resolved");
+      .in(
+        "metric",
+        metricValues.map(({ metric }) => metric),
+      );
+    if (lookupError) throw new Error("manual_snapshot_lookup_failed");
+
+    const existingRows = existing ?? [];
+    const existingCapturedAt = existingRows[0]?.captured_at;
+    if (
+      existingRows.length > 0 &&
+      (!existingCapturedAt || existingRows.some((row) => row.captured_at !== existingCapturedAt))
+    ) {
+      throw new Error("manual_snapshot_marker_timestamp_mismatch");
     }
+
+    const capturedAt = existingCapturedAt ?? new Date().toISOString();
+    const existingMetrics = new Set(existingRows.map(({ metric }) => metric));
+    const missingPayloads = metricValues
+      .filter(({ metric }) => !existingMetrics.has(metric))
+      .map(({ metric, value }) => ({
+        tent_id: tent.id,
+        metric,
+        value,
+        source: "manual",
+        quality: "ok",
+        captured_at: capturedAt,
+        ts: capturedAt,
+        raw_payload: {
+          entered_by: "grower",
+          unit_system: "imperial",
+          golden_marker: marker,
+          plant_id: plant.id,
+        },
+      }));
+
+    if (missingPayloads.length > 0) {
+      const ins = await supabase.from("sensor_readings").insert(missingPayloads);
+      if (ins.error) throw new Error("manual_snapshot_insert_failed");
+    }
+    console.log("Manual snapshot: resolved");
   }
 
   console.log("Fixture ownership: verified");

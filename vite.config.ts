@@ -221,7 +221,12 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     softwareApplicationJsonLd(),
     staticSocialRouteDocuments(),
-    mcpPlugin(),
+    // @lovable.dev/mcp-js 0.24.0 externalizes its entry as `npm:C:\...`
+    // on Windows, replacing the checked-in portable Edge bundle with a
+    // machine-local import. Lovable/CI run on Linux and still regenerate the
+    // bundle there; Windows builds retain the already-verified checked-in
+    // bundle instead of corrupting it.
+    process.platform !== "win32" && mcpPlugin(),
   ].filter(Boolean),
   resolve: {
     alias: {

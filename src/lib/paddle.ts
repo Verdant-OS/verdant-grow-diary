@@ -23,15 +23,12 @@ import {
 } from "@/lib/paddleEnvironment";
 import { handlePaddleCheckoutEvent } from "@/lib/checkoutOverlaySession";
 
-const clientToken = import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN as
-  | string
-  | undefined;
+const clientToken = import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN as string | undefined;
 
 // Global `(window as any).Paddle` typing is already declared by src/pages/Upgrade.tsx
 // (loose PaddleGlobal shape). We access it via `(window as any).Paddle` here
 // to avoid conflicting declarations while calling methods not modeled there
 // (e.g. `Checkout.open({ customer, customData, settings })`).
-
 
 function currentHostname(): string | null {
   if (typeof window === "undefined") return null;
@@ -58,7 +55,6 @@ export function getPaddleEnvironment(): "sandbox" | "live" {
   return classifyPaddleToken(clientToken) === "live" ? "live" : "sandbox";
 }
 
-
 /**
  * Slice A — deterministic checkout gate. Returns `'sandbox' | 'live' |
  * 'unavailable'`. Callers MUST refuse to open checkout when the result is
@@ -81,15 +77,11 @@ export function getCheckoutUnavailableMessage(): string | null {
   if (env !== "unavailable") return null;
   // Distinguish only the loopback+live case, which has a specific
   // remediation. Every other unavailable case gets generic copy.
-  if (
-    classifyPaddleToken(clientToken) === "live" &&
-    isLoopbackHostname(currentHostname())
-  ) {
+  if (classifyPaddleToken(clientToken) === "live" && isLoopbackHostname(currentHostname())) {
     return CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE;
   }
   return CHECKOUT_UNAVAILABLE_GENERIC_MESSAGE;
 }
-
 
 let paddleInitialized = false;
 let paddleInitPromise: Promise<void> | null = null;
@@ -111,14 +103,15 @@ export class PaddleCheckoutUnavailableError extends Error {
  *
  * `reason` mirrors the sanitized error code from get-paddle-price
  * (`unknown_plan` | `price_not_configured` | `price_resolution_unavailable`
- * | `plan_sold_out`). Callers should treat unknown reasons as a generic
- * "unavailable" state.
+ * | `plan_sold_out` | `pack_requires_monthly_plan`). Callers should treat
+ * unknown reasons as a generic "unavailable" state.
  */
 export type PaddleCheckoutCatalogReason =
   | "unknown_plan"
   | "price_not_configured"
   | "price_resolution_unavailable"
-  | "plan_sold_out";
+  | "plan_sold_out"
+  | "pack_requires_monthly_plan";
 
 export class PaddleCheckoutCatalogUnavailableError extends Error {
   readonly reason: PaddleCheckoutCatalogReason;
@@ -136,11 +129,10 @@ const CATALOG_REASONS: ReadonlySet<PaddleCheckoutCatalogReason> = new Set([
   "price_not_configured",
   "price_resolution_unavailable",
   "plan_sold_out",
+  "pack_requires_monthly_plan",
 ]);
 
-export function getPaddleCheckoutCatalogMessage(
-  reason: PaddleCheckoutCatalogReason,
-): string {
+export function getPaddleCheckoutCatalogMessage(reason: PaddleCheckoutCatalogReason): string {
   switch (reason) {
     case "unknown_plan":
       return "This plan isn't available for checkout yet. Please pick another plan or check back soon.";
@@ -148,6 +140,8 @@ export function getPaddleCheckoutCatalogMessage(
       return "This plan isn't set up for checkout yet. Please pick another plan or check back soon.";
     case "plan_sold_out":
       return "This plan is sold out.";
+    case "pack_requires_monthly_plan":
+      return "Credit packs top up the monthly AI allowance that comes with a paid plan. Your current plan includes AI Doctor checks per grow instead, so a pack would have nothing to add to yet.";
     case "price_resolution_unavailable":
     default:
       return "Checkout is temporarily unavailable for this plan. Please try again in a moment or pick another plan.";
@@ -164,7 +158,7 @@ async function extractCatalogReason(
 ): Promise<PaddleCheckoutCatalogReason | null> {
   const fromData =
     data && typeof data === "object" && typeof (data as { error?: unknown }).error === "string"
-      ? ((data as { error: string }).error)
+      ? (data as { error: string }).error
       : null;
   if (fromData && CATALOG_REASONS.has(fromData as PaddleCheckoutCatalogReason)) {
     return fromData as PaddleCheckoutCatalogReason;
@@ -198,9 +192,7 @@ export async function initializePaddle(): Promise<void> {
   }
 
   paddleInitPromise = new Promise<void>((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>(
-      'script[data-paddle-loader="true"]',
-    );
+    const existing = document.querySelector<HTMLScriptElement>('script[data-paddle-loader="true"]');
     const onLoad = () => {
       try {
         const paddleJsEnv = env === "sandbox" ? "sandbox" : "production";
@@ -258,4 +250,3 @@ export async function getPaddlePriceId(priceId: string): Promise<string> {
   }
   return data.paddleId as string;
 }
-

@@ -42,9 +42,9 @@ describe("TentPlantRosterPanel", () => {
       relationshipKnown: false,
     });
     wrap(<TentPlantRosterPanel viewModel={vm} />);
-    expect(
-      screen.getByTestId("tent-plant-roster-unknown-relationship"),
-    ).toHaveTextContent("Plant-to-tent relationship is unavailable.");
+    expect(screen.getByTestId("tent-plant-roster-unknown-relationship")).toHaveTextContent(
+      "Plant-to-tent relationship is unavailable.",
+    );
   });
 
   it("renders shared environment copy and labels tent-level sensor context", () => {
@@ -54,9 +54,9 @@ describe("TentPlantRosterPanel", () => {
       tentSensorContextLabel: "Live",
     });
     wrap(<TentPlantRosterPanel viewModel={vm} />);
-    expect(
-      screen.getByTestId("tent-plant-roster-shared-environment-copy"),
-    ).toHaveTextContent("Tent environment is shared.");
+    expect(screen.getByTestId("tent-plant-roster-shared-environment-copy")).toHaveTextContent(
+      "Tent environment is shared.",
+    );
     const ctx = screen.getByTestId("tent-plant-roster-tent-sensor-context");
     expect(ctx).toHaveTextContent("Tent-level sensor context");
     expect(ctx).toHaveTextContent("Live");
@@ -65,14 +65,12 @@ describe("TentPlantRosterPanel", () => {
   it("renders Harvest Watch fallback when no public state present", () => {
     const vm = buildTentPlantRosterViewModel({
       tentId: "t1",
-      plants: [
-        { id: "p1", name: "Alpha", stage: "flower", tentId: "t1" },
-      ],
+      plants: [{ id: "p1", name: "Alpha", stage: "flower", tentId: "t1" }],
     });
     wrap(<TentPlantRosterPanel viewModel={vm} />);
-    expect(
-      screen.getByTestId("tent-plant-roster-row-p1-harvest-watch"),
-    ).toHaveTextContent("Harvest Watch available on Plant Detail");
+    expect(screen.getByTestId("tent-plant-roster-row-p1-harvest-watch")).toHaveTextContent(
+      "Harvest Watch available on Plant Detail",
+    );
   });
 
   it("renders plant name/strain/stage and Plant Detail link", () => {
@@ -91,24 +89,12 @@ describe("TentPlantRosterPanel", () => {
       ],
     });
     wrap(<TentPlantRosterPanel viewModel={vm} />);
-    expect(
-      screen.getByTestId("tent-plant-roster-row-p1-name"),
-    ).toHaveTextContent("Alpha");
-    expect(
-      screen.getByTestId("tent-plant-roster-row-p1-strain"),
-    ).toHaveTextContent("Blue Dream");
-    expect(
-      screen.getByTestId("tent-plant-roster-row-p1-stage"),
-    ).toHaveTextContent("flower");
-    expect(
-      screen.getByTestId("tent-plant-roster-row-p1-latest-log"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("tent-plant-roster-row-p1-recent-photo"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("tent-plant-roster-row-p1-link"),
-    ).toHaveAttribute("href");
+    expect(screen.getByTestId("tent-plant-roster-row-p1-name")).toHaveTextContent("Alpha");
+    expect(screen.getByTestId("tent-plant-roster-row-p1-strain")).toHaveTextContent("Blue Dream");
+    expect(screen.getByTestId("tent-plant-roster-row-p1-stage")).toHaveTextContent("flower");
+    expect(screen.getByTestId("tent-plant-roster-row-p1-latest-log")).toBeInTheDocument();
+    expect(screen.getByTestId("tent-plant-roster-row-p1-recent-photo")).toBeInTheDocument();
+    expect(screen.getByTestId("tent-plant-roster-row-p1-link")).toHaveAttribute("href");
   });
 
   it("renders provided Harvest Watch public state when safe", () => {
@@ -171,9 +157,7 @@ describe("TentPlantRosterPanel", () => {
       plants: [{ id: "p1", name: "Alpha", tentId: "t1" }],
     });
     wrap(<TentPlantRosterPanel viewModel={vm} />);
-    expect(
-      screen.queryByTestId("tent-plant-roster-row-p1-recent-photo"),
-    ).toBeNull();
+    expect(screen.queryByTestId("tent-plant-roster-row-p1-recent-photo")).toBeNull();
   });
 
   it("does not render archived toggle when no handler is provided", () => {
@@ -182,9 +166,7 @@ describe("TentPlantRosterPanel", () => {
       plants: [{ id: "p1", name: "Alpha", tentId: "t1" }],
     });
     wrap(<TentPlantRosterPanel viewModel={vm} />);
-    expect(
-      screen.queryByTestId("tent-plant-roster-show-archived-toggle"),
-    ).toBeNull();
+    expect(screen.queryByTestId("tent-plant-roster-show-archived-toggle")).toBeNull();
   });
 
   it("renders archived toggle when handler is provided and excludes archived by default", () => {
@@ -195,15 +177,8 @@ describe("TentPlantRosterPanel", () => {
         { id: "p2", name: "Beta", tentId: "t1", isArchived: true },
       ],
     });
-    wrap(
-      <TentPlantRosterPanel
-        viewModel={vm}
-        onToggleIncludeArchived={() => {}}
-      />,
-    );
-    const toggle = screen.getByTestId(
-      "tent-plant-roster-show-archived-toggle",
-    ) as HTMLInputElement;
+    wrap(<TentPlantRosterPanel viewModel={vm} onToggleIncludeArchived={() => {}} />);
+    const toggle = screen.getByTestId("tent-plant-roster-show-archived-toggle") as HTMLInputElement;
     expect(toggle).toBeInTheDocument();
     expect(toggle.checked).toBe(false);
     expect(screen.getByTestId("tent-plant-roster-row-p1")).toBeInTheDocument();
@@ -216,15 +191,8 @@ describe("TentPlantRosterPanel", () => {
       plants: [{ id: "p1", name: "Alpha", tentId: "t1" }],
     });
     const calls: boolean[] = [];
-    wrap(
-      <TentPlantRosterPanel
-        viewModel={vm}
-        onToggleIncludeArchived={(v) => calls.push(v)}
-      />,
-    );
-    const toggle = screen.getByTestId(
-      "tent-plant-roster-show-archived-toggle",
-    );
+    wrap(<TentPlantRosterPanel viewModel={vm} onToggleIncludeArchived={(v) => calls.push(v)} />);
+    const toggle = screen.getByTestId("tent-plant-roster-show-archived-toggle");
     (toggle as HTMLInputElement).click();
     expect(calls).toEqual([true]);
   });
@@ -238,44 +206,26 @@ describe("TentPlantRosterPanel", () => {
         { id: "p2", name: "Beta", tentId: "t1", isArchived: true },
       ],
     });
-    wrap(
-      <TentPlantRosterPanel
-        viewModel={vm}
-        onToggleIncludeArchived={() => {}}
-      />,
-    );
+    wrap(<TentPlantRosterPanel viewModel={vm} onToggleIncludeArchived={() => {}} />);
     expect(screen.getByTestId("tent-plant-roster-row-p2")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("tent-plant-roster-row-p2-archived"),
-    ).toHaveTextContent("Archived");
-    expect(
-      screen.queryByTestId("tent-plant-roster-row-p1-archived"),
-    ).toBeNull();
+    expect(screen.getByTestId("tent-plant-roster-row-p2-archived")).toHaveTextContent("Archived");
+    expect(screen.queryByTestId("tent-plant-roster-row-p1-archived")).toBeNull();
     // Plant Detail link still present on archived row.
-    expect(
-      screen.getByTestId("tent-plant-roster-row-p2-link"),
-    ).toHaveAttribute("href");
+    expect(screen.getByTestId("tent-plant-roster-row-p2-link")).toHaveAttribute("href");
   });
 
   it("renders empty archived hint when active is empty but archived exist", () => {
     const vm = buildTentPlantRosterViewModel({
       tentId: "t1",
-      plants: [
-        { id: "p1", name: "Alpha", tentId: "t1", isArchived: true },
-      ],
+      plants: [{ id: "p1", name: "Alpha", tentId: "t1", isArchived: true }],
     });
-    wrap(
-      <TentPlantRosterPanel
-        viewModel={vm}
-        onToggleIncludeArchived={() => {}}
-      />,
-    );
+    wrap(<TentPlantRosterPanel viewModel={vm} onToggleIncludeArchived={() => {}} />);
     expect(screen.getByTestId("tent-plant-roster-empty")).toHaveTextContent(
       "No plants assigned to this tent yet.",
     );
-    expect(
-      screen.getByTestId("tent-plant-roster-empty-archived-hint"),
-    ).toHaveTextContent("Archived plants");
+    expect(screen.getByTestId("tent-plant-roster-empty-archived-hint")).toHaveTextContent(
+      "Archived plants",
+    );
   });
 
   it("does not render empty archived hint when no archived plants exist", () => {
@@ -283,15 +233,8 @@ describe("TentPlantRosterPanel", () => {
       tentId: "t1",
       plants: [],
     });
-    wrap(
-      <TentPlantRosterPanel
-        viewModel={vm}
-        onToggleIncludeArchived={() => {}}
-      />,
-    );
-    expect(
-      screen.queryByTestId("tent-plant-roster-empty-archived-hint"),
-    ).toBeNull();
+    wrap(<TentPlantRosterPanel viewModel={vm} onToggleIncludeArchived={() => {}} />);
+    expect(screen.queryByTestId("tent-plant-roster-empty-archived-hint")).toBeNull();
   });
 
   it("renders header counts that exclude other tents and stay stable when archived hidden", () => {
@@ -331,22 +274,14 @@ describe("TentPlantRosterPanel", () => {
       plants: [{ id: "p1", name: "Alpha", tentId: "t1" }],
     });
     wrap(<TentPlantRosterPanel viewModel={vm} onToggleIncludeArchived={() => {}} />);
-    const toggle = screen.getByTestId(
-      "tent-plant-roster-show-archived-toggle",
-    ) as HTMLInputElement;
+    const toggle = screen.getByTestId("tent-plant-roster-show-archived-toggle") as HTMLInputElement;
     expect(toggle.type).toBe("checkbox");
-    expect(toggle.getAttribute("aria-label")).toBe(
-      "Show archived plants in this tent roster",
-    );
-    expect(toggle.getAttribute("aria-describedby")).toBe(
-      "tent-plant-roster-show-archived-help",
-    );
+    expect(toggle.getAttribute("aria-label")).toBe("Show archived plants in this tent roster");
+    expect(toggle.getAttribute("aria-describedby")).toBe("tent-plant-roster-show-archived-help");
     expect(toggle.className).toMatch(/focus-visible:ring/);
     const help = screen.getByTestId("tent-plant-roster-show-archived-help");
     expect(help.id).toBe("tent-plant-roster-show-archived-help");
-    expect(help).toHaveTextContent(
-      "Archived plants are hidden by default.",
-    );
+    expect(help).toHaveTextContent("Archived plants are hidden by default.");
   });
 
   it("toggle reflects checked state from the view-model", () => {
@@ -410,52 +345,64 @@ describe("TentPlantRosterPanel quick-action menu", () => {
 
   it("does not render the menu when quickActionContext is not provided", () => {
     wrap(<TentPlantRosterPanel viewModel={buildVm()} />);
-    expect(
-      screen.queryByTestId("tent-plant-roster-row-p1-actions-trigger"),
-    ).toBeNull();
+    expect(screen.queryByTestId("tent-plant-roster-row-p1-actions-trigger")).toBeNull();
   });
 
   it("renders a trigger per row with accessible label including plant name", () => {
     wrap(<TentPlantRosterPanel viewModel={buildVm()} quickActionContext={ctx} />);
-    const trigger = screen.getByTestId(
-      "tent-plant-roster-row-p1-actions-trigger",
-    );
+    const trigger = screen.getByTestId("tent-plant-roster-row-p1-actions-trigger");
     expect(trigger.tagName.toLowerCase()).toBe("summary");
     expect(trigger.getAttribute("aria-label")).toBe("Open actions for Alpha");
   });
 
   it("menu exposes View diary, Add Quick Log, View photos", () => {
     wrap(<TentPlantRosterPanel viewModel={buildVm()} quickActionContext={ctx} />);
-    expect(
-      screen.getByTestId("tent-plant-roster-row-p1-action-view-diary"),
-    ).toHaveTextContent("View diary");
-    expect(
-      screen.getByTestId("tent-plant-roster-row-p1-action-add-quicklog"),
-    ).toHaveTextContent("Add Quick Log");
-    expect(
-      screen.getByTestId("tent-plant-roster-row-p1-action-view-photos"),
-    ).toHaveTextContent("View photos");
+    expect(screen.getByTestId("tent-plant-roster-row-p1-action-view-diary")).toHaveTextContent(
+      "View diary",
+    );
+    expect(screen.getByTestId("tent-plant-roster-row-p1-action-add-quicklog")).toHaveTextContent(
+      "Add Quick Log",
+    );
+    expect(screen.getByTestId("tent-plant-roster-row-p1-action-view-photos")).toHaveTextContent(
+      "View photos",
+    );
+  });
+
+  it("renders missing-plant quick actions as disabled buttons without hrefs", () => {
+    const vm = buildVm();
+    const missingPlantContextVm = {
+      ...vm,
+      rows: [{ ...vm.rows[0], id: "" }],
+    };
+
+    wrap(<TentPlantRosterPanel viewModel={missingPlantContextVm} quickActionContext={ctx} />);
+
+    for (const testId of [
+      "tent-plant-roster-row-action-view-diary",
+      "tent-plant-roster-row-action-add-quicklog",
+      "tent-plant-roster-row-action-view-photos",
+    ]) {
+      const action = screen.getByTestId(testId);
+      expect(action.tagName).toBe("BUTTON");
+      expect(action).toBeDisabled();
+      expect(action).not.toHaveAttribute("href");
+    }
+    expect(document.querySelector('a[href="#"]')).toBeNull();
   });
 
   it("View diary anchor links to plant timeline section", () => {
     wrap(<TentPlantRosterPanel viewModel={buildVm()} quickActionContext={ctx} />);
-    const link = screen.getByTestId(
-      "tent-plant-roster-row-p1-action-view-diary",
-    );
+    const link = screen.getByTestId("tent-plant-roster-row-p1-action-view-diary");
     expect(link.getAttribute("href")).toBe("/plants/p1#plant-relative-timeline");
     expect(link.getAttribute("data-anchor-blocked")).toBeNull();
   });
 
   it("View photos points to plant-photos anchor by default and clears the blocked flag", () => {
     wrap(<TentPlantRosterPanel viewModel={buildVm()} quickActionContext={ctx} />);
-    const link = screen.getByTestId(
-      "tent-plant-roster-row-p1-action-view-photos",
-    );
+    const link = screen.getByTestId("tent-plant-roster-row-p1-action-view-photos");
     expect(link.getAttribute("href")).toBe("/plants/p1#plant-photos");
     expect(link.getAttribute("data-anchor-blocked")).toBeNull();
-    expect(
-      screen.queryByTestId("tent-plant-roster-row-p1-photos-fallback-hint"),
-    ).toBeNull();
+    expect(screen.queryByTestId("tent-plant-roster-row-p1-photos-fallback-hint")).toBeNull();
   });
 
   it("Add Quick Log dispatches verdant:open-quicklog with correct payload", () => {
@@ -466,17 +413,13 @@ describe("TentPlantRosterPanel quick-action menu", () => {
       tentId: string;
       eventType: string;
     }> = [];
-    const listener = (ev: Event) =>
-      received.push((ev as CustomEvent).detail);
+    const listener = (ev: Event) => received.push((ev as CustomEvent).detail);
     window.addEventListener("verdant:open-quicklog", listener as EventListener);
     wrap(<TentPlantRosterPanel viewModel={buildVm()} quickActionContext={ctx} />);
     (
       screen.getByTestId("tent-plant-roster-row-p1-action-add-quicklog") as HTMLButtonElement
     ).click();
-    window.removeEventListener(
-      "verdant:open-quicklog",
-      listener as EventListener,
-    );
+    window.removeEventListener("verdant:open-quicklog", listener as EventListener);
     expect(received).toHaveLength(1);
     expect(received[0].plantId).toBe("p1");
     expect(received[0].plantName).toBe("Alpha");
@@ -487,47 +430,25 @@ describe("TentPlantRosterPanel quick-action menu", () => {
 
   it("archived row still exposes quick actions", () => {
     wrap(<TentPlantRosterPanel viewModel={buildVm()} quickActionContext={ctx} />);
-    expect(
-      screen.getByTestId("tent-plant-roster-row-p2-actions-trigger"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("tent-plant-roster-row-p2-action-add-quicklog"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("tent-plant-roster-row-p2-actions-trigger")).toBeInTheDocument();
+    expect(screen.getByTestId("tent-plant-roster-row-p2-action-add-quicklog")).toBeInTheDocument();
   });
 
   it("clicks dispatch verdant:tent-roster-action with safe detail (no ids)", () => {
     const received: Array<Record<string, unknown>> = [];
     const listener = (ev: Event) =>
       received.push((ev as CustomEvent).detail as Record<string, unknown>);
-    window.addEventListener(
-      "verdant:tent-roster-action",
-      listener as EventListener,
-    );
+    window.addEventListener("verdant:tent-roster-action", listener as EventListener);
     wrap(<TentPlantRosterPanel viewModel={buildVm()} quickActionContext={ctx} />);
+    (screen.getByTestId("tent-plant-roster-row-p1-action-view-diary") as HTMLAnchorElement).click();
     (
-      screen.getByTestId(
-        "tent-plant-roster-row-p1-action-view-diary",
-      ) as HTMLAnchorElement
+      screen.getByTestId("tent-plant-roster-row-p1-action-add-quicklog") as HTMLButtonElement
     ).click();
     (
-      screen.getByTestId(
-        "tent-plant-roster-row-p1-action-add-quicklog",
-      ) as HTMLButtonElement
+      screen.getByTestId("tent-plant-roster-row-p1-action-view-photos") as HTMLAnchorElement
     ).click();
-    (
-      screen.getByTestId(
-        "tent-plant-roster-row-p1-action-view-photos",
-      ) as HTMLAnchorElement
-    ).click();
-    window.removeEventListener(
-      "verdant:tent-roster-action",
-      listener as EventListener,
-    );
-    expect(received.map((d) => d.action)).toEqual([
-      "view_diary",
-      "add_quick_log",
-      "view_photos",
-    ]);
+    window.removeEventListener("verdant:tent-roster-action", listener as EventListener);
+    expect(received.map((d) => d.action)).toEqual(["view_diary", "add_quick_log", "view_photos"]);
     for (const detail of received) {
       expect(detail).not.toHaveProperty("plantId");
       expect(detail).not.toHaveProperty("tentId");
@@ -540,21 +461,13 @@ describe("TentPlantRosterPanel quick-action menu", () => {
 
   it("Escape on the menu closes the row actions", async () => {
     wrap(<TentPlantRosterPanel viewModel={buildVm()} quickActionContext={ctx} />);
-    const details = screen.getByTestId(
-      "tent-plant-roster-row-p1-actions",
-    ) as HTMLDetailsElement;
+    const details = screen.getByTestId("tent-plant-roster-row-p1-actions") as HTMLDetailsElement;
     details.open = true;
-    const menu = screen.getByTestId(
-      "tent-plant-roster-row-p1-actions-menu",
-    );
-    menu.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
-    );
+    const menu = screen.getByTestId("tent-plant-roster-row-p1-actions-menu");
+    menu.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect(details.open).toBe(false);
   });
 });
-
-
 
 describe("TentPlantRosterPanel static safety", () => {
   const sources = [

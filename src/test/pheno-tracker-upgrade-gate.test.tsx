@@ -8,6 +8,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { resolveEntitlements } from "@/lib/entitlements/resolveEntitlements";
 import type { BillingSubscriptionRow } from "@/lib/entitlements/types";
 
@@ -58,6 +60,11 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
 }));
 
 import PhenoTrackerUpgradeGate from "@/components/PhenoTrackerUpgradeGate";
+
+const GATE_SOURCE = readFileSync(
+  resolve(process.cwd(), "src/components/PhenoTrackerUpgradeGate.tsx"),
+  "utf8",
+);
 
 const FORBIDDEN = [
   /AI picks winners/i,
@@ -152,6 +159,11 @@ describe("PhenoTrackerUpgradeGate", () => {
     expect(upgrade.getAttribute("href")).toBe(
       "/pricing?returnTo=%2Fpheno-hunts%2Fnew%3FgrowId%3Dg1%26tentId%3Dt1",
     );
+  });
+
+  it("documents the checkout-success returnTo handoff as active", () => {
+    expect(GATE_SOURCE).toMatch(/checkout success flow consumes/i);
+    expect(GATE_SOURCE).not.toMatch(/does not yet consume/i);
   });
 
   it("Pro user sees children (no gate)", () => {

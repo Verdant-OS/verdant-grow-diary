@@ -97,7 +97,7 @@ export const VERDANT_GROWER_GUIDE_FAQ: ReadonlyArray<FaqEntry> = [
   {
     question: "How do approval-required actions work?",
     answer:
-      "AI Doctor and alerts may suggest actions and drop them into an Action Queue with a reason, evidence, and risk level. Verdant does not execute them for you. The grower reviews, approves, adjusts, or rejects each item. Verdant suggests; the grower decides. Verdant cannot touch your equipment.",
+      "AI Doctor and alerts may suggest actions with a reason, evidence, and risk level. A suggestion reaches the approval-required Action Queue only when the grower chooses to add it. Verdant does not execute actions for you. The grower reviews, approves, adjusts, or rejects each item. Verdant suggests; the grower decides. Verdant cannot touch your equipment.",
   },
 ];
 
@@ -130,7 +130,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "Grower-approved decisions, never hands-off",
-        body: "Verdant suggests; the grower decides. AI Doctor can point at likely causes and cite the evidence, but every recommended action stays in an approval-required Action Queue. Verdant cannot touch your equipment.",
+        body: "Verdant suggests; the grower decides. AI Doctor can point at likely causes and cite the evidence, but a recommendation reaches the approval-required Action Queue only when the grower chooses to add it. Verdant cannot touch your equipment.",
       },
     ],
     faq: [
@@ -335,7 +335,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "Approval-required, never automatic",
-        body: "AI Doctor may suggest actions and drop them into the Action Queue. Verdant does not execute them. The grower reviews, adjusts, approves, or rejects. Verdant cannot touch your equipment.",
+        body: "AI Doctor may suggest actions. A suggestion reaches the Action Queue only when the grower chooses to add it. Verdant does not execute actions. The grower reviews, adjusts, approves, or rejects. Verdant cannot touch your equipment.",
       },
     ],
     faq: [
@@ -965,7 +965,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "A cautious response, not a panic response",
-        body: "If you confirm bud rot, remove affected buds with clean scissors, cutting well below the visible damage, and dispose of them away from the tent. Reduce humidity, improve airflow, and inspect neighboring colas the next day. Verdant's cautious AI Doctor can review your photos and sensor history and suggest a step — improve airflow, adjust dehumidifier setpoint, or increase inspection cadence — but any equipment change is grower-approved through the Action Queue. Verdant suggests; the grower decides. Verdant will never touch your dehumidifier, fans, or lights.",
+        body: "If you confirm bud rot, remove affected buds with clean scissors, cutting well below the visible damage, and dispose of them away from the tent. Reduce humidity, improve airflow, and inspect neighboring colas the next day. Verdant's cautious AI Doctor can review your photos and sensor history and suggest a step — improve airflow, adjust dehumidifier setpoint, or increase inspection cadence — but the equipment change remains the grower's decision. The suggestion reaches the approval-required Action Queue only when the grower chooses to add it. Verdant suggests; the grower decides. Verdant will never touch your dehumidifier, fans, or lights.",
         links: [
           { label: "AI Doctor readiness check", to: "/ai-doctor-readiness-check" },
           { label: "How AI Doctor works", to: "/how-ai-doctor-works" },
@@ -986,7 +986,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         question: "Can Verdant automatically prevent bud rot?",
         answer:
-          "No. Verdant does not control your dehumidifier, fans, or lights. It gives you plant memory, source-labeled sensor history, and cautious AI Doctor context so bud rot risk is visible earlier. Any equipment change or pruning decision stays with the grower through the approval-required Action Queue.",
+          "No. Verdant does not control your dehumidifier, fans, or lights. It gives you plant memory, source-labeled sensor history, and cautious AI Doctor context so bud rot risk is visible earlier. Any equipment change or pruning decision stays with the grower. If AI Doctor suggests one, it reaches the approval-required Action Queue only when the grower chooses to add it.",
       },
       {
         question: "How do I use sensor history to spot bud rot risk?",
@@ -1031,13 +1031,6 @@ export function findGuideBySlug(slug: string | undefined): SeoGuidePage | null {
 /* ------------------------------------------------------------------ */
 
 export const VERDANT_SITE_ORIGIN = "https://verdantgrowdiary.com";
-
-/**
- * Canonical public entry-point for the Customer Mode guide shell. The
- * :shareId segment is opaque and rendered as placeholder copy in this
- * shell, so a stable "guide" slug is a safe internal link target.
- */
-export const VERDANT_CUSTOMER_GUIDE_PATH = "/customer/guide";
 
 export const VERDANT_GUIDES_BREADCRUMB_ITEMS: ReadonlyArray<{
   name: string;

@@ -18,13 +18,15 @@ import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 interface PublicOneTentTourProps {
   hasAccount: boolean;
   acquisitionSource?: PaidAcquisitionSource;
+  redirectTo?: string | null;
 }
 
 export default function PublicOneTentTour({
   hasAccount,
   acquisitionSource = "landing_page",
+  redirectTo = null,
 }: PublicOneTentTourProps) {
-  const signupPath = buildAttributedSignupPath({ source: acquisitionSource });
+  const signupPath = buildAttributedSignupPath({ source: acquisitionSource, redirectTo });
   const pricingPath = buildAttributedPricingPath({ source: acquisitionSource });
   const [activeId, setActiveId] = useState<PublicOneTentTourStepId>("home");
   const activeStep = resolvePublicOneTentTourStep(activeId);

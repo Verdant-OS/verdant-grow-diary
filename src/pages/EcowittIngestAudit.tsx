@@ -35,6 +35,11 @@ interface AuditRow extends EcowittSensorReadingRow {
   quality?: string | null;
 }
 
+interface LoggedEnvironmentEvent {
+  capturedAt: string;
+  growEventId: string | null;
+}
+
 export function useEcowittAuditRows(tentId: string | null | undefined) {
   return useQuery<AuditRow[]>({
     queryKey: ["ecowitt-ingest-audit", tentId ?? "none"],
@@ -69,6 +74,13 @@ export default function EcowittIngestAudit() {
     [urlTentId, tents, userSelectedTentId],
   );
   const effectiveTentId = selection.selectedTentId;
+  const effectiveGrowId =
+    (
+      tents as Array<{
+        id: string;
+        grow_id?: string | null;
+      }>
+    ).find((tent) => tent.id === effectiveTentId)?.grow_id ?? null;
 
   // Keep the URL in sync with the resolved selection on initial load so
   // refresh + share links open the same tent. Do NOT rewrite the URL when
@@ -90,16 +102,16 @@ export default function EcowittIngestAudit() {
 
   const query = useEcowittAuditRows(effectiveTentId);
   const { save: saveQuickLog, saving: isLogging } = useQuickLogV2Save();
-  const [loggedCapturedAts, setLoggedCapturedAts] = useState<string[]>([]);
+  const [locallyLoggedEvents, setLocallyLoggedEvents] = useState<LoggedEnvironmentEvent[]>([]);
 
   // Query existing EcoWitt-validation environment events for idempotency.
-  const loggedEventsQuery = useQuery<string[]>({
+  const loggedEventsQuery = useQuery<LoggedEnvironmentEvent[]>({
     queryKey: ["ecowitt-validation-logged", effectiveTentId ?? "none"],
     enabled: !!effectiveTentId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("grow_events")
-        .select("occurred_at,note")
+        .select("id,occurred_at,note")
         .eq("tent_id", effectiveTentId!)
         .eq("event_type", "environment")
         .order("occurred_at", { ascending: false })
@@ -107,13 +119,36 @@ export default function EcowittIngestAudit() {
       if (error) throw error;
       return (data ?? [])
         .filter((r) => typeof r.note === "string" && r.note.includes("EcoWitt Environment Check"))
-        .map((r) => r.occurred_at as string);
+        .map((r) => ({
+          capturedAt: r.occurred_at as string,
+          growEventId: r.id as string,
+        }));
     },
   });
 
+  const mergedLoggedEvents = useMemo(() => {
+    const byCapturedAt = new Map<string, LoggedEnvironmentEvent>();
+    for (const event of [...(loggedEventsQuery.data ?? []), ...locallyLoggedEvents]) {
+      if (!event.capturedAt) continue;
+      const current = byCapturedAt.get(event.capturedAt);
+      if (!current || (!current.growEventId && event.growEventId)) {
+        byCapturedAt.set(event.capturedAt, event);
+      }
+    }
+    return [...byCapturedAt.values()];
+  }, [loggedEventsQuery.data, locallyLoggedEvents]);
   const mergedLogged = useMemo(
-    () => Array.from(new Set([...(loggedEventsQuery.data ?? []), ...loggedCapturedAts])),
-    [loggedEventsQuery.data, loggedCapturedAts],
+    () => mergedLoggedEvents.map((event) => event.capturedAt),
+    [mergedLoggedEvents],
+  );
+  const loggedEventIdsByCapturedAt = useMemo(
+    () =>
+      Object.fromEntries(
+        mergedLoggedEvents.flatMap((event) =>
+          event.growEventId ? [[event.capturedAt, event.growEventId] as const] : [],
+        ),
+      ),
+    [mergedLoggedEvents],
   );
 
   const vm = useMemo(
@@ -126,17 +161,26 @@ export default function EcowittIngestAudit() {
   );
 
   const handleLogEnvironmentCheck = async (draft: DiaryEnvironmentCheckDraft) => {
-    if (!draft.eligible || !draft.rpcPayload.p_target_id) return;
-    if (mergedLogged.includes(draft.occurredAt)) return;
-    setLoggedCapturedAts((prev) =>
-      prev.includes(draft.occurredAt) ? prev : [...prev, draft.occurredAt],
-    );
+    if (!draft.eligible || !draft.rpcPayload.p_target_id) {
+      return { ok: false };
+    }
+    const existing = mergedLoggedEvents.find((event) => event.capturedAt === draft.occurredAt);
+    if (existing) {
+      return { ok: true, growEventId: existing.growEventId };
+    }
     const result = await saveQuickLog(draft.rpcPayload);
     if (!result.ok) {
-      setLoggedCapturedAts((prev) => prev.filter((x) => x !== draft.occurredAt));
-      return;
+      return { ok: false };
     }
+    setLocallyLoggedEvents((current) => [
+      ...current.filter((event) => event.capturedAt !== draft.occurredAt),
+      {
+        capturedAt: draft.occurredAt,
+        growEventId: result.growEventId ?? null,
+      },
+    ]);
     void loggedEventsQuery.refetch();
+    return { ok: true, growEventId: result.growEventId ?? null };
   };
 
   return (
@@ -197,6 +241,8 @@ export default function EcowittIngestAudit() {
         isRefreshing={query.isFetching || loggedEventsQuery.isFetching}
         onLogEnvironmentCheck={handleLogEnvironmentCheck}
         isLogging={isLogging}
+        growId={effectiveGrowId}
+        loggedEventIdsByCapturedAt={loggedEventIdsByCapturedAt}
       />
 
       {query.isLoading ? (

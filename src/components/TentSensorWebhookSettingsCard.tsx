@@ -1,8 +1,6 @@
-import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Copy, Webhook } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import {
   buildSensorWebhookCurlExample,
@@ -16,31 +14,17 @@ import {
  * Surfaces:
  *  - the webhook URL
  *  - the supported `source` labels
- *  - a copy-to-clipboard cURL example using the user's current session token
+ *  - a copy-to-clipboard cURL example with an explicit bridge-token placeholder
  *
- * Presenter only — never persists the token, never writes to storage, no
- * new schema. Webhook sensor ingest is read-only. It never triggers
- * alerts, the Action Queue, AI Doctor, or any device control.
+ * Presenter only — never reads or accepts a session JWT, never persists a
+ * token, never writes to storage, no new schema. Webhook sensor ingest is
+ * read-only. It never triggers alerts, the Action Queue, AI Doctor, or any
+ * device control.
  */
 export default function TentSensorWebhookSettingsCard({ tentId }: { tentId: string }) {
   const { toast } = useToast();
-  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const webhookUrl = buildSensorWebhookUrl(import.meta.env.VITE_SUPABASE_URL);
   const sources = getSupportedWebhookSourceLabels();
-
-  useEffect(() => {
-    let cancelled = false;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!cancelled) setSessionToken(data.session?.access_token ?? null);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSessionToken(session?.access_token ?? null);
-    });
-    return () => {
-      cancelled = true;
-      sub.subscription.unsubscribe();
-    };
-  }, []);
 
   if (!webhookUrl) {
     return (
@@ -53,11 +37,9 @@ export default function TentSensorWebhookSettingsCard({ tentId }: { tentId: stri
     );
   }
 
-  // On-screen snippet ALWAYS uses a placeholder — never the live JWT (AUD-004).
   const curlSnippet = buildSensorWebhookCurlExample({
     webhookUrl,
     tentId,
-    sessionToken,
   });
 
   const copy = async (value: string, label: string) => {
@@ -69,32 +51,11 @@ export default function TentSensorWebhookSettingsCard({ tentId }: { tentId: stri
     }
   };
 
-  const copyWithLiveToken = async () => {
-    if (!sessionToken) {
-      toast({ title: "Sign in to use your session token", variant: "destructive" });
-      return;
-    }
-    const confirmed =
-      typeof window === "undefined" ||
-      window.confirm(
-        "This copies a cURL command containing your live session token. " +
-          "Session tokens are temporary and tied to this browser — do NOT paste " +
-          "into docs, screenshots, chat, or shared notes. For long-running " +
-          "Raspberry Pi / ESP32 / Node-RED clients, use a bridge token instead.\n\n" +
-          "Continue?",
-      );
-    if (!confirmed) return;
-    const withToken = buildSensorWebhookCurlExample({
-      webhookUrl,
-      tentId,
-      sessionToken,
-      revealToken: true,
-    });
-    await copy(withToken, "cURL with session token");
-  };
-
   return (
-    <div className="glass rounded-2xl p-4 space-y-4" data-testid="tent-sensor-webhook-settings-card">
+    <div
+      className="glass rounded-2xl p-4 space-y-4"
+      data-testid="tent-sensor-webhook-settings-card"
+    >
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h2 className="font-display font-semibold flex items-center gap-2">
@@ -143,9 +104,7 @@ export default function TentSensorWebhookSettingsCard({ tentId }: { tentId: stri
 
       <div>
         <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-          <div className="text-xs font-medium text-muted-foreground">
-            cURL example
-          </div>
+          <div className="text-xs font-medium text-muted-foreground">cURL example</div>
           <Button
             size="sm"
             variant="outline"
@@ -162,33 +121,15 @@ export default function TentSensorWebhookSettingsCard({ tentId }: { tentId: stri
           {curlSnippet}
         </pre>
         <p className="text-[11px] text-muted-foreground mt-2">
-          This example uses a <code className="text-[11px]">&lt;YOUR_SESSION_TOKEN&gt;</code>{" "}
-          placeholder so it&apos;s safe to screenshot or paste into docs. Session JWTs are
-          temporary and tied to this browser — never paste a live token into docs,
-          screenshots, chat, or shared notes.
+          Mint a tent-scoped token in <strong>Bridge tokens</strong>, copy it when it is shown once,
+          then replace <code className="text-[11px]">&lt;VBT_BRIDGE_TOKEN&gt;</code> in this
+          command. Store the real <code className="text-[11px]">vbt_…</code> value in your
+          client&apos;s secret configuration — never in docs, screenshots, chat, or git.
         </p>
         <p className="text-[11px] text-muted-foreground mt-1">
-          For long-running clients (Raspberry Pi, ESP32, Node-RED, Home Assistant),
-          generate a <strong>bridge token</strong> instead — it&apos;s scoped to this tent
-          and revocable.
+          App-session JWTs are not accepted by this endpoint. Bridge tokens are scoped to this tent,
+          expiring, and revocable.
         </p>
-        <div className="mt-2 min-w-0">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-auto min-h-11 min-w-0 w-full whitespace-normal px-2 text-[11px] sm:h-7 sm:min-h-7 sm:w-auto"
-            disabled={!sessionToken}
-            onClick={copyWithLiveToken}
-            data-testid="tent-sensor-webhook-copy-curl-with-token"
-            title={
-              sessionToken
-                ? "Copies a one-time cURL with your live session token. Do not share."
-                : "Sign in to enable"
-            }
-          >
-            Copy with my session token (one-time, do not share)
-          </Button>
-        </div>
       </div>
     </div>
   );

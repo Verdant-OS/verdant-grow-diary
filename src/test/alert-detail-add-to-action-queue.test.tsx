@@ -59,6 +59,16 @@ let actionQueueInsertResult: { data: unknown; error: { code?: string; message: s
   data: { id: "new-action-uuid-1", grow_id: "grow-uuid-1" },
   error: null,
 };
+let relatedActionsSelectGate: { promise: Promise<void>; resolve: () => void } | null = null;
+let relatedActionsSelectStarted = false;
+
+function makeDeferredGate(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
 
 // Capture all insert payloads across all tables.
 const inserts: Array<{ table: string; payload: unknown }> = [];
@@ -105,6 +115,7 @@ vi.mock("@/integrations/supabase/client", () => {
 
   const makeSelectChain = (table: string) => {
     let currentSource: string | null = null;
+    let selectedColumns = "";
     const resolveSelect = (): Result => {
       if (table === "action_queue") {
         const rows = currentSource
@@ -115,7 +126,10 @@ vi.mock("@/integrations/supabase/client", () => {
       return { data: [], error: null };
     };
     const chain: Record<string, unknown> = {
-      select: () => chain,
+      select: (columns?: string) => {
+        selectedColumns = columns ?? "";
+        return chain;
+      },
       eq: (col: string, val: string) => {
         if (col === "source") currentSource = val;
         return chain;
@@ -124,7 +138,18 @@ vi.mock("@/integrations/supabase/client", () => {
       like: () => chain,
       contains: () => chain,
       order: () => chain,
-      limit: () => Promise.resolve(resolveSelect()),
+      limit: () => {
+        const result = resolveSelect();
+        if (
+          table === "action_queue" &&
+          selectedColumns.includes("risk_level") &&
+          relatedActionsSelectGate
+        ) {
+          relatedActionsSelectStarted = true;
+          return relatedActionsSelectGate.promise.then(() => result);
+        }
+        return Promise.resolve(result);
+      },
       then: (resolve: (r: Result) => unknown) => resolve(resolveSelect()),
     };
     return chain;
@@ -170,6 +195,8 @@ beforeEach(() => {
   toastSuccess.mockClear();
   toastError.mockClear();
   toastWarning.mockClear();
+  relatedActionsSelectGate = null;
+  relatedActionsSelectStarted = false;
 });
 
 function renderDetail() {
@@ -238,6 +265,34 @@ describe("AlertDetail — Add to Action Queue (render-level)", () => {
       expect(related.textContent ?? "").not.toContain(
         "No queue items have been created from this alert yet.",
       );
+    });
+  });
+
+  it("keeps the optimistic related row when a pre-insert empty read resolves late", async () => {
+    const gate = makeDeferredGate();
+    relatedActionsSelectGate = gate;
+
+    renderDetail();
+    await waitFor(() => expect(relatedActionsSelectStarted).toBe(true));
+    await clickAct(await screen.findByTestId("alert-handoff-add-button"));
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
+
+    const related = screen.getByRole("region", {
+      name: "Related Action Queue Items",
+    });
+    await waitFor(() => {
+      expect(related.textContent ?? "").toContain("Related Action Queue Items 1");
+    });
+
+    await act(async () => {
+      gate.resolve();
+      await gate.promise;
+    });
+
+    await waitFor(() => {
+      expect(related.textContent ?? "").not.toContain("Loading…");
+      expect(related.textContent ?? "").toContain("Related Action Queue Items 1");
+      expect(related.textContent ?? "").toContain("pending_approval");
     });
   });
 

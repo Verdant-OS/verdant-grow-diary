@@ -1,7 +1,7 @@
 /**
  * Static guardrails for the pi-ingest bridge credential secret-resolution
- * strategy audit. Docs + static tests only — no Edge Function, no
- * resolver module, no service_role usage may appear yet.
+ * strategy. The resolver is Edge-local and server-only; client code must not
+ * receive or reconstruct usable secret material.
  */
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -13,12 +13,8 @@ import { resolve, join } from "node:path";
 import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
 installScannerGuardrail({ file: __filename });
 
-
 const ROOT = resolve(__dirname, "../..");
-const DOC = readFileSync(
-  resolve(ROOT, "docs/pi-ingest-readings-contract.md"),
-  "utf8",
-);
+const DOC = readFileSync(resolve(ROOT, "docs/pi-ingest-readings-contract.md"), "utf8");
 
 describe("pi-ingest contract — bridge secret strategy section", () => {
   it("has a Section 12 secret resolution strategy", () => {
@@ -47,21 +43,15 @@ describe("pi-ingest contract — bridge secret strategy section", () => {
       /browser\/client\s+must\s+never\s+receive\s+the\s+raw\s+bridge\s+secret/i,
     ],
     [
-      "Edge Function implementation is blocked until strategy finalized",
-      /Edge\s+Function\s+implementation\s+is\s+\*?\*?blocked\*?\*?\s+until[\s\S]{0,80}secret\s+resolution\s+strategy/i,
+      "Edge Function fails closed unless encrypted resolution is configured",
+      /Edge\s+Function\s+must\s+fail\s+closed\s+unless[\s\S]{0,80}resolution[\s\S]{0,40}configured/i,
     ],
-    [
-      "documents Option A encrypted secret",
-      /Option\s+A[\s\S]{0,40}Encrypted/i,
-    ],
+    ["documents Option A encrypted secret", /Option\s+A[\s\S]{0,40}Encrypted/i],
     [
       "documents Option B vault / server-side store",
       /Option\s+B[\s\S]{0,80}(Vault|server-side\s+secret\s+store)/i,
     ],
-    [
-      "shown once at creation if UI added",
-      /only\s+once\s+at\s+creation/i,
-    ],
+    ["shown once at creation if UI added", /only\s+once\s+at\s+creation/i],
   ])("contract documents: %s", (_l, re) => {
     expect(DOC).toMatch(re);
   });
@@ -80,16 +70,12 @@ function walkSrc(dir: string, acc: string[] = []): string[] {
 }
 
 describe("pi-ingest bridge secret — repo guardrails", () => {
-  it("no resolver module exists yet", () => {
-    expect(
-      existsSync(resolve(ROOT, "src/lib/piIngestBridgeCredentialResolver.ts")),
-    ).toBe(false);
+  it("keeps bridge credential resolution out of the client bundle", () => {
+    expect(existsSync(resolve(ROOT, "src/lib/piIngestBridgeCredentialResolver.ts"))).toBe(false);
   });
 
   it("no source file maps secret_hash to a secret field", () => {
-    const files = walkSrc(resolve(ROOT, "src")).filter((p) =>
-      /\.(ts|tsx)$/.test(p),
-    );
+    const files = walkSrc(resolve(ROOT, "src")).filter((p) => /\.(ts|tsx)$/.test(p));
     const forbidden = [
       /secret\s*:\s*[A-Za-z_.]*\.?secret_hash\b/,
       /secret\s*:\s*row\.secret_hash\b/,
@@ -105,10 +91,11 @@ describe("pi-ingest bridge secret — repo guardrails", () => {
     }
   });
 
-  it("pi-ingest-readings Edge Function, if present, is fail-closed and decryption-free", () => {
+  it("pi-ingest-readings delegates resolution and fails closed without configuration", () => {
     const fn = resolve(ROOT, "supabase/functions/pi-ingest-readings/index.ts");
-    if (!existsSync(fn)) return;
+    expect(existsSync(fn)).toBe(true);
     const src = readFileSync(fn, "utf8");
+    expect(src).toMatch(/resolveBridgeSecret/);
     expect(src).toMatch(/secret_resolver_not_implemented/);
     expect(src).not.toMatch(/crypto\.subtle\.decrypt\s*\(/);
     expect(src).not.toMatch(/\bcreateDecipheriv\s*\(/);

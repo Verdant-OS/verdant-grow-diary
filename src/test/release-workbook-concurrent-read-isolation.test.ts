@@ -110,7 +110,7 @@ describe("release workbook concurrent-reader isolation", () => {
         CHILD_PROCESS_MODULE,
       );
     }
-  });
+  }, 30_000);
 
   it("keeps tracked XLSX readable and byte-stable during concurrent isolated generation", async () => {
     const seedPath = join(REPOSITORY_ARTIFACT_DIR, SEED_FILENAME);

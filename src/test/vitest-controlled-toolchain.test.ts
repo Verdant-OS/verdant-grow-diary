@@ -13,7 +13,7 @@
  *     node/bun/vitest versions (no env dumps).
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- runner stubs use loose types for the child_process contract */
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -38,13 +38,29 @@ const WORKFLOW_PATH = path.resolve(
 );
 
 const REAL_GIT = process.env.__LOVABLE_REAL_GIT || "git";
+const GIT_INTEGRATION_TIMEOUT_MS = 15_000;
+const TEMP_ROOTS = new Set<string>();
+
+function trackedTempRoot(prefix: string): string {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  TEMP_ROOTS.add(root);
+  return root;
+}
+
+afterEach(() => {
+  for (const root of TEMP_ROOTS) {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+  TEMP_ROOTS.clear();
+});
+
 function git(root: string, ...args: string[]) {
   const r = spawnSync(REAL_GIT, ["-C", root, ...args], { encoding: "utf8" });
   if (r.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${r.stderr}`);
 }
 
 function initRepo(): { root: string; testFiles: string[] } {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vc-tc-"));
+  const root = trackedTempRoot("vc-tc-");
   fs.writeFileSync(path.join(root, ".gitignore"), ".vitest-runs/\n");
   fs.mkdirSync(path.join(root, "src"), { recursive: true });
   fs.writeFileSync(path.join(root, "src/a.test.ts"), "// a\n");
@@ -142,7 +158,7 @@ describe("discoverToolVersions", () => {
   });
 
   it("reads Vitest version from installed local package metadata", () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "vc-tv-"));
+    const tmp = trackedTempRoot("vc-tv-");
     const pkg = path.join(tmp, "package.json");
     fs.writeFileSync(pkg, JSON.stringify({ name: "vitest", version: "9.9.9-test" }));
     const tv = discoverToolVersions({
@@ -177,7 +193,7 @@ describe("toolchainMismatch", () => {
   });
 });
 
-describe("resume + rerun-failed enforcement", () => {
+describe("resume + rerun-failed enforcement", { timeout: GIT_INTEGRATION_TIMEOUT_MS }, () => {
   it("resume refuses when Node version changes", async () => {
     const { root, testFiles } = initRepo();
     const first = await runWithTv(root, testFiles);
@@ -279,7 +295,7 @@ describe("resume + rerun-failed enforcement", () => {
   });
 });
 
-describe("aggregate toolchain enforcement", () => {
+describe("aggregate toolchain enforcement", { timeout: GIT_INTEGRATION_TIMEOUT_MS }, () => {
   async function makeShardSummary(tv: typeof STUB_TV) {
     const { root, testFiles } = initRepo();
     const res = await runWithTv(root, testFiles, tv);

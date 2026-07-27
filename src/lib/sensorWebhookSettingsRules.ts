@@ -3,8 +3,8 @@
  *
  * Presenter-only support: builds the public webhook URL, an allow-listed
  * source-label table, and a copy-to-clipboard cURL example. Tokens are
- * never persisted by this module — callers pass the live session JWT in
- * at render time and we render a string. No I/O, no React, no Supabase.
+ * never accepted by this module: the example always contains an explicit
+ * bridge-token placeholder. No I/O, no React, no Supabase.
  *
  * Webhook sensor ingest is read-only. It never triggers alerts, the
  * Action Queue, AI Doctor, or any device control.
@@ -57,44 +57,24 @@ export function buildSensorWebhookUrl(supabaseUrl: string | null | undefined): s
   return `${trimmed}/functions/v1/sensor-ingest-webhook`;
 }
 
-export const SESSION_TOKEN_PLACEHOLDER = "<YOUR_SESSION_TOKEN>";
+export const BRIDGE_TOKEN_PLACEHOLDER = "<VBT_BRIDGE_TOKEN>";
 
 export interface BuildCurlExampleOptions {
   webhookUrl: string;
   tentId: string;
-  /**
-   * Live session JWT — held only in-memory by the caller. By default the
-   * helper IGNORES this value and always renders the safe placeholder so
-   * the snippet is screenshot/doc/share-safe (AUD-004). The live token is
-   * only interpolated when `revealToken: true` is explicitly passed, which
-   * the UI gates behind an explicit user click.
-   */
-  sessionToken: string | null;
-  /**
-   * Explicit opt-in to substitute the live session JWT into the snippet.
-   * Defaults to false. Never default this to true — the on-screen example
-   * must remain safe to screenshot.
-   */
-  revealToken?: boolean;
 }
 
 /**
- * Build a copy-paste cURL example. The on-screen / default snippet ALWAYS
- * uses a `<YOUR_SESSION_TOKEN>` placeholder regardless of whether a live
- * session token is available, so the panel is safe to screenshot or paste
- * into docs. The live token is only interpolated when the caller passes
- * `revealToken: true` (used behind an explicit user action — see
- * TentSensorWebhookSettingsCard).
+ * Build a copy-paste cURL example. The snippet ALWAYS uses a
+ * `<VBT_BRIDGE_TOKEN>` placeholder, so this pure helper has no path that can
+ * read, accept, or interpolate an app-session JWT.
  *
- * Session JWTs are short-lived and tied to the current browser. For
- * long-running clients (Raspberry Pi / ESP32 / Node-RED / Home Assistant),
- * prefer a bridge token instead — see TentSensorBridgeTokenCard.
+ * sensor-ingest-webhook accepts only server-minted, tent-scoped bridge
+ * tokens. Growers replace the placeholder with the vbt_ token shown once by
+ * TentBridgeTokensCard and store that secret in their client configuration.
  */
 export function buildSensorWebhookCurlExample(opts: BuildCurlExampleOptions): string {
-  const { webhookUrl, tentId, sessionToken, revealToken = false } = opts;
-  const tokenForSnippet = revealToken && sessionToken && sessionToken.length > 0
-    ? sessionToken
-    : SESSION_TOKEN_PLACEHOLDER;
+  const { webhookUrl, tentId } = opts;
   const body = {
     tent_id: tentId || "<TENT_ID>",
     source: "webhook_generic",
@@ -111,7 +91,7 @@ export function buildSensorWebhookCurlExample(opts: BuildCurlExampleOptions): st
   };
   return [
     `curl -X POST '${webhookUrl}' \\`,
-    `  -H 'Authorization: Bearer ${tokenForSnippet}' \\`,
+    `  -H 'Authorization: Bearer ${BRIDGE_TOKEN_PLACEHOLDER}' \\`,
     `  -H 'Content-Type: application/json' \\`,
     `  -d '${JSON.stringify(body)}'`,
   ].join("\n");

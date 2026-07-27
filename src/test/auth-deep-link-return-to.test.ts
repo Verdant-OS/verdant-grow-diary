@@ -130,11 +130,15 @@ describe("Return-to wiring — static safety", () => {
     expect(APP_SHELL).toMatch(/nav\(signedOutRedirect/);
   });
 
-  it("Landing forwards a validated redirectTo into its sign-in CTAs only", () => {
+  it("Landing forwards a validated redirectTo into sign-in and signup CTAs", () => {
     expect(LANDING).toMatch(/resolveKnownRouteReturnTo\(searchParams\.get\("redirectTo"\)\)/);
     expect(LANDING).toMatch(
       /const signInPath = returnTo \? `\/auth\?redirectTo=\$\{encodeURIComponent\(returnTo\)\}` : "\/auth"/,
     );
+    expect(LANDING).toMatch(
+      /buildAttributedSignupPath\(\{\s*source:\s*acquisitionSource,\s*redirectTo:\s*returnTo\s*\}\)/,
+    );
+    expect(LANDING).toMatch(/redirectTo=\{returnTo\}/);
     // Both sign-in CTAs use the computed path; no remaining bare /auth links.
     expect(LANDING).toMatch(/data-testid="landing-signin-cta-header"/);
     expect(LANDING).toMatch(/data-testid="landing-signin-cta-final"/);

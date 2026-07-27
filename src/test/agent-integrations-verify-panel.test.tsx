@@ -1,13 +1,9 @@
 /**
  * Agent Integrations — Verify-tool-access panel rendering.
  *
- * The production route mounts the page with no harness prop, and the
- * default browser harness is never usable (the browser has no safe way
- * to probe MCP without exposing tokens). The page must therefore render
- * a static "harness unavailable" status — not an interactive Verify
- * button whose only possible answer is "unavailable". With an injected
- * usable adapter (tests / future safe harness) the interactive flow
- * stays intact.
+ * BrowserConnectPanel owns production OAuth verification. The optional
+ * local harness panel is rendered only when a usable adapter is injected
+ * by a test or development host.
  */
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
@@ -24,13 +20,11 @@ function renderPage(harness?: HarnessAdapter) {
 }
 
 describe("AgentIntegrations verify panel", () => {
-  it("renders a static unavailable status (no button) with the production default harness", () => {
+  it("does not render the optional harness panel with the production default adapter", () => {
     renderPage();
-    expect(screen.queryByTestId("verify-tool-access-button")).toBeNull();
-    expect(screen.getByTestId("verify-harness-unavailable-badge")).toBeTruthy();
-    const panel = screen.getByTestId("verify-tool-access-result");
-    expect(panel.getAttribute("data-status")).toBe("harness_unavailable");
-    expect(screen.getByTestId("verify-label").textContent).toMatch(/harness unavailable/i);
+    expect(screen.getByTestId("browser-connect-panel")).toBeTruthy();
+    expect(screen.queryByTestId("verify-tool-access")).toBeNull();
+    expect(screen.queryByText(/Unavailable in this build/i)).toBeNull();
   });
 
   it("keeps the interactive verify flow when a usable harness is injected", async () => {
@@ -39,7 +33,6 @@ describe("AgentIntegrations verify panel", () => {
       probe: async () => ({ ok: true, growCount: 3 }),
     };
     renderPage(adapter);
-    expect(screen.queryByTestId("verify-harness-unavailable-badge")).toBeNull();
     const panel = screen.getByTestId("verify-tool-access-result");
     expect(panel.getAttribute("data-status")).toBe("not_checked");
     fireEvent.click(screen.getByTestId("verify-tool-access-button"));
@@ -50,8 +43,7 @@ describe("AgentIntegrations verify panel", () => {
   it("treats an available adapter without a probe as unusable", () => {
     renderPage({ available: true });
     expect(screen.queryByTestId("verify-tool-access-button")).toBeNull();
-    expect(screen.getByTestId("verify-tool-access-result").getAttribute("data-status")).toBe(
-      "harness_unavailable",
-    );
+    expect(screen.queryByTestId("verify-tool-access-result")).toBeNull();
+    expect(screen.queryByText(/Unavailable in this build/i)).toBeNull();
   });
 });

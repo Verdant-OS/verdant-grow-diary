@@ -6,19 +6,12 @@ import {
   assertEquals,
   assertStringIncludes,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import {
-  CORS_HEADERS,
-  handlePiIngestReadingsRequest,
-  type PiIngestHandlerDeps,
-} from "./index.ts";
+import { CORS_HEADERS, handlePiIngestReadingsRequest, type PiIngestHandlerDeps } from "./index.ts";
 import type {
   PiIngestBridgeCredentialLookupClient,
   PiIngestBridgeCredentialLookupResponse,
 } from "./bridgeCredentialLookup.ts";
-import {
-  buildSigningString,
-  computeHmacSha256Hex,
-} from "../_shared/lib/lib/piIngestAuthRules.ts";
+import { buildSigningString, computeHmacSha256Hex } from "../_shared/lib/lib/piIngestAuthRules.ts";
 
 const ENDPOINT = "http://localhost/functions/v1/pi-ingest-readings";
 const NOW_MS = Date.parse("2026-05-23T12:00:00Z");
@@ -62,11 +55,7 @@ function makeClient(
     from(table: string) {
       const isTents = table === "tents";
       const isIdem = table === "pi_ingest_idempotency_keys";
-      const res = isTents
-        ? tentsResponse
-        : isIdem
-        ? idempotencyResponse
-        : response;
+      const res = isTents ? tentsResponse : isIdem ? idempotencyResponse : response;
       return {
         select() {
           return {
@@ -105,13 +94,18 @@ async function defaultRow() {
   };
 }
 
-function defaultDeps(
-  client: PiIngestBridgeCredentialLookupClient,
-): PiIngestHandlerDeps {
+function defaultDeps(client: PiIngestBridgeCredentialLookupClient): PiIngestHandlerDeps {
   return {
     client,
     keyProvider: (v) => (v === 1 ? KEY_V1 : null),
     now: NOW_MS,
+    expectedBillingEnvironment: "live",
+    checkLiveSensorEntitlement: () =>
+      Promise.resolve({
+        ok: true as const,
+        effectivePlanId: "pro_monthly" as const,
+        source: "lovable_paddle_subscription" as const,
+      }),
     // Default success commit for happy-path tests. Returns
     // inserted == rows.length so per-test assertions can derive
     // expected counts deterministically.
@@ -157,9 +151,7 @@ function validEnvelopeBody(overrides: Record<string, unknown> = {}): string {
 // ---------- CORS / method ----------
 
 Deno.test("OPTIONS returns 200 with CORS headers", async () => {
-  const res = await handlePiIngestReadingsRequest(
-    new Request(ENDPOINT, { method: "OPTIONS" }),
-  );
+  const res = await handlePiIngestReadingsRequest(new Request(ENDPOINT, { method: "OPTIONS" }));
   assertEquals(res.status, 200);
   assertEquals(
     res.headers.get("Access-Control-Allow-Origin"),
@@ -170,9 +162,7 @@ Deno.test("OPTIONS returns 200 with CORS headers", async () => {
 
 for (const method of ["GET", "PUT", "DELETE", "PATCH"] as const) {
   Deno.test(`${method} returns 405 method_not_allowed`, async () => {
-    const res = await handlePiIngestReadingsRequest(
-      new Request(ENDPOINT, { method }),
-    );
+    const res = await handlePiIngestReadingsRequest(new Request(ENDPOINT, { method }));
     assertEquals(res.status, 405);
     const body = await res.json();
     assertEquals(body.error, "method_not_allowed");
@@ -474,10 +464,7 @@ Deno.test("POST tent owned by different user returns 401 unauthorized", async ()
 Deno.test("POST unknown tent returns 401 unauthorized", async () => {
   const rawBody = JSON.stringify({ tent_id: "tent-1" });
   const headers = await signedPostHeaders(rawBody);
-  const client = makeClient(
-    { data: [await defaultRow()], error: null },
-    { data: [], error: null },
-  );
+  const client = makeClient({ data: [await defaultRow()], error: null }, { data: [], error: null });
   const res = await handlePiIngestReadingsRequest(
     new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
     defaultDeps(client),
@@ -545,12 +532,178 @@ Deno.test("POST bad HMAC skips tent-owner lookup", async () => {
   await res.text();
 });
 
+// ---------- POST authoritative live-sensor entitlement gate ----------
+
+for (const accountState of ["free", "canceled"] as const) {
+  Deno.test(
+    `POST ${accountState} owner is denied before idempotency lookup or commit`,
+    async () => {
+      const rawBody = validEnvelopeBody();
+      const headers = await signedPostHeaders(rawBody);
+      const client = makeClient(
+        { data: [await defaultRow()], error: null },
+        { data: [{ user_id: "user-xyz" }], error: null },
+      );
+      let idempotencyLookups = 0;
+      let commits = 0;
+      let checkedUserId: string | null = null;
+      const deps = defaultDeps(client);
+      deps.checkLiveSensorEntitlement = (_client, userId) => {
+        checkedUserId = userId;
+        return Promise.resolve({
+          ok: false,
+          reason: "upgrade_required" as const,
+        });
+      };
+      deps.loadExistingIdempotencyKeys = () => {
+        idempotencyLookups += 1;
+        return Promise.resolve({
+          ok: true as const,
+          existingKeys: new Set<string>(),
+        });
+      };
+      deps.commitPiIngestBatch = () => {
+        commits += 1;
+        return Promise.resolve({
+          ok: true as const,
+          inserted: 1,
+          rejected: 0,
+        });
+      };
+
+      const res = await handlePiIngestReadingsRequest(
+        new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+        deps,
+      );
+
+      assertEquals(res.status, 403);
+      assertEquals(await res.json(), { error: "upgrade_required" });
+      assertEquals(checkedUserId, "user-xyz");
+      assertEquals(idempotencyLookups, 0);
+      assertEquals(commits, 0);
+    },
+  );
+}
+
+Deno.test(
+  "POST entitlement lookup failure returns generic 503 before reads or writes",
+  async () => {
+    const rawBody = validEnvelopeBody();
+    const headers = await signedPostHeaders(rawBody);
+    const client = makeClient(
+      { data: [await defaultRow()], error: null },
+      { data: [{ user_id: "user-xyz" }], error: null },
+    );
+    let idempotencyLookups = 0;
+    let commits = 0;
+    const deps = defaultDeps(client);
+    deps.checkLiveSensorEntitlement = () =>
+      Promise.resolve({
+        ok: false,
+        reason: "entitlement_lookup_failed" as const,
+      });
+    deps.loadExistingIdempotencyKeys = () => {
+      idempotencyLookups += 1;
+      return Promise.resolve({
+        ok: true as const,
+        existingKeys: new Set<string>(),
+      });
+    };
+    deps.commitPiIngestBatch = () => {
+      commits += 1;
+      return Promise.resolve({
+        ok: true as const,
+        inserted: 1,
+        rejected: 0,
+      });
+    };
+
+    const res = await handlePiIngestReadingsRequest(
+      new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+      deps,
+    );
+
+    assertEquals(res.status, 503);
+    assertEquals((await res.json()).error, "internal_failure");
+    assertEquals(idempotencyLookups, 0);
+    assertEquals(commits, 0);
+  },
+);
+
+Deno.test("POST checks live-sensor entitlement before idempotency read and commit", async () => {
+  const rawBody = validEnvelopeBody();
+  const headers = await signedPostHeaders(rawBody);
+  const client = makeClient(
+    { data: [await defaultRow()], error: null },
+    { data: [{ user_id: "user-xyz" }], error: null },
+  );
+  const calls: string[] = [];
+  const deps = defaultDeps(client);
+  deps.checkLiveSensorEntitlement = (_client, userId, environment, now) => {
+    calls.push(`entitlement:${userId}:${environment}:${now.toISOString()}`);
+    return Promise.resolve({
+      ok: true as const,
+      effectivePlanId: "founder_lifetime" as const,
+      source: "lovable_paddle_lifetime" as const,
+    });
+  };
+  deps.loadExistingIdempotencyKeys = () => {
+    calls.push("idempotency");
+    return Promise.resolve({
+      ok: true as const,
+      existingKeys: new Set<string>(),
+    });
+  };
+  deps.commitPiIngestBatch = () => {
+    calls.push("commit");
+    return Promise.resolve({
+      ok: true as const,
+      inserted: 1,
+      rejected: 0,
+    });
+  };
+
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    deps,
+  );
+
+  assertEquals(res.status, 200);
+  assertEquals(calls, [`entitlement:user-xyz:live:${NOW_ISO}`, "idempotency", "commit"]);
+});
+
+Deno.test("POST bad HMAC never reveals or checks billing state", async () => {
+  const rawBody = validEnvelopeBody();
+  const headers = {
+    "Content-Type": "application/json",
+    "x-bridge-id": "bridge-abc",
+    "x-bridge-signature": "00".repeat(32),
+    "x-bridge-timestamp": NOW_ISO,
+  };
+  const deps = defaultDeps(makeClient({ data: [await defaultRow()], error: null }));
+  let entitlementChecks = 0;
+  deps.checkLiveSensorEntitlement = () => {
+    entitlementChecks += 1;
+    return Promise.resolve({
+      ok: false,
+      reason: "upgrade_required" as const,
+    });
+  };
+
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    deps,
+  );
+
+  assertEquals(res.status, 401);
+  assertEquals((await res.json()).error, "unauthorized");
+  assertEquals(entitlementChecks, 0);
+});
+
 // ---------- Source guardrails ----------
 
 function stripComments(s: string): string {
-  return s
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  return s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 }
 
 Deno.test("index.ts has no decryption / direct env reads / DB writes", async () => {
@@ -783,7 +936,7 @@ Deno.test("index.ts wires normalization after validation", async () => {
 
 // ---------- Commit-plan preview wiring ----------
 
-Deno.test("POST multi-reading batch returns 200 success with all rows", async () => {
+Deno.test("POST temperature + humidity commits a derived VPD row", async () => {
   const res = await postEnvelope({
     readings: [
       { metric: "temperature_c", value: 22.5, unit: "C" },
@@ -794,7 +947,7 @@ Deno.test("POST multi-reading batch returns 200 success with all rows", async ()
   assertEquals(res.status, 200);
   const body = await res.json();
   assertEquals(body.ok, true);
-  assertEquals(body.inserted, 3);
+  assertEquals(body.inserted, 4);
   assertEquals(body.rejected, 0);
 });
 
@@ -865,10 +1018,7 @@ type LookupCall = {
   candidateKeys: readonly string[];
 };
 
-function makeLookup(
-  result: PiIngestIdempotencyLookupResult | Error,
-  calls: LookupCall[] = [],
-) {
+function makeLookup(result: PiIngestIdempotencyLookupResult | Error, calls: LookupCall[] = []) {
   const fn = (
     _client: PiIngestIdempotencyLookupClient,
     input: { bridgeId: string; candidateKeys: readonly string[] },
@@ -893,7 +1043,7 @@ function depsWith(
   };
 }
 
-Deno.test("valid planned request calls idempotency lookup with derived keys", async () => {
+Deno.test("valid planned request looks up one key per normalized row", async () => {
   const rawBody = validEnvelopeBody({
     readings: [
       { metric: "temperature_c", value: 22.5, unit: "C" },
@@ -914,7 +1064,9 @@ Deno.test("valid planned request calls idempotency lookup with derived keys", as
   assertEquals((await res.json()).ok, true);
   assertEquals(lookup.calls.length, 1);
   assertEquals(lookup.calls[0].bridgeId, "bridge-abc");
-  assertEquals(lookup.calls[0].candidateKeys.length, 2);
+  assertEquals(lookup.calls[0].candidateKeys.length, 3);
+  assertEquals(new Set(lookup.calls[0].candidateKeys).size, 3);
+  assert(lookup.calls[0].candidateKeys.some((key) => key.includes(":vpd_kpa:")));
   for (const k of lookup.calls[0].candidateKeys) {
     assertEquals(typeof k, "string");
     assert(k.length > 0);
@@ -1024,10 +1176,10 @@ Deno.test("all candidate keys existing → 200 inserted=0 rejected=duplicates", 
   const body = await res.json();
   assertEquals(body.ok, true);
   assertEquals(body.inserted, 0);
-  assertEquals(body.rejected, 2);
+  assertEquals(body.rejected, 3);
 });
 
-Deno.test("partial duplicate keys → 200 inserted=2 rejected=1", async () => {
+Deno.test("partial duplicate keys → 200 inserted=3 rejected=1", async () => {
   const rawBody = validEnvelopeBody({
     readings: [
       { metric: "temperature_c", value: 22.5, unit: "C" },
@@ -1043,10 +1195,7 @@ Deno.test("partial duplicate keys → 200 inserted=2 rejected=1", async () => {
   const captured: LookupCall[] = [];
   await handlePiIngestReadingsRequest(
     new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
-    depsWith(
-      client,
-      makeLookup({ ok: true, existingKeys: new Set<string>() }, captured),
-    ),
+    depsWith(client, makeLookup({ ok: true, existingKeys: new Set<string>() }, captured)),
   );
   const partial = new Set<string>([captured[0].candidateKeys[0]]);
   const lookup = makeLookup({ ok: true, existingKeys: partial });
@@ -1057,7 +1206,7 @@ Deno.test("partial duplicate keys → 200 inserted=2 rejected=1", async () => {
   assertEquals(res.status, 200);
   const body = await res.json();
   assertEquals(body.ok, true);
-  assertEquals(body.inserted, 2);
+  assertEquals(body.inserted, 3);
   assertEquals(body.rejected, 1);
 });
 
@@ -1136,24 +1285,27 @@ Deno.test("idempotency lookup skipped when envelope validation fails", async () 
   await res.text();
 });
 
-Deno.test("idempotency lookup skipped when normalization-eligible payload is rejected by validator", async () => {
-  const rawBody = validEnvelopeBody({
-    readings: [{ metric: "temperature_c", value: 22, unit: "kPa" }],
-  });
-  const headers = await signedPostHeaders(rawBody);
-  const client = makeClient(
-    { data: [await defaultRow()], error: null },
-    { data: [{ user_id: "user-xyz" }], error: null },
-  );
-  const lookup = makeLookup({ ok: true, existingKeys: new Set<string>() });
-  const res = await handlePiIngestReadingsRequest(
-    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
-    depsWith(client, lookup),
-  );
-  assertEquals(res.status, 400);
-  assertEquals(lookup.calls.length, 0);
-  await res.text();
-});
+Deno.test(
+  "idempotency lookup skipped when normalization-eligible payload is rejected by validator",
+  async () => {
+    const rawBody = validEnvelopeBody({
+      readings: [{ metric: "temperature_c", value: 22, unit: "kPa" }],
+    });
+    const headers = await signedPostHeaders(rawBody);
+    const client = makeClient(
+      { data: [await defaultRow()], error: null },
+      { data: [{ user_id: "user-xyz" }], error: null },
+    );
+    const lookup = makeLookup({ ok: true, existingKeys: new Set<string>() });
+    const res = await handlePiIngestReadingsRequest(
+      new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+      depsWith(client, lookup),
+    );
+    assertEquals(res.status, 400);
+    assertEquals(lookup.calls.length, 0);
+    await res.text();
+  },
+);
 
 Deno.test("idempotency lookup skipped when intra-batch duplicate readings present", async () => {
   const dup = { metric: "temperature_c", value: 22.5, unit: "C" } as const;
@@ -1173,50 +1325,50 @@ Deno.test("idempotency lookup skipped when intra-batch duplicate readings presen
   await res.text();
 });
 
-Deno.test("planned response never includes idempotency keys, duplicate count, or planned rows", async () => {
-  const rawBody = validEnvelopeBody({
-    readings: [
-      { metric: "temperature_c", value: 22.5, unit: "C" },
-      { metric: "humidity_pct", value: 55, unit: "%" },
-    ],
-  });
-  const headers = await signedPostHeaders(rawBody);
-  const client = makeClient(
-    { data: [await defaultRow()], error: null },
-    { data: [{ user_id: "user-xyz" }], error: null },
-  );
-  const captured: LookupCall[] = [];
-  await handlePiIngestReadingsRequest(
-    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
-    depsWith(
-      client,
-      makeLookup({ ok: true, existingKeys: new Set<string>() }, captured),
-    ),
-  );
-  const partial = new Set<string>([captured[0].candidateKeys[0]]);
-  const lookup = makeLookup({ ok: true, existingKeys: partial });
-  const res = await handlePiIngestReadingsRequest(
-    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
-    depsWith(client, lookup),
-  );
-  const text = await res.text();
-  for (const k of captured[0].candidateKeys) {
-    assert(!text.includes(k), `response leaked idempotency key: ${k}`);
-  }
-  for (const forbidden of [
-    "idempotency_key",
-    "idempotencyKey",
-    "existingKeys",
-    "existing_keys",
-    "duplicate_count",
-    "duplicateCount",
-    "planned_rows",
-    "plannedRows",
-    "readingDrafts",
-    "reading_drafts",
-    "22.5",
-    "55",
-  ]) {
-    assert(!text.includes(forbidden), `response leaked: ${forbidden}`);
-  }
-});
+Deno.test(
+  "planned response never includes idempotency keys, duplicate count, or planned rows",
+  async () => {
+    const rawBody = validEnvelopeBody({
+      readings: [
+        { metric: "temperature_c", value: 22.5, unit: "C" },
+        { metric: "humidity_pct", value: 55, unit: "%" },
+      ],
+    });
+    const headers = await signedPostHeaders(rawBody);
+    const client = makeClient(
+      { data: [await defaultRow()], error: null },
+      { data: [{ user_id: "user-xyz" }], error: null },
+    );
+    const captured: LookupCall[] = [];
+    await handlePiIngestReadingsRequest(
+      new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+      depsWith(client, makeLookup({ ok: true, existingKeys: new Set<string>() }, captured)),
+    );
+    const partial = new Set<string>([captured[0].candidateKeys[0]]);
+    const lookup = makeLookup({ ok: true, existingKeys: partial });
+    const res = await handlePiIngestReadingsRequest(
+      new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+      depsWith(client, lookup),
+    );
+    const text = await res.text();
+    for (const k of captured[0].candidateKeys) {
+      assert(!text.includes(k), `response leaked idempotency key: ${k}`);
+    }
+    for (const forbidden of [
+      "idempotency_key",
+      "idempotencyKey",
+      "existingKeys",
+      "existing_keys",
+      "duplicate_count",
+      "duplicateCount",
+      "planned_rows",
+      "plannedRows",
+      "readingDrafts",
+      "reading_drafts",
+      "22.5",
+      "55",
+    ]) {
+      assert(!text.includes(forbidden), `response leaked: ${forbidden}`);
+    }
+  },
+);

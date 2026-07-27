@@ -25,9 +25,7 @@ const SRC = readFileSync(
   resolve(process.cwd(), "supabase/functions/get-paddle-price/index.ts"),
   "utf8",
 );
-const stripped = SRC
-  .replace(/\/\*[\s\S]*?\*\//g, "")
-  .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+const stripped = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 
 // Every logCatalogUnavailable({...}) call site, argument body captured.
 const CALL_SITES = [...stripped.matchAll(/logCatalogUnavailable\(\{([\s\S]*?)\}\)/g)].map(
@@ -101,6 +99,7 @@ describe("get-paddle-price — telemetry fires on every fail-closed branch", () 
       "method",
       "auth",
       "allowlist",
+      "entitlement",
       "founder_cap",
       "gateway",
       "gateway_body",
@@ -108,9 +107,7 @@ describe("get-paddle-price — telemetry fires on every fail-closed branch", () 
       "exception",
     ];
     for (const stage of stages) {
-      const hit = CALL_SITES.some((body) =>
-        new RegExp(`stage:\\s*["']${stage}["']`).test(body),
-      );
+      const hit = CALL_SITES.some((body) => new RegExp(`stage:\\s*["']${stage}["']`).test(body));
       expect(hit, `no logCatalogUnavailable call site with stage=${stage}`).toBe(true);
     }
   });
@@ -124,6 +121,7 @@ describe("get-paddle-price — telemetry fires on every fail-closed branch", () 
       "auth_required",
       "method_not_allowed",
       "internal_error",
+      "pack_requires_monthly_plan",
     ]);
     const reasons = CALL_SITES.flatMap((body) =>
       [...body.matchAll(/reason:\s*["']([^"']+)["']/g)].map((m) => m[1]),
@@ -166,9 +164,7 @@ describe("get-paddle-price — reason codes never leak into HTTP responses", () 
     for (const body of responses) {
       const keys = [...body.matchAll(/([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g)].map((m) => m[1]);
       const nonError = keys.filter((k) => k !== "error" && k !== "paddleId");
-      expect(nonError, `HTTP response leaks non-error field(s): ${nonError.join(",")}`).toEqual(
-        [],
-      );
+      expect(nonError, `HTTP response leaks non-error field(s): ${nonError.join(",")}`).toEqual([]);
     }
   });
 

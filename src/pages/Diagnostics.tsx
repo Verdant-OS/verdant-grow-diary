@@ -181,9 +181,8 @@ export default function Diagnostics() {
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">Connection diagnostics</h1>
         <p className="text-sm text-muted-foreground">
-          Operator-only. Verifies env vars, auth session, RLS-scoped reads, and a safe
-          insert/delete round-trip against your own data. No operator secrets or raw payloads
-          are shown.
+          Operator-only. Verifies env vars, auth session, RLS-scoped reads, and a safe insert/delete
+          round-trip against your own data. No operator secrets or raw payloads are shown.
         </p>
       </header>
 
@@ -192,11 +191,6 @@ export default function Diagnostics() {
       <ResourceHealthPanel />
 
       <LocalDataHealthPanel />
-
-
-
-
-
 
       <Button onClick={runAll} disabled={running}>
         {running ? "Running…" : "Run checks"}
@@ -274,12 +268,11 @@ export default function Diagnostics() {
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-2">
             <p>
-              Guided run sheet: Manual Snapshot → Alert → Action Queue → Completed
-              Follow-up → Timeline. No fake live data, no auto-actions, no device
-              control.
+              Guided run sheet: Manual Snapshot → Alert → Action Queue → Completed Follow-up →
+              Timeline. No fake live data, no auto-actions, no device control.
             </p>
             <Button asChild variant="outline" size="sm">
-              <Link to="/demo/one-tent-live-proof">Open proof path</Link>
+              <Link to="/operator/one-tent-live-proof">Open proof path</Link>
             </Button>
           </CardContent>
         </Card>
@@ -357,9 +350,8 @@ export default function Diagnostics() {
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-2">
             <p>
-              Side-by-side context view for 2–4 plants using labeled demo
-              fixture data. No live data, no AI, no save, no share, no
-              ranking — the grower decides.
+              Side-by-side context view for 2–4 plants using labeled demo fixture data. No live
+              data, no AI, no save, no share, no ranking — the grower decides.
             </p>
             <Button asChild variant="outline" size="sm">
               <Link
@@ -372,7 +364,6 @@ export default function Diagnostics() {
           </CardContent>
         </Card>
       </section>
-
     </div>
   );
 }

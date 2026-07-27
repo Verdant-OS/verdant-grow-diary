@@ -251,9 +251,9 @@ describe("ActionDetail — follow-up wiring (static)", () => {
   });
 
   it("only triggers follow-up creation when transitioning to completed", () => {
-    // The transition() function gates the call on new_status === "completed".
+    // The transition() function gates the call on the validated RPC status.
     expect(ACTION_DETAIL).toMatch(
-      /if \(new_status === "completed"\)\s*\{\s*await maybeCreateFollowupDiaryEntry/,
+      /if \(result\.new_status === "completed"\)\s*\{\s*await maybeCreateFollowupDiaryEntry/,
     );
     // There is exactly one call site for the helper.
     const calls = ACTION_DETAIL.match(/maybeCreateFollowupDiaryEntry\(/g) ?? [];
@@ -288,9 +288,10 @@ describe("ActionDetail — follow-up wiring (static)", () => {
     expect(ACTION_DETAIL).not.toMatch(/maybeCreateFollowupDiaryEntry[\s\S]{0,400}rollback/i);
   });
 
-  it("preserves existing action_queue_events audit insert path", () => {
-    expect(ACTION_DETAIL).toMatch(/\.from\("action_queue_events"\)\.insert\(/);
-    expect(ACTION_DETAIL).toMatch(/await logEvent\(current, event_type, new_status, note\)/);
+  it("uses the atomic transition-and-audit RPC", () => {
+    expect(ACTION_DETAIL).toMatch(/supabase\.rpc\(\s*"action_queue_transition"/);
+    expect(ACTION_DETAIL).toMatch(/parseActionQueueTransitionRpcResult\(data,\s*rpcArgs\)/);
+    expect(ACTION_DETAIL).not.toMatch(/\.from\("action_queue_events"\)\.insert\(/);
   });
 
   it("does NOT mutate alerts when completing an action", () => {

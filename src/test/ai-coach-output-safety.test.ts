@@ -27,9 +27,7 @@ import { resolve } from "node:path";
 
 const SOURCE_PATH = resolve(__dirname, "../../supabase/functions/ai-coach/index.ts");
 const SOURCE = readFileSync(SOURCE_PATH, "utf8");
-const CODE = SOURCE
-  .replace(/\/\*[\s\S]*?\*\//g, "")
-  .replace(/(^|[^:])\/\/.*$/gm, "$1");
+const CODE = SOURCE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 
 // Extract the EMPTY_ANALYSIS literal block as text so we can introspect it
 // without importing Deno-only code.
@@ -119,7 +117,13 @@ describe("ai-coach — output safety contract", () => {
 
   it("5. prompt does not recommend blind autopilot / unsupervised automation", () => {
     const lower = SYSTEM.toLowerCase();
-    for (const banned of ["autopilot", "auto-pilot", "automate everything", "auto execute", "auto-execute"]) {
+    for (const banned of [
+      "autopilot",
+      "auto-pilot",
+      "automate everything",
+      "auto execute",
+      "auto-execute",
+    ]) {
       expect(lower, `system prompt must not encourage "${banned}"`).not.toContain(banned);
     }
     // Prompt explicitly prefers safe, reversible steps when context is thin.
@@ -151,7 +155,9 @@ describe("ai-coach — output safety contract", () => {
     // EMPTY_ANALYSIS summary uses cautious framing (asks for more data, no diagnosis).
     expect(EMPTY_BLOCK).toMatch(/summary:\s*["'][^"']*log[\s\S]*?diagnosis/i);
     // EMPTY recommended_actions are observational, not interventionist.
-    expect(EMPTY_BLOCK.toLowerCase()).not.toMatch(/\b(flush|defoliate|top|prune|increase nutrients|raise ec)\b/);
+    expect(EMPTY_BLOCK.toLowerCase()).not.toMatch(
+      /\b(flush|defoliate|top|prune|increase nutrients|raise ec)\b/,
+    );
   });
 
   it("8. no self-contradiction: 'healthy' + 'high risk' cannot co-occur in canned output", () => {
@@ -170,7 +176,7 @@ describe("ai-coach — output safety contract", () => {
     // short-circuits to EMPTY_ANALYSIS before any AI call.
     expect(CODE).toMatch(/const\s+empty\s*=\s*!grow\s*\|\|\s*entries\.length\s*===\s*0/);
     expect(CODE).toMatch(
-      /if\s*\(\s*empty\s*&&\s*!body\.photoUrl\s*\)[\s\S]{0,200}return\s+json\(\s*\{\s*analysis:\s*EMPTY_ANALYSIS/,
+      /if\s*\(\s*empty\s*&&\s*!body\.photoUrl\s*\)[\s\S]{0,400}return\s+safeOk\(\s*\{\s*analysis:\s*EMPTY_ANALYSIS/,
     );
     // Ordering: empty short-circuit happens BEFORE the AI gateway fetch.
     const emptyIdx = CODE.search(/if\s*\(\s*empty\s*&&\s*!body\.photoUrl/);

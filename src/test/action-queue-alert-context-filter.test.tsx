@@ -186,9 +186,9 @@ beforeEach(() => {
 });
 
 function visibleRowIds(): string[] {
-  return Array.from(
-    document.querySelectorAll('[data-testid="action-queue-row"]'),
-  ).map((el) => el.getAttribute("data-action-id") ?? "");
+  return Array.from(document.querySelectorAll('[data-testid="action-queue-row"]')).map(
+    (el) => el.getAttribute("data-action-id") ?? "",
+  );
 }
 
 // --- Pure helpers -----------------------------------------------------------
@@ -278,18 +278,14 @@ describe("ActionQueue — client-side ?alert filter", () => {
 
   it("renders 'No actions linked to this alert yet.' title when no rows match", async () => {
     renderAt("/actions?alert=unknown-alert");
-    const title = await screen.findByTestId(
-      "action-queue-alert-context-empty-title",
-    );
+    const title = await screen.findByTestId("action-queue-alert-context-empty-title");
     expect(title.textContent).toBe("No actions linked to this alert yet.");
     expect(visibleRowIds()).toEqual([]);
   });
 
   it("renders helper text under the alert-filtered empty state", async () => {
     renderAt("/actions?alert=unknown-alert");
-    const help = await screen.findByTestId(
-      "action-queue-alert-context-empty-help",
-    );
+    const help = await screen.findByTestId("action-queue-alert-context-empty-help");
     expect(help.textContent).toBe(
       "Review the alert detail and add a suggested action when appropriate.",
     );
@@ -297,17 +293,13 @@ describe("ActionQueue — client-side ?alert filter", () => {
 
   it("alert-filtered empty state includes a 'Back to alert' link", async () => {
     renderAt("/actions?alert=unknown-alert");
-    const back = await screen.findByTestId(
-      "action-queue-alert-context-empty-back-link",
-    );
+    const back = await screen.findByTestId("action-queue-alert-context-empty-back-link");
     expect(back.getAttribute("href")).toBe("/alerts/unknown-alert");
   });
 
   it("chip-area 'Back to alert' link also renders when no matching actions exist", async () => {
     renderAt("/actions?alert=unknown-alert");
-    const back = await screen.findByTestId(
-      "action-queue-alert-context-back-link",
-    );
+    const back = await screen.findByTestId("action-queue-alert-context-back-link");
     expect(back.getAttribute("href")).toBe("/alerts/unknown-alert");
     expect(back.textContent).toContain("Back to alert");
     // No raw token leakage in the chip-area back link.
@@ -318,9 +310,7 @@ describe("ActionQueue — client-side ?alert filter", () => {
   it("invalid/unsafe alert param does not render the chip-area 'Back to alert' link", async () => {
     renderAt("/actions?alert=%5Balert%3Afoo%5D");
     await waitFor(() => expect(visibleRowIds().length).toBe(4));
-    expect(
-      screen.queryByTestId("action-queue-alert-context-back-link"),
-    ).toBeNull();
+    expect(screen.queryByTestId("action-queue-alert-context-back-link")).toBeNull();
   });
 
   it("invalid/unsafe alert param does not show the alert-filtered empty state", async () => {
@@ -329,7 +319,6 @@ describe("ActionQueue — client-side ?alert filter", () => {
     expect(screen.queryByTestId("action-queue-alert-context-empty")).toBeNull();
   });
 
-
   it("does not render the alert-empty state when ?alert is absent", async () => {
     renderAt("/actions");
     await waitFor(() => expect(visibleRowIds().length).toBe(4));
@@ -337,9 +326,7 @@ describe("ActionQueue — client-side ?alert filter", () => {
   });
 
   it("Clear alert filter restores all rows and preserves focus/growId/page/q", async () => {
-    renderAt(
-      "/actions?alert=alert-xyz&focus=aq-alert-1&growId=g1&page=2&view=card",
-    );
+    renderAt("/actions?alert=alert-xyz&focus=aq-alert-1&growId=g1&page=2&view=card");
     await waitFor(() => expect(visibleRowIds().length).toBe(2));
 
     fireEvent.click(screen.getByTestId("action-queue-clear-alert-context"));
@@ -402,10 +389,7 @@ describe("ActionQueue — client-side ?alert filter", () => {
 });
 
 // --- Static safety scan ------------------------------------------------------
-const PAGE = readFileSync(
-  resolve(__dirname, "../..", "src/pages/ActionQueue.tsx"),
-  "utf8",
-);
+const PAGE = readFileSync(resolve(__dirname, "../..", "src/pages/ActionQueue.tsx"), "utf8");
 const HELPER = readFileSync(
   resolve(__dirname, "../..", "src/lib/actionQueueAlertContextFilter.ts"),
   "utf8",
@@ -430,9 +414,12 @@ describe("alert-context filter — safety scan", () => {
     }
   });
 
-  it("page has no action_queue or alerts insert/update/delete/upsert paths added", () => {
+  it("page has no creation/deletion paths or non-transition RPCs added", () => {
     expect(PAGE).not.toMatch(/\.upsert\(/);
-    expect(PAGE).not.toMatch(/\.rpc\(/);
+    const rpcNames = [...PAGE.matchAll(/supabase\.rpc\(\s*["']([^"']+)["']/g)].map(
+      (match) => match[1],
+    );
+    expect(rpcNames).toEqual(["action_queue_transition"]);
     expect(PAGE).not.toMatch(
       /from\(["']action_queue["']\)[\s\S]{0,200}?\.(insert|delete|upsert)\(/,
     );

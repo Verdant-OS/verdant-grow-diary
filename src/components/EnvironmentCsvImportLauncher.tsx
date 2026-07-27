@@ -7,8 +7,9 @@
  *  - Opens the existing EnvironmentCsvImportModal.
  *  - On Confirm, delegates to the existing persistCsvEnvironmentRows
  *    adapter and forces source = "csv" on every row.
- *  - After success, invalidates timeline/sensor caches and fires
- *    `verdant:csv-imported` so timeline context refreshes in place.
+ *  - After any committed rows (including a partial multi-batch import),
+ *    invalidates timeline/sensor caches and fires `verdant:csv-imported`
+ *    so persisted history is never hidden behind stale client caches.
  *
  * Hard constraints:
  *  - No alert creation. No queued device actions. No scheduler/automation.
@@ -151,6 +152,17 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
         },
         client,
       );
+      // A later batch can fail after earlier atomic batches committed.
+      // Refresh read surfaces whenever any rows were persisted, while
+      // keeping completion analytics/toasts exclusive to full success.
+      if (res.insertedCount > 0) {
+        qc.invalidateQueries({ queryKey: ["grow", "sensors"] });
+        qc.invalidateQueries({ queryKey: ["sensor_readings"] });
+        qc.invalidateQueries({ queryKey: ["csv-timeline-context"] });
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("verdant:csv-imported"));
+        }
+      }
       if (!res.error) {
         const description =
           res.duplicateCount > 0
@@ -158,12 +170,6 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
             : `${res.insertedCount} reading(s) added as CSV context.`;
         toast({ title: "CSV history imported", description });
         trackFunnelEvent("csv_import_completed", { rows: res.insertedCount });
-        qc.invalidateQueries({ queryKey: ["grow", "sensors"] });
-        qc.invalidateQueries({ queryKey: ["sensor_readings"] });
-        qc.invalidateQueries({ queryKey: ["csv-timeline-context"] });
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("verdant:csv-imported"));
-        }
       }
       return res;
     },

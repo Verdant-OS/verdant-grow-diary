@@ -5,7 +5,7 @@ import { test, expect, type Page, type Request } from "@playwright/test";
  * surface.
  *
  * Verifies (mobile/tablet/desktop):
- *  - The read-only preview renders with its disclaimer, six-source legend,
+ *  - The read-only preview renders its demo disclaimer, six-source legend,
  *    comparability verdict, and candidate cards.
  *  - A full browser reload re-renders the same surface.
  *  - Zero interactive write controls (no button/form/input/select/textarea).
@@ -37,67 +37,30 @@ const VIEWPORTS = [
   { name: "desktop-1024", width: 1024, height: 800 },
 ];
 
+const SOURCE_KEYS = ["live", "manual", "csv", "demo", "stale", "invalid"] as const;
+
 async function assertReadOnlySurface(page: Page) {
   const region = page.getByTestId("pheno-comparison-page");
   await expect(region).toBeVisible();
-  await expect(page.getByTestId("pheno-comparison-readonly-badge")).toContainText(/read-only/i);
-  await expect(page.getByTestId("pheno-comparison-demo-banner")).toContainText(
-    /not real telemetry/i,
+  await expect(page.getByTestId("pheno-comparison-read-only-badge")).toContainText(
+    /read-only preview/i,
   );
-  await expect(page.getByTestId("pheno-comparison-source-legend")).toBeVisible();
-  await expect(page.getByTestId("pheno-comparability-verdict")).toBeVisible();
-  // Six canonical source labels present.
-  for (const key of ["live", "manual", "csv", "demo", "stale", "invalid"]) {
-    await expect(page.getByTestId(`pheno-source-legend-${key}`)).toBeVisible();
+  await expect(page.getByTestId("pheno-comparison-demo-banner")).toContainText(
+    /demo comparison data.*not live sensor data/i,
+  );
+  await expect(page.getByTestId("pheno-comparison-comparability-verdict")).not.toBeEmpty();
+
+  const legend = page.getByTestId("pheno-comparison-source-legend");
+  await expect(legend).toBeVisible();
+  for (const source of SOURCE_KEYS) {
+    await expect(legend.getByTestId(`legend-${source}`)).toBeVisible();
   }
-  // At least two candidate cards render side-by-side.
-  const cards = region.locator("[data-testid^='pheno-comparison-candidate-']");
-  expect(await cards.count()).toBeGreaterThanOrEqual(2);
-}
 
-/**
- * ACTIVE trunk safety fence — runs while the structure spec below stays
- * test.fixme pending "Reconcile imported Pheno Comparison v0 surface".
- * Pins only invariants the TRUNK page actually provides (verified against
- * src/components/PhenoComparisonView.tsx): the page region + h1 + read-only
- * status render, demo candidate sections exist, a reload re-renders, there
- * are zero write controls, no forbidden data-plane hosts are contacted, and
- * no uncaught page errors fire. A regression that makes /pheno-comparison
- * writable or network-active fails HERE even with the fixme block skipped.
- */
-test("/pheno-comparison trunk safety fence: read-only render, zero write surfaces, no forbidden hosts", async ({
-  page,
-}: {
-  page: Page;
-}) => {
-  const pageErrors: string[] = [];
-  page.on("pageerror", (e) => pageErrors.push(String(e)));
-  const forbidden: string[] = [];
-  page.on("request", (req: Request) => {
-    const url = req.url();
-    if (!isLocalhost(url) && FORBIDDEN_REQUEST_RE.test(url)) {
-      forbidden.push(`${req.method()} ${url}`);
-    }
-  });
-
-  await page.goto("/pheno-comparison");
-  await expect(page.getByRole("heading", { level: 1, name: /pheno comparison/i })).toBeVisible();
-  await expect(page.getByRole("status", { name: "Read-only preview" })).toBeVisible();
-  const region = page.getByTestId("pheno-comparison-page");
-  await expect(region).toBeVisible();
   expect(
     await region.locator("section[data-testid^='pheno-candidate-']").count(),
     "demo candidate sections render",
   ).toBeGreaterThanOrEqual(2);
-  await assertNoWriteControls(page);
-
-  await page.reload();
-  await expect(page.getByRole("heading", { level: 1, name: /pheno comparison/i })).toBeVisible();
-  await assertNoWriteControls(page);
-
-  expect(forbidden, "forbidden data-plane requests").toEqual([]);
-  expect(pageErrors, "uncaught page errors").toEqual([]);
-});
+}
 
 async function assertNoWriteControls(page: Page) {
   const region = page.getByTestId("pheno-comparison-page");
@@ -108,15 +71,7 @@ async function assertNoWriteControls(page: Page) {
 }
 
 for (const vp of VIEWPORTS) {
-  // FIXME: never-green on this branch — this spec was authored on the side
-  // branch that built the Pheno Comparison surface (e7e4e72d / be8ac1f7) and
-  // pins testids (pheno-comparison-readonly-badge, pheno-comparability-verdict,
-  // per-candidate strength chips, …) that the page version imported to trunk
-  // never rendered. The trunk page has since become the product truth (the
-  // Pheno Hunt foundation evolved the shared libs), so re-enabling requires
-  // reconciling the imported surface with the evolved libs. Tracked follow-up:
-  // "Reconcile imported Pheno Comparison v0 surface".
-  test.fixme(`/pheno-comparison is read-only + reloadable @ ${vp.name}`, async ({
+  test(`/pheno-comparison is read-only + reloadable @ ${vp.name}`, async ({
     page,
   }: {
     page: Page;
@@ -133,11 +88,13 @@ for (const vp of VIEWPORTS) {
     page.on("pageerror", (e) => pageErrors.push(String(e)));
 
     await page.goto("/pheno-comparison", { waitUntil: "networkidle" });
+    await expect(page.getByRole("heading", { level: 1, name: /pheno comparison/i })).toBeVisible();
     await assertReadOnlySurface(page);
     await assertNoWriteControls(page);
 
     // Full reload re-renders the same surface.
     await page.reload({ waitUntil: "networkidle" });
+    await expect(page.getByRole("heading", { level: 1, name: /pheno comparison/i })).toBeVisible();
     await assertReadOnlySurface(page);
     await assertNoWriteControls(page);
 

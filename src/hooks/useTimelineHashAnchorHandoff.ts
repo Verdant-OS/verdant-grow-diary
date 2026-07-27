@@ -46,6 +46,8 @@ export function useTimelineHashAnchorHandoff(
 ): void {
   const handledAnchorRef = useRef<string | null>(null);
 
+  // Intentionally retry after each render until the async row exists.
+  // handledAnchorRef keeps a successful handoff one-shot without polling.
   useEffect(() => {
     const anchorId = parseTimelineEntryAnchorHash(hash);
     if (!anchorId) {
@@ -59,20 +61,22 @@ export function useTimelineHashAnchorHandoff(
       ((id: string) => (typeof document !== "undefined" ? document.getElementById(id) : null));
     const node = lookup(anchorId);
     if (!node) return;
+    const aliasTargetId = node.getAttribute("data-timeline-entry-alias-for");
+    const target = aliasTargetId ? (lookup(aliasTargetId) ?? node) : node;
 
     handledAnchorRef.current = anchorId;
-    if (!node.hasAttribute("tabindex")) node.tabIndex = -1;
+    if (!target.hasAttribute("tabindex")) target.tabIndex = -1;
 
     const reducedMotion = options.prefersReducedMotion ?? isReducedMotionPreferred();
-    if (typeof node.scrollIntoView === "function") {
+    if (typeof target.scrollIntoView === "function") {
       try {
-        node.scrollIntoView({
+        target.scrollIntoView({
           behavior: reducedMotion ? "auto" : "smooth",
           block: "start",
         });
       } catch {
         try {
-          node.scrollIntoView();
+          target.scrollIntoView();
         } catch {
           // Presentation-only fallback; focus still identifies the destination.
         }
@@ -80,13 +84,13 @@ export function useTimelineHashAnchorHandoff(
     }
 
     try {
-      node.focus({ preventScroll: true });
+      target.focus({ preventScroll: true });
     } catch {
       try {
-        node.focus();
+        target.focus();
       } catch {
         // A failed focus must not turn a read-only navigation aid into an error.
       }
     }
-  }, [hash, ready, options.getNodeById, options.prefersReducedMotion]);
+  });
 }

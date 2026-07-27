@@ -10,6 +10,7 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { phenoDb } from "@/integrations/supabase/phenoTables";
+import { PhenoEvidenceReadError } from "@/lib/phenoEvidenceReadError";
 
 export interface SmokeTestRow {
   readonly plantId: string;
@@ -80,7 +81,7 @@ export async function listSmokeTestsForHunt(
   // Page-scoped read: fetch only the visible candidates' smoke tests at scale.
   if (plantIds && plantIds.length > 0) query = query.in("plant_id", plantIds as string[]);
   const { data, error } = await query;
-  if (error || !data) return {};
+  if (error || !data) throw new PhenoEvidenceReadError("smoke_tests");
   const map: Record<string, SmokeTestRow> = {};
   for (const row of data) {
     if (!row.plant_id) continue;

@@ -1020,7 +1020,11 @@ async function main() {
   );
   check(
     "same-key replay returns the original spend_created_at",
-    (s2 as any)?.spend_created_at === (s1 as any)?.spend_created_at,
+    typeof (s1 as any)?.spend_created_at === "string" &&
+      Number.isFinite(Date.parse((s1 as any).spend_created_at)) &&
+      typeof (s2 as any)?.spend_created_at === "string" &&
+      Number.isFinite(Date.parse((s2 as any).spend_created_at)) &&
+      (s2 as any).spend_created_at === (s1 as any).spend_created_at,
     JSON.stringify(s2),
   );
   check(

@@ -27,9 +27,7 @@ describe("buildPlantDetailWhatsMissing", () => {
   });
 
   it("shows no timeline prompt when hasTimelineEntries is false", () => {
-    const result = buildPlantDetailWhatsMissing(
-      makeInput({ hasTimelineEntries: false }),
-    );
+    const result = buildPlantDetailWhatsMissing(makeInput({ hasTimelineEntries: false }));
     expect(result.length).toBeGreaterThanOrEqual(1);
     expect(result[0].kind).toBe("no_timeline");
     expect(result[0].title).toBe("No timeline entries yet");
@@ -52,9 +50,7 @@ describe("buildPlantDetailWhatsMissing", () => {
   });
 
   it("shows stage unknown prompt when stage is empty string", () => {
-    const result = buildPlantDetailWhatsMissing(
-      makeInput({ stage: "", hasTimelineEntries: true }),
-    );
+    const result = buildPlantDetailWhatsMissing(makeInput({ stage: "", hasTimelineEntries: true }));
     expect(result.map((r) => r.kind)).toContain("stage_unknown");
   });
 
@@ -66,30 +62,36 @@ describe("buildPlantDetailWhatsMissing", () => {
   });
 
   it("shows no recent photo prompt when hasRecentPhoto is false", () => {
-    const result = buildPlantDetailWhatsMissing(
-      makeInput({ hasRecentPhoto: false }),
-    );
+    const result = buildPlantDetailWhatsMissing(makeInput({ hasRecentPhoto: false }));
     expect(result.map((r) => r.kind)).toContain("no_recent_photo");
     const prompt = result.find((r) => r.kind === "no_recent_photo")!;
     expect(prompt.title).toBe("No recent photo");
     expect(prompt.description).toMatch(/Photos help compare/);
     expect(prompt.cta?.kind).toBe("upload_photo");
     expect(prompt.cta?.label).toBe("Upload photo");
-    expect(prompt.cta?.href).toMatch(/^\/logs/);
+    expect(prompt.cta?.href).toBeUndefined();
+    expect(prompt.cta?.event).toBe("open-quicklog");
+    expect(prompt.cta?.eventPayload).toEqual({
+      plantId: "p-1",
+      growId: null,
+      activityId: "photo",
+    });
   });
 
-  it("includes growId in upload_photo href when provided", () => {
+  it("includes grow and plant context in the photo Quick Log handoff", () => {
     const result = buildPlantDetailWhatsMissing(
       makeInput({ hasRecentPhoto: false, growId: "g-1" }),
     );
     const prompt = result.find((r) => r.kind === "no_recent_photo")!;
-    expect(prompt.cta!.href).toBe("/logs?growId=g-1");
+    expect(prompt.cta!.eventPayload).toEqual({
+      plantId: "p-1",
+      growId: "g-1",
+      activityId: "photo",
+    });
   });
 
   it("shows no sensor snapshot prompt when hasSensorSnapshot is false", () => {
-    const result = buildPlantDetailWhatsMissing(
-      makeInput({ hasSensorSnapshot: false }),
-    );
+    const result = buildPlantDetailWhatsMissing(makeInput({ hasSensorSnapshot: false }));
     expect(result.map((r) => r.kind)).toContain("no_sensor_snapshot");
     const prompt = result.find((r) => r.kind === "no_sensor_snapshot")!;
     expect(prompt.title).toBe("No sensor snapshot");
@@ -107,13 +109,9 @@ describe("buildPlantDetailWhatsMissing", () => {
   });
 
   it("shows no recent watering/feed prompt when hasRecentWateringOrFeed is false", () => {
-    const result = buildPlantDetailWhatsMissing(
-      makeInput({ hasRecentWateringOrFeed: false }),
-    );
+    const result = buildPlantDetailWhatsMissing(makeInput({ hasRecentWateringOrFeed: false }));
     expect(result.map((r) => r.kind)).toContain("no_recent_watering_or_feed");
-    const prompt = result.find(
-      (r) => r.kind === "no_recent_watering_or_feed",
-    )!;
+    const prompt = result.find((r) => r.kind === "no_recent_watering_or_feed")!;
     expect(prompt.title).toBe("No recent watering or feed note");
     expect(prompt.description).toMatch(/Watering and feeding logs/);
     expect(prompt.cta?.kind).toBe("quicklog");
@@ -146,11 +144,7 @@ describe("buildPlantDetailWhatsMissing", () => {
         hasRecentWateringOrFeed: false,
       }),
     );
-    expect(result.map((r) => r.kind)).toEqual([
-      "no_timeline",
-      "stage_unknown",
-      "no_recent_photo",
-    ]);
+    expect(result.map((r) => r.kind)).toEqual(["no_timeline", "stage_unknown", "no_recent_photo"]);
   });
 
   it("falls back to lower priority when higher ones are satisfied", () => {
@@ -205,9 +199,7 @@ describe("buildPlantDetailWhatsMissing", () => {
   });
 
   it("does not expose storage paths or tokens", () => {
-    const result = buildPlantDetailWhatsMissing(
-      makeInput({ hasRecentPhoto: false }),
-    );
+    const result = buildPlantDetailWhatsMissing(makeInput({ hasRecentPhoto: false }));
     for (const r of result) {
       expect(r.description).not.toMatch(/storage|bucket|path|token|key/i);
     }
@@ -284,8 +276,6 @@ describe("PlantDetailWhatsMissing component static safety", () => {
       path.resolve(__dirname, "../components/PlantDetailWhatsMissing.tsx"),
       "utf8",
     );
-    expect(src).not.toMatch(
-      /calendar_events|notification|email|reminder|mail/i,
-    );
+    expect(src).not.toMatch(/calendar_events|notification|email|reminder|mail/i);
   });
 });

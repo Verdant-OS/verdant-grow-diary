@@ -90,8 +90,10 @@ function baseState(overrides: Partial<UsePhenoHuntWorkspaceState>): UsePhenoHunt
     candidates: [],
     totalCandidateCount: 0,
     loadingMore: false,
+    loadMoreError: null,
     hasMore: false,
     loadNextPage: loadNextPageMock,
+    reload: vi.fn(),
     filters: {},
     setFilter: vi.fn(),
     resetFilters: vi.fn(),
@@ -99,6 +101,7 @@ function baseState(overrides: Partial<UsePhenoHuntWorkspaceState>): UsePhenoHunt
     scoresByPlant: {},
     decisionsByPlant: {},
     roundsByKey: {},
+    roundLoadStates: {},
     decisionHistoryByPlant: {},
     sexByPlant: {},
     reversedPlantIds: new Set<string>(),
@@ -360,6 +363,24 @@ describe("bounded pagination", () => {
   it("hides Show more when there are no more pages", () => {
     renderWorkspace({ candidates: [candidate("p1")], totalCandidateCount: 1, hasMore: false });
     expect(screen.queryByTestId("workspace-show-more")).toBeNull();
+  });
+
+  it("keeps loaded candidates visible and offers a calm retry after pagination fails", () => {
+    const retry = vi.fn();
+    renderWorkspace({
+      candidates: [candidate("p1")],
+      totalCandidateCount: 120,
+      hasMore: true,
+      loadMoreError: "Could not load more candidates.",
+      loadNextPage: retry,
+    });
+
+    expect(screen.getByTestId("pheno-workspace-candidate-p1")).toBeInTheDocument();
+    expect(screen.getByTestId("workspace-load-more-error")).toHaveTextContent(
+      /could not load more candidates/i,
+    );
+    fireEvent.click(screen.getByTestId("workspace-load-more-retry"));
+    expect(retry).toHaveBeenCalledTimes(1);
   });
 });
 

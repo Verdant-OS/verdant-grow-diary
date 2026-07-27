@@ -17,6 +17,7 @@ const insertSpy = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@/lib/growRepo", () => ({
   insertSensorReading: (...args: unknown[]) => insertSpy(...args),
+  insertSensorReadingsBatch: (...args: unknown[]) => insertSpy(...args),
 }));
 
 const TENT_ID = "11111111-1111-4111-8111-111111111111";
@@ -71,8 +72,10 @@ describe("ManualSensorReadingCard — mandatory review gate", () => {
     fireEvent.click(screen.getByTestId("manual-reading-save"));
     fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
     await waitFor(() => expect(insertSpy.mock.calls.length).toBeGreaterThan(0));
-    for (const call of insertSpy.mock.calls) {
-      const payload = call[0];
+    const savedRows = insertSpy.mock.calls.flatMap(([payload]) =>
+      Array.isArray(payload) ? payload : [payload],
+    );
+    for (const payload of savedRows) {
       expect(payload.source).toBe("manual");
       expect(payload.source).not.toBe("live");
       expect(payload.tent_id).toBe(TENT_ID);
@@ -94,8 +97,11 @@ describe("ManualSensorReadingCard — mandatory review gate", () => {
     expect(confirm).not.toBeDisabled();
     fireEvent.click(confirm);
     await waitFor(() => expect(insertSpy).toHaveBeenCalled());
-    for (const call of insertSpy.mock.calls) {
-      expect(call[0].source).toBe("manual");
+    const savedRows = insertSpy.mock.calls.flatMap(([payload]) =>
+      Array.isArray(payload) ? payload : [payload],
+    );
+    for (const row of savedRows) {
+      expect(row.source).toBe("manual");
     }
   });
 

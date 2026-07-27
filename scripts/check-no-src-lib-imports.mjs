@@ -13,6 +13,10 @@
  *     the bundle as "npm:@/lib/ecUnits", breaking deploys. Scoped packages
  *     ("npm:@scope/pkg") are fine — the rule only matches "@" followed
  *     directly by "/".
+ *  3. Windows drive-absolute specifiers, with or without an "npm:" prefix.
+ *     Incident 2026-07-26: the MCP Vite plugin externalized its Windows entry
+ *     path as "npm:C:\...", replacing the portable bundle with a
+ *     machine-local import that Supabase cannot resolve.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -22,14 +26,16 @@ const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const FUNCTIONS = join(ROOT, "supabase", "functions");
 
 // Match import/export ... from "<spec>" and bare `import "<spec>"`, single or double quoted.
-const IMPORT_RE =
-  /(?:^|\n)\s*(?:import|export)(?:\s+[\s\S]*?\s+from)?\s*["']([^"']+)["']/g;
+const IMPORT_RE = /(?:^|\n)\s*(?:import|export)(?:\s+[\s\S]*?\s+from)?\s*["']([^"']+)["']/g;
 
 // Anything that reaches src/lib via a relative path: ../src/lib/, ../../src/lib/, ...
 const FORBIDDEN_RE = /(?:\.\.\/)+src\/lib\//;
 
 // Vite alias specifiers: "@/..." or "npm:@/..." — unresolvable in Deno.
 const ALIAS_RE = /^(?:npm:)?@\//;
+
+// Machine-local Windows paths: "C:\..." or "npm:C:\..." — unresolvable remotely.
+const WINDOWS_ABSOLUTE_RE = /^(?:npm:)?[A-Za-z]:[\\/]/;
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -44,7 +50,7 @@ const offenders = [];
 for (const file of walk(FUNCTIONS)) {
   const text = readFileSync(file, "utf8");
   for (const m of text.matchAll(IMPORT_RE)) {
-    if (FORBIDDEN_RE.test(m[1]) || ALIAS_RE.test(m[1])) {
+    if (FORBIDDEN_RE.test(m[1]) || ALIAS_RE.test(m[1]) || WINDOWS_ABSOLUTE_RE.test(m[1])) {
       offenders.push(`${relative(ROOT, file)}  →  ${m[1]}`);
     }
   }
@@ -52,7 +58,8 @@ for (const file of walk(FUNCTIONS)) {
 
 if (offenders.length) {
   console.error(
-    "❌ Unresolvable import(s) in supabase/functions/** (src/lib escape or @/ alias):\n",
+    "❌ Unresolvable import(s) in supabase/functions/** " +
+      "(src/lib escape, @/ alias, or Windows absolute path):\n",
   );
   for (const o of offenders) console.error("  - " + o);
   console.error(
@@ -64,5 +71,5 @@ if (offenders.length) {
 }
 
 console.log(
-  "OK — no src/lib escapes or @/ alias specifiers in supabase/functions/**.",
+  "OK — no src/lib escapes, @/ aliases, or Windows absolute imports in supabase/functions/**.",
 );

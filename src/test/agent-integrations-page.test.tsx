@@ -20,12 +20,9 @@ vi.mock("@/integrations/supabase/client", () => ({
     auth: {
       getSession: (...args: unknown[]) => getSessionMock(...args),
       oauth: {
-        getAuthorizationDetails: (...args: unknown[]) =>
-          getAuthorizationDetailsMock(...args),
-        approveAuthorization: (...args: unknown[]) =>
-          approveAuthorizationMock(...args),
-        denyAuthorization: (...args: unknown[]) =>
-          denyAuthorizationMock(...args),
+        getAuthorizationDetails: (...args: unknown[]) => getAuthorizationDetailsMock(...args),
+        approveAuthorization: (...args: unknown[]) => approveAuthorizationMock(...args),
+        denyAuthorization: (...args: unknown[]) => denyAuthorizationMock(...args),
       },
     },
   },
@@ -38,10 +35,7 @@ vi.mock("@/hooks/usePageSeo", () => ({
 // ---------- imports under test ----------
 import AgentIntegrations from "@/pages/AgentIntegrations";
 import OAuthConsent from "@/pages/OAuthConsent";
-import {
-  MCP_MANIFEST,
-  containsSecretLikeValue,
-} from "@/lib/mcp/manifestView";
+import { MCP_MANIFEST, containsSecretLikeValue } from "@/lib/mcp/manifestView";
 
 beforeEach(() => {
   getSessionMock.mockReset();
@@ -54,10 +48,7 @@ function renderAgentIntegrations() {
   return render(
     <MemoryRouter initialEntries={["/settings/agent-integrations"]}>
       <Routes>
-        <Route
-          path="/settings/agent-integrations"
-          element={<AgentIntegrations />}
-        />
+        <Route path="/settings/agent-integrations" element={<AgentIntegrations />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -74,9 +65,7 @@ describe("AgentIntegrations page", () => {
 
   it("shows the OAuth configured badge when issuer is a direct supabase.co host", () => {
     renderAgentIntegrations();
-    expect(screen.getByTestId("oauth-status").textContent).toMatch(
-      /configured/i,
-    );
+    expect(screen.getByTestId("oauth-status").textContent).toMatch(/configured/i);
   });
 
   it("lists every MCP tool with its exact name and no invented params", () => {
@@ -86,9 +75,7 @@ describe("AgentIntegrations page", () => {
       expect(row.textContent).toContain(tool.name);
       for (const p of tool.params) {
         expect(row.textContent).toContain(p.name);
-        expect(row.textContent).toContain(
-          p.required ? "required" : "optional",
-        );
+        expect(row.textContent).toContain(p.required ? "required" : "optional");
       }
     }
   });
@@ -113,9 +100,7 @@ describe("AgentIntegrations page", () => {
     expect(containsSecretLikeValue(payload)).toBe(false);
 
     await waitFor(() => {
-      expect(screen.getByTestId("copy-status").textContent).toMatch(
-        /copied/i,
-      );
+      expect(screen.getByTestId("copy-status").textContent).toMatch(/copied/i);
     });
   });
 
@@ -129,9 +114,7 @@ describe("AgentIntegrations page", () => {
     renderAgentIntegrations();
     fireEvent.click(screen.getByTestId("copy-connection-details"));
     await waitFor(() => {
-      expect(screen.getByTestId("copy-status").textContent).toMatch(
-        /copy failed/i,
-      );
+      expect(screen.getByTestId("copy-status").textContent).toMatch(/copy failed/i);
     });
   });
 
@@ -144,12 +127,8 @@ describe("AgentIntegrations page", () => {
 
   it("renders manifest version, fingerprint, and tool count", () => {
     renderAgentIntegrations();
-    expect(screen.getByTestId("manifest-version").textContent).toBe(
-      MCP_MANIFEST.version,
-    );
-    expect(screen.getByTestId("manifest-fingerprint").textContent).toMatch(
-      /^[0-9a-f]+/,
-    );
+    expect(screen.getByTestId("manifest-version").textContent).toBe(MCP_MANIFEST.version);
+    expect(screen.getByTestId("manifest-fingerprint").textContent).toMatch(/^[0-9a-f]+/);
     expect(screen.getByTestId("manifest-tool-count").textContent).toContain(
       `Tools advertised: ${MCP_MANIFEST.tools.length}`,
     );
@@ -168,24 +147,12 @@ describe("AgentIntegrations page", () => {
     }
   });
 
-  it("renders a static harness_unavailable panel (no button) by default", () => {
-    // The production default harness can never run a probe, so the page
-    // renders a non-interactive unavailable status instead of a Verify
-    // button whose only reachable answer is 'harness unavailable'.
+  it("omits the unusable local harness panel from the production page", () => {
     renderAgentIntegrations();
+    expect(screen.getByTestId("browser-connect-panel")).toBeTruthy();
+    expect(screen.queryByTestId("verify-tool-access")).toBeNull();
     expect(screen.queryByTestId("verify-tool-access-button")).toBeNull();
-    expect(screen.getByTestId("verify-harness-unavailable-badge")).toBeTruthy();
-    const panel = screen.getByTestId("verify-tool-access-result");
-    expect(panel.getAttribute("data-status")).toBe("harness_unavailable");
-    expect(screen.getByTestId("verify-label").textContent).toMatch(
-      /harness unavailable/i,
-    );
-    expect(screen.getByTestId("verify-tool-checked").textContent).toMatch(
-      /list_grows/,
-    );
-    expect(screen.getByTestId("verify-next-step").textContent).toMatch(
-      /configured local harness/i,
-    );
+    expect(screen.queryByText(/Unavailable in this build/i)).toBeNull();
   });
 
   it("renders authorized state when a harness adapter reports ok", async () => {
@@ -208,15 +175,11 @@ describe("AgentIntegrations page", () => {
     );
     fireEvent.click(screen.getByTestId("verify-tool-access-button"));
     await waitFor(() => {
-      expect(
-        screen
-          .getByTestId("verify-tool-access-result")
-          .getAttribute("data-status"),
-      ).toBe("authorized");
+      expect(screen.getByTestId("verify-tool-access-result").getAttribute("data-status")).toBe(
+        "authorized",
+      );
     });
-    expect(screen.getByTestId("verify-grow-count").textContent).toContain(
-      "1 grow",
-    );
+    expect(screen.getByTestId("verify-grow-count").textContent).toContain("1 grow");
     // Never leaks token-shaped strings into DOM.
     const body = document.body.textContent ?? "";
     expect(body).not.toMatch(/eyJ[A-Za-z0-9]{5,}\./);
@@ -244,11 +207,9 @@ describe("AgentIntegrations page", () => {
     );
     fireEvent.click(screen.getByTestId("verify-tool-access-button"));
     await waitFor(() => {
-      expect(
-        screen
-          .getByTestId("verify-tool-access-result")
-          .getAttribute("data-status"),
-      ).toBe("unauthorized");
+      expect(screen.getByTestId("verify-tool-access-result").getAttribute("data-status")).toBe(
+        "unauthorized",
+      );
     });
   });
 
@@ -263,9 +224,7 @@ describe("AgentIntegrations page", () => {
                 verifyHarness={{
                   available: true,
                   probe: async () => {
-                    throw new Error(
-                      "Bearer eyJabc.SECRET.SIG service_role refresh_token=xyz",
-                    );
+                    throw new Error("Bearer eyJabc.SECRET.SIG service_role refresh_token=xyz");
                   },
                 }}
               />
@@ -276,11 +235,9 @@ describe("AgentIntegrations page", () => {
     );
     fireEvent.click(screen.getByTestId("verify-tool-access-button"));
     await waitFor(() => {
-      expect(
-        screen
-          .getByTestId("verify-tool-access-result")
-          .getAttribute("data-status"),
-      ).toBe("failed");
+      expect(screen.getByTestId("verify-tool-access-result").getAttribute("data-status")).toBe(
+        "failed",
+      );
     });
     const body = document.body.textContent ?? "";
     expect(body).not.toMatch(/eyJabc\./);
@@ -296,46 +253,34 @@ describe("AgentIntegrations page", () => {
     expect(list.textContent).toMatch(/OAuth consent/i);
     expect(list.textContent).toMatch(/list_grows/);
 
-    const consent = screen.getByTestId(
-      "open-oauth-consent-link",
-    ) as HTMLAnchorElement;
+    const consent = screen.getByTestId("open-oauth-consent-link") as HTMLAnchorElement;
     expect(consent.getAttribute("href")).toContain("/.lovable/oauth/consent");
     expect(consent.getAttribute("rel")).toMatch(/noopener/);
 
-    const manifest = screen.getByTestId(
-      "view-mcp-manifest-link",
-    ) as HTMLAnchorElement;
+    const manifest = screen.getByTestId("view-mcp-manifest-link") as HTMLAnchorElement;
     expect(manifest.getAttribute("target")).toBe("_blank");
     expect(manifest.getAttribute("rel")).toMatch(/noopener/);
 
-    expect(
-      screen.getByTestId("connect-agent-safety-copy").textContent,
-    ).toMatch(/read-only/i);
+    expect(screen.getByTestId("connect-agent-safety-copy").textContent).toMatch(/read-only/i);
   });
 
   it("checklist links carry accessible aria-labels", () => {
     renderAgentIntegrations();
-    expect(
-      screen.getByTestId("open-oauth-consent-link").getAttribute("aria-label"),
-    ).toMatch(/OAuth consent/i);
-    expect(
-      screen.getByTestId("view-mcp-manifest-link").getAttribute("aria-label"),
-    ).toMatch(/MCP manifest/i);
-    expect(
-      screen
-        .getByTestId("view-tool-reference-link")
-        .getAttribute("aria-label"),
-    ).toMatch(/tool reference/i);
-    expect(
-      screen
-        .getByTestId("copy-connection-details")
-        .getAttribute("aria-label"),
-    ).toMatch(/connection details/i);
-    expect(
-      screen
-        .getByTestId("open-manifest-summary-modal")
-        .getAttribute("aria-label"),
-    ).toMatch(/safe MCP manifest summary/i);
+    expect(screen.getByTestId("open-oauth-consent-link").getAttribute("aria-label")).toMatch(
+      /OAuth consent/i,
+    );
+    expect(screen.getByTestId("view-mcp-manifest-link").getAttribute("aria-label")).toMatch(
+      /MCP manifest/i,
+    );
+    expect(screen.getByTestId("view-tool-reference-link").getAttribute("aria-label")).toMatch(
+      /tool reference/i,
+    );
+    expect(screen.getByTestId("copy-connection-details").getAttribute("aria-label")).toMatch(
+      /connection details/i,
+    );
+    expect(screen.getByTestId("open-manifest-summary-modal").getAttribute("aria-label")).toMatch(
+      /safe MCP manifest summary/i,
+    );
   });
 
   it("next-step guidance changes with verification state (unauthorized)", async () => {
@@ -358,15 +303,11 @@ describe("AgentIntegrations page", () => {
     );
     fireEvent.click(screen.getByTestId("verify-tool-access-button"));
     await waitFor(() => {
-      expect(
-        screen
-          .getByTestId("verify-tool-access-result")
-          .getAttribute("data-status"),
-      ).toBe("unauthorized");
+      expect(screen.getByTestId("verify-tool-access-result").getAttribute("data-status")).toBe(
+        "unauthorized",
+      );
     });
-    expect(screen.getByTestId("verify-next-step").textContent).toMatch(
-      /complete OAuth consent/i,
-    );
+    expect(screen.getByTestId("verify-next-step").textContent).toMatch(/complete OAuth consent/i);
   });
 
   it("View MCP manifest modal opens, renders the safe projection, and copy excludes secrets", async () => {
@@ -385,15 +326,15 @@ describe("AgentIntegrations page", () => {
     expect(screen.getByTestId("manifest-summary-title").textContent).toMatch(
       /safe MCP manifest summary/i,
     );
-    expect(
-      screen.getByTestId("manifest-summary-tool-count").textContent,
-    ).toContain(String(MCP_MANIFEST.tools.length));
+    expect(screen.getByTestId("manifest-summary-tool-count").textContent).toContain(
+      String(MCP_MANIFEST.tools.length),
+    );
     for (const t of MCP_MANIFEST.tools) {
       expect(screen.getByTestId(`manifest-summary-tool-${t.name}`)).toBeTruthy();
     }
-    expect(
-      screen.getByTestId("manifest-summary-safety-note").textContent,
-    ).toMatch(/does not include tokens/i);
+    expect(screen.getByTestId("manifest-summary-safety-note").textContent).toMatch(
+      /does not include tokens/i,
+    );
 
     // Copy button excludes secret-like values.
     fireEvent.click(screen.getByTestId("manifest-summary-copy"));
@@ -404,8 +345,7 @@ describe("AgentIntegrations page", () => {
     expect(containsSecretLikeValue(payload)).toBe(false);
 
     // Modal DOM contains no token/secret-like strings.
-    const modalText =
-      screen.getByTestId("manifest-summary-modal").textContent ?? "";
+    const modalText = screen.getByTestId("manifest-summary-modal").textContent ?? "";
     expect(modalText).not.toMatch(/eyJ[A-Za-z0-9]{5,}\./);
     expect(modalText.toLowerCase()).not.toContain("service_role");
     expect(modalText.toLowerCase()).not.toContain("refresh_token");
@@ -415,7 +355,6 @@ describe("AgentIntegrations page", () => {
 
 // ---------- OAuth consent route ----------
 
-
 function renderConsent(authorizationId: string | null) {
   const initial = authorizationId
     ? `/.lovable/oauth/consent?authorization_id=${authorizationId}`
@@ -423,10 +362,7 @@ function renderConsent(authorizationId: string | null) {
   return render(
     <MemoryRouter initialEntries={[initial]}>
       <Routes>
-        <Route
-          path="/.lovable/oauth/consent"
-          element={<OAuthConsent />}
-        />
+        <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -475,9 +411,7 @@ describe("OAuthConsent route regression", () => {
       expect(window.location.href).toMatch(/^\/auth\?redirectTo=/);
     });
     // The full consent path (including query) must be preserved.
-    expect(window.location.href).toContain(
-      encodeURIComponent("/.lovable/oauth/consent"),
-    );
+    expect(window.location.href).toContain(encodeURIComponent("/.lovable/oauth/consent"));
     expect(getAuthorizationDetailsMock).not.toHaveBeenCalled();
   });
 
@@ -496,9 +430,7 @@ describe("OAuthConsent route regression", () => {
     renderConsent("abc-123");
 
     await waitFor(() => {
-      expect(
-        screen.getByRole("heading", { name: /connect chatgpt/i }),
-      ).toBeTruthy();
+      expect(screen.getByRole("heading", { name: /connect chatgpt/i })).toBeTruthy();
     });
     expect(screen.getByRole("button", { name: /approve/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /deny/i })).toBeTruthy();
@@ -537,16 +469,12 @@ describe("OAuthConsent route regression", () => {
     });
 
     renderConsent("abc-123");
-    await waitFor(() =>
-      screen.getByRole("button", { name: /approve/i }),
-    );
+    await waitFor(() => screen.getByRole("button", { name: /approve/i }));
     fireEvent.click(screen.getByRole("button", { name: /approve/i }));
 
     await waitFor(() => {
       expect(approveAuthorizationMock).toHaveBeenCalledWith("abc-123");
-      expect(window.location.href).toBe(
-        "https://cursor.example/callback?code=OK",
-      );
+      expect(window.location.href).toBe("https://cursor.example/callback?code=OK");
     });
   });
 });

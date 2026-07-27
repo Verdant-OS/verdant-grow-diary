@@ -234,10 +234,7 @@ function watchTraffic(page: Page) {
 }
 
 async function storedDraftRaw(page: Page): Promise<string | null> {
-  return page.evaluate(
-    (key) => window.localStorage.getItem(key),
-    DRAFT_KEY,
-  );
+  return page.evaluate((key) => window.localStorage.getItem(key), DRAFT_KEY);
 }
 
 /**
@@ -269,9 +266,7 @@ async function walkResumeToSave(page: Page, world: MockWorld) {
   await expect(page.getByTestId("public-quick-log-handoff-status-line")).toContainText(
     /not in your diary yet/i,
   );
-  await expect(page.getByTestId("public-quick-log-handoff-row-plant")).toContainText(
-    NICKNAME,
-  );
+  await expect(page.getByTestId("public-quick-log-handoff-row-plant")).toContainText(NICKNAME);
 
   // The draft is still local and NOTHING has been written.
   expect(await storedDraftRaw(page)).not.toBeNull();
@@ -320,15 +315,15 @@ test.describe("Public Quick Log → first diary entry activation loop (mocked)",
     // Confirmed success: post-save panel, exactly one RPC write, draft gone.
     await expect(page.getByTestId("quick-log-post-save")).toBeVisible();
     expect(world.rpcCalls).toBe(1);
-    await expect
-      .poll(async () => storedDraftRaw(page), { timeout: 5_000 })
-      .toBeNull();
+    await expect.poll(async () => storedDraftRaw(page), { timeout: 5_000 }).toBeNull();
 
     // Close the dialog and verify the REAL Timeline surface shows the entry.
     await page.getByTestId("quick-log-post-save-close").click();
     await page.goto(`/timeline?growId=${GROW_ID}`);
     await acceptReconsentGateIfShown(page);
-    await expect(page.getByText(NOTE_TEXT).first()).toBeVisible();
+    await expect(
+      page.getByTestId("timeline-entry").filter({ hasText: NOTE_TEXT }).first(),
+    ).toBeVisible();
 
     expect(world.rpcCalls, "still exactly one write after navigation").toBe(1);
     expect(traffic.forbidden, "forbidden AI/function requests").toEqual([]);
@@ -364,9 +359,7 @@ test.describe("Public Quick Log → first diary entry activation loop (mocked)",
 
     await expect(page.getByTestId("quick-log-post-save")).toBeVisible();
     expect(world.rpcCalls).toBe(1);
-    await expect
-      .poll(async () => storedDraftRaw(page), { timeout: 5_000 })
-      .toBeNull();
+    await expect.poll(async () => storedDraftRaw(page), { timeout: 5_000 }).toBeNull();
 
     expect(traffic.forbidden, "forbidden AI/function requests").toEqual([]);
     expect(traffic.pageErrors, "uncaught page errors").toEqual([]);
@@ -397,9 +390,7 @@ test.describe("Public Quick Log → first diary entry activation loop (mocked)",
     await page.getByRole("dialog").getByTestId("quick-log-save").click();
     await expect(page.getByTestId("quick-log-post-save")).toBeVisible();
     expect(world.rpcCalls).toBe(2);
-    await expect
-      .poll(async () => storedDraftRaw(page), { timeout: 5_000 })
-      .toBeNull();
+    await expect.poll(async () => storedDraftRaw(page), { timeout: 5_000 }).toBeNull();
 
     expect(traffic.forbidden, "forbidden AI/function requests").toEqual([]);
     expect(traffic.pageErrors, "uncaught page errors").toEqual([]);

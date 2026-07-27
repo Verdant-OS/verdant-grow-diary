@@ -26,6 +26,14 @@ export const CSV_IMPORT_HISTORICAL_CONTEXT_NOTE =
 export const CSV_IMPORT_VIEW_HISTORY_LABEL = "View imported history";
 export const CSV_IMPORT_ADD_CURRENT_READING_LABEL = "Add current reading";
 
+export function buildCsvImportFailureMessage(insertedCount: number, partialWrite: boolean): string {
+  if (partialWrite && insertedCount > 0) {
+    const verb = insertedCount === 1 ? "was" : "were";
+    return `Import stopped after ${insertedCount} CSV reading${insertedCount === 1 ? "" : "s"} ${verb} saved. Review imported history before retrying; readings already present will be skipped safely. No live sensor data was created.`;
+  }
+  return "Import could not be completed. No CSV readings were saved. Try again. No live sensor data was created.";
+}
+
 export function formatCsvPreviewRow(row: ParsedEnvironmentRow): string {
   const parts = [new Date(row.captured_at).toLocaleString()];
   parts.push(row.temperature_c != null ? `${row.temperature_c.toFixed(1)}°C` : "—");

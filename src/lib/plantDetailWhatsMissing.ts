@@ -22,10 +22,7 @@ export type WhatsMissingPromptKind =
   | "no_sensor_snapshot"
   | "no_recent_watering_or_feed";
 
-export type WhatsMissingCtaKind =
-  | "quicklog"
-  | "sensor_snapshot"
-  | "upload_photo";
+export type WhatsMissingCtaKind = "quicklog" | "sensor_snapshot" | "upload_photo";
 
 export interface WhatsMissingPrompt {
   kind: WhatsMissingPromptKind;
@@ -41,6 +38,12 @@ export interface WhatsMissingCta {
   href?: string;
   /** Global event name when the CTA dispatches instead of navigating. */
   event?: "open-quicklog";
+  /** Existing Quick Log prefill; the grower still reviews and saves. */
+  eventPayload?: {
+    plantId: string | null;
+    growId: string | null;
+    activityId: "photo";
+  };
   /** Query params object for href construction (kept minimal). */
   query?: Record<string, string>;
 }
@@ -85,6 +88,7 @@ const PROMPTS: Record<WhatsMissingPromptKind, { title: string; description: stri
 
 function buildCta(
   kind: WhatsMissingCtaKind,
+  plantId?: string | null,
   growId?: string | null,
 ): WhatsMissingCta {
   switch (kind) {
@@ -95,8 +99,16 @@ function buildCta(
       return { kind, label: "Add manual sensor snapshot", href };
     }
     case "upload_photo": {
-      const href = growId ? `/logs?growId=${encodeURIComponent(growId)}` : "/logs";
-      return { kind, label: "Upload photo", href };
+      return {
+        kind,
+        label: "Upload photo",
+        event: "open-quicklog",
+        eventPayload: {
+          plantId: plantId ?? null,
+          growId: growId ?? null,
+          activityId: "photo",
+        },
+      };
     }
   }
 }
@@ -149,7 +161,7 @@ export function buildPlantDetailWhatsMissing(
       const prompt: WhatsMissingPrompt = {
         kind,
         ...PROMPTS[kind],
-        ...(ctaKind ? { cta: buildCta(ctaKind, input.growId) } : {}),
+        ...(ctaKind ? { cta: buildCta(ctaKind, input.plantId, input.growId) } : {}),
       };
       out.push(prompt);
     }

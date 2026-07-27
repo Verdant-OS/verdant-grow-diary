@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -16,6 +16,7 @@ import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 import RootEntry from "@/components/RootEntry";
 import RouteAliasRedirect from "@/components/RouteAliasRedirect";
+import { buildLegacyStrainSlugAliasTarget } from "@/lib/routeAliasRules";
 
 // Route pages and the authenticated AppShell are code-split so the public
 // marketing / auth entry paths (/welcome, /pricing, /hardware-integrations,
@@ -133,13 +134,10 @@ const AiDoctorConfidenceAudit = lazy(() => import("./pages/AiDoctorConfidenceAud
 const EcowittLiveBringup = lazy(() => import("./pages/EcowittLiveBringup"));
 const EnvironmentSummaryReportPage = lazy(() => import("./pages/EnvironmentSummaryReportPage"));
 const OperatorOneTentLoopSmokeTest = lazy(() => import("./pages/OperatorOneTentLoopSmokeTest"));
-const OperatorGgsRealPayloadIngest = lazy(() => import("./pages/OperatorGgsRealPayloadIngest"));
 const OperatorPostGrowReflectionDryRun = lazy(
   () => import("./pages/OperatorPostGrowReflectionDryRun"),
 );
 const OperatorDemoPreview = lazy(() => import("./pages/OperatorDemoPreview"));
-const CustomerModeGuide = lazy(() => import("./pages/CustomerModeGuide"));
-const CustomerModeCannabisCareFaq = lazy(() => import("./pages/CustomerModeCannabisCareFaq"));
 const OperatorAiDoctorPhase1Page = lazy(() =>
   import("./pages/OperatorAiDoctorPhase1").then((m) => ({
     default: m.OperatorAiDoctorPhase1Page,
@@ -191,9 +189,13 @@ function PageLoader() {
 }
 
 function LegacyStrainSlugRedirect() {
-  // Preserves the slug when redirecting /strains/:slug → /cultivars/:slug.
+  // Preserve the decoded slug as one encoded path segment plus the incoming
+  // query/hash when redirecting /strains/:slug → /cultivars/:slug.
   const { slug } = useParams<{ slug: string }>();
-  return <Navigate to={`/cultivars/${slug ?? ""}`} replace />;
+  const location = useLocation();
+  return (
+    <Navigate to={buildLegacyStrainSlugAliasTarget(slug, location.search, location.hash)} replace />
+  );
 }
 
 const App = () => (
@@ -202,7 +204,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <AnalyticsShell />
           <AuthProvider onBeforeAuthIdentityChange={clearQueryCacheBeforeAuthIdentityChange}>
             <OAuthPostAuthRedirect />
@@ -223,7 +225,7 @@ const App = () => (
                   <Route path="/signup" element={<RouteAliasRedirect to="/auth?mode=signup" />} />
                   <Route path="/register" element={<RouteAliasRedirect to="/auth?mode=signup" />} />
 
-                  <Route path="/features" element={<Navigate to="/welcome" replace />} />
+                  <Route path="/features" element={<RouteAliasRedirect to="/welcome" />} />
 
                   {/* Session-aware apex: signed-out visitors receive the public
                       landing directly; signed-in growers retain Dashboard in
@@ -232,7 +234,7 @@ const App = () => (
                   <Route path="/welcome" element={<Landing />} />
                   {/* /demo route removed — Verdant tracks real grow data only.
                       Old bookmarks redirect to the landing page. */}
-                  <Route path="/demo" element={<Navigate to="/welcome" replace />} />
+                  <Route path="/demo" element={<RouteAliasRedirect to="/welcome" />} />
                   <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
                   {/* Public, browser-local CSV proof. Both routes stay outside
                       AppShell and perform no private reads or writes. */}
@@ -253,7 +255,7 @@ const App = () => (
                   {/* Legacy "strain" URL aliases capture search intent for
                       "Oreoz strain" / "Do-Si-Dos" etc. and route to the
                       canonical /cultivars surface (vocab: cultivar, not strain). */}
-                  <Route path="/strains" element={<Navigate to="/cultivars" replace />} />
+                  <Route path="/strains" element={<RouteAliasRedirect to="/cultivars" />} />
                   <Route path="/strains/:slug" element={<LegacyStrainSlugRedirect />} />
                   <Route path="/glossary" element={<Glossary />} />
                   <Route path="/how-ai-doctor-works" element={<HowAiDoctorWorks />} />
@@ -270,18 +272,10 @@ const App = () => (
                   <Route path="/refund" element={<Refund />} />
                   <Route path="/feedback" element={<Feedback />} />
                   <Route path="/contact" element={<Contact />} />
-                  <Route path="/refunds" element={<Navigate to="/refund" replace />} />
-                  <Route path="/refund-policy" element={<Navigate to="/refund" replace />} />
-                  <Route path="/terms-of-service" element={<Navigate to="/terms" replace />} />
-                  <Route path="/privacy-policy" element={<Navigate to="/privacy" replace />} />
-
-                  {/* Public Customer Mode shell. Mounted OUTSIDE AppShell so
-                      no operator chrome (header, Quick Log) renders. */}
-                  <Route path="/customer/:shareId" element={<CustomerModeGuide />} />
-                  <Route
-                    path="/customer/:shareId/cannabis-care"
-                    element={<CustomerModeCannabisCareFaq />}
-                  />
+                  <Route path="/refunds" element={<RouteAliasRedirect to="/refund" />} />
+                  <Route path="/refund-policy" element={<RouteAliasRedirect to="/refund" />} />
+                  <Route path="/terms-of-service" element={<RouteAliasRedirect to="/terms" />} />
+                  <Route path="/privacy-policy" element={<RouteAliasRedirect to="/privacy" />} />
 
                   {/* Internal read-only walkthrough presenter. Mounted OUTSIDE
                       AppShell so the no-write E2E guard can render it without a
@@ -357,7 +351,7 @@ const App = () => (
                     <Route path="/doctor" element={<AiDoctorStart />} />
                     {/* Legacy alias — canonical route is /doctor. Growers
                         sometimes type /ai-doctor; redirect rather than 404. */}
-                    <Route path="/ai-doctor" element={<Navigate to="/doctor" replace />} />
+                    <Route path="/ai-doctor" element={<RouteAliasRedirect to="/doctor" />} />
                     <Route path="/doctor/sessions" element={<AiDoctorSessionsIndex />} />
                     <Route path="/doctor/sessions/:sessionId" element={<AiDoctorSessionDetail />} />
                     <Route path="/actions" element={<ActionQueue />} />
@@ -422,6 +416,7 @@ const App = () => (
                     />
                     <Route path="/breeding" element={<BreedingProgramsIndex />} />
                     <Route path="/breeding/new" element={<BreedingProgramNew />} />
+                    <Route path="/breeding/log/new" element={<BreedingLogNew />} />
                     <Route path="/breeding/:programId" element={<BreedingProgramDetail />} />
                     <Route path="/reports" element={<Reports />} />
                     <Route path="/reports/diary-range" element={<DiaryRangeReportPage />} />
@@ -494,10 +489,6 @@ const App = () => (
                       <Route
                         path="/operator/post-grow-reflection-dry-run"
                         element={<OperatorPostGrowReflectionDryRun />}
-                      />
-                      <Route
-                        path="/operator/ggs-real-payload-ingest"
-                        element={<OperatorGgsRealPayloadIngest />}
                       />
                       <Route path="/operator/demo-preview" element={<OperatorDemoPreview />} />
                       <Route path="/operator/support-inbox" element={<OperatorSupportInbox />} />

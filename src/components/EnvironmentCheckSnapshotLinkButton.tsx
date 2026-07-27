@@ -38,12 +38,11 @@ export default function EnvironmentCheckSnapshotLinkButton({
   const [open, setOpen] = useState(false);
 
   // Source/provider/VPD/soil summary line. Reject non-canonical source values.
-  const safeSource =
-    entry.source && CANONICAL_SOURCES.has(entry.source) ? entry.source : "unknown";
+  const safeSource = entry.source && CANONICAL_SOURCES.has(entry.source) ? entry.source : "unknown";
 
   const matchedSnapshot =
     result.matchKind !== "none" && result.snapshotId
-      ? snapshots.find((s) => s.id === result.snapshotId) ?? null
+      ? (snapshots.find((s) => s.id === result.snapshotId) ?? null)
       : null;
 
   const drawerData: SensorSnapshotDetailsDrawerData | null = matchedSnapshot
@@ -62,7 +61,8 @@ export default function EnvironmentCheckSnapshotLinkButton({
             ? ((matchedSnapshot as { humidityPct?: number | null }).humidityPct as number)
             : null,
         airTemperatureC:
-          typeof (matchedSnapshot as { airTemperatureC?: number | null }).airTemperatureC === "number"
+          typeof (matchedSnapshot as { airTemperatureC?: number | null }).airTemperatureC ===
+          "number"
             ? ((matchedSnapshot as { airTemperatureC?: number | null }).airTemperatureC as number)
             : null,
         confidence:
@@ -72,6 +72,8 @@ export default function EnvironmentCheckSnapshotLinkButton({
         staleOrInvalid: result.staleOrInvalid,
       }
     : null;
+  const snapshotCtaClassName =
+    "inline-flex items-center gap-1 underline text-foreground/90 hover:text-foreground";
 
   return (
     <div
@@ -98,22 +100,35 @@ export default function EnvironmentCheckSnapshotLinkButton({
       <span data-testid="env-check-vpd">
         VPD: {result.vpdKpa === null ? "Not available" : formatVpdKpa(result.vpdKpa)}
       </span>
-      {result.soilMoisturePct !== null && (
-        <span>soil: {result.soilMoisturePct}%</span>
-      )}
+      {result.soilMoisturePct !== null && <span>soil: {result.soilMoisturePct}%</span>}
       {result.matchKind !== "none" && drawerData ? (
         <>
-          <a
-            href={result.href ?? "#"}
-            data-testid="env-check-snapshot-cta"
-            onClick={(e) => {
-              e.preventDefault();
-              setOpen(true);
-            }}
-            className="inline-flex items-center gap-1 underline text-foreground/90 hover:text-foreground"
-          >
-            View sensor snapshot <ExternalLink className="h-3 w-3" />
-          </a>
+          {result.href ? (
+            <a
+              href={result.href}
+              data-testid="env-check-snapshot-cta"
+              aria-haspopup="dialog"
+              aria-expanded={open}
+              onClick={(e) => {
+                e.preventDefault();
+                setOpen(true);
+              }}
+              className={snapshotCtaClassName}
+            >
+              View sensor snapshot <ExternalLink className="h-3 w-3" />
+            </a>
+          ) : (
+            <button
+              type="button"
+              data-testid="env-check-snapshot-cta"
+              aria-haspopup="dialog"
+              aria-expanded={open}
+              onClick={() => setOpen(true)}
+              className={snapshotCtaClassName}
+            >
+              View sensor snapshot <ExternalLink className="h-3 w-3" />
+            </button>
+          )}
           <SensorSnapshotDetailsDrawer
             open={open}
             onOpenChange={setOpen}
@@ -122,10 +137,7 @@ export default function EnvironmentCheckSnapshotLinkButton({
           />
         </>
       ) : (
-        <span
-          data-testid="env-check-snapshot-not-linked"
-          className="text-muted-foreground"
-        >
+        <span data-testid="env-check-snapshot-not-linked" className="text-muted-foreground">
           {SNAPSHOT_NOT_LINKED_LABEL}
         </span>
       )}

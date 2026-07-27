@@ -6,7 +6,7 @@
  *  - Pending vs reviewed grouping uses the "Needs Review" / "Already Reviewed" labels.
  *  - All required empty-state strings exist.
  *  - Inline EventHistory is rendered per row in both groups.
- *  - Approve / Reject / Simulate still flow through transition()+audit.
+ *  - Approve / Reject / Simulate still flow through the transactional RPC.
  *  - No device-control surface introduced.
  */
 import { describe, it, expect } from "vitest";
@@ -155,16 +155,20 @@ describe("ActionQueue — transition/audit flow preserved", () => {
     expect(PAGE).toMatch(/function\s+confirmNoteDialog[\s\S]*?transition\(/);
   });
 
-  it("transition() writes to action_queue_events", () => {
-    expect(PAGE).toMatch(/\.from\(\s*["']action_queue_events["']\s*\)[\s\S]{0,200}\.insert\(/);
+  it("transition() uses the atomic transition-and-audit RPC", () => {
+    expect(PAGE).toMatch(/supabase\.rpc\(\s*["']action_queue_transition["']/);
+    expect(PAGE).not.toMatch(/\.from\(\s*["']action_queue_events["']\s*\)[\s\S]{0,200}\.insert\(/);
   });
 
-  it("approve never sends user_id from the client", () => {
+  it("approve never sends identity or lineage from the client", () => {
     const m = PAGE.match(
-      /\.from\(\s*["']action_queue_events["']\s*\)\s*\.insert\(\s*\{([\s\S]*?)\}\s*\)/,
+      /const\s+rpcArgs\s*=\s*buildActionQueueTransitionRpcArgs\(\s*\{([\s\S]*?)\}\s*\)/,
     );
     expect(m).not.toBeNull();
-    expect(m![1]).not.toMatch(/\buser_id\s*:/);
+    expect(m![1]).not.toMatch(/\buser_id\b|\bgrow_id\b|\bevent_type\b|\bnew_status\b/);
+    expect(PAGE).toMatch(
+      /supabase\.rpc\(\s*["']action_queue_transition["']\s*,\s*rpcArgs\s*,?\s*\)/,
+    );
   });
 });
 

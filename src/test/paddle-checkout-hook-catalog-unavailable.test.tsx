@@ -34,7 +34,8 @@ type CatalogReason =
   | "unknown_plan"
   | "price_not_configured"
   | "price_resolution_unavailable"
-  | "plan_sold_out";
+  | "plan_sold_out"
+  | "pack_requires_monthly_plan";
 
 const state = {
   resolverError: null as null | { reason: CatalogReason; message: string } | "generic",
@@ -138,6 +139,23 @@ describe("usePaddleCheckout — catalog-unavailable calm state", () => {
 
     expect(toastMock).not.toHaveBeenCalled();
     expect(result.current.blockedReason).toBe(state.resolverError.message);
+  });
+
+  it("pack_requires_monthly_plan lands as calm inline guidance", async () => {
+    state.resolverError = {
+      reason: "pack_requires_monthly_plan",
+      message:
+        "Credit packs top up the monthly AI allowance that comes with a paid plan. Your current plan includes AI Doctor checks per grow instead.",
+    };
+
+    const { result } = renderHook(() => usePaddleCheckout(), { wrapper });
+    await act(async () => {
+      await result.current.openCheckout({ priceId: "credit_pack_50" });
+    });
+
+    expect(toastMock).not.toHaveBeenCalled();
+    expect(result.current.blockedReason).toBe(state.resolverError.message);
+    expect(result.current.loading).toBe(false);
   });
 
   it("generic resolver error still surfaces the destructive toast (regression guard)", async () => {

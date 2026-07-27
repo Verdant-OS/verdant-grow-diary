@@ -19,6 +19,8 @@
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { verifyWebhook, getPaddleClient, type PaddleEnv } from "../_shared/paddle.ts";
+import { loadUnionEntitlementForUser } from "../_shared/unionEntitlementLookup.ts";
+import { creditPackIsSpendable } from "../_shared/lib/lib/creditPackEligibility.ts";
 import { handleVerifiedEvent, type Deps, type EventLikeWithId } from "./orchestrator.ts";
 import { insertPaddleEventLog } from "./eventLogInsert.ts";
 import { maybeSendPurchaseConfirmation } from "./sendPurchaseConfirmation.ts";
@@ -160,6 +162,25 @@ function buildDeps(): Deps {
         return { ok: true, reason };
       }
       return { ok: false, reason: payload.reason ?? "unknown_allocator_result" };
+    },
+    async probeCreditPackSpendable({ user_id, environment }) {
+      // Settlement-time annotation ONLY — see orchestrator.ts for why this
+      // never gates the grant. Same loader get-paddle-price's price-resolution
+      // gate uses, so the two checks cannot silently disagree about what
+      // "spendable" means.
+      try {
+        const { entitlement, lookupFailed } = await loadUnionEntitlementForUser(
+          sb,
+          user_id,
+          environment,
+          new Date(),
+        );
+        if (lookupFailed) return { known: false, spendable: false };
+        return { known: true, spendable: creditPackIsSpendable(entitlement) };
+      } catch {
+        // A probe failure must read as unknown, never as a false mismatch.
+        return { known: false, spendable: false };
+      }
     },
     async allocateCreditPack({ user_id, paddle_transaction_id, credits, sku, environment }) {
       // One-time AI credit-pack grant. Delegates to grant_lovable_credit_pack,

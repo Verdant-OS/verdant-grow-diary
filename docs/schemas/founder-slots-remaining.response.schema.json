@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://verdantgrowdiary.com/schemas/founder-slots-remaining.response.schema.json",
+  "title": "founder-slots-remaining response",
+  "description": "Response body contract for the public `founder-slots-remaining` edge function. Success (HTTP 200) returns the remaining/total slot counts; every failure (405 or 503) returns a stable error envelope with a machine-readable `error_code`. Every response — success or failure — includes a `request_id` UUID that is also echoed in the `x-request-id` response header.",
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/$defs/successResponse" },
+    { "$ref": "#/$defs/errorResponse" }
+  ],
+  "$defs": {
+    "requestId": {
+      "type": "string",
+      "description": "UUID (lowercase) that correlates the response with server-side structured logs and the `x-request-id` response header.",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "successResponse": {
+      "title": "Success (HTTP 200)",
+      "type": "object",
+      "required": ["remaining", "total", "request_id"],
+      "additionalProperties": false,
+      "properties": {
+        "remaining": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Founder Lifetime slots still available. `0` means sold out."
+        },
+        "total": {
+          "type": "integer",
+          "const": 100,
+          "description": "Total Founder Lifetime cap. Always 100."
+        },
+        "request_id": { "$ref": "#/$defs/requestId" }
+      }
+    },
+    "errorResponse": {
+      "title": "Failure (HTTP 405 or 503)",
+      "type": "object",
+      "required": ["error", "error_code", "request_id"],
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "type": "string",
+          "description": "Coarse category retained for back-compat. Clients should branch on `error_code`, not this field.",
+          "enum": ["method_not_allowed", "slots_unavailable"]
+        },
+        "error_code": {
+          "type": "string",
+          "description": "Stable machine-readable failure reason. See `errorCodeVariants` for the full catalog and semantics.",
+          "enum": [
+            "method_not_allowed",
+            "startup_dependencies_unavailable",
+            "env_missing",
+            "rpc_error",
+            "rpc_invalid_payload",
+            "handler_unhandled_error"
+          ]
+        },
+        "request_id": { "$ref": "#/$defs/requestId" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "error_code": { "const": "method_not_allowed" } } },
+          "then": { "properties": { "error": { "const": "method_not_allowed" } } }
+        },
+        {
+          "if": {
+            "properties": {
+              "error_code": {
+                "enum": [
+                  "startup_dependencies_unavailable",
+                  "env_missing",
+                  "rpc_error",
+                  "rpc_invalid_payload",
+                  "handler_unhandled_error"
+                ]
+              }
+            }
+          },
+          "then": { "properties": { "error": { "const": "slots_unavailable" } } }
+        }
+      ]
+    }
+  },
+  "errorCodeVariants": {
+    "method_not_allowed": {
+      "httpStatus": 405,
+      "meaning": "Request used an HTTP method other than GET, POST, or OPTIONS.",
+      "retry": "none",
+      "clientAction": "Fix the call site to use GET."
+    },
+    "startup_dependencies_unavailable": {
+      "httpStatus": 503,
+      "meaning": "Module dependencies (Supabase client, contract module) failed to import at cold start.",
+      "retry": "manual",
+      "clientAction": "Fall back to the static Founder cap copy; retry after a short delay."
+    },
+    "env_missing": {
+      "httpStatus": 503,
+      "meaning": "Required environment variables (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY) are not configured.",
+      "retry": "manual",
+      "clientAction": "Fall back to static cap copy; operator must configure the function."
+    },
+    "rpc_error": {
+      "httpStatus": 503,
+      "meaning": "The `public.founder_lifetime_slots_remaining()` RPC returned a database error.",
+      "retry": "auto",
+      "clientAction": "Retry with backoff; fall back to static cap copy on repeated failure."
+    },
+    "rpc_invalid_payload": {
+      "httpStatus": 503,
+      "meaning": "The RPC returned a value that is not an integer in the range 0..100.",
+      "retry": "auto",
+      "clientAction": "Retry once; fall back to static cap copy."
+    },
+    "handler_unhandled_error": {
+      "httpStatus": 503,
+      "meaning": "An unexpected exception escaped the handler's inner try/catch.",
+      "retry": "auto",
+      "clientAction": "Retry with backoff; fall back to static cap copy."
+    }
+  },
+  "responseHeaders": {
+    "x-request-id": "Same UUID as the body's `request_id`. Exposed via CORS.",
+    "Cache-Control": "Present on 200 responses only: `public, max-age=30`.",
+    "Content-Type": "Always `application/json` for JSON payloads."
+  },
+  "examples": [
+    {
+      "remaining": 42,
+      "total": 100,
+      "request_id": "6b1c9d2e-1111-4a22-8bbb-abcdef012345"
+    },
+    {
+      "error": "slots_unavailable",
+      "error_code": "rpc_error",
+      "request_id": "6b1c9d2e-1111-4a22-8bbb-abcdef012345"
+    },
+    {
+      "error": "method_not_allowed",
+      "error_code": "method_not_allowed",
+      "request_id": "6b1c9d2e-1111-4a22-8bbb-abcdef012345"
+    }
+  ]
+}

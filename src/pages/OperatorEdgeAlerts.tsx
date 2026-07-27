@@ -371,6 +371,35 @@ export default function OperatorEdgeAlerts() {
     attemptsQuery.refetch();
   };
 
+  const openDrilldown = (fn: string, metric: string) => setDrilldown({ fn, metric });
+
+  const drilldownDispatch = useMemo(() => {
+    if (!drilldown) return null;
+    return (
+      dispatchesWithExpiry.find(
+        (r) => r.fn === drilldown.fn && r.metric === drilldown.metric,
+      ) ?? null
+    );
+  }, [drilldown, dispatchesWithExpiry]);
+
+  const drilldownAttempts = useMemo(() => {
+    if (!drilldown) return [];
+    return (attemptsQuery.data ?? []).filter(
+      (a) => a.fn === drilldown.fn && a.metric === drilldown.metric,
+    );
+  }, [drilldown, attemptsQuery.data]);
+
+  const drilldownLiveBreaches = useMemo(() => {
+    if (!drilldown || !liveQuery.data) return [];
+    const fired = liveQuery.data.fired
+      .filter((b) => b.fn === drilldown.fn && b.metric === drilldown.metric)
+      .map((b) => ({ ...b, suppressed: false }));
+    const suppressed = liveQuery.data.suppressed
+      .filter((b) => b.fn === drilldown.fn && b.metric === drilldown.metric)
+      .map((b) => ({ ...b, suppressed: true }));
+    return [...fired, ...suppressed];
+  }, [drilldown, liveQuery.data]);
+
   if (roleLoading) {
     return (
       <div className="container max-w-5xl py-10 text-sm text-muted-foreground">

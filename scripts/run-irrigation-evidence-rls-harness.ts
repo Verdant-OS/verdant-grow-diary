@@ -452,7 +452,11 @@ async function main() {
     grow_id: oGrow,
     name: "T1",
   });
-  const oTent2 = await seedId(ownerC, "tents", {
+  // The irrigation matrix needs a second owned tent to prove wrong-tent
+  // rejection. Free users are correctly limited to one active tent, so seed
+  // only this over-cap test fixture through the trusted service-role setup
+  // client. Do not manufacture a billing entitlement for an RLS harness.
+  const oTent2 = await seedId(admin, "tents", {
     user_id: owner.id,
     grow_id: oGrow,
     name: "T2",

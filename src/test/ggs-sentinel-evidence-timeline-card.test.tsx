@@ -26,6 +26,7 @@ function row(
     metric,
     value,
     source: "live",
+    quality: "ok",
     captured_at: capturedAt,
     raw_payload: {
       source_app: "spider_farmer_ggs",
@@ -91,6 +92,6 @@ describe("GgsSentinelEvidenceTimelineCard", () => {
     const html = container.innerHTML;
     expect(html).not.toContain("PRIVATE-GGS-1");
     expect(html).not.toContain("do-not-render");
-    expect(html).not.toContain("\"payload\"");
+    expect(html).not.toContain('"payload"');
   });
 });

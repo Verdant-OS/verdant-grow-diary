@@ -1071,6 +1071,39 @@ export type Database = {
         }
         Relationships: []
       }
+      edge_metrics_alert_dispatches: {
+        Row: {
+          fire_count: number
+          fn: string
+          last_fired_at: string
+          last_requests_in_window: number
+          last_threshold: number
+          last_value: number
+          metric: string
+          updated_at: string
+        }
+        Insert: {
+          fire_count?: number
+          fn: string
+          last_fired_at?: string
+          last_requests_in_window: number
+          last_threshold: number
+          last_value: number
+          metric: string
+          updated_at?: string
+        }
+        Update: {
+          fire_count?: number
+          fn?: string
+          last_fired_at?: string
+          last_requests_in_window?: number
+          last_threshold?: number
+          last_value?: number
+          metric?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           created_at: string

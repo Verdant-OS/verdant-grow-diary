@@ -284,12 +284,17 @@ export async function handleFounderSlotsRequest(req: Request): Promise<Response>
       return done(
         json(
           405,
-          { error: "method_not_allowed", request_id: requestId },
+          {
+            error: "method_not_allowed",
+            error_code: "method_not_allowed",
+            request_id: requestId,
+          },
           requestHeaders,
         ),
         "method_not_allowed",
       );
     }
+
 
     let deps: Deps;
     try {

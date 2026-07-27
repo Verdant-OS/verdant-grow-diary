@@ -487,36 +487,46 @@ Deno.serve(async (req) => {
     }
   }
 
-  let webhook: Awaited<ReturnType<typeof postWebhook>> = { posted: false };
+  let webhook: Awaited<ReturnType<typeof postWebhook>> = { posted: false, attempts: [] };
   if (toFire.length > 0) {
-    webhook = await postWebhook(toFire, thresholds);
+    webhook = await postWebhook(toFire, thresholds, log, requestId);
     log("warn", "alert_fired", {
       request_id: requestId,
       breach_count: toFire.length,
       suppressed_count: suppressed.length,
       webhook_posted: webhook.posted,
       webhook_status: webhook.status,
+      webhook_attempts: webhook.attempts.length,
+      webhook_gave_up_transient: webhook.gave_up_transient ?? false,
     });
-    // Record dispatch state only for breaches we actually fired on.
-    // Failures here are non-fatal — the next cron pass will retry, and
-    // in the worst case one extra webhook message goes out.
-    const nowIso = new Date().toISOString();
-    const upsertRows = toFire.map((b) => ({
-      fn: b.fn,
-      metric: b.metric,
-      last_fired_at: nowIso,
-      last_value: b.value,
-      last_threshold: b.threshold,
-      last_requests_in_window: b.requests_in_window,
-      updated_at: nowIso,
-    }));
-    const { error: upsertErr } = await supa
-      .from("edge_metrics_alert_dispatches")
-      .upsert(upsertRows, { onConflict: "fn,metric" });
-    if (upsertErr) {
-      log("warn", "cooldown_upsert_failed", {
+    // Only record cooldown for breaches whose webhook actually delivered.
+    // If delivery failed transiently and we exhausted retries, leave the
+    // dispatch row untouched so the next cron pass can retry immediately
+    // instead of being silently suppressed by cooldown.
+    if (webhook.posted || !webhook.gave_up_transient) {
+      const nowIso = new Date().toISOString();
+      const upsertRows = toFire.map((b) => ({
+        fn: b.fn,
+        metric: b.metric,
+        last_fired_at: nowIso,
+        last_value: b.value,
+        last_threshold: b.threshold,
+        last_requests_in_window: b.requests_in_window,
+        updated_at: nowIso,
+      }));
+      const { error: upsertErr } = await supa
+        .from("edge_metrics_alert_dispatches")
+        .upsert(upsertRows, { onConflict: "fn,metric" });
+      if (upsertErr) {
+        log("warn", "cooldown_upsert_failed", {
+          request_id: requestId,
+          code: upsertErr.code,
+        });
+      }
+    } else {
+      log("warn", "cooldown_skipped_after_transient_failure", {
         request_id: requestId,
-        code: upsertErr.code,
+        breach_count: toFire.length,
       });
     }
   } else if (suppressed.length > 0) {

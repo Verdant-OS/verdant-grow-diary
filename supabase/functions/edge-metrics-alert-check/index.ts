@@ -190,22 +190,34 @@ async function postWebhook(breaches: Breach[], t: Thresholds): Promise<{ posted:
   }
 }
 
-async function requireOperator(authHeader: string): Promise<{ ok: true } | { ok: false; res: Response }> {
+async function requireOperator(
+  authHeader: string,
+  requestId: string,
+): Promise<{ ok: true } | { ok: false; res: Response }> {
   const url = Deno.env.get("SUPABASE_URL");
   const anon = Deno.env.get("SUPABASE_ANON_KEY");
-  if (!url || !anon) return { ok: false, res: json(503, { error: "env_missing" }) };
+  if (!url || !anon) {
+    return { ok: false, res: fail(503, "env_missing", "Service unavailable", requestId) };
+  }
   const supa = createClient(url, anon, { global: { headers: { Authorization: authHeader } } });
   const token = authHeader.slice("Bearer ".length);
   const { data: claims, error } = await supa.auth.getClaims(token);
-  if (error || !claims?.claims?.sub) return { ok: false, res: json(401, { error: "unauthorized" }) };
+  if (error || !claims?.claims?.sub) {
+    return { ok: false, res: fail(401, "invalid_jwt", "Unauthorized", requestId) };
+  }
   const { data: isOp, error: rErr } = await supa.rpc("has_role", {
     _user_id: claims.claims.sub,
     _role: "operator",
   });
-  if (rErr) return { ok: false, res: json(500, { error: "role_check_failed" }) };
-  if (!isOp) return { ok: false, res: json(403, { error: "forbidden" }) };
+  if (rErr) {
+    return { ok: false, res: fail(503, "role_check_failed", "Service unavailable", requestId) };
+  }
+  if (!isOp) {
+    return { ok: false, res: fail(403, "operator_role_required", "Forbidden", requestId) };
+  }
   return { ok: true };
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });

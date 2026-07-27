@@ -19,7 +19,18 @@ const PRIVATE_TABLES = [
   "action_queue",
 ];
 
-const PROTECTED_TABLES = [...PRIVATE_TABLES, "pheno_hunts", "pheno_keepers"];
+const PROTECTED_TABLES = [
+  ...PRIVATE_TABLES,
+  "pheno_hunts",
+  "pheno_keepers",
+  // Read by /operator/edge-alerts and /operator/edge-metrics — added when
+  // those two routes joined PROTECTED_MOBILE_ROUTES below, so a redirect-race
+  // read of either table now actually fails the "no private hits" assertion
+  // instead of passing silently.
+  "edge_metrics_alert_dispatches",
+  "edge_metrics_webhook_attempts",
+  "edge_function_metric_events",
+];
 
 // Representative protected/operator/internal mobile coverage. Kept in sync
 // with src/lib/appRouteManifest.ts via src/test/operator-route-mobile-coverage.test.ts.
@@ -241,6 +252,21 @@ test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
           body: JSON.stringify([]),
         });
       });
+      // /operator/edge-alerts invokes the `edge-metrics-alert-check` edge
+      // function. Without this, a redirect-race window could fire a REAL
+      // supabase.functions.invoke() call, breaking this file's own stated
+      // contract ("No real Supabase calls are made") — a stricter failure
+      // than a merely-unasserted REST read, so every /functions/v1/ hit
+      // counts here, not just ones matching a name allowlist.
+      const functionHits: string[] = [];
+      await page.route(/\/functions\/v1\//, (route, req) => {
+        functionHits.push(req.url());
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({}),
+        });
+      });
       // Reliability v1: avoid waiting on full network idle (mobile cold-boot
       // for 40+ protected routes is too tight at 8s and causes repo-wide
       // flake). Use domcontentloaded for the navigation and a polling URL
@@ -258,6 +284,10 @@ test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
       expect(
         privateHits,
         `Private-table hits while signed out (mobile, ${path}): ${privateHits.join(", ")}`,
+      ).toHaveLength(0);
+      expect(
+        functionHits,
+        `Edge Function invocation while signed out (mobile, ${path}): ${functionHits.join(", ")}`,
       ).toHaveLength(0);
       const body = ((await page.locator("body").textContent()) ?? "").toLowerCase();
       expect(body).not.toContain("page not found");

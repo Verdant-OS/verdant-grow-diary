@@ -318,6 +318,29 @@ export default function OperatorEdgeAlerts() {
     dispatchPage * PAGE_SIZE + PAGE_SIZE,
   );
 
+  const filteredAttempts = useMemo(() => {
+    return (attemptsQuery.data ?? []).filter((r) => {
+      if (!matchesCommonFilters(r.fn, r.metric)) return false;
+      if (timeCutoff !== null) {
+        const t = Date.parse(r.attempted_at);
+        if (!Number.isFinite(t) || t < timeCutoff) return false;
+      }
+      return true;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attemptsQuery.data, searchNeedle, metricFilter, timeCutoff]);
+
+  const attemptsPageCount = Math.max(1, Math.ceil(filteredAttempts.length / PAGE_SIZE));
+
+  useEffect(() => {
+    if (attemptsPage >= attemptsPageCount) setAttemptsPage(0);
+  }, [attemptsPageCount, attemptsPage]);
+
+  const pagedAttempts = filteredAttempts.slice(
+    attemptsPage * PAGE_SIZE,
+    attemptsPage * PAGE_SIZE + PAGE_SIZE,
+  );
+
   const activeCooldownCount = dispatchesWithExpiry.filter((r) => r.cooldown_active).length;
 
   const filtersActive =
@@ -332,12 +355,14 @@ export default function OperatorEdgeAlerts() {
     setStatusFilter("all");
     setTimeFilter("all");
     setDispatchPage(0);
+    setAttemptsPage(0);
   };
 
   const refresh = () => {
     setNow(Date.now());
     liveQuery.refetch();
     dispatchesQuery.refetch();
+    attemptsQuery.refetch();
   };
 
   if (roleLoading) {

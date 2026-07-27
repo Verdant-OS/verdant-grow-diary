@@ -981,7 +981,7 @@ export default function ActionQueue() {
               size="sm"
               variant="outline"
               onClick={() => {
-                setRpcUnavailable(false);
+                setRpcAvailability("unknown");
                 void load();
               }}
               data-testid="action-queue-transition-rpc-unavailable-retry"

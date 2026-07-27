@@ -280,6 +280,20 @@ describe("Daily Check CTA contract + safety", () => {
     expect(page).toMatch(/DAILY_CHECK_WHAT_COUNTS_HINT/);
   });
 
+  it("the test/debug-only step-list span is aria-hidden, not announced to real screen readers", () => {
+    // Found via a live production browser walkthrough: this sr-only span is
+    // explicitly commented "for tests/debug only — non-visual", but sr-only
+    // alone still puts the raw, comma-joined internal step-slug list
+    // ("select,environment,manual,quicklog,handheld,review,done") in front
+    // of every real screen-reader user. aria-hidden removes it from the
+    // accessibility tree while keeping it queryable by test tooling.
+    const stepListBlock = page.match(
+      /<span[^>]*data-testid="daily-grow-check-step-list"[^>]*>/,
+    )?.[0];
+    expect(stepListBlock, "daily-grow-check-step-list span not found").toBeDefined();
+    expect(stepListBlock).toMatch(/aria-hidden="true"/);
+  });
+
   it("rules module is I/O-free (no supabase / React)", () => {
     expect(rules).not.toMatch(/@\/integrations\/supabase/);
     expect(rules).not.toMatch(/from\s+["']react["']/);

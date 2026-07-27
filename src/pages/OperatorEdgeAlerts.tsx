@@ -131,10 +131,13 @@ export default function OperatorEdgeAlerts() {
   usePageSeo({
     title: "Operator · Edge alerts",
     description: "Fired vs suppressed edge alert breaches and cooldown expiry state.",
+    path: "/operator/edge-alerts",
     noindex: true,
   });
 
-  const { hasRole: isOperator, loading: roleLoading } = useHasRole("operator");
+  const roleResult = useHasRole("operator");
+  const isOperator = roleResult.granted;
+  const roleLoading = roleResult.status === "loading";
   const [now, setNow] = useState<number>(() => Date.now());
 
   const liveQuery = useQuery({

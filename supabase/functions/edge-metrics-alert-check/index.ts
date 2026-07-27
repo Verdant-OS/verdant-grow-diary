@@ -14,6 +14,7 @@
  *  - ALERT_RPC_ERROR_RATE         default 0.2 (share of requests, 0..1)
  *  - ALERT_STARTUP_FAILURE_THRESHOLD default 1
  *  - ALERT_MIN_REQUESTS           default 10  (skip rate check below this)
+ *  - ALERT_COOLDOWN_MINUTES       default 60  (dedupe window per fn+metric)
  *  - ALERT_WEBHOOK_URL            Slack-compatible incoming webhook. If
  *                                 unset, the function only reports JSON.
  *  - ALERT_WEBHOOK_TIMEOUT_MS     default 5000
@@ -25,6 +26,10 @@
  *    counts.
  *  - Webhook payload contains counts + fn names + env — never PII, never
  *    request IDs.
+ *  - Cooldown state lives in `public.edge_metrics_alert_dispatches`
+ *    (service-role only). While a (fn, metric) is inside its cooldown
+ *    window it is reported as `suppressed` and NOT posted to the
+ *    webhook, preventing repeat firing on the same breach condition.
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -93,6 +98,7 @@ interface Thresholds {
   rpcErrorRate: number;
   startupFailureCount: number;
   minRequests: number;
+  cooldownMinutes: number;
 }
 
 function loadThresholds(): Thresholds {
@@ -102,6 +108,7 @@ function loadThresholds(): Thresholds {
     rpcErrorRate: numEnv("ALERT_RPC_ERROR_RATE", 0.2),
     startupFailureCount: numEnv("ALERT_STARTUP_FAILURE_THRESHOLD", 1),
     minRequests: numEnv("ALERT_MIN_REQUESTS", 10),
+    cooldownMinutes: numEnv("ALERT_COOLDOWN_MINUTES", 60),
   };
 }
 
@@ -164,6 +171,61 @@ function evaluate(rows: EventRow[], t: Thresholds): Breach[] {
   }
   return breaches;
 }
+
+interface DispatchRow {
+  fn: string;
+  metric: string;
+  last_fired_at: string;
+}
+
+interface SuppressedBreach extends Breach {
+  last_fired_at: string;
+  next_eligible_at: string;
+  cooldown_remaining_seconds: number;
+}
+
+function partitionByCooldown(
+  breaches: Breach[],
+  existing: DispatchRow[],
+  now: Date,
+  cooldownMinutes: number,
+): { toFire: Breach[]; suppressed: SuppressedBreach[] } {
+  if (cooldownMinutes <= 0) return { toFire: breaches, suppressed: [] };
+  const cooldownMs = cooldownMinutes * 60_000;
+  const key = (fn: string, metric: string) => `${fn}::${metric}`;
+  const lastByKey = new Map<string, string>();
+  for (const row of existing) {
+    lastByKey.set(key(row.fn, row.metric), row.last_fired_at);
+  }
+  const toFire: Breach[] = [];
+  const suppressed: SuppressedBreach[] = [];
+  for (const b of breaches) {
+    const last = lastByKey.get(key(b.fn, b.metric));
+    if (!last) {
+      toFire.push(b);
+      continue;
+    }
+    const lastMs = Date.parse(last);
+    if (!Number.isFinite(lastMs)) {
+      toFire.push(b);
+      continue;
+    }
+    const nextMs = lastMs + cooldownMs;
+    if (nextMs <= now.getTime()) {
+      toFire.push(b);
+    } else {
+      suppressed.push({
+        ...b,
+        last_fired_at: last,
+        next_eligible_at: new Date(nextMs).toISOString(),
+        cooldown_remaining_seconds: Math.max(0, Math.ceil((nextMs - now.getTime()) / 1000)),
+      });
+    }
+  }
+  return { toFire, suppressed };
+}
+
+
 
 async function postWebhook(breaches: Breach[], t: Thresholds): Promise<{ posted: boolean; status?: number; error?: string }> {
   const url = Deno.env.get("ALERT_WEBHOOK_URL");
@@ -270,14 +332,76 @@ Deno.serve(async (req) => {
 
   const rows = (data ?? []) as EventRow[];
   const breaches = evaluate(rows, thresholds);
+
+  let toFire: Breach[] = breaches;
+  let suppressed: SuppressedBreach[] = [];
+  if (breaches.length > 0 && thresholds.cooldownMinutes > 0) {
+    const pairs = Array.from(new Set(breaches.map((b) => `${b.fn}|${b.metric}`)));
+    const fns = Array.from(new Set(breaches.map((b) => b.fn)));
+    const metrics = Array.from(new Set(breaches.map((b) => b.metric)));
+    const { data: dispatchRows, error: dispatchErr } = await supa
+      .from("edge_metrics_alert_dispatches")
+      .select("fn, metric, last_fired_at")
+      .in("fn", fns)
+      .in("metric", metrics);
+    if (dispatchErr) {
+      // Cooldown is best-effort — never let a lookup failure block alerting.
+      log("warn", "cooldown_lookup_failed", {
+        request_id: requestId,
+        code: dispatchErr.code,
+      });
+    } else {
+      const filtered = (dispatchRows ?? []).filter((r) =>
+        pairs.includes(`${r.fn}|${r.metric}`),
+      ) as DispatchRow[];
+      const parts = partitionByCooldown(
+        breaches,
+        filtered,
+        new Date(),
+        thresholds.cooldownMinutes,
+      );
+      toFire = parts.toFire;
+      suppressed = parts.suppressed;
+    }
+  }
+
   let webhook: Awaited<ReturnType<typeof postWebhook>> = { posted: false };
-  if (breaches.length > 0) {
-    webhook = await postWebhook(breaches, thresholds);
+  if (toFire.length > 0) {
+    webhook = await postWebhook(toFire, thresholds);
     log("warn", "alert_fired", {
       request_id: requestId,
-      breach_count: breaches.length,
+      breach_count: toFire.length,
+      suppressed_count: suppressed.length,
       webhook_posted: webhook.posted,
       webhook_status: webhook.status,
+    });
+    // Record dispatch state only for breaches we actually fired on.
+    // Failures here are non-fatal — the next cron pass will retry, and
+    // in the worst case one extra webhook message goes out.
+    const nowIso = new Date().toISOString();
+    const upsertRows = toFire.map((b) => ({
+      fn: b.fn,
+      metric: b.metric,
+      last_fired_at: nowIso,
+      last_value: b.value,
+      last_threshold: b.threshold,
+      last_requests_in_window: b.requests_in_window,
+      updated_at: nowIso,
+    }));
+    const { error: upsertErr } = await supa
+      .from("edge_metrics_alert_dispatches")
+      .upsert(upsertRows, { onConflict: "fn,metric" });
+    if (upsertErr) {
+      log("warn", "cooldown_upsert_failed", {
+        request_id: requestId,
+        code: upsertErr.code,
+      });
+    }
+  } else if (suppressed.length > 0) {
+    log("info", "alert_suppressed_by_cooldown", {
+      request_id: requestId,
+      suppressed_count: suppressed.length,
+      cooldown_minutes: thresholds.cooldownMinutes,
     });
   } else {
     log("info", "alert_check_clean", {
@@ -295,6 +419,8 @@ Deno.serve(async (req) => {
       sampled_events: rows.length,
       thresholds,
       breaches,
+      fired: toFire,
+      suppressed,
       webhook,
       invoked_via: isCron ? "cron" : "operator",
     },
@@ -303,4 +429,4 @@ Deno.serve(async (req) => {
 });
 
 
-export const __internals = { evaluate, loadThresholds };
+export const __internals = { evaluate, loadThresholds, partitionByCooldown };

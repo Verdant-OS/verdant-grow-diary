@@ -259,6 +259,46 @@ function remedyForFailRow(row) {
   return "Missing from catalog — create the price via `create_price` with this external_id.";
 }
 
+function statusLabel(row) {
+  if (row.status === "pass") return "✅ pass";
+  if (row.status === "skip") return "⚠️ not verified — API key unset";
+  return "❌ fail";
+}
+
+function remedyFor(row) {
+  if (row.status === "pass") return "—";
+  if (row.status === "skip") return "configure the secret";
+  return remedyForFailRow(row);
+}
+
+function causeLabel(row) {
+  if (row.status === "skip") return "key_unset";
+  if (row.status === "fail") {
+    const cause = row.cause ?? { kind: "missing" };
+    if (cause.kind === "api_error") return `api_error (HTTP ${cause.httpStatus})`;
+    return cause.kind;
+  }
+  return "—";
+}
+
+/**
+ * Group non-pass rows by env for the per-environment "Missing" section.
+ * Deterministic order: sandbox before live, then external_id asc — same
+ * ordering the verifier writes into the JSON `missingByEnv` field, so the
+ * comment and the machine-readable report line up.
+ */
+function groupMissingByEnv(rows) {
+  const byEnv = { sandbox: [], live: [] };
+  for (const row of rows) {
+    if (row.status === "pass") continue;
+    if (row.env === "sandbox" || row.env === "live") byEnv[row.env].push(row);
+  }
+  for (const env of ["sandbox", "live"]) {
+    byEnv[env].sort((a, b) => a.externalId.localeCompare(b.externalId));
+  }
+  return byEnv;
+}
+
 /**
  * Build the sticky-comment markdown. Only parsed fields flow in — never
  * the raw log, never the fail-detail text (which can embed request
@@ -294,14 +334,33 @@ export function renderComment({ verdict, parsed, runUrl, artifactHint }) {
     lines.push("| — | — | not verified | verifier produced no recognised output |");
   } else {
     for (const row of sorted) {
-      if (row.status === "pass") {
-        lines.push(`| ${row.env} | \`${row.externalId}\` | ✅ pass | — |`);
-      } else if (row.status === "skip") {
+      lines.push(
+        `| ${row.env} | \`${row.externalId}\` | ${statusLabel(row)} | ${remedyFor(row)} |`,
+      );
+    }
+  }
+
+  // Per-environment "Missing" breakdown — surfaces status + classified
+  // cause alongside the remedy so an operator can triage one env at a
+  // time without re-scanning the combined table above. Rendered only
+  // when there is at least one non-pass row somewhere.
+  const missingByEnv = groupMissingByEnv(parsed.rows);
+  const hasAnyMissing = missingByEnv.sandbox.length > 0 || missingByEnv.live.length > 0;
+  if (hasAnyMissing) {
+    lines.push("");
+    lines.push("#### Missing by environment");
+    for (const env of ["sandbox", "live"]) {
+      const rows = missingByEnv[env];
+      if (rows.length === 0) continue;
+      lines.push("");
+      lines.push(`**${env}** — ${rows.length} needing attention`);
+      lines.push("");
+      lines.push("| external_id | status | cause | remedy |");
+      lines.push("| --- | --- | --- | --- |");
+      for (const row of rows) {
         lines.push(
-          `| ${row.env} | \`${row.externalId}\` | ⚠️ not verified — API key unset | configure the secret |`,
+          `| \`${row.externalId}\` | ${statusLabel(row)} | ${causeLabel(row)} | ${remedyFor(row)} |`,
         );
-      } else {
-        lines.push(`| ${row.env} | \`${row.externalId}\` | ❌ fail | ${remedyForFailRow(row)} |`);
       }
     }
   }
@@ -366,9 +425,7 @@ if (isMain()) {
     inputMode = "report";
   } else {
     if (args.report) {
-      console.error(
-        `--report ${args.report} not readable — falling back to --log`,
-      );
+      console.error(`--report ${args.report} not readable — falling back to --log`);
     }
     const logText = safeReadLog(args.log) ?? "";
     parsed = parseVerifierLog(logText);

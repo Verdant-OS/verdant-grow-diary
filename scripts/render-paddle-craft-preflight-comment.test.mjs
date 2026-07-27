@@ -71,7 +71,10 @@ test("classifyFailure separates causes", () => {
     classifyFailure("found 1 entry/entries but none are active (status: archived)").kind,
     "inactive",
   );
-  assert.equal(classifyFailure("no price entity found (checked active + archived)").kind, "missing");
+  assert.equal(
+    classifyFailure("no price entity found (checked active + archived)").kind,
+    "missing",
+  );
 });
 
 test("all-pass log → verified verdict, no reason-code leak", () => {
@@ -302,7 +305,6 @@ test("parseVerifierReport returns empty parsed for non-object input", () => {
   assert.equal(parseVerifierReport({}).summary, null);
 });
 
-
 test("coverage_gap remedy tells operators to widen the allowlist, not create a price", () => {
   // The price EXISTS and is active; the app just doesn't know it is sellable.
   // Falling through to "Missing from catalog — create the price" sends an
@@ -334,12 +336,14 @@ test("coverage_gap remedy tells operators to widen the allowlist, not create a p
 // leaves --log handing out the old, wrong remedy.
 
 test("log fallback classifies a coverage gap, not a missing price", () => {
-  const parsed = parseVerifierLog([
-    "# Paddle Craft catalog preflight",
-    "✗ [live] credit_pack_500 — active in catalog but not in REQUIRED_PLAN_IDS — add to src/lib/paidPlanAllowlist.ts",
-    "",
-    "SUMMARY: pass=0 fail=1 skip=0",
-  ].join("\n"));
+  const parsed = parseVerifierLog(
+    [
+      "# Paddle Craft catalog preflight",
+      "✗ [live] credit_pack_500 — active in catalog but not in REQUIRED_PLAN_IDS — add to src/lib/paidPlanAllowlist.ts",
+      "",
+      "SUMMARY: pass=0 fail=1 skip=0",
+    ].join("\n"),
+  );
   assert.equal(parsed.rows.length, 1);
   assert.equal(parsed.rows[0].cause.kind, "coverage_gap");
 
@@ -356,11 +360,13 @@ test("log fallback classifies a coverage gap, not a missing price", () => {
 test("log fallback keeps the coverage row instead of dropping it", () => {
   // The synthetic id contains spaces. Under the old `\S+` id group this line
   // matched nothing and the failure rendered as no row at all.
-  const parsed = parseVerifierLog([
-    "✗ [live] craft_* / credit_pack_* (coverage) — catalog enumeration failed: Paddle API 500",
-    "",
-    "SUMMARY: pass=0 fail=1 skip=0",
-  ].join("\n"));
+  const parsed = parseVerifierLog(
+    [
+      "✗ [live] craft_* / credit_pack_* (coverage) — catalog enumeration failed: Paddle API 500",
+      "",
+      "SUMMARY: pass=0 fail=1 skip=0",
+    ].join("\n"),
+  );
   assert.equal(parsed.rows.length, 1, "row must not vanish");
   assert.equal(parsed.rows[0].externalId, "craft_* / credit_pack_* (coverage)");
   assert.equal(parsed.rows[0].cause.kind, "enumeration_error");
@@ -377,11 +383,137 @@ test("log fallback keeps the coverage row instead of dropping it", () => {
 test("log fallback still reads an ordinary id and a genuinely missing price", () => {
   // Non-triviality: the widened id group must not have broken normal rows or
   // collapsed every cause into the new branches.
-  const parsed = parseVerifierLog([
-    "✗ [live] craft_annual — no price entity found (checked active + archived)",
-    "",
-    "SUMMARY: pass=0 fail=1 skip=0",
-  ].join("\n"));
+  const parsed = parseVerifierLog(
+    [
+      "✗ [live] craft_annual — no price entity found (checked active + archived)",
+      "",
+      "SUMMARY: pass=0 fail=1 skip=0",
+    ].join("\n"),
+  );
   assert.equal(parsed.rows[0].externalId, "craft_annual");
   assert.equal(parsed.rows[0].cause.kind, "missing");
+});
+// ---------------------------------------------------------------------
+// Per-environment "Missing by environment" section — surfaces status +
+// cause for every non-pass row grouped by env so the PR comment / step
+// summary triages one env at a time.
+// ---------------------------------------------------------------------
+
+test("renderComment includes per-env Missing table with status + cause", () => {
+  const parsed = parseVerifierReport({
+    schemaVersion: 1,
+    envs: ["sandbox", "live"],
+    requiredIds: ["craft_monthly", "craft_annual"],
+    rows: [
+      { env: "sandbox", externalId: "craft_monthly", status: "pass" },
+      {
+        env: "sandbox",
+        externalId: "craft_annual",
+        status: "fail",
+        cause: { kind: "missing" },
+      },
+      {
+        env: "live",
+        externalId: "craft_annual",
+        status: "fail",
+        cause: { kind: "inactive" },
+      },
+      {
+        env: "live",
+        externalId: "craft_monthly",
+        status: "fail",
+        cause: { kind: "api_error", httpStatus: 429 },
+      },
+    ],
+    summary: { pass: 1, fail: 3, skip: 0 },
+    exitCode: 1,
+    keyUnset: false,
+  });
+  const md = renderComment({
+    verdict: decideVerdict({ rc: 1, parsed, eventName: "pull_request" }),
+    parsed,
+  });
+  assert.match(md, /Missing by environment/);
+  assert.match(md, /\*\*sandbox\*\* — 1 needing attention/);
+  assert.match(md, /\*\*live\*\* — 2 needing attention/);
+  assert.match(md, /\| external_id \| status \| cause \| remedy \|/);
+  assert.match(md, /api_error \(HTTP 429\)/);
+  assert.match(md, /inactive/);
+  assert.match(md, /missing/);
+  // No response-body leakage in the cause column.
+  assert.doesNotMatch(md, /pri_/);
+  assert.doesNotMatch(md, /Bad token/);
+});
+
+test("renderComment surfaces skip rows in per-env Missing table as key_unset", () => {
+  const parsed = parseVerifierReport({
+    schemaVersion: 1,
+    envs: ["sandbox"],
+    requiredIds: ["craft_monthly", "craft_annual"],
+    rows: [
+      { env: "sandbox", externalId: "craft_monthly", status: "skip" },
+      { env: "sandbox", externalId: "craft_annual", status: "skip" },
+    ],
+    summary: { pass: 0, fail: 0, skip: 2 },
+    exitCode: 2,
+    keyUnset: true,
+  });
+  const md = renderComment({
+    verdict: decideVerdict({ rc: 2, parsed, eventName: "pull_request" }),
+    parsed,
+  });
+  assert.match(md, /Missing by environment/);
+  assert.match(md, /\*\*sandbox\*\* — 2 needing attention/);
+  assert.match(md, /key_unset/);
+  // Only sandbox section rendered — no empty "**live**" header.
+  assert.doesNotMatch(md, /\*\*live\*\*/);
+});
+
+test("renderComment omits per-env Missing section when everything passed", () => {
+  const parsed = parseVerifierReport(REPORT_ALL_PASS);
+  const md = renderComment({
+    verdict: decideVerdict({ rc: 0, parsed, eventName: "pull_request" }),
+    parsed,
+  });
+  assert.doesNotMatch(md, /Missing by environment/);
+});
+
+test("renderComment classifies coverage_gap and enumeration_error in per-env table", () => {
+  const parsed = parseVerifierReport({
+    schemaVersion: 1,
+    envs: ["live"],
+    requiredIds: ["craft_monthly", "craft_annual"],
+    rows: [
+      {
+        env: "live",
+        externalId: "craft_quarterly",
+        status: "fail",
+        cause: { kind: "coverage_gap" },
+      },
+      {
+        env: "live",
+        externalId: "craft_monthly",
+        status: "fail",
+        cause: { kind: "enumeration_error" },
+      },
+    ],
+    summary: { pass: 0, fail: 2, skip: 0 },
+    exitCode: 1,
+    keyUnset: false,
+  });
+  const md = renderComment({
+    verdict: decideVerdict({ rc: 1, parsed, eventName: "pull_request" }),
+    parsed,
+  });
+  assert.match(md, /coverage_gap/);
+  assert.match(md, /enumeration_error/);
+  // Asserts the KIND of remedy, not its exact prose. This previously pinned
+  // two literal sentences; the coverage_gap wording has since been widened to
+  // send operators through the full sellable-tier chain (an allowlist entry
+  // alone leaves the SKU unsellable). Pinning prose would make that a test
+  // failure instead of an improvement — what matters is that a coverage gap is
+  // told to widen the allowlist, never to create a price that already exists.
+  assert.match(md, /PAID_PLAN_IDS/);
+  assert.doesNotMatch(md, /create the price via/i);
+  assert.match(md, /enumerate the catalog|Paddle enumeration failed/i);
 });

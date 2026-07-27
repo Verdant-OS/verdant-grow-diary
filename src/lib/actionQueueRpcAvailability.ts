@@ -133,3 +133,35 @@ export const ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY = {
     "Your queue is unchanged — no status was updated and no device commands were sent. " +
     "Support has been notified. Please try again in a few minutes.",
 } as const;
+
+/**
+ * Tri-state availability of the `action_queue_transition` RPC.
+ *
+ *   "unknown"     — not yet proven either way (initial mount, before any
+ *                   transition attempt). The UI surfaces this as an explicit
+ *                   "checking availability" placeholder so growers never see a
+ *                   stale/assumed status.
+ *   "available"   — a transition succeeded, proving the RPC is reachable.
+ *   "unavailable" — a transition failed with a missing-RPC signal (see
+ *                   `isMissingActionQueueTransitionRpcError`).
+ *
+ * Evidence-honest: we never optimistically flip to "available" without proof.
+ */
+export type ActionQueueRpcAvailability = "unknown" | "available" | "unavailable";
+
+/**
+ * Grower-safe copy for the interim "we don't know yet" state. Kept short so it
+ * fits in a status pill without truncation on mobile.
+ */
+export const ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY = {
+  title: "Checking action updates…",
+  label: "Checking availability",
+} as const;
+
+/**
+ * Grower-safe copy for the confirmed "reachable" state.
+ */
+export const ACTION_QUEUE_TRANSITION_RPC_AVAILABLE_COPY = {
+  title: "Action transitions are available",
+  label: "Transitions ready",
+} as const;

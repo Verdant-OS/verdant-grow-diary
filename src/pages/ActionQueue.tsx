@@ -92,6 +92,9 @@ import { safeActionQueueFailureCopy } from "@/lib/actionQueueFailureCopy";
 import {
   isMissingActionQueueTransitionRpcError,
   ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY,
+  ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY,
+  ACTION_QUEUE_TRANSITION_RPC_AVAILABLE_COPY,
+  type ActionQueueRpcAvailability,
 } from "@/lib/actionQueueRpcAvailability";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
@@ -421,10 +424,14 @@ export default function ActionQueue() {
     kind: ActionQueueTraceKind;
   } | null>(null);
   const [retryingTrace, setRetryingTrace] = useState(false);
-  // True when the `action_queue_transition` RPC is missing / renamed / not in
-  // the PostgREST schema cache. Surfaces a persistent banner so the grower
-  // isn't stuck retrying an approve/reject that can never land.
-  const [rpcUnavailable, setRpcUnavailable] = useState(false);
+  // Tri-state availability for the `action_queue_transition` RPC. Starts as
+  // "unknown" so the status pill renders an honest "Checking availability"
+  // placeholder instead of a stale/assumed green. Flips to "available" only
+  // when a transition actually succeeds, and to "unavailable" when a
+  // transition fails with a missing-RPC signal (persistent banner + red pill).
+  const [rpcAvailability, setRpcAvailability] =
+    useState<ActionQueueRpcAvailability>("unknown");
+  const rpcUnavailable = rpcAvailability === "unavailable";
 
   // Load existing approve/reject diary trace rows for the open drawer
   // row. Pure read; never inserts.
@@ -740,7 +747,7 @@ export default function ActionQueue() {
       // the grower gets a persistent, accurate banner instead of a looping
       // generic toast.
       if (isMissingActionQueueTransitionRpcError(error)) {
-        setRpcUnavailable(true);
+        setRpcAvailability("unavailable");
         console.warn(
           JSON.stringify({
             event: "action_queue_transition_rpc_unavailable",
@@ -776,8 +783,8 @@ export default function ActionQueue() {
       else setTraceFailure((prev) => (prev?.actionId === row.id ? null : prev));
     }
     setBusyId(null);
-    // Successful transition proves the RPC is reachable again.
-    if (rpcUnavailable) setRpcUnavailable(false);
+    // Successful transition proves the RPC is reachable.
+    setRpcAvailability("available");
     await load();
     if (drawerRow && drawerRow.id === row.id) {
       await loadDrawerHistory(row);
@@ -974,7 +981,7 @@ export default function ActionQueue() {
               size="sm"
               variant="outline"
               onClick={() => {
-                setRpcUnavailable(false);
+                setRpcAvailability("unknown");
                 void load();
               }}
               data-testid="action-queue-transition-rpc-unavailable-retry"
@@ -1019,31 +1026,49 @@ export default function ActionQueue() {
           icon={<ListChecks className="h-5 w-5" aria-hidden="true" />}
           actions={
             <div className="flex items-center gap-2">
-              <span
-                role="status"
-                aria-live="polite"
-                data-testid="action-queue-transition-rpc-status-pill"
-                data-state={rpcUnavailable ? "unavailable" : "available"}
-                title={
-                  rpcUnavailable
-                    ? ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.title
-                    : "Action transitions are available"
-                }
-                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-                  rpcUnavailable
+              {(() => {
+                const pillClass =
+                  rpcAvailability === "unavailable"
                     ? "border-destructive/40 bg-destructive/10 text-destructive"
-                    : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                }`}
-              >
-                {rpcUnavailable ? (
-                  <AlertTriangle className="h-3 w-3" aria-hidden="true" />
-                ) : (
-                  <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
-                )}
-                <span>
-                  {rpcUnavailable ? "Transitions unavailable" : "Transitions ready"}
-                </span>
-              </span>
+                    : rpcAvailability === "available"
+                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                      : "border-muted-foreground/30 bg-muted/40 text-muted-foreground";
+                const pillTitle =
+                  rpcAvailability === "unavailable"
+                    ? ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.title
+                    : rpcAvailability === "available"
+                      ? ACTION_QUEUE_TRANSITION_RPC_AVAILABLE_COPY.title
+                      : ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY.title;
+                const pillLabel =
+                  rpcAvailability === "unavailable"
+                    ? "Transitions unavailable"
+                    : rpcAvailability === "available"
+                      ? ACTION_QUEUE_TRANSITION_RPC_AVAILABLE_COPY.label
+                      : ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY.label;
+                return (
+                  <span
+                    role="status"
+                    aria-live="polite"
+                    aria-busy={rpcAvailability === "unknown"}
+                    data-testid="action-queue-transition-rpc-status-pill"
+                    data-state={rpcAvailability}
+                    title={pillTitle}
+                    className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${pillClass}`}
+                  >
+                    {rpcAvailability === "unavailable" ? (
+                      <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+                    ) : rpcAvailability === "available" ? (
+                      <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                    ) : (
+                      <Loader2
+                        className="h-3 w-3 animate-spin"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <span>{pillLabel}</span>
+                  </span>
+                );
+              })()}
               <Button
                 size="sm"
                 variant="ghost"

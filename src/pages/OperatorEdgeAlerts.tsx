@@ -754,6 +754,126 @@ export default function OperatorEdgeAlerts() {
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Webhook attempts</CardTitle>
+          <CardDescription>
+            Per-attempt delivery history from <code>edge_metrics_webhook_attempts</code>. Each
+            breach fire produces one row per attempt (delivered, transient retry, permanent
+            failure, or exhausted after retries).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {attemptsQuery.isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading attempt history…</p>
+          ) : attemptsQuery.error ? (
+            <p className="text-sm text-destructive">
+              {(attemptsQuery.error as Error).message}
+            </p>
+          ) : filteredAttempts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {(attemptsQuery.data ?? []).length === 0
+                ? "No webhook attempts recorded yet."
+                : "No attempts match the current filters."}
+            </p>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>When</TableHead>
+                    <TableHead>Function</TableHead>
+                    <TableHead>Metric</TableHead>
+                    <TableHead className="text-right">Attempt</TableHead>
+                    <TableHead>Outcome</TableHead>
+                    <TableHead className="text-right">Status</TableHead>
+                    <TableHead className="text-right">Delay</TableHead>
+                    <TableHead className="text-right">Duration</TableHead>
+                    <TableHead>Error</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pagedAttempts.map((r) => {
+                    const variant: "default" | "destructive" | "secondary" | "outline" =
+                      r.outcome === "delivered"
+                        ? "default"
+                        : r.outcome === "exhausted" || r.outcome === "permanent_failure"
+                        ? "destructive"
+                        : "secondary";
+                    return (
+                      <TableRow key={r.id}>
+                        <TableCell
+                          className="text-xs text-muted-foreground whitespace-nowrap"
+                          title={`${formatAbsolute(r.attempted_at)}${
+                            r.request_id ? ` · req ${r.request_id}` : ""
+                          }`}
+                        >
+                          {formatRelative(r.attempted_at, now)}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{r.fn}</TableCell>
+                        <TableCell className="text-xs">{metricLabel(r.metric)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{r.attempt}</TableCell>
+                        <TableCell>
+                          <Badge variant={variant}>{r.outcome.replace(/_/g, " ")}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {r.status_code ?? "—"}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          {r.delay_before_ms}ms
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          {r.duration_ms}ms
+                        </TableCell>
+                        <TableCell
+                          className="text-xs text-muted-foreground max-w-[16rem] truncate"
+                          title={r.error ?? ""}
+                        >
+                          {r.error ?? "—"}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+
+              <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                <span>
+                  Showing {attemptsPage * PAGE_SIZE + 1}–
+                  {Math.min(filteredAttempts.length, (attemptsPage + 1) * PAGE_SIZE)} of{" "}
+                  {filteredAttempts.length}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAttemptsPage((p) => Math.max(0, p - 1))}
+                    disabled={attemptsPage === 0}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Prev
+                  </Button>
+                  <span className="tabular-nums">
+                    Page {attemptsPage + 1} / {attemptsPageCount}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setAttemptsPage((p) => Math.min(attemptsPageCount - 1, p + 1))
+                    }
+                    disabled={attemptsPage >= attemptsPageCount - 1}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

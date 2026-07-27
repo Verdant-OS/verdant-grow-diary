@@ -901,7 +901,20 @@ export default function OperatorEdgeAlerts() {
                         ? "destructive"
                         : "secondary";
                     return (
-                      <TableRow key={r.id}>
+                      <TableRow
+                        key={r.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => openDrilldown(r.fn, r.metric)}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`View breach details for ${r.fn} ${r.metric}`}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openDrilldown(r.fn, r.metric);
+                          }
+                        }}
+                      >
                         <TableCell
                           className="text-xs text-muted-foreground whitespace-nowrap"
                           title={`${formatAbsolute(r.attempted_at)}${

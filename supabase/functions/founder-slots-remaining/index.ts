@@ -175,6 +175,59 @@ let requestsSinceSnapshot = 0;
 const SNAPSHOT_INTERVAL_MS = 30_000;
 let lastSnapshotAt = 0;
 
+// ---------------------------------------------------------------------------
+// Release provenance stamped onto every trendable metric line so log
+// aggregators can compare latency / error-rate across deploys and across
+// environments (sandbox vs live project) without joining on timestamps.
+//
+// Resolved once at module load. A test hook lets suites override the
+// values so assertions stay deterministic without touching real env vars.
+// ---------------------------------------------------------------------------
+
+export interface ReleaseProvenance {
+  deploy_version: string;
+  supabase_env: string;
+}
+
+function deriveSupabaseEnvFromUrl(url: string | undefined): string {
+  if (!url) return "unknown";
+  try {
+    const host = new URL(url).hostname;
+    // Supabase project URLs look like `<ref>.supabase.co` — the ref
+    // itself is the stable environment identifier.
+    const ref = host.split(".")[0];
+    return ref && ref.length > 0 ? ref : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+function resolveReleaseProvenance(): ReleaseProvenance {
+  const version =
+    Deno.env.get("EDGE_FUNCTION_VERSION") ??
+    Deno.env.get("DENO_DEPLOYMENT_ID") ??
+    Deno.env.get("SUPABASE_FUNCTION_VERSION") ??
+    "unknown";
+  const env =
+    Deno.env.get("SUPABASE_ENVIRONMENT") ??
+    Deno.env.get("SUPABASE_ENV") ??
+    deriveSupabaseEnvFromUrl(Deno.env.get("SUPABASE_URL"));
+  return { deploy_version: version, supabase_env: env };
+}
+
+let releaseProvenance: ReleaseProvenance = resolveReleaseProvenance();
+
+/**
+ * Test-only hook. Overrides the release provenance stamped onto
+ * `request_metric` and `metric_snapshot` lines. Pass `null` to
+ * re-resolve from the current env.
+ */
+export function __setReleaseProvenanceForTesting(
+  next: ReleaseProvenance | null,
+): void {
+  releaseProvenance = next ?? resolveReleaseProvenance();
+}
+
 function recordRequestMetric(
   outcome: Outcome,
   durationMs: number,
@@ -193,6 +246,8 @@ function recordRequestMetric(
     request_id: requestId,
     outcome,
     duration_ms: Math.round(durationMs * 100) / 100,
+    deploy_version: releaseProvenance.deploy_version,
+    supabase_env: releaseProvenance.supabase_env,
   });
   maybeEmitSnapshot();
 }
@@ -212,11 +267,14 @@ function maybeEmitSnapshot(): void {
     duration_ms_mean_in_window: mean,
     duration_ms_max_in_window: Math.round(durationMaxMsSinceSnapshot * 100) / 100,
     counters: { ...counters },
+    deploy_version: releaseProvenance.deploy_version,
+    supabase_env: releaseProvenance.supabase_env,
   });
   requestsSinceSnapshot = 0;
   durationSumMsSinceSnapshot = 0;
   durationMaxMsSinceSnapshot = 0;
 }
+
 
 
 // RFC 4122 v4 UUID regex — used to sanitize any client-supplied

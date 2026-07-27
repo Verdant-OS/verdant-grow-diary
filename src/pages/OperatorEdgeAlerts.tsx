@@ -34,6 +34,7 @@ import {
 
 import { supabase } from "@/integrations/supabase/client";
 import EdgeAlertsDryRunDialog from "@/components/EdgeAlertsDryRunDialog";
+import EdgeAlertsBreachDrilldownDialog from "@/components/EdgeAlertsBreachDrilldownDialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -202,6 +203,7 @@ export default function OperatorEdgeAlerts() {
   const [dispatchPage, setDispatchPage] = useState(0);
   const [attemptsPage, setAttemptsPage] = useState(0);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [drilldown, setDrilldown] = useState<{ fn: string; metric: string } | null>(null);
 
   const liveQuery = useQuery({
     queryKey: ["operator", "edge-alerts", "live"],
@@ -368,6 +370,35 @@ export default function OperatorEdgeAlerts() {
     dispatchesQuery.refetch();
     attemptsQuery.refetch();
   };
+
+  const openDrilldown = (fn: string, metric: string) => setDrilldown({ fn, metric });
+
+  const drilldownDispatch = useMemo(() => {
+    if (!drilldown) return null;
+    return (
+      dispatchesWithExpiry.find(
+        (r) => r.fn === drilldown.fn && r.metric === drilldown.metric,
+      ) ?? null
+    );
+  }, [drilldown, dispatchesWithExpiry]);
+
+  const drilldownAttempts = useMemo(() => {
+    if (!drilldown) return [];
+    return (attemptsQuery.data ?? []).filter(
+      (a) => a.fn === drilldown.fn && a.metric === drilldown.metric,
+    );
+  }, [drilldown, attemptsQuery.data]);
+
+  const drilldownLiveBreaches = useMemo(() => {
+    if (!drilldown || !liveQuery.data) return [];
+    const fired = liveQuery.data.fired
+      .filter((b) => b.fn === drilldown.fn && b.metric === drilldown.metric)
+      .map((b) => ({ ...b, suppressed: false }));
+    const suppressed = liveQuery.data.suppressed
+      .filter((b) => b.fn === drilldown.fn && b.metric === drilldown.metric)
+      .map((b) => ({ ...b, suppressed: true }));
+    return [...fired, ...suppressed];
+  }, [drilldown, liveQuery.data]);
 
   if (roleLoading) {
     return (
@@ -722,7 +753,20 @@ export default function OperatorEdgeAlerts() {
                 </TableHeader>
                 <TableBody>
                   {pagedDispatches.map((r) => (
-                    <TableRow key={`${r.fn}::${r.metric}`}>
+                    <TableRow
+                      key={`${r.fn}::${r.metric}`}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => openDrilldown(r.fn, r.metric)}
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`View breach details for ${r.fn} ${r.metric}`}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          openDrilldown(r.fn, r.metric);
+                        }
+                      }}
+                    >
                       <TableCell className="font-mono text-xs">{r.fn}</TableCell>
                       <TableCell>{metricLabel(r.metric)}</TableCell>
                       <TableCell className="text-right">{r.fire_count ?? "—"}</TableCell>
@@ -857,7 +901,20 @@ export default function OperatorEdgeAlerts() {
                         ? "destructive"
                         : "secondary";
                     return (
-                      <TableRow key={r.id}>
+                      <TableRow
+                        key={r.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => openDrilldown(r.fn, r.metric)}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`View breach details for ${r.fn} ${r.metric}`}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openDrilldown(r.fn, r.metric);
+                          }
+                        }}
+                      >
                         <TableCell
                           className="text-xs text-muted-foreground whitespace-nowrap"
                           title={`${formatAbsolute(r.attempted_at)}${
@@ -951,6 +1008,24 @@ export default function OperatorEdgeAlerts() {
           )}
         </CardContent>
       </Card>
+
+      <EdgeAlertsBreachDrilldownDialog
+        open={drilldown !== null}
+        onOpenChange={(o) => {
+          if (!o) setDrilldown(null);
+        }}
+        fn={drilldown?.fn ?? null}
+        metric={drilldown?.metric ?? null}
+        dispatch={drilldownDispatch}
+        attempts={drilldownAttempts}
+        liveBreaches={drilldownLiveBreaches}
+        cooldownMinutes={cooldownMinutes}
+        now={now}
+        metricLabel={metricLabel}
+        formatValue={formatValue}
+        formatAbsolute={formatAbsolute}
+        formatRelative={formatRelative}
+      />
     </div>
   );
 }

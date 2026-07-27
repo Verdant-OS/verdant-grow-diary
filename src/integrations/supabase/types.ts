@@ -4668,6 +4668,17 @@ export type Database = {
         Args: { p_retention_days?: number }
         Returns: Json
       }
+      purge_edge_function_metric_events: {
+        Args: {
+          other_days?: number
+          request_metric_days?: number
+          snapshot_days?: number
+        }
+        Returns: {
+          deleted_count: number
+          event_type: string
+        }[]
+      }
       quicklog_save_event: {
         Args: {
           p_details?: Json

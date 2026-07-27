@@ -4,6 +4,7 @@ import {
   PRIVILEGED_ROUTE_PREFIXES,
   PUBLIC_CORE_CENSUS_ROUTES,
   classifyLink,
+  expectedCensusNavigationPath,
   isReadOnlyEdgeFunction,
   isPrivilegedRoute,
   isSafelyFillableFieldType,
@@ -57,6 +58,36 @@ describe("core link and form census rules", () => {
     expect(
       classifyLink({ href: "/exports/example.csv", download: true }, MANIFEST).disposition,
     ).toBe("download");
+  });
+
+  it("expects signed-out links to auth routes to land on the welcome gate", () => {
+    const routes = [
+      { path: "/pheno-hunts/:id/compare", access: "public" },
+      { path: "/pheno-hunts/:id/workspace", access: "auth" },
+    ] as const;
+
+    expect(expectedCensusNavigationPath("/pheno-hunts/hunt-1/workspace", routes, false)).toBe(
+      "/welcome",
+    );
+    expect(expectedCensusNavigationPath("/pheno-hunts/hunt-1/workspace", routes, true)).toBe(
+      "/pheno-hunts/hunt-1/workspace",
+    );
+    expect(expectedCensusNavigationPath("/pheno-hunts/hunt-1/compare", routes, false)).toBe(
+      "/pheno-hunts/hunt-1/compare",
+    );
+  });
+
+  it("resolves the most specific route deterministically before applying access behavior", () => {
+    const routes = [
+      { path: "/pheno-hunts/:id/:view", access: "auth" },
+      { path: "/pheno-hunts/:id/compare", access: "public" },
+    ] as const;
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      expect(expectedCensusNavigationPath("/pheno-hunts/hunt-1/compare", routes, false)).toBe(
+        "/pheno-hunts/hunt-1/compare",
+      );
+    }
   });
 
   it.each(["text", "search", "email", "password", "number", "date", "datetime-local", "time"])(

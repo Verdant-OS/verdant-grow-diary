@@ -15,6 +15,7 @@ import {
   AUTHENTICATED_CORE_CENSUS_ROUTES,
   PUBLIC_CORE_CENSUS_ROUTES,
   classifyLink,
+  expectedCensusNavigationPath,
   isReadOnlyEdgeFunction,
   isSafelyFillableFieldType,
   placeholderValueForField,
@@ -637,6 +638,7 @@ async function findVisibleLinkByHref(page: Page, href: string): Promise<Locator 
 async function clickEverySafeInternalHref(
   page: Page,
   linkAudits: readonly LinkAudit[],
+  signedIn: boolean,
 ): Promise<string[]> {
   const unique = new Map<string, LinkAudit>();
   for (const link of linkAudits) {
@@ -660,18 +662,32 @@ async function clickEverySafeInternalHref(
       if (!anchor) return;
 
       const target = await anchor.getAttribute("target");
+      const expectedPathname = expectedCensusNavigationPath(
+        link.classification.pathname ?? link.href,
+        APP_ROUTES,
+        signedIn,
+      );
       if (target === "_blank") {
         const popupPromise = page.context().waitForEvent("page");
         await anchor.click();
         const popup = await popupPromise;
         await popup.waitForLoadState("domcontentloaded");
-        await assertMeaningfulPage(popup, link.classification.pathname ?? link.href);
+        await expect
+          .poll(() => new URL(popup.url()).pathname, {
+            message: `${link.href} must finish at its manifest-defined destination`,
+          })
+          .toBe(expectedPathname);
+        await assertMeaningfulPage(popup, expectedPathname);
         await popup.close();
       } else {
         await anchor.click();
         await page.waitForLoadState("domcontentloaded");
-        await assertMeaningfulPage(page, link.classification.pathname ?? link.href);
-        expect(new URL(page.url()).pathname).toBe(link.classification.pathname);
+        await expect
+          .poll(() => new URL(page.url()).pathname, {
+            message: `${link.href} must finish at its manifest-defined destination`,
+          })
+          .toBe(expectedPathname);
+        await assertMeaningfulPage(page, expectedPathname);
       }
       clicked.push(link.href);
     });
@@ -733,7 +749,7 @@ async function runLaneCensus(
     });
   }
 
-  report.clickedInternalHrefs = await clickEverySafeInternalHref(page, report.linkAudits);
+  report.clickedInternalHrefs = await clickEverySafeInternalHref(page, report.linkAudits, signedIn);
 
   console.log(
     `[core-census:${lane}] routes=${report.routeAudits.length} fields=${report.fieldAudits.length} exercised=${report.fieldAudits.filter((field) => field.exercised).length} links=${report.linkAudits.length} clicked=${report.clickedInternalHrefs.length} reads=${network.mockedReadRequests}`,

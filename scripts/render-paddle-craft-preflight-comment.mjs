@@ -153,6 +153,7 @@ export function parseVerifierReport(report) {
   return parsed;
 }
 
+
 function safeReadReport(reportPath) {
   if (!reportPath) return null;
   try {

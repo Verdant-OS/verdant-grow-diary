@@ -32,7 +32,13 @@ export const COMMENT_MARKER = "<!-- paddle-craft-catalog-preflight -->";
 //   ✗ [live] craft_annual — no price entity found (checked active + archived)
 //   • [live] craft_monthly — PADDLE_LIVE_API_KEY not set
 // Plus one SUMMARY line: SUMMARY: pass=<n> fail=<n> skip=<n>
-const LINE_RE = /^([✓✗•])\s+\[(sandbox|live)\]\s+(\S+)\s+—\s+(.+?)\s*$/u;
+// The id group is non-greedy `.+?` rather than `\S+` on purpose: the coverage
+// and enumeration rows carry a SYNTHETIC id containing spaces
+// ("craft_* / credit_pack_* (coverage)"). With `\S+` those lines matched
+// nothing and silently disappeared from the log-fallback comment — a failure
+// row that renders as no row at all. ` — ` is the field separator and never
+// appears inside an id, so non-greedy stops in the right place.
+const LINE_RE = /^([✓✗•])\s+\[(sandbox|live)\]\s+(.+?)\s+—\s+(.+?)\s*$/u;
 const SUMMARY_RE = /^SUMMARY:\s+pass=(\d+)\s+fail=(\d+)\s+skip=(\d+)\s*$/;
 const KEY_UNSET_RE = /_API_KEY is not set/;
 
@@ -48,6 +54,16 @@ export function classifyFailure(detail) {
   }
   if (/none are active/i.test(detail)) {
     return { kind: "inactive" };
+  }
+  // Kept in step with the JSON path's causes. Without these the fallback
+  // classifies a coverage gap as `missing` and tells an operator to create a
+  // price that already exists and is active — the exact inversion the JSON
+  // remedy was fixed for.
+  if (/not in REQUIRED_PLAN_IDS/i.test(detail)) {
+    return { kind: "coverage_gap" };
+  }
+  if (/catalog enumeration failed/i.test(detail)) {
+    return { kind: "enumeration_error" };
   }
   return { kind: "missing" };
 }

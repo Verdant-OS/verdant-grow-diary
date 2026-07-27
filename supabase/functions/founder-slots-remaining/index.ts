@@ -367,6 +367,9 @@ function recordRequestMetric(
     duration_ms: roundedDuration,
     deploy_version: releaseProvenance.deploy_version,
     supabase_env: releaseProvenance.supabase_env,
+    // Per-request key: retries of the same logical invocation (identified by
+    // request_id) collapse to a single row via the partial unique index.
+    idempotency_key: `${FN}:req:${requestId}`,
   });
   maybeEmitSnapshot();
 }

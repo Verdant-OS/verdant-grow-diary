@@ -4283,15 +4283,6 @@ export type Database = {
       }
     }
     Functions: {
-      action_queue_transition: {
-        Args: {
-          p_action_queue_id: string
-          p_expected_status: string
-          p_note?: string | null
-          p_transition: string
-        }
-        Returns: Json
-      }
       ai_credit_allowance: {
         Args: { p_plan_id: string }
         Returns: {

@@ -412,6 +412,83 @@ async function requireOperator(
   return { ok: true };
 }
 
+const ALLOWED_METRICS = new Set<Breach["metric"]>([
+  "rpc_error_count",
+  "rpc_error_rate",
+  "startup_import_failed",
+]);
+
+interface SimulateSpec {
+  fn: string;
+  metric: Breach["metric"];
+  value?: number;
+  requests_in_window?: number;
+}
+
+interface ParsedBody {
+  dryRun: boolean;
+  simulate?: SimulateSpec;
+  error?: string;
+}
+
+async function parseBody(req: Request): Promise<ParsedBody> {
+  if (req.method !== "POST") return { dryRun: false };
+  const ctype = req.headers.get("content-type") ?? "";
+  if (!ctype.includes("application/json")) return { dryRun: false };
+  let raw: unknown;
+  try {
+    raw = await req.json();
+  } catch {
+    return { dryRun: false, error: "invalid_json" };
+  }
+  if (!raw || typeof raw !== "object") return { dryRun: false };
+  const obj = raw as Record<string, unknown>;
+  const dryRun = obj.dry_run === true;
+  if (!dryRun) return { dryRun: false };
+  const sim = obj.simulate;
+  if (!sim || typeof sim !== "object") {
+    return { dryRun, error: "simulate_required" };
+  }
+  const s = sim as Record<string, unknown>;
+  const fn = typeof s.fn === "string" ? s.fn.trim() : "";
+  const metric = typeof s.metric === "string" ? (s.metric as Breach["metric"]) : ("" as Breach["metric"]);
+  if (!fn || fn.length > 128) return { dryRun, error: "invalid_fn" };
+  if (!ALLOWED_METRICS.has(metric)) return { dryRun, error: "invalid_metric" };
+  const value = typeof s.value === "number" && Number.isFinite(s.value) ? s.value : undefined;
+  const requests = typeof s.requests_in_window === "number" && Number.isFinite(s.requests_in_window)
+    ? s.requests_in_window
+    : undefined;
+  return { dryRun, simulate: { fn, metric, value, requests_in_window: requests } };
+}
+
+function buildSimulatedBreach(spec: SimulateSpec, t: Thresholds): Breach {
+  const defaults: Record<Breach["metric"], { value: number; threshold: number; requests: number }> = {
+    rpc_error_count: {
+      value: Math.max(t.rpcErrorCount, 1),
+      threshold: t.rpcErrorCount,
+      requests: Math.max(t.minRequests, t.rpcErrorCount),
+    },
+    rpc_error_rate: {
+      value: Math.min(1, Math.max(t.rpcErrorRate, 0.01)),
+      threshold: t.rpcErrorRate,
+      requests: Math.max(t.minRequests, 10),
+    },
+    startup_import_failed: {
+      value: Math.max(t.startupFailureCount, 1),
+      threshold: t.startupFailureCount,
+      requests: 1,
+    },
+  };
+  const d = defaults[spec.metric];
+  return {
+    fn: spec.fn,
+    metric: spec.metric,
+    value: spec.value ?? d.value,
+    threshold: d.threshold,
+    requests_in_window: spec.requests_in_window ?? d.requests,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const requestId = resolveRequestId(req);
@@ -443,6 +520,13 @@ Deno.serve(async (req) => {
     if (!gate.ok) return gate.res;
   }
 
+  const parsedBody = await parseBody(req);
+  if (parsedBody.error) {
+    return fail(400, parsedBody.error, "Invalid request body", requestId);
+  }
+  // Dry-run is strictly operator-driven; cron never carries a body.
+  const isDryRun = parsedBody.dryRun && !isCron;
+
   const thresholds = loadThresholds();
   const supa = createClient(url, serviceKey);
   const since = new Date(Date.now() - thresholds.windowMinutes * 60_000).toISOString();
@@ -460,7 +544,17 @@ Deno.serve(async (req) => {
   }
 
   const rows = (data ?? []) as EventRow[];
-  const breaches = evaluate(rows, thresholds);
+  const realBreaches = evaluate(rows, thresholds);
+  let simulatedBreach: Breach | null = null;
+  if (isDryRun && parsedBody.simulate) {
+    simulatedBreach = buildSimulatedBreach(parsedBody.simulate, thresholds);
+    log("info", "dry_run_simulated_breach", {
+      request_id: requestId,
+      fn: simulatedBreach.fn,
+      metric: simulatedBreach.metric,
+    });
+  }
+  const breaches = simulatedBreach ? [...realBreaches, simulatedBreach] : realBreaches;
 
   let toFire: Breach[] = breaches;
   let suppressed: SuppressedBreach[] = [];

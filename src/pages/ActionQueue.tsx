@@ -783,8 +783,8 @@ export default function ActionQueue() {
       else setTraceFailure((prev) => (prev?.actionId === row.id ? null : prev));
     }
     setBusyId(null);
-    // Successful transition proves the RPC is reachable again.
-    if (rpcUnavailable) setRpcUnavailable(false);
+    // Successful transition proves the RPC is reachable.
+    setRpcAvailability("available");
     await load();
     if (drawerRow && drawerRow.id === row.id) {
       await loadDrawerHistory(row);

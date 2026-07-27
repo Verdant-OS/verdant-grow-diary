@@ -54,7 +54,10 @@ describe("Action Queue manual refresh button structure", () => {
 
   it("button is a Button component with ghost variant", () => {
     const idx = SRC.indexOf("action-queue-refresh-button");
-    const block = SRC.slice(Math.max(0, idx - 300), idx + 300);
+    // Widened from the RPC-availability re-probe added to the onClick body
+    // (setRpcAvailability("unknown") before void load()), which pushed the
+    // opening `variant="ghost"` attribute further ahead of the testid.
+    const block = SRC.slice(Math.max(0, idx - 500), idx + 300);
     expect(block).toMatch(/variant="ghost"/);
     expect(block).toMatch(/size="sm"/);
   });
@@ -62,7 +65,13 @@ describe("Action Queue manual refresh button structure", () => {
 
 describe("Action Queue manual refresh button behavior", () => {
   it("onClick calls the existing load function", () => {
-    expect(SRC).toMatch(/onClick=\{load\}/);
+    // Manual refresh now re-probes RPC availability (resets the status pill
+    // to "unknown") before calling load(), so onClick is an inline handler
+    // rather than a bare `{load}` reference. Assert the handler still calls
+    // load() rather than pinning the old bare-reference shape.
+    const idx = SRC.indexOf("action-queue-refresh-button");
+    const block = SRC.slice(Math.max(0, idx - 500), idx);
+    expect(block).toMatch(/onClick=\{[\s\S]*?void load\(\);[\s\S]*?\}\}/);
   });
 
   it("button is disabled during loading or refreshing", () => {

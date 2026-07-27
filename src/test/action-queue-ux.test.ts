@@ -15,6 +15,32 @@ import { resolve } from "node:path";
 
 const PAGE = readFileSync(resolve(__dirname, "../..", "src/pages/ActionQueue.tsx"), "utf8");
 
+// Only two RPC-invocation shapes are legitimate in this codebase (see
+// action-detail-linked-alert.test.tsx for the full writeup):
+//   1. Direct call:       supabase.rpc("name", args)
+//   2. Cast-wrapped call: (supabase.rpc as unknown as (fn: string, args:
+//      unknown) => Promise<...>)("name", args) — used before the RPC's
+//      generated typing lands (see actionQueueRpcAvailability).
+// Anchoring to the call's own first argument (and second argument
+// identifier) rather than "any quote within N characters of supabase.rpc"
+// stops a dynamic/foreign RPC call from being credited with the canonical
+// name or the expected rpcArgs binding (Codex P2).
+const DIRECT_RPC_CALL_PATTERN = /supabase\.rpc\s*\(\s*["']([^"']+)["']\s*(?:,\s*(\w+))?\s*,?\s*\)/g;
+const CAST_RPC_CALL_PATTERN =
+  /supabase\.rpc\s+as\s+unknown\s+as\s*\([\s\S]{0,150}?\)\s*=>\s*[\s\S]{0,150}?\)\s*\(\s*["']([^"']+)["']\s*(?:,\s*(\w+))?\s*,?\s*\)/g;
+
+function resolveRpcCalls(src: string): Array<{ name: string; argsVar?: string }> {
+  const direct = [...src.matchAll(DIRECT_RPC_CALL_PATTERN)].map((m) => ({
+    name: m[1],
+    argsVar: m[2],
+  }));
+  const cast = [...src.matchAll(CAST_RPC_CALL_PATTERN)].map((m) => ({
+    name: m[1],
+    argsVar: m[2],
+  }));
+  return [...direct, ...cast];
+}
+
 function buttonOpeningTag(testId: string): string | undefined {
   const marker = `data-testid="${testId}"`;
   const markerIndex = PAGE.indexOf(marker);
@@ -156,7 +182,13 @@ describe("ActionQueue — transition/audit flow preserved", () => {
   });
 
   it("transition() uses the atomic transition-and-audit RPC", () => {
-    expect(PAGE).toMatch(/supabase\.rpc\(\s*["']action_queue_transition["']/);
+    const rpcCallSiteCount = (PAGE.match(/supabase\.rpc\b/g) ?? []).length;
+    const rpcCalls = resolveRpcCalls(PAGE);
+    // Every call site must independently resolve its own first-argument
+    // name — a dynamic/foreign call site would leave this short rather
+    // than being credited with the canonical name.
+    expect(rpcCalls.length).toBe(rpcCallSiteCount);
+    expect(rpcCalls.map((c) => c.name)).toEqual(["action_queue_transition"]);
     expect(PAGE).not.toMatch(/\.from\(\s*["']action_queue_events["']\s*\)[\s\S]{0,200}\.insert\(/);
   });
 
@@ -166,9 +198,8 @@ describe("ActionQueue — transition/audit flow preserved", () => {
     );
     expect(m).not.toBeNull();
     expect(m![1]).not.toMatch(/\buser_id\b|\bgrow_id\b|\bevent_type\b|\bnew_status\b/);
-    expect(PAGE).toMatch(
-      /supabase\.rpc\(\s*["']action_queue_transition["']\s*,\s*rpcArgs\s*,?\s*\)/,
-    );
+    const rpcCalls = resolveRpcCalls(PAGE);
+    expect(rpcCalls).toEqual([{ name: "action_queue_transition", argsVar: "rpcArgs" }]);
   });
 });
 

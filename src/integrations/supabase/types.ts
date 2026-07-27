@@ -1014,6 +1014,63 @@ export type Database = {
           },
         ]
       }
+      edge_function_metric_events: {
+        Row: {
+          counters: Json | null
+          created_at: string
+          deploy_version: string
+          duration_ms: number | null
+          duration_ms_max_in_window: number | null
+          duration_ms_mean_in_window: number | null
+          event_type: string
+          fn: string
+          id: number
+          idempotency_key: string | null
+          observed_at: string
+          outcome: string | null
+          request_id: string | null
+          requests_in_window: number | null
+          supabase_env: string
+          window_ms: number | null
+        }
+        Insert: {
+          counters?: Json | null
+          created_at?: string
+          deploy_version?: string
+          duration_ms?: number | null
+          duration_ms_max_in_window?: number | null
+          duration_ms_mean_in_window?: number | null
+          event_type: string
+          fn: string
+          id?: number
+          idempotency_key?: string | null
+          observed_at?: string
+          outcome?: string | null
+          request_id?: string | null
+          requests_in_window?: number | null
+          supabase_env?: string
+          window_ms?: number | null
+        }
+        Update: {
+          counters?: Json | null
+          created_at?: string
+          deploy_version?: string
+          duration_ms?: number | null
+          duration_ms_max_in_window?: number | null
+          duration_ms_mean_in_window?: number | null
+          event_type?: string
+          fn?: string
+          id?: number
+          idempotency_key?: string | null
+          observed_at?: string
+          outcome?: string | null
+          request_id?: string | null
+          requests_in_window?: number | null
+          supabase_env?: string
+          window_ms?: number | null
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           created_at: string
@@ -4610,6 +4667,17 @@ export type Database = {
       purge_billing_subscription_update_audit: {
         Args: { p_retention_days?: number }
         Returns: Json
+      }
+      purge_edge_function_metric_events: {
+        Args: {
+          other_days?: number
+          request_metric_days?: number
+          snapshot_days?: number
+        }
+        Returns: {
+          deleted_count: number
+          event_type: string
+        }[]
       }
       quicklog_save_event: {
         Args: {

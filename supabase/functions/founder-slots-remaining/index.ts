@@ -173,6 +173,164 @@ let requestsSinceSnapshot = 0;
 const SNAPSHOT_INTERVAL_MS = 30_000;
 let lastSnapshotAt = 0;
 
+// ---------------------------------------------------------------------------
+// Release provenance stamped onto every trendable metric line so log
+// aggregators can compare latency / error-rate across deploys and across
+// environments (sandbox vs live project) without joining on timestamps.
+//
+// Resolved once at module load. A test hook lets suites override the
+// values so assertions stay deterministic without touching real env vars.
+// ---------------------------------------------------------------------------
+
+export interface ReleaseProvenance {
+  deploy_version: string;
+  supabase_env: string;
+}
+
+function deriveSupabaseEnvFromUrl(url: string | undefined): string {
+  if (!url) return "unknown";
+  try {
+    const host = new URL(url).hostname;
+    // Supabase project URLs look like `<ref>.supabase.co` — the ref
+    // itself is the stable environment identifier.
+    const ref = host.split(".")[0];
+    return ref && ref.length > 0 ? ref : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+function resolveReleaseProvenance(): ReleaseProvenance {
+  const version =
+    Deno.env.get("EDGE_FUNCTION_VERSION") ??
+    Deno.env.get("DENO_DEPLOYMENT_ID") ??
+    Deno.env.get("SUPABASE_FUNCTION_VERSION") ??
+    "unknown";
+  const env =
+    Deno.env.get("SUPABASE_ENVIRONMENT") ??
+    Deno.env.get("SUPABASE_ENV") ??
+    deriveSupabaseEnvFromUrl(Deno.env.get("SUPABASE_URL"));
+  return { deploy_version: version, supabase_env: env };
+}
+
+let releaseProvenance: ReleaseProvenance = resolveReleaseProvenance();
+
+/**
+ * Test-only hook. Overrides the release provenance stamped onto
+ * `request_metric` and `metric_snapshot` lines. Pass `null` to
+ * re-resolve from the current env.
+ */
+export function __setReleaseProvenanceForTesting(next: ReleaseProvenance | null): void {
+  releaseProvenance = next ?? resolveReleaseProvenance();
+}
+
+// ---------------------------------------------------------------------------
+// Long-term analytics sink. Every request_metric / metric_snapshot is
+// mirrored to `public.edge_function_metric_events` via a raw PostgREST
+// insert with the service-role key. Rules:
+//   - Fire-and-forget: never awaited on the request path, never blocks
+//     the response, wrapped in EdgeRuntime.waitUntil when available so
+//     the runtime doesn't kill the connection before it flushes.
+//   - Fail-open: any insert error is swallowed with a structured
+//     `metric_persist_failed` log; the in-process counters and JSON logs
+//     remain the source of truth and never regress.
+//   - Skipped when SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY are absent
+//     (same env-missing branch the handler already reports).
+// ---------------------------------------------------------------------------
+
+interface MetricEventRow {
+  fn: string;
+  event_type: "request_metric" | "metric_snapshot";
+  request_id?: string | null;
+  outcome?: string | null;
+  duration_ms?: number | null;
+  window_ms?: number | null;
+  requests_in_window?: number | null;
+  duration_ms_mean_in_window?: number | null;
+  duration_ms_max_in_window?: number | null;
+  counters?: Record<string, number> | null;
+  deploy_version: string;
+  supabase_env: string;
+  /**
+   * Deterministic per-logical-event dedup key. Repeated inserts with the
+   * same key are collapsed to a single row by the partial unique index
+   * `edge_function_metric_events_idempotency_key_uidx`, so EdgeRuntime
+   * retries (or manual re-fires from `waitUntil`) can never double-count.
+   * Format:
+   *   - request_metric:  `${fn}:req:${request_id}`
+   *   - metric_snapshot: `${fn}:snap:${window_start_ms}`
+   * Kept ≤ 200 chars to satisfy the length CHECK.
+   */
+  idempotency_key: string;
+}
+
+type MetricPersistor = (row: MetricEventRow) => Promise<void>;
+
+async function persistMetricEventDefault(row: MetricEventRow): Promise<void> {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) return; // silently skip — env_missing already logged elsewhere
+  try {
+    // PostgREST upsert keyed on the partial-unique idempotency_key column.
+    // `resolution=merge-duplicates` + `on_conflict=idempotency_key` turns a
+    // repeated write into a no-op UPDATE (same values), so the row count
+    // stays 1 no matter how many times the runtime retries this waitUntil.
+    const res = await fetch(
+      `${url}/rest/v1/edge_function_metric_events?on_conflict=idempotency_key`,
+      {
+        method: "POST",
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal,resolution=merge-duplicates",
+        },
+        body: JSON.stringify(row),
+      },
+    );
+    if (!res.ok) {
+      log({
+        event: "metric_persist_failed",
+        severity: "warn",
+        status: res.status,
+        event_type: row.event_type,
+        idempotency_key: row.idempotency_key,
+      });
+    }
+  } catch (err) {
+    log({
+      event: "metric_persist_failed",
+      severity: "warn",
+      event_type: row.event_type,
+      idempotency_key: row.idempotency_key,
+      error_message: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+let metricPersistor: MetricPersistor = persistMetricEventDefault;
+
+/**
+ * Test-only hook. Overrides the metrics persistor so suites can assert
+ * on the rows without hitting the network. Pass `null` to restore the
+ * real PostgREST-based sink.
+ */
+export function __setMetricPersistorForTesting(next: MetricPersistor | null): void {
+  metricPersistor = next ?? persistMetricEventDefault;
+}
+
+function schedulePersist(row: MetricEventRow): void {
+  const promise = metricPersistor(row).catch(() => {
+    /* persistor is already fail-open; catch guards against unhandled rejections */
+  });
+  const runtime = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } })
+    .EdgeRuntime;
+  if (runtime && typeof runtime.waitUntil === "function") {
+    runtime.waitUntil(promise);
+  }
+  // else: fire-and-forget; classic Deno tests await it via the test hook.
+}
+
 function recordRequestMetric(outcome: Outcome, durationMs: number, requestId: string): void {
   counters.requests_total += 1;
   counters[outcome] = (counters[outcome] ?? 0) + 1;
@@ -181,12 +339,27 @@ function recordRequestMetric(outcome: Outcome, durationMs: number, requestId: st
   if (durationMs > durationMaxMsSinceSnapshot) {
     durationMaxMsSinceSnapshot = durationMs;
   }
+  const roundedDuration = Math.round(durationMs * 100) / 100;
   log({
     event: "request_metric",
     severity: "info",
     request_id: requestId,
     outcome,
-    duration_ms: Math.round(durationMs * 100) / 100,
+    duration_ms: roundedDuration,
+    deploy_version: releaseProvenance.deploy_version,
+    supabase_env: releaseProvenance.supabase_env,
+  });
+  schedulePersist({
+    fn: FN,
+    event_type: "request_metric",
+    request_id: requestId,
+    outcome,
+    duration_ms: roundedDuration,
+    deploy_version: releaseProvenance.deploy_version,
+    supabase_env: releaseProvenance.supabase_env,
+    // Per-request key: retries of the same logical invocation (identified by
+    // request_id) collapse to a single row via the partial unique index.
+    idempotency_key: `${FN}:req:${requestId}`,
   });
   maybeEmitSnapshot();
 }
@@ -199,14 +372,32 @@ function maybeEmitSnapshot(): void {
     requestsSinceSnapshot === 0
       ? 0
       : Math.round((durationSumMsSinceSnapshot / requestsSinceSnapshot) * 100) / 100;
+  const maxRounded = Math.round(durationMaxMsSinceSnapshot * 100) / 100;
+  const countersSnapshot = { ...counters };
   log({
     event: "metric_snapshot",
     severity: "info",
     window_ms: SNAPSHOT_INTERVAL_MS,
     requests_in_window: requestsSinceSnapshot,
     duration_ms_mean_in_window: mean,
-    duration_ms_max_in_window: Math.round(durationMaxMsSinceSnapshot * 100) / 100,
-    counters: { ...counters },
+    duration_ms_max_in_window: maxRounded,
+    counters: countersSnapshot,
+    deploy_version: releaseProvenance.deploy_version,
+    supabase_env: releaseProvenance.supabase_env,
+  });
+  schedulePersist({
+    fn: FN,
+    event_type: "metric_snapshot",
+    window_ms: SNAPSHOT_INTERVAL_MS,
+    requests_in_window: requestsSinceSnapshot,
+    duration_ms_mean_in_window: mean,
+    duration_ms_max_in_window: maxRounded,
+    counters: countersSnapshot,
+    deploy_version: releaseProvenance.deploy_version,
+    supabase_env: releaseProvenance.supabase_env,
+    // Per-window key: `lastSnapshotAt` is the deterministic window boundary
+    // for this snapshot, so a retried waitUntil re-fires with the same key.
+    idempotency_key: `${FN}:snap:${lastSnapshotAt}`,
   });
   requestsSinceSnapshot = 0;
   durationSumMsSinceSnapshot = 0;

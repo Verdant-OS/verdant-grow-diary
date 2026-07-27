@@ -92,7 +92,9 @@ import { safeActionQueueFailureCopy } from "@/lib/actionQueueFailureCopy";
 import {
   isMissingActionQueueTransitionRpcError,
   ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY,
+  type ActionQueueRpcAvailability,
 } from "@/lib/actionQueueRpcAvailability";
+import { ActionQueueRpcStatusPill } from "@/components/ActionQueueRpcStatusPill";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -421,10 +423,13 @@ export default function ActionQueue() {
     kind: ActionQueueTraceKind;
   } | null>(null);
   const [retryingTrace, setRetryingTrace] = useState(false);
-  // True when the `action_queue_transition` RPC is missing / renamed / not in
-  // the PostgREST schema cache. Surfaces a persistent banner so the grower
-  // isn't stuck retrying an approve/reject that can never land.
-  const [rpcUnavailable, setRpcUnavailable] = useState(false);
+  // Tri-state availability for the `action_queue_transition` RPC. Starts as
+  // "unknown" so the status pill renders an honest "Checking availability"
+  // placeholder instead of a stale/assumed green. Flips to "available" only
+  // when a transition actually succeeds, and to "unavailable" when a
+  // transition fails with a missing-RPC signal (persistent banner + red pill).
+  const [rpcAvailability, setRpcAvailability] = useState<ActionQueueRpcAvailability>("unknown");
+  const rpcUnavailable = rpcAvailability === "unavailable";
 
   // Load existing approve/reject diary trace rows for the open drawer
   // row. Pure read; never inserts.
@@ -745,7 +750,7 @@ export default function ActionQueue() {
       // the grower gets a persistent, accurate banner instead of a looping
       // generic toast.
       if (isMissingActionQueueTransitionRpcError(error)) {
-        setRpcUnavailable(true);
+        setRpcAvailability("unavailable");
         console.warn(
           JSON.stringify({
             event: "action_queue_transition_rpc_unavailable",
@@ -767,6 +772,9 @@ export default function ActionQueue() {
         (result.reason === "status_conflict" || result.reason === "action_not_found");
       if (shouldReload) await load();
       setBusyId(null);
+      // Retryable/transient failure: reset the pill to "unknown" so the next
+      // attempt re-proves the RPC state rather than showing stale status.
+      setRpcAvailability("unknown");
       toast.error(safeActionQueueFailureCopy("transition", error ?? result));
       return false;
     }
@@ -781,8 +789,8 @@ export default function ActionQueue() {
       else setTraceFailure((prev) => (prev?.actionId === row.id ? null : prev));
     }
     setBusyId(null);
-    // Successful transition proves the RPC is reachable again.
-    if (rpcUnavailable) setRpcUnavailable(false);
+    // Successful transition proves the RPC is reachable.
+    setRpcAvailability("available");
     await load();
     if (drawerRow && drawerRow.id === row.id) {
       await loadDrawerHistory(row);
@@ -979,7 +987,7 @@ export default function ActionQueue() {
               size="sm"
               variant="outline"
               onClick={() => {
-                setRpcUnavailable(false);
+                setRpcAvailability("unknown");
                 void load();
               }}
               data-testid="action-queue-transition-rpc-unavailable-retry"
@@ -1023,21 +1031,29 @@ export default function ActionQueue() {
           description="Suggestions are approval-gated. Verdant never sends commands to equipment."
           icon={<ListChecks className="h-5 w-5" aria-hidden="true" />}
           actions={
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={load}
-              disabled={loading || isRefreshing}
-              aria-label="Refresh Action Queue"
-              data-testid="action-queue-refresh-button"
-              className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-                aria-hidden="true"
-              />
-              <span>Refresh</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              <ActionQueueRpcStatusPill availability={rpcAvailability} />
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  // Manual refresh re-probes RPC state: show the interim
+                  // placeholder until the next transition proves availability.
+                  setRpcAvailability("unknown");
+                  void load();
+                }}
+                disabled={loading || isRefreshing}
+                aria-label="Refresh Action Queue"
+                data-testid="action-queue-refresh-button"
+                className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+                  aria-hidden="true"
+                />
+                <span>Refresh</span>
+              </Button>
+            </div>
           }
         />
         {lastUpdatedAt !== null && (

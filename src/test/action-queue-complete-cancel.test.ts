@@ -52,7 +52,10 @@ describe("Action Queue complete/cancel transitions", () => {
   });
 
   it("records status and audit through the canonical RPC (no privileged key)", () => {
-    expect(src).toMatch(/supabase\.rpc\(\s*"action_queue_transition"/);
+    // Tolerates the current runtime-availability cast:
+    //   (supabase.rpc as unknown as (...) => ...)("action_queue_transition", rpcArgs)
+    // as well as a direct supabase.rpc("action_queue_transition", ...).
+    expect(src).toMatch(/supabase\.rpc\b[\s\S]{0,200}?["']action_queue_transition["']/);
     expect(src).not.toMatch(/\.from\(\s*"action_queue_events"\s*\)\s*\.insert\(/);
     expect(src).not.toMatch(/service_role/i);
   });

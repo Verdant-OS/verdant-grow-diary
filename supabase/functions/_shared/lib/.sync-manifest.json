@@ -4,7 +4,7 @@
   "sourceHashes": {
     "src/constants/aiDoctorContextReadiness.ts": "22767b47268f6fa199b89f81d9dbb7fb017ab1f9f860c8dfdfe6d44501ee8170",
     "src/constants/aiDoctorImportedHistory.ts": "f04d998dea22c9e8e7aaa6489a64cf4af44202435982039a1f216ccba9c317a0",
-    "src/integrations/supabase/types.ts": "0cf5e7153d9f4b4cbb8c1f85a57fddb39d2bb81f709e82b796c4191066bb7d6b",
+    "src/integrations/supabase/types.ts": "3e7aa36c8ccda1bf181e0424724ae116f2ae5be368a730e7ae040a6cde5a921d",
     "src/lib/aiCoachLatestSensorSnapshot.ts": "b37f8baccdf66becef9023a2e632383c3a9cb3bd095d3d5faf813051ae6f32f5",
     "src/lib/aiDoctorContextCompiler.ts": "961834597ad69dce6d9b72cb901dbdc24a5bab891e6589713605750cdb439593",
     "src/lib/aiDoctorContextRules.ts": "9e107644add1559d6f3e076e45de759e7f75fe3a1ce5115f55b09517da60e358",

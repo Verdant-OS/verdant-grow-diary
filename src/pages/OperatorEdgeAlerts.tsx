@@ -893,28 +893,40 @@ export default function OperatorEdgeAlerts() {
                 </TableBody>
               </Table>
 
-              <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-                <span>
+              <div className="mt-3 flex flex-col items-stretch gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-center sm:text-left">
                   Showing {attemptsPage * PAGE_SIZE + 1}–
                   {Math.min(filteredAttempts.length, (attemptsPage + 1) * PAGE_SIZE)} of{" "}
                   {filteredAttempts.length}
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between gap-2 sm:justify-end">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-11 w-11 sm:h-9 sm:w-9"
+                    onClick={() => setAttemptsPage(0)}
+                    disabled={attemptsPage === 0}
+                    aria-label="First page"
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
+                    className="h-11 flex-1 sm:h-9 sm:flex-none"
                     onClick={() => setAttemptsPage((p) => Math.max(0, p - 1))}
                     disabled={attemptsPage === 0}
                   >
                     <ChevronLeft className="h-4 w-4" />
                     Prev
                   </Button>
-                  <span className="tabular-nums">
-                    Page {attemptsPage + 1} / {attemptsPageCount}
+                  <span className="tabular-nums whitespace-nowrap px-1">
+                    {attemptsPage + 1} / {attemptsPageCount}
                   </span>
                   <Button
                     variant="outline"
                     size="sm"
+                    className="h-11 flex-1 sm:h-9 sm:flex-none"
                     onClick={() =>
                       setAttemptsPage((p) => Math.min(attemptsPageCount - 1, p + 1))
                     }
@@ -922,6 +934,16 @@ export default function OperatorEdgeAlerts() {
                   >
                     Next
                     <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-11 w-11 sm:h-9 sm:w-9"
+                    onClick={() => setAttemptsPage(attemptsPageCount - 1)}
+                    disabled={attemptsPage >= attemptsPageCount - 1}
+                    aria-label="Last page"
+                  >
+                    <ChevronsRight className="h-4 w-4" />
                   </Button>
                 </div>
               </div>

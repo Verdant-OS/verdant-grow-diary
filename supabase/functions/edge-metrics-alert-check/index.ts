@@ -221,15 +221,17 @@ async function requireOperator(
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const requestId = resolveRequestId(req);
+
   if (req.method !== "GET" && req.method !== "POST") {
-    return json(405, { error: "method_not_allowed" });
+    return fail(405, "method_not_allowed", "Method not allowed", requestId);
   }
 
   const url = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !serviceKey) {
-    log("error", "env_missing");
-    return json(503, { error: "env_missing" });
+    log("error", "env_missing", { request_id: requestId });
+    return fail(503, "env_missing", "Service unavailable", requestId);
   }
 
   // Manual invocations must present an operator JWT. Scheduled pg_cron
@@ -237,12 +239,16 @@ Deno.serve(async (req) => {
   // lets pg_net trigger the check without carrying a user session.
   const cronSecret = Deno.env.get("ALERT_CRON_SECRET");
   const providedCronSecret = req.headers.get("x-alert-cron-secret");
-  const isCron = cronSecret && providedCronSecret && providedCronSecret === cronSecret;
+  const isCron = Boolean(
+    cronSecret && providedCronSecret && providedCronSecret === cronSecret,
+  );
 
   if (!isCron) {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return json(401, { error: "unauthorized" });
-    const gate = await requireOperator(authHeader);
+    if (!authHeader?.startsWith("Bearer ")) {
+      return fail(401, "missing_bearer_token", "Unauthorized", requestId);
+    }
+    const gate = await requireOperator(authHeader, requestId);
     if (!gate.ok) return gate.res;
   }
 
@@ -258,8 +264,8 @@ Deno.serve(async (req) => {
     .limit(10000);
 
   if (error) {
-    log("error", "query_failed", { code: error.code });
-    return json(500, { error: "query_failed" });
+    log("error", "query_failed", { request_id: requestId, code: error.code });
+    return fail(503, "query_failed", "Service unavailable", requestId);
   }
 
   const rows = (data ?? []) as EventRow[];
@@ -268,23 +274,33 @@ Deno.serve(async (req) => {
   if (breaches.length > 0) {
     webhook = await postWebhook(breaches, thresholds);
     log("warn", "alert_fired", {
+      request_id: requestId,
       breach_count: breaches.length,
       webhook_posted: webhook.posted,
       webhook_status: webhook.status,
     });
   } else {
-    log("info", "alert_check_clean", { window_minutes: thresholds.windowMinutes, sampled: rows.length });
+    log("info", "alert_check_clean", {
+      request_id: requestId,
+      window_minutes: thresholds.windowMinutes,
+      sampled: rows.length,
+    });
   }
 
-  return json(200, {
-    ok: true,
-    window_minutes: thresholds.windowMinutes,
-    sampled_events: rows.length,
-    thresholds,
-    breaches,
-    webhook,
-    invoked_via: isCron ? "cron" : "operator",
-  });
+  return json(
+    200,
+    {
+      ok: true,
+      window_minutes: thresholds.windowMinutes,
+      sampled_events: rows.length,
+      thresholds,
+      breaches,
+      webhook,
+      invoked_via: isCron ? "cron" : "operator",
+    },
+    requestId,
+  );
 });
+
 
 export const __internals = { evaluate, loadThresholds };

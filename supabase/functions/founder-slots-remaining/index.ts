@@ -109,68 +109,109 @@ function loadDeps(): Promise<Deps> {
 
 log({ event: "boot", severity: "info" });
 
+// RFC 4122 v4 UUID regex — used to sanitize any client-supplied
+// `x-request-id` header so log/response IDs stay compact and predictable
+// and can't be used to smuggle arbitrary content into log lines.
+const REQUEST_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function resolveRequestId(req: Request): string {
+  const incoming = req.headers.get("x-request-id");
+  if (incoming && REQUEST_ID_RE.test(incoming)) return incoming.toLowerCase();
+  return crypto.randomUUID();
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  const requestId = resolveRequestId(req);
+  // Every log line for this request carries request_id so a single
+  // failure can be traced from the 503 response header/body back through
+  // every structured log entry it produced.
+  const rlog = (fields: LogFields) => log({ ...fields, request_id: requestId });
+  const requestHeaders: Record<string, string> = { "x-request-id": requestId };
+  const fail = (body: Record<string, unknown> = {}) =>
+    json(503, { error: "slots_unavailable", request_id: requestId, ...body }, requestHeaders);
+
   if (req.method !== "GET" && req.method !== "POST") {
-    return json(405, { error: "method_not_allowed" });
+    return json(
+      405,
+      { error: "method_not_allowed", request_id: requestId },
+      requestHeaders,
+    );
   }
 
   let deps: Deps;
   try {
     deps = await loadDeps();
-  } catch {
-    // Already logged as startup_import_failed above.
-    return json(503, { error: "slots_unavailable" });
+  } catch (err) {
+    // loadDeps already logged startup_import_failed (module-scoped, no
+    // request_id). Emit a request-scoped companion so the 503 can be
+    // traced back to this request.
+    const message = err instanceof Error ? err.message : String(err);
+    const name = err instanceof Error ? err.name : "UnknownError";
+    rlog({
+      event: "startup_dependencies_unavailable",
+      severity: "critical",
+      error_name: name,
+      error_message: message,
+    });
+    return fail();
   }
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!supabaseUrl || !serviceRoleKey) {
-      log({
+      rlog({
         event: "env_missing",
         severity: "critical",
         has_url: Boolean(supabaseUrl),
         has_service_role: Boolean(serviceRoleKey),
       });
-      return json(503, { error: "slots_unavailable" });
+      return fail();
     }
     const sb = deps.createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false },
     });
     const { data, error } = await sb.rpc("founder_lifetime_slots_remaining");
     if (error) {
-      log({
+      rlog({
         event: "rpc_error",
         severity: "error",
         code: error.code ?? null,
         message: error.message ?? null,
       });
-      return json(503, { error: "slots_unavailable" });
+      return fail();
     }
     const payload = deps.buildFounderSlotsPayload(data);
     if (!payload) {
-      log({
+      rlog({
         event: "rpc_invalid_payload",
         severity: "error",
         data_type: typeof data,
       });
-      return json(503, { error: "slots_unavailable" });
+      return fail();
     }
-    return json(200, payload, {
-      "Cache-Control": `public, max-age=${CACHE_SECONDS}`,
-    });
+    return json(
+      200,
+      { ...payload, request_id: requestId },
+      {
+        ...requestHeaders,
+        "Cache-Control": `public, max-age=${CACHE_SECONDS}`,
+      },
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const name = err instanceof Error ? err.name : "UnknownError";
-    log({
+    rlog({
       event: "handler_unhandled_error",
       severity: "critical",
       error_name: name,
       error_message: message,
     });
-    return json(503, { error: "slots_unavailable" });
+    return fail();
   }
 });

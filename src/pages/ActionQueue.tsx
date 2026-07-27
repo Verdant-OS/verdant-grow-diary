@@ -769,6 +769,9 @@ export default function ActionQueue() {
         (result.reason === "status_conflict" || result.reason === "action_not_found");
       if (shouldReload) await load();
       setBusyId(null);
+      // Retryable/transient failure: reset the pill to "unknown" so the next
+      // attempt re-proves the RPC state rather than showing stale status.
+      setRpcAvailability("unknown");
       toast.error(safeActionQueueFailureCopy("transition", error ?? result));
       return false;
     }

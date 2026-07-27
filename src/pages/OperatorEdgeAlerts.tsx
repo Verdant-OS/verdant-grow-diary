@@ -753,33 +753,55 @@ export default function OperatorEdgeAlerts() {
                 </TableBody>
               </Table>
 
-              <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-                <span>
+              <div className="mt-3 flex flex-col items-stretch gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-center sm:text-left">
                   Showing {dispatchPage * PAGE_SIZE + 1}–
                   {Math.min(filteredDispatches.length, (dispatchPage + 1) * PAGE_SIZE)} of{" "}
                   {filteredDispatches.length}
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between gap-2 sm:justify-end">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-11 w-11 sm:h-9 sm:w-9"
+                    onClick={() => setDispatchPage(0)}
+                    disabled={dispatchPage === 0}
+                    aria-label="First page"
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
+                    className="h-11 flex-1 sm:h-9 sm:flex-none"
                     onClick={() => setDispatchPage((p) => Math.max(0, p - 1))}
                     disabled={dispatchPage === 0}
                   >
                     <ChevronLeft className="h-4 w-4" />
                     Prev
                   </Button>
-                  <span className="tabular-nums">
-                    Page {dispatchPage + 1} / {pageCount}
+                  <span className="tabular-nums whitespace-nowrap px-1">
+                    {dispatchPage + 1} / {pageCount}
                   </span>
                   <Button
                     variant="outline"
                     size="sm"
+                    className="h-11 flex-1 sm:h-9 sm:flex-none"
                     onClick={() => setDispatchPage((p) => Math.min(pageCount - 1, p + 1))}
                     disabled={dispatchPage >= pageCount - 1}
                   >
                     Next
                     <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-11 w-11 sm:h-9 sm:w-9"
+                    onClick={() => setDispatchPage(pageCount - 1)}
+                    disabled={dispatchPage >= pageCount - 1}
+                    aria-label="Last page"
+                  >
+                    <ChevronsRight className="h-4 w-4" />
                   </Button>
                 </div>
               </div>

@@ -122,6 +122,7 @@ const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
 const OperatorSupportInbox = lazy(() => import("./pages/OperatorSupportInbox"));
 const OperatorCreditsAudit = lazy(() => import("./pages/OperatorCreditsAudit"));
 const OperatorEdgeMetrics = lazy(() => import("./pages/OperatorEdgeMetrics"));
+const OperatorEdgeAlerts = lazy(() => import("./pages/OperatorEdgeAlerts"));
 
 const Leads = lazy(() => import("./pages/Leads"));
 const PiIngestStatus = lazy(() => import("./pages/PiIngestStatus"));
@@ -495,6 +496,7 @@ const App = () => (
                       <Route path="/operator/support-inbox" element={<OperatorSupportInbox />} />
                       <Route path="/operator/credits-audit" element={<OperatorCreditsAudit />} />
                       <Route path="/operator/edge-metrics" element={<OperatorEdgeMetrics />} />
+                      <Route path="/operator/edge-alerts" element={<OperatorEdgeAlerts />} />
 
                       <Route path="/operator/release-readiness" element={<ReleaseReadiness />} />
                       {/* Diagnostics Audience Split v1 — /diagnostics is an

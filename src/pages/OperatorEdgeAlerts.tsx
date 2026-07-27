@@ -24,8 +24,11 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Clock,
   RefreshCw,
+  SlidersHorizontal,
   X,
 } from "lucide-react";
 
@@ -198,6 +201,7 @@ export default function OperatorEdgeAlerts() {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [dispatchPage, setDispatchPage] = useState(0);
   const [attemptsPage, setAttemptsPage] = useState(0);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const liveQuery = useQuery({
     queryKey: ["operator", "edge-alerts", "live"],
@@ -407,17 +411,45 @@ export default function OperatorEdgeAlerts() {
         </div>
       </header>
 
-      <Card>
-        <CardHeader className="pb-3">
+      <Card className="sticky top-0 z-30 -mx-2 rounded-none border-x-0 bg-background/95 px-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/75 sm:static sm:mx-0 sm:rounded-lg sm:border-x sm:px-0 sm:bg-card sm:shadow-none sm:backdrop-blur-none">
+        <CardHeader className="hidden pb-3 sm:block">
           <CardTitle className="text-base">Filters</CardTitle>
           <CardDescription>
             Narrow by function name, metric, cooldown status, or time range. Applies to fired,
             suppressed, and cooldown tables.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <div className="grid gap-1.5 lg:col-span-2">
+        <CardContent className="space-y-3 py-3 sm:py-6">
+          {/* Mobile: compact row with search + toggle */}
+          <div className="flex items-center gap-2 sm:hidden">
+            <Input
+              id="edge-alerts-search-mobile"
+              placeholder="Search function…"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setDispatchPage(0);
+              }}
+              className="h-11 flex-1"
+              inputMode="search"
+            />
+            <Button
+              variant={mobileFiltersOpen || filtersActive ? "default" : "outline"}
+              size="icon"
+              aria-label={mobileFiltersOpen ? "Hide filters" : "Show filters"}
+              aria-expanded={mobileFiltersOpen}
+              className="h-11 w-11 shrink-0"
+              onClick={() => setMobileFiltersOpen((v) => !v)}
+            >
+              <SlidersHorizontal className="h-5 w-5" />
+            </Button>
+          </div>
+
+          {/* Full filter grid: always on desktop, toggled on mobile */}
+          <div
+            className={`${mobileFiltersOpen ? "grid" : "hidden"} gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-5`}
+          >
+            <div className="hidden gap-1.5 sm:grid lg:col-span-2">
               <Label htmlFor="edge-alerts-search" className="text-xs">
                 Function / rule
               </Label>
@@ -440,7 +472,7 @@ export default function OperatorEdgeAlerts() {
                   setDispatchPage(0);
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-11 sm:h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -460,7 +492,7 @@ export default function OperatorEdgeAlerts() {
                   setDispatchPage(0);
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-11 sm:h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -479,7 +511,7 @@ export default function OperatorEdgeAlerts() {
                   setDispatchPage(0);
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-11 sm:h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -493,19 +525,20 @@ export default function OperatorEdgeAlerts() {
             </div>
           </div>
           {filtersActive ? (
-            <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
               <span>
-                Showing {filteredDispatches.length} of {dispatchesWithExpiry.length} dispatch rows
+                {filteredDispatches.length}/{dispatchesWithExpiry.length} dispatch
                 {" · "}
                 {filteredFired.length} fired · {filteredSuppressed.length} suppressed
               </span>
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                <X className="mr-1 h-3 w-3" /> Clear filters
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9">
+                <X className="mr-1 h-3 w-3" /> Clear
               </Button>
             </div>
           ) : null}
         </CardContent>
       </Card>
+
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
@@ -720,33 +753,55 @@ export default function OperatorEdgeAlerts() {
                 </TableBody>
               </Table>
 
-              <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-                <span>
+              <div className="mt-3 flex flex-col items-stretch gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-center sm:text-left">
                   Showing {dispatchPage * PAGE_SIZE + 1}–
                   {Math.min(filteredDispatches.length, (dispatchPage + 1) * PAGE_SIZE)} of{" "}
                   {filteredDispatches.length}
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between gap-2 sm:justify-end">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-11 w-11 sm:h-9 sm:w-9"
+                    onClick={() => setDispatchPage(0)}
+                    disabled={dispatchPage === 0}
+                    aria-label="First page"
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
+                    className="h-11 flex-1 sm:h-9 sm:flex-none"
                     onClick={() => setDispatchPage((p) => Math.max(0, p - 1))}
                     disabled={dispatchPage === 0}
                   >
                     <ChevronLeft className="h-4 w-4" />
                     Prev
                   </Button>
-                  <span className="tabular-nums">
-                    Page {dispatchPage + 1} / {pageCount}
+                  <span className="tabular-nums whitespace-nowrap px-1">
+                    {dispatchPage + 1} / {pageCount}
                   </span>
                   <Button
                     variant="outline"
                     size="sm"
+                    className="h-11 flex-1 sm:h-9 sm:flex-none"
                     onClick={() => setDispatchPage((p) => Math.min(pageCount - 1, p + 1))}
                     disabled={dispatchPage >= pageCount - 1}
                   >
                     Next
                     <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-11 w-11 sm:h-9 sm:w-9"
+                    onClick={() => setDispatchPage(pageCount - 1)}
+                    disabled={dispatchPage >= pageCount - 1}
+                    aria-label="Last page"
+                  >
+                    <ChevronsRight className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
@@ -838,28 +893,40 @@ export default function OperatorEdgeAlerts() {
                 </TableBody>
               </Table>
 
-              <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-                <span>
+              <div className="mt-3 flex flex-col items-stretch gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-center sm:text-left">
                   Showing {attemptsPage * PAGE_SIZE + 1}–
                   {Math.min(filteredAttempts.length, (attemptsPage + 1) * PAGE_SIZE)} of{" "}
                   {filteredAttempts.length}
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between gap-2 sm:justify-end">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-11 w-11 sm:h-9 sm:w-9"
+                    onClick={() => setAttemptsPage(0)}
+                    disabled={attemptsPage === 0}
+                    aria-label="First page"
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
+                    className="h-11 flex-1 sm:h-9 sm:flex-none"
                     onClick={() => setAttemptsPage((p) => Math.max(0, p - 1))}
                     disabled={attemptsPage === 0}
                   >
                     <ChevronLeft className="h-4 w-4" />
                     Prev
                   </Button>
-                  <span className="tabular-nums">
-                    Page {attemptsPage + 1} / {attemptsPageCount}
+                  <span className="tabular-nums whitespace-nowrap px-1">
+                    {attemptsPage + 1} / {attemptsPageCount}
                   </span>
                   <Button
                     variant="outline"
                     size="sm"
+                    className="h-11 flex-1 sm:h-9 sm:flex-none"
                     onClick={() =>
                       setAttemptsPage((p) => Math.min(attemptsPageCount - 1, p + 1))
                     }
@@ -867,6 +934,16 @@ export default function OperatorEdgeAlerts() {
                   >
                     Next
                     <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-11 w-11 sm:h-9 sm:w-9"
+                    onClick={() => setAttemptsPage(attemptsPageCount - 1)}
+                    disabled={attemptsPage >= attemptsPageCount - 1}
+                    aria-label="Last page"
+                  >
+                    <ChevronsRight className="h-4 w-4" />
                   </Button>
                 </div>
               </div>

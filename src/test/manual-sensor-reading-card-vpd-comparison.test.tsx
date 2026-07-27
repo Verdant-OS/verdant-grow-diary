@@ -17,6 +17,10 @@ vi.mock("@/hooks/useInsertSensorReading", () => ({
   useInsertSensorReading: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
+vi.mock("@/hooks/useInsertSensorReadings", () => ({
+  useInsertSensorReadings: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
+
 function renderCard() {
   return render(
     <MemoryRouter>

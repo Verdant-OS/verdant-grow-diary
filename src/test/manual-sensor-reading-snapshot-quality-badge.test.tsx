@@ -20,6 +20,7 @@ import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 const insertSpy = vi.fn().mockResolvedValue(undefined);
 vi.mock("@/lib/growRepo", () => ({
   insertSensorReading: (...args: unknown[]) => insertSpy(...args),
+  insertSensorReadingsBatch: (...args: unknown[]) => insertSpy(...args),
 }));
 
 const TENT_ID = "11111111-1111-4111-8111-111111111111";
@@ -54,7 +55,9 @@ describe("ManualSensorReadingCard — snapshot quality badge", () => {
     const section = screen.getByTestId("manual-reading-snapshot-quality");
     expect(within(section).getByText(/Snapshot quality/i)).toBeInTheDocument();
     expect(
-      within(section).getByText(/AI Doctor decide whether the reading can support current-room guidance/i),
+      within(section).getByText(
+        /AI Doctor decide whether the reading can support current-room guidance/i,
+      ),
     ).toBeInTheDocument();
   });
 

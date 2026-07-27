@@ -138,6 +138,32 @@ export function isActionDerivedFromAlert(
   return extractSourceAlertId(action.reason) === alertId;
 }
 
+export interface RelatedActionRowIdentity {
+  id: string;
+}
+
+export function reconcileRelatedActionRows<T extends RelatedActionRowIdentity>(
+  currentRows: readonly T[] | null | undefined,
+  fetchedRows: readonly T[] | null | undefined,
+): T[] {
+  const fetched = fetchedRows ?? [];
+  const fetchedIds = new Set(fetched.map((row) => row.id));
+  const seenCurrentIds = new Set<string>();
+  const currentOnly = (currentRows ?? []).filter((row) => {
+    if (fetchedIds.has(row.id) || seenCurrentIds.has(row.id)) return false;
+    seenCurrentIds.add(row.id);
+    return true;
+  });
+  const seenFetchedIds = new Set<string>();
+  const deduplicatedFetched = fetched.filter((row) => {
+    if (seenFetchedIds.has(row.id)) return false;
+    seenFetchedIds.add(row.id);
+    return true;
+  });
+
+  return [...currentOnly, ...deduplicatedFetched];
+}
+
 /** Alert statuses considered "closed" for stale-action warning purposes. */
 export const CLOSED_ALERT_STATUSES = ["resolved", "dismissed"] as const;
 export type ClosedAlertStatus = (typeof CLOSED_ALERT_STATUSES)[number];

@@ -107,20 +107,24 @@ describe("CSV Import Safety Regression v1 — persistence boundary", () => {
     expect(inserts.every((i) => i.source === CSV_SENSOR_SOURCE)).toBe(true);
     expect(inserts.every((i) => i.raw_payload.source_tag === "csv")).toBe(true);
     // Never labeled as live anywhere in the insert payload.
-    expect(
-      inserts.every((i) => !JSON.stringify(i).toLowerCase().includes("\"live\"")),
-    ).toBe(true);
+    expect(inserts.every((i) => !JSON.stringify(i).toLowerCase().includes('"live"'))).toBe(true);
   });
 
-  it("propagates RLS/insert failures as a safe error state", async () => {
+  it("returns fixed grower-safe copy without leaking RLS diagnostics", async () => {
     const client: InsertClient = {
       async insertSensorReadings() {
         return { error: { message: "permission denied" }, insertedCount: 0 };
       },
     };
     const res = await persistCsvEnvironmentRows([row()], SCOPE, client);
-    expect(res.error).toMatch(/permission denied/i);
-    expect(res.insertedCount).toBe(0);
+    expect(res).toEqual({
+      insertedCount: 0,
+      duplicateCount: 0,
+      partialWrite: false,
+      error:
+        "Import could not be completed. No CSV readings were saved. Try again. No live sensor data was created.",
+    });
+    expect(res.error).not.toMatch(/permission denied|row-level security|rls/i);
   });
 });
 
@@ -130,13 +134,7 @@ describe("CSV Import Safety Regression v1 — persistence boundary", () => {
 describe("CSV Import Safety Regression v1 — confirm gate", () => {
   it("opening the modal does not call onConfirm", () => {
     const onConfirm = vi.fn().mockResolvedValue({ insertedCount: 0, error: null });
-    render(
-      <EnvironmentCsvImportModal
-        open
-        onOpenChange={() => {}}
-        onConfirm={onConfirm}
-      />,
-    );
+    render(<EnvironmentCsvImportModal open onOpenChange={() => {}} onConfirm={onConfirm} />);
     expect(onConfirm).not.toHaveBeenCalled();
     expect(screen.getByTestId("csv-import-entry")).toBeTruthy();
     cleanup();
@@ -144,16 +142,9 @@ describe("CSV Import Safety Regression v1 — confirm gate", () => {
 
   it("uploading + previewing a CSV does not call onConfirm until the Confirm CTA", async () => {
     const onConfirm = vi.fn().mockResolvedValue({ insertedCount: 0, error: null });
-    render(
-      <EnvironmentCsvImportModal
-        open
-        onOpenChange={() => {}}
-        onConfirm={onConfirm}
-      />,
-    );
+    render(<EnvironmentCsvImportModal open onOpenChange={() => {}} onConfirm={onConfirm} />);
 
-    const csv =
-      "Timestamp,Temperature (C),Humidity\n2026-06-01T10:00:00Z,24.0,55\n";
+    const csv = "Timestamp,Temperature (C),Humidity\n2026-06-01T10:00:00Z,24.0,55\n";
     const input = screen.getByTestId("csv-import-file-input") as HTMLInputElement;
     Object.defineProperty(input, "files", {
       value: [new File([csv], "export.csv", { type: "text/csv" })],
@@ -208,8 +199,8 @@ describe("CSV Import Safety Regression v1 — static safety scan", () => {
   it("CSV persistence is insert-only and never writes alerts / action_queue / devices", () => {
     expect(PERSISTENCE_SRC).not.toMatch(/\bdelete\b|\bupdate\b\s*\(/i);
     const combined = ALL.toLowerCase();
-    expect(combined).not.toContain("from(\"alerts\")");
-    expect(combined).not.toContain("from(\"action_queue\")");
+    expect(combined).not.toContain('from("alerts")');
+    expect(combined).not.toContain('from("action_queue")');
     expect(combined).not.toMatch(/device_control|actuator|relay\./);
   });
 

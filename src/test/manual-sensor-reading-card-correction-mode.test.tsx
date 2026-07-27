@@ -27,6 +27,10 @@ vi.mock("@/hooks/useInsertSensorReading", () => ({
   validateSensorReadingPayload: () => {},
 }));
 
+vi.mock("@/hooks/useInsertSensorReadings", () => ({
+  useInsertSensorReadings: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
+
 vi.mock("@/hooks/useInsertManualSnapshotEdit", () => ({
   insertManualSnapshotEdit: (p: unknown) => editMutate(p),
   useInsertManualSnapshotEdit: () => ({ mutateAsync: editMutate, isPending: false }),

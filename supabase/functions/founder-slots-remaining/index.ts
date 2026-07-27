@@ -225,86 +225,107 @@ Deno.serve(async (req) => {
   // every structured log entry it produced.
   const rlog = (fields: LogFields) => log({ ...fields, request_id: requestId });
   const requestHeaders: Record<string, string> = { "x-request-id": requestId };
-  const fail = (body: Record<string, unknown> = {}) =>
-    json(503, { error: "slots_unavailable", request_id: requestId, ...body }, requestHeaders);
-
-  if (req.method !== "GET" && req.method !== "POST") {
-    return json(
-      405,
-      { error: "method_not_allowed", request_id: requestId },
-      requestHeaders,
+  const startedAt = performance.now();
+  // Track outcome so the `finally` block can stamp exactly one
+  // `request_metric` per handler invocation.
+  let outcome: Outcome = "success";
+  const done = <T,>(resp: T, o: Outcome): T => {
+    outcome = o;
+    return resp;
+  };
+  const fail = (o: Outcome, body: Record<string, unknown> = {}) =>
+    done(
+      json(503, { error: "slots_unavailable", request_id: requestId, ...body }, requestHeaders),
+      o,
     );
-  }
-
-  let deps: Deps;
-  try {
-    deps = await loadDeps();
-  } catch (err) {
-    // loadDeps already logged startup_import_failed (module-scoped, no
-    // request_id). Emit a request-scoped companion so the 503 can be
-    // traced back to this request.
-    const message = err instanceof Error ? err.message : String(err);
-    const name = err instanceof Error ? err.name : "UnknownError";
-    rlog({
-      event: "startup_dependencies_unavailable",
-      severity: "critical",
-      error_name: name,
-      error_message: message,
-    });
-    return fail();
-  }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!supabaseUrl || !serviceRoleKey) {
+    if (req.method !== "GET" && req.method !== "POST") {
+      return done(
+        json(
+          405,
+          { error: "method_not_allowed", request_id: requestId },
+          requestHeaders,
+        ),
+        "method_not_allowed",
+      );
+    }
+
+    let deps: Deps;
+    try {
+      deps = await loadDeps();
+    } catch (err) {
+      // loadDeps already logged startup_import_failed (module-scoped, no
+      // request_id) and bumped the counter. Emit a request-scoped
+      // companion so the 503 can be traced back to this request.
+      const message = err instanceof Error ? err.message : String(err);
+      const name = err instanceof Error ? err.name : "UnknownError";
       rlog({
-        event: "env_missing",
+        event: "startup_dependencies_unavailable",
         severity: "critical",
-        has_url: Boolean(supabaseUrl),
-        has_service_role: Boolean(serviceRoleKey),
+        error_name: name,
+        error_message: message,
       });
-      return fail();
+      return fail("startup_dependencies_unavailable");
     }
-    const sb = deps.createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false },
-    });
-    const { data, error } = await sb.rpc("founder_lifetime_slots_remaining");
-    if (error) {
+
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (!supabaseUrl || !serviceRoleKey) {
+        rlog({
+          event: "env_missing",
+          severity: "critical",
+          has_url: Boolean(supabaseUrl),
+          has_service_role: Boolean(serviceRoleKey),
+        });
+        return fail("env_missing");
+      }
+      const sb = deps.createClient(supabaseUrl, serviceRoleKey, {
+        auth: { persistSession: false },
+      });
+      const { data, error } = await sb.rpc("founder_lifetime_slots_remaining");
+      if (error) {
+        rlog({
+          event: "rpc_error",
+          severity: "error",
+          code: error.code ?? null,
+          message: error.message ?? null,
+        });
+        return fail("rpc_error");
+      }
+      const payload = deps.buildFounderSlotsPayload(data);
+      if (!payload) {
+        rlog({
+          event: "rpc_invalid_payload",
+          severity: "error",
+          data_type: typeof data,
+        });
+        return fail("rpc_invalid_payload");
+      }
+      return done(
+        json(
+          200,
+          { ...payload, request_id: requestId },
+          {
+            ...requestHeaders,
+            "Cache-Control": `public, max-age=${CACHE_SECONDS}`,
+          },
+        ),
+        "success",
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const name = err instanceof Error ? err.name : "UnknownError";
       rlog({
-        event: "rpc_error",
-        severity: "error",
-        code: error.code ?? null,
-        message: error.message ?? null,
+        event: "handler_unhandled_error",
+        severity: "critical",
+        error_name: name,
+        error_message: message,
       });
-      return fail();
+      return fail("handler_unhandled_error");
     }
-    const payload = deps.buildFounderSlotsPayload(data);
-    if (!payload) {
-      rlog({
-        event: "rpc_invalid_payload",
-        severity: "error",
-        data_type: typeof data,
-      });
-      return fail();
-    }
-    return json(
-      200,
-      { ...payload, request_id: requestId },
-      {
-        ...requestHeaders,
-        "Cache-Control": `public, max-age=${CACHE_SECONDS}`,
-      },
-    );
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    const name = err instanceof Error ? err.name : "UnknownError";
-    rlog({
-      event: "handler_unhandled_error",
-      severity: "critical",
-      error_name: name,
-      error_message: message,
-    });
-    return fail();
+  } finally {
+    recordRequestMetric(outcome, performance.now() - startedAt, requestId);
   }
 });

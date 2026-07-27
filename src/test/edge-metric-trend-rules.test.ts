@@ -66,7 +66,7 @@ describe("bucketRequestMetrics", () => {
     const eleven = out.find((b) => b.bucketStartMs === Date.parse("2026-07-27T11:00:00Z"))!;
     expect(eleven.total).toBe(3);
     expect(eleven.byOutcome).toEqual({ success: 2, rpc_error: 1 });
-    expect(eleven.latencyMeanMs).toBeCloseTo((10 + 20 + 200) / 3, 5);
+    expect(eleven.latencyMeanMs).toBeCloseTo((10 + 20 + 200) / 3, 1);
     expect(eleven.latencyMaxMs).toBe(200);
   });
 

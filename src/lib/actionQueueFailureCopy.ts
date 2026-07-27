@@ -23,6 +23,9 @@ const SAFE_COPY: Readonly<Record<ActionQueueFailureOperation, string>> = {
 const TRANSITION_REASON_COPY = {
   status_conflict: "This action changed elsewhere. The latest status has been reloaded.",
   action_not_found: "This action is no longer available. The queue has been reloaded.",
+  rpc_missing:
+    "Action updates are temporarily unavailable — the backend hasn't finished deploying. " +
+    "Your queue is unchanged. Please try again in a few minutes.",
 } as const;
 
 /**
@@ -43,6 +46,12 @@ export function safeActionQueueFailureCopy(
     }
     if (row.ok === false && row.reason === "action_not_found") {
       return TRANSITION_REASON_COPY.action_not_found;
+    }
+    // Recognise the missing-RPC signal produced by
+    // `isMissingActionQueueTransitionRpcError` so callers that only pass the
+    // raw error still get a friendly, accurate line instead of "try again".
+    if (row.ok === false && row.reason === "rpc_missing") {
+      return TRANSITION_REASON_COPY.rpc_missing;
     }
   }
 

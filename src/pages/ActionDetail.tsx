@@ -52,6 +52,12 @@ import {
 } from "@/lib/actionQueueTransitions";
 import { safeActionQueueFailureCopy } from "@/lib/actionQueueFailureCopy";
 import {
+  isMissingActionQueueTransitionRpcError,
+  ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY,
+} from "@/lib/actionQueueRpcAvailability";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertTriangle } from "lucide-react";
+import {
   actionsPath,
   aiDoctorSessionDetailPath,
   alertDetailPath,
@@ -211,6 +217,8 @@ export default function ActionDetail() {
   const [notFound, setNotFound] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Persistent flag for a missing/renamed `action_queue_transition` RPC.
+  const [rpcUnavailable, setRpcUnavailable] = useState(false);
   const [dialog, setDialog] = useState<Kind | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [sourceAlertStatus, setSourceAlertStatus] = useState<string | null>(null);
@@ -426,6 +434,24 @@ export default function ActionDetail() {
     const { data, error } = await (supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ data: unknown; error: unknown }>)("action_queue_transition", rpcArgs);
     const result = parseActionQueueTransitionRpcResult(data, rpcArgs);
     if (error || !result || result.ok !== true) {
+      if (isMissingActionQueueTransitionRpcError(error)) {
+        setRpcUnavailable(true);
+        console.warn(
+          JSON.stringify({
+            event: "action_queue_transition_rpc_unavailable",
+            severity: "critical",
+            surface: "action_detail",
+            transition: kind,
+          }),
+        );
+        toast.error(ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.title, {
+          id: "action-queue-transition-rpc-unavailable",
+          description: ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.body,
+          duration: 10000,
+        });
+        setBusy(false);
+        return false;
+      }
       const shouldReload =
         result?.ok === false &&
         (result.reason === "status_conflict" || result.reason === "action_not_found");
@@ -445,6 +471,7 @@ export default function ActionDetail() {
       });
     }
     setBusy(false);
+    if (rpcUnavailable) setRpcUnavailable(false);
     await load();
     return true;
   }
@@ -616,6 +643,22 @@ export default function ActionDetail() {
         section="action-detail"
       />
       <BackLink />
+
+      {rpcUnavailable && (
+        <Alert
+          variant="destructive"
+          className="mb-4"
+          role="alert"
+          data-testid="action-detail-transition-rpc-unavailable-banner"
+        >
+          <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+          <AlertTitle>{ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.title}</AlertTitle>
+          <AlertDescription className="mt-1">
+            {ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.body}
+          </AlertDescription>
+        </Alert>
+      )}
+
 
       <header className="relative mb-6 overflow-hidden rounded-3xl border border-border/60 bg-card/70 p-5 shadow-card backdrop-blur-xl">
         <div

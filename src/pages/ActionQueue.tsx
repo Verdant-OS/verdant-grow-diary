@@ -424,10 +424,14 @@ export default function ActionQueue() {
     kind: ActionQueueTraceKind;
   } | null>(null);
   const [retryingTrace, setRetryingTrace] = useState(false);
-  // True when the `action_queue_transition` RPC is missing / renamed / not in
-  // the PostgREST schema cache. Surfaces a persistent banner so the grower
-  // isn't stuck retrying an approve/reject that can never land.
-  const [rpcUnavailable, setRpcUnavailable] = useState(false);
+  // Tri-state availability for the `action_queue_transition` RPC. Starts as
+  // "unknown" so the status pill renders an honest "Checking availability"
+  // placeholder instead of a stale/assumed green. Flips to "available" only
+  // when a transition actually succeeds, and to "unavailable" when a
+  // transition fails with a missing-RPC signal (persistent banner + red pill).
+  const [rpcAvailability, setRpcAvailability] =
+    useState<ActionQueueRpcAvailability>("unknown");
+  const rpcUnavailable = rpcAvailability === "unavailable";
 
   // Load existing approve/reject diary trace rows for the open drawer
   // row. Pure read; never inserts.

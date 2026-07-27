@@ -302,3 +302,122 @@ test("parseVerifierReport returns empty parsed for non-object input", () => {
   assert.equal(parseVerifierReport({}).summary, null);
 });
 
+// ---------------------------------------------------------------------
+// Per-environment "Missing by environment" section — surfaces status +
+// cause for every non-pass row grouped by env so the PR comment / step
+// summary triages one env at a time.
+// ---------------------------------------------------------------------
+
+test("renderComment includes per-env Missing table with status + cause", () => {
+  const parsed = parseVerifierReport({
+    schemaVersion: 1,
+    envs: ["sandbox", "live"],
+    requiredIds: ["craft_monthly", "craft_annual"],
+    rows: [
+      { env: "sandbox", externalId: "craft_monthly", status: "pass" },
+      {
+        env: "sandbox",
+        externalId: "craft_annual",
+        status: "fail",
+        cause: { kind: "missing" },
+      },
+      {
+        env: "live",
+        externalId: "craft_annual",
+        status: "fail",
+        cause: { kind: "inactive" },
+      },
+      {
+        env: "live",
+        externalId: "craft_monthly",
+        status: "fail",
+        cause: { kind: "api_error", httpStatus: 429 },
+      },
+    ],
+    summary: { pass: 1, fail: 3, skip: 0 },
+    exitCode: 1,
+    keyUnset: false,
+  });
+  const md = renderComment({
+    verdict: decideVerdict({ rc: 1, parsed, eventName: "pull_request" }),
+    parsed,
+  });
+  assert.match(md, /Missing by environment/);
+  assert.match(md, /\*\*sandbox\*\* — 1 needing attention/);
+  assert.match(md, /\*\*live\*\* — 2 needing attention/);
+  assert.match(md, /\| external_id \| status \| cause \| remedy \|/);
+  assert.match(md, /api_error \(HTTP 429\)/);
+  assert.match(md, /inactive/);
+  assert.match(md, /missing/);
+  // No response-body leakage in the cause column.
+  assert.doesNotMatch(md, /pri_/);
+  assert.doesNotMatch(md, /Bad token/);
+});
+
+test("renderComment surfaces skip rows in per-env Missing table as key_unset", () => {
+  const parsed = parseVerifierReport({
+    schemaVersion: 1,
+    envs: ["sandbox"],
+    requiredIds: ["craft_monthly", "craft_annual"],
+    rows: [
+      { env: "sandbox", externalId: "craft_monthly", status: "skip" },
+      { env: "sandbox", externalId: "craft_annual", status: "skip" },
+    ],
+    summary: { pass: 0, fail: 0, skip: 2 },
+    exitCode: 2,
+    keyUnset: true,
+  });
+  const md = renderComment({
+    verdict: decideVerdict({ rc: 2, parsed, eventName: "pull_request" }),
+    parsed,
+  });
+  assert.match(md, /Missing by environment/);
+  assert.match(md, /\*\*sandbox\*\* — 2 needing attention/);
+  assert.match(md, /key_unset/);
+  // Only sandbox section rendered — no empty "**live**" header.
+  assert.doesNotMatch(md, /\*\*live\*\*/);
+});
+
+test("renderComment omits per-env Missing section when everything passed", () => {
+  const parsed = parseVerifierReport(REPORT_ALL_PASS);
+  const md = renderComment({
+    verdict: decideVerdict({ rc: 0, parsed, eventName: "pull_request" }),
+    parsed,
+  });
+  assert.doesNotMatch(md, /Missing by environment/);
+});
+
+test("renderComment classifies coverage_gap and enumeration_error in per-env table", () => {
+  const parsed = parseVerifierReport({
+    schemaVersion: 1,
+    envs: ["live"],
+    requiredIds: ["craft_monthly", "craft_annual"],
+    rows: [
+      {
+        env: "live",
+        externalId: "craft_quarterly",
+        status: "fail",
+        cause: { kind: "coverage_gap" },
+      },
+      {
+        env: "live",
+        externalId: "craft_monthly",
+        status: "fail",
+        cause: { kind: "enumeration_error" },
+      },
+    ],
+    summary: { pass: 0, fail: 2, skip: 0 },
+    exitCode: 1,
+    keyUnset: false,
+  });
+  const md = renderComment({
+    verdict: decideVerdict({ rc: 1, parsed, eventName: "pull_request" }),
+    parsed,
+  });
+  assert.match(md, /coverage_gap/);
+  assert.match(md, /enumeration_error/);
+  assert.match(md, /not in REQUIRED_PLAN_IDS/);
+  assert.match(md, /Paddle enumeration failed/);
+});
+
+

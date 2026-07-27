@@ -69,14 +69,21 @@ project_id = "knkwiiywfkbqznbxwqfh"
   # UUID owner identifiers only — no email/name/profile fields.
   [functions.operator-credits-audit]
     verify_jwt = true
-  # edge-metrics-alert-check and edge-metrics-latest are operator-only edge
-  # function metric/alert surfaces. Require a platform-verified JWT AND
-  # re-check public.has_role(uid,'operator') inside via the caller-scoped
-  # has_role RPC before returning anything.
-  [functions.edge-metrics-alert-check]
-    verify_jwt = true
+  # edge-metrics-latest is a read-only operator-only diagnostics surface.
+  # Requires a platform-verified JWT AND re-checks public.has_role(uid,
+  # 'operator') inside via the caller-scoped has_role RPC before returning
+  # anything.
   [functions.edge-metrics-latest]
     verify_jwt = true
+  # edge-metrics-alert-check is dual-auth: manual operator calls carry a
+  # Supabase JWT (re-verified inside via requireOperator/has_role), but the
+  # documented pg_cron/pg_net scheduled trigger calls it with only the
+  # shared `x-alert-cron-secret` header and no user session at all. Platform
+  # verify_jwt would reject that cron caller at the gateway before the
+  # handler's isCron branch ever runs, silently breaking scheduled alert
+  # evaluation — keep it off and rely on the handler's own dual-path check.
+  [functions.edge-metrics-alert-check]
+    verify_jwt = false
   # Transactional email queue writes are server-only. The handler compares
   # `apikey` against SUPABASE_SECRET_KEYS (with local/legacy fallbacks) before
   # parsing any caller-controlled recipient/template fields. Gateway

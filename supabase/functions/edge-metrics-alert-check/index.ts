@@ -34,16 +34,44 @@ const FN = "edge-metrics-alert-check";
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-request-id, x-alert-cron-secret",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Expose-Headers": "x-request-id",
 };
 
-function json(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
+const REQUEST_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function resolveRequestId(req: Request): string {
+  const raw = req.headers.get("x-request-id")?.trim();
+  if (raw && REQUEST_ID_RE.test(raw)) return raw.toLowerCase();
+  return crypto.randomUUID();
+}
+
+function json(
+  status: number,
+  body: Record<string, unknown>,
+  requestId: string,
+): Response {
+  return new Response(JSON.stringify({ ...body, request_id: requestId }), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/json",
+      "x-request-id": requestId,
+    },
   });
 }
+
+function fail(
+  status: number,
+  errorCode: string,
+  message: string,
+  requestId: string,
+): Response {
+  return json(status, { error: message, error_code: errorCode }, requestId);
+}
+
 
 function log(severity: "info" | "warn" | "error", event: string, extra: Record<string, unknown> = {}): void {
   const line = JSON.stringify({ fn: FN, ts: new Date().toISOString(), severity, event, ...extra });

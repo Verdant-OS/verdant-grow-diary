@@ -203,6 +203,7 @@ export default function OperatorEdgeAlerts() {
   const [dispatchPage, setDispatchPage] = useState(0);
   const [attemptsPage, setAttemptsPage] = useState(0);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [drilldown, setDrilldown] = useState<{ fn: string; metric: string } | null>(null);
 
   const liveQuery = useQuery({
     queryKey: ["operator", "edge-alerts", "live"],

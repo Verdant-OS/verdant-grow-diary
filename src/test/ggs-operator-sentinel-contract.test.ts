@@ -79,13 +79,13 @@ describe("operator GGS writer / Sentinel cross-contract", () => {
     },
   );
 
-  it("fails closed for non-live source and unsafe/missing provenance", () => {
+  it("fails closed for the wrong acquisition source and unsafe/missing provenance", () => {
     const plan = writerPlan();
     if (!plan.ok) throw new Error("expected writer plan");
     expect(
       isTrustedGgsOperatorSentinelRow({
         ...plan.rows[0],
-        source: "manual",
+        source: "live",
       }),
     ).toBe(false);
     expect(

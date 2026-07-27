@@ -38,7 +38,7 @@ describe("buildGgsRealPayloadIngestViewModel", () => {
     });
     expect(vm.status).toBe("ok");
     if (vm.status !== "ok") return;
-    expect(vm.preview.source).toBe("live");
+    expect(vm.preview.source).toBe("manual");
     expect(vm.preview.vendor).toBe("spider_farmer_ggs");
     expect(vm.preview.rowCount).toBeGreaterThan(0);
     expect(vm.preview.ageSeconds).toBe(60);

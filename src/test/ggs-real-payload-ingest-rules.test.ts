@@ -58,7 +58,7 @@ describe("buildGgsRealPayloadCommitInput", () => {
     const metrics = plan.rows.map((r) => r.metric).sort();
     expect(metrics).toEqual(["ec", "soil_moisture_pct", "soil_temp_c"]);
     for (const row of plan.rows) {
-      expect(row.source).toBe("live");
+      expect(row.source).toBe("manual");
       expect(row.source).toBe(GGS_REAL_PAYLOAD_SOURCE);
       expect(row.raw_payload.source_app).toBe(GGS_REAL_PAYLOAD_SOURCE_APP);
       expect(row.raw_payload.source_app).toBe("spider_farmer_ggs");

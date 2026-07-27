@@ -22,6 +22,9 @@ import {
 } from "@/lib/ggsSentinelSmokeRunner";
 
 export const GGS_OPERATOR_SENTINEL_SOURCE = GGS_REAL_PAYLOAD_SOURCE;
+export const GGS_OPERATOR_SENTINEL_ACCEPTED_SOURCES = new Set<string>([
+  GGS_OPERATOR_SENTINEL_SOURCE,
+]);
 export const GGS_OPERATOR_SENTINEL_QUALITY = "ok" as const;
 export const GGS_OPERATOR_SENTINEL_VENDOR = GGS_REAL_PAYLOAD_SOURCE_APP;
 export const GGS_OPERATOR_SENTINEL_PROVENANCE = GGS_OPERATOR_ATTESTED_PROVENANCE;
@@ -178,7 +181,11 @@ export function evaluateGgsOperatorAttestedSentinelReadiness(
 ): GgsSentinelEvaluation {
   const selection = selectLatestTrustedGgsOperatorSentinelCohort(input.rows);
   if (selection.ok === false) {
-    const blocked = evaluateGgsSentinelReadiness({ ...input, rows: [] });
+    const blocked = evaluateGgsSentinelReadiness({
+      ...input,
+      rows: [],
+      acceptedSources: GGS_OPERATOR_SENTINEL_ACCEPTED_SOURCES,
+    });
     if (selection.reason === "no_rows") return blocked;
     return {
       ...blocked,
@@ -195,7 +202,11 @@ export function evaluateGgsOperatorAttestedSentinelReadiness(
     };
   }
 
-  const evaluated = evaluateGgsSentinelReadiness({ ...input, rows: selection.rows });
+  const evaluated = evaluateGgsSentinelReadiness({
+    ...input,
+    rows: selection.rows,
+    acceptedSources: GGS_OPERATOR_SENTINEL_ACCEPTED_SOURCES,
+  });
   const hasUntrustedRow = selection.rows.some((row) => !isTrustedGgsOperatorSentinelRow(row));
   const distinctMetrics = new Set(selection.rows.map((row) => row.metric));
   const hasDuplicates = distinctMetrics.size !== selection.rows.length;

@@ -13,7 +13,7 @@ function row(): GgsRealPayloadCommitRow {
     metric: "ec",
     value: 1.2,
     captured_at: "2026-07-25T11:59:00.000Z",
-    source: "live",
+    source: "manual",
     quality: "ok",
     raw_payload: {
       source_app: "spider_farmer_ggs",

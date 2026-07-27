@@ -7,6 +7,7 @@ import {
   evaluateGgsOperatorAttestedSentinelReadiness,
   selectLatestTrustedGgsOperatorSentinelCohort,
 } from "@/lib/ggsOperatorRealPayloadSentinelRules";
+import { evaluateGgsSentinelReadiness } from "@/lib/ggsSentinelSmokeRunner";
 import { buildGgsSentinelEvaluationPanelViewModel } from "@/lib/ggsSentinelSmokeRunnerViewModel";
 
 const NOW = new Date("2026-07-25T12:00:00.000Z");
@@ -47,6 +48,14 @@ describe("operator GGS coherent cohort selection", () => {
     expect(verdict.state).toBe("PASS_OPERATOR_ATTESTED_SENTINEL_READY");
     expect(verdict.state).not.toBe("PASS_LIVE_SENTINEL_READY");
     expect(verdict.passed).toBe(true);
+    expect(rows.every((row) => row.source === "manual")).toBe(true);
+    const genericLiveVerdict = evaluateGgsSentinelReadiness({
+      rows,
+      snapshot: null,
+      now: NOW,
+    });
+    expect(genericLiveVerdict.state).toBe("BLOCKED_SOURCE_NOT_CANONICAL");
+    expect(genericLiveVerdict.passed).toBe(false);
     const viewModel = buildGgsSentinelEvaluationPanelViewModel(verdict);
     expect(viewModel.pill.label).toBe("Operator-attested payload · Sentinel ready");
     expect(viewModel.pill.label).not.toContain("Live ·");

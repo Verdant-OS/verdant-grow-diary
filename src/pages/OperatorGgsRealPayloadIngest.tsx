@@ -53,6 +53,8 @@ export default function OperatorGgsRealPayloadIngest() {
       if (error) throw error;
       return (data ?? []) as GgsSentinelInputRow[];
     },
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   });
 
   const verdict = useMemo(

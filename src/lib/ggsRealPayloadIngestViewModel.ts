@@ -6,7 +6,8 @@
  *   - Pure (no I/O, no Supabase, no fetch, no console).
  *   - NEVER surfaces the verbatim `raw_payload.payload` body. UI may only
  *     render the safe summary fields exposed below.
- *   - NEVER emits source values other than `"live"`.
+ *   - NEVER emits source values other than `"manual"` for this operator-paste
+ *     acquisition path.
  *   - When the planner refuses, returns a typed refusal — no rows, no commit.
  *   - Adds a single non-domain rule: commit is forbidden unless the operator
  *     has checked the "real device" attestation box.
@@ -36,7 +37,7 @@ export interface GgsRealPayloadPreview {
   /** Age of the reading at preview time, in seconds. Negative = future. */
   ageSeconds: number;
   sensorId: string | null;
-  source: typeof GGS_REAL_PAYLOAD_SOURCE; // "live"
+  source: typeof GGS_REAL_PAYLOAD_SOURCE; // "manual"
   vendor: typeof GGS_REAL_PAYLOAD_SOURCE_APP; // "spider_farmer_ggs"
   metrics: GgsRealPayloadPreviewMetric[];
   /** Warnings surfaced by the normalizer (e.g. "soil_temp_unit_converted"). */

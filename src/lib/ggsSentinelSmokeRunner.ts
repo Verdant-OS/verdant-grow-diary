@@ -122,6 +122,11 @@ export interface GgsSentinelEvaluateInput {
   now?: Date;
   /** Freshness threshold; defaults to GGS 15-minute stale window. */
   staleMs?: number;
+  /**
+   * Accepted acquisition-path sources. Defaults to independently ingested
+   * live rows. Specialized callers may pass a stricter, explicit source set.
+   */
+  acceptedSources?: ReadonlySet<string>;
 }
 
 export const GGS_METRIC_FRIENDLY_NAME: Record<GgsSentinelMetric, string> = {
@@ -255,6 +260,7 @@ export function evaluateGgsSentinelReadiness(
 ): GgsSentinelEvaluation {
   const now = input.now ?? new Date();
   const staleMs = input.staleMs ?? SPIDER_FARMER_GGS_STALE_MS;
+  const acceptedSources = input.acceptedSources ?? CANONICAL_LIVE_SOURCES;
   const checks: GgsSentinelCheck[] = [];
 
   const rows = Array.isArray(input.rows) ? input.rows : [];
@@ -324,13 +330,13 @@ export function evaluateGgsSentinelReadiness(
     const row = latestByMetric.get(metric);
     if (!row) continue;
     const src = (row.source ?? "").trim();
-    if (!CANONICAL_LIVE_SOURCES.has(src)) {
+    if (!acceptedSources.has(src)) {
       sawForbiddenSource = src;
     }
     const quality = (row.quality ?? "").trim();
     if (quality === "stale") {
       staleQualityFor = metric;
-    } else if (quality && quality !== "ok") {
+    } else if (quality !== "ok") {
       untrustedQualityFor = metric;
     }
     if (!Number.isFinite(Date.parse(row.captured_at))) {

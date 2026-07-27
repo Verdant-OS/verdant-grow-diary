@@ -9,7 +9,9 @@
  *   - REFUSES to fabricate live telemetry. If the payload does not look
  *     like it came from a physical device, this helper returns a typed
  *     refusal — the runner never inserts anything.
- *   - NEVER emits `ggs_live` or `ggs_csv`. Canonical source is `"live"`.
+ *   - NEVER emits `ggs_live` or `ggs_csv`. Because the transport is an
+ *     operator paste, the stored source is `"manual"` even when the payload
+ *     came from a physical device.
  *   - Vendor identity belongs in `raw_payload.source_app` only.
  *   - Tent + captured_at + bridge + device + user context are all
  *     required. Missing anything → refusal.
@@ -28,8 +30,11 @@ import {
 /** Metrics this helper is allowed to emit. */
 export type GgsRealPayloadMetric = "soil_moisture_pct" | "ec" | "soil_temp_c";
 
-/** Canonical source value the RPC row will carry. Never `ggs_live`. */
-export const GGS_REAL_PAYLOAD_SOURCE = "live" as const;
+/**
+ * Canonical acquisition-path source stored by the RPC. The physical-device
+ * claim is preserved separately in the server-authored provenance envelope.
+ */
+export const GGS_REAL_PAYLOAD_SOURCE = "manual" as const;
 
 /** Vendor identity stored under raw_payload.source_app. */
 export const GGS_REAL_PAYLOAD_SOURCE_APP = GGS_SOIL_SENSOR_PROVIDER; // "spider_farmer_ggs"
@@ -78,7 +83,7 @@ export interface GgsRealPayloadCommitRow {
   metric: GgsRealPayloadMetric;
   value: number;
   captured_at: string;
-  source: typeof GGS_REAL_PAYLOAD_SOURCE; // always "live"
+  source: typeof GGS_REAL_PAYLOAD_SOURCE; // always "manual"
   quality: "ok" | "degraded";
   raw_payload: GgsRealPayloadAuditEnvelope;
 }

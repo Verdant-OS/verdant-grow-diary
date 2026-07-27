@@ -417,7 +417,7 @@ Deno.test(
     assertEquals(
       d.committed[0].rows.every(
         (row) =>
-          row.source === "live" &&
+          row.source === "manual" &&
           row.quality === "ok" &&
           row.device_id === "GGS-PROBE-001" &&
           row.raw_payload.source_app === "spider_farmer_ggs" &&

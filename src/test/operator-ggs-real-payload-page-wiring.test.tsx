@@ -25,6 +25,8 @@ const state = vi.hoisted(() => {
       enabled: boolean;
       queryKey: unknown[];
       queryFn: () => Promise<unknown>;
+      refetchInterval: number;
+      refetchIntervalInBackground: boolean;
     },
     refetch: vi.fn(async () => undefined),
     chainCalls,
@@ -38,6 +40,8 @@ vi.mock("@tanstack/react-query", () => ({
     enabled: boolean;
     queryKey: unknown[];
     queryFn: () => Promise<unknown>;
+    refetchInterval: number;
+    refetchIntervalInBackground: boolean;
   }) => {
     state.queryOptions = options;
     return { data: [], refetch: state.refetch };
@@ -120,6 +124,8 @@ describe("OperatorGgsRealPayloadIngest wiring", () => {
       "operator-ggs-real-payload",
       "33333333-3333-4333-8333-333333333333",
     ]);
+    expect(state.queryOptions?.refetchInterval).toBe(30_000);
+    expect(state.queryOptions?.refetchIntervalInBackground).toBe(false);
 
     await state.queryOptions?.queryFn();
 
@@ -127,7 +133,7 @@ describe("OperatorGgsRealPayloadIngest wiring", () => {
     expect(state.chainCalls).toEqual([
       ["select", "metric,value,source,quality,device_id,captured_at,raw_payload"],
       ["eq", "tent_id", "33333333-3333-4333-8333-333333333333"],
-      ["eq", "source", "live"],
+      ["eq", "source", "manual"],
       [
         "contains",
         "raw_payload",

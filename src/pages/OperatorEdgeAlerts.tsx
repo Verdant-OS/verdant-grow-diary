@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
+import EdgeAlertsDryRunDialog from "@/components/EdgeAlertsDryRunDialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -333,6 +334,7 @@ export default function OperatorEdgeAlerts() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <EdgeAlertsDryRunDialog />
           <Button variant="outline" size="sm" onClick={refresh} disabled={liveQuery.isFetching}>
             <RefreshCw className={`mr-2 h-4 w-4 ${liveQuery.isFetching ? "animate-spin" : ""}`} />
             Refresh

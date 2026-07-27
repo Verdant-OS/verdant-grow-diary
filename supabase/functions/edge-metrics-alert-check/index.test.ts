@@ -73,7 +73,7 @@ Deno.test("postWebhook: no-op when ALERT_WEBHOOK_URL unset", async () => {
       [{ fn: "f1", metric: "rpc_error_count", value: 7, threshold: 5, requests_in_window: 10 }],
       baseThresholds,
     );
-    assertEquals(res, { posted: false });
+    assertEquals(res, { posted: false, attempts: [] });
   } finally {
     if (prev) Deno.env.set("ALERT_WEBHOOK_URL", prev);
   }

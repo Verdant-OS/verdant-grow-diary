@@ -228,6 +228,98 @@ export function __setReleaseProvenanceForTesting(
   releaseProvenance = next ?? resolveReleaseProvenance();
 }
 
+// ---------------------------------------------------------------------------
+// Long-term analytics sink. Every request_metric / metric_snapshot is
+// mirrored to `public.edge_function_metric_events` via a raw PostgREST
+// insert with the service-role key. Rules:
+//   - Fire-and-forget: never awaited on the request path, never blocks
+//     the response, wrapped in EdgeRuntime.waitUntil when available so
+//     the runtime doesn't kill the connection before it flushes.
+//   - Fail-open: any insert error is swallowed with a structured
+//     `metric_persist_failed` log; the in-process counters and JSON logs
+//     remain the source of truth and never regress.
+//   - Skipped when SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY are absent
+//     (same env-missing branch the handler already reports).
+// ---------------------------------------------------------------------------
+
+interface MetricEventRow {
+  fn: string;
+  event_type: "request_metric" | "metric_snapshot";
+  request_id?: string | null;
+  outcome?: string | null;
+  duration_ms?: number | null;
+  window_ms?: number | null;
+  requests_in_window?: number | null;
+  duration_ms_mean_in_window?: number | null;
+  duration_ms_max_in_window?: number | null;
+  counters?: Record<string, number> | null;
+  deploy_version: string;
+  supabase_env: string;
+}
+
+type MetricPersistor = (row: MetricEventRow) => Promise<void>;
+
+async function persistMetricEventDefault(row: MetricEventRow): Promise<void> {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) return; // silently skip — env_missing already logged elsewhere
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/edge_function_metric_events`,
+      {
+        method: "POST",
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify(row),
+      },
+    );
+    if (!res.ok) {
+      log({
+        event: "metric_persist_failed",
+        severity: "warn",
+        status: res.status,
+        event_type: row.event_type,
+      });
+    }
+  } catch (err) {
+    log({
+      event: "metric_persist_failed",
+      severity: "warn",
+      event_type: row.event_type,
+      error_message: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+let metricPersistor: MetricPersistor = persistMetricEventDefault;
+
+/**
+ * Test-only hook. Overrides the metrics persistor so suites can assert
+ * on the rows without hitting the network. Pass `null` to restore the
+ * real PostgREST-based sink.
+ */
+export function __setMetricPersistorForTesting(
+  next: MetricPersistor | null,
+): void {
+  metricPersistor = next ?? persistMetricEventDefault;
+}
+
+function schedulePersist(row: MetricEventRow): void {
+  const promise = metricPersistor(row).catch(() => {
+    /* persistor is already fail-open; catch guards against unhandled rejections */
+  });
+  const runtime = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } })
+    .EdgeRuntime;
+  if (runtime && typeof runtime.waitUntil === "function") {
+    runtime.waitUntil(promise);
+  }
+  // else: fire-and-forget; classic Deno tests await it via the test hook.
+}
+
 function recordRequestMetric(
   outcome: Outcome,
   durationMs: number,
@@ -240,17 +332,28 @@ function recordRequestMetric(
   if (durationMs > durationMaxMsSinceSnapshot) {
     durationMaxMsSinceSnapshot = durationMs;
   }
+  const roundedDuration = Math.round(durationMs * 100) / 100;
   log({
     event: "request_metric",
     severity: "info",
     request_id: requestId,
     outcome,
-    duration_ms: Math.round(durationMs * 100) / 100,
+    duration_ms: roundedDuration,
+    deploy_version: releaseProvenance.deploy_version,
+    supabase_env: releaseProvenance.supabase_env,
+  });
+  schedulePersist({
+    fn: FN,
+    event_type: "request_metric",
+    request_id: requestId,
+    outcome,
+    duration_ms: roundedDuration,
     deploy_version: releaseProvenance.deploy_version,
     supabase_env: releaseProvenance.supabase_env,
   });
   maybeEmitSnapshot();
 }
+
 
 function maybeEmitSnapshot(): void {
   const now = Date.now();

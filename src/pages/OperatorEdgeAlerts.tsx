@@ -333,6 +333,7 @@ export default function OperatorEdgeAlerts() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <EdgeAlertsDryRunDialog />
           <Button variant="outline" size="sm" onClick={refresh} disabled={liveQuery.isFetching}>
             <RefreshCw className={`mr-2 h-4 w-4 ${liveQuery.isFetching ? "animate-spin" : ""}`} />
             Refresh

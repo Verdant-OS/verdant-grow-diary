@@ -231,7 +231,7 @@ function resolveRequestId(req: Request): string {
   return crypto.randomUUID();
 }
 
-Deno.serve(async (req) => {
+export async function handleFounderSlotsRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -345,4 +345,9 @@ Deno.serve(async (req) => {
   } finally {
     recordRequestMetric(outcome, performance.now() - startedAt, requestId);
   }
-});
+}
+
+if (Deno.env.get("FOUNDER_SLOTS_SKIP_SERVE") !== "1") {
+  Deno.serve(handleFounderSlotsRequest);
+}
+

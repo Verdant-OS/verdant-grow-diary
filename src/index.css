@@ -175,10 +175,13 @@
   [data-print-section="harvest-evidence-report"],
   [data-print-section="harvest-evidence-report"] *,
   [data-print-section="diary-range-report"],
-  [data-print-section="diary-range-report"] * { visibility: visible; }
+  [data-print-section="diary-range-report"] *,
+  [data-print-section="ai-doctor-report"],
+  [data-print-section="ai-doctor-report"] * { visibility: visible; }
   [data-print-section="environment-summary-report"],
   [data-print-section="harvest-evidence-report"],
-  [data-print-section="diary-range-report"] {
+  [data-print-section="diary-range-report"],
+  [data-print-section="ai-doctor-report"] {
     position: absolute;
     inset: 0;
     padding: 16px;
@@ -263,4 +266,3 @@
     width: 100%;
   }
 }
-

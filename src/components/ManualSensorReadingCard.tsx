@@ -27,6 +27,7 @@ import {
   mapManualSaveErrorToUserMessage,
 } from "@/lib/manualSensorSaveConfirmation";
 import { useInsertSensorReading } from "@/hooks/useInsertSensorReading";
+import { useInsertSensorReadings } from "@/hooks/useInsertSensorReadings";
 import {
   buildManualReadingPayloads,
   validateManualEntry,
@@ -143,6 +144,8 @@ export default function ManualSensorReadingCard({
   const [reviewOpen, setReviewOpen] = useState(false);
   const [lastSaved, setLastSaved] = useState<LastSavedConfirmation | null>(null);
   const insert = useInsertSensorReading();
+  const insertBatch = useInsertSensorReadings();
+  const isSaving = insert.isPending || insertBatch.isPending;
   const isCorrection = !!correction;
   const tentIdRef = useRef(tentId);
   const targetContextRef = useRef(`${initialTentId}\n${correctionIdentity}`);
@@ -295,7 +298,7 @@ export default function ManualSensorReadingCard({
   async function doSave() {
     // Belt-and-suspenders: even though Save buttons are disabled while
     // pending, guard against a second concurrent call from any path.
-    if (insert.isPending || saveInFlightRef.current) return;
+    if (isSaving || saveInFlightRef.current) return;
     saveInFlightRef.current = true;
     const submissionTentId = tentId;
     const submissionTargetContext = targetContextRef.current;
@@ -353,11 +356,10 @@ export default function ManualSensorReadingCard({
           }
         }
       } else {
-        // Standard save: sequential keeps ordering deterministic and
-        // per-row error surfacing simple.
-        for (const p of payloads) {
-          await insert.mutateAsync(p);
-        }
+        // A snapshot is one logical write. The batch helper sends one
+        // multi-row INSERT, so PostgreSQL either commits every metric or
+        // rejects the whole snapshot.
+        await insertBatch.mutateAsync(payloads);
       }
       const createdAt = new Date().toISOString();
       const successLine = buildManualSaveSuccessLine({ metrics: capturedMetrics });
@@ -492,7 +494,7 @@ export default function ManualSensorReadingCard({
                 <Select
                   value={tentId}
                   onValueChange={(nextTentId) => changeTentTarget(nextTentId, EMPTY)}
-                  disabled={isCorrection || insert.isPending}
+                  disabled={isCorrection || isSaving}
                 >
                   <SelectTrigger id="manual-reading-tent" data-testid="manual-reading-tent-select">
                     <SelectValue placeholder="Select tent" />
@@ -768,10 +770,10 @@ export default function ManualSensorReadingCard({
                       <Button
                         size="sm"
                         onClick={doSave}
-                        disabled={insert.isPending || hasBlocker}
+                        disabled={isSaving || hasBlocker}
                         data-testid="manual-sensor-review-confirm"
                       >
-                        {insert.isPending ? (
+                        {isSaving ? (
                           <>
                             <Loader2 className="h-4 w-4 animate-spin" />
                             Saving
@@ -846,10 +848,10 @@ export default function ManualSensorReadingCard({
               </p>
               <Button
                 onClick={onSave}
-                disabled={!validation.ok || !tentId || insert.isPending}
+                disabled={!validation.ok || !tentId || isSaving}
                 data-testid="manual-reading-save"
               >
-                {insert.isPending ? (
+                {isSaving ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Saving

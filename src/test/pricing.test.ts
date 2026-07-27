@@ -188,8 +188,8 @@ describe("Free vs Pro vs Founder Lifetime comparison", () => {
   it("Pro tier lists implemented paid capabilities without universal or unimplemented claims", () => {
     for (const item of [
       "Export / backups",
-      "Sensor snapshot history",
-      "Advanced timeline filtering",
+      "Full sensor snapshot history",
+      "Advanced timeline filtering and jump tools",
     ]) {
       expect(CONSTANTS).toContain(item);
     }

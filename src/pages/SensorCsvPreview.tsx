@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import CsvSensorPreviewPanel from "@/components/CsvSensorPreviewPanel";
 import CsvPreviewHelpPanel from "@/components/CsvPreviewHelpPanel";
 import CsvPreviewRecordingGuide from "@/components/CsvPreviewRecordingGuide";
+import PublicPageRecoveryNav from "@/components/PublicPageRecoveryNav";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { buildCsvHistorySignupPath } from "@/lib/csvHistoryOnboardingIntentRules";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
@@ -48,6 +49,7 @@ export default function SensorCsvPreview() {
           })
         }
       />
+      <PublicPageRecoveryNav className="border-t border-border pt-4" />
     </main>
   );
 }

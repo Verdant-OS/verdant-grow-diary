@@ -7,3 +7,4 @@ build
 node_modules
 .husky
 src/integrations/supabase/types.ts
+supabase/functions/_shared/lib/integrations/supabase/types.ts

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   ECOWITT_SOIL_CHANNEL_MAP_SCHEMA_ID,
@@ -8,9 +8,10 @@ import {
   EcowittBridgeConfigError,
 } from "@/lib/ecowittLiveSoilIngestRules";
 
-const SCHEMA_PATH = join(
+const SCHEMA_PATH = join(process.cwd(), "docs/schemas/ecowitt-soil-channel-map.schema.json");
+const PUBLIC_SCHEMA_PATH = join(
   process.cwd(),
-  "docs/schemas/ecowitt-soil-channel-map.schema.json",
+  "public/schemas/ecowitt-soil-channel-map.schema.json",
 );
 
 const TENT = "11111111-2222-3333-4444-555555555555";
@@ -22,6 +23,13 @@ describe("ECOWITT_SOIL_CHANNEL_MAP_JSON schema", () => {
     expect(schema.$id).toBe(ECOWITT_SOIL_CHANNEL_MAP_SCHEMA_ID);
     expect(schema.$schema).toContain("json-schema.org");
     expect(schema.type).toBe("object");
+  });
+
+  it("publishes the canonical schema at its advertised same-site URL", () => {
+    expect(existsSync(PUBLIC_SCHEMA_PATH)).toBe(true);
+    expect(JSON.parse(readFileSync(PUBLIC_SCHEMA_PATH, "utf8"))).toEqual(
+      JSON.parse(readFileSync(SCHEMA_PATH, "utf8")),
+    );
   });
 
   it("accepts unset / empty / empty-object payloads", () => {
@@ -62,11 +70,7 @@ describe("ECOWITT_SOIL_CHANNEL_MAP_JSON schema", () => {
     expect(res.ok).toBe(false);
     const paths = res.errors.map((e) => e.path).sort();
     expect(paths).toEqual(
-      expect.arrayContaining([
-        "$.soilmoisture0",
-        "$.humidity1",
-        "$.soilmoisture3.nickname",
-      ]),
+      expect.arrayContaining(["$.soilmoisture0", "$.humidity1", "$.soilmoisture3.nickname"]),
     );
   });
 
@@ -110,9 +114,7 @@ describe("ECOWITT_SOIL_CHANNEL_MAP_JSON schema", () => {
   it("assert helper is a no-op for valid payloads", () => {
     expect(() => assertEcowittSoilChannelMapJsonEnv(undefined)).not.toThrow();
     expect(() =>
-      assertEcowittSoilChannelMapJsonEnv(
-        JSON.stringify({ soilmoisture1: { tent_id: TENT } }),
-      ),
+      assertEcowittSoilChannelMapJsonEnv(JSON.stringify({ soilmoisture1: { tent_id: TENT } })),
     ).not.toThrow();
   });
 });

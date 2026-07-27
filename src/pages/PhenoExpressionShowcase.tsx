@@ -12,6 +12,7 @@
  */
 import { useMemo, useState } from "react";
 import PhenoComparisonView from "@/components/PhenoComparisonView";
+import PublicPageRecoveryNav from "@/components/PublicPageRecoveryNav";
 import { PHENO_EXAMPLE_STRAINS, PHENO_SHOWCASE_DEFAULT_SELECTION } from "@/lib/phenoExampleStrains";
 import { usePageSeo } from "@/hooks/usePageSeo";
 
@@ -87,6 +88,7 @@ export default function PhenoExpressionShowcase() {
 
       {/* headingLevel="h2": this page already renders its own H1 above. */}
       <PhenoComparisonView inputs={selectedInputs} mode="demo" headingLevel="h2" />
+      <PublicPageRecoveryNav className="mt-8 border-t border-border pt-4" />
     </div>
   );
 }

@@ -231,6 +231,23 @@ export default function OperatorEdgeAlerts() {
     },
   });
 
+  const attemptsQuery = useQuery({
+    queryKey: ["operator", "edge-alerts", "attempts"],
+    enabled: isOperator === true,
+    refetchInterval: 60_000,
+    queryFn: async (): Promise<WebhookAttemptRow[]> => {
+      const { data, error } = await supabase
+        .from("edge_metrics_webhook_attempts")
+        .select(
+          "id, dispatch_id, fn, metric, attempt, outcome, status_code, ok, transient, error, delay_before_ms, duration_ms, value, threshold, requests_in_window, request_id, attempted_at",
+        )
+        .order("attempted_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return (data ?? []) as WebhookAttemptRow[];
+    },
+  });
+
   const cooldownMinutes = liveQuery.data?.thresholds.cooldownMinutes ?? null;
 
   const dispatchesWithExpiry = useMemo(() => {

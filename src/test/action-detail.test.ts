@@ -73,11 +73,16 @@ describe("Action Queue detail view", () => {
     );
     expect(m).toBeTruthy();
     expect(m![1]).not.toMatch(/\buser_id\b|\bgrow_id\b|\bevent_type\b|\bnew_status\b/);
+    // Tolerates the current runtime-availability cast used to invoke the
+    // RPC before its generated typing lands (see actionQueueRpcAvailability):
+    //   (supabase.rpc as unknown as (...) => ...)("action_queue_transition", rpcArgs)
+    // and still matches a direct supabase.rpc("action_queue_transition", rpcArgs).
     expect(DETAIL).toMatch(
-      /supabase\.rpc\(\s*["']action_queue_transition["']\s*,\s*rpcArgs\s*,?\s*\)/,
+      /supabase\.rpc\b[\s\S]{0,200}?["']action_queue_transition["']\s*,\s*rpcArgs\s*,?\s*\)/,
     );
     expect(DETAIL).not.toMatch(/\.from\(\s*["']action_queue_events["']\s*\)\s*\.insert\(/);
   });
+
 
   it("introduces no device-control surface or service_role", () => {
     expect(DETAIL).not.toMatch(/mqtt|home.?assistant|pi_bridge|webhook|relay|actuator/i);

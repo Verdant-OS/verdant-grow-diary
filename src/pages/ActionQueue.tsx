@@ -1018,22 +1018,50 @@ export default function ActionQueue() {
           description="Suggestions are approval-gated. Verdant never sends commands to equipment."
           icon={<ListChecks className="h-5 w-5" aria-hidden="true" />}
           actions={
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={load}
-              disabled={loading || isRefreshing}
-              aria-label="Refresh Action Queue"
-              data-testid="action-queue-refresh-button"
-              className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-                aria-hidden="true"
-              />
-              <span>Refresh</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              <span
+                role="status"
+                aria-live="polite"
+                data-testid="action-queue-transition-rpc-status-pill"
+                data-state={rpcUnavailable ? "unavailable" : "available"}
+                title={
+                  rpcUnavailable
+                    ? ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.title
+                    : "Action transitions are available"
+                }
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                  rpcUnavailable
+                    ? "border-destructive/40 bg-destructive/10 text-destructive"
+                    : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                }`}
+              >
+                {rpcUnavailable ? (
+                  <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+                ) : (
+                  <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                )}
+                <span>
+                  {rpcUnavailable ? "Transitions unavailable" : "Transitions ready"}
+                </span>
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={load}
+                disabled={loading || isRefreshing}
+                aria-label="Refresh Action Queue"
+                data-testid="action-queue-refresh-button"
+                className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+                  aria-hidden="true"
+                />
+                <span>Refresh</span>
+              </Button>
+            </div>
           }
+
         />
         {lastUpdatedAt !== null && (
           <p

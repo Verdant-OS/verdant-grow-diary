@@ -122,6 +122,7 @@ const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
 const OperatorSupportInbox = lazy(() => import("./pages/OperatorSupportInbox"));
 const OperatorCreditsAudit = lazy(() => import("./pages/OperatorCreditsAudit"));
 const OperatorEdgeMetrics = lazy(() => import("./pages/OperatorEdgeMetrics"));
+const OperatorEdgeAlerts = lazy(() => import("./pages/OperatorEdgeAlerts"));
 
 const Leads = lazy(() => import("./pages/Leads"));
 const PiIngestStatus = lazy(() => import("./pages/PiIngestStatus"));

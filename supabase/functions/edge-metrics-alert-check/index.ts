@@ -332,14 +332,76 @@ Deno.serve(async (req) => {
 
   const rows = (data ?? []) as EventRow[];
   const breaches = evaluate(rows, thresholds);
+
+  let toFire: Breach[] = breaches;
+  let suppressed: SuppressedBreach[] = [];
+  if (breaches.length > 0 && thresholds.cooldownMinutes > 0) {
+    const pairs = Array.from(new Set(breaches.map((b) => `${b.fn}|${b.metric}`)));
+    const fns = Array.from(new Set(breaches.map((b) => b.fn)));
+    const metrics = Array.from(new Set(breaches.map((b) => b.metric)));
+    const { data: dispatchRows, error: dispatchErr } = await supa
+      .from("edge_metrics_alert_dispatches")
+      .select("fn, metric, last_fired_at")
+      .in("fn", fns)
+      .in("metric", metrics);
+    if (dispatchErr) {
+      // Cooldown is best-effort — never let a lookup failure block alerting.
+      log("warn", "cooldown_lookup_failed", {
+        request_id: requestId,
+        code: dispatchErr.code,
+      });
+    } else {
+      const filtered = (dispatchRows ?? []).filter((r) =>
+        pairs.includes(`${r.fn}|${r.metric}`),
+      ) as DispatchRow[];
+      const parts = partitionByCooldown(
+        breaches,
+        filtered,
+        new Date(),
+        thresholds.cooldownMinutes,
+      );
+      toFire = parts.toFire;
+      suppressed = parts.suppressed;
+    }
+  }
+
   let webhook: Awaited<ReturnType<typeof postWebhook>> = { posted: false };
-  if (breaches.length > 0) {
-    webhook = await postWebhook(breaches, thresholds);
+  if (toFire.length > 0) {
+    webhook = await postWebhook(toFire, thresholds);
     log("warn", "alert_fired", {
       request_id: requestId,
-      breach_count: breaches.length,
+      breach_count: toFire.length,
+      suppressed_count: suppressed.length,
       webhook_posted: webhook.posted,
       webhook_status: webhook.status,
+    });
+    // Record dispatch state only for breaches we actually fired on.
+    // Failures here are non-fatal — the next cron pass will retry, and
+    // in the worst case one extra webhook message goes out.
+    const nowIso = new Date().toISOString();
+    const upsertRows = toFire.map((b) => ({
+      fn: b.fn,
+      metric: b.metric,
+      last_fired_at: nowIso,
+      last_value: b.value,
+      last_threshold: b.threshold,
+      last_requests_in_window: b.requests_in_window,
+      updated_at: nowIso,
+    }));
+    const { error: upsertErr } = await supa
+      .from("edge_metrics_alert_dispatches")
+      .upsert(upsertRows, { onConflict: "fn,metric" });
+    if (upsertErr) {
+      log("warn", "cooldown_upsert_failed", {
+        request_id: requestId,
+        code: upsertErr.code,
+      });
+    }
+  } else if (suppressed.length > 0) {
+    log("info", "alert_suppressed_by_cooldown", {
+      request_id: requestId,
+      suppressed_count: suppressed.length,
+      cooldown_minutes: thresholds.cooldownMinutes,
     });
   } else {
     log("info", "alert_check_clean", {
@@ -357,6 +419,8 @@ Deno.serve(async (req) => {
       sampled_events: rows.length,
       thresholds,
       breaches,
+      fired: toFire,
+      suppressed,
       webhook,
       invoked_via: isCron ? "cron" : "operator",
     },
@@ -365,4 +429,4 @@ Deno.serve(async (req) => {
 });
 
 
-export const __internals = { evaluate, loadThresholds };
+export const __internals = { evaluate, loadThresholds, partitionByCooldown };

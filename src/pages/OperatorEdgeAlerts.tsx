@@ -24,8 +24,11 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Clock,
   RefreshCw,
+  SlidersHorizontal,
   X,
 } from "lucide-react";
 

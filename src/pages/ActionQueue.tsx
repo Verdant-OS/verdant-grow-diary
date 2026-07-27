@@ -769,6 +769,9 @@ export default function ActionQueue() {
         (result.reason === "status_conflict" || result.reason === "action_not_found");
       if (shouldReload) await load();
       setBusyId(null);
+      // Retryable/transient failure: reset the pill to "unknown" so the next
+      // attempt re-proves the RPC state rather than showing stale status.
+      setRpcAvailability("unknown");
       toast.error(safeActionQueueFailureCopy("transition", error ?? result));
       return false;
     }
@@ -1072,7 +1075,12 @@ export default function ActionQueue() {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={load}
+                onClick={() => {
+                  // Manual refresh re-probes RPC state: show the interim
+                  // placeholder until the next transition proves availability.
+                  setRpcAvailability("unknown");
+                  void load();
+                }}
                 disabled={loading || isRefreshing}
                 aria-label="Refresh Action Queue"
                 data-testid="action-queue-refresh-button"

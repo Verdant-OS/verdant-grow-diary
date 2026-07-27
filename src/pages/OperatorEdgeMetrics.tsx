@@ -99,7 +99,7 @@ export default function OperatorEdgeMetrics() {
   usePageSeo({
     title: "Edge function metrics — operator",
     description: "Internal analytics for edge function request and snapshot trends.",
-    noIndex: true,
+    noindex: true,
   });
 
   const role = useHasRole("operator");

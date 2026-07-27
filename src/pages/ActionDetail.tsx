@@ -423,7 +423,7 @@ export default function ActionDetail() {
       expectedStatus: current.status,
       note,
     });
-    const { data, error } = await supabase.rpc("action_queue_transition", rpcArgs);
+    const { data, error } = await (supabase.rpc as (fn: string, args: unknown) => Promise<{ data: unknown; error: unknown }>)("action_queue_transition", rpcArgs);
     const result = parseActionQueueTransitionRpcResult(data, rpcArgs);
     if (error || !result || result.ok !== true) {
       const shouldReload =

@@ -34,6 +34,14 @@ describe("AccountPlanBadge", () => {
     render(<AccountPlanBadge entitlement={ent("pro_annual")} />);
     expect(screen.getByTestId("account-plan-badge")).toHaveTextContent("Pro Annual");
   });
+  it("renders Craft Monthly", () => {
+    render(<AccountPlanBadge entitlement={ent("craft_monthly")} />);
+    expect(screen.getByTestId("account-plan-badge")).toHaveTextContent("Craft Monthly");
+  });
+  it("renders Craft Annual", () => {
+    render(<AccountPlanBadge entitlement={ent("craft_annual")} />);
+    expect(screen.getByTestId("account-plan-badge")).toHaveTextContent("Craft Annual");
+  });
   it("renders Founder Lifetime", () => {
     render(<AccountPlanBadge entitlement={ent("founder_lifetime")} />);
     expect(screen.getByTestId("account-plan-badge")).toHaveTextContent("Founder Lifetime");

@@ -21,6 +21,13 @@ const SITE_ORIGIN = "https://verdantgrowdiary.com";
  * truth) so the structured data can never drift from the pricing page. Static
  * output means non-JS crawlers see it too — no aggregateRating is emitted
  * because we have no real ratings to cite.
+ *
+ * Offers list ONLY the plans a grower can buy from the public pricing page
+ * today: Free, Pro, and Craft. Founder Lifetime was retired from the public
+ * grid (it renders only behind an explicit ?plan=founder_lifetime deep link),
+ * so advertising it in structured data would misrepresent availability.
+ * Existing founder ENTITLEMENTS are untouched — this is display truth only.
+ * src/test/software-application-offers-truth.test.ts pins this contract.
  */
 function softwareApplicationJsonLd(): Plugin {
   const jsonLd = {
@@ -49,8 +56,14 @@ function softwareApplicationJsonLd(): Plugin {
       },
       {
         "@type": "Offer",
-        name: "Founder Lifetime",
-        price: String(PRICING.founder.price),
+        name: "Craft (monthly)",
+        price: String(PRICING.craft.monthlyPrice),
+        priceCurrency: "USD",
+      },
+      {
+        "@type": "Offer",
+        name: "Craft (annual)",
+        price: String(PRICING.craft.annualPrice),
         priceCurrency: "USD",
       },
     ],

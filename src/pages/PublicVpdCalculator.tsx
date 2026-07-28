@@ -273,10 +273,13 @@ export default function PublicVpdCalculator() {
         <section className="mx-auto mt-10 max-w-3xl" aria-labelledby="calculator-heading">
           <Card>
             <CardHeader>
-              <CardTitle id="calculator-heading" className="flex items-center gap-2 font-display">
+              <h2
+                id="calculator-heading"
+                className="flex items-center gap-2 font-display text-2xl font-semibold leading-none tracking-tight"
+              >
                 <Calculator aria-hidden="true" className="h-5 w-5 text-primary" />
                 Calculate from a manual reading
-              </CardTitle>
+              </h2>
             </CardHeader>
             <CardContent>
               <form onSubmit={calculate} className="space-y-6">

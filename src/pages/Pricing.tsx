@@ -582,9 +582,13 @@ export default function Pricing() {
       {/* Pricing tier cards */}
       <section
         id="pricing-plans"
+        aria-labelledby="pricing-plans-heading"
         data-testid="pricing-plans-grid"
         className="px-6 pb-10 max-w-6xl mx-auto grid gap-8 md:gap-6 md:grid-cols-2 xl:grid-cols-4 scroll-mt-24"
       >
+        <h2 id="pricing-plans-heading" className="sr-only">
+          Choose a Verdant plan
+        </h2>
         {/* Free */}
         <PricingCard
           testId="pricing-card-free"
@@ -1054,7 +1058,12 @@ export default function Pricing() {
           that includes full Pro access and the Pro Blueprint.
         </p>
 
-        <div className="mt-8 overflow-x-auto rounded-xl border border-border/60">
+        <div
+          tabIndex={0}
+          role="region"
+          aria-label="Plan feature comparison"
+          className="mt-8 overflow-x-auto rounded-xl border border-border/60"
+        >
           <table className="w-full min-w-[760px] text-sm" data-testid="pricing-comparison-table">
             <thead className="bg-secondary/40 text-muted-foreground">
               <tr>

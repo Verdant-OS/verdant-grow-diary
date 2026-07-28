@@ -24,6 +24,10 @@ describe("Strain Reference Library V1 detail", () => {
     expect(screen.getByTestId("cultivar-reference-banner")).toHaveTextContent(
       /not plant-specific advice/i,
     );
+    expect(screen.getByText(/sample reference data — not plant-specific advice/i)).toHaveClass(
+      "text-amber-200",
+    );
+    expect(screen.getByTestId("cultivar-pheno-sample-label")).toHaveClass("text-amber-300");
 
     const nav = screen.getByTestId("cultivar-sticky-section-nav");
     for (const key of CULTIVAR_GUIDE_SECTION_KEYS) {

@@ -133,7 +133,7 @@ export default function CultivarsIndex() {
           data-testid="cultivar-sample-banner"
           className="mt-6 rounded-xl border border-amber-500/35 bg-amber-500/10 p-4 text-sm"
         >
-          <p className="font-semibold text-amber-800 dark:text-amber-200">
+          <p className="font-semibold text-amber-200">
             Sample reference data — not a universal grow recipe
           </p>
           <p className="mt-1 text-muted-foreground">
@@ -277,7 +277,7 @@ export default function CultivarsIndex() {
                     <span className="rounded-full border border-border/70 px-2 py-0.5">
                       {cultivar.difficulty}
                     </span>
-                    <span className="rounded-full border border-amber-500/35 bg-amber-500/10 px-2 py-0.5 text-amber-800 dark:text-amber-200">
+                    <span className="rounded-full border border-amber-500/35 bg-amber-500/10 px-2 py-0.5 text-amber-200">
                       {formatVerificationStatus(cultivar.verificationStatus)}
                     </span>
                   </div>

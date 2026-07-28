@@ -96,6 +96,17 @@ afterEach(() => {
 });
 
 describe("MCP API reference clipboard feedback", () => {
+  it("makes every horizontally scrollable code sample keyboard-focusable", () => {
+    const { container } = renderMcpReference();
+    const samples = [...container.querySelectorAll("pre")];
+
+    expect(samples.length).toBeGreaterThan(0);
+    for (const sample of samples) {
+      expect(sample).toHaveAttribute("tabindex", "0");
+      expect(sample).toHaveAccessibleName(/code example/i);
+    }
+  });
+
   it("shows success only after the clipboard write resolves", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     setClipboard({ writeText });

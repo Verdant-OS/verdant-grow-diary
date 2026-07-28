@@ -7,9 +7,7 @@
  * anything itself.
  */
 
-export type RlsAuditGrants = Partial<
-  Record<"anon" | "authenticated" | "service_role", string[]>
->;
+export type RlsAuditGrants = Partial<Record<"anon" | "authenticated" | "service_role", string[]>>;
 
 export interface RlsAuditInput {
   table: string;
@@ -72,8 +70,7 @@ export function evaluateRlsAudit(rows: RlsAuditInput[]): RlsFinding[] {
         table: row.table,
         severity: "warning",
         code: "rls_enabled_no_policies",
-        message:
-          "RLS is enabled but no policies exist — all non-service_role access is denied.",
+        message: "RLS is enabled but no policies exist — all non-service_role access is denied.",
       });
     }
 
@@ -93,8 +90,7 @@ export function evaluateRlsAudit(rows: RlsAuditInput[]): RlsFinding[] {
         table: row.table,
         severity: "info",
         code: "anon_read_grant",
-        message:
-          "Anonymous role has SELECT. Confirm this table is intentionally public.",
+        message: "Anonymous role has SELECT. Confirm this table is intentionally public.",
       });
     }
 
@@ -103,14 +99,18 @@ export function evaluateRlsAudit(rows: RlsAuditInput[]): RlsFinding[] {
         table: row.table,
         severity: "warning",
         code: "authenticated_missing_crud",
-        message:
-          "authenticated role is missing one or more of SELECT/INSERT/UPDATE/DELETE.",
+        message: "authenticated role is missing one or more of SELECT/INSERT/UPDATE/DELETE.",
         detail: `has: ${(row.grants.authenticated ?? []).join(", ") || "(none)"}`,
       });
     }
 
-    const svc = row.grants.service_role ?? [];
-    if (!svc.includes("SELECT") || !svc.includes("INSERT") || !svc.includes("UPDATE") || !svc.includes("DELETE")) {
+    const svc = row.grants["service_role"] ?? [];
+    if (
+      !svc.includes("SELECT") ||
+      !svc.includes("INSERT") ||
+      !svc.includes("UPDATE") ||
+      !svc.includes("DELETE")
+    ) {
       findings.push({
         table: row.table,
         severity: "warning",

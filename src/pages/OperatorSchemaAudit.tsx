@@ -11,7 +11,14 @@
  *    pure presenter; it never writes and never bypasses that check.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, XCircle, RefreshCw, Loader2, AlertTriangle, ChevronRight } from "lucide-react";
+import {
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
+  Loader2,
+  AlertTriangle,
+  ChevronRight,
+} from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -59,7 +66,9 @@ const MANIFEST_ENTRIES: ManifestEntry[] = [
 ];
 
 const REQUIRED_COLUMNS: Array<{ table: string; column: string }> = Array.from(
-  new Map(MANIFEST_ENTRIES.map((e) => [`${e.table}.${e.column}`, { table: e.table, column: e.column }])).values(),
+  new Map(
+    MANIFEST_ENTRIES.map((e) => [`${e.table}.${e.column}`, { table: e.table, column: e.column }]),
+  ).values(),
 );
 
 // Union of all tables named by the core + advisory manifest, plus the
@@ -128,9 +137,9 @@ export default function OperatorSchemaAudit() {
   const [error, setError] = useState<string | null>(null);
   const [openMigration, setOpenMigration] = useState<MigrationRow | null>(null);
   const [migrationSearch, setMigrationSearch] = useState("");
-  const [migrationStatusFilter, setMigrationStatusFilter] = useState<
-    "all" | "applied" | "missing"
-  >("all");
+  const [migrationStatusFilter, setMigrationStatusFilter] = useState<"all" | "applied" | "missing">(
+    "all",
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -225,7 +234,11 @@ export default function OperatorSchemaAudit() {
       if (missingTableSet.has(c.table)) continue;
       for (const entry of MANIFEST_ENTRIES) {
         if (entry.table === c.table && entry.column === c.column) {
-          ensure(entry.migration).columns.push({ table: c.table, column: c.column, reason: entry.reason });
+          ensure(entry.migration).columns.push({
+            table: c.table,
+            column: c.column,
+            reason: entry.reason,
+          });
         }
       }
     }
@@ -242,10 +255,7 @@ export default function OperatorSchemaAudit() {
     };
   }, [data]);
 
-  const rlsFindings = useMemo(
-    () => evaluateRlsAudit(data?.rls_audit ?? []),
-    [data],
-  );
+  const rlsFindings = useMemo(() => evaluateRlsAudit(data?.rls_audit ?? []), [data]);
   const rlsFindingStats = useMemo(() => summarizeRlsFindings(rlsFindings), [rlsFindings]);
   const rlsFindingsByTable = useMemo(() => {
     const map = new Map<string, typeof rlsFindings>();
@@ -330,8 +340,8 @@ export default function OperatorSchemaAudit() {
           <div>
             <CardTitle className="text-base">Automated scan</CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
-              Missing tables and manifest columns, grouped by the migration
-              responsible. Open a row to jump into the drilldown for verification.
+              Missing tables and manifest columns, grouped by the migration responsible. Open a row
+              to jump into the drilldown for verification.
             </p>
           </div>
           <div className="flex items-center gap-2 text-xs flex-wrap justify-end">
@@ -341,9 +351,7 @@ export default function OperatorSchemaAudit() {
             <Badge variant={scan.totalMissingColumns > 0 ? "destructive" : "outline"}>
               {scan.totalMissingColumns} columns
             </Badge>
-            <span className="text-muted-foreground">
-              of {columnStats.total} checked
-            </span>
+            <span className="text-muted-foreground">of {columnStats.total} checked</span>
             {allMissingIds.length > 0 && (
               <>
                 <Badge
@@ -370,8 +378,8 @@ export default function OperatorSchemaAudit() {
         <CardContent className="p-0">
           {allMissingIds.length > 0 && (
             <div className="border-b bg-muted/20 px-4 py-2 text-[11px] text-muted-foreground">
-              Local session checklist — tick items after reviewing the drilldown.
-              Nothing is saved to the database; verifications clear when this browser tab closes.
+              Local session checklist — tick items after reviewing the drilldown. Nothing is saved
+              to the database; verifications clear when this browser tab closes.
             </div>
           )}
           {scan.groups.length === 0 && scan.orphanTables.length === 0 ? (
@@ -387,9 +395,7 @@ export default function OperatorSchemaAudit() {
                     <div className="min-w-0">
                       <div className="font-mono text-xs truncate">{g.filename}</div>
                       <div className="text-[11px] text-muted-foreground">
-                        {g.migration?.applied
-                          ? "Ledger: applied"
-                          : "Ledger: not recorded"}
+                        {g.migration?.applied ? "Ledger: applied" : "Ledger: not recorded"}
                       </div>
                     </div>
                     <Button
@@ -404,29 +410,31 @@ export default function OperatorSchemaAudit() {
                   </div>
                   {g.tables.size > 0 && (
                     <div className="flex flex-wrap gap-1.5">
-                      {Array.from(g.tables).sort().map((t) => {
-                        const id = `table:${t}`;
-                        const done = checklist.isVerified(id);
-                        return (
-                          <label
-                            key={t}
-                            className="inline-flex items-center gap-1.5 cursor-pointer"
-                            data-testid={`schema-audit-checklist-item-${id}`}
-                          >
-                            <Checkbox
-                              checked={done}
-                              onCheckedChange={() => checklist.toggle(id)}
-                              aria-label={`Mark missing table public.${t} as verified`}
-                            />
-                            <Badge
-                              variant={done ? "outline" : "destructive"}
-                              className={`text-[10px] font-mono ${done ? "line-through opacity-60" : ""}`}
+                      {Array.from(g.tables)
+                        .sort()
+                        .map((t) => {
+                          const id = `table:${t}`;
+                          const done = checklist.isVerified(id);
+                          return (
+                            <label
+                              key={t}
+                              className="inline-flex items-center gap-1.5 cursor-pointer"
+                              data-testid={`schema-audit-checklist-item-${id}`}
                             >
-                              missing table · public.{t}
-                            </Badge>
-                          </label>
-                        );
-                      })}
+                              <Checkbox
+                                checked={done}
+                                onCheckedChange={() => checklist.toggle(id)}
+                                aria-label={`Mark missing table public.${t} as verified`}
+                              />
+                              <Badge
+                                variant={done ? "outline" : "destructive"}
+                                className={`text-[10px] font-mono ${done ? "line-through opacity-60" : ""}`}
+                              >
+                                missing table · public.{t}
+                              </Badge>
+                            </label>
+                          );
+                        })}
                     </div>
                   )}
                   {g.columns.length > 0 && (
@@ -496,8 +504,8 @@ export default function OperatorSchemaAudit() {
                   </div>
                   <p className="text-[11px] text-muted-foreground">
                     These tables are watched by this page but no entry in{" "}
-                    <code className="font-mono">required-core-migrations.mjs</code>{" "}
-                    ties them to a specific migration file.
+                    <code className="font-mono">required-core-migrations.mjs</code> ties them to a
+                    specific migration file.
                   </p>
                 </div>
               )}
@@ -505,7 +513,6 @@ export default function OperatorSchemaAudit() {
           )}
         </CardContent>
       </Card>
-
 
       <Card>
         <CardHeader className="flex flex-col gap-3 pb-3 sm:flex-row sm:items-center sm:justify-between">
@@ -530,9 +537,7 @@ export default function OperatorSchemaAudit() {
             />
             <Select
               value={migrationStatusFilter}
-              onValueChange={(v) =>
-                setMigrationStatusFilter(v as "all" | "applied" | "missing")
-              }
+              onValueChange={(v) => setMigrationStatusFilter(v as "all" | "applied" | "missing")}
             >
               <SelectTrigger
                 className="h-9 sm:w-48"
@@ -621,7 +626,6 @@ export default function OperatorSchemaAudit() {
         </CardContent>
       </Card>
 
-
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
           <CardTitle className="text-base">Critical tables</CardTitle>
@@ -666,8 +670,8 @@ export default function OperatorSchemaAudit() {
           <div>
             <CardTitle className="text-base">RLS &amp; policy audit</CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
-              For each critical table: row-level security state, policy count, and
-              expected grants for anon / authenticated / service_role.
+              For each critical table: row-level security state, policy count, and expected grants
+              for anonymous, signed-in, and server roles.
             </p>
           </div>
           <div className="flex items-center gap-2 text-xs">
@@ -711,9 +715,7 @@ export default function OperatorSchemaAudit() {
                     <div className={`min-w-0 ${done ? "line-through" : ""}`}>
                       <span className="font-mono text-xs">public.{f.table}</span>{" "}
                       <span>{f.message}</span>
-                      {f.detail && (
-                        <span className="text-muted-foreground"> — {f.detail}</span>
-                      )}
+                      {f.detail && <span className="text-muted-foreground"> — {f.detail}</span>}
                     </div>
                   </div>
                 );
@@ -744,7 +746,7 @@ export default function OperatorSchemaAudit() {
                       {row.policy_count === 1 ? "y" : "ies"} · anon:{" "}
                       {(row.grants.anon ?? []).join("/") || "—"} · authn:{" "}
                       {(row.grants.authenticated ?? []).join("/") || "—"} · svc:{" "}
-                      {(row.grants.service_role ?? []).join("/") || "—"}
+                      {(row.grants["service_role"] ?? []).join("/") || "—"}
                     </div>
                   </div>
                   <div className="shrink-0">
@@ -778,10 +780,11 @@ export default function OperatorSchemaAudit() {
         </CardContent>
       </Card>
 
-
       <SchemaAuditMigrationDrilldown
         open={openMigration !== null}
-        onOpenChange={(o) => { if (!o) setOpenMigration(null); }}
+        onOpenChange={(o) => {
+          if (!o) setOpenMigration(null);
+        }}
         filename={openMigration?.filename ?? null}
         version={openMigration?.version ?? null}
         applied={openMigration?.applied ?? false}

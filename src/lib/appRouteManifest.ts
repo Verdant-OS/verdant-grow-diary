@@ -341,6 +341,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
       "Read-only release readiness / validation status snapshot (static/manual, no live CI feed).",
   },
   {
+    path: "/operator/schema-audit",
+    access: "operator",
+    description: "Operator required-migration and critical-table audit (read-only).",
+  },
+  {
     path: "/operator/subscriber-growth",
     access: "operator",
     description:

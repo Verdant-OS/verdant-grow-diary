@@ -57,6 +57,7 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/operator/paddle-processing-audit",
   "/operator/post-grow-reflection-dry-run",
   "/operator/release-readiness",
+  "/operator/schema-audit",
   "/operator/subscriber-growth",
   "/operator/support-inbox",
   "/operator/demo-preview",

@@ -120,6 +120,7 @@ export default function OperatorSchemaAudit() {
       const { data: rpcData, error: rpcError } = await client.rpc("admin_schema_audit", {
         _migrations: REQUIRED_MIGRATIONS,
         _tables: REQUIRED_TABLES,
+        _columns: REQUIRED_COLUMNS.map((c) => ({ table: c.table, column: c.column })),
       });
       if (rpcError) {
         setError(rpcError.message);

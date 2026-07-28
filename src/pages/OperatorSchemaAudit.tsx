@@ -1,13 +1,13 @@
 /**
  * OperatorSchemaAudit — operator/staff-only read-only surface that reports
  * which required Supabase migrations are recorded in the ledger, and whether
- * critical public tables exist in the live schema.
+ * critical public-schema tables exist in the live schema.
  *
  * SAFETY
  *  - Route nested under <RequireOperatorRole /> (UI gate).
  *  - Data comes from `public.admin_schema_audit` (SECURITY DEFINER RPC) which
  *    re-verifies operator/staff role server-side before reading
- *    `supabase_migrations.schema_migrations` or `pg_tables`. This page is a
+ *    migration and PostgreSQL catalog metadata. This page is a
  *    pure presenter; it never writes and never bypasses that check.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -36,7 +36,17 @@ import {
 } from "@/components/ui/select";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import SchemaAuditMigrationDrilldown from "@/components/SchemaAuditMigrationDrilldown";
-import { evaluateRlsAudit, summarizeRlsFindings } from "@/lib/rlsAuditRules";
+import { evaluateRlsAudit, rlsPostureForTable, summarizeRlsFindings } from "@/lib/rlsAuditRules";
+import {
+  attachAccessProfiles,
+  backendReferenceFromUrl,
+  columnEvidenceMap,
+  deriveSchemaAuditTrust,
+  schemaAuditChecklistScope,
+  schemaAuditRows,
+  type MigrationAuditRow,
+  type SchemaAuditResponse,
+} from "@/lib/schemaAuditRules";
 import {
   REQUIRED_CORE_SCHEMA,
   ADVISORY_SCHEMA,
@@ -88,40 +98,40 @@ const REQUIRED_TABLES: string[] = Array.from(
     "action_queue",
   ]),
 ).sort();
+const REQUIRED_MIGRATION_SET = new Set(REQUIRED_MIGRATIONS);
+const REQUIRED_TABLE_SET = new Set(REQUIRED_TABLES);
 
-interface MigrationRow {
-  filename: string;
-  version: string | null;
-  applied: boolean;
-}
+const AUDIT_CONTRACT = {
+  migrations: REQUIRED_MIGRATIONS,
+  tables: REQUIRED_TABLES,
+  columns: REQUIRED_COLUMNS,
+} as const;
 
-interface TableRow {
-  table: string;
-  exists: boolean;
-}
+const BACKEND_REFERENCE = backendReferenceFromUrl(import.meta.env.VITE_SUPABASE_URL);
 
-interface ColumnRow {
-  table: string;
-  column: string;
-  exists: boolean;
-}
-
-interface RlsAuditRow {
-  table: string;
-  exists: boolean;
-  rls_enabled: boolean;
-  rls_forced: boolean;
-  policy_count: number;
-  grants: Partial<Record<"anon" | "authenticated" | "service_role", string[]>>;
-}
-
-interface AuditResponse {
-  migrations: MigrationRow[];
-  tables: TableRow[];
-  columns: ColumnRow[];
-  rls_audit?: RlsAuditRow[];
-  checked_at: string;
-}
+const TRUST_COPY = {
+  loading: {
+    label: "Loading",
+    description: "Fetching a fresh, operator-scoped catalog snapshot.",
+  },
+  error: {
+    label: "Error",
+    description:
+      "The latest refresh failed. Previously displayed evidence is stale and unverified.",
+  },
+  unverified: {
+    label: "Unverified",
+    description: "No complete, fingerprinted catalog snapshot is available.",
+  },
+  partial: {
+    label: "Partial",
+    description: "The snapshot returned, but required evidence or safety checks are unresolved.",
+  },
+  ready: {
+    label: "Ready",
+    description: "The complete fingerprinted snapshot passed the bounded catalog checks.",
+  },
+} as const;
 
 export default function OperatorSchemaAudit() {
   usePageSeo({
@@ -132,10 +142,10 @@ export default function OperatorSchemaAudit() {
     noindex: true,
   });
 
-  const [data, setData] = useState<AuditResponse | null>(null);
+  const [data, setData] = useState<SchemaAuditResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [openMigration, setOpenMigration] = useState<MigrationRow | null>(null);
+  const [openMigration, setOpenMigration] = useState<MigrationAuditRow | null>(null);
   const [migrationSearch, setMigrationSearch] = useState("");
   const [migrationStatusFilter, setMigrationStatusFilter] = useState<"all" | "applied" | "missing">(
     "all",
@@ -149,7 +159,7 @@ export default function OperatorSchemaAudit() {
         rpc: (
           fn: string,
           args: Record<string, unknown>,
-        ) => Promise<{ data: AuditResponse | null; error: { message: string } | null }>;
+        ) => Promise<{ data: SchemaAuditResponse | null; error: { message: string } | null }>;
       };
       const { data: rpcData, error: rpcError } = await client.rpc("admin_schema_audit", {
         _migrations: REQUIRED_MIGRATIONS,
@@ -158,7 +168,6 @@ export default function OperatorSchemaAudit() {
       });
       if (rpcError) {
         setError(rpcError.message);
-        setData(null);
       } else {
         setData(rpcData);
       }
@@ -173,42 +182,54 @@ export default function OperatorSchemaAudit() {
     void load();
   }, [load]);
 
+  const rows = useMemo(() => schemaAuditRows(data), [data]);
+  const migrationRows = rows.migrations;
+  const tableRows = rows.tables;
+  const columnRows = rows.columns;
+  const rawRlsRows = rows.rlsAudit;
+
   const migrationStats = useMemo(() => {
-    const rows = data?.migrations ?? [];
-    const applied = rows.filter((r) => r.applied).length;
-    return { applied, total: rows.length, missing: rows.length - applied };
-  }, [data]);
+    const applied = new Set(
+      migrationRows
+        .filter((row) => row.applied && REQUIRED_MIGRATION_SET.has(row.filename))
+        .map((row) => row.filename),
+    ).size;
+    return {
+      applied,
+      total: REQUIRED_MIGRATIONS.length,
+      unverified: REQUIRED_MIGRATIONS.length - applied,
+    };
+  }, [migrationRows]);
 
   const tableStats = useMemo(() => {
-    const rows = data?.tables ?? [];
-    const present = rows.filter((r) => r.exists).length;
-    return { present, total: rows.length, missing: rows.length - present };
-  }, [data]);
+    const present = new Set(
+      tableRows
+        .filter((row) => row.exists && REQUIRED_TABLE_SET.has(row.table))
+        .map((row) => row.table),
+    ).size;
+    return { present, total: REQUIRED_TABLES.length, unverified: REQUIRED_TABLES.length - present };
+  }, [tableRows]);
 
   const tableExistence = useMemo(() => {
     const map: Record<string, boolean> = {};
-    for (const row of data?.tables ?? []) map[row.table] = row.exists;
+    for (const row of tableRows) map[row.table] = row.exists;
     return map;
-  }, [data]);
+  }, [tableRows]);
 
-  const columnStats = useMemo(() => {
-    const rows = data?.columns ?? [];
-    const present = rows.filter((r) => r.exists).length;
-    return { present, total: rows.length, missing: rows.length - present };
-  }, [data]);
+  const columnsByContract = useMemo(() => columnEvidenceMap(columnRows), [columnRows]);
 
   // ---- Automated scan ---------------------------------------------------
   const scan = useMemo(() => {
-    const migByFile = new Map<string, MigrationRow>();
-    for (const m of data?.migrations ?? []) migByFile.set(m.filename, m);
+    const migByFile = new Map<string, MigrationAuditRow>();
+    for (const migration of migrationRows) migByFile.set(migration.filename, migration);
 
-    const missingTables = (data?.tables ?? []).filter((t) => !t.exists);
-    const missingColumns = (data?.columns ?? []).filter((c) => !c.exists);
+    const missingTables = tableRows.filter((table) => !table.exists);
+    const missingColumns = columnRows.filter((column) => !column.exists);
     const missingTableSet = new Set(missingTables.map((t) => t.table));
 
     interface Group {
       filename: string;
-      migration: MigrationRow | null;
+      migration: MigrationAuditRow | null;
       tables: Set<string>;
       columns: Array<{ table: string; column: string; reason: string }>;
     }
@@ -253,32 +274,48 @@ export default function OperatorSchemaAudit() {
       groups: Array.from(groups.values()).sort((a, b) => a.filename.localeCompare(b.filename)),
       orphanTables,
     };
-  }, [data]);
+  }, [columnRows, migrationRows, tableRows]);
 
-  const rlsFindings = useMemo(() => evaluateRlsAudit(data?.rls_audit ?? []), [data]);
+  const rlsRows = useMemo(() => attachAccessProfiles(rawRlsRows), [rawRlsRows]);
+  const rlsFindings = useMemo(() => evaluateRlsAudit(rlsRows), [rlsRows]);
   const rlsFindingStats = useMemo(() => summarizeRlsFindings(rlsFindings), [rlsFindings]);
-  const rlsFindingsByTable = useMemo(() => {
-    const map = new Map<string, typeof rlsFindings>();
-    for (const f of rlsFindings) {
-      const list = map.get(f.table) ?? [];
-      list.push(f);
-      map.set(f.table, list);
-    }
-    return map;
-  }, [rlsFindings]);
 
   const openMigrationByFilename = useCallback(
     (filename: string) => {
-      const row = (data?.migrations ?? []).find((m) => m.filename === filename);
-      setOpenMigration(row ?? { filename, version: null, applied: false });
+      const row = migrationRows.find((migration) => migration.filename === filename);
+      setOpenMigration(
+        row ?? {
+          filename,
+          version: null,
+          applied: false,
+          match_kind: "absent",
+          candidate_count: 0,
+          matched_version: null,
+          matched_name: null,
+        },
+      );
     },
-    [data],
+    [migrationRows],
   );
+
+  const trust = useMemo(
+    () =>
+      deriveSchemaAuditTrust({
+        loading,
+        error,
+        data,
+        contract: AUDIT_CONTRACT,
+        rlsFindings,
+      }),
+    [data, error, loading, rlsFindings],
+  );
+  const snapshotReady = trust.state === "ready";
 
   // ---- Local session checklist ------------------------------------------
   // Marks each missing item (table/column/RLS finding) as reviewed by the
   // operator. Stored only in sessionStorage — no writes reach the database.
-  const checklist = useSchemaAuditVerifiedChecklist();
+  const checklistScope = useMemo(() => schemaAuditChecklistScope(data, BACKEND_REFERENCE), [data]);
+  const checklist = useSchemaAuditVerifiedChecklist(checklistScope);
 
   const allMissingIds = useMemo(() => {
     const ids: string[] = [];
@@ -300,12 +337,13 @@ export default function OperatorSchemaAudit() {
         <div>
           <h1 className="font-display text-2xl font-semibold">Schema audit</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Compares required migrations against the ledger and confirms critical tables exist in
-            the live database. Read-only.
+            Compares required migrations, catalog objects, grants, and policy definitions in a
+            bounded read-only snapshot.
           </p>
           {data?.checked_at && (
             <p className="text-xs text-muted-foreground mt-1">
-              Checked {new Date(data.checked_at).toLocaleString()}
+              Snapshot checked {new Date(data.checked_at).toLocaleString()} · backend{" "}
+              <span className="font-mono">{BACKEND_REFERENCE}</span>
             </p>
           )}
         </div>
@@ -318,6 +356,48 @@ export default function OperatorSchemaAudit() {
           <span className="ml-2">Refresh</span>
         </Button>
       </header>
+
+      <Card
+        data-testid="schema-audit-trust-state"
+        data-state={trust.state}
+        className={snapshotReady ? "border-emerald-500/50" : undefined}
+      >
+        <CardContent className="p-4 flex items-start justify-between gap-3">
+          <div className="flex items-start gap-2">
+            {trust.state === "loading" ? (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-0.5" />
+            ) : snapshotReady ? (
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5" />
+            ) : (
+              <AlertTriangle
+                className={`h-4 w-4 mt-0.5 ${
+                  trust.state === "error" ? "text-destructive" : "text-amber-600"
+                }`}
+              />
+            )}
+            <div>
+              <div className={`text-sm font-medium ${snapshotReady ? "text-emerald-600" : ""}`}>
+                {TRUST_COPY[trust.state].label}
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {TRUST_COPY[trust.state].description}
+              </p>
+              {trust.state === "partial" && trust.issues.length > 0 && (
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {trust.issues.length} unresolved trust check
+                  {trust.issues.length === 1 ? "" : "s"}.
+                </p>
+              )}
+            </div>
+          </div>
+          <Badge
+            variant={trust.state === "error" ? "destructive" : "outline"}
+            className={snapshotReady ? "border-emerald-500 text-emerald-600" : ""}
+          >
+            {TRUST_COPY[trust.state].label}
+          </Badge>
+        </CardContent>
+      </Card>
 
       {error && (
         <Card className="border-destructive/40">
@@ -351,15 +431,16 @@ export default function OperatorSchemaAudit() {
             <Badge variant={scan.totalMissingColumns > 0 ? "destructive" : "outline"}>
               {scan.totalMissingColumns} columns
             </Badge>
-            <span className="text-muted-foreground">of {columnStats.total} checked</span>
-            {allMissingIds.length > 0 && (
+            <span className="text-muted-foreground">
+              {columnRows.length}/{REQUIRED_COLUMNS.length} column rows returned
+            </span>
+            {trust.state === "partial" && allMissingIds.length > 0 && (
               <>
                 <Badge
                   variant={outstanding === 0 ? "outline" : "secondary"}
                   data-testid="schema-audit-checklist-summary"
-                  className={outstanding === 0 ? "border-emerald-500 text-emerald-600" : ""}
                 >
-                  {verifiedInScope}/{allMissingIds.length} verified this session
+                  {verifiedInScope}/{allMissingIds.length} reviewed for this snapshot
                 </Badge>
                 <Button
                   size="sm"
@@ -376,16 +457,25 @@ export default function OperatorSchemaAudit() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          {allMissingIds.length > 0 && (
+          {trust.state === "partial" && allMissingIds.length > 0 && (
             <div className="border-b bg-muted/20 px-4 py-2 text-[11px] text-muted-foreground">
-              Local session checklist — tick items after reviewing the drilldown. Nothing is saved
-              to the database; verifications clear when this browser tab closes.
+              Local snapshot checklist — marks are bound to this user, backend, checked time, and
+              fingerprint. Nothing is saved to the database.
             </div>
           )}
-          {scan.groups.length === 0 && scan.orphanTables.length === 0 ? (
+          {snapshotReady ? (
             <div className="px-4 py-6 text-sm text-emerald-600 flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4" />
-              No missing tables or manifest columns detected.
+              Complete snapshot: every expected table and manifest column is present.
+            </div>
+          ) : scan.groups.length === 0 && scan.orphanTables.length === 0 ? (
+            <div className="px-4 py-6 text-sm text-muted-foreground flex items-center gap-2">
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+              )}
+              Table and column evidence is not ready for a green result.
             </div>
           ) : (
             <div className="divide-y">
@@ -395,7 +485,10 @@ export default function OperatorSchemaAudit() {
                     <div className="min-w-0">
                       <div className="font-mono text-xs truncate">{g.filename}</div>
                       <div className="text-[11px] text-muted-foreground">
-                        {g.migration?.applied ? "Ledger: applied" : "Ledger: not recorded"}
+                        Ledger:{" "}
+                        {g.migration
+                          ? g.migration.match_kind.replace(/_/g, " ")
+                          : "response row unverified"}
                       </div>
                     </div>
                     <Button
@@ -424,6 +517,7 @@ export default function OperatorSchemaAudit() {
                               <Checkbox
                                 checked={done}
                                 onCheckedChange={() => checklist.toggle(id)}
+                                disabled={trust.state !== "partial"}
                                 aria-label={`Mark missing table public.${t} as verified`}
                               />
                               <Badge
@@ -457,6 +551,7 @@ export default function OperatorSchemaAudit() {
                               <Checkbox
                                 checked={done}
                                 onCheckedChange={() => checklist.toggle(id)}
+                                disabled={trust.state !== "partial"}
                                 aria-label={`Mark missing column ${c.table}.${c.column} as verified`}
                               />
                               <Badge
@@ -490,6 +585,7 @@ export default function OperatorSchemaAudit() {
                           <Checkbox
                             checked={done}
                             onCheckedChange={() => checklist.toggle(id)}
+                            disabled={trust.state !== "partial"}
                             aria-label={`Mark orphan missing table public.${t} as verified`}
                           />
                           <Badge
@@ -519,8 +615,8 @@ export default function OperatorSchemaAudit() {
           <CardTitle className="text-base">Required migrations</CardTitle>
           <div className="flex items-center gap-2 text-xs">
             <Badge variant="outline">{migrationStats.applied} applied</Badge>
-            <Badge variant={migrationStats.missing > 0 ? "destructive" : "outline"}>
-              {migrationStats.missing} missing
+            <Badge variant={migrationStats.unverified > 0 ? "secondary" : "outline"}>
+              {migrationStats.unverified} not verified
             </Badge>
             <span className="text-muted-foreground">of {migrationStats.total}</span>
           </div>
@@ -568,7 +664,7 @@ export default function OperatorSchemaAudit() {
           </div>
           <div className="divide-y">
             {(() => {
-              const all = data?.migrations ?? [];
+              const all = migrationRows;
               const q = migrationSearch.trim().toLowerCase();
               const filtered = all.filter((row) => {
                 if (migrationStatusFilter === "applied" && !row.applied) return false;
@@ -592,17 +688,29 @@ export default function OperatorSchemaAudit() {
                       <div className="min-w-0">
                         <div className="font-mono text-xs truncate">{row.filename}</div>
                         <div className="text-xs text-muted-foreground">
-                          version {row.version ?? "unknown"}
+                          expected version {row.version ?? "unknown"} ·{" "}
+                          {row.match_kind.replace(/_/g, " ")}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {row.applied ? (
-                          <span className="inline-flex items-center gap-1 text-emerald-600 text-xs font-medium">
-                            <CheckCircle2 className="h-4 w-4" /> applied
+                          <span
+                            className={`inline-flex items-center gap-1 text-xs font-medium ${
+                              snapshotReady ? "text-emerald-600" : "text-muted-foreground"
+                            }`}
+                          >
+                            <CheckCircle2 className="h-4 w-4" />{" "}
+                            {row.match_kind === "canonical_name"
+                              ? "canonical match"
+                              : "exact match"}
+                          </span>
+                        ) : row.match_kind === "ambiguous" ? (
+                          <span className="inline-flex items-center gap-1 text-amber-600 text-xs font-medium">
+                            <AlertTriangle className="h-4 w-4" /> ambiguous
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-destructive text-xs font-medium">
-                            <XCircle className="h-4 w-4" /> not in ledger
+                            <XCircle className="h-4 w-4" /> absent
                           </span>
                         )}
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -631,22 +739,26 @@ export default function OperatorSchemaAudit() {
           <CardTitle className="text-base">Critical tables</CardTitle>
           <div className="flex items-center gap-2 text-xs">
             <Badge variant="outline">{tableStats.present} present</Badge>
-            <Badge variant={tableStats.missing > 0 ? "destructive" : "outline"}>
-              {tableStats.missing} missing
+            <Badge variant={tableStats.unverified > 0 ? "secondary" : "outline"}>
+              {tableStats.unverified} not verified
             </Badge>
             <span className="text-muted-foreground">of {tableStats.total}</span>
           </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y">
-            {(data?.tables ?? []).map((row) => (
+            {tableRows.map((row) => (
               <div
                 key={row.table}
                 className="px-4 py-2 flex items-center justify-between gap-3 text-sm"
               >
                 <span className="font-mono text-xs">public.{row.table}</span>
                 {row.exists ? (
-                  <span className="inline-flex items-center gap-1 text-emerald-600 text-xs font-medium">
+                  <span
+                    className={`inline-flex items-center gap-1 text-xs font-medium ${
+                      snapshotReady ? "text-emerald-600" : "text-muted-foreground"
+                    }`}
+                  >
                     <CheckCircle2 className="h-4 w-4" /> exists
                   </span>
                 ) : (
@@ -656,7 +768,7 @@ export default function OperatorSchemaAudit() {
                 )}
               </div>
             ))}
-            {!loading && (data?.tables ?? []).length === 0 && (
+            {!loading && tableRows.length === 0 && (
               <div className="px-4 py-6 text-sm text-muted-foreground text-center">
                 No table data returned.
               </div>
@@ -670,8 +782,9 @@ export default function OperatorSchemaAudit() {
           <div>
             <CardTitle className="text-base">RLS &amp; policy audit</CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
-              For each critical table: row-level security state, policy count, and expected grants
-              for anonymous, signed-in, and server roles.
+              Direct PUBLIC, anonymous, authenticated, and server-role table and column grants are
+              checked separately from policy definitions and reviewed access profiles. Expression
+              checks are heuristic, not formal proof.
             </p>
           </div>
           <div className="flex items-center gap-2 text-xs">
@@ -680,6 +793,9 @@ export default function OperatorSchemaAudit() {
             </Badge>
             <Badge variant={rlsFindingStats.warning > 0 ? "secondary" : "outline"}>
               {rlsFindingStats.warning} warning
+            </Badge>
+            <Badge variant={rlsFindingStats.unverified > 0 ? "secondary" : "outline"}>
+              {rlsFindingStats.unverified} unverified
             </Badge>
             <Badge variant="outline">{rlsFindingStats.info} info</Badge>
           </div>
@@ -703,12 +819,15 @@ export default function OperatorSchemaAudit() {
                       className="mt-0.5"
                       checked={done}
                       onCheckedChange={() => checklist.toggle(id)}
+                      disabled={trust.state !== "partial"}
                       aria-label={`Mark RLS finding ${f.code} on public.${f.table} as verified`}
                     />
                     {f.severity === "critical" ? (
                       <XCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
                     ) : f.severity === "warning" ? (
                       <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                    ) : f.severity === "unverified" ? (
+                      <AlertTriangle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                     ) : (
                       <CheckCircle2 className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                     )}
@@ -723,15 +842,11 @@ export default function OperatorSchemaAudit() {
             </div>
           )}
           <div className="divide-y">
-            {(data?.rls_audit ?? []).map((row) => {
-              const tableFindings = rlsFindingsByTable.get(row.table) ?? [];
-              const worst = tableFindings.some((f) => f.severity === "critical")
-                ? "critical"
-                : tableFindings.some((f) => f.severity === "warning")
-                  ? "warning"
-                  : tableFindings.length > 0
-                    ? "info"
-                    : "ok";
+            {rlsRows.map((row) => {
+              const posture = rlsPostureForTable(row.table, rlsFindings);
+              const policyLabel = Number.isInteger(row.policy_count)
+                ? `${row.policy_count} ${row.policy_count === 1 ? "policy" : "policies"}`
+                : "policies unverified";
               return (
                 <div
                   key={row.table}
@@ -741,37 +856,46 @@ export default function OperatorSchemaAudit() {
                   <div className="min-w-0">
                     <div className="font-mono text-xs">public.{row.table}</div>
                     <div className="text-xs text-muted-foreground">
-                      RLS {row.rls_enabled ? "enabled" : "disabled"}
-                      {row.rls_forced && " (forced)"} · {row.policy_count} polic
-                      {row.policy_count === 1 ? "y" : "ies"} · anon:{" "}
-                      {(row.grants.anon ?? []).join("/") || "—"} · authn:{" "}
-                      {(row.grants.authenticated ?? []).join("/") || "—"} · svc:{" "}
-                      {(row.grants["service_role"] ?? []).join("/") || "—"}
+                      profile: {row.access_profile.replace(/_/g, " ")} · RLS{" "}
+                      {row.rls_enabled === null
+                        ? "unverified"
+                        : row.rls_enabled
+                          ? "enabled"
+                          : "disabled"}
+                      {row.rls_forced && " (forced)"} · {policyLabel} · anon:{" "}
+                      {(row.grants?.anon ?? []).join("/") || "—"} · PUBLIC:{" "}
+                      {(row.grants?.PUBLIC ?? []).join("/") || "—"} · authn:{" "}
+                      {(row.grants?.authenticated ?? []).join("/") || "—"} · svc:{" "}
+                      {(row.grants?.["service_role"] ?? []).join("/") || "—"}
                     </div>
                   </div>
                   <div className="shrink-0">
-                    {worst === "ok" ? (
-                      <span className="inline-flex items-center gap-1 text-emerald-600 text-xs font-medium">
-                        <CheckCircle2 className="h-4 w-4" /> ok
+                    {posture === "ready" ? (
+                      <span
+                        className={`inline-flex items-center gap-1 text-xs font-medium ${
+                          snapshotReady ? "text-emerald-600" : "text-muted-foreground"
+                        }`}
+                      >
+                        <CheckCircle2 className="h-4 w-4" /> checked
                       </span>
-                    ) : worst === "critical" ? (
+                    ) : posture === "critical" ? (
                       <span className="inline-flex items-center gap-1 text-destructive text-xs font-medium">
                         <XCircle className="h-4 w-4" /> critical
                       </span>
-                    ) : worst === "warning" ? (
+                    ) : posture === "warning" ? (
                       <span className="inline-flex items-center gap-1 text-amber-600 text-xs font-medium">
                         <AlertTriangle className="h-4 w-4" /> warning
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-muted-foreground text-xs font-medium">
-                        info
+                        <AlertTriangle className="h-4 w-4" /> unverified
                       </span>
                     )}
                   </div>
                 </div>
               );
             })}
-            {!loading && (data?.rls_audit ?? []).length === 0 && (
+            {!loading && rlsRows.length === 0 && (
               <div className="px-4 py-6 text-sm text-muted-foreground text-center">
                 No RLS audit data returned.
               </div>
@@ -788,7 +912,10 @@ export default function OperatorSchemaAudit() {
         filename={openMigration?.filename ?? null}
         version={openMigration?.version ?? null}
         applied={openMigration?.applied ?? false}
+        matchKind={openMigration?.match_kind ?? null}
+        snapshotReady={snapshotReady}
         tableExistence={tableExistence}
+        columnEvidence={columnsByContract}
       />
     </div>
   );

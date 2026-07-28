@@ -8,7 +8,7 @@
  * Presenter only. No writes, no RPCs of its own — it consumes data the parent
  * page has already loaded.
  */
-import { CheckCircle2, XCircle, HelpCircle } from "lucide-react";
+import { CheckCircle2, XCircle, HelpCircle, AlertTriangle } from "lucide-react";
 
 import {
   Dialog,
@@ -18,10 +18,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import {
-  REQUIRED_CORE_SCHEMA,
-  ADVISORY_SCHEMA,
-} from "../../scripts/required-core-migrations.mjs";
+import type { MigrationMatchKind } from "@/lib/schemaAuditRules";
+import { REQUIRED_CORE_SCHEMA, ADVISORY_SCHEMA } from "../../scripts/required-core-migrations.mjs";
 
 export interface SchemaAuditMigrationDrilldownProps {
   open: boolean;
@@ -29,8 +27,12 @@ export interface SchemaAuditMigrationDrilldownProps {
   filename: string | null;
   version: string | null;
   applied: boolean;
+  matchKind: MigrationMatchKind | null;
+  snapshotReady: boolean;
   /** table → exists map from the live schema snapshot. */
   tableExistence: Record<string, boolean>;
+  /** table.column → exists map; absent keys are unverified. */
+  columnEvidence: Record<string, boolean | undefined>;
 }
 
 interface ContractEntry {
@@ -41,20 +43,24 @@ interface ContractEntry {
 }
 
 function contractEntriesFor(filename: string): ContractEntry[] {
-  const core = (REQUIRED_CORE_SCHEMA as ReadonlyArray<{
-    table: string;
-    column: string;
-    migration: string;
-    reason: string;
-  }>)
+  const core = (
+    REQUIRED_CORE_SCHEMA as ReadonlyArray<{
+      table: string;
+      column: string;
+      migration: string;
+      reason: string;
+    }>
+  )
     .filter((e) => e.migration === filename)
     .map((e) => ({ ...e, scope: "core" as const }));
-  const advisory = (ADVISORY_SCHEMA as ReadonlyArray<{
-    table: string;
-    column: string;
-    migration: string;
-    reason: string;
-  }>)
+  const advisory = (
+    ADVISORY_SCHEMA as ReadonlyArray<{
+      table: string;
+      column: string;
+      migration: string;
+      reason: string;
+    }>
+  )
     .filter((e) => e.migration === filename)
     .map((e) => ({ ...e, scope: "advisory" as const }));
   return [...core, ...advisory];
@@ -66,7 +72,10 @@ export default function SchemaAuditMigrationDrilldown({
   filename,
   version,
   applied,
+  matchKind,
+  snapshotReady,
   tableExistence,
+  columnEvidence,
 }: SchemaAuditMigrationDrilldownProps) {
   const entries = filename ? contractEntriesFor(filename) : [];
 
@@ -85,17 +94,12 @@ export default function SchemaAuditMigrationDrilldown({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-w-lg"
-        data-testid="schema-audit-migration-drilldown"
-      >
+      <DialogContent className="max-w-lg" data-testid="schema-audit-migration-drilldown">
         <DialogHeader>
-          <DialogTitle className="font-mono text-sm break-all">
-            {filename ?? "—"}
-          </DialogTitle>
+          <DialogTitle className="font-mono text-sm break-all">{filename ?? "—"}</DialogTitle>
           <DialogDescription>
-            Read-only view of ledger status and the schema contract this
-            migration is expected to satisfy.
+            Read-only view of ledger status and the schema contract this migration is expected to
+            satisfy.
           </DialogDescription>
         </DialogHeader>
 
@@ -105,9 +109,7 @@ export default function SchemaAuditMigrationDrilldown({
               <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                 Version
               </div>
-              <div className="font-mono text-xs mt-1">
-                {version ?? "unknown"}
-              </div>
+              <div className="font-mono text-xs mt-1">{version ?? "unknown"}</div>
             </div>
             <div className="rounded-lg border p-2">
               <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -115,8 +117,19 @@ export default function SchemaAuditMigrationDrilldown({
               </div>
               <div className="mt-1">
                 {applied ? (
-                  <span className="inline-flex items-center gap-1 text-emerald-600 text-xs font-medium">
-                    <CheckCircle2 className="h-4 w-4" /> applied
+                  <span
+                    className={`inline-flex items-center gap-1 text-xs font-medium ${
+                      snapshotReady ? "text-emerald-600" : "text-muted-foreground"
+                    }`}
+                  >
+                    <CheckCircle2 className="h-4 w-4" />{" "}
+                    {matchKind === "canonical_name"
+                      ? "canonical-name match"
+                      : "exact-version match"}
+                  </span>
+                ) : matchKind === "ambiguous" ? (
+                  <span className="inline-flex items-center gap-1 text-amber-600 text-xs font-medium">
+                    <AlertTriangle className="h-4 w-4" /> ambiguous ledger match
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 text-destructive text-xs font-medium">
@@ -143,9 +156,8 @@ export default function SchemaAuditMigrationDrilldown({
 
           {entries.length === 0 ? (
             <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
-              No manifest contract entries reference this migration. It is
-              required for ledger completeness but does not have column-level
-              expectations declared in{" "}
+              No manifest contract entries reference this migration. It is required for ledger
+              completeness but does not have column-level expectations declared in{" "}
               <code className="font-mono">required-core-migrations.mjs</code>.
             </div>
           ) : (
@@ -156,15 +168,17 @@ export default function SchemaAuditMigrationDrilldown({
                 return (
                   <div key={table} className="rounded-lg border">
                     <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30">
-                      <span className="font-mono text-xs">
-                        public.{table}
-                      </span>
+                      <span className="font-mono text-xs">public.{table}</span>
                       {!known ? (
                         <span className="inline-flex items-center gap-1 text-muted-foreground text-[11px]">
                           <HelpCircle className="h-3.5 w-3.5" /> not checked
                         </span>
                       ) : exists ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-600 text-[11px] font-medium">
+                        <span
+                          className={`inline-flex items-center gap-1 text-[11px] font-medium ${
+                            snapshotReady ? "text-emerald-600" : "text-muted-foreground"
+                          }`}
+                        >
                           <CheckCircle2 className="h-3.5 w-3.5" /> table exists
                         </span>
                       ) : (
@@ -175,20 +189,38 @@ export default function SchemaAuditMigrationDrilldown({
                     </div>
                     <ul className="divide-y">
                       {rows.map((r) => (
-                        <li
-                          key={`${r.table}.${r.column}`}
-                          className="px-3 py-2 space-y-1"
-                        >
+                        <li key={`${r.table}.${r.column}`} className="px-3 py-2 space-y-1">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-mono text-xs">
-                              {r.column}
-                            </span>
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] capitalize"
-                            >
-                              {r.scope}
-                            </Badge>
+                            <span className="font-mono text-xs">{r.column}</span>
+                            <div className="flex items-center gap-1.5">
+                              {columnEvidence[`${r.table}.${r.column}`] === true ? (
+                                <span
+                                  className={`inline-flex items-center gap-1 text-[11px] font-medium ${
+                                    snapshotReady ? "text-emerald-600" : "text-muted-foreground"
+                                  }`}
+                                  data-testid={`schema-audit-column-status-${r.table}.${r.column}`}
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5" /> present
+                                </span>
+                              ) : columnEvidence[`${r.table}.${r.column}`] === false ? (
+                                <span
+                                  className="inline-flex items-center gap-1 text-destructive text-[11px] font-medium"
+                                  data-testid={`schema-audit-column-status-${r.table}.${r.column}`}
+                                >
+                                  <XCircle className="h-3.5 w-3.5" /> missing
+                                </span>
+                              ) : (
+                                <span
+                                  className="inline-flex items-center gap-1 text-muted-foreground text-[11px]"
+                                  data-testid={`schema-audit-column-status-${r.table}.${r.column}`}
+                                >
+                                  <HelpCircle className="h-3.5 w-3.5" /> unverified
+                                </span>
+                              )}
+                              <Badge variant="outline" className="text-[10px] capitalize">
+                                {r.scope}
+                              </Badge>
+                            </div>
                           </div>
                           <p className="text-[11px] text-muted-foreground leading-snug">
                             {r.reason}
@@ -203,11 +235,9 @@ export default function SchemaAuditMigrationDrilldown({
           )}
 
           <p className="text-[11px] text-muted-foreground">
-            Column-level existence is not queried live from this page; only
-            table presence is confirmed against{" "}
-            <code className="font-mono">pg_tables</code>. Use the CI
-            required-core-migrations gate for the authoritative column contract
-            check.
+            Each expected column is cross-referenced with the parent catalog snapshot. Missing
+            response rows remain unverified; they are never inferred from table presence or the
+            migration ledger.
           </p>
         </div>
       </DialogContent>

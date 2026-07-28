@@ -385,10 +385,12 @@ const CandidateNumberAssign = memo(function CandidateNumberAssign({
 /** Post-cure smoke test — the deciding gate. Own state + save. */
 function SmokeTestFields({
   plantId,
+  candidateLabel,
   row,
   onSave,
 }: {
   plantId: string;
+  candidateLabel: string;
   row: SmokeTestRow | undefined;
   onSave: (
     plantId: string,
@@ -445,6 +447,7 @@ function SmokeTestFields({
               type="number"
               min={1}
               max={5}
+              aria-label={`${candidateLabel}: Post-cure smoothness score (1–5)`}
               data-testid={`workspace-smoke-smoothness-${plantId}`}
               value={smoothness}
               onChange={(e) => {
@@ -460,6 +463,7 @@ function SmokeTestFields({
               type="number"
               min={1}
               max={5}
+              aria-label={`${candidateLabel}: Post-cure potency impression (1–5)`}
               data-testid={`workspace-smoke-potency-${plantId}`}
               value={potency}
               onChange={(e) => {
@@ -507,10 +511,12 @@ function SmokeTestFields({
 /** COA / lab numbers — grower-attached, source-tagged, never fabricated. */
 function LabFields({
   plantId,
+  candidateLabel,
   row,
   onSave,
 }: {
   plantId: string;
+  candidateLabel: string;
   row: LabResultRow | undefined;
   onSave: (
     plantId: string,
@@ -555,6 +561,7 @@ function LabFields({
             <input
               type="number"
               step="0.1"
+              aria-label={`${candidateLabel}: Lab THC percentage`}
               data-testid={`workspace-lab-thc-${plantId}`}
               value={thc}
               onChange={(e) => {
@@ -569,6 +576,7 @@ function LabFields({
             <input
               type="number"
               step="0.1"
+              aria-label={`${candidateLabel}: Lab CBD percentage`}
               data-testid={`workspace-lab-cbd-${plantId}`}
               value={cbd}
               onChange={(e) => {
@@ -883,6 +891,7 @@ const CandidateEditor = memo(function CandidateEditor({
               min={axis.min}
               max={axis.max}
               step={1}
+              aria-label={`${displayLabel}: ${axis.label} score (${axis.min}–${axis.max})`}
               data-testid={`workspace-trait-${plantId}-${axis.key}`}
               value={traits[axis.key] ?? ""}
               onChange={(e) => setTrait(axis.key, e.target.value)}
@@ -929,6 +938,7 @@ const CandidateEditor = memo(function CandidateEditor({
       <label className="block text-sm">
         <span className="mb-1 block">Notes</span>
         <textarea
+          aria-label={`${displayLabel}: Notes`}
           data-testid={`workspace-note-${plantId}`}
           value={note}
           onChange={(e) => {
@@ -1049,8 +1059,18 @@ const CandidateEditor = memo(function CandidateEditor({
         </div>
       )}
 
-      <SmokeTestFields plantId={plantId} row={smokeRow} onSave={onSaveSmokeTest} />
-      <LabFields plantId={plantId} row={labRow} onSave={onSaveLabResult} />
+      <SmokeTestFields
+        plantId={plantId}
+        candidateLabel={displayLabel}
+        row={smokeRow}
+        onSave={onSaveSmokeTest}
+      />
+      <LabFields
+        plantId={plantId}
+        candidateLabel={displayLabel}
+        row={labRow}
+        onSave={onSaveLabResult}
+      />
 
       <PhenoDocumentationSections
         recordId={plantId}

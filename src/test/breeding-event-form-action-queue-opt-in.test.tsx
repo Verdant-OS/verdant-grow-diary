@@ -14,12 +14,15 @@ describe("BreedingEventForm Action Queue opt-in", () => {
       />,
     );
 
-    const optIn = screen.getByTestId("breeding-action-queue-opt-in");
+    const optIn = screen.getByRole("checkbox", {
+      name: "Create approval-required follow-up suggestions",
+    });
+    expect(optIn).toHaveAttribute("data-testid", "breeding-action-queue-opt-in");
     expect(optIn).not.toBeChecked();
     expect(screen.getByText(/Optional\. Adds pending items/i)).toBeInTheDocument();
     expect(screen.getByText(/will not execute equipment changes/i)).toBeInTheDocument();
 
-    await userEvent.click(screen.getByText("Create approval-required follow-up suggestions"));
+    await userEvent.click(optIn);
     expect(optIn).toBeChecked();
   });
 });

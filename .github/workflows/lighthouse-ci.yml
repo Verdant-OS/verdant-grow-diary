@@ -46,7 +46,7 @@ jobs:
         run: node --test scripts/lib/lighthouse-url-sharding.test.cjs
 
       - name: Install Lighthouse CI
-        run: npm install -g @lhci/cli@0.14.x
+        run: npm install -g @lhci/cli@0.15.1
 
       - name: Run Lighthouse against published sitemap shard
         run: lhci autorun --config=./lighthouserc.cjs

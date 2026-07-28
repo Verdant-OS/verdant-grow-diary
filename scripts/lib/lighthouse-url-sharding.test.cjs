@@ -110,6 +110,7 @@ test("workflow defines all four parallel shards and passes their coordinates to 
   assert.match(workflow, /^\s+max-parallel: 4$/m);
   assert.match(workflow, /^\s+timeout-minutes: 25$/m);
   assert.match(workflow, /^\s+run: node --test scripts\/lib\/lighthouse-url-sharding\.test\.cjs$/m);
+  assert.match(workflow, /^\s+run: npm install -g @lhci\/cli@0\.15\.1$/m);
   assert.match(workflow, /^\s+LHCI_SHARD_INDEX: \$\{\{ matrix\.shard\.index \}\}$/m);
   assert.match(workflow, /^\s+LHCI_SHARD_COUNT: 4$/m);
 });

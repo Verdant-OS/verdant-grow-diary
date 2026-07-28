@@ -33,8 +33,10 @@ import {
   type FastAddActionId,
 } from "@/lib/fastAddActionRules";
 import {
-  resolveContextFreeQuickLogDestination,
+  queueContextFreeQuickLogIntent,
   quickLogEventTypeForAction,
+  resolveContextFreeQuickLogStart,
+  type PendingContextFreeQuickLogIntent,
 } from "@/lib/globalSearchQuickLogFallbackRules";
 import { useAuth } from "@/store/auth";
 import { Button } from "@/components/ui/button";
@@ -119,7 +121,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   // its draft is device-local and its only CTA is "Create a free account".
   // Read from the app-wide AuthProvider, which also wraps the public
   // /cultivars route where this dialog is the second mount site.
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   // Best-effort current-context derivation so empty-state "Create" buttons can
   // prefill the Quick Log form with the plant/tent the grower is looking at.
   // Returns null on routes like /dashboard where no plant/tent segment matches.
@@ -134,6 +136,8 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const [history, setHistory] = useState<GlobalSearchHistoryEntry[]>([]);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const [previewRow, setPreviewRow] = useState<GlobalSearchResult | null>(null);
+  const [pendingContextFreeQuickLog, setPendingContextFreeQuickLog] =
+    useState<PendingContextFreeQuickLogIntent | null>(null);
   const [lastSelected, setLastSelected] = useState<GlobalSearchLastSelected | null>(() =>
     readGlobalSearchLastSelected(),
   );
@@ -151,7 +155,12 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
       setQuery(restored.query);
       setEnabledTypes(restored.filters);
       setLastSelected(readGlobalSearchLastSelected());
+      return;
     }
+    // Closing unmounts Radix's content but leaves this owner mounted. Cancel
+    // any deferred auth-resolution intent so it cannot navigate from a closed
+    // palette. A full owner unmount cancels naturally with local state.
+    setPendingContextFreeQuickLog(null);
     // Intentionally do NOT clear query/filters on close — session memory is
     // the whole point of this hook.
   }, [open]);
@@ -160,6 +169,24 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   useEffect(() => {
     writeGlobalSearchSession({ query, filters: enabledTypes });
   }, [query, enabledTypes]);
+
+  // The public /cultivars mount can receive a click while AuthProvider still
+  // has { loading: true, user: null }. Hold the grower's complete preset until
+  // ownership is known, then consume it exactly once while the palette stays
+  // open. Unresolved auth must never be interpreted as anonymous.
+  useEffect(() => {
+    if (!pendingContextFreeQuickLog || !open) return;
+    const decision = resolveContextFreeQuickLogStart({
+      authLoading,
+      isSignedIn: !!user,
+      ...pendingContextFreeQuickLog,
+    });
+    if (decision.kind === "wait-for-auth") return;
+
+    setPendingContextFreeQuickLog(null);
+    onOpenChange(false);
+    navigate(decision.to);
+  }, [authLoading, navigate, onOpenChange, open, pendingContextFreeQuickLog, user]);
 
   // Debounced push to session history: capture stable {query, filters} tuples
   // (≥2 chars) so re-running a prior search is one click. Selecting a result
@@ -258,6 +285,11 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const enabledCount = GROUP_ORDER.filter((t) => enabledTypes[t]).length;
   const allEnabled = enabledCount === GROUP_ORDER.length;
 
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) setPendingContextFreeQuickLog(null);
+    onOpenChange(nextOpen);
+  };
+
   const toggleType = (t: GlobalSearchEntityType) => {
     setEnabledTypes((prev) => {
       const next = { ...prev, [t]: !prev[t] };
@@ -280,7 +312,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     const entry = { entity_type: row.entity_type, id: row.id };
     writeGlobalSearchLastSelected(entry);
     setLastSelected({ ...entry, ts: Date.now() });
-    onOpenChange(false);
+    handleDialogOpenChange(false);
     navigate(routeFor(row));
   };
 
@@ -329,7 +361,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const activeValue = previewRow ? rowKey(previewRow) : undefined;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="overflow-hidden p-0 shadow-lg md:max-w-3xl">
         <CommandPrimitive
           shouldFilter={false}
@@ -719,11 +751,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                               label: string;
                               testId: string;
                               fallbackType:
-                                | "observation"
-                                | "watering"
-                                | "feeding"
-                                | "environment"
-                                | null;
+                                "observation" | "watering" | "feeding" | "environment" | null;
                             }>
                           ).map(({ actionId, label, testId, fallbackType }) => (
                             <Button
@@ -732,7 +760,6 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                               size="sm"
                               variant={actionId === "diary_note" ? "default" : "secondary"}
                               onClick={() => {
-                                onOpenChange(false);
                                 // With plant/tent context: dispatch the same Quick
                                 // Log prefill event the plant/tent detail pages
                                 // already listen for. The form opens prefilled
@@ -753,28 +780,34 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                                         new CustomEvent(intent.eventName, { detail }),
                                       );
                                     }
+                                    handleDialogOpenChange(false);
                                     return;
                                   }
                                 }
-                                // No plant/tent in the current route. Signed-in
-                                // growers go to the authenticated start route, so
-                                // AppShell's one-shot open=quick-log intent opens
-                                // the real Quick Log and the entry reaches their
-                                // diary. Only anonymous visitors get the public
-                                // device-local starter, with a type hint when the
-                                // starter supports it (training does not).
-                                navigate(
-                                  resolveContextFreeQuickLogDestination({
-                                    isSignedIn: !!user,
-                                    // Signed-in growers get the preset's REAL
-                                    // event type from FAST_ADD_ACTIONS. The
-                                    // fallbackType column above is the narrower
-                                    // public-starter vocabulary (no photo, no
-                                    // training) and must not stand in for it.
-                                    authedEventType: quickLogEventTypeForAction(actionId),
-                                    fallbackType,
-                                  }).to,
-                                );
+                                // No plant/tent in the current route. The public
+                                // /cultivars mount can be clicked before auth has
+                                // resolved, so keep the palette open and queue the
+                                // complete preset instead of treating the temporary
+                                // null user as anonymous. Both channels matter:
+                                // Photo and Training have an authenticated event
+                                // type but no public-starter fallback.
+                                const preset = {
+                                  authedEventType: quickLogEventTypeForAction(actionId),
+                                  fallbackType,
+                                };
+                                const decision = resolveContextFreeQuickLogStart({
+                                  authLoading,
+                                  isSignedIn: !!user,
+                                  ...preset,
+                                });
+                                if (decision.kind === "wait-for-auth") {
+                                  setPendingContextFreeQuickLog((current) =>
+                                    queueContextFreeQuickLogIntent(current, preset),
+                                  );
+                                  return;
+                                }
+                                handleDialogOpenChange(false);
+                                navigate(decision.to);
                               }}
                               data-testid={`global-search-empty-start-${testId}`}
                             >

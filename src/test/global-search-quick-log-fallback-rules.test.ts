@@ -28,12 +28,16 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve as resolvePath } from "node:path";
 import {
+  queueContextFreeQuickLogIntent,
   resolveContextFreeQuickLogDestination,
+  resolveContextFreeQuickLogStart,
   readQuickLogStartEventType,
   quickLogEventTypeForAction,
   QUICK_LOG_START_TYPE_PARAM,
   QUICK_LOG_START_EVENT_TYPES,
   type ContextFreeQuickLogInput,
+  type ContextFreeQuickLogStartInput,
+  type PendingContextFreeQuickLogIntent,
 } from "@/lib/globalSearchQuickLogFallbackRules";
 import { QUICK_LOG_START_ROUTE, consumeQuickLogStartIntent } from "@/lib/startScreenPreferences";
 import { PUBLIC_QUICK_LOG_STARTER_PATH } from "@/lib/quickLogStarterLinks";
@@ -114,6 +118,134 @@ describe("Global Search context-free Quick Log fallback", () => {
       fallbackType: "feeding",
     };
     expect(resolve(input)).toEqual(resolve(input));
+  });
+});
+
+describe("Global Search auth-resolution gate", () => {
+  it("returns no destination while auth is loading, regardless of the temporary user value", () => {
+    for (const isSignedIn of [false, true]) {
+      const decision = resolveContextFreeQuickLogStart({
+        authLoading: true,
+        isSignedIn,
+        authedEventType: "watering",
+        fallbackType: "watering",
+      });
+      expect(decision).toEqual({ kind: "wait-for-auth" });
+      expect(decision).not.toHaveProperty("to");
+    }
+  });
+
+  it("fails closed for null, undefined, and malformed loading state", () => {
+    const malformedLoading = {
+      authLoading: "not-a-boolean",
+      isSignedIn: true,
+      authedEventType: "watering",
+      fallbackType: "watering",
+    } as unknown as ContextFreeQuickLogStartInput;
+    const malformedSession = {
+      authLoading: false,
+      isSignedIn: "not-a-boolean",
+      authedEventType: "watering",
+      fallbackType: "watering",
+    } as unknown as ContextFreeQuickLogStartInput;
+
+    expect(resolveContextFreeQuickLogStart(null)).toEqual({ kind: "wait-for-auth" });
+    expect(resolveContextFreeQuickLogStart(undefined)).toEqual({ kind: "wait-for-auth" });
+    expect(resolveContextFreeQuickLogStart(malformedLoading)).toEqual({ kind: "wait-for-auth" });
+    expect(resolveContextFreeQuickLogStart(malformedSession)).toEqual({ kind: "wait-for-auth" });
+  });
+
+  it("resolves a settled signed-in session with the authenticated preset channel", () => {
+    for (const authedEventType of QUICK_LOG_START_EVENT_TYPES) {
+      expect(
+        resolveContextFreeQuickLogStart({
+          authLoading: false,
+          isSignedIn: true,
+          authedEventType,
+          fallbackType: null,
+        }),
+      ).toEqual({
+        kind: "authed-start",
+        to: `${QUICK_LOG_START_ROUTE}&type=${authedEventType}`,
+      });
+    }
+  });
+
+  it("resolves a settled signed-out session with only the public fallback channel", () => {
+    expect(
+      resolveContextFreeQuickLogStart({
+        authLoading: false,
+        isSignedIn: false,
+        authedEventType: "photo",
+        fallbackType: null,
+      }),
+    ).toEqual({
+      kind: "public-starter",
+      to: PUBLIC_QUICK_LOG_STARTER_PATH,
+    });
+
+    expect(
+      resolveContextFreeQuickLogStart({
+        authLoading: false,
+        isSignedIn: false,
+        authedEventType: "training",
+        fallbackType: "feeding",
+      }),
+    ).toEqual({
+      kind: "public-starter",
+      to: `${PUBLIC_QUICK_LOG_STARTER_PATH}?type=feeding`,
+    });
+  });
+
+  it("preserves both channels, dedupes the same choice, and lets the latest different choice win", () => {
+    const photo = queueContextFreeQuickLogIntent(null, {
+      authedEventType: "photo",
+      fallbackType: null,
+    });
+    const duplicatePhoto = queueContextFreeQuickLogIntent(photo, {
+      authedEventType: "photo",
+      fallbackType: null,
+    });
+    const training = queueContextFreeQuickLogIntent(duplicatePhoto, {
+      authedEventType: "training",
+      fallbackType: null,
+    });
+
+    expect(photo).toEqual({ authedEventType: "photo", fallbackType: null });
+    expect(duplicatePhoto).toBe(photo);
+    expect(training).toEqual({ authedEventType: "training", fallbackType: null });
+    expect(training).not.toBe(photo);
+  });
+
+  it("normalizes invalid queued preset values instead of persisting them", () => {
+    const invalid = {
+      authedEventType: "device-control",
+      fallbackType: "rm-rf",
+    } as unknown as PendingContextFreeQuickLogIntent;
+
+    expect(queueContextFreeQuickLogIntent(null, invalid)).toEqual({
+      authedEventType: null,
+      fallbackType: null,
+    });
+    expect(queueContextFreeQuickLogIntent(null, null)).toEqual({
+      authedEventType: null,
+      fallbackType: null,
+    });
+  });
+
+  it("is deterministic across repeated queue and resolve calls", () => {
+    const pending = queueContextFreeQuickLogIntent(null, {
+      authedEventType: "environment",
+      fallbackType: "environment",
+    });
+    const input: ContextFreeQuickLogStartInput = {
+      authLoading: false,
+      isSignedIn: true,
+      ...pending,
+    };
+
+    expect(queueContextFreeQuickLogIntent(pending, pending)).toBe(pending);
+    expect(resolveContextFreeQuickLogStart(input)).toEqual(resolveContextFreeQuickLogStart(input));
   });
 });
 
@@ -210,13 +342,15 @@ describe("GlobalSearchDialog wiring", () => {
   it("passes the REAL session into the rule, not a constant", () => {
     // This is the assertion that mutation testing showed was missing. A
     // rewrite to `isSignedIn: false` / `!user` must fail here.
-    expect(body()).toMatch(/resolveContextFreeQuickLogDestination\(\{\s*isSignedIn:\s*!!user\s*,/);
+    expect(body()).toMatch(
+      /resolveContextFreeQuickLogStart\(\{\s*authLoading\s*,\s*isSignedIn:\s*!!user\s*,/,
+    );
   });
 
   it("sources the session from the auth store", () => {
     const src = body();
     expect(src).toContain('from "@/store/auth"');
-    expect(src).toMatch(/const\s*\{\s*user\s*\}\s*=\s*useAuth\(\)/);
+    expect(src).toMatch(/const\s*\{\s*user\s*,\s*loading:\s*authLoading\s*\}\s*=\s*useAuth\(\)/);
   });
 
   it("derives the authed marker from quickLogEventTypeForAction, not fallbackType", () => {
@@ -227,10 +361,19 @@ describe("GlobalSearchDialog wiring", () => {
 
   it("resolves the fallback through the rule instead of hardcoding /quick-log", () => {
     const src = body();
-    expect(src).toContain("resolveContextFreeQuickLogDestination");
+    expect(src).toContain("resolveContextFreeQuickLogStart");
+    expect(src).toContain("queueContextFreeQuickLogIntent");
     // The old unconditional navigation must not come back.
     expect(src).not.toMatch(/navigate\(\s*fallbackType\s*\?/);
     expect(src).not.toMatch(/navigate\(\s*["'`]\/quick-log/);
+  });
+
+  it("queues both preset channels while auth is unresolved", () => {
+    const src = body();
+    expect(src).toMatch(
+      /const\s+preset\s*=\s*\{\s*authedEventType:\s*quickLogEventTypeForAction\(actionId\),\s*fallbackType,\s*\}/,
+    );
+    expect(src).toMatch(/queueContextFreeQuickLogIntent\(current,\s*preset\)/);
   });
 });
 

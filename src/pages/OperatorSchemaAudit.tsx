@@ -32,12 +32,30 @@ import {
 
 const REQUIRED_MIGRATIONS: string[] = [...REQUIRED_CORE_MIGRATIONS];
 
+// Every table.column contract entry from the manifest — this drives both the
+// live column-existence scan and the migration→columns mapping used to build
+// verification links.
+interface ManifestEntry {
+  table: string;
+  column: string;
+  migration: string;
+  reason: string;
+}
+
+const MANIFEST_ENTRIES: ManifestEntry[] = [
+  ...(REQUIRED_CORE_SCHEMA as ReadonlyArray<ManifestEntry>),
+  ...(ADVISORY_SCHEMA as ReadonlyArray<ManifestEntry>),
+];
+
+const REQUIRED_COLUMNS: Array<{ table: string; column: string }> = Array.from(
+  new Map(MANIFEST_ENTRIES.map((e) => [`${e.table}.${e.column}`, { table: e.table, column: e.column }])).values(),
+);
+
 // Union of all tables named by the core + advisory manifest, plus the
 // currently-critical tables the user has been reconciling by hand.
 const REQUIRED_TABLES: string[] = Array.from(
   new Set<string>([
-    ...REQUIRED_CORE_SCHEMA.map((e: { table: string }) => e.table),
-    ...ADVISORY_SCHEMA.map((e: { table: string }) => e.table),
+    ...MANIFEST_ENTRIES.map((e) => e.table),
     "soil_moisture_calibrations",
     "pheno_crosses",
     "pheno_reversals",
@@ -62,9 +80,16 @@ interface TableRow {
   exists: boolean;
 }
 
+interface ColumnRow {
+  table: string;
+  column: string;
+  exists: boolean;
+}
+
 interface AuditResponse {
   migrations: MigrationRow[];
   tables: TableRow[];
+  columns: ColumnRow[];
   checked_at: string;
 }
 

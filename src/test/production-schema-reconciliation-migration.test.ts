@@ -261,7 +261,7 @@ describe("production schema reconciliation migration", () => {
     expect(sql).not.toMatch(/DROP POLICY[^;\n]*pheno_crosses_pro_required_/i);
   });
 
-  it("accepts only canonical or exact legacy-bloated Pheno ACLs and normalizes both", () => {
+  it("accepts only canonical, exact production legacy, or exact local replay Pheno ACLs and normalizes all", () => {
     const ownerRefusal = sql.indexOf(
       "schema reconciliation refused unexpected Pheno relation owners",
     );
@@ -279,9 +279,13 @@ describe("production schema reconciliation migration", () => {
     expect(sql).toContain("v_cross_acl_canonical CONSTANT jsonb");
     expect(sql).toContain("v_reversal_acl_canonical CONSTANT jsonb");
     expect(sql).toContain("v_legacy_bloat_acl CONSTANT jsonb");
-    expect(sql.match(/"postgres": \[/g)).toHaveLength(5);
+    expect(sql).toContain("v_replay_cross_acl CONSTANT jsonb");
+    expect(sql).toContain("v_replay_reversal_acl CONSTANT jsonb");
+    expect(sql).toContain('"anon": ["MAINTAIN", "REFERENCES", "TRIGGER", "TRUNCATE"]');
+    expect(sql).toContain('"INSERT", "MAINTAIN", "REFERENCES", "SELECT", "TRIGGER", "TRUNCATE"');
     expect(sql).toContain("v_pheno_acl_state := 'canonical'");
     expect(sql).toContain("v_pheno_acl_state := 'known_legacy_default_bloat'");
+    expect(sql).toContain("v_pheno_acl_state := 'known_local_replay_acl'");
     expect(ownerRefusal).toBeGreaterThan(0);
     expect(columnRefusal).toBeGreaterThan(ownerRefusal);
     expect(grantorRefusal).toBeGreaterThan(columnRefusal);

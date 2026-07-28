@@ -117,6 +117,35 @@ DECLARE
       "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"
     ]
   }'::jsonb;
+  v_replay_cross_acl CONSTANT jsonb := '{
+    "anon": ["MAINTAIN", "REFERENCES", "TRIGGER", "TRUNCATE"],
+    "authenticated": [
+      "DELETE", "INSERT", "MAINTAIN", "REFERENCES",
+      "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"
+    ],
+    "postgres": [
+      "DELETE", "INSERT", "MAINTAIN", "REFERENCES",
+      "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"
+    ],
+    "service_role": [
+      "DELETE", "INSERT", "MAINTAIN", "REFERENCES",
+      "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"
+    ]
+  }'::jsonb;
+  v_replay_reversal_acl CONSTANT jsonb := '{
+    "anon": ["MAINTAIN", "REFERENCES", "TRIGGER", "TRUNCATE"],
+    "authenticated": [
+      "INSERT", "MAINTAIN", "REFERENCES", "SELECT", "TRIGGER", "TRUNCATE"
+    ],
+    "postgres": [
+      "DELETE", "INSERT", "MAINTAIN", "REFERENCES",
+      "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"
+    ],
+    "service_role": [
+      "DELETE", "INSERT", "MAINTAIN", "REFERENCES",
+      "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"
+    ]
+  }'::jsonb;
 BEGIN
   -- Resolve relations by catalog identity, not search_path. A view, foreign
   -- table, or partition with a colliding name is an unexpected state.
@@ -1275,10 +1304,11 @@ BEGIN
       MESSAGE = 'schema reconciliation refused noncanonical Pheno restrictive entitlement policies';
   END IF;
 
-  -- Accept only the canonical ACL or the exact production-observed legacy
-  -- default-ACL bloat. The production relation owner and its represented ACL
-  -- are part of the exact shape; so are every grantor, grantee, privilege,
-  -- grant-option bit, and column ACL.
+  -- Accept only the canonical ACL, the exact production-observed legacy
+  -- default-ACL bloat, or the exact pair produced by a full local migration
+  -- replay after later anon/DML hardening. The relation owner and its
+  -- represented ACL are part of each exact shape; so are every grantor,
+  -- grantee, privilege, grant-option bit, and column ACL.
   IF EXISTS (
     SELECT 1
     FROM pg_catalog.pg_class c
@@ -1381,6 +1411,9 @@ BEGIN
   ELSIF v_cross_acl_shape = v_legacy_bloat_acl
         AND v_reversal_acl_shape = v_legacy_bloat_acl THEN
     v_pheno_acl_state := 'known_legacy_default_bloat';
+  ELSIF v_cross_acl_shape = v_replay_cross_acl
+        AND v_reversal_acl_shape = v_replay_reversal_acl THEN
+    v_pheno_acl_state := 'known_local_replay_acl';
   ELSE
     RAISE EXCEPTION USING
       ERRCODE = '55000',
@@ -1390,7 +1423,7 @@ BEGIN
         v_cross_acl_shape,
         v_reversal_acl_shape
       ),
-      HINT = 'Expected both tables to be canonical or both to match the exact known legacy default-ACL bloat.';
+      HINT = 'Expected the canonical pair, exact production legacy-bloat pair, or exact local-replay pair.';
   END IF;
 
   -- Normalize both accepted inputs to the same least-privilege contract before

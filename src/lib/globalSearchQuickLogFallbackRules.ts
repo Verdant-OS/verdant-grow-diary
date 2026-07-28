@@ -23,12 +23,12 @@
  * marker is stripped when the intent is consumed (see
  * consumeQuickLogStartIntent) so it never lingers across refresh/back.
  *
- * Note on timing: inside AppShell this decision is never made mid-auth,
- * because AppShell itself only renders children once `loading` is false and
- * a user is present. On the public /cultivars page a signed-in visitor who
- * clicks before their session resolves falls back to the public starter,
- * which is the same behaviour anonymous visitors get and is never a data
- * write — a soft, recoverable outcome rather than a wrong write.
+ * Inside AppShell this decision is never made mid-auth, because AppShell only
+ * renders children once `loading` is false and a user is present. The public
+ * /cultivars mount does render while AuthProvider resolves, so that caller
+ * must defer the start until loading is explicitly false. Treating a
+ * temporary null user as anonymous would recreate the signed-in-to-public
+ * starter race.
  *
  * Pure: no I/O, no React, no time reads, no Supabase.
  */
@@ -75,6 +75,10 @@ export type ContextFreeQuickLogDestination =
   /** Anonymous visitor: the public, device-local starter. */
   | { kind: "public-starter"; to: string };
 
+export type ContextFreeQuickLogStartDecision =
+  /** Session ownership is not known yet; the caller must wait and retry. */
+  { kind: "wait-for-auth" } | ContextFreeQuickLogDestination;
+
 export interface ContextFreeQuickLogInput {
   /** True when an authenticated session owns this view. */
   isSignedIn: boolean;
@@ -92,6 +96,16 @@ export interface ContextFreeQuickLogInput {
   fallbackType: PublicQuickLogStarterLogType | null;
 }
 
+export interface ContextFreeQuickLogStartInput extends ContextFreeQuickLogInput {
+  /** Must be explicitly false before a context-free destination is safe. */
+  authLoading: boolean;
+}
+
+export type PendingContextFreeQuickLogIntent = Pick<
+  ContextFreeQuickLogInput,
+  "authedEventType" | "fallbackType"
+>;
+
 function isKnownStarterType(value: unknown): value is PublicQuickLogStarterLogType {
   return (
     typeof value === "string" &&
@@ -103,6 +117,37 @@ function isKnownEventType(value: unknown): value is QuickLogStartEventType {
   return (
     typeof value === "string" && (QUICK_LOG_START_EVENT_TYPES as readonly string[]).includes(value)
   );
+}
+
+function normalizePendingIntent(
+  next: PendingContextFreeQuickLogIntent | null | undefined,
+): PendingContextFreeQuickLogIntent {
+  return {
+    authedEventType: isKnownEventType(next?.authedEventType) ? next.authedEventType : null,
+    fallbackType: isKnownStarterType(next?.fallbackType) ? next.fallbackType : null,
+  };
+}
+
+/**
+ * Keep one owner-scoped deferred intent while auth resolves.
+ *
+ * Both preset channels are load-bearing: Photo and Training have a real
+ * authenticated Quick Log event type but intentionally have no public-starter
+ * fallback. Repeating the same normalized choice is idempotent; a different
+ * choice deterministically replaces it so the grower's latest click wins.
+ */
+export function queueContextFreeQuickLogIntent(
+  current: PendingContextFreeQuickLogIntent | null | undefined,
+  next: PendingContextFreeQuickLogIntent | null | undefined,
+): PendingContextFreeQuickLogIntent {
+  const normalized = normalizePendingIntent(next);
+  if (
+    current?.authedEventType === normalized.authedEventType &&
+    current?.fallbackType === normalized.fallbackType
+  ) {
+    return current;
+  }
+  return normalized;
 }
 
 /**
@@ -150,6 +195,22 @@ export function resolveContextFreeQuickLogDestination(
       ? `${PUBLIC_QUICK_LOG_STARTER_PATH}?${QUICK_LOG_START_TYPE_PARAM}=${encodeURIComponent(seed)}`
       : PUBLIC_QUICK_LOG_STARTER_PATH,
   };
+}
+
+/**
+ * Gate a context-free Quick Log start on a resolved auth state.
+ *
+ * The deferred result deliberately has no destination. Unknown, null, or
+ * malformed loading state therefore fails closed instead of being mistaken
+ * for an anonymous session.
+ */
+export function resolveContextFreeQuickLogStart(
+  input: ContextFreeQuickLogStartInput | null | undefined,
+): ContextFreeQuickLogStartDecision {
+  if (input?.authLoading !== false || typeof input.isSignedIn !== "boolean") {
+    return { kind: "wait-for-auth" };
+  }
+  return resolveContextFreeQuickLogDestination(input);
 }
 
 /**

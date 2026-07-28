@@ -334,7 +334,7 @@ export default function OperatorSchemaAudit() {
               responsible. Open a row to jump into the drilldown for verification.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-xs flex-wrap justify-end">
             <Badge variant={scan.totalMissingTables > 0 ? "destructive" : "outline"}>
               {scan.totalMissingTables} tables
             </Badge>
@@ -344,9 +344,36 @@ export default function OperatorSchemaAudit() {
             <span className="text-muted-foreground">
               of {columnStats.total} checked
             </span>
+            {allMissingIds.length > 0 && (
+              <>
+                <Badge
+                  variant={outstanding === 0 ? "outline" : "secondary"}
+                  data-testid="schema-audit-checklist-summary"
+                  className={outstanding === 0 ? "border-emerald-500 text-emerald-600" : ""}
+                >
+                  {verifiedInScope}/{allMissingIds.length} verified this session
+                </Badge>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs"
+                  onClick={checklist.clearAll}
+                  disabled={checklist.count === 0}
+                  data-testid="schema-audit-checklist-clear"
+                >
+                  Clear
+                </Button>
+              </>
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-0">
+          {allMissingIds.length > 0 && (
+            <div className="border-b bg-muted/20 px-4 py-2 text-[11px] text-muted-foreground">
+              Local session checklist — tick items after reviewing the drilldown.
+              Nothing is saved to the database; verifications clear when this browser tab closes.
+            </div>
+          )}
           {scan.groups.length === 0 && scan.orphanTables.length === 0 ? (
             <div className="px-4 py-6 text-sm text-emerald-600 flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4" />

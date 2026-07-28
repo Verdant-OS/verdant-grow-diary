@@ -47,12 +47,12 @@ const INDEX_HTML_FIXTURE = `<!doctype html><html><head>
 <meta property="og:title" content="t" />
 <meta property="og:description" content="d" />
 <meta property="og:url" content="${VERDANT_SITE_ORIGIN}" />
-<meta property="og:image" content="${VERDANT_SITE_ORIGIN}/brand/verdant-logo.png" />
+<meta property="og:image" content="${VERDANT_SITE_ORIGIN}/brand/verdant-logo-512.png" />
 <meta property="og:image:alt" content="a" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="t" />
 <meta name="twitter:description" content="d" />
-<meta name="twitter:image" content="${VERDANT_SITE_ORIGIN}/brand/verdant-logo.png" />
+<meta name="twitter:image" content="${VERDANT_SITE_ORIGIN}/brand/verdant-logo-512.png" />
 <link rel="canonical" href="${VERDANT_SITE_ORIGIN}" />
 </head><body></body></html>`;
 
@@ -89,9 +89,7 @@ describe("static social documents: no conflicting robots directives", () => {
       // Exactly one <meta name="robots"> — duplicates let the most
       // restrictive value win silently.
       const robotsMatches = [
-        ...html.matchAll(
-          /<meta\s+name=["']robots["']\s+content=["']([^"']+)["']/gi,
-        ),
+        ...html.matchAll(/<meta\s+name=["']robots["']\s+content=["']([^"']+)["']/gi),
       ].map((m) => m[1]);
       expect(
         robotsMatches,
@@ -108,10 +106,7 @@ describe("static social documents: no conflicting robots directives", () => {
       // Must affirmatively allow indexing — either "index" or "all",
       // or the default the builder injects. Reject an empty/whitespace
       // directive that would leave crawlers to guess.
-      expect(
-        tokens.length,
-        `${doc.path} robots directive must not be empty`,
-      ).toBeGreaterThan(0);
+      expect(tokens.length, `${doc.path} robots directive must not be empty`).toBeGreaterThan(0);
 
       // Sibling directive tags (per-crawler overrides + x-robots-tag in
       // <meta>) must not carry blocking tokens either.

@@ -271,8 +271,8 @@ describe("Landing and Pricing OG/Twitter metadata", () => {
 
   it("usePageSeo defaults og:image to an absolute https URL (no broken paths)", () => {
     const hook = read("src/hooks/usePageSeo.ts");
-    // Default is `${SITE_ORIGIN}/brand/verdant-logo.png` — accept template form.
-    expect(hook).toMatch(/\/brand\/verdant-logo\.png/);
+    // Default is `${SITE_ORIGIN}/brand/verdant-logo-512.png` — accept template form.
+    expect(hook).toMatch(/\/brand\/verdant-logo-512\.png/);
     expect(hook).toMatch(/https:\/\/verdantgrowdiary\.com/);
   });
 });

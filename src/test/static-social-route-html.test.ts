@@ -46,6 +46,17 @@ describe("static social route HTML", () => {
     );
   });
 
+  it("injects route JSON-LD without allowing HTML/script breakout", () => {
+    const html = buildStaticSocialRouteHtml(INDEX_HTML, {
+      ...FOUNDER_SOCIAL_META,
+      jsonLd: [{ "@type": "WebPage", name: "</script><script>alert(1)</script>" }],
+    });
+
+    expect(html).toContain('data-static-route-ldjson="true"');
+    expect(html).toContain("\\u003c/script\\u003e");
+    expect(html).not.toContain("</script><script>alert(1)</script>");
+  });
+
   it("is deterministic and does not duplicate canonicals", () => {
     const first = buildStaticSocialRouteHtml(INDEX_HTML, FOUNDER_SOCIAL_META);
     const second = buildStaticSocialRouteHtml(first, FOUNDER_SOCIAL_META);

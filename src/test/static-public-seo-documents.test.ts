@@ -96,6 +96,14 @@ describe("static public SEO documents", () => {
       expect(document.metadata.title).toBeTruthy();
       expect(document.metadata.description).toBeTruthy();
       expect(document.metadata.image).toMatch(/^https:\/\//);
+      expect(document.metadata.jsonLd).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            "@type": "WebPage",
+            "@id": `${document.metadata.url}#webpage`,
+          }),
+        ]),
+      );
       expect(document.metadata.robots ?? "index, follow").toBe("index, follow");
     }
 
@@ -110,6 +118,20 @@ describe("static public SEO documents", () => {
       const requestUrl = new URL(`/cultivars${filterVariant}`, VERDANT_SITE_ORIGIN);
       expect(cultivarCanonical).toBe(`${VERDANT_SITE_ORIGIN}${requestUrl.pathname}`);
       expect(new URL(cultivarCanonical ?? "", VERDANT_SITE_ORIGIN).search).toBe("");
+    }
+  });
+
+  it("provides route-specific WebPage JSON-LD for non-JavaScript crawlers", () => {
+    for (const document of STATIC_PUBLIC_SEO_DOCUMENTS) {
+      const page = document.metadata.jsonLd?.find(
+        (block): block is { "@type"?: unknown; "@id"?: unknown; url?: unknown } =>
+          typeof block === "object" && block !== null && "@type" in block,
+      );
+      expect(page).toMatchObject({
+        "@type": "WebPage",
+        "@id": `${document.metadata.url}#webpage`,
+        url: document.metadata.url,
+      });
     }
   });
 

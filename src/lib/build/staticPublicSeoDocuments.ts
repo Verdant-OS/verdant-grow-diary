@@ -15,7 +15,7 @@ import { FOUNDER_SOCIAL_META } from "../../constants/founderSocialMeta";
 import type { StaticSocialRouteMetadata } from "./staticSocialRouteHtml";
 
 export const VERDANT_SITE_ORIGIN = "https://verdantgrowdiary.com";
-const DEFAULT_OG_IMAGE = `${VERDANT_SITE_ORIGIN}/brand/verdant-logo.png`;
+const DEFAULT_OG_IMAGE = `${VERDANT_SITE_ORIGIN}/brand/verdant-logo-512.png`;
 
 export interface StaticPublicSeoDocument {
   /** Public pathname without query parameters. */
@@ -37,19 +37,40 @@ function routeFileName(path: string): string {
   return `${path.slice(1)}/index.html`;
 }
 
+function buildStaticWebPageJsonLd(metadata: {
+  readonly title: string;
+  readonly description: string;
+  readonly url: string;
+}) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "@id": `${metadata.url}#webpage`,
+    url: metadata.url,
+    name: metadata.title,
+    description: metadata.description,
+    isPartOf: {
+      "@type": "WebSite",
+      "@id": `${VERDANT_SITE_ORIGIN}/#website`,
+    },
+  } as const;
+}
+
 function publicDocument(
   path: string,
   metadata: Omit<StaticSocialRouteMetadata, "url" | "image"> & {
     readonly image?: string;
   },
 ): StaticPublicSeoDocument {
+  const url = `${VERDANT_SITE_ORIGIN}${path}`;
   return {
     path,
     fileName: routeFileName(path),
     metadata: {
       ...metadata,
-      url: `${VERDANT_SITE_ORIGIN}${path}`,
+      url,
       image: metadata.image ?? DEFAULT_OG_IMAGE,
+      jsonLd: metadata.jsonLd ?? [buildStaticWebPageJsonLd({ ...metadata, url })],
     },
   };
 }
@@ -215,7 +236,17 @@ export const STATIC_PUBLIC_SEO_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument>
   {
     path: "/founder",
     fileName: routeFileName("/founder"),
-    metadata: FOUNDER_SOCIAL_META,
+    metadata: {
+      ...FOUNDER_SOCIAL_META,
+      image: `${VERDANT_SITE_ORIGIN}/brand/verdant-logo-512.png`,
+      jsonLd: [
+        buildStaticWebPageJsonLd({
+          title: FOUNDER_SOCIAL_META.title,
+          description: FOUNDER_SOCIAL_META.description,
+          url: FOUNDER_SOCIAL_META.url,
+        }),
+      ],
+    },
   },
   ...CORE_ACQUISITION_DOCUMENTS,
   GUIDE_HUB,

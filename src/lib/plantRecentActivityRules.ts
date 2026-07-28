@@ -19,7 +19,27 @@ import { resolveQuickLogEventIdentity } from "@/lib/quickLogEventIdentityRules";
 
 export interface PlantRecentActivityRow {
   id: string;
+  /**
+   * Raw envelope event_type from the diary_entries row. Kept for
+   * back-compat / debugging. Presenters should render `displayLabel`
+   * and classify with `effectiveEventType`.
+   */
   eventType: string;
+  /**
+   * Canonical event type after Quick Log envelope promotion (e.g.
+   * "watering" for a `quick_log` wrapper whose details declared
+   * `event_type: "watering"`). Deterministic — see
+   * `resolveQuickLogEventIdentity`.
+   */
+  effectiveEventType: string;
+  /** Grower-facing label for the badge (e.g. "Watering"). */
+  displayLabel: string;
+  /**
+   * Compact structured summary built from normalized details (e.g.
+   * "500 ml", "pH 6.1 · EC 1.2"). Empty when no structured summary is
+   * available — never invented.
+   */
+  summarySuffix: string;
   occurredAt: string | null;
   occurredAtLabel: string;
   notePreview: string;
@@ -51,6 +71,7 @@ export interface PlantRecentActivityRow {
    */
   showPhotoNonDiagnosticLabel?: boolean;
 }
+
 
 const NOTE_PREVIEW_MAX = 140;
 const DEFAULT_LIMIT = 10;

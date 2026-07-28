@@ -351,6 +351,10 @@ export type LinkDescriptor = {
   download?: boolean;
 };
 
+export function visibleLinkByHrefSelector(href: string): string {
+  return `a[href=${JSON.stringify(href)}]:visible`;
+}
+
 const READ_ONLY_EDGE_FUNCTIONS = new Set([
   "environment-summary-report-entitlement",
   "founder-slots-remaining",

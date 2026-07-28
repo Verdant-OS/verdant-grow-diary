@@ -21,6 +21,7 @@ import {
   isReadOnlyRpc,
   isSafelyFillableFieldType,
   placeholderValueForField,
+  visibleLinkByHrefSelector,
   type CoreCensusRoute,
   type LinkClassification,
 } from "./lib/coreLinkFormCensus";
@@ -989,17 +990,6 @@ async function navigateForAudit(page: Page, route: CoreCensusRoute) {
   return finalPath;
 }
 
-async function findVisibleLinkByHref(page: Page, href: string): Promise<Locator | null> {
-  const anchors = page.locator("a[href]");
-  for (let index = 0; index < (await anchors.count()); index += 1) {
-    const anchor = anchors.nth(index);
-    if ((await anchor.getAttribute("href")) === href && (await anchor.isVisible())) {
-      return anchor;
-    }
-  }
-  return null;
-}
-
 async function clickEverySafeInternalHref(
   page: Page,
   linkAudits: readonly LinkAudit[],
@@ -1016,15 +1006,10 @@ async function clickEverySafeInternalHref(
     await test.step(`click ${link.href} from ${link.sourcePath}`, async () => {
       await page.goto(link.sourcePath, { waitUntil: "domcontentloaded" });
       await assertMeaningfulPage(page, link.sourcePath);
-      await expect
-        .poll(async () => (await findVisibleLinkByHref(page, link.href)) !== null, {
-          message: `${link.href} must remain visible on ${link.sourcePath}`,
-          timeout: 10_000,
-        })
-        .toBe(true);
-      const anchor = await findVisibleLinkByHref(page, link.href);
-      expect(anchor, `${link.href} disappeared from ${link.sourcePath}`).not.toBeNull();
-      if (!anchor) return;
+      const anchor = page.locator(visibleLinkByHrefSelector(link.href)).first();
+      await expect(anchor, `${link.href} must remain visible on ${link.sourcePath}`).toBeVisible({
+        timeout: 10_000,
+      });
 
       const target = await anchor.getAttribute("target");
       const expectedPathname = expectedCensusNavigationPath(

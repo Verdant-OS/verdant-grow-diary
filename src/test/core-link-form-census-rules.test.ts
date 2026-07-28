@@ -14,6 +14,7 @@ import {
   missingAuthenticatedCensusRoutePatterns,
   missingAuthenticatedDynamicRouteSuccessContracts,
   placeholderValueForField,
+  visibleLinkByHrefSelector,
   type CoreCensusRoute,
 } from "../../e2e/lib/coreLinkFormCensus";
 
@@ -63,6 +64,16 @@ describe("core link and form census rules", () => {
     expect(
       classifyLink({ href: "/exports/example.csv", download: true }, MANIFEST).disposition,
     ).toBe("download");
+  });
+
+  it("builds one exact live locator for same-href links across re-renders", () => {
+    expect(
+      visibleLinkByHrefSelector(
+        '/pheno-hunts/hunt-1/workspace?note="quoted"\\value#phenotype-notes',
+      ),
+    ).toBe(
+      'a[href="/pheno-hunts/hunt-1/workspace?note=\\"quoted\\"\\\\value#phenotype-notes"]:visible',
+    );
   });
 
   it("expects signed-out links to auth routes to land on the welcome gate", () => {

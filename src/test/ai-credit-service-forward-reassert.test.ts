@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const ROOT = resolve(__dirname, "../..");
 const MIGRATIONS = resolve(ROOT, "supabase/migrations");
 const FORWARD_FILENAME = "20260727050000_ai_credit_service_contract_forward_reassert.sql";
+const FINAL_SERVICE_SPEND_FILENAME = "20260728090736_ai_credit_pack_portability.sql";
 const FORWARD = readFileSync(resolve(MIGRATIONS, FORWARD_FILENAME), "utf8");
 const EXECUTABLE = FORWARD.replace(/--.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
 const NORMALIZED = EXECUTABLE.replace(/\s+/g, " ").trim().toLowerCase();
@@ -102,7 +103,7 @@ describe("AI-credit service contract forward reassertion", () => {
         return SERVICE_SPEND_SIGNATURE.test(sql) || SERVICE_REFUND_SIGNATURE.test(sql);
       });
 
-    expect(definingMigrations.at(-1)).toBe(FORWARD_FILENAME);
+    expect(definingMigrations.at(-1)).toBe(FINAL_SERVICE_SPEND_FILENAME);
   });
 });
 

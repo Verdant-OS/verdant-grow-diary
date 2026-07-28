@@ -29,17 +29,19 @@ export interface PlantRecentActivityRow {
    * Canonical event type after Quick Log envelope promotion (e.g.
    * "watering" for a `quick_log` wrapper whose details declared
    * `event_type: "watering"`). Deterministic — see
-   * `resolveQuickLogEventIdentity`.
+   * `resolveQuickLogEventIdentity`. Optional for back-compat with
+   * hand-built test fixtures; presenters fall back to `eventType`.
    */
-  effectiveEventType: string;
+  effectiveEventType?: string;
   /** Grower-facing label for the badge (e.g. "Watering"). */
-  displayLabel: string;
+  displayLabel?: string;
   /**
    * Compact structured summary built from normalized details (e.g.
    * "500 ml", "pH 6.1 · EC 1.2"). Empty when no structured summary is
    * available — never invented.
    */
-  summarySuffix: string;
+  summarySuffix?: string;
+
   occurredAt: string | null;
   occurredAtLabel: string;
   notePreview: string;

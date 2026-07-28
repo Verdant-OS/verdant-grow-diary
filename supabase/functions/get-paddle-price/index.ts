@@ -10,7 +10,7 @@ import {
   PAID_PLAN_ALLOWLIST,
   PAID_PLAN_IDS,
 } from "../_shared/lib/lib/paidPlanAllowlist.ts";
-import { creditPackIsSpendable } from "../_shared/lib/lib/creditPackEligibility.ts";
+import { creditPackPurchaseEligible } from "../_shared/lib/lib/creditPackEligibility.ts";
 
 /**
  * Resolve a paid plan id to its public Paddle price ID. Read-only; no DB
@@ -172,28 +172,40 @@ Deno.serve(async (req) => {
       return json(400, { error: "unknown_plan" });
     }
 
-    // 2a. A credit pack tops up the monthly AI bucket. Free grows spend from
-    //     a per-grow allowance, so pack grants are not consulted by the
-    //     authoritative spend function and would be unusable.
+    // 2a. Credit packs are merchandised as paid-plan top-ups. Already-owned
+    //     grant balance remains portable in the authoritative spend function,
+    //     but starting a NEW checkout still requires a verified paid plan.
     //
     //     Enforce this before returning a price. The client uses the same pure
     //     predicate for presentation, but this verified caller-JWT/RLS lookup
     //     is authoritative and cannot be bypassed by invoking the function.
     if ((CREDIT_PACK_IDS as readonly string[]).includes(requested)) {
-      let packSpendable = false;
+      let packPurchaseEligible = false;
       try {
-        const { entitlement, lookupFailed } = await loadUnionEntitlementForUser(
+        const resolved = await loadUnionEntitlementForUser(
           supabase,
           userData.user.id,
           resolveServerBillingEnvironment(),
           new Date(),
         );
-        packSpendable = !lookupFailed && creditPackIsSpendable(entitlement);
+        if (resolved.lookupFailed) {
+          logCatalogUnavailable({
+            plan: requested,
+            reason: "price_resolution_unavailable",
+            stage: "entitlement",
+          });
+          return json(503, { error: "price_resolution_unavailable" });
+        }
+        packPurchaseEligible = creditPackPurchaseEligible(resolved.entitlement);
       } catch {
-        // Fail closed: an unreadable entitlement must never become a sale.
-        packSpendable = false;
+        logCatalogUnavailable({
+          plan: requested,
+          reason: "price_resolution_unavailable",
+          stage: "entitlement",
+        });
+        return json(503, { error: "price_resolution_unavailable" });
       }
-      if (!packSpendable) {
+      if (!packPurchaseEligible) {
         logCatalogUnavailable({
           plan: requested,
           reason: "pack_requires_monthly_plan",

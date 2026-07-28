@@ -43,6 +43,29 @@ describe("ai-coach edge — 200-envelope credit transport", () => {
     expect(src.slice(conflict, conflict + 250)).toContain('return calmFailure("invalid")');
   });
 
+  it("returns the same authoritative receipt fields on fresh and cached success", () => {
+    const helper = src.indexOf("function buildAiCreditReceiptContext");
+    const helperEnd = src.indexOf("async function settleResultPersistence", helper);
+    expect(helper).toBeGreaterThan(-1);
+    expect(helperEnd).toBeGreaterThan(helper);
+    const helperBlock = src.slice(helper, helperEnd);
+    for (const field of [
+      "remaining",
+      "scope",
+      "scope_used",
+      "scope_limit",
+      "plan_id",
+      "funded_by",
+      "pack_balance",
+    ]) {
+      expect(helperBlock).toContain(`${field}: spend.${field}`);
+    }
+    expect(src).toContain(
+      "return safeOk(cached.result, buildAiCreditReceiptContext(spendObj, true))",
+    );
+    expect(src).toContain("return safeOk(validated.result, buildAiCreditReceiptContext(spendObj))");
+  });
+
   it("upstream provider 402 after refund returns 200 with { ok:false, reason:'upstream_credit_exhausted' }", () => {
     const upstream402 = src.indexOf("r.status === 402");
     const genericFailure = src.indexOf("if (!r.ok)", upstream402);
@@ -92,8 +115,27 @@ describe("ai-doctor-review edge — credit_denied envelope unchanged", () => {
     expect(src).toMatch(/function\s+calmFailure[\s\S]{0,200}status:\s*200/);
   });
 
-  it("returns the server-resolved plan identity with successful credit context", () => {
-    expect(src).toContain("plan_id: spendObj.plan_id");
+  it("returns the immutable server receipt on both fresh and cached success", () => {
+    const helper = src.indexOf("function buildAiCreditReceiptContext");
+    const helperEnd = src.indexOf("function isUuid", helper);
+    expect(helper).toBeGreaterThan(-1);
+    expect(helperEnd).toBeGreaterThan(helper);
+    const helperBlock = src.slice(helper, helperEnd);
+    for (const field of [
+      "remaining",
+      "scope",
+      "scope_used",
+      "scope_limit",
+      "plan_id",
+      "funded_by",
+      "pack_balance",
+    ]) {
+      expect(helperBlock).toContain(`${field}: spend.${field}`);
+    }
+    expect(src).toContain(
+      "return safeOk(cached.result, buildAiCreditReceiptContext(spendObj, true))",
+    );
+    expect(src).toContain("return safeOk(v.result, buildAiCreditReceiptContext(spendObj))");
   });
 
   it("refunds an upstream provider 402 and returns the service-degraded envelope", () => {
@@ -230,6 +272,13 @@ describe("Coach client — credit transport wiring", () => {
 
   it("credit_denied path sets denial state and short-circuits", () => {
     expect(src).toMatch(/outcome\.reason\s*===\s*"credit_denied"[\s\S]{0,200}setCreditDenial\(/);
+  });
+
+  it("merges the authoritative success credit envelope into rendered Coach state", () => {
+    expect(src).toContain("credit?: AiCreditRemainingInput");
+    expect(src).toMatch(
+      /setResult\(\s*d\s*\?\s*\{\s*\.\.\.d,\s*credit:\s*outcome\.credit\s*\}\s*:\s*null\s*\)/,
+    );
   });
 
   it("upstream_credit_exhausted sets a degraded state (no paywall)", () => {

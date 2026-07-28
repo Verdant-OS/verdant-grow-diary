@@ -537,8 +537,50 @@ describe("handleVerifiedEvent — AI credit-pack grant", () => {
       environment: "sandbox",
     });
     expect(f.markCalls.at(-1)?.patch.processing_status).toBe("processed");
+    expect(f.markCalls.at(-1)?.patch.last_error).toBeNull();
     // A credit purchase must never touch the subscriptions (entitlement) table.
     expect(f.upsertCalls).toHaveLength(0);
+  });
+
+  it("an idempotent grant RPC replay is still a clean processed settlement", async () => {
+    const f = makeFixture();
+    const grant = wirePack(f, { ok: true, reason: "idempotent" });
+    const res = await handleVerifiedEvent(
+      f.deps,
+      packTxEvent("credit_pack_50", "evt_pack_rpc_replay"),
+      "sandbox",
+      NOW,
+      {},
+    );
+
+    expect(res).toEqual({ httpStatus: 200, reason: "processed:grant_credit_pack" });
+    expect(grant).toHaveBeenCalledTimes(1);
+    expect(f.markCalls.at(-1)?.patch).toMatchObject({
+      processing_status: "processed",
+      processed_ok: true,
+      last_error: null,
+    });
+  });
+
+  it("credit-pack settlement does not invoke Founder provider-cancellation work", async () => {
+    const f = makeFixture();
+    wirePack(f, { ok: true, reason: "granted" });
+    const cancel = vi.fn(async () => {
+      throw new Error("pack path must not call this");
+    });
+    (f.deps as Deps).cancelOtherRecurringSubscriptions = cancel;
+
+    const res = await handleVerifiedEvent(
+      f.deps,
+      packTxEvent("credit_pack_150", "evt_pack_no_founder_cancel"),
+      "sandbox",
+      NOW,
+      {},
+    );
+
+    expect(res).toEqual({ httpStatus: 200, reason: "processed:grant_credit_pack" });
+    expect(cancel).not.toHaveBeenCalled();
+    expect(f.markCalls.at(-1)?.patch.last_error).toBeNull();
   });
 
   it("transient grant failure returns 500 so Paddle retries (grant is idempotent) and marks failed", async () => {
@@ -591,90 +633,6 @@ describe("handleVerifiedEvent — AI credit-pack grant", () => {
     );
     expect(second.reason).toBe("duplicate_processed");
     expect(grant).toHaveBeenCalledTimes(1);
-  });
-
-  it("grants a pack the buyer cannot yet spend, and PERSISTS the flag to the audit row", async () => {
-    // Founder decision: never withhold credits someone paid for. The money is
-    // taken before this runs, and packs do not expire — so a buyer who lapsed
-    // between price resolution and settlement gets the credits, which activate
-    // when they have a plan again. The flag makes that dormant balance
-    // findable instead of silent.
-    //
-    // Codex (P2): my first version put the marker ONLY in the response
-    // `reason` — a transient string that logs expire and that a future
-    // duplicate delivery of the same event never recomputes (it short-circuits
-    // to `duplicate_processed` before this code runs again). So the marker was
-    // findable exactly once, in a log line, never in the durable
-    // lovable_paddle_events row an operator would actually query months later.
-    // It now also lands in the persisted last_error column.
-    const f = makeFixture();
-    const grant = vi.fn(async () => ({ ok: true }) as Awaited<ReturnType<PackDep>>);
-    (f.deps as Deps).allocateCreditPack = grant;
-    (f.deps as Deps).probeCreditPackSpendable = vi.fn(async () => ({
-      known: true,
-      spendable: false,
-    }));
-
-    const res = await handleVerifiedEvent(
-      f.deps,
-      packTxEvent("credit_pack_50", "evt_pack_unspendable"),
-      "sandbox",
-      NOW,
-      {},
-    );
-
-    expect(res.httpStatus).toBe(200);
-    // Granted — the assertion that matters most.
-    expect(grant).toHaveBeenCalledTimes(1);
-    expect(res.reason).toContain("processed:grant_credit_pack");
-    expect(res.reason).toContain("unspendable_at_settlement");
-    // The durable row, not just the transient response — this is the part
-    // Codex's finding was actually about.
-    expect(f.markCalls.at(-1)?.patch).toMatchObject({
-      processing_status: "processed",
-      processed_ok: true,
-      last_error: expect.stringContaining("unspendable_at_settlement"),
-    });
-  });
-
-  it("does not flag a spendable buyer, and never lets a probe failure touch the grant", async () => {
-    // Non-triviality + blast-radius guard: the probe is annotation only. A
-    // spendable buyer must be unmarked, and a throwing probe must not turn a
-    // completed grant into a failure or a false mismatch.
-    const f = makeFixture();
-    const grant = vi.fn(async () => ({ ok: true }) as Awaited<ReturnType<PackDep>>);
-    (f.deps as Deps).allocateCreditPack = grant;
-    (f.deps as Deps).probeCreditPackSpendable = vi.fn(async () => ({
-      known: true,
-      spendable: true,
-    }));
-    const ok = await handleVerifiedEvent(
-      f.deps,
-      packTxEvent("credit_pack_50", "evt_pack_ok"),
-      "sandbox",
-      NOW,
-      {},
-    );
-    expect(ok.reason).toBe("processed:grant_credit_pack");
-    expect(ok.reason).not.toContain("unspendable");
-
-    const f2 = makeFixture();
-    const grant2 = vi.fn(async () => ({ ok: true }) as Awaited<ReturnType<PackDep>>);
-    (f2.deps as Deps).allocateCreditPack = grant2;
-    (f2.deps as Deps).probeCreditPackSpendable = vi.fn(async () => {
-      throw new Error("entitlement read exploded");
-    });
-    const boom = await handleVerifiedEvent(
-      f2.deps,
-      packTxEvent("credit_pack_50", "evt_pack_probe_boom"),
-      "sandbox",
-      NOW,
-      {},
-    );
-    expect(boom.httpStatus).toBe(200);
-    expect(grant2).toHaveBeenCalledTimes(1);
-    // Unknown is NOT a mismatch.
-    expect(boom.reason).not.toContain("unspendable");
   });
 
   it("grant dep not wired: NEVER reports a grant it did not make, and stays retryable", async () => {

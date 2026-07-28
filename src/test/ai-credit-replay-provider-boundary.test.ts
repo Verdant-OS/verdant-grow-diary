@@ -31,7 +31,9 @@ describe("AI credit replay provider boundary", () => {
     expect(replayBlock).toContain('"result_recording_failed"');
     expect(replayBlock).toContain('spendDecision.kind === "refunded"');
     expect(replayBlock).toContain("validateAiDoctorReviewResult(spendDecision.result)");
-    expect(replayBlock).toContain("return safeOk(cached.result, { replayed: true })");
+    expect(replayBlock).toContain(
+      "return safeOk(cached.result, buildAiCreditReceiptContext(spendObj, true))",
+    );
     expect(replayBlock).not.toContain("fetch(");
   });
 

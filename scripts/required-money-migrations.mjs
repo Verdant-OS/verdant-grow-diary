@@ -40,6 +40,11 @@ export const REQUIRED_MONEY_MIGRATIONS = [
   // before the affected Edge Functions ship or legacy audit rows can regain
   // authority over paid capabilities.
   "20260728050000_canonical_subscription_authority_reassert.sql",
+  // Purchased/granted AI-credit balance remains usable after a paid plan
+  // lapses, while live and sandbox ledgers stay isolated. This is the final
+  // authoritative service-spend definition and closes the checkout-to-
+  // settlement race for completed credit-pack purchases.
+  "20260728090736_ai_credit_pack_portability.sql",
 ];
 
 /**

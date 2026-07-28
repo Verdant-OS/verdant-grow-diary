@@ -1,16 +1,17 @@
 /**
- * A credit pack must only be sellable to someone who can spend it.
- *
- * `ai_credit_spend` only consults pack balance under the monthly scope.
- * Free grows are scoped per-grow, so selling a pack to Free would record
- * credits that the authoritative spend path never reads.
+ * New credit-pack purchases remain paid-plan top-ups. That is a merchandising
+ * rule, not a technical spendability rule: once settled, an owned grant stays
+ * portable if the buyer later returns to Free.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { KNOWN_PLAN_IDS, PLAN_CATALOG } from "@/lib/entitlements/planCatalog";
 import type { LovableSubscriptionRow, PlanId, ResolvedEntitlement } from "@/lib/entitlements";
-import { creditPackIsSpendable, resolveCreditPackPurchaseGate } from "@/lib/creditPackEligibility";
+import {
+  creditPackPurchaseEligible,
+  resolveCreditPackPurchaseGate,
+} from "@/lib/creditPackEligibility";
 import { loadUnionEntitlementForUser } from "../../supabase/functions/_shared/unionEntitlementLookup.ts";
 
 const SPEND_SQL = readFileSync(
@@ -138,15 +139,15 @@ function fakeUnionClient(state: FakeUnionState) {
 }
 
 describe("credit pack server gate", () => {
-  it("refuses a pack the caller cannot spend before returning a price", () => {
+  it("refuses a new pack purchase for a verified ineligible plan before returning a price", () => {
     expect(PRICE_FN).toMatch(/CREDIT_PACK_IDS[\s\S]{0,80}includes\(requested\)/);
-    expect(PRICE_FN).toMatch(/creditPackIsSpendable/);
+    expect(PRICE_FN).toMatch(/creditPackPurchaseEligible/);
     expect(PRICE_FN).toMatch(/pack_requires_monthly_plan/);
     expect(PRICE_FN).toMatch(/json\(403, \{ error: "pack_requires_monthly_plan" \}\)/);
   });
 
   it("shares one predicate with the client instead of copying the rule", () => {
-    expect(PRICE_FN).toMatch(/creditPackIsSpendable[\s\S]{0,140}creditPackEligibility/);
+    expect(PRICE_FN).toMatch(/creditPackPurchaseEligible[\s\S]{0,140}creditPackEligibility/);
   });
 
   it("loads the canonical billing authority for the verified auth user, never a client user_id", () => {
@@ -156,9 +157,30 @@ describe("credit pack server gate", () => {
     expect(PRICE_FN).not.toMatch(/\{\s*user_id\s*\}\s*=\s*body/);
   });
 
-  it("fails closed if entitlement cannot be read", () => {
-    const block = PRICE_FN.slice(PRICE_FN.indexOf("CREDIT_PACK_IDS as readonly string[]"));
-    expect(block.slice(0, 1_000)).toMatch(/catch[\s\S]{0,240}packSpendable = false/);
+  it("distinguishes a transient entitlement lookup failure from genuine ineligibility", () => {
+    const start = PRICE_FN.indexOf(
+      "if ((CREDIT_PACK_IDS as readonly string[]).includes(requested))",
+    );
+    const end = PRICE_FN.indexOf("// 2b. Founder Lifetime", start);
+    const block = PRICE_FN.slice(start, end);
+
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    expect(block).toMatch(
+      /if \(resolved\.lookupFailed\)[\s\S]{0,420}json\(503, \{ error: "price_resolution_unavailable" \}\)/,
+    );
+    expect(block).toMatch(
+      /catch \{[\s\S]{0,420}json\(503, \{ error: "price_resolution_unavailable" \}\)/,
+    );
+    expect(block).toMatch(
+      /if \(!packPurchaseEligible\)[\s\S]{0,420}json\(403, \{ error: "pack_requires_monthly_plan" \}\)/,
+    );
+    expect(block.indexOf("if (resolved.lookupFailed)")).toBeLessThan(
+      block.indexOf("creditPackPurchaseEligible(resolved.entitlement)"),
+    );
+    expect(block.indexOf("creditPackPurchaseEligible(resolved.entitlement)")).toBeLessThan(
+      block.indexOf("if (!packPurchaseEligible)"),
+    );
   });
 
   it("surfaces refusal as a typed catalog reason", () => {
@@ -176,7 +198,7 @@ describe("credit pack eligibility", () => {
 
     expect(result.lookupFailed).toBe(false);
     expect(result.entitlement.source).toBe("lovable_paddle_subscription");
-    expect(creditPackIsSpendable(result.entitlement)).toBe(true);
+    expect(creditPackPurchaseEligible(result.entitlement)).toBe(true);
     expect(fake.tableReads).toEqual(["subscriptions"]);
     expect(fake.ownerFilters).toEqual([{ table: "subscriptions", userId: VERIFIED_USER_ID }]);
   });
@@ -201,7 +223,7 @@ describe("credit pack eligibility", () => {
 
     expect(result.lookupFailed).toBe(true);
     expect(result.entitlement.effectivePlanId).toBe("free");
-    expect(creditPackIsSpendable(result.entitlement)).toBe(false);
+    expect(creditPackPurchaseEligible(result.entitlement)).toBe(false);
     expect(
       resolveCreditPackPurchaseGate({
         entitlement: result.entitlement,
@@ -221,19 +243,19 @@ describe("credit pack eligibility", () => {
 
     expect(result.lookupFailed).toBe(false);
     expect(result.entitlement.effectivePlanId).toBe("pro_monthly");
-    expect(creditPackIsSpendable(result.entitlement)).toBe(true);
+    expect(creditPackPurchaseEligible(result.entitlement)).toBe(true);
     expect(fake.tableReads).toEqual(["subscriptions", "subscriptions"]);
   });
 
   it("agrees with ai_credit_allowance for every known plan", () => {
     for (const plan of KNOWN_PLAN_IDS) {
       const allowedInTs = gateFor(plan).kind === "allowed";
-      const spendableInSql = sqlPerGrowIsNull(plan);
+      const hasMonthlyBucketInSql = sqlPerGrowIsNull(plan);
       expect(
         allowedInTs,
-        `${plan}: UI ${allowedInTs ? "sells" : "withholds"} packs but SQL ` +
-          `${spendableInSql ? "would" : "would not"} spend them`,
-      ).toBe(spendableInSql);
+        `${plan}: UI ${allowedInTs ? "sells" : "withholds"} new packs but SQL ` +
+          `${hasMonthlyBucketInSql ? "does" : "does not"} define a paid monthly bucket`,
+      ).toBe(hasMonthlyBucketInSql);
     }
   });
 

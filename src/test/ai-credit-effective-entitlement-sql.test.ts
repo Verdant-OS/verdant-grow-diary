@@ -140,7 +140,9 @@ describe("ai_credit_spend FINAL migration state (regression-proof)", () => {
   });
 
   it("preserves the ledger contract: idempotent replay, advisory lock, append-only", () => {
-    expect(FINAL).toContain("WHERE user_id = v_uid AND idempotency_key = p_idempotency_key");
+    expect(FINAL).toMatch(
+      /WHERE\s+(?:spend\.)?user_id\s*=\s*v_uid\s+AND\s+(?:spend\.)?idempotency_key\s*=\s*p_idempotency_key/i,
+    );
     expect(FINAL).toContain("pg_advisory_xact_lock");
     expect(FINAL).toContain("INSERT INTO public.ai_credit_spends");
     expect(FINAL).not.toMatch(/UPDATE\s+public\.ai_credit_spends/i);

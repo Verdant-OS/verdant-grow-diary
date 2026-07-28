@@ -287,11 +287,13 @@ export const AUTHENTICATED_CORE_CENSUS_ROUTES = [
     path: "/pheno-hunts/55555555-5555-4555-8555-555555555555/workspace",
     label: "Pheno Hunt workspace",
     fieldPolicy: "fill-safe-fields",
+    expectedContent: [{ kind: "test-id", value: "pheno-workspace" }],
   },
   {
     path: "/pheno-hunts/55555555-5555-4555-8555-555555555555/keepers",
     label: "Pheno Hunt keepers",
     fieldPolicy: "fill-safe-fields",
+    expectedContent: [{ kind: "test-id", value: "pheno-keepers" }],
   },
   { path: "/grow-lineage", label: "Grow lineage", fieldPolicy: "audit-only" },
   {
@@ -355,13 +357,15 @@ const READ_ONLY_EDGE_FUNCTIONS = new Set([
   "premium-export-entitlement",
 ]);
 
-const READ_ONLY_RPCS = new Set(["genetics_trace_resolve"]);
+const READ_ONLY_RPCS = new Set([
+  "genetics_trace_resolve",
+  "get_latest_tent_sensor_snapshot",
+  "has_role",
+  "verdant_search",
+]);
 
 export function isReadOnlyRpc(rpcName: string): boolean {
-  return (
-    /^(can_|check_|count_|get_|has_|is_|list_|preview_|resolve_)/.test(rpcName) ||
-    READ_ONLY_RPCS.has(rpcName)
-  );
+  return READ_ONLY_RPCS.has(rpcName);
 }
 
 export function isReadOnlyEdgeFunction(functionName: string): boolean {
@@ -406,6 +410,28 @@ export function missingAuthenticatedCensusRoutePatterns(
     .filter((route) => route.access === "auth")
     .map((route) => route.path)
     .filter((pattern) => !assignedPatterns.has(pattern))
+    .sort();
+}
+
+export function missingAuthenticatedDynamicRouteSuccessContracts(
+  manifest: ReadonlyArray<Pick<AppRouteEntry, "path" | "access">>,
+  routes: readonly CoreCensusRoute[],
+): string[] {
+  const contractedPatterns = new Set(
+    routes
+      .filter((route) => (route.expectedContent?.length ?? 0) > 0)
+      .map((route) => new URL(route.path, "http://localhost").pathname)
+      .map((pathname) => matchingManifestRoute(pathname, manifest)?.path)
+      .filter((pattern): pattern is string => pattern !== undefined),
+  );
+
+  return manifest
+    .filter(
+      (route) =>
+        route.access === "auth" && route.path.split("/").some((segment) => segment.startsWith(":")),
+    )
+    .map((route) => route.path)
+    .filter((pattern) => !contractedPatterns.has(pattern))
     .sort();
 }
 

@@ -4,12 +4,13 @@
 // SAFETY:
 // - Runs only in the chromium-mocked project.
 // - Uses either no session or a clearly fake session.
-// - Intercepts every Supabase auth, REST, storage, and edge-function request.
+// - Intercepts every Supabase auth, REST, storage, and edge-function request
+//   from the primary page and any popup it opens.
 // - Blocks every unapproved mutation and external fetch.
 // - Never submits a form, invokes AI, uploads a file, changes billing, writes
 //   Action Queue state, ingests sensor data, or controls a device.
 // - Exercises Claude-finished surfaces without reviving superseded branches.
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { APP_ROUTES } from "../src/lib/appRouteManifest";
 import {
   AUTHENTICATED_CORE_CENSUS_ROUTES,
@@ -42,6 +43,7 @@ const AI_SESSION_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const ACCESSION_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const BATCH_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const LEARNING_ACTION_ID = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+const SCREENING_RESULT_ID = "abababab-abab-4bab-8bab-abababababab";
 const MANIFEST_PATTERNS = APP_ROUTES.map((route) => route.path);
 const CURRENT_AGREEMENTS = [
   { agreement_type: "terms", version: "2026-07-13" },
@@ -309,7 +311,7 @@ const BATCH = {
 };
 
 const SCREENING_RESULT = {
-  id: "abababab-abab-4bab-8bab-abababababab",
+  id: SCREENING_RESULT_ID,
   user_id: USER_ID,
   subject_type: "accession",
   subject_id: ACCESSION_ID,
@@ -328,11 +330,12 @@ const QUARANTINE_EPISODE = {
   subject_type: "accession",
   subject_id: ACCESSION_ID,
   target: "HLVd intake review",
-  status: "closed",
+  status: "released",
   opened_at: "2026-07-01T00:00:00.000Z",
   reopened_at: null,
   closed_at: "2026-07-03T00:00:00.000Z",
   closure_kind: "cleared",
+  closure_screening_result_id: SCREENING_RESULT_ID,
 };
 
 const BILLING_SUBSCRIPTIONS = ["live", "sandbox"].map((environment) => ({
@@ -478,29 +481,39 @@ function rowsForRestRequest(table: string, url: URL): unknown[] {
   return rows;
 }
 
-async function seedFakeSession(page: Page) {
-  await page.addInitScript(
-    ({ key, user }) => {
-      sessionStorage.setItem(
-        key,
-        JSON.stringify({
-          access_token: "FAKE-ACCESS-TOKEN-NOT-REAL",
-          refresh_token: "FAKE-REFRESH-TOKEN-NOT-REAL",
-          token_type: "bearer",
-          expires_in: 21_600,
-          expires_at: Math.floor(Date.now() / 1000) + 21_600,
-          user,
-        }),
-      );
+async function seedFakeSession(context: BrowserContext) {
+  await context.addInitScript(
+    ({ appOrigin, key, user }) => {
+      if (location.origin !== appOrigin) return;
+      try {
+        sessionStorage.setItem(
+          key,
+          JSON.stringify({
+            access_token: "FAKE-ACCESS-TOKEN-NOT-REAL",
+            refresh_token: "FAKE-REFRESH-TOKEN-NOT-REAL",
+            token_type: "bearer",
+            expires_in: 21_600,
+            expires_at: Math.floor(Date.now() / 1000) + 21_600,
+            user,
+          }),
+        );
+      } catch {
+        // Sandboxed frames can intentionally deny storage access. They neither
+        // need nor receive the fake authenticated census session.
+      }
     },
-    { key: SESSION_KEY, user: FAKE_USER },
+    { appOrigin: APP_ORIGIN, key: SESSION_KEY, user: FAKE_USER },
   );
 }
 
-async function installNetworkFence(page: Page, signedIn: boolean, network: NetworkAudit) {
+async function installNetworkFence(
+  context: BrowserContext,
+  signedIn: boolean,
+  network: NetworkAudit,
+) {
   // Register the broad external fence first. Playwright runs the most recently
   // registered matching route first, so the explicit safe mocks below win.
-  await page.route("**/*", async (route, request) => {
+  await context.route("**/*", async (route, request) => {
     const url = new URL(request.url());
     if (url.origin === APP_ORIGIN) {
       await route.continue();
@@ -512,16 +525,16 @@ async function installNetworkFence(page: Page, signedIn: boolean, network: Netwo
     await route.abort("blockedbyclient");
   });
 
-  await page.route("https://fonts.googleapis.com/**", (route) =>
+  await context.route("https://fonts.googleapis.com/**", (route) =>
     route.fulfill({ status: 200, contentType: "text/css", body: "" }),
   );
-  await page.route("https://fonts.gstatic.com/**", (route) => route.abort("blockedbyclient"));
-  await page.route(
+  await context.route("https://fonts.gstatic.com/**", (route) => route.abort("blockedbyclient"));
+  await context.route(
     /google-analytics\.com|googletagmanager\.com|doubleclick\.net|posthog\.com|sentry\.io|clarity\.ms/,
     (route) => route.abort("blockedbyclient"),
   );
 
-  await page.route(/\/auth\/v1\//, async (route, request) => {
+  await context.route(/\/auth\/v1\//, async (route, request) => {
     network.mockedReadRequests += 1;
     if (/\/user(?:\?|$)/i.test(request.url())) {
       await route.fulfill({
@@ -543,7 +556,7 @@ async function installNetworkFence(page: Page, signedIn: boolean, network: Netwo
     await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
   });
 
-  await page.route(/\/rest\/v1\//, async (route, request) => {
+  await context.route(/\/rest\/v1\//, async (route, request) => {
     const url = new URL(request.url());
     const rpcName = url.pathname.match(/\/rest\/v1\/rpc\/([^/]+)/i)?.[1] ?? "";
     const isRead = request.method() === "GET" || request.method() === "HEAD";
@@ -589,7 +602,7 @@ async function installNetworkFence(page: Page, signedIn: boolean, network: Netwo
               ],
               edges: [],
             }
-          : rpcName === "has_role" || rpcName.startsWith("is_")
+          : rpcName === "has_role"
             ? false
             : [];
       await route.fulfill({
@@ -620,7 +633,7 @@ async function installNetworkFence(page: Page, signedIn: boolean, network: Netwo
     });
   });
 
-  await page.route(/\/storage\/v1\//, async (route, request) => {
+  await context.route(/\/storage\/v1\//, async (route, request) => {
     if (!["GET", "HEAD"].includes(request.method())) {
       network.blockedMutations.push(`${request.method()} ${request.url()}`);
       await route.abort("blockedbyclient");
@@ -630,7 +643,7 @@ async function installNetworkFence(page: Page, signedIn: boolean, network: Netwo
     await route.fulfill({ status: 404, contentType: "application/json", body: "{}" });
   });
 
-  await page.route(/\/functions\/v1\//, async (route, request) => {
+  await context.route(/\/functions\/v1\//, async (route, request) => {
     const functionName = new URL(request.url()).pathname.split("/").filter(Boolean).at(-1) ?? "";
     const readLike = isReadOnlyEdgeFunction(functionName);
     if (!readLike) {
@@ -657,6 +670,19 @@ async function installNetworkFence(page: Page, signedIn: boolean, network: Netwo
             }),
           },
     );
+  });
+}
+
+function installContextErrorAudit(context: BrowserContext, report: LaneReport) {
+  context.on("weberror", (webError) => {
+    const source = webError.page()?.url() || webError.location().url || "unknown page";
+    report.pageErrors.push(`${source}: ${webError.error().message}`);
+  });
+  context.on("console", (message) => {
+    if (message.type() === "error") {
+      const source = message.page()?.url() || message.location().url || "unknown page";
+      report.consoleErrors.push(`${source}: ${message.text()}`);
+    }
   });
 }
 
@@ -987,7 +1013,7 @@ async function clickEverySafeInternalHref(
         signedIn,
       );
       if (target === "_blank") {
-        const popupPromise = page.context().waitForEvent("page");
+        const popupPromise = page.waitForEvent("popup", { timeout: 15_000 });
         await anchor.click();
         const popup = await popupPromise;
         await popup.waitForLoadState("domcontentloaded");
@@ -1019,6 +1045,7 @@ async function runLaneCensus(
   lane: LaneReport["lane"],
   routes: readonly CoreCensusRoute[],
 ): Promise<LaneReport> {
+  const context = page.context();
   const signedIn = lane === "authenticated";
   const network: NetworkAudit = {
     blockedMutations: [],
@@ -1036,15 +1063,9 @@ async function runLaneCensus(
     network,
   };
 
-  page.on("pageerror", (error) => report.pageErrors.push(`${page.url()}: ${error.message}`));
-  page.on("console", (message) => {
-    if (message.type() === "error") {
-      report.consoleErrors.push(`${page.url()}: ${message.text()}`);
-    }
-  });
-
-  if (signedIn) await seedFakeSession(page);
-  await installNetworkFence(page, signedIn, network);
+  installContextErrorAudit(context, report);
+  if (signedIn) await seedFakeSession(context);
+  await installNetworkFence(context, signedIn, network);
 
   for (const route of routes) {
     await test.step(`audit ${route.label} (${route.path})`, async () => {

@@ -12,6 +12,7 @@ import {
   isSafelyFillableFieldType,
   matchesKnownAppRoute,
   missingAuthenticatedCensusRoutePatterns,
+  missingAuthenticatedDynamicRouteSuccessContracts,
   placeholderValueForField,
   type CoreCensusRoute,
 } from "../../e2e/lib/coreLinkFormCensus";
@@ -134,10 +135,25 @@ describe("core link and form census rules", () => {
     expect(isReadOnlyEdgeFunction(name)).toBe(false);
   });
 
-  it("allows the read-only trace resolver without opening the RPC mutation fence", () => {
-    expect(isReadOnlyRpc("genetics_trace_resolve")).toBe(true);
-    expect(isReadOnlyRpc("get_latest_sensor_snapshot")).toBe(true);
-    expect(isReadOnlyRpc("action_queue_transition")).toBe(false);
+  it.each([
+    "genetics_trace_resolve",
+    "get_latest_tent_sensor_snapshot",
+    "has_role",
+    "verdant_search",
+  ])("allows the explicitly reviewed read-only RPC %s", (name) => {
+    expect(isReadOnlyRpc(name)).toBe(true);
+  });
+
+  it.each([
+    "action_queue_transition",
+    "check_then_write",
+    "count_and_increment",
+    "get_or_create_profile",
+    "list_and_delete_grows",
+    "preview_and_save",
+    "resolve_and_persist_alert",
+  ])("keeps the read-like mutating RPC %s behind the mutation fence", (name) => {
+    expect(isReadOnlyRpc(name)).toBe(false);
   });
 
   it("builds safe, deterministic placeholder values", () => {
@@ -202,31 +218,24 @@ describe("core link and form census rules", () => {
     ]);
   });
 
-  it("requires a success-state content contract for every added authenticated detail route", () => {
-    const detailPaths = [
-      "/actions/77777777-7777-4777-8777-777777777777",
-      "/alerts/88888888-8888-4888-8888-888888888888",
-      "/doctor/sessions/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-      "/reports/post-grow/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
-      "/breeding/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      "/breeding/log/new?growId=11111111-1111-4111-8111-111111111111",
-      "/genetics/accessions/cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-      "/genetics/batches/dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-      "/genetics/health/accession/cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-      "/genetics/trace/accession/cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-      "/grows/11111111-1111-4111-8111-111111111111",
-      "/grows/11111111-1111-4111-8111-111111111111/learning",
-      "/plants/33333333-3333-4333-8333-333333333333",
-      "/tents/22222222-2222-4222-8222-222222222222",
-    ] as const;
-    const routes = AUTHENTICATED_CORE_CENSUS_ROUTES as readonly CoreCensusRoute[];
+  it("requires a success-state content contract for every authenticated dynamic route", () => {
+    expect(
+      missingAuthenticatedDynamicRouteSuccessContracts(
+        APP_ROUTES,
+        AUTHENTICATED_CORE_CENSUS_ROUTES,
+      ),
+    ).toEqual([]);
+  });
 
-    for (const path of detailPaths) {
-      const route = routes.find((candidate) => candidate.path === path);
-      expect(
-        route?.expectedContent?.length,
-        `${path} must have an expected-content contract`,
-      ).toBeGreaterThan(0);
-    }
+  it("reports the manifest pattern when a dynamic route loses its success contract", () => {
+    const withoutBreedingDetailContract = AUTHENTICATED_CORE_CENSUS_ROUTES.map((route) =>
+      route.path === "/breeding/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        ? { ...route, expectedContent: undefined }
+        : route,
+    ) as readonly CoreCensusRoute[];
+
+    expect(
+      missingAuthenticatedDynamicRouteSuccessContracts(APP_ROUTES, withoutBreedingDetailContract),
+    ).toEqual(["/breeding/:programId"]);
   });
 });

@@ -266,6 +266,119 @@ export default function OperatorSchemaAudit() {
         </Card>
       )}
 
+      <Card data-testid="schema-audit-scan-panel">
+        <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+          <div>
+            <CardTitle className="text-base">Automated scan</CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Missing tables and manifest columns, grouped by the migration
+              responsible. Open a row to jump into the drilldown for verification.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <Badge variant={scan.totalMissingTables > 0 ? "destructive" : "outline"}>
+              {scan.totalMissingTables} tables
+            </Badge>
+            <Badge variant={scan.totalMissingColumns > 0 ? "destructive" : "outline"}>
+              {scan.totalMissingColumns} columns
+            </Badge>
+            <span className="text-muted-foreground">
+              of {columnStats.total} checked
+            </span>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {scan.groups.length === 0 && scan.orphanTables.length === 0 ? (
+            <div className="px-4 py-6 text-sm text-emerald-600 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              No missing tables or manifest columns detected.
+            </div>
+          ) : (
+            <div className="divide-y">
+              {scan.groups.map((g) => (
+                <div key={g.filename} className="p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-mono text-xs truncate">{g.filename}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {g.migration?.applied
+                          ? "Ledger: applied"
+                          : "Ledger: not recorded"}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      data-testid={`schema-audit-scan-verify-${g.filename}`}
+                      onClick={() => openMigrationByFilename(g.filename)}
+                    >
+                      Verify
+                      <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                    </Button>
+                  </div>
+                  {g.tables.size > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {Array.from(g.tables).sort().map((t) => (
+                        <Badge
+                          key={t}
+                          variant="destructive"
+                          className="text-[10px] font-mono"
+                        >
+                          missing table · public.{t}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  {g.columns.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {g.columns
+                        .slice()
+                        .sort((a, b) =>
+                          `${a.table}.${a.column}`.localeCompare(`${b.table}.${b.column}`),
+                        )
+                        .map((c) => (
+                          <Badge
+                            key={`${c.table}.${c.column}`}
+                            variant="destructive"
+                            className="text-[10px] font-mono"
+                            title={c.reason}
+                          >
+                            missing column · {c.table}.{c.column}
+                          </Badge>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {scan.orphanTables.length > 0 && (
+                <div className="p-3 space-y-2">
+                  <div className="text-xs font-medium">
+                    Missing tables not owned by a manifest migration
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {scan.orphanTables.sort().map((t) => (
+                      <Badge
+                        key={t}
+                        variant="destructive"
+                        className="text-[10px] font-mono"
+                      >
+                        public.{t}
+                      </Badge>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    These tables are watched by this page but no entry in{" "}
+                    <code className="font-mono">required-core-migrations.mjs</code>{" "}
+                    ties them to a specific migration file.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
           <CardTitle className="text-base">Required migrations</CardTitle>

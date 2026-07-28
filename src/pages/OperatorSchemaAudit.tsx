@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import SchemaAuditMigrationDrilldown from "@/components/SchemaAuditMigrationDrilldown";
+import { evaluateRlsAudit, summarizeRlsFindings } from "@/lib/rlsAuditRules";
 import {
   REQUIRED_CORE_SCHEMA,
   ADVISORY_SCHEMA,

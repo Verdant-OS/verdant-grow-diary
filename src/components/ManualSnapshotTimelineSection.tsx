@@ -46,7 +46,7 @@ export default function ManualSnapshotTimelineSection(props: Props) {
           className="text-xs text-muted-foreground"
           data-testid="manual-snapshot-timeline-section-helper"
         >
-          Grower-recorded readings. Not live, not synced, not imported.
+          Grower-recorded readings saved to your Verdant account. Not live or imported.
         </p>
       </CardHeader>
       <CardContent>

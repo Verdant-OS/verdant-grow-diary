@@ -190,6 +190,13 @@ describe("ManualSnapshotTimelineSection — tent scope", () => {
 });
 
 describe("ManualSnapshotTimelineSection — failure + empty", () => {
+  it("labels account-backed manual readings accurately", () => {
+    renderSection({ scope: "plant", plantId: null });
+    expect(screen.getByTestId("manual-snapshot-timeline-section-helper")).toHaveTextContent(
+      "Grower-recorded readings saved to your Verdant account. Not live or imported.",
+    );
+  });
+
   it("shows a calm non-blocking notice when the read fails", async () => {
     nextResponse = { data: null, error: new Error("boom") };
     renderSection({ scope: "plant", plantId: "plant-1" });

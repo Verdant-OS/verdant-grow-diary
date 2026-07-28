@@ -498,6 +498,7 @@ const App = () => (
                       <Route path="/operator/credits-audit" element={<OperatorCreditsAudit />} />
                       <Route path="/operator/edge-metrics" element={<OperatorEdgeMetrics />} />
                       <Route path="/operator/edge-alerts" element={<OperatorEdgeAlerts />} />
+                      <Route path="/operator/schema-audit" element={<OperatorSchemaAudit />} />
 
                       <Route path="/operator/release-readiness" element={<ReleaseReadiness />} />
                       {/* Diagnostics Audience Split v1 — /diagnostics is an

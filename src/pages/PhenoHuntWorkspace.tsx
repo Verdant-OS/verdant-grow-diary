@@ -1590,6 +1590,7 @@ export default function PhenoHuntWorkspace() {
                 Decision
                 <select
                   data-testid="workspace-filter-decision"
+                  aria-label="Filter candidates by keeper decision"
                   value={ws.filters.decision ?? "all"}
                   onChange={(e) =>
                     setFilter({ decision: e.target.value === "all" ? undefined : e.target.value })
@@ -1609,6 +1610,7 @@ export default function PhenoHuntWorkspace() {
                 Sex
                 <select
                   data-testid="workspace-filter-sex"
+                  aria-label="Filter candidates by sex"
                   value={ws.filters.sex ?? "all"}
                   onChange={(e) =>
                     setFilter({ sex: e.target.value === "all" ? undefined : e.target.value })
@@ -1627,6 +1629,7 @@ export default function PhenoHuntWorkspace() {
                 Readiness
                 <select
                   data-testid="workspace-filter-readiness"
+                  aria-label="Filter candidates by readiness"
                   value={readinessFilter}
                   onChange={(e) => setReadinessFilter(e.target.value as typeof readinessFilter)}
                   className="rounded border border-border bg-background px-2 py-1"

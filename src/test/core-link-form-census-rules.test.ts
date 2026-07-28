@@ -16,6 +16,7 @@ import {
   missingAuthenticatedCensusRoutePatterns,
   missingAuthenticatedDynamicRouteSuccessContracts,
   placeholderValueForField,
+  selectAvailableAlternativeValue,
   visibleLinkByHrefSelector,
   type CoreCensusRoute,
 } from "../../e2e/lib/coreLinkFormCensus";
@@ -85,6 +86,13 @@ describe("core link and form census rules", () => {
 
   it("mutates and restores controlled selects through the reacquired live locator", () => {
     expect(CENSUS_SPEC_SOURCE).toContain(
+      "const selectSnapshot = await stableControl.evaluate((element) => {",
+    );
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      "selectAvailableAlternativeValue(selectSnapshot.options, original)",
+    );
+    expect(CENSUS_SPEC_SOURCE).not.toContain("const alternative = await control.evaluate");
+    expect(CENSUS_SPEC_SOURCE).toContain(
       "await stableControl.selectOption(alternative, { timeout: 5_000 });",
     );
     expect(CENSUS_SPEC_SOURCE).toContain(
@@ -93,6 +101,41 @@ describe("core link and form census rules", () => {
     expect(CENSUS_SPEC_SOURCE).not.toContain(
       "await control.selectOption(alternative, { timeout: 5_000 });",
     );
+  });
+
+  it("derives a select alternative from the reacquired control's current options", () => {
+    const staleAlternative = selectAvailableAlternativeValue(
+      [
+        { value: "all", disabled: false },
+        { value: "keep", disabled: false },
+      ],
+      "all",
+    );
+    const liveAlternative = selectAvailableAlternativeValue(
+      [
+        { value: "all", disabled: false },
+        { value: "undecided", disabled: false },
+        { value: "cull", disabled: true },
+      ],
+      "all",
+    );
+
+    expect(staleAlternative).toBe("keep");
+    expect(liveAlternative).toBe("undecided");
+    expect(liveAlternative).not.toBe(staleAlternative);
+  });
+
+  it("skips a select when its current live options have no safe alternative", () => {
+    expect(
+      selectAvailableAlternativeValue(
+        [
+          { value: "", disabled: false },
+          { value: "all", disabled: false },
+          { value: "keep", disabled: true },
+        ],
+        "all",
+      ),
+    ).toBeUndefined();
   });
 
   it("expects signed-out links to auth routes to land on the welcome gate", () => {

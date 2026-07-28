@@ -541,6 +541,20 @@ export type CensusFieldDescriptor = {
   step?: string | null;
 };
 
+export type CensusSelectOption = {
+  value: string;
+  disabled: boolean;
+};
+
+export function selectAvailableAlternativeValue(
+  options: readonly CensusSelectOption[],
+  currentValue: string,
+): string | undefined {
+  return options.find(
+    (option) => !option.disabled && option.value !== "" && option.value !== currentValue,
+  )?.value;
+}
+
 const NON_FILLABLE_FIELD_TYPES = new Set([
   "button",
   "checkbox",

@@ -21,6 +21,7 @@ import {
   isReadOnlyRpc,
   isSafelyFillableFieldType,
   placeholderValueForField,
+  selectAvailableAlternativeValue,
   visibleLinkByHrefSelector,
   type CoreCensusRoute,
   type LinkClassification,
@@ -807,13 +808,21 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
     }
 
     if (type === "select") {
-      const original = await control.inputValue();
-      const alternative = await control.evaluate((element) => {
+      const namedControl = page.getByRole("combobox", { name, exact: true });
+      const hasStableNamedControl = (await namedControl.count()) === 1;
+      const stableControl = hasStableNamedControl ? namedControl : control;
+      const selectSnapshot = await stableControl.evaluate((element) => {
         const select = element as HTMLSelectElement;
-        return Array.from(select.options).find(
-          (option) => !option.disabled && option.value !== select.value && option.value !== "",
-        )?.value;
+        return {
+          currentValue: select.value,
+          options: Array.from(select.options, (option) => ({
+            value: option.value,
+            disabled: option.disabled,
+          })),
+        };
       });
+      const original = selectSnapshot.currentValue;
+      const alternative = selectAvailableAlternativeValue(selectSnapshot.options, original);
       if (!alternative) {
         audits.push({
           route: route.path,
@@ -824,9 +833,6 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
         });
         continue;
       }
-      const namedControl = page.getByRole("combobox", { name, exact: true });
-      const hasStableNamedControl = (await namedControl.count()) === 1;
-      const stableControl = hasStableNamedControl ? namedControl : control;
       await stableControl.selectOption(alternative, { timeout: 5_000 });
       await expect(stableControl).toHaveValue(alternative, { timeout: 5_000 });
 

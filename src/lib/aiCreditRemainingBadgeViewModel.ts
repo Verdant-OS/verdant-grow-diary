@@ -23,6 +23,8 @@ export type AiCreditRemainingScope = "per_grow" | "per_month" | string;
 export interface AiCreditRemainingInput {
   remaining?: number | null;
   scope?: AiCreditRemainingScope | null;
+  /** Post-spend allowance usage captured in the immutable receipt. */
+  scope_used?: number | null;
   scope_limit?: number | null;
   period_key?: string | null;
   /** Server-resolved plan identity. Optional for older/replayed responses. */
@@ -32,6 +34,10 @@ export interface AiCreditRemainingInput {
    * under either per-grow or per-month scope.
    */
   pack_balance?: number | null;
+  /** Whether the authoritative spend was funded by included allowance or a pack. */
+  funded_by?: "allowance" | "pack" | string | null;
+  /** True when the edge function returned a cached same-key result. */
+  replayed?: boolean | null;
 }
 
 export interface AiCreditRemainingBadgeViewModel {

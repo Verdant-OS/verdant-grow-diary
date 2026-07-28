@@ -43,12 +43,27 @@ describe("ai-coach edge — 200-envelope credit transport", () => {
     expect(src.slice(conflict, conflict + 250)).toContain('return calmFailure("invalid")');
   });
 
-  it("returns authoritative pack balance and plan identity on fresh success", () => {
-    const success = src.lastIndexOf("return safeOk(validated.result");
-    expect(success).toBeGreaterThan(-1);
-    const block = src.slice(success, success + 350);
-    expect(block).toContain("plan_id: spendObj.plan_id");
-    expect(block).toContain("pack_balance: spendObj.pack_balance");
+  it("returns the same authoritative receipt fields on fresh and cached success", () => {
+    const helper = src.indexOf("function buildAiCreditReceiptContext");
+    const helperEnd = src.indexOf("async function settleResultPersistence", helper);
+    expect(helper).toBeGreaterThan(-1);
+    expect(helperEnd).toBeGreaterThan(helper);
+    const helperBlock = src.slice(helper, helperEnd);
+    for (const field of [
+      "remaining",
+      "scope",
+      "scope_used",
+      "scope_limit",
+      "plan_id",
+      "funded_by",
+      "pack_balance",
+    ]) {
+      expect(helperBlock).toContain(`${field}: spend.${field}`);
+    }
+    expect(src).toContain(
+      "return safeOk(cached.result, buildAiCreditReceiptContext(spendObj, true))",
+    );
+    expect(src).toContain("return safeOk(validated.result, buildAiCreditReceiptContext(spendObj))");
   });
 
   it("upstream provider 402 after refund returns 200 with { ok:false, reason:'upstream_credit_exhausted' }", () => {
@@ -100,8 +115,27 @@ describe("ai-doctor-review edge — credit_denied envelope unchanged", () => {
     expect(src).toMatch(/function\s+calmFailure[\s\S]{0,200}status:\s*200/);
   });
 
-  it("returns the server-resolved plan identity with successful credit context", () => {
-    expect(src).toContain("plan_id: spendObj.plan_id");
+  it("returns the immutable server receipt on both fresh and cached success", () => {
+    const helper = src.indexOf("function buildAiCreditReceiptContext");
+    const helperEnd = src.indexOf("function isUuid", helper);
+    expect(helper).toBeGreaterThan(-1);
+    expect(helperEnd).toBeGreaterThan(helper);
+    const helperBlock = src.slice(helper, helperEnd);
+    for (const field of [
+      "remaining",
+      "scope",
+      "scope_used",
+      "scope_limit",
+      "plan_id",
+      "funded_by",
+      "pack_balance",
+    ]) {
+      expect(helperBlock).toContain(`${field}: spend.${field}`);
+    }
+    expect(src).toContain(
+      "return safeOk(cached.result, buildAiCreditReceiptContext(spendObj, true))",
+    );
+    expect(src).toContain("return safeOk(v.result, buildAiCreditReceiptContext(spendObj))");
   });
 
   it("refunds an upstream provider 402 and returns the service-degraded envelope", () => {

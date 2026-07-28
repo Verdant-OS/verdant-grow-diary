@@ -7,7 +7,6 @@ import {
 import { buildAiSensorSnapshotContext } from "../_shared/lib/lib/aiSensorSnapshotContextRules.ts";
 import { pickLatestSensorSnapshotEvidenceByCapturedAt } from "../_shared/lib/lib/aiCoachLatestSensorSnapshot.ts";
 import { resolveRequiredServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
-import { isMissingAiCreditRpcOverload } from "../_shared/aiCreditRpcCompatibility.ts";
 import {
   classifyAiDoctorCreditSpend,
   isConfirmedAiDoctorCreditRefund,
@@ -221,6 +220,22 @@ function safeOk(result: unknown, credit?: Record<string, unknown>): Response {
   return json({ ok: true, result, ...(credit ? { credit } : {}) }, 200);
 }
 
+function buildAiCreditReceiptContext(
+  spend: Record<string, unknown>,
+  replayed = false,
+): Record<string, unknown> {
+  return {
+    remaining: spend.remaining,
+    scope: spend.scope,
+    scope_used: spend.scope_used,
+    scope_limit: spend.scope_limit,
+    plan_id: spend.plan_id,
+    funded_by: spend.funded_by,
+    pack_balance: spend.pack_balance,
+    ...(replayed ? { replayed: true } : {}),
+  };
+}
+
 async function settleResultPersistence<T>(operation: PromiseLike<T>): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -284,7 +299,7 @@ Deno.serve(async (req) => {
     const idempotencyKey = body.idempotencyKey;
 
     creditSpendMayExist = true;
-    let spendResponse = await creditSupabase.rpc("ai_credit_spend", {
+    const spendResponse = await creditSupabase.rpc("ai_credit_spend", {
       p_user_id: userId,
       p_billing_environment: billingEnvironment,
       p_feature: FEATURE,
@@ -293,15 +308,6 @@ Deno.serve(async (req) => {
       p_idempotency_key: idempotencyKey,
       p_result: null,
     });
-    if (isMissingAiCreditRpcOverload(spendResponse.error, "ai_credit_spend", "p_user_id")) {
-      spendResponse = await supabase.rpc("ai_credit_spend", {
-        p_feature: FEATURE,
-        p_grow_id: growId,
-        p_model_tier: MODEL_TIER,
-        p_idempotency_key: idempotencyKey,
-        p_result: null,
-      });
-    }
     const { data: spend, error: spendErr } = spendResponse;
     if (spendErr || !spend || typeof spend !== "object") {
       console.log("ai-coach status=credit_rpc_error");
@@ -315,7 +321,7 @@ Deno.serve(async (req) => {
       if (!spendId) return "unconfirmed";
       const refundKey = `refund:${spendId}`;
       try {
-        let refundResponse = await settleResultPersistence(
+        const refundResponse = await settleResultPersistence(
           creditSupabase.rpc("ai_credit_refund", {
             p_expected_user_id: userId,
             p_spend_id: spendId,
@@ -323,21 +329,6 @@ Deno.serve(async (req) => {
             p_reason: reason,
           }),
         );
-        if (
-          isMissingAiCreditRpcOverload(
-            refundResponse.error,
-            "ai_credit_refund",
-            "p_expected_user_id",
-          )
-        ) {
-          refundResponse = await settleResultPersistence(
-            supabase.rpc("ai_credit_refund", {
-              p_spend_id: spendId,
-              p_idempotency_key: refundKey,
-              p_reason: reason,
-            }),
-          );
-        }
         if (!refundResponse.error && isConfirmedAiDoctorCreditRefund(refundResponse.data)) {
           console.log("ai-coach refund=confirmed");
           return "confirmed";
@@ -402,7 +393,7 @@ Deno.serve(async (req) => {
       const cached = validateAiCoachResult(spendDecision.result);
       if (cached.ok) {
         console.log("ai-coach status=ok_replayed");
-        return safeOk(cached.result, { replayed: true });
+        return safeOk(cached.result, buildAiCreditReceiptContext(spendObj, true));
       }
       console.log("ai-coach status=cached_result_invalid");
       return failureAfterRefund(
@@ -716,13 +707,7 @@ Rules for diagnosis (structured view, approval-first):
     }
 
     console.log(finalization === "recorded" ? "ai-coach status=ok" : "ai-coach status=ok_replayed");
-    return safeOk(validated.result, {
-      remaining: spendObj.remaining,
-      scope: spendObj.scope,
-      scope_limit: spendObj.scope_limit,
-      plan_id: spendObj.plan_id,
-      pack_balance: spendObj.pack_balance,
-    });
+    return safeOk(validated.result, buildAiCreditReceiptContext(spendObj));
   } catch {
     console.log("ai-coach status=unexpected");
     return calmFailure(creditSpendMayExist ? "result_pending" : "http");

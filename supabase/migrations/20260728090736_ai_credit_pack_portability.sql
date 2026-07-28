@@ -7,7 +7,8 @@
 -- grant under either the per-grow Free scope or a paid per-month scope.
 --
 -- Forward-only and function-only. Published migrations remain immutable.
--- The legacy authenticated overload is intentionally untouched.
+-- Legacy overloads are conditionally removed from every API role so only the
+-- environment-bound service contracts remain executable.
 
 DO $preflight$
 BEGIN
@@ -62,6 +63,7 @@ DECLARE
   v_pack_used int := 0;
   v_pack_balance int := 0;
   v_funded_by text;
+  v_receipt_snapshot jsonb;
 BEGIN
   IF v_role IS DISTINCT FROM 'service_role' THEN
     RETURN jsonb_build_object('ok', false, 'status', 'invalid', 'reason', 'not_authorized');
@@ -113,6 +115,10 @@ BEGIN
       spend.period_key,
       spend.created_at,
       COALESCE(spend.meta ->> 'server_billing_environment', 'live') AS server_billing_environment,
+      spend.meta -> 'receipt_snapshot' AS receipt_snapshot,
+      spend.meta ->> 'plan_id' AS legacy_plan_id,
+      spend.meta ->> 'scope' AS legacy_scope,
+      spend.meta ->> 'funded_by' AS legacy_funded_by,
       COALESCE(cache.result, spend.result) AS cached_result,
       EXISTS (
         SELECT 1
@@ -158,22 +164,44 @@ BEGIN
       );
     END IF;
     IF v_existing.status = 'spent' THEN
-      RETURN jsonb_build_object(
-        'ok', true,
-        'status', 'replayed',
-        'spend_id', v_existing.id,
-        'weight', v_existing.weight,
-        'period_key', v_existing.period_key,
-        'model_tier', v_existing.model_tier,
-        'feature', v_existing.feature,
-        'grow_id', v_existing.grow_id,
-        'result', v_existing.cached_result,
-        'spend_created_at', v_existing.created_at,
-        'spend_age_ms', GREATEST(
-          0,
-          floor(EXTRACT(EPOCH FROM (clock_timestamp() - v_existing.created_at)) * 1000)::bigint
-        )
-      );
+      -- Rehydrate the receipt captured when the spend committed. Never
+      -- recompute time-dependent allowance or pack balances during replay.
+      -- Older rows without receipt_snapshot retain their known provenance and
+      -- omit unavailable numeric fields instead of inventing current values.
+      RETURN jsonb_strip_nulls(jsonb_build_object(
+          'plan_id', COALESCE(
+            v_existing.receipt_snapshot ->> 'plan_id',
+            v_existing.legacy_plan_id
+          ),
+          'scope', COALESCE(
+            v_existing.receipt_snapshot ->> 'scope',
+            v_existing.legacy_scope
+          ),
+          'scope_used', v_existing.receipt_snapshot -> 'scope_used',
+          'scope_limit', v_existing.receipt_snapshot -> 'scope_limit',
+          'remaining', v_existing.receipt_snapshot -> 'remaining',
+          'funded_by', COALESCE(
+            v_existing.receipt_snapshot ->> 'funded_by',
+            v_existing.legacy_funded_by
+          ),
+          'pack_balance', v_existing.receipt_snapshot -> 'pack_balance'
+        ))
+        || jsonb_build_object(
+          'ok', true,
+          'status', 'replayed',
+          'spend_id', v_existing.id,
+          'weight', v_existing.weight,
+          'period_key', v_existing.period_key,
+          'model_tier', v_existing.model_tier,
+          'feature', v_existing.feature,
+          'grow_id', v_existing.grow_id,
+          'result', v_existing.cached_result,
+          'spend_created_at', v_existing.created_at,
+          'spend_age_ms', GREATEST(
+            0,
+            floor(EXTRACT(EPOCH FROM (clock_timestamp() - v_existing.created_at)) * 1000)::bigint
+          )
+        );
     END IF;
     RETURN jsonb_build_object(
       'ok', false,
@@ -303,6 +331,24 @@ BEGIN
     );
   END IF;
 
+  IF v_funded_by = 'pack' THEN
+    v_pack_balance := v_pack_balance - v_weight;
+  ELSE
+    v_used := v_used + v_weight;
+  END IF;
+
+  -- This immutable snapshot is the authoritative receipt for both the fresh
+  -- response and every same-key replay. It captures post-spend values once.
+  v_receipt_snapshot := jsonb_build_object(
+    'plan_id', v_plan_id,
+    'scope', v_scope,
+    'scope_used', v_used,
+    'scope_limit', v_limit,
+    'remaining', GREATEST(v_limit - v_used, 0),
+    'funded_by', v_funded_by,
+    'pack_balance', GREATEST(v_pack_balance, 0)
+  );
+
   INSERT INTO public.ai_credit_spends
     (user_id, grow_id, period_key, weight, model_tier, feature, status,
      idempotency_key, result, meta)
@@ -317,35 +363,24 @@ BEGIN
        'staff', v_is_staff,
        'server_billing_environment', p_billing_environment,
        'entitlement_environment', v_entitlement_environment,
-       'funded_by', v_funded_by
+       'funded_by', v_funded_by,
+       'receipt_snapshot', v_receipt_snapshot
      ))
   RETURNING id, created_at INTO v_new_id, v_new_created_at;
 
-  IF v_funded_by = 'pack' THEN
-    v_pack_balance := v_pack_balance - v_weight;
-  ELSE
-    v_used := v_used + v_weight;
-  END IF;
-
-  RETURN jsonb_build_object(
-    'ok', true,
-    'status', 'spent',
-    'spend_id', v_new_id,
-    'weight', v_weight,
-    'plan_id', v_plan_id,
-    'scope', v_scope,
-    'scope_used', v_used,
-    'scope_limit', v_limit,
-    'remaining', GREATEST(v_limit - v_used, 0),
-    'funded_by', v_funded_by,
-    'pack_balance', GREATEST(v_pack_balance, 0),
-    'period_key', v_period_key,
-    'model_tier', p_model_tier,
-    'feature', p_feature,
-    'grow_id', p_grow_id,
-    'spend_created_at', v_new_created_at,
-    'spend_age_ms', 0
-  );
+  RETURN v_receipt_snapshot
+    || jsonb_build_object(
+      'ok', true,
+      'status', 'spent',
+      'spend_id', v_new_id,
+      'weight', v_weight,
+      'period_key', v_period_key,
+      'model_tier', p_model_tier,
+      'feature', p_feature,
+      'grow_id', p_grow_id,
+      'spend_created_at', v_new_created_at,
+      'spend_age_ms', 0
+    );
 END;
 $function$;
 
@@ -354,5 +389,23 @@ REVOKE ALL ON FUNCTION public.ai_credit_spend(uuid, text, text, uuid, text, text
 REVOKE ALL ON FUNCTION public.ai_credit_spend(uuid, text, text, uuid, text, text, jsonb) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.ai_credit_spend(uuid, text, text, uuid, text, text, jsonb) TO service_role;
 
+DO $legacy_acl$
+BEGIN
+  IF to_regprocedure('public.ai_credit_spend(text,uuid,text,text,jsonb)') IS NOT NULL THEN
+    EXECUTE 'REVOKE ALL ON FUNCTION public.ai_credit_spend(text, uuid, text, text, jsonb) FROM PUBLIC';
+    EXECUTE 'REVOKE ALL ON FUNCTION public.ai_credit_spend(text, uuid, text, text, jsonb) FROM anon';
+    EXECUTE 'REVOKE ALL ON FUNCTION public.ai_credit_spend(text, uuid, text, text, jsonb) FROM authenticated';
+    EXECUTE 'REVOKE ALL ON FUNCTION public.ai_credit_spend(text, uuid, text, text, jsonb) FROM service_role';
+  END IF;
+
+  IF to_regprocedure('public.ai_credit_refund(uuid,text,text)') IS NOT NULL THEN
+    EXECUTE 'REVOKE ALL ON FUNCTION public.ai_credit_refund(uuid, text, text) FROM PUBLIC';
+    EXECUTE 'REVOKE ALL ON FUNCTION public.ai_credit_refund(uuid, text, text) FROM anon';
+    EXECUTE 'REVOKE ALL ON FUNCTION public.ai_credit_refund(uuid, text, text) FROM authenticated';
+    EXECUTE 'REVOKE ALL ON FUNCTION public.ai_credit_refund(uuid, text, text) FROM service_role';
+  END IF;
+END;
+$legacy_acl$;
+
 COMMENT ON FUNCTION public.ai_credit_spend(uuid, text, text, uuid, text, text, jsonb) IS
-  'Authoritative service-only AI credit spend. Included plan allowance is consumed first; environment-bound grant balance is portable across per-grow and per-month scopes.';
+  'Authoritative service-only AI credit spend. Included plan allowance is consumed first; environment-bound grant balance is portable across per-grow and per-month scopes. Fresh and replayed responses return the immutable post-spend receipt snapshot.';

@@ -47,15 +47,23 @@ describe("AI-credit pack portability runtime harness contract", () => {
       "paid spend 101 uses the settled pack",
       "sandbox-only grant cannot fund a live spend",
       "sandbox grant funds a sandbox spend after allowance exhaustion",
-      "same pack key replays one spend id and inserts one row",
+      "same pack key preserves its immutable receipt and inserts one row",
       "one-credit concurrent unique keys yield one pack spend and one denial",
       "append-only refund restores one environment-bound pack credit",
     ]) {
       expect(HARNESS).toContain(evidence);
     }
+    for (const role of ["authenticated", "anon", "service_role"]) {
+      expect(HARNESS).toContain(`["${role}",`);
+    }
+    expect(HARNESS).toContain("${role} cannot execute the legacy AI-credit spend overload");
+    expect(HARNESS).toContain("${role} cannot execute the legacy AI-credit refund overload");
     expect(HARNESS).toContain('admin.rpc("grant_lovable_credit_pack"');
     expect(HARNESS).toContain('admin.rpc("ai_credit_spend"');
     expect(HARNESS).toContain('admin.rpc("ai_credit_refund"');
+    expect(HARNESS).toContain('client.rpc("ai_credit_spend"');
+    expect(HARNESS).toContain('client.rpc("ai_credit_refund"');
+    expect(HARNESS).toContain("sameReceiptSnapshot(firstReplayReceipt, secondReplayReceipt)");
     expect(HARNESS).toContain("await Promise.all(");
   });
 

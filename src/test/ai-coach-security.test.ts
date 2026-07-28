@@ -36,11 +36,12 @@ describe("ai-coach edge function — security shape", () => {
     expect(creditIndex).toBeGreaterThan(authIndex);
   });
 
-  it("requires explicit billing environment and falls back only for a missing overload", () => {
+  it("requires explicit billing environment and never calls legacy credit overloads", () => {
     expect(CODE).toContain("resolveRequiredServerBillingEnvironment()");
-    expect(CODE).toContain("isMissingAiCreditRpcOverload(");
-    expect(CODE).toContain('"p_user_id"');
-    expect(CODE).toContain('"p_expected_user_id"');
+    expect(CODE).not.toContain("isMissingAiCreditRpcOverload(");
+    expect(CODE).not.toMatch(/supabase\.rpc\(\s*["']ai_credit_(?:spend|refund)["']/);
+    expect(CODE).toContain("p_user_id: userId");
+    expect(CODE).toContain("p_expected_user_id: userId");
   });
 
   it("rejects scope mismatches and resolves every replay before the provider call", () => {

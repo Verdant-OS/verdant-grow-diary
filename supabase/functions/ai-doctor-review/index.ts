@@ -52,7 +52,6 @@ import {
   parseAiDoctorResultAttachment,
 } from "../_shared/aiDoctorCreditReplayRules.ts";
 import { resolveRequiredServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
-import { isMissingAiCreditRpcOverload } from "../_shared/aiCreditRpcCompatibility.ts";
 // Measurement-only cost wiring. Pure helpers; no persistence, no I/O.
 import {
   attachProviderResponseUsageToAiDoctorPromptMeasurement,
@@ -129,6 +128,22 @@ function safeOk(result: unknown, credit?: Record<string, unknown>): Response {
     status: 200,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+function buildAiCreditReceiptContext(
+  spend: Record<string, unknown>,
+  replayed = false,
+): Record<string, unknown> {
+  return {
+    remaining: spend.remaining,
+    scope: spend.scope,
+    scope_used: spend.scope_used,
+    scope_limit: spend.scope_limit,
+    plan_id: spend.plan_id,
+    funded_by: spend.funded_by,
+    pack_balance: spend.pack_balance,
+    ...(replayed ? { replayed: true } : {}),
+  };
 }
 
 function isUuid(s: unknown): s is string {
@@ -361,7 +376,7 @@ Deno.serve(async (req) => {
     }
     // ---- ai_credit_spend (atomic check-and-spend) ---------------------------
     creditSpendMayExist = true;
-    let spendResponse = await creditSupabase.rpc("ai_credit_spend", {
+    const spendResponse = await creditSupabase.rpc("ai_credit_spend", {
       p_user_id: userId,
       p_billing_environment: billingEnvironment,
       p_feature: FEATURE,
@@ -370,20 +385,6 @@ Deno.serve(async (req) => {
       p_idempotency_key: idempotencyKey,
       p_result: null,
     });
-    // Spend-overload compatibility only: if an older database lacks the
-    // service-only spend signature, and only for that exact missing-overload
-    // error, use the still-authorized legacy user-scoped spend RPC. The result
-    // result-cache/receipt migrations remain hard deployment prerequisites. Permission,
-    // timeout, validation, and other database errors always fail closed.
-    if (isMissingAiCreditRpcOverload(spendResponse.error, "ai_credit_spend", "p_user_id")) {
-      spendResponse = await supabase.rpc("ai_credit_spend", {
-        p_feature: FEATURE,
-        p_grow_id: growId,
-        p_model_tier: MODEL_TIER,
-        p_idempotency_key: idempotencyKey,
-        p_result: null,
-      });
-    }
     const { data: spend, error: spendErr } = spendResponse;
     if (spendErr || !spend || typeof spend !== "object") {
       console.log(`ai-doctor-review status=credit_rpc_error`);
@@ -397,7 +398,7 @@ Deno.serve(async (req) => {
       if (!spendId) return "unconfirmed";
       const refundKey = `refund:${spendId}`;
       try {
-        let refundResponse = await settleResultPersistence(
+        const refundResponse = await settleResultPersistence(
           creditSupabase.rpc("ai_credit_refund", {
             p_expected_user_id: userId,
             p_spend_id: spendId,
@@ -405,21 +406,6 @@ Deno.serve(async (req) => {
             p_reason: reason,
           }),
         );
-        if (
-          isMissingAiCreditRpcOverload(
-            refundResponse.error,
-            "ai_credit_refund",
-            "p_expected_user_id",
-          )
-        ) {
-          refundResponse = await settleResultPersistence(
-            supabase.rpc("ai_credit_refund", {
-              p_spend_id: spendId,
-              p_idempotency_key: refundKey,
-              p_reason: reason,
-            }),
-          );
-        }
         if (!refundResponse.error && isConfirmedAiDoctorCreditRefund(refundResponse.data)) {
           console.log("ai-doctor-review refund=confirmed");
           return "confirmed";
@@ -486,7 +472,7 @@ Deno.serve(async (req) => {
       const cached = validateAiDoctorReviewResult(spendDecision.result);
       if (cached.ok) {
         console.log("ai-doctor-review status=ok_replayed");
-        return safeOk(cached.result, { replayed: true });
+        return safeOk(cached.result, buildAiCreditReceiptContext(spendObj, true));
       }
       console.log("ai-doctor-review status=cached_result_invalid");
       return failureAfterRefund(
@@ -636,15 +622,7 @@ Deno.serve(async (req) => {
       await recordFreshAiDoctorReviewCompletion(userId, spendId);
     }
     console.log("ai-doctor-review status=ok");
-    return safeOk(v.result, {
-      remaining: spendObj.remaining,
-      scope: spendObj.scope,
-      scope_limit: spendObj.scope_limit,
-      plan_id: spendObj.plan_id,
-      // Purchased pack balance (PR2 return field) so the badge can show it
-      // instead of reading "0 left" after a pack-funded review.
-      pack_balance: spendObj.pack_balance,
-    });
+    return safeOk(v.result, buildAiCreditReceiptContext(spendObj));
   } catch {
     console.log("ai-doctor-review status=unexpected");
     return calmFailure(creditSpendMayExist ? "result_pending" : "http");

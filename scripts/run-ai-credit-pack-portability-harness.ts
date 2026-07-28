@@ -94,6 +94,9 @@ if (!localHost) {
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
+const anonymous = createClient(SUPABASE_URL, ANON_KEY, {
+  auth: { autoRefreshToken: false, persistSession: false },
+});
 
 type BillingEnvironment = "live" | "sandbox";
 type Feature = "ai_doctor_review" | "ai_coach";
@@ -106,6 +109,8 @@ interface SpendReceipt {
   spend_id?: string;
   plan_id?: string;
   scope?: string;
+  scope_used?: number;
+  scope_limit?: number;
   funded_by?: string;
   remaining?: number;
   pack_balance?: number;
@@ -270,6 +275,38 @@ function serverRefund(userId: string, spendId: string) {
   });
 }
 
+function legacySpend(client: SupabaseClient, growId: string | null) {
+  return client.rpc("ai_credit_spend", {
+    p_feature: "ai_doctor_review",
+    p_grow_id: growId,
+    p_model_tier: "standard",
+    p_idempotency_key: `legacy_spend_${crypto.randomUUID()}`,
+    p_result: null,
+  });
+}
+
+function legacyRefund(client: SupabaseClient) {
+  return client.rpc("ai_credit_refund", {
+    p_spend_id: crypto.randomUUID(),
+    p_idempotency_key: `legacy_refund_${crypto.randomUUID()}`,
+    p_reason: "credit_pack_portability_harness",
+  });
+}
+
+function sameReceiptSnapshot(left: SpendReceipt | null, right: SpendReceipt | null): boolean {
+  return (
+    !!left &&
+    !!right &&
+    left.plan_id === right.plan_id &&
+    left.scope === right.scope &&
+    left.scope_used === right.scope_used &&
+    left.scope_limit === right.scope_limit &&
+    left.remaining === right.remaining &&
+    left.funded_by === right.funded_by &&
+    left.pack_balance === right.pack_balance
+  );
+}
+
 async function exhaustFreeAllowance(user: DisposableUser): Promise<void> {
   for (let index = 1; index <= 3; index += 1) {
     const { data, error } = await serverSpend(user.id, "live", {
@@ -347,6 +384,7 @@ async function run(): Promise<void> {
     const replay = await createDisposableUser("replay");
     const race = await createDisposableUser("race");
     const refund = await createDisposableUser("refund");
+    const authority = await createDisposableUser("authority");
 
     await seedPaidPlan(paid.id);
     await grantPack(free.id, "live", 1);
@@ -358,6 +396,7 @@ async function run(): Promise<void> {
 
     console.log("[ai-credit-pack-portability] proving client/server authority boundary");
     const freeClient = await signedInClient(free);
+    const authorityClient = await signedInClient(authority);
     const { data: clientSpoof, error: clientSpoofError } = await freeClient.rpc("ai_credit_spend", {
       p_user_id: paid.id,
       p_billing_environment: "sandbox",
@@ -388,6 +427,30 @@ async function run(): Promise<void> {
       !!inventedAuthorityError,
       errorDetail(inventedAuthorityError),
     );
+
+    for (const [role, client, growId] of [
+      ["authenticated", authorityClient, authority.growId],
+      ["anon", anonymous, null],
+      ["service_role", admin, null],
+    ] as const) {
+      const legacySpendCall = await legacySpend(client, growId);
+      check(
+        `${role} cannot execute the legacy AI-credit spend overload`,
+        !!legacySpendCall.error,
+        legacySpendCall.error
+          ? errorDetail(legacySpendCall.error)
+          : JSON.stringify(legacySpendCall.data),
+      );
+
+      const legacyRefundCall = await legacyRefund(client);
+      check(
+        `${role} cannot execute the legacy AI-credit refund overload`,
+        !!legacyRefundCall.error,
+        legacyRefundCall.error
+          ? errorDetail(legacyRefundCall.error)
+          : JSON.stringify(legacyRefundCall.data),
+      );
+    }
 
     console.log("[ai-credit-pack-portability] proving Free allowance-first portability");
     await exhaustFreeAllowance(free);
@@ -491,13 +554,14 @@ async function run(): Promise<void> {
       idempotency_key: replayKey,
     });
     check(
-      "same pack key replays one spend id and inserts one row",
+      "same pack key preserves its immutable receipt and inserts one row",
       !firstReplayCall.error &&
         !secondReplayCall.error &&
         firstReplayReceipt?.status === "spent" &&
         firstReplayReceipt.funded_by === "pack" &&
         secondReplayReceipt?.status === "replayed" &&
         firstReplayReceipt.spend_id === secondReplayReceipt.spend_id &&
+        sameReceiptSnapshot(firstReplayReceipt, secondReplayReceipt) &&
         replayRowCount === 1,
       firstReplayCall.error
         ? errorDetail(firstReplayCall.error)

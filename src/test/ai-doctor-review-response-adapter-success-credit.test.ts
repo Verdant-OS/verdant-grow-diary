@@ -27,9 +27,12 @@ describe("adaptCreditedAiResponse — success credit passthrough (S3.1)", () => 
       credit: {
         remaining: 97,
         scope: "per_month",
+        scope_used: 3,
         scope_limit: 100,
         plan_id: "pro_monthly",
+        funded_by: "pack",
         pack_balance: 49,
+        replayed: true,
       },
     });
     expect(out.ok).toBe(true);
@@ -37,9 +40,12 @@ describe("adaptCreditedAiResponse — success credit passthrough (S3.1)", () => 
       expect(out.credit).toEqual({
         remaining: 97,
         scope: "per_month",
+        scope_used: 3,
         scope_limit: 100,
         plan_id: "pro_monthly",
+        funded_by: "pack",
         pack_balance: 49,
+        replayed: true,
       });
     }
   });

@@ -21,6 +21,10 @@ const SERVICE_SPEND_SIGNATURE =
   /create or replace function public\.ai_credit_spend\(\s*p_user_id uuid,\s*p_billing_environment text,\s*p_feature text,\s*p_grow_id uuid,\s*p_model_tier text,\s*p_idempotency_key text,\s*p_result jsonb default null::jsonb\s*\)/i;
 const ANY_SERVICE_SPEND_DEFINITION =
   /create or replace function public\.ai_credit_spend\(\s*p_user_id uuid,\s*p_billing_environment text/i;
+const LEGACY_SIGNATURES = [
+  "public.ai_credit_spend(text, uuid, text, text, jsonb)",
+  "public.ai_credit_refund(uuid, text, text)",
+] as const;
 
 function position(needle: string): number {
   const at = NORMALIZED.indexOf(needle);
@@ -113,6 +117,38 @@ describe("AI-credit pack portability migration", () => {
     expect(NORMALIZED).toContain("'result', v_existing.cached_result");
   });
 
+  it("stores one immutable post-spend receipt and rehydrates it without recomputing balances", () => {
+    expect(NORMALIZED).toContain("v_receipt_snapshot := jsonb_build_object(");
+    for (const field of [
+      "plan_id",
+      "scope",
+      "scope_used",
+      "scope_limit",
+      "remaining",
+      "funded_by",
+      "pack_balance",
+    ]) {
+      expect(NORMALIZED).toContain(`'${field}'`);
+    }
+    for (const field of ["scope_used", "scope_limit", "remaining", "pack_balance"]) {
+      expect(NORMALIZED).toContain(`v_existing.receipt_snapshot -> '${field}'`);
+    }
+    for (const field of ["plan_id", "scope", "funded_by"]) {
+      expect(NORMALIZED).toContain(`v_existing.receipt_snapshot ->> '${field}'`);
+    }
+    expect(NORMALIZED).toContain("'receipt_snapshot', v_receipt_snapshot");
+    expect(NORMALIZED).toContain("return v_receipt_snapshot || jsonb_build_object(");
+
+    const replayStart = position("if v_existing.status = 'spent' then");
+    const replayEnd = position("'reason', 'spend_not_replayable'");
+    const replayBlock = NORMALIZED.slice(replayStart, replayEnd);
+    expect(replayBlock).toContain("v_existing.receipt_snapshot");
+    expect(replayBlock).not.toContain("from public.ai_credit_grants");
+    expect(replayBlock).not.toContain("from public.ai_credit_spends spend_row");
+    expect(replayBlock).not.toContain("v_pack_balance :=");
+    expect(replayBlock).not.toContain("v_used :=");
+  });
+
   it("keeps the spend ledger append-only and records authoritative provenance", () => {
     expect(NORMALIZED).toContain("insert into public.ai_credit_spends");
     expect(NORMALIZED).toContain("'server_billing_environment', p_billing_environment");
@@ -135,7 +171,21 @@ describe("AI-credit pack portability migration", () => {
     );
   });
 
-  it("does not alter tables, policies, billing, auth, grants, or refund contracts", () => {
+  it("conditionally removes every API role from both legacy overloads", () => {
+    for (const signature of LEGACY_SIGNATURES) {
+      const compactSignature = signature.replace(/, /g, ",");
+      expect(MIGRATION).toContain(`to_regprocedure('${compactSignature}')`);
+      for (const role of ["PUBLIC", "anon", "authenticated", "service_role"]) {
+        expect(MIGRATION).toContain(`REVOKE ALL ON FUNCTION ${signature} FROM ${role}`);
+      }
+    }
+    expect(MIGRATION).toContain("DO $legacy_acl$");
+    expect(MIGRATION).not.toMatch(
+      /GRANT EXECUTE ON FUNCTION public\.ai_credit_(?:spend|refund)\([^;]+TO (?:PUBLIC|anon|authenticated)/i,
+    );
+  });
+
+  it("does not alter tables, policies, billing, auth, grant rows, or refund bodies", () => {
     expect(EXECUTABLE).not.toMatch(/(?:create|alter|drop)\s+table/i);
     expect(EXECUTABLE).not.toMatch(/(?:create|alter|drop)\s+policy/i);
     expect(EXECUTABLE).not.toMatch(/create\s+(?:unique\s+)?index/i);

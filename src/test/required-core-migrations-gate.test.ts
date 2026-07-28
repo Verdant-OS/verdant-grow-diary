@@ -25,7 +25,7 @@ const PRODUCTION_REF = "knkwiiywfkbqznbxwqfh";
 const PASSWORD = "gate-test-password";
 const MIGRATIONS_DIR = resolve(__dirname, "../../supabase/migrations");
 const WORKFLOW_PATH = resolve(__dirname, "../../.github/workflows/required-core-migrations.yml");
-const SOIL_MOISTURE_CALIBRATION_MIGRATION = "20260619083000_add_soil_moisture_calibration_v1.sql";
+const PRODUCTION_SCHEMA_RECONCILIATION = "20260728090000_production_schema_reconciliation.sql";
 const SOIL_MOISTURE_CALIBRATION_COLUMNS = [
   "id",
   "user_id",
@@ -44,7 +44,6 @@ const SOIL_MOISTURE_CALIBRATION_COLUMNS = [
   "created_at",
   "updated_at",
 ];
-const PHENO_CROSSES_TAXONOMY_MIGRATION = "20260707210000_pheno_crosses_full_taxonomy.sql";
 const PHENO_CROSSES_TAXONOMY_COLUMNS = ["channel", "generation", "recurrent_parent_id"];
 const EXPECTED_CORE_COLUMN_COUNT = 37;
 const EXPECTED_ADVISORY_COLUMN_COUNT = 4;
@@ -293,7 +292,7 @@ describe("required core schema manifest", () => {
     ).toEqual(
       SOIL_MOISTURE_CALIBRATION_COLUMNS.map((column) => ({
         column,
-        migration: SOIL_MOISTURE_CALIBRATION_MIGRATION,
+        migration: PRODUCTION_SCHEMA_RECONCILIATION,
       })),
     );
     expect(soilEntries.every((entry) => entry.reason.includes("One-Tent Loop"))).toBe(true);
@@ -368,7 +367,7 @@ describe("required core schema manifest", () => {
     ).toEqual(
       PHENO_CROSSES_TAXONOMY_COLUMNS.map((column) => ({
         column,
-        migration: PHENO_CROSSES_TAXONOMY_MIGRATION,
+        migration: PRODUCTION_SCHEMA_RECONCILIATION,
       })),
     );
     expect(

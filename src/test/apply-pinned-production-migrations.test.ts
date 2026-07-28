@@ -9,6 +9,7 @@ import {
   buildApplySql,
   buildCanonicalPolicyVerificationSql,
   classifyTargetLedger,
+  describeDatabaseUrlRepairProbes,
   EXIT,
   extractExpectedFunctionBodies,
   findUnsafeSqlReason,
@@ -972,6 +973,78 @@ describe("production runner", () => {
       }),
     ).toBe(EXIT.TARGET_REJECTED);
     expect(spawnImpl).not.toHaveBeenCalled();
+  });
+
+  it("repair probes disclose only booleans — never credential-derived measurements", () => {
+    const productionUrl = DATABASE_URL;
+    const quoteWrapped = `"${productionUrl}"`;
+    const bomPrefixed = "﻿" + productionUrl;
+    const bomAndQuotes = "﻿" + quoteWrapped;
+    const barePassword = "just-a-secret-password-value";
+
+    expect(describeDatabaseUrlRepairProbes(quoteWrapped)).toEqual({
+      starts_with_postgres_scheme: false,
+      pins_production_after_unquote: true,
+      pins_production_after_bom_strip: false,
+      pins_production_after_bom_strip_and_unquote: false,
+    });
+    expect(
+      describeDatabaseUrlRepairProbes(bomPrefixed).pins_production_after_bom_strip,
+    ).toBe(true);
+    expect(
+      describeDatabaseUrlRepairProbes(bomAndQuotes)
+        .pins_production_after_bom_strip_and_unquote,
+    ).toBe(true);
+
+    // A mis-set bare password yields only four booleans, all false-ish facts:
+    // no length, no character codes, no counts, no string fragments.
+    const passwordProbes = describeDatabaseUrlRepairProbes(barePassword);
+    expect(passwordProbes).toEqual({
+      starts_with_postgres_scheme: false,
+      pins_production_after_unquote: false,
+      pins_production_after_bom_strip: false,
+      pins_production_after_bom_strip_and_unquote: false,
+    });
+    for (const value of Object.values(passwordProbes)) {
+      expect(typeof value).toBe("boolean");
+    }
+  });
+
+  it("records only repair-probe booleans in the artifacts on target rejection", () => {
+    const spawnImpl = vi.fn();
+    const { logger } = makeLogger();
+    const reportPath = join(testRoot, "probes", "report.md");
+    const auditPath = join(testRoot, "probes", "audit.json");
+    const badUrl = `"${DATABASE_URL}"`;
+
+    expect(
+      runPinnedProductionMigrations({
+        env: validEnvironment({
+          SUPABASE_DB_URL: badUrl,
+          REPORT_PATH: reportPath,
+          AUDIT_PATH: auditPath,
+        }),
+        spawnImpl,
+        logger,
+      }),
+    ).toBe(EXIT.TARGET_REJECTED);
+
+    const audit = JSON.parse(readFileSync(auditPath, "utf8"));
+    expect(audit.outcome).toBe("target_rejected");
+    expect(audit.url_repair_probes).toEqual({
+      starts_with_postgres_scheme: false,
+      pins_production_after_unquote: true,
+      pins_production_after_bom_strip: false,
+      pins_production_after_bom_strip_and_unquote: false,
+    });
+    // No value material anywhere: not the URL, not the password, no lengths
+    // or character codes.
+    for (const artifact of [readFileSync(auditPath, "utf8"), readFileSync(reportPath, "utf8")]) {
+      expect(artifact).not.toContain(DATABASE_URL);
+      expect(artifact).not.toContain(PASSWORD);
+      expect(artifact).not.toMatch(/first_char|last_char|length|_count/);
+    }
+    expect(readFileSync(reportPath, "utf8")).toContain("Repair probes:");
   });
 
   it("rejects a changed migration before invoking psql", () => {

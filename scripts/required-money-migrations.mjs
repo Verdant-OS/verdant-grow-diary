@@ -35,6 +35,11 @@ export const REQUIRED_MONEY_MIGRATIONS = [
   // forward reassertion or paid pack overflow, idempotent result replay, grow
   // ownership, and service-role-only execution can silently regress.
   "20260727050000_ai_credit_service_contract_forward_reassert.sql",
+  // Canonical entitlement authority for server lookups, Free creation caps,
+  // sensor-history retention, and PhenoID. Production must carry this repair
+  // before the affected Edge Functions ship or legacy audit rows can regain
+  // authority over paid capabilities.
+  "20260728050000_canonical_subscription_authority_reassert.sql",
 ];
 
 /**

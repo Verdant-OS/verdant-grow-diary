@@ -71,8 +71,9 @@ export default function OperatorSchemaAudit() {
   usePageSeo({
     title: "Schema audit · Operator · Verdant",
     description:
-      "Operator-only view of required Supabase migrations and critical table presence in the live database.",
-    robots: "noindex,nofollow",
+      "Operator-only view of required migrations and critical table presence in the live database.",
+    path: "/operator/schema-audit",
+    noindex: true,
   });
 
   const [data, setData] = useState<AuditResponse | null>(null);

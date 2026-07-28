@@ -22,6 +22,57 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public
   TO anon, authenticated, service_role;
 
+-- Public support forms are insert-only for visitors. Attribution, generated
+-- fields, attachments, and operator review state are not client-supplied.
+-- Reapply the migration's exact production ACLs after the blanket local grant.
+DO $$
+BEGIN
+  IF to_regclass('public.customer_feedback') IS NOT NULL
+     AND to_regclass('public.contact_messages') IS NOT NULL THEN
+    REVOKE ALL PRIVILEGES ON TABLE public.customer_feedback
+      FROM PUBLIC, anon, authenticated;
+    REVOKE ALL PRIVILEGES ON TABLE public.contact_messages
+      FROM PUBLIC, anon, authenticated;
+    REVOKE ALL PRIVILEGES (reviewed_at, reviewed_by, admin_notes)
+      ON TABLE public.customer_feedback FROM PUBLIC, anon, authenticated;
+    REVOKE ALL PRIVILEGES (reviewed_at, reviewed_by, admin_notes)
+      ON TABLE public.contact_messages FROM PUBLIC, anon, authenticated;
+
+    GRANT INSERT (
+      overall_rating,
+      ai_doctor_rating,
+      sensors_rating,
+      quicklog_rating,
+      trust_rating,
+      whats_working,
+      whats_friction,
+      one_improvement,
+      grow_context,
+      contact_email,
+      follow_up_ok,
+      user_agent
+    ) ON public.customer_feedback TO anon, authenticated;
+
+    GRANT INSERT (
+      name,
+      email,
+      category,
+      message,
+      grow_context,
+      user_agent
+    ) ON public.contact_messages TO anon, authenticated;
+
+    GRANT SELECT ON public.customer_feedback TO authenticated;
+    GRANT SELECT ON public.contact_messages TO authenticated;
+    GRANT UPDATE (reviewed_at, reviewed_by, admin_notes)
+      ON public.customer_feedback TO authenticated;
+    GRANT UPDATE (reviewed_at, reviewed_by, admin_notes)
+      ON public.contact_messages TO authenticated;
+    GRANT ALL ON public.customer_feedback TO service_role;
+    GRANT ALL ON public.contact_messages TO service_role;
+  END IF;
+END $$;
+
 -- Re-apply deliberate hardening REVOKEs from migrations (keep in sync with
 -- explicit `REVOKE ... ON [TABLE] public.<name>` statements in
 -- supabase/migrations/ — service_role grants there remain in effect).

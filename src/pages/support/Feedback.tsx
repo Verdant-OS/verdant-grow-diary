@@ -39,7 +39,10 @@ const feedbackSchema = z.object({
 type FeedbackValues = z.infer<typeof feedbackSchema>;
 
 const SPECIFIC_RATINGS: Array<{
-  key: keyof Pick<FeedbackValues, "ai_doctor_rating" | "sensors_rating" | "quicklog_rating" | "trust_rating">;
+  key: keyof Pick<
+    FeedbackValues,
+    "ai_doctor_rating" | "sensors_rating" | "quicklog_rating" | "trust_rating"
+  >;
   title: string;
   hint: string;
 }> = [
@@ -113,7 +116,9 @@ function StarRating({
 }
 
 export default function Feedback() {
-  const [submitState, setSubmitState] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [submitState, setSubmitState] = useState<"idle" | "submitting" | "success" | "error">(
+    "idle",
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [honeypot, setHoneypot] = useState("");
   const formOpenedAt = useRef<number>(Date.now());
@@ -162,11 +167,7 @@ export default function Feedback() {
       return;
     }
 
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id ?? null;
-
     const payload = {
-      user_id: userId,
       overall_rating: values.overall_rating,
       ai_doctor_rating: values.ai_doctor_rating,
       sensors_rating: values.sensors_rating,
@@ -252,7 +253,9 @@ export default function Feedback() {
             <Label className="text-base">
               Overall experience <span className="text-destructive">*</span>
             </Label>
-            <p className="text-xs text-muted-foreground">How is Verdant working for you right now?</p>
+            <p className="text-xs text-muted-foreground">
+              How is Verdant working for you right now?
+            </p>
           </div>
           <StarRating
             value={overall && overall > 0 ? overall : null}
@@ -381,7 +384,10 @@ export default function Feedback() {
         <PrivacyNote />
 
         {submitState === "error" && errorMessage ? (
-          <div role="alert" className="rounded-lg border border-destructive/60 bg-destructive/10 p-3 text-sm text-destructive">
+          <div
+            role="alert"
+            className="rounded-lg border border-destructive/60 bg-destructive/10 p-3 text-sm text-destructive"
+          >
             {errorMessage}
           </div>
         ) : null}

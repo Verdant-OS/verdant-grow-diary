@@ -31,6 +31,31 @@ interface Props {
   plantName?: string | null;
 }
 
+/**
+ * Format the entry timestamp for display. Falls back to the pre-computed
+ * label (or "Unknown time") when the ISO is missing or malformed —
+ * never leaks a raw ISO string into the badge.
+ */
+function formatEntryTimestamp(iso: string | null, fallback: string): string {
+  const fb = (fallback ?? "").trim();
+  const safeFallback = fb && fb !== iso ? fb : "Unknown time";
+  if (!iso) return safeFallback;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return safeFallback;
+  try {
+    return new Date(t).toLocaleString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return safeFallback;
+  }
+}
+
+
 function EntryRow({
   row,
   plantName,

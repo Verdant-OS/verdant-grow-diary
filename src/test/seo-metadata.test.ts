@@ -63,7 +63,7 @@ describe("index.html — Open Graph", () => {
     expect(meta(HTML, "property", "og:url")).toBe(PROD);
     expect(meta(HTML, "property", "og:type")).toBe("website");
     expect(meta(HTML, "property", "og:site_name")).toBe("Verdant Grow Diary");
-    expect(meta(HTML, "property", "og:image")).toMatch(/\/brand\/verdant-logo\.png$/);
+    expect(meta(HTML, "property", "og:image")).toMatch(/\/brand\/verdant-logo-512\.png$/);
   });
 });
 
@@ -72,7 +72,7 @@ describe("index.html — Twitter card", () => {
     expect(meta(HTML, "name", "twitter:card")).toBe("summary_large_image");
     expect(meta(HTML, "name", "twitter:title")).toBe("Verdant Grow Diary");
     expect(meta(HTML, "name", "twitter:description")).toBe(DESC);
-    expect(meta(HTML, "name", "twitter:image")).toMatch(/\/brand\/verdant-logo\.png$/);
+    expect(meta(HTML, "name", "twitter:image")).toMatch(/\/brand\/verdant-logo-512\.png$/);
   });
 });
 

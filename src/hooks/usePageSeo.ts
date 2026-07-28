@@ -18,7 +18,7 @@ const SITE_ORIGIN = "https://verdantgrowdiary.com";
 const SITE_NAME = "Verdant Grow Diary";
 const DEFAULT_DESCRIPTION =
   "Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators.";
-const DEFAULT_OG_IMAGE = `${SITE_ORIGIN}/brand/verdant-logo.png`;
+const DEFAULT_OG_IMAGE = `${SITE_ORIGIN}/brand/verdant-logo-512.png`;
 
 export interface PageSeo {
   /** Full <title>. Include the brand suffix, e.g. "Pricing | Verdant Grow Diary". */

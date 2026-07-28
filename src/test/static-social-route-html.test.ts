@@ -46,6 +46,49 @@ describe("static social route HTML", () => {
     );
   });
 
+  it("injects route JSON-LD without allowing HTML/script breakout", () => {
+    const html = buildStaticSocialRouteHtml(INDEX_HTML, {
+      ...FOUNDER_SOCIAL_META,
+      jsonLd: [{ "@type": "WebPage", name: "</script><script>alert(1)</script>" }],
+    });
+
+    expect(html).toContain('data-static-route-ldjson="true"');
+    expect(html).toContain("\\u003c/script\\u003e");
+    expect(html).not.toContain("</script><script>alert(1)</script>");
+  });
+
+  it("strips prior static JSON-LD blocks to a fixed point (no reconstructed blocks)", () => {
+    // Removing one marker block must never splice the surrounding text into a
+    // NEW executable marker block that a single-pass replace would leave
+    // behind (CodeQL js/incomplete-multi-character-sanitization): here the
+    // outer block's closing tag is split around a complete inner block, so
+    // deleting the inner block RECONSTRUCTS the outer one.
+    const block = (body: string) =>
+      `<script type="application/ld+json" data-static-route-ldjson="true">${body}</script>`;
+    const spliced =
+      `<script type="application/ld+json" data-static-route-ldjson="true">` +
+      `{"outer":1}</scr${block('{"mid":2}')}ipt>`;
+    const nested = INDEX_HTML.replace("</head>", `${spliced}\n  </head>`);
+
+    const metadata = {
+      ...FOUNDER_SOCIAL_META,
+      jsonLd: [{ "@type": "WebPage", name: "fresh" }],
+    };
+    const html = buildStaticSocialRouteHtml(nested, metadata);
+
+    // Neither stale payload survives, and exactly the one freshly injected
+    // full block remains.
+    expect(html).not.toContain('{"outer":1}');
+    expect(html).not.toContain('{"mid":2}');
+    const fullBlocks =
+      html.match(
+        /<script\s+type=["']application\/ld\+json["']\s+data-static-route-ldjson[^>]*>[\s\S]*?<\/script>/gi,
+      ) ?? [];
+    expect(fullBlocks.length).toBe(1);
+    // And re-running stays deterministic.
+    expect(buildStaticSocialRouteHtml(html, metadata)).toBe(html);
+  });
+
   it("is deterministic and does not duplicate canonicals", () => {
     const first = buildStaticSocialRouteHtml(INDEX_HTML, FOUNDER_SOCIAL_META);
     const second = buildStaticSocialRouteHtml(first, FOUNDER_SOCIAL_META);

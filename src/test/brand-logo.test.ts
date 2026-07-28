@@ -16,7 +16,7 @@ import { resolve } from "node:path";
 const root = resolve(__dirname, "..", "..");
 const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 
-const LOGO_PATH = "public/brand/verdant-logo.png";
+const LOGO_PATH = "public/brand/verdant-logo-512.png";
 const RESPONSIVE_LOGO_PATHS = [
   "public/brand/verdant-logo-32.webp",
   "public/brand/verdant-logo-64.webp",
@@ -30,7 +30,7 @@ const SIDEBAR = read("src/components/AppSidebar.tsx");
 const AUTH = read("src/pages/Auth.tsx");
 
 describe("Verdant logo asset", () => {
-  it("public/brand/verdant-logo.png exists and is non-empty", () => {
+  it("public/brand/verdant-logo-512.png exists and is non-empty", () => {
     const abs = resolve(root, LOGO_PATH);
     expect(existsSync(abs)).toBe(true);
     expect(statSync(abs).size).toBeGreaterThan(1000);
@@ -53,6 +53,7 @@ describe("BrandLogo component", () => {
     expect(BRAND).toMatch(/srcSet=\{LOGO_SRC_SET\}/);
     expect(BRAND).toMatch(/sizes=\{`\$\{px\}px`\}/);
     expect(BRAND).not.toMatch(/["']\/brand\/verdant-logo\.png["']/);
+    expect(BRAND).not.toMatch(/verdant-logo-512\.png/);
   });
 
   it("has accessible alt text", () => {

@@ -404,15 +404,29 @@ export default function OperatorSchemaAudit() {
                   </div>
                   {g.tables.size > 0 && (
                     <div className="flex flex-wrap gap-1.5">
-                      {Array.from(g.tables).sort().map((t) => (
-                        <Badge
-                          key={t}
-                          variant="destructive"
-                          className="text-[10px] font-mono"
-                        >
-                          missing table · public.{t}
-                        </Badge>
-                      ))}
+                      {Array.from(g.tables).sort().map((t) => {
+                        const id = `table:${t}`;
+                        const done = checklist.isVerified(id);
+                        return (
+                          <label
+                            key={t}
+                            className="inline-flex items-center gap-1.5 cursor-pointer"
+                            data-testid={`schema-audit-checklist-item-${id}`}
+                          >
+                            <Checkbox
+                              checked={done}
+                              onCheckedChange={() => checklist.toggle(id)}
+                              aria-label={`Mark missing table public.${t} as verified`}
+                            />
+                            <Badge
+                              variant={done ? "outline" : "destructive"}
+                              className={`text-[10px] font-mono ${done ? "line-through opacity-60" : ""}`}
+                            >
+                              missing table · public.{t}
+                            </Badge>
+                          </label>
+                        );
+                      })}
                     </div>
                   )}
                   {g.columns.length > 0 && (
@@ -422,16 +436,30 @@ export default function OperatorSchemaAudit() {
                         .sort((a, b) =>
                           `${a.table}.${a.column}`.localeCompare(`${b.table}.${b.column}`),
                         )
-                        .map((c) => (
-                          <Badge
-                            key={`${c.table}.${c.column}`}
-                            variant="destructive"
-                            className="text-[10px] font-mono"
-                            title={c.reason}
-                          >
-                            missing column · {c.table}.{c.column}
-                          </Badge>
-                        ))}
+                        .map((c) => {
+                          const id = `column:${c.table}.${c.column}`;
+                          const done = checklist.isVerified(id);
+                          return (
+                            <label
+                              key={id}
+                              className="inline-flex items-center gap-1.5 cursor-pointer"
+                              title={c.reason}
+                              data-testid={`schema-audit-checklist-item-${id}`}
+                            >
+                              <Checkbox
+                                checked={done}
+                                onCheckedChange={() => checklist.toggle(id)}
+                                aria-label={`Mark missing column ${c.table}.${c.column} as verified`}
+                              />
+                              <Badge
+                                variant={done ? "outline" : "destructive"}
+                                className={`text-[10px] font-mono ${done ? "line-through opacity-60" : ""}`}
+                              >
+                                missing column · {c.table}.{c.column}
+                              </Badge>
+                            </label>
+                          );
+                        })}
                     </div>
                   )}
                 </div>
@@ -442,15 +470,29 @@ export default function OperatorSchemaAudit() {
                     Missing tables not owned by a manifest migration
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {scan.orphanTables.sort().map((t) => (
-                      <Badge
-                        key={t}
-                        variant="destructive"
-                        className="text-[10px] font-mono"
-                      >
-                        public.{t}
-                      </Badge>
-                    ))}
+                    {scan.orphanTables.sort().map((t) => {
+                      const id = `table:${t}`;
+                      const done = checklist.isVerified(id);
+                      return (
+                        <label
+                          key={t}
+                          className="inline-flex items-center gap-1.5 cursor-pointer"
+                          data-testid={`schema-audit-checklist-item-${id}`}
+                        >
+                          <Checkbox
+                            checked={done}
+                            onCheckedChange={() => checklist.toggle(id)}
+                            aria-label={`Mark orphan missing table public.${t} as verified`}
+                          />
+                          <Badge
+                            variant={done ? "outline" : "destructive"}
+                            className={`text-[10px] font-mono ${done ? "line-through opacity-60" : ""}`}
+                          >
+                            public.{t}
+                          </Badge>
+                        </label>
+                      );
+                    })}
                   </div>
                   <p className="text-[11px] text-muted-foreground">
                     These tables are watched by this page but no entry in{" "}

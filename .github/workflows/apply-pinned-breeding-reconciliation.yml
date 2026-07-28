@@ -1,0 +1,127 @@
+name: Apply pinned breeding reconciliation
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_head_sha:
+        description: "Exact 40-character verdant-grow-diary commit to deploy"
+        required: true
+        type: string
+      confirm_project_ref:
+        description: "Type the pinned production project ref"
+        required: true
+        type: string
+      confirm_apply:
+        description: "Type: APPLY PINNED BREEDING RECONCILIATION"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Same production concurrency group as the three-file reconciliation lane so
+# the two protected runners can never touch production concurrently.
+concurrency:
+  group: pinned-production-migrations
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate the production dispatch
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+      CONFIRM_PROJECT_REF: ${{ inputs.confirm_project_ref }}
+      CONFIRM_APPLY: ${{ inputs.confirm_apply }}
+
+    steps:
+      - name: Refuse every branch except the production branch
+        env:
+          OBSERVED_REF: ${{ github.ref }}
+        run: |
+          if [ "$OBSERVED_REF" != "refs/heads/verdant-grow-diary" ]; then
+            echo "::error::This workflow only runs from refs/heads/verdant-grow-diary."
+            exit 1
+          fi
+
+      - name: Verify dispatch confirmations
+        env:
+          OBSERVED_SHA: ${{ github.sha }}
+        run: |
+          if ! [[ "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::expected_head_sha must be exactly 40 lowercase hexadecimal characters."
+            exit 1
+          fi
+          if [ "$EXPECTED_HEAD_SHA" != "$OBSERVED_SHA" ]; then
+            echo "::error::expected_head_sha does not match the checked-out commit."
+            exit 1
+          fi
+          if [ "$CONFIRM_PROJECT_REF" != "knkwiiywfkbqznbxwqfh" ]; then
+            echo "::error::The production project confirmation did not match."
+            exit 1
+          fi
+          if [ "$CONFIRM_APPLY" != "APPLY PINNED BREEDING RECONCILIATION" ]; then
+            echo "::error::The production apply confirmation phrase did not match."
+            exit 1
+          fi
+
+  apply:
+    name: Preflight, apply once, and verify
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: verdant-production
+    env:
+      TARGET_ENV: production
+      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+      CONFIRM_PROJECT_REF: ${{ inputs.confirm_project_ref }}
+      CONFIRM_APPLY: ${{ inputs.confirm_apply }}
+      REPORT_PATH: ${{ github.workspace }}/audit/breeding-reconciliation/report.md
+      AUDIT_PATH: ${{ github.workspace }}/audit/breeding-reconciliation/audit.json
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Prepare sanitized audit directory
+        run: mkdir -p "${{ github.workspace }}/audit/breeding-reconciliation"
+
+      - name: Require the protected production database secret
+        uses: ./.github/actions/require-ci-secret
+        with:
+          secret-name: SUPABASE_DB_URL
+          secret-value: ${{ secrets.SUPABASE_DB_URL }}
+          guard-heading: "Pinned breeding reconciliation apply"
+          report-path: ${{ github.workspace }}/audit/breeding-reconciliation/report.md
+          log-prefix: pinned-breeding-reconciliation
+          fix-steps-json: >-
+            ["1. Open Settings → Environments → verdant-production.",
+             "2. Add environment secret SUPABASE_DB_URL using the pooled Postgres URL for project knkwiiywfkbqznbxwqfh.",
+             "3. Configure a required reviewer for verdant-production, then dispatch again from verdant-grow-diary."]
+          reason-lines-json: >-
+            ["The exact production target cannot be proven or reached without the protected database URL.",
+             "No migration SQL is allowed to run when this secret is absent."]
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Apply only the reviewed breeding reconciliation
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: node scripts/apply-pinned-breeding-reconciliation.mjs
+
+      - name: Publish sanitized summary
+        if: always() && hashFiles('audit/breeding-reconciliation/report.md') != ''
+        run: cat audit/breeding-reconciliation/report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload sanitized evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pinned-breeding-reconciliation-evidence
+          path: audit/breeding-reconciliation
+          if-no-files-found: error
+          retention-days: 30

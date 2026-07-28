@@ -170,6 +170,23 @@ describe("PhenoHuntWorkspace", () => {
     }
   });
 
+  it("gives controlled candidate filters stable, unique accessible names", () => {
+    renderAt({
+      candidates: [{ candidateId: "p1", candidateLabel: "BD #1" }],
+    });
+
+    expect(
+      screen.getByRole("combobox", { name: "Filter candidates by keeper decision" }),
+    ).toHaveAttribute("data-testid", "workspace-filter-decision");
+    expect(screen.getByRole("combobox", { name: "Filter candidates by sex" })).toHaveAttribute(
+      "data-testid",
+      "workspace-filter-sex",
+    );
+    expect(
+      screen.getByRole("combobox", { name: "Filter candidates by readiness" }),
+    ).toHaveAttribute("data-testid", "workspace-filter-readiness");
+  });
+
   it("saves entered trait scores and the keeper decision via the hook", async () => {
     const { saveScore, saveDecision } = renderAt({
       candidates: [{ candidateId: "p1", candidateLabel: "BD #1" }],

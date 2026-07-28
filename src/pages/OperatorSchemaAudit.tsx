@@ -686,28 +686,38 @@ export default function OperatorSchemaAudit() {
               <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Findings
               </div>
-              {rlsFindings.map((f, i) => (
-                <div
-                  key={`${f.table}-${f.code}-${i}`}
-                  className="flex items-start gap-2 text-sm"
-                  data-testid={`schema-audit-rls-finding-${f.code}`}
-                >
-                  {f.severity === "critical" ? (
-                    <XCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-                  ) : f.severity === "warning" ? (
-                    <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                  )}
-                  <div className="min-w-0">
-                    <span className="font-mono text-xs">public.{f.table}</span>{" "}
-                    <span>{f.message}</span>
-                    {f.detail && (
-                      <span className="text-muted-foreground"> — {f.detail}</span>
+              {rlsFindings.map((f, i) => {
+                const id = `rls:${f.table}:${f.code}:${i}`;
+                const done = checklist.isVerified(id);
+                return (
+                  <div
+                    key={`${f.table}-${f.code}-${i}`}
+                    className={`flex items-start gap-2 text-sm ${done ? "opacity-60" : ""}`}
+                    data-testid={`schema-audit-rls-finding-${f.code}`}
+                  >
+                    <Checkbox
+                      className="mt-0.5"
+                      checked={done}
+                      onCheckedChange={() => checklist.toggle(id)}
+                      aria-label={`Mark RLS finding ${f.code} on public.${f.table} as verified`}
+                    />
+                    {f.severity === "critical" ? (
+                      <XCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                    ) : f.severity === "warning" ? (
+                      <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                     )}
+                    <div className={`min-w-0 ${done ? "line-through" : ""}`}>
+                      <span className="font-mono text-xs">public.{f.table}</span>{" "}
+                      <span>{f.message}</span>
+                      {f.detail && (
+                        <span className="text-muted-foreground"> — {f.detail}</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
           <div className="divide-y">

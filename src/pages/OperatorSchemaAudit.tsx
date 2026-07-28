@@ -265,6 +265,25 @@ export default function OperatorSchemaAudit() {
     [data],
   );
 
+  // ---- Local session checklist ------------------------------------------
+  // Marks each missing item (table/column/RLS finding) as reviewed by the
+  // operator. Stored only in sessionStorage — no writes reach the database.
+  const checklist = useSchemaAuditVerifiedChecklist();
+
+  const allMissingIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const g of scan.groups) {
+      for (const t of g.tables) ids.push(`table:${t}`);
+      for (const c of g.columns) ids.push(`column:${c.table}.${c.column}`);
+    }
+    for (const t of scan.orphanTables) ids.push(`table:${t}`);
+    rlsFindings.forEach((f, i) => ids.push(`rls:${f.table}:${f.code}:${i}`));
+    return Array.from(new Set(ids));
+  }, [scan, rlsFindings]);
+
+  const verifiedInScope = allMissingIds.filter((id) => checklist.isVerified(id)).length;
+  const outstanding = allMissingIds.length - verifiedInScope;
+
   return (
     <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">

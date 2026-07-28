@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { APP_ROUTES } from "@/lib/appRouteManifest";
 import {
   AUTHENTICATED_CORE_CENSUS_ROUTES,
   PRIVILEGED_ROUTE_PREFIXES,
@@ -6,10 +7,13 @@ import {
   classifyLink,
   expectedCensusNavigationPath,
   isReadOnlyEdgeFunction,
+  isReadOnlyRpc,
   isPrivilegedRoute,
   isSafelyFillableFieldType,
   matchesKnownAppRoute,
+  missingAuthenticatedCensusRoutePatterns,
   placeholderValueForField,
+  type CoreCensusRoute,
 } from "../../e2e/lib/coreLinkFormCensus";
 
 const MANIFEST = [
@@ -130,6 +134,12 @@ describe("core link and form census rules", () => {
     expect(isReadOnlyEdgeFunction(name)).toBe(false);
   });
 
+  it("allows the read-only trace resolver without opening the RPC mutation fence", () => {
+    expect(isReadOnlyRpc("genetics_trace_resolve")).toBe(true);
+    expect(isReadOnlyRpc("get_latest_sensor_snapshot")).toBe(true);
+    expect(isReadOnlyRpc("action_queue_transition")).toBe(false);
+  });
+
   it("builds safe, deterministic placeholder values", () => {
     expect(placeholderValueForField({ type: "email", accessibleName: "Email" })).toBe(
       "verdant-census@example.invalid",
@@ -174,5 +184,49 @@ describe("core link and form census rules", () => {
       ...AUTHENTICATED_CORE_CENSUS_ROUTES.map((route) => route.path),
     ];
     expect(new Set(paths).size).toBe(paths.length);
+  });
+
+  it("schedules a concrete browser census visit for every authenticated route", () => {
+    expect(
+      missingAuthenticatedCensusRoutePatterns(APP_ROUTES, AUTHENTICATED_CORE_CENSUS_ROUTES),
+    ).toEqual([]);
+  });
+
+  it("does not let the static breeding/new visit cover the breeding detail pattern", () => {
+    const withoutBreedingDetail = AUTHENTICATED_CORE_CENSUS_ROUTES.filter(
+      (route) => route.path !== "/breeding/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    );
+
+    expect(missingAuthenticatedCensusRoutePatterns(APP_ROUTES, withoutBreedingDetail)).toEqual([
+      "/breeding/:programId",
+    ]);
+  });
+
+  it("requires a success-state content contract for every added authenticated detail route", () => {
+    const detailPaths = [
+      "/actions/77777777-7777-4777-8777-777777777777",
+      "/alerts/88888888-8888-4888-8888-888888888888",
+      "/doctor/sessions/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "/reports/post-grow/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      "/breeding/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "/breeding/log/new?growId=11111111-1111-4111-8111-111111111111",
+      "/genetics/accessions/cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      "/genetics/batches/dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      "/genetics/health/accession/cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      "/genetics/trace/accession/cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      "/grows/11111111-1111-4111-8111-111111111111",
+      "/grows/11111111-1111-4111-8111-111111111111/learning",
+      "/plants/33333333-3333-4333-8333-333333333333",
+      "/tents/22222222-2222-4222-8222-222222222222",
+    ] as const;
+    const routes = AUTHENTICATED_CORE_CENSUS_ROUTES as readonly CoreCensusRoute[];
+
+    for (const path of detailPaths) {
+      const route = routes.find((candidate) => candidate.path === path);
+      expect(
+        route?.expectedContent?.length,
+        `${path} must have an expected-content contract`,
+      ).toBeGreaterThan(0);
+    }
   });
 });

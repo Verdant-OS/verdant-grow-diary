@@ -54,16 +54,12 @@ export interface PhenoComparisonViewProps {
 }
 
 function toneClass(view: PhenoSensorSnapshotView): string {
-  if (view.source === "live")
-    return "border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300";
-  if (view.source === "manual")
-    return "border-sky-500/40 bg-sky-500/10 text-sky-800 dark:text-sky-300";
-  if (view.source === "csv")
-    return "border-indigo-500/40 bg-indigo-500/10 text-indigo-800 dark:text-indigo-300";
-  if (view.source === "invalid")
-    return "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300";
+  if (view.source === "live") return "border-emerald-500/40 bg-emerald-500/10 text-emerald-300";
+  if (view.source === "manual") return "border-sky-500/40 bg-sky-500/10 text-sky-300";
+  if (view.source === "csv") return "border-indigo-500/40 bg-indigo-500/10 text-indigo-300";
+  if (view.source === "invalid") return "border-red-500/40 bg-red-500/10 text-red-300";
   // demo | stale
-  return "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300";
+  return "border-amber-500/40 bg-amber-500/10 text-amber-300";
 }
 
 function fmtMetric(v: number | null, unit?: string): string {
@@ -113,7 +109,7 @@ function ExpressionBlock({ e }: { e: PhenoExpressionView }) {
           <div
             data-testid={`pheno-candidate-${e.candidateId}-herm-flag`}
             role="alert"
-            className="space-y-1 rounded-md border border-red-500/50 bg-red-500/10 p-2 text-xs text-red-700 dark:text-red-300"
+            className="space-y-1 rounded-md border border-red-500/50 bg-red-500/10 p-2 text-xs text-red-300"
           >
             <p className="font-semibold">⚠ Hermaphrodite observed — consider removing</p>
             {e.herm.note && <p>{e.herm.note}</p>}
@@ -212,8 +208,8 @@ function ExpressionBlock({ e }: { e: PhenoExpressionView }) {
             <span
               className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${
                 e.labResult.labVerified
-                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300"
-                  : "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300"
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                  : "border-amber-500/40 bg-amber-500/10 text-amber-300"
               }`}
             >
               {e.labResult.sourceLabel}
@@ -237,7 +233,7 @@ function ExpressionBlock({ e }: { e: PhenoExpressionView }) {
 
       {/* Honest missing-expression flags */}
       {e.missing.length > 0 && (
-        <ul className="space-y-0.5 text-[10px] text-amber-800 dark:text-amber-300">
+        <ul className="space-y-0.5 text-[10px] text-amber-300">
           {e.missing.map((m) => (
             <li key={m.code} data-testid={`expression-missing-${e.candidateId}-${m.code}`}>
               ⚠ {m.message}
@@ -287,9 +283,8 @@ function CandidateColumn({
       {c.missing.length > 0 && (
         <ul
           data-testid={`pheno-candidate-${c.candidateId}-missing`}
-          role="status"
           aria-label={`Missing context for ${c.candidateLabel}`}
-          className="space-y-1 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-800 dark:text-amber-300"
+          className="space-y-1 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-200"
         >
           {c.missing.map((m) => (
             <li key={m.code} data-testid={`missing-${m.code}`}>
@@ -348,7 +343,7 @@ function CandidateColumn({
             data-testid={`pheno-candidate-${c.candidateId}-no-photo`}
             role="status"
             aria-label={`No photo attached for ${c.candidateLabel}`}
-            className="text-xs text-amber-800 dark:text-amber-300"
+            className="text-xs text-amber-300"
           >
             No photo attached.
           </p>
@@ -374,7 +369,7 @@ function CandidateColumn({
             data-testid={`pheno-candidate-${c.candidateId}-no-sensor`}
             role="status"
             aria-label={`No sensor snapshot for ${c.candidateLabel}`}
-            className="text-xs text-amber-800 dark:text-amber-300"
+            className="text-xs text-amber-300"
           >
             No sensor snapshot.
           </p>
@@ -407,7 +402,7 @@ function CandidateColumn({
                   <li>PPFD: {fmtMetric(s.ppfd)}</li>
                 </ul>
                 {s.missing.length > 0 && (
-                  <ul className="space-y-0.5 border-t border-border pt-1 text-[11px] text-amber-800 dark:text-amber-300">
+                  <ul className="space-y-0.5 border-t border-border pt-1 text-[11px] text-amber-300">
                     {s.missing.map((m) => (
                       <li key={m.code} data-testid={`snapshot-${s.id}-missing-${m.code}`}>
                         ⚠ {m.message}
@@ -483,7 +478,7 @@ export default function PhenoComparisonView({
             data-testid="pheno-comparison-demo-banner"
             role="status"
             aria-label="Demo data disclaimer"
-            className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
+            className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
           >
             {PHENO_COMPARISON_DEMO_BANNER}
           </p>
@@ -519,7 +514,7 @@ export default function PhenoComparisonView({
             data-testid="pheno-comparison-comparability-warning"
             role="status"
             aria-label="Apples-to-apples comparability warning"
-            className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
+            className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
           >
             ⚠ {comparability.warning}
           </p>

@@ -24,6 +24,10 @@ const OPERATOR_COMPONENTS = [
     name: "OperatorModeCallout",
     sourcePath: "src/components/OperatorModeCallout.tsx",
   },
+  {
+    name: "DashboardOperatorAccountReadModels",
+    sourcePath: "src/components/DashboardOperatorAccountReadModels.tsx",
+  },
 ] as const;
 
 describe("Dashboard · operator-only UI guard", () => {
@@ -46,6 +50,12 @@ describe("Dashboard · operator-only UI guard", () => {
     // The path should be referenced only through the self-gated card.
     expect(DASHBOARD).not.toMatch(/to=\{?["']\/operator\/release-readiness["']/);
     expect(DASHBOARD).not.toMatch(/href=["']\/operator\/release-readiness["']/);
+  });
+
+  it("keeps the operator account panel aligned with the Dashboard grow scope", () => {
+    expect(DASHBOARD).toMatch(
+      /<DashboardOperatorAccountReadModels\s+growId=\{scopedGrowId\}\s*\/>/,
+    );
   });
 
   it("Dashboard does not render any /operator/* navigation links unconditionally", () => {

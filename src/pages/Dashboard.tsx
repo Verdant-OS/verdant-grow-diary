@@ -35,6 +35,7 @@ import PublicQuickLogHandoffCard from "@/components/PublicQuickLogHandoffCard";
 import OnboardingProgressPill from "@/components/OnboardingProgressPill";
 import DashboardZeroTentEmptyState from "@/components/DashboardZeroTentEmptyState";
 import OperatorModeCallout from "@/components/OperatorModeCallout";
+import DashboardOperatorAccountReadModels from "@/components/DashboardOperatorAccountReadModels";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import ReleaseReadinessOperatorCard from "@/components/ReleaseReadinessOperatorCard";
 import LineageRepairCta from "@/components/LineageRepairCta";
@@ -364,6 +365,8 @@ export default function Dashboard() {
       <div className="my-3">
         <OperatorModeCallout />
       </div>
+
+      <DashboardOperatorAccountReadModels growId={scopedGrowId} />
 
       <div className="my-3">
         <ReleaseReadinessOperatorCard />

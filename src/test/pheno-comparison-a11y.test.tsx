@@ -73,9 +73,7 @@ for (const vp of VIEWPORTS) {
     it("main region exposes an accessible name via heading", () => {
       renderPage();
       // <main aria-labelledby="pheno-comparison-heading"> and the h1.
-      expect(
-        screen.getByRole("main", { name: /pheno comparison/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("main", { name: /pheno comparison/i })).toBeInTheDocument();
       expect(
         screen.getByRole("heading", { level: 1, name: /pheno comparison/i }),
       ).toBeInTheDocument();
@@ -94,9 +92,7 @@ for (const vp of VIEWPORTS) {
       expect(banner).toHaveAttribute("role", "status");
       expect(banner).toHaveAccessibleName(/demo/i);
 
-      const verdict = screen.getByTestId(
-        "pheno-comparison-comparability-verdict",
-      );
+      const verdict = screen.getByTestId("pheno-comparison-comparability-verdict");
       expect(verdict).toHaveAttribute("role", "status");
       expect(verdict).toHaveAccessibleName(/comparability/i);
     });
@@ -108,27 +104,22 @@ for (const vp of VIEWPORTS) {
       const bravo = screen.getByRole("region", { name: /bravo/i });
       expect(alpha).toBeInTheDocument();
       expect(bravo).toBeInTheDocument();
-      expect(
-        within(alpha).getByRole("heading", { level: 2, name: /alpha/i }),
-      ).toBeInTheDocument();
+      expect(within(alpha).getByRole("heading", { level: 2, name: /alpha/i })).toBeInTheDocument();
     });
 
-    it("missing photo + missing sensor states expose status role", () => {
+    it("missing photo + missing-context states expose accessible semantics", () => {
       renderPage();
-      const bravoNoPhoto = screen.getByTestId(
-        "pheno-candidate-demo-cand-bravo-no-photo",
-      );
+      const bravoNoPhoto = screen.getByTestId("pheno-candidate-demo-cand-bravo-no-photo");
       expect(bravoNoPhoto).toHaveAttribute("role", "status");
       expect(bravoNoPhoto).toHaveAccessibleName(/no photo/i);
 
       // Charlie has invalid+null snapshot but non-empty snapshots array, so
       // "no sensor snapshot" doesn't render. Instead the invalid missing
-      // flags render — verify those are also labelled via the missing list.
-      const charlieMissing = screen.getByTestId(
-        "pheno-candidate-demo-cand-charlie-missing",
-      );
-      expect(charlieMissing).toHaveAttribute("role", "status");
+      // flags render — verify those remain a labelled semantic list.
+      const charlieMissing = screen.getByTestId("pheno-candidate-demo-cand-charlie-missing");
+      expect(charlieMissing).toHaveRole("list");
       expect(charlieMissing).toHaveAccessibleName(/missing context/i);
+      expect(within(charlieMissing).getAllByRole("listitem").length).toBeGreaterThan(0);
     });
 
     it("missing temp/RH/VPD/EC/pH/PPFD flags render on incomplete candidates", () => {
@@ -158,9 +149,7 @@ for (const vp of VIEWPORTS) {
 
       const charlie = screen.getByTestId("pheno-candidate-demo-cand-charlie");
       expect(
-        within(charlie).getByTestId(
-          "snapshot-sn-c-1-missing-invalid_reading",
-        ),
+        within(charlie).getByTestId("snapshot-sn-c-1-missing-invalid_reading"),
       ).toBeInTheDocument();
     });
 
@@ -172,9 +161,7 @@ for (const vp of VIEWPORTS) {
       for (const src of PHENO_COMPARISON_SENSOR_SOURCES) {
         const item = within(legend).getByTestId(`legend-${src}`);
         expect(item).toHaveAttribute("aria-label");
-        expect(item.getAttribute("aria-label") ?? "").toMatch(
-          new RegExp(src, "i"),
-        );
+        expect(item.getAttribute("aria-label") ?? "").toMatch(new RegExp(src, "i"));
       }
     });
   });

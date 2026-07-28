@@ -118,10 +118,12 @@ function toRow(
     // display type alone can no longer prove manual origin.
     isManualEntry:
       entry.eventType === "quick_log" ||
+      identity.fromQuickLog ||
       (entry.details.extras?.source as unknown) === "manual" ||
       entry.details.extras?.quick_log_version != null ||
       entry.details.extras?.linked_grow_event_id != null ||
       entry.details.extras?.grow_event_id != null,
+
     warnings: entry.warnings,
     hasHardwareReadings: split.hasHardwareBlock,
     hardwareReadingLines: split.hardwareLines,

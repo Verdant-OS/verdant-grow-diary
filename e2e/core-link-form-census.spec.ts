@@ -823,16 +823,19 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
         });
         continue;
       }
+      const namedControl = page.getByRole("combobox", { name, exact: true });
+      const hasStableNamedControl = (await namedControl.count()) === 1;
+      const stableControl = hasStableNamedControl ? namedControl : control;
       await control.selectOption(alternative, { timeout: 5_000 });
-      await expect(control).toHaveValue(alternative, { timeout: 5_000 });
+      await expect(stableControl).toHaveValue(alternative, { timeout: 5_000 });
 
       // A controlled filter can re-render the page and change the live nth()
-      // locator before cleanup. Restore through a unique accessible-name
-      // locator only when the original option still exists; cleanup must never
-      // turn a successfully exercised field into a test-wide timeout.
-      const restoreControl = page.getByRole("combobox", { name, exact: true });
-      if ((await restoreControl.count()) === 1) {
-        const originalStillExists = await restoreControl
+      // locator during both verification and cleanup. Reacquire a uniquely
+      // named control across renders, and restore only when the original option
+      // still exists; cleanup must never turn a successfully exercised field
+      // into a test-wide timeout.
+      if (hasStableNamedControl) {
+        const originalStillExists = await stableControl
           .locator("option")
           .evaluateAll(
             (options, expected) =>
@@ -840,7 +843,7 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
             original,
           );
         if (originalStillExists) {
-          await restoreControl.selectOption(original, { timeout: 5_000 }).catch(() => undefined);
+          await stableControl.selectOption(original, { timeout: 5_000 }).catch(() => undefined);
         }
       }
       audits.push({ route: route.path, name, type, exercised: true });

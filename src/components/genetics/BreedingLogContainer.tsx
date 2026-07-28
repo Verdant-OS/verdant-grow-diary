@@ -1,50 +1,87 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { BreedingEventForm } from "./BreedingEventForm";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import type { BreedingEventType } from "@/lib/genetics/breedingTypes";
 import { emitBreedingAuditEvent } from "@/lib/genetics/breedingAuditLog";
+import {
+  resolveBreedingSubmissionAttempt,
+  type BreedingSubmissionAttempt,
+} from "@/lib/genetics/breedingSubmissionIdempotencyRules";
 import { useAuth } from "@/store/auth";
 
 interface Props {
   activeGrowId: string;
-  plants: any[];
+  plants: BreedingLogPlant[];
   onCreated: () => void;
   onCancel: () => void;
 }
 
+interface BreedingLogPlant {
+  id: string;
+  tent_id: string | null;
+  name?: string | null;
+}
+
+function normalizeStringDetails(value: unknown): Record<string, string> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
+
+  const details: Record<string, string> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (typeof item === "string") details[key] = item;
+  }
+  return details;
+}
+
 export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel }: Props) {
   const [busy, setBusy] = useState(false);
+  const submissionAttemptRef = useRef<BreedingSubmissionAttempt | null>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   const handleSubmit = async (data: {
     plantId: string;
     subType: BreedingEventType;
-    details: any;
+    details: unknown;
     requestActionQueueSuggestions: boolean;
   }) => {
     setBusy(true);
     try {
+      let suggestionsFailed = false;
+
       // 1. Save through the breeding_log_save_event RPC. The RPC applies the
       //    auth.uid() trust boundary + ownership checks server-side; the client
       //    never sends a user_id.
       const selectedPlant = plants.find((p) => p.id === data.plantId);
-      const details = (data.details ?? {}) as Record<string, string>;
-
-      const { data: rpcData, error: rpcError } = await (supabase.rpc as any)(
-        "breeding_log_save_event",
+      const details = normalizeStringDetails(data.details);
+      const method = details.method ?? null;
+      const intensity = details.intensity ?? null;
+      const attempt = resolveBreedingSubmissionAttempt(
+        submissionAttemptRef.current,
         {
-          p_grow_id: activeGrowId,
-          p_plant_id: data.plantId,
-          p_event_type: data.subType,
-          p_tent_id: selectedPlant?.tent_id ?? null,
-          p_method: typeof details.method === "string" ? details.method : null,
-          p_intensity: typeof details.intensity === "string" ? details.intensity : null,
-          p_details: details,
+          growId: activeGrowId,
+          plantId: data.plantId,
+          eventType: data.subType,
+          tentId: selectedPlant?.tent_id ?? null,
+          method,
+          intensity,
+          details,
         },
+        () => crypto.randomUUID(),
       );
+      submissionAttemptRef.current = attempt;
+
+      const { data: rpcData, error: rpcError } = await supabase.rpc("breeding_log_save_event", {
+        p_idempotency_key: attempt.idempotencyKey,
+        p_grow_id: activeGrowId,
+        p_plant_id: data.plantId,
+        p_event_type: data.subType,
+        p_tent_id: selectedPlant?.tent_id ?? null,
+        p_method: method,
+        p_intensity: intensity,
+        p_details: details,
+      });
 
       if (rpcError) {
         throw new Error(`Failed to save event: ${rpcError.message}`);
@@ -58,6 +95,7 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
         throw new Error(`Failed to save event: ${result?.reason ?? "unknown_error"}`);
       }
       const eventId = result.grow_event_id;
+      submissionAttemptRef.current = null;
 
       // 2. Suggestions are a separate, explicit grower choice. The event still
       // saves when suggestions are not requested or when their insert fails.
@@ -71,6 +109,7 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
           );
           if (fnError) {
             console.error("[BreedingLogContainer] Edge function error:", fnError);
+            suggestionsFailed = true;
           } else {
             const actionIds =
               (fnData as { actionIds?: Array<{ id: string; plantId: string | null }> } | null)
@@ -91,6 +130,7 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
           }
         } catch (err) {
           console.error("[BreedingLogContainer] Failed to invoke suggestions:", err);
+          suggestionsFailed = true;
         }
       }
 
@@ -98,10 +138,19 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
       queryClient.invalidateQueries({ queryKey: ["grow_events"] });
       queryClient.invalidateQueries({ queryKey: ["action_queue"] });
 
-      toast.success("Breeding event logged 🌱");
+      if (suggestionsFailed) {
+        toast.warning(
+          "Breeding event logged. Follow-up suggestion status could not be confirmed.",
+          {
+            description: "Check Action Queue before creating any follow-ups manually.",
+          },
+        );
+      } else {
+        toast.success("Breeding event logged 🌱");
+      }
       onCreated();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setBusy(false);
     }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -6,6 +6,9 @@ const rpc = vi.hoisted(() => vi.fn());
 const invoke = vi.hoisted(() => vi.fn());
 const invalidateQueries = vi.hoisted(() => vi.fn());
 const emitBreedingAuditEvent = vi.hoisted(() => vi.fn());
+const toastSuccess = vi.hoisted(() => vi.fn());
+const toastWarning = vi.hoisted(() => vi.fn());
+const toastError = vi.hoisted(() => vi.fn());
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -28,8 +31,9 @@ vi.mock("@/lib/genetics/breedingAuditLog", () => ({
 
 vi.mock("sonner", () => ({
   toast: {
-    success: vi.fn(),
-    error: vi.fn(),
+    success: toastSuccess,
+    warning: toastWarning,
+    error: toastError,
   },
 }));
 
@@ -78,7 +82,10 @@ vi.mock("@/components/genetics/BreedingEventForm", () => ({
 import { BreedingLogContainer } from "@/components/genetics/BreedingLogContainer";
 
 describe("BreedingLogContainer Action Queue opt-in", () => {
+  let consoleError: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
+    consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     rpc.mockReset().mockResolvedValue({
       data: { ok: true, grow_event_id: "event-1" },
       error: null,
@@ -89,6 +96,13 @@ describe("BreedingLogContainer Action Queue opt-in", () => {
     });
     invalidateQueries.mockReset();
     emitBreedingAuditEvent.mockReset();
+    toastSuccess.mockReset();
+    toastWarning.mockReset();
+    toastError.mockReset();
+  });
+
+  afterEach(() => {
+    consoleError.mockRestore();
   });
 
   it("logs the breeding event without creating suggestions by default", async () => {
@@ -105,8 +119,23 @@ describe("BreedingLogContainer Action Queue opt-in", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save without suggestions" }));
 
     await waitFor(() => expect(rpc).toHaveBeenCalledTimes(1));
+    expect(rpc).toHaveBeenCalledWith(
+      "breeding_log_save_event",
+      expect.objectContaining({
+        p_idempotency_key: expect.stringMatching(/^breeding-event-/),
+        p_grow_id: "grow-1",
+        p_plant_id: "plant-1",
+        p_event_type: "pollination",
+        p_tent_id: "tent-1",
+        p_method: null,
+        p_intensity: null,
+        p_details: {},
+      }),
+    );
     expect(invoke).not.toHaveBeenCalled();
     expect(emitBreedingAuditEvent).not.toHaveBeenCalled();
+    expect(toastSuccess).toHaveBeenCalledWith("Breeding event logged 🌱");
+    expect(toastWarning).not.toHaveBeenCalled();
     expect(onCreated).toHaveBeenCalledTimes(1);
   });
 
@@ -134,5 +163,71 @@ describe("BreedingLogContainer Action Queue opt-in", () => {
         status: "pending_approval",
       }),
     );
+  });
+
+  it("keeps the saved event and warns when opted-in suggestions fail", async () => {
+    invoke.mockResolvedValueOnce({
+      data: null,
+      error: new Error("edge unavailable"),
+    });
+    const onCreated = vi.fn();
+
+    render(
+      <BreedingLogContainer
+        activeGrowId="grow-1"
+        plants={[{ id: "plant-1", tent_id: "tent-1" }]}
+        onCreated={onCreated}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Save and request suggestions" }));
+
+    await waitFor(() =>
+      expect(toastWarning).toHaveBeenCalledWith(
+        "Breeding event logged. Follow-up suggestion status could not be confirmed.",
+        {
+          description: "Check Action Queue before creating any follow-ups manually.",
+        },
+      ),
+    );
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith(
+      "[BreedingLogContainer] Edge function error:",
+      expect.any(Error),
+    );
+    expect(onCreated).toHaveBeenCalledTimes(1);
+  });
+
+  it("reuses the same request key when an ambiguous save is retried", async () => {
+    rpc
+      .mockResolvedValueOnce({
+        data: null,
+        error: new Error("network response lost"),
+      })
+      .mockResolvedValueOnce({
+        data: { ok: true, grow_event_id: "event-1", reused: true },
+        error: null,
+      });
+
+    render(
+      <BreedingLogContainer
+        activeGrowId="grow-1"
+        plants={[{ id: "plant-1", tent_id: "tent-1" }]}
+        onCreated={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    const submit = screen.getByRole("button", { name: "Save without suggestions" });
+    await userEvent.click(submit);
+    await waitFor(() => expect(toastError).toHaveBeenCalledTimes(1));
+    await userEvent.click(submit);
+    await waitFor(() => expect(rpc).toHaveBeenCalledTimes(2));
+
+    const firstArgs = rpc.mock.calls[0]?.[1] as { p_idempotency_key?: string };
+    const retryArgs = rpc.mock.calls[1]?.[1] as { p_idempotency_key?: string };
+    expect(firstArgs.p_idempotency_key).toMatch(/^breeding-event-/);
+    expect(retryArgs.p_idempotency_key).toBe(firstArgs.p_idempotency_key);
   });
 });

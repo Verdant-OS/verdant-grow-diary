@@ -147,7 +147,7 @@ export default function CheckoutSuccess() {
   }, [view, refetch]);
 
   // Auto-redirect to the sanitized returnTo path ONLY after entitlement has
-  // confirmed active Pro. Waiting on `confirmed` prevents flicker back into
+  // confirmed an active paid plan. Waiting on `confirmed` prevents flicker back into
   // the upgrade gate on a gated Pheno route. If returnTo is missing or
   // unsafe, we stay on this page (existing behavior).
   const redirectedRef = useRef(false);
@@ -244,8 +244,8 @@ export default function CheckoutSuccess() {
               Confirming your checkout…
             </h1>
             <p className="mt-4 text-muted-foreground">
-              We're confirming your Verdant Pro access with the payment provider. This usually takes
-              a few seconds while the billing webhook is processed.
+              We're confirming your Verdant plan with the payment provider. This usually takes a few
+              seconds while the billing webhook is processed.
             </p>
             {pollExhausted && (
               <p

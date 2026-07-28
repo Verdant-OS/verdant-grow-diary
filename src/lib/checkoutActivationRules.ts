@@ -22,7 +22,7 @@ export function buildCheckoutActivationViewModel(
   return {
     primaryHref: safeReturnTo ?? "/grows",
     primaryLabel: safeReturnTo ? "Continue where I left off" : "Start my grow memory",
-    heading: "Put Pro to work in one real grow",
+    heading: "Put Verdant to work in one real grow",
     description:
       "The fastest path to value is the same core loop Verdant protects: Grow → Tent → Plant → Quick Log.",
     steps: CHECKOUT_ACTIVATION_STEPS,

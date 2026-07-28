@@ -1,51 +1,109 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-const STORAGE_KEY = "verdant:schema-audit:verified";
+import type { SchemaAuditChecklistScope } from "@/lib/schemaAuditRules";
 
-function readStore(): Set<string> {
-  if (typeof window === "undefined") return new Set();
+const STORAGE_KEY = "verdant:schema-audit:verified:v2";
+
+interface StoredChecklist {
+  scope: string;
+  verified: string[];
+}
+
+function serializeScope(scope: SchemaAuditChecklistScope | null): string | null {
+  if (!scope) return null;
+  return JSON.stringify({
+    user_id: scope.user_id,
+    backend_ref: scope.backend_ref,
+    checked_at: scope.checked_at,
+    snapshot_fingerprint: scope.snapshot_fingerprint,
+  });
+}
+
+function readStore(scopeKey: string | null): Set<string> {
+  if (typeof window === "undefined" || !scopeKey) return new Set();
   try {
     const raw = window.sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return new Set();
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? new Set(parsed.filter((x) => typeof x === "string")) : new Set();
+    const parsed = JSON.parse(raw) as Partial<StoredChecklist>;
+    if (parsed.scope !== scopeKey || !Array.isArray(parsed.verified)) return new Set();
+    return new Set(parsed.verified.filter((value): value is string => typeof value === "string"));
   } catch {
     return new Set();
   }
 }
 
-function writeStore(set: Set<string>) {
+function writeStore(scopeKey: string, verified: Set<string>) {
   if (typeof window === "undefined") return;
   try {
-    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(set)));
+    const payload: StoredChecklist = {
+      scope: scopeKey,
+      verified: Array.from(verified).sort(),
+    };
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
-    // sessionStorage disabled — silently ignore, verification is best-effort local state.
+    // sessionStorage disabled — verification remains best-effort local state.
+  }
+}
+
+function clearStore() {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // sessionStorage disabled — there is no durable local checklist to clear.
   }
 }
 
 /**
- * Local, per-tab session checklist for the operator schema audit.
- * State is stored only in sessionStorage — nothing is written to the database.
+ * Per-tab review checklist scoped to one authenticated backend snapshot.
+ * Changing user, backend, checked_at, or fingerprint clears prior marks.
  */
-export function useSchemaAuditVerifiedChecklist() {
-  const [verified, setVerified] = useState<Set<string>>(() => readStore());
+export function useSchemaAuditVerifiedChecklist(scope: SchemaAuditChecklistScope | null) {
+  const scopeKey = useMemo(() => serializeScope(scope), [scope]);
+  const [activeScopeKey, setActiveScopeKey] = useState<string | null>(scopeKey);
+  const [verified, setVerified] = useState<Set<string>>(() => readStore(scopeKey));
 
   useEffect(() => {
-    writeStore(verified);
-  }, [verified]);
+    if (activeScopeKey === scopeKey) return;
+    clearStore();
+    setActiveScopeKey(scopeKey);
+    setVerified(new Set());
+  }, [activeScopeKey, scopeKey]);
 
-  const isVerified = useCallback((id: string) => verified.has(id), [verified]);
+  useEffect(() => {
+    if (scopeKey && activeScopeKey === scopeKey) writeStore(scopeKey, verified);
+  }, [activeScopeKey, scopeKey, verified]);
 
-  const toggle = useCallback((id: string) => {
-    setVerified((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
+  const currentVerified = useMemo(
+    () => (activeScopeKey === scopeKey ? verified : new Set<string>()),
+    [activeScopeKey, scopeKey, verified],
+  );
+  const isVerified = useCallback((id: string) => currentVerified.has(id), [currentVerified]);
 
-  const clearAll = useCallback(() => setVerified(new Set()), []);
+  const toggle = useCallback(
+    (id: string) => {
+      if (!scopeKey || activeScopeKey !== scopeKey) return;
+      setVerified((previous) => {
+        const next = new Set(previous);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    },
+    [activeScopeKey, scopeKey],
+  );
 
-  return { verified, isVerified, toggle, clearAll, count: verified.size };
+  const clearAll = useCallback(() => {
+    if (!scopeKey || activeScopeKey !== scopeKey) return;
+    setVerified(new Set());
+  }, [activeScopeKey, scopeKey]);
+
+  return {
+    verified: currentVerified,
+    isVerified,
+    toggle,
+    clearAll,
+    count: currentVerified.size,
+    scoped: scopeKey !== null && activeScopeKey === scopeKey,
+  };
 }

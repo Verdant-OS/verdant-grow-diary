@@ -22,10 +22,13 @@ const PRIVATE_TABLES = [
 // Representative protected/operator/internal mobile coverage. Kept in sync
 // with src/lib/appRouteManifest.ts via src/test/operator-route-mobile-coverage.test.ts.
 // IMPORTANT: every operator + internal route in APP_ROUTES must be listed here.
+// Only list routes the router actually mounts behind the auth gate — the
+// spreadsheet-import surfaces (/operator/genetics-import,
+// /imports/representative-csv, /sensors/csv-preview) were deliberately removed
+// and now 404, which src/test/operator-xlsx-import-routes-removed.test.ts pins.
 const PROTECTED_MOBILE_ROUTES: string[] = [
   // operator
   "/diagnostics",
-  "/imports/representative-csv",
   "/ingest-inspector",
   "/operator/ai-doctor-phase1",
   "/operator/billing-entitlement-resolution",
@@ -35,7 +38,6 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/operator/ecowitt-bridge-debug",
   "/operator/ecowitt-live-bringup",
   "/operator/ecowitt-tent-preview",
-  "/operator/genetics-import",
   "/operator/ggs-real-payload-ingest",
   "/operator/one-tent-live-proof",
   "/operator/one-tent-loop-smoke-test",
@@ -43,7 +45,6 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/operator/paddle-processing-audit",
   "/operator/post-grow-reflection-dry-run",
   "/pi-ingest-status",
-  "/sensors/csv-preview",
   "/sensors/ecowitt-audit",
   "/sensors/ingest-normalizer",
   // internal
@@ -51,7 +52,6 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/grow-lineage",
   "/internal/ai-doctor-confidence-audit",
   "/internal/ai-doctor-phase1-preview",
-  "/internal/demo-proof-walkthrough",
   "/internal/one-tent-loop-proof",
   "/internal/sensor-truth-audit",
   "/leads",
@@ -72,6 +72,11 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   // AuthProvider/GrowsProvider/AppShell — must render signed-out on mobile with
   // zero private-table fetches.
   "/pheno-comparison",
+  // Unlinked internal walkthrough, but genuinely ungated: App.tsx mounts it
+  // outside AppShell (the RequireAuth host) so the read-only no-write guard can
+  // render it signed-out. It must therefore satisfy the public contract —
+  // renders without private-table fetches — not the redirect-to-/auth one.
+  "/internal/demo-proof-walkthrough",
 ];
 
 async function mockAllSupabase(page: Page, opts: { signedIn?: boolean } = {}) {

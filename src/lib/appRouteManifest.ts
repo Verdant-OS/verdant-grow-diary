@@ -120,9 +120,16 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Static Phase 1 view model preview.",
   },
   {
+    // `access` records the gate the router actually applies, not the URL
+    // prefix. App.tsx mounts this route OUTSIDE `<AppShell>` (the component
+    // that calls `useRequireAuth("/auth")`) so the no-write E2E guard can
+    // render it without a signed-in session — same shape as
+    // `/customer/:shareId`. It is unlinked, but it is not auth-gated, so
+    // classifying it as `internal` misreported real routing behavior.
     path: "/internal/demo-proof-walkthrough",
-    access: "internal",
-    description: "Read-only operator walkthrough of the V0 One-Tent Loop proof path.",
+    access: "public",
+    description:
+      "Read-only operator walkthrough of the V0 One-Tent Loop proof path. Unlinked but ungated: mounted outside RequireAuth, performs no Supabase/AI/alert/device calls.",
   },
   {
     path: "/internal/one-tent-loop-proof",

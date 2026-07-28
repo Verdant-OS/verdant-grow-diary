@@ -6,8 +6,8 @@
  *    marker or returnTo handoff) while the resolver is pending
  *  - a direct visit with no checkout context shows the no-context state and
  *    never claims a completed checkout
- *  - "Verdant Pro is active." shown only after resolver confirms an active
- *    paid plan
+ *  - the plan-neutral activation claim is shown only after the resolver
+ *    confirms an active paid plan; the badge names the exact tier
  *  - Refresh action present in both unconfirmed states
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -35,6 +35,7 @@ const mockEnt: { value: ResolvedEntitlement; loading: boolean; lookupFailed: boo
 };
 
 const refetchSpy = vi.hoisted(() => vi.fn(async () => undefined));
+const usePageSeoSpy = vi.hoisted(() => vi.fn());
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => ({
     loading: mockEnt.loading,
@@ -43,7 +44,9 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
     refetch: refetchSpy,
   }),
 }));
-vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => undefined }));
+vi.mock("@/hooks/usePageSeo", () => ({
+  usePageSeo: (input: unknown) => usePageSeoSpy(input),
+}));
 
 function renderPage() {
   return render(
@@ -59,6 +62,7 @@ describe("CheckoutSuccess truth copy", () => {
     mockEnt.loading = false;
     mockEnt.lookupFailed = false;
     refetchSpy.mockClear();
+    usePageSeoSpy.mockClear();
   });
 
   it("shows the no-context state on a direct visit — never claims a completed checkout", () => {
@@ -110,9 +114,18 @@ describe("CheckoutSuccess truth copy", () => {
     expect(screen.getByTestId("checkout-success-pending-heading")).toHaveTextContent(
       /Confirming your checkout/i,
     );
+    expect(document.body).toHaveTextContent(
+      "We're confirming your Verdant plan with the payment provider.",
+    );
+    expect(document.body).not.toHaveTextContent("Verdant Pro");
     expect(document.body.textContent).not.toMatch(/Checkout completed/i);
     expect(screen.getByTestId("checkout-success-refresh-button")).toBeInTheDocument();
     expect(screen.queryByTestId("checkout-success-confirmed-heading")).toBeNull();
+    expect(usePageSeoSpy).toHaveBeenLastCalledWith({
+      title: "Confirming your Verdant access | Verdant Grow Diary",
+      description: "Paid Verdant access is confirmed server-side by the billing webhook.",
+      path: "/checkout/success",
+    });
   });
 
   it("no_context still runs the quiet bounded entitlement poll (storage-blocked buyers self-heal)", () => {
@@ -153,7 +166,7 @@ describe("CheckoutSuccess truth copy", () => {
     expect(screen.getByTestId("checkout-success-page")).toHaveAttribute("data-view", "no_context");
   });
 
-  it('shows "Verdant Pro is active." after entitlement confirms an active paid plan', () => {
+  it("shows a plan-neutral activation claim after entitlement confirms an active Pro plan", () => {
     mockEnt.value = {
       ...mockEnt.value,
       effectivePlanId: "pro_monthly",
@@ -164,12 +177,33 @@ describe("CheckoutSuccess truth copy", () => {
     renderPage();
     expect(screen.getByTestId("checkout-success-page")).toHaveAttribute("data-confirmed", "true");
     expect(screen.getByTestId("checkout-success-confirmed-heading")).toHaveTextContent(
-      "Verdant Pro is active.",
+      "Your Verdant plan is active.",
     );
     expect(screen.getByTestId("account-plan-badge")).toHaveTextContent("Pro Monthly");
     expect(screen.getByTestId("checkout-success-activation-handoff")).toHaveTextContent(
       "Grow → Tent → Plant → Quick Log",
     );
+    expect(usePageSeoSpy).toHaveBeenLastCalledWith({
+      title: "Your Verdant plan is active | Verdant Grow Diary",
+      description: "Paid Verdant access is confirmed server-side by the billing webhook.",
+      path: "/checkout/success",
+    });
+  });
+
+  it("names an active Craft plan in the badge without calling it Pro", () => {
+    mockEnt.value = {
+      ...mockEnt.value,
+      effectivePlanId: "craft_annual",
+      displayPlanId: "craft_annual",
+      isActive: true,
+      source: "lovable_paddle_subscription",
+    };
+    renderPage();
+    expect(screen.getByTestId("checkout-success-confirmed-heading")).toHaveTextContent(
+      "Your Verdant plan is active.",
+    );
+    expect(screen.getByTestId("account-plan-badge")).toHaveTextContent("Craft Annual");
+    expect(document.body.textContent).not.toMatch(/\bPro\b/i);
   });
 
   it("shows confirmed state for Founder Lifetime", () => {
@@ -181,6 +215,10 @@ describe("CheckoutSuccess truth copy", () => {
       source: "lovable_paddle_lifetime",
     };
     renderPage();
+    expect(screen.getByTestId("checkout-success-confirmed-heading")).toHaveTextContent(
+      "Your Verdant plan is active.",
+    );
     expect(screen.getByTestId("account-plan-badge")).toHaveTextContent("Founder Lifetime");
+    expect(document.body.textContent).not.toMatch(/\bPro\b/i);
   });
 });

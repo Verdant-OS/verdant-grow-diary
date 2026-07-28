@@ -25,6 +25,7 @@ import type {
   NormalizedDiaryDetails,
   NormalizedDiaryEntry,
 } from "./diaryEntryRules";
+import { classifyTimelineEntry } from "./timelineEntryClassification";
 
 /**
  * Envelope event-type strings that indicate a Quick Log wrapper row
@@ -179,6 +180,30 @@ function buildSummarySuffix(
 }
 
 /**
+ * Recognized machine markers that legitimately ride in
+ * `details.event_type` WITHOUT being promotable Quick Log actions. The
+ * default Quick Log photo path stamps "quicklog_photo_attachment"
+ * (see quickLogPhotoDiaryEntry / plantMemoryEpisodeAdapter), and the
+ * normalizer's own contract keeps such markers on the "note" envelope.
+ * They are valid plant history — never `invalid_event_type`.
+ */
+export const RECOGNIZED_DIARY_MACHINE_MARKERS: ReadonlySet<string> = new Set([
+  "quicklog_photo_attachment",
+]);
+
+/**
+ * A declared type is "recognized" when it is a known machine marker or
+ * when the shared timeline classifier resolves it to a real bucket
+ * (e.g. "action_followup" → reminder, "manual_snapshot" → measurement).
+ * Recognized declared types keep the envelope identity instead of being
+ * misrepresented as invalid.
+ */
+function isRecognizedDeclaredMarker(declared: string): boolean {
+  if (RECOGNIZED_DIARY_MACHINE_MARKERS.has(declared)) return true;
+  return classifyTimelineEntry({ eventType: declared, source: null }) !== "notes";
+}
+
+/**
  * Resolve the effective identity of a normalized diary entry.
  *
  * Rules (deterministic, in order):
@@ -186,10 +211,12 @@ function buildSummarySuffix(
  *     or empty) AND `details.declaredEventType` is a canonical Quick Log
  *     type, promote the declared type.
  *  2. When the envelope is a wrapper AND a declared type is present but
- *     NOT canonical, the row's true kind is unknowable — resolve to the
- *     explicit `invalid_event_type` identity with a neutral label. It
- *     must never masquerade as a "Note" and never echo the raw invalid
- *     string.
+ *     neither canonical NOR a recognized diary marker, the row's true
+ *     kind is unknowable — resolve to the explicit `invalid_event_type`
+ *     identity with a neutral label. It must never masquerade as a
+ *     "Note" and never echo the raw invalid string. Recognized machine
+ *     markers ("quicklog_photo_attachment", "action_followup", …) are
+ *     exempt: they are valid history and keep the envelope identity.
  *  3. Otherwise the envelope type wins.
  *  4. The display label is the canonical label for known types, else a
  *     title-cased fallback ("Note" when unresolvable).
@@ -204,7 +231,7 @@ export function resolveQuickLogEventIdentity(
   const wrapper = QUICK_LOG_WRAPPER_ENVELOPES.has(envelope);
   const promote =
     wrapper && declared !== "" && QUICK_LOG_CANONICAL_EVENT_TYPES.has(declared);
-  if (wrapper && declared !== "" && !promote) {
+  if (wrapper && declared !== "" && !promote && !isRecognizedDeclaredMarker(declared)) {
     // Rule 2: declared-but-unrecognized action. Neutral identity; no
     // summary is ever built for an unknown kind (nothing to honestly
     // summarize), and the raw declared string is never displayed.

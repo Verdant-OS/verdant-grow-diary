@@ -58,6 +58,10 @@ describe("GrowStageCareGuide page", () => {
     expect(screen.getByTestId("grow-stage-care-seedling")).toBeInTheDocument();
     expect(screen.getByTestId("grow-stage-care-veg")).toBeInTheDocument();
     expect(screen.getByTestId("grow-stage-care-flower")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Watering" })).toHaveClass("text-blue-300");
+    expect(screen.getByRole("button", { name: "Nutrients" })).toHaveClass("text-green-300");
+    expect(screen.getByRole("button", { name: "Environment" })).toHaveClass("text-amber-300");
+    expect(screen.getByRole("button", { name: "Harvest" })).toHaveClass("text-purple-300");
   });
 
   it("filters to one stage when a stage button is clicked", () => {

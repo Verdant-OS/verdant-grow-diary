@@ -160,7 +160,7 @@ export default function CultivarPage() {
             data-testid="cultivar-reference-banner"
             className="mt-6 rounded-xl border border-amber-500/35 bg-amber-500/10 p-4"
           >
-            <p className="font-semibold text-amber-800 dark:text-amber-200">
+            <p className="font-semibold text-amber-200">
               {formatVerificationStatus(cultivar.verificationStatus)} — not plant-specific advice
             </p>
             <p className="mt-1 text-sm text-muted-foreground">

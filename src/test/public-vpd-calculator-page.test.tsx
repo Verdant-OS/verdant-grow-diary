@@ -44,6 +44,9 @@ describe("public VPD calculator page", () => {
 
     expect(screen.getAllByText(/Nothing is uploaded or saved/)).toHaveLength(2);
     expect(
+      screen.getByRole("heading", { level: 2, name: "Calculate from a manual reading" }),
+    ).toBeInTheDocument();
+    expect(
       screen.getByText(/Air estimate first · verified leaf VPD for target status/),
     ).toBeInTheDocument();
     await user.type(screen.getByLabelText("Air temperature"), "77");

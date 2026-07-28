@@ -22,13 +22,18 @@ afterEach(cleanup);
 
 describe("Strain Reference Library V1 index", () => {
   it("shows the sample-data boundary and all ten profiles", () => {
-    renderIndex();
+    const { container } = renderIndex();
     expect(
       screen.getByRole("heading", { name: /source-backed cultivar profiles/i }),
     ).toBeInTheDocument();
     expect(screen.getByTestId("cultivar-sample-banner")).toHaveTextContent(
       /sample reference data/i,
     );
+    expect(screen.getByText("Sample reference data — not a universal grow recipe")).toHaveClass(
+      "text-amber-200",
+    );
+    expect(container.querySelectorAll("span.text-amber-200")).toHaveLength(10);
+    expect(container.querySelector(".text-amber-800")).toBeNull();
     expect(screen.getByTestId("cultivars-index-result-count")).toHaveTextContent(
       "Showing all 10 reference profiles",
     );

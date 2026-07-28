@@ -39,7 +39,11 @@ function Code({ children, copyLabel }: { children: string; copyLabel?: string })
   };
   return (
     <div className="relative group">
-      <pre className="bg-muted text-foreground text-xs rounded-md p-4 pr-12 overflow-x-auto border border-border">
+      <pre
+        tabIndex={0}
+        aria-label={copyLabel ? `${copyLabel} code example` : "Code example"}
+        className="bg-muted text-foreground text-xs rounded-md p-4 pr-12 overflow-x-auto border border-border"
+      >
         <code>{children}</code>
       </pre>
       <button

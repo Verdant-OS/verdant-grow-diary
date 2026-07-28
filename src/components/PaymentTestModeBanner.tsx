@@ -19,7 +19,9 @@ export function PaymentTestModeBanner() {
 
   if (env === "sandbox") {
     return (
-      <div
+      <aside
+        aria-label="Payment environment"
+        aria-live="polite"
         data-testid="payments-test-mode-banner"
         data-payment-env="sandbox"
         className="w-full bg-amber-100 dark:bg-amber-900/40 border-b border-amber-300 dark:border-amber-800 px-4 py-2 text-center text-xs md:text-sm text-amber-900 dark:text-amber-100"
@@ -33,7 +35,7 @@ export function PaymentTestModeBanner() {
         >
           Learn more
         </a>
-      </div>
+      </aside>
     );
   }
 
@@ -41,27 +43,29 @@ export function PaymentTestModeBanner() {
     const message = getCheckoutUnavailableMessage();
     if (!message) return null;
     return (
-      <div
-        role="status"
+      <aside
+        aria-label="Payment availability"
+        aria-live="polite"
         data-testid="payments-unavailable-banner"
         data-payment-env="unavailable"
         className="w-full bg-destructive/10 border-b border-destructive/30 px-4 py-2 text-center text-xs md:text-sm text-destructive"
       >
         {message}
-      </div>
+      </aside>
     );
   }
 
   // env === 'live': subtle confirmation strip. Not alarming, not celebratory —
   // just a signal that real charges are enabled on this build.
   return (
-    <div
+    <aside
+      aria-label="Payment status"
       data-testid="payments-live-mode-banner"
       data-payment-env="live"
       className="w-full bg-emerald-50 dark:bg-emerald-950/40 border-b border-emerald-200 dark:border-emerald-900 px-4 py-1.5 text-center text-[11px] md:text-xs text-emerald-800 dark:text-emerald-200"
     >
       Live payments enabled · secured by Paddle
-    </div>
+    </aside>
   );
 }
 

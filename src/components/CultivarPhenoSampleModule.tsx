@@ -31,7 +31,7 @@ export default function CultivarPhenoSampleModule({ cultivar }: Props) {
         </h2>
         <span
           data-testid="cultivar-pheno-sample-label"
-          className="inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300"
+          className="inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium uppercase tracking-wide text-amber-300"
         >
           Sample data — not real grower diary
         </span>

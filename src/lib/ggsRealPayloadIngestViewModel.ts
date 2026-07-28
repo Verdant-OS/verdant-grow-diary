@@ -171,6 +171,35 @@ export type GgsRealPayloadIngestRefusalReason =
   | "payload_unparseable"
   | "payload_blank";
 
+export interface GgsRealPayloadCommitFailureFeedback {
+  title: string;
+  description: string;
+}
+
+export function describeGgsRealPayloadCommitFailure(
+  reason: string,
+): GgsRealPayloadCommitFailureFeedback {
+  if (reason === "commit_not_confirmed") {
+    return {
+      title: "Commit not confirmed",
+      description:
+        "Verdant could not verify a complete new three-reading cohort, so this operation was not marked complete. Review the existing sensor history before retrying.",
+    };
+  }
+  if (reason === "authorization_unavailable") {
+    return {
+      title: "Access check unavailable",
+      description:
+        "Verdant could not verify your operator access right now. Nothing was marked complete. Try again shortly.",
+    };
+  }
+  return {
+    title: "Commit not completed",
+    description:
+      "Verdant could not safely confirm this commit. Nothing was marked complete. Review the payload and try again.",
+  };
+}
+
 /** Human-readable explanation for a refusal reason. UI-only. */
 export function describeRefusal(reason: GgsRealPayloadIngestRefusalReason): string {
   switch (reason) {
@@ -194,7 +223,7 @@ export function describeRefusal(reason: GgsRealPayloadIngestRefusalReason): stri
     case "captured_at_missing_or_malformed":
       return "Payload is missing a valid timestamp.";
     case "declared_source_not_allowed":
-      return "Payload declares an unknown or synthetic source. Operator attestation cannot override it.";
+      return "Payload source declarations are malformed, conflicting, unknown, or synthetic. Operator attestation cannot override them.";
     case "payload_device_id_missing":
       return "Payload must include its physical sensor or device id.";
     case "payload_device_id_mismatch":

@@ -16,6 +16,7 @@ import {
   hasCompleteCanonicalGgsRealPayloadRows,
   type GgsRealPayloadCommitInput,
 } from "@/lib/ggsRealPayloadIngestRules";
+import { GGS_SOIL_STALE_MS } from "@/lib/ggsSoilSensorReadingNormalizer";
 
 const NOW = new Date("2026-06-17T12:00:00Z");
 const FRESH_TS = "2026-06-17T11:59:00Z";
@@ -161,6 +162,106 @@ describe("buildGgsRealPayloadCommitInput", () => {
   it.each(["live", "spider_farmer_ggs"])("allows explicit real source %s", (source) => {
     const plan = buildGgsRealPayloadCommitInput({ ...realLookingPayload(), source }, CTX);
     expect(plan.ok).toBe(true);
+  });
+
+  it("validates every present source alias instead of trusting the first allowed declaration", () => {
+    for (const payload of [
+      {
+        ...realLookingPayload(),
+        source: "live",
+        declared_source: "synthetic",
+      },
+      {
+        ...realLookingPayload(),
+        source: "live",
+        declaredSource: "demo",
+      },
+      {
+        ...realLookingPayload(),
+        declared_source: "spider_farmer_ggs",
+        declaredSource: "fixture",
+      },
+    ]) {
+      expect(refusalReason(buildGgsRealPayloadCommitInput(payload, CTX))).toBe(
+        "declared_source_not_allowed",
+      );
+    }
+  });
+
+  it.each([null, 42, true, {}, [], "", "   "])(
+    "refuses malformed present source declarations: %j",
+    (declaredSource) => {
+      const plan = buildGgsRealPayloadCommitInput(
+        {
+          ...realLookingPayload(),
+          source: "live",
+          declared_source: declaredSource,
+        },
+        CTX,
+      );
+      expect(refusalReason(plan)).toBe("declared_source_not_allowed");
+    },
+  );
+
+  it("refuses conflicting declarations even when each value is independently allowed", () => {
+    const plan = buildGgsRealPayloadCommitInput(
+      {
+        ...realLookingPayload(),
+        source: "live",
+        declared_source: "spider_farmer_ggs",
+      },
+      CTX,
+    );
+    expect(refusalReason(plan)).toBe("declared_source_not_allowed");
+  });
+
+  it("accepts repeated aliases only when every declaration normalizes identically", () => {
+    const plan = buildGgsRealPayloadCommitInput(
+      {
+        ...realLookingPayload(),
+        source: " LIVE ",
+        declared_source: "live",
+        declaredSource: "Live",
+      },
+      CTX,
+    );
+    expect(plan.ok).toBe(true);
+  });
+
+  it("accepts the exact past and future freshness boundaries, then refuses one millisecond beyond", () => {
+    const exactStaleBoundary = new Date(NOW.getTime() - GGS_SOIL_STALE_MS).toISOString();
+    const beyondStaleBoundary = new Date(NOW.getTime() - GGS_SOIL_STALE_MS - 1).toISOString();
+    const exactFutureBoundary = new Date(NOW.getTime() + 5 * 60 * 1000).toISOString();
+    const beyondFutureBoundary = new Date(NOW.getTime() + 5 * 60 * 1000 + 1).toISOString();
+
+    expect(
+      buildGgsRealPayloadCommitInput(
+        { ...realLookingPayload(), timestamp: exactStaleBoundary },
+        CTX,
+      ).ok,
+    ).toBe(true);
+    expect(
+      refusalReason(
+        buildGgsRealPayloadCommitInput(
+          { ...realLookingPayload(), timestamp: beyondStaleBoundary },
+          CTX,
+        ),
+      ),
+    ).toBe("normalizer_refused");
+    expect(
+      buildGgsRealPayloadCommitInput(
+        { ...realLookingPayload(), timestamp: exactFutureBoundary },
+        CTX,
+      ).ok,
+    ).toBe(true);
+    expect(
+      refusalReason(
+        buildGgsRealPayloadCommitInput(
+          { ...realLookingPayload(), timestamp: beyondFutureBoundary },
+          CTX,
+        ),
+      ),
+    ).toBe("normalizer_refused");
   });
 
   it("refuses a missing or mismatched payload device identity", () => {

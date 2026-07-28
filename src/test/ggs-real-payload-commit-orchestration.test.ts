@@ -36,6 +36,18 @@ describe("commitGgsRealPayloadAndRefresh", () => {
     expect(onCommitSuccess).not.toHaveBeenCalled();
   });
 
+  it("does not refresh when the server cannot confirm the complete cohort", async () => {
+    const commit = vi.fn(async () => ({
+      ok: false as const,
+      reason: "commit_not_confirmed",
+    }));
+    const onCommitSuccess = vi.fn(async () => undefined);
+    await expect(
+      commitGgsRealPayloadAndRefresh(ARGS, { commit, onCommitSuccess }),
+    ).resolves.toEqual({ ok: false, reason: "commit_not_confirmed" });
+    expect(onCommitSuccess).not.toHaveBeenCalled();
+  });
+
   it("does not rewrite a successful commit when refresh fails", async () => {
     const commit = vi.fn(async () => ({
       ok: true as const,

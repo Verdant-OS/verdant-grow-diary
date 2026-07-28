@@ -13,7 +13,7 @@ export async function handleRequest(req: Request): Promise<Response> {
       hasOperatorRole: async () => ({ ok: true, value: false }),
       loadTentAuthority: async () => ({ ok: true, value: null }),
       loadBridgeTokenContext: async () => ({ ok: true, value: null }),
-      commitBatch: async () => ({ ok: false }),
+      commitBatch: async () => ({ ok: false, reason: "commit_failed" }),
     });
   }
 

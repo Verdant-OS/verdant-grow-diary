@@ -67,6 +67,26 @@ describe("commitGgsRealPayload browser boundary", () => {
     expect(sent).not.toHaveProperty("rows");
   });
 
+  it("requires an integer 3/0 confirmation before reporting success", async () => {
+    for (const counts of [
+      { inserted: 2, rejected: 1 },
+      { inserted: 1, rejected: 2 },
+      { inserted: 0, rejected: 3 },
+      { inserted: 2.5, rejected: 0.5 },
+      { inserted: 4, rejected: 0 },
+      { inserted: 3, rejected: 1 },
+    ]) {
+      state.invoke.mockResolvedValue({
+        data: { ok: true, ...counts },
+        error: null,
+      });
+      await expect(commitGgsRealPayload(args())).resolves.toEqual({
+        ok: false,
+        reason: "commit_not_confirmed",
+      });
+    }
+  });
+
   it.each([
     { tentId: "not-a-uuid" },
     { bridgeId: "not-a-uuid" },
@@ -100,24 +120,26 @@ describe("commitGgsRealPayload browser boundary", () => {
     });
   });
 
-  it.each(["payload_rejected", "bridge_forbidden", "incomplete_canonical_readings"])(
-    "preserves allowlisted FunctionsHttpError refusal %s",
-    async (reason) => {
-      state.invoke.mockResolvedValue({
-        data: null,
-        error: new FunctionsHttpError(
-          new Response(JSON.stringify({ error: reason }), {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          }),
-        ),
-      });
-      await expect(commitGgsRealPayload(args())).resolves.toEqual({
-        ok: false,
-        reason,
-      });
-    },
-  );
+  it.each([
+    "payload_rejected",
+    "bridge_forbidden",
+    "incomplete_canonical_readings",
+    "commit_not_confirmed",
+  ])("preserves allowlisted FunctionsHttpError refusal %s", async (reason) => {
+    state.invoke.mockResolvedValue({
+      data: null,
+      error: new FunctionsHttpError(
+        new Response(JSON.stringify({ error: reason }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    });
+    await expect(commitGgsRealPayload(args())).resolves.toEqual({
+      ok: false,
+      reason,
+    });
+  });
 
   it.each([
     new FunctionsHttpError(new Response("{", { status: 400 })),

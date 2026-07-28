@@ -12,6 +12,7 @@ import type {
   OperatorGgsRealPayloadCommitDeps,
   OperatorGgsTentAuthority,
 } from "./handler.ts";
+import { GGS_REAL_PAYLOAD_EXPECTED_ROW_COUNT } from "../_shared/lib/lib/ggsRealPayloadIngestRules.ts";
 
 export interface OperatorGgsAuthedClient {
   auth: {
@@ -88,28 +89,39 @@ function parseBridgeTokenContext(
 
 function parseCommitCounts(
   data: unknown,
-): { ok: true; inserted: number; rejected: number } | { ok: false } {
+):
+  | { ok: true; inserted: number; rejected: number }
+  | { ok: false; reason: "commit_not_confirmed" } {
   let row: Record<string, unknown> | null = null;
   if (Array.isArray(data)) {
-    if (data.length !== 1 || !isPlainObject(data[0])) return { ok: false };
+    if (data.length !== 1 || !isPlainObject(data[0])) {
+      return { ok: false, reason: "commit_not_confirmed" };
+    }
     row = data[0];
   } else if (isPlainObject(data)) {
     row = data;
   }
-  if (!row) return { ok: false };
+  if (!row) return { ok: false, reason: "commit_not_confirmed" };
   const inserted = row.inserted;
   const rejected = row.rejected;
   if (
     typeof inserted !== "number" ||
-    !Number.isFinite(inserted) ||
-    inserted < 0 ||
+    !Number.isSafeInteger(inserted) ||
     typeof rejected !== "number" ||
-    !Number.isFinite(rejected) ||
-    rejected < 0
+    !Number.isSafeInteger(rejected) ||
+    inserted !== GGS_REAL_PAYLOAD_EXPECTED_ROW_COUNT ||
+    rejected !== 0
   ) {
-    return { ok: false };
+    return { ok: false, reason: "commit_not_confirmed" };
   }
   return { ok: true, inserted, rejected };
+}
+
+function isInvalidCredentialError(error: unknown): boolean {
+  if (!isPlainObject(error)) return false;
+  if (error.name === "AuthRetryableFetchError") return false;
+  const status = error.status;
+  return status === 400 || status === 401 || status === 403;
 }
 
 export function buildOperatorGgsRealPayloadCommitDeps(
@@ -122,7 +134,9 @@ export function buildOperatorGgsRealPayloadCommitDeps(
     getVerifiedUserId: async () => {
       try {
         const { data, error } = await authed.auth.getUser();
-        if (error) return { ok: true, value: null };
+        if (error) {
+          return isInvalidCredentialError(error) ? { ok: true, value: null } : { ok: false };
+        }
         const id = data?.user?.id;
         return {
           ok: true,
@@ -174,10 +188,10 @@ export function buildOperatorGgsRealPayloadCommitDeps(
           p_tent_id: input.tentId,
           p_rows: input.rows,
         });
-        if (error) return { ok: false };
+        if (error) return { ok: false, reason: "commit_failed" };
         return parseCommitCounts(data);
       } catch {
-        return { ok: false };
+        return { ok: false, reason: "commit_failed" };
       }
     },
   };

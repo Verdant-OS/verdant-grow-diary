@@ -10,6 +10,7 @@
 import {
   buildGgsRealPayloadCommitInput,
   buildGgsRealPayloadCohortId,
+  GGS_REAL_PAYLOAD_EXPECTED_ROW_COUNT,
   GGS_OPERATOR_ATTESTATION_BOUNDARY,
   GGS_OPERATOR_ATTESTED_PROVENANCE,
   GGS_REAL_PAYLOAD_SOURCE,
@@ -64,7 +65,10 @@ export interface OperatorGgsCommitBatchInput {
 
 export type OperatorGgsCommitBatchResult =
   | { ok: true; inserted: number; rejected: number }
-  | { ok: false };
+  | {
+      ok: false;
+      reason: "commit_failed" | "commit_not_confirmed";
+    };
 
 export interface OperatorGgsRealPayloadCommitDeps {
   getVerifiedUserId: (authorizationHeader: string) => Promise<OperatorGgsLookupResult<string>>;
@@ -215,6 +219,17 @@ function rowsAreTrusted(
   );
 }
 
+function isConfirmedCompleteCommit(
+  result: Extract<OperatorGgsCommitBatchResult, { ok: true }>,
+): boolean {
+  return (
+    Number.isSafeInteger(result.inserted) &&
+    Number.isSafeInteger(result.rejected) &&
+    result.inserted === GGS_REAL_PAYLOAD_EXPECTED_ROW_COUNT &&
+    result.rejected === 0
+  );
+}
+
 /**
  * Testable request handler. Production dependencies are built in index.ts.
  * No response contains raw payloads, database errors, bridge metadata, or
@@ -321,7 +336,13 @@ export async function handleOperatorGgsRealPayloadCommit(
       rows: plan.rows,
     });
     if (!committed.ok) {
+      if (committed.reason === "commit_not_confirmed") {
+        return json(req, 409, { error: "commit_not_confirmed" });
+      }
       return json(req, 500, { error: "commit_failed" });
+    }
+    if (!isConfirmedCompleteCommit(committed)) {
+      return json(req, 409, { error: "commit_not_confirmed" });
     }
 
     return json(req, 200, {

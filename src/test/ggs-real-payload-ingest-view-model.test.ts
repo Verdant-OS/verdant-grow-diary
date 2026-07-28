@@ -7,6 +7,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildGgsRealPayloadIngestViewModel,
+  describeGgsRealPayloadCommitFailure,
   describeRefusal,
 } from "@/lib/ggsRealPayloadIngestViewModel";
 
@@ -153,5 +154,20 @@ describe("buildGgsRealPayloadIngestViewModel", () => {
     for (const r of reasons) {
       expect(describeRefusal(r).length).toBeGreaterThan(0);
     }
+  });
+
+  it("describes unconfirmed commit counts without claiming completion", () => {
+    const feedback = describeGgsRealPayloadCommitFailure("commit_not_confirmed");
+    expect(feedback.title).toBe("Commit not confirmed");
+    expect(feedback.description).toMatch(/complete new three-reading cohort/i);
+    expect(feedback.description).toMatch(/not marked complete/i);
+    expect(feedback.description).not.toMatch(/commit complete|successfully saved/i);
+  });
+
+  it("keeps auth outages retryable instead of blaming credentials", () => {
+    const feedback = describeGgsRealPayloadCommitFailure("authorization_unavailable");
+    expect(feedback.title).toBe("Access check unavailable");
+    expect(feedback.description).toMatch(/try again shortly/i);
+    expect(feedback.description).not.toMatch(/invalid credentials|sign in again/i);
   });
 });

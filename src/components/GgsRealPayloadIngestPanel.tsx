@@ -32,6 +32,7 @@ import { useAuth } from "@/store/auth";
 import { useTents } from "@/hooks/use-tents";
 import {
   buildGgsRealPayloadIngestViewModel,
+  describeGgsRealPayloadCommitFailure,
   describeRefusal,
 } from "@/lib/ggsRealPayloadIngestViewModel";
 import { commitGgsRealPayload, type GgsRealPayloadCommitResult } from "@/lib/ggsRealPayloadCommit";
@@ -69,6 +70,8 @@ export default function GgsRealPayloadIngestPanel({
   const [attested, setAttested] = useState<boolean>(false);
   const [committing, setCommitting] = useState(false);
   const [result, setResult] = useState<GgsRealPayloadCommitResult | null>(null);
+  const failureFeedback =
+    result?.ok === false ? describeGgsRealPayloadCommitFailure(result.reason) : null;
 
   function resetAttestationForEvidenceChange() {
     setAttested(false);
@@ -289,7 +292,7 @@ export default function GgsRealPayloadIngestPanel({
               ) : (
                 <AlertTriangle className="h-4 w-4" />
               )}
-              <AlertTitle>{result.ok ? "Commit complete" : "Commit failed"}</AlertTitle>
+              <AlertTitle>{result.ok ? "Commit complete" : failureFeedback?.title}</AlertTitle>
               <AlertDescription className="text-sm">
                 {result.ok === true ? (
                   <>
@@ -297,7 +300,7 @@ export default function GgsRealPayloadIngestPanel({
                     <strong>{result.rejected}</strong>
                   </>
                 ) : (
-                  <>{result.reason}</>
+                  <>{failureFeedback?.description}</>
                 )}
               </AlertDescription>
             </Alert>

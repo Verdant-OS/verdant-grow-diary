@@ -29,6 +29,7 @@ import {
 
 /** Exactly one row for each metric is required before any commit is allowed. */
 export const GGS_REAL_PAYLOAD_METRICS = ["soil_moisture_pct", "ec", "soil_temp_c"] as const;
+export const GGS_REAL_PAYLOAD_EXPECTED_ROW_COUNT = GGS_REAL_PAYLOAD_METRICS.length;
 
 /** Metrics this helper is allowed to emit. */
 export type GgsRealPayloadMetric = (typeof GGS_REAL_PAYLOAD_METRICS)[number];
@@ -154,12 +155,33 @@ function isNonEmptyString(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0;
 }
 
-function readDeclaredSource(raw: Record<string, unknown>): string | null {
-  const candidates = [raw.source, raw.declared_source, raw.declaredSource];
-  for (const c of candidates) {
-    if (typeof c === "string" && c.trim().length > 0) return c.trim().toLowerCase();
+type DeclaredSourceValidation = { ok: true; value: string | null } | { ok: false; details: string };
+
+const GGS_REAL_PAYLOAD_SOURCE_DECLARATION_ALIASES = [
+  "source",
+  "declared_source",
+  "declaredSource",
+] as const;
+
+function validateDeclaredSources(raw: Record<string, unknown>): DeclaredSourceValidation {
+  const declarations: Array<{ alias: string; value: string }> = [];
+  for (const alias of GGS_REAL_PAYLOAD_SOURCE_DECLARATION_ALIASES) {
+    if (!Object.prototype.hasOwnProperty.call(raw, alias)) continue;
+    const candidate = raw[alias];
+    if (typeof candidate !== "string" || candidate.trim().length === 0) {
+      return { ok: false, details: `${alias}:malformed` };
+    }
+    const value = candidate.trim().toLowerCase();
+    if (!GGS_ALLOWED_REAL_PAYLOAD_DECLARED_SOURCES.has(value)) {
+      return { ok: false, details: `${alias}:not_allowed` };
+    }
+    declarations.push({ alias, value });
   }
-  return null;
+
+  if (new Set(declarations.map((declaration) => declaration.value)).size > 1) {
+    return { ok: false, details: "conflicting_source_declarations" };
+  }
+  return { ok: true, value: declarations[0]?.value ?? null };
 }
 
 function readSensorIds(raw: Record<string, unknown>): string[] {
@@ -235,9 +257,9 @@ export function buildGgsRealPayloadCommitInput(
   }
   const raw = payload as Record<string, unknown>;
 
-  const declared = readDeclaredSource(raw);
-  if (declared && !GGS_ALLOWED_REAL_PAYLOAD_DECLARED_SOURCES.has(declared)) {
-    return refuse("declared_source_not_allowed", declared);
+  const declared = validateDeclaredSources(raw);
+  if (declared.ok === false) {
+    return refuse("declared_source_not_allowed", declared.details);
   }
 
   // Run the existing pure normalizer to validate units, ranges, freshness,

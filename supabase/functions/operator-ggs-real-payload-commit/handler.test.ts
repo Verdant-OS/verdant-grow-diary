@@ -417,6 +417,49 @@ Deno.test("unknown or synthetic declared source cannot be promoted by attestatio
   }
 });
 
+Deno.test("every present source alias is validated before any commit", async () => {
+  for (const payloadValue of [
+    payload({ source: "live", declared_source: "synthetic" }),
+    payload({ source: "live", declaredSource: "demo" }),
+    payload({ source: "live", declared_source: 42 }),
+    payload({ source: "live", declaredSource: {} }),
+    payload({ source: "live", declared_source: "" }),
+    payload({ source: "live", declared_source: "spider_farmer_ggs" }),
+  ]) {
+    const d = deps();
+    const response = await handleOperatorGgsRealPayloadCommit(
+      request(body({ payload: payloadValue })),
+      d.value,
+    );
+    assertEquals(response.status, 400);
+    assertEquals(await responseJson(response), { error: "payload_rejected" });
+    assertEquals(d.committed.length, 0);
+  }
+});
+
+Deno.test("identical normalized source aliases preserve a legitimate commit", async () => {
+  const d = deps();
+  const response = await handleOperatorGgsRealPayloadCommit(
+    request(
+      body({
+        payload: payload({
+          source: " LIVE ",
+          declared_source: "live",
+          declaredSource: "Live",
+        }),
+      }),
+    ),
+    d.value,
+  );
+  assertEquals(response.status, 200);
+  assertEquals(await responseJson(response), {
+    ok: true,
+    inserted: 3,
+    rejected: 0,
+  });
+  assertEquals(d.committed.length, 1);
+});
+
 Deno.test("request deviceId is bound to the payload sensor identity", async () => {
   for (const payloadValue of [
     payload({ sensor_id: "OTHER-GGS-PROBE" }),
@@ -490,3 +533,26 @@ Deno.test("commit failures are sanitized", async () => {
   assertFalse(text.includes("pi_ingest_commit_batch"));
   assertFalse(text.includes("sensor_readings"));
 });
+
+Deno.test(
+  "mixed, duplicate-only, fractional, and impossible commit counts are never success",
+  async () => {
+    for (const committed of [
+      { ok: true as const, inserted: 2, rejected: 1 },
+      { ok: true as const, inserted: 1, rejected: 2 },
+      { ok: true as const, inserted: 0, rejected: 3 },
+      { ok: true as const, inserted: 2.5, rejected: 0.5 },
+      { ok: true as const, inserted: 4, rejected: 0 },
+      { ok: true as const, inserted: 3, rejected: 1 },
+    ]) {
+      const d = deps({
+        commitBatch: async () => committed,
+      });
+      const response = await handleOperatorGgsRealPayloadCommit(request(), d.value);
+      assertEquals(response.status, 409);
+      assertEquals(await responseJson(response), {
+        error: "commit_not_confirmed",
+      });
+    }
+  },
+);

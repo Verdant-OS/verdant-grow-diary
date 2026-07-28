@@ -7,6 +7,7 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { isUuid } from "@/lib/isUuid";
+import { GGS_REAL_PAYLOAD_EXPECTED_ROW_COUNT } from "@/lib/ggsRealPayloadIngestRules";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 
 export const GGS_REAL_PAYLOAD_COMMIT_FUNCTION = "operator-ggs-real-payload-commit" as const;
@@ -45,13 +46,13 @@ function parseSuccess(data: unknown): GgsRealPayloadCommitResult | null {
   const rejected = data.rejected;
   if (
     typeof inserted !== "number" ||
-    !Number.isFinite(inserted) ||
-    inserted < 0 ||
+    !Number.isSafeInteger(inserted) ||
     typeof rejected !== "number" ||
-    !Number.isFinite(rejected) ||
-    rejected < 0
+    !Number.isSafeInteger(rejected) ||
+    inserted !== GGS_REAL_PAYLOAD_EXPECTED_ROW_COUNT ||
+    rejected !== 0
   ) {
-    return null;
+    return { ok: false, reason: "commit_not_confirmed" };
   }
   return { ok: true, inserted, rejected };
 }
@@ -73,6 +74,7 @@ function safeFailureReason(data: unknown): string {
     "incomplete_canonical_readings",
     "payload_too_large",
     "commit_failed",
+    "commit_not_confirmed",
     "internal_error",
     "unavailable",
   ]);

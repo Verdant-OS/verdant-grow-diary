@@ -25,6 +25,29 @@ const PRODUCTION_REF = "knkwiiywfkbqznbxwqfh";
 const PASSWORD = "gate-test-password";
 const MIGRATIONS_DIR = resolve(__dirname, "../../supabase/migrations");
 const WORKFLOW_PATH = resolve(__dirname, "../../.github/workflows/required-core-migrations.yml");
+const SOIL_MOISTURE_CALIBRATION_MIGRATION = "20260619083000_add_soil_moisture_calibration_v1.sql";
+const SOIL_MOISTURE_CALIBRATION_COLUMNS = [
+  "id",
+  "user_id",
+  "grow_id",
+  "tent_id",
+  "plant_id",
+  "device_id",
+  "label",
+  "medium",
+  "sensor_depth_cm",
+  "dry_raw",
+  "wet_raw",
+  "source",
+  "is_active",
+  "notes",
+  "created_at",
+  "updated_at",
+];
+const PHENO_CROSSES_TAXONOMY_MIGRATION = "20260707210000_pheno_crosses_full_taxonomy.sql";
+const PHENO_CROSSES_TAXONOMY_COLUMNS = ["channel", "generation", "recurrent_parent_id"];
+const EXPECTED_CORE_COLUMN_COUNT = 37;
+const EXPECTED_ADVISORY_COLUMN_COUNT = 4;
 
 const tempDirs: string[] = [];
 
@@ -256,6 +279,30 @@ describe("Supabase database target identity", () => {
 });
 
 describe("required core schema manifest", () => {
+  it("blocks on the complete soil moisture calibration table contract", () => {
+    const soilEntries = REQUIRED_CORE_SCHEMA.filter(
+      (entry) => entry.table === "soil_moisture_calibrations",
+    );
+
+    expect(soilEntries.map((entry) => entry.column)).toEqual(SOIL_MOISTURE_CALIBRATION_COLUMNS);
+    expect(
+      soilEntries.map((entry) => ({
+        column: entry.column,
+        migration: entry.migration,
+      })),
+    ).toEqual(
+      SOIL_MOISTURE_CALIBRATION_COLUMNS.map((column) => ({
+        column,
+        migration: SOIL_MOISTURE_CALIBRATION_MIGRATION,
+      })),
+    );
+    expect(soilEntries.every((entry) => entry.reason.includes("One-Tent Loop"))).toBe(true);
+    expect(
+      ADVISORY_SCHEMA.filter((entry) => entry.table === "soil_moisture_calibrations"),
+    ).toHaveLength(0);
+    expect(REQUIRED_CORE_SCHEMA).toHaveLength(EXPECTED_CORE_COLUMN_COUNT);
+  });
+
   it("maps request_hash and plant_type to the additive forward repair", () => {
     const repair = "20260725023000_core_schema_forward_repair.sql";
     const migrationFor = (key: string) =>
@@ -298,9 +345,38 @@ describe("required core schema manifest", () => {
     );
   });
 
-  it("keeps candidate_number advisory and out of the blocking manifest", () => {
-    expect(REQUIRED_CORE_SCHEMA.map(schemaKey)).not.toContain("plants.candidate_number");
-    expect(ADVISORY_SCHEMA.map(schemaKey)).toEqual(["plants.candidate_number"]);
+  it("keeps Pheno candidate and cross taxonomy columns advisory-only", () => {
+    const advisoryKeys = ADVISORY_SCHEMA.map(schemaKey);
+    const phenoTaxonomyKeys = PHENO_CROSSES_TAXONOMY_COLUMNS.map(
+      (column) => `pheno_crosses.${column}`,
+    );
+
+    expect(advisoryKeys).toEqual(["plants.candidate_number", ...phenoTaxonomyKeys]);
+    for (const advisoryKey of advisoryKeys) {
+      expect(REQUIRED_CORE_SCHEMA.map(schemaKey)).not.toContain(advisoryKey);
+    }
+    expect(ADVISORY_SCHEMA[0]).toMatchObject({
+      table: "plants",
+      column: "candidate_number",
+      migration: "20260712010343_pheno_candidate_number_foundation.sql",
+    });
+    expect(
+      ADVISORY_SCHEMA.filter((entry) => entry.table === "pheno_crosses").map((entry) => ({
+        column: entry.column,
+        migration: entry.migration,
+      })),
+    ).toEqual(
+      PHENO_CROSSES_TAXONOMY_COLUMNS.map((column) => ({
+        column,
+        migration: PHENO_CROSSES_TAXONOMY_MIGRATION,
+      })),
+    );
+    expect(
+      ADVISORY_SCHEMA.filter((entry) => entry.table === "pheno_crosses").every((entry) =>
+        entry.reason.includes("gated Pheno"),
+      ),
+    ).toBe(true);
+    expect(ADVISORY_SCHEMA).toHaveLength(EXPECTED_ADVISORY_COLUMN_COUNT);
     expect(manifestForScope("advisory")).toBe(ADVISORY_SCHEMA);
   });
 
@@ -326,6 +402,128 @@ describe("required core schema manifest", () => {
 });
 
 describe("remote applied-schema runner safety", () => {
+  it("blocks core signoff when the soil calibration contract is absent", () => {
+    const secretSentinel = "SOIL-GATE-SECRET-SENTINEL";
+    const soilKeys = new Set(
+      SOIL_MOISTURE_CALIBRATION_COLUMNS.map((column) => `soil_moisture_calibrations.${column}`),
+    );
+    const presentEntries = REQUIRED_CORE_SCHEMA.filter((entry) => !soilKeys.has(schemaKey(entry)));
+    const dir = mkdtempSync(join(tmpdir(), "core-schema-soil-gate-"));
+    tempDirs.push(dir);
+    const reportPath = join(dir, "report.md");
+    const auditPath = join(dir, "audit.json");
+    const { logger, lines } = captureLogger();
+    let psqlCalls = 0;
+
+    const status = runRequiredCoreMigrationsApplied({
+      env: {
+        TARGET_ENV: "production",
+        SUPABASE_DB_URL: directUrl(PRODUCTION_REF, 5432, secretSentinel),
+        REPORT_PATH: reportPath,
+        AUDIT_PATH: auditPath,
+      },
+      spawnImpl: () => {
+        psqlCalls += 1;
+        if (psqlCalls === 1) {
+          return {
+            status: 0,
+            stdout: presentEntries.map(schemaKey).join("\n"),
+            stderr: "",
+          };
+        }
+        return {
+          status: 0,
+          stdout: [...new Set(presentEntries.map((entry) => entry.table))].join("\n"),
+          stderr: "",
+        };
+      },
+      logger,
+    });
+
+    const audit = JSON.parse(readFileSync(auditPath, "utf8"));
+    const observable = [...lines, readFileSync(reportPath, "utf8"), JSON.stringify(audit)].join(
+      "\n",
+    );
+
+    expect(status).toBe(EXIT.MISSING_COLUMNS);
+    expect(psqlCalls).toBe(2);
+    expect(lines).toContain(
+      `16 of ${EXPECTED_CORE_COLUMN_COUNT} required core column(s) are missing.`,
+    );
+    expect(audit).toMatchObject({
+      outcome: "missing_columns",
+      schema_verified: true,
+      expected_count: EXPECTED_CORE_COLUMN_COUNT,
+      present_count: EXPECTED_CORE_COLUMN_COUNT - SOIL_MOISTURE_CALIBRATION_COLUMNS.length,
+      missing_count: SOIL_MOISTURE_CALIBRATION_COLUMNS.length,
+      note: "Required tables absent: soil_moisture_calibrations.",
+    });
+    expect(
+      audit.expected
+        .filter((entry: { present: boolean }) => entry.present === false)
+        .map((entry: { key: string }) => entry.key),
+    ).toEqual([...soilKeys]);
+    expect(observable).not.toContain(secretSentinel);
+  });
+
+  it("reports missing Pheno taxonomy as advisory drift only", () => {
+    const missingKeys = new Set(
+      PHENO_CROSSES_TAXONOMY_COLUMNS.map((column) => `pheno_crosses.${column}`),
+    );
+    const presentEntries = ADVISORY_SCHEMA.filter((entry) => !missingKeys.has(schemaKey(entry)));
+    const dir = mkdtempSync(join(tmpdir(), "core-schema-pheno-gate-"));
+    tempDirs.push(dir);
+    const auditPath = join(dir, "audit.json");
+    const { logger, lines } = captureLogger();
+    let psqlCalls = 0;
+
+    const status = runRequiredCoreMigrationsApplied({
+      env: {
+        TARGET_ENV: "production",
+        MANIFEST_SCOPE: "advisory",
+        SUPABASE_DB_URL: directUrl(PRODUCTION_REF),
+        AUDIT_PATH: auditPath,
+      },
+      spawnImpl: () => {
+        psqlCalls += 1;
+        if (psqlCalls === 1) {
+          return {
+            status: 0,
+            stdout: presentEntries.map(schemaKey).join("\n"),
+            stderr: "",
+          };
+        }
+        return {
+          status: 0,
+          stdout: "plants\npheno_crosses",
+          stderr: "",
+        };
+      },
+      logger,
+    });
+
+    const audit = JSON.parse(readFileSync(auditPath, "utf8"));
+
+    expect(status).toBe(EXIT.MISSING_COLUMNS);
+    expect(psqlCalls).toBe(2);
+    expect(lines).toContain(
+      `3 of ${EXPECTED_ADVISORY_COLUMN_COUNT} required advisory column(s) are missing.`,
+    );
+    expect(audit).toMatchObject({
+      outcome: "missing_columns",
+      schema_verified: true,
+      expected_count: EXPECTED_ADVISORY_COLUMN_COUNT,
+      present_count: 1,
+      missing_count: PHENO_CROSSES_TAXONOMY_COLUMNS.length,
+      note: "Required tables absent: (none).",
+    });
+    expect(
+      audit.expected
+        .filter((entry: { present: boolean }) => entry.present === false)
+        .map((entry: { key: string }) => entry.key),
+    ).toEqual([...missingKeys]);
+  });
+
   it("does not invoke psql when target identity validation fails", () => {
     let psqlCalls = 0;
     const { logger } = captureLogger();
@@ -607,6 +805,24 @@ describe("required-core-migrations workflow trust boundary", () => {
     expect(productionBlock).not.toContain("pull_request");
     expect(productionBlock).toContain("environment: verdant-production");
     expect(productionBlock).toContain("secrets.SUPABASE_DB_URL");
+  });
+
+  it("keeps advisory drift warning-only without weakening either blocking core step", () => {
+    for (const remoteBlock of [sandboxBlock, productionBlock]) {
+      const blockingStart = remoteBlock.indexOf("- name: Verify blocking core schema");
+      const advisoryStart = remoteBlock.indexOf("- name: Verify advisory schema");
+      const publishStart = remoteBlock.indexOf("- name: Publish sanitized reports");
+      const blockingStep = remoteBlock.slice(blockingStart, advisoryStart);
+      const advisoryStep = remoteBlock.slice(advisoryStart, publishStart);
+
+      expect(blockingStart).toBeGreaterThan(0);
+      expect(advisoryStart).toBeGreaterThan(blockingStart);
+      expect(publishStart).toBeGreaterThan(advisoryStart);
+      expect(blockingStep).not.toContain("continue-on-error");
+      expect(blockingStep).not.toContain("MANIFEST_SCOPE");
+      expect(advisoryStep).toContain("continue-on-error: true");
+      expect(advisoryStep).toContain("MANIFEST_SCOPE: advisory");
+    }
   });
 
   it("never references the retired live repository secret", () => {

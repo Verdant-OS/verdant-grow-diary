@@ -10,6 +10,8 @@ const FEEDING_BASE_MIGRATION = "20260518152526_4236167d-2942-4166-91f3-09be993ca
 const FEEDING_EXTENSION_MIGRATION = "20260612212323_568c55c7-3cd0-46f6-aef7-301e61e61362.sql";
 const QUICKLOG_AUDIT_MIGRATION = "20260610230856_e8544509-5a66-41bc-8beb-39c95d96dde5.sql";
 const CORE_SCHEMA_FORWARD_REPAIR = "20260725023000_core_schema_forward_repair.sql";
+const SOIL_MOISTURE_CALIBRATION_MIGRATION = "20260619083000_add_soil_moisture_calibration_v1.sql";
+const PHENO_CROSSES_TAXONOMY_MIGRATION = "20260707210000_pheno_crosses_full_taxonomy.sql";
 
 const feedingColumn = (column, migration) => ({
   table: "feeding_events",
@@ -29,6 +31,24 @@ const quicklogAuditColumn = (column) => ({
     "recording save and validation outcomes. A partial audit table aborts the save path.",
 });
 
+const soilMoistureCalibrationColumn = (column) => ({
+  table: "soil_moisture_calibrations",
+  column,
+  migration: SOIL_MOISTURE_CALIBRATION_MIGRATION,
+  reason:
+    `The One-Tent Loop soil-calibration surface reads and writes ` +
+    `soil_moisture_calibrations.${column}. A partial table breaks sensor calibration.`,
+});
+
+const phenoCrossTaxonomyColumn = (column) => ({
+  table: "pheno_crosses",
+  column,
+  migration: PHENO_CROSSES_TAXONOMY_MIGRATION,
+  reason:
+    `The gated Pheno cross surface reads and writes pheno_crosses.${column}. ` +
+    "Missing taxonomy columns break that paid surface but do not block the One-Tent Loop.",
+});
+
 export const REQUIRED_CORE_SCHEMA = Object.freeze([
   {
     table: "tents",
@@ -42,6 +62,28 @@ export const REQUIRED_CORE_SCHEMA = Object.freeze([
     migration: "20260520154245_5ceda703-6134-459a-87a6-6285cd859ca0.sql",
     reason: "Grow-scoped plant reads require plants.grow_id.",
   },
+
+  // Complete CREATE TABLE contract used by the Sensors calibration read/write
+  // path. A one-column sentinel would miss a partially or manually applied
+  // table and allow a false-green production signoff.
+  ...[
+    "id",
+    "user_id",
+    "grow_id",
+    "tent_id",
+    "plant_id",
+    "device_id",
+    "label",
+    "medium",
+    "sensor_depth_cm",
+    "dry_raw",
+    "wet_raw",
+    "source",
+    "is_active",
+    "notes",
+    "created_at",
+    "updated_at",
+  ].map(soilMoistureCalibrationColumn),
 
   // Complete column list named by the current quicklog_save_event feeding
   // INSERT. Keeping only ALTER-added columns would let a partial/manual table
@@ -85,6 +127,7 @@ export const ADVISORY_SCHEMA = Object.freeze([
     reason:
       "Pheno Hunt candidate ordering depends on candidate_number, but the surface is entitlement-gated.",
   },
+  ...["channel", "generation", "recurrent_parent_id"].map(phenoCrossTaxonomyColumn),
 ]);
 
 export function manifestForScope(scope) {

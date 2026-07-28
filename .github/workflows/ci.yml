@@ -24,8 +24,8 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
-      issues: write         # notify-edge-shared-drift.mjs opens/updates a tracking issue
-      pull-requests: write  # notify-edge-shared-drift.mjs posts a PR comment on drift
+      issues: write # notify-edge-shared-drift.mjs opens/updates a tracking issue
+      pull-requests: write # notify-edge-shared-drift.mjs posts a PR comment on drift
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -332,6 +332,13 @@ jobs:
       # found". Test-only invocation; no production source changes.
       - name: Run AI Doctor provider usage wiring tests
         run: deno test --allow-env --allow-read --unstable-sloppy-imports supabase/functions/ai-doctor-review/providerUsageWiring.test.ts
+
+      # Stop-ship: operator-pasted GGS payloads must preserve strict source,
+      # device/cohort, attestation, auth, ownership, and CORS boundaries before
+      # the private commit RPC is reachable. Local-only; no Supabase or device
+      # network calls and no secrets required.
+      - name: Operator GGS real-payload boundary tests (Deno)
+        run: deno test --no-lock supabase/functions/operator-ggs-real-payload-commit/handler.test.ts supabase/functions/operator-ggs-real-payload-commit/productionDeps.test.ts
 
       # Optional: QuickLog RPC runtime harnesses. Only runs when staging
       # Supabase credentials are configured as repo/org secrets. The

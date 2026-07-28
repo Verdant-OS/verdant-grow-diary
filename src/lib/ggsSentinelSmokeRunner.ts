@@ -30,6 +30,7 @@ type GgsSensorBodyKey = typeof RAW_SENSOR_BODY_KEY;
 
 export type GgsSentinelState =
   | "PASS_LIVE_SENTINEL_READY"
+  | "PASS_OPERATOR_ATTESTED_SENTINEL_READY"
   | "BLOCKED_NO_GGS_ROWS"
   | "BLOCKED_NO_SOIL_TEMP_C"
   | "BLOCKED_NO_EC"
@@ -37,6 +38,8 @@ export type GgsSentinelState =
   | "BLOCKED_SOURCE_NOT_CANONICAL"
   | "BLOCKED_STALE_READING"
   | "BLOCKED_RAW_PAYLOAD_RENDER_RISK"
+  | "BLOCKED_OPERATOR_ATTESTATION_MISSING"
+  | "BLOCKED_COHORT_INCOHERENT"
   | "BLOCKED_VALIDATION_ERROR";
 
 /** Minimal row shape consumed by the evaluator. Pulled from sensor readings. */
@@ -44,6 +47,8 @@ export type GgsSentinelInputRow = {
   metric: string;
   value: number | null;
   source: string | null;
+  quality?: string | null;
+  device_id?: string | null;
   captured_at: string;
 } & Record<GgsSensorBodyKey, unknown>;
 
@@ -117,6 +122,11 @@ export interface GgsSentinelEvaluateInput {
   now?: Date;
   /** Freshness threshold; defaults to GGS 15-minute stale window. */
   staleMs?: number;
+  /**
+   * Accepted acquisition-path sources. Defaults to independently ingested
+   * live rows. Specialized callers may pass a stricter, explicit source set.
+   */
+  acceptedSources?: ReadonlySet<string>;
 }
 
 export const GGS_METRIC_FRIENDLY_NAME: Record<GgsSentinelMetric, string> = {
@@ -250,6 +260,7 @@ export function evaluateGgsSentinelReadiness(
 ): GgsSentinelEvaluation {
   const now = input.now ?? new Date();
   const staleMs = input.staleMs ?? SPIDER_FARMER_GGS_STALE_MS;
+  const acceptedSources = input.acceptedSources ?? CANONICAL_LIVE_SOURCES;
   const checks: GgsSentinelCheck[] = [];
 
   const rows = Array.isArray(input.rows) ? input.rows : [];
@@ -310,14 +321,26 @@ export function evaluateGgsSentinelReadiness(
   let sawForbiddenSource: string | null = null;
   let missingVendorFor: GgsSentinelMetric | null = null;
   let staleMetric: { metric: GgsSentinelMetric; age: number } | null = null;
+  let staleQualityFor: GgsSentinelMetric | null = null;
+  let untrustedQualityFor: GgsSentinelMetric | null = null;
+  let invalidRowFor: GgsSentinelMetric | null = null;
   const safeMetrics: GgsSentinelSafeMetricSummary[] = [];
 
   for (const metric of GGS_SENTINEL_METRICS) {
     const row = latestByMetric.get(metric);
     if (!row) continue;
     const src = (row.source ?? "").trim();
-    if (FORBIDDEN_NON_CANONICAL_SOURCES.has(src)) {
+    if (!acceptedSources.has(src)) {
       sawForbiddenSource = src;
+    }
+    const quality = (row.quality ?? "").trim();
+    if (quality === "stale") {
+      staleQualityFor = metric;
+    } else if (quality !== "ok") {
+      untrustedQualityFor = metric;
+    }
+    if (!Number.isFinite(Date.parse(row.captured_at))) {
+      invalidRowFor = metric;
     }
     const vendor = readVendor(readSensorBody(row));
     if (vendor !== GGS_REAL_PAYLOAD_SOURCE_APP) {
@@ -350,6 +373,18 @@ export function evaluateGgsSentinelReadiness(
       "All GGS rows use canonical source",
       sawForbiddenSource ? "fail" : "pass",
       sawForbiddenSource ? `forbidden source: ${sawForbiddenSource}` : undefined,
+    ),
+  );
+  checks.push(
+    check(
+      "quality_trusted",
+      'All GGS rows use quality "ok"',
+      staleQualityFor || untrustedQualityFor ? "fail" : "pass",
+      staleQualityFor
+        ? `stale quality for ${staleQualityFor}`
+        : untrustedQualityFor
+          ? `unsafe quality for ${untrustedQualityFor}`
+          : undefined,
     ),
   );
   checks.push(
@@ -393,6 +428,8 @@ export function evaluateGgsSentinelReadiness(
     state = "BLOCKED_SOURCE_NOT_CANONICAL";
   } else if (missingVendorFor) {
     state = "BLOCKED_VENDOR_PROVENANCE_MISSING";
+  } else if (invalidRowFor || untrustedQualityFor) {
+    state = "BLOCKED_VALIDATION_ERROR";
   } else if (!hasSoilTemp) {
     state = "BLOCKED_NO_SOIL_TEMP_C";
   } else if (!hasEc) {
@@ -400,7 +437,7 @@ export function evaluateGgsSentinelReadiness(
   } else if (!hasMoisture) {
     // Treat as BLOCKED_NO_GGS_ROWS-ish, but more specific: moisture missing.
     state = "BLOCKED_NO_GGS_ROWS";
-  } else if (staleMetric) {
+  } else if (staleMetric || staleQualityFor) {
     state = "BLOCKED_STALE_READING";
   } else {
     state = "PASS_LIVE_SENTINEL_READY";

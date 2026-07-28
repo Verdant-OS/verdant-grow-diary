@@ -32,6 +32,16 @@ describe("sensor provenance RLS harness fixture safety", () => {
     );
   });
 
+  it("proves both reserved markers are client-denied and the service-role RPC remains valid", () => {
+    expect(HARNESS).toContain('"operator_attested_real_payload"');
+    expect(HARNESS).toContain('"operator-ggs-real-payload-commit"');
+    expect(HARNESS).toContain("authenticated client cannot forge reserved");
+    expect(HARNESS).toMatch(/admin\.rpc\("pi_ingest_commit_batch",\s*\{[\s\S]*p_rows:/);
+    expect(HARNESS).toContain(
+      "service-role pi_ingest_commit_batch preserves reserved operator attestation",
+    );
+  });
+
   it("keeps the remote-database opt-in guard and never prints credentials", () => {
     expect(HARNESS).toContain("SENSOR_READINGS_SOURCE_RLS_HARNESS_ALLOW_REMOTE");
     expect(HARNESS).toContain("refusing remote database");

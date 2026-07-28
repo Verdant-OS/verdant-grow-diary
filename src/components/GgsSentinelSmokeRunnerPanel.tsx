@@ -12,12 +12,7 @@
  * no device control.
  */
 import React from "react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CircleHelp, ClockAlert, ShieldAlert, ShieldCheck, TimerReset } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +33,9 @@ const TONE_CLASSES: Readonly<Record<FreshnessTone, string>> = {
   destructive: "bg-destructive/15 text-destructive border-destructive/40",
   muted: "bg-muted text-muted-foreground border-border",
 };
+
+const FRESHNESS_PRIORITY_COPY =
+  "Freshness guidance explains metric timing only — result-state priority still comes from the smoke-check result above.";
 
 const STATE_ICON: Readonly<Record<MetricFreshnessState, ComponentType<SVGProps<SVGSVGElement>>>> = {
   fresh: ShieldCheck,
@@ -124,9 +122,7 @@ function FreshnessBadge({ freshness }: { freshness: GgsSentinelMetricFreshness }
           aria-label={`${f.freshnessStatus} freshness details`}
           className="rounded border px-1.5 py-0.5 text-xs"
         >
-          <span data-testid={`ggs-freshness-badge-${f.freshnessStatus}`}>
-            {f.freshnessStatus}
-          </span>
+          <span data-testid={`ggs-freshness-badge-${f.freshnessStatus}`}>{f.freshnessStatus}</span>
         </button>
       </TooltipTrigger>
       <TooltipContent>{tooltipText}</TooltipContent>
@@ -143,7 +139,7 @@ export function GgsSentinelFreshnessGuidanceList({
     <TooltipProvider>
       <div data-testid="ggs-freshness-compact-list" className="space-y-2">
         <p data-testid="ggs-freshness-priority-note" className="text-xs text-muted-foreground">
-          Freshness guidance explains metric timing only — result-state priority still comes from the smoke-check result above.
+          {FRESHNESS_PRIORITY_COPY}
         </p>
         <ul className="overflow-hidden rounded-md border bg-muted/20">
           {metricFreshness.map((f) => (
@@ -162,7 +158,9 @@ export function GgsSentinelFreshnessGuidanceList({
               {f.missing && <span aria-label="no row found" className="sr-only" />}
               <span className="font-medium text-foreground">{f.ageLabel}</span>
               <FreshnessBadge freshness={f} />
-              <span aria-hidden="true" className="text-muted-foreground">·</span>
+              <span aria-hidden="true" className="text-muted-foreground">
+                ·
+              </span>
               <span className="text-muted-foreground truncate">{f.nextActionLabel}</span>
             </li>
           ))}
@@ -178,7 +176,9 @@ export interface GgsSentinelSmokeRunnerPanelProps {
 
 export function GgsSentinelSmokeRunnerPanel({ viewModel }: GgsSentinelSmokeRunnerPanelProps) {
   const { pill, freshnessNote, rows } = viewModel;
-  const isPass = pill.state === "PASS_LIVE_SENTINEL_READY";
+  const isPass =
+    pill.state === "PASS_LIVE_SENTINEL_READY" ||
+    pill.state === "PASS_OPERATOR_ATTESTED_SENTINEL_READY";
   const HeaderIcon = isPass ? ShieldCheck : ShieldAlert;
 
   return (

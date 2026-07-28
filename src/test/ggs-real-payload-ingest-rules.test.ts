@@ -10,10 +10,13 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   buildGgsRealPayloadCommitInput,
+  GGS_REAL_PAYLOAD_METRICS,
   GGS_REAL_PAYLOAD_SOURCE,
   GGS_REAL_PAYLOAD_SOURCE_APP,
+  hasCompleteCanonicalGgsRealPayloadRows,
   type GgsRealPayloadCommitInput,
 } from "@/lib/ggsRealPayloadIngestRules";
+import { GGS_SOIL_STALE_MS } from "@/lib/ggsSoilSensorReadingNormalizer";
 
 const NOW = new Date("2026-06-17T12:00:00Z");
 const FRESH_TS = "2026-06-17T11:59:00Z";
@@ -23,7 +26,8 @@ const CTX = {
   userId: "user-uuid-aaaa",
   bridgeId: "bridge-uuid-bbbb",
   tentId: TENT,
-  deviceId: "ggs-probe-serial-001",
+  deviceId: "GGS-PRO-1234567",
+  operatorAttested: true,
   now: NOW,
 };
 
@@ -57,17 +61,46 @@ describe("buildGgsRealPayloadCommitInput", () => {
     const metrics = plan.rows.map((r) => r.metric).sort();
     expect(metrics).toEqual(["ec", "soil_moisture_pct", "soil_temp_c"]);
     for (const row of plan.rows) {
-      expect(row.source).toBe("live");
+      expect(row.source).toBe("manual");
       expect(row.source).toBe(GGS_REAL_PAYLOAD_SOURCE);
       expect(row.raw_payload.source_app).toBe(GGS_REAL_PAYLOAD_SOURCE_APP);
       expect(row.raw_payload.source_app).toBe("spider_farmer_ggs");
       expect(row.raw_payload.sensor_id).toBe("GGS-PRO-1234567");
+      expect(row.raw_payload.device_id).toBe("GGS-PRO-1234567");
+      expect(row.raw_payload.cohort_id).toBe(`ggs:GGS-PRO-1234567:${row.captured_at}`);
+      expect(row.raw_payload.provenance).toBe("operator_attested_real_payload");
+      expect(row.raw_payload.operator_attestation).toEqual({
+        attested: true,
+        attested_at: NOW.toISOString(),
+        boundary: "operator-ggs-real-payload-commit",
+      });
       expect(row.raw_payload.original_units?.soil_ec).toBe("mS/cm");
       expect(new Date(row.captured_at).toISOString()).toBe(new Date(FRESH_TS).toISOString());
       expect(row.device_id).toBe(CTX.deviceId);
       expect(row.idempotency_key.startsWith("ggs:")).toBe(true);
       expect(Number.isFinite(row.value)).toBe(true);
     }
+  });
+
+  it.each([
+    ["soil moisture", "soil_moisture_pct"],
+    ["EC", "soil_ec"],
+    ["soil temperature", "soil_temp_c"],
+  ] as const)("refuses a payload missing %s as one incomplete atomic cohort", (_label, key) => {
+    const incomplete = realLookingPayload();
+    delete incomplete[key];
+    expect(refusalReason(buildGgsRealPayloadCommitInput(incomplete, CTX))).toBe(
+      "incomplete_canonical_readings",
+    );
+  });
+
+  it("requires exactly one of each canonical metric", () => {
+    const complete = GGS_REAL_PAYLOAD_METRICS.map((metric) => ({ metric }));
+    expect(hasCompleteCanonicalGgsRealPayloadRows(complete)).toBe(true);
+    expect(hasCompleteCanonicalGgsRealPayloadRows(complete.slice(0, 2))).toBe(false);
+    expect(hasCompleteCanonicalGgsRealPayloadRows([complete[0], complete[0], complete[2]])).toBe(
+      false,
+    );
   });
 
   it("never emits ggs_live or ggs_csv sources", () => {
@@ -80,23 +113,189 @@ describe("buildGgsRealPayloadCommitInput", () => {
   });
 
   it("refuses an explicit declared source of demo", () => {
-    const plan = buildGgsRealPayloadCommitInput(
-      { ...realLookingPayload(), source: "demo" },
-      CTX,
-    );
-    expect(refusalReason(plan)).toBe("forbidden_declared_source");
+    const plan = buildGgsRealPayloadCommitInput({ ...realLookingPayload(), source: "demo" }, CTX);
+    expect(refusalReason(plan)).toBe("declared_source_not_allowed");
   });
 
-  it.each(["ggs_live", "ggs_csv", "fixture", "test", "sample"])(
-    "refuses forbidden declared source %s",
-    (src) => {
+  it.each([
+    "ggs_live",
+    "ggs_csv",
+    "manual",
+    "csv",
+    "stale",
+    "invalid",
+    "fixture",
+    "test",
+    "sample",
+    "unknown_device_source",
+    "synthetic",
+  ])("refuses every explicit source outside the strict allowlist: %s", (src) => {
+    const plan = buildGgsRealPayloadCommitInput({ ...realLookingPayload(), source: src }, CTX);
+    expect(refusalReason(plan)).toBe("declared_source_not_allowed");
+  });
+
+  it("overwrites client-forged provenance with the server-authored outer envelope", () => {
+    const plan = buildGgsRealPayloadCommitInput(
+      {
+        ...realLookingPayload(),
+        source_app: "forged_vendor",
+        cohort_id: "forged-cohort",
+        provenance: "independently_verified_live",
+        operator_attestation: { attested: false, boundary: "forged" },
+      },
+      CTX,
+    );
+    if (plan.ok === false) throw new Error(`expected ok, got ${plan.reason}`);
+    for (const row of plan.rows) {
+      expect(row.raw_payload.source_app).toBe("spider_farmer_ggs");
+      expect(row.raw_payload.cohort_id).toBe(`ggs:${CTX.deviceId}:${row.captured_at}`);
+      expect(row.raw_payload.provenance).toBe("operator_attested_real_payload");
+      expect(row.raw_payload.operator_attestation.attested).toBe(true);
+      expect(row.raw_payload.payload).toMatchObject({
+        source_app: "forged_vendor",
+        cohort_id: "forged-cohort",
+        provenance: "independently_verified_live",
+      });
+    }
+  });
+
+  it.each(["live", "spider_farmer_ggs"])("allows explicit real source %s", (source) => {
+    const plan = buildGgsRealPayloadCommitInput({ ...realLookingPayload(), source }, CTX);
+    expect(plan.ok).toBe(true);
+  });
+
+  it("validates every present source alias instead of trusting the first allowed declaration", () => {
+    for (const payload of [
+      {
+        ...realLookingPayload(),
+        source: "live",
+        declared_source: "synthetic",
+      },
+      {
+        ...realLookingPayload(),
+        source: "live",
+        declaredSource: "demo",
+      },
+      {
+        ...realLookingPayload(),
+        declared_source: "spider_farmer_ggs",
+        declaredSource: "fixture",
+      },
+    ]) {
+      expect(refusalReason(buildGgsRealPayloadCommitInput(payload, CTX))).toBe(
+        "declared_source_not_allowed",
+      );
+    }
+  });
+
+  it.each([null, 42, true, {}, [], "", "   "])(
+    "refuses malformed present source declarations: %j",
+    (declaredSource) => {
       const plan = buildGgsRealPayloadCommitInput(
-        { ...realLookingPayload(), source: src },
+        {
+          ...realLookingPayload(),
+          source: "live",
+          declared_source: declaredSource,
+        },
         CTX,
       );
-      expect(refusalReason(plan)).toBe("forbidden_declared_source");
+      expect(refusalReason(plan)).toBe("declared_source_not_allowed");
     },
   );
+
+  it("refuses conflicting declarations even when each value is independently allowed", () => {
+    const plan = buildGgsRealPayloadCommitInput(
+      {
+        ...realLookingPayload(),
+        source: "live",
+        declared_source: "spider_farmer_ggs",
+      },
+      CTX,
+    );
+    expect(refusalReason(plan)).toBe("declared_source_not_allowed");
+  });
+
+  it("accepts repeated aliases only when every declaration normalizes identically", () => {
+    const plan = buildGgsRealPayloadCommitInput(
+      {
+        ...realLookingPayload(),
+        source: " LIVE ",
+        declared_source: "live",
+        declaredSource: "Live",
+      },
+      CTX,
+    );
+    expect(plan.ok).toBe(true);
+  });
+
+  it("accepts the exact past and future freshness boundaries, then refuses one millisecond beyond", () => {
+    const exactStaleBoundary = new Date(NOW.getTime() - GGS_SOIL_STALE_MS).toISOString();
+    const beyondStaleBoundary = new Date(NOW.getTime() - GGS_SOIL_STALE_MS - 1).toISOString();
+    const exactFutureBoundary = new Date(NOW.getTime() + 5 * 60 * 1000).toISOString();
+    const beyondFutureBoundary = new Date(NOW.getTime() + 5 * 60 * 1000 + 1).toISOString();
+
+    expect(
+      buildGgsRealPayloadCommitInput(
+        { ...realLookingPayload(), timestamp: exactStaleBoundary },
+        CTX,
+      ).ok,
+    ).toBe(true);
+    expect(
+      refusalReason(
+        buildGgsRealPayloadCommitInput(
+          { ...realLookingPayload(), timestamp: beyondStaleBoundary },
+          CTX,
+        ),
+      ),
+    ).toBe("normalizer_refused");
+    expect(
+      buildGgsRealPayloadCommitInput(
+        { ...realLookingPayload(), timestamp: exactFutureBoundary },
+        CTX,
+      ).ok,
+    ).toBe(true);
+    expect(
+      refusalReason(
+        buildGgsRealPayloadCommitInput(
+          { ...realLookingPayload(), timestamp: beyondFutureBoundary },
+          CTX,
+        ),
+      ),
+    ).toBe("normalizer_refused");
+  });
+
+  it("refuses a missing or mismatched payload device identity", () => {
+    const missing = realLookingPayload();
+    delete missing.sensor_id;
+    expect(refusalReason(buildGgsRealPayloadCommitInput(missing, CTX))).toBe(
+      "payload_device_id_missing",
+    );
+
+    expect(
+      refusalReason(
+        buildGgsRealPayloadCommitInput(
+          { ...realLookingPayload(), sensor_id: "OTHER-GGS-PROBE" },
+          CTX,
+        ),
+      ),
+    ).toBe("payload_device_id_mismatch");
+
+    expect(
+      refusalReason(
+        buildGgsRealPayloadCommitInput(
+          { ...realLookingPayload(), device_id: "CONFLICTING-GGS-PROBE" },
+          CTX,
+        ),
+      ),
+    ).toBe("payload_device_id_mismatch");
+  });
+
+  it("accepts a controller_id-only payload when it exactly matches request deviceId", () => {
+    const controllerOnly = realLookingPayload();
+    delete controllerOnly.sensor_id;
+    controllerOnly.controller_id = CTX.deviceId;
+    expect(buildGgsRealPayloadCommitInput(controllerOnly, CTX).ok).toBe(true);
+  });
 
   it("refuses when timestamp is missing", () => {
     const p = realLookingPayload();
@@ -121,14 +320,14 @@ describe("buildGgsRealPayloadCommitInput", () => {
     expect(refusalReason(plan)).toBe("device_id_missing");
   });
 
-  it("refuses fully non-numeric payloads and never emits NaN rows for partials", () => {
+  it("refuses fully non-numeric and partial payloads without emitting any rows", () => {
     const partial = buildGgsRealPayloadCommitInput(
       { ...realLookingPayload(), soil_temp_c: "warm" },
       CTX,
     );
     const allBad = buildGgsRealPayloadCommitInput(
       {
-        sensor_id: "x",
+        sensor_id: CTX.deviceId,
         tent_id: TENT,
         timestamp: FRESH_TS,
         soil_moisture_pct: "wet",
@@ -137,13 +336,10 @@ describe("buildGgsRealPayloadCommitInput", () => {
       },
       CTX,
     );
-    expect(["no_canonical_readings", "normalizer_refused"]).toContain(
+    expect(refusalReason(partial)).toBe("incomplete_canonical_readings");
+    expect(["incomplete_canonical_readings", "normalizer_refused"]).toContain(
       refusalReason(allBad),
     );
-    if (partial.ok) {
-      expect(partial.rows.find((r) => r.metric === "soil_temp_c")).toBeUndefined();
-      for (const row of partial.rows) expect(Number.isFinite(row.value)).toBe(true);
-    }
   });
 
   it("refuses NaN / Infinity values", () => {
@@ -155,10 +351,7 @@ describe("buildGgsRealPayloadCommitInput", () => {
   });
 
   it("refuses out-of-bounds soil_temp_c", () => {
-    const plan = buildGgsRealPayloadCommitInput(
-      { ...realLookingPayload(), soil_temp_c: 999 },
-      CTX,
-    );
+    const plan = buildGgsRealPayloadCommitInput({ ...realLookingPayload(), soil_temp_c: 999 }, CTX);
     // Either upstream normalizer drops it, or our bounds check fires.
     if (plan.ok === true) {
       expect(plan.rows.find((r) => r.metric === "soil_temp_c")).toBeUndefined();
@@ -166,17 +359,14 @@ describe("buildGgsRealPayloadCommitInput", () => {
       const failed = plan as Extract<GgsRealPayloadCommitInput, { ok: false }>;
       expect([
         "soil_temp_out_of_range",
-        "no_canonical_readings",
+        "incomplete_canonical_readings",
         "normalizer_refused",
       ]).toContain(failed.reason);
     }
   });
 
   it("refuses suspected EC unit mismatch (µS/cm leaking through)", () => {
-    const plan = buildGgsRealPayloadCommitInput(
-      { ...realLookingPayload(), soil_ec: 1500 },
-      CTX,
-    );
+    const plan = buildGgsRealPayloadCommitInput({ ...realLookingPayload(), soil_ec: 1500 }, CTX);
     expect(refusalReason(plan)).toBe("soil_ec_unit_mismatch_suspected");
   });
 
@@ -205,10 +395,7 @@ describe("buildGgsRealPayloadCommitInput", () => {
   });
 
   it("does not import Supabase, fetch, AI, alerts, action_queue, or device control", () => {
-    const src = readFileSync(
-      resolve(__dirname, "../lib/ggsRealPayloadIngestRules.ts"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(__dirname, "../lib/ggsRealPayloadIngestRules.ts"), "utf8");
     expect(src).not.toMatch(/from\s+["']@\/integrations\/supabase/);
     expect(src).not.toMatch(/@supabase\/supabase-js/);
     expect(src).not.toMatch(/\.from\(["']sensor_readings["']\)/);

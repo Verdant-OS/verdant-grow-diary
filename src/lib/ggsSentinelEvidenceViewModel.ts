@@ -115,7 +115,9 @@ export function buildGgsSentinelEvidenceViewModel(
 
 function mapStateToVerdict(state: GgsSentinelState | null | undefined): GgsSentinelEvidenceVerdict {
   if (!state) return "unknown";
-  if (state === "PASS_LIVE_SENTINEL_READY") return "pass";
+  if (state === "PASS_LIVE_SENTINEL_READY" || state === "PASS_OPERATOR_ATTESTED_SENTINEL_READY") {
+    return "pass";
+  }
   if (state === "BLOCKED_VALIDATION_ERROR") return "warn";
   return "blocked";
 }
@@ -137,9 +139,7 @@ function buildMetricLines(
   }
   // Always render one row per canonical metric in deterministic order.
   const ordered: GgsSentinelMetric[] =
-    freshness.length > 0
-      ? freshness.map((f) => f.metric)
-      : (Array.from(safeByMetric.keys()));
+    freshness.length > 0 ? freshness.map((f) => f.metric) : Array.from(safeByMetric.keys());
 
   // Deduplicate while preserving order.
   const seen = new Set<GgsSentinelMetric>();
@@ -202,7 +202,11 @@ function buildNextSteps(
   if (state === "BLOCKED_VALIDATION_ERROR") {
     steps.push("Re-run the GGS Sentinel smoke check after resolving the validation error.");
   }
-  if (steps.length === 0 && state !== "PASS_LIVE_SENTINEL_READY") {
+  if (
+    steps.length === 0 &&
+    state !== "PASS_LIVE_SENTINEL_READY" &&
+    state !== "PASS_OPERATOR_ATTESTED_SENTINEL_READY"
+  ) {
     steps.push("Refresh evidence by running the GGS Sentinel smoke check again.");
   }
   return Array.from(new Set(steps));

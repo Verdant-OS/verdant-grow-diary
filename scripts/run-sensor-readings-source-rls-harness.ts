@@ -20,6 +20,8 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 const REMOTE_CONFIRM_ENV = "SENSOR_READINGS_SOURCE_RLS_HARNESS_ALLOW_REMOTE";
+const OPERATOR_ATTESTED_PROVENANCE = "operator_attested_real_payload";
+const OPERATOR_ATTESTATION_BOUNDARY = "operator-ggs-real-payload-commit";
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const anonKey =
@@ -160,6 +162,37 @@ async function main() {
       );
     }
 
+    const reservedMarkerForgeries = [
+      {
+        label: "operator provenance",
+        raw_payload: { provenance: OPERATOR_ATTESTED_PROVENANCE },
+      },
+      {
+        label: "operator attestation boundary",
+        raw_payload: {
+          operator_attestation: { boundary: OPERATOR_ATTESTATION_BOUNDARY },
+        },
+      },
+    ] as const;
+    for (const [index, attempt] of reservedMarkerForgeries.entries()) {
+      const row = {
+        ...reading(ownerFixture.id, ownerTentId, "manual", (index + 12) * 1_000),
+        raw_payload: attempt.raw_payload,
+      };
+      const { data, error } = await ownerClient.from("sensor_readings").insert(row).select("id");
+      const { count, error: countError } = await admin
+        .from("sensor_readings")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", row.user_id)
+        .eq("tent_id", row.tent_id)
+        .eq("captured_at", row.captured_at);
+      check(
+        `authenticated client cannot forge reserved ${attempt.label}`,
+        (!!error || (data ?? []).length === 0) && !countError && count === 0,
+        error?.code ?? countError?.code,
+      );
+    }
+
     const blockedSources = ["live", "ecowitt", "mqtt", "webhook", "pi_bridge"];
     for (const [index, source] of blockedSources.entries()) {
       const row = reading(ownerFixture.id, ownerTentId, source, (index + 2) * 1_000);
@@ -242,10 +275,59 @@ async function main() {
       !serviceRoleError && serviceRoleData?.length === 1 && serviceRoleData[0]?.source === "live",
       serviceRoleError?.code,
     );
+
+    const rpcCapturedAt = new Date(Date.now() - 30_000).toISOString();
+    const rpcIdempotencyKey = `operator-ggs-rls-${crypto.randomUUID()}`;
+    const { data: rpcData, error: rpcError } = await admin.rpc("pi_ingest_commit_batch", {
+      p_user_id: ownerFixture.id,
+      p_bridge_id: crypto.randomUUID(),
+      p_tent_id: ownerTentId,
+      p_rows: [
+        {
+          idempotency_key: rpcIdempotencyKey,
+          device_id: "GGS-RLS-HARNESS",
+          metric: "soil_moisture_pct",
+          value: 42.5,
+          captured_at: rpcCapturedAt,
+          source: "manual",
+          quality: "ok",
+          raw_payload: {
+            provenance: OPERATOR_ATTESTED_PROVENANCE,
+            operator_attestation: {
+              attested: true,
+              boundary: OPERATOR_ATTESTATION_BOUNDARY,
+            },
+          },
+        },
+      ],
+    });
+    const rpcCounts = (Array.isArray(rpcData) ? rpcData[0] : rpcData) as {
+      inserted?: number;
+      rejected?: number;
+    } | null;
+    const { data: rpcRows, error: rpcReadError } = await admin
+      .from("sensor_readings")
+      .select("source,raw_payload")
+      .eq("user_id", ownerFixture.id)
+      .eq("tent_id", ownerTentId)
+      .eq("captured_at", rpcCapturedAt);
+    check(
+      "service-role pi_ingest_commit_batch preserves reserved operator attestation",
+      !rpcError &&
+        !rpcReadError &&
+        rpcCounts?.inserted === 1 &&
+        rpcCounts.rejected === 0 &&
+        rpcRows?.length === 1 &&
+        rpcRows[0]?.source === "manual" &&
+        rpcRows[0]?.raw_payload?.provenance === OPERATOR_ATTESTED_PROVENANCE &&
+        rpcRows[0]?.raw_payload?.operator_attestation?.boundary === OPERATOR_ATTESTATION_BOUNDARY,
+      rpcError?.code ?? rpcReadError?.code,
+    );
   } finally {
     const userIds = [owner?.id, other?.id].filter((id): id is string => typeof id === "string");
     const tentIds = [ownerTentId, otherTentId].filter((id): id is string => typeof id === "string");
     if (userIds.length > 0) {
+      await admin.from("pi_ingest_idempotency_keys").delete().in("user_id", userIds);
       await admin.from("sensor_readings").delete().in("user_id", userIds);
     }
     if (tentIds.length > 0) {

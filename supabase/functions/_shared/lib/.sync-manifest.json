@@ -1,6 +1,6 @@
 {
   "generator": "scripts/sync-edge-shared.mjs",
-  "sourceCount": 87,
+  "sourceCount": 90,
   "sourceHashes": {
     "src/constants/aiDoctorContextReadiness.ts": "22767b47268f6fa199b89f81d9dbb7fb017ab1f9f860c8dfdfe6d44501ee8170",
     "src/constants/aiDoctorImportedHistory.ts": "f04d998dea22c9e8e7aaa6489a64cf4af44202435982039a1f216ccba9c317a0",
@@ -46,6 +46,8 @@
     "src/lib/entitlements/types.ts": "01e4bef6d3d45a7b455bf110ba524f7374de9a9b5bc99c85013c1d3dafd3c1fd",
     "src/lib/entitlements/unionEntitlements.ts": "125535fa611f766d4ae8a242dfef217462ee7b5ffd303c81113945ae1fe5b3fc",
     "src/lib/environmentTargetComparison.ts": "565e9242bca55e8df02cfc36dd5e5c1e2caca8f4e31496634b775eac5892bf0b",
+    "src/lib/ggsRealPayloadIngestRules.ts": "df85bb4b0fe4b0f6f05c87b6c49d8536c5c7683bd75093ed38671805f403329c",
+    "src/lib/ggsSoilSensorReadingNormalizer.ts": "0d43d85f9b79171782bf281fcc1b766e34e6e6aa0134bd69c6fd3bcfe6450fea",
     "src/lib/harvestWatchEvidenceHistoryViewModel.ts": "086b9df002fb4d7315777c7f6a79c7777c91ab49004468ca69ceed4fdd4c7a8b",
     "src/lib/latestSensorSnapshotRules.ts": "4a3177cda98afc0b42f215169f766978e681ff7f8f2fae80bfa07dcbfcf10bdf",
     "src/lib/manualSensorSnapshotRules.ts": "c71b8a44acc9f29b731935383e7bff95337daa52b882a1da24eea7ce9964b415",
@@ -84,6 +86,7 @@
     "src/lib/sensorSnapshotStatusContract.ts": "22b50ce8fb192afcd631bdd2a8d8c56d98d9f11fc739b00bbd46ed55629b5911",
     "src/lib/sensorSourceDisplayLabel.ts": "d08b1c1908249b7b0706bc02d16e0738b827f9711bcbe3a215480ca9d6189942",
     "src/lib/sensorTestbenchIndicatorRules.ts": "be49643388458d37554f1d1f512145a5e228483fa4578827489470e2def41fe7",
+    "src/lib/spiderFarmerGgsMappingRules.ts": "55150bb191cc4acde5013c976c18c78555713baa29fa7b21db330895bfee0519",
     "src/lib/timelineEntryAnchorRules.ts": "155cf98d4cc8c75d583748fceaff088158ffee4fb3d25dbc4e74b24367080deb",
     "src/lib/timelineEntryClassification.ts": "b108ca8b86ed6973ad69626d316dde9445e8981d2a8018a167783cad145f5b86",
     "src/lib/timelineFilterRules.ts": "3cc84ca8afcd59f95342079e24849be71077bf1515d38b223a4809c7224b967c",

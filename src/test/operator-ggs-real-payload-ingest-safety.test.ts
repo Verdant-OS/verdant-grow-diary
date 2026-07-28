@@ -8,7 +8,8 @@ import { resolve } from "node:path";
  *
  * These tests guard the AGENTS.md "Hard Safety Rules" for this slice:
  *   - Sentinel evaluation stays read-only.
- *   - Ingest writes route only through the validated commit helper/RPC.
+ *   - Ingest writes cross the authenticated Edge boundary; the browser never
+ *     calls the private commit RPC directly.
  *   - No Action Queue mutation, AI imports, device control, raw_payload
  *     rendering, MQTT publishing, or ggs_live/ggs_csv test-data labels.
  */
@@ -80,8 +81,12 @@ describe("static safety — GGS Sentinel page", () => {
       expect(SENTINEL_PAGE).not.toContain(term);
     });
   }
-  it("page does not import raw_payload from anywhere", () => {
-    expect(SENTINEL_PAGE).not.toMatch(/raw_payload/);
+  it("page selects raw_payload only for safe vendor provenance and never renders it", () => {
+    expect(SENTINEL_PAGE).toContain(
+      "metric,value,source,quality,device_id,captured_at,raw_payload",
+    );
+    expect(SENTINEL_PAGE).not.toMatch(/\{[^}]*raw_payload[^}]*\}/);
+    expect(SENTINEL_PAGE).not.toMatch(/JSON\.stringify\([^)]*raw_payload/);
   });
   it("page does not publish or broadcast", () => {
     expect(SENTINEL_PAGE).not.toMatch(/\b(publish|broadcast|emit|dispatch)\s*\(/);
@@ -124,9 +129,10 @@ describe("evaluator priority unchanged — explanatory note pinned verbatim", ()
       "Freshness guidance does not change Sentinel result priority. It only explains why each metric is fresh, aging, stale, or missing.",
     );
   });
-  it("rules module's verdict ladder includes all and only the 9 documented states", () => {
+  it("rules module's verdict ladder includes every documented state", () => {
     const expected = [
       "PASS_LIVE_SENTINEL_READY",
+      "PASS_OPERATOR_ATTESTED_SENTINEL_READY",
       "BLOCKED_NO_GGS_ROWS",
       "BLOCKED_NO_SOIL_TEMP_C",
       "BLOCKED_NO_EC",
@@ -135,6 +141,8 @@ describe("evaluator priority unchanged — explanatory note pinned verbatim", ()
       "BLOCKED_STALE_READING",
       "BLOCKED_VALIDATION_ERROR",
       "BLOCKED_RAW_PAYLOAD_RENDER_RISK",
+      "BLOCKED_OPERATOR_ATTESTATION_MISSING",
+      "BLOCKED_COHORT_INCOHERENT",
     ];
     for (const code of expected) {
       expect(SENTINEL_RULES).toContain(code);
@@ -151,6 +159,7 @@ describe("operator GGS real-payload ingest — static safety", () => {
   it("visible route copy discloses both attested commit capability and read-only Sentinel review", () => {
     expect(REAL_PAYLOAD_PAGE).toContain("Commit validated, attested Spider Farmer GGS readings");
     expect(REAL_PAYLOAD_PAGE).toContain("read-only Sentinel verdict");
+    expect(REAL_PAYLOAD_PAGE).toContain("not presented as independently verified live telemetry");
   });
 
   it("panel never renders raw_payload body fields", () => {
@@ -171,8 +180,10 @@ describe("operator GGS real-payload ingest — static safety", () => {
     }
   });
 
-  it("commit wrapper only calls pi_ingest_commit_batch, not direct sensor_readings inserts", () => {
-    expect(REAL_PAYLOAD_COMMIT).toMatch(/pi_ingest_commit_batch/);
+  it("commit wrapper invokes the operator Edge boundary, never the private RPC", () => {
+    expect(REAL_PAYLOAD_COMMIT).toMatch(/operator-ggs-real-payload-commit/);
+    expect(REAL_PAYLOAD_COMMIT).toMatch(/functions\.invoke/);
+    expect(REAL_PAYLOAD_COMMIT).not.toMatch(/\.rpc\(\s*["']pi_ingest_commit_batch["']/);
     expect(REAL_PAYLOAD_COMMIT).not.toMatch(/\.from\(\s*["']sensor_readings["']\s*\)/);
   });
 

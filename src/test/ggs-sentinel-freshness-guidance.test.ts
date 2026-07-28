@@ -25,6 +25,7 @@ function row(
     metric,
     value,
     source: "live",
+    quality: "ok",
     captured_at: capturedAt,
     raw_payload: { source_app: "spider_farmer_ggs", sensor_id: "GGS-1" },
     ...opts,
@@ -45,11 +46,7 @@ function offset(ms: number): string {
 
 function allRowsAt(ageMs: number): GgsSentinelInputRow[] {
   const ts = offset(ageMs);
-  return [
-    row("soil_moisture_pct", 40, ts),
-    row("ec", 1, ts),
-    row("soil_temp_c", 22, ts),
-  ];
+  return [row("soil_moisture_pct", 40, ts), row("ec", 1, ts), row("soil_temp_c", 22, ts)];
 }
 
 describe("GGS Sentinel freshness guidance", () => {
@@ -95,9 +92,7 @@ describe("GGS Sentinel freshness guidance", () => {
     const m = ev.metricFreshness.find((f) => f.metric === "soil_moisture_pct")!;
     expect(m.freshnessStatus).toBe("fresh");
     expect(m.ageLabel).toBe("0m ago");
-    expect(m.nextActionLabel).toBe(
-      "Fresh — captured 0m ago. Valid for live Sentinel.",
-    );
+    expect(m.nextActionLabel).toBe("Fresh — captured 0m ago. Valid for live Sentinel.");
   });
 
   it("exactly 15m old remains aging and shows exact threshold guidance copy", () => {
@@ -138,11 +133,7 @@ describe("GGS Sentinel freshness guidance", () => {
     // 13min old → > 75% of 15min window
     const ts = offset(13 * 60_000);
     const ev = evaluateGgsSentinelReadiness({
-      rows: [
-        row("soil_moisture_pct", 40, ts),
-        row("ec", 1, ts),
-        row("soil_temp_c", 22, ts),
-      ],
+      rows: [row("soil_moisture_pct", 40, ts), row("ec", 1, ts), row("soil_temp_c", 22, ts)],
       snapshot: SNAP,
       now: NOW,
     });
@@ -156,11 +147,7 @@ describe("GGS Sentinel freshness guidance", () => {
   it("stale row shows stale + ingest-new-reading guidance", () => {
     const ts = offset(24 * 60_000);
     const ev = evaluateGgsSentinelReadiness({
-      rows: [
-        row("soil_moisture_pct", 40, ts),
-        row("ec", 1, ts),
-        row("soil_temp_c", 22, ts),
-      ],
+      rows: [row("soil_moisture_pct", 40, ts), row("ec", 1, ts), row("soil_temp_c", 22, ts)],
       snapshot: SNAP,
       now: NOW,
     });
@@ -174,10 +161,7 @@ describe("GGS Sentinel freshness guidance", () => {
 
   it("missing metric shows missing + no-row guidance", () => {
     const ev = evaluateGgsSentinelReadiness({
-      rows: [
-        row("soil_moisture_pct", 40, offset(60_000)),
-        row("ec", 1, offset(60_000)),
-      ],
+      rows: [row("soil_moisture_pct", 40, offset(60_000)), row("ec", 1, offset(60_000))],
       snapshot: SNAP,
       now: NOW,
     });
@@ -208,11 +192,7 @@ describe("GGS Sentinel freshness guidance", () => {
     // aging row alone should still PASS (not stale)
     const ts = offset(13 * 60_000);
     const ev = evaluateGgsSentinelReadiness({
-      rows: [
-        row("soil_moisture_pct", 40, ts),
-        row("ec", 1, ts),
-        row("soil_temp_c", 22, ts),
-      ],
+      rows: [row("soil_moisture_pct", 40, ts), row("ec", 1, ts), row("soil_temp_c", 22, ts)],
       snapshot: SNAP,
       now: NOW,
     });

@@ -782,9 +782,9 @@ export default function OperatorSchemaAudit() {
           <div>
             <CardTitle className="text-base">RLS &amp; policy audit</CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
-              Direct PUBLIC/anon/authenticated/service_role table and column grants are checked
-              separately from policy definitions and reviewed access profiles. Expression checks are
-              heuristic, not formal proof.
+              Direct PUBLIC, anonymous, authenticated, and server-role table and column grants are
+              checked separately from policy definitions and reviewed access profiles. Expression
+              checks are heuristic, not formal proof.
             </p>
           </div>
           <div className="flex items-center gap-2 text-xs">

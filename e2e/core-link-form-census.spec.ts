@@ -4,12 +4,13 @@
 // SAFETY:
 // - Runs only in the chromium-mocked project.
 // - Uses either no session or a clearly fake session.
-// - Intercepts every Supabase auth, REST, storage, and edge-function request.
+// - Intercepts every Supabase auth, REST, storage, and edge-function request
+//   from the primary page and any popup it opens.
 // - Blocks every unapproved mutation and external fetch.
 // - Never submits a form, invokes AI, uploads a file, changes billing, writes
 //   Action Queue state, ingests sensor data, or controls a device.
 // - Exercises Claude-finished surfaces without reviving superseded branches.
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { APP_ROUTES } from "../src/lib/appRouteManifest";
 import {
   AUTHENTICATED_CORE_CENSUS_ROUTES,
@@ -17,6 +18,7 @@ import {
   classifyLink,
   expectedCensusNavigationPath,
   isReadOnlyEdgeFunction,
+  isReadOnlyRpc,
   isSafelyFillableFieldType,
   placeholderValueForField,
   type CoreCensusRoute,
@@ -29,10 +31,19 @@ const PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 const SESSION_KEY = `sb-${PROJECT_REF}-auth-token`;
 const USER_ID = "99999999-9999-4999-8999-999999999999";
 const GROW_ID = "11111111-1111-4111-8111-111111111111";
+const REPORT_GROW_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 const TENT_ID = "22222222-2222-4222-8222-222222222222";
 const PLANT_ID = "33333333-3333-4333-8333-333333333333";
 const SECOND_PLANT_ID = "66666666-6666-4666-8666-666666666666";
 const PHENO_HUNT_ID = "55555555-5555-4555-8555-555555555555";
+const ACTION_ID = "77777777-7777-4777-8777-777777777777";
+const ALERT_ID = "88888888-8888-4888-8888-888888888888";
+const BREEDING_PROGRAM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const AI_SESSION_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const ACCESSION_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+const BATCH_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+const LEARNING_ACTION_ID = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+const SCREENING_RESULT_ID = "abababab-abab-4bab-8bab-abababababab";
 const MANIFEST_PATTERNS = APP_ROUTES.map((route) => route.path);
 const CURRENT_AGREEMENTS = [
   { agreement_type: "terms", version: "2026-07-13" },
@@ -65,6 +76,15 @@ const GROW = {
   created_at: "2026-07-01T00:00:00.000Z",
   updated_at: "2026-07-01T00:00:00.000Z",
   is_archived: false,
+};
+
+const REPORT_GROW = {
+  ...GROW,
+  id: REPORT_GROW_ID,
+  name: "Core Census Completed Grow",
+  stage: "harvest",
+  notes: "Dedicated mocked report fixture. Not live cultivation data.",
+  is_archived: true,
 };
 
 const TENT = {
@@ -146,9 +166,176 @@ const DIARY_ENTRY = {
   plant_id: PLANT_ID,
   entry_type: "observation",
   entry_at: "2026-07-26T13:00:00.000Z",
+  note: "Mocked observation. Not live cultivation evidence.",
   notes: "Mocked observation. Not live cultivation evidence.",
   details: { event_type: "observation" },
   created_at: "2026-07-26T13:00:00.000Z",
+};
+
+const ACTION = {
+  id: ACTION_ID,
+  user_id: USER_ID,
+  grow_id: GROW_ID,
+  tent_id: TENT_ID,
+  plant_id: PLANT_ID,
+  source: "ai_doctor",
+  action_type: "observation_followup",
+  target_metric: null,
+  target_device: null,
+  suggested_change: "Recheck canopy conditions before making any adjustment",
+  reason: `[session:${AI_SESSION_ID}] Mocked AI Doctor follow-up with no sensor snapshot.`,
+  risk_level: "low",
+  status: "pending_approval",
+  approved_at: null,
+  rejected_at: null,
+  completed_at: null,
+  originating_timeline_events: [],
+  created_at: "2026-07-18T12:00:00.000Z",
+  updated_at: "2026-07-18T12:00:00.000Z",
+};
+
+const LEARNING_ACTION = {
+  ...ACTION,
+  id: LEARNING_ACTION_ID,
+  source: "manual",
+  action_type: "environment_review",
+  suggested_change: "Keep the environment stable and record the observed response",
+  reason: "Mocked completed action for the grow learning census.",
+  status: "completed",
+  completed_at: "2026-07-20T12:00:00.000Z",
+  updated_at: "2026-07-20T12:00:00.000Z",
+};
+
+const ALERT = {
+  id: ALERT_ID,
+  user_id: USER_ID,
+  grow_id: GROW_ID,
+  tent_id: TENT_ID,
+  plant_id: PLANT_ID,
+  source: "environment_alerts",
+  severity: "watch",
+  metric: "vpd",
+  title: "Mocked VPD review",
+  reason: "Mocked browser fixture; verify context before acting.",
+  status: "open",
+  first_seen_at: "2026-07-18T12:00:00.000Z",
+  last_seen_at: "2026-07-18T12:00:00.000Z",
+  acknowledged_at: null,
+  resolved_at: null,
+  created_at: "2026-07-18T12:00:00.000Z",
+  updated_at: "2026-07-18T12:00:00.000Z",
+  originating_timeline_events: [],
+};
+
+const AI_SESSION = {
+  id: AI_SESSION_ID,
+  user_id: USER_ID,
+  created_at: "2026-07-18T12:00:00.000Z",
+  plant_id: PLANT_ID,
+  tent_id: TENT_ID,
+  grow_id: GROW_ID,
+  question: "What should I verify next?",
+  diagnosis: {
+    summary: "Verify environmental context before changing the crop plan.",
+    likelyIssue: "Not enough evidence for a diagnosis",
+    confidence: 0.35,
+    evidence: ["Grower observation only"],
+    missingInformation: ["Calibrated canopy temperature", "Verified relative humidity"],
+    possibleCauses: ["Normal short-term variation"],
+    immediateAction: "Collect another calibrated observation.",
+    whatNotToDo: ["Do not change irrigation or nutrients from this single observation."],
+    followUp24h: {
+      summary: "Compare a second observation at the same point in the light cycle.",
+      checklist: ["Capture calibrated canopy temperature and relative humidity."],
+    },
+    recoveryPlan3d: {
+      summary: "Keep conditions stable while gathering evidence.",
+      checklist: ["Log one comparable observation each day."],
+    },
+    riskLevel: "low",
+    suggestedActions: [],
+  },
+  raw_confidence: 0.35,
+  displayed_confidence: 0.35,
+  context_confidence_ceiling: "low",
+  suggested_actions: [],
+};
+
+const BREEDING_PROGRAM = {
+  id: BREEDING_PROGRAM_ID,
+  user_id: USER_ID,
+  name: "Core Census Breeding Program",
+  status: "active",
+  sop_version: "v1",
+  starting_generation: "P1",
+  p1_maternal_label: "Mocked maternal parent",
+  p1_paternal_label: "Mocked paternal parent",
+  cross_pair_label: "Mocked cross",
+  target_traits: ["structure"],
+  grow_id: GROW_ID,
+  tent_id: TENT_ID,
+  current_step_id: null,
+  notes: "Mocked browser fixture. No live breeding evidence.",
+  created_at: "2026-07-01T00:00:00.000Z",
+  updated_at: "2026-07-01T00:00:00.000Z",
+};
+
+const ACCESSION = {
+  id: ACCESSION_ID,
+  user_id: USER_ID,
+  source_kind: "seed",
+  source_party: "Mocked breeder",
+  cultivar_name: "Sour Stomper",
+  line_name: null,
+  generation: "F1",
+  acquisition_date: "2026-07-01",
+  known_state: "known",
+  archived_at: null,
+  created_at: "2026-07-01T00:00:00.000Z",
+};
+
+const BATCH = {
+  id: BATCH_ID,
+  user_id: USER_ID,
+  batch_code: "CENSUS-BATCH-1",
+  name: "Core Census Batch",
+  propagation_method: "seed",
+  source_accession_id: ACCESSION_ID,
+  mother_plant_id: null,
+  origin_unknown: false,
+  initial_quantity: 6,
+  viable_quantity: 6,
+  counts_unknown: false,
+  status: "active",
+  created_at: "2026-07-01T00:00:00.000Z",
+};
+
+const SCREENING_RESULT = {
+  id: SCREENING_RESULT_ID,
+  user_id: USER_ID,
+  subject_type: "accession",
+  subject_id: ACCESSION_ID,
+  target: "HLVd",
+  result: "negative",
+  laboratory: "Synthetic census laboratory",
+  collected_date: "2026-07-02",
+  result_date: "2026-07-03",
+  supersedes_id: null,
+  recorded_at: "2026-07-03T00:00:00.000Z",
+};
+
+const QUARANTINE_EPISODE = {
+  id: "acacacac-acac-4cac-8cac-acacacacacac",
+  user_id: USER_ID,
+  subject_type: "accession",
+  subject_id: ACCESSION_ID,
+  target: "HLVd intake review",
+  status: "released",
+  opened_at: "2026-07-01T00:00:00.000Z",
+  reopened_at: null,
+  closed_at: "2026-07-03T00:00:00.000Z",
+  closure_kind: "cleared",
+  closure_screening_result_id: SCREENING_RESULT_ID,
 };
 
 const BILLING_SUBSCRIPTIONS = ["live", "sandbox"].map((environment) => ({
@@ -211,7 +398,7 @@ function rowsForTable(table: string): unknown[] {
     case "profiles":
       return [PROFILE];
     case "grows":
-      return [GROW];
+      return [GROW, REPORT_GROW];
     case "tents":
       return [TENT];
     case "plants":
@@ -220,6 +407,28 @@ function rowsForTable(table: string): unknown[] {
       return [PHENO_HUNT];
     case "diary_entries":
       return [DIARY_ENTRY];
+    case "action_queue":
+      return [ACTION, LEARNING_ACTION];
+    case "action_queue_events":
+    case "alert_events":
+    case "ai_doctor_session_reviews":
+    case "breeding_program_steps":
+    case "breeding_step_evidence":
+      return [];
+    case "genetics_screening_results":
+      return [SCREENING_RESULT];
+    case "quarantine_episodes":
+      return [QUARANTINE_EPISODE];
+    case "alerts":
+      return [ALERT];
+    case "ai_doctor_sessions":
+      return [AI_SESSION];
+    case "breeding_programs":
+      return [BREEDING_PROGRAM];
+    case "genetics_accessions":
+      return [ACCESSION];
+    case "propagation_batches":
+      return [BATCH];
     case "user_agreement_acceptances":
       return CURRENT_AGREEMENTS;
     case "billing_subscriptions":
@@ -230,33 +439,81 @@ function rowsForTable(table: string): unknown[] {
   }
 }
 
-function isReadOnlyRpc(rpcName: string): boolean {
-  return /^(can_|check_|count_|get_|has_|is_|list_|preview_|resolve_)/.test(rpcName);
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-async function seedFakeSession(page: Page) {
-  await page.addInitScript(
-    ({ key, user }) => {
-      sessionStorage.setItem(
-        key,
-        JSON.stringify({
-          access_token: "FAKE-ACCESS-TOKEN-NOT-REAL",
-          refresh_token: "FAKE-REFRESH-TOKEN-NOT-REAL",
-          token_type: "bearer",
-          expires_in: 21_600,
-          expires_at: Math.floor(Date.now() / 1000) + 21_600,
-          user,
-        }),
+function rowsForRestRequest(table: string, url: URL): unknown[] {
+  let rows = rowsForTable(table);
+
+  for (const [field, filter] of url.searchParams) {
+    if (!rows.some((row) => isRecord(row) && field in row)) continue;
+
+    if (filter.startsWith("eq.")) {
+      const requested = filter.slice("eq.".length);
+      rows = rows.filter((row) => isRecord(row) && String(row[field]) === requested);
+      continue;
+    }
+
+    if (filter.startsWith("in.(") && filter.endsWith(")")) {
+      const requested = new Set(
+        filter
+          .slice("in.(".length, -1)
+          .split(",")
+          .map((value) => value.replace(/^"|"$/g, "")),
       );
+      rows = rows.filter((row) => isRecord(row) && requested.has(String(row[field])));
+      continue;
+    }
+
+    if (filter.startsWith("like.")) {
+      const pattern = filter.slice("like.".length);
+      const needle = pattern.replaceAll("%", "");
+      rows = rows.filter((row) => isRecord(row) && String(row[field]).includes(needle));
+      continue;
+    }
+
+    if (filter === "is.null") {
+      rows = rows.filter((row) => isRecord(row) && row[field] == null);
+    }
+  }
+
+  return rows;
+}
+
+async function seedFakeSession(context: BrowserContext) {
+  await context.addInitScript(
+    ({ appOrigin, key, user }) => {
+      if (location.origin !== appOrigin) return;
+      try {
+        sessionStorage.setItem(
+          key,
+          JSON.stringify({
+            access_token: "FAKE-ACCESS-TOKEN-NOT-REAL",
+            refresh_token: "FAKE-REFRESH-TOKEN-NOT-REAL",
+            token_type: "bearer",
+            expires_in: 21_600,
+            expires_at: Math.floor(Date.now() / 1000) + 21_600,
+            user,
+          }),
+        );
+      } catch {
+        // Sandboxed frames can intentionally deny storage access. They neither
+        // need nor receive the fake authenticated census session.
+      }
     },
-    { key: SESSION_KEY, user: FAKE_USER },
+    { appOrigin: APP_ORIGIN, key: SESSION_KEY, user: FAKE_USER },
   );
 }
 
-async function installNetworkFence(page: Page, signedIn: boolean, network: NetworkAudit) {
+async function installNetworkFence(
+  context: BrowserContext,
+  signedIn: boolean,
+  network: NetworkAudit,
+) {
   // Register the broad external fence first. Playwright runs the most recently
   // registered matching route first, so the explicit safe mocks below win.
-  await page.route("**/*", async (route, request) => {
+  await context.route("**/*", async (route, request) => {
     const url = new URL(request.url());
     if (url.origin === APP_ORIGIN) {
       await route.continue();
@@ -268,16 +525,16 @@ async function installNetworkFence(page: Page, signedIn: boolean, network: Netwo
     await route.abort("blockedbyclient");
   });
 
-  await page.route("https://fonts.googleapis.com/**", (route) =>
+  await context.route("https://fonts.googleapis.com/**", (route) =>
     route.fulfill({ status: 200, contentType: "text/css", body: "" }),
   );
-  await page.route("https://fonts.gstatic.com/**", (route) => route.abort("blockedbyclient"));
-  await page.route(
+  await context.route("https://fonts.gstatic.com/**", (route) => route.abort("blockedbyclient"));
+  await context.route(
     /google-analytics\.com|googletagmanager\.com|doubleclick\.net|posthog\.com|sentry\.io|clarity\.ms/,
     (route) => route.abort("blockedbyclient"),
   );
 
-  await page.route(/\/auth\/v1\//, async (route, request) => {
+  await context.route(/\/auth\/v1\//, async (route, request) => {
     network.mockedReadRequests += 1;
     if (/\/user(?:\?|$)/i.test(request.url())) {
       await route.fulfill({
@@ -299,7 +556,7 @@ async function installNetworkFence(page: Page, signedIn: boolean, network: Netwo
     await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
   });
 
-  await page.route(/\/rest\/v1\//, async (route, request) => {
+  await context.route(/\/rest\/v1\//, async (route, request) => {
     const url = new URL(request.url());
     const rpcName = url.pathname.match(/\/rest\/v1\/rpc\/([^/]+)/i)?.[1] ?? "";
     const isRead = request.method() === "GET" || request.method() === "HEAD";
@@ -312,7 +569,42 @@ async function installNetworkFence(page: Page, signedIn: boolean, network: Netwo
 
     network.mockedReadRequests += 1;
     if (rpcName) {
-      const body = rpcName === "has_role" || rpcName.startsWith("is_") ? false : [];
+      const body =
+        rpcName === "genetics_trace_resolve"
+          ? {
+              ok: true,
+              subject: { kind: "accession", id: ACCESSION_ID },
+              direction: "both",
+              truncated: false,
+              node_count: 1,
+              nodes: [
+                {
+                  key: `accession:${ACCESSION_ID}`,
+                  kind: "accession",
+                  id: ACCESSION_ID,
+                  depth: 0,
+                  label: "Core Census Sour Stomper Accession",
+                  from: null,
+                  edge_type: null,
+                  evidence: {
+                    state: "negative_scoped",
+                    targets: [
+                      {
+                        target: "HLVd",
+                        result: "negative",
+                        collected_date: "2026-07-02",
+                      },
+                    ],
+                    open_quarantine: false,
+                  },
+                  gaps: [],
+                },
+              ],
+              edges: [],
+            }
+          : rpcName === "has_role"
+            ? false
+            : [];
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -322,7 +614,7 @@ async function installNetworkFence(page: Page, signedIn: boolean, network: Netwo
     }
 
     const table = url.pathname.match(/\/rest\/v1\/([^/]+)/i)?.[1] ?? "";
-    const rows = rowsForTable(table);
+    const rows = rowsForRestRequest(table, url);
     const headers = {
       "Access-Control-Allow-Origin": "*",
       "Content-Range": rows.length > 0 ? `0-${rows.length - 1}/${rows.length}` : "*/0",
@@ -341,7 +633,7 @@ async function installNetworkFence(page: Page, signedIn: boolean, network: Netwo
     });
   });
 
-  await page.route(/\/storage\/v1\//, async (route, request) => {
+  await context.route(/\/storage\/v1\//, async (route, request) => {
     if (!["GET", "HEAD"].includes(request.method())) {
       network.blockedMutations.push(`${request.method()} ${request.url()}`);
       await route.abort("blockedbyclient");
@@ -351,7 +643,7 @@ async function installNetworkFence(page: Page, signedIn: boolean, network: Netwo
     await route.fulfill({ status: 404, contentType: "application/json", body: "{}" });
   });
 
-  await page.route(/\/functions\/v1\//, async (route, request) => {
+  await context.route(/\/functions\/v1\//, async (route, request) => {
     const functionName = new URL(request.url()).pathname.split("/").filter(Boolean).at(-1) ?? "";
     const readLike = isReadOnlyEdgeFunction(functionName);
     if (!readLike) {
@@ -359,11 +651,38 @@ async function installNetworkFence(page: Page, signedIn: boolean, network: Netwo
     } else {
       network.mockedReadRequests += 1;
     }
-    await route.fulfill({
-      status: 404,
-      contentType: "application/json",
-      body: JSON.stringify({ error: "Synthetic census: edge function not invoked" }),
-    });
+    const premiumExportAllowed = functionName === "premium-export-entitlement";
+    await route.fulfill(
+      premiumExportAllowed
+        ? {
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              ok: true,
+              display_plan_id: "founder_lifetime",
+            }),
+          }
+        : {
+            status: 404,
+            contentType: "application/json",
+            body: JSON.stringify({
+              error: "Synthetic census: edge function not invoked",
+            }),
+          },
+    );
+  });
+}
+
+function installContextErrorAudit(context: BrowserContext, report: LaneReport) {
+  context.on("weberror", (webError) => {
+    const source = webError.page()?.url() || webError.location().url || "unknown page";
+    report.pageErrors.push(`${source}: ${webError.error().message}`);
+  });
+  context.on("console", (message) => {
+    if (message.type() === "error") {
+      const source = message.page()?.url() || message.location().url || "unknown page";
+      report.consoleErrors.push(`${source}: ${message.text()}`);
+    }
   });
 }
 
@@ -614,6 +933,31 @@ async function assertMeaningfulPage(page: Page, expectedPath: string) {
   ).toHaveCount(0);
 }
 
+async function assertExpectedRouteContent(page: Page, route: CoreCensusRoute) {
+  const main = page.locator("main").first();
+
+  for (const expected of route.expectedContent ?? []) {
+    const locator =
+      expected.kind === "test-id"
+        ? main.getByTestId(expected.value).first()
+        : expected.kind === "heading"
+          ? main.getByRole("heading", { name: expected.value, exact: true }).first()
+          : main.getByLabel(expected.value, { exact: true }).first();
+
+    await expect(
+      locator,
+      `${route.path} must render its ${expected.kind} success contract: ${expected.value}`,
+    ).toBeVisible({ timeout: 15_000 });
+
+    if (expected.kind === "test-id" && expected.text) {
+      await expect(
+        locator,
+        `${route.path} must render fixture-backed content in ${expected.value}`,
+      ).toContainText(expected.text);
+    }
+  }
+}
+
 async function navigateForAudit(page: Page, route: CoreCensusRoute) {
   const response = await page.goto(route.path, { waitUntil: "domcontentloaded" });
   expect(response?.status() ?? 200, `${route.path} document response`).toBeLessThan(400);
@@ -621,6 +965,7 @@ async function navigateForAudit(page: Page, route: CoreCensusRoute) {
   const finalPath = new URL(page.url()).pathname;
   const expectedPathname = route.expectedPathname ?? new URL(route.path, APP_ORIGIN).pathname;
   expect(finalPath, `${route.path} unexpectedly redirected`).toBe(expectedPathname);
+  await assertExpectedRouteContent(page, route);
   return finalPath;
 }
 
@@ -668,7 +1013,7 @@ async function clickEverySafeInternalHref(
         signedIn,
       );
       if (target === "_blank") {
-        const popupPromise = page.context().waitForEvent("page");
+        const popupPromise = page.waitForEvent("popup", { timeout: 15_000 });
         await anchor.click();
         const popup = await popupPromise;
         await popup.waitForLoadState("domcontentloaded");
@@ -700,6 +1045,7 @@ async function runLaneCensus(
   lane: LaneReport["lane"],
   routes: readonly CoreCensusRoute[],
 ): Promise<LaneReport> {
+  const context = page.context();
   const signedIn = lane === "authenticated";
   const network: NetworkAudit = {
     blockedMutations: [],
@@ -717,15 +1063,9 @@ async function runLaneCensus(
     network,
   };
 
-  page.on("pageerror", (error) => report.pageErrors.push(`${page.url()}: ${error.message}`));
-  page.on("console", (message) => {
-    if (message.type() === "error") {
-      report.consoleErrors.push(`${page.url()}: ${message.text()}`);
-    }
-  });
-
-  if (signedIn) await seedFakeSession(page);
-  await installNetworkFence(page, signedIn, network);
+  installContextErrorAudit(context, report);
+  if (signedIn) await seedFakeSession(context);
+  await installNetworkFence(context, signedIn, network);
 
   for (const route of routes) {
     await test.step(`audit ${route.label} (${route.path})`, async () => {
@@ -790,7 +1130,7 @@ test.describe("core link and form census", () => {
   test("audits every scheduled authenticated page, visible field, and safe internal link", async ({
     page,
   }) => {
-    test.setTimeout(300_000);
+    test.setTimeout(900_000);
     const report = await runLaneCensus(page, "authenticated", AUTHENTICATED_CORE_CENSUS_ROUTES);
     expect(report.routeAudits).toHaveLength(AUTHENTICATED_CORE_CENSUS_ROUTES.length);
     expect(report.fieldAudits.length).toBeGreaterThan(0);

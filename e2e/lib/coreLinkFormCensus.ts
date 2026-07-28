@@ -2,9 +2,25 @@ import type { AppRouteEntry } from "../../src/lib/appRouteManifest";
 
 export type FieldExercisePolicy = "fill-safe-fields" | "audit-only";
 
+export type RouteContentExpectation =
+  | {
+      kind: "test-id";
+      value: string;
+      text?: string;
+    }
+  | {
+      kind: "heading";
+      value: string;
+    }
+  | {
+      kind: "field";
+      value: string;
+    };
+
 export type CoreCensusRoute = {
   path: string;
   expectedPathname?: string;
+  expectedContent?: readonly RouteContentExpectation[];
   label: string;
   fieldPolicy: FieldExercisePolicy;
 };
@@ -138,12 +154,42 @@ export const AUTHENTICATED_CORE_CENSUS_ROUTES = [
   { path: "/timeline", label: "Timeline", fieldPolicy: "fill-safe-fields" },
   { path: "/sensors", label: "Sensors", fieldPolicy: "fill-safe-fields" },
   { path: "/actions", label: "Action Queue", fieldPolicy: "fill-safe-fields" },
+  {
+    path: "/actions/77777777-7777-4777-8777-777777777777",
+    label: "Action Queue detail",
+    fieldPolicy: "fill-safe-fields",
+    expectedContent: [
+      {
+        kind: "test-id",
+        value: "action-detail-ai-doctor-provenance",
+        text: "Source: AI Doctor",
+      },
+    ],
+  },
   { path: "/alerts", label: "Alerts", fieldPolicy: "fill-safe-fields" },
+  {
+    path: "/alerts/88888888-8888-4888-8888-888888888888",
+    label: "Alert detail",
+    fieldPolicy: "fill-safe-fields",
+    expectedContent: [{ kind: "heading", value: "Mocked VPD review" }],
+  },
   { path: "/doctor", label: "AI Doctor", fieldPolicy: "fill-safe-fields" },
   {
     path: "/doctor/sessions",
     label: "AI Doctor history",
     fieldPolicy: "fill-safe-fields",
+  },
+  {
+    path: "/doctor/sessions/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    label: "AI Doctor session detail",
+    fieldPolicy: "fill-safe-fields",
+    expectedContent: [
+      {
+        kind: "test-id",
+        value: "ai-doctor-session-detail-question",
+        text: "What should I verify next?",
+      },
+    ],
   },
   { path: "/reports", label: "Reports", fieldPolicy: "fill-safe-fields" },
   {
@@ -155,6 +201,12 @@ export const AUTHENTICATED_CORE_CENSUS_ROUTES = [
     path: "/diary/environment-summary",
     label: "Environment summary",
     fieldPolicy: "fill-safe-fields",
+  },
+  {
+    path: "/reports/post-grow/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+    label: "Post-grow report",
+    fieldPolicy: "fill-safe-fields",
+    expectedContent: [{ kind: "test-id", value: "post-grow-report-page" }],
   },
   { path: "/settings", label: "Settings", fieldPolicy: "audit-only" },
   {
@@ -174,7 +226,56 @@ export const AUTHENTICATED_CORE_CENSUS_ROUTES = [
     label: "New breeding program",
     fieldPolicy: "fill-safe-fields",
   },
+  {
+    path: "/breeding/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    label: "Breeding program detail",
+    fieldPolicy: "audit-only",
+    expectedContent: [{ kind: "heading", value: "Core Census Breeding Program" }],
+  },
+  {
+    path: "/breeding/log/new?growId=11111111-1111-4111-8111-111111111111",
+    expectedPathname: "/breeding/log/new",
+    label: "New breeding log event",
+    fieldPolicy: "fill-safe-fields",
+    expectedContent: [
+      { kind: "heading", value: "Log Breeding Event" },
+      { kind: "field", value: "Plant" },
+    ],
+  },
   { path: "/genetics", label: "Genetics library", fieldPolicy: "fill-safe-fields" },
+  {
+    path: "/genetics/accessions/cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    label: "Genetics accession detail",
+    fieldPolicy: "fill-safe-fields",
+    expectedContent: [{ kind: "heading", value: "Sour Stomper" }],
+  },
+  {
+    path: "/genetics/batches/dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    label: "Genetics propagation batch detail",
+    fieldPolicy: "fill-safe-fields",
+    expectedContent: [{ kind: "heading", value: "Core Census Batch" }],
+  },
+  {
+    path: "/genetics/health/accession/cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    label: "Genetics health evidence",
+    fieldPolicy: "fill-safe-fields",
+    expectedContent: [
+      { kind: "test-id", value: "screening-row", text: "HLVd" },
+      { kind: "test-id", value: "quarantine-row", text: "HLVd" },
+    ],
+  },
+  {
+    path: "/genetics/trace/accession/cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    label: "Genetics traceability",
+    fieldPolicy: "fill-safe-fields",
+    expectedContent: [
+      {
+        kind: "test-id",
+        value: "trace-node",
+        text: "Core Census Sour Stomper Accession",
+      },
+    ],
+  },
   { path: "/pheno-hunts", label: "Pheno Hunts", fieldPolicy: "fill-safe-fields" },
   {
     path: "/pheno-hunts/new?growId=11111111-1111-4111-8111-111111111111&tentId=22222222-2222-4222-8222-222222222222",
@@ -186,13 +287,44 @@ export const AUTHENTICATED_CORE_CENSUS_ROUTES = [
     path: "/pheno-hunts/55555555-5555-4555-8555-555555555555/workspace",
     label: "Pheno Hunt workspace",
     fieldPolicy: "fill-safe-fields",
+    expectedContent: [{ kind: "test-id", value: "pheno-workspace" }],
   },
   {
     path: "/pheno-hunts/55555555-5555-4555-8555-555555555555/keepers",
     label: "Pheno Hunt keepers",
     fieldPolicy: "fill-safe-fields",
+    expectedContent: [{ kind: "test-id", value: "pheno-keepers" }],
   },
   { path: "/grow-lineage", label: "Grow lineage", fieldPolicy: "audit-only" },
+  {
+    path: "/grows/11111111-1111-4111-8111-111111111111",
+    label: "Grow detail",
+    fieldPolicy: "fill-safe-fields",
+    expectedContent: [{ kind: "test-id", value: "grow-status-card" }],
+  },
+  {
+    path: "/grows/11111111-1111-4111-8111-111111111111/learning",
+    label: "Grow learning report",
+    fieldPolicy: "fill-safe-fields",
+    expectedContent: [
+      {
+        kind: "test-id",
+        value: "plant-memory-episode-ffffffff-ffff-4fff-8fff-ffffffffffff",
+      },
+    ],
+  },
+  {
+    path: "/plants/33333333-3333-4333-8333-333333333333",
+    label: "Plant detail",
+    fieldPolicy: "fill-safe-fields",
+    expectedContent: [{ kind: "test-id", value: "plant-detail-tent", text: "Core Census Tent" }],
+  },
+  {
+    path: "/tents/22222222-2222-4222-8222-222222222222",
+    label: "Tent detail",
+    fieldPolicy: "fill-safe-fields",
+    expectedContent: [{ kind: "test-id", value: "tent-detail-metric-chips" }],
+  },
   { path: "/onboarding", label: "Onboarding", fieldPolicy: "fill-safe-fields" },
   { path: "/health", label: "App health", fieldPolicy: "audit-only" },
 ] as const satisfies readonly CoreCensusRoute[];
@@ -225,6 +357,17 @@ const READ_ONLY_EDGE_FUNCTIONS = new Set([
   "premium-export-entitlement",
 ]);
 
+const READ_ONLY_RPCS = new Set([
+  "genetics_trace_resolve",
+  "get_latest_tent_sensor_snapshot",
+  "has_role",
+  "verdant_search",
+]);
+
+export function isReadOnlyRpc(rpcName: string): boolean {
+  return READ_ONLY_RPCS.has(rpcName);
+}
+
 export function isReadOnlyEdgeFunction(functionName: string): boolean {
   return (
     /^(check-|count-|get-|health|list-|preview-|resolve-|status)/.test(functionName) ||
@@ -251,6 +394,45 @@ export function matchesKnownAppRoute(
   return manifestPatterns
     .filter((pattern) => pattern !== "*")
     .some((pattern) => routePatternToRegExp(pattern).test(pathname));
+}
+
+export function missingAuthenticatedCensusRoutePatterns(
+  manifest: ReadonlyArray<Pick<AppRouteEntry, "path" | "access">>,
+  routes: readonly CoreCensusRoute[],
+): string[] {
+  const assignedPatterns = new Set(
+    routes
+      .map((route) => new URL(route.path, "http://localhost").pathname)
+      .map((pathname) => matchingManifestRoute(pathname, manifest)?.path)
+      .filter((pattern): pattern is string => pattern !== undefined),
+  );
+  return manifest
+    .filter((route) => route.access === "auth")
+    .map((route) => route.path)
+    .filter((pattern) => !assignedPatterns.has(pattern))
+    .sort();
+}
+
+export function missingAuthenticatedDynamicRouteSuccessContracts(
+  manifest: ReadonlyArray<Pick<AppRouteEntry, "path" | "access">>,
+  routes: readonly CoreCensusRoute[],
+): string[] {
+  const contractedPatterns = new Set(
+    routes
+      .filter((route) => (route.expectedContent?.length ?? 0) > 0)
+      .map((route) => new URL(route.path, "http://localhost").pathname)
+      .map((pathname) => matchingManifestRoute(pathname, manifest)?.path)
+      .filter((pattern): pattern is string => pattern !== undefined),
+  );
+
+  return manifest
+    .filter(
+      (route) =>
+        route.access === "auth" && route.path.split("/").some((segment) => segment.startsWith(":")),
+    )
+    .map((route) => route.path)
+    .filter((pattern) => !contractedPatterns.has(pattern))
+    .sort();
 }
 
 function matchingManifestRoute(

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { APP_ROUTES } from "@/lib/appRouteManifest";
 import {
   AUTHENTICATED_CORE_CENSUS_ROUTES,
   PRIVILEGED_ROUTE_PREFIXES,
@@ -6,10 +7,14 @@ import {
   classifyLink,
   expectedCensusNavigationPath,
   isReadOnlyEdgeFunction,
+  isReadOnlyRpc,
   isPrivilegedRoute,
   isSafelyFillableFieldType,
   matchesKnownAppRoute,
+  missingAuthenticatedCensusRoutePatterns,
+  missingAuthenticatedDynamicRouteSuccessContracts,
   placeholderValueForField,
+  type CoreCensusRoute,
 } from "../../e2e/lib/coreLinkFormCensus";
 
 const MANIFEST = [
@@ -130,6 +135,27 @@ describe("core link and form census rules", () => {
     expect(isReadOnlyEdgeFunction(name)).toBe(false);
   });
 
+  it.each([
+    "genetics_trace_resolve",
+    "get_latest_tent_sensor_snapshot",
+    "has_role",
+    "verdant_search",
+  ])("allows the explicitly reviewed read-only RPC %s", (name) => {
+    expect(isReadOnlyRpc(name)).toBe(true);
+  });
+
+  it.each([
+    "action_queue_transition",
+    "check_then_write",
+    "count_and_increment",
+    "get_or_create_profile",
+    "list_and_delete_grows",
+    "preview_and_save",
+    "resolve_and_persist_alert",
+  ])("keeps the read-like mutating RPC %s behind the mutation fence", (name) => {
+    expect(isReadOnlyRpc(name)).toBe(false);
+  });
+
   it("builds safe, deterministic placeholder values", () => {
     expect(placeholderValueForField({ type: "email", accessibleName: "Email" })).toBe(
       "verdant-census@example.invalid",
@@ -174,5 +200,42 @@ describe("core link and form census rules", () => {
       ...AUTHENTICATED_CORE_CENSUS_ROUTES.map((route) => route.path),
     ];
     expect(new Set(paths).size).toBe(paths.length);
+  });
+
+  it("schedules a concrete browser census visit for every authenticated route", () => {
+    expect(
+      missingAuthenticatedCensusRoutePatterns(APP_ROUTES, AUTHENTICATED_CORE_CENSUS_ROUTES),
+    ).toEqual([]);
+  });
+
+  it("does not let the static breeding/new visit cover the breeding detail pattern", () => {
+    const withoutBreedingDetail = AUTHENTICATED_CORE_CENSUS_ROUTES.filter(
+      (route) => route.path !== "/breeding/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    );
+
+    expect(missingAuthenticatedCensusRoutePatterns(APP_ROUTES, withoutBreedingDetail)).toEqual([
+      "/breeding/:programId",
+    ]);
+  });
+
+  it("requires a success-state content contract for every authenticated dynamic route", () => {
+    expect(
+      missingAuthenticatedDynamicRouteSuccessContracts(
+        APP_ROUTES,
+        AUTHENTICATED_CORE_CENSUS_ROUTES,
+      ),
+    ).toEqual([]);
+  });
+
+  it("reports the manifest pattern when a dynamic route loses its success contract", () => {
+    const withoutBreedingDetailContract = AUTHENTICATED_CORE_CENSUS_ROUTES.map((route) =>
+      route.path === "/breeding/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        ? { ...route, expectedContent: undefined }
+        : route,
+    ) as readonly CoreCensusRoute[];
+
+    expect(
+      missingAuthenticatedDynamicRouteSuccessContracts(APP_ROUTES, withoutBreedingDetailContract),
+    ).toEqual(["/breeding/:programId"]);
   });
 });

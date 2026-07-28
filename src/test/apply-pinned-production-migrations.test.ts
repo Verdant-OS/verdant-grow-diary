@@ -978,8 +978,8 @@ describe("production runner", () => {
   it("repair probes disclose only booleans — never credential-derived measurements", () => {
     const productionUrl = DATABASE_URL;
     const quoteWrapped = `"${productionUrl}"`;
-    const bomPrefixed = `﻿${productionUrl}`;
-    const bomAndQuotes = `﻿"${productionUrl}"`;
+    const bomPrefixed = "﻿" + productionUrl;
+    const bomAndQuotes = "﻿" + quoteWrapped;
     const barePassword = "just-a-secret-password-value";
 
     expect(describeDatabaseUrlRepairProbes(quoteWrapped)).toEqual({

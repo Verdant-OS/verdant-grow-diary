@@ -17,7 +17,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { useSchemaAuditVerifiedChecklist } from "@/hooks/useSchemaAuditVerifiedChecklist";
 import {
   Select,
   SelectContent,
@@ -263,6 +265,25 @@ export default function OperatorSchemaAudit() {
     [data],
   );
 
+  // ---- Local session checklist ------------------------------------------
+  // Marks each missing item (table/column/RLS finding) as reviewed by the
+  // operator. Stored only in sessionStorage — no writes reach the database.
+  const checklist = useSchemaAuditVerifiedChecklist();
+
+  const allMissingIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const g of scan.groups) {
+      for (const t of g.tables) ids.push(`table:${t}`);
+      for (const c of g.columns) ids.push(`column:${c.table}.${c.column}`);
+    }
+    for (const t of scan.orphanTables) ids.push(`table:${t}`);
+    rlsFindings.forEach((f, i) => ids.push(`rls:${f.table}:${f.code}:${i}`));
+    return Array.from(new Set(ids));
+  }, [scan, rlsFindings]);
+
+  const verifiedInScope = allMissingIds.filter((id) => checklist.isVerified(id)).length;
+  const outstanding = allMissingIds.length - verifiedInScope;
+
   return (
     <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
@@ -313,7 +334,7 @@ export default function OperatorSchemaAudit() {
               responsible. Open a row to jump into the drilldown for verification.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-xs flex-wrap justify-end">
             <Badge variant={scan.totalMissingTables > 0 ? "destructive" : "outline"}>
               {scan.totalMissingTables} tables
             </Badge>
@@ -323,9 +344,36 @@ export default function OperatorSchemaAudit() {
             <span className="text-muted-foreground">
               of {columnStats.total} checked
             </span>
+            {allMissingIds.length > 0 && (
+              <>
+                <Badge
+                  variant={outstanding === 0 ? "outline" : "secondary"}
+                  data-testid="schema-audit-checklist-summary"
+                  className={outstanding === 0 ? "border-emerald-500 text-emerald-600" : ""}
+                >
+                  {verifiedInScope}/{allMissingIds.length} verified this session
+                </Badge>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs"
+                  onClick={checklist.clearAll}
+                  disabled={checklist.count === 0}
+                  data-testid="schema-audit-checklist-clear"
+                >
+                  Clear
+                </Button>
+              </>
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-0">
+          {allMissingIds.length > 0 && (
+            <div className="border-b bg-muted/20 px-4 py-2 text-[11px] text-muted-foreground">
+              Local session checklist — tick items after reviewing the drilldown.
+              Nothing is saved to the database; verifications clear when this browser tab closes.
+            </div>
+          )}
           {scan.groups.length === 0 && scan.orphanTables.length === 0 ? (
             <div className="px-4 py-6 text-sm text-emerald-600 flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4" />
@@ -356,15 +404,29 @@ export default function OperatorSchemaAudit() {
                   </div>
                   {g.tables.size > 0 && (
                     <div className="flex flex-wrap gap-1.5">
-                      {Array.from(g.tables).sort().map((t) => (
-                        <Badge
-                          key={t}
-                          variant="destructive"
-                          className="text-[10px] font-mono"
-                        >
-                          missing table · public.{t}
-                        </Badge>
-                      ))}
+                      {Array.from(g.tables).sort().map((t) => {
+                        const id = `table:${t}`;
+                        const done = checklist.isVerified(id);
+                        return (
+                          <label
+                            key={t}
+                            className="inline-flex items-center gap-1.5 cursor-pointer"
+                            data-testid={`schema-audit-checklist-item-${id}`}
+                          >
+                            <Checkbox
+                              checked={done}
+                              onCheckedChange={() => checklist.toggle(id)}
+                              aria-label={`Mark missing table public.${t} as verified`}
+                            />
+                            <Badge
+                              variant={done ? "outline" : "destructive"}
+                              className={`text-[10px] font-mono ${done ? "line-through opacity-60" : ""}`}
+                            >
+                              missing table · public.{t}
+                            </Badge>
+                          </label>
+                        );
+                      })}
                     </div>
                   )}
                   {g.columns.length > 0 && (
@@ -374,16 +436,30 @@ export default function OperatorSchemaAudit() {
                         .sort((a, b) =>
                           `${a.table}.${a.column}`.localeCompare(`${b.table}.${b.column}`),
                         )
-                        .map((c) => (
-                          <Badge
-                            key={`${c.table}.${c.column}`}
-                            variant="destructive"
-                            className="text-[10px] font-mono"
-                            title={c.reason}
-                          >
-                            missing column · {c.table}.{c.column}
-                          </Badge>
-                        ))}
+                        .map((c) => {
+                          const id = `column:${c.table}.${c.column}`;
+                          const done = checklist.isVerified(id);
+                          return (
+                            <label
+                              key={id}
+                              className="inline-flex items-center gap-1.5 cursor-pointer"
+                              title={c.reason}
+                              data-testid={`schema-audit-checklist-item-${id}`}
+                            >
+                              <Checkbox
+                                checked={done}
+                                onCheckedChange={() => checklist.toggle(id)}
+                                aria-label={`Mark missing column ${c.table}.${c.column} as verified`}
+                              />
+                              <Badge
+                                variant={done ? "outline" : "destructive"}
+                                className={`text-[10px] font-mono ${done ? "line-through opacity-60" : ""}`}
+                              >
+                                missing column · {c.table}.{c.column}
+                              </Badge>
+                            </label>
+                          );
+                        })}
                     </div>
                   )}
                 </div>
@@ -394,15 +470,29 @@ export default function OperatorSchemaAudit() {
                     Missing tables not owned by a manifest migration
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {scan.orphanTables.sort().map((t) => (
-                      <Badge
-                        key={t}
-                        variant="destructive"
-                        className="text-[10px] font-mono"
-                      >
-                        public.{t}
-                      </Badge>
-                    ))}
+                    {scan.orphanTables.sort().map((t) => {
+                      const id = `table:${t}`;
+                      const done = checklist.isVerified(id);
+                      return (
+                        <label
+                          key={t}
+                          className="inline-flex items-center gap-1.5 cursor-pointer"
+                          data-testid={`schema-audit-checklist-item-${id}`}
+                        >
+                          <Checkbox
+                            checked={done}
+                            onCheckedChange={() => checklist.toggle(id)}
+                            aria-label={`Mark orphan missing table public.${t} as verified`}
+                          />
+                          <Badge
+                            variant={done ? "outline" : "destructive"}
+                            className={`text-[10px] font-mono ${done ? "line-through opacity-60" : ""}`}
+                          >
+                            public.{t}
+                          </Badge>
+                        </label>
+                      );
+                    })}
                   </div>
                   <p className="text-[11px] text-muted-foreground">
                     These tables are watched by this page but no entry in{" "}
@@ -596,28 +686,38 @@ export default function OperatorSchemaAudit() {
               <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Findings
               </div>
-              {rlsFindings.map((f, i) => (
-                <div
-                  key={`${f.table}-${f.code}-${i}`}
-                  className="flex items-start gap-2 text-sm"
-                  data-testid={`schema-audit-rls-finding-${f.code}`}
-                >
-                  {f.severity === "critical" ? (
-                    <XCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-                  ) : f.severity === "warning" ? (
-                    <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                  )}
-                  <div className="min-w-0">
-                    <span className="font-mono text-xs">public.{f.table}</span>{" "}
-                    <span>{f.message}</span>
-                    {f.detail && (
-                      <span className="text-muted-foreground"> — {f.detail}</span>
+              {rlsFindings.map((f, i) => {
+                const id = `rls:${f.table}:${f.code}:${i}`;
+                const done = checklist.isVerified(id);
+                return (
+                  <div
+                    key={`${f.table}-${f.code}-${i}`}
+                    className={`flex items-start gap-2 text-sm ${done ? "opacity-60" : ""}`}
+                    data-testid={`schema-audit-rls-finding-${f.code}`}
+                  >
+                    <Checkbox
+                      className="mt-0.5"
+                      checked={done}
+                      onCheckedChange={() => checklist.toggle(id)}
+                      aria-label={`Mark RLS finding ${f.code} on public.${f.table} as verified`}
+                    />
+                    {f.severity === "critical" ? (
+                      <XCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                    ) : f.severity === "warning" ? (
+                      <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                     )}
+                    <div className={`min-w-0 ${done ? "line-through" : ""}`}>
+                      <span className="font-mono text-xs">public.{f.table}</span>{" "}
+                      <span>{f.message}</span>
+                      {f.detail && (
+                        <span className="text-muted-foreground"> — {f.detail}</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
           <div className="divide-y">

@@ -192,8 +192,6 @@ Deno.test(
       [
         "ai_doctor_finalize_review",
         "ai_credit_refund",
-        "ai_credit_refund",
-        "ai_credit_spend",
         "ai_credit_spend",
         "record_ai_doctor_review_completion",
       ].sort(),

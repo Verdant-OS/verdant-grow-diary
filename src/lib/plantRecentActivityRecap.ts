@@ -107,18 +107,31 @@ export function buildPlantRecentActivityRecap(
   const out: PlantRecentActivityRecapItem[] = [];
   for (const r of rows) {
     const source = r.hasPhoto ? "photo" : null;
+    // Prefer the canonical event type resolved by buildPlantRecentActivity
+    // so `quick_log`/`note` envelope wrappers classify as their true action.
     const category = classifyTimelineEntry({
-      eventType: r.eventType,
+      eventType: r.effectiveEventType ?? r.eventType,
       source,
     });
+    // When the row has no free-text note but carries a structured Quick
+    // Log summary (e.g. "500 ml"), prefer that over the generic
+    // "No details recorded." placeholder.
+    const structured = (r.summarySuffix ?? "").trim();
+    const summary =
+      r.notePreview && r.notePreview.trim().length > 0
+        ? previewSummary(r.notePreview, r.hasPhoto, r.hasSnapshot)
+        : structured.length > 0
+          ? structured
+          : previewSummary(r.notePreview, r.hasPhoto, r.hasSnapshot);
     out.push({
       key: out.length.toString(),
       category,
       categoryLabel: CATEGORY_LABELS[category],
-      summary: previewSummary(r.notePreview, r.hasPhoto, r.hasSnapshot),
+      summary,
       timestampLabel: formatTimestamp(r.occurredAt, r.occurredAtLabel),
     });
     if (out.length >= limit) break;
   }
+
   return out;
 }

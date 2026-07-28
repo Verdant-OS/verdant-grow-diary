@@ -43,9 +43,11 @@ function wrapper() {
 }
 
 function readyDefaults() {
+  const activeGrow = { id: GROW_ID, name: "Home run" };
   mocks.auth.mockReturnValue({ user: { id: USER_ID } });
   mocks.grows.mockReturnValue({
-    activeGrow: { id: GROW_ID, name: "Home run" },
+    grows: [activeGrow],
+    activeGrow,
     activeGrowId: GROW_ID,
     loading: false,
     error: null,
@@ -147,6 +149,74 @@ describe("useOperatorAccountReadModels", () => {
     );
     expect(result.current.status === "ready" && result.current.tentScopeStatus).toBe("ready");
     expect(result.current.status === "ready" && result.current.selectedTentId).toBe(TENT_ID);
+  });
+
+  it("uses an explicit owner-visible grow scope instead of the account active grow", async () => {
+    const scopedGrowId = "77777777-7777-4777-8777-777777777777";
+    mocks.grows.mockReturnValue({
+      grows: [
+        { id: GROW_ID, name: "Home run" },
+        { id: scopedGrowId, name: "Scoped dashboard grow" },
+      ],
+      activeGrow: { id: GROW_ID, name: "Home run" },
+      activeGrowId: GROW_ID,
+      loading: false,
+      error: null,
+    });
+    mocks.tents.mockImplementation((growId: string) => ({
+      data:
+        growId === scopedGrowId
+          ? [{ id: TENT_ID, growId: scopedGrowId, name: "Scoped flower tent" }]
+          : [],
+      isLoading: false,
+      isError: false,
+    }));
+    mocks.listDiary.mockResolvedValue({
+      ok: true,
+      data: { entries: [] },
+    });
+    mocks.listTentDiary.mockResolvedValue({
+      ok: true,
+      data: { entries: [] },
+    });
+    mocks.getSnapshot.mockResolvedValue({
+      ok: true,
+      data: {
+        tent: { id: TENT_ID, name: "Scoped flower tent", grow_id: scopedGrowId },
+        snapshot: null,
+      },
+    });
+
+    const { result } = renderHook(() => useOperatorAccountReadModels({ growId: scopedGrowId }), {
+      wrapper: wrapper(),
+    });
+
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    expect(mocks.tents).toHaveBeenCalledWith(scopedGrowId);
+    expect(mocks.listDiary).toHaveBeenCalledWith(expect.anything(), scopedGrowId, 10);
+    expect(mocks.listTentDiary).toHaveBeenCalledWith(expect.anything(), scopedGrowId, TENT_ID, 10);
+    expect(mocks.rootZone).toHaveBeenCalledWith({
+      growId: scopedGrowId,
+      tentId: TENT_ID,
+    });
+    expect(result.current.status === "ready" && result.current.growName).toBe(
+      "Scoped dashboard grow",
+    );
+  });
+
+  it("fails a non-owned explicit grow scope closed without account read queries", async () => {
+    const foreignGrowId = "88888888-8888-4888-8888-888888888888";
+
+    const { result } = renderHook(() => useOperatorAccountReadModels({ growId: foreignGrowId }), {
+      wrapper: wrapper(),
+    });
+
+    await waitFor(() => expect(result.current.status).toBe("unavailable"));
+    expect(mocks.tents).toHaveBeenCalledWith("operator-no-grow");
+    expect(mocks.listDiary).not.toHaveBeenCalled();
+    expect(mocks.listTentDiary).not.toHaveBeenCalled();
+    expect(mocks.getSnapshot).not.toHaveBeenCalled();
+    expect(mocks.rootZone).toHaveBeenCalledWith(null);
   });
 
   it("requires a tent choice and never mixes another tent's diary note into watering context", async () => {
@@ -464,6 +534,7 @@ describe("useOperatorAccountReadModels", () => {
 
   it("returns a no-grow state without executing owner data queries", async () => {
     mocks.grows.mockReturnValue({
+      grows: [],
       activeGrow: null,
       activeGrowId: null,
       loading: false,

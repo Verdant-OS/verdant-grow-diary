@@ -18,9 +18,22 @@ on:
 
 jobs:
   lighthouse:
-    name: Lighthouse (published sitemap)
+    name: Lighthouse (published sitemap, ${{ matrix.shard.label }})
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard:
+          - index: 0
+            label: shard 1/4
+          - index: 1
+            label: shard 2/4
+          - index: 2
+            label: shard 3/4
+          - index: 3
+            label: shard 4/4
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -29,10 +42,15 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Verify Lighthouse sharding contract
+        run: node --test scripts/lib/lighthouse-url-sharding.test.cjs
+
       - name: Install Lighthouse CI
         run: npm install -g @lhci/cli@0.14.x
 
-      - name: Run Lighthouse against published sitemap
+      - name: Run Lighthouse against published sitemap shard
         run: lhci autorun --config=./lighthouserc.cjs
         env:
           LHCI_BUILD_CONTEXT__CURRENT_BRANCH: ${{ github.ref_name }}
+          LHCI_SHARD_INDEX: ${{ matrix.shard.index }}
+          LHCI_SHARD_COUNT: 4

@@ -9,7 +9,7 @@ import {
   buildApplySql,
   buildCanonicalPolicyVerificationSql,
   classifyTargetLedger,
-  describeDatabaseUrlShape,
+  describeDatabaseUrlRepairProbes,
   EXIT,
   extractExpectedFunctionBodies,
   findUnsafeSqlReason,
@@ -975,32 +975,47 @@ describe("production runner", () => {
     expect(spawnImpl).not.toHaveBeenCalled();
   });
 
-  it("describes a rejected URL's shape without leaking any value material", () => {
-    const wrapped = '"postgresql://postgres:sec ret@db.example.supabase.co:5432/postgres"';
-    const shape = describeDatabaseUrlShape(wrapped);
-    expect(shape.length).toBe(wrapped.length);
-    expect(shape.starts_with_postgres_scheme).toBe(false); // leading quote
-    expect(shape.first_char_code).toBe(34);
-    expect(shape.last_char_code).toBe(34);
-    expect(shape.double_quote_count).toBe(2);
-    expect(shape.space_count).toBe(1);
-    expect(shape.at_sign_count).toBe(1);
-    expect(shape.has_non_ascii).toBe(false);
-    // Nothing recoverable: the shape object never carries string fragments.
-    for (const value of Object.values(shape)) {
-      expect(typeof value === "string").toBe(false);
+  it("repair probes disclose only booleans — never credential-derived measurements", () => {
+    const productionUrl = DATABASE_URL;
+    const quoteWrapped = `"${productionUrl}"`;
+    const bomPrefixed = `﻿${productionUrl}`;
+    const bomAndQuotes = `﻿"${productionUrl}"`;
+    const barePassword = "just-a-secret-password-value";
+
+    expect(describeDatabaseUrlRepairProbes(quoteWrapped)).toEqual({
+      starts_with_postgres_scheme: false,
+      pins_production_after_unquote: true,
+      pins_production_after_bom_strip: false,
+      pins_production_after_bom_strip_and_unquote: false,
+    });
+    expect(
+      describeDatabaseUrlRepairProbes(bomPrefixed).pins_production_after_bom_strip,
+    ).toBe(true);
+    expect(
+      describeDatabaseUrlRepairProbes(bomAndQuotes)
+        .pins_production_after_bom_strip_and_unquote,
+    ).toBe(true);
+
+    // A mis-set bare password yields only four booleans, all false-ish facts:
+    // no length, no character codes, no counts, no string fragments.
+    const passwordProbes = describeDatabaseUrlRepairProbes(barePassword);
+    expect(passwordProbes).toEqual({
+      starts_with_postgres_scheme: false,
+      pins_production_after_unquote: false,
+      pins_production_after_bom_strip: false,
+      pins_production_after_bom_strip_and_unquote: false,
+    });
+    for (const value of Object.values(passwordProbes)) {
+      expect(typeof value).toBe("boolean");
     }
-    // BOM detection.
-    expect(describeDatabaseUrlShape("﻿postgresql://x").first_char_code).toBe(0xfeff);
-    expect(describeDatabaseUrlShape("﻿postgresql://x").has_non_ascii).toBe(true);
   });
 
-  it("records the sanitized url shape in the audit artifact on target rejection", () => {
+  it("records only repair-probe booleans in the artifacts on target rejection", () => {
     const spawnImpl = vi.fn();
     const { logger } = makeLogger();
-    const reportPath = join(testRoot, "shape", "report.md");
-    const auditPath = join(testRoot, "shape", "audit.json");
-    const badUrl = '"not a url"';
+    const reportPath = join(testRoot, "probes", "report.md");
+    const auditPath = join(testRoot, "probes", "audit.json");
+    const badUrl = `"${DATABASE_URL}"`;
 
     expect(
       runPinnedProductionMigrations({
@@ -1016,17 +1031,20 @@ describe("production runner", () => {
 
     const audit = JSON.parse(readFileSync(auditPath, "utf8"));
     expect(audit.outcome).toBe("target_rejected");
-    expect(audit.url_shape).toMatchObject({
-      length: badUrl.length,
+    expect(audit.url_repair_probes).toEqual({
       starts_with_postgres_scheme: false,
-      first_char_code: 34,
-      double_quote_count: 2,
+      pins_production_after_unquote: true,
+      pins_production_after_bom_strip: false,
+      pins_production_after_bom_strip_and_unquote: false,
     });
-    const rawAudit = readFileSync(auditPath, "utf8");
-    expect(rawAudit).not.toContain("not a url");
-    const rawReport = readFileSync(reportPath, "utf8");
-    expect(rawReport).toContain("Sanitized shape:");
-    expect(rawReport).not.toContain("not a url");
+    // No value material anywhere: not the URL, not the password, no lengths
+    // or character codes.
+    for (const artifact of [readFileSync(auditPath, "utf8"), readFileSync(reportPath, "utf8")]) {
+      expect(artifact).not.toContain(DATABASE_URL);
+      expect(artifact).not.toContain(PASSWORD);
+      expect(artifact).not.toMatch(/first_char|last_char|length|_count/);
+    }
+    expect(readFileSync(reportPath, "utf8")).toContain("Repair probes:");
   });
 
   it("rejects a changed migration before invoking psql", () => {

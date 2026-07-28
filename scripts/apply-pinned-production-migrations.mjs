@@ -647,27 +647,41 @@ function compactError(error) {
 }
 
 /**
- * Structural shape of a rejected database URL, for the sanitized audit
- * artifact ONLY. Reports facts that pinpoint how a pasted secret was
- * mangled (wrapping quotes, BOM, truncation, stray whitespace, non-ASCII)
- * without exposing the value, the password, or any recoverable substring:
- * total length, scheme prefix boolean, first/last character codes, counts
- * of a fixed set of structural characters, and a non-ASCII flag.
+ * Repair probes for a rejected database URL, for the sanitized audit
+ * artifact ONLY. Publishes NO measurement derived from the credential —
+ * no lengths, character codes, or character counts (a mis-set secret could
+ * be a bare password, and those would leak its properties into a 30-day
+ * artifact). Each probe answers exactly one question: "would the value
+ * prove the pinned production project after undoing one specific transport
+ * artifact (wrapping quotes / UTF-8 BOM / both)?" A true probe confirms
+ * the value IS the production URL modulo that artifact; a false probe
+ * reveals only that this particular repair does not apply.
  */
-export function describeDatabaseUrlShape(value) {
+export function describeDatabaseUrlRepairProbes(value) {
   const text = typeof value === "string" ? value : "";
-  const count = (re) => (text.match(re) ?? []).length;
+  const pinsProduction = (candidate) => {
+    if (candidate === null) return false;
+    try {
+      sanitizeSupabaseDatabaseUrlForPsql(candidate, "production");
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const withoutWrappingQuotes = (t) =>
+    t.length >= 2 && (t[0] === '"' || t[0] === "'") && t[t.length - 1] === t[0]
+      ? t.slice(1, -1)
+      : null;
+  const withoutBom = (t) => (t.codePointAt(0) === 0xfeff ? t.slice(1) : null);
+  const unquoted = withoutWrappingQuotes(text);
+  const deBommed = withoutBom(text);
+  const deBommedUnquoted =
+    deBommed !== null ? withoutWrappingQuotes(deBommed) : null;
   return Object.freeze({
-    length: text.length,
     starts_with_postgres_scheme: /^postgres(?:ql)?:\/\//.test(text),
-    first_char_code: text.length > 0 ? text.codePointAt(0) : null,
-    last_char_code: text.length > 0 ? text.codePointAt(text.length - 1) : null,
-    double_quote_count: count(/"/g),
-    single_quote_count: count(/'/g),
-    backslash_count: count(/\\/g),
-    space_count: count(/ /g),
-    at_sign_count: count(/@/g),
-    has_non_ascii: /[^ -~]/.test(text),
+    pins_production_after_unquote: pinsProduction(unquoted),
+    pins_production_after_bom_strip: pinsProduction(deBommed),
+    pins_production_after_bom_strip_and_unquote: pinsProduction(deBommedUnquoted),
   });
 }
 
@@ -715,7 +729,7 @@ function makeArtifactWriters({ reportPath, auditPath, now, logger }) {
           migration_versions: PINNED_PRODUCTION_MIGRATIONS.map(({ version }) => version),
           ...(extra.ledgerState ? { ledger_state: extra.ledgerState } : {}),
           ...(extra.note ? { note: extra.note } : {}),
-          ...(extra.url_shape ? { url_shape: extra.url_shape } : {}),
+          ...(extra.url_repair_probes ? { url_repair_probes: extra.url_repair_probes } : {}),
         },
         null,
         2,
@@ -2760,17 +2774,16 @@ export function runPinnedProductionMigrations({
     childEnv = buildPsqlEnvironment(env, databaseUrl);
   } catch (error) {
     const reason = compactError(error);
-    const shape = describeDatabaseUrlShape(databaseUrl);
+    const probes = describeDatabaseUrlRepairProbes(databaseUrl);
     logger.error(`Production database identity was rejected (${reason}).`);
     writeReport("BLOCKED - target identity rejected", [
       "The protected URL did not prove the pinned Verdant production project.",
-      `Sanitized shape: length=${shape.length}, scheme_ok=${shape.starts_with_postgres_scheme}, ` +
-        `first_char=${shape.first_char_code}, last_char=${shape.last_char_code}, ` +
-        `quotes=${shape.double_quote_count}/${shape.single_quote_count}, ` +
-        `backslashes=${shape.backslash_count}, spaces=${shape.space_count}, ` +
-        `at_signs=${shape.at_sign_count}, non_ascii=${shape.has_non_ascii}`,
+      `Repair probes: scheme_present=${probes.starts_with_postgres_scheme}, ` +
+        `pins_after_unquote=${probes.pins_production_after_unquote}, ` +
+        `pins_after_bom_strip=${probes.pins_production_after_bom_strip}, ` +
+        `pins_after_bom_strip_and_unquote=${probes.pins_production_after_bom_strip_and_unquote}`,
     ]);
-    writeAudit("target_rejected", { ...auditBase, note: reason, url_shape: shape });
+    writeAudit("target_rejected", { ...auditBase, note: reason, url_repair_probes: probes });
     return EXIT.TARGET_REJECTED;
   }
 

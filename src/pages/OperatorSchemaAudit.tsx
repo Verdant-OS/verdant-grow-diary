@@ -392,14 +392,6 @@ export default function OperatorSchemaAudit() {
 
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
-          <CardTitle className="text-base">Required migrations</CardTitle>
-          <div className="flex items-center gap-2 text-xs">
-            <Badge variant="outline">{migrationStats.applied} applied</Badge>
-            <Badge variant={migrationStats.missing > 0 ? "destructive" : "outline"}>
-              {migrationStats.missing} missing
-            </Badge>
-      <Card>
         <CardHeader className="flex flex-col gap-3 pb-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-base">Required migrations</CardTitle>
           <div className="flex items-center gap-2 text-xs">

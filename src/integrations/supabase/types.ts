@@ -4436,10 +4436,12 @@ export type Database = {
       }
     }
     Functions: {
-      admin_schema_audit: {
-        Args: { _columns?: Json; _migrations: string[]; _tables: string[] }
-        Returns: Json
-      }
+      admin_schema_audit:
+        | { Args: { _migrations: string[]; _tables: string[] }; Returns: Json }
+        | {
+            Args: { _columns?: Json; _migrations: string[]; _tables: string[] }
+            Returns: Json
+          }
       ai_credit_allowance: {
         Args: { p_plan_id: string }
         Returns: {

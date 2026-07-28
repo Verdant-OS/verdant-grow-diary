@@ -1,3 +1,5 @@
+import type { AppRouteEntry } from "../../src/lib/appRouteManifest";
+
 export type FieldExercisePolicy = "fill-safe-fields" | "audit-only";
 
 export type CoreCensusRoute = {
@@ -249,6 +251,41 @@ export function matchesKnownAppRoute(
   return manifestPatterns
     .filter((pattern) => pattern !== "*")
     .some((pattern) => routePatternToRegExp(pattern).test(pathname));
+}
+
+function matchingManifestRoute(
+  pathname: string,
+  manifest: ReadonlyArray<Pick<AppRouteEntry, "path" | "access">>,
+): Pick<AppRouteEntry, "path" | "access"> | undefined {
+  return manifest
+    .filter((route) => route.path !== "*" && routePatternToRegExp(route.path).test(pathname))
+    .sort((left, right) => {
+      const leftDynamicSegments = left.path
+        .split("/")
+        .filter((segment) => segment.startsWith(":")).length;
+      const rightDynamicSegments = right.path
+        .split("/")
+        .filter((segment) => segment.startsWith(":")).length;
+      return (
+        leftDynamicSegments - rightDynamicSegments ||
+        right.path.length - left.path.length ||
+        left.path.localeCompare(right.path)
+      );
+    })[0];
+}
+
+export function expectedCensusNavigationPath(
+  pathname: string,
+  manifest: ReadonlyArray<Pick<AppRouteEntry, "path" | "access">>,
+  signedIn: boolean,
+): string {
+  if (signedIn) return pathname;
+
+  const route = matchingManifestRoute(pathname, manifest);
+  if (route && ["auth", "operator", "internal"].includes(route.access)) {
+    return "/welcome";
+  }
+  return pathname;
 }
 
 export function isPrivilegedRoute(pathname: string): boolean {

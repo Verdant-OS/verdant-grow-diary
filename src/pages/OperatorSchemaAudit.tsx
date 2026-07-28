@@ -11,13 +11,14 @@
  *    pure presenter; it never writes and never bypasses that check.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, XCircle, RefreshCw, Loader2, AlertTriangle } from "lucide-react";
+import { CheckCircle2, XCircle, RefreshCw, Loader2, AlertTriangle, ChevronRight } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { usePageSeo } from "@/hooks/usePageSeo";
+import SchemaAuditMigrationDrilldown from "@/components/SchemaAuditMigrationDrilldown";
 import {
   REQUIRED_CORE_SCHEMA,
   ADVISORY_SCHEMA,
@@ -79,6 +80,7 @@ export default function OperatorSchemaAudit() {
   const [data, setData] = useState<AuditResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [openMigration, setOpenMigration] = useState<MigrationRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -121,6 +123,12 @@ export default function OperatorSchemaAudit() {
     const rows = data?.tables ?? [];
     const present = rows.filter((r) => r.exists).length;
     return { present, total: rows.length, missing: rows.length - present };
+  }, [data]);
+
+  const tableExistence = useMemo(() => {
+    const map: Record<string, boolean> = {};
+    for (const row of data?.tables ?? []) map[row.table] = row.exists;
+    return map;
   }, [data]);
 
   return (
@@ -178,9 +186,12 @@ export default function OperatorSchemaAudit() {
         <CardContent className="p-0">
           <div className="divide-y">
             {(data?.migrations ?? []).map((row) => (
-              <div
+              <button
+                type="button"
                 key={row.filename}
-                className="px-4 py-2 flex items-center justify-between gap-3 text-sm"
+                onClick={() => setOpenMigration(row)}
+                data-testid={`schema-audit-migration-row-${row.filename}`}
+                className="w-full px-4 py-2 flex items-center justify-between gap-3 text-sm text-left hover:bg-muted/40 transition"
               >
                 <div className="min-w-0">
                   <div className="font-mono text-xs truncate">{row.filename}</div>
@@ -188,16 +199,19 @@ export default function OperatorSchemaAudit() {
                     version {row.version ?? "unknown"}
                   </div>
                 </div>
-                {row.applied ? (
-                  <span className="inline-flex items-center gap-1 text-emerald-600 text-xs font-medium">
-                    <CheckCircle2 className="h-4 w-4" /> applied
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-destructive text-xs font-medium">
-                    <XCircle className="h-4 w-4" /> not in ledger
-                  </span>
-                )}
-              </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {row.applied ? (
+                    <span className="inline-flex items-center gap-1 text-emerald-600 text-xs font-medium">
+                      <CheckCircle2 className="h-4 w-4" /> applied
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-destructive text-xs font-medium">
+                      <XCircle className="h-4 w-4" /> not in ledger
+                    </span>
+                  )}
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </button>
             ))}
             {!loading && (data?.migrations ?? []).length === 0 && (
               <div className="px-4 py-6 text-sm text-muted-foreground text-center">
@@ -246,6 +260,15 @@ export default function OperatorSchemaAudit() {
           </div>
         </CardContent>
       </Card>
+
+      <SchemaAuditMigrationDrilldown
+        open={openMigration !== null}
+        onOpenChange={(o) => { if (!o) setOpenMigration(null); }}
+        filename={openMigration?.filename ?? null}
+        version={openMigration?.version ?? null}
+        applied={openMigration?.applied ?? false}
+        tableExistence={tableExistence}
+      />
     </div>
   );
 }

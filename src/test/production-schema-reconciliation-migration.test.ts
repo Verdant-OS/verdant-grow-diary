@@ -186,10 +186,12 @@ describe("production schema reconciliation migration", () => {
     );
 
     expect(sql).toContain("v_soil_acl_canonical CONSTANT jsonb");
+    expect(sql).toContain("v_soil_legacy_bloat_acl CONSTANT jsonb");
     expect(sql).toContain("v_soil_acl_state := 'canonical'");
     expect(sql).toContain("v_soil_acl_state := 'known_legacy_default_bloat'");
     expect(sql).toContain("v_soil_acl_state := 'absent'");
-    expect(sql).toContain("v_soil_acl_shape = v_legacy_bloat_acl");
+    expect(sql).toContain("v_soil_acl_shape = v_soil_legacy_bloat_acl");
+    expect(sql).toContain('"anon": ["MAINTAIN", "REFERENCES", "TRIGGER", "TRUNCATE"]');
     expect(ownerRefusal).toBeGreaterThan(0);
     expect(columnRefusal).toBeGreaterThan(ownerRefusal);
     expect(grantorRefusal).toBeGreaterThan(columnRefusal);
@@ -277,7 +279,7 @@ describe("production schema reconciliation migration", () => {
     expect(sql).toContain("v_cross_acl_canonical CONSTANT jsonb");
     expect(sql).toContain("v_reversal_acl_canonical CONSTANT jsonb");
     expect(sql).toContain("v_legacy_bloat_acl CONSTANT jsonb");
-    expect(sql.match(/"postgres": \[/g)).toHaveLength(4);
+    expect(sql.match(/"postgres": \[/g)).toHaveLength(5);
     expect(sql).toContain("v_pheno_acl_state := 'canonical'");
     expect(sql).toContain("v_pheno_acl_state := 'known_legacy_default_bloat'");
     expect(ownerRefusal).toBeGreaterThan(0);

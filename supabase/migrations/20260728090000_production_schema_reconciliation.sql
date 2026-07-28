@@ -62,6 +62,21 @@ DECLARE
       "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"
     ]
   }'::jsonb;
+  v_soil_legacy_bloat_acl CONSTANT jsonb := '{
+    "anon": ["MAINTAIN", "REFERENCES", "TRIGGER", "TRUNCATE"],
+    "authenticated": [
+      "DELETE", "INSERT", "MAINTAIN", "REFERENCES",
+      "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"
+    ],
+    "postgres": [
+      "DELETE", "INSERT", "MAINTAIN", "REFERENCES",
+      "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"
+    ],
+    "service_role": [
+      "DELETE", "INSERT", "MAINTAIN", "REFERENCES",
+      "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"
+    ]
+  }'::jsonb;
   v_cross_acl_canonical CONSTANT jsonb := '{
     "authenticated": ["DELETE", "INSERT", "SELECT", "UPDATE"],
     "postgres": [
@@ -568,14 +583,14 @@ BEGIN
 
     IF v_soil_acl_shape = v_soil_acl_canonical THEN
       v_soil_acl_state := 'canonical';
-    ELSIF v_soil_acl_shape = v_legacy_bloat_acl THEN
+    ELSIF v_soil_acl_shape = v_soil_legacy_bloat_acl THEN
       v_soil_acl_state := 'known_legacy_default_bloat';
     ELSE
       RAISE EXCEPTION USING
         ERRCODE = '55000',
         MESSAGE = 'schema reconciliation refused unexpected soil_moisture_calibrations ACL shape',
         DETAIL = format('soil_moisture_calibrations=%s', v_soil_acl_shape),
-        HINT = 'Expected the canonical ACL or the exact known hosted default-ACL bloat.';
+        HINT = 'Expected the canonical ACL or the exact replay-observed hosted default-ACL bloat.';
     END IF;
   ELSE
     v_soil_policy_state := 'absent';

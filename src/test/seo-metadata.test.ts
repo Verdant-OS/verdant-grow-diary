@@ -133,9 +133,25 @@ describe("favicon and manifest", () => {
     expect(MANIFEST.icons.length).toBeGreaterThan(0);
     for (const icon of MANIFEST.icons) {
       expect(icon.src).toMatch(/^\/brand\//);
+      expect(icon.src).not.toBe("/brand/verdant-logo.png");
       const abs = resolve(root, "public", icon.src.replace(/^\//, ""));
       expect(existsSync(abs)).toBe(true);
+      expect(statSync(abs).size, `${icon.src} should stay below 40 KiB`).toBeLessThan(40 * 1024);
     }
+    expect(MANIFEST.icons).toEqual([
+      {
+        src: "/brand/verdant-logo-192.webp",
+        sizes: "192x192",
+        type: "image/webp",
+        purpose: "any",
+      },
+      {
+        src: "/brand/verdant-logo-512.webp",
+        sizes: "512x512",
+        type: "image/webp",
+        purpose: "any",
+      },
+    ]);
   });
 });
 

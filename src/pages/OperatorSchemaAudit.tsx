@@ -106,6 +106,10 @@ export default function OperatorSchemaAudit() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openMigration, setOpenMigration] = useState<MigrationRow | null>(null);
+  const [migrationSearch, setMigrationSearch] = useState("");
+  const [migrationStatusFilter, setMigrationStatusFilter] = useState<
+    "all" | "applied" | "missing"
+  >("all");
 
   const load = useCallback(async () => {
     setLoading(true);

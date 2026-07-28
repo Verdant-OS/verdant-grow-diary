@@ -75,7 +75,7 @@ describe("Guides + glossary head-tag registry coverage", () => {
   it("every registered guide + glossary route has a route-local filename", () => {
     for (const path of TARGET_PATHS) {
       const doc = REGISTRY_BY_PATH.get(path)!;
-      expect(doc.fileName).toBe(`${path.slice(1)}.html`);
+      expect(doc.fileName).toBe(`${path.slice(1)}/index.html`);
     }
   });
 

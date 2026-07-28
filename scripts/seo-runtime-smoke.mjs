@@ -50,11 +50,11 @@ const ROUTES = [
 const browser = await chromium.launch();
 let failed = 0;
 
-// Vercel serves this entry to non-JavaScript social crawlers before the SPA
-// fallback. Check the emitted document directly because Vite preview does not
-// apply vercel.json rewrites.
+// Filesystem-first production hosts serve this entry to non-JavaScript social
+// crawlers before the SPA fallback. Check the emitted document directly
+// because Vite preview does not reproduce every production host's routing.
 {
-  const html = await readFile(new URL("../dist/founder.html", import.meta.url), "utf8");
+  const html = await readFile(new URL("../dist/founder/index.html", import.meta.url), "utf8");
   const expected = {
     title: "Founder Lifetime — Support Verdant Early | Verdant Grow Diary",
     url: `${ORIGIN}/founder`,

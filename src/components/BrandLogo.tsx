@@ -1,7 +1,9 @@
 /**
  * Verdant brand logo.
  *
- * Renders the circular Verdant mark from /brand/verdant-logo.png.
+ * Renders responsive, display-sized WebP variants of the circular Verdant
+ * mark. The 2.38 MB source PNG remains available for structured-data and
+ * print-quality uses, but must never be fetched by this UI component.
  *
  * Sizes:
  *  - sm   24px  — favicon-adjacent, dense nav rails
@@ -17,7 +19,13 @@
  * the purpose-built leaf-and-pen SVG favicon in public/favicon.svg.
  */
 
-const LOGO_SRC = "/brand/verdant-logo.png";
+const LOGO_SRC = "/brand/verdant-logo-128.webp";
+const LOGO_SRC_SET = [
+  "/brand/verdant-logo-32.webp 32w",
+  "/brand/verdant-logo-64.webp 64w",
+  "/brand/verdant-logo-128.webp 128w",
+  "/brand/verdant-logo-256.webp 256w",
+].join(", ");
 const ALT = "Verdant Grow Diary logo";
 
 export type BrandLogoSize = "sm" | "md" | "lg" | "hero";
@@ -52,6 +60,8 @@ export default function BrandLogo({ size = "md", showText = false, className }: 
     <span className={`inline-flex items-center gap-2 ${className ?? ""}`.trim()}>
       <img
         src={LOGO_SRC}
+        srcSet={LOGO_SRC_SET}
+        sizes={`${px}px`}
         alt={ALT}
         width={px}
         height={px}

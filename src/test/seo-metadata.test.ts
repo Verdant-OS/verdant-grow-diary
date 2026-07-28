@@ -7,7 +7,7 @@
  * and that no service_role / external-control strings leaked in.
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = resolve(__dirname, "..", "..");
@@ -100,18 +100,22 @@ describe("favicon and manifest", () => {
     expect(readFileSync(svg, "utf8").length).toBeLessThan(4096);
   });
 
-  it("apple-touch-icon points at the brand logo", () => {
-    expect(HTML).toMatch(/<link\s+rel="apple-touch-icon"[^>]+href="\/brand\/verdant-logo\.png"/);
+  it("apple-touch-icon uses a bounded purpose-built 180px logo", () => {
+    expect(HTML).toMatch(
+      /<link\s+rel="apple-touch-icon"\s+sizes="180x180"\s+href="\/brand\/verdant-logo-180\.png"/,
+    );
+    const icon = resolve(root, "public/brand/verdant-logo-180.png");
+    expect(existsSync(icon)).toBe(true);
+    expect(statSync(icon).size).toBeLessThan(100 * 1024);
   });
 
   it("links to /site.webmanifest", () => {
     expect(HTML).toMatch(/<link\s+rel="manifest"\s+href="\/site\.webmanifest"/);
   });
 
-  it("still tracks the remaining raster-icon design follow-up", () => {
-    // The SVG favicon is shipped; the apple-touch-icon still points at the full
-    // brand PNG and wants a purpose-built 180x180. Keep that follow-up visible.
-    expect(HTML).toMatch(/TODO\(design\)/);
+  it("does not regress browser icon discovery to the full source logo", () => {
+    const browserIcons = HTML.match(/<link[^>]+rel="(?:icon|apple-touch-icon)"[^>]*>/g) ?? [];
+    expect(browserIcons.join("\n")).not.toContain("/brand/verdant-logo.png");
   });
 
   it("legacy /favicon.ico is no longer shipped", () => {

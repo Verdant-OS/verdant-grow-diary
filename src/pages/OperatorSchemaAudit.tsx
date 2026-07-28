@@ -399,47 +399,120 @@ export default function OperatorSchemaAudit() {
             <Badge variant={migrationStats.missing > 0 ? "destructive" : "outline"}>
               {migrationStats.missing} missing
             </Badge>
+      <Card>
+        <CardHeader className="flex flex-col gap-3 pb-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="text-base">Required migrations</CardTitle>
+          <div className="flex items-center gap-2 text-xs">
+            <Badge variant="outline">{migrationStats.applied} applied</Badge>
+            <Badge variant={migrationStats.missing > 0 ? "destructive" : "outline"}>
+              {migrationStats.missing} missing
+            </Badge>
             <span className="text-muted-foreground">of {migrationStats.total}</span>
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="divide-y">
-            {(data?.migrations ?? []).map((row) => (
-              <button
-                type="button"
-                key={row.filename}
-                onClick={() => setOpenMigration(row)}
-                data-testid={`schema-audit-migration-row-${row.filename}`}
-                className="w-full px-4 py-2 flex items-center justify-between gap-3 text-sm text-left hover:bg-muted/40 transition"
+          <div className="flex flex-col gap-2 border-b bg-muted/20 px-4 py-3 sm:flex-row sm:items-center">
+            <Input
+              value={migrationSearch}
+              onChange={(e) => setMigrationSearch(e.target.value)}
+              placeholder="Search by version or filename…"
+              aria-label="Search migrations"
+              data-testid="schema-audit-migration-search"
+              className="h-9 sm:max-w-sm"
+            />
+            <Select
+              value={migrationStatusFilter}
+              onValueChange={(v) =>
+                setMigrationStatusFilter(v as "all" | "applied" | "missing")
+              }
+            >
+              <SelectTrigger
+                className="h-9 sm:w-48"
+                aria-label="Filter migrations by status"
+                data-testid="schema-audit-migration-status-filter"
               >
-                <div className="min-w-0">
-                  <div className="font-mono text-xs truncate">{row.filename}</div>
-                  <div className="text-xs text-muted-foreground">
-                    version {row.version ?? "unknown"}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {row.applied ? (
-                    <span className="inline-flex items-center gap-1 text-emerald-600 text-xs font-medium">
-                      <CheckCircle2 className="h-4 w-4" /> applied
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-destructive text-xs font-medium">
-                      <XCircle className="h-4 w-4" /> not in ledger
-                    </span>
-                  )}
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </div>
-              </button>
-            ))}
-            {!loading && (data?.migrations ?? []).length === 0 && (
-              <div className="px-4 py-6 text-sm text-muted-foreground text-center">
-                No migration data returned.
-              </div>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="applied">Applied</SelectItem>
+                <SelectItem value="missing">Missing</SelectItem>
+              </SelectContent>
+            </Select>
+            {(migrationSearch || migrationStatusFilter !== "all") && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setMigrationSearch("");
+                  setMigrationStatusFilter("all");
+                }}
+                className="h-9"
+              >
+                Clear
+              </Button>
             )}
+          </div>
+          <div className="divide-y">
+            {(() => {
+              const all = data?.migrations ?? [];
+              const q = migrationSearch.trim().toLowerCase();
+              const filtered = all.filter((row) => {
+                if (migrationStatusFilter === "applied" && !row.applied) return false;
+                if (migrationStatusFilter === "missing" && row.applied) return false;
+                if (!q) return true;
+                return (
+                  row.filename.toLowerCase().includes(q) ||
+                  (row.version ?? "").toLowerCase().includes(q)
+                );
+              });
+              return (
+                <>
+                  {filtered.map((row) => (
+                    <button
+                      type="button"
+                      key={row.filename}
+                      onClick={() => setOpenMigration(row)}
+                      data-testid={`schema-audit-migration-row-${row.filename}`}
+                      className="w-full px-4 py-2 flex items-center justify-between gap-3 text-sm text-left hover:bg-muted/40 transition"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-mono text-xs truncate">{row.filename}</div>
+                        <div className="text-xs text-muted-foreground">
+                          version {row.version ?? "unknown"}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {row.applied ? (
+                          <span className="inline-flex items-center gap-1 text-emerald-600 text-xs font-medium">
+                            <CheckCircle2 className="h-4 w-4" /> applied
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-destructive text-xs font-medium">
+                            <XCircle className="h-4 w-4" /> not in ledger
+                          </span>
+                        )}
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </button>
+                  ))}
+                  {!loading && all.length > 0 && filtered.length === 0 && (
+                    <div className="px-4 py-6 text-sm text-muted-foreground text-center">
+                      No migrations match this search or filter.
+                    </div>
+                  )}
+                  {!loading && all.length === 0 && (
+                    <div className="px-4 py-6 text-sm text-muted-foreground text-center">
+                      No migration data returned.
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </CardContent>
       </Card>
+
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">

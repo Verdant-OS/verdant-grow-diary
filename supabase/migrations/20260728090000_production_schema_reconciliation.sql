@@ -7,9 +7,11 @@
 --   * Pheno matches the composed 20260706191500 -> 20260707120001 contract, or
 --     it already matches the final 20260707210000 taxonomy contract.
 --
--- Any partial or unexpected state aborts before public-schema DDL. Existing
--- Pheno ACLs are never changed. Only the two permissive owner write policies
--- are rebuilt during the pre-taxonomy -> final-taxonomy transition; the later
+-- Any partial or unexpected state aborts before public-schema DDL. Pheno ACLs
+-- must be either canonical or the exact known legacy default-ACL bloat; both
+-- accepted inputs are normalized to canonical browser/service grants before
+-- reconciliation continues. Only the two permissive owner write policies are
+-- rebuilt during the pre-taxonomy -> final-taxonomy transition; the later
 -- RESTRICTIVE entitlement policies remain untouched.
 -- The two soil write policies are forward-hardened with explicit outer-table
 -- qualification so same-user grow/tent/plant mismatches cannot pass through
@@ -25,9 +27,12 @@ DECLARE
   v_soil_exists boolean := false;
   v_soil_policy_state text;
   v_pheno_state text;
+  v_pheno_acl_state text;
   v_shape text[];
   v_names text[];
   v_acl text[];
+  v_cross_acl_shape jsonb;
+  v_reversal_acl_shape jsonb;
   v_definitions text;
   v_policy_expression text;
   v_cross_count_before bigint;
@@ -36,14 +41,54 @@ DECLARE
   v_reversal_ids_before uuid[];
   v_soil_count_before bigint := 0;
   v_soil_ids_before uuid[] := ARRAY[]::uuid[];
-  v_cross_acl_before text;
-  v_reversal_acl_before text;
+  v_cross_acl_after_normalization text;
+  v_reversal_acl_after_normalization text;
   v_restrictive_before text[];
   v_restrictive_after text[];
   v_count_after bigint;
   v_ids_after uuid[];
   v_published_policy_count integer;
   v_hardened_policy_count integer;
+  v_cross_acl_canonical CONSTANT jsonb := '{
+    "authenticated": ["DELETE", "INSERT", "SELECT", "UPDATE"],
+    "postgres": [
+      "DELETE", "INSERT", "MAINTAIN", "REFERENCES",
+      "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"
+    ],
+    "service_role": [
+      "DELETE", "INSERT", "MAINTAIN", "REFERENCES",
+      "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"
+    ]
+  }'::jsonb;
+  v_reversal_acl_canonical CONSTANT jsonb := '{
+    "authenticated": ["INSERT", "SELECT"],
+    "postgres": [
+      "DELETE", "INSERT", "MAINTAIN", "REFERENCES",
+      "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"
+    ],
+    "service_role": [
+      "DELETE", "INSERT", "MAINTAIN", "REFERENCES",
+      "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"
+    ]
+  }'::jsonb;
+  v_legacy_bloat_acl CONSTANT jsonb := '{
+    "anon": [
+      "DELETE", "INSERT", "MAINTAIN", "REFERENCES",
+      "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"
+    ],
+    "authenticated": [
+      "DELETE", "INSERT", "MAINTAIN", "REFERENCES",
+      "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"
+    ],
+    "postgres": [
+      "DELETE", "INSERT", "MAINTAIN", "REFERENCES",
+      "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"
+    ],
+    "service_role": [
+      "DELETE", "INSERT", "MAINTAIN", "REFERENCES",
+      "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"
+    ]
+  }'::jsonb;
 BEGIN
   -- Resolve relations by catalog identity, not search_path. A view, foreign
   -- table, or partition with a colliding name is an unexpected state.
@@ -102,16 +147,6 @@ BEGIN
     INTO v_soil_count_before, v_soil_ids_before
     FROM public.soil_moisture_calibrations;
   END IF;
-
-  SELECT c.relacl::text
-  INTO v_cross_acl_before
-  FROM pg_catalog.pg_class c
-  WHERE c.oid = 'public.pheno_crosses'::regclass;
-
-  SELECT c.relacl::text
-  INTO v_reversal_acl_before
-  FROM pg_catalog.pg_class c
-  WHERE c.oid = 'public.pheno_reversals'::regclass;
 
   SELECT array_agg(
     format(
@@ -1187,78 +1222,37 @@ BEGIN
       MESSAGE = 'schema reconciliation refused noncanonical Pheno restrictive entitlement policies';
   END IF;
 
-  -- Exact Pheno ACL posture is a precondition, but this migration never
-  -- changes it.
-  SELECT array_agg(a.privilege_type ORDER BY a.privilege_type)
-  INTO v_acl
-  FROM pg_catalog.pg_class c
-  CROSS JOIN LATERAL pg_catalog.aclexplode(
-    COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))
-  ) a
-  WHERE c.oid = 'public.pheno_crosses'::regclass
-    AND a.grantee = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = 'authenticated')
-    AND NOT a.is_grantable;
-
-  IF v_acl IS DISTINCT FROM ARRAY['DELETE', 'INSERT', 'SELECT', 'UPDATE']::text[] THEN
-    RAISE EXCEPTION USING
-      ERRCODE = '55000',
-      MESSAGE = 'schema reconciliation refused noncanonical pheno_crosses authenticated grants';
-  END IF;
-
-  SELECT array_agg(a.privilege_type ORDER BY a.privilege_type)
-  INTO v_acl
-  FROM pg_catalog.pg_class c
-  CROSS JOIN LATERAL pg_catalog.aclexplode(
-    COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))
-  ) a
-  WHERE c.oid = 'public.pheno_reversals'::regclass
-    AND a.grantee = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = 'authenticated')
-    AND NOT a.is_grantable;
-
-  IF v_acl IS DISTINCT FROM ARRAY['INSERT', 'SELECT']::text[] THEN
-    RAISE EXCEPTION USING
-      ERRCODE = '55000',
-      MESSAGE = 'schema reconciliation refused noncanonical pheno_reversals authenticated grants';
-  END IF;
-
-  SELECT array_agg(a.privilege_type ORDER BY a.privilege_type)
-  INTO v_acl
-  FROM pg_catalog.pg_class c
-  CROSS JOIN LATERAL pg_catalog.aclexplode(
-    COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))
-  ) a
-  WHERE c.oid = 'public.pheno_crosses'::regclass
-    AND a.grantee = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = 'service_role')
-    AND NOT a.is_grantable;
-
-  IF v_acl IS NULL OR NOT (
-    v_acl @> ARRAY[
-      'DELETE', 'INSERT', 'REFERENCES', 'SELECT', 'TRIGGER', 'TRUNCATE', 'UPDATE'
-    ]::text[]
+  -- Accept only the canonical ACL or the exact production-observed legacy
+  -- default-ACL bloat. The production relation owner and its represented ACL
+  -- are part of the exact shape; so are every grantor, grantee, privilege,
+  -- grant-option bit, and column ACL.
+  IF EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_class c
+    LEFT JOIN pg_catalog.pg_roles owner_role ON owner_role.oid = c.relowner
+    WHERE c.oid IN (
+      'public.pheno_crosses'::regclass,
+      'public.pheno_reversals'::regclass
+    )
+      AND owner_role.rolname IS DISTINCT FROM 'postgres'
   ) THEN
     RAISE EXCEPTION USING
       ERRCODE = '55000',
-      MESSAGE = 'schema reconciliation refused noncanonical pheno_crosses service_role grants';
+      MESSAGE = 'schema reconciliation refused unexpected Pheno relation owners';
   END IF;
 
-  SELECT array_agg(a.privilege_type ORDER BY a.privilege_type)
-  INTO v_acl
-  FROM pg_catalog.pg_class c
-  CROSS JOIN LATERAL pg_catalog.aclexplode(
-    COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))
-  ) a
-  WHERE c.oid = 'public.pheno_reversals'::regclass
-    AND a.grantee = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = 'service_role')
-    AND NOT a.is_grantable;
-
-  IF v_acl IS NULL OR NOT (
-    v_acl @> ARRAY[
-      'DELETE', 'INSERT', 'REFERENCES', 'SELECT', 'TRIGGER', 'TRUNCATE', 'UPDATE'
-    ]::text[]
+  IF EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_attribute a
+    WHERE a.attrelid IN (
+      'public.pheno_crosses'::regclass,
+      'public.pheno_reversals'::regclass
+    )
+      AND a.attacl IS NOT NULL
   ) THEN
     RAISE EXCEPTION USING
       ERRCODE = '55000',
-      MESSAGE = 'schema reconciliation refused noncanonical pheno_reversals service_role grants';
+      MESSAGE = 'schema reconciliation refused unexpected Pheno column ACLs';
   END IF;
 
   IF EXISTS (
@@ -1266,17 +1260,192 @@ BEGIN
     FROM pg_catalog.pg_class c
     CROSS JOIN LATERAL pg_catalog.aclexplode(
       COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))
-    ) a
-    WHERE c.oid IN ('public.pheno_crosses'::regclass, 'public.pheno_reversals'::regclass)
-      AND a.grantee IN (
-        0,
-        COALESCE((SELECT oid FROM pg_catalog.pg_roles WHERE rolname = 'anon'), 0)
-      )
+    ) acl
+    WHERE c.oid IN (
+      'public.pheno_crosses'::regclass,
+      'public.pheno_reversals'::regclass
+    )
+      AND acl.grantor IS DISTINCT FROM c.relowner
   ) THEN
     RAISE EXCEPTION USING
       ERRCODE = '55000',
-      MESSAGE = 'schema reconciliation refused public or anon Pheno grants';
+      MESSAGE = 'schema reconciliation refused unexpected Pheno ACL grantors';
   END IF;
+
+  SELECT COALESCE(
+    jsonb_object_agg(grantee, privileges),
+    '{}'::jsonb
+  )
+  INTO v_cross_acl_shape
+  FROM (
+    SELECT
+      CASE
+        WHEN acl.grantee = 0 THEN 'PUBLIC'
+        ELSE COALESCE(role.rolname, format('oid:%s', acl.grantee))
+      END AS grantee,
+      jsonb_agg(
+        acl.privilege_type ||
+          CASE WHEN acl.is_grantable THEN ' WITH GRANT OPTION' ELSE '' END
+        ORDER BY acl.privilege_type, acl.is_grantable
+      ) AS privileges
+    FROM pg_catalog.pg_class c
+    CROSS JOIN LATERAL pg_catalog.aclexplode(
+      COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))
+    ) acl
+    LEFT JOIN pg_catalog.pg_roles role ON role.oid = acl.grantee
+    WHERE c.oid = 'public.pheno_crosses'::regclass
+    GROUP BY acl.grantee, role.rolname
+  ) exact_grants;
+
+  SELECT COALESCE(
+    jsonb_object_agg(grantee, privileges),
+    '{}'::jsonb
+  )
+  INTO v_reversal_acl_shape
+  FROM (
+    SELECT
+      CASE
+        WHEN acl.grantee = 0 THEN 'PUBLIC'
+        ELSE COALESCE(role.rolname, format('oid:%s', acl.grantee))
+      END AS grantee,
+      jsonb_agg(
+        acl.privilege_type ||
+          CASE WHEN acl.is_grantable THEN ' WITH GRANT OPTION' ELSE '' END
+        ORDER BY acl.privilege_type, acl.is_grantable
+      ) AS privileges
+    FROM pg_catalog.pg_class c
+    CROSS JOIN LATERAL pg_catalog.aclexplode(
+      COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))
+    ) acl
+    LEFT JOIN pg_catalog.pg_roles role ON role.oid = acl.grantee
+    WHERE c.oid = 'public.pheno_reversals'::regclass
+    GROUP BY acl.grantee, role.rolname
+  ) exact_grants;
+
+  IF v_cross_acl_shape = v_cross_acl_canonical
+     AND v_reversal_acl_shape = v_reversal_acl_canonical THEN
+    v_pheno_acl_state := 'canonical';
+  ELSIF v_cross_acl_shape = v_legacy_bloat_acl
+        AND v_reversal_acl_shape = v_legacy_bloat_acl THEN
+    v_pheno_acl_state := 'known_legacy_default_bloat';
+  ELSE
+    RAISE EXCEPTION USING
+      ERRCODE = '55000',
+      MESSAGE = 'schema reconciliation refused unexpected Pheno ACL shape',
+      DETAIL = format(
+        'pheno_crosses=%s; pheno_reversals=%s',
+        v_cross_acl_shape,
+        v_reversal_acl_shape
+      ),
+      HINT = 'Expected both tables to be canonical or both to match the exact known legacy default-ACL bloat.';
+  END IF;
+
+  -- Normalize both accepted inputs to the same least-privilege contract before
+  -- any soil/taxonomy DDL. Any later failure rolls this transition back with
+  -- the rest of the reconciliation transaction.
+  EXECUTE
+    'REVOKE ALL PRIVILEGES ON TABLE ' ||
+    'public.pheno_crosses, public.pheno_reversals ' ||
+    'FROM PUBLIC, anon, authenticated';
+  EXECUTE
+    'GRANT DELETE, INSERT, SELECT, UPDATE ' ||
+    'ON TABLE public.pheno_crosses TO authenticated';
+  EXECUTE
+    'GRANT INSERT, SELECT ' ||
+    'ON TABLE public.pheno_reversals TO authenticated';
+  EXECUTE
+    'GRANT ALL PRIVILEGES ON TABLE ' ||
+    'public.pheno_crosses, public.pheno_reversals TO service_role';
+
+  IF EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_class c
+    CROSS JOIN LATERAL pg_catalog.aclexplode(
+      COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))
+    ) acl
+    WHERE c.oid IN (
+      'public.pheno_crosses'::regclass,
+      'public.pheno_reversals'::regclass
+    )
+      AND acl.grantor IS DISTINCT FROM c.relowner
+  ) THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '55000',
+      MESSAGE = 'schema reconciliation failed canonical Pheno ACL grantor normalization';
+  END IF;
+
+  SELECT COALESCE(
+    jsonb_object_agg(grantee, privileges),
+    '{}'::jsonb
+  )
+  INTO v_cross_acl_shape
+  FROM (
+    SELECT
+      CASE
+        WHEN acl.grantee = 0 THEN 'PUBLIC'
+        ELSE COALESCE(role.rolname, format('oid:%s', acl.grantee))
+      END AS grantee,
+      jsonb_agg(
+        acl.privilege_type ||
+          CASE WHEN acl.is_grantable THEN ' WITH GRANT OPTION' ELSE '' END
+        ORDER BY acl.privilege_type, acl.is_grantable
+      ) AS privileges
+    FROM pg_catalog.pg_class c
+    CROSS JOIN LATERAL pg_catalog.aclexplode(
+      COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))
+    ) acl
+    LEFT JOIN pg_catalog.pg_roles role ON role.oid = acl.grantee
+    WHERE c.oid = 'public.pheno_crosses'::regclass
+    GROUP BY acl.grantee, role.rolname
+  ) exact_grants;
+
+  SELECT COALESCE(
+    jsonb_object_agg(grantee, privileges),
+    '{}'::jsonb
+  )
+  INTO v_reversal_acl_shape
+  FROM (
+    SELECT
+      CASE
+        WHEN acl.grantee = 0 THEN 'PUBLIC'
+        ELSE COALESCE(role.rolname, format('oid:%s', acl.grantee))
+      END AS grantee,
+      jsonb_agg(
+        acl.privilege_type ||
+          CASE WHEN acl.is_grantable THEN ' WITH GRANT OPTION' ELSE '' END
+        ORDER BY acl.privilege_type, acl.is_grantable
+      ) AS privileges
+    FROM pg_catalog.pg_class c
+    CROSS JOIN LATERAL pg_catalog.aclexplode(
+      COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))
+    ) acl
+    LEFT JOIN pg_catalog.pg_roles role ON role.oid = acl.grantee
+    WHERE c.oid = 'public.pheno_reversals'::regclass
+    GROUP BY acl.grantee, role.rolname
+  ) exact_grants;
+
+  IF v_cross_acl_shape IS DISTINCT FROM v_cross_acl_canonical
+     OR v_reversal_acl_shape IS DISTINCT FROM v_reversal_acl_canonical THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '55000',
+      MESSAGE = 'schema reconciliation failed canonical Pheno ACL normalization',
+      DETAIL = format(
+        'input_state=%s; pheno_crosses=%s; pheno_reversals=%s',
+        v_pheno_acl_state,
+        v_cross_acl_shape,
+        v_reversal_acl_shape
+      );
+  END IF;
+
+  SELECT c.relacl::text
+  INTO v_cross_acl_after_normalization
+  FROM pg_catalog.pg_class c
+  WHERE c.oid = 'public.pheno_crosses'::regclass;
+
+  SELECT c.relacl::text
+  INTO v_reversal_acl_after_normalization
+  FROM pg_catalog.pg_class c
+  WHERE c.oid = 'public.pheno_reversals'::regclass;
 
   -- -----------------------------------------------------------------------
   -- Apply the wholly-absent soil contract.
@@ -1979,13 +2148,13 @@ BEGIN
 
   IF (SELECT c.relacl::text FROM pg_catalog.pg_class c
       WHERE c.oid = 'public.pheno_crosses'::regclass)
-       IS DISTINCT FROM v_cross_acl_before
+       IS DISTINCT FROM v_cross_acl_after_normalization
      OR (SELECT c.relacl::text FROM pg_catalog.pg_class c
          WHERE c.oid = 'public.pheno_reversals'::regclass)
-       IS DISTINCT FROM v_reversal_acl_before THEN
+       IS DISTINCT FROM v_reversal_acl_after_normalization THEN
     RAISE EXCEPTION USING
       ERRCODE = '55000',
-      MESSAGE = 'schema reconciliation changed Pheno ACLs';
+      MESSAGE = 'schema reconciliation changed normalized canonical Pheno ACLs';
   END IF;
 
   SELECT count(*), COALESCE(array_agg(id ORDER BY id), ARRAY[]::uuid[])

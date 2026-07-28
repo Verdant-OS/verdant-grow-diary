@@ -65,11 +65,14 @@ describe("production schema reconciliation migration", () => {
     expect(sql).toContain("Only the four exact historical rows");
   });
 
-  it("is the single latest-timestamp migration and leaves published sources byte-identical", () => {
+  it("uses one unique reconciliation timestamp and leaves published sources byte-identical", () => {
     const migrationNames = readdirSync(MIGRATIONS_DIR)
       .filter((name) => name.endsWith(".sql"))
       .sort();
-    expect(migrationNames.at(-1)).toBe(MIGRATION_NAME);
+    expect(migrationNames).toContain(MIGRATION_NAME);
+    expect(migrationNames.filter((name) => name.startsWith("20260728090000_"))).toEqual([
+      MIGRATION_NAME,
+    ]);
 
     for (const [name, expectedHash] of Object.entries(PUBLISHED_CONTRACT_HASHES)) {
       const bytes = readFileSync(resolve(MIGRATIONS_DIR, name));
@@ -136,14 +139,14 @@ describe("production schema reconciliation migration", () => {
   });
 
   it("revokes legacy defaults before granting only the canonical new-soil ACL", () => {
-    const revoke = sql.indexOf(
-      "REVOKE ALL ON TABLE public.soil_moisture_calibrations\n        FROM PUBLIC, anon, authenticated",
+    const revoke = sql.search(
+      /REVOKE ALL ON TABLE public\.soil_moisture_calibrations\s+FROM PUBLIC, anon, authenticated/,
     );
-    const authenticatedGrant = sql.indexOf(
-      "GRANT SELECT, INSERT, UPDATE, DELETE\n        ON TABLE public.soil_moisture_calibrations TO authenticated",
+    const authenticatedGrant = sql.search(
+      /GRANT SELECT, INSERT, UPDATE, DELETE\s+ON TABLE public\.soil_moisture_calibrations TO authenticated/,
     );
-    const serviceGrant = sql.indexOf(
-      "GRANT ALL ON TABLE public.soil_moisture_calibrations TO service_role",
+    const serviceGrant = sql.search(
+      /GRANT ALL ON TABLE public\.soil_moisture_calibrations TO service_role/,
     );
 
     expect(revoke).toBeGreaterThan(0);
@@ -206,9 +209,93 @@ describe("production schema reconciliation migration", () => {
     ].map((match) => match[1]);
     expect(droppedOwnerPolicies).toEqual(["pheno_crosses_insert_own", "pheno_crosses_update_own"]);
     expect(sql).not.toMatch(/DROP POLICY[^;\n]*pheno_crosses_pro_required_/i);
-    expect(sql).not.toMatch(
-      /\b(?:GRANT|REVOKE)\b[\s\S]{0,240}?\bON(?: TABLE)? public\.pheno_(?:crosses|reversals)\b/i,
+  });
+
+  it("accepts only canonical or exact legacy-bloated Pheno ACLs and normalizes both", () => {
+    const ownerRefusal = sql.indexOf(
+      "schema reconciliation refused unexpected Pheno relation owners",
     );
+    const columnRefusal = sql.indexOf("schema reconciliation refused unexpected Pheno column ACLs");
+    const grantorRefusal = sql.indexOf(
+      "schema reconciliation refused unexpected Pheno ACL grantors",
+    );
+    const aclRefusal = sql.indexOf("schema reconciliation refused unexpected Pheno ACL shape");
+    const revoke = sql.indexOf("'REVOKE ALL PRIVILEGES ON TABLE '");
+    const grantorPostcondition = sql.indexOf(
+      "schema reconciliation failed canonical Pheno ACL grantor normalization",
+    );
+    const soilDdl = sql.indexOf("CREATE TABLE public.soil_moisture_calibrations");
+
+    expect(sql).toContain("v_cross_acl_canonical CONSTANT jsonb");
+    expect(sql).toContain("v_reversal_acl_canonical CONSTANT jsonb");
+    expect(sql).toContain("v_legacy_bloat_acl CONSTANT jsonb");
+    expect(sql.match(/"postgres": \[/g)).toHaveLength(3);
+    expect(sql).toContain("v_pheno_acl_state := 'canonical'");
+    expect(sql).toContain("v_pheno_acl_state := 'known_legacy_default_bloat'");
+    expect(ownerRefusal).toBeGreaterThan(0);
+    expect(columnRefusal).toBeGreaterThan(ownerRefusal);
+    expect(grantorRefusal).toBeGreaterThan(columnRefusal);
+    expect(sql).toContain("schema reconciliation refused unexpected Pheno column ACLs");
+    expect(sql).toContain("'public.pheno_crosses, public.pheno_reversals '");
+    expect(sql).toContain("'FROM PUBLIC, anon, authenticated'");
+    expect(sql).toContain("'GRANT DELETE, INSERT, SELECT, UPDATE '");
+    expect(sql).toContain("'ON TABLE public.pheno_crosses TO authenticated'");
+    expect(sql).toContain("'GRANT INSERT, SELECT '");
+    expect(sql).toContain("'ON TABLE public.pheno_reversals TO authenticated'");
+    expect(sql).toContain("'public.pheno_crosses, public.pheno_reversals TO service_role'");
+    expect(sql).toContain("schema reconciliation failed canonical Pheno ACL normalization");
+    expect(aclRefusal).toBeGreaterThan(grantorRefusal);
+    expect(revoke).toBeGreaterThan(aclRefusal);
+    expect(grantorPostcondition).toBeGreaterThan(revoke);
+    expect(soilDdl).toBeGreaterThan(revoke);
+    expect(sql).not.toMatch(/\bGRANT\b[\s\S]*?\bTO\s+(?:PUBLIC|anon)\b/i);
+  });
+
+  it("rejects every column ACL, non-postgres owners, and alternate grantors before soil DDL", () => {
+    // This is source-contract coverage. PGlite is not a repository dependency,
+    // and this catalog-heavy migration needs a disposable PostgreSQL/Supabase
+    // runtime lane to execute these catalog states and transaction rollback.
+    const ownerRefusal = sql.indexOf(
+      "schema reconciliation refused unexpected Pheno relation owners",
+    );
+    const columnRefusal = sql.indexOf("schema reconciliation refused unexpected Pheno column ACLs");
+    const grantorRefusal = sql.indexOf(
+      "schema reconciliation refused unexpected Pheno ACL grantors",
+    );
+    const aclRefusal = sql.indexOf("schema reconciliation refused unexpected Pheno ACL shape");
+    const revoke = sql.indexOf("'REVOKE ALL PRIVILEGES ON TABLE '");
+    const grantorPostcondition = sql.indexOf(
+      "schema reconciliation failed canonical Pheno ACL grantor normalization",
+    );
+    const soilDdl = sql.indexOf("CREATE TABLE public.soil_moisture_calibrations");
+
+    const ownerGuard = sql.slice(sql.lastIndexOf("IF EXISTS (", ownerRefusal), ownerRefusal);
+    const columnGuard = sql.slice(sql.lastIndexOf("IF EXISTS (", columnRefusal), columnRefusal);
+    const grantorGuard = sql.slice(sql.lastIndexOf("IF EXISTS (", grantorRefusal), grantorRefusal);
+    const grantorPostGuard = sql.slice(
+      sql.lastIndexOf("IF EXISTS (", grantorPostcondition),
+      grantorPostcondition,
+    );
+    const aclContract = sql.slice(ownerRefusal, soilDdl);
+
+    expect(ownerGuard).toContain("owner_role.rolname IS DISTINCT FROM 'postgres'");
+    expect(ownerGuard).toContain("'public.pheno_crosses'::regclass");
+    expect(ownerGuard).toContain("'public.pheno_reversals'::regclass");
+
+    expect(columnGuard).toContain("a.attacl IS NOT NULL");
+    expect(columnGuard).not.toMatch(/\ba\.attnum\b/);
+    expect(columnGuard).not.toMatch(/\ba\.attisdropped\b/);
+
+    expect(grantorGuard).toContain("acl.grantor IS DISTINCT FROM c.relowner");
+    expect(grantorPostGuard).toContain("acl.grantor IS DISTINCT FROM c.relowner");
+    expect(aclContract).not.toContain("acl.grantee <> c.relowner");
+
+    expect(ownerRefusal).toBeLessThan(columnRefusal);
+    expect(columnRefusal).toBeLessThan(grantorRefusal);
+    expect(grantorRefusal).toBeLessThan(aclRefusal);
+    expect(aclRefusal).toBeLessThan(revoke);
+    expect(revoke).toBeLessThan(grantorPostcondition);
+    expect(grantorPostcondition).toBeLessThan(soilDdl);
   });
 
   it("preserves restrictive entitlement policies and row identity/counts", () => {
@@ -230,9 +317,9 @@ describe("production schema reconciliation migration", () => {
     expect(sql).toContain("v_restrictive_before");
     expect(sql).toContain("v_restrictive_after");
     expect(sql).toContain("changed restrictive Pheno entitlement policies");
-    expect(sql).toContain("v_cross_acl_before");
-    expect(sql).toContain("v_reversal_acl_before");
-    expect(sql).toContain("changed Pheno ACLs");
+    expect(sql).toContain("v_cross_acl_after_normalization");
+    expect(sql).toContain("v_reversal_acl_after_normalization");
+    expect(sql).toContain("changed normalized canonical Pheno ACLs");
   });
 
   it("writes exact historical markers only after postconditions and name-collision checks", () => {

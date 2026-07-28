@@ -10,8 +10,7 @@ const FEEDING_BASE_MIGRATION = "20260518152526_4236167d-2942-4166-91f3-09be993ca
 const FEEDING_EXTENSION_MIGRATION = "20260612212323_568c55c7-3cd0-46f6-aef7-301e61e61362.sql";
 const QUICKLOG_AUDIT_MIGRATION = "20260610230856_e8544509-5a66-41bc-8beb-39c95d96dde5.sql";
 const CORE_SCHEMA_FORWARD_REPAIR = "20260725023000_core_schema_forward_repair.sql";
-const SOIL_MOISTURE_CALIBRATION_MIGRATION = "20260619083000_add_soil_moisture_calibration_v1.sql";
-const PHENO_CROSSES_TAXONOMY_MIGRATION = "20260707210000_pheno_crosses_full_taxonomy.sql";
+const PRODUCTION_SCHEMA_RECONCILIATION = "20260728090000_production_schema_reconciliation.sql";
 
 const feedingColumn = (column, migration) => ({
   table: "feeding_events",
@@ -34,7 +33,7 @@ const quicklogAuditColumn = (column) => ({
 const soilMoistureCalibrationColumn = (column) => ({
   table: "soil_moisture_calibrations",
   column,
-  migration: SOIL_MOISTURE_CALIBRATION_MIGRATION,
+  migration: PRODUCTION_SCHEMA_RECONCILIATION,
   reason:
     `The One-Tent Loop soil-calibration surface reads and writes ` +
     `soil_moisture_calibrations.${column}. A partial table breaks sensor calibration.`,
@@ -43,7 +42,7 @@ const soilMoistureCalibrationColumn = (column) => ({
 const phenoCrossTaxonomyColumn = (column) => ({
   table: "pheno_crosses",
   column,
-  migration: PHENO_CROSSES_TAXONOMY_MIGRATION,
+  migration: PRODUCTION_SCHEMA_RECONCILIATION,
   reason:
     `The gated Pheno cross surface reads and writes pheno_crosses.${column}. ` +
     "Missing taxonomy columns break that paid surface but do not block the One-Tent Loop.",

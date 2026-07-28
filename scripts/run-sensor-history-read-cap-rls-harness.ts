@@ -4,8 +4,8 @@
  *
  * Real signed-in clients prove:
  *   - Free and expired accounts see only recent history
- *   - canonical billing_subscriptions Pro sees full history
- *   - live Lovable Pro, Craft, and Founder compatibility rows see full history
+ *   - legacy-only billing_subscriptions Pro remains limited to recent history
+ *   - live canonical Pro, Craft, and Founder rows see full history
  *   - cross-user isolation remains intact
  *   - service_role retains trusted recovery access
  *   - reads never delete or rewrite stored sensor evidence
@@ -98,11 +98,11 @@ const OLD_AT = new Date(NOW - 91 * 24 * 60 * 60 * 1_000).toISOString();
 const FUTURE_END = new Date(NOW + 30 * 24 * 60 * 60 * 1_000).toISOString();
 const PAST_END = new Date(NOW - 24 * 60 * 60 * 1_000).toISOString();
 
-type AccountKey = "free" | "byoPro" | "lovablePro" | "craft" | "founder" | "expired" | "other";
+type AccountKey = "free" | "legacyOnly" | "lovablePro" | "craft" | "founder" | "expired" | "other";
 
 const EMAILS: Record<AccountKey, string> = {
   free: `sensor-history-free-${RUN_ID}@verdant.test`,
-  byoPro: `sensor-history-byo-pro-${RUN_ID}@verdant.test`,
+  legacyOnly: `sensor-history-legacy-only-${RUN_ID}@verdant.test`,
   lovablePro: `sensor-history-lovable-pro-${RUN_ID}@verdant.test`,
   craft: `sensor-history-craft-${RUN_ID}@verdant.test`,
   founder: `sensor-history-founder-${RUN_ID}@verdant.test`,
@@ -206,22 +206,13 @@ async function main(): Promise<void> {
       await seedHistory(userIds[key]!, key);
     }
 
-    const { error: billingError } = await admin.from("billing_subscriptions").insert([
-      {
-        user_id: userIds.byoPro!,
-        plan_id: "pro_monthly",
-        status: "active",
-        provider: "paddle",
-        current_period_end: FUTURE_END,
-      },
-      {
-        user_id: userIds.expired!,
-        plan_id: "pro_monthly",
-        status: "expired",
-        provider: "paddle",
-        current_period_end: PAST_END,
-      },
-    ]);
+    const { error: billingError } = await admin.from("billing_subscriptions").insert({
+      user_id: userIds.legacyOnly!,
+      plan_id: "pro_monthly",
+      status: "active",
+      provider: "paddle",
+      current_period_end: FUTURE_END,
+    });
     if (billingError) throw new Error(`seed billing_subscriptions: ${billingError.message}`);
 
     const { error: subscriptionsError } = await admin.from("subscriptions").insert([
@@ -261,6 +252,18 @@ async function main(): Promise<void> {
         cancel_at_period_end: false,
         environment: "live",
       },
+      {
+        user_id: userIds.expired!,
+        paddle_subscription_id: `subscription_${crypto.randomUUID()}`,
+        paddle_customer_id: `customer_${crypto.randomUUID()}`,
+        product_id: "pro",
+        price_id: "pro_monthly",
+        status: "expired",
+        current_period_start: OLD_AT,
+        current_period_end: PAST_END,
+        cancel_at_period_end: false,
+        environment: "live",
+      },
     ]);
     if (subscriptionsError) {
       throw new Error(`seed subscriptions: ${subscriptionsError.message}`);
@@ -294,8 +297,16 @@ async function main(): Promise<void> {
       free.error?.message,
     );
 
+    const legacyOnly = await readOwnHistory(clients.legacyOnly, userIds.legacyOnly!);
+    check(
+      "Legacy-only Pro cannot read sensor history older than 90 days",
+      legacyOnly.error == null &&
+        legacyOnly.data?.length === 1 &&
+        isSameInstant(legacyOnly.data[0]?.captured_at, RECENT_AT),
+      legacyOnly.error?.message,
+    );
+
     for (const [key, name] of [
-      ["byoPro", "BYO Pro sees full sensor history"],
       ["lovablePro", "Lovable Pro sees full sensor history"],
       ["craft", "Lovable Craft sees full sensor history"],
       ["founder", "Lovable Founder sees full sensor history"],

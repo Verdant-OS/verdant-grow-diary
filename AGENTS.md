@@ -256,8 +256,12 @@ Do not make one-photo diagnoses sound certain.
 Current billing foundation:
 
 - `profiles.tier` is XP/gamification only. Never use it as billing.
-- `public.billing_subscriptions` is the billing entitlement source of truth.
-- Absence of a billing row resolves to Free.
+- `public.subscriptions` is the sole billing entitlement source of truth.
+- Live rows grant production access; sandbox rows grant access only when the
+  server has explicitly resolved `PAYMENTS_ENVIRONMENT=sandbox`.
+- `public.billing_subscriptions` is a legacy sandbox/operator-audit surface
+  only. It must never grant an entitlement.
+- Absence of an entitling `public.subscriptions` row resolves to Free.
 - Client entitlement reads are presentation-only.
 - Server-side checks are authoritative for paid/costly features.
 - Founder Lifetime is Pro-like access with capped AI credits, never unlimited AI.

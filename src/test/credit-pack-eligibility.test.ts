@@ -9,12 +9,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { KNOWN_PLAN_IDS, PLAN_CATALOG } from "@/lib/entitlements/planCatalog";
-import type {
-  BillingSubscriptionRow,
-  LovableSubscriptionRow,
-  PlanId,
-  ResolvedEntitlement,
-} from "@/lib/entitlements";
+import type { LovableSubscriptionRow, PlanId, ResolvedEntitlement } from "@/lib/entitlements";
 import { creditPackIsSpendable, resolveCreditPackPurchaseGate } from "@/lib/creditPackEligibility";
 import { loadUnionEntitlementForUser } from "../../supabase/functions/_shared/unionEntitlementLookup.ts";
 
@@ -73,21 +68,6 @@ const VERIFIED_USER_ID = "verified-user";
 const NOW = new Date("2026-07-25T12:00:00.000Z");
 const FUTURE = "2026-08-25T12:00:00.000Z";
 
-const BYO_PRO: BillingSubscriptionRow = {
-  id: "billing-1",
-  user_id: VERIFIED_USER_ID,
-  plan_id: "pro_monthly",
-  status: "active",
-  provider: "paddle",
-  provider_customer_id: "ctm-byo",
-  provider_subscription_id: "sub-byo",
-  current_period_end: FUTURE,
-  cancel_at_period_end: false,
-  founder_number: null,
-  created_at: "2026-07-01T00:00:00.000Z",
-  updated_at: "2026-07-01T00:00:00.000Z",
-};
-
 const LOVABLE_PRO: LovableSubscriptionRow = {
   user_id: VERIFIED_USER_ID,
   paddle_subscription_id: "sub-lovable",
@@ -104,17 +84,21 @@ const LOVABLE_PRO: LovableSubscriptionRow = {
 };
 
 interface FakeUnionState {
-  billingRows?: BillingSubscriptionRow[];
-  billingError?: unknown;
   liveRows?: LovableSubscriptionRow[];
+  liveError?: unknown;
+  sandboxRows?: LovableSubscriptionRow[];
+  sandboxError?: unknown;
 }
 
 function fakeUnionClient(state: FakeUnionState) {
   const ownerFilters: Array<{ table: string; userId: string }> = [];
+  const tableReads: string[] = [];
   return {
     ownerFilters,
+    tableReads,
     client: {
       from(table: string) {
+        tableReads.push(table);
         let environment: "live" | "sandbox" | null = null;
         const builder = {
           select() {
@@ -134,16 +118,16 @@ function fakeUnionClient(state: FakeUnionState) {
             return builder;
           },
           then(resolveResult: (result: { data: unknown[] | null; error: unknown }) => void) {
-            if (table === "billing_subscriptions") {
-              resolveResult({
-                data: state.billingError ? null : (state.billingRows ?? []),
-                error: state.billingError ?? null,
-              });
-              return;
-            }
+            if (table !== "subscriptions") throw new Error(`unexpected authority read: ${table}`);
+            const error = environment === "sandbox" ? state.sandboxError : state.liveError;
             resolveResult({
-              data: environment === "live" ? (state.liveRows ?? []) : [],
-              error: null,
+              data:
+                error != null
+                  ? null
+                  : environment === "sandbox"
+                    ? (state.sandboxRows ?? [])
+                    : (state.liveRows ?? []),
+              error: error ?? null,
             });
           },
         };
@@ -165,7 +149,7 @@ describe("credit pack server gate", () => {
     expect(PRICE_FN).toMatch(/creditPackIsSpendable[\s\S]{0,140}creditPackEligibility/);
   });
 
-  it("loads both billing authorities for the verified auth user, never a client user_id", () => {
+  it("loads the canonical billing authority for the verified auth user, never a client user_id", () => {
     expect(PRICE_FN).toMatch(/loadUnionEntitlementForUser/);
     expect(PRICE_FN).toMatch(/loadUnionEntitlementForUser\([\s\S]{0,180}userData\.user\.id/);
     expect(PRICE_FN).not.toMatch(/body\s*(?:\.|\?\.)\s*user_id/);
@@ -186,23 +170,32 @@ describe("credit pack server gate", () => {
 });
 
 describe("credit pack eligibility", () => {
-  it("allows a verified active BYO Paddle Pro row and owner-scopes every authority read", async () => {
-    const fake = fakeUnionClient({ billingRows: [BYO_PRO] });
+  it("allows a verified active canonical Paddle Pro row and owner-scopes every read", async () => {
+    const fake = fakeUnionClient({ liveRows: [LOVABLE_PRO] });
     const result = await loadUnionEntitlementForUser(fake.client, VERIFIED_USER_ID, "live", NOW);
 
     expect(result.lookupFailed).toBe(false);
-    expect(result.entitlement.source).toBe("byo_paddle");
+    expect(result.entitlement.source).toBe("lovable_paddle_subscription");
     expect(creditPackIsSpendable(result.entitlement)).toBe(true);
-    expect(fake.ownerFilters).toEqual([
-      { table: "billing_subscriptions", userId: VERIFIED_USER_ID },
-      { table: "subscriptions", userId: VERIFIED_USER_ID },
-    ]);
+    expect(fake.tableReads).toEqual(["subscriptions"]);
+    expect(fake.ownerFilters).toEqual([{ table: "subscriptions", userId: VERIFIED_USER_ID }]);
   });
 
-  it("fails closed when the incumbent billing authority cannot be read", async () => {
+  it("does not query the legacy billing_subscriptions audit table", () => {
+    const lookup = readFileSync(
+      resolve(process.cwd(), "supabase", "functions", "_shared", "unionEntitlementLookup.ts"),
+      "utf8",
+    );
+    const scoped = lookup.slice(
+      lookup.indexOf("export async function loadUnionEntitlementForUser"),
+    );
+    expect(scoped).toContain("loadUnionEntitlementScoped");
+    expect(scoped).not.toContain('.from("billing_subscriptions")');
+  });
+
+  it("fails closed when the canonical authority cannot be read", async () => {
     const fake = fakeUnionClient({
-      billingError: { message: "billing unavailable" },
-      liveRows: [LOVABLE_PRO],
+      liveError: { message: "subscriptions unavailable" },
     });
     const result = await loadUnionEntitlementForUser(fake.client, VERIFIED_USER_ID, "live", NOW);
 
@@ -217,6 +210,19 @@ describe("credit pack eligibility", () => {
         signedIn: true,
       }),
     ).toEqual({ kind: "blocked", reason: "unverified" });
+  });
+
+  it("keeps a proven live paid row verified when the lower-precedence sandbox read fails", async () => {
+    const fake = fakeUnionClient({
+      liveRows: [LOVABLE_PRO],
+      sandboxError: { message: "sandbox unavailable" },
+    });
+    const result = await loadUnionEntitlementForUser(fake.client, VERIFIED_USER_ID, "sandbox", NOW);
+
+    expect(result.lookupFailed).toBe(false);
+    expect(result.entitlement.effectivePlanId).toBe("pro_monthly");
+    expect(creditPackIsSpendable(result.entitlement)).toBe(true);
+    expect(fake.tableReads).toEqual(["subscriptions", "subscriptions"]);
   });
 
   it("agrees with ai_credit_allowance for every known plan", () => {

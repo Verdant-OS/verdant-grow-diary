@@ -1,15 +1,13 @@
 /**
  * _shared/unionEntitlementLookup.ts — server-side entitlement helper.
  *
- * `loadUnionEntitlement` retains the current caller-JWT subscriptions lookup
- * used by existing presentation/preflight gates. The security-sensitive
- * `loadUnionEntitlementForUser` reads both public.billing_subscriptions and
- * public.subscriptions with an explicit server-resolved user_id filter.
- * billing_subscriptions remains the incumbent authority branch; the Lovable
- * branch is required for current Craft rows, which that published table's
- * historical plan CHECK cannot represent.
+ * Both `loadUnionEntitlement` and the security-sensitive
+ * `loadUnionEntitlementForUser` resolve access only from canonical
+ * public.subscriptions. The latter adds an explicit server-resolved user_id
+ * filter for trusted service clients. Legacy public.billing_subscriptions is
+ * an operator-audit surface and is never an entitlement authority.
  *
- * The shared pure resolver deterministically composes both rows without
+ * The shared pure resolver deterministically selects canonical rows without
  * trusting a client-supplied plan or capability claim.
  *
  * SAFETY:
@@ -33,7 +31,6 @@ import {
   lovableRowEntitles,
   SUBSCRIPTION_ROW_SCAN_LIMIT,
 } from "./lib/lib/entitlements/unionEntitlements.ts";
-import type { BillingSubscriptionRow } from "./lib/lib/entitlements/types.ts";
 import type {
   LovableBillingEnvironment,
   LovableSubscriptionRow,
@@ -114,8 +111,6 @@ export function pickExpectedBillingEnvironment(raw: unknown): LovableBillingEnvi
 
 const SUBSCRIPTION_COLUMNS =
   "user_id,paddle_subscription_id,paddle_customer_id,product_id,price_id,status,current_period_end,current_period_start,cancel_at_period_end,environment,created_at,updated_at";
-const BILLING_SUBSCRIPTION_COLUMNS =
-  "id,user_id,plan_id,status,provider,provider_customer_id,provider_subscription_id,current_period_end,cancel_at_period_end,founder_number,created_at,updated_at";
 
 // Bounded newest-first window + any-entitling-row selection semantics are
 // shared with the client hook via pickEntitlingLovableRow /
@@ -165,7 +160,7 @@ async function loadUnionEntitlementScoped(
       : Promise.resolve({ data: [], error: null }),
   ]);
 
-  const byoRow: BillingSubscriptionRow | null = null;
+  const byoRow = null;
   const liveRow = pickEntitlingLovableRow(rowsOrEmpty(lovableLiveRes), "live", now);
   const liveRowEntitles = liveRow != null && lovableRowEntitles(liveRow, "live", now);
 
@@ -255,78 +250,5 @@ export async function loadUnionEntitlementForUser(
     };
   }
 
-  // billing_subscriptions is the incumbent entitlement authority and is
-  // user-unique. The Lovable subscriptions lane remains part of the union
-  // because it carries current Craft rows (a plan the published
-  // billing_subscriptions CHECK cannot represent). Both reads are explicitly
-  // server-owner scoped; a service client must never issue an unfiltered read.
-  const wantsSandbox = expectedBillingEnvironment === "sandbox";
-  const [byoRes, lovableLiveRes, lovableSandboxRes] = await Promise.all([
-    supabase
-      .from("billing_subscriptions")
-      .select(BILLING_SUBSCRIPTION_COLUMNS)
-      .eq("user_id", userId)
-      .limit(1),
-    newestSubscriptionRows(supabase, "live", userId),
-    wantsSandbox
-      ? newestSubscriptionRows(supabase, "sandbox", userId)
-      : Promise.resolve({ data: [], error: null }),
-  ]);
-
-  // An authority-lane read failure is never interpreted as Free and never
-  // bypassed by a secondary row. This keeps billing degradation fail-closed.
-  if (byoRes.error) {
-    return {
-      lookupFailed: true,
-      entitlement: resolveUnionEntitlements({
-        byoRow: null,
-        lovableRow: null,
-        expectedBillingEnvironment,
-        now,
-      }),
-    };
-  }
-
-  const byoRow = (
-    byoRes.data && byoRes.data.length > 0 ? byoRes.data[0] : null
-  ) as BillingSubscriptionRow | null;
-  const liveRow = pickEntitlingLovableRow(rowsOrEmpty(lovableLiveRes), "live", now);
-  const liveRowEntitles = liveRow != null && lovableRowEntitles(liveRow, "live", now);
-  const sandboxRow = wantsSandbox
-    ? pickEntitlingLovableRow(rowsOrEmpty(lovableSandboxRes), "sandbox", now)
-    : null;
-  const sandboxRowEntitles = sandboxRow != null && lovableRowEntitles(sandboxRow, "sandbox", now);
-
-  const byoOnly = resolveUnionEntitlements({
-    byoRow,
-    lovableRow: null,
-    expectedBillingEnvironment,
-    now,
-  });
-  const byoEntitles = byoOnly.isActive && byoOnly.effectivePlanId !== "free";
-
-  const resolvedEnvironment = liveRowEntitles
-    ? "live"
-    : sandboxRowEntitles || wantsSandbox
-      ? "sandbox"
-      : "live";
-  const lovableRow = liveRowEntitles
-    ? liveRow
-    : sandboxRowEntitles || wantsSandbox
-      ? sandboxRow
-      : liveRow;
-  const paidRowProven = byoEntitles || liveRowEntitles || sandboxRowEntitles;
-  const lookupFailed =
-    !paidRowProven &&
-    (lovableLiveRes.error != null || (wantsSandbox && lovableSandboxRes.error != null));
-
-  return {
-    lookupFailed,
-    entitlement: resolveUnionEntitlements({
-      byoRow,
-      lovableRow,
-      expectedBillingEnvironment: resolvedEnvironment,
-      now,
-    }),
-  };
+  return loadUnionEntitlementScoped(supabase, expectedBillingEnvironment, now, userId);
 }

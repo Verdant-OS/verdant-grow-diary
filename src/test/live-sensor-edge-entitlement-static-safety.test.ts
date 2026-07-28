@@ -40,7 +40,8 @@ describe("live-sensor bridge security boundary", () => {
     const gate = executable("supabase/functions/_shared/liveSensorEntitlementGate.ts");
 
     expect(lookup).toMatch(/loadUnionEntitlementForUser/);
-    expect(lookup).toMatch(/\.from\("billing_subscriptions"\)/);
+    expect(lookup).toMatch(/\.from\("subscriptions"\)/);
+    expect(lookup).not.toMatch(/\.from\("billing_subscriptions"\)/);
     expect(lookup).toMatch(/\.eq\("user_id",\s*userId\)/);
     expect(gate).toMatch(/loadUnionEntitlementForUser/);
     expect(gate).toMatch(/capabilities\.liveSensors\s*!==\s*true/);

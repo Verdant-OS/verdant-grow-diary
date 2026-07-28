@@ -166,6 +166,9 @@ describe("production schema reconciliation migration", () => {
     expect(phenoStart).toBeGreaterThan(insertStart);
     expect(sql).toContain("v_soil_policy_state := 'published'");
     expect(sql).toContain("v_soil_policy_state := 'hardened'");
+    expect(sql).toContain("expression ~ 't[.]grow_id=t[.]grow_id'");
+    expect(sql).toContain("expression ~ 'p[.]grow_id=p[.]grow_id'");
+    expect(sql).toContain("expression ~ 'p[.]tent_id=p[.]tent_id'");
     expect(sql).toContain('DROP POLICY "Users insert own soil moisture calibrations"');
     expect(sql).toContain('DROP POLICY "Users update own soil moisture calibrations"');
     expect(hardenedPolicies).toContain("g.id = soil_moisture_calibrations.grow_id");

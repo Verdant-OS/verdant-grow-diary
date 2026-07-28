@@ -453,13 +453,13 @@ BEGIN
         WHERE expression ~ 'auth.uid\(\)=user_id'
           AND expression ~ 'g.id=soil_moisture_calibrations\.grow_id'
           AND expression ~ 't.id=soil_moisture_calibrations\.tent_id'
-          AND expression ~ 't.grow_id=t.grow_id'
+          AND expression ~ 't[.]grow_id=t[.]grow_id'
           AND expression ~ 'plant_idisnull'
           AND expression ~ 'p.id=soil_moisture_calibrations\.plant_id'
           AND expression ~ 'p.grow_idisnull'
-          AND expression ~ 'p.grow_id=p.grow_id'
+          AND expression ~ 'p[.]grow_id=p[.]grow_id'
           AND expression ~ 'p.tent_idisnull'
-          AND expression ~ 'p.tent_id=p.tent_id'
+          AND expression ~ 'p[.]tent_id=p[.]tent_id'
       )
     INTO v_hardened_policy_count, v_published_policy_count
     FROM (

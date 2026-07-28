@@ -85,7 +85,7 @@ describe("production schema reconciliation migration", () => {
     }
   });
 
-  it("accepts only wholly absent/exact soil and exact pre-taxonomy/final Pheno states", () => {
+  it("accepts only wholly absent/exact soil structure and exact pre-taxonomy/final Pheno states", () => {
     expect(sql).toContain("IF v_soil_exists THEN");
     expect(sql).toContain("IF NOT v_soil_exists THEN");
     expect(sql).toContain("refused partial soil_moisture_calibrations columns");
@@ -143,15 +143,15 @@ describe("production schema reconciliation migration", () => {
     expect(sql).toContain("refused noncanonical soil_moisture_calibrations policy commands");
   });
 
-  it("revokes legacy defaults before granting only the canonical new-soil ACL", () => {
+  it("normalizes hosted defaults before granting only the canonical soil ACL", () => {
     const revoke = sql.search(
-      /REVOKE ALL ON TABLE public\.soil_moisture_calibrations\s+FROM PUBLIC, anon, authenticated/,
+      /REVOKE ALL PRIVILEGES ON TABLE public\.soil_moisture_calibrations\s+FROM PUBLIC, anon, authenticated/,
     );
     const authenticatedGrant = sql.search(
       /GRANT SELECT, INSERT, UPDATE, DELETE\s+ON TABLE public\.soil_moisture_calibrations TO authenticated/,
     );
     const serviceGrant = sql.search(
-      /GRANT ALL ON TABLE public\.soil_moisture_calibrations TO service_role/,
+      /GRANT ALL PRIVILEGES\s+ON TABLE public\.soil_moisture_calibrations TO service_role/,
     );
 
     expect(revoke).toBeGreaterThan(0);
@@ -159,6 +159,46 @@ describe("production schema reconciliation migration", () => {
     expect(serviceGrant).toBeGreaterThan(authenticatedGrant);
     expect(sql).not.toMatch(
       /GRANT[\s\S]*?ON(?: TABLE)? public\.soil_moisture_calibrations TO (?:PUBLIC|anon)\b/i,
+    );
+  });
+
+  it("accepts only canonical or exact legacy-bloated soil ACLs and proves normalization", () => {
+    const ownerRefusal = sql.indexOf(
+      "schema reconciliation refused unexpected soil_moisture_calibrations relation owner",
+    );
+    const columnRefusal = sql.indexOf(
+      "schema reconciliation refused unexpected soil_moisture_calibrations column ACLs",
+    );
+    const grantorRefusal = sql.indexOf(
+      "schema reconciliation refused unexpected soil_moisture_calibrations ACL grantors",
+    );
+    const aclRefusal = sql.indexOf(
+      "schema reconciliation refused unexpected soil_moisture_calibrations ACL shape",
+    );
+    const revoke = sql.search(
+      /REVOKE ALL PRIVILEGES ON TABLE public\.soil_moisture_calibrations\s+FROM PUBLIC, anon, authenticated/,
+    );
+    const grantorPostcondition = sql.indexOf(
+      "schema reconciliation failed canonical soil_moisture_calibrations ACL grantor normalization",
+    );
+    const aclPostcondition = sql.indexOf(
+      "schema reconciliation failed canonical soil_moisture_calibrations ACL normalization",
+    );
+
+    expect(sql).toContain("v_soil_acl_canonical CONSTANT jsonb");
+    expect(sql).toContain("v_soil_acl_state := 'canonical'");
+    expect(sql).toContain("v_soil_acl_state := 'known_legacy_default_bloat'");
+    expect(sql).toContain("v_soil_acl_state := 'absent'");
+    expect(sql).toContain("v_soil_acl_shape = v_legacy_bloat_acl");
+    expect(ownerRefusal).toBeGreaterThan(0);
+    expect(columnRefusal).toBeGreaterThan(ownerRefusal);
+    expect(grantorRefusal).toBeGreaterThan(columnRefusal);
+    expect(aclRefusal).toBeGreaterThan(grantorRefusal);
+    expect(revoke).toBeGreaterThan(aclRefusal);
+    expect(grantorPostcondition).toBeGreaterThan(revoke);
+    expect(aclPostcondition).toBeGreaterThan(grantorPostcondition);
+    expect(sql).toContain(
+      "schema reconciliation changed normalized canonical soil_moisture_calibrations ACL",
     );
   });
 
@@ -237,7 +277,7 @@ describe("production schema reconciliation migration", () => {
     expect(sql).toContain("v_cross_acl_canonical CONSTANT jsonb");
     expect(sql).toContain("v_reversal_acl_canonical CONSTANT jsonb");
     expect(sql).toContain("v_legacy_bloat_acl CONSTANT jsonb");
-    expect(sql.match(/"postgres": \[/g)).toHaveLength(3);
+    expect(sql.match(/"postgres": \[/g)).toHaveLength(4);
     expect(sql).toContain("v_pheno_acl_state := 'canonical'");
     expect(sql).toContain("v_pheno_acl_state := 'known_legacy_default_bloat'");
     expect(ownerRefusal).toBeGreaterThan(0);

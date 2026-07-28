@@ -26,11 +26,12 @@ DO $reconcile$
 DECLARE
   v_soil_exists boolean := false;
   v_soil_policy_state text;
+  v_soil_acl_state text;
   v_pheno_state text;
   v_pheno_acl_state text;
   v_shape text[];
   v_names text[];
-  v_acl text[];
+  v_soil_acl_shape jsonb;
   v_cross_acl_shape jsonb;
   v_reversal_acl_shape jsonb;
   v_definitions text;
@@ -41,6 +42,7 @@ DECLARE
   v_reversal_ids_before uuid[];
   v_soil_count_before bigint := 0;
   v_soil_ids_before uuid[] := ARRAY[]::uuid[];
+  v_soil_acl_after_normalization text;
   v_cross_acl_after_normalization text;
   v_reversal_acl_after_normalization text;
   v_restrictive_before text[];
@@ -49,6 +51,17 @@ DECLARE
   v_ids_after uuid[];
   v_published_policy_count integer;
   v_hardened_policy_count integer;
+  v_soil_acl_canonical CONSTANT jsonb := '{
+    "authenticated": ["DELETE", "INSERT", "SELECT", "UPDATE"],
+    "postgres": [
+      "DELETE", "INSERT", "MAINTAIN", "REFERENCES",
+      "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"
+    ],
+    "service_role": [
+      "DELETE", "INSERT", "MAINTAIN", "REFERENCES",
+      "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"
+    ]
+  }'::jsonb;
   v_cross_acl_canonical CONSTANT jsonb := '{
     "authenticated": ["DELETE", "INSERT", "SELECT", "UPDATE"],
     "postgres": [
@@ -488,40 +501,30 @@ BEGIN
         MESSAGE = 'schema reconciliation refused mixed or unexpected soil write policies';
     END IF;
 
-    SELECT array_agg(a.privilege_type ORDER BY a.privilege_type)
-    INTO v_acl
-    FROM pg_catalog.pg_class c
-    CROSS JOIN LATERAL pg_catalog.aclexplode(
-      COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))
-    ) a
-    WHERE c.oid = 'public.soil_moisture_calibrations'::regclass
-      AND a.grantee = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = 'authenticated')
-      AND NOT a.is_grantable;
-
-    IF v_acl IS DISTINCT FROM ARRAY['DELETE', 'INSERT', 'SELECT', 'UPDATE']::text[] THEN
-      RAISE EXCEPTION USING
-        ERRCODE = '55000',
-        MESSAGE = 'schema reconciliation refused noncanonical authenticated soil_moisture_calibrations grants';
-    END IF;
-
-    SELECT array_agg(a.privilege_type ORDER BY a.privilege_type)
-    INTO v_acl
-    FROM pg_catalog.pg_class c
-    CROSS JOIN LATERAL pg_catalog.aclexplode(
-      COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))
-    ) a
-    WHERE c.oid = 'public.soil_moisture_calibrations'::regclass
-      AND a.grantee = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = 'service_role')
-      AND NOT a.is_grantable;
-
-    IF v_acl IS NULL OR NOT (
-      v_acl @> ARRAY[
-        'DELETE', 'INSERT', 'REFERENCES', 'SELECT', 'TRIGGER', 'TRUNCATE', 'UPDATE'
-      ]::text[]
+    -- The historical table can carry the same hosted default-ACL bloat that
+    -- production exposed on the Pheno tables. Accept only that exact whole
+    -- shape or the canonical shape, then normalize transactionally below.
+    IF EXISTS (
+      SELECT 1
+      FROM pg_catalog.pg_class c
+      LEFT JOIN pg_catalog.pg_roles owner_role ON owner_role.oid = c.relowner
+      WHERE c.oid = 'public.soil_moisture_calibrations'::regclass
+        AND owner_role.rolname IS DISTINCT FROM 'postgres'
     ) THEN
       RAISE EXCEPTION USING
         ERRCODE = '55000',
-        MESSAGE = 'schema reconciliation refused noncanonical service_role soil_moisture_calibrations grants';
+        MESSAGE = 'schema reconciliation refused unexpected soil_moisture_calibrations relation owner';
+    END IF;
+
+    IF EXISTS (
+      SELECT 1
+      FROM pg_catalog.pg_attribute a
+      WHERE a.attrelid = 'public.soil_moisture_calibrations'::regclass
+        AND a.attacl IS NOT NULL
+    ) THEN
+      RAISE EXCEPTION USING
+        ERRCODE = '55000',
+        MESSAGE = 'schema reconciliation refused unexpected soil_moisture_calibrations column ACLs';
     END IF;
 
     IF EXISTS (
@@ -529,19 +532,54 @@ BEGIN
       FROM pg_catalog.pg_class c
       CROSS JOIN LATERAL pg_catalog.aclexplode(
         COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))
-      ) a
+      ) acl
       WHERE c.oid = 'public.soil_moisture_calibrations'::regclass
-        AND a.grantee IN (
-          0,
-          COALESCE((SELECT oid FROM pg_catalog.pg_roles WHERE rolname = 'anon'), 0)
-        )
+        AND acl.grantor IS DISTINCT FROM c.relowner
     ) THEN
       RAISE EXCEPTION USING
         ERRCODE = '55000',
-        MESSAGE = 'schema reconciliation refused public or anon soil_moisture_calibrations grants';
+        MESSAGE = 'schema reconciliation refused unexpected soil_moisture_calibrations ACL grantors';
+    END IF;
+
+    SELECT COALESCE(
+      jsonb_object_agg(grantee, privileges),
+      '{}'::jsonb
+    )
+    INTO v_soil_acl_shape
+    FROM (
+      SELECT
+        CASE
+          WHEN acl.grantee = 0 THEN 'PUBLIC'
+          ELSE COALESCE(role.rolname, format('oid:%s', acl.grantee))
+        END AS grantee,
+        jsonb_agg(
+          acl.privilege_type ||
+            CASE WHEN acl.is_grantable THEN ' WITH GRANT OPTION' ELSE '' END
+          ORDER BY acl.privilege_type, acl.is_grantable
+        ) AS privileges
+      FROM pg_catalog.pg_class c
+      CROSS JOIN LATERAL pg_catalog.aclexplode(
+        COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))
+      ) acl
+      LEFT JOIN pg_catalog.pg_roles role ON role.oid = acl.grantee
+      WHERE c.oid = 'public.soil_moisture_calibrations'::regclass
+      GROUP BY acl.grantee, role.rolname
+    ) exact_grants;
+
+    IF v_soil_acl_shape = v_soil_acl_canonical THEN
+      v_soil_acl_state := 'canonical';
+    ELSIF v_soil_acl_shape = v_legacy_bloat_acl THEN
+      v_soil_acl_state := 'known_legacy_default_bloat';
+    ELSE
+      RAISE EXCEPTION USING
+        ERRCODE = '55000',
+        MESSAGE = 'schema reconciliation refused unexpected soil_moisture_calibrations ACL shape',
+        DETAIL = format('soil_moisture_calibrations=%s', v_soil_acl_shape),
+        HINT = 'Expected the canonical ACL or the exact known hosted default-ACL bloat.';
     END IF;
   ELSE
     v_soil_policy_state := 'absent';
+    v_soil_acl_state := 'absent';
     -- Index names are schema-wide. Their presence without the table is not a
     -- wholly-absent state and must fail before CREATE TABLE.
     IF EXISTS (
@@ -1524,20 +1562,6 @@ BEGIN
         FOR EACH ROW EXECUTE FUNCTION public.set_updated_at()
     $ddl$;
 
-    -- A new table must not inherit hosted legacy defaults. Revoke first, then
-    -- state the canonical browser/service capabilities explicitly.
-    EXECUTE $ddl$
-      REVOKE ALL ON TABLE public.soil_moisture_calibrations
-        FROM PUBLIC, anon, authenticated
-    $ddl$;
-    EXECUTE $ddl$
-      GRANT SELECT, INSERT, UPDATE, DELETE
-        ON TABLE public.soil_moisture_calibrations TO authenticated
-    $ddl$;
-    EXECUTE $ddl$
-      GRANT ALL ON TABLE public.soil_moisture_calibrations TO service_role
-    $ddl$;
-
     EXECUTE $ddl$
       ALTER TABLE public.soil_moisture_calibrations ENABLE ROW LEVEL SECURITY
     $ddl$;
@@ -1556,6 +1580,76 @@ BEGIN
         USING (auth.uid() = user_id)
     $policy$;
   END IF;
+
+  -- Normalize either accepted historical ACL input, or the just-created
+  -- table's hosted defaults, to the same least-privilege contract.
+  EXECUTE $ddl$
+    REVOKE ALL PRIVILEGES ON TABLE public.soil_moisture_calibrations
+      FROM PUBLIC, anon, authenticated
+  $ddl$;
+  EXECUTE $ddl$
+    GRANT SELECT, INSERT, UPDATE, DELETE
+      ON TABLE public.soil_moisture_calibrations TO authenticated
+  $ddl$;
+  EXECUTE $ddl$
+    GRANT ALL PRIVILEGES
+      ON TABLE public.soil_moisture_calibrations TO service_role
+  $ddl$;
+
+  IF EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_class c
+    CROSS JOIN LATERAL pg_catalog.aclexplode(
+      COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))
+    ) acl
+    WHERE c.oid = 'public.soil_moisture_calibrations'::regclass
+      AND acl.grantor IS DISTINCT FROM c.relowner
+  ) THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '55000',
+      MESSAGE = 'schema reconciliation failed canonical soil_moisture_calibrations ACL grantor normalization';
+  END IF;
+
+  SELECT COALESCE(
+    jsonb_object_agg(grantee, privileges),
+    '{}'::jsonb
+  )
+  INTO v_soil_acl_shape
+  FROM (
+    SELECT
+      CASE
+        WHEN acl.grantee = 0 THEN 'PUBLIC'
+        ELSE COALESCE(role.rolname, format('oid:%s', acl.grantee))
+      END AS grantee,
+      jsonb_agg(
+        acl.privilege_type ||
+          CASE WHEN acl.is_grantable THEN ' WITH GRANT OPTION' ELSE '' END
+        ORDER BY acl.privilege_type, acl.is_grantable
+      ) AS privileges
+    FROM pg_catalog.pg_class c
+    CROSS JOIN LATERAL pg_catalog.aclexplode(
+      COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))
+    ) acl
+    LEFT JOIN pg_catalog.pg_roles role ON role.oid = acl.grantee
+    WHERE c.oid = 'public.soil_moisture_calibrations'::regclass
+    GROUP BY acl.grantee, role.rolname
+  ) exact_grants;
+
+  IF v_soil_acl_shape IS DISTINCT FROM v_soil_acl_canonical THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '55000',
+      MESSAGE = 'schema reconciliation failed canonical soil_moisture_calibrations ACL normalization',
+      DETAIL = format(
+        'input_state=%s; soil_moisture_calibrations=%s',
+        v_soil_acl_state,
+        v_soil_acl_shape
+      );
+  END IF;
+
+  SELECT c.relacl::text
+  INTO v_soil_acl_after_normalization
+  FROM pg_catalog.pg_class c
+  WHERE c.oid = 'public.soil_moisture_calibrations'::regclass;
 
   -- Replace the published alias-shadowed write checks (or deterministically
   -- reassert an already-hardened retry) with explicit target-table references.
@@ -2155,6 +2249,14 @@ BEGIN
     RAISE EXCEPTION USING
       ERRCODE = '55000',
       MESSAGE = 'schema reconciliation changed normalized canonical Pheno ACLs';
+  END IF;
+
+  IF (SELECT c.relacl::text FROM pg_catalog.pg_class c
+      WHERE c.oid = 'public.soil_moisture_calibrations'::regclass)
+       IS DISTINCT FROM v_soil_acl_after_normalization THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '55000',
+      MESSAGE = 'schema reconciliation changed normalized canonical soil_moisture_calibrations ACL';
   END IF;
 
   SELECT count(*), COALESCE(array_agg(id ORDER BY id), ARRAY[]::uuid[])

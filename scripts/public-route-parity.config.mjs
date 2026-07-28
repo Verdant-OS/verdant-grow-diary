@@ -21,9 +21,7 @@
 
 /** Sitemap URLs that legitimately have no STATIC_PUBLIC_SEO_DOCUMENTS entry. */
 export const SITEMAP_ONLY_ROUTES = Object.freeze([
-  "/",         // Homepage served by index.html itself; head baked at build.
-  "/feedback", // Support form; runtime Helmet only.
-  "/contact",  // Support form; runtime Helmet only.
+  "/", // Homepage served by index.html itself; head baked at build.
 ]);
 
 /** STATIC_PUBLIC_SEO_DOCUMENTS paths intentionally excluded from sitemap.xml. */

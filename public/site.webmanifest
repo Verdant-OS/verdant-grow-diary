@@ -9,9 +9,15 @@
   "theme_color": "#0d1a12",
   "icons": [
     {
-      "src": "/brand/verdant-logo.png",
+      "src": "/brand/verdant-logo-192.webp",
+      "sizes": "192x192",
+      "type": "image/webp",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/verdant-logo-512.webp",
       "sizes": "512x512",
-      "type": "image/png",
+      "type": "image/webp",
       "purpose": "any"
     }
   ]

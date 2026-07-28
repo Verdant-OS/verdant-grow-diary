@@ -5,6 +5,8 @@ import { resolve } from "node:path";
 import { VERDANT_CULTIVAR_SLUGS } from "@/constants/verdantCultivars";
 import { VERDANT_GUIDE_SLUGS } from "@/constants/verdantSeoContent";
 import {
+  STATIC_PUBLIC_ALIAS_DOCUMENTS,
+  STATIC_PUBLIC_OUTPUT_DOCUMENTS,
   STATIC_PUBLIC_SEO_DOCUMENTS,
   VERDANT_SITE_ORIGIN,
 } from "@/lib/build/staticPublicSeoDocuments";
@@ -30,6 +32,8 @@ describe("static public SEO documents", () => {
       "/tools/vpd-calculator",
       "/hardware-integrations",
       "/how-ai-doctor-works",
+      "/feedback",
+      "/contact",
     ]) {
       expect(paths).toContain(required);
     }
@@ -38,6 +42,46 @@ describe("static public SEO documents", () => {
     }
     for (const slug of VERDANT_CULTIVAR_SLUGS) {
       expect(paths).toContain(`/cultivars/${slug}`);
+    }
+  });
+
+  it("emits legacy strain aliases as noindex documents owned by cultivar canonicals", () => {
+    expect(STATIC_PUBLIC_ALIAS_DOCUMENTS.length).toBe(VERDANT_CULTIVAR_SLUGS.length + 1);
+
+    const aliasesByPath = new Map(
+      STATIC_PUBLIC_ALIAS_DOCUMENTS.map((document) => [document.path, document]),
+    );
+    const hub = aliasesByPath.get("/strains");
+    expect(hub).toMatchObject({
+      canonicalPath: "/cultivars",
+      fileName: "strains/index.html",
+      metadata: {
+        url: `${VERDANT_SITE_ORIGIN}/cultivars`,
+        robots: "noindex, follow",
+      },
+    });
+
+    for (const slug of VERDANT_CULTIVAR_SLUGS) {
+      expect(aliasesByPath.get(`/strains/${slug}`)).toMatchObject({
+        canonicalPath: `/cultivars/${slug}`,
+        fileName: `strains/${slug}/index.html`,
+        metadata: {
+          url: `${VERDANT_SITE_ORIGIN}/cultivars/${slug}`,
+          robots: "noindex, follow",
+        },
+      });
+    }
+  });
+
+  it("keeps every emitted filesystem path unique and query-free", () => {
+    const paths = STATIC_PUBLIC_OUTPUT_DOCUMENTS.map((document) => document.path);
+    const fileNames = STATIC_PUBLIC_OUTPUT_DOCUMENTS.map((document) => document.fileName);
+
+    expect(new Set(paths).size).toBe(paths.length);
+    expect(new Set(fileNames).size).toBe(fileNames.length);
+    for (const document of STATIC_PUBLIC_OUTPUT_DOCUMENTS) {
+      expect(document.path).not.toMatch(/[?#]/);
+      expect(document.fileName).toBe(`${document.path.slice(1)}/index.html`);
     }
   });
 

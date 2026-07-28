@@ -827,7 +827,7 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
       const namedControl = page.getByRole("combobox", { name, exact: true });
       const hasStableNamedControl = (await namedControl.count()) === 1;
       const stableControl = hasStableNamedControl ? namedControl : control;
-      await control.selectOption(alternative, { timeout: 5_000 });
+      await stableControl.selectOption(alternative, { timeout: 5_000 });
       await expect(stableControl).toHaveValue(alternative, { timeout: 5_000 });
 
       // A controlled filter can re-render the page and change the live nth()

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
 import {
@@ -29,6 +31,11 @@ const MANIFEST = [
   "/pricing",
   "/pheno-hunts/:id/workspace",
 ] as const;
+
+const CENSUS_SPEC_SOURCE = readFileSync(
+  resolve(process.cwd(), "e2e/core-link-form-census.spec.ts"),
+  "utf8",
+);
 
 describe("core link and form census rules", () => {
   it("matches exact and dynamic manifest routes without allowing the catch-all", () => {
@@ -73,6 +80,18 @@ describe("core link and form census rules", () => {
       ),
     ).toBe(
       'a[href="/pheno-hunts/hunt-1/workspace?note=\\"quoted\\"\\\\value#phenotype-notes"]:visible',
+    );
+  });
+
+  it("mutates and restores controlled selects through the reacquired live locator", () => {
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      "await stableControl.selectOption(alternative, { timeout: 5_000 });",
+    );
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      "await stableControl.selectOption(original, { timeout: 5_000 }).catch(() => undefined);",
+    );
+    expect(CENSUS_SPEC_SOURCE).not.toContain(
+      "await control.selectOption(alternative, { timeout: 5_000 });",
     );
   });
 

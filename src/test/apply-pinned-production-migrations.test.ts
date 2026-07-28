@@ -9,6 +9,7 @@ import {
   buildApplySql,
   buildCanonicalPolicyVerificationSql,
   classifyTargetLedger,
+  describeDatabaseUrlShape,
   EXIT,
   extractExpectedFunctionBodies,
   findUnsafeSqlReason,
@@ -972,6 +973,60 @@ describe("production runner", () => {
       }),
     ).toBe(EXIT.TARGET_REJECTED);
     expect(spawnImpl).not.toHaveBeenCalled();
+  });
+
+  it("describes a rejected URL's shape without leaking any value material", () => {
+    const wrapped = '"postgresql://postgres:sec ret@db.example.supabase.co:5432/postgres"';
+    const shape = describeDatabaseUrlShape(wrapped);
+    expect(shape.length).toBe(wrapped.length);
+    expect(shape.starts_with_postgres_scheme).toBe(false); // leading quote
+    expect(shape.first_char_code).toBe(34);
+    expect(shape.last_char_code).toBe(34);
+    expect(shape.double_quote_count).toBe(2);
+    expect(shape.space_count).toBe(1);
+    expect(shape.at_sign_count).toBe(1);
+    expect(shape.has_non_ascii).toBe(false);
+    // Nothing recoverable: the shape object never carries string fragments.
+    for (const value of Object.values(shape)) {
+      expect(typeof value === "string").toBe(false);
+    }
+    // BOM detection.
+    expect(describeDatabaseUrlShape("﻿postgresql://x").first_char_code).toBe(0xfeff);
+    expect(describeDatabaseUrlShape("﻿postgresql://x").has_non_ascii).toBe(true);
+  });
+
+  it("records the sanitized url shape in the audit artifact on target rejection", () => {
+    const spawnImpl = vi.fn();
+    const { logger } = makeLogger();
+    const reportPath = join(testRoot, "shape", "report.md");
+    const auditPath = join(testRoot, "shape", "audit.json");
+    const badUrl = '"not a url"';
+
+    expect(
+      runPinnedProductionMigrations({
+        env: validEnvironment({
+          SUPABASE_DB_URL: badUrl,
+          REPORT_PATH: reportPath,
+          AUDIT_PATH: auditPath,
+        }),
+        spawnImpl,
+        logger,
+      }),
+    ).toBe(EXIT.TARGET_REJECTED);
+
+    const audit = JSON.parse(readFileSync(auditPath, "utf8"));
+    expect(audit.outcome).toBe("target_rejected");
+    expect(audit.url_shape).toMatchObject({
+      length: badUrl.length,
+      starts_with_postgres_scheme: false,
+      first_char_code: 34,
+      double_quote_count: 2,
+    });
+    const rawAudit = readFileSync(auditPath, "utf8");
+    expect(rawAudit).not.toContain("not a url");
+    const rawReport = readFileSync(reportPath, "utf8");
+    expect(rawReport).toContain("Sanitized shape:");
+    expect(rawReport).not.toContain("not a url");
   });
 
   it("rejects a changed migration before invoking psql", () => {

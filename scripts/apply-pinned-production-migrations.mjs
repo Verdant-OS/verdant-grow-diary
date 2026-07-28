@@ -646,6 +646,31 @@ function compactError(error) {
   return error instanceof Error ? error.name : "unknown_error";
 }
 
+/**
+ * Structural shape of a rejected database URL, for the sanitized audit
+ * artifact ONLY. Reports facts that pinpoint how a pasted secret was
+ * mangled (wrapping quotes, BOM, truncation, stray whitespace, non-ASCII)
+ * without exposing the value, the password, or any recoverable substring:
+ * total length, scheme prefix boolean, first/last character codes, counts
+ * of a fixed set of structural characters, and a non-ASCII flag.
+ */
+export function describeDatabaseUrlShape(value) {
+  const text = typeof value === "string" ? value : "";
+  const count = (re) => (text.match(re) ?? []).length;
+  return Object.freeze({
+    length: text.length,
+    starts_with_postgres_scheme: /^postgres(?:ql)?:\/\//.test(text),
+    first_char_code: text.length > 0 ? text.codePointAt(0) : null,
+    last_char_code: text.length > 0 ? text.codePointAt(text.length - 1) : null,
+    double_quote_count: count(/"/g),
+    single_quote_count: count(/'/g),
+    backslash_count: count(/\\/g),
+    space_count: count(/ /g),
+    at_sign_count: count(/@/g),
+    has_non_ascii: /[^ -~]/.test(text),
+  });
+}
+
 function writeSafeFile(path, contents, logger) {
   if (!path) return;
   try {
@@ -690,6 +715,7 @@ function makeArtifactWriters({ reportPath, auditPath, now, logger }) {
           migration_versions: PINNED_PRODUCTION_MIGRATIONS.map(({ version }) => version),
           ...(extra.ledgerState ? { ledger_state: extra.ledgerState } : {}),
           ...(extra.note ? { note: extra.note } : {}),
+          ...(extra.url_shape ? { url_shape: extra.url_shape } : {}),
         },
         null,
         2,
@@ -2734,11 +2760,17 @@ export function runPinnedProductionMigrations({
     childEnv = buildPsqlEnvironment(env, databaseUrl);
   } catch (error) {
     const reason = compactError(error);
+    const shape = describeDatabaseUrlShape(databaseUrl);
     logger.error(`Production database identity was rejected (${reason}).`);
     writeReport("BLOCKED - target identity rejected", [
       "The protected URL did not prove the pinned Verdant production project.",
+      `Sanitized shape: length=${shape.length}, scheme_ok=${shape.starts_with_postgres_scheme}, ` +
+        `first_char=${shape.first_char_code}, last_char=${shape.last_char_code}, ` +
+        `quotes=${shape.double_quote_count}/${shape.single_quote_count}, ` +
+        `backslashes=${shape.backslash_count}, spaces=${shape.space_count}, ` +
+        `at_signs=${shape.at_sign_count}, non_ascii=${shape.has_non_ascii}`,
     ]);
-    writeAudit("target_rejected", { ...auditBase, note: reason });
+    writeAudit("target_rejected", { ...auditBase, note: reason, url_shape: shape });
     return EXIT.TARGET_REJECTED;
   }
 

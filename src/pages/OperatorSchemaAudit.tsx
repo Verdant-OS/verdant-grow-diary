@@ -186,9 +186,12 @@ export default function OperatorSchemaAudit() {
         <CardContent className="p-0">
           <div className="divide-y">
             {(data?.migrations ?? []).map((row) => (
-              <div
+              <button
+                type="button"
                 key={row.filename}
-                className="px-4 py-2 flex items-center justify-between gap-3 text-sm"
+                onClick={() => setOpenMigration(row)}
+                data-testid={`schema-audit-migration-row-${row.filename}`}
+                className="w-full px-4 py-2 flex items-center justify-between gap-3 text-sm text-left hover:bg-muted/40 transition"
               >
                 <div className="min-w-0">
                   <div className="font-mono text-xs truncate">{row.filename}</div>
@@ -196,16 +199,19 @@ export default function OperatorSchemaAudit() {
                     version {row.version ?? "unknown"}
                   </div>
                 </div>
-                {row.applied ? (
-                  <span className="inline-flex items-center gap-1 text-emerald-600 text-xs font-medium">
-                    <CheckCircle2 className="h-4 w-4" /> applied
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-destructive text-xs font-medium">
-                    <XCircle className="h-4 w-4" /> not in ledger
-                  </span>
-                )}
-              </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {row.applied ? (
+                    <span className="inline-flex items-center gap-1 text-emerald-600 text-xs font-medium">
+                      <CheckCircle2 className="h-4 w-4" /> applied
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-destructive text-xs font-medium">
+                      <XCircle className="h-4 w-4" /> not in ledger
+                    </span>
+                  )}
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </button>
             ))}
             {!loading && (data?.migrations ?? []).length === 0 && (
               <div className="px-4 py-6 text-sm text-muted-foreground text-center">

@@ -149,6 +149,7 @@ export function BreedingEventForm({ plants, busy, onSubmit, onCancel }: Props) {
       <div className="flex items-start gap-3 rounded-md border border-border/70 p-3">
         <Checkbox
           id="breeding-action-queue-opt-in"
+          aria-label="Create approval-required follow-up suggestions"
           checked={requestActionQueueSuggestions}
           onCheckedChange={(checked) => setRequestActionQueueSuggestions(checked === true)}
           disabled={busy}

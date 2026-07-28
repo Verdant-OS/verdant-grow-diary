@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { UsePhenoHuntWorkspaceState } from "@/hooks/usePhenoHuntWorkspace";
+import { LOUD_TRAIT_AXES } from "@/lib/phenoExpressionRules";
 
 const hookMock = vi.fn<() => UsePhenoHuntWorkspaceState>();
 vi.mock("@/hooks/usePhenoHuntWorkspace", () => ({
@@ -126,6 +127,47 @@ describe("PhenoHuntWorkspace", () => {
     expect(within(card).getByTestId("workspace-decision-p1")).toBeInTheDocument();
     // suggest-only caveat present
     expect(screen.getByTestId("pheno-workspace")).toHaveTextContent(/never keeps, culls, or acts/i);
+  });
+
+  it("gives every audited candidate score, note, smoke, and lab input a contextual name", () => {
+    renderAt({
+      candidates: [
+        { candidateId: "p1", candidateLabel: "BD #1" },
+        { candidateId: "p2", candidateLabel: "BD #2" },
+      ],
+    });
+
+    for (const candidateLabel of ["BD #1", "BD #2"]) {
+      for (const axis of LOUD_TRAIT_AXES) {
+        expect(
+          screen.getByRole("spinbutton", {
+            name: `${candidateLabel}: ${axis.label} score (${axis.min}–${axis.max})`,
+          }),
+        ).toBeInTheDocument();
+      }
+
+      expect(screen.getByRole("textbox", { name: `${candidateLabel}: Notes` })).toBeInTheDocument();
+      expect(
+        screen.getByRole("spinbutton", {
+          name: `${candidateLabel}: Post-cure smoothness score (1–5)`,
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("spinbutton", {
+          name: `${candidateLabel}: Post-cure potency impression (1–5)`,
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("spinbutton", {
+          name: `${candidateLabel}: Lab THC percentage`,
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("spinbutton", {
+          name: `${candidateLabel}: Lab CBD percentage`,
+        }),
+      ).toBeInTheDocument();
+    }
   });
 
   it("saves entered trait scores and the keeper decision via the hook", async () => {

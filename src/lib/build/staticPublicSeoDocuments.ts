@@ -25,6 +25,11 @@ export interface StaticPublicSeoDocument {
   readonly metadata: StaticSocialRouteMetadata;
 }
 
+export interface StaticPublicAliasDocument extends StaticPublicSeoDocument {
+  /** Canonical public route that owns indexing and social identity. */
+  readonly canonicalPath: string;
+}
+
 function routeFileName(path: string): string {
   if (!path.startsWith("/") || path === "/" || path.includes("?") || path.includes("#")) {
     throw new Error(`Static SEO route must be a non-root clean path: ${path}`);
@@ -45,6 +50,21 @@ function publicDocument(
       ...metadata,
       url: `${VERDANT_SITE_ORIGIN}${path}`,
       image: metadata.image ?? DEFAULT_OG_IMAGE,
+    },
+  };
+}
+
+function aliasDocument(
+  path: string,
+  canonicalDocument: StaticPublicSeoDocument,
+): StaticPublicAliasDocument {
+  return {
+    path,
+    fileName: routeFileName(path),
+    canonicalPath: canonicalDocument.path,
+    metadata: {
+      ...canonicalDocument.metadata,
+      robots: "noindex, follow",
     },
   };
 }
@@ -160,6 +180,18 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
       "Verdant Grow Diary refund policy — 30-day money-back guarantee on paid plans, with refunds through Paddle (paddle.net) as Merchant of Record.",
     imageAlt: "Verdant refund policy",
   }),
+  publicDocument("/feedback", {
+    title: "Customer Feedback | Verdant Grow Diary",
+    description:
+      "Tell the humans building Verdant what's working and what isn't. Read by real people, no automated replies.",
+    imageAlt: "Verdant customer feedback",
+  }),
+  publicDocument("/contact", {
+    title: "Contact Us | Verdant Grow Diary",
+    description:
+      "Reach the humans building Verdant. Support, bugs, hardware ideas, billing, or questions.",
+    imageAlt: "Contact the Verdant team",
+  }),
 ];
 
 const GUIDE_DOCUMENTS = VERDANT_SEO_GUIDES.map((guide) =>
@@ -191,3 +223,21 @@ export const STATIC_PUBLIC_SEO_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument>
   CULTIVAR_HUB,
   ...CULTIVAR_DOCUMENTS,
 ]);
+
+/**
+ * Legacy route aliases emitted for filesystem-first hosts that do not apply
+ * vercel.json redirects. They are never indexable documents: each one points
+ * crawlers at its cultivar canonical while the existing React route performs
+ * the browser redirect after hydration.
+ */
+export const STATIC_PUBLIC_ALIAS_DOCUMENTS: ReadonlyArray<StaticPublicAliasDocument> =
+  Object.freeze([
+    aliasDocument("/strains", CULTIVAR_HUB),
+    ...CULTIVAR_DOCUMENTS.map((document) =>
+      aliasDocument(document.path.replace(/^\/cultivars\//, "/strains/"), document),
+    ),
+  ]);
+
+/** Every route-local HTML document emitted by the Vite build. */
+export const STATIC_PUBLIC_OUTPUT_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> =
+  Object.freeze([...STATIC_PUBLIC_SEO_DOCUMENTS, ...STATIC_PUBLIC_ALIAS_DOCUMENTS]);

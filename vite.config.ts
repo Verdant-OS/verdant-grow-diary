@@ -7,7 +7,7 @@ import { PRICING } from "./src/constants/pricing";
 import { viteManualChunks } from "./src/lib/build/manualChunks";
 import { buildStaticSocialRouteHtml } from "./src/lib/build/staticSocialRouteHtml";
 import {
-  STATIC_PUBLIC_SEO_DOCUMENTS,
+  STATIC_PUBLIC_OUTPUT_DOCUMENTS,
   VERDANT_SITE_ORIGIN,
 } from "./src/lib/build/staticPublicSeoDocuments";
 import { buildOgCardSvg, ogImageSlugForPath, OG_IMAGE_WIDTH } from "./src/lib/build/ogImageCard";
@@ -83,7 +83,7 @@ function staticSocialRouteDocuments(): Plugin {
       }
       const fileNames = new Set<string>();
       const ogEmitted = new Set<string>();
-      for (const document of STATIC_PUBLIC_SEO_DOCUMENTS) {
+      for (const document of STATIC_PUBLIC_OUTPUT_DOCUMENTS) {
         if (fileNames.has(document.fileName)) {
           this.error(`Duplicate static SEO output path: ${document.fileName}`);
           return;
@@ -91,14 +91,15 @@ function staticSocialRouteDocuments(): Plugin {
         fileNames.add(document.fileName);
 
         // Per-route OG PNG. Deterministic filename derived from the URL path.
-        const slug = ogImageSlugForPath(document.path);
+        const canonicalPath = new URL(document.metadata.url).pathname;
+        const slug = ogImageSlugForPath(canonicalPath);
         const ogFileName = `og/${slug}.png`;
         if (!ogEmitted.has(ogFileName)) {
           ogEmitted.add(ogFileName);
           const svg = buildOgCardSvg({
             title: document.metadata.title,
             description: document.metadata.description,
-            path: document.path,
+            path: canonicalPath,
           });
           try {
             const png = new Resvg(svg, {
@@ -184,8 +185,8 @@ function staticSocialRouteDocuments(): Plugin {
       // validators (validate-static-route-head-fidelity.mjs) and the sitemap
       // parity vitest use this as the single source of truth, so head
       // fidelity and sitemap membership never drift silently.
-      const manifest = STATIC_PUBLIC_SEO_DOCUMENTS.map((document) => {
-        const slug = ogImageSlugForPath(document.path);
+      const manifest = STATIC_PUBLIC_OUTPUT_DOCUMENTS.map((document) => {
+        const slug = ogImageSlugForPath(new URL(document.metadata.url).pathname);
         const ogFileName = `og/${slug}.png`;
         return {
           path: document.path,

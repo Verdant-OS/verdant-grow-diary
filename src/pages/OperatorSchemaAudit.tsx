@@ -94,10 +94,20 @@ interface ColumnRow {
   exists: boolean;
 }
 
+interface RlsAuditRow {
+  table: string;
+  exists: boolean;
+  rls_enabled: boolean;
+  rls_forced: boolean;
+  policy_count: number;
+  grants: Partial<Record<"anon" | "authenticated" | "service_role", string[]>>;
+}
+
 interface AuditResponse {
   migrations: MigrationRow[];
   tables: TableRow[];
   columns: ColumnRow[];
+  rls_audit?: RlsAuditRow[];
   checked_at: string;
 }
 

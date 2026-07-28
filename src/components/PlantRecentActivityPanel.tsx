@@ -49,7 +49,8 @@ function EntryRow({
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="capitalize" data-testid="plant-recent-activity-event-type">
-            {row.eventType}
+            {row.displayLabel ?? row.eventType}
+            {row.summarySuffix ? ` · ${row.summarySuffix}` : ""}
           </Badge>
           {row.isManualEntry ? (
             <Badge
@@ -62,9 +63,10 @@ function EntryRow({
             </Badge>
           ) : null}
           <span className="text-xs text-muted-foreground" data-testid="plant-recent-activity-timestamp">
-            {row.occurredAtLabel}
+            {formatEntryTimestamp(row.occurredAt, row.occurredAtLabel)}
           </span>
         </div>
+
         <div className="flex items-center gap-1">
           {row.hasPhoto ? (
             <Badge variant="outline" className="gap-1" data-testid="plant-recent-activity-photo-badge">

@@ -75,11 +75,15 @@ export const EXPECTED_JSONLD_NODES = Object.freeze([
       operatingSystem: "Web",
       url: "https://verdantgrowdiary.com",
     }),
+    // Publicly purchasable SKUs only. Founder Lifetime is retired from the
+    // public pricing grid (deep-link-only) and must NOT be advertised here —
+    // src/test/software-application-offers-truth.test.ts pins this list.
     offerNames: Object.freeze([
       "Free",
       "Pro (monthly)",
       "Pro (annual)",
-      "Founder Lifetime",
+      "Craft (monthly)",
+      "Craft (annual)",
     ]),
   }),
 ]);

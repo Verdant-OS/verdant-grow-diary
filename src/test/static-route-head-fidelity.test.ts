@@ -39,7 +39,8 @@ const VALID_JSONLD = {
     { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD" },
     { "@type": "Offer", name: "Pro (monthly)", price: "9", priceCurrency: "USD" },
     { "@type": "Offer", name: "Pro (annual)", price: "90", priceCurrency: "USD" },
-    { "@type": "Offer", name: "Founder Lifetime", price: "129", priceCurrency: "USD" },
+    { "@type": "Offer", name: "Craft (monthly)", price: "19", priceCurrency: "USD" },
+    { "@type": "Offer", name: "Craft (annual)", price: "190", priceCurrency: "USD" },
   ],
 };
 
@@ -355,7 +356,7 @@ describe("static route head fidelity helpers", () => {
     it("flags a missing offer in the SoftwareApplication catalog", () => {
       const bad = {
         ...VALID_JSONLD,
-        offers: VALID_JSONLD.offers.filter((o) => o.name !== "Founder Lifetime"),
+        offers: VALID_JSONLD.offers.filter((o) => o.name !== "Craft (annual)"),
       };
       const diff = diffRouteHead(extractHead(fixtureHtml({}, { jsonLd: bad })), {
         path: "/pricing",
@@ -365,7 +366,7 @@ describe("static route head fidelity helpers", () => {
         f.label === "JSON-LD SoftwareApplication.offers[] names",
       );
       expect(field).toBeTruthy();
-      expect(field!.actual).not.toContain("Founder Lifetime");
+      expect(field!.actual).not.toContain("Craft (annual)");
     });
 
     it("accepts a SoftwareApplication node nested under @graph", () => {

@@ -11,13 +11,14 @@
  *    pure presenter; it never writes and never bypasses that check.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, XCircle, RefreshCw, Loader2, AlertTriangle } from "lucide-react";
+import { CheckCircle2, XCircle, RefreshCw, Loader2, AlertTriangle, ChevronRight } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { usePageSeo } from "@/hooks/usePageSeo";
+import SchemaAuditMigrationDrilldown from "@/components/SchemaAuditMigrationDrilldown";
 import {
   REQUIRED_CORE_SCHEMA,
   ADVISORY_SCHEMA,

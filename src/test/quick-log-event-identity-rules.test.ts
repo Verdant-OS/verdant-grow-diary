@@ -103,6 +103,46 @@ describe("resolveQuickLogEventIdentity", () => {
     expect(identity.displayLabel).not.toBe("Invalid Event Type");
   });
 
+  it("keeps recognized machine markers on the envelope — never invalid (Codex P2)", () => {
+    // The default Quick Log photo path stamps
+    // details.event_type = "quicklog_photo_attachment"; learning-loop rows
+    // stamp "action_followup". Both are valid history, not invalid types.
+    for (const marker of [
+      "quicklog_photo_attachment",
+      "action_followup",
+      "action_outcome",
+      "manual_snapshot",
+    ]) {
+      const identity = resolveQuickLogEventIdentity({
+        eventType: "note",
+        details: { declaredEventType: marker },
+      });
+      expect(identity.effectiveEventType, marker).toBe("note");
+      expect(identity.displayLabel, marker).toBe("Note");
+    }
+  });
+
+  it("keeps a photo-attachment marker row classified as Photo in the recap", () => {
+    const rows = buildPlantRecentActivity(
+      [
+        rawEntry({
+          event_type: "note",
+          note: "",
+          photo_url: "https://example.invalid/photo.jpg",
+          details: { event_type: "quicklog_photo_attachment" },
+        }),
+      ],
+      { plantId: PLANT_ID },
+    );
+    expect(rows[0].effectiveEventType).toBe("note");
+    const items = buildPlantRecentActivityRecap({ rows });
+    expect(items).toHaveLength(1);
+    // source=photo wins in the classifier; the label must stay "Photo",
+    // never the neutral invalid label and never "Log entry".
+    expect(items[0].category).toBe("photos");
+    expect(items[0].categoryLabel).toBe("Photo");
+  });
+
   it("keeps a plain note row (no declared type) labeled Note — neutrality is scoped to invalid identities", () => {
     const identity = resolveQuickLogEventIdentity({
       eventType: "note",

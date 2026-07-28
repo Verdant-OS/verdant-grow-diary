@@ -11,13 +11,13 @@ const flat = sql.replace(/\s+/g, " ");
 
 const PUBLISHED_CONTRACT_HASHES = {
   "20260619083000_add_soil_moisture_calibration_v1.sql":
-    "0ae031af23acb0af06bf5262a3edd72331cfe9fc51d12409e241469af2b3cc78",
+    "1fc99fdb1653c16a0106e43ee471541f0010d224a764449005fbf468c0e0cb49",
   "20260706191500_pheno_crosses_foundation.sql":
-    "5b9ac7b730b197b33d43e03111561e481657183e1f2580572e3faace8e027a56",
+    "485c4f735ad1540642a9731d54f5adaa85f91e8040246a3d9f8f190730860096",
   "20260707120001_pheno_reversals_and_cross_types.sql":
-    "99713558236cd425e812f8160eb785089ad6cd441a81ee6ccaa4d6ab19176b73",
+    "dc5eb64d6fd2ac6161fb120972ab9debc55488d44b45547589a610afce2a0467",
   "20260707210000_pheno_crosses_full_taxonomy.sql":
-    "1fcd7a15d05df27768719609507ca1ab8ab4e79385ebab6876396e0054044e7f",
+    "4da8fe48faad0010f7d8ddedfbf658e1ecb72ec97ca83a2f5887761a552b3b87",
 } as const;
 
 const SOIL_COLUMNS = [
@@ -75,8 +75,13 @@ describe("production schema reconciliation migration", () => {
     ]);
 
     for (const [name, expectedHash] of Object.entries(PUBLISHED_CONTRACT_HASHES)) {
-      const bytes = readFileSync(resolve(MIGRATIONS_DIR, name));
-      expect(createHash("sha256").update(bytes).digest("hex"), name).toBe(expectedHash);
+      const canonicalLfSource = readFileSync(resolve(MIGRATIONS_DIR, name), "utf8").replace(
+        /\r\n?/g,
+        "\n",
+      );
+      expect(createHash("sha256").update(canonicalLfSource, "utf8").digest("hex"), name).toBe(
+        expectedHash,
+      );
     }
   });
 

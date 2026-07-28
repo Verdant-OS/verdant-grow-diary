@@ -14,6 +14,8 @@ import {
 import { isStale } from "@/lib/sensorSnapshot";
 import { splitHardwareReadingsFromNote } from "@/lib/quickLogHardwareReadingsDisplayRules";
 import { shouldShowPhotoNonDiagnosticLabel } from "@/lib/photoEventNonDiagnosticLabelRules";
+import { resolveQuickLogEventIdentity } from "@/lib/quickLogEventIdentityRules";
+
 
 export interface PlantRecentActivityRow {
   id: string;

@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import SchemaAuditMigrationDrilldown from "@/components/SchemaAuditMigrationDrilldown";
+import { evaluateRlsAudit, summarizeRlsFindings } from "@/lib/rlsAuditRules";
 import {
   REQUIRED_CORE_SCHEMA,
   ADVISORY_SCHEMA,
@@ -94,10 +95,20 @@ interface ColumnRow {
   exists: boolean;
 }
 
+interface RlsAuditRow {
+  table: string;
+  exists: boolean;
+  rls_enabled: boolean;
+  rls_forced: boolean;
+  policy_count: number;
+  grants: Partial<Record<"anon" | "authenticated" | "service_role", string[]>>;
+}
+
 interface AuditResponse {
   migrations: MigrationRow[];
   tables: TableRow[];
   columns: ColumnRow[];
+  rls_audit?: RlsAuditRow[];
   checked_at: string;
 }
 
@@ -228,6 +239,21 @@ export default function OperatorSchemaAudit() {
       orphanTables,
     };
   }, [data]);
+
+  const rlsFindings = useMemo(
+    () => evaluateRlsAudit(data?.rls_audit ?? []),
+    [data],
+  );
+  const rlsFindingStats = useMemo(() => summarizeRlsFindings(rlsFindings), [rlsFindings]);
+  const rlsFindingsByTable = useMemo(() => {
+    const map = new Map<string, typeof rlsFindings>();
+    for (const f of rlsFindings) {
+      const list = map.get(f.table) ?? [];
+      list.push(f);
+      map.set(f.table, list);
+    }
+    return map;
+  }, [rlsFindings]);
 
   const openMigrationByFilename = useCallback(
     (filename: string) => {
@@ -544,6 +570,114 @@ export default function OperatorSchemaAudit() {
           </div>
         </CardContent>
       </Card>
+
+      <Card data-testid="schema-audit-rls-card">
+        <CardHeader className="flex flex-col gap-2 pb-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle className="text-base">RLS &amp; policy audit</CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              For each critical table: row-level security state, policy count, and
+              expected grants for anon / authenticated / service_role.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <Badge variant={rlsFindingStats.critical > 0 ? "destructive" : "outline"}>
+              {rlsFindingStats.critical} critical
+            </Badge>
+            <Badge variant={rlsFindingStats.warning > 0 ? "secondary" : "outline"}>
+              {rlsFindingStats.warning} warning
+            </Badge>
+            <Badge variant="outline">{rlsFindingStats.info} info</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {rlsFindings.length > 0 && (
+            <div className="border-b bg-muted/20 px-4 py-3 space-y-1.5">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Findings
+              </div>
+              {rlsFindings.map((f, i) => (
+                <div
+                  key={`${f.table}-${f.code}-${i}`}
+                  className="flex items-start gap-2 text-sm"
+                  data-testid={`schema-audit-rls-finding-${f.code}`}
+                >
+                  {f.severity === "critical" ? (
+                    <XCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                  ) : f.severity === "warning" ? (
+                    <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <span className="font-mono text-xs">public.{f.table}</span>{" "}
+                    <span>{f.message}</span>
+                    {f.detail && (
+                      <span className="text-muted-foreground"> — {f.detail}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="divide-y">
+            {(data?.rls_audit ?? []).map((row) => {
+              const tableFindings = rlsFindingsByTable.get(row.table) ?? [];
+              const worst = tableFindings.some((f) => f.severity === "critical")
+                ? "critical"
+                : tableFindings.some((f) => f.severity === "warning")
+                  ? "warning"
+                  : tableFindings.length > 0
+                    ? "info"
+                    : "ok";
+              return (
+                <div
+                  key={row.table}
+                  className="px-4 py-2 flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between"
+                  data-testid={`schema-audit-rls-row-${row.table}`}
+                >
+                  <div className="min-w-0">
+                    <div className="font-mono text-xs">public.{row.table}</div>
+                    <div className="text-xs text-muted-foreground">
+                      RLS {row.rls_enabled ? "enabled" : "disabled"}
+                      {row.rls_forced && " (forced)"} · {row.policy_count} polic
+                      {row.policy_count === 1 ? "y" : "ies"} · anon:{" "}
+                      {(row.grants.anon ?? []).join("/") || "—"} · authn:{" "}
+                      {(row.grants.authenticated ?? []).join("/") || "—"} · svc:{" "}
+                      {(row.grants.service_role ?? []).join("/") || "—"}
+                    </div>
+                  </div>
+                  <div className="shrink-0">
+                    {worst === "ok" ? (
+                      <span className="inline-flex items-center gap-1 text-emerald-600 text-xs font-medium">
+                        <CheckCircle2 className="h-4 w-4" /> ok
+                      </span>
+                    ) : worst === "critical" ? (
+                      <span className="inline-flex items-center gap-1 text-destructive text-xs font-medium">
+                        <XCircle className="h-4 w-4" /> critical
+                      </span>
+                    ) : worst === "warning" ? (
+                      <span className="inline-flex items-center gap-1 text-amber-600 text-xs font-medium">
+                        <AlertTriangle className="h-4 w-4" /> warning
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-muted-foreground text-xs font-medium">
+                        info
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {!loading && (data?.rls_audit ?? []).length === 0 && (
+              <div className="px-4 py-6 text-sm text-muted-foreground text-center">
+                No RLS audit data returned.
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
 
       <SchemaAuditMigrationDrilldown
         open={openMigration !== null}

@@ -550,7 +550,13 @@ export function normalizeDiaryEntry(
     if (observations) details.observations = observations;
     if (sensorSnapshot) details.sensorSnapshot = sensorSnapshot;
     if (remindAt) details.remindAt = remindAt;
+    // Preserve the raw declared event-type inside details for downstream
+    // Quick Log identity resolution (envelope event_type may be "quick_log").
+    if (detailsEventTypeCandidate) {
+      details.declaredEventType = detailsEventTypeCandidate.toLowerCase().trim();
+    }
     if (extras) details.extras = extras;
+
   }
 
   const isValidForAiContext =

@@ -92,12 +92,17 @@ function toRow(
   const snapshotAt = snap?.at ?? null;
   const hasSnapshot = !!snap;
   const split = splitHardwareReadingsFromNote(entry.note);
+  const identity = resolveQuickLogEventIdentity(entry);
   return {
     id: entry.id,
     eventType: entry.eventType,
+    effectiveEventType: identity.effectiveEventType,
+    displayLabel: identity.displayLabel,
+    summarySuffix: identity.summarySuffix,
     occurredAt: entry.createdAt,
     occurredAtLabel: entry.createdAtLabel,
     notePreview: previewNote(split.body),
+
     plantId: entry.plantId,
     tentId: entry.tentId,
     hasPhoto: !!entry.photoUrl,

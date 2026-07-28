@@ -21,6 +21,7 @@ import {
   GitFork,
   History,
   PlugZap,
+  Database,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -166,6 +167,7 @@ const operatorGroups: { label: string; items: NavItem[] }[] = [
     label: "Operator Mode",
     items: [
       { to: "/operator/release-readiness", label: "Release Readiness", icon: ClipboardList },
+      { to: "/operator/schema-audit", label: "Schema Audit", icon: Database },
       { to: "/operator/ai-doctor-phase1", label: "AI Doctor Results", icon: Stethoscope },
       { to: "/sensors/ecowitt-audit", label: "EcoWitt Audit", icon: Activity },
       { to: "/guides/cannabis-plant-care", label: "Help/Guides", icon: HelpCircle },

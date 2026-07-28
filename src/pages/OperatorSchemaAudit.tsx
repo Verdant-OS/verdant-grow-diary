@@ -80,6 +80,7 @@ export default function OperatorSchemaAudit() {
   const [data, setData] = useState<AuditResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [openMigration, setOpenMigration] = useState<MigrationRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);

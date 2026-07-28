@@ -51,15 +51,25 @@ function serializeJsonLd(value: unknown): string {
 function injectJsonLd(html: string, jsonLd: ReadonlyArray<unknown> | undefined): string {
   if (!jsonLd?.length) return html;
 
-  const staticScripts = /\s*<script\s+type=["']application\/ld\+json["']\s+data-static-route-ldjson(?:=["'][^"']*["'])?\s*>[\s\S]*?<\/script>/gi;
-  // Strip to a fixed point: a single pass could leave a reconstructed
-  // marker block behind when removals splice surrounding text together
-  // (CodeQL js/incomplete-multi-character-sanitization). Inputs are our
-  // own build output, but idempotence must not depend on that.
+  // Strip prior static blocks by index-splicing (not String.replace) until a
+  // fixed point: a single removal pass could leave a reconstructed marker
+  // block behind when a deletion splices surrounding text together (CodeQL
+  // js/incomplete-multi-character-sanitization). Inputs are our own build
+  // output, but idempotence must not depend on that.
+  const openMarker =
+    /<script\s+type=["']application\/ld\+json["']\s+data-static-route-ldjson(?:=["'][^"']*["'])?\s*>/i;
+  const closeMarker = "</script>";
   let withoutPrevious = html;
-  for (let previous = ""; previous !== withoutPrevious; ) {
-    previous = withoutPrevious;
-    withoutPrevious = withoutPrevious.replace(staticScripts, "");
+  for (;;) {
+    const open = openMarker.exec(withoutPrevious);
+    if (!open) break;
+    const close = withoutPrevious.indexOf(closeMarker, open.index + open[0].length);
+    if (close < 0) break;
+    // Also consume the leading whitespace the injector emitted before the tag.
+    let start = open.index;
+    while (start > 0 && /\s/.test(withoutPrevious[start - 1])) start -= 1;
+    withoutPrevious =
+      withoutPrevious.slice(0, start) + withoutPrevious.slice(close + closeMarker.length);
   }
   const scripts = jsonLd
     .map(

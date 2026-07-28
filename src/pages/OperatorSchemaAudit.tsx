@@ -157,6 +157,74 @@ export default function OperatorSchemaAudit() {
     return map;
   }, [data]);
 
+  const columnStats = useMemo(() => {
+    const rows = data?.columns ?? [];
+    const present = rows.filter((r) => r.exists).length;
+    return { present, total: rows.length, missing: rows.length - present };
+  }, [data]);
+
+  // ---- Automated scan ---------------------------------------------------
+  const scan = useMemo(() => {
+    const migByFile = new Map<string, MigrationRow>();
+    for (const m of data?.migrations ?? []) migByFile.set(m.filename, m);
+
+    const missingTables = (data?.tables ?? []).filter((t) => !t.exists);
+    const missingColumns = (data?.columns ?? []).filter((c) => !c.exists);
+    const missingTableSet = new Set(missingTables.map((t) => t.table));
+
+    interface Group {
+      filename: string;
+      migration: MigrationRow | null;
+      tables: Set<string>;
+      columns: Array<{ table: string; column: string; reason: string }>;
+    }
+    const groups = new Map<string, Group>();
+    const ensure = (filename: string): Group => {
+      let g = groups.get(filename);
+      if (!g) {
+        g = {
+          filename,
+          migration: migByFile.get(filename) ?? null,
+          tables: new Set(),
+          columns: [],
+        };
+        groups.set(filename, g);
+      }
+      return g;
+    };
+
+    for (const entry of MANIFEST_ENTRIES) {
+      if (missingTableSet.has(entry.table)) ensure(entry.migration).tables.add(entry.table);
+    }
+    for (const c of missingColumns) {
+      if (missingTableSet.has(c.table)) continue;
+      for (const entry of MANIFEST_ENTRIES) {
+        if (entry.table === c.table && entry.column === c.column) {
+          ensure(entry.migration).columns.push({ table: c.table, column: c.column, reason: entry.reason });
+        }
+      }
+    }
+
+    const orphanTables = missingTables
+      .filter((t) => !MANIFEST_ENTRIES.some((e) => e.table === t.table))
+      .map((t) => t.table);
+
+    return {
+      totalMissingTables: missingTables.length,
+      totalMissingColumns: missingColumns.length,
+      groups: Array.from(groups.values()).sort((a, b) => a.filename.localeCompare(b.filename)),
+      orphanTables,
+    };
+  }, [data]);
+
+  const openMigrationByFilename = useCallback(
+    (filename: string) => {
+      const row = (data?.migrations ?? []).find((m) => m.filename === filename);
+      setOpenMigration(row ?? { filename, version: null, applied: false });
+    },
+    [data],
+  );
+
   return (
     <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">

@@ -239,6 +239,21 @@ export default function OperatorSchemaAudit() {
     };
   }, [data]);
 
+  const rlsFindings = useMemo(
+    () => evaluateRlsAudit(data?.rls_audit ?? []),
+    [data],
+  );
+  const rlsFindingStats = useMemo(() => summarizeRlsFindings(rlsFindings), [rlsFindings]);
+  const rlsFindingsByTable = useMemo(() => {
+    const map = new Map<string, typeof rlsFindings>();
+    for (const f of rlsFindings) {
+      const list = map.get(f.table) ?? [];
+      list.push(f);
+      map.set(f.table, list);
+    }
+    return map;
+  }, [rlsFindings]);
+
   const openMigrationByFilename = useCallback(
     (filename: string) => {
       const row = (data?.migrations ?? []).find((m) => m.filename === filename);

@@ -31,6 +31,31 @@ interface Props {
   plantName?: string | null;
 }
 
+/**
+ * Format the entry timestamp for display. Falls back to the pre-computed
+ * label (or "Unknown time") when the ISO is missing or malformed —
+ * never leaks a raw ISO string into the badge.
+ */
+function formatEntryTimestamp(iso: string | null, fallback: string): string {
+  const fb = (fallback ?? "").trim();
+  const safeFallback = fb && fb !== iso ? fb : "Unknown time";
+  if (!iso) return safeFallback;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return safeFallback;
+  try {
+    return new Date(t).toLocaleString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return safeFallback;
+  }
+}
+
+
 function EntryRow({
   row,
   plantName,
@@ -49,7 +74,8 @@ function EntryRow({
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="capitalize" data-testid="plant-recent-activity-event-type">
-            {row.eventType}
+            {row.displayLabel ?? row.eventType}
+            {row.summarySuffix ? ` · ${row.summarySuffix}` : ""}
           </Badge>
           {row.isManualEntry ? (
             <Badge
@@ -62,9 +88,10 @@ function EntryRow({
             </Badge>
           ) : null}
           <span className="text-xs text-muted-foreground" data-testid="plant-recent-activity-timestamp">
-            {row.occurredAtLabel}
+            {formatEntryTimestamp(row.occurredAt, row.occurredAtLabel)}
           </span>
         </div>
+
         <div className="flex items-center gap-1">
           {row.hasPhoto ? (
             <Badge variant="outline" className="gap-1" data-testid="plant-recent-activity-photo-badge">

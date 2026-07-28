@@ -45,9 +45,19 @@ export interface NormalizedDiaryDetails {
     vendor?: string;
   };
   remindAt?: string;
+  /**
+   * Raw declared event-type string carried inside the diary_entries
+   * `details` jsonb (Quick Log companion rows stamp this — the envelope
+   * `event_type` column may be a wrapper like "quick_log" or "note").
+   * Preserved verbatim (lowercased/trimmed) so downstream identity
+   * resolvers can promote a canonical Quick Log type without re-parsing
+   * raw details. Not used by AI context.
+   */
+  declaredEventType?: string;
   /** Unknown but preserved keys (sanitized — no functions, no class instances). */
   extras?: DiaryEntryDetailsExtras;
 }
+
 
 export interface NormalizedDiaryEntry {
   id: string;
@@ -540,7 +550,13 @@ export function normalizeDiaryEntry(
     if (observations) details.observations = observations;
     if (sensorSnapshot) details.sensorSnapshot = sensorSnapshot;
     if (remindAt) details.remindAt = remindAt;
+    // Preserve the raw declared event-type inside details for downstream
+    // Quick Log identity resolution (envelope event_type may be "quick_log").
+    if (detailsEventTypeCandidate) {
+      details.declaredEventType = detailsEventTypeCandidate.toLowerCase().trim();
+    }
     if (extras) details.extras = extras;
+
   }
 
   const isValidForAiContext =

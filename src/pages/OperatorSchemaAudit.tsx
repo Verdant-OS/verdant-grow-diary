@@ -125,6 +125,12 @@ export default function OperatorSchemaAudit() {
     return { present, total: rows.length, missing: rows.length - present };
   }, [data]);
 
+  const tableExistence = useMemo(() => {
+    const map: Record<string, boolean> = {};
+    for (const row of data?.tables ?? []) map[row.table] = row.exists;
+    return map;
+  }, [data]);
+
   return (
     <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">

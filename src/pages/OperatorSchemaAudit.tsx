@@ -260,6 +260,15 @@ export default function OperatorSchemaAudit() {
           </div>
         </CardContent>
       </Card>
+
+      <SchemaAuditMigrationDrilldown
+        open={openMigration !== null}
+        onOpenChange={(o) => { if (!o) setOpenMigration(null); }}
+        filename={openMigration?.filename ?? null}
+        version={openMigration?.version ?? null}
+        applied={openMigration?.applied ?? false}
+        tableExistence={tableExistence}
+      />
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import SchemaAuditMigrationDrilldown from "@/components/SchemaAuditMigrationDrilldown";
 
-const filename = "20260619083000_add_soil_moisture_calibration_v1.sql";
+const filename = "20260728090000_production_schema_reconciliation.sql";
 
 describe("SchemaAuditMigrationDrilldown", () => {
   it("renders each expected column as present, missing, or unverified from parent evidence", () => {
@@ -12,7 +12,7 @@ describe("SchemaAuditMigrationDrilldown", () => {
         open
         onOpenChange={vi.fn()}
         filename={filename}
-        version="20260619083000"
+        version="20260728090000"
         applied
         matchKind="exact_version"
         snapshotReady={false}
@@ -41,7 +41,7 @@ describe("SchemaAuditMigrationDrilldown", () => {
         open
         onOpenChange={vi.fn()}
         filename={filename}
-        version="20260619083000"
+        version="20260728090000"
         applied={false}
         matchKind="ambiguous"
         snapshotReady={false}

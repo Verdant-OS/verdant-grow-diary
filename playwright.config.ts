@@ -67,11 +67,22 @@ export default defineConfig({
       // intercept all /auth/v1/** + /rest/v1/** traffic via page.route().
       // They must NOT use real saved auth state or the `setup` login flow, so
       // they require no E2E_TEST_EMAIL / E2E_TEST_PASSWORD secrets.
+      //
+      // The disposable-fixture specs are deliberately excluded: they are
+      // credentialed, authenticated-only checks that drive the real signed-in
+      // UI (see package.json — both run with `--project=chromium-authed`).
+      // `fixture-safety` is the write-safety fence for the Quick Log smoke and
+      // MUST hard-fail when fixture config is absent, so it is scoped out of
+      // the mocked lane rather than softened into a skip.
       name: "chromium-mocked",
       use: {
         ...devices["Desktop Chrome"],
       },
-      testIgnore: /auth\.setup\.ts/,
+      testIgnore: [
+        /auth\.setup\.ts/,
+        /fixture-safety\.spec\.ts/,
+        /fixture-bootstrap\.spec\.ts/,
+      ],
     },
   ],
 });

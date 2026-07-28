@@ -108,6 +108,283 @@ describe("check-supabase-migration-safety", () => {
     expect(r.err).toContain("PERMISSIVE_POLICY");
   });
 
+  it("clears a historical permissive finding after an exact DROP and safe recreation", () => {
+    const { scriptPath } = makeSandbox({
+      "20260101_bad.sql": `
+        CREATE POLICY "Anyone can submit feedback" ON public.customer_feedback
+          FOR INSERT TO anon, authenticated
+          WITH CHECK (true);
+      `,
+      "20260102_fixed.sql": `
+        DROP POLICY IF EXISTS "Anyone can submit feedback" ON public.customer_feedback;
+        CREATE POLICY "Public can submit bounded feedback" ON public.customer_feedback
+          FOR INSERT TO anon, authenticated
+          WITH CHECK (user_id IS NOT DISTINCT FROM (select auth.uid()));
+      `,
+    });
+
+    const r = run(scriptPath);
+    expect(r.code).toBe(0);
+    expect(r.err).not.toContain("PERMISSIVE_POLICY");
+  });
+
+  it("keeps a permissive finding when a later DROP targets a different table", () => {
+    const { scriptPath } = makeSandbox({
+      "20260101_bad.sql": `
+        CREATE POLICY "public_insert" ON public.customer_feedback
+          FOR INSERT TO anon
+          WITH CHECK (true);
+      `,
+      "20260102_wrong_drop.sql": `
+        DROP POLICY IF EXISTS "public_insert" ON public.contact_messages;
+      `,
+    });
+
+    const r = run(scriptPath);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("PERMISSIVE_POLICY");
+    expect(r.err).toContain("20260101_bad.sql");
+  });
+
+  it("keeps a permissive finding when a later DROP targets a different policy name", () => {
+    const { scriptPath } = makeSandbox({
+      "20260101_bad.sql": `
+        CREATE POLICY "public_insert" ON public.customer_feedback
+          FOR INSERT TO anon
+          WITH CHECK (true);
+      `,
+      "20260102_wrong_drop.sql": `
+        DROP POLICY IF EXISTS "other_policy" ON public.customer_feedback;
+      `,
+    });
+
+    const r = run(scriptPath);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("PERMISSIVE_POLICY");
+  });
+
+  it("does not treat a commented-out or string-literal DROP as effective DDL", () => {
+    const { scriptPath } = makeSandbox({
+      "20260101_bad.sql": `
+        CREATE POLICY "public_insert" ON public.customer_feedback
+          FOR INSERT TO anon
+          WITH CHECK (true);
+      `,
+      "20260102_not_a_drop.sql": `
+        -- DROP POLICY IF EXISTS "public_insert" ON public.customer_feedback;
+        SELECT 'DROP POLICY IF EXISTS "public_insert" ON public.customer_feedback';
+      `,
+    });
+
+    const r = run(scriptPath);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("PERMISSIVE_POLICY");
+  });
+
+  it("keeps qualified and unqualified policy targets distinct", () => {
+    const { scriptPath } = makeSandbox({
+      "20260101_bad.sql": `
+        CREATE POLICY "public_insert" ON public.customer_feedback
+          FOR INSERT TO anon
+          WITH CHECK (true);
+      `,
+      "20260102_ambiguous_drop.sql": `
+        DROP POLICY IF EXISTS "public_insert" ON customer_feedback;
+      `,
+    });
+
+    const r = run(scriptPath);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("PERMISSIVE_POLICY");
+  });
+
+  it("reports only an unrelated active permissive policy after an exact repair", () => {
+    const { scriptPath } = makeSandbox({
+      "20260101_bad.sql": `
+        CREATE POLICY "fixed_later" ON public.customer_feedback
+          FOR INSERT TO anon
+          WITH CHECK (true);
+      `,
+      "20260102_fixed.sql": `
+        DROP POLICY IF EXISTS "fixed_later" ON public.customer_feedback;
+        CREATE POLICY "fixed_later" ON public.customer_feedback
+          FOR INSERT TO anon
+          WITH CHECK (user_id IS NULL);
+      `,
+      "20260103_still_bad.sql": `
+        CREATE POLICY "still_bad" ON public.contact_messages
+          FOR INSERT TO anon
+          WITH CHECK (true);
+      `,
+    });
+
+    const r = run(scriptPath, ["--json"]);
+    expect(r.code).toBe(1);
+    const report = JSON.parse(r.out) as {
+      new: Array<{ migration: string; subject: string }>;
+    };
+    expect(report.new).toHaveLength(1);
+    expect(report.new[0]?.migration).toBe("20260103_still_bad.sql");
+    expect(report.new[0]?.subject).toContain("still_bad");
+  });
+
+  it("matches quoted lowercase identifiers to their unquoted PostgreSQL form", () => {
+    const { scriptPath } = makeSandbox({
+      "20260101_bad.sql": `
+        CREATE POLICY "public_insert" ON public.customer_feedback
+          FOR INSERT TO anon
+          WITH CHECK (true);
+      `,
+      "20260102_exact_drop.sql": `
+        DROP POLICY IF EXISTS public_insert ON "public"."customer_feedback";
+      `,
+    });
+
+    const r = run(scriptPath);
+    expect(r.code).toBe(0);
+  });
+
+  it("preserves quoted identifier case when matching policy targets", () => {
+    const { scriptPath } = makeSandbox({
+      "20260101_bad.sql": `
+        CREATE POLICY "Public_Insert" ON public.customer_feedback
+          FOR INSERT TO anon
+          WITH CHECK (true);
+      `,
+      "20260102_wrong_case_drop.sql": `
+        DROP POLICY IF EXISTS public_insert ON public.customer_feedback;
+      `,
+    });
+
+    const r = run(scriptPath);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("PERMISSIVE_POLICY");
+  });
+
+  it("flags a policy that becomes permissive again after a safe replacement", () => {
+    const { scriptPath } = makeSandbox({
+      "20260101_safe.sql": `
+        CREATE POLICY "public_insert" ON public.customer_feedback
+          FOR INSERT TO anon
+          WITH CHECK (user_id IS NULL);
+      `,
+      "20260102_regression.sql": `
+        DROP POLICY IF EXISTS "public_insert" ON public.customer_feedback;
+        CREATE POLICY "public_insert" ON public.customer_feedback
+          FOR INSERT TO anon
+          WITH CHECK (true);
+      `,
+    });
+
+    const r = run(scriptPath);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("PERMISSIVE_POLICY");
+    expect(r.err).toContain("20260102_regression.sql");
+  });
+
+  it("does not hide a same-line permissive recreation after an exact DROP", () => {
+    const { scriptPath } = makeSandbox({
+      "20260101_bad.sql": `
+        CREATE POLICY "public_insert" ON public.customer_feedback
+          FOR INSERT TO anon
+          WITH CHECK (true);
+      `,
+      "20260102_regression.sql": `
+        DROP POLICY IF EXISTS "public_insert" ON public.customer_feedback; CREATE POLICY "public_insert" ON public.customer_feedback FOR INSERT TO anon WITH CHECK (true);
+      `,
+    });
+
+    const r = run(scriptPath, ["--json"]);
+    expect(r.code).toBe(1);
+    const report = JSON.parse(r.out) as {
+      new: Array<{ migration: string; subject: string }>;
+    };
+    expect(report.new).toHaveLength(1);
+    expect(report.new[0]?.migration).toBe("20260102_regression.sql");
+  });
+
+  it("flags an ALTER POLICY that makes a safe write policy permissive", () => {
+    const { scriptPath } = makeSandbox({
+      "20260101_safe.sql": `
+        CREATE POLICY "public_insert" ON public.customer_feedback
+          FOR INSERT TO anon
+          WITH CHECK (user_id IS NULL);
+      `,
+      "20260102_regression.sql": `
+        ALTER POLICY "public_insert" ON public.customer_feedback
+          WITH CHECK (true);
+      `,
+    });
+
+    const r = run(scriptPath, ["--json"]);
+    expect(r.code).toBe(1);
+    const report = JSON.parse(r.out) as {
+      new: Array<{ migration: string; subject: string }>;
+    };
+    expect(report.new).toHaveLength(1);
+    expect(report.new[0]?.migration).toBe("20260102_regression.sql");
+    expect(report.new[0]?.subject).toContain("public_insert");
+  });
+
+  it("flags direct TRUE through nested parentheses and SQL comments", () => {
+    const { scriptPath } = makeSandbox({
+      "20260101_bad.sql": `
+        CREATE POLICY "public_insert" ON public.customer_feedback
+          FOR INSERT TO anon
+          WITH CHECK (
+            (
+              /* formatting comment */
+              (TRUE)
+            )
+          );
+      `,
+    });
+
+    const r = run(scriptPath);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("PERMISSIVE_POLICY");
+  });
+
+  it("clears a permissive policy after a later safe ALTER POLICY", () => {
+    const { scriptPath } = makeSandbox({
+      "20260101_bad.sql": `
+        CREATE POLICY "public_insert" ON public.customer_feedback
+          FOR INSERT TO anon
+          WITH CHECK (true);
+      `,
+      "20260102_fixed.sql": `
+        ALTER POLICY "public_insert" ON public.customer_feedback
+          WITH CHECK (user_id IS NOT DISTINCT FROM (select auth.uid()));
+      `,
+    });
+
+    const r = run(scriptPath);
+    expect(r.code).toBe(0);
+    expect(r.err).not.toContain("PERMISSIVE_POLICY");
+  });
+
+  it("does not flag TRUE inside a condition, comment, or string literal", () => {
+    const { scriptPath } = makeSandbox({
+      "20260101_safe.sql": `
+        CREATE POLICY "conditional_insert" ON public.customer_feedback
+          FOR INSERT TO anon
+          WITH CHECK (
+            enabled = true
+            AND note <> 'WITH CHECK (true)'
+            /* WITH CHECK (true) is intentionally not the policy expression. */
+          );
+        CREATE POLICY "conditional_update" ON public.customer_feedback
+          FOR UPDATE TO authenticated
+          USING (true AND user_id IS NOT DISTINCT FROM (select auth.uid()))
+          WITH CHECK (approved = true);
+      `,
+    });
+
+    const r = run(scriptPath);
+    expect(r.code).toBe(0);
+    expect(r.err).not.toContain("PERMISSIVE_POLICY");
+  });
+
   it("fails when a NEW public table is created without ENABLE ROW LEVEL SECURITY", () => {
     const { scriptPath, dir } = makeSandbox({
       "20260101_ok.sql": `-- empty`,

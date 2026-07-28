@@ -133,6 +133,13 @@ jobs:
           set -o pipefail
           bun run test:subscriber-interest-db-security 2>&1 | tee subscriber-interest-db.log
 
+      - name: Public support forms RLS
+        if: env.ENABLED == 'true'
+        id: public-support-forms-db
+        run: |
+          set -o pipefail
+          bun run test:public-support-forms-db-security 2>&1 | tee public-support-forms-db.log
+
       - name: AI Doctor sessions RLS
         if: env.ENABLED == 'true'
         id: ai-doctor-sessions-rls
@@ -163,6 +170,7 @@ jobs:
             profiles-db.log
             customer-mode-db.log
             subscriber-interest-db.log
+            public-support-forms-db.log
             ai-doctor-sessions-rls.log
             security-db-local.log
             test-results/**
@@ -199,6 +207,7 @@ jobs:
               echo "- profiles DB security (\`test:profiles-db-security\`)"
               echo "- customer mode isolation (\`test:customer-mode-db-security\`)"
               echo "- subscriber interest RLS (\`test:subscriber-interest-db-security\`)"
+              echo "- public support forms RLS (\`test:public-support-forms-db-security\`)"
               echo "- AI Doctor sessions RLS (\`test:ai-doctor-sessions-rls\`)"
               echo "- VPD calibration provenance RLS (via aggregate lane)"
               echo "- aggregate lane (\`test:security-db-local\`)"
@@ -207,7 +216,7 @@ jobs:
               echo ""
               echo "Artifact paths (when uploaded):"
               echo "- \`migration-replay-compatibility.json\`, \`local-supabase-replay-report.json\`"
-              echo "- \`profiles-db.log\`, \`customer-mode-db.log\`, \`subscriber-interest-db.log\`, \`ai-doctor-sessions-rls.log\`, \`security-db-local.log\`"
+              echo "- \`profiles-db.log\`, \`customer-mode-db.log\`, \`subscriber-interest-db.log\`, \`public-support-forms-db.log\`, \`ai-doctor-sessions-rls.log\`, \`security-db-local.log\`"
               echo "- \`supabase-start.log\`, \`supabase-db-reset.log\` (sanitized)"
               echo "- \`test-results/\`, \`artifacts/security-db/\` (if produced)"
               echo ""

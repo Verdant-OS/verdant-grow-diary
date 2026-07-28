@@ -12,14 +12,11 @@
     <meta name="google-site-verification" content="xPFb9yyxbDpIFrPhumD9-10JIkCO_gUlu09ZsF2nevo" />
 
     <!-- Favicon / app icons.
-         Primary favicon is a tiny inline-simple SVG (leaf + pen nib), served
-         instead of the 2.38 MB brand PNG that was previously fetched on every
-         route. All current browsers support SVG favicons.
-         TODO(design): apple-touch-icon still points at the full logo PNG —
-         iOS ignores SVG here. Replace with a purpose-built 180x180 PNG. It is
-         only fetched by Safari when adding to the home screen, not per page. -->
+         Primary favicon is a tiny inline-simple SVG (leaf + pen nib). The
+         Apple touch icon is a purpose-built 180px raster so browser icon
+         discovery never downloads the 2.38 MB print-quality source logo. -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/brand/verdant-logo.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/brand/verdant-logo-180.png" />
     <link rel="manifest" href="/site.webmanifest" />
 
     <!-- Google tag (gtag.js) -->

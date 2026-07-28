@@ -2,8 +2,8 @@
  * Tests for the Verdant brand logo integration.
  *
  * Verifies:
- *   - BrandLogo component exists and references /brand/verdant-logo.png
- *   - Logo asset exists in public/brand
+ *   - BrandLogo uses bounded responsive assets instead of the 2.38 MB source
+ *   - Every responsive logo asset exists and stays within its transfer budget
  *   - BrandLogo exposes size variants, showText, className, and accessible alt
  *   - Landing, AppShell, AppSidebar, and Auth pages render BrandLogo
  *   - Landing page still does not query private tables
@@ -17,6 +17,12 @@ const root = resolve(__dirname, "..", "..");
 const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 
 const LOGO_PATH = "public/brand/verdant-logo.png";
+const RESPONSIVE_LOGO_PATHS = [
+  "public/brand/verdant-logo-32.webp",
+  "public/brand/verdant-logo-64.webp",
+  "public/brand/verdant-logo-128.webp",
+  "public/brand/verdant-logo-256.webp",
+] as const;
 const BRAND = read("src/components/BrandLogo.tsx");
 const LANDING = read("src/pages/Landing.tsx");
 const SHELL = read("src/components/AppShell.tsx");
@@ -29,11 +35,24 @@ describe("Verdant logo asset", () => {
     expect(existsSync(abs)).toBe(true);
     expect(statSync(abs).size).toBeGreaterThan(1000);
   });
+
+  it("ships bounded responsive WebP variants for UI rendering", () => {
+    for (const relativePath of RESPONSIVE_LOGO_PATHS) {
+      const abs = resolve(root, relativePath);
+      expect(existsSync(abs), `${relativePath} should exist`).toBe(true);
+      expect(statSync(abs).size, `${relativePath} should stay below 20 KiB`).toBeLessThan(
+        20 * 1024,
+      );
+    }
+  });
 });
 
 describe("BrandLogo component", () => {
-  it("references the public logo path", () => {
-    expect(BRAND).toMatch(/\/brand\/verdant-logo\.png/);
+  it("references responsive UI assets and never the full source PNG", () => {
+    expect(BRAND).toMatch(/\/brand\/verdant-logo-128\.webp/);
+    expect(BRAND).toMatch(/srcSet=\{LOGO_SRC_SET\}/);
+    expect(BRAND).toMatch(/sizes=\{`\$\{px\}px`\}/);
+    expect(BRAND).not.toMatch(/["']\/brand\/verdant-logo\.png["']/);
   });
 
   it("has accessible alt text", () => {

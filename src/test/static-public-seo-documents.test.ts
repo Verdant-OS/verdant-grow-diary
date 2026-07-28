@@ -46,9 +46,7 @@ describe("static public SEO documents", () => {
     for (const document of STATIC_PUBLIC_SEO_DOCUMENTS) {
       expect(outputPaths.has(document.fileName)).toBe(false);
       outputPaths.add(document.fileName);
-      expect(document.fileName).toBe(
-        document.path === "/founder" ? "founder.html" : `${document.path.slice(1)}.html`,
-      );
+      expect(document.fileName).toBe(`${document.path.slice(1)}/index.html`);
       expect(document.metadata.url).toBe(`${VERDANT_SITE_ORIGIN}${document.path}`);
       expect(document.metadata.url).not.toMatch(/[?#]/);
       expect(document.metadata.title).toBeTruthy();
@@ -60,18 +58,24 @@ describe("static public SEO documents", () => {
     const cultivarCanonical = STATIC_PUBLIC_SEO_DOCUMENTS.find(
       (document) => document.path === "/cultivars",
     )?.metadata.url;
-    for (const filterVariant of ["?q=oreoz", "?difficulty=Advanced", "?q=oreoz&difficulty=Advanced"]) {
+    for (const filterVariant of [
+      "?q=oreoz",
+      "?difficulty=Advanced",
+      "?q=oreoz&difficulty=Advanced",
+    ]) {
       const requestUrl = new URL(`/cultivars${filterVariant}`, VERDANT_SITE_ORIGIN);
       expect(cultivarCanonical).toBe(`${VERDANT_SITE_ORIGIN}${requestUrl.pathname}`);
       expect(new URL(cultivarCanonical ?? "", VERDANT_SITE_ORIGIN).search).toBe("");
     }
   });
 
-  it("serves static public documents with clean URLs before the SPA fallback and redirects legacy strain aliases", () => {
+  it("uses directory-local documents that filesystem-first hosts serve before the SPA fallback", () => {
+    for (const document of STATIC_PUBLIC_SEO_DOCUMENTS) {
+      expect(document.fileName).toBe(`${document.path.slice(1)}/index.html`);
+    }
+
     expect(VERCEL.cleanUrls).toBe(true);
-    const spaFallbackIndex = VERCEL.rewrites?.findIndex(
-      (rewrite) => rewrite.destination === "/",
-    );
+    const spaFallbackIndex = VERCEL.rewrites?.findIndex((rewrite) => rewrite.destination === "/");
     expect(spaFallbackIndex).toBe(0);
 
     expect(VERCEL.redirects).toEqual(

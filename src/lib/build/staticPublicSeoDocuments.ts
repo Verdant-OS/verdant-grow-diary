@@ -1,10 +1,12 @@
 /**
  * Static metadata documents for public acquisition routes.
  *
- * Vite emits these as route-local index.html files. Static hosts serve them
- * before the SPA fallback, which lets non-JavaScript crawlers receive the
- * same title, canonical, robots, OpenGraph, and Twitter metadata as the app.
- * The interactive React application still boots from the same asset shell.
+ * Vite emits these as directory-local index.html files. Filesystem-first
+ * static hosts (including Lovable's documented SPA setup) resolve a clean
+ * route such as `/privacy` to `privacy/index.html` before falling back to the
+ * root SPA document. This lets non-JavaScript crawlers receive the same title,
+ * canonical, robots, OpenGraph, and Twitter metadata as the app. The
+ * interactive React application still boots from the same asset shell.
  */
 
 import { VERDANT_CULTIVARS } from "../../constants/verdantCultivars";
@@ -18,7 +20,7 @@ const DEFAULT_OG_IMAGE = `${VERDANT_SITE_ORIGIN}/brand/verdant-logo.png`;
 export interface StaticPublicSeoDocument {
   /** Public pathname without query parameters. */
   readonly path: string;
-  /** Vite output path. Vercel clean URLs map this static file back to `path`. */
+  /** Vite output path served at `path` by filesystem-first static hosts. */
   readonly fileName: string;
   readonly metadata: StaticSocialRouteMetadata;
 }
@@ -27,7 +29,7 @@ function routeFileName(path: string): string {
   if (!path.startsWith("/") || path === "/" || path.includes("?") || path.includes("#")) {
     throw new Error(`Static SEO route must be a non-root clean path: ${path}`);
   }
-  return `${path.slice(1)}.html`;
+  return `${path.slice(1)}/index.html`;
 }
 
 function publicDocument(
@@ -180,7 +182,7 @@ const CULTIVAR_DOCUMENTS = VERDANT_CULTIVARS.map((cultivar) =>
 export const STATIC_PUBLIC_SEO_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = Object.freeze([
   {
     path: "/founder",
-    fileName: "founder.html",
+    fileName: routeFileName("/founder"),
     metadata: FOUNDER_SOCIAL_META,
   },
   ...CORE_ACQUISITION_DOCUMENTS,

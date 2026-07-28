@@ -1,7 +1,8 @@
 /**
  * AccountPlanBadge — pure presenter for the resolved plan.
  *
- * Renders ONE of: Free / Pro Monthly / Pro Annual / Founder Lifetime.
+ * Renders ONE of:
+ * Free / Pro Monthly / Pro Annual / Craft Monthly / Craft Annual / Founder Lifetime.
  * NEVER renders raw Paddle customer/subscription/transaction/event IDs.
  */
 import type { ResolvedEntitlement } from "@/lib/entitlements";
@@ -10,6 +11,8 @@ const LABELS = {
   free: "Free",
   pro_monthly: "Pro Monthly",
   pro_annual: "Pro Annual",
+  craft_monthly: "Craft Monthly",
+  craft_annual: "Craft Annual",
   founder_lifetime: "Founder Lifetime",
 } as const;
 

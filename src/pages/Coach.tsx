@@ -30,6 +30,7 @@ import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
 import AiCreditServiceDegradedNotice from "@/components/AiCreditServiceDegradedNotice";
 import { adaptCreditedAiResponse } from "@/lib/aiCreditedResponseAdapter";
 import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";
+import type { AiCreditRemainingInput } from "@/lib/aiCreditRemainingBadgeViewModel";
 import { buildLegacyAiSensorEvidence } from "@/lib/growSensorEvidenceRules";
 import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
 import {
@@ -69,12 +70,7 @@ interface CoachResponse {
   empty?: boolean;
   error?: string;
   /** Post-success credit envelope (S3.1 Coach parity). Optional + defensive. */
-  credit?: {
-    remaining?: number | null;
-    scope?: string | null;
-    scope_limit?: number | null;
-    period_key?: string | null;
-  };
+  credit?: AiCreditRemainingInput;
 }
 
 export default function Coach() {
@@ -362,7 +358,7 @@ export default function Coach() {
       clearPendingRequest();
       const d = outcome.result as CoachResponse | null;
       if (d?.error) throw new Error(d.error);
-      setResult(d ?? null);
+      setResult(d ? { ...d, credit: outcome.credit } : null);
 
       // Persist a read-only snapshot of the completed AI Doctor response.
       // SECURITY: never include user_id (DB default auth.uid()). Only the

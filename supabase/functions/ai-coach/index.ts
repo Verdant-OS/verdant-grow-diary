@@ -720,6 +720,8 @@ Rules for diagnosis (structured view, approval-first):
       remaining: spendObj.remaining,
       scope: spendObj.scope,
       scope_limit: spendObj.scope_limit,
+      plan_id: spendObj.plan_id,
+      pack_balance: spendObj.pack_balance,
     });
   } catch {
     console.log("ai-coach status=unexpected");

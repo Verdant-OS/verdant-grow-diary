@@ -45,6 +45,38 @@ describe("buildAiDoctorPostValueUpgradeViewModel", () => {
   });
 
   it.each([
+    ["positive", 1],
+    ["larger positive", 20],
+    ["negative", -1],
+    ["fractional", 0.5],
+    ["not finite", Number.NaN],
+    ["string", "1"],
+  ])("hides when pack_balance is %s", (_label, packBalance) => {
+    expect(
+      buildAiDoctorPostValueUpgradeViewModel({
+        credit: { ...FINAL_FREE_CREDIT, pack_balance: packBalance } as never,
+        viewerEntitlement: FREE,
+        entitlementLoading: false,
+        durableSessionSaved: true,
+      }),
+    ).toEqual({ visible: false });
+  });
+
+  it.each([
+    ["null", null],
+    ["zero", 0],
+  ])("preserves the handoff when pack_balance is %s", (_label, packBalance) => {
+    expect(
+      buildAiDoctorPostValueUpgradeViewModel({
+        credit: { ...FINAL_FREE_CREDIT, pack_balance: packBalance },
+        viewerEntitlement: FREE,
+        entitlementLoading: false,
+        durableSessionSaved: true,
+      }).visible,
+    ).toBe(true);
+  });
+
+  it.each([
     ["one credit remains", { ...FINAL_FREE_CREDIT, remaining: 1 }],
     ["two credits remain", { ...FINAL_FREE_CREDIT, remaining: 2 }],
     ["monthly scope", { ...FINAL_FREE_CREDIT, scope: "per_month" }],

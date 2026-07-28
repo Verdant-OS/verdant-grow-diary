@@ -54,7 +54,11 @@ function isExactFreePostValueCredit(
     Number.isInteger(credit.remaining) &&
     credit.remaining === 0 &&
     Number.isInteger(credit.scope_limit) &&
-    credit.scope_limit === AI_DOCTOR_FREE_CREDITS_PER_GROW
+    credit.scope_limit === AI_DOCTOR_FREE_CREDITS_PER_GROW &&
+    // Older success envelopes omitted pack_balance. Preserve that rollout
+    // compatibility, but only a confirmed numeric zero may opt a present
+    // balance into an upsell. Positive or malformed nonzero values fail closed.
+    (credit.pack_balance == null || credit.pack_balance === 0)
   );
 }
 

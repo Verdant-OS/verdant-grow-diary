@@ -24,6 +24,15 @@ describe("AI credit remaining badge — Coach surface (S3.1)", () => {
     expect(vm.label).not.toMatch(/AI Doctor credits/i);
   });
 
+  it("view model: coach per_grow label includes portable pack balance", () => {
+    const vm = buildAiCreditRemainingBadgeViewModel(
+      { remaining: 0, scope: "per_grow", scope_limit: 3, pack_balance: 7 },
+      { surface: "coach" },
+    );
+    expect(vm.label).toBe("0 of 3 AI Coach credits left for this grow · 7 pack credits available");
+    expect(vm.packBalance).toBe(7);
+  });
+
   it("view model: coach per_month label says 'AI Coach credits left this month'", () => {
     const vm = buildAiCreditRemainingBadgeViewModel(
       { remaining: 97, scope: "per_month", scope_limit: 100 },
@@ -44,10 +53,9 @@ describe("AI credit remaining badge — Coach surface (S3.1)", () => {
 
   it("view model: missing remaining → hidden (both surfaces)", () => {
     expect(
-      buildAiCreditRemainingBadgeViewModel(
-        { scope: "per_grow", scope_limit: 3 } as never,
-        { surface: "coach" },
-      ).visible,
+      buildAiCreditRemainingBadgeViewModel({ scope: "per_grow", scope_limit: 3 } as never, {
+        surface: "coach",
+      }).visible,
     ).toBe(false);
   });
 
@@ -73,18 +81,13 @@ describe("AI credit remaining badge — Coach surface (S3.1)", () => {
   });
 
   it("presenter: hides on null credit", () => {
-    const { container } = render(
-      <AiCreditRemainingBadge credit={null} surface="coach" />,
-    );
+    const { container } = render(<AiCreditRemainingBadge credit={null} surface="coach" />);
     expect(container.firstChild).toBeNull();
   });
 
   it("presenter: hides on replayed-only credit (no remaining)", () => {
     const { container } = render(
-      <AiCreditRemainingBadge
-        credit={{ replayed: true } as never}
-        surface="coach"
-      />,
+      <AiCreditRemainingBadge credit={{ replayed: true } as never} surface="coach" />,
     );
     expect(container.firstChild).toBeNull();
   });

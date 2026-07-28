@@ -29,6 +29,7 @@ describe("adaptCreditedAiResponse — success credit passthrough (S3.1)", () => 
         scope: "per_month",
         scope_limit: 100,
         plan_id: "pro_monthly",
+        pack_balance: 49,
       },
     });
     expect(out.ok).toBe(true);
@@ -38,6 +39,7 @@ describe("adaptCreditedAiResponse — success credit passthrough (S3.1)", () => 
         scope: "per_month",
         scope_limit: 100,
         plan_id: "pro_monthly",
+        pack_balance: 49,
       });
     }
   });

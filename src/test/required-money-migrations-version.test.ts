@@ -27,6 +27,12 @@ describe("migrationVersion()", () => {
     );
   });
 
+  it("requires the canonical subscription-authority repair in every deploy target", () => {
+    expect(REQUIRED_MONEY_MIGRATIONS).toContain(
+      "20260728050000_canonical_subscription_authority_reassert.sql",
+    );
+  });
+
   it("extracts the 14-digit prefix from a well-formed filename", () => {
     expect(migrationVersion("20260721103000_ai_credit_grants.sql")).toBe(
       "20260721103000",
@@ -252,4 +258,3 @@ describe("applied-check comparison — partial-file corruption", () => {
   });
 
 });
-

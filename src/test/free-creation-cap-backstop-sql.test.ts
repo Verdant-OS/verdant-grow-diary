@@ -3,18 +3,28 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const ROOT = resolve(__dirname, "../..");
-const MIGRATION_RELATIVE = "supabase/migrations/20260725234500_free_creation_cap_backstop.sql";
+const FOUNDATION_RELATIVE = "supabase/migrations/20260725234500_free_creation_cap_backstop.sql";
+const MIGRATION_RELATIVE =
+  "supabase/migrations/20260728050000_canonical_subscription_authority_reassert.sql";
 const HARNESS_RELATIVE = "scripts/run-free-creation-caps-rls-harness.ts";
+const FOUNDATION_PATH = resolve(ROOT, FOUNDATION_RELATIVE);
 const MIGRATION_PATH = resolve(ROOT, MIGRATION_RELATIVE);
 const HARNESS_PATH = resolve(ROOT, HARNESS_RELATIVE);
 
+const FOUNDATION_SQL = existsSync(FOUNDATION_PATH) ? readFileSync(FOUNDATION_PATH, "utf8") : "";
 const SQL = existsSync(MIGRATION_PATH) ? readFileSync(MIGRATION_PATH, "utf8") : "";
 const HARNESS = existsSync(HARNESS_PATH) ? readFileSync(HARNESS_PATH, "utf8") : "";
 const NORMALIZED_SQL = SQL.replace(/\s+/g, " ").toLowerCase();
 const EXECUTABLE_SQL = SQL.replace(/--.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+const FUNCTION_SQL = EXECUTABLE_SQL.slice(
+  EXECUTABLE_SQL.indexOf("CREATE OR REPLACE FUNCTION public.enforce_free_creation_caps()"),
+  EXECUTABLE_SQL.indexOf("$function$;") + "$function$;".length,
+);
+const NORMALIZED_FUNCTION = FUNCTION_SQL.replace(/\s+/g, " ").toLowerCase();
+const FOUNDATION_NORMALIZED = FOUNDATION_SQL.replace(/\s+/g, " ").toLowerCase();
 
 describe("server-authoritative Free grow/tent creation caps", () => {
-  it("ships as one new additive migration", () => {
+  it("ships as a forward-only canonical-authority repair migration", () => {
     expect(existsSync(MIGRATION_PATH), MIGRATION_RELATIVE).toBe(true);
     expect(SQL).toContain("CREATE OR REPLACE FUNCTION public.enforce_free_creation_caps()");
   });
@@ -43,7 +53,7 @@ describe("server-authoritative Free grow/tent creation caps", () => {
     const archivedRowShortcutIndex = NORMALIZED_SQL.indexOf(
       "new.is_archived is distinct from false",
     );
-    const firstBillingLookupIndex = NORMALIZED_SQL.indexOf("from public.billing_subscriptions");
+    const firstBillingLookupIndex = NORMALIZED_SQL.indexOf("from public.subscriptions");
     expect(ownerMismatchIndex).toBeGreaterThanOrEqual(0);
     expect(archivedRowShortcutIndex).toBeGreaterThan(ownerMismatchIndex);
     expect(firstBillingLookupIndex).toBeGreaterThan(ownerMismatchIndex);
@@ -53,7 +63,6 @@ describe("server-authoritative Free grow/tent creation caps", () => {
     expect(NORMALIZED_SQL).toMatch(
       /hashtextextended\('verdant:free-creation-cap:'\s*\|\|\s*v_owner_id::text,\s*0\)/,
     );
-    expect(NORMALIZED_SQL).toContain("bs.user_id = v_owner_id");
     expect(NORMALIZED_SQL).toContain("s.user_id = v_owner_id");
     expect(NORMALIZED_SQL).toMatch(
       /from public\.grows[\s\S]*user_id = v_owner_id[\s\S]*is_archived = false/,
@@ -62,7 +71,7 @@ describe("server-authoritative Free grow/tent creation caps", () => {
       /from public\.tents[\s\S]*user_id = v_owner_id[\s\S]*is_archived = false/,
     );
     expect(EXECUTABLE_SQL).not.toMatch(
-      /(?:bs|s)\.user_id\s*=\s*new\.user_id|user_id\s*=\s*new\.user_id[\s\S]*is_archived\s*=\s*false/i,
+      /s\.user_id\s*=\s*new\.user_id|user_id\s*=\s*new\.user_id[\s\S]*is_archived\s*=\s*false/i,
     );
   });
 
@@ -76,10 +85,10 @@ describe("server-authoritative Free grow/tent creation caps", () => {
     );
   });
 
-  it("derives paid authority from both server-owned billing lanes, never the profile XP column", () => {
-    expect(NORMALIZED_SQL).toContain("from public.billing_subscriptions");
+  it("derives paid authority only from canonical subscriptions, never the legacy audit lane", () => {
     expect(NORMALIZED_SQL).toContain("from public.subscriptions");
     expect(NORMALIZED_SQL).toContain("s.environment = 'live'");
+    expect(EXECUTABLE_SQL).not.toMatch(/from\s+public\.billing_subscriptions/i);
     expect(EXECUTABLE_SQL).not.toMatch(/profiles\s*\.\s*tier|from\s+public\.profiles/i);
   });
 
@@ -118,14 +127,14 @@ describe("server-authoritative Free grow/tent creation caps", () => {
   });
 
   it("mounts the backstop on both direct PostgREST write surfaces", () => {
-    expect(NORMALIZED_SQL).toMatch(
+    expect(FOUNDATION_NORMALIZED).toMatch(
       /create trigger enforce_free_creation_cap_grows[\s\S]*before insert or update of is_archived, user_id on public\.grows/,
     );
-    expect(NORMALIZED_SQL).toMatch(
+    expect(FOUNDATION_NORMALIZED).toMatch(
       /create trigger enforce_free_creation_cap_tents[\s\S]*before insert or update of is_archived, user_id on public\.tents/,
     );
     expect(
-      NORMALIZED_SQL.match(/execute function public\.enforce_free_creation_caps\(\)/g),
+      FOUNDATION_NORMALIZED.match(/execute function public\.enforce_free_creation_caps\(\)/g),
     ).toHaveLength(2);
   });
 
@@ -137,10 +146,12 @@ describe("server-authoritative Free grow/tent creation caps", () => {
     expect(EXECUTABLE_SQL).not.toMatch(/profiles\s*\.\s*(tier|role)/i);
   });
 
-  it("preserves existing over-limit rows and existing RLS/policy posture", () => {
-    expect(NORMALIZED_SQL).not.toMatch(/\b(update|delete from|truncate)\s+public\.(grows|tents)\b/);
-    expect(NORMALIZED_SQL).not.toMatch(/create\s+unique\s+index/);
-    expect(NORMALIZED_SQL).not.toMatch(
+  it("preserves existing over-limit rows and existing grow/tent RLS posture", () => {
+    expect(NORMALIZED_FUNCTION).not.toMatch(
+      /\b(update|delete from|truncate)\s+public\.(grows|tents)\b/,
+    );
+    expect(NORMALIZED_FUNCTION).not.toMatch(/create\s+unique\s+index/);
+    expect(NORMALIZED_FUNCTION).not.toMatch(
       /\b(create|alter|drop)\s+policy\b|disable\s+row\s+level\s+security/,
     );
   });
@@ -170,7 +181,8 @@ describe("Free creation-cap runtime harness contract", () => {
       "Free second active tent is denied",
       "Free tent archive-to-active transition is denied",
       "Free bulk tent insert cannot create two active rows",
-      "BYO Pro can create multiple active grows and tents",
+      "Legacy-only Pro remains capped at one active grow and tent",
+      "Lovable Pro can create multiple active grows and tents",
       "Lovable Founder can create multiple active grows and tents",
       "Lovable Craft can create multiple active grows and tents",
       "cross-user grow spoof is denied identically for paid and Free targets",

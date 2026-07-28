@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { BillingSubscriptionRow, LovableSubscriptionRow, PlanId } from "@/lib/entitlements";
+import type { LovableSubscriptionRow, PlanId } from "@/lib/entitlements";
 import { requireLiveSensorEntitlement } from "../../supabase/functions/_shared/liveSensorEntitlementGate.ts";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -30,36 +30,19 @@ function row(
   };
 }
 
-function billingRow(overrides: Partial<BillingSubscriptionRow> = {}): BillingSubscriptionRow {
-  return {
-    id: "33333333-3333-4333-8333-333333333333",
-    user_id: USER_ID,
-    plan_id: "pro_monthly",
-    status: "active",
-    provider: "paddle",
-    provider_customer_id: null,
-    provider_subscription_id: "sub_byo_sensor",
-    current_period_end: FUTURE,
-    cancel_at_period_end: false,
-    founder_number: null,
-    created_at: "2026-07-25T00:00:00.000Z",
-    updated_at: "2026-07-25T00:00:00.000Z",
-    ...overrides,
-  };
-}
-
 interface FakeState {
   rows: LovableSubscriptionRow[];
   error?: unknown;
-  billingRows?: BillingSubscriptionRow[];
-  billingError?: unknown;
+  errorByEnvironment?: Partial<Record<"live" | "sandbox", unknown>>;
   filters: Array<{ column: string; value: string }>;
+  tableReads?: string[];
 }
 
 function fakeClient(state: FakeState) {
   return {
     from(table: string) {
-      expect(["billing_subscriptions", "subscriptions"]).toContain(table);
+      state.tableReads?.push(table);
+      expect(table).toBe("subscriptions");
       const filters: Array<{ column: string; value: string }> = [];
       let max = Infinity;
       const builder = {
@@ -79,14 +62,16 @@ function fakeClient(state: FakeState) {
           return builder;
         },
         then(resolve: (result: { data: unknown[] | null; error: unknown }) => void) {
-          const error = table === "billing_subscriptions" ? state.billingError : state.error;
+          const environment = filters.find(({ column }) => column === "environment")?.value as
+            | "live"
+            | "sandbox"
+            | undefined;
+          const error = (environment && state.errorByEnvironment?.[environment]) ?? state.error;
           if (error) {
             resolve({ data: null, error });
             return;
           }
-          const candidates =
-            table === "billing_subscriptions" ? (state.billingRows ?? []) : state.rows;
-          const data = candidates
+          const data = state.rows
             .filter((candidate) =>
               filters.every(
                 ({ column, value }) =>
@@ -128,19 +113,17 @@ describe("requireLiveSensorEntitlement", () => {
     expect(state.filters).toContainEqual({ column: "user_id", value: USER_ID });
   });
 
-  it("honors an active billing_subscriptions row when Lovable has no row", async () => {
+  it("never consults the legacy billing_subscriptions audit lane", async () => {
     const state: FakeState = {
       rows: [],
-      billingRows: [billingRow()],
       filters: [],
+      tableReads: [],
     };
 
     await expect(
       requireLiveSensorEntitlement(fakeClient(state), USER_ID, "live", NOW),
-    ).resolves.toMatchObject({
-      ok: true,
-      effectivePlanId: "pro_monthly",
-    });
+    ).resolves.toEqual({ ok: false, reason: "upgrade_required" });
+    expect(state.tableReads).toEqual(["subscriptions"]);
   });
 
   it("fails a degraded paid row closed after its paid-through period", async () => {
@@ -166,16 +149,19 @@ describe("requireLiveSensorEntitlement", () => {
     ).resolves.toEqual({ ok: false, reason: "entitlement_lookup_failed" });
   });
 
-  it("fails closed when billing_subscriptions is unverifiable even if Lovable is paid", async () => {
+  it("keeps a proven live paid row verified if the lower-precedence sandbox read fails", async () => {
     const state: FakeState = {
       rows: [row("craft_monthly")],
-      billingError: { message: "authority unavailable" },
+      errorByEnvironment: { sandbox: { message: "sandbox unavailable" } },
       filters: [],
     };
 
     await expect(
-      requireLiveSensorEntitlement(fakeClient(state), USER_ID, "live", NOW),
-    ).resolves.toEqual({ ok: false, reason: "entitlement_lookup_failed" });
+      requireLiveSensorEntitlement(fakeClient(state), USER_ID, "sandbox", NOW),
+    ).resolves.toMatchObject({
+      ok: true,
+      effectivePlanId: "craft_monthly",
+    });
   });
 
   it("rejects a missing server-resolved owner without querying", async () => {

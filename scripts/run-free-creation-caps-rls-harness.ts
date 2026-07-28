@@ -7,7 +7,8 @@
  *   - direct second-active INSERTs are rejected for grows and tents
  *   - archived rows do not consume a slot, but archive -> active is enforced
  *   - cross-user owner spoofing fails identically for Free and paid targets
- *   - BYO Pro, Lovable Founder, and Lovable Craft receive paid capability
+ *   - legacy-only BYO Pro remains capped
+ *   - canonical Lovable Pro, Founder, and Craft receive paid capability
  *   - service_role remains usable for trusted over-limit fixtures
  *   - an existing over-limit fixture can still receive ordinary row edits
  *
@@ -97,7 +98,8 @@ const RUN_ID = crypto.randomUUID().slice(0, 8);
 const FUTURE_PERIOD_END = new Date(Date.now() + 30 * 86_400_000).toISOString();
 const EMAILS = {
   free: `free-creation-cap-free-${RUN_ID}@verdant.test`,
-  byoPro: `free-creation-cap-byo-pro-${RUN_ID}@verdant.test`,
+  legacyOnly: `free-creation-cap-legacy-only-${RUN_ID}@verdant.test`,
+  pro: `free-creation-cap-pro-${RUN_ID}@verdant.test`,
   founder: `free-creation-cap-founder-${RUN_ID}@verdant.test`,
   craft: `free-creation-cap-craft-${RUN_ID}@verdant.test`,
   serviceFixture: `free-creation-cap-service-fixture-${RUN_ID}@verdant.test`,
@@ -213,6 +215,27 @@ async function assertPaidUnlimited(
   );
 }
 
+async function assertLegacyOnlyCapped(client: SupabaseClient, userId: string): Promise<void> {
+  const firstGrow = await insertGrow(client, userId, "Legacy-only grow A");
+  const secondGrow = await insertGrow(client, userId, "Legacy-only grow B");
+  const firstTent = await insertTent(client, userId, "Legacy-only tent A");
+  const secondTent = await insertTent(client, userId, "Legacy-only tent B");
+
+  check(
+    "Legacy-only Pro remains capped at one active grow and tent",
+    firstGrow.error == null &&
+      isCapError(secondGrow.error, "free_active_grow_limit_reached") &&
+      firstTent.error == null &&
+      isCapError(secondTent.error, "free_active_tent_limit_reached") &&
+      (await activeCount("grows", userId)) === 1 &&
+      (await activeCount("tents", userId)) === 1,
+    [firstGrow.error, secondGrow.error, firstTent.error, secondTent.error]
+      .filter(Boolean)
+      .map((error) => error?.message)
+      .join("; "),
+  );
+}
+
 async function main() {
   const createdUserIds: string[] = [];
 
@@ -226,7 +249,8 @@ async function main() {
     }
     const {
       free: uidFree,
-      byoPro: uidByoPro,
+      legacyOnly: uidLegacyOnly,
+      pro: uidPro,
       founder: uidFounder,
       craft: uidCraft,
       serviceFixture: uidServiceFixture,
@@ -234,15 +258,27 @@ async function main() {
 
     console.log("→ seeding server-owned paid entitlement rows");
     const { error: byoError } = await admin.from("billing_subscriptions").insert({
-      user_id: uidByoPro,
+      user_id: uidLegacyOnly,
       plan_id: "pro_monthly",
       status: "active",
       provider: "paddle",
       current_period_end: FUTURE_PERIOD_END,
     });
-    if (byoError) throw new Error(`seed BYO Pro: ${byoError.message}`);
+    if (byoError) throw new Error(`seed legacy-only Pro audit row: ${byoError.message}`);
 
     const { error: lovableError } = await admin.from("subscriptions").insert([
+      {
+        user_id: uidPro,
+        paddle_subscription_id: `subscription_${crypto.randomUUID()}`,
+        paddle_customer_id: `customer_${crypto.randomUUID()}`,
+        product_id: "pro",
+        price_id: "pro_monthly",
+        status: "active",
+        current_period_start: new Date().toISOString(),
+        current_period_end: FUTURE_PERIOD_END,
+        cancel_at_period_end: false,
+        environment: "live",
+      },
       {
         user_id: uidFounder,
         paddle_subscription_id: `lifetime_${crypto.randomUUID()}`,
@@ -271,10 +307,11 @@ async function main() {
     if (lovableError) throw new Error(`seed Lovable paid rows: ${lovableError.message}`);
 
     console.log("→ signing in real authenticated clients");
-    const [freeA, freeB, byoPro, founder, craft, serviceFixtureUser] = await Promise.all([
+    const [freeA, freeB, legacyOnly, pro, founder, craft, serviceFixtureUser] = await Promise.all([
       signedInClient(EMAILS.free),
       signedInClient(EMAILS.free),
-      signedInClient(EMAILS.byoPro),
+      signedInClient(EMAILS.legacyOnly),
+      signedInClient(EMAILS.pro),
       signedInClient(EMAILS.founder),
       signedInClient(EMAILS.craft),
       signedInClient(EMAILS.serviceFixture),
@@ -282,7 +319,7 @@ async function main() {
 
     console.log("→ authenticated owner-binding checks");
     const [paidGrowSpoof, freeGrowSpoof] = await Promise.all([
-      insertGrow(freeA, uidByoPro, "Cross-user paid-owner grow spoof"),
+      insertGrow(freeA, uidPro, "Cross-user paid-owner grow spoof"),
       insertGrow(freeA, uidServiceFixture, "Cross-user Free-owner grow spoof"),
     ]);
     check(
@@ -297,7 +334,7 @@ async function main() {
     );
 
     const [paidTentSpoof, freeTentSpoof] = await Promise.all([
-      insertTent(freeA, uidByoPro, "Cross-user paid-owner tent spoof"),
+      insertTent(freeA, uidPro, "Cross-user paid-owner tent spoof"),
       insertTent(freeA, uidServiceFixture, "Cross-user Free-owner tent spoof"),
     ]);
     check(
@@ -322,7 +359,7 @@ async function main() {
     }
     const ownerTransfer = await freeA
       .from("grows")
-      .update({ user_id: uidByoPro })
+      .update({ user_id: uidPro })
       .eq("id", transferSource.data.id)
       .select("id");
     check(
@@ -333,9 +370,9 @@ async function main() {
 
     check(
       "cross-user owner spoof creates no rows for either target",
-      (await activeCount("grows", uidByoPro)) === 0 &&
+      (await activeCount("grows", uidPro)) === 0 &&
         (await activeCount("grows", uidServiceFixture)) === 0 &&
-        (await activeCount("tents", uidByoPro)) === 0 &&
+        (await activeCount("tents", uidPro)) === 0 &&
         (await activeCount("tents", uidServiceFixture)) === 0,
     );
 
@@ -497,12 +534,13 @@ async function main() {
       bulkTentInsert.error?.message,
     );
 
-    console.log("→ paid server-union checks");
+    console.log("→ canonical paid and legacy-audit checks");
+    await assertLegacyOnlyCapped(legacyOnly, uidLegacyOnly);
     await assertPaidUnlimited(
-      "BYO Pro",
-      "BYO Pro can create multiple active grows and tents",
-      byoPro,
-      uidByoPro,
+      "Lovable Pro",
+      "Lovable Pro can create multiple active grows and tents",
+      pro,
+      uidPro,
     );
     await assertPaidUnlimited(
       "Lovable Founder",

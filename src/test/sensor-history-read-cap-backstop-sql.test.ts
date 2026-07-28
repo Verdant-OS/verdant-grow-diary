@@ -3,7 +3,8 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const ROOT = resolve(__dirname, "../..");
-const MIGRATION_RELATIVE = "supabase/migrations/20260726045740_free_sensor_history_read_cap.sql";
+const MIGRATION_RELATIVE =
+  "supabase/migrations/20260728050000_canonical_subscription_authority_reassert.sql";
 const HARNESS_RELATIVE = "scripts/run-sensor-history-read-cap-rls-harness.ts";
 const MIGRATION_PATH = resolve(ROOT, MIGRATION_RELATIVE);
 const HARNESS_PATH = resolve(ROOT, HARNESS_RELATIVE);
@@ -18,8 +19,11 @@ function source(relativePath: string): string {
 }
 
 describe("server-authoritative Free sensor-history read cap", () => {
-  it("ships as one additive restrictive SELECT policy on sensor_readings", () => {
+  it("replaces the existing policy with one canonical restrictive SELECT policy", () => {
     expect(existsSync(MIGRATION_PATH), MIGRATION_RELATIVE).toBe(true);
+    expect(NORMALIZED_SQL).toContain(
+      'drop policy if exists "free sensor history is limited to 90 days" on public.sensor_readings',
+    );
     expect(NORMALIZED_SQL).toMatch(
       /create policy "free sensor history is limited to 90 days" on public\.sensor_readings as restrictive for select to authenticated using \(/,
     );
@@ -33,43 +37,36 @@ describe("server-authoritative Free sensor-history read cap", () => {
     );
   });
 
-  it("uses billing_subscriptions as the canonical paid authority", () => {
-    const canonical = NORMALIZED_SQL.match(
-      /exists \( select 1 from public\.billing_subscriptions bs[\s\S]*?\)\s*or exists \(/,
-    )?.[0];
-    expect(canonical, "canonical billing_subscriptions entitlement branch").toBeDefined();
-    expect(canonical).toContain("bs.user_id = (select auth.uid())");
-    expect(canonical).toContain("bs.plan_id in ('pro_monthly', 'pro_annual')");
-    expect(canonical).toContain("bs.plan_id = 'founder_lifetime'");
-  });
-
-  it("uses subscriptions only for live Pro, Craft, and Founder compatibility", () => {
-    const compatibilityStart = NORMALIZED_SQL.indexOf(
-      "exists ( select 1 from public.subscriptions s",
-    );
-    const compatibilityEnd = NORMALIZED_SQL.indexOf("comment on policy");
-    const compatibility =
-      compatibilityStart >= 0
+  it("uses subscriptions as the sole live Pro, Craft, and Founder authority", () => {
+    const canonicalStart = NORMALIZED_SQL.indexOf("exists ( select 1 from public.subscriptions s");
+    const canonicalEnd = NORMALIZED_SQL.indexOf("comment on policy");
+    const canonical =
+      canonicalStart >= 0
         ? NORMALIZED_SQL.slice(
-            compatibilityStart,
-            compatibilityEnd > compatibilityStart ? compatibilityEnd : undefined,
+            canonicalStart,
+            canonicalEnd > canonicalStart ? canonicalEnd : undefined,
           )
         : undefined;
-    expect(compatibility, "Lovable compatibility entitlement branch").toBeDefined();
-    expect(compatibility).toContain("s.user_id = (select auth.uid())");
-    expect(compatibility).toContain("s.environment = 'live'");
-    expect(compatibility).toMatch(
+    expect(canonical, "canonical subscriptions entitlement branch").toBeDefined();
+    expect(canonical).toContain("s.user_id = (select auth.uid())");
+    expect(canonical).toContain("s.environment = 'live'");
+    expect(canonical).toMatch(
       /s\.price_id in \(\s*'pro_monthly', 'pro_annual', 'craft_monthly', 'craft_annual'\s*\)/,
     );
-    expect(compatibility).toContain("s.price_id = 'founder_lifetime'");
+    expect(canonical).toContain("s.price_id = 'founder_lifetime'");
+    expect(EXECUTABLE_SQL).not.toMatch(/from\s+public\.billing_subscriptions/i);
   });
 
   it("matches paid status, dunning, cancellation-grace, and Founder invariants", () => {
-    expect(NORMALIZED_SQL.match(/status in \('active', 'trialing'\)/g)).toHaveLength(2);
-    expect(NORMALIZED_SQL.match(/status = 'past_due'/g)).toHaveLength(2);
-    expect(NORMALIZED_SQL.match(/status = 'canceled'/g)).toHaveLength(2);
-    expect(NORMALIZED_SQL.match(/current_period_end is not null/g)).toHaveLength(2);
-    expect(NORMALIZED_SQL.match(/current_period_end > now\(\)/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(
+      NORMALIZED_SQL.match(/status in \('active', 'trialing'\)/g)?.length,
+    ).toBeGreaterThanOrEqual(1);
+    expect(NORMALIZED_SQL.match(/status = 'past_due'/g)?.length).toBeGreaterThanOrEqual(1);
+    expect(NORMALIZED_SQL.match(/status = 'canceled'/g)?.length).toBeGreaterThanOrEqual(1);
+    expect(NORMALIZED_SQL.match(/current_period_end is not null/g)?.length).toBeGreaterThanOrEqual(
+      1,
+    );
+    expect(NORMALIZED_SQL.match(/current_period_end > now\(\)/g)?.length).toBeGreaterThanOrEqual(2);
     expect(NORMALIZED_SQL).toContain("left(s.paddle_subscription_id, 9) = 'lifetime_'");
   });
 
@@ -98,7 +95,7 @@ describe("sensor-history read-cap runtime harness contract", () => {
     for (const evidence of [
       "Free sees recent sensor history",
       "Free cannot read sensor history older than 90 days",
-      "BYO Pro sees full sensor history",
+      "Legacy-only Pro cannot read sensor history older than 90 days",
       "Lovable Pro sees full sensor history",
       "Lovable Craft sees full sensor history",
       "Lovable Founder sees full sensor history",

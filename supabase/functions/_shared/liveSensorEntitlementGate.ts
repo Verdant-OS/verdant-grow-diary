@@ -3,8 +3,7 @@
  *
  * The caller supplies only a server-resolved owner id: auth.getClaims() for
  * minting or the authenticated bridge_tokens row for ingest. Billing plan
- * and capabilities are loaded from the server-side billing_subscriptions +
- * Lovable subscriptions union.
+ * and capabilities are loaded only from canonical public.subscriptions.
  */
 import { loadUnionEntitlementForUser } from "./unionEntitlementLookup.ts";
 import type { PlanId } from "./lib/lib/entitlements/types.ts";

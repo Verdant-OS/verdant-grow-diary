@@ -1184,16 +1184,32 @@ describe("production runner", () => {
     expect(messages.join("\n")).toContain("failed and was rolled back");
   });
 
-  it("fails closed when postflight schema or preservation checks differ", () => {
+  it("allows concurrent pheno inserts between unlocked preflight and postflight snapshots", () => {
+    const stub = makeSpawnStub({
+      postflight: makePostflight({
+        pheno_identity: {
+          ...phenoIdentity,
+          pheno_crosses: { row_count: 3, ids_md5: "concurrent-insert" },
+        },
+      }),
+    });
+    const { logger, messages } = makeLogger();
+
+    const result = runPinnedProductionMigrations({
+      env: validEnvironment(),
+      spawnImpl: stub.spawnImpl,
+      readFile: readLfCheckoutFile,
+      logger,
+    });
+
+    expect(result, messages.join("\n")).toBe(EXIT.OK);
+    expect(stub.calls).toHaveLength(4);
+  });
+
+  it("fails closed when postflight schema or policy preservation checks differ", () => {
     for (const postflight of [
       makePostflight({ ledger_collision_count: 1 }),
       makePostflight({ soil_column_count: 15 }),
-      makePostflight({
-        pheno_identity: {
-          ...phenoIdentity,
-          pheno_crosses: { row_count: 1, ids_md5: "changed" },
-        },
-      }),
       makePostflight({ restrictive_policies: [] }),
     ]) {
       const stub = makeSpawnStub({ postflight });

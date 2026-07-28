@@ -2678,12 +2678,6 @@ function validatePostflight({ before, after, exactPolicies, expectedFunctionBodi
     throw new Error("schema_postcondition");
   }
   if (
-    JSON.stringify(stableJson(after?.pheno_identity)) !==
-    JSON.stringify(stableJson(before?.pheno_identity))
-  ) {
-    throw new Error("pheno_identity_changed");
-  }
-  if (
     JSON.stringify(stableJson(after?.restrictive_policies)) !==
     JSON.stringify(stableJson(before?.restrictive_policies))
   ) {

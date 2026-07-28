@@ -7,6 +7,7 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { isUuid } from "@/lib/isUuid";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 
 export const GGS_REAL_PAYLOAD_COMMIT_FUNCTION = "operator-ggs-real-payload-commit" as const;
 
@@ -69,12 +70,35 @@ function safeFailureReason(data: unknown): string {
     "tent_forbidden",
     "bridge_forbidden",
     "payload_rejected",
+    "incomplete_canonical_readings",
     "payload_too_large",
     "commit_failed",
     "internal_error",
     "unavailable",
   ]);
   return allowed.has(data.error) ? data.error : "commit_unavailable";
+}
+
+async function safeFailureReasonFromHttpError(error: unknown): Promise<string> {
+  if (!(error instanceof FunctionsHttpError)) return "commit_unavailable";
+  const context = error.context as { status?: unknown; json?: unknown } | null;
+  if (
+    !context ||
+    typeof context !== "object" ||
+    typeof context.status !== "number" ||
+    typeof context.json !== "function"
+  ) {
+    return "commit_unavailable";
+  }
+  try {
+    const body = await context.json();
+    if (!isPlainObject(body) || Object.keys(body).length !== 1) {
+      return "commit_unavailable";
+    }
+    return safeFailureReason(body);
+  } catch {
+    return "commit_unavailable";
+  }
 }
 
 export async function commitGgsRealPayload(
@@ -106,7 +130,7 @@ export async function commitGgsRealPayload(
   });
 
   if (error) {
-    return { ok: false, reason: "commit_unavailable" };
+    return { ok: false, reason: await safeFailureReasonFromHttpError(error) };
   }
   const success = parseSuccess(data);
   return success ?? { ok: false, reason: safeFailureReason(data) };

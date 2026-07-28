@@ -205,6 +205,8 @@ export function describeRefusal(reason: GgsRealPayloadIngestRefusalReason): stri
       return "Soil temperature is outside the realistic -20°C..80°C range.";
     case "soil_ec_unit_mismatch_suspected":
       return "EC unit looks wrong (µS/cm vs mS/cm). Refusing rather than guessing.";
+    case "incomplete_canonical_readings":
+      return "Payload must include one soil moisture, one EC, and one soil temperature reading.";
     case "no_canonical_readings":
       return "Payload does not contain any soil moisture / EC / soil temperature value.";
     case "normalizer_refused":

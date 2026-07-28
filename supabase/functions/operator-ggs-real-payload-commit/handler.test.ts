@@ -6,6 +6,10 @@ import {
   type OperatorGgsCommitBatchInput,
   type OperatorGgsRealPayloadCommitDeps,
 } from "./handler.ts";
+import {
+  GGS_REAL_PAYLOAD_METRICS,
+  hasCompleteCanonicalGgsRealPayloadRows,
+} from "../_shared/lib/lib/ggsRealPayloadIngestRules.ts";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const OTHER_USER_ID = "22222222-2222-4222-8222-222222222222";
@@ -334,23 +338,60 @@ Deno.test("stale payload is rejected with zero writes", async () => {
   assertEquals(d.committed.length, 0);
 });
 
-Deno.test("degraded payload is rejected with zero writes", async () => {
-  const d = deps();
-  const response = await handleOperatorGgsRealPayloadCommit(
-    request(
-      body({
-        payload: payload({
-          soil_temp_c: undefined,
-          soil_ec: undefined,
+Deno.test("every missing canonical metric is refused before commit", async () => {
+  for (const key of ["soil_moisture_pct", "soil_temp_c", "soil_ec"] as const) {
+    const d = deps();
+    const response = await handleOperatorGgsRealPayloadCommit(
+      request(
+        body({
+          payload: payload({ [key]: undefined }),
         }),
-      }),
-    ),
-    d.value,
-  );
-  assertEquals(response.status, 400);
-  assertEquals(await responseJson(response), { error: "payload_rejected" });
-  assertEquals(d.committed.length, 0);
+      ),
+      d.value,
+    );
+    assertEquals(response.status, 400);
+    assertEquals(await responseJson(response), {
+      error: "incomplete_canonical_readings",
+    });
+    assertEquals(d.committed.length, 0);
+  }
 });
+
+Deno.test("duplicate canonical metrics fail the shared Edge trust invariant", () => {
+  const complete = GGS_REAL_PAYLOAD_METRICS.map((metric) => ({ metric }));
+  assertEquals(hasCompleteCanonicalGgsRealPayloadRows(complete), true);
+  assertEquals(
+    hasCompleteCanonicalGgsRealPayloadRows([complete[0], complete[0], complete[2]]),
+    false,
+  );
+});
+
+Deno.test(
+  "an incomplete attempt writes nothing and a corrected same-sample retry stays eligible",
+  async () => {
+    const d = deps();
+    const incomplete = await handleOperatorGgsRealPayloadCommit(
+      request(body({ payload: payload({ soil_ec: undefined }) })),
+      d.value,
+    );
+    assertEquals(incomplete.status, 400);
+    assertEquals(await responseJson(incomplete), {
+      error: "incomplete_canonical_readings",
+    });
+    assertEquals(d.committed.length, 0);
+
+    const corrected = await handleOperatorGgsRealPayloadCommit(request(), d.value);
+    assertEquals(corrected.status, 200);
+    assertEquals(await responseJson(corrected), {
+      ok: true,
+      inserted: 3,
+      rejected: 0,
+    });
+    assertEquals(d.committed.length, 1);
+    assertEquals(d.committed[0].rows.length, 3);
+    assertEquals(new Set(d.committed[0].rows.map((row) => row.idempotency_key)).size, 3);
+  },
+);
 
 Deno.test("declared non-live payload is rejected with zero writes", async () => {
   const d = deps();

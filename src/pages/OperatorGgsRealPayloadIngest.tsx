@@ -13,6 +13,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTents } from "@/hooks/use-tents";
 import { useAuth } from "@/store/auth";
 import { useHasRole } from "@/hooks/useHasRole";
+import {
+  GGS_OPERATOR_EVALUATION_INTERVAL_MS,
+  useGgsOperatorEvaluationClock,
+} from "@/hooks/useGgsOperatorEvaluationClock";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import GgsRealPayloadIngestPanel from "@/components/GgsRealPayloadIngestPanel";
@@ -36,10 +40,14 @@ export default function OperatorGgsRealPayloadIngest() {
   const tents = tentsQ.data ?? [];
 
   const [selectedTentId, setSelectedTentId] = useState<string>("");
+  const queryEnabled = authAvailable && role.status === "granted" && !!selectedTentId;
+  const evaluationNowMs = useGgsOperatorEvaluationClock({
+    enabled: queryEnabled,
+  });
 
   const ggsRowsQ = useQuery({
     queryKey: ["operator-ggs-real-payload", selectedTentId],
-    enabled: authAvailable && role.status === "granted" && !!selectedTentId,
+    enabled: queryEnabled,
     queryFn: async (): Promise<GgsSentinelInputRow[]> => {
       const { data, error } = await supabase
         .from("sensor_readings")
@@ -49,11 +57,14 @@ export default function OperatorGgsRealPayloadIngest() {
         .contains("raw_payload", GGS_OPERATOR_SENTINEL_PROVENANCE_CONTAINS)
         .in("metric", [...GGS_OPERATOR_SENTINEL_METRICS])
         .order("captured_at", { ascending: false })
+        .order("created_at", { ascending: false })
+        .order("device_id", { ascending: true })
+        .order("metric", { ascending: true })
         .limit(ROW_FETCH_LIMIT);
       if (error) throw error;
       return (data ?? []) as GgsSentinelInputRow[];
     },
-    refetchInterval: 30_000,
+    refetchInterval: GGS_OPERATOR_EVALUATION_INTERVAL_MS,
     refetchIntervalInBackground: false,
   });
 
@@ -62,9 +73,9 @@ export default function OperatorGgsRealPayloadIngest() {
       evaluateGgsOperatorAttestedSentinelReadiness({
         rows: ggsRowsQ.data ?? [],
         snapshot: null,
-        now: new Date(),
+        now: new Date(evaluationNowMs),
       }),
-    [ggsRowsQ.data],
+    [evaluationNowMs, ggsRowsQ.data],
   );
   const panelVm = useMemo(() => buildGgsSentinelEvaluationPanelViewModel(verdict), [verdict]);
 

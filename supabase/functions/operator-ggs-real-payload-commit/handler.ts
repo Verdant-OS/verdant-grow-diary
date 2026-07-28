@@ -14,6 +14,7 @@ import {
   GGS_OPERATOR_ATTESTED_PROVENANCE,
   GGS_REAL_PAYLOAD_SOURCE,
   GGS_REAL_PAYLOAD_SOURCE_APP,
+  hasCompleteCanonicalGgsRealPayloadRows,
   type GgsRealPayloadCommitRow,
 } from "../_shared/lib/lib/ggsRealPayloadIngestRules.ts";
 
@@ -193,21 +194,24 @@ function rowsAreTrusted(
   deviceId: string,
   attestedAt: Date,
 ): boolean {
-  return rows.every(
-    (row) =>
-      row.source === GGS_REAL_PAYLOAD_SOURCE &&
-      row.quality === "ok" &&
-      row.device_id === deviceId &&
-      row.raw_payload?.source_app === GGS_REAL_PAYLOAD_SOURCE_APP &&
-      row.raw_payload?.sensor_id === deviceId &&
-      row.raw_payload?.device_id === deviceId &&
-      row.raw_payload?.captured_at === row.captured_at &&
-      row.raw_payload?.cohort_id === buildGgsRealPayloadCohortId(deviceId, row.captured_at) &&
-      row.raw_payload?.provenance === GGS_OPERATOR_ATTESTED_PROVENANCE &&
-      row.raw_payload?.operator_attestation?.attested === true &&
-      row.raw_payload?.operator_attestation?.attested_at === attestedAt.toISOString() &&
-      row.raw_payload?.operator_attestation?.boundary === GGS_OPERATOR_ATTESTATION_BOUNDARY &&
-      Number.isFinite(row.value),
+  return (
+    hasCompleteCanonicalGgsRealPayloadRows(rows) &&
+    rows.every(
+      (row) =>
+        row.source === GGS_REAL_PAYLOAD_SOURCE &&
+        row.quality === "ok" &&
+        row.device_id === deviceId &&
+        row.raw_payload?.source_app === GGS_REAL_PAYLOAD_SOURCE_APP &&
+        row.raw_payload?.sensor_id === deviceId &&
+        row.raw_payload?.device_id === deviceId &&
+        row.raw_payload?.captured_at === row.captured_at &&
+        row.raw_payload?.cohort_id === buildGgsRealPayloadCohortId(deviceId, row.captured_at) &&
+        row.raw_payload?.provenance === GGS_OPERATOR_ATTESTED_PROVENANCE &&
+        row.raw_payload?.operator_attestation?.attested === true &&
+        row.raw_payload?.operator_attestation?.attested_at === attestedAt.toISOString() &&
+        row.raw_payload?.operator_attestation?.boundary === GGS_OPERATOR_ATTESTATION_BOUNDARY &&
+        Number.isFinite(row.value),
+    )
   );
 }
 
@@ -295,7 +299,18 @@ export async function handleOperatorGgsRealPayloadCommit(
       operatorAttested: true,
       now: requestNow,
     });
-    if (!plan.ok || !rowsAreTrusted(plan.rows, deviceId, requestNow)) {
+    if (!plan.ok) {
+      return json(req, 400, {
+        error:
+          plan.reason === "incomplete_canonical_readings"
+            ? "incomplete_canonical_readings"
+            : "payload_rejected",
+      });
+    }
+    if (!hasCompleteCanonicalGgsRealPayloadRows(plan.rows)) {
+      return json(req, 400, { error: "incomplete_canonical_readings" });
+    }
+    if (!rowsAreTrusted(plan.rows, deviceId, requestNow)) {
       return json(req, 400, { error: "payload_rejected" });
     }
 

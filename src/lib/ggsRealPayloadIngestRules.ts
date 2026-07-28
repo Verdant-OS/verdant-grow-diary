@@ -27,8 +27,11 @@ import {
   type GgsSoilReadingDraft,
 } from "@/lib/ggsSoilSensorReadingNormalizer";
 
+/** Exactly one row for each metric is required before any commit is allowed. */
+export const GGS_REAL_PAYLOAD_METRICS = ["soil_moisture_pct", "ec", "soil_temp_c"] as const;
+
 /** Metrics this helper is allowed to emit. */
-export type GgsRealPayloadMetric = "soil_moisture_pct" | "ec" | "soil_temp_c";
+export type GgsRealPayloadMetric = (typeof GGS_REAL_PAYLOAD_METRICS)[number];
 
 /**
  * Canonical acquisition-path source stored by the RPC. The physical-device
@@ -124,6 +127,7 @@ export type GgsRealPayloadRefusalReason =
   | "non_finite_value"
   | "soil_temp_out_of_range"
   | "soil_ec_unit_mismatch_suspected"
+  | "incomplete_canonical_readings"
   | "no_canonical_readings"
   | "normalizer_refused";
 
@@ -181,6 +185,22 @@ function readSensorIds(raw: Record<string, unknown>): string[] {
 
 export function buildGgsRealPayloadCohortId(deviceId: string, capturedAt: string): string {
   return `ggs:${deviceId}:${capturedAt}`;
+}
+
+/**
+ * One physical GGS sample is atomic for Sentinel purposes: exactly one row
+ * for each canonical metric. This stays exported so the Edge handler can
+ * re-assert the invariant at the final trust boundary.
+ */
+export function hasCompleteCanonicalGgsRealPayloadRows(
+  rows: readonly { metric: string }[],
+): boolean {
+  if (!Array.isArray(rows) || rows.length !== GGS_REAL_PAYLOAD_METRICS.length) return false;
+  const metrics = new Set(rows.map((row) => row.metric));
+  return (
+    metrics.size === GGS_REAL_PAYLOAD_METRICS.length &&
+    GGS_REAL_PAYLOAD_METRICS.every((metric) => metrics.has(metric))
+  );
 }
 
 function readOriginalUnits(raw: Record<string, unknown>): Record<string, string> | undefined {
@@ -247,9 +267,6 @@ export function buildGgsRealPayloadCommitInput(
   }
 
   const r = draft.readings;
-  if (r.soil_moisture_pct === undefined && r.ec === undefined && r.soil_temp_c === undefined) {
-    return refuse("no_canonical_readings");
-  }
   // Bounds check (defense in depth — DB trigger also enforces -20..80).
   if (typeof r.soil_temp_c === "number" && (r.soil_temp_c < -20 || r.soil_temp_c > 80)) {
     return refuse("soil_temp_out_of_range");
@@ -290,11 +307,13 @@ export function buildGgsRealPayloadCommitInput(
   const rows: GgsRealPayloadCommitRow[] = [];
   const idKeyPrefix = cohortId;
 
-  const orderedMetrics: Array<[GgsRealPayloadMetric, number | undefined]> = [
-    ["soil_moisture_pct", r.soil_moisture_pct],
-    ["ec", r.ec],
-    ["soil_temp_c", r.soil_temp_c],
-  ];
+  const valuesByMetric: Record<GgsRealPayloadMetric, number | undefined> = {
+    soil_moisture_pct: r.soil_moisture_pct,
+    ec: r.ec,
+    soil_temp_c: r.soil_temp_c,
+  };
+  const orderedMetrics: Array<[GgsRealPayloadMetric, number | undefined]> =
+    GGS_REAL_PAYLOAD_METRICS.map((metric) => [metric, valuesByMetric[metric]]);
   for (const [metric, value] of orderedMetrics) {
     if (typeof value !== "number" || !Number.isFinite(value)) continue;
     rows.push({
@@ -309,7 +328,9 @@ export function buildGgsRealPayloadCommitInput(
     });
   }
 
-  if (rows.length === 0) return refuse("no_canonical_readings");
+  if (!hasCompleteCanonicalGgsRealPayloadRows(rows)) {
+    return refuse("incomplete_canonical_readings");
+  }
 
   return {
     ok: true,

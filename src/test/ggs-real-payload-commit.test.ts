@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 
 const state = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -93,6 +94,51 @@ describe("commitGgsRealPayload browser boundary", () => {
       data: null,
       error: { message: "service role secret and SQL detail" },
     });
+    await expect(commitGgsRealPayload(args())).resolves.toEqual({
+      ok: false,
+      reason: "commit_unavailable",
+    });
+  });
+
+  it.each(["payload_rejected", "bridge_forbidden", "incomplete_canonical_readings"])(
+    "preserves allowlisted FunctionsHttpError refusal %s",
+    async (reason) => {
+      state.invoke.mockResolvedValue({
+        data: null,
+        error: new FunctionsHttpError(
+          new Response(JSON.stringify({ error: reason }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          }),
+        ),
+      });
+      await expect(commitGgsRealPayload(args())).resolves.toEqual({
+        ok: false,
+        reason,
+      });
+    },
+  );
+
+  it.each([
+    new FunctionsHttpError(new Response("{", { status: 400 })),
+    new FunctionsHttpError(
+      new Response(JSON.stringify({ error: "unknown_server_reason" }), { status: 400 }),
+    ),
+    new FunctionsHttpError(
+      new Response(
+        JSON.stringify({
+          error: "payload_rejected",
+          detail: "service-role-secret-should-never-leak",
+        }),
+        { status: 400 },
+      ),
+    ),
+    {
+      name: "FunctionsHttpError",
+      context: new Response(JSON.stringify({ error: "bridge_forbidden" }), { status: 403 }),
+    },
+  ])("fails malformed, unknown, detailed, or forged HTTP errors closed", async (error) => {
+    state.invoke.mockResolvedValue({ data: null, error });
     await expect(commitGgsRealPayload(args())).resolves.toEqual({
       ok: false,
       reason: "commit_unavailable",

@@ -146,6 +146,7 @@ describe("buildGgsRealPayloadIngestViewModel", () => {
       "non_finite_value",
       "soil_temp_out_of_range",
       "soil_ec_unit_mismatch_suspected",
+      "incomplete_canonical_readings",
       "no_canonical_readings",
       "normalizer_refused",
     ] as const;

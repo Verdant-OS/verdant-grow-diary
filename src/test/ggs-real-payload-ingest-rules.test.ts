@@ -10,8 +10,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   buildGgsRealPayloadCommitInput,
+  GGS_REAL_PAYLOAD_METRICS,
   GGS_REAL_PAYLOAD_SOURCE,
   GGS_REAL_PAYLOAD_SOURCE_APP,
+  hasCompleteCanonicalGgsRealPayloadRows,
   type GgsRealPayloadCommitInput,
 } from "@/lib/ggsRealPayloadIngestRules";
 
@@ -77,6 +79,27 @@ describe("buildGgsRealPayloadCommitInput", () => {
       expect(row.idempotency_key.startsWith("ggs:")).toBe(true);
       expect(Number.isFinite(row.value)).toBe(true);
     }
+  });
+
+  it.each([
+    ["soil moisture", "soil_moisture_pct"],
+    ["EC", "soil_ec"],
+    ["soil temperature", "soil_temp_c"],
+  ] as const)("refuses a payload missing %s as one incomplete atomic cohort", (_label, key) => {
+    const incomplete = realLookingPayload();
+    delete incomplete[key];
+    expect(refusalReason(buildGgsRealPayloadCommitInput(incomplete, CTX))).toBe(
+      "incomplete_canonical_readings",
+    );
+  });
+
+  it("requires exactly one of each canonical metric", () => {
+    const complete = GGS_REAL_PAYLOAD_METRICS.map((metric) => ({ metric }));
+    expect(hasCompleteCanonicalGgsRealPayloadRows(complete)).toBe(true);
+    expect(hasCompleteCanonicalGgsRealPayloadRows(complete.slice(0, 2))).toBe(false);
+    expect(hasCompleteCanonicalGgsRealPayloadRows([complete[0], complete[0], complete[2]])).toBe(
+      false,
+    );
   });
 
   it("never emits ggs_live or ggs_csv sources", () => {
@@ -196,7 +219,7 @@ describe("buildGgsRealPayloadCommitInput", () => {
     expect(refusalReason(plan)).toBe("device_id_missing");
   });
 
-  it("refuses fully non-numeric payloads and never emits NaN rows for partials", () => {
+  it("refuses fully non-numeric and partial payloads without emitting any rows", () => {
     const partial = buildGgsRealPayloadCommitInput(
       { ...realLookingPayload(), soil_temp_c: "warm" },
       CTX,
@@ -212,11 +235,10 @@ describe("buildGgsRealPayloadCommitInput", () => {
       },
       CTX,
     );
-    expect(["no_canonical_readings", "normalizer_refused"]).toContain(refusalReason(allBad));
-    if (partial.ok) {
-      expect(partial.rows.find((r) => r.metric === "soil_temp_c")).toBeUndefined();
-      for (const row of partial.rows) expect(Number.isFinite(row.value)).toBe(true);
-    }
+    expect(refusalReason(partial)).toBe("incomplete_canonical_readings");
+    expect(["incomplete_canonical_readings", "normalizer_refused"]).toContain(
+      refusalReason(allBad),
+    );
   });
 
   it("refuses NaN / Infinity values", () => {
@@ -234,9 +256,11 @@ describe("buildGgsRealPayloadCommitInput", () => {
       expect(plan.rows.find((r) => r.metric === "soil_temp_c")).toBeUndefined();
     } else {
       const failed = plan as Extract<GgsRealPayloadCommitInput, { ok: false }>;
-      expect(["soil_temp_out_of_range", "no_canonical_readings", "normalizer_refused"]).toContain(
-        failed.reason,
-      );
+      expect([
+        "soil_temp_out_of_range",
+        "incomplete_canonical_readings",
+        "normalizer_refused",
+      ]).toContain(failed.reason);
     }
   });
 

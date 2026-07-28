@@ -29,6 +29,7 @@ const state = vi.hoisted(() => {
       refetchIntervalInBackground: boolean;
     },
     refetch: vi.fn(async () => undefined),
+    clockEnabled: [] as boolean[],
     chainCalls,
     chain,
     from: vi.fn(() => chain),
@@ -73,6 +74,14 @@ vi.mock("@/hooks/use-tents", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useGgsOperatorEvaluationClock", () => ({
+  GGS_OPERATOR_EVALUATION_INTERVAL_MS: 30_000,
+  useGgsOperatorEvaluationClock: ({ enabled }: { enabled: boolean }) => {
+    state.clockEnabled.push(enabled);
+    return new Date("2026-07-25T12:00:00.000Z").getTime();
+  },
+}));
+
 vi.mock("@/components/GgsRealPayloadIngestPanel", () => ({
   default: ({
     selectedTentId,
@@ -104,6 +113,7 @@ describe("OperatorGgsRealPayloadIngest wiring", () => {
   beforeEach(() => {
     state.queryOptions = null;
     state.refetch.mockClear();
+    state.clockEnabled.length = 0;
     state.chainCalls.length = 0;
     state.from.mockClear();
   });
@@ -112,6 +122,7 @@ describe("OperatorGgsRealPayloadIngest wiring", () => {
     render(<OperatorGgsRealPayloadIngest />);
 
     expect(state.queryOptions?.enabled).toBe(false);
+    expect(state.clockEnabled.at(-1)).toBe(false);
     expect(screen.getByTestId("selected-tent")).toHaveTextContent("");
 
     fireEvent.click(screen.getByRole("button", { name: "Select flower tent" }));
@@ -120,6 +131,7 @@ describe("OperatorGgsRealPayloadIngest wiring", () => {
       "33333333-3333-4333-8333-333333333333",
     );
     expect(state.queryOptions?.enabled).toBe(true);
+    expect(state.clockEnabled.at(-1)).toBe(true);
     expect(state.queryOptions?.queryKey).toEqual([
       "operator-ggs-real-payload",
       "33333333-3333-4333-8333-333333333333",
@@ -148,6 +160,24 @@ describe("OperatorGgsRealPayloadIngest wiring", () => {
       ],
       ["in", "metric", ["soil_moisture_pct", "ec", "soil_temp_c"]],
       ["order", "captured_at", { ascending: false }],
+      ["order", "created_at", { ascending: false }],
+      ["order", "device_id", { ascending: true }],
+      ["order", "metric", { ascending: true }],
+      ["limit", 50],
+    ]);
+  });
+
+  it("applies every same-timestamp tie-breaker before the server-side limit", async () => {
+    render(<OperatorGgsRealPayloadIngest />);
+    fireEvent.click(screen.getByRole("button", { name: "Select flower tent" }));
+    await state.queryOptions?.queryFn();
+
+    const orderAndLimit = state.chainCalls.filter(([name]) => name === "order" || name === "limit");
+    expect(orderAndLimit).toEqual([
+      ["order", "captured_at", { ascending: false }],
+      ["order", "created_at", { ascending: false }],
+      ["order", "device_id", { ascending: true }],
+      ["order", "metric", { ascending: true }],
       ["limit", 50],
     ]);
   });

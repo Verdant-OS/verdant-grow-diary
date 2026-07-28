@@ -866,7 +866,7 @@ export default function OperatorSchemaAudit() {
                       {(row.grants?.anon ?? []).join("/") || "—"} · PUBLIC:{" "}
                       {(row.grants?.PUBLIC ?? []).join("/") || "—"} · authn:{" "}
                       {(row.grants?.authenticated ?? []).join("/") || "—"} · svc:{" "}
-                      {(row.grants?.service_role ?? []).join("/") || "—"}
+                      {(row.grants?.["service_role"] ?? []).join("/") || "—"}
                     </div>
                   </div>
                   <div className="shrink-0">

@@ -540,7 +540,7 @@ export function evaluateRlsAudit(rows: RlsAuditInput[]): RlsFinding[] {
         }
       }
 
-      const servicePrivileges = normalizedPrivileges(row.grants.service_role);
+      const servicePrivileges = normalizedPrivileges(row.grants["service_role"]);
       if (!CRUD.every((privilege) => servicePrivileges.includes(privilege))) {
         findings.push({
           table: row.table,

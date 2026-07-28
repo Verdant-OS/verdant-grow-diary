@@ -70,10 +70,14 @@ function EntryRow({
       className="rounded-lg border bg-card/40 p-3 text-sm"
       data-testid="plant-recent-activity-row"
       data-entry-id={row.id}
+      data-effective-event-type={row.effectiveEventType ?? row.eventType}
     >
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="capitalize" data-testid="plant-recent-activity-event-type">
+          {/* No `capitalize`: displayLabel is already title-cased by the
+              identity resolver, and CSS-capitalizing the payload suffix
+              corrupts case-sensitive units ("500 ml" → "500 Ml"). */}
+          <Badge variant="secondary" data-testid="plant-recent-activity-event-type">
             {row.displayLabel ?? row.eventType}
             {row.summarySuffix ? ` · ${row.summarySuffix}` : ""}
           </Badge>

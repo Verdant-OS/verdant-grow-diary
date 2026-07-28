@@ -62,6 +62,21 @@ export const QUICK_LOG_CANONICAL_EVENT_TYPES: ReadonlySet<string> = new Set([
   "reminder",
 ]);
 
+/**
+ * Sentinel identity for a wrapper row whose declared event type exists but is
+ * not a canonical Quick Log type (legacy imports, retired writers, malformed
+ * rows). Mirrors the `quicklog_save_event` RPC's rejection vocabulary so the
+ * read path and the write seam speak the same name for the same condition.
+ */
+export const INVALID_EVENT_TYPE_IDENTITY = "invalid_event_type" as const;
+
+/**
+ * Neutral grower-facing label for `invalid_event_type` identities. The row is
+ * a log entry of unknown kind — it must never masquerade as a "Note" (the row
+ * is not known to be a note) and never echo the raw invalid type string.
+ */
+export const INVALID_EVENT_TYPE_NEUTRAL_LABEL = "Log entry" as const;
+
 const DISPLAY_LABELS: Record<string, string> = {
   observation: "Observation",
   watering: "Watering",
@@ -82,6 +97,9 @@ const DISPLAY_LABELS: Record<string, string> = {
   reminder: "Reminder",
   note: "Note",
   quick_log: "Note",
+  // Defensive: a row whose ENVELOPE literally carries the sentinel must also
+  // render neutrally, not title-case into "Invalid Event Type".
+  [INVALID_EVENT_TYPE_IDENTITY]: INVALID_EVENT_TYPE_NEUTRAL_LABEL,
 };
 
 function titleCase(raw: string): string {
@@ -167,10 +185,15 @@ function buildSummarySuffix(
  *  1. When the envelope type is a Quick Log wrapper ("quick_log", "note",
  *     or empty) AND `details.declaredEventType` is a canonical Quick Log
  *     type, promote the declared type.
- *  2. Otherwise the envelope type wins.
- *  3. The display label is the canonical label for known types, else a
+ *  2. When the envelope is a wrapper AND a declared type is present but
+ *     NOT canonical, the row's true kind is unknowable — resolve to the
+ *     explicit `invalid_event_type` identity with a neutral label. It
+ *     must never masquerade as a "Note" and never echo the raw invalid
+ *     string.
+ *  3. Otherwise the envelope type wins.
+ *  4. The display label is the canonical label for known types, else a
  *     title-cased fallback ("Note" when unresolvable).
- *  4. `summarySuffix` is filled only from already-normalized detail
+ *  5. `summarySuffix` is filled only from already-normalized detail
  *     fields; missing values stay empty — never invented.
  */
 export function resolveQuickLogEventIdentity(
@@ -181,6 +204,17 @@ export function resolveQuickLogEventIdentity(
   const wrapper = QUICK_LOG_WRAPPER_ENVELOPES.has(envelope);
   const promote =
     wrapper && declared !== "" && QUICK_LOG_CANONICAL_EVENT_TYPES.has(declared);
+  if (wrapper && declared !== "" && !promote) {
+    // Rule 2: declared-but-unrecognized action. Neutral identity; no
+    // summary is ever built for an unknown kind (nothing to honestly
+    // summarize), and the raw declared string is never displayed.
+    return {
+      effectiveEventType: INVALID_EVENT_TYPE_IDENTITY,
+      displayLabel: INVALID_EVENT_TYPE_NEUTRAL_LABEL,
+      fromQuickLog: true,
+      summarySuffix: "",
+    };
+  }
   const effective = promote ? declared : envelope || declared || "note";
   const label = DISPLAY_LABELS[effective] ?? titleCase(effective);
   const fromQuickLog =

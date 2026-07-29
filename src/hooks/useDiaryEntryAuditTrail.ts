@@ -40,7 +40,7 @@ export function useDiaryEntryAuditTrail(
         .eq("diary_entry_id", diaryEntryId as string)
         .order("changed_at", { ascending: false });
       if (error) throw new Error(error.message);
-      return (data ?? []) as DiaryEntryAuditRow[];
+      return (data ?? []) as unknown as DiaryEntryAuditRow[];
     },
   });
 }

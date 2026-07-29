@@ -7,6 +7,7 @@ import type { BreedingEventType } from "@/lib/genetics/breedingTypes";
 import { emitBreedingAuditEvent } from "@/lib/genetics/breedingAuditLog";
 import {
   callBreedingLogSaveEvent,
+  describeBreedingLogSaveEventReason,
   BREEDING_LOG_SAVE_EVENT_RPC_NAME,
 } from "@/lib/genetics/breedingLogSaveEventRpc";
 import { MissingAuditRpcError } from "@/lib/rpcAvailability/missingRpcError";
@@ -46,7 +47,6 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
   const submissionAttemptRef = useRef<BreedingSubmissionAttempt | null>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
-
 
   const handleSubmit = async (data: {
     plantId: string;
@@ -92,7 +92,12 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
       });
 
       if (!result.ok || !result.growEventId) {
-        throw new Error(`Failed to save event: ${result.reason ?? "unknown_error"}`);
+        // Growers get a sentence, not the RPC's internal reason code. The raw
+        // code is kept for diagnostics only.
+        if (result.rawReason && !result.reason) {
+          console.error("[BreedingLogContainer] Unrecognized save reason:", result.rawReason);
+        }
+        throw new Error(describeBreedingLogSaveEventReason(result.reason ?? result.rawReason));
       }
       const eventId = result.growEventId;
       submissionAttemptRef.current = null;
@@ -160,8 +165,6 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
       setBusy(false);
     }
   };
-
-
 
   if (auditRpcMissing) {
     return (

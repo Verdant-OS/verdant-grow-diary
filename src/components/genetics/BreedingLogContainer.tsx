@@ -5,7 +5,12 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import type { BreedingEventType } from "@/lib/genetics/breedingTypes";
 import { emitBreedingAuditEvent } from "@/lib/genetics/breedingAuditLog";
-import { callBreedingLogSaveEvent } from "@/lib/genetics/breedingLogSaveEventRpc";
+import {
+  callBreedingLogSaveEvent,
+  BREEDING_LOG_SAVE_EVENT_RPC_NAME,
+} from "@/lib/genetics/breedingLogSaveEventRpc";
+import { MissingAuditRpcError } from "@/lib/rpcAvailability/missingRpcError";
+import { AuditRpcMissingFallback } from "@/components/AuditRpcMissingFallback";
 import {
   resolveBreedingSubmissionAttempt,
   type BreedingSubmissionAttempt,
@@ -37,9 +42,11 @@ function normalizeStringDetails(value: unknown): Record<string, string> {
 
 export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel }: Props) {
   const [busy, setBusy] = useState(false);
+  const [auditRpcMissing, setAuditRpcMissing] = useState(false);
   const submissionAttemptRef = useRef<BreedingSubmissionAttempt | null>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
+
 
   const handleSubmit = async (data: {
     plantId: string;
@@ -143,11 +150,29 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
       }
       onCreated();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to save");
+      if (err instanceof MissingAuditRpcError) {
+        console.error("[BreedingLogContainer] Audit RPC missing:", err.rpcName, err.cause);
+        setAuditRpcMissing(true);
+      } else {
+        toast.error(err instanceof Error ? err.message : "Failed to save");
+      }
     } finally {
       setBusy(false);
     }
   };
+
+
+
+  if (auditRpcMissing) {
+    return (
+      <AuditRpcMissingFallback
+        rpcName={BREEDING_LOG_SAVE_EVENT_RPC_NAME}
+        surfaceLabel="Breeding event"
+        onRetry={() => setAuditRpcMissing(false)}
+        onDismiss={onCancel}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">

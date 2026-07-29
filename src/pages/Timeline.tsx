@@ -1,4 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import TimelineEmptyState from "@/components/TimelineEmptyState";
+import {
+  resolveTimelineEmptyState,
+  TIMELINE_EMPTY_STATE_FALLBACK,
+} from "@/lib/timelineEmptyStateRules";
+import type { FastAddSelectionContext } from "@/lib/fastAddActionRules";
 import PageHeader from "@/components/PageHeader";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import { supabase } from "@/integrations/supabase/client";
@@ -105,8 +111,6 @@ import {
   filterTimelineEvidenceRows,
   isTimelineDateFilterValue,
   isTimelineEvidenceFilterActive,
-  TIMELINE_EVIDENCE_EMPTY_DESC,
-  TIMELINE_EVIDENCE_EMPTY_TITLE,
   TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER,
 } from "@/lib/timelineEvidenceFilterRules";
 import {
@@ -840,6 +844,21 @@ export default function Timeline() {
     endDate: effectiveEndDate,
   };
   const evidenceActive = isTimelineEvidenceFilterActive(evidenceFilterInput);
+
+  // Selection context handed to the empty-state fast-add buttons. The
+  // timeline's own plant/tent filters ARE the grower's current selection,
+  // so a filtered view can log straight into that scope. Presenter-only —
+  // the Quick Log surface still owns confirmation and save.
+  const fastAddContext = useMemo<FastAddSelectionContext | null>(() => {
+    if (!plantFilter && !tentFilter) return null;
+    return {
+      plantId: plantFilter || null,
+      plantName: plantFilter ? (plantNamesById?.[plantFilter] ?? null) : null,
+      tentId: tentFilter || null,
+      tentName: tentFilter ? (tentNamesById?.[tentFilter] ?? null) : null,
+      growId: activeGrowId ?? null,
+    };
+  }, [plantFilter, tentFilter, plantNamesById, tentNamesById, activeGrowId]);
 
   const filtered = useMemo(() => {
     const afterStageEvent = entries.filter((e) => {
@@ -1756,16 +1775,25 @@ export default function Timeline() {
         <AlertEventsSection events={alertEvents} />
       </div>
 
-      {pageReadView.kind === "ready_empty" ? (
-        <Empty title="No entries yet" desc="Tap the + button to log your first photo and note." />
-      ) : entries.length === 0 ? null : filtered.length === 0 ? (
-        <Empty
-          title={evidenceActive ? TIMELINE_EVIDENCE_EMPTY_TITLE : "No matching entries"}
-          desc={
-            evidenceActive ? TIMELINE_EVIDENCE_EMPTY_DESC : "Try a different stage or event filter."
+      {pageReadView.kind === "ready_empty" || (entries.length > 0 && filtered.length === 0) ? (
+        <TimelineEmptyState
+          view={
+            resolveTimelineEmptyState({
+              totalEntryCount: pageReadView.kind === "ready_empty" ? 0 : entries.length,
+              filteredEntryCount: filtered.length,
+              evidenceFilterActive: evidenceActive,
+              otherFiltersActive: stageFilter !== "all" || eventFilter !== "all" || evidenceActive,
+              context: fastAddContext,
+            }) ?? TIMELINE_EMPTY_STATE_FALLBACK
           }
+          context={fastAddContext}
+          onClearFilters={() => {
+            clearEvidenceFilters();
+            setStageFilter("all");
+            setEventFilter("all");
+          }}
         />
-      ) : (
+      ) : entries.length === 0 ? null : (
         <div className="space-y-5">
           {groupedByStage.map((group, gi) => (
             <section key={`${group.stage}-${gi}`}>

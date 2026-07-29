@@ -955,6 +955,19 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
             select.getBoundingClientRect().width > 0 &&
             select.getBoundingClientRect().height > 0 &&
             getComputedStyle(select).visibility !== "hidden",
+          // Positive-evidence-only hit check: pointer-events none on the
+          // control, or a FOREIGN element at its center (an overlay), marks
+          // it blocked; a null hit (off-viewport) proves nothing and counts
+          // as unobstructed so strictness is not weakened below the fold.
+          controlReceivesEvents: (() => {
+            if (getComputedStyle(select).pointerEvents === "none") return false;
+            const rect = select.getBoundingClientRect();
+            const hit = document.elementFromPoint(
+              rect.left + rect.width / 2,
+              rect.top + rect.height / 2,
+            );
+            return hit === null || hit === select || select.contains(hit) || hit.contains(select);
+          })(),
           options: Array.from(select.options, (option) => ({
             value: option.value,
             disabled: option.disabled,
@@ -1027,6 +1040,17 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
                 select.getBoundingClientRect().width > 0 &&
                 select.getBoundingClientRect().height > 0 &&
                 getComputedStyle(select).visibility !== "hidden",
+              receivesEvents: (() => {
+                if (getComputedStyle(select).pointerEvents === "none") return false;
+                const rect = select.getBoundingClientRect();
+                const hit = document.elementFromPoint(
+                  rect.left + rect.width / 2,
+                  rect.top + rect.height / 2,
+                );
+                return (
+                  hit === null || hit === select || select.contains(hit) || hit.contains(select)
+                );
+              })(),
               options: Array.from(select.options, (option) => ({
                 value: option.value,
                 disabled: option.disabled,
@@ -1039,6 +1063,7 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
             {
               disabled: selectSnapshot.controlDisabled,
               visible: selectSnapshot.controlVisible,
+              receivesEvents: selectSnapshot.controlReceivesEvents,
               options: selectSnapshot.options,
             },
             liveState,
@@ -1138,7 +1163,14 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
       // DISPATCHED: a pre-dispatch detachment changed nothing, and writing
       // the old value into whatever now holds the index would corrupt it.
       if (fillDispatched) {
-        await control.fill(original, { timeout: 5_000 }).catch(() => undefined);
+        const restoredReplacement = await control
+          .fill(original, { timeout: 5_000 })
+          .then(() => true)
+          .catch(() => false);
+        expect(
+          restoredReplacement,
+          `${route.path} field "${name}" remounted after a fill and its replacement could not be restored`,
+        ).toBe(true);
       }
       audits.push({
         route: route.path,

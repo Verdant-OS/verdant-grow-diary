@@ -558,6 +558,7 @@ export function selectAvailableAlternativeValue(
 export type FallbackSelectObservedState = {
   disabled: boolean;
   visible: boolean;
+  receivesEvents: boolean;
   options: readonly CensusSelectOption[];
 };
 
@@ -582,14 +583,14 @@ export function fallbackSelectExerciseFailureIsFatal(
   live: FallbackSelectObservedState | undefined,
   liveElementIsSnapshotElement: boolean,
 ): boolean {
-  // A control that was already disabled or hidden when snapshotted can never
-  // prove a broken onChange — the transition itself, arriving after the
-  // earlier editable/visible checks, is churn.
-  if (snapshot.disabled || !snapshot.visible) return false;
+  // A control that was already disabled, hidden, or event-blocked (overlay /
+  // pointer-events) when snapshotted can never prove a broken onChange — the
+  // transition itself, arriving after the earlier checks, is churn.
+  if (snapshot.disabled || !snapshot.visible || !snapshot.receivesEvents) return false;
   if (!liveElementIsSnapshotElement || !live) return false;
-  // A control that became disabled or hidden by catch time timed out on
-  // actionability, not on a value that failed to stick.
-  if (live.disabled || !live.visible) return false;
+  // A control that became disabled, hidden, or event-blocked by catch time
+  // timed out on actionability, not on a value that failed to stick.
+  if (live.disabled || !live.visible || !live.receivesEvents) return false;
   return (
     live.options.length === snapshot.options.length &&
     live.options.every(

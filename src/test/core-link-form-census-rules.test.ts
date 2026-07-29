@@ -154,9 +154,11 @@ describe("core link and form census rules", () => {
       options: { value: string; disabled: boolean }[],
       disabled = false,
       visible = true,
+      receivesEvents = true,
     ) => ({
       disabled,
       visible,
+      receivesEvents,
       options,
     });
     const snapshot = state([option(""), option("all"), option("keep")]);
@@ -253,6 +255,26 @@ describe("core link and form census rules", () => {
       ),
     ).toBe(false);
 
+    // Event blockage (an overlay at the control's center, or pointer-events
+    // none) is churn on either end: blocked at snapshot proves a transition
+    // after the earlier checks; blocked at catch means the action timed out
+    // on the hit target, not on a value that failed to stick.
+    const blockedSnapshot = state([option(""), option("all"), option("keep")], false, true, false);
+    expect(
+      fallbackSelectExerciseFailureIsFatal(
+        blockedSnapshot,
+        state([option(""), option("all"), option("keep")], false, true, false),
+        true,
+      ),
+    ).toBe(false);
+    expect(
+      fallbackSelectExerciseFailureIsFatal(
+        snapshot,
+        state([option(""), option("all"), option("keep")], false, true, false),
+        true,
+      ),
+    ).toBe(false);
+
     // An element that cannot be resolved at all at catch time is churn.
     expect(fallbackSelectExerciseFailureIsFatal(snapshot, undefined, false)).toBe(false);
 
@@ -269,6 +291,14 @@ describe("core link and form census rules", () => {
     // that Playwright's actionability still treats as invisible.
     expect(CENSUS_SPEC_SOURCE).toContain("controlVisible:");
     expect(CENSUS_SPEC_SOURCE).toContain("visible: selectSnapshot.controlVisible,");
+    // Hit-target state is observed on both ends with positive-evidence-only
+    // semantics: pointer-events none or a foreign element at the center marks
+    // blocked; a null (off-viewport) hit counts as unobstructed.
+    expect(CENSUS_SPEC_SOURCE).toContain("controlReceivesEvents:");
+    expect(CENSUS_SPEC_SOURCE).toContain("receivesEvents: selectSnapshot.controlReceivesEvents,");
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      'if (getComputedStyle(select).pointerEvents === "none") return false;',
+    );
     expect(CENSUS_SPEC_SOURCE).toContain("select.getBoundingClientRect().width > 0 &&");
     expect(CENSUS_SPEC_SOURCE).toContain("select.getBoundingClientRect().height > 0 &&");
     // The fallback identity REUSES the node pinned for the name/type reads —
@@ -298,9 +328,7 @@ describe("core link and form census rules", () => {
     // embedding date values) must return to its original shape before the
     // link phase collects hrefs.
     expect(CENSUS_SPEC_SOURCE).toContain("const restored = await fillTarget");
-    expect(CENSUS_SPEC_SOURCE).toContain(
-      "await control.fill(original, { timeout: 5_000 }).catch(() => undefined);",
-    );
+    expect(CENSUS_SPEC_SOURCE).toContain("const restoredReplacement = await control");
     // Downgrade-path cleanup only runs when a fill actually dispatched — a
     // pre-dispatch detachment changed nothing, and restoring into whatever
     // now holds the index would corrupt an unrelated control. A pre-dispatch
@@ -313,6 +341,12 @@ describe("core link and form census rules", () => {
     );
     expect(CENSUS_SPEC_SOURCE).toContain(
       "accepted the census placeholder but could not be restored",
+    );
+    // The downgrade-path remount restore is verified too — a replacement that
+    // rejects the original value fails the census instead of leaving
+    // placeholder-derived state to corrupt later audits.
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      "remounted after a fill and its replacement could not be restored",
     );
     // The link phase re-loads a source page once when a collected href is not
     // visible on revisit — data-dependent links get one settled render before

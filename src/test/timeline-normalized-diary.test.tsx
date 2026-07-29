@@ -21,6 +21,10 @@ const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
 
 const ROOT = resolve(__dirname, "../..");
 const TIMELINE = readFileSync(resolve(ROOT, "src/pages/Timeline.tsx"), "utf8");
+const TIMELINE_EMPTY_STATE_RULES = readFileSync(
+  resolve(ROOT, "src/lib/timelineEmptyStateRules.ts"),
+  "utf8",
+);
 const BADGES = readFileSync(
   resolve(ROOT, "src/components/DiaryEntryBadges.tsx"),
   "utf8",

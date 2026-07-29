@@ -786,11 +786,12 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
     // fails below.
     for (let attempt = 0; name === "" && attempt < 5; attempt += 1) {
       await page.waitForTimeout(250);
-      if (!(await control.isVisible())) break;
       name = normalizeText(await accessibleNameForControl(control).catch(() => ""));
     }
-    // The element under this index vanished while settling — the re-render
-    // removed it, so there is nothing left to audit at this position.
+    // Only an element that is STILL gone after the whole settle window is
+    // skipped as removed; a control that was merely hidden mid-transition
+    // keeps getting re-read above, so a genuinely unnamed one that reappears
+    // still fails the assertion below.
     if (name === "" && !(await control.isVisible())) continue;
     const type = await controlType(control);
     expect(name, `${route.path} has a visible ${type} field without a user-facing name`).not.toBe(
@@ -887,9 +888,16 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
           // route the action or its verification to a look-alike sibling.
           await snapshotTarget.selectOption(alternative, { timeout: 5_000 });
           selectionDispatched = true;
+          // A retained handle can read a DETACHED node's stale value, which
+          // would equal the alternative and record a false exercise — only a
+          // connected node's value counts; detachment yields null and routes
+          // through the catch verdict as post-dispatch churn.
           await expect
             .poll(
-              () => snapshotTarget.evaluate((element) => (element as HTMLSelectElement).value),
+              () =>
+                snapshotTarget.evaluate((element) =>
+                  element.isConnected ? (element as HTMLSelectElement).value : null,
+                ),
               { timeout: 5_000 },
             )
             .toBe(alternative);

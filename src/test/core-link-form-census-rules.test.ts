@@ -126,8 +126,10 @@ describe("core link and form census rules", () => {
     expect(CENSUS_SPEC_SOURCE).toContain(
       "await snapshotTarget.selectOption(alternative, { timeout: 5_000 });",
     );
+    // The success poll only accepts a CONNECTED node's value — a retained
+    // handle can read a detached node's stale value, which must not count.
     expect(CENSUS_SPEC_SOURCE).toContain(
-      "() => snapshotTarget.evaluate((element) => (element as HTMLSelectElement).value)",
+      "element.isConnected ? (element as HTMLSelectElement).value : null,",
     );
     // A fallback control that cannot be pinned is never exercised through the
     // live locator — that would allow snapshotting one select and acting on a

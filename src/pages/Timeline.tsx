@@ -1346,7 +1346,7 @@ export default function Timeline() {
             Clear filters
           </Button>
         </div>
-        {/* Pro advanced filtering: inclusive date range + next-missing-action jump. */}
+        {/* Date range (all plans) + Pro next-missing-action jump. */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
             Date range
@@ -1355,7 +1355,6 @@ export default function Timeline() {
             type="date"
             value={startDateFilter}
             onChange={(e) => setStartDateFilter(e.target.value)}
-            disabled={!advancedTimelineUnlocked}
             aria-label="Filter from date"
             data-testid="timeline-start-date"
             className="rounded-md border border-border/50 bg-background/60 px-2 py-1 text-sm disabled:opacity-50"
@@ -1365,11 +1364,11 @@ export default function Timeline() {
             type="date"
             value={endDateFilter}
             onChange={(e) => setEndDateFilter(e.target.value)}
-            disabled={!advancedTimelineUnlocked}
             aria-label="Filter to date"
             data-testid="timeline-end-date"
             className="rounded-md border border-border/50 bg-background/60 px-2 py-1 text-sm disabled:opacity-50"
           />
+
           <Button
             type="button"
             variant="outline"

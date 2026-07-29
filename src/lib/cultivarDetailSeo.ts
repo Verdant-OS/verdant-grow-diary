@@ -28,6 +28,8 @@ function difficultyPhrase(difficulty: VerdantCultivarProfile["difficulty"]): str
       return "intermediate";
     case "Advanced":
       return "advanced";
+    default:
+      return "variable in difficulty";
   }
 }
 

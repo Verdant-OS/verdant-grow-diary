@@ -73,35 +73,21 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
       );
       submissionAttemptRef.current = attempt;
 
-      const { data: rpcData, error: rpcError } = await (supabase.rpc as unknown as (
-        fn: string,
-        args: Record<string, unknown>,
-      ) => Promise<{ data: unknown; error: { message: string } | null }>)(
-        "breeding_log_save_event",
-        {
-          p_idempotency_key: attempt.idempotencyKey,
-          p_grow_id: activeGrowId,
-          p_plant_id: data.plantId,
-          p_event_type: data.subType,
-          p_tent_id: selectedPlant?.tent_id ?? null,
-          p_method: method,
-          p_intensity: intensity,
-          p_details: details,
-        },
-      );
+      const result = await callBreedingLogSaveEvent({
+        idempotencyKey: attempt.idempotencyKey,
+        growId: activeGrowId,
+        plantId: data.plantId,
+        eventType: data.subType,
+        tentId: selectedPlant?.tent_id ?? null,
+        method,
+        intensity,
+        details,
+      });
 
-      if (rpcError) {
-        throw new Error(`Failed to save event: ${rpcError.message}`);
+      if (!result.ok || !result.growEventId) {
+        throw new Error(`Failed to save event: ${result.reason ?? "unknown_error"}`);
       }
-      const result = rpcData as {
-        ok?: boolean;
-        grow_event_id?: string;
-        reason?: string;
-      } | null;
-      if (!result?.ok || !result.grow_event_id) {
-        throw new Error(`Failed to save event: ${result?.reason ?? "unknown_error"}`);
-      }
-      const eventId = result.grow_event_id;
+      const eventId = result.growEventId;
       submissionAttemptRef.current = null;
 
       // 2. Suggestions are a separate, explicit grower choice. The event still

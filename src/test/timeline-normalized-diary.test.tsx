@@ -173,7 +173,10 @@ describe("Timeline page wiring of normalized diary rules", () => {
   });
 
   it("preserves empty diary state copy", () => {
-    expect(TIMELINE).toMatch(/No entries yet/);
+    // The literal copy now lives in the pure rules module; Timeline renders
+    // it through the shared TimelineEmptyState presenter.
+    expect(TIMELINE).toMatch(/TimelineEmptyState/);
+    expect(TIMELINE_EMPTY_STATE_RULES).toMatch(/No entries yet/);
   });
 
   it("does not introduce service_role or device-control surfaces", () => {

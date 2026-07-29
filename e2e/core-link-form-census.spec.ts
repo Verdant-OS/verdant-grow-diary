@@ -835,6 +835,19 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
       const fallbackSnapshotHandle = hasStableNamedControl
         ? null
         : await stableControl.elementHandle({ timeout: 5_000 }).catch(() => null);
+      // A fallback control that cannot be pinned cannot be exercised with an
+      // identity guarantee — exercising the live nth() query instead could
+      // snapshot one select and act on a later look-alike at that index.
+      if (!hasStableNamedControl && fallbackSnapshotHandle === null) {
+        audits.push({
+          route: route.path,
+          name,
+          type,
+          exercised: false,
+          reason: "could not pin the control before exercising it",
+        });
+        continue;
+      }
       const snapshotTarget = fallbackSnapshotHandle ?? stableControl;
       const selectSnapshot = await snapshotTarget.evaluate((element) => {
         const select = element as HTMLSelectElement;
@@ -899,6 +912,11 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
           .evaluate((element) => {
             const select = element as HTMLSelectElement;
             return {
+              // A retained handle can still evaluate a DETACHED node with its
+              // state intact ("Element is not attached to the DOM" from the
+              // action, unchanged options here) — only a connected node can
+              // prove the failure was not a re-render replacing it.
+              connected: select.isConnected,
               disabled: select.matches(":disabled"),
               options: Array.from(select.options, (option) => ({
                 value: option.value,
@@ -911,7 +929,7 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
           fallbackSelectExerciseFailureIsFatal(
             { disabled: selectSnapshot.controlDisabled, options: selectSnapshot.options },
             liveState,
-            fallbackSnapshotHandle !== null && liveState !== undefined,
+            liveState?.connected ?? false,
           )
         ) {
           throw error;

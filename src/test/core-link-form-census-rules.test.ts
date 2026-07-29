@@ -129,6 +129,16 @@ describe("core link and form census rules", () => {
     expect(CENSUS_SPEC_SOURCE).toContain(
       "() => snapshotTarget.evaluate((element) => (element as HTMLSelectElement).value)",
     );
+    // A fallback control that cannot be pinned is never exercised through the
+    // live locator — that would allow snapshotting one select and acting on a
+    // look-alike at the same index.
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      'reason: "could not pin the control before exercising it"',
+    );
+    // A retained handle can evaluate a DETACHED node with its state intact, so
+    // the fatal verdict requires the node to still be connected.
+    expect(CENSUS_SPEC_SOURCE).toContain("connected: select.isConnected,");
+    expect(CENSUS_SPEC_SOURCE).toContain("liveState?.connected ?? false,");
   });
 
   it("keeps a stable-but-broken fallback select fatal while downgrading verified churn", () => {

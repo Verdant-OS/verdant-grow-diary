@@ -259,9 +259,13 @@ describe("core link and form census rules", () => {
     expect(CENSUS_SPEC_SOURCE).toContain('controlDisabled: select.matches(":disabled"),');
     expect(CENSUS_SPEC_SOURCE).toContain('disabled: select.matches(":disabled"),');
     // Effective visibility is observed on both ends so a control hidden by an
-    // async transition reads as churn, not as a broken stable select.
+    // async transition reads as churn, not as a broken stable select. The box
+    // must have nonzero AREA — getClientRects() can return a zero-area rect
+    // that Playwright's actionability still treats as invisible.
     expect(CENSUS_SPEC_SOURCE).toContain("controlVisible:");
     expect(CENSUS_SPEC_SOURCE).toContain("visible: selectSnapshot.controlVisible,");
+    expect(CENSUS_SPEC_SOURCE).toContain("select.getBoundingClientRect().width > 0 &&");
+    expect(CENSUS_SPEC_SOURCE).toContain("select.getBoundingClientRect().height > 0 &&");
     expect(CENSUS_SPEC_SOURCE).toContain(
       "await stableControl.elementHandle({ timeout: 5_000 }).catch(() => null);",
     );

@@ -861,7 +861,9 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
           // hidden.
           controlDisabled: select.matches(":disabled"),
           controlVisible:
-            select.getClientRects().length > 0 && getComputedStyle(select).visibility !== "hidden",
+            select.getBoundingClientRect().width > 0 &&
+            select.getBoundingClientRect().height > 0 &&
+            getComputedStyle(select).visibility !== "hidden",
           options: Array.from(select.options, (option) => ({
             value: option.value,
             disabled: option.disabled,
@@ -931,7 +933,8 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
               connected: select.isConnected,
               disabled: select.matches(":disabled"),
               visible:
-                select.getClientRects().length > 0 &&
+                select.getBoundingClientRect().width > 0 &&
+                select.getBoundingClientRect().height > 0 &&
                 getComputedStyle(select).visibility !== "hidden",
               options: Array.from(select.options, (option) => ({
                 value: option.value,

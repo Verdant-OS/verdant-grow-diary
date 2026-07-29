@@ -277,14 +277,20 @@ describe("core link and form census rules", () => {
     // PINNED node, so a transient reorder cannot lend the unnamed control a
     // named sibling's name — and only a node that vanished or stayed hidden
     // through the settle window is skipped rather than reported as unnamed.
+    // The node is pinned BEFORE the first name read; every subsequent name
+    // and type read goes through that pinned element, so no read can straddle
+    // a reorder onto a named sibling.
     expect(CENSUS_SPEC_SOURCE).toContain(
-      "const unnamedHandle = await control.elementHandle({ timeout: 1_000 }).catch(() => null);",
+      "const pinnedControl = await control.elementHandle({ timeout: 1_000 }).catch(() => null);",
     );
     expect(CENSUS_SPEC_SOURCE).toContain(
-      'for (let attempt = 0; name === "" && unnamedHandle && attempt < 5; attempt += 1) {',
+      'for (let attempt = 0; name === "" && pinnedControl && attempt < 5; attempt += 1) {',
     );
     expect(CENSUS_SPEC_SOURCE).toContain(
-      "name = normalizeText(await accessibleNameForControl(unnamedHandle)",
+      "name = normalizeText(await accessibleNameForControl(pinnedControl)",
+    );
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      "const type = await controlType(pinnedControl ?? control);",
     );
     // An index whose live element is no longer the pinned node — detached OR
     // displaced by a visible replacement — is re-audited once (bounded by the

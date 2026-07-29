@@ -752,7 +752,9 @@ async function accessibleNameForControl(
   });
 }
 
-async function controlType(locator: Locator): Promise<string> {
+async function controlType(
+  locator: Locator | ElementHandle<SVGElement | HTMLElement>,
+): Promise<string> {
   return locator.evaluate((element) => {
     if (element instanceof HTMLInputElement) return element.type || "text";
     if (element instanceof HTMLTextAreaElement) return "textarea";
@@ -787,17 +789,20 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
     if (!(await control.isVisible())) continue;
     if (await isVisuallyHiddenImplementationControl(control)) continue;
 
-    let name = normalizeText(await accessibleNameForControl(control).catch(() => ""));
+    // Pin the node BEFORE the first name read so every read below describes
+    // one element: separate live nth() resolutions can straddle a reorder and
+    // pin (or read) a named sibling instead of the control under audit.
+    const pinnedControl = await control.elementHandle({ timeout: 1_000 }).catch(() => null);
+    let name = pinnedControl
+      ? normalizeText(await accessibleNameForControl(pinnedControl).catch(() => ""))
+      : "";
     if (name === "") {
-      // A sibling control's exercise can re-render the page while the live
-      // nth() query is being read, transiently reading as unnamed. Pin the
-      // unnamed node and re-read THIS element briefly before judging — a
-      // retry through the live index could adopt a named sibling's name
-      // during a transient reorder and audit the unnamed control under it.
-      const unnamedHandle = await control.elementHandle({ timeout: 1_000 }).catch(() => null);
-      for (let attempt = 0; name === "" && unnamedHandle && attempt < 5; attempt += 1) {
+      // A sibling control's exercise can re-render the page mid-read,
+      // transiently reading as unnamed. Re-read THIS pinned element briefly
+      // before judging; a genuinely unnamed control stays empty throughout.
+      for (let attempt = 0; name === "" && pinnedControl && attempt < 5; attempt += 1) {
         await page.waitForTimeout(250);
-        name = normalizeText(await accessibleNameForControl(unnamedHandle).catch(() => ""));
+        name = normalizeText(await accessibleNameForControl(pinnedControl).catch(() => ""));
       }
       if (name === "") {
         // A pinned node that is still connected and visible after the whole
@@ -806,8 +811,8 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
         // DETACHED may have a live replacement at this index, so the index is
         // re-audited once — an unnamed replacement must not slip through
         // unaudited just because its predecessor churned away.
-        const pinnedState = unnamedHandle
-          ? await unnamedHandle
+        const pinnedState = pinnedControl
+          ? await pinnedControl
               .evaluate((element) => ({
                 connected: element.isConnected,
                 visible:
@@ -824,7 +829,7 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
           // cannot escape the census. An index still holding the pinned
           // (hidden or gone) node has nothing else to audit.
           const indexStillPinnedNode = await control
-            .evaluate((element, pinned) => pinned !== null && element === pinned, unnamedHandle, {
+            .evaluate((element, pinned) => pinned !== null && element === pinned, pinnedControl, {
               timeout: 1_000,
             })
             .catch(() => false);
@@ -836,7 +841,7 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
         }
       }
     }
-    const type = await controlType(control);
+    const type = await controlType(pinnedControl ?? control);
     expect(name, `${route.path} has a visible ${type} field without a user-facing name`).not.toBe(
       "",
     );

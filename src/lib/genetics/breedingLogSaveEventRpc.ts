@@ -36,7 +36,7 @@ export interface BreedingLogSaveEventResult {
 type RpcInvoker = (
   fn: string,
   args: Record<string, unknown>,
-) => Promise<{ data: unknown; error: { message: string } | null }>;
+) => Promise<{ data: unknown; error: unknown }>;
 
 interface RawResult {
   ok?: boolean;
@@ -44,11 +44,19 @@ interface RawResult {
   reason?: string;
 }
 
+function readErrorMessage(error: unknown): string {
+  if (error && typeof error === "object" && "message" in error) {
+    const m = (error as { message?: unknown }).message;
+    if (typeof m === "string" && m.length > 0) return m;
+  }
+  return "unknown_error";
+}
+
 export async function callBreedingLogSaveEvent(
   args: BreedingLogSaveEventArgs,
 ): Promise<BreedingLogSaveEventResult> {
   const invoke = supabase.rpc as unknown as RpcInvoker;
-  const { data, error } = await invoke("breeding_log_save_event", {
+  const { data, error } = await invoke(BREEDING_LOG_SAVE_EVENT_RPC_NAME, {
     p_idempotency_key: args.idempotencyKey,
     p_grow_id: args.growId,
     p_plant_id: args.plantId,
@@ -60,7 +68,10 @@ export async function callBreedingLogSaveEvent(
   });
 
   if (error) {
-    throw new Error(`Failed to save event: ${error.message}`);
+    if (isMissingRpcError(error, BREEDING_LOG_SAVE_EVENT_RPC_NAME)) {
+      throw new MissingAuditRpcError(BREEDING_LOG_SAVE_EVENT_RPC_NAME, error);
+    }
+    throw new Error(`Failed to save event: ${readErrorMessage(error)}`);
   }
 
   const raw = (data ?? null) as RawResult | null;

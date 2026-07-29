@@ -442,12 +442,12 @@ export default function Timeline() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDateFilter, endDateFilter]);
 
-  // Applied bounds: only when the Pro gate is open and values are valid
-  // ISO dates. An inverted range applies nothing (honest no-op + notice).
-  const appliedStartDate =
-    advancedTimelineUnlocked && isTimelineDateFilterValue(startDateFilter) ? startDateFilter : null;
-  const appliedEndDate =
-    advancedTimelineUnlocked && isTimelineDateFilterValue(endDateFilter) ? endDateFilter : null;
+  // Applied bounds: any valid ISO date applies. Date-range filtering is
+  // available on every plan — it is a purely client/query-level narrowing of
+  // the grower's OWN already-authorized diary rows, so there is no cost or
+  // trust surface to gate. An inverted range applies nothing (honest no-op).
+  const appliedStartDate = isTimelineDateFilterValue(startDateFilter) ? startDateFilter : null;
+  const appliedEndDate = isTimelineDateFilterValue(endDateFilter) ? endDateFilter : null;
   const dateRangeInvalid =
     appliedStartDate !== null && appliedEndDate !== null && appliedStartDate > appliedEndDate;
   const effectiveStartDate = dateRangeInvalid ? null : appliedStartDate;
@@ -1346,7 +1346,7 @@ export default function Timeline() {
             Clear filters
           </Button>
         </div>
-        {/* Pro advanced filtering: inclusive date range + next-missing-action jump. */}
+        {/* Date range (all plans) + Pro next-missing-action jump. */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
             Date range
@@ -1355,7 +1355,6 @@ export default function Timeline() {
             type="date"
             value={startDateFilter}
             onChange={(e) => setStartDateFilter(e.target.value)}
-            disabled={!advancedTimelineUnlocked}
             aria-label="Filter from date"
             data-testid="timeline-start-date"
             className="rounded-md border border-border/50 bg-background/60 px-2 py-1 text-sm disabled:opacity-50"
@@ -1365,11 +1364,11 @@ export default function Timeline() {
             type="date"
             value={endDateFilter}
             onChange={(e) => setEndDateFilter(e.target.value)}
-            disabled={!advancedTimelineUnlocked}
             aria-label="Filter to date"
             data-testid="timeline-end-date"
             className="rounded-md border border-border/50 bg-background/60 px-2 py-1 text-sm disabled:opacity-50"
           />
+
           <Button
             type="button"
             variant="outline"
@@ -1415,8 +1414,8 @@ export default function Timeline() {
             className="text-[11px] text-muted-foreground"
             data-testid="timeline-advanced-filters-locked"
           >
-            Date-range filtering and the next-missing-action jump are part of Advanced timeline
-            filtering, a Pro feature.{" "}
+            The next-missing-action jump is part of Advanced timeline filtering, a Pro feature.
+            Date-range filtering is available on every plan.{" "}
             <Link to="/pricing" className="text-primary hover:underline">
               See plans
             </Link>

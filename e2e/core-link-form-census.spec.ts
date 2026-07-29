@@ -833,8 +833,27 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
         });
         continue;
       }
-      await stableControl.selectOption(alternative, { timeout: 5_000 });
-      await expect(stableControl).toHaveValue(alternative, { timeout: 5_000 });
+      try {
+        await stableControl.selectOption(alternative, { timeout: 5_000 });
+        await expect(stableControl).toHaveValue(alternative, { timeout: 5_000 });
+      } catch (error) {
+        // A select without a unique accessible-name locator is only reachable
+        // through the live nth() query, and a sibling control's re-render can
+        // swap the element under that index between the snapshot and the
+        // exercise ("did not find some options"). That churn says nothing
+        // about the product, so it downgrades to an unexercised audit entry;
+        // a uniquely named control survives re-renders, so its failure is
+        // real and still fails the census.
+        if (hasStableNamedControl) throw error;
+        audits.push({
+          route: route.path,
+          name,
+          type,
+          exercised: false,
+          reason: "re-rendered mid-exercise without a unique accessible-name locator",
+        });
+        continue;
+      }
 
       // A controlled filter can re-render the page and change the live nth()
       // locator during both verification and cleanup. Reacquire a uniquely

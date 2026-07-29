@@ -103,6 +103,13 @@ describe("core link and form census rules", () => {
     );
   });
 
+  it("downgrades nth-fallback select churn to an unexercised audit instead of a census failure", () => {
+    expect(CENSUS_SPEC_SOURCE).toContain("if (hasStableNamedControl) throw error;");
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      'reason: "re-rendered mid-exercise without a unique accessible-name locator"',
+    );
+  });
+
   it("derives a select alternative from the reacquired control's current options", () => {
     const staleAlternative = selectAvailableAlternativeValue(
       [

@@ -110,6 +110,14 @@ describe("core link and form census rules", () => {
     );
   });
 
+  it("keeps a stable-but-broken fallback select fatal by verifying churn before downgrading", () => {
+    // A fallback select whose options still match the pre-exercise snapshot
+    // did not churn — its value failing to stick is a product defect, and the
+    // census must not swallow it as re-render noise.
+    expect(CENSUS_SPEC_SOURCE).toContain("if (optionsUnchanged) throw error;");
+    expect(CENSUS_SPEC_SOURCE).toContain("selectSnapshot.options.map((option) => option.value),");
+  });
+
   it("derives a select alternative from the reacquired control's current options", () => {
     const staleAlternative = selectAvailableAlternativeValue(
       [

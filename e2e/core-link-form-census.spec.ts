@@ -845,6 +845,26 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
         // a uniquely named control survives re-renders, so its failure is
         // real and still fails the census.
         if (hasStableNamedControl) throw error;
+        // Only verified churn downgrades. If the element under the live nth()
+        // query still shows the snapshotted options, the alternative was
+        // selectable the whole time and the value simply did not stick — a
+        // broken onChange, not churn — so the failure must stay fatal.
+        const optionsUnchanged = await stableControl
+          .evaluate(
+            (element, expected) => {
+              const select = element as HTMLSelectElement;
+              return (
+                select.options.length === expected.length &&
+                Array.from(select.options).every(
+                  (option, optionIndex) => option.value === expected[optionIndex],
+                )
+              );
+            },
+            selectSnapshot.options.map((option) => option.value),
+            { timeout: 5_000 },
+          )
+          .catch(() => false);
+        if (optionsUnchanged) throw error;
         audits.push({
           route: route.path,
           name,

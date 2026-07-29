@@ -892,15 +892,14 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
       const namedControl = page.getByRole("combobox", { name, exact: true });
       const hasStableNamedControl = (await namedControl.count()) === 1;
       const stableControl = hasStableNamedControl ? namedControl : control;
-      // Pin the DOM node a fallback select resolves to BEFORE snapshotting,
-      // and snapshot through the pinned node so both describe the same
-      // element: repeated selects can share an identical option list, so on
-      // failure only node identity can distinguish "the nth() index moved to
-      // a look-alike sibling" (churn) from "this very element dropped the
-      // value" (product defect).
-      const fallbackSnapshotHandle = hasStableNamedControl
-        ? null
-        : await stableControl.elementHandle({ timeout: 5_000 }).catch(() => null);
+      // The fallback identity is the SAME pinned node the name and type were
+      // read from — acquiring a fresh handle here could pin a sibling after a
+      // reorder while name/type still describe the original. Repeated selects
+      // can share an identical option list, so on failure only this node
+      // identity can distinguish "the nth() index moved to a look-alike
+      // sibling" (churn) from "this very element dropped the value" (product
+      // defect).
+      const fallbackSnapshotHandle = hasStableNamedControl ? null : pinnedControl;
       // A fallback control that cannot be pinned cannot be exercised with an
       // identity guarantee — exercising the live nth() query instead could
       // snapshot one select and act on a later look-alike at that index.
@@ -1059,18 +1058,31 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
       continue;
     }
 
-    const original = await control.inputValue().catch(() => "");
+    // The fill exercise goes through the same pinned node the name and type
+    // describe, so a transient sibling can never absorb the fill and get the
+    // original recorded as exercised. Verification stays STRICT — a value
+    // that does not stick fails the census; only the resolution is pinned.
+    const fillTarget = pinnedControl ?? control;
+    const original = await fillTarget.inputValue().catch(() => "");
     const field = {
       type,
       accessibleName: name,
-      min: await control.getAttribute("min"),
-      max: await control.getAttribute("max"),
-      step: await control.getAttribute("step"),
+      min: await fillTarget.getAttribute("min"),
+      max: await fillTarget.getAttribute("max"),
+      step: await fillTarget.getAttribute("step"),
     };
     const placeholder = placeholderValueForField(field);
-    await control.fill(placeholder);
-    await expect(control).toHaveValue(placeholder);
-    await control.fill(original);
+    await fillTarget.fill(placeholder);
+    await expect
+      .poll(
+        () =>
+          fillTarget.evaluate((element) =>
+            element.isConnected ? ((element as HTMLInputElement).value ?? null) : null,
+          ),
+        { timeout: 5_000 },
+      )
+      .toBe(placeholder);
+    await fillTarget.fill(original);
     audits.push({ route: route.path, name, type, exercised: true });
   }
 

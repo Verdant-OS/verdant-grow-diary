@@ -266,9 +266,17 @@ describe("core link and form census rules", () => {
     expect(CENSUS_SPEC_SOURCE).toContain("visible: selectSnapshot.controlVisible,");
     expect(CENSUS_SPEC_SOURCE).toContain("select.getBoundingClientRect().width > 0 &&");
     expect(CENSUS_SPEC_SOURCE).toContain("select.getBoundingClientRect().height > 0 &&");
+    // The fallback identity REUSES the node pinned for the name/type reads —
+    // a fresh handle here could pin a sibling after a reorder while name and
+    // type still describe the original.
     expect(CENSUS_SPEC_SOURCE).toContain(
-      "await stableControl.elementHandle({ timeout: 5_000 }).catch(() => null);",
+      "const fallbackSnapshotHandle = hasStableNamedControl ? null : pinnedControl;",
     );
+    // The fill exercise resolves through the same pinned node too, with
+    // STRICT connected-value verification — no downgrade path for fills.
+    expect(CENSUS_SPEC_SOURCE).toContain("const fillTarget = pinnedControl ?? control;");
+    expect(CENSUS_SPEC_SOURCE).toContain("await fillTarget.fill(placeholder);");
+    expect(CENSUS_SPEC_SOURCE).not.toContain("await control.fill(placeholder);");
   });
 
   it("settles a transiently unnamed control before asserting it lacks a user-facing name", () => {

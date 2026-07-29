@@ -1200,20 +1200,35 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
         continue;
       }
 
-      // A controlled filter can re-render the page and change the live nth()
-      // locator during both verification and cleanup. Reacquire a uniquely
-      // named control across renders, and restore only when the original option
-      // still exists; cleanup must never turn a successfully exercised field
-      // into a test-wide timeout.
-      if (hasStableNamedControl) {
-        const originalStillExists = await stableControl
-          .locator("option")
-          .evaluateAll(
-            (options, expected) =>
-              options.some((option) => (option as HTMLOptionElement).value === expected),
-            original,
-          );
-        if (originalStillExists) {
+      // Restore through the pinned node — the exercised element itself. The
+      // named locator is not identity-safe for restoration either: the same
+      // name migration that broke name-resolved exercise would restore a
+      // sibling while the exercised select kept the alternative. The named
+      // locator remains only as a detachment fallback, guarded by the
+      // logical-replacement check (it must hold the dispatched alternative).
+      // Cleanup stays best-effort: it must never turn a successfully
+      // exercised field into a test-wide timeout.
+      const pinnedHoldsOriginalOption = await snapshotTarget
+        .evaluate(
+          (element, expected) =>
+            element.isConnected &&
+            Array.from((element as HTMLSelectElement).options).some(
+              (option) => option.value === expected,
+            ),
+          original,
+        )
+        .catch(() => false);
+      if (pinnedHoldsOriginalOption) {
+        await snapshotTarget.selectOption(original, { timeout: 5_000 }).catch(() => undefined);
+      } else if (hasStableNamedControl) {
+        const namedHoldsAlternative = await stableControl
+          .evaluate(
+            (element, expected) => (element as HTMLSelectElement).value === expected,
+            alternative,
+            { timeout: 1_000 },
+          )
+          .catch(() => false);
+        if (namedHoldsAlternative) {
           await stableControl.selectOption(original, { timeout: 5_000 }).catch(() => undefined);
         }
       }

@@ -292,16 +292,23 @@ describe("core link and form census rules", () => {
     // placeholder and page content derived from the field (e.g. hrefs
     // embedding date values) must return to its original shape before the
     // link phase collects hrefs.
-    expect(CENSUS_SPEC_SOURCE).toContain(
-      "await fillTarget.fill(original, { timeout: 5_000 }).catch(async () => {",
-    );
+    expect(CENSUS_SPEC_SOURCE).toContain("const restored = await fillTarget");
     expect(CENSUS_SPEC_SOURCE).toContain(
       "await control.fill(original, { timeout: 5_000 }).catch(() => undefined);",
     );
     // Downgrade-path cleanup only runs when a fill actually dispatched — a
     // pre-dispatch detachment changed nothing, and restoring into whatever
-    // now holds the index would corrupt an unrelated control.
+    // now holds the index would corrupt an unrelated control. A pre-dispatch
+    // detachment also re-audits a displaced index so the replacement is not
+    // orphaned, and a field that accepted the placeholder but cannot be
+    // restored fails the census outright.
     expect(CENSUS_SPEC_SOURCE).toContain("if (fillDispatched) {");
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      "if (!fillDispatched && !(await liveIndexHoldsPinnedNode())) {",
+    );
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      "accepted the census placeholder but could not be restored",
+    );
     // The link phase re-loads a source page once when a collected href is not
     // visible on revisit — data-dependent links get one settled render before
     // the unchanged strict assertion.

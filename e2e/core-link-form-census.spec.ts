@@ -1143,16 +1143,39 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
           ? "re-rendered in response to a fill before value verification"
           : "re-rendered before the fill could be dispatched",
       });
+      // A pre-dispatch detachment may have left a visible replacement at
+      // this index; give it the bounded re-audit pass so an unnamed or
+      // broken replacement cannot escape unaudited.
+      if (!fillDispatched && !(await liveIndexHoldsPinnedNode())) {
+        reauditIndexOnce();
+      }
       continue;
     }
     // Restore prefers the pinned handle while it remains connected — a
     // reorder without detachment must not restore a sibling and leave the
-    // audited field at the placeholder. Only a remount between verification
-    // and cleanup falls back to the live locator, whose replacement holds the
-    // dispatched placeholder.
-    await fillTarget.fill(original, { timeout: 5_000 }).catch(async () => {
-      await control.fill(original, { timeout: 5_000 }).catch(() => undefined);
-    });
+    // audited field at the placeholder. The live-locator fallback runs ONLY
+    // after confirmed detachment (a remount whose replacement holds the
+    // dispatched placeholder), and an unrestorable field is FATAL: a field
+    // that accepted the placeholder but cannot return to its original value
+    // is a product defect, and silently leaving placeholder-derived state
+    // would corrupt every later field and link audit.
+    const restored = await fillTarget
+      .fill(original, { timeout: 5_000 })
+      .then(() => true)
+      .catch(async () => {
+        const pinnedGone = pinnedControl
+          ? !(await pinnedControl.evaluate((element) => element.isConnected).catch(() => false))
+          : true;
+        if (!pinnedGone) return false;
+        return await control
+          .fill(original, { timeout: 5_000 })
+          .then(() => true)
+          .catch(() => false);
+      });
+    expect(
+      restored,
+      `${route.path} field "${name}" accepted the census placeholder but could not be restored`,
+    ).toBe(true);
     audits.push({ route: route.path, name, type, exercised: true });
   }
 

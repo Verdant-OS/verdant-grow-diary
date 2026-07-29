@@ -45,9 +45,26 @@ function ensureLocalStorage(): Storage {
       "[localStorageTestHelper] window is not defined; ensure vitest is running with jsdom.",
     );
   }
+
+  const descriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
+
+  // Node 26 exposes a non-enumerable process-global localStorage accessor.
+  // Reading it without --localstorage-file emits an ExperimentalWarning before
+  // returning an unusable value. A browser/jsdom localStorage accessor is
+  // enumerable, so skip only the Node host accessor and install the test shim
+  // below without invoking it.
+  if (descriptor?.get && descriptor.enumerable === false) {
+    const shim = new InMemoryStorageShim();
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      writable: true,
+      value: shim,
+    });
+    return shim;
+  }
+
   try {
-    const existing = (window as unknown as { localStorage?: Storage })
-      .localStorage;
+    const existing = (window as unknown as { localStorage?: Storage }).localStorage;
     if (existing && typeof existing.setItem === "function") {
       return existing;
     }

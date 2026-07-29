@@ -23,6 +23,33 @@ import {
 } from "./helpers/localStorageTestHelper";
 
 describe("localStorage test helper — setup order", () => {
+  it("does not invoke a non-enumerable Node host accessor", () => {
+    const original = Object.getOwnPropertyDescriptor(window, "localStorage");
+    let reads = 0;
+
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      enumerable: false,
+      get() {
+        reads += 1;
+        throw new Error("host localStorage getter should not be read");
+      },
+    });
+
+    try {
+      const storage = ensureLocalStorageForTest();
+      expect(reads).toBe(0);
+      storage.setItem("verdant.helper-proof.host-accessor", "safe");
+      expect(storage.getItem("verdant.helper-proof.host-accessor")).toBe("safe");
+    } finally {
+      if (original) {
+        Object.defineProperty(window, "localStorage", original);
+      } else {
+        Reflect.deleteProperty(window, "localStorage");
+      }
+    }
+  });
+
   it("window.localStorage exists before this test body runs", () => {
     expect(typeof window).toBe("object");
     expect(window.localStorage).toBeDefined();
@@ -31,8 +58,7 @@ describe("localStorage test helper — setup order", () => {
 
   it("globalThis.localStorage exists before this test body runs", () => {
     // jsdom mirrors window.localStorage onto globalThis as `localStorage`.
-    const ls = (globalThis as unknown as { localStorage?: Storage })
-      .localStorage;
+    const ls = (globalThis as unknown as { localStorage?: Storage }).localStorage;
     expect(ls).toBeDefined();
     expect(typeof ls!.getItem).toBe("function");
   });
@@ -46,9 +72,7 @@ describe("localStorage test helper — setup order", () => {
   it("removeLocalStorageItemForTest clears a single key", () => {
     setLocalStorageItemForTest("verdant.helper-proof.removable", "x");
     removeLocalStorageItemForTest("verdant.helper-proof.removable");
-    expect(getLocalStorageItemForTest("verdant.helper-proof.removable")).toBe(
-      null,
-    );
+    expect(getLocalStorageItemForTest("verdant.helper-proof.removable")).toBe(null);
   });
 
   it("clearLocalStorageForTest empties storage", () => {

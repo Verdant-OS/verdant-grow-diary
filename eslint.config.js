@@ -54,6 +54,15 @@ export default tseslint.config(
       "import/no-unresolved": ["error", { commonjs: false, caseSensitiveStrict: false }],
     },
   },
+  // Playwright specs resolve some modules through the *browser* at runtime
+  // (`page.evaluate(() => import("/src/lib/..."))` is a Vite dev-server URL,
+  // not a Node module specifier). Node-side resolution can never see those.
+  {
+    files: ["e2e/**/*.{ts,tsx}"],
+    rules: {
+      "import/no-unresolved": ["error", { ignore: ["^/src/"] }],
+    },
+  },
   {
     files: ["src/components/ui/**/*.{ts,tsx}", "src/store/**/*.{ts,tsx}"],
     rules: { "react-refresh/only-export-components": "off" },

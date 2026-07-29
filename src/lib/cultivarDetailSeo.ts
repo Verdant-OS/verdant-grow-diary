@@ -8,7 +8,7 @@
  * stays authoritative. The visible FAQ rendered from these items is the single
  * source of truth for the FAQPage JSON-LD (no schema-only claims).
  */
-import type { VerdantCultivarProfile } from "@/constants/verdantCultivars";
+import type { VerdantCultivarProfile } from "@/constants/strainReferenceLibrary";
 
 export interface CultivarFaqItem {
   question: string;

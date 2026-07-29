@@ -7,6 +7,7 @@
  */
 import { describe, it, expect } from "vitest";
 import {
+  buildTimelineNameLookup,
   deriveTimelineEventTypeOptions,
   deriveTimelinePlantOptions,
   deriveTimelineTentOptions,
@@ -225,6 +226,103 @@ describe("derived option lists", () => {
   it("deriveTimelineEventTypeOptions enumerates distinct event types", () => {
     const opts = deriveTimelineEventTypeOptions(ROWS);
     expect(opts.map((o) => o.id)).toEqual(["feeding", "note", "watering"]);
+  });
+});
+
+describe("archived/merged name resolution (presenter)", () => {
+  // Diary rows referencing an archived plant/tent: no snapshot name in
+  // details, entity absent from the active-entity queries. The directory
+  // lookup (loaded without the is_archived filter) must still label them.
+  const ARCHIVED_ROWS = [
+    {
+      id: "a1",
+      note: "Watered before archive",
+      stage: "veg",
+      plant_id: "5d7206aa-0000-4000-8000-000000000001",
+      tent_id: "6b1faabb-0000-4000-8000-000000000002",
+      details: { event_type: "watering" },
+    },
+    {
+      id: "a2",
+      note: "Second log",
+      stage: "veg",
+      plant_id: "5d7206aa-0000-4000-8000-000000000001",
+      tent_id: "6b1faabb-0000-4000-8000-000000000002",
+      details: { event_type: "note" },
+    },
+  ];
+
+  it("plant label resolves from the directory when the plant is archived/merged", () => {
+    const directory = new Map([["5d7206aa-0000-4000-8000-000000000001", "Project McDonald #3"]]);
+    const opts = deriveTimelinePlantOptions(ARCHIVED_ROWS, directory);
+    expect(opts).toEqual([
+      { id: "5d7206aa-0000-4000-8000-000000000001", label: "Project McDonald #3", count: 2 },
+    ]);
+  });
+
+  it("tent label resolves from the directory when the tent is archived", () => {
+    const directory = new Map([["6b1faabb-0000-4000-8000-000000000002", "Retired 4x4"]]);
+    const opts = deriveTimelineTentOptions(ARCHIVED_ROWS, directory);
+    expect(opts).toEqual([
+      { id: "6b1faabb-0000-4000-8000-000000000002", label: "Retired 4x4", count: 2 },
+    ]);
+  });
+
+  it("directory name wins over the row's snapshot plant_name (rename-aware)", () => {
+    const directory = new Map([["p1", "Blue Dream (renamed)"]]);
+    const opts = deriveTimelinePlantOptions(ROWS, directory);
+    expect(opts.find((o) => o.id === "p1")?.label).toBe("Blue Dream (renamed)");
+    // p2 is absent from the directory but keeps its snapshot name.
+    expect(opts.find((o) => o.id === "p2")?.label).toBe("Northern Lights");
+  });
+
+  it("falls back to 'Archived plant/tent' + fragment only when a loaded directory cannot resolve the id", () => {
+    const emptyDirectory = new Map<string, string>();
+    const plantOpts = deriveTimelinePlantOptions(ARCHIVED_ROWS, emptyDirectory);
+    expect(plantOpts[0]?.label).toBe("Archived plant 5d7206");
+    const tentOpts = deriveTimelineTentOptions(ARCHIVED_ROWS, emptyDirectory);
+    expect(tentOpts[0]?.label).toBe("Archived tent 6b1faa");
+  });
+
+  it("keeps the neutral fragment label while the directory is unavailable (null/undefined)", () => {
+    expect(deriveTimelinePlantOptions(ARCHIVED_ROWS)[0]?.label).toBe("Plant 5d7206");
+    expect(deriveTimelinePlantOptions(ARCHIVED_ROWS, null)[0]?.label).toBe("Plant 5d7206");
+    expect(deriveTimelineTentOptions(ARCHIVED_ROWS, null)[0]?.label).toBe("Tent 6b1faa");
+  });
+});
+
+describe("buildTimelineNameLookup", () => {
+  it("returns null (lookup unavailable) for non-array input", () => {
+    expect(buildTimelineNameLookup(null)).toBeNull();
+    expect(buildTimelineNameLookup(undefined)).toBeNull();
+    expect(buildTimelineNameLookup({})).toBeNull();
+    expect(buildTimelineNameLookup("rows")).toBeNull();
+  });
+
+  it("builds a trimmed id → name map and skips malformed rows", () => {
+    const lookup = buildTimelineNameLookup([
+      { id: " p1 ", name: "  Blue Dream  " },
+      { id: "p2", name: "" },
+      { id: "", name: "No id" },
+      { id: "p3" },
+      { id: "p4", name: 42 },
+      null,
+      "junk",
+      { id: "p5", name: "Kept" },
+    ]);
+    expect(lookup).not.toBeNull();
+    expect(lookup?.size).toBe(2);
+    expect(lookup?.get("p1")).toBe("Blue Dream");
+    expect(lookup?.get("p5")).toBe("Kept");
+  });
+
+  it("is deterministic: first name wins on duplicate ids, empty array → empty map", () => {
+    const lookup = buildTimelineNameLookup([
+      { id: "p1", name: "First" },
+      { id: "p1", name: "Second" },
+    ]);
+    expect(lookup?.get("p1")).toBe("First");
+    expect(buildTimelineNameLookup([])?.size).toBe(0);
   });
 });
 

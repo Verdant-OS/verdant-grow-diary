@@ -322,6 +322,53 @@ describe("Timeline mounted read-state boundary", () => {
     expectNoTimelineContinuation();
   });
 
+  it("labels plant/tent filter options from the archived-inclusive name directory", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry("entry-archived-refs", "Log against archived plant"),
+              plant_id: "5d7206aa-0000-4000-8000-000000000001",
+              tent_id: "6b1faabb-0000-4000-8000-000000000002",
+            },
+          ],
+          error: null,
+          count: 1,
+        };
+      }
+      if (spec.table === "plants") {
+        // The directory read must NOT filter on is_archived — archived
+        // rows still carry names and must stay resolvable.
+        expect(spec.filters.some((f) => f.column === "is_archived")).toBe(false);
+        return {
+          data: [{ id: "5d7206aa-0000-4000-8000-000000000001", name: "Project McDonald #3" }],
+          error: null,
+        };
+      }
+      if (spec.table === "tents") {
+        expect(spec.filters.some((f) => f.column === "is_archived")).toBe(false);
+        return {
+          data: [{ id: "6b1faabb-0000-4000-8000-000000000002", name: "Retired 4x4" }],
+          error: null,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    expect(await screen.findByText("Log against archived plant")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId("timeline-plant-filter")).toHaveTextContent(
+        "Project McDonald #3 (1)",
+      );
+      expect(screen.getByTestId("timeline-tent-filter")).toHaveTextContent("Retired 4x4 (1)");
+    });
+    expect(screen.getByTestId("timeline-plant-filter")).not.toHaveTextContent("Plant 5d7206");
+    expect(screen.getByTestId("timeline-tent-filter")).not.toHaveTextContent("Tent 6b1faa");
+  });
+
   it("treats a blank URL grow id as absent and reads the active grow", async () => {
     harness.scopedGrowState.urlGrowId = "";
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {

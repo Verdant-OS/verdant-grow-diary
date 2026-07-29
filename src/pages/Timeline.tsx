@@ -119,6 +119,7 @@ import {
   type MissingActionResult,
 } from "@/lib/timelineMissingActionRules";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { useTimelineNameDirectory } from "@/hooks/useTimelineNameDirectory";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { canUseFeature } from "@/lib/featureEntitlements";
 import {
@@ -811,8 +812,22 @@ export default function Timeline() {
     return map;
   }, [actionResponseState]);
 
-  const plantOptions = useMemo(() => deriveTimelinePlantOptions(entries), [entries]);
-  const tentOptions = useMemo(() => deriveTimelineTentOptions(entries), [entries]);
+  // Archived/merged plants and tents disappear from the active-entity
+  // queries but their diary history remains. This read-only directory
+  // (includes is_archived rows) keeps filter labels on real names.
+  // Gated on a resolved grow scope so a rejected/invalid scope issues
+  // no reads at all, matching the page's fail-closed read policy.
+  const { plantNamesById, tentNamesById } = useTimelineNameDirectory(
+    user && activeGrowId ? user : null,
+  );
+  const plantOptions = useMemo(
+    () => deriveTimelinePlantOptions(entries, plantNamesById),
+    [entries, plantNamesById],
+  );
+  const tentOptions = useMemo(
+    () => deriveTimelineTentOptions(entries, tentNamesById),
+    [entries, tentNamesById],
+  );
   const eventTypeOptions = useMemo(() => deriveTimelineEventTypeOptions(entries), [entries]);
 
   const evidenceFilterInput = {

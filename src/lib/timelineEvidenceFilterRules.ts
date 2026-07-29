@@ -199,20 +199,70 @@ export interface TimelineEvidenceFilterOption {
 }
 
 /**
+ * Build an id → name lookup from raw `plants`/`tents` directory rows.
+ *
+ * The caller is expected to load the directory WITHOUT an `is_archived`
+ * filter: archived/merged rows still carry their names, and the whole
+ * point of the lookup is that archived-plant diary history keeps its
+ * real labels. Returns `null` (lookup unavailable) when `rows` is not
+ * an array, so a failed read degrades to the neutral fragment label
+ * instead of mislabeling everything as archived. Malformed rows are
+ * skipped; the first name seen for an id wins. Pure.
+ */
+export function buildTimelineNameLookup(rows: unknown): ReadonlyMap<string, string> | null {
+  if (!Array.isArray(rows)) return null;
+  const m = new Map<string, string>();
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const { id, name } = row as { id?: unknown; name?: unknown };
+    if (typeof id !== "string" || id.trim() === "") continue;
+    if (typeof name !== "string" || name.trim() === "") continue;
+    if (!m.has(id.trim())) m.set(id.trim(), name.trim());
+  }
+  return m;
+}
+
+/**
+ * Resolve one option label. Order: directory name (current truth,
+ * includes archived/merged rows) → row-embedded snapshot name →
+ * fragment fallback. The "Archived" fallback wording is used only when
+ * a loaded directory truly cannot resolve the id; while the directory
+ * is unavailable (`nameById` null/undefined) the neutral noun keeps us
+ * from claiming an archival state we never confirmed.
+ */
+function resolveOptionLabel(
+  id: string,
+  noun: "plant" | "tent",
+  nameById: ReadonlyMap<string, string> | null | undefined,
+  snapshotName: unknown,
+): string {
+  const directoryName = nameById?.get(id);
+  if (typeof directoryName === "string" && directoryName.trim() !== "") {
+    return directoryName.trim();
+  }
+  if (typeof snapshotName === "string" && snapshotName.trim() !== "") {
+    return snapshotName.trim();
+  }
+  const fragment = id.slice(0, 6);
+  const capitalized = noun === "plant" ? "Plant" : "Tent";
+  return nameById ? `Archived ${noun} ${fragment}` : `${capitalized} ${fragment}`;
+}
+
+/**
  * Derive a deterministic, sorted list of distinct plant filter options
- * from the rows. Label falls back to a short id slice when no name is
- * present in `details.plant_name`. Pure.
+ * from the rows. Names resolve via the optional directory lookup (which
+ * should include archived/merged plants), then `details.plant_name`,
+ * then a fragment fallback. Pure.
  */
 export function deriveTimelinePlantOptions(
   rows: ReadonlyArray<TimelineEvidenceRow>,
+  nameById?: ReadonlyMap<string, string> | null,
 ): TimelineEvidenceFilterOption[] {
   const m = new Map<string, { label: string; count: number }>();
   for (const r of rows) {
     const id = typeof r.plant_id === "string" ? r.plant_id.trim() : "";
     if (id === "") continue;
-    const name = (r.details ?? {})["plant_name"];
-    const label =
-      typeof name === "string" && name.trim() !== "" ? name.trim() : `Plant ${id.slice(0, 6)}`;
+    const label = resolveOptionLabel(id, "plant", nameById, (r.details ?? {})["plant_name"]);
     const cur = m.get(id);
     if (cur) cur.count += 1;
     else m.set(id, { label, count: 1 });
@@ -223,8 +273,9 @@ export function deriveTimelinePlantOptions(
 }
 
 /**
- * Derive distinct tent options from the rows. Label uses a short id
- * slice when no name lookup is provided. Pure.
+ * Derive distinct tent options from the rows. Names resolve via the
+ * optional directory lookup (which should include archived tents), with
+ * a fragment fallback when no lookup resolves the id. Pure.
  */
 export function deriveTimelineTentOptions(
   rows: ReadonlyArray<TimelineEvidenceRow>,
@@ -234,9 +285,7 @@ export function deriveTimelineTentOptions(
   for (const r of rows) {
     const id = typeof r.tent_id === "string" ? r.tent_id.trim() : "";
     if (id === "") continue;
-    const name = nameById?.get(id);
-    const label =
-      typeof name === "string" && name.trim() !== "" ? name.trim() : `Tent ${id.slice(0, 6)}`;
+    const label = resolveOptionLabel(id, "tent", nameById, null);
     const cur = m.get(id);
     if (cur) cur.count += 1;
     else m.set(id, { label, count: 1 });

@@ -163,6 +163,17 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
 
 
 
+  if (auditRpcMissing) {
+    return (
+      <AuditRpcMissingFallback
+        rpcName={BREEDING_LOG_SAVE_EVENT_RPC_NAME}
+        surfaceLabel="Breeding event"
+        onRetry={() => setAuditRpcMissing(false)}
+        onDismiss={onCancel}
+      />
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-pink-500/30 bg-pink-500/5 p-4">

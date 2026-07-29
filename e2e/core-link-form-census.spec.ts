@@ -775,7 +775,7 @@ async function fillAndVerify(
     .then(() => true)
     .catch(() => false);
   if (!filled) return false;
-  return await expect
+  const matchedOnce = await expect
     .poll(
       () =>
         target.evaluate((element) =>
@@ -785,6 +785,18 @@ async function fillAndVerify(
     )
     .toBe(value)
     .then(() => true)
+    .catch(() => false);
+  if (!matchedOnce) return false;
+  // A first matching sample is not stability — a controlled handler can
+  // accept the value synchronously and normalize or revert it a beat later.
+  // Re-sample after a settle interval and require the value to have held.
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  return await target
+    .evaluate(
+      (element, expected) =>
+        element.isConnected && ((element as HTMLInputElement).value ?? null) === expected,
+      value,
+    )
     .catch(() => false);
 }
 
@@ -965,18 +977,14 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
       const namedControl = page.getByRole("combobox", { name, exact: true });
       const hasStableNamedControl = (await namedControl.count()) === 1;
       const stableControl = hasStableNamedControl ? namedControl : control;
-      // The fallback identity is the SAME pinned node the name and type were
-      // read from — acquiring a fresh handle here could pin a sibling after a
-      // reorder while name/type still describe the original. Repeated selects
-      // can share an identical option list, so on failure only this node
-      // identity can distinguish "the nth() index moved to a look-alike
-      // sibling" (churn) from "this very element dropped the value" (product
-      // defect).
-      const fallbackSnapshotHandle = hasStableNamedControl ? null : pinnedControl;
-      // A fallback control that cannot be pinned cannot be exercised with an
-      // identity guarantee — exercising the live nth() query instead could
-      // snapshot one select and act on a later look-alike at that index.
-      if (!hasStableNamedControl && fallbackSnapshotHandle === null) {
+      // EVERY select exercises through the pinned node — named ones too. An
+      // accessible name can migrate to a different combobox when the value it
+      // derives from changes (observed on the pheno comparison axis selects:
+      // selecting "vigor" moved the name to the sibling still holding
+      // "nose_loudness", failing a name-resolved verification). The named
+      // locator is kept ONLY for restoration, where re-resolution across
+      // re-renders is exactly what cleanup wants.
+      if (!pinnedControl) {
         audits.push({
           route: route.path,
           name,
@@ -986,7 +994,7 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
         });
         continue;
       }
-      const snapshotTarget = fallbackSnapshotHandle ?? stableControl;
+      const snapshotTarget = pinnedControl;
       const selectSnapshot = await snapshotTarget.evaluate((element) => {
         const select = element as HTMLSelectElement;
         return {
@@ -1034,38 +1042,26 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
       }
       let selectionDispatched = false;
       try {
-        if (hasStableNamedControl) {
-          await stableControl.selectOption(alternative, { timeout: 5_000 });
-          selectionDispatched = true;
-          await expect(stableControl).toHaveValue(alternative, { timeout: 5_000 });
-        } else {
-          // The pinned handle IS the element under audit: acting through it
-          // makes exercise and identity atomic, so an index reorder can never
-          // route the action or its verification to a look-alike sibling.
-          await snapshotTarget.selectOption(alternative, { timeout: 5_000 });
-          selectionDispatched = true;
-          // A retained handle can read a DETACHED node's stale value, which
-          // would equal the alternative and record a false exercise — only a
-          // connected node's value counts; detachment yields null and routes
-          // through the catch verdict as post-dispatch churn.
-          await expect
-            .poll(
-              () =>
-                snapshotTarget.evaluate((element) =>
-                  element.isConnected ? (element as HTMLSelectElement).value : null,
-                ),
-              { timeout: 5_000 },
-            )
-            .toBe(alternative);
-        }
+        // The pinned handle IS the element under audit: acting through it
+        // makes exercise and identity atomic, so neither an index reorder nor
+        // an accessible-name migration can route the action or its
+        // verification to a look-alike sibling.
+        await snapshotTarget.selectOption(alternative, { timeout: 5_000 });
+        selectionDispatched = true;
+        // A retained handle can read a DETACHED node's stale value, which
+        // would equal the alternative and record a false exercise — only a
+        // connected node's value counts; detachment yields null and routes
+        // through the catch verdict as post-dispatch churn.
+        await expect
+          .poll(
+            () =>
+              snapshotTarget.evaluate((element) =>
+                element.isConnected ? (element as HTMLSelectElement).value : null,
+              ),
+            { timeout: 5_000 },
+          )
+          .toBe(alternative);
       } catch (error) {
-        // A select without a unique accessible-name locator has no stable
-        // query; its pinned node can be replaced wholesale by a sibling
-        // control's re-render. That churn says nothing about the product, so
-        // it downgrades to an unexercised audit entry; a uniquely named
-        // control survives re-renders, so its failure is real and still
-        // fails the census.
-        if (hasStableNamedControl) throw error;
         // Only proven stability stays fatal. Re-read the pinned node and let
         // the pure decision helper judge: the same node still attached and
         // showing the snapshotted state — control disabled flag and full
@@ -1124,19 +1120,34 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
         // logical-replacement guard from the fill path — and fail if that
         // state cannot be restored; a vanished selection owes nothing.
         if (selectionDispatched) {
+          // Replacement identity needs more than the current value — selects
+          // share common values ("all"), so a shifted unrelated sibling could
+          // collide. The logical replacement must also carry the snapshotted
+          // option list.
           const liveHoldsAlternative = await control
             .evaluate(
-              (element, expected) =>
-                element.isConnected && (element as HTMLSelectElement).value === expected,
-              alternative,
+              (element, expected) => {
+                const select = element as HTMLSelectElement;
+                return (
+                  select.isConnected &&
+                  select.value === expected.alternative &&
+                  select.options.length === expected.options.length &&
+                  Array.from(select.options).every(
+                    (option, optionIndex) =>
+                      option.value === expected.options[optionIndex].value &&
+                      option.disabled === expected.options[optionIndex].disabled,
+                  )
+                );
+              },
+              { alternative, options: selectSnapshot.options },
               { timeout: 1_000 },
             )
             .catch(() => false);
           if (liveHoldsAlternative) {
             const selectionRestored = await control
               .selectOption(original, { timeout: 5_000 })
-              .then(async () =>
-                expect
+              .then(async () => {
+                const matchedOnce = await expect
                   .poll(
                     () =>
                       control.evaluate((element) =>
@@ -1146,8 +1157,19 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
                   )
                   .toBe(original)
                   .then(() => true)
-                  .catch(() => false),
-              )
+                  .catch(() => false);
+                if (!matchedOnce) return false;
+                // Same settle re-sample as fillAndVerify: a first matching
+                // sample is not stability against a delayed revert.
+                await new Promise((resolve) => setTimeout(resolve, 250));
+                return await control
+                  .evaluate(
+                    (element, expected) =>
+                      element.isConnected && (element as HTMLSelectElement).value === expected,
+                    original,
+                  )
+                  .catch(() => false);
+              })
               .catch(() => false);
             expect(
               selectionRestored,

@@ -86,11 +86,12 @@ describe("core link and form census rules", () => {
   });
 
   it("mutates and restores controlled selects through the reacquired live locator", () => {
-    // The snapshot reads through the pinned fallback node when one exists so
-    // the snapshot and the identity handle always describe the same element.
-    expect(CENSUS_SPEC_SOURCE).toContain(
-      "const snapshotTarget = fallbackSnapshotHandle ?? stableControl;",
-    );
+    // EVERY select — named or not — exercises through the pinned node: an
+    // accessible name can migrate to a sibling combobox when the value it
+    // derives from changes, so name-resolved exercise/verification is unsafe.
+    // The named locator survives only for restoration, where re-resolution
+    // across re-renders is exactly what cleanup wants.
+    expect(CENSUS_SPEC_SOURCE).toContain("const snapshotTarget = pinnedControl;");
     expect(CENSUS_SPEC_SOURCE).toContain(
       "const selectSnapshot = await snapshotTarget.evaluate((element) => {",
     );
@@ -98,9 +99,10 @@ describe("core link and form census rules", () => {
       "selectAvailableAlternativeValue(selectSnapshot.options, original)",
     );
     expect(CENSUS_SPEC_SOURCE).not.toContain("const alternative = await control.evaluate");
-    expect(CENSUS_SPEC_SOURCE).toContain(
+    expect(CENSUS_SPEC_SOURCE).not.toContain(
       "await stableControl.selectOption(alternative, { timeout: 5_000 });",
     );
+    expect(CENSUS_SPEC_SOURCE).not.toContain("await expect(stableControl).toHaveValue(");
     expect(CENSUS_SPEC_SOURCE).toContain(
       "await stableControl.selectOption(original, { timeout: 5_000 }).catch(() => undefined);",
     );
@@ -110,7 +112,10 @@ describe("core link and form census rules", () => {
   });
 
   it("downgrades nth-fallback select churn to an unexercised audit instead of a census failure", () => {
-    expect(CENSUS_SPEC_SOURCE).toContain("if (hasStableNamedControl) throw error;");
+    // The identity/state verdict applies to EVERY select — named ones too,
+    // since an accessible name can migrate between comboboxes; there is no
+    // named-path unconditional rethrow anymore.
+    expect(CENSUS_SPEC_SOURCE).not.toContain("if (hasStableNamedControl) throw error;");
     // Pre-dispatch churn and post-dispatch re-renders carry distinct reasons
     // so the census report records WHEN the churn hit.
     expect(CENSUS_SPEC_SOURCE).toContain(
@@ -307,12 +312,10 @@ describe("core link and form census rules", () => {
     );
     expect(CENSUS_SPEC_SOURCE).toContain("select.getBoundingClientRect().width > 0 &&");
     expect(CENSUS_SPEC_SOURCE).toContain("select.getBoundingClientRect().height > 0 &&");
-    // The fallback identity REUSES the node pinned for the name/type reads —
+    // The select identity REUSES the node pinned for the name/type reads —
     // a fresh handle here could pin a sibling after a reorder while name and
     // type still describe the original.
-    expect(CENSUS_SPEC_SOURCE).toContain(
-      "const fallbackSnapshotHandle = hasStableNamedControl ? null : pinnedControl;",
-    );
+    expect(CENSUS_SPEC_SOURCE).toContain("const snapshotTarget = pinnedControl;");
     // The fill exercise resolves through the same pinned node too. Strictness
     // is identity-scoped: a connected pinned node that dropped the value still
     // fails the census, while a node the page replaced mid-exercise (e.g. a
@@ -352,6 +355,14 @@ describe("core link and form census rules", () => {
     // and the displaced index is re-audited instead.
     expect(CENSUS_SPEC_SOURCE).toContain("const liveHoldsPlaceholder = await control");
     expect(CENSUS_SPEC_SOURCE).toContain("if (liveHoldsPlaceholder) {");
+    // Restored values must HOLD through a settle re-sample — a first matching
+    // poll sample is not stability against a delayed normalize/revert.
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      "await new Promise((resolve) => setTimeout(resolve, 250));",
+    );
+    // Select replacement identity requires the snapshotted option list, not
+    // just a colliding current value like "all".
+    expect(CENSUS_SPEC_SOURCE).toContain("select.value === expected.alternative &&");
     // Downgrade-path cleanup only runs when a fill actually dispatched — a
     // pre-dispatch detachment changed nothing, and restoring into whatever
     // now holds the index would corrupt an unrelated control. A pre-dispatch

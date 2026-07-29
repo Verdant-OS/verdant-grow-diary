@@ -308,11 +308,17 @@ describe("core link and form census rules", () => {
     expect(CENSUS_SPEC_SOURCE).toContain(
       "const pinnedControl = await control.elementHandle({ timeout: 1_000 }).catch(() => null);",
     );
+    // Every pinned-state-driven skip first asks whether the live index still
+    // holds the pinned node, and re-audits once (bounded) when it does not —
+    // a visible replacement of a hidden/detached/unpinnable predecessor gets
+    // its own audit pass instead of escaping the census.
+    expect(CENSUS_SPEC_SOURCE).toContain("const liveIndexHoldsPinnedNode = async ()");
+    expect(CENSUS_SPEC_SOURCE).toContain("const reauditIndexOnce = (): void => {");
     expect(CENSUS_SPEC_SOURCE).toContain(
-      "if (!(await pinnedControl.isVisible().catch(() => false))) continue;",
+      "if (!(await liveIndexHoldsPinnedNode())) reauditIndexOnce();",
     );
     expect(CENSUS_SPEC_SOURCE).toContain(
-      "if (await isVisuallyHiddenImplementationControl(pinnedControl)) continue;",
+      "if (await isVisuallyHiddenImplementationControl(pinnedControl)) {",
     );
     expect(CENSUS_SPEC_SOURCE).not.toContain("if (!(await control.isVisible())) continue;");
     expect(CENSUS_SPEC_SOURCE).toContain(

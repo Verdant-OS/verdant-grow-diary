@@ -793,9 +793,34 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
     // exercise) describes this one element: any read through the live nth()
     // query can straddle a reorder onto a sibling.
     const pinnedControl = await control.elementHandle({ timeout: 1_000 }).catch(() => null);
-    if (!pinnedControl) continue;
-    if (!(await pinnedControl.isVisible().catch(() => false))) continue;
-    if (await isVisuallyHiddenImplementationControl(pinnedControl)) continue;
+    // Every skip driven by the pinned node's state must first ask whether the
+    // live index still holds that node: a visible replacement that displaced
+    // a hidden, detached, or unpinnable predecessor deserves its own audit
+    // pass, bounded to one revisit per index.
+    const liveIndexHoldsPinnedNode = async (): Promise<boolean> =>
+      pinnedControl
+        ? await control
+            .evaluate((element, pinned) => element === pinned, pinnedControl, { timeout: 1_000 })
+            .catch(() => false)
+        : false;
+    const reauditIndexOnce = (): void => {
+      if (!reauditedIndexes.has(index)) {
+        reauditedIndexes.add(index);
+        index -= 1;
+      }
+    };
+    if (!pinnedControl) {
+      reauditIndexOnce();
+      continue;
+    }
+    if (!(await pinnedControl.isVisible().catch(() => false))) {
+      if (!(await liveIndexHoldsPinnedNode())) reauditIndexOnce();
+      continue;
+    }
+    if (await isVisuallyHiddenImplementationControl(pinnedControl)) {
+      if (!(await liveIndexHoldsPinnedNode())) reauditIndexOnce();
+      continue;
+    }
 
     let name = normalizeText(await accessibleNameForControl(pinnedControl).catch(() => ""));
     if (name === "") {
@@ -852,17 +877,9 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
     // index off it, every later check and action would describe a DIFFERENT
     // control under this name and type — re-audit the index once instead of
     // misattributing.
-    if (pinnedControl) {
-      const indexStillPinned = await control
-        .evaluate((element, pinned) => element === pinned, pinnedControl, { timeout: 1_000 })
-        .catch(() => false);
-      if (!indexStillPinned) {
-        if (!reauditedIndexes.has(index)) {
-          reauditedIndexes.add(index);
-          index -= 1;
-        }
-        continue;
-      }
+    if (!(await liveIndexHoldsPinnedNode())) {
+      reauditIndexOnce();
+      continue;
     }
 
     const disabled = await (pinnedControl ?? control).isDisabled().catch(() => false);

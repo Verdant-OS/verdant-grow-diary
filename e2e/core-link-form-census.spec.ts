@@ -763,6 +763,31 @@ async function controlType(
   });
 }
 
+// Fill a control and verify the value actually PERSISTED on a connected
+// node — a resolving fill() is not persistence: a controlled handler can
+// asynchronously normalize, reject, or revert the value afterwards.
+async function fillAndVerify(
+  target: Locator | ElementHandle<SVGElement | HTMLElement>,
+  value: string,
+): Promise<boolean> {
+  const filled = await target
+    .fill(value, { timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!filled) return false;
+  return await expect
+    .poll(
+      () =>
+        target.evaluate((element) =>
+          element.isConnected ? ((element as HTMLInputElement).value ?? null) : null,
+        ),
+      { timeout: 5_000 },
+    )
+    .toBe(value)
+    .then(() => true)
+    .catch(() => false);
+}
+
 async function isVisuallyHiddenImplementationControl(
   locator: Locator | ElementHandle<SVGElement | HTMLElement>,
 ): Promise<boolean> {
@@ -823,7 +848,9 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
     }
 
     let name = normalizeText(await accessibleNameForControl(pinnedControl).catch(() => ""));
+    let nameRequiredSettling = false;
     if (name === "") {
+      nameRequiredSettling = true;
       // A sibling control's exercise can re-render the page mid-read,
       // transiently reading as unnamed. Re-read THIS pinned element briefly
       // before judging; a genuinely unnamed control stays empty throughout.
@@ -866,6 +893,25 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
           }
           continue;
         }
+      }
+    }
+    // A control that gained its name during the settle window may have been
+    // hidden by the same transition — a still-hidden pinned node is skipped
+    // (and a displaced index re-audited), never exercised into a fatal
+    // actionability timeout.
+    if (nameRequiredSettling && name !== "") {
+      const pinnedStillVisible = await pinnedControl
+        .evaluate(
+          (element) =>
+            element.isConnected &&
+            element.getBoundingClientRect().width > 0 &&
+            element.getBoundingClientRect().height > 0 &&
+            getComputedStyle(element).visibility !== "hidden",
+        )
+        .catch(() => false);
+      if (!pinnedStillVisible) {
+        if (!(await liveIndexHoldsPinnedNode())) reauditIndexOnce();
+        continue;
       }
     }
     const type = await controlType(pinnedControl ?? control);
@@ -1163,10 +1209,7 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
       // DISPATCHED: a pre-dispatch detachment changed nothing, and writing
       // the old value into whatever now holds the index would corrupt it.
       if (fillDispatched) {
-        const restoredReplacement = await control
-          .fill(original, { timeout: 5_000 })
-          .then(() => true)
-          .catch(() => false);
+        const restoredReplacement = await fillAndVerify(control, original);
         expect(
           restoredReplacement,
           `${route.path} field "${name}" remounted after a fill and its replacement could not be restored`,
@@ -1197,19 +1240,15 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
     // that accepted the placeholder but cannot return to its original value
     // is a product defect, and silently leaving placeholder-derived state
     // would corrupt every later field and link audit.
-    const restored = await fillTarget
-      .fill(original, { timeout: 5_000 })
-      .then(() => true)
-      .catch(async () => {
-        const pinnedGone = pinnedControl
-          ? !(await pinnedControl.evaluate((element) => element.isConnected).catch(() => false))
-          : true;
-        if (!pinnedGone) return false;
-        return await control
-          .fill(original, { timeout: 5_000 })
-          .then(() => true)
-          .catch(() => false);
-      });
+    let restored = await fillAndVerify(fillTarget, original);
+    if (!restored) {
+      const pinnedGone = pinnedControl
+        ? !(await pinnedControl.evaluate((element) => element.isConnected).catch(() => false))
+        : true;
+      if (pinnedGone) {
+        restored = await fillAndVerify(control, original);
+      }
+    }
     expect(
       restored,
       `${route.path} field "${name}" accepted the census placeholder but could not be restored`,

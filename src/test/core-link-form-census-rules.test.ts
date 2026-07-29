@@ -327,8 +327,19 @@ describe("core link and form census rules", () => {
     // placeholder and page content derived from the field (e.g. hrefs
     // embedding date values) must return to its original shape before the
     // link phase collects hrefs.
-    expect(CENSUS_SPEC_SOURCE).toContain("const restored = await fillTarget");
-    expect(CENSUS_SPEC_SOURCE).toContain("const restoredReplacement = await control");
+    // Every restore verifies the value PERSISTED on a connected node — a
+    // resolving fill() is not persistence when a handler can revert it.
+    expect(CENSUS_SPEC_SOURCE).toContain("async function fillAndVerify(");
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      "let restored = await fillAndVerify(fillTarget, original);",
+    );
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      "const restoredReplacement = await fillAndVerify(control, original);",
+    );
+    // A name that only settled during the retry window rechecks the pinned
+    // node's visibility before any exercise — a control hidden by the same
+    // transition that named it is skipped, not timed out fatally.
+    expect(CENSUS_SPEC_SOURCE).toContain('if (nameRequiredSettling && name !== "") {');
     // Downgrade-path cleanup only runs when a fill actually dispatched — a
     // pre-dispatch detachment changed nothing, and restoring into whatever
     // now holds the index would corrupt an unrelated control. A pre-dispatch

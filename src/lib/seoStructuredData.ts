@@ -9,7 +9,7 @@
  * the visible accordion/list — do not synthesize hidden questions here.
  */
 
-import type { FaqEntry } from "@/constants/verdantSeoCopy";
+import type { FaqEntry } from "../constants/verdantSeoCopy";
 
 export interface FaqPageJsonLd {
   readonly "@context": "https://schema.org";

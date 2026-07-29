@@ -1014,6 +1014,39 @@ export type Database = {
           },
         ]
       }
+      diary_entry_audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          changed_at: string
+          changed_fields: Json
+          diary_entry_id: string
+          id: string
+          previous_snapshot: Json | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          changed_at?: string
+          changed_fields?: Json
+          diary_entry_id: string
+          id?: string
+          previous_snapshot?: Json | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          changed_at?: string
+          changed_fields?: Json
+          diary_entry_id?: string
+          id?: string
+          previous_snapshot?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       edge_function_metric_events: {
         Row: {
           counters: Json | null

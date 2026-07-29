@@ -54,7 +54,7 @@ describe("index.html — primary SEO", () => {
     // this without reading that file.
     const tags = HTML.match(/<link\b[^>]*rel=["']canonical["'][^>]*>/gi) ?? [];
     expect(tags).toHaveLength(1);
-    expect(tags[0]).toContain('href="https://verdantgrowdiary.com/"');
+    expect(tags[0]).toContain('href="https://verdantgrowdiary.com"');
   });
 
   it("robots is index, follow", () => {

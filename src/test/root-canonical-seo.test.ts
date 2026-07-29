@@ -73,7 +73,7 @@ describe("index.html shell", () => {
   it("points that canonical at the site root", () => {
     const tag = (INDEX_HTML.match(/<link\b[^>]*rel=["']canonical["'][^>]*>/i) ?? [""])[0];
     const href = (tag.match(/href=["']([^"']+)["']/) ?? [])[1];
-    expect(href).toBe(`${SITE_ORIGIN}/`);
+    expect(href).toBe(SITE_ORIGIN);
   });
 
   it("uses the absolute origin, not a relative path", () => {

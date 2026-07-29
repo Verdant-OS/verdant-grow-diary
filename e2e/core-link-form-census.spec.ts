@@ -1133,7 +1133,14 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
       });
       continue;
     }
-    await control.fill(original, { timeout: 5_000 }).catch(() => undefined);
+    // Restore prefers the pinned handle while it remains connected — a
+    // reorder without detachment must not restore a sibling and leave the
+    // audited field at the placeholder. Only a remount between verification
+    // and cleanup falls back to the live locator, whose replacement holds the
+    // dispatched placeholder.
+    await fillTarget.fill(original, { timeout: 5_000 }).catch(async () => {
+      await control.fill(original, { timeout: 5_000 }).catch(() => undefined);
+    });
     audits.push({ route: route.path, name, type, exercised: true });
   }
 

@@ -286,14 +286,18 @@ describe("core link and form census rules", () => {
       '"re-rendered in response to a fill before value verification"',
     );
     expect(CENSUS_SPEC_SOURCE).toContain('"re-rendered before the fill could be dispatched"');
-    // Cleanup is identity-AGNOSTIC: restore goes through the live locator on
-    // every exit path so page content derived from the field (e.g. hrefs
-    // embedding date values) returns to its original shape before the link
-    // phase collects hrefs — a remount must not leave the placeholder behind.
+    // Restore prefers the pinned handle while connected (a reorder without
+    // detachment must not restore a sibling), and falls back to the live
+    // locator only on remount — where the replacement holds the dispatched
+    // placeholder and page content derived from the field (e.g. hrefs
+    // embedding date values) must return to its original shape before the
+    // link phase collects hrefs.
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      "await fillTarget.fill(original, { timeout: 5_000 }).catch(async () => {",
+    );
     expect(CENSUS_SPEC_SOURCE).toContain(
       "await control.fill(original, { timeout: 5_000 }).catch(() => undefined);",
     );
-    expect(CENSUS_SPEC_SOURCE).not.toContain("await fillTarget.fill(original");
   });
 
   it("settles a transiently unnamed control before asserting it lacks a user-facing name", () => {

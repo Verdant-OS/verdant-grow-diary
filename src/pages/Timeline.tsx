@@ -1414,8 +1414,8 @@ export default function Timeline() {
             className="text-[11px] text-muted-foreground"
             data-testid="timeline-advanced-filters-locked"
           >
-            Date-range filtering and the next-missing-action jump are part of Advanced timeline
-            filtering, a Pro feature.{" "}
+            The next-missing-action jump is part of Advanced timeline filtering, a Pro feature.
+            Date-range filtering is available on every plan.{" "}
             <Link to="/pricing" className="text-primary hover:underline">
               See plans
             </Link>

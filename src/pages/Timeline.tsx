@@ -853,9 +853,9 @@ export default function Timeline() {
     if (!plantFilter && !tentFilter) return null;
     return {
       plantId: plantFilter || null,
-      plantName: plantFilter ? (plantNamesById[plantFilter] ?? null) : null,
+      plantName: plantFilter ? (plantNamesById?.[plantFilter] ?? null) : null,
       tentId: tentFilter || null,
-      tentName: tentFilter ? (tentNamesById[tentFilter] ?? null) : null,
+      tentName: tentFilter ? (tentNamesById?.[tentFilter] ?? null) : null,
       growId: activeGrowId ?? null,
     };
   }, [plantFilter, tentFilter, plantNamesById, tentNamesById, activeGrowId]);

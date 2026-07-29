@@ -298,6 +298,15 @@ describe("core link and form census rules", () => {
     expect(CENSUS_SPEC_SOURCE).toContain(
       "await control.fill(original, { timeout: 5_000 }).catch(() => undefined);",
     );
+    // Downgrade-path cleanup only runs when a fill actually dispatched — a
+    // pre-dispatch detachment changed nothing, and restoring into whatever
+    // now holds the index would corrupt an unrelated control.
+    expect(CENSUS_SPEC_SOURCE).toContain("if (fillDispatched) {");
+    // The link phase re-loads a source page once when a collected href is not
+    // visible on revisit — data-dependent links get one settled render before
+    // the unchanged strict assertion.
+    expect(CENSUS_SPEC_SOURCE).toContain("const anchorVisibleOnFirstRender = await anchor");
+    expect(CENSUS_SPEC_SOURCE).toContain("if (!anchorVisibleOnFirstRender) {");
   });
 
   it("settles a transiently unnamed control before asserting it lacks a user-facing name", () => {

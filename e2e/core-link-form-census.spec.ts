@@ -1128,8 +1128,12 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
       // the timeline's diary-range link embeds its date values) must return
       // to its original shape before the link phase collects hrefs. Restoring
       // through the live locator is cleanup, not audit — exactly what the
-      // pre-pinning code did.
-      await control.fill(original, { timeout: 5_000 }).catch(() => undefined);
+      // pre-pinning code did. But cleanup is only owed when a fill actually
+      // DISPATCHED: a pre-dispatch detachment changed nothing, and writing
+      // the old value into whatever now holds the index would corrupt it.
+      if (fillDispatched) {
+        await control.fill(original, { timeout: 5_000 }).catch(() => undefined);
+      }
       audits.push({
         route: route.path,
         name,
@@ -1293,6 +1297,19 @@ async function clickEverySafeInternalHref(
       await page.goto(link.sourcePath, { waitUntil: "domcontentloaded" });
       await assertMeaningfulPage(page, link.sourcePath);
       const anchor = page.locator(visibleLinkByHrefSelector(link.href)).first();
+      // A data-dependent link can render on one visit and miss on the next
+      // while its page's queries settle (observed: the dashboard's grow link
+      // when the mocked grow list resolves empty on a revisit). One full
+      // reload gives the data a second chance; a link that is still missing
+      // afterwards fails the census exactly as before.
+      const anchorVisibleOnFirstRender = await anchor
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!anchorVisibleOnFirstRender) {
+        await page.goto(link.sourcePath, { waitUntil: "domcontentloaded" });
+        await assertMeaningfulPage(page, link.sourcePath);
+      }
       await expect(anchor, `${link.href} must remain visible on ${link.sourcePath}`).toBeVisible({
         timeout: 10_000,
       });

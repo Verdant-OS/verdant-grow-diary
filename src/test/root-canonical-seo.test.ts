@@ -25,6 +25,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { STATIC_PUBLIC_OUTPUT_DOCUMENTS } from "@/lib/build/staticPublicSeoDocuments";
+import { getRoutesByAccess } from "@/lib/appRouteManifest";
 
 const ROOT = resolve(__dirname, "../..");
 const SITE_ORIGIN = "https://verdantgrowdiary.com";
@@ -61,6 +62,74 @@ describe("the invariant that keeps a baked root canonical safe", () => {
     // and the shell tag stops being root's only source — worth re-reading this
     // file's reasoning at that point.
     expect(prerendered.has("/")).toBe(false);
+  });
+});
+
+/**
+ * The sitemap invariant above is necessary but not sufficient: the route
+ * manifest is the real universe of public routes, and a public route absent
+ * from BOTH the sitemap and the prerender set still receives the shell — and
+ * with it the root canonical. For an indexable page that means declaring
+ * itself a duplicate of the homepage (caught by Codex on /docs/mcp-api, which
+ * previously reached non-JS crawlers with the request URL as its implicit —
+ * and correct — canonical).
+ *
+ * Every concrete public route must therefore either be prerendered or appear
+ * below with a reason why dedupe-to-homepage is the RIGHT outcome for it.
+ */
+const ROOT_CANONICAL_TOLERATED: ReadonlyMap<string, string> = new Map([
+  ["/", "the shell itself — the root canonical IS its self-canonical"],
+  ["*", "NotFound catch-all — dedupe-to-homepage is the soft-404 mitigation"],
+  ["/.lovable/oauth/consent", "OAuth protocol page; must never rank on its own"],
+  ["/auth", "sign-in flow; noindex client-side, never an acquisition page"],
+  ["/checkout/cancel", "transactional return; indexing it would be a bug"],
+  ["/checkout/success", "transactional return; indexing it would be a bug"],
+  ["/internal/contextual-pheno-comparison-demo", "fixture demo, deliberately unlinked"],
+  ["/internal/demo-proof-walkthrough", "fixture demo, deliberately unlinked"],
+  ["/internal/pheno-hunt-demo", "fixture demo, deliberately unlinked"],
+  ["/partners/csv-preview", "browser-local tool, not in sitemap; promote to a prerendered doc if it becomes an acquisition page"],
+  ["/reset-password", "credential flow; must never rank"],
+  ["/sensors/csv-preview", "browser-local tool, not in sitemap; promote to a prerendered doc if it becomes an acquisition page"],
+  ["/unsubscribe", "token-validated flow; must never rank"],
+]);
+
+describe("every public MANIFEST route is prerendered or tolerates the root canonical", () => {
+  const concretePublicRoutes = getRoutesByAccess("public")
+    .map((r) => r.path)
+    .filter((p) => !p.includes(":"));
+
+  it("no public route silently inherits the root canonical", () => {
+    const orphaned = concretePublicRoutes.filter(
+      (p) => !prerendered.has(p) && !ROOT_CANONICAL_TOLERATED.has(p),
+    );
+    expect(
+      orphaned,
+      `These PUBLIC manifest routes have no prerendered document, so non-JS ` +
+        `crawlers see them with the root canonical — each would declare itself ` +
+        `a duplicate of the homepage. Add a static SEO document (indexable ` +
+        `pages), or add to ROOT_CANONICAL_TOLERATED with a reason (flow/utility ` +
+        `pages):\n  ${orphaned.join("\n  ")}`,
+    ).toEqual([]);
+  });
+
+  it("the toleration list cannot go stale", () => {
+    for (const [path] of ROOT_CANONICAL_TOLERATED) {
+      if (path === "*") continue; // catch-all is not a manifest concrete path
+      expect(concretePublicRoutes, `${path} left the public manifest`).toContain(path);
+      // A route that gained a prerendered doc supplies its own canonical; its
+      // entry here is dead weight that would mask a future regression.
+      expect(prerendered.has(path), `${path} is now prerendered — remove its toleration`).toBe(
+        false,
+      );
+    }
+  });
+
+  it("indexable documentation is prerendered, not tolerated", () => {
+    // The concrete case that motivated this block. If /docs/mcp-api ever
+    // drops out of the prerender set, this fails before the generic check's
+    // message sends someone hunting.
+    expect(prerendered.has("/docs/mcp-api")).toBe(true);
+    expect(ROOT_CANONICAL_TOLERATED.has("/docs/mcp-api")).toBe(false);
   });
 });
 

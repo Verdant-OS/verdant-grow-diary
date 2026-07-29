@@ -297,7 +297,7 @@ describe("core link and form census rules", () => {
     // set) so an unnamed replacement cannot slip through unaudited.
     expect(CENSUS_SPEC_SOURCE).toContain("const reauditedUnnamedIndexes = new Set<number>();");
     expect(CENSUS_SPEC_SOURCE).toContain(
-      ".evaluate((element, pinned) => pinned !== null && element === pinned, unnamedHandle, {",
+      ".evaluate((element, pinned) => pinned !== null && element === pinned, pinnedControl, {",
     );
     expect(CENSUS_SPEC_SOURCE).toContain(
       "if (!indexStillPinnedNode && !reauditedUnnamedIndexes.has(index)) {",

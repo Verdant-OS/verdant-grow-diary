@@ -442,12 +442,12 @@ export default function Timeline() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDateFilter, endDateFilter]);
 
-  // Applied bounds: only when the Pro gate is open and values are valid
-  // ISO dates. An inverted range applies nothing (honest no-op + notice).
-  const appliedStartDate =
-    advancedTimelineUnlocked && isTimelineDateFilterValue(startDateFilter) ? startDateFilter : null;
-  const appliedEndDate =
-    advancedTimelineUnlocked && isTimelineDateFilterValue(endDateFilter) ? endDateFilter : null;
+  // Applied bounds: any valid ISO date applies. Date-range filtering is
+  // available on every plan — it is a purely client/query-level narrowing of
+  // the grower's OWN already-authorized diary rows, so there is no cost or
+  // trust surface to gate. An inverted range applies nothing (honest no-op).
+  const appliedStartDate = isTimelineDateFilterValue(startDateFilter) ? startDateFilter : null;
+  const appliedEndDate = isTimelineDateFilterValue(endDateFilter) ? endDateFilter : null;
   const dateRangeInvalid =
     appliedStartDate !== null && appliedEndDate !== null && appliedStartDate > appliedEndDate;
   const effectiveStartDate = dateRangeInvalid ? null : appliedStartDate;

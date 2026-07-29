@@ -135,7 +135,10 @@ beforeEach(() => {
 
 function renderList(url = "/actions") {
   return render(
-    <MemoryRouter initialEntries={[url]}>
+    <MemoryRouter
+      initialEntries={[url]}
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <ActionQueue />
     </MemoryRouter>,
   );

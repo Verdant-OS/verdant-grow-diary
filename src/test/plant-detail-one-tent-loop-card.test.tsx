@@ -15,7 +15,11 @@ const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() =
 }) as never);
 
 function renderCard(ui: React.ReactElement) {
-  return render(<MemoryRouter>{ui}</MemoryRouter>);
+  return render(
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      {ui}
+    </MemoryRouter>,
+  );
 }
 
 describe("PlantDetail One-Tent Loop next-step card wiring", () => {

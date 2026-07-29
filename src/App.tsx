@@ -124,6 +124,7 @@ const OperatorCreditsAudit = lazy(() => import("./pages/OperatorCreditsAudit"));
 const OperatorEdgeMetrics = lazy(() => import("./pages/OperatorEdgeMetrics"));
 const OperatorEdgeAlerts = lazy(() => import("./pages/OperatorEdgeAlerts"));
 const OperatorSchemaAudit = lazy(() => import("./pages/OperatorSchemaAudit"));
+const OperatorMode = lazy(() => import("./pages/OperatorMode"));
 
 const Leads = lazy(() => import("./pages/Leads"));
 const PiIngestStatus = lazy(() => import("./pages/PiIngestStatus"));

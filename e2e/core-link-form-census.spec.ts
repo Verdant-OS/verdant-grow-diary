@@ -826,7 +826,17 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
       const namedControl = page.getByRole("combobox", { name, exact: true });
       const hasStableNamedControl = (await namedControl.count()) === 1;
       const stableControl = hasStableNamedControl ? namedControl : control;
-      const selectSnapshot = await stableControl.evaluate((element) => {
+      // Pin the DOM node a fallback select resolves to BEFORE snapshotting,
+      // and snapshot through the pinned node so both describe the same
+      // element: repeated selects can share an identical option list, so on
+      // failure only node identity can distinguish "the nth() index moved to
+      // a look-alike sibling" (churn) from "this very element dropped the
+      // value" (product defect).
+      const fallbackSnapshotHandle = hasStableNamedControl
+        ? null
+        : await stableControl.elementHandle({ timeout: 5_000 }).catch(() => null);
+      const snapshotTarget = fallbackSnapshotHandle ?? stableControl;
+      const selectSnapshot = await snapshotTarget.evaluate((element) => {
         const select = element as HTMLSelectElement;
         return {
           currentValue: select.value,
@@ -849,14 +859,6 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
         });
         continue;
       }
-      // Pin the DOM node a fallback select resolves to before exercising it:
-      // repeated selects can share an identical option list, so on failure
-      // only node identity can distinguish "the nth() index moved to a
-      // look-alike sibling" (churn) from "this very element dropped the
-      // value" (product defect).
-      const fallbackSnapshotHandle = hasStableNamedControl
-        ? null
-        : await stableControl.elementHandle({ timeout: 5_000 }).catch(() => null);
       let selectionDispatched = false;
       try {
         await stableControl.selectOption(alternative, { timeout: 5_000 });

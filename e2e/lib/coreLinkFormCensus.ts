@@ -581,6 +581,10 @@ export function fallbackSelectExerciseFailureIsFatal(
   live: FallbackSelectObservedState | undefined,
   liveElementIsSnapshotElement: boolean,
 ): boolean {
+  // A control that was already disabled when snapshotted can never prove a
+  // broken onChange — the disablement itself evidences a state transition
+  // after the earlier editable check, which is churn.
+  if (snapshot.disabled) return false;
   if (!liveElementIsSnapshotElement || !live) return false;
   if (live.disabled !== snapshot.disabled) return false;
   return (

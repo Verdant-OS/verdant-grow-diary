@@ -86,8 +86,13 @@ describe("core link and form census rules", () => {
   });
 
   it("mutates and restores controlled selects through the reacquired live locator", () => {
+    // The snapshot reads through the pinned fallback node when one exists so
+    // the snapshot and the identity handle always describe the same element.
     expect(CENSUS_SPEC_SOURCE).toContain(
-      "const selectSnapshot = await stableControl.evaluate((element) => {",
+      "const snapshotTarget = fallbackSnapshotHandle ?? stableControl;",
+    );
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      "const selectSnapshot = await snapshotTarget.evaluate((element) => {",
     );
     expect(CENSUS_SPEC_SOURCE).toContain(
       "selectAvailableAlternativeValue(selectSnapshot.options, original)",
@@ -181,6 +186,18 @@ describe("core link and form census rules", () => {
     expect(
       fallbackSelectExerciseFailureIsFatal(
         snapshot,
+        state([option(""), option("all"), option("keep")], true),
+        true,
+      ),
+    ).toBe(false);
+
+    // A control that was ALREADY disabled when snapshotted (it got disabled
+    // between the editable check and the snapshot) can never prove a broken
+    // onChange — even if the catch-time state matches the snapshot exactly.
+    const disabledSnapshot = state([option(""), option("all"), option("keep")], true);
+    expect(
+      fallbackSelectExerciseFailureIsFatal(
+        disabledSnapshot,
         state([option(""), option("all"), option("keep")], true),
         true,
       ),

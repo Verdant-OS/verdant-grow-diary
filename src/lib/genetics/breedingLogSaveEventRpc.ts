@@ -1,5 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { BreedingEventType } from "@/lib/genetics/breedingTypes";
+import {
+  isMissingRpcError,
+  MissingAuditRpcError,
+} from "@/lib/rpcAvailability/missingRpcError";
+
+export const BREEDING_LOG_SAVE_EVENT_RPC_NAME = "breeding_log_save_event" as const;
 
 /**
  * Type-safe wrapper around the `breeding_log_save_event` Postgres RPC.

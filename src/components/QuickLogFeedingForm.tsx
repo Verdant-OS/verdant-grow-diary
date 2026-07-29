@@ -30,28 +30,10 @@ import {
 import { updateEcPpm500Pair, type EcPpm500EditSource } from "@/lib/ecPpm500PairRules";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import {
-  fahrenheitToCelsius,
   getTemperatureUnitSymbol,
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
-
-const PLAIN_TEMP_INPUT = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
-
-/**
- * Convert the grower-typed water temperature (entered in the active
- * preference unit) into a canonical-°C string EXACTLY ONCE for the
- * review/EC-preview consumers, which interpret their input as °C.
- * Blank stays blank and non-numeric text passes through unchanged so
- * the existing validators keep rejecting it with their original reasons.
- */
-function typedTempToCelsiusInput(raw: string, unit: TemperatureUnitPreference): string {
-  if (unit !== "fahrenheit") return raw;
-  const trimmed = raw.trim();
-  if (trimmed === "" || !PLAIN_TEMP_INPUT.test(trimmed)) return raw;
-  const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed)) return raw;
-  return String(Math.round(fahrenheitToCelsius(parsed) * 100) / 100);
-}
+import { preferredTemperatureToCelsiusInputString } from "@/lib/sensorInputUnitConversion";
 
 interface Props {
   value: QuickLogFeedingFormState;
@@ -79,7 +61,7 @@ export default function QuickLogFeedingForm({
   // raw typed value itself (QuickLogV2Sheet), never from this derived copy,
   // so no value is ever converted twice. Uses the entry-pinned unit (when
   // available) so this preview never disagrees with what will be saved.
-  const canonicalWaterTempC = typedTempToCelsiusInput(
+  const canonicalWaterTempC = preferredTemperatureToCelsiusInputString(
     value.waterTempC,
     entryTemperatureUnit ?? temperatureUnit,
   );
@@ -113,8 +95,14 @@ export default function QuickLogFeedingForm({
   // entry-pinned unit (when a draft is in progress) so the label never
   // disagrees with what the write seam will actually save — mirrors
   // canonicalWaterTempC above.
-  const entryTemperatureUnitSymbol = getTemperatureUnitSymbol(entryTemperatureUnit ?? temperatureUnit);
-  const review = buildFeedingReview(value, defaultsApplied, entryTemperatureUnit ?? temperatureUnit);
+  const entryTemperatureUnitSymbol = getTemperatureUnitSymbol(
+    entryTemperatureUnit ?? temperatureUnit,
+  );
+  const review = buildFeedingReview(
+    value,
+    defaultsApplied,
+    entryTemperatureUnit ?? temperatureUnit,
+  );
 
   return (
     <div className="space-y-4" data-testid="qlv2-feeding-form">

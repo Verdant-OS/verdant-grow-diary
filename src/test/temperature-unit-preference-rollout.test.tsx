@@ -206,8 +206,8 @@ describe("Tent surfaces (TentDetail + Tents) render preferred unit on chips", ()
   const TENTS = readFileSync("src/pages/Tents.tsx", "utf8");
 
   it("TentDetail metric chip uses centralized symbol+conversion", () => {
-    expect(TENT_DETAIL).toContain("convertCelsiusForDisplay(snap.temp)");
-    expect(TENT_DETAIL).toContain("getTemperatureUnitSymbol()");
+    expect(TENT_DETAIL).toContain("convertCelsiusForDisplay(snap.temp, temperatureUnit)");
+    expect(TENT_DETAIL).toContain("getTemperatureUnitSymbol(temperatureUnit)");
     expect(TENT_DETAIL).not.toContain('unit="°F"');
   });
 
@@ -215,7 +215,7 @@ describe("Tent surfaces (TentDetail + Tents) render preferred unit on chips", ()
     // Chips now come from the shared Dashboard-strip presenter; the page
     // resolves the saved preference once and passes it through, so the
     // temp chip still flips °F/°C with the grower's setting.
-    expect(TENTS).toContain("loadTemperatureUnitPreference()");
+    expect(TENTS).toContain("useTemperatureUnitPreference()");
     expect(TENTS).toContain("{ temperatureUnit }");
     expect(TENTS).not.toContain('unit="°F"');
   });

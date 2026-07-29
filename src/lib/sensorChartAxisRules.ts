@@ -11,14 +11,9 @@
  * Pure rules only. No I/O, no React, no Recharts. Tooltip behavior and
  * stored data semantics are unchanged.
  */
+import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
-export type SensorChartMetricKey =
-  | "temp"
-  | "rh"
-  | "vpd"
-  | "co2"
-  | "soil"
-  | "ppfd";
+export type SensorChartMetricKey = "temp" | "rh" | "vpd" | "co2" | "soil" | "ppfd";
 
 export interface SensorChartMetricMeta {
   label: string;
@@ -38,11 +33,23 @@ export interface SensorChartMetricMeta {
 }
 
 export const SENSOR_CHART_METRIC_META: Record<SensorChartMetricKey, SensorChartMetricMeta> = {
-  temp: { label: "Temperature", unit: "°F", color: "hsl(var(--warning))", tickDecimals: 0, yAxisWidth: 48 },
-  rh:   { label: "Humidity",    unit: "%",  color: "hsl(var(--info))",    tickDecimals: 0, yAxisWidth: 44 },
-  vpd:  { label: "VPD",         unit: "kPa", color: "hsl(var(--primary))", tickDecimals: 2, yAxisWidth: 64 },
-  co2:  { label: "CO₂",         unit: "ppm", color: "hsl(var(--leaf-glow))", tickDecimals: 0, yAxisWidth: 64 },
-  soil: { label: "Soil",        unit: "%",  color: "hsl(var(--accent))",  tickDecimals: 0, yAxisWidth: 44 },
+  temp: {
+    label: "Temperature",
+    unit: "°F",
+    color: "hsl(var(--warning))",
+    tickDecimals: 0,
+    yAxisWidth: 48,
+  },
+  rh: { label: "Humidity", unit: "%", color: "hsl(var(--info))", tickDecimals: 0, yAxisWidth: 44 },
+  vpd: { label: "VPD", unit: "kPa", color: "hsl(var(--primary))", tickDecimals: 2, yAxisWidth: 64 },
+  co2: {
+    label: "CO₂",
+    unit: "ppm",
+    color: "hsl(var(--leaf-glow))",
+    tickDecimals: 0,
+    yAxisWidth: 64,
+  },
+  soil: { label: "Soil", unit: "%", color: "hsl(var(--accent))", tickDecimals: 0, yAxisWidth: 44 },
   ppfd: {
     label: "PPFD",
     // Canonical user-facing unit; matches PPFD_UNIT_LONG in ppfdRules.
@@ -58,7 +65,18 @@ export const SENSOR_CHART_METRIC_META: Record<SensorChartMetricKey, SensorChartM
 /** Left chart margin — small breathing room so negative ticks aren't clipped. */
 export const SENSOR_CHART_LEFT_MARGIN = 4;
 
-function tickUnitOf(meta: SensorChartMetricMeta): string {
+function temperatureUnitSymbol(unit: TemperatureUnitPreference): "°F" | "°C" {
+  return unit === "celsius" ? "°C" : "°F";
+}
+
+function tickUnitOf(
+  meta: SensorChartMetricMeta,
+  metric: SensorChartMetricKey,
+  temperatureUnit?: TemperatureUnitPreference,
+): string {
+  if (metric === "temp" && temperatureUnit) {
+    return temperatureUnitSymbol(temperatureUnit);
+  }
   return meta.tickUnit ?? meta.unit;
 }
 
@@ -71,13 +89,12 @@ function tickUnitOf(meta: SensorChartMetricMeta): string {
 export function formatSensorChartYTick(
   value: number,
   metric: SensorChartMetricKey,
+  temperatureUnit?: TemperatureUnitPreference,
 ): string {
   if (!Number.isFinite(value)) return "";
   const m = SENSOR_CHART_METRIC_META[metric];
-  const rounded = m.tickDecimals > 0
-    ? Number(value.toFixed(m.tickDecimals))
-    : Math.round(value);
-  const unit = tickUnitOf(m);
+  const rounded = m.tickDecimals > 0 ? Number(value.toFixed(m.tickDecimals)) : Math.round(value);
+  const unit = tickUnitOf(m, metric, temperatureUnit);
   // Compound units (kPa / ppm / µmol) read better with a hair of
   // separation; attached unit symbols (°F / %) stay flush.
   const sep = /^[A-Za-zµ]/.test(unit) ? " " : "";
@@ -88,11 +105,12 @@ export function formatSensorChartYTick(
 export function formatSensorChartTooltipValue(
   value: number,
   metric: SensorChartMetricKey,
+  temperatureUnit?: TemperatureUnitPreference,
 ): string {
   if (!Number.isFinite(value)) return "";
-  const m = SENSOR_CHART_METRIC_META[metric];
-  const sep = /^[A-Za-zµ]/.test(m.unit) ? " " : "";
-  return `${value}${sep}${m.unit}`;
+  const unit = sensorChartUnit(metric, temperatureUnit);
+  const sep = /^[A-Za-zµ]/.test(unit) ? " " : "";
+  return `${value}${sep}${unit}`;
 }
 
 /**
@@ -100,7 +118,13 @@ export function formatSensorChartTooltipValue(
  * both the legend label and the tooltip value formatter so the unit can
  * never drift between surfaces.
  */
-export function sensorChartUnit(metric: SensorChartMetricKey): string {
+export function sensorChartUnit(
+  metric: SensorChartMetricKey,
+  temperatureUnit?: TemperatureUnitPreference,
+): string {
+  if (metric === "temp" && temperatureUnit) {
+    return temperatureUnitSymbol(temperatureUnit);
+  }
   return SENSOR_CHART_METRIC_META[metric].unit;
 }
 
@@ -108,7 +132,11 @@ export function sensorChartUnit(metric: SensorChartMetricKey): string {
  * Human-readable legend label for a metric, e.g. "Temperature (°F)" or
  * "VPD (kPa)". Metrics without a unit string render as the plain label.
  */
-export function sensorChartLegendLabel(metric: SensorChartMetricKey): string {
+export function sensorChartLegendLabel(
+  metric: SensorChartMetricKey,
+  temperatureUnit?: TemperatureUnitPreference,
+): string {
   const m = SENSOR_CHART_METRIC_META[metric];
-  return m.unit ? `${m.label} (${m.unit})` : m.label;
+  const unit = sensorChartUnit(metric, temperatureUnit);
+  return unit ? `${m.label} (${unit})` : m.label;
 }

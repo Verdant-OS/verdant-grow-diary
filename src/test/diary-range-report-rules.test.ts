@@ -174,6 +174,35 @@ describe("environment — provenance honesty", () => {
     expect(vm.environment.readingCount).toBe(3);
   });
 
+  it("renders stored temperature aggregates in the selected report unit", () => {
+    const vm = buildDiaryRangeReport(
+      baseInput({
+        temperatureUnit: "celsius",
+        sensorReadings: [
+          {
+            metric: "temperature_c",
+            value: 20,
+            ts: "2026-07-02T10:00:00Z",
+            source: "manual",
+          },
+          {
+            metric: "temperature_c",
+            value: 24,
+            ts: "2026-07-03T10:00:00Z",
+            source: "live",
+          },
+        ],
+      }),
+    );
+    expect(vm.environment.metrics.find((m) => m.key === "temperature_c")).toMatchObject({
+      unit: "°C",
+      count: 2,
+      min: 20,
+      max: 24,
+      avg: 22,
+    });
+  });
+
   it("uses captured_at rather than a later import ts for range inclusion", () => {
     const vm = buildDiaryRangeReport(
       baseInput({

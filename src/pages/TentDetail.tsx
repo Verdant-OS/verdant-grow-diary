@@ -40,6 +40,7 @@ import { buildSensorSnapshotReadModel } from "@/lib/sensors/sensorSnapshotReadMo
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useImportedSensorHistory } from "@/hooks/useImportedSensorHistory";
 import { useGrowTent, useGrowPlants, getGrowDataMeta } from "@/hooks/useGrowData";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { buildTentSensorChartSeries, buildTentSensorHeaderView } from "@/lib/tentSensorChartRules";
 import { resolveVerifiedAssignedPlantCount } from "@/lib/tentManagementRules";
 import {
@@ -93,6 +94,7 @@ import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
 const EMPTY_TENT_PLANTS: never[] = [];
 
 export default function TentDetail() {
+  const temperatureUnit = useTemperatureUnitPreference();
   const { id } = useParams();
   const { user } = useAuth();
   const [showArchived, setShowArchived] = useState(false);
@@ -303,8 +305,8 @@ export default function TentDetail() {
         {snap?.temp !== null && snap?.temp !== undefined && (
           <MetricChip
             label="T"
-            value={(convertCelsiusForDisplay(snap.temp) ?? 0).toFixed(1)}
-            unit={getTemperatureUnitSymbol()}
+            value={(convertCelsiusForDisplay(snap.temp, temperatureUnit) ?? 0).toFixed(1)}
+            unit={getTemperatureUnitSymbol(temperatureUnit)}
             status={environmentMetricChipStatus(
               classifyTempAgainstStage(snap.temp, { stage: tent.stage, stale: header.stale }),
             )}

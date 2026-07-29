@@ -1,11 +1,9 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 
 import { SensorSnapshotPreview } from "@/components/SensorSnapshotPreview";
-import {
-  EMPTY_SENSOR_SNAPSHOT,
-  buildSensorSnapshot,
-} from "@/lib/latestSensorSnapshotRules";
+import { EMPTY_SENSOR_SNAPSHOT, buildSensorSnapshot } from "@/lib/latestSensorSnapshotRules";
+import { saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
 const NOW = new Date("2026-06-08T12:00:00.000Z");
 
@@ -106,48 +104,36 @@ function invalidSnap() {
 }
 
 afterEach(cleanup);
+beforeEach(() => {
+  window.localStorage.clear();
+});
 
 describe("SensorSnapshotPreview", () => {
   it("renders Temp / RH / VPD / Soil moisture", () => {
-    render(
-      <SensorSnapshotPreview
-        status="ready"
-        snapshot={freshLiveSnap()}
-        attach
-        canToggle
-      />,
-    );
+    render(<SensorSnapshotPreview status="ready" snapshot={freshLiveSnap()} attach canToggle />);
     expect(screen.getByText("Temp")).toBeInTheDocument();
     expect(screen.getByText("RH")).toBeInTheDocument();
     expect(screen.getByText("VPD")).toBeInTheDocument();
     expect(screen.getByText("Soil moisture")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("sensor-snapshot-preview-metric-temp_f").textContent,
-    ).toContain("75°F");
+    expect(screen.getByTestId("sensor-snapshot-preview-metric-temp_f").textContent).toContain(
+      "75.0°F",
+    );
+  });
+
+  it("renders its read-only Fahrenheit snapshot in the saved Celsius preference", () => {
+    saveTemperatureUnitPreference("celsius");
+    render(<SensorSnapshotPreview status="ready" snapshot={freshLiveSnap()} attach canToggle />);
+    expect(screen.getByTestId("sensor-snapshot-preview-metric-temp_f")).toHaveTextContent("23.9°C");
   });
 
   it("renders a Live badge only for fresh_live", () => {
-    render(
-      <SensorSnapshotPreview
-        status="ready"
-        snapshot={freshLiveSnap()}
-        attach
-        canToggle
-      />,
-    );
+    render(<SensorSnapshotPreview status="ready" snapshot={freshLiveSnap()} attach canToggle />);
     const badge = screen.getByTestId("sensor-snapshot-preview-badge");
     expect(badge.textContent).toMatch(/Live/);
   });
 
   it("renders stale amber badge and never says Live", () => {
-    render(
-      <SensorSnapshotPreview
-        status="ready"
-        snapshot={staleSnap()}
-        attach
-        canToggle
-      />,
-    );
+    render(<SensorSnapshotPreview status="ready" snapshot={staleSnap()} attach canToggle />);
     const badge = screen.getByTestId("sensor-snapshot-preview-badge");
     expect(badge.textContent).toMatch(/^Stale /);
     expect(badge.textContent).not.toMatch(/\bLive\b/);
@@ -221,9 +207,7 @@ describe("SensorSnapshotPreview", () => {
         onToggleAttach={onToggle}
       />,
     );
-    fireEvent.click(
-      screen.getByTestId("sensor-snapshot-preview-attach-toggle"),
-    );
+    fireEvent.click(screen.getByTestId("sensor-snapshot-preview-attach-toggle"));
     expect(onToggle).toHaveBeenCalledWith(false);
   });
 
@@ -236,23 +220,12 @@ describe("SensorSnapshotPreview", () => {
         canToggle={false}
       />,
     );
-    const toggle = screen.getByTestId(
-      "sensor-snapshot-preview-attach-toggle",
-    ) as HTMLInputElement;
+    const toggle = screen.getByTestId("sensor-snapshot-preview-attach-toggle") as HTMLInputElement;
     expect(toggle.disabled).toBe(true);
   });
 
   it("exposes an accessible region heading", () => {
-    render(
-      <SensorSnapshotPreview
-        status="ready"
-        snapshot={freshLiveSnap()}
-        attach
-        canToggle
-      />,
-    );
-    expect(
-      screen.getByRole("region", { name: /sensor snapshot/i }),
-    ).toBeInTheDocument();
+    render(<SensorSnapshotPreview status="ready" snapshot={freshLiveSnap()} attach canToggle />);
+    expect(screen.getByRole("region", { name: /sensor snapshot/i })).toBeInTheDocument();
   });
 });

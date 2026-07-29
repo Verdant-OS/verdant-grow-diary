@@ -3,7 +3,11 @@ import { Droplets, AlertTriangle } from "lucide-react";
 
 import { normalizeDiaryEntries, type NormalizeDiaryInput } from "@/lib/diaryEntryRules";
 import { buildWateringHistory, type WateringHistoryRow } from "@/lib/wateringHistoryRules";
-import { formatTempDualF } from "@/lib/temperatureDisplay";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  formatTemperatureDisplay,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 interface WateringHistoryPanelProps {
   /**
@@ -49,7 +53,22 @@ function MetricChip({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Row({ row }: { row: WateringHistoryRow }) {
+function formatWaterTemperature(
+  value: number | null,
+  unit: TemperatureUnitPreference,
+): string | null {
+  if (value === null || !Number.isFinite(value) || value < -10 || value > 60) return null;
+  return formatTemperatureDisplay(value, { valueUnit: "C", unit, digits: 1 });
+}
+
+function Row({
+  row,
+  temperatureUnit,
+}: {
+  row: WateringHistoryRow;
+  temperatureUnit: TemperatureUnitPreference;
+}) {
+  const waterTemperature = formatWaterTemperature(row.waterTempC, temperatureUnit);
   return (
     <li
       id={row.timelineAnchorId ?? undefined}
@@ -94,9 +113,7 @@ function Row({ row }: { row: WateringHistoryRow }) {
         {row.runoffTds !== null && (
           <MetricChip label="Runoff TDS" value={fmtNumber(row.runoffTds, { suffix: "ppm" })} />
         )}
-        {formatTempDualF(row.waterTempC).display && (
-          <MetricChip label="Water" value={formatTempDualF(row.waterTempC).display as string} />
-        )}
+        {waterTemperature && <MetricChip label="Water" value={waterTemperature} />}
       </div>
 
       {row.notePreview && (
@@ -121,6 +138,7 @@ export default function WateringHistoryPanel({
   limit = 20,
   className,
 }: WateringHistoryPanelProps) {
+  const temperatureUnit = useTemperatureUnitPreference();
   const rows = useMemo(() => {
     // Mirror Timeline's normalization convention: lift `details.event_type`
     // to the top-level `entry_type` so the diary normalizer can classify
@@ -160,7 +178,7 @@ export default function WateringHistoryPanel({
       ) : (
         <ul className="space-y-2">
           {rows.map((r) => (
-            <Row key={r.id} row={r} />
+            <Row key={r.id} row={r} temperatureUnit={temperatureUnit} />
           ))}
         </ul>
       )}

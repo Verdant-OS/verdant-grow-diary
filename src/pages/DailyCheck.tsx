@@ -98,7 +98,9 @@ import { toast } from "sonner";
 
 import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingCard";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { deriveChangeContextFromReadings } from "@/lib/manualSensorSnapshotChangeContextRules";
+import { getTemperatureUnitSymbol } from "@/lib/temperatureUnitPreference";
 
 import { plantDetailPath, plantsPath, sensorsPath, tentsPath, timelinePath } from "@/lib/routes";
 import {
@@ -139,6 +141,7 @@ function resolveCompatibleAssignedTentId(
 }
 
 export default function DailyCheck() {
+  const temperatureUnit = useTemperatureUnitPreference();
   const navigate = useNavigate();
   const { data: tents = [], isLoading: tentsLoading } = useTents();
   const { data: plants = [], isLoading: plantsLoading } = usePlants();
@@ -426,8 +429,12 @@ export default function DailyCheck() {
   // Read-only — no writes, no ingestion changes.
   const { data: tentReadings = [] } = useSensorReadings(effectiveTentId || null, 50);
   const changeContext = useMemo(
-    () => deriveChangeContextFromReadings(tentReadings, { tentId: effectiveTentId }),
-    [effectiveTentId, tentReadings],
+    () =>
+      deriveChangeContextFromReadings(tentReadings, {
+        tentId: effectiveTentId,
+        temperatureUnit,
+      }),
+    [effectiveTentId, temperatureUnit, tentReadings],
   );
 
   const progress = stepProgress(renderedStep);
@@ -993,7 +1000,8 @@ export default function DailyCheck() {
                 onSaved={() => handleSubmitSuccess("sensor")}
               />
               <p className="mt-2 min-w-0 break-words text-[11px] text-muted-foreground">
-                Saved as <strong>manual</strong>, not live sensor data. Temperature uses °F.
+                Saved as <strong>manual</strong>, not live sensor data. Temperature uses{" "}
+                {getTemperatureUnitSymbol(temperatureUnit)}.
               </p>
               <div className="mt-3 flex min-w-0 gap-2">
                 <Button

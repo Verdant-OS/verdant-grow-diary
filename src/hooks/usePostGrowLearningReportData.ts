@@ -8,9 +8,10 @@
  *
  * No schema/RLS/Edge/auth changes. No device control. No AI calls.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import {
   POST_GROW_LESSON_EVENT_TYPE,
   buildPostGrowLearningReportViewModel,
@@ -52,14 +53,33 @@ export function usePostGrowLearningReportData(
   growId: string | null | undefined,
 ): UsePostGrowLearningReportDataResult {
   const { user } = useAuth();
+  const temperatureUnit = useTemperatureUnitPreference();
   const [status, setStatus] = useState<PostGrowReportStatus>("idle");
   const [report, setReport] = useState<PostGrowLearningReportViewModel | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const temperatureUnitRef = useRef(temperatureUnit);
+  const reportInputRef = useRef<Omit<
+    Parameters<typeof buildPostGrowLearningReportViewModel>[0],
+    "temperatureUnit"
+  > | null>(null);
+
+  useEffect(() => {
+    temperatureUnitRef.current = temperatureUnit;
+    if (reportInputRef.current) {
+      setReport(
+        buildPostGrowLearningReportViewModel({
+          ...reportInputRef.current,
+          temperatureUnit,
+        }),
+      );
+    }
+  }, [temperatureUnit]);
 
   const load = useCallback(async () => {
     if (!user || !growId) {
       setStatus("idle");
       setReport(null);
+      reportInputRef.current = null;
       setError(null);
       return;
     }
@@ -74,6 +94,7 @@ export function usePostGrowLearningReportData(
       if (growErr) throw growErr;
       if (!grow) {
         setReport(null);
+        reportInputRef.current = null;
         setStatus("unavailable");
         setError("Grow not found or unavailable.");
         return;
@@ -123,17 +144,23 @@ export function usePostGrowLearningReportData(
       if (actionRes.error) throw actionRes.error;
 
       const diaryRows = await signPhotoUrls((diaryRes.data ?? []) as PostGrowDiaryLike[]);
-      const vm = buildPostGrowLearningReportViewModel({
+      const reportInput = {
         grow: grow as PostGrowGrowLike,
         harvests: (harvestRes.data ?? []) as PostGrowHarvestLike[],
         diaryEntries: diaryRows,
         sensorReadings: (sensorRes.data ?? []) as PostGrowSensorReadingLike[],
         actions: (actionRes.data ?? []) as PostGrowActionLike[],
+      };
+      reportInputRef.current = reportInput;
+      const vm = buildPostGrowLearningReportViewModel({
+        ...reportInput,
+        temperatureUnit: temperatureUnitRef.current,
       });
       setReport(vm);
       setStatus("ready");
     } catch (err) {
       setReport(null);
+      reportInputRef.current = null;
       setStatus("unavailable");
       setError(err instanceof Error ? err.message : "Unable to load post-grow report.");
     }

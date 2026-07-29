@@ -125,6 +125,7 @@ import {
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { useTimelineNameDirectory } from "@/hooks/useTimelineNameDirectory";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import { formatTemperatureDisplay } from "@/lib/temperatureUnitPreference";
 import { canUseFeature } from "@/lib/featureEntitlements";
 import {
   buildTimelinePhotoLightboxList,
@@ -2142,7 +2143,11 @@ export default function Timeline() {
                                       <TimelineSensorSourceBadge badge={sourceBadge} />
                                       {sensor.temp != null && (
                                         <SnapChip>
-                                          {((sensor.temp * 9) / 5 + 32).toFixed(1)}°F
+                                          {formatTemperatureDisplay(sensor.temp, {
+                                            valueUnit: "C",
+                                            unit: temperatureUnit,
+                                            digits: 1,
+                                          })}
                                         </SnapChip>
                                       )}
                                       {sensor.rh != null && <SnapChip>{sensor.rh}% RH</SnapChip>}

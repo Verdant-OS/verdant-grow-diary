@@ -18,12 +18,11 @@ import { Loader2, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useGrows } from "@/store/grows";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
-import {
-  checkPremiumExportEntitlement,
-} from "@/hooks/usePremiumExportServerGate";
+import { checkPremiumExportEntitlement } from "@/hooks/usePremiumExportServerGate";
 import PaywallCta from "@/components/PaywallCta";
 import { buildPaywallCtaViewModel } from "@/lib/paywallCtaViewModel";
 import { useDiaryRangeReportData } from "@/hooks/useDiaryRangeReportData";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import {
   buildDiaryRangeReport,
   DIARY_RANGE_ENVIRONMENT_EMPTY_COPY,
@@ -55,6 +54,7 @@ function slugify(name: string): string {
 }
 
 export default function DiaryRangeReportPage() {
+  const temperatureUnit = useTemperatureUnitPreference();
   const [searchParams, setSearchParams] = useSearchParams();
   const { activeGrowId: storeGrowId } = useGrows();
 
@@ -87,8 +87,7 @@ export default function DiaryRangeReportPage() {
     loading: entitlementLoading,
     lookupFailed: clientLookupFailed,
   } = useMyEntitlements();
-  const clientIsPremium =
-    !clientLookupFailed && canUseCapability(entitlement, "advancedExports");
+  const clientIsPremium = !clientLookupFailed && canUseCapability(entitlement, "advancedExports");
 
   // Authoritative server gate. Fail-closed.
   const [serverGate, setServerGate] = useState<{
@@ -124,7 +123,11 @@ export default function DiaryRangeReportPage() {
   }, [growId, startDate, endDate, serverGateAttempt]);
 
   const gateAllowed = serverGate.status === "allowed";
-  const { status: dataStatus, data, error } = useDiaryRangeReportData(
+  const {
+    status: dataStatus,
+    data,
+    error,
+  } = useDiaryRangeReportData(
     gateAllowed ? growId : null,
     gateAllowed ? startDate : null,
     gateAllowed ? endDate : null,
@@ -141,8 +144,9 @@ export default function DiaryRangeReportPage() {
       startDate,
       endDate,
       now: new Date(),
+      temperatureUnit,
     });
-  }, [data, dataStatus, startDate, endDate]);
+  }, [data, dataStatus, startDate, endDate, temperatureUnit]);
 
   function triggerPrint() {
     if (typeof window === "undefined" || typeof document === "undefined") return;
@@ -195,8 +199,8 @@ export default function DiaryRangeReportPage() {
           className="text-sm text-muted-foreground mb-4"
           data-testid="diary-range-report-server-gate-message"
         >
-          The report entitlement check did not complete. Nothing was generated. Try the check
-          again in a moment.
+          The report entitlement check did not complete. Nothing was generated. Try the check again
+          in a moment.
         </p>
         <Button
           type="button"
@@ -323,7 +327,11 @@ export default function DiaryRangeReportPage() {
           </p>
         </section>
 
-        <section className="glass rounded-2xl p-4" data-testid="diary-range-report-watering" data-print-card>
+        <section
+          className="glass rounded-2xl p-4"
+          data-testid="diary-range-report-watering"
+          data-print-card
+        >
           <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2">
             Watering
           </h3>
@@ -352,7 +360,11 @@ export default function DiaryRangeReportPage() {
           )}
         </section>
 
-        <section className="glass rounded-2xl p-4" data-testid="diary-range-report-feeding" data-print-card>
+        <section
+          className="glass rounded-2xl p-4"
+          data-testid="diary-range-report-feeding"
+          data-print-card
+        >
           <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2">
             Feeding
           </h3>
@@ -362,10 +374,8 @@ export default function DiaryRangeReportPage() {
             <>
               <p className="text-sm">
                 {vm.feeding.count} {vm.feeding.count === 1 ? "feeding" : "feedings"}
-                {vm.feeding.phRange &&
-                  ` · pH ${vm.feeding.phRange.min}–${vm.feeding.phRange.max}`}
-                {vm.feeding.ecRange &&
-                  ` · EC ${vm.feeding.ecRange.min}–${vm.feeding.ecRange.max}`}
+                {vm.feeding.phRange && ` · pH ${vm.feeding.phRange.min}–${vm.feeding.phRange.max}`}
+                {vm.feeding.ecRange && ` · EC ${vm.feeding.ecRange.min}–${vm.feeding.ecRange.max}`}
               </p>
               {vm.feeding.nutrients.length > 0 && (
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -381,7 +391,11 @@ export default function DiaryRangeReportPage() {
           )}
         </section>
 
-        <section className="glass rounded-2xl p-4" data-testid="diary-range-report-training" data-print-card>
+        <section
+          className="glass rounded-2xl p-4"
+          data-testid="diary-range-report-training"
+          data-print-card
+        >
           <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2">
             Training
           </h3>
@@ -420,22 +434,22 @@ export default function DiaryRangeReportPage() {
                   .filter((m) => m.count > 0)
                   .map((m) => (
                     <li key={m.key}>
-                      {m.label}: avg {m.avg} {m.unit} (min {m.min}, max {m.max}, {m.count}{" "}
-                      readings)
+                      {m.label}: avg {m.avg} {m.unit} (min {m.min}, max {m.max}, {m.count} readings)
                     </li>
                   ))}
               </ul>
               <p className="mt-2 text-xs text-muted-foreground">
-                Sources:{" "}
-                {vm.environment.sources
-                  .map((s) => `${s.label} × ${s.count}`)
-                  .join(", ")}
+                Sources: {vm.environment.sources.map((s) => `${s.label} × ${s.count}`).join(", ")}
               </p>
             </>
           )}
         </section>
 
-        <section className="glass rounded-2xl p-4" data-testid="diary-range-report-photos" data-print-card>
+        <section
+          className="glass rounded-2xl p-4"
+          data-testid="diary-range-report-photos"
+          data-print-card
+        >
           <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2">
             Photos
           </h3>
@@ -467,7 +481,11 @@ export default function DiaryRangeReportPage() {
           )}
         </section>
 
-        <section className="glass rounded-2xl p-4" data-testid="diary-range-report-harvest" data-print-card>
+        <section
+          className="glass rounded-2xl p-4"
+          data-testid="diary-range-report-harvest"
+          data-print-card
+        >
           <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2">
             Harvest outcomes
           </h3>

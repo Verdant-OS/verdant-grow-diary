@@ -11,13 +11,11 @@ import {
   temperatureInputUnitFromPreference,
   TEMPERATURE_INPUT_UNITS,
   TEMPERATURE_UNIT_SYMBOL,
+  toCelsiusInputString,
   toFahrenheitInputString,
   TYPICAL_AIR_TEMP_RANGE,
 } from "@/lib/sensorInputUnitConversion";
-import {
-  resolveManualAirTemp,
-  validateManualEntry,
-} from "@/lib/sensorReadingManualEntryRules";
+import { resolveManualAirTemp, validateManualEntry } from "@/lib/sensorReadingManualEntryRules";
 import { evaluateManualSnapshotAdvisor } from "@/lib/manualSensorSnapshotAdvisorRules";
 
 describe("parseTemperatureInput", () => {
@@ -48,6 +46,42 @@ describe("parseTemperatureInput", () => {
     const p = parseTemperatureInput(75, "F");
     expect(p.celsius).toBeCloseTo(23.888889, 5);
     expect(p.fahrenheit).toBe(75);
+  });
+
+  it("accepts compact or spaced Fahrenheit and Celsius suffixes", () => {
+    const fahrenheit = parseTemperatureInput("72°F", "C");
+    expect(fahrenheit).toMatchObject({
+      kind: "ok",
+      unit: "F",
+      enteredValue: 72,
+    });
+    expect(fahrenheit.celsius).toBeCloseTo(22.222222, 5);
+
+    const celsius = parseTemperatureInput("22 °C", "F");
+    expect(celsius).toMatchObject({
+      kind: "ok",
+      unit: "C",
+      enteredValue: 22,
+      celsius: 22,
+    });
+  });
+
+  it("accepts case-insensitive short and long unit names", () => {
+    expect(parseTemperatureInput("72 f", "C").unit).toBe("F");
+    expect(parseTemperatureInput("72 FAHRENHEIT", "C").unit).toBe("F");
+    expect(parseTemperatureInput("22 c", "F").unit).toBe("C");
+    expect(parseTemperatureInput("22 celsius", "F").unit).toBe("C");
+  });
+
+  it("lets an explicit suffix override the field preference", () => {
+    expect(parseTemperatureInput("72°F", "C").celsius).toBeCloseTo(22.222222, 5);
+    expect(parseTemperatureInput("22°C", "F").celsius).toBe(22);
+  });
+
+  it("rejects partial, unknown, or duplicated suffixes", () => {
+    for (const raw of ["72°F later", "22 kelvin", "72°F°C", "72Fjunk", "°F", "72°"]) {
+      expect(parseTemperatureInput(raw, "F").kind).toBe("invalid");
+    }
   });
 
   it("handles negative and zero temperatures without treating them as missing", () => {
@@ -130,6 +164,19 @@ describe("input bridging helpers", () => {
     expect(Number(toFahrenheitInputString("75", "F"))).toBe(75);
   });
 
+  it("bridges explicitly suffixed text to canonical Celsius", () => {
+    expect(Number(toCelsiusInputString("72°F", "C"))).toBeCloseTo(22.22, 2);
+    expect(toCelsiusInputString("22 °C", "F")).toBe("22");
+    expect(toCelsiusInputString("22.12345", "C")).toBe("22.12345");
+    expect(toCelsiusInputString("", "F")).toBe("");
+    expect(toCelsiusInputString("72°K", "F")).toBe("72°K");
+  });
+
+  it("honors an explicit suffix in Fahrenheit legacy bridges", () => {
+    expect(Number(toFahrenheitInputString("22 °C", "F"))).toBeCloseTo(71.6, 4);
+    expect(Number(toFahrenheitInputString("72°F", "C"))).toBe(72);
+  });
+
   it("bridges empty and invalid entries to an empty string, not zero", () => {
     expect(toFahrenheitInputString("", "C")).toBe("");
     expect(toFahrenheitInputString("abc", "F")).toBe("");
@@ -174,6 +221,21 @@ describe("validateManualEntry with an explicit entry unit", () => {
   it("stores a Fahrenheit entry converted to Celsius exactly once", () => {
     const v = validateManualEntry({ airTemp: 75, airTempUnit: "F" });
     expect(v.metrics.find((m) => m.metric === "temperature_c")?.value).toBeCloseTo(23.89, 2);
+  });
+
+  it("stores suffixed values using the suffix rather than the selected field unit", () => {
+    const fromF = validateManualEntry({
+      airTemp: "72°F",
+      airTempUnit: "C",
+    });
+    const fromC = validateManualEntry({
+      airTemp: "22 °C",
+      airTempUnit: "F",
+    });
+    expect(fromF.ok).toBe(true);
+    expect(fromF.metrics.find((m) => m.metric === "temperature_c")?.value).toBeCloseTo(22.22, 2);
+    expect(fromC.ok).toBe(true);
+    expect(fromC.metrics.find((m) => m.metric === "temperature_c")?.value).toBe(22);
   });
 
   it("keeps the legacy airTempF field working unchanged", () => {

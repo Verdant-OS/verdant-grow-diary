@@ -81,7 +81,11 @@ export function resolveTemperatureInputUnit(value: unknown): TemperatureInputUni
 export interface ParsedTemperatureInput {
   /** "empty" = grower left it blank (unknown, NOT zero). */
   readonly kind: "empty" | "invalid" | "ok";
-  /** The unit the grower typed in. Always explicit. */
+  /**
+   * The unit the grower typed in. A suffix in the text (`72°F`, `22 °C`)
+   * wins over the field's selected unit; otherwise the selected unit is
+   * used. This is always explicit after parsing.
+   */
   readonly unit: TemperatureInputUnit;
   /** The number exactly as typed, in `unit`. Null unless kind === "ok". */
   readonly enteredValue: number | null;
@@ -108,7 +112,36 @@ const EMPTY_PARSE = (unit: TemperatureInputUnit): ParsedTemperatureInput => ({
 /** Round without accumulating float noise. */
 function round(value: number, digits: number): number {
   const f = 10 ** digits;
-  return Math.round(value * f) / f;
+  const scaled = value * f;
+  return Number.isFinite(scaled) ? Math.round(scaled) / f : value;
+}
+
+/**
+ * Strict full-string grammar for a temperature field. The numeric portion
+ * accepts plain decimals plus the finite scientific notation older callers
+ * already supported. The optional suffix may be F/C, °F/°C, Fahrenheit, or
+ * Celsius (case-insensitive), with optional whitespace. Partial parses such
+ * as "72°F later" stay invalid.
+ */
+const TEMPERATURE_INPUT_RE =
+  /^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)(?:\s*°?\s*(fahrenheit|celsius|f|c))?$/i;
+
+function parseTemperatureString(
+  raw: string,
+  fallbackUnit: TemperatureInputUnit,
+): { value: number; unit: TemperatureInputUnit } | null {
+  const match = TEMPERATURE_INPUT_RE.exec(raw.trim());
+  if (!match) return null;
+  const value = Number(match[1]);
+  if (!Number.isFinite(value)) return null;
+  const suffix = match[2]?.toLowerCase();
+  const unit =
+    suffix === "c" || suffix === "celsius"
+      ? "C"
+      : suffix === "f" || suffix === "fahrenheit"
+        ? "F"
+        : fallbackUnit;
+  return { value, unit };
 }
 
 /** Format a number with its unit symbol, trimming pointless trailing zeros. */
@@ -168,25 +201,31 @@ export function parseTemperatureInput(
     return { ...EMPTY_PARSE(safeUnit), kind: "invalid" };
   }
 
-  const n = typeof raw === "number" ? raw : Number(raw.trim());
-  if (!Number.isFinite(n)) {
+  const parsed =
+    typeof raw === "number"
+      ? Number.isFinite(raw)
+        ? { value: raw, unit: safeUnit }
+        : null
+      : parseTemperatureString(raw, safeUnit);
+  if (!parsed) {
     return { ...EMPTY_PARSE(safeUnit), kind: "invalid" };
   }
 
-  const celsius = safeUnit === "C" ? n : fahrenheitToCelsius(n);
-  const fahrenheit = safeUnit === "F" ? n : celsiusToFahrenheit(n);
-  const band = TYPICAL_AIR_TEMP_RANGE[safeUnit];
+  const { value: n, unit: parsedUnit } = parsed;
+  const celsius = parsedUnit === "C" ? n : fahrenheitToCelsius(n);
+  const fahrenheit = parsedUnit === "F" ? n : celsiusToFahrenheit(n);
+  const band = TYPICAL_AIR_TEMP_RANGE[parsedUnit];
 
   return {
     kind: "ok",
-    unit: safeUnit,
+    unit: parsedUnit,
     enteredValue: n,
     celsius: round(celsius, 6),
     fahrenheit: round(fahrenheit, 6),
-    unitMismatchHint: detectTemperatureUnitMismatch(n, safeUnit),
+    unitMismatchHint: detectTemperatureUnitMismatch(n, parsedUnit),
     outOfTypicalRangeHint:
       n < band.min || n > band.max
-        ? `Air temp ${formatTemperatureWithUnit(n, safeUnit)} is outside the typical ${describeTypicalAirTempRange(safeUnit)} range.`
+        ? `Air temp ${formatTemperatureWithUnit(n, parsedUnit)} is outside the typical ${describeTypicalAirTempRange(parsedUnit)} range.`
         : null,
   };
 }
@@ -201,6 +240,31 @@ export function toFahrenheitInputString(raw: unknown, unit: TemperatureInputUnit
   const parsed = parseTemperatureInput(raw, unit);
   if (parsed.kind !== "ok" || parsed.fahrenheit === null) return "";
   return String(parsed.fahrenheit);
+}
+
+/**
+ * Convert a grower-entered temperature to the canonical-Celsius string used
+ * by existing form validators and save payloads. An explicit suffix wins over
+ * the selected field unit. Blank stays blank; invalid text is returned
+ * unchanged so the caller's established validation message still fires.
+ */
+export function toCelsiusInputString(raw: string, unit: TemperatureInputUnit, digits = 2): string {
+  const parsed = parseTemperatureInput(raw, unit);
+  if (parsed.kind === "empty") return "";
+  if (parsed.kind !== "ok" || parsed.celsius === null) return raw;
+  if (parsed.unit === "C" && parsed.enteredValue !== null) {
+    return String(parsed.enteredValue);
+  }
+  return String(round(parsed.celsius, digits));
+}
+
+/** Preference-shaped convenience wrapper for React form presenters. */
+export function preferredTemperatureToCelsiusInputString(
+  raw: string,
+  preference: TemperatureUnitPreference,
+  digits = 2,
+): string {
+  return toCelsiusInputString(raw, temperatureInputUnitFromPreference(preference), digits);
 }
 
 /**

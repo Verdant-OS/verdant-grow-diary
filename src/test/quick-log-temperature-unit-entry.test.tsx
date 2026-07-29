@@ -26,6 +26,13 @@ describe("Quick Log temperature unit entry", () => {
     expect(snap?.temp_f).toBeCloseTo(75.2, 6);
   });
 
+  it("honors explicit suffixes over the active entry preference", () => {
+    const fahrenheit = buildManualSensorSnapshot(payloadSensors("72°F", "C"));
+    const celsius = buildManualSensorSnapshot(payloadSensors("22 °C", "F"));
+    expect(fahrenheit?.temp_f).toBe(72);
+    expect(celsius?.temp_f).toBeCloseTo(71.6, 6);
+  });
+
   it("keeps the canonical source label and never fabricates other metrics", () => {
     const snap = buildManualSensorSnapshot(payloadSensors("20", "C"));
     expect(snap?.source).toBe("manual");

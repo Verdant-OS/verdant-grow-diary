@@ -7,7 +7,11 @@ import {
   buildEcCompensationPreview,
   EC_COMPENSATION_PREVIEW_DISCLAIMER,
 } from "@/lib/ecCompensationPreviewViewModel";
-import { formatTempDualF } from "@/lib/temperatureDisplay";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  formatTemperatureDisplay,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 interface FeedingHistoryPanelProps {
   /**
@@ -53,7 +57,22 @@ function MetricChip({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Row({ row }: { row: FeedingHistoryRow }) {
+function formatWaterTemperature(
+  value: number | null,
+  unit: TemperatureUnitPreference,
+): string | null {
+  if (value === null || !Number.isFinite(value) || value < -10 || value > 60) return null;
+  return formatTemperatureDisplay(value, { valueUnit: "C", unit, digits: 1 });
+}
+
+function Row({
+  row,
+  temperatureUnit,
+}: {
+  row: FeedingHistoryRow;
+  temperatureUnit: TemperatureUnitPreference;
+}) {
+  const waterTemperature = formatWaterTemperature(row.waterTempC, temperatureUnit);
   return (
     <li
       id={row.timelineAnchorId ?? undefined}
@@ -102,9 +121,7 @@ function Row({ row }: { row: FeedingHistoryRow }) {
           <MetricChip label="Runoff TDS" value={fmtNumber(row.runoffTds, { suffix: "ppm" })} />
         )}
         {row.recipe && <MetricChip label="Recipe" value={row.recipe} />}
-        {formatTempDualF(row.waterTempC).display && (
-          <MetricChip label="Water" value={formatTempDualF(row.waterTempC).display as string} />
-        )}
+        {waterTemperature && <MetricChip label="Water" value={waterTemperature} />}
       </div>
 
       <EcCompensationPreview row={row} />
@@ -150,6 +167,7 @@ export default function FeedingHistoryPanel({
   limit = 20,
   className,
 }: FeedingHistoryPanelProps) {
+  const temperatureUnit = useTemperatureUnitPreference();
   const rows = useMemo(() => {
     // Mirror Timeline's normalization convention: lift `details.event_type`
     // to the top-level `entry_type` so the diary normalizer can classify
@@ -190,7 +208,7 @@ export default function FeedingHistoryPanel({
       ) : (
         <ul className="space-y-2">
           {rows.map((r) => (
-            <Row key={r.id} row={r} />
+            <Row key={r.id} row={r} temperatureUnit={temperatureUnit} />
           ))}
         </ul>
       )}

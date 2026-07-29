@@ -13,6 +13,7 @@ import {
   type ResolveOptions,
 } from "@/lib/sensorSnapshotFreshnessRules";
 import { applyTemperatureUnitToSnapshotMetrics } from "@/lib/sensorSnapshotTemperatureUnitView";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 export interface SensorSnapshotCardProps {
   /** Raw input — resolver will normalize and freshness-classify it. */
@@ -59,13 +60,15 @@ export default function SensorSnapshotCard({
   className,
   testId = "sensor-snapshot-card",
 }: SensorSnapshotCardProps) {
+  const temperatureUnit = useTemperatureUnitPreference();
   const rawModel: SensorSnapshotDisplayModel | null =
-    display ??
-    (snapshot ? resolveSensorSnapshotDisplay(snapshot, resolveOptions) : null);
+    display ?? (snapshot ? resolveSensorSnapshotDisplay(snapshot, resolveOptions) : null);
   const model: SensorSnapshotDisplayModel | null = rawModel
     ? {
         ...rawModel,
-        metrics: applyTemperatureUnitToSnapshotMetrics(rawModel.metrics),
+        metrics: applyTemperatureUnitToSnapshotMetrics(rawModel.metrics, {
+          unit: temperatureUnit,
+        }),
       }
     : null;
 
@@ -79,9 +82,7 @@ export default function SensorSnapshotCard({
         )}
       >
         <p>No sensor snapshot available.</p>
-        <p className="text-[11px]">
-          Enter a manual reading or check latest sensor ingestion.
-        </p>
+        <p className="text-[11px]">Enter a manual reading or check latest sensor ingestion.</p>
       </div>
     );
   }
@@ -113,10 +114,7 @@ export default function SensorSnapshotCard({
       <div className="flex flex-wrap items-center gap-2">
         <SensorSourceBadge source={badgeSource} status={badgeStatus} />
         {model.ageLabel && (
-          <span
-            data-testid={`${testId}-age`}
-            className="text-[11px] text-muted-foreground"
-          >
+          <span data-testid={`${testId}-age`} className="text-[11px] text-muted-foreground">
             {model.ageLabel}
           </span>
         )}
@@ -129,10 +127,7 @@ export default function SensorSnapshotCard({
           </span>
         )}
         {typeof model.confidence === "number" && (
-          <span
-            data-testid={`${testId}-confidence`}
-            className="text-[11px] text-muted-foreground"
-          >
+          <span data-testid={`${testId}-confidence`} className="text-[11px] text-muted-foreground">
             conf {(model.confidence * 100).toFixed(0)}%
           </span>
         )}
@@ -155,9 +150,7 @@ export default function SensorSnapshotCard({
               <span className="font-mono tabular-nums">
                 {metric.display === null ? "—" : metric.display}
                 {metric.unit && metric.display !== null ? (
-                  <span className="ml-0.5 text-muted-foreground">
-                    {metric.unit}
-                  </span>
+                  <span className="ml-0.5 text-muted-foreground">{metric.unit}</span>
                 ) : null}
               </span>
             </li>

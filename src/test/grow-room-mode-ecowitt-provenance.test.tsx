@@ -73,6 +73,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import GrowRoomMode from "@/pages/GrowRoomMode";
+import { saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
 function reading(raw_payload: unknown): ReadingFixture {
   return {
@@ -97,6 +98,7 @@ function renderPage() {
 beforeEach(() => {
   mockState.readingRows = [];
   mockState.selectCalls = [];
+  window.localStorage.clear();
 });
 
 describe("GrowRoomMode ECOWITT provenance", () => {
@@ -158,5 +160,26 @@ describe("GrowRoomMode ECOWITT provenance", () => {
 
     expect(await screen.findByTestId("grow-room-source")).toHaveTextContent("Live");
     expect(screen.getByTestId("grow-room-health")).toHaveTextContent("Healthy");
+  });
+
+  it("renders its read-only temperature summary in the saved Celsius preference", async () => {
+    saveTemperatureUnitPreference("celsius");
+    mockState.readingRows = [
+      reading({
+        vendor: "ecowitt_windows_testbench",
+        metadata: {
+          reported_verdant_source: "live",
+          raw_payload: {
+            stationtype: "GW2000A_V3.2.4",
+            dateutc: "2026-07-17 12:00:00",
+          },
+        },
+      }),
+    ];
+    renderPage();
+
+    expect(await screen.findByTestId("grow-room-source")).toHaveTextContent("Live");
+    expect(screen.getByTestId("grow-room-card")).toHaveTextContent("Temp 24.0°C");
+    expect(screen.getByTestId("grow-room-card")).not.toHaveTextContent("Temp 75.2°F");
   });
 });

@@ -16,11 +16,8 @@
  *    the same guards Quick Log v2 uses. Pure import (no I/O) so v1 and v2
  *    can never disagree on what counts as a physically real reading.
  */
-import {
-  isTemperatureValid,
-  isHumidityValid,
-  isVpdValid,
-} from "./sensorReadingNormalizationRules";
+import { isTemperatureValid, isHumidityValid, isVpdValid } from "./sensorReadingNormalizationRules";
+import { parseTemperatureInput } from "./sensorInputUnitConversion";
 
 export type EnvironmentCheckWaterTempUnit = "F" | "C";
 
@@ -87,11 +84,7 @@ function parseFinite(raw: string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function clampOrNull(
-  n: number | null,
-  min: number,
-  max: number,
-): number | null {
+function clampOrNull(n: number | null, min: number, max: number): number | null {
   if (n === null) return null;
   if (n < min || n > max) return null;
   return n;
@@ -139,20 +132,19 @@ export function buildEnvironmentCheckDetails(
   // validateEnvironmentCheckSensorBand, so in the real flow build only ever
   // sees in-band values; this guard just guarantees the builder can never
   // emit an out-of-band reading even if called ungated.
-  const roomRaw = parseFinite(input.roomTempF);
   const roomUnit = input.roomTempUnit ?? "F";
+  const roomParsed = parseTemperatureInput(input.roomTempF, roomUnit);
   let room_temp_f: number | null = null;
   let temp_c: number | null = null;
-  if (roomRaw !== null) {
-    if (roomUnit === "C") {
-      if (isTemperatureValid(roomRaw)) {
-        temp_c = roomRaw;
-        room_temp_f = roundTo(celsiusToFahrenheit(roomRaw), 1);
-      }
-    } else if (isTemperatureValid(fahrenheitToCelsius(roomRaw))) {
-      room_temp_f = roomRaw;
-      temp_c = roundTo(fahrenheitToCelsius(roomRaw), 2);
-    }
+  if (
+    roomParsed.kind === "ok" &&
+    roomParsed.celsius !== null &&
+    roomParsed.fahrenheit !== null &&
+    isTemperatureValid(roomParsed.celsius)
+  ) {
+    temp_c = roundTo(roomParsed.celsius, 2);
+    room_temp_f =
+      roomParsed.unit === "C" ? roundTo(roomParsed.fahrenheit, 1) : roomParsed.fahrenheit;
   }
   const humRaw = parseFinite(input.humidityPct);
   const humidity_pct = humRaw !== null && isHumidityValid(humRaw) ? humRaw : null;
@@ -161,21 +153,28 @@ export function buildEnvironmentCheckDetails(
 
   let water_temp_f: number | null = null;
   let water_temp_c: number | null = null;
-  const waterRaw = parseFinite(input.waterTempValue);
-  if (waterRaw !== null) {
-    if (input.waterTempUnit === "F") {
-      water_temp_f = clampOrNull(waterRaw, WATER_TEMP_F_MIN, WATER_TEMP_F_MAX);
-      if (water_temp_f !== null) {
-        water_temp_c = roundTo(fahrenheitToCelsius(water_temp_f), 2);
-      }
-    } else if (input.waterTempUnit === "C") {
-      water_temp_c = clampOrNull(waterRaw, WATER_TEMP_C_MIN, WATER_TEMP_C_MAX);
-      if (water_temp_c !== null) {
-        water_temp_f = roundTo(celsiusToFahrenheit(water_temp_c), 1);
+  if (input.waterTempUnit === "F" || input.waterTempUnit === "C") {
+    const waterParsed = parseTemperatureInput(input.waterTempValue, input.waterTempUnit);
+    if (
+      waterParsed.kind === "ok" &&
+      waterParsed.enteredValue !== null &&
+      waterParsed.celsius !== null &&
+      waterParsed.fahrenheit !== null
+    ) {
+      if (waterParsed.unit === "F") {
+        water_temp_f = clampOrNull(waterParsed.enteredValue, WATER_TEMP_F_MIN, WATER_TEMP_F_MAX);
+        if (water_temp_f !== null) {
+          water_temp_c = roundTo(waterParsed.celsius, 2);
+        }
+      } else {
+        water_temp_c = clampOrNull(waterParsed.enteredValue, WATER_TEMP_C_MIN, WATER_TEMP_C_MAX);
+        if (water_temp_c !== null) {
+          water_temp_f = roundTo(waterParsed.fahrenheit, 1);
+        }
       }
     }
-    // Missing unit → silently drop. Per safety rule: never infer units.
   }
+  // Missing unit → silently drop. Per safety rule: never infer units.
 
   const ec_mscm = clampOrNull(parseFinite(input.ecMscm), EC_MSCM_MIN, EC_MSCM_MAX);
   const note = clipNote(input.note);
@@ -231,15 +230,11 @@ export type EnvironmentCheckSensorBandResult =
  * out of scope here (no canonical counterpart; unchanged this slice).
  */
 export function validateEnvironmentCheckSensorBand(
-  input: Pick<
-    EnvironmentCheckFormInput,
-    "roomTempF" | "roomTempUnit" | "humidityPct" | "vpdKpa"
-  >,
+  input: Pick<EnvironmentCheckFormInput, "roomTempF" | "roomTempUnit" | "humidityPct" | "vpdKpa">,
 ): EnvironmentCheckSensorBandResult {
-  const roomRaw = parseFinite(input.roomTempF);
-  if (roomRaw !== null) {
-    const roomC = input.roomTempUnit === "C" ? roomRaw : fahrenheitToCelsius(roomRaw);
-    if (!isTemperatureValid(roomC)) {
+  const roomParsed = parseTemperatureInput(input.roomTempF, input.roomTempUnit ?? "F");
+  if (roomParsed.kind === "ok" && roomParsed.celsius !== null) {
+    if (!isTemperatureValid(roomParsed.celsius)) {
       return { ok: false, reason: "temperature_out_of_range" };
     }
   }
@@ -255,9 +250,7 @@ export function validateEnvironmentCheckSensorBand(
 }
 
 /** True when any measurement field has a parseable, in-range value. */
-export function hasAnyEnvironmentCheckMeasurement(
-  input: EnvironmentCheckFormInput,
-): boolean {
+export function hasAnyEnvironmentCheckMeasurement(input: EnvironmentCheckFormInput): boolean {
   const e = buildEnvironmentCheckDetails({ ...input, note: null });
   return e !== null;
 }
@@ -275,14 +268,14 @@ function roundTo(n: number, digits: number): number {
 export function resolvePreviewWaterTempC(
   input: Pick<EnvironmentCheckFormInput, "waterTempValue" | "waterTempUnit">,
 ): number | null {
-  const raw = parseFinite(input.waterTempValue);
-  if (raw === null) return null;
-  if (input.waterTempUnit === "C") {
-    return clampOrNull(raw, WATER_TEMP_C_MIN, WATER_TEMP_C_MAX);
+  if (input.waterTempUnit !== "C" && input.waterTempUnit !== "F") return null;
+  const parsed = parseTemperatureInput(input.waterTempValue, input.waterTempUnit);
+  if (parsed.kind !== "ok" || parsed.enteredValue === null || parsed.celsius === null) {
+    return null;
   }
-  if (input.waterTempUnit === "F") {
-    const f = clampOrNull(raw, WATER_TEMP_F_MIN, WATER_TEMP_F_MAX);
-    return f === null ? null : fahrenheitToCelsius(f);
-  }
-  return null;
+  const inRange =
+    parsed.unit === "C"
+      ? clampOrNull(parsed.enteredValue, WATER_TEMP_C_MIN, WATER_TEMP_C_MAX)
+      : clampOrNull(parsed.enteredValue, WATER_TEMP_F_MIN, WATER_TEMP_F_MAX);
+  return inRange === null ? null : parsed.celsius;
 }

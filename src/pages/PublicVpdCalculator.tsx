@@ -16,8 +16,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { usePageSeo } from "@/hooks/usePageSeo";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { buildAttributedPricingPath } from "@/lib/paidAcquisitionAttributionRules";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
+import { temperatureInputUnitFromPreference } from "@/lib/sensorInputUnitConversion";
 import {
   buildPublicVpdShareData,
   evaluatePublicVpdCalculator,
@@ -58,11 +60,15 @@ function parseNumber(value: string): number | null {
 }
 
 export default function PublicVpdCalculator() {
-  const [temperature, setTemperature] = useState(() => parsePublicVpdTemperatureField("", "F"));
-  const [leafTemperature, setLeafTemperature] = useState(() =>
-    parsePublicVpdTemperatureField("", "F"),
+  const savedTemperatureUnit = useTemperatureUnitPreference();
+  const preferredInputUnit = temperatureInputUnitFromPreference(savedTemperatureUnit);
+  const [temperature, setTemperature] = useState(() =>
+    parsePublicVpdTemperatureField("", preferredInputUnit),
   );
-  const [temperatureUnit, setTemperatureUnit] = useState<TempUnit>("F");
+  const [leafTemperature, setLeafTemperature] = useState(() =>
+    parsePublicVpdTemperatureField("", preferredInputUnit),
+  );
+  const [temperatureUnit, setTemperatureUnit] = useState<TempUnit>(preferredInputUnit);
   const [humidity, setHumidity] = useState("");
   const [stage, setStage] = useState<VpdStage>("unknown");
   const [placement, setPlacement] = useState<VpdSensorPlacement>("unknown");
@@ -138,6 +144,13 @@ export default function PublicVpdCalculator() {
     return () => script.remove();
   }, []);
 
+  useEffect(() => {
+    const nextUnit = temperatureInputUnitFromPreference(savedTemperatureUnit);
+    setTemperature((current) => redisplayPublicVpdTemperatureField(current, nextUnit));
+    setLeafTemperature((current) => redisplayPublicVpdTemperatureField(current, nextUnit));
+    setTemperatureUnit(nextUnit);
+  }, [savedTemperatureUnit]);
+
   function calculate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setShowResult(true);
@@ -168,9 +181,9 @@ export default function PublicVpdCalculator() {
   }
 
   function reset() {
-    setTemperature(parsePublicVpdTemperatureField("", "F"));
-    setLeafTemperature(parsePublicVpdTemperatureField("", "F"));
-    setTemperatureUnit("F");
+    setTemperature(parsePublicVpdTemperatureField("", preferredInputUnit));
+    setLeafTemperature(parsePublicVpdTemperatureField("", preferredInputUnit));
+    setTemperatureUnit(preferredInputUnit);
     setHumidity("");
     setStage("unknown");
     setPlacement("unknown");
@@ -289,11 +302,8 @@ export default function PublicVpdCalculator() {
                     <div className="flex gap-2">
                       <Input
                         id="vpd-temperature"
-                        type="number"
+                        type="text"
                         inputMode="decimal"
-                        step="0.1"
-                        min={temperatureUnit === "C" ? -20 : -4}
-                        max={temperatureUnit === "C" ? 60 : 140}
                         value={temperature.displayValue}
                         aria-invalid={
                           temperature.validity === "invalid" ||
@@ -356,11 +366,8 @@ export default function PublicVpdCalculator() {
                     <div className="relative">
                       <Input
                         id="vpd-leaf-temperature"
-                        type="number"
+                        type="text"
                         inputMode="decimal"
-                        step="0.1"
-                        min={temperatureUnit === "C" ? -20 : -4}
-                        max={temperatureUnit === "C" ? 60 : 140}
                         value={leafTemperature.displayValue}
                         aria-invalid={
                           leafTemperature.validity === "invalid" ||

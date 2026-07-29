@@ -36,6 +36,12 @@ import {
   writeQuickLogWateringTypedEvent,
   type WriteWateringTypedEventResult,
 } from "@/lib/writeQuickLogWateringTypedEvent";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
+import { preferredTemperatureToCelsiusInputString } from "@/lib/sensorInputUnitConversion";
 
 export type StructuredWateringSaveStatus = "idle" | "pending" | "saved" | "failed";
 
@@ -61,7 +67,7 @@ const NUMERIC_FIELDS: ReadonlyArray<[string, keyof QuickLogWateringFormState, st
   ["Runoff volume (ml)", "runoffMl", "optional"],
   ["Runoff pH", "runoffPh", "0–14"],
   ["Runoff EC (mS/cm)", "runoffEc", "mS/cm"],
-  ["Water temperature (°C)", "waterTempC", "°C"],
+  ["Water temperature", "waterTempC", "optional"],
 ];
 
 export function StructuredWateringEntry({
@@ -72,18 +78,34 @@ export function StructuredWateringEntry({
   writer = writeQuickLogWateringTypedEvent,
   className,
 }: StructuredWateringEntryProps) {
+  const temperatureUnit = useTemperatureUnitPreference();
   const [form, setForm] = useState<QuickLogWateringFormState>({ ...EMPTY_QUICKLOG_WATERING_FORM });
+  const [entryTemperatureUnit, setEntryTemperatureUnit] =
+    useState<TemperatureUnitPreference | null>(null);
   const [occurredAt, setOccurredAt] = useState("");
   const [note, setNote] = useState("");
   const [status, setStatus] = useState<StructuredWateringSaveStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const attemptKeyRef = useRef<string | null>(null);
 
-  const review = useMemo(() => buildWateringReview(form), [form]);
+  const effectiveTemperatureUnit = entryTemperatureUnit ?? temperatureUnit;
+  const temperatureUnitSymbol = getTemperatureUnitSymbol(effectiveTemperatureUnit);
+  const review = useMemo(
+    () => buildWateringReview(form, effectiveTemperatureUnit),
+    [effectiveTemperatureUnit, form],
+  );
 
-  const setField = useCallback((key: keyof QuickLogWateringFormState, value: string) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  }, []);
+  const setField = useCallback(
+    (key: keyof QuickLogWateringFormState, value: string) => {
+      if (key === "waterTempC") {
+        setEntryTemperatureUnit((pinned) =>
+          value.trim() === "" ? null : (pinned ?? temperatureUnit),
+        );
+      }
+      setForm((prev) => ({ ...prev, [key]: value }));
+    },
+    [temperatureUnit],
+  );
 
   const run = useCallback(
     async (key: string): Promise<WriteWateringTypedEventResult> => {
@@ -95,7 +117,13 @@ export function StructuredWateringEntry({
         plantId,
         idempotencyKey: key,
         occurredAt: occurredAt.trim() === "" ? null : occurredAt,
-        form,
+        form: {
+          ...form,
+          waterTempC: preferredTemperatureToCelsiusInputString(
+            form.waterTempC,
+            effectiveTemperatureUnit,
+          ),
+        },
         note,
       });
       // strict:false does not narrow `!x.ok`; compare the discriminant explicitly.
@@ -122,7 +150,7 @@ export function StructuredWateringEntry({
       }
       return result;
     },
-    [growId, tentId, plantId, occurredAt, form, note, writer, onSaved],
+    [growId, tentId, plantId, occurredAt, form, effectiveTemperatureUnit, note, writer, onSaved],
   );
 
   const handleSubmit = useCallback(
@@ -177,12 +205,14 @@ export function StructuredWateringEntry({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {NUMERIC_FIELDS.map(([label, key, placeholder]) => (
           <div key={key} className="space-y-1.5 min-w-0">
-            <Label htmlFor={`swe-${key}`}>{label}</Label>
+            <Label htmlFor={`swe-${key}`}>
+              {key === "waterTempC" ? `${label} (${temperatureUnitSymbol})` : label}
+            </Label>
             <Input
               id={`swe-${key}`}
               inputMode="decimal"
               className="min-h-11"
-              placeholder={placeholder}
+              placeholder={key === "waterTempC" ? temperatureUnitSymbol : placeholder}
               value={form[key]}
               onChange={(e) => setField(key, e.target.value)}
             />

@@ -8,13 +8,14 @@
 // - Output is presenter-only; the operator decides nothing here.
 
 import { CanonicalEcowittTentSnapshot } from "./ecowittTentSnapshot";
+import {
+  formatTemperatureDisplay,
+  type TemperatureUnitPreference,
+} from "./temperatureUnitPreference";
 
-export const ECOWITT_DIARY_PREVIEW_NOTICE =
-  "Preview only. No diary entry will be saved." as const;
-export const ECOWITT_DIARY_PREVIEW_DISABLED_LABEL =
-  "Save disabled in preview" as const;
-export const ECOWITT_DIARY_PREVIEW_ATTACH_LABEL =
-  "Attach to diary" as const;
+export const ECOWITT_DIARY_PREVIEW_NOTICE = "Preview only. No diary entry will be saved." as const;
+export const ECOWITT_DIARY_PREVIEW_DISABLED_LABEL = "Save disabled in preview" as const;
+export const ECOWITT_DIARY_PREVIEW_ATTACH_LABEL = "Attach to diary" as const;
 
 export interface EcowittDiaryAttachPreview {
   notice: typeof ECOWITT_DIARY_PREVIEW_NOTICE;
@@ -55,6 +56,8 @@ function fmtMetric(label: string, value: number | null, unit: string): string | 
 export interface EcowittDiaryAttachPreviewOptions {
   /** Whether the surrounding evidence is stale (drives a warning). */
   is_stale?: boolean;
+  /** Display-only temperature unit. Stored snapshot metrics remain °F. */
+  temperatureUnit?: TemperatureUnitPreference;
 }
 
 export function buildEcowittDiaryAttachPreview(
@@ -62,11 +65,24 @@ export function buildEcowittDiaryAttachPreview(
   options: EcowittDiaryAttachPreviewOptions = {},
 ): EcowittDiaryAttachPreview {
   const title = `EcoWitt snapshot preview — ${snap.tent_label}`;
+  const temperatureUnit = options.temperatureUnit ?? "fahrenheit";
 
   const summaryRows = [
-    fmtMetric("Air temperature", snap.metrics.air_temp_f, "°F"),
+    snap.metrics.air_temp_f === null
+      ? null
+      : `Air temperature: ${formatTemperatureDisplay(snap.metrics.air_temp_f, {
+          valueUnit: "F",
+          unit: temperatureUnit,
+          digits: 1,
+        })}`,
     fmtMetric("Humidity", snap.metrics.humidity_pct, "%"),
-    fmtMetric("Soil temperature", snap.metrics.soil_temp_f, "°F"),
+    snap.metrics.soil_temp_f === null
+      ? null
+      : `Soil temperature: ${formatTemperatureDisplay(snap.metrics.soil_temp_f, {
+          valueUnit: "F",
+          unit: temperatureUnit,
+          digits: 1,
+        })}`,
     fmtMetric("Soil moisture (primary)", snap.metrics.soil_moisture_pct_primary, "%"),
     fmtMetric("Soil moisture (secondary)", snap.metrics.soil_moisture_pct_secondary, "%"),
   ].filter((s): s is string => s !== null);

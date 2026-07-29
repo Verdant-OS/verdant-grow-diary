@@ -106,30 +106,10 @@ import {
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import {
-  fahrenheitToCelsius,
   getTemperatureUnitSymbol,
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
-
-const PLAIN_TEMP_INPUT = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
-
-/**
- * Convert a grower-typed temperature string (entered in the active
- * preference unit) into a canonical-°C string. Called EXACTLY ONCE per
- * save attempt, at the payload-build seam, on the raw typed value — the
- * built payload (including the locked watering retry submission) already
- * holds °C and is never re-converted. Blank stays blank and non-numeric
- * text passes through unchanged so the existing validators keep rejecting
- * it with their original reasons.
- */
-function typedTempToCelsiusInput(raw: string, unit: TemperatureUnitPreference): string {
-  if (unit !== "fahrenheit") return raw;
-  const trimmed = raw.trim();
-  if (trimmed === "" || !PLAIN_TEMP_INPUT.test(trimmed)) return raw;
-  const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed)) return raw;
-  return String(Math.round(fahrenheitToCelsius(parsed) * 100) / 100);
-}
+import { preferredTemperatureToCelsiusInputString } from "@/lib/sensorInputUnitConversion";
 
 interface Props {
   open: boolean;
@@ -730,7 +710,7 @@ export default function QuickLogV2Sheet({
         // unit; canonical °C is produced exactly once, right here.
         form: {
           ...feedingForm,
-          waterTempC: typedTempToCelsiusInput(
+          waterTempC: preferredTemperatureToCelsiusInputString(
             feedingForm.waterTempC,
             feedingTempEntryUnitRef.current ?? temperatureUnit,
           ),
@@ -821,13 +801,13 @@ export default function QuickLogV2Sheet({
         // is never re-converted.
         form: {
           ...wateringForm,
-          waterTempC: typedTempToCelsiusInput(
+          waterTempC: preferredTemperatureToCelsiusInputString(
             wateringForm.waterTempC,
             wateringTempEntryUnitRef.current ?? temperatureUnit,
           ),
         },
         note: form.note,
-        temperatureC: typedTempToCelsiusInput(
+        temperatureC: preferredTemperatureToCelsiusInputString(
           form.temperatureC,
           manualTempEntryUnitRef.current ?? temperatureUnit,
         ),
@@ -922,7 +902,7 @@ export default function QuickLogV2Sheet({
         note: form.note,
         // Unit seam: manual snapshot temp was typed in the preference unit;
         // canonical °C is produced exactly once, right here.
-        temperatureC: typedTempToCelsiusInput(
+        temperatureC: preferredTemperatureToCelsiusInputString(
           form.temperatureC,
           manualTempEntryUnitRef.current ?? temperatureUnit,
         ),
@@ -1598,7 +1578,8 @@ export default function QuickLogV2Sheet({
               <div className="mt-3 grid grid-cols-3 gap-2">
                 <div>
                   <Label htmlFor="qlv2-temp">
-                    Temp ({getTemperatureUnitSymbol(manualTempEntryUnitRef.current ?? temperatureUnit)})
+                    Temp (
+                    {getTemperatureUnitSymbol(manualTempEntryUnitRef.current ?? temperatureUnit)})
                   </Label>
                   <Input
                     id="qlv2-temp"

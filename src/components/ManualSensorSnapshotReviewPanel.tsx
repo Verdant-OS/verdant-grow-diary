@@ -10,6 +10,8 @@ import type {
   SensorSnapshotReviewResult,
   SensorSnapshotNormalizedPreview,
 } from "@/lib/sensorSnapshotReviewRules";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import { formatTemperatureDisplay } from "@/lib/temperatureUnitPreference";
 
 interface Props {
   result: SensorSnapshotReviewResult;
@@ -20,7 +22,7 @@ const PREVIEW_FIELDS: Array<{
   label: string;
   unit?: string;
 }> = [
-  { key: "tempF", label: "Air temp", unit: "°F" },
+  { key: "tempF", label: "Air temp" },
   { key: "humidity", label: "Humidity", unit: "%" },
   { key: "vpdKpa", label: "VPD", unit: "kPa" },
   { key: "soilWaterContent", label: "Soil water content", unit: "%" },
@@ -46,6 +48,7 @@ function findingRole(severity: SensorSnapshotReviewFinding["severity"]): string 
 }
 
 export default function ManualSensorSnapshotReviewPanel({ result }: Props) {
+  const temperatureUnit = useTemperatureUnitPreference();
   const { source, confidence, findings, normalizedPreview, canSave } = result;
 
   // Clean state: no blockers, no findings at all → render a compact panel
@@ -67,17 +70,12 @@ export default function ManualSensorSnapshotReviewPanel({ result }: Props) {
     >
       <CardHeader className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-base font-semibold leading-none tracking-tight">
-            Snapshot review
-          </h2>
+          <h2 className="text-base font-semibold leading-none tracking-tight">Snapshot review</h2>
           <Badge variant="outline" data-testid="snapshot-source-chip">
             {source}
           </Badge>
           {!isClean && (
-            <Badge
-              variant={confidenceVariant(confidence)}
-              data-testid="snapshot-confidence-chip"
-            >
+            <Badge variant={confidenceVariant(confidence)} data-testid="snapshot-confidence-chip">
               {confidence} data confidence
             </Badge>
           )}
@@ -85,36 +83,23 @@ export default function ManualSensorSnapshotReviewPanel({ result }: Props) {
         {normalizedPreview.capturedAt ? (
           <p className="text-xs text-muted-foreground">
             Captured at{" "}
-            <span data-testid="snapshot-captured-at">
-              {normalizedPreview.capturedAt}
-            </span>
+            <span data-testid="snapshot-captured-at">{normalizedPreview.capturedAt}</span>
           </p>
         ) : null}
       </CardHeader>
       <CardContent className="space-y-4">
         {isClean ? (
-          <p
-            className="text-sm font-medium"
-            data-testid="snapshot-ready-status"
-          >
+          <p className="text-sm font-medium" data-testid="snapshot-ready-status">
             Ready — this will save as manual data.
           </p>
         ) : (
           <>
-            <p
-              className="text-sm font-medium"
-              data-testid="snapshot-ready-status"
-            >
-              {canSave
-                ? "Ready to save this manual snapshot."
-                : "Fix blockers before saving."}
+            <p className="text-sm font-medium" data-testid="snapshot-ready-status">
+              {canSave ? "Ready to save this manual snapshot." : "Fix blockers before saving."}
             </p>
 
             {findings.length > 0 && (
-              <ul
-                className="space-y-2"
-                data-testid="snapshot-findings"
-              >
+              <ul className="space-y-2" data-testid="snapshot-findings">
                 {findings.map((f) => (
                   <li
                     key={f.key}
@@ -141,8 +126,13 @@ export default function ManualSensorSnapshotReviewPanel({ result }: Props) {
                     <div key={key} className="contents">
                       <dt className="text-muted-foreground">{label}</dt>
                       <dd data-testid={`snapshot-preview-${key}`}>
-                        {String(normalizedPreview[key])}
-                        {unit ? ` ${unit}` : ""}
+                        {key === "tempF"
+                          ? formatTemperatureDisplay(normalizedPreview.tempF, {
+                              valueUnit: "F",
+                              unit: temperatureUnit,
+                              digits: 1,
+                            })
+                          : `${String(normalizedPreview[key])}${unit ? ` ${unit}` : ""}`}
                       </dd>
                     </div>
                   ))}

@@ -586,6 +586,7 @@ export default function PlantQuickLog({
                 inputMode="decimal"
                 step="any"
                 delta={deltaFor("temp_f", sensorsForPayload.temp)}
+                allowTemperatureSuffix
               />
               <SensorField
                 id="plant-quick-log-humidity"
@@ -683,9 +684,19 @@ interface SensorFieldProps {
   inputMode: "decimal" | "numeric";
   step: string;
   delta: ChronologyDelta | null;
+  allowTemperatureSuffix?: boolean;
 }
 
-function SensorField({ id, label, value, onChange, inputMode, step, delta }: SensorFieldProps) {
+function SensorField({
+  id,
+  label,
+  value,
+  onChange,
+  inputMode,
+  step,
+  delta,
+  allowTemperatureSuffix = false,
+}: SensorFieldProps) {
   const deltaTone =
     delta?.direction === "up"
       ? "text-primary"
@@ -700,7 +711,7 @@ function SensorField({ id, label, value, onChange, inputMode, step, delta }: Sen
       <Input
         id={id}
         data-testid={id}
-        type="number"
+        type={allowTemperatureSuffix ? "text" : "number"}
         inputMode={inputMode}
         step={step}
         value={value}

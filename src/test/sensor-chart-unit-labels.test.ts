@@ -17,6 +17,12 @@ describe("sensorChartUnit", () => {
     expect(sensorChartUnit("co2")).toBe("ppm");
     expect(sensorChartUnit("soil")).toBe("%");
   });
+
+  it("returns the selected temperature unit without changing other metrics", () => {
+    expect(sensorChartUnit("temp", "celsius")).toBe("°C");
+    expect(sensorChartUnit("temp", "fahrenheit")).toBe("°F");
+    expect(sensorChartUnit("rh", "celsius")).toBe("%");
+  });
 });
 
 describe("sensorChartLegendLabel", () => {
@@ -26,6 +32,11 @@ describe("sensorChartLegendLabel", () => {
     expect(sensorChartLegendLabel("vpd")).toBe("VPD (kPa)");
     expect(sensorChartLegendLabel("co2")).toBe("CO₂ (ppm)");
     expect(sensorChartLegendLabel("soil")).toBe("Soil (%)");
+  });
+
+  it("renders the selected temperature unit in the legend", () => {
+    expect(sensorChartLegendLabel("temp", "celsius")).toBe("Temperature (°C)");
+    expect(sensorChartLegendLabel("temp", "fahrenheit")).toBe("Temperature (°F)");
   });
 
   it("never returns an empty label", () => {

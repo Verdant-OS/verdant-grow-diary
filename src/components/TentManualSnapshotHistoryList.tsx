@@ -19,6 +19,7 @@ import {
   DEFAULT_HISTORY_LIMIT,
 } from "@/lib/manualSensorSnapshotHistoryListRules";
 import type { ChangeContextReading } from "@/lib/manualSensorSnapshotChangeContextRules";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 interface Props {
   tentId: string | null | undefined;
@@ -37,6 +38,7 @@ export default function TentManualSnapshotHistoryList({
   readings,
   limit = DEFAULT_HISTORY_LIMIT,
 }: Props) {
+  const temperatureUnit = useTemperatureUnitPreference();
   if (!tentId) return null;
 
   const rows: ChangeContextReading[] = readings.map((r) => ({
@@ -47,13 +49,14 @@ export default function TentManualSnapshotHistoryList({
     tent_id: r.tent_id as string | null | undefined,
   }));
 
-  const entries = buildManualSnapshotHistoryList(rows, { tentId, limit });
+  const entries = buildManualSnapshotHistoryList(rows, {
+    tentId,
+    limit,
+    temperatureUnit,
+  });
 
   return (
-    <div
-      className="glass rounded-2xl p-4 mb-6"
-      data-testid="tent-manual-snapshot-history"
-    >
+    <div className="glass rounded-2xl p-4 mb-6" data-testid="tent-manual-snapshot-history">
       <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
         <h2 className="font-display font-semibold flex items-center gap-2">
           <History className="h-4 w-4" />
@@ -101,9 +104,7 @@ export default function TentManualSnapshotHistoryList({
                       data-metric={m.key}
                       className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background/40 px-2 py-0.5 text-[11px]"
                     >
-                      <span className="font-medium text-foreground/80">
-                        {m.label}
-                      </span>
+                      <span className="font-medium text-foreground/80">{m.label}</span>
                       <span className="text-muted-foreground">{m.formatted}</span>
                     </span>
                   ))}
@@ -156,9 +157,7 @@ export default function TentManualSnapshotHistoryList({
                       data-direction={d.direction}
                       className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background/40 px-2 py-0.5 text-[11px] text-muted-foreground"
                     >
-                      <span className="font-medium text-foreground/80">
-                        {d.label}
-                      </span>
+                      <span className="font-medium text-foreground/80">{d.label}</span>
                       <span>{d.formatted}</span>
                     </span>
                   ))}

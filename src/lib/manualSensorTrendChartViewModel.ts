@@ -19,6 +19,11 @@
 
 import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
 import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
+import {
+  formatTemperatureDisplay,
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 export type ManualSensorTrendMetric = "ppfd" | "temperature_c" | "humidity_pct" | "vpd_kpa";
 
@@ -105,21 +110,13 @@ const ALLOWED_SOURCES: ReadonlySet<ManualSensorTrendSource> = new Set([
 const TRUSTED_SOURCES: ReadonlySet<ManualSensorTrendSource> = new Set(["live", "manual", "csv"]);
 
 const METRIC_META: Record<
-  ManualSensorTrendMetric,
+  Exclude<ManualSensorTrendMetric, "temperature_c">,
   { label: string; unit: string; format: (v: number) => string }
 > = {
   ppfd: {
     label: "PPFD",
     unit: "µmol/m²/s",
     format: (v) => `${Math.round(v)} µmol/m²/s`,
-  },
-  temperature_c: {
-    label: "Temperature",
-    unit: "°F",
-    format: (v) => {
-      const f = v * (9 / 5) + 32;
-      return `${(Math.round(f * 10) / 10).toFixed(1)}°F`;
-    },
   },
   humidity_pct: {
     label: "Humidity",
@@ -222,6 +219,8 @@ function makeOmission(
 
 export interface BuildManualSensorTrendChartInput {
   readings: ReadonlyArray<ManualSensorTrendInputRow>;
+  /** Display-only preference. Stored temperature rows remain Celsius. */
+  temperatureUnit?: TemperatureUnitPreference;
 }
 
 const TITLE = "PPFD and environment context";
@@ -238,6 +237,7 @@ const EMPTY_STALE_ONLY =
 export function buildManualSensorTrendChartViewModel(
   input: BuildManualSensorTrendChartInput,
 ): ManualSensorTrendChartViewModel {
+  const temperatureUnit = input.temperatureUnit ?? "fahrenheit";
   const omissions: ManualSensorTrendOmission[] = [];
   const acceptedPoints: ManualSensorTrendPoint[] = [];
   const flagged: ManualSensorTrendPoint[] = [];
@@ -271,7 +271,19 @@ export function buildManualSensorTrendChartViewModel(
       continue;
     }
 
-    const meta = METRIC_META[metric];
+    const meta =
+      metric === "temperature_c"
+        ? {
+            label: "Temperature",
+            unit: getTemperatureUnitSymbol(temperatureUnit),
+            format: (temperatureC: number) =>
+              formatTemperatureDisplay(temperatureC, {
+                valueUnit: "C",
+                unit: temperatureUnit,
+                digits: 1,
+              }),
+          }
+        : METRIC_META[metric];
     const resolvedSource = source;
     const point: ManualSensorTrendPoint = {
       capturedAt: ts,
@@ -310,8 +322,11 @@ export function buildManualSensorTrendChartViewModel(
 
   const series: ManualSensorTrendSeries[] = TRACKED_METRICS.map((metric) => ({
     metric,
-    unit: METRIC_META[metric].unit,
-    label: METRIC_META[metric].label,
+    unit:
+      metric === "temperature_c"
+        ? getTemperatureUnitSymbol(temperatureUnit)
+        : METRIC_META[metric].unit,
+    label: metric === "temperature_c" ? "Temperature" : METRIC_META[metric].label,
     points: acceptedPoints.filter((p) => p.metric === metric),
   }));
 

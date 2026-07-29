@@ -73,6 +73,33 @@ describe("public VPD temperature field rules", () => {
     });
   });
 
+  it("parses explicitly suffixed temperature text independent of the selected unit", () => {
+    const { parse } = temperatureFieldApi();
+
+    expect(parse("72°F", "C")).toMatchObject({
+      rawInput: "72°F",
+      canonicalC: 22.222222,
+      validity: "valid",
+    });
+    expect(parse("22 °C", "F")).toMatchObject({
+      rawInput: "22 °C",
+      canonicalC: 22,
+      validity: "valid",
+    });
+  });
+
+  it("rejects malformed or unsupported suffixes without inventing zero", () => {
+    const { parse } = temperatureFieldApi();
+    for (const raw of ["72°F later", "22 °K", "72°F°C"]) {
+      expect(parse(raw, "F")).toMatchObject({
+        displayValue: "",
+        rawInput: raw,
+        canonicalC: null,
+        validity: "invalid",
+      });
+    }
+  });
+
   it("formats one decimal at most, trims trailing zero, and normalizes negative zero", () => {
     const { parse, redisplay } = temperatureFieldApi();
 

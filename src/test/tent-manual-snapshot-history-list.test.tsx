@@ -6,7 +6,7 @@
  * sensor ingestion, alerts, action_queue, automation, device control, or
  * service_role.
  */
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, within } from "@testing-library/react";
@@ -19,6 +19,7 @@ import {
   MAX_HISTORY_LIMIT,
 } from "@/lib/manualSensorSnapshotHistoryListRules";
 import type { SensorReadingRow } from "@/lib/db";
+import { saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) =>
@@ -55,9 +56,7 @@ function row(
 }
 
 function manualSnapshot(ts: string, tentId: string, m: Record<string, number | null>) {
-  return Object.entries(m).map(([metric, value]) =>
-    row(ts, metric, value, "manual", tentId),
-  );
+  return Object.entries(m).map(([metric, value]) => row(ts, metric, value, "manual", tentId));
 }
 
 const T = [
@@ -70,12 +69,14 @@ const T = [
   "2026-05-25T09:00:00Z",
 ];
 
+beforeEach(() => {
+  window.localStorage.clear();
+});
+
 describe("Tent manual snapshot history — audit", () => {
   it("TentDetail mounts the compact history list", () => {
     expect(TENT_DETAIL).toContain("TentManualSnapshotHistoryList");
-    expect(TENT_DETAIL).toMatch(
-      /from\s+["']@\/components\/TentManualSnapshotHistoryList["']/,
-    );
+    expect(TENT_DETAIL).toMatch(/from\s+["']@\/components\/TentManualSnapshotHistoryList["']/);
   });
 
   it("filtering/grouping/delta logic lives outside JSX (uses pure helpers)", () => {
@@ -187,21 +188,29 @@ describe("buildManualSnapshotHistoryList — pure rules", () => {
     ];
     const list = buildManualSnapshotHistoryList(rows, { tentId: TENT_A });
     expect(list[0].firstSnapshot).toBe(false);
-    expect(list[0].deltas.map((d) => d.key)).toEqual([
-      "temperature_c",
-      "humidity_pct",
-    ]);
+    expect(list[0].deltas.map((d) => d.key)).toEqual(["temperature_c", "humidity_pct"]);
     expect(list[1].firstSnapshot).toBe(true);
     expect(list[1].deltas.length).toBe(0);
+  });
+
+  it("formats stored temperatures and deltas in Celsius when selected", () => {
+    const rows = [
+      ...manualSnapshot(T[0], TENT_A, { temperature_c: 24 }),
+      ...manualSnapshot(T[1], TENT_A, { temperature_c: 25 }),
+    ];
+    const list = buildManualSnapshotHistoryList(rows, {
+      tentId: TENT_A,
+      temperatureUnit: "celsius",
+    });
+    expect(list[0].metrics[0]?.formatted).toBe("25.0°C");
+    expect(list[0].deltas[0]?.formatted).toBe("+1.0°C");
   });
 });
 
 describe("TentManualSnapshotHistoryList — render", () => {
   it("renders empty state when no manual snapshots exist for this tent", () => {
     render(<TentManualSnapshotHistoryList tentId={TENT_A} readings={[]} />);
-    expect(
-      screen.getByTestId("tent-manual-snapshot-history-empty"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("tent-manual-snapshot-history-empty")).toBeInTheDocument();
   });
 
   it("renders timestamp, Manual source label, and metric chips per snapshot", () => {
@@ -216,21 +225,24 @@ describe("TentManualSnapshotHistoryList — render", () => {
     render(<TentManualSnapshotHistoryList tentId={TENT_A} readings={rows} />);
     const items = screen.getAllByTestId("tent-manual-snapshot-history-item");
     expect(items.length).toBe(1);
-    expect(
-      within(items[0]).getByTestId("tent-manual-snapshot-history-source"),
-    ).toHaveTextContent(/Manual/i);
-    expect(
-      within(items[0]).getByTestId("tent-manual-snapshot-history-ts"),
-    ).toBeInTheDocument();
-    const metrics = within(items[0]).getAllByTestId(
-      "tent-manual-snapshot-history-metric",
+    expect(within(items[0]).getByTestId("tent-manual-snapshot-history-source")).toHaveTextContent(
+      /Manual/i,
     );
+    expect(within(items[0]).getByTestId("tent-manual-snapshot-history-ts")).toBeInTheDocument();
+    const metrics = within(items[0]).getAllByTestId("tent-manual-snapshot-history-metric");
     expect(metrics.map((m) => m.getAttribute("data-metric"))).toEqual([
       "temperature_c",
       "humidity_pct",
       "vpd_kpa",
       "co2_ppm",
     ]);
+  });
+
+  it("renders temperature chips in the saved Celsius preference", () => {
+    saveTemperatureUnitPreference("celsius");
+    const rows = manualSnapshot(T[0], TENT_A, { temperature_c: 24 });
+    render(<TentManualSnapshotHistoryList tentId={TENT_A} readings={rows} />);
+    expect(screen.getByTestId("tent-manual-snapshot-history-metric")).toHaveTextContent("24.0°C");
   });
 
   it("shows first-snapshot copy on the earliest displayed entry and changed-since-previous on later ones", () => {
@@ -241,14 +253,10 @@ describe("TentManualSnapshotHistoryList — render", () => {
     render(<TentManualSnapshotHistoryList tentId={TENT_A} readings={rows} />);
     const items = screen.getAllByTestId("tent-manual-snapshot-history-item");
     expect(items.length).toBe(2);
-    const latestChange = within(items[0]).getByTestId(
-      "tent-manual-snapshot-history-change",
-    );
+    const latestChange = within(items[0]).getByTestId("tent-manual-snapshot-history-change");
     expect(latestChange).toHaveAttribute("data-state", "changed");
     expect(latestChange).toHaveTextContent(/Changed since previous snapshot/i);
-    const earliestChange = within(items[1]).getByTestId(
-      "tent-manual-snapshot-history-change",
-    );
+    const earliestChange = within(items[1]).getByTestId("tent-manual-snapshot-history-change");
     expect(earliestChange).toHaveAttribute("data-state", "first-snapshot");
     expect(earliestChange).toHaveTextContent(/First snapshot for this tent/i);
   });
@@ -259,12 +267,8 @@ describe("TentManualSnapshotHistoryList — render", () => {
       row(T[2], "temperature_c", 26, "live", TENT_A),
     ];
     render(<TentManualSnapshotHistoryList tentId={TENT_A} readings={rows} />);
-    expect(
-      screen.getByTestId("tent-manual-snapshot-history-empty"),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryAllByTestId("tent-manual-snapshot-history-item").length,
-    ).toBe(0);
+    expect(screen.getByTestId("tent-manual-snapshot-history-empty")).toBeInTheDocument();
+    expect(screen.queryAllByTestId("tent-manual-snapshot-history-item").length).toBe(0);
   });
 
   it("only includes manual snapshots from the active tent", () => {
@@ -275,18 +279,14 @@ describe("TentManualSnapshotHistoryList — render", () => {
     render(<TentManualSnapshotHistoryList tentId={TENT_A} readings={rows} />);
     const items = screen.getAllByTestId("tent-manual-snapshot-history-item");
     expect(items.length).toBe(1);
-    const metrics = within(items[0]).getAllByTestId(
-      "tent-manual-snapshot-history-metric",
-    );
+    const metrics = within(items[0]).getAllByTestId("tent-manual-snapshot-history-metric");
     // Other tent's 99°C must not appear.
     expect(metrics[0]).not.toHaveTextContent(/210.2/);
   });
 
   it("renders nothing when tentId is null", () => {
     const rows = manualSnapshot(T[0], TENT_A, { temperature_c: 24 });
-    const { container } = render(
-      <TentManualSnapshotHistoryList tentId={null} readings={rows} />,
-    );
+    const { container } = render(<TentManualSnapshotHistoryList tentId={null} readings={rows} />);
     expect(container).toBeEmptyDOMElement();
   });
 

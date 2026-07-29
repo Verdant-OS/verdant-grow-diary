@@ -194,11 +194,7 @@ export default function ManualSensorReadingCard({
   useEffect(() => {
     const nextTentId = correction?.tentId ?? defaultTentId;
     if (!nextTentId) return;
-    changeTentTarget(
-      nextTentId,
-      correctionToPrefill(correction, airTempUnit),
-      correctionIdentity,
-    );
+    changeTentTarget(nextTentId, correctionToPrefill(correction, airTempUnit), correctionIdentity);
   }, [airTempUnit, changeTentTarget, correction, correctionIdentity, defaultTentId]);
 
   // Switching the entry unit re-expresses what the grower already typed
@@ -643,6 +639,7 @@ export default function ManualSensorReadingCard({
                   value={form.airTemp as string}
                   onChange={(v) => update("airTemp", v)}
                   placeholder={AIR_TEMP_PLACEHOLDER[airTempUnit]}
+                  allowTemperatureSuffix
                 />
                 <div
                   className="flex items-center gap-1"
@@ -991,6 +988,7 @@ function Field({
   value,
   onChange,
   placeholder,
+  allowTemperatureSuffix = false,
 }: {
   id: string;
   label: string;
@@ -998,6 +996,7 @@ function Field({
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  allowTemperatureSuffix?: boolean;
 }) {
   return (
     <div className="space-y-1">
@@ -1009,7 +1008,7 @@ function Field({
       </Label>
       <Input
         id={id}
-        type="number"
+        type={allowTemperatureSuffix ? "text" : "number"}
         inputMode="decimal"
         step="any"
         value={value ?? ""}

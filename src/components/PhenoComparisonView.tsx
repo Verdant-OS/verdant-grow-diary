@@ -29,6 +29,8 @@ import {
   assessCohortComparability,
   type PhenoExpressionView,
 } from "@/lib/phenoExpressionRules";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import { formatTemperatureDisplay } from "@/lib/temperatureUnitPreference";
 
 export interface PhenoComparisonViewProps {
   readonly inputs: readonly PhenoCandidateInput[] | null | undefined;
@@ -252,6 +254,7 @@ function CandidateColumn({
   c: PhenoCandidateView;
   expression?: PhenoExpressionView | null;
 }) {
+  const temperatureUnit = useTemperatureUnitPreference();
   const headingId = `pheno-candidate-${c.candidateId}-heading`;
   return (
     <section
@@ -394,7 +397,15 @@ function CandidateColumn({
                   <span className="text-muted-foreground">{s.capturedAt ?? "no timestamp"}</span>
                 </div>
                 <ul className="grid grid-cols-3 gap-1 text-[11px]">
-                  <li>Temp: {fmtMetric(s.tempF, "°F")}</li>
+                  <li>
+                    Temp:{" "}
+                    {formatTemperatureDisplay(s.tempF, {
+                      valueUnit: "F",
+                      unit: temperatureUnit,
+                      digits: 1,
+                      unavailableLabel: "—",
+                    })}
+                  </li>
                   <li>RH: {fmtMetric(s.rh, "%")}</li>
                   <li>VPD: {fmtMetric(s.vpd, "kPa")}</li>
                   <li>EC: {fmtMetric(s.ec, "mS/cm")}</li>

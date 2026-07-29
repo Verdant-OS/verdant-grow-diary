@@ -279,4 +279,15 @@ describe("buildManualSensorTrendChartViewModel", () => {
     expect(tempPoint?.display).toBe("32.0°F");
     expect(vm.series.find((s) => s.metric === "temperature_c")?.unit).toBe("°F");
   });
+
+  it("formats stored temperature history in Celsius when selected", () => {
+    const vm = buildManualSensorTrendChartViewModel({
+      readings: [row({ metric: "ppfd", value: 400 }), row({ metric: "temperature_c", value: 24 })],
+      temperatureUnit: "celsius",
+    });
+    const temperatureSeries = vm.series.find((s) => s.metric === "temperature_c");
+    expect(temperatureSeries?.label).toBe("Temperature");
+    expect(temperatureSeries?.unit).toBe("°C");
+    expect(temperatureSeries?.points[0]?.display).toBe("24.0°C");
+  });
 });

@@ -77,6 +77,34 @@ describe("buildPostGrowLearningReportViewModel", () => {
     expect(vm.photos).toHaveLength(1);
   });
 
+  it("renders stored temperature aggregates in Fahrenheit when selected", () => {
+    const vm = buildPostGrowLearningReportViewModel({
+      grow: archivedGrow,
+      temperatureUnit: "fahrenheit",
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 20,
+          ts: "2026-03-01T00:00:00.000Z",
+          source: "live",
+        },
+        {
+          metric: "temperature_c",
+          value: 30,
+          ts: "2026-03-02T00:00:00.000Z",
+          source: "manual",
+        },
+      ],
+    });
+    expect(vm.environment.find((m) => m.key === "temperature_c")).toMatchObject({
+      unit: "°F",
+      count: 2,
+      min: 68,
+      max: 86,
+      avg: 77,
+    });
+  });
+
   it("keeps labeled non-live context out of aggregates and excludes diagnostics", () => {
     const vm = buildPostGrowLearningReportViewModel({
       grow: archivedGrow,

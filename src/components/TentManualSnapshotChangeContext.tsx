@@ -15,6 +15,7 @@ import {
   deriveChangeContextFromReadings,
   type ChangeContextReading,
 } from "@/lib/manualSensorSnapshotChangeContextRules";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 interface Props {
   tentId: string | null | undefined;
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export default function TentManualSnapshotChangeContext({ tentId, readings }: Props) {
+  const temperatureUnit = useTemperatureUnitPreference();
   if (!tentId) return null;
 
   const rows: ChangeContextReading[] = readings.map((r) => ({
@@ -33,12 +35,10 @@ export default function TentManualSnapshotChangeContext({ tentId, readings }: Pr
   }));
 
   // Only render anything if at least one manual snapshot exists for this tent.
-  const hasAnyManual = rows.some(
-    (r) => r.source === "manual" && r.tent_id === tentId,
-  );
+  const hasAnyManual = rows.some((r) => r.source === "manual" && r.tent_id === tentId);
   if (!hasAnyManual) return null;
 
-  const ctx = deriveChangeContextFromReadings(rows, { tentId });
+  const ctx = deriveChangeContextFromReadings(rows, { tentId, temperatureUnit });
 
   if (ctx.firstSnapshot) {
     return (

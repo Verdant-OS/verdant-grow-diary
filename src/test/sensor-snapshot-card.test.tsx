@@ -1,11 +1,16 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import SensorSnapshotCard from "@/components/sensor/SensorSnapshotCard";
 import type { SensorSnapshot } from "@/lib/sensor/sensorSnapshotFreshnessRules";
+import { saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
 const NOW = Date.parse("2026-06-26T12:00:00Z");
+
+beforeEach(() => {
+  window.localStorage.clear();
+});
 
 function make(overrides: Partial<SensorSnapshot> = {}): SensorSnapshot {
   return {
@@ -20,16 +25,14 @@ function make(overrides: Partial<SensorSnapshot> = {}): SensorSnapshot {
 describe("SensorSnapshotCard", () => {
   it("labels demo snapshot as sample/demo, not live", () => {
     render(
-      <SensorSnapshotCard
-        snapshot={make({ source: "demo" })}
-        classifyOptions={{ now: NOW }}
-      />,
+      <SensorSnapshotCard snapshot={make({ source: "demo" })} classifyOptions={{ now: NOW }} />,
     );
     const card = screen.getByTestId("sensor-snapshot-card");
     expect(card.getAttribute("data-source")).toBe("demo");
     expect(card.getAttribute("data-degraded")).toBe("true");
-    expect(screen.getByTestId("sensor-snapshot-card-demo-notice").textContent)
-      .toMatch(/sample|demo/i);
+    expect(screen.getByTestId("sensor-snapshot-card-demo-notice").textContent).toMatch(
+      /sample|demo/i,
+    );
   });
 
   it("shows warnings for suspicious metrics", () => {
@@ -42,20 +45,26 @@ describe("SensorSnapshotCard", () => {
     expect(
       screen.getByTestId("sensor-snapshot-card-warning-temp_f_looks_celsius"),
     ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("sensor-snapshot-card-warning-humidity_stuck_0"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("sensor-snapshot-card-warning-humidity_stuck_0")).toBeInTheDocument();
     expect(
       screen.getByTestId("sensor-snapshot-card-warning-ec_likely_microsiemens"),
     ).toBeInTheDocument();
   });
 
-  it("invalid snapshot is degraded and never says healthy", () => {
+  it("renders Fahrenheit source data in the saved Celsius preference", () => {
+    saveTemperatureUnitPreference("celsius");
     render(
       <SensorSnapshotCard
-        snapshot={make({ captured_at: null })}
+        snapshot={make({ metrics: { temp_f: 77, rh: 55 } })}
         classifyOptions={{ now: NOW }}
       />,
+    );
+    expect(screen.getByTestId("sensor-snapshot-card-metric-temp_f")).toHaveTextContent("25.0°C");
+  });
+
+  it("invalid snapshot is degraded and never says healthy", () => {
+    render(
+      <SensorSnapshotCard snapshot={make({ captured_at: null })} classifyOptions={{ now: NOW }} />,
     );
     const card = screen.getByTestId("sensor-snapshot-card");
     expect(card.getAttribute("data-freshness")).toBe("invalid");

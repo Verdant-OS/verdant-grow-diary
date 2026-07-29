@@ -25,7 +25,6 @@ import {
 import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
 installScannerGuardrail({ file: __filename });
 
-
 const T1 = "2026-05-24T09:00:00Z";
 const T2 = "2026-05-24T15:00:00Z";
 
@@ -75,6 +74,21 @@ describe("buildManualSnapshotChangeContext — pure helper", () => {
     expect(r.deltas.find((d) => d.key === "humidity_pct")!.direction).toBe("down");
     expect(r.deltas.find((d) => d.key === "vpd_kpa")!.formatted).toMatch(/\+0\.18 kPa/);
     expect(r.deltas.find((d) => d.key === "co2_ppm")!.formatted).toMatch(/\+120 ppm/);
+  });
+
+  it("formats temperature deltas in Celsius when selected", () => {
+    const result = buildManualSnapshotChangeContext({
+      previous: { ts: T1, metrics: { temperature_c: 24 } },
+      latest: { ts: T2, metrics: { temperature_c: 25 } },
+      temperatureUnit: "celsius",
+    });
+    expect(result.deltas).toEqual([
+      expect.objectContaining({
+        key: "temperature_c",
+        delta: 1,
+        formatted: "+1.0°C",
+      }),
+    ]);
   });
 
   it("omits missing/invalid values rather than guessing", () => {
@@ -270,10 +284,7 @@ describe("DailyCheck post-submit — change context surfacing", () => {
 });
 
 describe("safety — change context adds no new writes or wording", () => {
-  const rules = readFileSync(
-    "src/lib/manualSensorSnapshotChangeContextRules.ts",
-    "utf8",
-  );
+  const rules = readFileSync("src/lib/manualSensorSnapshotChangeContextRules.ts", "utf8");
   const page = readFileSync("src/pages/DailyCheck.tsx", "utf8");
 
   it("no persistence, RPC, ingestion, alerts, action_queue, automation, device control, or service_role added", () => {

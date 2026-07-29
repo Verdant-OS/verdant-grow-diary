@@ -24,7 +24,10 @@ function renderPage() {
   );
 }
 
-beforeEach(() => mocks.track.mockReset());
+beforeEach(() => {
+  mocks.track.mockReset();
+  window.localStorage.clear();
+});
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -71,6 +74,28 @@ describe("public VPD calculator page", () => {
       item: "air_estimate",
       source: "veg",
     });
+  });
+
+  it("accepts an explicit temperature suffix even when the selector shows the other unit", () => {
+    renderPage();
+    fireEvent.change(screen.getByLabelText("Temperature unit"), {
+      target: { value: "C" },
+    });
+    fireEvent.change(screen.getByLabelText("Air temperature"), {
+      target: { value: "72°F" },
+    });
+    fireEvent.change(screen.getByLabelText("Relative humidity (current room reading)"), {
+      target: { value: "60" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Calculate VPD/ }));
+
+    expect(screen.getByLabelText("Air temperature")).toHaveValue("72°F");
+    expect(screen.getByTestId("public-vpd-calculator-result")).toHaveTextContent(
+      "Air VPD estimate — no target claim",
+    );
+    expect(screen.getByTestId("public-vpd-calculator-result")).not.toHaveTextContent(
+      /invalid|outside supported range/i,
+    );
   });
 
   it("previews the Pro Blueprint stage targets once a stage is selected", async () => {
@@ -195,7 +220,7 @@ describe("public VPD calculator page", () => {
 
     await user.click(screen.getByRole("button", { name: "Reset" }));
     expect(screen.queryByTestId("public-vpd-calculator-result")).toBeNull();
-    expect(screen.getByLabelText("Air temperature")).toHaveValue(null);
+    expect(screen.getByLabelText("Air temperature")).toHaveValue("");
     expect(mocks.track).toHaveBeenCalledWith("vpd_calculator_reset");
   });
 
@@ -209,19 +234,19 @@ describe("public VPD calculator page", () => {
     const unit = screen.getByLabelText("Temperature unit");
 
     fireEvent.change(unit, { target: { value: "C" } });
-    expect(screen.getByLabelText("Air temperature")).toHaveValue(25.6);
-    expect(screen.getByLabelText("Measured leaf temperature")).toHaveValue(23);
+    expect(screen.getByLabelText("Air temperature")).toHaveValue("25.6");
+    expect(screen.getByLabelText("Measured leaf temperature")).toHaveValue("23");
 
     fireEvent.change(unit, { target: { value: "F" } });
-    expect(screen.getByLabelText("Air temperature")).toHaveValue(78);
-    expect(screen.getByLabelText("Measured leaf temperature")).toHaveValue(73.4);
+    expect(screen.getByLabelText("Air temperature")).toHaveValue("78");
+    expect(screen.getByLabelText("Measured leaf temperature")).toHaveValue("73.4");
 
     for (let index = 0; index < 20; index += 1) {
       fireEvent.change(unit, { target: { value: index % 2 === 0 ? "C" : "F" } });
     }
     expect(unit).toHaveValue("F");
-    expect(screen.getByLabelText("Air temperature")).toHaveValue(78);
-    expect(screen.getByLabelText("Measured leaf temperature")).toHaveValue(73.4);
+    expect(screen.getByLabelText("Air temperature")).toHaveValue("78");
+    expect(screen.getByLabelText("Measured leaf temperature")).toHaveValue("73.4");
   });
 
   it("keeps blank temperatures blank and clears canonical field state on reset", async () => {
@@ -230,12 +255,12 @@ describe("public VPD calculator page", () => {
 
     await user.type(screen.getByLabelText("Air temperature"), "78");
     await user.selectOptions(screen.getByLabelText("Temperature unit"), "C");
-    expect(screen.getByLabelText("Measured leaf temperature")).toHaveValue(null);
+    expect(screen.getByLabelText("Measured leaf temperature")).toHaveValue("");
 
     await user.click(screen.getByRole("button", { name: "Reset" }));
     expect(screen.getByLabelText("Temperature unit")).toHaveValue("F");
-    expect(screen.getByLabelText("Air temperature")).toHaveValue(null);
-    expect(screen.getByLabelText("Measured leaf temperature")).toHaveValue(null);
+    expect(screen.getByLabelText("Air temperature")).toHaveValue("");
+    expect(screen.getByLabelText("Measured leaf temperature")).toHaveValue("");
   });
 
   it("invalidates the result and share state when the unit changes", async () => {
@@ -268,7 +293,7 @@ describe("public VPD calculator page", () => {
     fireEvent.change(screen.getByLabelText("Air temperature"), { target: { value: "141" } });
     await user.type(screen.getByLabelText(/^Relative humidity/), "60");
     await user.selectOptions(screen.getByLabelText("Temperature unit"), "C");
-    expect(screen.getByLabelText("Air temperature")).toHaveValue(60.6);
+    expect(screen.getByLabelText("Air temperature")).toHaveValue("60.6");
 
     const form = screen.getByRole("button", { name: /Calculate VPD/ }).closest("form");
     expect(form).toBeTruthy();

@@ -11,6 +11,11 @@
 import { normalizeReportSensorSource } from "@/lib/postGrowReportRules";
 import { withoutDiagnosticSensorRows } from "@/lib/sensorProvenanceFenceRules";
 import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
+import {
+  convertCelsiusForDisplay,
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 export const POST_GROW_LESSON_EVENT_TYPE = "post_grow_learning_lesson";
 
@@ -198,6 +203,7 @@ function sparkline(values: number[]): SparklinePoint[] {
 function buildMetricAggregate(
   metric: MetricAggregateView["key"],
   readings: PostGrowSensorReadingLike[],
+  temperatureUnit: TemperatureUnitPreference,
 ): MetricAggregateView {
   const values = readings
     .filter((r) => r.metric === metric)
@@ -222,16 +228,23 @@ function buildMetricAggregate(
     .map(({ reading }) => finite(reading.value))
     .filter((v): v is number => v !== null);
   const stableCount = values.filter((v) => stableMetricValue(metric, v)).length;
+  const displayValues =
+    metric === "temperature_c"
+      ? values.map((value) => convertCelsiusForDisplay(value, temperatureUnit) ?? value)
+      : values;
   return {
     key: metric,
     label: METRIC_META[metric].label,
-    unit: METRIC_META[metric].unit,
-    count: values.length,
-    avg: average(values),
-    min: values.length ? Math.min(...values) : null,
-    max: values.length ? Math.max(...values) : null,
+    unit:
+      metric === "temperature_c"
+        ? getTemperatureUnitSymbol(temperatureUnit)
+        : METRIC_META[metric].unit,
+    count: displayValues.length,
+    avg: average(displayValues),
+    min: displayValues.length ? Math.min(...displayValues) : null,
+    max: displayValues.length ? Math.max(...displayValues) : null,
     stablePct: values.length ? Math.round((stableCount / values.length) * 100) : null,
-    sparkline: sparkline(values),
+    sparkline: sparkline(displayValues),
   };
 }
 
@@ -332,7 +345,10 @@ export function buildPostGrowLearningReportViewModel(input: {
   diaryEntries?: PostGrowDiaryLike[] | null;
   sensorReadings?: PostGrowSensorReadingLike[] | null;
   actions?: PostGrowActionLike[] | null;
+  /** Display-only preference. Stored sensor rows and stability rules stay Celsius. */
+  temperatureUnit?: TemperatureUnitPreference;
 }): PostGrowLearningReportViewModel {
+  const temperatureUnit = input.temperatureUnit ?? "celsius";
   const harvests = input.harvests ?? [];
   const diaries = input.diaryEntries ?? [];
   const sensorReadings = withoutDiagnosticSensorRows(input.sensorReadings ?? []);
@@ -361,7 +377,7 @@ export function buildPostGrowLearningReportViewModel(input: {
       alt: `Post-grow photo ${i + 1} from ${input.grow.name}`,
     }));
   const environment = (["temperature_c", "humidity_pct", "vpd_kpa"] as const).map((m) =>
-    buildMetricAggregate(m, aggregateSensorReadings),
+    buildMetricAggregate(m, aggregateSensorReadings, temperatureUnit),
   );
   const completeness = buildDataCompleteness({
     harvests,

@@ -23,6 +23,10 @@ import {
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
 import {
+  parseTemperatureInput,
+  temperatureInputUnitFromPreference,
+} from "@/lib/sensorInputUnitConversion";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -34,14 +38,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type Field =
-  | "temp"
-  | "rh"
-  | "vpd"
-  | "soil_wc"
-  | "soil_ec"
-  | "soil_temp"
-  | "ppfd";
+type Field = "temp" | "rh" | "vpd" | "soil_wc" | "soil_ec" | "soil_temp" | "ppfd";
 
 interface FieldDef {
   key: Field;
@@ -79,18 +76,12 @@ export function temperatureUnitSymbol(unit: TemperatureUnitPreference): string {
  */
 const TEMPERATURE_ROUND_TRIP_DIGITS = 2;
 
-export function celsiusToDisplayUnit(
-  celsius: number,
-  unit: TemperatureUnitPreference,
-): number {
+export function celsiusToDisplayUnit(celsius: number, unit: TemperatureUnitPreference): number {
   const displayed = unit === "fahrenheit" ? celsiusToFahrenheit(celsius) : celsius;
   return Number(displayed.toFixed(TEMPERATURE_ROUND_TRIP_DIGITS));
 }
 
-export function displayUnitToCelsius(
-  displayed: number,
-  unit: TemperatureUnitPreference,
-): number {
+export function displayUnitToCelsius(displayed: number, unit: TemperatureUnitPreference): number {
   const celsius = unit === "fahrenheit" ? fahrenheitToCelsius(displayed) : displayed;
   return Number(celsius.toFixed(TEMPERATURE_ROUND_TRIP_DIGITS));
 }
@@ -131,10 +122,25 @@ export function rowToForm(
   return form;
 }
 
-function parseField(v: string): number | null {
-  if (v.trim() === "") return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
+type ParsedTargetField =
+  | { kind: "empty"; value: null }
+  | { kind: "invalid"; value: null }
+  | { kind: "ok"; value: number };
+
+function parseTargetField(
+  raw: string,
+  field: FieldDef,
+  displayUnit: TemperatureUnitPreference,
+): ParsedTargetField {
+  if (raw.trim() === "") return { kind: "empty", value: null };
+  if (field.isTemperature) {
+    const parsed = parseTemperatureInput(raw, temperatureInputUnitFromPreference(displayUnit));
+    return parsed.kind === "ok" && parsed.celsius !== null
+      ? { kind: "ok", value: parsed.celsius }
+      : { kind: "invalid", value: null };
+  }
+  const value = Number(raw);
+  return Number.isFinite(value) ? { kind: "ok", value } : { kind: "invalid", value: null };
 }
 
 interface Props {
@@ -188,14 +194,17 @@ export default function GrowTargetsEditor({
 
   const invalid = useMemo(() => {
     for (const f of FIELDS) {
-      const min = parseField(form[`${f.key}_min`]);
-      const max = parseField(form[`${f.key}_max`]);
-      if (min !== null && max !== null && min > max) {
+      const min = parseTargetField(form[`${f.key}_min`], f, unit);
+      const max = parseTargetField(form[`${f.key}_max`], f, unit);
+      if (min.kind === "invalid" || max.kind === "invalid") {
+        return `${f.label} must be a valid number${f.isTemperature ? " with an optional °F or °C suffix" : ""}`;
+      }
+      if (min.value !== null && max.value !== null && min.value > max.value) {
         return `${f.label} min must be ≤ max`;
       }
     }
     return null;
-  }, [form]);
+  }, [form, unit]);
 
   async function handleSave() {
     if (!user) return;
@@ -209,12 +218,10 @@ export default function GrowTargetsEditor({
       user_id: user.id,
     } as Record<string, unknown>;
     for (const f of FIELDS) {
-      const min = parseField(form[`${f.key}_min`]);
-      const max = parseField(form[`${f.key}_max`]);
-      payload[`${f.key}_min`] =
-        f.isTemperature && min !== null ? displayUnitToCelsius(min, unit) : min;
-      payload[`${f.key}_max`] =
-        f.isTemperature && max !== null ? displayUnitToCelsius(max, unit) : max;
+      const min = parseTargetField(form[`${f.key}_min`], f, unit);
+      const max = parseTargetField(form[`${f.key}_max`], f, unit);
+      payload[`${f.key}_min`] = min.value;
+      payload[`${f.key}_max`] = max.value;
     }
     const { error } = await supabase
       .from("grow_targets")
@@ -237,9 +244,8 @@ export default function GrowTargetsEditor({
         <DialogHeader>
           <DialogTitle>Edit grow targets</DialogTitle>
           <DialogDescription>
-            Manual ranges for {growName ?? "this grow"}. Leave a field empty
-            for "no target". Not advice — used only for the Target Comparison
-            card.
+            Manual ranges for {growName ?? "this grow"}. Leave a field empty for "no target". Not
+            advice — used only for the Target Comparison card.
           </DialogDescription>
         </DialogHeader>
 
@@ -248,16 +254,13 @@ export default function GrowTargetsEditor({
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto">
             {FIELDS.map((f) => (
-              <div
-                key={f.key}
-                className="rounded-lg border border-border/40 p-2"
-              >
+              <div key={f.key} className="rounded-lg border border-border/40 p-2">
                 <Label className="text-xs">
                   {f.label} ({f.isTemperature ? temperatureUnitSymbol(unit) : f.unit})
                 </Label>
                 <div className="flex items-center gap-2 mt-1">
                   <Input
-                    type="number"
+                    type={f.isTemperature ? "text" : "number"}
                     inputMode="decimal"
                     step={f.step}
                     placeholder="min"
@@ -272,7 +275,7 @@ export default function GrowTargetsEditor({
                   />
                   <span className="text-xs text-muted-foreground">to</span>
                   <Input
-                    type="number"
+                    type={f.isTemperature ? "text" : "number"}
                     inputMode="decimal"
                     step={f.step}
                     placeholder="max"
@@ -291,16 +294,10 @@ export default function GrowTargetsEditor({
           </div>
         )}
 
-        {invalid && (
-          <p className="text-xs text-amber-600 mt-2">{invalid}</p>
-        )}
+        {invalid && <p className="text-xs text-amber-600 mt-2">{invalid}</p>}
 
         <DialogFooter>
-          <Button
-            variant="ghost"
-            onClick={() => onOpenChange(false)}
-            disabled={saving}
-          >
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={saving || loading || !!invalid}>

@@ -37,6 +37,11 @@ describe("AUD-006 sensorChartAxisRules.formatSensorChartYTick", () => {
     expect(formatSensorChartYTick(1.235, "vpd")).toBe("1.24 kPa");
   });
 
+  it("uses the requested Celsius unit for temperature ticks", () => {
+    expect(formatSensorChartYTick(24.49, "temp", "celsius")).toBe("24°C");
+    expect(formatSensorChartYTick(-5, "temp", "celsius")).toBe("-5°C");
+  });
+
   it("returns an empty string for non-finite values rather than NaN", () => {
     expect(formatSensorChartYTick(NaN, "temp")).toBe("");
     expect(formatSensorChartYTick(Infinity, "co2")).toBe("");
@@ -56,6 +61,10 @@ describe("AUD-006 sensorChartAxisRules.formatSensorChartTooltipValue", () => {
     expect(formatSensorChartTooltipValue(78.4, "temp")).toBe("78.4°F");
     expect(formatSensorChartTooltipValue(1200, "co2")).toBe("1200 ppm");
     expect(formatSensorChartTooltipValue(1.18, "vpd")).toBe("1.18 kPa");
+  });
+
+  it("uses the requested Celsius unit for temperature tooltips", () => {
+    expect(formatSensorChartTooltipValue(24.4, "temp", "celsius")).toBe("24.4°C");
   });
 });
 
@@ -78,10 +87,7 @@ describe("AUD-006 per-metric YAxis gutter widths", () => {
 });
 
 describe("AUD-006 SensorChart wires the helper", () => {
-  const SRC = readFileSync(
-    resolve(__dirname, "..", "components", "SensorChart.tsx"),
-    "utf8",
-  );
+  const SRC = readFileSync(resolve(__dirname, "..", "components", "SensorChart.tsx"), "utf8");
 
   it("uses the per-metric YAxis width helper instead of a hard-coded 36px gutter", () => {
     expect(SRC).toMatch(/axisMeta\.yAxisWidth/);

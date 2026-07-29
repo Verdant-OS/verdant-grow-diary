@@ -41,7 +41,12 @@ import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { actionsPath, alertsPath, tentDetailPath, tentsPath } from "@/lib/routes";
+import {
+  formatTemperatureDisplay,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 import { EMPTY_SNAPSHOT, snapshotFromReadings, type SensorSnapshot } from "@/lib/sensorSnapshot";
 import {
@@ -88,13 +93,16 @@ function fmt(v: number | null, unit: string) {
   return v === null || Number.isNaN(v) ? "—" : `${v}${unit}`;
 }
 
-function snapshotSummary(s: SensorSnapshot | null) {
+function snapshotSummary(s: SensorSnapshot | null, temperatureUnit: TemperatureUnitPreference) {
   if (!s) return "No snapshot";
-  // Temperature stored in Celsius, displayed in Fahrenheit (Verdant convention).
-  const tempF =
-    s.temp === null || !Number.isFinite(s.temp) ? "—" : `${((s.temp * 9) / 5 + 32).toFixed(1)}°F`;
+  const temperature = formatTemperatureDisplay(s.temp, {
+    unit: temperatureUnit,
+    valueUnit: "C",
+    digits: 1,
+    unavailableLabel: "—",
+  });
   return [
-    `Temp ${tempF}`,
+    `Temp ${temperature}`,
     `RH ${fmt(s.rh, "%")}`,
     `VPD ${s.vpd === null ? "—" : `${s.vpd.toFixed(2)} kPa`}`,
   ].join(" · ");
@@ -110,6 +118,7 @@ function snapshotAgeLabel(ageMin: number | null): string {
 }
 
 export default function GrowRoomMode() {
+  const temperatureUnit = useTemperatureUnitPreference();
   const { data: tents } = useTents();
   const { data: plants = [] } = usePlants();
   const { alerts } = useAlertsList({});
@@ -342,7 +351,9 @@ export default function GrowRoomMode() {
                   </Badge>
                 </div>
 
-                <div className="text-sm text-foreground/90">{snapshotSummary(card.snapshot)}</div>
+                <div className="text-sm text-foreground/90">
+                  {snapshotSummary(card.snapshot, temperatureUnit)}
+                </div>
 
                 {vpdClassification.classification !== "unavailable" && (
                   <p

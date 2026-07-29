@@ -19,6 +19,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 
 import { EcowittLatestSnapshotCard } from "@/components/EcowittLatestSnapshotCard";
+import { saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
 const TENT_A = "11111111-1111-1111-1111-111111111111";
 const NOW = new Date("2026-06-04T12:30:00Z");
@@ -49,6 +50,7 @@ vi.mock("@/store/auth", () => ({
 
 beforeEach(() => {
   rowsMock = [];
+  window.localStorage.clear();
 });
 
 function wrap() {
@@ -100,11 +102,34 @@ describe("EcowittLatestSnapshotCard — proof card behavior", () => {
       wrapper: wrap(),
     });
     await waitFor(() => expect(screen.getByTestId("ecowitt-metric-temp_f")).toBeInTheDocument());
-    expect(screen.getByTestId("ecowitt-metric-temp_f").textContent).toBe("78.6 °F");
+    expect(screen.getByTestId("ecowitt-metric-temp_f").textContent).toBe("78.6°F");
     expect(screen.getByTestId("ecowitt-metric-humidity_pct").textContent).toBe("56 %");
     expect(screen.getByTestId("ecowitt-metric-soil_moisture_pct").textContent).toBe("45 %");
     expect(screen.getByTestId("ecowitt-metric-co2_ppm").textContent).toBe("966 ppm");
     expect(screen.getByTestId("ecowitt-metric-vpd_kpa").textContent).toMatch(/kPa/);
+  });
+
+  it("renders Fahrenheit source data in the saved Celsius preference", async () => {
+    saveTemperatureUnitPreference("celsius");
+    rowsMock = [
+      ecowittRow({
+        raw_payload: {
+          vendor: "ecowitt",
+          temp1f: 77,
+          humidity1: 56,
+          dateutc: FRESH_AT,
+        },
+      }),
+    ];
+
+    render(<EcowittLatestSnapshotCard tentId={TENT_A} now={NOW} />, {
+      wrapper: wrap(),
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("ecowitt-metric-temp_f")).toHaveTextContent("25.0°C"),
+    );
+    expect(screen.getByTestId("ecowitt-metric-temp_f")).not.toHaveTextContent("°F");
   });
 
   it("shows empty state when no EcoWitt data exists", async () => {
@@ -266,9 +291,7 @@ describe("EcowittLatestSnapshotCard — proof card behavior", () => {
         ),
       );
       expect(screen.getByTestId("ecowitt-source-badge")).toHaveTextContent("Invalid");
-      expect(screen.getByTestId("ecowitt-metric-vpd_kpa")).toHaveTextContent(
-        "Unavailable",
-      );
+      expect(screen.getByTestId("ecowitt-metric-vpd_kpa")).toHaveTextContent("Unavailable");
       expect(screen.queryByText(/^Ecowitt$/)).not.toBeInTheDocument();
     },
   );

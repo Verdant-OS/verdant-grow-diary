@@ -14,7 +14,15 @@ import type {
   QuickLogFeedingFormState,
   QuickLogFeedingFormProductRow,
 } from "./quickLogFeedingFormViewModel";
-import { getTemperatureUnitSymbol, type TemperatureUnitPreference } from "./temperatureUnitPreference";
+import {
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "./temperatureUnitPreference";
+import {
+  parseTemperatureInput,
+  temperatureInputUnitFromPreference,
+  TEMPERATURE_UNIT_SYMBOL,
+} from "./sensorInputUnitConversion";
 
 export const FEEDING_REVIEW_TITLE = "Review feeding log" as const;
 export const FEEDING_REVIEW_DEFAULTS_FLAG = "Includes prefilled feeding defaults" as const;
@@ -96,7 +104,15 @@ function collectOptionalMetrics(
   push("Runoff pH", form.runoffPh);
   push("Runoff EC", form.runoffEc);
   push("Runoff PPM (500)", form.runoffPpm);
-  push(`Water (${getTemperatureUnitSymbol(tempUnit)})`, form.waterTempC);
+  const parsedWaterTemperature = parseTemperatureInput(
+    form.waterTempC,
+    temperatureInputUnitFromPreference(tempUnit),
+  );
+  const waterTemperatureSymbol =
+    parsedWaterTemperature.kind === "ok"
+      ? TEMPERATURE_UNIT_SYMBOL[parsedWaterTemperature.unit]
+      : getTemperatureUnitSymbol(tempUnit);
+  push(`Water (${waterTemperatureSymbol})`, form.waterTempC);
 
   return metrics;
 }

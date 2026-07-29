@@ -13,6 +13,8 @@ import {
 } from "@/lib/sensor/sensorSnapshotFreshnessRules";
 import { detectSuspiciousMetrics } from "@/lib/sensor/sensorMetricSafetyRules";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import { formatTemperatureDisplay } from "@/lib/temperatureUnitPreference";
 
 export interface SensorSnapshotEditHistoryEntry {
   id: string;
@@ -39,7 +41,7 @@ export interface SensorSnapshotCardProps {
 }
 
 const METRIC_DISPLAY: Array<{ key: string; label: string; unit?: string }> = [
-  { key: "temp_f", label: "Temp", unit: "°F" },
+  { key: "temp_f", label: "Temp" },
   { key: "rh", label: "RH", unit: "%" },
   { key: "vpd", label: "VPD", unit: "kPa" },
   { key: "soil_moisture", label: "Soil", unit: "%" },
@@ -54,6 +56,7 @@ export default function SensorSnapshotCard({
   testId = "sensor-snapshot-card",
   edits,
 }: SensorSnapshotCardProps) {
+  const temperatureUnit = useTemperatureUnitPreference();
   const freshness = classifySnapshotFreshness(snapshot, classifyOptions);
   const flags = detectSuspiciousMetrics(snapshot.metrics);
 
@@ -78,10 +81,7 @@ export default function SensorSnapshotCard({
     >
       <div className="flex flex-wrap items-center gap-2">
         <SensorSourceBadge source={freshness.source} />
-        <span
-          data-testid={`${testId}-age`}
-          className="text-[11px] text-muted-foreground"
-        >
+        <span data-testid={`${testId}-age`} className="text-[11px] text-muted-foreground">
           {freshness.ageLabel}
         </span>
         <span
@@ -114,7 +114,14 @@ export default function SensorSnapshotCard({
           const value = snapshot.metrics[key];
           const display =
             typeof value === "number" && Number.isFinite(value)
-              ? `${value}${unit ? ` ${unit}` : ""}`
+              ? key === "temp_f"
+                ? formatTemperatureDisplay(value, {
+                    valueUnit: "F",
+                    unit: temperatureUnit,
+                    digits: 1,
+                    unavailableLabel: "—",
+                  })
+                : `${value}${unit ? ` ${unit}` : ""}`
               : "—";
           return (
             <li
@@ -164,10 +171,7 @@ export default function SensorSnapshotCard({
               No corrections recorded.
             </p>
           ) : (
-            <ul
-              data-testid={`${testId}-edit-history-list`}
-              className="space-y-1.5"
-            >
+            <ul data-testid={`${testId}-edit-history-list`} className="space-y-1.5">
               {edits.map((e) => (
                 <li
                   key={e.id}

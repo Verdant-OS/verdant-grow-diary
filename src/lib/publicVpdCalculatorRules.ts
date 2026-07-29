@@ -1,4 +1,5 @@
 import { celsiusToFahrenheit, fahrenheitToCelsius } from "@/lib/temperatureUnits";
+import { parseTemperatureInput } from "@/lib/sensorInputUnitConversion";
 import { AIR_TEMP_MAX_C, AIR_TEMP_MIN_C, type TempUnit } from "@/lib/vpdRules";
 import {
   evaluateVpdMeasurementTrust,
@@ -100,8 +101,8 @@ export function parsePublicVpdTemperatureField(
     };
   }
 
-  const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed)) {
+  const parsed = parseTemperatureInput(trimmed, unit);
+  if (parsed.kind !== "ok" || parsed.celsius === null) {
     return {
       displayValue: "",
       rawInput,
@@ -110,7 +111,7 @@ export function parsePublicVpdTemperatureField(
     };
   }
 
-  const canonicalC = unit === "F" ? fahrenheitToCelsius(parsed) : parsed;
+  const canonicalC = parsed.celsius;
   return {
     displayValue: rawInput,
     rawInput,

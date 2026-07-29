@@ -29,6 +29,11 @@ import { withoutDiagnosticSensorRows } from "@/lib/sensorProvenanceFenceRules";
 import { SENSOR_SOURCE_SHORT_LABEL } from "@/constants/sensorSourceLabels";
 import type { TimelineSensorSourceKind } from "@/lib/timelineSensorSourceBadgeRules";
 import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
+import {
+  convertCelsiusForDisplay,
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -73,6 +78,8 @@ export interface BuildDiaryRangeReportInput {
   startDate: string;
   endDate: string;
   now: Date;
+  /** Display-only preference. Stored sensor readings remain Celsius. */
+  temperatureUnit?: TemperatureUnitPreference;
 }
 
 export interface DiaryRangeEntryPreview {
@@ -173,10 +180,6 @@ function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
-function cToF(c: number): number {
-  return (c * 9) / 5 + 32;
-}
-
 /** Resolve a row's report category. Delegates to the canonical classifier. */
 function categoryOf(
   eventType: string | null | undefined,
@@ -227,6 +230,7 @@ export function buildDiaryRangeReport(
   input: BuildDiaryRangeReportInput,
 ): DiaryRangeReportViewModel {
   const { startDate, endDate } = input;
+  const temperatureUnit = input.temperatureUnit ?? "fahrenheit";
 
   const rawGrowName =
     input.grow && typeof input.grow.name === "string" && input.grow.name.trim() !== ""
@@ -391,7 +395,12 @@ export function buildDiaryRangeReport(
     unit: string;
     display: (v: number) => number;
   }> = [
-    { key: "temperature_c", label: "Temperature", unit: "°F", display: (v) => cToF(v) },
+    {
+      key: "temperature_c",
+      label: "Temperature",
+      unit: getTemperatureUnitSymbol(temperatureUnit),
+      display: (v) => convertCelsiusForDisplay(v, temperatureUnit) ?? v,
+    },
     { key: "humidity_pct", label: "Humidity", unit: "% RH", display: (v) => v },
     { key: "vpd_kpa", label: "VPD", unit: "kPa", display: (v) => v },
   ];

@@ -12,12 +12,7 @@
  *  - Commit is a callback-only handoff; this component performs no I/O.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
   Droplets,
@@ -36,17 +31,12 @@ import { GeneticsBadge } from "@/components/GeneticsBadge";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import {
   celsiusToFahrenheit,
-  fahrenheitToCelsius,
   getTemperatureUnitSymbol,
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
+import { preferredTemperatureToCelsiusInputString } from "@/lib/sensorInputUnitConversion";
 
-export type HyperLogAction =
-  | "water"
-  | "feed"
-  | "defoliate"
-  | "note"
-  | "environment";
+export type HyperLogAction = "water" | "feed" | "defoliate" | "note" | "environment";
 
 export interface HyperLogDemoFormState {
   waterAmount: string;
@@ -113,24 +103,6 @@ const DEMO_SNAPSHOT = {
 const WATER_UNITS = ["ml", "L", "cups"] as const;
 
 const VERDANT_GREEN = "#00C853";
-
-const PLAIN_TEMP_INPUT = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
-
-/**
- * Convert the grower-typed environment temperature (entered in the active
- * preference unit) into a canonical-°C string EXACTLY ONCE at the commit
- * handoff — the dispatched draft stores canonical °C, which is what
- * hyperLogDraftRules renders as "Temp X°C". Blank stays blank and
- * non-numeric text passes through unchanged.
- */
-function typedTempToCelsiusInput(raw: string, unit: TemperatureUnitPreference): string {
-  if (unit !== "fahrenheit") return raw;
-  const trimmed = raw.trim();
-  if (trimmed === "" || !PLAIN_TEMP_INPUT.test(trimmed)) return raw;
-  const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed)) return raw;
-  return String(Math.round(fahrenheitToCelsius(parsed) * 100) / 100);
-}
 
 const EMPTY_FORM: HyperLogDemoFormState = {
   waterAmount: "",
@@ -267,7 +239,10 @@ export function HyperLogModal({
     // draft stores canonical °C. Converted exactly once, right here.
     const committedForm: HyperLogDemoFormState = {
       ...form,
-      envTemp: typedTempToCelsiusInput(form.envTemp, envTempEntryUnitRef.current ?? temperatureUnit),
+      envTemp: preferredTemperatureToCelsiusInputString(
+        form.envTemp,
+        envTempEntryUnitRef.current ?? temperatureUnit,
+      ),
     };
     onCommit?.(selected, committedForm, { photoCount: photos.length });
     onOpenChange(false);
@@ -310,8 +285,7 @@ export function HyperLogModal({
           data-testid="hyperlog-modal"
           className="bg-[#0a0a0a] border border-white/[0.06] rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col max-h-[92vh] font-mono"
           style={{
-            boxShadow:
-              "0 24px 60px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,200,83,0.06)",
+            boxShadow: "0 24px 60px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,200,83,0.06)",
           }}
         >
           {/* Header */}
@@ -341,9 +315,7 @@ export function HyperLogModal({
           <div className="px-5 py-5 space-y-5 overflow-y-auto">
             {/* Action Tiles */}
             <div>
-              <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 mb-2.5">
-                Action
-              </p>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 mb-2.5">Action</p>
               <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                 {ACTION_TILES.map((tile) => {
                   const Icon = tile.icon;
@@ -372,7 +344,10 @@ export function HyperLogModal({
                       }
                       aria-pressed={isActive}
                     >
-                      <Icon className="h-4 w-4" style={isActive ? { color: VERDANT_GREEN } : undefined} />
+                      <Icon
+                        className="h-4 w-4"
+                        style={isActive ? { color: VERDANT_GREEN } : undefined}
+                      />
                       <span className="text-[11px] font-medium tracking-wide">{tile.label}</span>
                     </button>
                   );
@@ -558,11 +533,7 @@ export function HyperLogModal({
                       key={p.id}
                       className="relative aspect-square rounded-lg overflow-hidden border border-white/[0.08] bg-[#0d0d0d]"
                     >
-                      <img
-                        src={p.url}
-                        alt={p.name}
-                        className="h-full w-full object-cover"
-                      />
+                      <img src={p.url} alt={p.name} className="h-full w-full object-cover" />
                       <button
                         type="button"
                         data-testid={`hyperlog-photo-remove-${p.id}`}
@@ -637,13 +608,9 @@ export function HyperLogModal({
                 <p className="text-[11px] uppercase tracking-wider text-white/40">
                   {timelinePreview.headline}
                 </p>
-                <p className="mt-1 text-sm text-white/85 leading-snug">
-                  {timelinePreview.summary}
-                </p>
+                <p className="mt-1 text-sm text-white/85 leading-snug">{timelinePreview.summary}</p>
                 {timelinePreview.meta ? (
-                  <p className="mt-1.5 text-[10px] text-white/40">
-                    {timelinePreview.meta}
-                  </p>
+                  <p className="mt-1.5 text-[10px] text-white/40">{timelinePreview.meta}</p>
                 ) : null}
               </div>
 
@@ -697,11 +664,13 @@ function buildTimelinePreview(
   photoCount: number,
   temperatureUnitSymbol: string,
 ): { headline: string; summary: string; meta: string | null } {
-  const photoMeta = photoCount > 0 ? `${photoCount} photo${photoCount === 1 ? "" : "s"} attached` : null;
+  const photoMeta =
+    photoCount > 0 ? `${photoCount} photo${photoCount === 1 ? "" : "s"} attached` : null;
   if (!action) {
     return {
       headline: "No entry yet",
-      summary: "Choose Feed, Defoliate, Note, or Env Check to see how this entry will appear in the plant memory timeline.",
+      summary:
+        "Choose Feed, Defoliate, Note, or Env Check to see how this entry will appear in the plant memory timeline.",
       meta: null,
     };
   }

@@ -9,7 +9,10 @@ import { loadEcowittEvidenceSample } from "@/lib/ecowittLocalEvidence";
 
 const NOW = new Date("2026-06-16T12:00:00.000Z");
 
-function snap(tentKey: "flower" | "seedling" | "vegetation", sampleKey: Parameters<typeof loadEcowittEvidenceSample>[0]) {
+function snap(
+  tentKey: "flower" | "seedling" | "vegetation",
+  sampleKey: Parameters<typeof loadEcowittEvidenceSample>[0],
+) {
   const loaded = loadEcowittEvidenceSample(sampleKey, { now: NOW });
   return normalizeEcowittTentPayload(loaded.sample.payload, tentKey, {
     now: NOW,
@@ -30,6 +33,18 @@ describe("EcoWitt diary attach preview", () => {
     expect(p.body).toContain("Flower Tent");
   });
 
+  it("formats snapshot temperatures in the requested display unit without mutating metrics", () => {
+    const s = snap("flower", "valid");
+    const originalMetrics = { ...s.metrics };
+    const p = buildEcowittDiaryAttachPreview(s, {
+      temperatureUnit: "celsius",
+    });
+
+    expect(p.metrics_summary.some((line) => line.includes("°C"))).toBe(true);
+    expect(p.metrics_summary.some((line) => line.includes("°F"))).toBe(false);
+    expect(p.attached_snapshot_preview.metrics).toEqual(originalMetrics);
+  });
+
   it("degraded Seedling snapshot includes degraded warning", () => {
     const s = snap("seedling", "degraded");
     const p = buildEcowittDiaryAttachPreview(s, { is_stale: true });
@@ -43,7 +58,6 @@ describe("EcoWitt diary attach preview", () => {
     expect(["DEGRADED", "INVALID"]).toContain(p.source_label);
     expect(p.warnings.some((w) => /invalid/i.test(w))).toBe(true);
   });
-
 
   it("preview contains source/provider/captured_at/tent label", () => {
     const s = snap("flower", "valid");

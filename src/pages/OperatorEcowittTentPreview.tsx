@@ -15,8 +15,13 @@ import {
   EcowittPreviewSampleKey,
 } from "@/fixtures/ecowitt-preview-samples";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { buildEcowittEvidenceHistoryViewModel } from "@/lib/ecowittEvidenceHistoryViewModel";
 import { buildEcowittDiaryAttachPreview } from "@/lib/ecowittDiaryAttachPreview";
+import {
+  formatTemperatureDisplay,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 import {
   buildEcowittSnapshotExport,
   downloadEcowittSnapshotExport,
@@ -49,7 +54,17 @@ function fmt(n: number | null, unit: string): string {
   return `${n}${unit}`;
 }
 
+function fmtTemperatureF(value: number | null, temperatureUnit: TemperatureUnitPreference): string {
+  return formatTemperatureDisplay(value, {
+    valueUnit: "F",
+    unit: temperatureUnit,
+    digits: 1,
+    unavailableLabel: "—",
+  });
+}
+
 export default function OperatorEcowittTentPreview() {
+  const temperatureUnit = useTemperatureUnitPreference();
   const [tentKey, setTentKey] = useState<EcowittTentKey>("flower");
   const [sampleKey, setSampleKey] = useState<EcowittPreviewSampleKey>("valid");
   const [showRaw, setShowRaw] = useState(false);
@@ -91,8 +106,12 @@ export default function OperatorEcowittTentPreview() {
   }, [tentKey, sampleKey, now]);
 
   const diaryPreview = useMemo(
-    () => buildEcowittDiaryAttachPreview(snapshot, { is_stale: vm.is_stale }),
-    [snapshot, vm.is_stale],
+    () =>
+      buildEcowittDiaryAttachPreview(snapshot, {
+        is_stale: vm.is_stale,
+        temperatureUnit,
+      }),
+    [snapshot, vm.is_stale, temperatureUnit],
   );
 
   const handleExport = () => {
@@ -299,7 +318,11 @@ export default function OperatorEcowittTentPreview() {
                 <div className="font-medium">{m.label}</div>
                 <div className="text-xs text-muted-foreground">Channel: {m.channel ?? "—"}</div>
               </div>
-              <div className="font-mono">{fmt(m.value, m.unit)}</div>
+              <div className="font-mono">
+                {m.key === "air_temp_f" || m.key === "soil_temp_f"
+                  ? fmtTemperatureF(m.value, temperatureUnit)
+                  : fmt(m.value, m.unit)}
+              </div>
             </li>
           ))}
         </ul>
@@ -395,9 +418,9 @@ export default function OperatorEcowittTentPreview() {
                     {row.tent_label} · {row.captured_at}
                   </div>
                   <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs sm:grid-cols-3">
-                    <div>Air: {fmt(row.air_temp_f, "°F")}</div>
+                    <div>Air: {fmtTemperatureF(row.air_temp_f, temperatureUnit)}</div>
                     <div>RH: {fmt(row.humidity_pct, "%")}</div>
-                    <div>Soil T: {fmt(row.soil_temp_f, "°F")}</div>
+                    <div>Soil T: {fmtTemperatureF(row.soil_temp_f, temperatureUnit)}</div>
                     <div>Soil M1: {fmt(row.soil_moisture_pct_primary, "%")}</div>
                     <div>Soil M2: {fmt(row.soil_moisture_pct_secondary, "%")}</div>
                     <div>Root: {row.root_zone_confidence}</div>

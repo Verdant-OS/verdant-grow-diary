@@ -16,12 +16,12 @@ import { useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useNowTick } from "@/hooks/useNowTick";
 import { useAuth } from "@/store/auth";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useGrows } from "@/store/grows";
 import { tentDetailPath, tentsPath } from "@/lib/routes";
 import { isUuid } from "@/lib/isUuid";
-import { loadTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { formatTentLightStatus } from "@/lib/lightScheduleFormat";
 import { resolveVerifiedAssignedPlantCount } from "@/lib/tentManagementRules";
 import { normalizeVpdStage } from "@/lib/vpdStageTargetRules";
@@ -80,7 +80,7 @@ export default function Tents() {
     statusByTent: sensorStatusByTent,
     retryTent: retrySensorTent,
   } = useSensorReadingsByTents(tents.map((t) => t.id).filter((id) => isUuid(id)));
-  const temperatureUnit = loadTemperatureUnitPreference();
+  const temperatureUnit = useTemperatureUnitPreference();
   // Freshness is time-relative: re-evaluate the presenter's clock every
   // minute so an open tab cannot keep a fresh label past the stale boundary.
   const nowTick = useNowTick();

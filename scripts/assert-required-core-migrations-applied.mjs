@@ -277,10 +277,29 @@ export function runRequiredCoreMigrationsApplied({
     logger.error(
       `psql exited ${String(result.status)} while reading pg_catalog; stderr was suppressed.`,
     );
+    // The exit STATUS is a small integer with no credential content, so it is
+    // safe to publish while stderr stays suppressed. Without it this failure
+    // is undiagnosable: psql also exits non-zero when it cannot connect at
+    // all, which is indistinguishable from a rejected query in the report.
+    // libpq/psql convention: 1 = psql's own fatal error, 2 = connection could
+    // not be established or the session was lost, 3 = script error under
+    // ON_ERROR_STOP.
+    const psqlStatus = String(result.status);
+    const statusHint =
+      result.status === 2
+        ? "psql status 2 means the CONNECTION failed — the query never ran. Check the target's host/port reachability from the runner (GitHub-hosted runners are IPv4-only; a direct db.<ref>.supabase.co host may require the pooler host instead) before suspecting schema drift."
+        : result.status === 3
+          ? "psql status 3 means the SQL was rejected under ON_ERROR_STOP — the connection itself succeeded."
+          : "psql reported its own fatal error before a verdict was reached.";
     writeReport("FAILED - schema query failed", [
       "The target schema remains unknown. Raw psql stderr was suppressed to protect credentials.",
+      `psql exit status: ${psqlStatus}.`,
+      statusHint,
     ]);
-    writeAudit("schema_query_failed", "psql returned a non-zero status.");
+    writeAudit(
+      "schema_query_failed",
+      `psql returned a non-zero status (${psqlStatus}).`,
+    );
     return EXIT.SCHEMA_QUERY_FAILED;
   }
 

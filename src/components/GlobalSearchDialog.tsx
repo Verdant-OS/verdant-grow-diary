@@ -40,7 +40,7 @@ import {
 } from "@/lib/globalSearchQuickLogFallbackRules";
 import { useAuth } from "@/store/auth";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   CommandEmpty,
@@ -363,6 +363,10 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="overflow-hidden p-0 shadow-lg md:max-w-3xl">
+        <DialogTitle className="sr-only">Search Verdant</DialogTitle>
+        <DialogDescription className="sr-only">
+          Search your grows, tents, plants, and the cultivar reference library.
+        </DialogDescription>
         <CommandPrimitive
           shouldFilter={false}
           value={activeValue}
@@ -751,7 +755,11 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                               label: string;
                               testId: string;
                               fallbackType:
-                                "observation" | "watering" | "feeding" | "environment" | null;
+                                | "observation"
+                                | "watering"
+                                | "feeding"
+                                | "environment"
+                                | null;
                             }>
                           ).map(({ actionId, label, testId, fallbackType }) => (
                             <Button

@@ -17,6 +17,10 @@
  */
 
 import type { FastAddActionId, FastAddSelectionContext } from "./fastAddActionRules";
+import {
+  TIMELINE_EVIDENCE_EMPTY_DESC,
+  TIMELINE_EVIDENCE_EMPTY_TITLE,
+} from "./timelineEvidenceFilterRules";
 
 /**
  * Which empty situation the timeline is in. These are mutually exclusive and
@@ -88,9 +92,13 @@ export const TIMELINE_EMPTY_FILTERED_TITLE = "No entries match these filters";
 export const TIMELINE_EMPTY_FILTERED_DESC =
   "Entries exist in this grow, but none match the current filters. Widen the date range or clear a filter to see them.";
 
-export const TIMELINE_EMPTY_EVIDENCE_TITLE = "No evidence-backed entries match";
-export const TIMELINE_EMPTY_EVIDENCE_DESC =
-  "The evidence-only filter hides entries without an attached photo or sensor reading. Those entries are still in your diary — clear the filter to see them.";
+/**
+ * The evidence-filter wording is already pinned in
+ * `timelineEvidenceFilterRules`. Re-export rather than fork it so the two
+ * surfaces can never drift apart.
+ */
+export const TIMELINE_EMPTY_EVIDENCE_TITLE = TIMELINE_EVIDENCE_EMPTY_TITLE;
+export const TIMELINE_EMPTY_EVIDENCE_DESC = TIMELINE_EVIDENCE_EMPTY_DESC;
 
 function hasSelectionContext(ctx: FastAddSelectionContext | null | undefined): boolean {
   if (!ctx) return false;

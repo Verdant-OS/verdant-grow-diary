@@ -780,6 +780,7 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
     "input:not([type='hidden']), textarea, select, [contenteditable='true']",
   );
   const audits: FieldAudit[] = [];
+  const reauditedUnnamedIndexes = new Set<number>();
 
   for (let index = 0; index < (await controls.count()); index += 1) {
     const control = controls.nth(index);
@@ -801,19 +802,28 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
       if (name === "") {
         // A pinned node that is still connected and visible after the whole
         // settle window is a genuinely unnamed control and must fail below;
-        // one that vanished or stayed hidden has nothing left to audit.
-        const auditable = unnamedHandle
+        // one that stayed hidden has nothing left to audit. A node that
+        // DETACHED may have a live replacement at this index, so the index is
+        // re-audited once — an unnamed replacement must not slip through
+        // unaudited just because its predecessor churned away.
+        const pinnedState = unnamedHandle
           ? await unnamedHandle
-              .evaluate(
-                (element) =>
-                  element.isConnected &&
+              .evaluate((element) => ({
+                connected: element.isConnected,
+                visible:
                   element.getBoundingClientRect().width > 0 &&
                   element.getBoundingClientRect().height > 0 &&
                   getComputedStyle(element).visibility !== "hidden",
-              )
-              .catch(() => false)
-          : false;
-        if (!auditable) continue;
+              }))
+              .catch(() => ({ connected: false, visible: false }))
+          : { connected: false, visible: false };
+        if (!(pinnedState.connected && pinnedState.visible)) {
+          if (!pinnedState.connected && !reauditedUnnamedIndexes.has(index)) {
+            reauditedUnnamedIndexes.add(index);
+            index -= 1;
+          }
+          continue;
+        }
       }
     }
     const type = await controlType(control);

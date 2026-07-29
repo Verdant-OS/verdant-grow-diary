@@ -149,7 +149,22 @@ describe("static wiring — src/pages/Timeline.tsx", () => {
   it("gates the advanced surface through the canonical feature key", () => {
     expect(src).toMatch(/canUseFeature\(\s*entitlement,\s*"advanced_timeline_filters",?\s*\)/);
     expect(src).toMatch(/from "@\/hooks\/useMyEntitlements"/);
+    // The next-missing-action jump remains the only Pro-gated control here.
     expect(src).toMatch(/disabled=\{!advancedTimelineUnlocked\}/);
+    expect((src.match(/disabled=\{!advancedTimelineUnlocked\}/g) ?? []).length).toBe(1);
+  });
+
+  it("does NOT gate the date-range inputs — available on every plan", () => {
+    // The applied bounds must not be conditioned on the entitlement.
+    expect(src).toContain(
+      "const appliedStartDate = isTimelineDateFilterValue(startDateFilter) ? startDateFilter : null;",
+    );
+    expect(src).toContain(
+      "const appliedEndDate = isTimelineDateFilterValue(endDateFilter) ? endDateFilter : null;",
+    );
+    expect(src).not.toMatch(/advancedTimelineUnlocked\s*&&\s*isTimelineDateFilterValue/);
+    // Locked copy must not claim date filtering is Pro.
+    expect(src).toContain("Date-range filtering is available on every plan.");
   });
 
   it("distinguishes entitlement verification failure from a verified Free plan", () => {

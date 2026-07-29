@@ -1,0 +1,84 @@
+name: Typecheck (tsgo) + build
+
+# Runs on EVERY push to any branch, plus PRs and manual dispatch.
+#
+# This is deliberately separate from `ci.yml`:
+#   * `ci.yml` runs the heavy lint/test/build gate, but only on pushes to
+#     `main` and `verdant-grow-diary` — pushes to feature branches get no
+#     signal until a PR is opened.
+#   * `typecheck.yml` runs `tsc -p tsconfig.app.json --noEmit` on PRs and
+#     pushes to `main` only.
+#
+# This workflow is the cheap always-on gate: `tsgo --noEmit` (the same
+# command used for local validation, so CI and local agree) followed by a
+# production build. It does NOT replace either of the above — `tsc`
+# remains the authoritative typecheck in `ci.yml`; `tsgo` is the fast
+# cross-check that catches a broken tree on any branch within a minute.
+#
+# Both steps are stop-ship. No `continue-on-error`.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # One run per ref; a newer push supersedes an in-flight run on the same
+  # branch. `main` is excluded from cancellation so release history keeps a
+  # completed run for every commit.
+  group: typecheck-build-push-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck-and-build:
+    name: tsgo --noEmit + vite build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      # --frozen-lockfile so `tsgo` resolves to the pinned
+      # @typescript/native-preview in devDependencies, not whatever bunx
+      # would download at run time. A CI typecheck on a floating compiler
+      # version is not a reproducible gate.
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck (tsgo --noEmit)
+        run: bun run typecheck:tsgo
+
+      # Build runs only after the typecheck passes — a build that succeeds
+      # on a type-broken tree is noise, not signal.
+      - name: Production build
+        run: bun run build
+
+      - name: Report
+        if: always()
+        run: |
+          {
+            echo "### Typecheck + build"
+            echo ""
+            echo "| Step | Command |"
+            echo "| --- | --- |"
+            echo "| Typecheck | \`bun run typecheck:tsgo\` |"
+            echo "| Build | \`bun run build\` |"
+            echo ""
+            echo "Ref: \`${{ github.ref }}\` — commit \`${{ github.sha }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

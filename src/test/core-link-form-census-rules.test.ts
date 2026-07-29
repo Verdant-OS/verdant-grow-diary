@@ -120,12 +120,14 @@ describe("core link and form census rules", () => {
       '"re-rendered in response to selection before value verification"',
     );
     expect(CENSUS_SPEC_SOURCE).toContain('? "re-rendered in response to selection');
-    // A fallback success only counts for the pinned node: if the live index
-    // resolves elsewhere after the exercise, a look-alike sibling absorbed the
-    // selection and the original is recorded as unexercised, never exercised.
-    expect(CENSUS_SPEC_SOURCE).toContain("const exercisedPinnedNode = await stableControl");
+    // The fallback exercise acts THROUGH the pinned handle, making action and
+    // identity atomic — an index reorder can never route the selection or its
+    // verification to a look-alike sibling.
     expect(CENSUS_SPEC_SOURCE).toContain(
-      'reason: "a look-alike sibling absorbed the selection after a re-render"',
+      "await snapshotTarget.selectOption(alternative, { timeout: 5_000 });",
+    );
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      "() => snapshotTarget.evaluate((element) => (element as HTMLSelectElement).value)",
     );
   });
 

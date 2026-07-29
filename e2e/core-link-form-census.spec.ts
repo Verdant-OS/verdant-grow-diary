@@ -864,44 +864,54 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
       }
       let selectionDispatched = false;
       try {
-        await stableControl.selectOption(alternative, { timeout: 5_000 });
-        selectionDispatched = true;
-        await expect(stableControl).toHaveValue(alternative, { timeout: 5_000 });
+        if (hasStableNamedControl) {
+          await stableControl.selectOption(alternative, { timeout: 5_000 });
+          selectionDispatched = true;
+          await expect(stableControl).toHaveValue(alternative, { timeout: 5_000 });
+        } else {
+          // The pinned handle IS the element under audit: acting through it
+          // makes exercise and identity atomic, so an index reorder can never
+          // route the action or its verification to a look-alike sibling.
+          await snapshotTarget.selectOption(alternative, { timeout: 5_000 });
+          selectionDispatched = true;
+          await expect
+            .poll(
+              () => snapshotTarget.evaluate((element) => (element as HTMLSelectElement).value),
+              { timeout: 5_000 },
+            )
+            .toBe(alternative);
+        }
       } catch (error) {
-        // A select without a unique accessible-name locator is only reachable
-        // through the live nth() query, and a sibling control's re-render can
-        // swap the element under that index between the snapshot and the
-        // exercise ("did not find some options"). That churn says nothing
-        // about the product, so it downgrades to an unexercised audit entry;
-        // a uniquely named control survives re-renders, so its failure is
-        // real and still fails the census.
+        // A select without a unique accessible-name locator has no stable
+        // query; its pinned node can be replaced wholesale by a sibling
+        // control's re-render. That churn says nothing about the product, so
+        // it downgrades to an unexercised audit entry; a uniquely named
+        // control survives re-renders, so its failure is real and still
+        // fails the census.
         if (hasStableNamedControl) throw error;
-        // Only proven stability stays fatal. Re-read the live element and let
-        // the pure decision helper judge: the same pinned DOM node still
+        // Only proven stability stays fatal. Re-read the pinned node and let
+        // the pure decision helper judge: the same node still attached and
         // showing the snapshotted state — control disabled flag and full
-        // option state alike — means a broken onChange, not churn.
-        const liveState = await stableControl
-          .evaluate(
-            (element, snapshotElement) => {
-              const select = element as HTMLSelectElement;
-              return {
-                sameElement: snapshotElement !== null && element === snapshotElement,
-                disabled: select.matches(":disabled"),
-                options: Array.from(select.options, (option) => ({
-                  value: option.value,
-                  disabled: option.disabled,
-                })),
-              };
-            },
-            fallbackSnapshotHandle,
-            { timeout: 5_000 },
-          )
+        // option state alike — means a broken onChange, not churn. A node
+        // that detached (evaluate rejects) or was never pinned cannot prove
+        // anything.
+        const liveState = await snapshotTarget
+          .evaluate((element) => {
+            const select = element as HTMLSelectElement;
+            return {
+              disabled: select.matches(":disabled"),
+              options: Array.from(select.options, (option) => ({
+                value: option.value,
+                disabled: option.disabled,
+              })),
+            };
+          })
           .catch(() => undefined);
         if (
           fallbackSelectExerciseFailureIsFatal(
             { disabled: selectSnapshot.controlDisabled, options: selectSnapshot.options },
-            liveState ? { disabled: liveState.disabled, options: liveState.options } : undefined,
-            liveState?.sameElement ?? false,
+            liveState,
+            fallbackSnapshotHandle !== null && liveState !== undefined,
           )
         ) {
           throw error;
@@ -921,31 +931,6 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
             : "re-rendered mid-exercise without a unique accessible-name locator",
         });
         continue;
-      }
-
-      // Success on the fallback path only counts for the snapshotted element:
-      // an async re-render between the snapshot and the action can move the
-      // live nth() index to a look-alike sibling that accepts the same
-      // alternative, in which case the original was never exercised and must
-      // not be recorded as such.
-      if (!hasStableNamedControl) {
-        const exercisedPinnedNode = await stableControl
-          .evaluate(
-            (element, snapshotElement) => snapshotElement !== null && element === snapshotElement,
-            fallbackSnapshotHandle,
-            { timeout: 5_000 },
-          )
-          .catch(() => false);
-        if (!exercisedPinnedNode) {
-          audits.push({
-            route: route.path,
-            name,
-            type,
-            exercised: false,
-            reason: "a look-alike sibling absorbed the selection after a re-render",
-          });
-          continue;
-        }
       }
 
       // A controlled filter can re-render the page and change the live nth()

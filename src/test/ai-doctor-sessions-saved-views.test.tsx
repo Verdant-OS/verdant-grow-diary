@@ -248,7 +248,8 @@ describe("AiDoctorSessionsIndex — saved views UI", () => {
   });
 
   it("does not claim an unsaved view when browser storage rejects the write", async () => {
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    const storagePrototype = Object.getPrototypeOf(window.localStorage) as Storage;
+    vi.spyOn(storagePrototype, "setItem").mockImplementation(() => {
       throw new DOMException("Storage is unavailable", "QuotaExceededError");
     });
 
@@ -397,7 +398,8 @@ describe("AiDoctorSessionsIndex — saved views UI", () => {
     fireEvent.change(select, { target: { value: "v-keep" } });
     fireEvent.click(await screen.findByTestId("ai-doctor-sessions-saved-views-delete"));
 
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    const storagePrototype = Object.getPrototypeOf(window.localStorage) as Storage;
+    vi.spyOn(storagePrototype, "setItem").mockImplementation(() => {
       throw new DOMException("Storage is unavailable", "QuotaExceededError");
     });
     fireEvent.click(

@@ -378,7 +378,8 @@ describe("AiDoctorSessionsIndex — import action", () => {
       target: { value: json },
     });
 
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    const storagePrototype = Object.getPrototypeOf(window.localStorage) as Storage;
+    vi.spyOn(storagePrototype, "setItem").mockImplementation(() => {
       throw new DOMException("Storage is unavailable", "QuotaExceededError");
     });
     fireEvent.click(screen.getByTestId("ai-doctor-sessions-saved-views-import-confirm"));

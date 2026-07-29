@@ -520,7 +520,7 @@ describe("Quick Log Playwright CI surface", () => {
     const pwCache = wf.match(/-\s*name:\s*Cache Playwright browsers[\s\S]*?(?=\n {6}- name:)/);
     expect(pwCache, "Playwright browser cache step missing").toBeTruthy();
     const pwBlock = pwCache![0];
-    expect(pwBlock).toMatch(/uses:\s*actions\/cache@[0-9a-f]{40} # v4/);
+    expect(pwBlock).toMatch(/uses:\s*actions\/cache@[0-9a-f]{40}\b/);
     expect(pwBlock).toContain("~/.cache/ms-playwright");
     expect(pwBlock).toMatch(/\$\{\{\s*runner\.os\s*\}\}-playwright-/);
     expect(pwBlock).toMatch(/hashFiles\(\s*'bun\.lock',\s*'bun\.lockb',\s*'package\.json'\s*\)/);
@@ -529,7 +529,7 @@ describe("Quick Log Playwright CI surface", () => {
     const bunCache = wf.match(/-\s*name:\s*Cache Bun packages[\s\S]*?(?=\n {6}- name:)/);
     expect(bunCache, "Bun cache step missing").toBeTruthy();
     const bunBlock = bunCache![0];
-    expect(bunBlock).toMatch(/uses:\s*actions\/cache@[0-9a-f]{40} # v4/);
+    expect(bunBlock).toMatch(/uses:\s*actions\/cache@[0-9a-f]{40}\b/);
     expect(bunBlock).toContain("~/.bun/install/cache");
 
     // Neither cache's `path:` may include sensitive or output paths.
@@ -617,7 +617,7 @@ describe("Quick Log Playwright CI surface", () => {
   it("every actions/cache block is gated, has runner.os + hashFiles(lock/package), and excludes forbidden paths", () => {
     const wf = read(".github/workflows/quicklog-smoke.yml");
     const blocks = extractStepBlocks(wf).filter((b) =>
-      /uses:\s*actions\/cache@[0-9a-f]{40} # v4/.test(b),
+      /uses:\s*actions\/cache@[0-9a-f]{40}\b/.test(b),
     );
     expect(
       blocks.length,
@@ -761,7 +761,7 @@ describe("Quick Log Playwright CI surface", () => {
     expect(step, "Upload Playwright HTML report step missing").toBeTruthy();
     const block = step![0];
     expect(block).toMatch(/id:\s*upload_playwright_report/);
-    expect(block).toMatch(/uses:\s*actions\/upload-artifact@[0-9a-f]{40} # v4/);
+    expect(block).toMatch(/uses:\s*actions\/upload-artifact@[0-9a-f]{40}\b/);
     expect(readWorkflowYamlScalar(block, "if")).toMatch(
       /^always\(\)\s*&&\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/,
     );

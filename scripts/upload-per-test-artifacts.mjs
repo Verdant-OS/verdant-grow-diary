@@ -93,7 +93,7 @@ export function artifactNameFor(test) {
 }
 
 /**
- * Build the artifact-viewer URL the same way actions/upload-artifact@v4's
+ * Build the artifact-viewer URL the same way actions/upload-artifact@v7's
  * own `artifact-url` output does, so links behave identically whether they
  * came from the marketplace action or this script's direct SDK call.
  */

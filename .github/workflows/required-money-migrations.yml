@@ -41,8 +41,8 @@ jobs:
     name: Unit tests — migrationVersion + applied-check logic
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.3.14
       - name: Install dependencies
@@ -70,7 +70,7 @@ jobs:
             > "${{ github.workspace }}/audit/vitest/expected-prefixes.json" || true
       - name: Upload vitest + extractor artifacts
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: required-money-migrations-vitest
           path: audit/vitest
@@ -81,7 +81,7 @@ jobs:
     needs: unit-tests-migration-version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Assert filename allowlist
         run: node scripts/assert-required-money-migrations.mjs
       - name: Assert no unreviewed money-adjacent migrations
@@ -103,7 +103,7 @@ jobs:
       PGSERVICEFILE: ""
       PGUSER: ""
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Prepare audit dir
         run: mkdir -p "${{ github.workspace }}/audit/sandbox"
       - name: Preflight — SUPABASE_DB_URL_SANDBOX configured
@@ -157,7 +157,7 @@ jobs:
         run: cat audit/sandbox/report.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload sandbox audit bundle
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: money-migration-audit-sandbox
           path: audit/sandbox
@@ -180,7 +180,7 @@ jobs:
       PGSERVICEFILE: ""
       PGUSER: ""
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Prepare audit dir
         run: mkdir -p "${{ github.workspace }}/audit/live"
       - name: Preflight — SUPABASE_DB_URL_LIVE configured
@@ -234,7 +234,7 @@ jobs:
         run: cat audit/live/report.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload live audit bundle
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: money-migration-audit-live
           path: audit/live

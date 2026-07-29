@@ -99,8 +99,8 @@ describe("Client Secret Boundary — CI wiring contract", () => {
     expect(win).toMatch(/client-secret-boundary-proof\.txt/);
     expect(win).toMatch(/name:\s*client-secret-boundary-proof-ci/);
     // Org policy requires full-SHA pinning; accept the pinned form
-    // (trailing "# v4" comment documents the version).
-    expect(win).toMatch(/actions\/upload-artifact@[a-f0-9]{40} # v4/);
+    // The central GitHub Actions policy owns the reviewed runtime/version.
+    expect(win).toMatch(/actions\/upload-artifact@[a-f0-9]{40}\b/);
     // No `if: always()` near the proof upload — it must be gated on guard success.
     expect(win).not.toMatch(/if:\s*always\(\)/);
   });
@@ -110,8 +110,8 @@ describe("Client Secret Boundary — CI wiring contract", () => {
     expect(win).toMatch(/client-secret-boundary-proof\.txt/);
     expect(win).toMatch(/name:\s*client-secret-boundary-proof-docs-safety/);
     // Org policy requires full-SHA pinning; accept the pinned form
-    // (trailing "# v4" comment documents the version).
-    expect(win).toMatch(/actions\/upload-artifact@[a-f0-9]{40} # v4/);
+    // The central GitHub Actions policy owns the reviewed runtime/version.
+    expect(win).toMatch(/actions\/upload-artifact@[a-f0-9]{40}\b/);
     expect(win).not.toMatch(/if:\s*always\(\)/);
   });
 

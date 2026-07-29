@@ -71,7 +71,7 @@ jobs:
       SARIF_PATH: artifacts/prefix-diff-expected.sarif
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Prepare artifacts dir
         run: mkdir -p artifacts
@@ -103,14 +103,14 @@ jobs:
 
       - name: Upload offline SARIF to Code Scanning
         if: hashFiles(env.SARIF_PATH) != ''
-        uses: github/codeql-action/upload-sarif@4187e74d05793876e9989daffde9c3e66b4acd07 # v3
+        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
         with:
           sarif_file: ${{ env.SARIF_PATH }}
           category: prefix-diff-expected
 
       - name: Archive offline manifest evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: prefix-diff-offline
           path: |
@@ -149,7 +149,7 @@ jobs:
       TARGET_ENV: sandbox
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Preflight — SUPABASE_DB_URL_SANDBOX configured
         uses: ./.github/actions/require-ci-secret
@@ -199,14 +199,14 @@ jobs:
 
       - name: Upload sandbox SARIF to Code Scanning
         if: hashFiles(env.SARIF_PATH) != ''
-        uses: github/codeql-action/upload-sarif@4187e74d05793876e9989daffde9c3e66b4acd07 # v3
+        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
         with:
           sarif_file: ${{ env.SARIF_PATH }}
           category: prefix-diff-sandbox
 
       - name: Archive sandbox SARIF + JSON
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: prefix-diff-sarif-sandbox
           path: |
@@ -245,7 +245,7 @@ jobs:
       TARGET_ENV: live
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Preflight — SUPABASE_DB_URL_LIVE configured
         uses: ./.github/actions/require-ci-secret
@@ -295,14 +295,14 @@ jobs:
 
       - name: Upload live SARIF to Code Scanning
         if: hashFiles(env.SARIF_PATH) != ''
-        uses: github/codeql-action/upload-sarif@4187e74d05793876e9989daffde9c3e66b4acd07 # v3
+        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
         with:
           sarif_file: ${{ env.SARIF_PATH }}
           category: prefix-diff-live
 
       - name: Archive live SARIF + JSON
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: prefix-diff-sarif-live
           path: |

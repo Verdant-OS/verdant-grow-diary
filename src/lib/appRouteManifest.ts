@@ -310,6 +310,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Operator edge-function metric trend charts (read-only).",
   },
   {
+    path: "/operator/mode",
+    access: "operator",
+    description: "Operator Mode landing surface.",
+  },
+  {
     path: "/operator/one-tent-live-proof",
     access: "operator",
     description: "Operator one-tent live proof page.",

@@ -920,6 +920,31 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
         continue;
       }
 
+      // Success on the fallback path only counts for the snapshotted element:
+      // an async re-render between the snapshot and the action can move the
+      // live nth() index to a look-alike sibling that accepts the same
+      // alternative, in which case the original was never exercised and must
+      // not be recorded as such.
+      if (!hasStableNamedControl) {
+        const exercisedPinnedNode = await stableControl
+          .evaluate(
+            (element, snapshotElement) => snapshotElement !== null && element === snapshotElement,
+            fallbackSnapshotHandle,
+            { timeout: 5_000 },
+          )
+          .catch(() => false);
+        if (!exercisedPinnedNode) {
+          audits.push({
+            route: route.path,
+            name,
+            type,
+            exercised: false,
+            reason: "a look-alike sibling absorbed the selection after a re-render",
+          });
+          continue;
+        }
+      }
+
       // A controlled filter can re-render the page and change the live nth()
       // locator during both verification and cleanup. Reacquire a uniquely
       // named control across renders, and restore only when the original option

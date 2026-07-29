@@ -103,16 +103,25 @@ describe("core link and form census rules", () => {
       "await stableControl.selectOption(alternative, { timeout: 5_000 });",
     );
     expect(CENSUS_SPEC_SOURCE).not.toContain("await expect(stableControl).toHaveValue(");
-    // Restoration goes through the pinned node first; the named locator is
-    // only a detachment fallback guarded by the logical-replacement check —
-    // a migrated name must never route the restore to a sibling.
+    // Restoration goes through the pinned node first and is VERIFIED for
+    // persistence like every other restore; the named locator is only a
+    // detachment fallback guarded by the logical-replacement check — a
+    // migrated name must never route the restore to a sibling, and an
+    // unrestorable exercised select fails the census.
+    expect(CENSUS_SPEC_SOURCE).toContain("async function selectAndVerify(");
     expect(CENSUS_SPEC_SOURCE).toContain("const pinnedHoldsOriginalOption = await snapshotTarget");
     expect(CENSUS_SPEC_SOURCE).toContain(
-      "await snapshotTarget.selectOption(original, { timeout: 5_000 }).catch(() => undefined);",
+      "selectRestored = await selectAndVerify(snapshotTarget, original);",
     );
     expect(CENSUS_SPEC_SOURCE).toContain("const namedHoldsAlternative = await stableControl");
     expect(CENSUS_SPEC_SOURCE).toContain(
-      "await stableControl.selectOption(original, { timeout: 5_000 }).catch(() => undefined);",
+      "selectRestored = await selectAndVerify(stableControl, original);",
+    );
+    // A non-persisting select restore ANNOTATES the exercised audit row
+    // rather than failing: action-selects legitimately consume a selection
+    // without round-tripping (the AI Doctor Saved-views applier).
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      '{ reason: "exercised; original value did not persist after restore" }',
     );
     expect(CENSUS_SPEC_SOURCE).not.toContain(
       "await control.selectOption(alternative, { timeout: 5_000 });",

@@ -800,6 +800,39 @@ async function fillAndVerify(
     .catch(() => false);
 }
 
+// Select analog of fillAndVerify: dispatch, poll the connected value, then
+// settle re-sample — a first matching sample is not stability.
+async function selectAndVerify(
+  target: Locator | ElementHandle<SVGElement | HTMLElement>,
+  value: string,
+): Promise<boolean> {
+  const selected = await target
+    .selectOption(value, { timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!selected) return false;
+  const matchedOnce = await expect
+    .poll(
+      () =>
+        target.evaluate((element) =>
+          element.isConnected ? (element as HTMLSelectElement).value : null,
+        ),
+      { timeout: 5_000 },
+    )
+    .toBe(value)
+    .then(() => true)
+    .catch(() => false);
+  if (!matchedOnce) return false;
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  return await target
+    .evaluate(
+      (element, expected) =>
+        element.isConnected && (element as HTMLSelectElement).value === expected,
+      value,
+    )
+    .catch(() => false);
+}
+
 async function isVisuallyHiddenImplementationControl(
   locator: Locator | ElementHandle<SVGElement | HTMLElement>,
 ): Promise<boolean> {
@@ -1144,33 +1177,7 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
             )
             .catch(() => false);
           if (liveHoldsAlternative) {
-            const selectionRestored = await control
-              .selectOption(original, { timeout: 5_000 })
-              .then(async () => {
-                const matchedOnce = await expect
-                  .poll(
-                    () =>
-                      control.evaluate((element) =>
-                        element.isConnected ? (element as HTMLSelectElement).value : null,
-                      ),
-                    { timeout: 5_000 },
-                  )
-                  .toBe(original)
-                  .then(() => true)
-                  .catch(() => false);
-                if (!matchedOnce) return false;
-                // Same settle re-sample as fillAndVerify: a first matching
-                // sample is not stability against a delayed revert.
-                await new Promise((resolve) => setTimeout(resolve, 250));
-                return await control
-                  .evaluate(
-                    (element, expected) =>
-                      element.isConnected && (element as HTMLSelectElement).value === expected,
-                    original,
-                  )
-                  .catch(() => false);
-              })
-              .catch(() => false);
+            const selectionRestored = await selectAndVerify(control, original);
             expect(
               selectionRestored,
               `${route.path} select "${name}" kept the census alternative and could not be restored`,
@@ -1218,8 +1225,9 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
           original,
         )
         .catch(() => false);
+      let selectRestored: boolean;
       if (pinnedHoldsOriginalOption) {
-        await snapshotTarget.selectOption(original, { timeout: 5_000 }).catch(() => undefined);
+        selectRestored = await selectAndVerify(snapshotTarget, original);
       } else if (hasStableNamedControl) {
         const namedHoldsAlternative = await stableControl
           .evaluate(
@@ -1229,10 +1237,33 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
           )
           .catch(() => false);
         if (namedHoldsAlternative) {
-          await stableControl.selectOption(original, { timeout: 5_000 }).catch(() => undefined);
+          selectRestored = await selectAndVerify(stableControl, original);
+        } else {
+          // Neither the pinned node nor a named logical replacement holds
+          // restorable state — the alternative vanished with its node, so
+          // nothing is owed; the displaced index gets its bounded re-audit.
+          selectRestored = true;
+          if (!(await liveIndexHoldsPinnedNode())) reauditIndexOnce();
         }
+      } else {
+        selectRestored = true;
+        if (!(await liveIndexHoldsPinnedNode())) reauditIndexOnce();
       }
-      audits.push({ route: route.path, name, type, exercised: true });
+      // A non-persisting restore is ANNOTATED, not fatal: action-selects
+      // legitimately consume a selection without round-tripping (observed on
+      // the AI Doctor "Saved views" applier, whose placeholder never
+      // returns). The annotation keeps the report honest, and the link
+      // phase's full-reload navigation plus its revisit retry bound the
+      // mutated-state risk.
+      audits.push({
+        route: route.path,
+        name,
+        type,
+        exercised: true,
+        ...(selectRestored
+          ? {}
+          : { reason: "exercised; original value did not persist after restore" }),
+      });
       continue;
     }
 

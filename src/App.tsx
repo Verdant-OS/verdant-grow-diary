@@ -500,6 +500,7 @@ const App = () => (
                       <Route path="/operator/edge-metrics" element={<OperatorEdgeMetrics />} />
                       <Route path="/operator/edge-alerts" element={<OperatorEdgeAlerts />} />
                       <Route path="/operator/schema-audit" element={<OperatorSchemaAudit />} />
+                      <Route path="/operator/mode" element={<OperatorMode />} />
 
                       <Route path="/operator/release-readiness" element={<ReleaseReadiness />} />
                       {/* Diagnostics Audience Split v1 — /diagnostics is an

@@ -42,9 +42,11 @@ function normalizeStringDetails(value: unknown): Record<string, string> {
 
 export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel }: Props) {
   const [busy, setBusy] = useState(false);
+  const [auditRpcMissing, setAuditRpcMissing] = useState(false);
   const submissionAttemptRef = useRef<BreedingSubmissionAttempt | null>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
+
 
   const handleSubmit = async (data: {
     plantId: string;

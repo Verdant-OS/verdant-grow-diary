@@ -90,3 +90,47 @@ export function buildCultivarBreadcrumbItems(
     { name: cultivar.name, url: `${origin}/cultivars/${cultivar.slug}` },
   ];
 }
+
+/**
+ * Safe fallback FAQ used when the requested cultivar profile is missing or
+ * partially populated. Keeps the page compliant (non-empty FAQPage JSON-LD)
+ * without inventing chemistry, lineage, or breeder claims for an unknown strain.
+ */
+export function buildCultivarFaqItemsSafe(
+  cultivar: VerdantCultivarProfile | null | undefined,
+): CultivarFaqItem[] {
+  if (!cultivar || !cultivar.name || !cultivar.name.trim()) {
+    return [
+      {
+        question: "Is this cultivar profile available?",
+        answer:
+          "This cultivar reference is not currently available. Verdant only publishes reported context for cultivars in its strain reference library — your own plant logs, stage, medium, and source-labeled sensors remain authoritative.",
+      },
+      {
+        question: "Will a missing reference page affect my grow?",
+        answer:
+          "No. Reference pages never create alerts, nutrient or irrigation actions, or guaranteed outcomes. Use your grow's diary and sensor snapshots as the source of truth.",
+      },
+    ];
+  }
+  return buildCultivarFaqItems(cultivar);
+}
+
+/**
+ * Safe fallback breadcrumbs when the cultivar profile is missing. Always
+ * returns at least Home + Library so the BreadcrumbList JSON-LD stays valid.
+ */
+export function buildCultivarBreadcrumbItemsSafe(
+  cultivar: VerdantCultivarProfile | null | undefined,
+  siteOrigin: string,
+): CultivarBreadcrumbItem[] {
+  const origin = siteOrigin.replace(/\/$/, "");
+  const base: CultivarBreadcrumbItem[] = [
+    { name: "Home", url: `${origin}/welcome` },
+    { name: "Strain Reference Library", url: `${origin}/cultivars` },
+  ];
+  if (cultivar && cultivar.name?.trim() && cultivar.slug?.trim()) {
+    base.push({ name: cultivar.name, url: `${origin}/cultivars/${cultivar.slug}` });
+  }
+  return base;
+}

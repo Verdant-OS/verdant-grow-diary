@@ -160,6 +160,47 @@ export function safeJsonLdStringify(data: unknown): string {
   return JSON.stringify(data).replace(/<\/(script)/gi, "<\\/$1");
 }
 
+/**
+ * Safe FAQPage builder that never throws on missing/empty copy. Filters out
+ * invalid entries and returns `null` when no valid question/answer pair remains,
+ * so presenters can simply skip emitting the JSON-LD <script> tag rather than
+ * crash the render.
+ */
+export function buildFaqPageJsonLdSafe({
+  pageUrl,
+  questions,
+}: {
+  pageUrl?: string;
+  questions: ReadonlyArray<FaqEntry> | null | undefined;
+}): FaqPageJsonLd | null {
+  if (!Array.isArray(questions) || questions.length === 0) return null;
+  const valid = questions.filter(
+    (q): q is FaqEntry =>
+      !!q && typeof q.question === "string" && !!q.question.trim() &&
+      typeof q.answer === "string" && !!q.answer.trim(),
+  );
+  if (valid.length === 0) return null;
+  return buildFaqPageJsonLd({ pageUrl, questions: valid });
+}
+
+/**
+ * Safe BreadcrumbList builder that drops items with missing names or
+ * non-absolute URLs instead of throwing. Returns `null` when nothing remains.
+ */
+export function buildBreadcrumbListJsonLdSafe({
+  items,
+}: {
+  items: ReadonlyArray<BreadcrumbListItem> | null | undefined;
+}): BreadcrumbListJsonLd | null {
+  if (!Array.isArray(items) || items.length === 0) return null;
+  const valid = items.filter(
+    (it): it is BreadcrumbListItem =>
+      !!it && !!it.name?.trim() && !!it.url && /^https?:\/\//i.test(it.url),
+  );
+  if (valid.length === 0) return null;
+  return buildBreadcrumbListJsonLd({ items: valid });
+}
+
 export interface ArticleJsonLd {
   readonly "@context": "https://schema.org";
   readonly "@type": "Article";

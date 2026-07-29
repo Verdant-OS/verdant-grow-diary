@@ -856,8 +856,12 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
           currentValue: select.value,
           // :disabled captures effective disablement — a direct attribute or
           // an ancestor <fieldset disabled> — matching what Playwright's
-          // actionability checks actually honor.
+          // actionability checks actually honor. Visibility mirrors
+          // Playwright's definition: a non-empty box without visibility
+          // hidden.
           controlDisabled: select.matches(":disabled"),
+          controlVisible:
+            select.getClientRects().length > 0 && getComputedStyle(select).visibility !== "hidden",
           options: Array.from(select.options, (option) => ({
             value: option.value,
             disabled: option.disabled,
@@ -926,6 +930,9 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
               // prove the failure was not a re-render replacing it.
               connected: select.isConnected,
               disabled: select.matches(":disabled"),
+              visible:
+                select.getClientRects().length > 0 &&
+                getComputedStyle(select).visibility !== "hidden",
               options: Array.from(select.options, (option) => ({
                 value: option.value,
                 disabled: option.disabled,
@@ -935,7 +942,11 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
           .catch(() => undefined);
         if (
           fallbackSelectExerciseFailureIsFatal(
-            { disabled: selectSnapshot.controlDisabled, options: selectSnapshot.options },
+            {
+              disabled: selectSnapshot.controlDisabled,
+              visible: selectSnapshot.controlVisible,
+              options: selectSnapshot.options,
+            },
             liveState,
             liveState?.connected ?? false,
           )

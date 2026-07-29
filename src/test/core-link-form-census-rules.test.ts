@@ -145,8 +145,13 @@ describe("core link and form census rules", () => {
 
   it("keeps a stable-but-broken fallback select fatal while downgrading verified churn", () => {
     const option = (value: string, disabled = false) => ({ value, disabled });
-    const state = (options: { value: string; disabled: boolean }[], disabled = false) => ({
+    const state = (
+      options: { value: string; disabled: boolean }[],
+      disabled = false,
+      visible = true,
+    ) => ({
       disabled,
+      visible,
       options,
     });
     const snapshot = state([option(""), option("all"), option("keep")]);
@@ -224,6 +229,25 @@ describe("core link and form census rules", () => {
       ),
     ).toBe(false);
 
+    // Visibility transitions are churn on either end: hidden when snapshotted
+    // (transition arrived after the visible check), or hidden by catch time
+    // (the action timed out on actionability, not a dropped value).
+    const hiddenSnapshot = state([option(""), option("all"), option("keep")], false, false);
+    expect(
+      fallbackSelectExerciseFailureIsFatal(
+        hiddenSnapshot,
+        state([option(""), option("all"), option("keep")], false, false),
+        true,
+      ),
+    ).toBe(false);
+    expect(
+      fallbackSelectExerciseFailureIsFatal(
+        snapshot,
+        state([option(""), option("all"), option("keep")], false, false),
+        true,
+      ),
+    ).toBe(false);
+
     // An element that cannot be resolved at all at catch time is churn.
     expect(fallbackSelectExerciseFailureIsFatal(snapshot, undefined, false)).toBe(false);
 
@@ -234,6 +258,10 @@ describe("core link and form census rules", () => {
     // ancestor <fieldset disabled>) — the same semantics Playwright honors.
     expect(CENSUS_SPEC_SOURCE).toContain('controlDisabled: select.matches(":disabled"),');
     expect(CENSUS_SPEC_SOURCE).toContain('disabled: select.matches(":disabled"),');
+    // Effective visibility is observed on both ends so a control hidden by an
+    // async transition reads as churn, not as a broken stable select.
+    expect(CENSUS_SPEC_SOURCE).toContain("controlVisible:");
+    expect(CENSUS_SPEC_SOURCE).toContain("visible: selectSnapshot.controlVisible,");
     expect(CENSUS_SPEC_SOURCE).toContain(
       "await stableControl.elementHandle({ timeout: 5_000 }).catch(() => null);",
     );

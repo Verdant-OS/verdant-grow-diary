@@ -156,7 +156,8 @@ describe("storage-failure honesty", () => {
   });
 
   it("a failed storage write shows the honest error instead of a saved card", () => {
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    const storagePrototype = Object.getPrototypeOf(window.localStorage) as Storage;
+    vi.spyOn(storagePrototype, "setItem").mockImplementation(() => {
       throw new Error("QuotaExceededError");
     });
     renderStarter();

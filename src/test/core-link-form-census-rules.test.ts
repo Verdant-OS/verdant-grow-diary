@@ -146,6 +146,12 @@ describe("core link and form census rules", () => {
     expect(CENSUS_SPEC_SOURCE).toContain(
       "Whatever displaced the pinned select at this index is unaudited",
     );
+    // A dispatched alternative is restored on the logical replacement (a live
+    // node still holding the alternative) before the census continues, and an
+    // unrestorable alternative fails the census — filters and derived state
+    // must not stay mutated for the rest of the route's audit.
+    expect(CENSUS_SPEC_SOURCE).toContain("const liveHoldsAlternative = await control");
+    expect(CENSUS_SPEC_SOURCE).toContain("kept the census alternative and could not be restored");
   });
 
   it("keeps a stable-but-broken fallback select fatal while downgrading verified churn", () => {

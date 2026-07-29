@@ -1118,6 +1118,43 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
         ) {
           throw error;
         }
+        // A dispatched alternative must not keep mutating filters and derived
+        // page state for the rest of the route's audit. Restore a live
+        // replacement that still reflects the dispatched alternative — the
+        // logical-replacement guard from the fill path — and fail if that
+        // state cannot be restored; a vanished selection owes nothing.
+        if (selectionDispatched) {
+          const liveHoldsAlternative = await control
+            .evaluate(
+              (element, expected) =>
+                element.isConnected && (element as HTMLSelectElement).value === expected,
+              alternative,
+              { timeout: 1_000 },
+            )
+            .catch(() => false);
+          if (liveHoldsAlternative) {
+            const selectionRestored = await control
+              .selectOption(original, { timeout: 5_000 })
+              .then(async () =>
+                expect
+                  .poll(
+                    () =>
+                      control.evaluate((element) =>
+                        element.isConnected ? (element as HTMLSelectElement).value : null,
+                      ),
+                    { timeout: 5_000 },
+                  )
+                  .toBe(original)
+                  .then(() => true)
+                  .catch(() => false),
+              )
+              .catch(() => false);
+            expect(
+              selectionRestored,
+              `${route.path} select "${name}" kept the census alternative and could not be restored`,
+            ).toBe(true);
+          }
+        }
         // Distinct reasons keep the census report honest about WHEN the churn
         // hit: after a dispatched selection, the page reacting with a
         // re-render is evidence the control is live (a handler that throws

@@ -113,10 +113,14 @@ describe("core link and form census rules", () => {
     expect(CENSUS_SPEC_SOURCE).toContain(
       "selectRestored = await selectAndVerify(snapshotTarget, original);",
     );
-    expect(CENSUS_SPEC_SOURCE).toContain("const namedHoldsAlternative = await stableControl");
+    expect(CENSUS_SPEC_SOURCE).toContain("const namedHoldsAlternative = hasStableNamedControl");
     expect(CENSUS_SPEC_SOURCE).toContain(
       "selectRestored = await selectAndVerify(stableControl, original);",
     );
+    // Success-then-remount: a live replacement carrying the snapshotted
+    // option list and the dispatched alternative is restored through the
+    // same logical-replacement guard as the catch path.
+    expect(CENSUS_SPEC_SOURCE).toContain("const liveReplacementHoldsAlternative = await control");
     // A non-persisting select restore ANNOTATES the exercised audit row
     // rather than failing: action-selects legitimately consume a selection
     // without round-tripping (the AI Doctor Saved-views applier).

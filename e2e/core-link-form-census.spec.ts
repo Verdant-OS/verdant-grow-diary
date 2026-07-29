@@ -1228,26 +1228,49 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
       let selectRestored: boolean;
       if (pinnedHoldsOriginalOption) {
         selectRestored = await selectAndVerify(snapshotTarget, original);
-      } else if (hasStableNamedControl) {
-        const namedHoldsAlternative = await stableControl
-          .evaluate(
-            (element, expected) => (element as HTMLSelectElement).value === expected,
-            alternative,
-            { timeout: 1_000 },
-          )
-          .catch(() => false);
+      } else {
+        const namedHoldsAlternative = hasStableNamedControl
+          ? await stableControl
+              .evaluate(
+                (element, expected) => (element as HTMLSelectElement).value === expected,
+                alternative,
+                { timeout: 1_000 },
+              )
+              .catch(() => false)
+          : false;
         if (namedHoldsAlternative) {
           selectRestored = await selectAndVerify(stableControl, original);
         } else {
-          // Neither the pinned node nor a named logical replacement holds
-          // restorable state — the alternative vanished with its node, so
-          // nothing is owed; the displaced index gets its bounded re-audit.
-          selectRestored = true;
+          // Success-then-remount without a usable named fallback: a live
+          // replacement at the index that carries the snapshotted option
+          // list AND still holds the dispatched alternative is the logical
+          // replacement (same guard as the catch path) and gets restored; a
+          // vanished selection owes nothing. Either way the displaced index
+          // gets its bounded re-audit.
+          const liveReplacementHoldsAlternative = await control
+            .evaluate(
+              (element, expected) => {
+                const select = element as HTMLSelectElement;
+                return (
+                  select.isConnected &&
+                  select.value === expected.alternative &&
+                  select.options.length === expected.options.length &&
+                  Array.from(select.options).every(
+                    (option, optionIndex) =>
+                      option.value === expected.options[optionIndex].value &&
+                      option.disabled === expected.options[optionIndex].disabled,
+                  )
+                );
+              },
+              { alternative, options: selectSnapshot.options },
+              { timeout: 1_000 },
+            )
+            .catch(() => false);
+          selectRestored = liveReplacementHoldsAlternative
+            ? await selectAndVerify(control, original)
+            : true;
           if (!(await liveIndexHoldsPinnedNode())) reauditIndexOnce();
         }
-      } else {
-        selectRestored = true;
-        if (!(await liveIndexHoldsPinnedNode())) reauditIndexOnce();
       }
       // A non-persisting restore is ANNOTATED, not fatal: action-selects
       // legitimately consume a selection without round-tripping (observed on

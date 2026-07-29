@@ -36,14 +36,25 @@ describe("index.html — primary SEO", () => {
     expect(meta(HTML, "name", "description")).toBe(DESC);
   });
 
-  it("bakes no single root canonical (per-route self-canonicals set client-side)", () => {
-    // A single root canonical baked into every SPA route makes /welcome,
-    // /pricing, etc. declare themselves duplicates of the homepage, which
-    // de-indexes them. Per-route self-canonicals are emitted client-side by
-    // usePageSeo; non-JS crawlers fall back to the request URL (the correct
-    // self-canonical). See the index.html comment + src/hooks/usePageSeo.ts.
-    expect(HTML).not.toMatch(/<link\s+rel="canonical"/);
-    expect(HTML).toMatch(/No hardcoded canonical here on purpose/);
+  it("bakes exactly one root self-canonical", () => {
+    // This assertion was previously inverted: it required NO canonical at all,
+    // because one baked canonical would have made /welcome, /pricing, etc.
+    // declare themselves duplicates of the homepage. That was correct only
+    // while the prerender pass was still deferred.
+    //
+    // It has since shipped, and buildStaticSocialRouteHtml REPLACES an existing
+    // canonical rather than appending one, so all 60+ prerendered routes
+    // overwrite this tag with their own. What kept the shell tag reaching real
+    // pages is gone; what it now reaches is "/" (never prerendered, and until
+    // now shipping to non-JS crawlers with no canonical whatsoever) and unknown
+    // URLs, which static SPA hosting answers with this shell at HTTP 200.
+    //
+    // The invariant this depends on — every sitemap URL except "/" is
+    // prerendered — is enforced in root-canonical-seo.test.ts. Do not relax
+    // this without reading that file.
+    const tags = HTML.match(/<link\b[^>]*rel=["']canonical["'][^>]*>/gi) ?? [];
+    expect(tags).toHaveLength(1);
+    expect(tags[0]).toContain('href="https://verdantgrowdiary.com"');
   });
 
   it("robots is index, follow", () => {

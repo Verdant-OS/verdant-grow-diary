@@ -315,6 +315,19 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
       "Reach the humans building Verdant. Support, bugs, hardware ideas, billing, or questions.",
     imageAlt: "Contact the Verdant team",
   }),
+  // Indexable public documentation. Without a pre-rendered doc this route
+  // inherits the shell's root canonical and declares itself a duplicate of
+  // the homepage to non-JS crawlers. Title/description mirror the page's own
+  // usePageSeo call (src/pages/McpApiReference.tsx) so hydration changes
+  // nothing. Deliberately STATIC_ONLY (not in sitemap.xml) — advertising it
+  // is a separate acquisition decision; this entry only makes its canonical
+  // truthful.
+  publicDocument("/docs/mcp-api", {
+    title: "Verdant Grow OS MCP API Reference | Tools, Parameters, Safety",
+    description:
+      "Reference for the Verdant Grow OS MCP server: list_grows, list_recent_diary_entries, and get_latest_sensor_snapshot — parameters, response examples, and safety invariants.",
+    imageAlt: "Verdant Grow OS MCP API reference",
+  }),
 ];
 
 const GUIDE_DOCUMENTS = VERDANT_SEO_GUIDES.map((guide) =>

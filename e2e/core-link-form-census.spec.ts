@@ -840,7 +840,10 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
         const select = element as HTMLSelectElement;
         return {
           currentValue: select.value,
-          controlDisabled: select.disabled,
+          // :disabled captures effective disablement — a direct attribute or
+          // an ancestor <fieldset disabled> — matching what Playwright's
+          // actionability checks actually honor.
+          controlDisabled: select.matches(":disabled"),
           options: Array.from(select.options, (option) => ({
             value: option.value,
             disabled: option.disabled,
@@ -883,7 +886,7 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
               const select = element as HTMLSelectElement;
               return {
                 sameElement: snapshotElement !== null && element === snapshotElement,
-                disabled: select.disabled,
+                disabled: select.matches(":disabled"),
                 options: Array.from(select.options, (option) => ({
                   value: option.value,
                   disabled: option.disabled,

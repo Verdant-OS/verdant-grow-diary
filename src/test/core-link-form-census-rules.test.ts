@@ -216,7 +216,10 @@ describe("core link and form census rules", () => {
     // The census spec must actually consult the helper on the fallback path,
     // feeding it the pinned-node identity signal and the control state.
     expect(CENSUS_SPEC_SOURCE).toContain("fallbackSelectExerciseFailureIsFatal(");
-    expect(CENSUS_SPEC_SOURCE).toContain("controlDisabled: select.disabled,");
+    // Effective disablement (:disabled matches direct attributes AND an
+    // ancestor <fieldset disabled>) — the same semantics Playwright honors.
+    expect(CENSUS_SPEC_SOURCE).toContain('controlDisabled: select.matches(":disabled"),');
+    expect(CENSUS_SPEC_SOURCE).toContain('disabled: select.matches(":disabled"),');
     expect(CENSUS_SPEC_SOURCE).toContain(
       "await stableControl.elementHandle({ timeout: 5_000 }).catch(() => null);",
     );

@@ -1756,16 +1756,25 @@ export default function Timeline() {
         <AlertEventsSection events={alertEvents} />
       </div>
 
-      {pageReadView.kind === "ready_empty" ? (
-        <Empty title="No entries yet" desc="Tap the + button to log your first photo and note." />
-      ) : entries.length === 0 ? null : filtered.length === 0 ? (
-        <Empty
-          title={evidenceActive ? TIMELINE_EVIDENCE_EMPTY_TITLE : "No matching entries"}
-          desc={
-            evidenceActive ? TIMELINE_EVIDENCE_EMPTY_DESC : "Try a different stage or event filter."
+      {pageReadView.kind === "ready_empty" || (entries.length > 0 && filtered.length === 0) ? (
+        <TimelineEmptyState
+          view={
+            resolveTimelineEmptyState({
+              totalEntryCount: pageReadView.kind === "ready_empty" ? 0 : entries.length,
+              filteredEntryCount: filtered.length,
+              evidenceFilterActive: evidenceActive,
+              otherFiltersActive: stageFilter !== "all" || eventFilter !== "all" || evidenceActive,
+              context: fastAddContext,
+            }) ?? TIMELINE_EMPTY_STATE_FALLBACK
           }
+          context={fastAddContext}
+          onClearFilters={() => {
+            clearEvidenceFilters();
+            setStageFilter("all");
+            setEventFilter("all");
+          }}
         />
-      ) : (
+      ) : entries.length === 0 ? null : (
         <div className="space-y-5">
           {groupedByStage.map((group, gi) => (
             <section key={`${group.stage}-${gi}`}>

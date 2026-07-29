@@ -557,18 +557,23 @@ export function selectAvailableAlternativeValue(
 
 /**
  * Decides whether an exercise failure on a fallback select (one with no
- * unique accessible-name locator) is a real product defect or verified
- * locator churn. Identical live options mean the element never churned — the
- * alternative was selectable the whole time and the value simply did not
- * stick, so the failure must stay fatal. Changed options, or an element that
- * can no longer be resolved (`undefined`), prove the live nth() query was
- * swapped mid-exercise, which downgrades to an unexercised audit entry.
+ * unique accessible-name locator) is a real product defect or locator churn.
+ * Fatal requires positive proof the exercised element stayed put: the live
+ * nth() query must still resolve to the very DOM node that was snapshotted
+ * (`liveElementIsSnapshotElement` — repeated selects can share an identical
+ * option list, so option equality alone cannot prove identity) AND that
+ * node's options must still match the snapshot (a re-render can mutate a
+ * reused node's options in place). Only then did the value fail to stick on
+ * a stable select — a broken onChange. Any missing proof (a different node,
+ * changed options, or an element that can no longer be resolved) is churn
+ * and downgrades to an unexercised audit entry.
  */
 export function fallbackSelectExerciseFailureIsFatal(
   snapshotOptionValues: readonly string[],
   liveOptionValues: readonly string[] | undefined,
+  liveElementIsSnapshotElement: boolean,
 ): boolean {
-  if (!liveOptionValues) return false;
+  if (!liveElementIsSnapshotElement || !liveOptionValues) return false;
   return (
     liveOptionValues.length === snapshotOptionValues.length &&
     liveOptionValues.every((value, index) => value === snapshotOptionValues[index])

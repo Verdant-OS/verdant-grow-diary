@@ -848,6 +848,14 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
         });
         continue;
       }
+      // Pin the DOM node a fallback select resolves to before exercising it:
+      // repeated selects can share an identical option list, so on failure
+      // only node identity can distinguish "the nth() index moved to a
+      // look-alike sibling" (churn) from "this very element dropped the
+      // value" (product defect).
+      const fallbackSnapshotHandle = hasStableNamedControl
+        ? null
+        : await stableControl.elementHandle({ timeout: 5_000 }).catch(() => null);
       try {
         await stableControl.selectOption(alternative, { timeout: 5_000 });
         await expect(stableControl).toHaveValue(alternative, { timeout: 5_000 });
@@ -860,21 +868,27 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
         // a uniquely named control survives re-renders, so its failure is
         // real and still fails the census.
         if (hasStableNamedControl) throw error;
-        // Only verified churn downgrades. Re-read the live element's options
-        // and let the pure decision helper judge: identical options mean a
-        // broken onChange, not churn, and the failure must stay fatal.
-        const liveOptionValues = await stableControl
+        // Only proven stability stays fatal. Re-read the live element and let
+        // the pure decision helper judge: the same pinned DOM node still
+        // showing the snapshotted options means a broken onChange, not churn.
+        const liveState = await stableControl
           .evaluate(
-            (element) =>
-              Array.from((element as HTMLSelectElement).options, (option) => option.value),
-            undefined,
+            (element, snapshotElement) => ({
+              sameElement: snapshotElement !== null && element === snapshotElement,
+              optionValues: Array.from(
+                (element as HTMLSelectElement).options,
+                (option) => option.value,
+              ),
+            }),
+            fallbackSnapshotHandle,
             { timeout: 5_000 },
           )
           .catch(() => undefined);
         if (
           fallbackSelectExerciseFailureIsFatal(
             selectSnapshot.options.map((option) => option.value),
-            liveOptionValues,
+            liveState?.optionValues,
+            liveState?.sameElement ?? false,
           )
         ) {
           throw error;

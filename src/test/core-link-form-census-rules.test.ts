@@ -114,21 +114,32 @@ describe("core link and form census rules", () => {
   it("keeps a stable-but-broken fallback select fatal while downgrading verified churn", () => {
     const snapshot = ["", "all", "keep"];
 
-    // Identical live options: the element never churned, so a value that did
-    // not stick is a broken onChange and the census must keep failing.
-    expect(fallbackSelectExerciseFailureIsFatal(snapshot, ["", "all", "keep"])).toBe(true);
+    // The same pinned DOM node still showing the snapshotted options never
+    // churned, so a value that did not stick is a broken onChange and the
+    // census must keep failing.
+    expect(fallbackSelectExerciseFailureIsFatal(snapshot, ["", "all", "keep"], true)).toBe(true);
 
-    // Fewer, extra, or renamed options prove the live nth() query resolved a
-    // swapped element mid-exercise — verified churn, downgrade.
-    expect(fallbackSelectExerciseFailureIsFatal(snapshot, ["", "all"])).toBe(false);
-    expect(fallbackSelectExerciseFailureIsFatal(snapshot, ["", "all", "keep", "cull"])).toBe(false);
-    expect(fallbackSelectExerciseFailureIsFatal(snapshot, ["", "all", "cull"])).toBe(false);
+    // Identical options on a DIFFERENT node: the nth() index moved to a
+    // look-alike sibling (repeated selects share option lists) — churn.
+    expect(fallbackSelectExerciseFailureIsFatal(snapshot, ["", "all", "keep"], false)).toBe(false);
 
-    // An element that cannot be resolved at all at catch time is churn too.
-    expect(fallbackSelectExerciseFailureIsFatal(snapshot, undefined)).toBe(false);
+    // The same node whose options were rewritten in place by a re-render
+    // (fewer, extra, or renamed) is churn too, not a defect.
+    expect(fallbackSelectExerciseFailureIsFatal(snapshot, ["", "all"], true)).toBe(false);
+    expect(fallbackSelectExerciseFailureIsFatal(snapshot, ["", "all", "keep", "cull"], true)).toBe(
+      false,
+    );
+    expect(fallbackSelectExerciseFailureIsFatal(snapshot, ["", "all", "cull"], true)).toBe(false);
 
-    // The census spec must actually consult the helper on the fallback path.
+    // An element that cannot be resolved at all at catch time is churn.
+    expect(fallbackSelectExerciseFailureIsFatal(snapshot, undefined, false)).toBe(false);
+
+    // The census spec must actually consult the helper on the fallback path,
+    // feeding it the pinned-node identity signal.
     expect(CENSUS_SPEC_SOURCE).toContain("fallbackSelectExerciseFailureIsFatal(");
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      "await stableControl.elementHandle({ timeout: 5_000 }).catch(() => null);",
+    );
   });
 
   it("settles a transiently unnamed control before asserting it lacks a user-facing name", () => {

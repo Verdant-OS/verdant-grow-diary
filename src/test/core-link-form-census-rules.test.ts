@@ -286,12 +286,15 @@ describe("core link and form census rules", () => {
     expect(CENSUS_SPEC_SOURCE).toContain(
       "name = normalizeText(await accessibleNameForControl(unnamedHandle)",
     );
-    // A pinned node that DETACHED may have a live replacement at its index;
-    // the index is re-audited once (bounded by the set) so an unnamed
-    // replacement cannot slip through unaudited.
+    // An index whose live element is no longer the pinned node — detached OR
+    // displaced by a visible replacement — is re-audited once (bounded by the
+    // set) so an unnamed replacement cannot slip through unaudited.
     expect(CENSUS_SPEC_SOURCE).toContain("const reauditedUnnamedIndexes = new Set<number>();");
     expect(CENSUS_SPEC_SOURCE).toContain(
-      "if (!pinnedState.connected && !reauditedUnnamedIndexes.has(index)) {",
+      ".evaluate((element, pinned) => pinned !== null && element === pinned, unnamedHandle, {",
+    );
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      "if (!indexStillPinnedNode && !reauditedUnnamedIndexes.has(index)) {",
     );
     expect(CENSUS_SPEC_SOURCE).toContain("index -= 1;");
   });

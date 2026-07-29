@@ -818,7 +818,17 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
               .catch(() => ({ connected: false, visible: false }))
           : { connected: false, visible: false };
         if (!(pinnedState.connected && pinnedState.visible)) {
-          if (!pinnedState.connected && !reauditedUnnamedIndexes.has(index)) {
+          // Re-audit once if the live index no longer resolves to the pinned
+          // node — whether it detached or a visible replacement displaced a
+          // connected-but-hidden predecessor — so an unnamed replacement
+          // cannot escape the census. An index still holding the pinned
+          // (hidden or gone) node has nothing else to audit.
+          const indexStillPinnedNode = await control
+            .evaluate((element, pinned) => pinned !== null && element === pinned, unnamedHandle, {
+              timeout: 1_000,
+            })
+            .catch(() => false);
+          if (!indexStillPinnedNode && !reauditedUnnamedIndexes.has(index)) {
             reauditedUnnamedIndexes.add(index);
             index -= 1;
           }

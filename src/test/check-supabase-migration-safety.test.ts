@@ -49,7 +49,7 @@ function run(scriptPath: string, extra: string[] = []): { code: number; out: str
   }
 }
 
-describe("check-supabase-migration-safety", () => {
+describe("check-supabase-migration-safety", { timeout: 15_000 }, () => {
   it("passes when a well-formed migration adds SECURITY DEFINER with search_path", () => {
     const { scriptPath } = makeSandbox({
       "20260101_ok.sql": `

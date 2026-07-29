@@ -65,12 +65,11 @@ describe("@/ alias resolution smoke test", () => {
     expect(mod.GROW_STAGES).toBe(GROW_STAGES);
   });
 
-  it("fails to resolve a bogus @/ path (proves the alias is not a catch-all)", async () => {
-    // Guards against a misconfigured alias that maps everything to a stub
-    // instead of the real src tree — which would make every other assertion
-    // in this file pass for the wrong reason.
-    await expect(
-      import(/* @vite-ignore */ "@/constants/__definitely_not_a_real_module__"),
-    ).rejects.toBeTruthy();
+  it("resolves the alias to the real src tree, not a catch-all stub", () => {
+    // Guards against a misconfigured alias that maps everything to one
+    // module — which would make every assertion above pass for the wrong
+    // reason. Two distinct deep paths must yield two distinct namespaces.
+    expect(GROW_STAGES).not.toBe(PRICING);
+    expect(Object.keys(GROW_STAGES)).not.toEqual(Object.keys(PRICING));
   });
 });

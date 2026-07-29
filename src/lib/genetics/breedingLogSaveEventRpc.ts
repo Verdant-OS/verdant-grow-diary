@@ -75,8 +75,13 @@ export const BREEDING_LOG_SAVE_EVENT_REASON_COPY: Readonly<
   plant_cross_grow: "That plant is attached to a different grow than its tent.",
   tent_not_in_grow: "That tent isn't part of the selected grow.",
   plant_not_in_tent: "That plant isn't in the selected tent.",
+  // A conflict proves the server already holds a committed record for this
+  // submission, so "save again" was the one instruction that could not work.
+  // Point the grower at the timeline to check, and be explicit that saving
+  // again adds a SECOND entry rather than retrying the first.
   idempotency_key_conflict:
-    "This looks like a repeat submission with different details. Review the form and save again.",
+    "An earlier attempt at this submission may already have been recorded. " +
+    "Open this grow's timeline to check — saving again adds a separate entry.",
   save_failed: "The event could not be saved. Nothing was recorded — please try again.",
 });
 

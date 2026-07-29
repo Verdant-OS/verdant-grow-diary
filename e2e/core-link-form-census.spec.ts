@@ -782,7 +782,7 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
     "input:not([type='hidden']), textarea, select, [contenteditable='true']",
   );
   const audits: FieldAudit[] = [];
-  const reauditedUnnamedIndexes = new Set<number>();
+  const reauditedIndexes = new Set<number>();
 
   for (let index = 0; index < (await controls.count()); index += 1) {
     const control = controls.nth(index);
@@ -833,8 +833,8 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
               timeout: 1_000,
             })
             .catch(() => false);
-          if (!indexStillPinnedNode && !reauditedUnnamedIndexes.has(index)) {
-            reauditedUnnamedIndexes.add(index);
+          if (!indexStillPinnedNode && !reauditedIndexes.has(index)) {
+            reauditedIndexes.add(index);
             index -= 1;
           }
           continue;
@@ -846,8 +846,25 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
       "",
     );
 
-    const disabled = await control.isDisabled().catch(() => false);
-    const editable = await control.isEditable().catch(() => false);
+    // The audited identity is the pinned node. If a reorder moved the live
+    // index off it, every later check and action would describe a DIFFERENT
+    // control under this name and type — re-audit the index once instead of
+    // misattributing.
+    if (pinnedControl) {
+      const indexStillPinned = await control
+        .evaluate((element, pinned) => element === pinned, pinnedControl, { timeout: 1_000 })
+        .catch(() => false);
+      if (!indexStillPinned) {
+        if (!reauditedIndexes.has(index)) {
+          reauditedIndexes.add(index);
+          index -= 1;
+        }
+        continue;
+      }
+    }
+
+    const disabled = await (pinnedControl ?? control).isDisabled().catch(() => false);
+    const editable = await (pinnedControl ?? control).isEditable().catch(() => false);
     if (
       route.fieldPolicy === "audit-only" ||
       disabled ||

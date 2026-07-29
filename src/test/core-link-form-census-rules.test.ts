@@ -292,15 +292,28 @@ describe("core link and form census rules", () => {
     expect(CENSUS_SPEC_SOURCE).toContain(
       "const type = await controlType(pinnedControl ?? control);",
     );
+    // After the name/type reads, an identity gate re-audits the index once if
+    // the live element is no longer the pinned node, and the actionability
+    // reads go through the pinned node — later checks and actions can never
+    // describe a different control than the one named above.
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      ".evaluate((element, pinned) => element === pinned, pinnedControl, { timeout: 1_000 })",
+    );
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      "const disabled = await (pinnedControl ?? control).isDisabled().catch(() => false);",
+    );
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      "const editable = await (pinnedControl ?? control).isEditable().catch(() => false);",
+    );
     // An index whose live element is no longer the pinned node — detached OR
     // displaced by a visible replacement — is re-audited once (bounded by the
     // set) so an unnamed replacement cannot slip through unaudited.
-    expect(CENSUS_SPEC_SOURCE).toContain("const reauditedUnnamedIndexes = new Set<number>();");
+    expect(CENSUS_SPEC_SOURCE).toContain("const reauditedIndexes = new Set<number>();");
     expect(CENSUS_SPEC_SOURCE).toContain(
       ".evaluate((element, pinned) => pinned !== null && element === pinned, pinnedControl, {",
     );
     expect(CENSUS_SPEC_SOURCE).toContain(
-      "if (!indexStillPinnedNode && !reauditedUnnamedIndexes.has(index)) {",
+      "if (!indexStillPinnedNode && !reauditedIndexes.has(index)) {",
     );
     expect(CENSUS_SPEC_SOURCE).toContain("index -= 1;");
   });

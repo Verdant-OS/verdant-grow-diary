@@ -68,4 +68,29 @@ describe("OperatorSchemaAudit trust states", () => {
     );
     expect(screen.queryByText(/Complete snapshot:/)).not.toBeInTheDocument();
   });
+it('shows the actionable fallback when the audit RPC is not live yet', async () => {
+    rpc.mockResolvedValueOnce({
+      data: null,
+      error: { code: 'PGRST202', message: 'Could not find the function in the schema cache' },
+    });
+    render(<OperatorSchemaAudit />);
+
+    const panel = await screen.findByTestId('schema-audit-rpc-unavailable');
+    expect(panel).toBeInTheDocument();
+    // Names the next action instead of dumping the PostgREST string.
+    expect(screen.getByTestId('schema-audit-rpc-unavailable-steps')).toBeInTheDocument();
+    expect(screen.getByTestId('schema-audit-rpc-unavailable-retry')).toBeInTheDocument();
+    expect(screen.queryByText('PGRST202')).not.toBeInTheDocument();
+    // Must never read as a verified audit.
+    expect(screen.queryByText(/Complete snapshot:/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('schema-audit-trust-state')).toHaveAttribute('data-state', 'error');
+  });
+
+  it('keeps the generic error card for a real permission failure', async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: { code: '42501', message: 'permission denied' } });
+    render(<OperatorSchemaAudit />);
+
+    await waitFor(() => expect(screen.getByText('Audit unavailable')).toBeInTheDocument());
+    expect(screen.queryByTestId('schema-audit-rpc-unavailable')).not.toBeInTheDocument();
+  });
 });

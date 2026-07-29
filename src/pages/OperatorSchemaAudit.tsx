@@ -35,6 +35,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { usePageSeo } from "@/hooks/usePageSeo";
+import {
+  isMissingOrStaleRpc,
+  RPC_MISSING_OR_STALE_COPY,
+} from "@/lib/supabaseRpcAvailability";
 import SchemaAuditMigrationDrilldown from "@/components/SchemaAuditMigrationDrilldown";
 import { evaluateRlsAudit, rlsPostureForTable, summarizeRlsFindings } from "@/lib/rlsAuditRules";
 import {
@@ -145,6 +149,9 @@ export default function OperatorSchemaAudit() {
   const [data, setData] = useState<SchemaAuditResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // True when the audit RPC itself is absent/stale on this project, as opposed
+  // to a transport or permission failure. Drives the actionable fallback panel.
+  const [rpcUnavailable, setRpcUnavailable] = useState(false);
   const [openMigration, setOpenMigration] = useState<MigrationAuditRow | null>(null);
   const [migrationSearch, setMigrationSearch] = useState("");
   const [migrationStatusFilter, setMigrationStatusFilter] = useState<"all" | "applied" | "missing">(
@@ -167,8 +174,16 @@ export default function OperatorSchemaAudit() {
         _columns: REQUIRED_COLUMNS.map((c) => ({ table: c.table, column: c.column })),
       });
       if (rpcError) {
+        // Distinguish "the audit function isn't live on this project yet"
+        // (reviewed migration merged but not applied, or a stale API schema
+        // cache) from a genuine failure. The former gets an actionable panel
+        // instead of a raw PostgREST string, and clears any previous result
+        // so nothing stale can be read as verified.
+        setRpcUnavailable(isMissingOrStaleRpc(rpcError));
         setError(rpcError.message);
+        setData(null);
       } else {
+        setRpcUnavailable(false);
         setData(rpcData);
       }
     } catch (e) {
@@ -399,7 +414,48 @@ export default function OperatorSchemaAudit() {
         </CardContent>
       </Card>
 
-      {error && (
+      {error && rpcUnavailable && (
+        <Card className="border-amber-500/40" data-testid="schema-audit-rpc-unavailable">
+          <CardContent className="p-4 flex items-start gap-2 text-sm">
+            <AlertTriangle className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" />
+            <div className="min-w-0 space-y-2">
+              <div className="font-medium text-amber-200">
+                {RPC_MISSING_OR_STALE_COPY.title}
+              </div>
+              <p className="text-muted-foreground">{RPC_MISSING_OR_STALE_COPY.body}</p>
+              <div>
+                <div className="text-xs font-medium text-foreground/80">
+                  {RPC_MISSING_OR_STALE_COPY.nextActionLabel}
+                </div>
+                <ol
+                  className="mt-1 list-decimal space-y-0.5 pl-4 text-xs text-muted-foreground"
+                  data-testid="schema-audit-rpc-unavailable-steps"
+                >
+                  {RPC_MISSING_OR_STALE_COPY.nextActionSteps.map((step) => (
+                    <li key={step}>{step}</li>
+                  ))}
+                </ol>
+              </div>
+              <Button
+                onClick={() => void load()}
+                disabled={loading}
+                variant="outline"
+                size="sm"
+                data-testid="schema-audit-rpc-unavailable-retry"
+              >
+                {loading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" />
+                )}
+                <span className="ml-1.5">Re-run this check</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {error && !rpcUnavailable && (
         <Card className="border-destructive/40">
           <CardContent className="p-4 flex items-start gap-2 text-sm">
             <AlertTriangle className="h-4 w-4 text-destructive mt-0.5" />

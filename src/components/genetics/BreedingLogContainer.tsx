@@ -6,6 +6,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { BreedingEventType } from "@/lib/genetics/breedingTypes";
 import { emitBreedingAuditEvent } from "@/lib/genetics/breedingAuditLog";
 import {
+  BREEDING_LOG_SAVE_EVENT_COPY,
+  BREEDING_LOG_SAVE_EVENT_UNAVAILABLE_COPY,
+  callBreedingLogSaveEvent,
+} from "@/lib/genetics/breedingLogSaveEventRpc";
+import {
   resolveBreedingSubmissionAttempt,
   type BreedingSubmissionAttempt,
 } from "@/lib/genetics/breedingSubmissionIdempotencyRules";
@@ -72,35 +77,33 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
       );
       submissionAttemptRef.current = attempt;
 
-      const { data: rpcData, error: rpcError } = await (supabase.rpc as unknown as (
-        fn: string,
-        args: Record<string, unknown>,
-      ) => Promise<{ data: unknown; error: { message: string } | null }>)(
-        "breeding_log_save_event",
-        {
-          p_idempotency_key: attempt.idempotencyKey,
-          p_grow_id: activeGrowId,
-          p_plant_id: data.plantId,
-          p_event_type: data.subType,
-          p_tent_id: selectedPlant?.tent_id ?? null,
-          p_method: method,
-          p_intensity: intensity,
-          p_details: details,
-        },
-      );
+      // Typed seam: argument shape, result union, and the "RPC isn't live on
+      // this project yet" case all come from the wrapper, so no local cast is
+      // needed here and refusals carry a known reason instead of a raw
+      // PostgREST string.
+      const outcome = await callBreedingLogSaveEvent(supabase, {
+        p_idempotency_key: attempt.idempotencyKey,
+        p_grow_id: activeGrowId,
+        p_plant_id: data.plantId,
+        p_event_type: data.subType,
+        p_tent_id: selectedPlant?.tent_id ?? null,
+        p_method: method,
+        p_intensity: intensity,
+        p_details: details,
+      });
 
-      if (rpcError) {
-        throw new Error(`Failed to save event: ${rpcError.message}`);
+      if (outcome.status === "rpc_unavailable") {
+        // Keep the attempt so a retry after the migration lands reuses the
+        // same idempotency key rather than risking a duplicate event.
+        throw new Error(BREEDING_LOG_SAVE_EVENT_UNAVAILABLE_COPY);
       }
-      const result = rpcData as {
-        ok?: boolean;
-        grow_event_id?: string;
-        reason?: string;
-      } | null;
-      if (!result?.ok || !result.grow_event_id) {
-        throw new Error(`Failed to save event: ${result?.reason ?? "unknown_error"}`);
+      if (outcome.status === "failed") {
+        throw new Error(`Failed to save event: ${outcome.message}`);
       }
-      const eventId = result.grow_event_id;
+      if (outcome.status === "refused") {
+        throw new Error(BREEDING_LOG_SAVE_EVENT_COPY[outcome.reason]);
+      }
+      const eventId = outcome.growEventId;
       submissionAttemptRef.current = null;
 
       // 2. Suggestions are a separate, explicit grower choice. The event still

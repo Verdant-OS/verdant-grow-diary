@@ -278,7 +278,8 @@
     "check:client-secret-boundary-ci": "node scripts/check-client-secret-boundary-ci.mjs",
     "check:client-secret-boundary-artifacts": "node scripts/check-client-secret-boundary-artifacts.mjs",
     "test:check-client-secret-boundary-artifacts": "node scripts/test-check-client-secret-boundary-artifacts.mjs",
-    "check:jsonld-id-canonical-parity": "node scripts/validate-jsonld-id-canonical-parity.mjs dist"
+    "check:jsonld-id-canonical-parity": "node scripts/validate-jsonld-id-canonical-parity.mjs dist",
+    "typecheck:tsgo": "tsgo --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -351,6 +352,7 @@
     "@types/node": "^22.16.5",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
+    "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "@vitejs/plugin-react-swc": "^3.11.0",
     "autoprefixer": "^10.4.21",
     "axe-core": "^4.12.0",

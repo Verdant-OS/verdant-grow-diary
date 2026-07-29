@@ -21,6 +21,7 @@ import CreatePlantDialog from "@/components/CreatePlantDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
+import FastAddPendingBanner from "@/components/FastAddPendingBanner";
 import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
 import PlantPhoto from "@/components/PlantPhoto";
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
@@ -98,7 +99,7 @@ export default function Plants() {
     error: growsError = null,
     refresh: refreshGrows,
   } = useGrows();
-  const validGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
+  const validGrowId = isValidScopedGrow ? (urlGrowId ?? undefined) : undefined;
   const scopeState = classifyPlantsScopeState({
     hasRequestedGrow: !!urlGrowId,
     isLoading: growsLoading,
@@ -290,6 +291,7 @@ export default function Plants() {
         current="Plants"
         section="plants"
       />
+      <FastAddPendingBanner search={searchParams.toString()} target="plant" />
       <PageHeader
         title="Plants"
         description="Every plant you're tracking, across every tent."

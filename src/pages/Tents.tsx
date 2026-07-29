@@ -11,6 +11,7 @@ import TentCardActionsMenu from "@/components/TentCardActionsMenu";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
+import FastAddPendingBanner from "@/components/FastAddPendingBanner";
 import { useGrowPlants } from "@/hooks/useGrowData";
 import { useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
@@ -118,6 +119,7 @@ export default function Tents() {
         current="Tents"
         section="tents"
       />
+      <FastAddPendingBanner search={searchParams.toString()} target="tent" />
       <PageHeader
         title="Tents"
         description="Your grow tents — environment, lighting, and assigned plants."

@@ -10,6 +10,10 @@ import {
   type BreedingSubmissionAttempt,
 } from "@/lib/genetics/breedingSubmissionIdempotencyRules";
 import { useAuth } from "@/store/auth";
+import { saveBreedingLogEvent } from "@/lib/genetics/breedingLogSaveEventRpc";
+import AuditRpcOutOfSyncNotice, {
+  BREEDING_AUDIT_RPC_OUT_OF_SYNC_MESSAGE,
+} from "./AuditRpcOutOfSyncNotice";
 
 interface Props {
   activeGrowId: string;
@@ -36,6 +40,7 @@ function normalizeStringDetails(value: unknown): Record<string, string> {
 
 export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel }: Props) {
   const [busy, setBusy] = useState(false);
+  const [auditRpcOutOfSync, setAuditRpcOutOfSync] = useState(false);
   const submissionAttemptRef = useRef<BreedingSubmissionAttempt | null>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -72,7 +77,7 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
       );
       submissionAttemptRef.current = attempt;
 
-      const { data: rpcData, error: rpcError } = await supabase.rpc("breeding_log_save_event", {
+      const outcome = await saveBreedingLogEvent(supabase, {
         p_idempotency_key: attempt.idempotencyKey,
         p_grow_id: activeGrowId,
         p_plant_id: data.plantId,
@@ -83,18 +88,14 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
         p_details: details,
       });
 
-      if (rpcError) {
-        throw new Error(`Failed to save event: ${rpcError.message}`);
+      if (outcome.status === "schema_out_of_sync") {
+        setAuditRpcOutOfSync(true);
+        throw new Error(BREEDING_AUDIT_RPC_OUT_OF_SYNC_MESSAGE);
       }
-      const result = rpcData as {
-        ok?: boolean;
-        grow_event_id?: string;
-        reason?: string;
-      } | null;
-      if (!result?.ok || !result.grow_event_id) {
-        throw new Error(`Failed to save event: ${result?.reason ?? "unknown_error"}`);
+      if (outcome.status !== "saved") {
+        throw new Error(`Failed to save event: ${outcome.reason}`);
       }
-      const eventId = result.grow_event_id;
+      const eventId = outcome.growEventId;
       submissionAttemptRef.current = null;
 
       // 2. Suggestions are a separate, explicit grower choice. The event still
@@ -158,6 +159,7 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
 
   return (
     <div className="space-y-4">
+      <AuditRpcOutOfSyncNotice visible={auditRpcOutOfSync} />
       <div className="rounded-lg border border-pink-500/30 bg-pink-500/5 p-4">
         <h3 className="text-sm font-medium text-pink-400 mb-2">Breeding Event</h3>
         <p className="text-xs text-muted-foreground mb-4">

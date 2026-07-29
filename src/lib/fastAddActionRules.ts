@@ -88,6 +88,60 @@ export const FAST_ADD_PICKER_CTAS = [
 ] as const;
 export type FastAddPickerCtaId = (typeof FAST_ADD_PICKER_CTAS)[number]["id"];
 
+/** Query param that carries a pending Quick Log action through the picker. */
+export const FAST_ADD_PARAM = "fastAdd";
+
+export interface FastAddPickerCta {
+  id: FastAddPickerCtaId;
+  label: string;
+  to: string;
+}
+
+/**
+ * Picker CTAs that preserve the pending action, so a grower who detours
+ * through /plants or /tents does not silently lose their Quick Log intent.
+ *
+ * Pure — builds plain paths only. Performs no navigation and no writes.
+ * Unknown/absent actions degrade to the bare picker path.
+ */
+export function buildFastAddPickerCtas(
+  actionId: FastAddActionId | null | undefined,
+): readonly FastAddPickerCta[] {
+  const known =
+    actionId && FAST_ADD_ACTIONS.some((a) => a.id === actionId)
+      ? (actionId as FastAddActionId)
+      : null;
+  const suffix = known ? `?${FAST_ADD_PARAM}=${encodeURIComponent(known)}` : "";
+  return FAST_ADD_PICKER_CTAS.map((cta) => ({
+    id: cta.id,
+    label: cta.label,
+    to: `${cta.to}${suffix}`,
+  }));
+}
+
+/**
+ * Read a pending Quick Log action from a router search string.
+ * Null-safe and total: unknown or malformed values return null, never throw.
+ */
+export function readFastAddParam(search: string | null | undefined): FastAddActionId | null {
+  if (!search) return null;
+  let raw: string | null = null;
+  try {
+    const query = search.startsWith("?") ? search.slice(1) : search;
+    raw = new URLSearchParams(query).get(FAST_ADD_PARAM);
+  } catch {
+    return null;
+  }
+  if (!raw) return null;
+  return FAST_ADD_ACTIONS.find((a) => a.id === raw)?.id ?? null;
+}
+
+/** Human label for a pending action, for calm picker copy. Null when unknown. */
+export function fastAddActionLabel(actionId: FastAddActionId | null | undefined): string | null {
+  if (!actionId) return null;
+  return FAST_ADD_ACTIONS.find((a) => a.id === actionId)?.label ?? null;
+}
+
 export interface FastAddSelectionContext {
   plantId: string | null;
   plantName?: string | null;
@@ -123,7 +177,8 @@ export interface FastAddOpenQuickLogIntent {
 export interface FastAddNeedsContextIntent {
   kind: "needs-context";
   message: typeof FAST_ADD_NO_CONTEXT_COPY;
-  ctas: typeof FAST_ADD_PICKER_CTAS;
+  /** Picker CTAs, carrying the pending action so intent survives the detour. */
+  ctas: readonly FastAddPickerCta[];
 }
 export interface FastAddOpenQuickLogV2Intent {
   kind: "open-quicklog-v2";
@@ -165,7 +220,7 @@ export function resolveFastAddIntent(
     return {
       kind: "needs-context",
       message: FAST_ADD_NO_CONTEXT_COPY,
-      ctas: FAST_ADD_PICKER_CTAS,
+      ctas: buildFastAddPickerCtas(actionId),
     };
   }
   const context = ctx as FastAddSelectionContext;
@@ -174,7 +229,7 @@ export function resolveFastAddIntent(
     return {
       kind: "needs-context",
       message: FAST_ADD_NO_CONTEXT_COPY,
-      ctas: FAST_ADD_PICKER_CTAS,
+      ctas: buildFastAddPickerCtas(null),
     };
   }
 
@@ -198,7 +253,7 @@ export function resolveFastAddIntent(
       : {
           kind: "needs-context",
           message: FAST_ADD_NO_CONTEXT_COPY,
-          ctas: FAST_ADD_PICKER_CTAS,
+          ctas: buildFastAddPickerCtas(actionId),
         };
   }
 

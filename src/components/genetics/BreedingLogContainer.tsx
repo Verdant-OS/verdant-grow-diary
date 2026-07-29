@@ -72,16 +72,22 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
       );
       submissionAttemptRef.current = attempt;
 
-      const { data: rpcData, error: rpcError } = await supabase.rpc("breeding_log_save_event", {
-        p_idempotency_key: attempt.idempotencyKey,
-        p_grow_id: activeGrowId,
-        p_plant_id: data.plantId,
-        p_event_type: data.subType,
-        p_tent_id: selectedPlant?.tent_id ?? null,
-        p_method: method,
-        p_intensity: intensity,
-        p_details: details,
-      });
+      const { data: rpcData, error: rpcError } = await (supabase.rpc as unknown as (
+        fn: string,
+        args: Record<string, unknown>,
+      ) => Promise<{ data: unknown; error: { message: string } | null }>)(
+        "breeding_log_save_event",
+        {
+          p_idempotency_key: attempt.idempotencyKey,
+          p_grow_id: activeGrowId,
+          p_plant_id: data.plantId,
+          p_event_type: data.subType,
+          p_tent_id: selectedPlant?.tent_id ?? null,
+          p_method: method,
+          p_intensity: intensity,
+          p_details: details,
+        },
+      );
 
       if (rpcError) {
         throw new Error(`Failed to save event: ${rpcError.message}`);

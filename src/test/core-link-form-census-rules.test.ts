@@ -341,12 +341,16 @@ describe("core link and form census rules", () => {
     expect(CENSUS_SPEC_SOURCE).toContain(
       ".evaluate((element, pinned) => element === pinned, pinnedControl, { timeout: 1_000 })",
     );
+    // Actionability read failures (detached mid-read) stay null and trigger
+    // the bounded index re-audit instead of classifying the old node as
+    // read-only and orphaning its replacement.
     expect(CENSUS_SPEC_SOURCE).toContain(
-      "const disabled = await (pinnedControl ?? control).isDisabled().catch(() => false);",
+      "const disabled = await pinnedControl.isDisabled().catch(() => null);",
     );
     expect(CENSUS_SPEC_SOURCE).toContain(
-      "const editable = await (pinnedControl ?? control).isEditable().catch(() => false);",
+      "const editable = await pinnedControl.isEditable().catch(() => null);",
     );
+    expect(CENSUS_SPEC_SOURCE).toContain("if (disabled === null || editable === null) {");
     // An index whose live element is no longer the pinned node — detached OR
     // displaced by a visible replacement — is re-audited once (bounded by the
     // set) so an unnamed replacement cannot slip through unaudited.

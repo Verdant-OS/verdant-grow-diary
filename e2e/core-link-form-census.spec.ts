@@ -882,8 +882,16 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
       continue;
     }
 
-    const disabled = await (pinnedControl ?? control).isDisabled().catch(() => false);
-    const editable = await (pinnedControl ?? control).isEditable().catch(() => false);
+    // An actionability read that fails (the pinned node detached mid-read)
+    // must not be coerced into a "read-only" classification — the failure is
+    // preserved as null and triggers the bounded index re-audit so a visible
+    // replacement gets audited instead.
+    const disabled = await pinnedControl.isDisabled().catch(() => null);
+    const editable = await pinnedControl.isEditable().catch(() => null);
+    if (disabled === null || editable === null) {
+      reauditIndexOnce();
+      continue;
+    }
     if (
       route.fieldPolicy === "audit-only" ||
       disabled ||

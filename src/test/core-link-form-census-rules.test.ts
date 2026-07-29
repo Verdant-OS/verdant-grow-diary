@@ -106,30 +106,71 @@ describe("core link and form census rules", () => {
 
   it("downgrades nth-fallback select churn to an unexercised audit instead of a census failure", () => {
     expect(CENSUS_SPEC_SOURCE).toContain("if (hasStableNamedControl) throw error;");
+    // Pre-dispatch churn and post-dispatch re-renders carry distinct reasons
+    // so the census report records WHEN the churn hit.
     expect(CENSUS_SPEC_SOURCE).toContain(
-      'reason: "re-rendered mid-exercise without a unique accessible-name locator"',
+      '"re-rendered mid-exercise without a unique accessible-name locator"',
     );
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      '"re-rendered in response to selection before value verification"',
+    );
+    expect(CENSUS_SPEC_SOURCE).toContain('? "re-rendered in response to selection');
   });
 
   it("keeps a stable-but-broken fallback select fatal while downgrading verified churn", () => {
-    const snapshot = ["", "all", "keep"];
+    const option = (value: string, disabled = false) => ({ value, disabled });
+    const snapshot = [option(""), option("all"), option("keep")];
 
-    // The same pinned DOM node still showing the snapshotted options never
-    // churned, so a value that did not stick is a broken onChange and the
-    // census must keep failing.
-    expect(fallbackSelectExerciseFailureIsFatal(snapshot, ["", "all", "keep"], true)).toBe(true);
+    // The same pinned DOM node still showing the snapshotted option state
+    // never churned, so a value that did not stick is a broken onChange and
+    // the census must keep failing.
+    expect(
+      fallbackSelectExerciseFailureIsFatal(
+        snapshot,
+        [option(""), option("all"), option("keep")],
+        true,
+      ),
+    ).toBe(true);
 
     // Identical options on a DIFFERENT node: the nth() index moved to a
     // look-alike sibling (repeated selects share option lists) — churn.
-    expect(fallbackSelectExerciseFailureIsFatal(snapshot, ["", "all", "keep"], false)).toBe(false);
+    expect(
+      fallbackSelectExerciseFailureIsFatal(
+        snapshot,
+        [option(""), option("all"), option("keep")],
+        false,
+      ),
+    ).toBe(false);
 
     // The same node whose options were rewritten in place by a re-render
     // (fewer, extra, or renamed) is churn too, not a defect.
-    expect(fallbackSelectExerciseFailureIsFatal(snapshot, ["", "all"], true)).toBe(false);
-    expect(fallbackSelectExerciseFailureIsFatal(snapshot, ["", "all", "keep", "cull"], true)).toBe(
+    expect(fallbackSelectExerciseFailureIsFatal(snapshot, [option(""), option("all")], true)).toBe(
       false,
     );
-    expect(fallbackSelectExerciseFailureIsFatal(snapshot, ["", "all", "cull"], true)).toBe(false);
+    expect(
+      fallbackSelectExerciseFailureIsFatal(
+        snapshot,
+        [option(""), option("all"), option("keep"), option("cull")],
+        true,
+      ),
+    ).toBe(false);
+    expect(
+      fallbackSelectExerciseFailureIsFatal(
+        snapshot,
+        [option(""), option("all"), option("cull")],
+        true,
+      ),
+    ).toBe(false);
+
+    // Same node, same values, but the alternative was disabled in place —
+    // the option state churned even though the value list looks identical.
+    expect(
+      fallbackSelectExerciseFailureIsFatal(
+        snapshot,
+        [option(""), option("all"), option("keep", true)],
+        true,
+      ),
+    ).toBe(false);
 
     // An element that cannot be resolved at all at catch time is churn.
     expect(fallbackSelectExerciseFailureIsFatal(snapshot, undefined, false)).toBe(false);

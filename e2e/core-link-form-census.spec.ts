@@ -856,8 +856,10 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
       const fallbackSnapshotHandle = hasStableNamedControl
         ? null
         : await stableControl.elementHandle({ timeout: 5_000 }).catch(() => null);
+      let selectionDispatched = false;
       try {
         await stableControl.selectOption(alternative, { timeout: 5_000 });
+        selectionDispatched = true;
         await expect(stableControl).toHaveValue(alternative, { timeout: 5_000 });
       } catch (error) {
         // A select without a unique accessible-name locator is only reachable
@@ -870,15 +872,16 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
         if (hasStableNamedControl) throw error;
         // Only proven stability stays fatal. Re-read the live element and let
         // the pure decision helper judge: the same pinned DOM node still
-        // showing the snapshotted options means a broken onChange, not churn.
+        // showing the snapshotted option state, disabled flags included,
+        // means a broken onChange, not churn.
         const liveState = await stableControl
           .evaluate(
             (element, snapshotElement) => ({
               sameElement: snapshotElement !== null && element === snapshotElement,
-              optionValues: Array.from(
-                (element as HTMLSelectElement).options,
-                (option) => option.value,
-              ),
+              options: Array.from((element as HTMLSelectElement).options, (option) => ({
+                value: option.value,
+                disabled: option.disabled,
+              })),
             }),
             fallbackSnapshotHandle,
             { timeout: 5_000 },
@@ -886,19 +889,26 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
           .catch(() => undefined);
         if (
           fallbackSelectExerciseFailureIsFatal(
-            selectSnapshot.options.map((option) => option.value),
-            liveState?.optionValues,
+            selectSnapshot.options,
+            liveState?.options,
             liveState?.sameElement ?? false,
           )
         ) {
           throw error;
         }
+        // Distinct reasons keep the census report honest about WHEN the churn
+        // hit: after a dispatched selection, the page reacting with a
+        // re-render is evidence the control is live (a handler that throws
+        // instead is caught by the lane's pageErrors fence); before dispatch
+        // it is plain locator churn.
         audits.push({
           route: route.path,
           name,
           type,
           exercised: false,
-          reason: "re-rendered mid-exercise without a unique accessible-name locator",
+          reason: selectionDispatched
+            ? "re-rendered in response to selection before value verification"
+            : "re-rendered mid-exercise without a unique accessible-name locator",
         });
         continue;
       }

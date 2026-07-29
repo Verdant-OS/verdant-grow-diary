@@ -562,21 +562,26 @@ export function selectAvailableAlternativeValue(
  * nth() query must still resolve to the very DOM node that was snapshotted
  * (`liveElementIsSnapshotElement` — repeated selects can share an identical
  * option list, so option equality alone cannot prove identity) AND that
- * node's options must still match the snapshot (a re-render can mutate a
- * reused node's options in place). Only then did the value fail to stick on
- * a stable select — a broken onChange. Any missing proof (a different node,
- * changed options, or an element that can no longer be resolved) is churn
- * and downgrades to an unexercised audit entry.
+ * node's full option state, values and disabled flags alike, must still
+ * match the snapshot (a re-render can mutate a reused node's options in
+ * place, including disabling the chosen alternative). Only then did the
+ * value fail to stick on a stable select — a broken onChange. Any missing
+ * proof (a different node, changed option state, or an element that can no
+ * longer be resolved) is churn and downgrades to an unexercised audit entry.
  */
 export function fallbackSelectExerciseFailureIsFatal(
-  snapshotOptionValues: readonly string[],
-  liveOptionValues: readonly string[] | undefined,
+  snapshotOptions: readonly CensusSelectOption[],
+  liveOptions: readonly CensusSelectOption[] | undefined,
   liveElementIsSnapshotElement: boolean,
 ): boolean {
-  if (!liveElementIsSnapshotElement || !liveOptionValues) return false;
+  if (!liveElementIsSnapshotElement || !liveOptions) return false;
   return (
-    liveOptionValues.length === snapshotOptionValues.length &&
-    liveOptionValues.every((value, index) => value === snapshotOptionValues[index])
+    liveOptions.length === snapshotOptions.length &&
+    liveOptions.every(
+      (option, index) =>
+        option.value === snapshotOptions[index].value &&
+        option.disabled === snapshotOptions[index].disabled,
+    )
   );
 }
 

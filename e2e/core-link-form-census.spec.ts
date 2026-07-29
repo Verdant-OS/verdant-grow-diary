@@ -17,6 +17,7 @@ import {
   PUBLIC_CORE_CENSUS_ROUTES,
   classifyLink,
   expectedCensusNavigationPath,
+  fallbackSelectExerciseFailureIsFatal,
   isReadOnlyEdgeFunction,
   isReadOnlyRpc,
   isSafelyFillableFieldType,
@@ -776,7 +777,21 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
     if (!(await control.isVisible())) continue;
     if (await isVisuallyHiddenImplementationControl(control)) continue;
 
-    const name = normalizeText(await accessibleNameForControl(control));
+    let name = normalizeText(await accessibleNameForControl(control).catch(() => ""));
+    // A sibling control's exercise can re-render the page while the live
+    // nth() query is being read, transiently resolving this index to an
+    // element whose label association has not settled — which reads as
+    // unnamed. Re-read briefly before judging; a control that is genuinely
+    // missing a user-facing name stays empty through every retry and still
+    // fails below.
+    for (let attempt = 0; name === "" && attempt < 5; attempt += 1) {
+      await page.waitForTimeout(250);
+      if (!(await control.isVisible())) break;
+      name = normalizeText(await accessibleNameForControl(control).catch(() => ""));
+    }
+    // The element under this index vanished while settling — the re-render
+    // removed it, so there is nothing left to audit at this position.
+    if (name === "" && !(await control.isVisible())) continue;
     const type = await controlType(control);
     expect(name, `${route.path} has a visible ${type} field without a user-facing name`).not.toBe(
       "",
@@ -845,26 +860,25 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
         // a uniquely named control survives re-renders, so its failure is
         // real and still fails the census.
         if (hasStableNamedControl) throw error;
-        // Only verified churn downgrades. If the element under the live nth()
-        // query still shows the snapshotted options, the alternative was
-        // selectable the whole time and the value simply did not stick — a
-        // broken onChange, not churn — so the failure must stay fatal.
-        const optionsUnchanged = await stableControl
+        // Only verified churn downgrades. Re-read the live element's options
+        // and let the pure decision helper judge: identical options mean a
+        // broken onChange, not churn, and the failure must stay fatal.
+        const liveOptionValues = await stableControl
           .evaluate(
-            (element, expected) => {
-              const select = element as HTMLSelectElement;
-              return (
-                select.options.length === expected.length &&
-                Array.from(select.options).every(
-                  (option, optionIndex) => option.value === expected[optionIndex],
-                )
-              );
-            },
-            selectSnapshot.options.map((option) => option.value),
+            (element) =>
+              Array.from((element as HTMLSelectElement).options, (option) => option.value),
+            undefined,
             { timeout: 5_000 },
           )
-          .catch(() => false);
-        if (optionsUnchanged) throw error;
+          .catch(() => undefined);
+        if (
+          fallbackSelectExerciseFailureIsFatal(
+            selectSnapshot.options.map((option) => option.value),
+            liveOptionValues,
+          )
+        ) {
+          throw error;
+        }
         audits.push({
           route: route.path,
           name,

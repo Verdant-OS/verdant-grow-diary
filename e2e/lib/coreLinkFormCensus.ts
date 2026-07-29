@@ -555,6 +555,26 @@ export function selectAvailableAlternativeValue(
   )?.value;
 }
 
+/**
+ * Decides whether an exercise failure on a fallback select (one with no
+ * unique accessible-name locator) is a real product defect or verified
+ * locator churn. Identical live options mean the element never churned — the
+ * alternative was selectable the whole time and the value simply did not
+ * stick, so the failure must stay fatal. Changed options, or an element that
+ * can no longer be resolved (`undefined`), prove the live nth() query was
+ * swapped mid-exercise, which downgrades to an unexercised audit entry.
+ */
+export function fallbackSelectExerciseFailureIsFatal(
+  snapshotOptionValues: readonly string[],
+  liveOptionValues: readonly string[] | undefined,
+): boolean {
+  if (!liveOptionValues) return false;
+  return (
+    liveOptionValues.length === snapshotOptionValues.length &&
+    liveOptionValues.every((value, index) => value === snapshotOptionValues[index])
+  );
+}
+
 const NON_FILLABLE_FIELD_TYPES = new Set([
   "button",
   "checkbox",

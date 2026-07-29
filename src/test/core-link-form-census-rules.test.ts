@@ -8,6 +8,7 @@ import {
   PUBLIC_CORE_CENSUS_ROUTES,
   classifyLink,
   expectedCensusNavigationPath,
+  fallbackSelectExerciseFailureIsFatal,
   isReadOnlyEdgeFunction,
   isReadOnlyRpc,
   isPrivilegedRoute,
@@ -110,12 +111,37 @@ describe("core link and form census rules", () => {
     );
   });
 
-  it("keeps a stable-but-broken fallback select fatal by verifying churn before downgrading", () => {
-    // A fallback select whose options still match the pre-exercise snapshot
-    // did not churn — its value failing to stick is a product defect, and the
-    // census must not swallow it as re-render noise.
-    expect(CENSUS_SPEC_SOURCE).toContain("if (optionsUnchanged) throw error;");
-    expect(CENSUS_SPEC_SOURCE).toContain("selectSnapshot.options.map((option) => option.value),");
+  it("keeps a stable-but-broken fallback select fatal while downgrading verified churn", () => {
+    const snapshot = ["", "all", "keep"];
+
+    // Identical live options: the element never churned, so a value that did
+    // not stick is a broken onChange and the census must keep failing.
+    expect(fallbackSelectExerciseFailureIsFatal(snapshot, ["", "all", "keep"])).toBe(true);
+
+    // Fewer, extra, or renamed options prove the live nth() query resolved a
+    // swapped element mid-exercise — verified churn, downgrade.
+    expect(fallbackSelectExerciseFailureIsFatal(snapshot, ["", "all"])).toBe(false);
+    expect(fallbackSelectExerciseFailureIsFatal(snapshot, ["", "all", "keep", "cull"])).toBe(false);
+    expect(fallbackSelectExerciseFailureIsFatal(snapshot, ["", "all", "cull"])).toBe(false);
+
+    // An element that cannot be resolved at all at catch time is churn too.
+    expect(fallbackSelectExerciseFailureIsFatal(snapshot, undefined)).toBe(false);
+
+    // The census spec must actually consult the helper on the fallback path.
+    expect(CENSUS_SPEC_SOURCE).toContain("fallbackSelectExerciseFailureIsFatal(");
+  });
+
+  it("settles a transiently unnamed control before asserting it lacks a user-facing name", () => {
+    // A sibling exercise can re-render the page mid-read, so an empty
+    // accessible name is re-read before it fails the census, and an index
+    // whose element vanished while settling is skipped rather than reported
+    // as an unnamed field.
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      'for (let attempt = 0; name === "" && attempt < 5; attempt += 1) {',
+    );
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      'if (name === "" && !(await control.isVisible())) continue;',
+    );
   });
 
   it("derives a select alternative from the reacquired control's current options", () => {

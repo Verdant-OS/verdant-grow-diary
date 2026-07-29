@@ -3,6 +3,7 @@ import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
+import importPlugin from "eslint-plugin-import";
 
 const EDGE_FORBIDDEN_IMPORT_MESSAGE =
   "Edge functions must import shared code via supabase/functions/_shared/lib/** (generated mirror), not src/ or @/ aliases. Run `bun run sync-edge-shared` to regenerate the mirror and rewrite entry imports.";
@@ -23,6 +24,23 @@ export default tseslint.config(
     plugins: {
       "react-hooks": reactHooks,
       "react-refresh": reactRefresh,
+      import: importPlugin,
+    },
+    // Teach ESLint the Vite/TS `@/*` -> `./src/*` alias so aliased imports
+    // resolve instead of being reported as unresolved. Mirrors the `paths`
+    // entry in tsconfig.json and the `resolve.alias` entry in vite.config.ts;
+    // those remain the source of truth — this only lets the linter follow it.
+    settings: {
+      "import/resolver": {
+        typescript: {
+          alwaysTryTypes: true,
+          project: ["./tsconfig.app.json", "./tsconfig.node.json"],
+        },
+        node: { extensions: [".js", ".jsx", ".ts", ".tsx"] },
+      },
+      "import/parsers": {
+        "@typescript-eslint/parser": [".ts", ".tsx"],
+      },
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
@@ -32,6 +50,8 @@ export default tseslint.config(
       // Tracked for full cleanup – do not add new `any` usage.
       // See: https://github.com/Verdant-OS/verdant-grow-diary/issues/16
       "@typescript-eslint/no-explicit-any": "warn",
+      // Catches broken/typo'd module specifiers, including `@/` aliases.
+      "import/no-unresolved": ["error", { commonjs: false, caseSensitiveStrict: false }],
     },
   },
   {

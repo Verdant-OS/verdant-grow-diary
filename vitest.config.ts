@@ -38,6 +38,12 @@ export default defineConfig({
     server: { deps: { inline: [/[\\/]scripts[\\/].*\.mjs$/] } },
   },
   resolve: {
-    alias: { "@": path.resolve(__dirname, "./src") },
+    alias: [
+      { find: "@", replacement: path.resolve(__dirname, "./src") },
+      {
+        find: /^react-router-dom$/,
+        replacement: path.resolve(__dirname, "./src/test/reactRouterTestAdapter.tsx"),
+      },
+    ],
   },
 });

@@ -150,11 +150,18 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
       }
       onCreated();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to save");
+      if (err instanceof MissingAuditRpcError) {
+        console.error("[BreedingLogContainer] Audit RPC missing:", err.rpcName, err.cause);
+        setAuditRpcMissing(true);
+      } else {
+        toast.error(err instanceof Error ? err.message : "Failed to save");
+      }
     } finally {
       setBusy(false);
     }
   };
+
+
 
   return (
     <div className="space-y-4">

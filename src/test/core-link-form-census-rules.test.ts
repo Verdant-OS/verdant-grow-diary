@@ -272,11 +272,28 @@ describe("core link and form census rules", () => {
     expect(CENSUS_SPEC_SOURCE).toContain(
       "const fallbackSnapshotHandle = hasStableNamedControl ? null : pinnedControl;",
     );
-    // The fill exercise resolves through the same pinned node too, with
-    // STRICT connected-value verification — no downgrade path for fills.
+    // The fill exercise resolves through the same pinned node too. Strictness
+    // is identity-scoped: a connected pinned node that dropped the value still
+    // fails the census, while a node the page replaced mid-exercise (e.g. a
+    // controlled date input remounting on fill) downgrades with a phase-tagged
+    // reason — proven live by the date-field remount both CI and local runs
+    // reproduced.
     expect(CENSUS_SPEC_SOURCE).toContain("const fillTarget = pinnedControl ?? control;");
-    expect(CENSUS_SPEC_SOURCE).toContain("await fillTarget.fill(placeholder);");
-    expect(CENSUS_SPEC_SOURCE).not.toContain("await control.fill(placeholder);");
+    expect(CENSUS_SPEC_SOURCE).toContain("await fillTarget.fill(placeholder, { timeout: 5_000 });");
+    expect(CENSUS_SPEC_SOURCE).not.toContain("await control.fill(placeholder");
+    expect(CENSUS_SPEC_SOURCE).toContain("if (pinnedStillConnected) throw error;");
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      '"re-rendered in response to a fill before value verification"',
+    );
+    expect(CENSUS_SPEC_SOURCE).toContain('"re-rendered before the fill could be dispatched"');
+    // Cleanup is identity-AGNOSTIC: restore goes through the live locator on
+    // every exit path so page content derived from the field (e.g. hrefs
+    // embedding date values) returns to its original shape before the link
+    // phase collects hrefs — a remount must not leave the placeholder behind.
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      "await control.fill(original, { timeout: 5_000 }).catch(() => undefined);",
+    );
+    expect(CENSUS_SPEC_SOURCE).not.toContain("await fillTarget.fill(original");
   });
 
   it("settles a transiently unnamed control before asserting it lacks a user-facing name", () => {

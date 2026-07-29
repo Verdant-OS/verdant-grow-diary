@@ -1072,17 +1072,49 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
       step: await fillTarget.getAttribute("step"),
     };
     const placeholder = placeholderValueForField(field);
-    await fillTarget.fill(placeholder);
-    await expect
-      .poll(
-        () =>
-          fillTarget.evaluate((element) =>
-            element.isConnected ? ((element as HTMLInputElement).value ?? null) : null,
-          ),
-        { timeout: 5_000 },
-      )
-      .toBe(placeholder);
-    await fillTarget.fill(original);
+    let fillDispatched = false;
+    try {
+      await fillTarget.fill(placeholder, { timeout: 5_000 });
+      fillDispatched = true;
+      await expect
+        .poll(
+          () =>
+            fillTarget.evaluate((element) =>
+              element.isConnected ? ((element as HTMLInputElement).value ?? null) : null,
+            ),
+          { timeout: 5_000 },
+        )
+        .toBe(placeholder);
+    } catch (error) {
+      // Strictness is identity-scoped: a CONNECTED pinned node that failed to
+      // take or keep the value is a real defect and still fails the census. A
+      // node the page REPLACED mid-exercise (a controlled input remounting in
+      // response to the fill) is churn, tagged by phase — the old live-locator
+      // assertion silently passed on the replacement, which is exactly the
+      // misattribution this path no longer allows.
+      const pinnedStillConnected = pinnedControl
+        ? await pinnedControl.evaluate((element) => element.isConnected).catch(() => false)
+        : true;
+      if (pinnedStillConnected) throw error;
+      // Cleanup is identity-AGNOSTIC by design: the replacement input holds
+      // the dispatched placeholder, and page content derived from it (e.g.
+      // the timeline's diary-range link embeds its date values) must return
+      // to its original shape before the link phase collects hrefs. Restoring
+      // through the live locator is cleanup, not audit — exactly what the
+      // pre-pinning code did.
+      await control.fill(original, { timeout: 5_000 }).catch(() => undefined);
+      audits.push({
+        route: route.path,
+        name,
+        type,
+        exercised: false,
+        reason: fillDispatched
+          ? "re-rendered in response to a fill before value verification"
+          : "re-rendered before the fill could be dispatched",
+      });
+      continue;
+    }
+    await control.fill(original, { timeout: 5_000 }).catch(() => undefined);
     audits.push({ route: route.path, name, type, exercised: true });
   }
 

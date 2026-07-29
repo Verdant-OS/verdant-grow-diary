@@ -94,6 +94,8 @@ export default function GuidePage() {
       description: guide.description,
       url: guideUrl,
       datePublished: "2025-01-01",
+      dateModified: "2025-01-01",
+      image: "https://verdantgrowdiary.com/brand/verdant-logo-512.png",
       authorName: "Verdant Grow Diary",
       publisherName: "Verdant Grow Diary",
       siteUrl: VERDANT_SITE_ORIGIN,
@@ -165,9 +167,7 @@ export default function GuidePage() {
             <h2 className="font-display text-xl md:text-2xl font-semibold text-foreground">
               {guide.cta.heading}
             </h2>
-            <p className="mt-2 text-sm md:text-base text-foreground/85">
-              {guide.cta.description}
-            </p>
+            <p className="mt-2 text-sm md:text-base text-foreground/85">{guide.cta.description}</p>
             {guide.cta.prompts && guide.cta.prompts.length > 0 && (
               <ul className="mt-3 space-y-1 text-sm text-foreground/80 list-disc pl-5">
                 {guide.cta.prompts.map((prompt) => (
@@ -185,8 +185,6 @@ export default function GuidePage() {
             </div>
           </aside>
         )}
-
-
 
         <div className="mt-10 space-y-8">
           {guide.sections.map((section) => (
@@ -217,7 +215,6 @@ export default function GuidePage() {
               )}
             </section>
           ))}
-
         </div>
 
         {guide.faq.length > 0 && (
@@ -298,10 +295,9 @@ export default function GuidePage() {
               Download the Bud Rot prevention checklist (PDF)
             </h2>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              A one-page, grower-approved checklist for late flower: environment
-              targets, a daily walk-through, a weekly Environment Check audit,
-              and what to do if you find rot. Print it and pin it next to the
-              tent, or keep it on your phone.
+              A one-page, grower-approved checklist for late flower: environment targets, a daily
+              walk-through, a weekly Environment Check audit, and what to do if you find rot. Print
+              it and pin it next to the tent, or keep it on your phone.
             </p>
             <a
               href="/verdant-bud-rot-prevention-checklist.pdf"
@@ -312,8 +308,7 @@ export default function GuidePage() {
               Download checklist (PDF)
             </a>
             <p className="mt-3 text-xs text-muted-foreground">
-              Verdant suggests; the grower decides. Nothing on this checklist
-              triggers automation.
+              Verdant suggests; the grower decides. Nothing on this checklist triggers automation.
             </p>
           </section>
         )}

@@ -54,9 +54,7 @@ export function buildFaqPageJsonLd({
       throw new Error("buildFaqPageJsonLd: every entry must have a question");
     }
     if (!q.answer || !q.answer.trim()) {
-      throw new Error(
-        `buildFaqPageJsonLd: FAQ answer is empty for question "${q.question}"`,
-      );
+      throw new Error(`buildFaqPageJsonLd: FAQ answer is empty for question "${q.question}"`);
     }
   }
   return {
@@ -90,8 +88,7 @@ export function buildSoftwareApplicationJsonLd({
   url?: string;
 }): SoftwareApplicationJsonLd {
   if (!name.trim()) throw new Error("buildSoftwareApplicationJsonLd: name required");
-  if (!description.trim())
-    throw new Error("buildSoftwareApplicationJsonLd: description required");
+  if (!description.trim()) throw new Error("buildSoftwareApplicationJsonLd: description required");
   return {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
@@ -139,9 +136,7 @@ export function buildBreadcrumbListJsonLd({
       throw new Error("buildBreadcrumbListJsonLd: every item must have a name");
     }
     if (!it.url || !/^https?:\/\//i.test(it.url)) {
-      throw new Error(
-        `buildBreadcrumbListJsonLd: item url must be absolute (got "${it.url}")`,
-      );
+      throw new Error(`buildBreadcrumbListJsonLd: item url must be absolute (got "${it.url}")`);
     }
   }
   return {
@@ -171,10 +166,19 @@ export interface ArticleJsonLd {
   readonly headline: string;
   readonly description: string;
   readonly url: string;
+  readonly image?: string;
   readonly datePublished: string;
   readonly dateModified?: string;
-  readonly author: { readonly "@type": "Organization"; readonly name: string; readonly url?: string };
-  readonly publisher: { readonly "@type": "Organization"; readonly name: string; readonly url?: string };
+  readonly author: {
+    readonly "@type": "Organization";
+    readonly name: string;
+    readonly url?: string;
+  };
+  readonly publisher: {
+    readonly "@type": "Organization";
+    readonly name: string;
+    readonly url?: string;
+  };
   readonly mainEntityOfPage: { readonly "@type": "WebPage"; readonly "@id": string };
 }
 
@@ -187,6 +191,7 @@ export function buildArticleJsonLd({
   headline,
   description,
   url,
+  image,
   datePublished,
   dateModified,
   authorName = "Verdant Grow Diary",
@@ -198,6 +203,7 @@ export function buildArticleJsonLd({
   url: string;
   datePublished: string;
   dateModified?: string;
+  image?: string;
   authorName?: string;
   publisherName?: string;
   siteUrl?: string;
@@ -216,10 +222,15 @@ export function buildArticleJsonLd({
     headline,
     description,
     url,
+    ...(image ? { image } : {}),
     datePublished,
     ...(dateModified ? { dateModified } : {}),
     author: { "@type": "Organization", name: authorName, ...(siteUrl ? { url: siteUrl } : {}) },
-    publisher: { "@type": "Organization", name: publisherName, ...(siteUrl ? { url: siteUrl } : {}) },
+    publisher: {
+      "@type": "Organization",
+      name: publisherName,
+      ...(siteUrl ? { url: siteUrl } : {}),
+    },
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
   };
 }

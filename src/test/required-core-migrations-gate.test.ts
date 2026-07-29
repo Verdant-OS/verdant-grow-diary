@@ -807,13 +807,30 @@ describe("remote applied-schema runner safety", () => {
       };
     }
 
-    it("names status 2 as a connection failure, not schema drift", () => {
+    it("names status 2 as a bad connection, not schema drift", () => {
       const { status, report } = runWithPsqlStatus(2);
       expect(status).toBe(EXIT.SCHEMA_QUERY_FAILED);
       expect(report).toContain("psql exit status: 2.");
-      expect(report).toMatch(/CONNECTION failed/);
+      expect(report).toMatch(/CONNECTION to the server went bad/);
       // The whole point: stop the operator from chasing migrations that are fine.
-      expect(report).toMatch(/before suspecting schema drift/i);
+      expect(report).toMatch(/rather than schema drift/i);
+    });
+
+    /**
+     * psql returns 2 both when the connection was never established AND when an
+     * established session dropped mid-query — the exit code cannot tell them
+     * apart. An earlier draft of this hint asserted "the query never ran", which
+     * would send an operator to host/port config for what may have been a
+     * server-side termination. The copy must stay agnostic.
+     */
+    it("does not claim the query never ran at status 2", () => {
+      const { report } = runWithPsqlStatus(2);
+      expect(report).not.toMatch(/never ran|never executed|did not run|never began/i);
+      // It must still say the gate has no verdict — agnostic, not silent.
+      expect(report).toMatch(/no verdict/i);
+      // And it must name both possibilities rather than only the first.
+      expect(report).toMatch(/never established/i);
+      expect(report).toMatch(/session was lost/i);
     });
 
     it("names status 3 as a rejected query on a live connection", () => {

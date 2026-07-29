@@ -155,3 +155,17 @@ export function resolveTimelineEmptyState(
     offersClearFilters: input.otherFiltersActive,
   };
 }
+
+/**
+ * Non-null fallback for call sites that have already determined the timeline
+ * is empty but cannot prove it to the type system. Structurally identical to
+ * the "filters excluded everything" result.
+ */
+export const TIMELINE_EMPTY_STATE_FALLBACK: TimelineEmptyStateView = {
+  kind: "filtered_out",
+  title: TIMELINE_EMPTY_FILTERED_TITLE,
+  description: TIMELINE_EMPTY_FILTERED_DESC,
+  actions: [],
+  needsContext: false,
+  offersClearFilters: true,
+};

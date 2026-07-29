@@ -763,7 +763,9 @@ async function controlType(
   });
 }
 
-async function isVisuallyHiddenImplementationControl(locator: Locator): Promise<boolean> {
+async function isVisuallyHiddenImplementationControl(
+  locator: Locator | ElementHandle<SVGElement | HTMLElement>,
+): Promise<boolean> {
   return locator.evaluate((element) => {
     const htmlElement = element as HTMLElement;
     if (htmlElement.getAttribute("aria-hidden") === "true") return true;
@@ -786,16 +788,16 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
 
   for (let index = 0; index < (await controls.count()); index += 1) {
     const control = controls.nth(index);
-    if (!(await control.isVisible())) continue;
-    if (await isVisuallyHiddenImplementationControl(control)) continue;
-
-    // Pin the node BEFORE the first name read so every read below describes
-    // one element: separate live nth() resolutions can straddle a reorder and
-    // pin (or read) a named sibling instead of the control under audit.
+    // Pin the node FIRST — before even the visibility gates — so every
+    // per-control read below (visibility, name, type, actionability,
+    // exercise) describes this one element: any read through the live nth()
+    // query can straddle a reorder onto a sibling.
     const pinnedControl = await control.elementHandle({ timeout: 1_000 }).catch(() => null);
-    let name = pinnedControl
-      ? normalizeText(await accessibleNameForControl(pinnedControl).catch(() => ""))
-      : "";
+    if (!pinnedControl) continue;
+    if (!(await pinnedControl.isVisible().catch(() => false))) continue;
+    if (await isVisuallyHiddenImplementationControl(pinnedControl)) continue;
+
+    let name = normalizeText(await accessibleNameForControl(pinnedControl).catch(() => ""));
     if (name === "") {
       // A sibling control's exercise can re-render the page mid-read,
       // transiently reading as unnamed. Re-read THIS pinned element briefly

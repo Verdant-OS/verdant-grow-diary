@@ -141,6 +141,11 @@ describe("core link and form census rules", () => {
     // the fatal verdict requires the node to still be connected.
     expect(CENSUS_SPEC_SOURCE).toContain("connected: select.isConnected,");
     expect(CENSUS_SPEC_SOURCE).toContain("liveState?.connected ?? false,");
+    // A downgraded select whose index was displaced re-audits the replacement
+    // once, pre- or post-dispatch alike — displaced surface stays audited.
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      "Whatever displaced the pinned select at this index is unaudited",
+    );
   });
 
   it("keeps a stable-but-broken fallback select fatal while downgrading verified churn", () => {
@@ -304,7 +309,7 @@ describe("core link and form census rules", () => {
     // restored fails the census outright.
     expect(CENSUS_SPEC_SOURCE).toContain("if (fillDispatched) {");
     expect(CENSUS_SPEC_SOURCE).toContain(
-      "if (!fillDispatched && !(await liveIndexHoldsPinnedNode())) {",
+      "Whatever displaced the pinned input at this index is unaudited",
     );
     expect(CENSUS_SPEC_SOURCE).toContain(
       "accepted the census placeholder but could not be restored",

@@ -1061,6 +1061,12 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
             ? "re-rendered in response to selection before value verification"
             : "re-rendered mid-exercise without a unique accessible-name locator",
         });
+        // Whatever displaced the pinned select at this index is unaudited
+        // surface — give it the bounded re-audit pass, pre- or post-dispatch
+        // alike.
+        if (!(await liveIndexHoldsPinnedNode())) {
+          reauditIndexOnce();
+        }
         continue;
       }
 
@@ -1143,10 +1149,10 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
           ? "re-rendered in response to a fill before value verification"
           : "re-rendered before the fill could be dispatched",
       });
-      // A pre-dispatch detachment may have left a visible replacement at
-      // this index; give it the bounded re-audit pass so an unnamed or
-      // broken replacement cannot escape unaudited.
-      if (!fillDispatched && !(await liveIndexHoldsPinnedNode())) {
+      // Whatever displaced the pinned input at this index is unaudited
+      // surface — give it the bounded re-audit pass, pre- or post-dispatch
+      // alike.
+      if (!(await liveIndexHoldsPinnedNode())) {
         reauditIndexOnce();
       }
       continue;

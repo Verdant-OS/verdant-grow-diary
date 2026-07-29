@@ -75,7 +75,7 @@ Create a `.env.local` (gitignored) for local scripts. **Do not edit `.env`** —
 ```bash
 # Public (safe to expose in client)
 VITE_SUPABASE_URL=https://knkwiiywfkbqznbxwqfh.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_bMlmBZJQFG-J7oh5Q65oBw_-ALsyLwg
+VITE_SUPABASE_PUBLISHABLE_KEY=<get from Lovable → Cloud → Settings → API keys — do NOT copy a key from another project>
 VITE_SUPABASE_PROJECT_ID=knkwiiywfkbqznbxwqfh
 
 # Server-only (NEVER commit, NEVER expose to the client)

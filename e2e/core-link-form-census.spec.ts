@@ -10,7 +10,14 @@
 // - Never submits a form, invokes AI, uploads a file, changes billing, writes
 //   Action Queue state, ingests sensor data, or controls a device.
 // - Exercises Claude-finished surfaces without reviving superseded branches.
-import { expect, test, type BrowserContext, type Locator, type Page } from "@playwright/test";
+import {
+  expect,
+  test,
+  type BrowserContext,
+  type ElementHandle,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import { APP_ROUTES } from "../src/lib/appRouteManifest";
 import {
   AUTHENTICATED_CORE_CENSUS_ROUTES,
@@ -693,7 +700,9 @@ function normalizeText(value: string | null | undefined): string {
   return (value ?? "").replace(/\s+/g, " ").trim();
 }
 
-async function accessibleNameForControl(locator: Locator): Promise<string> {
+async function accessibleNameForControl(
+  locator: Locator | ElementHandle<SVGElement | HTMLElement>,
+): Promise<string> {
   return locator.evaluate((element) => {
     const htmlElement = element as HTMLElement;
     const ariaLabel = htmlElement.getAttribute("aria-label")?.trim();
@@ -778,21 +787,35 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
     if (await isVisuallyHiddenImplementationControl(control)) continue;
 
     let name = normalizeText(await accessibleNameForControl(control).catch(() => ""));
-    // A sibling control's exercise can re-render the page while the live
-    // nth() query is being read, transiently resolving this index to an
-    // element whose label association has not settled — which reads as
-    // unnamed. Re-read briefly before judging; a control that is genuinely
-    // missing a user-facing name stays empty through every retry and still
-    // fails below.
-    for (let attempt = 0; name === "" && attempt < 5; attempt += 1) {
-      await page.waitForTimeout(250);
-      name = normalizeText(await accessibleNameForControl(control).catch(() => ""));
+    if (name === "") {
+      // A sibling control's exercise can re-render the page while the live
+      // nth() query is being read, transiently reading as unnamed. Pin the
+      // unnamed node and re-read THIS element briefly before judging — a
+      // retry through the live index could adopt a named sibling's name
+      // during a transient reorder and audit the unnamed control under it.
+      const unnamedHandle = await control.elementHandle({ timeout: 1_000 }).catch(() => null);
+      for (let attempt = 0; name === "" && unnamedHandle && attempt < 5; attempt += 1) {
+        await page.waitForTimeout(250);
+        name = normalizeText(await accessibleNameForControl(unnamedHandle).catch(() => ""));
+      }
+      if (name === "") {
+        // A pinned node that is still connected and visible after the whole
+        // settle window is a genuinely unnamed control and must fail below;
+        // one that vanished or stayed hidden has nothing left to audit.
+        const auditable = unnamedHandle
+          ? await unnamedHandle
+              .evaluate(
+                (element) =>
+                  element.isConnected &&
+                  element.getBoundingClientRect().width > 0 &&
+                  element.getBoundingClientRect().height > 0 &&
+                  getComputedStyle(element).visibility !== "hidden",
+              )
+              .catch(() => false)
+          : false;
+        if (!auditable) continue;
+      }
     }
-    // Only an element that is STILL gone after the whole settle window is
-    // skipped as removed; a control that was merely hidden mid-transition
-    // keeps getting re-read above, so a genuinely unnamed one that reappears
-    // still fails the assertion below.
-    if (name === "" && !(await control.isVisible())) continue;
     const type = await controlType(control);
     expect(name, `${route.path} has a visible ${type} field without a user-facing name`).not.toBe(
       "",

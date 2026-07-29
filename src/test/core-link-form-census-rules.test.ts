@@ -273,15 +273,20 @@ describe("core link and form census rules", () => {
 
   it("settles a transiently unnamed control before asserting it lacks a user-facing name", () => {
     // A sibling exercise can re-render the page mid-read, so an empty
-    // accessible name is re-read before it fails the census, and an index
-    // whose element vanished while settling is skipped rather than reported
-    // as an unnamed field.
+    // accessible name is re-read before it fails the census — through a
+    // PINNED node, so a transient reorder cannot lend the unnamed control a
+    // named sibling's name — and only a node that vanished or stayed hidden
+    // through the settle window is skipped rather than reported as unnamed.
     expect(CENSUS_SPEC_SOURCE).toContain(
-      'for (let attempt = 0; name === "" && attempt < 5; attempt += 1) {',
+      "const unnamedHandle = await control.elementHandle({ timeout: 1_000 }).catch(() => null);",
     );
     expect(CENSUS_SPEC_SOURCE).toContain(
-      'if (name === "" && !(await control.isVisible())) continue;',
+      'for (let attempt = 0; name === "" && unnamedHandle && attempt < 5; attempt += 1) {',
     );
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      "name = normalizeText(await accessibleNameForControl(unnamedHandle)",
+    );
+    expect(CENSUS_SPEC_SOURCE).toContain("if (!auditable) continue;");
   });
 
   it("derives a select alternative from the reacquired control's current options", () => {

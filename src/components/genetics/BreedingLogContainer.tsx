@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import type { BreedingEventType } from "@/lib/genetics/breedingTypes";
 import { emitBreedingAuditEvent } from "@/lib/genetics/breedingAuditLog";
+import { callBreedingLogSaveEvent } from "@/lib/genetics/breedingLogSaveEventRpc";
 import {
   resolveBreedingSubmissionAttempt,
   type BreedingSubmissionAttempt,

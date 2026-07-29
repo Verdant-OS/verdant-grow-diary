@@ -1209,11 +1209,25 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
       // DISPATCHED: a pre-dispatch detachment changed nothing, and writing
       // the old value into whatever now holds the index would corrupt it.
       if (fillDispatched) {
-        const restoredReplacement = await fillAndVerify(control, original);
-        expect(
-          restoredReplacement,
-          `${route.path} field "${name}" remounted after a fill and its replacement could not be restored`,
-        ).toBe(true);
+        // The live node is only the LOGICAL replacement if it still holds
+        // the dispatched placeholder — a removal that shifted an unrelated
+        // sibling into the index must not be overwritten with the old
+        // field's value. A vanished placeholder owes no cleanup.
+        const liveHoldsPlaceholder = await control
+          .evaluate(
+            (element, expected) =>
+              element.isConnected && ((element as HTMLInputElement).value ?? null) === expected,
+            placeholder,
+            { timeout: 1_000 },
+          )
+          .catch(() => false);
+        if (liveHoldsPlaceholder) {
+          const restoredReplacement = await fillAndVerify(control, original);
+          expect(
+            restoredReplacement,
+            `${route.path} field "${name}" remounted after a fill and its replacement could not be restored`,
+          ).toBe(true);
+        }
       }
       audits.push({
         route: route.path,
@@ -1246,7 +1260,25 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
         ? !(await pinnedControl.evaluate((element) => element.isConnected).catch(() => false))
         : true;
       if (pinnedGone) {
-        restored = await fillAndVerify(control, original);
+        // Same logical-replacement guard as the downgrade path: only a live
+        // node still holding the dispatched placeholder is restored; a
+        // shifted unrelated sibling is left untouched, nothing is owed for a
+        // vanished placeholder, and the displaced index gets its bounded
+        // re-audit.
+        const liveHoldsPlaceholder = await control
+          .evaluate(
+            (element, expected) =>
+              element.isConnected && ((element as HTMLInputElement).value ?? null) === expected,
+            placeholder,
+            { timeout: 1_000 },
+          )
+          .catch(() => false);
+        if (liveHoldsPlaceholder) {
+          restored = await fillAndVerify(control, original);
+        } else {
+          restored = true;
+          if (!(await liveIndexHoldsPinnedNode())) reauditIndexOnce();
+        }
       }
     }
     expect(

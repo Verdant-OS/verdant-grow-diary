@@ -340,6 +340,12 @@ describe("core link and form census rules", () => {
     // node's visibility before any exercise — a control hidden by the same
     // transition that named it is skipped, not timed out fatally.
     expect(CENSUS_SPEC_SOURCE).toContain('if (nameRequiredSettling && name !== "") {');
+    // Fallback restores only write into a live node that still HOLDS the
+    // dispatched placeholder (the logical replacement) — a shifted unrelated
+    // sibling is never overwritten; a vanished placeholder owes no cleanup
+    // and the displaced index is re-audited instead.
+    expect(CENSUS_SPEC_SOURCE).toContain("const liveHoldsPlaceholder = await control");
+    expect(CENSUS_SPEC_SOURCE).toContain("if (liveHoldsPlaceholder) {");
     // Downgrade-path cleanup only runs when a fill actually dispatched — a
     // pre-dispatch detachment changed nothing, and restoring into whatever
     // now holds the index would corrupt an unrelated control. A pre-dispatch

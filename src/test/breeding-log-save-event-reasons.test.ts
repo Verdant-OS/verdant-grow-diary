@@ -11,7 +11,7 @@
  * server-side rename fails here instead of degrading the UI silently.
  */
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
@@ -23,19 +23,58 @@ import {
 } from "@/lib/genetics/breedingLogSaveEventRpc";
 
 const ROOT = resolve(__dirname, "../..");
-const MIGRATION = readFileSync(
-  resolve(
-    ROOT,
-    "supabase/migrations/20260728163100_production_breeding_workflow_reconciliation.sql",
-  ),
-  "utf8",
-);
+const MIGRATIONS_DIR = resolve(ROOT, "supabase/migrations");
+
+/**
+ * Resolve the migration that currently DEFINES the RPC.
+ *
+ * Applied migrations are immutable, so a future change to
+ * `breeding_log_save_event` arrives as a NEW migration rather than an edit to
+ * 20260728163100. Pinning this guard to a single hard-coded filename would
+ * therefore keep scanning stale SQL and pass while the live function drifted
+ * away from the client union — exactly the regression this file exists to
+ * prevent. Filenames are timestamp-prefixed, so the lexicographically last
+ * definer is the active one.
+ */
+function readActiveRpcDefinition(): { fileName: string; sql: string } {
+  const definers = readdirSync(MIGRATIONS_DIR)
+    .filter((name) => name.endsWith(".sql"))
+    .filter((name) =>
+      /(?:CREATE|CREATE\s+OR\s+REPLACE)\s+FUNCTION\s+public\.breeding_log_save_event/i.test(
+        readFileSync(resolve(MIGRATIONS_DIR, name), "utf8"),
+      ),
+    )
+    .sort();
+  if (definers.length === 0) {
+    throw new Error("No migration defines public.breeding_log_save_event");
+  }
+  const fileName = definers[definers.length - 1];
+  return { fileName, sql: readFileSync(resolve(MIGRATIONS_DIR, fileName), "utf8") };
+}
+
+const ACTIVE_DEFINITION = readActiveRpcDefinition();
+const MIGRATION = ACTIVE_DEFINITION.sql;
 const CONTAINER = readFileSync(
   resolve(ROOT, "src/components/genetics/BreedingLogContainer.tsx"),
   "utf8",
 );
 
 describe("reason list stays in lockstep with the migration", () => {
+  it("scans the NEWEST migration that defines the RPC, not a hard-coded one", () => {
+    // Two migrations already define this function; the guard must follow the
+    // latest so a future redefinition cannot pass against stale SQL.
+    const definers = readdirSync(MIGRATIONS_DIR)
+      .filter((n) => n.endsWith(".sql"))
+      .filter((n) =>
+        /(?:CREATE|CREATE\s+OR\s+REPLACE)\s+FUNCTION\s+public\.breeding_log_save_event/i.test(
+          readFileSync(resolve(MIGRATIONS_DIR, n), "utf8"),
+        ),
+      )
+      .sort();
+    expect(definers.length).toBeGreaterThan(1);
+    expect(ACTIVE_DEFINITION.fileName).toBe(definers[definers.length - 1]);
+  });
+
   it("every typed reason is actually returned by the RPC", () => {
     for (const reason of BREEDING_LOG_SAVE_EVENT_REASONS) {
       expect(MIGRATION, reason).toContain(`'${reason}'`);

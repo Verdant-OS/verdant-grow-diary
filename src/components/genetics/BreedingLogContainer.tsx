@@ -5,7 +5,12 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import type { BreedingEventType } from "@/lib/genetics/breedingTypes";
 import { emitBreedingAuditEvent } from "@/lib/genetics/breedingAuditLog";
-import { callBreedingLogSaveEvent } from "@/lib/genetics/breedingLogSaveEventRpc";
+import {
+  callBreedingLogSaveEvent,
+  BREEDING_LOG_SAVE_EVENT_RPC_NAME,
+} from "@/lib/genetics/breedingLogSaveEventRpc";
+import { MissingAuditRpcError } from "@/lib/rpcAvailability/missingRpcError";
+import { AuditRpcMissingFallback } from "@/components/AuditRpcMissingFallback";
 import {
   resolveBreedingSubmissionAttempt,
   type BreedingSubmissionAttempt,

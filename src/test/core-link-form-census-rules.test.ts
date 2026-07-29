@@ -119,15 +119,19 @@ describe("core link and form census rules", () => {
 
   it("keeps a stable-but-broken fallback select fatal while downgrading verified churn", () => {
     const option = (value: string, disabled = false) => ({ value, disabled });
-    const snapshot = [option(""), option("all"), option("keep")];
+    const state = (options: { value: string; disabled: boolean }[], disabled = false) => ({
+      disabled,
+      options,
+    });
+    const snapshot = state([option(""), option("all"), option("keep")]);
 
-    // The same pinned DOM node still showing the snapshotted option state
-    // never churned, so a value that did not stick is a broken onChange and
-    // the census must keep failing.
+    // The same pinned DOM node still showing the snapshotted state never
+    // churned, so a value that did not stick is a broken onChange and the
+    // census must keep failing.
     expect(
       fallbackSelectExerciseFailureIsFatal(
         snapshot,
-        [option(""), option("all"), option("keep")],
+        state([option(""), option("all"), option("keep")]),
         true,
       ),
     ).toBe(true);
@@ -137,27 +141,27 @@ describe("core link and form census rules", () => {
     expect(
       fallbackSelectExerciseFailureIsFatal(
         snapshot,
-        [option(""), option("all"), option("keep")],
+        state([option(""), option("all"), option("keep")]),
         false,
       ),
     ).toBe(false);
 
     // The same node whose options were rewritten in place by a re-render
     // (fewer, extra, or renamed) is churn too, not a defect.
-    expect(fallbackSelectExerciseFailureIsFatal(snapshot, [option(""), option("all")], true)).toBe(
-      false,
-    );
+    expect(
+      fallbackSelectExerciseFailureIsFatal(snapshot, state([option(""), option("all")]), true),
+    ).toBe(false);
     expect(
       fallbackSelectExerciseFailureIsFatal(
         snapshot,
-        [option(""), option("all"), option("keep"), option("cull")],
+        state([option(""), option("all"), option("keep"), option("cull")]),
         true,
       ),
     ).toBe(false);
     expect(
       fallbackSelectExerciseFailureIsFatal(
         snapshot,
-        [option(""), option("all"), option("cull")],
+        state([option(""), option("all"), option("cull")]),
         true,
       ),
     ).toBe(false);
@@ -167,7 +171,17 @@ describe("core link and form census rules", () => {
     expect(
       fallbackSelectExerciseFailureIsFatal(
         snapshot,
-        [option(""), option("all"), option("keep", true)],
+        state([option(""), option("all"), option("keep", true)]),
+        true,
+      ),
+    ).toBe(false);
+
+    // Same node, same options, but the WHOLE control was disabled in place
+    // (an async loading state) — churn, not a broken onChange.
+    expect(
+      fallbackSelectExerciseFailureIsFatal(
+        snapshot,
+        state([option(""), option("all"), option("keep")], true),
         true,
       ),
     ).toBe(false);
@@ -176,8 +190,9 @@ describe("core link and form census rules", () => {
     expect(fallbackSelectExerciseFailureIsFatal(snapshot, undefined, false)).toBe(false);
 
     // The census spec must actually consult the helper on the fallback path,
-    // feeding it the pinned-node identity signal.
+    // feeding it the pinned-node identity signal and the control state.
     expect(CENSUS_SPEC_SOURCE).toContain("fallbackSelectExerciseFailureIsFatal(");
+    expect(CENSUS_SPEC_SOURCE).toContain("controlDisabled: select.disabled,");
     expect(CENSUS_SPEC_SOURCE).toContain(
       "await stableControl.elementHandle({ timeout: 5_000 }).catch(() => null);",
     );

@@ -555,6 +555,11 @@ export function selectAvailableAlternativeValue(
   )?.value;
 }
 
+export type FallbackSelectObservedState = {
+  disabled: boolean;
+  options: readonly CensusSelectOption[];
+};
+
 /**
  * Decides whether an exercise failure on a fallback select (one with no
  * unique accessible-name locator) is a real product defect or locator churn.
@@ -562,25 +567,28 @@ export function selectAvailableAlternativeValue(
  * nth() query must still resolve to the very DOM node that was snapshotted
  * (`liveElementIsSnapshotElement` — repeated selects can share an identical
  * option list, so option equality alone cannot prove identity) AND that
- * node's full option state, values and disabled flags alike, must still
- * match the snapshot (a re-render can mutate a reused node's options in
- * place, including disabling the chosen alternative). Only then did the
- * value fail to stick on a stable select — a broken onChange. Any missing
- * proof (a different node, changed option state, or an element that can no
- * longer be resolved) is churn and downgrades to an unexercised audit entry.
+ * node's full observed state must still match the snapshot — the control's
+ * own disabled flag (an async loading state can disable the whole select)
+ * plus every option's value and disabled flag (a re-render can mutate a
+ * reused node's options in place, including disabling the chosen
+ * alternative). Only then did the value fail to stick on a stable, enabled
+ * select — a broken onChange. Any missing proof (a different node, changed
+ * state, or an element that can no longer be resolved) is churn and
+ * downgrades to an unexercised audit entry.
  */
 export function fallbackSelectExerciseFailureIsFatal(
-  snapshotOptions: readonly CensusSelectOption[],
-  liveOptions: readonly CensusSelectOption[] | undefined,
+  snapshot: FallbackSelectObservedState,
+  live: FallbackSelectObservedState | undefined,
   liveElementIsSnapshotElement: boolean,
 ): boolean {
-  if (!liveElementIsSnapshotElement || !liveOptions) return false;
+  if (!liveElementIsSnapshotElement || !live) return false;
+  if (live.disabled !== snapshot.disabled) return false;
   return (
-    liveOptions.length === snapshotOptions.length &&
-    liveOptions.every(
+    live.options.length === snapshot.options.length &&
+    live.options.every(
       (option, index) =>
-        option.value === snapshotOptions[index].value &&
-        option.disabled === snapshotOptions[index].disabled,
+        option.value === snapshot.options[index].value &&
+        option.disabled === snapshot.options[index].disabled,
     )
   );
 }

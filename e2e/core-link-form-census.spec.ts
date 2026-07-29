@@ -830,6 +830,7 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
         const select = element as HTMLSelectElement;
         return {
           currentValue: select.value,
+          controlDisabled: select.disabled,
           options: Array.from(select.options, (option) => ({
             value: option.value,
             disabled: option.disabled,
@@ -872,25 +873,29 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
         if (hasStableNamedControl) throw error;
         // Only proven stability stays fatal. Re-read the live element and let
         // the pure decision helper judge: the same pinned DOM node still
-        // showing the snapshotted option state, disabled flags included,
-        // means a broken onChange, not churn.
+        // showing the snapshotted state — control disabled flag and full
+        // option state alike — means a broken onChange, not churn.
         const liveState = await stableControl
           .evaluate(
-            (element, snapshotElement) => ({
-              sameElement: snapshotElement !== null && element === snapshotElement,
-              options: Array.from((element as HTMLSelectElement).options, (option) => ({
-                value: option.value,
-                disabled: option.disabled,
-              })),
-            }),
+            (element, snapshotElement) => {
+              const select = element as HTMLSelectElement;
+              return {
+                sameElement: snapshotElement !== null && element === snapshotElement,
+                disabled: select.disabled,
+                options: Array.from(select.options, (option) => ({
+                  value: option.value,
+                  disabled: option.disabled,
+                })),
+              };
+            },
             fallbackSnapshotHandle,
             { timeout: 5_000 },
           )
           .catch(() => undefined);
         if (
           fallbackSelectExerciseFailureIsFatal(
-            selectSnapshot.options,
-            liveState?.options,
+            { disabled: selectSnapshot.controlDisabled, options: selectSnapshot.options },
+            liveState ? { disabled: liveState.disabled, options: liveState.options } : undefined,
             liveState?.sameElement ?? false,
           )
         ) {

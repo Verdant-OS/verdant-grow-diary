@@ -209,7 +209,6 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <AnalyticsShell />
           <AuthProvider onBeforeAuthIdentityChange={clearQueryCacheBeforeAuthIdentityChange}>
             <OAuthPostAuthRedirect />
             <GrowsProvider>
@@ -543,6 +542,7 @@ const App = () => (
 
                   <Route path="*" element={<NotFound />} />
                 </Routes>
+                <AnalyticsShell />
               </Suspense>
             </GrowsProvider>
           </AuthProvider>

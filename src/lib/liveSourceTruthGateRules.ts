@@ -20,13 +20,7 @@ export type LiveSourceTruthVerdict =
   | "invalid"
   | "mismatch";
 
-export type LiveSourceTruthSource =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid";
+export type LiveSourceTruthSource = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 
 export type LiveSourceTruthMetricKey =
   | "temp_f"
@@ -99,14 +93,14 @@ export interface LiveSourceTruthGateResult {
 // =========================================================================
 
 /** Captured_at older than this is stale. */
+// Deliberately NOT re-homed to @/constants/sensorTiming: this module has a
+// no-external-imports contract (live-source-truth-gate-rules.test.ts).
 export const LIVE_SOURCE_TRUTH_STALE_AFTER_MS = 15 * 60 * 1000;
 
 /** Captured_at more than this far in the future is invalid. */
 export const LIVE_SOURCE_TRUTH_FUTURE_SKEW_MS = 5 * 60 * 1000;
 
-const DEFAULT_TOLERANCES: Readonly<
-  Record<LiveSourceTruthMetricKey, number>
-> = Object.freeze({
+const DEFAULT_TOLERANCES: Readonly<Record<LiveSourceTruthMetricKey, number>> = Object.freeze({
   temp_f: 1.5,
   humidity_pct: 3,
   vpd_kpa: 0.2,
@@ -119,10 +113,7 @@ const DEFAULT_TOLERANCES: Readonly<
 });
 
 const SUSPICIOUS_RANGES: Readonly<
-  Record<
-    LiveSourceTruthMetricKey,
-    { min: number; max: number; forbid_exact?: readonly number[] }
-  >
+  Record<LiveSourceTruthMetricKey, { min: number; max: number; forbid_exact?: readonly number[] }>
 > = Object.freeze({
   temp_f: { min: 32, max: 120 },
   humidity_pct: { min: 1, max: 99, forbid_exact: [0, 100] },
@@ -230,12 +221,8 @@ function evaluateMetric(m: LiveSourceTruthMetricEvidence): MetricEval {
   }
 
   const backend = isFiniteNumber(m.backend_value) ? m.backend_value : null;
-  const controller = isFiniteNumber(m.controller_value)
-    ? m.controller_value
-    : null;
-  const tolerance = isFiniteNumber(m.tolerance)
-    ? Math.abs(m.tolerance)
-    : DEFAULT_TOLERANCES[key];
+  const controller = isFiniteNumber(m.controller_value) ? m.controller_value : null;
+  const tolerance = isFiniteNumber(m.tolerance) ? Math.abs(m.tolerance) : DEFAULT_TOLERANCES[key];
 
   // Suspicious-value check on backend value
   if (backend !== null) {
@@ -315,10 +302,7 @@ function evaluateMetric(m: LiveSourceTruthMetricEvidence): MetricEval {
       status,
       backend_value: backend,
       controller_value: controller,
-      difference:
-        backend !== null && controller !== null
-          ? Math.abs(backend - controller)
-          : null,
+      difference: backend !== null && controller !== null ? Math.abs(backend - controller) : null,
       tolerance,
       message,
     },
@@ -333,20 +317,15 @@ function evaluateMetric(m: LiveSourceTruthMetricEvidence): MetricEval {
 // Summary copy (operator-facing, no overconfident words)
 // =========================================================================
 
-const SUMMARY_COPY: Readonly<Record<LiveSourceTruthVerdict, string>> =
-  Object.freeze({
-    verified_live:
-      "Live proof verified from recent device evidence and controller comparison.",
-    unverified_live:
-      "Recent live-source evidence exists, but controller comparison is missing or incomplete.",
-    not_live_proof:
-      "This evidence can support review, but it cannot prove live sensor truth.",
-    stale: "Sensor evidence is too old to prove current live conditions.",
-    invalid:
-      "Sensor evidence is missing, malformed, or suspicious and cannot be trusted.",
-    mismatch:
-      "Backend values and controller/app values disagree beyond tolerance.",
-  });
+const SUMMARY_COPY: Readonly<Record<LiveSourceTruthVerdict, string>> = Object.freeze({
+  verified_live: "Live proof verified from recent device evidence and controller comparison.",
+  unverified_live:
+    "Recent live-source evidence exists, but controller comparison is missing or incomplete.",
+  not_live_proof: "This evidence can support review, but it cannot prove live sensor truth.",
+  stale: "Sensor evidence is too old to prove current live conditions.",
+  invalid: "Sensor evidence is missing, malformed, or suspicious and cannot be trusted.",
+  mismatch: "Backend values and controller/app values disagree beyond tolerance.",
+});
 
 const CONFIDENCE_BY_VERDICT: Readonly<
   Record<LiveSourceTruthVerdict, LiveSourceTruthConfidenceLabel>
@@ -394,18 +373,12 @@ export function evaluateLiveSourceTruth(
     const delta = capturedMs - nowMs;
     if (delta > LIVE_SOURCE_TRUTH_FUTURE_SKEW_MS) {
       any_invalid = true;
-      pushUnique(
-        limitations,
-        "captured_at is in the future beyond the allowed clock skew.",
-      );
+      pushUnique(limitations, "captured_at is in the future beyond the allowed clock skew.");
     } else {
       const age = nowMs - capturedMs;
       if (age > LIVE_SOURCE_TRUTH_STALE_AFTER_MS) {
         any_stale = true;
-        pushUnique(
-          limitations,
-          "captured_at is older than the freshness threshold (15 minutes).",
-        );
+        pushUnique(limitations, "captured_at is older than the freshness threshold (15 minutes).");
         pushUnique(next, "Refresh sensor reading before claiming live proof.");
       }
     }
@@ -425,13 +398,9 @@ export function evaluateLiveSourceTruth(
     pushUnique(limitations, "Source is labelled stale.");
   }
 
-  const isNonLiveProofSource =
-    source === "manual" || source === "csv" || source === "demo";
+  const isNonLiveProofSource = source === "manual" || source === "csv" || source === "demo";
   if (isNonLiveProofSource) {
-    pushUnique(
-      limitations,
-      `Source '${source}' cannot prove live sensor truth on its own.`,
-    );
+    pushUnique(limitations, `Source '${source}' cannot prove live sensor truth on its own.`);
     pushUnique(
       next,
       "Compare a recent live sensor reading against the controller before claiming live proof.",
@@ -451,10 +420,7 @@ export function evaluateLiveSourceTruth(
     }
     if (evidence?.normalized_payload_present !== true) {
       pushUnique(limitations, "Normalized backend payload is missing.");
-      pushUnique(
-        next,
-        "Capture the normalized backend payload for tonight's reading.",
-      );
+      pushUnique(next, "Capture the normalized backend payload for tonight's reading.");
     }
   }
 
@@ -490,10 +456,7 @@ export function evaluateLiveSourceTruth(
     if (ev.result.status === "match") comparedAttemptCount++;
 
     if (ev.result.status === "missing_controller") {
-      pushUnique(
-        limitations,
-        `Controller/app value missing for ${m.key}; comparison incomplete.`,
-      );
+      pushUnique(limitations, `Controller/app value missing for ${m.key}; comparison incomplete.`);
     }
     if (ev.result.status === "missing_backend") {
       pushUnique(limitations, `Backend value missing for ${m.key}.`);
@@ -517,10 +480,7 @@ export function evaluateLiveSourceTruth(
 
   if (source === "live") {
     if (!operatorCompared) {
-      pushUnique(
-        limitations,
-        "Operator did not record a controller/app comparison.",
-      );
+      pushUnique(limitations, "Operator did not record a controller/app comparison.");
       pushUnique(
         next,
         "Compare controller/app readings against backend values and record the result.",
@@ -530,10 +490,7 @@ export function evaluateLiveSourceTruth(
         limitations,
         "Operator comparison flagged, but no metric has both backend and controller values.",
       );
-      pushUnique(
-        next,
-        "Record at least one metric with both backend and controller values.",
-      );
+      pushUnique(next, "Record at least one metric with both backend and controller values.");
     }
   }
 
@@ -549,14 +506,8 @@ export function evaluateLiveSourceTruth(
     verdict = "not_live_proof";
   } else if (source === "live") {
     const payloadsPresent =
-      evidence?.raw_payload_present === true &&
-      evidence?.normalized_payload_present === true;
-    if (
-      operatorCompared &&
-      hasComparedMetric &&
-      comparedMatchCount > 0 &&
-      payloadsPresent
-    ) {
+      evidence?.raw_payload_present === true && evidence?.normalized_payload_present === true;
+    if (operatorCompared && hasComparedMetric && comparedMatchCount > 0 && payloadsPresent) {
       verdict = "verified_live";
     } else {
       verdict = "unverified_live";
@@ -567,10 +518,7 @@ export function evaluateLiveSourceTruth(
   }
 
   if (verdict === "verified_live") {
-    pushUnique(
-      next,
-      "Record GO with linked evidence for the captured_at window reviewed.",
-    );
+    pushUnique(next, "Record GO with linked evidence for the captured_at window reviewed.");
   }
   if (verdict === "mismatch") {
     pushUnique(
@@ -579,10 +527,7 @@ export function evaluateLiveSourceTruth(
     );
   }
   if (verdict === "invalid") {
-    pushUnique(
-      next,
-      "Hold. Do not describe the loop as live until evidence is repaired.",
-    );
+    pushUnique(next, "Hold. Do not describe the loop as live until evidence is repaired.");
   }
 
   return Object.freeze({

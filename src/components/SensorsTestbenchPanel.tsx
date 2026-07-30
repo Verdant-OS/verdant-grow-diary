@@ -32,7 +32,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Copy, KeyRound, Send, ShieldAlert, Activity, CheckCircle2, XCircle, Server, Trash2, Terminal, FileJson, History, Download, Eye, Share2 } from "lucide-react";
+import {
+  Copy,
+  KeyRound,
+  Send,
+  ShieldAlert,
+  Activity,
+  CheckCircle2,
+  XCircle,
+  Server,
+  Trash2,
+  Terminal,
+  FileJson,
+  History,
+  Download,
+  Eye,
+  Share2,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -94,7 +110,6 @@ const INGEST_URL =
   buildCanonicalSensorIngestUrl(SUPABASE_URL) ??
   `${SUPABASE_URL}/functions/v1/sensor-ingest-webhook`;
 
-
 interface Props {
   tentId: string | null;
   tentName?: string | null;
@@ -120,35 +135,27 @@ function indicatorBadge(c: SensorTestbenchClassification) {
       </Badge>
     );
   }
-  if (c.indicator === "live") {
+  if (c.indicator === "receiving") {
     return (
       <Badge
         variant="secondary"
         data-testid="sensors-testbench-indicator"
-        data-state="live"
-        className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+        data-state="receiving"
+        className="border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300"
       >
-        Live connected sensor
+        Receiving data — unverified source
       </Badge>
     );
   }
   if (c.indicator === "stale") {
     return (
-      <Badge
-        variant="outline"
-        data-testid="sensors-testbench-indicator"
-        data-state="stale"
-      >
+      <Badge variant="outline" data-testid="sensors-testbench-indicator" data-state="stale">
         Stale — no recent ingest
       </Badge>
     );
   }
   return (
-    <Badge
-      variant="outline"
-      data-testid="sensors-testbench-indicator"
-      data-state="none"
-    >
+    <Badge variant="outline" data-testid="sensors-testbench-indicator" data-state="none">
       No ingest yet
     </Badge>
   );
@@ -169,7 +176,14 @@ function relativeFromIso(iso: string | null): string {
 
 export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
   const { toast } = useToast();
-  const [rows, setRows] = useState<Array<{ source: string | null; captured_at: string | null; created_at: string | null; raw_payload: unknown }>>([]);
+  const [rows, setRows] = useState<
+    Array<{
+      source: string | null;
+      captured_at: string | null;
+      created_at: string | null;
+      raw_payload: unknown;
+    }>
+  >([]);
   const [ingestCount, setIngestCount] = useState<number>(0);
   const [tokenName, setTokenName] = useState("ecowitt-testbench");
   const [ttlDays, setTtlDays] = useState<number>(BRIDGE_TOKEN_DEFAULT_TTL_DAYS);
@@ -179,9 +193,9 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
   const [result, setResult] = useState<TestPayloadResult | null>(null);
   const [tokens, setTokens] = useState<BridgeTokenRow[]>([]);
   const [history, setHistory] = useState<SensorIngestHistoryItem[]>([]);
-  const [diagnosticsHistory, setDiagnosticsHistory] = useState<
-    SensorDiagnosticsRunHistoryEntry[]
-  >([]);
+  const [diagnosticsHistory, setDiagnosticsHistory] = useState<SensorDiagnosticsRunHistoryEntry[]>(
+    [],
+  );
   const [lastPayload, setLastPayload] = useState<unknown>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const validationDetailsRef = useRef<HTMLDivElement | null>(null);
@@ -195,7 +209,6 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     setDiagnosticsHistory([]);
     setLastPayload(null);
   }, [tentId]);
-
 
   useEffect(() => {
     let cancelled = false;
@@ -235,10 +248,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     };
   }, [tentId, result, minting]);
 
-  const classification = useMemo(
-    () => classifySensorTestbench({ rows }),
-    [rows],
-  );
+  const classification = useMemo(() => classifySensorTestbench({ rows }), [rows]);
 
   const activeToken = useMemo<BridgeTokenRow | null>(() => {
     const active = tokens.find((t) => bridgeTokenStatus(t) === "active");
@@ -321,10 +331,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     if (!result || !resultClass) return null;
     return buildSensorIngestNetworkDiagnostics({
       ingestUrl: INGEST_URL,
-      appOrigin:
-        typeof window !== "undefined" && window.location
-          ? window.location.origin
-          : null,
+      appOrigin: typeof window !== "undefined" && window.location ? window.location.origin : null,
       httpStatus: result.status,
       classification: resultClass.category,
       errorMessage:
@@ -351,24 +358,23 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
         inspectorPlainText,
         networkDiagnostics,
       }),
-    [bundleFilenamePreview, validationUi, result, resultClass, inspectorPlainText, networkDiagnostics],
+    [
+      bundleFilenamePreview,
+      validationUi,
+      result,
+      resultClass,
+      inspectorPlainText,
+      networkDiagnostics,
+    ],
   );
 
   const verifyCommands = useMemo(() => {
     const canonical = buildCanonicalSensorIngestUrl(SUPABASE_URL);
     return buildSensorIngestVerifyCommands({
       ingestUrl: canonical,
-      appOrigin:
-        typeof window !== "undefined" && window.location
-          ? window.location.origin
-          : null,
+      appOrigin: typeof window !== "undefined" && window.location ? window.location.origin : null,
     });
   }, []);
-
-
-
-
-
 
   const powershell = useMemo(
     () =>
@@ -458,10 +464,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     // Append a redacted diagnostics-run entry alongside the ingest history.
     const diagForHistory = buildSensorIngestNetworkDiagnostics({
       ingestUrl: INGEST_URL,
-      appOrigin:
-        typeof window !== "undefined" && window.location
-          ? window.location.origin
-          : null,
+      appOrigin: typeof window !== "undefined" && window.location ? window.location.origin : null,
       httpStatus: status,
       classification: classification.category,
       errorMessage:
@@ -478,9 +481,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
       classification: classification.category,
       diagnostics: diagForHistory,
     });
-    setDiagnosticsHistory((prev) =>
-      trimSensorDiagnosticsRunHistory([diagEntry, ...prev]),
-    );
+    setDiagnosticsHistory((prev) => trimSensorDiagnosticsRunHistory([diagEntry, ...prev]));
   }
 
   async function safeCopy(text: string, label: string) {
@@ -554,11 +555,9 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     el.focus({ preventScroll: true });
   }
 
-
   async function copyPowerShell() {
     await safeCopy(powershell, "PowerShell snippet");
   }
-
 
   function downloadNetworkDiagnosticsJson() {
     if (!networkDiagnostics) return;
@@ -571,11 +570,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           ? { http_status: result.status, classification: resultClass.category }
           : null,
     });
-    downloadBlob(
-      json,
-      "application/json",
-      buildNetworkDiagnosticsDownloadFilename(now),
-    );
+    downloadBlob(json, "application/json", buildNetworkDiagnosticsDownloadFilename(now));
     toast({
       title: "Downloaded network diagnostics JSON",
       description: "Sensitive values were redacted.",
@@ -585,21 +580,13 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
   function downloadDiagnosticsRunHistoryJson() {
     if (diagnosticsHistory.length === 0) return;
     const now = new Date();
-    const json = sensorDiagnosticsRunHistoryToJson(
-      diagnosticsHistory,
-      now.toISOString(),
-    );
-    downloadBlob(
-      json,
-      "application/json",
-      buildSensorDiagnosticsRunHistoryFilename(now),
-    );
+    const json = sensorDiagnosticsRunHistoryToJson(diagnosticsHistory, now.toISOString());
+    downloadBlob(json, "application/json", buildSensorDiagnosticsRunHistoryFilename(now));
   }
 
   function clearDiagnosticsHistory() {
     setDiagnosticsHistory([]);
   }
-
 
   function buildDiagnosticsPayload() {
     return {
@@ -633,17 +620,11 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
   }
 
   async function copyDiagnosticsJson() {
-    await safeCopy(
-      diagnosticsExportToJson(buildDiagnosticsPayload()),
-      "Diagnostics JSON",
-    );
+    await safeCopy(diagnosticsExportToJson(buildDiagnosticsPayload()), "Diagnostics JSON");
   }
 
   async function copyDiagnosticsText() {
-    await safeCopy(
-      diagnosticsExportToText(buildDiagnosticsPayload()),
-      "Diagnostics text",
-    );
+    await safeCopy(diagnosticsExportToText(buildDiagnosticsPayload()), "Diagnostics text");
   }
 
   async function copyCurl() {
@@ -678,7 +659,6 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     });
     await safeCopy(cmd, "PowerShell ingest test");
   }
-
 
   function buildHistoryPayload() {
     return {
@@ -767,22 +747,16 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     }
   }
 
-
   function clearHistory() {
     setHistory([]);
   }
-
-
 
   if (!tentId) {
     return null;
   }
 
   return (
-    <div
-      className="glass rounded-2xl p-4 mt-4"
-      data-testid="sensors-testbench-panel"
-    >
+    <div className="glass rounded-2xl p-4 mt-4" data-testid="sensors-testbench-panel">
       <div className="flex items-center gap-2 mb-1">
         <Activity className="size-4 text-muted-foreground" />
         <h2 className="font-display font-semibold">EcoWitt testbench &amp; setup</h2>
@@ -792,7 +766,10 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
         <span className="text-xs text-muted-foreground" data-testid="sensors-testbench-last-ingest">
           Last ingest: {relativeFromIso(classification.latestAtIso)}
         </span>
-        <span className="text-xs text-muted-foreground" data-testid="sensors-testbench-ingest-count">
+        <span
+          className="text-xs text-muted-foreground"
+          data-testid="sensors-testbench-ingest-count"
+        >
           · {ingestCount} ingest{ingestCount === 1 ? "" : "s"}
         </span>
         {classification.source && (
@@ -805,9 +782,9 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
         )}
       </div>
       <p className="text-xs text-muted-foreground mb-3">
-        Testbench data is auditable but is <strong>not</strong> production live
-        sensor state. Promote to live by minting a production bridge token and
-        pointing your real EcoWitt gateway at this tent.
+        Testbench data is auditable but is <strong>not</strong> production live sensor state.
+        Promote to live by minting a production bridge token and pointing your real EcoWitt gateway
+        at this tent.
       </p>
 
       {/* Environment diagnostics — proves the app, endpoint, tent, and token
@@ -847,7 +824,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
               title={
                 canonicalReady
                   ? "Contains token if copied during reveal. Do not paste into chat, screenshots, or git."
-                  : canonicalDisabledHint ?? undefined
+                  : (canonicalDisabledHint ?? undefined)
               }
             >
               <Terminal className="size-3 mr-1" /> curl
@@ -861,7 +838,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
               title={
                 canonicalReady
                   ? "Contains token if copied during reveal. Confirmation required when token is revealed."
-                  : canonicalDisabledHint ?? undefined
+                  : (canonicalDisabledHint ?? undefined)
               }
             >
               <Terminal className="size-3 mr-1" /> PowerShell
@@ -891,7 +868,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
               title={
                 canonicalReady
                   ? "Download diagnostics + history as one .zip — client-side only."
-                  : canonicalDisabledHint ?? undefined
+                  : (canonicalDisabledHint ?? undefined)
               }
             >
               <Download className="size-3 mr-1" /> bundle
@@ -900,10 +877,9 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
         </div>
 
         <p className="text-[11px] text-muted-foreground mb-1">
-          Exports contain safe identity only. The curl and PowerShell buttons
-          include the bridge token only while the one-time reveal is in memory
-          — do not paste them into chat, screenshots, or git. Revoke any token
-          that leaks.
+          Exports contain safe identity only. The curl and PowerShell buttons include the bridge
+          token only while the one-time reveal is in memory — do not paste them into chat,
+          screenshots, or git. Revoke any token that leaks.
         </p>
         <p
           className="text-[11px] text-muted-foreground mb-2 font-mono"
@@ -912,27 +888,17 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           bundle filename: {bundleFilenamePreview}
         </p>
 
-
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
           <dt className="text-muted-foreground">App Supabase URL</dt>
-          <dd
-            className="font-mono break-all"
-            data-testid="sensors-diag-supabase-url"
-          >
+          <dd className="font-mono break-all" data-testid="sensors-diag-supabase-url">
             {SUPABASE_URL || "—"}
           </dd>
           <dt className="text-muted-foreground">Ingest endpoint</dt>
-          <dd
-            className="font-mono break-all"
-            data-testid="sensors-diag-ingest-url"
-          >
+          <dd className="font-mono break-all" data-testid="sensors-diag-ingest-url">
             {INGEST_URL}
           </dd>
           <dt className="text-muted-foreground">Selected tent</dt>
-          <dd
-            className="font-mono break-all"
-            data-testid="sensors-diag-tent-uuid"
-          >
+          <dd className="font-mono break-all" data-testid="sensors-diag-tent-uuid">
             {tentName ? `${tentName} · ` : ""}
             {tentId}
           </dd>
@@ -941,9 +907,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             {activeToken ? (
               <span>
                 <span className="font-mono">{activeToken.token_prefix}…</span>{" "}
-                <span className="text-muted-foreground">
-                  ({activeToken.name})
-                </span>{" "}
+                <span className="text-muted-foreground">({activeToken.name})</span>{" "}
                 <Badge
                   variant="outline"
                   className="ml-1 text-[10px]"
@@ -990,16 +954,13 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
                   <span className={item.ok ? "" : "text-amber-700 dark:text-amber-300"}>
                     {item.label}
                   </span>
-                  {item.hint && (
-                    <span className="text-muted-foreground"> — {item.hint}</span>
-                  )}
+                  {item.hint && <span className="text-muted-foreground"> — {item.hint}</span>}
                 </span>
               </li>
             ))}
           </ul>
         </div>
       </div>
-
 
       <div className="rounded-lg border border-border/60 p-3 mb-3">
         <div className="flex items-center gap-2 mb-2">
@@ -1023,11 +984,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             onChange={(e) => setTtlDays(Number(e.target.value))}
             className="sm:max-w-[120px]"
           />
-          <Button
-            onClick={mint}
-            disabled={minting}
-            data-testid="sensors-testbench-mint-btn"
-          >
+          <Button onClick={mint} disabled={minting} data-testid="sensors-testbench-mint-btn">
             {minting ? "Minting…" : "Mint token"}
           </Button>
         </div>
@@ -1037,14 +994,12 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             role="alert"
             data-testid="sensors-testbench-token-reveal"
           >
-            <div className="text-xs font-medium mb-1">
-              New token — shown once, copy now
-            </div>
+            <div className="text-xs font-medium mb-1">New token — shown once, copy now</div>
             <code className="text-xs break-all select-all">{reveal}</code>
             <p className="text-[11px] text-muted-foreground mt-1 flex items-start gap-1">
               <ShieldAlert className="size-3 mt-0.5 shrink-0" />
-              Do not paste this token into chats, screenshots, or git. If it
-              leaks, revoke it from the tent detail page.
+              Do not paste this token into chats, screenshots, or git. If it leaks, revoke it from
+              the tent detail page.
             </p>
           </div>
         )}
@@ -1060,11 +1015,13 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
         <pre
           className="text-[11px] bg-muted/40 rounded p-2 overflow-x-auto whitespace-pre"
           data-testid="sensors-testbench-powershell"
-        >{powershell}</pre>
+        >
+          {powershell}
+        </pre>
         <p className="text-[11px] text-muted-foreground mt-2">
-          EcoWitt gateway settings: <strong>Protocol</strong> Ecowitt ·{" "}
-          <strong>Host</strong> your PC IP · <strong>Port</strong> 8787 ·{" "}
-          <strong>Path</strong> /ecowitt. Tent: {tentName ?? tentId}.
+          EcoWitt gateway settings: <strong>Protocol</strong> Ecowitt · <strong>Host</strong> your
+          PC IP · <strong>Port</strong> 8787 · <strong>Path</strong> /ecowitt. Tent:{" "}
+          {tentName ?? tentId}.
         </p>
       </div>
 
@@ -1085,8 +1042,8 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           <p className="text-xs text-muted-foreground">
             Mint a token above to enable the test send. Test payloads are tagged
             <code className="mx-1">vendor=ecowitt_windows_testbench</code> and
-            <code className="mx-1">metadata.confidence=test</code> — they will
-            appear as testbench, not live.
+            <code className="mx-1">metadata.confidence=test</code> — they will appear as testbench,
+            not live.
           </p>
         )}
         {result && resultClass && (
@@ -1110,7 +1067,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
               {resultClass.detail}
             </div>
             <pre className="bg-muted/40 rounded p-2 overflow-x-auto whitespace-pre-wrap break-words">
-{JSON.stringify(result.body, null, 2)}
+              {JSON.stringify(result.body, null, 2)}
             </pre>
           </div>
         )}
@@ -1164,9 +1121,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
               </Button>
             </div>
             {responseInspector.note && (
-              <div className="text-muted-foreground mb-1">
-                {responseInspector.note}
-              </div>
+              <div className="text-muted-foreground mb-1">{responseInspector.note}</div>
             )}
             {responseInspector.fields.length > 0 && (
               <ul
@@ -1353,7 +1308,9 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             data-testid="sensors-testbench-verify-commands"
           >
             <div className="font-medium mb-1 flex items-center gap-2">
-              <Badge variant="outline" className="text-[10px]">How to verify</Badge>
+              <Badge variant="outline" className="text-[10px]">
+                How to verify
+              </Badge>
               <span>Safe curl commands (placeholders only)</span>
             </div>
             <p
@@ -1411,7 +1368,9 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           >
             <div className="flex items-center justify-between mb-1">
               <div className="font-medium flex items-center gap-2">
-                <Badge variant="outline" className="text-[10px]">Diagnostics history</Badge>
+                <Badge variant="outline" className="text-[10px]">
+                  Diagnostics history
+                </Badge>
                 <span className="text-muted-foreground">
                   Last {diagnosticsHistory.length} of {SENSOR_DIAGNOSTICS_RUN_HISTORY_MAX}
                 </span>
@@ -1466,9 +1425,6 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           </div>
         )}
 
-
-
-
         {/* Canonical payload validation summary — view-model driven. */}
         <div
           className="mt-3 border-t border-border/40 pt-2 text-xs rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -1522,9 +1478,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
                 <span>—</span>
               ) : (
                 <span>
-                  {validationUi.summary.missing
-                    .map((m) => `${m.label} (${m.reason})`)
-                    .join(", ")}
+                  {validationUi.summary.missing.map((m) => `${m.label} (${m.reason})`).join(", ")}
                 </span>
               )}
             </div>
@@ -1534,9 +1488,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
                 <span>—</span>
               ) : (
                 <span>
-                  {validationUi.summary.invalid
-                    .map((i) => `${i.label}: ${i.reason}`)
-                    .join("; ")}
+                  {validationUi.summary.invalid.map((i) => `${i.label}: ${i.reason}`).join("; ")}
                 </span>
               )}
             </div>
@@ -1580,7 +1532,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
               className="bg-muted/40 rounded p-2 mt-2 overflow-x-auto whitespace-pre-wrap break-words"
               data-testid="sensors-testbench-payload-preview-body"
             >
-{buildRedactedPayloadPreview(lastPayload)}
+              {buildRedactedPayloadPreview(lastPayload)}
             </pre>
           ) : (
             <p
@@ -1593,8 +1545,6 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             </p>
           )}
         </details>
-
-
 
         {history.length > 0 && (
           <div
@@ -1654,30 +1604,22 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
                     <span>·</span>
                     <span>{h.classification}</span>
                     {h.inserted !== null && (
-                      <span className="text-muted-foreground">
-                        · inserted {h.inserted}
-                      </span>
+                      <span className="text-muted-foreground">· inserted {h.inserted}</span>
                     )}
                     {h.skipped_duplicate !== null && (
-                      <span className="text-muted-foreground">
-                        · dup {h.skipped_duplicate}
-                      </span>
+                      <span className="text-muted-foreground">· dup {h.skipped_duplicate}</span>
                     )}
                     {h.rejected_count !== null && (
-                      <span className="text-muted-foreground">
-                        · rejected {h.rejected_count}
-                      </span>
+                      <span className="text-muted-foreground">· rejected {h.rejected_count}</span>
                     )}
                   </div>
-                  <div className="text-muted-foreground break-all">
-                    key: {h.idempotency_key}
-                  </div>
+                  <div className="text-muted-foreground break-all">key: {h.idempotency_key}</div>
                   <details className="mt-1">
                     <summary className="cursor-pointer text-muted-foreground">
                       response body
                     </summary>
                     <pre className="bg-muted/40 rounded p-2 mt-1 overflow-x-auto whitespace-pre-wrap break-words">
-{JSON.stringify(h.body, null, 2)}
+                      {JSON.stringify(h.body, null, 2)}
                     </pre>
                   </details>
                 </li>
@@ -1688,15 +1630,12 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
       </div>
 
       <Dialog open={shareOpen} onOpenChange={setShareOpen}>
-        <DialogContent
-          className="max-w-2xl"
-          data-testid="sensors-testbench-share-modal"
-        >
+        <DialogContent className="max-w-2xl" data-testid="sensors-testbench-share-modal">
           <DialogHeader>
             <DialogTitle>Share diagnostics</DialogTitle>
             <DialogDescription>
-              Support-ready summary. Sensitive values (tokens, authorization
-              headers, secrets, server-only keys) are redacted before they leave this panel.
+              Support-ready summary. Sensitive values (tokens, authorization headers, secrets,
+              server-only keys) are redacted before they leave this panel.
             </DialogDescription>
           </DialogHeader>
 
@@ -1729,26 +1668,22 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
               </Badge>
             </div>
             <div>
-              <div className="text-muted-foreground mb-1">
-                support-ready summary
-              </div>
+              <div className="text-muted-foreground mb-1">support-ready summary</div>
               <pre
                 className="bg-muted/40 rounded p-2 max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px]"
                 data-testid="sensors-testbench-share-summary"
               >
-{shareModalState.supportSummary}
+                {shareModalState.supportSummary}
               </pre>
             </div>
             {shareModalState.redactedInspectorText && (
               <div>
-                <div className="text-muted-foreground mb-1">
-                  redacted response inspector
-                </div>
+                <div className="text-muted-foreground mb-1">redacted response inspector</div>
                 <pre
                   className="bg-muted/40 rounded p-2 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px]"
                   data-testid="sensors-testbench-share-inspector"
                 >
-{shareModalState.redactedInspectorText}
+                  {shareModalState.redactedInspectorText}
                 </pre>
               </div>
             )}
@@ -1799,4 +1734,3 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     </div>
   );
 }
-

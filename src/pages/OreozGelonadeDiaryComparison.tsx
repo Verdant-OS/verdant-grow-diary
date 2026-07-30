@@ -14,6 +14,7 @@ import {
   type TraitSideSummary,
 } from "@/lib/oreozGelonadeDiaryRules";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+import { plantsPath } from "@/lib/routes";
 
 function summaryText(summary: TraitSideSummary): string {
   if (summary.observedCount === 0 || summary.average === null) return "No scores yet";
@@ -181,7 +182,7 @@ export default function OreozGelonadeDiaryComparison() {
             assigned to a Pheno Hunt can also store editable trait scores and growth habit notes.
           </p>
           <Link
-            to="/plants"
+            to={plantsPath()}
             className="mt-4 inline-flex min-h-[44px] items-center text-sm font-semibold text-primary underline underline-offset-4"
           >
             Open plants

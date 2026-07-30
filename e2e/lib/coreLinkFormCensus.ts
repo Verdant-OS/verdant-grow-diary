@@ -74,6 +74,11 @@ export const PUBLIC_CORE_CENSUS_ROUTES = [
     fieldPolicy: "fill-safe-fields",
   },
   {
+    path: "/customer/guide/oreoz-vs-gelonade-comparison",
+    label: "Next Door Cannabis customer comparison",
+    fieldPolicy: "audit-only",
+  },
+  {
     path: "/hardware-integrations",
     label: "Hardware integrations",
     fieldPolicy: "audit-only",
@@ -201,6 +206,18 @@ export const AUTHENTICATED_CORE_CENSUS_ROUTES = [
     path: "/diary/environment-summary",
     label: "Environment summary",
     fieldPolicy: "fill-safe-fields",
+  },
+  {
+    path: "/diary/pheno-expression-comparison",
+    label: "Oreoz and Gelonade diary comparison",
+    fieldPolicy: "audit-only",
+    expectedContent: [{ kind: "test-id", value: "oreoz-gelonade-diary-comparison" }],
+  },
+  {
+    path: "/diary/strains/oreoz",
+    label: "Oreoz phenotype diary profile",
+    fieldPolicy: "fill-safe-fields",
+    expectedContent: [{ kind: "test-id", value: "cultivar-diary-profile-oreoz" }],
   },
   {
     path: "/reports/post-grow/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",

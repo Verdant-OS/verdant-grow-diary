@@ -20,6 +20,7 @@ import {
 } from "@/lib/oreozGelonadeDiaryRules";
 import { DEFAULT_HYBRID_TRAITS } from "@/lib/phenoTraitScoringRules";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+import { plantsPath } from "@/lib/routes";
 
 type EditableScores = Record<string, number | "">;
 
@@ -277,7 +278,7 @@ export default function CultivarDiaryProfile() {
             scores and growth habit notes here.
           </p>
           <Link
-            to="/plants"
+            to={plantsPath()}
             className="mt-4 inline-flex min-h-[44px] items-center text-sm font-semibold text-primary underline underline-offset-4"
           >
             Open plants

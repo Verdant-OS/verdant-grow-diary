@@ -16,6 +16,7 @@
  *  - Raw payload preserved verbatim; never consulted for downstream logic.
  */
 
+import { SENSOR_READING_NORMALIZATION_STALE_MS } from "@/constants/sensorTiming";
 // ---------------------------------------------------------------------------
 // Source Classification
 // ---------------------------------------------------------------------------
@@ -85,7 +86,7 @@ export interface NormalizedSensorReading {
 // ---------------------------------------------------------------------------
 
 /** Default freshness threshold: 30 minutes in milliseconds. */
-export const STALE_THRESHOLD_MS = 30 * 60 * 1000;
+export const STALE_THRESHOLD_MS = SENSOR_READING_NORMALIZATION_STALE_MS;
 
 // ---------------------------------------------------------------------------
 // Validation Guards

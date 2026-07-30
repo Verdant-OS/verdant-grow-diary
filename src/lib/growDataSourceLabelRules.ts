@@ -7,6 +7,7 @@
  * No React, no Supabase, no I/O. Deterministic for any given input + `now`.
  */
 
+import { GROW_DATA_SOURCE_LABEL_STALE_MS } from "@/constants/sensorTiming";
 export type GrowDataSourceLabel =
   | "Live"
   | "Manual"
@@ -43,7 +44,7 @@ export interface GrowDataSourceLabelResult {
   reasons: string[];
 }
 
-const DEFAULT_STALE_MS = 15 * 60 * 1000;
+const DEFAULT_STALE_MS = GROW_DATA_SOURCE_LABEL_STALE_MS;
 
 const DEMO_SOURCES = new Set(["mock", "demo", "fake", "sample", "fixture"]);
 const SIMULATED_SOURCES = new Set(["sim", "simulated", "simulation"]);

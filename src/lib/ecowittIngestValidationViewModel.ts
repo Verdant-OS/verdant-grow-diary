@@ -15,17 +15,10 @@
  *  - returns "not_validated" (not "healthy") when evidence is missing
  */
 
-export type EcowittValidationStatus =
-  | "not_validated"
-  | "accepted"
-  | "rejected_test"
-  | "stale";
+import { ECOWITT_INGEST_VALIDATION_STALE_AFTER_MS } from "@/constants/sensorTiming";
+export type EcowittValidationStatus = "not_validated" | "accepted" | "rejected_test" | "stale";
 
-export type EcowittValidationMetricStatus =
-  | "accepted"
-  | "rejected"
-  | "missing"
-  | "not_checked";
+export type EcowittValidationMetricStatus = "accepted" | "rejected" | "missing" | "not_checked";
 
 export interface EcowittIngestValidationRow {
   id?: string | null;
@@ -135,7 +128,7 @@ export interface EcowittIngestValidationViewModel {
   }>;
 }
 
-const DEFAULT_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_STALE_AFTER_MS = ECOWITT_INGEST_VALIDATION_STALE_AFTER_MS;
 const TIMELINE_MAX = 10;
 
 interface MetricSpec {
@@ -301,10 +294,7 @@ const EMPTY_METRIC_ROWS: EcowittValidationMetricRow[] = METRIC_SPECS.map((m) => 
   reason: "No local test sender evidence yet.",
 }));
 
-const EMPTY_VM: Omit<
-  EcowittIngestValidationViewModel,
-  "tentScopedLabel" | "cliHints"
-> = {
+const EMPTY_VM: Omit<EcowittIngestValidationViewModel, "tentScopedLabel" | "cliHints"> = {
   hasEvidence: false,
   status: "not_validated",
   statusLabel: "Not validated yet",
@@ -354,9 +344,7 @@ interface BatchValues {
   presentRawKeys: Set<string>;
 }
 
-function collectBatchValues(
-  rows: EcowittIngestValidationRow[],
-): BatchValues {
+function collectBatchValues(rows: EcowittIngestValidationRow[]): BatchValues {
   const values = new Map<string, number>();
   const presentRawKeys = new Set<string>();
   for (const r of rows) {
@@ -471,12 +459,10 @@ function buildTimeline(
   for (const [key, batchRows] of groups) {
     const first = batchRows[0];
     const meta = pickMetadata(first);
-    const invalidTest =
-      meta.invalid_test === true || meta.invalid_test === "true";
+    const invalidTest = meta.invalid_test === true || meta.invalid_test === "true";
     const capturedAt = asString(first.captured_at) ?? asString(first.ts);
     const ts = capturedAt ? Date.parse(capturedAt) : NaN;
-    const stale =
-      Number.isFinite(ts) && now.getTime() - ts > staleAfterMs;
+    const stale = Number.isFinite(ts) && now.getTime() - ts > staleAfterMs;
     const metricRows = buildMetricRows(batchRows, invalidTest);
     const accepted = metricRows.filter((m) => m.status === "accepted").length;
     const rejected = metricRows.filter((m) => m.status === "rejected").length;
@@ -553,17 +539,13 @@ export function buildEcowittIngestValidationViewModel(
   const meta = pickMetadata(testSenderRow);
   const invalidTest = meta.invalid_test === true || meta.invalid_test === "true";
   const transport = asString(meta.transport) ?? "—";
-  const vendor =
-    asString(meta.vendor) ?? asString(meta.stationtype) ?? "ecowitt";
+  const vendor = asString(meta.vendor) ?? asString(meta.stationtype) ?? "ecowitt";
   const sourceLabel = asString(testSenderRow.source) ?? "ecowitt";
-  const capturedAt =
-    asString(testSenderRow.captured_at) ?? asString(testSenderRow.ts);
+  const capturedAt = asString(testSenderRow.captured_at) ?? asString(testSenderRow.ts);
   const capturedAtLabel = capturedAt ?? "—";
 
   const sameBatch = sorted.filter(
-    (r) =>
-      (r.captured_at ?? r.ts) ===
-      (testSenderRow.captured_at ?? testSenderRow.ts),
+    (r) => (r.captured_at ?? r.ts) === (testSenderRow.captured_at ?? testSenderRow.ts),
   );
 
   const batch = collectBatchValues(sameBatch);
@@ -598,9 +580,7 @@ export function buildEcowittIngestValidationViewModel(
 
   const nextSteps: string[] =
     status === "accepted"
-      ? [
-          "No action required — this is test data only, not live telemetry.",
-        ]
+      ? ["No action required — this is test data only, not live telemetry."]
       : status === "stale"
         ? ["Re-run `bun run dev:send-ecowitt` to refresh evidence."]
         : [

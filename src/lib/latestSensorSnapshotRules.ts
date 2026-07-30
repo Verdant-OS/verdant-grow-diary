@@ -16,7 +16,8 @@
 
 import { withoutDiagnosticSensorRows } from "@/lib/sensorProvenanceFenceRules";
 
-export const SENSOR_FRESH_WINDOW_MINUTES = 15;
+import { SENSOR_FRESH_WINDOW_MINUTES } from "@/constants/sensorTiming";
+export { SENSOR_FRESH_WINDOW_MINUTES };
 export const SENSOR_FUTURE_SKEW_LIMIT_MINUTES = 5;
 /** Metrics outside this window are not one coherent sensor snapshot. */
 const SENSOR_SNAPSHOT_COHERENCE_MS = 5 * 60 * 1000;

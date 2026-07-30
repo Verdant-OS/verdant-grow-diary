@@ -25,6 +25,7 @@
  */
 import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
 
+import { DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS } from "@/constants/sensorTiming";
 export type AiSensorSnapshotSource =
   | "live"
   | "manual"
@@ -66,7 +67,7 @@ export interface AiSensorSnapshotsContext {
   omittedSnapshotCount: number;
 }
 
-export const DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS = 30 * 60 * 1000;
+export { DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS };
 
 const KNOWN_SOURCES: ReadonlySet<AiSensorSnapshotSource> = new Set([
   "live",

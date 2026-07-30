@@ -67,6 +67,8 @@ const EXPECTED_SLUGS: ReadonlyArray<string> = [
   // Lighting demand cluster: measured setup and cautious symptom comparison.
   "cannabis-grow-light-distance-and-schedule",
   "cannabis-light-stress-light-burn-bleaching-or-heat",
+  // Cultivar comparison cluster: pheno expression showcase.
+  "oreoz-vs-gelonade-comparison",
 ];
 
 describe("Verdant grower guide FAQ (/guides)", () => {
@@ -118,8 +120,8 @@ describe("Verdant grower guide FAQ (/guides)", () => {
   });
 });
 
-describe("Verdant SEO guide pages (23)", () => {
-  it("defines exactly the twenty-three expected slugs, in order", () => {
+describe("Verdant SEO guide pages (24)", () => {
+  it("defines exactly the twenty-four expected slugs, in order", () => {
     expect(VERDANT_GUIDE_SLUGS).toEqual(EXPECTED_SLUGS);
   });
 

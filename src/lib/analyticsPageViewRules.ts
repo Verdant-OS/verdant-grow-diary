@@ -9,6 +9,7 @@
 
 const UUID_SEGMENT_RE = /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 const LONG_TOKEN_SEGMENT_RE = /\/[a-zA-Z0-9_-]{20,}/g;
+const PUBLIC_GUIDE_PATH_RE = /^\/guides\/[a-z0-9]+(?:-[a-z0-9]+)+(?:\/)?$/;
 
 function pathnameOnly(input: string): string {
   const queryIndex = input.indexOf("?");
@@ -22,9 +23,17 @@ function pathnameOnly(input: string): string {
 
 /** Returns only a de-identified pathname. Never returns a query or hash. */
 export function sanitizePagePath(input: string): string {
-  return pathnameOnly(input)
-    .replace(UUID_SEGMENT_RE, "/:id")
-    .replace(LONG_TOKEN_SEGMENT_RE, "/:id");
+  const pathname = pathnameOnly(input);
+
+  // Public guide slugs are intentional page identities, not user or row IDs.
+  // Preserve them so GA4 can compare individual SEO landing pages. Other
+  // long segments still fail closed to `:id`, including protected routes and
+  // token-bearing paths.
+  if (PUBLIC_GUIDE_PATH_RE.test(pathname)) {
+    return pathname;
+  }
+
+  return pathname.replace(UUID_SEGMENT_RE, "/:id").replace(LONG_TOKEN_SEGMENT_RE, "/:id");
 }
 
 /**

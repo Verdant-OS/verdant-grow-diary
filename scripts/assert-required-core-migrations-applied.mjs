@@ -277,10 +277,35 @@ export function runRequiredCoreMigrationsApplied({
     logger.error(
       `psql exited ${String(result.status)} while reading pg_catalog; stderr was suppressed.`,
     );
+    // The exit STATUS is a small integer with no credential content, so it is
+    // safe to publish while stderr stays suppressed. Without it this failure
+    // is undiagnosable: psql also exits non-zero when it cannot connect at
+    // all, which is indistinguishable from a rejected query in the report.
+    // libpq/psql convention: 1 = psql's own fatal error, 2 = the connection to
+    // the server went bad in a noninteractive session, 3 = script error under
+    // ON_ERROR_STOP.
+    //
+    // Status 2 deliberately does NOT claim the query never ran. psql returns it
+    // both when the connection was never established and when an established
+    // session dropped mid-query, and those are indistinguishable from the exit
+    // code alone. Asserting "never ran" would steer an operator straight at
+    // host/port config when the real fault could be a server-side termination.
+    const psqlStatus = String(result.status);
+    const statusHint =
+      result.status === 2
+        ? "psql status 2 means the CONNECTION to the server went bad — either it was never established, or an established session was lost. The exit code alone cannot distinguish those, so this gate reached no verdict on the schema either way. Treat reachability and credentials for the target as the first suspects rather than schema drift; note GitHub-hosted runners are IPv4-only, so a direct db.<ref>.supabase.co host may need the pooler host instead."
+        : result.status === 3
+          ? "psql status 3 means the SQL was rejected under ON_ERROR_STOP — the connection itself succeeded."
+          : "psql reported its own fatal error before a verdict was reached.";
     writeReport("FAILED - schema query failed", [
       "The target schema remains unknown. Raw psql stderr was suppressed to protect credentials.",
+      `psql exit status: ${psqlStatus}.`,
+      statusHint,
     ]);
-    writeAudit("schema_query_failed", "psql returned a non-zero status.");
+    writeAudit(
+      "schema_query_failed",
+      `psql returned a non-zero status (${psqlStatus}).`,
+    );
     return EXIT.SCHEMA_QUERY_FAILED;
   }
 

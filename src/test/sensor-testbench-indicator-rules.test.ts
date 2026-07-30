@@ -157,7 +157,7 @@ describe("classifySensorTestbench", () => {
     },
   );
 
-  it("renders fresh physical Windows-listener lineage with preserved source and gateway markers as live", () => {
+  it("renders fresh physical Windows-listener lineage with preserved source and gateway markers as receiving", () => {
     const r = classifySensorTestbench({
       rows: [
         {
@@ -179,12 +179,12 @@ describe("classifySensorTestbench", () => {
       ],
       now: NOW,
     });
-    expect(r.indicator).toBe("live");
+    expect(r.indicator).toBe("receiving");
     expect(r.isTestbench).toBe(false);
     expect(r.source).toBe("live");
   });
 
-  it("renders fresh non-testbench ecowitt as live", () => {
+  it("renders fresh non-testbench ecowitt as receiving (transport, never live — #584)", () => {
     const r = classifySensorTestbench({
       rows: [
         {
@@ -195,7 +195,7 @@ describe("classifySensorTestbench", () => {
       ],
       now: NOW,
     });
-    expect(r.indicator).toBe("live");
+    expect(r.indicator).toBe("receiving");
     expect(r.isTestbench).toBe(false);
   });
 
@@ -215,7 +215,7 @@ describe("classifySensorTestbench", () => {
     expect(r.indicator).toBe("stale");
   });
 
-  it("never promotes manual readings to live", () => {
+  it("never promotes manual readings to receiving", () => {
     const r = classifySensorTestbench({
       rows: [
         {

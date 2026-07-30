@@ -51,6 +51,7 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/operator/edge-alerts",
   "/operator/edge-metrics",
   "/demo/one-tent-live-proof",
+  "/operator/mode",
   "/operator/one-tent-live-proof",
   "/operator/one-tent-loop-smoke-test",
   "/operator/one-tent-proof-record",

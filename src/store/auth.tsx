@@ -61,10 +61,21 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => applySession(s));
-    supabase.auth.getSession().then(({ data }) => {
-      applySession(data.session);
-      setLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        applySession(data.session);
+      })
+      .catch(() => {
+        // A rejected initial session read (network failure, corrupt storage)
+        // must resolve to signed-out instead of leaving the apex and every
+        // AppShell route on a permanent loading screen. onAuthStateChange
+        // still delivers the real session if one materializes later.
+        applySession(null);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
     return () => sub.subscription.unsubscribe();
   }, [applySession]);
 

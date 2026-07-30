@@ -10,7 +10,7 @@
  * Flags:
  *   --urls a,b,c            Explicit URL list
  *   --sitemap <url>         Pull URLs from a sitemap.xml
- *   --max <n>               Max URLs to inspect (default 15, hard cap 50)
+ *   --max <n>               Max URLs to inspect (default 100, hard cap 100)
  *   --allow <a,b,c>         Ad-hoc URLs allowed to be non-indexable
  *   --expected-noindex      Treat every URL as expected-non-indexable
  *   --allowlist <path>      Tracked allowlist (default: config/seo-allowlist.json)
@@ -101,6 +101,8 @@ function toUrlClassifications(simulated) {
 
 const ARTIFACT_DIR = resolve(process.cwd(), "artifacts/seo");
 const DEFAULT_PREVIOUS_DIR = resolve(process.cwd(), "artifacts/seo/previous");
+const HARD_CAP = 100;
+const DEFAULT_MAX_URLS = HARD_CAP;
 const DEFAULT_URLS = [
   "https://verdantgrowdiary.com/",
   "https://verdantgrowdiary.com/welcome",
@@ -108,7 +110,6 @@ const DEFAULT_URLS = [
   "https://verdantgrowdiary.com/hardware-integrations",
   "https://verdantgrowdiary.com/guides/cronk-nutrients-grow-diary",
 ];
-const HARD_CAP = 50;
 
 // List of stable artifact paths that both the JSON summary and the
 // markdown summary point at. Keeping these in one place means the
@@ -134,7 +135,7 @@ function parseArgs(argv) {
   const out = {
     urls: null,
     sitemap: null,
-    max: 15,
+    max: DEFAULT_MAX_URLS,
     allow: [],
     expectedNoindex: false,
     allowlistPath: DEFAULT_ALLOWLIST_PATH,
@@ -154,7 +155,8 @@ function parseArgs(argv) {
         .map((s) => s.trim())
         .filter(Boolean);
     else if (a === "--sitemap") out.sitemap = argv[++i];
-    else if (a === "--max") out.max = Math.min(HARD_CAP, Math.max(1, Number(argv[++i]) || 15));
+    else if (a === "--max")
+      out.max = Math.min(HARD_CAP, Math.max(1, Number(argv[++i]) || DEFAULT_MAX_URLS));
     else if (a === "--allow")
       out.allow = argv[++i]
         .split(",")

@@ -74,3 +74,19 @@ describe("Google Analytics static safety — no PII in path logic", () => {
     expect(indexHtml).toMatch(/send_page_view:\s*false/);
   });
 });
+
+describe("Google Analytics route metadata timing", () => {
+  it("mounts analytics after the lazy route inside Suspense", () => {
+    const app = readFile("src/App.tsx");
+    const suspenseStart = app.indexOf("<Suspense");
+    const routesEnd = app.indexOf("</Routes>", suspenseStart);
+    const analyticsMount = app.indexOf("<AnalyticsShell />", suspenseStart);
+    const suspenseEnd = app.indexOf("</Suspense>", suspenseStart);
+
+    expect(suspenseStart).toBeGreaterThanOrEqual(0);
+    expect(routesEnd).toBeGreaterThan(suspenseStart);
+    expect(analyticsMount).toBeGreaterThan(routesEnd);
+    expect(analyticsMount).toBeLessThan(suspenseEnd);
+    expect(app.match(/<AnalyticsShell \/>/g)).toHaveLength(1);
+  });
+});

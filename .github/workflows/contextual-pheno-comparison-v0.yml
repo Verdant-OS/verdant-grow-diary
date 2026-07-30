@@ -1,8 +1,11 @@
 name: Contextual Pheno Comparison v0
 
+# NOTE: `verdant-grow-diary` is this repo's default branch; a main-only
+# filter means the workflow never runs (#581). The changed-file scan uses
+# `origin/${{ github.base_ref }}`, so it follows the PR's base automatically.
 on:
   pull_request:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
 
 permissions:
   contents: read

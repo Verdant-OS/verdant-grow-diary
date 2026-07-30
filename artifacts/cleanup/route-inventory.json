@@ -1,0 +1,946 @@
+{
+  "$schema_note": "Point-in-time snapshot generated from src/lib/appRouteManifest.ts (the canonical, drift-guarded route inventory; see src/test/route-manifest-sync.test.ts). Regenerate rather than hand-editing.",
+  "generated_for": "docs/cleanup/verdant-stabilization-audit.md (2026-07-30 stabilization sprint)",
+  "source": "src/lib/appRouteManifest.ts",
+  "route_count": 134,
+  "routes": [
+    {
+      "path": "*",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "NotFound catch-all."
+    },
+    {
+      "path": "/",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Public landing when signed out; authenticated Dashboard when signed in."
+    },
+    {
+      "path": "/.lovable/oauth/consent",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Lovable MCP OAuth consent page (public by protocol requirement)."
+    },
+    {
+      "path": "/account/preferences",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Grower account preferences."
+    },
+    {
+      "path": "/action-queue",
+      "access": "redirect",
+      "requiredFeature": null,
+      "label": null,
+      "description": "→ /actions"
+    },
+    {
+      "path": "/actions",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/actions/:actionId",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/admin/leads",
+      "access": "internal",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/ai-doctor",
+      "access": "redirect",
+      "requiredFeature": null,
+      "label": null,
+      "description": "→ /doctor"
+    },
+    {
+      "path": "/ai-doctor-readiness-check",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Private, no-diagnosis AI Doctor context coverage check."
+    },
+    {
+      "path": "/alerts",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/alerts/:alertId",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/auth",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/billing/:plan",
+      "access": "redirect",
+      "requiredFeature": null,
+      "label": null,
+      "description": "→ /pricing?plan=<canonical> (legacy billing entry; /pricing owns live checkout)."
+    },
+    {
+      "path": "/breeder-beta",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Breeder beta landing page."
+    },
+    {
+      "path": "/breeding",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Breeding programs index."
+    },
+    {
+      "path": "/breeding/:programId",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Breeding program detail."
+    },
+    {
+      "path": "/breeding/log/new",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Log a grow-scoped breeding event."
+    },
+    {
+      "path": "/breeding/new",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Create a new breeding program."
+    },
+    {
+      "path": "/checkout/cancel",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Checkout cancellation return."
+    },
+    {
+      "path": "/checkout/success",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Checkout success return."
+    },
+    {
+      "path": "/contact",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Public support contact page."
+    },
+    {
+      "path": "/creator-beta",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Creator beta landing page."
+    },
+    {
+      "path": "/cultivars",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Public cultivar guides index."
+    },
+    {
+      "path": "/cultivars/:slug",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Public per-cultivar guide page (evergreen best-practice content)."
+    },
+    {
+      "path": "/daily-check",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/dashboard",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Authenticated Dashboard alias; preserves optional growId scope."
+    },
+    {
+      "path": "/demo",
+      "access": "redirect",
+      "requiredFeature": null,
+      "label": null,
+      "description": "→ /welcome"
+    },
+    {
+      "path": "/demo/one-tent-live-proof",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Legacy operator one-tent live proof page."
+    },
+    {
+      "path": "/diagnostics",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/diary/environment-summary",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Environment summary report (diary)."
+    },
+    {
+      "path": "/docs/mcp-api",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Public MCP API reference documentation."
+    },
+    {
+      "path": "/doctor",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/doctor/sessions",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/doctor/sessions/:sessionId",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/features",
+      "access": "redirect",
+      "requiredFeature": null,
+      "label": null,
+      "description": "→ /welcome"
+    },
+    {
+      "path": "/feedback",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Public support feedback page."
+    },
+    {
+      "path": "/founder",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Public Founder Lifetime acquisition and offer explainer."
+    },
+    {
+      "path": "/genetics",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": "Genetics",
+      "description": "Genetics Library: accessions, propagation batches, screening/quarantine evidence, and lineage traceability (owner-scoped, RLS-protected)."
+    },
+    {
+      "path": "/genetics/accessions/:id",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/genetics/batches/:id",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/genetics/health/:kind/:id",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/genetics/trace/:kind/:id",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/glossary",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Public grower glossary (SEO)."
+    },
+    {
+      "path": "/grow-lineage",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": "Lineage Repair",
+      "description": "Grower-facing repair tool for reassigning tents to grows (owner-scoped, RLS-protected)."
+    },
+    {
+      "path": "/grow-room",
+      "access": "redirect",
+      "requiredFeature": null,
+      "label": null,
+      "description": "→ /"
+    },
+    {
+      "path": "/grows",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/grows/:growId",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/grows/:growId/learning",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Post-grow learning report for a specific grow."
+    },
+    {
+      "path": "/guides",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Grower guides index."
+    },
+    {
+      "path": "/guides/:slug",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Individual grower guide page."
+    },
+    {
+      "path": "/guides/grow-stage-care-guide",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Searchable grow-stage care guide with checklists."
+    },
+    {
+      "path": "/hardware-integrations",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/health",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Authenticated app health page."
+    },
+    {
+      "path": "/how-ai-doctor-works",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Public AI Doctor safety and workflow explainer."
+    },
+    {
+      "path": "/ingest-inspector",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/internal/ai-doctor-confidence-audit",
+      "access": "internal",
+      "requiredFeature": null,
+      "label": null,
+      "description": "AI Doctor confidence internal static audit."
+    },
+    {
+      "path": "/internal/ai-doctor-phase1-preview",
+      "access": "internal",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Static Phase 1 view model preview."
+    },
+    {
+      "path": "/internal/contextual-pheno-comparison-demo",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Read-only Contextual Pheno Comparison v0.1 demo (fixture data only; mounted outside AppShell, unlinked / hidden by URL — no private data)."
+    },
+    {
+      "path": "/internal/demo-proof-walkthrough",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Read-only walkthrough of the V0 One-Tent Loop proof path (fixture-only presenter; mounted outside AppShell, unlinked / hidden by URL — no private data)."
+    },
+    {
+      "path": "/internal/one-tent-loop-proof",
+      "access": "internal",
+      "requiredFeature": null,
+      "label": null,
+      "description": "One-tent loop internal proof checklist."
+    },
+    {
+      "path": "/internal/pheno-hunt-demo",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Read-only full pheno-hunt demo (pack → triage → keepers → clones → crosses → family tree; fixture data only; mounted outside AppShell, unlinked / hidden by URL — no private data)."
+    },
+    {
+      "path": "/internal/sensor-truth-audit",
+      "access": "internal",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Sensor truth internal static audit."
+    },
+    {
+      "path": "/invite",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Authenticated PII-free grower referral surface."
+    },
+    {
+      "path": "/leads",
+      "access": "internal",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/login",
+      "access": "redirect",
+      "requiredFeature": null,
+      "label": null,
+      "description": "→ /auth"
+    },
+    {
+      "path": "/logs",
+      "access": "redirect",
+      "requiredFeature": null,
+      "label": null,
+      "description": "→ /timeline"
+    },
+    {
+      "path": "/onboarding",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Post-sign-in start-screen choice (diary-first default)."
+    },
+    {
+      "path": "/one-tent-loop-proof",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Operator-only One-Tent Loop proof surface."
+    },
+    {
+      "path": "/operator/ai-doctor-phase1",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Operator AI Doctor Phase 1 results page."
+    },
+    {
+      "path": "/operator/billing-entitlement-resolution",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Operator billing entitlement resolution audit (read-only)."
+    },
+    {
+      "path": "/operator/billing-subscription-updates",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Operator billing subscription update audit (read-only)."
+    },
+    {
+      "path": "/operator/credits-audit",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Operator AI-credit grants/spends audit (read-only)."
+    },
+    {
+      "path": "/operator/demo-preview",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Operator demo preview (read-only)."
+    },
+    {
+      "path": "/operator/ecowitt",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Cloud Canary preview."
+    },
+    {
+      "path": "/operator/ecowitt-bridge-debug",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "EcoWitt bridge debug (read-only)."
+    },
+    {
+      "path": "/operator/ecowitt-bridge-status",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "EcoWitt bridge status (read-only)."
+    },
+    {
+      "path": "/operator/ecowitt-live-bringup",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "EcoWitt live bring-up tooling (read-only)."
+    },
+    {
+      "path": "/operator/ecowitt-tent-preview",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "EcoWitt per-tent preview (read-only)."
+    },
+    {
+      "path": "/operator/edge-alerts",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Operator edge-function alert breach state — live evaluation plus cooldown dispatch history (read-only)."
+    },
+    {
+      "path": "/operator/edge-metrics",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Operator edge-function metric trend charts (read-only)."
+    },
+    {
+      "path": "/operator/mode",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Operator Mode landing surface."
+    },
+    {
+      "path": "/operator/one-tent-live-proof",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Operator one-tent live proof page."
+    },
+    {
+      "path": "/operator/one-tent-loop-smoke-test",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Operator one-tent loop smoke test (read-only)."
+    },
+    {
+      "path": "/operator/one-tent-proof-record",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "One-tent proof record export."
+    },
+    {
+      "path": "/operator/paddle-processing-audit",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Operator Paddle processing audit (read-only)."
+    },
+    {
+      "path": "/operator/post-grow-reflection-dry-run",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Post-Grow Reflection dry-run diagnostics panel (read-only)."
+    },
+    {
+      "path": "/operator/release-readiness",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Read-only release readiness / validation status snapshot (static/manual, no live CI feed)."
+    },
+    {
+      "path": "/operator/schema-audit",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Operator required-migration and critical-table audit (read-only)."
+    },
+    {
+      "path": "/operator/subscriber-growth",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Operator subscriber-growth goal snapshot from authoritative billing counts (read-only)."
+    },
+    {
+      "path": "/operator/support-inbox",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Operator support inbox; original submissions are read-only, while review status and internal notes are editable."
+    },
+    {
+      "path": "/partners/csv-preview",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Read-only partner explainer for the browser-local CSV sensor preview."
+    },
+    {
+      "path": "/pheno-comparison",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Read-only Pheno Comparison preview (sample data, mounted outside AuthProvider/GrowsProvider/AppShell — no grows read, no write chrome)."
+    },
+    {
+      "path": "/pheno-expression-showcase",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Fixture-only public pheno expression showcase."
+    },
+    {
+      "path": "/pheno-hunts",
+      "access": "auth",
+      "requiredFeature": "pheno_tracker",
+      "label": null,
+      "description": "Pheno hunts index (the grower's own hunts)."
+    },
+    {
+      "path": "/pheno-hunts/:id/compare",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Read-only per-hunt comparison with graceful unauthenticated state."
+    },
+    {
+      "path": "/pheno-hunts/:id/keepers",
+      "access": "auth",
+      "requiredFeature": "pheno_tracker",
+      "label": null,
+      "description": "Pheno keeper selection."
+    },
+    {
+      "path": "/pheno-hunts/:id/showcase",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Read-only per-hunt showcase (pack, contenders, fight, cure, family tree) with graceful demo fallback."
+    },
+    {
+      "path": "/pheno-hunts/:id/workspace",
+      "access": "auth",
+      "requiredFeature": "pheno_tracker",
+      "label": null,
+      "description": "Pheno hunt workspace."
+    },
+    {
+      "path": "/pheno-hunts/new",
+      "access": "auth",
+      "requiredFeature": "pheno_tracker",
+      "label": null,
+      "description": "New pheno hunt entry."
+    },
+    {
+      "path": "/pi-ingest-status",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/plants",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/plants/:id",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/pricing",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/privacy",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Privacy policy."
+    },
+    {
+      "path": "/privacy-policy",
+      "access": "redirect",
+      "requiredFeature": null,
+      "label": null,
+      "description": "→ /privacy"
+    },
+    {
+      "path": "/quick-log",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Public 30-second Quick Log starter (local draft on this device only; routes to signup with allow-listed UTM attribution)."
+    },
+    {
+      "path": "/refund",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Refund policy page."
+    },
+    {
+      "path": "/refund-policy",
+      "access": "redirect",
+      "requiredFeature": null,
+      "label": null,
+      "description": "→ /refund"
+    },
+    {
+      "path": "/refunds",
+      "access": "redirect",
+      "requiredFeature": null,
+      "label": null,
+      "description": "→ /refund"
+    },
+    {
+      "path": "/register",
+      "access": "redirect",
+      "requiredFeature": null,
+      "label": null,
+      "description": "→ /auth"
+    },
+    {
+      "path": "/reports",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/reports/diary-range",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Date-range diary report (Print / Save PDF)."
+    },
+    {
+      "path": "/reports/post-grow/:growId",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Post-grow learning report."
+    },
+    {
+      "path": "/reset-password",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Password reset landing page."
+    },
+    {
+      "path": "/sensors",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/sensors/csv-preview",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Browser-local CSV/TSV sensor preview with no upload or persistence."
+    },
+    {
+      "path": "/sensors/ecowitt-audit",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/sensors/ingest-normalizer",
+      "access": "operator",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/settings",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/settings/agent-integrations",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Authenticated agent integrations settings."
+    },
+    {
+      "path": "/signup",
+      "access": "redirect",
+      "requiredFeature": null,
+      "label": null,
+      "description": "→ /auth"
+    },
+    {
+      "path": "/strains",
+      "access": "redirect",
+      "requiredFeature": null,
+      "label": null,
+      "description": "→ /cultivars"
+    },
+    {
+      "path": "/strains/:slug",
+      "access": "redirect",
+      "requiredFeature": null,
+      "label": null,
+      "description": "→ /cultivars/:slug"
+    },
+    {
+      "path": "/tasks",
+      "access": "redirect",
+      "requiredFeature": null,
+      "label": null,
+      "description": "→ /actions"
+    },
+    {
+      "path": "/tents",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/tents/:id",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/terms",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Terms of service."
+    },
+    {
+      "path": "/terms-of-service",
+      "access": "redirect",
+      "requiredFeature": null,
+      "label": null,
+      "description": "→ /terms"
+    },
+    {
+      "path": "/timeline",
+      "access": "auth",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    },
+    {
+      "path": "/tools/vpd-calculator",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Public manual-input, stage-aware air VPD calculator."
+    },
+    {
+      "path": "/unsubscribe",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": "Public token-validated email unsubscribe flow."
+    },
+    {
+      "path": "/upgrade",
+      "access": "redirect",
+      "requiredFeature": null,
+      "label": null,
+      "description": "→ /pricing with allowlisted plan, acquisition, and return intent."
+    },
+    {
+      "path": "/welcome",
+      "access": "public",
+      "requiredFeature": null,
+      "label": null,
+      "description": null
+    }
+  ]
+}

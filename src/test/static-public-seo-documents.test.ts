@@ -135,6 +135,35 @@ describe("static public SEO documents", () => {
     }
   });
 
+  it("keeps rich page schema available in the static crawler documents", () => {
+    const byPath = new Map(
+      STATIC_PUBLIC_SEO_DOCUMENTS.map((document) => [document.path, document]),
+    );
+    const typesAt = (path: string) =>
+      (byPath.get(path)?.metadata.jsonLd ?? []).flatMap((block) => {
+        if (typeof block !== "object" || block === null || !("@type" in block)) return [];
+        const type = (block as { "@type"?: unknown })["@type"];
+        return typeof type === "string" ? [type] : [];
+      });
+
+    expect(typesAt("/guides")).toEqual(
+      expect.arrayContaining(["WebPage", "FAQPage", "BreadcrumbList"]),
+    );
+    expect(typesAt("/guides/what-to-log-in-a-grow-journal")).toEqual(
+      expect.arrayContaining(["WebPage", "FAQPage", "BreadcrumbList"]),
+    );
+    expect(typesAt("/guides/what-to-log-in-a-grow-journal")).not.toContain("Article");
+    expect(typesAt("/guides/cannabis-grow-light-distance-and-schedule")).toEqual(
+      expect.arrayContaining(["WebPage", "FAQPage", "BreadcrumbList", "Article"]),
+    );
+    expect(typesAt("/cultivars/oreoz")).toEqual(
+      expect.arrayContaining(["WebPage", "CollectionPage", "FAQPage", "BreadcrumbList", "Article"]),
+    );
+    expect(typesAt("/quick-log")).toEqual(
+      expect.arrayContaining(["WebPage", "SoftwareApplication", "FAQPage"]),
+    );
+  });
+
   it("uses directory-local documents that filesystem-first hosts serve before the SPA fallback", () => {
     for (const document of STATIC_PUBLIC_SEO_DOCUMENTS) {
       expect(document.fileName).toBe(`${document.path.slice(1)}/index.html`);

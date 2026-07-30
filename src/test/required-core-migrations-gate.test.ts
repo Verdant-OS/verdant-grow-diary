@@ -762,6 +762,100 @@ describe("remote applied-schema runner safety", () => {
     expect(observable).not.toContain("could not connect using");
     expect(observable).toContain("stderr was suppressed");
   });
+
+  /**
+   * Suppressing stderr is correct, but it left the report saying only "the
+   * target schema remains unknown" for BOTH a rejected query and a database
+   * the runner could never reach. The sandbox gate burned six red pushes on
+   * exactly that ambiguity. psql's exit status is a small integer with no
+   * credential content, so publishing it — and only it — restores the
+   * diagnosis without weakening the secret boundary.
+   */
+  describe("publishes psql's exit status so a dead connection is diagnosable", () => {
+    function runWithPsqlStatus(psqlStatus: number) {
+      const sentinel = "STATUS-PROBE-SECRET-SENTINEL";
+      const url = directUrl(SANDBOX_REF, 5432, sentinel);
+      const dir = mkdtempSync(join(tmpdir(), "core-schema-gate-"));
+      tempDirs.push(dir);
+      const reportPath = join(dir, "report.md");
+      const auditPath = join(dir, "audit.json");
+      const { logger, lines } = captureLogger();
+
+      const status = runRequiredCoreMigrationsApplied({
+        env: {
+          TARGET_ENV: "sandbox",
+          SUPABASE_DB_URL: url,
+          REPORT_PATH: reportPath,
+          AUDIT_PATH: auditPath,
+        },
+        spawnImpl: () => ({
+          status: psqlStatus,
+          stdout: "",
+          // A hostile or merely careless psql can echo the whole URI here.
+          stderr: `psql: connection to ${url} failed: FATAL: password authentication failed`,
+        }),
+        logger,
+      });
+
+      return {
+        status,
+        report: readFileSync(reportPath, "utf8"),
+        audit: readFileSync(auditPath, "utf8"),
+        observable: [...lines, readFileSync(reportPath, "utf8"), readFileSync(auditPath, "utf8")].join("\n"),
+        sentinel,
+        url,
+      };
+    }
+
+    it("names status 2 as a bad connection, not schema drift", () => {
+      const { status, report } = runWithPsqlStatus(2);
+      expect(status).toBe(EXIT.SCHEMA_QUERY_FAILED);
+      expect(report).toContain("psql exit status: 2.");
+      expect(report).toMatch(/CONNECTION to the server went bad/);
+      // The whole point: stop the operator from chasing migrations that are fine.
+      expect(report).toMatch(/rather than schema drift/i);
+    });
+
+    /**
+     * psql returns 2 both when the connection was never established AND when an
+     * established session dropped mid-query — the exit code cannot tell them
+     * apart. An earlier draft of this hint asserted "the query never ran", which
+     * would send an operator to host/port config for what may have been a
+     * server-side termination. The copy must stay agnostic.
+     */
+    it("does not claim the query never ran at status 2", () => {
+      const { report } = runWithPsqlStatus(2);
+      expect(report).not.toMatch(/never ran|never executed|did not run|never began/i);
+      // It must still say the gate has no verdict — agnostic, not silent.
+      expect(report).toMatch(/no verdict/i);
+      // And it must name both possibilities rather than only the first.
+      expect(report).toMatch(/never established/i);
+      expect(report).toMatch(/session was lost/i);
+    });
+
+    it("names status 3 as a rejected query on a live connection", () => {
+      const { status, report } = runWithPsqlStatus(3);
+      expect(status).toBe(EXIT.SCHEMA_QUERY_FAILED);
+      expect(report).toContain("psql exit status: 3.");
+      expect(report).toMatch(/connection itself succeeded/);
+    });
+
+    it("records the status in the audit trail too", () => {
+      const { audit } = runWithPsqlStatus(2);
+      expect(audit).toContain("schema_query_failed");
+      expect(audit).toContain("(2)");
+    });
+
+    it("still leaks nothing from stderr at any status", () => {
+      for (const psqlStatus of [1, 2, 3, 127]) {
+        const { observable, sentinel, url } = runWithPsqlStatus(psqlStatus);
+        expect(observable, `status ${psqlStatus}`).not.toContain(sentinel);
+        expect(observable, `status ${psqlStatus}`).not.toContain(url);
+        expect(observable, `status ${psqlStatus}`).not.toContain("password authentication failed");
+        expect(observable, `status ${psqlStatus}`).toContain("stderr was suppressed");
+      }
+    });
+  });
 });
 
 describe("required-core-migrations workflow trust boundary", () => {

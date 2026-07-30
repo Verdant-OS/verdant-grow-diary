@@ -31,4 +31,8 @@ export const STATIC_ONLY_ROUTES = Object.freeze([
   "/creator-beta",
   "/pheno-comparison",
   "/pheno-expression-showcase",
+  // Pre-rendered so its canonical is itself rather than the shell's root
+  // canonical (which would mark it a homepage duplicate for non-JS crawlers).
+  // Whether to ADVERTISE it in sitemap.xml is a separate acquisition call.
+  "/docs/mcp-api",
 ]);

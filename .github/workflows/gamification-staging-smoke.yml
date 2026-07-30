@@ -1,5 +1,13 @@
 name: Gamification staging smoke
 
+# dormant: deliberately main-only (#581). Requires staging Supabase secrets.
+# WARNING recorded during the 2026-07-30 sweep: its payload steps gate on
+# `env.*` names defined only inside each step's own env: block, which is out
+# of scope for that step's `if:` — so the RLS/smoke steps have NEVER
+# executed; its green runs prove only that `bun install` works. Fix the
+# gating (see datadog-synthetics' outputs-based gate for the working
+# pattern) before trusting or retargeting this workflow.
+#
 # Manual / protected workflow for live gamification verification.
 #
 # Why separate from ci.yml:

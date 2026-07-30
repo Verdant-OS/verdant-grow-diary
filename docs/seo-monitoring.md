@@ -1,11 +1,13 @@
 # Verdant SEO Monitoring v1
 
-Post-deploy Google Search Console (GSC) monitoring. Read-only. No product
+Post-CI Google Search Console (GSC) monitoring. Read-only. It runs after the
+repository's `ci` workflow succeeds; it does not prove a deployment occurred.
+No product
 UI, schema, RLS, Edge Function, or auth changes.
 
 ## Scope
 
-- URL Inspection API (bounded run per deploy)
+- URL Inspection API (bounded run after successful CI)
 - Sitemap-driven URL discovery
 - Verification of the last tracked GSC finding
 - Sanitized JSON + Markdown reports under `artifacts/seo/`
@@ -55,7 +57,7 @@ Add these repo secrets (Settings → Secrets and variables → Actions):
 - `GSC_REFRESH_TOKEN` (from `.seo/gsc-token.local.json`)
 - `GSC_SITE_URL` (e.g. `https://verdantgrowdiary.com/`)
 
-If any are missing, the `SEO Monitoring (post-deploy)` workflow marks
+If any are missing, the `SEO Monitoring (post-CI)` workflow marks
 the GSC step **skipped** (not failed) and uploads an artifact explaining
 that OAuth is not configured.
 
@@ -63,10 +65,14 @@ that OAuth is not configured.
 
 `.github/workflows/seo-monitoring.yml`
 
-- Runs on successful completion of the `ci` workflow, or on
-  `workflow_dispatch`.
-- Inspects up to `max_urls` URLs (default 15, hard cap 50) pulled from
-  the sitemap.
+- Runs after successful completion of the `ci` workflow on the production
+  `verdant-grow-diary` branch, or on `workflow_dispatch`. It is post-CI
+  monitoring, not a deployment receipt.
+- Inspects up to `max_urls` sitemap URLs (default 100, hard cap 100). The
+  current sitemap has 51 URLs, so the default inspects every sitemap target
+  while remaining far below Search Console's per-site daily inspection quota.
+- Has a 20-minute job timeout so a stalled dependency or remote inspection
+  cannot occupy a runner indefinitely.
 - Verifies the last tracked GSC finding
   (`config/seo-last-gsc-finding.json`).
 - Uploads `artifacts/seo/**` on success and failure. Excludes anything
@@ -111,7 +117,7 @@ are intentionally non-indexable (e.g. `/auth`).
 ```
 
 Update the description and `affected_urls` when a new GSC UI issue
-appears; the post-deploy workflow will re-verify it every run.
+appears; the post-CI workflow will re-verify it every run.
 
 ## Safety
 
@@ -140,6 +146,12 @@ _new_ critical issues. Three sections:
   `validateAllowlist` refuses any allowlist pattern that would
   capture them.
 
+`sitemap.xml` and `robots.txt` are intentionally outside the sitemap-driven
+GSC URL Inspection input: they are crawl-control assets, not sitemap entries.
+The default 100-URL sweep covers every current sitemap URL, including every
+sitemap-backed `never_allowlist` URL; static repository checks continue to
+cover these two assets.
+
 Runner flags:
 
 - `--allowlist <path>` — override the default `config/seo-allowlist.json`.
@@ -152,11 +164,12 @@ matching `id` attached for audit.
 ### Tests
 
 ```bash
-node --test scripts/test-seo-allowlist.mjs scripts/test-seo-allowlist-config.mjs
+node --test scripts/test-seo-monitoring-workflow.mjs scripts/test-seo-allowlist.mjs scripts/test-seo-allowlist-config.mjs
 ```
 
-The workflow runs both files before invoking the inspection runner, so
-a malformed or too-broad allowlist fails CI before any GSC call.
+The workflow runs these checks before invoking the inspection runner, so a
+malformed or too-broad allowlist — or a default sweep that no longer covers the
+current sitemap — fails CI before any GSC call.
 
 ## Last-finding verification safety
 

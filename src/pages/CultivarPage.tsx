@@ -28,10 +28,7 @@ import {
   safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
 import { buildCultivarSummaryRows } from "@/lib/cultivarReferenceViewModel";
-import {
-  buildCultivarBreadcrumbItems,
-  buildCultivarFaqItems,
-} from "@/lib/cultivarDetailSeo";
+import { buildCultivarBreadcrumbItems, buildCultivarFaqItems } from "@/lib/cultivarDetailSeo";
 
 function sectionId(key: CultivarGuideSectionKey): string {
   return `guide-${key.replace(/_/g, "-")}`;
@@ -95,6 +92,7 @@ export default function CultivarPage() {
       url,
       datePublished: verifiedDate,
       dateModified: verifiedDate,
+      image: "https://verdantgrowdiary.com/brand/verdant-logo-512.png",
       siteUrl: VERDANT_SITE_ORIGIN,
     });
 
@@ -236,10 +234,14 @@ export default function CultivarPage() {
                     <h3 className="text-sm font-semibold">Reported tendencies</h3>
                     <ul className="mt-2 space-y-3">
                       {section.reportedTendencies.map((item) => (
-                        <li key={`${item.text}-${item.confidence}`} className="rounded-lg bg-muted/35 p-3 text-sm">
+                        <li
+                          key={`${item.text}-${item.confidence}`}
+                          className="rounded-lg bg-muted/35 p-3 text-sm"
+                        >
                           <p>{item.text}</p>
                           <p className="mt-1 text-xs capitalize text-muted-foreground">
-                            {item.confidence} confidence · {item.evidenceKeys.length} evidence reference
+                            {item.confidence} confidence · {item.evidenceKeys.length} evidence
+                            reference
                             {item.evidenceKeys.length === 1 ? "" : "s"}
                           </p>
                         </li>
@@ -255,7 +257,9 @@ export default function CultivarPage() {
                       {section.guidance.map((item) => (
                         <li key={item.text} className="rounded-lg border border-border/50 p-3">
                           {item.text}
-                          <span className="ml-2 text-xs uppercase tracking-wide">Risk: {item.risk}</span>
+                          <span className="ml-2 text-xs uppercase tracking-wide">
+                            Risk: {item.risk}
+                          </span>
                         </li>
                       ))}
                     </ul>
@@ -291,19 +295,27 @@ export default function CultivarPage() {
               <h2 className="font-display text-lg font-semibold">Profile summary</h2>
               <dl className="mt-3 space-y-3 text-sm">
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">Difficulty</dt>
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Difficulty
+                  </dt>
                   <dd className="mt-1">{cultivar.difficulty}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">Height tendency</dt>
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Height tendency
+                  </dt>
                   <dd className="mt-1 capitalize">{cultivar.heightCategory}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">Market classification</dt>
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Market classification
+                  </dt>
                   <dd className="mt-1 capitalize">{cultivar.marketClassification}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">Data origin</dt>
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Data origin
+                  </dt>
                   <dd className="mt-1 capitalize">{cultivar.dataOrigin}</dd>
                 </div>
               </dl>
@@ -326,7 +338,8 @@ export default function CultivarPage() {
                       {source.title}
                     </a>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {source.publisher} · {source.sourceType.replace(/_/g, " ")} · retrieved {formatDate(source.retrievedAt)}
+                      {source.publisher} · {source.sourceType.replace(/_/g, " ")} · retrieved{" "}
+                      {formatDate(source.retrievedAt)}
                     </p>
                   </li>
                 ))}
@@ -366,9 +379,9 @@ export default function CultivarPage() {
             Track {cultivar.name} in your own grow
           </h2>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            A linked reference may provide context later, but Verdant will keep the plant&apos;s actual
-            logs and sensors in charge. Reference pages never create alerts, nutrient actions,
-            irrigation actions, or equipment commands.
+            A linked reference may provide context later, but Verdant will keep the plant&apos;s
+            actual logs and sensors in charge. Reference pages never create alerts, nutrient
+            actions, irrigation actions, or equipment commands.
           </p>
           <div className="mt-4 flex flex-wrap gap-3 text-sm">
             <Link

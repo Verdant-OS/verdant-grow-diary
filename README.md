@@ -539,7 +539,7 @@ output:
 
 ```bash
 # 1) Export the sandbox DB URL for this shell session.
-export SUPABASE_DB_URL="postgres://postgres:${SANDBOX_DB_PASSWORD}@db.knkwiiywfkbqznbxwqfh.supabase.co:5432/postgres"
+export SUPABASE_DB_URL="postgres://postgres:${SANDBOX_DB_PASSWORD}@db.bzatgtgjvuojpoxcknaa.supabase.co:5432/postgres"
 export TARGET_ENV=sandbox
 
 # 2) Snapshot expected prefixes offline (no DB call).

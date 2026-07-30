@@ -57,6 +57,7 @@ import { Badge } from "@/components/ui/badge";
 import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
+import { useGrows } from "@/store/grows";
 import {
   DAILY_GROW_CHECK_STEPS,
   INITIAL_DAILY_GROW_CHECK_STATE,
@@ -147,6 +148,7 @@ export default function DailyCheck() {
   const methodParam = useQueryParam("method");
   const methodHint = useMemo(() => parseDailyCheckMethodHint(methodParam), [methodParam]);
   const { urlGrowId } = useScopedGrow();
+  const { activeGrowId } = useGrows();
 
   const [plantId, setPlantId] = useState<string>("");
   const [tentId, setTentId] = useState<string>("");
@@ -301,8 +303,17 @@ export default function DailyCheck() {
     () => selectableTents.find((tent) => tent.id === effectiveTentId) ?? null,
     [effectiveTentId, selectableTents],
   );
+  // Grow context, most specific first: the selected plant's own grow, then an
+  // explicit `?growId=` scope, then the workspace's active grow. That last
+  // fallback matters for the plain `/daily-check` entry (sidebar link, Quick
+  // Log CTA): without it a grower who HAS an active grow still saw
+  // "Select a grow to enable Quick Log actions" with every action disabled,
+  // because no plant is selected yet and no URL scope is present.
   const growId =
-    (selectedPlant as { grow_id?: string | null } | null)?.grow_id ?? urlGrowId ?? null;
+    (selectedPlant as { grow_id?: string | null } | null)?.grow_id ??
+    urlGrowId ??
+    activeGrowId ??
+    null;
   const quickLogTargetIdentity = JSON.stringify([
     selectedPlant?.id ?? null,
     effectiveTentId || null,

@@ -1,10 +1,13 @@
 name: Security regression
 
+# NOTE: `verdant-grow-diary` is this repo's default branch. A `main`-only
+# filter means the workflow never runs (that is how a red secret scan sat
+# unnoticed on the default branch — see zero-defect board).
 on:
   pull_request:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
   push:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
   merge_group:
 
 jobs:

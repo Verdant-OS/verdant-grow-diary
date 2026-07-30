@@ -26,6 +26,7 @@ import {
   type TruthReasonCode,
 } from "@/lib/sensorTruthRules";
 
+import { ECOWITT_MQTT_STALE_MS } from "../constants/sensorTiming";
 // ---------------------------------------------------------------------------
 // Contract
 // ---------------------------------------------------------------------------
@@ -37,7 +38,7 @@ export const ECOWITT_MQTT_SOURCE = "live" as const;
  * Stale window for live bridge readings. Anything older than this at
  * normalize time is rejected — we do NOT promote stale telemetry to live.
  */
-export const ECOWITT_MQTT_STALE_MS = 15 * 60 * 1000;
+export { ECOWITT_MQTT_STALE_MS };
 
 /** Future-tolerance for sensor clock skew. Anything beyond is rejected. */
 export const ECOWITT_MQTT_FUTURE_TOLERANCE_MS = 5 * 60 * 1000;
@@ -313,10 +314,7 @@ export function normalizeEcowittMqttPayload(
 // Payload-kind classification + evidence (dry-run report)
 // ---------------------------------------------------------------------------
 
-export type EcowittPayloadKind =
-  | "real_ecowitt_gateway"
-  | "fake_local_test"
-  | "unknown";
+export type EcowittPayloadKind = "real_ecowitt_gateway" | "fake_local_test" | "unknown";
 
 /**
  * Identity fields a real EcoWitt gateway POSTs. Presence of two or more, or
@@ -351,10 +349,7 @@ function isFakeLocalTest(payload: EcowittMqttPayload): boolean {
   if (payload.test_sender === true) return true;
   const t = payload.transport;
   if (typeof t === "string" && /local[_-]?test|mqtt_local_test/i.test(t)) return true;
-  if (
-    payload.source === "local_test_sender" ||
-    payload.invalid_test === true
-  ) {
+  if (payload.source === "local_test_sender" || payload.invalid_test === true) {
     return true;
   }
   return false;
@@ -420,10 +415,8 @@ export function buildEcowittIngestEvidence(args: {
   const kind = classifyEcowittPayloadKind(payload);
   const keys = payload && typeof payload === "object" ? Object.keys(payload).sort() : [];
   const passkeyPresent = keys.some((k) => k.toLowerCase() === "passkey");
-  const transport =
-    payload && typeof payload.transport === "string" ? payload.transport : null;
-  const dateutc =
-    payload && typeof payload.dateutc === "string" ? payload.dateutc : null;
+  const transport = payload && typeof payload.transport === "string" ? payload.transport : null;
+  const dateutc = payload && typeof payload.dateutc === "string" ? payload.dateutc : null;
 
   const d = args.draft;
   const canonical: string[] = [];
@@ -460,12 +453,7 @@ export function buildEcowittIngestEvidence(args: {
   // / role / endpoint patterns. raw_keys_redacted contains only KEY NAMES
   // and transport/topic/dateutc are operator-visible identifiers; if any
   // of these somehow contain a token-shaped substring, flag it loudly.
-  const haystack = [
-    transport ?? "",
-    args.topic,
-    dateutc ?? "",
-    ...keys,
-  ].join(" | ");
+  const haystack = [transport ?? "", args.topic, dateutc ?? "", ...keys].join(" | ");
   const forbiddenLeak = FORBIDDEN_OUTPUT_PATTERNS.some((re) => re.test(haystack));
 
   return {

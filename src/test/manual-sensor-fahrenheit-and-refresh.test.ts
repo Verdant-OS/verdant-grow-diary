@@ -136,9 +136,12 @@ describe("Static safety", () => {
       expect(src).not.toMatch(/from\(\s*['"]alerts['"]\s*\)\s*\.(insert|update|delete|upsert)/);
     }
   });
-  it("ManualSensorReadingCard labels temperature as °F", () => {
+  it("ManualSensorReadingCard labels temperature with the active entry unit", () => {
     const src = readFileSync("src/components/ManualSensorReadingCard.tsx", "utf8");
-    expect(src).toMatch(/unit="°F"/);
+    // No hardcoded unit symbol in either direction — the label follows the
+    // unit the grower is actually entering in.
+    expect(src).not.toMatch(/unit="°F"/);
     expect(src).not.toMatch(/unit="°C"/);
+    expect(src).toMatch(/unit=\{TEMPERATURE_UNIT_SYMBOL\[airTempUnit\]\}/);
   });
 });

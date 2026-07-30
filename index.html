@@ -40,14 +40,28 @@
       name="description"
       content="Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators."
     />
-    <!-- No hardcoded canonical here on purpose. A single root canonical baked
-         into every SPA route makes /welcome, /pricing, etc. declare themselves
-         duplicates of the homepage (which de-indexes them). Per-route
-         self-canonicals are set client-side by the usePageSeo hook
-         (src/hooks/usePageSeo.ts); non-JS crawlers fall back to the request
-         URL (the correct self-canonical). A
-         build-time prerender pass (deferred) will bake per-route canonicals
-         into static HTML for non-JS consumers. -->
+    <!-- Root self-canonical. This used to be omitted on purpose, because a
+         single baked canonical would make /welcome, /pricing, etc. declare
+         themselves duplicates of the homepage. That reasoning ended when the
+         deferred prerender pass this file's old comment anticipated actually
+         shipped: buildStaticSocialRouteHtml REPLACES an existing canonical
+         rather than appending one (src/lib/build/staticSocialRouteHtml.ts),
+         so every prerendered route overwrites this tag with its own correct
+         self-canonical. Verified: every URL in public/sitemap.xml except "/"
+         has a prerendered document, and root-canonical-seo.test.ts fails the
+         build if that ever stops being true.
+
+         What still receives this tag verbatim is exactly what should:
+           - "/" itself, which is not prerendered (routeFileName rejects root)
+             and previously shipped with NO canonical at all to non-JS crawlers.
+           - Unknown URLs. Static SPA hosting serves this shell for every
+             unmatched path with HTTP 200, so junk URLs used to arrive with
+             "index, follow" and no canonical — an invitation to index
+             unlimited soft-404s. They now point at the homepage instead of
+             standing as separate indexable pages.
+         Per-route client-side canonicals from usePageSeo still apply on top
+         for JS-rendering consumers. -->
+    <link rel="canonical" href="https://verdantgrowdiary.com" />
 
     <!-- Fonts.
          The Google Fonts stylesheet is loaded non-blocking so above-the-fold

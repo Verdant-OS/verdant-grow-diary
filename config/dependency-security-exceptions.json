@@ -91,6 +91,21 @@
           "spec": "^0.5.16"
         },
         {
+          "package": "eslint",
+          "group": "devDependencies",
+          "spec": "^9.32.0"
+        },
+        {
+          "package": "eslint-import-resolver-typescript",
+          "group": "devDependencies",
+          "spec": "^4.4.5"
+        },
+        {
+          "package": "eslint-plugin-import",
+          "group": "devDependencies",
+          "spec": "^2.32.0"
+        },
+        {
           "package": "eslint-plugin-react-hooks",
           "group": "devDependencies",
           "spec": "^5.2.0"
@@ -99,11 +114,6 @@
           "package": "eslint-plugin-react-refresh",
           "group": "devDependencies",
           "spec": "^0.4.20"
-        },
-        {
-          "package": "eslint",
-          "group": "devDependencies",
-          "spec": "^9.32.0"
         },
         {
           "package": "lovable-tagger",
@@ -128,6 +138,21 @@
           "spec": "^6.2.1"
         },
         {
+          "package": "eslint",
+          "group": "devDependencies",
+          "spec": "^9.32.0"
+        },
+        {
+          "package": "eslint-import-resolver-typescript",
+          "group": "devDependencies",
+          "spec": "^4.4.5"
+        },
+        {
+          "package": "eslint-plugin-import",
+          "group": "devDependencies",
+          "spec": "^2.32.0"
+        },
+        {
           "package": "eslint-plugin-react-hooks",
           "group": "devDependencies",
           "spec": "^5.2.0"
@@ -136,11 +161,6 @@
           "package": "eslint-plugin-react-refresh",
           "group": "devDependencies",
           "spec": "^0.4.20"
-        },
-        {
-          "package": "eslint",
-          "group": "devDependencies",
-          "spec": "^9.32.0"
         },
         {
           "package": "typescript-eslint",
@@ -170,7 +190,9 @@
           "version": "0.27.7"
         }
       ],
-      "expectedBunAffectedKeys": ["@lovable.dev/mcp-js/esbuild"],
+      "expectedBunAffectedKeys": [
+        "@lovable.dev/mcp-js/esbuild"
+      ],
       "expectedNpmLockResolutions": [
         {
           "path": "node_modules/esbuild",
@@ -185,13 +207,19 @@
           "version": "0.25.12"
         }
       ],
-      "expectedParentKeys": ["@lovable.dev/mcp-js", "lovable-tagger", "vite"],
+      "expectedParentKeys": [
+        "@lovable.dev/mcp-js",
+        "lovable-tagger",
+        "vite"
+      ],
       "expectedNpmParentPaths": [
         "node_modules/@lovable.dev/mcp-js",
         "node_modules/lovable-tagger",
         "node_modules/vite"
       ],
-      "expectedNpmAffectedPaths": ["node_modules/esbuild"],
+      "expectedNpmAffectedPaths": [
+        "node_modules/esbuild"
+      ],
       "allowedImportPaths": [],
       "allowedScriptNames": [],
       "expectedBunDirectRootAncestors": [

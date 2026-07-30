@@ -60,6 +60,15 @@ const EXPECTED_SLUGS: ReadonlyArray<string> = [
   "house-and-garden-nutrients-grow-diary",
   "canna-nutrients-grow-diary",
   "bud-rot-prevention-identification",
+  // Nutrient demand cluster: stage requirements, feed frequency, damage control.
+  // Schedule-neutral by design — brand-named nutrient guides above cover
+  // logging, not dosing.
+  "cannabis-nutrient-schedule",
+  // Lighting demand cluster: measured setup and cautious symptom comparison.
+  "cannabis-grow-light-distance-and-schedule",
+  "cannabis-light-stress-light-burn-bleaching-or-heat",
+  // Cultivar comparison cluster: pheno expression showcase.
+  "oreoz-vs-gelonade-comparison",
 ];
 
 describe("Verdant grower guide FAQ (/guides)", () => {
@@ -111,8 +120,8 @@ describe("Verdant grower guide FAQ (/guides)", () => {
   });
 });
 
-describe("Verdant SEO guide pages (20)", () => {
-  it("defines exactly the twenty expected slugs, in order", () => {
+describe("Verdant SEO guide pages (24)", () => {
+  it("defines exactly the twenty-four expected slugs, in order", () => {
     expect(VERDANT_GUIDE_SLUGS).toEqual(EXPECTED_SLUGS);
   });
 
@@ -310,7 +319,7 @@ describe("retired Customer Mode routes stay absent from the public guide funnel"
 
 describe("Guides hub metadata (/guides)", () => {
   it("GuidesIndex title/description carry the target keyword phrases", () => {
-    expect(GUIDES_INDEX).toContain("Grower Guides: Grow Diary, VPD & Sensor Truth | Verdant");
+    expect(GUIDES_INDEX).toContain("Grower Guides: Diary, Lighting & Sensor Truth | Verdant");
     expect(GUIDES_INDEX).toMatch(/source-labeled sensor data/i);
     expect(GUIDES_INDEX).toMatch(/path:\s*"\/guides"/);
   });

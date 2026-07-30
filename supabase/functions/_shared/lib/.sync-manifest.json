@@ -4,7 +4,7 @@
   "sourceHashes": {
     "src/constants/aiDoctorContextReadiness.ts": "22767b47268f6fa199b89f81d9dbb7fb017ab1f9f860c8dfdfe6d44501ee8170",
     "src/constants/aiDoctorImportedHistory.ts": "f04d998dea22c9e8e7aaa6489a64cf4af44202435982039a1f216ccba9c317a0",
-    "src/constants/sensorTiming.ts": "50136073eaabfb1c4c8aa87e3cb4d83b3c47e4fdb0f2ffbaf7a320a18f93d238",
+    "src/constants/sensorTiming.ts": "0d3ccfd5918debe891368db0b44f31fe7afa8cca9c287d9754912ec961d4e052",
     "src/integrations/supabase/types.ts": "c9ea54d5c5a52444a331dc53dbde418d65bd0cfc5b9b023766d9c2c5e7f881d0",
     "src/lib/aiCoachLatestSensorSnapshot.ts": "b37f8baccdf66becef9023a2e632383c3a9cb3bd095d3d5faf813051ae6f32f5",
     "src/lib/aiDoctorContextCompiler.ts": "961834597ad69dce6d9b72cb901dbdc24a5bab891e6589713605750cdb439593",
@@ -84,7 +84,7 @@
     "src/lib/sensorProvenanceFenceRules.ts": "180a0980fa1b014d2138ab0714318dd39fcb2d786d32853fa9d34bfab4f56d0b",
     "src/lib/sensorReadingNormalizationRules.ts": "931eae8750ad8aa51c703c4612c67cd897cd5d7f32ba9982098daedc678fd187",
     "src/lib/sensorReadingVendorLineage.ts": "6b2244e66267a1e7999a6b67d5b3f4941a142fe774e03fdc2bbf21a300c70c59",
-    "src/lib/sensorSnapshot.ts": "5f8b173773532a68d06b5f7bf98ff4bf54712dd59a81e769d7fb595b962b7002",
+    "src/lib/sensorSnapshot.ts": "f30fe0f3e74562b8e3e8a43a272a5d1c3d4164221c3490aeaad2d52357480a5b",
     "src/lib/sensorSnapshotStatusContract.ts": "1661a62627786d709b7d5ee0870f10284be925121a5bdad00a162f7e50191668",
     "src/lib/sensorSourceDisplayLabel.ts": "d08b1c1908249b7b0706bc02d16e0738b827f9711bcbe3a215480ca9d6189942",
     "src/lib/sensorTestbenchIndicatorRules.ts": "3d71ddf55f558e5e2c393e2fb746462ef5ed64803861e31d3e0424f9dd0c0eb0",

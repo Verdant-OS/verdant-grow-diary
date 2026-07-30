@@ -142,6 +142,18 @@ describe("useLatestSensorSnapshot hook — source priority and safety", () => {
     expect(HOOK).toMatch(/details\.environment_check/);
   });
 
+  it("scopes environment_check evidence to the requested tents (Codex, PR #601)", () => {
+    // The diary query selects tent_id, and a tent-scoped view only accepts
+    // env checks attributed to one of those tents — null/foreign tent_id
+    // rows must not surface as the selected tent's evidence.
+    expect(HOOK).toMatch(/\.select\(\s*['"]entry_at,details,tent_id['"]\s*\)/);
+    expect(HOOK).toMatch(
+      /tentIds\.length === 0 \|\| \(row\.tent_id != null && tentIds\.includes\(row\.tent_id\)\)/,
+    );
+    // The scope gate must sit before the env-check fallback returns.
+    expect(HOOK).toMatch(/envScopeOk[\s\S]*?snapshotFromEnvironmentCheck\(/);
+  });
+
   it("idles when growId is missing (does not query)", () => {
     expect(HOOK).toMatch(/if\s*\(\s*!user\s*||\s*!growId\s*\)/);
   });

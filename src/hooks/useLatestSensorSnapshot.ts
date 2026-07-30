@@ -75,7 +75,7 @@ export function useLatestSensorSnapshot(
         // 2) Fall back to latest diary_entries.details.sensor_snapshot.
         const { data: diaryRows, error: diaryErr } = await supabase
           .from("diary_entries")
-          .select("entry_at,details")
+          .select("entry_at,details,tent_id")
           .eq("grow_id", growId)
           .order("entry_at", { ascending: false })
           .limit(20);
@@ -90,7 +90,13 @@ export function useLatestSensorSnapshot(
           if (snap) return snap;
           // #596: a Quick Log Environment Check is grower-entered manual
           // evidence; within the same row a full sensor_snapshot blob wins,
-          // and rows are already newest-first.
+          // and rows are already newest-first. When the view is scoped to
+          // tents, only rows attributed to one of those tents count — a
+          // null/foreign tent_id must not surface as this tent's evidence
+          // (Codex review, PR #601).
+          const envScopeOk =
+            tentIds.length === 0 || (row.tent_id != null && tentIds.includes(row.tent_id));
+          if (!envScopeOk) continue;
           const envSnap = snapshotFromEnvironmentCheck(
             row.entry_at,
             details.environment_check as Record<string, unknown> | undefined,

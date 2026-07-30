@@ -8,7 +8,6 @@
  * only clock the rules consult.
  */
 
-import { LIVE_SOURCE_TRUTH_STALE_AFTER_MS } from "@/constants/sensorTiming";
 // =========================================================================
 // Types
 // =========================================================================
@@ -94,7 +93,9 @@ export interface LiveSourceTruthGateResult {
 // =========================================================================
 
 /** Captured_at older than this is stale. */
-export { LIVE_SOURCE_TRUTH_STALE_AFTER_MS };
+// Deliberately NOT re-homed to @/constants/sensorTiming: this module has a
+// no-external-imports contract (live-source-truth-gate-rules.test.ts).
+export const LIVE_SOURCE_TRUTH_STALE_AFTER_MS = 15 * 60 * 1000;
 
 /** Captured_at more than this far in the future is invalid. */
 export const LIVE_SOURCE_TRUTH_FUTURE_SKEW_MS = 5 * 60 * 1000;

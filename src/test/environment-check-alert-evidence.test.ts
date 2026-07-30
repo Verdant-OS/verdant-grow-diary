@@ -64,6 +64,44 @@ describe("snapshotFromEnvironmentCheck (#596)", () => {
     ).toBeNull();
   });
 
+  // Read-time distrust (Codex review, PR #601): diary JSON may be legacy or
+  // hand-written — never coerce, never trust the write-time gate.
+  it("rejects coercible junk instead of coercing it (empty string, booleans, numeric strings)", () => {
+    expect(
+      snapshotFromEnvironmentCheck(minutesAgoIso(1), {
+        temp_c: "",
+        humidity_pct: false,
+        vpd_kpa: true,
+      }),
+    ).toBeNull();
+    expect(
+      snapshotFromEnvironmentCheck(minutesAgoIso(1), {
+        temp_c: "24.5",
+        humidity_pct: "55",
+        vpd_kpa: "1.1",
+      }),
+    ).toBeNull();
+  });
+
+  it("drops out-of-band values to null instead of surfacing implausible telemetry", () => {
+    const snap = snapshotFromEnvironmentCheck(minutesAgoIso(1), {
+      temp_c: 300, // impossible tent temperature
+      humidity_pct: 55,
+      vpd_kpa: -2,
+    });
+    expect(snap).not.toBeNull();
+    expect(snap?.temp).toBeNull();
+    expect(snap?.rh).toBe(55);
+    expect(snap?.vpd).toBeNull();
+    expect(
+      snapshotFromEnvironmentCheck(minutesAgoIso(1), {
+        temp_c: 300,
+        humidity_pct: 101,
+        vpd_kpa: -2,
+      }),
+    ).toBeNull();
+  });
+
   it("returns null without a timestamp or with malformed input", () => {
     expect(snapshotFromEnvironmentCheck(null, envelope())).toBeNull();
     expect(snapshotFromEnvironmentCheck(minutesAgoIso(1), null)).toBeNull();

@@ -25,8 +25,10 @@
 /** Dashboard latest-snapshot freshness (latestSensorSnapshotRules). */
 export const SENSOR_FRESH_WINDOW_MINUTES = 15;
 
-/** Operator live-source truth gate (liveSourceTruthGateRules). */
-export const LIVE_SOURCE_TRUTH_STALE_AFTER_MS = 15 * 60 * 1000;
+// Deliberate exception: liveSourceTruthGateRules.ts keeps its own local
+// 15-minute LIVE_SOURCE_TRUTH_STALE_AFTER_MS — that module has a
+// no-external-imports contract (live-source-truth-gate-rules.test.ts) and
+// cannot import this file. Change both together.
 
 /** EcoWitt live soil ingest acceptance (ecowittLiveSoilIngestRules). */
 export const ECOWITT_LIVE_SOIL_STALE_MS = 15 * 60 * 1000;

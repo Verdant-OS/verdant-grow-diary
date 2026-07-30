@@ -348,6 +348,28 @@ const CULTIVAR_DOCUMENTS = VERDANT_CULTIVARS.map((cultivar) =>
   }),
 );
 
+/**
+ * Transactional checkout return routes are reachable without JavaScript, but
+ * must never compete for organic results. They intentionally stay separate
+ * from `STATIC_PUBLIC_SEO_DOCUMENTS`, whose callers enforce indexable public
+ * acquisition metadata and sitemap parity.
+ */
+export const STATIC_TRANSACTIONAL_NOINDEX_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> =
+  Object.freeze([
+    publicDocument("/checkout/success", {
+      title: "Checkout status | Verdant Grow Diary",
+      description: "Paid Verdant access is confirmed server-side by the billing webhook.",
+      imageAlt: "Verdant checkout status",
+      robots: "noindex, follow",
+    }),
+    publicDocument("/checkout/cancel", {
+      title: "Checkout not completed | Verdant Grow Diary",
+      description: "No charge was made. You can try again anytime.",
+      imageAlt: "Verdant checkout not completed",
+      robots: "noindex, follow",
+    }),
+  ]);
+
 /** All public documents emitted alongside Vite's primary SPA entry. */
 export const STATIC_PUBLIC_SEO_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = Object.freeze([
   {
@@ -388,4 +410,8 @@ export const STATIC_PUBLIC_ALIAS_DOCUMENTS: ReadonlyArray<StaticPublicAliasDocum
 
 /** Every route-local HTML document emitted by the Vite build. */
 export const STATIC_PUBLIC_OUTPUT_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> =
-  Object.freeze([...STATIC_PUBLIC_SEO_DOCUMENTS, ...STATIC_PUBLIC_ALIAS_DOCUMENTS]);
+  Object.freeze([
+    ...STATIC_PUBLIC_SEO_DOCUMENTS,
+    ...STATIC_TRANSACTIONAL_NOINDEX_DOCUMENTS,
+    ...STATIC_PUBLIC_ALIAS_DOCUMENTS,
+  ]);

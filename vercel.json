@@ -16,7 +16,13 @@
   },
   "redirects": [
     { "source": "/strains", "destination": "/cultivars", "permanent": true },
-    { "source": "/strains/:slug", "destination": "/cultivars/:slug", "permanent": true }
+    { "source": "/strains/:slug", "destination": "/cultivars/:slug", "permanent": true },
+    { "source": "/features", "destination": "/welcome", "permanent": true },
+    { "source": "/demo", "destination": "/welcome", "permanent": true },
+    { "source": "/refunds", "destination": "/refund", "permanent": true },
+    { "source": "/refund-policy", "destination": "/refund", "permanent": true },
+    { "source": "/terms-of-service", "destination": "/terms", "permanent": true },
+    { "source": "/privacy-policy", "destination": "/privacy", "permanent": true }
   ],
   "rewrites": [{ "source": "/((?!assets/).*)", "destination": "/" }],
   "headers": [

@@ -8,3 +8,6 @@ node_modules
 .husky
 src/integrations/supabase/types.ts
 supabase/functions/_shared/lib/integrations/supabase/types.ts
+
+# Curated tables and command transcripts; formatting the whole file creates unrelated churn.
+README.md

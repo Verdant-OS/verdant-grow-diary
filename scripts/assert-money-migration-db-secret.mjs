@@ -4,12 +4,10 @@
  *
  * Thin wrapper around the shared core in
  * scripts/lib/assertRequiredCiSecret.mjs — kept as its own script so the
- * required-money-migrations workflow (and its contract tests in
- * src/test/assert-money-migration-db-secret.test.ts) can keep calling
- * `node scripts/assert-money-migration-db-secret.mjs` with the two
- * env vars TARGET_ENV + SUPABASE_DB_URL. All other CI workflows should
- * prefer the generic `.github/actions/require-ci-secret` composite
- * action instead.
+ * target-specific contract tests can keep calling
+ * `node scripts/assert-money-migration-db-secret.mjs` with the two env
+ * vars TARGET_ENV + SUPABASE_DB_URL. Production workflows use the generic
+ * `.github/actions/require-ci-secret` composite action instead.
  *
  * Env inputs:
  *   TARGET_ENV      Required. "sandbox" | "live". Selects the secret.
@@ -28,7 +26,12 @@ const TARGET_ENV = (process.env.TARGET_ENV ?? "").trim().toLowerCase();
 
 const SECRET_NAMES = {
   sandbox: "SUPABASE_DB_URL_SANDBOX",
-  live: "SUPABASE_DB_URL_LIVE",
+  live: "SUPABASE_DB_URL",
+};
+
+const GITHUB_ENVIRONMENTS = {
+  sandbox: "verdant-sandbox",
+  live: "verdant-production",
 };
 
 if (!TARGET_ENV || !(TARGET_ENV in SECRET_NAMES)) {
@@ -39,6 +42,7 @@ if (!TARGET_ENV || !(TARGET_ENV in SECRET_NAMES)) {
 }
 
 const secretName = SECRET_NAMES[TARGET_ENV];
+const githubEnvironment = GITHUB_ENVIRONMENTS[TARGET_ENV];
 const envLabel = TARGET_ENV.toUpperCase();
 
 const code = assertRequiredCiSecret({
@@ -46,8 +50,8 @@ const code = assertRequiredCiSecret({
   secretValue: process.env.SUPABASE_DB_URL,
   guardHeading: `Money-critical migration deploy guard — ${envLabel}`,
   fixSteps: [
-    "1. Open **Settings → Secrets and variables → Actions** in this repository.",
-    `2. Add a repository secret named \`${secretName}\` whose value is the pooled Postgres connection string for the ${envLabel} database (the same URL used by \`supabase db push\`).`,
+    `1. Open **Settings → Environments → ${githubEnvironment}** in this repository.`,
+    `2. Add an environment secret named \`${secretName}\` whose value is the pooled Postgres connection string for the ${envLabel} database (the same URL used by \`supabase db push\`).`,
     `3. Re-run this workflow. The gate will run \`node scripts/assert-required-money-migrations-applied.mjs\` against ${envLabel} and confirm every money-critical migration is applied.`,
   ],
   reasonLines: [
@@ -68,7 +72,9 @@ const code = assertRequiredCiSecret({
 if (code === 1) {
   console.error(
     `::error::${secretName} secret is not set. Configure it before ${
-      TARGET_ENV === "live" ? "deploying money-critical changes to live" : "merging money-critical changes"
+      TARGET_ENV === "live"
+        ? "deploying money-critical changes to live"
+        : "merging money-critical changes"
     }. Do NOT deploy until this is configured.`,
   );
 }

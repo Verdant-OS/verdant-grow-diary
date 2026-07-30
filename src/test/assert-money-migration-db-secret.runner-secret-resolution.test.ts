@@ -1,8 +1,8 @@
 /**
  * Runner-shaped secret-resolution contract for the money-migration
  * preflight (`scripts/assert-money-migration-db-secret.mjs`), which is
- * the exact CLI the required-money-migrations workflow invokes via the
- * `.github/actions/require-ci-secret` composite.
+ * a target-specific compatibility wrapper around the shared CI-secret
+ * preflight.
  *
  * GitHub Actions injects `${{ secrets.SUPABASE_DB_URL_SANDBOX }}` as an
  * env var whose *string* value can arrive in several shapes:
@@ -81,9 +81,7 @@ describe("SUPABASE_DB_URL_SANDBOX resolution — runner-shaped values", () => {
       it(`${label} → exits 1 and names SUPABASE_DB_URL_SANDBOX`, () => {
         const result = run(env);
         expect(result.status).toBe(1);
-        expect(result.stderr).toMatch(
-          /::error title=SUPABASE_DB_URL_SANDBOX missing::/,
-        );
+        expect(result.stderr).toMatch(/::error title=SUPABASE_DB_URL_SANDBOX missing::/);
         expect(result.stderr).toContain("SUPABASE_DB_URL_SANDBOX");
         expect(result.stderr).toContain("Do NOT deploy");
       });
@@ -126,13 +124,13 @@ describe("SUPABASE_DB_URL_SANDBOX resolution — runner-shaped values", () => {
   it("LIVE follows the same whitespace/trim rules", () => {
     const missing = run({ TARGET_ENV: "live", SUPABASE_DB_URL: "  \n  " });
     expect(missing.status).toBe(1);
-    expect(missing.stderr).toMatch(/::error title=SUPABASE_DB_URL_LIVE missing::/);
+    expect(missing.stderr).toMatch(/::error title=SUPABASE_DB_URL missing::/);
 
     const configured = run({
       TARGET_ENV: "live",
       SUPABASE_DB_URL: "postgres://ok\n",
     });
     expect(configured.status).toBe(0);
-    expect(configured.stdout).toContain("SUPABASE_DB_URL_LIVE is configured");
+    expect(configured.stdout).toContain("SUPABASE_DB_URL is configured");
   });
 });

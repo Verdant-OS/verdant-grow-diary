@@ -244,7 +244,8 @@ describe("required-money-migrations workflow trust boundary", () => {
     expect(LIVE_JOB).not.toContain("github.event_name == 'push'");
     expect(LIVE_JOB).not.toContain("pull_request");
     expect(LIVE_JOB).not.toContain("SUPABASE_DB_URL_SANDBOX");
-    expect(LIVE_JOB).toContain("secrets.SUPABASE_DB_URL_LIVE");
+    expect(LIVE_JOB).not.toContain("SUPABASE_DB_URL_LIVE");
+    expect(LIVE_JOB).toMatch(/secrets\.SUPABASE_DB_URL(?![A-Z0-9_])/);
   });
 
   it("clears ambient libpq fallbacks in both remote jobs", () => {
@@ -317,7 +318,8 @@ describe("prefix-diff-sarif workflow trust boundary", () => {
     expect(PREFIX_LIVE_JOB).toContain("github.event_name == 'workflow_dispatch'");
     expect(PREFIX_LIVE_JOB).toContain("github.ref == 'refs/heads/verdant-grow-diary'");
     expect(PREFIX_LIVE_JOB).toContain("inputs.target_env == 'live'");
-    expect(PREFIX_LIVE_JOB).toContain("secrets.SUPABASE_DB_URL_LIVE");
+    expect(PREFIX_LIVE_JOB).not.toContain("SUPABASE_DB_URL_LIVE");
+    expect(PREFIX_LIVE_JOB).toMatch(/secrets\.SUPABASE_DB_URL(?![A-Z0-9_])/);
     expect(PREFIX_LIVE_JOB).not.toContain("SUPABASE_DB_URL_SANDBOX");
     expect(PREFIX_LIVE_JOB).not.toContain("github.event_name == 'push'");
     expect(PREFIX_LIVE_JOB).not.toContain("pull_request");
@@ -325,11 +327,11 @@ describe("prefix-diff-sarif workflow trust boundary", () => {
 
   it("has no combined or cross-environment secret fallback", () => {
     expect(PREFIX_WORKFLOW).not.toMatch(
-      /SUPABASE_DB_URL_LIVE[\s\S]{0,120}\|\|[\s\S]{0,120}SUPABASE_DB_URL_SANDBOX/,
+      /secrets\.SUPABASE_DB_URL(?![A-Z0-9_])[\s\S]{0,120}\|\|[\s\S]{0,120}secrets\.SUPABASE_DB_URL_SANDBOX/,
     );
     for (const line of PREFIX_WORKFLOW.split("\n")) {
       expect(
-        line.includes("secrets.SUPABASE_DB_URL_LIVE") &&
+        /secrets\.SUPABASE_DB_URL(?![A-Z0-9_])/.test(line) &&
           line.includes("secrets.SUPABASE_DB_URL_SANDBOX"),
       ).toBe(false);
     }

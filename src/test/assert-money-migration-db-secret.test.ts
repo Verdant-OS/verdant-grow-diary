@@ -2,7 +2,7 @@
  * Contract tests for scripts/assert-money-migration-db-secret.mjs.
  *
  * These prove the CI preflight fails FAST with a clear, actionable message
- * when SUPABASE_DB_URL_{SANDBOX,LIVE} is missing — the whole point of the
+ * when the environment's configured DB secret is missing — the whole point of the
  * script is to replace the opaque "money-critical gate failed" red with a
  * green/red signal named after the actual missing secret.
  */
@@ -62,23 +62,24 @@ describe("assert-money-migration-db-secret preflight", () => {
       SUPABASE_DB_URL: "postgres://ok",
     });
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("SUPABASE_DB_URL_LIVE is configured");
+    expect(result.stdout).toContain("SUPABASE_DB_URL is configured");
   });
 
   it("fails with clear ::error:: annotation naming SUPABASE_DB_URL_SANDBOX when unset (sandbox)", () => {
     const result = run({ TARGET_ENV: "sandbox", SUPABASE_DB_URL: "" });
     expect(result.status).toBe(1);
     expect(result.stderr).toMatch(/::error title=SUPABASE_DB_URL_SANDBOX missing::/);
-    expect(result.stderr).toContain("Settings → Secrets and variables → Actions");
+    expect(result.stderr).toContain("Settings → Environments → verdant-sandbox");
     expect(result.stderr).toContain("SUPABASE_DB_URL_SANDBOX");
     expect(result.stderr).toContain("Do NOT deploy");
   });
 
-  it("fails with clear ::error:: annotation naming SUPABASE_DB_URL_LIVE when unset (live)", () => {
+  it("fails with clear ::error:: annotation naming SUPABASE_DB_URL when unset (live)", () => {
     const result = run({ TARGET_ENV: "live", SUPABASE_DB_URL: "" });
     expect(result.status).toBe(1);
-    expect(result.stderr).toMatch(/::error title=SUPABASE_DB_URL_LIVE missing::/);
-    expect(result.stderr).toContain("SUPABASE_DB_URL_LIVE");
+    expect(result.stderr).toMatch(/::error title=SUPABASE_DB_URL missing::/);
+    expect(result.stderr).toContain("SUPABASE_DB_URL");
+    expect(result.stderr).toContain("Settings → Environments → verdant-production");
   });
 
   it("treats a whitespace-only secret value as missing", () => {
@@ -98,7 +99,7 @@ describe("assert-money-migration-db-secret preflight", () => {
     const body = readFileSync(reportPath, "utf8");
     expect(body).toContain("Money-critical migration deploy guard — SANDBOX");
     expect(body).toContain("SUPABASE_DB_URL_SANDBOX secret is not configured");
-    expect(body).toContain("Settings → Secrets and variables → Actions");
+    expect(body).toContain("Settings → Environments → verdant-sandbox");
     expect(body).toContain("Do NOT deploy");
   });
 

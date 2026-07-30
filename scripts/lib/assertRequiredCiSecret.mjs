@@ -2,7 +2,7 @@
  * Shared core for the "required CI secret" preflight check.
  *
  * Turns the opaque red-X you get when a downstream step reads an unset
- * repository secret into a clear, step-named failure with a fix-me-now
+ * GitHub Actions secret into a clear, step-named failure with a fix-me-now
  * message in the log AND, optionally, a markdown report suitable for a
  * sticky PR comment / workflow step summary.
  *
@@ -20,7 +20,7 @@ import { dirname } from "node:path";
 
 /**
  * @typedef {object} AssertRequiredCiSecretInput
- * @property {string} secretName            Repository secret name, e.g. "SUPABASE_DB_URL_LIVE".
+ * @property {string} secretName            GitHub Actions secret name, e.g. "SUPABASE_DB_URL".
  * @property {string | undefined} secretValue Raw value injected by the workflow (`${{ secrets.X }}`).
  * @property {string} [guardHeading]        Heading for logs + markdown report. Defaults to a generic guard label.
  * @property {string[]} [fixSteps]          Ordered fix steps rendered as a numbered list. Sensible default if omitted.
@@ -42,12 +42,9 @@ export function assertRequiredCiSecret(input, io = defaultIo()) {
 
   const value = String(input.secretValue ?? "").trim();
   const logPrefix = input.logPrefix ?? "ci-secret-preflight";
-  const heading =
-    input.guardHeading?.trim() || `Required CI secret guard — ${secretName}`;
+  const heading = input.guardHeading?.trim() || `Required CI secret guard — ${secretName}`;
   const fixSteps =
-    input.fixSteps && input.fixSteps.length > 0
-      ? input.fixSteps
-      : defaultFixSteps(secretName);
+    input.fixSteps && input.fixSteps.length > 0 ? input.fixSteps : defaultFixSteps(secretName);
   const reasonLines = input.reasonLines ?? [];
 
   if (value.length > 0) {
@@ -55,7 +52,7 @@ export function assertRequiredCiSecret(input, io = defaultIo()) {
     return 0;
   }
 
-  const oneLiner = `${secretName} secret is not configured in this repository.`;
+  const oneLiner = `${secretName} secret is not configured for this workflow.`;
 
   io.error(
     `::error title=${secretName} missing::${oneLiner} Do NOT proceed until this is configured.`,
@@ -105,16 +102,14 @@ export function assertRequiredCiSecret(input, io = defaultIo()) {
 function defaultFixSteps(secretName) {
   return [
     "1. Open **Settings → Secrets and variables → Actions** in this repository.",
-    `2. Add a repository secret named \`${secretName}\` with the correct value for this environment.`,
+    `2. Add a GitHub Actions secret named \`${secretName}\` at the scope selected by this workflow.`,
     "3. Re-run this workflow so the preflight and downstream steps can verify the value.",
   ];
 }
 
 function defaultIo() {
   return {
-    // eslint-disable-next-line no-console
     log: (msg) => console.log(msg),
-    // eslint-disable-next-line no-console
     error: (msg) => console.error(msg),
   };
 }

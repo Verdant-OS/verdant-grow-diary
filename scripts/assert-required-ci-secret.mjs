@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Generic CI preflight — fails fast with an actionable, step-named error
- * when a required repository secret is missing.
+ * when a required GitHub Actions secret is missing.
  *
  * Intended to be invoked by the `.github/actions/require-ci-secret`
  * composite action, but is safe to call directly in any workflow.
@@ -43,9 +43,7 @@ function parseJsonArray(name, raw) {
     process.exit(2);
   }
   if (!Array.isArray(parsed) || parsed.some((x) => typeof x !== "string")) {
-    console.error(
-      `::error::assert-required-ci-secret: ${name} must be a JSON array of strings.`,
-    );
+    console.error(`::error::assert-required-ci-secret: ${name} must be a JSON array of strings.`);
     process.exit(2);
   }
   return parsed;
@@ -53,9 +51,7 @@ function parseJsonArray(name, raw) {
 
 const secretName = (process.env.SECRET_NAME ?? "").trim();
 if (!secretName) {
-  console.error(
-    "::error::assert-required-ci-secret: SECRET_NAME env var is required.",
-  );
+  console.error("::error::assert-required-ci-secret: SECRET_NAME env var is required.");
   process.exit(2);
 }
 

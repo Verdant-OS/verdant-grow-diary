@@ -355,7 +355,7 @@ if (!DB_URL && !HAS_PG_ENV) {
   console.error(`✗ ${msg}`);
   writeReport("No database connection configured", [
     "The deploy guard could not run because no database connection was configured.",
-    "Configure the appropriate `SUPABASE_DB_URL_*` secret and re-run the workflow.",
+    "Configure the workflow's required `SUPABASE_DB_URL` connection input and re-run the workflow.",
   ]);
   writeAudit("no_db_connection", { note: "No SUPABASE_DB_URL / PGHOST env." });
   writeDiff("no_db_connection", {

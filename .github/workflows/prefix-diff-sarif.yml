@@ -10,7 +10,7 @@ name: Prefix Diff — SARIF upload
 # Prereqs (Repo Settings):
 #   - Settings → Code security → Code scanning: enabled (default setup off).
 #   - Environment secret SUPABASE_DB_URL_SANDBOX in verdant-sandbox.
-#   - Environment secret SUPABASE_DB_URL_LIVE in verdant-production.
+#   - Environment secret SUPABASE_DB_URL in verdant-production.
 
 on:
   pull_request:
@@ -249,15 +249,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Preflight — SUPABASE_DB_URL_LIVE configured
+      - name: Preflight — SUPABASE_DB_URL configured
         uses: ./.github/actions/require-ci-secret
         with:
-          secret-name: SUPABASE_DB_URL_LIVE
-          secret-value: ${{ secrets.SUPABASE_DB_URL_LIVE }}
+          secret-name: SUPABASE_DB_URL
+          secret-value: ${{ secrets.SUPABASE_DB_URL }}
           guard-heading: "Money-migration prefix diff — LIVE"
           fix-steps-json: >-
             ["1. Open **Settings → Environments → verdant-production** in this repository.",
-             "2. Add the `SUPABASE_DB_URL_LIVE` environment secret.",
+             "2. Add the `SUPABASE_DB_URL` environment secret.",
              "3. Re-run this workflow manually from `verdant-grow-diary`."]
 
       - name: Install psql client
@@ -269,7 +269,7 @@ jobs:
       - name: Run live prefix diff (JSON)
         id: diff-json
         env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_LIVE }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         shell: bash
         run: |
           set +e
@@ -282,7 +282,7 @@ jobs:
       - name: Run live prefix diff (SARIF)
         id: diff-sarif
         env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_LIVE }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         shell: bash
         run: |
           set +e

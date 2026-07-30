@@ -185,17 +185,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Prepare audit dir
         run: mkdir -p "${{ github.workspace }}/audit/live"
-      - name: Preflight — SUPABASE_DB_URL_LIVE configured
+      - name: Preflight — SUPABASE_DB_URL configured
         uses: ./.github/actions/require-ci-secret
         with:
-          secret-name: SUPABASE_DB_URL_LIVE
-          secret-value: ${{ secrets.SUPABASE_DB_URL_LIVE }}
+          secret-name: SUPABASE_DB_URL
+          secret-value: ${{ secrets.SUPABASE_DB_URL }}
           guard-heading: "Money-critical migration deploy guard — LIVE"
           report-path: ${{ github.workspace }}/audit/live/report.md
           log-prefix: money-migration-preflight
           fix-steps-json: >-
             ["1. Open **Settings → Environments → verdant-production** in this repository.",
-             "2. Add an environment secret named `SUPABASE_DB_URL_LIVE` whose value is the pooled Postgres connection string for the LIVE database (the same URL used by `supabase db push`).",
+             "2. Add an environment secret named `SUPABASE_DB_URL` whose value is the pooled Postgres connection string for the LIVE database (the same URL used by `supabase db push`).",
              "3. Re-run this workflow. The gate will run `node scripts/assert-required-money-migrations-applied.mjs` against LIVE and confirm every money-critical migration is applied."]
           reason-lines-json: >-
             ["Why this is a hard failure: without the DB URL the deploy gate cannot",
@@ -207,12 +207,12 @@ jobs:
       - name: Fast-fail prefix diff (live)
         id: prefix_diff_live
         env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_LIVE }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           TARGET_ENV: live
         run: |
           set -o pipefail
           if [ -z "${SUPABASE_DB_URL:-}" ]; then
-            echo "SUPABASE_DB_URL_LIVE not configured — skipping fast-fail diff; verify step will emit the missing-secret report."
+            echo "SUPABASE_DB_URL not configured — skipping fast-fail diff; verify step will emit the missing-secret report."
             exit 0
           fi
           node scripts/diff-money-migration-prefixes.mjs --json \
@@ -223,7 +223,7 @@ jobs:
         id: verify_live
         if: always()
         env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_LIVE }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           TARGET_ENV: live
           REPORT_PATH: ${{ github.workspace }}/audit/live/report.md
           AUDIT_PATH: ${{ github.workspace }}/audit/live/applied-audit.json

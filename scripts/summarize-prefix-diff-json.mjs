@@ -57,7 +57,8 @@ if (Array.isArray(data.expected) || Array.isArray(data.malformed)) {
       "| --- | --- |",
       ...malformed.slice(0, 10).map((m) => `| \`${m.file}\` | ${escapeCell(m.reason)} |`),
     );
-    if (malformed.length > 10) lines.push("", `_…and ${malformed.length - 10} more (see artifacts)._`);
+    if (malformed.length > 10)
+      lines.push("", `_…and ${malformed.length - 10} more (see artifacts)._`);
   }
   emit(lines.join("\n") + "\n");
   process.exit(0);
@@ -99,7 +100,7 @@ lines.push(
   "**Likely causes:**",
   "- Required migration file added in this PR but not yet applied to the target DB.",
   "- Migration filename edited after apply (14-digit prefix changed).",
-  "- Wrong `SUPABASE_DB_URL_*` secret pointed at a stale environment.",
+  "- The protected database URL points at a stale or different environment.",
   "",
   "Re-run once the missing migrations are applied. Full audit in the `money-migration-audit-*` artifact bundle.",
 );
@@ -112,5 +113,7 @@ function emit(text) {
 }
 
 function escapeCell(v) {
-  return String(v ?? "").replace(/\|/g, "\\|").replace(/\n/g, " ");
+  return String(v ?? "")
+    .replace(/\|/g, "\\|")
+    .replace(/\n/g, " ");
 }

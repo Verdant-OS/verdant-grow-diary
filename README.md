@@ -355,10 +355,10 @@ environment.
 
 The `.github/workflows/required-money-migrations.yml` workflow runs this
 check against both sandbox and live. It reads the DB connection strings
-from two repository secrets:
+from two protected GitHub environments:
 
-- `SUPABASE_DB_URL_SANDBOX`
-- `SUPABASE_DB_URL_LIVE`
+- `verdant-sandbox`: `SUPABASE_DB_URL_SANDBOX`
+- `verdant-production`: `SUPABASE_DB_URL`
 
 ### Setting the GitHub secrets
 
@@ -367,14 +367,17 @@ from two repository secrets:
    URI format). It looks like
    `postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres`.
    The password is the database password, not the anon or service-role key.
-2. In GitHub, open **Settings → Secrets and variables → Actions → New
-   repository secret**.
-3. Create `SUPABASE_DB_URL_SANDBOX` and paste the sandbox project's URL.
-4. Create `SUPABASE_DB_URL_LIVE` and paste the live project's URL.
-5. Re-run the `required-money-migrations` workflow to confirm both jobs
-   go green. If a job errors with exit code `2`, the URL is wrong or the
-   pooler is unreachable; exit code `1` means a required migration is
-   missing from that environment and must be applied before deploying.
+2. In GitHub, open **Settings → Environments**, then open the target
+   protected environment.
+3. In `verdant-sandbox`, create `SUPABASE_DB_URL_SANDBOX` and paste the
+   sandbox project's URL.
+4. In `verdant-production`, create `SUPABASE_DB_URL` and paste the live
+   project's URL.
+5. Re-run the target check. Sandbox runs on a trusted default-branch push;
+   live requires a manual dispatch with `target_env=live`. Exit code `1`
+   means a required migration is missing. Codes `2` through `7` are blocking
+   setup, target-identity, or hosted-runner connection failures; fix those
+   before deploying.
 
 Rotate these secrets whenever the database password is rotated.
 
@@ -498,14 +501,15 @@ Environment variables:
 
 | Variable                | Required?                     | Purpose                                                                 |
 |-------------------------|-------------------------------|-------------------------------------------------------------------------|
-| `SUPABASE_DB_URL`       | Yes (diff mode)               | Direct Postgres connection string used by `psql`. Overrides `TARGET_ENV`. |
-| `TARGET_ENV`            | Optional                      | `sandbox` or `live`. When `SUPABASE_DB_URL` is unset, the script reads `SUPABASE_DB_URL_SANDBOX` or `SUPABASE_DB_URL_LIVE`. Also stamped into JSON/SARIF output as `target_env`. |
-| `SUPABASE_DB_URL_SANDBOX` / `SUPABASE_DB_URL_LIVE` | Optional | Convenience env-selected URLs used with `TARGET_ENV`.                    |
+| `SUPABASE_DB_URL`       | Yes (database mode)           | Postgres connection string used by `psql`. GitHub workflows bind their environment secret to this runtime variable. |
+| `DATABASE_URL` / `PG*`  | Local alternative              | Used only when `SUPABASE_DB_URL` is absent. Protected sandbox/live jobs clear these fallbacks. |
+| `TARGET_ENV`            | Recommended for protected runs | `sandbox` or `live`; validates the URL against the expected target and is stamped into JSON/SARIF output. It does not select a secret name. |
 
-The connection string must be the **direct** Postgres URL for the target
-project (usually `postgres://postgres:<PASSWORD>@db.<REF>.supabase.co:5432/postgres`),
-not the PostgREST/API URL. Never commit it — export it in your shell or
-load from a local `.env` that is gitignored.
+The connection string must be a Postgres URL for the target project, never
+the PostgREST/API URL. Use the **Session Pooler** URL for GitHub-hosted gates:
+the direct `db.<REF>.supabase.co` endpoint can be IPv6-only and the hosted
+gate rejects it. Never commit a connection string — export it in your shell
+or load it from a local `.env` that is gitignored.
 
 #### Sample expected-prefixes file
 
@@ -538,8 +542,8 @@ End-to-end local run against sandbox, capturing both human and machine
 output:
 
 ```bash
-# 1) Export the sandbox DB URL for this shell session.
-export SUPABASE_DB_URL="postgres://postgres:${SANDBOX_DB_PASSWORD}@db.bzatgtgjvuojpoxcknaa.supabase.co:5432/postgres"
+# 1) Export the sandbox Session Pooler URL for this shell session.
+export SUPABASE_DB_URL="postgresql://postgres.<sandbox-ref>:${SANDBOX_DB_PASSWORD}@aws-0-<region>.pooler.supabase.com:5432/postgres"
 export TARGET_ENV=sandbox
 
 # 2) Snapshot expected prefixes offline (no DB call).
@@ -592,8 +596,7 @@ node scripts/diff-money-migration-prefixes.mjs --json \
 
 ```bash
 # 1) Full diff: expected (manifest) vs. actual (target DB).
-#    Requires SUPABASE_DB_URL (or SUPABASE_DB_URL_SANDBOX /
-#    SUPABASE_DB_URL_LIVE selected via TARGET_ENV=sandbox|live).
+#    Requires SUPABASE_DB_URL, DATABASE_URL, or the local PG* inputs.
 node scripts/diff-money-migration-prefixes.mjs
 
 # 2) Manifest-only dump (offline, no DB needed) — useful for reviewing
@@ -609,8 +612,9 @@ node scripts/diff-money-migration-prefixes.mjs --expected --json
 SUPABASE_DB_URL="postgres://..." \
   node scripts/diff-money-migration-prefixes.mjs
 
-# 5) Select the CI-style env explicitly.
-TARGET_ENV=live node scripts/diff-money-migration-prefixes.mjs
+# 5) Bind a supplied URL to the live target explicitly.
+TARGET_ENV=live SUPABASE_DB_URL="postgres://..." \
+  node scripts/diff-money-migration-prefixes.mjs
 ```
 
 #### Interpreting `--json` output
@@ -1298,7 +1302,7 @@ job's `env:` block) so the comparison is apples-to-apples:
 
 ```bash
 TARGET_ENV=sandbox \
-SUPABASE_DB_URL_SANDBOX="$SUPABASE_DB_URL_SANDBOX" \
+SUPABASE_DB_URL="postgresql://..." \
   node scripts/diff-money-migration-prefixes.mjs \
     --sarif --sarif-out=local-diff.sarif
 ```
@@ -1372,7 +1376,7 @@ two outputs was truncated — re-download the artifact.
 | Symptom                                                     | Cause / fix                                                                                              |
 |-------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
 | `gh run download` says *no artifacts found*                 | Artifact expired (>90 days) or the job was skipped/cancelled before the upload step ran.                 |
-| Local SARIF has findings, CI SARIF is empty                 | You're pointed at a different DB. Re-check `TARGET_ENV` and that `SUPABASE_DB_URL_*` matches the job env. |
+| Local SARIF has findings, CI SARIF is empty                 | You're pointed at a different DB. Re-check `TARGET_ENV` and bind the same target URL to local `SUPABASE_DB_URL` that the job receives. |
 | Rule IDs differ (`money-migration-drift` vs old name)       | You're on an older branch locally. Rebase onto `main` and rerun.                                         |
 | `jq: error: Cannot iterate over null (null)`                | SARIF has `results: []` (clean run). Wrap the filter in `.runs[0].results // [] \| .[]`.                 |
 | Fingerprints match but URIs differ                          | One run used absolute paths, the other used repo-relative. The `del(...uriBaseId)` step above fixes it.  |
@@ -2411,7 +2415,7 @@ or `jq` before wiring up `upload-sarif`.
 
 ```bash
 TARGET_ENV=sandbox \
-SUPABASE_DB_URL_SANDBOX="postgres://..." \
+SUPABASE_DB_URL="postgres://..." \
 node scripts/diff-money-migration-prefixes.mjs \
   --sarif --sarif-out=audit/money-migrations/diff.sarif
 
@@ -2510,8 +2514,8 @@ inputs as any other invocation of the CLI — nothing extra to prepare:
 - `supabase/migrations/*.sql` on disk — to confirm each required file
   exists and to extract its prefix.
 - The target database's `supabase_migrations.schema_migrations` table
-  (via `psql` + `SUPABASE_DB_URL` / `SUPABASE_DB_URL_SANDBOX` /
-  `SUPABASE_DB_URL_LIVE`, selected by `TARGET_ENV`) — for the applied
+  (via `psql` plus the runtime `SUPABASE_DB_URL`, `DATABASE_URL`, or local
+  `PG*` inputs) — for the applied
   prefixes. Omit the DB URL when running `--expected` only; the CLI
   emits `money-migration-malformed` annotations without a DB round-trip.
 
@@ -2557,7 +2561,7 @@ Minimal step:
 - name: Prefix diff (annotations)
   env:
     TARGET_ENV: sandbox
-    SUPABASE_DB_URL_SANDBOX: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
+    SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
   run: node scripts/diff-money-migration-prefixes.mjs --github-annotations
 ```
 
@@ -2573,14 +2577,14 @@ Common failure modes and the fastest fix for each. All apply to both
 
 | Symptom                                                                          | Likely cause                                                        | Quickest fix                                                                                                                          |
 |----------------------------------------------------------------------------------|---------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| `No DB URL provided` / exit code `2` / SARIF `money-migration-tooling`           | Neither `SUPABASE_DB_URL` nor the env-specific URL is set           | `export SUPABASE_DB_URL_SANDBOX=...` (or `_LIVE`) **and** `export TARGET_ENV=sandbox`. Verify with `env \| grep SUPABASE_DB_URL`.     |
+| `No DB URL provided` / exit code `2` / SARIF `money-migration-tooling`           | No runtime DB URL or local PG* input is set                          | `export SUPABASE_DB_URL=...` **and** `export TARGET_ENV=sandbox`. Verify with `env \| grep SUPABASE_DB_URL`.                           |
 | `psql: command not found` / `spawn psql ENOENT`                                  | Postgres client not installed or not on `PATH`                      | macOS: `brew install libpq && brew link --force libpq`. Debian/Ubuntu: `sudo apt-get install postgresql-client`. Confirm: `which psql`. |
-| Applied-check reports drift but sandbox is definitely up to date                 | `TARGET_ENV` points at the wrong DB (e.g. `live` while URL is sandbox) | Set `TARGET_ENV` to match the URL variable you exported. Cross-check with `echo $TARGET_ENV` and the `target_env` field in JSON output. |
-| `psql: FATAL: password authentication failed`                                    | Stale or wrong pooler credentials in the DB URL                     | Refresh the connection string; ensure no shell-escaped `$` characters in the password. Test with `psql "$SUPABASE_DB_URL_SANDBOX" -c 'select 1'`. |
+| Applied-check reports drift but sandbox is definitely up to date                 | `TARGET_ENV` points at the wrong DB (e.g. `live` while URL is sandbox) | Set `TARGET_ENV` to match the URL you exported. Cross-check with `echo $TARGET_ENV` and the `target_env` field in JSON output.          |
+| `psql: FATAL: password authentication failed`                                    | Stale or wrong pooler credentials in the DB URL                     | Refresh the connection string; ensure no shell-escaped `$` characters in the password. Test with `psql "$SUPABASE_DB_URL" -c 'select 1'`. |
 | `Tracker query failed` / SARIF `money-migration-tooling`                          | `supabase_migrations.schema_migrations` unreachable (network, SSL, wrong DB) | Add `?sslmode=require` if the pooler needs it, and confirm the URL points at the Supabase project's Postgres, not a local instance.   |
 | Exit `1` immediately, no drift table                                              | Manifest entry missing a 14-digit prefix (`money-migration-malformed`) | Open `scripts/required-money-migrations.mjs` and confirm each path begins with a 14-digit timestamp. Re-run the unit tests: `bun run test:prefix-diff`. |
 | `mkdir` / `ENOENT` errors when writing diff or redirected SARIF artifacts        | `DIFF_PATH` and shell `>` redirects don't auto-create parent dirs   | `mkdir -p audit/money-migrations` before setting `DIFF_PATH=` or `--sarif > path`. `--sarif-out=PATH` creates parents itself.          |
-| CI green locally, red in Actions                                                  | `SUPABASE_DB_URL_SANDBOX` / `_LIVE` GitHub secrets missing or misnamed | Re-check the exact names in the repo Secrets settings — the workflow only reads those two, not `DATABASE_URL`.                        |
+| CI green locally, red in Actions                                                  | Environment secret missing, mis-scoped, or not a Session Pooler URL | Re-check **Settings → Environments**: sandbox uses `SUPABASE_DB_URL_SANDBOX`; production uses `SUPABASE_DB_URL`.                     |
 | Sandbox smoke script hangs                                                       | Missing `SANDBOX_SMOKE_USER` or the user has no Paddle sandbox entitlement | Set `SANDBOX_SMOKE_USER` to a real sandbox account UUID; re-run with `--verbose` to see the checkpoint it stalls on.                  |
 | `Edge shared-lib mirror is out of sync` during `bun run build` / prebuild        | Files under `src/lib` (or imported closure) changed without regenerating `supabase/functions/_shared/lib` and `.sync-manifest.json` | Run `bun run sync-edge-shared`, then `git add supabase/functions/_shared/lib .sync-manifest.json` and commit. Locally, `prebuild` auto-regenerates; in CI (`CI=1` / `--check-only`) it fails closed so drift can't be papered over — commit the sync output and push. |
 
@@ -2687,5 +2691,4 @@ Fork PRs skip the report job (their token is read-only and would 403).
 Comment matching keys on both the hidden marker **and** the
 `github-actions[bot]` login, so a forged marker from a human account
 can't wedge future updates.
-
 

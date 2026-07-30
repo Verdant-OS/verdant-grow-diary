@@ -28,7 +28,25 @@ function activeGrowStorageKey(ownerId: string | null): string | null {
 
 function readActiveGrowId(ownerId: string | null): string | null {
   const storageKey = activeGrowStorageKey(ownerId);
-  return storageKey ? localStorage.getItem(storageKey) : null;
+  if (!storageKey) return null;
+  // The saved selection is only a convenience. Browser storage can be
+  // unavailable or throw (privacy settings, hardened webviews, quota), and
+  // must not prevent the authenticated grow context from rendering.
+  try {
+    return globalThis.localStorage.getItem(storageKey);
+  } catch {
+    return null;
+  }
+}
+
+function persistActiveGrowId(storageKey: string | null, id: string | null): void {
+  if (!storageKey) return;
+  try {
+    if (id) globalThis.localStorage.setItem(storageKey, id);
+    else globalThis.localStorage.removeItem(storageKey);
+  } catch {
+    // Keep the selection in memory when browser storage is unavailable.
+  }
 }
 
 /**
@@ -54,12 +72,13 @@ function GrowsProviderForOwner({ children, user }: { children: ReactNode; user: 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const setActiveGrowId = (id: string | null) => {
-    _setActive(id);
-    if (!storageKey) return;
-    if (id) localStorage.setItem(storageKey, id);
-    else localStorage.removeItem(storageKey);
-  };
+  const setActiveGrowId = useCallback(
+    (id: string | null) => {
+      _setActive(id);
+      persistActiveGrowId(storageKey, id);
+    },
+    [storageKey],
+  );
 
   const refresh = useCallback(async () => {
     if (!user) {
@@ -94,7 +113,7 @@ function GrowsProviderForOwner({ children, user }: { children: ReactNode; user: 
     if (!activeGrowId && grows.length > 0) setActiveGrowId(grows[0].id);
     if (activeGrowId && grows.length > 0 && !grows.find((g) => g.id === activeGrowId))
       setActiveGrowId(grows[0].id);
-  }, [grows, activeGrowId]);
+  }, [grows, activeGrowId, setActiveGrowId]);
 
   const activeGrow = grows.find((g) => g.id === activeGrowId) ?? null;
 

@@ -1,5 +1,5 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type GrowQueryResponse = {
   data: Array<{ id: string; name: string }> | null;
@@ -80,12 +80,76 @@ function GrowsProbe({ ownerBSnapshots }: { ownerBSnapshots: OwnerBSnapshot[] }) 
   );
 }
 
+function StorageControls() {
+  const { activeGrowId, setActiveGrowId } = useGrows();
+  return (
+    <>
+      <output data-testid="storage-active-grow">{activeGrowId ?? "none"}</output>
+      <button type="button" onClick={() => setActiveGrowId("storage-blocked-grow")}>
+        Select grow
+      </button>
+      <button type="button" onClick={() => setActiveGrowId(null)}>
+        Clear grow
+      </button>
+    </>
+  );
+}
+
 beforeEach(() => {
   state.ownerId = "owner-a";
   state.requests.length = 0;
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("GrowsProvider owner transitions", () => {
+  it("fails open when browser storage throws and still isolates a new owner", async () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("storage blocked");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("storage blocked");
+    });
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      throw new Error("storage blocked");
+    });
+
+    const ownerBSnapshots: OwnerBSnapshot[] = [];
+    const view = render(
+      <GrowsProvider>
+        <GrowsProbe ownerBSnapshots={ownerBSnapshots} />
+        <StorageControls />
+      </GrowsProvider>,
+    );
+
+    await waitFor(() => expect(state.requests).toHaveLength(1));
+    expect(screen.getByTestId("grows-state")).toHaveTextContent("owner-a|loading|none|");
+
+    expect(() =>
+      fireEvent.click(screen.getByRole("button", { name: "Select grow" })),
+    ).not.toThrow();
+    expect(screen.getByTestId("storage-active-grow")).toHaveTextContent("storage-blocked-grow");
+
+    expect(() => fireEvent.click(screen.getByRole("button", { name: "Clear grow" }))).not.toThrow();
+    expect(screen.getByTestId("storage-active-grow")).toHaveTextContent("none");
+
+    state.ownerId = "owner-b";
+    view.rerender(
+      <GrowsProvider>
+        <GrowsProbe ownerBSnapshots={ownerBSnapshots} />
+        <StorageControls />
+      </GrowsProvider>,
+    );
+
+    await waitFor(() => expect(state.requests).toHaveLength(2));
+    expect(screen.getByTestId("grows-state")).toHaveTextContent("owner-b|loading|none|");
+    for (const snapshot of ownerBSnapshots) {
+      expect(snapshot.activeGrowId).not.toBe("storage-blocked-grow");
+    }
+  });
+
   it("never renders owner A state to owner B while B's grow fetch is pending", async () => {
     const ownerBSnapshots: OwnerBSnapshot[] = [];
     const view = render(

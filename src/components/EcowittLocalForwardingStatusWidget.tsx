@@ -7,7 +7,7 @@
  * remote service. No tokens, no Authorization headers, no raw payloads.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -42,18 +42,28 @@ export default function EcowittLocalForwardingStatusWidget({
     state: "loading",
   });
   const [busy, setBusy] = useState(false);
+  // The status fetch can resolve after unmount (CI caught it landing after
+  // jsdom teardown as an unhandled "window is not defined" rejection); state
+  // updates must stop once the widget is gone.
+  const unmountedRef = useRef(false);
+  useEffect(() => {
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
+    };
+  }, []);
 
   const refresh = useCallback(async () => {
     setBusy(true);
     setFetchState({ state: "loading" });
     const next = await fetchLocalForwardingStatus();
+    if (unmountedRef.current) return;
     setFetchState(next);
     setBusy(false);
     if (next.state === "offline") {
       toast({
         title: "EcoWitt local bridge not reachable",
-        description:
-          "Start the listener on localhost:8787, then refresh. No data was sent.",
+        description: "Start the listener on localhost:8787, then refresh. No data was sent.",
       });
     }
   }, [toast]);
@@ -75,8 +85,7 @@ export default function EcowittLocalForwardingStatusWidget({
     if (statusNext.state !== "ready") {
       toast({
         title: "Could not copy report",
-        description:
-          "EcoWitt local bridge is not reachable. Start the listener first.",
+        description: "EcoWitt local bridge is not reachable. Start the listener first.",
         variant: "destructive",
       });
       return;
@@ -105,8 +114,7 @@ export default function EcowittLocalForwardingStatusWidget({
         await navigator.clipboard.writeText(safeJson);
         toast({
           title: "Sanitized forwarding report copied",
-          description:
-            "Safe to share with a developer. Never paste your bridge token.",
+          description: "Safe to share with a developer. Never paste your bridge token.",
         });
       } else {
         toast({
@@ -129,16 +137,11 @@ export default function EcowittLocalForwardingStatusWidget({
   return (
     <Card data-testid="ecowitt-local-forwarding-widget">
       <CardHeader>
-        <CardTitle className="text-base">
-          EcoWitt Local Bridge — Forwarding Health
-        </CardTitle>
+        <CardTitle className="text-base">EcoWitt Local Bridge — Forwarding Health</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="space-y-1">
-          <p
-            className="text-sm font-medium"
-            data-testid="ecowitt-local-forwarding-headline"
-          >
+          <p className="text-sm font-medium" data-testid="ecowitt-local-forwarding-headline">
             {vm.headline}
           </p>
           {vm.subheadline ? (
@@ -161,16 +164,11 @@ export default function EcowittLocalForwardingStatusWidget({
                     : "border-muted bg-muted/30")
             }
           >
-            <p
-              className="text-sm font-semibold"
-              data-testid="ecowitt-live-ingest-verified-title"
-            >
+            <p className="text-sm font-semibold" data-testid="ecowitt-live-ingest-verified-title">
               {vm.verifiedMarker.title}
             </p>
             {vm.verifiedMarker.detail ? (
-              <p data-testid="ecowitt-live-ingest-verified-detail">
-                {vm.verifiedMarker.detail}
-              </p>
+              <p data-testid="ecowitt-live-ingest-verified-detail">{vm.verifiedMarker.detail}</p>
             ) : null}
             {vm.verifiedMarker.source ? (
               <p data-testid="ecowitt-live-ingest-verified-source">
@@ -181,9 +179,7 @@ export default function EcowittLocalForwardingStatusWidget({
             {vm.verifiedMarker.capturedAt ? (
               <p data-testid="ecowitt-live-ingest-verified-captured-at">
                 <span className="text-muted-foreground">Captured at: </span>
-                <span className="font-medium">
-                  {vm.verifiedMarker.capturedAt}
-                </span>
+                <span className="font-medium">{vm.verifiedMarker.capturedAt}</span>
               </p>
             ) : null}
           </div>
@@ -213,14 +209,9 @@ export default function EcowittLocalForwardingStatusWidget({
               <span className="text-muted-foreground">Reason: </span>
               <span className="font-medium">{vm.banner.reason}</span>
             </p>
-            <p
-              data-testid="ecowitt-local-forwarding-banner-next-step"
-              className="pt-1"
-            >
+            <p data-testid="ecowitt-local-forwarding-banner-next-step" className="pt-1">
               <span className="text-muted-foreground">Next step: </span>
-              <span className="font-medium">
-                {vm.banner.recommendedNextStep}
-              </span>
+              <span className="font-medium">{vm.banner.recommendedNextStep}</span>
             </p>
             <a
               className="inline-block pt-1 underline text-[11px]"
@@ -275,9 +266,8 @@ export default function EcowittLocalForwardingStatusWidget({
         </div>
 
         <p className="text-[11px] text-muted-foreground">
-          Widget reads only the local listener on localhost:8787. No tokens,
-          Authorization headers, raw payloads, or .env values are fetched,
-          shown, or copied.
+          Widget reads only the local listener on localhost:8787. No tokens, Authorization headers,
+          raw payloads, or .env values are fetched, shown, or copied.
         </p>
       </CardContent>
     </Card>
@@ -296,10 +286,7 @@ function Row({ row }: { row: ForwardingStatusRow }) {
   return (
     <div>
       <dt className="text-muted-foreground">{row.label}</dt>
-      <dd
-        className={`font-medium ${tone}`}
-        data-testid={`ecowitt-local-forwarding-row-${row.key}`}
-      >
+      <dd className={`font-medium ${tone}`} data-testid={`ecowitt-local-forwarding-row-${row.key}`}>
         {row.value}
       </dd>
     </div>

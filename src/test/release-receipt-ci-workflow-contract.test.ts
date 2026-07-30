@@ -52,6 +52,11 @@ describe("release-receipt CI workflow upload v1 — contract", () => {
     expect(fs.existsSync(COMPOSER_PATH)).toBe(true);
   });
 
+  it("runs automatically for the legacy and deployment branches", () => {
+    expect(workflow).toMatch(/push:\s*\r?\n\s+branches:\s*\[main, verdant-grow-diary\]/);
+    expect(workflow).toMatch(/pull_request:\s*\r?\n\s+branches:\s*\[main, verdant-grow-diary\]/);
+  });
+
   it("uses actions/upload-artifact", () => {
     expect(workflow).toMatch(/actions\/upload-artifact/);
   });

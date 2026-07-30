@@ -16,9 +16,9 @@ name: Release Receipt CI Upload
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
   pull_request:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
 
 jobs:
   release-receipt:

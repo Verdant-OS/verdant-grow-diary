@@ -87,19 +87,19 @@ export default function GuidePage() {
     const crumbs = buildBreadcrumbListJsonLd({
       items: [...VERDANT_GUIDES_BREADCRUMB_ITEMS, { name: guide.h1, url: guideUrl }],
     });
-    // Evergreen guides — use the site's stable publish date so Article
-    // schema validates without inventing per-guide edit timestamps.
-    const article = buildArticleJsonLd({
-      headline: guide.h1,
-      description: guide.description,
-      url: guideUrl,
-      datePublished: "2025-01-01",
-      dateModified: "2025-01-01",
-      image: "https://verdantgrowdiary.com/brand/verdant-logo-512.png",
-      authorName: "Verdant Grow Diary",
-      publisherName: "Verdant Grow Diary",
-      siteUrl: VERDANT_SITE_ORIGIN,
-    });
+    const article = guide.publishedOn
+      ? buildArticleJsonLd({
+          headline: guide.h1,
+          description: guide.description,
+          url: guideUrl,
+          datePublished: guide.publishedOn,
+          dateModified: guide.modifiedOn,
+          image: "https://verdantgrowdiary.com/brand/verdant-logo-512.png",
+          authorName: "Verdant Grow Diary",
+          publisherName: "Verdant Grow Diary",
+          siteUrl: VERDANT_SITE_ORIGIN,
+        })
+      : null;
     const faqScript = document.createElement("script");
     faqScript.type = "application/ld+json";
     faqScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-faq`);
@@ -110,15 +110,17 @@ export default function GuidePage() {
     crumbScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-breadcrumb`);
     crumbScript.text = safeJsonLdStringify(crumbs);
     document.head.appendChild(crumbScript);
-    const articleScript = document.createElement("script");
-    articleScript.type = "application/ld+json";
-    articleScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-article`);
-    articleScript.text = safeJsonLdStringify(article);
-    document.head.appendChild(articleScript);
+    const articleScript = article ? document.createElement("script") : null;
+    if (articleScript) {
+      articleScript.type = "application/ld+json";
+      articleScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-article`);
+      articleScript.text = safeJsonLdStringify(article);
+      document.head.appendChild(articleScript);
+    }
     return () => {
       faqScript.remove();
       crumbScript.remove();
-      articleScript.remove();
+      articleScript?.remove();
     };
   }, [guide]);
 
@@ -158,6 +160,24 @@ export default function GuidePage() {
           {guide.h1}
         </h1>
         <p className="mt-5 text-lg text-muted-foreground">{guide.intro}</p>
+        {(guide.publishedOn || guide.modifiedOn) && (
+          <p
+            data-testid="guide-editorial-provenance"
+            className="mt-4 text-xs text-muted-foreground"
+          >
+            {guide.publishedOn ? (
+              <>
+                Published <time dateTime={guide.publishedOn}>{guide.publishedOn}</time>
+              </>
+            ) : null}
+            {guide.publishedOn && guide.modifiedOn ? " · " : null}
+            {guide.modifiedOn ? (
+              <>
+                Reviewed <time dateTime={guide.modifiedOn}>{guide.modifiedOn}</time>
+              </>
+            ) : null}
+          </p>
+        )}
 
         {guide.cta && (
           <aside
@@ -259,6 +279,31 @@ export default function GuidePage() {
                 );
               })}
             </Accordion>
+          </section>
+        )}
+
+        {guide.sources && guide.sources.length > 0 && (
+          <section className="mt-12" data-testid="guide-sources">
+            <h2 className="font-display text-xl md:text-2xl font-semibold">Evidence and scope</h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              These sources support the measurement concepts and study-specific observations in this
+              guide. They do not establish a universal fixture setting or diagnose a plant.
+            </p>
+            <ul className="mt-4 space-y-4">
+              {guide.sources.map((source) => (
+                <li key={source.href} className="rounded-md border border-border/60 p-4">
+                  <a
+                    href={source.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+                  >
+                    {source.label}
+                  </a>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{source.note}</p>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 

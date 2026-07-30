@@ -29,6 +29,8 @@ export default function CheckoutCancel() {
     title: "Checkout not completed | Verdant Grow Diary",
     description: "No charge was made. You can try again anytime.",
     path: "/checkout/cancel",
+    // A transactional recovery route is useful to the buyer, not a search result.
+    noindex: true,
   });
 
   useEffect(() => {

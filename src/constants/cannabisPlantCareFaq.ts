@@ -7,7 +7,7 @@
  *
  * ORDER IS PART OF THE CONTRACT: entries are referenced positionally elsewhere
  * (a diary FAQ deep-link targets index 2, "yellowing leaves"). New questions are
- * appended via CANNABIS_NUTRIENT_FAQ — never inserted or reordered.
+ * appended via the topic arrays below — never inserted or reordered.
  *
  * Cultivation guidance rules:
  *   - Horticultural best practices, no brand-specific schedules or bro-science.
@@ -52,6 +52,68 @@ export const CANNABIS_NUTRIENT_FAQ: ReadonlyArray<CannabisPlantCareFaqEntry> = [
   },
 ];
 
+/**
+ * Lighting setup questions shared by the plant-care FAQ and the lighting
+ * distance/schedule guide. The answers make measurement and provenance useful
+ * without turning a fixture chart or one research treatment into a universal
+ * target.
+ */
+export const CANNABIS_LIGHTING_SETUP_FAQ: ReadonlyArray<CannabisPlantCareFaqEntry> = [
+  {
+    question: "How far should an LED grow light be from cannabis plants?",
+    answer:
+      "Use the fixture maker's hanging range as a starting point, then verify the canopy rather than treating distance as the dose. Record the distance in inches or centimeters, dimmer setting, plant stage, and a PPFD reading or clearly labeled estimate at several canopy positions. A center reading can hide dim edges or a hot spot. Change height or output gradually and compare new growth before changing something else.",
+  },
+  {
+    question: "What is the difference between PPFD and DLI for cannabis?",
+    answer:
+      "PPFD is the photosynthetic light reaching a square meter each second at the measurement point, written as micromoles per square meter per second. DLI adds the photoperiod and describes the total delivered across a day, in moles per square meter per day. For a constant PPFD, calculate DLI as PPFD multiplied by light-hours and 3,600, divided by 1,000,000. Both are comparison tools, not universal prescriptions.",
+  },
+  {
+    question: "Do autoflowers need a different light schedule?",
+    answer:
+      "Autoflowers do not require a 12/12 switch to initiate flowering, but that does not make one long schedule correct for every plant or room. Compare any schedule alongside measured or clearly labeled estimated PPFD, calculated DLI, temperature and humidity, plant stage, energy and heat limits, and the plant's response. Keep the schedule stable long enough to read the result and change one variable at a time.",
+  },
+  {
+    question: "Should I copy a PPFD chart from another cannabis grow?",
+    answer:
+      "Treat an outside chart as context, not a prescription. Fixture spectrum and geometry, meter or app method, canopy shape, cultivar, stage, carbon dioxide, temperature, irrigation, and nutrition all change the response. Make a small grid at your own canopy, label the source of every value, and keep the same measurement method when you compare a later change.",
+  },
+];
+
+/**
+ * Symptom-triage questions shared by the plant-care FAQ and the light-stress
+ * guide. They describe evidence to compare; they do not diagnose from a photo
+ * or tell the grower to stack corrective changes.
+ */
+export const CANNABIS_LIGHT_STRESS_FAQ: ReadonlyArray<CannabisPlantCareFaqEntry> = [
+  {
+    question: "Is bleaching always caused by too much light?",
+    answer:
+      "No. Bleaching is a visible loss of pigment, not a complete diagnosis. Compare where it appears in the canopy, whether it followed a fixture, dimmer, distance, or schedule change, the PPFD source and map position, temperature and humidity, watering and feeding history, pest pressure, and how the symptom progresses before deciding what to adjust.",
+  },
+  {
+    question: "How can I tell cannabis light stress from heat stress?",
+    answer:
+      "Possible excess-light patterns are usually strongest in the most exposed canopy area and follow a documented intensity, height, or schedule change. Heat stress needs local temperature, humidity, airflow, and timing evidence and may not follow the light map. The patterns can overlap, so compare exposed and shaded growth, repeat photos, and environmental readings instead of deciding from leaf shape alone.",
+  },
+  {
+    question: "Should I lower my grow light immediately when top leaves look stressed?",
+    answer:
+      "Address an immediate electrical or unsafe-heat condition first. Otherwise, verify fixture output, distance, canopy measurement source, schedule, local temperature and humidity, and recent root-zone changes before reacting. If a change is warranted, make it measured and reversible, record when it happened, and avoid changing feed, watering, and lighting together.",
+  },
+  {
+    question: "What should I log before adjusting a cannabis grow light?",
+    answer:
+      "Record fixture and model, dimmer setting, distance in inches or centimeters, photoperiod, canopy position, PPFD source or method, temperature and humidity source and time, plant stage, recent watering or feeding changes, and repeatable photos of affected and unaffected growth. That baseline lets you compare the next light period and the next few days without guessing.",
+  },
+];
+
+export const CANNABIS_LIGHTING_FAQ: ReadonlyArray<CannabisPlantCareFaqEntry> = [
+  ...CANNABIS_LIGHTING_SETUP_FAQ,
+  ...CANNABIS_LIGHT_STRESS_FAQ,
+];
+
 export const CANNABIS_PLANT_CARE_FAQ: ReadonlyArray<CannabisPlantCareFaqEntry> = [
   {
     question: "How often should I water a cannabis plant?",
@@ -80,4 +142,5 @@ export const CANNABIS_PLANT_CARE_FAQ: ReadonlyArray<CannabisPlantCareFaqEntry> =
   },
   // Appended — see the order contract in the file docstring.
   ...CANNABIS_NUTRIENT_FAQ,
+  ...CANNABIS_LIGHTING_FAQ,
 ];

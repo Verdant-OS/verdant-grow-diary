@@ -71,23 +71,26 @@ function buildStaticWebPageJsonLd(metadata: {
 
 function buildStaticGuideJsonLd(guide: (typeof VERDANT_SEO_GUIDES)[number]) {
   const url = `${VERDANT_SITE_ORIGIN}/guides/${guide.slug}`;
+  const article = guide.publishedOn
+    ? buildArticleJsonLd({
+        headline: guide.h1,
+        description: guide.description,
+        url,
+        datePublished: guide.publishedOn,
+        dateModified: guide.modifiedOn,
+        image: DEFAULT_OG_IMAGE,
+        authorName: "Verdant Grow Diary",
+        publisherName: "Verdant Grow Diary",
+        siteUrl: VERDANT_SITE_ORIGIN,
+      })
+    : null;
   return [
     buildStaticWebPageJsonLd({ title: guide.title, description: guide.description, url }),
     buildFaqPageJsonLd({ pageUrl: url, questions: guide.faq }),
     buildBreadcrumbListJsonLd({
       items: [...VERDANT_GUIDES_BREADCRUMB_ITEMS, { name: guide.h1, url }],
     }),
-    buildArticleJsonLd({
-      headline: guide.h1,
-      description: guide.description,
-      url,
-      datePublished: "2025-01-01",
-      dateModified: "2025-01-01",
-      image: DEFAULT_OG_IMAGE,
-      authorName: "Verdant Grow Diary",
-      publisherName: "Verdant Grow Diary",
-      siteUrl: VERDANT_SITE_ORIGIN,
-    }),
+    ...(article ? [article] : []),
   ];
 }
 
@@ -164,15 +167,15 @@ function aliasDocument(
 }
 
 const GUIDE_HUB = publicDocument("/guides", {
-  title: "Grower Guides: Grow Diary, VPD & Sensor Truth | Verdant",
+  title: "Grower Guides: Diary, Lighting & Sensor Truth | Verdant",
   description:
-    "Practical grower guides for using plant timelines, source-labeled sensor data, VPD context, and cautious AI to make better cultivation decisions.",
+    "Practical grower guides for plant timelines, grow-light distance, PPFD, DLI, source-labeled sensor data, VPD context, and cautious troubleshooting.",
   imageAlt: "Verdant Grower Guides",
   jsonLd: [
     buildStaticWebPageJsonLd({
-      title: "Grower Guides: Grow Diary, VPD & Sensor Truth | Verdant",
+      title: "Grower Guides: Diary, Lighting & Sensor Truth | Verdant",
       description:
-        "Practical grower guides for using plant timelines, source-labeled sensor data, VPD context, and cautious AI to make better cultivation decisions.",
+        "Practical grower guides for plant timelines, grow-light distance, PPFD, DLI, source-labeled sensor data, VPD context, and cautious troubleshooting.",
       url: `${VERDANT_SITE_ORIGIN}/guides`,
     }),
     buildFaqPageJsonLd({
@@ -348,6 +351,28 @@ const CULTIVAR_DOCUMENTS = VERDANT_CULTIVARS.map((cultivar) =>
   }),
 );
 
+/**
+ * Transactional checkout return routes are reachable without JavaScript, but
+ * must never compete for organic results. They intentionally stay separate
+ * from `STATIC_PUBLIC_SEO_DOCUMENTS`, whose callers enforce indexable public
+ * acquisition metadata and sitemap parity.
+ */
+export const STATIC_TRANSACTIONAL_NOINDEX_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> =
+  Object.freeze([
+    publicDocument("/checkout/success", {
+      title: "Checkout status | Verdant Grow Diary",
+      description: "Paid Verdant access is confirmed server-side by the billing webhook.",
+      imageAlt: "Verdant checkout status",
+      robots: "noindex, follow",
+    }),
+    publicDocument("/checkout/cancel", {
+      title: "Checkout not completed | Verdant Grow Diary",
+      description: "No charge was made. You can try again anytime.",
+      imageAlt: "Verdant checkout not completed",
+      robots: "noindex, follow",
+    }),
+  ]);
+
 /** All public documents emitted alongside Vite's primary SPA entry. */
 export const STATIC_PUBLIC_SEO_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = Object.freeze([
   {
@@ -388,4 +413,8 @@ export const STATIC_PUBLIC_ALIAS_DOCUMENTS: ReadonlyArray<StaticPublicAliasDocum
 
 /** Every route-local HTML document emitted by the Vite build. */
 export const STATIC_PUBLIC_OUTPUT_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> =
-  Object.freeze([...STATIC_PUBLIC_SEO_DOCUMENTS, ...STATIC_PUBLIC_ALIAS_DOCUMENTS]);
+  Object.freeze([
+    ...STATIC_PUBLIC_SEO_DOCUMENTS,
+    ...STATIC_TRANSACTIONAL_NOINDEX_DOCUMENTS,
+    ...STATIC_PUBLIC_ALIAS_DOCUMENTS,
+  ]);

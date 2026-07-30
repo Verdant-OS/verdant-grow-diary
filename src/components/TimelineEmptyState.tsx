@@ -12,7 +12,7 @@
  *    surface owned by Timeline.tsx and must never be shown as "empty".
  */
 import { useCallback, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Sprout } from "lucide-react";
 import {
   FAST_ADD_PICKER_CTAS,
@@ -124,6 +124,25 @@ export default function TimelineEmptyState({
             Clear filters
           </button>
         </div>
+      ) : null}
+
+      {view.kind === "no_entries" ? (
+        <aside
+          data-testid="timeline-empty-lighting-guide"
+          className="mx-auto mt-6 max-w-md rounded-xl border border-border/60 bg-secondary/20 p-4 text-left"
+        >
+          <p className="text-xs font-semibold text-foreground">Planning a grow-light change?</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Start the timeline with the old setting, canopy distance, schedule, measurement source,
+            and a repeatable photo.
+          </p>
+          <Link
+            to="/guides/cannabis-grow-light-distance-and-schedule"
+            className="mt-2 inline-flex text-xs font-medium text-primary underline underline-offset-4"
+          >
+            See what to measure before changing the light
+          </Link>
+        </aside>
       ) : null}
 
       {notice ? (

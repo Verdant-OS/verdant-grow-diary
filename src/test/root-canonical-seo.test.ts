@@ -82,14 +82,18 @@ const ROOT_CANONICAL_TOLERATED: ReadonlyMap<string, string> = new Map([
   ["*", "NotFound catch-all — dedupe-to-homepage is the soft-404 mitigation"],
   ["/.lovable/oauth/consent", "OAuth protocol page; must never rank on its own"],
   ["/auth", "sign-in flow; noindex client-side, never an acquisition page"],
-  ["/checkout/cancel", "transactional return; indexing it would be a bug"],
-  ["/checkout/success", "transactional return; indexing it would be a bug"],
   ["/internal/contextual-pheno-comparison-demo", "fixture demo, deliberately unlinked"],
   ["/internal/demo-proof-walkthrough", "fixture demo, deliberately unlinked"],
   ["/internal/pheno-hunt-demo", "fixture demo, deliberately unlinked"],
-  ["/partners/csv-preview", "browser-local tool, not in sitemap; promote to a prerendered doc if it becomes an acquisition page"],
+  [
+    "/partners/csv-preview",
+    "browser-local tool, not in sitemap; promote to a prerendered doc if it becomes an acquisition page",
+  ],
   ["/reset-password", "credential flow; must never rank"],
-  ["/sensors/csv-preview", "browser-local tool, not in sitemap; promote to a prerendered doc if it becomes an acquisition page"],
+  [
+    "/sensors/csv-preview",
+    "browser-local tool, not in sitemap; promote to a prerendered doc if it becomes an acquisition page",
+  ],
   ["/unsubscribe", "token-validated flow; must never rank"],
 ]);
 
@@ -156,10 +160,7 @@ describe("index.html shell", () => {
 describe("prerendered routes override the shell canonical", () => {
   it("replaces rather than appends, so no page ships two canonicals", () => {
     // The safety of baking a root canonical rests entirely on this branch.
-    const builder = readFileSync(
-      resolve(ROOT, "src/lib/build/staticSocialRouteHtml.ts"),
-      "utf8",
-    );
+    const builder = readFileSync(resolve(ROOT, "src/lib/build/staticSocialRouteHtml.ts"), "utf8");
     expect(builder).toMatch(/canonicalPattern\.test\(html\)/);
     expect(builder).toMatch(/html\.replace\(canonicalPattern, canonicalTag\)/);
   });

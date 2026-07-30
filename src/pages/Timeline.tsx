@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TimelineEmptyState from "@/components/TimelineEmptyState";
+import TimelineLightingGuideCard from "@/components/TimelineLightingGuideCard";
 import {
   resolveTimelineEmptyState,
   TIMELINE_EMPTY_STATE_FALLBACK,
 } from "@/lib/timelineEmptyStateRules";
+import { resolveTimelineLightingGuide } from "@/lib/timelineLightingGuideRules";
 import type { FastAddSelectionContext } from "@/lib/fastAddActionRules";
 import PageHeader from "@/components/PageHeader";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
@@ -815,6 +817,17 @@ export default function Timeline() {
     }
     return map;
   }, [actionResponseState]);
+  const lightingGuideByEntryId = useMemo(() => {
+    const map = new Map<string, NonNullable<ReturnType<typeof resolveTimelineLightingGuide>>>();
+    for (const entry of entries) {
+      const view = resolveTimelineLightingGuide({
+        note: entry.note,
+        details: entry.details,
+      });
+      if (view) map.set(entry.id, view);
+    }
+    return map;
+  }, [entries]);
 
   // Archived/merged plants and tents disappear from the active-entity
   // queries but their diary history remains. This read-only directory
@@ -2007,6 +2020,16 @@ export default function Timeline() {
                                 />
                               </div>
                               <p className="text-sm whitespace-pre-wrap">{e.note}</p>
+                              {lightingGuideByEntryId.has(e.id) ? (
+                                <div
+                                  onClick={(event) => event.stopPropagation()}
+                                  onKeyDown={(event) => event.stopPropagation()}
+                                >
+                                  <TimelineLightingGuideCard
+                                    view={lightingGuideByEntryId.get(e.id)!}
+                                  />
+                                </div>
+                              ) : null}
                               {(() => {
                                 // Compact canonical "Action response" card for
                                 // grower-recorded evidence rows. Rendered inside

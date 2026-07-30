@@ -281,7 +281,10 @@ export default function ManualSensorReadingCard({
       capturedAt: new Date().toISOString(),
       tentId: tentId || null,
     });
-  }, [form, tentId]);
+    // airTempFahrenheit is derived from form.airTempText AND temperatureUnit, so
+    // `form` alone does not cover it: switching °F↔°C would otherwise leave this
+    // review holding a stale temperature.
+  }, [form, tentId, airTempFahrenheit]);
 
   // Entered VPD vs air-VPD estimate. Uses only sanitized numeric metrics —
   // never relabels source. If the grower entered a VPD that disagrees with

@@ -72,6 +72,7 @@ describe("packet-loop slice — safety fences", () => {
 
 describe("packet-loop slice — Quick Log bridge stays single-path", () => {
   const quickLog = read("src/components/QuickLog.tsx");
+  const captureRules = read("src/lib/phenoEvidenceCaptureRules.ts");
 
   it("the explicit-goal reset effect is intact", () => {
     expect(quickLog).toMatch(
@@ -79,17 +80,23 @@ describe("packet-loop slice — Quick Log bridge stays single-path", () => {
     );
   });
 
-  it("the prefill seed is guarded by plant, hunt, ready context, and configured goal", () => {
-    expect(quickLog).toMatch(/selectedPlant\?\.id !== prefill\.plantId\) return;/);
-    expect(quickLog).toMatch(/selectedPhenoHuntId !== prefill\.phenoHuntId\) return;/);
-    expect(quickLog).toMatch(
-      /phenoEvidenceContext\.status !== "ready" \|\| !phenoEvidenceContext\.context\) return;/,
+  it("the prefill goal is centrally revalidated against candidate, hunt, and configured goals", () => {
+    expect(quickLog).toMatch(/resolvePhenoEvidenceGoalHandoff/);
+    expect(captureRules).toMatch(/handoffHuntId !== currentHuntId/);
+    expect(captureRules).toMatch(/handoffPlantId !== currentPlantId/);
+    expect(captureRules).toMatch(
+      /sanitizeConfiguredPhenoEvidenceGoals\(input\.configuredGoals\)\.includes\(goal\)/,
     );
-    expect(quickLog).toMatch(/coverage\.goals\.some\(\(g\) => g\.id === goal\);\s*if \(!configured\) return;/);
   });
 
   it("save-time revalidation against live configured goals is intact", () => {
-    expect(quickLog).toMatch(/coverage\.goals\.some\(\s*\(goal\) => goal\.id === selectedPhenoEvidenceGoal/);
+    expect(quickLog).toMatch(
+      /coverage\.goals\.some\(\s*\(goal\) => goal\.id === effectivePhenoEvidenceGoal/,
+    );
+  });
+
+  it("a confirmed Pheno handoff does not expose the generic non-receipt saver", () => {
+    expect(quickLog).toMatch(/!isPhenoEvidenceGoalHandoff && \(/);
   });
 
   it("the coverage presenter dispatches the EXISTING prefill event, no new modal/route", () => {

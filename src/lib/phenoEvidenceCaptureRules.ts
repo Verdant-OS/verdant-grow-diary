@@ -32,6 +32,23 @@ export interface BuildPhenoEvidenceReceiptInput {
   stage?: unknown;
 }
 
+/**
+ * The exact evidence-goal handoff is an explicit grower action from the
+ * Pheno workspace. Resolve it again against the currently loaded candidate
+ * context before using it for display or persistence. A crafted/stale
+ * handoff, a changed candidate, a changed hunt, or a now-unconfigured goal
+ * all fail closed to null.
+ */
+export interface ResolvePhenoEvidenceGoalHandoffInput {
+  source: unknown;
+  handoffHuntId: unknown;
+  handoffPlantId: unknown;
+  handoffGoal: unknown;
+  currentHuntId: unknown;
+  currentPlantId: unknown;
+  configuredGoals: unknown;
+}
+
 export interface RawPhenoEvidenceDiaryRow {
   id: string;
   plant_id: string | null;
@@ -127,6 +144,37 @@ export function buildPhenoEvidenceReceiptDetails(
     action_queue_created: false,
     device_control: false,
   };
+}
+
+/**
+ * Returns only the specific goal the grower clicked when the live Pheno
+ * context still proves that the handoff belongs to this candidate and hunt.
+ * This does not choose a goal on its own.
+ */
+export function resolvePhenoEvidenceGoalHandoff(
+  input: ResolvePhenoEvidenceGoalHandoffInput,
+): PhenoEvidenceGoalId | null {
+  if (input.source !== "pheno-evidence-goal") return null;
+
+  const handoffHuntId = boundedId(input.handoffHuntId);
+  const handoffPlantId = boundedId(input.handoffPlantId);
+  const currentHuntId = boundedId(input.currentHuntId);
+  const currentPlantId = boundedId(input.currentPlantId);
+  const goal = asGoalId(input.handoffGoal);
+
+  if (
+    !handoffHuntId ||
+    !handoffPlantId ||
+    !currentHuntId ||
+    !currentPlantId ||
+    !goal ||
+    handoffHuntId !== currentHuntId ||
+    handoffPlantId !== currentPlantId
+  ) {
+    return null;
+  }
+
+  return sanitizeConfiguredPhenoEvidenceGoals(input.configuredGoals).includes(goal) ? goal : null;
 }
 
 /**

@@ -4,6 +4,7 @@ import {
   buildPhenoEvidenceCoverage,
   buildPhenoEvidenceReceiptDetails,
   parsePhenoEvidenceReceiptRow,
+  resolvePhenoEvidenceGoalHandoff,
   sanitizeConfiguredPhenoEvidenceGoals,
   type RawPhenoEvidenceDiaryRow,
 } from "@/lib/phenoEvidenceCaptureRules";
@@ -84,6 +85,54 @@ describe("phenoEvidenceCaptureRules", () => {
       sanitizeConfiguredPhenoEvidenceGoals(["vigor", "unknown", "vigor", null, "structure"]),
     ).toEqual(["vigor", "structure"]);
     expect(sanitizeConfiguredPhenoEvidenceGoals(null)).toEqual([]);
+  });
+
+  it("keeps an evidence-goal handoff only when its live candidate and hunt still match", () => {
+    expect(
+      resolvePhenoEvidenceGoalHandoff({
+        source: "pheno-evidence-goal",
+        handoffHuntId: HUNT_ID,
+        handoffPlantId: PLANT_ID,
+        handoffGoal: "vigor",
+        currentHuntId: HUNT_ID,
+        currentPlantId: PLANT_ID,
+        configuredGoals: ["structure", "vigor"],
+      }),
+    ).toBe("vigor");
+
+    expect(
+      resolvePhenoEvidenceGoalHandoff({
+        source: "pheno-evidence-goal",
+        handoffHuntId: HUNT_ID,
+        handoffPlantId: "another-plant",
+        handoffGoal: "vigor",
+        currentHuntId: HUNT_ID,
+        currentPlantId: PLANT_ID,
+        configuredGoals: ["structure", "vigor"],
+      }),
+    ).toBeNull();
+    expect(
+      resolvePhenoEvidenceGoalHandoff({
+        source: "pheno-evidence-goal",
+        handoffHuntId: HUNT_ID,
+        handoffPlantId: PLANT_ID,
+        handoffGoal: "vigor",
+        currentHuntId: HUNT_ID,
+        currentPlantId: PLANT_ID,
+        configuredGoals: ["structure"],
+      }),
+    ).toBeNull();
+    expect(
+      resolvePhenoEvidenceGoalHandoff({
+        source: "ordinary-quick-log",
+        handoffHuntId: HUNT_ID,
+        handoffPlantId: PLANT_ID,
+        handoffGoal: "vigor",
+        currentHuntId: HUNT_ID,
+        currentPlantId: PLANT_ID,
+        configuredGoals: ["structure", "vigor"],
+      }),
+    ).toBeNull();
   });
 
   it("parses photo and source-honest sensor context without a health claim", () => {

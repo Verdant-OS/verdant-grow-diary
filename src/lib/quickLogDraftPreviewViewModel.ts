@@ -123,27 +123,30 @@ export function buildQuickLogDraftPreview(
     const note = trimToNull(prefill.note);
     const noteSummary = note ? firstLine(note) : null;
     const isHyperLog = prefill.source === "hyperlog";
+    const isPhenoEvidenceGoalHandoff = prefill.source === "pheno-evidence-goal";
+
+    // A Pheno goal handoff selects an evidence tag, not a starter note. Do
+    // not render a "Note prefilled" banner when there is no note for the
+    // grower to review; the dedicated Pheno panel names the selected goal.
+    if (isPhenoEvidenceGoalHandoff && !noteSummary) return empty;
 
     const sourceLabel = isHyperLog
       ? "From HyperLog draft (manual)"
       : prefill.source
-      ? `From ${prefill.source} draft`
-      : null;
+        ? `From ${prefill.source} draft`
+        : null;
 
     // Snapshot guidance — never call HyperLog data "live".
     let snapshotLabel: string | null = null;
     if (isHyperLog) {
       snapshotLabel = QUICK_LOG_DRAFT_DEMO_SNAPSHOT_COPY;
     } else if (prefill.suggestSnapshot && prefill.tentId) {
-      snapshotLabel =
-        "Sensor snapshot suggested — confirm in Quick Log before saving.";
+      snapshotLabel = "Sensor snapshot suggested — confirm in Quick Log before saving.";
     }
 
     const photoCount = Number(prefill.photoCount ?? 0);
     const photoLabel =
-      Number.isFinite(photoCount) && photoCount > 0
-        ? QUICK_LOG_DRAFT_PHOTO_BLOCKED_COPY
-        : null;
+      Number.isFinite(photoCount) && photoCount > 0 ? QUICK_LOG_DRAFT_PHOTO_BLOCKED_COPY : null;
 
     const show =
       Boolean(eventTypeLabel) ||

@@ -143,7 +143,10 @@ import { buildSensorNormalizationPreviewViewModel } from "@/lib/sensors/sensorNo
 import { SensorNormalizationPreviewPanel } from "@/components/SensorNormalizationPreviewPanel";
 import PhenoEvidenceQuickLogPanel from "@/components/PhenoEvidenceQuickLogPanel";
 import { usePhenoEvidenceCaptureContext } from "@/hooks/usePhenoEvidenceCaptureContext";
-import { buildPhenoEvidenceReceiptDetails } from "@/lib/phenoEvidenceCaptureRules";
+import {
+  buildPhenoEvidenceReceiptDetails,
+  resolvePhenoEvidenceGoalHandoff,
+} from "@/lib/phenoEvidenceCaptureRules";
 import type { PhenoEvidenceGoalId } from "@/lib/phenoEvidenceGoals";
 import {
   buildHarvestInspectionPreviewViewModel,
@@ -175,8 +178,9 @@ export interface QuickLogPrefill {
   note?: string | null;
   /**
    * Optional handoff source label (e.g. "hyperlog", "harvest-watch-inspection").
-   * Drives the draft preview header copy — never used as a write path
-   * discriminator.
+   * Drives the draft preview header copy. The narrowly typed
+   * "pheno-evidence-goal" source also keeps that explicit handoff on the
+   * existing receipt-aware observation form; it never creates a new write path.
    */
   source?: "hyperlog" | "harvest-watch-inspection" | string | null;
   /**
@@ -401,6 +405,10 @@ export default function QuickLog({
   const [harvestPhotoLighting, setHarvestPhotoLighting] = useState<HarvestPhotoLighting | "">("");
   const [selectedPhenoEvidenceGoal, setSelectedPhenoEvidenceGoal] =
     useState<PhenoEvidenceGoalId | null>(null);
+  // A clicked Pheno-workspace goal is an explicit handoff, not an automatic
+  // choice. This ref distinguishes that one-shot default from a later
+  // grower change (including deliberately clearing the chip).
+  const phenoEvidenceGoalUserTouchedRef = useRef(false);
 
   const wateringInputRef = useRef<HTMLInputElement | null>(null);
   const plantSelectTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -529,6 +537,33 @@ export default function QuickLog({
   const phenoEvidenceContext = usePhenoEvidenceCaptureContext(
     selectedPhenoHuntId,
     selectedPlant?.id ?? null,
+  );
+  const isPhenoEvidenceGoalHandoff =
+    prefill?.source === "pheno-evidence-goal" &&
+    typeof prefill.phenoHuntId === "string" &&
+    prefill.phenoHuntId.trim().length > 0 &&
+    typeof prefill.phenoEvidenceGoal === "string" &&
+    prefill.phenoEvidenceGoal.trim().length > 0;
+  const phenoEvidenceHandoffGoal = useMemo(
+    () =>
+      resolvePhenoEvidenceGoalHandoff({
+        source: prefill?.source,
+        handoffHuntId: prefill?.phenoHuntId,
+        handoffPlantId: prefill?.plantId,
+        handoffGoal: prefill?.phenoEvidenceGoal,
+        currentHuntId: selectedPhenoHuntId,
+        currentPlantId: selectedPlant?.id ?? null,
+        configuredGoals: phenoEvidenceContext.context?.coverage.goals.map((goal) => goal.id),
+      }),
+    [
+      prefill?.phenoEvidenceGoal,
+      prefill?.phenoHuntId,
+      prefill?.plantId,
+      prefill?.source,
+      phenoEvidenceContext.context,
+      selectedPhenoHuntId,
+      selectedPlant?.id,
+    ],
   );
 
   const selectedTent = useMemo(
@@ -709,6 +744,7 @@ export default function QuickLog({
   // current candidate. Never carry a choice between plants or dialog opens.
   useEffect(() => {
     if (saveInFlightRef.current) return;
+    phenoEvidenceGoalUserTouchedRef.current = false;
     setSelectedPhenoEvidenceGoal(null);
   }, [open, editorPlantId, selectedPhenoHuntId]);
 
@@ -733,30 +769,21 @@ export default function QuickLog({
   // leaves the selection empty — never auto-picks a different goal. Runs at
   // most ONCE per dialog handoff via phenoSeedConsumedRef.
   useEffect(() => {
-    if (!open || saveInFlightRef.current) return;
+    if (!open || saveInFlightRef.current || !phenoEvidenceHandoffGoal) return;
     if (phenoSeedConsumedRef.current) return;
-    const goal = prefill?.phenoEvidenceGoal;
-    if (typeof goal !== "string" || goal.length === 0) return;
-    if (!prefill?.plantId || selectedPlant?.id !== prefill.plantId) return;
-    if (!prefill?.phenoHuntId || selectedPhenoHuntId !== prefill.phenoHuntId) return;
-    if (phenoEvidenceContext.status !== "ready" || !phenoEvidenceContext.context) return;
-    if (phenoEvidenceContext.context.huntId !== prefill.phenoHuntId) return;
-    const configured = phenoEvidenceContext.context.coverage.goals.some((g) => g.id === goal);
-    if (!configured) return;
     // Consume the handoff BEFORE seeding so any concurrent context refetch
     // that re-runs this effect finds the guard already set.
     phenoSeedConsumedRef.current = true;
-    setSelectedPhenoEvidenceGoal(goal as PhenoEvidenceGoalId);
-  }, [
-    open,
-    prefill?.phenoEvidenceGoal,
-    prefill?.phenoHuntId,
-    prefill?.plantId,
-    selectedPlant?.id,
-    selectedPhenoHuntId,
-    phenoEvidenceContext.status,
-    phenoEvidenceContext.context,
-  ]);
+    setSelectedPhenoEvidenceGoal(phenoEvidenceHandoffGoal);
+  }, [open, phenoEvidenceHandoffGoal]);
+
+  // The confirmed clicked goal remains visible and persists even if the
+  // asynchronous seed has not committed yet. Once the one-shot seed has run,
+  // a grower reset or chip change cannot resurrect the original handoff.
+  const effectivePhenoEvidenceGoal = phenoEvidenceGoalUserTouchedRef.current
+    ? selectedPhenoEvidenceGoal
+    : (selectedPhenoEvidenceGoal ??
+      (!phenoSeedConsumedRef.current ? phenoEvidenceHandoffGoal : null));
 
   useEffect(() => {
     if (eventType !== "watering" || details.watering.trim()) setWateringError(null);
@@ -827,6 +854,7 @@ export default function QuickLog({
     setEnvEcMscm("");
     setHarvestPhotoAngle("");
     setHarvestPhotoLighting("");
+    phenoEvidenceGoalUserTouchedRef.current = false;
     setSelectedPhenoEvidenceGoal(null);
     setInFlightSaveContext(null);
   }
@@ -898,6 +926,8 @@ export default function QuickLog({
 
   function resetForAnother() {
     // "Log another" starts a genuinely new logical submission.
+    // Never let the prior Pheno workspace handoff seed or fall back into it.
+    phenoSeedConsumedRef.current = true;
     saveIdempotencyKeyRef.current = newQuickLogSaveKey();
     lastFailedSaveSigRef.current = null;
     const keepPlantId = savedTarget?.id ?? plantId;
@@ -927,6 +957,7 @@ export default function QuickLog({
     setEnvEcMscm("");
     setHarvestPhotoAngle("");
     setHarvestPhotoLighting("");
+    phenoEvidenceGoalUserTouchedRef.current = false;
     setSelectedPhenoEvidenceGoal(null);
     if (keepPlantId) setPlantId(keepPlantId);
     setTimeout(() => noteRef.current?.focus(), 0);
@@ -1095,14 +1126,14 @@ export default function QuickLog({
         : null;
       const configuredPhenoGoal =
         saveEventType === "observation" &&
-        selectedPhenoEvidenceGoal &&
+        effectivePhenoEvidenceGoal &&
         phenoEvidenceContext.status === "ready" &&
         phenoEvidenceContext.context?.huntId === selectedPhenoHuntId &&
         phenoEvidenceContext.context.plantId === saveTarget.plantId &&
         phenoEvidenceContext.context.coverage.goals.some(
-          (goal) => goal.id === selectedPhenoEvidenceGoal,
+          (goal) => goal.id === effectivePhenoEvidenceGoal,
         )
-          ? selectedPhenoEvidenceGoal
+          ? effectivePhenoEvidenceGoal
           : null;
       const phenoEvidenceReceipt = configuredPhenoGoal
         ? buildPhenoEvidenceReceiptDetails({
@@ -1331,39 +1362,40 @@ export default function QuickLog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Shared v1a activity surface — consumes canonical
-            QUICK_LOG_ACTIVITY_DEFINITIONS. Additive to the existing
-            note/photo/watering flow below; every save routes through
-            useQuickLogActivitySave and dispatches
-            verdant:entry-created only on confirmed success. */}
-        <QuickLogAllActivitiesSection
-          growId={resolvedTarget?.growId ?? null}
-          tentId={resolvedTarget?.tentId ?? null}
-          plantId={resolvedTarget?.plantId ?? null}
-          externalPersistenceBlockReason={
-            targetQueryPending
-              ? QUICK_LOG_TARGET_BLOCKED_COPY.prefill_target_pending
-              : targetQueryError
-                ? `We couldn't load the ${targetQueryErrorSubject} needed to confirm this Quick Log target.`
-                : editorTargetBlocked && editorTarget.status === "blocked"
-                  ? QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]
-                  : null
-          }
-          plantStage={(resolvedTargetPlant as { stage?: unknown } | null)?.stage ?? null}
-          heading="All activity types"
-          testIdPrefix="quick-log-dialog-all-activities"
-          requestedActivityId={prefill?.activityId ?? null}
-          requestedNote={prefill?.activityId ? (prefill.note ?? null) : null}
-          onSaveSuccess={consumeReviewedPublicStarterDraft}
-          onSaveStart={beginAllActivitiesSave}
-          onSaveEnd={endAllActivitiesSave}
-          saveBlocked={saveLocked}
-          isSaveBlocked={isSaveInFlight}
-          onBeforeStructuredWaterOpen={() => {
-            onOpenChange(false);
-            reset();
-          }}
-        />
+        {/* A Pheno "Record <goal> evidence" handoff stays on the legacy
+            observation form below: that is the established receipt-aware
+            manual writer. The shared activity surface would otherwise offer
+            a successful ordinary save with no evidence receipt. */}
+        {!isPhenoEvidenceGoalHandoff && (
+          <QuickLogAllActivitiesSection
+            growId={resolvedTarget?.growId ?? null}
+            tentId={resolvedTarget?.tentId ?? null}
+            plantId={resolvedTarget?.plantId ?? null}
+            externalPersistenceBlockReason={
+              targetQueryPending
+                ? QUICK_LOG_TARGET_BLOCKED_COPY.prefill_target_pending
+                : targetQueryError
+                  ? `We couldn't load the ${targetQueryErrorSubject} needed to confirm this Quick Log target.`
+                  : editorTargetBlocked && editorTarget.status === "blocked"
+                    ? QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]
+                    : null
+            }
+            plantStage={(resolvedTargetPlant as { stage?: unknown } | null)?.stage ?? null}
+            heading="All activity types"
+            testIdPrefix="quick-log-dialog-all-activities"
+            requestedActivityId={prefill?.activityId ?? null}
+            requestedNote={prefill?.activityId ? (prefill.note ?? null) : null}
+            onSaveSuccess={consumeReviewedPublicStarterDraft}
+            onSaveStart={beginAllActivitiesSave}
+            onSaveEnd={endAllActivitiesSave}
+            saveBlocked={saveLocked}
+            isSaveBlocked={isSaveInFlight}
+            onBeforeStructuredWaterOpen={() => {
+              onOpenChange(false);
+              reset();
+            }}
+          />
+        )}
 
         <form onSubmit={submit} className="grid gap-4">
           <fieldset
@@ -2059,9 +2091,10 @@ export default function QuickLog({
                     ? (selectedPlant as { candidate_label: string }).candidate_label || null
                     : null
                 }
-                selectedGoal={selectedPhenoEvidenceGoal}
+                selectedGoal={effectivePhenoEvidenceGoal}
                 onSelectedGoalChange={(goal) => {
                   if (isMainDraftMutationLocked()) return;
+                  phenoEvidenceGoalUserTouchedRef.current = true;
                   setSelectedPhenoEvidenceGoal(goal);
                 }}
               />

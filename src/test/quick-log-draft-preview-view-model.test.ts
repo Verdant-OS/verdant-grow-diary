@@ -78,6 +78,25 @@ describe("buildQuickLogDraftPreview", () => {
     expect(vm.snapshotLabel).not.toMatch(/\bis live\b/i);
   });
 
+  it("does not claim a Pheno evidence goal handoff prefilled a missing note", () => {
+    expect(
+      buildQuickLogDraftPreview({
+        prefill: {
+          eventType: "observation",
+          source: "pheno-evidence-goal",
+          suggestSnapshot: true,
+          tentId: "tent-1",
+          note: null,
+        },
+      }),
+    ).toMatchObject({
+      show: false,
+      eventTypeLabel: null,
+      noteSummary: null,
+      sourceLabel: null,
+    });
+  });
+
   it("never throws on malformed input", () => {
     expect(() =>
       buildQuickLogDraftPreview({

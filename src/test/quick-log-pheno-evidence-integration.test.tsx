@@ -80,7 +80,9 @@ vi.mock("sonner", () => ({
 
 import QuickLog from "@/components/QuickLog";
 
-function renderQuickLog(prefill: Record<string, unknown> = { plantId: "plant-1", growId: "grow-1" }) {
+function renderQuickLog(
+  prefill: Record<string, unknown> = { plantId: "plant-1", growId: "grow-1" },
+) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   const result = render(
     <QueryClientProvider client={client}>
@@ -135,6 +137,96 @@ describe("Quick Log Pheno evidence integration", () => {
     });
   });
 
+  it("keeps a Record-goal handoff on the receipt-aware form and persists the clicked goal", async () => {
+    renderQuickLog({
+      plantId: "plant-1",
+      growId: "grow-1",
+      tentId: "tent-1",
+      eventType: "observation",
+      source: "pheno-evidence-goal",
+      phenoHuntId: "hunt-1",
+      phenoEvidenceGoal: "structure",
+    });
+
+    const panel = await screen.findByTestId("quick-log-pheno-evidence-panel");
+    await waitFor(() => expect(panel).toHaveAttribute("data-status", "ready"));
+    await waitFor(() =>
+      expect(within(panel).getByTestId("quick-log-pheno-evidence-goal-structure")).toHaveAttribute(
+        "aria-checked",
+        "true",
+      ),
+    );
+    // The generic activity editor cannot attach a Pheno receipt. This
+    // handoff must expose only the established receipt-aware save surface.
+    expect(screen.queryByTestId("quick-log-dialog-all-activities")).toBeNull();
+    // Clicking a goal is not a note draft; never claim otherwise.
+    expect(screen.queryByTestId("quick-log-draft-preview")).toBeNull();
+
+    fireEvent.change(screen.getByTestId("quicklog-note"), {
+      target: { value: "Strong growth after the last watering." },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    expect(saveMock.mock.calls[0][0]).toMatchObject({
+      p_action: "note",
+      p_target_id: "plant-1",
+      p_details: {
+        kind: "pheno_evidence_receipt",
+        hunt_id: "hunt-1",
+        plant_id: "plant-1",
+        evidence_goal: "structure",
+        source: "manual",
+        evidence_only: true,
+        automatic_selection: false,
+        action_queue_created: false,
+        device_control: false,
+      },
+    });
+  });
+
+  it("does not carry a Record-goal handoff into Log another", async () => {
+    renderQuickLog({
+      plantId: "plant-1",
+      growId: "grow-1",
+      tentId: "tent-1",
+      eventType: "observation",
+      source: "pheno-evidence-goal",
+      phenoHuntId: "hunt-1",
+      phenoEvidenceGoal: "structure",
+    });
+
+    const panel = await screen.findByTestId("quick-log-pheno-evidence-panel");
+    await waitFor(() =>
+      expect(within(panel).getByTestId("quick-log-pheno-evidence-goal-structure")).toHaveAttribute(
+        "aria-checked",
+        "true",
+      ),
+    );
+
+    fireEvent.change(screen.getByTestId("quicklog-note"), {
+      target: { value: "First observation is structure evidence." },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    expect(saveMock.mock.calls[0][0].p_details).toMatchObject({ evidence_goal: "structure" });
+
+    fireEvent.click(await screen.findByTestId("quick-log-post-save-another"));
+    await waitFor(() =>
+      expect(within(panel).getByTestId("quick-log-pheno-evidence-goal-structure")).toHaveAttribute(
+        "aria-checked",
+        "false",
+      ),
+    );
+
+    fireEvent.change(screen.getByTestId("quicklog-note"), {
+      target: { value: "Second observation has no selected evidence goal." },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
+    expect(saveMock.mock.calls[1][0].p_details).toBeNull();
+  });
+
   it("a delayed receipt-context refetch never re-seeds a handoff goal the grower changed", async () => {
     // Handoff prefill seeds 'structure'. The grower then switches to 'aroma'.
     // A later pheno_evidence_receipts-family invalidation (e.g. after a save)
@@ -143,6 +235,7 @@ describe("Quick Log Pheno evidence integration", () => {
     const { client } = renderQuickLog({
       plantId: "plant-1",
       growId: "grow-1",
+      source: "pheno-evidence-goal",
       phenoHuntId: "hunt-1",
       phenoEvidenceGoal: "structure",
     });
@@ -159,21 +252,33 @@ describe("Quick Log Pheno evidence integration", () => {
 
     // Grower changes to a different configured goal.
     fireEvent.click(within(panel).getByTestId("quick-log-pheno-evidence-goal-aroma"));
-    expect(
-      within(panel).getByTestId("quick-log-pheno-evidence-goal-aroma"),
-    ).toHaveAttribute("aria-checked", "true");
+    expect(within(panel).getByTestId("quick-log-pheno-evidence-goal-aroma")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
 
     // Force the exact refetch that a successful save triggers.
     await client.invalidateQueries({ queryKey: ["pheno_evidence_receipts"] });
 
     // The grower's choice survives; the handoff goal is NOT silently restored.
     await waitFor(() => expect(panel).toHaveAttribute("data-status", "ready"));
-    expect(
-      within(panel).getByTestId("quick-log-pheno-evidence-goal-aroma"),
-    ).toHaveAttribute("aria-checked", "true");
-    expect(
-      within(panel).getByTestId("quick-log-pheno-evidence-goal-structure"),
-    ).toHaveAttribute("aria-checked", "false");
+    expect(within(panel).getByTestId("quick-log-pheno-evidence-goal-aroma")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(within(panel).getByTestId("quick-log-pheno-evidence-goal-structure")).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+
+    fireEvent.change(screen.getByTestId("quicklog-note"), {
+      target: { value: "Aroma is clearer this week." },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    expect(saveMock.mock.calls[0][0].p_details).toMatchObject({
+      evidence_goal: "aroma",
+    });
   });
 
   it("fails closed for an unavailable hunt but still saves a normal Quick Log", async () => {

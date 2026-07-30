@@ -178,6 +178,25 @@ describe("buildAiSensorSnapshotContext — staleThresholdMs edges", () => {
     expect(r.annotationLine).toContain("captured_at invalid");
   });
 
+  it("future captured_at → invalid source, low trust, and values omitted", () => {
+    for (const capturedAt of [
+      new Date(NOW.getTime() + 1).toISOString(),
+      new Date(NOW.getTime() + 60_000).toISOString(),
+    ]) {
+      const r = buildAiSensorSnapshotContext(
+        { source: "live", captured_at: capturedAt, ...baseReadings },
+        { now: NOW },
+      );
+      expect(r.sourceLabel).toBe("invalid");
+      expect(r.trustLevel).toBe("low");
+      expect(r.valuesForModel).toBeNull();
+      expect(r.isTrustedForAi).toBe(false);
+      expect(r.annotationLine).toContain("source=invalid");
+      expect(r.annotationLine).toContain("captured_at is in the future");
+      expect(r.safetyNotes.some((note) => /future/i.test(note))).toBe(true);
+    }
+  });
+
   it("default threshold constant matches 30 minutes", () => {
     expect(DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS).toBe(30 * 60 * 1000);
   });

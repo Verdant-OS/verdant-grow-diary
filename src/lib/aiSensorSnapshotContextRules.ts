@@ -12,6 +12,7 @@
  *  - Pure. No I/O, no Supabase, no model calls, no Deno.
  *  - Never relabels manual/csv as live.
  *  - Never forwards demo / invalid / unknown reading values.
+ *  - Never forwards values whose captured_at is in the future.
  *  - Never emits device-control language or secrets.
  *  - Deterministic for the same (snapshot, options.now, options.staleThresholdMs).
  *  - `staleThresholdMs <= 0` means there is NO trustworthy freshness
@@ -348,7 +349,7 @@ export function buildAiSensorSnapshotContext(
   const safetyNotes: string[] = [];
   const missingInformationHints: string[] = [];
   let stale = false;
-  let captureProblem: "missing" | "invalid" | null = null;
+  let captureProblem: "missing" | "invalid" | "future" | null = null;
 
   if (captured.kind === "missing") {
     captureProblem = "missing";
@@ -360,8 +361,15 @@ export function buildAiSensorSnapshotContext(
     safetyNotes.push("Snapshot captured_at timestamp is invalid; freshness cannot be verified.");
   } else {
     const ageMs = now.getTime() - captured.ms;
-    // Exactly on threshold (ageMs === threshold) is NOT stale: strict ">".
-    if (threshold <= 0) {
+    if (ageMs < 0) {
+      captureProblem = "future";
+      safetyNotes.push(
+        "Snapshot captured_at timestamp is in the future; values are not trusted for diagnosis.",
+      );
+      missingInformationHints.push(
+        "A sensor snapshot captured at or before the current time is needed before drawing environmental conclusions.",
+      );
+    } else if (threshold <= 0) {
       // No trustworthy freshness window declared by caller.
       stale = ageMs > 0; // any positive age is stale; exact same instant stays not-stale
     } else if (ageMs > threshold) {
@@ -381,6 +389,9 @@ export function buildAiSensorSnapshotContext(
       includeValues = false;
     } else if (captureProblem === "invalid") {
       message = "values omitted; captured_at invalid, freshness cannot be verified.";
+      includeValues = false;
+    } else if (captureProblem === "future") {
+      message = "values omitted; captured_at is in the future, freshness cannot be verified.";
       includeValues = false;
     } else {
       // stale but timestamp valid
@@ -404,13 +415,14 @@ export function buildAiSensorSnapshotContext(
   const valuesForModel = includeValues ? extractNumericReadings(snapshot) : null;
   const isTrustedForAi =
     includeValues && !stale && !captureProblem && (trust === "medium" || trust === "high");
+  const annotationSource: AiSensorSnapshotSource = captureProblem === "future" ? "invalid" : source;
 
   return {
-    annotationLine: buildLine(source, stale, trust, message),
+    annotationLine: buildLine(annotationSource, stale, trust, message),
     valuesForModel,
     safetyNotes,
     missingInformationHints,
-    sourceLabel: source,
+    sourceLabel: annotationSource,
     trustLevel: trust,
     stale,
     isTrustedForAi,

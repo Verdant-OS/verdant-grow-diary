@@ -204,18 +204,28 @@ describe("buildAiDoctorCurrentSensorSnapshot", () => {
     );
   });
 
-  it("fails closed for future-skewed evidence and omits every value", () => {
-    const snapshot = buildAiDoctorCurrentSensorSnapshot(
-      [row("temperature_c", 25, "live", "2026-07-17T12:30:00.000Z")],
-      { now: NOW },
-    );
-    expect(snapshot?.severity).toBe("invalid");
-    expect(snapshot?.readings).toEqual([]);
-    expect(snapshot?.annotation).toMatchObject({
-      source: "invalid",
-      trust: "low",
-      includesValues: false,
-    });
+  it("fails closed for every future timestamp, including the display skew tolerance", () => {
+    for (const capturedAt of [
+      "2026-07-17T12:00:00.001Z",
+      "2026-07-17T12:01:00.000Z",
+      "2026-07-17T12:30:00.000Z",
+    ]) {
+      const rows = [row("temperature_c", 25, "live", capturedAt)];
+      const snapshot = buildAiDoctorCurrentSensorSnapshot(rows, { now: NOW });
+      expect(snapshot?.severity).toBe("invalid");
+      expect(snapshot?.readings).toEqual([]);
+      expect(snapshot?.annotation).toMatchObject({
+        source: "invalid",
+        trust: "low",
+        includesValues: false,
+      });
+      expect(classifyAiDoctorCurrentSensorEvidence(rows, { now: NOW }).status).toBe("invalid");
+      expect(packet(rows)).toMatchObject({
+        recentSensorSnapshot: { capturedAt, severity: "invalid", readings: [] },
+        recentSensorSnapshotAnnotation: { source: "invalid", includesValues: false },
+        missingLiveSensorReadings: true,
+      });
+    }
   });
 
   it("ignores CSV/demo/unknown sources and is deterministic under input reordering", () => {

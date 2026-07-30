@@ -269,13 +269,15 @@ export function buildAiDoctorCurrentSensorSnapshot(
 
   const now = options.now ?? new Date();
   const freshness = classifyFreshness(newest.atIso, now);
-  const invalidSnapshot = freshness.freshness === "invalid" || readings.length === 0;
-  if (invalidSnapshot) annotationInput.source = "invalid";
-
   const context = buildAiSensorSnapshotContext(annotationInput, {
     now,
     staleThresholdMs: SENSOR_FRESH_WINDOW_MINUTES * 60 * 1000,
   });
+  // General live-sensor display tolerates a small device-clock skew. AI
+  // context is stricter: a future captured_at cannot be trustworthy model
+  // evidence, even when it falls inside that UI tolerance.
+  const invalidSnapshot =
+    freshness.freshness === "invalid" || readings.length === 0 || context.sourceLabel === "invalid";
   const invalidNote =
     invalidCount > 0
       ? "One or more current sensor values were omitted because they failed plausibility validation."

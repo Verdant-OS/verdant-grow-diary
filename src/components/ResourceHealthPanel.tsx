@@ -31,6 +31,25 @@ const INTERVAL_OPTIONS: { label: string; value: number }[] = [
   { label: "Every 15 min", value: 15 * 60_000 },
 ];
 
+function readPersistedInterval(): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const raw = window.localStorage.getItem(INTERVAL_STORAGE_KEY);
+    const parsed = raw ? Number.parseInt(raw, 10) : 0;
+    return INTERVAL_OPTIONS.some((option) => option.value === parsed) ? parsed : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function persistInterval(intervalMs: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(INTERVAL_STORAGE_KEY, String(intervalMs));
+  } catch {
+    // The scan setting is optional; keep the current session functional.
+  }
+}
 
 interface ResourceCheck {
   name: string;
@@ -103,15 +122,8 @@ export function ResourceHealthPanel() {
   const [running, setRunning] = useState(false);
   const [lastRunAt, setLastRunAt] = useState<string | null>(null);
   const [history, setHistory] = useState<RunSummary[]>([]);
-  const [intervalMs, setIntervalMs] = useState<number>(() => {
-    if (typeof window === "undefined") return 0;
-    const raw = window.localStorage.getItem(INTERVAL_STORAGE_KEY);
-    const parsed = raw ? Number.parseInt(raw, 10) : 0;
-    return INTERVAL_OPTIONS.some((o) => o.value === parsed) ? parsed : 0;
-  });
+  const [intervalMs, setIntervalMs] = useState<number>(readPersistedInterval);
   const runningRef = useRef(false);
-
-
 
   const runAll = useCallback(async () => {
     if (runningRef.current) return;
@@ -200,8 +212,8 @@ export function ResourceHealthPanel() {
 
   // Persist interval + schedule periodic background scans.
   useEffect(() => {
+    persistInterval(intervalMs);
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(INTERVAL_STORAGE_KEY, String(intervalMs));
     if (intervalMs <= 0) return;
     const id = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
@@ -209,8 +221,6 @@ export function ResourceHealthPanel() {
     }, intervalMs);
     return () => window.clearInterval(id);
   }, [intervalMs, runAll]);
-
-
 
   const failing = checks.filter((c) => c.status === "fail").length;
   const passing = checks.filter((c) => c.status === "pass").length;
@@ -296,9 +306,7 @@ export function ResourceHealthPanel() {
                 </div>
                 <StatusBadge status={c.status} />
               </div>
-              {c.detail && (
-                <p className="text-xs text-muted-foreground break-words">{c.detail}</p>
-              )}
+              {c.detail && <p className="text-xs text-muted-foreground break-words">{c.detail}</p>}
               <p className="text-[11px] text-muted-foreground opacity-80">
                 {c.checkedAt ? new Date(c.checkedAt).toLocaleTimeString() : "—"}
                 {typeof c.durationMs === "number" ? ` · ${c.durationMs} ms` : ""}
@@ -349,7 +357,6 @@ export function ResourceHealthPanel() {
           Fetches each resource with <code>cache: "no-store"</code> from the current origin.
           Auto-scan pauses while the tab is hidden. No auth, no writes, no secrets.
         </p>
-
       </CardContent>
     </Card>
   );

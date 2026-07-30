@@ -12,8 +12,13 @@
  * - All other event types (photo, feeding, training, reminder, etc.)
  *   are rejected with `unsupported_event_type`. The ordinary selector
  *   filters them out because they belong in the structured Quick Log path.
- * - Sensor snapshot values are NOT persisted via this adapter. The
- *   strip remains pre-save trust UI only.
+ * - Sensor-strip readings are persisted only as the redacted envelope
+ *   under `p_details.sensor` (see `sensorAttachPayload`); they are never
+ *   promoted to the RPC's first-class sensor params.
+ * - Environment Check air metrics (temp/RH/VPD) DO ride the first-class
+ *   `p_temperature_c` / `p_humidity_pct` / `p_vpd_kpa` params, mirroring
+ *   Quick Log v2, so the RPC writes the `environment_events` row that the
+ *   VPD/alert arc reads. The envelope JSON alone is invisible to it.
  * - Plant selection is required because the RPC needs a tent or plant
  *   target; the legacy dialog has no tent picker.
  * - Free-text "more details" (pH/EC/runoff/nutrients/training) are
@@ -172,6 +177,10 @@ function trimStr(value: string | undefined | null): string {
   return (value ?? "").toString().trim();
 }
 
+function finiteOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 export function appendLegacyDetailsToNote(
   baseNote: string,
   details: LegacyQuickLogDetails,
@@ -241,6 +250,17 @@ export function buildLegacyQuickLogUnifiedPayload(
   // companion (and writes that companion for stage-only saves).
   const stageTag = normalizeQuickLogStage(input.stage ?? "") || null;
 
+  // Environment Check air metrics must reach the RPC's first-class sensor
+  // params — quicklog_save_manual only writes an environment_events row when
+  // at least one of them is non-null, and the envelope JSON alone never
+  // reaches that gate. Values in the envelope already passed the canonical
+  // band gate; reading defensively keeps this adapter null-safe when called
+  // ungated.
+  const envCheck = input.eventType === "environment" ? input.environmentCheck : null;
+  const envTempC = finiteOrNull(envCheck?.["temp_c"]);
+  const envHumidityPct = finiteOrNull(envCheck?.["humidity_pct"]);
+  const envVpdKpa = finiteOrNull(envCheck?.["vpd_kpa"]);
+
   if (input.eventType === "watering") {
     const raw = trimStr(input.details.watering);
     const volume = Number(raw);
@@ -286,9 +306,9 @@ export function buildLegacyQuickLogUnifiedPayload(
       p_action: "note",
       p_volume_ml: null,
       p_note: note,
-      p_temperature_c: null,
-      p_humidity_pct: null,
-      p_vpd_kpa: null,
+      p_temperature_c: envTempC,
+      p_humidity_pct: envHumidityPct,
+      p_vpd_kpa: envVpdKpa,
       p_occurred_at: null,
       p_details: detailsEnvelope,
       p_stage: stageTag,

@@ -273,11 +273,19 @@ export function deriveSelectionContextFromPathname(
   if (!pathname) return null;
   const plant = pathname.match(/^\/plants\/([^/?#]+)/);
   if (plant) {
-    return { plantId: decodeURIComponent(plant[1]), tentId: null, growId };
+    try {
+      return { plantId: decodeURIComponent(plant[1]), tentId: null, growId };
+    } catch {
+      return null;
+    }
   }
   const tent = pathname.match(/^\/tents\/([^/?#]+)/);
   if (tent) {
-    return { plantId: null, tentId: decodeURIComponent(tent[1]), growId };
+    try {
+      return { plantId: null, tentId: decodeURIComponent(tent[1]), growId };
+    } catch {
+      return null;
+    }
   }
   return null;
 }

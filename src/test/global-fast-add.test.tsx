@@ -84,6 +84,11 @@ describe("fastAddActionRules", () => {
     });
     expect(deriveSelectionContextFromPathname("/dashboard")).toBeNull();
   });
+
+  it("falls back to no selection when a path segment has malformed URI encoding", () => {
+    expect(deriveSelectionContextFromPathname("/plants/%")).toBeNull();
+    expect(deriveSelectionContextFromPathname("/tents/%E0%A4%A")).toBeNull();
+  });
 });
 
 describe("GlobalFastAddButton", () => {
@@ -106,6 +111,15 @@ describe("GlobalFastAddButton", () => {
     fireEvent.click(screen.getByTestId("global-fast-add-action-watering"));
     const notice = screen.getByTestId("global-fast-add-needs-context");
     expect(notice.textContent).toBe(FAST_ADD_NO_CONTEXT_COPY);
+  });
+
+  it("keeps Fast Add usable when a selected path has malformed URI encoding", () => {
+    renderAt("/plants/%");
+    fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
+    fireEvent.click(screen.getByTestId("global-fast-add-action-watering"));
+    expect(screen.getByTestId("global-fast-add-needs-context").textContent).toBe(
+      FAST_ADD_NO_CONTEXT_COPY,
+    );
   });
 
   it("dispatches the Quick Log event for a logging action when context exists", () => {

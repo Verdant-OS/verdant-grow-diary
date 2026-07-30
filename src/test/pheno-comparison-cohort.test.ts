@@ -25,6 +25,11 @@ describe("parse / serialize cohort param", () => {
     expect(parseCohortParamValue("id%20one,id%2Btwo")).toEqual(["id one", "id+two"]);
   });
 
+  it("drops malformed URI-encoded ids while preserving valid cohort entries", () => {
+    expect(parseCohortParamValue("first,%,later")).toEqual(["first", "later"]);
+    expect(readCohortFromSearch("?candidates=%")).toEqual([]);
+  });
+
   it("returns [] for empty/nullish input", () => {
     expect(parseCohortParamValue(null)).toEqual([]);
     expect(parseCohortParamValue(undefined)).toEqual([]);

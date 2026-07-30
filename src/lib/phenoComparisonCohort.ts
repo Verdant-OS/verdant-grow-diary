@@ -30,7 +30,13 @@ export function parseCohortParamValue(raw: string | null | undefined): string[] 
   const out: string[] = [];
   const seen = new Set<string>();
   for (const part of raw.split(",")) {
-    const id = cleanId(decodeURIComponent(part));
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(part);
+    } catch {
+      continue;
+    }
+    const id = cleanId(decoded);
     if (id && !seen.has(id)) {
       seen.add(id);
       out.push(id);

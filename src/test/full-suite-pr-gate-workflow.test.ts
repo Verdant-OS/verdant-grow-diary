@@ -52,4 +52,13 @@ describe("Full Vitest Suite PR gate workflow", () => {
   it("uses the batch matrix var so each job runs a distinct partition", () => {
     expect(WF).toMatch(/--batch=\$\{\{\s*matrix\.batch\s*\}\}/);
   });
+
+  it("publishes one fail-closed aggregate status for branch protection", () => {
+    expect(WF).toMatch(/^\s*full-suite-aggregate\s*:/m);
+    expect(WF).toMatch(/name:\s*Full suite — aggregate/);
+    expect(WF).toMatch(/needs:\s*full-suite/);
+    expect(WF).toMatch(/if:\s*\$\{\{\s*always\(\)\s*\}\}/);
+    expect(WF).toMatch(/FULL_SUITE_RESULT:\s*\$\{\{\s*needs\.full-suite\.result\s*\}\}/);
+    expect(WF).toMatch(/\[\s*"\$FULL_SUITE_RESULT"\s*!=\s*"success"\s*\]/);
+  });
 });

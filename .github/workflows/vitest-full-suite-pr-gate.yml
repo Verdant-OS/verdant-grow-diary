@@ -66,3 +66,24 @@ jobs:
             --isolate \
             --pool=forks \
             --retry-failed-chunk-once
+
+  # A matrix produces sixteen individual check names, which cannot be safely
+  # wildcarded in branch protection. Keep one fail-closed aggregate status so
+  # the deployment branch can require the entire suite without coupling its
+  # protection rule to each matrix child.
+  full-suite-aggregate:
+    name: Full suite — aggregate
+    needs: full-suite
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every full-suite batch to pass
+        env:
+          FULL_SUITE_RESULT: ${{ needs.full-suite.result }}
+        run: |
+          if [ "$FULL_SUITE_RESULT" != "success" ]; then
+            echo "::error title=Full Vitest Suite failed::The matrix result was $FULL_SUITE_RESULT."
+            exit 1
+          fi
+          echo "All 16 full-suite batches passed." >> "$GITHUB_STEP_SUMMARY"

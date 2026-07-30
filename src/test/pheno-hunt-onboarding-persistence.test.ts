@@ -14,6 +14,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   createPhenoHunt,
   PhenoHuntError,
+  renamePhenoHunt,
   updatePhenoHuntSetup,
 } from "@/lib/phenoHuntService";
 
@@ -32,13 +33,11 @@ function makeFakeClient(
     const call: Call = { table, op: "select", filters: [] };
     calls.push(call);
     const chain: Record<string, unknown> = {};
-    const setOp =
-      (op: Call["op"]) =>
-      (payload?: unknown) => {
-        call.op = op;
-        call.payload = payload;
-        return chain;
-      };
+    const setOp = (op: Call["op"]) => (payload?: unknown) => {
+      call.op = op;
+      call.payload = payload;
+      return chain;
+    };
     chain.insert = setOp("insert");
     chain.update = setOp("update");
     chain.delete = setOp("delete");
@@ -54,10 +53,8 @@ function makeFakeClient(
     }
     chain.single = () => Promise.resolve(respond(call));
     chain.maybeSingle = () => Promise.resolve(respond(call));
-    chain.then = (
-      onFulfilled: (v: unknown) => unknown,
-      onRejected?: (e: unknown) => unknown,
-    ) => Promise.resolve(respond(call)).then(onFulfilled, onRejected);
+    chain.then = (onFulfilled: (v: unknown) => unknown, onRejected?: (e: unknown) => unknown) =>
+      Promise.resolve(respond(call)).then(onFulfilled, onRejected);
     return chain;
   }
   const client = { from: builder } as unknown as SupabaseClient;
@@ -136,17 +133,56 @@ describe("updatePhenoHuntSetup persistence honesty", () => {
   it("a silently-filtered update (0 rows: lapsed plan or cross-user id) is NOT a success", async () => {
     const { client } = makeFakeClient(() => ({ data: null, error: null }));
     await expect(
-      updatePhenoHuntSetup(
-        { huntId: "someone-elses-hunt", markSetupComplete: true },
-        client,
-      ),
+      updatePhenoHuntSetup({ huntId: "someone-elses-hunt", markSetupComplete: true }, client),
     ).rejects.toBeInstanceOf(PhenoHuntError);
   });
 
   it("an explicit RLS rejection surfaces as PhenoHuntError", async () => {
     const { client } = makeFakeClient(() => ({ data: null, error: RLS_DENIAL }));
+    await expect(updatePhenoHuntSetup({ huntId: "h1", notes: "x" }, client)).rejects.toBeInstanceOf(
+      PhenoHuntError,
+    );
+  });
+});
+
+describe("renamePhenoHunt persistence honesty", () => {
+  it("writes only a trimmed name and succeeds when the row is returned", async () => {
+    const { client, calls } = makeFakeClient(() => ({ data: { id: "h1" }, error: null }));
+
+    await renamePhenoHunt({ huntId: "h1", name: "  Corrected Hunt  " }, client);
+
+    const update = calls.find((call) => call.op === "update");
+    expect(update?.table).toBe("pheno_hunts");
+    expect(update?.payload).toEqual({ name: "Corrected Hunt" });
+    expect(update?.filters).toEqual(
+      expect.arrayContaining([
+        { kind: "eq", args: ["id", "h1"] },
+        { kind: "select", args: ["id"] },
+      ]),
+    );
+  });
+
+  it("rejects missing identity or a blank name before touching the database", async () => {
+    const { client, calls } = makeFakeClient(() => ({ data: null, error: null }));
+
+    await expect(renamePhenoHunt({ huntId: "", name: "Valid" }, client)).rejects.toBeInstanceOf(
+      PhenoHuntError,
+    );
+    await expect(renamePhenoHunt({ huntId: "h1", name: "   " }, client)).rejects.toBeInstanceOf(
+      PhenoHuntError,
+    );
+    expect(calls).toHaveLength(0);
+  });
+
+  it("does not report a silently filtered or rejected write as saved", async () => {
+    const filtered = makeFakeClient(() => ({ data: null, error: null }));
     await expect(
-      updatePhenoHuntSetup({ huntId: "h1", notes: "x" }, client),
-    ).rejects.toBeInstanceOf(PhenoHuntError);
+      renamePhenoHunt({ huntId: "h1", name: "Corrected" }, filtered.client),
+    ).rejects.toThrow(/not saved/i);
+
+    const denied = makeFakeClient(() => ({ data: null, error: RLS_DENIAL }));
+    await expect(
+      renamePhenoHunt({ huntId: "h1", name: "Corrected" }, denied.client),
+    ).rejects.toThrow(/could not rename/i);
   });
 });

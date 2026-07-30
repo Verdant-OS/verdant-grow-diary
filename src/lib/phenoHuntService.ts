@@ -346,6 +346,37 @@ export interface UpdatePhenoHuntSetupInput {
   breedingObjective?: readonly unknown[];
 }
 
+export interface RenamePhenoHuntInput {
+  huntId: string;
+  name: string;
+}
+
+/**
+ * Correct a hunt title without changing its candidates, evidence, or setup
+ * state. The database remains authoritative: owner + active Pheno Tracker
+ * entitlement policies can silently filter a blocked update, so the selected
+ * row is required before this resolves successfully.
+ */
+export async function renamePhenoHunt(
+  input: RenamePhenoHuntInput,
+  client: SupabaseClient = defaultClient,
+): Promise<void> {
+  if (!input.huntId) throw new PhenoHuntError("Hunt id is required.");
+  const name = input.name.trim();
+  if (!name) throw new PhenoHuntError("Hunt name is required.");
+
+  const { data, error } = await client
+    .from("pheno_hunts")
+    .update({ name } as never)
+    .eq("id", input.huntId)
+    .select("id")
+    .maybeSingle();
+  if (error) throw new PhenoHuntError(`Could not rename pheno hunt: ${error.message}`, error);
+  if (!data) {
+    throw new PhenoHuntError("Hunt name was not saved (hunt missing or write rejected).");
+  }
+}
+
 /**
  * Update the onboarding-only fields on an existing hunt. Owner-only via RLS
  * (Users update own pheno_hunts) plus the RESTRICTIVE Pro entitlement policy.

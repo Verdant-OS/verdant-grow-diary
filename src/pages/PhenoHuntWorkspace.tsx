@@ -14,7 +14,7 @@
  * to compare side by side. Client gating is presentation-only; the database is
  * authoritative for numbering and Pro access.
  */
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { usePhenoHuntWorkspace, CANDIDATE_PAGE_SIZE } from "@/hooks/usePhenoHuntWorkspace";
 import { buildPhenoHuntCsv, phenoHuntCsvFilename } from "@/lib/phenoHuntCsvExport";
@@ -62,7 +62,7 @@ import { usePhenoStressObservations } from "@/hooks/usePhenoStressObservations";
 import PhenoHuntSetupProgressCard from "@/components/PhenoHuntSetupProgressCard";
 import PhenoCompareCandidatesAction from "@/components/PhenoCompareCandidatesAction";
 import { buildPhenoComparisonActionState } from "@/lib/phenoComparisonActionState";
-import { updatePhenoHuntSetup } from "@/lib/phenoHuntService";
+import { renamePhenoHunt, updatePhenoHuntSetup } from "@/lib/phenoHuntService";
 import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 import PhenoCandidateEvidenceCoverage from "@/components/PhenoCandidateEvidenceCoverage";
 import { usePhenoEvidencePackets } from "@/hooks/usePhenoEvidencePackets";
@@ -1172,8 +1172,34 @@ export default function PhenoHuntWorkspace() {
     BreedingObjectiveTarget[] | null
   >(null);
   const [objectiveSaving, setObjectiveSaving] = useState(false);
+  // A successful title save is reflected immediately without forcing every
+  // workspace read to refetch. Pair it with the hunt id so a route change can
+  // never carry the prior hunt's name into the next workspace.
+  const [renamedHunt, setRenamedHunt] = useState<{ huntId: string; name: string } | null>(null);
+  const [renamingHunt, setRenamingHunt] = useState(false);
+  const [huntRenameDraft, setHuntRenameDraft] = useState("");
+  const [huntRenameSaving, setHuntRenameSaving] = useState(false);
+  const [huntRenameError, setHuntRenameError] = useState<string | null>(null);
+  const activeHuntIdRef = useRef<string | null>(ws.hunt?.id ?? null);
+  const huntRenameRequestRef = useRef(0);
   const effectiveBreedingObjective: BreedingObjectiveTarget[] =
     breedingObjectiveLocal ?? ws.hunt?.breedingObjective ?? [];
+  const effectiveHuntName =
+    renamedHunt?.huntId === ws.hunt?.id ? renamedHunt.name : (ws.hunt?.name ?? "this hunt");
+  // A workspace route can be reused while its id changes. Never leave an
+  // in-progress title edit open against a different hunt, and invalidate a
+  // late completion from the prior hunt before it can touch this editor.
+  useEffect(() => {
+    activeHuntIdRef.current = ws.hunt?.id ?? null;
+    huntRenameRequestRef.current += 1;
+    setRenamingHunt(false);
+    setHuntRenameSaving(false);
+    setHuntRenameError(null);
+    return () => {
+      activeHuntIdRef.current = null;
+      huntRenameRequestRef.current += 1;
+    };
+  }, [ws.hunt?.id]);
   const selectedRoundLoadState =
     round === "overall"
       ? null
@@ -1211,6 +1237,53 @@ export default function PhenoHuntWorkspace() {
       return false;
     } finally {
       setObjectiveSaving(false);
+    }
+  };
+
+  const startHuntRename = () => {
+    if (!ws.hunt?.id) return;
+    setHuntRenameDraft(effectiveHuntName);
+    setHuntRenameError(null);
+    setRenamingHunt(true);
+  };
+
+  const cancelHuntRename = () => {
+    setRenamingHunt(false);
+    setHuntRenameError(null);
+  };
+
+  const saveHuntRename = async () => {
+    if (!ws.hunt?.id || huntRenameSaving) return;
+    const huntId = ws.hunt.id;
+    const name = huntRenameDraft.trim();
+    if (!name) {
+      setHuntRenameError("Enter a hunt name before saving.");
+      return;
+    }
+    if (name === effectiveHuntName) {
+      setRenamingHunt(false);
+      return;
+    }
+
+    setHuntRenameSaving(true);
+    setHuntRenameError(null);
+    const requestId = huntRenameRequestRef.current + 1;
+    huntRenameRequestRef.current = requestId;
+    const isCurrentRename = () =>
+      activeHuntIdRef.current === huntId && huntRenameRequestRef.current === requestId;
+    try {
+      await renamePhenoHunt({ huntId, name });
+      if (!isCurrentRename()) return;
+      setRenamedHunt({ huntId, name });
+      setRenamingHunt(false);
+    } catch {
+      if (!isCurrentRename()) return;
+      // The write service treats both an RLS-filtered update and a transport
+      // failure as errors. Do not optimistically change a title we could not
+      // prove was saved.
+      setHuntRenameError("Couldn't save the hunt name. Please try again.");
+    } finally {
+      if (isCurrentRename()) setHuntRenameSaving(false);
     }
   };
 
@@ -1442,7 +1515,69 @@ export default function PhenoHuntWorkspace() {
         className="container mx-auto max-w-5xl space-y-4 px-4 py-6"
       >
         <header className="space-y-1">
-          <h1 className="text-2xl font-semibold">Hunt workspace: {ws.hunt?.name ?? "this hunt"}</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold">Hunt workspace: {effectiveHuntName}</h1>
+            {canAssign && ws.hunt?.id ? (
+              <button
+                type="button"
+                onClick={startHuntRename}
+                data-testid="workspace-rename-hunt"
+                className="text-sm font-medium underline underline-offset-2"
+              >
+                Rename hunt
+              </button>
+            ) : null}
+          </div>
+          {renamingHunt ? (
+            <form
+              className="flex flex-wrap items-center gap-2 pt-1"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void saveHuntRename();
+              }}
+            >
+              <label className="sr-only" htmlFor="workspace-hunt-name">
+                Hunt name
+              </label>
+              <input
+                id="workspace-hunt-name"
+                data-testid="workspace-hunt-name-input"
+                value={huntRenameDraft}
+                disabled={huntRenameSaving}
+                onChange={(event) => {
+                  setHuntRenameDraft(event.target.value);
+                  setHuntRenameError(null);
+                }}
+                className="min-w-56 rounded border border-border bg-background px-2 py-1 text-sm"
+              />
+              <button
+                type="submit"
+                disabled={huntRenameSaving || !huntRenameDraft.trim()}
+                data-testid="workspace-save-hunt-name"
+                className="rounded bg-primary px-3 py-1 text-sm font-medium text-primary-foreground disabled:opacity-50"
+              >
+                {huntRenameSaving ? "Saving…" : "Save"}
+              </button>
+              <button
+                type="button"
+                onClick={cancelHuntRename}
+                disabled={huntRenameSaving}
+                data-testid="workspace-cancel-hunt-name"
+                className="text-sm underline underline-offset-2 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              {huntRenameError ? (
+                <span
+                  role="alert"
+                  data-testid="workspace-hunt-name-error"
+                  className="text-sm text-red-600"
+                >
+                  {huntRenameError}
+                </span>
+              ) : null}
+            </form>
+          ) : null}
           <p className="text-xs text-muted-foreground">{PHENO_KEEPER_DECISION_CAVEAT}</p>
           <label className="flex items-center gap-2 pt-1 text-sm">
             <span className="font-medium">Scoring round</span>

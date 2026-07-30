@@ -11,6 +11,16 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { UsePhenoHuntWorkspaceState } from "@/hooks/usePhenoHuntWorkspace";
 import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 const hookMock = vi.fn<() => UsePhenoHuntWorkspaceState>();
 vi.mock("@/hooks/usePhenoHuntWorkspace", async (orig) => {
   const actual = await orig<typeof import("@/hooks/usePhenoHuntWorkspace")>();
@@ -51,6 +61,14 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
     refetch: refetchEntitlementMock,
   }),
 }));
+
+const { renamePhenoHuntMock } = vi.hoisted(() => ({
+  renamePhenoHuntMock: vi.fn(),
+}));
+vi.mock("@/lib/phenoHuntService", async (orig) => {
+  const actual = await orig<typeof import("@/lib/phenoHuntService")>();
+  return { ...actual, renamePhenoHunt: renamePhenoHuntMock };
+});
 
 import PhenoHuntWorkspace from "@/pages/PhenoHuntWorkspace";
 
@@ -124,15 +142,24 @@ function baseState(overrides: Partial<UsePhenoHuntWorkspaceState>): UsePhenoHunt
 }
 
 function renderWorkspace(overrides: Partial<UsePhenoHuntWorkspaceState>) {
-  hookMock.mockReturnValue(baseState(overrides));
-  return render(
+  let currentState = baseState(overrides);
+  hookMock.mockImplementation(() => currentState);
+  const routeTree = () => (
     <MemoryRouter initialEntries={["/pheno-hunts/hunt-1/workspace"]}>
       <Routes>
         <Route path="/pheno-hunts/:id/workspace" element={<PhenoHuntWorkspace />} />
         <Route path="/pheno-hunts/:id/compare" element={<div data-testid="compare-stub" />} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+  const utils = render(routeTree());
+  return {
+    ...utils,
+    rerenderState: (patch: Partial<UsePhenoHuntWorkspaceState>) => {
+      currentState = { ...currentState, ...patch };
+      utils.rerender(routeTree());
+    },
+  };
 }
 
 beforeEach(() => {
@@ -140,6 +167,7 @@ beforeEach(() => {
   assignMock.mockReset().mockResolvedValue({ ok: true, candidateNumber: 5 });
   loadNextPageMock.mockReset();
   refetchEntitlementMock.mockReset().mockResolvedValue(false);
+  renamePhenoHuntMock.mockReset().mockResolvedValue(undefined);
   entitlementMock = {
     isActive: true,
     effectivePlanId: "pro_monthly",
@@ -147,6 +175,140 @@ beforeEach(() => {
   };
 });
 afterEach(() => cleanup());
+
+describe("hunt title correction", () => {
+  it("lets an active Pheno Tracker owner correct a hunt name without faking a failed save", async () => {
+    renderWorkspace({
+      hunt: {
+        id: "hunt-1",
+        name: "Starter HuntClaude Hunt",
+        growId: "g1",
+        tentId: "t1",
+      },
+    });
+
+    fireEvent.click(screen.getByTestId("workspace-rename-hunt"));
+    const input = screen.getByTestId("workspace-hunt-name-input");
+    expect(input).toHaveValue("Starter HuntClaude Hunt");
+    fireEvent.change(input, { target: { value: "  Starter Hunt  " } });
+    fireEvent.click(screen.getByTestId("workspace-save-hunt-name"));
+
+    await waitFor(() =>
+      expect(renamePhenoHuntMock).toHaveBeenCalledWith({ huntId: "hunt-1", name: "Starter Hunt" }),
+    );
+    expect(
+      screen.getByRole("heading", { name: "Hunt workspace: Starter Hunt" }),
+    ).toBeInTheDocument();
+
+    renamePhenoHuntMock.mockRejectedValueOnce(new Error("denied"));
+    fireEvent.click(screen.getByTestId("workspace-rename-hunt"));
+    fireEvent.change(screen.getByTestId("workspace-hunt-name-input"), {
+      target: { value: "Should not appear" },
+    });
+    fireEvent.click(screen.getByTestId("workspace-save-hunt-name"));
+
+    expect(await screen.findByTestId("workspace-hunt-name-error")).toHaveTextContent(
+      /couldn't save/i,
+    );
+    expect(
+      screen.getByRole("heading", { name: "Hunt workspace: Starter Hunt" }),
+    ).toBeInTheDocument();
+  });
+
+  it("does not offer title changes when the existing Pheno Tracker write gate is inactive", () => {
+    entitlementMock = {
+      isActive: false,
+      effectivePlanId: "free",
+      displayPlanId: "free",
+    };
+
+    renderWorkspace({
+      hunt: { id: "hunt-1", name: "Read-only Hunt", growId: "g1", tentId: "t1" },
+    });
+
+    expect(screen.queryByTestId("workspace-rename-hunt")).toBeNull();
+  });
+
+  it("dismisses an unfinished title edit when the workspace switches hunts", async () => {
+    const { rerenderState } = renderWorkspace({
+      hunt: { id: "hunt-1", name: "First Hunt", growId: "g1", tentId: "t1" },
+    });
+    fireEvent.click(screen.getByTestId("workspace-rename-hunt"));
+    expect(screen.getByTestId("workspace-hunt-name-input")).toHaveValue("First Hunt");
+
+    rerenderState({
+      hunt: { id: "hunt-2", name: "Second Hunt", growId: "g2", tentId: "t2" },
+    });
+
+    await waitFor(() => expect(screen.queryByTestId("workspace-hunt-name-input")).toBeNull());
+    expect(
+      screen.getByRole("heading", { name: "Hunt workspace: Second Hunt" }),
+    ).toBeInTheDocument();
+  });
+
+  it("ignores a late successful save from a prior hunt", async () => {
+    const firstSave = deferred<void>();
+    renamePhenoHuntMock.mockReturnValueOnce(firstSave.promise);
+    const { rerenderState } = renderWorkspace({
+      hunt: { id: "hunt-1", name: "First Hunt", growId: "g1", tentId: "t1" },
+    });
+    fireEvent.click(screen.getByTestId("workspace-rename-hunt"));
+    fireEvent.change(screen.getByTestId("workspace-hunt-name-input"), {
+      target: { value: "First saved" },
+    });
+    fireEvent.click(screen.getByTestId("workspace-save-hunt-name"));
+    await waitFor(() => expect(renamePhenoHuntMock).toHaveBeenCalledTimes(1));
+
+    rerenderState({
+      hunt: { id: "hunt-2", name: "Second Hunt", growId: "g2", tentId: "t2" },
+    });
+    await waitFor(() => expect(screen.queryByTestId("workspace-hunt-name-input")).toBeNull());
+    fireEvent.click(screen.getByTestId("workspace-rename-hunt"));
+    fireEvent.change(screen.getByTestId("workspace-hunt-name-input"), {
+      target: { value: "Second draft" },
+    });
+
+    firstSave.resolve();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("workspace-hunt-name-input")).toHaveValue("Second draft");
+      expect(screen.queryByTestId("workspace-hunt-name-error")).toBeNull();
+    });
+    expect(
+      screen.getByRole("heading", { name: "Hunt workspace: Second Hunt" }),
+    ).toBeInTheDocument();
+  });
+
+  it("ignores a late rejected save from a prior hunt", async () => {
+    const firstSave = deferred<void>();
+    renamePhenoHuntMock.mockReturnValueOnce(firstSave.promise);
+    const { rerenderState } = renderWorkspace({
+      hunt: { id: "hunt-1", name: "First Hunt", growId: "g1", tentId: "t1" },
+    });
+    fireEvent.click(screen.getByTestId("workspace-rename-hunt"));
+    fireEvent.change(screen.getByTestId("workspace-hunt-name-input"), {
+      target: { value: "First rejected" },
+    });
+    fireEvent.click(screen.getByTestId("workspace-save-hunt-name"));
+    await waitFor(() => expect(renamePhenoHuntMock).toHaveBeenCalledTimes(1));
+
+    rerenderState({
+      hunt: { id: "hunt-2", name: "Second Hunt", growId: "g2", tentId: "t2" },
+    });
+    await waitFor(() => expect(screen.queryByTestId("workspace-hunt-name-input")).toBeNull());
+    fireEvent.click(screen.getByTestId("workspace-rename-hunt"));
+    fireEvent.change(screen.getByTestId("workspace-hunt-name-input"), {
+      target: { value: "Second draft" },
+    });
+
+    firstSave.reject(new Error("denied"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("workspace-hunt-name-input")).toHaveValue("Second draft");
+      expect(screen.queryByTestId("workspace-hunt-name-error")).toBeNull();
+    });
+  });
+});
 
 describe("candidate identity + number", () => {
   it("shows the number badge (fixed) for a numbered candidate", () => {

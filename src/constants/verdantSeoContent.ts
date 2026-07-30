@@ -120,6 +120,39 @@ export const VERDANT_GROWER_GUIDE_FAQ: ReadonlyArray<FaqEntry> = [
 ];
 
 /* ------------------------------------------------------------------ */
+/* Cultivar comparison FAQ (Oreoz vs Gelonade pheno expression)        */
+/* ------------------------------------------------------------------ */
+
+export const OREOZ_VS_GELONADE_FAQ: ReadonlyArray<FaqEntry> = [
+  {
+    question: "What is the main difference between Oreoz and Gelonade?",
+    answer:
+      "Public grower reports describe Oreoz as compact, dense, and dessert/fuel aromatic, and Gelonade as taller, stretchier, and citrus-leaning. Those are directional descriptions, not guarantees. Pheno variation within one pack often exceeds the reported difference between the two cultivars, so treat both as starting expectations and let your own logged record decide.",
+  },
+  {
+    question: "Which one is easier to grow indoors?",
+    answer:
+      "Neither has a reliable public difficulty ranking worth trusting. What is reported is that compact, dense structure — commonly attributed to Oreoz expressions — asks for closer attention to interior airflow and late-flower humidity, while a stretchier habit asks for earlier canopy and trellis planning. The right answer for your room comes from measuring stretch and canopy density at flip, not from a label.",
+  },
+  {
+    question: "How do I tell my phenos apart during a run?",
+    answer:
+      "Record the same fields at the same points for every plant: internode spacing and height at flip, stretch through early flower, aroma direction at week 4 and at chop, and photos from repeatable angles. Attach feed, runoff, and source-labeled environment context to the same window. Consistent fields at consistent times are what make two cuts comparable later.",
+  },
+  {
+    question: "Does Verdant have a Gelonade cultivar profile?",
+    answer:
+      "Not yet. Verdant carries a first-party Oreoz reference and leaves timing and potency fields blank where public evidence is too thin. Gelonade context in this guide comes from public grower reports and is labeled as directional. If you run it, your own per-plant record becomes the reliable source.",
+  },
+  {
+    question: "How does Verdant help with pheno hunting?",
+    answer:
+      "Pheno Tracker keeps per-plant structure, aroma, photo, and environment evidence side by side across runs, with every sensor reading labeled live, manual, csv, demo, stale, or invalid. It does not score a winner for you. It keeps the evidence readable so the grower can compare cuts and decide which one to keep.",
+  },
+];
+
+
+/* ------------------------------------------------------------------ */
 /* Seven SEO guide pages                                               */
 /* ------------------------------------------------------------------ */
 

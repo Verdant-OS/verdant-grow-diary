@@ -229,3 +229,23 @@ a written next-slice path.
   migration; out of scope by contract. BLOCKED (proposal written).
 - e2e golden-path UI spec requires managed-session credentials; it emits a
   deterministic BLOCKED receipt without them (documented existing behavior).
+
+## 6. Slice 2 (same day) — dormant-CI sweep (#581)
+
+Premise correction first: only 11 workflows (not 24) never ran — 13 of the
+originally-listed set have unfiltered `pull_request:` triggers and run on
+every PR; their dead `push:[main]` lane is a documented follow-up, not part
+of this sweep. Dispositions applied for the true dead set: **5 retargeted**
+(ai-doctor-golden-cases, ai-doctor-readiness-ui,
+contextual-pheno-comparison-v0, stabilization-pr-scope — opt-in via its
+label gate — and docs-safety, which turned out to be load-bearing for the
+client-secret-boundary proof tooling and must not be deleted), **4 kept
+dormant** with `# dormant:` headers and guard-test registration
+(datadog-synthetics, gamification-staging-smoke — whose payload steps have
+a broken env-scope gate and have never executed — pheno-disabled-compare-e2e,
+release-receipt-ci), **1 deleted** (supabase-security-baseline; byte-identical
+command runs in security-regression.yml; `docs/ci-security-baseline.md`
+updated). Regression guard for the class:
+`src/test/workflow-branch-filter-liveness.test.ts` (fail-closed parser;
+dormancy requires an in-test reason and an in-file comment). Full
+per-workflow table: #581.

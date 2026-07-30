@@ -21,16 +21,16 @@ const docs = readFileSync(resolve(ROOT, "docs/seo-monitoring.md"), "utf8");
 const inspectionScript = readFileSync(resolve(ROOT, "scripts/seo/gsc-inspect-urls.mjs"), "utf8");
 
 const sitemapUrls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
-const WORKFLOW_DEFAULT_MAX_URLS = 50;
+const WORKFLOW_DEFAULT_MAX_URLS = 75;
 
 test("SEO monitoring defaults to the hard-cap sitemap sweep", () => {
   assert.match(
     workflow,
-    /max_urls:\s*\n\s*description:.*\n\s*required: false\s*\n\s*default: "50"/,
+    /max_urls:\s*\n\s*description:.*\n\s*required: false\s*\n\s*default: "75"/,
   );
   assert.match(
     workflow,
-    /SEO_MAX_URLS:\s*\$\{\{\s*github\.event\.inputs\.max_urls\s*\|\|\s*'50'\s*\}\}/,
+    /SEO_MAX_URLS:\s*\$\{\{\s*github\.event\.inputs\.max_urls\s*\|\|\s*'75'\s*\}\}/,
   );
   assert.match(
     workflow,
@@ -38,7 +38,7 @@ test("SEO monitoring defaults to the hard-cap sitemap sweep", () => {
   );
   assert.match(workflow, /--sitemap "\$SEO_SITEMAP_URL" --max "\$SEO_MAX_URLS"/);
   assert.match(inspectionScript, /const DEFAULT_MAX_URLS = HARD_CAP;/);
-  assert.match(inspectionScript, /const HARD_CAP = 50;/);
+  assert.match(inspectionScript, /const HARD_CAP = 75;/);
   assert.ok(sitemapUrls.length > 0, "sitemap discovery must yield at least one URL");
   assert.ok(
     sitemapUrls.length <= WORKFLOW_DEFAULT_MAX_URLS,

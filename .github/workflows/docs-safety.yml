@@ -1,8 +1,13 @@
 name: docs-safety
 
+# NOTE: `verdant-grow-diary` is this repo's default branch; a main-only
+# filter means the workflow never runs (#581). This file is load-bearing
+# beyond its steps: client-secret-boundary-ci-wiring.test.ts pins its
+# structure, and scripts/check-client-secret-boundary-ci.mjs consumes the
+# proof artifact it uploads — do not delete it as "redundant".
 on:
   pull_request:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
 
 permissions:
   contents: read

@@ -104,9 +104,15 @@ unless marked otherwise. Issue numbers are the live board entries.
   path is RPC-first with static trust-boundary suites over migration SQL and
   a runtime harness that needs a local Supabase lane.
 - P1 **#583** (fixed this slice): legacy Quick Log Environment Check readings
-  never reached `environment_events` (RPC sensor params hard-coded null), so
-  the VPD/alert arc never saw them; V2 was correct — same data saved
-  differently by surface.
+  never reached `environment_events` (RPC sensor params hard-coded null); V2
+  passed them through — same data saved differently by surface. The fix
+  restores v2 payload parity and structured persistence. **Correction
+  (post-review, credit: Codex on PR #594):** alert evaluation reads
+  `sensor_readings` then diary `details.sensor_snapshot`, and no production
+  code SELECTs `environment_events` at all — so env checks from _either_
+  Quick Log variant still cannot produce environment alerts. That gap is
+  registered separately (#596) and needs a product decision, since manual
+  _sensor snapshots_ do feed alerts today.
 - P2 **#587**: Timeline date-range filter uses UTC day boundaries against
   locally-rendered dates (off-by-one-day both directions for non-UTC growers).
 - Verified clean: timeline merge ordering is deterministic with a complete
@@ -223,3 +229,23 @@ a written next-slice path.
   migration; out of scope by contract. BLOCKED (proposal written).
 - e2e golden-path UI spec requires managed-session credentials; it emits a
   deterministic BLOCKED receipt without them (documented existing behavior).
+
+## 6. Slice 2 (same day) — dormant-CI sweep (#581)
+
+Premise correction first: only 11 workflows (not 24) never ran — 13 of the
+originally-listed set have unfiltered `pull_request:` triggers and run on
+every PR; their dead `push:[main]` lane is a documented follow-up, not part
+of this sweep. Dispositions applied for the true dead set: **5 retargeted**
+(ai-doctor-golden-cases, ai-doctor-readiness-ui,
+contextual-pheno-comparison-v0, stabilization-pr-scope — opt-in via its
+label gate — and docs-safety, which turned out to be load-bearing for the
+client-secret-boundary proof tooling and must not be deleted), **4 kept
+dormant** with `# dormant:` headers and guard-test registration
+(datadog-synthetics, gamification-staging-smoke — whose payload steps have
+a broken env-scope gate and have never executed — pheno-disabled-compare-e2e,
+release-receipt-ci), **1 deleted** (supabase-security-baseline; byte-identical
+command runs in security-regression.yml; `docs/ci-security-baseline.md`
+updated). Regression guard for the class:
+`src/test/workflow-branch-filter-liveness.test.ts` (fail-closed parser;
+dormancy requires an in-test reason and an in-file comment). Full
+per-workflow table: #581.

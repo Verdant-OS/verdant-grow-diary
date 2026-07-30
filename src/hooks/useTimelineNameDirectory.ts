@@ -14,10 +14,14 @@ export interface TimelineNameDirectory {
  *
  * Deliberately omits the `is_archived = false` filter the active-entity
  * hooks use: diary history keeps referencing plants/tents after they are
- * archived or merged away, and those rows still carry their names. RLS
- * scopes both reads to the signed-in owner. A failed or unavailable read
- * resolves to `null` (never an empty map); unresolved ids keep the
- * presenter's neutral fragment label either way.
+ * archived or merged away, and those rows still carry their names. Both
+ * reads filter on `user_id = userId` explicitly — RLS alone is not
+ * enough here, because additive operator policies ("Operators view all
+ * plants") would otherwise pull every grower's rows into this
+ * owner-facing page and could crowd the owner's own records out of the
+ * bounded response. A failed or unavailable read resolves to `null`
+ * (never an empty map); unresolved ids keep the presenter's neutral
+ * fragment label either way.
  */
 export function useTimelineNameDirectory(userId: string | null): TimelineNameDirectory {
   const [plantNamesById, setPlantNamesById] = useState<ReadonlyMap<string, string> | null>(null);
@@ -33,8 +37,8 @@ export function useTimelineNameDirectory(userId: string | null): TimelineNameDir
     (async () => {
       try {
         const [plantsResult, tentsResult] = await Promise.all([
-          supabase.from("plants").select("id,name"),
-          supabase.from("tents").select("id,name"),
+          supabase.from("plants").select("id,name").eq("user_id", userId),
+          supabase.from("tents").select("id,name").eq("user_id", userId),
         ]);
         if (cancelled) return;
         setPlantNamesById(plantsResult?.error ? null : buildTimelineNameLookup(plantsResult?.data));

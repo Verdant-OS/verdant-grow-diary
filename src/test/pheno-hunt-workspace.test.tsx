@@ -137,34 +137,38 @@ describe("PhenoHuntWorkspace", () => {
       ],
     });
 
-    for (const candidateLabel of ["BD #1", "BD #2"]) {
+    for (const { id, label } of [
+      { id: "p1", label: "BD #1" },
+      { id: "p2", label: "BD #2" },
+    ]) {
+      const candidate = within(screen.getByTestId(`pheno-workspace-candidate-${id}`));
       for (const axis of LOUD_TRAIT_AXES) {
         expect(
-          screen.getByRole("spinbutton", {
-            name: `${candidateLabel}: ${axis.label} score (${axis.min}–${axis.max})`,
+          candidate.getByRole("spinbutton", {
+            name: `${label}: ${axis.label} score (${axis.min}–${axis.max})`,
           }),
         ).toBeInTheDocument();
       }
 
-      expect(screen.getByRole("textbox", { name: `${candidateLabel}: Notes` })).toBeInTheDocument();
+      expect(candidate.getByRole("textbox", { name: `${label}: Notes` })).toBeInTheDocument();
       expect(
-        screen.getByRole("spinbutton", {
-          name: `${candidateLabel}: Post-cure smoothness score (1–5)`,
+        candidate.getByRole("spinbutton", {
+          name: `${label}: Post-cure smoothness score (1–5)`,
         }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole("spinbutton", {
-          name: `${candidateLabel}: Post-cure potency impression (1–5)`,
+        candidate.getByRole("spinbutton", {
+          name: `${label}: Post-cure potency impression (1–5)`,
         }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole("spinbutton", {
-          name: `${candidateLabel}: Lab THC percentage`,
+        candidate.getByRole("spinbutton", {
+          name: `${label}: Lab THC percentage`,
         }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole("spinbutton", {
-          name: `${candidateLabel}: Lab CBD percentage`,
+        candidate.getByRole("spinbutton", {
+          name: `${label}: Lab CBD percentage`,
         }),
       ).toBeInTheDocument();
     }

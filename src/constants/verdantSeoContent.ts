@@ -1,6 +1,6 @@
 /**
  * verdantSeoContent — shared content constants for the public /guides hub
- * and the first seven grower-intent SEO guide pages.
+ * and the grower-intent SEO guide pages.
  *
  * Presenter-only copy. No business logic, no data access, no side effects.
  * Centralized here so visible page copy and FAQPage JSON-LD share the same
@@ -14,7 +14,11 @@
  */
 
 import type { FaqEntry } from "./verdantSeoCopy";
-import { CANNABIS_PLANT_CARE_FAQ } from "./cannabisPlantCareFaq";
+import {
+  CANNABIS_LIGHTING_FAQ,
+  CANNABIS_LIGHTING_GUIDE_SLUG,
+  CANNABIS_PLANT_CARE_FAQ,
+} from "./cannabisPlantCareFaq";
 
 export interface GuideSectionLink {
   readonly label: string;
@@ -102,7 +106,7 @@ export const VERDANT_GROWER_GUIDE_FAQ: ReadonlyArray<FaqEntry> = [
 ];
 
 /* ------------------------------------------------------------------ */
-/* Seven SEO guide pages                                               */
+/* SEO guide pages                                                     */
 /* ------------------------------------------------------------------ */
 
 export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
@@ -350,12 +354,12 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
   {
     slug: "cannabis-plant-care",
     title: "Cannabis plant care FAQ for home growers | Verdant Grow Diary",
-    h1: "Cannabis plant care FAQ: the five questions every home grower asks",
+    h1: "Cannabis plant care FAQ: practical answers for home growers",
     description:
-      "Answers to the five most common cannabis plant care questions for home growers: watering, nutrients, yellow leaves, temperature and humidity, and harvest timing.",
+      "Practical cannabis plant care answers for home growers: watering, nutrients, yellow leaves, temperature, humidity, lighting, schedules, stress, and harvest timing.",
     targetKeyword: "cannabis plant care",
     intro:
-      "New home growers usually ask the same five questions: how often to water, what to feed, why leaves turn yellow, what temperature and humidity to keep, and when to harvest. These answers are grounded in horticultural basics — not brand-specific schedules or bro-science — and tie back to the plant memory that makes good care repeatable.",
+      "New home growers repeatedly ask how often to water, what to feed, why leaves turn yellow, what environment and light schedule to keep, how to read stress, and when to harvest. These cannabis plant care answers are grounded in horticultural basics — not brand-specific schedules or bro-science — and tie back to the plant memory that makes good care repeatable.",
     sections: [
       {
         heading: "Watering is the most common early mistake",
@@ -375,7 +379,59 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
     ],
     faq: CANNABIS_PLANT_CARE_FAQ,
-    related: ["grow-room-vpd-tracker", "grow-diary-app"],
+    related: [CANNABIS_LIGHTING_GUIDE_SLUG, "grow-room-vpd-tracker", "grow-diary-app"],
+  },
+  {
+    slug: CANNABIS_LIGHTING_GUIDE_SLUG,
+    title: "Cannabis grow-light distance, PPFD & schedules | Verdant",
+    h1: "Cannabis grow light distance from plants, PPFD, DLI, and schedules",
+    description:
+      "A practical cannabis lighting guide to hanging distance, canopy PPFD, DLI, autoflower and photoperiod schedules, and cautious light-stress troubleshooting.",
+    targetKeyword: "grow light distance from plants",
+    intro:
+      "Grow light distance from plants is only a starting point. The useful evidence is what reaches the canopy, for how long, and what changed before a symptom appeared. This guide connects hanging distance with PPFD and DLI, explains autoflower and photoperiod schedules, and shows how a plant timeline can separate light-intensity stress, bleaching, heat stress, and feed-related tip burn without guessing from one leaf.",
+    sections: [
+      {
+        heading: "Hanging distance is a proxy, not a target",
+        body: "Two fixtures hung at the same distance can deliver very different light because wattage, optics, dimmer setting, footprint, and canopy shape all matter. Start with the fixture maker's measured map, measure at canopy height when a real quantum sensor is available, and check the center and edges instead of trusting one hot-spot reading. As the canopy rises, log the fixture model, dimmer setting, and distance from the highest healthy top. Never infer PPFD from wattage, lux, or a dimmer percentage alone.",
+      },
+      {
+        heading: "Use PPFD for intensity and DLI for the full day",
+        body: "PPFD measures photosynthetic photon flux density at a surface in µmol/m²/s. DLI adds the whole light period: for a stable indoor fixture, DLI in mol/m²/day equals average PPFD × light-hours × 3,600 ÷ 1,000,000. A longer schedule can raise DLI without changing PPFD, which is why distance, intensity, and schedule belong in the same record. Verdant can preserve a real manual or source-labeled PPFD reading beside the diary entry; missing PPFD stays unknown rather than being invented from fixture settings.",
+        links: [
+          {
+            label: "How source-labeled sensor truth works",
+            to: "/guides/sensor-truth-grow-room",
+          },
+        ],
+      },
+      {
+        heading: "Photoperiod and autoflower schedules answer different questions",
+        body: "Photoperiod-sensitive cannabis commonly runs 18 hours on and 6 off during vegetative growth, then uses 12/12 as a conservative flowering baseline. Autoflower cultivars are photoperiod-insensitive and do not need that flip to initiate flowering; stable 18/6 and 20/4 schedules are both common choices. The honest comparison is not a slogan about more hours. Compare DLI, canopy temperature, room recovery during lights-off, power load, and the cultivar's observed response, then keep the schedule consistent enough for the timeline to mean something.",
+      },
+      {
+        heading: "Separate light-intensity stress, bleaching, heat, and tip burn",
+        body: "Light-intensity stress is better supported when curling, crisping, or stalled top growth is strongest under the fixture and follows a height, dimmer, or schedule change. Bleaching is pale or white tissue where chlorophyll has been damaged; it describes what you see, not a proven cause. Heat stress is better supported by high canopy or leaf temperature, dry-air or VPD changes, and broader canopy curl or droop. Feed-related burn is more likely to begin at tips across plant levels and line up with a feed or EC change. These patterns can overlap, so one photo or one reading is not a diagnosis.",
+        links: [
+          {
+            label: "Read temperature, humidity, and VPD in context",
+            to: "/guides/grow-room-vpd-tracker",
+          },
+        ],
+      },
+      {
+        heading: "Log the evidence before changing several variables",
+        body: "Capture a top and mid-canopy photo from the same angles, fixture model and dimmer setting, fixture-to-canopy distance, lights-on schedule, center and edge PPFD if a real meter is available, and canopy temperature, RH, or VPD with source and captured time. Add the last light, height, schedule, watering, feed, or EC change. Recheck after the next full light cycle and again over the next few days. If an adjustment is needed, keep it small and reversible, change one variable at a time, and watch new growth rather than expecting damaged tissue to prove recovery.",
+        links: [
+          {
+            label: "What to log in a grow journal",
+            to: "/guides/what-to-log-in-a-grow-journal",
+          },
+        ],
+      },
+    ],
+    faq: CANNABIS_LIGHTING_FAQ,
+    related: ["cannabis-plant-care", "grow-room-vpd-tracker", "what-to-log-in-a-grow-journal"],
   },
   {
     slug: "how-to-start-a-grow-journal",

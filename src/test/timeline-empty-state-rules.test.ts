@@ -3,6 +3,7 @@ import {
   resolveTimelineEmptyState,
   TIMELINE_EMPTY_STATE_ACTIONS,
   TIMELINE_EMPTY_STATE_FALLBACK,
+  TIMELINE_EMPTY_LIGHTING_RESOURCE,
   TIMELINE_EMPTY_NO_ENTRIES_TITLE,
   TIMELINE_EMPTY_NO_ENTRIES_DESC,
   TIMELINE_EMPTY_NO_ENTRIES_NEEDS_CONTEXT_DESC,
@@ -40,6 +41,7 @@ describe("resolveTimelineEmptyState", () => {
     expect(view?.actions).toEqual(TIMELINE_EMPTY_STATE_ACTIONS);
     expect(view?.needsContext).toBe(false);
     expect(view?.offersClearFilters).toBe(false);
+    expect(view?.resourceLink).toEqual(TIMELINE_EMPTY_LIGHTING_RESOURCE);
   });
 
   it("flags needs-context and swaps copy when no plant or tent is selected", () => {
@@ -66,6 +68,7 @@ describe("resolveTimelineEmptyState", () => {
     expect(view?.kind).toBe("evidence_filtered");
     expect(view?.title).toBe(TIMELINE_EMPTY_EVIDENCE_TITLE);
     expect(view?.offersClearFilters).toBe(true);
+    expect(view?.resourceLink).toBeNull();
   });
 
   it("does not fork the pinned evidence-filter copy", () => {
@@ -82,6 +85,7 @@ describe("resolveTimelineEmptyState", () => {
     expect(view?.kind).toBe("filtered_out");
     expect(view?.title).toBe(TIMELINE_EMPTY_FILTERED_TITLE);
     expect(view?.offersClearFilters).toBe(true);
+    expect(view?.resourceLink).toBeNull();
   });
 
   it("withholds the clear-filters control when no filter is actually active", () => {
@@ -127,6 +131,7 @@ describe("resolveTimelineEmptyState", () => {
   it("exposes a non-null fallback shaped like a filtered-out view", () => {
     expect(TIMELINE_EMPTY_STATE_FALLBACK.kind).toBe("filtered_out");
     expect(TIMELINE_EMPTY_STATE_FALLBACK.actions).toEqual([]);
+    expect(TIMELINE_EMPTY_STATE_FALLBACK.resourceLink).toBeNull();
   });
 
   it("never promises automation or device control in its copy", () => {

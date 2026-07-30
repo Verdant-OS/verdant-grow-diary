@@ -21,6 +21,7 @@ import {
   TIMELINE_EVIDENCE_EMPTY_DESC,
   TIMELINE_EVIDENCE_EMPTY_TITLE,
 } from "./timelineEvidenceFilterRules";
+import { CANNABIS_LIGHTING_GUIDE_PATH } from "@/constants/cannabisPlantCareFaq";
 
 /**
  * Which empty situation the timeline is in. These are mutually exclusive and
@@ -53,6 +54,11 @@ export interface TimelineEmptyStateAction {
   label: string;
 }
 
+export interface TimelineEmptyStateResourceLink {
+  readonly href: string;
+  readonly label: string;
+}
+
 export interface TimelineEmptyStateView {
   kind: TimelineEmptyStateKind;
   title: string;
@@ -70,6 +76,8 @@ export interface TimelineEmptyStateView {
   needsContext: boolean;
   /** True when the caller should offer a "Clear filters" control. */
   offersClearFilters: boolean;
+  /** Optional read-only learning resource; never a persistence action. */
+  resourceLink: TimelineEmptyStateResourceLink | null;
 }
 
 /**
@@ -81,6 +89,11 @@ export const TIMELINE_EMPTY_STATE_ACTIONS: readonly TimelineEmptyStateAction[] =
   { actionId: "diary_note", label: "Log a note" },
   { actionId: "watering", label: "Log a watering" },
 ] as const;
+
+export const TIMELINE_EMPTY_LIGHTING_RESOURCE: TimelineEmptyStateResourceLink = {
+  href: CANNABIS_LIGHTING_GUIDE_PATH,
+  label: "Learn what lighting data to log",
+};
 
 export const TIMELINE_EMPTY_NO_ENTRIES_TITLE = "No entries yet";
 export const TIMELINE_EMPTY_NO_ENTRIES_DESC =
@@ -132,6 +145,7 @@ export function resolveTimelineEmptyState(
       actions: TIMELINE_EMPTY_STATE_ACTIONS,
       needsContext,
       offersClearFilters: false,
+      resourceLink: TIMELINE_EMPTY_LIGHTING_RESOURCE,
     };
   }
 
@@ -143,6 +157,7 @@ export function resolveTimelineEmptyState(
       actions: [],
       needsContext: false,
       offersClearFilters: true,
+      resourceLink: null,
     };
   }
 
@@ -153,6 +168,7 @@ export function resolveTimelineEmptyState(
     actions: [],
     needsContext: false,
     offersClearFilters: input.otherFiltersActive,
+    resourceLink: null,
   };
 }
 
@@ -168,4 +184,5 @@ export const TIMELINE_EMPTY_STATE_FALLBACK: TimelineEmptyStateView = {
   actions: [],
   needsContext: false,
   offersClearFilters: true,
+  resourceLink: null,
 };

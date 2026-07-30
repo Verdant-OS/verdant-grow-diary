@@ -1,8 +1,9 @@
 /**
  * CustomerModeCannabisCareFaq — public, read-only Customer Mode page for
- * the 5-question cannabis plant care FAQ.
+ * the shared cannabis plant care FAQ.
  *
- * Mounted at /customer/:shareId/cannabis-care OUTSIDE the AppShell.
+ * Retained as a presenter, but deliberately unrouted until the real Customer
+ * Mode share-token backend exists. Tests mount it in isolation only.
  *
  * Hard constraints:
  *   - No Supabase imports. No fetch. No private grow data.
@@ -42,7 +43,7 @@ export default function CustomerModeCannabisCareFaq() {
   usePageSeo({
     title: "Cannabis Plant Care FAQ | Customer Mode | Verdant",
     description:
-      "Answers to the five most common cannabis plant care questions for home growers, shared from a Verdant grower.",
+      "Practical cannabis plant care answers for home growers, including watering, environment, lighting, stress, and harvest timing.",
     path: shareId ? `/customer/${shareId}/cannabis-care` : "/customer/cannabis-care",
   });
 

@@ -12,8 +12,8 @@
  *    surface owned by Timeline.tsx and must never be shown as "empty".
  */
 import { useCallback, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Sprout } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { BookOpen, Sprout } from "lucide-react";
 import {
   FAST_ADD_PICKER_CTAS,
   resolveFastAddIntent,
@@ -111,6 +111,17 @@ export default function TimelineEmptyState({
             </button>
           ))}
         </div>
+      ) : null}
+
+      {view.resourceLink ? (
+        <Link
+          to={view.resourceLink.href}
+          data-testid="timeline-empty-state-resource-link"
+          className="mx-auto mt-4 inline-flex min-h-11 items-center gap-2 rounded-md px-3 text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <BookOpen className="h-4 w-4" aria-hidden="true" />
+          {view.resourceLink.label}
+        </Link>
       ) : null}
 
       {view.offersClearFilters && onClearFilters ? (

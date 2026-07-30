@@ -47,6 +47,7 @@ const EXPECTED_SLUGS: ReadonlyArray<string> = [
   "sensor-truth-grow-room",
   "ai-grow-doctor",
   "cannabis-plant-care",
+  "cannabis-grow-light-distance-and-schedule",
   // Search-to-first-value cluster (funnels to the public /quick-log starter).
   "how-to-start-a-grow-journal",
   "what-to-log-in-a-grow-journal",
@@ -111,8 +112,8 @@ describe("Verdant grower guide FAQ (/guides)", () => {
   });
 });
 
-describe("Verdant SEO guide pages (20)", () => {
-  it("defines exactly the twenty expected slugs, in order", () => {
+describe("Verdant SEO guide pages (21)", () => {
+  it("defines exactly the twenty-one expected slugs, in order", () => {
     expect(VERDANT_GUIDE_SLUGS).toEqual(EXPECTED_SLUGS);
   });
 

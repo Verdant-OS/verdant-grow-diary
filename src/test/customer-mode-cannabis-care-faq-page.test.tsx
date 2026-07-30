@@ -2,8 +2,8 @@
  * CustomerModeCannabisCareFaq — render + safety tests.
  *
  * Covers:
- *   - Page renders at /customer/:shareId/cannabis-care.
- *   - The 5 cannabis plant care FAQ questions render in an accordion.
+ *   - The retained presenter renders when mounted in an isolated test route.
+ *   - Every shared cannabis plant care FAQ question renders in an accordion.
  *   - Expanding an answer reveals the answer text.
  *   - The shareId path param is NEVER echoed into the visible DOM.
  *   - The back link points to the main customer guide for the same shareId.
@@ -51,10 +51,10 @@ describe("CustomerModeCannabisCareFaq", () => {
     );
   });
 
-  it("renders all 5 cannabis plant care FAQ questions", () => {
+  it("renders all 9 cannabis plant care FAQ questions", () => {
     renderAt("/customer/share-abc/cannabis-care");
     const questions = screen.getAllByTestId("customer-mode-cannabis-care-faq-item");
-    expect(questions.length).toBe(5);
+    expect(questions.length).toBe(9);
     expect(screen.getByText("How often should I water a cannabis plant?")).toBeInTheDocument();
     expect(screen.getByText("What nutrients should I give my cannabis plant?")).toBeInTheDocument();
     expect(screen.getByText("Why are my cannabis leaves turning yellow?")).toBeInTheDocument();
@@ -62,6 +62,12 @@ describe("CustomerModeCannabisCareFaq", () => {
       screen.getByText("What temperature and humidity should a cannabis grow room have?"),
     ).toBeInTheDocument();
     expect(screen.getByText("How do I know when to harvest cannabis?")).toBeInTheDocument();
+    expect(
+      screen.getByText("How far should an LED grow light be from cannabis plants?"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("What light schedule should I use for autoflower cannabis?"),
+    ).toBeInTheDocument();
   });
 
   it("accordion expands to reveal the answer text", () => {

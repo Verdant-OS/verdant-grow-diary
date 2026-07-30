@@ -218,8 +218,10 @@ export const QUICK_LOG_ACTIVITY_DETAIL_FIELDS: Partial<
       kind: "select",
       options: [
         { value: "discoloration", label: "Discoloration / yellowing" },
+        { value: "bleached_tissue", label: "Pale / bleached tissue" },
         { value: "spots", label: "Spots or lesions" },
         { value: "curling", label: "Curling or clawing leaves" },
+        { value: "upward_curling", label: "Upward-curling / taco leaves" },
         { value: "wilting", label: "Wilting or drooping" },
         { value: "crispy_edges", label: "Crispy / burnt edges or tips" },
         { value: "pests_seen", label: "Pests seen (bugs / webbing / eggs)" },
@@ -344,9 +346,7 @@ export const QUICK_LOG_DETAIL_FIELD_KEYS: ReadonlySet<string> = new Set([
   ...Object.values(QUICK_LOG_ACTIVITY_DETAIL_FIELDS).flatMap((specs) =>
     (specs ?? []).map((s) => s.envelope ?? s.key),
   ),
-  ...Object.values(QUICK_LOG_ACTIVITY_FIXED_DETAILS).flatMap((fixed) =>
-    Object.keys(fixed ?? {}),
-  ),
+  ...Object.values(QUICK_LOG_ACTIVITY_FIXED_DETAILS).flatMap((fixed) => Object.keys(fixed ?? {})),
   // Written by useQuickLogActivitySave's metadata fence (e.g. "defoliation",
   // "issue"); machine routing data, never useful as a raw chip.
   "subtype",
@@ -546,6 +546,49 @@ function readSpecValue(spec: QuickLogDetailFieldSpec, record: Record<string, unk
     return (parent as Record<string, unknown>)[spec.key];
   }
   return record[spec.key];
+}
+
+export interface QuickLogDiaryContextDetails {
+  readonly observedSign: string | null;
+  readonly observationLocation: string | null;
+  readonly environmentCheckType: string | null;
+}
+
+function readClosedSelectCode(
+  activityId: QuickLogActivityId,
+  key: string,
+  record: Record<string, unknown>,
+): string | null {
+  const spec = (QUICK_LOG_ACTIVITY_DETAIL_FIELDS[activityId] ?? []).find(
+    (candidate) => candidate.key === key && candidate.kind === "select",
+  );
+  if (!spec) return null;
+  const raw = readSpecValue(spec, record);
+  if (typeof raw !== "string") return null;
+  const normalized = raw.trim();
+  return optionLabel(spec, normalized) === null ? null : normalized;
+}
+
+/**
+ * Read only the closed-set detail codes needed for diary context helpers.
+ * Unknown, malformed, or grower-supplied free text is never returned. This
+ * lets downstream presenters distinguish a structured lighting check from a
+ * generic note without copying the option tables or exposing raw JSON.
+ */
+export function readQuickLogDiaryContextDetails(details: unknown): QuickLogDiaryContextDetails {
+  if (!details || typeof details !== "object" || Array.isArray(details)) {
+    return {
+      observedSign: null,
+      observationLocation: null,
+      environmentCheckType: null,
+    };
+  }
+  const record = details as Record<string, unknown>;
+  return {
+    observedSign: readClosedSelectCode("issue_observation", "observedSign", record),
+    observationLocation: readClosedSelectCode("issue_observation", "observationLocation", record),
+    environmentCheckType: readClosedSelectCode("environment_check", "checkType", record),
+  };
 }
 
 /**

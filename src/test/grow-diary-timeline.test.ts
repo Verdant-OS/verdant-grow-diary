@@ -2,10 +2,7 @@
  * Tests for growDiaryTimelineRules — pure timeline view-model builder.
  */
 import { describe, it, expect } from "vitest";
-import {
-  buildGrowDiaryTimeline,
-  toTimelineItem,
-} from "@/lib/growDiaryTimelineRules";
+import { buildGrowDiaryTimeline, toTimelineItem } from "@/lib/growDiaryTimelineRules";
 import { normalizeDiaryEntry } from "@/lib/diaryEntryRules";
 
 const NOW = 1_700_000_000_000;
@@ -125,8 +122,7 @@ describe("buildGrowDiaryTimeline", () => {
     // Only valid entries by default (no includeInvalid).
     expect(out.length).toBeGreaterThan(0);
     for (let i = 1; i < out.length; i += 1) {
-      expect((out[i - 1].timestamp ?? -Infinity) >=
-        (out[i].timestamp ?? -Infinity)).toBe(true);
+      expect((out[i - 1].timestamp ?? -Infinity) >= (out[i].timestamp ?? -Infinity)).toBe(true);
     }
     // Newest entry should be the watering (-1 day).
     expect(out[0].id).toBe("e-water");
@@ -316,5 +312,28 @@ describe("toTimelineItem", () => {
     expect(item.hasPhoto).toBe(false);
     expect(item.tags).toContain("watering");
     expect(item.subtitle).toContain("pH 6.2");
+  });
+
+  it("preserves only closed-set Quick Log context needed by diary help", () => {
+    const n = normalizeDiaryEntry(
+      {
+        id: "e-light-check",
+        entry_at: iso(-day),
+        entry_type: "observation",
+        note: "Checked the top growth.",
+        details: {
+          observedSign: "bleached_tissue",
+          observationLocation: "upper_growth",
+          checkType: "light",
+          arbitrary_private_detail: "never expose this through the timeline item",
+        },
+      },
+      {},
+    )!;
+    const item = toTimelineItem(n);
+    expect(item.observedSign).toBe("bleached_tissue");
+    expect(item.observationLocation).toBe("upper_growth");
+    expect(item.environmentCheckType).toBe("light");
+    expect(item).not.toHaveProperty("arbitrary_private_detail");
   });
 });

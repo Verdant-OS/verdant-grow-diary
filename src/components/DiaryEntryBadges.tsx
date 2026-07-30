@@ -15,6 +15,8 @@ import {
   normalizeFollowupKindLabel,
 } from "@/lib/actionFollowupVisibilityRules";
 import DiaryEntryFaqLink from "@/components/DiaryEntryFaqLink";
+import DiaryEntryLightingHelp from "@/components/DiaryEntryLightingHelp";
+import { buildDiaryLightingGuideLink } from "@/lib/diaryLightingGuideLinkRules";
 
 const TAG_LABELS: Record<string, string> = {
   watering: "Watering",
@@ -53,34 +55,32 @@ export default function DiaryEntryBadges({ item, className }: DiaryEntryBadgesPr
   const tagsToShow = PRIMARY_TAGS.filter((t) => item.tags.includes(t));
   const hasWarnings = item.warnings.length > 0;
   const sensorBadge = sensorSnapshotBadge(item.sensorSnapshotState);
-  const sourceLabel = item.hasSensorSnapshot ? item.sensorSourceLabel ?? null : null;
-  const vendorLabel = item.hasSensorSnapshot ? item.sensorVendorLabel ?? null : null;
+  const sourceLabel = item.hasSensorSnapshot ? (item.sensorSourceLabel ?? null) : null;
+  const vendorLabel = item.hasSensorSnapshot ? (item.sensorVendorLabel ?? null) : null;
   const faqLinkInput = {
     eventType: item.eventType,
     tags: item.tags,
     notePreview: item.notePreview,
+    observedSign: item.observedSign,
+    observationLocation: item.observationLocation,
+    environmentCheckType: item.environmentCheckType,
   };
+  const hasLightingHelp = buildDiaryLightingGuideLink(faqLinkInput) !== null;
+  const contextualHelp = hasLightingHelp ? (
+    <DiaryEntryLightingHelp item={faqLinkInput} />
+  ) : (
+    <DiaryEntryFaqLink item={faqLinkInput} />
+  );
 
-  if (
-    tagsToShow.length === 0 &&
-    !hasWarnings &&
-    !sensorBadge &&
-    !sourceLabel &&
-    !vendorLabel
-  ) {
-    return <DiaryEntryFaqLink item={faqLinkInput} />;
+  if (tagsToShow.length === 0 && !hasWarnings && !sensorBadge && !sourceLabel && !vendorLabel) {
+    return contextualHelp;
   }
 
-
   const variantClasses: Record<SensorSnapshotBadge["variant"], string> = {
-    positive:
-      "bg-emerald-500/10 border-emerald-500/30 text-emerald-300",
-    neutral:
-      "bg-secondary/60 border-border/40 text-muted-foreground",
-    warning:
-      "bg-amber-500/10 border-amber-500/30 text-amber-300",
-    error:
-      "bg-red-500/10 border-red-500/30 text-red-300",
+    positive: "bg-emerald-500/10 border-emerald-500/30 text-emerald-300",
+    neutral: "bg-secondary/60 border-border/40 text-muted-foreground",
+    warning: "bg-amber-500/10 border-amber-500/30 text-amber-300",
+    error: "bg-red-500/10 border-red-500/30 text-red-300",
   };
 
   return (
@@ -147,7 +147,11 @@ export default function DiaryEntryBadges({ item, className }: DiaryEntryBadgesPr
           {normalizeFollowupKindLabel("24h_recheck")} · {FOLLOWUP_SAFE_CAPTION}
         </span>
       )}
-      <DiaryEntryFaqLink item={faqLinkInput} className="basis-full" />
+      {hasLightingHelp ? (
+        <DiaryEntryLightingHelp item={faqLinkInput} />
+      ) : (
+        <DiaryEntryFaqLink item={faqLinkInput} className="basis-full" />
+      )}
     </div>
   );
 }

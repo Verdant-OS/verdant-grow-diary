@@ -363,6 +363,7 @@ const App = () => (
                     {/* Legacy alias — canonical route is /actions. Keeps old
                         bookmarks, docs, and external links working. */}
                     <Route path="/action-queue" element={<RouteAliasRedirect to="/actions" />} />
+                    <Route path="/labs" element={<RouteAliasRedirect to="/pheno-hunts" />} />
                     <Route path="/grow-lineage" element={<GrowLineageRepair />} />
                     <Route path="/genetics" element={<GeneticsLibrary />} />
                     <Route path="/genetics/accessions/:id" element={<AccessionDetail />} />

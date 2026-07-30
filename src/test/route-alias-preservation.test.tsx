@@ -103,6 +103,13 @@ describe("route alias scope preservation", () => {
     );
   });
 
+  it("redirects /labs to the first existing Labs destination while preserving context", async () => {
+    renderAlias("/labs?growId=g1#candidate", "/labs", "/pheno-hunts");
+    expect(await screen.findByTestId("route-alias-location")).toHaveTextContent(
+      "/pheno-hunts?growId=g1#candidate",
+    );
+  });
+
   it("keeps blank search and hash blank", () => {
     expect(buildRouteAliasTarget("/timeline", "", "")).toBe("/timeline");
   });
@@ -177,6 +184,7 @@ describe("stateful alias wiring", () => {
     { path: "/refund-policy", to: "/refund" },
     { path: "/terms-of-service", to: "/terms" },
     { path: "/privacy-policy", to: "/privacy" },
+    { path: "/labs", to: "/pheno-hunts" },
   ])("routes $path through the query-preserving alias", ({ path, to }) => {
     const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const escapedTarget = to.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

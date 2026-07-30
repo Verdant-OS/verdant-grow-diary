@@ -239,6 +239,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "auth",
     description: "Authenticated PII-free grower referral surface.",
   },
+  { path: "/labs", access: "redirect", description: "→ /pheno-hunts (Labs group landing)." },
   { path: "/leads", access: "internal" },
   { path: "/login", access: "redirect", description: "→ /auth" },
   { path: "/logs", access: "redirect", description: "→ /timeline" },

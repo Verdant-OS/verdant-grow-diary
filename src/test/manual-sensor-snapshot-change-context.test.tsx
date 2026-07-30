@@ -207,6 +207,15 @@ describe("DailyCheck post-submit — change context surfacing", () => {
           : [],
       }),
     }));
+    // This suite only covers Daily Check's post-submit change-context handoff.
+    // Keep the unrelated activity editor and grow store outside its module graph
+    // so each dynamic DailyCheck import does not instantiate a real auth client.
+    vi.doMock("@/components/QuickLogAllActivitiesSection", () => ({
+      default: () => null,
+    }));
+    vi.doMock("@/store/grows", () => ({
+      useGrows: () => ({ activeGrowId: "grow-1" }),
+    }));
     vi.doMock("@/components/QuickLog", () => ({
       default: () => <div data-testid="mock-quicklog" />,
     }));

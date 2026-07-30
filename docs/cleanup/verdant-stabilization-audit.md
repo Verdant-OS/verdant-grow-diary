@@ -249,3 +249,29 @@ updated). Regression guard for the class:
 `src/test/workflow-branch-filter-liveness.test.ts` (fail-closed parser;
 dormancy requires an in-test reason and an in-file comment). Full
 per-workflow table: #581.
+
+## 7. Slice 3 (same day) — sensor-truth slice (#584, #592, #596)
+
+Product decisions made by Matt in-session: transport language wins over
+"live"; consolidation preserves per-surface values; environment checks DO
+feed alert evaluation.
+
+- **#584** — the testbench indicator's `"live"` state renamed to
+  `"receiving"`; grower-visible badge now reads "Receiving data — unverified
+  source" (sky, not emerald); `sensorBridgeHealthViewModel` keeps the healthy
+  claim only for a verified `live` source and downgrades any other fresh
+  vendor-string transport to `needs_review` (regression test added — the old
+  behavior skipped every downgrade). Residual for a later slice: the
+  four-table "what counts as live" consolidation (#592's family).
+- **#592 (partial)** — all 19 stale/freshness windows re-homed to
+  `src/constants/sensorTiming.ts` with per-surface names and UNCHANGED
+  values; the 15-vs-30-minute divergence from the spec is now explicit and
+  documented in one place. Value unification stays open in #592.
+- **#596** — `snapshotFromEnvironmentCheck` maps the three air metrics
+  (only) from the env-check envelope to a `manual`-sourced snapshot
+  timestamped from `entry_at`; `useLatestSensorSnapshot` consults it after
+  `sensor_snapshot` within each diary row. The diary fence is untouched —
+  `snapshotFromDiary` blobs remain `"diary"` and non-persistable (proof
+  suite: `environment-check-alert-evidence.test.ts`). Water temperature and
+  EC are deliberately NOT mapped onto soil fields.
+- Edge-shared mirror re-synced (91 → 92 files; `sensorTiming` pulled in).

@@ -4,9 +4,12 @@
 
 `scripts/check-supabase-migration-safety.mjs` is a static, dependency-free
 scanner over `supabase/migrations/*.sql`. It runs on every push and PR to
-`main` via `.github/workflows/supabase-security-baseline.yml` and fails
-the build when a NEW high-risk pattern appears that is not present in
-`config/supabase-migration-safety-baseline.json`.
+the default branch as the `check:supabase-security` step of
+`.github/workflows/security-regression.yml` (the standalone
+`supabase-security-baseline.yml` workflow was deleted in the #581 sweep —
+it ran the identical command but was filtered to `main` only and had never
+executed). It fails the build when a NEW high-risk pattern appears that is
+not present in `config/supabase-migration-safety-baseline.json`.
 
 ## High-risk patterns detected
 
@@ -15,7 +18,7 @@ the build when a NEW high-risk pattern appears that is not present in
    Matches Supabase linter rule `0011_function_search_path_mutable`.
 2. **PERMISSIVE_POLICY** — `CREATE POLICY` for `INSERT`, `UPDATE`, or
    `DELETE` with `USING (true)` or `WITH CHECK (true)`. `SELECT ... USING
-   (true)` is intentionally allowed for public-read tables.
+(true)` is intentionally allowed for public-read tables.
 3. **TABLE_WITHOUT_RLS** — `CREATE TABLE public.<x>` without a matching
    `ALTER TABLE public.<x> ENABLE ROW LEVEL SECURITY` anywhere in the
    migrations tree.

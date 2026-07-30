@@ -45,7 +45,7 @@ export const ONE_TENT_LOOP_CTA_LABEL: Record<OneTentLoopStep, string> = {
   timeline: "Review sensor snapshot",
   "sensor-snapshot": "Open AI Doctor",
   "ai-doctor": "Review alert",
-  alert: "Add to Action Queue",
+  alert: "Review Action Queue",
   "action-queue": "Review approval-required action",
 };
 
@@ -180,10 +180,10 @@ export function resolveOneTentLoopNextStep(
       if (alertId) return enable(base, `/alerts/${alertId}`);
       return { ...enable(base, "/alerts"), ctaLabel: "Review alerts" };
     case "alert":
-      // CTA is "Add to Action Queue" — must route to the Action Queue
-      // surface (/actions), not back to alerts. Action Queue items
+      // CTA is "Review Action Queue" — it only navigates to the Action
+      // Queue surface (/actions), never back to alerts. Action Queue items
       // remain approval-required; this CTA does NOT create or approve
-      // anything automatically — it only navigates the operator there.
+      // anything automatically.
       if (actionId) return enable(base, `/actions/${actionId}`);
       return enable(base, "/actions");
     case "action-queue":

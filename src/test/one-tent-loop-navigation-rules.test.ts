@@ -34,7 +34,7 @@ describe("oneTentLoopNavigationRules", () => {
       timeline: "Review sensor snapshot",
       "sensor-snapshot": "Open AI Doctor",
       "ai-doctor": "Review alert",
-      alert: "Add to Action Queue",
+      alert: "Review Action Queue",
       "action-queue": "Review approval-required action",
     });
   });
@@ -143,10 +143,10 @@ describe("oneTentLoopNavigationRules", () => {
     expect(fallback.ctaLabel).toBe("Review alerts");
   });
 
-  it("alert → Action Queue routes to the existing /actions surface, never back to /alerts", () => {
-    // CTA copy says "Add to Action Queue" — destination must match.
+  it("alert → Action Queue offers review navigation to the existing /actions surface", () => {
+    // CTA copy must describe navigation, not creation, and match its destination.
     const r = resolveOneTentLoopNextStep("alert", { alertId: "a1" });
-    expect(r.ctaLabel).toBe("Add to Action Queue");
+    expect(r.ctaLabel).toBe("Review Action Queue");
     expect(r.href).toBe("/actions");
     expect(resolveOneTentLoopNextStep("alert").href).toBe("/actions");
     expect(resolveOneTentLoopNextStep("alert", { actionId: "x1" }).href).toBe("/actions/x1");

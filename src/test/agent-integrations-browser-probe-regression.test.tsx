@@ -36,8 +36,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  window.sessionStorage.clear();
   vi.unstubAllGlobals();
+  window.sessionStorage.clear();
 });
 
 describe("AgentIntegrations production browser verification", () => {
@@ -104,5 +104,28 @@ describe("AgentIntegrations production browser verification", () => {
     );
     expect(screen.queryByText(/Unavailable in this build/i)).not.toBeInTheDocument();
     expect(screen.queryByTestId("verify-tool-access")).not.toBeInTheDocument();
+  });
+
+  it("keeps the browser OAuth panel available when session storage is blocked", () => {
+    vi.stubGlobal("sessionStorage", {
+      getItem: vi.fn(() => {
+        throw new DOMException("Storage is blocked", "SecurityError");
+      }),
+      setItem: vi.fn(() => {
+        throw new DOMException("Storage is blocked", "SecurityError");
+      }),
+      removeItem: vi.fn(() => {
+        throw new DOMException("Storage is blocked", "SecurityError");
+      }),
+    } as Pick<Storage, "getItem" | "setItem" | "removeItem">);
+
+    renderPage();
+
+    expect(screen.getByTestId("browser-connect-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("browser-oauth-status")).toHaveTextContent("Not connected");
+    expect(screen.getByTestId("browser-connect-result")).toHaveAttribute(
+      "data-status",
+      "idle_disconnected",
+    );
   });
 });

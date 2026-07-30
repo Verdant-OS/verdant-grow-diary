@@ -20,6 +20,13 @@ const SS_KEYS = {
 
 const SCOPE = "openid email profile";
 
+const OAUTH_STORAGE_UNAVAILABLE_MESSAGE =
+  "OAuth needs browser session storage. Enable site data and try connecting again.";
+const PENDING_AUTHORIZATION_INVALID_MESSAGE =
+  "Pending authorization data is invalid. Start the connection again.";
+const PKCE_VERIFIER_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+const OAUTH_STATE_PATTERN = /^[A-Za-z0-9_-]{22}$/;
+
 export type OAuthDiscovery = {
   issuer: string;
   authorization_endpoint: string;
@@ -27,11 +34,7 @@ export type OAuthDiscovery = {
   registration_endpoint?: string;
 };
 
-export type ProbeStatus =
-  | "not_connected"
-  | "connected"
-  | "unauthorized"
-  | "failed";
+export type ProbeStatus = "not_connected" | "connected" | "unauthorized" | "failed";
 
 export type ProbeResult = {
   status: ProbeStatus;
@@ -41,6 +44,84 @@ export type ProbeResult = {
   message: string;
   checkedAt: string;
 };
+
+type PendingAuthorization = {
+  verifier: string;
+  state: string;
+  redirect_uri: string;
+  client_id: string;
+};
+
+type StoredToken = {
+  access_token: string;
+  obtained_at: number;
+  expires_in: number;
+};
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isBrowserPkceVerifier(value: unknown): value is string {
+  return typeof value === "string" && PKCE_VERIFIER_PATTERN.test(value);
+}
+
+function isBrowserOAuthState(value: unknown): value is string {
+  return typeof value === "string" && OAUTH_STATE_PATTERN.test(value);
+}
+
+function resolveSessionStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function readOptionalSessionItem(key: string): string | null {
+  const storage = resolveSessionStorage();
+  if (!storage) return null;
+  try {
+    return storage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function readRequiredSessionItem(key: string): string | null {
+  const storage = resolveSessionStorage();
+  if (!storage) throw new Error(OAUTH_STORAGE_UNAVAILABLE_MESSAGE);
+  try {
+    return storage.getItem(key);
+  } catch {
+    throw new Error(OAUTH_STORAGE_UNAVAILABLE_MESSAGE);
+  }
+}
+
+function writeRequiredSessionItem(key: string, value: string): void {
+  const storage = resolveSessionStorage();
+  if (!storage) throw new Error(OAUTH_STORAGE_UNAVAILABLE_MESSAGE);
+  try {
+    storage.setItem(key, value);
+  } catch {
+    throw new Error(OAUTH_STORAGE_UNAVAILABLE_MESSAGE);
+  }
+}
+
+function removeSessionItem(key: string): void {
+  const storage = resolveSessionStorage();
+  if (!storage) return;
+  try {
+    storage.removeItem(key);
+  } catch {
+    // Cleanup is best effort; an unavailable browser store must not crash the UI.
+  }
+}
 
 function base64url(bytes: Uint8Array): string {
   let s = "";
@@ -87,18 +168,27 @@ export async function fetchDiscovery(issuer: string): Promise<OAuthDiscovery> {
 
 type RegisteredClient = { client_id: string; redirect_uri: string };
 
+function parseRegisteredClient(raw: string, redirectUri: string): RegisteredClient | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<RegisteredClient>;
+    if (isNonEmptyString(parsed.client_id) && parsed.redirect_uri === redirectUri) {
+      return { client_id: parsed.client_id, redirect_uri: redirectUri };
+    }
+  } catch {
+    // Invalid cache entries are replaced by a freshly registered client.
+  }
+  return null;
+}
+
 async function getOrRegisterClient(
   discovery: OAuthDiscovery,
   redirectUri: string,
 ): Promise<RegisteredClient> {
-  const raw = sessionStorage.getItem(SS_KEYS.client);
+  const raw = readRequiredSessionItem(SS_KEYS.client);
   if (raw) {
-    try {
-      const parsed = JSON.parse(raw) as RegisteredClient;
-      if (parsed.client_id && parsed.redirect_uri === redirectUri) return parsed;
-    } catch {
-      /* ignore, re-register */
-    }
+    const cached = parseRegisteredClient(raw, redirectUri);
+    if (cached) return cached;
+    removeSessionItem(SS_KEYS.client);
   }
   if (!discovery.registration_endpoint) {
     throw new Error("Authorization server does not support dynamic client registration");
@@ -116,10 +206,20 @@ async function getOrRegisterClient(
     }),
   });
   if (!res.ok) throw new Error(`Client registration failed (${res.status})`);
-  const body = (await res.json()) as { client_id?: string };
-  if (!body.client_id) throw new Error("Client registration did not return a client_id");
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch {
+    throw new Error("Client registration returned an invalid response");
+  }
+  if (!isRecord(body)) {
+    throw new Error("Client registration returned an invalid response");
+  }
+  if (!isNonEmptyString(body.client_id)) {
+    throw new Error("Client registration did not return a client_id");
+  }
   const rec: RegisteredClient = { client_id: body.client_id, redirect_uri: redirectUri };
-  sessionStorage.setItem(SS_KEYS.client, JSON.stringify(rec));
+  writeRequiredSessionItem(SS_KEYS.client, JSON.stringify(rec));
   return rec;
 }
 
@@ -131,17 +231,16 @@ export function sameOriginRedirect(path: string): string {
   return url.toString();
 }
 
-export async function startAuthorization(
-  issuer: string,
-  redirectPath: string,
-): Promise<void> {
+export async function startAuthorization(issuer: string, redirectPath: string): Promise<void> {
   const discovery = await fetchDiscovery(issuer);
   const redirectUri = sameOriginRedirect(redirectPath);
   const client = await getOrRegisterClient(discovery, redirectUri);
   const verifier = randomString(32);
   const challenge = base64url(await sha256(verifier));
   const state = randomString(16);
-  sessionStorage.setItem(
+  // The verifier and state must be durable in this tab before redirecting.
+  // Without them, a callback could not be safely exchanged.
+  writeRequiredSessionItem(
     SS_KEYS.pkce,
     JSON.stringify({ verifier, state, redirect_uri: redirectUri, client_id: client.client_id }),
   );
@@ -166,18 +265,59 @@ export function readCallbackParams(search: string): CallbackParams | null {
   return { code, state };
 }
 
-export async function completeAuthorization(
-  issuer: string,
-  params: CallbackParams,
-): Promise<void> {
-  const raw = sessionStorage.getItem(SS_KEYS.pkce);
+function parsePendingAuthorization(raw: string): PendingAuthorization | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<PendingAuthorization>;
+    if (
+      !isBrowserPkceVerifier(parsed.verifier) ||
+      !isBrowserOAuthState(parsed.state) ||
+      !isNonEmptyString(parsed.redirect_uri) ||
+      !isNonEmptyString(parsed.client_id)
+    ) {
+      return null;
+    }
+    return {
+      verifier: parsed.verifier,
+      state: parsed.state,
+      redirect_uri: sameOriginRedirect(parsed.redirect_uri),
+      client_id: parsed.client_id,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseStoredToken(raw: string): StoredToken | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<StoredToken>;
+    if (
+      !isNonEmptyString(parsed.access_token) ||
+      typeof parsed.obtained_at !== "number" ||
+      !Number.isFinite(parsed.obtained_at) ||
+      typeof parsed.expires_in !== "number" ||
+      !Number.isFinite(parsed.expires_in) ||
+      parsed.expires_in <= 0
+    ) {
+      return null;
+    }
+    return {
+      access_token: parsed.access_token,
+      obtained_at: parsed.obtained_at,
+      expires_in: parsed.expires_in,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function completeAuthorization(issuer: string, params: CallbackParams): Promise<void> {
+  const raw = readRequiredSessionItem(SS_KEYS.pkce);
   if (!raw) throw new Error("No pending authorization in this browser");
-  const pending = JSON.parse(raw) as {
-    verifier: string;
-    state: string;
-    redirect_uri: string;
-    client_id: string;
-  };
+  const pending = parsePendingAuthorization(raw);
+  if (!pending) {
+    removeSessionItem(SS_KEYS.pkce);
+    throw new Error(PENDING_AUTHORIZATION_INVALID_MESSAGE);
+  }
   if (pending.state !== params.state) throw new Error("OAuth state mismatch");
   const discovery = await fetchDiscovery(issuer);
   const body = new URLSearchParams({
@@ -196,52 +336,70 @@ export async function completeAuthorization(
     body: body.toString(),
   });
   if (!res.ok) {
-    sessionStorage.removeItem(SS_KEYS.pkce);
+    removeSessionItem(SS_KEYS.pkce);
     throw new Error(`Token exchange failed (${res.status})`);
   }
-  const tok = (await res.json()) as {
-    access_token?: string;
-    token_type?: string;
-    expires_in?: number;
-  };
-  if (!tok.access_token) throw new Error("Token endpoint returned no access_token");
-  sessionStorage.removeItem(SS_KEYS.pkce);
-  sessionStorage.setItem(
-    SS_KEYS.token,
-    JSON.stringify({
-      access_token: tok.access_token,
-      obtained_at: Date.now(),
-      expires_in: tok.expires_in ?? 3600,
-    }),
-  );
+  let tok: unknown;
+  try {
+    tok = await res.json();
+  } catch {
+    removeSessionItem(SS_KEYS.pkce);
+    throw new Error("Token endpoint returned an invalid response");
+  }
+  if (!isRecord(tok)) {
+    removeSessionItem(SS_KEYS.pkce);
+    throw new Error("Token endpoint returned an invalid response");
+  }
+  if (!isNonEmptyString(tok.access_token)) {
+    removeSessionItem(SS_KEYS.pkce);
+    throw new Error("Token endpoint returned no access_token");
+  }
+  const expiresIn =
+    typeof tok.expires_in === "number" && Number.isFinite(tok.expires_in) && tok.expires_in > 0
+      ? tok.expires_in
+      : 3600;
+  try {
+    writeRequiredSessionItem(
+      SS_KEYS.token,
+      JSON.stringify({
+        access_token: tok.access_token,
+        obtained_at: Date.now(),
+        expires_in: expiresIn,
+      }),
+    );
+  } finally {
+    // An authorization code is one-shot. Never leave its verifier behind after an exchange attempt.
+    removeSessionItem(SS_KEYS.pkce);
+  }
 }
 
 export function hasStoredToken(): boolean {
-  const raw = sessionStorage.getItem(SS_KEYS.token);
+  const raw = readOptionalSessionItem(SS_KEYS.token);
   if (!raw) return false;
-  try {
-    const t = JSON.parse(raw) as { obtained_at: number; expires_in: number };
-    const ageSec = (Date.now() - t.obtained_at) / 1000;
-    return ageSec < t.expires_in - 30;
-  } catch {
+  const token = parseStoredToken(raw);
+  if (!token) {
+    removeSessionItem(SS_KEYS.token);
     return false;
   }
+  const ageSec = (Date.now() - token.obtained_at) / 1000;
+  return ageSec < token.expires_in - 30;
 }
 
 export function disconnect(): void {
-  sessionStorage.removeItem(SS_KEYS.token);
-  sessionStorage.removeItem(SS_KEYS.pkce);
-  sessionStorage.removeItem(SS_KEYS.client);
+  removeSessionItem(SS_KEYS.token);
+  removeSessionItem(SS_KEYS.pkce);
+  removeSessionItem(SS_KEYS.client);
 }
 
 function readToken(): string | null {
-  const raw = sessionStorage.getItem(SS_KEYS.token);
+  const raw = readOptionalSessionItem(SS_KEYS.token);
   if (!raw) return null;
-  try {
-    return (JSON.parse(raw) as { access_token: string }).access_token ?? null;
-  } catch {
+  const token = parseStoredToken(raw);
+  if (!token) {
+    removeSessionItem(SS_KEYS.token);
     return null;
   }
+  return token.access_token;
 }
 
 type JsonRpcResp<T = unknown> = {
@@ -251,7 +409,13 @@ type JsonRpcResp<T = unknown> = {
   error?: { code: number; message: string };
 };
 
-async function mcpCall<T>(endpoint: string, token: string, method: string, params: unknown, id: number): Promise<JsonRpcResp<T>> {
+async function mcpCall<T>(
+  endpoint: string,
+  token: string,
+  method: string,
+  params: unknown,
+  id: number,
+): Promise<JsonRpcResp<T>> {
   const res = await fetch(endpoint, {
     method: "POST",
     headers: {
@@ -292,14 +456,24 @@ export async function probeTools(endpoint: string): Promise<ProbeResult> {
   }
   try {
     // 1) initialize
-    await mcpCall(endpoint, token, "initialize", {
-      protocolVersion: "2025-06-18",
-      capabilities: {},
-      clientInfo: { name: "verdant-browser-test", version: "0.1.0" },
-    }, 1);
+    await mcpCall(
+      endpoint,
+      token,
+      "initialize",
+      {
+        protocolVersion: "2025-06-18",
+        capabilities: {},
+        clientInfo: { name: "verdant-browser-test", version: "0.1.0" },
+      },
+      1,
+    );
     // 2) tools/list
     const list = await mcpCall<{ tools: Array<{ name: string }> }>(
-      endpoint, token, "tools/list", {}, 2,
+      endpoint,
+      token,
+      "tools/list",
+      {},
+      2,
     );
     if (list.error) throw new Error(list.error.message);
     const toolNames = (list.result?.tools ?? []).map((t) => t.name);
@@ -308,10 +482,16 @@ export async function probeTools(endpoint: string): Promise<ProbeResult> {
       content?: Array<{ type: string; text?: string }>;
       structuredContent?: { grows?: unknown[] };
       isError?: boolean;
-    }>(endpoint, token, "tools/call", {
-      name: "list_grows",
-      arguments: { limit: 1 },
-    }, 3);
+    }>(
+      endpoint,
+      token,
+      "tools/call",
+      {
+        name: "list_grows",
+        arguments: { limit: 1 },
+      },
+      3,
+    );
     if (call.error) throw new Error(call.error.message);
     let growCount: number | undefined;
     const sc = call.result?.structuredContent;
@@ -323,7 +503,9 @@ export async function probeTools(endpoint: string): Promise<ProbeResult> {
           const parsed = JSON.parse(t) as { grows?: unknown[] } | unknown[];
           growCount = Array.isArray(parsed)
             ? parsed.length
-            : Array.isArray(parsed.grows) ? parsed.grows.length : undefined;
+            : Array.isArray(parsed.grows)
+              ? parsed.grows.length
+              : undefined;
         } catch {
           /* ignore parse — count remains undefined */
         }
@@ -384,11 +566,17 @@ export async function callMcpTool(
   }
   try {
     // Ensure the session is initialized before the first call in a fresh tab.
-    await mcpCall(endpoint, token, "initialize", {
-      protocolVersion: "2025-06-18",
-      capabilities: {},
-      clientInfo: { name: "verdant-tool-explorer", version: "0.1.0" },
-    }, 1);
+    await mcpCall(
+      endpoint,
+      token,
+      "initialize",
+      {
+        protocolVersion: "2025-06-18",
+        capabilities: {},
+        clientInfo: { name: "verdant-tool-explorer", version: "0.1.0" },
+      },
+      1,
+    );
     const resp = await mcpCall<{
       content?: Array<{ type: string; text?: string }>;
       structuredContent?: unknown;
@@ -409,4 +597,3 @@ export async function callMcpTool(
     return { status: "error", message: "Tool call failed. Try again or reconnect." };
   }
 }
-

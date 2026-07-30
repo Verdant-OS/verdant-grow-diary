@@ -1,0 +1,61 @@
+# Zero Known Defects board — snapshot 2026-07-30
+
+The **live board** is the GitHub issue set labeled `zero-defect` (severity
+labels `severity:P1/P2/P3`), mirrored on org project 2 "Zero-Defect Board".
+This file is a point-in-time snapshot for the 2026-07-30 stabilization sprint;
+when it disagrees with GitHub, GitHub wins.
+
+"Zero known defects" claim scope: **no known open P0, and no known open P1
+inside the first-time-user One-Tent Loop**, in the audited scope. It is not a
+claim about the whole product.
+
+## P0 — stop-ship
+
+None known. The 2026-07-30 audit found no P0: no demo write path, no secret
+in the frontend or published bundle (after #580's fix), no invalid-telemetry-
+as-healthy on grower truth surfaces, no auth bypass, no silent data loss in
+the core write path.
+
+## P1 — release blockers
+
+| #                                                                   | Title (short)                                              | Status                                             | Owner type              | Test status                                                        | Blocker                                                                                    |
+| ------------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------- | ----------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| [#561](https://github.com/Verdant-OS/verdant-grow-diary/issues/561) | Supabase MCP + PR preview point at sandbox project         | **BLOCKED**                                        | Owner (Matt)            | n/a (external config)                                              | MCP re-scope + Supabase GitHub integration move/rename; re-verified still wrong 2026-07-30 |
+| [#580](https://github.com/Verdant-OS/verdant-grow-diary/issues/580) | test:security-static red; bundle carried role-name token   | **FIXED** (this slice)                             | Repo                    | Scanner self-test + scan green, with and without dist/             | —                                                                                          |
+| [#581](https://github.com/Verdant-OS/verdant-grow-diary/issues/581) | 24 workflows trigger only on `main`, never run             | **PARTIAL** — security-regression fixed; 23 remain | Repo                    | 8/8 workflow steps proven green locally before enabling            | Case-by-case triage; some intentionally dormant                                            |
+| [#582](https://github.com/Verdant-OS/verdant-grow-diary/issues/582) | getSession() rejection hangs apex + all protected routes   | **FIXED** (this slice)                             | Repo                    | `auth-provider-initial-session-failure.test.tsx` (3 tests)         | —                                                                                          |
+| [#583](https://github.com/Verdant-OS/verdant-grow-diary/issues/583) | Legacy Quick Log env check never writes environment_events | **FIXED** (this slice)                             | Repo                    | `environment-check-entry-type-audit.test.ts` (+3 regression tests) | —                                                                                          |
+| [#584](https://github.com/Verdant-OS/verdant-grow-diary/issues/584) | "Live" means 4 things; grower-visible badge contradiction  | **VERIFIED, deferred**                             | Repo + product decision | Existing suites pin each module's own contract                     | Needs vocabulary decision before code changes                                              |
+| [#585](https://github.com/Verdant-OS/verdant-grow-diary/issues/585) | Paid keepers page unreachable from any UI nav              | **VERIFIED, deferred**                             | Repo                    | None (gap is itself a finding)                                     | Outside One-Tent Loop; pairs with pheno cluster                                            |
+| [#562](https://github.com/Verdant-OS/verdant-grow-diary/issues/562) | CI suite didn't run on pushed feature branch               | CLOSED (branch protection, 11 required checks)     | Repo                    | Read-back verified                                                 | —                                                                                          |
+| [#563](https://github.com/Verdant-OS/verdant-grow-diary/issues/563) | pheno e2e spec bad `Page` import                           | CLOSED (PR #579)                                   | Repo                    | CI green                                                           | —                                                                                          |
+
+## P2 — important cleanup
+
+| #                                                                                                                                       | Title (short)                                                                                                                                         | Status                                                    |
+| --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| [#564](https://github.com/Verdant-OS/verdant-grow-diary/issues/564)–[#569](https://github.com/Verdant-OS/verdant-grow-diary/issues/569) | Pheno hunt cluster (remounts, phantom sex observation, zero-candidate "complete", unenforced one-hunt rule, newest-only timeline, concatenated names) | OPEN (pre-existing board)                                 |
+| [#586](https://github.com/Verdant-OS/verdant-grow-diary/issues/586)                                                                     | Action Queue: best-effort creation audit; client-side-only dedupe                                                                                     | OPEN — durable fix **BLOCKED** on migration authorization |
+| [#587](https://github.com/Verdant-OS/verdant-grow-diary/issues/587)                                                                     | Timeline range filter uses UTC day bounds vs local rendering                                                                                          | OPEN                                                      |
+| [#588](https://github.com/Verdant-OS/verdant-grow-diary/issues/588)                                                                     | Swallowed sign-out failures; AppShell mounts before revalidation                                                                                      | OPEN                                                      |
+| [#589](https://github.com/Verdant-OS/verdant-grow-diary/issues/589)                                                                     | Single-file demo static-safety scans; invariant bypassed transitively                                                                                 | OPEN                                                      |
+| [#590](https://github.com/Verdant-OS/verdant-grow-diary/issues/590)                                                                     | App tsconfig strict mode off (no strictNullChecks)                                                                                                    | OPEN                                                      |
+| [#591](https://github.com/Verdant-OS/verdant-grow-diary/issues/591)                                                                     | robots.txt blocks public `/sensors/csv-preview`                                                                                                       | OPEN                                                      |
+| [#592](https://github.com/Verdant-OS/verdant-grow-diary/issues/592)                                                                     | Divergent duplicated sensor rule tables (stale windows, EC, bands, vocabularies)                                                                      | OPEN                                                      |
+
+## P3 — polish / future debt
+
+| #                                                                                                                                       | Title (short)                                                                                         | Status                               |
+| --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| [#570](https://github.com/Verdant-OS/verdant-grow-diary/issues/570)–[#577](https://github.com/Verdant-OS/verdant-grow-diary/issues/577) | Pheno P3s (test data on real grow, slow first render, testid naming, etc.)                            | OPEN (pre-existing board)            |
+| [#578](https://github.com/Verdant-OS/verdant-grow-diary/issues/578)                                                                     | Node 26 breaks five storage-rejection tests locally (pass in CI)                                      | OPEN (documented environment caveat) |
+| [#593](https://github.com/Verdant-OS/verdant-grow-diary/issues/593)                                                                     | P3 polish backlog from 2026-07-30 audit (dead code clusters, doc/code contradictions, misc hardening) | OPEN                                 |
+
+## Reading the board
+
+- Statuses used here follow the sprint contract: VERIFIED / FIXED / BLOCKED /
+  DEFERRED / NOT REPRODUCED / NOT APPLICABLE.
+- Every FIXED row above ships in the `chore/verdant-stabilization` slice with
+  a named regression test; close those issues when the PR merges.
+- Full evidence (file:line, repro, root cause, proposed fixes) lives in each
+  issue body and [verdant-stabilization-audit.md](./verdant-stabilization-audit.md).

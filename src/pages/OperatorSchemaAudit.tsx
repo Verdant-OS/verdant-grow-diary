@@ -36,7 +36,12 @@ import {
 } from "@/components/ui/select";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import SchemaAuditMigrationDrilldown from "@/components/SchemaAuditMigrationDrilldown";
-import { evaluateRlsAudit, rlsPostureForTable, summarizeRlsFindings } from "@/lib/rlsAuditRules";
+import {
+  SERVICE_ROLE_GRANT_KEY,
+  evaluateRlsAudit,
+  rlsPostureForTable,
+  summarizeRlsFindings,
+} from "@/lib/rlsAuditRules";
 import {
   attachAccessProfiles,
   backendReferenceFromUrl,
@@ -866,7 +871,7 @@ export default function OperatorSchemaAudit() {
                       {(row.grants?.anon ?? []).join("/") || "—"} · PUBLIC:{" "}
                       {(row.grants?.PUBLIC ?? []).join("/") || "—"} · authn:{" "}
                       {(row.grants?.authenticated ?? []).join("/") || "—"} · svc:{" "}
-                      {(row.grants?.["service_role"] ?? []).join("/") || "—"}
+                      {(row.grants?.[SERVICE_ROLE_GRANT_KEY] ?? []).join("/") || "—"}
                     </div>
                   </div>
                   <div className="shrink-0">

@@ -23,7 +23,8 @@
  * to the app. One-Tent Loop regression is covered by re-running the
  * standard quicklog smoke after this suite (see docs in the PR).
  */
-import { test, expect, type Page } from "./lib/authedTest";
+import type { Page } from "@playwright/test";
+import { test, expect } from "./lib/authedTest";
 
 const PHASE = process.env.E2E_PHENO_PHASE ?? "";
 const BASE_URL = process.env.E2E_BASE_URL ?? "";
@@ -102,9 +103,7 @@ test.describe("Phase PAID — entitled fixture runs create → evidence → comp
 
     // Basics: name is prefilled from the grow; add a note.
     await expect(page.getByTestId("ph-name-input")).not.toHaveValue("");
-    await page
-      .getByTestId("ph-notes-input")
-      .fill("E2E paid-journey smoke — safe to delete");
+    await page.getByTestId("ph-notes-input").fill("E2E paid-journey smoke — safe to delete");
     await page.getByTestId("pheno-step-next").click();
 
     // Candidates: needs >=2 plants (operator-seeded precondition).
@@ -170,18 +169,14 @@ test.describe("Phase PAID — entitled fixture runs create → evidence → comp
 
     // 1) Phenotype note for EVERY candidate (partial notes must not enable).
     for (const [i, id] of candidateIds.entries()) {
-      await page
-        .getByTestId(`workspace-note-${id}`)
-        .fill(`E2E phenotype note candidate ${i + 1}`);
+      await page.getByTestId(`workspace-note-${id}`).fill(`E2E phenotype note candidate ${i + 1}`);
       await page.getByTestId(`workspace-save-${id}`).click();
       await expect(page.getByTestId(`workspace-saved-${id}`)).toBeVisible({
         timeout: 10_000,
       });
       // Still disabled after the first candidate's note — the ladder demands
       // notes on all candidates before harvest/cure evidence even counts.
-      await expect(
-        page.getByTestId("pheno-workspace-compare-action-disabled"),
-      ).toBeVisible();
+      await expect(page.getByTestId("pheno-workspace-compare-action-disabled")).toBeVisible();
     }
 
     // 2) Post-harvest signal: a real keeper decision on one candidate.

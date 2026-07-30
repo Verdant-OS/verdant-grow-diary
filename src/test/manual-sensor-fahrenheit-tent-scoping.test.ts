@@ -48,10 +48,15 @@ const LATEST_SNAP = read("src/hooks/useLatestSensorSnapshot.ts");
 // ---------------------------------------------------------------------------
 
 describe("Manual sensor temperature is collected and labeled in Fahrenheit", () => {
-  it("labels the air-temp input with °F and uses a Fahrenheit placeholder", () => {
-    expect(CARD).toContain("airTempF");
-    expect(CARD).toContain('unit="°F"');
-    expect(CARD).toMatch(/placeholder="75"/);
+  it("labels the air-temp input from the saved preference, with a matching placeholder", () => {
+    // The field accepts a typed unit now, so the label is preference-driven
+    // rather than pinned to °F, and the example placeholder follows suit.
+    expect(CARD).toMatch(/unit=\{temperatureSymbol\}/);
+    expect(CARD).not.toContain('unit="°F"');
+    // A Fahrenheit example under a °F preference, a Celsius one under °C.
+    expect(CARD).toMatch(/"24" : "75"/);
+    // Free text is required for a suffix — type="number" would discard it.
+    expect(CARD).toMatch(/allowUnitSuffix/);
   });
 
   it("validates Fahrenheit ranges (warns outside 50–100°F)", () => {
@@ -78,10 +83,24 @@ describe("Manual sensor temperature is collected and labeled in Fahrenheit", () 
     expect(RULES).toMatch(/converted to °C/i);
   });
 
-  it("never silently treats Fahrenheit as Celsius (no °C in the manual UI)", () => {
-    // The only °C reference in the card should be absent (we render °F).
-    expect(CARD).not.toMatch(/°C/);
-    expect(CARD).not.toMatch(/celsius/i);
+  it("never silently confuses Fahrenheit and Celsius — the unit is always explicit", () => {
+    // Was: assert °C appears nowhere in the card, because the field was °F-only.
+    // The card now handles BOTH units deliberately, so absence-of-°C is the
+    // wrong guard. The real invariant — a value is never silently misread as the
+    // other unit — is asserted directly instead.
+
+    // Every consumer gets an explicitly-named unit: canonical Celsius to the
+    // validator, a Fahrenheit view to the helpers still written against °F.
+    expect(CARD).toMatch(/airTempC: airTempCelsius/);
+    expect(CARD).toMatch(/airTempF: airTempFahrenheit/);
+
+    // The Fahrenheit view is DERIVED from the parsed Celsius, never re-read from
+    // the raw text — that is what stops a double conversion.
+    expect(CARD).toMatch(/celsiusToFahrenheit\(airTempCelsius\)/);
+
+    // The raw typed text is never handed to a consumer as if it were a number.
+    expect(CARD).not.toMatch(/airTempF: form\./);
+    expect(CARD).not.toMatch(/tempF: form\./);
   });
 });
 

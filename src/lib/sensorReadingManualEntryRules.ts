@@ -30,6 +30,15 @@ export type ManualMetric =
 export interface ManualEntryInput {
   /** Air temperature in °F (UI convenience). Converted to °C on save. */
   airTempF?: string | number | null;
+  /**
+   * Air temperature already in canonical °C — the preferred input now that the
+   * form can accept a typed unit ("22°C" / "72°F", see parseTemperatureInput).
+   *
+   * Takes precedence over `airTempF` when both are supplied. `airTempF` is kept
+   * for callers that still hold a Fahrenheit value; supplying only that path
+   * behaves exactly as before, warning strings included.
+   */
+  airTempC?: string | number | null;
   /** Relative humidity %. */
   humidityPct?: string | number | null;
   /** Grower-entered VPD kPa. Air-only estimates are preview-only. */
@@ -71,6 +80,14 @@ export function fahrenheitToCelsius(f: number): number {
 }
 
 /**
+ * Typical grow-room air temperature band in canonical °C — the same band the
+ * Fahrenheit path expresses as 50–100°F. Rounded to whole °C for copy; the
+ * Fahrenheit branch still compares in °F so its behavior is bit-identical.
+ */
+const TYPICAL_AIR_TEMP_MIN_C = 10;
+const TYPICAL_AIR_TEMP_MAX_C = 38;
+
+/**
  * Saturation vapor pressure (kPa) via Tetens formula.
  * Standard horticulture approximation; not weather-grade.
  */
@@ -86,7 +103,16 @@ export function validateManualEntry(input: ManualEntryInput): ManualEntryValidat
   const warnings: string[] = [];
   const metrics: ManualReadingMetric[] = [];
 
+  // Resolve the air temperature into canonical °C, remembering which unit it
+  // arrived in so warnings can be worded in the grower's own unit rather than
+  // always in °F. `airTempC` wins when both are present.
+  const airTempC = toFinite(input.airTempC);
   const airTempF = toFinite(input.airTempF);
+  const enteredTempUnit: "C" | "F" | null =
+    airTempC !== null ? "C" : airTempF !== null ? "F" : null;
+  const tempC =
+    airTempC !== null ? airTempC : airTempF !== null ? fahrenheitToCelsius(airTempF) : null;
+
   const humidity = toFinite(input.humidityPct);
   const vpd = toFinite(input.vpdKpa);
   const co2 = toFinite(input.co2Ppm);
@@ -117,9 +143,17 @@ export function validateManualEntry(input: ManualEntryInput): ManualEntryValidat
   }
 
   // Suspicious-but-allowed warnings
-  if (airTempF !== null) {
+  // Typical grow-room air temp is 50–100°F, i.e. 10–38°C. The Fahrenheit branch
+  // keeps its original comparison and wording so existing callers and their
+  // assertions are untouched; the Celsius branch states the same band in °C
+  // rather than quoting a °F range at somebody working in °C.
+  if (enteredTempUnit === "F" && airTempF !== null) {
     if (airTempF < 50 || airTempF > 100) {
       warnings.push(`Air temp ${airTempF}°F is outside the typical 50–100°F range.`);
+    }
+  } else if (enteredTempUnit === "C" && airTempC !== null) {
+    if (airTempC < TYPICAL_AIR_TEMP_MIN_C || airTempC > TYPICAL_AIR_TEMP_MAX_C) {
+      warnings.push(`Air temp ${airTempC}°C is outside the typical 10–38°C range.`);
     }
   }
   if (humidity !== null && humidity >= 0 && humidity <= 100) {
@@ -130,17 +164,17 @@ export function validateManualEntry(input: ManualEntryInput): ManualEntryValidat
   if (vpd !== null && vpd >= 0 && vpd > 2.5) {
     warnings.push(`VPD ${vpd} kPa is unusually high (> 2.5).`);
   }
-  if (vpd === null && airTempF !== null && humidity !== null && humidity >= 0 && humidity <= 100) {
+  if (vpd === null && tempC !== null && humidity !== null && humidity >= 0 && humidity <= 100) {
     warnings.push(
       "Air VPD estimate is preview-only and is not saved as verified VPD. Measure leaf temperature and complete calibration evidence before making a target claim.",
     );
   }
 
   // Build metric rows for accepted fields (only schema-supported metrics).
-  if (airTempF !== null) {
+  if (tempC !== null) {
     metrics.push({
       metric: "temperature_c",
-      value: Math.round(fahrenheitToCelsius(airTempF) * 100) / 100,
+      value: Math.round(tempC * 100) / 100,
     });
   }
   if (humidity !== null && humidity >= 0 && humidity <= 100) {

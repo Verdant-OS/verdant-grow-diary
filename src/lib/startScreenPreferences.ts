@@ -56,11 +56,12 @@ export function routeForStartScreen(choice: StartScreenChoice): string {
  * query parameters. Returns null when no valid intent is present.
  *
  * The intent's companion `type` marker (the preset a grower picked before
- * being routed here — see globalSearchQuickLogFallbackRules) is consumed too,
- * so it cannot linger in the URL and re-seed the activity on refresh/back.
- * Callers that need the value must read it BEFORE consuming, via
- * readQuickLogStartEventType. Only stripped alongside a valid intent: a bare
- * `?type=` with no `open=quick-log` belongs to someone else and is untouched.
+ * being routed here — see globalSearchQuickLogFallbackRules) and closed
+ * `prompt` marker (guide handoff) are consumed too, so neither can linger in
+ * the URL and re-seed the draft on refresh/back. Callers that need either
+ * value must read it BEFORE consuming. They are stripped only alongside a
+ * valid intent: bare markers with no `open=quick-log` belong to someone else
+ * and are untouched.
  */
 export function consumeQuickLogStartIntent(search: string): string | null {
   if (typeof search !== "string") return null;
@@ -68,6 +69,7 @@ export function consumeQuickLogStartIntent(search: string): string | null {
   if (params.get("open") !== "quick-log") return null;
   params.delete("open");
   params.delete("type");
+  params.delete("prompt");
   const remaining = params.toString();
   return remaining ? `?${remaining}` : "";
 }

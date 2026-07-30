@@ -4,8 +4,8 @@
  * Static guarantees:
  *  - Public demo routes (/pheno-comparison, /pheno-expression-showcase,
  *    /pheno-hunts/:id/compare) are NOT wrapped in PhenoTrackerUpgradeGate.
- *  - Gated workflow routes (/pheno-hunts, /new, workspace, keepers) ARE
- *    wrapped in PhenoTrackerUpgradeGate.
+ *  - Gated workflow routes (/pheno-hunts, /new, workspace, keepers, and the
+ *    editable diary strain profile) ARE wrapped in PhenoTrackerUpgradeGate.
  *  - Server-side entitlement enforcement files are untouched by this UI
  *    slice (well-known paths still exist and still export the assertion).
  */
@@ -23,6 +23,7 @@ const PUBLIC_DEMO_ROUTES = [
 ];
 
 const GATED_ROUTES = [
+  "/diary/strains/:slug",
   "/pheno-hunts",
   "/pheno-hunts/new",
   "/pheno-hunts/:id/workspace",

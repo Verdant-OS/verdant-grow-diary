@@ -21,6 +21,7 @@ import { SubscriptionPastDueBanner } from "./SubscriptionPastDueBanner";
 import GlobalSearchDialog from "./GlobalSearchDialog";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { readQuickLogStartEventType } from "@/lib/globalSearchQuickLogFallbackRules";
+import { readGuidePhenoQuickLogPrefill } from "@/lib/guidePhenoQuickLogHandoffRules";
 import { isEmailVerificationPending } from "@/lib/emailVerificationRules";
 import { resolveMobileQuickLogTarget } from "@/lib/quickLogRouteTargetRules";
 import { consumeQuickLogStartIntent } from "@/lib/startScreenPreferences";
@@ -133,14 +134,16 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   // query intent. Consume it only after AppShell is mounted, open the existing
   // Quick Log dialog, then remove the marker so refresh/back does not reopen it.
   useEffect(() => {
-    // Read the preset BEFORE consuming: consumeQuickLogStartIntent strips the
-    // companion type marker along with the intent itself.
+    // Read the closed guide prompt and activity preset BEFORE consuming:
+    // consumeQuickLogStartIntent strips both companion markers.
+    const guidePrefill = readGuidePhenoQuickLogPrefill(location.search);
     const startEventType = readQuickLogStartEventType(location.search);
     const nextSearch = consumeQuickLogStartIntent(location.search);
     if (nextSearch === null) return;
-    // Seed only the activity. No plant is invented — the grower still selects
-    // one, exactly as a context-free launcher has always required.
-    setPrefill(startEventType ? { eventType: startEventType } : null);
+    // A guide may seed a static draft prompt as well as the activity. No plant
+    // or private context is encoded in the URL — the grower still selects the
+    // target, reviews the note, and saves explicitly.
+    setPrefill(guidePrefill ?? (startEventType ? { eventType: startEventType } : null));
     setOpenLog(true);
     nav(
       {

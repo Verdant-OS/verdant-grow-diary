@@ -102,6 +102,7 @@ const Pricing = lazy(() => import("./pages/Pricing"));
 const Founder = lazy(() => import("./pages/Founder"));
 const GuidesIndex = lazy(() => import("./pages/GuidesIndex"));
 const GuidePage = lazy(() => import("./pages/GuidePage"));
+const CustomerOreozGelonadeGuide = lazy(() => import("./pages/CustomerOreozGelonadeGuide"));
 const GrowStageCareGuide = lazy(() => import("./pages/GrowStageCareGuide"));
 const CultivarsIndex = lazy(() => import("./pages/CultivarsIndex"));
 const CultivarPage = lazy(() => import("./pages/CultivarPage"));
@@ -137,6 +138,8 @@ const SensorTruthAudit = lazy(() => import("./pages/SensorTruthAudit"));
 const AiDoctorConfidenceAudit = lazy(() => import("./pages/AiDoctorConfidenceAudit"));
 const EcowittLiveBringup = lazy(() => import("./pages/EcowittLiveBringup"));
 const EnvironmentSummaryReportPage = lazy(() => import("./pages/EnvironmentSummaryReportPage"));
+const OreozGelonadeDiaryComparison = lazy(() => import("./pages/OreozGelonadeDiaryComparison"));
+const CultivarDiaryProfile = lazy(() => import("./pages/CultivarDiaryProfile"));
 const OperatorOneTentLoopSmokeTest = lazy(() => import("./pages/OperatorOneTentLoopSmokeTest"));
 const OperatorPostGrowReflectionDryRun = lazy(
   () => import("./pages/OperatorPostGrowReflectionDryRun"),
@@ -254,6 +257,14 @@ const App = () => (
                   <Route path="/guides" element={<GuidesIndex />} />
                   <Route path="/guides/grow-stage-care-guide" element={<GrowStageCareGuide />} />
                   <Route path="/guides/:slug" element={<GuidePage />} />
+                  {/* Exact, ID-free Customer Mode education page. It is static,
+                      noindex, and deliberately carries no share id or Operator
+                      data dependency. The retired /customer/:shareId routes
+                      remain unrouted. */}
+                  <Route
+                    path="/customer/guide/oreoz-vs-gelonade-comparison"
+                    element={<CustomerOreozGelonadeGuide />}
+                  />
                   <Route path="/cultivars" element={<CultivarsIndex />} />
                   <Route path="/cultivars/:slug" element={<CultivarPage />} />
                   {/* Legacy "strain" URL aliases capture search intent for
@@ -428,6 +439,18 @@ const App = () => (
                     <Route
                       path="/diary/environment-summary"
                       element={<EnvironmentSummaryReportPage />}
+                    />
+                    <Route
+                      path="/diary/pheno-expression-comparison"
+                      element={<OreozGelonadeDiaryComparison />}
+                    />
+                    <Route
+                      path="/diary/strains/:slug"
+                      element={
+                        <PhenoTrackerUpgradeGate>
+                          <CultivarDiaryProfile />
+                        </PhenoTrackerUpgradeGate>
+                      }
                     />
 
                     <Route path="/settings" element={<Settings />} />

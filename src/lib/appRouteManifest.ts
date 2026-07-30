@@ -120,6 +120,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "public",
     description: "Public per-cultivar guide page (evergreen best-practice content).",
   },
+  {
+    path: "/customer/guide/oreoz-vs-gelonade-comparison",
+    access: "public",
+    description:
+      "ID-free, noindex Next Door Cannabis comparison guide (static education; no Operator data).",
+  },
   { path: "/daily-check", access: "auth" },
   {
     path: "/dashboard",
@@ -137,6 +143,19 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     path: "/diary/environment-summary",
     access: "auth",
     description: "Environment summary report (diary).",
+  },
+  {
+    path: "/diary/pheno-expression-comparison",
+    access: "auth",
+    description:
+      "Read-only comparison of the grower's RLS-scoped Oreoz and Gelonade phenotype records.",
+  },
+  {
+    path: "/diary/strains/:slug",
+    access: "auth",
+    requiredFeature: "pheno_tracker",
+    description:
+      "Editable Oreoz or Gelonade phenotype diary profile backed by owner-scoped Pheno Tracker records.",
   },
   {
     path: "/docs/mcp-api",

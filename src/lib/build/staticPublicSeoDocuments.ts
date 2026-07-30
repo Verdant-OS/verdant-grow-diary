@@ -17,6 +17,10 @@ import {
 } from "../../constants/verdantSeoContent";
 import { PUBLIC_QUICK_LOG_STARTER_COPY } from "../../constants/publicQuickLogStarterCopy";
 import { FOUNDER_SOCIAL_META } from "../../constants/founderSocialMeta";
+import {
+  NEXT_DOOR_CUSTOMER_COMPARISON_PATH,
+  OREOZ_GELONADE_CUSTOMER_SEO,
+} from "../../constants/oreozGelonadeExperience";
 import { buildCultivarBreadcrumbItems, buildCultivarFaqItems } from "../cultivarDetailSeo";
 import {
   buildArticleJsonLd,
@@ -373,6 +377,21 @@ export const STATIC_TRANSACTIONAL_NOINDEX_DOCUMENTS: ReadonlyArray<StaticPublicS
     }),
   ]);
 
+/**
+ * Publicly reachable education pages that must not enter organic search or
+ * the acquisition sitemap. Customer Mode remains outside Operator data and
+ * outside share-token routing.
+ */
+export const STATIC_PUBLIC_NOINDEX_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> =
+  Object.freeze([
+    publicDocument(NEXT_DOOR_CUSTOMER_COMPARISON_PATH, {
+      title: OREOZ_GELONADE_CUSTOMER_SEO.title,
+      description: OREOZ_GELONADE_CUSTOMER_SEO.description,
+      imageAlt: "Next Door Cannabis Oreoz and Gelonade comparison",
+      robots: "noindex, follow",
+    }),
+  ]);
+
 /** All public documents emitted alongside Vite's primary SPA entry. */
 export const STATIC_PUBLIC_SEO_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = Object.freeze([
   {
@@ -415,6 +434,7 @@ export const STATIC_PUBLIC_ALIAS_DOCUMENTS: ReadonlyArray<StaticPublicAliasDocum
 export const STATIC_PUBLIC_OUTPUT_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> =
   Object.freeze([
     ...STATIC_PUBLIC_SEO_DOCUMENTS,
+    ...STATIC_PUBLIC_NOINDEX_DOCUMENTS,
     ...STATIC_TRANSACTIONAL_NOINDEX_DOCUMENTS,
     ...STATIC_PUBLIC_ALIAS_DOCUMENTS,
   ]);

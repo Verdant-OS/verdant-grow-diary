@@ -276,15 +276,19 @@ describe("archived/merged name resolution (presenter)", () => {
     expect(opts.find((o) => o.id === "p2")?.label).toBe("Northern Lights");
   });
 
-  it("falls back to 'Archived plant/tent' + fragment only when a loaded directory cannot resolve the id", () => {
+  it("keeps a neutral fragment fallback for unresolvable ids — never asserts an archival state", () => {
+    // A loaded-but-unresolving directory covers hard-deleted tents
+    // (deleteTent preserves logs) and entities created after the
+    // directory snapshot; archived rows resolve normally, so claiming
+    // "Archived …" here would be wrong.
     const emptyDirectory = new Map<string, string>();
-    const plantOpts = deriveTimelinePlantOptions(ARCHIVED_ROWS, emptyDirectory);
-    expect(plantOpts[0]?.label).toBe("Archived plant 5d7206");
-    const tentOpts = deriveTimelineTentOptions(ARCHIVED_ROWS, emptyDirectory);
-    expect(tentOpts[0]?.label).toBe("Archived tent 6b1faa");
+    expect(deriveTimelinePlantOptions(ARCHIVED_ROWS, emptyDirectory)[0]?.label).toBe(
+      "Plant 5d7206",
+    );
+    expect(deriveTimelineTentOptions(ARCHIVED_ROWS, emptyDirectory)[0]?.label).toBe("Tent 6b1faa");
   });
 
-  it("keeps the neutral fragment label while the directory is unavailable (null/undefined)", () => {
+  it("keeps the same neutral fragment label while the directory is unavailable (null/undefined)", () => {
     expect(deriveTimelinePlantOptions(ARCHIVED_ROWS)[0]?.label).toBe("Plant 5d7206");
     expect(deriveTimelinePlantOptions(ARCHIVED_ROWS, null)[0]?.label).toBe("Plant 5d7206");
     expect(deriveTimelineTentOptions(ARCHIVED_ROWS, null)[0]?.label).toBe("Tent 6b1faa");

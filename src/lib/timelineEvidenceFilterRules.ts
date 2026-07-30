@@ -205,9 +205,8 @@ export interface TimelineEvidenceFilterOption {
  * filter: archived/merged rows still carry their names, and the whole
  * point of the lookup is that archived-plant diary history keeps its
  * real labels. Returns `null` (lookup unavailable) when `rows` is not
- * an array, so a failed read degrades to the neutral fragment label
- * instead of mislabeling everything as archived. Malformed rows are
- * skipped; the first name seen for an id wins. Pure.
+ * an array, so callers can tell a failed read from an empty directory.
+ * Malformed rows are skipped; the first name seen for an id wins. Pure.
  */
 export function buildTimelineNameLookup(rows: unknown): ReadonlyMap<string, string> | null {
   if (!Array.isArray(rows)) return null;
@@ -225,14 +224,16 @@ export function buildTimelineNameLookup(rows: unknown): ReadonlyMap<string, stri
 /**
  * Resolve one option label. Order: directory name (current truth,
  * includes archived/merged rows) → row-embedded snapshot name →
- * fragment fallback. The "Archived" fallback wording is used only when
- * a loaded directory truly cannot resolve the id; while the directory
- * is unavailable (`nameById` null/undefined) the neutral noun keeps us
- * from claiming an archival state we never confirmed.
+ * neutral fragment fallback.
+ *
+ * The fallback never asserts an archival state: an id absent from a
+ * loaded directory is NOT necessarily archived — archived rows resolve
+ * normally, while hard-deleted tents (deleteTent preserves logs) and
+ * entities created after the directory snapshot both come through here.
  */
 function resolveOptionLabel(
   id: string,
-  noun: "plant" | "tent",
+  noun: "Plant" | "Tent",
   nameById: ReadonlyMap<string, string> | null | undefined,
   snapshotName: unknown,
 ): string {
@@ -243,9 +244,7 @@ function resolveOptionLabel(
   if (typeof snapshotName === "string" && snapshotName.trim() !== "") {
     return snapshotName.trim();
   }
-  const fragment = id.slice(0, 6);
-  const capitalized = noun === "plant" ? "Plant" : "Tent";
-  return nameById ? `Archived ${noun} ${fragment}` : `${capitalized} ${fragment}`;
+  return `${noun} ${id.slice(0, 6)}`;
 }
 
 /**
@@ -262,7 +261,7 @@ export function deriveTimelinePlantOptions(
   for (const r of rows) {
     const id = typeof r.plant_id === "string" ? r.plant_id.trim() : "";
     if (id === "") continue;
-    const label = resolveOptionLabel(id, "plant", nameById, (r.details ?? {})["plant_name"]);
+    const label = resolveOptionLabel(id, "Plant", nameById, (r.details ?? {})["plant_name"]);
     const cur = m.get(id);
     if (cur) cur.count += 1;
     else m.set(id, { label, count: 1 });
@@ -285,7 +284,7 @@ export function deriveTimelineTentOptions(
   for (const r of rows) {
     const id = typeof r.tent_id === "string" ? r.tent_id.trim() : "";
     if (id === "") continue;
-    const label = resolveOptionLabel(id, "tent", nameById, null);
+    const label = resolveOptionLabel(id, "Tent", nameById, null);
     const cur = m.get(id);
     if (cur) cur.count += 1;
     else m.set(id, { label, count: 1 });

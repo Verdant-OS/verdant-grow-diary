@@ -314,7 +314,7 @@ describe("per-candidate readiness badge", () => {
     });
     const badge = screen.getByTestId("workspace-readiness-p1");
     expect(badge).toHaveAttribute("data-readiness", "insufficient");
-    expect(badge).toHaveTextContent(/evidence goals/i);
+    expect(badge).toHaveTextContent(/readiness signals/i);
     expect(badge.textContent ?? "").not.toMatch(/winner|best|keeper pick/i);
   });
 });

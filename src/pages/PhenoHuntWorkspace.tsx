@@ -162,9 +162,10 @@ const READINESS_SYMBOL: Record<PhenoReadinessLevel, string> = {
   insufficient: "○",
 };
 
-/** Readiness badge — evidence completeness, never a keeper recommendation. Uses
- * text + symbol (not colour alone) and deep-links a missing target to a real
- * in-workspace record anchor. */
+/** Readiness badge — stage-applicable readiness signals, never a keeper
+ * recommendation. This is distinct from the manual configured-goal coverage
+ * rendered in the candidate card below. Uses text + symbol (not colour alone)
+ * and deep-links a missing target to a real in-workspace record anchor. */
 function CandidateReadinessBadge({ readiness }: { readiness: PhenoCandidateReadiness }) {
   const next = readiness.nextEvidenceTarget;
   return (
@@ -178,7 +179,7 @@ function CandidateReadinessBadge({ readiness }: { readiness: PhenoCandidateReadi
         {PHENO_READINESS_LABELS[readiness.readiness]}
       </span>
       <span className="block text-muted-foreground">
-        {readiness.completedGoalCount}/{readiness.selectedGoalCount} evidence goals
+        {readiness.completedGoalCount}/{readiness.selectedGoalCount} readiness signals
       </span>
       {next ? (
         next.anchor ? (

@@ -47,10 +47,7 @@ interface ProgressItem {
   detail: string;
 }
 
-const COMPARISON_READINESS_LABEL: Record<
-  PhenoWorkspaceComparisonReadiness,
-  string
-> = {
+const COMPARISON_READINESS_LABEL: Record<PhenoWorkspaceComparisonReadiness, string> = {
   not_ready: PHENO_STATUS_LABELS.notComparisonReadyYet,
   ready_for_tracking: PHENO_STATUS_LABELS.readyForTracking,
   missing_evidence: PHENO_STATUS_LABELS.missingEvidence,
@@ -91,20 +88,18 @@ export default function PhenoHuntSetupProgressCard({
     },
     {
       id: "goals",
-      label: "Evidence goals",
+      label: "Evidence goal setup",
       complete: goals.length > 0,
       detail:
         goals.length > 0
-          ? `${goals.length} of ${PHENO_EVIDENCE_GOALS.length} goals selected`
+          ? `${goals.length} of ${PHENO_EVIDENCE_GOALS.length} available goal types selected`
           : "No evidence goals selected yet",
     },
     {
       id: "confirmation",
       label: "Setup confirmed",
       complete: setupDone,
-      detail: setupDone
-        ? "Setup marked complete"
-        : "Mark setup complete to finish onboarding",
+      detail: setupDone ? "Setup marked complete" : "Mark setup complete to finish onboarding",
     },
   ];
 
@@ -122,9 +117,7 @@ export default function PhenoHuntSetupProgressCard({
     >
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold">
-          {allDone
-            ? PHENO_STATUS_LABELS.setupComplete
-            : "Continue setup"}
+          {allDone ? PHENO_STATUS_LABELS.setupComplete : "Continue setup"}
         </h2>
         <span className="text-xs text-muted-foreground" data-testid={`${testId}-count`}>
           {items.length - missing.length} of {items.length} steps done
@@ -132,15 +125,10 @@ export default function PhenoHuntSetupProgressCard({
       </div>
 
       {/* Setup vs Comparison-ready — always two separate lines. */}
-      <div
-        className="grid gap-1 text-xs"
-        data-testid={`${testId}-status-lines`}
-      >
+      <div className="grid gap-1 text-xs" data-testid={`${testId}-status-lines`}>
         <div data-testid={`${testId}-setup-status`}>
           <span className="font-medium">{PHENO_STATUS_LABELS.setupComplete}:</span>{" "}
-          <span className="text-muted-foreground">
-            {setupDone ? "Yes" : "Not yet"}
-          </span>
+          <span className="text-muted-foreground">{setupDone ? "Yes" : "Not yet"}</span>
         </div>
         <div data-testid={`${testId}-comparison-status`}>
           <span className="font-medium">Comparison readiness:</span>{" "}
@@ -178,12 +166,8 @@ export default function PhenoHuntSetupProgressCard({
         className="text-xs text-muted-foreground space-y-1 pt-1 border-t border-border/50"
         data-testid={`${testId}-definitions`}
       >
-        <p data-testid={`${testId}-definition-setup`}>
-          {PHENO_SETUP_COMPLETE_DEFINITION}
-        </p>
-        <p data-testid={`${testId}-definition-comparison`}>
-          {PHENO_COMPARISON_READY_DEFINITION}
-        </p>
+        <p data-testid={`${testId}-definition-setup`}>{PHENO_SETUP_COMPLETE_DEFINITION}</p>
+        <p data-testid={`${testId}-definition-comparison`}>{PHENO_COMPARISON_READY_DEFINITION}</p>
       </div>
 
       {!setupDone && onMarkComplete ? (

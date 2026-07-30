@@ -42,6 +42,15 @@ describe("PhenoHuntSetupProgressCard", () => {
     ).toBe("false");
   });
 
+  it("labels the catalog selection as setup, not a candidate evidence count", () => {
+    render(
+      <PhenoHuntSetupProgressCard hunt={hunt()} candidateCount={1} onMarkComplete={vi.fn()} />,
+    );
+    const goals = screen.getByTestId("pheno-workspace-setup-progress-item-goals");
+    expect(goals).toHaveTextContent("Evidence goal setup");
+    expect(goals).toHaveTextContent(/2 of 12 available goal types selected/i);
+  });
+
   it("shows setup-complete state when hunt.setupCompletedAt is set", () => {
     render(
       <PhenoHuntSetupProgressCard
@@ -52,9 +61,7 @@ describe("PhenoHuntSetupProgressCard", () => {
     const card = screen.getByTestId("pheno-workspace-setup-progress");
     expect(card.getAttribute("data-setup-complete")).toBe("true");
     // Mark button is not rendered when complete.
-    expect(
-      screen.queryByTestId("pheno-workspace-setup-progress-mark-complete"),
-    ).toBeNull();
+    expect(screen.queryByTestId("pheno-workspace-setup-progress-mark-complete")).toBeNull();
   });
 
   it("Mark setup complete is disabled while no candidates or goals", () => {
@@ -83,9 +90,7 @@ describe("PhenoHuntSetupProgressCard", () => {
         onMarkComplete={onMarkComplete}
       />,
     );
-    fireEvent.click(
-      screen.getByTestId("pheno-workspace-setup-progress-mark-complete"),
-    );
+    fireEvent.click(screen.getByTestId("pheno-workspace-setup-progress-mark-complete"));
     expect(onMarkComplete).toHaveBeenCalledTimes(1);
   });
 
@@ -125,9 +130,7 @@ describe("PhenoHuntSetupProgressCard", () => {
       />,
     );
     expect(
-      screen
-        .getByTestId("pheno-workspace-setup-progress-comparison-status")
-        .textContent,
+      screen.getByTestId("pheno-workspace-setup-progress-comparison-status").textContent,
     ).toMatch(/Comparison-ready/);
 
     rerender(
@@ -138,9 +141,7 @@ describe("PhenoHuntSetupProgressCard", () => {
       />,
     );
     expect(
-      screen
-        .getByTestId("pheno-workspace-setup-progress-comparison-status")
-        .textContent,
+      screen.getByTestId("pheno-workspace-setup-progress-comparison-status").textContent,
     ).toMatch(/Pending until cure/);
   });
 

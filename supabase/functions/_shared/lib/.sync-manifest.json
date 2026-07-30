@@ -85,7 +85,7 @@
     "src/lib/sensorReadingNormalizationRules.ts": "931eae8750ad8aa51c703c4612c67cd897cd5d7f32ba9982098daedc678fd187",
     "src/lib/sensorReadingVendorLineage.ts": "6b2244e66267a1e7999a6b67d5b3f4941a142fe774e03fdc2bbf21a300c70c59",
     "src/lib/sensorSnapshot.ts": "5f8b173773532a68d06b5f7bf98ff4bf54712dd59a81e769d7fb595b962b7002",
-    "src/lib/sensorSnapshotStatusContract.ts": "1ff5f208f9c72c54b8a24bc8d5fd346de67ab0da73eddd9038f3f17cd85666ea",
+    "src/lib/sensorSnapshotStatusContract.ts": "1661a62627786d709b7d5ee0870f10284be925121a5bdad00a162f7e50191668",
     "src/lib/sensorSourceDisplayLabel.ts": "d08b1c1908249b7b0706bc02d16e0738b827f9711bcbe3a215480ca9d6189942",
     "src/lib/sensorTestbenchIndicatorRules.ts": "3d71ddf55f558e5e2c393e2fb746462ef5ed64803861e31d3e0424f9dd0c0eb0",
     "src/lib/spiderFarmerGgsMappingRules.ts": "55150bb191cc4acde5013c976c18c78555713baa29fa7b21db330895bfee0519",

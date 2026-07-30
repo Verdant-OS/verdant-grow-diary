@@ -11,7 +11,10 @@ import { resolve } from "node:path";
 import { test } from "node:test";
 
 const ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
-const workflow = readFileSync(resolve(ROOT, ".github/workflows/seo-monitoring.yml"), "utf8");
+const workflow = readFileSync(
+  resolve(ROOT, ".github/workflows/seo-monitoring.yml"),
+  "utf8",
+).replace(/\r\n/g, "\n");
 const sitemap = readFileSync(resolve(ROOT, "public/sitemap.xml"), "utf8");
 const allowlist = JSON.parse(readFileSync(resolve(ROOT, "config/seo-allowlist.json"), "utf8"));
 const docs = readFileSync(resolve(ROOT, "docs/seo-monitoring.md"), "utf8");

@@ -1,5 +1,7 @@
 # Brief — Light-change checklist for a grow diary
 
+**Implementation status:** next-sprint implementation-ready brief; deliberately not routed.
+
 - **Working title:** What to Log When You Change a Grow Light: A One-Change-at-a-Time Checklist
 - **Recommended slug:** `light-change-checklist-grow-diary`
 - **Primary intent:** Decision support after changing distance, dimmer level, fixture, or schedule.

@@ -1,5 +1,7 @@
 # Brief — Autoflower light schedule and grow log
 
+**Implementation status:** next-sprint implementation-ready brief; deliberately not routed.
+
 - **Working title:** Autoflower Light Schedules: How to Compare 18/6, 20/4, and Your Plant’s Response
 - **Recommended slug:** `autoflower-light-schedule-and-grow-log`
 - **Primary intent:** `light schedule for autoflowers`.

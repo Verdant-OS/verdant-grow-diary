@@ -2,8 +2,8 @@
 slug: cannabis-light-stress-light-burn-bleaching-or-heat
 title: Cannabis Light Stress: How to Tell Light Burn, Bleaching, and Heat Stress Apart Before You React
 meta_description: A cautious, evidence-first way to compare possible light burn, bleaching, heat stress, and look-alike issues—plus what to log before changing several variables.
-schema: Article, BreadcrumbList, FAQPage (only after the visible FAQs below ship)
-status: production-ready editorial draft; not mounted pending shared-registry PR resolution
+schema: Article, BreadcrumbList, FAQPage backed by the mounted visible FAQ
+status: implemented in the shared guide registry on the PR #560-stacked production-ready branch
 ---
 
 # Cannabis Light Stress: How to Tell Light Burn, Bleaching, and Heat Stress Apart Before You React

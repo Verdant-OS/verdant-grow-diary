@@ -33,7 +33,9 @@
 
 - Pillar and troubleshooting pages: `Article`, `BreadcrumbList`, and `FAQPage` only for questions visibly rendered on the page.
 - Do not use HowTo schema for cultivation changes that need context and cannot be safely universalized.
-- Keep Article dates out of schema until there is a truthful publication/review source per page.
+- Emit Article only from the guide's visible, repository-backed publication/review fields. Keep
+  WebPage, FAQ, and Breadcrumb schema but omit Article for legacy guides without a verified
+  publication date.
 
 ## Conversion path and internal links
 
@@ -45,10 +47,12 @@
 
 ## Publication gate
 
-Before mounting any page in `VERDANT_SEO_GUIDES`:
+The two production-ready pages passed this gate:
 
-1. Resolve PR #560’s shared-registry/sitemap overlap.
-2. Have a content owner validate the citation set and local-law/product-safety framing.
-3. Add visible FAQs before FAQPage JSON-LD.
-4. Add exact publication/review provenance before Article dates.
-5. Run static-head, JSON-LD, sitemap, and mobile verification.
+1. Stack on PR #560’s exact head so the shared-registry/sitemap changes have one ordered base.
+2. Use scoped primary research and explicit non-generalization notes.
+3. Render the same shared FAQ arrays used by FAQPage JSON-LD.
+4. Add exact publication/review provenance before emitting Article dates.
+5. Run static-head, JSON-LD, sitemap, render, type, lint, and production-build verification.
+
+Publication to the live site remains unclaimed until the dependency stack is merged and deployed.

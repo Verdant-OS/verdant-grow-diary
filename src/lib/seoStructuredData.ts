@@ -176,8 +176,11 @@ export function buildFaqPageJsonLdSafe({
   if (!Array.isArray(questions) || questions.length === 0) return null;
   const valid = questions.filter(
     (q): q is FaqEntry =>
-      !!q && typeof q.question === "string" && !!q.question.trim() &&
-      typeof q.answer === "string" && !!q.answer.trim(),
+      !!q &&
+      typeof q.question === "string" &&
+      !!q.question.trim() &&
+      typeof q.answer === "string" &&
+      !!q.answer.trim(),
   );
   if (valid.length === 0) return null;
   return buildFaqPageJsonLd({ pageUrl, questions: valid });
@@ -256,6 +259,9 @@ export function buildArticleJsonLd({
   }
   if (!/^\d{4}-\d{2}-\d{2}/.test(datePublished)) {
     throw new Error(`buildArticleJsonLd: datePublished must be ISO-8601 (got "${datePublished}")`);
+  }
+  if (dateModified && !/^\d{4}-\d{2}-\d{2}/.test(dateModified)) {
+    throw new Error(`buildArticleJsonLd: dateModified must be ISO-8601 (got "${dateModified}")`);
   }
   return {
     "@context": "https://schema.org",

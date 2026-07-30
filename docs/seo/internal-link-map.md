@@ -2,42 +2,44 @@
 
 ## Release status
 
-This is the approved **20-link implementation map**, not a claim that the links are already mounted. The two new lighting pages and their shared registry entries are held behind open PR #560’s `verdantSeoContent.ts`/sitemap overlap. No public page should link to an unmounted URL.
+Implementation is complete on `codex/seo-foundation-publish-lighting`, which is intentionally
+stacked on open PR #560 because that PR owns the shared guide registry and sitemap base. The two
+lighting routes are production-ready in this branch; they are not claimed as deployed until the
+stack is merged and published.
 
-## Contextual links to implement after registry resolution
+## Implemented contextual links
 
-| #   | From visible context                      | To                            | Anchor / purpose                                               | Status                    |
-| --- | ----------------------------------------- | ----------------------------- | -------------------------------------------------------------- | ------------------------- |
-| 1   | Guides index lighting card                | Lighting pillar               | “Grow light distance, PPFD, DLI, and schedules”                | Pending route publication |
-| 2   | Stage-care environment section            | Lighting pillar               | “Measure light at the canopy before changing distance”         | Pending route publication |
-| 3   | Hardware integrations measurement section | PPFD canopy-map guide         | “Make a source-labeled canopy map”                             | Pending route publication |
-| 4   | VPD calculator result context             | Light-stress guide            | “Compare heat/light context before changing several variables” | Pending route publication |
-| 5   | Public Quick Log starter help             | Light-change checklist        | “What to log after a fixture or schedule change”               | Pending route publication |
-| 6   | Generic plant-care FAQ stress answer      | Light-stress guide            | “Compare light, heat, and root-zone context”                   | Pending route publication |
-| 7   | Lighting pillar PPFD section              | PPFD canopy-map guide         | “Make a repeatable canopy map”                                 | Pending route publication |
-| 8   | Lighting pillar schedule section          | Autoflower schedule guide     | “Compare an autoflower schedule with DLI context”              | Pending route publication |
-| 9   | Lighting pillar symptom section           | Light-stress guide            | “What to log before reacting”                                  | Pending route publication |
-| 10  | Lighting pillar workflow section          | Quick Log                     | “Log the baseline and one change”                              | Pending route publication |
-| 11  | PPFD canopy-map guide source section      | Hardware integrations         | “Understand sensor and meter source labels”                    | Pending route publication |
-| 12  | PPFD canopy-map guide environment section | VPD calculator                | “Put air temperature and RH beside the light record”           | Pending route publication |
-| 13  | PPFD canopy-map guide workflow section    | Quick Log                     | “Save the map source and change time”                          | Pending route publication |
-| 14  | Autoflower schedule guide dose section    | Lighting pillar               | “Calculate the schedule’s daily light context”                 | Pending route publication |
-| 15  | Autoflower schedule guide change plan     | Light-change checklist        | “Keep one change at a time”                                    | Pending route publication |
-| 16  | Autoflower schedule guide CTA             | Quick Log                     | “Attach the timer change to the plant history”                 | Pending route publication |
-| 17  | Light-stress guide differential           | Lighting pillar               | “Verify PPFD, DLI, distance, and coverage”                     | Pending route publication |
-| 18  | Light-stress guide heat context           | VPD calculator                | “Check measured temperature/RH context”                        | Pending route publication |
-| 19  | Light-stress guide evidence gap           | AI Doctor readiness explainer | “See what cautious context collection requires”                | Pending route publication |
-| 20  | Light-change checklist                    | Quick Log                     | “Record the baseline now”                                      | Pending route publication |
+The registry contains **28 unique source-to-target relationships** where either the source is one
+of the two lighting pages or the target is one of those pages. The focused test collapses duplicate
+placements such as a section link plus a related-guide link before asserting the count.
 
-## Existing relevant links retained
+| Source                                               | Contextual targets                                                                                                                                                | Unique pairs |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------: |
+| `cannabis-grow-light-distance-and-schedule`          | Light-stress guide, plant-care FAQ, daily checklist, VPD tracker, stage-care guide, sensor truth, journal guide, hardware integrations, Quick Log, VPD calculator |           10 |
+| `cannabis-light-stress-light-burn-bleaching-or-heat` | Lighting pillar, nutrient evidence guide, plant-care FAQ, daily checklist, VPD tracker, sensor truth, journal guide, Quick Log                                    |            8 |
+| `grow-room-vpd-tracker`                              | Lighting pillar and light-stress guide                                                                                                                            |            2 |
+| `sensor-truth-grow-room`                             | Lighting pillar and light-stress guide                                                                                                                            |            2 |
+| `cannabis-plant-care`                                | Lighting pillar and light-stress guide                                                                                                                            |            2 |
+| `what-to-log-in-a-grow-journal`                      | Lighting pillar and light-stress guide                                                                                                                            |            2 |
+| `daily-grow-log-checklist`                           | Lighting pillar and light-stress guide                                                                                                                            |            2 |
+| **Registry total**                                   |                                                                                                                                                                   |       **28** |
 
-- Guide hub already links to every registered guide and the stage-care guide.
-- Data-driven guides already provide a stable path to the guide hub, welcome, pricing, Quick Log, and public demo where those destinations make sense.
-- Stage-care already links to generic care and the VPD calculator.
+Additional contextual placements are present but excluded from the automated 28-pair count:
 
-## Guardrails
+- The public `/guides` hub has a lighting-decision card linking to both pages.
+- A matched Operator Mode diary entry links to both pages from the read-only troubleshooting card.
+- The true no-entries timeline state links to the lighting baseline guide.
 
-- Do not link an anonymous educational page directly to a protected plant, timeline, report, or sensor route.
-- A signed-in continuation can say “open the plant timeline” only after access is resolved; the public link should remain `/quick-log` or another public handoff.
-- Anchor text should identify the next task, not say “click here.”
-- Add each link where it helps the reader’s immediate decision, not as a footer keyword list.
+## Anchor and placement rules used
+
+- Setup anchors describe the next measurement: distance, PPFD, DLI, schedule, or source labeling.
+- Stress anchors describe the comparison: excess light, bleaching, heat, and root-zone or nutrient
+  look-alikes.
+- Workflow anchors lead to public Quick Log, a relevant public tool, or another public guide.
+- Links sit beside the decision they help with; they are not a keyword footer.
+- Anonymous pages never link directly to protected plant, timeline, report, or sensor routes.
+
+## Validation contract
+
+`src/test/lighting-seo-cluster.test.ts` requires at least 20 unique contextual pairs and verifies
+that each of the five refreshed pages links to both new lighting pages.

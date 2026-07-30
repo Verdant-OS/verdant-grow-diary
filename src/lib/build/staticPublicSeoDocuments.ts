@@ -71,23 +71,26 @@ function buildStaticWebPageJsonLd(metadata: {
 
 function buildStaticGuideJsonLd(guide: (typeof VERDANT_SEO_GUIDES)[number]) {
   const url = `${VERDANT_SITE_ORIGIN}/guides/${guide.slug}`;
+  const article = guide.publishedOn
+    ? buildArticleJsonLd({
+        headline: guide.h1,
+        description: guide.description,
+        url,
+        datePublished: guide.publishedOn,
+        dateModified: guide.modifiedOn,
+        image: DEFAULT_OG_IMAGE,
+        authorName: "Verdant Grow Diary",
+        publisherName: "Verdant Grow Diary",
+        siteUrl: VERDANT_SITE_ORIGIN,
+      })
+    : null;
   return [
     buildStaticWebPageJsonLd({ title: guide.title, description: guide.description, url }),
     buildFaqPageJsonLd({ pageUrl: url, questions: guide.faq }),
     buildBreadcrumbListJsonLd({
       items: [...VERDANT_GUIDES_BREADCRUMB_ITEMS, { name: guide.h1, url }],
     }),
-    buildArticleJsonLd({
-      headline: guide.h1,
-      description: guide.description,
-      url,
-      datePublished: "2025-01-01",
-      dateModified: "2025-01-01",
-      image: DEFAULT_OG_IMAGE,
-      authorName: "Verdant Grow Diary",
-      publisherName: "Verdant Grow Diary",
-      siteUrl: VERDANT_SITE_ORIGIN,
-    }),
+    ...(article ? [article] : []),
   ];
 }
 
@@ -164,15 +167,15 @@ function aliasDocument(
 }
 
 const GUIDE_HUB = publicDocument("/guides", {
-  title: "Grower Guides: Grow Diary, VPD & Sensor Truth | Verdant",
+  title: "Grower Guides: Diary, Lighting & Sensor Truth | Verdant",
   description:
-    "Practical grower guides for using plant timelines, source-labeled sensor data, VPD context, and cautious AI to make better cultivation decisions.",
+    "Practical grower guides for plant timelines, grow-light distance, PPFD, DLI, source-labeled sensor data, VPD context, and cautious troubleshooting.",
   imageAlt: "Verdant Grower Guides",
   jsonLd: [
     buildStaticWebPageJsonLd({
-      title: "Grower Guides: Grow Diary, VPD & Sensor Truth | Verdant",
+      title: "Grower Guides: Diary, Lighting & Sensor Truth | Verdant",
       description:
-        "Practical grower guides for using plant timelines, source-labeled sensor data, VPD context, and cautious AI to make better cultivation decisions.",
+        "Practical grower guides for plant timelines, grow-light distance, PPFD, DLI, source-labeled sensor data, VPD context, and cautious troubleshooting.",
       url: `${VERDANT_SITE_ORIGIN}/guides`,
     }),
     buildFaqPageJsonLd({

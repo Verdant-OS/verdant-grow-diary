@@ -1,5 +1,7 @@
 # Brief — PPFD canopy map and DLI grow log
 
+**Implementation status:** next-sprint implementation-ready brief; deliberately not routed.
+
 - **Working title:** How to Make a PPFD Canopy Map and Use It With a DLI Grow Log
 - **Recommended slug:** `ppfd-canopy-map-and-dli-grow-log`
 - **Primary intent:** `ppfd chart`, `ppfd cannabis`, `dli cannabis`.

@@ -2,13 +2,17 @@
 
 ## Days 0–30 — foundation
 
-- Complete route/indexation inventory and safe P1 technical fixes.
-- Establish an authenticated GSC/GA4 baseline or retain explicit **NO_BASELINE** status.
-- Resolve shared-registry PR overlap and publish the two reviewed lighting pages.
-- Implement the 20 contextual links in the lighting map.
-- Start the weekly scorecard using redacted aggregate data only.
+- [x] Complete route/indexation inventory and safe P1 technical fixes.
+- [x] Retain explicit **BLOCKED / NO_BASELINE** status because authenticated GSC/GA4 evidence was
+      not supplied.
+- [x] Resolve the shared-registry file collision with a dependency-ordered stacked branch and make
+      the two reviewed lighting pages production-ready.
+- [x] Implement and test 28 unique registry link relationships, exceeding the 20-link target.
+- [x] Establish the weekly scorecard using redacted aggregate data only.
 
-**Exit evidence:** route-policy tests pass; production deployment is confirmed; GSC workflow has a real tracked finding or an explicit owner decision; two pages have visible schema parity and review provenance.
+**Exit evidence:** route-policy tests pass; two pages have visible schema parity and review
+provenance; the branch is production-ready and pushed. Live deployment and authenticated GSC/GA4
+remain explicit follow-up evidence, not invented gates.
 
 ## Days 31–60 — validate and deepen one cluster
 

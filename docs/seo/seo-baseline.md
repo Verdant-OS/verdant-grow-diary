@@ -35,8 +35,24 @@ No traffic, ranking, indexing, or conversion result is claimed in this document.
 1. Transactional return pages had an indexability gap in both client and non-JS paths.
 2. Several public aliases were browser-only redirects, which leaves first-pass crawlers with a 200 shell rather than a canonical HTTP redirect.
 3. Monitoring inspected only the first 15 sitemap URLs, omitting 32 current URLs and a never-allowlisted guide.
-4. Guide Article dates used a shared historical value rather than per-guide provenance; this is a content-freshness trust risk, not proof that a page is stale.
+4. Guide Article dates used a shared historical value rather than per-guide provenance; this was a content-freshness trust risk, not proof that a page was stale.
 5. The nutrient-guide registry and sitemap are being changed by open PR #560. Content publication from this sprint must not silently overlap that work.
+
+## Sprint completion delta
+
+The baseline above remains the dated comparison point. The production-ready continuation branch
+adds the following repository evidence without rewriting that historical snapshot:
+
+- Sitemap coverage grows from 47 to 50 concrete production URLs: PR #560 contributes the nutrient
+  guide and this sprint contributes two lighting guides.
+- The shared registry contains 23 guide records, including both lighting pages.
+- Five existing guides now have refreshed intent alignment, titles/descriptions, five-section
+  answer structures, visible scoped sources, workflow CTAs, and links into both lighting pages.
+- Article schema is omitted when a guide has no repository-backed publication date; WebPage, FAQ,
+  and breadcrumb schema remain. The two new pages carry `2026-07-30` publication/review fields and
+  Article schema; the five refreshed pages visibly carry a truthful review field only.
+- The PR #560 file collision is handled by stacking this branch on its exact head, not by competing
+  edits. Merge/publish remains dependency-ordered.
 
 ## Baseline operating rule
 

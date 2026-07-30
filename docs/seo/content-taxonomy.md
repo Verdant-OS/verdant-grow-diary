@@ -63,4 +63,8 @@ Pillar: /guides/cannabis-grow-light-distance-and-schedule
 Each page → relevant existing guide/tool → Quick Log → signed-in plant timeline
 ```
 
-The first two pages are drafted in `docs/seo/content-drafts/` and are production-ready editorially, but are not mounted because PR #560 currently changes the shared guide registry and sitemap. This is a collision guard, not a claim that the pages are published.
+The first two pages are mounted in the shared guide registry on the stacked
+`codex/seo-foundation-publish-lighting` branch, have visible FAQs and scoped sources, and are in
+the sitemap with repository-backed publication/review dates. They are production-ready, not
+claimed as deployed. The other three cluster pages remain implementation-ready briefs for the next
+sprint so this release does not become a thin five-page burst.

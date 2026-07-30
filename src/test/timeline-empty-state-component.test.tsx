@@ -38,6 +38,10 @@ describe("TimelineEmptyState", () => {
     expect(screen.getByTestId("timeline-empty-state-action-photo")).toBeInTheDocument();
     expect(screen.getByTestId("timeline-empty-state-action-diary_note")).toBeInTheDocument();
     expect(screen.getByTestId("timeline-empty-state-action-watering")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-empty-lighting-guide")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /measure before changing the light/i }),
+    ).toHaveAttribute("href", "/guides/cannabis-grow-light-distance-and-schedule");
   });
 
   it("hands a photo log off to Quick Log without writing anything itself", () => {
@@ -69,6 +73,7 @@ describe("TimelineEmptyState", () => {
       { onClearFilters },
     );
     expect(screen.queryByTestId("timeline-empty-state-actions")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-empty-lighting-guide")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("timeline-empty-state-clear-filters"));
     expect(onClearFilters).toHaveBeenCalledTimes(1);
   });

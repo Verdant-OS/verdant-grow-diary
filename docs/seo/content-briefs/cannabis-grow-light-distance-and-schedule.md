@@ -1,5 +1,8 @@
 # Brief — Cannabis grow light distance and schedule
 
+**Implementation status:** mounted as a production-ready guide on
+`codex/seo-foundation-publish-lighting`; deployment is not yet claimed.
+
 - **Working title:** Cannabis Grow Light Distance, PPFD, DLI, and Schedules: What to Measure Before You Change Anything
 - **Recommended slug:** `cannabis-grow-light-distance-and-schedule`
 - **Primary intent:** Set or verify indoor light intensity, fixture distance, and photoperiod without relying on a universal hanging-height chart.

@@ -150,6 +150,10 @@ describe("static public SEO documents", () => {
       expect.arrayContaining(["WebPage", "FAQPage", "BreadcrumbList"]),
     );
     expect(typesAt("/guides/what-to-log-in-a-grow-journal")).toEqual(
+      expect.arrayContaining(["WebPage", "FAQPage", "BreadcrumbList"]),
+    );
+    expect(typesAt("/guides/what-to-log-in-a-grow-journal")).not.toContain("Article");
+    expect(typesAt("/guides/cannabis-grow-light-distance-and-schedule")).toEqual(
       expect.arrayContaining(["WebPage", "FAQPage", "BreadcrumbList", "Article"]),
     );
     expect(typesAt("/cultivars/oreoz")).toEqual(

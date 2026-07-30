@@ -1,5 +1,8 @@
 # Brief — Cannabis light-stress troubleshooting
 
+**Implementation status:** mounted as a production-ready guide on
+`codex/seo-foundation-publish-lighting`; deployment is not yet claimed.
+
 - **Working title:** Cannabis Light Stress: How to Tell Light Burn, Bleaching, and Heat Stress Apart Before You React
 - **Recommended slug:** `cannabis-light-stress-light-burn-bleaching-or-heat`
 - **Primary intent:** Triage `light burn cannabis` and `cannabis light stress` without presenting a photo or one symptom as proof.

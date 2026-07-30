@@ -121,20 +121,33 @@ describe("release-receipt CI workflow upload v1 — contract", () => {
     }
   });
 
-  it("preserves CI failure with a final failing step after artifact upload", () => {
+  it("routes trusted and diagnostic artifacts from explicit step outcomes", () => {
     const uploadIdx = workflow.indexOf("actions/upload-artifact");
-    const preserveIdx = workflow.indexOf("Preserve CI failure if any validation command failed");
+    const trustedIdx = workflow.indexOf("Upload release-receipt-v1 artifact (trusted)");
+    const diagnosticIdx = workflow.indexOf(
+      "Upload release-receipt-v1 artifact (diagnostic on failure)",
+    );
+    const preserveIdx = workflow.indexOf(
+      "Preserve CI failure if any validation or receipt step failed",
+    );
     expect(uploadIdx).toBeGreaterThan(0);
     expect(preserveIdx).toBeGreaterThan(uploadIdx);
-    // The preservation step must `exit 1` on non-success outcomes.
-    expect(workflow.slice(preserveIdx)).toMatch(/exit\s+1/);
-    // Trusted upload must run on success, diagnostic upload on failure.
-    expect(workflow).toMatch(
-      /Upload release-receipt-v1 artifact \(trusted\)[\s\S]*?if:\s*success\(\)/,
-    );
-    expect(workflow).toMatch(
-      /Upload release-receipt-v1 artifact \(diagnostic on failure\)[\s\S]*?if:\s*failure\(\)/,
-    );
+    const trustedBlock = workflow.slice(trustedIdx, diagnosticIdx);
+    const diagnosticBlock = workflow.slice(diagnosticIdx, preserveIdx);
+    const preserveBlock = workflow.slice(preserveIdx);
+    const stepIds = ["tc", "pc", "em", "ca", "ss", "ds", "emit", "validate", "print_status"];
+
+    expect(trustedBlock).toContain("always()");
+    expect(diagnosticBlock).toContain("always()");
+    expect(trustedBlock).not.toMatch(/\bsuccess\(\)/);
+    expect(diagnosticBlock).not.toMatch(/\bfailure\(\)/);
+    for (const stepId of stepIds) {
+      expect(trustedBlock).toContain(`steps.${stepId}.outcome == 'success'`);
+      expect(diagnosticBlock).toContain(`steps.${stepId}.outcome != 'success'`);
+      expect(preserveBlock).toContain(`steps.${stepId}.outcome`);
+    }
+    // The preservation step must `exit 1` on any non-success outcome.
+    expect(preserveBlock).toMatch(/exit\s+1/);
   });
 
   it("failed validation cannot emit a passing receipt (deterministic emitter rules)", async () => {
@@ -186,7 +199,9 @@ describe("release-receipt CI workflow upload v1 — contract", () => {
     );
     const printIdx = workflow.indexOf("Print derived release receipt status");
     const trustedIdx = workflow.indexOf("Upload release-receipt-v1 artifact (trusted)");
-    const preserveIdx = workflow.indexOf("Preserve CI failure if any validation command failed");
+    const preserveIdx = workflow.indexOf(
+      "Preserve CI failure if any validation or receipt step failed",
+    );
     expect(emitIdx).toBeGreaterThan(0);
     expect(validateIdx).toBeGreaterThan(emitIdx);
     expect(printIdx).toBeGreaterThan(validateIdx);

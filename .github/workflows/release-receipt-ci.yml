@@ -6,8 +6,8 @@ name: Release Receipt CI Upload
 # into `command-results.json`, builds the EmitReleaseReceiptInput JSON, runs
 # the pure emitter to produce `release-receipt.v1.json`, then uploads the
 # artifact directory. If any validation command fails, the emitter still
-# produces a `fail` receipt and the artifact is still uploaded; CI failure
-# is preserved by a final failing step.
+# produces a `fail` receipt and uploads it only as a diagnostic artifact; CI
+# failure is preserved by a final failing step.
 #
 # This workflow does NOT call GitHub APIs, the backend, or any UI code path.
 # It does NOT unlock Release GO and does NOT change Release Readiness
@@ -179,7 +179,19 @@ jobs:
             artifacts/release-readiness/release-receipt.v1.json
 
       - name: Upload release-receipt-v1 artifact (trusted)
-        if: success()
+        if: >-
+          ${{
+            always() &&
+            steps.tc.outcome == 'success' &&
+            steps.pc.outcome == 'success' &&
+            steps.em.outcome == 'success' &&
+            steps.ca.outcome == 'success' &&
+            steps.ss.outcome == 'success' &&
+            steps.ds.outcome == 'success' &&
+            steps.emit.outcome == 'success' &&
+            steps.validate.outcome == 'success' &&
+            steps.print_status.outcome == 'success'
+          }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-receipt-v1
@@ -188,7 +200,21 @@ jobs:
           retention-days: 30
 
       - name: Upload release-receipt-v1 artifact (diagnostic on failure)
-        if: failure()
+        if: >-
+          ${{
+            always() &&
+            (
+              steps.tc.outcome != 'success' ||
+              steps.pc.outcome != 'success' ||
+              steps.em.outcome != 'success' ||
+              steps.ca.outcome != 'success' ||
+              steps.ss.outcome != 'success' ||
+              steps.ds.outcome != 'success' ||
+              steps.emit.outcome != 'success' ||
+              steps.validate.outcome != 'success' ||
+              steps.print_status.outcome != 'success'
+            )
+          }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-receipt-v1-diagnostic
@@ -196,7 +222,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Preserve CI failure if any validation command failed
+      - name: Preserve CI failure if any validation or receipt step failed
         if: always()
         run: |
           for o in \
@@ -205,10 +231,13 @@ jobs:
             "${{ steps.em.outcome }}" \
             "${{ steps.ca.outcome }}" \
             "${{ steps.ss.outcome }}" \
-            "${{ steps.ds.outcome }}"; do
+            "${{ steps.ds.outcome }}" \
+            "${{ steps.emit.outcome }}" \
+            "${{ steps.validate.outcome }}" \
+            "${{ steps.print_status.outcome }}"; do
             if [ "$o" != "success" ]; then
-              echo "::error::One or more validation commands did not succeed; failing CI after artifact upload."
+              echo "::error::One or more validation or release receipt steps did not succeed; failing CI after artifact upload."
               exit 1
             fi
           done
-          echo "All validation commands passed; ci_full_suite receipt is pass."
+          echo "All validation and receipt steps passed; ci_full_suite receipt is pass."

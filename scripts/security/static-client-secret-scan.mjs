@@ -12,12 +12,13 @@
  *   src/, public/, dist/
  *
  * Never scanned: .env*, .git, node_modules, .seo/, supabase/functions/
- * (server-only; may legitimately reference `service_role`), test fixtures
- * dedicated to this scanner (allow-listed by exact path).
+ * (server-only; may legitimately reference `service_role`), and test files.
+ * Scanner fixtures outside those roots remain allow-listed by exact path.
  *
- * Uses TypeScript AST masking so comments, strings, and regular-expression
- * literals are ignored without confusing comment markers or quote characters
- * inside another token class.
+ * Uses TypeScript AST masking so comments, ordinary strings, and
+ * regular-expression literals are ignored without confusing comment markers
+ * or quote characters inside another token class. Concrete Stripe/Paddle
+ * secret-shaped string literals receive a separate fail-closed scan.
  */
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { resolve, join, relative } from "node:path";
@@ -48,6 +49,19 @@ export const FORBIDDEN_PATTERNS = [
   { name: "authorization_header_log", re: /console\.log\([^)]*authorization/i },
 ];
 
+/** Concrete credential shapes must also be detected inside string/template
+ *  literals in source and minified bundles. Control-string patterns stay on
+ *  the executable-code pass so harmless copy and audit labels remain usable. */
+export const LITERAL_SECRET_PATTERN_NAMES = new Set([
+  "paddle_ntfset_secret",
+  "stripe_live_secret",
+  "stripe_test_secret",
+]);
+
+const LITERAL_SECRET_PATTERNS = FORBIDDEN_PATTERNS.filter((pattern) =>
+  LITERAL_SECRET_PATTERN_NAMES.has(pattern.name),
+);
+
 /** Exact relative paths that may legitimately reference these strings
  *  (scanner tests, allowlist docs). Keep narrow. */
 export const EXACT_PATH_ALLOWLIST = new Set([
@@ -67,6 +81,17 @@ export const PREFIX_ALLOWLIST = [
   "src/integrations/supabase/types.ts",
 ];
 
+export const TEST_FILE_RE = /\.(?:test|spec)\.(?:ts|tsx|js|jsx|mjs|cjs)$/i;
+
+export function isTestFilePath(relPath) {
+  const normalized = relPath.replace(/\\/g, "/");
+  return (
+    normalized.startsWith("src/test/") ||
+    normalized.includes("/__tests__/") ||
+    TEST_FILE_RE.test(normalized)
+  );
+}
+
 const MASKED_SYNTAX_KINDS = new Set([
   ts.SyntaxKind.StringLiteral,
   ts.SyntaxKind.NoSubstitutionTemplateLiteral,
@@ -76,6 +101,20 @@ const MASKED_SYNTAX_KINDS = new Set([
   ts.SyntaxKind.TemplateTail,
   ts.SyntaxKind.JsxText,
 ]);
+
+const LITERAL_SECRET_SYNTAX_KINDS = new Set([
+  ts.SyntaxKind.StringLiteral,
+  ts.SyntaxKind.NoSubstitutionTemplateLiteral,
+  ts.SyntaxKind.TemplateHead,
+  ts.SyntaxKind.TemplateMiddle,
+  ts.SyntaxKind.TemplateTail,
+  ts.SyntaxKind.JsxText,
+]);
+
+// Minifiers may rewrite a quoted RLS-audit key into `.service_role`. The
+// source pass remains strict; only static property names in published bundles
+// are masked so generated syntax cannot create a false violation.
+const PUBLISHED_STATIC_PROPERTY_NAMES = new Set(["service_role"]);
 
 function isLineBreak(ch) {
   return ch === "\n" || ch === "\r";
@@ -128,24 +167,64 @@ function blankComments(out) {
   }
 }
 
-export function scrubSource(src, filePath = "scan.ts") {
-  const out = src.split("");
-  const sourceFile = ts.createSourceFile(
+function isPublishedStaticPropertyName(node) {
+  if (!ts.isIdentifier(node) || !PUBLISHED_STATIC_PROPERTY_NAMES.has(node.text)) return false;
+
+  const parent = node.parent;
+  return (
+    (ts.isPropertyAccessExpression(parent) && parent.name === node) ||
+    (ts.isPropertyAssignment(parent) && parent.name === node) ||
+    (ts.isBindingElement(parent) && parent.propertyName === node) ||
+    (ts.isMethodDeclaration(parent) && parent.name === node) ||
+    (ts.isGetAccessorDeclaration(parent) && parent.name === node) ||
+    (ts.isSetAccessorDeclaration(parent) && parent.name === node)
+  );
+}
+
+function createSourceFile(src, filePath) {
+  return ts.createSourceFile(
     filePath,
     src,
     ts.ScriptTarget.Latest,
     true,
     scriptKindForPath(filePath),
   );
+}
 
-  // Fail closed. Returning the raw source can cause a harmless literal or
-  // comment to be reported, but it never hides executable code after malformed
-  // syntax.
+function patternMatches(pattern, body) {
+  const re = new RegExp(pattern.re.source, pattern.re.flags.includes("i") ? "gi" : "g");
+  return re.test(body);
+}
+
+function analyzeSource(src, filePath, { maskPublishedPropertyNames = false } = {}) {
+  const out = src.split("");
+  const sourceFile = createSourceFile(src, filePath);
+
+  // Malformed published code is suspicious. Scan the raw source so a parser
+  // failure cannot hide a concrete credential.
   if (sourceFile.parseDiagnostics.length > 0) {
-    return src;
+    return {
+      body: src,
+      literalHits: new Set(
+        LITERAL_SECRET_PATTERNS.filter((pattern) => patternMatches(pattern, src)).map(
+          (pattern) => pattern.name,
+        ),
+      ),
+    };
   }
 
+  const literalHits = new Set();
   function visit(node) {
+    if (maskPublishedPropertyNames && isPublishedStaticPropertyName(node)) {
+      blankRange(out, node.getStart(sourceFile), node.end);
+      return;
+    }
+    if (LITERAL_SECRET_SYNTAX_KINDS.has(node.kind)) {
+      const text = typeof node.text === "string" ? node.text : node.getText(sourceFile);
+      for (const pattern of LITERAL_SECRET_PATTERNS) {
+        if (patternMatches(pattern, text)) literalHits.add(pattern.name);
+      }
+    }
     if (MASKED_SYNTAX_KINDS.has(node.kind)) {
       blankRange(out, node.getStart(sourceFile), node.end);
       return;
@@ -155,15 +234,24 @@ export function scrubSource(src, filePath = "scan.ts") {
 
   visit(sourceFile);
   blankComments(out);
-  return out.join("");
+  return { body: out.join(""), literalHits };
 }
 
-export function findOffending(src, { scrub = true, filePath = "scan.ts" } = {}) {
-  const body = scrub ? scrubSource(src, filePath) : src;
+export function scrubSource(
+  src,
+  filePath = "scan.ts",
+  { maskPublishedPropertyNames = false } = {},
+) {
+  return analyzeSource(src, filePath, { maskPublishedPropertyNames }).body;
+}
+
+export function findOffending(src, { scrub = true, filePath = "scan.ts", published = false } = {}) {
+  const analysis = scrub
+    ? analyzeSource(src, filePath, { maskPublishedPropertyNames: published })
+    : { body: src, literalHits: new Set() };
   const hits = [];
   for (const p of FORBIDDEN_PATTERNS) {
-    const re = new RegExp(p.re.source, p.re.flags.includes("i") ? "gi" : "g");
-    if (re.test(body)) hits.push(p.name);
+    if (patternMatches(p, analysis.body) || analysis.literalHits.has(p.name)) hits.push(p.name);
   }
   return hits;
 }
@@ -199,6 +287,7 @@ export function scanRepo(rootDir = process.cwd()) {
     if (!existsSync(root)) continue;
     for (const file of walk(root)) {
       const relPath = relative(rootDir, file).replace(/\\/g, "/");
+      if (isTestFilePath(relPath)) continue;
       if (EXACT_PATH_ALLOWLIST.has(relPath)) continue;
       if (PREFIX_ALLOWLIST.some((p) => relPath.startsWith(p))) continue;
       let src;
@@ -210,7 +299,11 @@ export function scanRepo(rootDir = process.cwd()) {
       // For non-source assets (json/html/css/map/txt/md) do NOT scrub —
       // any occurrence is a real leak.
       const isCode = /\.(ts|tsx|js|jsx|mjs|cjs)$/.test(relPath);
-      const hits = findOffending(src, { scrub: isCode, filePath: relPath });
+      const hits = findOffending(src, {
+        scrub: isCode,
+        filePath: relPath,
+        published: isCode && relPath.startsWith("dist/"),
+      });
       if (hits.length > 0) violations.push({ file: relPath, hits });
     }
   }

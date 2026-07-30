@@ -7,8 +7,10 @@ import {
   findOffending,
   scanRepo,
   FORBIDDEN_PATTERNS,
+  LITERAL_SECRET_PATTERN_NAMES,
   SCAN_ROOTS,
   EXACT_PATH_ALLOWLIST,
+  isTestFilePath,
 } from "./static-client-secret-scan.mjs";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -43,6 +45,26 @@ t("flags Paddle notification set secret shape", () => {
 t("flags sk_live_ literal", () => {
   const hits = findOffending(`const s = other.sk_live_abcdef1234;`);
   assert.ok(hits.includes("stripe_live_secret"));
+});
+
+t("flags concrete secret-shaped string and template literals", () => {
+  const cases = [
+    ['const secret = "sk_live_abcdef1234";', "stripe_live_secret"],
+    ["const secret = `sk_test_abcdef1234`;", "stripe_test_secret"],
+    ['const secret = "pdl_ntfset_abc123def";', "paddle_ntfset_secret"],
+  ];
+
+  for (const [src, expected] of cases) {
+    assert.ok(findOffending(src).includes(expected), `missing ${expected}`);
+  }
+});
+
+t("permits secret-prefix detector regexes and comments", () => {
+  const src = String.raw`
+    const stripePattern = /sk_live_[A-Za-z0-9]+/;
+    // Example shape: sk_live_abcdef1234
+  `;
+  assert.deepEqual(findOffending(src), []);
 });
 
 t("flags Bearer ${process.env template usage", () => {
@@ -144,6 +166,37 @@ t("flags executable secrets inside template interpolation", () => {
   assert.ok(findOffending(src).includes("SUPABASE_SERVICE_ROLE_KEY"));
 });
 
+t("published bundles permit minifier-written service_role property names", () => {
+  const src = `const grants = row.grants.service_role; const empty = { service_role: [] };`;
+  assert.deepEqual(
+    findOffending(src, {
+      filePath: "dist/assets/operator-audit.js",
+      published: true,
+    }),
+    [],
+  );
+});
+
+t("published bundles still flag executable service_role identifiers", () => {
+  const src = `const activeRole = service_role;`;
+  assert.ok(
+    findOffending(src, {
+      filePath: "dist/assets/app.js",
+      published: true,
+    }).includes("service_role"),
+  );
+});
+
+t("published bundles still flag concrete secret-shaped literals", () => {
+  const src = `const secret = "sk_live_abcdef1234";`;
+  assert.ok(
+    findOffending(src, {
+      filePath: "dist/assets/app.js",
+      published: true,
+    }).includes("stripe_live_secret"),
+  );
+});
+
 t("fails closed when source parsing is malformed", () => {
   const src = `const broken = "service_role; const key = SUPABASE_SERVICE_ROLE_KEY;`;
   assert.ok(findOffending(src).includes("SUPABASE_SERVICE_ROLE_KEY"));
@@ -166,6 +219,34 @@ t("forbidden pattern list covers required categories", () => {
     "authorization_header_log",
   ]) {
     assert.ok(names.includes(required), `missing pattern ${required}`);
+  }
+});
+
+t("literal secret pass covers each concrete credential shape", () => {
+  assert.deepEqual([...LITERAL_SECRET_PATTERN_NAMES].sort(), [
+    "paddle_ntfset_secret",
+    "stripe_live_secret",
+    "stripe_test_secret",
+  ]);
+});
+
+t("co-located test files are excluded without hiding production modules", () => {
+  for (const relPath of [
+    "src/lib/rlsAuditRules.test.ts",
+    "src/components/widget.spec.tsx",
+    "src/test/fixture.ts",
+    "src/features/__tests__/nested.ts",
+  ]) {
+    assert.equal(isTestFilePath(relPath), true, `expected test path: ${relPath}`);
+  }
+
+  for (const relPath of [
+    "src/lib/rlsAuditRules.ts",
+    "src/components/Contest.tsx",
+    "public/app.js",
+    "dist/assets/app.js",
+  ]) {
+    assert.equal(isTestFilePath(relPath), false, `expected production path: ${relPath}`);
   }
 });
 

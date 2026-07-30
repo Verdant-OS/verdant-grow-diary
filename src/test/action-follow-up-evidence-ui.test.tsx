@@ -43,9 +43,11 @@ vi.mock("@/integrations/supabase/client", () => {
       select: () => chain,
       eq: () => chain,
       contains: () => ({
-        then: (resolve: (r: unknown) => unknown) => resolve({ data: existingRows, error: queryError }),
+        then: (resolve: (r: unknown) => unknown) =>
+          resolve({ data: existingRows, error: queryError }),
       }),
-      then: (resolve: (r: unknown) => unknown) => resolve({ data: existingRows, error: queryError }),
+      then: (resolve: (r: unknown) => unknown) =>
+        resolve({ data: existingRows, error: queryError }),
       limit: () => promise(),
     };
     return chain;
@@ -120,9 +122,7 @@ describe("actionFollowUpEvidenceViewModel", () => {
   });
 
   it("returns null for missing record", () => {
-    expect(
-      buildActionFollowUpEvidenceViewModel({ record: null, actionLabel: "x" }),
-    ).toBeNull();
+    expect(buildActionFollowUpEvidenceViewModel({ record: null, actionLabel: "x" })).toBeNull();
   });
 
   it("hides the conservative fallback note as an observation", () => {
@@ -192,12 +192,8 @@ describe("ActionFollowUpEvidenceCard", () => {
       actionLabel: "Lower humidity to 55%",
     })!;
     render(<ActionFollowUpEvidenceCard viewModel={vm} />);
-    expect(screen.getByTestId("action-followup-outcome-label")).toHaveTextContent(
-      /Improved/,
-    );
-    expect(screen.getByTestId("action-followup-note-text")).toHaveTextContent(
-      "Humidity dropped",
-    );
+    expect(screen.getByTestId("action-followup-outcome-label")).toHaveTextContent(/Improved/);
+    expect(screen.getByTestId("action-followup-note-text")).toHaveTextContent("Humidity dropped");
     expect(screen.getByText(/Lower humidity to 55%/)).toBeInTheDocument();
   });
 
@@ -279,9 +275,7 @@ async function flush() {
 describe("ActionFollowUpEvidenceSection", () => {
   it("shows loading then Add follow-up when no existing evidence", async () => {
     render(<ActionFollowUpEvidenceSection action={BASE_ACTION} save={vi.fn()} />);
-    await waitFor(() =>
-      expect(screen.getByTestId("action-followup-add-btn")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("action-followup-add-btn")).toBeInTheDocument());
     expect(screen.queryByTestId("action-followup-card")).toBeNull();
   });
 
@@ -303,12 +297,43 @@ describe("ActionFollowUpEvidenceSection", () => {
       },
     ];
     render(<ActionFollowUpEvidenceSection action={BASE_ACTION} save={vi.fn()} />);
-    await waitFor(() =>
-      expect(screen.getByTestId("action-followup-card")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("action-followup-card")).toBeInTheDocument());
     expect(screen.queryByTestId("action-followup-add-btn")).toBeNull();
-    expect(screen.getByTestId("action-followup-outcome-label")).toHaveTextContent(
-      /Improved/,
+    expect(screen.getByTestId("action-followup-outcome-label")).toHaveTextContent(/Improved/);
+  });
+
+  it("keeps canonical evidence linked to current action copy after a rerender", async () => {
+    existingRows = [
+      {
+        id: "de-1",
+        grow_id: "g-1",
+        tent_id: "t-1",
+        plant_id: "p-1",
+        note: "Real observation",
+        details: {
+          event_type: "action_followup",
+          action_queue_id: "aq-1",
+          outcome: "improved",
+          observed_at: "2026-07-11T18:30:00.000Z",
+          note: "Real observation",
+        },
+      },
+    ];
+    const { rerender } = render(
+      <ActionFollowUpEvidenceSection action={BASE_ACTION} save={vi.fn()} />,
+    );
+    await waitFor(() => expect(screen.getByTestId("action-followup-card")).toBeInTheDocument());
+    expect(screen.getByText(/Linked to Lower humidity to 55%/)).toBeInTheDocument();
+
+    rerender(
+      <ActionFollowUpEvidenceSection
+        action={{ ...BASE_ACTION, actionLabel: "Keep humidity steady at 55%" }}
+        save={vi.fn()}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText(/Linked to Keep humidity steady at 55%/)).toBeInTheDocument(),
     );
   });
 
@@ -335,7 +360,8 @@ describe("ActionFollowUpEvidenceSection", () => {
   });
 
   it("saves through the injected service and renders the returned card", async () => {
-    const save = vi.fn<(draft: ActionFollowUpDraft) => Promise<ActionFollowUpEvidenceSaveResult>>()
+    const save = vi
+      .fn<(draft: ActionFollowUpDraft) => Promise<ActionFollowUpEvidenceSaveResult>>()
       .mockResolvedValue({ status: "created", followUp: recordFixture() });
     render(<ActionFollowUpEvidenceSection action={BASE_ACTION} save={save} />);
     await waitFor(() => screen.getByTestId("action-followup-add-btn"));
@@ -351,13 +377,12 @@ describe("ActionFollowUpEvidenceSection", () => {
     expect(draft.outcome).toBe("improved");
     // never contains signed/blob/data URLs — form doesn't collect a URL
     expect(draft.photoReference ?? "").not.toMatch(/^https?:|^blob:|^data:/);
-    await waitFor(() =>
-      expect(screen.getByTestId("action-followup-card")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("action-followup-card")).toBeInTheDocument());
   });
 
   it("renders existing card when the service returns status=existing", async () => {
-    const save = vi.fn<(draft: ActionFollowUpDraft) => Promise<ActionFollowUpEvidenceSaveResult>>()
+    const save = vi
+      .fn<(draft: ActionFollowUpDraft) => Promise<ActionFollowUpEvidenceSaveResult>>()
       .mockResolvedValue({
         status: "existing",
         followUp: recordFixture({ outcome: "unclear" }),
@@ -368,14 +393,13 @@ describe("ActionFollowUpEvidenceSection", () => {
     await userEvent.click(screen.getByTestId("action-followup-outcome-improved"));
     await userEvent.click(screen.getByTestId("action-followup-submit"));
     await waitFor(() =>
-      expect(screen.getByTestId("action-followup-outcome-label")).toHaveTextContent(
-        /Unclear/,
-      ),
+      expect(screen.getByTestId("action-followup-outcome-label")).toHaveTextContent(/Unclear/),
     );
   });
 
   it("shows sanitized copy on blocked results", async () => {
-    const save = vi.fn<(draft: ActionFollowUpDraft) => Promise<ActionFollowUpEvidenceSaveResult>>()
+    const save = vi
+      .fn<(draft: ActionFollowUpDraft) => Promise<ActionFollowUpEvidenceSaveResult>>()
       .mockResolvedValue({ status: "blocked", reason: "action_not_completed" });
     render(<ActionFollowUpEvidenceSection action={BASE_ACTION} save={save} />);
     await waitFor(() => screen.getByTestId("action-followup-add-btn"));
@@ -390,7 +414,8 @@ describe("ActionFollowUpEvidenceSection", () => {
   });
 
   it("shows sanitized copy on failed results (no raw provider text)", async () => {
-    const save = vi.fn<(draft: ActionFollowUpDraft) => Promise<ActionFollowUpEvidenceSaveResult>>()
+    const save = vi
+      .fn<(draft: ActionFollowUpDraft) => Promise<ActionFollowUpEvidenceSaveResult>>()
       .mockResolvedValue({ status: "failed", reason: "insert_failed" });
     render(<ActionFollowUpEvidenceSection action={BASE_ACTION} save={save} />);
     await waitFor(() => screen.getByTestId("action-followup-add-btn"));

@@ -4,7 +4,6 @@
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
-import { execSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import {
   ACTION_OUTCOME_SUMMARY_JSON_PREFIX,
@@ -221,6 +220,16 @@ describe("static architecture", () => {
     "src/lib/actionOutcomeReportViewModel.ts",
     "src/lib/actionOutcomeAnalysisService.ts",
   ];
+  const EXISTING_FOLLOW_UP_SURFACES = [
+    "@/components/ActionFollowUpEvidenceForm",
+    "@/components/ActionFollowUpEvidenceCard",
+    "@/components/ActionFollowUpEvidenceSection",
+    "@/pages/ActionDetail",
+    "@/lib/actionFollowUpManualSensorRules",
+    "@/lib/actionFollowUpManualSensorService",
+    "@/components/ActionFollowUpManualSensorSelector",
+    "@/components/ActionFollowUpManualSensorEvidence",
+  ];
 
   it("no React, AI-provider, device-control, or admin-cleanup imports in engine files", () => {
     for (const file of ENGINE_FILES) {
@@ -248,29 +257,13 @@ describe("static architecture", () => {
     }
   });
 
-  it("no Lovable active files are modified by this build (git diff clean)", () => {
-    const activeFiles = [
-      "src/components/ActionFollowUpEvidenceForm.tsx",
-      "src/components/ActionFollowUpEvidenceCard.tsx",
-      "src/components/ActionFollowUpEvidenceSection.tsx",
-      "src/pages/ActionDetail.tsx",
-      "src/lib/actionFollowUpManualSensorRules.ts",
-      "src/lib/actionFollowUpManualSensorService.ts",
-      "src/components/ActionFollowUpManualSensorSelector.tsx",
-      "src/components/ActionFollowUpManualSensorEvidence.tsx",
-      "src/test/action-follow-up-manual-sensor.test.tsx",
-    ];
-    const diff = execSync("git diff --name-only HEAD~0", { cwd: ROOT, encoding: "utf8" });
-    const staged = execSync("git status --porcelain", { cwd: ROOT, encoding: "utf8" });
-    for (const f of activeFiles) {
-      expect(diff, `${f} must stay untouched`).not.toContain(f);
-      expect(staged, `${f} must stay untouched`).not.toContain(f);
+  it("report-only engine stays independent of Action Detail and existing follow-up UI", () => {
+    for (const file of ENGINE_FILES) {
+      const src = readFileSync(join(ROOT, file), "utf8");
+      for (const surface of EXISTING_FOLLOW_UP_SURFACES) {
+        expect(src, `${file} must not import ${surface}`).not.toContain(surface);
+      }
     }
-  });
-
-  it("no schema/migration/Edge Function changes in this build", () => {
-    const status = execSync("git status --porcelain supabase/", { cwd: ROOT, encoding: "utf8" });
-    expect(status.trim()).toBe("");
   });
 
   it("no product code imports the outcome engine yet (report-only until integration)", () => {

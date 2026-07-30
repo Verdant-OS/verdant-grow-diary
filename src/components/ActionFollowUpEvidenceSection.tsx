@@ -15,10 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { CircleCheckBig } from "lucide-react";
 import { useAuth } from "@/store/auth";
-import {
-  ACTION_FOLLOWUP_EVENT_TYPE,
-  followupMatchesAction,
-} from "@/lib/actionFollowupRules";
+import { ACTION_FOLLOWUP_EVENT_TYPE, followupMatchesAction } from "@/lib/actionFollowupRules";
 import {
   evaluateActionFollowUpEligibility,
   type ActionFollowUpDraft,
@@ -77,12 +74,6 @@ type QueryState =
   | {
       status: "ready";
       existing: ActionFollowUpEvidenceRecord | null;
-      /**
-       * Canonical Action Response Memory (Milestone 5) when the row is an
-       * explicit grower-recorded response. Null for legacy marker rows,
-       * which keep their established rendering.
-       */
-      canonicalMemory?: ActionResponseMemory | null;
     };
 
 /**
@@ -140,9 +131,7 @@ function projectRow(row: {
 }): ActionFollowUpEvidenceRecord | null {
   if (!row.id || !row.grow_id) return null;
   const d =
-    row.details && typeof row.details === "object"
-      ? (row.details as Record<string, unknown>)
-      : {};
+    row.details && typeof row.details === "object" ? (row.details as Record<string, unknown>) : {};
   const outcome = (d.outcome as ActionFollowUpEvidenceRecord["outcome"]) ?? "unclear";
   return {
     diaryEntryId: row.id,
@@ -168,7 +157,12 @@ function pickPrimary(
 ): (typeof rows)[number] | null {
   const matched = rows.filter((r) =>
     followupMatchesAction(
-      { details: (r as { details?: unknown }).details as { event_type?: unknown; action_queue_id?: unknown } | null },
+      {
+        details: (r as { details?: unknown }).details as {
+          event_type?: unknown;
+          action_queue_id?: unknown;
+        } | null,
+      },
       actionId,
     ),
   );
@@ -230,11 +224,7 @@ export default function ActionFollowUpEvidenceSection({
             },
           )
         : null;
-      // Canonical memory builds only for explicit grower responses (valid
-      // outcome + valid observed time). Legacy marker rows fail closed to
-      // null and keep their established rendering.
-      const canonicalMemory = existing ? canonicalMemoryFromRecord(existing, action) : null;
-      setQuery({ status: "ready", existing, canonicalMemory });
+      setQuery({ status: "ready", existing });
     })();
     return () => {
       cancelled = true;
@@ -289,8 +279,7 @@ export default function ActionFollowUpEvidenceSection({
         growId: action.growId,
         tentId: action.tentId,
         plantId: action.plantId,
-        existingFollowUpCount:
-          query.status === "ready" && query.existing ? 1 : 0,
+        existingFollowUpCount: query.status === "ready" && query.existing ? 1 : 0,
         currentUserOwnsAction: true,
       }),
     [action, query],
@@ -318,7 +307,6 @@ export default function ActionFollowUpEvidenceSection({
           setQuery({
             status: "ready",
             existing: result.followUp,
-            canonicalMemory: canonicalMemoryFromRecord(result.followUp, action),
           });
           setShowForm(false);
         } else if (result.status === "existing") {
@@ -326,7 +314,6 @@ export default function ActionFollowUpEvidenceSection({
           setQuery({
             status: "ready",
             existing: result.followUp,
-            canonicalMemory: canonicalMemoryFromRecord(result.followUp, action),
           });
           setShowForm(false);
         } else if (result.status === "blocked") {
@@ -356,14 +343,23 @@ export default function ActionFollowUpEvidenceSection({
     [action, saveFn],
   );
 
+  // Action context is a prop, while the follow-up row is fetched state. Keep
+  // the canonical memory derived at render time so an Action Detail rerender
+  // cannot leave the evidence card linked to stale action copy. This is pure
+  // and deliberately does not re-query diary entries.
+  const canonicalMemory = useMemo(() => {
+    if (query.status !== "ready" || !query.existing) return null;
+    return canonicalMemoryFromRecord(query.existing, action);
+  }, [query, action]);
+
   const viewModel = useMemo(() => {
     if (query.status !== "ready" || !query.existing) return null;
     // Canonical grower responses flow through the shared Milestone 5 model
     // (single outcome-label mapping); legacy marker rows keep the original
     // record-based view model unchanged.
-    if (query.canonicalMemory) {
+    if (canonicalMemory) {
       return toActionFollowUpEvidenceViewModel({
-        memory: query.canonicalMemory,
+        memory: canonicalMemory,
         fallbackActionLabel: action.actionLabel,
       });
     }
@@ -371,14 +367,13 @@ export default function ActionFollowUpEvidenceSection({
       record: query.existing,
       actionLabel: action.actionLabel,
     });
-  }, [query, action.actionLabel]);
-  const isCanonicalResponse = query.status === "ready" && !!query.canonicalMemory;
+  }, [query, canonicalMemory, action.actionLabel]);
+  const isCanonicalResponse = canonicalMemory !== null;
 
   const ineligibleCopy = useMemo(() => {
     if (eligibility.eligible === true) return "";
     const reason: string = eligibility.reason;
-    if (reason === "action_not_completed")
-      return "Complete this action to record a follow-up.";
+    if (reason === "action_not_completed") return "Complete this action to record a follow-up.";
     return "Follow-up isn't available for this action.";
   }, [eligibility]);
 
@@ -408,11 +403,7 @@ export default function ActionFollowUpEvidenceSection({
           <p role="alert" className="text-sm text-red-500">
             We couldn't check the follow-up status. Try again.
           </p>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => setReloadNonce((n) => n + 1)}
-          >
+          <Button size="sm" variant="secondary" onClick={() => setReloadNonce((n) => n + 1)}>
             Retry
           </Button>
         </div>
@@ -426,9 +417,7 @@ export default function ActionFollowUpEvidenceSection({
               <ActionFollowUpExistingPhotoEvidence reference={viewModel.photoReference} />
             ) : null
           }
-          historicalNote={
-            isCanonicalResponse ? ACTION_RESPONSE_MEMORY_HISTORICAL_COPY : null
-          }
+          historicalNote={isCanonicalResponse ? ACTION_RESPONSE_MEMORY_HISTORICAL_COPY : null}
         />
       )}
 
@@ -467,20 +456,17 @@ export default function ActionFollowUpEvidenceSection({
                 }
               />
             ) : (
-            <Button
-              size="sm"
-              variant="secondary"
-              data-testid="action-followup-add-btn"
-              onClick={() => setShowForm(true)}
-            >
-              Add follow-up
-            </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                data-testid="action-followup-add-btn"
+                onClick={() => setShowForm(true)}
+              >
+                Add follow-up
+              </Button>
             )
           ) : (
-            <p
-              className="text-xs text-muted-foreground"
-              data-testid="action-followup-ineligible"
-            >
+            <p className="text-xs text-muted-foreground" data-testid="action-followup-ineligible">
               {ineligibleCopy}
             </p>
           )}

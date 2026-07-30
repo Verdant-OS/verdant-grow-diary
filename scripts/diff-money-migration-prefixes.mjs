@@ -34,6 +34,7 @@ import {
   coreTargetEnvironmentForMoney,
   sanitizeMoneyDatabaseUrlForPsql,
 } from "./lib/moneyDatabaseTargetIdentity.mjs";
+import { isSharedSupavisorConnectionMode } from "./lib/supabaseDatabaseTargetIdentity.mjs";
 import { REQUIRED_MONEY_MIGRATIONS, migrationVersion } from "./required-money-migrations.mjs";
 
 const rawArgs = process.argv.slice(2);
@@ -329,6 +330,18 @@ if (DB_URL) {
         ? error.code
         : "invalid_target_environment";
     const msg = `Database target identity rejected (${reason}); psql was not invoked`;
+    console.error(`✗ ${msg}`);
+    finish(2, { toolingError: msg });
+  }
+
+  if (
+    process.env.REQUIRE_SHARED_SUPAVISOR === "true" &&
+    sanitized.targetBound &&
+    !isSharedSupavisorConnectionMode(sanitized.connectionMode)
+  ) {
+    const msg =
+      "Protected GitHub runner requires a Shared Supavisor pooler URL " +
+      `(configured connection mode: ${sanitized.connectionMode}); psql was not invoked`;
     console.error(`✗ ${msg}`);
     finish(2, { toolingError: msg });
   }

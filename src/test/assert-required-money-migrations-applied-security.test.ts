@@ -90,6 +90,7 @@ describe("assert-required-money-migrations-applied process boundary", () => {
       SUPABASE_ACCESS_TOKEN: "ambient-supabase-token-canary",
       SUPABASE_DB_URL: dbUrl,
       SUPABASE_DB_URL_LIVE: "postgresql://ambient-live.invalid/decoy",
+      REQUIRE_SHARED_SUPAVISOR: "true",
       TARGET_ENV: "sandbox",
     });
 
@@ -153,6 +154,36 @@ describe("assert-required-money-migrations-applied process boundary", () => {
     expect(result.stderr).not.toContain(secret);
     expect(result.stderr).not.toContain(dbUrl);
     expect(psqlStub).toBeUndefined();
+  });
+
+  it("requires a shared Supavisor URL before psql on protected GitHub-hosted runners", () => {
+    const secret = "direct-url-secret-sentinel";
+    const reportPath = artifactPath("report.md");
+    const auditPath = artifactPath("audit.json");
+    const diffPath = artifactPath("diff.txt");
+    installPsql({ stdout: "must-not-run" });
+
+    const result = runScript({
+      AUDIT_PATH: auditPath,
+      DIFF_PATH: diffPath,
+      REPORT_PATH: reportPath,
+      REQUIRE_SHARED_SUPAVISOR: "true",
+      SUPABASE_DB_URL: directUrl(PRODUCTION_REF, secret),
+      TARGET_ENV: "live",
+    });
+
+    const persisted = [reportPath, auditPath, diffPath]
+      .filter(existsSync)
+      .map((path) => readFileSync(path, "utf8"))
+      .join("\n");
+    const observable = `${result.stdout}\n${result.stderr}\n${persisted}`;
+
+    expect(result.status).toBe(7);
+    expect(result.stderr).toContain("Shared Supavisor pooler URL");
+    expect(result.stderr).toContain("psql was not invoked");
+    expect(existsSync(psqlStub?.invocationPath ?? "")).toBe(false);
+    expect(observable).not.toContain(secret);
+    expect(observable).not.toContain("postgresql://");
   });
 
   it("fails closed before spawning psql when no connection is configured", () => {

@@ -541,6 +541,71 @@ describe("remote applied-schema runner safety", () => {
     expect(psqlCalls).toBe(0);
   });
 
+  it("requires a shared Supavisor URL on protected GitHub-hosted runners before psql", () => {
+    const secretSentinel = "DIRECT-URL-SECRET-SENTINEL";
+    const dir = mkdtempSync(join(tmpdir(), "core-schema-pooler-required-"));
+    tempDirs.push(dir);
+    const reportPath = join(dir, "report.md");
+    const auditPath = join(dir, "audit.json");
+    const { logger, lines } = captureLogger();
+    let psqlCalls = 0;
+
+    const status = runRequiredCoreMigrationsApplied({
+      env: {
+        TARGET_ENV: "sandbox",
+        SUPABASE_DB_URL: directUrl(SANDBOX_REF, 5432, secretSentinel),
+        REQUIRE_SHARED_SUPAVISOR: "true",
+        REPORT_PATH: reportPath,
+        AUDIT_PATH: auditPath,
+      },
+      spawnImpl: () => {
+        psqlCalls += 1;
+        return { status: 0, stdout: "" };
+      },
+      logger,
+    });
+
+    const observable = [
+      ...lines,
+      readFileSync(reportPath, "utf8"),
+      readFileSync(auditPath, "utf8"),
+    ].join("\n");
+
+    expect(status).toBe(EXIT.SHARED_SUPAVISOR_REQUIRED);
+    expect(psqlCalls).toBe(0);
+    expect(observable).toContain("Shared Supavisor pooler URL");
+    expect(observable).toContain("Configured connection mode: `direct`.");
+    expect(observable).toContain("shared_supavisor_required");
+    expect(observable).not.toContain(secretSentinel);
+    expect(observable).not.toContain("postgresql://");
+  });
+
+  it.each([5432, 6543])(
+    "allows shared Supavisor port %i when the protected runner requires it",
+    (port) => {
+      let psqlCalls = 0;
+      const { logger } = captureLogger();
+      const status = runRequiredCoreMigrationsApplied({
+        env: {
+          TARGET_ENV: "sandbox",
+          SUPABASE_DB_URL: sharedUrl(SANDBOX_REF, port),
+          REQUIRE_SHARED_SUPAVISOR: "true",
+        },
+        spawnImpl: () => {
+          psqlCalls += 1;
+          return {
+            status: 0,
+            stdout: REQUIRED_CORE_SCHEMA.map(schemaKey).join("\n"),
+          };
+        },
+        logger,
+      });
+
+      expect(status).toBe(EXIT.OK);
+      expect(psqlCalls).toBe(1);
+    },
+  );
+
   it("does not accept PGHOST or DATABASE_URL as a connection fallback", () => {
     let psqlCalls = 0;
     const { logger } = captureLogger();
@@ -801,7 +866,11 @@ describe("remote applied-schema runner safety", () => {
         status,
         report: readFileSync(reportPath, "utf8"),
         audit: readFileSync(auditPath, "utf8"),
-        observable: [...lines, readFileSync(reportPath, "utf8"), readFileSync(auditPath, "utf8")].join("\n"),
+        observable: [
+          ...lines,
+          readFileSync(reportPath, "utf8"),
+          readFileSync(auditPath, "utf8"),
+        ].join("\n"),
         sentinel,
         url,
       };
@@ -898,6 +967,12 @@ describe("required-core-migrations workflow trust boundary", () => {
     expect(productionBlock).not.toContain("pull_request");
     expect(productionBlock).toContain("environment: verdant-production");
     expect(productionBlock).toContain("secrets.SUPABASE_DB_URL");
+  });
+
+  it("requires the shared Supavisor preflight in each protected GitHub-hosted job", () => {
+    for (const remoteBlock of [sandboxBlock, productionBlock]) {
+      expect(remoteBlock).toContain('REQUIRE_SHARED_SUPAVISOR: "true"');
+    }
   });
 
   it("keeps advisory drift warning-only without weakening either blocking core step", () => {

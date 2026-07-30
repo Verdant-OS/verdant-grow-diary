@@ -138,6 +138,7 @@ jobs:
     env:
       DATABASE_URL: ""
       DIFF_JSON_PATH: artifacts/prefix-diff-sandbox.json
+      REQUIRE_SHARED_SUPAVISOR: "true"
       PGDATABASE: ""
       PGHOST: ""
       PGPASSWORD: ""
@@ -234,6 +235,7 @@ jobs:
     env:
       DATABASE_URL: ""
       DIFF_JSON_PATH: artifacts/prefix-diff-live.json
+      REQUIRE_SHARED_SUPAVISOR: "true"
       PGDATABASE: ""
       PGHOST: ""
       PGPASSWORD: ""

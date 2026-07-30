@@ -21,6 +21,10 @@ const PROJECT_REF = /^[a-z0-9]{20}$/;
 const DIRECT_OR_DEDICATED_HOST = /^db\.([a-z0-9]{20})\.supabase\.co$/;
 const SHARED_SUPAVISOR_HOST = /^aws-\d+-[a-z0-9]+(?:-[a-z0-9]+)*\.pooler\.supabase\.com$/;
 const ALLOWED_SSL_MODES = new Set(["require", "verify-ca", "verify-full"]);
+const SHARED_SUPAVISOR_CONNECTION_MODES = new Set([
+  "shared-supavisor-session",
+  "shared-supavisor-transaction",
+]);
 const SSL_MODE_STRENGTH = Object.freeze({
   require: 1,
   "verify-ca": 2,
@@ -33,6 +37,15 @@ export class SupabaseDatabaseTargetIdentityError extends Error {
     this.name = "SupabaseDatabaseTargetIdentityError";
     this.code = code;
   }
+}
+
+/**
+ * Whether a parsed connection mode uses Supabase's shared Supavisor host.
+ * Callers decide whether their execution environment requires that host; the
+ * identity layer deliberately continues to support direct and dedicated URLs.
+ */
+export function isSharedSupavisorConnectionMode(connectionMode) {
+  return SHARED_SUPAVISOR_CONNECTION_MODES.has(connectionMode);
 }
 
 function identityError(code, message) {
@@ -200,6 +213,7 @@ export function sanitizeSupabaseDatabaseUrlForPsql(databaseUrl, targetEnv) {
   return Object.freeze({
     databaseUrl: url.toString(),
     sslMode,
+    connectionMode: identity.connectionMode,
   });
 }
 

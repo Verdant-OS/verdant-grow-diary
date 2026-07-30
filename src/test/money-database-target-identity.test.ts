@@ -45,6 +45,7 @@ describe("money database target identity", () => {
       username: `postgres.${PRODUCTION_REF}`,
       port: 5432,
       expectedRef: SANDBOX_REF,
+      expectedConnectionMode: "shared-supavisor-session",
     },
     {
       label: "custom role",
@@ -52,6 +53,7 @@ describe("money database target identity", () => {
       username: "readonly",
       port: 6543,
       expectedRef: SANDBOX_REF,
+      expectedConnectionMode: "shared-supavisor-transaction",
     },
     {
       label: "placeholder suffix",
@@ -59,6 +61,7 @@ describe("money database target identity", () => {
       username: "postgres.%5BPROJECT_REF%5D",
       port: 5432,
       expectedRef: PRODUCTION_REF,
+      expectedConnectionMode: "shared-supavisor-session",
     },
   ])("binds $label to the pinned $targetEnv project", (testCase) => {
     const source = sharedUrl(testCase.username, testCase.port);
@@ -66,6 +69,7 @@ describe("money database target identity", () => {
     const canonical = new URL(result.databaseUrl);
 
     expect(result.targetBound).toBe(true);
+    expect(result.connectionMode).toBe(testCase.expectedConnectionMode);
     expect(result.sslMode).toBe("verify-full");
     expect(canonical.username).toBe(`postgres.${testCase.expectedRef}`);
     expect(canonical.password).toBe(encodeURIComponent(PASSWORD));

@@ -394,6 +394,7 @@ describe("all pull-request-capable money workflows", () => {
         const requiredBoundary = TRUSTED_REMOTE_JOB_CONDITIONS.get(condition);
         expect(requiredBoundary, workflow.name).toBeDefined();
         expect(jobEnvironment(job), workflow.name).toBe(requiredBoundary?.environment);
+        expect(job, workflow.name).toContain('REQUIRE_SHARED_SUPAVISOR: "true"');
         expect(job, workflow.name).toMatch(
           new RegExp(`\\n\\s+TARGET_ENV: ${requiredBoundary?.targetEnv}(?:\\s|$)`),
         );

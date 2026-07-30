@@ -95,6 +95,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: ""
+      REQUIRE_SHARED_SUPAVISOR: "true"
       PGDATABASE: ""
       PGHOST: ""
       PGPASSWORD: ""
@@ -172,6 +173,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: ""
+      REQUIRE_SHARED_SUPAVISOR: "true"
       PGDATABASE: ""
       PGHOST: ""
       PGPASSWORD: ""

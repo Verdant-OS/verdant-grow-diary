@@ -58,6 +58,8 @@ jobs:
     if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/verdant-grow-diary') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox') }}
     runs-on: ubuntu-latest
     environment: verdant-sandbox
+    env:
+      REQUIRE_SHARED_SUPAVISOR: "true"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install psql
@@ -109,6 +111,8 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'production' }}
     runs-on: ubuntu-latest
     environment: verdant-production
+    env:
+      REQUIRE_SHARED_SUPAVISOR: "true"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install psql

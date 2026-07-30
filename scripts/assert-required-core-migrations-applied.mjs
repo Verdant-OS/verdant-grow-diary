@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import {
   assertSupabaseDatabaseTargetIdentity,
   databaseTargetForEnvironment,
+  isSharedSupavisorConnectionMode,
   sanitizeSupabaseDatabaseUrlForPsql,
   SupabaseDatabaseTargetIdentityError,
 } from "./lib/supabaseDatabaseTargetIdentity.mjs";
@@ -31,6 +32,7 @@ export const EXIT = Object.freeze({
   PSQL_NOT_INVOCABLE: 4,
   SCHEMA_QUERY_FAILED: 5,
   TARGET_IDENTITY_INVALID: 6,
+  SHARED_SUPAVISOR_REQUIRED: 7,
 });
 
 function writeTextFile(path, contents, logger) {
@@ -230,6 +232,26 @@ export function runRequiredCoreMigrationsApplied({
 
   logger.log(`Database identity verified for ${targetEnv} (${identity.connectionMode}).`);
 
+  if (
+    env.REQUIRE_SHARED_SUPAVISOR === "true" &&
+    !isSharedSupavisorConnectionMode(identity.connectionMode)
+  ) {
+    logger.error(
+      "This protected runner requires a Shared Supavisor pooler URL; psql was not invoked.",
+    );
+    writeReport("FAILED - shared pooler required", [
+      "This protected GitHub-hosted runner requires a Shared Supavisor pooler URL.",
+      `Configured connection mode: \`${identity.connectionMode}\`.`,
+      "Copy the Shared Pooler connection string from Supabase Dashboard → Connect, then replace the protected environment secret.",
+      "No database query ran. Do not apply migrations until this check passes.",
+    ]);
+    writeAudit(
+      "shared_supavisor_required",
+      `Connection mode ${identity.connectionMode} was rejected before psql.`,
+    );
+    return EXIT.SHARED_SUPAVISOR_REQUIRED;
+  }
+
   const keyList = expected.map((entry) => `'${entry.key}'`).join(",");
   const tableList = [...new Set(expected.map((entry) => entry.table))]
     .map((table) => `'${table}'`)
@@ -302,10 +324,7 @@ export function runRequiredCoreMigrationsApplied({
       `psql exit status: ${psqlStatus}.`,
       statusHint,
     ]);
-    writeAudit(
-      "schema_query_failed",
-      `psql returned a non-zero status (${psqlStatus}).`,
-    );
+    writeAudit("schema_query_failed", `psql returned a non-zero status (${psqlStatus}).`);
     return EXIT.SCHEMA_QUERY_FAILED;
   }
 

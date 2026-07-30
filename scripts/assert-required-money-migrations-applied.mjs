@@ -40,8 +40,9 @@
  *   5  = migration-tracker query failed (psql returned non-zero) — target
  *        state is unknown; treat as blocking
  *   6  = protected database target identity rejected before psql was invoked
+ *   7  = a protected GitHub-hosted runner requires a Shared Supavisor URL
  *
- * Any non-zero exit MUST be treated as "do not deploy". Codes 2-6 also mean
+ * Any non-zero exit MUST be treated as "do not deploy". Codes 2-7 also mean
  * "the guard did not actually verify anything" — never interpret them as a
  * soft pass.
  */
@@ -52,6 +53,7 @@ import {
   coreTargetEnvironmentForMoney,
   sanitizeMoneyDatabaseUrlForPsql,
 } from "./lib/moneyDatabaseTargetIdentity.mjs";
+import { isSharedSupavisorConnectionMode } from "./lib/supabaseDatabaseTargetIdentity.mjs";
 import { REQUIRED_MONEY_MIGRATIONS, migrationVersion } from "./required-money-migrations.mjs";
 
 const EXIT = Object.freeze({
@@ -62,6 +64,7 @@ const EXIT = Object.freeze({
   PSQL_NOT_INVOCABLE: 4,
   TRACKER_QUERY_FAILED: 5,
   TARGET_IDENTITY_REJECTED: 6,
+  SHARED_SUPAVISOR_REQUIRED: 7,
 });
 
 const TARGET_ENV = process.env.TARGET_ENV ?? "unspecified";
@@ -96,6 +99,7 @@ function writeDiff(kind, { expectedRows, appliedVersions }) {
     kind === "psql_not_invocable" ||
     kind === "tracker_query_failed" ||
     kind === "target_identity_rejected" ||
+    kind === "shared_supavisor_required" ||
     kind === "malformed_filename";
   const unknownMarker = "?? UNKNOWN ??";
 
@@ -184,7 +188,7 @@ function writeAudit(outcome, extra = {}) {
     tool: "assert-required-money-migrations-applied",
     target_env: TARGET_ENV,
     checked_at: new Date().toISOString(),
-    outcome, // "verified" | "missing_migrations" | "malformed_filename" | "psql_not_invocable" | "tracker_query_failed" | "target_identity_rejected" | "no_db_connection"
+    outcome, // "verified" | "missing_migrations" | "malformed_filename" | "psql_not_invocable" | "tracker_query_failed" | "target_identity_rejected" | "shared_supavisor_required" | "no_db_connection"
     expected_count: extra.expected?.length ?? 0,
     applied_count: extra.expected?.filter((e) => e.applied).length ?? 0,
     missing_count: extra.expected?.filter((e) => !e.applied).length ?? 0,
@@ -305,6 +309,28 @@ function failTargetIdentity(reason) {
   process.exit(EXIT.TARGET_IDENTITY_REJECTED);
 }
 
+function failSharedSupavisorRequired(connectionMode) {
+  console.error("✗ Protected GitHub runner requires a Shared Supavisor pooler URL.");
+  console.error(`  Configured connection mode: ${connectionMode}. psql was not invoked.`);
+  console.error(
+    "  Copy the Shared Pooler connection string from Supabase Dashboard → Connect. Do NOT deploy.",
+  );
+  writeReport("Shared Supavisor pooler URL required", [
+    "This protected GitHub-hosted runner requires a Shared Supavisor pooler URL.",
+    `Configured connection mode: \`${connectionMode}\`.`,
+    "Copy the Shared Pooler connection string from Supabase Dashboard → Connect, then replace the protected environment secret.",
+    "`psql` was not invoked and the target migration state remains unknown.",
+  ]);
+  writeAudit("shared_supavisor_required", {
+    note: `Connection mode ${connectionMode} was rejected before psql.`,
+  });
+  writeDiff("shared_supavisor_required", {
+    expectedRows: expected.map((entry) => ({ ...entry, applied: false })),
+    appliedVersions: [],
+  });
+  process.exit(EXIT.SHARED_SUPAVISOR_REQUIRED);
+}
+
 // -----------------------------------------------------------------------
 // Pre-flight #2: require a database connection. A missing connection is a
 // distinct failure mode from a broken manifest and from a psql tooling
@@ -355,6 +381,14 @@ if (DB_URL) {
         ? error.code
         : "invalid_target_environment";
     failTargetIdentity(reason);
+  }
+
+  if (
+    process.env.REQUIRE_SHARED_SUPAVISOR === "true" &&
+    sanitized.targetBound &&
+    !isSharedSupavisorConnectionMode(sanitized.connectionMode)
+  ) {
+    failSharedSupavisorRequired(sanitized.connectionMode);
   }
 
   // Keep credentials out of the process argument list. libpq accepts a

@@ -37,6 +37,10 @@ function sharedUrl(ref: string, password = "money-test-secret", port = 5432): st
   return `postgresql://postgres.${ref}:${encodeURIComponent(password)}@aws-0-us-east-1.pooler.supabase.com:${port}/postgres?sslmode=require`;
 }
 
+function directUrl(ref: string, password = "money-test-secret"): string {
+  return `postgresql://postgres:${encodeURIComponent(password)}@db.${ref}.supabase.co:5432/postgres?sslmode=require`;
+}
+
 let shimDir: string;
 let psqlStub: InstalledPsqlSpawnStub | undefined;
 
@@ -145,7 +149,11 @@ describe("diff-money-migration-prefixes.mjs — DB diff mode (exit 0)", () => {
     installPsqlShim({ stdout: `${allApplied}\n`, exit: 0 });
     const r = runScript({
       args: ["--json"],
-      env: { SUPABASE_DB_URL: sharedUrl(PRODUCTION_REF), TARGET_ENV: "live" },
+      env: {
+        REQUIRE_SHARED_SUPAVISOR: "true",
+        SUPABASE_DB_URL: sharedUrl(PRODUCTION_REF),
+        TARGET_ENV: "live",
+      },
     });
     expect(r.status).toBe(0);
     const parsed = JSON.parse(r.stdout);
@@ -284,6 +292,25 @@ describe("diff-money-migration-prefixes.mjs — DB diff mode (exit 2, tooling)",
     expect(r.stderr).toContain("psql was not invoked");
     expect(r.stderr).not.toContain("ambient-secret");
     expect(r.stderr).not.toContain("attacker.invalid");
+    expect(existsSync(psqlStub?.invocationPath ?? "")).toBe(false);
+  });
+
+  it("requires a shared Supavisor URL before psql on protected GitHub-hosted runners", () => {
+    const secret = "direct-url-secret-sentinel";
+    installPsqlShim({ stdout: "must-not-run" });
+    const r = runScript({
+      env: {
+        REQUIRE_SHARED_SUPAVISOR: "true",
+        SUPABASE_DB_URL: directUrl(SANDBOX_REF, secret),
+        TARGET_ENV: "sandbox",
+      },
+    });
+
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain("Shared Supavisor pooler URL");
+    expect(r.stderr).toContain("psql was not invoked");
+    expect(r.stderr).not.toContain(secret);
+    expect(r.stderr).not.toContain("postgresql://");
     expect(existsSync(psqlStub?.invocationPath ?? "")).toBe(false);
   });
 });

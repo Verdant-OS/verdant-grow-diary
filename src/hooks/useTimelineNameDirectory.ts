@@ -16,8 +16,8 @@ export interface TimelineNameDirectory {
  * hooks use: diary history keeps referencing plants/tents after they are
  * archived or merged away, and those rows still carry their names. RLS
  * scopes both reads to the signed-in owner. A failed or unavailable read
- * resolves to `null` (never an empty map), so the presenter falls back to
- * the neutral fragment label instead of mislabeling entities as archived.
+ * resolves to `null` (never an empty map); unresolved ids keep the
+ * presenter's neutral fragment label either way.
  */
 export function useTimelineNameDirectory(userId: string | null): TimelineNameDirectory {
   const [plantNamesById, setPlantNamesById] = useState<ReadonlyMap<string, string> | null>(null);

@@ -120,6 +120,39 @@ export const VERDANT_GROWER_GUIDE_FAQ: ReadonlyArray<FaqEntry> = [
 ];
 
 /* ------------------------------------------------------------------ */
+/* Cultivar comparison FAQ (Oreoz vs Gelonade pheno expression)        */
+/* ------------------------------------------------------------------ */
+
+export const OREOZ_VS_GELONADE_FAQ: ReadonlyArray<FaqEntry> = [
+  {
+    question: "What is the main difference between Oreoz and Gelonade?",
+    answer:
+      "Public grower reports describe Oreoz as compact, dense, and dessert/fuel aromatic, and Gelonade as taller, stretchier, and citrus-leaning. Those are directional descriptions, not guarantees. Pheno variation within one pack often exceeds the reported difference between the two cultivars, so treat both as starting expectations and let your own logged record decide.",
+  },
+  {
+    question: "Which one is easier to grow indoors?",
+    answer:
+      "Neither has a reliable public difficulty ranking worth trusting. What is reported is that compact, dense structure — commonly attributed to Oreoz expressions — asks for closer attention to interior airflow and late-flower humidity, while a stretchier habit asks for earlier canopy and trellis planning. The right answer for your room comes from measuring stretch and canopy density at flip, not from a label.",
+  },
+  {
+    question: "How do I tell my phenos apart during a run?",
+    answer:
+      "Record the same fields at the same points for every plant: internode spacing and height at flip, stretch through early flower, aroma direction at week 4 and at chop, and photos from repeatable angles. Attach feed, runoff, and source-labeled environment context to the same window. Consistent fields at consistent times are what make two cuts comparable later.",
+  },
+  {
+    question: "Does Verdant have a Gelonade cultivar profile?",
+    answer:
+      "Not yet. Verdant carries a first-party Oreoz reference and leaves timing and potency fields blank where public evidence is too thin. Gelonade context in this guide comes from public grower reports and is labeled as directional. If you run it, your own per-plant record becomes the reliable source.",
+  },
+  {
+    question: "How does Verdant help with pheno hunting?",
+    answer:
+      "Pheno Tracker keeps per-plant structure, aroma, photo, and environment evidence side by side across runs, with every sensor reading labeled live, manual, csv, demo, stale, or invalid. It does not score a winner for you. It keeps the evidence readable so the grower can compare cuts and decide which one to keep.",
+  },
+];
+
+
+/* ------------------------------------------------------------------ */
 /* Seven SEO guide pages                                               */
 /* ------------------------------------------------------------------ */
 
@@ -1500,7 +1533,90 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     publishedOn: "2026-07-30",
     modifiedOn: "2026-07-30",
   },
+  {
+    slug: "oreoz-vs-gelonade-comparison",
+    title: "Oreoz vs Gelonade: pheno expression compared | Verdant",
+    h1: "Oreoz vs Gelonade: comparing pheno expression, structure, and what to record per cut",
+    description:
+      "A cautious Oreoz vs Gelonade comparison for growers running multiple cuts — reported structure and aroma directions, what public descriptions can't tell you, and the evidence to log per pheno.",
+    targetKeyword: "oreoz vs gelonade",
+    intro:
+      "Oreoz vs gelonade searches usually come from one of two places: choosing what to pop next, or trying to work out which cut in a tent is actually worth keeping. Public cultivar descriptions are directional, not predictive — two growers running the same pack can end up with plants that look and smell nothing alike. This comparison stays honest about that. It sets out what is commonly reported for each cultivar, names what those reports do not prove, and shows the per-plant record Verdant keeps so your own phenos, not a marketing blurb, decide the keeper.",
+    cta: {
+      label: "Start a pheno record",
+      to: "/quick-log",
+      heading: "Record each cut before the differences blur",
+      description:
+        "Log structure, aroma, and stage photos against the individual plant so the comparison survives the run and is still readable at the next pop.",
+      prompts: [
+        "Which plant number, from which pack or cut?",
+        "Internode spacing, stretch, and canopy habit at flip",
+        "Aroma direction at week 4 and again at chop",
+        "Feed, runoff EC, and environment context for the same window",
+      ],
+    },
+    sections: [
+      {
+        heading: "What is commonly reported about Oreoz",
+        body: "Oreoz (Cookies & Cream × Secret Weapon, 3rd Coast Genetics) is commonly described as compact and resin-forward, with dessert, earthy, and fuel aroma descriptors. Short internodes and dense interior growth show up often in grower reports, which is why airflow observation matters in some expressions. Verdant's cultivar reference deliberately leaves flowering timing and potency summaries blank where the public evidence is thin — an unknown is recorded as unknown, not filled in with a plausible number.",
+        links: [
+          { label: "Oreoz cultivar reference", to: "/cultivars/oreoz" },
+          { label: "Browse the cultivar index", to: "/cultivars" },
+        ],
+      },
+      {
+        heading: "What is commonly reported about Gelonade",
+        body: "Gelonade is generally described as a Gelato-line, citrus-leaning cultivar — lemon and sweet-gas descriptors are the ones growers repeat most, alongside a taller, more stretch-prone habit than the compact end of the Oreoz descriptions. Verdant does not yet carry a first-party Gelonade profile, so treat this paragraph as directional context from public grower reports rather than a verified profile. If you run it, your own logged record becomes the reliable source.",
+        links: [
+          { label: "What to log in a grow journal", to: "/guides/what-to-log-in-a-grow-journal" },
+          { label: "Start a Quick Log", to: "/quick-log" },
+        ],
+      },
+      {
+        heading: "Where the two actually differ in a tent",
+        body: "The practical oreoz vs gelonade difference growers report is habit and aroma direction: a compact, dense, dessert-and-fuel Oreoz expression against a stretchier, citrus-forward Gelonade expression. That changes canopy planning, trellis timing, and how closely you watch interior humidity on dense colas. It does not tell you which plant in your tent will do what. Pheno variation inside a single pack routinely exceeds the difference between two cultivar descriptions, so plan the room from what you measure at flip, not from the label.",
+        links: [
+          { label: "Grow-room VPD tracker guide", to: "/guides/grow-room-vpd-tracker" },
+          { label: "Bud rot identification and prevention", to: "/guides/bud-rot-prevention-identification" },
+        ],
+      },
+      {
+        heading: "Record the evidence that separates one cut from another",
+        body: "For each plant, capture the same fields at the same points: internode spacing and height at flip, stretch through the first two weeks of flower, aroma direction at week 4 and at chop, trichome and structure photos from repeatable angles, plus the feed, runoff, and source-labeled temperature and humidity context for that window. Verdant keeps every reading tagged live, manual, csv, demo, stale, or invalid, so a comparison never rests on a number that was already out of date when you read it.",
+        links: [
+          { label: "Sensor truth in a grow room", to: "/guides/sensor-truth-grow-room" },
+          { label: "Daily grow log checklist", to: "/guides/daily-grow-log-checklist" },
+        ],
+      },
+      {
+        heading: "Turn the record into a keeper decision",
+        body: "At the end of the run, compare plants on the evidence you actually collected rather than on memory: which cut held structure without extra support, which aroma held through dry and cure, and which one behaved predictably under your environment. Pheno Tracker keeps those per-plant records side by side across runs so a keeper from this pack is still comparable to the next one. Verdant surfaces the comparison; the grower makes the call.",
+        links: [
+          { label: "See how Verdant tracks phenos", to: "/pricing" },
+          { label: "Back to all grower guides", to: "/guides" },
+        ],
+      },
+    ],
+    faq: OREOZ_VS_GELONADE_FAQ,
+    related: [
+      "cannabis-plant-care",
+      "what-to-log-in-a-grow-journal",
+      "sensor-truth-grow-room",
+      "bud-rot-prevention-identification",
+      "daily-grow-log-checklist",
+    ],
+    sources: [
+      {
+        label: "Leafly — Oreoz cultivar information",
+        href: "https://www.leafly.com/strains/oreoz",
+        note: "A directional public community profile. It supports commonly reported aroma and structure descriptors; it does not establish flowering timing, potency, or how a specific pheno will express.",
+      },
+    ],
+    publishedOn: "2026-07-30",
+    modifiedOn: "2026-07-30",
+  },
 ];
+
 
 /** Return the full published guide slugs, in the same order rendered on /guides. */
 export const VERDANT_GUIDE_SLUGS: ReadonlyArray<string> = VERDANT_SEO_GUIDES.map((g) => g.slug);

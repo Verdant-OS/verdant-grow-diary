@@ -1,5 +1,9 @@
 name: Pheno disabled Compare E2E
 
+# dormant: deliberately main-only (#581). Needs Playwright browsers, E2E
+# account secrets (E2E_TEST_EMAIL/PASSWORD), and a deployed E2E_BASE_URL
+# plus fixture env — none available on ordinary PR runners. Run via
+# workflow_dispatch against a configured environment instead.
 on:
   workflow_dispatch:
   pull_request:

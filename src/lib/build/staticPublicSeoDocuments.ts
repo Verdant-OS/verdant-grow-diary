@@ -203,7 +203,7 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
   publicDocument("/pricing", {
     title: "Pricing — Free, Pro & Craft | Verdant Grow Diary",
     description:
-      "Free grow diary forever. Pro adds multi-tent support, sensor history and advanced exports. Craft adds the live Pro Blueprint that scores every reading against your per-stage SOP.",
+      "Free grow diary forever. Pro adds multi-tent support, full sensor history and advanced exports. Craft adds the live Pro Blueprint.",
     imageAlt: "Verdant pricing",
   }),
   publicDocument("/guides/grow-stage-care-guide", {

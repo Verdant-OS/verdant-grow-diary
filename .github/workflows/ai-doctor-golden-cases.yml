@@ -1,8 +1,10 @@
 name: AI Doctor Golden Cases
 
+# NOTE: `verdant-grow-diary` is this repo's default branch; a main-only
+# filter means the workflow never runs (#581).
 on:
   pull_request:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
 
 permissions:
   contents: read

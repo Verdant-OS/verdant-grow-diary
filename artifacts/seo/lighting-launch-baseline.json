@@ -136,6 +136,7 @@
     "workflow_run": "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30577682453",
     "workflow_status": "failed_before_gsc",
     "workflow_failure": "SEO monitoring default coverage (50) does not include all 51 sitemap URLs.",
+    "workflow_repair": "PR #597 raises the bounded default and hard cap to 100; production remains blocked until the repair is merged and published.",
     "oauth_configured": false,
     "static_checks_are_indexing_proof": false,
     "blocked_fields": [

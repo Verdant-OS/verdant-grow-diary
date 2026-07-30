@@ -12,9 +12,9 @@ on:
         required: false
         default: "https://verdantgrowdiary.com/sitemap.xml"
       max_urls:
-        description: "Max sitemap URLs to inspect (default and hard cap: 50)"
+        description: "Max sitemap URLs to inspect (default and hard cap: 100)"
         required: false
-        default: "50"
+        default: "100"
       verify_last_finding:
         description: "Run last-finding verification"
         required: false
@@ -40,7 +40,7 @@ jobs:
       GSC_SITE_URL: ${{ secrets.GSC_SITE_URL }}
       SEO_DEPLOYED_URL: ${{ github.event.inputs.deployed_url || 'https://verdantgrowdiary.com' }}
       SEO_SITEMAP_URL: ${{ github.event.inputs.sitemap_url || 'https://verdantgrowdiary.com/sitemap.xml' }}
-      SEO_MAX_URLS: ${{ github.event.inputs.max_urls || '50' }}
+      SEO_MAX_URLS: ${{ github.event.inputs.max_urls || '100' }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4

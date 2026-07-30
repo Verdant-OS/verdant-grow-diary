@@ -10,7 +10,7 @@
  * Flags:
  *   --urls a,b,c            Explicit URL list
  *   --sitemap <url>         Pull URLs from a sitemap.xml
- *   --max <n>               Max URLs to inspect (default 50, hard cap 50)
+ *   --max <n>               Max URLs to inspect (default 100, hard cap 100)
  *   --allow <a,b,c>         Ad-hoc URLs allowed to be non-indexable
  *   --expected-noindex      Treat every URL as expected-non-indexable
  *   --allowlist <path>      Tracked allowlist (default: config/seo-allowlist.json)
@@ -101,7 +101,7 @@ function toUrlClassifications(simulated) {
 
 const ARTIFACT_DIR = resolve(process.cwd(), "artifacts/seo");
 const DEFAULT_PREVIOUS_DIR = resolve(process.cwd(), "artifacts/seo/previous");
-const HARD_CAP = 50;
+const HARD_CAP = 100;
 const DEFAULT_MAX_URLS = HARD_CAP;
 const DEFAULT_URLS = [
   "https://verdantgrowdiary.com/",

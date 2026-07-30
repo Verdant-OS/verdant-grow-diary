@@ -41,11 +41,13 @@ recorded.
 
 1. Merge and publish the focused page-identity repair in PR #597.
 2. Verify production GA4 sends each full public lighting-guide path and its page-specific title.
-3. Provide authenticated access to the existing Verdant GA4 property.
-4. Configure the existing read-only Search Console OAuth workflow or provide another authorized
+3. Verify the repaired SEO monitor covers all 51 current sitemap URLs without exceeding its
+   bounded 100-URL cap.
+4. Provide authenticated access to the existing Verdant GA4 property.
+5. Configure the existing read-only Search Console OAuth workflow or provide another authorized
    authenticated Search Console session.
 
-Day 0 must remain unset until all four conditions are resolved and both authenticated baselines are
+Day 0 must remain unset until all five conditions are resolved and both authenticated baselines are
 recorded.
 
 ## Review source contract

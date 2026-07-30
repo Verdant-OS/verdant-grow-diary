@@ -153,5 +153,6 @@ Day 0 remains unset until the repair is live and authenticated GA4/GSC baselines
 - The latest post-CI SEO monitoring run for production commit `c353a6a1…`
   ([run 30577682453](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30577682453))
   stopped in its configuration tests: 57 passed and 1 failed because the default 50-URL coverage
-  cap does not include all 51 current sitemap URLs. No GSC call occurred. This monitoring gap is
-  distinct from the page-specific GA4 repair and is not mixed into PR #597.
+  cap does not include all 51 current sitemap URLs. No GSC call occurred. PR #597 now raises the
+  bounded default and hard cap to 100 so the current sitemap is fully covered; production remains
+  blocked until that repair is merged, published, and run with authenticated GSC access.

@@ -68,8 +68,9 @@ that OAuth is not configured.
 - Runs after successful completion of the `ci` workflow on the production
   `verdant-grow-diary` branch, or on `workflow_dispatch`. It is post-CI
   monitoring, not a deployment receipt.
-- Inspects up to `max_urls` sitemap URLs (default 50, hard cap 50). The
-  current sitemap has 47 URLs, so the default inspects every sitemap target.
+- Inspects up to `max_urls` sitemap URLs (default 100, hard cap 100). The
+  current sitemap has 51 URLs, so the default inspects every sitemap target
+  while remaining far below Search Console's per-site daily inspection quota.
 - Has a 20-minute job timeout so a stalled dependency or remote inspection
   cannot occupy a runner indefinitely.
 - Verifies the last tracked GSC finding
@@ -147,7 +148,7 @@ _new_ critical issues. Three sections:
 
 `sitemap.xml` and `robots.txt` are intentionally outside the sitemap-driven
 GSC URL Inspection input: they are crawl-control assets, not sitemap entries.
-The default 50-URL sweep covers every current sitemap URL, including every
+The default 100-URL sweep covers every current sitemap URL, including every
 sitemap-backed `never_allowlist` URL; static repository checks continue to
 cover these two assets.
 

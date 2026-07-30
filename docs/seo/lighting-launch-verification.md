@@ -1,22 +1,24 @@
 # Lighting launch verification
 
-**Generated:** 2026-07-30T18:41:50.2169733Z
+**Generated:** 2026-07-30T21:33:48.7133347Z
 **Production host:** https://verdantgrowdiary.com
 **Merged PR:** [#595](https://github.com/Verdant-OS/verdant-grow-diary/pull/595)
 **Merge commit:** `1223c56c9db586160a2798d017c2e78d1de1dd5a`
 **Lovable project:** `66255e7b-892c-4be5-8686-ab1cfc3666db`
-**Production deployment:** `bdba8c36-79e6-4d7d-a86c-18e6c6a35a07`
+**Production build manifest commit:** `c353a6a1ba45a9fc0bb9bb389f9f534732768f22`
+**Production deployment ID:** not exposed by the current production response
 
 ## Launch verdict
 
 **NOT READY — PRODUCTION DEFECT FOUND**
 
-Both pages are published, publicly reachable, and technically indexable. Production matches the
-content merged in PR #595. Day 0 has not started because:
+Both pages are published, publicly reachable, and technically indexable. The production build
+contains the content merged in PR #595. Day 0 has not started because:
 
-1. production GA4 currently reports both long guide slugs as `/guides/:id` and sends the generic
-   `Verdant Grow Diary` title before each lazy guide applies its page-specific metadata, which
-   prevents a reliable page-by-page baseline; and
+1. production GA4 currently reports both long guide slugs as `/guides/:id`; a client-side
+   `/guides` → lighting-guide transition also sends the generic `Verdant Grow Diary` title before
+   the lazy guide applies its page-specific metadata, which prevents a reliable page-by-page
+   baseline; and
 2. authenticated GA4 reporting and Search Console inspection are unavailable to this run.
 
 The GA4 route-identity and page-title defects have a focused repair on
@@ -25,14 +27,12 @@ before the baseline is captured.
 
 ## Publication and release evidence
 
-- Lovable reports the project as published and its latest project commit as the exact PR #595 merge
-  commit.
-- The production response identifies deployment
-  `bdba8c36-79e6-4d7d-a86c-18e6c6a35a07`.
+- `https://verdantgrowdiary.com/version.json` identifies production build commit
+  `c353a6a1ba45a9fc0bb9bb389f9f534732768f22`, built at `2026-07-30T20:02:53.283Z`.
+- Repository ancestry proves the PR #595 merge commit is an ancestor of that production commit.
+- The current production response does not expose a Lovable deployment ID, so none is inferred.
 - Both release-specific URLs, titles, descriptions, H1s, Article/FAQ schema, sitemap entries, and
   cross-links are present in production.
-- No publisher header exposes a Git commit. The Lovable project record provides the commit match;
-  production content fingerprints independently match the merged release.
 
 **Release content match: PASS**
 
@@ -103,17 +103,17 @@ still required before treating rich-result eligibility as confirmed.
 - Existing supporting guides link into the lighting cluster.
 - Timeline empty-state and lighting-event guidance link to the distance/schedule guide in the
   protected application.
-- Fifteen distinct internal destinations found across the two pages were checked; none returned a
-  broken response.
-- Quick Log CTAs resolve through the existing authentication boundary; unauthenticated users are
-  sent to the public welcome flow rather than private content.
+- Thirty-five distinct internal destinations found across the two pages and verified inbound source
+  pages were checked; none returned a broken response or unnecessary redirect.
+- Quick Log CTAs resolve to the existing public, no-account 30-second Quick Log starter. The page
+  returns HTTP 200 and does not expose private grow data.
 
 ## Regression and safety findings
 
-- `/`, `/welcome`, `/demo`, and `/auth` render without browser errors.
+- `/`, `/welcome`, `/demo`, `/auth`, and `/quick-log` render without browser errors.
 - `/demo` reaches the intended welcome surface after client rendering.
-- Unauthenticated `/timeline`, `/plants`, `/alerts`, and `/actions` requests resolve to
-  `/welcome?redirectTo=...`.
+- Unauthenticated `/dashboard`, `/grows`, `/plants`, `/timeline`, `/sensors`, `/doctor`, `/alerts`,
+  `/actions`, and `/account/preferences` requests resolve to `/welcome?redirectTo=...`.
 - No private content, live telemetry, credentials, tokens, schema, RLS, Supabase, AI Doctor,
   Action Queue, automation, or device-control behavior changed in PR #595.
 - No demo value is presented as live data on either lighting page.
@@ -128,7 +128,7 @@ mixed into the GA4 repair.
 
 ## Measurement blocker
 
-Production GA4 emits an explicit `page_view` for the long guide route with:
+Production GA4 emits an explicit `page_view` after client-side guide navigation with:
 
 ```text
 page_location = https://verdantgrowdiary.com/guides/:id
@@ -142,3 +142,16 @@ protected and token-bearing routes. It also mounts route-change analytics after 
 content, so each guide applies its page-specific title before the explicit page view is sent.
 
 Day 0 remains unset until the repair is live and authenticated GA4/GSC baselines are recorded.
+
+## Authenticated access and monitoring status
+
+- **GA4 baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
+- **GSC baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
+- No local GSC token, GA4/GSC environment variables, or GSC OAuth repository secrets are
+  configured. Static inspection and observed collection requests are not an authenticated
+  reporting baseline.
+- The latest post-CI SEO monitoring run for production commit `c353a6a1…`
+  ([run 30577682453](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30577682453))
+  stopped in its configuration tests: 57 passed and 1 failed because the default 50-URL coverage
+  cap does not include all 51 current sitemap URLs. No GSC call occurred. This monitoring gap is
+  distinct from the page-specific GA4 repair and is not mixed into PR #597.

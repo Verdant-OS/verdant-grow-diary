@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-30T18:41:50.2169733Z",
+  "generated_at": "2026-07-30T21:33:48.7133347Z",
   "measurement_start_at": null,
   "measurement_status": "blocked",
   "timezone": "America/Chicago",
@@ -8,8 +8,11 @@
     "pull_request": 595,
     "merge_commit": "1223c56c9db586160a2798d017c2e78d1de1dd5a",
     "lovable_project_id": "66255e7b-892c-4be5-8686-ab1cfc3666db",
-    "publisher_latest_commit_sha": "1223c56c9db586160a2798d017c2e78d1de1dd5a",
-    "production_deployment_id": "bdba8c36-79e6-4d7d-a86c-18e6c6a35a07",
+    "publisher_latest_commit_sha": "c353a6a1ba45a9fc0bb9bb389f9f534732768f22",
+    "production_version_url": "https://verdantgrowdiary.com/version.json",
+    "production_build_time": "2026-07-30T20:02:53.283Z",
+    "production_deployment_id": null,
+    "pull_request_merge_in_production_commit": true,
     "release_content_match": "pass"
   },
   "pages": [
@@ -130,7 +133,9 @@
   },
   "gsc_access": {
     "status": "blocked_authenticated_access_unavailable",
-    "workflow_run": "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30569356364",
+    "workflow_run": "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30577682453",
+    "workflow_status": "failed_before_gsc",
+    "workflow_failure": "SEO monitoring default coverage (50) does not include all 51 sitemap URLs.",
     "oauth_configured": false,
     "static_checks_are_indexing_proof": false,
     "blocked_fields": [

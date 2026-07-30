@@ -125,6 +125,7 @@ describe("CheckoutSuccess truth copy", () => {
       title: "Confirming your Verdant access | Verdant Grow Diary",
       description: "Paid Verdant access is confirmed server-side by the billing webhook.",
       path: "/checkout/success",
+      noindex: true,
     });
   });
 
@@ -187,6 +188,7 @@ describe("CheckoutSuccess truth copy", () => {
       title: "Your Verdant plan is active | Verdant Grow Diary",
       description: "Paid Verdant access is confirmed server-side by the billing webhook.",
       path: "/checkout/success",
+      noindex: true,
     });
   });
 

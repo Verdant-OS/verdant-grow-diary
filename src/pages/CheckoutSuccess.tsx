@@ -102,6 +102,8 @@ export default function CheckoutSuccess() {
             : "Checkout status | Verdant Grow Diary",
     description: "Paid Verdant access is confirmed server-side by the billing webhook.",
     path: "/checkout/success",
+    // A transactional confirmation route is useful to the buyer, not a search result.
+    noindex: true,
   });
 
   // Funnel ping once per mount, only after the server-side resolver has

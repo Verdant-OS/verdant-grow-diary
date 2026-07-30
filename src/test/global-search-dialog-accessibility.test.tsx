@@ -25,12 +25,7 @@ afterEach(cleanup);
 describe("GlobalSearchDialog accessibility", () => {
   it("provides an accessible dialog name and description", () => {
     render(
-      <MemoryRouter
-        future={{
-          v7_relativeSplatPath: true,
-          v7_startTransition: true,
-        }}
-      >
+      <MemoryRouter>
         <GlobalSearchDialog open onOpenChange={vi.fn()} />
       </MemoryRouter>,
     );

@@ -54,10 +54,7 @@ describe("BreedingLogNew Action Queue copy", () => {
 
   it("states that approval-required suggestions are optional, selected, and non-controlling", async () => {
     render(
-      <MemoryRouter
-        initialEntries={["/breeding/log/new?growId=grow-1"]}
-        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-      >
+      <MemoryRouter initialEntries={["/breeding/log/new?growId=grow-1"]}>
         <BreedingLogNew />
       </MemoryRouter>,
     );

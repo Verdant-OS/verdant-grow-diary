@@ -201,10 +201,7 @@ beforeEach(() => {
 
 function renderDetail() {
   return render(
-    <MemoryRouter
-      initialEntries={[`/alerts/${currentAlert.id}`]}
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-    >
+    <MemoryRouter initialEntries={[`/alerts/${currentAlert.id}`]}>
       <Routes>
         <Route path="/alerts/:alertId" element={<AlertDetail />} />
       </Routes>

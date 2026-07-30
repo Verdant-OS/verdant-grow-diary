@@ -71,10 +71,7 @@ function renderAt(initialEntry: string) {
   });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter
-        initialEntries={[initialEntry]}
-        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-      >
+      <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
           <Route
             path="/doctor/sessions"

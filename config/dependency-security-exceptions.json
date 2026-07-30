@@ -170,6 +170,50 @@
       ]
     },
     {
+      "package": "react-router",
+      "advisoryId": "1124282",
+      "severity": "high",
+      "expectedNpmAdvisoryUrl": "https://github.com/advisories/GHSA-qwww-vcr4-c8h2",
+      "expectedNpmVulnerableRange": ">=7.12.0 <8.3.0",
+      "owner": "Verdant dependency security",
+      "reason": "React Router 8.3.0 is the published fix, but it removes react-router-dom and requires React 19.2.7 or newer; Verdant is on React 18.3.1, so the required major migration cannot be a lock-only security patch.",
+      "reachability": "Verdant is a client-only Vite SPA using BrowserRouter and does not import or configure React Router's unstable RSC APIs affected by this advisory.",
+      "recheckOn": "2026-08-05",
+      "expiresOn": "2026-08-19",
+      "expectedLockResolutions": [
+        {
+          "key": "react-router",
+          "version": "7.18.2"
+        }
+      ],
+      "expectedBunAffectedKeys": ["react-router"],
+      "expectedNpmLockResolutions": [
+        {
+          "path": "node_modules/react-router",
+          "version": "7.18.2"
+        }
+      ],
+      "expectedParentKeys": ["react-router-dom"],
+      "expectedNpmParentPaths": ["node_modules/react-router-dom"],
+      "expectedNpmAffectedPaths": ["node_modules/react-router"],
+      "allowedImportPaths": [],
+      "allowedScriptNames": [],
+      "expectedBunDirectRootAncestors": [
+        {
+          "package": "react-router-dom",
+          "group": "dependencies",
+          "spec": "^7.18.0"
+        }
+      ],
+      "expectedNpmDirectRootAncestors": [
+        {
+          "package": "react-router-dom",
+          "group": "dependencies",
+          "spec": "^7.18.0"
+        }
+      ]
+    },
+    {
       "package": "esbuild",
       "advisoryId": "1120680",
       "severity": "low",
@@ -190,9 +234,7 @@
           "version": "0.27.7"
         }
       ],
-      "expectedBunAffectedKeys": [
-        "@lovable.dev/mcp-js/esbuild"
-      ],
+      "expectedBunAffectedKeys": ["@lovable.dev/mcp-js/esbuild"],
       "expectedNpmLockResolutions": [
         {
           "path": "node_modules/esbuild",
@@ -207,19 +249,13 @@
           "version": "0.25.12"
         }
       ],
-      "expectedParentKeys": [
-        "@lovable.dev/mcp-js",
-        "lovable-tagger",
-        "vite"
-      ],
+      "expectedParentKeys": ["@lovable.dev/mcp-js", "lovable-tagger", "vite"],
       "expectedNpmParentPaths": [
         "node_modules/@lovable.dev/mcp-js",
         "node_modules/lovable-tagger",
         "node_modules/vite"
       ],
-      "expectedNpmAffectedPaths": [
-        "node_modules/esbuild"
-      ],
+      "expectedNpmAffectedPaths": ["node_modules/esbuild"],
       "allowedImportPaths": [],
       "allowedScriptNames": [],
       "expectedBunDirectRootAncestors": [

@@ -8,10 +8,9 @@ const INDEX = readFileSync(resolve(ROOT, "index.html"), "utf8");
 const NOT_FOUND = readFileSync(resolve(ROOT, "src/pages/NotFound.tsx"), "utf8");
 
 describe("production browser-router console cleanliness", () => {
-  it("opts into both supported React Router v7 transition behaviors", () => {
-    expect(APP).toMatch(
-      /<BrowserRouter\s+future=\{\{\s*v7_startTransition:\s*true,\s*v7_relativeSplatPath:\s*true,?\s*\}\}>/,
-    );
+  it("uses current React Router behavior without obsolete future flags", () => {
+    expect(APP).toMatch(/<BrowserRouter>/);
+    expect(APP).not.toMatch(/<BrowserRouter\s+future=/);
   });
 
   it("does not turn an expected Not Found render into a raw-path console error", () => {

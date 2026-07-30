@@ -63,10 +63,7 @@ function renderPlantDetail() {
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter
-        initialEntries={["/plants/plant-1"]}
-        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-      >
+      <MemoryRouter initialEntries={["/plants/plant-1"]}>
         <LocationProbe />
         <Routes>
           <Route path="/plants/:id" element={<PlantDetail />} />

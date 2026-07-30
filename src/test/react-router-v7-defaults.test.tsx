@@ -7,11 +7,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("React Router test adapter", () => {
+describe("React Router v7 defaults", () => {
   it.each([
     ["MemoryRouter", MemoryRouter],
     ["BrowserRouter", BrowserRouter],
-  ] as const)("%s opts into the production future flags", (_name, Router) => {
+  ] as const)("%s renders without legacy future-flag warnings", (_name, Router) => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     const { unmount } = render(

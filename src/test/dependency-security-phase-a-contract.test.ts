@@ -59,6 +59,15 @@ function productionSourceFiles(directory: string): string[] {
   });
 }
 
+function deploymentSourceFiles(): string[] {
+  return [
+    ...productionSourceFiles(resolve(root, "src")),
+    ...productionSourceFiles(resolve(root, "supabase/functions")),
+    ...productionSourceFiles(resolve(root, "scripts")),
+    resolve(root, "vite.config.ts"),
+  ];
+}
+
 describe("dependency security Phase A resolution floors", () => {
   it("declares the direct security floors", () => {
     expect(
@@ -137,15 +146,38 @@ describe("dependency security Phase A resolution floors", () => {
         (exception: { package: string; advisoryId: string; severity: string }) =>
           `${exception.package}#${exception.advisoryId}:${exception.severity}`,
       ),
-    ).toEqual(["brace-expansion#1124334:high", "esbuild#1120680:low"]);
+    ).toEqual(["brace-expansion#1124334:high", "react-router#1124282:high", "esbuild#1120680:low"]);
   });
 
-  it("does not import either excepted package from production source", () => {
+  it("does not import any excepted package from production source", () => {
     const directImport =
-      /(?:from\s+["'](?:brace-expansion|esbuild)["']|import\s*\(\s*["'](?:brace-expansion|esbuild)["']\s*\)|require\s*\(\s*["'](?:brace-expansion|esbuild)["']\s*\))/;
+      /(?:from\s+["'](?:brace-expansion|esbuild|react-router)["']|import\s*\(\s*["'](?:brace-expansion|esbuild|react-router)["']\s*\)|require\s*\(\s*["'](?:brace-expansion|esbuild|react-router)["']\s*\))/;
     const offenders = productionSourceFiles(resolve(root, "src"))
       .filter((path) => directImport.test(readFileSync(path, "utf8")))
       .map((path) => path.slice(root.length + 1).replace(/\\/g, "/"));
     expect(offenders).toEqual([]);
   });
+
+  it("keeps the React Router exception limited to a non-RSC declarative app", () => {
+    expect(packageJson.dependencies?.["react-router"]).toBeUndefined();
+    expect(readFileSync(resolve(root, "src/App.tsx"), "utf8")).toMatch(/<BrowserRouter>/);
+
+    const rscApi =
+      /(?:unstable[_-][A-Za-z0-9_$]*RSC[A-Za-z0-9_$]*|routeRSCServerRequest|RSCStaticRouter|createCallServer|createServerReference|react-server-dom|@vitejs\/plugin-rsc|\.rsc\b)/i;
+    const offenders = deploymentSourceFiles()
+      .filter((path) => rscApi.test(readFileSync(path, "utf8")))
+      .map((path) => path.slice(root.length + 1).replace(/\\/g, "/"));
+    expect(offenders).toEqual([]);
+  });
+
+  it.each(["react-router", "react-router-dom"])(
+    "recognizes unstable RSC APIs re-exported through %s",
+    (packageName) => {
+      const rscApi =
+        /(?:unstable[_-][A-Za-z0-9_$]*RSC[A-Za-z0-9_$]*|routeRSCServerRequest|RSCStaticRouter|createCallServer|createServerReference|react-server-dom|@vitejs\/plugin-rsc|\.rsc\b)/i;
+      expect(rscApi.test(`import { unstable_matchRSCServerRequest } from "${packageName}";`)).toBe(
+        true,
+      );
+    },
+  );
 });

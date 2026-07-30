@@ -268,7 +268,17 @@ export function reconcileSensorBridgeHealthWithReadings(
     liveWindowMs: input.liveWindowMs,
   });
 
-  if (evidence.indicator === "live") return vm;
+  // A fresh machine-pathway ingest ("receiving") proves transport, not truth.
+  // Only a verified `live` source keeps the healthy claim; any other vendor
+  // string used to skip every downgrade below — the #584 defect.
+  if (evidence.indicator === "receiving") {
+    if (evidence.source === "live") return vm;
+    return withoutHealthyClaim(
+      vm,
+      "needs_review",
+      "Bridge intake accepted; readings are arriving from an unverified source. A verified live reading is still required.",
+    );
+  }
 
   if (evidence.indicator === "testbench") {
     return withoutHealthyClaim(

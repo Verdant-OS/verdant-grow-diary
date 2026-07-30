@@ -12,6 +12,7 @@
  *     NEVER 0.
  */
 
+import { ECOWITT_BRIDGE_TROUBLESHOOTING_STALE_MS } from "../constants/sensorTiming";
 export type TroubleshootingStatus = "ok" | "warn" | "error" | "unknown";
 
 export interface TroubleshootingCheck {
@@ -70,7 +71,7 @@ export const TROUBLESHOOTING_NEXT_ACTIONS: ReadonlyArray<TroubleshootingNextActi
   { id: "no_router_ports", label: "Do not open router ports" },
 ];
 
-const DEFAULT_STALE_MS = 15 * 60 * 1000;
+const DEFAULT_STALE_MS = ECOWITT_BRIDGE_TROUBLESHOOTING_STALE_MS;
 
 function isFiniteNumber(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v);
@@ -83,9 +84,7 @@ function rollup(checks: TroubleshootingCheck[]): TroubleshootingStatus {
   return "ok";
 }
 
-export function buildTroubleshootingReport(
-  input: TroubleshootingInput,
-): TroubleshootingReport {
+export function buildTroubleshootingReport(input: TroubleshootingInput): TroubleshootingReport {
   const checks: TroubleshootingCheck[] = [];
   const env = input.env ?? {};
   const reading = input.lastReading ?? null;
@@ -96,7 +95,8 @@ export function buildTroubleshootingReport(
   checks.push({
     id: "tent_id",
     label: "VERDANT_TENT_ID",
-    status: env.tentIdConfigured === true ? "ok" : env.tentIdConfigured === false ? "error" : "unknown",
+    status:
+      env.tentIdConfigured === true ? "ok" : env.tentIdConfigured === false ? "error" : "unknown",
     detail:
       env.tentIdConfigured === true
         ? "Tent ID configured."
@@ -130,7 +130,14 @@ export function buildTroubleshootingReport(
   checks.push({
     id: "bridge_token",
     label: "VERDANT_BRIDGE_TOKEN",
-    status: tok === "present" ? "ok" : tok === "missing" ? (env.sendModeRequested ? "error" : "warn") : "unknown",
+    status:
+      tok === "present"
+        ? "ok"
+        : tok === "missing"
+          ? env.sendModeRequested
+            ? "error"
+            : "warn"
+          : "unknown",
     detail:
       tok === "present"
         ? "Bridge token present (value never displayed)."
@@ -284,7 +291,8 @@ export function buildTroubleshootingReport(
 
     // VPD presence — must be null/blank when missing; NEVER 0
     const tempOk = isFiniteNumber(reading.airTempC);
-    const humOk = isFiniteNumber(reading.humidityPct) && reading.humidityPct! > 0 && reading.humidityPct! < 100;
+    const humOk =
+      isFiniteNumber(reading.humidityPct) && reading.humidityPct! > 0 && reading.humidityPct! < 100;
     if (tempOk && humOk) {
       if (isFiniteNumber(reading.vpdKpa) && reading.vpdKpa !== 0) {
         checks.push({

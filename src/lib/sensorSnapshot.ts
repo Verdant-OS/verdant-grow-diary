@@ -6,10 +6,16 @@
  */
 
 import { normalizeQuickLogSnapshotMetrics } from "@/lib/quick-log/quickLogSnapshotMetricNormalizer";
+import {
+  isHumidityValid,
+  isTemperatureValid,
+  isVpdValid,
+} from "@/lib/sensorReadingNormalizationRules";
 import { summarizeCsvVendor } from "@/lib/sensorReadingVendorLineage";
 import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
 import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 
+import { SENSOR_SNAPSHOT_STALE_THRESHOLD_MS } from "../constants/sensorTiming";
 export type SnapshotSource =
   | "live"
   | "manual"
@@ -124,7 +130,7 @@ export const SOURCE_LABEL: Record<SnapshotSource, string> = {
 };
 
 /** Default stale threshold (30 minutes). */
-export const STALE_THRESHOLD_MS = 30 * 60 * 1000;
+export const STALE_THRESHOLD_MS = SENSOR_SNAPSHOT_STALE_THRESHOLD_MS;
 
 export function isStale(
   ts: string | null,
@@ -346,6 +352,59 @@ export function snapshotFromDiary(
     soil_ec: toFiniteNumber(snap.soil_ec),
     soil_temp: toFiniteNumber(snap.soil_temp),
     ppfd: toFiniteNumber(snap.ppfd),
+    device_id: null,
+  };
+}
+
+/**
+ * Build a snapshot from a diary_entries.details.environment_check envelope
+ * (Quick Log Environment Check, either variant — see #596).
+ *
+ * Contract decisions, made deliberately:
+ *  - `source` is `"manual"`: an environment check is a grower-entered manual
+ *    reading, the same trust class as a manual sensor snapshot, so it may
+ *    feed alert evaluation. This does NOT weaken the diary fence —
+ *    `snapshotFromDiary` blobs stay `"diary"` and stay non-persistable.
+ *  - `ts` is the diary row's `entry_at` (== grow_events.occurred_at, the
+ *    grower-reported observation time). The envelope itself carries no
+ *    timestamp; using `logged_at` would make a back-dated check look fresh.
+ *  - Only the three air metrics map (`temp_c`→temp, `humidity_pct`→rh,
+ *    `vpd_kpa`→vpd). `water_temp_c` is reservoir temperature, NOT soil/root
+ *    probe temperature, and `ec_mscm`'s soil-vs-reservoir identity is
+ *    unresolved — neither is silently equated to a snapshot field.
+ *  - A note-only envelope (all metrics null) is not sensor evidence → null.
+ *  - Read-time distrust (Codex review, PR #601): diary JSON can be legacy or
+ *    hand-written, so the write-time band gate cannot be assumed. Values are
+ *    accepted only as number-typed finite values inside the same canonical
+ *    plausibility bands the writer uses; `""`/booleans/numeric strings are
+ *    rejected, never coerced, and an out-of-band metric drops to null.
+ */
+function strictBandValue(value: unknown, isValid: (n: number | null) => boolean): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return isValid(value) ? value : null;
+}
+
+export function snapshotFromEnvironmentCheck(
+  entryAt: string | null,
+  envCheck: Record<string, unknown> | null | undefined,
+): SensorSnapshot | null {
+  if (!envCheck || typeof envCheck !== "object") return null;
+  if (!entryAt) return null;
+  const temp = strictBandValue(envCheck.temp_c, isTemperatureValid);
+  const rh = strictBandValue(envCheck.humidity_pct, isHumidityValid);
+  const vpd = strictBandValue(envCheck.vpd_kpa, isVpdValid);
+  if (temp === null && rh === null && vpd === null) return null;
+  return {
+    source: "manual",
+    ts: entryAt,
+    temp,
+    rh,
+    vpd,
+    co2: null,
+    soil: null,
+    soil_ec: null,
+    soil_temp: null,
+    ppfd: null,
     device_id: null,
   };
 }

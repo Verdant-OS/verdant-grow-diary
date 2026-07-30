@@ -132,6 +132,7 @@ vi.mock("@/hooks/useActionResponseMemory", () => ({
 }));
 
 vi.mock("@/lib/useTimelineHighlightAutoScroll", () => ({
+  isReducedMotionPreferred: () => false,
   useTimelineHighlightAutoScroll: () => undefined,
 }));
 

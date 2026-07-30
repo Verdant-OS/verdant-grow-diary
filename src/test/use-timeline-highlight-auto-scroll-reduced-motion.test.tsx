@@ -1,6 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
-import { useTimelineHighlightAutoScroll } from "@/lib/useTimelineHighlightAutoScroll";
+import {
+  isReducedMotionPreferred,
+  useTimelineHighlightAutoScroll,
+} from "@/lib/useTimelineHighlightAutoScroll";
 import {
   parseTimelineHighlightToken,
   TIMELINE_HIGHLIGHT_TESTID,
@@ -22,7 +25,22 @@ function entry(id: string, key: string) {
   };
 }
 
+const originalMatchMedia = window.matchMedia;
+
+afterEach(() => {
+  window.matchMedia = originalMatchMedia;
+  vi.restoreAllMocks();
+});
+
 describe("useTimelineHighlightAutoScroll — reduced motion", () => {
+  it("defaults to motion when matchMedia rejects the query", () => {
+    window.matchMedia = vi.fn(() => {
+      throw new Error("matchMedia is unavailable");
+    }) as unknown as typeof window.matchMedia;
+
+    expect(isReducedMotionPreferred()).toBe(false);
+  });
+
   it("skips scrollIntoView when prefers-reduced-motion is reduce", () => {
     const node = makeNode();
     const highlight = parseTimelineHighlightToken("action-queue:aq-1:approved");
@@ -32,8 +50,8 @@ describe("useTimelineHighlightAutoScroll — reduced motion", () => {
         prefersReducedMotion: true,
       }),
     );
-    expect((node.scrollIntoView as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
-    expect((node.focus as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
+    expect(node.scrollIntoView as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
+    expect(node.focus as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(1);
   });
 
   it("still scrolls when reduced motion is false", () => {
@@ -45,8 +63,8 @@ describe("useTimelineHighlightAutoScroll — reduced motion", () => {
         prefersReducedMotion: false,
       }),
     );
-    expect((node.scrollIntoView as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
-    expect((node.focus as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
+    expect(node.scrollIntoView as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(1);
+    expect(node.focus as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(1);
   });
 
   it("does not re-scroll on rerender with the same highlight token (reduced motion)", () => {
@@ -62,19 +80,15 @@ describe("useTimelineHighlightAutoScroll — reduced motion", () => {
       { initialProps: { h: highlight, e: entries } },
     );
     rerender({ h: highlight, e: [...entries] });
-    expect((node.scrollIntoView as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
-    expect((node.focus as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
+    expect(node.scrollIntoView as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
+    expect(node.focus as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(1);
   });
 
   it("relies on test-injected reduced motion (testid/aria-label invariants intact)", () => {
     // These constants are still consumed by Timeline.tsx to mark the
     // highlighted entry; ensure they remain present so reduced-motion
     // mode keeps the visual highlight discoverable.
-    expect(TIMELINE_HIGHLIGHT_TESTID).toBe(
-      "timeline-highlighted-action-queue-trace",
-    );
-    expect(TIMELINE_HIGHLIGHT_ARIA_LABEL).toBe(
-      "Highlighted Action Queue diary trace",
-    );
+    expect(TIMELINE_HIGHLIGHT_TESTID).toBe("timeline-highlighted-action-queue-trace");
+    expect(TIMELINE_HIGHLIGHT_ARIA_LABEL).toBe("Highlighted Action Queue diary trace");
   });
 });

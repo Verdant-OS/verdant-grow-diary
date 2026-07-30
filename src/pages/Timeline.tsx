@@ -176,7 +176,10 @@ import {
 } from "@/lib/actionQueueTimelineLinkRules";
 import { buildCopyableTraceLinkFromDiaryDetails } from "@/lib/actionQueueTraceLinkCopyRules";
 import CopyTraceLinkButton from "@/components/CopyTraceLinkButton";
-import { useTimelineHighlightAutoScroll } from "@/lib/useTimelineHighlightAutoScroll";
+import {
+  isReducedMotionPreferred,
+  useTimelineHighlightAutoScroll,
+} from "@/lib/useTimelineHighlightAutoScroll";
 import { useTimelineHashAnchorHandoff } from "@/hooks/useTimelineHashAnchorHandoff";
 import {
   buildLinkedGrowEventTimelineAnchorId,
@@ -902,10 +905,7 @@ export default function Timeline() {
       const targetId = findNewestEntryIdForCategory(entries, result.suggestion.category);
       if (targetId && typeof document !== "undefined") {
         const node = document.getElementById(`timeline-entry-${targetId}`);
-        const prefersReduced =
-          typeof window !== "undefined" &&
-          typeof window.matchMedia === "function" &&
-          window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const prefersReduced = isReducedMotionPreferred();
         node?.scrollIntoView({ behavior: prefersReduced ? "auto" : "smooth", block: "center" });
       }
     }

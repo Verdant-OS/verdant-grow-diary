@@ -15,7 +15,7 @@ import { summarizeCsvVendor } from "@/lib/sensorReadingVendorLineage";
 import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
 import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 
-import { SENSOR_SNAPSHOT_STALE_THRESHOLD_MS } from "@/constants/sensorTiming";
+import { SENSOR_SNAPSHOT_STALE_THRESHOLD_MS } from "../constants/sensorTiming";
 export type SnapshotSource =
   | "live"
   | "manual"

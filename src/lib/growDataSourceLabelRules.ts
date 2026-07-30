@@ -7,7 +7,7 @@
  * No React, no Supabase, no I/O. Deterministic for any given input + `now`.
  */
 
-import { GROW_DATA_SOURCE_LABEL_STALE_MS } from "@/constants/sensorTiming";
+import { GROW_DATA_SOURCE_LABEL_STALE_MS } from "../constants/sensorTiming";
 export type GrowDataSourceLabel =
   | "Live"
   | "Manual"

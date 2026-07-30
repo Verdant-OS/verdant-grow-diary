@@ -20,7 +20,7 @@ import {
   VWC_RANGE,
 } from "@/constants/csvValidationRanges";
 
-import { MANUAL_SNAPSHOT_CURRENT_STALE_HOURS } from "@/constants/sensorTiming";
+import { MANUAL_SNAPSHOT_CURRENT_STALE_HOURS } from "../constants/sensorTiming";
 /** Default staleness threshold for "current" room confidence. */
 export { MANUAL_SNAPSHOT_CURRENT_STALE_HOURS };
 /** Realistic VPD window for indoor grow rooms (kPa). */

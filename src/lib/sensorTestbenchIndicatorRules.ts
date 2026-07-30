@@ -20,7 +20,7 @@
  *  - Manual / CSV / demo readings do not promote to "receiving".
  */
 
-import { SENSOR_TESTBENCH_LIVE_WINDOW_MS } from "@/constants/sensorTiming";
+import { SENSOR_TESTBENCH_LIVE_WINDOW_MS } from "../constants/sensorTiming";
 export { SENSOR_TESTBENCH_LIVE_WINDOW_MS };
 
 // "receiving" was previously named "live" (#584): a fresh ingest from a

@@ -25,7 +25,7 @@
  */
 import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
 
-import { DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS } from "@/constants/sensorTiming";
+import { DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS } from "../constants/sensorTiming";
 export type AiSensorSnapshotSource =
   | "live"
   | "manual"

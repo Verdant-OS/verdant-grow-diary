@@ -16,7 +16,7 @@
  *    channel indices are preserved but flagged "unsupported".
  */
 
-import { ECOWITT_CHANNEL_LABELING_STALE_AFTER_MS } from "@/constants/sensorTiming";
+import { ECOWITT_CHANNEL_LABELING_STALE_AFTER_MS } from "../constants/sensorTiming";
 export type EcowittChannelFamily = "soil_moisture" | "air_temperature" | "humidity" | "other";
 
 export type EcowittChannelStatus =

@@ -12,7 +12,7 @@
  *     NEVER 0.
  */
 
-import { ECOWITT_BRIDGE_TROUBLESHOOTING_STALE_MS } from "@/constants/sensorTiming";
+import { ECOWITT_BRIDGE_TROUBLESHOOTING_STALE_MS } from "../constants/sensorTiming";
 export type TroubleshootingStatus = "ok" | "warn" | "error" | "unknown";
 
 export interface TroubleshootingCheck {

@@ -15,7 +15,7 @@
  * `scripts/sync-edge-shared.mjs`.
  */
 
-import { DEFAULT_AI_COACH_STALE_THRESHOLD_MS } from "@/constants/sensorTiming";
+import { DEFAULT_AI_COACH_STALE_THRESHOLD_MS } from "../constants/sensorTiming";
 export type AiCoachSnapshotSource =
   | "live"
   | "manual"

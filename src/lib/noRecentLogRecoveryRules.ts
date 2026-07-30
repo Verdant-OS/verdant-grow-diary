@@ -7,7 +7,7 @@
  * Pure, deterministic, no React, no I/O, no writes, no alerts, no AI.
  */
 
-import { NO_RECENT_LOG_STALE_AFTER_HOURS } from "@/constants/sensorTiming";
+import { NO_RECENT_LOG_STALE_AFTER_HOURS } from "../constants/sensorTiming";
 export interface NoRecentLogRecoveryRow {
   occurredAt: string | null;
 }

@@ -15,7 +15,7 @@
  *  - returns "not_validated" (not "healthy") when evidence is missing
  */
 
-import { ECOWITT_INGEST_VALIDATION_STALE_AFTER_MS } from "@/constants/sensorTiming";
+import { ECOWITT_INGEST_VALIDATION_STALE_AFTER_MS } from "../constants/sensorTiming";
 export type EcowittValidationStatus = "not_validated" | "accepted" | "rejected_test" | "stale";
 
 export type EcowittValidationMetricStatus = "accepted" | "rejected" | "missing" | "not_checked";

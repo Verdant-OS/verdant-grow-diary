@@ -26,7 +26,7 @@ import {
   type TruthReasonCode,
 } from "@/lib/sensorTruthRules";
 
-import { ECOWITT_MQTT_STALE_MS } from "@/constants/sensorTiming";
+import { ECOWITT_MQTT_STALE_MS } from "../constants/sensorTiming";
 // ---------------------------------------------------------------------------
 // Contract
 // ---------------------------------------------------------------------------

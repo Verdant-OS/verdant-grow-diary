@@ -33,7 +33,7 @@ import {
   classifyManualMetric,
 } from "@/lib/sensorTruthRules";
 
-import { ECOWITT_LIVE_SOIL_STALE_MS } from "@/constants/sensorTiming";
+import { ECOWITT_LIVE_SOIL_STALE_MS } from "../constants/sensorTiming";
 // ---------------------------------------------------------------------------
 // Contract
 // ---------------------------------------------------------------------------

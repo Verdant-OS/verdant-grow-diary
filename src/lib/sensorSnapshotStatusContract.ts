@@ -16,7 +16,7 @@
  *  - Presenter-safe labels. No IDs, payloads, tokens, or secrets.
  */
 
-import { DEFAULT_STALE_WINDOW_MS } from "@/constants/sensorTiming";
+import { DEFAULT_STALE_WINDOW_MS } from "../constants/sensorTiming";
 // ============================================================================
 // Canonical contract (new spec)
 // ============================================================================

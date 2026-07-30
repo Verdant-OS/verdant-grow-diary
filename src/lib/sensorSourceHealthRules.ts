@@ -11,7 +11,7 @@ import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
 import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
 import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 
-import { SENSOR_SOURCE_STALE_MINUTES } from "@/constants/sensorTiming";
+import { SENSOR_SOURCE_STALE_MINUTES } from "../constants/sensorTiming";
 export { SENSOR_SOURCE_STALE_MINUTES };
 export const SENSOR_SOURCE_NO_DATA_HOURS = 24;
 

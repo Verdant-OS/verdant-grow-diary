@@ -9,7 +9,7 @@
  * cap the ceiling at medium. Demo/unavailable cap at low.
  */
 
-import { DEFAULT_SENSOR_STALE_MS } from "@/constants/sensorTiming";
+import { DEFAULT_SENSOR_STALE_MS } from "../constants/sensorTiming";
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------

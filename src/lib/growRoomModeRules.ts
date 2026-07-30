@@ -15,7 +15,7 @@
  */
 import type { SensorSnapshot, SnapshotSource } from "@/lib/sensorSnapshot";
 
-import { GROW_ROOM_MODE_STALE_MINUTES } from "@/constants/sensorTiming";
+import { GROW_ROOM_MODE_STALE_MINUTES } from "../constants/sensorTiming";
 // ---------- Inputs --------------------------------------------------------
 
 export type GrowRoomAlertSeverity = "info" | "watch" | "warning" | "critical";

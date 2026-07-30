@@ -16,7 +16,7 @@
  *  - Raw payload preserved verbatim; never consulted for downstream logic.
  */
 
-import { SENSOR_READING_NORMALIZATION_STALE_MS } from "@/constants/sensorTiming";
+import { SENSOR_READING_NORMALIZATION_STALE_MS } from "../constants/sensorTiming";
 // ---------------------------------------------------------------------------
 // Source Classification
 // ---------------------------------------------------------------------------

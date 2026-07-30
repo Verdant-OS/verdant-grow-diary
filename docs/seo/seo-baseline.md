@@ -36,7 +36,7 @@ No traffic, ranking, indexing, or conversion result is claimed in this document.
 2. Several public aliases were browser-only redirects, which leaves first-pass crawlers with a 200 shell rather than a canonical HTTP redirect.
 3. Monitoring inspected only the first 15 sitemap URLs, omitting 32 current URLs and a never-allowlisted guide.
 4. Guide Article dates used a shared historical value rather than per-guide provenance; this was a content-freshness trust risk, not proof that a page was stale.
-5. The nutrient-guide registry and sitemap are being changed by open PR #560. Content publication from this sprint must not silently overlap that work.
+5. At audit time, the nutrient-guide registry and sitemap were being changed by PR #560. This branch started from that PR's exact head to avoid silently overlapping the work; PR #560 is now merged.
 
 ## Sprint completion delta
 
@@ -51,8 +51,9 @@ adds the following repository evidence without rewriting that historical snapsho
 - Article schema is omitted when a guide has no repository-backed publication date; WebPage, FAQ,
   and breadcrumb schema remain. The two new pages carry `2026-07-30` publication/review fields and
   Article schema; the five refreshed pages visibly carry a truthful review field only.
-- The PR #560 file collision is handled by stacking this branch on its exact head, not by competing
-  edits. Merge/publish remains dependency-ordered.
+- The PR #560 file collision was handled by starting this branch on its exact head, not by competing
+  edits, then rebasing the post-PR commits onto the current deploy head after the squash merge. Only
+  this branch's merge and deployment remain.
 
 ## Baseline operating rule
 

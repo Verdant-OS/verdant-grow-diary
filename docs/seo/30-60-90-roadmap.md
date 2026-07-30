@@ -5,8 +5,8 @@
 - [x] Complete route/indexation inventory and safe P1 technical fixes.
 - [x] Retain explicit **BLOCKED / NO_BASELINE** status because authenticated GSC/GA4 evidence was
       not supplied.
-- [x] Resolve the shared-registry file collision with a dependency-ordered stacked branch and make
-      the two reviewed lighting pages production-ready.
+- [x] Resolve the shared-registry file collision against PR #560, then rebase onto the current deploy
+      head after that PR merged; the two reviewed lighting pages are production-ready.
 - [x] Implement and test 28 unique registry link relationships, exceeding the 20-link target.
 - [x] Establish the weekly scorecard using redacted aggregate data only.
 

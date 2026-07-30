@@ -49,10 +49,11 @@
 
 The two production-ready pages passed this gate:
 
-1. Stack on PR #560’s exact head so the shared-registry/sitemap changes have one ordered base.
+1. Start on PR #560’s exact head while it owns the shared registry, then rebase the post-PR commits
+   onto the current deploy head after its squash merge.
 2. Use scoped primary research and explicit non-generalization notes.
 3. Render the same shared FAQ arrays used by FAQPage JSON-LD.
 4. Add exact publication/review provenance before emitting Article dates.
 5. Run static-head, JSON-LD, sitemap, render, type, lint, and production-build verification.
 
-Publication to the live site remains unclaimed until the dependency stack is merged and deployed.
+Publication to the live site remains unclaimed until this branch is merged and deployed.

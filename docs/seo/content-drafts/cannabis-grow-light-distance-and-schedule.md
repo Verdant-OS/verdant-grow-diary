@@ -3,7 +3,7 @@ slug: cannabis-grow-light-distance-and-schedule
 title: Cannabis Grow Light Distance, PPFD, DLI, and Schedules: What to Measure Before You Change Anything
 meta_description: Learn why fixture distance alone is not enough. Measure canopy PPFD, calculate DLI from your schedule, and log one light change at a time.
 schema: Article, BreadcrumbList, FAQPage backed by the mounted visible FAQ
-status: implemented in the shared guide registry on the PR #560-stacked production-ready branch
+status: implemented in the shared guide registry on a production-ready branch based on merged PR #560
 ---
 
 # Cannabis Grow Light Distance, PPFD, DLI, and Schedules: What to Measure Before You Change Anything

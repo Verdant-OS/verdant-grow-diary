@@ -48,7 +48,7 @@ The only current keyword dataset in this sprint is the owner-supplied Semrush US
 1. It has owner-supplied high-intent, low-difficulty demand across setup, routine, and symptom moments; unlike the broad retailer-dominated head terms, these are answerable decision queries.
 2. It has a clear product advantage: Verdant can attach a light change to a plant’s timeline, sensor snapshot, stage, and observed response rather than repeating a generic “hang it X inches away” answer.
 3. It has an identified content gap: no direct PPFD, DLI, hanging-distance, light-schedule, light-burn, or light-stress page exists in the current guide registry or shared care FAQ.
-4. It does not rely on the unverified claim that a Cronk page is a top organic landing page. Nutrient work stays a candidate until GSC evidence exists and open PR #560 resolves.
+4. It does not rely on the unverified claim that a Cronk page is a top organic landing page. Nutrient work stays a candidate until GSC evidence exists; PR #560 is now merged.
 5. It supports two useful, non-duplicate pages and three follow-up briefs without mass-page generation.
 
 ## Cluster architecture
@@ -63,7 +63,7 @@ Pillar: /guides/cannabis-grow-light-distance-and-schedule
 Each page → relevant existing guide/tool → Quick Log → signed-in plant timeline
 ```
 
-The first two pages are mounted in the shared guide registry on the stacked
+The first two pages are mounted in the shared guide registry on the
 `codex/seo-foundation-publish-lighting` branch, have visible FAQs and scoped sources, and are in
 the sitemap with repository-backed publication/review dates. They are production-ready, not
 claimed as deployed. The other three cluster pages remain implementation-ready briefs for the next

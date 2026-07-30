@@ -2,10 +2,10 @@
 
 ## Release status
 
-Implementation is complete on `codex/seo-foundation-publish-lighting`, which is intentionally
-stacked on open PR #560 because that PR owns the shared guide registry and sitemap base. The two
-lighting routes are production-ready in this branch; they are not claimed as deployed until the
-stack is merged and published.
+Implementation is complete on `codex/seo-foundation-publish-lighting`, rebased onto the current
+deploy head after PR #560 merged because that PR owned the shared guide registry and sitemap base.
+The two lighting routes are production-ready in this branch; they are not claimed as deployed until
+this branch is merged and published.
 
 ## Implemented contextual links
 

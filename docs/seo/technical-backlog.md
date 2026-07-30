@@ -26,14 +26,14 @@ No confirmed P0 issue was found in the static audit. Protected paths are covered
 
 ## P2 — next sprint
 
-| Finding                                                                   | Recommendation                                                                                                                           |
-| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Fixture pheno previews are static-index candidates but are not in sitemap | Make an owner decision: acquisition demo with a clear product path, or noindex fixture-only preview. Do not leave the purpose ambiguous. |
-| `/docs/mcp-api` is static-only and unsitemapped                           | Keep it out of sitemap unless documentation acquisition is a deliberate goal; otherwise explicitly noindex it.                           |
-| Static public aliases beyond the fixed set                                | Audit query-preservation semantics and add host redirects/noindex aliases case by case.                                                  |
-| `docs/lighthouse-ci.md` has an older sitemap-count statement              | Refresh it with the current count and pin the local LHCI path if local reproducibility is required.                                      |
-| Analytics consent behavior                                                | Make consent/opt-out policy explicit before adding any new content events.                                                               |
-| Branded nutrient guide duplication and Cronk disclosure                   | Resolve independently after PR #560 lands; retain a visible material-relationship disclosure before distribution.                        |
+| Finding                                                                   | Recommendation                                                                                                                                 |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fixture pheno previews are static-index candidates but are not in sitemap | Make an owner decision: acquisition demo with a clear product path, or noindex fixture-only preview. Do not leave the purpose ambiguous.       |
+| `/docs/mcp-api` is static-only and unsitemapped                           | Keep it out of sitemap unless documentation acquisition is a deliberate goal; otherwise explicitly noindex it.                                 |
+| Static public aliases beyond the fixed set                                | Audit query-preservation semantics and add host redirects/noindex aliases case by case.                                                        |
+| `docs/lighthouse-ci.md` has an older sitemap-count statement              | Refresh it with the current count and pin the local LHCI path if local reproducibility is required.                                            |
+| Analytics consent behavior                                                | Make consent/opt-out policy explicit before adding any new content events.                                                                     |
+| Branded nutrient guide duplication and Cronk disclosure                   | PR #560 has landed; resolve the remaining duplication independently and retain a visible material-relationship disclosure before distribution. |
 
 ## P3 — experiments and optimization
 

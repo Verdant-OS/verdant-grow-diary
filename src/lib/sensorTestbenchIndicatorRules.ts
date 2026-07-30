@@ -6,22 +6,28 @@
  *
  *  - "testbench"  → most recent ingest carries the Ecowitt Windows testbench
  *                    lineage (vendor=ecowitt_windows_testbench OR
- *                    metadata.confidence=test/demo). Never rendered as "live".
- *  - "live"       → recent (≤ STALE_MS) ingest from an ingest source that is
- *                    NOT testbench-tagged. UI shows existing live treatment.
+ *                    metadata.confidence=test/demo). Never rendered as live.
+ *  - "receiving"  → recent (≤ STALE_MS) ingest from a machine pathway that is
+ *                    NOT testbench-tagged. Transport evidence only — the UI
+ *                    must not call this "live" (#584).
  *  - "stale"      → most recent ingest is older than STALE_MS.
  *  - "none"       → no rows seen for this tent.
  *
  * Hard constraints:
  *  - Pure. No I/O, no React, no timers, no automation.
  *  - Testbench tag wins over freshness. A fresh testbench ingest is NEVER
- *    surfaced as "live".
- *  - Manual / CSV / demo readings do not promote to "live".
+ *    surfaced as receiving.
+ *  - Manual / CSV / demo readings do not promote to "receiving".
  */
 
-export const SENSOR_TESTBENCH_LIVE_WINDOW_MS = 15 * 60 * 1000;
+import { SENSOR_TESTBENCH_LIVE_WINDOW_MS } from "@/constants/sensorTiming";
+export { SENSOR_TESTBENCH_LIVE_WINDOW_MS };
 
-export type SensorTestbenchIndicator = "testbench" | "live" | "stale" | "none";
+// "receiving" was previously named "live" (#584): a fresh ingest from a
+// machine pathway is TRANSPORT evidence, not a verified live reading — only
+// the strict source rules may award the word "live". Renamed so the two
+// meanings can never be confused again.
+export type SensorTestbenchIndicator = "testbench" | "receiving" | "stale" | "none";
 
 export interface SensorTestbenchRowLike {
   source?: string | null;
@@ -45,7 +51,9 @@ export interface SensorTestbenchClassification {
   isTestbench: boolean;
 }
 
-const LIVE_SOURCES = new Set([
+// Machine-ingest pathways that count as "receiving" when fresh. Membership
+// here proves transport only — it never promotes a reading to verified live.
+const RECEIVING_SOURCES = new Set([
   "live",
   "ecowitt",
   "webhook",
@@ -227,8 +235,8 @@ export function classifySensorTestbench(input: ClassifyInput): SensorTestbenchCl
   if (testbench) {
     // Testbench tag always wins over freshness — never render as live.
     indicator = "testbench";
-  } else if (ageMs <= windowMs && source && LIVE_SOURCES.has(source)) {
-    indicator = "live";
+  } else if (ageMs <= windowMs && source && RECEIVING_SOURCES.has(source)) {
+    indicator = "receiving";
   } else {
     indicator = "stale";
   }

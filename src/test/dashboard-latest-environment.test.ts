@@ -142,6 +142,16 @@ describe("useLatestSensorSnapshot hook — source priority and safety", () => {
     expect(HOOK).toMatch(/details\.environment_check/);
   });
 
+  it("never lets a stale sensor row suppress fresher diary evidence (Codex, PR #601)", () => {
+    // Fresh sensor rows return immediately; a stale sensor snapshot is only
+    // a candidate that strictly newer manual/env-check evidence replaces.
+    expect(HOOK).toMatch(/if \(snap && !isStale\(snap\.ts\)\) return snap;/);
+    expect(HOOK).toMatch(/staleSensorCandidate = snap;/);
+    expect(HOOK).toMatch(/return preferNewer\(staleSensorCandidate, snap\);/);
+    expect(HOOK).toMatch(/return preferNewer\(staleSensorCandidate, envSnap\);/);
+    expect(HOOK).toMatch(/return staleSensorCandidate \?\? EMPTY_SNAPSHOT;/);
+  });
+
   it("scopes environment_check evidence to the requested tents (Codex, PR #601)", () => {
     // The diary query selects tent_id, and a tent-scoped view only accepts
     // env checks attributed to one of those tents — null/foreign tent_id

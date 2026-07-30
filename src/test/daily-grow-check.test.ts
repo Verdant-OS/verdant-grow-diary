@@ -180,9 +180,10 @@ describe("DailyCheck page — entry points and structure", () => {
     expect(PLANT_DETAIL).toMatch(/data-testid="plant-detail-daily-grow-check-entry"/);
     expect(PLANT_DETAIL).toMatch(/\/daily-check\?plantId=/);
   });
-  it("emphasizes manual snapshot is not live data and uses Fahrenheit", () => {
+  it("emphasizes manual snapshot is not live data and uses the saved temperature unit", () => {
     expect(PAGE).toMatch(/Manual snapshot, not live sensor data/i);
-    expect(PAGE).toMatch(/°F/);
+    expect(PAGE).toMatch(/useTemperatureUnitPreference/);
+    expect(PAGE).toMatch(/getTemperatureUnitSymbol\(temperatureUnit\)/);
   });
 });
 

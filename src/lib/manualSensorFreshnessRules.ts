@@ -6,6 +6,12 @@
  * src/test/manual-sensor-freshness-and-delta.test.ts — keep this file a pure
  * read-only helper. Stale means "data is old", nothing more.
  */
+import {
+  DEFAULT_TEMPERATURE_UNIT,
+  fahrenheitToCelsius,
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "./temperatureUnitPreference";
 
 export type ManualSensorMetric = "temp_f" | "humidity_percent" | "ph" | "ec";
 export type FreshnessState = "fresh" | "aging" | "stale" | "missing";
@@ -47,6 +53,44 @@ export const METRIC_UNITS: Record<ManualSensorMetric, string> = {
   ec: "",
 };
 
+export interface ManualSensorDisplayValue {
+  magnitude: string;
+  unit: string;
+}
+
+/**
+ * Format one canonical manual-memory value for display.
+ *
+ * Legacy Plant Quick Log snapshots store `temp_f` in Fahrenheit. That value
+ * remains untouched; only the returned magnitude/unit follows the display
+ * preference. The explicit Fahrenheit default preserves existing callers.
+ */
+export function formatManualSensorDisplayValue(
+  metric: ManualSensorMetric,
+  value: number | null | undefined,
+  temperatureUnit: TemperatureUnitPreference = DEFAULT_TEMPERATURE_UNIT,
+): ManualSensorDisplayValue | null {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return null;
+  }
+
+  switch (metric) {
+    case "temp_f": {
+      const displayed = temperatureUnit === "celsius" ? fahrenheitToCelsius(value) : value;
+      return {
+        magnitude: String(Math.round(displayed)),
+        unit: getTemperatureUnitSymbol(temperatureUnit),
+      };
+    }
+    case "humidity_percent":
+      return { magnitude: String(Math.round(value)), unit: METRIC_UNITS[metric] };
+    case "ph":
+      return { magnitude: value.toFixed(1), unit: METRIC_UNITS[metric] };
+    case "ec":
+      return { magnitude: value.toFixed(2), unit: METRIC_UNITS[metric] };
+  }
+}
+
 function toMillis(iso: string | Date): number | null {
   const t = iso instanceof Date ? iso.getTime() : new Date(iso).getTime();
   return Number.isFinite(t) ? t : null;
@@ -85,8 +129,7 @@ export function buildFreshnessSnapshot(
   }
   const nowMs = toMillis(now);
   const loggedMs = toMillis(reading.loggedAt);
-  const ageHours =
-    nowMs !== null && loggedMs !== null ? (nowMs - loggedMs) / 3_600_000 : null;
+  const ageHours = nowMs !== null && loggedMs !== null ? (nowMs - loggedMs) / 3_600_000 : null;
   return {
     metric,
     state,
@@ -104,9 +147,7 @@ export function buildFreshnessSnapshots(
   latest: Partial<Record<ManualSensorMetric, LatestManualReading | null>>,
   now: string | Date,
 ): FreshnessSnapshot[] {
-  return MANUAL_SENSOR_METRICS.map((m) =>
-    buildFreshnessSnapshot(m, latest[m] ?? null, now),
-  );
+  return MANUAL_SENSOR_METRICS.map((m) => buildFreshnessSnapshot(m, latest[m] ?? null, now));
 }
 
 /**
@@ -120,9 +161,7 @@ export function buildFreshnessSnapshots(
  */
 export type FreshnessCta = "add_first" | "update" | "none";
 
-export function computeFreshnessCta(
-  snapshots: ReadonlyArray<FreshnessSnapshot>,
-): FreshnessCta {
+export function computeFreshnessCta(snapshots: ReadonlyArray<FreshnessSnapshot>): FreshnessCta {
   if (snapshots.length === 0) return "none";
   if (snapshots.every((s) => s.state === "missing")) return "add_first";
   if (snapshots.some((s) => s.state === "aging" || s.state === "stale")) {

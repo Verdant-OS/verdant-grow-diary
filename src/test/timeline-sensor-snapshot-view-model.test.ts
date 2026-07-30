@@ -32,9 +32,7 @@ describe("buildTimelineSensorSnapshotViewModel", () => {
 
   it("renders soil moisture and CO2 only when present", () => {
     const a = buildTimelineSensorSnapshotViewModel({ temp_f: 70 });
-    expect(a.kind === "chips" && a.chips.some((c) => c.metric === "soil_moisture")).toBe(
-      false,
-    );
+    expect(a.kind === "chips" && a.chips.some((c) => c.metric === "soil_moisture")).toBe(false);
     expect(a.kind === "chips" && a.chips.some((c) => c.metric === "co2")).toBe(false);
 
     const b = buildTimelineSensorSnapshotViewModel({
@@ -58,13 +56,70 @@ describe("buildTimelineSensorSnapshotViewModel", () => {
     expect(temp?.display).toBe("75.2°F");
   });
 
+  it("converts an explicit Fahrenheit field to Celsius only for Celsius display", () => {
+    const storedSnapshot = {
+      temp_f: 68,
+      source: "stale" as const,
+    };
+    const vm = buildTimelineSensorSnapshotViewModel(storedSnapshot, {
+      displayUnit: "C",
+    });
+
+    expect(vm.kind).toBe("chips");
+    if (vm.kind !== "chips") return;
+    const temp = vm.chips.find((c) => c.label === "Temp");
+    expect(temp).toMatchObject({
+      metric: "temp_c",
+      value: 20,
+      unit: "°C",
+      display: "20°C",
+    });
+    expect(vm.sourceLabel).toBe("Stale");
+    expect(vm.isLive).toBe(false);
+    expect(storedSnapshot).toEqual({ temp_f: 68, source: "stale" });
+  });
+
   it("can preserve explicit Celsius when the caller requests Celsius", () => {
-    const vm = buildTimelineSensorSnapshotViewModel({ temp_c: 24 }, { preferUnit: "C" });
+    const vm = buildTimelineSensorSnapshotViewModel({ temp_c: 24 }, { displayUnit: "C" });
     expect(vm.kind).toBe("chips");
     if (vm.kind !== "chips") return;
     const temp = vm.chips.find((c) => c.label === "Temp");
     expect(temp?.metric).toBe("temp_c");
     expect(temp?.display).toBe("24°C");
+  });
+
+  it("never relabels an ambiguous generic temperature when the display unit changes", () => {
+    const storedSnapshot = { temp: 75, humidity: 50 };
+    const fahrenheitVm = buildTimelineSensorSnapshotViewModel(storedSnapshot, {
+      displayUnit: "F",
+    });
+    const celsiusVm = buildTimelineSensorSnapshotViewModel(storedSnapshot, {
+      displayUnit: "C",
+    });
+
+    for (const vm of [fahrenheitVm, celsiusVm]) {
+      expect(vm.kind).toBe("chips");
+      if (vm.kind !== "chips") continue;
+      expect(vm.chips).toEqual([
+        {
+          metric: "rh",
+          label: "RH",
+          value: 50,
+          unit: "%",
+          display: "50%",
+        },
+      ]);
+    }
+    expect(storedSnapshot).toEqual({ temp: 75, humidity: 50 });
+  });
+
+  it("returns unavailable when an ambiguous generic temperature is the only value", () => {
+    expect(buildTimelineSensorSnapshotViewModel({ temperature: 24 }, { displayUnit: "C" })).toEqual(
+      {
+        kind: "invalid",
+        message: "Sensor snapshot unavailable",
+      },
+    );
   });
 
   it("omits non-finite sensor values", () => {

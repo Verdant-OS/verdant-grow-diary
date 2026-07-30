@@ -12,11 +12,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import PlantManualSensorFreshnessCard from "@/components/PlantManualSensorFreshnessCard";
 import type { PlantManualSensorHistory } from "@/hooks/usePlantManualSensorHistory";
+import {
+  clearLocalStorageForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 vi.mock("@/hooks/usePlantManualSensorHistory", async () => {
-  const actual = await vi.importActual<
-    typeof import("@/hooks/usePlantManualSensorHistory")
-  >("@/hooks/usePlantManualSensorHistory");
+  const actual = await vi.importActual<typeof import("@/hooks/usePlantManualSensorHistory")>(
+    "@/hooks/usePlantManualSensorHistory",
+  );
   return {
     ...actual,
     usePlantManualSensorHistory: vi.fn(),
@@ -30,6 +34,7 @@ const mocked = usePlantManualSensorHistory as unknown as ReturnType<typeof vi.fn
 afterEach(() => {
   cleanup();
   mocked.mockReset();
+  clearLocalStorageForTest();
 });
 
 function renderCard(onUpdate = vi.fn()) {
@@ -46,10 +51,38 @@ function setHistory(data: PlantManualSensorHistory | undefined, isLoading = fals
   mocked.mockReturnValue({ data, isLoading });
 }
 
-const hoursAgo = (h: number) =>
-  new Date(Date.now() - h * 3_600_000).toISOString();
+const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
 
 describe("PlantManualSensorFreshnessCard CTA", () => {
+  it("shows the legacy Fahrenheit value when no preference is saved", () => {
+    setHistory({
+      temp_f: { value: 77, loggedAt: hoursAgo(1) },
+      humidity_percent: null,
+      ph: null,
+      ec: null,
+    });
+    renderCard();
+
+    expect(screen.getByTestId("plant-manual-sensor-freshness-temp_f").textContent).toContain(
+      "77°F",
+    );
+  });
+
+  it("shows the same stored Fahrenheit value in Celsius when selected", () => {
+    setLocalStorageItemForTest("verdant:temperatureUnit", "celsius");
+    setHistory({
+      temp_f: { value: 77, loggedAt: hoursAgo(1) },
+      humidity_percent: null,
+      ph: null,
+      ec: null,
+    });
+    renderCard();
+
+    const tile = screen.getByTestId("plant-manual-sensor-freshness-temp_f");
+    expect(tile.textContent).toContain("25°C");
+    expect(tile.textContent).not.toContain("77°F");
+  });
+
   it("renders 'Add first snapshot' and invokes onUpdate when all metrics missing", () => {
     setHistory({ temp_f: null, humidity_percent: null, ph: null, ec: null });
     const { onUpdate } = renderCard();
@@ -81,9 +114,7 @@ describe("PlantManualSensorFreshnessCard CTA", () => {
       ec: { value: 1.4, loggedAt: hoursAgo(1) },
     });
     renderCard();
-    expect(
-      screen.queryByTestId("plant-manual-sensor-freshness-update"),
-    ).toBeNull();
+    expect(screen.queryByTestId("plant-manual-sensor-freshness-update")).toBeNull();
   });
 
   it("does not nag when fresh + missing are mixed", () => {
@@ -94,9 +125,7 @@ describe("PlantManualSensorFreshnessCard CTA", () => {
       ec: null,
     });
     renderCard();
-    expect(
-      screen.queryByTestId("plant-manual-sensor-freshness-update"),
-    ).toBeNull();
+    expect(screen.queryByTestId("plant-manual-sensor-freshness-update")).toBeNull();
   });
 
   it("uses gentle, plant-memory framing (no scary/alert words)", () => {
@@ -135,14 +164,10 @@ describe("PlantManualSensorFreshnessCard CTA", () => {
     });
     renderCard();
     // Logged metric has the stamp...
-    expect(
-      screen.queryByTestId("plant-manual-sensor-freshness-temp_f-last-log"),
-    ).not.toBeNull();
+    expect(screen.queryByTestId("plant-manual-sensor-freshness-temp_f-last-log")).not.toBeNull();
     // ...but missing metrics do not invent one.
     for (const m of ["humidity_percent", "ph", "ec"]) {
-      expect(
-        screen.queryByTestId(`plant-manual-sensor-freshness-${m}-last-log`),
-      ).toBeNull();
+      expect(screen.queryByTestId(`plant-manual-sensor-freshness-${m}-last-log`)).toBeNull();
     }
   });
 });

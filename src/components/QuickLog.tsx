@@ -127,6 +127,7 @@ import {
   ENVIRONMENT_CHECK_HELPER_COPY,
   ENVIRONMENT_CHECK_SECTION_TITLE,
   buildEnvironmentCheckDetails,
+  buildEnvironmentCheckNormalizationPreviewTemperaturePayload,
   hasAnyEnvironmentCheckMeasurement,
   resolvePreviewWaterTempC,
   validateEnvironmentCheckSensorBand,
@@ -2204,6 +2205,13 @@ export default function QuickLog({
                   waterTempValue: envWaterTempValue,
                   waterTempUnit: envWaterTempUnit,
                 });
+                const normalizationTemperaturePayload =
+                  buildEnvironmentCheckNormalizationPreviewTemperaturePayload({
+                    roomTempF: envRoomTempF,
+                    roomTempUnit: effectiveEnvRoomTempUnit,
+                    waterTempValue: envWaterTempValue,
+                    waterTempUnit: envWaterTempUnit,
+                  });
                 const ecPreview = buildEcCompensationPreview({
                   ec: envEcMscm,
                   ecUnit: "mS/cm",
@@ -2398,14 +2406,10 @@ export default function QuickLog({
                       (() => {
                         const normPreviewVm = buildSensorNormalizationPreviewViewModel({
                           payload: {
-                            [effectiveEnvRoomTempUnit === "C" ? "temperature_c" : "temperature_f"]:
-                              envRoomTempF || undefined,
+                            ...normalizationTemperaturePayload,
                             humidity_pct: envHumidityPct || undefined,
                             vpd_kpa: envVpdKpa || undefined,
                             soil_ec_ms_cm: envEcMscm || undefined,
-                            [envWaterTempUnit === "C"
-                              ? "soil_temperature_c"
-                              : "soil_temperature_f"]: envWaterTempValue || undefined,
                           },
                           options: {
                             source: "manual",

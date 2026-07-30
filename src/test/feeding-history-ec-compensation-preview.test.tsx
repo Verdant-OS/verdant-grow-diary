@@ -1,11 +1,26 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 
 import FeedingHistoryPanel from "@/components/FeedingHistoryPanel";
 import { normalizeDiaryEntries, type NormalizedDiaryEntry } from "@/lib/diaryEntryRules";
 import { buildFeedingHistory } from "@/lib/feedingHistoryRules";
+import {
+  clearTemperatureUnitPreference,
+  saveTemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
+
+beforeEach(() => {
+  act(() => {
+    clearTemperatureUnitPreference();
+  });
+});
+afterEach(() => {
+  act(() => {
+    clearTemperatureUnitPreference();
+  });
+});
 
 function feeding(id: string, details: Record<string, unknown>) {
   return {
@@ -67,9 +82,17 @@ describe("FeedingHistoryPanel — EC @25°C preview rendering", () => {
     expect(within(block).getByText(/Not stored/)).toBeInTheDocument();
   });
 
-  it("shows Fahrenheit-first water temp chip", () => {
+  it("shows the water temperature in the default Fahrenheit preference", () => {
     render(<FeedingHistoryPanel rawEntries={[feeding("f-temp", { ec: 1.8, water_temp_c: 20 })]} />);
-    expect(screen.getByText(/68°F \/ 20°C/)).toBeInTheDocument();
+    expect(screen.getByText("68.0°F")).toBeInTheDocument();
+  });
+
+  it("shows the water temperature in the saved Celsius preference", () => {
+    act(() => {
+      saveTemperatureUnitPreference("celsius");
+    });
+    render(<FeedingHistoryPanel rawEntries={[feeding("c-temp", { ec: 1.8, water_temp_c: 20 })]} />);
+    expect(screen.getByText("20.0°C")).toBeInTheDocument();
   });
 
   it("hides preview when EC is missing", () => {

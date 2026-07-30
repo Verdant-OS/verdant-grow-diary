@@ -13,19 +13,10 @@
  *    source of truth for source-label display.
  */
 import type { SensorReadingSource } from "@/mock";
-import {
-  resolveSensorSourceLabel,
-  type ResolvedSourceLabel,
-} from "@/lib/sensorSourceLabelRules";
-import { tempFFromC } from "@/lib/temperatureUnits";
+import { resolveSensorSourceLabel, type ResolvedSourceLabel } from "@/lib/sensorSourceLabelRules";
+import { fahrenheitToCelsius, tempFFromC } from "@/lib/temperatureUnits";
 
-export type TimelineSensorChipMetric =
-  | "temp_f"
-  | "temp_c"
-  | "rh"
-  | "vpd"
-  | "soil_moisture"
-  | "co2";
+export type TimelineSensorChipMetric = "temp_f" | "temp_c" | "rh" | "vpd" | "soil_moisture" | "co2";
 
 export interface TimelineSensorChip {
   metric: TimelineSensorChipMetric;
@@ -91,20 +82,21 @@ function readSource(raw: unknown): SensorReadingSource | null {
  * Build a Timeline sensor-chip view-model from an unknown input.
  *
  * Accepted shapes (all optional, only finite values rendered):
- *   { temp_f|temperature_f|temp_c|temperature_c|temp|temperature,
+ *   { temp_f|temperature_f|temp_c|temperature_c,
  *     rh|humidity, vpd|vpd_kpa,
  *     soil_moisture|soil_water_content|swc,
  *     co2|co2_ppm,
  *     source, vendor, metadata: { vendor } }
  *
- * Temperature display convention on this branch: explicit Fahrenheit fields
- * render as-is; explicit Celsius fields convert once to Fahrenheit at the
- * chip build layer. Generic temperature fields keep the caller-provided unit
- * via `preferUnit` because their source unit is not knowable here.
+ * Explicit Fahrenheit/Celsius fields convert once at the chip-build boundary
+ * when the requested display unit differs. Ambiguous generic `temp` /
+ * `temperature` fields are deliberately ignored because their source unit is
+ * unknowable here; relabeling their magnitude would manufacture a false unit.
+ * Callers that omit `displayUnit` retain the Fahrenheit display default.
  */
 export function buildTimelineSensorSnapshotViewModel(
   input: unknown,
-  options: { preferUnit?: "F" | "C" } = {},
+  options: { displayUnit?: "F" | "C" } = {},
 ): TimelineSensorSnapshotViewModel {
   if (input === null || input === undefined) return { kind: "none" };
   if (typeof input !== "object") {
@@ -116,7 +108,6 @@ export function buildTimelineSensorSnapshotViewModel(
   // Temperature
   const tempF = pick(obj, "temp_f", "temperature_f", "tempF", "temperatureF");
   const tempC = pick(obj, "temp_c", "temperature_c", "tempC", "temperatureC");
-  const tempGeneric = pick(obj, "temp", "temperature");
   const rh = pick(obj, "rh", "humidity", "relative_humidity", "relativeHumidity");
   const vpd = pick(obj, "vpd", "vpd_kpa", "vpdKpa");
   const soil = pick(
@@ -131,18 +122,21 @@ export function buildTimelineSensorSnapshotViewModel(
 
   const chips: TimelineSensorChip[] = [];
 
-  // Temperature chip — never double-convert explicit Fahrenheit values.
+  // Temperature chip — explicit fields convert exactly once for display.
   if (isFiniteNumber(tempF)) {
-    const v = roundTo(tempF, 1);
+    const displayCelsius = options.displayUnit === "C";
+    const v = roundTo(displayCelsius ? fahrenheitToCelsius(tempF) : tempF, 1);
+    const metric: TimelineSensorChipMetric = displayCelsius ? "temp_c" : "temp_f";
+    const unit = displayCelsius ? "°C" : "°F";
     chips.push({
-      metric: "temp_f",
+      metric,
       label: "Temp",
       value: v,
-      unit: "°F",
-      display: `${v}°F`,
+      unit,
+      display: `${v}${unit}`,
     });
   } else if (isFiniteNumber(tempC)) {
-    if (options.preferUnit === "C") {
+    if (options.displayUnit === "C") {
       const v = roundTo(tempC, 1);
       chips.push({
         metric: "temp_c",
@@ -164,12 +158,6 @@ export function buildTimelineSensorSnapshotViewModel(
         });
       }
     }
-  } else if (isFiniteNumber(tempGeneric)) {
-    const v = roundTo(tempGeneric, 1);
-    const unit = options.preferUnit === "C" ? "°C" : "°F";
-    const metric: TimelineSensorChipMetric =
-      options.preferUnit === "C" ? "temp_c" : "temp_f";
-    chips.push({ metric, label: "Temp", value: v, unit, display: `${v}${unit}` });
   }
 
   if (isFiniteNumber(rh)) {

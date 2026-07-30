@@ -131,8 +131,8 @@ describe("UI surfaces render stored Celsius via the preferred display unit", () 
   });
 
   it("TentDetail metric chip uses convertCelsiusForDisplay + getTemperatureUnitSymbol", () => {
-    expect(TENT_DETAIL).toMatch(/convertCelsiusForDisplay\(snap\.temp\)/);
-    expect(TENT_DETAIL).toMatch(/getTemperatureUnitSymbol\(\)/);
+    expect(TENT_DETAIL).toMatch(/convertCelsiusForDisplay\(snap\.temp,\s*temperatureUnit\)/);
+    expect(TENT_DETAIL).toMatch(/getTemperatureUnitSymbol\(temperatureUnit\)/);
     expect(TENT_DETAIL).toMatch(/@\/lib\/temperatureUnitPreference/);
   });
 

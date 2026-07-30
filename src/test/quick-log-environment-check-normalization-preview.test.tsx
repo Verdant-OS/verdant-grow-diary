@@ -13,12 +13,16 @@
  *    combobox flow with a stable accessible name
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import QuickLog from "@/components/QuickLog";
+import {
+  clearTemperatureUnitPreference,
+  saveTemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 import { renderQuickLogEnvironmentCheck } from "./helpers/quickLogEnvironmentCheckTestHelper";
 
 const saveMock = vi.fn();
@@ -73,9 +77,32 @@ function renderWithClient(ui: ReactElement) {
 }
 
 beforeEach(() => {
+  clearTemperatureUnitPreference();
   saveMock.mockReset();
+  saveMock.mockResolvedValue({ ok: true, eventId: "event-1" });
   insertMock.mockReset();
 });
+
+function getPreviewMetrics(slot: HTMLElement): Record<string, number> {
+  return Object.fromEntries(
+    within(slot)
+      .getAllByTestId("sensor-normalization-preview-metric-row")
+      .map((row) => {
+        const cells = row.querySelectorAll("td");
+        return [cells[0]?.textContent ?? "", Number(cells[1]?.textContent)];
+      }),
+  );
+}
+
+async function saveEnvironmentCheck(dialog: HTMLElement): Promise<Record<string, unknown>> {
+  const note = dialog.querySelector("textarea") as HTMLTextAreaElement;
+  fireEvent.change(note, { target: { value: "Temperature preview parity check." } });
+  fireEvent.click(within(dialog).getByRole("button", { name: /save log/i }));
+  await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+  const payload = saveMock.mock.calls[0]?.[0] as Record<string, unknown>;
+  const details = (payload.p_details ?? {}) as Record<string, unknown>;
+  return details.environment_check as Record<string, unknown>;
+}
 
 describe("Quick Log Environment Check — normalization preview", () => {
   it("shared helper opens QuickLog directly in Environment Check mode", () => {
@@ -121,6 +148,59 @@ describe("Quick Log Environment Check — normalization preview", () => {
     h.setMeasurement("humidity", "55");
     expect(insertMock).not.toHaveBeenCalled();
     expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps a °C-suffixed room and water preview in parity with the default °F UI and save", async () => {
+    const h = renderQuickLogEnvironmentCheck();
+    expect(within(h.section).getByLabelText("Room temperature (°F)")).toBeInTheDocument();
+    expect(within(h.section).getByTestId("quick-log-env-water-temp-unit")).toHaveTextContent("°F");
+
+    h.setMeasurement("room-temp-f", "22 °C");
+    h.setMeasurement("water-temp", "20°C");
+
+    const metrics = getPreviewMetrics(h.getPreviewSlot()!);
+    expect(metrics).toMatchObject({
+      temperature_c: 22,
+      temperature_f: 71.6,
+      soil_temperature_c: 20,
+      soil_temperature_f: 68,
+    });
+
+    const saved = await saveEnvironmentCheck(h.dialog);
+    expect(saved).toMatchObject({
+      room_temp_f: 71.6,
+      temp_c: 22,
+      water_temp_f: 68,
+      water_temp_c: 20,
+    });
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps an °F-suffixed room and water preview in parity with the °C UI and save", async () => {
+    saveTemperatureUnitPreference("celsius");
+    const h = renderQuickLogEnvironmentCheck();
+    expect(within(h.section).getByLabelText("Room temperature (°C)")).toBeInTheDocument();
+    expect(within(h.section).getByTestId("quick-log-env-water-temp-unit")).toHaveTextContent("°C");
+
+    h.setMeasurement("room-temp-f", "72°F");
+    h.setMeasurement("water-temp", "68 °F");
+
+    const metrics = getPreviewMetrics(h.getPreviewSlot()!);
+    expect(metrics).toMatchObject({
+      temperature_c: 22.22,
+      temperature_f: 72,
+      soil_temperature_c: 20,
+      soil_temperature_f: 68,
+    });
+
+    const saved = await saveEnvironmentCheck(h.dialog);
+    expect(saved).toMatchObject({
+      room_temp_f: 72,
+      temp_c: 22.22,
+      water_temp_f: 68,
+      water_temp_c: 20,
+    });
+    expect(insertMock).not.toHaveBeenCalled();
   });
 
   it("static safety: no write helpers / no normalization rows persisted in QuickLog", () => {

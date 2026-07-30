@@ -4,10 +4,12 @@
  * Mocks the Supabase client so the read-only diary fetch is deterministic.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { act, render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import TimelineMemorySection from "@/components/TimelineMemorySection";
+import { saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+import { removeLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 
 type Row = {
   id: string;
@@ -46,6 +48,22 @@ const ROWS: Row[] = [
     note: "Day 14 photo.",
     photo_url: "diary-photos/foo.jpg",
     details: { event_type: "note" },
+  },
+  {
+    id: "sensor-a",
+    plant_id: "plant-1",
+    tent_id: "tent-1",
+    entry_at: "2026-01-03T12:00:00.000Z",
+    note: "Environment check.",
+    photo_url: null,
+    details: {
+      event_type: "environment",
+      sensor: {
+        source: "manual",
+        temp_f: 68,
+        humidity: 50,
+      },
+    },
   },
   {
     id: "snap-ok",
@@ -107,6 +125,7 @@ function renderSection(props: Parameters<typeof TimelineMemorySection>[0]) {
 
 beforeEach(() => {
   nextResponse = { data: [], error: null };
+  removeLocalStorageItemForTest("verdant:temperatureUnit");
 });
 
 describe("TimelineMemorySection", () => {
@@ -118,6 +137,39 @@ describe("TimelineMemorySection", () => {
     );
     expect(screen.getAllByTestId("manual-snapshot-timeline-card")).toHaveLength(2);
     expect(screen.getAllByTestId("timeline-memory-diary-item").length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("reacts to the saved unit preference for an explicit Fahrenheit diary snapshot", async () => {
+    nextResponse = {
+      data: ROWS.filter((row) => row.id === "sensor-a"),
+      error: null,
+    };
+    renderSection({ scope: "plant", plantId: "plant-1" });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("timeline-diary-sensor-chip-temp_f")).toHaveTextContent(
+        "Temp 68°F",
+      ),
+    );
+    expect(screen.getByTestId("timeline-diary-sensor-source")).toHaveTextContent("Manual");
+
+    act(() => {
+      expect(saveTemperatureUnitPreference("celsius")).toBe(true);
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("timeline-diary-sensor-chip-temp_c")).toHaveTextContent(
+        "Temp 20°C",
+      ),
+    );
+    expect(
+      (
+        ROWS.find((row) => row.id === "sensor-a")?.details as {
+          sensor: { temp_f: number };
+        }
+      ).sensor.temp_f,
+    ).toBe(68);
+    expect(screen.getByTestId("timeline-diary-sensor-source")).toHaveTextContent("Manual");
   });
 
   it("filters to manual snapshots only", async () => {

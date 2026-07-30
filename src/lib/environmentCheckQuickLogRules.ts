@@ -53,6 +53,18 @@ export interface EnvironmentCheckEnvelope {
   note: string | null;
 }
 
+/**
+ * Temperature-only payload fragment for the adjacent, read-only sensor
+ * normalization preview. Keys deliberately mirror the generic normalizer's
+ * strict input contract, while values are already parsed finite numbers.
+ */
+export interface EnvironmentCheckNormalizationPreviewTemperaturePayload {
+  temperature_c?: number;
+  temperature_f?: number;
+  soil_temperature_c?: number;
+  soil_temperature_f?: number;
+}
+
 /** Calm helper copy when no optional measurement has been entered. */
 export const ENVIRONMENT_CHECK_HELPER_COPY =
   "Add any measurements you have. A note alone is okay." as const;
@@ -253,6 +265,61 @@ export function validateEnvironmentCheckSensorBand(
 export function hasAnyEnvironmentCheckMeasurement(input: EnvironmentCheckFormInput): boolean {
   const e = buildEnvironmentCheckDetails({ ...input, note: null });
   return e !== null;
+}
+
+/**
+ * Build the temperature fragment consumed by Quick Log's read-only
+ * normalization preview.
+ *
+ * A suffix in the grower's text wins over the selected field unit, exactly as
+ * it does for validation and persistence. The generic untrusted-payload
+ * normalizer remains strict: it receives a finite number under the actual
+ * suffix-resolved unit key, never a UI string such as "22 °C".
+ *
+ * `buildEnvironmentCheckDetails` is also used as the acceptance gate so the
+ * preview cannot show a temperature that the adjacent save envelope would
+ * drop as invalid or out of range.
+ */
+export function buildEnvironmentCheckNormalizationPreviewTemperaturePayload(
+  input: Pick<
+    EnvironmentCheckFormInput,
+    "roomTempF" | "roomTempUnit" | "waterTempValue" | "waterTempUnit"
+  >,
+): EnvironmentCheckNormalizationPreviewTemperaturePayload {
+  const accepted = buildEnvironmentCheckDetails(input);
+  if (accepted === null) return {};
+
+  const payload: EnvironmentCheckNormalizationPreviewTemperaturePayload = {};
+
+  const roomParsed = parseTemperatureInput(input.roomTempF, input.roomTempUnit ?? "F");
+  if (
+    roomParsed.kind === "ok" &&
+    roomParsed.enteredValue !== null &&
+    (roomParsed.unit === "C" ? accepted.temp_c !== null : accepted.room_temp_f !== null)
+  ) {
+    if (roomParsed.unit === "C") {
+      payload.temperature_c = roomParsed.enteredValue;
+    } else {
+      payload.temperature_f = roomParsed.enteredValue;
+    }
+  }
+
+  if (input.waterTempUnit === "C" || input.waterTempUnit === "F") {
+    const waterParsed = parseTemperatureInput(input.waterTempValue, input.waterTempUnit);
+    if (
+      waterParsed.kind === "ok" &&
+      waterParsed.enteredValue !== null &&
+      (waterParsed.unit === "C" ? accepted.water_temp_c !== null : accepted.water_temp_f !== null)
+    ) {
+      if (waterParsed.unit === "C") {
+        payload.soil_temperature_c = waterParsed.enteredValue;
+      } else {
+        payload.soil_temperature_f = waterParsed.enteredValue;
+      }
+    }
+  }
+
+  return payload;
 }
 
 function roundTo(n: number, digits: number): number {

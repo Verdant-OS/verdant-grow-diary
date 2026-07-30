@@ -35,6 +35,8 @@ import {
   EARLY_STAGE_MILESTONE_UNKNOWN_LABEL,
   EARLY_STAGE_VIGOR_UNKNOWN_LABEL,
 } from "@/lib/earlyStageTimelineViewModel";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
 type Props =
   | {
@@ -53,10 +55,19 @@ function toScope(props: Props): TimelineMemoryScope | null {
   return props.tentId ? { kind: "tent", tentId: props.tentId } : null;
 }
 
-function DiaryItemRow({ item }: { item: Extract<TimelineMemoryItem, { kind: "diary" }> }) {
+function DiaryItemRow({
+  item,
+  temperatureUnit,
+}: {
+  item: Extract<TimelineMemoryItem, { kind: "diary" }>;
+  temperatureUnit: TemperatureUnitPreference;
+}) {
   const sensorVm = useMemo(
-    () => buildTimelineSensorSnapshotViewModel(item.sensorSnapshot),
-    [item.sensorSnapshot],
+    () =>
+      buildTimelineSensorSnapshotViewModel(item.sensorSnapshot, {
+        displayUnit: temperatureUnit === "celsius" ? "C" : "F",
+      }),
+    [item.sensorSnapshot, temperatureUnit],
   );
   const photoVm = useMemo(
     () =>
@@ -295,6 +306,7 @@ function LinkedEvidenceUnavailableNotice({ onRetry }: { onRetry: () => void }) {
 }
 
 export default function TimelineMemorySection(props: Props) {
+  const temperatureUnit = useTemperatureUnitPreference();
   const scope = toScope(props);
   const { items, displayItems, companionEvidenceUnavailable, isLoading, isError, refetch } =
     useTimelineMemory(scope);
@@ -427,7 +439,7 @@ export default function TimelineMemorySection(props: Props) {
                           </li>
                         ) : item.kind === "diary" ? (
                           <li key={`diary:${item.key}`}>
-                            <DiaryItemRow item={item} />
+                            <DiaryItemRow item={item} temperatureUnit={temperatureUnit} />
                           </li>
                         ) : (
                           <li

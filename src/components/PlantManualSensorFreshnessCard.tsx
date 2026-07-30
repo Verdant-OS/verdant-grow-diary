@@ -20,29 +20,18 @@ import { cn } from "@/lib/utils";
 import {
   buildFreshnessSnapshots,
   computeFreshnessCta,
+  formatManualSensorDisplayValue,
   METRIC_LABELS,
-  METRIC_UNITS,
   type FreshnessSnapshot,
   type FreshnessState,
-  type ManualSensorMetric,
 } from "@/lib/manualSensorFreshnessRules";
 import { usePlantManualSensorHistory } from "@/hooks/usePlantManualSensorHistory";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
 interface Props {
   plantId: string;
   onUpdate?: () => void;
-}
-
-function formatValue(metric: ManualSensorMetric, value: number): string {
-  switch (metric) {
-    case "temp_f":
-    case "humidity_percent":
-      return String(Math.round(value));
-    case "ph":
-      return value.toFixed(1);
-    case "ec":
-      return value.toFixed(2);
-  }
 }
 
 const STATE_STYLES: Record<FreshnessState, string> = {
@@ -61,6 +50,7 @@ const STATE_LABELS: Record<FreshnessState, string> = {
 
 export default function PlantManualSensorFreshnessCard({ plantId, onUpdate }: Props) {
   const { data, isLoading } = usePlantManualSensorHistory(plantId);
+  const temperatureUnit = useTemperatureUnitPreference();
 
   const snapshots = useMemo<FreshnessSnapshot[]>(() => {
     return buildFreshnessSnapshots(data ?? {}, new Date());
@@ -110,7 +100,7 @@ export default function PlantManualSensorFreshnessCard({ plantId, onUpdate }: Pr
               data-testid={`plant-manual-sensor-freshness-${s.metric}-loading`}
             />
           ) : (
-            <FreshnessTile key={s.metric} snapshot={s} />
+            <FreshnessTile key={s.metric} snapshot={s} temperatureUnit={temperatureUnit} />
           ),
         )}
       </div>
@@ -118,18 +108,22 @@ export default function PlantManualSensorFreshnessCard({ plantId, onUpdate }: Pr
   );
 }
 
-function FreshnessTile({ snapshot }: { snapshot: FreshnessSnapshot }) {
+function FreshnessTile({
+  snapshot,
+  temperatureUnit,
+}: {
+  snapshot: FreshnessSnapshot;
+  temperatureUnit: TemperatureUnitPreference;
+}) {
   const { metric, state, value, loggedAt } = snapshot;
   const label = METRIC_LABELS[metric];
-  const unit = METRIC_UNITS[metric];
+  const displayValue = formatManualSensorDisplayValue(metric, value, temperatureUnit);
 
   return (
     <div
       data-testid={`plant-manual-sensor-freshness-${metric}`}
       data-state={state}
-      className={cn(
-        "rounded-lg border border-border/50 bg-background/40 p-3 grid gap-0.5",
-      )}
+      className={cn("rounded-lg border border-border/50 bg-background/40 p-3 grid gap-0.5")}
     >
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">{label}</span>
@@ -141,7 +135,7 @@ function FreshnessTile({ snapshot }: { snapshot: FreshnessSnapshot }) {
           />
         )}
       </div>
-      {state === "missing" || value === null ? (
+      {state === "missing" || displayValue === null ? (
         <span
           className={cn("text-sm", STATE_STYLES[state])}
           data-testid={`plant-manual-sensor-freshness-${metric}-missing`}
@@ -151,9 +145,9 @@ function FreshnessTile({ snapshot }: { snapshot: FreshnessSnapshot }) {
       ) : (
         <>
           <span className={cn("text-base font-medium", STATE_STYLES[state])}>
-            {formatValue(metric, value)}
-            {unit && (
-              <span className="text-xs text-muted-foreground ml-0.5">{unit}</span>
+            {displayValue.magnitude}
+            {displayValue.unit && (
+              <span className="text-xs text-muted-foreground ml-0.5">{displayValue.unit}</span>
             )}
           </span>
           {loggedAt && (

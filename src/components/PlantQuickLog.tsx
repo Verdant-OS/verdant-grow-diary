@@ -117,7 +117,8 @@ export default function PlantQuickLog({
   // Temperature is TYPED in the grower's preferred unit and converted to °F
   // exactly once before it reaches the payload, which keeps its canonical
   // `temp_f` key. The unit is always shown on the field — never inferred.
-  const tempUnit = temperatureInputUnitFromPreference(useTemperatureUnitPreference());
+  const temperatureUnitPreference = useTemperatureUnitPreference();
+  const tempUnit = temperatureInputUnitFromPreference(temperatureUnitPreference);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -183,7 +184,13 @@ export default function PlantQuickLog({
 
   function deltaFor(metric: ManualSensorMetric, raw: string): ChronologyDelta | null {
     const current = parseOptionalNumber(raw);
-    return computeChronologyDelta(metric, current, currentCapturedAt, logs ?? []);
+    return computeChronologyDelta(
+      metric,
+      current,
+      currentCapturedAt,
+      logs ?? [],
+      temperatureUnitPreference,
+    );
   }
 
   function resetForm() {

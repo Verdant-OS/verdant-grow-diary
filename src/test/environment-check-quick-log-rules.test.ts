@@ -4,6 +4,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildEnvironmentCheckDetails,
+  buildEnvironmentCheckNormalizationPreviewTemperaturePayload,
   hasAnyEnvironmentCheckMeasurement,
   resolvePreviewWaterTempC,
   validateEnvironmentCheckSensorBand,
@@ -174,6 +175,33 @@ describe("hasAnyEnvironmentCheckMeasurement", () => {
   });
   it("is false when only a note is present", () => {
     expect(hasAnyEnvironmentCheckMeasurement({ note: "tent is calm" } as never)).toBe(false);
+  });
+});
+
+describe("buildEnvironmentCheckNormalizationPreviewTemperaturePayload", () => {
+  it("uses suffix-resolved numeric values when suffixes oppose the selected units", () => {
+    expect(
+      buildEnvironmentCheckNormalizationPreviewTemperaturePayload({
+        roomTempF: "22 °C",
+        roomTempUnit: "F",
+        waterTempValue: "68°F",
+        waterTempUnit: "C",
+      }),
+    ).toEqual({
+      temperature_c: 22,
+      soil_temperature_f: 68,
+    });
+  });
+
+  it("omits invalid and out-of-range temperatures that persistence would drop", () => {
+    expect(
+      buildEnvironmentCheckNormalizationPreviewTemperaturePayload({
+        roomTempF: "141°F",
+        roomTempUnit: "C",
+        waterTempValue: "46 °C",
+        waterTempUnit: "F",
+      }),
+    ).toEqual({});
   });
 });
 

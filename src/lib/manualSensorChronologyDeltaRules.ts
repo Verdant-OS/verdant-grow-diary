@@ -14,6 +14,11 @@
  */
 import type { ManualSensorMetric } from "./manualSensorFreshnessRules";
 import { METRIC_UNITS } from "./manualSensorFreshnessRules";
+import {
+  DEFAULT_TEMPERATURE_UNIT,
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "./temperatureUnitPreference";
 
 export const MANUAL_SOURCE = "manual" as const;
 
@@ -34,6 +39,7 @@ export interface ChronologyDelta {
   metric: ManualSensorMetric;
   currentValue: number;
   previousValue: number | null;
+  /** Canonical delta; `temp_f` remains Fahrenheit even when its label is Celsius. */
   delta: number | null;
   direction: ChronologyDirection;
   first_log: boolean;
@@ -63,9 +69,20 @@ function parseMs(iso: string | null | undefined): number | null {
   return Number.isFinite(t) ? t : null;
 }
 
-function formatMagnitude(metric: ManualSensorMetric, n: number): string {
+function formatMagnitude(
+  metric: ManualSensorMetric,
+  n: number,
+  temperatureUnit: TemperatureUnitPreference,
+): string {
   switch (metric) {
-    case "temp_f":
+    case "temp_f": {
+      const displayed = temperatureUnit === "celsius" ? n * (5 / 9) : n;
+      if (temperatureUnit === "celsius") {
+        const rounded = Math.round(displayed * 10) / 10;
+        return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+      }
+      return String(Math.round(displayed));
+    }
     case "humidity_percent":
       return String(Math.round(n));
     case "ph":
@@ -76,8 +93,18 @@ function formatMagnitude(metric: ManualSensorMetric, n: number): string {
 }
 
 const SHORT_MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 
 /** Deterministic, locale-free "MMM D" formatter. UTC-based for stable tests. */
@@ -178,6 +205,7 @@ export function computeChronologyDelta(
   currentValue: number | null | undefined,
   currentCapturedAt: string,
   history: ReadonlyArray<ManualSensorLog>,
+  temperatureUnit: TemperatureUnitPreference = DEFAULT_TEMPERATURE_UNIT,
 ): ChronologyDelta | null {
   if (!isFiniteNumber(currentValue)) return null;
 
@@ -218,8 +246,9 @@ export function computeChronologyDelta(
 
   const direction: ChronologyDirection = diff > 0 ? "up" : "down";
   const sign = diff > 0 ? "+" : "-";
-  const magnitude = formatMagnitude(metric, Math.abs(diff));
-  const unit = METRIC_UNITS[metric];
+  const magnitude = formatMagnitude(metric, Math.abs(diff), temperatureUnit);
+  const unit =
+    metric === "temp_f" ? getTemperatureUnitSymbol(temperatureUnit) : METRIC_UNITS[metric];
   const suffix = timeContext ?? "since last log";
   return {
     metric,
@@ -243,11 +272,18 @@ export function buildChronologyDeltas(args: {
   currentCapturedAt: string;
   currentMetrics: Partial<Record<ManualSensorMetric, number | null | undefined>>;
   history: ReadonlyArray<ManualSensorLog>;
+  temperatureUnit?: TemperatureUnitPreference;
 }): Partial<Record<ManualSensorMetric, ChronologyDelta>> {
   const out: Partial<Record<ManualSensorMetric, ChronologyDelta>> = {};
   for (const metric of Object.keys(args.currentMetrics) as ManualSensorMetric[]) {
     const v = args.currentMetrics[metric];
-    const d = computeChronologyDelta(metric, v, args.currentCapturedAt, args.history);
+    const d = computeChronologyDelta(
+      metric,
+      v,
+      args.currentCapturedAt,
+      args.history,
+      args.temperatureUnit,
+    );
     if (d) out[metric] = d;
   }
   return out;

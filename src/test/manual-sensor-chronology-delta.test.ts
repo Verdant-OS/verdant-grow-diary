@@ -34,9 +34,8 @@ function manualLog(
 describe("computeChronologyDelta — basic rules", () => {
   it("returns null when current value is not finite", () => {
     expect(computeChronologyDelta("ph", null, NOW, [])).toBeNull();
-    expect(
-      computeChronologyDelta("ph", Number.NaN, NOW, []),
-    ).toBeNull();
+    expect(computeChronologyDelta("ph", Number.NaN, NOW, [])).toBeNull();
+    expect(computeChronologyDelta("temp_f", null, NOW, [], "celsius")).toBeNull();
   });
 
   it("first_log when no prior manual reading exists for that metric", () => {
@@ -174,10 +173,7 @@ describe("chronology / back-dating", () => {
     // Two logs share capturedAt; neither should be picked as prior for the
     // current snapshot taken at the same instant.
     const sameTs = iso(-24);
-    const history = [
-      manualLog(sameTs, { ph: 6.0 }, "a"),
-      manualLog(sameTs, { ph: 6.4 }, "b"),
-    ];
+    const history = [manualLog(sameTs, { ph: 6.0 }, "a"), manualLog(sameTs, { ph: 6.4 }, "b")];
     const tied = computeChronologyDelta("ph", 6.2, sameTs, history);
     expect(tied?.first_log).toBe(true);
 
@@ -206,7 +202,7 @@ describe("formatting", () => {
   });
 
   it("ec delta keeps 2 decimals", () => {
-    const history = [manualLog(iso(-2), { ec: 1.40 })];
+    const history = [manualLog(iso(-2), { ec: 1.4 })];
     const d = computeChronologyDelta("ec", 1.65, NOW, history);
     expect(d?.label).toBe("+0.25 2 hours ago");
   });
@@ -215,6 +211,37 @@ describe("formatting", () => {
     const history = [manualLog(iso(-2), { temp_f: 75.3 })];
     const d = computeChronologyDelta("temp_f", 77.1, NOW, history);
     expect(d?.label).toBe("+2°F 2 hours ago");
+  });
+
+  it("formats a canonical Fahrenheit temperature delta in Celsius on request", () => {
+    const history = [manualLog(iso(-2), { temp_f: 75 })];
+    const d = computeChronologyDelta("temp_f", 76.8, NOW, history, "celsius");
+
+    expect(d?.label).toBe("+1°C 2 hours ago");
+    expect(d?.currentValue).toBe(76.8);
+    expect(d?.previousValue).toBe(75);
+    expect(d?.delta).toBeCloseTo(1.8, 5);
+  });
+
+  it("passes the selected temperature unit through the batch helper", () => {
+    const out = buildChronologyDeltas({
+      currentCapturedAt: NOW,
+      currentMetrics: { temp_f: 76.8 },
+      history: [manualLog(iso(-2), { temp_f: 75 })],
+      temperatureUnit: "celsius",
+    });
+
+    expect(out.temp_f?.label).toBe("+1°C 2 hours ago");
+    expect(out.temp_f?.delta).toBeCloseTo(1.8, 5);
+  });
+
+  it("keeps small non-stable Celsius deltas visible instead of rounding to zero", () => {
+    const history = [manualLog(iso(-2), { temp_f: 75 })];
+    const d = computeChronologyDelta("temp_f", 75.5, NOW, history, "celsius");
+
+    expect(d?.direction).toBe("up");
+    expect(d?.label).toBe("+0.3°C 2 hours ago");
+    expect(d?.delta).toBeCloseTo(0.5, 5);
   });
 });
 
@@ -264,10 +291,7 @@ describe("deriveManualSensorLogs", () => {
 
 // ---------- Source-level safety contract for the new helper ----------
 const ROOT = resolve(__dirname, "../..");
-const HELPER = readFileSync(
-  resolve(ROOT, "src/lib/manualSensorChronologyDeltaRules.ts"),
-  "utf8",
-);
+const HELPER = readFileSync(resolve(ROOT, "src/lib/manualSensorChronologyDeltaRules.ts"), "utf8");
 
 describe("manualSensorChronologyDeltaRules safety contract", () => {
   it("carries the documented chronology + source comment", () => {

@@ -9,7 +9,7 @@
  *     rerun-failed BEFORE any completed-file reuse.
  *   * Aggregate rejects toolchain drift between shards.
  *   * Legacy run-schema versions are refused.
- *   * The workflow pins Bun to 1.3.3 in every job and prints only
+ *   * The workflow matches the required PR gate's Bun pin in every job and prints only
  *     node/bun/vitest versions (no env dumps).
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- runner stubs use loose types for the child_process contract */
@@ -35,6 +35,10 @@ import { aggregateShards, summarizeRun } from "../../scripts/vitest-controlled/s
 const WORKFLOW_PATH = path.resolve(
   __dirname,
   "../../.github/workflows/vitest-controlled-full-suite.yml",
+);
+const PR_GATE_WORKFLOW_PATH = path.resolve(
+  __dirname,
+  "../../.github/workflows/vitest-full-suite-pr-gate.yml",
 );
 
 const REAL_GIT = process.env.__LOVABLE_REAL_GIT || "git";
@@ -324,9 +328,16 @@ describe("workflow static assertions", () => {
   it("contains no bun-version: latest", () => {
     expect(yaml).not.toMatch(/bun-version:\s*latest/);
   });
-  it("pins Bun 1.3.3 in every setup-bun block (exactly 2)", () => {
-    const pins = yaml.match(/bun-version:\s*1\.3\.3/g) ?? [];
-    expect(pins.length).toBe(2);
+  it("matches the required PR gate Bun pin in every setup-bun block", () => {
+    const prGateYaml = fs.readFileSync(PR_GATE_WORKFLOW_PATH, "utf8");
+    const prGatePin = prGateYaml.match(/bun-version:\s*([0-9.]+)/)?.[1];
+    const controlledPins = Array.from(
+      yaml.matchAll(/bun-version:\s*([0-9.]+)/g),
+      (match) => match[1],
+    );
+
+    expect(prGatePin).toBe("1.3.14");
+    expect(controlledPins).toEqual([prGatePin, prGatePin]);
   });
   it("has runtime-proof steps and they do not print env or secrets", () => {
     const runtimeStepRegex = /Runtime proof \(node\/bun\/vitest\)[\s\S]*?(?=- name:|$)/g;

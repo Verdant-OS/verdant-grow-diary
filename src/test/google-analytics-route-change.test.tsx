@@ -32,6 +32,24 @@ describe("sanitizePagePath", () => {
     expect(sanitizePagePath("/token/abc123def456ghi789jkl")).toBe("/token/:id");
   });
 
+  it("preserves public guide slugs so SEO landing pages remain measurable", () => {
+    expect(
+      sanitizePagePath("/guides/cannabis-grow-light-distance-and-schedule?utm_source=google#ppfd"),
+    ).toBe("/guides/cannabis-grow-light-distance-and-schedule");
+    expect(sanitizePagePath("/guides/cannabis-light-stress-light-burn-bleaching-or-heat")).toBe(
+      "/guides/cannabis-light-stress-light-burn-bleaching-or-heat",
+    );
+  });
+
+  it("continues masking long segments outside the public guide namespace", () => {
+    expect(sanitizePagePath("/plants/cannabis-grow-light-distance-and-schedule")).toBe(
+      "/plants/:id",
+    );
+    expect(sanitizePagePath("/auth/cannabis-light-stress-light-burn-bleaching-or-heat")).toBe(
+      "/auth/:id",
+    );
+  });
+
   it("preserves short non-UUID segments like /billing/pro", () => {
     expect(sanitizePagePath("/billing/pro")).toBe("/billing/pro");
     expect(sanitizePagePath("/settings/profile")).toBe("/settings/profile");
@@ -103,6 +121,21 @@ describe("useGoogleAnalyticsPageViews — gtag behavior", () => {
       send_to: GOOGLE_ANALYTICS_MEASUREMENT_ID,
       page_path: "/plants/:id",
       page_location: `${window.location.origin}/plants/:id`,
+      page_title: "Test Title",
+    });
+  });
+
+  it("sends an individual public guide path to gtag", () => {
+    const guidePath = "/guides/cannabis-grow-light-distance-and-schedule";
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(MemoryRouter, { initialEntries: [guidePath] }, children);
+
+    renderHook(() => useGoogleAnalyticsPageViews(), { wrapper });
+
+    expect(gtagMock).toHaveBeenCalledWith("event", "page_view", {
+      send_to: GOOGLE_ANALYTICS_MEASUREMENT_ID,
+      page_path: guidePath,
+      page_location: `${window.location.origin}${guidePath}`,
       page_title: "Test Title",
     });
   });

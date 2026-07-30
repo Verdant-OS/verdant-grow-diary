@@ -5,11 +5,12 @@ import { resolve } from "node:path";
 import SensorSnapshotCard from "@/components/sensor/SensorSnapshotCard";
 import type { SensorSnapshot } from "@/lib/sensor/sensorSnapshotFreshnessRules";
 import { saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 const NOW = Date.parse("2026-06-26T12:00:00Z");
 
 beforeEach(() => {
-  window.localStorage.clear();
+  clearLocalStorageForTest();
 });
 
 function make(overrides: Partial<SensorSnapshot> = {}): SensorSnapshot {

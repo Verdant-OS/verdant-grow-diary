@@ -4,6 +4,7 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { SensorSnapshotPreview } from "@/components/SensorSnapshotPreview";
 import { EMPTY_SENSOR_SNAPSHOT, buildSensorSnapshot } from "@/lib/latestSensorSnapshotRules";
 import { saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 const NOW = new Date("2026-06-08T12:00:00.000Z");
 
@@ -105,7 +106,7 @@ function invalidSnap() {
 
 afterEach(cleanup);
 beforeEach(() => {
-  window.localStorage.clear();
+  clearLocalStorageForTest();
 });
 
 describe("SensorSnapshotPreview", () => {

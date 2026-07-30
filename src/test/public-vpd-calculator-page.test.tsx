@@ -12,6 +12,7 @@ vi.mock("@/lib/pricingAnalytics", () => ({
 
 import { buildPublicVpdShareData } from "@/lib/publicVpdCalculatorRules";
 import PublicVpdCalculator from "@/pages/PublicVpdCalculator";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 const originalClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
 const originalShare = Object.getOwnPropertyDescriptor(navigator, "share");
@@ -26,7 +27,7 @@ function renderPage() {
 
 beforeEach(() => {
   mocks.track.mockReset();
-  window.localStorage.clear();
+  clearLocalStorageForTest();
 });
 
 afterEach(() => {

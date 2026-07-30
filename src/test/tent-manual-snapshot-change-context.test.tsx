@@ -15,6 +15,7 @@ import React from "react";
 import TentManualSnapshotChangeContext from "@/components/TentManualSnapshotChangeContext";
 import type { SensorReadingRow } from "@/lib/db";
 import { saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) =>
@@ -53,7 +54,7 @@ const T1 = "2026-05-23T09:00:00Z";
 const T2 = "2026-05-24T09:00:00Z";
 
 beforeEach(() => {
-  window.localStorage.clear();
+  clearLocalStorageForTest();
 });
 
 describe("Tent history change context — audit", () => {

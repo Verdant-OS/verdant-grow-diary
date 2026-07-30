@@ -20,6 +20,7 @@ import {
 } from "@/lib/manualSensorSnapshotHistoryListRules";
 import type { SensorReadingRow } from "@/lib/db";
 import { saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) =>
@@ -70,7 +71,7 @@ const T = [
 ];
 
 beforeEach(() => {
-  window.localStorage.clear();
+  clearLocalStorageForTest();
 });
 
 describe("Tent manual snapshot history — audit", () => {

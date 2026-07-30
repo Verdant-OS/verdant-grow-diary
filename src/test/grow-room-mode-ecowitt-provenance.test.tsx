@@ -10,6 +10,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 interface ReadingFixture {
   tent_id: string;
@@ -98,7 +99,7 @@ function renderPage() {
 beforeEach(() => {
   mockState.readingRows = [];
   mockState.selectCalls = [];
-  window.localStorage.clear();
+  clearLocalStorageForTest();
 });
 
 describe("GrowRoomMode ECOWITT provenance", () => {

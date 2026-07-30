@@ -20,6 +20,7 @@ import { MemoryRouter } from "react-router-dom";
 
 import { EcowittLatestSnapshotCard } from "@/components/EcowittLatestSnapshotCard";
 import { saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 const TENT_A = "11111111-1111-1111-1111-111111111111";
 const NOW = new Date("2026-06-04T12:30:00Z");
@@ -50,7 +51,7 @@ vi.mock("@/store/auth", () => ({
 
 beforeEach(() => {
   rowsMock = [];
-  window.localStorage.clear();
+  clearLocalStorageForTest();
 });
 
 function wrap() {

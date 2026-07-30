@@ -73,7 +73,7 @@ describe("landing subscriber funnel", () => {
         "/pricing?utm_source=landing_page&utm_medium=owned&utm_campaign=paid_launch",
       );
     }
-    expect(screen.getAllByText("See Pro & Founder plans")).toHaveLength(2);
+    expect(screen.getAllByText("See Pro & Craft plans")).toHaveLength(2);
     for (const testId of ["landing-signup-cta-hero", "landing-signup-cta-final"]) {
       expect(screen.getByTestId(testId)).toHaveAttribute(
         "href",

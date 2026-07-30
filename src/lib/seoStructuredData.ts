@@ -9,7 +9,7 @@
  * the visible accordion/list — do not synthesize hidden questions here.
  */
 
-import type { FaqEntry } from "@/constants/verdantSeoCopy";
+import type { FaqEntry } from "../constants/verdantSeoCopy";
 
 export interface FaqPageJsonLd {
   readonly "@context": "https://schema.org";
@@ -54,9 +54,7 @@ export function buildFaqPageJsonLd({
       throw new Error("buildFaqPageJsonLd: every entry must have a question");
     }
     if (!q.answer || !q.answer.trim()) {
-      throw new Error(
-        `buildFaqPageJsonLd: FAQ answer is empty for question "${q.question}"`,
-      );
+      throw new Error(`buildFaqPageJsonLd: FAQ answer is empty for question "${q.question}"`);
     }
   }
   return {
@@ -90,8 +88,7 @@ export function buildSoftwareApplicationJsonLd({
   url?: string;
 }): SoftwareApplicationJsonLd {
   if (!name.trim()) throw new Error("buildSoftwareApplicationJsonLd: name required");
-  if (!description.trim())
-    throw new Error("buildSoftwareApplicationJsonLd: description required");
+  if (!description.trim()) throw new Error("buildSoftwareApplicationJsonLd: description required");
   return {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
@@ -139,9 +136,7 @@ export function buildBreadcrumbListJsonLd({
       throw new Error("buildBreadcrumbListJsonLd: every item must have a name");
     }
     if (!it.url || !/^https?:\/\//i.test(it.url)) {
-      throw new Error(
-        `buildBreadcrumbListJsonLd: item url must be absolute (got "${it.url}")`,
-      );
+      throw new Error(`buildBreadcrumbListJsonLd: item url must be absolute (got "${it.url}")`);
     }
   }
   return {
@@ -165,16 +160,66 @@ export function safeJsonLdStringify(data: unknown): string {
   return JSON.stringify(data).replace(/<\/(script)/gi, "<\\/$1");
 }
 
+/**
+ * Safe FAQPage builder that never throws on missing/empty copy. Filters out
+ * invalid entries and returns `null` when no valid question/answer pair remains,
+ * so presenters can simply skip emitting the JSON-LD <script> tag rather than
+ * crash the render.
+ */
+export function buildFaqPageJsonLdSafe({
+  pageUrl,
+  questions,
+}: {
+  pageUrl?: string;
+  questions: ReadonlyArray<FaqEntry> | null | undefined;
+}): FaqPageJsonLd | null {
+  if (!Array.isArray(questions) || questions.length === 0) return null;
+  const valid = questions.filter(
+    (q): q is FaqEntry =>
+      !!q && typeof q.question === "string" && !!q.question.trim() &&
+      typeof q.answer === "string" && !!q.answer.trim(),
+  );
+  if (valid.length === 0) return null;
+  return buildFaqPageJsonLd({ pageUrl, questions: valid });
+}
+
+/**
+ * Safe BreadcrumbList builder that drops items with missing names or
+ * non-absolute URLs instead of throwing. Returns `null` when nothing remains.
+ */
+export function buildBreadcrumbListJsonLdSafe({
+  items,
+}: {
+  items: ReadonlyArray<BreadcrumbListItem> | null | undefined;
+}): BreadcrumbListJsonLd | null {
+  if (!Array.isArray(items) || items.length === 0) return null;
+  const valid = items.filter(
+    (it): it is BreadcrumbListItem =>
+      !!it && !!it.name?.trim() && !!it.url && /^https?:\/\//i.test(it.url),
+  );
+  if (valid.length === 0) return null;
+  return buildBreadcrumbListJsonLd({ items: valid });
+}
+
 export interface ArticleJsonLd {
   readonly "@context": "https://schema.org";
   readonly "@type": "Article";
   readonly headline: string;
   readonly description: string;
   readonly url: string;
+  readonly image?: string;
   readonly datePublished: string;
   readonly dateModified?: string;
-  readonly author: { readonly "@type": "Organization"; readonly name: string; readonly url?: string };
-  readonly publisher: { readonly "@type": "Organization"; readonly name: string; readonly url?: string };
+  readonly author: {
+    readonly "@type": "Organization";
+    readonly name: string;
+    readonly url?: string;
+  };
+  readonly publisher: {
+    readonly "@type": "Organization";
+    readonly name: string;
+    readonly url?: string;
+  };
   readonly mainEntityOfPage: { readonly "@type": "WebPage"; readonly "@id": string };
 }
 
@@ -187,6 +232,7 @@ export function buildArticleJsonLd({
   headline,
   description,
   url,
+  image,
   datePublished,
   dateModified,
   authorName = "Verdant Grow Diary",
@@ -198,6 +244,7 @@ export function buildArticleJsonLd({
   url: string;
   datePublished: string;
   dateModified?: string;
+  image?: string;
   authorName?: string;
   publisherName?: string;
   siteUrl?: string;
@@ -216,10 +263,15 @@ export function buildArticleJsonLd({
     headline,
     description,
     url,
+    ...(image ? { image } : {}),
     datePublished,
     ...(dateModified ? { dateModified } : {}),
     author: { "@type": "Organization", name: authorName, ...(siteUrl ? { url: siteUrl } : {}) },
-    publisher: { "@type": "Organization", name: publisherName, ...(siteUrl ? { url: siteUrl } : {}) },
+    publisher: {
+      "@type": "Organization",
+      name: publisherName,
+      ...(siteUrl ? { url: siteUrl } : {}),
+    },
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
   };
 }

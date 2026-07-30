@@ -19,7 +19,7 @@ export const VERDANT_HERO = {
     "Verdant turns your grow logs, photos, and sensor readings from the gear you already own into one plant timeline — with AI that cites its evidence and cannot touch your equipment.",
   tagline: "Plant memory. Sensor truth. Grower-approved decisions.",
   primaryCtaLabel: "Start Free",
-  pricingCtaLabel: "See Pro & Founder plans",
+  pricingCtaLabel: "See Pro & Craft plans",
   secondaryCtaLabel: "Take the 60-second tour",
   safetyLine: "No fake live data. No blind automation. The grower stays in control.",
 } as const;

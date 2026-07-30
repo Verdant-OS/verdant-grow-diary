@@ -42,6 +42,12 @@ import {
 import type { ManualSensorMetric } from "@/lib/manualSensorFreshnessRules";
 import { usePlantManualSensorLogs } from "@/hooks/usePlantManualSensorHistory";
 import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  TEMPERATURE_UNIT_SYMBOL,
+  temperatureInputUnitFromPreference,
+  toFahrenheitInputString,
+} from "@/lib/sensorInputUnitConversion";
 import {
   QUICK_LOG_ACTION_CHIPS,
   RESPONSE_CHECK_STATUSES,
@@ -108,6 +114,10 @@ export default function PlantQuickLog({
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [sensors, setSensors] = useState<QuickLogSensorInput>(EMPTY_SENSORS);
+  // Temperature is TYPED in the grower's preferred unit and converted to °F
+  // exactly once before it reaches the payload, which keeps its canonical
+  // `temp_f` key. The unit is always shown on the field — never inferred.
+  const tempUnit = temperatureInputUnitFromPreference(useTemperatureUnitPreference());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -141,7 +151,16 @@ export default function PlantQuickLog({
     };
   }, [photoPreview]);
 
-  const hasManualReadings = !!buildManualSensorSnapshot(sensors);
+  /**
+   * Payload view of the typed readings: temperature converted from the
+   * entry unit into the canonical °F the snapshot contract stores. Blank or
+   * unparseable stays blank — never a fabricated zero.
+   */
+  const sensorsForPayload: QuickLogSensorInput = useMemo(
+    () => ({ ...sensors, temp: toFahrenheitInputString(sensors.temp, tempUnit) }),
+    [sensors, tempUnit],
+  );
+  const hasManualReadings = !!buildManualSensorSnapshot(sensorsForPayload);
   const hasPhoto = !!photoFile;
   const hasPlantResponseCheck = hasResponseCheck(note);
   const timelineNote = buildTimelineNote(note, hasPhoto, hasManualReadings);
@@ -263,7 +282,7 @@ export default function PlantQuickLog({
         tentId: tentId ?? null,
         note: timelineNote,
         photoPath: uploadedPath,
-        sensors,
+        sensors: sensorsForPayload,
       });
       if (!result.ok) {
         if (uploadedPath) {
@@ -558,7 +577,7 @@ export default function PlantQuickLog({
               </p>
               <SensorField
                 id="plant-quick-log-temp"
-                label="Temp (°F)"
+                label={`Temp (${TEMPERATURE_UNIT_SYMBOL[tempUnit]})`}
                 value={sensors.temp}
                 onChange={(v) => {
                   setSensors((s) => ({ ...s, temp: v }));
@@ -566,7 +585,7 @@ export default function PlantQuickLog({
                 }}
                 inputMode="decimal"
                 step="any"
-                delta={deltaFor("temp_f", sensors.temp)}
+                delta={deltaFor("temp_f", sensorsForPayload.temp)}
               />
               <SensorField
                 id="plant-quick-log-humidity"

@@ -132,31 +132,16 @@ describe("Static safety", () => {
       expect(src).not.toMatch(/autopilot/i);
       expect(src).not.toMatch(/writeWateringTypedEvent/);
       expect(src).not.toMatch(/from\(\s*['"]leads['"]\s*\)/);
-      expect(src).not.toMatch(
-        /from\(\s*['"]action_queue['"]\s*\)\s*\.(insert|update|delete|upsert)/,
-      );
+      expect(src).not.toMatch(/from\(\s*['"]action_queue['"]\s*\)\s*\.(insert|update|delete|upsert)/);
       expect(src).not.toMatch(/from\(\s*['"]alerts['"]\s*\)\s*\.(insert|update|delete|upsert)/);
     }
   });
-  it("ManualSensorReadingCard labels temperature from the saved preference, never a pinned unit", () => {
-    // Was: assert the label is hardcoded °F. The field is now unit-aware (a
-    // grower can type "72F" or "22C"), so pinning the markup to one unit is no
-    // longer the right guard. The safety concern it protected — that a collected
-    // value can never be silently misread between C and F — is now enforced by
-    // explicit parsing, which is what this asserts instead.
+  it("ManualSensorReadingCard labels temperature with the active entry unit", () => {
     const src = readFileSync("src/components/ManualSensorReadingCard.tsx", "utf8");
-
-    // The air-temp label follows the grower's preference...
-    expect(src).toMatch(/unit=\{temperatureSymbol\}/);
-    // ...and is never pinned to a single unit in markup.
+    // No hardcoded unit symbol in either direction — the label follows the
+    // unit the grower is actually entering in.
     expect(src).not.toMatch(/unit="°F"/);
     expect(src).not.toMatch(/unit="°C"/);
-
-    // The typed value is parsed unit-aware, never coerced with a bare Number().
-    expect(src).toMatch(/parseTemperatureInput\(/);
-    // The validator is handed canonical Celsius, and the legacy °F field is
-    // explicitly cleared so it can never be double-counted.
-    expect(src).toMatch(/airTempC: airTempCelsius/);
-    expect(src).toMatch(/airTempF: null/);
+    expect(src).toMatch(/unit=\{TEMPERATURE_UNIT_SYMBOL\[airTempUnit\]\}/);
   });
 });

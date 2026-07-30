@@ -124,6 +124,7 @@ const OperatorCreditsAudit = lazy(() => import("./pages/OperatorCreditsAudit"));
 const OperatorEdgeMetrics = lazy(() => import("./pages/OperatorEdgeMetrics"));
 const OperatorEdgeAlerts = lazy(() => import("./pages/OperatorEdgeAlerts"));
 const OperatorSchemaAudit = lazy(() => import("./pages/OperatorSchemaAudit"));
+const OperatorMode = lazy(() => import("./pages/OperatorMode"));
 
 const Leads = lazy(() => import("./pages/Leads"));
 const PiIngestStatus = lazy(() => import("./pages/PiIngestStatus"));
@@ -499,6 +500,7 @@ const App = () => (
                       <Route path="/operator/edge-metrics" element={<OperatorEdgeMetrics />} />
                       <Route path="/operator/edge-alerts" element={<OperatorEdgeAlerts />} />
                       <Route path="/operator/schema-audit" element={<OperatorSchemaAudit />} />
+                      <Route path="/operator/mode" element={<OperatorMode />} />
 
                       <Route path="/operator/release-readiness" element={<ReleaseReadiness />} />
                       {/* Diagnostics Audience Split v1 — /diagnostics is an

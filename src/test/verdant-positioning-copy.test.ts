@@ -37,7 +37,7 @@ describe("Verdant positioning copy constants", () => {
 
   it("exposes signup, pricing, and honest product-discovery CTAs", () => {
     expect(VERDANT_HERO.primaryCtaLabel).toBe("Start Free");
-    expect(VERDANT_HERO.pricingCtaLabel).toBe("See Pro & Founder plans");
+    expect(VERDANT_HERO.pricingCtaLabel).toBe("See Pro & Craft plans");
     expect(VERDANT_HERO.secondaryCtaLabel).toBe("Take the 60-second tour");
   });
 

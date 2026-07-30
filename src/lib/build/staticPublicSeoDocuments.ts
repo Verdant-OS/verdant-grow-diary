@@ -9,9 +9,22 @@
  * interactive React application still boots from the same asset shell.
  */
 
-import { VERDANT_CULTIVARS } from "../../constants/verdantCultivars";
-import { VERDANT_SEO_GUIDES } from "../../constants/verdantSeoContent";
+import { formatVerificationStatus, VERDANT_CULTIVARS } from "../../constants/verdantCultivars";
+import {
+  VERDANT_GROWER_GUIDE_FAQ,
+  VERDANT_GUIDES_BREADCRUMB_ITEMS,
+  VERDANT_SEO_GUIDES,
+} from "../../constants/verdantSeoContent";
+import { PUBLIC_QUICK_LOG_STARTER_COPY } from "../../constants/publicQuickLogStarterCopy";
 import { FOUNDER_SOCIAL_META } from "../../constants/founderSocialMeta";
+import { buildCultivarBreadcrumbItems, buildCultivarFaqItems } from "../cultivarDetailSeo";
+import {
+  buildArticleJsonLd,
+  buildBreadcrumbListJsonLd,
+  buildCultivarCollectionJsonLd,
+  buildFaqPageJsonLd,
+  buildSoftwareApplicationJsonLd,
+} from "../seoStructuredData";
 import type { StaticSocialRouteMetadata } from "./staticSocialRouteHtml";
 
 export const VERDANT_SITE_ORIGIN = "https://verdantgrowdiary.com";
@@ -56,6 +69,66 @@ function buildStaticWebPageJsonLd(metadata: {
   } as const;
 }
 
+function buildStaticGuideJsonLd(guide: (typeof VERDANT_SEO_GUIDES)[number]) {
+  const url = `${VERDANT_SITE_ORIGIN}/guides/${guide.slug}`;
+  return [
+    buildStaticWebPageJsonLd({ title: guide.title, description: guide.description, url }),
+    buildFaqPageJsonLd({ pageUrl: url, questions: guide.faq }),
+    buildBreadcrumbListJsonLd({
+      items: [...VERDANT_GUIDES_BREADCRUMB_ITEMS, { name: guide.h1, url }],
+    }),
+    buildArticleJsonLd({
+      headline: guide.h1,
+      description: guide.description,
+      url,
+      datePublished: "2025-01-01",
+      dateModified: "2025-01-01",
+      image: DEFAULT_OG_IMAGE,
+      authorName: "Verdant Grow Diary",
+      publisherName: "Verdant Grow Diary",
+      siteUrl: VERDANT_SITE_ORIGIN,
+    }),
+  ];
+}
+
+function buildStaticCultivarJsonLd(cultivar: (typeof VERDANT_CULTIVARS)[number]) {
+  const url = `${VERDANT_SITE_ORIGIN}/cultivars/${cultivar.slug}`;
+  const verifiedDate = cultivar.lastVerifiedAt.slice(0, 10);
+  return [
+    buildStaticWebPageJsonLd({
+      title: `${cultivar.name} Cultivar Grow Guide | Verdant`,
+      description: `${cultivar.name} grow guide: lineage (${cultivar.lineage}), ${cultivar.flowerWeeks} flower, environment ranges by stage, and common issues home growers report.`,
+      url,
+    }),
+    buildCultivarCollectionJsonLd({
+      name: `${cultivar.name} source-backed grow reference`,
+      alternateName: [cultivar.searchAlias, ...cultivar.aliases].join(", "),
+      description: `${cultivar.name} reference profile with reported lineage (${cultivar.lineage}), ${cultivar.flowerWeeks}, sources, confidence, and missing-information notes.`,
+      url,
+      properties: [
+        { name: "Lineage", value: cultivar.lineage },
+        { name: "Life cycle", value: cultivar.lifeCycle },
+        { name: "Reported flower window", value: cultivar.flowerWeeks },
+        { name: "Difficulty", value: cultivar.difficulty },
+        { name: "Evidence state", value: formatVerificationStatus(cultivar.verificationStatus) },
+      ],
+    }),
+    buildFaqPageJsonLd({ pageUrl: url, questions: buildCultivarFaqItems(cultivar) }),
+    buildBreadcrumbListJsonLd({
+      items: buildCultivarBreadcrumbItems(cultivar, VERDANT_SITE_ORIGIN),
+    }),
+    buildArticleJsonLd({
+      headline: `${cultivar.name} Cultivar Grow Guide`,
+      description: `${cultivar.name} source-backed grow reference: reported lineage (${cultivar.lineage}), ${cultivar.flowerWeeks}, environment context by stage, and common issues home growers report.`,
+      url,
+      datePublished: verifiedDate,
+      dateModified: verifiedDate,
+      image: DEFAULT_OG_IMAGE,
+      siteUrl: VERDANT_SITE_ORIGIN,
+    }),
+  ];
+}
+
 function publicDocument(
   path: string,
   metadata: Omit<StaticSocialRouteMetadata, "url" | "image"> & {
@@ -95,6 +168,19 @@ const GUIDE_HUB = publicDocument("/guides", {
   description:
     "Practical grower guides for using plant timelines, source-labeled sensor data, VPD context, and cautious AI to make better cultivation decisions.",
   imageAlt: "Verdant Grower Guides",
+  jsonLd: [
+    buildStaticWebPageJsonLd({
+      title: "Grower Guides: Grow Diary, VPD & Sensor Truth | Verdant",
+      description:
+        "Practical grower guides for using plant timelines, source-labeled sensor data, VPD context, and cautious AI to make better cultivation decisions.",
+      url: `${VERDANT_SITE_ORIGIN}/guides`,
+    }),
+    buildFaqPageJsonLd({
+      pageUrl: `${VERDANT_SITE_ORIGIN}/guides`,
+      questions: VERDANT_GROWER_GUIDE_FAQ,
+    }),
+    buildBreadcrumbListJsonLd({ items: VERDANT_GUIDES_BREADCRUMB_ITEMS }),
+  ],
 });
 
 const CULTIVAR_HUB = publicDocument("/cultivars", {
@@ -152,6 +238,22 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
     description:
       "Try the Verdant Quick Log without an account: nickname a plant, jot one note, and keep the draft on your device. Create a free account when you want it in your grow diary.",
     imageAlt: "Verdant 30-second Quick Log starter",
+    jsonLd: [
+      buildStaticWebPageJsonLd({
+        title: PUBLIC_QUICK_LOG_STARTER_COPY.seoTitle,
+        description: PUBLIC_QUICK_LOG_STARTER_COPY.seoDescription,
+        url: `${VERDANT_SITE_ORIGIN}/quick-log`,
+      }),
+      buildSoftwareApplicationJsonLd({
+        name: "Verdant Grow Diary",
+        description: PUBLIC_QUICK_LOG_STARTER_COPY.seoDescription,
+        url: `${VERDANT_SITE_ORIGIN}/quick-log`,
+      }),
+      buildFaqPageJsonLd({
+        pageUrl: `${VERDANT_SITE_ORIGIN}/quick-log`,
+        questions: PUBLIC_QUICK_LOG_STARTER_COPY.faq,
+      }),
+    ],
   }),
   publicDocument("/glossary", {
     title: "Cannabis Cultivation Glossary | Verdant Grow Diary",
@@ -213,6 +315,19 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
       "Reach the humans building Verdant. Support, bugs, hardware ideas, billing, or questions.",
     imageAlt: "Contact the Verdant team",
   }),
+  // Indexable public documentation. Without a pre-rendered doc this route
+  // inherits the shell's root canonical and declares itself a duplicate of
+  // the homepage to non-JS crawlers. Title/description mirror the page's own
+  // usePageSeo call (src/pages/McpApiReference.tsx) so hydration changes
+  // nothing. Deliberately STATIC_ONLY (not in sitemap.xml) — advertising it
+  // is a separate acquisition decision; this entry only makes its canonical
+  // truthful.
+  publicDocument("/docs/mcp-api", {
+    title: "Verdant Grow OS MCP API Reference | Tools, Parameters, Safety",
+    description:
+      "Reference for the Verdant Grow OS MCP server: list_grows, list_recent_diary_entries, and get_latest_sensor_snapshot — parameters, response examples, and safety invariants.",
+    imageAlt: "Verdant Grow OS MCP API reference",
+  }),
 ];
 
 const GUIDE_DOCUMENTS = VERDANT_SEO_GUIDES.map((guide) =>
@@ -220,6 +335,7 @@ const GUIDE_DOCUMENTS = VERDANT_SEO_GUIDES.map((guide) =>
     title: guide.title,
     description: guide.description,
     imageAlt: guide.h1,
+    jsonLd: buildStaticGuideJsonLd(guide),
   }),
 );
 
@@ -228,6 +344,7 @@ const CULTIVAR_DOCUMENTS = VERDANT_CULTIVARS.map((cultivar) =>
     title: `${cultivar.name} Cultivar Grow Guide | Verdant`,
     description: `${cultivar.name} grow guide: lineage (${cultivar.lineage}), ${cultivar.flowerWeeks} flower, environment ranges by stage, and common issues home growers report.`,
     imageAlt: `${cultivar.name} cultivar guide`,
+    jsonLd: buildStaticCultivarJsonLd(cultivar),
   }),
 );
 

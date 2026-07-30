@@ -3,8 +3,9 @@
  * scoping accuracy.
  *
  * Audit-driven static + pure-rule tests:
- *  - Fahrenheit is the user-facing standard (input, label, placeholder,
- *    display chips, chart axes, panels).
+ *  - Fahrenheit is the user-facing DEFAULT (display chips, chart axes,
+ *    panels). Manual entry now accepts °F or °C with the unit stated
+ *    explicitly, and converts to canonical Celsius exactly once.
  *  - Manual payload preserves the documented "store Celsius, display
  *    Fahrenheit" convention via fahrenheitToCelsius().
  *  - Manual insert payload always carries the selected tent_id.
@@ -28,6 +29,7 @@ import {
   validateManualEntry,
 } from "@/lib/sensorReadingManualEntryRules";
 import { celsiusToFahrenheit, formatTempFFromC, tempFFromC } from "@/lib/temperatureUnits";
+import { temperatureInputUnitFromPreference } from "@/lib/sensorInputUnitConversion";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
@@ -48,15 +50,22 @@ const LATEST_SNAP = read("src/hooks/useLatestSensorSnapshot.ts");
 // ---------------------------------------------------------------------------
 
 describe("Manual sensor temperature is collected and labeled in Fahrenheit", () => {
-  it("labels the air-temp input from the saved preference, with a matching placeholder", () => {
-    // The field accepts a typed unit now, so the label is preference-driven
-    // rather than pinned to °F, and the example placeholder follows suit.
-    expect(CARD).toMatch(/unit=\{temperatureSymbol\}/);
-    expect(CARD).not.toContain('unit="°F"');
-    // A Fahrenheit example under a °F preference, a Celsius one under °C.
-    expect(CARD).toMatch(/"24" : "75"/);
-    // Free text is required for a suffix — type="number" would discard it.
-    expect(CARD).toMatch(/allowUnitSuffix/);
+  it("labels the air-temp input with the active entry unit and matching placeholder", () => {
+    // Fahrenheit remains the default entry unit, but the label and placeholder
+    // are now driven by the grower's chosen unit rather than hardcoded, so a
+    // Celsius grower is never shown °F over a value they typed in °C.
+    expect(CARD).toContain("TEMPERATURE_UNIT_SYMBOL[airTempUnit]");
+    expect(CARD).toContain("AIR_TEMP_PLACEHOLDER[airTempUnit]");
+    const conversion = read("src/lib/sensorInputUnitConversion.ts");
+    expect(conversion).toMatch(/F:\s*"°F"/);
+    expect(conversion).toMatch(/F:\s*"75"/);
+  });
+
+  it("defaults the entry unit to Fahrenheit unless the grower prefers Celsius", () => {
+    expect(temperatureInputUnitFromPreference("fahrenheit")).toBe("F");
+    expect(temperatureInputUnitFromPreference("celsius")).toBe("C");
+    expect(temperatureInputUnitFromPreference(undefined)).toBe("F");
+    expect(temperatureInputUnitFromPreference("nonsense")).toBe("F");
   });
 
   it("validates Fahrenheit ranges (warns outside 50–100°F)", () => {
@@ -83,24 +92,30 @@ describe("Manual sensor temperature is collected and labeled in Fahrenheit", () 
     expect(RULES).toMatch(/converted to °C/i);
   });
 
-  it("never silently confuses Fahrenheit and Celsius — the unit is always explicit", () => {
-    // Was: assert °C appears nowhere in the card, because the field was °F-only.
-    // The card now handles BOTH units deliberately, so absence-of-°C is the
-    // wrong guard. The real invariant — a value is never silently misread as the
-    // other unit — is asserted directly instead.
+  it("never silently treats Fahrenheit as Celsius (the unit is always explicit)", () => {
+    // The card no longer hardcodes a unit symbol at all — it renders the
+    // active entry unit and states plainly what is stored. What must never
+    // happen is a bare number rendered without a declared unit, or a value
+    // re-read in a different unit without conversion.
+    expect(CARD).not.toMatch(/unit="°C"/);
+    expect(CARD).not.toMatch(/unit="°F"/);
+    expect(CARD).toContain("Entered in");
+    expect(CARD).toContain("saved as Celsius");
+    expect(CARD).toContain("convertTemperatureInputString");
+  });
 
-    // Every consumer gets an explicitly-named unit: canonical Celsius to the
-    // validator, a Fahrenheit view to the helpers still written against °F.
-    expect(CARD).toMatch(/airTempC: airTempCelsius/);
-    expect(CARD).toMatch(/airTempF: airTempFahrenheit/);
+  it("converts a Celsius entry to Celsius storage without a Fahrenheit detour error", () => {
+    const v = validateManualEntry({ airTemp: 24, airTempUnit: "C" });
+    const row = v.metrics.find((m) => m.metric === "temperature_c");
+    expect(row?.value).toBeCloseTo(24, 2);
+  });
 
-    // The Fahrenheit view is DERIVED from the parsed Celsius, never re-read from
-    // the raw text — that is what stops a double conversion.
-    expect(CARD).toMatch(/celsiusToFahrenheit\(airTempCelsius\)/);
-
-    // The raw typed text is never handed to a consumer as if it were a number.
-    expect(CARD).not.toMatch(/airTempF: form\./);
-    expect(CARD).not.toMatch(/tempF: form\./);
+  it("would have stored the classic bug value before this fix", () => {
+    // Regression pin: 24 typed by a Celsius grower must NOT become -4.44°C.
+    const wrong = validateManualEntry({ airTempF: 24 });
+    expect(wrong.metrics.find((m) => m.metric === "temperature_c")?.value).toBeCloseTo(-4.44, 2);
+    const right = validateManualEntry({ airTemp: 24, airTempUnit: "C" });
+    expect(right.metrics.find((m) => m.metric === "temperature_c")?.value).toBeCloseTo(24, 2);
   });
 });
 

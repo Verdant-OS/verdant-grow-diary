@@ -615,54 +615,6 @@ export type Database = {
         }
         Relationships: []
       }
-      breeding_events: {
-        Row: {
-          created_at: string
-          details: Json
-          donor_plant_id: string | null
-          event_id: string
-          intensity: string | null
-          method: string | null
-          notes: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          details?: Json
-          donor_plant_id?: string | null
-          event_id: string
-          intensity?: string | null
-          method?: string | null
-          notes?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          details?: Json
-          donor_plant_id?: string | null
-          event_id?: string
-          intensity?: string | null
-          method?: string | null
-          notes?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "breeding_events_donor_plant_id_fkey"
-            columns: ["donor_plant_id"]
-            isOneToOne: false
-            referencedRelation: "plants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "breeding_events_event_id_fkey"
-            columns: ["event_id"]
-            isOneToOne: true
-            referencedRelation: "grow_events"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       breeding_program_steps: {
         Row: {
           completed_at: string | null
@@ -1061,6 +1013,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      diary_entry_audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          changed_at: string
+          changed_fields: Json
+          diary_entry_id: string
+          id: string
+          previous_snapshot: Json | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          changed_at?: string
+          changed_fields?: Json
+          diary_entry_id: string
+          id?: string
+          previous_snapshot?: Json | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          changed_at?: string
+          changed_fields?: Json
+          diary_entry_id?: string
+          id?: string
+          previous_snapshot?: Json | null
+          user_id?: string
+        }
+        Relationships: []
       }
       edge_function_metric_events: {
         Row: {
@@ -4592,21 +4577,6 @@ export type Database = {
       }
       billing_entitlement_resolution_operator_audit: {
         Args: { p_limit?: number }
-        Returns: Json
-      }
-      breeding_log_save_event: {
-        Args: {
-          p_details?: Json | null
-          p_event_type: string
-          p_grow_id: string
-          p_idempotency_key: string
-          p_intensity?: string | null
-          p_method?: string | null
-          p_notes?: string | null
-          p_occurred_at?: string | null
-          p_plant_id: string
-          p_tent_id?: string | null
-        }
         Returns: Json
       }
       bump_bridge_token_usage: {

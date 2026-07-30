@@ -21,6 +21,10 @@ const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
 
 const ROOT = resolve(__dirname, "../..");
 const TIMELINE = readFileSync(resolve(ROOT, "src/pages/Timeline.tsx"), "utf8");
+const TIMELINE_EMPTY_STATE_RULES = readFileSync(
+  resolve(ROOT, "src/lib/timelineEmptyStateRules.ts"),
+  "utf8",
+);
 const BADGES = readFileSync(
   resolve(ROOT, "src/components/DiaryEntryBadges.tsx"),
   "utf8",
@@ -173,7 +177,10 @@ describe("Timeline page wiring of normalized diary rules", () => {
   });
 
   it("preserves empty diary state copy", () => {
-    expect(TIMELINE).toMatch(/No entries yet/);
+    // The literal copy now lives in the pure rules module; Timeline renders
+    // it through the shared TimelineEmptyState presenter.
+    expect(TIMELINE).toMatch(/TimelineEmptyState/);
+    expect(TIMELINE_EMPTY_STATE_RULES).toMatch(/No entries yet/);
   });
 
   it("does not introduce service_role or device-control surfaces", () => {

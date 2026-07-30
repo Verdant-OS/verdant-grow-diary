@@ -11,12 +11,22 @@
  *    are intentionally not part of this form. Adding them would require a
  *    migration to extend the trigger; out of scope here.
  *  - Source is always `manual`. Never fakes live data.
- *  - Air temp is entered in °F (grow-room friendly) and converted to °C
- *    before save. Air-only VPD is preview context and is never silently
- *    persisted as though it were verified leaf-to-air VPD.
+ *  - Air temp is entered in °F by default (grow-room friendly) and is
+ *    converted to °C before save. Growers who prefer Celsius enter °C
+ *    directly by passing `airTempUnit: "C"` with `airTemp` — the unit is
+ *    always explicit and is never guessed from the magnitude. Conversion
+ *    still happens exactly once, in `sensorInputUnitConversion`.
+ *  - Air-only VPD is preview context and is never silently persisted as
+ *    though it were verified leaf-to-air VPD.
  */
 
 import { buildManualDeviceId } from "@/lib/manualSensorSourceLabel";
+import {
+  parseTemperatureInput,
+  resolveTemperatureInputUnit,
+  type ParsedTemperatureInput,
+  type TemperatureInputUnit,
+} from "@/lib/sensorInputUnitConversion";
 import { classifyPpfd, PPFD_MAX } from "@/lib/ppfdRules";
 
 export type ManualMetric =
@@ -28,17 +38,19 @@ export type ManualMetric =
   | "ppfd";
 
 export interface ManualEntryInput {
-  /** Air temperature in °F (UI convenience). Converted to °C on save. */
+  /**
+   * Air temperature in °F. Legacy field, kept for the many callers that
+   * already speak Fahrenheit. Ignored when `airTemp` is supplied.
+   */
   airTempF?: string | number | null;
   /**
-   * Air temperature already in canonical °C — the preferred input now that the
-   * form can accept a typed unit ("22°C" / "72°F", see parseTemperatureInput).
-   *
-   * Takes precedence over `airTempF` when both are supplied. `airTempF` is kept
-   * for callers that still hold a Fahrenheit value; supplying only that path
-   * behaves exactly as before, warning strings included.
+   * Air temperature in the unit named by `airTempUnit`. Preferred over
+   * `airTempF` when present, so a grower entering Celsius is validated and
+   * stored in the units they actually typed.
    */
-  airTempC?: string | number | null;
+  airTemp?: string | number | null;
+  /** Unit for `airTemp`. Explicit — never inferred from the value. */
+  airTempUnit?: TemperatureInputUnit;
   /** Relative humidity %. */
   humidityPct?: string | number | null;
   /** Grower-entered VPD kPa. Air-only estimates are preview-only. */
@@ -80,12 +92,20 @@ export function fahrenheitToCelsius(f: number): number {
 }
 
 /**
- * Typical grow-room air temperature band in canonical °C — the same band the
- * Fahrenheit path expresses as 50–100°F. Rounded to whole °C for copy; the
- * Fahrenheit branch still compares in °F so its behavior is bit-identical.
+ * Resolve which air-temperature field the caller supplied and parse it in
+ * its declared unit. `airTemp` + `airTempUnit` wins; otherwise the legacy
+ * `airTempF` field is read as Fahrenheit. Pure.
  */
-const TYPICAL_AIR_TEMP_MIN_C = 10;
-const TYPICAL_AIR_TEMP_MAX_C = 38;
+export function resolveManualAirTemp(input: ManualEntryInput): ParsedTemperatureInput {
+  const hasExplicit =
+    input.airTemp !== undefined &&
+    input.airTemp !== null &&
+    !(typeof input.airTemp === "string" && input.airTemp.trim() === "");
+  if (hasExplicit) {
+    return parseTemperatureInput(input.airTemp, resolveTemperatureInputUnit(input.airTempUnit));
+  }
+  return parseTemperatureInput(input.airTempF, "F");
+}
 
 /**
  * Saturation vapor pressure (kPa) via Tetens formula.
@@ -103,16 +123,7 @@ export function validateManualEntry(input: ManualEntryInput): ManualEntryValidat
   const warnings: string[] = [];
   const metrics: ManualReadingMetric[] = [];
 
-  // Resolve the air temperature into canonical °C, remembering which unit it
-  // arrived in so warnings can be worded in the grower's own unit rather than
-  // always in °F. `airTempC` wins when both are present.
-  const airTempC = toFinite(input.airTempC);
-  const airTempF = toFinite(input.airTempF);
-  const enteredTempUnit: "C" | "F" | null =
-    airTempC !== null ? "C" : airTempF !== null ? "F" : null;
-  const tempC =
-    airTempC !== null ? airTempC : airTempF !== null ? fahrenheitToCelsius(airTempF) : null;
-
+  const airTemp = resolveManualAirTemp(input);
   const humidity = toFinite(input.humidityPct);
   const vpd = toFinite(input.vpdKpa);
   const co2 = toFinite(input.co2Ppm);
@@ -132,6 +143,9 @@ export function validateManualEntry(input: ManualEntryInput): ManualEntryValidat
   if (vpd !== null && vpd < 0) {
     errors.push("VPD cannot be negative.");
   }
+  if (airTemp.kind === "invalid") {
+    errors.push("Air temperature must be a finite number.");
+  }
   if (ppfdClass.kind === "invalid") {
     if (ppfdClass.reason === "negative") {
       errors.push("PPFD cannot be negative.");
@@ -143,18 +157,11 @@ export function validateManualEntry(input: ManualEntryInput): ManualEntryValidat
   }
 
   // Suspicious-but-allowed warnings
-  // Typical grow-room air temp is 50–100°F, i.e. 10–38°C. The Fahrenheit branch
-  // keeps its original comparison and wording so existing callers and their
-  // assertions are untouched; the Celsius branch states the same band in °C
-  // rather than quoting a °F range at somebody working in °C.
-  if (enteredTempUnit === "F" && airTempF !== null) {
-    if (airTempF < 50 || airTempF > 100) {
-      warnings.push(`Air temp ${airTempF}°F is outside the typical 50–100°F range.`);
-    }
-  } else if (enteredTempUnit === "C" && airTempC !== null) {
-    if (airTempC < TYPICAL_AIR_TEMP_MIN_C || airTempC > TYPICAL_AIR_TEMP_MAX_C) {
-      warnings.push(`Air temp ${airTempC}°C is outside the typical 10–38°C range.`);
-    }
+  if (airTemp.outOfTypicalRangeHint) {
+    warnings.push(airTemp.outOfTypicalRangeHint);
+  }
+  if (airTemp.unitMismatchHint) {
+    warnings.push(airTemp.unitMismatchHint);
   }
   if (humidity !== null && humidity >= 0 && humidity <= 100) {
     if (humidity < 20 || humidity > 90) {
@@ -164,17 +171,17 @@ export function validateManualEntry(input: ManualEntryInput): ManualEntryValidat
   if (vpd !== null && vpd >= 0 && vpd > 2.5) {
     warnings.push(`VPD ${vpd} kPa is unusually high (> 2.5).`);
   }
-  if (vpd === null && tempC !== null && humidity !== null && humidity >= 0 && humidity <= 100) {
+  if (vpd === null && airTemp.celsius !== null && humidity !== null && humidity >= 0 && humidity <= 100) {
     warnings.push(
       "Air VPD estimate is preview-only and is not saved as verified VPD. Measure leaf temperature and complete calibration evidence before making a target claim.",
     );
   }
 
   // Build metric rows for accepted fields (only schema-supported metrics).
-  if (tempC !== null) {
+  if (airTemp.celsius !== null) {
     metrics.push({
       metric: "temperature_c",
-      value: Math.round(tempC * 100) / 100,
+      value: Math.round(airTemp.celsius * 100) / 100,
     });
   }
   if (humidity !== null && humidity >= 0 && humidity <= 100) {

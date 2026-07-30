@@ -21,14 +21,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import {
-  celsiusToFahrenheit,
-  formatTemperatureForInput,
-  getTemperatureUnitSymbol,
-  parseTemperatureInput,
-  type TemperatureUnitPreference,
-} from "@/lib/temperatureUnitPreference";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  AIR_TEMP_PLACEHOLDER,
+  celsiusToInputString,
+  convertTemperatureInputString,
+  temperatureInputUnitFromPreference,
+  TEMPERATURE_INPUT_UNITS,
+  TEMPERATURE_UNIT_SYMBOL,
+  toFahrenheitInputString,
+  type TemperatureInputUnit,
+} from "@/lib/sensorInputUnitConversion";
 import {
   buildManualSaveSuccessLine,
   mapManualSaveErrorToUserMessage,
@@ -105,19 +108,8 @@ interface LastSavedConfirmation {
   tentId: string;
 }
 
-/**
- * Local form shape. `airTempText` replaces `ManualEntryInput.airTempF` because
- * the field now holds RAW TYPED TEXT that may carry its own unit ("72F",
- * "22°C") or none at all — calling it `airTempF` would be a lie. It is parsed
- * once (see `parsedAirTemp`) and each downstream consumer is then handed the
- * unit it actually expects.
- */
-type ManualFormState = Omit<ManualEntryInput, "airTempF" | "airTempC"> & {
-  airTempText: string;
-};
-
-const EMPTY: ManualFormState = {
-  airTempText: "",
+const EMPTY: ManualEntryInput = {
+  airTemp: "",
   humidityPct: "",
   vpdKpa: "",
   co2Ppm: "",
@@ -129,15 +121,14 @@ const STANDARD_TARGET_CONTEXT = "manual-reading-standard";
 
 function correctionToPrefill(
   ctx: ManualCorrectionContext | null | undefined,
-  unit?: TemperatureUnitPreference,
-): ManualFormState {
-  if (!ctx) return EMPTY;
+  unit: TemperatureInputUnit,
+): ManualEntryInput {
+  if (!ctx) return { ...EMPTY, airTempUnit: unit };
   const v = ctx.originalValues;
-  const out: ManualFormState = { ...EMPTY };
+  const out: ManualEntryInput = { ...EMPTY, airTempUnit: unit };
   if (typeof v.temperature_c === "number") {
-    // Seed the field in whichever unit the grower reads in, unsuffixed — the
-    // field labels its own unit.
-    out.airTempText = formatTemperatureForInput(v.temperature_c, { unit, digits: 2 });
+    // Stored value is canonical Celsius; render it in the grower's entry unit.
+    out.airTemp = celsiusToInputString(v.temperature_c, unit);
   }
   if (typeof v.humidity_pct === "number") out.humidityPct = String(v.humidity_pct);
   if (typeof v.vpd_kpa === "number") out.vpdKpa = String(v.vpd_kpa);
@@ -155,17 +146,20 @@ export default function ManualSensorReadingCard({
   onSaved,
   correction,
 }: Props) {
+  const temperaturePreference = useTemperatureUnitPreference();
+  // The grower may override the entry unit for this snapshot without changing
+  // their saved display preference. The unit is always explicit and shown next
+  // to the field — it is never inferred from the number typed.
+  const [tempUnitOverride, setTempUnitOverride] = useState<TemperatureInputUnit | null>(null);
+  const airTempUnit: TemperatureInputUnit =
+    tempUnitOverride ?? temperatureInputUnitFromPreference(temperaturePreference);
   const initialTentId = correction?.tentId ?? defaultTentId ?? tents[0]?.id ?? "";
   const correctionIdentity = correction
     ? encodeManualCorrectionHash(correction)
     : STANDARD_TARGET_CONTEXT;
-  // The grower's saved °F/°C preference drives the field's unit label, how a
-  // bare number is interpreted, and how a correction prefill is rendered.
-  const temperatureUnit = useTemperatureUnitPreference();
-  const temperatureSymbol = getTemperatureUnitSymbol(temperatureUnit);
   const [tentId, setTentId] = useState<string>(initialTentId);
-  const [form, setForm] = useState<ManualFormState>(() =>
-    correctionToPrefill(correction, temperatureUnit),
+  const [form, setForm] = useState<ManualEntryInput>(() =>
+    correctionToPrefill(correction, airTempUnit),
   );
   const [devicePreset, setDevicePreset] = useState<string>("none");
   const [deviceCustom, setDeviceCustom] = useState<string>("");
@@ -181,7 +175,7 @@ export default function ManualSensorReadingCard({
   const saveInFlightRef = useRef(false);
 
   const changeTentTarget = useCallback(
-    (nextTentId: string, nextForm: ManualFormState, nextContext = STANDARD_TARGET_CONTEXT) => {
+    (nextTentId: string, nextForm: ManualEntryInput, nextContext = STANDARD_TARGET_CONTEXT) => {
       const nextTargetContext = `${nextTentId}\n${nextContext}`;
       if (targetContextRef.current === nextTargetContext) return;
       targetContextRef.current = nextTargetContext;
@@ -202,10 +196,44 @@ export default function ManualSensorReadingCard({
     if (!nextTentId) return;
     changeTentTarget(
       nextTentId,
-      correctionToPrefill(correction, temperatureUnit),
+      correctionToPrefill(correction, airTempUnit),
       correctionIdentity,
     );
-  }, [changeTentTarget, correction, correctionIdentity, defaultTentId, temperatureUnit]);
+  }, [airTempUnit, changeTentTarget, correction, correctionIdentity, defaultTentId]);
+
+  // Switching the entry unit re-expresses what the grower already typed
+  // (24 °C becomes 75.2 °F) instead of silently re-reading the same number
+  // in a different unit.
+  const changeAirTempUnit = useCallback((next: TemperatureInputUnit) => {
+    setTempUnitOverride(next);
+    setForm((prev) => {
+      const from = prev.airTempUnit ?? "F";
+      if (from === next) return prev;
+      return {
+        ...prev,
+        airTempUnit: next,
+        airTemp: convertTemperatureInputString(
+          typeof prev.airTemp === "string" ? prev.airTemp : String(prev.airTemp ?? ""),
+          from,
+          next,
+        ),
+      };
+    });
+  }, []);
+
+  useEffect(() => {
+    setForm((prev) => (prev.airTempUnit === airTempUnit ? prev : { ...prev, airTempUnit }));
+  }, [airTempUnit]);
+
+  /**
+   * Fahrenheit bridge for the advisor / snapshot review / derived-VPD
+   * preview, which all speak the legacy °F contract. Converted exactly once
+   * here; nothing downstream re-converts. Empty stays empty.
+   */
+  const airTempFBridge = useMemo(
+    () => toFahrenheitInputString(form.airTemp, form.airTempUnit ?? airTempUnit),
+    [form.airTemp, form.airTempUnit, airTempUnit],
+  );
 
   const devicePresets = useMemo(() => getManualSensorDeviceOptions(), []);
   const deviceNote = useMemo(() => {
@@ -215,38 +243,15 @@ export default function ManualSensorReadingCard({
     return preset ? normalizeManualSourceNote(preset.label) : null;
   }, [devicePreset, deviceCustom, devicePresets]);
 
-  // Parse the typed temperature ONCE. A bare number is read in the grower's
-  // saved unit; an explicit "72F" / "22°C" always wins over that.
-  const parsedAirTemp = useMemo(
-    () => parseTemperatureInput(form.airTempText, { assumeUnit: temperatureUnit }),
-    [form.airTempText, temperatureUnit],
-  );
-  const airTempCelsius = parsedAirTemp.ok ? parsedAirTemp.celsius : null;
-  /**
-   * Fahrenheit view of the same value, for the consumers still written against
-   * °F. Deriving it from the parsed Celsius rather than the raw text is what
-   * makes the advisor's "that looks like Celsius" heuristic correct: an explicit
-   * "22°C" arrives here as 71.6°F and no longer trips it, while a bare "22"
-   * typed under a °F preference still does.
-   */
-  const airTempFahrenheit =
-    airTempCelsius === null ? null : Math.round(celsiusToFahrenheit(airTempCelsius) * 100) / 100;
-
-  /** Only complain once the grower has actually typed something unusable. */
-  const airTempError =
-    parsedAirTemp.error === "unknown_unit"
-      ? "Use °F or °C — e.g. 72F or 22C."
-      : parsedAirTemp.error === "not_a_number"
-        ? "Enter a number, optionally with its unit — e.g. 72F or 22C."
-        : null;
-
-  const validation = useMemo(
-    () => validateManualEntry({ ...form, airTempF: null, airTempC: airTempCelsius }),
-    [form, airTempCelsius],
-  );
+  const validation = useMemo(() => validateManualEntry(form), [form]);
   const advisor = useMemo(
-    () => evaluateManualSnapshotAdvisor({ ...form, airTempF: airTempFahrenheit }),
-    [form, airTempFahrenheit],
+    () =>
+      evaluateManualSnapshotAdvisor({
+        ...form,
+        airTemp: form.airTemp,
+        airTempUnit: form.airTempUnit ?? airTempUnit,
+      }),
+    [form, airTempUnit],
   );
   const snapshotQuality = useMemo(() => {
     // Build a sanitized snapshot from validated metrics only. No raw_payload,
@@ -272,7 +277,7 @@ export default function ManualSensorReadingCard({
   // confirming. Blockers here also disable the Confirm button.
   const snapshotReview = useMemo(() => {
     return reviewManualSensorSnapshot({
-      tempF: airTempFahrenheit,
+      tempF: airTempFBridge,
       humidity: form.humidityPct,
       vpdKpa: form.vpdKpa,
       soilWaterContent: form.soilMoisturePct,
@@ -281,10 +286,7 @@ export default function ManualSensorReadingCard({
       capturedAt: new Date().toISOString(),
       tentId: tentId || null,
     });
-    // airTempFahrenheit is derived from form.airTempText AND temperatureUnit, so
-    // `form` alone does not cover it: switching °F↔°C would otherwise leave this
-    // review holding a stale temperature.
-  }, [form, tentId, airTempFahrenheit]);
+  }, [form, airTempFBridge, tentId]);
 
   // Entered VPD vs air-VPD estimate. Uses only sanitized numeric metrics —
   // never relabels source. If the grower entered a VPD that disagrees with
@@ -336,7 +338,7 @@ export default function ManualSensorReadingCard({
     (h) => h.field === "vpdKpa" && h.severity === "warn",
   );
 
-  function update<K extends keyof ManualFormState>(key: K, value: string) {
+  function update<K extends keyof ManualEntryInput>(key: K, value: string) {
     interactionRevisionRef.current += 1;
     setForm((f) => ({ ...f, [key]: value }));
     // Any edit invalidates a previously-shown review prompt so it must be
@@ -633,21 +635,43 @@ export default function ManualSensorReadingCard({
             </div>
 
             <Section title="Air" testId="manual-reading-section-air">
-              <Field
-                id="m-air-temp"
-                label="Air temp"
-                unit={temperatureSymbol}
-                value={form.airTempText}
-                onChange={(v) => update("airTempText", v)}
-                placeholder={temperatureUnit === "celsius" ? "24" : "75"}
-                allowUnitSuffix
-                error={airTempError}
-                hint={
-                  parsedAirTemp.ok && !parsedAirTemp.unitAssumed
-                    ? `Read as ${parsedAirTemp.value}${parsedAirTemp.unit === "C" ? "°C" : "°F"}.`
-                    : `Bare numbers are read as ${temperatureSymbol}. You can also type 72F or 22C.`
-                }
-              />
+              <div className="space-y-1">
+                <Field
+                  id="m-air-temp"
+                  label="Air temp"
+                  unit={TEMPERATURE_UNIT_SYMBOL[airTempUnit]}
+                  value={form.airTemp as string}
+                  onChange={(v) => update("airTemp", v)}
+                  placeholder={AIR_TEMP_PLACEHOLDER[airTempUnit]}
+                />
+                <div
+                  className="flex items-center gap-1"
+                  role="group"
+                  aria-label="Temperature entry unit"
+                  data-testid="manual-reading-temp-unit-toggle"
+                  data-active-unit={airTempUnit}
+                >
+                  {TEMPERATURE_INPUT_UNITS.map((u) => (
+                    <button
+                      key={u}
+                      type="button"
+                      onClick={() => changeAirTempUnit(u)}
+                      aria-pressed={airTempUnit === u}
+                      data-testid={`manual-reading-temp-unit-${u}`}
+                      className={`min-h-11 min-w-11 rounded-md border px-3 text-xs font-medium transition-colors ${
+                        airTempUnit === u
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border/60 text-muted-foreground hover:bg-secondary/40"
+                      }`}
+                    >
+                      {TEMPERATURE_UNIT_SYMBOL[u]}
+                    </button>
+                  ))}
+                  <span className="ml-1 text-[10px] text-muted-foreground">
+                    Entered in {TEMPERATURE_UNIT_SYMBOL[airTempUnit]} — saved as Celsius.
+                  </span>
+                </div>
+              </div>
               <Field
                 id="m-humidity"
                 label="Humidity"
@@ -710,7 +734,7 @@ export default function ManualSensorReadingCard({
 
             <DerivedVpdStatus
               testId="manual-reading-derived-vpd"
-              airTempF={airTempFahrenheit}
+              airTempF={airTempFBridge}
               humidityPct={form.humidityPct as string}
             />
             {advisor.derivedVpdKpa !== null && (
@@ -967,9 +991,6 @@ function Field({
   value,
   onChange,
   placeholder,
-  allowUnitSuffix = false,
-  error,
-  hint,
 }: {
   id: string;
   label: string;
@@ -977,19 +998,7 @@ function Field({
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
-  /**
-   * Accept free text so a unit can be typed alongside the number (e.g. "72F").
-   * `type="number"` silently discards non-numeric characters, so a suffix is
-   * impossible without this. Numeric fields keep type="number" for its native
-   * validation; `inputMode="decimal"` still gives mobile a numeric keypad here.
-   */
-  allowUnitSuffix?: boolean;
-  /** Inline error, e.g. an unrecognized unit. Never blocks typing. */
-  error?: string | null;
-  /** Quiet helper line under the field. */
-  hint?: string | null;
 }) {
-  const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
   return (
     <div className="space-y-1">
       <Label htmlFor={id} className="text-xs flex items-center justify-between gap-2">
@@ -1000,28 +1009,13 @@ function Field({
       </Label>
       <Input
         id={id}
-        type={allowUnitSuffix ? "text" : "number"}
+        type="number"
         inputMode="decimal"
-        step={allowUnitSuffix ? undefined : "any"}
+        step="any"
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={describedBy}
       />
-      {error ? (
-        <p id={`${id}-error`} className="text-[11px] text-destructive" data-testid={`${id}-error`}>
-          {error}
-        </p>
-      ) : hint ? (
-        <p
-          id={`${id}-hint`}
-          className="text-[11px] text-muted-foreground"
-          data-testid={`${id}-hint`}
-        >
-          {hint}
-        </p>
-      ) : null}
     </div>
   );
 }

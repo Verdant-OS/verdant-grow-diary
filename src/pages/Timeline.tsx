@@ -1,4 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import TimelineEmptyState from "@/components/TimelineEmptyState";
+import {
+  resolveTimelineEmptyState,
+  TIMELINE_EMPTY_STATE_FALLBACK,
+} from "@/lib/timelineEmptyStateRules";
+import type { FastAddSelectionContext } from "@/lib/fastAddActionRules";
 import PageHeader from "@/components/PageHeader";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import { supabase } from "@/integrations/supabase/client";
@@ -105,8 +111,6 @@ import {
   filterTimelineEvidenceRows,
   isTimelineDateFilterValue,
   isTimelineEvidenceFilterActive,
-  TIMELINE_EVIDENCE_EMPTY_DESC,
-  TIMELINE_EVIDENCE_EMPTY_TITLE,
   TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER,
 } from "@/lib/timelineEvidenceFilterRules";
 import {
@@ -119,6 +123,7 @@ import {
   type MissingActionResult,
 } from "@/lib/timelineMissingActionRules";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { useTimelineNameDirectory } from "@/hooks/useTimelineNameDirectory";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { canUseFeature } from "@/lib/featureEntitlements";
 import {
@@ -441,12 +446,12 @@ export default function Timeline() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDateFilter, endDateFilter]);
 
-  // Applied bounds: only when the Pro gate is open and values are valid
-  // ISO dates. An inverted range applies nothing (honest no-op + notice).
-  const appliedStartDate =
-    advancedTimelineUnlocked && isTimelineDateFilterValue(startDateFilter) ? startDateFilter : null;
-  const appliedEndDate =
-    advancedTimelineUnlocked && isTimelineDateFilterValue(endDateFilter) ? endDateFilter : null;
+  // Applied bounds: any valid ISO date applies. Date-range filtering is
+  // available on every plan — it is a purely client/query-level narrowing of
+  // the grower's OWN already-authorized diary rows, so there is no cost or
+  // trust surface to gate. An inverted range applies nothing (honest no-op).
+  const appliedStartDate = isTimelineDateFilterValue(startDateFilter) ? startDateFilter : null;
+  const appliedEndDate = isTimelineDateFilterValue(endDateFilter) ? endDateFilter : null;
   const dateRangeInvalid =
     appliedStartDate !== null && appliedEndDate !== null && appliedStartDate > appliedEndDate;
   const effectiveStartDate = dateRangeInvalid ? null : appliedStartDate;
@@ -811,8 +816,22 @@ export default function Timeline() {
     return map;
   }, [actionResponseState]);
 
-  const plantOptions = useMemo(() => deriveTimelinePlantOptions(entries), [entries]);
-  const tentOptions = useMemo(() => deriveTimelineTentOptions(entries), [entries]);
+  // Archived/merged plants and tents disappear from the active-entity
+  // queries but their diary history remains. This read-only directory
+  // (includes is_archived rows) keeps filter labels on real names.
+  // Gated on a resolved grow scope so a rejected/invalid scope issues
+  // no reads at all, matching the page's fail-closed read policy.
+  const { plantNamesById, tentNamesById } = useTimelineNameDirectory(
+    user && activeGrowId ? user : null,
+  );
+  const plantOptions = useMemo(
+    () => deriveTimelinePlantOptions(entries, plantNamesById),
+    [entries, plantNamesById],
+  );
+  const tentOptions = useMemo(
+    () => deriveTimelineTentOptions(entries, tentNamesById),
+    [entries, tentNamesById],
+  );
   const eventTypeOptions = useMemo(() => deriveTimelineEventTypeOptions(entries), [entries]);
 
   const evidenceFilterInput = {
@@ -825,6 +844,21 @@ export default function Timeline() {
     endDate: effectiveEndDate,
   };
   const evidenceActive = isTimelineEvidenceFilterActive(evidenceFilterInput);
+
+  // Selection context handed to the empty-state fast-add buttons. The
+  // timeline's own plant/tent filters ARE the grower's current selection,
+  // so a filtered view can log straight into that scope. Presenter-only —
+  // the Quick Log surface still owns confirmation and save.
+  const fastAddContext = useMemo<FastAddSelectionContext | null>(() => {
+    if (!plantFilter && !tentFilter) return null;
+    return {
+      plantId: plantFilter || null,
+      plantName: plantFilter ? (plantNamesById?.[plantFilter] ?? null) : null,
+      tentId: tentFilter || null,
+      tentName: tentFilter ? (tentNamesById?.[tentFilter] ?? null) : null,
+      growId: activeGrowId ?? null,
+    };
+  }, [plantFilter, tentFilter, plantNamesById, tentNamesById, activeGrowId]);
 
   const filtered = useMemo(() => {
     const afterStageEvent = entries.filter((e) => {
@@ -1331,7 +1365,7 @@ export default function Timeline() {
             Clear filters
           </Button>
         </div>
-        {/* Pro advanced filtering: inclusive date range + next-missing-action jump. */}
+        {/* Date range (all plans) + Pro next-missing-action jump. */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
             Date range
@@ -1340,7 +1374,6 @@ export default function Timeline() {
             type="date"
             value={startDateFilter}
             onChange={(e) => setStartDateFilter(e.target.value)}
-            disabled={!advancedTimelineUnlocked}
             aria-label="Filter from date"
             data-testid="timeline-start-date"
             className="rounded-md border border-border/50 bg-background/60 px-2 py-1 text-sm disabled:opacity-50"
@@ -1350,11 +1383,11 @@ export default function Timeline() {
             type="date"
             value={endDateFilter}
             onChange={(e) => setEndDateFilter(e.target.value)}
-            disabled={!advancedTimelineUnlocked}
             aria-label="Filter to date"
             data-testid="timeline-end-date"
             className="rounded-md border border-border/50 bg-background/60 px-2 py-1 text-sm disabled:opacity-50"
           />
+
           <Button
             type="button"
             variant="outline"
@@ -1400,8 +1433,8 @@ export default function Timeline() {
             className="text-[11px] text-muted-foreground"
             data-testid="timeline-advanced-filters-locked"
           >
-            Date-range filtering and the next-missing-action jump are part of Advanced timeline
-            filtering, a Pro feature.{" "}
+            The next-missing-action jump is part of Advanced timeline filtering, a Pro feature.
+            Date-range filtering is available on every plan.{" "}
             <Link to="/pricing" className="text-primary hover:underline">
               See plans
             </Link>
@@ -1742,16 +1775,25 @@ export default function Timeline() {
         <AlertEventsSection events={alertEvents} />
       </div>
 
-      {pageReadView.kind === "ready_empty" ? (
-        <Empty title="No entries yet" desc="Tap the + button to log your first photo and note." />
-      ) : entries.length === 0 ? null : filtered.length === 0 ? (
-        <Empty
-          title={evidenceActive ? TIMELINE_EVIDENCE_EMPTY_TITLE : "No matching entries"}
-          desc={
-            evidenceActive ? TIMELINE_EVIDENCE_EMPTY_DESC : "Try a different stage or event filter."
+      {pageReadView.kind === "ready_empty" || (entries.length > 0 && filtered.length === 0) ? (
+        <TimelineEmptyState
+          view={
+            resolveTimelineEmptyState({
+              totalEntryCount: pageReadView.kind === "ready_empty" ? 0 : entries.length,
+              filteredEntryCount: filtered.length,
+              evidenceFilterActive: evidenceActive,
+              otherFiltersActive: stageFilter !== "all" || eventFilter !== "all" || evidenceActive,
+              context: fastAddContext,
+            }) ?? TIMELINE_EMPTY_STATE_FALLBACK
           }
+          context={fastAddContext}
+          onClearFilters={() => {
+            clearEvidenceFilters();
+            setStageFilter("all");
+            setEventFilter("all");
+          }}
         />
-      ) : (
+      ) : entries.length === 0 ? null : (
         <div className="space-y-5">
           {groupedByStage.map((group, gi) => (
             <section key={`${group.stage}-${gi}`}>

@@ -23,6 +23,7 @@ import {
   EMPTY_SNAPSHOT,
   type SensorSnapshot,
   snapshotFromDiary,
+  snapshotFromEnvironmentCheck,
   snapshotFromReadings,
 } from "@/lib/sensorSnapshot";
 import { selectDashboardSensorEvidenceRows } from "@/lib/dashboardSensorEvidenceRules";
@@ -81,14 +82,20 @@ export function useLatestSensorSnapshot(
         if (diaryErr) throw diaryErr;
         for (const row of diaryRows ?? []) {
           const details = (row.details ?? null) as Record<string, unknown> | null;
-          const snap =
-            details && typeof details === "object"
-              ? snapshotFromDiary(
-                  row.entry_at,
-                  details.sensor_snapshot as Record<string, unknown> | undefined,
-                )
-              : null;
+          if (!details || typeof details !== "object") continue;
+          const snap = snapshotFromDiary(
+            row.entry_at,
+            details.sensor_snapshot as Record<string, unknown> | undefined,
+          );
           if (snap) return snap;
+          // #596: a Quick Log Environment Check is grower-entered manual
+          // evidence; within the same row a full sensor_snapshot blob wins,
+          // and rows are already newest-first.
+          const envSnap = snapshotFromEnvironmentCheck(
+            row.entry_at,
+            details.environment_check as Record<string, unknown> | undefined,
+          );
+          if (envSnap) return envSnap;
         }
         // 3) Nothing available.
         return EMPTY_SNAPSHOT;

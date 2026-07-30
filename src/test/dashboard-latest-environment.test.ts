@@ -27,14 +27,10 @@ import {
 
 const ROOT = resolve(__dirname, "../..");
 const DASHBOARD = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
-const HOOK = readFileSync(
-  resolve(ROOT, "src/hooks/useLatestSensorSnapshot.ts"),
-  "utf8",
-);
+const HOOK = readFileSync(resolve(ROOT, "src/hooks/useLatestSensorSnapshot.ts"), "utf8");
 
 const AI_COACH_CALL = /["'`]ai-coach["'`]|functions\/ai-coach|ai_coach/;
-const DEVICE_SURFACE =
-  /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i;
+const DEVICE_SURFACE = /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i;
 const WRITE_PATH = /\.from\(['"][^'"]+['"]\)\s*\.(insert|update|delete|upsert)/;
 
 describe("sensorSnapshot pure helpers", () => {
@@ -139,6 +135,13 @@ describe("useLatestSensorSnapshot hook — source priority and safety", () => {
     expect(HOOK).toMatch(/sensor_snapshot/);
   });
 
+  it("consults environment_check as manual evidence only after sensor_snapshot (#596)", () => {
+    // Within a diary row the richer sensor_snapshot blob wins; the env-check
+    // envelope is a manual-evidence fallback, never a replacement.
+    expect(HOOK).toMatch(/snapshotFromDiary\([\s\S]*?snapshotFromEnvironmentCheck\(/);
+    expect(HOOK).toMatch(/details\.environment_check/);
+  });
+
   it("idles when growId is missing (does not query)", () => {
     expect(HOOK).toMatch(/if\s*\(\s*!user\s*||\s*!growId\s*\)/);
   });
@@ -193,9 +196,7 @@ describe("Dashboard — Latest Environment card wiring", () => {
     expect(DASHBOARD).toMatch(
       /formatSensorSourceLabel\(\{[\s\S]{0,200}source:\s*sensorState\.snapshot\.source/,
     );
-    expect(DASHBOARD).toMatch(
-      /deviceId:\s*sensorState\.snapshot\.device_id/,
-    );
+    expect(DASHBOARD).toMatch(/deviceId:\s*sensorState\.snapshot\.device_id/);
   });
 
   it("links to the canonical /timeline route via timelinePath (no dead links, no legacy /logs)", () => {

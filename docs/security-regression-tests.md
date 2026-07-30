@@ -2,16 +2,17 @@
 
 Three tiers of coverage:
 
-| Tier                              | Required? | Needs local Supabase? | Needs Deno? |
-| --------------------------------- | --------- | --------------------- | ----------- |
-| `test:security-regression`        | ✅ yes    | no                    | no          |
-| `test:paddle-webhook-edge-security` | optional (Deno present) | no          | yes         |
-| `test:security-db-local`          | ❌ no (optional job) | yes        | no          |
+| Tier                                | Required?               | Needs local Supabase? | Needs Deno? |
+| ----------------------------------- | ----------------------- | --------------------- | ----------- |
+| `test:security-regression`          | ✅ yes                  | no                    | no          |
+| `test:paddle-webhook-edge-security` | optional (Deno present) | no                    | yes         |
+| `test:security-db-local`            | ❌ no (optional job)    | yes                   | no          |
 
 ## Tier 1 — `test:security-regression` (required CI, fully offline)
 
-Runs on every PR via `.github/workflows/security-regression.yml` as the
-required check named **`test:security-regression`**.
+Runs on every PR targeting `main` or `verdant-grow-diary` via
+`.github/workflows/security-regression.yml` as the required check named
+**`test:security-regression`**.
 
 ```bash
 bun install --frozen-lockfile
@@ -26,7 +27,7 @@ bun run test:security-regression
 No network, no database, no Deno. Must stay fast so it can gate every PR.
 
 **Manual step (one-time):** mark `test:security-regression` as a required
-status check on `main` in GitHub branch protection.
+status check on the repository's default branch in GitHub branch protection.
 
 ## Tier 2 — `test:paddle-webhook-edge-security` (Deno)
 
@@ -121,7 +122,7 @@ They never fake a pass. Required CI never depends on these variables.
 - `test:pi-ingest-db-security` — proves `pi_ingest_commit_batch` is
   executable by service_role only (anon/authenticated get 42501); that
   full and partial batch replays are rejected per `(user_id,
-  idempotency_key)` without duplicate `sensor_readings`; that a
+idempotency_key)` without duplicate `sensor_readings`; that a
   cross-user tent hard-fails and persists nothing; that one invalid row
   aborts the whole batch atomically; that commits never write `alerts`
   or `action_queue` rows; that the idempotency ledger is owner-scoped
@@ -191,7 +192,6 @@ failed / cancelled), tests requested, artifact name
 (`security-db-local-artifacts`, upload-on-failure only, 14-day
 retention), which sanitized log paths are inside it, and a link to the
 current run. The summary itself contains no secrets, JWTs, or DB URLs.
-
 
 Current status: **implemented and verified end-to-end** (2026-07-09,
 fresh `supabase start` + `db reset` + grant-parity seed): profiles

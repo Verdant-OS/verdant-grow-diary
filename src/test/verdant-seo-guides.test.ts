@@ -60,6 +60,10 @@ const EXPECTED_SLUGS: ReadonlyArray<string> = [
   "house-and-garden-nutrients-grow-diary",
   "canna-nutrients-grow-diary",
   "bud-rot-prevention-identification",
+  // Nutrient demand cluster: stage requirements, feed frequency, damage control.
+  // Schedule-neutral by design — brand-named nutrient guides above cover
+  // logging, not dosing.
+  "cannabis-nutrient-schedule",
 ];
 
 describe("Verdant grower guide FAQ (/guides)", () => {
@@ -111,8 +115,8 @@ describe("Verdant grower guide FAQ (/guides)", () => {
   });
 });
 
-describe("Verdant SEO guide pages (20)", () => {
-  it("defines exactly the twenty expected slugs, in order", () => {
+describe("Verdant SEO guide pages (21)", () => {
+  it("defines exactly the twenty-one expected slugs, in order", () => {
     expect(VERDANT_GUIDE_SLUGS).toEqual(EXPECTED_SLUGS);
   });
 

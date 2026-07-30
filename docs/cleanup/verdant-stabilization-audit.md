@@ -104,9 +104,15 @@ unless marked otherwise. Issue numbers are the live board entries.
   path is RPC-first with static trust-boundary suites over migration SQL and
   a runtime harness that needs a local Supabase lane.
 - P1 **#583** (fixed this slice): legacy Quick Log Environment Check readings
-  never reached `environment_events` (RPC sensor params hard-coded null), so
-  the VPD/alert arc never saw them; V2 was correct — same data saved
-  differently by surface.
+  never reached `environment_events` (RPC sensor params hard-coded null); V2
+  passed them through — same data saved differently by surface. The fix
+  restores v2 payload parity and structured persistence. **Correction
+  (post-review, credit: Codex on PR #594):** alert evaluation reads
+  `sensor_readings` then diary `details.sensor_snapshot`, and no production
+  code SELECTs `environment_events` at all — so env checks from _either_
+  Quick Log variant still cannot produce environment alerts. That gap is
+  registered separately (#596) and needs a product decision, since manual
+  _sensor snapshots_ do feed alerts today.
 - P2 **#587**: Timeline date-range filter uses UTC day boundaries against
   locally-rendered dates (off-by-one-day both directions for non-UTC growers).
 - Verified clean: timeline merge ordering is deterministic with a complete

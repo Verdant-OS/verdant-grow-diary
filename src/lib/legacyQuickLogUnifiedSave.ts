@@ -17,8 +17,11 @@
  *   promoted to the RPC's first-class sensor params.
  * - Environment Check air metrics (temp/RH/VPD) DO ride the first-class
  *   `p_temperature_c` / `p_humidity_pct` / `p_vpd_kpa` params, mirroring
- *   Quick Log v2, so the RPC writes the `environment_events` row that the
- *   VPD/alert arc reads. The envelope JSON alone is invisible to it.
+ *   Quick Log v2, so `quicklog_save_manual` persists the structured
+ *   `environment_events` row. Alert evaluation does NOT read that table
+ *   (it reads sensor_readings, then diary `details.sensor_snapshot`), so
+ *   env checks still cannot trigger environment alerts — from either
+ *   Quick Log variant. Tracked on the zero-defect board.
  * - Plant selection is required because the RPC needs a tent or plant
  *   target; the legacy dialog has no tent picker.
  * - Free-text "more details" (pH/EC/runoff/nutrients/training) are

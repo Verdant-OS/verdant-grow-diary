@@ -124,7 +124,10 @@ describe("Environment Check Quick Log — save payload semantics", () => {
   // Regression: the adapter used to hard-code p_temperature_c / p_humidity_pct /
   // p_vpd_kpa to null, so quicklog_save_manual never wrote the
   // environment_events row (its v_has_sensors gate reads exactly these three
-  // params) and Environment Check values were invisible to the VPD/alert arc.
+  // params) and legacy env checks lost their structured persistence — the
+  // parity Quick Log v2 already had. (Alert evaluation reads sensor_readings /
+  // diary sensor_snapshot details, not environment_events; that gap is a
+  // separate board item.)
   it("lifts env-check air metrics into the RPC's first-class sensor params", () => {
     const r = buildLegacyQuickLogUnifiedPayload({
       eventType: "environment",

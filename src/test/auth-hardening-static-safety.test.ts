@@ -8,19 +8,32 @@ import { listFilesCached, readFileCached } from "./helpers/cachedSrcTextScan";
 const ROOT = resolve(__dirname, "../..");
 const SRC = resolve(ROOT, "src");
 const CLIENT = readFileSync(resolve(SRC, "integrations/supabase/client.ts"), "utf8");
+const RESILIENT_SESSION_STORAGE = readFileSync(
+  resolve(SRC, "lib/resilientSessionStorage.ts"),
+  "utf8",
+);
 const AUTH_DOC = readFileSync(resolve(ROOT, "docs/auth-security.md"), "utf8");
 const RLS_DOC = readFileSync(resolve(ROOT, "docs/qa-rls-checklist.md"), "utf8");
 
-const SRC_FILES = listFilesCached(SRC).filter((p) =>
-  /\.(ts|tsx|js|jsx)$/.test(p),
-);
+const SRC_FILES = listFilesCached(SRC).filter((p) => /\.(ts|tsx|js|jsx)$/.test(p));
 const isSrcTestFile = (filePath: string) =>
   relative(SRC, filePath).replace(/\\/g, "/").startsWith("test/");
 
 describe("Supabase client storage", () => {
-  it("uses sessionStorage (not localStorage) for auth persistence", () => {
-    expect(CLIENT).toMatch(/storage:\s*sessionStorage/);
+  it("uses a sessionStorage-backed adapter (not localStorage) for auth persistence", () => {
+    expect(CLIENT).toMatch(/storage:\s*resilientSessionStorage/);
     expect(CLIENT).not.toMatch(/storage:\s*localStorage/);
+    expect(RESILIENT_SESSION_STORAGE).toContain("window.sessionStorage");
+    const executableStorageCode = RESILIENT_SESSION_STORAGE.replace(
+      /\/\*[\s\S]*?\*\/|\/\/.*$/gm,
+      "",
+    );
+    expect(executableStorageCode).not.toMatch(/\blocalStorage\b/);
+  });
+
+  it("keeps blocked storage page-local instead of crashing client startup", () => {
+    expect(RESILIENT_SESSION_STORAGE).toContain("new Map<string, string>()");
+    expect(RESILIENT_SESSION_STORAGE).toContain("fallbackOnly = true");
   });
 
   it("keeps autoRefreshToken + persistSession enabled", () => {
@@ -96,9 +109,7 @@ describe("src/ static safety", () => {
     const offenders = SRC_FILES.filter((f) => {
       if (f.endsWith("auth-hardening-static-safety.test.ts")) return false;
       const body = readFileCached(f);
-      return /from\s+['"]@supabase\/ssr['"]|from\s+['"]next\/headers['"]/.test(
-        body,
-      );
+      return /from\s+['"]@supabase\/ssr['"]|from\s+['"]next\/headers['"]/.test(body);
     });
     expect(offenders).toEqual([]);
   });

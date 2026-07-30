@@ -17,16 +17,19 @@ We do **not** use Supabase SSR, Next.js middleware, `next/headers`, or
 
 ## Storage choice — sessionStorage
 
-The Supabase client is configured with `storage: sessionStorage`
-(see `src/integrations/supabase/client.ts`).
+The Supabase client uses a `sessionStorage`-backed adapter (see
+`src/integrations/supabase/client.ts`). In ordinary browsers it persists the
+session in `sessionStorage`. If a privacy setting or browser policy blocks
+storage access, it safely falls back to page memory only, so the app can still
+load but the session is lost on refresh. It never falls back to `localStorage`.
 
 ### Tradeoffs
 
-| Storage          | Survives tab close? | Survives browser restart? | Readable by injected JS (XSS)? |
-| ---------------- | ------------------- | ------------------------- | ------------------------------ |
-| `localStorage`   | Yes                 | Yes                       | Yes                            |
-| `sessionStorage` | No                  | No                        | Yes                            |
-| `httpOnly` cookie| Yes (server-bound)  | Yes                       | No (not readable from JS)      |
+| Storage           | Survives tab close? | Survives browser restart? | Readable by injected JS (XSS)? |
+| ----------------- | ------------------- | ------------------------- | ------------------------------ |
+| `localStorage`    | Yes                 | Yes                       | Yes                            |
+| `sessionStorage`  | No                  | No                        | Yes                            |
+| `httpOnly` cookie | Yes (server-bound)  | Yes                       | No (not readable from JS)      |
 
 Why `sessionStorage`:
 

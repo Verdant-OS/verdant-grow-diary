@@ -14,7 +14,7 @@
  */
 
 import type { FaqEntry } from "./verdantSeoCopy";
-import { CANNABIS_PLANT_CARE_FAQ } from "./cannabisPlantCareFaq";
+import { CANNABIS_NUTRIENT_FAQ, CANNABIS_PLANT_CARE_FAQ } from "./cannabisPlantCareFaq";
 
 export interface GuideSectionLink {
   readonly label: string;
@@ -1014,6 +1014,60 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "sensor-truth-grow-room",
       "ai-grow-doctor",
       "what-to-log-in-a-grow-journal",
+    ],
+  },
+  {
+    slug: "cannabis-nutrient-schedule",
+    title: "Cannabis nutrient schedule by stage | Verdant Grow Diary",
+    h1: "Cannabis nutrient schedule: what plants need at each stage, and how often to feed",
+    description:
+      "What cannabis plants need in each stage, how often to feed, and how to read feed vs runoff EC — plus how to recover from nutrient burn. Directional guidance and your own record, not a brand chart.",
+    targetKeyword: "cannabis nutrient schedule",
+    intro:
+      "Most nutrient questions come down to three: what does the plant need right now, how often should I feed it, and what do I do when I have overdone it. The honest answer to all three starts the same way — there is no universal schedule. Cultivar, medium, light intensity, and room temperature all move the target, which is why two growers following the same chart get different results. What travels is the method: feed conservatively, measure what goes in and what comes out, change one thing at a time, and keep a record you can actually compare against.",
+    sections: [
+      {
+        heading: "What the plant needs shifts by stage, directionally",
+        body: "Seedlings need almost nothing — a lightly buffered medium and water usually carry them until the first true leaves are working. Vegetative growth leans on nitrogen for leaves and stems, with steady calcium and magnesium underneath. Flowering shifts toward phosphorus and potassium while nitrogen tapers, and late flower wants less of everything as the plant finishes. Treat that as a direction of travel rather than a dosing table: the same stage in a 3-gallon coco pot under heavy light behaves differently than in amended soil under a modest fixture.",
+        links: [
+          { label: "Grow stage care guide", to: "/guides/grow-stage-care-guide" },
+          { label: "Cannabis plant care FAQ", to: "/guides/cannabis-plant-care" },
+        ],
+      },
+      {
+        heading: "Feed frequency follows the medium, not the calendar",
+        body: "Soil holds a nutrient charge, so many soil growers alternate feed and plain water and let the medium buffer the difference. Coco and hydro are inert — they hold almost nothing back — so they are usually fed at every watering at a lower strength. Neither approach is more correct; they are different rhythms for different root zones. The part that decides whether it works is consistency plus a written record of strength and date, because a feed interval you cannot reconstruct is a feed interval you cannot fix.",
+        links: [{ label: "Log a feeding in Quick Log", to: "/quick-log" }],
+      },
+      {
+        heading: "Read feed against runoff instead of chasing an EC number",
+        body: "Published EC and PPM targets vary so widely because they are downstream of everything else in the room. A single number is far less useful than a comparison: measure the EC of what you feed, then the EC of what runs off. Runoff meaningfully higher than the feed means salts are accumulating and the plant is taking up less than you are giving — ease off, or water plain until it settles. Runoff meaningfully lower means heavier uptake and room to feed. Measure the same way every time, and note whether your meter uses the 500 or 700 PPM scale, because the number is only comparable to your own history.",
+      },
+      {
+        heading: "Burn and lockout look similar and want opposite responses",
+        body: "Nutrient burn typically shows as crisping or browning leaf tips after a strength increase; the fix is to stop feeding at that strength and water plain until runoff EC settles. Scorched tissue does not recover, so judge the outcome by new growth, not by the damaged leaves. Lockout is the opposite problem: the nutrient is present but unavailable, usually because pH drifted outside roughly 6.0–6.8 in soil or 5.5–6.5 in soilless and hydro. Feeding more into a lockout makes it worse, so check pH and runoff before adding anything.",
+        links: [
+          {
+            label: "Bud rot prevention and identification",
+            to: "/guides/bud-rot-prevention-identification",
+          },
+        ],
+      },
+      {
+        heading: "The record is what makes the next grow better",
+        body: "Nutrient decisions are only as good as the evidence behind them, and the evidence is easy to lose. Log each feed with its strength, note runoff when you measure it, and photograph tip burn the day you notice it rather than a week later. In Verdant, sensor context attached to an entry stays source-labeled — live, manual, csv, demo, stale, or invalid — so a reading you typed yourself never later reads as something a device measured. When there is enough history, the cautious AI Doctor can point at likely causes and cite your own logged entries; a suggested step only reaches the approval-required Action Queue if you choose to add it. The record informs; the grower decides.",
+        links: [
+          { label: "Sensor truth in the grow room", to: "/guides/sensor-truth-grow-room" },
+          { label: "What to log in a grow journal", to: "/guides/what-to-log-in-a-grow-journal" },
+        ],
+      },
+    ],
+    faq: CANNABIS_NUTRIENT_FAQ,
+    related: [
+      "cannabis-plant-care",
+      "plant-watering-log",
+      "what-to-log-in-a-grow-journal",
+      "ai-grow-doctor",
     ],
   },
 ];

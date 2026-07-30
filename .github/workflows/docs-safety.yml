@@ -2,7 +2,9 @@ name: docs-safety
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
+  push:
+    branches: [verdant-grow-diary]
 
 permissions:
   contents: read

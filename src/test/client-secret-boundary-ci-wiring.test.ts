@@ -21,6 +21,36 @@ const DOCS_YML = readFileSync(resolve(ROOT, ".github/workflows/docs-safety.yml")
 const PKG = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8"));
 const GUARD = readFileSync(resolve(ROOT, "scripts/assert-client-secret-boundary.mjs"), "utf8");
 
+function triggerConfig(yaml: string, event: "pull_request" | "push"): string {
+  const match = yaml.match(new RegExp(`^ {2}${event}:\\s*\\r?\\n((?: {4}.*(?:\\r?\\n|$))*)`, "m"));
+  expect(match, `${event} trigger must be configured`).toBeTruthy();
+  return match?.[1] ?? "";
+}
+
+function configuredBranches(config: string): string[] {
+  const lines = config.split(/\r?\n/);
+  const index = lines.findIndex((line) => /^ {4}branches:\s*/.test(line));
+  expect(
+    index,
+    "pull_request trigger must scope supported branches explicitly",
+  ).toBeGreaterThanOrEqual(0);
+
+  const scalar = lines[index]?.match(/^ {4}branches:\s*(.+?)\s*$/)?.[1] ?? "";
+  if (scalar) {
+    const values =
+      scalar.startsWith("[") && scalar.endsWith("]") ? scalar.slice(1, -1).split(",") : [scalar];
+    return values.map((value) => value.trim().replace(/^['"]|['"]$/g, "")).filter(Boolean);
+  }
+
+  const branches: string[] = [];
+  for (const line of lines.slice(index + 1)) {
+    const item = line.match(/^ {6}-\s*(.+?)\s*$/);
+    if (!item) break;
+    branches.push(item[1].trim().replace(/^['"]|['"]$/g, ""));
+  }
+  return branches;
+}
+
 describe("Client Secret Boundary — CI wiring contract", () => {
   it("ci.yml runs the guard via npm script", () => {
     expect(CI_YML).toMatch(/bun run test:client-secret-boundary/);
@@ -58,6 +88,23 @@ describe("Client Secret Boundary — CI wiring contract", () => {
     const idx = DOCS_YML.indexOf("test:client-secret-boundary");
     const window = DOCS_YML.slice(Math.max(0, idx - 400), idx + 200);
     expect(window).not.toMatch(/continue-on-error\s*:\s*true/);
+  });
+
+  it("docs-safety.yml covers every supported PR target and default-branch push without restrictive filters", () => {
+    const pullRequest = triggerConfig(DOCS_YML, "pull_request");
+    const push = triggerConfig(DOCS_YML, "push");
+
+    expect(configuredBranches(pullRequest)).toEqual(
+      expect.arrayContaining(["main", "verdant-grow-diary"]),
+    );
+    expect(configuredBranches(push)).toEqual(expect.arrayContaining(["verdant-grow-diary"]));
+    for (const config of [pullRequest, push]) {
+      expect(config).not.toMatch(/^ {4}(?:paths|paths-ignore|types):\s*/m);
+    }
+
+    const jobsIndex = DOCS_YML.indexOf("\njobs:");
+    expect(jobsIndex, "docs-safety job must remain configured").toBeGreaterThanOrEqual(0);
+    expect(DOCS_YML.slice(jobsIndex)).not.toMatch(/^ {4}if:\s*/m);
   });
 
   it("package.json wires the script to the boundary scanner", () => {

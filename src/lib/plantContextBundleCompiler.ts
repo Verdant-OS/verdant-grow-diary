@@ -759,7 +759,13 @@ export function summarizeSensorWindow(
 // ---------------------------------------------------------------------------
 
 /** Context slots the runtime expects. Presence drives completeness. */
-const CONTEXT_SLOTS = [
+/**
+ * The context slots the runtime expects, and the exact tokens
+ * `missingInformation` emits. Exported so downstream layers (skill
+ * manifests, applicability) can require context by the SAME token
+ * instead of forking a parallel spelling.
+ */
+export const CONTEXT_SLOTS = [
   "stage",
   "strain",
   "plant_type",
@@ -771,6 +777,8 @@ const CONTEXT_SLOTS = [
   "sensor_readings",
   "photos",
 ] as const;
+
+export type PlantContextSlot = (typeof CONTEXT_SLOTS)[number];
 
 /**
  * Report what is MISSING. Nothing here infers a value — an absent slot

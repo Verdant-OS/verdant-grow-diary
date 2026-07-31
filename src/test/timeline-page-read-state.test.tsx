@@ -339,8 +339,11 @@ describe("Timeline mounted read-state boundary", () => {
       }
       if (spec.table === "plants") {
         // The directory read must NOT filter on is_archived — archived
-        // rows still carry names and must stay resolvable.
+        // rows still carry names and must stay resolvable. It MUST
+        // filter on user_id: additive operator RLS policies would
+        // otherwise return every grower's rows on this owner-facing page.
         expect(spec.filters.some((f) => f.column === "is_archived")).toBe(false);
+        expect(spec.filters).toContainEqual({ op: "eq", column: "user_id", value: "owner-1" });
         return {
           data: [{ id: "5d7206aa-0000-4000-8000-000000000001", name: "Project McDonald #3" }],
           error: null,
@@ -348,6 +351,7 @@ describe("Timeline mounted read-state boundary", () => {
       }
       if (spec.table === "tents") {
         expect(spec.filters.some((f) => f.column === "is_archived")).toBe(false);
+        expect(spec.filters).toContainEqual({ op: "eq", column: "user_id", value: "owner-1" });
         return {
           data: [{ id: "6b1faabb-0000-4000-8000-000000000002", name: "Retired 4x4" }],
           error: null,

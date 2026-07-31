@@ -16,6 +16,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   diffUrlClassifications,
   renderUrlDecisionTraceMarkdown,
@@ -168,6 +169,141 @@ function runDry(dir, extraEnv = {}) {
   );
 }
 
+const GSC_CREDENTIAL_KEYS = [
+  "GSC_CLIENT_ID",
+  "GSC_CLIENT_SECRET",
+  "GSC_REFRESH_TOKEN",
+  "GSC_SITE_URL",
+];
+
+function withoutGscCredentials(extraEnv = {}) {
+  const env = { ...process.env, ...extraEnv };
+  for (const key of GSC_CREDENTIAL_KEYS) delete env[key];
+  return env;
+}
+
+function runLiveWithoutOauth(dir) {
+  return spawnSync(
+    "node",
+    [
+      RUNNER,
+      "--urls",
+      URLS,
+      "--allowlist",
+      "config/seo-allowlist.json",
+      "--now",
+      "2026-07-02T00:00:00Z",
+      "--previous-dir",
+      "artifacts/seo/previous",
+    ],
+    { cwd: dir, encoding: "utf8", env: withoutGscCredentials() },
+  );
+}
+
+function runInvalidSitemap(dir) {
+  return spawnSync(
+    "node",
+    [
+      RUNNER,
+      "--sitemap",
+      "not-a-url",
+      "--allowlist",
+      "config/seo-allowlist.json",
+      "--now",
+      "2026-07-02T00:00:00Z",
+    ],
+    { cwd: dir, encoding: "utf8", env: withoutGscCredentials() },
+  );
+}
+
+function runInvalidAllowlist(dir) {
+  writeFileSync(
+    join(dir, "config/invalid-seo-allowlist.json"),
+    JSON.stringify({ allowlisted_issues: [{ id: "missing-required-fields" }] }),
+  );
+  return spawnSync(
+    "node",
+    [
+      RUNNER,
+      "--urls",
+      URLS,
+      "--allowlist",
+      "config/invalid-seo-allowlist.json",
+      "--now",
+      "2026-07-02T00:00:00Z",
+    ],
+    { cwd: dir, encoding: "utf8", env: withoutGscCredentials() },
+  );
+}
+
+function runLiveWithMockedGsc(dir, scenario, { failAfterInspection = false } = {}) {
+  const preload = join(dir, "mock-gsc-fetch.mjs");
+  writeFileSync(
+    preload,
+    `
+globalThis.fetch = async (input) => {
+  const url = String(input);
+  const scenario = process.env.GSC_TEST_SCENARIO;
+  if (url === "https://oauth2.googleapis.com/token") {
+    if (scenario === "token-failure") return new Response("denied", { status: 401 });
+    return new Response(JSON.stringify({ access_token: "test-access-token" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  if (url === "https://searchconsole.googleapis.com/v1/urlInspection/index:inspect") {
+    if (scenario === "inspection-failure") return new Response("denied", { status: 403 });
+    const verdict = scenario === "finding" ? "FAIL" : "PASS";
+    return new Response(JSON.stringify({
+      inspectionResult: {
+        indexStatusResult: {
+          verdict,
+          coverageState: verdict === "PASS" ? "Submitted and indexed" : "Excluded",
+          robotsTxtState: "ALLOWED",
+          indexingState: "INDEXING_ALLOWED",
+          pageFetchState: "SUCCESSFUL"
+        }
+      }
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  throw new Error("Unexpected test fetch: " + url);
+};
+`,
+  );
+
+  if (failAfterInspection) {
+    mkdirSync(join(dir, "artifacts/seo/gsc-url-inspection.json"));
+  }
+
+  const env = withoutGscCredentials();
+  Object.assign(env, {
+    GSC_CLIENT_ID: "test-client-id",
+    GSC_CLIENT_SECRET: "test-client-secret",
+    GSC_REFRESH_TOKEN: "test-refresh-token",
+    GSC_SITE_URL: "https://verdantgrowdiary.com/",
+    GSC_TEST_SCENARIO: scenario,
+  });
+  return spawnSync(
+    "node",
+    [
+      "--import",
+      pathToFileURL(preload).href,
+      RUNNER,
+      "--urls",
+      "https://verdantgrowdiary.com/",
+      "--allowlist",
+      "config/seo-allowlist.json",
+      "--now",
+      "2026-07-02T00:00:00Z",
+      "--no-diff",
+    ],
+    { cwd: dir, encoding: "utf8", env },
+  );
+}
+
 test("dry-run persists url_classifications, writes per-URL trace, and reports NO_BASELINE first", () => {
   const dir = scaffoldRun();
   try {
@@ -214,6 +350,14 @@ test("second dry-run with a baseline reports baseline available and stable diff"
 test("job-summary JSON mirrors metrics: artifact paths, run URL, and stable flag keys", () => {
   const dir = scaffoldRun();
   try {
+    writeFileSync(
+      join(dir, "artifacts/seo/gsc-last-finding-verification.json"),
+      JSON.stringify({
+        mode: "fail-only-previously-resolved-expired",
+        status: "no_regression",
+        outcome_groups: {},
+      }),
+    );
     runDry(dir, {
       GITHUB_SERVER_URL: "https://github.com",
       GITHUB_REPOSITORY: "Verdant-OS/verdant-grow-diary",
@@ -223,11 +367,18 @@ test("job-summary JSON mirrors metrics: artifact paths, run URL, and stable flag
     // Stable top-level keys always present.
     for (const k of [
       "status",
+      "status_scope",
       "mode",
       "urls_evaluated",
       "workflow_run_url",
       "oauth_configured",
       "gsc_skipped",
+      "gsc_access_status",
+      "gsc_execution_status",
+      "gsc_token_refresh_status",
+      "gsc_inspection_attempted",
+      "gsc_inspection_succeeded",
+      "gsc_inspection_failed",
       "previous_baseline_found",
       "diff_comparison_ran",
       "expired_allowlist_ids",
@@ -242,6 +393,18 @@ test("job-summary JSON mirrors metrics: artifact paths, run URL, and stable flag
     // Artifact paths present and stable.
     assert.equal(js.artifacts.suppressions_md, "artifacts/seo/seo-allowlist-suppressions.md");
     assert.equal(js.artifacts.job_summary_json, "artifacts/seo/seo-job-summary.json");
+    assert.equal(js.status, "PASS");
+    assert.equal(js.status_scope, "OPERATION");
+    assert.equal(js.oauth_configured, null);
+    assert.equal(js.gsc_skipped, true);
+    assert.equal(js.gsc_access_status, "NOT_APPLICABLE");
+    assert.equal(js.gsc_execution_status, "SKIPPED");
+    assert.equal(js.gsc_token_refresh_status, "SKIPPED");
+    assert.equal(js.gsc_inspection_attempted, 0);
+    assert.equal(js.gsc_inspection_succeeded, 0);
+    assert.equal(js.gsc_inspection_failed, 0);
+    assert.equal(js.last_finding_status, null);
+    assert.equal(js.regression_status, "no_regression");
     // Run URL built from env.
     assert.equal(
       js.workflow_run_url,
@@ -251,6 +414,168 @@ test("job-summary JSON mirrors metrics: artifact paths, run URL, and stable flag
     const md = readFileSync(join(dir, "artifacts/seo/seo-job-summary.md"), "utf8");
     assert.match(md, /actions\/runs\/777/);
     assert.match(md, /seo-allowlist-suppressions\.md/);
+    assert.match(md, /Operation status:\*\* PASS/);
+    assert.match(md, /GSC access status:\*\* NOT_APPLICABLE/);
+    assert.match(md, /GSC execution status:\*\* SKIPPED/);
+    assert.match(md, /Dry-run — no GSC API calls/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("missing OAuth overwrites dry-run PASS with a blocked, skipped live summary", () => {
+  const dir = scaffoldRun();
+  try {
+    assert.equal(runDry(dir).status, 0);
+    const result = runLiveWithoutOauth(dir);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+
+    const summary = JSON.parse(
+      readFileSync(join(dir, "artifacts/seo/seo-job-summary.json"), "utf8"),
+    );
+    assert.equal(summary.mode, "live-skipped");
+    assert.equal(summary.status, "SKIPPED");
+    assert.equal(summary.status_scope, "OPERATION");
+    assert.equal(summary.oauth_configured, false);
+    assert.equal(summary.gsc_skipped, true);
+    assert.equal(summary.gsc_access_status, "BLOCKED");
+    assert.equal(summary.gsc_execution_status, "SKIPPED");
+
+    const md = readFileSync(join(dir, "artifacts/seo/seo-job-summary.md"), "utf8");
+    assert.match(md, /Operation status:\*\* SKIPPED/);
+    assert.match(md, /GSC access status:\*\* BLOCKED/);
+    assert.match(md, /GSC execution status:\*\* SKIPPED/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("runner failure overwrites a pre-existing dry-run PASS with FAIL", () => {
+  const dir = scaffoldRun();
+  try {
+    assert.equal(runDry(dir).status, 0);
+    const result = runInvalidSitemap(dir);
+    assert.equal(result.status, 1, result.stderr || result.stdout);
+
+    const summary = JSON.parse(
+      readFileSync(join(dir, "artifacts/seo/seo-job-summary.json"), "utf8"),
+    );
+    assert.equal(summary.mode, "runner-error");
+    assert.equal(summary.status, "FAIL");
+    assert.equal(summary.status_scope, "OPERATION");
+    assert.equal(summary.gsc_execution_status, "SKIPPED");
+    assert.match(summary.notes.join(" "), /failed before a complete result/i);
+
+    const md = readFileSync(join(dir, "artifacts/seo/seo-job-summary.md"), "utf8");
+    assert.match(md, /Operation status:\*\* FAIL/);
+    assert.doesNotMatch(md, /Operation status:\*\* PASS/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("invalid allowlist overwrites a pre-existing dry-run PASS with FAIL", () => {
+  const dir = scaffoldRun();
+  try {
+    assert.equal(runDry(dir).status, 0);
+    const result = runInvalidAllowlist(dir);
+    assert.equal(result.status, 2, result.stderr || result.stdout);
+
+    const summary = JSON.parse(
+      readFileSync(join(dir, "artifacts/seo/seo-job-summary.json"), "utf8"),
+    );
+    assert.equal(summary.mode, "invalid-allowlist");
+    assert.equal(summary.status, "FAIL");
+    assert.equal(summary.status_scope, "OPERATION");
+    assert.equal(summary.gsc_execution_status, "SKIPPED");
+    assert.match(summary.notes.join(" "), /structural validation failed/i);
+
+    const md = readFileSync(join(dir, "artifacts/seo/seo-job-summary.md"), "utf8");
+    assert.match(md, /Operation status:\*\* FAIL/);
+    assert.doesNotMatch(md, /Operation status:\*\* PASS/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("successful GSC response with an SEO finding keeps access and execution PASS", () => {
+  const dir = scaffoldRun();
+  try {
+    const result = runLiveWithMockedGsc(dir, "finding");
+    assert.equal(result.status, 1, result.stderr || result.stdout);
+    const summary = JSON.parse(
+      readFileSync(join(dir, "artifacts/seo/seo-job-summary.json"), "utf8"),
+    );
+    assert.equal(summary.mode, "live");
+    assert.equal(summary.status, "FAIL");
+    assert.equal(summary.gsc_access_status, "PASS");
+    assert.equal(summary.gsc_execution_status, "PASS");
+    assert.equal(summary.gsc_token_refresh_status, "PASS");
+    assert.equal(summary.gsc_inspection_attempted, 1);
+    assert.equal(summary.gsc_inspection_succeeded, 1);
+    assert.equal(summary.gsc_inspection_failed, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("token refresh failure records access failure and skipped inspection", () => {
+  const dir = scaffoldRun();
+  try {
+    const result = runLiveWithMockedGsc(dir, "token-failure");
+    assert.equal(result.status, 1, result.stderr || result.stdout);
+    const summary = JSON.parse(
+      readFileSync(join(dir, "artifacts/seo/seo-job-summary.json"), "utf8"),
+    );
+    assert.equal(summary.mode, "runner-error");
+    assert.equal(summary.status, "FAIL");
+    assert.equal(summary.oauth_configured, true);
+    assert.equal(summary.gsc_access_status, "FAIL");
+    assert.equal(summary.gsc_execution_status, "SKIPPED");
+    assert.equal(summary.gsc_token_refresh_status, "FAIL");
+    assert.equal(summary.gsc_inspection_attempted, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("inspection HTTP failure records failed access and execution", () => {
+  const dir = scaffoldRun();
+  try {
+    const result = runLiveWithMockedGsc(dir, "inspection-failure");
+    assert.equal(result.status, 1, result.stderr || result.stdout);
+    const summary = JSON.parse(
+      readFileSync(join(dir, "artifacts/seo/seo-job-summary.json"), "utf8"),
+    );
+    assert.equal(summary.mode, "live");
+    assert.equal(summary.status, "FAIL");
+    assert.equal(summary.gsc_access_status, "FAIL");
+    assert.equal(summary.gsc_execution_status, "FAIL");
+    assert.equal(summary.gsc_token_refresh_status, "PASS");
+    assert.equal(summary.gsc_inspection_attempted, 1);
+    assert.equal(summary.gsc_inspection_succeeded, 0);
+    assert.equal(summary.gsc_inspection_failed, 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("post-call runner failure preserves observed access and fails execution", () => {
+  const dir = scaffoldRun();
+  try {
+    const result = runLiveWithMockedGsc(dir, "pass", { failAfterInspection: true });
+    assert.equal(result.status, 1, result.stderr || result.stdout);
+    const summary = JSON.parse(
+      readFileSync(join(dir, "artifacts/seo/seo-job-summary.json"), "utf8"),
+    );
+    assert.equal(summary.mode, "runner-error");
+    assert.equal(summary.status, "FAIL");
+    assert.equal(summary.gsc_access_status, "PASS");
+    assert.equal(summary.gsc_execution_status, "FAIL");
+    assert.equal(summary.gsc_token_refresh_status, "PASS");
+    assert.equal(summary.gsc_inspection_attempted, 1);
+    assert.equal(summary.gsc_inspection_succeeded, 1);
+    assert.equal(summary.gsc_inspection_failed, 0);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

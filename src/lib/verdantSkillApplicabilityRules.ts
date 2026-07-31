@@ -63,6 +63,7 @@ export const SKILL_APPLICABILITY_REASONS = [
   "missing_required_sensor_metric",
   "required_sensor_metric_conflicted",
   "autoflower_status_unknown",
+  "plant_identity_contradictory",
   "missing_required_context",
   "missing_optional_context",
   "insufficient_usable_sensor_readings",
@@ -153,6 +154,42 @@ function hasFiniteBound(range: { min?: unknown; max?: unknown } | null | undefin
 }
 
 /**
+ * Photoperiod-vs-autoflower is recorded in TWO places — free text in
+ * `plantType` and a boolean in `isAutoflower` — and they are the same
+ * fact. This resolves them to one answer, in one place, so the two can
+ * never be consulted independently and reach different conclusions.
+ *
+ * The three outcomes matter separately:
+ *  - either source alone answers the question, so a plant with only the
+ *    boolean recorded is not asked to re-record it as text (and vice
+ *    versa). A dead end is not a safe refusal.
+ *  - when both are recorded and DISAGREE, the plant's identity is not
+ *    known — it is worse than unknown, because two sources assert
+ *    different things. Picking one would be a guess, so this reports
+ *    insufficient context and says why.
+ */
+interface PlantIdentity {
+  known: boolean;
+  isAutoflower: boolean | null;
+  contradictory: boolean;
+}
+
+function resolvePlantIdentity(compilation: PlantContextCompilation): PlantIdentity {
+  const fromText = normalizePlantType(compilation.plantType);
+  const textSays = fromText === null ? null : fromText === "autoflower";
+  const flag = compilation.bundle.isAutoflower;
+  const flagSays = flag === null || flag === undefined ? null : flag === true;
+
+  if (textSays !== null && flagSays !== null) {
+    if (textSays !== flagSays) return { known: false, isAutoflower: null, contradictory: true };
+    return { known: true, isAutoflower: textSays, contradictory: false };
+  }
+  if (textSays !== null) return { known: true, isAutoflower: textSays, contradictory: false };
+  if (flagSays !== null) return { known: true, isAutoflower: flagSays, contradictory: false };
+  return { known: false, isAutoflower: null, contradictory: false };
+}
+
+/**
  * Is a required slot genuinely present?
  *
  * PRESENCE IS TOTAL OVER THE SLOT VOCABULARY. This used to be a short
@@ -180,13 +217,7 @@ const SLOT_IS_PRESENT: Record<PlantContextSlot, (compilation: PlantContextCompil
     stage: (c) =>
       c.bundle.stage !== null && c.bundle.stage !== undefined && c.bundle.stage !== "unknown",
     strain: (c) => isMeaningfulText(c.bundle.strain),
-    // Free text, so spelling normalization alone is not enough: "banana"
-    // normalizes cleanly and answers nothing. A recorded autoflower flag
-    // answers the same question, so it counts.
-    plant_type: (c) => {
-      if (normalizePlantType(c.plantType) !== null) return true;
-      return c.bundle.isAutoflower !== null && c.bundle.isAutoflower !== undefined;
-    },
+    plant_type: (c) => resolvePlantIdentity(c).known,
     medium: (c) => {
       const m = normalizeMedium(c.bundle.medium);
       return m !== null && m !== "unknown";
@@ -340,7 +371,14 @@ export function evaluateSkillApplicability(
     reasons.add("medium_unknown");
     if (!missingRequired.includes("medium")) missingRequired.push("medium");
   }
-  if (envelope.requiresKnownAutoflowerStatus && compilation.bundle.isAutoflower === null) {
+  // Identity is resolved from BOTH sources, so an autoflower-sensitive
+  // skill is not told to record a status the plant already carries as
+  // text — and two sources that disagree are not silently reconciled.
+  const identity = resolvePlantIdentity(compilation);
+  if (identity.contradictory) {
+    reasons.add("plant_identity_contradictory");
+    if (!missingRequired.includes("plant_type")) missingRequired.push("plant_type");
+  } else if (envelope.requiresKnownAutoflowerStatus && !identity.known) {
     // null is not false — autoflower-sensitive skills stay conservative.
     reasons.add("autoflower_status_unknown");
     if (!missingRequired.includes("plant_type")) missingRequired.push("plant_type");

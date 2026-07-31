@@ -216,6 +216,56 @@ describe("promotion — the decision must name its subject", () => {
   });
 });
 
+describe("promotion — a transition has two ends", () => {
+  // Gates were selected from the requested state alone, so any edge landing
+  // on limited_beta was authorized by the same evidence — including one
+  // starting from `paused`, the state a skill lands in precisely because
+  // something went wrong. Every gate reads the report; none read where the
+  // skill is coming from.
+  it("refuses to reactivate a withdrawn skill straight into grower exposure", () => {
+    for (const from of ["paused", "deprecated", "withdrawn", "superseded"] as const) {
+      const d = decide({ currentState: from, requestedState: "limited_beta" });
+      expect(d.eligible, from).toBe(false);
+      expect(d.blockingReasons, from).toContain("transition_not_permitted");
+      expect(d.authorizedManifestLifecycle, from).toBeNull();
+    }
+  });
+
+  it("refuses a regression that keeps the skill exposed", () => {
+    // The way DOWN the ladder is through a withdrawal state, not sideways
+    // into a lower exposure tier while still shipping.
+    const d = decide({ currentState: "verified", requestedState: "limited_beta" });
+    expect(d.eligible).toBe(false);
+    expect(d.blockingReasons).toContain("transition_not_permitted");
+  });
+
+  it("refuses a no-op transition", () => {
+    const d = decide({ currentState: "limited_beta", requestedState: "limited_beta" });
+    expect(d.eligible).toBe(false);
+    expect(d.blockingReasons).toContain("transition_not_permitted");
+  });
+
+  it("still allows an advance that skips rungs, because gates are cumulative", () => {
+    // Guards the guard: an edge check that rejected everything would satisfy
+    // the three tests above while breaking the CLI, which asks
+    // draft → limited_beta.
+    const d = decide({ currentState: "draft", requestedState: "limited_beta" });
+    expect(d.blockingReasons).not.toContain("transition_not_permitted");
+    expect(d.eligible).toBe(true);
+  });
+
+  it("still allows withdrawal from anywhere, including from another withdrawal state", () => {
+    // Removing exposure never needs an edge check: requiring one to pause a
+    // misbehaving skill would be exactly backwards.
+    for (const from of ["draft", "verified", "limited_beta", "withdrawn"] as const) {
+      for (const to of ["paused", "deprecated", "withdrawn", "superseded"] as const) {
+        const d = decide({ currentState: from, requestedState: to });
+        expect(d.blockingReasons, `${from} → ${to}`).not.toContain("transition_not_permitted");
+      }
+    }
+  });
+});
+
 describe("promotion — refusals", () => {
   it("never promotes a harness self-test", () => {
     const d = decide({

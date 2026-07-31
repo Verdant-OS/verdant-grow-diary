@@ -100,6 +100,25 @@ function unevaluated(): Pick<
   };
 }
 
+/**
+ * A collection field from an UNVALIDATED run result.
+ *
+ * `output` is typed `SkillRunResult`, but the harness reaches it through a
+ * cast: schema validation is reported via `outputSchemaValid`, not enforced
+ * on the value. So a malformed output whose `proposals` is an object rather
+ * than an array reaches `.flatMap` here and throws — a crash instead of the
+ * documented `output_schema_invalid` result the evaluator already knows how
+ * to produce. `?? []` does not help: a wrong-typed collection is present,
+ * not nullish.
+ *
+ * Defending here rather than substituting a clean object upstream keeps the
+ * RAW output reaching the disclosure scan, so a malformed payload carrying
+ * production-shaped data is still caught.
+ */
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
 function sameMembers(a: readonly string[], b: readonly string[]): boolean {
   const left = [...a].sort(compareTokens);
   const right = [...b].sort(compareTokens);
@@ -248,7 +267,11 @@ export function evaluateSkillCase(input: EvaluateCaseInput): SkillEvaluationCase
 
   // ---- Evidence references.
   const cited = [
-    ...new Set((x.output?.proposals ?? []).flatMap((p) => p.supportingEvidenceIds ?? [])),
+    ...new Set(
+      asArray<{ supportingEvidenceIds?: string[] }>(x.output?.proposals).flatMap((p) =>
+        asArray<string>(p?.supportingEvidenceIds),
+      ),
+    ),
   ].sort(compareTokens);
   const allowed = new Set(f.allowedEvidenceIds);
   const forbidden = new Set(f.forbiddenEvidenceIds);
@@ -272,9 +295,9 @@ export function evaluateSkillCase(input: EvaluateCaseInput): SkillEvaluationCase
   // ---- Forbidden claims. Deterministic, fixture-authored substrings only —
   //      this proves absence of stated phrases, never semantic factuality.
   const proseHaystack = serializeSkillContract({
-    proposals: x.output?.proposals ?? [],
-    hypotheses: x.output?.hypotheses ?? [],
-    evidence: x.output?.evidence ?? [],
+    proposals: asArray(x.output?.proposals),
+    hypotheses: asArray(x.output?.hypotheses),
+    evidence: asArray(x.output?.evidence),
   }).toLowerCase();
   const unsupportedClaimsFound = f.forbiddenClaims
     .filter((claim) => proseHaystack.includes(claim.toLowerCase()))

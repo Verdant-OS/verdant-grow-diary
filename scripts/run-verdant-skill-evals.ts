@@ -374,12 +374,28 @@ export function main(argv: readonly string[]): MainResult {
   }
 
   const outDir = resolve(ROOT, args.outputDir ?? `artifacts/skills/${skillId}/${skillVersion}`);
-  const artifactPaths = [
-    `${outDir}/evaluation.json`,
-    `${outDir}/evaluation.md`,
-    `${outDir}/promotion-decision.json`,
-    `${outDir}/promotion-decision.md`,
-  ];
+
+  // LOGICAL names, and only logical names, go into the report.
+  //
+  // `outDir` is absolute, so recording it would fold the checkout location
+  // into the report and therefore into the report's own digest: the same
+  // fixtures and arguments would produce different bytes and a different
+  // binding on a developer machine than in CI, which is exactly what the
+  // reproducibility contract forbids. It would also carry the filesystem
+  // layout — on Windows, the operating-system username — into an artifact CI
+  // uploads, a disclosure the run scanner has no pattern for.
+  //
+  // The four artifacts are always siblings in one directory, so their names
+  // are their whole logical identity. Where that directory is belongs to the
+  // reader, not to the record.
+  const ARTIFACT_NAMES = [
+    "evaluation.json",
+    "evaluation.md",
+    "promotion-decision.json",
+    "promotion-decision.md",
+  ] as const;
+  const artifactPaths = [...ARTIFACT_NAMES];
+  const writeTargets = ARTIFACT_NAMES.map((name) => `${outDir}/${name}`);
 
   const report = buildEvaluationReport({
     skillId,
@@ -413,10 +429,10 @@ export function main(argv: readonly string[]): MainResult {
   });
 
   try {
-    writeAtomic(artifactPaths[0], `${JSON.stringify(report, null, 2)}\n`);
-    if (!args.jsonOnly) writeAtomic(artifactPaths[1], `${renderEvaluationMarkdown(report)}\n`);
-    writeAtomic(artifactPaths[2], `${JSON.stringify(decision, null, 2)}\n`);
-    if (!args.jsonOnly) writeAtomic(artifactPaths[3], `${renderPromotionMarkdown(decision)}\n`);
+    writeAtomic(writeTargets[0], `${JSON.stringify(report, null, 2)}\n`);
+    if (!args.jsonOnly) writeAtomic(writeTargets[1], `${renderEvaluationMarkdown(report)}\n`);
+    writeAtomic(writeTargets[2], `${JSON.stringify(decision, null, 2)}\n`);
+    if (!args.jsonOnly) writeAtomic(writeTargets[3], `${renderPromotionMarkdown(decision)}\n`);
   } catch (error) {
     return {
       code: EXIT_USAGE_OR_IO,

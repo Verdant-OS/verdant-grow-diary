@@ -65,7 +65,7 @@ describe("cli — argument contract", () => {
   });
 });
 
-describe("cli — fixture envelope validation", () => {
+describe("cli — untrusted fixture input", () => {
   const SOURCE = resolve(
     __dirname,
     "../../fixtures/skills/harness-self-test/v1/hst-001-happy-path.json",
@@ -115,6 +115,24 @@ describe("cli — fixture envelope validation", () => {
         record.execution = value;
       });
       expect(r.code, JSON.stringify(value)).toBe(EXIT_USAGE_OR_IO);
+    }
+  });
+
+  // `output` is typed SkillRunResult but reaches the evaluator through a cast:
+  // schema validity is REPORTED, not enforced. A wrong-typed collection is
+  // present rather than nullish, so `?? []` does not catch it, and the
+  // evaluator used to reach `.flatMap` on an object and throw — a crash
+  // instead of the documented output_schema_invalid result it already knows
+  // how to produce.
+  it("survives a wrong-typed collection in an untrusted run output", () => {
+    for (const shape of [{}, "proposals", 42, true]) {
+      const r = runWithMutated((record) => {
+        (record.execution as { output: Record<string, unknown> }).output.proposals = shape;
+      });
+      // Not a throw, and not exit 2 either: the file is well-formed, the
+      // OUTPUT is not. That is an evaluation result, not a usage error.
+      expect(r.code, JSON.stringify(shape)).not.toBe(EXIT_USAGE_OR_IO);
+      expect([EXIT_EVALUATION_FAILURE, EXIT_HARD_SAFETY], JSON.stringify(shape)).toContain(r.code);
     }
   });
 
@@ -187,8 +205,6 @@ describe("cli — self-test run", () => {
   });
 
   it("produces byte-identical artifacts under a fixed clock", () => {
-    // Same output directory on purpose: the artifact records its own paths,
-    // so a different directory is a different input and SHOULD differ.
     const shared = outDir();
     try {
       selfTest([], shared);
@@ -198,6 +214,53 @@ describe("cli — self-test run", () => {
       expect(second).toBe(first);
     } finally {
       rmSync(shared, { recursive: true, force: true });
+    }
+  });
+
+  it("produces byte-identical artifacts from different output directories", () => {
+    // The stronger claim, and the one that matters: reproducibility must not
+    // depend on where the checkout lives. An artifact that records its own
+    // absolute path folds the working directory into its own digest, so the
+    // same fixtures and arguments yield a different report and a different
+    // binding on a developer machine than in CI — and the two can never be
+    // compared or cross-verified.
+    const a = outDir();
+    const b = outDir();
+    try {
+      selfTest([], a);
+      selfTest([], b);
+      expect(readFileSync(join(b, "evaluation.json"), "utf8")).toBe(
+        readFileSync(join(a, "evaluation.json"), "utf8"),
+      );
+      expect(readFileSync(join(b, "promotion-decision.json"), "utf8")).toBe(
+        readFileSync(join(a, "promotion-decision.json"), "utf8"),
+      );
+    } finally {
+      rmSync(a, { recursive: true, force: true });
+      rmSync(b, { recursive: true, force: true });
+    }
+  });
+
+  it("records logical artifact names, never a filesystem location", () => {
+    // Absolute paths also carry the filesystem layout — on Windows, the
+    // operating-system username — into an artifact CI uploads, and the run
+    // disclosure scanner has no pattern for that shape.
+    const { out } = selfTest();
+    try {
+      const report = JSON.parse(readFileSync(join(out, "evaluation.json"), "utf8"));
+      expect(report.artifactPaths).toEqual([
+        "evaluation.json",
+        "evaluation.md",
+        "promotion-decision.json",
+        "promotion-decision.md",
+      ]);
+      const serialized = JSON.stringify(report);
+      expect(serialized).not.toContain(out);
+      expect(serialized).not.toMatch(/[A-Za-z]:[\\/]/);
+      expect(serialized).not.toContain("/Users/");
+      expect(serialized).not.toContain("/home/");
+    } finally {
+      rmSync(out, { recursive: true, force: true });
     }
   });
 

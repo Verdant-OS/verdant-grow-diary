@@ -157,6 +157,48 @@ const WITHDRAWAL_STATES: readonly string[] = Object.freeze([
   "superseded",
 ]);
 
+/**
+ * The advancement ladder, in order. A state's position is its rung.
+ *
+ * The withdrawal states deliberately have NO rung. They are not a position on
+ * the ladder, they are a way off it — so nothing climbs back out of one
+ * through this decision. Re-exposing a paused, deprecated, withdrawn or
+ * superseded skill is a reactivation, which this build does not model and
+ * therefore must not authorize.
+ */
+const PROGRESSION_LADDER: readonly string[] = Object.freeze([
+  "draft",
+  "schema_valid",
+  "static_safety_passed",
+  "golden_cases_passed",
+  "expert_reviewed",
+  "internal_sandbox",
+  "limited_beta",
+  "monitored_release",
+  "verified",
+]);
+
+/** Rung index, or -1 for a state that is not on the ladder at all. */
+function rungOf(state: string): number {
+  return PROGRESSION_LADDER.indexOf(state);
+}
+
+/**
+ * Whether the requested edge is an ADVANCEMENT: both ends on the ladder, and
+ * strictly upward.
+ *
+ * Gate tables are cumulative, so a long advance (draft straight to limited
+ * beta) still has to satisfy every gate in between — skipping rungs is safe,
+ * because the evidence demanded is the same. What is NOT safe is an edge that
+ * starts off the ladder, or one that moves down it while exposure continues:
+ * the way down is through a withdrawal state.
+ */
+function isAdvancement(currentState: string, requestedState: string): boolean {
+  const from = rungOf(currentState);
+  const to = rungOf(requestedState);
+  return from >= 0 && to >= 0 && to > from;
+}
+
 export interface PromotionEligibilityInput {
   /**
    * The skill being advanced. Required, because a decision that does not
@@ -247,9 +289,17 @@ export function evaluateSkillPromotionEligibility(
     ? []
     : (GATES_BY_TARGET[input.requestedState] ?? []);
 
-  if (!isWithdrawal && targetKnown && requiredGates.length === 0) {
+  // BOTH ends of the edge, not just the destination. Selecting gates from
+  // the requested state alone means a skill sitting in `paused` — the state a
+  // skill lands in precisely because something went wrong — can be advanced
+  // straight back to grower exposure on a report that predates whatever
+  // caused the pause, because every gate consulted reads the report and none
+  // reads where the skill is coming from.
+  if (!isWithdrawal && targetKnown) {
     // A forward state with no gate table is not "free" — it is unmodelled.
-    block("transition_not_permitted");
+    if (requiredGates.length === 0 || !isAdvancement(input.currentState, input.requestedState)) {
+      block("transition_not_permitted");
+    }
   }
 
   // Identity is checked for EVERY transition, including withdrawal: pausing

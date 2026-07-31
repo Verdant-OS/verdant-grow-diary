@@ -351,6 +351,35 @@ export const verdantSkillManifestSchema = z
         });
       }
     }
+    // A skill cannot depend on sensor data it is not permitted to read.
+    if (
+      (m.operatingEnvelope.requiredSensorMetrics.length > 0 ||
+        m.operatingEnvelope.minUsableSensorReadings > 0) &&
+      !m.permissions.includes("read_sensor_context")
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["permissions"],
+        message: "sensor_dependency_requires_read_sensor_context",
+      });
+    }
+    // "unknown" is meaningful as an EXCLUSION but unsatisfiable as
+    // support: the evaluator fail-closes unknown values, so a manifest
+    // claiming to support "unknown" could never be applicable for it.
+    if (m.operatingEnvelope.media.includes("unknown")) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["operatingEnvelope", "media"],
+        message: "unknown_is_not_a_supportable_medium",
+      });
+    }
+    if (m.operatingEnvelope.irrigationArchitectures.includes("unknown")) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["operatingEnvelope", "irrigationArchitectures"],
+        message: "unknown_is_not_a_supportable_irrigation_architecture",
+      });
+    }
     const supportedSettings = new Set<string>(m.operatingEnvelope.growSettings);
     for (const setting of m.excludedConditions.growSettings) {
       if (supportedSettings.has(setting)) {

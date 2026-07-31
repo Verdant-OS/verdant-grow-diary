@@ -267,14 +267,28 @@ export function evaluateSkillApplicability(
       }
     }
   }
-  for (const metric of compilation.sensorSummary.metrics) {
-    if (metric.excludedCount > 0 && metric.usableCount === 0) {
-      provenanceBlockers.add(`no_usable_${metric.metric}`);
+  // Sensor caveats apply only to skills that actually CONSUME sensor
+  // evidence. A diary/photo skill must not be downgraded because some
+  // unrelated metric in the tent happens to be stale.
+  const dependsOnSensors =
+    envelope.requiredSensorMetrics.length > 0 ||
+    envelope.minUsableSensorReadings > 0 ||
+    manifest.requiredContext.includes("sensor_readings") ||
+    manifest.optionalContext.includes("sensor_readings");
+  if (dependsOnSensors) {
+    // When the skill names specific metrics, only those matter.
+    const relevant = new Set<string>(envelope.requiredSensorMetrics);
+    for (const metric of compilation.sensorSummary.metrics) {
+      if (relevant.size > 0 && !relevant.has(metric.metric)) continue;
+      if (metric.excludedCount > 0 && metric.usableCount === 0) {
+        provenanceBlockers.add(`no_usable_${metric.metric}`);
+      }
     }
-  }
-  if (provenanceBlockers.size > 0) reasons.add("sensor_provenance_blocked");
-  if (compilation.sensorSummary.conflicts.length > 0) {
-    reasons.add("conflicting_sensor_evidence");
+    if (provenanceBlockers.size > 0) reasons.add("sensor_provenance_blocked");
+    const relevantConflicts = compilation.sensorSummary.conflicts.filter(
+      (c) => relevant.size === 0 || relevant.has(c.metric),
+    );
+    if (relevantConflicts.length > 0) reasons.add("conflicting_sensor_evidence");
   }
 
   // 7. Optional context (never blocks, only downgrades).

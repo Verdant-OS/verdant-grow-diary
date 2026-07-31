@@ -280,6 +280,59 @@ describe("manifest contract", () => {
     expect(r.ok).toBe(false);
   });
 
+  it("rejects a sensor dependency without sensor-read permission", () => {
+    const r = parseVerdantSkillManifest(
+      makeManifest({
+        permissions: ["read_plant_history", "propose_manual_action"],
+      }),
+    );
+    // The default envelope requires soil moisture, so omitting
+    // read_sensor_context is incoherent.
+    expect(r.ok).toBe(false);
+  });
+
+  it("rejects `unknown` in support lists but allows it as an exclusion", () => {
+    const supported = parseVerdantSkillManifest(
+      makeManifest({
+        operatingEnvelope: {
+          growSettings: [],
+          media: ["unknown"],
+          irrigationArchitectures: [],
+          requiresKnownIrrigationArchitecture: false,
+          requiresKnownAutoflowerStatus: false,
+          minUsableSensorReadings: 0,
+          requiredSensorMetrics: [],
+        },
+        permissions: ["read_plant_history"],
+        requiredContext: [],
+        excludedConditions: { media: [], irrigationArchitectures: [], growSettings: [] },
+      }),
+    );
+    expect(supported.ok).toBe(false);
+    // Excluding unknown is meaningful: refuse when nobody recorded it.
+    const excludedUnknown = parseVerdantSkillManifest(
+      makeManifest({
+        operatingEnvelope: {
+          growSettings: [],
+          media: [],
+          irrigationArchitectures: [],
+          requiresKnownIrrigationArchitecture: false,
+          requiresKnownAutoflowerStatus: false,
+          minUsableSensorReadings: 0,
+          requiredSensorMetrics: [],
+        },
+        permissions: ["read_plant_history"],
+        requiredContext: [],
+        excludedConditions: {
+          media: ["unknown"],
+          irrigationArchitectures: ["unknown"],
+          growSettings: [],
+        },
+      }),
+    );
+    expect(excludedUnknown.ok).toBe(true);
+  });
+
   it("requires context slots to use the compiler's token vocabulary", () => {
     expect(parseVerdantSkillManifest(makeManifest({ requiredContext: ["moon_phase"] })).ok).toBe(
       false,
@@ -642,6 +695,50 @@ describe("applicability — the spec's coco dryback cases", () => {
     expect(r.reasons).toContain("required_sensor_metric_conflicted");
     expect(r.provenanceBlockers).toContain("conflicted_soil_moisture_pct");
     expect(skillMayRun(r)).toBe(false);
+  });
+
+  it("does not downgrade a non-sensor skill for unrelated stale telemetry", () => {
+    // A diary/photo skill: no sensor dependency at all.
+    const diarySkill = manifest({
+      operatingEnvelope: {
+        growSettings: [],
+        media: [],
+        irrigationArchitectures: [],
+        requiresKnownIrrigationArchitecture: false,
+        requiresKnownAutoflowerStatus: false,
+        minUsableSensorReadings: 0,
+        requiredSensorMetrics: [],
+      },
+      permissions: ["read_plant_history", "read_photo_metadata"],
+      requiredContext: ["stage"],
+      optionalContext: [],
+      excludedConditions: { media: [], irrigationArchitectures: [], growSettings: [] },
+    });
+    const r = evaluateSkillApplicability({
+      manifest: diarySkill,
+      compilation: compileContext({
+        sensorReadings: [
+          // Stale and invalid telemetry this skill never consumes.
+          {
+            metric: "co2_ppm",
+            value: 700,
+            unit: "ppm",
+            captured_at: hoursAgo(9),
+            source: "live",
+          },
+          {
+            metric: "humidity_pct",
+            value: 900,
+            unit: "%",
+            captured_at: hoursAgo(0.1),
+            source: "live",
+          },
+        ],
+      }),
+    });
+    expect(r.verdict).toBe("applicable");
+    expect(r.reasons).not.toContain("sensor_provenance_blocked");
+    expect(r.reasons).not.toContain("conflicting_sensor_evidence");
   });
 
   it("reports partial applicability when only optional context is missing", () => {

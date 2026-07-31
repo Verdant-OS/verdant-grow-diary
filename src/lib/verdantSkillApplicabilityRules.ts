@@ -1,0 +1,515 @@
+/**
+ * verdantSkillApplicabilityRules — decides whether a skill may run
+ * against a compiled plant context, and says why not when it may not.
+ *
+ * Build 4 of Verdant Skill Runtime v1. Pure and deterministic: no I/O,
+ * no model calls, no clock. The evaluator is the enforcement point for
+ * "a skill cannot run outside its declared operating envelope" — and a
+ * model cannot override it, because nothing here reads model output.
+ *
+ * RELATIONSHIP TO EXISTING VERDICTS (this repo already has six
+ * readiness ladders): this evaluator answers a DIFFERENT question —
+ * "does this specific skill's declared envelope match this plant?" —
+ * not "is there enough context for AI in general", which
+ * `evaluateAiContextSufficiency` already answers. The two compose:
+ * sufficiency caps confidence, applicability decides eligibility.
+ *
+ * Vocabulary is deliberately borrowed rather than forked:
+ *  - missing context uses the compiler's exported `CONTEXT_SLOTS`
+ *    tokens, so the evaluator and the bundle name gaps identically.
+ *  - provenance blockers reuse the truth gate's exclusion reasons.
+ *  - the next-step field mirrors the existing `safeNextStep` name.
+ */
+
+import {
+  CONTEXT_SLOTS,
+  type PlantContextCompilation,
+  type PlantContextSlot,
+} from "@/lib/plantContextBundleCompiler";
+import {
+  normalizeEnvelopeToken,
+  normalizeIrrigationArchitecture,
+  normalizeMedium,
+  normalizePlantType,
+  type SkillIrrigationArchitecture,
+  type SkillMedium,
+  type VerdantSkillManifest,
+} from "@/lib/verdantSkillManifest";
+
+// ---------------------------------------------------------------------------
+// Result vocabulary
+// ---------------------------------------------------------------------------
+
+export const SKILL_APPLICABILITY_VERDICTS = [
+  "applicable",
+  "partially_applicable",
+  "insufficient_context",
+  "not_applicable",
+] as const;
+export type SkillApplicabilityVerdict = (typeof SKILL_APPLICABILITY_VERDICTS)[number];
+
+/** Stable reason codes. Ordered deterministically in the result. */
+export const SKILL_APPLICABILITY_REASONS = [
+  "skill_retired",
+  "medium_excluded",
+  "medium_unsupported",
+  "medium_unknown",
+  "irrigation_excluded",
+  "irrigation_unsupported",
+  "irrigation_unknown",
+  "grow_setting_excluded",
+  "grow_setting_unsupported",
+  "grow_setting_unknown",
+  "missing_required_sensor_metric",
+  "required_sensor_metric_conflicted",
+  "autoflower_status_unknown",
+  "plant_identity_contradictory",
+  "missing_required_context",
+  "missing_optional_context",
+  "insufficient_usable_sensor_readings",
+  "sensor_provenance_blocked",
+  "conflicting_sensor_evidence",
+] as const;
+export type SkillApplicabilityReason = (typeof SKILL_APPLICABILITY_REASONS)[number];
+
+export interface SkillApplicabilityResult {
+  verdict: SkillApplicabilityVerdict;
+  skillId: string;
+  skillVersion: string;
+  /** Deterministically ordered reason codes. */
+  reasons: SkillApplicabilityReason[];
+  /** Context slots the skill requires but the plant does not have. */
+  missingRequiredContext: PlantContextSlot[];
+  /** Declared exclusions that this plant actually matches. */
+  excludedConditions: string[];
+  /** Truth-gate reasons that block the sensor evidence this skill needs. */
+  provenanceBlockers: string[];
+  /**
+   * One safe, non-actionable next step: what to record so the skill
+   * could run. Never a cultivation instruction.
+   */
+  safeNextStep: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Safe next steps — data requests only, never cultivation advice
+// ---------------------------------------------------------------------------
+
+const SLOT_NEXT_STEPS: Record<PlantContextSlot, string> = {
+  stage: "Set this plant's current stage.",
+  strain: "Add the cultivar or strain name.",
+  plant_type: "Record whether this plant is photoperiod or autoflower.",
+  medium: "Record the growing medium.",
+  pot_size: "Record the container size.",
+  irrigation_architecture: "Record how this plant is watered.",
+  targets: "Set environment targets for this tent.",
+  recent_actions: "Log a recent watering, feeding, or training entry.",
+  sensor_readings: "Add a current sensor reading or manual snapshot.",
+  photos: "Add a recent photo of this plant.",
+};
+
+// ---------------------------------------------------------------------------
+// Evaluator
+// ---------------------------------------------------------------------------
+
+export interface EvaluateSkillApplicabilityInput {
+  manifest: VerdantSkillManifest;
+  compilation: PlantContextCompilation;
+  /** Grow setting (tent, outdoor, …) when the caller knows it. */
+  growSetting?: string | null;
+}
+
+/**
+ * Sentinel spellings of "we do not know" that arrive as ordinary text.
+ * A free-text column has no vocabulary to validate against, so the
+ * compiler's gap flag can only report that SOMETHING was typed — and
+ * `strain: "unknown"` is something typed.
+ */
+const CONTEXT_SENTINEL_VALUES = new Set([
+  "unknown",
+  "unspecified",
+  "notspecified",
+  "na",
+  "none",
+  "tbd",
+  "unset",
+  "null",
+  "undefined",
+]);
+
+/** Nonempty text that is not one of the "we do not know" spellings. */
+function isMeaningfulText(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  const compact = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+  if (compact === "") return false;
+  return !CONTEXT_SENTINEL_VALUES.has(compact);
+}
+
+function hasFiniteBound(range: { min?: unknown; max?: unknown } | null | undefined): boolean {
+  if (range === null || range === undefined) return false;
+  return Number.isFinite(range.min) || Number.isFinite(range.max);
+}
+
+/**
+ * Photoperiod-vs-autoflower is recorded in TWO places — free text in
+ * `plantType` and a boolean in `isAutoflower` — and they are the same
+ * fact. This resolves them to one answer, in one place, so the two can
+ * never be consulted independently and reach different conclusions.
+ *
+ * The three outcomes matter separately:
+ *  - either source alone answers the question, so a plant with only the
+ *    boolean recorded is not asked to re-record it as text (and vice
+ *    versa). A dead end is not a safe refusal.
+ *  - when both are recorded and DISAGREE, the plant's identity is not
+ *    known — it is worse than unknown, because two sources assert
+ *    different things. Picking one would be a guess, so this reports
+ *    insufficient context and says why.
+ */
+interface PlantIdentity {
+  known: boolean;
+  isAutoflower: boolean | null;
+  contradictory: boolean;
+}
+
+function resolvePlantIdentity(compilation: PlantContextCompilation): PlantIdentity {
+  const fromText = normalizePlantType(compilation.plantType);
+  const textSays = fromText === null ? null : fromText === "autoflower";
+  const flag = compilation.bundle.isAutoflower;
+  const flagSays = flag === null || flag === undefined ? null : flag === true;
+
+  if (textSays !== null && flagSays !== null) {
+    if (textSays !== flagSays) return { known: false, isAutoflower: null, contradictory: true };
+    return { known: true, isAutoflower: textSays, contradictory: false };
+  }
+  if (textSays !== null) return { known: true, isAutoflower: textSays, contradictory: false };
+  if (flagSays !== null) return { known: true, isAutoflower: flagSays, contradictory: false };
+  return { known: false, isAutoflower: null, contradictory: false };
+}
+
+/**
+ * Is a required slot genuinely present?
+ *
+ * PRESENCE IS TOTAL OVER THE SLOT VOCABULARY. This used to be a short
+ * list of special cases with a `return true` fallthrough, and review
+ * found a hole in that fallthrough four times running — medium, then
+ * plant type, then stage, then targets and the free-text slots. The
+ * defect was never any individual slot; it was that "present" defaulted
+ * to true for anything nobody had thought about yet.
+ *
+ * The distinction the compiler's gap flags cannot make: they answer "did
+ * anyone populate this field", which is a different question from "does
+ * this value tell us the thing". `medium: "moon dust"` resolves to no
+ * known medium, `stage: "unknown"` is a canonical token meaning nobody
+ * knows, `targets: {}` is a populated object with no band in it, and
+ * `strain: "n/a"` is text that says there is no answer. Each of those
+ * would let a skill run — and propose a manual action — without the
+ * context it declared it needs.
+ *
+ * `recent_actions` and `photos` defer to the gap flag, which is exact
+ * for them: you either have entries or you do not. `sensor_readings`
+ * cannot, because a conflicted metric still HAS readings — see below.
+ */
+const SLOT_IS_PRESENT: Record<PlantContextSlot, (compilation: PlantContextCompilation) => boolean> =
+  {
+    stage: (c) =>
+      c.bundle.stage !== null && c.bundle.stage !== undefined && c.bundle.stage !== "unknown",
+    strain: (c) => isMeaningfulText(c.bundle.strain),
+    plant_type: (c) => resolvePlantIdentity(c).known,
+    medium: (c) => {
+      const m = normalizeMedium(c.bundle.medium);
+      return m !== null && m !== "unknown";
+    },
+    pot_size: (c) => isMeaningfulText(c.bundle.potSize),
+    irrigation_architecture: (c) => {
+      const a = normalizeIrrigationArchitecture(c.irrigationArchitecture);
+      return a !== null && a !== "unknown";
+    },
+    // Every band is individually optional, so `{}` parses. A target set
+    // with no band in it states no target.
+    targets: (c) => {
+      const t = c.bundle.targets;
+      if (t === null || t === undefined) return false;
+      return (
+        hasFiniteBound(t.temperatureC) || hasFiniteBound(t.humidityPct) || hasFiniteBound(t.vpdKpa)
+      );
+    },
+    recent_actions: () => true,
+    // The compiler's gap flag counts readings, and a conflicted metric
+    // still has readings. A manifest whose only sensor dependency is
+    // this slot — no required metric, no minimum count — would otherwise
+    // be satisfied by a plant where every device disagrees, since a bare
+    // conflict merely downgrades to partially_applicable.
+    sensor_readings: (c) => c.sensorSummary.unconflictedIncludedCount > 0,
+    photos: () => true,
+  };
+
+/**
+ * Slots whose presence rests ENTIRELY on their own predicate.
+ *
+ * The compiler's gap flag is otherwise authoritative for absence — if it
+ * says nobody filled the field in, the field is empty. `plant_type` is
+ * the one exception: the flag watches the free-text column, but
+ * `isAutoflower` records the same fact in boolean form. Refusing a plant
+ * whose autoflower status IS recorded, and telling the grower to record
+ * what they already recorded, is a dead end rather than a safe refusal.
+ */
+const SLOTS_WITH_ALTERNATE_SOURCE: ReadonlySet<PlantContextSlot> = new Set<PlantContextSlot>([
+  "plant_type",
+]);
+
+function slotIsPresent(compilation: PlantContextCompilation, slot: PlantContextSlot): boolean {
+  const predicate = SLOT_IS_PRESENT[slot];
+  // An unrecognized slot is not evidence of presence.
+  if (typeof predicate !== "function") return false;
+  if (!SLOTS_WITH_ALTERNATE_SOURCE.has(slot) && compilation.missingInformation.includes(slot)) {
+    return false;
+  }
+  return predicate(compilation);
+}
+
+/**
+ * Evaluate one skill against one compiled context.
+ *
+ * Precedence, most decisive first:
+ *  1. retired skill or a matched exclusion → not_applicable
+ *  2. envelope mismatch (medium / irrigation / setting) → not_applicable
+ *  3. required context absent, unknown-but-required envelope facts, or
+ *     too few usable readings → insufficient_context
+ *  4. optional context absent or evidence caveats → partially_applicable
+ *  5. otherwise → applicable
+ */
+export function evaluateSkillApplicability(
+  input: EvaluateSkillApplicabilityInput,
+): SkillApplicabilityResult {
+  const { manifest, compilation } = input;
+  const reasons = new Set<SkillApplicabilityReason>();
+  const excluded: string[] = [];
+  const missingRequired: PlantContextSlot[] = [];
+  const provenanceBlockers = new Set<string>();
+
+  const envelope = manifest.operatingEnvelope;
+  const medium = normalizeMedium(compilation.bundle.medium);
+  const irrigation = normalizeIrrigationArchitecture(compilation.irrigationArchitecture);
+  const growSetting = (input.growSetting ?? "").trim().toLowerCase();
+
+  // 1. Retired skills never run.
+  const retired =
+    manifest.deprecation.deprecated === true ||
+    manifest.lifecycle === "deprecated" ||
+    manifest.lifecycle === "superseded" ||
+    manifest.lifecycle === "paused";
+  if (retired) reasons.add("skill_retired");
+
+  // 2. Declared exclusions the plant actually matches.
+  // An ABSENT value is the "unknown" case: a manifest that excludes
+  // `unknown` is saying "refuse when nobody recorded it", so a null
+  // must match that exclusion just as the literal token does.
+  const mediumForExclusion = medium ?? "unknown";
+  const irrigationForExclusion = irrigation ?? "unknown";
+  if (manifest.excludedConditions.media.includes(mediumForExclusion)) {
+    reasons.add("medium_excluded");
+    excluded.push(`medium:${mediumForExclusion}`);
+  }
+  if (manifest.excludedConditions.irrigationArchitectures.includes(irrigationForExclusion)) {
+    reasons.add("irrigation_excluded");
+    excluded.push(`irrigation_architecture:${irrigationForExclusion}`);
+  }
+  if (
+    growSetting !== "" &&
+    (manifest.excludedConditions.growSettings as readonly string[]).includes(growSetting)
+  ) {
+    reasons.add("grow_setting_excluded");
+    excluded.push(`grow_setting:${growSetting}`);
+  }
+
+  // 3. Envelope support. An EMPTY list means the skill is agnostic on
+  //    that axis; a non-empty list is a closed allow-list.
+  if (envelope.media.length > 0 && medium !== null && medium !== "unknown") {
+    if (!envelope.media.includes(medium as SkillMedium)) {
+      reasons.add("medium_unsupported");
+    }
+  }
+  if (envelope.irrigationArchitectures.length > 0) {
+    if (irrigation === null || irrigation === "unknown") {
+      // Closed allow-list + unknown architecture: absence is not
+      // agreement here either. Handled below as missing context.
+      reasons.add("irrigation_unknown");
+      if (!missingRequired.includes("irrigation_architecture")) {
+        missingRequired.push("irrigation_architecture");
+      }
+    } else if (
+      !envelope.irrigationArchitectures.includes(irrigation as SkillIrrigationArchitecture)
+    ) {
+      reasons.add("irrigation_unsupported");
+    }
+  }
+  if (envelope.growSettings.length > 0) {
+    if (growSetting === "") {
+      // A closed allow-list with an UNKNOWN setting is not a pass. The
+      // plant could be outdoor or greenhouse; absence is not agreement.
+      reasons.add("grow_setting_unknown");
+    } else if (!(envelope.growSettings as readonly string[]).includes(growSetting)) {
+      reasons.add("grow_setting_unsupported");
+    }
+  }
+
+  // 4. Unknown-but-required envelope facts. These are NOT guesses —
+  //    an unknown irrigation architecture yields insufficient context.
+  if (
+    envelope.requiresKnownIrrigationArchitecture &&
+    (irrigation === null || irrigation === "unknown")
+  ) {
+    reasons.add("irrigation_unknown");
+    if (!missingRequired.includes("irrigation_architecture")) {
+      missingRequired.push("irrigation_architecture");
+    }
+  }
+  if (envelope.media.length > 0 && (medium === null || medium === "unknown")) {
+    reasons.add("medium_unknown");
+    if (!missingRequired.includes("medium")) missingRequired.push("medium");
+  }
+  // Identity is resolved from BOTH sources, so an autoflower-sensitive
+  // skill is not told to record a status the plant already carries as
+  // text — and two sources that disagree are not silently reconciled.
+  const identity = resolvePlantIdentity(compilation);
+  if (identity.contradictory) {
+    reasons.add("plant_identity_contradictory");
+    if (!missingRequired.includes("plant_type")) missingRequired.push("plant_type");
+  } else if (envelope.requiresKnownAutoflowerStatus && !identity.known) {
+    // null is not false — autoflower-sensitive skills stay conservative.
+    reasons.add("autoflower_status_unknown");
+    if (!missingRequired.includes("plant_type")) missingRequired.push("plant_type");
+  }
+
+  // 5. Declared required context.
+  for (const slot of manifest.requiredContext) {
+    if (!slotIsPresent(compilation, slot) && !missingRequired.includes(slot)) {
+      missingRequired.push(slot);
+    }
+  }
+  if (missingRequired.length > 0) reasons.add("missing_required_context");
+
+  // 6. Sensor sufficiency and provenance.
+  // The floor is measured against UNCONFLICTED evidence. Counting
+  // readings from a metric whose devices disagree would let a plant
+  // where nothing agrees clear a sensor-hungry skill's minimum, and a
+  // bare conflict only downgrades to partially_applicable — so the run
+  // would proceed with no trustworthy value behind it.
+  if (
+    envelope.minUsableSensorReadings > 0 &&
+    compilation.sensorSummary.unconflictedIncludedCount < envelope.minUsableSensorReadings
+  ) {
+    reasons.add("insufficient_usable_sensor_readings");
+    if (!missingRequired.includes("sensor_readings")) {
+      missingRequired.push("sensor_readings");
+    }
+  }
+  // A skill that depends on a specific signal must actually have it.
+  // A global reading count is not enough: a fresh temperature reading
+  // must not satisfy a moisture-dependent skill.
+  for (const required of envelope.requiredSensorMetrics) {
+    const entry = compilation.sensorSummary.metrics.find((m) => m.metric === required);
+    if (entry === undefined || entry.usableCount === 0) {
+      reasons.add("missing_required_sensor_metric");
+      provenanceBlockers.add(`no_usable_${required}`);
+      if (!missingRequired.includes("sensor_readings")) {
+        missingRequired.push("sensor_readings");
+      }
+      continue;
+    }
+    // A metric the skill DEPENDS on, whose devices disagree, has no
+    // single trustworthy value — that must block the run, not merely
+    // downgrade it to partially applicable.
+    if (entry.conflicted) {
+      reasons.add("required_sensor_metric_conflicted");
+      provenanceBlockers.add(`conflicted_${required}`);
+      if (!missingRequired.includes("sensor_readings")) {
+        missingRequired.push("sensor_readings");
+      }
+    }
+  }
+  // Sensor caveats apply only to skills that actually CONSUME sensor
+  // evidence. A diary/photo skill must not be downgraded because some
+  // unrelated metric in the tent happens to be stale.
+  const dependsOnSensors =
+    envelope.requiredSensorMetrics.length > 0 ||
+    envelope.minUsableSensorReadings > 0 ||
+    manifest.requiredContext.includes("sensor_readings") ||
+    manifest.optionalContext.includes("sensor_readings");
+  if (dependsOnSensors) {
+    // When the skill names specific metrics, only those matter.
+    const relevant = new Set<string>(envelope.requiredSensorMetrics);
+    for (const metric of compilation.sensorSummary.metrics) {
+      if (relevant.size > 0 && !relevant.has(metric.metric)) continue;
+      if (metric.excludedCount > 0 && metric.usableCount === 0) {
+        provenanceBlockers.add(`no_usable_${metric.metric}`);
+      }
+    }
+    if (provenanceBlockers.size > 0) reasons.add("sensor_provenance_blocked");
+    const relevantConflicts = compilation.sensorSummary.conflicts.filter(
+      (c) => relevant.size === 0 || relevant.has(c.metric),
+    );
+    if (relevantConflicts.length > 0) reasons.add("conflicting_sensor_evidence");
+  }
+
+  // 7. Optional context (never blocks, only downgrades).
+  const missingOptional = manifest.optionalContext.filter(
+    (slot) => !slotIsPresent(compilation, slot),
+  );
+  if (missingOptional.length > 0) reasons.add("missing_optional_context");
+
+  // --- Verdict ------------------------------------------------------------
+  let verdict: SkillApplicabilityVerdict;
+  if (
+    reasons.has("skill_retired") ||
+    excluded.length > 0 ||
+    reasons.has("medium_unsupported") ||
+    reasons.has("irrigation_unsupported") ||
+    reasons.has("grow_setting_unsupported")
+  ) {
+    verdict = "not_applicable";
+  } else if (missingRequired.length > 0 || reasons.has("grow_setting_unknown")) {
+    verdict = "insufficient_context";
+  } else if (
+    missingOptional.length > 0 ||
+    reasons.has("sensor_provenance_blocked") ||
+    reasons.has("conflicting_sensor_evidence")
+  ) {
+    verdict = "partially_applicable";
+  } else {
+    verdict = "applicable";
+  }
+
+  // Deterministic reason ordering: the declared vocabulary order.
+  const orderedReasons = SKILL_APPLICABILITY_REASONS.filter((r) => reasons.has(r));
+
+  // Safe next step: the first missing slot in canonical slot order.
+  const orderedMissing = CONTEXT_SLOTS.filter((slot) => missingRequired.includes(slot));
+  const safeNextStep =
+    verdict === "not_applicable"
+      ? null
+      : orderedMissing.length > 0
+        ? SLOT_NEXT_STEPS[orderedMissing[0]]
+        : reasons.has("grow_setting_unknown")
+          ? "Record whether this grow is in a tent, greenhouse, or outdoors."
+          : null;
+
+  return {
+    verdict,
+    skillId: manifest.id,
+    skillVersion: manifest.version,
+    reasons: [...orderedReasons],
+    missingRequiredContext: [...orderedMissing],
+    excludedConditions: excluded.sort(),
+    provenanceBlockers: [...provenanceBlockers].sort(),
+    safeNextStep,
+  };
+}
+
+/** True only for verdicts that may proceed to a skill run. */
+export function skillMayRun(result: SkillApplicabilityResult): boolean {
+  return result.verdict === "applicable" || result.verdict === "partially_applicable";
+}

@@ -305,6 +305,15 @@ export interface SensorWindowSummary {
   }>;
   sourceCounts: Array<{ source: SkillSensorSourceLabel; count: number }>;
   includedCount: number;
+  /**
+   * Subset of `includedCount` whose metric is NOT conflicted. A reading
+   * belonging to a metric whose contemporaneous devices disagree has no
+   * single trustworthy value, so it must not help clear a "how much
+   * usable evidence is there" floor: otherwise a plant where every
+   * device disagrees can satisfy a sensor-hungry skill's minimum with
+   * readings none of which can be relied on.
+   */
+  unconflictedIncludedCount: number;
   excludedCount: number;
   warnings: SensorTruthWarning[];
   conflicts: SensorConflict[];
@@ -740,6 +749,9 @@ export function summarizeSensorWindow(
     // sensor gap and inflate completeness for context the plant does
     // not have.
     includedCount: currentEvaluations.length,
+    unconflictedIncludedCount: currentEvaluations.filter(
+      (e) => e.metric === null || !conflictedMetrics.has(e.metric),
+    ).length,
     excludedCount: series.evaluations.length - currentEvaluations.length,
     warnings: provenance.warnings,
     conflicts: scopedConflicts.slice(0, PLANT_CONTEXT_CAPS.conflicts),
@@ -759,7 +771,13 @@ export function summarizeSensorWindow(
 // ---------------------------------------------------------------------------
 
 /** Context slots the runtime expects. Presence drives completeness. */
-const CONTEXT_SLOTS = [
+/**
+ * The context slots the runtime expects, and the exact tokens
+ * `missingInformation` emits. Exported so downstream layers (skill
+ * manifests, applicability) can require context by the SAME token
+ * instead of forking a parallel spelling.
+ */
+export const CONTEXT_SLOTS = [
   "stage",
   "strain",
   "plant_type",
@@ -771,6 +789,8 @@ const CONTEXT_SLOTS = [
   "sensor_readings",
   "photos",
 ] as const;
+
+export type PlantContextSlot = (typeof CONTEXT_SLOTS)[number];
 
 /**
  * Report what is MISSING. Nothing here infers a value — an absent slot

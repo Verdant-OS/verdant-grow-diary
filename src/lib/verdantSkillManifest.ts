@@ -30,6 +30,7 @@
 import { z } from "zod";
 import { GROW_TYPES } from "@/lib/grow";
 import { CONTEXT_SLOTS, type PlantContextSlot } from "@/lib/plantContextBundleCompiler";
+import { SENSOR_GATE_METRICS, type SensorGateMetric } from "@/lib/sensorTruthGateRules";
 import {
   SKILL_CONTRACT_VERSION,
   SKILL_EXECUTION_CAPABILITIES,
@@ -200,8 +201,14 @@ const operatingEnvelopeSchema = z.object({
    * status is unknown (null), because null is not false.
    */
   requiresKnownAutoflowerStatus: z.boolean().default(false),
-  /** Minimum usable sensor readings the skill needs. */
+  /** Minimum usable sensor readings the skill needs, across any metric. */
   minUsableSensorReadings: z.number().int().min(0).default(0),
+  /**
+   * Specific metrics the skill depends on. A global reading count is
+   * not enough: a moisture-dependent skill must not be satisfied by a
+   * fresh temperature reading.
+   */
+  requiredSensorMetrics: z.array(z.enum(SENSOR_GATE_METRICS)).default([]),
 });
 /**
  * Declared explicitly rather than via `z.infer`: this project compiles
@@ -216,6 +223,7 @@ export interface SkillOperatingEnvelope {
   requiresKnownIrrigationArchitecture: boolean;
   requiresKnownAutoflowerStatus: boolean;
   minUsableSensorReadings: number;
+  requiredSensorMetrics: SensorGateMetric[];
 }
 
 const excludedConditionsSchema = z.object({

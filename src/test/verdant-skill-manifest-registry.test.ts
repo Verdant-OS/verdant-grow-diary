@@ -54,6 +54,8 @@ function makeManifest(overrides: Record<string, unknown> = {}): unknown {
       requiresKnownIrrigationArchitecture: true,
       requiresKnownAutoflowerStatus: false,
       minUsableSensorReadings: 1,
+      // A dryback skill depends on MOISTURE, not just any reading.
+      requiredSensorMetrics: ["soil_moisture_pct"],
     },
     requiredContext: ["stage", "medium", "irrigation_architecture", "sensor_readings"],
     optionalContext: ["photos"],
@@ -109,6 +111,15 @@ function compileContext(overrides: Partial<CompilePlantContextBundleInput> = {})
         unit: "°C",
         captured_at: hoursAgo(0.1),
         source: "live",
+      },
+      // Root-zone moisture must name the plant to count as its evidence.
+      {
+        metric: "soil_moisture_pct",
+        value: 42,
+        unit: "%",
+        captured_at: hoursAgo(0.1),
+        source: "live",
+        plant_id: PLANT,
       },
     ],
     ...overrides,
@@ -413,6 +424,69 @@ describe("applicability — the spec's coco dryback cases", () => {
     expect(r.verdict).toBe("insufficient_context");
     expect(r.reasons).toContain("insufficient_usable_sensor_readings");
     expect(r.missingRequiredContext).toContain("sensor_readings");
+  });
+
+  it("does not treat an absent grow setting as agreement with a closed envelope", () => {
+    const r = evaluateSkillApplicability({
+      manifest: manifest(),
+      compilation: compileContext(),
+      // growSetting omitted: the plant could be outdoor or greenhouse.
+    });
+    expect(r.verdict).toBe("insufficient_context");
+    expect(r.reasons).toContain("grow_setting_unknown");
+    expect(r.safeNextStep).toContain("tent");
+    expect(skillMayRun(r)).toBe(false);
+  });
+
+  it("requires the specific sensor metric the skill depends on", () => {
+    // Fresh temperature but NO moisture: a dryback skill must not run.
+    const r = evaluateSkillApplicability({
+      manifest: manifest(),
+      compilation: compileContext({
+        sensorReadings: [
+          {
+            metric: "temperature_c",
+            value: 25,
+            unit: "°C",
+            captured_at: hoursAgo(0.1),
+            source: "live",
+          },
+        ],
+      }),
+      growSetting: "tent",
+    });
+    expect(r.verdict).toBe("insufficient_context");
+    expect(r.reasons).toContain("missing_required_sensor_metric");
+    expect(r.provenanceBlockers).toContain("no_usable_soil_moisture_pct");
+    expect(skillMayRun(r)).toBe(false);
+  });
+
+  it("does not accept another plant's moisture as this plant's evidence", () => {
+    const r = evaluateSkillApplicability({
+      manifest: manifest(),
+      compilation: compileContext({
+        sensorReadings: [
+          {
+            metric: "temperature_c",
+            value: 25,
+            unit: "°C",
+            captured_at: hoursAgo(0.1),
+            source: "live",
+          },
+          {
+            metric: "soil_moisture_pct",
+            value: 42,
+            unit: "%",
+            captured_at: hoursAgo(0.1),
+            source: "live",
+            plant_id: "other-plant",
+          },
+        ],
+      }),
+      growSetting: "tent",
+    });
+    expect(r.verdict).toBe("insufficient_context");
+    expect(r.reasons).toContain("missing_required_sensor_metric");
   });
 
   it("reports partial applicability when only optional context is missing", () => {

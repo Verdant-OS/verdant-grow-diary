@@ -57,6 +57,8 @@ export const SKILL_APPLICABILITY_REASONS = [
   "irrigation_unknown",
   "grow_setting_excluded",
   "grow_setting_unsupported",
+  "grow_setting_unknown",
+  "missing_required_sensor_metric",
   "autoflower_status_unknown",
   "missing_required_context",
   "missing_optional_context",
@@ -185,8 +187,12 @@ export function evaluateSkillApplicability(
       reasons.add("irrigation_unsupported");
     }
   }
-  if (envelope.growSettings.length > 0 && growSetting !== "") {
-    if (!(envelope.growSettings as readonly string[]).includes(growSetting)) {
+  if (envelope.growSettings.length > 0) {
+    if (growSetting === "") {
+      // A closed allow-list with an UNKNOWN setting is not a pass. The
+      // plant could be outdoor or greenhouse; absence is not agreement.
+      reasons.add("grow_setting_unknown");
+    } else if (!(envelope.growSettings as readonly string[]).includes(growSetting)) {
       reasons.add("grow_setting_unsupported");
     }
   }
@@ -230,6 +236,19 @@ export function evaluateSkillApplicability(
       missingRequired.push("sensor_readings");
     }
   }
+  // A skill that depends on a specific signal must actually have it.
+  // A global reading count is not enough: a fresh temperature reading
+  // must not satisfy a moisture-dependent skill.
+  for (const required of envelope.requiredSensorMetrics) {
+    const entry = compilation.sensorSummary.metrics.find((m) => m.metric === required);
+    if (entry === undefined || entry.usableCount === 0) {
+      reasons.add("missing_required_sensor_metric");
+      provenanceBlockers.add(`no_usable_${required}`);
+      if (!missingRequired.includes("sensor_readings")) {
+        missingRequired.push("sensor_readings");
+      }
+    }
+  }
   for (const metric of compilation.sensorSummary.metrics) {
     if (metric.excludedCount > 0 && metric.usableCount === 0) {
       provenanceBlockers.add(`no_usable_${metric.metric}`);
@@ -256,7 +275,7 @@ export function evaluateSkillApplicability(
     reasons.has("grow_setting_unsupported")
   ) {
     verdict = "not_applicable";
-  } else if (missingRequired.length > 0) {
+  } else if (missingRequired.length > 0 || reasons.has("grow_setting_unknown")) {
     verdict = "insufficient_context";
   } else if (
     missingOptional.length > 0 ||
@@ -278,7 +297,9 @@ export function evaluateSkillApplicability(
       ? null
       : orderedMissing.length > 0
         ? SLOT_NEXT_STEPS[orderedMissing[0]]
-        : null;
+        : reasons.has("grow_setting_unknown")
+          ? "Record whether this grow is in a tent, greenhouse, or outdoors."
+          : null;
 
   return {
     verdict,

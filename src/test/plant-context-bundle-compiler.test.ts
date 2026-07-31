@@ -491,6 +491,7 @@ describe("gaps and completeness", () => {
     const all = identifyContextGaps({
       stage: true,
       strain: true,
+      plant_type: true,
       medium: true,
       pot_size: true,
       irrigation_architecture: true,
@@ -503,11 +504,28 @@ describe("gaps and completeness", () => {
     expect(all.missingInformation).toEqual([]);
   });
 
-  it("reports irrigation architecture as missing when unknown", () => {
-    const c = compile();
-    expect(c.missingInformation).toContain("irrigation_architecture");
-    const known = compile({ identity: { irrigationArchitecture: "top-feed drain-to-waste" } });
+  it("reports irrigation architecture and plant type, and CARRIES them when known", () => {
+    const unknown = compile();
+    expect(unknown.missingInformation).toContain("irrigation_architecture");
+    expect(unknown.missingInformation).toContain("plant_type");
+    expect(unknown.irrigationArchitecture).toBeNull();
+    expect(unknown.plantType).toBeNull();
+
+    const known = compile({
+      identity: {
+        irrigationArchitecture: "top-feed drain-to-waste",
+        plantType: "photoperiod",
+      },
+    });
     expect(known.missingInformation).not.toContain("irrigation_architecture");
+    expect(known.missingInformation).not.toContain("plant_type");
+    // Clearing the gap flag without emitting the value would be worse
+    // than reporting it missing — assert the values actually ship.
+    expect(known.irrigationArchitecture).toBe("top-feed drain-to-waste");
+    expect(known.plantType).toBe("photoperiod");
+    const serialized = serializeSkillContract(known);
+    expect(serialized).toContain("top-feed drain-to-waste");
+    expect(serialized).toContain("photoperiod");
   });
 
   it("reports deviations only against caller-supplied targets", () => {

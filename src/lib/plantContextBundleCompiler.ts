@@ -267,6 +267,14 @@ export interface PlantContextCompilation {
   bundle: PlantContextBundle;
   contextVersion: string;
   windows: PlantContextWindows;
+  /**
+   * Identity the canonical bundle does not model. Carried explicitly so
+   * a caller that KNOWS the architecture actually delivers it — clearing
+   * the gap flag without emitting the value would be worse than
+   * reporting it missing.
+   */
+  plantType: string | null;
+  irrigationArchitecture: string | null;
   recentActions: RecentActionSummary[];
   observations: ObservationSummary[];
   compactTimeline: CompactTimelineItem[];
@@ -571,6 +579,7 @@ export function summarizeSensorWindow(
 const CONTEXT_SLOTS = [
   "stage",
   "strain",
+  "plant_type",
   "medium",
   "pot_size",
   "irrigation_architecture",
@@ -646,6 +655,7 @@ export function compilePlantContextBundle(
   const medium = cleanText(plant?.medium);
   const potSize = cleanText(plant?.pot_size);
   const irrigationArchitecture = cleanText(input.identity?.irrigationArchitecture);
+  const plantType = cleanText(input.identity?.plantType);
 
   const growEvents = input.growEvents ?? [];
   const diaryEntries = input.diaryEntries ?? [];
@@ -788,6 +798,7 @@ export function compilePlantContextBundle(
   const gaps = identifyContextGaps({
     stage: stage !== null,
     strain: strain !== null,
+    plant_type: plantType !== null,
     medium: medium !== null,
     pot_size: potSize !== null,
     irrigation_architecture: irrigationArchitecture !== null,
@@ -860,6 +871,8 @@ export function compilePlantContextBundle(
       bundle: parsed.value,
       contextVersion: options.contextVersion,
       windows,
+      plantType,
+      irrigationArchitecture,
       recentActions,
       observations,
       compactTimeline,

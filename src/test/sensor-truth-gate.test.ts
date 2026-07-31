@@ -182,6 +182,59 @@ describe("single-candidate evaluation", () => {
     expect(badRh.usability).toBe("invalid");
   });
 
+  it("flags unrealistic pH and accepts realistic pH via both metric aliases", () => {
+    const high = evaluateSensorTruth(makeCandidate({ metric: "ph", value: 12, unit: "pH" }), {
+      nowMs: NOW_MS,
+    });
+    expect(high.validity).toBe("invalid");
+    expect(high.warnings).toContain("invalid_ph");
+    expect(high.normalizedValue).toBeNull();
+    const reservoir = evaluateSensorTruth(
+      makeCandidate({ metric: "reservoir_ph", value: 6.2, unit: "pH" }),
+      { nowMs: NOW_MS },
+    );
+    expect(reservoir.metric).toBe("ph");
+    expect(reservoir.usability).toBe("usable");
+    expect(reservoir.normalizedValue).toBe(6.2);
+  });
+
+  it("applies realism ranges to CO2 and soil temperature", () => {
+    const co2 = evaluateSensorTruth(
+      makeCandidate({ metric: "co2_ppm", value: 50000, unit: "ppm" }),
+      { nowMs: NOW_MS },
+    );
+    expect(co2.validity).toBe("invalid");
+    expect(co2.normalizedValue).toBeNull();
+    const co2Ok = evaluateSensorTruth(
+      makeCandidate({ metric: "co2_ppm", value: 900, unit: "ppm" }),
+      { nowMs: NOW_MS },
+    );
+    expect(co2Ok.usability).toBe("usable");
+    const soilTemp = evaluateSensorTruth(
+      makeCandidate({ metric: "soil_temp_c", value: 80, unit: "°C" }),
+      { nowMs: NOW_MS },
+    );
+    expect(soilTemp.validity).toBe("invalid");
+    expect(soilTemp.warnings).toContain("invalid_soil_temp");
+  });
+
+  it("rejects soil_ec_us_cm contradicted by an explicit non-µS unit", () => {
+    const e = evaluateSensorTruth(
+      makeCandidate({ metric: "soil_ec_us_cm", value: 1.8, unit: "mS/cm" }),
+      { nowMs: NOW_MS },
+    );
+    expect(e.normalizedValue).toBeNull();
+    expect(e.warnings).toContain("unit_mismatch_suspected");
+    expect(e.usability).toBe("invalid");
+    // Consistent declarations still convert.
+    const consistent = evaluateSensorTruth(
+      makeCandidate({ metric: "soil_ec_us_cm", value: 1200, unit: "uS/cm" }),
+      { nowMs: NOW_MS },
+    );
+    expect(consistent.normalizedValue).toBe(1.2);
+    expect(consistent.usability).toBe("usable");
+  });
+
   it("persisted quality can only worsen an evaluation, never upgrade it", () => {
     // A fresh in-range live reading the sensor layer marked invalid.
     const invalidQ = evaluateSensorTruth(makeCandidate({ quality: "invalid" }), {

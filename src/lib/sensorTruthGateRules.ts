@@ -420,6 +420,21 @@ export function normalizeSensorCandidate(
 
   if (metric === "soil_ec_ms_cm") {
     const rawUnit = (candidate.unit ?? "").trim();
+    // Mirror the temperature doctrine: a unit-encoding metric key
+    // (soil_ec_us_cm) contradicted by an explicit non-µS unit is
+    // unresolvable — reject, never guess a conversion.
+    if (
+      candidate.metric === "soil_ec_us_cm" &&
+      rawUnit !== "" &&
+      normalizeEcUnitString(rawUnit) !== "µS/cm"
+    ) {
+      return {
+        metric,
+        value: null,
+        unit: CANONICAL_UNIT[metric],
+        warnings: ["unit_mismatch_suspected"],
+      };
+    }
     const declaredUs =
       candidate.metric === "soil_ec_us_cm" || normalizeEcUnitString(rawUnit) === "µS/cm";
     if (declaredUs) {

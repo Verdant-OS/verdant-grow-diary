@@ -683,6 +683,66 @@ describe("series evaluation", () => {
     expect(healthyVpd?.usability).toBe("usable");
   });
 
+  it("never coerces non-string metric, timestamp, or quality metadata", () => {
+    const arrayMetric = evaluateSensorTruth(
+      makeCandidate({ metric: ["temperature_c"] as unknown as string }),
+      { nowMs: NOW_MS },
+    );
+    expect(arrayMetric.metric).toBeNull();
+    expect(arrayMetric.exclusionReason).toBe("unknown_metric");
+    const arrayTimestamp = evaluateSensorTruth(
+      makeCandidate({ capturedAt: [minutesAgo(5)] as unknown as string }),
+      { nowMs: NOW_MS },
+    );
+    expect(arrayTimestamp.freshness).toBe("unknown_timestamp");
+    expect(arrayTimestamp.capturedAt).toBeNull();
+    expect(arrayTimestamp.excludedFromReasoning).toBe(true);
+    const arrayQuality = evaluateSensorTruth(
+      makeCandidate({ quality: ["ok"] as unknown as string }),
+      { nowMs: NOW_MS },
+    );
+    expect(arrayQuality.usability).toBe("invalid");
+    expect(arrayQuality.warnings).toContain("unknown_quality");
+  });
+
+  it("drops a stored vpd_kpa when a sibling is unusable for any reason", () => {
+    // Sibling is in-range but stale — still cannot support the VPD.
+    const staleSibling = evaluateSensorSeries(
+      [
+        makeCandidate({ metric: "vpd_kpa", value: 1.2, unit: "kPa" }),
+        makeCandidate({
+          metric: "humidity_pct",
+          value: 55,
+          unit: "%",
+          capturedAt: minutesAgo(3),
+          quality: "stale",
+        }),
+      ],
+      { nowMs: NOW_MS },
+    );
+    const vpd = staleSibling.evaluations.find((e) => e.metric === "vpd_kpa");
+    expect(vpd?.excludedFromReasoning).toBe(true);
+    expect(vpd?.warnings).toContain("vpd_dropped_temp_rh_invalid");
+  });
+
+  it("breaks equal capture-time ties by received time", () => {
+    const row = (value: number, receivedAt: string) =>
+      makeCandidate({
+        deviceId: "dev-1",
+        capturedAt: minutesAgo(5),
+        receivedAt,
+        value,
+      });
+    // Same capturedAt; the later-received correction must win.
+    const series = evaluateSensorSeries([row(21, minutesAgo(4)), row(26, minutesAgo(1))], {
+      nowMs: NOW_MS,
+      aggregation: { rule: "mean" },
+    });
+    expect(series.aggregates).toHaveLength(1);
+    expect(series.aggregates[0].value).toBe(26);
+    expect(series.conflicts).toEqual([]);
+  });
+
   it("classifies non-string metadata instead of throwing", () => {
     const badUnit = evaluateSensorTruth(makeCandidate({ unit: 1 as unknown as string }), {
       nowMs: NOW_MS,

@@ -84,7 +84,18 @@ import { SKILL_SENSOR_SOURCE_LABELS } from "@/lib/verdantSkillSchemas";
  * keys like "constructor" resolve to inherited Object members.
  */
 function ownLookup<V>(table: Record<string, V>, key: string): V | undefined {
+  if (typeof key !== "string") return undefined;
   return Object.prototype.hasOwnProperty.call(table, key) ? table[key] : undefined;
+}
+
+/**
+ * Untrusted JSON metadata is string-typed at the type level but can be
+ * anything at runtime (arrays coerce silently through `String()`,
+ * `Date.parse`, and property lookup). Non-strings become null so every
+ * consumer classifies them as absent/unknown rather than coercing.
+ */
+function safeString(v: unknown): string | null {
+  return typeof v === "string" ? v : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -194,6 +205,8 @@ export interface SensorTruthEvaluation {
   deviceId: string | null;
   /** Canonical ISO capture timestamp, or null when absent/unparseable. */
   capturedAt: string | null;
+  /** Canonical ISO ingest timestamp; breaks equal-capture-time ties. */
+  receivedAt: string | null;
   metric: SensorGateMetric | null;
   /** Canonical unit value, or null. Never invented, never defaulted to 0. */
   normalizedValue: number | null;
@@ -376,7 +389,8 @@ export function normalizeSensorCandidate(
   candidate: Pick<SensorReadingCandidate, "metric" | "value" | "unit">,
 ): NormalizedMetricValue {
   const warnings: SensorTruthWarning[] = [];
-  const metric = ownLookup(METRIC_ALIAS, candidate.metric) ?? null;
+  const metricKey = safeString(candidate.metric);
+  const metric = metricKey === null ? null : (ownLookup(METRIC_ALIAS, metricKey) ?? null);
   if (metric === null) {
     return { metric: null, value: null, unit: null, warnings: ["unknown_metric"] };
   }
@@ -499,10 +513,11 @@ export function normalizeSensorCandidate(
 const MINUTE_MS = 60_000;
 
 function classifyCandidateFreshness(
-  capturedAt: string | null | undefined,
+  capturedAtRaw: unknown,
   source: CanonicalSensorSource,
   nowMs: number,
 ): { freshness: SensorFreshness; warning: SensorTruthWarning | null } {
+  const capturedAt = safeString(capturedAtRaw);
   if (capturedAt == null || capturedAt === "") {
     return { freshness: "unknown_timestamp", warning: "missing_timestamp" };
   }
@@ -576,7 +591,8 @@ function buildProvenanceSummary(
 }
 
 /** Canonical ISO capture timestamp, or null when absent/unparseable. */
-function canonicalCapturedAt(capturedAt: string | null | undefined): string | null {
+function canonicalCapturedAt(capturedAtRaw: unknown): string | null {
+  const capturedAt = safeString(capturedAtRaw);
   if (capturedAt == null || capturedAt === "") return null;
   const t = Date.parse(capturedAt);
   if (Number.isNaN(t)) return null;
@@ -674,10 +690,13 @@ export function evaluateSensorTruth(
   // Persisted quality can only WORSEN the evaluation. A row the sensor
   // layer already marked degraded/stale/invalid must never be recomputed
   // as healthier here; unknown quality labels classify as invalid.
-  const qualityRaw = candidate.quality;
+  const qualityRaw: unknown = candidate.quality;
   if (qualityRaw !== null && qualityRaw !== undefined) {
-    const quality = String(qualityRaw).trim().toLowerCase();
-    const cap = ownLookup(QUALITY_TO_MAX_USABILITY, quality);
+    // Non-string quality metadata is deny-by-default unknown, never
+    // coerced (an array would otherwise stringify to a valid label).
+    const qualityStr = safeString(qualityRaw);
+    const quality = qualityStr === null ? "" : qualityStr.trim().toLowerCase();
+    const cap = quality === "" ? undefined : ownLookup(QUALITY_TO_MAX_USABILITY, quality);
     if (cap === undefined) {
       warnings.push("unknown_quality");
       usability = "invalid";
@@ -700,6 +719,7 @@ export function evaluateSensorTruth(
     plantId: candidate.plantId ?? null,
     deviceId: candidate.deviceId ?? null,
     capturedAt: canonicalCapturedAt(candidate.capturedAt),
+    receivedAt: canonicalCapturedAt(candidate.receivedAt),
     metric: normalized.metric,
     normalizedValue: excludedFromReasoning && validity === "invalid" ? null : value,
     normalizedUnit: normalized.unit,
@@ -856,9 +876,13 @@ export function evaluateSensorSeries(
   // vpd_kpa is untrustworthy when a contemporaneous same-tent temperature
   // or humidity reading is invalid — even if the VPD value itself parses
   // inside the plausible band. Missing timestamps fail closed.
+  // Any sibling input that cannot support reasoning taints the VPD —
+  // not just outright-invalid values, but stale, demo, unknown-source,
+  // and missing-value readings too.
   const invalidVpdInputs = evaluations.filter(
     (e) =>
-      (e.metric === "temperature_c" || e.metric === "humidity_pct") && e.validity === "invalid",
+      (e.metric === "temperature_c" || e.metric === "humidity_pct") &&
+      (e.validity === "invalid" || e.excludedFromReasoning),
   );
   if (invalidVpdInputs.length > 0) {
     for (const e of evaluations) {
@@ -912,9 +936,17 @@ export function evaluateSensorSeries(
       // candidates each count as their own device.
       const deviceKey = e.deviceId !== null ? `d:${e.deviceId}` : `anon:${order}`;
       const prev = latestPerDevice.get(deviceKey);
-      if (prev === undefined || (e.capturedAt ?? "") > (prev.capturedAt ?? "")) {
+      if (prev === undefined) {
         latestPerDevice.set(deviceKey, e);
+        continue;
       }
+      const capturedCmp = (e.capturedAt ?? "").localeCompare(prev.capturedAt ?? "");
+      // Equal capture times are broken by received time (later wins), so
+      // a corrected re-send supersedes the row it replaces.
+      const wins =
+        capturedCmp > 0 ||
+        (capturedCmp === 0 && (e.receivedAt ?? "").localeCompare(prev.receivedAt ?? "") > 0);
+      if (wins) latestPerDevice.set(deviceKey, e);
     }
     const current = [...latestPerDevice.values()].filter(
       (e) => !e.excludedFromReasoning && e.normalizedValue !== null,

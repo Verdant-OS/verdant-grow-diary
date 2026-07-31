@@ -182,6 +182,76 @@ describe("single-candidate evaluation", () => {
     expect(badRh.usability).toBe("invalid");
   });
 
+  it("persisted quality can only worsen an evaluation, never upgrade it", () => {
+    // A fresh in-range live reading the sensor layer marked invalid.
+    const invalidQ = evaluateSensorTruth(makeCandidate({ quality: "invalid" }), {
+      nowMs: NOW_MS,
+    });
+    expect(invalidQ.usability).toBe("invalid");
+    expect(invalidQ.excludedFromReasoning).toBe(true);
+    expect(invalidQ.exclusionReason).toBe("upstream_quality");
+    const staleQ = evaluateSensorTruth(makeCandidate({ quality: "stale" }), {
+      nowMs: NOW_MS,
+    });
+    expect(staleQ.usability).toBe("stale");
+    const degradedQ = evaluateSensorTruth(makeCandidate({ quality: "degraded" }), {
+      nowMs: NOW_MS,
+    });
+    expect(degradedQ.usability).toBe("degraded");
+    expect(degradedQ.warnings).toContain("upstream_quality");
+    // quality "ok" never upgrades an untrusted source.
+    const demoOk = evaluateSensorTruth(makeCandidate({ source: "demo", quality: "ok" }), {
+      nowMs: NOW_MS,
+    });
+    expect(demoOk.excludedFromReasoning).toBe(true);
+    expect(demoOk.exclusionReason).toBe("demo_source");
+    // Unknown quality labels are deny-by-default invalid.
+    const weird = evaluateSensorTruth(makeCandidate({ quality: "vibes" }), {
+      nowMs: NOW_MS,
+    });
+    expect(weird.usability).toBe("invalid");
+    expect(weird.warnings).toContain("unknown_quality");
+  });
+
+  it("rejects a unit-encoding metric key contradicted by an explicit unit", () => {
+    const e = evaluateSensorTruth(
+      makeCandidate({ metric: "temperature_f", value: 77, unit: "°C" }),
+      { nowMs: NOW_MS },
+    );
+    expect(e.normalizedValue).toBeNull();
+    expect(e.warnings).toContain("temperature_unit_suspected");
+    expect(e.usability).toBe("invalid");
+  });
+
+  it("maps the persisted long-form ec metric to canonical soil EC", () => {
+    const e = evaluateSensorTruth(makeCandidate({ metric: "ec", value: 1.8, unit: "mS/cm" }), {
+      nowMs: NOW_MS,
+    });
+    expect(e.metric).toBe("soil_ec_ms_cm");
+    expect(e.normalizedValue).toBe(1.8);
+    expect(e.usability).toBe("usable");
+  });
+
+  it("treats explicitly malformed confidence conservatively, not as 1", () => {
+    const nan = evaluateSensorTruth(makeCandidate({ confidence: Number.NaN }), {
+      nowMs: NOW_MS,
+    });
+    expect(nan.adjustedConfidence).toBe(0);
+    expect(nan.warnings).toContain("invalid_confidence");
+    const absent = evaluateSensorTruth(makeCandidate({ confidence: null }), {
+      nowMs: NOW_MS,
+    });
+    expect(absent.adjustedConfidence).toBe(1);
+  });
+
+  it("keeps unknown provider strings out of the provenance summary", () => {
+    const e = evaluateSensorTruth(makeCandidate({ provider: "sk_live_secretvalue" }), {
+      nowMs: NOW_MS,
+    });
+    expect(e.provenanceSummary).not.toContain("secretvalue");
+    expect(e.provenanceSummary).not.toContain("Sk_live");
+  });
+
   it("keeps arbitrary transport strings out of the provenance summary", () => {
     const e = evaluateSensorTruth(makeCandidate({ transport: "Bearer eyJhbGciOi.secret-token" }), {
       nowMs: NOW_MS,
@@ -388,6 +458,30 @@ describe("series evaluation", () => {
     );
     expect(air.conflicts).toHaveLength(1);
     expect(air.conflicts[0].plantId).toBeNull();
+  });
+
+  it("treats successive samples from one device as history, not a conflict", () => {
+    const sample = (minsAgo: number, value: number) =>
+      makeCandidate({ deviceId: "dev-1", capturedAt: minutesAgo(minsAgo), value });
+    const series = evaluateSensorSeries([sample(10, 21), sample(5, 27)], {
+      nowMs: NOW_MS,
+      aggregation: { rule: "mean" },
+    });
+    // Same device, two moments in time: no cross-sensor conflict...
+    expect(series.conflicts).toEqual([]);
+    // ...and only the LATEST sample enters the aggregate.
+    expect(series.aggregates).toHaveLength(1);
+    expect(series.aggregates[0].value).toBe(27);
+    expect(series.aggregates[0].usableCount).toBe(1);
+    // Two DIFFERENT devices disagreeing at the same time is a conflict.
+    const twoDevices = evaluateSensorSeries(
+      [
+        makeCandidate({ deviceId: "dev-1", value: 21 }),
+        makeCandidate({ deviceId: "dev-2", value: 27 }),
+      ],
+      { nowMs: NOW_MS },
+    );
+    expect(twoDevices.conflicts).toHaveLength(1);
   });
 
   it("flags conflicts between two sensors on the same plant", () => {

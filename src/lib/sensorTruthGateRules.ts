@@ -59,7 +59,7 @@ import {
   isCanonicalSensorSource,
   type CanonicalSensorSource,
 } from "@/constants/sensorIngestProvenance";
-import { deriveProviderLabel } from "@/constants/sensorProviderLabels";
+import { SENSOR_PROVIDER_LABELS, deriveProviderLabel } from "@/constants/sensorProviderLabels";
 import {
   classifyManualMetric,
   isAirTempCRealistic,
@@ -113,10 +113,19 @@ export interface SensorReadingCandidate {
   transport?: string | null;
   /** Raw source label as recorded; normalized deny-by-default. */
   source: string | null | undefined;
+  /**
+   * Persisted quality label (ok|degraded|stale|invalid) when the row
+   * carries one. Non-ok quality can only WORSEN the evaluation, never
+   * upgrade it; unknown labels classify as invalid.
+   */
+  quality?: string | null;
   capturedAt: string | null | undefined;
   receivedAt?: string | null;
   tentId: string;
   plantId?: string | null;
+  /** Sensor/device identity, used to separate temporal samples from
+   * genuine cross-sensor disagreement in series evaluation. */
+  deviceId?: string | null;
   metric: string;
   /** Missing stays null. The gate never substitutes zero. */
   value: number | null | undefined;
@@ -152,6 +161,9 @@ export type SensorTruthWarning =
   | "unit_unknown"
   | "soil_moisture_stuck_extreme"
   | "sensor_conflict"
+  | "upstream_quality"
+  | "unknown_quality"
+  | "invalid_confidence"
   | "demo_source";
 
 export type SensorExclusionReason =
@@ -162,11 +174,13 @@ export type SensorExclusionReason =
   | "future_timestamp"
   | "missing_timestamp"
   | "missing_value"
+  | "upstream_quality"
   | "stale_reading";
 
 export interface SensorTruthEvaluation {
   tentId: string;
   plantId: string | null;
+  deviceId: string | null;
   /** Canonical ISO capture timestamp, or null when absent/unparseable. */
   capturedAt: string | null;
   metric: SensorGateMetric | null;
@@ -200,6 +214,23 @@ export const SENSOR_TRUTH_CONFIDENCE_FACTORS: Record<SensorUsability, number> = 
   invalid: 0,
   unknown: 0,
 });
+
+/** Ordering used when a persisted quality label caps usability. */
+const USABILITY_SEVERITY: Record<SensorUsability, number> = {
+  usable: 0,
+  degraded: 1,
+  stale: 2,
+  unknown: 3,
+  invalid: 4,
+};
+
+/** Persisted DB quality labels → the BEST usability they permit. */
+const QUALITY_TO_MAX_USABILITY: Record<string, SensorUsability> = {
+  ok: "usable",
+  degraded: "degraded",
+  stale: "stale",
+  invalid: "invalid",
+};
 
 /**
  * Cross-sensor disagreement tolerances per metric (canonical units).
@@ -252,6 +283,8 @@ const METRIC_ALIAS: Record<string, SensorGateMetric> = {
   soil_ec_ms_cm: "soil_ec_ms_cm",
   soil_ec: "soil_ec_ms_cm",
   soil_ec_us_cm: "soil_ec_ms_cm",
+  // Persisted long-form rows and the webhook normalizer store EC as "ec".
+  ec: "soil_ec_ms_cm",
   soil_temp_c: "soil_temp_c",
   ph: "ph",
   reservoir_ph: "ph",
@@ -290,11 +323,22 @@ const ACCEPTED_UNITS: Record<Exclude<SensorGateMetric, "soil_ec_ms_cm">, readonl
   ph: ["", "ph"],
 };
 
-function clamp01(v: number | null | undefined): number {
-  if (typeof v !== "number" || !Number.isFinite(v)) return 1;
-  if (v < 0) return 0;
-  if (v > 1) return 1;
-  return v;
+/**
+ * Upstream confidence handling: ABSENT confidence defaults to 1, but an
+ * explicitly malformed (non-finite) confidence is conservative 0 — bad
+ * trust metadata must never increase trust.
+ */
+function normalizeUpstreamConfidence(v: number | null | undefined): {
+  value: number;
+  malformed: boolean;
+} {
+  if (v === null || v === undefined) return { value: 1, malformed: false };
+  if (typeof v !== "number" || !Number.isFinite(v)) {
+    return { value: 0, malformed: true };
+  }
+  if (v < 0) return { value: 0, malformed: false };
+  if (v > 1) return { value: 1, malformed: false };
+  return { value: v, malformed: false };
 }
 
 interface NormalizedMetricValue {
@@ -346,6 +390,16 @@ export function normalizeSensorCandidate(
 
   if (metric === "temperature_c" || metric === "soil_temp_c") {
     const unit = (candidate.unit ?? "").trim().toUpperCase();
+    // A unit-encoding metric key (temperature_f) contradicted by an
+    // explicit Celsius unit is unresolvable — reject, never guess.
+    if (candidate.metric === "temperature_f" && (unit === "C" || unit === "°C")) {
+      return {
+        metric,
+        value: null,
+        unit: CANONICAL_UNIT[metric],
+        warnings: ["temperature_unit_suspected"],
+      };
+    }
     const declaredF = candidate.metric === "temperature_f" || unit === "F" || unit === "°F";
     if (declaredF) {
       value = fahrenheitToCelsius(raw);
@@ -449,8 +503,15 @@ function buildProvenanceSummary(
   source: CanonicalSensorSource,
 ): string {
   const parts: string[] = [`${source} reading`];
-  const provider = deriveProviderLabel(candidate.provider ?? null);
-  if (provider) parts.push(provider);
+  // Provider is echoed ONLY when it resolves against the known provider
+  // label map — arbitrary adapter text (including credential-shaped
+  // strings) must never reach the presenter-safe summary, even
+  // title-cased.
+  const providerKey = (candidate.provider ?? "").trim().toLowerCase().replace(/-/g, "_");
+  if (providerKey && SENSOR_PROVIDER_LABELS[providerKey]) {
+    const provider = deriveProviderLabel(candidate.provider ?? null);
+    if (provider) parts.push(provider);
+  }
   // Transport is echoed ONLY when it is one of the canonical provenance
   // transports — an arbitrary adapter string (token, URL, header) must
   // never reach the presenter-safe summary.
@@ -552,14 +613,34 @@ export function evaluateSensorTruth(
     usability = "usable";
   }
 
+  // Persisted quality can only WORSEN the evaluation. A row the sensor
+  // layer already marked degraded/stale/invalid must never be recomputed
+  // as healthier here; unknown quality labels classify as invalid.
+  const qualityRaw = candidate.quality;
+  if (qualityRaw !== null && qualityRaw !== undefined) {
+    const quality = String(qualityRaw).trim().toLowerCase();
+    const cap = QUALITY_TO_MAX_USABILITY[quality];
+    if (cap === undefined) {
+      warnings.push("unknown_quality");
+      usability = "invalid";
+      exclusionReason = exclusionReason ?? "upstream_quality";
+    } else if (USABILITY_SEVERITY[cap] > USABILITY_SEVERITY[usability]) {
+      warnings.push("upstream_quality");
+      usability = cap;
+      exclusionReason = exclusionReason ?? "upstream_quality";
+    }
+  }
+
   const excludedFromReasoning = usability !== "usable" && usability !== "degraded";
   const confidenceFactor = SENSOR_TRUTH_CONFIDENCE_FACTORS[usability];
-  const adjustedConfidence =
-    Math.round(clamp01(candidate.confidence) * confidenceFactor * 1000) / 1000;
+  const upstreamConfidence = normalizeUpstreamConfidence(candidate.confidence);
+  if (upstreamConfidence.malformed) warnings.push("invalid_confidence");
+  const adjustedConfidence = Math.round(upstreamConfidence.value * confidenceFactor * 1000) / 1000;
 
   return {
     tentId: candidate.tentId,
     plantId: candidate.plantId ?? null,
+    deviceId: candidate.deviceId ?? null,
     capturedAt: canonicalCapturedAt(candidate.capturedAt),
     metric: normalized.metric,
     normalizedValue: excludedFromReasoning && validity === "invalid" ? null : value,
@@ -700,16 +781,34 @@ export function evaluateSensorSeries(
 
   // Group included (usable/degraded) readings by tent + metric, and by
   // plant as well for root-zone metrics — one plant's root-zone telemetry
-  // must never contaminate another's evidence.
-  const groups = new Map<string, SensorTruthEvaluation[]>();
-  evaluations.forEach((e) => {
+  // must never contaminate another's evidence. Within each group, only
+  // the LATEST reading per device participates: successive temporal
+  // samples from one sensor are history, not a cross-sensor conflict,
+  // and must not be averaged together.
+  const grouped = new Map<string, Array<{ e: SensorTruthEvaluation; order: number }>>();
+  evaluations.forEach((e, i) => {
     if (e.metric === null || e.normalizedValue === null) return;
     if (e.excludedFromReasoning) return;
     const key = `${e.tentId}|${groupPlantId(e) ?? ""}|${e.metric}`;
-    const list = groups.get(key) ?? [];
-    list.push(e);
-    groups.set(key, list);
+    const list = grouped.get(key) ?? [];
+    list.push({ e, order: i });
+    grouped.set(key, list);
   });
+
+  const groups = new Map<string, SensorTruthEvaluation[]>();
+  for (const [key, list] of grouped.entries()) {
+    const latestPerDevice = new Map<string, SensorTruthEvaluation>();
+    for (const { e, order } of list) {
+      // A device identity separates temporal samples; anonymous
+      // candidates each count as their own device.
+      const deviceKey = e.deviceId !== null ? `d:${e.deviceId}` : `anon:${order}`;
+      const prev = latestPerDevice.get(deviceKey);
+      if (prev === undefined || (e.capturedAt ?? "") > (prev.capturedAt ?? "")) {
+        latestPerDevice.set(deviceKey, e);
+      }
+    }
+    groups.set(key, [...latestPerDevice.values()]);
+  }
 
   const conflicts: SensorConflict[] = [];
   for (const [, list] of [...groups.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {

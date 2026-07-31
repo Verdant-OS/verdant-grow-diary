@@ -66,7 +66,10 @@ import {
 } from "@/lib/aiOutputTextSafetyDetectors";
 import { DEVICE_CONTROL_DETECTION_PATTERNS } from "@/lib/aiDoctorSafetyRules";
 import { SENSOR_TRUTH_CONFIDENCE_FACTORS } from "@/lib/sensorTruthGateRules";
-import type { PlantContextCompilation } from "@/lib/plantContextBundleCompiler";
+import {
+  PLANT_CONTEXT_WINDOWS,
+  type PlantContextCompilation,
+} from "@/lib/plantContextBundleCompiler";
 import {
   resolvePlantIdentity,
   skillMayRun,
@@ -201,17 +204,36 @@ const SOURCE_TRUST_FACTOR: Readonly<Record<string, number>> = Object.freeze({
  * rated 0 by the layer that produced it — reading only the label would treat
  * telemetry its own producer called unusable as fully trustworthy.
  */
-function recordTrust(record: { source?: string | null; confidence?: number | null }): number {
+function recordTrust(
+  record: { source?: string | null; confidence?: number | null; observedAt?: string | null },
+  asOfMs: number,
+): number {
   // An absent source is not a benign default — it is an unlabelled reading,
   // which the truth gate scores at zero.
   const sourceFactor =
     record.source === null || record.source === undefined
       ? SENSOR_TRUTH_CONFIDENCE_FACTORS.unknown
       : (SOURCE_TRUST_FACTOR[record.source] ?? SENSOR_TRUTH_CONFIDENCE_FACTORS.unknown);
+  // `live` describes HOW a reading arrived, never WHEN. A months-old
+  // record keeps its live label forever, so freshness is measured against
+  // the run's own completion time using the window the context compiler
+  // already uses to admit sensor evidence at all.
+  const observedMs =
+    typeof record.observedAt === "string" ? Date.parse(record.observedAt) : Number.NaN;
+  const ageFactor = Number.isNaN(observedMs)
+    ? SENSOR_TRUTH_CONFIDENCE_FACTORS.unknown
+    : observedMs > asOfMs + SENSOR_CLOCK_SKEW_MS
+      ? SENSOR_TRUTH_CONFIDENCE_FACTORS.invalid
+      : asOfMs - observedMs > PLANT_CONTEXT_WINDOWS.sensorDays * 86_400_000
+        ? SENSOR_TRUTH_CONFIDENCE_FACTORS.stale
+        : SENSOR_TRUTH_CONFIDENCE_FACTORS.usable;
   const own =
     record.confidence === null || record.confidence === undefined ? 1 : clamp01(record.confidence);
-  return sourceFactor * own;
+  return sourceFactor * own * ageFactor;
 }
+
+/** Tolerance for ordinary clock drift between a device and the runtime. */
+const SENSOR_CLOCK_SKEW_MS = 5 * 60 * 1000;
 
 /** V1 ships exactly one allow state, and it is low-risk-only. */
 export const V1_MAX_ALLOWED_RISK: SkillRiskLevel = "low";
@@ -359,6 +381,14 @@ export interface SkillPolicyRuleRef {
 export interface SkillProposalVerdict {
   proposalId: string;
   verdict: "allow" | "block";
+  /** Carried so eligibility is derived from capability, not verdict count. */
+  executionCapability: "none" | "manual_only";
+  /**
+   * Confidence ceiling from the evidence THIS proposal cites, which can be
+   * far below the run's — a run-wide maximum would let one strong reading
+   * underwrite a proposal that cites only a weak one.
+   */
+  citedEvidenceCeiling: number;
   declaredRiskLevel: SkillRiskLevel;
   effectiveRiskLevel: SkillRiskLevel;
   interventionClass: SkillInterventionClass;
@@ -588,6 +618,9 @@ export function governSkillOutput(input: GovernSkillOutputInput): SkillPolicyDec
     });
   }
   const output = parsed.value;
+  // The run's own completion time is the injected clock. The governor never
+  // reads a real one, so the same inputs always produce the same decision.
+  const runCompletedMs = Date.parse(output.completedAt);
 
   // ---- D0: manifest conformance. Structural, runs first, blocks everything.
   const manifestBlocks: SkillPolicyRuleCode[] = [];
@@ -721,7 +754,7 @@ export function governSkillOutput(input: GovernSkillOutputInput): SkillPolicyDec
     (e) => e.kind === "sensor_reading" || e.kind === "derived_metric",
   );
   if (sensorRecords.length > 0) {
-    const trust = Math.max(...sensorRecords.map((e) => recordTrust(e)));
+    const trust = Math.max(...sensorRecords.map((e) => recordTrust(e, runCompletedMs)));
     if (trust < 1) {
       cap(trust, "proposal_evidence_untrustworthy", "Cited telemetry is not fully trusted.");
     }
@@ -836,6 +869,7 @@ export function governSkillOutput(input: GovernSkillOutputInput): SkillPolicyDec
       identity,
       context,
       output,
+      runCompletedMs,
       fire,
       outcomes,
     }),
@@ -868,7 +902,13 @@ export function governSkillOutput(input: GovernSkillOutputInput): SkillPolicyDec
   for (const followUp of output.followUps) {
     const strings: { path: string; text: string }[] = [];
     collectStrings(
-      { question: followUp.question, expectedObservation: followUp.expectedObservation },
+      {
+        question: followUp.question,
+        expectedObservation: followUp.expectedObservation,
+        // A recorded outcome is model-adjacent prose too: a note reading
+        // "turn on the pump" would otherwise render with an allowed id.
+        recordedNote: followUp.recordedOutcome?.note,
+      },
       `followUps.${followUp.followUpId}`,
       strings,
     );
@@ -997,6 +1037,7 @@ interface JudgeInput {
   identity: { known: boolean; isAutoflower: boolean | null; contradictory: boolean };
   context: PlantContextCompilation;
   output: SkillRunResult;
+  runCompletedMs: number;
   fire: (
     code: SkillPolicyRuleCode,
     basis: "structural" | "linguistic",
@@ -1019,6 +1060,7 @@ function judgeProposal(input: JudgeInput): SkillProposalVerdict {
     manifestBlocks,
     runMaxRisk,
     effectiveConfidence,
+    runCompletedMs,
     stage,
     identity,
     context,
@@ -1176,18 +1218,6 @@ function judgeProposal(input: JudgeInput): SkillProposalVerdict {
     );
   }
 
-  // Confidence and risk ceiling.
-  if (effectiveConfidence < MIN_CONFIDENCE_FOR_LOW_RISK_ACTION) {
-    block("confidence_below_action_floor", "structural", "Confidence is below the action floor.");
-  }
-  if (runMaxRisk === null || riskRank(effectiveRiskLevel) > riskRank(runMaxRisk)) {
-    block(
-      "risk_exceeds_confidence_ceiling",
-      "structural",
-      "Risk exceeds what the evidence supports.",
-    );
-  }
-
   // Evidence must be real and trustworthy.
   const cited = proposal.supportingEvidenceIds
     .map((eid) => output.evidence.find((e) => e.evidenceId === eid))
@@ -1196,21 +1226,47 @@ function judgeProposal(input: JudgeInput): SkillProposalVerdict {
   // reported confidence leave it usable. Both halves are required: trust
   // alone would readmit a stale record carrying a high confidence, and the
   // source allowlist alone would accept a live record its producer scored 0.
-  const trustworthy = cited.some(
+  const usableCited = cited.filter(
     (e) =>
       e !== undefined &&
       e.source !== "stale" &&
       e.source !== "invalid" &&
       e.source !== "demo" &&
-      recordTrust(e) > 0,
+      recordTrust(e, runCompletedMs) > 0,
   );
-  if (!trustworthy) {
+  if (usableCited.length === 0) {
     block("proposal_evidence_untrustworthy", "structural", "No cited evidence is trustworthy.");
+  }
+  // The ceiling is the best record THIS proposal cites — one sound reading
+  // is enough to reason from, but a strong reading the proposal never cited
+  // must not underwrite it.
+  const citedEvidenceCeiling =
+    usableCited.length === 0
+      ? 0
+      : Math.max(...usableCited.map((e) => recordTrust(e, runCompletedMs)));
+  const proposalConfidence = Math.min(effectiveConfidence, citedEvidenceCeiling);
+
+  // Confidence and risk ceiling, scoped to what this proposal actually cites.
+  if (proposalConfidence < MIN_CONFIDENCE_FOR_LOW_RISK_ACTION) {
+    block("confidence_below_action_floor", "structural", "Confidence is below the action floor.");
+  }
+  const proposalBand =
+    MAX_RISK_BY_CONFIDENCE.find((row) => proposalConfidence >= row.minSystemConfidence) ??
+    MAX_RISK_BY_CONFIDENCE[MAX_RISK_BY_CONFIDENCE.length - 1];
+  const proposalMaxRisk = minRisk(runMaxRisk, proposalBand.maxRiskLevel);
+  if (proposalMaxRisk === null || riskRank(effectiveRiskLevel) > riskRank(proposalMaxRisk)) {
+    block(
+      "risk_exceeds_confidence_ceiling",
+      "structural",
+      "Risk exceeds what the evidence supports.",
+    );
   }
 
   return {
     proposalId: id,
     verdict: blocked ? "block" : "allow",
+    executionCapability: proposal.executionCapability === "manual_only" ? "manual_only" : "none",
+    citedEvidenceCeiling,
     declaredRiskLevel: proposal.riskLevel,
     effectiveRiskLevel,
     interventionClass: klass,
@@ -1250,10 +1306,12 @@ interface FinalizeInput {
 
 function finalize(input: FinalizeInput): SkillPolicyDecision {
   const orderedOutcomes = SKILL_POLICY_OUTCOMES.filter((o) => input.outcomes.has(o));
-  const allowed = input.verdicts
-    .filter((v) => v.verdict === "allow")
-    .map((v) => v.proposalId)
-    .sort(compareIds);
+  const allowedVerdicts = input.verdicts.filter((v) => v.verdict === "allow");
+  const allowed = allowedVerdicts.map((v) => v.proposalId).sort(compareIds);
+  // An allowed proposal that declares `none` is informational by contract.
+  // Advertising manual eligibility because SOME proposal survived would
+  // upgrade it into an action the contract says it is not.
+  const anyActionable = allowedVerdicts.some((v) => v.executionCapability === "manual_only");
 
   return {
     decisionVersion: SKILL_POLICY_DECISION_VERSION,
@@ -1264,7 +1322,7 @@ function finalize(input: FinalizeInput): SkillPolicyDecision {
     urgent: orderedOutcomes.includes("urgent_manual_attention"),
     urgentReasons: [...input.urgentReasons],
     informationRequired: orderedOutcomes.includes("request_more_information"),
-    actionEligibility: allowed.length > 0 ? "low_risk_manual_only" : "none",
+    actionEligibility: anyActionable ? "low_risk_manual_only" : "none",
     proposalVerdicts: [...input.verdicts].sort((a, b) => compareIds(a.proposalId, b.proposalId)),
     allowedProposalIds: allowed,
     allowedEvidenceIds: [...input.allowedEvidenceIds].sort(compareIds),

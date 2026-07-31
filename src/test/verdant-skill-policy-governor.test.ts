@@ -1029,3 +1029,124 @@ describe("policy governor — review round 2", () => {
     ).toBe(true);
   });
 });
+
+describe("policy governor — review round 3", () => {
+  it("withholds a device instruction in a recorded follow-up note", () => {
+    const d = govern({
+      output: runResult({
+        followUps: [
+          {
+            followUpId: "f-1",
+            runId: RUN,
+            proposalId: "p-1",
+            checkAfterHours: 24,
+            question: "Did runoff stabilise?",
+            expectedObservation: "Runoff within the usual range.",
+            status: "recorded",
+            recordedOutcome: {
+              observedAt: hoursAgo(1),
+              outcome: "unchanged",
+              note: "Turn on the pump for ten minutes.",
+            },
+          },
+        ],
+      }),
+    });
+    expect(d.allowedFollowUpIds).not.toContain("f-1");
+    expect(d.withheldTextPaths.some((p) => p.includes("followUps.f-1"))).toBe(true);
+  });
+
+  it("treats an old reading as stale however it was labelled", () => {
+    // `live` says HOW a reading arrived, never WHEN.
+    const d = govern({
+      output: runResult({
+        evidence: [
+          {
+            evidenceId: "e-1",
+            kind: "sensor_reading",
+            observedAt: hoursAgo(24 * 60),
+            source: "live",
+            confidence: 0.9,
+            summary: "Substrate moisture 42 percent.",
+            detail: null,
+            metric: { name: "soil_moisture_pct", value: 42, unit: "%" },
+            entityRef: null,
+          },
+        ],
+      }),
+    });
+    expect(d.confidenceCeiling).toBeLessThan(MIN_CONFIDENCE_FOR_LOW_RISK_ACTION);
+    expect(d.proposalVerdicts[0].verdict).toBe("block");
+  });
+
+  it("refuses a reading timestamped after the run finished", () => {
+    const d = govern({
+      output: runResult({
+        evidence: [
+          {
+            evidenceId: "e-1",
+            kind: "sensor_reading",
+            observedAt: hoursAgo(-48),
+            source: "live",
+            confidence: 0.9,
+            summary: "Substrate moisture 42 percent.",
+            detail: null,
+            metric: null,
+            entityRef: null,
+          },
+        ],
+      }),
+    });
+    expect(d.proposalVerdicts[0].verdict).toBe("block");
+  });
+
+  it("scopes a proposal's ceiling to the evidence it actually cites", () => {
+    // A strong reading the proposal never cited must not underwrite it.
+    const d = govern({
+      output: runResult({
+        evidence: [
+          {
+            evidenceId: "e-strong",
+            kind: "sensor_reading",
+            observedAt: hoursAgo(0.1),
+            source: "live",
+            confidence: 0.95,
+            summary: "Substrate moisture 42 percent.",
+            detail: null,
+            metric: null,
+            entityRef: null,
+          },
+          {
+            evidenceId: "e-weak",
+            kind: "sensor_reading",
+            observedAt: hoursAgo(0.1),
+            source: "live",
+            confidence: 0.01,
+            summary: "Marginal humidity reading.",
+            detail: null,
+            metric: null,
+            entityRef: null,
+          },
+        ],
+        proposals: [proposal({ supportingEvidenceIds: ["e-weak"] })],
+      }),
+    });
+    const v = d.proposalVerdicts[0];
+    expect(v.citedEvidenceCeiling).toBeCloseTo(0.01, 5);
+    expect(v.ruleCodes).toContain("confidence_below_action_floor");
+    expect(v.verdict).toBe("block");
+  });
+
+  it("keeps an informational proposal informational", () => {
+    // `executionCapability: "none"` is a contract statement that this is not
+    // an action, even under a manual_only manifest.
+    const d = govern({
+      output: runResult({ proposals: [proposal({ executionCapability: "none" })] }),
+    });
+    expect(d.proposalVerdicts[0].verdict).toBe("allow");
+    expect(d.proposalVerdicts[0].executionCapability).toBe("none");
+    expect(d.actionEligibility).toBe("none");
+    // A manual_only proposal still advertises manual eligibility.
+    expect(govern().actionEligibility).toBe("low_risk_manual_only");
+  });
+});

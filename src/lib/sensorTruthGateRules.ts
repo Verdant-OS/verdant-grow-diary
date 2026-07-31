@@ -55,6 +55,7 @@
 
 import {
   CANONICAL_SENSOR_SOURCES,
+  SENSOR_PROVENANCE_TRANSPORTS,
   isCanonicalSensorSource,
   type CanonicalSensorSource,
 } from "@/constants/sensorIngestProvenance";
@@ -148,6 +149,7 @@ export type SensorTruthWarning =
   | "missing_value"
   | "temperature_unit_suspected"
   | "ec_unit_unknown"
+  | "unit_unknown"
   | "soil_moisture_stuck_extreme"
   | "sensor_conflict"
   | "demo_source";
@@ -165,6 +167,8 @@ export type SensorExclusionReason =
 export interface SensorTruthEvaluation {
   tentId: string;
   plantId: string | null;
+  /** Canonical ISO capture timestamp, or null when absent/unparseable. */
+  capturedAt: string | null;
   metric: SensorGateMetric | null;
   /** Canonical unit value, or null. Never invented, never defaulted to 0. */
   normalizedValue: number | null;
@@ -269,6 +273,23 @@ function normalizeEcUnitString(unit: string): string {
   return unit.replace(/[μu]S\/cm/i, "µS/cm").replace(/µs\/cm/i, "µS/cm");
 }
 
+/**
+ * Accepted declared units per metric (lowercased). An EMPTY unit means
+ * the candidate is trusted to already be in the metric's canonical unit
+ * — the one documented implicit-unit assumption. Any other explicit
+ * unit must be recognized or the value is rejected, never guessed.
+ * (EC units are validated separately through `toCanonicalMscm`.)
+ */
+const ACCEPTED_UNITS: Record<Exclude<SensorGateMetric, "soil_ec_ms_cm">, readonly string[]> = {
+  temperature_c: ["", "c", "°c", "f", "°f"],
+  humidity_pct: ["", "%"],
+  vpd_kpa: ["", "kpa"],
+  co2_ppm: ["", "ppm"],
+  soil_moisture_pct: ["", "%"],
+  soil_temp_c: ["", "c", "°c", "f", "°f"],
+  ph: ["", "ph"],
+};
+
 function clamp01(v: number | null | undefined): number {
   if (typeof v !== "number" || !Number.isFinite(v)) return 1;
   if (v < 0) return 0;
@@ -305,6 +326,20 @@ export function normalizeSensorCandidate(
       unit: CANONICAL_UNIT[metric],
       warnings: raw === null || raw === undefined ? ["missing_value"] : [],
     };
+  }
+
+  // Reject unrecognized explicit units instead of assuming canonical —
+  // e.g. { metric: "temperature_c", unit: "K" } must never pass as °C.
+  if (metric !== "soil_ec_ms_cm") {
+    const declaredUnit = (candidate.unit ?? "").trim().toLowerCase();
+    if (!ACCEPTED_UNITS[metric].includes(declaredUnit)) {
+      return {
+        metric,
+        value: null,
+        unit: CANONICAL_UNIT[metric],
+        warnings: ["unit_unknown"],
+      };
+    }
   }
 
   let value: number | null = raw;
@@ -416,9 +451,22 @@ function buildProvenanceSummary(
   const parts: string[] = [`${source} reading`];
   const provider = deriveProviderLabel(candidate.provider ?? null);
   if (provider) parts.push(provider);
-  const transport = (candidate.transport ?? "").trim();
-  if (transport) parts.push(transport);
+  // Transport is echoed ONLY when it is one of the canonical provenance
+  // transports — an arbitrary adapter string (token, URL, header) must
+  // never reach the presenter-safe summary.
+  const transport = (candidate.transport ?? "").trim().toLowerCase();
+  if ((SENSOR_PROVENANCE_TRANSPORTS as readonly string[]).includes(transport)) {
+    parts.push(transport);
+  }
   return parts.join(" · ");
+}
+
+/** Canonical ISO capture timestamp, or null when absent/unparseable. */
+function canonicalCapturedAt(capturedAt: string | null | undefined): string | null {
+  if (capturedAt == null || capturedAt === "") return null;
+  const t = Date.parse(capturedAt);
+  if (Number.isNaN(t)) return null;
+  return new Date(t).toISOString();
 }
 
 /**
@@ -512,6 +560,7 @@ export function evaluateSensorTruth(
   return {
     tentId: candidate.tentId,
     plantId: candidate.plantId ?? null,
+    capturedAt: canonicalCapturedAt(candidate.capturedAt),
     metric: normalized.metric,
     normalizedValue: excludedFromReasoning && validity === "invalid" ? null : value,
     normalizedUnit: normalized.unit,
@@ -535,7 +584,13 @@ export function evaluateSensorTruth(
 export interface TruthGatedVpdResult {
   /** Derived vpd_kpa, or null. A missing vpd_kpa never becomes 0. */
   vpdKpa: number | null;
-  reason: "derived" | "temperature_not_usable" | "humidity_not_usable" | "inputs_missing" | null;
+  reason:
+    | "derived"
+    | "temperature_not_usable"
+    | "humidity_not_usable"
+    | "context_mismatch"
+    | "inputs_missing"
+    | null;
 }
 
 /**
@@ -558,6 +613,10 @@ export function deriveTruthGatedVpd(
   if (!humidity || humidity.metric !== "humidity_pct" || humidity.normalizedValue === null) {
     return { vpdKpa: null, reason: "inputs_missing" };
   }
+  // Readings from different tents must never be combined into one VPD.
+  if (temperature.tentId !== humidity.tentId) {
+    return { vpdKpa: null, reason: "context_mismatch" };
+  }
   if (temperature.usability !== "usable") {
     return { vpdKpa: null, reason: "temperature_not_usable" };
   }
@@ -578,6 +637,8 @@ export function deriveTruthGatedVpd(
 
 export interface SensorConflict {
   tentId: string;
+  /** Set for root-zone (plant-scoped) groups; null for tent-scoped ones. */
+  plantId: string | null;
   metric: SensorGateMetric;
   /** Max minus min across the disagreeing included readings. */
   spread: number;
@@ -587,6 +648,8 @@ export interface SensorConflict {
 
 export interface SensorAggregate {
   tentId: string;
+  /** Set for root-zone (plant-scoped) groups; null for tent-scoped ones. */
+  plantId: string | null;
   metric: SensorGateMetric;
   rule: "mean";
   value: number;
@@ -594,6 +657,25 @@ export interface SensorAggregate {
   usableCount: number;
   /** How many readings were excluded from the aggregate. */
   excludedCount: number;
+}
+
+/**
+ * Root-zone metrics are plant-scoped: two plants in one tent legitimately
+ * differ, so they group per plant. Atmospheric metrics group per tent.
+ */
+const ROOT_ZONE_METRICS: ReadonlySet<SensorGateMetric> = new Set([
+  "soil_moisture_pct",
+  "soil_ec_ms_cm",
+  "soil_temp_c",
+  "ph",
+]);
+
+/** Grouping plant scope: the plant for root-zone metrics, else null. */
+function groupPlantId(e: {
+  metric: SensorGateMetric | null;
+  plantId: string | null;
+}): string | null {
+  return e.metric !== null && ROOT_ZONE_METRICS.has(e.metric) ? e.plantId : null;
 }
 
 export interface EvaluateSensorSeriesOptions extends EvaluateSensorTruthOptions {
@@ -616,30 +698,30 @@ export function evaluateSensorSeries(
 ): SensorSeriesResult {
   const evaluations = candidates.map((c) => evaluateSensorTruth(c, { nowMs: options.nowMs }));
 
-  // Group included (usable/degraded) fresh readings by tent + metric.
+  // Group included (usable/degraded) readings by tent + metric, and by
+  // plant as well for root-zone metrics — one plant's root-zone telemetry
+  // must never contaminate another's evidence.
   const groups = new Map<string, SensorTruthEvaluation[]>();
   evaluations.forEach((e) => {
     if (e.metric === null || e.normalizedValue === null) return;
     if (e.excludedFromReasoning) return;
-    const key = `${e.tentId} ${e.metric}`;
+    const key = `${e.tentId}|${groupPlantId(e) ?? ""}|${e.metric}`;
     const list = groups.get(key) ?? [];
     list.push(e);
     groups.set(key, list);
   });
 
   const conflicts: SensorConflict[] = [];
-  for (const [key, list] of [...groups.entries()].sort(([a], [b]) =>
-    a < b ? -1 : a > b ? 1 : 0,
-  )) {
+  for (const [, list] of [...groups.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
     if (list.length < 2) continue;
     const values = list.map((e) => e.normalizedValue as number);
     const spread = Math.max(...values) - Math.min(...values);
     const metric = list[0].metric as SensorGateMetric;
     const tolerance = SENSOR_CONFLICT_TOLERANCES[metric];
     if (spread > tolerance) {
-      const tentId = key.split(" ")[0];
       conflicts.push({
-        tentId,
+        tentId: list[0].tentId,
+        plantId: groupPlantId(list[0]),
         metric,
         spread: Math.round(spread * 1000) / 1000,
         tolerance,
@@ -657,19 +739,19 @@ export function evaluateSensorSeries(
 
   const aggregates: SensorAggregate[] = [];
   if (options.aggregation?.rule === "mean") {
-    for (const [key, list] of [...groups.entries()].sort(([a], [b]) =>
-      a < b ? -1 : a > b ? 1 : 0,
-    )) {
+    for (const [, list] of [...groups.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
       const usable = list.filter((e) => e.usability === "usable");
       if (usable.length === 0) continue;
-      const tentId = key.split(" ")[0];
+      const tentId = list[0].tentId;
+      const plantId = groupPlantId(list[0]);
       const metric = list[0].metric as SensorGateMetric;
       const totalForGroup = evaluations.filter(
-        (e) => e.tentId === tentId && e.metric === metric,
+        (e) => e.tentId === tentId && e.metric === metric && groupPlantId(e) === plantId,
       ).length;
       const sum = usable.reduce((acc, e) => acc + (e.normalizedValue as number), 0);
       aggregates.push({
         tentId,
+        plantId,
         metric,
         rule: "mean",
         value: Math.round((sum / usable.length) * 1000) / 1000,

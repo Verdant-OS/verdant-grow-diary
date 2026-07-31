@@ -158,6 +158,54 @@ describe("single-candidate evaluation", () => {
     expect(mismatch.normalizedValue).toBeNull();
   });
 
+  it("rejects unrecognized explicit units instead of assuming canonical", () => {
+    const kelvin = evaluateSensorTruth(
+      makeCandidate({ metric: "temperature_c", value: 24, unit: "K" }),
+      { nowMs: NOW_MS },
+    );
+    expect(kelvin.warnings).toContain("unit_unknown");
+    expect(kelvin.normalizedValue).toBeNull();
+    expect(kelvin.usability).toBe("invalid");
+    // An absent unit is the one documented canonical-unit assumption.
+    const implicit = evaluateSensorTruth(
+      makeCandidate({ metric: "temperature_c", value: 24, unit: null }),
+      { nowMs: NOW_MS },
+    );
+    expect(implicit.usability).toBe("usable");
+    expect(implicit.normalizedValue).toBe(24);
+    // Non-temperature metrics are guarded too.
+    const badRh = evaluateSensorTruth(
+      makeCandidate({ metric: "humidity_pct", value: 55, unit: "g/m3" }),
+      { nowMs: NOW_MS },
+    );
+    expect(badRh.warnings).toContain("unit_unknown");
+    expect(badRh.usability).toBe("invalid");
+  });
+
+  it("keeps arbitrary transport strings out of the provenance summary", () => {
+    const e = evaluateSensorTruth(makeCandidate({ transport: "Bearer eyJhbGciOi.secret-token" }), {
+      nowMs: NOW_MS,
+    });
+    expect(e.provenanceSummary).not.toContain("secret-token");
+    expect(e.provenanceSummary).not.toContain("Bearer");
+    // Canonical transports are still echoed.
+    const canonical = evaluateSensorTruth(makeCandidate({ transport: "webhook" }), {
+      nowMs: NOW_MS,
+    });
+    expect(canonical.provenanceSummary).toContain("webhook");
+  });
+
+  it("preserves the canonical capture timestamp for downstream auditing", () => {
+    const e = evaluateSensorTruth(makeCandidate({ capturedAt: minutesAgo(5) }), {
+      nowMs: NOW_MS,
+    });
+    expect(e.capturedAt).toBe(new Date(NOW_MS - 5 * 60_000).toISOString());
+    const unparseable = evaluateSensorTruth(makeCandidate({ capturedAt: "nope" }), {
+      nowMs: NOW_MS,
+    });
+    expect(unparseable.capturedAt).toBeNull();
+  });
+
   it("rejects unknown units without guessing a conversion", () => {
     const e = evaluateSensorTruth(
       makeCandidate({ metric: "soil_ec_ms_cm", value: 2.4, unit: "banana" }),
@@ -274,6 +322,21 @@ describe("truth-gated VPD derivation", () => {
     expect(r.reason).toBe("temperature_not_usable");
   });
 
+  it("refuses to combine readings from different tents", () => {
+    const otherTentRh = evaluateSensorTruth(
+      makeCandidate({
+        metric: "humidity_pct",
+        value: 55,
+        unit: "%",
+        tentId: "99999999-9999-4999-8999-999999999999",
+      }),
+      { nowMs: NOW_MS },
+    );
+    const r = deriveTruthGatedVpd(temp(), otherTentRh);
+    expect(r.vpdKpa).toBeNull();
+    expect(r.reason).toBe("context_mismatch");
+  });
+
   it("a missing vpd_kpa stays null — never zero", () => {
     const r = deriveTruthGatedVpd(null, null);
     expect(r.vpdKpa).toBeNull();
@@ -300,6 +363,46 @@ describe("series evaluation", () => {
     }
     // No aggregation was requested → none happens.
     expect(series.aggregates).toEqual([]);
+  });
+
+  it("keeps root-zone readings from different plants in separate groups", () => {
+    const rootZone = (plantId: string, value: number) =>
+      makeCandidate({ metric: "soil_moisture_pct", unit: "%", plantId, value });
+    const series = evaluateSensorSeries([rootZone("plant-a", 20), rootZone("plant-b", 65)], {
+      nowMs: NOW_MS,
+      aggregation: { rule: "mean" },
+    });
+    // Two plants legitimately differing is NOT a sensor conflict...
+    expect(series.conflicts).toEqual([]);
+    // ...and their values are never averaged into one tent-level number.
+    expect(series.aggregates).toHaveLength(2);
+    expect(series.aggregates.map((a) => a.plantId).sort()).toEqual(["plant-a", "plant-b"]);
+    expect(series.aggregates.map((a) => a.value).sort((x, y) => x - y)).toEqual([20, 65]);
+    // Atmospheric metrics stay tent-scoped regardless of plant id.
+    const air = evaluateSensorSeries(
+      [
+        makeCandidate({ plantId: "plant-a", value: 22 }),
+        makeCandidate({ plantId: "plant-b", value: 27 }),
+      ],
+      { nowMs: NOW_MS },
+    );
+    expect(air.conflicts).toHaveLength(1);
+    expect(air.conflicts[0].plantId).toBeNull();
+  });
+
+  it("flags conflicts between two sensors on the same plant", () => {
+    const rootZone = (value: number) =>
+      makeCandidate({
+        metric: "soil_moisture_pct",
+        unit: "%",
+        plantId: "plant-a",
+        value,
+      });
+    const series = evaluateSensorSeries([rootZone(20), rootZone(65)], {
+      nowMs: NOW_MS,
+    });
+    expect(series.conflicts).toHaveLength(1);
+    expect(series.conflicts[0].plantId).toBe("plant-a");
   });
 
   it("does not flag agreeing sensors", () => {

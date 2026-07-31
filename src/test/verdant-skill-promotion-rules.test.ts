@@ -43,7 +43,9 @@ const POLICY_DIGEST = computeBoundDigest(
   "policy_decision",
   {
     policyVersion: "1.0.0",
-    policyDecision: computeBoundDigest("policy_decision", POLICY, D).value,
+    // EVERY case's decision, sorted — the single-case reports these tests
+    // build therefore bind a one-element set.
+    policyDecisions: [computeBoundDigest("policy_decision", POLICY, D).value],
   },
   D,
 ).value;

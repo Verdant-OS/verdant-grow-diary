@@ -296,6 +296,14 @@ const executionFiredRuleSchema = z
  */
 const executionProposalVerdictSchema = z
   .object({
+    // The proposal this verdict is ABOUT. The governor emits one verdict per
+    // proposal, so a verdict with no proposalId is unattached to anything —
+    // and the evaluator derives action eligibility and capability from the
+    // verdicts alone, so an output containing zero proposals could sit beside
+    // an allowed manual_only verdict and satisfy `must_act`. Green promotion
+    // evidence for a decision the governor could not have produced for the
+    // output actually recorded.
+    proposalId: z.string().min(1),
     // The governor produces exactly "allow" or "block". Any other string was
     // accepted and then read as not-allowed downstream, so a case could pass
     // on a policy decision the governor cannot emit.
@@ -348,7 +356,14 @@ const executionPolicySchema = z
 export const verdantSkillExecutionRecordSchema = z
   .object({
     skillContract: z.record(z.unknown()),
-    manifest: z.record(z.unknown()),
+    // WHOSE manifest this is. The canonical manifest types id/version as
+    // required, and the policy governor anchors every identity check on them —
+    // but here it was `z.record(z.unknown())`, so a manifest belonging to
+    // another skill was digested and PUBLISHED as the report's headline
+    // provenance row under the correct-looking title. `.passthrough()` rather
+    // than the full manifest schema: the fixtures carry deliberate stubs, and
+    // the identity is the part that has to be real.
+    manifest: z.object({ id: z.string().min(1), version: z.string().min(1) }).passthrough(),
     context: z.record(z.unknown()),
     applicability: executionApplicabilitySchema,
     evidenceCorpus: z.record(z.unknown()),

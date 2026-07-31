@@ -274,6 +274,33 @@ function loadFixtures(
       issues.push(...executionCheck.issues.map((i) => `${name}: execution.${i}`));
       continue;
     }
+    // A verdict must be ABOUT a proposal the output actually contains, and
+    // every proposal must have been judged. Carrying a proposalId is only half
+    // the check — an id nothing correlates is the "declared but never
+    // compared" shape this build keeps finding. Membership is verified in both
+    // directions because either gap is a decision the governor could not have
+    // produced for the recorded output.
+    const execPolicy = record.execution.policy as { proposalVerdicts: { proposalId: string }[] };
+    const execOutput = record.execution.output as { proposals?: unknown };
+    const outputProposalIds = new Set(
+      (Array.isArray(execOutput?.proposals) ? execOutput.proposals : [])
+        .map((p) => (p as { proposalId?: unknown })?.proposalId)
+        .filter((id): id is string => typeof id === "string"),
+    );
+    const verdictIds = new Set(execPolicy.proposalVerdicts.map((v) => v.proposalId));
+    const unattached = [...verdictIds].filter((id) => !outputProposalIds.has(id)).sort();
+    const unjudged = [...outputProposalIds].filter((id) => !verdictIds.has(id)).sort();
+    if (unattached.length > 0 || unjudged.length > 0) {
+      if (unattached.length > 0) {
+        issues.push(
+          `${name}: policy verdicts for proposals absent from the output: ${unattached.join(", ")}`,
+        );
+      }
+      if (unjudged.length > 0) {
+        issues.push(`${name}: output proposals with no policy verdict: ${unjudged.join(", ")}`);
+      }
+      continue;
+    }
     files.push(record);
   }
   if (issues.length > 0) return { ok: false, issues: issues.sort() };
@@ -363,6 +390,33 @@ export function main(argv: readonly string[]): MainResult {
     };
   }
 
+  // A manifest naming another skill cannot govern THIS run. Its digest is what
+  // the report publishes as `manifestBinding` and what a later caller compares
+  // for currency, so a foreign one is not stale evidence — it is evidence
+  // about a different skill. Verified end to end before this check existed:
+  // swapping every fixture's manifest for a competitor's produced exit 0,
+  // 14/14 bindingValid, and the foreign digest rendered as the provenance row
+  // under the title "harness-self-test@1.0.0".
+  //
+  // `skill_id_mismatch` exists in the binding vocabulary and could never fire
+  // here, because both sides of that comparison are filled from the same CLI
+  // locals — the "declared but never emitted" shape again.
+  const manifestMismatches = loaded.files
+    .filter((f) => {
+      const m = (f.execution as { manifest?: { id?: string; version?: string } }).manifest;
+      return m?.id !== skillId || m?.version !== skillVersion;
+    })
+    .map((f) => (f.fixture as { fixtureId: string }).fixtureId)
+    .sort();
+  if (manifestMismatches.length > 0) {
+    return {
+      code: EXIT_USAGE_OR_IO,
+      lines: manifestMismatches.map(
+        (id) => `Fixture ${id} records a manifest for a different skill`,
+      ),
+    };
+  }
+
   // Parsing proves an output is a valid run result; it says nothing about
   // WHOSE run it is. A fixture could otherwise supply a valid output from
   // another skill and have it reported under the CLI identity.
@@ -387,7 +441,15 @@ export function main(argv: readonly string[]): MainResult {
   // counts double, `tagsByFixtureId` keeps whichever was written last, and
   // promotion's required-golden-case check only ever asks whether an id is
   // PRESENT. Every counted case has to be individually nameable.
-  const allFixtureIds = loaded.files.map((f) => (f.fixture as { fixtureId: string }).fixtureId);
+  // The PARSED id, not the raw one. The schema trims, so a raw
+  // "hst-003-expected-abstention " with a trailing space is a distinct string
+  // here and the same identity everywhere downstream — which defeated this
+  // very guard and put two case results under one name.
+  const allFixtureIds = loaded.files.map((f) => {
+    const parsed = parseEvaluationFixture(f.fixture);
+    if (parsed.ok === false) throw new Error(parsed.issues.join("; "));
+    return parsed.fixture.fixtureId;
+  });
   const duplicateFixtureIds = [
     ...new Set(allFixtureIds.filter((id, i) => allFixtureIds.indexOf(id) !== i)),
   ].sort();
@@ -467,6 +529,22 @@ export function main(argv: readonly string[]): MainResult {
     // Derived, never trusted. A fixture asserting that its own malformed
     // output is schema-compliant would otherwise produce a green compliance
     // rate and satisfy the promotion gate.
+    // The run result names the context version it ran against; the bindings
+    // name the context itself. Neither was compared to the other, so a result
+    // produced against a different context could ride inside a case whose
+    // provenance attested to this one.
+    const boundContextVersion = (e.context as { contextVersion?: unknown })?.contextVersion;
+    const outputContextVersion = (e.output as { contextVersion?: unknown })?.contextVersion;
+    if (
+      typeof boundContextVersion === "string" &&
+      typeof outputContextVersion === "string" &&
+      boundContextVersion !== outputContextVersion
+    ) {
+      throw new Error(
+        `Fixture ${fixture.fixtureId} run result names context ${outputContextVersion} but was bound to ${boundContextVersion}`,
+      );
+    }
+
     const outputParse = parseSkillRunResult(e.output);
     const outputSchemaValid = outputParse.ok === true;
     const parsedOutput = outputParse.ok === true ? outputParse.value : null;

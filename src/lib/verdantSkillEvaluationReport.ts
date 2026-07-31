@@ -198,7 +198,23 @@ export function buildEvaluationReport(input: BuildReportInput): SkillEvaluationR
             // artifact; binding it apart from that artifact binds nothing.
             {
               policyVersion: first.bindings?.policyVersion ?? "",
-              policyDecision: first.bindings?.policy?.value ?? "",
+              // EVERY case's decision, not the first one's.
+              //
+              // Round 14 tied the version to a decision, which was right, but
+              // to `first`'s alone. Cases 2..N could then carry stale or
+              // fabricated decisions relabelled with the same version and the
+              // report binding would not change — and `mixedBindings`
+              // deliberately compares the policy VERSION rather than the
+              // per-case decisions, because different scenarios legitimately
+              // produce different decisions, so it does not catch this either.
+              // Each check was looking past the other.
+              //
+              // Sorted so the set is order-independent: two reports over the
+              // same evidence bind identically however their cases were
+              // ordered.
+              policyDecisions: cases
+                .map((c) => c.bindings?.policy?.value ?? "")
+                .sort(compareTokens),
             },
             input.digest,
           ),

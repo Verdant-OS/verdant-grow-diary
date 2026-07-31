@@ -131,6 +131,9 @@ for (const dir of dirs) {
     // place, so a report can go from an ordinary failure to a safety failure
     // or a blocked state while keeping identical case counts — and both checks
     // above still pass while the Markdown states the opposite verdict.
+    if (!md.includes(`# Skill evaluation — ${report.skillId}@${report.skillVersion}`)) {
+      note("markdown_identity_disagrees_with_json", evalMdPath);
+    }
     if (!md.includes(`- Overall: **${String(report.overallStatus).toUpperCase()}**`)) {
       note("markdown_overall_disagrees_with_json", evalMdPath);
     }

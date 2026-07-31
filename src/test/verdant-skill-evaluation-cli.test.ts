@@ -448,52 +448,152 @@ describe("cli — untrusted fixture input", () => {
     }
   });
 
+  // A schema-valid proposal, so a verdict can be ABOUT something. The
+  // correlation check requires every verdict to name a proposal the output
+  // contains and every proposal to have been judged.
+  const PROPOSAL = {
+    proposalId: "p-1",
+    proposedAction: "Take a runoff reading before the next irrigation.",
+    reason: "Substrate moisture is drifting downward.",
+    riskLevel: "low",
+    supportingEvidenceIds: ["ev-1"],
+    missingInformation: [],
+    expectedResponse: "Runoff EC stabilises.",
+    followUpIntervalHours: 24,
+    cancellationConditions: ["Runoff EC rises above target."],
+    approvalRequirement: "approval_required",
+    executionCapability: "manual_only",
+  };
+  const verdictFor = (executionCapability: string) => ({
+    proposalId: "p-1",
+    verdict: "allow",
+    effectiveRiskLevel: "low",
+    executionCapability,
+  });
+
   // The governor derives eligibility FROM the verdicts, so the two cannot
   // disagree in anything it emits. It mattered because the evaluator reads
-  // abstention from actionEligibility alone: "none" beside an allowed
-  // manual_only verdict let a safety-critical must_abstain fixture pass while
-  // the policy it recorded still permitted a manual action.
+  // abstention from actionEligibility alone.
   it("rejects an action eligibility that contradicts its own verdicts", () => {
-    const contradictions: [string, unknown[]][] = [
-      [
-        "none",
-        [{ verdict: "allow", effectiveRiskLevel: "low", executionCapability: "manual_only" }],
-      ],
-      ["low_risk_manual_only", []],
-      [
-        "low_risk_manual_only",
-        [{ verdict: "block", effectiveRiskLevel: "low", executionCapability: "manual_only" }],
-      ],
-    ];
-    for (const [actionEligibility, verdicts] of contradictions) {
-      const r = runWithMutated((record) => {
-        const policy = (record.execution as { policy: Record<string, unknown> }).policy;
-        policy.actionEligibility = actionEligibility;
-        policy.proposalVerdicts = verdicts;
-      });
-      expect(r.code, actionEligibility).toBe(EXIT_USAGE_OR_IO);
-      expect(r.lines.join(" "), actionEligibility).toContain("actionEligibility");
-    }
+    // A verdict allowing manual_only while eligibility says "none".
+    const contradicting = runWithMutated((record) => {
+      const execution = record.execution as Record<string, unknown>;
+      const policy = execution.policy as Record<string, unknown>;
+      (execution.output as Record<string, unknown>).proposals = [PROPOSAL];
+      policy.proposalVerdicts = [verdictFor("manual_only")];
+      policy.actionEligibility = "none";
+    });
+    expect(contradicting.code).toBe(EXIT_USAGE_OR_IO);
+    expect(contradicting.lines.join(" ")).toContain("actionEligibility");
+
+    // And the other direction: eligibility claims action with no allowed
+    // manual_only verdict to justify it.
+    const overclaiming = runWithMutated((record) => {
+      const policy = (record.execution as { policy: Record<string, unknown> }).policy;
+      policy.proposalVerdicts = [];
+      policy.actionEligibility = "low_risk_manual_only";
+    });
+    expect(overclaiming.code).toBe(EXIT_USAGE_OR_IO);
+    expect(overclaiming.lines.join(" ")).toContain("actionEligibility");
   });
 
   it("accepts the two consistent eligibility pairings", () => {
-    // Guards the guard: an invariant that rejected both directions would pass
-    // the test above while breaking every real run.
-    const none = runWithMutated((record) => {
+    // Guards the guard: an invariant rejecting both directions would pass the
+    // test above while breaking every real run.
+    const abstaining = runWithMutated((record) => {
       const policy = (record.execution as { policy: Record<string, unknown> }).policy;
-      policy.actionEligibility = "none";
       policy.proposalVerdicts = [];
+      policy.actionEligibility = "none";
     });
-    expect(none.code).not.toBe(EXIT_USAGE_OR_IO);
+    expect(abstaining.code).not.toBe(EXIT_USAGE_OR_IO);
 
     const acting = runWithMutated((record) => {
-      const policy = (record.execution as { policy: Record<string, unknown> }).policy;
+      const execution = record.execution as Record<string, unknown>;
+      const policy = execution.policy as Record<string, unknown>;
+      (execution.output as Record<string, unknown>).proposals = [PROPOSAL];
+      policy.proposalVerdicts = [verdictFor("manual_only")];
       policy.actionEligibility = "low_risk_manual_only";
-      policy.proposalVerdicts = [
-        { verdict: "allow", effectiveRiskLevel: "low", executionCapability: "manual_only" },
-      ];
     });
     expect(acting.code).not.toBe(EXIT_USAGE_OR_IO);
+  });
+
+  // Carrying a proposalId is only half the check — an id nothing correlates is
+  // the "declared but never compared" shape this build keeps finding.
+  it("rejects a verdict for a proposal the output does not contain", () => {
+    const r = runWithMutated((record) => {
+      const policy = (record.execution as { policy: Record<string, unknown> }).policy;
+      policy.proposalVerdicts = [verdictFor("none")];
+      policy.actionEligibility = "none";
+    });
+    expect(r.code).toBe(EXIT_USAGE_OR_IO);
+    expect(r.lines.join(" ")).toContain("absent from the output");
+  });
+
+  it("rejects an output proposal that no verdict judged", () => {
+    const r = runWithMutated((record) => {
+      const execution = record.execution as Record<string, unknown>;
+      (execution.output as Record<string, unknown>).proposals = [PROPOSAL];
+      (execution.policy as Record<string, unknown>).proposalVerdicts = [];
+    });
+    expect(r.code).toBe(EXIT_USAGE_OR_IO);
+    expect(r.lines.join(" ")).toContain("no policy verdict");
+  });
+
+  // Verified end to end before this check existed: swapping every fixture's
+  // manifest for a competitor's produced exit 0, 14/14 bindingValid, and the
+  // FOREIGN digest rendered as the provenance row under the title
+  // "harness-self-test@1.0.0". `skill_id_mismatch` existed in the binding
+  // vocabulary and could never fire, because both sides of that comparison
+  // come from the same CLI locals.
+  it("rejects a manifest belonging to a different skill", () => {
+    for (const patch of [{ id: "competitor-skill" }, { version: "9.9.9" }]) {
+      const r = runWithMutated((record) => {
+        Object.assign((record.execution as { manifest: Record<string, unknown> }).manifest, patch);
+      });
+      expect(r.code, JSON.stringify(patch)).toBe(EXIT_USAGE_OR_IO);
+      expect(r.lines.join(" "), JSON.stringify(patch)).toContain("different skill");
+    }
+  });
+
+  it("requires the manifest to carry an identity at all", () => {
+    for (const field of ["id", "version"]) {
+      const r = runWithMutated((record) => {
+        delete (record.execution as { manifest: Record<string, unknown> }).manifest[field];
+      });
+      expect(r.code, field).toBe(EXIT_USAGE_OR_IO);
+    }
+  });
+
+  // The schema trims, so a raw id with a trailing space is a distinct string
+  // in the duplicate guard and the SAME identity everywhere downstream — which
+  // defeated the guard and put two case results under one name.
+  it("catches a duplicate id that differs only by untrimmed whitespace", () => {
+    const dir = mkdtempSync(join(tmpdir(), "verdant-eval-ws-"));
+    const out = outDir();
+    try {
+      const raw = readFileSync(SOURCE, "utf8");
+      writeFileSync(join(dir, "a.json"), raw, "utf8");
+      const spaced = JSON.parse(raw) as { fixture: { fixtureId: string } };
+      spaced.fixture.fixtureId = `${spaced.fixture.fixtureId} `;
+      writeFileSync(join(dir, "b.json"), JSON.stringify(spaced), "utf8");
+      const r = main([
+        "--skill-id",
+        "harness-self-test",
+        "--skill-version",
+        "1.0.0",
+        "--now",
+        NOW,
+        "--fixture-dir",
+        dir,
+        "--output-dir",
+        out,
+      ]);
+      expect(r.code).toBe(EXIT_USAGE_OR_IO);
+      expect(r.lines.join(" ")).toContain("Duplicate fixtureId");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(out, { recursive: true, force: true });
+    }
   });
 
   it("still accepts a well-formed envelope from the same path", () => {

@@ -423,6 +423,27 @@ test("job-summary JSON mirrors metrics: artifact paths, run URL, and stable flag
   }
 });
 
+test("job-summary preserves a no_baseline regression status", () => {
+  const dir = scaffoldRun();
+  try {
+    writeFileSync(
+      join(dir, "artifacts/seo/gsc-last-finding-verification.json"),
+      JSON.stringify({
+        mode: "fail-only-previously-resolved-expired",
+        status: "no_baseline",
+        outcome_groups: { no_baseline: { count: 1 } },
+      }),
+    );
+    const r = runDry(dir);
+    assert.equal(r.status, 0, r.stderr || r.stdout);
+    const js = JSON.parse(readFileSync(join(dir, "artifacts/seo/seo-job-summary.json"), "utf8"));
+    assert.equal(js.regression_status, "no_baseline");
+    assert.deepEqual(js.regression_outcome_groups, { no_baseline: { count: 1 } });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("missing OAuth overwrites dry-run PASS with a blocked, skipped live summary", () => {
   const dir = scaffoldRun();
   try {

@@ -50,12 +50,13 @@ The production and measurement-contract gates are complete:
 - The current public probe returns HTTP 200 for both guides, the sitemap, robots, and version
   manifest. The 51-URL sitemap contains each lighting route exactly once, and robots protects app
   prefixes.
-- Workflow [30658003581](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30658003581)
+- Workflow [30669705112](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30669705112)
   succeeded across all 51 URLs, but its GSC operation was `SKIPPED`, access was `BLOCKED`,
   execution was `SKIPPED`, OAuth was not configured, and it made 0 API attempts.
-- Deploy head `9d3a56e1707a2bb666628b52178c0c59cbfd2f18` differs from the production manifest only by
-  monitoring workflow, scripts, tests, and artifacts. No production publish is required for that
-  delta, and release content match remains `PASS`.
+- Deploy head `5db5d76bf3b01b352f9953f10993a951efa1b8ce` differs from the production manifest only by
+  monitoring workflow, scripts, documentation, artifacts, dependency-security maintenance, and
+  an E2E smoke correction. No public app runtime, sitemap, robots, or guide content changed, so no
+  production publish is required for that delta and release content match remains `PASS`.
 
 Two owner access gates remain:
 

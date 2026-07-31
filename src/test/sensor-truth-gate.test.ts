@@ -658,6 +658,55 @@ describe("series evaluation", () => {
     expect(series.conflicts[0].plantId).toBe("plant-a");
   });
 
+  it("drops a stored vpd_kpa when a contemporaneous sibling input is invalid", () => {
+    const series = evaluateSensorSeries(
+      [
+        makeCandidate({ metric: "vpd_kpa", value: 1.2, unit: "kPa" }),
+        makeCandidate({ metric: "humidity_pct", value: 150, unit: "%" }),
+      ],
+      { nowMs: NOW_MS, aggregation: { rule: "mean" } },
+    );
+    const vpd = series.evaluations.find((e) => e.metric === "vpd_kpa");
+    expect(vpd?.excludedFromReasoning).toBe(true);
+    expect(vpd?.normalizedValue).toBeNull();
+    expect(vpd?.warnings).toContain("vpd_dropped_temp_rh_invalid");
+    expect(series.aggregates).toEqual([]);
+    // With valid siblings the stored vpd stays usable.
+    const healthy = evaluateSensorSeries(
+      [
+        makeCandidate({ metric: "vpd_kpa", value: 1.2, unit: "kPa" }),
+        makeCandidate({ metric: "humidity_pct", value: 55, unit: "%" }),
+      ],
+      { nowMs: NOW_MS },
+    );
+    const healthyVpd = healthy.evaluations.find((e) => e.metric === "vpd_kpa");
+    expect(healthyVpd?.usability).toBe("usable");
+  });
+
+  it("classifies non-string metadata instead of throwing", () => {
+    const badUnit = evaluateSensorTruth(makeCandidate({ unit: 1 as unknown as string }), {
+      nowMs: NOW_MS,
+    });
+    expect(badUnit.warnings).toContain("unit_unknown");
+    expect(badUnit.usability).toBe("invalid");
+    const badMeta = evaluateSensorTruth(
+      makeCandidate({
+        provider: 42 as unknown as string,
+        transport: {} as unknown as string,
+      }),
+      { nowMs: NOW_MS },
+    );
+    expect(badMeta.usability).toBe("usable");
+    expect(badMeta.provenanceSummary).toBe("live reading");
+    // A malformed candidate never aborts the batch.
+    const series = evaluateSensorSeries(
+      [makeCandidate({ unit: {} as unknown as string }), makeCandidate()],
+      { nowMs: NOW_MS },
+    );
+    expect(series.evaluations).toHaveLength(2);
+    expect(series.evaluations[1].usability).toBe("usable");
+  });
+
   it("does not flag agreeing sensors", () => {
     const series = evaluateSensorSeries(
       [makeCandidate({ value: 23 }), makeCandidate({ value: 24 })],

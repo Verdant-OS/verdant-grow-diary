@@ -390,6 +390,21 @@ export function normalizeSensorCandidate(
     };
   }
 
+  // Untrusted payloads may carry non-string unit metadata; classify it
+  // as unknown instead of throwing on a string method.
+  if (
+    candidate.unit !== null &&
+    candidate.unit !== undefined &&
+    typeof candidate.unit !== "string"
+  ) {
+    return {
+      metric,
+      value: null,
+      unit: CANONICAL_UNIT[metric],
+      warnings: ["unit_unknown"],
+    };
+  }
+
   // Reject unrecognized explicit units instead of assuming canonical —
   // e.g. { metric: "temperature_c", unit: "K" } must never pass as °C.
   if (metric !== "soil_ec_ms_cm") {
@@ -540,15 +555,20 @@ function buildProvenanceSummary(
   // label map — arbitrary adapter text (including credential-shaped
   // strings) must never reach the presenter-safe summary, even
   // title-cased.
-  const providerKey = (candidate.provider ?? "").trim().toLowerCase().replace(/-/g, "_");
+  // Non-string metadata from untrusted payloads is treated as absent —
+  // never fed to string methods.
+  const providerRaw = typeof candidate.provider === "string" ? candidate.provider : "";
+  const providerKey = providerRaw.trim().toLowerCase().replace(/-/g, "_");
   if (providerKey && ownLookup(SENSOR_PROVIDER_LABELS, providerKey)) {
-    const provider = deriveProviderLabel(candidate.provider ?? null);
+    const provider = deriveProviderLabel(providerRaw);
     if (provider) parts.push(provider);
   }
   // Transport is echoed ONLY when it is one of the canonical provenance
   // transports — an arbitrary adapter string (token, URL, header) must
   // never reach the presenter-safe summary.
-  const transport = (candidate.transport ?? "").trim().toLowerCase();
+  const transport = (typeof candidate.transport === "string" ? candidate.transport : "")
+    .trim()
+    .toLowerCase();
   if ((SENSOR_PROVENANCE_TRANSPORTS as readonly string[]).includes(transport)) {
     parts.push(transport);
   }
@@ -831,6 +851,38 @@ export function evaluateSensorSeries(
   options: EvaluateSensorSeriesOptions,
 ): SensorSeriesResult {
   const evaluations = candidates.map((c) => evaluateSensorTruth(c, { nowMs: options.nowMs }));
+
+  // Cross-metric dependency (mirrors classifySnapshotTruth): a recorded
+  // vpd_kpa is untrustworthy when a contemporaneous same-tent temperature
+  // or humidity reading is invalid — even if the VPD value itself parses
+  // inside the plausible band. Missing timestamps fail closed.
+  const invalidVpdInputs = evaluations.filter(
+    (e) =>
+      (e.metric === "temperature_c" || e.metric === "humidity_pct") && e.validity === "invalid",
+  );
+  if (invalidVpdInputs.length > 0) {
+    for (const e of evaluations) {
+      if (e.metric !== "vpd_kpa" || e.excludedFromReasoning) continue;
+      const vpdMs = Date.parse(e.capturedAt ?? "");
+      const tainted = invalidVpdInputs.some((bad) => {
+        if (bad.tentId !== e.tentId) return false;
+        const badMs = Date.parse(bad.capturedAt ?? "");
+        if (Number.isNaN(vpdMs) || Number.isNaN(badMs)) return true;
+        return Math.abs(vpdMs - badMs) <= SENSOR_FRESH_WINDOW_MINUTES * MINUTE_MS;
+      });
+      if (tainted) {
+        e.usability = "invalid";
+        e.excludedFromReasoning = true;
+        e.exclusionReason = "invalid_value";
+        e.normalizedValue = null;
+        e.confidenceFactor = SENSOR_TRUTH_CONFIDENCE_FACTORS.invalid;
+        e.adjustedConfidence = 0;
+        if (!e.warnings.includes("vpd_dropped_temp_rh_invalid")) {
+          e.warnings = [...e.warnings, "vpd_dropped_temp_rh_invalid"];
+        }
+      }
+    }
+  }
 
   // Group included (usable/degraded) readings by tent + metric, and by
   // plant as well for root-zone metrics — one plant's root-zone telemetry

@@ -199,6 +199,21 @@ export interface EvidenceConflictNote {
   status: EvidenceStatus;
   /** True when this record is not itself applicable to the query. */
   excludedFromApplicable: boolean;
+  /**
+   * Why it is not applicable, in the same vocabulary `excluded` uses.
+   *
+   * A counter-claim scoped to a different product, medium, stage, or
+   * species is still shown — suppressing it is how a runtime
+   * manufactures certainty — but it is NOT a counter-claim to this
+   * query, and a downstream model must be able to tell the difference
+   * without re-deriving the scope itself. Empty when the record is
+   * applicable and genuinely contests the finding.
+   */
+  exclusionReasons: EvidenceExclusionReason[];
+  /** Scope the conflicting record carries, e.g. its product limitation. */
+  limitations: EvidenceLimitation[];
+  /** Products this counter-claim is confined to, if any. */
+  productIds: string[];
   citation: EvidenceCitationRef;
 }
 
@@ -504,6 +519,15 @@ export function retrieveEvidence(
         continue;
       }
       seenConflict.add(targetId);
+      // A counter-claim scoped elsewhere is shown but LABELLED. Without
+      // its reasons a caller cannot distinguish "this finding is
+      // contested" from "a feeding instruction for a product you are not
+      // using says something different", and the two are not the same
+      // fact. The reasons use the same vocabulary as `excluded`, so the
+      // scope never has to be re-derived downstream.
+      const targetReasons = applicableIds.has(target.evidenceId)
+        ? new Set<EvidenceExclusionReason>()
+        : excludeReasons(target, query, manifest.id);
       conflicts.push({
         evidenceId: target.evidenceId,
         conflictsWith: target.conflictingEvidenceIds
@@ -513,6 +537,9 @@ export function retrieveEvidence(
         tier: target.tier,
         status: target.status,
         excludedFromApplicable: !applicableIds.has(target.evidenceId),
+        exclusionReasons: orderedReasons(targetReasons),
+        limitations: [...target.limitations, ...derivedLimitations(target, query)],
+        productIds: [...target.productIds],
         citation: toCitationRef(target),
       });
     }

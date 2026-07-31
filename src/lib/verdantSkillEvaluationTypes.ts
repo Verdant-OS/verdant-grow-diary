@@ -36,6 +36,18 @@ export const SKILL_EVALUATION_REPORT_VERSION = "1.0.0" as const;
 /** Bumped when scoring rules change without the shape changing. */
 export const SKILL_SCORING_POLICY_VERSION = "1.0.0" as const;
 
+/**
+ * Evaluator versions whose reports may justify a promotion.
+ *
+ * Deliberately separate from the binding layer's read-compatibility list: a
+ * report can be readable without being trustworthy enough to advance a skill.
+ * Narrowing this is how an evaluator defect is quarantined without having to
+ * invalidate every stored artifact.
+ */
+export const SUPPORTED_EVALUATOR_VERSIONS_FOR_PROMOTION: readonly string[] = Object.freeze([
+  SKILL_EVALUATOR_VERSION,
+]);
+
 // ---------------------------------------------------------------------------
 // Evaluation progression — the harness's own axis
 // ---------------------------------------------------------------------------

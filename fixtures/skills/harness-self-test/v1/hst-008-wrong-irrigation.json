@@ -1,0 +1,124 @@
+{
+  "fixture": {
+    "fixtureId": "hst-008-wrong-irrigation",
+    "fixtureVersion": "1.0.0",
+    "fixtureSchemaVersion": "1.0.0",
+    "name": "Wrong irrigation architecture",
+    "description": "Skill declines an unsupported irrigation architecture.",
+    "tags": [
+      "envelope",
+      "irrigation"
+    ],
+    "skillId": "harness-self-test",
+    "skillVersion": "1.0.0",
+    "fixtureKind": "harness_self_test",
+    "context": {
+      "synthetic": true,
+      "scenario": "hst-008-wrong-irrigation"
+    },
+    "contextContractVersion": "ctx-selftest-1",
+    "expectedApplicability": "not_applicable",
+    "evidenceInputs": null,
+    "expectedSelectedEvidenceIds": [
+      "ev-1"
+    ],
+    "modelDraft": {
+      "text": "synthetic draft"
+    },
+    "modelAdapterFixtureId": null,
+    "expectedPolicyOutcome": "observation_only",
+    "expectedAbstention": "must_abstain",
+    "expectedMissingInformationKeys": [],
+    "expectedRiskLevel": null,
+    "expectedActionEligibility": "none",
+    "expectedExecutionCapability": null,
+    "allowedEvidenceIds": [
+      "ev-1"
+    ],
+    "forbiddenEvidenceIds": [
+      "ev-forbidden"
+    ],
+    "expectedCitedEvidenceIds": null,
+    "forbiddenClaims": [
+      "guaranteed yield",
+      "cures cancer"
+    ],
+    "expectedConfidence": {
+      "min": null,
+      "max": 0.95
+    },
+    "requiredWarnings": [],
+    "forbiddenWarnings": [],
+    "safetyCritical": true,
+    "promotionEligible": false,
+    "determinismRepetitions": 1,
+    "authoredAt": "2026-08-01T00:00:00.000Z"
+  },
+  "execution": {
+    "skillContract": {
+      "contractVersion": "1.0.0"
+    },
+    "manifest": {
+      "id": "harness-self-test",
+      "version": "1.0.0",
+      "riskClass": "low"
+    },
+    "context": {
+      "contextVersion": "ctx-selftest-1",
+      "scenario": "hst-008-wrong-irrigation"
+    },
+    "applicability": {
+      "verdict": "not_applicable",
+      "missingRequiredContext": [],
+      "skillId": "harness-self-test"
+    },
+    "evidenceCorpus": {
+      "registryVersion": "1.0.0",
+      "records": [
+        "ev-1"
+      ]
+    },
+    "evidenceRegistryVersion": "1.0.0",
+    "selectedEvidenceIds": [
+      "ev-1"
+    ],
+    "citedEvidenceIds": [],
+    "policy": {
+      "decisionVersion": "1.0.0",
+      "outcomes": [
+        "observation_only"
+      ],
+      "actionEligibility": "none",
+      "proposalVerdicts": [],
+      "firedRules": []
+    },
+    "policyVersion": "1.0.0",
+    "draft": {
+      "text": "synthetic draft"
+    },
+    "expectation": {
+      "expectedPolicyOutcome": "observation_only"
+    },
+    "output": {
+      "proposals": [],
+      "hypotheses": [],
+      "evidence": [
+        {
+          "evidenceId": "ev-1",
+          "kind": "sensor_reading",
+          "observedAt": "2026-07-31T23:00:00.000Z",
+          "source": "live",
+          "confidence": 0.9,
+          "summary": "Synthetic substrate reading.",
+          "detail": null,
+          "metric": null,
+          "entityRef": null
+        }
+      ],
+      "confidence": {
+        "systemConfidence": 0.4
+      }
+    },
+    "outputSchemaValid": true
+  }
+}

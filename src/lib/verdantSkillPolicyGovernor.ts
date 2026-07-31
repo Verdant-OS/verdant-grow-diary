@@ -362,6 +362,7 @@ export interface SkillPolicyDecision {
   actionEligibility: "none" | "low_risk_manual_only";
   proposalVerdicts: SkillProposalVerdict[];
   allowedProposalIds: string[];
+  allowedEvidenceIds: string[];
   allowedHypothesisIds: string[];
   allowedFollowUpIds: string[];
   withheldTextPaths: string[];
@@ -486,6 +487,16 @@ const BLOCKING_FAMILIES: readonly {
   },
 ]);
 
+/**
+ * Codes that impugn a proposal's INTEGRITY rather than its risk arithmetic.
+ * A critical-risk proposal carrying none of these was refused only because
+ * V1 caps what may be acted on — which is the one state that can honestly
+ * ground an urgency claim about the plant itself.
+ */
+const PROPOSAL_INTEGRITY_BLOCK_CODES: readonly SkillPolicyRuleCode[] = BLOCKING_FAMILIES.map(
+  (f) => f.code,
+);
+
 function scanBlocking(text: string): SkillPolicyRuleCode[] {
   const hits: SkillPolicyRuleCode[] = [];
   for (const family of BLOCKING_FAMILIES) {
@@ -547,6 +558,7 @@ export function governSkillOutput(input: GovernSkillOutputInput): SkillPolicyDec
       urgentReasons,
       safeNextStep: applicability.safeNextStep,
       mandatedRunStatus: "error",
+      allowedEvidenceIds: [],
       allowedHypothesisIds: [],
       allowedFollowUpIds: [],
       withheldTextPaths: [],
@@ -835,16 +847,68 @@ export function governSkillOutput(input: GovernSkillOutputInput): SkillPolicyDec
     }
   }
 
+  // ---- Evidence and error prose. These fields are rendered too: a device
+  //      instruction in `evidence[].summary` or `error.message` reaches the
+  //      grower exactly as a hypothesis would, and GOVERNED_RESULT_KEYS
+  //      declaring them governed is a claim this loop has to make true.
+  const allowedEvidenceIds: string[] = [];
+  for (const record of output.evidence) {
+    const strings: { path: string; text: string }[] = [];
+    collectStrings(
+      { summary: record.summary, detail: record.detail, unit: record.metric?.unit },
+      `evidence.${record.evidenceId}`,
+      strings,
+    );
+    const hits = strings.flatMap((s) => scanBlocking(s.text).map((code) => ({ ...s, code })));
+    if (hits.length === 0) {
+      allowedEvidenceIds.push(record.evidenceId);
+      continue;
+    }
+    for (const hit of hits) {
+      withheldTextPaths.push(hit.path);
+      fire(hit.code, "linguistic", "run", null, `Withheld ${hit.path}.`);
+    }
+  }
+  if (output.error !== null && output.error !== undefined) {
+    const strings: { path: string; text: string }[] = [];
+    collectStrings(
+      { message: output.error.message, details: output.error.details },
+      "error",
+      strings,
+    );
+    for (const s of strings) {
+      for (const code of scanBlocking(s.text)) {
+        withheldTextPaths.push(s.path);
+        fire(code, "linguistic", "run", null, `Withheld ${s.path}.`);
+      }
+    }
+  }
+
   // ---- Outcomes. Derived from what survived; never seeded at the permissive
   //      end. An empty rule set does not mean "allow".
   const anyAllowed = verdicts.some((v) => v.verdict === "allow");
   if (verdicts.some((v) => v.verdict === "block")) outcomes.add("block_action");
   if (anyAllowed) outcomes.add("allow_low_risk_manual_action");
 
-  const criticalRisk = output.proposals.some((p) => p.riskLevel === "critical");
-  if (criticalRisk && effectiveConfidence >= MIN_CONFIDENCE_FOR_LOW_RISK_ACTION) {
+  // Urgency is a CONDITION-level claim, and `riskLevel` describes the risk of
+  // TAKING an action — a dangerous flush the governor just blocked says
+  // nothing about the plant. The V1-representable signal that the condition
+  // itself demands attention is a critical-risk proposal whose integrity
+  // held: clean prose, trustworthy cited evidence, adequate confidence — one
+  // the governor refuses only because V1 caps what may be ACTED on.
+  const honestCritical = verdicts.some(
+    (v) =>
+      v.declaredRiskLevel === "critical" &&
+      !v.ruleCodes.some(
+        (c) =>
+          PROPOSAL_INTEGRITY_BLOCK_CODES.includes(c) || c === "proposal_evidence_untrustworthy",
+      ),
+  );
+  if (honestCritical && effectiveConfidence >= MIN_CONFIDENCE_FOR_LOW_RISK_ACTION) {
     outcomes.add("urgent_manual_attention");
-    urgentReasons.push("A critical-risk condition was identified with supporting evidence.");
+    urgentReasons.push(
+      "A critical-risk condition was identified on trustworthy evidence; act manually, not through this proposal.",
+    );
   }
   if (context.sensorSummary.conflicts.length > 0 || curatedEvidence.conflicts.length > 0) {
     outcomes.add("monitor");
@@ -865,10 +929,18 @@ export function governSkillOutput(input: GovernSkillOutputInput): SkillPolicyDec
     withheldReasons: [...curatedEvidence.conflictSurvey.withheldReasons],
     urgentReasons,
     safeNextStep: applicability.safeNextStep,
+    // A run that itself failed stays failed. Mandating "ok" over a valid
+    // `status: "error"` or model-declared insufficient_context would let a
+    // persistence layer record a failed run as successful; the never-"error"
+    // rule applies to POLICY REFUSALS, which only happen on ok runs.
     mandatedRunStatus:
-      applicability.missingRequiredContext.length > 0 || applicability.provenanceBlockers.length > 0
-        ? "insufficient_context"
-        : "ok",
+      output.status !== "ok"
+        ? output.status
+        : applicability.missingRequiredContext.length > 0 ||
+            applicability.provenanceBlockers.length > 0
+          ? "insufficient_context"
+          : "ok",
+    allowedEvidenceIds,
     allowedHypothesisIds,
     allowedFollowUpIds,
     withheldTextPaths,
@@ -1129,6 +1201,7 @@ interface FinalizeInput {
   urgentReasons: string[];
   safeNextStep: string | null;
   mandatedRunStatus: SkillRunStatus;
+  allowedEvidenceIds: string[];
   allowedHypothesisIds: string[];
   allowedFollowUpIds: string[];
   withheldTextPaths: string[];
@@ -1153,6 +1226,7 @@ function finalize(input: FinalizeInput): SkillPolicyDecision {
     actionEligibility: allowed.length > 0 ? "low_risk_manual_only" : "none",
     proposalVerdicts: [...input.verdicts].sort((a, b) => compareIds(a.proposalId, b.proposalId)),
     allowedProposalIds: allowed,
+    allowedEvidenceIds: [...input.allowedEvidenceIds].sort(compareIds),
     allowedHypothesisIds: [...input.allowedHypothesisIds].sort(compareIds),
     allowedFollowUpIds: [...input.allowedFollowUpIds].sort(compareIds),
     withheldTextPaths: [...input.withheldTextPaths].sort(compareIds),

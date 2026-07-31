@@ -55,15 +55,27 @@ export const PROHIBITION_MARKER_RE =
 const POLARITY_INVERTING_RE = /\b(fail to|forget to|hesitate to|neglect to|delay|wait)\b/i;
 
 /**
+ * Words that END a prohibition's scope inside a clause. "Do not turn on the
+ * fan BUT turn on the pump" pivots from a prohibition to a fresh command
+ * without a clause boundary; the marker must not exempt what follows the
+ * pivot. Bare "and" is deliberately absent — "do not turn on the fan and the
+ * extractor" is one prohibition governing two objects.
+ */
+const PROHIBITION_SCOPE_BREAK_RE = /\b(but|however|instead|rather|then|yet)\b/i;
+
+/**
  * True when `text` contains a command matching `patterns` that is NOT governed
  * by an explicit prohibition.
  *
  * A prohibition only exempts a command it actually GOVERNS: the marker must
- * OPEN the clause the command appears in, and must not itself be inverted.
+ * OPEN the clause, must not be inverted, and its scope must reach the match
+ * without a contrastive pivot in between. EVERY occurrence in a clause is
+ * examined — an exempt first match must not shadow an ungoverned second one.
  *   "Do not turn on the humidifier; keep observing."   → exempt (governed)
  *   "Do not wait; turn on the humidifier."             → finding (next clause)
  *   "It is not safe. Activate the pump."               → finding (not a marker)
  *   "Do not fail to turn on the humidifier."           → finding (inverted)
+ *   "Do not turn on the fan but turn on the pump."     → finding (pivot)
  * This is why we do not simply drop every clause containing "no"/"not".
  */
 export function hasUngovernedCommand(text: string, patterns: readonly RegExp[]): boolean {
@@ -71,17 +83,24 @@ export function hasUngovernedCommand(text: string, patterns: readonly RegExp[]):
   for (const rawClause of text.split(CLAUSE_SPLIT_RE)) {
     const clause = rawClause.trim();
     if (clause === "") continue;
+    const marker = normalizeDetectionPattern(PROHIBITION_MARKER_RE).exec(clause);
+    const markerOpensClause = marker !== null && marker.index === 0;
     for (const pattern of patterns) {
-      const match = normalizeDetectionPattern(pattern).exec(clause);
-      if (match === null) continue;
-      const marker = normalizeDetectionPattern(PROHIBITION_MARKER_RE).exec(clause);
-      const governed =
-        marker !== null &&
-        marker.index === 0 &&
-        marker.index < match.index &&
-        !normalizeDetectionPattern(POLARITY_INVERTING_RE).test(clause.slice(0, match.index));
-      if (governed) continue;
-      return true;
+      const re = normalizeDetectionPattern(pattern);
+      let searchFrom = 0;
+      while (searchFrom < clause.length) {
+        const match = re.exec(clause.slice(searchFrom));
+        if (match === null) break;
+        const matchIndex = searchFrom + match.index;
+        const before = clause.slice(0, matchIndex);
+        const governed =
+          markerOpensClause &&
+          matchIndex > 0 &&
+          !normalizeDetectionPattern(POLARITY_INVERTING_RE).test(before) &&
+          !normalizeDetectionPattern(PROHIBITION_SCOPE_BREAK_RE).test(before);
+        if (!governed) return true;
+        searchFrom = matchIndex + Math.max(1, match[0].length);
+      }
     }
   }
   return false;
@@ -192,7 +211,7 @@ export const AUTOFLOWER_STRESS_PATTERNS: readonly RegExp[] = AUTOFLOWER_TIER_A_S
 const NUMBER_TOKEN =
   "(?:\\d+(?:\\.\\d+)?|\\d+\\s*\\/\\s*\\d+|half|quarter|third|one|two|three|four|five|six|seven|eight|nine|ten|a couple of|a few)";
 const DOSE_UNIT =
-  "(?:ml|millilit(?:er|re)s?|lit(?:er|re)s?|grams?|mg|milligrams?|tsp|teaspoons?|tbsp|tablespoons?|oz|ounces?|cc)";
+  "(?:ml|millilit(?:er|re)s?|lit(?:er|re)s?|gal|gallons?|quarts?|pints?|cups?|grams?|mg|milligrams?|tsp|teaspoons?|tbsp|tablespoons?|oz|ounces?|cc)";
 
 /**
  * Quantities that ADMINISTER something or make an irreversible input change.

@@ -816,3 +816,131 @@ describe("policy governor — distrusted telemetry cannot strengthen a conclusio
     expect(d.proposalVerdicts[0].verdict).toBe("block");
   });
 });
+
+describe("policy governor — review round 1", () => {
+  it("withholds a device instruction hidden in evidence prose", () => {
+    const d = govern({
+      output: runResult({
+        evidence: [
+          {
+            evidenceId: "e-1",
+            kind: "sensor_reading",
+            observedAt: hoursAgo(0.1),
+            source: "live",
+            confidence: 0.9,
+            summary: "Humidity is high. Turn on the dehumidifier overnight.",
+            detail: null,
+            metric: { name: "humidity_pct", value: 72, unit: "%" },
+            entityRef: null,
+          },
+        ],
+      }),
+    });
+    expect(d.allowedEvidenceIds).not.toContain("e-1");
+    expect(d.withheldTextPaths.some((p) => p.includes("evidence.e-1"))).toBe(true);
+  });
+
+  it("allows clean evidence through by id", () => {
+    const d = govern();
+    expect(d.allowedEvidenceIds).toEqual(["e-1"]);
+  });
+
+  it("withholds unsafe prose in an error message", () => {
+    const d = govern({
+      output: runResult({
+        status: "error",
+        proposals: [],
+        confidence: null,
+        error: {
+          code: "internal",
+          message: "Retry after you turn on the pump for ten minutes.",
+          retryable: true,
+          occurredAt: NOW,
+          details: null,
+        },
+      }),
+    });
+    expect(d.withheldTextPaths.some((p) => p.startsWith("error"))).toBe(true);
+    // ...and a failed run stays failed.
+    expect(d.mandatedRunStatus).toBe("error");
+  });
+
+  it("preserves a model-declared insufficient_context status", () => {
+    const d = govern({
+      output: runResult({ status: "insufficient_context", proposals: [], confidence: null }),
+    });
+    expect(d.mandatedRunStatus).toBe("insufficient_context");
+    // The never-"error" rule is about POLICY refusals, which happen on ok
+    // runs: a blocked proposal still mandates ok.
+    const refused = govern({
+      output: runResult({
+        proposals: [proposal({ proposedAction: "Turn on the pump for ten minutes." })],
+      }),
+    });
+    expect(refused.mandatedRunStatus).toBe("ok");
+  });
+
+  it("catches a command pivoting out of a prohibition's scope", () => {
+    for (const text of [
+      "Do not turn on the fan but turn on the pump.",
+      "Do not turn on the fan — instead turn on the pump.",
+      "Never run the pump midday, rather run the pump at dusk.",
+    ]) {
+      expect(hasUngovernedCommand(text, DEVICE_CONTROL_DETECTION_PATTERNS), text).toBe(true);
+    }
+    // A prohibition over two objects is still one governed prohibition.
+    expect(
+      hasUngovernedCommand(
+        "Do not turn on the fan or the extractor.",
+        DEVICE_CONTROL_DETECTION_PATTERNS,
+      ),
+    ).toBe(false);
+  });
+
+  it("does not report urgency from the risk of an untrustworthy proposal", () => {
+    // A dangerous flush on stale evidence is a blocked action, not a fact
+    // about the plant.
+    const d = govern({
+      output: runResult({
+        evidence: [
+          {
+            evidenceId: "e-1",
+            kind: "sensor_reading",
+            observedAt: hoursAgo(90),
+            source: "stale",
+            confidence: 0.2,
+            summary: "Old reading.",
+            detail: null,
+            metric: null,
+            entityRef: null,
+          },
+        ],
+        proposals: [
+          proposal({ riskLevel: "critical", proposedAction: "Flush the medium immediately." }),
+        ],
+      }),
+    });
+    expect(d.urgent).toBe(false);
+    expect(d.outcomes).not.toContain("urgent_manual_attention");
+    // The same critical claim on trustworthy evidence IS surfaced as urgent.
+    const honest = govern({
+      output: runResult({
+        proposals: [
+          proposal({ riskLevel: "critical", proposedAction: "Flush the medium immediately." }),
+        ],
+      }),
+    });
+    expect(honest.urgent).toBe(true);
+    expect(honest.proposalVerdicts[0].verdict).toBe("block");
+  });
+
+  it("blocks a standalone administered volume", () => {
+    for (const text of [
+      "Apply one gallon of water now.",
+      "Give the plant 2 cups of feed.",
+      "Water with half a gallon per plant.",
+    ]) {
+      expect(scanProseForPatterns(text, DOSE_QUANTITY_PATTERNS), text).toBe(true);
+    }
+  });
+});

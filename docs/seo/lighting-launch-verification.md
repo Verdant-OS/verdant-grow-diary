@@ -1,38 +1,48 @@
 # Lighting launch verification
 
-**Generated:** 2026-07-30T21:33:48.7133347Z
+**Generated:** 2026-07-31T19:18:39.6233761Z
 **Production host:** https://verdantgrowdiary.com
 **Merged PR:** [#595](https://github.com/Verdant-OS/verdant-grow-diary/pull/595)
 **Merge commit:** `1223c56c9db586160a2798d017c2e78d1de1dd5a`
+**Measurement repair:** [#597](https://github.com/Verdant-OS/verdant-grow-diary/pull/597),
+commit `51363737ca97e74f861558f082b849bbbd389aa2`
 **Lovable project:** `66255e7b-892c-4be5-8686-ab1cfc3666db`
-**Production build manifest commit:** `c353a6a1ba45a9fc0bb9bb389f9f534732768f22`
+**Production build manifest commit:** `92d8330af90d983d3bcc1ad7507028505b8b14d8`
+**Deploy branch head:** `9d3a56e1707a2bb666628b52178c0c59cbfd2f18`
 **Production deployment ID:** not exposed by the current production response
 
 ## Launch verdict
 
-**NOT READY — PRODUCTION DEFECT FOUND**
+**BLOCKED — GA4/GSC OWNER SETUP REQUIRED**
 
-Both pages are published, publicly reachable, and technically indexable. The production build
-contains the content merged in PR #595. Day 0 has not started because:
+Both pages are published, publicly reachable, technically indexable, and match the content merged
+in PR #595. The page-identity repair from PR #597 is also live: the intercepted production browser
+verification at `2026-07-31T17:14:59.0979608Z` observed each exact guide path and title, no
+duplicate page views, and protected-ID masking. The collection requests were intercepted, so no
+verification events were transmitted to GA4.
 
-1. production GA4 currently reports both long guide slugs as `/guides/:id`; a client-side
-   `/guides` → lighting-guide transition also sends the generic `Verdant Grow Diary` title before
-   the lazy guide applies its page-specific metadata, which prevents a reliable page-by-page
-   baseline; and
-2. authenticated GA4 reporting and Search Console inspection are unavailable to this run.
-
-The GA4 route-identity and page-title defects have a focused repair on
-`codex/lighting-measurement-repair`. It must be merged, published through Lovable, and verified
-before the baseline is captured.
+No release-blocking production defect remains. Day 0 has not started because authenticated GA4
+reporting and authenticated Search Console inspection are unavailable. Observed collection
+payloads and public crawl checks prove implementation behavior, but they are not reporting
+baselines.
 
 ## Publication and release evidence
 
 - `https://verdantgrowdiary.com/version.json` identifies production build commit
-  `c353a6a1ba45a9fc0bb9bb389f9f534732768f22`, built at `2026-07-30T20:02:53.283Z`.
-- Repository ancestry proves the PR #595 merge commit is an ancestor of that production commit.
+  `92d8330af90d983d3bcc1ad7507028505b8b14d8`, built at
+  `2026-07-31T03:34:48.447Z`.
+- Repository ancestry proves the PR #595 merge commit and PR #597 repair commit are ancestors of
+  that production manifest commit.
+- The production manifest commit is an ancestor of deploy head
+  `9d3a56e1707a2bb666628b52178c0c59cbfd2f18`. The delta contains only monitoring workflow,
+  scripts, tests, and artifacts, so `production_publish_required=false` and release content still
+  matches production.
 - The current production response does not expose a Lovable deployment ID, so none is inferred.
 - Both release-specific URLs, titles, descriptions, H1s, Article/FAQ schema, sitemap entries, and
   cross-links are present in production.
+- The public probe at `2026-07-31T19:18:39.6233761Z` returned HTTP 200 for `version.json`, both
+  lighting guides, `sitemap.xml`, and `robots.txt`. The sitemap contains 51 URLs and each lighting
+  route exactly once; robots declares the production sitemap and protects app prefixes.
 
 **Release content match: PASS**
 
@@ -126,33 +136,48 @@ configuration. Client rendering reaches the intended public destinations, but th
 host redirects. This does not block measurement of the two canonical lighting URLs and is not
 mixed into the GA4 repair.
 
-## Measurement blocker
+## Measurement repair verification
 
-Production GA4 emits an explicit `page_view` after client-side guide navigation with:
+Production now emits explicit `page_view` events for the two pages with:
 
 ```text
-page_location = https://verdantgrowdiary.com/guides/:id
-page_title = Verdant Grow Diary
+page_location = https://verdantgrowdiary.com/guides/cannabis-grow-light-distance-and-schedule
+page_path = /guides/cannabis-grow-light-distance-and-schedule
+page_title = Cannabis Grow Light Distance, PPFD & DLI Guide | Verdant
+
+page_location = https://verdantgrowdiary.com/guides/cannabis-light-stress-light-burn-bleaching-or-heat
+page_path = /guides/cannabis-light-stress-light-burn-bleaching-or-heat
+page_title = Cannabis Light Stress: Burn, Bleaching, or Heat? | Verdant
 ```
 
-The shared privacy rule treated every path segment of 20 or more characters as a token. That is
-correct for protected IDs but incorrect for intentional public SEO slugs. The focused repair
-preserves hyphenated `/guides/<public-slug>` paths while continuing to mask long segments on
-protected and token-bearing routes. It also mounts route-change analytics after the lazy route
-content, so each guide applies its page-specific title before the explicit page view is sent.
+The browser verification fulfilled the collection endpoint locally, so the inspected payloads did
+not add verification traffic to the production property. Protected token-bearing paths remained
+masked, and no duplicate page views were observed.
 
-Day 0 remains unset until the repair is live and authenticated GA4/GSC baselines are recorded.
+**GA4 page identity repair: PASS**
 
 ## Authenticated access and monitoring status
 
 - **GA4 baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
 - **GSC baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
-- No local GSC token, GA4/GSC environment variables, or GSC OAuth repository secrets are
-  configured. Static inspection and observed collection requests are not an authenticated
-  reporting baseline.
-- The latest post-CI SEO monitoring run for production commit `c353a6a1…`
-  ([run 30577682453](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30577682453))
-  stopped in its configuration tests: 57 passed and 1 failed because the default 50-URL coverage
-  cap does not include all 51 current sitemap URLs. No GSC call occurred. PR #597 now raises the
-  bounded default and hard cap to 100 so the current sitemap is fully covered; production remains
-  blocked until that repair is merged, published, and run with authenticated GSC access.
+- At `2026-07-31T19:18:39.6233761Z`, name-only GitHub secret listings found none of the expected GA4
+  or GSC reporting secrets configured at repository scope or in the `verdant-production`,
+  `verdant-sandbox`, and `copilot` environments; `.seo/gsc-token.local.json` is also absent. The
+  workflow and documentation reference the expected `GSC_*` names, but no credential value was
+  read or recorded in this verification.
+- The latest SEO workflow on merge `9d3a56e…`
+  ([run 30658003581](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30658003581))
+  succeeded and evaluated all 51 sitemap URLs. Its GSC operation was `SKIPPED`, access was
+  `BLOCKED`, execution was `SKIPPED`, OAuth was not configured, and it made 0 GSC API attempts.
+  Workflow success is not an authenticated GSC baseline.
+- Owner handoff: complete the status-marked steps in the
+  [lighting analytics owner setup checklist](./analytics-owner-setup-checklist.md) without sending
+  credentials through chat or committing them.
+- Machine-readable handoff: the current blocked state is recorded in
+  [`artifacts/seo/seo-readiness-status.json`](../../artifacts/seo/seo-readiness-status.json).
+
+The current bounded slice is `P2 SEO_READINESS_CANONICAL_TRUTH`. The next slice is
+`P3 GSC_REGRESSION_NO_BASELINE_SEMANTICS`; it does not change the current access verdict.
+
+Day 0 remains `UNSET`, and the four-week clock remains `NOT_STARTED`, until both authenticated
+baselines are recorded.

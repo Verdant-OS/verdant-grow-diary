@@ -1,6 +1,8 @@
 # Lighting four-week measurement plan
 
-**Status:** Day 0 not started
+**Verdict:** BLOCKED — GA4/GSC OWNER SETUP REQUIRED
+**Day 0:** UNSET
+**Four-week clock:** NOT_STARTED
 **Timezone:** America/Chicago
 **Pages:** the two lighting guides published through PR #595
 
@@ -39,16 +41,32 @@ recorded.
 
 ## Current blockers
 
-1. Merge and publish the focused page-identity repair in PR #597.
-2. Verify production GA4 sends each full public lighting-guide path and its page-specific title.
-3. Verify the repaired SEO monitor covers all 51 current sitemap URLs without exceeding its
-   bounded 100-URL cap.
-4. Provide authenticated access to the existing Verdant GA4 property.
-5. Configure the existing read-only Search Console OAuth workflow or provide another authorized
-   authenticated Search Console session.
+The production and measurement-contract gates are complete:
 
-Day 0 must remain unset until all five conditions are resolved and both authenticated baselines are
-recorded.
+- PR #597 is merged and live in production manifest
+  `92d8330af90d983d3bcc1ad7507028505b8b14d8`.
+- Intercepted browser evidence preserves each exact lighting-guide path and page-specific title,
+  reports no duplicate views, keeps protected IDs masked, and transmitted no verification events.
+- The current public probe returns HTTP 200 for both guides, the sitemap, robots, and version
+  manifest. The 51-URL sitemap contains each lighting route exactly once, and robots protects app
+  prefixes.
+- Workflow [30658003581](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30658003581)
+  succeeded across all 51 URLs, but its GSC operation was `SKIPPED`, access was `BLOCKED`,
+  execution was `SKIPPED`, OAuth was not configured, and it made 0 API attempts.
+- Deploy head `9d3a56e1707a2bb666628b52178c0c59cbfd2f18` differs from the production manifest only by
+  monitoring workflow, scripts, tests, and artifacts. No production publish is required for that
+  delta, and release content match remains `PASS`.
+
+Two owner access gates remain:
+
+1. Provide read-only authenticated reporting access to the existing Verdant GA4 property.
+2. Configure the existing owner-controlled, read-only Search Console OAuth workflow, or provide
+   another authorized authenticated Search Console session.
+
+Use the [analytics owner setup checklist](./analytics-owner-setup-checklist.md). Do not send
+credentials through chat or commit them. Day 0 must remain unset until both authenticated
+baselines are recorded. Observed GA4 collection payloads and successful public/static checks are
+implementation evidence, not reporting baselines.
 
 ## Review source contract
 

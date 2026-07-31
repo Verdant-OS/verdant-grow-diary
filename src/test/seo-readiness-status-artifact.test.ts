@@ -2,13 +2,24 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { GOOGLE_ANALYTICS_MEASUREMENT_ID } from "@/constants/analytics";
+
 const ROOT = resolve(__dirname, "../..");
 const ARTIFACT_PATH = resolve(ROOT, "artifacts/seo/seo-readiness-status.json");
 const RAW_ARTIFACT = readFileSync(ARTIFACT_PATH, "utf8");
 const READINESS = JSON.parse(RAW_ARTIFACT) as Record<string, unknown>;
-const BASELINE = JSON.parse(
-  readFileSync(resolve(ROOT, "artifacts/seo/lighting-launch-baseline.json"), "utf8"),
-) as Record<string, unknown>;
+const RAW_BASELINE = readFileSync(
+  resolve(ROOT, "artifacts/seo/lighting-launch-baseline.json"),
+  "utf8",
+);
+const BASELINE = JSON.parse(RAW_BASELINE) as Record<string, unknown>;
+const IDENTITY_BEARING_ARTIFACTS = [
+  RAW_ARTIFACT,
+  RAW_BASELINE,
+  readFileSync(resolve(ROOT, "docs/seo/analytics-owner-setup-checklist.md"), "utf8"),
+  readFileSync(resolve(ROOT, "docs/seo/lighting-four-week-measurement-plan.md"), "utf8"),
+  readFileSync(resolve(ROOT, "docs/seo/lighting-launch-verification.md"), "utf8"),
+];
 const JOB_SUMMARY = JSON.parse(
   readFileSync(resolve(ROOT, "artifacts/seo/seo-job-summary.json"), "utf8"),
 ) as { mode: string; status: string };
@@ -29,12 +40,13 @@ describe("SEO readiness status artifact", () => {
       schema_version: 1,
       scope: "LIGHTING_LAUNCH_MEASUREMENT",
       timezone: "America/Chicago",
+      artifact_semantics: "POINT_IN_TIME_EVIDENCE_SNAPSHOT",
       operating_mode: "MODE_A_ACCESS_BLOCKED_READINESS_WORK",
       verdict: "BLOCKED — GA4/GSC OWNER SETUP REQUIRED",
       status_vocabulary: EXPECTED_STATUS_VOCABULARY,
       production_status: "PASS",
       analytics_identity_status: "PASS",
-      technical_seo_status: "PASS",
+      technical_seo_status: "FAIL",
       ga4_access_status: "BLOCKED",
       gsc_access_status: "BLOCKED",
       day_0_status: "UNSET",
@@ -47,24 +59,24 @@ describe("SEO readiness status artifact", () => {
     expect(RAW_ARTIFACT).toBe(`${JSON.stringify(READINESS, null, 2)}\n`);
   });
 
-  it("pins repository, deploy, and production identities without claiming equality", () => {
+  it("pins repository, deploy, and production identities with observed equality", () => {
     expect(READINESS.run_context).toEqual({
       repository: "Verdant-OS/verdant-grow-diary",
-      branch: "codex/gsc-regression-no-baseline-semantics",
-      head: "5db5d76bf3b01b352f9953f10993a951efa1b8ce",
+      branch: "codex/ga4-stream-identity",
+      head: "0c61cc572de32a8a7af975ace14659dfb77a0a43",
       deploy_branch: "verdant-grow-diary",
-      deploy_branch_head: "5db5d76bf3b01b352f9953f10993a951efa1b8ce",
+      deploy_branch_head: "0c61cc572de32a8a7af975ace14659dfb77a0a43",
       head_equals_deploy_branch_head: true,
       working_tree_status: "DIRTY_READINESS_WORK",
     });
     expect(READINESS.production).toMatchObject({
       host: "https://verdantgrowdiary.com",
-      observed_at: "2026-07-31T22:23:35.7016921Z",
-      manifest_commit: "92d8330af90d983d3bcc1ad7507028505b8b14d8",
-      build_time: "2026-07-31T03:34:48.447Z",
-      matches_deploy_branch_head: false,
+      observed_at: "2026-07-31T23:10:32.9711027Z",
+      manifest_commit: "0c61cc572de32a8a7af975ace14659dfb77a0a43",
+      build_time: "2026-07-31T22:57:00.211Z",
+      matches_deploy_branch_head: true,
       manifest_is_ancestor_of_deploy_branch_head: true,
-      source_delta_since_manifest: "NON_RUNTIME_MAINTENANCE_ONLY",
+      source_delta_since_manifest: "NONE",
       production_publish_required: false,
       release_content_match: "PASS",
       sitemap_url_count: 51,
@@ -94,11 +106,35 @@ describe("SEO readiness status artifact", () => {
     );
   });
 
+  it("keeps direct-load indexability distinct from the route-runtime structured-data failure", () => {
+    expect(READINESS.technical_seo_status).toBe("FAIL");
+    expect(READINESS.technical_seo).toMatchObject({
+      lighting_pages: "FAIL",
+      direct_load_indexability: "PASS",
+      route_runtime_structured_data: "FAIL",
+      robots: "PASS",
+      sitemap: "PASS",
+      protected_route_exclusion: "PASS",
+    });
+    expect((BASELINE.launch_gates as Record<string, string>).route_runtime_structured_data).toBe(
+      "fail_non_blocking",
+    );
+  });
+
   it("separates passing collection evidence from unavailable authenticated baselines", () => {
     expect(READINESS.analytics_identity).toMatchObject({
       last_full_verified_at: "2026-07-31T17:14:59.0979608Z",
       verification_method: "INTERCEPTED_BROWSER_COLLECTION_REQUESTS",
       test_events_transmitted: false,
+      stream_identity_status: "PASS",
+      stream_identity_evidence: "OWNER_CONFIRMED_VALUES_MATCH_DEPLOYED_PRODUCTION_TAG",
+      stream: {
+        name: "Verdant Grow Diary",
+        url: "https://verdantgrowdiary.com",
+        stream_id: "15065867361",
+        measurement_id: GOOGLE_ANALYTICS_MEASUREMENT_ID,
+      },
+      property_id: null,
       guide_page_identity: "PASS",
       route_specific_titles: "PASS",
       duplicate_page_views: "PASS",
@@ -109,6 +145,15 @@ describe("SEO readiness status artifact", () => {
       reason: "AUTHENTICATED_ACCESS_UNAVAILABLE",
       baseline_status: "BLOCKED",
       collection_contract_status: "PASS",
+      stream_identity_status: "PASS",
+      property_identity_status: "BLOCKED",
+      stream: {
+        name: "Verdant Grow Diary",
+        url: "https://verdantgrowdiary.com",
+        stream_id: "15065867361",
+        measurement_id: GOOGLE_ANALYTICS_MEASUREMENT_ID,
+      },
+      property_id: null,
       authenticated_reporting_available: false,
       metrics: null,
     });
@@ -118,7 +163,7 @@ describe("SEO readiness status artifact", () => {
       baseline_status: "BLOCKED",
       authenticated_reporting_available: false,
       latest_workflow_run:
-        "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30669705112",
+        "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30671654959",
       latest_workflow_status: "PASS",
       operation_status: "SKIPPED",
       access_status: "BLOCKED",
@@ -137,6 +182,7 @@ describe("SEO readiness status artifact", () => {
     const production = READINESS.production as Record<string, unknown>;
     const release = BASELINE.release as Record<string, unknown>;
     const publicProbe = BASELINE.public_probe as Record<string, unknown>;
+    const baselineGa4 = BASELINE.ga4_access as Record<string, unknown>;
     const baselineGsc = BASELINE.gsc_access as Record<string, unknown>;
     const launchGates = BASELINE.launch_gates as Record<string, string>;
 
@@ -146,11 +192,23 @@ describe("SEO readiness status artifact", () => {
     );
     expect(production.production_publish_required).toBe(release.production_publish_required);
     expect(production.observed_at).toBe(publicProbe.observed_at);
+    expect(BASELINE.artifact_semantics).toBe("POINT_IN_TIME_EVIDENCE_SNAPSHOT");
+    expect(baselineGa4).toMatchObject({
+      stream_identity_status: "pass_owner_confirmed_matches_production",
+      stream: {
+        name: "Verdant Grow Diary",
+        url: "https://verdantgrowdiary.com",
+        stream_id: "15065867361",
+        measurement_id: GOOGLE_ANALYTICS_MEASUREMENT_ID,
+      },
+      property_id: null,
+    });
     expect((READINESS.gsc as Record<string, unknown>).latest_workflow_run).toBe(
       baselineGsc.workflow_run,
     );
     expect(READINESS.production_status).toBe(launchGates.release_content_match.toUpperCase());
     expect(READINESS.ga4_access_status).toBe(launchGates.ga4_baseline.toUpperCase());
+    expect(launchGates.ga4_stream_identity).toBe("pass");
     expect(READINESS.gsc_access_status).toBe(launchGates.gsc_baseline.toUpperCase());
     expect((READINESS.measurement as Record<string, unknown>).measurement_start_at).toBe(
       BASELINE.measurement_start_at,
@@ -169,7 +227,7 @@ describe("SEO readiness status artifact", () => {
     });
   });
 
-  it("records only the two owner blockers and the bounded slice handoff", () => {
+  it("records only the two owner blockers and a point-in-time bounded-slice handoff", () => {
     expect(READINESS.open_blockers).toEqual([
       expect.objectContaining({
         id: "GA4_AUTHENTICATED_ACCESS",
@@ -187,20 +245,28 @@ describe("SEO readiness status artifact", () => {
         expect.objectContaining({
           id: "GSC_REGRESSION_NO_BASELINE_SEMANTICS",
           priority: "P3",
-          status: "FIXED_PENDING_MERGE",
+          status: "FIXED_AND_POST_MERGE_VERIFIED",
+        }),
+        expect.objectContaining({
+          id: "LIGHTING_DUPLICATE_HYDRATED_JSON_LD",
+          priority: "P1",
+          status: "VERIFIED_UNFIXED",
         }),
       ]),
     );
     expect(READINESS.current_slice).toEqual({
-      priority: "P3",
-      id: "GSC_REGRESSION_NO_BASELINE_SEMANTICS",
-      status: "IMPLEMENTED_PENDING_MERGE",
+      priority: "P2",
+      id: "GA4_PRODUCTION_STREAM_IDENTITY",
+      status: "COMPLETE_AT_GENERATION",
+      evidence:
+        "Owner-confirmed stream values match the deployed production tag and canonical host; property identity and reporting access remain blocked.",
     });
     expect(READINESS.next_slice).toEqual({
-      priority: "P3",
-      id: "SEO_ARTIFACT_BUNDLE_PATH_DISCOVERABILITY",
+      priority: "P1",
+      id: "LIGHTING_DUPLICATE_HYDRATED_JSON_LD",
       status: "NOT_STARTED",
     });
+    expect(RAW_ARTIFACT).not.toContain("PENDING_MERGE");
   });
 
   it("references only existing repository-relative artifact paths", () => {
@@ -217,7 +283,7 @@ describe("SEO readiness status artifact", () => {
 
   it("contains no credentials, private paths, or fake zero metrics", () => {
     expect(READINESS.reporting_access_configuration).toEqual({
-      observed_at: "2026-07-31T22:23:35.7016921Z",
+      observed_at: "2026-07-31T23:10:32.9711027Z",
       audit_method: "GITHUB_SECRET_NAME_LISTING",
       configured_scopes_checked: [
         "repository",
@@ -243,15 +309,15 @@ describe("SEO readiness status artifact", () => {
       private_ids_included: false,
       unavailable_metrics_are_null: true,
     });
-    expect(RAW_ARTIFACT).not.toMatch(/C:\\Users\\/i);
-    expect(RAW_ARTIFACT).not.toMatch(/-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/);
-    expect(RAW_ARTIFACT).not.toMatch(/ya29\.[A-Za-z0-9_-]+/);
-    expect(RAW_ARTIFACT).not.toMatch(
-      /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,
-    );
-    expect(RAW_ARTIFACT).not.toMatch(
-      /"(?:client_secret|refresh_token|access_token|api_key|service_role)"\s*:/i,
-    );
+    for (const artifact of IDENTITY_BEARING_ARTIFACTS) {
+      expect(artifact).not.toMatch(/C:\\Users\\/i);
+      expect(artifact).not.toMatch(/-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/);
+      expect(artifact).not.toMatch(/ya29\.[A-Za-z0-9_-]+/);
+      expect(artifact).not.toMatch(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/);
+      expect(artifact).not.toMatch(
+        /["']?(?:client_secret|refresh_token|access_token|api_key|service_role)["']?\s*[=:]\s*["'][^"']+["']/i,
+      );
+    }
     expect(RAW_ARTIFACT).not.toMatch(
       /"(?:page_views|users|sessions|impressions|clicks|ctr|average_position)"\s*:\s*0(?:[,.])/,
     );

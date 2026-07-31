@@ -42,8 +42,32 @@ describe("lighting analytics owner setup checklist", () => {
       expect(CHECKLIST).toContain(phrase);
     }
     expect(CHECKLIST).toContain(GOOGLE_ANALYTICS_MEASUREMENT_ID);
+    expect(CHECKLIST).toContain("Verdant Grow Diary");
+    expect(CHECKLIST).toContain("15065867361");
+    expect(CHECKLIST).toContain("https://verdantgrowdiary.com");
     expect(CHECKLIST).toMatch(/numeric property ID \*\*must not be inferred\*\*/);
     expect(CHECKLIST).not.toMatch(/properties\/\d+/);
+  });
+
+  it("records the owner-confirmed production stream without claiming property access", () => {
+    expect(CHECKLIST).toMatch(/Production web data stream\s+\| `COMPLETE`/);
+    expect(CHECKLIST).toMatch(/Production hostname and deployed tag\s+\| `COMPLETE`/);
+    expect(CHECKLIST).toMatch(/Correct GA4 property\s+\| `INCOMPLETE`/);
+    expect(CHECKLIST).toMatch(/Read-only reporting access\s+\| `INCOMPLETE`/);
+    expect(CHECKLIST).toMatch(/property identity and authenticated reporting\s+access/);
+  });
+
+  it("keeps the stream tuple and blocked property boundary in both measurement handoffs", () => {
+    for (const document of [LAUNCH_VERIFICATION, MEASUREMENT_PLAN]) {
+      expect(document).toContain("Verdant Grow Diary");
+      expect(document).toContain("https://verdantgrowdiary.com");
+      expect(document).toContain("15065867361");
+      expect(document).toContain(GOOGLE_ANALYTICS_MEASUREMENT_ID);
+    }
+    expect(LAUNCH_VERIFICATION).toContain(
+      "numeric property ID and authenticated reporting baseline remain unavailable",
+    );
+    expect(MEASUREMENT_PLAN).toContain("The property ID is still unconfirmed");
   });
 
   it("pins both exact lighting identities", () => {
@@ -78,7 +102,7 @@ describe("lighting analytics owner setup checklist", () => {
     expect(CHECKLIST).toContain("`BLOCKED_BY_ACCESS`");
     expect(CHECKLIST).toMatch(/Exact owner action\s+\| Codex can verify afterward/);
     expect(CHECKLIST).toContain("Tell Codex only that access is ready");
-    expect(CHECKLIST).toMatch(/Production hostname and deployed tag\s+\| `BLOCKED_BY_ACCESS`/);
+    expect(CHECKLIST).toMatch(/Enhanced measurement review\s+\| `BLOCKED_BY_ACCESS`/);
     expect(CHECKLIST).toMatch(/Production hostname\s+\| `BLOCKED_BY_ACCESS`/);
   });
 

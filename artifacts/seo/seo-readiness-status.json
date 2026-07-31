@@ -1,9 +1,10 @@
 {
   "schema_version": 1,
   "scope": "LIGHTING_LAUNCH_MEASUREMENT",
-  "generated_at": "2026-07-31T22:23:35.7016921Z",
-  "generated_at_chicago": "2026-07-31T17:23:35.7016921-05:00",
+  "generated_at": "2026-07-31T23:10:32.9711027Z",
+  "generated_at_chicago": "2026-07-31T18:10:32.9711027-05:00",
   "timezone": "America/Chicago",
+  "artifact_semantics": "POINT_IN_TIME_EVIDENCE_SNAPSHOT",
   "operating_mode": "MODE_A_ACCESS_BLOCKED_READINESS_WORK",
   "verdict": "BLOCKED — GA4/GSC OWNER SETUP REQUIRED",
   "status_vocabulary": [
@@ -17,29 +18,29 @@
   ],
   "production_status": "PASS",
   "analytics_identity_status": "PASS",
-  "technical_seo_status": "PASS",
+  "technical_seo_status": "FAIL",
   "ga4_access_status": "BLOCKED",
   "gsc_access_status": "BLOCKED",
   "day_0_status": "UNSET",
   "four_week_clock_status": "NOT_STARTED",
   "run_context": {
     "repository": "Verdant-OS/verdant-grow-diary",
-    "branch": "codex/gsc-regression-no-baseline-semantics",
-    "head": "5db5d76bf3b01b352f9953f10993a951efa1b8ce",
+    "branch": "codex/ga4-stream-identity",
+    "head": "0c61cc572de32a8a7af975ace14659dfb77a0a43",
     "deploy_branch": "verdant-grow-diary",
-    "deploy_branch_head": "5db5d76bf3b01b352f9953f10993a951efa1b8ce",
+    "deploy_branch_head": "0c61cc572de32a8a7af975ace14659dfb77a0a43",
     "head_equals_deploy_branch_head": true,
     "working_tree_status": "DIRTY_READINESS_WORK"
   },
   "production": {
     "host": "https://verdantgrowdiary.com",
-    "observed_at": "2026-07-31T22:23:35.7016921Z",
+    "observed_at": "2026-07-31T23:10:32.9711027Z",
     "version_url": "https://verdantgrowdiary.com/version.json",
-    "manifest_commit": "92d8330af90d983d3bcc1ad7507028505b8b14d8",
-    "build_time": "2026-07-31T03:34:48.447Z",
-    "matches_deploy_branch_head": false,
+    "manifest_commit": "0c61cc572de32a8a7af975ace14659dfb77a0a43",
+    "build_time": "2026-07-31T22:57:00.211Z",
+    "matches_deploy_branch_head": true,
     "manifest_is_ancestor_of_deploy_branch_head": true,
-    "source_delta_since_manifest": "NON_RUNTIME_MAINTENANCE_ONLY",
+    "source_delta_since_manifest": "NONE",
     "production_publish_required": false,
     "release_content_match": "PASS",
     "sitemap_url_count": 51,
@@ -80,6 +81,15 @@
     "last_full_verified_at": "2026-07-31T17:14:59.0979608Z",
     "verification_method": "INTERCEPTED_BROWSER_COLLECTION_REQUESTS",
     "test_events_transmitted": false,
+    "stream_identity_status": "PASS",
+    "stream_identity_evidence": "OWNER_CONFIRMED_VALUES_MATCH_DEPLOYED_PRODUCTION_TAG",
+    "stream": {
+      "name": "Verdant Grow Diary",
+      "url": "https://verdantgrowdiary.com",
+      "stream_id": "15065867361",
+      "measurement_id": "G-B3QRSZEM9S"
+    },
+    "property_id": null,
     "guide_page_identity": "PASS",
     "route_specific_titles": "PASS",
     "duplicate_page_views": "PASS",
@@ -87,15 +97,17 @@
     "evidence": "docs/seo/lighting-launch-verification.md"
   },
   "technical_seo": {
-    "last_http_verified_at": "2026-07-31T22:23:35.7016921Z",
-    "lighting_pages": "PASS",
+    "last_http_verified_at": "2026-07-31T23:10:32.9711027Z",
+    "lighting_pages": "FAIL",
+    "direct_load_indexability": "PASS",
+    "route_runtime_structured_data": "FAIL",
     "robots": "PASS",
     "sitemap": "PASS",
     "protected_route_exclusion": "PASS",
     "evidence": "docs/seo/lighting-launch-verification.md"
   },
   "reporting_access_configuration": {
-    "observed_at": "2026-07-31T22:23:35.7016921Z",
+    "observed_at": "2026-07-31T23:10:32.9711027Z",
     "audit_method": "GITHUB_SECRET_NAME_LISTING",
     "configured_scopes_checked": [
       "repository",
@@ -120,6 +132,15 @@
     "reason": "AUTHENTICATED_ACCESS_UNAVAILABLE",
     "baseline_status": "BLOCKED",
     "collection_contract_status": "PASS",
+    "stream_identity_status": "PASS",
+    "property_identity_status": "BLOCKED",
+    "stream": {
+      "name": "Verdant Grow Diary",
+      "url": "https://verdantgrowdiary.com",
+      "stream_id": "15065867361",
+      "measurement_id": "G-B3QRSZEM9S"
+    },
+    "property_id": null,
     "authenticated_reporting_available": false,
     "metrics": null
   },
@@ -129,7 +150,7 @@
     "baseline_status": "BLOCKED",
     "authenticated_reporting_available": false,
     "local_oauth_token_available": false,
-    "latest_workflow_run": "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30669705112",
+    "latest_workflow_run": "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30671654959",
     "latest_workflow_status": "PASS",
     "operation_status": "SKIPPED",
     "access_status": "BLOCKED",
@@ -154,7 +175,7 @@
       "status": "BLOCKED",
       "owner": "OWNER",
       "reason": "AUTHENTICATED_ACCESS_UNAVAILABLE",
-      "required_action": "Complete the GA4 property, production stream, and read-only reporting access steps in the owner checklist."
+      "required_action": "Confirm the GA4 property identity and provide owner-approved read-only reporting access. The production stream identity is already owner-confirmed."
     },
     {
       "id": "GSC_AUTHENTICATED_ACCESS",
@@ -176,18 +197,27 @@
     {
       "id": "GSC_REGRESSION_NO_BASELINE_SEMANTICS",
       "priority": "P3",
-      "status": "FIXED_PENDING_MERGE",
-      "evidence": "13 focused regression-mode tests pass with no-baseline JSON, Markdown, stdout, grouping, and unchanged exit-code assertions."
+      "status": "FIXED_AND_POST_MERGE_VERIFIED",
+      "pull_request": "https://github.com/Verdant-OS/verdant-grow-diary/pull/618",
+      "merge_commit": "d9bf8e71f76e155be728a02297c6d46e6d78975c",
+      "verification_run": "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30670976735"
+    },
+    {
+      "id": "LIGHTING_DUPLICATE_HYDRATED_JSON_LD",
+      "priority": "P1",
+      "status": "VERIFIED_UNFIXED",
+      "evidence": "Direct loads hydrate identical duplicate FAQPage, BreadcrumbList, and Article objects. After cross-guide client navigation, the prior route's static objects remain beside the current route's runtime objects; all objects parse but page identities conflict."
     }
   ],
   "current_slice": {
-    "priority": "P3",
-    "id": "GSC_REGRESSION_NO_BASELINE_SEMANTICS",
-    "status": "IMPLEMENTED_PENDING_MERGE"
+    "priority": "P2",
+    "id": "GA4_PRODUCTION_STREAM_IDENTITY",
+    "status": "COMPLETE_AT_GENERATION",
+    "evidence": "Owner-confirmed stream values match the deployed production tag and canonical host; property identity and reporting access remain blocked."
   },
   "next_slice": {
-    "priority": "P3",
-    "id": "SEO_ARTIFACT_BUNDLE_PATH_DISCOVERABILITY",
+    "priority": "P1",
+    "id": "LIGHTING_DUPLICATE_HYDRATED_JSON_LD",
     "status": "NOT_STARTED"
   },
   "monitoring_repair": {
@@ -205,7 +235,7 @@
       "gsc_api_attempts": 0
     },
     "production_publish_required": false,
-    "production_publish_reason": "The deploy delta contains only SEO monitoring workflow, scripts, tests, and artifacts; public app runtime files did not change."
+    "production_publish_reason": "Production manifest and deploy head match; no pending public app release exists."
   },
   "artifact_paths": {
     "readiness_status": "artifacts/seo/seo-readiness-status.json",

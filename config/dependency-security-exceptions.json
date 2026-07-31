@@ -3,173 +3,6 @@
   "notes": "Exact, temporary exceptions for audit findings that cannot be removed safely in Phase A. New package/advisory pairs or lockfile resolution drift fail closed.",
   "exceptions": [
     {
-      "package": "brace-expansion",
-      "advisoryId": "1124334",
-      "severity": "high",
-      "expectedNpmAdvisoryUrl": "https://github.com/advisories/GHSA-mh99-v99m-4gvg",
-      "expectedNpmVulnerableRange": "<=5.0.7",
-      "owner": "Verdant dependency security",
-      "reason": "The requested compatible 1.1.16 and 2.1.2 floors remain covered by this newer advisory; forcing brace-expansion 5 across old minimatch ranges would be a breaking override.",
-      "reachability": "Verdant does not import brace-expansion directly. The affected copies are reached through local build, lint, and file-glob tooling with repository-controlled patterns.",
-      "recheckOn": "2026-08-08",
-      "expiresOn": "2026-08-25",
-      "expectedLockResolutions": [
-        {
-          "key": "brace-expansion",
-          "version": "1.1.16"
-        },
-        {
-          "key": "@typescript-eslint/typescript-estree/minimatch/brace-expansion",
-          "version": "2.1.2"
-        },
-        {
-          "key": "glob/minimatch/brace-expansion",
-          "version": "2.1.2"
-        },
-        {
-          "key": "readdir-glob/minimatch/brace-expansion",
-          "version": "2.1.2"
-        }
-      ],
-      "expectedBunAffectedKeys": [
-        "@typescript-eslint/typescript-estree/minimatch/brace-expansion",
-        "brace-expansion",
-        "glob/minimatch/brace-expansion",
-        "readdir-glob/minimatch/brace-expansion"
-      ],
-      "expectedNpmLockResolutions": [
-        {
-          "path": "node_modules/@typescript-eslint/typescript-estree/node_modules/brace-expansion",
-          "version": "5.0.8"
-        },
-        {
-          "path": "node_modules/brace-expansion",
-          "version": "1.1.16"
-        },
-        {
-          "path": "node_modules/glob/node_modules/brace-expansion",
-          "version": "2.1.2"
-        },
-        {
-          "path": "node_modules/readdir-glob/node_modules/brace-expansion",
-          "version": "2.1.2"
-        }
-      ],
-      "expectedParentKeys": [
-        "@typescript-eslint/typescript-estree/minimatch",
-        "glob/minimatch",
-        "minimatch",
-        "readdir-glob/minimatch"
-      ],
-      "expectedNpmParentPaths": [
-        "node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch",
-        "node_modules/glob/node_modules/minimatch",
-        "node_modules/minimatch",
-        "node_modules/readdir-glob/node_modules/minimatch"
-      ],
-      "expectedNpmAffectedPaths": [
-        "node_modules/brace-expansion",
-        "node_modules/glob/node_modules/brace-expansion",
-        "node_modules/readdir-glob/node_modules/brace-expansion"
-      ],
-      "allowedImportPaths": [],
-      "allowedScriptNames": [],
-      "expectedBunDirectRootAncestors": [
-        {
-          "package": "tailwindcss-animate",
-          "group": "dependencies",
-          "spec": "^1.0.7"
-        },
-        {
-          "package": "@actions/artifact",
-          "group": "devDependencies",
-          "spec": "^6.2.1"
-        },
-        {
-          "package": "@tailwindcss/typography",
-          "group": "devDependencies",
-          "spec": "^0.5.16"
-        },
-        {
-          "package": "eslint",
-          "group": "devDependencies",
-          "spec": "^9.32.0"
-        },
-        {
-          "package": "eslint-import-resolver-typescript",
-          "group": "devDependencies",
-          "spec": "^4.4.5"
-        },
-        {
-          "package": "eslint-plugin-import",
-          "group": "devDependencies",
-          "spec": "^2.32.0"
-        },
-        {
-          "package": "eslint-plugin-react-hooks",
-          "group": "devDependencies",
-          "spec": "^5.2.0"
-        },
-        {
-          "package": "eslint-plugin-react-refresh",
-          "group": "devDependencies",
-          "spec": "^0.4.20"
-        },
-        {
-          "package": "lovable-tagger",
-          "group": "devDependencies",
-          "spec": "^1.1.13"
-        },
-        {
-          "package": "tailwindcss",
-          "group": "devDependencies",
-          "spec": "^3.4.17"
-        },
-        {
-          "package": "typescript-eslint",
-          "group": "devDependencies",
-          "spec": "^8.38.0"
-        }
-      ],
-      "expectedNpmDirectRootAncestors": [
-        {
-          "package": "@actions/artifact",
-          "group": "devDependencies",
-          "spec": "^6.2.1"
-        },
-        {
-          "package": "eslint",
-          "group": "devDependencies",
-          "spec": "^9.32.0"
-        },
-        {
-          "package": "eslint-import-resolver-typescript",
-          "group": "devDependencies",
-          "spec": "^4.4.5"
-        },
-        {
-          "package": "eslint-plugin-import",
-          "group": "devDependencies",
-          "spec": "^2.32.0"
-        },
-        {
-          "package": "eslint-plugin-react-hooks",
-          "group": "devDependencies",
-          "spec": "^5.2.0"
-        },
-        {
-          "package": "eslint-plugin-react-refresh",
-          "group": "devDependencies",
-          "spec": "^0.4.20"
-        },
-        {
-          "package": "typescript-eslint",
-          "group": "devDependencies",
-          "spec": "^8.38.0"
-        }
-      ]
-    },
-    {
       "package": "esbuild",
       "advisoryId": "1120680",
       "severity": "low",
@@ -190,9 +23,7 @@
           "version": "0.27.7"
         }
       ],
-      "expectedBunAffectedKeys": [
-        "@lovable.dev/mcp-js/esbuild"
-      ],
+      "expectedBunAffectedKeys": ["@lovable.dev/mcp-js/esbuild"],
       "expectedNpmLockResolutions": [
         {
           "path": "node_modules/esbuild",
@@ -207,19 +38,13 @@
           "version": "0.25.12"
         }
       ],
-      "expectedParentKeys": [
-        "@lovable.dev/mcp-js",
-        "lovable-tagger",
-        "vite"
-      ],
+      "expectedParentKeys": ["@lovable.dev/mcp-js", "lovable-tagger", "vite"],
       "expectedNpmParentPaths": [
         "node_modules/@lovable.dev/mcp-js",
         "node_modules/lovable-tagger",
         "node_modules/vite"
       ],
-      "expectedNpmAffectedPaths": [
-        "node_modules/esbuild"
-      ],
+      "expectedNpmAffectedPaths": ["node_modules/esbuild"],
       "allowedImportPaths": [],
       "allowedScriptNames": [],
       "expectedBunDirectRootAncestors": [

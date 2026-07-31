@@ -168,13 +168,13 @@ function hasFiniteBound(range: { min?: unknown; max?: unknown } | null | undefin
  *    different things. Picking one would be a guess, so this reports
  *    insufficient context and says why.
  */
-interface PlantIdentity {
+export interface PlantIdentity {
   known: boolean;
   isAutoflower: boolean | null;
   contradictory: boolean;
 }
 
-function resolvePlantIdentity(compilation: PlantContextCompilation): PlantIdentity {
+export function resolvePlantIdentity(compilation: PlantContextCompilation): PlantIdentity {
   const fromText = normalizePlantType(compilation.plantType);
   const textSays = fromText === null ? null : fromText === "autoflower";
   const flag = compilation.bundle.isAutoflower;

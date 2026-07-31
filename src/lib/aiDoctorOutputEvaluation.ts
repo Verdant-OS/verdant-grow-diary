@@ -38,6 +38,13 @@ import {
   isLikelyAutoflower,
   DEVICE_CONTROL_DETECTION_PATTERNS,
 } from "@/lib/aiDoctorSafetyRules";
+import {
+  AGGRESSIVE_IRRIGATION_PATTERNS,
+  AGGRESSIVE_NUTRIENT_PATTERNS,
+  AUTOFLOWER_STRESS_PATTERNS,
+  AUTOMATIC_AQ_PATTERNS,
+  hasUngovernedCommand,
+} from "@/lib/aiOutputTextSafetyDetectors";
 
 // ---------------------------------------------------------------------------
 // Contract version
@@ -1074,17 +1081,8 @@ function validateConfidenceCalibration(
  */
 const DEVICE_CONTROL_PATTERNS: readonly RegExp[] = DEVICE_CONTROL_DETECTION_PATTERNS;
 
-const AUTOMATIC_AQ_PATTERNS: readonly RegExp[] = [
-  /\bautomatically\b/,
-  /\bauto-?approve/,
-  /\bwithout approval\b/,
-  /\bno approval (needed|required)\b/,
-  /\bbypass(ing)? (the )?(approval|action queue|review)\b/,
-  /\bwill (be )?(execute|appl|run)/,
-  /\bqueue and (run|execute)\b/,
-  /\bexecutes? (the )?action\b/,
-  /\bapplied automatically\b/,
-];
+// AUTOMATIC_AQ_PATTERNS now lives in `aiOutputTextSafetyDetectors` so the
+// Skill Policy Governor scans with the same definition.
 
 /**
  * Feed / nutrient / EC strength increases.
@@ -1096,40 +1094,10 @@ const AUTOMATIC_AQ_PATTERNS: readonly RegExp[] = [
  * contract, so these are detected at EVERY readiness level, including `strong`.
  * This mirrors the existing rule; it does not invent a new policy.
  */
-const AGGRESSIVE_NUTRIENT_PATTERNS: readonly RegExp[] = [
-  // increase/raise/bump/boost <the> feed | nutrient(s) | ec  [strength]
-  /\b(increase|raise|bump|boost)\s+(the\s+)?(feed|nutrient|nutrients|ec)\b/i,
-  /\bfeed more\b/i,
-  /\b(reduce|lower|decrease|cut|drop)\s+(the\s+)?(feed|nutrient|nutrients|ec)\b/i,
-  /\bfeed less\b/i,
-  /\bless nutrients?\b/i,
-  /\badd (more )?nutrient/i,
-  /\bflush (immediately|now|the plant)\b/i,
-  /\bdouble (the )?(feed|nutrient|ec)\b/i,
-  /\bheavy feed\b/i,
-];
-
-const AGGRESSIVE_IRRIGATION_PATTERNS: readonly RegExp[] = [
-  /\bwater (a lot |much )?more\b/,
-  /\bincrease (the )?(watering|irrigation)\b/,
-  /\breduce (the )?(watering|irrigation)\b/,
-  /\bwater less\b/,
-  /\birrigate now\b/,
-  /\bml of water\b/,
-  /\bsoak (the )?(medium|pot|plant)\b/,
-];
-
-/** Mirrors `AUTOFLOWER_NEVER_DO` (aiDoctorSafetyRules): high-stress verbs. */
-const AUTOFLOWER_STRESS_PATTERNS: readonly RegExp[] = [
-  /\bheav(y|ily) defoliat/,
-  /\bdefoliate (heavily|hard)\b/,
-  /\btop(ping)? (the|this|your)?\s?plant/,
-  /\bfim\b/,
-  /\bhigh[- ]stress training\b/,
-  /\bsevere (lst|training)\b/,
-  /\btransplant/,
-  /\baggressive flush\b/,
-];
+// AGGRESSIVE_NUTRIENT_PATTERNS, AGGRESSIVE_IRRIGATION_PATTERNS and
+// AUTOFLOWER_STRESS_PATTERNS now live in `aiOutputTextSafetyDetectors`.
+// They gained the `i` flag in the move, which is a no-op here because every
+// caller in this module already lowercases before scanning.
 
 interface VariableLex {
   key: string;
@@ -1238,32 +1206,11 @@ function affirmativeResultText(result: Phase1DiagnosisResult): string {
  * Bounded, EXPLICIT prohibition markers. Deliberately not bare "no"/"not":
  * "It is not safe. Activate the pump." must still be a device finding.
  */
-const PROHIBITION_MARKER_RE =
-  /\b(do not|don'?t|never|avoid|should not|shouldn'?t|must not|mustn'?t|refrain from)\b/i;
-
-/**
- * True when `text` contains a command matching `patterns` that is NOT governed
- * by an explicit prohibition.
- *
- * A prohibition only exempts a command it actually GOVERNS — i.e. the marker
- * appears before the match, inside the same clause. So:
- *   "Do not turn on the humidifier; keep observing."  → exempt (governed)
- *   "Do not wait; turn on the humidifier."            → FINDING (different clause)
- *   "It is not safe. Activate the pump."              → FINDING (not a marker)
- * This is why we do not simply drop every clause containing "no"/"not".
- */
-function hasUngovernedCommand(text: string, patterns: readonly RegExp[]): boolean {
-  for (const clause of text.split(/[.;,:\n]+/)) {
-    for (const re of patterns) {
-      const match = re.exec(clause);
-      if (!match) continue;
-      const preceding = clause.slice(0, match.index);
-      if (PROHIBITION_MARKER_RE.test(preceding)) continue; // prohibition governs it
-      return true;
-    }
-  }
-  return false;
-}
+// PROHIBITION_MARKER_RE and hasUngovernedCommand now live in
+// `aiOutputTextSafetyDetectors`. The shared version is HARDENED relative to
+// the one that lived here: the marker must open the clause, an inverting verb
+// ("Do not fail to turn on the fan") no longer exempts the command, and the
+// clause splitter recognizes sentence enders and dashes.
 
 function detectRecommendationConflicts(result: Phase1DiagnosisResult, findings: FindingList): void {
   const r = result as unknown as Record<string, unknown>;

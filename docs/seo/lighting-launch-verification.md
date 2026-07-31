@@ -1,14 +1,14 @@
 # Lighting launch verification
 
-**Generated:** 2026-07-31T22:23:35.7016921Z
+**Generated:** 2026-07-31T23:10:32.9711027Z
 **Production host:** https://verdantgrowdiary.com
 **Merged PR:** [#595](https://github.com/Verdant-OS/verdant-grow-diary/pull/595)
 **Merge commit:** `1223c56c9db586160a2798d017c2e78d1de1dd5a`
 **Measurement repair:** [#597](https://github.com/Verdant-OS/verdant-grow-diary/pull/597),
 commit `51363737ca97e74f861558f082b849bbbd389aa2`
 **Lovable project:** `66255e7b-892c-4be5-8686-ab1cfc3666db`
-**Production build manifest commit:** `92d8330af90d983d3bcc1ad7507028505b8b14d8`
-**Deploy branch head:** `5db5d76bf3b01b352f9953f10993a951efa1b8ce`
+**Production build manifest commit:** `0c61cc572de32a8a7af975ace14659dfb77a0a43`
+**Deploy branch head:** `0c61cc572de32a8a7af975ace14659dfb77a0a43`
 **Production deployment ID:** not exposed by the current production response
 
 ## Launch verdict
@@ -26,22 +26,27 @@ reporting and authenticated Search Console inspection are unavailable. Observed 
 payloads and public crawl checks prove implementation behavior, but they are not reporting
 baselines.
 
+The owner-confirmed GA4 production stream is `Verdant Grow Diary`, stream URL
+`https://verdantgrowdiary.com`, stream ID `15065867361`, and measurement ID `G-B3QRSZEM9S`.
+Production loads and targets that exact measurement ID. This closes stream identity only; the
+numeric property ID and authenticated reporting baseline remain unavailable to Codex.
+
 ## Publication and release evidence
 
 - `https://verdantgrowdiary.com/version.json` identifies production build commit
-  `92d8330af90d983d3bcc1ad7507028505b8b14d8`, built at
-  `2026-07-31T03:34:48.447Z`.
+  `0c61cc572de32a8a7af975ace14659dfb77a0a43`, built at
+  `2026-07-31T22:57:00.211Z`.
 - Repository ancestry proves the PR #595 merge commit and PR #597 repair commit are ancestors of
   that production manifest commit.
-- The production manifest commit is an ancestor of deploy head
-  `5db5d76bf3b01b352f9953f10993a951efa1b8ce`. The delta contains only monitoring workflow,
-  scripts, documentation, artifacts, dependency-security maintenance, and an E2E smoke correction.
-  No public app runtime, sitemap, robots, or guide content changed, so
-  `production_publish_required=false` and release content still matches production.
+- The production manifest exactly matches deploy head
+  `0c61cc572de32a8a7af975ace14659dfb77a0a43`; there is no pending public-app publish. Its only
+  delta after the prior `d9bf8e71…` production build is the generated read-only MCP Edge Function
+  bundle created after Lovable research chats. No public app runtime, sitemap, robots, or guide
+  content changed, and release content still matches production.
 - The current production response does not expose a Lovable deployment ID, so none is inferred.
 - Both release-specific URLs, titles, descriptions, H1s, Article/FAQ schema, sitemap entries, and
   cross-links are present in production.
-- The public probe at `2026-07-31T22:23:35.7016921Z` returned HTTP 200 for `version.json`, both
+- The public probe at `2026-07-31T23:10:32.9711027Z` returned HTTP 200 for `version.json`, both
   lighting guides, `sitemap.xml`, and `robots.txt`. The sitemap contains 51 URLs and each lighting
   route exactly once; robots declares the production sitemap and protects app prefixes.
 
@@ -92,10 +97,17 @@ baselines.
 | JSON-LD parse errors                 |                      0 |                      0 |
 | Fabricated review/rating fields      |                      0 |                      0 |
 
-The statically generated route document and the hydrated page both emit the same FAQ,
-BreadcrumbList, and Article objects. The duplication is redundant but the objects parse, match the
-visible content, and do not fabricate claims. Authenticated Search Console enhancement evidence is
-still required before treating rich-result eligibility as confirmed.
+On a direct load, the statically generated route document and hydrated page emit identical FAQ,
+BreadcrumbList, and Article object pairs. Those objects parse, match the visible content, and do
+not fabricate claims. Authenticated Search Console enhancement evidence is still required before
+treating rich-result eligibility as confirmed.
+
+**Verified low-urgency, non-launch-blocking P1 technical SEO defect:** after cross-guide client
+navigation, the prior route's three static objects remain while the current route's runtime objects
+mount, so the target DOM advertises conflicting page identities until a reload or back navigation
+realigns them. Raw static HTML has one of each. A focused fix must establish one owner for these
+page-level objects and add a combined static-plus-hydration navigation regression test; it must not
+change visible copy or schema claims.
 
 ## Sitemap and robots
 
@@ -161,13 +173,14 @@ masked, and no duplicate page views were observed.
 
 - **GA4 baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
 - **GSC baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
-- At `2026-07-31T22:23:35.7016921Z`, name-only GitHub secret listings found none of the expected GA4
+- **GA4 production stream identity:** PASS — owner-confirmed values match the deployed host and tag.
+- At `2026-07-31T23:10:32.9711027Z`, name-only GitHub secret listings found none of the expected GA4
   or GSC reporting secrets configured at repository scope or in the `verdant-production`,
   `verdant-sandbox`, and `copilot` environments; `.seo/gsc-token.local.json` is also absent. The
   workflow and documentation reference the expected `GSC_*` names, but no credential value was
   read or recorded in this verification.
-- The latest SEO workflow on merge `5db5d76b…`
-  ([run 30669705112](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30669705112))
+- The latest SEO workflow on deploy head `0c61cc57…`
+  ([run 30671654959](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30671654959))
   succeeded and evaluated all 51 sitemap URLs. Its GSC operation was `SKIPPED`, access was
   `BLOCKED`, execution was `SKIPPED`, OAuth was not configured, and it made 0 GSC API attempts.
   Workflow success is not an authenticated GSC baseline.
@@ -177,8 +190,9 @@ masked, and no duplicate page views were observed.
 - Machine-readable handoff: the current blocked state is recorded in
   [`artifacts/seo/seo-readiness-status.json`](../../artifacts/seo/seo-readiness-status.json).
 
-The current bounded slice is `P3 GSC_REGRESSION_NO_BASELINE_SEMANTICS`. The next slice is
-`P3 SEO_ARTIFACT_BUNDLE_PATH_DISCOVERABILITY`; neither changes the current access verdict.
+The current bounded slice is `P2 GA4_PRODUCTION_STREAM_IDENTITY`, complete at this snapshot. The
+next highest-priority unblocked slice is `P1 LIGHTING_DUPLICATE_HYDRATED_JSON_LD`. Fixing it will
+improve structured-data hygiene but will not change the current access verdict.
 
 Day 0 remains `UNSET`, and the four-week clock remains `NOT_STARTED`, until both authenticated
 baselines are recorded.

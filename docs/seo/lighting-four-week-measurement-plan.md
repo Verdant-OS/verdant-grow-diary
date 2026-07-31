@@ -44,23 +44,28 @@ recorded.
 The production and measurement-contract gates are complete:
 
 - PR #597 is merged and live in production manifest
-  `92d8330af90d983d3bcc1ad7507028505b8b14d8`.
+  `0c61cc572de32a8a7af975ace14659dfb77a0a43`.
 - Intercepted browser evidence preserves each exact lighting-guide path and page-specific title,
   reports no duplicate views, keeps protected IDs masked, and transmitted no verification events.
+- The owner-confirmed GA4 production stream is `Verdant Grow Diary`, stream URL
+  `https://verdantgrowdiary.com`, stream ID `15065867361`, and measurement ID `G-B3QRSZEM9S`;
+  production loads and targets that exact measurement ID. The property ID is still unconfirmed.
 - The current public probe returns HTTP 200 for both guides, the sitemap, robots, and version
   manifest. The 51-URL sitemap contains each lighting route exactly once, and robots protects app
   prefixes.
-- Workflow [30669705112](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30669705112)
+- Workflow [30671654959](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30671654959)
   succeeded across all 51 URLs, but its GSC operation was `SKIPPED`, access was `BLOCKED`,
   execution was `SKIPPED`, OAuth was not configured, and it made 0 API attempts.
-- Deploy head `5db5d76bf3b01b352f9953f10993a951efa1b8ce` differs from the production manifest only by
-  monitoring workflow, scripts, documentation, artifacts, dependency-security maintenance, and
-  an E2E smoke correction. No public app runtime, sitemap, robots, or guide content changed, so no
-  production publish is required for that delta and release content match remains `PASS`.
+- Deploy head `0c61cc572de32a8a7af975ace14659dfb77a0a43` exactly matches the production manifest. There is
+  no pending public-app publish, and release content match remains `PASS`.
+- Direct-load indexability remains `PASS`, but cross-guide client navigation leaves conflicting
+  prior-route/current-route page-level JSON-LD in the hydrated DOM. This is the next P1 technical
+  SEO repair and is not treated as an authenticated reporting baseline or a reason to backdate Day 0.
 
 Two owner access gates remain:
 
-1. Provide read-only authenticated reporting access to the existing Verdant GA4 property.
+1. Confirm the existing Verdant GA4 property identity and provide read-only authenticated
+   reporting access. The production stream identity itself is complete.
 2. Configure the existing owner-controlled, read-only Search Console OAuth workflow, or provide
    another authorized authenticated Search Console session.
 

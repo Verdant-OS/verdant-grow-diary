@@ -339,6 +339,51 @@ describe("promotion — a transition has two ends", () => {
   });
 });
 
+describe("promotion — a target is judged by its own gate table", () => {
+  // The evidence-only rungs record PARTIAL guarantees. Blocking schema_valid
+  // on a behavioural expectation miss denied a true statement about outputs
+  // that really were schema-compliant. These rungs authorize no manifest
+  // lifecycle, which is why they can be honest about what they do not cover.
+  it("allows an evidence-only rung whose own gate is satisfied", () => {
+    const d = decide({
+      currentState: "draft",
+      requestedState: "schema_valid",
+      report: report([caseResult({ status: "fail", failureClass: "expectation_mismatch" })]),
+      attestations: [],
+      rollbackTarget: null,
+    });
+    expect(d.blockingReasons).not.toContain("evaluation_not_passing");
+    expect(d.authorizedManifestLifecycle).toBeNull();
+  });
+
+  it("still blocks a grower-facing rung on the same failing report", () => {
+    // Guards the guard: the cumulative gate tables above must not loosen.
+    const d = decide({
+      report: report([caseResult({ status: "fail", failureClass: "expectation_mismatch" })]),
+    });
+    expect(d.eligible).toBe(false);
+    expect(d.blockingReasons).toContain("evaluation_not_passing");
+  });
+
+  it("still blocks static_safety_passed on a hard safety failure", () => {
+    const d = decide({
+      currentState: "draft",
+      requestedState: "static_safety_passed",
+      report: report([
+        caseResult({
+          status: "safety_fail",
+          failureClass: "safety_policy_failure",
+          safetyFailures: ["evidence_cited_outside_selection"],
+          safetyCritical: true,
+        }),
+      ]),
+      attestations: [],
+      rollbackTarget: null,
+    });
+    expect(d.blockingReasons).toContain("hard_safety_failure");
+  });
+});
+
 describe("promotion — refusals", () => {
   it("never promotes a harness self-test", () => {
     const d = decide({

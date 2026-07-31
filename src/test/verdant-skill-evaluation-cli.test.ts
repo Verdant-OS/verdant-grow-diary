@@ -293,6 +293,21 @@ describe("cli — untrusted fixture input", () => {
     expect(runWithMutated(() => {}).code).not.toBe(EXIT_USAGE_OR_IO);
   });
 
+  // The exemption is exactly the fields the CONTRACT types as uuid, which is
+  // runId alone. The wider allowlist named fields the run result does not own,
+  // and because the run-result object is non-strict an extra plantId still
+  // parsed — so redacting that key deleted a real grower id before inspection.
+  it("does not exempt an id-shaped key the run-result contract does not own", () => {
+    for (const field of ["plantId", "entityId", "growId"]) {
+      const r = runWithMutated((record) => {
+        (record.execution as { output: Record<string, unknown> }).output[field] =
+          "7f3d9a2b-1c4e-4f8a-9b2d-5e6f7a8b9c0d";
+      });
+      expect(r.code, field).toBe(EXIT_USAGE_OR_IO);
+      expect(r.lines.join(" "), field).toContain("real_uuid");
+    }
+  });
+
   it("still accepts a well-formed envelope from the same path", () => {
     // Guards the guard: a check that rejected everything would pass the two
     // tests above while breaking the harness.

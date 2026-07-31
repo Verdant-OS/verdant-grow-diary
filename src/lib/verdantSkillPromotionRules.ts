@@ -354,8 +354,26 @@ export function evaluateSkillPromotionEligibility(
       block("self_test_target_is_never_promotable");
     }
 
-    if (report.overallStatus !== "pass") block("evaluation_not_passing");
-    if (report.hardSafetyStatus !== "clean") block("hard_safety_failure");
+    // Judged by THIS target's gate table, not by every check unconditionally.
+    //
+    // The evidence-only rungs exist to record PARTIAL guarantees:
+    // `GATES_BY_TARGET.schema_valid` asks for schema compliance and nothing
+    // else, so blocking it on a behavioural expectation miss denied a true
+    // statement about outputs that really were schema-compliant. These rungs
+    // map to a null manifest lifecycle, so recording one authorizes no
+    // exposure — which is exactly why they can be honest about what they do
+    // and do not cover. Every rung that ships to a grower inherits both gates
+    // cumulatively, so nothing above loosens.
+    if (requiredGates.includes("green_evaluation") && report.overallStatus !== "pass") {
+      block("evaluation_not_passing");
+    }
+    if (
+      (requiredGates.includes("no_hard_safety_failures") ||
+        requiredGates.includes("static_safety_passed")) &&
+      report.hardSafetyStatus !== "clean"
+    ) {
+      block("hard_safety_failure");
+    }
     if (!input.reportBindingValid) block("report_binding_invalid");
     if ((input.artifactDisclosureCategories ?? []).length > 0) {
       block("artifact_disclosure_scan_failed");

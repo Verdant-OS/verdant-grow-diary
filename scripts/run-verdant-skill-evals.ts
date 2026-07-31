@@ -189,14 +189,26 @@ function loadFixtures(
     // rationale, a follow-up note or an error detail was accepted exactly like
     // the legitimate runId. Redacting the fields the contract types as uuids
     // lets everything else be judged by the strict list.
-    const CONTRACT_OWNED_ID_FIELDS = new Set(["runId", "plantId", "entityId", "entityRef"]);
+    // EXACTLY the fields `skillRunResultSchema` types as a uuid, which is
+    // `runId` and nothing else. The wider allowlist this replaces — plantId,
+    // entityId, entityRef — named fields the RUN RESULT does not own; they
+    // belong to other schemas. Because the run-result object is non-strict, an
+    // output carrying an extra `plantId` still parsed, and redacting that key
+    // deleted a real grower identifier before it could be inspected. An
+    // exemption list must be derived from the contract, not from field names
+    // that sound like identifiers.
+    //
+    // Fourth iteration on this one scope: file-wide, then output-wide, then
+    // id-like-key-wide, now contract-defined. Each earlier version was the
+    // containing thing rather than the specific fields.
+    const CONTRACT_OWNED_UUID_FIELDS = new Set(["runId"]);
     const redactContractIds = (value: unknown): unknown => {
       if (Array.isArray(value)) return value.map(redactContractIds);
       if (value === null || typeof value !== "object") return value;
       return Object.fromEntries(
         Object.entries(value as Record<string, unknown>).map(([k, v]) => [
           k,
-          CONTRACT_OWNED_ID_FIELDS.has(k) ? null : redactContractIds(v),
+          CONTRACT_OWNED_UUID_FIELDS.has(k) ? null : redactContractIds(v),
         ]),
       );
     };

@@ -64,8 +64,13 @@ for (const dir of dirs) {
   const evalJsonPath = join(dir, "evaluation.json");
   const evalMdPath = join(dir, "evaluation.md");
   const promoJsonPath = join(dir, "promotion-decision.json");
+  // The harness writes FOUR artifacts and the required list named three, so a
+  // missing promotion markdown produced no violation and the later disclosure
+  // loop simply skipped the absent file — CI uploading an incomplete set from
+  // a validator that exited 0.
+  const promoMdPath = join(dir, "promotion-decision.md");
 
-  for (const required of [evalJsonPath, evalMdPath, promoJsonPath]) {
+  for (const required of [evalJsonPath, evalMdPath, promoJsonPath, promoMdPath]) {
     if (!existsSync(required)) note("missing_artifact", required);
   }
   // A leftover temp file means a write was interrupted; the sibling artifact
@@ -187,7 +192,7 @@ for (const dir of dirs) {
     }
   }
 
-  for (const path of [evalJsonPath, evalMdPath, promoJsonPath]) {
+  for (const path of [evalJsonPath, evalMdPath, promoJsonPath, promoMdPath]) {
     if (!existsSync(path)) continue;
     const text = readFileSync(path, "utf8");
     for (const { code, re } of DISCLOSURE_PATTERNS) {

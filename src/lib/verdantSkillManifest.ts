@@ -352,9 +352,13 @@ export const verdantSkillManifestSchema = z
       }
     }
     // A skill cannot depend on sensor data it is not permitted to read.
+    // Declaring sensor_readings as required/optional context is also a
+    // sensor dependency — the evaluator treats it as one.
     if (
       (m.operatingEnvelope.requiredSensorMetrics.length > 0 ||
-        m.operatingEnvelope.minUsableSensorReadings > 0) &&
+        m.operatingEnvelope.minUsableSensorReadings > 0 ||
+        m.requiredContext.includes("sensor_readings") ||
+        m.optionalContext.includes("sensor_readings")) &&
       !m.permissions.includes("read_sensor_context")
     ) {
       ctx.addIssue({

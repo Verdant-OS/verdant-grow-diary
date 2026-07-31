@@ -154,16 +154,18 @@ export function evaluateSkillApplicability(
   if (retired) reasons.add("skill_retired");
 
   // 2. Declared exclusions the plant actually matches.
-  if (medium !== null && manifest.excludedConditions.media.includes(medium)) {
+  // An ABSENT value is the "unknown" case: a manifest that excludes
+  // `unknown` is saying "refuse when nobody recorded it", so a null
+  // must match that exclusion just as the literal token does.
+  const mediumForExclusion = medium ?? "unknown";
+  const irrigationForExclusion = irrigation ?? "unknown";
+  if (manifest.excludedConditions.media.includes(mediumForExclusion)) {
     reasons.add("medium_excluded");
-    excluded.push(`medium:${medium}`);
+    excluded.push(`medium:${mediumForExclusion}`);
   }
-  if (
-    irrigation !== null &&
-    manifest.excludedConditions.irrigationArchitectures.includes(irrigation)
-  ) {
+  if (manifest.excludedConditions.irrigationArchitectures.includes(irrigationForExclusion)) {
     reasons.add("irrigation_excluded");
-    excluded.push(`irrigation_architecture:${irrigation}`);
+    excluded.push(`irrigation_architecture:${irrigationForExclusion}`);
   }
   if (
     growSetting !== "" &&

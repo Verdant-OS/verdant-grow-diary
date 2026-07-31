@@ -291,6 +291,52 @@ describe("manifest contract", () => {
     expect(r.ok).toBe(false);
   });
 
+  it("requires sensor-read permission for context-declared sensor use", () => {
+    const contextOnly = {
+      operatingEnvelope: {
+        growSettings: [],
+        media: [],
+        irrigationArchitectures: [],
+        requiresKnownIrrigationArchitecture: false,
+        requiresKnownAutoflowerStatus: false,
+        minUsableSensorReadings: 0,
+        requiredSensorMetrics: [],
+      },
+      permissions: ["read_plant_history"],
+      excludedConditions: { media: [], irrigationArchitectures: [], growSettings: [] },
+    };
+    // Declaring sensor_readings as context is a sensor dependency too.
+    expect(
+      parseVerdantSkillManifest(
+        makeManifest({
+          ...contextOnly,
+          requiredContext: ["sensor_readings"],
+          optionalContext: [],
+        }),
+      ).ok,
+    ).toBe(false);
+    expect(
+      parseVerdantSkillManifest(
+        makeManifest({
+          ...contextOnly,
+          requiredContext: [],
+          optionalContext: ["sensor_readings"],
+        }),
+      ).ok,
+    ).toBe(false);
+    // With the grant present it parses.
+    expect(
+      parseVerdantSkillManifest(
+        makeManifest({
+          ...contextOnly,
+          permissions: ["read_plant_history", "read_sensor_context"],
+          requiredContext: ["sensor_readings"],
+          optionalContext: [],
+        }),
+      ).ok,
+    ).toBe(true);
+  });
+
   it("rejects `unknown` in support lists but allows it as an exclusion", () => {
     const supported = parseVerdantSkillManifest(
       makeManifest({
@@ -695,6 +741,39 @@ describe("applicability — the spec's coco dryback cases", () => {
     expect(r.reasons).toContain("required_sensor_metric_conflicted");
     expect(r.provenanceBlockers).toContain("conflicted_soil_moisture_pct");
     expect(skillMayRun(r)).toBe(false);
+  });
+
+  it("matches an ABSENT medium against an `unknown` exclusion", () => {
+    // "Refuse when nobody recorded it" must fire for a missing value,
+    // not only for the literal token.
+    const strictSkill = manifest({
+      operatingEnvelope: {
+        growSettings: [],
+        media: [],
+        irrigationArchitectures: [],
+        requiresKnownIrrigationArchitecture: false,
+        requiresKnownAutoflowerStatus: false,
+        minUsableSensorReadings: 0,
+        requiredSensorMetrics: [],
+      },
+      permissions: ["read_plant_history"],
+      requiredContext: [],
+      optionalContext: [],
+      excludedConditions: {
+        media: ["unknown"],
+        irrigationArchitectures: [],
+        growSettings: [],
+      },
+    });
+    const r = evaluateSkillApplicability({
+      manifest: strictSkill,
+      compilation: compileContext({
+        plant: { id: PLANT, grow_id: GROW, tent_id: TENT, stage: "flower" },
+      }),
+    });
+    expect(r.verdict).toBe("not_applicable");
+    expect(r.reasons).toContain("medium_excluded");
+    expect(r.excludedConditions).toContain("medium:unknown");
   });
 
   it("does not downgrade a non-sensor skill for unrelated stale telemetry", () => {

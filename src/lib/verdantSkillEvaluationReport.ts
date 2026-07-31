@@ -186,7 +186,20 @@ export function buildEvaluationReport(input: BuildReportInput): SkillEvaluationR
         ? null
         : computeBoundDigest(
             "policy_decision",
-            { policyVersion: first.bindings?.policyVersion ?? "" },
+            // The version AND the decision it labels, together.
+            //
+            // Hashing the free-standing label meant a decision produced by an
+            // old governor, relabelled with the current policyVersion, still
+            // bound cleanly — case verification checks the decision object and
+            // this checked only the string, so neither noticed the mismatch. A
+            // later caller supplying the matching current-policy digest then
+            // satisfied `current_bindings`, and stale policy behaviour could
+            // authorize a release. A version label is a claim ABOUT an
+            // artifact; binding it apart from that artifact binds nothing.
+            {
+              policyVersion: first.bindings?.policyVersion ?? "",
+              policyDecision: first.bindings?.policy?.value ?? "",
+            },
             input.digest,
           ),
     evidenceRegistryBinding: {

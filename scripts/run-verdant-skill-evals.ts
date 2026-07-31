@@ -99,7 +99,12 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     return i >= 0 && i + 1 < argv.length ? argv[i + 1] : null;
   };
   const repeatRaw = value("--repeat");
-  const parsedRepeat = repeatRaw === null ? 1 : Number.parseInt(repeatRaw, 10);
+  // The WHOLE token, not a numeric prefix. `Number.parseInt` reads "2.9" and
+  // "2junk" as 2, so the harness silently ran and BOUND two repetitions for an
+  // argument it should have refused — and this flag controls the repeatability
+  // measurement, so a silently-reinterpreted value misstates what was measured.
+  const parsedRepeat =
+    repeatRaw === null ? 1 : /^\d+$/.test(repeatRaw.trim()) ? Number(repeatRaw.trim()) : Number.NaN;
   return {
     skillId: value("--skill-id"),
     skillVersion: value("--skill-version"),

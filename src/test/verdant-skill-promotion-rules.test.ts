@@ -36,7 +36,17 @@ const POLICY = { decisionVersion: "1.0.0" };
 const CORPUS = { registryVersion: "1.0.0" };
 
 const MANIFEST_DIGEST = computeBoundDigest("skill_manifest", MANIFEST, D).value;
-const POLICY_DIGEST = computeBoundDigest("policy_decision", { policyVersion: "1.0.0" }, D).value;
+// The report binds the version TOGETHER with the decision it labels, so a
+// stale decision relabelled with a current version no longer verifies. The
+// expected "current" digest has to be built the same way.
+const POLICY_DIGEST = computeBoundDigest(
+  "policy_decision",
+  {
+    policyVersion: "1.0.0",
+    policyDecision: computeBoundDigest("policy_decision", POLICY, D).value,
+  },
+  D,
+).value;
 const CORPUS_DIGEST = computeBoundDigest("evidence_corpus", CORPUS, D).value;
 
 function caseResult(overrides: Partial<SkillEvaluationCaseResult> = {}): SkillEvaluationCaseResult {

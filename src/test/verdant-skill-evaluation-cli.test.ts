@@ -48,6 +48,24 @@ describe("cli — argument contract", () => {
     expect(main(["--self-test", "--now", NOW, "--repeat", "many"]).code).toBe(EXIT_USAGE_OR_IO);
   });
 
+  it("rejects a numeric PREFIX, not just a wholly non-numeric value", () => {
+    // parseInt reads "2.9" and "2junk" as 2, so the harness silently ran AND
+    // BOUND two repetitions for an argument it should have refused — and this
+    // flag controls the repeatability measurement, so a silently
+    // reinterpreted value misstates what was measured.
+    for (const bad of ["2.9", "2junk", " 2 x", "0x3", "1e2", "-1", "0", ""]) {
+      expect(parseCliArgs(["--repeat", bad]).repeat, bad).toBeNaN();
+    }
+  });
+
+  it("still accepts a plain positive integer", () => {
+    for (const good of ["1", "3", "16"]) {
+      expect(parseCliArgs(["--repeat", good]).repeat, good).toBe(Number(good));
+    }
+    // Absent means one run.
+    expect(parseCliArgs([]).repeat).toBe(1);
+  });
+
   it("requires a skill identity when not self-testing", () => {
     expect(main(["--now", NOW]).code).toBe(EXIT_USAGE_OR_IO);
   });

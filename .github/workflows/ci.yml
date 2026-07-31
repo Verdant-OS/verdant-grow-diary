@@ -103,8 +103,12 @@ jobs:
       - name: Validate generated evaluation artifacts
         run: bun scripts/validate-skill-eval-artifacts.mjs
 
+      # NOT `if: always()`. The validator's entire job is deciding whether this
+      # set is safe to upload, and one of its violations is
+      # `artifact_disclosure` — so uploading on failure publishes exactly the
+      # secret-shaped content the check exists to catch. A failed run keeps its
+      # logs; it does not get to ship its artifacts.
       - name: Upload skill evaluation artifacts
-        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: skill-evaluation-artifacts

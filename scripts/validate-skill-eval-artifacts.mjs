@@ -126,6 +126,20 @@ for (const dir of dirs) {
     ) {
       note("markdown_pass_fail_disagrees_with_json", evalMdPath);
     }
+    // The VERDICT fields too, not only the counts. A `--json-only` rerun into
+    // an existing directory deliberately leaves the previous evaluation.md in
+    // place, so a report can go from an ordinary failure to a safety failure
+    // or a blocked state while keeping identical case counts — and both checks
+    // above still pass while the Markdown states the opposite verdict.
+    if (!md.includes(`- Overall: **${String(report.overallStatus).toUpperCase()}**`)) {
+      note("markdown_overall_disagrees_with_json", evalMdPath);
+    }
+    if (!md.includes(`- Hard safety: **${report.hardSafetyStatus}**`)) {
+      note("markdown_hard_safety_disagrees_with_json", evalMdPath);
+    }
+    if (!md.includes(`- Safety-critical failures: ${report.metrics?.safetyCriticalFailures}`)) {
+      note("markdown_safety_failures_disagree_with_json", evalMdPath);
+    }
   }
 
   // The promotion decision, PARSED — not merely scanned as text.

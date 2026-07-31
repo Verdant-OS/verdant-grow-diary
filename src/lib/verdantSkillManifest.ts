@@ -367,6 +367,17 @@ export const verdantSkillManifestSchema = z
         message: "sensor_dependency_requires_read_sensor_context",
       });
     }
+    // Declaring photo context is a photo dependency: same rule.
+    if (
+      (m.requiredContext.includes("photos") || m.optionalContext.includes("photos")) &&
+      !m.permissions.includes("read_photo_metadata")
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["permissions"],
+        message: "photo_dependency_requires_read_photo_metadata",
+      });
+    }
     // "unknown" is meaningful as an EXCLUSION but unsatisfiable as
     // support: the evaluator fail-closes unknown values, so a manifest
     // claiming to support "unknown" could never be applicable for it.

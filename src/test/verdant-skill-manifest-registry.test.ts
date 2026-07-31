@@ -66,7 +66,12 @@ function makeManifest(overrides: Record<string, unknown> = {}): unknown {
     },
     evidencePolicy: "context_only",
     riskClass: "medium",
-    permissions: ["read_plant_history", "read_sensor_context", "propose_manual_action"],
+    permissions: [
+      "read_plant_history",
+      "read_sensor_context",
+      "read_photo_metadata",
+      "propose_manual_action",
+    ],
     deterministicCalculators: ["dryback_percent"],
     outputContractVersion: SKILL_CONTRACT_VERSION,
     followUpContract: { requiresFollowUp: true, defaultIntervalHours: 24 },
@@ -291,6 +296,40 @@ describe("manifest contract", () => {
     expect(r.ok).toBe(false);
   });
 
+  it("requires photo-read permission for photo context", () => {
+    const base = {
+      operatingEnvelope: {
+        growSettings: [],
+        media: [],
+        irrigationArchitectures: [],
+        requiresKnownIrrigationArchitecture: false,
+        requiresKnownAutoflowerStatus: false,
+        minUsableSensorReadings: 0,
+        requiredSensorMetrics: [],
+      },
+      permissions: ["read_plant_history"],
+      requiredContext: [],
+      excludedConditions: { media: [], irrigationArchitectures: [], growSettings: [] },
+    };
+    expect(
+      parseVerdantSkillManifest(makeManifest({ ...base, optionalContext: ["photos"] })).ok,
+    ).toBe(false);
+    expect(
+      parseVerdantSkillManifest(
+        makeManifest({ ...base, requiredContext: ["photos"], optionalContext: [] }),
+      ).ok,
+    ).toBe(false);
+    expect(
+      parseVerdantSkillManifest(
+        makeManifest({
+          ...base,
+          permissions: ["read_plant_history", "read_photo_metadata"],
+          optionalContext: ["photos"],
+        }),
+      ).ok,
+    ).toBe(true);
+  });
+
   it("requires sensor-read permission for context-declared sensor use", () => {
     const contextOnly = {
       operatingEnvelope: {
@@ -351,6 +390,7 @@ describe("manifest contract", () => {
         },
         permissions: ["read_plant_history"],
         requiredContext: [],
+        optionalContext: [],
         excludedConditions: { media: [], irrigationArchitectures: [], growSettings: [] },
       }),
     );
@@ -369,6 +409,7 @@ describe("manifest contract", () => {
         },
         permissions: ["read_plant_history"],
         requiredContext: [],
+        optionalContext: [],
         excludedConditions: {
           media: ["unknown"],
           irrigationArchitectures: ["unknown"],
@@ -741,6 +782,40 @@ describe("applicability — the spec's coco dryback cases", () => {
     expect(r.reasons).toContain("required_sensor_metric_conflicted");
     expect(r.provenanceBlockers).toContain("conflicted_soil_moisture_pct");
     expect(skillMayRun(r)).toBe(false);
+  });
+
+  it("treats a semantically unknown required value as missing, not present", () => {
+    // The compiler's gap flag only asks "did anyone type something".
+    // A required identity slot with an unrecognized value must still
+    // count as missing, or the skill runs without the context it needs.
+    for (const medium of ["moon dust", "unknown"]) {
+      const r = evaluateSkillApplicability({
+        manifest: manifest({
+          operatingEnvelope: {
+            growSettings: [],
+            media: [],
+            irrigationArchitectures: [],
+            requiresKnownIrrigationArchitecture: false,
+            requiresKnownAutoflowerStatus: false,
+            minUsableSensorReadings: 0,
+            requiredSensorMetrics: [],
+          },
+          permissions: ["read_plant_history"],
+          requiredContext: ["medium"],
+          optionalContext: [],
+          excludedConditions: {
+            media: [],
+            irrigationArchitectures: [],
+            growSettings: [],
+          },
+        }),
+        compilation: compileContext({
+          plant: { id: PLANT, grow_id: GROW, tent_id: TENT, stage: "flower", medium },
+        }),
+      });
+      expect(r.verdict).toBe("insufficient_context");
+      expect(r.missingRequiredContext).toContain("medium");
+    }
   });
 
   it("matches an ABSENT medium against an `unknown` exclusion", () => {

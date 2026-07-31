@@ -27,6 +27,7 @@ import {
   type PlantContextSlot,
 } from "@/lib/plantContextBundleCompiler";
 import {
+  normalizeEnvelopeToken,
   normalizeIrrigationArchitecture,
   normalizeMedium,
   type SkillIrrigationArchitecture,
@@ -116,8 +117,32 @@ export interface EvaluateSkillApplicabilityInput {
   growSetting?: string | null;
 }
 
+/**
+ * Is a required slot genuinely present?
+ *
+ * The compiler's gap flags answer "did anyone type something here",
+ * which is not the same question for identity axes that have a
+ * controlled vocabulary. `medium: "moon dust"` is a nonempty string but
+ * resolves to no known medium, and an unrecognized irrigation token
+ * resolves to null — treating either as present would let a skill run
+ * (and propose a manual action) without the context it declared it
+ * needs. So those slots are checked SEMANTICALLY.
+ */
 function slotIsPresent(compilation: PlantContextCompilation, slot: PlantContextSlot): boolean {
-  return !compilation.missingInformation.includes(slot);
+  if (compilation.missingInformation.includes(slot)) return false;
+  if (slot === "medium") {
+    const m = normalizeMedium(compilation.bundle.medium);
+    return m !== null && m !== "unknown";
+  }
+  if (slot === "irrigation_architecture") {
+    const a = normalizeIrrigationArchitecture(compilation.irrigationArchitecture);
+    return a !== null && a !== "unknown";
+  }
+  if (slot === "plant_type") {
+    const t = normalizeEnvelopeToken(compilation.plantType);
+    return t !== null && t !== "unknown";
+  }
+  return true;
 }
 
 /**

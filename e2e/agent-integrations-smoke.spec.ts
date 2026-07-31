@@ -125,7 +125,7 @@ test.describe("Agent Integrations settings smoke (mocked, 1280x800)", () => {
     await mockSignedInSupabase(page);
   });
 
-  test("page loads with fingerprint, tools, checklist, and safe verify default", async ({
+  test("page loads with fingerprint, tools, checklist, and safe browser-connect default", async ({
     page,
   }) => {
     await page.goto("/settings/agent-integrations");
@@ -159,17 +159,16 @@ test.describe("Agent Integrations settings smoke (mocked, 1280x800)", () => {
     await expect(manifestLink).toHaveAttribute("target", "_blank");
     await expect(manifestLink).toHaveAttribute("rel", /noopener/);
 
-    // Verify tool access section: no harness exists in this build, so the
-    // panel declares harness_unavailable statically and renders an
-    // "Unavailable in this build" badge in place of a Verify button —
-    // no clickable dead end, and never authorized without a harness.
-    await expect(page.getByTestId("verify-tool-access")).toBeVisible();
-    const panel = page.getByTestId("verify-tool-access-result");
-    await expect(panel).toHaveAttribute("data-status", "harness_unavailable");
-    await expect(page.getByTestId("verify-tool-checked")).toContainText("list_grows");
-    await expect(page.getByTestId("verify-harness-unavailable-badge")).toBeVisible();
-    await expect(page.getByTestId("verify-tool-access-button")).toHaveCount(0);
-    await expect(page.getByTestId("verify-next-step")).toContainText(/configured local harness/i);
+    // BrowserConnectPanel owns production OAuth verification. The disconnected
+    // default is honest and actionable, while the auxiliary local-harness
+    // panel stays absent unless a usable test/dev harness is injected.
+    await expect(page.getByTestId("browser-connect-panel")).toBeVisible();
+    await expect(page.getByTestId("browser-connect-result")).toHaveAttribute(
+      "data-status",
+      "idle_disconnected",
+    );
+    await expect(page.getByTestId("verify-tool-access")).toHaveCount(0);
+    await expect(page.getByText(/Unavailable in this build/i)).toHaveCount(0);
 
     // Manifest summary modal opens + shows safe projection.
     await page.getByTestId("open-manifest-summary-modal").click();

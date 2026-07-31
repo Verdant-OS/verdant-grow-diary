@@ -459,13 +459,20 @@ export function buildCompactTimeline(
  * events count — an absent action is never inferred as "not done".
  */
 export function summarizeRecentActions(
-  growEvents: readonly (GrowEventRowLike & { id?: string | null })[],
+  growEvents: readonly (GrowEventRowLike & {
+    id?: string | null;
+    is_deleted?: boolean | null;
+  })[],
   options: { nowMs: number; windowDays: number; immediateHours: number },
 ): RecentActionSummary[] {
   const cutoff = options.nowMs - options.windowDays * DAY_MS;
   const immediateCutoff = options.nowMs - options.immediateHours * HOUR_MS;
   const rows: Array<{ ms: number; id: string; item: RecentActionSummary }> = [];
   for (const row of growEvents) {
+    // Soft-deleted events are not grower history. `mergeTimelineSources`
+    // already drops them for the timeline; do the same here so a
+    // retracted action cannot be summarized as something that happened.
+    if (row?.is_deleted === true) continue;
     const occurredAt = canonicalIso(row?.occurred_at);
     if (occurredAt === null) continue;
     const ms = Date.parse(occurredAt);
@@ -651,7 +658,13 @@ export function summarizeSensorWindow(
   const newestPerDevice = new Map<string, SensorTruthEvaluation>();
   scopedEvaluations.forEach((e, i) => {
     const metric = e.metric as SensorGateMetric;
-    const deviceKey = `${metric}|${e.plantId ?? ""}|${e.deviceId !== null ? `d:${e.deviceId}` : `anon:${i}`}`;
+    // Plant scope belongs in the key ONLY for root-zone metrics. An
+    // atmospheric device is tent-scoped, so including plantId would
+    // split one device's successive samples into separate "devices"
+    // whenever the rows carry different plant ids — turning ordinary
+    // temporal change into a false conflict.
+    const scopeKey = ROOT_ZONE_METRICS.has(metric) ? (e.plantId ?? "") : "";
+    const deviceKey = `${metric}|${scopeKey}|${e.deviceId !== null ? `d:${e.deviceId}` : `anon:${i}`}`;
     const prev = newestPerDevice.get(deviceKey);
     if (prev === undefined || isPreferredReading(e, prev)) {
       newestPerDevice.set(deviceKey, e);

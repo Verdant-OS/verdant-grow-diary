@@ -182,6 +182,25 @@ describe("empty and partial histories", () => {
     expect(weird.missingInformation).toContain("stage");
   });
 
+  it("excludes soft-deleted events from recent actions", () => {
+    const c = compile({
+      growEvents: [
+        {
+          id: "ge-live",
+          occurred_at: hoursAgo(3),
+          event_type: "watering",
+        },
+        {
+          id: "ge-gone",
+          occurred_at: hoursAgo(2),
+          event_type: "feeding",
+          is_deleted: true,
+        },
+      ],
+    });
+    expect(c.recentActions.map((a) => a.eventType)).toEqual(["watering"]);
+  });
+
   it("never infers grower actions that were not recorded", () => {
     const c = compile({ growEvents: [] });
     expect(c.recentActions).toEqual([]);
@@ -555,6 +574,38 @@ describe("snapshot coherence, continued", () => {
     const temp = c.sensorSummary.metrics.find((m) => m.metric === "temperature_c");
     expect(temp?.latestValue).toBe(25);
     expect(temp?.usableCount).toBe(1);
+  });
+
+  it("keeps one atmospheric device's samples in a single group", () => {
+    // Same tent sensor, successive samples, rows tagged with different
+    // plant ids: an atmospheric device is tent-scoped, so this is one
+    // device's temporal change — not two sensors disagreeing.
+    const c = compile({
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 21,
+          unit: "°C",
+          captured_at: hoursAgo(0.2),
+          source: "live",
+          device_id: "tent-sensor",
+          plant_id: PLANT,
+        },
+        {
+          metric: "temperature_c",
+          value: 27,
+          unit: "°C",
+          captured_at: hoursAgo(0.05),
+          source: "live",
+          device_id: "tent-sensor",
+          plant_id: "other-plant",
+        },
+      ],
+    });
+    expect(c.sensorSummary.conflicts).toEqual([]);
+    const temp = c.sensorSummary.metrics.find((m) => m.metric === "temperature_c");
+    expect(temp?.usableCount).toBe(1);
+    expect(temp?.latestValue).toBe(27);
   });
 
   it("does not resurrect an older healthy sample behind a bad newest one", () => {

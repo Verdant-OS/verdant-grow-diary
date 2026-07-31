@@ -160,10 +160,11 @@ masked, and no duplicate page views were observed.
 
 - **GA4 baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
 - **GSC baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
-- A GitHub configuration audit found none of the expected GA4 or GSC reporting secrets configured
-  at repository or environment scope, and `.seo/gsc-token.local.json` is absent. The workflow and
-  documentation reference the expected `GSC_*` names, but no credential value is recorded in this
-  verification.
+- At `2026-07-31T19:18:39.6233761Z`, name-only GitHub secret listings found none of the expected GA4
+  or GSC reporting secrets configured at repository scope or in the `verdant-production`,
+  `verdant-sandbox`, and `copilot` environments; `.seo/gsc-token.local.json` is also absent. The
+  workflow and documentation reference the expected `GSC_*` names, but no credential value was
+  read or recorded in this verification.
 - The latest SEO workflow on merge `9d3a56e…`
   ([run 30658003581](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30658003581))
   succeeded and evaluated all 51 sitemap URLs. Its GSC operation was `SKIPPED`, access was

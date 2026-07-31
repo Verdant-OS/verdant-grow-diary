@@ -208,6 +208,14 @@ describe("SEO readiness status artifact", () => {
 
   it("contains no credentials, private paths, or fake zero metrics", () => {
     expect(READINESS.reporting_access_configuration).toEqual({
+      observed_at: "2026-07-31T19:18:39.6233761Z",
+      audit_method: "GITHUB_SECRET_NAME_LISTING",
+      configured_scopes_checked: [
+        "repository",
+        "environment:verdant-production",
+        "environment:verdant-sandbox",
+        "environment:copilot",
+      ],
       configured_ga4_repository_or_environment_secret_names_found: [],
       configured_gsc_repository_or_environment_secret_names_found: [],
       expected_gsc_names_referenced_by_workflow: [

@@ -78,6 +78,8 @@ describe("lighting analytics owner setup checklist", () => {
     expect(CHECKLIST).toContain("`BLOCKED_BY_ACCESS`");
     expect(CHECKLIST).toMatch(/Exact owner action\s+\| Codex can verify afterward/);
     expect(CHECKLIST).toContain("Tell Codex only that access is ready");
+    expect(CHECKLIST).toMatch(/Production hostname and deployed tag\s+\| `BLOCKED_BY_ACCESS`/);
+    expect(CHECKLIST).toMatch(/Production hostname\s+\| `BLOCKED_BY_ACCESS`/);
   });
 
   it("forbids secret sharing and contains no credential-shaped value", () => {

@@ -1,0 +1,1394 @@
+{
+  "$comment": "Synthetic, deterministic Plant Event Review v1 fixtures. No real grow, person, device, note text, photo URL, raw payload, credential, write request, Action Queue shape, or hardware command is present.",
+  "schemaVersion": "verdant-skill-golden-fixture.v1",
+  "skillId": "plant-event-review",
+  "skillVersion": "1.0.0",
+  "fixtureSet": "plant-event-review-golden-cases.v1",
+  "executionAt": "2026-07-30T12:00:00.000Z",
+  "cases": [
+    {
+      "id": "valid-observation-fresh-manual",
+      "description": "A normalized observation with a matching, fresh manual snapshot and explicit evidence reference is reviewable at the v1 medium-confidence ceiling.",
+      "input": {
+        "event": {
+          "id": "event-001",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T11:45:00.000Z",
+          "eventType": "observation",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": false,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": [
+          {
+            "scope": {
+              "tentId": "tent-001",
+              "plantId": "plant-001"
+            },
+            "snapshot": {
+              "source": "manual",
+              "sourceDetail": "manual_snapshot",
+              "capturedAt": "2026-07-30T11:45:00.000Z",
+              "confidence": 0.8,
+              "invalid": false,
+              "metrics": [
+                {
+                  "key": "temp",
+                  "value": 24.5,
+                  "unit": "°C",
+                  "kind": "environment"
+                },
+                {
+                  "key": "rh",
+                  "value": 58,
+                  "unit": "%",
+                  "kind": "environment"
+                }
+              ]
+            },
+            "explicitRef": {
+              "id": "sensor-reading-001",
+              "captured_at": "2026-07-30T11:45:00.000Z",
+              "source": "manual",
+              "metric": "temp"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "applicabilityStatus": "applicable",
+        "handlerStatus": "completed",
+        "outcome": {
+          "status": "reviewed",
+          "category": "notes",
+          "confidence": "medium",
+          "findingCodes": ["sensor_evidence_fresh_manual"],
+          "evidenceRefs": [
+            {
+              "id": "sensor-reading-001",
+              "type": "sensor_snapshot",
+              "occurred_at": "2026-07-30T11:45:00.000Z",
+              "source": "manual"
+            }
+          ],
+          "missingInformation": [],
+          "nextDataToLog": ["log_follow_up_observation"]
+        }
+      }
+    },
+    {
+      "id": "watering-without-sensor-context",
+      "description": "A valid watering log stays low-confidence and asks for current sensor context rather than inferring a plant response.",
+      "input": {
+        "event": {
+          "id": "event-002",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T11:30:00.000Z",
+          "eventType": "watering",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": false,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": []
+      },
+      "expected": {
+        "applicabilityStatus": "applicable",
+        "handlerStatus": "insufficient_evidence",
+        "outcome": {
+          "status": "needs_context",
+          "category": "watering",
+          "confidence": "low",
+          "findingCodes": ["sensor_context_missing"],
+          "evidenceRefs": [],
+          "missingInformation": ["current_sensor_context"],
+          "nextDataToLog": ["add_current_sensor_snapshot", "log_plant_response_in_24h"]
+        }
+      }
+    },
+    {
+      "id": "photo-only-is-non-diagnostic",
+      "description": "A single photo-presence flag without an observation note or sensor context remains non-diagnostic and insufficient.",
+      "input": {
+        "event": {
+          "id": "event-003",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T11:20:00.000Z",
+          "eventType": "photo",
+          "stage": "flower_mid",
+          "notePresent": false,
+          "photoPresent": true,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": []
+      },
+      "expected": {
+        "applicabilityStatus": "applicable",
+        "handlerStatus": "insufficient_evidence",
+        "outcome": {
+          "status": "needs_context",
+          "category": "photos",
+          "confidence": "low",
+          "findingCodes": [
+            "event_description_missing",
+            "sensor_context_missing",
+            "single_photo_non_diagnostic"
+          ],
+          "evidenceRefs": [],
+          "missingInformation": ["current_sensor_context", "event_description"],
+          "nextDataToLog": ["add_current_sensor_snapshot", "add_observation_note"]
+        }
+      }
+    },
+    {
+      "id": "missing-plant-context",
+      "description": "A grow-level row without a plant id is outside the Plant Event Review applicability boundary.",
+      "input": {
+        "event": {
+          "id": "event-004",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": null,
+          "occurredAt": "2026-07-30T11:00:00.000Z",
+          "eventType": "observation",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": false,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": []
+      },
+      "expected": {
+        "applicabilityStatus": "not_applicable",
+        "reasonCodes": ["plant_context_missing"]
+      }
+    },
+    {
+      "id": "invalid-event-time",
+      "description": "A malformed event time cannot be reviewed.",
+      "input": {
+        "event": {
+          "id": "event-005",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "not-a-time",
+          "eventType": "observation",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": false,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": []
+      },
+      "expected": {
+        "applicabilityStatus": "not_applicable",
+        "reasonCodes": ["event_time_invalid"]
+      }
+    },
+    {
+      "id": "future-event-time",
+      "description": "An event after the injected execution time cannot support a deterministic current review.",
+      "input": {
+        "event": {
+          "id": "event-006",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T12:01:00.000Z",
+          "eventType": "observation",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": false,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": []
+      },
+      "expected": {
+        "applicabilityStatus": "not_applicable",
+        "reasonCodes": ["event_time_future"]
+      }
+    },
+    {
+      "id": "normalized-entry-invalid",
+      "description": "An upstream-normalized event explicitly marked invalid for review remains outside applicability.",
+      "input": {
+        "event": {
+          "id": "event-007",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T11:00:00.000Z",
+          "eventType": "measurement",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": false,
+          "validForAiContext": false,
+          "normalizationWarnings": ["sensor-snapshot:temp:invalid"]
+        },
+        "sensorEvidence": []
+      },
+      "expected": {
+        "applicabilityStatus": "not_applicable",
+        "reasonCodes": ["event_invalid_for_review"]
+      }
+    },
+    {
+      "id": "stale-sensor-context",
+      "description": "Old sensor evidence is labeled stale and cannot raise review confidence.",
+      "input": {
+        "event": {
+          "id": "event-008",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T10:00:00.000Z",
+          "eventType": "diagnosis",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": false,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": [
+          {
+            "scope": {
+              "tentId": "tent-001",
+              "plantId": "plant-001"
+            },
+            "snapshot": {
+              "source": "live",
+              "sourceDetail": "pi_bridge",
+              "capturedAt": "2026-07-30T10:00:00.000Z",
+              "confidence": 0.9,
+              "invalid": false,
+              "metrics": [
+                {
+                  "key": "temp",
+                  "value": 25,
+                  "unit": "°C",
+                  "kind": "environment"
+                }
+              ]
+            },
+            "explicitRef": {
+              "id": "sensor-reading-008",
+              "captured_at": "2026-07-30T10:00:00.000Z",
+              "source": "live",
+              "metric": "temp"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "applicabilityStatus": "applicable",
+        "handlerStatus": "insufficient_evidence",
+        "outcome": {
+          "status": "needs_context",
+          "category": "symptoms",
+          "confidence": "low",
+          "findingCodes": ["sensor_evidence_stale"],
+          "evidenceRefs": [],
+          "missingInformation": ["fresh_sensor_context"],
+          "nextDataToLog": [
+            "add_current_sensor_snapshot",
+            "add_photo",
+            "add_recent_feeding_context",
+            "add_recent_watering_context"
+          ]
+        }
+      }
+    },
+    {
+      "id": "demo-sensor-context",
+      "description": "Demo evidence remains demo and never counts as current plant evidence.",
+      "input": {
+        "event": {
+          "id": "event-009",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T11:40:00.000Z",
+          "eventType": "observation",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": false,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": [
+          {
+            "scope": {
+              "tentId": "tent-001",
+              "plantId": "plant-001"
+            },
+            "snapshot": {
+              "source": "demo",
+              "sourceDetail": "demo_fixture",
+              "capturedAt": "2026-07-30T11:40:00.000Z",
+              "confidence": 0.5,
+              "invalid": false,
+              "metrics": [
+                {
+                  "key": "rh",
+                  "value": 60,
+                  "unit": "%",
+                  "kind": "environment"
+                }
+              ]
+            },
+            "explicitRef": {
+              "id": "sensor-reading-009",
+              "captured_at": "2026-07-30T11:40:00.000Z",
+              "source": "demo",
+              "metric": "rh"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "applicabilityStatus": "applicable",
+        "handlerStatus": "insufficient_evidence",
+        "outcome": {
+          "status": "needs_context",
+          "category": "notes",
+          "confidence": "low",
+          "findingCodes": ["sensor_evidence_demo"],
+          "evidenceRefs": [],
+          "missingInformation": ["fresh_sensor_context"],
+          "nextDataToLog": ["add_current_sensor_snapshot", "log_follow_up_observation"]
+        }
+      }
+    },
+    {
+      "id": "explicit-invalid-sensor-context",
+      "description": "An explicitly invalid reading cannot count as current evidence even when its declared source is live.",
+      "input": {
+        "event": {
+          "id": "event-010",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T11:45:00.000Z",
+          "eventType": "observation",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": false,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": [
+          {
+            "scope": {
+              "tentId": "tent-001",
+              "plantId": "plant-001"
+            },
+            "snapshot": {
+              "source": "live",
+              "sourceDetail": "pi_bridge",
+              "capturedAt": "2026-07-30T11:45:00.000Z",
+              "confidence": 0.2,
+              "invalid": true,
+              "metrics": [
+                {
+                  "key": "rh",
+                  "value": 100,
+                  "unit": "%",
+                  "kind": "environment"
+                }
+              ]
+            },
+            "explicitRef": {
+              "id": "sensor-reading-010",
+              "captured_at": "2026-07-30T11:45:00.000Z",
+              "source": "live",
+              "metric": "rh"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "applicabilityStatus": "applicable",
+        "handlerStatus": "insufficient_evidence",
+        "outcome": {
+          "status": "needs_context",
+          "category": "notes",
+          "confidence": "low",
+          "findingCodes": ["sensor_evidence_invalid"],
+          "evidenceRefs": [],
+          "missingInformation": ["fresh_sensor_context"],
+          "nextDataToLog": ["add_current_sensor_snapshot", "log_follow_up_observation"]
+        }
+      }
+    },
+    {
+      "id": "unknown-sensor-source",
+      "description": "A vendor label is not a trust state and is never upgraded to current evidence.",
+      "input": {
+        "event": {
+          "id": "event-011",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T11:45:00.000Z",
+          "eventType": "observation",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": false,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": [
+          {
+            "scope": {
+              "tentId": "tent-001",
+              "plantId": "plant-001"
+            },
+            "snapshot": {
+              "source": "ecowitt",
+              "sourceDetail": "ecowitt",
+              "capturedAt": "2026-07-30T11:45:00.000Z",
+              "confidence": 0.9,
+              "invalid": false,
+              "metrics": [
+                {
+                  "key": "temp",
+                  "value": 24,
+                  "unit": "°C",
+                  "kind": "environment"
+                }
+              ]
+            },
+            "explicitRef": {
+              "id": "sensor-reading-011",
+              "captured_at": "2026-07-30T11:45:00.000Z",
+              "source": "ecowitt",
+              "metric": "temp"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "applicabilityStatus": "applicable",
+        "handlerStatus": "insufficient_evidence",
+        "outcome": {
+          "status": "needs_context",
+          "category": "notes",
+          "confidence": "low",
+          "findingCodes": ["sensor_evidence_unknown_source"],
+          "evidenceRefs": [],
+          "missingInformation": ["fresh_sensor_context"],
+          "nextDataToLog": ["add_current_sensor_snapshot", "log_follow_up_observation"]
+        }
+      }
+    },
+    {
+      "id": "sensor-scope-mismatch",
+      "description": "Evidence explicitly scoped to a different plant is excluded rather than nearest-matched.",
+      "input": {
+        "event": {
+          "id": "event-012",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T11:45:00.000Z",
+          "eventType": "observation",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": false,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": [
+          {
+            "scope": {
+              "tentId": "tent-001",
+              "plantId": "plant-999"
+            },
+            "snapshot": {
+              "source": "manual",
+              "sourceDetail": "manual_snapshot",
+              "capturedAt": "2026-07-30T11:45:00.000Z",
+              "confidence": 0.8,
+              "invalid": false,
+              "metrics": [
+                {
+                  "key": "temp",
+                  "value": 24,
+                  "unit": "°C",
+                  "kind": "environment"
+                }
+              ]
+            },
+            "explicitRef": {
+              "id": "sensor-reading-012",
+              "captured_at": "2026-07-30T11:45:00.000Z",
+              "source": "manual",
+              "metric": "temp"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "applicabilityStatus": "applicable",
+        "handlerStatus": "insufficient_evidence",
+        "outcome": {
+          "status": "needs_context",
+          "category": "notes",
+          "confidence": "low",
+          "findingCodes": ["sensor_scope_mismatch"],
+          "evidenceRefs": [],
+          "missingInformation": ["matching_sensor_context"],
+          "nextDataToLog": ["add_current_sensor_snapshot", "log_follow_up_observation"]
+        }
+      }
+    },
+    {
+      "id": "unknown-event-type",
+      "description": "An unknown but bounded event code receives the safe notes fallback and cannot become a diagnosis.",
+      "input": {
+        "event": {
+          "id": "event-013",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T11:45:00.000Z",
+          "eventType": "mystery_code",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": false,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": [
+          {
+            "scope": {
+              "tentId": "tent-001",
+              "plantId": "plant-001"
+            },
+            "snapshot": {
+              "source": "manual",
+              "sourceDetail": "manual_snapshot",
+              "capturedAt": "2026-07-30T11:45:00.000Z",
+              "confidence": 0.8,
+              "invalid": false,
+              "metrics": [
+                {
+                  "key": "temp",
+                  "value": 24,
+                  "unit": "°C",
+                  "kind": "environment"
+                }
+              ]
+            },
+            "explicitRef": {
+              "id": "sensor-reading-013",
+              "captured_at": "2026-07-30T11:45:00.000Z",
+              "source": "manual",
+              "metric": "temp"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "applicabilityStatus": "applicable",
+        "handlerStatus": "insufficient_evidence",
+        "outcome": {
+          "status": "needs_context",
+          "category": "notes",
+          "confidence": "low",
+          "findingCodes": ["event_type_unknown", "sensor_evidence_fresh_manual"],
+          "evidenceRefs": [
+            {
+              "id": "sensor-reading-013",
+              "type": "sensor_snapshot",
+              "occurred_at": "2026-07-30T11:45:00.000Z",
+              "source": "manual"
+            }
+          ],
+          "missingInformation": ["specific_event_type"],
+          "nextDataToLog": ["clarify_event_type", "log_follow_up_observation"]
+        }
+      }
+    },
+    {
+      "id": "reordered-evidence-is-deterministic",
+      "description": "Two valid explicit references are normalized into stable source-independent ordering.",
+      "input": {
+        "event": {
+          "id": "event-014",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T11:45:00.000Z",
+          "eventType": "observation",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": false,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": [
+          {
+            "scope": {
+              "tentId": "tent-001",
+              "plantId": "plant-001"
+            },
+            "snapshot": {
+              "source": "live",
+              "sourceDetail": "pi_bridge",
+              "capturedAt": "2026-07-30T11:52:00.000Z",
+              "confidence": 0.9,
+              "invalid": false,
+              "metrics": [
+                {
+                  "key": "rh",
+                  "value": 58,
+                  "unit": "%",
+                  "kind": "environment"
+                }
+              ]
+            },
+            "explicitRef": {
+              "id": "sensor-reading-b",
+              "captured_at": "2026-07-30T11:52:00.000Z",
+              "source": "live",
+              "metric": "rh"
+            }
+          },
+          {
+            "scope": {
+              "tentId": "tent-001",
+              "plantId": "plant-001"
+            },
+            "snapshot": {
+              "source": "manual",
+              "sourceDetail": "manual_snapshot",
+              "capturedAt": "2026-07-30T11:50:00.000Z",
+              "confidence": 0.8,
+              "invalid": false,
+              "metrics": [
+                {
+                  "key": "temp",
+                  "value": 24.5,
+                  "unit": "°C",
+                  "kind": "environment"
+                }
+              ]
+            },
+            "explicitRef": {
+              "id": "sensor-reading-a",
+              "captured_at": "2026-07-30T11:50:00.000Z",
+              "source": "manual",
+              "metric": "temp"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "applicabilityStatus": "applicable",
+        "handlerStatus": "completed",
+        "outcome": {
+          "status": "reviewed",
+          "category": "notes",
+          "confidence": "medium",
+          "findingCodes": ["sensor_evidence_fresh_live", "sensor_evidence_fresh_manual"],
+          "evidenceRefs": [
+            {
+              "id": "sensor-reading-a",
+              "type": "sensor_snapshot",
+              "occurred_at": "2026-07-30T11:50:00.000Z",
+              "source": "manual"
+            },
+            {
+              "id": "sensor-reading-b",
+              "type": "sensor_snapshot",
+              "occurred_at": "2026-07-30T11:52:00.000Z",
+              "source": "live"
+            }
+          ],
+          "missingInformation": [],
+          "nextDataToLog": ["log_follow_up_observation"]
+        }
+      }
+    },
+    {
+      "id": "null-sensor-scope-does-not-match",
+      "description": "Null evidence scope never nearest-matches an explicitly scoped plant event.",
+      "input": {
+        "event": {
+          "id": "event-016",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T11:45:00.000Z",
+          "eventType": "observation",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": false,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": [
+          {
+            "scope": {
+              "tentId": null,
+              "plantId": null
+            },
+            "snapshot": {
+              "source": "manual",
+              "sourceDetail": "manual_snapshot",
+              "capturedAt": "2026-07-30T11:45:00.000Z",
+              "confidence": 0.8,
+              "invalid": false,
+              "metrics": [
+                {
+                  "key": "temp",
+                  "value": 24,
+                  "unit": "°C",
+                  "kind": "environment"
+                }
+              ]
+            },
+            "explicitRef": {
+              "id": "sensor-reading-016",
+              "captured_at": "2026-07-30T11:45:00.000Z",
+              "source": "manual",
+              "metric": "temp"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "applicabilityStatus": "applicable",
+        "handlerStatus": "insufficient_evidence",
+        "outcome": {
+          "status": "needs_context",
+          "category": "notes",
+          "confidence": "low",
+          "findingCodes": ["sensor_scope_mismatch"],
+          "evidenceRefs": [],
+          "missingInformation": ["matching_sensor_context"],
+          "nextDataToLog": ["add_current_sensor_snapshot", "log_follow_up_observation"]
+        }
+      }
+    },
+    {
+      "id": "sensor-metric-unit-mismatch",
+      "description": "A Fahrenheit value in the Celsius-only normalized metric contract cannot promote evidence.",
+      "input": {
+        "event": {
+          "id": "event-017",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T11:45:00.000Z",
+          "eventType": "observation",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": false,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": [
+          {
+            "scope": {
+              "tentId": "tent-001",
+              "plantId": "plant-001"
+            },
+            "snapshot": {
+              "source": "manual",
+              "sourceDetail": "manual_snapshot",
+              "capturedAt": "2026-07-30T11:45:00.000Z",
+              "confidence": 0.8,
+              "invalid": false,
+              "metrics": [
+                {
+                  "key": "temp",
+                  "value": 72,
+                  "unit": "°F",
+                  "kind": "environment"
+                }
+              ]
+            },
+            "explicitRef": {
+              "id": "sensor-reading-017",
+              "captured_at": "2026-07-30T11:45:00.000Z",
+              "source": "manual",
+              "metric": "temp"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "applicabilityStatus": "applicable",
+        "handlerStatus": "insufficient_evidence",
+        "outcome": {
+          "status": "needs_context",
+          "category": "notes",
+          "confidence": "low",
+          "findingCodes": ["sensor_evidence_metrics_unusable"],
+          "evidenceRefs": [],
+          "missingInformation": ["fresh_sensor_context", "sensor_metrics"],
+          "nextDataToLog": ["add_current_sensor_snapshot", "log_follow_up_observation"]
+        }
+      }
+    },
+    {
+      "id": "sensor-metric-stuck-endpoint",
+      "description": "A humidity endpoint of 100 percent is treated as unusable sensor evidence.",
+      "input": {
+        "event": {
+          "id": "event-018",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T11:45:00.000Z",
+          "eventType": "observation",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": false,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": [
+          {
+            "scope": {
+              "tentId": "tent-001",
+              "plantId": "plant-001"
+            },
+            "snapshot": {
+              "source": "live",
+              "sourceDetail": "pi_bridge",
+              "capturedAt": "2026-07-30T11:45:00.000Z",
+              "confidence": 0.9,
+              "invalid": false,
+              "metrics": [
+                {
+                  "key": "rh",
+                  "value": 100,
+                  "unit": "%",
+                  "kind": "environment"
+                }
+              ]
+            },
+            "explicitRef": {
+              "id": "sensor-reading-018",
+              "captured_at": "2026-07-30T11:45:00.000Z",
+              "source": "live",
+              "metric": "rh"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "applicabilityStatus": "applicable",
+        "handlerStatus": "insufficient_evidence",
+        "outcome": {
+          "status": "needs_context",
+          "category": "notes",
+          "confidence": "low",
+          "findingCodes": ["sensor_evidence_metrics_unusable"],
+          "evidenceRefs": [],
+          "missingInformation": ["fresh_sensor_context", "sensor_metrics"],
+          "nextDataToLog": ["add_current_sensor_snapshot", "log_follow_up_observation"]
+        }
+      }
+    },
+    {
+      "id": "sensor-confidence-null",
+      "description": "Missing sensor confidence cannot promote otherwise fresh evidence.",
+      "input": {
+        "event": {
+          "id": "event-019",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T11:45:00.000Z",
+          "eventType": "observation",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": false,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": [
+          {
+            "scope": {
+              "tentId": "tent-001",
+              "plantId": "plant-001"
+            },
+            "snapshot": {
+              "source": "manual",
+              "sourceDetail": "manual_snapshot",
+              "capturedAt": "2026-07-30T11:45:00.000Z",
+              "confidence": null,
+              "invalid": false,
+              "metrics": [
+                {
+                  "key": "temp",
+                  "value": 24,
+                  "unit": "°C",
+                  "kind": "environment"
+                }
+              ]
+            },
+            "explicitRef": {
+              "id": "sensor-reading-019",
+              "captured_at": "2026-07-30T11:45:00.000Z",
+              "source": "manual",
+              "metric": "temp"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "applicabilityStatus": "applicable",
+        "handlerStatus": "insufficient_evidence",
+        "outcome": {
+          "status": "needs_context",
+          "category": "notes",
+          "confidence": "low",
+          "findingCodes": ["sensor_evidence_confidence_unusable"],
+          "evidenceRefs": [],
+          "missingInformation": ["fresh_sensor_context"],
+          "nextDataToLog": ["add_current_sensor_snapshot", "log_follow_up_observation"]
+        }
+      }
+    },
+    {
+      "id": "sensor-confidence-zero",
+      "description": "Zero confidence cannot promote otherwise fresh evidence.",
+      "input": {
+        "event": {
+          "id": "event-020",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T11:45:00.000Z",
+          "eventType": "observation",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": false,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": [
+          {
+            "scope": {
+              "tentId": "tent-001",
+              "plantId": "plant-001"
+            },
+            "snapshot": {
+              "source": "manual",
+              "sourceDetail": "manual_snapshot",
+              "capturedAt": "2026-07-30T11:45:00.000Z",
+              "confidence": 0,
+              "invalid": false,
+              "metrics": [
+                {
+                  "key": "temp",
+                  "value": 24,
+                  "unit": "°C",
+                  "kind": "environment"
+                }
+              ]
+            },
+            "explicitRef": {
+              "id": "sensor-reading-020",
+              "captured_at": "2026-07-30T11:45:00.000Z",
+              "source": "manual",
+              "metric": "temp"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "applicabilityStatus": "applicable",
+        "handlerStatus": "insufficient_evidence",
+        "outcome": {
+          "status": "needs_context",
+          "category": "notes",
+          "confidence": "low",
+          "findingCodes": ["sensor_evidence_confidence_unusable"],
+          "evidenceRefs": [],
+          "missingInformation": ["fresh_sensor_context"],
+          "nextDataToLog": ["add_current_sensor_snapshot", "log_follow_up_observation"]
+        }
+      }
+    },
+    {
+      "id": "noncanonical-snapshot-timestamp",
+      "description": "A parseable but noncanonical snapshot timestamp is rejected before execution.",
+      "input": {
+        "event": {
+          "id": "event-021",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T11:45:00.000Z",
+          "eventType": "observation",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": false,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": [
+          {
+            "scope": {
+              "tentId": "tent-001",
+              "plantId": "plant-001"
+            },
+            "snapshot": {
+              "source": "manual",
+              "sourceDetail": "manual_snapshot",
+              "capturedAt": "2026-07-30T11:45:00Z",
+              "confidence": 0.8,
+              "invalid": false,
+              "metrics": [
+                {
+                  "key": "temp",
+                  "value": 24,
+                  "unit": "°C",
+                  "kind": "environment"
+                }
+              ]
+            },
+            "explicitRef": {
+              "id": "sensor-reading-021",
+              "captured_at": "2026-07-30T11:45:00.000Z",
+              "source": "manual",
+              "metric": "temp"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "applicabilityStatus": "invalid",
+        "issues": ["sensor_captured_at_invalid"]
+      }
+    },
+    {
+      "id": "duplicate-explicit-reference-ids",
+      "description": "Duplicate explicit reference ids are rejected regardless of evidence order.",
+      "input": {
+        "event": {
+          "id": "event-022",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T11:45:00.000Z",
+          "eventType": "observation",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": false,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": [
+          {
+            "scope": {
+              "tentId": "tent-001",
+              "plantId": "plant-001"
+            },
+            "snapshot": {
+              "source": "manual",
+              "sourceDetail": "manual_snapshot",
+              "capturedAt": "2026-07-30T11:45:00.000Z",
+              "confidence": 0.8,
+              "invalid": false,
+              "metrics": [
+                {
+                  "key": "temp",
+                  "value": 24,
+                  "unit": "°C",
+                  "kind": "environment"
+                }
+              ]
+            },
+            "explicitRef": {
+              "id": "sensor-reading-duplicate",
+              "captured_at": "2026-07-30T11:45:00.000Z",
+              "source": "manual",
+              "metric": "temp"
+            }
+          },
+          {
+            "scope": {
+              "tentId": "tent-001",
+              "plantId": "plant-001"
+            },
+            "snapshot": {
+              "source": "live",
+              "sourceDetail": "pi_bridge",
+              "capturedAt": "2026-07-30T11:50:00.000Z",
+              "confidence": 0.9,
+              "invalid": false,
+              "metrics": [
+                {
+                  "key": "rh",
+                  "value": 58,
+                  "unit": "%",
+                  "kind": "environment"
+                }
+              ]
+            },
+            "explicitRef": {
+              "id": "sensor-reading-duplicate",
+              "captured_at": "2026-07-30T11:50:00.000Z",
+              "source": "live",
+              "metric": "rh"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "applicabilityStatus": "invalid",
+        "issues": ["sensor_ref_id_duplicate"]
+      }
+    },
+    {
+      "id": "unknown-event-type-with-photo",
+      "description": "A photo presentation does not turn an unknown semantic event type into a supported type.",
+      "input": {
+        "event": {
+          "id": "event-023",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T11:45:00.000Z",
+          "eventType": "mystery_photo",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": true,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": [
+          {
+            "scope": {
+              "tentId": "tent-001",
+              "plantId": "plant-001"
+            },
+            "snapshot": {
+              "source": "manual",
+              "sourceDetail": "manual_snapshot",
+              "capturedAt": "2026-07-30T11:45:00.000Z",
+              "confidence": 0.8,
+              "invalid": false,
+              "metrics": [
+                {
+                  "key": "temp",
+                  "value": 24,
+                  "unit": "°C",
+                  "kind": "environment"
+                }
+              ]
+            },
+            "explicitRef": {
+              "id": "sensor-reading-023",
+              "captured_at": "2026-07-30T11:45:00.000Z",
+              "source": "manual",
+              "metric": "temp"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "applicabilityStatus": "applicable",
+        "handlerStatus": "insufficient_evidence",
+        "outcome": {
+          "status": "needs_context",
+          "category": "photos",
+          "confidence": "low",
+          "findingCodes": ["event_type_unknown", "sensor_evidence_fresh_manual"],
+          "evidenceRefs": [
+            {
+              "id": "sensor-reading-023",
+              "type": "sensor_snapshot",
+              "occurred_at": "2026-07-30T11:45:00.000Z",
+              "source": "manual"
+            }
+          ],
+          "missingInformation": ["specific_event_type"],
+          "nextDataToLog": ["clarify_event_type", "log_follow_up_observation"]
+        }
+      }
+    },
+    {
+      "id": "known-watering-event-with-photo",
+      "description": "A photo does not hide that watering is a supported semantic event type.",
+      "input": {
+        "event": {
+          "id": "event-024",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T11:45:00.000Z",
+          "eventType": "watering",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": true,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": [
+          {
+            "scope": {
+              "tentId": "tent-001",
+              "plantId": "plant-001"
+            },
+            "snapshot": {
+              "source": "manual",
+              "sourceDetail": "manual_snapshot",
+              "capturedAt": "2026-07-30T11:45:00.000Z",
+              "confidence": 0.8,
+              "invalid": false,
+              "metrics": [
+                {
+                  "key": "soil",
+                  "value": 55,
+                  "unit": "%",
+                  "kind": "soil"
+                }
+              ]
+            },
+            "explicitRef": {
+              "id": "sensor-reading-024",
+              "captured_at": "2026-07-30T11:45:00.000Z",
+              "source": "manual",
+              "metric": "soil"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "applicabilityStatus": "applicable",
+        "handlerStatus": "completed",
+        "outcome": {
+          "status": "reviewed",
+          "category": "photos",
+          "confidence": "medium",
+          "findingCodes": ["sensor_evidence_fresh_manual"],
+          "evidenceRefs": [
+            {
+              "id": "sensor-reading-024",
+              "type": "sensor_snapshot",
+              "occurred_at": "2026-07-30T11:45:00.000Z",
+              "source": "manual"
+            }
+          ],
+          "missingInformation": [],
+          "nextDataToLog": ["log_plant_response_in_24h"]
+        }
+      }
+    },
+    {
+      "id": "known-symptom-event-with-photo",
+      "description": "A photo does not hide that a symptom event type is supported, and no redundant photo request is emitted.",
+      "input": {
+        "event": {
+          "id": "event-025",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T11:45:00.000Z",
+          "eventType": "diagnosis",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": true,
+          "validForAiContext": true,
+          "normalizationWarnings": []
+        },
+        "sensorEvidence": [
+          {
+            "scope": {
+              "tentId": "tent-001",
+              "plantId": "plant-001"
+            },
+            "snapshot": {
+              "source": "live",
+              "sourceDetail": "pi_bridge",
+              "capturedAt": "2026-07-30T11:45:00.000Z",
+              "confidence": 0.9,
+              "invalid": false,
+              "metrics": [
+                {
+                  "key": "vpd",
+                  "value": 1.2,
+                  "unit": "kPa",
+                  "kind": "environment"
+                }
+              ]
+            },
+            "explicitRef": {
+              "id": "sensor-reading-025",
+              "captured_at": "2026-07-30T11:45:00.000Z",
+              "source": "live",
+              "metric": "vpd"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "applicabilityStatus": "applicable",
+        "handlerStatus": "completed",
+        "outcome": {
+          "status": "reviewed",
+          "category": "photos",
+          "confidence": "medium",
+          "findingCodes": ["sensor_evidence_fresh_live"],
+          "evidenceRefs": [
+            {
+              "id": "sensor-reading-025",
+              "type": "sensor_snapshot",
+              "occurred_at": "2026-07-30T11:45:00.000Z",
+              "source": "live"
+            }
+          ],
+          "missingInformation": [],
+          "nextDataToLog": ["add_recent_feeding_context", "add_recent_watering_context"]
+        }
+      }
+    },
+    {
+      "id": "sensitive-and-raw-event-fields-are-rejected",
+      "description": "The fixed-key boundary rejects raw note text instead of silently passing it to the skill.",
+      "input": {
+        "event": {
+          "id": "event-015",
+          "growId": "grow-001",
+          "tentId": "tent-001",
+          "plantId": "plant-001",
+          "occurredAt": "2026-07-30T11:45:00.000Z",
+          "eventType": "observation",
+          "stage": "flower_mid",
+          "notePresent": true,
+          "photoPresent": false,
+          "validForAiContext": true,
+          "normalizationWarnings": [],
+          "note": "raw note text must not cross the skill boundary"
+        },
+        "sensorEvidence": []
+      },
+      "expected": {
+        "applicabilityStatus": "invalid",
+        "issues": ["event_shape_invalid"]
+      }
+    }
+  ]
+}

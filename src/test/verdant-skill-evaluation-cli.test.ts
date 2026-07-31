@@ -63,6 +63,26 @@ describe("cli — argument contract", () => {
     expect(r.code).toBe(EXIT_USAGE_OR_IO);
     expect(r.lines.join(" ")).toContain("not found");
   });
+
+  it("reports an unreadable fixture directory as a usage error, not a crash", () => {
+    // existsSync also succeeds for a regular FILE, and the directory listing
+    // threw outside any catch. An uncaught exception is not an exit-code
+    // contract: it surfaced as the interpreter's exit 1, the code reserved for
+    // "the skill failed its expectations", so a broken invocation read as a
+    // clean refusal.
+    const r = main([
+      "--skill-id",
+      "harness-self-test",
+      "--skill-version",
+      "1.0.0",
+      "--now",
+      NOW,
+      "--fixture-dir",
+      resolve(__dirname, "../../fixtures/skills/harness-self-test/v1/hst-001-happy-path.json"),
+    ]);
+    expect(r.code).toBe(EXIT_USAGE_OR_IO);
+    expect(r.lines.join(" ")).toContain("Cannot read fixture directory");
+  });
 });
 
 describe("cli — untrusted fixture input", () => {
@@ -136,6 +156,64 @@ describe("cli — untrusted fixture input", () => {
     }
   });
 
+  // Proving `execution` is an object was never enough. A wrong-typed inner
+  // field still reached a spread and threw, so a malformed fixture surfaced as
+  // a crash with the interpreter's exit 1 — the code reserved for "the skill
+  // failed its expectations" — instead of the documented exit 2.
+  it("rejects wrong-typed inner execution fields by name", () => {
+    const cases: [string, unknown][] = [
+      ["selectedEvidenceIds", 42],
+      ["selectedEvidenceIds", {}],
+      ["evidenceRegistryVersion", 7],
+      ["policyVersion", null],
+      ["context", "not-an-object"],
+    ];
+    for (const [key, value] of cases) {
+      const r = runWithMutated((record) => {
+        (record.execution as Record<string, unknown>)[key] = value;
+      });
+      expect(r.code, key).toBe(EXIT_USAGE_OR_IO);
+      expect(r.lines.join(" "), key).toContain(key);
+    }
+  });
+
+  // The safety-relevant case, and the reason these collections are REQUIRED
+  // rather than defaulted: every downstream read was `?? []`, so an ABSENT key
+  // was indistinguishable from an empty one. The only equipment-control check
+  // in the build reads policy.firedRules, which meant a policy object missing
+  // that key read as "the governor fired nothing".
+  it("refuses a policy whose safety-relevant collection is absent, not empty", () => {
+    for (const key of ["firedRules", "outcomes", "actionEligibility"]) {
+      const r = runWithMutated((record) => {
+        const execution = record.execution as { policy: Record<string, unknown> };
+        delete execution.policy[key];
+      });
+      expect(r.code, key).toBe(EXIT_USAGE_OR_IO);
+      expect(r.lines.join(" "), key).toContain(key);
+    }
+  });
+
+  it("refuses an unrecognised execution key rather than ignoring it", () => {
+    const r = runWithMutated((record) => {
+      (record.execution as Record<string, unknown>).sneakyExtra = true;
+    });
+    expect(r.code).toBe(EXIT_USAGE_OR_IO);
+  });
+
+  // The production-data scan ran over the fixture block only, while the
+  // execution block beside it is where the run payloads live.
+  it("scans the execution half for production-shaped data, not just the fixture half", () => {
+    const r = runWithMutated((record) => {
+      (record.execution as { context: Record<string, unknown> }).context.owner =
+        "grower@example.com";
+    });
+    expect(r.code).toBe(EXIT_USAGE_OR_IO);
+    const printed = r.lines.join(" ");
+    expect(printed).toContain("email_address");
+    // The CATEGORY, never the matched value — reporting it would re-leak it.
+    expect(printed).not.toContain("grower@example.com");
+  });
+
   it("still accepts a well-formed envelope from the same path", () => {
     // Guards the guard: a check that rejected everything would pass the two
     // tests above while breaking the harness.
@@ -187,6 +265,25 @@ describe("cli — self-test run", () => {
       expect(md).toContain(
         `${report.metrics.passedCases} passed, ${report.metrics.failedCases} failed`,
       );
+    } finally {
+      rmSync(out, { recursive: true, force: true });
+    }
+  });
+
+  it("cannot self-certify that its own bindings are current", () => {
+    // The CLI used to fill the promotion engine's "bindings in force RIGHT
+    // NOW" from `report.manifestBinding?.value` — the artifact being judged —
+    // so all three staleness comparisons reduced to `x === x`. The reasons
+    // existed, were reachable in principle, and could never fire on this path.
+    // Build 7 has no registry to read the live manifest from, so the honest
+    // answer is that currency is unsubstantiated.
+    const { out } = selfTest();
+    try {
+      const decision = JSON.parse(readFileSync(join(out, "promotion-decision.json"), "utf8"));
+      expect(decision.blockingReasons).toContain("manifest_binding_stale");
+      expect(decision.blockingReasons).toContain("policy_binding_stale");
+      expect(decision.blockingReasons).toContain("evidence_registry_binding_stale");
+      expect(decision.unsatisfiedGates).toContain("current_bindings");
     } finally {
       rmSync(out, { recursive: true, force: true });
     }

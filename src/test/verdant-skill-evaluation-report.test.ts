@@ -30,6 +30,7 @@ function caseResult(overrides: Partial<SkillEvaluationCaseResult> = {}): SkillEv
     fixtureId: "gc-001",
     fixtureVersion: "1.0.0",
     fixtureKind: "golden_case",
+    fixturePromotionEligible: true,
     skillId: "coco-dryback-review",
     skillVersion: "1.0.0",
     bindings: {

@@ -17,6 +17,7 @@ function caseResult(overrides: Partial<SkillEvaluationCaseResult> = {}): SkillEv
     fixtureId: "hst-001",
     fixtureVersion: "1.0.0",
     fixtureKind: "harness_self_test",
+    fixturePromotionEligible: true,
     skillId: "harness-self-test",
     skillVersion: "1.0.0",
     bindings: {} as never,

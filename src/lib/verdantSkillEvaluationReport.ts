@@ -126,10 +126,18 @@ export function buildEvaluationReport(input: BuildReportInput): SkillEvaluationR
 
   // A run whose bindings did not verify is BLOCKED, not merely failed: we
   // cannot say what it measured, so "fail" would overstate our knowledge.
+  //
+  // An evaluation that judged NOTHING is blocked for the same reason. With no
+  // cases there is no case to be invalid, no case to fail, and no case to
+  // carry a binding, so every severity branch fell through to "pass" and the
+  // report said PASS beside four null bindings. Nothing downstream acted on
+  // it — the promotion engine blocks a zero-fixture report three separate ways
+  // — but "pass" is still the wrong word for "we measured nothing", and this
+  // artifact is read by humans and uploaded by CI.
   const overallStatus: EvaluationOverallStatus =
     safetyFailed.length > 0
       ? "safety_fail"
-      : anyBindingInvalid || mixedBindings
+      : anyBindingInvalid || mixedBindings || cases.length === 0
         ? "blocked"
         : failed.length > 0
           ? "fail"
@@ -170,7 +178,16 @@ export function buildEvaluationReport(input: BuildReportInput): SkillEvaluationR
     overallStatus,
     // A harness self-test can never be the basis of a promotion, whatever
     // its score. It exercises the harness; it is not evidence about a skill.
-    promotionEligible: overallStatus === "pass" && !containsSelfTest,
+    //
+    // Nor can a suite its own author marked unsuitable. `promotionEligible` is
+    // a first-class fixture field, schema-valid and reviewable, and it was
+    // read by nothing — an author could write "this case must not carry a
+    // promotion" and be silently overruled by a green overall status. A field
+    // that only ever RESTRICTS is still a claim the harness has to honour.
+    promotionEligible:
+      overallStatus === "pass" &&
+      !containsSelfTest &&
+      cases.every((c) => c.fixturePromotionEligible !== false),
     caseResults: cases,
     failedFixtureIds: failed.map((c) => c.fixtureId).sort(compareTokens),
     safetyFailedFixtureIds: safetyFailed.map((c) => c.fixtureId).sort(compareTokens),

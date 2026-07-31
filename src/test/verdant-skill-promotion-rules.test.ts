@@ -44,6 +44,7 @@ function caseResult(overrides: Partial<SkillEvaluationCaseResult> = {}): SkillEv
     fixtureId: "gc-001",
     fixtureVersion: "1.0.0",
     fixtureKind: "golden_case",
+    fixturePromotionEligible: true,
     skillId: "coco-dryback-review",
     skillVersion: "1.0.0",
     bindings: {
@@ -167,6 +168,54 @@ describe("promotion — the happy path is the narrow one", () => {
     // It reports what WOULD be authorized; something else must apply it.
     expect(d.authorizedManifestLifecycle).toBe("limited_beta");
     expect(renderPromotionMarkdown(d)).toContain("not a promotion");
+  });
+});
+
+describe("promotion — currency must come from outside the artifact", () => {
+  // The only caller filled these from `report.manifestBinding?.value` — the
+  // artifact being judged — reducing all three checks to `x === x`. Three
+  // blocking reasons became structurally unreachable and `current_bindings`
+  // was satisfied by construction. A gate that cannot fail is not a gate.
+  it("treats an unsupplied current digest as a failed comparison, not a passed one", () => {
+    const d = decide({
+      currentManifestDigest: null,
+      currentPolicyDigest: null,
+      currentEvidenceCorpusDigest: null,
+    });
+    expect(d.eligible).toBe(false);
+    expect(d.blockingReasons).toContain("manifest_binding_stale");
+    expect(d.blockingReasons).toContain("policy_binding_stale");
+    expect(d.blockingReasons).toContain("evidence_registry_binding_stale");
+    expect(d.unsatisfiedGates).toContain("current_bindings");
+  });
+
+  it("blocks when an independently supplied digest disagrees with the report", () => {
+    const d = decide({ currentManifestDigest: "0".repeat(64) });
+    expect(d.eligible).toBe(false);
+    expect(d.blockingReasons).toContain("manifest_binding_stale");
+  });
+});
+
+describe("promotion — a report that judged nothing", () => {
+  // These guards were real but unpinned — nothing asserted they fire, which is
+  // the same "gate exists only on paper" shape as the identity codes.
+  it("refuses a zero-case report", () => {
+    const d = decide({ report: report([]) });
+    expect(d.eligible).toBe(false);
+    expect(d.blockingReasons).toContain("fixture_set_incomplete");
+    expect(d.authorizedManifestLifecycle).toBeNull();
+  });
+
+  it("does not call a zero-case report a pass", () => {
+    const empty = report([]);
+    expect(empty.overallStatus).toBe("blocked");
+    expect(empty.promotionEligible).toBe(false);
+  });
+
+  it("honours a fixture its own author marked unpromotable", () => {
+    const r = report([caseResult({ fixturePromotionEligible: false })]);
+    expect(r.overallStatus).toBe("pass");
+    expect(r.promotionEligible).toBe(false);
   });
 });
 

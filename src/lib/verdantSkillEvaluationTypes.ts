@@ -197,6 +197,14 @@ export interface SkillEvaluationCaseResult {
   fixtureId: string;
   fixtureVersion: string;
   fixtureKind: EvaluationFixtureKind;
+  /**
+   * What the fixture's OWN author said about promotability.
+   *
+   * Carried onto the result because the report has to honour it and never saw
+   * it otherwise: a suite explicitly marked unsuitable for promotion could
+   * still mark the whole report eligible on the strength of a green status.
+   */
+  fixturePromotionEligible: boolean;
   skillId: string;
   skillVersion: string;
   bindings: SkillEvaluationBindings;

@@ -232,6 +232,90 @@ export type FixtureParse =
   | { ok: false; issues: string[] };
 
 /** Wrapped rather than thrown, matching the Build 1–6 parse convention. */
+/**
+ * The RECORDED EXECUTION half of a fixture file.
+ *
+ * The fixture block has always been schema-checked; the execution block beside
+ * it was not, and it is the half that carries model output. Two consequences,
+ * both observed:
+ *
+ *  1. A wrong-typed field (`selectedEvidenceIds: 42`) reached a spread or a
+ *     `.flatMap` and threw, so a malformed input surfaced as a crash with exit
+ *     1 — the code reserved for "the skill failed its expectations" — instead
+ *     of the documented exit 2.
+ *  2. Worse, and the reason `firedRules` and `missingRequiredContext` are
+ *     REQUIRED here rather than defaulted: every downstream read was
+ *     `?? []`, so an ABSENT key was indistinguishable from an empty one. The
+ *     only equipment-control safety check in the build reads
+ *     `policy.firedRules`, which meant a policy object missing that key read
+ *     as "the governor fired nothing" — unevaluated silently defaulting to
+ *     safe. A missing safety-relevant collection is an error, not zero
+ *     findings.
+ *
+ * Deliberately `.strict()`: an unrecognised key is a typo or a drifted
+ * producer, and both should be loud.
+ */
+const executionApplicabilitySchema = z
+  .object({
+    verdict: z.string().min(1),
+    missingRequiredContext: z.array(z.string()),
+  })
+  .passthrough();
+
+const executionPolicySchema = z
+  .object({
+    // Required, not defaulted. See above: absent must never read as empty.
+    firedRules: z.array(z.unknown()),
+    outcomes: z.array(z.string()),
+    actionEligibility: z.string().min(1),
+  })
+  .passthrough();
+
+export const verdantSkillExecutionRecordSchema = z
+  .object({
+    skillContract: z.record(z.unknown()),
+    manifest: z.record(z.unknown()),
+    context: z.record(z.unknown()),
+    applicability: executionApplicabilitySchema,
+    evidenceCorpus: z.record(z.unknown()),
+    evidenceRegistryVersion: z.string().min(1),
+    selectedEvidenceIds: z.array(z.string()),
+    // Present in authored fixtures for readability; the harness DERIVES the
+    // real value from the output and never reads this one.
+    citedEvidenceIds: z.array(z.string()).optional(),
+    policy: executionPolicySchema,
+    policyVersion: z.string().min(1),
+    draft: z.record(z.unknown()),
+    expectation: z.record(z.unknown()),
+    // Left unconstrained on purpose: `output` is untrusted model output and is
+    // validated separately by the Build 1 contract parser, whose verdict is
+    // itself a measurement the harness reports.
+    output: z.unknown(),
+    // Authored value is ignored — schema validity is derived by parsing.
+    outputSchemaValid: z.boolean().optional(),
+  })
+  .strict();
+
+export type VerdantSkillExecutionRecord = z.infer<typeof verdantSkillExecutionRecordSchema>;
+
+export type ExecutionParse =
+  | { ok: true; execution: Record<string, unknown> }
+  | { ok: false; issues: string[] };
+
+/** Named-field issues, sorted, so a malformed fixture reports WHICH field. */
+export function parseExecutionRecord(input: unknown): ExecutionParse {
+  const parsed = verdantSkillExecutionRecordSchema.safeParse(input);
+  if (parsed.success === false) {
+    return {
+      ok: false,
+      issues: parsed.error.issues
+        .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
+        .sort(),
+    };
+  }
+  return { ok: true, execution: parsed.data as Record<string, unknown> };
+}
+
 export function parseEvaluationFixture(input: unknown): FixtureParse {
   const parsed = verdantSkillEvaluationFixtureSchema.safeParse(input);
   if (parsed.success === false) {

@@ -119,6 +119,47 @@ function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
 
+/**
+ * Every evidence id a run result CITES, across every channel the contract
+ * defines.
+ *
+ * The Build 1 contract lets a run rest on evidence through three fields, not
+ * one: `proposals[].supportingEvidenceIds`, `hypotheses[].supportingEvidenceIds`
+ * and `hypotheses[].conflictingEvidenceIds`. Referential integrity is enforced
+ * identically on all three, so the contract does not treat one as lesser.
+ *
+ * Deriving from proposals alone made `evidence_cited_outside_selection` — a
+ * HARD SAFETY failure — evadable by routing the citation through a hypothesis:
+ * the same forbidden, unselected id passed clean as a hypothesis citation and
+ * failed as a proposal citation. A conflicting citation counts too, because
+ * naming a record as contradicting your conclusion still rests on having
+ * retrieved it.
+ *
+ * This lives in ONE place and is exported because the harness derives the same
+ * set a second time when it records what was cited. Two copies of this rule is
+ * exactly how the hypothesis channel came to be missing from one of them.
+ */
+export function deriveCitedEvidenceIds(output: unknown): string[] {
+  const o = output as
+    | {
+        proposals?: unknown;
+        hypotheses?: unknown;
+      }
+    | null
+    | undefined;
+  const fromProposals = asArray<{ supportingEvidenceIds?: unknown }>(o?.proposals).flatMap((p) =>
+    asArray<string>(p?.supportingEvidenceIds),
+  );
+  const fromHypotheses = asArray<{
+    supportingEvidenceIds?: unknown;
+    conflictingEvidenceIds?: unknown;
+  }>(o?.hypotheses).flatMap((h) => [
+    ...asArray<string>(h?.supportingEvidenceIds),
+    ...asArray<string>(h?.conflictingEvidenceIds),
+  ]);
+  return [...new Set([...fromProposals, ...fromHypotheses])].sort(compareTokens);
+}
+
 function sameMembers(a: readonly string[], b: readonly string[]): boolean {
   const left = [...a].sort(compareTokens);
   const right = [...b].sort(compareTokens);
@@ -146,10 +187,26 @@ export function evaluateSkillCase(input: EvaluateCaseInput): SkillEvaluationCase
   };
 
   // ---- Bindings first. Nothing is judged against an unproven run.
+  //
+  // The values VERIFIED are taken from the values JUDGED, not accepted
+  // alongside them. `actual` and the scored fields used to be two independent
+  // caller-supplied sets with nothing requiring them to describe the same run,
+  // so a case could be bindingValid and passing while its digests attested to
+  // artifacts that were never evaluated — the governing rule exactly inverted.
+  //
+  // `fixture` is deliberately NOT overridden: the bound value is the raw
+  // fixture record and the judged value is its parsed form, so they serialize
+  // differently by design. Parsing is deterministic, so the parsed form is
+  // derived from the bound one rather than independent of it.
   const bindingCheck = verifyEvaluationBindings({
     bindings: x.bindings,
     digest,
-    actual: x.actual,
+    actual: {
+      ...x.actual,
+      applicability: x.applicability,
+      policy: x.policy,
+      citedEvidenceIds: deriveCitedEvidenceIds(x.output),
+    },
   });
   // These two rejections are not merely invalid — they are the safety
   // properties Build 6 was reviewed into having, so they are reported as
@@ -166,6 +223,7 @@ export function evaluateSkillCase(input: EvaluateCaseInput): SkillEvaluationCase
     fixtureId: f.fixtureId,
     fixtureVersion: f.fixtureVersion,
     fixtureKind: f.fixtureKind,
+    fixturePromotionEligible: f.promotionEligible,
     skillId: f.skillId,
     skillVersion: f.skillVersion,
     bindings: x.bindings,
@@ -266,13 +324,7 @@ export function evaluateSkillCase(input: EvaluateCaseInput): SkillEvaluationCase
   }
 
   // ---- Evidence references.
-  const cited = [
-    ...new Set(
-      asArray<{ supportingEvidenceIds?: string[] }>(x.output?.proposals).flatMap((p) =>
-        asArray<string>(p?.supportingEvidenceIds),
-      ),
-    ),
-  ].sort(compareTokens);
+  const cited = deriveCitedEvidenceIds(x.output);
   const allowed = new Set(f.allowedEvidenceIds);
   const forbidden = new Set(f.forbiddenEvidenceIds);
   const citedForbidden = cited.filter((id) => forbidden.has(id));

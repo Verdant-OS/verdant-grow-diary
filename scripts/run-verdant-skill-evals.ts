@@ -39,7 +39,12 @@ import {
   computeBoundDigest,
   type SkillEvaluationBindings,
 } from "@/lib/verdantSkillEvaluationBindings";
-import { parseEvaluationFixture } from "@/lib/verdantSkillEvaluationSchemas";
+import {
+  detectProductionDataCategories,
+  parseEvaluationFixture,
+  parseExecutionRecord,
+} from "@/lib/verdantSkillEvaluationSchemas";
+
 import { calculateEvaluationMetrics } from "@/lib/verdantSkillEvaluationMetrics";
 import {
   buildEvaluationReport,
@@ -47,7 +52,7 @@ import {
   scanArtifactForDisclosure,
   verifyReportBinding,
 } from "@/lib/verdantSkillEvaluationReport";
-import { evaluateSkillCase } from "@/lib/verdantSkillEvaluator";
+import { deriveCitedEvidenceIds, evaluateSkillCase } from "@/lib/verdantSkillEvaluator";
 import {
   evaluateSkillPromotionEligibility,
   renderPromotionMarkdown,
@@ -55,6 +60,11 @@ import {
 import { SKILL_EVALUATION_BINDING_VERSION } from "@/lib/verdantSkillEvaluationBindings";
 import { parseSkillRunResult, serializeSkillContract } from "@/lib/verdantSkillSchemas";
 import { sha256Digest } from "./lib/verdantSkillEvaluationDigest";
+
+/** Message text without assuming the thrown value is an Error. */
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 const ROOT = resolve(fileURLToPath(import.meta.url), "../..");
 const D = sha256Digest;
@@ -126,11 +136,43 @@ function loadFixtures(
   if (!existsSync(dir)) return { ok: false, issues: [`Fixture directory not found: ${dir}`] };
   const issues: string[] = [];
   const files: SelfTestFixtureFile[] = [];
-  for (const name of readdirSync(dir).sort()) {
+  // `existsSync` also succeeds for a regular file, and the listing below threw
+  // OUTSIDE any catch — an uncaught exception is not an exit-code contract. It
+  // surfaced as the interpreter's default exit 1, the code reserved for "the
+  // skill failed its expectations", so a broken invocation read as a clean
+  // refusal. That is the exact collapse the 1/2 split exists to prevent.
+  let names: string[];
+  try {
+    names = readdirSync(dir).sort();
+  } catch (error) {
+    return { ok: false, issues: [`Cannot read fixture directory ${dir}: ${errorText(error)}`] };
+  }
+  for (const name of names) {
     if (!name.endsWith(".json")) continue;
+    let text: string;
+    try {
+      text = readFileSync(join(dir, name), "utf8");
+    } catch (error) {
+      issues.push(`${name}: cannot be read: ${errorText(error)}`);
+      continue;
+    }
+    // The WHOLE file, not the fixture half. The production-data scan ran only
+    // over the fixture block, while the execution block beside it is where the
+    // run payloads actually live — context, evidence corpus, model draft. A
+    // real grow's data pasted into an execution field passed unremarked.
+    // Category names only; never the matched value, which would re-leak it.
+    const leaks = detectProductionDataCategories(text).filter(
+      // A run result legitimately carries contract UUIDs, so that one category
+      // is judged by the run-level list instead of the strict authored one.
+      (category) => category !== "real_uuid",
+    );
+    if (leaks.length > 0) {
+      issues.push(`${name}: contains production-shaped data: ${leaks.join(", ")}`);
+      continue;
+    }
     let parsed: unknown;
     try {
-      parsed = JSON.parse(readFileSync(join(dir, name), "utf8"));
+      parsed = JSON.parse(text);
     } catch {
       issues.push(`${name}: not valid JSON`);
       continue;
@@ -155,6 +197,15 @@ function loadFixtures(
     const check = parseEvaluationFixture(record.fixture);
     if (check.ok === false) {
       issues.push(...check.issues.map((i) => `${name}: ${i}`));
+      continue;
+    }
+    // The execution block, by schema and by name. Proving it is an object is
+    // not enough: a wrong-typed inner field still reached a spread and threw,
+    // and — the safety-relevant case — a policy missing `firedRules` read as
+    // "the governor fired nothing" rather than as the error it is.
+    const executionCheck = parseExecutionRecord(record.execution);
+    if (executionCheck.ok === false) {
+      issues.push(...executionCheck.issues.map((i) => `${name}: execution.${i}`));
       continue;
     }
     files.push(record);
@@ -318,9 +369,11 @@ export function main(argv: readonly string[]): MainResult {
     // fixture-authored list. An authored list omitting an id the output
     // actually cites would let an unselected citation pass both the selection
     // expectation and the evidence-integrity check.
-    const derivedCitedEvidenceIds = [
-      ...new Set((parsedOutput?.proposals ?? []).flatMap((p) => p.supportingEvidenceIds ?? [])),
-    ].sort();
+    //
+    // Through the SHARED helper, not a second copy of the rule: the copy that
+    // used to live here covered only proposals, so a hypothesis citation was
+    // invisible to the hard-safety check on one path and not the other.
+    const derivedCitedEvidenceIds = deriveCitedEvidenceIds(parsedOutput);
 
     const buildExecution = (repeatSerializations: string[]) => ({
       fixture,
@@ -415,9 +468,16 @@ export function main(argv: readonly string[]): MainResult {
     currentState: "draft",
     requestedState: "limited_beta",
     report,
-    currentManifestDigest: report.manifestBinding?.value ?? "",
-    currentPolicyDigest: report.policyBinding?.value ?? "",
-    currentEvidenceCorpusDigest: report.evidenceRegistryBinding.corpus?.value ?? "",
+    // NULL, not the report's own digests. Reading "what is current" out of the
+    // artifact being judged made every staleness comparison `x === x`: three
+    // blocking reasons became unreachable and `current_bindings` was satisfied
+    // by construction. Build 7 has no registry to read the live manifest,
+    // policy or corpus from, so the honest answer is that it cannot
+    // substantiate currency — and the gate stays unsatisfied rather than
+    // self-certifying. Build 8 supplies these from the real sources.
+    currentManifestDigest: null,
+    currentPolicyDigest: null,
+    currentEvidenceCorpusDigest: null,
     // Nothing is attested by running a script. Attestations are human acts.
     attestations: [],
     rollbackTarget: null,

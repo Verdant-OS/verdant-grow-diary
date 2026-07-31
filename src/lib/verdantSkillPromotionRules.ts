@@ -211,10 +211,19 @@ export interface PromotionEligibilityInput {
   currentState: EvaluationProgressionState;
   requestedState: EvaluationProgressionState;
   report: SkillEvaluationReport;
-  /** The bindings in force RIGHT NOW, not those the report was built from. */
-  currentManifestDigest: string;
-  currentPolicyDigest: string;
-  currentEvidenceCorpusDigest: string;
+  /**
+   * The bindings in force RIGHT NOW, not those the report was built from.
+   *
+   * `null` means NO INDEPENDENT SOURCE WAS AVAILABLE, and is treated as a
+   * failed comparison rather than a passed one. The only caller used to fill
+   * these from `report.manifestBinding?.value` — the artifact being judged —
+   * which reduced all three checks to `x === x`, made three blocking reasons
+   * structurally unreachable, and left `current_bindings` unconditionally
+   * satisfied. A gate that cannot fail is not a gate.
+   */
+  currentManifestDigest: string | null;
+  currentPolicyDigest: string | null;
+  currentEvidenceCorpusDigest: string | null;
   /** Recorded human acts. Absent means absent; never inferred. */
   attestations: readonly PromotionAttestation[];
   rollbackTarget: string | null;
@@ -276,6 +285,20 @@ export function evaluateSkillPromotionEligibility(
   const block = (reason: PromotionBlockingReason): void => {
     blocking.add(reason);
   };
+
+  /**
+   * A comparison only counts when there was something INDEPENDENT to compare
+   * against. An absent current digest is the absence of the check, not its
+   * success, so it fails closed.
+   */
+  const isCurrent = (claimed: string | null | undefined, supplied: string | null): boolean =>
+    supplied !== null && supplied !== undefined && claimed === supplied;
+  const manifestIsCurrent = isCurrent(report.manifestBinding?.value, input.currentManifestDigest);
+  const policyIsCurrent = isCurrent(report.policyBinding?.value, input.currentPolicyDigest);
+  const corpusIsCurrent = isCurrent(
+    report.evidenceRegistryBinding.corpus?.value,
+    input.currentEvidenceCorpusDigest,
+  );
 
   const targetKnown = (EVALUATION_PROGRESSION_STATES as readonly string[]).includes(
     input.requestedState,
@@ -339,15 +362,9 @@ export function evaluateSkillPromotionEligibility(
     // The bindings must be CURRENT, not merely internally consistent. A
     // report can be perfectly self-consistent and describe a manifest that
     // has since been edited.
-    if (report.manifestBinding?.value !== input.currentManifestDigest) {
-      block("manifest_binding_stale");
-    }
-    if (report.policyBinding?.value !== input.currentPolicyDigest) {
-      block("policy_binding_stale");
-    }
-    if (report.evidenceRegistryBinding.corpus?.value !== input.currentEvidenceCorpusDigest) {
-      block("evidence_registry_binding_stale");
-    }
+    if (!manifestIsCurrent) block("manifest_binding_stale");
+    if (!policyIsCurrent) block("policy_binding_stale");
+    if (!corpusIsCurrent) block("evidence_registry_binding_stale");
   }
 
   // Gate satisfaction.
@@ -386,12 +403,7 @@ export function evaluateSkillPromotionEligibility(
         if (report.metrics.safetyCriticalFailures === 0) satisfied.add(gate);
         break;
       case "current_bindings":
-        if (
-          report.manifestBinding?.value === input.currentManifestDigest &&
-          report.policyBinding?.value === input.currentPolicyDigest &&
-          report.evidenceRegistryBinding.corpus?.value === input.currentEvidenceCorpusDigest
-        )
-          satisfied.add(gate);
+        if (manifestIsCurrent && policyIsCurrent && corpusIsCurrent) satisfied.add(gate);
         break;
       case "rollback_target":
         // A release-like state without somewhere to fall back to is a

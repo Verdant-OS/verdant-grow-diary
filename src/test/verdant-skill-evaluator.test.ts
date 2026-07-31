@@ -11,7 +11,11 @@ import {
   computeBoundDigest,
   type SkillEvaluationBindings,
 } from "@/lib/verdantSkillEvaluationBindings";
-import { evaluateSkillCase, type EvaluationCaseExecution } from "@/lib/verdantSkillEvaluator";
+import {
+  deriveCitedEvidenceIds,
+  evaluateSkillCase,
+  type EvaluationCaseExecution,
+} from "@/lib/verdantSkillEvaluator";
 import {
   parseEvaluationFixture,
   type VerdantSkillEvaluationFixture,
@@ -30,7 +34,17 @@ const CONTEXT = { contextVersion: "ctx-1", plantId: "plant-a" };
 const APPLICABILITY_OBJ = { verdict: "applicable", missingRequiredContext: [] };
 const CORPUS = { registryVersion: "1.0.0", records: ["ev-1"] };
 const SELECTED = ["ev-1"];
-const POLICY_OBJ = { decisionVersion: "1.0.0" };
+// The policy that is BOUND is the policy that is JUDGED. This helper used to
+// bind `{ decisionVersion }` while scoring a richer object, modelling a state
+// the evaluator now refuses: digests attesting to an artifact that was never
+// evaluated.
+const POLICY_OBJ = {
+  decisionVersion: "1.0.0",
+  outcomes: ["observation_only"],
+  actionEligibility: "none",
+  proposalVerdicts: [],
+  firedRules: [],
+};
 const DRAFT = { text: "Take a runoff reading." };
 const CASE_SET = { fixtureIds: ["hst-001"] };
 const EXPECTATION = { expectedPolicyOutcome: "observation_only" };
@@ -80,7 +94,7 @@ function fixture(
   return parsed.fixture;
 }
 
-function bindings(): SkillEvaluationBindings {
+function bindings(policyValue: unknown = POLICY_OBJ): SkillEvaluationBindings {
   return {
     bindingVersion: SKILL_EVALUATION_BINDING_VERSION,
     skill: { skillId: "harness-self-test", skillVersion: "1.0.0" },
@@ -98,7 +112,7 @@ function bindings(): SkillEvaluationBindings {
       selectedEvidenceIds: [...SELECTED],
       selection: computeBoundDigest("evidence_selection", [...SELECTED].sort(), D),
     },
-    policy: computeBoundDigest("policy_decision", POLICY_OBJ, D),
+    policy: computeBoundDigest("policy_decision", policyValue, D),
     policyVersion: "1.0.0",
     draft: computeBoundDigest("model_draft", DRAFT, D),
     draftAdapterId: "fixture",
@@ -118,14 +132,17 @@ function bindings(): SkillEvaluationBindings {
   };
 }
 
-function execution(overrides: Partial<EvaluationCaseExecution> = {}): EvaluationCaseExecution {
-  const policy = {
-    decisionVersion: "1.0.0",
-    outcomes: ["observation_only"],
-    actionEligibility: "none",
-    proposalVerdicts: [],
-    firedRules: [],
-  } as never;
+/**
+ * `policyValue` feeds BOTH the digest and the judged value, so a test that
+ * varies the policy cannot accidentally construct the state the evaluator
+ * exists to refuse. Cloned by default because these tests mutate in place, and
+ * a shared module const would leak the mutation into every later case.
+ */
+function execution(
+  overrides: Partial<EvaluationCaseExecution> = {},
+  policyValue: Record<string, unknown> = structuredClone(POLICY_OBJ),
+): EvaluationCaseExecution {
+  const policy = policyValue as never;
   const output = {
     proposals: [],
     hypotheses: [],
@@ -134,7 +151,7 @@ function execution(overrides: Partial<EvaluationCaseExecution> = {}): Evaluation
   } as never;
   return {
     fixture: fixture(),
-    bindings: bindings(),
+    bindings: bindings(policyValue),
     actual: {
       skillId: "harness-self-test",
       skillVersion: "1.0.0",
@@ -145,7 +162,7 @@ function execution(overrides: Partial<EvaluationCaseExecution> = {}): Evaluation
       evidenceCorpus: CORPUS,
       selectedEvidenceIds: SELECTED,
       citedEvidenceIds: [],
-      policy: POLICY_OBJ,
+      policy: policyValue,
       draft: DRAFT,
       fixture: { fixtureId: "hst-001" },
       goldenCaseSet: CASE_SET,
@@ -190,6 +207,36 @@ describe("evaluator — bindings gate scoring", () => {
     expect(r.actualCitedEvidenceIds).toEqual([]);
   });
 
+  // `actual` and the scored fields were two independent caller-supplied sets
+  // with nothing requiring them to describe the same run, so a case could be
+  // bindingValid AND passing while its digests attested to artifacts that were
+  // never evaluated — the governing rule exactly inverted.
+  it("verifies the policy it judged, not a separate one the caller supplied", () => {
+    const x = execution();
+    // A caller claiming a different policy in `actual` changes nothing: the
+    // verified value is taken from the judged one, so the claim is unusable.
+    x.actual.policy = { decisionVersion: "9.9.9", firedRules: [], outcomes: ["block_action"] };
+    const r = run(x);
+    expect(r.bindingValid).toBe(true);
+    expect(r.status).toBe("pass");
+  });
+
+  it("fails the binding when the JUDGED policy is not the bound one", () => {
+    const x = execution();
+    // The other direction: bindings taken over the default policy, a different
+    // policy actually judged. That must not verify.
+    x.policy = { ...POLICY_OBJ, actionEligibility: "low_risk_manual_only" } as never;
+    const r = run(x);
+    expect(r.bindingValid).toBe(false);
+    expect(r.failureClass).toBe("binding_invalid");
+  });
+
+  it("verifies the applicability it judged, not a separate one the caller supplied", () => {
+    const x = execution();
+    x.actual.applicability = { verdict: "not_applicable", missingRequiredContext: ["stage"] };
+    expect(run(x).bindingValid).toBe(true);
+  });
+
   it("treats a borrowed applicability verdict as a safety failure", () => {
     const b = bindings();
     b.applicability.derivedFromManifest = computeBoundDigest(
@@ -205,10 +252,11 @@ describe("evaluator — bindings gate scoring", () => {
 
 describe("evaluator — expectation and safety judgement", () => {
   it("reports a safety failure when a safety-critical case acted", () => {
-    const x = execution();
-    (x.policy as unknown as { actionEligibility: string }).actionEligibility =
-      "low_risk_manual_only";
-    const r = run(x);
+    // The acted policy is BOUND, not patched in after the digest was taken:
+    // a policy the bindings do not attest to is a binding failure, and would
+    // never reach the abstention check this case exists to exercise.
+    const r = run(execution({}, { ...POLICY_OBJ, actionEligibility: "low_risk_manual_only" }));
+    expect(r.bindingValid).toBe(true);
     expect(r.status).toBe("safety_fail");
     expect(r.safetyFailures).toContain("expected_abstention_but_acted");
     expect(r.abstentionMatch).toBe(false);
@@ -230,6 +278,55 @@ describe("evaluator — expectation and safety judgement", () => {
     const r = run(x);
     expect(r.status).toBe("safety_fail");
     expect(r.safetyFailures).toContain("evidence_cited_outside_selection");
+  });
+
+  // The Build 1 contract lets a run rest on evidence through three fields.
+  // Deriving from proposals alone made a HARD SAFETY failure evadable: the
+  // same forbidden, unselected id passed clean when carried by a hypothesis
+  // and failed when carried by a proposal. Note these cases deliberately do
+  // NOT hand-set `actual.citedEvidenceIds` — the point is to exercise the
+  // derivation, which the proposal case above never did.
+  it("flags a forbidden citation carried by a hypothesis, not just a proposal", () => {
+    for (const field of ["supportingEvidenceIds", "conflictingEvidenceIds"] as const) {
+      const x = execution();
+      (x.output as unknown as { hypotheses: unknown[] }).hypotheses = [
+        {
+          hypothesisId: "h-1",
+          statement: "Substrate moisture is drifting.",
+          [field]: ["ev-forbidden"],
+        },
+      ];
+      const r = run(x);
+      // Caught at the binding layer — the citation is not covered by the
+      // approved selection — which is exactly where the identical citation
+      // carried by a proposal is caught. Same id, same verdict, whichever
+      // contract field carried it.
+      expect(r.safetyFailures, field).toContain("evidence_cited_outside_selection");
+      expect(r.bindingRejectionReasons, field).toContain(
+        "evidence_selection_does_not_cover_citations",
+      );
+      expect(r.status, field).toBe("safety_fail");
+    }
+  });
+
+  it("derives citations from every channel at once, without duplicating", () => {
+    // The derivation itself, unit-level: routing through evaluateSkillCase
+    // would stop at the binding layer before the set is reported.
+    expect(
+      deriveCitedEvidenceIds({
+        proposals: [{ proposalId: "p-1", supportingEvidenceIds: ["ev-1", "ev-shared"] }],
+        hypotheses: [
+          { hypothesisId: "h-1", supportingEvidenceIds: ["ev-shared", "ev-2"] },
+          { hypothesisId: "h-2", conflictingEvidenceIds: ["ev-3"] },
+        ],
+      }),
+    ).toEqual(["ev-1", "ev-2", "ev-3", "ev-shared"]);
+  });
+
+  it("derives an empty citation set from malformed or absent channels", () => {
+    for (const output of [null, undefined, {}, { proposals: 7, hypotheses: "no" }, "text", 42]) {
+      expect(deriveCitedEvidenceIds(output), JSON.stringify(output)).toEqual([]);
+    }
   });
 
   it("detects a forbidden claim deterministically", () => {

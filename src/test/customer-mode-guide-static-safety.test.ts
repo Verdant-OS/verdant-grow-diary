@@ -15,10 +15,12 @@ const FILES = [
   "src/components/customer/CustomerGuideSection.tsx",
   "src/components/customer/CustomerGuideTimeline.tsx",
   "src/components/customer/CustomerGuideQrBlock.tsx",
+  "src/components/customer/CustomerComparisonGuideQrOption.tsx",
   "src/components/customer/CustomerGuideTrustFooter.tsx",
   "src/components/customer/CustomerShareLinkPreview.tsx",
   "src/pages/CustomerModeGuide.tsx",
   "src/pages/CustomerModeCannabisCareFaq.tsx",
+  "src/pages/CustomerOreozGelonadeGuide.tsx",
 ];
 
 function read(rel: string): string {
@@ -60,5 +62,10 @@ describe("CustomerModeGuide — static safety", () => {
     const src = stripCommentsAndStrings(read("src/pages/CustomerModeGuide.tsx"));
     expect(src).not.toMatch(/from\s+["']@\/components\/AppShell["']/);
     expect(src).not.toMatch(/GlobalFastAddButton/);
+  });
+
+  it("ID-free comparison page must not import AppShell, auth, or Quick Log controls", () => {
+    const src = stripCommentsAndStrings(read("src/pages/CustomerOreozGelonadeGuide.tsx"));
+    expect(src).not.toMatch(/AppShell|GlobalFastAddButton|QuickLog|useAuth/);
   });
 });

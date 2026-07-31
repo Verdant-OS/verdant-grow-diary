@@ -67,6 +67,7 @@ describe("appRouteManifest — structural invariants", () => {
 
   it("models the exact Pheno Tracker route family with the canonical feature key", () => {
     const expected = [
+      "/diary/strains/:slug",
       "/pheno-hunts",
       "/pheno-hunts/:id/keepers",
       "/pheno-hunts/:id/workspace",

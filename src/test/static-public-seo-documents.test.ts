@@ -6,10 +6,15 @@ import { VERDANT_CULTIVAR_SLUGS } from "@/constants/verdantCultivars";
 import { VERDANT_GUIDE_SLUGS } from "@/constants/verdantSeoContent";
 import {
   STATIC_PUBLIC_ALIAS_DOCUMENTS,
+  STATIC_PUBLIC_NOINDEX_DOCUMENTS,
   STATIC_PUBLIC_OUTPUT_DOCUMENTS,
   STATIC_PUBLIC_SEO_DOCUMENTS,
   VERDANT_SITE_ORIGIN,
 } from "@/lib/build/staticPublicSeoDocuments";
+import {
+  NEXT_DOOR_CUSTOMER_COMPARISON_PATH,
+  OREOZ_GELONADE_CUSTOMER_SEO,
+} from "@/constants/oreozGelonadeExperience";
 
 const ROOT = resolve(process.cwd());
 const VERCEL = JSON.parse(readFileSync(resolve(ROOT, "vercel.json"), "utf8")) as {
@@ -71,6 +76,31 @@ describe("static public SEO documents", () => {
         },
       });
     }
+  });
+
+  it("emits the ID-free Customer Mode guide as noindex and keeps it out of acquisition docs", () => {
+    expect(STATIC_PUBLIC_NOINDEX_DOCUMENTS).toEqual([
+      expect.objectContaining({
+        path: NEXT_DOOR_CUSTOMER_COMPARISON_PATH,
+        fileName: "customer/guide/oreoz-vs-gelonade-comparison/index.html",
+        metadata: expect.objectContaining({
+          title: OREOZ_GELONADE_CUSTOMER_SEO.title,
+          description: OREOZ_GELONADE_CUSTOMER_SEO.description,
+          url: `${VERDANT_SITE_ORIGIN}${NEXT_DOOR_CUSTOMER_COMPARISON_PATH}`,
+          robots: "noindex, follow",
+        }),
+      }),
+    ]);
+    expect(
+      STATIC_PUBLIC_SEO_DOCUMENTS.some(
+        (document) => document.path === NEXT_DOOR_CUSTOMER_COMPARISON_PATH,
+      ),
+    ).toBe(false);
+    expect(
+      STATIC_PUBLIC_OUTPUT_DOCUMENTS.some(
+        (document) => document.path === NEXT_DOOR_CUSTOMER_COMPARISON_PATH,
+      ),
+    ).toBe(true);
   });
 
   it("keeps every emitted filesystem path unique and query-free", () => {

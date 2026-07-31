@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
+import CustomerComparisonGuideQrOption from "@/components/customer/CustomerComparisonGuideQrOption";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
   Accordion,
@@ -29,6 +30,7 @@ import {
 } from "@/lib/seoStructuredData";
 import { buildGuideQuickLogStarterHref } from "@/lib/quickLogStarterLinks";
 import { resolveGuideFaqFromHash } from "@/lib/guideFaqHashResolver";
+import { OREOZ_GELONADE_GUIDE_SLUG } from "@/constants/oreozGelonadeExperience";
 
 export default function GuidePage() {
   const { slug } = useParams<{ slug: string }>();
@@ -205,6 +207,8 @@ export default function GuidePage() {
             </div>
           </aside>
         )}
+
+        {guide.slug === OREOZ_GELONADE_GUIDE_SLUG && <CustomerComparisonGuideQrOption />}
 
         <div className="mt-10 space-y-8">
           {guide.sections.map((section) => (

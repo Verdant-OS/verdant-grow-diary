@@ -382,17 +382,22 @@ describe("AppShell intent consumption wiring", () => {
 
   it("reads the preset before consuming the intent", () => {
     const src = body();
+    const guideReadAt = src.indexOf("readGuidePhenoQuickLogPrefill(location.search)");
     const readAt = src.indexOf("readQuickLogStartEventType(location.search)");
     const consumeAt = src.indexOf("consumeQuickLogStartIntent(location.search)");
+    expect(guideReadAt).toBeGreaterThan(-1);
     expect(readAt).toBeGreaterThan(-1);
     expect(consumeAt).toBeGreaterThan(-1);
     // Order matters: consuming strips the marker.
+    expect(guideReadAt).toBeLessThan(consumeAt);
     expect(readAt).toBeLessThan(consumeAt);
   });
 
-  it("seeds the activity from the intent instead of always clearing it", () => {
+  it("seeds the guide prompt or activity from the intent instead of always clearing it", () => {
     // The pre-fix shape was an unconditional setPrefill(null) here, which
     // dropped the grower's chosen preset.
-    expect(body()).toMatch(/setPrefill\(\s*startEventType\s*\?\s*\{\s*eventType:\s*startEventType/);
+    expect(body()).toMatch(
+      /setPrefill\(\s*guidePrefill\s*\?\?\s*\(\s*startEventType\s*\?\s*\{\s*eventType:\s*startEventType/,
+    );
   });
 });

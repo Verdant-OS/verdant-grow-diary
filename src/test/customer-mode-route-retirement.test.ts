@@ -12,8 +12,9 @@ const SEO_CONTENT = read("src/constants/verdantSeoContent.ts");
 const MOBILE_ROUTE_SPEC = read("e2e/auth-route-protection-mobile.spec.ts");
 
 const RETIRED_CUSTOMER_ROUTES = ["/customer/:shareId", "/customer/:shareId/cannabis-care"] as const;
+const STATIC_CUSTOMER_GUIDE = "/customer/guide/oreoz-vs-gelonade-comparison";
 
-describe("retired unbacked Customer Mode routes", () => {
+describe("retired unbacked Customer Mode share routes", () => {
   it("does not load or mount the dormant Customer Mode pages", () => {
     expect(APP).not.toMatch(/import\(\s*["']\.\/pages\/CustomerModeGuide["']\s*\)/);
     expect(APP).not.toMatch(/import\(\s*["']\.\/pages\/CustomerModeCannabisCareFaq["']\s*\)/);
@@ -28,6 +29,18 @@ describe("retired unbacked Customer Mode routes", () => {
       expect(APP_ROUTES.find((route) => route.path === path)).toBeUndefined();
       expect(MOBILE_ROUTE_SPEC).not.toContain(`"${path}"`);
     }
+  });
+
+  it("allows only the exact ID-free comparison guide as a public customer route", () => {
+    expect(APP).toContain(`path="${STATIC_CUSTOMER_GUIDE}"`);
+    expect(APP_ROUTES.find((route) => route.path === STATIC_CUSTOMER_GUIDE)).toMatchObject({
+      access: "public",
+    });
+    expect(MOBILE_ROUTE_SPEC).toContain(`"${STATIC_CUSTOMER_GUIDE}"`);
+
+    const customerRoutes = APP_ROUTES.filter((route) => route.path.startsWith("/customer/"));
+    expect(customerRoutes.map((route) => route.path)).toEqual([STATIC_CUSTOMER_GUIDE]);
+    expect(customerRoutes.some((route) => route.path.includes(":shareId"))).toBe(false);
   });
 
   it.each(["/customer/invented-share", "/customer/invented-share/cannabis-care"])(

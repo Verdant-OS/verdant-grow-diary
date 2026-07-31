@@ -286,20 +286,24 @@ describe("Landing and Pricing OG/Twitter metadata", () => {
   });
 });
 
-describe("retired Customer Mode routes stay absent from the public guide funnel", () => {
+describe("retired Customer Mode share routes stay absent from the public guide funnel", () => {
   it("does not mount an unbacked Customer Mode share route", () => {
     expect(APP_TSX).not.toMatch(/path="\/customer\/:shareId"/);
     expect(CONTENT_TS).not.toContain('"/customer/guide"');
   });
 
-  it("GuidePage and GuidesIndex neither import nor promote Customer Mode", () => {
-    expect(GUIDE_PAGE).not.toMatch(/\/customer\//);
+  it("GuidePage scopes the ID-free QR option to the comparison guide only", () => {
+    expect(GUIDE_PAGE).toContain("CustomerComparisonGuideQrOption");
+    expect(GUIDE_PAGE).toContain("OREOZ_GELONADE_GUIDE_SLUG");
+    expect(GUIDE_PAGE).toMatch(
+      /guide\.slug\s*===\s*OREOZ_GELONADE_GUIDE_SLUG\s*&&\s*<CustomerComparisonGuideQrOption/,
+    );
     expect(GUIDES_INDEX).not.toMatch(/\/customer\//);
     expect(GUIDE_PAGE).not.toMatch(/Start with the Customer Guide/i);
     expect(GUIDES_INDEX).not.toMatch(/start with the Customer Guide/i);
   });
 
-  it("guide pages do not link to protected/private app routes", () => {
+  it("generic guide presenters do not hardcode protected/private app routes", () => {
     const surface = [GUIDES_INDEX, GUIDE_PAGE].join("\n");
     for (const priv of [
       'to="/dashboard"',

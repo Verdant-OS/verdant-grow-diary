@@ -12,6 +12,8 @@
  * Queue item — this helper only normalizes the AI Doctor's draft suggestions.
  */
 
+import { OVER_PROMISE_PATTERNS } from "@/lib/aiOutputTextSafetyDetectors";
+
 export type DiagnosisRiskLevel = "low" | "medium" | "high";
 
 export type DiagnosisSuggestedActionType = "task" | "alert" | "note";
@@ -124,16 +126,7 @@ const DEVICE_CONTROL_PATTERNS: RegExp[] = [
   /\bcontrol (the )?(fan|light|pump|heater|humidifier|dehumidifier|valve)\b/i,
 ];
 
-/** Phrases that over-promise recovery, yield, or certainty. */
-const OVER_PROMISE_PATTERNS: RegExp[] = [
-  /\bguarantee(d|s)?\b/i,
-  /\bdefinitely\b/i,
-  /\bwill (fully )?recover\b/i,
-  /\bfull recovery\b/i,
-  /\bmaximize? (your )?yield\b/i,
-  /\bguaranteed yield\b/i,
-  /\b(100%|hundred percent) (sure|certain|safe)\b/i,
-];
+
 
 function containsDeviceControl(text: string): boolean {
   return DEVICE_CONTROL_PATTERNS.some((re) => re.test(text));

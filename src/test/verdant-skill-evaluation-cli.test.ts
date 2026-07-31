@@ -430,6 +430,54 @@ describe("cli — untrusted fixture input", () => {
     }
   });
 
+  // The governor derives eligibility FROM the verdicts, so the two cannot
+  // disagree in anything it emits. It mattered because the evaluator reads
+  // abstention from actionEligibility alone: "none" beside an allowed
+  // manual_only verdict let a safety-critical must_abstain fixture pass while
+  // the policy it recorded still permitted a manual action.
+  it("rejects an action eligibility that contradicts its own verdicts", () => {
+    const contradictions: [string, unknown[]][] = [
+      [
+        "none",
+        [{ verdict: "allow", effectiveRiskLevel: "low", executionCapability: "manual_only" }],
+      ],
+      ["low_risk_manual_only", []],
+      [
+        "low_risk_manual_only",
+        [{ verdict: "block", effectiveRiskLevel: "low", executionCapability: "manual_only" }],
+      ],
+    ];
+    for (const [actionEligibility, verdicts] of contradictions) {
+      const r = runWithMutated((record) => {
+        const policy = (record.execution as { policy: Record<string, unknown> }).policy;
+        policy.actionEligibility = actionEligibility;
+        policy.proposalVerdicts = verdicts;
+      });
+      expect(r.code, actionEligibility).toBe(EXIT_USAGE_OR_IO);
+      expect(r.lines.join(" "), actionEligibility).toContain("actionEligibility");
+    }
+  });
+
+  it("accepts the two consistent eligibility pairings", () => {
+    // Guards the guard: an invariant that rejected both directions would pass
+    // the test above while breaking every real run.
+    const none = runWithMutated((record) => {
+      const policy = (record.execution as { policy: Record<string, unknown> }).policy;
+      policy.actionEligibility = "none";
+      policy.proposalVerdicts = [];
+    });
+    expect(none.code).not.toBe(EXIT_USAGE_OR_IO);
+
+    const acting = runWithMutated((record) => {
+      const policy = (record.execution as { policy: Record<string, unknown> }).policy;
+      policy.actionEligibility = "low_risk_manual_only";
+      policy.proposalVerdicts = [
+        { verdict: "allow", effectiveRiskLevel: "low", executionCapability: "manual_only" },
+      ];
+    });
+    expect(acting.code).not.toBe(EXIT_USAGE_OR_IO);
+  });
+
   it("still accepts a well-formed envelope from the same path", () => {
     // Guards the guard: a check that rejected everything would pass the two
     // tests above while breaking the harness.

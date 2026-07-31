@@ -448,6 +448,27 @@ describe("promotion — trustworthiness applies always, sufficiency by target", 
     expect(d.blockingReasons).toContain("manifest_binding_stale");
   });
 
+  it("refuses a binding-blocked report at every target, not just release ones", () => {
+    // A correction to how I first applied the rule: "blocked" is a
+    // TRUSTWORTHINESS verdict — the report cannot say what it measured —
+    // so gating it behind green_evaluation let an evidence-only rung accept a
+    // report whose schema-compliance rate was 1 while its bindings never
+    // verified.
+    const blockedReport = report([
+      caseResult({ bindingValid: false, failureClass: "binding_invalid", status: "fail" }),
+    ]);
+    expect(blockedReport.overallStatus).toBe("blocked");
+    const d = decide({
+      currentState: "draft",
+      requestedState: "schema_valid",
+      report: blockedReport,
+      attestations: [],
+      rollbackTarget: null,
+    });
+    expect(d.eligible).toBe(false);
+    expect(d.blockingReasons).toContain("evaluation_not_passing");
+  });
+
   it("applies trustworthiness checks even to an evidence-only rung", () => {
     // A report we cannot read supports no claim, however modest. The binding
     // is BROKEN here rather than asserted broken — the module recomputes it,

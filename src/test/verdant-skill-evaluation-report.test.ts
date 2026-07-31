@@ -107,6 +107,38 @@ function report(cases: SkillEvaluationCaseResult[] = [caseResult()], generatedAt
   });
 }
 
+describe("report — a report is about ONE skill", () => {
+  it("blocks a report assembled from another skill's cases", () => {
+    // The report adopts an identity from its INPUT, so nothing stopped
+    // skill B's report being built from skill A's cases: it self-verified,
+    // and promotion's wrong-skill check compares only the copied top-level
+    // identity.
+    const r = buildEvaluationReport({
+      skillId: "some-other-skill",
+      skillVersion: "1.0.0",
+      generatedAt: NOW,
+      sourceRevision: null,
+      caseResults: [caseResult()],
+      digest: D,
+    });
+    expect(r.overallStatus).toBe("blocked");
+    expect(r.promotionEligible).toBe(false);
+    expect(r.warnings.join(" ")).toContain("different skill");
+  });
+
+  it("blocks on a version mismatch too", () => {
+    const r = buildEvaluationReport({
+      skillId: "coco-dryback-review",
+      skillVersion: "2.0.0",
+      generatedAt: NOW,
+      sourceRevision: null,
+      caseResults: [caseResult()],
+      digest: D,
+    });
+    expect(r.overallStatus).toBe("blocked");
+  });
+});
+
 describe("report — the summary is a summary OF the report", () => {
   it("derives metrics from its own cases rather than accepting them", () => {
     // Accepting precomputed metrics let a report carry numbers calculated from

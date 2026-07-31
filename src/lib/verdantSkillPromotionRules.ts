@@ -377,7 +377,16 @@ export function evaluateSkillPromotionEligibility(
     // exposure — which is exactly why they can be honest about what they do
     // and do not cover. Every rung that ships to a grower inherits both gates
     // cumulatively, so nothing above loosens.
-    if (requiredGates.includes("green_evaluation") && report.overallStatus !== "pass") {
+    // A refinement of the rule above, and a correction to how I first applied
+    // it. "blocked" is a TRUSTWORTHINESS verdict — the report cannot say what
+    // it measured, because a case binding did not verify, the cases describe
+    // differing upstreams, or there were no cases at all. Gating it behind
+    // `green_evaluation` let an evidence-only rung accept a report whose
+    // schema-compliance rate was 1 while its bindings never verified. Only an
+    // ordinary expectation failure is a sufficiency question.
+    if (report.overallStatus === "blocked") {
+      block("evaluation_not_passing");
+    } else if (requiredGates.includes("green_evaluation") && report.overallStatus !== "pass") {
       block("evaluation_not_passing");
     }
     if (

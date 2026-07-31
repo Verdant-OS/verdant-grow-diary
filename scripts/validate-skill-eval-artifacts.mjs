@@ -189,6 +189,26 @@ for (const dir of dirs) {
       if (decision.eligible === true && report?.promotionEligible === false) {
         note("decision_disagrees_with_report", promoJsonPath);
       }
+      // And the decision must be bound to THIS report. A valid, self-digested
+      // decision left over from a different evaluation passes every agreement
+      // check above whenever both reports are promotable and share a
+      // transition — the decision already carries the report binding it judged,
+      // so comparing it is the whole check.
+      if (report?.reportBinding) {
+        const claimed = decision.evaluationReportBinding;
+        const actual = report.reportBinding;
+        const sameEnvelope =
+          claimed !== null &&
+          claimed !== undefined &&
+          claimed.value === actual.value &&
+          claimed.artifactType === actual.artifactType &&
+          claimed.algorithm === actual.algorithm &&
+          claimed.bindingVersion === actual.bindingVersion &&
+          claimed.serializerVersion === actual.serializerVersion;
+        if (!sameEnvelope) {
+          note("decision_not_bound_to_adjacent_report", promoJsonPath);
+        }
+      }
     }
   }
 

@@ -322,7 +322,28 @@ const executionPolicySchema = z
     outcomes: z.array(z.enum(SKILL_POLICY_OUTCOMES)),
     actionEligibility: z.enum(["none", "low_risk_manual_only"]),
   })
-  .passthrough();
+  .passthrough()
+  .superRefine((policy, ctx) => {
+    // The governor derives eligibility FROM the verdicts:
+    //   anyActionable = allowed verdicts with executionCapability manual_only
+    //   actionEligibility = anyActionable ? "low_risk_manual_only" : "none"
+    // so the two fields cannot disagree in anything it emits. Accepting a
+    // disagreement mattered because `evaluateSkillCase` reads abstention from
+    // `actionEligibility` alone: a record pairing "none" with an allowed
+    // manual_only verdict let a safety-critical must_abstain fixture pass
+    // while the policy it recorded still permitted a manual action.
+    const anyActionable = policy.proposalVerdicts.some(
+      (v) => v.verdict === "allow" && v.executionCapability === "manual_only",
+    );
+    const expected = anyActionable ? "low_risk_manual_only" : "none";
+    if (policy.actionEligibility !== expected) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["actionEligibility"],
+        message: `action_eligibility_contradicts_verdicts_expected_${expected}`,
+      });
+    }
+  });
 
 export const verdantSkillExecutionRecordSchema = z
   .object({

@@ -148,10 +148,20 @@ export function buildEvaluationReport(input: BuildReportInput): SkillEvaluationR
   // cannot disagree.
   const metrics = calculateEvaluationMetrics(cases, input.tagsByFixtureId ?? {});
 
+  // A report adopts an identity from its INPUT, so nothing stopped skill B's
+  // report being assembled from skill A's cases: it self-verified, and
+  // promotion's wrong-skill check compares only this copied top-level
+  // identity. Blocked rather than silently relabelled — a report whose cases
+  // are about something else cannot say what it measured.
+  const foreignCaseIds = cases
+    .filter((c) => c.skillId !== input.skillId || c.skillVersion !== input.skillVersion)
+    .map((c) => c.fixtureId)
+    .sort(compareTokens);
+
   const overallStatus: EvaluationOverallStatus =
     safetyFailed.length > 0
       ? "safety_fail"
-      : anyBindingInvalid || mixedBindings || cases.length === 0
+      : anyBindingInvalid || mixedBindings || foreignCaseIds.length > 0 || cases.length === 0
         ? "blocked"
         : failed.length > 0
           ? "fail"
@@ -207,6 +217,9 @@ export function buildEvaluationReport(input: BuildReportInput): SkillEvaluationR
     safetyFailedFixtureIds: safetyFailed.map((c) => c.fixtureId).sort(compareTokens),
     warnings: [
       ...(input.warnings ?? []),
+      ...(foreignCaseIds.length > 0
+        ? [`Cases belong to a different skill than the report: ${foreignCaseIds.join(", ")}.`]
+        : []),
       ...(mixedBindings
         ? ["Cases were evaluated against differing manifests, policies, or evidence corpora."]
         : []),

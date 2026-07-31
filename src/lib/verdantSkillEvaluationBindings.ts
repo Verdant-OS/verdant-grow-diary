@@ -99,6 +99,10 @@ export const BINDING_ARTIFACT_TYPES = [
   "expectation_set",
   "execution_config",
   "evaluation_report",
+  // A decision is not a report. Sharing a framing type would put two
+  // semantically different artifacts in one domain, which is exactly what
+  // typed envelopes exist to prevent.
+  "promotion_decision",
 ] as const;
 export type BindingArtifactType = (typeof BINDING_ARTIFACT_TYPES)[number];
 

@@ -22,6 +22,8 @@ import { fileURLToPath } from "node:url";
 // nobody runs locally.
 import { verifyReportBinding } from "../src/lib/verdantSkillEvaluationReport.ts";
 import { sha256Digest } from "./lib/verdantSkillEvaluationDigest.ts";
+import { computeBoundDigest } from "../src/lib/verdantSkillEvaluationBindings.ts";
+import { PROGRESSION_TO_MANIFEST_LIFECYCLE } from "../src/lib/verdantSkillEvaluationTypes.ts";
 
 const ROOT = resolve(fileURLToPath(import.meta.url), "../..");
 const ARTIFACT_ROOT = resolve(ROOT, process.argv[2] ?? "artifacts/skills");
@@ -145,11 +147,38 @@ for (const dir of dirs) {
       if (!Array.isArray(decision.blockingReasons)) {
         note("decision_states_no_blocking_reasons", promoJsonPath);
       }
-      // A YES that authorizes nothing is not a YES. An eligible decision must
-      // name the lifecycle it would authorize, or it reports a success that
-      // changes nothing.
-      if (decision.eligible === true && decision.authorizedManifestLifecycle === null) {
-        note("eligible_decision_authorizes_nothing", promoJsonPath);
+      // The decision is self-bound the same way the report is, and recomputing
+      // one while trusting the other leaves the authorization artifact — the
+      // one that says YES — as the unchecked half. Editing it to set
+      // eligible:true, add a lifecycle and clear the blocking reasons passed
+      // every shape and agreement check above, because nothing recomputed
+      // this.
+      if (typeof decision.decisionDigest !== "string" || decision.decisionDigest === "") {
+        note("decision_not_self_bound", promoJsonPath);
+      } else {
+        const recomputed = computeBoundDigest(
+          "promotion_decision",
+          { ...decision, decisionDigest: "" },
+          sha256Digest,
+        );
+        if (recomputed.value !== decision.decisionDigest) {
+          note("decision_digest_does_not_verify", promoJsonPath);
+        }
+      }
+      // Deliberately NOT "every eligible decision must name a lifecycle".
+      //
+      // That rule, as I first wrote it, was wrong: the evidence-only targets
+      // (`schema_valid`, `golden_cases_passed`, …) and the withdrawal states
+      // map to null BY DESIGN, because they authorize no manifest mutation.
+      // The unconditional form would have failed CI on a legitimate artifact —
+      // a validator rule that rejects correct output is worse than the gap it
+      // was meant to close. The honest check is agreement between the decision
+      // and the progression model it claims to follow.
+      const mapped = PROGRESSION_TO_MANIFEST_LIFECYCLE[decision.requestedState];
+      if (decision.eligible === true && mapped !== undefined) {
+        if (decision.authorizedManifestLifecycle !== mapped) {
+          note("decision_lifecycle_disagrees_with_progression_model", promoJsonPath);
+        }
       }
       // The two artifacts describe one decision and must agree.
       if (decision.eligible === true && report?.promotionEligible === false) {

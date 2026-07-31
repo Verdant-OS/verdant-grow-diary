@@ -183,9 +183,26 @@ function loadFixtures(
       v !== null && typeof v === "object" ? (v as Record<string, unknown>) : {};
     const executionBlock = asRecord(asRecord(parsed).execution);
     const { output, ...executionRest } = executionBlock;
+    // Only the CONTRACT-OWNED identity fields are exempt, not the whole run
+    // result. Passing all of `output` through the run-level list dropped every
+    // uuid match in it, so a grower id sitting in evidence prose, a proposal
+    // rationale, a follow-up note or an error detail was accepted exactly like
+    // the legitimate runId. Redacting the fields the contract types as uuids
+    // lets everything else be judged by the strict list.
+    const CONTRACT_OWNED_ID_FIELDS = new Set(["runId", "plantId", "entityId", "entityRef"]);
+    const redactContractIds = (value: unknown): unknown => {
+      if (Array.isArray(value)) return value.map(redactContractIds);
+      if (value === null || typeof value !== "object") return value;
+      return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>).map(([k, v]) => [
+          k,
+          CONTRACT_OWNED_ID_FIELDS.has(k) ? null : redactContractIds(v),
+        ]),
+      );
+    };
     const leaks = [
       ...detectProductionDataCategories(JSON.stringify(executionRest ?? {})),
-      ...detectRunDisclosureCategories(JSON.stringify(output ?? null)),
+      ...detectProductionDataCategories(JSON.stringify(redactContractIds(output) ?? null)),
     ];
     if (leaks.length > 0) {
       issues.push(

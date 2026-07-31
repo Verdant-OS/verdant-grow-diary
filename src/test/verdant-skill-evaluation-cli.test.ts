@@ -257,6 +257,42 @@ describe("cli — untrusted fixture input", () => {
     expect(clean.code).not.toBe(EXIT_USAGE_OR_IO);
   });
 
+  // Validating `verdict` alone let [{verdict:"allow"}] load, put undefined
+  // into actualRiskLevels/actualCapabilities, and stay green wherever the
+  // matching fixture expectation happened to be null — an expectation
+  // silently unchecked rather than loudly unmet.
+  it("requires every verdict field the evaluator reads", () => {
+    for (const verdict of [
+      { verdict: "allow" },
+      { verdict: "allow", effectiveRiskLevel: "low" },
+      { verdict: "allow", executionCapability: "none" },
+      { verdict: "allow", effectiveRiskLevel: "nonsense", executionCapability: "none" },
+    ]) {
+      const r = runWithMutated((record) => {
+        (record.execution as { policy: Record<string, unknown> }).policy.proposalVerdicts = [
+          verdict,
+        ];
+      });
+      expect(r.code, JSON.stringify(verdict)).toBe(EXIT_USAGE_OR_IO);
+    }
+  });
+
+  // The exemption belongs to the contract's OWN identity fields. Passing all
+  // of `output` through the run-level list dropped every uuid match in it, so
+  // a grower id in evidence prose was accepted exactly like the runId.
+  it("flags a production uuid in run-result prose but not in a contract id field", () => {
+    const inProse = runWithMutated((record) => {
+      const output = (record.execution as { output: Record<string, unknown> }).output;
+      (output.evidence as Record<string, unknown>[])[0].summary =
+        "Matches grow 7f3d9a2b-1c4e-4f8a-9b2d-5e6f7a8b9c0d.";
+    });
+    expect(inProse.code).toBe(EXIT_USAGE_OR_IO);
+    expect(inProse.lines.join(" ")).toContain("real_uuid");
+
+    // The contract types runId as a uuid, so the untouched fixture must load.
+    expect(runWithMutated(() => {}).code).not.toBe(EXIT_USAGE_OR_IO);
+  });
+
   it("still accepts a well-formed envelope from the same path", () => {
     // Guards the guard: a check that rejected everything would pass the two
     // tests above while breaking the harness.

@@ -286,6 +286,13 @@ const executionFiredRuleSchema = z
 const executionProposalVerdictSchema = z
   .object({
     verdict: z.string().min(1),
+    // Every field the evaluator READS, not just the one it switches on.
+    // Validating `verdict` alone let `[{"verdict":"allow"}]` load, put
+    // undefined into actualRiskLevels/actualCapabilities, and stay green
+    // wherever the matching fixture expectation happened to be null — an
+    // expectation silently unchecked rather than loudly unmet.
+    effectiveRiskLevel: z.enum(SKILL_RISK_LEVELS),
+    executionCapability: z.enum(["none", "manual_only"]),
   })
   .passthrough();
 

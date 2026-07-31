@@ -452,7 +452,7 @@ export function evaluateSkillPromotionEligibility(
   };
 
   decision.decisionDigest = computeBoundDigest(
-    "evaluation_report",
+    "promotion_decision",
     { ...decision, decisionDigest: "" },
     input.digest,
   ).value;

@@ -154,6 +154,15 @@ describe("empty and partial histories", () => {
     expect(c.missingInformation).toContain("stage");
   });
 
+  it("falls back to the supplied grow stage when the plant row lacks one", () => {
+    const c = compile({
+      plant: { id: PLANT, grow_id: GROW, tent_id: TENT },
+      grow: { id: GROW, stage: "flower" },
+    });
+    expect(c.bundle.stage).toBe("flower");
+    expect(c.missingInformation).not.toContain("stage");
+  });
+
   it("never infers grower actions that were not recorded", () => {
     const c = compile({ growEvents: [] });
     expect(c.recentActions).toEqual([]);
@@ -271,6 +280,113 @@ describe("sensor summarization routes through the truth gate", () => {
       ],
     });
     expect(none.bundle.latestSnapshot).toBeNull();
+  });
+});
+
+describe("snapshot coherence", () => {
+  it("never mixes another source or moment into one snapshot", () => {
+    const c = compile({
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 25,
+          unit: "°C",
+          captured_at: hoursAgo(0.1),
+          source: "live",
+        },
+        // Usable (manual is fresh for 24h) but two hours older and from a
+        // different source — it must not ride inside the live snapshot.
+        {
+          metric: "humidity_pct",
+          value: 58,
+          unit: "%",
+          captured_at: hoursAgo(2),
+          source: "manual",
+        },
+      ],
+    });
+    expect(c.bundle.latestSnapshot?.source).toBe("live");
+    expect(c.bundle.latestSnapshot?.temperatureC).toBe(25);
+    expect(c.bundle.latestSnapshot?.humidityPct).toBeNull();
+    // The manual value is still available with its own provenance.
+    const rh = c.sensorSummary.metrics.find((m) => m.metric === "humidity_pct");
+    expect(rh?.latestValue).toBe(58);
+    expect(rh?.latestSource).toBe("manual");
+  });
+
+  it("keeps degraded readings out of values labeled ok", () => {
+    const c = compile({
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 25,
+          unit: "°C",
+          captured_at: hoursAgo(0.1),
+          source: "live",
+        },
+        // Stuck at 100 → degraded, not excluded. Must not become part of
+        // an "ok" snapshot.
+        {
+          metric: "humidity_pct",
+          value: 100,
+          unit: "%",
+          captured_at: hoursAgo(0.1),
+          source: "live",
+        },
+      ],
+    });
+    expect(c.bundle.latestSnapshot?.quality).toBe("ok");
+    expect(c.bundle.latestSnapshot?.humidityPct).toBeNull();
+    const rh = c.sensorSummary.metrics.find((m) => m.metric === "humidity_pct");
+    expect(rh?.degradedCount).toBe(1);
+    expect(rh?.usableCount).toBe(0);
+    expect(rh?.latestValue).toBeNull();
+  });
+});
+
+describe("persisted row fields the gate needs", () => {
+  it("passes stored confidence through, including from raw_payload", () => {
+    const direct = compile({
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 25,
+          unit: "°C",
+          captured_at: hoursAgo(0.1),
+          source: "live",
+          confidence: 0.3,
+        },
+      ],
+    });
+    expect(direct.bundle.latestSnapshot?.confidence).toBe(0.3);
+    const nested = compile({
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 25,
+          unit: "°C",
+          captured_at: hoursAgo(0.1),
+          source: "live",
+          raw_payload: { confidence: 0.4, token: "sk-NEVERSURVIVE1234" },
+        },
+      ],
+    });
+    expect(nested.bundle.latestSnapshot?.confidence).toBe(0.4);
+    expect(serializeSkillContract(nested)).not.toContain("NEVERSURVIVE");
+  });
+
+  it("forwards device identity so one device's samples are not a conflict", () => {
+    const sample = (value: number, hours: number) => ({
+      metric: "temperature_c",
+      value,
+      unit: "°C",
+      captured_at: hoursAgo(hours),
+      source: "live",
+      device_id: "dev-1",
+    });
+    const c = compile({ sensorReadings: [sample(21, 0.2), sample(27, 0.05)] });
+    expect(c.sensorSummary.conflicts).toEqual([]);
+    expect(c.conflictingEvidence).toEqual([]);
   });
 });
 

@@ -67,6 +67,7 @@ import {
   type GrowEventRowInput,
   type MergedTimelineEntry,
 } from "@/lib/timelineMergeRules";
+import { SENSOR_FRESH_WINDOW_MINUTES } from "@/lib/latestSensorSnapshotRules";
 import {
   evaluateSensorSeries,
   summarizeSensorProvenance,
@@ -127,6 +128,17 @@ export const PLANT_CONTEXT_CAPS = Object.freeze({
 // Input
 // ---------------------------------------------------------------------------
 
+/**
+ * Sensor row plus the two persisted fields `SensorReadingRowLike` does
+ * not model but the truth gate uses: device identity (separates
+ * temporal samples from genuine cross-sensor disagreement) and stored
+ * per-reading confidence.
+ */
+export interface SensorReadingRowForContext extends SensorReadingRowLike {
+  device_id?: string | null;
+  confidence?: number | null;
+}
+
 export interface PhotoRowLike {
   id?: string | null;
   captured_at?: string | null;
@@ -156,7 +168,7 @@ export interface CompilePlantContextBundleInput {
   tent?: { id?: string | null } | null;
   diaryEntries?: readonly DiaryEntryRowInput[];
   growEvents?: readonly (GrowEventRowInput & GrowEventRowLike)[];
-  sensorReadings?: readonly SensorReadingRowLike[];
+  sensorReadings?: readonly SensorReadingRowForContext[];
   photos?: readonly PhotoRowLike[];
   previousRecommendations?: readonly PreviousRecommendationRowLike[];
   followUps?: readonly FollowUpRowLike[];
@@ -215,12 +227,21 @@ export interface PhotoSummary {
 }
 
 export interface SensorWindowSummary {
-  /** Per-metric summary over usable readings only. */
+  /**
+   * Per-metric summary. `latestValue`/`mean` come from STRICTLY usable
+   * readings only — degraded (suspicious-but-kept) readings are counted
+   * separately so they can be surfaced without being treated as sound
+   * evidence.
+   */
   metrics: Array<{
     metric: SensorGateMetric;
     latestValue: number | null;
     unit: string | null;
+    /** Provenance of `latestValue`, so consumers can judge it. */
+    latestSource: SkillSensorSourceLabel | null;
+    latestCapturedAt: string | null;
     usableCount: number;
+    degradedCount: number;
     excludedCount: number;
     mean: number | null;
   }>;
@@ -406,8 +427,24 @@ export function summarizeRecentActions(
 // summarizeSensorWindow
 // ---------------------------------------------------------------------------
 
+/**
+ * Read a stored numeric confidence. Persisted rows carry it either as a
+ * column or inside `raw_payload.confidence`; ONLY that one numeric
+ * field is read — no other payload content is touched or forwarded.
+ */
+function readStoredConfidence(row: SensorReadingRowForContext): number | null {
+  const direct = row?.confidence;
+  if (typeof direct === "number" && Number.isFinite(direct)) return direct;
+  const payload = row?.raw_payload;
+  if (typeof payload === "object" && payload !== null && !Array.isArray(payload)) {
+    const nested = (payload as Record<string, unknown>).confidence;
+    if (typeof nested === "number" && Number.isFinite(nested)) return nested;
+  }
+  return null;
+}
+
 function toSensorCandidate(
-  row: SensorReadingRowLike,
+  row: SensorReadingRowForContext,
   tentId: string,
   plantId: string | null,
 ): SensorReadingCandidate {
@@ -424,9 +461,11 @@ function toSensorCandidate(
     capturedAt: row?.captured_at ?? null,
     tentId,
     plantId,
+    deviceId: typeof row?.device_id === "string" ? row.device_id : null,
     metric: typeof row?.metric === "string" ? row.metric : "",
     value: numeric !== null && Number.isFinite(numeric) ? numeric : null,
     unit: row?.unit ?? null,
+    confidence: readStoredConfidence(row),
     // raw_payload contents never enter the bundle; only the gate's
     // opaque-reference validation would carry an identifier.
   };
@@ -438,7 +477,7 @@ function toSensorCandidate(
  * and their warnings surfaced, never silently folded in.
  */
 export function summarizeSensorWindow(
-  sensorReadings: readonly SensorReadingRowLike[],
+  sensorReadings: readonly SensorReadingRowForContext[],
   options: {
     nowMs: number;
     windowDays: number;
@@ -470,7 +509,11 @@ export function summarizeSensorWindow(
   const metrics: SensorWindowSummary["metrics"] = [];
   for (const metric of [...byMetric.keys()].sort()) {
     const list = byMetric.get(metric) as SensorTruthEvaluation[];
-    const usable = list.filter((e) => !e.excludedFromReasoning && e.normalizedValue !== null);
+    // STRICTLY usable only. Degraded readings (suspicious-but-kept, e.g.
+    // humidity stuck at 100) are counted and warned, never treated as
+    // sound values or averaged in.
+    const usable = list.filter((e) => e.usability === "usable" && e.normalizedValue !== null);
+    const degradedCount = list.filter((e) => e.usability === "degraded").length;
     let latest: SensorTruthEvaluation | null = null;
     for (const e of usable) {
       if (latest === null || (e.capturedAt ?? "") > (latest.capturedAt ?? "")) {
@@ -485,8 +528,11 @@ export function summarizeSensorWindow(
       metric,
       latestValue: latest?.normalizedValue ?? null,
       unit: latest?.normalizedUnit ?? null,
+      latestSource: latest?.source ?? null,
+      latestCapturedAt: latest?.capturedAt ?? null,
       usableCount: usable.length,
-      excludedCount: list.length - usable.length,
+      degradedCount,
+      excludedCount: list.length - usable.length - degradedCount,
       mean,
     });
   }
@@ -592,7 +638,10 @@ export function compilePlantContextBundle(
     };
   }
 
-  const stage = cleanText(plant?.stage) ?? cleanText(plant?.growth_stage);
+  // Grow-level stage is a legitimate fallback for older/partial plant
+  // rows — using it is reading available context, not inferring it.
+  const stage =
+    cleanText(plant?.stage) ?? cleanText(plant?.growth_stage) ?? cleanText(input.grow?.stage);
   const strain = cleanText(plant?.strain);
   const medium = cleanText(plant?.medium);
   const potSize = cleanText(plant?.pot_size);
@@ -748,18 +797,35 @@ export function compilePlantContextBundle(
     photos: photoSummary.count > 0,
   });
 
-  // Latest snapshot for the canonical bundle — assembled ONLY from
-  // gate-usable values. When nothing is usable the bundle carries no
-  // snapshot at all rather than a hopeful one.
-  const pick = (metric: SensorGateMetric): number | null =>
-    sensorSummary.metrics.find((m) => m.metric === metric)?.latestValue ?? null;
+  // Latest snapshot for the canonical bundle. A snapshot is ONE moment
+  // from ONE source: it is anchored on the newest strictly-usable
+  // reading, and a metric is included only when its own newest
+  // strictly-usable reading shares that source and falls inside the
+  // contemporaneity window. Anything else stays out — the per-metric
+  // detail (with its own provenance) lives in `sensorSummary.metrics`,
+  // so nothing is lost, but the snapshot never mixes a two-hour-old
+  // manual value into a six-minute-old live reading.
   const latestUsable = sensorSummary.latestUsable;
+  const anchorCapturedAt = latestUsable?.capturedAt ?? null;
+  const anchorMs = anchorCapturedAt === null ? null : Date.parse(anchorCapturedAt);
+  const pick = (metric: SensorGateMetric): number | null => {
+    if (latestUsable === null || anchorMs === null) return null;
+    const m = sensorSummary.metrics.find((x) => x.metric === metric);
+    if (!m || m.latestValue === null || m.latestCapturedAt === null) return null;
+    if (m.latestSource !== latestUsable.source) return null;
+    const ms = Date.parse(m.latestCapturedAt);
+    if (Number.isNaN(ms)) return null;
+    if (Math.abs(anchorMs - ms) > SENSOR_FRESH_WINDOW_MINUTES * 60 * 1000) return null;
+    return m.latestValue;
+  };
   const latestSnapshot =
-    latestUsable === null || latestUsable.capturedAt === null
+    latestUsable === null || anchorCapturedAt === null
       ? null
       : {
-          capturedAt: latestUsable.capturedAt,
+          capturedAt: anchorCapturedAt,
           source: latestUsable.source,
+          // Truthful: every included value is strictly usable and from
+          // this source at this moment.
           quality: "ok" as const,
           confidence: latestUsable.confidence,
           temperatureC: pick("temperature_c"),

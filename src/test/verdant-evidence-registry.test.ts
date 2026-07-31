@@ -596,3 +596,82 @@ describe("evidence contracts — structural guarantees", () => {
     }
   });
 });
+
+describe("evidence retrieval — conflicts carry their own scope", () => {
+  it("labels a scope-mismatched counter-claim instead of presenting it bare", () => {
+    // A manufacturer feeding instruction that contests an applicable SOP
+    // but is confined to a product the caller is not using. Shown —
+    // suppressing a conflict manufactures certainty — but a caller must
+    // be able to tell "contested" from "a different product says
+    // otherwise" without re-deriving the scope.
+    const reg = registry([
+      ...EVIDENCE_FIXTURES,
+      record({
+        evidenceId: "ev-nutrient-b-dryback-note",
+        tier: "manufacturer_specification",
+        sourceDocumentType: "manufacturer_manual",
+        citation: {
+          title: "Nutrient B substrate guidance",
+          publisher: "Example Nutrients Ltd",
+          year: 2025,
+          locator: "Rev. 1",
+          url: null,
+        },
+        productIds: ["prod-nutrient-b"],
+        conflictingEvidenceIds: ["ev-coco-dryback-sop"],
+      }),
+    ]);
+    const r = retrieve({}, {}, reg);
+    expect(ids(r.applicable)).toContain("ev-coco-dryback-sop");
+
+    const note = r.conflicts.find((c) => c.evidenceId === "ev-nutrient-b-dryback-note");
+    expect(note).toBeDefined();
+    // Visible...
+    expect(note?.claim).toBeTruthy();
+    // ...and explicitly out of scope, in the same vocabulary `excluded`
+    // uses, with the product it is confined to.
+    expect(note?.excludedFromApplicable).toBe(true);
+    expect(note?.exclusionReasons).toContain("product_scope_not_matched");
+    expect(note?.productIds).toEqual(["prod-nutrient-b"]);
+    expect(note?.limitations.map((l) => l.code)).toContain("product_specific_instruction");
+  });
+
+  it("leaves exclusion reasons empty for a genuinely applicable counter-claim", () => {
+    const reg = registry([
+      ...EVIDENCE_FIXTURES.filter((r) => r.evidenceId !== "ev-vpd-flower-band-contested"),
+      record({
+        evidenceId: "ev-vpd-flower-band-contested",
+        tier: "controlled_cannabis_research",
+        sourceDocumentType: "journal_article",
+        species: "cannabis",
+        citation: {
+          title: "Contrary finding",
+          publisher: "Controlled Environment Research Letters",
+          year: 2025,
+          locator: "10.5678/cerl.2025.0001",
+          url: null,
+        },
+        growSettings: [],
+        media: [],
+        irrigationArchitectures: [],
+        stages: ["flower"],
+        metrics: ["vpd_kpa"],
+        agnosticAxes: ["growSettings", "media", "irrigationArchitectures"],
+        applicabilityConditions: [],
+        limitations: [],
+        status: "verified",
+      }),
+    ]);
+    const r = retrieve({}, {}, reg);
+    const note = r.conflicts.find((c) => c.evidenceId === "ev-vpd-flower-band-contested");
+    expect(note).toBeDefined();
+    expect(note?.excludedFromApplicable).toBe(false);
+    expect(note?.exclusionReasons).toEqual([]);
+  });
+
+  it("still reports why a retired counter-claim is not applicable", () => {
+    const r = retrieve();
+    const note = r.conflicts.find((c) => c.evidenceId === "ev-vpd-flower-band-contested");
+    expect(note?.exclusionReasons).toContain("status_not_verified");
+  });
+});

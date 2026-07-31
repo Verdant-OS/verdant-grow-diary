@@ -46,7 +46,7 @@ export function scanProseForPatterns(text: string, patterns: readonly RegExp[]):
 export const CLAUSE_SPLIT_RE = /[.;,:!?\n–—]+/;
 
 export const PROHIBITION_MARKER_RE =
-  /\b(do not|don'?t|never|avoid|should not|shouldn'?t|must not|mustn'?t|refrain from)\b/i;
+  /\b(do not|do n't|don'?t|never|avoid|should not|shouldn'?t|must not|mustn'?t|will not|won'?t|cannot|can'?t|does not|doesn'?t|is not|isn'?t|are not|aren'?t|refrain from|no need to)\b/i;
 
 /**
  * Verbs that invert a prohibition's polarity. "Do not turn on the fan"
@@ -84,7 +84,6 @@ export function hasUngovernedCommand(text: string, patterns: readonly RegExp[]):
     const clause = rawClause.trim();
     if (clause === "") continue;
     const marker = normalizeDetectionPattern(PROHIBITION_MARKER_RE).exec(clause);
-    const markerOpensClause = marker !== null && marker.index === 0;
     for (const pattern of patterns) {
       const re = normalizeDetectionPattern(pattern);
       let searchFrom = 0;
@@ -93,12 +92,22 @@ export function hasUngovernedCommand(text: string, patterns: readonly RegExp[]):
         if (match === null) break;
         const matchIndex = searchFrom + match.index;
         const before = clause.slice(0, matchIndex);
-        const governed =
-          markerOpensClause &&
-          matchIndex > 0 &&
+        // The marker need not open the clause — "You should not turn on the
+        // fan" and "Please do not turn on the fan" are ordinary cautious
+        // phrasing, and treating them as instructions would withhold exactly
+        // the disclaimers the output should keep. What matters is that no
+        // COMMAND precedes the marker (otherwise the marker belongs to a
+        // later thought), that the marker is not inverted, and that its scope
+        // has not been broken by a contrastive pivot.
+        const markerGovernsMatch =
+          marker !== null &&
+          marker.index < matchIndex &&
+          !re.test(clause.slice(0, marker.index)) &&
           !normalizeDetectionPattern(POLARITY_INVERTING_RE).test(before) &&
-          !normalizeDetectionPattern(PROHIBITION_SCOPE_BREAK_RE).test(before);
-        if (!governed) return true;
+          !normalizeDetectionPattern(PROHIBITION_SCOPE_BREAK_RE).test(
+            clause.slice(marker.index, matchIndex),
+          );
+        if (!markerGovernsMatch) return true;
         searchFrom = matchIndex + Math.max(1, match[0].length);
       }
     }

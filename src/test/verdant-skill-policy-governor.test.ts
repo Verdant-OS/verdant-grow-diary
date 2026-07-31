@@ -782,15 +782,18 @@ describe("policy governor — distrusted telemetry cannot strengthen a conclusio
         ],
       }),
     });
-    // 0.3 is the truth gate's stale multiplier, not a number invented here.
-    expect(d.confidenceCeiling).toBeCloseTo(0.3, 5);
+    // 0.3 is the truth gate's stale multiplier, combined with the record's
+    // own 0.9 — the source label and the producer's own rating both count.
+    expect(d.confidenceCeiling).toBeCloseTo(0.27, 5);
     expect(d.confidenceCeilingImposedBy).toContain("proposal_evidence_untrustworthy");
     expect(d.proposalVerdicts[0].verdict).toBe("block");
   });
 
-  it("does not cap on telemetry the gate trusts", () => {
+  it("caps trusted telemetry only at what the record itself claims", () => {
     const d = govern();
-    expect(d.confidenceCeilingImposedBy).not.toContain("proposal_evidence_untrustworthy");
+    // Live source, but the record reports 0.9 — so 0.9 is the honest ceiling,
+    // and the action still clears the floor.
+    expect(d.confidenceCeiling).toBeCloseTo(0.8, 5);
     expect(d.proposalVerdicts[0].verdict).toBe("allow");
   });
 
@@ -942,5 +945,87 @@ describe("policy governor — review round 1", () => {
     ]) {
       expect(scanProseForPatterns(text, DOSE_QUANTITY_PATTERNS), text).toBe(true);
     }
+  });
+});
+
+describe("policy governor — review round 2", () => {
+  it("refuses a run built against a different plant context", () => {
+    const d = govern({ output: runResult({ contextVersion: "ctx-OLD" }) });
+    expect(d.firedRules.some((r) => r.code === "context_version_mismatch")).toBe(true);
+    expect(d.actionEligibility).toBe("none");
+  });
+
+  it("refuses an applicability verdict computed for another skill", () => {
+    const m = manifest();
+    const c = compilation();
+    const borrowed = { ...applicability(m, c), skillId: "some-other-skill" };
+    const d = govern({ applicabilityOverride: borrowed });
+    expect(d.firedRules.some((r) => r.code === "applicability_manifest_mismatch")).toBe(true);
+    expect(d.actionEligibility).toBe("none");
+  });
+
+  it("respects a record's own confidence, not just its source label", () => {
+    // The producing layer rated this live reading unusable.
+    const d = govern({
+      output: runResult({
+        evidence: [
+          {
+            evidenceId: "e-1",
+            kind: "sensor_reading",
+            observedAt: hoursAgo(0.1),
+            source: "live",
+            confidence: 0,
+            summary: "Substrate moisture 42 percent.",
+            detail: null,
+            metric: { name: "soil_moisture_pct", value: 42, unit: "%" },
+            entityRef: null,
+          },
+        ],
+      }),
+    });
+    expect(d.confidenceCeiling).toBe(0);
+    expect(codesFor(d)).toContain("proposal_evidence_untrustworthy");
+    expect(d.proposalVerdicts[0].verdict).toBe("block");
+  });
+
+  it("forbids every action proposal under a none-capability manifest", () => {
+    // Self-declaring `none` on the proposal must not buy it past the cap.
+    for (const capability of ["none", "manual_only"] as const) {
+      const d = govern({
+        manifest: manifest({ maxExecutionCapability: "none" }),
+        output: runResult({ proposals: [proposal({ executionCapability: capability })] }),
+      });
+      expect(codesFor(d), capability).toContain("capability_exceeds_manifest");
+      expect(d.proposalVerdicts[0].verdict).toBe("block");
+      expect(d.actionEligibility).toBe("none");
+    }
+  });
+
+  it("keeps cautious disclaimers instead of reading them as instructions", () => {
+    for (const text of [
+      "You should not turn on the fan.",
+      "Please do not turn on the fan.",
+      "Verdant will not automatically execute actions.",
+      "We cannot turn on the pump for you.",
+    ]) {
+      expect(hasUngovernedCommand(text, DEVICE_CONTROL_DETECTION_PATTERNS), text).toBe(false);
+    }
+    // The inversion and pivot checks still hold through a prefix.
+    for (const text of [
+      "You should not fail to turn on the fan.",
+      "Please do not turn on the fan but turn on the pump.",
+    ]) {
+      expect(hasUngovernedCommand(text, DEVICE_CONTROL_DETECTION_PATTERNS), text).toBe(true);
+    }
+  });
+
+  it("does not let a marker after a command exempt that command", () => {
+    // The prohibition belongs to the later thought, not the earlier order.
+    expect(
+      hasUngovernedCommand(
+        "Turn on the pump and do not turn on the fan",
+        DEVICE_CONTROL_DETECTION_PATTERNS,
+      ),
+    ).toBe(true);
   });
 });

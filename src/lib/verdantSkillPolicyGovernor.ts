@@ -121,6 +121,8 @@ export const SKILL_POLICY_RULE_CODES = [
   "contract_violation",
   "confidence_input_mismatch",
   "manifest_run_mismatch",
+  "context_version_mismatch",
+  "applicability_manifest_mismatch",
   "contract_version_mismatch",
   "proposal_without_grant",
   "capability_exceeds_manifest",
@@ -189,6 +191,27 @@ const SOURCE_TRUST_FACTOR: Readonly<Record<string, number>> = Object.freeze({
   invalid: SENSOR_TRUTH_CONFIDENCE_FACTORS.invalid,
   demo: SENSOR_TRUTH_CONFIDENCE_FACTORS.invalid,
 });
+
+/**
+ * How far ONE evidence record lets a conclusion be trusted.
+ *
+ * The source label and the originating layer's own per-record confidence
+ * are combined multiplicatively, matching how the sensor truth gate already
+ * derives its adjusted confidence. A record can be sourced live and still be
+ * rated 0 by the layer that produced it — reading only the label would treat
+ * telemetry its own producer called unusable as fully trustworthy.
+ */
+function recordTrust(record: { source?: string | null; confidence?: number | null }): number {
+  // An absent source is not a benign default — it is an unlabelled reading,
+  // which the truth gate scores at zero.
+  const sourceFactor =
+    record.source === null || record.source === undefined
+      ? SENSOR_TRUTH_CONFIDENCE_FACTORS.unknown
+      : (SOURCE_TRUST_FACTOR[record.source] ?? SENSOR_TRUTH_CONFIDENCE_FACTORS.unknown);
+  const own =
+    record.confidence === null || record.confidence === undefined ? 1 : clamp01(record.confidence);
+  return sourceFactor * own;
+}
 
 /** V1 ships exactly one allow state, and it is low-risk-only. */
 export const V1_MAX_ALLOWED_RISK: SkillRiskLevel = "low";
@@ -576,6 +599,23 @@ export function governSkillOutput(input: GovernSkillOutputInput): SkillPolicyDec
   if (output.skillId !== manifest.id || output.skillVersion !== manifest.version) {
     blockAll("manifest_run_mismatch", "Run does not identify the manifest that governs it.");
   }
+  // The run must have been produced against THIS compilation. Otherwise the
+  // governor judges old prose using a newer context's stage, plant identity,
+  // recent actions and open follow-ups — every cultivation gate below would
+  // be answering about a different moment than the one the model saw.
+  if (output.contextVersion !== context.contextVersion) {
+    blockAll("context_version_mismatch", "Run was produced against a different plant context.");
+  }
+  // An applicability verdict is only meaningful for the skill it was computed
+  // for. Accepting a borrowed one lets a permissive manifest's `applicable`
+  // stand in for this manifest's medium, irrigation and required-context
+  // exclusions — the gate would pass without ever having been asked.
+  if (applicability.skillId !== manifest.id || applicability.skillVersion !== manifest.version) {
+    blockAll(
+      "applicability_manifest_mismatch",
+      "Applicability was computed for a different skill.",
+    );
+  }
   if (manifest.outputContractVersion !== SKILL_CONTRACT_VERSION) {
     blockAll("contract_version_mismatch", "Manifest targets a different output contract version.");
   }
@@ -681,11 +721,7 @@ export function governSkillOutput(input: GovernSkillOutputInput): SkillPolicyDec
     (e) => e.kind === "sensor_reading" || e.kind === "derived_metric",
   );
   if (sensorRecords.length > 0) {
-    const trust = Math.max(
-      ...sensorRecords.map(
-        (e) => SOURCE_TRUST_FACTOR[e.source] ?? SENSOR_TRUTH_CONFIDENCE_FACTORS.unknown,
-      ),
-    );
+    const trust = Math.max(...sensorRecords.map((e) => recordTrust(e)));
     if (trust < 1) {
       cap(trust, "proposal_evidence_untrustworthy", "Cited telemetry is not fully trusted.");
     }
@@ -1013,15 +1049,11 @@ function judgeProposal(input: JudgeInput): SkillProposalVerdict {
   };
 
   // Structural manifest ceilings that are per-proposal.
-  if (
-    proposal.executionCapability === "manual_only" &&
-    input.manifest.maxExecutionCapability === "none"
-  ) {
-    block(
-      "capability_exceeds_manifest",
-      "structural",
-      "Proposal exceeds the manifest capability cap.",
-    );
+  // A `none` manifest is informational-only, so ANY action proposal exceeds
+  // it. Keying on the proposal's self-declared capability would let a model
+  // set `none` on its own proposal and keep the action.
+  if (input.manifest.maxExecutionCapability === "none") {
+    block("capability_exceeds_manifest", "structural", "Manifest permits no action proposals.");
   }
   if (riskRank(proposal.riskLevel) > riskRank(input.manifest.riskClass)) {
     block(
@@ -1160,8 +1192,17 @@ function judgeProposal(input: JudgeInput): SkillProposalVerdict {
   const cited = proposal.supportingEvidenceIds
     .map((eid) => output.evidence.find((e) => e.evidenceId === eid))
     .filter((e) => e !== undefined);
+  // A cited record supports a proposal only when BOTH its source and its own
+  // reported confidence leave it usable. Both halves are required: trust
+  // alone would readmit a stale record carrying a high confidence, and the
+  // source allowlist alone would accept a live record its producer scored 0.
   const trustworthy = cited.some(
-    (e) => e !== undefined && e.source !== "stale" && e.source !== "invalid" && e.source !== "demo",
+    (e) =>
+      e !== undefined &&
+      e.source !== "stale" &&
+      e.source !== "invalid" &&
+      e.source !== "demo" &&
+      recordTrust(e) > 0,
   );
   if (!trustworthy) {
     block("proposal_evidence_untrustworthy", "structural", "No cited evidence is trustworthy.");

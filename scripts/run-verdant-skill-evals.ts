@@ -136,7 +136,23 @@ function loadFixtures(
       continue;
     }
     const record = parsed as SelfTestFixtureFile;
-    const check = parseEvaluationFixture(record?.fixture);
+    // The OUTER envelope, before anything inside it is trusted. A file with a
+    // schema-valid fixture but a missing or non-object execution would
+    // otherwise be accepted here and throw later on a property access,
+    // producing a crash instead of the documented usage exit code — and this
+    // file is exactly where untrusted model output arrives.
+    if (
+      record === null ||
+      typeof record !== "object" ||
+      Array.isArray(record) ||
+      record.execution === null ||
+      typeof record.execution !== "object" ||
+      Array.isArray(record.execution)
+    ) {
+      issues.push(`${name}: missing or malformed "execution" envelope`);
+      continue;
+    }
+    const check = parseEvaluationFixture(record.fixture);
     if (check.ok === false) {
       issues.push(...check.issues.map((i) => `${name}: ${i}`));
       continue;
@@ -240,6 +256,14 @@ export function main(argv: readonly string[]): MainResult {
     if (reparsed.ok === false) throw new Error(reparsed.issues.join("; "));
     const fixture = reparsed.fixture;
     const e = file.execution;
+
+    // A fixture may demand more repetitions than the caller asked for. Taking
+    // only --repeat would let a determinism-tagged fixture run once, leaving
+    // determinismMatch null and the case green without ever exercising the
+    // requirement it declares. Computed HERE, above the bindings, because the
+    // binding must record the count that actually ran.
+    const repeatCount = Math.max(1, args.repeat, fixture.determinismRepetitions);
+
     const bindings: SkillEvaluationBindings = {
       bindingVersion: SKILL_EVALUATION_BINDING_VERSION,
       skill: { skillId, skillVersion },
@@ -276,7 +300,10 @@ export function main(argv: readonly string[]): MainResult {
         skillRuntimeVersion: "1.0.0",
         evaluatorVersion: "1.0.0",
         scoringPolicyVersion: "1.0.0",
-        executionConfig: computeBoundDigest("execution_config", { repeat: args.repeat }, D),
+        // The EFFECTIVE count. Binding the requested one would let a case
+        // run multiple repetitions while its provenance attested to a
+        // different execution configuration.
+        executionConfig: computeBoundDigest("execution_config", { repeat: repeatCount }, D),
       },
     };
 
@@ -294,12 +321,6 @@ export function main(argv: readonly string[]): MainResult {
     const derivedCitedEvidenceIds = [
       ...new Set((parsedOutput?.proposals ?? []).flatMap((p) => p.supportingEvidenceIds ?? [])),
     ].sort();
-
-    // A fixture may demand more repetitions than the caller asked for. Taking
-    // only --repeat would let a determinism-tagged fixture run once, leaving
-    // determinismMatch null and the case green without ever exercising the
-    // requirement it declares.
-    const repeatCount = Math.max(1, args.repeat, fixture.determinismRepetitions);
 
     const buildExecution = (repeatSerializations: string[]) => ({
       fixture,
@@ -319,7 +340,7 @@ export function main(argv: readonly string[]): MainResult {
         fixture: file.fixture,
         goldenCaseSet: caseSet,
         expectation: e.expectation,
-        executionConfig: { repeat: args.repeat },
+        executionConfig: { repeat: repeatCount },
         evaluatorVersion: "1.0.0",
       },
       applicability: e.applicability as never,
@@ -373,6 +394,8 @@ export function main(argv: readonly string[]): MainResult {
 
   const disclosure = scanArtifactForDisclosure(report);
   const decision = evaluateSkillPromotionEligibility({
+    targetSkillId: skillId,
+    targetSkillVersion: skillVersion,
     currentState: "draft",
     requestedState: "limited_beta",
     report,

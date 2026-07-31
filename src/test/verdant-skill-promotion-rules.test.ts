@@ -18,6 +18,7 @@ import { calculateEvaluationMetrics } from "@/lib/verdantSkillEvaluationMetrics"
 import {
   evaluateSkillPromotionEligibility,
   renderPromotionMarkdown,
+  PROMOTION_BLOCKING_REASONS,
   type PromotionAttestation,
   type PromotionEligibilityInput,
 } from "@/lib/verdantSkillPromotionRules";
@@ -127,6 +128,8 @@ const ALL: PromotionAttestation[] = [
 
 function decide(overrides: Partial<PromotionEligibilityInput> = {}) {
   return evaluateSkillPromotionEligibility({
+    targetSkillId: "coco-dryback-review",
+    targetSkillVersion: "1.0.0",
     currentState: "internal_sandbox",
     requestedState: "limited_beta",
     report: report(),
@@ -164,6 +167,52 @@ describe("promotion — the happy path is the narrow one", () => {
     // It reports what WOULD be authorized; something else must apply it.
     expect(d.authorizedManifestLifecycle).toBe("limited_beta");
     expect(renderPromotionMarkdown(d)).toContain("not a promotion");
+  });
+});
+
+describe("promotion — the decision must name its subject", () => {
+  // A decision that does not name its target can be satisfied by ANY green
+  // report. Supply skill B's report alongside B's digests and attestations,
+  // ask for a transition on skill A, and every other gate passes — because
+  // every other gate reads the report, not the request.
+  it("refuses a report belonging to a different skill", () => {
+    const d = decide({ targetSkillId: "some-other-skill" });
+    expect(d.eligible).toBe(false);
+    expect(d.blockingReasons).toContain("report_for_other_skill");
+    expect(d.authorizedManifestLifecycle).toBeNull();
+  });
+
+  it("refuses a report belonging to a different version of the same skill", () => {
+    const d = decide({ targetSkillVersion: "2.0.0" });
+    expect(d.eligible).toBe(false);
+    expect(d.blockingReasons).toContain("report_for_other_skill_version");
+    expect(d.authorizedManifestLifecycle).toBeNull();
+  });
+
+  it("checks identity on withdrawal too", () => {
+    // Withdrawal waives the evidence gates, not the identity one: pausing the
+    // wrong skill on the strength of another skill's report is its own
+    // failure, not a safe default.
+    const d = decide({
+      requestedState: "paused",
+      targetSkillId: "some-other-skill",
+      attestations: [],
+      report: report([caseResult({ status: "fail", failureClass: "expectation_mismatch" })]),
+    });
+    expect(d.eligible).toBe(false);
+    expect(d.blockingReasons).toContain("report_for_other_skill");
+  });
+
+  it("emits every identity code it declares", () => {
+    // These two codes were declared in the vocabulary before anything emitted
+    // them — a blocking reason that can never fire is a gate that does not
+    // exist. This test fails if either becomes unreachable again.
+    expect(PROMOTION_BLOCKING_REASONS).toContain("report_for_other_skill");
+    expect(PROMOTION_BLOCKING_REASONS).toContain("report_for_other_skill_version");
+    expect(decide({ targetSkillId: "x" }).blockingReasons).toContain("report_for_other_skill");
+    expect(decide({ targetSkillVersion: "9.9.9" }).blockingReasons).toContain(
+      "report_for_other_skill_version",
+    );
   });
 });
 

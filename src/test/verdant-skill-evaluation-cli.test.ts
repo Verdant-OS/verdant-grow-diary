@@ -7,10 +7,11 @@
  * ordinary scoring miss.
  */
 
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, it, expect } from "vitest";
+import { computeBoundDigest } from "@/lib/verdantSkillEvaluationBindings";
 import {
   EXIT_BLOCKED,
   EXIT_EVALUATION_FAILURE,
@@ -61,6 +62,72 @@ describe("cli — argument contract", () => {
     const r = main(["--skill-id", "ghost", "--skill-version", "1.0.0", "--now", NOW]);
     expect(r.code).toBe(EXIT_USAGE_OR_IO);
     expect(r.lines.join(" ")).toContain("not found");
+  });
+});
+
+describe("cli — fixture envelope validation", () => {
+  const SOURCE = resolve(
+    __dirname,
+    "../../fixtures/skills/harness-self-test/v1/hst-001-happy-path.json",
+  );
+
+  /** Writes one mutated fixture into a throwaway directory and runs the CLI. */
+  function runWithMutated(mutate: (record: Record<string, unknown>) => void) {
+    const dir = mkdtempSync(join(tmpdir(), "verdant-eval-fx-"));
+    const out = outDir();
+    try {
+      const record = JSON.parse(readFileSync(SOURCE, "utf8")) as Record<string, unknown>;
+      mutate(record);
+      writeFileSync(join(dir, "case.json"), JSON.stringify(record), "utf8");
+      return main([
+        "--skill-id",
+        "harness-self-test",
+        "--skill-version",
+        "1.0.0",
+        "--now",
+        NOW,
+        "--fixture-dir",
+        dir,
+        "--output-dir",
+        out,
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(out, { recursive: true, force: true });
+    }
+  }
+
+  // The fixture inside the envelope is schema-checked; the envelope AROUND it
+  // was not. A malformed one used to reach property access and throw, which
+  // surfaces as a crash rather than the documented usage exit code — and this
+  // is precisely the file that carries untrusted model output.
+  it("rejects a missing execution envelope as a usage error, not a crash", () => {
+    const r = runWithMutated((record) => {
+      delete record.execution;
+    });
+    expect(r.code).toBe(EXIT_USAGE_OR_IO);
+    expect(r.lines.join(" ")).toContain("execution");
+  });
+
+  it("rejects a non-object execution envelope", () => {
+    for (const value of ["not-an-object", 7, null, [], true]) {
+      const r = runWithMutated((record) => {
+        record.execution = value;
+      });
+      expect(r.code, JSON.stringify(value)).toBe(EXIT_USAGE_OR_IO);
+    }
+  });
+
+  it("still accepts a well-formed envelope from the same path", () => {
+    // Guards the guard: a check that rejected everything would pass the two
+    // tests above while breaking the harness.
+    const r = runWithMutated(() => {});
+    expect(r.code).not.toBe(EXIT_USAGE_OR_IO);
+    expect(r.lines.join("\n")).toContain("passed: 1  failed: 0");
+    // Exit 4, not 0: these are self-test fixtures run under an ordinary skill
+    // identity, so promotion is refused and the run blocks. That refusal is
+    // the point — it must not be mistaken for a rejected fixture file.
+    expect(r.code).toBe(EXIT_BLOCKED);
   });
 });
 
@@ -140,6 +207,32 @@ describe("cli — self-test run", () => {
       for (const name of ["evaluation.json", "promotion-decision.json"]) {
         expect(existsSync(join(out, `${name}.tmp`)), name).toBe(false);
       }
+    } finally {
+      rmSync(out, { recursive: true, force: true });
+    }
+  });
+
+  it("binds the effective repetition count, not the requested one", () => {
+    // A fixture may demand more repetitions than --repeat asks for. If the
+    // binding recorded the REQUESTED count, a case could run three times
+    // while its provenance attested to one — provenance describing an
+    // execution that never happened.
+    const { out } = selfTest(["--repeat", "1"]);
+    try {
+      const report = JSON.parse(readFileSync(join(out, "evaluation.json"), "utf8"));
+      const byId = (id: string) =>
+        report.caseResults.find((c: { fixtureId: string }) => c.fixtureId === id);
+      const repeated = byId("hst-014-deterministic-repeat");
+      const single = byId("hst-001-happy-path");
+      expect(repeated.bindings.runtime.executionConfig.value).toBe(
+        computeBoundDigest("execution_config", { repeat: 3 }, sha256Digest).value,
+      );
+      expect(single.bindings.runtime.executionConfig.value).toBe(
+        computeBoundDigest("execution_config", { repeat: 1 }, sha256Digest).value,
+      );
+      expect(repeated.bindings.runtime.executionConfig.value).not.toBe(
+        single.bindings.runtime.executionConfig.value,
+      );
     } finally {
       rmSync(out, { recursive: true, force: true });
     }

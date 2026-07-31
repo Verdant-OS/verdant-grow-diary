@@ -158,6 +158,14 @@ const WITHDRAWAL_STATES: readonly string[] = Object.freeze([
 ]);
 
 export interface PromotionEligibilityInput {
+  /**
+   * The skill being advanced. Required, because a decision that does not
+   * name its target can be satisfied by any green report — including one for
+   * a different skill, supplied alongside that skill's current digests and
+   * attestations, which would then authorize a transition for the wrong one.
+   */
+  targetSkillId: string;
+  targetSkillVersion: string;
   currentState: EvaluationProgressionState;
   requestedState: EvaluationProgressionState;
   report: SkillEvaluationReport;
@@ -242,6 +250,16 @@ export function evaluateSkillPromotionEligibility(
   if (!isWithdrawal && targetKnown && requiredGates.length === 0) {
     // A forward state with no gate table is not "free" — it is unmodelled.
     block("transition_not_permitted");
+  }
+
+  // Identity is checked for EVERY transition, including withdrawal: pausing
+  // the wrong skill on the strength of another skill's report is its own
+  // failure, not a safe default.
+  if (report.skillId !== input.targetSkillId) {
+    block("report_for_other_skill");
+  }
+  if (report.skillVersion !== input.targetSkillVersion) {
+    block("report_for_other_skill_version");
   }
 
   if (!isWithdrawal) {

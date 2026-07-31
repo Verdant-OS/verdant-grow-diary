@@ -157,8 +157,16 @@ void _plantStageStaysCanonical;
 
 const uuidSchema = z.string().uuid();
 
-/** Opaque id token (evidence ids, proposal ids, …). */
-const idTokenSchema = z
+/**
+ * Opaque id token (evidence ids, proposal ids, …).
+ *
+ * Exported so sibling runtime modules (the Evidence Registry, Build 5)
+ * reuse this exact grammar instead of restating a near-identical regex.
+ * The same reasoning applies to `contractTextSchema` and
+ * `isoTimestampSchema` below: every fork of a primitive is a place the
+ * runtime can disagree with itself about what a valid value is.
+ */
+export const idTokenSchema = z
   .string()
   .trim()
   .min(1)
@@ -183,13 +191,13 @@ export type SkillVersion = z.infer<typeof skillVersionSchema>;
  * shape; the extra refine rejects impossible calendar dates (e.g. Feb 30),
  * which the shape regex alone would let through.
  */
-const isoTimestampSchema = z
+export const isoTimestampSchema = z
   .string()
   .max(64)
   .datetime({ offset: true })
   .refine((v) => !Number.isNaN(Date.parse(v)), "timestamp_not_a_real_date");
 
-const contractTextSchema = z.string().trim().min(1).max(SKILL_CONTRACT_LIMITS.textMax);
+export const contractTextSchema = z.string().trim().min(1).max(SKILL_CONTRACT_LIMITS.textMax);
 
 const contractTextListSchema = z.array(contractTextSchema).max(SKILL_CONTRACT_LIMITS.textItemsMax);
 

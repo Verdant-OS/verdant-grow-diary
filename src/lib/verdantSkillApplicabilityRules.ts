@@ -30,6 +30,7 @@ import {
   normalizeEnvelopeToken,
   normalizeIrrigationArchitecture,
   normalizeMedium,
+  normalizePlantType,
   type SkillIrrigationArchitecture,
   type SkillMedium,
   type VerdantSkillManifest,
@@ -170,18 +171,21 @@ function hasFiniteBound(range: { min?: unknown; max?: unknown } | null | undefin
  * would let a skill run — and propose a manual action — without the
  * context it declared it needs.
  *
- * The three count-based slots defer to the gap flag, which is already
- * exact for them: you either have recent actions, readings, or photos,
- * or you do not.
+ * `recent_actions` and `photos` defer to the gap flag, which is exact
+ * for them: you either have entries or you do not. `sensor_readings`
+ * cannot, because a conflicted metric still HAS readings — see below.
  */
 const SLOT_IS_PRESENT: Record<PlantContextSlot, (compilation: PlantContextCompilation) => boolean> =
   {
     stage: (c) =>
       c.bundle.stage !== null && c.bundle.stage !== undefined && c.bundle.stage !== "unknown",
     strain: (c) => isMeaningfulText(c.bundle.strain),
+    // Free text, so spelling normalization alone is not enough: "banana"
+    // normalizes cleanly and answers nothing. A recorded autoflower flag
+    // answers the same question, so it counts.
     plant_type: (c) => {
-      const t = normalizeEnvelopeToken(c.plantType);
-      return t !== null && t !== "unknown";
+      if (normalizePlantType(c.plantType) !== null) return true;
+      return c.bundle.isAutoflower !== null && c.bundle.isAutoflower !== undefined;
     },
     medium: (c) => {
       const m = normalizeMedium(c.bundle.medium);
@@ -202,15 +206,36 @@ const SLOT_IS_PRESENT: Record<PlantContextSlot, (compilation: PlantContextCompil
       );
     },
     recent_actions: () => true,
-    sensor_readings: () => true,
+    // The compiler's gap flag counts readings, and a conflicted metric
+    // still has readings. A manifest whose only sensor dependency is
+    // this slot — no required metric, no minimum count — would otherwise
+    // be satisfied by a plant where every device disagrees, since a bare
+    // conflict merely downgrades to partially_applicable.
+    sensor_readings: (c) => c.sensorSummary.unconflictedIncludedCount > 0,
     photos: () => true,
   };
 
+/**
+ * Slots whose presence rests ENTIRELY on their own predicate.
+ *
+ * The compiler's gap flag is otherwise authoritative for absence — if it
+ * says nobody filled the field in, the field is empty. `plant_type` is
+ * the one exception: the flag watches the free-text column, but
+ * `isAutoflower` records the same fact in boolean form. Refusing a plant
+ * whose autoflower status IS recorded, and telling the grower to record
+ * what they already recorded, is a dead end rather than a safe refusal.
+ */
+const SLOTS_WITH_ALTERNATE_SOURCE: ReadonlySet<PlantContextSlot> = new Set<PlantContextSlot>([
+  "plant_type",
+]);
+
 function slotIsPresent(compilation: PlantContextCompilation, slot: PlantContextSlot): boolean {
-  if (compilation.missingInformation.includes(slot)) return false;
   const predicate = SLOT_IS_PRESENT[slot];
   // An unrecognized slot is not evidence of presence.
   if (typeof predicate !== "function") return false;
+  if (!SLOTS_WITH_ALTERNATE_SOURCE.has(slot) && compilation.missingInformation.includes(slot)) {
+    return false;
+  }
   return predicate(compilation);
 }
 

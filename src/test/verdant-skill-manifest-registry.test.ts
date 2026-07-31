@@ -1299,3 +1299,155 @@ describe("round 8 — presence is total, vocabularies are frozen", () => {
     expect(parseVerdantSkillManifest(makeManifest()).ok).toBe(true);
   });
 });
+
+describe("round 9 — conflicted context, identity vocabulary, envelope grants", () => {
+  const noSensorEnvelope = {
+    growSettings: [],
+    media: [],
+    irrigationArchitectures: [],
+    requiredSensorMetrics: [],
+    minUsableSensorReadings: 0,
+  };
+
+  function allConflicted() {
+    return compileContext({
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 20,
+          unit: "°C",
+          captured_at: hoursAgo(0.1),
+          source: "live",
+          device_id: "dev-a",
+        },
+        {
+          metric: "temperature_c",
+          value: 34,
+          unit: "°C",
+          captured_at: hoursAgo(0.1),
+          source: "live",
+          device_id: "dev-b",
+        },
+      ],
+    });
+  }
+
+  it("blocks required sensor context when every reading conflicts", () => {
+    // The dependency is expressed ONLY as a context slot — no required
+    // metric, no minimum count — so neither of the round-7 fixes covers it.
+    const contextOnlySensorSkill = manifest({
+      permissions: ["read_plant_history", "read_sensor_context"],
+      requiredContext: ["sensor_readings"],
+      optionalContext: [],
+      operatingEnvelope: noSensorEnvelope,
+      excludedConditions: { media: [], irrigationArchitectures: [], growSettings: [] },
+    });
+    const conflicted = allConflicted();
+    expect(conflicted.missingInformation).not.toContain("sensor_readings");
+    expect(conflicted.sensorSummary.includedCount).toBeGreaterThan(0);
+
+    const r = evaluateSkillApplicability({
+      manifest: contextOnlySensorSkill,
+      compilation: conflicted,
+      growSetting: "tent",
+    });
+    expect(r.missingRequiredContext).toContain("sensor_readings");
+    expect(skillMayRun(r)).toBe(false);
+
+    // Unconflicted readings still satisfy the same manifest.
+    const clean = evaluateSkillApplicability({
+      manifest: contextOnlySensorSkill,
+      compilation: compileContext(),
+      growSetting: "tent",
+    });
+    expect(clean.missingRequiredContext).not.toContain("sensor_readings");
+  });
+
+  it("validates required plant type against a recognized vocabulary", () => {
+    const typeSkill = manifest({
+      permissions: ["read_plant_history"],
+      requiredContext: ["plant_type"],
+      optionalContext: [],
+      operatingEnvelope: noSensorEnvelope,
+      excludedConditions: { media: [], irrigationArchitectures: [], growSettings: [] },
+    });
+    // "banana" normalizes cleanly and answers nothing.
+    const nonsense = compileContext({
+      identity: { irrigationArchitecture: "top-feed drain-to-waste", plantType: "banana" },
+    });
+    const bad = evaluateSkillApplicability({
+      manifest: typeSkill,
+      compilation: nonsense,
+      growSetting: "tent",
+    });
+    expect(bad.missingRequiredContext).toContain("plant_type");
+    expect(skillMayRun(bad)).toBe(false);
+
+    for (const good of ["photoperiod", "autoflower", "Auto-Flower"]) {
+      const r = evaluateSkillApplicability({
+        manifest: typeSkill,
+        compilation: compileContext({
+          identity: { irrigationArchitecture: "top-feed drain-to-waste", plantType: good },
+        }),
+        growSetting: "tent",
+      });
+      expect(r.missingRequiredContext, `plantType ${good}`).not.toContain("plant_type");
+    }
+
+    // A recorded autoflower flag answers the same question on its own.
+    const flagged = evaluateSkillApplicability({
+      manifest: typeSkill,
+      compilation: compileContext({
+        identity: { irrigationArchitecture: "top-feed drain-to-waste", isAutoflower: true },
+      }),
+      growSetting: "tent",
+    });
+    expect(flagged.missingRequiredContext).not.toContain("plant_type");
+  });
+
+  it("requires a plant-history grant for identity-based envelope predicates", () => {
+    const base = {
+      permissions: ["propose_manual_action"],
+      requiredContext: [],
+      optionalContext: [],
+      operatingEnvelope: noSensorEnvelope,
+      excludedConditions: { media: [], irrigationArchitectures: [], growSettings: [] },
+    };
+    // No identity predicate: the bare grant is coherent.
+    expect(parseVerdantSkillManifest(makeManifest(base)).ok).toBe(true);
+
+    // Each identity predicate makes the evaluator read the plant record.
+    const identityVariants: Record<string, unknown>[] = [
+      { operatingEnvelope: { ...noSensorEnvelope, media: ["coco"] } },
+      {
+        operatingEnvelope: {
+          ...noSensorEnvelope,
+          irrigationArchitectures: ["top_feed_drain_to_waste"],
+        },
+      },
+      { operatingEnvelope: { ...noSensorEnvelope, growSettings: ["tent"] } },
+      {
+        operatingEnvelope: { ...noSensorEnvelope, requiresKnownIrrigationArchitecture: true },
+      },
+      { operatingEnvelope: { ...noSensorEnvelope, requiresKnownAutoflowerStatus: true } },
+      {
+        excludedConditions: { media: ["soil"], irrigationArchitectures: [], growSettings: [] },
+      },
+    ];
+    for (const variant of identityVariants) {
+      expect(
+        parseVerdantSkillManifest(makeManifest({ ...base, ...variant })).ok,
+        `variant ${JSON.stringify(variant)}`,
+      ).toBe(false);
+      expect(
+        parseVerdantSkillManifest(
+          makeManifest({
+            ...base,
+            ...variant,
+            permissions: ["read_plant_history", "propose_manual_action"],
+          }),
+        ).ok,
+      ).toBe(true);
+    }
+  });
+});

@@ -130,6 +130,40 @@ export function normalizeIrrigationArchitecture(raw: unknown): SkillIrrigationAr
     : null;
 }
 
+/**
+ * Plant types. The plant row carries free text, so without a closed
+ * vocabulary "banana" reads as a known plant type — and a skill that
+ * declared it needs to know whether the plant is photoperiod or
+ * autoflower would run believing it did.
+ */
+export const SKILL_PLANT_TYPES = ["photoperiod", "autoflower"] as const;
+export type SkillPlantType = (typeof SKILL_PLANT_TYPES)[number];
+
+/**
+ * Spellings growers actually type. Accepting these is not laxness — the
+ * point of the closed vocabulary is to reject values that answer NOTHING
+ * ("banana"), not to reject a real answer written a common way.
+ */
+const PLANT_TYPE_ALIASES: Record<string, SkillPlantType> = {
+  photoperiod: "photoperiod",
+  photo_period: "photoperiod",
+  photoperiodic: "photoperiod",
+  photo: "photoperiod",
+  autoflower: "autoflower",
+  auto_flower: "autoflower",
+  autoflowering: "autoflower",
+  auto_flowering: "autoflower",
+  auto: "autoflower",
+};
+
+export function normalizePlantType(raw: unknown): SkillPlantType | null {
+  const token = normalizeEnvelopeToken(raw);
+  if (token === null) return null;
+  return Object.prototype.hasOwnProperty.call(PLANT_TYPE_ALIASES, token)
+    ? PLANT_TYPE_ALIASES[token]
+    : null;
+}
+
 export function normalizeMedium(raw: unknown): SkillMedium | null {
   const token = normalizeEnvelopeToken(raw);
   if (token === null) return null;
@@ -412,6 +446,23 @@ export const verdantSkillManifestSchema = z
     for (const slot of declaredSlots) {
       const needed = SLOT_REQUIRED_PERMISSION[slot];
       if (!m.permissions.includes(needed)) missingGrants.add(needed);
+    }
+    // Envelope and exclusion predicates READ plant identity even when no
+    // history slot is declared: the evaluator has to look at the plant's
+    // medium, irrigation, grow setting, and autoflower flag to decide
+    // whether any of them match. A manifest that names those conditions
+    // is therefore consuming plant history, and must hold the grant.
+    const envelopeReadsPlantIdentity =
+      m.operatingEnvelope.media.length > 0 ||
+      m.operatingEnvelope.irrigationArchitectures.length > 0 ||
+      m.operatingEnvelope.growSettings.length > 0 ||
+      m.operatingEnvelope.requiresKnownIrrigationArchitecture === true ||
+      m.operatingEnvelope.requiresKnownAutoflowerStatus === true ||
+      m.excludedConditions.media.length > 0 ||
+      m.excludedConditions.irrigationArchitectures.length > 0 ||
+      m.excludedConditions.growSettings.length > 0;
+    if (envelopeReadsPlantIdentity && !m.permissions.includes("read_plant_history")) {
+      missingGrants.add("read_plant_history");
     }
     // The envelope's sensor thresholds are a sensor dependency even when
     // the manifest declares no sensor_readings slot.

@@ -151,6 +151,46 @@ export interface SensorReadingRowForContext extends SensorReadingRowLike {
    * belongs to the plant being compiled.
    */
   plant_id?: string | null;
+  /**
+   * Row-level tent ownership. A reading from another tent is not this
+   * tent's evidence and is dropped rather than re-homed.
+   */
+  tent_id?: string | null;
+}
+
+/**
+ * Persisted plant stages (`seedling|veg|flower|flush|harvest|cure`) do
+ * not all exist in the canonical skill vocabulary. Map the known
+ * aliases; anything unrecognized becomes null and is REPORTED as a gap
+ * rather than failing the whole compilation.
+ *
+ *  - `flush` is the final phase of flowering → `late_flower`
+ *  - `cure` → `curing` (Build 1 already accepts this alias)
+ */
+const PERSISTED_STAGE_ALIASES: Record<string, string> = {
+  flush: "late_flower",
+  cure: "curing",
+};
+
+const CANONICAL_STAGES: ReadonlySet<string> = new Set([
+  "seedling",
+  "veg",
+  "flower",
+  "late_flower",
+  "harvest",
+  "drying",
+  "curing",
+  "unknown",
+]);
+
+function normalizeStage(raw: string | null): string | null {
+  if (raw === null) return null;
+  const lower = raw.trim().toLowerCase();
+  if (lower === "") return null;
+  const aliased = Object.prototype.hasOwnProperty.call(PERSISTED_STAGE_ALIASES, lower)
+    ? PERSISTED_STAGE_ALIASES[lower]
+    : lower;
+  return CANONICAL_STAGES.has(aliased) ? aliased : null;
 }
 
 export interface PhotoRowLike {
@@ -559,6 +599,10 @@ export function summarizeSensorWindow(
   const cutoff = options.nowMs - options.windowDays * DAY_MS;
   const candidates: SensorReadingCandidate[] = [];
   for (const row of sensorReadings) {
+    // A reading owned by another tent is not this tent's evidence. Drop
+    // it rather than re-homing it onto the compiled tent.
+    const rowTentId = typeof row?.tent_id === "string" ? row.tent_id : null;
+    if (rowTentId !== null && rowTentId !== options.tentId) continue;
     const ms = parseTimestampMs(row?.captured_at ?? row?.ts);
     // Unparseable timestamps still go through the gate so they are
     // counted and warned about rather than vanishing.
@@ -593,9 +637,32 @@ export function summarizeSensorWindow(
     return plantId === compiledPlantId;
   };
 
+  // In-scope evaluations only. Everything else stays in the provenance
+  // counts below but can never become this plant's value.
+  const scopedEvaluations = series.evaluations.filter((e) => inPlantScope(e.metric, e.plantId));
+
+  /**
+   * CURRENT samples, selected exactly once and reused by every view.
+   * Mirrors the gate's own rule: take each device's newest sample per
+   * metric FIRST, then drop it if that newest sample is not usable — a
+   * device whose latest reading is invalid/stale contributes nothing
+   * rather than resurrecting older healthy evidence.
+   */
+  const newestPerDevice = new Map<string, SensorTruthEvaluation>();
+  scopedEvaluations.forEach((e, i) => {
+    const metric = e.metric as SensorGateMetric;
+    const deviceKey = `${metric}|${e.plantId ?? ""}|${e.deviceId !== null ? `d:${e.deviceId}` : `anon:${i}`}`;
+    const prev = newestPerDevice.get(deviceKey);
+    if (prev === undefined || isPreferredReading(e, prev)) {
+      newestPerDevice.set(deviceKey, e);
+    }
+  });
+  const currentEvaluations = [...newestPerDevice.values()].filter(
+    (e) => e.usability === "usable" && e.normalizedValue !== null,
+  );
+
   const byMetric = new Map<SensorGateMetric, SensorTruthEvaluation[]>();
-  for (const e of series.evaluations) {
-    if (!inPlantScope(e.metric, e.plantId)) continue;
+  for (const e of scopedEvaluations) {
     const metric = e.metric as SensorGateMetric;
     const list = byMetric.get(metric) ?? [];
     list.push(e);
@@ -612,7 +679,8 @@ export function summarizeSensorWindow(
     // STRICTLY usable only. Degraded readings (suspicious-but-kept, e.g.
     // humidity stuck at 100) are counted and warned, never treated as
     // sound values or averaged in.
-    const usable = list.filter((e) => e.usability === "usable" && e.normalizedValue !== null);
+    // Only CURRENT samples count as this metric's usable evidence.
+    const usable = currentEvaluations.filter((e) => e.metric === metric);
     const degradedCount = list.filter((e) => e.usability === "degraded").length;
     let latest: SensorTruthEvaluation | null = null;
     for (const e of usable) {
@@ -636,15 +704,15 @@ export function summarizeSensorWindow(
       conflicted: conflictedMetrics.has(metric),
       usableCount: usable.length,
       degradedCount,
-      excludedCount: list.length - usable.length - degradedCount,
+      excludedCount: Math.max(0, list.length - usable.length - degradedCount),
       mean,
     });
   }
 
+  // The anchor comes from CURRENT, in-scope, unconflicted samples only.
   let latestUsableEval: SensorTruthEvaluation | null = null;
-  for (const e of series.evaluations) {
-    if (e.usability !== "usable" || e.capturedAt === null) continue;
-    // Conflicted metrics never anchor a snapshot.
+  for (const e of currentEvaluations) {
+    if (e.capturedAt === null) continue;
     if (e.metric !== null && conflictedMetrics.has(e.metric)) continue;
     if (latestUsableEval === null || isPreferredReading(e, latestUsableEval)) {
       latestUsableEval = e;
@@ -654,8 +722,12 @@ export function summarizeSensorWindow(
   return {
     metrics,
     sourceCounts: provenance.sourceCounts,
-    includedCount: provenance.includedCount,
-    excludedCount: provenance.excludedCount,
+    // includedCount reflects readings that are actually THIS plant's
+    // evidence. Counting out-of-scope telemetry here would clear the
+    // sensor gap and inflate completeness for context the plant does
+    // not have.
+    includedCount: currentEvaluations.length,
+    excludedCount: series.evaluations.length - currentEvaluations.length,
     warnings: provenance.warnings,
     conflicts: scopedConflicts.slice(0, PLANT_CONTEXT_CAPS.conflicts),
     latestUsable:
@@ -747,8 +819,9 @@ export function compilePlantContextBundle(
 
   // Grow-level stage is a legitimate fallback for older/partial plant
   // rows — using it is reading available context, not inferring it.
-  const stage =
-    cleanText(plant?.stage) ?? cleanText(plant?.growth_stage) ?? cleanText(input.grow?.stage);
+  const stage = normalizeStage(
+    cleanText(plant?.stage) ?? cleanText(plant?.growth_stage) ?? cleanText(input.grow?.stage),
+  );
   const strain = cleanText(plant?.strain);
   const medium = cleanText(plant?.medium);
   const potSize = cleanText(plant?.pot_size);
@@ -837,9 +910,16 @@ export function compilePlantContextBundle(
       angle: cleanText(p?.angle, 32),
     });
   }
+  // `id` is optional on PhotoRowLike, so it cannot be the only
+  // tie-breaker: without quality/angle tiebreaks, caller order would
+  // decide which photos survive the cap and change bestQualityScore.
   selectedPhotos.sort((a, b) => {
     const timeCmp = b.capturedAt.localeCompare(a.capturedAt);
     if (timeCmp !== 0) return timeCmp;
+    const qualityCmp = (b.quality ?? -1) - (a.quality ?? -1);
+    if (qualityCmp !== 0) return qualityCmp;
+    const angleCmp = (a.angle ?? "").localeCompare(b.angle ?? "");
+    if (angleCmp !== 0) return angleCmp;
     return a.id.localeCompare(b.id);
   });
   const cappedPhotos = selectedPhotos.slice(0, PLANT_CONTEXT_CAPS.photos);

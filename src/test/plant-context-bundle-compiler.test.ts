@@ -163,6 +163,25 @@ describe("empty and partial histories", () => {
     expect(c.missingInformation).not.toContain("stage");
   });
 
+  it("normalizes persisted stage aliases instead of failing the compile", () => {
+    // "flush" is written by the app and accepted by the DB trigger, but
+    // is not in the canonical skill vocabulary.
+    const flush = compile({
+      plant: { id: PLANT, grow_id: GROW, tent_id: TENT, stage: "flush" },
+    });
+    expect(flush.bundle.stage).toBe("late_flower");
+    const cure = compile({
+      plant: { id: PLANT, grow_id: GROW, tent_id: TENT, stage: "cure" },
+    });
+    expect(cure.bundle.stage).toBe("curing");
+    // An unrecognized stage is REPORTED, not fatal.
+    const weird = compile({
+      plant: { id: PLANT, grow_id: GROW, tent_id: TENT, stage: "moon phase" },
+    });
+    expect(weird.bundle.stage).toBeNull();
+    expect(weird.missingInformation).toContain("stage");
+  });
+
   it("never infers grower actions that were not recorded", () => {
     const c = compile({ growEvents: [] });
     expect(c.recentActions).toEqual([]);
@@ -510,6 +529,79 @@ describe("snapshot coherence, continued", () => {
     const soil = c.sensorSummary.metrics.find((m) => m.metric === "soil_moisture_pct");
     expect(soil?.mean).toBe(40);
     expect(soil?.conflicted).toBe(false);
+  });
+
+  it("drops readings owned by another tent instead of re-homing them", () => {
+    const c = compile({
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 40,
+          unit: "°C",
+          captured_at: hoursAgo(0.05),
+          source: "live",
+          tent_id: "other-tent",
+        },
+        {
+          metric: "temperature_c",
+          value: 25,
+          unit: "°C",
+          captured_at: hoursAgo(0.1),
+          source: "live",
+          tent_id: TENT,
+        },
+      ],
+    });
+    const temp = c.sensorSummary.metrics.find((m) => m.metric === "temperature_c");
+    expect(temp?.latestValue).toBe(25);
+    expect(temp?.usableCount).toBe(1);
+  });
+
+  it("does not resurrect an older healthy sample behind a bad newest one", () => {
+    const c = compile({
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 25,
+          unit: "°C",
+          captured_at: hoursAgo(0.2),
+          source: "live",
+          device_id: "dev-1",
+        },
+        // Same device, newer, invalid: the device contributes nothing.
+        {
+          metric: "temperature_c",
+          value: 999,
+          unit: "°C",
+          captured_at: hoursAgo(0.05),
+          source: "live",
+          device_id: "dev-1",
+        },
+      ],
+    });
+    const temp = c.sensorSummary.metrics.find((m) => m.metric === "temperature_c");
+    expect(temp?.latestValue).toBeNull();
+    expect(temp?.usableCount).toBe(0);
+    expect(c.bundle.latestSnapshot?.temperatureC ?? null).toBeNull();
+  });
+
+  it("keeps out-of-scope telemetry counted as a missing sensor gap", () => {
+    const c = compile({
+      sensorReadings: [
+        // Only another plant's root-zone reading: this plant has no
+        // sensor context, and completeness must say so.
+        {
+          metric: "soil_moisture_pct",
+          value: 40,
+          unit: "%",
+          captured_at: hoursAgo(0.1),
+          source: "live",
+          plant_id: "other-plant",
+        },
+      ],
+    });
+    expect(c.sensorSummary.includedCount).toBe(0);
+    expect(c.missingInformation).toContain("sensor_readings");
   });
 
   it("omits a snapshot whose every metric was filtered out", () => {

@@ -209,6 +209,26 @@ export function main(argv: readonly string[]): MainResult {
     };
   }
 
+  // Parsing proves an output is a valid run result; it says nothing about
+  // WHOSE run it is. A fixture could otherwise supply a valid output from
+  // another skill and have it reported under the CLI identity.
+  const outputIdentityMismatches = loaded.files
+    .filter((f) => {
+      const parsed = parseSkillRunResult(f.execution?.output);
+      if (parsed.ok === false) return false;
+      return parsed.value.skillId !== skillId || parsed.value.skillVersion !== skillVersion;
+    })
+    .map((f) => (f.fixture as { fixtureId: string }).fixtureId)
+    .sort();
+  if (outputIdentityMismatches.length > 0) {
+    return {
+      code: EXIT_USAGE_OR_IO,
+      lines: outputIdentityMismatches.map(
+        (id) => `Fixture ${id} supplies a run result for a different skill`,
+      ),
+    };
+  }
+
   const caseSet = {
     fixtureIds: loaded.files.map((f) => (f.fixture as { fixtureId: string }).fixtureId).sort(),
   };
@@ -265,7 +285,21 @@ export function main(argv: readonly string[]): MainResult {
     // rate and satisfy the promotion gate.
     const outputParse = parseSkillRunResult(e.output);
     const outputSchemaValid = outputParse.ok === true;
-    const repeatCount = Math.max(1, args.repeat);
+    const parsedOutput = outputParse.ok === true ? outputParse.value : null;
+
+    // Citations are DERIVED from the parsed output, never read from a
+    // fixture-authored list. An authored list omitting an id the output
+    // actually cites would let an unselected citation pass both the selection
+    // expectation and the evidence-integrity check.
+    const derivedCitedEvidenceIds = [
+      ...new Set((parsedOutput?.proposals ?? []).flatMap((p) => p.supportingEvidenceIds ?? [])),
+    ].sort();
+
+    // A fixture may demand more repetitions than the caller asked for. Taking
+    // only --repeat would let a determinism-tagged fixture run once, leaving
+    // determinismMatch null and the case green without ever exercising the
+    // requirement it declares.
+    const repeatCount = Math.max(1, args.repeat, fixture.determinismRepetitions);
 
     const buildExecution = (repeatSerializations: string[]) => ({
       fixture,
@@ -279,7 +313,7 @@ export function main(argv: readonly string[]): MainResult {
         applicability: e.applicability,
         evidenceCorpus: e.evidenceCorpus,
         selectedEvidenceIds: (e.selectedEvidenceIds as string[]) ?? [],
-        citedEvidenceIds: (e.citedEvidenceIds as string[]) ?? [],
+        citedEvidenceIds: derivedCitedEvidenceIds,
         policy: e.policy,
         draft: e.draft,
         fixture: file.fixture,

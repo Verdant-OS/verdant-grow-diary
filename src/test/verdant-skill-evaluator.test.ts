@@ -317,3 +317,40 @@ describe("fixture contract", () => {
     expect(bad.ok).toBe(false);
   });
 });
+
+describe("evaluator — review round 2", () => {
+  it("treats an empty missing-context expectation as an assertion", () => {
+    // "This fixture expects no gaps" is a real claim. Treating empty as
+    // "not checked" would keep a happy path green the day the runtime starts
+    // reporting missing context — exactly when it should go red.
+    const x = execution();
+    (x.applicability as unknown as { missingRequiredContext: string[] }).missingRequiredContext = [
+      "stage",
+    ];
+    x.actual.applicability = x.applicability;
+    x.bindings.applicability.result = computeBoundDigest(
+      "applicability_result",
+      x.applicability,
+      D,
+    );
+    const r = run(x);
+    expect(r.missingInformationMatch).toBe(false);
+    expect(r.status).not.toBe("pass");
+  });
+
+  it("treats an empty expected selection as an assertion", () => {
+    const x = execution({ fixture: fixture({ expectedSelectedEvidenceIds: [] }) });
+    const r = run(x);
+    // The run selected ev-1, the fixture expected nothing.
+    expect(r.evidenceSelectionMatch).toBe(false);
+  });
+
+  it("compares the fixture's declared risk expectation", () => {
+    const x = execution({ fixture: fixture({ expectedRiskLevel: "low" }) });
+    // No proposals means no effective risk levels, so a stated expectation
+    // cannot be satisfied silently.
+    const r = run(x);
+    expect(r.riskLevelMatch).toBe(false);
+    expect(r.expectedRiskLevel).toBe("low");
+  });
+});

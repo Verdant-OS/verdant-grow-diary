@@ -237,8 +237,11 @@ export function evaluateSkillCase(input: EvaluateCaseInput): SkillEvaluationCase
   // ---- Missing information.
   const detectedMissing = [...(x.applicability?.missingRequiredContext ?? [])].sort(compareTokens);
   const expectedMissing = [...f.expectedMissingInformationKeys].sort(compareTokens);
-  const missingInformationMatch =
-    expectedMissing.length === 0 ? true : sameMembers(expectedMissing, detectedMissing);
+  // Compared exactly, INCLUDING the empty case. "This fixture expects no
+  // gaps" is a real assertion; treating empty as "not checked" would let a
+  // happy-path case stay green the day the runtime starts reporting missing
+  // context, which is exactly when it should go red.
+  const missingInformationMatch = sameMembers(expectedMissing, detectedMissing);
   if (!missingInformationMatch) {
     fail("Detected missing information does not match the fixture's expectation.");
   }
@@ -313,9 +316,9 @@ export function evaluateSkillCase(input: EvaluateCaseInput): SkillEvaluationCase
   // The SELECTION the retrieval layer produced, not merely what was cited.
   // A run can retrieve the wrong corpus slice and still cite innocently.
   const actualSelected = [...(x.actual?.selectedEvidenceIds ?? [])].sort(compareTokens);
-  const evidenceSelectionMatch =
-    f.expectedSelectedEvidenceIds.length === 0 ||
-    sameMembers(f.expectedSelectedEvidenceIds, actualSelected);
+  // Same reasoning as missing information: an empty expected selection
+  // asserts that nothing should have been selected.
+  const evidenceSelectionMatch = sameMembers(f.expectedSelectedEvidenceIds, actualSelected);
   if (!evidenceSelectionMatch) {
     fail("Selected evidence does not match the fixture's expected selection.");
   }

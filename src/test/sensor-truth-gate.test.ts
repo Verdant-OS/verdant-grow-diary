@@ -683,6 +683,21 @@ describe("series evaluation", () => {
     expect(healthyVpd?.usability).toBe("usable");
   });
 
+  it("rejects timezone-less timestamps so freshness never depends on the runtime zone", () => {
+    const naive = evaluateSensorTruth(makeCandidate({ capturedAt: "2026-07-30T11:55:00" }), {
+      nowMs: NOW_MS,
+    });
+    expect(naive.freshness).toBe("unknown_timestamp");
+    expect(naive.capturedAt).toBeNull();
+    expect(naive.excludedFromReasoning).toBe(true);
+    // Explicit Z and explicit offsets are both accepted.
+    for (const capturedAt of ["2026-07-30T11:55:00Z", "2026-07-30T06:55:00-05:00"]) {
+      const e = evaluateSensorTruth(makeCandidate({ capturedAt }), { nowMs: NOW_MS });
+      expect(e.freshness).toBe("fresh");
+      expect(e.capturedAt).toBe("2026-07-30T11:55:00.000Z");
+    }
+  });
+
   it("never coerces non-string metric, timestamp, or quality metadata", () => {
     const arrayMetric = evaluateSensorTruth(
       makeCandidate({ metric: ["temperature_c"] as unknown as string }),
@@ -723,6 +738,33 @@ describe("series evaluation", () => {
     const vpd = staleSibling.evaluations.find((e) => e.metric === "vpd_kpa");
     expect(vpd?.excludedFromReasoning).toBe(true);
     expect(vpd?.warnings).toContain("vpd_dropped_temp_rh_invalid");
+  });
+
+  it("does not let a superseded bad sibling taint a current vpd_kpa", () => {
+    const series = evaluateSensorSeries(
+      [
+        makeCandidate({ metric: "vpd_kpa", value: 1.2, unit: "kPa" }),
+        // Same device: an invalid row followed by its valid correction.
+        makeCandidate({
+          metric: "humidity_pct",
+          value: 150,
+          unit: "%",
+          deviceId: "rh-1",
+          capturedAt: minutesAgo(9),
+        }),
+        makeCandidate({
+          metric: "humidity_pct",
+          value: 55,
+          unit: "%",
+          deviceId: "rh-1",
+          capturedAt: minutesAgo(4),
+        }),
+      ],
+      { nowMs: NOW_MS },
+    );
+    const vpd = series.evaluations.find((e) => e.metric === "vpd_kpa");
+    expect(vpd?.usability).toBe("usable");
+    expect(vpd?.warnings).not.toContain("vpd_dropped_temp_rh_invalid");
   });
 
   it("breaks equal capture-time ties by received time", () => {

@@ -98,6 +98,25 @@ function safeString(v: unknown): string | null {
   return typeof v === "string" ? v : null;
 }
 
+/** An ISO timestamp must carry Z or an explicit ±HH:MM offset. */
+const ISO_EXPLICIT_TZ_RE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
+
+/**
+ * Parse a timestamp to epoch ms, or null. Timezone-less strings are
+ * REJECTED rather than parsed: `Date.parse("2026-07-30T12:00:00")` uses
+ * the process's local timezone, which would make freshness and the
+ * canonical timestamp depend on where the code runs — breaking the
+ * gate's determinism contract.
+ */
+function parseExplicitTimestampMs(v: unknown): number | null {
+  const s = safeString(v);
+  if (s === null) return null;
+  const trimmed = s.trim();
+  if (trimmed === "" || !ISO_EXPLICIT_TZ_RE.test(trimmed)) return null;
+  const t = Date.parse(trimmed);
+  return Number.isNaN(t) ? null : t;
+}
+
 // ---------------------------------------------------------------------------
 // Vocabulary locks
 // ---------------------------------------------------------------------------
@@ -517,12 +536,8 @@ function classifyCandidateFreshness(
   source: CanonicalSensorSource,
   nowMs: number,
 ): { freshness: SensorFreshness; warning: SensorTruthWarning | null } {
-  const capturedAt = safeString(capturedAtRaw);
-  if (capturedAt == null || capturedAt === "") {
-    return { freshness: "unknown_timestamp", warning: "missing_timestamp" };
-  }
-  const t = Date.parse(capturedAt);
-  if (Number.isNaN(t)) {
+  const t = parseExplicitTimestampMs(capturedAtRaw);
+  if (t === null) {
     return { freshness: "unknown_timestamp", warning: "missing_timestamp" };
   }
   const ageMs = nowMs - t;
@@ -592,10 +607,8 @@ function buildProvenanceSummary(
 
 /** Canonical ISO capture timestamp, or null when absent/unparseable. */
 function canonicalCapturedAt(capturedAtRaw: unknown): string | null {
-  const capturedAt = safeString(capturedAtRaw);
-  if (capturedAt == null || capturedAt === "") return null;
-  const t = Date.parse(capturedAt);
-  if (Number.isNaN(t)) return null;
+  const t = parseExplicitTimestampMs(capturedAtRaw);
+  if (t === null) return null;
   return new Date(t).toISOString();
 }
 
@@ -878,11 +891,26 @@ export function evaluateSensorSeries(
   // inside the plausible band. Missing timestamps fail closed.
   // Any sibling input that cannot support reasoning taints the VPD —
   // not just outright-invalid values, but stale, demo, unknown-source,
-  // and missing-value readings too.
-  const invalidVpdInputs = evaluations.filter(
-    (e) =>
-      (e.metric === "temperature_c" || e.metric === "humidity_pct") &&
-      (e.validity === "invalid" || e.excludedFromReasoning),
+  // and missing-value readings too. Siblings are first deduplicated to
+  // the latest sample per device, so a superseded bad row does not taint
+  // evidence its own correction already replaced.
+  const latestSiblings = new Map<string, SensorTruthEvaluation>();
+  evaluations.forEach((e, i) => {
+    if (e.metric !== "temperature_c" && e.metric !== "humidity_pct") return;
+    const key = `${e.tentId}|${e.metric}|${e.deviceId !== null ? `d:${e.deviceId}` : `anon:${i}`}`;
+    const prev = latestSiblings.get(key);
+    if (prev === undefined) {
+      latestSiblings.set(key, e);
+      return;
+    }
+    const capturedCmp = (e.capturedAt ?? "").localeCompare(prev.capturedAt ?? "");
+    const wins =
+      capturedCmp > 0 ||
+      (capturedCmp === 0 && (e.receivedAt ?? "").localeCompare(prev.receivedAt ?? "") > 0);
+    if (wins) latestSiblings.set(key, e);
+  });
+  const invalidVpdInputs = [...latestSiblings.values()].filter(
+    (e) => e.validity === "invalid" || e.excludedFromReasoning,
   );
   if (invalidVpdInputs.length > 0) {
     for (const e of evaluations) {

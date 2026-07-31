@@ -118,39 +118,100 @@ export interface EvaluateSkillApplicabilityInput {
 }
 
 /**
+ * Sentinel spellings of "we do not know" that arrive as ordinary text.
+ * A free-text column has no vocabulary to validate against, so the
+ * compiler's gap flag can only report that SOMETHING was typed — and
+ * `strain: "unknown"` is something typed.
+ */
+const CONTEXT_SENTINEL_VALUES = new Set([
+  "unknown",
+  "unspecified",
+  "notspecified",
+  "na",
+  "none",
+  "tbd",
+  "unset",
+  "null",
+  "undefined",
+]);
+
+/** Nonempty text that is not one of the "we do not know" spellings. */
+function isMeaningfulText(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  const compact = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+  if (compact === "") return false;
+  return !CONTEXT_SENTINEL_VALUES.has(compact);
+}
+
+function hasFiniteBound(range: { min?: unknown; max?: unknown } | null | undefined): boolean {
+  if (range === null || range === undefined) return false;
+  return Number.isFinite(range.min) || Number.isFinite(range.max);
+}
+
+/**
  * Is a required slot genuinely present?
  *
- * The compiler's gap flags answer "did anyone type something here",
- * which is not the same question for identity axes that have a
- * controlled vocabulary. `medium: "moon dust"` is a nonempty string but
- * resolves to no known medium, and an unrecognized irrigation token
- * resolves to null — treating either as present would let a skill run
- * (and propose a manual action) without the context it declared it
- * needs. So those slots are checked SEMANTICALLY.
+ * PRESENCE IS TOTAL OVER THE SLOT VOCABULARY. This used to be a short
+ * list of special cases with a `return true` fallthrough, and review
+ * found a hole in that fallthrough four times running — medium, then
+ * plant type, then stage, then targets and the free-text slots. The
+ * defect was never any individual slot; it was that "present" defaulted
+ * to true for anything nobody had thought about yet.
+ *
+ * The distinction the compiler's gap flags cannot make: they answer "did
+ * anyone populate this field", which is a different question from "does
+ * this value tell us the thing". `medium: "moon dust"` resolves to no
+ * known medium, `stage: "unknown"` is a canonical token meaning nobody
+ * knows, `targets: {}` is a populated object with no band in it, and
+ * `strain: "n/a"` is text that says there is no answer. Each of those
+ * would let a skill run — and propose a manual action — without the
+ * context it declared it needs.
+ *
+ * The three count-based slots defer to the gap flag, which is already
+ * exact for them: you either have recent actions, readings, or photos,
+ * or you do not.
  */
+const SLOT_IS_PRESENT: Record<PlantContextSlot, (compilation: PlantContextCompilation) => boolean> =
+  {
+    stage: (c) =>
+      c.bundle.stage !== null && c.bundle.stage !== undefined && c.bundle.stage !== "unknown",
+    strain: (c) => isMeaningfulText(c.bundle.strain),
+    plant_type: (c) => {
+      const t = normalizeEnvelopeToken(c.plantType);
+      return t !== null && t !== "unknown";
+    },
+    medium: (c) => {
+      const m = normalizeMedium(c.bundle.medium);
+      return m !== null && m !== "unknown";
+    },
+    pot_size: (c) => isMeaningfulText(c.bundle.potSize),
+    irrigation_architecture: (c) => {
+      const a = normalizeIrrigationArchitecture(c.irrigationArchitecture);
+      return a !== null && a !== "unknown";
+    },
+    // Every band is individually optional, so `{}` parses. A target set
+    // with no band in it states no target.
+    targets: (c) => {
+      const t = c.bundle.targets;
+      if (t === null || t === undefined) return false;
+      return (
+        hasFiniteBound(t.temperatureC) || hasFiniteBound(t.humidityPct) || hasFiniteBound(t.vpdKpa)
+      );
+    },
+    recent_actions: () => true,
+    sensor_readings: () => true,
+    photos: () => true,
+  };
+
 function slotIsPresent(compilation: PlantContextCompilation, slot: PlantContextSlot): boolean {
   if (compilation.missingInformation.includes(slot)) return false;
-  if (slot === "medium") {
-    const m = normalizeMedium(compilation.bundle.medium);
-    return m !== null && m !== "unknown";
-  }
-  if (slot === "irrigation_architecture") {
-    const a = normalizeIrrigationArchitecture(compilation.irrigationArchitecture);
-    return a !== null && a !== "unknown";
-  }
-  if (slot === "plant_type") {
-    const t = normalizeEnvelopeToken(compilation.plantType);
-    return t !== null && t !== "unknown";
-  }
-  if (slot === "stage") {
-    // "unknown" is a CANONICAL stage value, so the compiler rightly does
-    // not flag it as a gap — the field was populated. But a skill that
-    // declared `stage` as required context needs to know the stage, and
-    // "unknown" is the answer "nobody knows", not a stage.
-    const s = compilation.bundle.stage;
-    return s !== null && s !== undefined && s !== "unknown";
-  }
-  return true;
+  const predicate = SLOT_IS_PRESENT[slot];
+  // An unrecognized slot is not evidence of presence.
+  if (typeof predicate !== "function") return false;
+  return predicate(compilation);
 }
 
 /**

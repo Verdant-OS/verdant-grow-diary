@@ -136,9 +136,24 @@ export function normalizeMedium(raw: unknown): SkillMedium | null {
   return (SKILL_MEDIA as readonly string[]).includes(token) ? (token as SkillMedium) : null;
 }
 
-/** Grow settings, reusing the repo's existing GROW_TYPES vocabulary. */
-export const SKILL_GROW_SETTINGS = GROW_TYPES.map((g) => g.value);
+/**
+ * Grow settings, reusing the repo's existing GROW_TYPES vocabulary.
+ *
+ * Frozen, and every `z.enum` built from it takes a COPY. `Array.map`
+ * returns a mutable array, so an exported one is a vocabulary any
+ * consumer could `pop()` before the first manifest was parsed — and
+ * since the enum holds the same backing array, which grow settings are
+ * accepted would then depend on who ran first.
+ */
+export const SKILL_GROW_SETTINGS: readonly string[] = Object.freeze(
+  GROW_TYPES.map((g) => g.value as string),
+);
 export type SkillGrowSetting = (typeof GROW_TYPES)[number]["value"];
+
+/** Fresh tuple per enum, so no caller shares the enum's backing array. */
+export function growSettingEnumValues(): [string, ...string[]] {
+  return [...SKILL_GROW_SETTINGS] as [string, ...string[]];
+}
 
 export const SKILL_EVIDENCE_POLICIES = [
   "context_only",
@@ -223,7 +238,7 @@ const PERMISSION_DEPENDENCY_MESSAGE: Record<SkillPermission, string> = {
 const operatingEnvelopeSchema = z
   .object({
     /** Grow settings the skill supports. Empty = any setting. */
-    growSettings: z.array(z.enum(SKILL_GROW_SETTINGS as [string, ...string[]])).default([]),
+    growSettings: z.array(z.enum(growSettingEnumValues())).default([]),
     /** Supported media. Empty = medium-agnostic. */
     media: z.array(z.enum(SKILL_MEDIA)).default([]),
     /** Supported irrigation architectures. Empty = irrigation-agnostic. */
@@ -268,7 +283,7 @@ const excludedConditionsSchema = z
   .object({
     media: z.array(z.enum(SKILL_MEDIA)).default([]),
     irrigationArchitectures: z.array(z.enum(SKILL_IRRIGATION_ARCHITECTURES)).default([]),
-    growSettings: z.array(z.enum(SKILL_GROW_SETTINGS as [string, ...string[]])).default([]),
+    growSettings: z.array(z.enum(growSettingEnumValues())).default([]),
   })
   .strict();
 export interface SkillExcludedConditions {

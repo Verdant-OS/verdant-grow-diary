@@ -9,7 +9,9 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  SKILL_GROW_SETTINGS,
   SKILL_PERMISSIONS,
+  growSettingEnumValues,
   normalizeIrrigationArchitecture,
   normalizeMedium,
   parseVerdantSkillManifest,
@@ -1171,5 +1173,129 @@ describe("round 7 — grants and trustworthy counts", () => {
       );
       expect(ungranted.ok).toBe(false);
     }
+  });
+});
+
+describe("round 8 — presence is total, vocabularies are frozen", () => {
+  const noSensorEnvelope = {
+    growSettings: [],
+    media: [],
+    irrigationArchitectures: [],
+    requiredSensorMetrics: [],
+    minUsableSensorReadings: 0,
+  };
+
+  it("rejects an empty target set for required target context", () => {
+    // Every band is individually optional, so `{}` is a valid targets
+    // object. It still states no target.
+    const targetSkill = manifest({
+      permissions: ["read_plant_history", "read_sensor_context"],
+      requiredContext: ["targets"],
+      optionalContext: [],
+      operatingEnvelope: noSensorEnvelope,
+      excludedConditions: { media: [], irrigationArchitectures: [], growSettings: [] },
+    });
+    const bandless = compileContext({ targets: {} });
+    expect(bandless.missingInformation).not.toContain("targets");
+
+    const r = evaluateSkillApplicability({
+      manifest: targetSkill,
+      compilation: bandless,
+      growSetting: "tent",
+    });
+    expect(r.missingRequiredContext).toContain("targets");
+    expect(skillMayRun(r)).toBe(false);
+
+    // A real band satisfies it.
+    const withBand = evaluateSkillApplicability({
+      manifest: targetSkill,
+      compilation: compileContext(),
+      growSetting: "tent",
+    });
+    expect(withBand.missingRequiredContext).not.toContain("targets");
+  });
+
+  it("treats sentinel free text as missing for strain and pot size", () => {
+    const identitySkill = manifest({
+      permissions: ["read_plant_history"],
+      requiredContext: ["strain", "pot_size"],
+      optionalContext: [],
+      operatingEnvelope: noSensorEnvelope,
+      excludedConditions: { media: [], irrigationArchitectures: [], growSettings: [] },
+    });
+    for (const sentinel of ["unknown", "Unknown", "n/a", "N/A", "none", "TBD", "  "]) {
+      const c = compileContext({
+        plant: {
+          id: PLANT,
+          grow_id: GROW,
+          tent_id: TENT,
+          stage: "flower",
+          strain: sentinel,
+          medium: "coco",
+          pot_size: sentinel,
+        },
+      });
+      const r = evaluateSkillApplicability({
+        manifest: identitySkill,
+        compilation: c,
+        growSetting: "tent",
+      });
+      expect(r.missingRequiredContext, `sentinel ${JSON.stringify(sentinel)}`).toContain("strain");
+      expect(r.missingRequiredContext).toContain("pot_size");
+      expect(skillMayRun(r)).toBe(false);
+    }
+    // A real strain still satisfies it.
+    const good = evaluateSkillApplicability({
+      manifest: identitySkill,
+      compilation: compileContext(),
+      growSetting: "tent",
+    });
+    expect(good.missingRequiredContext).not.toContain("strain");
+    expect(good.missingRequiredContext).not.toContain("pot_size");
+  });
+
+  it("covers every context slot with a presence rule", () => {
+    // Presence must be TOTAL: no slot may fall through to a default of
+    // "present". This is the property that failed four rounds running.
+    const empty = compileContext({
+      plant: { id: PLANT, grow_id: GROW, tent_id: TENT },
+      identity: {},
+      targets: undefined,
+      growEvents: [],
+      diaryEntries: [],
+      photos: [],
+      sensorReadings: [],
+    });
+    for (const slot of CONTEXT_SLOTS) {
+      const m = manifest({
+        permissions: ["read_plant_history", "read_sensor_context", "read_photo_metadata"],
+        requiredContext: [slot],
+        optionalContext: [],
+        operatingEnvelope: noSensorEnvelope,
+        excludedConditions: { media: [], irrigationArchitectures: [], growSettings: [] },
+      });
+      const r = evaluateSkillApplicability({
+        manifest: m,
+        compilation: empty,
+        growSetting: "tent",
+      });
+      expect(r.missingRequiredContext, `slot ${slot} fell through as present`).toContain(slot);
+    }
+  });
+
+  it("freezes the exported grow-setting vocabulary", () => {
+    // A mutable exported array is a vocabulary any consumer could shrink
+    // before the first manifest parse.
+    expect(Object.isFrozen(SKILL_GROW_SETTINGS)).toBe(true);
+    expect(() => {
+      (SKILL_GROW_SETTINGS as string[]).pop();
+    }).toThrow();
+    // Each enum gets its own copy, so no caller shares the backing array.
+    const a = growSettingEnumValues();
+    const b = growSettingEnumValues();
+    expect(a).not.toBe(b);
+    a.pop();
+    expect(b.length).toBe(SKILL_GROW_SETTINGS.length);
+    expect(parseVerdantSkillManifest(makeManifest()).ok).toBe(true);
   });
 });

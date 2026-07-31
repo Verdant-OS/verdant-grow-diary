@@ -220,6 +220,66 @@ describe("manifest contract", () => {
     expect(parseVerdantSkillManifest(makeManifest({ lifecycle: "superseded" })).ok).toBe(false);
   });
 
+  it("rejects unknown fields inside NESTED manifest objects too", () => {
+    const nested = [
+      {
+        operatingEnvelope: {
+          growSettings: ["tent"],
+          media: ["coco"],
+          irrigationArchitectures: [],
+          requiresKnownIrrigationArchitecture: false,
+          requiresKnownAutoflowerStatus: false,
+          minUsableSensorReadings: 0,
+          requiredSensorMetrics: [],
+          shellCommand: "rm -rf /",
+        },
+      },
+      {
+        excludedConditions: {
+          media: [],
+          irrigationArchitectures: [],
+          growSettings: [],
+          sqlFilter: "1=1",
+        },
+      },
+      {
+        followUpContract: {
+          requiresFollowUp: false,
+          defaultIntervalHours: null,
+          webhook: "https://example.com",
+        },
+      },
+      {
+        deprecation: { deprecated: false, supersededBy: null, note: null, script: "x" },
+      },
+    ];
+    for (const override of nested) {
+      expect(parseVerdantSkillManifest(makeManifest(override)).ok).toBe(false);
+    }
+  });
+
+  it("rejects a grow setting that is both supported and excluded", () => {
+    const r = parseVerdantSkillManifest(
+      makeManifest({
+        operatingEnvelope: {
+          growSettings: ["tent"],
+          media: [],
+          irrigationArchitectures: [],
+          requiresKnownIrrigationArchitecture: false,
+          requiresKnownAutoflowerStatus: false,
+          minUsableSensorReadings: 0,
+          requiredSensorMetrics: [],
+        },
+        excludedConditions: {
+          media: [],
+          irrigationArchitectures: [],
+          growSettings: ["tent"],
+        },
+      }),
+    );
+    expect(r.ok).toBe(false);
+  });
+
   it("requires context slots to use the compiler's token vocabulary", () => {
     expect(parseVerdantSkillManifest(makeManifest({ requiredContext: ["moon_phase"] })).ok).toBe(
       false,
@@ -360,6 +420,16 @@ describe("registry", () => {
     expect(compareSkillVersions("1.10.0", "1.9.0")).toBeGreaterThan(0);
     expect(compareSkillVersions("2.0.0", "10.0.0")).toBeLessThan(0);
     expect(compareSkillVersions("1.0.0", "1.0.0")).toBe(0);
+  });
+
+  it("compares long version segments without precision loss", () => {
+    // Past 2^53 these parse to the SAME float, so a parseInt-based
+    // comparison would call them equal and pick an arbitrary winner.
+    const lower = "9007199254740993.0.0";
+    const higher = "9007199254740994.0.0";
+    expect(compareSkillVersions(higher, lower)).toBeGreaterThan(0);
+    expect(compareSkillVersions(lower, higher)).toBeLessThan(0);
+    expect(compareSkillVersions(lower, lower)).toBe(0);
   });
 
   it("throws from the assert helper on an invalid set", () => {

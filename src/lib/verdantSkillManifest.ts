@@ -184,32 +184,34 @@ const textSchema = z.string().trim().min(1).max(500);
 /** Context slots come from the compiler's exported token set. */
 const contextSlotSchema = z.enum(CONTEXT_SLOTS);
 
-const operatingEnvelopeSchema = z.object({
-  /** Grow settings the skill supports. Empty = any setting. */
-  growSettings: z.array(z.enum(SKILL_GROW_SETTINGS as [string, ...string[]])).default([]),
-  /** Supported media. Empty = medium-agnostic. */
-  media: z.array(z.enum(SKILL_MEDIA)).default([]),
-  /** Supported irrigation architectures. Empty = irrigation-agnostic. */
-  irrigationArchitectures: z.array(z.enum(SKILL_IRRIGATION_ARCHITECTURES)).default([]),
-  /**
-   * When true, the skill needs a KNOWN irrigation architecture: an
-   * unknown/absent one yields insufficient context rather than a guess.
-   */
-  requiresKnownIrrigationArchitecture: z.boolean().default(false),
-  /**
-   * When true, the skill must not run on a plant whose autoflower
-   * status is unknown (null), because null is not false.
-   */
-  requiresKnownAutoflowerStatus: z.boolean().default(false),
-  /** Minimum usable sensor readings the skill needs, across any metric. */
-  minUsableSensorReadings: z.number().int().min(0).default(0),
-  /**
-   * Specific metrics the skill depends on. A global reading count is
-   * not enough: a moisture-dependent skill must not be satisfied by a
-   * fresh temperature reading.
-   */
-  requiredSensorMetrics: z.array(z.enum(SENSOR_GATE_METRICS)).default([]),
-});
+const operatingEnvelopeSchema = z
+  .object({
+    /** Grow settings the skill supports. Empty = any setting. */
+    growSettings: z.array(z.enum(SKILL_GROW_SETTINGS as [string, ...string[]])).default([]),
+    /** Supported media. Empty = medium-agnostic. */
+    media: z.array(z.enum(SKILL_MEDIA)).default([]),
+    /** Supported irrigation architectures. Empty = irrigation-agnostic. */
+    irrigationArchitectures: z.array(z.enum(SKILL_IRRIGATION_ARCHITECTURES)).default([]),
+    /**
+     * When true, the skill needs a KNOWN irrigation architecture: an
+     * unknown/absent one yields insufficient context rather than a guess.
+     */
+    requiresKnownIrrigationArchitecture: z.boolean().default(false),
+    /**
+     * When true, the skill must not run on a plant whose autoflower
+     * status is unknown (null), because null is not false.
+     */
+    requiresKnownAutoflowerStatus: z.boolean().default(false),
+    /** Minimum usable sensor readings the skill needs, across any metric. */
+    minUsableSensorReadings: z.number().int().min(0).default(0),
+    /**
+     * Specific metrics the skill depends on. A global reading count is
+     * not enough: a moisture-dependent skill must not be satisfied by a
+     * fresh temperature reading.
+     */
+    requiredSensorMetrics: z.array(z.enum(SENSOR_GATE_METRICS)).default([]),
+  })
+  .strict();
 /**
  * Declared explicitly rather than via `z.infer`: this project compiles
  * with `strict: false`, where Zod's `.default()` degrades inferred
@@ -226,11 +228,13 @@ export interface SkillOperatingEnvelope {
   requiredSensorMetrics: SensorGateMetric[];
 }
 
-const excludedConditionsSchema = z.object({
-  media: z.array(z.enum(SKILL_MEDIA)).default([]),
-  irrigationArchitectures: z.array(z.enum(SKILL_IRRIGATION_ARCHITECTURES)).default([]),
-  growSettings: z.array(z.enum(SKILL_GROW_SETTINGS as [string, ...string[]])).default([]),
-});
+const excludedConditionsSchema = z
+  .object({
+    media: z.array(z.enum(SKILL_MEDIA)).default([]),
+    irrigationArchitectures: z.array(z.enum(SKILL_IRRIGATION_ARCHITECTURES)).default([]),
+    growSettings: z.array(z.enum(SKILL_GROW_SETTINGS as [string, ...string[]])).default([]),
+  })
+  .strict();
 export interface SkillExcludedConditions {
   media: SkillMedium[];
   irrigationArchitectures: SkillIrrigationArchitecture[];
@@ -260,10 +264,12 @@ export const verdantSkillManifestSchema = z
      */
     deterministicCalculators: z.array(idTokenSchema).default([]),
     outputContractVersion: z.literal(SKILL_CONTRACT_VERSION),
-    followUpContract: z.object({
-      requiresFollowUp: z.boolean(),
-      defaultIntervalHours: z.number().finite().positive().max(720).nullable(),
-    }),
+    followUpContract: z
+      .object({
+        requiresFollowUp: z.boolean(),
+        defaultIntervalHours: z.number().finite().positive().max(720).nullable(),
+      })
+      .strict(),
     evaluationSuiteId: idTokenSchema,
     modelPolicyId: idTokenSchema,
     /** Highest capability the skill may ever request. V1 caps at manual. */
@@ -274,6 +280,7 @@ export const verdantSkillManifestSchema = z
         supersededBy: semverSchema.nullable().default(null),
         note: textSchema.nullable().default(null),
       })
+      .strict()
       .default({ deprecated: false, supersededBy: null, note: null }),
   })
   .strict()
@@ -341,6 +348,16 @@ export const verdantSkillManifestSchema = z
           code: z.ZodIssueCode.custom,
           path: ["excludedConditions", "irrigationArchitectures"],
           message: "irrigation_both_supported_and_excluded",
+        });
+      }
+    }
+    const supportedSettings = new Set<string>(m.operatingEnvelope.growSettings);
+    for (const setting of m.excludedConditions.growSettings) {
+      if (supportedSettings.has(setting)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["excludedConditions", "growSettings"],
+          message: "grow_setting_both_supported_and_excluded",
         });
       }
     }

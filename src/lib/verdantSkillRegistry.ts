@@ -23,18 +23,27 @@ import {
 // Version helpers
 // ---------------------------------------------------------------------------
 
-function versionParts(version: string): [number, number, number] {
-  const [major = 0, minor = 0, patch = 0] = version.split(".").map((p) => Number.parseInt(p, 10));
-  return [major, minor, patch];
+/**
+ * Compare one numeric semver segment WITHOUT parsing to a number:
+ * the manifest regex accepts arbitrarily long digit strings, and
+ * `Number.parseInt` silently loses precision past 2^53. Leading zeros
+ * are already forbidden, so longer digit string = larger value, and
+ * equal-length strings compare correctly lexically.
+ */
+function compareNumericSegment(a: string, b: string): number {
+  if (a.length !== b.length) return a.length - b.length;
+  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 /** Negative when a < b, positive when a > b, 0 when equal. */
 export function compareSkillVersions(a: string, b: string): number {
-  const [aMajor, aMinor, aPatch] = versionParts(a);
-  const [bMajor, bMinor, bPatch] = versionParts(b);
-  if (aMajor !== bMajor) return aMajor - bMajor;
-  if (aMinor !== bMinor) return aMinor - bMinor;
-  return aPatch - bPatch;
+  const aParts = a.split(".");
+  const bParts = b.split(".");
+  for (let i = 0; i < 3; i += 1) {
+    const cmp = compareNumericSegment(aParts[i] ?? "0", bParts[i] ?? "0");
+    if (cmp !== 0) return cmp;
+  }
+  return 0;
 }
 
 // ---------------------------------------------------------------------------

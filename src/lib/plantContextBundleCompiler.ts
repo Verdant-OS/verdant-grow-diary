@@ -144,6 +144,12 @@ export interface SensorReadingRowForContext extends SensorReadingRowLike {
    * as missing_timestamp.
    */
   ts?: string | null;
+  /**
+   * Row-level plant ownership. Most persisted rows are TENT-scoped and
+   * leave this null; the compiler must not assert that such a reading
+   * belongs to the plant being compiled.
+   */
+  plant_id?: string | null;
 }
 
 export interface PhotoRowLike {
@@ -412,12 +418,12 @@ export function buildCompactTimeline(
  * events count — an absent action is never inferred as "not done".
  */
 export function summarizeRecentActions(
-  growEvents: readonly GrowEventRowLike[],
+  growEvents: readonly (GrowEventRowLike & { id?: string | null })[],
   options: { nowMs: number; windowDays: number; immediateHours: number },
 ): RecentActionSummary[] {
   const cutoff = options.nowMs - options.windowDays * DAY_MS;
   const immediateCutoff = options.nowMs - options.immediateHours * HOUR_MS;
-  const rows: Array<{ ms: number; item: RecentActionSummary }> = [];
+  const rows: Array<{ ms: number; id: string; item: RecentActionSummary }> = [];
   for (const row of growEvents) {
     const occurredAt = canonicalIso(row?.occurred_at);
     if (occurredAt === null) continue;
@@ -427,6 +433,7 @@ export function summarizeRecentActions(
     if (eventType === null) continue;
     rows.push({
       ms,
+      id: typeof row?.id === "string" ? row.id : "",
       item: {
         occurredAt,
         eventType,
@@ -436,9 +443,20 @@ export function summarizeRecentActions(
       },
     });
   }
-  rows.sort((a, b) =>
-    b.ms - a.ms !== 0 ? b.ms - a.ms : a.item.eventType.localeCompare(b.item.eventType),
-  );
+  // Fully deterministic ordering: newest first, then event type, source,
+  // note, and finally row identity. Database order is not guaranteed for
+  // ties, and with more than `recentActions` tied rows an unstable sort
+  // would change WHICH actions survive the cap.
+  rows.sort((a, b) => {
+    if (b.ms !== a.ms) return b.ms - a.ms;
+    const typeCmp = a.item.eventType.localeCompare(b.item.eventType);
+    if (typeCmp !== 0) return typeCmp;
+    const sourceCmp = (a.item.source ?? "").localeCompare(b.item.source ?? "");
+    if (sourceCmp !== 0) return sourceCmp;
+    const noteCmp = (a.item.note ?? "").localeCompare(b.item.note ?? "");
+    if (noteCmp !== 0) return noteCmp;
+    return a.id.localeCompare(b.id);
+  });
   return rows.slice(0, PLANT_CONTEXT_CAPS.recentActions).map((r) => r.item);
 }
 
@@ -478,10 +496,20 @@ function isPreferredReading(next: SensorTruthEvaluation, prev: SensorTruthEvalua
   return (next.normalizedValue ?? 0) < (prev.normalizedValue ?? 0);
 }
 
+/**
+ * Plant scope comes from the ROW, never from the plant being compiled.
+ * Most persisted rows are tent-scoped and leave `plant_id` null; those
+ * stay tent-scoped so a root-zone reading is never asserted to belong to
+ * a plant whose ownership was never established. A row naming another
+ * plant keeps that plant, so the gate groups it away from ours.
+ */
+function resolveRowPlantId(row: SensorReadingRowForContext): string | null {
+  return typeof row?.plant_id === "string" && row.plant_id !== "" ? row.plant_id : null;
+}
+
 function toSensorCandidate(
   row: SensorReadingRowForContext,
   tentId: string,
-  plantId: string | null,
 ): SensorReadingCandidate {
   const rawValue = row?.value;
   const numeric =
@@ -495,7 +523,7 @@ function toSensorCandidate(
     quality: row?.quality ?? null,
     capturedAt: row?.captured_at ?? row?.ts ?? null,
     tentId,
-    plantId,
+    plantId: resolveRowPlantId(row),
     deviceId: typeof row?.device_id === "string" ? row.device_id : null,
     metric: typeof row?.metric === "string" ? row.metric : "",
     value: numeric !== null && Number.isFinite(numeric) ? numeric : null,
@@ -517,7 +545,6 @@ export function summarizeSensorWindow(
     nowMs: number;
     windowDays: number;
     tentId: string;
-    plantId: string | null;
   },
 ): SensorWindowSummary {
   const cutoff = options.nowMs - options.windowDays * DAY_MS;
@@ -527,10 +554,16 @@ export function summarizeSensorWindow(
     // Unparseable timestamps still go through the gate so they are
     // counted and warned about rather than vanishing.
     if (ms !== null && (ms < cutoff || ms > options.nowMs)) continue;
-    candidates.push(toSensorCandidate(row, options.tentId, options.plantId));
+    candidates.push(toSensorCandidate(row, options.tentId));
   }
 
-  const series = evaluateSensorSeries(candidates, { nowMs: options.nowMs });
+  // Means come from the gate's EXPLICIT aggregation path, which groups
+  // latest-per-device first. Averaging evaluations directly here would
+  // silently weight a ten-sample device ten times a one-sample device.
+  const series = evaluateSensorSeries(candidates, {
+    nowMs: options.nowMs,
+    aggregation: { rule: "mean" },
+  });
   const provenance = summarizeSensorProvenance(series.evaluations);
 
   const byMetric = new Map<SensorGateMetric, SensorTruthEvaluation[]>();
@@ -555,9 +588,13 @@ export function summarizeSensorWindow(
     for (const e of usable) {
       if (latest === null || isPreferredReading(e, latest)) latest = e;
     }
+    // Mean comes from the gate's explicit aggregation, not a local
+    // average. Multiple groups (e.g. per-plant root-zone) are averaged
+    // across their group means so no group's sample count dominates.
+    const groupMeans = series.aggregates.filter((a) => a.metric === metric).map((a) => a.value);
     const mean =
-      usable.length > 0
-        ? round3(usable.reduce((acc, e) => acc + (e.normalizedValue as number), 0) / usable.length)
+      groupMeans.length > 0
+        ? round3(groupMeans.reduce((acc, v) => acc + v, 0) / groupMeans.length)
         : null;
     metrics.push({
       metric,
@@ -724,7 +761,6 @@ export function compilePlantContextBundle(
     nowMs: options.nowMs,
     windowDays: windows.sensorDays,
     tentId: tentId ?? growId,
-    plantId,
   });
 
   // Photo summary — metadata only, never image contents or URLs.
@@ -789,6 +825,9 @@ export function compilePlantContextBundle(
       const { min, max } = range;
       const m = sensorSummary.metrics.find((x) => x.metric === metric);
       if (!m || m.latestValue === null) return;
+      // A conflicted metric has no single honest value, so it cannot
+      // support an actionable-looking deviation either.
+      if (m.conflicted) return;
       if (typeof min === "number" && m.latestValue < min) {
         notableDeviations.push(`${label} below target (${m.latestValue} < ${min})`);
       } else if (typeof max === "number" && m.latestValue > max) {

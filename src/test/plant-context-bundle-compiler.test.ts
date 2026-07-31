@@ -373,6 +373,60 @@ describe("snapshot coherence, continued", () => {
     expect(temp?.conflicted).toBe(true);
   });
 
+  it("reports no target deviation for a conflicted metric", () => {
+    const c = compile({
+      targets: { temperatureC: { min: 22, max: 26 } },
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 20,
+          unit: "°C",
+          captured_at: hoursAgo(0.1),
+          source: "live",
+          device_id: "dev-a",
+        },
+        {
+          metric: "temperature_c",
+          value: 28,
+          unit: "°C",
+          captured_at: hoursAgo(0.1),
+          source: "live",
+          device_id: "dev-b",
+        },
+      ],
+    });
+    expect(c.sensorSummary.conflicts.length).toBeGreaterThan(0);
+    // Neither "below target" nor "above target" may be asserted from an
+    // arbitrarily chosen side of the conflict.
+    expect(c.notableDeviations).toEqual([]);
+  });
+
+  it("does not assign tent-scoped root-zone readings to the compiled plant", () => {
+    const c = compile({
+      sensorReadings: [
+        // Tent-scoped row: plant ownership was never established.
+        {
+          metric: "soil_moisture_pct",
+          value: 30,
+          unit: "%",
+          captured_at: hoursAgo(0.1),
+          source: "live",
+        },
+        {
+          metric: "soil_moisture_pct",
+          value: 65,
+          unit: "%",
+          captured_at: hoursAgo(0.1),
+          source: "live",
+          plant_id: "other-plant",
+        },
+      ],
+    });
+    // The tent-scoped and other-plant rows are grouped apart, so they do
+    // not become a conflict attributed to this plant.
+    expect(c.sensorSummary.conflicts).toEqual([]);
+  });
+
   it("stamps the weakest included metric's confidence, not the anchor's", () => {
     const c = compile({
       sensorReadings: [
@@ -529,9 +583,57 @@ describe("windows and caps", () => {
           source: "manual",
         },
       ],
-      { nowMs: NOW_MS, windowDays: 7, tentId: TENT, plantId: PLANT },
+      { nowMs: NOW_MS, windowDays: 7, tentId: TENT },
     );
     expect(summary.includedCount).toBe(0);
+  });
+
+  it("orders tied actions deterministically regardless of row order", () => {
+    const rows = [
+      { id: "ge-2", occurred_at: hoursAgo(2), event_type: "watering", note: "b" },
+      { id: "ge-1", occurred_at: hoursAgo(2), event_type: "watering", note: "a" },
+      { id: "ge-3", occurred_at: hoursAgo(2), event_type: "watering", note: "c" },
+    ];
+    const forward = summarizeRecentActions(rows, {
+      nowMs: NOW_MS,
+      windowDays: 14,
+      immediateHours: 48,
+    });
+    const reversed = summarizeRecentActions([...rows].reverse(), {
+      nowMs: NOW_MS,
+      windowDays: 14,
+      immediateHours: 48,
+    });
+    expect(serializeSkillContract(forward)).toBe(serializeSkillContract(reversed));
+    expect(forward.map((a) => a.note)).toEqual(["a", "b", "c"]);
+  });
+
+  it("does not let one device's sample count dominate the mean", () => {
+    const chatty = Array.from({ length: 10 }, (_, i) => ({
+      metric: "temperature_c",
+      value: 20,
+      unit: "°C",
+      captured_at: hoursAgo(0.1 + i * 0.001),
+      source: "live",
+      device_id: "chatty",
+    }));
+    const quiet = {
+      metric: "temperature_c",
+      value: 30,
+      unit: "°C",
+      captured_at: hoursAgo(0.1),
+      source: "live",
+      device_id: "quiet",
+    };
+    const summary = summarizeSensorWindow([...chatty, quiet], {
+      nowMs: NOW_MS,
+      windowDays: 7,
+      tentId: TENT,
+    });
+    const temp = summary.metrics.find((m) => m.metric === "temperature_c");
+    // Latest-per-device grouping first: 20 and 30 weigh equally (25),
+    // rather than the chatty device's ten samples pulling toward 20.
+    expect(temp?.mean).toBe(25);
   });
 
   it("caps recent actions and the compact timeline", () => {

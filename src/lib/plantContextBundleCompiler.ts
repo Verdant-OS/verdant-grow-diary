@@ -575,21 +575,36 @@ export function summarizeSensorWindow(
   });
   const provenance = summarizeSensorProvenance(series.evaluations);
 
+  /**
+   * THE single plant-scope rule for this summary. Root-zone metrics are
+   * plant-scoped evidence: only a reading naming the compiled plant can
+   * become this plant's value, mean, or conflict. Atmospheric metrics
+   * stay tent-scoped. Everything filtered out remains counted in the
+   * provenance summary, so nothing disappears silently.
+   *
+   * Every derived view below (per-metric, means, conflicts, snapshot)
+   * MUST go through this predicate — scoping one consumer at a time is
+   * how another plant's telemetry leaks back in.
+   */
+  const compiledPlantId = options.plantId ?? null;
+  const inPlantScope = (metric: SensorGateMetric | null, plantId: string | null): boolean => {
+    if (metric === null) return false;
+    if (!ROOT_ZONE_METRICS.has(metric)) return true;
+    return plantId === compiledPlantId;
+  };
+
   const byMetric = new Map<SensorGateMetric, SensorTruthEvaluation[]>();
   for (const e of series.evaluations) {
-    if (e.metric === null) continue;
-    // Root-zone metrics are plant-scoped evidence: only a reading that
-    // names the compiled plant may become this plant's value. Others
-    // remain counted in the provenance summary.
-    if (ROOT_ZONE_METRICS.has(e.metric) && e.plantId !== (options.plantId ?? null)) {
-      continue;
-    }
-    const list = byMetric.get(e.metric) ?? [];
+    if (!inPlantScope(e.metric, e.plantId)) continue;
+    const metric = e.metric as SensorGateMetric;
+    const list = byMetric.get(metric) ?? [];
     list.push(e);
-    byMetric.set(e.metric, list);
+    byMetric.set(metric, list);
   }
 
-  const conflictedMetrics = new Set<SensorGateMetric>(series.conflicts.map((c) => c.metric));
+  const scopedConflicts = series.conflicts.filter((c) => inPlantScope(c.metric, c.plantId));
+  const scopedAggregates = series.aggregates.filter((a) => inPlantScope(a.metric, a.plantId));
+  const conflictedMetrics = new Set<SensorGateMetric>(scopedConflicts.map((c) => c.metric));
 
   const metrics: SensorWindowSummary["metrics"] = [];
   for (const metric of [...byMetric.keys()].sort()) {
@@ -606,7 +621,7 @@ export function summarizeSensorWindow(
     // Mean comes from the gate's explicit aggregation, not a local
     // average. Multiple groups (e.g. per-plant root-zone) are averaged
     // across their group means so no group's sample count dominates.
-    const groupMeans = series.aggregates.filter((a) => a.metric === metric).map((a) => a.value);
+    const groupMeans = scopedAggregates.filter((a) => a.metric === metric).map((a) => a.value);
     const mean =
       groupMeans.length > 0
         ? round3(groupMeans.reduce((acc, v) => acc + v, 0) / groupMeans.length)
@@ -642,7 +657,7 @@ export function summarizeSensorWindow(
     includedCount: provenance.includedCount,
     excludedCount: provenance.excludedCount,
     warnings: provenance.warnings,
-    conflicts: series.conflicts.slice(0, PLANT_CONTEXT_CAPS.conflicts),
+    conflicts: scopedConflicts.slice(0, PLANT_CONTEXT_CAPS.conflicts),
     latestUsable:
       latestUsableEval === null
         ? null
@@ -897,26 +912,54 @@ export function compilePlantContextBundle(
       occurredAt: canonicalIso(r?.created_at),
       summary: cleanText(r?.summary),
       riskLevel: cleanText(r?.risk_level, 32),
+      id: typeof r?.id === "string" ? r.id : "",
     }))
     .filter(
-      (r): r is { occurredAt: string; summary: string; riskLevel: string | null } =>
-        r.occurredAt !== null && r.summary !== null,
+      (
+        r,
+      ): r is {
+        occurredAt: string;
+        summary: string;
+        riskLevel: string | null;
+        id: string;
+      } => r.occurredAt !== null && r.summary !== null,
     )
-    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
-    .slice(0, PLANT_CONTEXT_CAPS.previousRecommendations);
+    // Deterministic before the cap: ties must not decide which survive.
+    .sort((a, b) => {
+      const timeCmp = b.occurredAt.localeCompare(a.occurredAt);
+      if (timeCmp !== 0) return timeCmp;
+      const riskCmp = (a.riskLevel ?? "").localeCompare(b.riskLevel ?? "");
+      if (riskCmp !== 0) return riskCmp;
+      const summaryCmp = a.summary.localeCompare(b.summary);
+      if (summaryCmp !== 0) return summaryCmp;
+      return a.id.localeCompare(b.id);
+    })
+    .slice(0, PLANT_CONTEXT_CAPS.previousRecommendations)
+    .map(({ occurredAt, summary, riskLevel }) => ({ occurredAt, summary, riskLevel }));
 
   const unresolvedFollowUps = (input.followUps ?? [])
     .map((f) => ({
       dueAt: canonicalIso(f?.due_at),
       question: cleanText(f?.question),
       status: cleanText(f?.status, 32) ?? "pending",
+      id: typeof f?.id === "string" ? f.id : "",
     }))
     .filter(
-      (f): f is { dueAt: string | null; question: string; status: string } =>
+      (f): f is { dueAt: string | null; question: string; status: string; id: string } =>
         f.question !== null && f.status !== "recorded" && f.status !== "cancelled",
     )
-    .sort((a, b) => (a.dueAt ?? "").localeCompare(b.dueAt ?? ""))
-    .slice(0, PLANT_CONTEXT_CAPS.unresolvedFollowUps);
+    // Deterministic before the cap: ties must not decide which survive.
+    .sort((a, b) => {
+      const dueCmp = (a.dueAt ?? "").localeCompare(b.dueAt ?? "");
+      if (dueCmp !== 0) return dueCmp;
+      const statusCmp = a.status.localeCompare(b.status);
+      if (statusCmp !== 0) return statusCmp;
+      const questionCmp = a.question.localeCompare(b.question);
+      if (questionCmp !== 0) return questionCmp;
+      return a.id.localeCompare(b.id);
+    })
+    .slice(0, PLANT_CONTEXT_CAPS.unresolvedFollowUps)
+    .map(({ dueAt, question, status }) => ({ dueAt, question, status }));
 
   const gaps = identifyContextGaps({
     stage: stage !== null,
@@ -970,8 +1013,17 @@ export function compilePlantContextBundle(
           co2Ppm: pick("co2_ppm"),
           soilMoisturePct: pick("soil_moisture_pct"),
         };
+  // A snapshot with every metric filtered out carries no evidence — it
+  // would be a bare "live, ok, just now" header implying health that no
+  // value supports. Omit it entirely.
+  const snapshotHasValue =
+    snapshotValues !== null &&
+    Object.values(snapshotValues).some((v) => v !== null && v !== undefined);
   const latestSnapshot =
-    latestUsable === null || anchorCapturedAt === null || snapshotValues === null
+    latestUsable === null ||
+    anchorCapturedAt === null ||
+    snapshotValues === null ||
+    !snapshotHasValue
       ? null
       : {
           capturedAt: anchorCapturedAt,

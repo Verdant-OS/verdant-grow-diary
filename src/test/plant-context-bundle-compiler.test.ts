@@ -478,6 +478,58 @@ describe("snapshot coherence, continued", () => {
     ).toBeUndefined();
   });
 
+  it("scopes root-zone means and conflicts to the compiled plant", () => {
+    const other = (value: number, device: string) => ({
+      metric: "soil_moisture_pct",
+      value,
+      unit: "%",
+      captured_at: hoursAgo(0.1),
+      source: "live",
+      plant_id: "other-plant",
+      device_id: device,
+    });
+    const c = compile({
+      sensorReadings: [
+        // Another plant's two devices disagree wildly — not our conflict,
+        // and not our mean.
+        other(10, "o-1"),
+        other(90, "o-2"),
+        {
+          metric: "soil_moisture_pct",
+          value: 40,
+          unit: "%",
+          captured_at: hoursAgo(0.1),
+          source: "live",
+          plant_id: PLANT,
+          device_id: "mine",
+        },
+      ],
+    });
+    expect(c.sensorSummary.conflicts).toEqual([]);
+    expect(c.conflictingEvidence).toEqual([]);
+    const soil = c.sensorSummary.metrics.find((m) => m.metric === "soil_moisture_pct");
+    expect(soil?.mean).toBe(40);
+    expect(soil?.conflicted).toBe(false);
+  });
+
+  it("omits a snapshot whose every metric was filtered out", () => {
+    const c = compile({
+      sensorReadings: [
+        // Only a root-zone reading, and it belongs to another plant: the
+        // anchor would have no represented metric.
+        {
+          metric: "soil_moisture_pct",
+          value: 40,
+          unit: "%",
+          captured_at: hoursAgo(0.1),
+          source: "live",
+          plant_id: "other-plant",
+        },
+      ],
+    });
+    expect(c.bundle.latestSnapshot).toBeNull();
+  });
+
   it("stamps the weakest included metric's confidence, not the anchor's", () => {
     const c = compile({
       sensorReadings: [
@@ -840,6 +892,32 @@ describe("photos, recommendations, follow-ups", () => {
       serializeSkillContract(reversed.observations),
     );
     expect(forward.observations.map((o) => o.note)).toEqual(["a", "b", "c"]);
+  });
+
+  it("orders tied recommendations and follow-ups deterministically", () => {
+    const recs = [
+      { id: "r-2", created_at: hoursAgo(3), summary: "b", risk_level: "low" },
+      { id: "r-1", created_at: hoursAgo(3), summary: "a", risk_level: "low" },
+      { id: "r-3", created_at: hoursAgo(3), summary: "c", risk_level: "low" },
+    ];
+    const ups = [
+      { id: "f-2", due_at: hoursAgo(-6), question: "b?", status: "pending" },
+      { id: "f-1", due_at: hoursAgo(-6), question: "a?", status: "pending" },
+      { id: "f-3", due_at: hoursAgo(-6), question: "c?", status: "pending" },
+    ];
+    const forward = compile({ previousRecommendations: recs, followUps: ups });
+    const reversed = compile({
+      previousRecommendations: [...recs].reverse(),
+      followUps: [...ups].reverse(),
+    });
+    expect(serializeSkillContract(forward.previousRecommendations)).toBe(
+      serializeSkillContract(reversed.previousRecommendations),
+    );
+    expect(serializeSkillContract(forward.unresolvedFollowUps)).toBe(
+      serializeSkillContract(reversed.unresolvedFollowUps),
+    );
+    expect(forward.previousRecommendations.map((r) => r.summary)).toEqual(["a", "b", "c"]);
+    expect(forward.unresolvedFollowUps.map((f) => f.question)).toEqual(["a?", "b?", "c?"]);
   });
 
   it("keeps only unresolved follow-ups", () => {

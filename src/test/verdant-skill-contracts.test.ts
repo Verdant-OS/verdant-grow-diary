@@ -266,11 +266,17 @@ describe("VerdantSkillInputEnvelope", () => {
             "x-api-key": "should-never-survive",
             launchWindow: "eyJzaG91bGQtbmV2ZXItc3Vydml2ZQ",
             modelNote: "sk-NEVERSURVIVE1234567890",
+            diagNote: "request failed for sk-NEVERSURVIVEQRSTUV, retrying",
+            reviewTag: "risk-assessment-notes ready",
           },
         }),
       ),
     );
-    expect(v.flags).toEqual({ skillRuntimeV1: true, betaUi: "on" });
+    expect(v.flags).toEqual({
+      skillRuntimeV1: true,
+      betaUi: "on",
+      reviewTag: "risk-assessment-notes ready",
+    });
     const serialized = serializeSkillContract(v);
     expect(serialized).not.toContain("never-survive");
     expect(serialized).not.toContain("eyJ");
@@ -350,6 +356,40 @@ describe("PlantContextBundle", () => {
     expect(coherent.latestSnapshot?.quality).toBe("invalid");
   });
 
+  it("rejects unit-domain-impossible metric values, leaves plausibility to the truth gate", () => {
+    for (const bad of [
+      { humidityPct: 150 },
+      { humidityPct: -5 },
+      { soilMoisturePct: 101 },
+      { co2Ppm: -10 },
+      { vpdKpa: -0.2 },
+    ]) {
+      expectIssues(
+        parsePlantContextBundle(
+          makeBundle({
+            latestSnapshot: { capturedAt: T0, source: "live", quality: "ok", ...bad },
+          }),
+        ),
+      );
+    }
+    // Boundary values are unit-legal; flagging suspicious stuck-at-bound
+    // readings is the Sensor Truth Gate's job, not the contract's.
+    const boundary = expectOk(
+      parsePlantContextBundle(
+        makeBundle({
+          latestSnapshot: {
+            capturedAt: T0,
+            source: "live",
+            quality: "ok",
+            humidityPct: 100,
+            soilMoisturePct: 0,
+          },
+        }),
+      ),
+    );
+    expect(boundary.latestSnapshot?.humidityPct).toBe(100);
+  });
+
   it("carries optional per-reading confidence, bounded to [0, 1]", () => {
     const withConfidence = expectOk(
       parsePlantContextBundle(
@@ -414,6 +454,15 @@ describe("EvidenceRecord", () => {
 
   it("rejects malformed observation timestamps", () => {
     expectIssues(parseEvidenceRecord(makeEvidence({ observedAt: "yesterday" })));
+  });
+
+  it("carries optional per-record confidence, bounded to [0, 1]", () => {
+    const v = expectOk(parseEvidenceRecord(makeEvidence({ confidence: 0.4 })));
+    expect(v.confidence).toBe(0.4);
+    const unknown = expectOk(parseEvidenceRecord(makeEvidence({ confidence: null })));
+    expect(unknown.confidence).toBeNull();
+    expectIssues(parseEvidenceRecord(makeEvidence({ confidence: 1.5 })));
+    expectIssues(parseEvidenceRecord(makeEvidence({ confidence: -0.1 })));
   });
 });
 
@@ -616,6 +665,25 @@ describe("SkillRunResult", () => {
     expect(v.status).toBe("ok");
     expect(v.proposals).toHaveLength(1);
     expect(v.confidence?.systemConfidence).toBe(0.5);
+  });
+
+  it("rejects duplicate evidence and proposal identifiers", () => {
+    const dupEvidence = expectIssues(
+      parseSkillRunResult(
+        makeRunResult({
+          evidence: [makeEvidence(), makeEvidence()],
+        }),
+      ),
+    );
+    expect(dupEvidence.join(" ")).toContain("duplicate_evidence_id");
+    const dupProposals = expectIssues(
+      parseSkillRunResult(
+        makeRunResult({
+          proposals: [makeProposal(), makeProposal()],
+        }),
+      ),
+    );
+    expect(dupProposals.join(" ")).toContain("duplicate_proposal_id");
   });
 
   it("enforces evidence-id referential integrity", () => {

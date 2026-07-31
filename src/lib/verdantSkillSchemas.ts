@@ -239,10 +239,12 @@ function normalizeRecordKey(key: string): string {
  * key name — defense in depth for values pasted under a benign key. The
  * shapes covered: vendor secret-key prefixes (both underscore forms like
  * sk_live_ and hyphenated OpenAI/Anthropic-style sk-… keys), JWT-style
- * base64 JSON, and bearer-prefixed strings.
+ * base64 JSON, and bearer-prefixed strings. Matches ANYWHERE in the
+ * string (a secret pasted mid-diagnostic still drops the entry); the
+ * lookbehind keeps ordinary words like "risk-assessment" from matching.
  */
 const SENSITIVE_VALUE_RE =
-  /^(sk|pk|rk)_(live|test)_|^sk-[A-Za-z0-9_-]{8,}|^eyJ[A-Za-z0-9_-]{8,}|^bearer\s/i;
+  /(?<![A-Za-z0-9_-])((sk|pk|rk)_(live|test)_|sk-[A-Za-z0-9_-]{8,}|eyJ[A-Za-z0-9_-]{8,}|bearer\s+[A-Za-z0-9._~+/=-]{8,})/i;
 
 function isSensitiveRecordEntry(key: string, value: unknown): boolean {
   if (SENSITIVE_KEY_RE.test(normalizeRecordKey(key))) return true;
@@ -337,11 +339,16 @@ const skillSensorSnapshotSchema = z
      * for backward compatibility; explicit null (unknown) is preserved.
      */
     confidence: unitIntervalSchema.nullish(),
+    // Unit-domain bounds only (what the unit itself makes impossible).
+    // Plausibility heuristics — stuck-at-100 RH, F/C confusion, unrealistic
+    // pH — belong to the Sensor Truth Gate layer, which composes the
+    // centralized validation-range and suspicious-reading rules. Keeping
+    // them out of the contract avoids a second threshold table.
     temperatureC: finiteNumberSchema.nullish(),
-    humidityPct: finiteNumberSchema.nullish(),
-    vpdKpa: finiteNumberSchema.nullish(),
-    co2Ppm: finiteNumberSchema.nullish(),
-    soilMoisturePct: finiteNumberSchema.nullish(),
+    humidityPct: finiteNumberSchema.min(0).max(100).nullish(),
+    vpdKpa: finiteNumberSchema.min(0).nullish(),
+    co2Ppm: finiteNumberSchema.min(0).nullish(),
+    soilMoisturePct: finiteNumberSchema.min(0).max(100).nullish(),
   })
   .superRefine((s, ctx) => {
     // Bad or unknown telemetry must never be labeled healthy: a snapshot
@@ -395,6 +402,14 @@ export const evidenceRecordSchema = z.object({
   kind: z.enum(SKILL_EVIDENCE_KINDS),
   observedAt: isoTimestampSchema,
   source: sensorSourceSchema,
+  /**
+   * Per-record trust confidence from the originating layer (e.g. the
+   * sensor layer for sensor_reading evidence), 0..1. Optional for
+   * backward compatibility; explicit null (unknown) is preserved so the
+   * runtime can derive evidenceConfidence without losing per-reading
+   * trust.
+   */
+  confidence: unitIntervalSchema.nullish(),
   summary: contractTextSchema,
   detail: contractTextSchema.nullish(),
   metric: z
@@ -640,6 +655,30 @@ export const skillRunResultSchema = z
         message: "proposals_require_ok_status",
       });
     }
+    // Citation ids must be unambiguous: duplicate evidence or proposal
+    // ids would let two different records satisfy the same reference.
+    const seenEvidenceIds = new Set<string>();
+    r.evidence.forEach((e, i) => {
+      if (seenEvidenceIds.has(e.evidenceId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["evidence", i, "evidenceId"],
+          message: "duplicate_evidence_id",
+        });
+      }
+      seenEvidenceIds.add(e.evidenceId);
+    });
+    const seenProposalIds = new Set<string>();
+    r.proposals.forEach((p, i) => {
+      if (seenProposalIds.has(p.proposalId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["proposals", i, "proposalId"],
+          message: "duplicate_proposal_id",
+        });
+      }
+      seenProposalIds.add(p.proposalId);
+    });
     // Referential integrity: every evidence id referenced anywhere must
     // exist in this result's evidence list. Citations must be real.
     const knownIds = new Set(r.evidence.map((e) => e.evidenceId));

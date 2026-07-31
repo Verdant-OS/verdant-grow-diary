@@ -235,6 +235,61 @@ describe("single-candidate evaluation", () => {
     expect(consistent.usability).toBe("usable");
   });
 
+  it("treats prototype-inherited keys as unknown, never as matches", () => {
+    for (const source of ["constructor", "toString", "hasOwnProperty"]) {
+      const e = evaluateSensorTruth(makeCandidate({ source }), { nowMs: NOW_MS });
+      expect(e.source).toBe("invalid");
+      expect(e.warnings).toContain("unknown_source");
+      expect(e.excludedFromReasoning).toBe(true);
+    }
+    const badMetric = evaluateSensorTruth(makeCandidate({ metric: "constructor" }), {
+      nowMs: NOW_MS,
+    });
+    expect(badMetric.metric).toBeNull();
+    expect(badMetric.exclusionReason).toBe("unknown_metric");
+    // One crafted candidate must not abort a whole series batch.
+    const series = evaluateSensorSeries(
+      [makeCandidate({ metric: "constructor" }), makeCandidate()],
+      { nowMs: NOW_MS },
+    );
+    expect(series.evaluations).toHaveLength(2);
+    expect(series.evaluations[1].usability).toBe("usable");
+    const badQuality = evaluateSensorTruth(makeCandidate({ quality: "constructor" }), {
+      nowMs: NOW_MS,
+    });
+    expect(badQuality.usability).toBe("invalid");
+    expect(badQuality.warnings).toContain("unknown_quality");
+    const badProvider = evaluateSensorTruth(makeCandidate({ provider: "constructor" }), {
+      nowMs: NOW_MS,
+    });
+    expect(badProvider.provenanceSummary).not.toContain("function");
+    expect(badProvider.provenanceSummary).not.toContain("Constructor");
+  });
+
+  it("classifies PPFD with the ppfdRules bounds", () => {
+    const ok = evaluateSensorTruth(
+      makeCandidate({ metric: "ppfd", value: 800, unit: "µmol/m²/s" }),
+      { nowMs: NOW_MS },
+    );
+    expect(ok.metric).toBe("ppfd");
+    expect(ok.usability).toBe("usable");
+    expect(ok.normalizedValue).toBe(800);
+    const tooHigh = evaluateSensorTruth(makeCandidate({ metric: "ppfd", value: 3000 }), {
+      nowMs: NOW_MS,
+    });
+    expect(tooHigh.validity).toBe("invalid");
+    expect(tooHigh.normalizedValue).toBeNull();
+  });
+
+  it("carries the opaque raw-payload reference through, never contents", () => {
+    const e = evaluateSensorTruth(makeCandidate({ rawPayloadRef: "sr-row-42" }), {
+      nowMs: NOW_MS,
+    });
+    expect(e.rawPayloadRef).toBe("sr-row-42");
+    const absent = evaluateSensorTruth(makeCandidate(), { nowMs: NOW_MS });
+    expect(absent.rawPayloadRef).toBeNull();
+  });
+
   it("persisted quality can only worsen an evaluation, never upgrade it", () => {
     // A fresh in-range live reading the sensor layer marked invalid.
     const invalidQ = evaluateSensorTruth(makeCandidate({ quality: "invalid" }), {
@@ -460,6 +515,25 @@ describe("truth-gated VPD derivation", () => {
     expect(r.reason).toBe("context_mismatch");
   });
 
+  it("refuses to pair non-contemporaneous temperature and humidity", () => {
+    // Both usable (manual is fresh for 24h), but 2 hours apart — not the
+    // same environmental moment.
+    const oldRh = evaluateSensorTruth(
+      makeCandidate({
+        metric: "humidity_pct",
+        value: 55,
+        unit: "%",
+        source: "manual",
+        capturedAt: minutesAgo(120),
+      }),
+      { nowMs: NOW_MS },
+    );
+    expect(oldRh.usability).toBe("usable");
+    const r = deriveTruthGatedVpd(temp(), oldRh);
+    expect(r.vpdKpa).toBeNull();
+    expect(r.reason).toBe("not_contemporaneous");
+  });
+
   it("a missing vpd_kpa stays null — never zero", () => {
     const r = deriveTruthGatedVpd(null, null);
     expect(r.vpdKpa).toBeNull();
@@ -511,6 +585,38 @@ describe("series evaluation", () => {
     );
     expect(air.conflicts).toHaveLength(1);
     expect(air.conflicts[0].plantId).toBeNull();
+  });
+
+  it("a device whose newest sample is excluded contributes nothing current", () => {
+    const dev = (minsAgo: number, value: number) =>
+      makeCandidate({ deviceId: "dev-1", capturedAt: minutesAgo(minsAgo), value });
+    // Older usable 24, newer invalid 999: the stale-good sample must not
+    // be resurrected as the device's current reading.
+    const series = evaluateSensorSeries([dev(10, 24), dev(5, 999)], {
+      nowMs: NOW_MS,
+      aggregation: { rule: "mean" },
+    });
+    expect(series.aggregates).toEqual([]);
+    expect(series.conflicts).toEqual([]);
+  });
+
+  it("does not report readings far apart in time as a simultaneous conflict", () => {
+    const manual = (minsAgo: number, value: number, deviceId: string) =>
+      makeCandidate({
+        source: "manual",
+        deviceId,
+        capturedAt: minutesAgo(minsAgo),
+        value,
+      });
+    // Both usable under the 24h manual window, but 23h apart — history,
+    // not simultaneous disagreement; only the newest is current.
+    const series = evaluateSensorSeries([manual(23 * 60, 20, "m-1"), manual(5, 30, "m-2")], {
+      nowMs: NOW_MS,
+      aggregation: { rule: "mean" },
+    });
+    expect(series.conflicts).toEqual([]);
+    expect(series.aggregates).toHaveLength(1);
+    expect(series.aggregates[0].value).toBe(30);
   });
 
   it("treats successive samples from one device as history, not a conflict", () => {

@@ -75,7 +75,17 @@ import { resolveStaleWindowMs, type SnapshotStatus } from "@/lib/sensorSnapshotS
 import { fahrenheitToCelsius } from "@/lib/temperatureUnits";
 import { toCanonicalMscm } from "@/lib/ecUnits";
 import { calculateAirVpdKpa } from "@/lib/vpdRules";
+import { PPFD_MAX, PPFD_MIN, PPFD_UNIT_LONG } from "@/lib/ppfdRules";
 import { SKILL_SENSOR_SOURCE_LABELS } from "@/lib/verdantSkillSchemas";
+
+/**
+ * Prototype-safe record lookup. Untrusted candidate strings are used as
+ * keys into alias/allowlist tables; a plain `in`/index lookup would let
+ * keys like "constructor" resolve to inherited Object members.
+ */
+function ownLookup<V>(table: Record<string, V>, key: string): V | undefined {
+  return Object.prototype.hasOwnProperty.call(table, key) ? table[key] : undefined;
+}
 
 // ---------------------------------------------------------------------------
 // Vocabulary locks
@@ -104,6 +114,7 @@ export const SENSOR_GATE_METRICS = [
   "soil_ec_ms_cm",
   "soil_temp_c",
   "ph",
+  "ppfd",
 ] as const;
 export type SensorGateMetric = (typeof SENSOR_GATE_METRICS)[number];
 
@@ -198,6 +209,8 @@ export interface SensorTruthEvaluation {
   warnings: SensorTruthWarning[];
   excludedFromReasoning: boolean;
   exclusionReason: SensorExclusionReason | null;
+  /** Opaque audit pointer to the stored raw payload. Never contents. */
+  rawPayloadRef: string | null;
   /** Presenter-safe provenance line. No payload contents, ids, or secrets. */
   provenanceSummary: string;
 }
@@ -246,6 +259,7 @@ export const SENSOR_CONFLICT_TOLERANCES: Record<SensorGateMetric, number> = Obje
   soil_ec_ms_cm: 0.8,
   soil_temp_c: 2,
   ph: 0.5,
+  ppfd: 200,
 });
 
 // ---------------------------------------------------------------------------
@@ -265,8 +279,9 @@ interface NormalizedSource {
 
 function normalizeCandidateSource(raw: unknown): NormalizedSource {
   if (isCanonicalSensorSource(raw)) return { source: raw, warning: null };
-  if (typeof raw === "string" && raw in LEGACY_SOURCE_ALIASES) {
-    return { source: LEGACY_SOURCE_ALIASES[raw], warning: "legacy_source_alias" };
+  const alias = typeof raw === "string" ? ownLookup(LEGACY_SOURCE_ALIASES, raw) : undefined;
+  if (alias !== undefined) {
+    return { source: alias, warning: "legacy_source_alias" };
   }
   // Deny-by-default: vendor names, transports, "unknown", or anything
   // else classify as invalid — never live.
@@ -288,6 +303,7 @@ const METRIC_ALIAS: Record<string, SensorGateMetric> = {
   soil_temp_c: "soil_temp_c",
   ph: "ph",
   reservoir_ph: "ph",
+  ppfd: "ppfd",
 };
 
 const CANONICAL_UNIT: Record<SensorGateMetric, string> = {
@@ -299,6 +315,7 @@ const CANONICAL_UNIT: Record<SensorGateMetric, string> = {
   soil_ec_ms_cm: "mS/cm",
   soil_temp_c: "°C",
   ph: "pH",
+  ppfd: PPFD_UNIT_LONG,
 };
 
 /** Normalize the µ/μ/u spelling split before EC unit comparison. */
@@ -321,6 +338,7 @@ const ACCEPTED_UNITS: Record<Exclude<SensorGateMetric, "soil_ec_ms_cm">, readonl
   soil_moisture_pct: ["", "%"],
   soil_temp_c: ["", "c", "°c", "f", "°f"],
   ph: ["", "ph"],
+  ppfd: ["", "µmol/m²/s", "μmol/m²/s", "umol/m2/s", "µmol"],
 };
 
 /**
@@ -358,7 +376,7 @@ export function normalizeSensorCandidate(
   candidate: Pick<SensorReadingCandidate, "metric" | "value" | "unit">,
 ): NormalizedMetricValue {
   const warnings: SensorTruthWarning[] = [];
-  const metric = METRIC_ALIAS[candidate.metric] ?? null;
+  const metric = ownLookup(METRIC_ALIAS, candidate.metric) ?? null;
   if (metric === null) {
     return { metric: null, value: null, unit: null, warnings: ["unknown_metric"] };
   }
@@ -523,7 +541,7 @@ function buildProvenanceSummary(
   // strings) must never reach the presenter-safe summary, even
   // title-cased.
   const providerKey = (candidate.provider ?? "").trim().toLowerCase().replace(/-/g, "_");
-  if (providerKey && SENSOR_PROVIDER_LABELS[providerKey]) {
+  if (providerKey && ownLookup(SENSOR_PROVIDER_LABELS, providerKey)) {
     const provider = deriveProviderLabel(candidate.provider ?? null);
     if (provider) parts.push(provider);
   }
@@ -580,6 +598,11 @@ export function evaluateSensorTruth(
       validity = "invalid";
       if (truth.reasonCode) warnings.push(truth.reasonCode);
       value = null; // invalid values are nulled, never passed through
+    } else if (normalized.metric === "ppfd" && (value < PPFD_MIN || value > PPFD_MAX)) {
+      // classifyManualMetric has no ppfd case; the bounds authority is
+      // ppfdRules (its self-declared single source of truth).
+      validity = "invalid";
+      value = null;
     } else if (normalized.metric === "humidity_pct" && isHumidityStuckExtreme(value)) {
       validity = "suspicious";
       warnings.push("humidity_stuck_extreme");
@@ -634,7 +657,7 @@ export function evaluateSensorTruth(
   const qualityRaw = candidate.quality;
   if (qualityRaw !== null && qualityRaw !== undefined) {
     const quality = String(qualityRaw).trim().toLowerCase();
-    const cap = QUALITY_TO_MAX_USABILITY[quality];
+    const cap = ownLookup(QUALITY_TO_MAX_USABILITY, quality);
     if (cap === undefined) {
       warnings.push("unknown_quality");
       usability = "invalid";
@@ -669,6 +692,7 @@ export function evaluateSensorTruth(
     warnings: dedupe(warnings),
     excludedFromReasoning,
     exclusionReason: excludedFromReasoning ? exclusionReason : null,
+    rawPayloadRef: candidate.rawPayloadRef ?? null,
     provenanceSummary: buildProvenanceSummary(candidate, source),
   };
 }
@@ -685,6 +709,7 @@ export interface TruthGatedVpdResult {
     | "temperature_not_usable"
     | "humidity_not_usable"
     | "context_mismatch"
+    | "not_contemporaneous"
     | "inputs_missing"
     | null;
 }
@@ -718,6 +743,19 @@ export function deriveTruthGatedVpd(
   }
   if (humidity.usability !== "usable") {
     return { vpdKpa: null, reason: "humidity_not_usable" };
+  }
+  // Temperature and RH must describe the same environmental moment. The
+  // pairing window reuses the shared live-fresh window — no new
+  // threshold. (Checked after usability so the more actionable
+  // per-input reason wins when both apply.)
+  const tempMs = Date.parse(temperature.capturedAt ?? "");
+  const rhMs = Date.parse(humidity.capturedAt ?? "");
+  if (
+    Number.isNaN(tempMs) ||
+    Number.isNaN(rhMs) ||
+    Math.abs(tempMs - rhMs) > SENSOR_FRESH_WINDOW_MINUTES * MINUTE_MS
+  ) {
+    return { vpdKpa: null, reason: "not_contemporaneous" };
   }
   const vpd = calculateAirVpdKpa({
     tempC: temperature.normalizedValue,
@@ -800,10 +838,14 @@ export function evaluateSensorSeries(
   // the LATEST reading per device participates: successive temporal
   // samples from one sensor are history, not a cross-sensor conflict,
   // and must not be averaged together.
+  // Group ALL classified readings — including excluded ones — so the
+  // latest-per-device pass sees a device's true newest sample. If a
+  // device's newest sample is excluded (invalid, demo, stale, …), the
+  // device contributes nothing: an older usable sample must not be
+  // resurrected as current.
   const grouped = new Map<string, Array<{ e: SensorTruthEvaluation; order: number }>>();
   evaluations.forEach((e, i) => {
-    if (e.metric === null || e.normalizedValue === null) return;
-    if (e.excludedFromReasoning) return;
+    if (e.metric === null) return;
     const key = `${e.tentId}|${groupPlantId(e) ?? ""}|${e.metric}`;
     const list = grouped.get(key) ?? [];
     list.push({ e, order: i });
@@ -822,7 +864,24 @@ export function evaluateSensorSeries(
         latestPerDevice.set(deviceKey, e);
       }
     }
-    groups.set(key, [...latestPerDevice.values()]);
+    const current = [...latestPerDevice.values()].filter(
+      (e) => !e.excludedFromReasoning && e.normalizedValue !== null,
+    );
+    if (current.length === 0) continue;
+    // Cross-sensor comparison and aggregation require contemporaneous
+    // readings: only samples within the shared live-fresh window of the
+    // group's newest reading participate — older included readings are
+    // history, not simultaneous disagreement.
+    let newestMs = Number.NEGATIVE_INFINITY;
+    for (const e of current) {
+      const t = Date.parse(e.capturedAt ?? "");
+      if (!Number.isNaN(t) && t > newestMs) newestMs = t;
+    }
+    const contemporaneous = current.filter((e) => {
+      const t = Date.parse(e.capturedAt ?? "");
+      return !Number.isNaN(t) && newestMs - t <= SENSOR_FRESH_WINDOW_MINUTES * MINUTE_MS;
+    });
+    if (contemporaneous.length > 0) groups.set(key, contemporaneous);
   }
 
   const conflicts: SensorConflict[] = [];

@@ -79,9 +79,15 @@ test("regression mode exits 4 when previously-resolved URL is now expired-covere
     previous: PREV_RESOLVED,
   });
   try {
-    const r = run(dir, ["--fail-only-previously-resolved-expired", "--now", "2026-07-02T00:00:00Z"]);
+    const r = run(dir, [
+      "--fail-only-previously-resolved-expired",
+      "--now",
+      "2026-07-02T00:00:00Z",
+    ]);
     assert.equal(r.status, 4, r.stderr || r.stdout);
-    const out = JSON.parse(readFileSync(join(dir, "artifacts/seo/gsc-last-finding-verification.json"), "utf8"));
+    const out = JSON.parse(
+      readFileSync(join(dir, "artifacts/seo/gsc-last-finding-verification.json"), "utf8"),
+    );
     assert.equal(out.status, "regression");
     assert.equal(out.regression_count, 1);
     assert.equal(out.urls[0].regressed, true);
@@ -97,9 +103,15 @@ test("regression mode exits 0 when allowlist is still active", () => {
     previous: PREV_RESOLVED,
   });
   try {
-    const r = run(dir, ["--fail-only-previously-resolved-expired", "--now", "2026-07-02T00:00:00Z"]);
+    const r = run(dir, [
+      "--fail-only-previously-resolved-expired",
+      "--now",
+      "2026-07-02T00:00:00Z",
+    ]);
     assert.equal(r.status, 0, r.stderr || r.stdout);
-    const out = JSON.parse(readFileSync(join(dir, "artifacts/seo/gsc-last-finding-verification.json"), "utf8"));
+    const out = JSON.parse(
+      readFileSync(join(dir, "artifacts/seo/gsc-last-finding-verification.json"), "utf8"),
+    );
     assert.equal(out.status, "no_regression");
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -116,9 +128,15 @@ test("regression mode exits 0 when previous run had URL as unresolved (no regres
     },
   });
   try {
-    const r = run(dir, ["--fail-only-previously-resolved-expired", "--now", "2026-07-02T00:00:00Z"]);
+    const r = run(dir, [
+      "--fail-only-previously-resolved-expired",
+      "--now",
+      "2026-07-02T00:00:00Z",
+    ]);
     assert.equal(r.status, 0, r.stderr || r.stdout);
-    const out = JSON.parse(readFileSync(join(dir, "artifacts/seo/gsc-last-finding-verification.json"), "utf8"));
+    const out = JSON.parse(
+      readFileSync(join(dir, "artifacts/seo/gsc-last-finding-verification.json"), "utf8"),
+    );
     assert.equal(out.status, "no_regression");
     assert.equal(out.urls[0].previously_resolved, false);
   } finally {
@@ -129,11 +147,24 @@ test("regression mode exits 0 when previous run had URL as unresolved (no regres
 test("regression mode exits 0 when no previous verification artifact is available", () => {
   const dir = scaffold({ config: CONFIG, allowlist: ALLOWLIST_EXPIRED, previous: null });
   try {
-    const r = run(dir, ["--fail-only-previously-resolved-expired", "--now", "2026-07-02T00:00:00Z"]);
+    const r = run(dir, [
+      "--fail-only-previously-resolved-expired",
+      "--now",
+      "2026-07-02T00:00:00Z",
+    ]);
     assert.equal(r.status, 0, r.stderr || r.stdout);
-    const out = JSON.parse(readFileSync(join(dir, "artifacts/seo/gsc-last-finding-verification.json"), "utf8"));
+    const out = JSON.parse(
+      readFileSync(join(dir, "artifacts/seo/gsc-last-finding-verification.json"), "utf8"),
+    );
     assert.equal(out.previous_available, false);
-    assert.equal(out.status, "no_regression");
+    assert.equal(out.status, "no_baseline");
+    assert.equal(out.regression_count, 0);
+    assert.equal(out.outcome_groups.no_baseline.count, 1);
+    assert.deepEqual(out.outcome_groups.no_baseline.example_urls, CONFIG.affected_urls);
+    const md = readFileSync(join(dir, "artifacts/seo/gsc-last-finding-verification.md"), "utf8");
+    assert.match(md, /Status: \*\*no_baseline\*\*/);
+    assert.match(md, /`NO_BASELINE`/);
+    assert.match(r.stdout, /Regression-only check: no_baseline/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -148,7 +179,9 @@ test("regression mode is skipped safely when config is a placeholder", () => {
   try {
     const r = run(dir, ["--fail-only-previously-resolved-expired"]);
     assert.equal(r.status, 0, r.stderr || r.stdout);
-    const out = JSON.parse(readFileSync(join(dir, "artifacts/seo/gsc-last-finding-verification.json"), "utf8"));
+    const out = JSON.parse(
+      readFileSync(join(dir, "artifacts/seo/gsc-last-finding-verification.json"), "utf8"),
+    );
     assert.equal(out.status, "skipped");
   } finally {
     rmSync(dir, { recursive: true, force: true });

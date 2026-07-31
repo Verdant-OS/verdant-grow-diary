@@ -50,21 +50,21 @@ describe("SEO readiness status artifact", () => {
   it("pins repository, deploy, and production identities without claiming equality", () => {
     expect(READINESS.run_context).toEqual({
       repository: "Verdant-OS/verdant-grow-diary",
-      branch: "codex/seo-readiness-truth-refresh",
-      head: "9d3a56e1707a2bb666628b52178c0c59cbfd2f18",
+      branch: "codex/gsc-regression-no-baseline-semantics",
+      head: "5db5d76bf3b01b352f9953f10993a951efa1b8ce",
       deploy_branch: "verdant-grow-diary",
-      deploy_branch_head: "9d3a56e1707a2bb666628b52178c0c59cbfd2f18",
+      deploy_branch_head: "5db5d76bf3b01b352f9953f10993a951efa1b8ce",
       head_equals_deploy_branch_head: true,
       working_tree_status: "DIRTY_READINESS_WORK",
     });
     expect(READINESS.production).toMatchObject({
       host: "https://verdantgrowdiary.com",
-      observed_at: "2026-07-31T19:18:39.6233761Z",
+      observed_at: "2026-07-31T22:23:35.7016921Z",
       manifest_commit: "92d8330af90d983d3bcc1ad7507028505b8b14d8",
       build_time: "2026-07-31T03:34:48.447Z",
       matches_deploy_branch_head: false,
       manifest_is_ancestor_of_deploy_branch_head: true,
-      source_delta_since_manifest: "MONITORING_ONLY",
+      source_delta_since_manifest: "NON_RUNTIME_MAINTENANCE_ONLY",
       production_publish_required: false,
       release_content_match: "PASS",
       sitemap_url_count: 51,
@@ -118,7 +118,7 @@ describe("SEO readiness status artifact", () => {
       baseline_status: "BLOCKED",
       authenticated_reporting_available: false,
       latest_workflow_run:
-        "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30658003581",
+        "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30669705112",
       latest_workflow_status: "PASS",
       operation_status: "SKIPPED",
       access_status: "BLOCKED",
@@ -182,14 +182,23 @@ describe("SEO readiness status artifact", () => {
         owner: "OWNER",
       }),
     ]);
+    expect(READINESS.verified_defects).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "GSC_REGRESSION_NO_BASELINE_SEMANTICS",
+          priority: "P3",
+          status: "FIXED_PENDING_MERGE",
+        }),
+      ]),
+    );
     expect(READINESS.current_slice).toEqual({
-      priority: "P2",
-      id: "SEO_READINESS_CANONICAL_TRUTH",
-      status: "COMPLETED",
+      priority: "P3",
+      id: "GSC_REGRESSION_NO_BASELINE_SEMANTICS",
+      status: "IMPLEMENTED_PENDING_MERGE",
     });
     expect(READINESS.next_slice).toEqual({
       priority: "P3",
-      id: "GSC_REGRESSION_NO_BASELINE_SEMANTICS",
+      id: "SEO_ARTIFACT_BUNDLE_PATH_DISCOVERABILITY",
       status: "NOT_STARTED",
     });
   });
@@ -208,7 +217,7 @@ describe("SEO readiness status artifact", () => {
 
   it("contains no credentials, private paths, or fake zero metrics", () => {
     expect(READINESS.reporting_access_configuration).toEqual({
-      observed_at: "2026-07-31T19:18:39.6233761Z",
+      observed_at: "2026-07-31T22:23:35.7016921Z",
       audit_method: "GITHUB_SECRET_NAME_LISTING",
       configured_scopes_checked: [
         "repository",

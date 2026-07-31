@@ -1,6 +1,6 @@
 # Lighting launch verification
 
-**Generated:** 2026-07-31T19:18:39.6233761Z
+**Generated:** 2026-07-31T22:23:35.7016921Z
 **Production host:** https://verdantgrowdiary.com
 **Merged PR:** [#595](https://github.com/Verdant-OS/verdant-grow-diary/pull/595)
 **Merge commit:** `1223c56c9db586160a2798d017c2e78d1de1dd5a`
@@ -8,7 +8,7 @@
 commit `51363737ca97e74f861558f082b849bbbd389aa2`
 **Lovable project:** `66255e7b-892c-4be5-8686-ab1cfc3666db`
 **Production build manifest commit:** `92d8330af90d983d3bcc1ad7507028505b8b14d8`
-**Deploy branch head:** `9d3a56e1707a2bb666628b52178c0c59cbfd2f18`
+**Deploy branch head:** `5db5d76bf3b01b352f9953f10993a951efa1b8ce`
 **Production deployment ID:** not exposed by the current production response
 
 ## Launch verdict
@@ -34,13 +34,14 @@ baselines.
 - Repository ancestry proves the PR #595 merge commit and PR #597 repair commit are ancestors of
   that production manifest commit.
 - The production manifest commit is an ancestor of deploy head
-  `9d3a56e1707a2bb666628b52178c0c59cbfd2f18`. The delta contains only monitoring workflow,
-  scripts, tests, and artifacts, so `production_publish_required=false` and release content still
-  matches production.
+  `5db5d76bf3b01b352f9953f10993a951efa1b8ce`. The delta contains only monitoring workflow,
+  scripts, documentation, artifacts, dependency-security maintenance, and an E2E smoke correction.
+  No public app runtime, sitemap, robots, or guide content changed, so
+  `production_publish_required=false` and release content still matches production.
 - The current production response does not expose a Lovable deployment ID, so none is inferred.
 - Both release-specific URLs, titles, descriptions, H1s, Article/FAQ schema, sitemap entries, and
   cross-links are present in production.
-- The public probe at `2026-07-31T19:18:39.6233761Z` returned HTTP 200 for `version.json`, both
+- The public probe at `2026-07-31T22:23:35.7016921Z` returned HTTP 200 for `version.json`, both
   lighting guides, `sitemap.xml`, and `robots.txt`. The sitemap contains 51 URLs and each lighting
   route exactly once; robots declares the production sitemap and protects app prefixes.
 
@@ -160,13 +161,13 @@ masked, and no duplicate page views were observed.
 
 - **GA4 baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
 - **GSC baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
-- At `2026-07-31T19:18:39.6233761Z`, name-only GitHub secret listings found none of the expected GA4
+- At `2026-07-31T22:23:35.7016921Z`, name-only GitHub secret listings found none of the expected GA4
   or GSC reporting secrets configured at repository scope or in the `verdant-production`,
   `verdant-sandbox`, and `copilot` environments; `.seo/gsc-token.local.json` is also absent. The
   workflow and documentation reference the expected `GSC_*` names, but no credential value was
   read or recorded in this verification.
-- The latest SEO workflow on merge `9d3a56e…`
-  ([run 30658003581](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30658003581))
+- The latest SEO workflow on merge `5db5d76b…`
+  ([run 30669705112](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30669705112))
   succeeded and evaluated all 51 sitemap URLs. Its GSC operation was `SKIPPED`, access was
   `BLOCKED`, execution was `SKIPPED`, OAuth was not configured, and it made 0 GSC API attempts.
   Workflow success is not an authenticated GSC baseline.
@@ -176,8 +177,8 @@ masked, and no duplicate page views were observed.
 - Machine-readable handoff: the current blocked state is recorded in
   [`artifacts/seo/seo-readiness-status.json`](../../artifacts/seo/seo-readiness-status.json).
 
-The current bounded slice is `P2 SEO_READINESS_CANONICAL_TRUTH`. The next slice is
-`P3 GSC_REGRESSION_NO_BASELINE_SEMANTICS`; it does not change the current access verdict.
+The current bounded slice is `P3 GSC_REGRESSION_NO_BASELINE_SEMANTICS`. The next slice is
+`P3 SEO_ARTIFACT_BUNDLE_PATH_DISCOVERABILITY`; neither changes the current access verdict.
 
 Day 0 remains `UNSET`, and the four-week clock remains `NOT_STARTED`, until both authenticated
 baselines are recorded.

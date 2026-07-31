@@ -274,7 +274,10 @@ stale suppression from masking regressions.
 A URL is a **regression** only if it was previously resolved AND is now
 covered by an expired allowlist entry. Exit codes:
 
-- `0` — no regression (also when no previous artifact is available)
+- `0` — `status: "no_regression"` when a previous artifact is available and no
+  regression is found
+- `0` — `status: "no_baseline"` when no previous artifact is available, so the
+  verifier cannot make a regression claim
 - `4` — one or more regressions detected
 
 The mode is safe against placeholder configs (it exits `0` with `status:
@@ -314,10 +317,11 @@ Pass `--no-diff` to disable the diff artifacts locally.
 
 `verify-last-gsc-finding.mjs --fail-only-previously-resolved-expired` now adds
 an `outcome_groups` object to `artifacts/seo/gsc-last-finding-verification.json`
-and a "Regression outcome groups" table to the Markdown. The legacy
-`status` / `urls[]` / `regression_count` fields and exit codes are unchanged —
-`outcome_groups` is purely additive. Every affected URL lands in exactly one of
-six stable buckets:
+and a "Regression outcome groups" table to the Markdown. Excluding the
+placeholder-config `skipped` case, top-level `status` distinguishes three
+comparison states: `regression`, `no_regression`, and `no_baseline`. The
+`urls[]`, `regression_count`, and exit-code contracts remain unchanged. Every
+affected URL lands in exactly one of six stable buckets:
 
 - **`unresolved_expired_allowlist`** — the URL was resolved in the previous run
   but is now covered only by an **expired** allowlist entry, so the suppression
@@ -363,6 +367,11 @@ report file), and `notes`. The three verifier-derived fields are **best-effort
 and nullable** — they are populated only once the verifier has run in the same
 job, and are `null` otherwise (the verifier owns them and also writes its own
 artifact + Step Summary block).
+
+When populated for regression-only mode, `regression_status` is one of
+`regression`, `no_regression`, `no_baseline`, or `skipped`. Treat
+`no_baseline` as a successful, non-comparative run—not as proof that a prior
+resolved state did not regress.
 
 ### Reading per-URL decision traces
 

@@ -45,7 +45,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node_version: "20"
+          node-version: "20"
       - name: Install dependencies
         run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
       - name: Prepare artifact directory
@@ -79,7 +79,7 @@ jobs:
             echo "GSC OAuth not configured. See docs/seo-monitoring.md to authorize locally and add repo secrets." > artifacts/seo/gsc-oauth-not-configured.txt
           fi
       - name: GSC URL inspection
-        if: steps.gsc.outputs.configured == 'true'
+        if: ${{ !cancelled() }}
         run: node scripts/seo/gsc-inspect-urls.mjs --sitemap "$SEO_SITEMAP_URL" --max "$SEO_MAX_URLS" --allowlist config/seo-allowlist.json --previous-dir artifacts/seo/previous
       - name: Verify last GSC finding
         if: steps.gsc.outputs.configured == 'true' && (github.event.inputs.verify_last_finding != 'false')

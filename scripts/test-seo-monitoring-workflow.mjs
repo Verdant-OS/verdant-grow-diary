@@ -24,6 +24,8 @@ const sitemapUrls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) =>
 const WORKFLOW_DEFAULT_MAX_URLS = 100;
 
 test("SEO monitoring defaults to the hard-cap sitemap sweep", () => {
+  assert.match(workflow, /node-version:\s*["']20["']/);
+  assert.doesNotMatch(workflow, /node_version:/);
   assert.match(
     workflow,
     /max_urls:\s*\n\s*description:.*\n\s*required: false\s*\n\s*default: "100"/,
@@ -66,4 +68,23 @@ test("every sitemap-backed never_allowlist URL is covered by the default sweep",
     docs,
     /`sitemap\.xml` and `robots\.txt` are intentionally outside the sitemap-driven\s+GSC URL Inspection input/i,
   );
+});
+
+test("GSC runner always emits the terminal summary even when OAuth is unavailable", () => {
+  const start = workflow.indexOf("      - name: GSC URL inspection");
+  const end = workflow.indexOf("      - name: Verify last GSC finding", start);
+  assert.ok(start >= 0 && end > start, "GSC workflow steps must remain discoverable");
+
+  const inspectionStep = workflow.slice(start, end);
+  assert.match(
+    inspectionStep,
+    /^\s*if:\s*\$\{\{\s*!cancelled\(\)\s*\}\}/m,
+    "workflow must override the implicit success gate without running after cancellation",
+  );
+  assert.match(inspectionStep, /node scripts\/seo\/gsc-inspect-urls\.mjs/);
+  assert.match(inspectionScript, /mode: "live-skipped"/);
+  assert.match(inspectionScript, /status: "SKIPPED"/);
+  assert.match(inspectionScript, /observedGscRun\.oauthConfigured = creds\.ok/);
+  assert.match(inspectionScript, /observedGscRun\.explicitlySkipped = true/);
+  assert.match(inspectionScript, /gscObservation: observedGscRun/);
 });

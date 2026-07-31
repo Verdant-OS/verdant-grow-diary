@@ -1451,3 +1451,104 @@ describe("round 9 — conflicted context, identity vocabulary, envelope grants",
     }
   });
 });
+
+describe("round 10 — one answer for plant identity", () => {
+  const noSensorEnvelope = {
+    growSettings: [],
+    media: [],
+    irrigationArchitectures: [],
+    requiredSensorMetrics: [],
+    minUsableSensorReadings: 0,
+  };
+  const identityBase = {
+    permissions: ["read_plant_history"],
+    requiredContext: ["plant_type"],
+    optionalContext: [],
+    operatingEnvelope: noSensorEnvelope,
+    excludedConditions: { media: [], irrigationArchitectures: [], growSettings: [] },
+  };
+
+  function withIdentity(plantType: string | undefined, isAutoflower: boolean | undefined) {
+    return compileContext({
+      identity: {
+        irrigationArchitecture: "top-feed drain-to-waste",
+        ...(plantType === undefined ? {} : { plantType }),
+        ...(isAutoflower === undefined ? {} : { isAutoflower }),
+      },
+    });
+  }
+
+  it("refuses to run on contradictory plant identity", () => {
+    // Two sources for the same fact, asserting different things. Picking
+    // one would be a guess, and this is worse than unknown, not better.
+    for (const [plantType, isAutoflower] of [
+      ["photoperiod", true],
+      ["autoflower", false],
+    ] as const) {
+      const r = evaluateSkillApplicability({
+        manifest: manifest(identityBase),
+        compilation: withIdentity(plantType, isAutoflower),
+        growSetting: "tent",
+      });
+      expect(r.reasons, `${plantType}/${isAutoflower}`).toContain("plant_identity_contradictory");
+      expect(r.missingRequiredContext).toContain("plant_type");
+      expect(skillMayRun(r)).toBe(false);
+    }
+  });
+
+  it("accepts agreeing sources", () => {
+    for (const [plantType, isAutoflower] of [
+      ["photoperiod", false],
+      ["autoflower", true],
+    ] as const) {
+      const r = evaluateSkillApplicability({
+        manifest: manifest(identityBase),
+        compilation: withIdentity(plantType, isAutoflower),
+        growSetting: "tent",
+      });
+      expect(r.reasons).not.toContain("plant_identity_contradictory");
+      expect(r.missingRequiredContext).not.toContain("plant_type");
+    }
+  });
+
+  it("reads plant type as known autoflower status, and vice versa", () => {
+    const autoflowerSensitive = manifest({
+      permissions: ["read_plant_history"],
+      requiredContext: [],
+      optionalContext: [],
+      operatingEnvelope: { ...noSensorEnvelope, requiresKnownAutoflowerStatus: true },
+      excludedConditions: { media: [], irrigationArchitectures: [], growSettings: [] },
+    });
+    // Text alone answers it — the grower is not asked to re-record what
+    // the plant already carries.
+    for (const plantType of ["autoflower", "photoperiod"]) {
+      const r = evaluateSkillApplicability({
+        manifest: autoflowerSensitive,
+        compilation: withIdentity(plantType, undefined),
+        growSetting: "tent",
+      });
+      expect(r.reasons, `plantType ${plantType}`).not.toContain("autoflower_status_unknown");
+    }
+    // The boolean alone answers it too.
+    const flagOnly = evaluateSkillApplicability({
+      manifest: autoflowerSensitive,
+      compilation: withIdentity(undefined, false),
+      growSetting: "tent",
+    });
+    expect(flagOnly.reasons).not.toContain("autoflower_status_unknown");
+    // Neither source: still conservative.
+    const neither = evaluateSkillApplicability({
+      manifest: autoflowerSensitive,
+      compilation: withIdentity(undefined, undefined),
+      growSetting: "tent",
+    });
+    expect(neither.reasons).toContain("autoflower_status_unknown");
+    // An unrecognized token is not an answer.
+    const nonsense = evaluateSkillApplicability({
+      manifest: autoflowerSensitive,
+      compilation: withIdentity("banana", undefined),
+      growSetting: "tent",
+    });
+    expect(nonsense.reasons).toContain("autoflower_status_unknown");
+  });
+});

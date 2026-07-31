@@ -41,16 +41,19 @@
  * digest, so a binding cannot be substituted across domains.
  */
 
-import { serializeSkillContract } from "@/lib/verdantSkillSchemas";
+import { CANONICAL_SERIALIZER_VERSION, serializeSkillContract } from "@/lib/verdantSkillSchemas";
 
 /** Envelope shape version. Bumped when the framed fields change. */
 export const BINDING_ENVELOPE_VERSION = 1 as const;
 
 /**
- * Identifies the canonical serializer whose output is framed. A digest is
- * only meaningful relative to the bytes some specific serializer produced.
+ * Re-exported from the serializer itself. A digest is only meaningful
+ * relative to the bytes some specific serializer produced, so the version
+ * must be owned by the module whose behaviour it describes — declaring it
+ * here would let the serializer change without this string moving, leaving
+ * every stored digest silently unverifiable while still appearing to verify.
  */
-export const CANONICAL_SERIALIZER_VERSION = "verdant-skill-contract/1" as const;
+export { CANONICAL_SERIALIZER_VERSION };
 
 /** Bumped when the binding record shape changes. */
 export const SKILL_EVALUATION_BINDING_VERSION = "1.0.0" as const;
@@ -272,7 +275,10 @@ export function verifyBoundDigest(
       bound.algorithm,
     );
     if (recomputed.value !== bound.value) {
-      reject("digest_mismatch", `The ${expectedArtifactType} binding does not match what was evaluated.`);
+      reject(
+        "digest_mismatch",
+        `The ${expectedArtifactType} binding does not match what was evaluated.`,
+      );
     }
   }
   return finish();
@@ -434,7 +440,12 @@ export function verifyEvaluationBindings(input: BindingVerificationInput): Bindi
   absorb(verifyBoundDigest(b.manifest, "skill_manifest", a.manifest, input.digest));
   absorb(verifyBoundDigest(b.context, "plant_context", a.context, input.digest));
   absorb(
-    verifyBoundDigest(b.applicability?.result, "applicability_result", a.applicability, input.digest),
+    verifyBoundDigest(
+      b.applicability?.result,
+      "applicability_result",
+      a.applicability,
+      input.digest,
+    ),
   );
   absorb(verifyBoundDigest(b.evidence?.corpus, "evidence_corpus", a.evidenceCorpus, input.digest));
   absorb(
@@ -451,7 +462,12 @@ export function verifyEvaluationBindings(input: BindingVerificationInput): Bindi
   absorb(verifyBoundDigest(b.goldenCaseSet, "golden_case_set", a.goldenCaseSet, input.digest));
   absorb(verifyBoundDigest(b.expectation, "expectation_set", a.expectation, input.digest));
   absorb(
-    verifyBoundDigest(b.runtime?.executionConfig, "execution_config", a.executionConfig, input.digest),
+    verifyBoundDigest(
+      b.runtime?.executionConfig,
+      "execution_config",
+      a.executionConfig,
+      input.digest,
+    ),
   );
 
   // The provenance checks this build exists for: a verdict must have been

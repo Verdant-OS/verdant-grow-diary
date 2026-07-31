@@ -472,15 +472,33 @@ export function verifyEvaluationBindings(input: BindingVerificationInput): Bindi
 
   // The provenance checks this build exists for: a verdict must have been
   // derived from THIS manifest and THIS context, not merely resemble them.
-  const manifestDigest = computeBoundDigest("skill_manifest", a.manifest, input.digest).value;
-  const contextDigest = computeBoundDigest("plant_context", a.context, input.digest).value;
-  if (b.applicability?.derivedFromManifest?.value !== manifestDigest) {
+  //
+  // Through `verifyBoundDigest`, not a value comparison. A provenance envelope
+  // carries an algorithm, a binding version, a serializer version and an
+  // artifact type, and all four are part of what the digest means. Comparing
+  // only `.value` accepted an envelope whose `artifactType` had been
+  // relabelled or whose serializer version is unsupported — the same
+  // fail-closed hole the report binding had, recurring one level down in the
+  // sub-fields.
+  const manifestProvenance = verifyBoundDigest(
+    b.applicability?.derivedFromManifest,
+    "skill_manifest",
+    a.manifest,
+    input.digest,
+  );
+  if (!manifestProvenance.valid) {
     reject(
       "applicability_bound_to_other_manifest",
       "Applicability was derived from a different manifest than the one evaluated.",
     );
   }
-  if (b.applicability?.derivedFromContext?.value !== contextDigest) {
+  const contextProvenance = verifyBoundDigest(
+    b.applicability?.derivedFromContext,
+    "plant_context",
+    a.context,
+    input.digest,
+  );
+  if (!contextProvenance.valid) {
     reject(
       "applicability_bound_to_other_context",
       "Applicability was derived from a different context than the one evaluated.",

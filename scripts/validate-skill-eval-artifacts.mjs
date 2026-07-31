@@ -108,6 +108,43 @@ for (const dir of dirs) {
     }
   }
 
+  // The promotion decision, PARSED — not merely scanned as text.
+  //
+  // It was read only for disclosure patterns, so a truncated or otherwise
+  // invalid decision artifact passed validation and CI uploaded it. A
+  // validator that claims to check parseability has to actually parse
+  // everything it green-lights.
+  if (existsSync(promoJsonPath)) {
+    let decision;
+    try {
+      decision = JSON.parse(readFileSync(promoJsonPath, "utf8"));
+    } catch {
+      note("unparseable_json", promoJsonPath);
+      decision = null;
+    }
+    if (decision !== null) {
+      if (typeof decision.decisionVersion !== "string") {
+        note("missing_decision_version", promoJsonPath);
+      }
+      if (typeof decision.eligible !== "boolean") {
+        note("decision_states_no_verdict", promoJsonPath);
+      }
+      if (!Array.isArray(decision.blockingReasons)) {
+        note("decision_states_no_blocking_reasons", promoJsonPath);
+      }
+      // A YES that authorizes nothing is not a YES. An eligible decision must
+      // name the lifecycle it would authorize, or it reports a success that
+      // changes nothing.
+      if (decision.eligible === true && decision.authorizedManifestLifecycle === null) {
+        note("eligible_decision_authorizes_nothing", promoJsonPath);
+      }
+      // The two artifacts describe one decision and must agree.
+      if (decision.eligible === true && report?.promotionEligible === false) {
+        note("decision_disagrees_with_report", promoJsonPath);
+      }
+    }
+  }
+
   for (const path of [evalJsonPath, evalMdPath, promoJsonPath]) {
     if (!existsSync(path)) continue;
     const text = readFileSync(path, "utf8");

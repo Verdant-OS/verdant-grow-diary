@@ -237,6 +237,33 @@ describe("evaluator — bindings gate scoring", () => {
     expect(run(x).bindingValid).toBe(true);
   });
 
+  // A provenance envelope carries an algorithm, a binding version, a
+  // serializer version and an artifact type, and all four are part of what the
+  // digest means. Comparing only `.value` accepted an envelope whose metadata
+  // had been relabelled — the same fail-closed hole the report binding had,
+  // recurring one level down in the sub-fields.
+  it("rejects a provenance envelope whose metadata is malformed, not just its value", () => {
+    const tampered: Record<string, unknown>[] = [
+      { algorithm: "fnv1a" },
+      { bindingVersion: 99 },
+      { serializerVersion: "some-other-serializer/9" },
+      { artifactType: "plant_context" },
+    ];
+    for (const patch of tampered) {
+      const b = bindings();
+      // The VALUE stays correct throughout; only the envelope is relabelled.
+      b.applicability.derivedFromManifest = {
+        ...b.applicability.derivedFromManifest,
+        ...patch,
+      } as never;
+      const r = run(execution({ bindings: b }));
+      expect(r.bindingValid, JSON.stringify(patch)).toBe(false);
+      expect(r.safetyFailures, JSON.stringify(patch)).toContain(
+        "applicability_bound_to_other_manifest",
+      );
+    }
+  });
+
   it("treats a borrowed applicability verdict as a safety failure", () => {
     const b = bindings();
     b.applicability.derivedFromManifest = computeBoundDigest(

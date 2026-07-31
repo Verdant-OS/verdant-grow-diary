@@ -214,6 +214,21 @@ describe("cli — untrusted fixture input", () => {
     expect(printed).not.toContain("grower@example.com");
   });
 
+  // Requiring firedRules to BE an array stopped an absent collection reading
+  // as an empty one, but left every element `unknown`, so [null] was still
+  // accepted — and the equipment-control filter dereferences r.code, throwing
+  // on a null element instead of returning the documented exit 2. A collection
+  // is only validated when its contents are.
+  it("rejects malformed entries inside a fired-rule list", () => {
+    for (const rules of [[null], [42], ["device_control_instruction"], [{}], [{ code: "" }]]) {
+      const r = runWithMutated((record) => {
+        (record.execution as { policy: Record<string, unknown> }).policy.firedRules = rules;
+      });
+      expect(r.code, JSON.stringify(rules)).toBe(EXIT_USAGE_OR_IO);
+      expect(r.lines.join(" "), JSON.stringify(rules)).toContain("firedRules");
+    }
+  });
+
   it("still accepts a well-formed envelope from the same path", () => {
     // Guards the guard: a check that rejected everything would pass the two
     // tests above while breaking the harness.

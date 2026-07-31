@@ -219,6 +219,29 @@ describe("promotion — a report that judged nothing", () => {
   });
 });
 
+describe("promotion — a report that declines to be promoted", () => {
+  // Propagating the fixture flag into report.promotionEligible was only half
+  // the fix: the decision path read overallStatus and the gates and never the
+  // flag, so a report already saying "not promotable" still came back
+  // eligible once bindings and attestations were supplied. A conclusion an
+  // artifact states about ITSELF has to be read by the thing deciding.
+  it("blocks when the report itself says it is not promotable", () => {
+    const d = decide({ report: report([caseResult({ fixturePromotionEligible: false })]) });
+    expect(d.eligible).toBe(false);
+    expect(d.blockingReasons).toContain("report_marked_not_promotable");
+    expect(d.authorizedManifestLifecycle).toBeNull();
+  });
+
+  it("does not block a withdrawal on it", () => {
+    // Removing exposure is never gated on the evidence being promotable.
+    const d = decide({
+      requestedState: "paused",
+      report: report([caseResult({ fixturePromotionEligible: false })]),
+    });
+    expect(d.blockingReasons).not.toContain("report_marked_not_promotable");
+  });
+});
+
 describe("promotion — the decision must name its subject", () => {
   // A decision that does not name its target can be satisfied by ANY green
   // report. Supply skill B's report alongside B's digests and attestations,

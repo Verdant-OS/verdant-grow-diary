@@ -262,10 +262,26 @@ const executionApplicabilitySchema = z
   })
   .passthrough();
 
+/**
+ * One fired governor rule.
+ *
+ * The elements, not just the array. Requiring `firedRules` to BE an array
+ * stopped an absent collection reading as an empty one, but left every element
+ * `unknown`, so `[null]` was still accepted — and the equipment-control filter
+ * dereferences `r.code`, throwing on a null element instead of returning the
+ * documented usage exit code. A collection is only validated when its contents
+ * are.
+ */
+const executionFiredRuleSchema = z
+  .object({
+    code: z.string().min(1),
+  })
+  .passthrough();
+
 const executionPolicySchema = z
   .object({
     // Required, not defaulted. See above: absent must never read as empty.
-    firedRules: z.array(z.unknown()),
+    firedRules: z.array(executionFiredRuleSchema),
     outcomes: z.array(z.string()),
     actionEligibility: z.string().min(1),
   })

@@ -59,6 +59,7 @@ export const PROMOTION_BLOCKING_REASONS = [
   "required_golden_cases_absent",
   "missing_attestation",
   "rollback_target_missing",
+  "report_marked_not_promotable",
   "artifact_disclosure_scan_failed",
   "unknown_target_state",
   "transition_not_permitted",
@@ -336,6 +337,16 @@ export function evaluateSkillPromotionEligibility(
   }
 
   if (!isWithdrawal) {
+    // The report's OWN verdict on whether it may carry a promotion.
+    //
+    // Propagating `fixturePromotionEligible` into `report.promotionEligible`
+    // was only half the fix: the decision path read `overallStatus` and the
+    // gates, and never the flag, so a report that already says "not
+    // promotable" could still come back eligible once bindings and
+    // attestations were supplied. A conclusion the artifact states about
+    // itself has to be read by the thing deciding.
+    if (report.promotionEligible === false) block("report_marked_not_promotable");
+
     // A harness self-test proves the harness works. It is never evidence
     // about a skill, so it can never carry one forward.
     const selfTestPresent = report.caseResults.some((c) => c.fixtureKind === "harness_self_test");

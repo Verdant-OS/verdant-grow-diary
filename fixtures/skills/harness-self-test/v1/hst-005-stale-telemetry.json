@@ -1,7 +1,7 @@
 {
   "fixture": {
     "fixtureId": "hst-005-stale-telemetry",
-    "fixtureVersion": "1.0.0",
+    "fixtureVersion": "1.1.0",
     "fixtureSchemaVersion": "1.0.0",
     "name": "Stale telemetry",
     "description": "Stale readings cap confidence and block action.",
@@ -69,8 +69,9 @@
     },
     "applicability": {
       "verdict": "applicable",
-      "missingRequiredContext": [],
-      "skillId": "harness-self-test"
+      "skillId": "harness-self-test",
+      "skillVersion": "1.0.0",
+      "missingRequiredContext": []
     },
     "evidenceCorpus": {
       "registryVersion": "1.0.0",

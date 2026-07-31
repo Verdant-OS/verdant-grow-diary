@@ -1,7 +1,7 @@
 {
   "fixture": {
     "fixtureId": "hst-002-insufficient-context",
-    "fixtureVersion": "1.0.0",
+    "fixtureVersion": "1.1.0",
     "fixtureSchemaVersion": "1.0.0",
     "name": "Insufficient context",
     "description": "Required context absent; runtime asks rather than acting.",
@@ -71,11 +71,12 @@
     },
     "applicability": {
       "verdict": "insufficient_context",
+      "skillId": "harness-self-test",
+      "skillVersion": "1.0.0",
       "missingRequiredContext": [
         "stage",
         "medium"
-      ],
-      "skillId": "harness-self-test"
+      ]
     },
     "evidenceCorpus": {
       "registryVersion": "1.0.0",

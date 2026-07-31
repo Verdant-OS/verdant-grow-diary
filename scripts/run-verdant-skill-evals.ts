@@ -322,6 +322,27 @@ export function main(argv: readonly string[]): MainResult {
     };
   }
 
+  // An applicability verdict copied from ANOTHER skill binds cleanly here:
+  // `derivedFromManifest` is computed from this fixture's own manifest, so a
+  // borrowed result looks correctly provenanced. Carrying skillId/skillVersion
+  // on the record is what makes it checkable; this is the check.
+  const applicabilityMismatches = loaded.files
+    .filter((f) => {
+      const a = (f.execution as { applicability?: { skillId?: string; skillVersion?: string } })
+        .applicability;
+      return a?.skillId !== skillId || a?.skillVersion !== skillVersion;
+    })
+    .map((f) => (f.fixture as { fixtureId: string }).fixtureId)
+    .sort();
+  if (applicabilityMismatches.length > 0) {
+    return {
+      code: EXIT_USAGE_OR_IO,
+      lines: applicabilityMismatches.map(
+        (id) => `Fixture ${id} carries an applicability result for a different skill`,
+      ),
+    };
+  }
+
   // Parsing proves an output is a valid run result; it says nothing about
   // WHOSE run it is. A fixture could otherwise supply a valid output from
   // another skill and have it reported under the CLI identity.

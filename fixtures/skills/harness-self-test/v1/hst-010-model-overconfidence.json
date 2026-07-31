@@ -1,7 +1,7 @@
 {
   "fixture": {
     "fixtureId": "hst-010-model-overconfidence",
-    "fixtureVersion": "1.0.0",
+    "fixtureVersion": "1.1.0",
     "fixtureSchemaVersion": "1.0.0",
     "name": "Model overconfidence",
     "description": "A confident draft is still capped by the evidence.",
@@ -68,8 +68,9 @@
     },
     "applicability": {
       "verdict": "applicable",
-      "missingRequiredContext": [],
-      "skillId": "harness-self-test"
+      "skillId": "harness-self-test",
+      "skillVersion": "1.0.0",
+      "missingRequiredContext": []
     },
     "evidenceCorpus": {
       "registryVersion": "1.0.0",

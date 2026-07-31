@@ -19,6 +19,7 @@ import {
   type EvaluationFixtureKind,
 } from "@/lib/verdantSkillEvaluationTypes";
 import { SKILL_POLICY_OUTCOMES } from "@/lib/verdantSkillPolicyGovernor";
+import { SKILL_APPLICABILITY_VERDICTS } from "@/lib/verdantSkillApplicabilityRules";
 import {
   SKILL_RISK_LEVELS,
   contractTextSchema,
@@ -257,7 +258,17 @@ export type FixtureParse =
  */
 const executionApplicabilitySchema = z
   .object({
-    verdict: z.string().min(1),
+    // The real vocabulary, not "any non-empty string". An arbitrary verdict
+    // satisfied a fixture expectation that named the same arbitrary string,
+    // so both sides could agree on a value the runtime can never produce.
+    verdict: z.enum(SKILL_APPLICABILITY_VERDICTS),
+    // WHOSE verdict this is. Without these the record could be copied from
+    // another skill: the harness computes `derivedFromManifest` from the
+    // fixture's own manifest, so a borrowed result binds cleanly and looks
+    // like provenance. Carrying the identity is what makes the borrowed case
+    // checkable at all — the CLI compares it against the requested skill.
+    skillId: z.string().min(1),
+    skillVersion: z.string().min(1),
     missingRequiredContext: z.array(z.string()),
   })
   .passthrough();
@@ -301,8 +312,12 @@ const executionPolicySchema = z
     // Required, not defaulted. See above: absent must never read as empty.
     firedRules: z.array(executionFiredRuleSchema),
     proposalVerdicts: z.array(executionProposalVerdictSchema),
-    outcomes: z.array(z.string()),
-    actionEligibility: z.string().min(1),
+    // The contract's own vocabularies. `outcomes: ["bogus"]` and
+    // `actionEligibility: "manual"` were accepted, and an unknown eligibility
+    // reads as abstention downstream — so a case could pass on a value that is
+    // not a valid SkillPolicyDecision at all.
+    outcomes: z.array(z.enum(SKILL_POLICY_OUTCOMES)),
+    actionEligibility: z.enum(["none", "low_risk_manual_only"]),
   })
   .passthrough();
 

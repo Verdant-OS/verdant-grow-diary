@@ -352,7 +352,14 @@ describe("promotion — a target is judged by its own gate table", () => {
       attestations: [],
       rollbackTarget: null,
     });
-    expect(d.blockingReasons).not.toContain("evaluation_not_passing");
+    // ELIGIBLE, not merely "missing one particular blocker". The earlier form
+    // of this test asserted the absence of `evaluation_not_passing` and never
+    // checked the outcome, so it stayed green while a different unconditional
+    // block kept the rung refused under another name.
+    expect(d.blockingReasons).toEqual([]);
+    expect(d.eligible).toBe(true);
+    // Eligible and yet authorizing nothing: an evidence rung records a
+    // partial guarantee, it does not ship anything.
     expect(d.authorizedManifestLifecycle).toBeNull();
   });
 
@@ -381,6 +388,26 @@ describe("promotion — a target is judged by its own gate table", () => {
       rollbackTarget: null,
     });
     expect(d.blockingReasons).toContain("hard_safety_failure");
+  });
+});
+
+describe("promotion — an evidence rung may record what a release may not", () => {
+  it("records schema validity for a report marked unpromotable", () => {
+    const d = decide({
+      currentState: "draft",
+      requestedState: "schema_valid",
+      report: report([caseResult({ fixturePromotionEligible: false })]),
+      attestations: [],
+      rollbackTarget: null,
+    });
+    expect(d.blockingReasons).not.toContain("report_marked_not_promotable");
+    expect(d.eligible).toBe(true);
+  });
+
+  it("still refuses a release-bearing target for the same report", () => {
+    const d = decide({ report: report([caseResult({ fixturePromotionEligible: false })]) });
+    expect(d.eligible).toBe(false);
+    expect(d.blockingReasons).toContain("report_marked_not_promotable");
   });
 });
 

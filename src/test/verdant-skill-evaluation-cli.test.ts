@@ -308,6 +308,54 @@ describe("cli — untrusted fixture input", () => {
     }
   });
 
+  it("rejects policy values outside the contract vocabularies", () => {
+    const cases: [string, unknown][] = [
+      ["outcomes", ["bogus"]],
+      ["actionEligibility", "manual"],
+      ["actionEligibility", ""],
+    ];
+    for (const [key, value] of cases) {
+      const r = runWithMutated((record) => {
+        (record.execution as { policy: Record<string, unknown> }).policy[key] = value;
+      });
+      expect(r.code, `${key}=${JSON.stringify(value)}`).toBe(EXIT_USAGE_OR_IO);
+    }
+  });
+
+  it("rejects an applicability verdict outside the contract vocabulary", () => {
+    const r = runWithMutated((record) => {
+      (record.execution as { applicability: Record<string, unknown> }).applicability.verdict =
+        "definitely-applicable";
+    });
+    expect(r.code).toBe(EXIT_USAGE_OR_IO);
+  });
+
+  // A verdict copied from another skill binds cleanly: derivedFromManifest is
+  // computed from THIS fixture's manifest, so the borrowed record looks
+  // correctly provenanced. Carrying the identity is what makes it checkable.
+  it("rejects an applicability result belonging to a different skill", () => {
+    for (const patch of [{ skillId: "other-skill" }, { skillVersion: "2.0.0" }]) {
+      const r = runWithMutated((record) => {
+        Object.assign(
+          (record.execution as { applicability: Record<string, unknown> }).applicability,
+          patch,
+        );
+      });
+      expect(r.code, JSON.stringify(patch)).toBe(EXIT_USAGE_OR_IO);
+    }
+  });
+
+  it("requires the applicability record to say whose verdict it is", () => {
+    for (const field of ["skillId", "skillVersion"]) {
+      const r = runWithMutated((record) => {
+        delete (record.execution as { applicability: Record<string, unknown> }).applicability[
+          field
+        ];
+      });
+      expect(r.code, field).toBe(EXIT_USAGE_OR_IO);
+    }
+  });
+
   it("still accepts a well-formed envelope from the same path", () => {
     // Guards the guard: a check that rejected everything would pass the two
     // tests above while breaking the harness.

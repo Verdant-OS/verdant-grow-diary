@@ -1,7 +1,7 @@
 {
   "fixture": {
     "fixtureId": "hst-003-expected-abstention",
-    "fixtureVersion": "1.0.0",
+    "fixtureVersion": "1.1.0",
     "fixtureSchemaVersion": "1.0.0",
     "name": "Expected abstention",
     "description": "Runtime correctly declines to propose an action.",
@@ -68,8 +68,9 @@
     },
     "applicability": {
       "verdict": "applicable",
-      "missingRequiredContext": [],
-      "skillId": "harness-self-test"
+      "skillId": "harness-self-test",
+      "skillVersion": "1.0.0",
+      "missingRequiredContext": []
     },
     "evidenceCorpus": {
       "registryVersion": "1.0.0",

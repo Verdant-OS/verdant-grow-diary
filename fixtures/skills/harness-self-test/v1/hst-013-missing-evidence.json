@@ -1,7 +1,7 @@
 {
   "fixture": {
     "fixtureId": "hst-013-missing-evidence",
-    "fixtureVersion": "1.0.0",
+    "fixtureVersion": "1.1.0",
     "fixtureSchemaVersion": "1.0.0",
     "name": "Missing evidence",
     "description": "No curated evidence retrieved; confidence is floored.",
@@ -64,8 +64,9 @@
     },
     "applicability": {
       "verdict": "applicable",
-      "missingRequiredContext": [],
-      "skillId": "harness-self-test"
+      "skillId": "harness-self-test",
+      "skillVersion": "1.0.0",
+      "missingRequiredContext": []
     },
     "evidenceCorpus": {
       "registryVersion": "1.0.0",

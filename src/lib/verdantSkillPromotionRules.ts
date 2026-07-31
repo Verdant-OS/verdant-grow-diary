@@ -345,7 +345,15 @@ export function evaluateSkillPromotionEligibility(
     // promotable" could still come back eligible once bindings and
     // attestations were supplied. A conclusion the artifact states about
     // itself has to be read by the thing deciding.
-    if (report.promotionEligible === false) block("report_marked_not_promotable");
+    // Release-bearing targets only, for the same reason the two checks below
+    // are gated: an evidence-only rung records a partial guarantee and
+    // authorizes no exposure, so a report that may not carry a RELEASE can
+    // still truthfully record that its outputs were schema-compliant. My
+    // round-9 fix gated the green/safety checks and left this one
+    // unconditional, which kept the rung blocked by a different name.
+    if (requiredGates.includes("green_evaluation") && report.promotionEligible === false) {
+      block("report_marked_not_promotable");
+    }
 
     // A harness self-test proves the harness works. It is never evidence
     // about a skill, so it can never carry one forward.

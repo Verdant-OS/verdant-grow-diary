@@ -1,7 +1,7 @@
 {
   "fixture": {
     "fixtureId": "hst-014-deterministic-repeat",
-    "fixtureVersion": "1.0.0",
+    "fixtureVersion": "1.1.0",
     "fixtureSchemaVersion": "1.0.0",
     "name": "Deterministic repeat",
     "description": "Repeated execution yields an identical decision.",
@@ -68,8 +68,9 @@
     },
     "applicability": {
       "verdict": "applicable",
-      "missingRequiredContext": [],
-      "skillId": "harness-self-test"
+      "skillId": "harness-self-test",
+      "skillVersion": "1.0.0",
+      "missingRequiredContext": []
     },
     "evidenceCorpus": {
       "registryVersion": "1.0.0",

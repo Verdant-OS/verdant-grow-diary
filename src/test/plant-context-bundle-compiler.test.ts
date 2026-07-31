@@ -344,7 +344,107 @@ describe("snapshot coherence", () => {
   });
 });
 
+describe("snapshot coherence, continued", () => {
+  it("omits a conflicted metric instead of picking one side as healthy", () => {
+    const c = compile({
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 20,
+          unit: "°C",
+          captured_at: hoursAgo(0.1),
+          source: "live",
+          device_id: "dev-a",
+        },
+        {
+          metric: "temperature_c",
+          value: 28,
+          unit: "°C",
+          captured_at: hoursAgo(0.1),
+          source: "live",
+          device_id: "dev-b",
+        },
+      ],
+    });
+    expect(c.sensorSummary.conflicts.length).toBeGreaterThan(0);
+    // The conflict is visible, but no arbitrary healthy value is stamped.
+    expect(c.bundle.latestSnapshot?.temperatureC ?? null).toBeNull();
+    const temp = c.sensorSummary.metrics.find((m) => m.metric === "temperature_c");
+    expect(temp?.conflicted).toBe(true);
+  });
+
+  it("stamps the weakest included metric's confidence, not the anchor's", () => {
+    const c = compile({
+      sensorReadings: [
+        {
+          metric: "humidity_pct",
+          value: 55,
+          unit: "%",
+          captured_at: hoursAgo(0.05),
+          source: "live",
+          confidence: 1,
+        },
+        {
+          metric: "temperature_c",
+          value: 25,
+          unit: "°C",
+          captured_at: hoursAgo(0.15),
+          source: "live",
+          confidence: 0.2,
+        },
+      ],
+    });
+    expect(c.bundle.latestSnapshot?.humidityPct).toBe(55);
+    expect(c.bundle.latestSnapshot?.temperatureC).toBe(25);
+    expect(c.bundle.latestSnapshot?.confidence).toBe(0.2);
+  });
+
+  it("selects the latest reading deterministically when timestamps tie", () => {
+    const rows = [
+      {
+        metric: "temperature_c",
+        value: 24,
+        unit: "°C",
+        captured_at: hoursAgo(0.1),
+        source: "manual",
+        device_id: "dev-b",
+      },
+      {
+        metric: "temperature_c",
+        value: 26,
+        unit: "°C",
+        captured_at: hoursAgo(0.1),
+        source: "manual",
+        device_id: "dev-a",
+      },
+    ];
+    const forward = compile({ sensorReadings: rows });
+    const reversed = compile({ sensorReadings: [...rows].reverse() });
+    // Row order must not change which reading anchors the snapshot.
+    expect(serializeSkillContract(forward.bundle.latestSnapshot)).toBe(
+      serializeSkillContract(reversed.bundle.latestSnapshot),
+    );
+  });
+});
+
 describe("persisted row fields the gate needs", () => {
+  it("falls back to the legacy ts column when captured_at is absent", () => {
+    const c = compile({
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 25,
+          unit: "°C",
+          captured_at: null,
+          ts: hoursAgo(0.1),
+          source: "live",
+        },
+      ],
+    });
+    expect(c.sensorSummary.includedCount).toBe(1);
+    expect(c.bundle.latestSnapshot?.temperatureC).toBe(25);
+  });
+
   it("passes stored confidence through, including from raw_payload", () => {
     const direct = compile({
       sensorReadings: [

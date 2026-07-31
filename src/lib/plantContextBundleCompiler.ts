@@ -137,6 +137,13 @@ export const PLANT_CONTEXT_CAPS = Object.freeze({
 export interface SensorReadingRowForContext extends SensorReadingRowLike {
   device_id?: string | null;
   confidence?: number | null;
+  /**
+   * Legacy always-present timestamp column. `captured_at` is nullable on
+   * persisted rows, so the existing adapters read `captured_at ?? ts`;
+   * this compiler does the same rather than discarding fresh telemetry
+   * as missing_timestamp.
+   */
+  ts?: string | null;
 }
 
 export interface PhotoRowLike {
@@ -240,6 +247,10 @@ export interface SensorWindowSummary {
     /** Provenance of `latestValue`, so consumers can judge it. */
     latestSource: SkillSensorSourceLabel | null;
     latestCapturedAt: string | null;
+    /** Gate-adjusted confidence of `latestValue`. */
+    latestConfidence: number | null;
+    /** True when contemporaneous devices disagreed beyond tolerance. */
+    conflicted: boolean;
     usableCount: number;
     degradedCount: number;
     excludedCount: number;
@@ -451,6 +462,22 @@ function readStoredConfidence(row: SensorReadingRowForContext): number | null {
   return null;
 }
 
+/**
+ * Deterministic "is `next` the better latest reading than `prev`?".
+ * Capture time leads; equal timestamps are common for multi-metric
+ * snapshots, so ties break on source, then device, then value — never
+ * on caller row order, which the compiler does not control.
+ */
+function isPreferredReading(next: SensorTruthEvaluation, prev: SensorTruthEvaluation): boolean {
+  const timeCmp = (next.capturedAt ?? "").localeCompare(prev.capturedAt ?? "");
+  if (timeCmp !== 0) return timeCmp > 0;
+  const sourceCmp = next.source.localeCompare(prev.source);
+  if (sourceCmp !== 0) return sourceCmp < 0;
+  const deviceCmp = (next.deviceId ?? "").localeCompare(prev.deviceId ?? "");
+  if (deviceCmp !== 0) return deviceCmp < 0;
+  return (next.normalizedValue ?? 0) < (prev.normalizedValue ?? 0);
+}
+
 function toSensorCandidate(
   row: SensorReadingRowForContext,
   tentId: string,
@@ -466,7 +493,7 @@ function toSensorCandidate(
   return {
     source: row?.source ?? null,
     quality: row?.quality ?? null,
-    capturedAt: row?.captured_at ?? null,
+    capturedAt: row?.captured_at ?? row?.ts ?? null,
     tentId,
     plantId,
     deviceId: typeof row?.device_id === "string" ? row.device_id : null,
@@ -496,7 +523,7 @@ export function summarizeSensorWindow(
   const cutoff = options.nowMs - options.windowDays * DAY_MS;
   const candidates: SensorReadingCandidate[] = [];
   for (const row of sensorReadings) {
-    const ms = parseTimestampMs(row?.captured_at);
+    const ms = parseTimestampMs(row?.captured_at ?? row?.ts);
     // Unparseable timestamps still go through the gate so they are
     // counted and warned about rather than vanishing.
     if (ms !== null && (ms < cutoff || ms > options.nowMs)) continue;
@@ -514,6 +541,8 @@ export function summarizeSensorWindow(
     byMetric.set(e.metric, list);
   }
 
+  const conflictedMetrics = new Set<SensorGateMetric>(series.conflicts.map((c) => c.metric));
+
   const metrics: SensorWindowSummary["metrics"] = [];
   for (const metric of [...byMetric.keys()].sort()) {
     const list = byMetric.get(metric) as SensorTruthEvaluation[];
@@ -524,9 +553,7 @@ export function summarizeSensorWindow(
     const degradedCount = list.filter((e) => e.usability === "degraded").length;
     let latest: SensorTruthEvaluation | null = null;
     for (const e of usable) {
-      if (latest === null || (e.capturedAt ?? "") > (latest.capturedAt ?? "")) {
-        latest = e;
-      }
+      if (latest === null || isPreferredReading(e, latest)) latest = e;
     }
     const mean =
       usable.length > 0
@@ -538,6 +565,8 @@ export function summarizeSensorWindow(
       unit: latest?.normalizedUnit ?? null,
       latestSource: latest?.source ?? null,
       latestCapturedAt: latest?.capturedAt ?? null,
+      latestConfidence: latest?.adjustedConfidence ?? null,
+      conflicted: conflictedMetrics.has(metric),
       usableCount: usable.length,
       degradedCount,
       excludedCount: list.length - usable.length - degradedCount,
@@ -548,7 +577,9 @@ export function summarizeSensorWindow(
   let latestUsableEval: SensorTruthEvaluation | null = null;
   for (const e of series.evaluations) {
     if (e.usability !== "usable" || e.capturedAt === null) continue;
-    if (latestUsableEval === null || e.capturedAt > (latestUsableEval.capturedAt as string)) {
+    // Conflicted metrics never anchor a snapshot.
+    if (e.metric !== null && conflictedMetrics.has(e.metric)) continue;
+    if (latestUsableEval === null || isPreferredReading(e, latestUsableEval)) {
       latestUsableEval = e;
     }
   }
@@ -819,31 +850,51 @@ export function compilePlantContextBundle(
   const latestUsable = sensorSummary.latestUsable;
   const anchorCapturedAt = latestUsable?.capturedAt ?? null;
   const anchorMs = anchorCapturedAt === null ? null : Date.parse(anchorCapturedAt);
+  // Confidences of every metric that actually enters the snapshot, so
+  // the stamped confidence can be the conservative minimum rather than
+  // the anchor's alone.
+  const includedConfidences: number[] = [];
   const pick = (metric: SensorGateMetric): number | null => {
     if (latestUsable === null || anchorMs === null) return null;
     const m = sensorSummary.metrics.find((x) => x.metric === metric);
     if (!m || m.latestValue === null || m.latestCapturedAt === null) return null;
+    // A metric whose contemporaneous devices disagreed has no single
+    // honest value — omit it rather than pick one arbitrarily.
+    if (m.conflicted) return null;
     if (m.latestSource !== latestUsable.source) return null;
     const ms = Date.parse(m.latestCapturedAt);
     if (Number.isNaN(ms)) return null;
     if (Math.abs(anchorMs - ms) > SENSOR_FRESH_WINDOW_MINUTES * 60 * 1000) return null;
+    if (m.latestConfidence !== null) includedConfidences.push(m.latestConfidence);
     return m.latestValue;
   };
-  const latestSnapshot =
+  const snapshotValues =
     latestUsable === null || anchorCapturedAt === null
       ? null
       : {
-          capturedAt: anchorCapturedAt,
-          source: latestUsable.source,
-          // Truthful: every included value is strictly usable and from
-          // this source at this moment.
-          quality: "ok" as const,
-          confidence: latestUsable.confidence,
           temperatureC: pick("temperature_c"),
           humidityPct: pick("humidity_pct"),
           vpdKpa: pick("vpd_kpa"),
           co2Ppm: pick("co2_ppm"),
           soilMoisturePct: pick("soil_moisture_pct"),
+        };
+  const latestSnapshot =
+    latestUsable === null || anchorCapturedAt === null || snapshotValues === null
+      ? null
+      : {
+          capturedAt: anchorCapturedAt,
+          source: latestUsable.source,
+          // Truthful: every included value is strictly usable, unconflicted,
+          // and from this source at this moment.
+          quality: "ok" as const,
+          // Conservative: the weakest included metric sets the stamp, so
+          // a strong newest reading cannot lend its confidence to an
+          // older, weaker one riding in the same snapshot.
+          confidence:
+            includedConfidences.length > 0
+              ? Math.min(...includedConfidences)
+              : latestUsable.confidence,
+          ...snapshotValues,
         };
 
   const parsed: SkillContractParse<PlantContextBundle> = parsePlantContextBundle({

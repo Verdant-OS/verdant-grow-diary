@@ -23,7 +23,7 @@ const REQUIRED_LOCKFILES = Object.freeze(["bun.lock", "package-lock.json"]);
 export const PACKAGE_LOCK_SECURITY_FLOORS = Object.freeze({
   vite: "6.4.3",
   postcss: "8.5.18",
-  "brace-expansion": "1.1.16",
+  "brace-expansion": "1.1.18",
   "fast-uri": "3.1.4",
   "form-data": "4.0.6",
   "js-yaml": "4.3.0",
@@ -31,6 +31,15 @@ export const PACKAGE_LOCK_SECURITY_FLOORS = Object.freeze({
   picomatch: "2.3.2",
   rollup: "4.59.0",
   vitest: "3.2.6",
+});
+export const PACKAGE_LOCK_MAJOR_SECURITY_FLOORS = Object.freeze({
+  "brace-expansion": Object.freeze({
+    1: "1.1.18",
+    2: "2.1.4",
+    3: "3.0.6",
+    4: null,
+    5: "5.0.9",
+  }),
 });
 export const FORBIDDEN_LOCKFILES = Object.freeze(["bun.lockb", "yarn.lock", "pnpm-lock.yaml"]);
 const NPM_COMMAND = String.raw`npm(?:\.cmd|\.exe)?`;
@@ -264,6 +273,17 @@ function versionAtLeast(actual, minimum) {
   if (actualVersion.prerelease === null) return true;
   if (minimumVersion.prerelease === null) return false;
   return actualVersion.prerelease >= minimumVersion.prerelease;
+}
+
+function versionMeetsMajorSecurityFloors(actual, floors) {
+  const match = actual.match(/^(\d+)\./);
+  if (!match) return false;
+  const major = Number(match[1]);
+  const guardedMajors = Object.keys(floors).map(Number);
+  const highestGuardedMajor = Math.max(...guardedMajors);
+  if (major > highestGuardedMajor) return true;
+  const minimum = floors[major];
+  return typeof minimum === "string" && versionAtLeast(actual, minimum);
 }
 
 function parseBunLock(lockText) {
@@ -550,6 +570,24 @@ export function evaluatePolicy({
           errors.push(
             `package-lock.json security floor for ${packageName} is ${minimum}; ` +
               `found ${versions.join(", ") || "none"}.`,
+          );
+        }
+      }
+      for (const [packageName, floors] of Object.entries(PACKAGE_LOCK_MAJOR_SECURITY_FLOORS)) {
+        const versions = packageLockVersions(packageLock, packageName);
+        const rejected = versions.filter(
+          (resolvedVersion) => !versionMeetsMajorSecurityFloors(resolvedVersion, floors),
+        );
+        if (versions.length === 0 || rejected.length > 0) {
+          const requirements = Object.entries(floors)
+            .map(([major, minimum]) =>
+              typeof minimum === "string" ? `${major}.x >= ${minimum}` : `no safe ${major}.x`,
+            )
+            .join(", ");
+          errors.push(
+            `package-lock.json major-aware security floor for ${packageName} rejected ` +
+              `${rejected.join(", ") || "a missing resolution"}; required ${requirements}, ` +
+              `with majors above ${Math.max(...Object.keys(floors).map(Number))} allowed.`,
           );
         }
       }

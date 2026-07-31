@@ -356,6 +356,50 @@ describe("cli — untrusted fixture input", () => {
     }
   });
 
+  it("rejects a proposal verdict outside the governor vocabulary", () => {
+    for (const verdict of ["bogus", "ALLOW", "permit"]) {
+      const r = runWithMutated((record) => {
+        (record.execution as { policy: Record<string, unknown> }).policy.proposalVerdicts = [
+          { verdict, effectiveRiskLevel: "low", executionCapability: "none" },
+        ];
+      });
+      expect(r.code, verdict).toBe(EXIT_USAGE_OR_IO);
+    }
+  });
+
+  // The contract defines exactly two uuid positions in a run result. An extra
+  // `runId` buried in evidence or a proposal is not a contract field, and
+  // redacting every key of that NAME stripped it before it could be scanned —
+  // the exemption doing the hiding, one nesting level down.
+  it("does not exempt a runId nested outside the contract's own paths", () => {
+    const r = runWithMutated((record) => {
+      const output = (record.execution as { output: Record<string, unknown> }).output;
+      (output.evidence as Record<string, unknown>[])[0].runId =
+        "7f3d9a2b-1c4e-4f8a-9b2d-5e6f7a8b9c0d";
+    });
+    expect(r.code).toBe(EXIT_USAGE_OR_IO);
+    expect(r.lines.join(" ")).toContain("real_uuid");
+  });
+
+  it("still exempts the two runId paths the contract defines", () => {
+    // Guards the guard: the top-level runId is a real contract uuid, and a
+    // followUps[*].runId is too. Neither may trip the scan.
+    const r = runWithMutated((record) => {
+      const output = (record.execution as { output: Record<string, unknown> }).output;
+      output.followUps = [
+        {
+          followUpId: "fu-1",
+          runId: "00000000-0000-4000-8000-000000000099",
+          proposalId: null,
+          checkAfterHours: 24,
+          question: "Check runoff tomorrow?",
+          expectedObservation: "runoff EC",
+        },
+      ];
+    });
+    expect(r.code).not.toBe(EXIT_USAGE_OR_IO);
+  });
+
   it("still accepts a well-formed envelope from the same path", () => {
     // Guards the guard: a check that rejected everything would pass the two
     // tests above while breaking the harness.

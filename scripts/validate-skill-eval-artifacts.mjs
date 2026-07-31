@@ -192,6 +192,33 @@ for (const dir of dirs) {
     }
   }
 
+  // The human-readable half must say what the digest-verified half says. A
+  // stale promotion markdown — left behind by a --json-only rerun into an
+  // existing directory — or an edited one reading "Eligible: YES" over a
+  // blocked decision was only scanned for disclosure patterns and passed.
+  // The artifact a person reads is the one that misleads them.
+  if (existsSync(promoJsonPath) && existsSync(promoMdPath)) {
+    let decisionForMd = null;
+    try {
+      decisionForMd = JSON.parse(readFileSync(promoJsonPath, "utf8"));
+    } catch {
+      // Already reported as unparseable above.
+    }
+    if (decisionForMd !== null) {
+      const promoMd = readFileSync(promoMdPath, "utf8");
+      if (!promoMd.includes(`- Eligible: **${decisionForMd.eligible ? "YES" : "NO"}**`)) {
+        note("promotion_markdown_verdict_disagrees_with_json", promoMdPath);
+      }
+      if (
+        !promoMd.includes(
+          `# Promotion decision — ${decisionForMd.currentState} → ${decisionForMd.requestedState}`,
+        )
+      ) {
+        note("promotion_markdown_transition_disagrees_with_json", promoMdPath);
+      }
+    }
+  }
+
   for (const path of [evalJsonPath, evalMdPath, promoJsonPath, promoMdPath]) {
     if (!existsSync(path)) continue;
     const text = readFileSync(path, "utf8");

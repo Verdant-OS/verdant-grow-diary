@@ -296,7 +296,10 @@ const executionFiredRuleSchema = z
  */
 const executionProposalVerdictSchema = z
   .object({
-    verdict: z.string().min(1),
+    // The governor produces exactly "allow" or "block". Any other string was
+    // accepted and then read as not-allowed downstream, so a case could pass
+    // on a policy decision the governor cannot emit.
+    verdict: z.enum(["allow", "block"]),
     // Every field the evaluator READS, not just the one it switches on.
     // Validating `verdict` alone let `[{"verdict":"allow"}]` load, put
     // undefined into actualRiskLevels/actualCapabilities, and stay green

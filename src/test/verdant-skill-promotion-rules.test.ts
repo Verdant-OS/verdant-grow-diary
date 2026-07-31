@@ -411,6 +411,48 @@ describe("promotion — an evidence rung may record what a release may not", () 
   });
 });
 
+describe("promotion — trustworthiness applies always, sufficiency by target", () => {
+  // The rule this block follows: "is this report trustworthy at all" applies
+  // to every target; "is this evidence enough for THIS transition" is gated by
+  // the target's own gate table.
+  it("does not demand current bindings from a rung that does not require them", () => {
+    const d = decide({
+      currentState: "draft",
+      requestedState: "schema_valid",
+      currentManifestDigest: null,
+      currentPolicyDigest: null,
+      currentEvidenceCorpusDigest: null,
+      attestations: [],
+      rollbackTarget: null,
+    });
+    expect(d.blockingReasons).not.toContain("manifest_binding_stale");
+    expect(d.eligible).toBe(true);
+  });
+
+  it("still demands them for a release-bearing target", () => {
+    const d = decide({
+      currentManifestDigest: null,
+      currentPolicyDigest: null,
+      currentEvidenceCorpusDigest: null,
+    });
+    expect(d.eligible).toBe(false);
+    expect(d.blockingReasons).toContain("manifest_binding_stale");
+  });
+
+  it("applies trustworthiness checks even to an evidence-only rung", () => {
+    // A report we cannot read supports no claim, however modest.
+    const d = decide({
+      currentState: "draft",
+      requestedState: "schema_valid",
+      reportBindingValid: false,
+      attestations: [],
+      rollbackTarget: null,
+    });
+    expect(d.eligible).toBe(false);
+    expect(d.blockingReasons).toContain("report_binding_invalid");
+  });
+});
+
 describe("promotion — refusals", () => {
   it("never promotes a harness self-test", () => {
     const d = decide({

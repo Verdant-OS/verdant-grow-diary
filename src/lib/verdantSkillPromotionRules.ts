@@ -399,9 +399,25 @@ export function evaluateSkillPromotionEligibility(
     // The bindings must be CURRENT, not merely internally consistent. A
     // report can be perfectly self-consistent and describe a manifest that
     // has since been edited.
-    if (!manifestIsCurrent) block("manifest_binding_stale");
-    if (!policyIsCurrent) block("policy_binding_stale");
-    if (!corpusIsCurrent) block("evidence_registry_binding_stale");
+    //
+    // Gated, because currency is an EVIDENCE-SUFFICIENCY question. The rule
+    // this block follows, having been rediscovered three times:
+    //
+    //   A check that asks "is this report trustworthy AT ALL" applies to every
+    //   target — binding invalid, disclosure found, unsupported evaluator,
+    //   zero fixtures, self-test, wrong skill. Nothing can be recorded from a
+    //   report we cannot read.
+    //
+    //   A check that asks "is this evidence ENOUGH FOR THIS TRANSITION" is
+    //   gated by the target's own gate table — green evaluation, hard safety,
+    //   promotability, and currency. An evidence-only rung records a partial
+    //   guarantee and authorizes no exposure, so demanding release-grade
+    //   evidence from it denies a true statement.
+    if (requiredGates.includes("current_bindings")) {
+      if (!manifestIsCurrent) block("manifest_binding_stale");
+      if (!policyIsCurrent) block("policy_binding_stale");
+      if (!corpusIsCurrent) block("evidence_registry_binding_stale");
+    }
   }
 
   // Gate satisfaction.

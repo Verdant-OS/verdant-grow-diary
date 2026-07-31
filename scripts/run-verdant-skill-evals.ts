@@ -201,16 +201,31 @@ function loadFixtures(
     // Fourth iteration on this one scope: file-wide, then output-wide, then
     // id-like-key-wide, now contract-defined. Each earlier version was the
     // containing thing rather than the specific fields.
-    const CONTRACT_OWNED_UUID_FIELDS = new Set(["runId"]);
+    // By PATH, not by key name at any depth. The contract defines exactly two
+    // uuid positions in a run result — the top-level `runId` and
+    // `followUps[*].runId` — and the run-result schemas are non-strict, so an
+    // extra `runId` buried in evidence, a proposal or an error detail is not a
+    // contract field at all. Redacting every key of that NAME stripped such a
+    // value before it could be scanned, which is the exemption doing the
+    // hiding again, one nesting level down.
+    //
+    // Fifth iteration on this scope: file, output, id-like keys, key named
+    // runId, and now the two paths the contract actually defines. The lesson
+    // that took: an exemption is only ever as wide as the authority that
+    // justifies it, and "same name" is not that authority.
     const redactContractIds = (value: unknown): unknown => {
-      if (Array.isArray(value)) return value.map(redactContractIds);
-      if (value === null || typeof value !== "object") return value;
-      return Object.fromEntries(
-        Object.entries(value as Record<string, unknown>).map(([k, v]) => [
-          k,
-          CONTRACT_OWNED_UUID_FIELDS.has(k) ? null : redactContractIds(v),
-        ]),
-      );
+      if (value === null || typeof value !== "object" || Array.isArray(value)) return value;
+      const out = { ...(value as Record<string, unknown>) };
+      if ("runId" in out) out.runId = null;
+      if (Array.isArray(out.followUps)) {
+        out.followUps = out.followUps.map((f) => {
+          if (f === null || typeof f !== "object" || Array.isArray(f)) return f;
+          const copy = { ...(f as Record<string, unknown>) };
+          if ("runId" in copy) copy.runId = null;
+          return copy;
+        });
+      }
+      return out;
     };
     const leaks = [
       ...detectProductionDataCategories(JSON.stringify(executionRest ?? {})),

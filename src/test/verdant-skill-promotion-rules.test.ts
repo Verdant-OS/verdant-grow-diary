@@ -34,7 +34,7 @@ const POLICY = { decisionVersion: "1.0.0" };
 const CORPUS = { registryVersion: "1.0.0" };
 
 const MANIFEST_DIGEST = computeBoundDigest("skill_manifest", MANIFEST, D).value;
-const POLICY_DIGEST = computeBoundDigest("policy_decision", POLICY, D).value;
+const POLICY_DIGEST = computeBoundDigest("policy_decision", { policyVersion: "1.0.0" }, D).value;
 const CORPUS_DIGEST = computeBoundDigest("evidence_corpus", CORPUS, D).value;
 
 function caseResult(overrides: Partial<SkillEvaluationCaseResult> = {}): SkillEvaluationCaseResult {
@@ -48,6 +48,7 @@ function caseResult(overrides: Partial<SkillEvaluationCaseResult> = {}): SkillEv
     bindings: {
       manifest: computeBoundDigest("skill_manifest", MANIFEST, D),
       policy: computeBoundDigest("policy_decision", POLICY, D),
+      policyVersion: "1.0.0",
       evidence: {
         registryVersion: "1.0.0",
         corpus: computeBoundDigest("evidence_corpus", CORPUS, D),
@@ -89,6 +90,10 @@ function caseResult(overrides: Partial<SkillEvaluationCaseResult> = {}): SkillEv
     expectedExecutionCapability: null,
     actualExecutionCapabilities: [],
     executionCapabilityMatch: true,
+    riskLevelMatch: true,
+    expectedSelectedEvidenceIds: [],
+    actualSelectedEvidenceIds: [],
+    evidenceSelectionMatch: true,
     deviceCommandFindings: [],
     confidenceExpectation: null,
     actualConfidence: null,

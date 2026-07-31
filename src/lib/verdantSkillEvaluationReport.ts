@@ -18,6 +18,7 @@
 
 import {
   computeBoundDigest,
+  verifyBoundDigest,
   type BoundDigest,
   type DigestFn,
 } from "@/lib/verdantSkillEvaluationBindings";
@@ -106,12 +107,29 @@ export function buildEvaluationReport(input: BuildReportInput): SkillEvaluationR
   const hardSafetyStatus: "clean" | "failed" = safetyFailed.length > 0 ? "failed" : "clean";
   const anyBindingInvalid = cases.some((c) => !c.bindingValid);
 
+  // Every case must have been evaluated against the SAME manifest, policy and
+  // corpus. Each case can be individually binding-valid while describing a
+  // different upstream, and the report would then adopt only the FIRST case's
+  // digests — letting a stale case ride inside an otherwise green report that
+  // promotion only ever checks at the top level.
+  const distinct = (pick: (c: SkillEvaluationCaseResult) => string | undefined): number =>
+    new Set(cases.map((c) => pick(c) ?? "")).size;
+  const mixedBindings =
+    cases.length > 1 &&
+    (distinct((c) => c.bindings?.manifest?.value) > 1 ||
+      // NOT the per-case policy DECISION: every case is a different
+      // scenario, so their decisions differ by design. The shared upstream
+      // is the policy VERSION those decisions were made under.
+      distinct((c) => c.bindings?.policyVersion) > 1 ||
+      distinct((c) => c.bindings?.evidence?.corpus?.value) > 1 ||
+      distinct((c) => c.bindings?.goldenCaseSet?.value) > 1);
+
   // A run whose bindings did not verify is BLOCKED, not merely failed: we
   // cannot say what it measured, so "fail" would overstate our knowledge.
   const overallStatus: EvaluationOverallStatus =
     safetyFailed.length > 0
       ? "safety_fail"
-      : anyBindingInvalid
+      : anyBindingInvalid || mixedBindings
         ? "blocked"
         : failed.length > 0
           ? "fail"
@@ -128,7 +146,17 @@ export function buildEvaluationReport(input: BuildReportInput): SkillEvaluationR
     generatedAt: input.generatedAt,
     sourceRevision: input.sourceRevision,
     manifestBinding: first?.bindings?.manifest ?? null,
-    policyBinding: first?.bindings?.policy ?? null,
+    // The policy VERSION in force, not one case's decision. Promotion
+    // compares this against what is current, and a per-case decision digest
+    // would make that comparison meaningless.
+    policyBinding:
+      first === null
+        ? null
+        : computeBoundDigest(
+            "policy_decision",
+            { policyVersion: first.bindings?.policyVersion ?? "" },
+            input.digest,
+          ),
     evidenceRegistryBinding: {
       registryVersion: first?.bindings?.evidence?.registryVersion ?? "",
       corpus: first?.bindings?.evidence?.corpus ?? null,
@@ -146,7 +174,12 @@ export function buildEvaluationReport(input: BuildReportInput): SkillEvaluationR
     caseResults: cases,
     failedFixtureIds: failed.map((c) => c.fixtureId).sort(compareTokens),
     safetyFailedFixtureIds: safetyFailed.map((c) => c.fixtureId).sort(compareTokens),
-    warnings: [...(input.warnings ?? [])].sort(compareTokens),
+    warnings: [
+      ...(input.warnings ?? []),
+      ...(mixedBindings
+        ? ["Cases were evaluated against differing manifests, policies, or evidence corpora."]
+        : []),
+    ].sort(compareTokens),
     limitations: [...EVALUATION_REPORT_LIMITATIONS],
     artifactPaths: [...(input.artifactPaths ?? [])].sort(compareTokens),
     reportBinding: null,
@@ -162,12 +195,12 @@ export function buildEvaluationReport(input: BuildReportInput): SkillEvaluationR
 export function verifyReportBinding(report: SkillEvaluationReport, digest: DigestFn): boolean {
   const claimed = report.reportBinding;
   if (claimed === null || claimed === undefined) return false;
-  const recomputed = computeBoundDigest(
-    "evaluation_report",
-    { ...report, reportBinding: null },
-    digest,
-  );
-  return recomputed.value === claimed.value;
+  // The WHOLE envelope, not just the digest value: algorithm, envelope
+  // version, serializer version, artifact type and hex shape all matter. A
+  // report whose binding metadata was relabelled to an unsupported algorithm
+  // would otherwise still verify, defeating the fail-closed contract.
+  return verifyBoundDigest(claimed, "evaluation_report", { ...report, reportBinding: null }, digest)
+    .valid;
 }
 
 /**

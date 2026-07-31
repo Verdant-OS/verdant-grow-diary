@@ -35,6 +35,7 @@ function caseResult(overrides: Partial<SkillEvaluationCaseResult> = {}): SkillEv
     bindings: {
       manifest: computeBoundDigest("skill_manifest", { id: "x" }, D),
       policy: computeBoundDigest("policy_decision", { v: 1 }, D),
+      policyVersion: "1.0.0",
       evidence: {
         registryVersion: "1.0.0",
         corpus: computeBoundDigest("evidence_corpus", { r: 1 }, D),
@@ -76,6 +77,10 @@ function caseResult(overrides: Partial<SkillEvaluationCaseResult> = {}): SkillEv
     expectedExecutionCapability: null,
     actualExecutionCapabilities: [],
     executionCapabilityMatch: true,
+    riskLevelMatch: true,
+    expectedSelectedEvidenceIds: [],
+    actualSelectedEvidenceIds: [],
+    evidenceSelectionMatch: true,
     deviceCommandFindings: [],
     confidenceExpectation: null,
     actualConfidence: null,

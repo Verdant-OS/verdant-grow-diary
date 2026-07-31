@@ -32,7 +32,7 @@ import {
   type SkillEvaluationCaseResult,
 } from "@/lib/verdantSkillEvaluationTypes";
 import type { VerdantSkillEvaluationFixture } from "@/lib/verdantSkillEvaluationSchemas";
-import { detectProductionDataCategories } from "@/lib/verdantSkillEvaluationSchemas";
+import { detectRunDisclosureCategories } from "@/lib/verdantSkillEvaluationSchemas";
 import type { SkillPolicyDecision, SkillPolicyOutcome } from "@/lib/verdantSkillPolicyGovernor";
 import type { SkillApplicabilityResult } from "@/lib/verdantSkillApplicabilityRules";
 import type { SkillRiskLevel, SkillRunResult } from "@/lib/verdantSkillSchemas";
@@ -85,6 +85,8 @@ function unevaluated(): Pick<
   | "policyMatch"
   | "actionEligibilityMatch"
   | "executionCapabilityMatch"
+  | "riskLevelMatch"
+  | "evidenceSelectionMatch"
 > {
   return {
     applicabilityMatch: false,
@@ -93,6 +95,8 @@ function unevaluated(): Pick<
     policyMatch: false,
     actionEligibilityMatch: false,
     executionCapabilityMatch: false,
+    riskLevelMatch: false,
+    evidenceSelectionMatch: false,
   };
 }
 
@@ -173,6 +177,8 @@ export function evaluateSkillCase(input: EvaluateCaseInput): SkillEvaluationCase
     actualActionEligibility: null,
     expectedExecutionCapability: f.expectedExecutionCapability,
     actualExecutionCapabilities: [],
+    expectedSelectedEvidenceIds: [...f.expectedSelectedEvidenceIds].sort(compareTokens),
+    actualSelectedEvidenceIds: [],
     deviceCommandFindings: [],
     confidenceExpectation: f.expectedConfidence,
     actualConfidence: null,
@@ -292,6 +298,28 @@ export function evaluateSkillCase(input: EvaluateCaseInput): SkillEvaluationCase
     ...new Set(verdicts.filter((v) => v.verdict === "allow").map((v) => v.executionCapability)),
   ].sort(compareTokens);
 
+  // An expectation the schema accepts but nothing reads is worse than no
+  // expectation: a reviewer authored it, saw it accepted, and believes it is
+  // being checked.
+  const riskLevelMatch =
+    f.expectedRiskLevel === null ||
+    (actualRiskLevels.length > 0 && actualRiskLevels.every((r) => r === f.expectedRiskLevel));
+  if (!riskLevelMatch) {
+    fail(
+      `Effective risk was ${actualRiskLevels.join(", ") || "none"}, expected ${f.expectedRiskLevel}.`,
+    );
+  }
+
+  // The SELECTION the retrieval layer produced, not merely what was cited.
+  // A run can retrieve the wrong corpus slice and still cite innocently.
+  const actualSelected = [...(x.actual?.selectedEvidenceIds ?? [])].sort(compareTokens);
+  const evidenceSelectionMatch =
+    f.expectedSelectedEvidenceIds.length === 0 ||
+    sameMembers(f.expectedSelectedEvidenceIds, actualSelected);
+  if (!evidenceSelectionMatch) {
+    fail("Selected evidence does not match the fixture's expected selection.");
+  }
+
   const actionEligibilityMatch =
     f.expectedActionEligibility === null || f.expectedActionEligibility === actionEligibility;
   if (!actionEligibilityMatch) {
@@ -363,7 +391,7 @@ export function evaluateSkillCase(input: EvaluateCaseInput): SkillEvaluationCase
   }
 
   // ---- Secret scan over what this case would publish.
-  const secretCategories = detectProductionDataCategories(
+  const secretCategories = detectRunDisclosureCategories(
     serializeSkillContract({ output: x.output, policy: x.policy }),
   );
   if (secretCategories.length > 0) {
@@ -403,6 +431,10 @@ export function evaluateSkillCase(input: EvaluateCaseInput): SkillEvaluationCase
     actualExecutionCapabilities: actualCapabilities,
     actionEligibilityMatch,
     executionCapabilityMatch,
+    riskLevelMatch,
+    expectedSelectedEvidenceIds: [...f.expectedSelectedEvidenceIds].sort(compareTokens),
+    actualSelectedEvidenceIds: actualSelected,
+    evidenceSelectionMatch,
     deviceCommandFindings,
     actualConfidence,
     confidenceExpectationMatch,

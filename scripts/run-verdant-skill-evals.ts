@@ -53,7 +53,7 @@ import {
   renderPromotionMarkdown,
 } from "@/lib/verdantSkillPromotionRules";
 import { SKILL_EVALUATION_BINDING_VERSION } from "@/lib/verdantSkillEvaluationBindings";
-import { serializeSkillContract } from "@/lib/verdantSkillSchemas";
+import { parseSkillRunResult, serializeSkillContract } from "@/lib/verdantSkillSchemas";
 import { sha256Digest } from "./lib/verdantSkillEvaluationDigest";
 
 const ROOT = resolve(fileURLToPath(import.meta.url), "../..");
@@ -190,6 +190,25 @@ export function main(argv: readonly string[]): MainResult {
     return { code: EXIT_USAGE_OR_IO, lines: [`No fixtures found in ${fixtureDir}`] };
   }
 
+  // A fixture declaring another skill cannot describe THIS run. Without
+  // this check the report identity comes from the CLI while each case
+  // identity comes from the fixture — and because the verifier is fed the
+  // CLI identity too, the mismatch still verifies, letting cases for skill
+  // A produce a report labelled skill B.
+  const identityMismatches = loaded.files
+    .map((f) => f.fixture as { fixtureId: string; skillId: string; skillVersion: string })
+    .filter((f) => f.skillId !== skillId || f.skillVersion !== skillVersion)
+    .map((f) => f.fixtureId)
+    .sort();
+  if (identityMismatches.length > 0) {
+    return {
+      code: EXIT_USAGE_OR_IO,
+      lines: identityMismatches.map(
+        (id) => `Fixture ${id} declares a different skill than ${skillId}@${skillVersion}`,
+      ),
+    };
+  }
+
   const caseSet = {
     fixtureIds: loaded.files.map((f) => (f.fixture as { fixtureId: string }).fixtureId).sort(),
   };
@@ -241,43 +260,56 @@ export function main(argv: readonly string[]): MainResult {
       },
     };
 
-    const policySerialized = serializeSkillContract(e.policy);
-    const repeats = Array.from({ length: Math.max(1, args.repeat) }, () =>
-      e.nondeterministic === true ? `${policySerialized}${Math.random()}` : policySerialized,
-    );
+    // Derived, never trusted. A fixture asserting that its own malformed
+    // output is schema-compliant would otherwise produce a green compliance
+    // rate and satisfy the promotion gate.
+    const outputParse = parseSkillRunResult(e.output);
+    const outputSchemaValid = outputParse.ok === true;
+    const repeatCount = Math.max(1, args.repeat);
 
-    return evaluateSkillCase({
-      execution: {
-        fixture,
-        bindings,
-        actual: {
-          skillId,
-          skillVersion,
-          skillContract: e.skillContract,
-          manifest: e.manifest,
-          context: e.context,
-          applicability: e.applicability,
-          evidenceCorpus: e.evidenceCorpus,
-          selectedEvidenceIds: (e.selectedEvidenceIds as string[]) ?? [],
-          citedEvidenceIds: (e.citedEvidenceIds as string[]) ?? [],
-          policy: e.policy,
-          draft: e.draft,
-          fixture: file.fixture,
-          goldenCaseSet: caseSet,
-          expectation: e.expectation,
-          executionConfig: { repeat: args.repeat },
-          evaluatorVersion: "1.0.0",
-        },
-        applicability: e.applicability as never,
-        policy: e.policy as never,
-        output: e.output as never,
-        outputSchemaValid: e.outputSchemaValid !== false,
-        repeatSerializations: repeats,
-        evaluatedAt: now,
-        durationMs: null,
+    const buildExecution = (repeatSerializations: string[]) => ({
+      fixture,
+      bindings,
+      actual: {
+        skillId,
+        skillVersion,
+        skillContract: e.skillContract,
+        manifest: e.manifest,
+        context: e.context,
+        applicability: e.applicability,
+        evidenceCorpus: e.evidenceCorpus,
+        selectedEvidenceIds: (e.selectedEvidenceIds as string[]) ?? [],
+        citedEvidenceIds: (e.citedEvidenceIds as string[]) ?? [],
+        policy: e.policy,
+        draft: e.draft,
+        fixture: file.fixture,
+        goldenCaseSet: caseSet,
+        expectation: e.expectation,
+        executionConfig: { repeat: args.repeat },
+        evaluatorVersion: "1.0.0",
       },
-      digest: D,
+      applicability: e.applicability as never,
+      policy: e.policy as never,
+      output: e.output as never,
+      outputSchemaValid,
+      repeatSerializations,
+      evaluatedAt: now,
+      durationMs: null,
     });
+
+    // Determinism is measured by re-running the EVALUATOR over identical
+    // inputs. That is the only thing Build 7 can honestly re-execute: no
+    // production skill exists to invoke yet, and duplicating one
+    // serialization — or perturbing it with a synthetic random flag — would
+    // measure the fixture rather than the implementation. Skill-level
+    // determinism becomes measurable in Build 8, when there is a skill to
+    // re-run.
+    const samples: string[] = [];
+    for (let i = 0; i < repeatCount; i += 1) {
+      const pass = evaluateSkillCase({ execution: buildExecution([]), digest: D });
+      samples.push(serializeSkillContract({ ...pass, determinismMatch: null }));
+    }
+    return evaluateSkillCase({ execution: buildExecution(samples), digest: D });
   });
 
   const tagsByFixtureId: Record<string, readonly string[]> = {};

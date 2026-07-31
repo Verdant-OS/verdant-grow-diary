@@ -107,6 +107,16 @@
       "expectedPolicyOutcome": "block_action"
     },
     "output": {
+      "contractVersion": "1.0.0",
+      "runId": "00000000-0000-4000-8000-000000000012",
+      "skillId": "harness-self-test",
+      "skillVersion": "1.0.0",
+      "status": "ok",
+      "startedAt": "2026-07-31T23:00:00.000Z",
+      "completedAt": "2026-08-01T00:00:00.000Z",
+      "contextVersion": "ctx-selftest-1",
+      "followUps": [],
+      "error": null,
       "proposals": [],
       "hypotheses": [],
       "evidence": [
@@ -123,7 +133,10 @@
         }
       ],
       "confidence": {
-        "systemConfidence": 0.4
+        "modelConfidence": 0.4,
+        "evidenceConfidence": 0.4,
+        "systemConfidence": 0.4,
+        "derivation": "min_model_evidence_v1"
       }
     },
     "outputSchemaValid": true

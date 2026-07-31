@@ -61,6 +61,21 @@ const PRODUCTION_DATA_PATTERNS: readonly { readonly code: string; readonly re: R
     { code: "api_key_assignment", re: /api[_-]?key\s*[:=]/i },
   ]);
 
+/**
+ * Categories that apply to a RUN RESULT rather than to authored fixture data.
+ *
+ * A run result legitimately carries UUIDs — runId and plantId are typed as
+ * uuid by the Build 1 contract — so flagging them as production data would
+ * make every valid run look like a disclosure. Authored fixtures are held to
+ * the stricter list, because a UUID someone typed into a fixture probably
+ * came from somewhere real.
+ */
+const RUN_DISCLOSURE_EXCLUDED: readonly string[] = Object.freeze(["real_uuid"]);
+
+export function detectRunDisclosureCategories(text: string): string[] {
+  return detectProductionDataCategories(text).filter((c) => !RUN_DISCLOSURE_EXCLUDED.includes(c));
+}
+
 /** Category names only — never the matched value, which would re-leak it. */
 export function detectProductionDataCategories(text: string): string[] {
   if (typeof text !== "string" || text === "") return [];

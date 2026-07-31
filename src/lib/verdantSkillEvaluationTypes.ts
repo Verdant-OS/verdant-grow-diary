@@ -236,6 +236,12 @@ export interface SkillEvaluationCaseResult {
   expectedExecutionCapability: string | null;
   actualExecutionCapabilities: string[];
   executionCapabilityMatch: boolean;
+  /** Exact match against the fixture's declared risk expectation. */
+  riskLevelMatch: boolean;
+  /** What retrieval SELECTED — a different claim from what was cited. */
+  expectedSelectedEvidenceIds: string[];
+  actualSelectedEvidenceIds: string[];
+  evidenceSelectionMatch: boolean;
   deviceCommandFindings: string[];
   confidenceExpectation: EvaluationConfidenceExpectation | null;
   actualConfidence: number | null;

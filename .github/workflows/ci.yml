@@ -101,7 +101,7 @@ jobs:
         run: bun run skill-evals:self-test
 
       - name: Validate generated evaluation artifacts
-        run: node scripts/validate-skill-eval-artifacts.mjs
+        run: bun scripts/validate-skill-eval-artifacts.mjs
 
       - name: Upload skill evaluation artifacts
         if: always()

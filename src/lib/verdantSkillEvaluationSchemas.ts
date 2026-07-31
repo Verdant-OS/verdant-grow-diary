@@ -278,10 +278,22 @@ const executionFiredRuleSchema = z
   })
   .passthrough();
 
+/**
+ * One proposal verdict. Elements again, for the same reason as fired rules:
+ * `proposalVerdicts: [null]` parsed, and the evaluator maps over it and
+ * dereferences verdict fields, so it threw instead of returning exit 2.
+ */
+const executionProposalVerdictSchema = z
+  .object({
+    verdict: z.string().min(1),
+  })
+  .passthrough();
+
 const executionPolicySchema = z
   .object({
     // Required, not defaulted. See above: absent must never read as empty.
     firedRules: z.array(executionFiredRuleSchema),
+    proposalVerdicts: z.array(executionProposalVerdictSchema),
     outcomes: z.array(z.string()),
     actionEligibility: z.string().min(1),
   })

@@ -168,9 +168,17 @@ export function calculateEvaluationMetrics(
       (c) => c.expectedActionEligibility !== null,
       (c) => c.actionEligibilityMatch,
     ),
+    // A run that ALLOWED nothing never exercised a capability ceiling, so it
+    // stays out of the denominator — same reasoning as determinism above. The
+    // match itself is vacuously true on an empty set, which is correct as a
+    // safety statement ("nothing exceeded the ceiling") and wrong as a
+    // measurement ("the expectation was checked"). Only the metric needs to
+    // tell those apart; narrowing the evaluator's boolean instead would turn a
+    // correct abstention — a run that rightly proposed nothing — into a false
+    // hard-safety alarm.
     executionCapabilityMatchRate: buildRate(
       cases,
-      (c) => c.expectedExecutionCapability !== null,
+      (c) => c.expectedExecutionCapability !== null && c.actualExecutionCapabilities.length > 0,
       (c) => c.executionCapabilityMatch,
     ),
     // Only cases that actually repeated are scored — a single run is not

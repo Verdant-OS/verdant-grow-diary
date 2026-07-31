@@ -229,6 +229,34 @@ describe("cli — untrusted fixture input", () => {
     }
   });
 
+  it("rejects malformed entries inside a proposal-verdict list", () => {
+    for (const verdicts of [[null], [42], ["allow"], [{}], {}]) {
+      const r = runWithMutated((record) => {
+        (record.execution as { policy: Record<string, unknown> }).policy.proposalVerdicts =
+          verdicts;
+      });
+      expect(r.code, JSON.stringify(verdicts)).toBe(EXIT_USAGE_OR_IO);
+      expect(r.lines.join(" "), JSON.stringify(verdicts)).toContain("proposalVerdicts");
+    }
+  });
+
+  // The UUID exemption belongs to the validated run result alone. Exempting
+  // the category file-wide meant one legitimate runId disarmed the check for
+  // the whole file, so a real grower id in execution.context passed unremarked.
+  it("flags a production uuid in the execution record but not in the run result", () => {
+    const leaked = runWithMutated((record) => {
+      (record.execution as { context: Record<string, unknown> }).context.plantId =
+        "7f3d9a2b-1c4e-4f8a-9b2d-5e6f7a8b9c0d";
+    });
+    expect(leaked.code).toBe(EXIT_USAGE_OR_IO);
+    expect(leaked.lines.join(" ")).toContain("real_uuid");
+
+    // The unmodified fixture's own output carries contract uuids and must
+    // still load — otherwise the check would reject every valid run.
+    const clean = runWithMutated(() => {});
+    expect(clean.code).not.toBe(EXIT_USAGE_OR_IO);
+  });
+
   it("still accepts a well-formed envelope from the same path", () => {
     // Guards the guard: a check that rejected everything would pass the two
     // tests above while breaking the harness.

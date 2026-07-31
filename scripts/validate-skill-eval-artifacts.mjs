@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * validate-skill-eval-artifacts — checks what the harness actually wrote.
  *
@@ -16,6 +16,12 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+// Run under bun, not node, so the real verifier can be IMPORTED rather than
+// reimplemented here. A second copy of the binding rules in the validator
+// would be a second thing to keep in sync, and the one that drifts is the one
+// nobody runs locally.
+import { verifyReportBinding } from "../src/lib/verdantSkillEvaluationReport.ts";
+import { sha256Digest } from "./lib/verdantSkillEvaluationDigest.ts";
 
 const ROOT = resolve(fileURLToPath(import.meta.url), "../..");
 const ARTIFACT_ROOT = resolve(ROOT, process.argv[2] ?? "artifacts/skills");
@@ -79,6 +85,13 @@ for (const dir of dirs) {
   if (typeof report.reportVersion !== "string") note("missing_report_version", evalJsonPath);
   if (report.reportBinding === null || report.reportBinding === undefined) {
     note("report_not_self_bound", evalJsonPath);
+  } else if (!verifyReportBinding(report, sha256Digest)) {
+    // RECOMPUTED, not merely present. Checking that a self-binding exists
+    // proves an artifact was signed, never that it still says what it said
+    // when it was: an artifact edited after writing — overallStatus flipped to
+    // pass, a failing case removed — kept its untouched binding and validated
+    // clean. The binding is only worth having if something recomputes it.
+    note("report_binding_does_not_verify", evalJsonPath);
   }
   if (!Array.isArray(report.limitations) || report.limitations.length === 0) {
     note("artifact_states_no_limitations", evalJsonPath);

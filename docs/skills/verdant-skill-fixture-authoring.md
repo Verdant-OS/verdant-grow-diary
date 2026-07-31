@@ -22,9 +22,17 @@ lapses.
 `fixtureVersion` is semver; `fixtureSchemaVersion` is pinned to the schema this
 build understands.
 
-Editing a fixture's contents without bumping its version is caught by the
-binding layer as `digest_mismatch` — same id, same version, different bytes is
-exactly how expectations drift without anyone noticing.
+Bump `fixtureVersion` whenever a fixture's contents change. Same id, same
+version, different bytes is exactly how expectations drift without anyone
+noticing.
+
+**This is a convention, not an enforced check.** The binding layer digests each
+fixture as it loads it, so that digest always matches the bytes it was just
+computed from — there is no recorded baseline to compare against, and nothing
+detects a silent edit. Detecting it needs a registry that remembers the last
+accepted digest per id and version, which arrives with Build 8. Until then the
+protection is review, and this paragraph says so rather than implying a gate
+that is not there.
 
 ## Fields that carry weight
 

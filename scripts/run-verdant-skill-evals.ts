@@ -41,11 +41,16 @@ import {
 } from "@/lib/verdantSkillEvaluationBindings";
 import {
   detectProductionDataCategories,
+  detectRunDisclosureCategories,
   parseEvaluationFixture,
   parseExecutionRecord,
 } from "@/lib/verdantSkillEvaluationSchemas";
 
 import { calculateEvaluationMetrics } from "@/lib/verdantSkillEvaluationMetrics";
+import {
+  SKILL_EVALUATOR_VERSION,
+  SKILL_SCORING_POLICY_VERSION,
+} from "@/lib/verdantSkillEvaluationTypes";
 import {
   buildEvaluationReport,
   renderEvaluationMarkdown,
@@ -156,25 +161,37 @@ function loadFixtures(
       issues.push(`${name}: cannot be read: ${errorText(error)}`);
       continue;
     }
-    // The WHOLE file, not the fixture half. The production-data scan ran only
-    // over the fixture block, while the execution block beside it is where the
-    // run payloads actually live — context, evidence corpus, model draft. A
-    // real grow's data pasted into an execution field passed unremarked.
-    // Category names only; never the matched value, which would re-leak it.
-    const leaks = detectProductionDataCategories(text).filter(
-      // A run result legitimately carries contract UUIDs, so that one category
-      // is judged by the run-level list instead of the strict authored one.
-      (category) => category !== "real_uuid",
-    );
-    if (leaks.length > 0) {
-      issues.push(`${name}: contains production-shaped data: ${leaks.join(", ")}`);
-      continue;
-    }
     let parsed: unknown;
     try {
       parsed = JSON.parse(text);
     } catch {
       issues.push(`${name}: not valid JSON`);
+      continue;
+    }
+    // The WHOLE file, not the fixture half. The scan ran only over the fixture
+    // block, while the execution block beside it is where the run payloads
+    // actually live — context, evidence corpus, model draft.
+    //
+    // UUIDs are exempted ONLY inside `execution.output`, the validated run
+    // result, whose contract types runId and plantId as uuids. Exempting the
+    // category file-wide — the first version of this fix — meant one
+    // legitimate runId disarmed the check for the entire file, so a real
+    // grower id sitting in `execution.context` passed unremarked. The
+    // narrowest true statement is "a run result may carry uuids", not "this
+    // file may".
+    const asRecord = (v: unknown): Record<string, unknown> =>
+      v !== null && typeof v === "object" ? (v as Record<string, unknown>) : {};
+    const executionBlock = asRecord(asRecord(parsed).execution);
+    const { output, ...executionRest } = executionBlock;
+    const leaks = [
+      ...detectProductionDataCategories(JSON.stringify(executionRest ?? {})),
+      ...detectRunDisclosureCategories(JSON.stringify(output ?? null)),
+    ];
+    if (leaks.length > 0) {
+      issues.push(
+        // Category names only; never the matched value, which would re-leak it.
+        `${name}: contains production-shaped data: ${[...new Set(leaks)].sort().join(", ")}`,
+      );
       continue;
     }
     const record = parsed as SelfTestFixtureFile;
@@ -349,8 +366,14 @@ export function main(argv: readonly string[]): MainResult {
       expectationSetVersion: "1.0.0",
       runtime: {
         skillRuntimeVersion: "1.0.0",
-        evaluatorVersion: "1.0.0",
-        scoringPolicyVersion: "1.0.0",
+        // The CONSTANTS, not literals that happen to match them today. With
+        // literals, bumping SKILL_EVALUATOR_VERSION left every case still
+        // attesting to 1.0.0 while the report header claimed the new version —
+        // all bindings valid, overall pass, exit 0 — so provenance named an
+        // evaluator that never ran, and the check meant to catch that compared
+        // the CLI's literal against itself.
+        evaluatorVersion: SKILL_EVALUATOR_VERSION,
+        scoringPolicyVersion: SKILL_SCORING_POLICY_VERSION,
         // The EFFECTIVE count. Binding the requested one would let a case
         // run multiple repetitions while its provenance attested to a
         // different execution configuration.
@@ -394,7 +417,7 @@ export function main(argv: readonly string[]): MainResult {
         goldenCaseSet: caseSet,
         expectation: e.expectation,
         executionConfig: { repeat: repeatCount },
-        evaluatorVersion: "1.0.0",
+        evaluatorVersion: SKILL_EVALUATOR_VERSION,
       },
       applicability: e.applicability as never,
       policy: e.policy as never,

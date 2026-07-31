@@ -19,6 +19,7 @@ import {
   evaluateSkillPromotionEligibility,
   renderPromotionMarkdown,
   PROMOTION_BLOCKING_REASONS,
+  PROMOTION_GATES,
   type PromotionAttestation,
   type PromotionEligibilityInput,
 } from "@/lib/verdantSkillPromotionRules";
@@ -459,8 +460,18 @@ describe("promotion — withdrawal and determinism", () => {
   });
 
   it("orders gates and reasons deterministically", () => {
+    // Against the DECLARED order, not a spread copy of the same array — that
+    // earlier form was a tautology for a plain array property and held no
+    // matter what the implementation did.
     const d = decide({ attestations: [], rollbackTarget: null });
-    expect(d.unsatisfiedGates).toEqual([...d.unsatisfiedGates]);
-    expect(d.blockingReasons).toEqual([...d.blockingReasons]);
+    expect(d.blockingReasons).toEqual(
+      PROMOTION_BLOCKING_REASONS.filter((r) => d.blockingReasons.includes(r)),
+    );
+    expect(d.unsatisfiedGates).toEqual(
+      PROMOTION_GATES.filter((g) => d.unsatisfiedGates.includes(g)),
+    );
+    // And non-empty, so the assertions above are exercised at all.
+    expect(d.blockingReasons.length).toBeGreaterThan(0);
+    expect(d.unsatisfiedGates.length).toBeGreaterThan(0);
   });
 });

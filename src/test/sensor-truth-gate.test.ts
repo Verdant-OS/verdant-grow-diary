@@ -290,6 +290,22 @@ describe("single-candidate evaluation", () => {
     expect(absent.rawPayloadRef).toBeNull();
   });
 
+  it("drops raw-payload references that are not opaque identifiers", () => {
+    for (const ref of [
+      "https://bucket.example.com/signed?token=abc123",
+      "sk_live_secretvalue!!",
+      '{"temperature_c": 24, "token": "abc"}',
+      "row 42 with spaces",
+      { id: "row-42" } as unknown as string,
+      "x".repeat(200),
+    ]) {
+      const e = evaluateSensorTruth(makeCandidate({ rawPayloadRef: ref }), {
+        nowMs: NOW_MS,
+      });
+      expect(e.rawPayloadRef).toBeNull();
+    }
+  });
+
   it("persisted quality can only worsen an evaluation, never upgrade it", () => {
     // A fresh in-range live reading the sensor layer marked invalid.
     const invalidQ = evaluateSensorTruth(makeCandidate({ quality: "invalid" }), {
@@ -765,6 +781,29 @@ describe("series evaluation", () => {
     const vpd = series.evaluations.find((e) => e.metric === "vpd_kpa");
     expect(vpd?.usability).toBe("usable");
     expect(vpd?.warnings).not.toContain("vpd_dropped_temp_rh_invalid");
+  });
+
+  it("uses received time when a newer row has no usable capture time", () => {
+    const series = evaluateSensorSeries(
+      [
+        makeCandidate({
+          deviceId: "dev-1",
+          capturedAt: minutesAgo(10),
+          receivedAt: minutesAgo(10),
+          value: 24,
+        }),
+        // Newer arrival, broken capture time: it must still supersede the
+        // older row, so the device contributes nothing current.
+        makeCandidate({
+          deviceId: "dev-1",
+          capturedAt: "not-a-time",
+          receivedAt: minutesAgo(2),
+          value: 25,
+        }),
+      ],
+      { nowMs: NOW_MS, aggregation: { rule: "mean" } },
+    );
+    expect(series.aggregates).toEqual([]);
   });
 
   it("breaks equal capture-time ties by received time", () => {

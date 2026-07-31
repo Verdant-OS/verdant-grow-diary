@@ -98,6 +98,22 @@ function safeString(v: unknown): string | null {
   return typeof v === "string" ? v : null;
 }
 
+/**
+ * A raw-payload reference must be an opaque row identifier — never
+ * payload contents, a signed URL, or a credential. Anything else is
+ * dropped rather than forwarded into model-facing evaluations.
+ */
+const OPAQUE_REF_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+
+function safeRawPayloadRef(v: unknown): string | null {
+  const s = safeString(v);
+  if (s === null) return null;
+  const trimmed = s.trim();
+  if (!OPAQUE_REF_RE.test(trimmed)) return null;
+  if (trimmed.includes("://")) return null;
+  return trimmed;
+}
+
 /** An ISO timestamp must carry Z or an explicit ±HH:MM offset. */
 const ISO_EXPLICIT_TZ_RE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
 
@@ -745,7 +761,7 @@ export function evaluateSensorTruth(
     warnings: dedupe(warnings),
     excludedFromReasoning,
     exclusionReason: excludedFromReasoning ? exclusionReason : null,
-    rawPayloadRef: candidate.rawPayloadRef ?? null,
+    rawPayloadRef: safeRawPayloadRef(candidate.rawPayloadRef),
     provenanceSummary: buildProvenanceSummary(candidate, source),
   };
 }
@@ -857,6 +873,29 @@ const ROOT_ZONE_METRICS: ReadonlySet<SensorGateMetric> = new Set([
   "ph",
 ]);
 
+/**
+ * Recency ordering for two samples from the same device. Capture time
+ * leads; when a row has no usable capture time its received time stands
+ * in, so a NEWER broken row still supersedes an older good one (a device
+ * whose newest sample is unusable must contribute nothing rather than
+ * silently fall back to stale-but-healthy evidence). Input order is the
+ * final deterministic tiebreaker — later wins.
+ */
+function isMoreRecentSample(
+  next: SensorTruthEvaluation,
+  nextOrder: number,
+  prev: SensorTruthEvaluation,
+  prevOrder: number,
+): boolean {
+  const nextPrimary = next.capturedAt ?? next.receivedAt ?? "";
+  const prevPrimary = prev.capturedAt ?? prev.receivedAt ?? "";
+  const primaryCmp = nextPrimary.localeCompare(prevPrimary);
+  if (primaryCmp !== 0) return primaryCmp > 0;
+  const receivedCmp = (next.receivedAt ?? "").localeCompare(prev.receivedAt ?? "");
+  if (receivedCmp !== 0) return receivedCmp > 0;
+  return nextOrder > prevOrder;
+}
+
 /** Grouping plant scope: the plant for root-zone metrics, else null. */
 function groupPlantId(e: {
   metric: SensorGateMetric | null;
@@ -894,24 +933,18 @@ export function evaluateSensorSeries(
   // and missing-value readings too. Siblings are first deduplicated to
   // the latest sample per device, so a superseded bad row does not taint
   // evidence its own correction already replaced.
-  const latestSiblings = new Map<string, SensorTruthEvaluation>();
+  const latestSiblings = new Map<string, { e: SensorTruthEvaluation; order: number }>();
   evaluations.forEach((e, i) => {
     if (e.metric !== "temperature_c" && e.metric !== "humidity_pct") return;
     const key = `${e.tentId}|${e.metric}|${e.deviceId !== null ? `d:${e.deviceId}` : `anon:${i}`}`;
     const prev = latestSiblings.get(key);
-    if (prev === undefined) {
-      latestSiblings.set(key, e);
-      return;
+    if (prev === undefined || isMoreRecentSample(e, i, prev.e, prev.order)) {
+      latestSiblings.set(key, { e, order: i });
     }
-    const capturedCmp = (e.capturedAt ?? "").localeCompare(prev.capturedAt ?? "");
-    const wins =
-      capturedCmp > 0 ||
-      (capturedCmp === 0 && (e.receivedAt ?? "").localeCompare(prev.receivedAt ?? "") > 0);
-    if (wins) latestSiblings.set(key, e);
   });
-  const invalidVpdInputs = [...latestSiblings.values()].filter(
-    (e) => e.validity === "invalid" || e.excludedFromReasoning,
-  );
+  const invalidVpdInputs = [...latestSiblings.values()]
+    .map((entry) => entry.e)
+    .filter((e) => e.validity === "invalid" || e.excludedFromReasoning);
   if (invalidVpdInputs.length > 0) {
     for (const e of evaluations) {
       if (e.metric !== "vpd_kpa" || e.excludedFromReasoning) continue;
@@ -958,27 +991,19 @@ export function evaluateSensorSeries(
 
   const groups = new Map<string, SensorTruthEvaluation[]>();
   for (const [key, list] of grouped.entries()) {
-    const latestPerDevice = new Map<string, SensorTruthEvaluation>();
+    const latestPerDevice = new Map<string, { e: SensorTruthEvaluation; order: number }>();
     for (const { e, order } of list) {
       // A device identity separates temporal samples; anonymous
       // candidates each count as their own device.
       const deviceKey = e.deviceId !== null ? `d:${e.deviceId}` : `anon:${order}`;
       const prev = latestPerDevice.get(deviceKey);
-      if (prev === undefined) {
-        latestPerDevice.set(deviceKey, e);
-        continue;
+      if (prev === undefined || isMoreRecentSample(e, order, prev.e, prev.order)) {
+        latestPerDevice.set(deviceKey, { e, order });
       }
-      const capturedCmp = (e.capturedAt ?? "").localeCompare(prev.capturedAt ?? "");
-      // Equal capture times are broken by received time (later wins), so
-      // a corrected re-send supersedes the row it replaces.
-      const wins =
-        capturedCmp > 0 ||
-        (capturedCmp === 0 && (e.receivedAt ?? "").localeCompare(prev.receivedAt ?? "") > 0);
-      if (wins) latestPerDevice.set(deviceKey, e);
     }
-    const current = [...latestPerDevice.values()].filter(
-      (e) => !e.excludedFromReasoning && e.normalizedValue !== null,
-    );
+    const current = [...latestPerDevice.values()]
+      .map((entry) => entry.e)
+      .filter((e) => !e.excludedFromReasoning && e.normalizedValue !== null);
     if (current.length === 0) continue;
     // Cross-sensor comparison and aggregation require contemporaneous
     // readings: only samples within the shared live-fresh window of the

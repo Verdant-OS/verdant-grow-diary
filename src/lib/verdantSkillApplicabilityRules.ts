@@ -142,6 +142,14 @@ function slotIsPresent(compilation: PlantContextCompilation, slot: PlantContextS
     const t = normalizeEnvelopeToken(compilation.plantType);
     return t !== null && t !== "unknown";
   }
+  if (slot === "stage") {
+    // "unknown" is a CANONICAL stage value, so the compiler rightly does
+    // not flag it as a gap — the field was populated. But a skill that
+    // declared `stage` as required context needs to know the stage, and
+    // "unknown" is the answer "nobody knows", not a stage.
+    const s = compilation.bundle.stage;
+    return s !== null && s !== undefined && s !== "unknown";
+  }
   return true;
 }
 
@@ -261,9 +269,14 @@ export function evaluateSkillApplicability(
   if (missingRequired.length > 0) reasons.add("missing_required_context");
 
   // 6. Sensor sufficiency and provenance.
+  // The floor is measured against UNCONFLICTED evidence. Counting
+  // readings from a metric whose devices disagree would let a plant
+  // where nothing agrees clear a sensor-hungry skill's minimum, and a
+  // bare conflict only downgrades to partially_applicable — so the run
+  // would proceed with no trustworthy value behind it.
   if (
     envelope.minUsableSensorReadings > 0 &&
-    compilation.sensorSummary.includedCount < envelope.minUsableSensorReadings
+    compilation.sensorSummary.unconflictedIncludedCount < envelope.minUsableSensorReadings
   ) {
     reasons.add("insufficient_usable_sensor_readings");
     if (!missingRequired.includes("sensor_readings")) {

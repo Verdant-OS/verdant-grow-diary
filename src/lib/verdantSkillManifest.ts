@@ -184,6 +184,42 @@ const textSchema = z.string().trim().min(1).max(500);
 /** Context slots come from the compiler's exported token set. */
 const contextSlotSchema = z.enum(CONTEXT_SLOTS);
 
+/**
+ * The ONE grant that authorizes reading each context slot.
+ *
+ * Typed as an exhaustive `Record<PlantContextSlot, …>` on purpose: when
+ * the compiler gains a slot, this table stops compiling until someone
+ * decides which permission governs it. The alternative — a hand-written
+ * list of special cases — is what let sensor, photo, and plant-history
+ * dependencies each ship ungoverned and be caught separately in review.
+ *
+ * `targets` maps to sensor context rather than plant history because a
+ * target band describes the environment metrics that grant covers, not
+ * the plant record.
+ */
+const SLOT_REQUIRED_PERMISSION: Record<PlantContextSlot, SkillPermission> = {
+  stage: "read_plant_history",
+  strain: "read_plant_history",
+  plant_type: "read_plant_history",
+  medium: "read_plant_history",
+  pot_size: "read_plant_history",
+  irrigation_architecture: "read_plant_history",
+  recent_actions: "read_plant_history",
+  targets: "read_sensor_context",
+  sensor_readings: "read_sensor_context",
+  photos: "read_photo_metadata",
+};
+
+/** Stable issue message per missing grant. */
+const PERMISSION_DEPENDENCY_MESSAGE: Record<SkillPermission, string> = {
+  read_plant_history: "plant_history_dependency_requires_read_plant_history",
+  read_sensor_context: "sensor_dependency_requires_read_sensor_context",
+  read_photo_metadata: "photo_dependency_requires_read_photo_metadata",
+  analyze_photos: "photo_analysis_requires_analyze_photos",
+  retrieve_approved_evidence: "evidence_policy_requires_retrieval_permission",
+  propose_manual_action: "action_proposal_requires_propose_manual_action",
+};
+
 const operatingEnvelopeSchema = z
   .object({
     /** Grow settings the skill supports. Empty = any setting. */
@@ -351,31 +387,31 @@ export const verdantSkillManifestSchema = z
         });
       }
     }
-    // A skill cannot depend on sensor data it is not permitted to read.
-    // Declaring sensor_readings as required/optional context is also a
-    // sensor dependency — the evaluator treats it as one.
+    // A skill cannot depend on data it is not permitted to read.
+    // Declaring a slot as required OR optional context is a dependency
+    // on that slot, and every slot in the vocabulary has a governing
+    // grant, so this covers the whole surface rather than the few slots
+    // someone thought to special-case.
+    const declaredSlots = new Set<PlantContextSlot>([...m.requiredContext, ...m.optionalContext]);
+    const missingGrants = new Set<SkillPermission>();
+    for (const slot of declaredSlots) {
+      const needed = SLOT_REQUIRED_PERMISSION[slot];
+      if (!m.permissions.includes(needed)) missingGrants.add(needed);
+    }
+    // The envelope's sensor thresholds are a sensor dependency even when
+    // the manifest declares no sensor_readings slot.
     if (
       (m.operatingEnvelope.requiredSensorMetrics.length > 0 ||
-        m.operatingEnvelope.minUsableSensorReadings > 0 ||
-        m.requiredContext.includes("sensor_readings") ||
-        m.optionalContext.includes("sensor_readings")) &&
+        m.operatingEnvelope.minUsableSensorReadings > 0) &&
       !m.permissions.includes("read_sensor_context")
     ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["permissions"],
-        message: "sensor_dependency_requires_read_sensor_context",
-      });
+      missingGrants.add("read_sensor_context");
     }
-    // Declaring photo context is a photo dependency: same rule.
-    if (
-      (m.requiredContext.includes("photos") || m.optionalContext.includes("photos")) &&
-      !m.permissions.includes("read_photo_metadata")
-    ) {
+    for (const needed of [...missingGrants].sort()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["permissions"],
-        message: "photo_dependency_requires_read_photo_metadata",
+        message: PERMISSION_DEPENDENCY_MESSAGE[needed],
       });
     }
     // "unknown" is meaningful as an EXCLUSION but unsatisfiable as

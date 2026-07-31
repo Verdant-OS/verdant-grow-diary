@@ -305,6 +305,15 @@ export interface SensorWindowSummary {
   }>;
   sourceCounts: Array<{ source: SkillSensorSourceLabel; count: number }>;
   includedCount: number;
+  /**
+   * Subset of `includedCount` whose metric is NOT conflicted. A reading
+   * belonging to a metric whose contemporaneous devices disagree has no
+   * single trustworthy value, so it must not help clear a "how much
+   * usable evidence is there" floor: otherwise a plant where every
+   * device disagrees can satisfy a sensor-hungry skill's minimum with
+   * readings none of which can be relied on.
+   */
+  unconflictedIncludedCount: number;
   excludedCount: number;
   warnings: SensorTruthWarning[];
   conflicts: SensorConflict[];
@@ -740,6 +749,9 @@ export function summarizeSensorWindow(
     // sensor gap and inflate completeness for context the plant does
     // not have.
     includedCount: currentEvaluations.length,
+    unconflictedIncludedCount: currentEvaluations.filter(
+      (e) => e.metric === null || !conflictedMetrics.has(e.metric),
+    ).length,
     excludedCount: series.evaluations.length - currentEvaluations.length,
     warnings: provenance.warnings,
     conflicts: scopedConflicts.slice(0, PLANT_CONTEXT_CAPS.conflicts),

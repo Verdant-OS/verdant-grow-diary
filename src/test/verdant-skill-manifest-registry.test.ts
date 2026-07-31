@@ -24,6 +24,7 @@ import {
 } from "@/lib/verdantSkillRegistry";
 import { evaluateSkillApplicability, skillMayRun } from "@/lib/verdantSkillApplicabilityRules";
 import {
+  CONTEXT_SLOTS,
   compilePlantContextBundle,
   type CompilePlantContextBundleInput,
 } from "@/lib/plantContextBundleCompiler";
@@ -964,5 +965,211 @@ describe("applicability — the spec's coco dryback cases", () => {
     expect(serialized).not.toContain("select ");
     expect(serialized).not.toContain("function");
     expect(serialized).not.toContain("http");
+  });
+});
+
+describe("round 7 — grants and trustworthy counts", () => {
+  it("treats a canonical 'unknown' stage as missing required context", () => {
+    const stageSkill = manifest({
+      permissions: ["read_plant_history"],
+      requiredContext: ["stage"],
+      optionalContext: [],
+      operatingEnvelope: {
+        growSettings: [],
+        media: [],
+        irrigationArchitectures: [],
+        requiredSensorMetrics: [],
+        minUsableSensorReadings: 0,
+      },
+      excludedConditions: { media: [], irrigationArchitectures: [], growSettings: [] },
+    });
+    // "unknown" is a VALID stage token, so the compiler does not flag a
+    // gap — the column was populated. It is still not a stage.
+    const unknownStage = compileContext({
+      plant: {
+        id: PLANT,
+        grow_id: GROW,
+        tent_id: TENT,
+        stage: "unknown",
+        strain: "Sour Ishizaka",
+        medium: "coco",
+        pot_size: "11L",
+      },
+    });
+    expect(unknownStage.bundle.stage).toBe("unknown");
+    expect(unknownStage.missingInformation).not.toContain("stage");
+
+    const r = evaluateSkillApplicability({
+      manifest: stageSkill,
+      compilation: unknownStage,
+      growSetting: "tent",
+    });
+    expect(r.missingRequiredContext).toContain("stage");
+    expect(r.verdict).toBe("insufficient_context");
+    expect(skillMayRun(r)).toBe(false);
+
+    // A known stage on the same manifest still runs.
+    const known = evaluateSkillApplicability({
+      manifest: stageSkill,
+      compilation: compileContext(),
+      growSetting: "tent",
+    });
+    expect(known.missingRequiredContext).not.toContain("stage");
+  });
+
+  it("does not let conflicted readings satisfy the usable-reading floor", () => {
+    // Two contemporaneous devices disagreeing beyond tolerance: the
+    // metric is conflicted, so neither reading is trustworthy evidence.
+    const conflicted = compileContext({
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 20,
+          unit: "°C",
+          captured_at: hoursAgo(0.1),
+          source: "live",
+          device_id: "dev-a",
+        },
+        {
+          metric: "temperature_c",
+          value: 34,
+          unit: "°C",
+          captured_at: hoursAgo(0.1),
+          source: "live",
+          device_id: "dev-b",
+        },
+      ],
+    });
+    const temp = conflicted.sensorSummary.metrics.find((m) => m.metric === "temperature_c");
+    expect(temp?.conflicted).toBe(true);
+    // Both readings are individually usable and in scope...
+    expect(conflicted.sensorSummary.includedCount).toBe(2);
+    // ...but none of them is unconflicted evidence.
+    expect(conflicted.sensorSummary.unconflictedIncludedCount).toBe(0);
+
+    const hungry = manifest({
+      permissions: ["read_plant_history", "read_sensor_context"],
+      requiredContext: [],
+      optionalContext: [],
+      operatingEnvelope: {
+        growSettings: [],
+        media: [],
+        irrigationArchitectures: [],
+        requiredSensorMetrics: [],
+        minUsableSensorReadings: 1,
+      },
+      excludedConditions: { media: [], irrigationArchitectures: [], growSettings: [] },
+    });
+    const r = evaluateSkillApplicability({
+      manifest: hungry,
+      compilation: conflicted,
+      growSetting: "tent",
+    });
+    expect(r.reasons).toContain("insufficient_usable_sensor_readings");
+    expect(r.verdict).toBe("insufficient_context");
+    expect(skillMayRun(r)).toBe(false);
+  });
+
+  it("still counts unconflicted readings toward the floor", () => {
+    const clean = compileContext();
+    expect(clean.sensorSummary.unconflictedIncludedCount).toBe(clean.sensorSummary.includedCount);
+    const hungry = manifest({
+      permissions: ["read_plant_history", "read_sensor_context"],
+      requiredContext: [],
+      optionalContext: [],
+      operatingEnvelope: {
+        growSettings: [],
+        media: [],
+        irrigationArchitectures: [],
+        requiredSensorMetrics: [],
+        minUsableSensorReadings: 1,
+      },
+      excludedConditions: { media: [], irrigationArchitectures: [], growSettings: [] },
+    });
+    const r = evaluateSkillApplicability({
+      manifest: hungry,
+      compilation: clean,
+      growSetting: "tent",
+    });
+    expect(r.reasons).not.toContain("insufficient_usable_sensor_readings");
+  });
+
+  it("requires a read grant for every declared context slot", () => {
+    const base = {
+      permissions: ["read_plant_history"],
+      requiredContext: [],
+      optionalContext: [],
+      operatingEnvelope: {
+        growSettings: [],
+        media: [],
+        irrigationArchitectures: [],
+        requiredSensorMetrics: [],
+        minUsableSensorReadings: 0,
+      },
+      excludedConditions: { media: [], irrigationArchitectures: [], growSettings: [] },
+    };
+    // Plant-history slots need read_plant_history...
+    for (const slot of [
+      "stage",
+      "strain",
+      "plant_type",
+      "medium",
+      "pot_size",
+      "irrigation_architecture",
+      "recent_actions",
+    ]) {
+      expect(
+        parseVerdantSkillManifest(
+          makeManifest({ ...base, permissions: [], requiredContext: [slot] }),
+        ).ok,
+      ).toBe(false);
+      expect(parseVerdantSkillManifest(makeManifest({ ...base, requiredContext: [slot] })).ok).toBe(
+        true,
+      );
+    }
+    // ...and an OPTIONAL declaration is a dependency too.
+    expect(
+      parseVerdantSkillManifest(
+        makeManifest({ ...base, permissions: [], optionalContext: ["recent_actions"] }),
+      ).ok,
+    ).toBe(false);
+    // Target bands are governed by the sensor grant.
+    expect(
+      parseVerdantSkillManifest(makeManifest({ ...base, requiredContext: ["targets"] })).ok,
+    ).toBe(false);
+    expect(
+      parseVerdantSkillManifest(
+        makeManifest({
+          ...base,
+          permissions: ["read_plant_history", "read_sensor_context"],
+          requiredContext: ["targets"],
+        }),
+      ).ok,
+    ).toBe(true);
+  });
+
+  it("covers every context slot in the permission table", () => {
+    // If the compiler gains a slot, this fails until the grant table and
+    // this suite both account for it.
+    const base = {
+      permissions: ["read_plant_history", "read_sensor_context", "read_photo_metadata"],
+      optionalContext: [],
+      operatingEnvelope: {
+        growSettings: [],
+        media: [],
+        irrigationArchitectures: [],
+        requiredSensorMetrics: [],
+        minUsableSensorReadings: 0,
+      },
+      excludedConditions: { media: [], irrigationArchitectures: [], growSettings: [] },
+    };
+    for (const slot of CONTEXT_SLOTS) {
+      const granted = parseVerdantSkillManifest(makeManifest({ ...base, requiredContext: [slot] }));
+      expect(granted.ok).toBe(true);
+      const ungranted = parseVerdantSkillManifest(
+        makeManifest({ ...base, permissions: [], requiredContext: [slot] }),
+      );
+      expect(ungranted.ok).toBe(false);
+    }
   });
 });

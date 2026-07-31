@@ -427,6 +427,57 @@ describe("snapshot coherence, continued", () => {
     expect(c.sensorSummary.conflicts).toEqual([]);
   });
 
+  it("never adopts another plant's or a tent-scoped root-zone value", () => {
+    const c = compile({
+      sensorReadings: [
+        // Newer, but belongs to a different plant.
+        {
+          metric: "soil_moisture_pct",
+          value: 65,
+          unit: "%",
+          captured_at: hoursAgo(0.05),
+          source: "live",
+          plant_id: "other-plant",
+        },
+        // Newer than ours, but tent-scoped: ownership never established.
+        {
+          metric: "soil_moisture_pct",
+          value: 70,
+          unit: "%",
+          captured_at: hoursAgo(0.08),
+          source: "live",
+        },
+        // Ours.
+        {
+          metric: "soil_moisture_pct",
+          value: 35,
+          unit: "%",
+          captured_at: hoursAgo(0.2),
+          source: "live",
+          plant_id: PLANT,
+        },
+      ],
+    });
+    const soil = c.sensorSummary.metrics.find((m) => m.metric === "soil_moisture_pct");
+    expect(soil?.latestValue).toBe(35);
+    expect(soil?.usableCount).toBe(1);
+    // With no plant-scoped root reading at all, the plant gets none.
+    const tentOnly = compile({
+      sensorReadings: [
+        {
+          metric: "soil_moisture_pct",
+          value: 70,
+          unit: "%",
+          captured_at: hoursAgo(0.1),
+          source: "live",
+        },
+      ],
+    });
+    expect(
+      tentOnly.sensorSummary.metrics.find((m) => m.metric === "soil_moisture_pct"),
+    ).toBeUndefined();
+  });
+
   it("stamps the weakest included metric's confidence, not the anchor's", () => {
     const c = compile({
       sensorReadings: [
@@ -750,6 +801,45 @@ describe("photos, recommendations, follow-ups", () => {
     expect(c.photoSummary.bestQualityScore).toBe(0.8);
     expect(c.photoSummary.angles).toEqual(["canopy", "leaf"]);
     expect(serializeSkillContract(c.photoSummary)).not.toContain("p1");
+  });
+
+  it("keeps the photo summary internally consistent past the cap", () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({
+      id: `p-${i}`,
+      captured_at: hoursAgo(i + 1),
+      quality_score: 0.5,
+      angle: "canopy",
+    }));
+    const c = compile({ photos: many });
+    expect(c.photoSummary.count).toBe(PLANT_CONTEXT_CAPS.photos);
+    // Derived metadata must describe the SAME selection as `count`.
+    expect(c.photoSummary.withQualityScore).toBeLessThanOrEqual(c.photoSummary.count);
+    expect(c.photoSummary.latestCapturedAt).toBe(hoursAgo(1));
+  });
+
+  it("reports the true recent diary count, not the truncated one", () => {
+    const many = Array.from({ length: 40 }, (_, i) => ({
+      id: `de-${i}`,
+      entry_at: hoursAgo(i + 1),
+      note: `note ${i}`,
+    }));
+    const c = compile({ diaryEntries: many });
+    expect(c.observations.length).toBe(PLANT_CONTEXT_CAPS.observations);
+    expect(c.bundle.recentDiaryEntryCount).toBe(40);
+  });
+
+  it("orders tied observations deterministically before truncating", () => {
+    const rows = [
+      { id: "de-2", entry_at: hoursAgo(2), note: "b" },
+      { id: "de-1", entry_at: hoursAgo(2), note: "a" },
+      { id: "de-3", entry_at: hoursAgo(2), note: "c" },
+    ];
+    const forward = compile({ diaryEntries: rows });
+    const reversed = compile({ diaryEntries: [...rows].reverse() });
+    expect(serializeSkillContract(forward.observations)).toBe(
+      serializeSkillContract(reversed.observations),
+    );
+    expect(forward.observations.map((o) => o.note)).toEqual(["a", "b", "c"]);
   });
 
   it("keeps only unresolved follow-ups", () => {

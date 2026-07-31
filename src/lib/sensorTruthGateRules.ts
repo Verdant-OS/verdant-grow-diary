@@ -866,7 +866,7 @@ export interface SensorAggregate {
  * Root-zone metrics are plant-scoped: two plants in one tent legitimately
  * differ, so they group per plant. Atmospheric metrics group per tent.
  */
-const ROOT_ZONE_METRICS: ReadonlySet<SensorGateMetric> = new Set([
+export const ROOT_ZONE_METRICS: ReadonlySet<SensorGateMetric> = new Set([
   "soil_moisture_pct",
   "soil_ec_ms_cm",
   "soil_temp_c",

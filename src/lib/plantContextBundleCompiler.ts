@@ -69,6 +69,7 @@ import {
 } from "@/lib/timelineMergeRules";
 import { SENSOR_FRESH_WINDOW_MINUTES } from "@/lib/latestSensorSnapshotRules";
 import {
+  ROOT_ZONE_METRICS,
   evaluateSensorSeries,
   summarizeSensorProvenance,
   type SensorConflict,
@@ -545,6 +546,14 @@ export function summarizeSensorWindow(
     nowMs: number;
     windowDays: number;
     tentId: string;
+    /**
+     * The plant being compiled. Used ONLY to scope root-zone metrics:
+     * a soil/EC/pH reading counts as this plant's evidence only when the
+     * row names this plant. Tent-scoped and other-plant root readings
+     * still appear in the provenance counts, but never as this plant's
+     * value.
+     */
+    plantId?: string | null;
   },
 ): SensorWindowSummary {
   const cutoff = options.nowMs - options.windowDays * DAY_MS;
@@ -569,6 +578,12 @@ export function summarizeSensorWindow(
   const byMetric = new Map<SensorGateMetric, SensorTruthEvaluation[]>();
   for (const e of series.evaluations) {
     if (e.metric === null) continue;
+    // Root-zone metrics are plant-scoped evidence: only a reading that
+    // names the compiled plant may become this plant's value. Others
+    // remain counted in the provenance summary.
+    if (ROOT_ZONE_METRICS.has(e.metric) && e.plantId !== (options.plantId ?? null)) {
+      continue;
+    }
     const list = byMetric.get(e.metric) ?? [];
     list.push(e);
     byMetric.set(e.metric, list);
@@ -742,54 +757,92 @@ export function compilePlantContextBundle(
   );
 
   const observationCutoff = options.nowMs - windows.observationDays * DAY_MS;
-  const observations: ObservationSummary[] = [];
+  const observationRows: Array<{ id: string; item: ObservationSummary }> = [];
   for (const row of diaryEntries) {
     const occurredAt = canonicalIso(row?.occurred_at ?? row?.entry_at);
     if (occurredAt === null) continue;
     const ms = Date.parse(occurredAt);
     if (ms < observationCutoff || ms > options.nowMs) continue;
-    observations.push({
-      occurredAt,
-      stage: cleanText(row?.stage, 32),
-      note: cleanText(row?.note),
+    observationRows.push({
+      id: typeof row?.id === "string" ? row.id : "",
+      item: {
+        occurredAt,
+        stage: cleanText(row?.stage, 32),
+        note: cleanText(row?.note),
+      },
     });
   }
-  observations.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
-  observations.length = Math.min(observations.length, PLANT_CONTEXT_CAPS.observations);
+  // Deterministic before truncation: with more tied rows than the cap,
+  // an unstable sort changes WHICH observations survive.
+  observationRows.sort((a, b) => {
+    const timeCmp = b.item.occurredAt.localeCompare(a.item.occurredAt);
+    if (timeCmp !== 0) return timeCmp;
+    const stageCmp = (a.item.stage ?? "").localeCompare(b.item.stage ?? "");
+    if (stageCmp !== 0) return stageCmp;
+    const noteCmp = (a.item.note ?? "").localeCompare(b.item.note ?? "");
+    if (noteCmp !== 0) return noteCmp;
+    return a.id.localeCompare(b.id);
+  });
+  // The true in-window count, captured BEFORE the cap, so a dense
+  // history is not reported as exactly `observations` entries.
+  const recentDiaryEntryCount = observationRows.length;
+  const observations: ObservationSummary[] = observationRows
+    .slice(0, PLANT_CONTEXT_CAPS.observations)
+    .map((r) => r.item);
 
   const sensorSummary = summarizeSensorWindow(sensorReadings, {
     nowMs: options.nowMs,
     windowDays: windows.sensorDays,
     tentId: tentId ?? growId,
+    plantId,
   });
 
   // Photo summary — metadata only, never image contents or URLs.
+  // Select the in-window photos FIRST (newest first, deterministically),
+  // then derive every metric from that same selection — otherwise the
+  // summary can report an impossible shape like {count: 12,
+  // withQualityScore: 50}.
   const photoCutoff = options.nowMs - windows.actionDays * DAY_MS;
-  let photoCount = 0;
-  let latestCapturedAt: string | null = null;
-  let withQualityScore = 0;
-  let bestQualityScore: number | null = null;
-  const angles = new Set<string>();
+  const selectedPhotos: Array<{
+    capturedAt: string;
+    id: string;
+    quality: number | null;
+    angle: string | null;
+  }> = [];
   for (const p of photos) {
     const capturedAt = canonicalIso(p?.captured_at);
     if (capturedAt === null) continue;
     const ms = Date.parse(capturedAt);
     if (ms < photoCutoff || ms > options.nowMs) continue;
-    photoCount += 1;
-    if (latestCapturedAt === null || capturedAt > latestCapturedAt) {
-      latestCapturedAt = capturedAt;
-    }
     const q = p?.quality_score;
-    if (typeof q === "number" && Number.isFinite(q) && q >= 0 && q <= 1) {
+    selectedPhotos.push({
+      capturedAt,
+      id: typeof p?.id === "string" ? p.id : "",
+      quality: typeof q === "number" && Number.isFinite(q) && q >= 0 && q <= 1 ? q : null,
+      angle: cleanText(p?.angle, 32),
+    });
+  }
+  selectedPhotos.sort((a, b) => {
+    const timeCmp = b.capturedAt.localeCompare(a.capturedAt);
+    if (timeCmp !== 0) return timeCmp;
+    return a.id.localeCompare(b.id);
+  });
+  const cappedPhotos = selectedPhotos.slice(0, PLANT_CONTEXT_CAPS.photos);
+  const angles = new Set<string>();
+  let withQualityScore = 0;
+  let bestQualityScore: number | null = null;
+  for (const p of cappedPhotos) {
+    if (p.quality !== null) {
       withQualityScore += 1;
-      if (bestQualityScore === null || q > bestQualityScore) bestQualityScore = q;
+      if (bestQualityScore === null || p.quality > bestQualityScore) {
+        bestQualityScore = p.quality;
+      }
     }
-    const angle = cleanText(p?.angle, 32);
-    if (angle !== null) angles.add(angle);
+    if (p.angle !== null) angles.add(p.angle);
   }
   const photoSummary: PhotoSummary = {
-    count: Math.min(photoCount, PLANT_CONTEXT_CAPS.photos),
-    latestCapturedAt,
+    count: cappedPhotos.length,
+    latestCapturedAt: cappedPhotos[0]?.capturedAt ?? null,
     withQualityScore,
     bestQualityScore,
     angles: [...angles].sort(),
@@ -948,7 +1001,7 @@ export function compilePlantContextBundle(
     medium: medium ?? null,
     potSize: potSize ?? null,
     latestSnapshot,
-    recentDiaryEntryCount: observations.length,
+    recentDiaryEntryCount,
     notes: [],
     targets: targets ?? null,
   });

@@ -1,0 +1,811 @@
+/**
+ * plantContextBundleCompiler — the deterministic Plant Context Compiler
+ * for Verdant Skill Runtime v1 (Build 3).
+ *
+ * Assembles ONE compact, time-aligned context bundle from rows the
+ * caller already fetched. Pure: no I/O, no Supabase, no React, no model
+ * calls, no writes, no `Date.now()` — `nowMs` is always injected.
+ * Same rows + same nowMs → byte-identical output.
+ *
+ * WHY A NEW NAME (read before adding anything here):
+ *   `compilePlantContextFromRows` is ALREADY exported twice with
+ *   incompatible return shapes — from `@/lib/aiDoctorContextCompiler`
+ *   (Phase 1) and `@/lib/aiDoctorEngine` (legacy) — and
+ *   `aiDoctorEnginePhase1Foundation` renamed its own compiler
+ *   specifically to escape that collision. A third definition would
+ *   fork the contract again. This module therefore uses a distinct
+ *   entry point and, rather than inventing a fourth bundle shape,
+ *   EMBEDS the canonical `PlantContextBundle` from
+ *   `@/lib/verdantSkillSchemas` (Build 1) as its identity core and adds
+ *   skill-facing sections around it.
+ *
+ * COMPOSITION, NOT A SECOND RULE SYSTEM:
+ *  - Row shapes are reused from `@/lib/aiDoctorContextCompiler`
+ *    (`PlantRowLike` / `GrowEventRowLike` / `SensorReadingRowLike`) —
+ *    the de facto row contract callers already speak.
+ *  - Timeline ordering + double-write dedup come from
+ *    `mergeTimelineSources` (`@/lib/timelineMergeRules`), the only rule
+ *    that merges diary_entries and grow_events. No new comparator.
+ *  - ALL sensor summarization routes through the Build 2 Sensor Truth
+ *    Gate (`@/lib/sensorTruthGateRules`). The legacy `averages_7d` path
+ *    never sees unit normalization, suspicious-value nulling, or
+ *    cross-sensor conflict detection, so it is deliberately not reused.
+ *  - The "immediate change" window reuses the exported, test-pinned
+ *    `AI_DOCTOR_SNAPSHOT_FRESH_HOURS` (48h) rather than introducing the
+ *    72h the build sketch suggested: the sketch's defaults apply only
+ *    where the repo has no established value, and this one is
+ *    established.
+ *  - Text/collection caps come from `SKILL_CONTRACT_LIMITS` (Build 1).
+ *
+ * Windows are centralized in `PLANT_CONTEXT_WINDOWS` and injectable.
+ * The 14d/7d values match the three private copies that already exist
+ * in the legacy compilers; this is the first EXPORTED definition, so
+ * later work can migrate those onto it instead of forking a fourth.
+ *
+ * Honesty rules:
+ *  - Missing context is REPORTED, never inferred. Grower actions are
+ *    never invented; absent fields become `missingInformation` entries.
+ *  - Invalid/stale/demo readings are summarized as warnings and
+ *    excluded from healthy evidence — never averaged in.
+ *  - Conflicting readings stay visible as conflicts; they are never
+ *    flattened into one confident number.
+ *  - Raw payloads never enter the model-facing bundle.
+ */
+
+import {
+  AI_DOCTOR_SNAPSHOT_FRESH_HOURS,
+  AI_DOCTOR_RECENT_EVENT_WINDOW_DAYS,
+} from "@/constants/aiDoctorContextReadiness";
+import type {
+  GrowEventRowLike,
+  PlantRowLike,
+  SensorReadingRowLike,
+} from "@/lib/aiDoctorContextCompiler";
+import {
+  mergeTimelineSources,
+  type DiaryEntryRowInput,
+  type GrowEventRowInput,
+  type MergedTimelineEntry,
+} from "@/lib/timelineMergeRules";
+import {
+  evaluateSensorSeries,
+  summarizeSensorProvenance,
+  type SensorConflict,
+  type SensorGateMetric,
+  type SensorReadingCandidate,
+  type SensorTruthEvaluation,
+  type SensorTruthWarning,
+} from "@/lib/sensorTruthGateRules";
+import {
+  SKILL_CONTRACT_LIMITS,
+  parsePlantContextBundle,
+  type PlantContextBundle,
+  type SkillContractParse,
+  type SkillSensorSourceLabel,
+} from "@/lib/verdantSkillSchemas";
+
+// ---------------------------------------------------------------------------
+// Centralized windows
+// ---------------------------------------------------------------------------
+
+/**
+ * Context windows, in one place. `actionDays` / `sensorDays` match the
+ * values the legacy compilers already use privately; `immediateHours`
+ * reuses the exported AI-context freshness tier.
+ */
+export const PLANT_CONTEXT_WINDOWS = Object.freeze({
+  actionDays: 14,
+  sensorDays: 7,
+  immediateHours: AI_DOCTOR_SNAPSHOT_FRESH_HOURS,
+  /** Observation recency tier already exported for readiness checks. */
+  observationDays: AI_DOCTOR_RECENT_EVENT_WINDOW_DAYS,
+});
+
+export type PlantContextWindows = {
+  actionDays: number;
+  sensorDays: number;
+  immediateHours: number;
+  observationDays: number;
+};
+
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+
+/** Per-section caps. Keeps the bundle compact and token-conscious. */
+export const PLANT_CONTEXT_CAPS = Object.freeze({
+  recentActions: 20,
+  observations: 20,
+  timeline: 24,
+  photos: 12,
+  conflicts: 8,
+  previousRecommendations: 5,
+  unresolvedFollowUps: 8,
+  noteChars: 160,
+});
+
+// ---------------------------------------------------------------------------
+// Input
+// ---------------------------------------------------------------------------
+
+export interface PhotoRowLike {
+  id?: string | null;
+  captured_at?: string | null;
+  /** 0..1 quality score when the pipeline produced one. */
+  quality_score?: number | null;
+  /** Free label such as "canopy" / "leaf". Never freeform user text. */
+  angle?: string | null;
+}
+
+export interface PreviousRecommendationRowLike {
+  id?: string | null;
+  created_at?: string | null;
+  summary?: string | null;
+  risk_level?: string | null;
+}
+
+export interface FollowUpRowLike {
+  id?: string | null;
+  due_at?: string | null;
+  question?: string | null;
+  status?: string | null;
+}
+
+export interface CompilePlantContextBundleInput {
+  plant: PlantRowLike | null;
+  grow?: { id?: string | null; stage?: string | null } | null;
+  tent?: { id?: string | null } | null;
+  diaryEntries?: readonly DiaryEntryRowInput[];
+  growEvents?: readonly (GrowEventRowInput & GrowEventRowLike)[];
+  sensorReadings?: readonly SensorReadingRowLike[];
+  photos?: readonly PhotoRowLike[];
+  previousRecommendations?: readonly PreviousRecommendationRowLike[];
+  followUps?: readonly FollowUpRowLike[];
+  /** Caller-supplied targets. Never inferred from notes or strain. */
+  targets?: PlantContextBundle["targets"];
+  /** Extra identity the plant row does not carry. */
+  identity?: {
+    isAutoflower?: boolean | null;
+    ageDays?: number | null;
+    /** Irrigation architecture, when the caller knows it. */
+    irrigationArchitecture?: string | null;
+    plantType?: string | null;
+  };
+}
+
+export interface CompilePlantContextBundleOptions {
+  /** Injected clock (epoch ms). Required — the compiler never reads one. */
+  nowMs: number;
+  /** Stable version tag for this context build. */
+  contextVersion: string;
+  windows?: Partial<PlantContextWindows>;
+}
+
+// ---------------------------------------------------------------------------
+// Output
+// ---------------------------------------------------------------------------
+
+export interface RecentActionSummary {
+  occurredAt: string;
+  eventType: string;
+  source: string | null;
+  note: string | null;
+  /** True when inside the immediate-change window. */
+  immediate: boolean;
+}
+
+export interface ObservationSummary {
+  occurredAt: string;
+  stage: string | null;
+  note: string | null;
+}
+
+export interface CompactTimelineItem {
+  occurredAt: string;
+  kind: string;
+  detail: string | null;
+}
+
+export interface PhotoSummary {
+  count: number;
+  latestCapturedAt: string | null;
+  /** Photos carrying a usable quality score, and the best score seen. */
+  withQualityScore: number;
+  bestQualityScore: number | null;
+  angles: string[];
+}
+
+export interface SensorWindowSummary {
+  /** Per-metric summary over usable readings only. */
+  metrics: Array<{
+    metric: SensorGateMetric;
+    latestValue: number | null;
+    unit: string | null;
+    usableCount: number;
+    excludedCount: number;
+    mean: number | null;
+  }>;
+  sourceCounts: Array<{ source: SkillSensorSourceLabel; count: number }>;
+  includedCount: number;
+  excludedCount: number;
+  warnings: SensorTruthWarning[];
+  conflicts: SensorConflict[];
+  /**
+   * Newest fully-usable evaluation in the window, used to stamp the
+   * canonical bundle's snapshot. Null when nothing is usable — the
+   * bundle then carries no snapshot rather than a hopeful one.
+   */
+  latestUsable: {
+    capturedAt: string | null;
+    source: SkillSensorSourceLabel;
+    confidence: number;
+  } | null;
+}
+
+export interface PlantContextCompilation {
+  /** The canonical Build 1 bundle — the identity core, validated. */
+  bundle: PlantContextBundle;
+  contextVersion: string;
+  windows: PlantContextWindows;
+  recentActions: RecentActionSummary[];
+  observations: ObservationSummary[];
+  compactTimeline: CompactTimelineItem[];
+  photoSummary: PhotoSummary;
+  sensorSummary: SensorWindowSummary;
+  notableDeviations: string[];
+  conflictingEvidence: string[];
+  missingInformation: string[];
+  sourceWarnings: string[];
+  previousRecommendations: Array<{
+    occurredAt: string;
+    summary: string;
+    riskLevel: string | null;
+  }>;
+  unresolvedFollowUps: Array<{
+    dueAt: string | null;
+    question: string;
+    status: string;
+  }>;
+  /** 0..1. Share of the expected context slots that are actually present. */
+  completenessScore: number;
+}
+
+export type PlantContextCompileResult =
+  | { ok: true; compilation: PlantContextCompilation }
+  | { ok: false; issues: string[] };
+
+// ---------------------------------------------------------------------------
+// Small pure helpers
+// ---------------------------------------------------------------------------
+
+function safeString(v: unknown): string | null {
+  return typeof v === "string" ? v : null;
+}
+
+function cleanText(v: unknown, max: number = PLANT_CONTEXT_CAPS.noteChars): string | null {
+  const s = safeString(v);
+  if (s === null) return null;
+  const trimmed = s.trim().replace(/\s+/g, " ");
+  if (trimmed === "") return null;
+  return trimmed.length > max ? `${trimmed.slice(0, max - 1)}…` : trimmed;
+}
+
+const ISO_EXPLICIT_TZ_RE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
+
+/**
+ * Timezone-less timestamps are rejected, matching the Sensor Truth
+ * Gate: `Date.parse` would read them in the process's local zone and
+ * make the compilation depend on where it runs.
+ */
+function parseTimestampMs(v: unknown): number | null {
+  const s = safeString(v);
+  if (s === null) return null;
+  const trimmed = s.trim();
+  if (trimmed === "" || !ISO_EXPLICIT_TZ_RE.test(trimmed)) return null;
+  const t = Date.parse(trimmed);
+  return Number.isNaN(t) ? null : t;
+}
+
+function canonicalIso(v: unknown): string | null {
+  const t = parseTimestampMs(v);
+  return t === null ? null : new Date(t).toISOString();
+}
+
+function round3(v: number): number {
+  return Math.round(v * 1000) / 1000;
+}
+
+function resolveWindows(overrides: Partial<PlantContextWindows> | undefined): PlantContextWindows {
+  return {
+    actionDays: overrides?.actionDays ?? PLANT_CONTEXT_WINDOWS.actionDays,
+    sensorDays: overrides?.sensorDays ?? PLANT_CONTEXT_WINDOWS.sensorDays,
+    immediateHours: overrides?.immediateHours ?? PLANT_CONTEXT_WINDOWS.immediateHours,
+    observationDays: overrides?.observationDays ?? PLANT_CONTEXT_WINDOWS.observationDays,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// buildCompactTimeline
+// ---------------------------------------------------------------------------
+
+/**
+ * Merge diary + grow-event rows into one ordered, deduped timeline via
+ * the canonical `mergeTimelineSources`, then project a compact,
+ * token-conscious view. Rows without a usable timestamp are dropped
+ * from the compact view (they cannot be time-aligned) — they still
+ * surface through `identifyContextGaps`.
+ */
+export function buildCompactTimeline(
+  input: {
+    diaryEntries?: readonly DiaryEntryRowInput[];
+    growEvents?: readonly GrowEventRowInput[];
+  },
+  options: { nowMs: number; windowDays: number; limit?: number },
+): CompactTimelineItem[] {
+  const merged: MergedTimelineEntry[] = mergeTimelineSources({
+    diaryEntries: [...(input.diaryEntries ?? [])],
+    growEvents: [...(input.growEvents ?? [])],
+  });
+  const cutoff = options.nowMs - options.windowDays * DAY_MS;
+  const limit = options.limit ?? PLANT_CONTEXT_CAPS.timeline;
+  const out: CompactTimelineItem[] = [];
+  for (const entry of merged) {
+    const occurredAt = canonicalIso(entry.occurred_at);
+    if (occurredAt === null) continue;
+    const ms = Date.parse(occurredAt);
+    if (ms < cutoff || ms > options.nowMs) continue;
+    out.push({
+      occurredAt,
+      kind: cleanText(entry.event_type, 48) ?? "entry",
+      detail: cleanText(entry.note),
+    });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// summarizeRecentActions
+// ---------------------------------------------------------------------------
+
+/**
+ * Summarize grower actions inside the action window. Only recorded
+ * events count — an absent action is never inferred as "not done".
+ */
+export function summarizeRecentActions(
+  growEvents: readonly GrowEventRowLike[],
+  options: { nowMs: number; windowDays: number; immediateHours: number },
+): RecentActionSummary[] {
+  const cutoff = options.nowMs - options.windowDays * DAY_MS;
+  const immediateCutoff = options.nowMs - options.immediateHours * HOUR_MS;
+  const rows: Array<{ ms: number; item: RecentActionSummary }> = [];
+  for (const row of growEvents) {
+    const occurredAt = canonicalIso(row?.occurred_at);
+    if (occurredAt === null) continue;
+    const ms = Date.parse(occurredAt);
+    if (ms < cutoff || ms > options.nowMs) continue;
+    const eventType = cleanText(row?.event_type, 48);
+    if (eventType === null) continue;
+    rows.push({
+      ms,
+      item: {
+        occurredAt,
+        eventType,
+        source: cleanText(row?.source, 32),
+        note: cleanText(row?.note),
+        immediate: ms >= immediateCutoff,
+      },
+    });
+  }
+  rows.sort((a, b) =>
+    b.ms - a.ms !== 0 ? b.ms - a.ms : a.item.eventType.localeCompare(b.item.eventType),
+  );
+  return rows.slice(0, PLANT_CONTEXT_CAPS.recentActions).map((r) => r.item);
+}
+
+// ---------------------------------------------------------------------------
+// summarizeSensorWindow
+// ---------------------------------------------------------------------------
+
+function toSensorCandidate(
+  row: SensorReadingRowLike,
+  tentId: string,
+  plantId: string | null,
+): SensorReadingCandidate {
+  const rawValue = row?.value;
+  const numeric =
+    typeof rawValue === "number"
+      ? rawValue
+      : typeof rawValue === "string" && rawValue.trim() !== ""
+        ? Number(rawValue)
+        : null;
+  return {
+    source: row?.source ?? null,
+    quality: row?.quality ?? null,
+    capturedAt: row?.captured_at ?? null,
+    tentId,
+    plantId,
+    metric: typeof row?.metric === "string" ? row.metric : "",
+    value: numeric !== null && Number.isFinite(numeric) ? numeric : null,
+    unit: row?.unit ?? null,
+    // raw_payload contents never enter the bundle; only the gate's
+    // opaque-reference validation would carry an identifier.
+  };
+}
+
+/**
+ * Summarize the sensor window through the Build 2 truth gate. Averages
+ * are computed over USABLE readings only; excluded readings are counted
+ * and their warnings surfaced, never silently folded in.
+ */
+export function summarizeSensorWindow(
+  sensorReadings: readonly SensorReadingRowLike[],
+  options: {
+    nowMs: number;
+    windowDays: number;
+    tentId: string;
+    plantId: string | null;
+  },
+): SensorWindowSummary {
+  const cutoff = options.nowMs - options.windowDays * DAY_MS;
+  const candidates: SensorReadingCandidate[] = [];
+  for (const row of sensorReadings) {
+    const ms = parseTimestampMs(row?.captured_at);
+    // Unparseable timestamps still go through the gate so they are
+    // counted and warned about rather than vanishing.
+    if (ms !== null && (ms < cutoff || ms > options.nowMs)) continue;
+    candidates.push(toSensorCandidate(row, options.tentId, options.plantId));
+  }
+
+  const series = evaluateSensorSeries(candidates, { nowMs: options.nowMs });
+  const provenance = summarizeSensorProvenance(series.evaluations);
+
+  const byMetric = new Map<SensorGateMetric, SensorTruthEvaluation[]>();
+  for (const e of series.evaluations) {
+    if (e.metric === null) continue;
+    const list = byMetric.get(e.metric) ?? [];
+    list.push(e);
+    byMetric.set(e.metric, list);
+  }
+
+  const metrics: SensorWindowSummary["metrics"] = [];
+  for (const metric of [...byMetric.keys()].sort()) {
+    const list = byMetric.get(metric) as SensorTruthEvaluation[];
+    const usable = list.filter((e) => !e.excludedFromReasoning && e.normalizedValue !== null);
+    let latest: SensorTruthEvaluation | null = null;
+    for (const e of usable) {
+      if (latest === null || (e.capturedAt ?? "") > (latest.capturedAt ?? "")) {
+        latest = e;
+      }
+    }
+    const mean =
+      usable.length > 0
+        ? round3(usable.reduce((acc, e) => acc + (e.normalizedValue as number), 0) / usable.length)
+        : null;
+    metrics.push({
+      metric,
+      latestValue: latest?.normalizedValue ?? null,
+      unit: latest?.normalizedUnit ?? null,
+      usableCount: usable.length,
+      excludedCount: list.length - usable.length,
+      mean,
+    });
+  }
+
+  let latestUsableEval: SensorTruthEvaluation | null = null;
+  for (const e of series.evaluations) {
+    if (e.usability !== "usable" || e.capturedAt === null) continue;
+    if (latestUsableEval === null || e.capturedAt > (latestUsableEval.capturedAt as string)) {
+      latestUsableEval = e;
+    }
+  }
+
+  return {
+    metrics,
+    sourceCounts: provenance.sourceCounts,
+    includedCount: provenance.includedCount,
+    excludedCount: provenance.excludedCount,
+    warnings: provenance.warnings,
+    conflicts: series.conflicts.slice(0, PLANT_CONTEXT_CAPS.conflicts),
+    latestUsable:
+      latestUsableEval === null
+        ? null
+        : {
+            capturedAt: latestUsableEval.capturedAt,
+            source: latestUsableEval.source,
+            confidence: latestUsableEval.adjustedConfidence,
+          },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// identifyContextGaps
+// ---------------------------------------------------------------------------
+
+/** Context slots the runtime expects. Presence drives completeness. */
+const CONTEXT_SLOTS = [
+  "stage",
+  "strain",
+  "medium",
+  "pot_size",
+  "irrigation_architecture",
+  "targets",
+  "recent_actions",
+  "sensor_readings",
+  "photos",
+] as const;
+
+/**
+ * Report what is MISSING. Nothing here infers a value — an absent slot
+ * becomes a stated gap so downstream skills can request data instead of
+ * assuming.
+ */
+export function identifyContextGaps(present: Record<string, boolean>): {
+  missingInformation: string[];
+  completenessScore: number;
+} {
+  const missing: string[] = [];
+  let have = 0;
+  for (const slot of CONTEXT_SLOTS) {
+    if (present[slot] === true) {
+      have += 1;
+    } else {
+      missing.push(slot);
+    }
+  }
+  return {
+    missingInformation: missing,
+    completenessScore: round3(have / CONTEXT_SLOTS.length),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Entry point
+// ---------------------------------------------------------------------------
+
+/**
+ * Compile one plant-context bundle. Returns the canonical Build 1
+ * `PlantContextBundle` (schema-validated) plus the skill-facing
+ * sections around it. Deterministic for a given (rows, nowMs).
+ */
+export function compilePlantContextBundle(
+  input: CompilePlantContextBundleInput,
+  options: CompilePlantContextBundleOptions,
+): PlantContextCompileResult {
+  const windows = resolveWindows(options.windows);
+  const plant = input.plant;
+
+  const plantId = cleanText(plant?.id, SKILL_CONTRACT_LIMITS.idMax);
+  const growId =
+    cleanText(plant?.grow_id, SKILL_CONTRACT_LIMITS.idMax) ??
+    cleanText(input.grow?.id, SKILL_CONTRACT_LIMITS.idMax);
+  const tentId =
+    cleanText(plant?.tent_id, SKILL_CONTRACT_LIMITS.idMax) ??
+    cleanText(input.tent?.id, SKILL_CONTRACT_LIMITS.idMax);
+
+  if (plantId === null || growId === null) {
+    return {
+      ok: false,
+      issues: [
+        plantId === null ? "plant.id: required" : "",
+        growId === null ? "grow_id: required" : "",
+      ].filter((s) => s !== ""),
+    };
+  }
+
+  const stage = cleanText(plant?.stage) ?? cleanText(plant?.growth_stage);
+  const strain = cleanText(plant?.strain);
+  const medium = cleanText(plant?.medium);
+  const potSize = cleanText(plant?.pot_size);
+  const irrigationArchitecture = cleanText(input.identity?.irrigationArchitecture);
+
+  const growEvents = input.growEvents ?? [];
+  const diaryEntries = input.diaryEntries ?? [];
+  const sensorReadings = input.sensorReadings ?? [];
+  const photos = input.photos ?? [];
+
+  const recentActions = summarizeRecentActions(growEvents, {
+    nowMs: options.nowMs,
+    windowDays: windows.actionDays,
+    immediateHours: windows.immediateHours,
+  });
+
+  const compactTimeline = buildCompactTimeline(
+    { diaryEntries, growEvents },
+    { nowMs: options.nowMs, windowDays: windows.actionDays },
+  );
+
+  const observationCutoff = options.nowMs - windows.observationDays * DAY_MS;
+  const observations: ObservationSummary[] = [];
+  for (const row of diaryEntries) {
+    const occurredAt = canonicalIso(row?.occurred_at ?? row?.entry_at);
+    if (occurredAt === null) continue;
+    const ms = Date.parse(occurredAt);
+    if (ms < observationCutoff || ms > options.nowMs) continue;
+    observations.push({
+      occurredAt,
+      stage: cleanText(row?.stage, 32),
+      note: cleanText(row?.note),
+    });
+  }
+  observations.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
+  observations.length = Math.min(observations.length, PLANT_CONTEXT_CAPS.observations);
+
+  const sensorSummary = summarizeSensorWindow(sensorReadings, {
+    nowMs: options.nowMs,
+    windowDays: windows.sensorDays,
+    tentId: tentId ?? growId,
+    plantId,
+  });
+
+  // Photo summary — metadata only, never image contents or URLs.
+  const photoCutoff = options.nowMs - windows.actionDays * DAY_MS;
+  let photoCount = 0;
+  let latestCapturedAt: string | null = null;
+  let withQualityScore = 0;
+  let bestQualityScore: number | null = null;
+  const angles = new Set<string>();
+  for (const p of photos) {
+    const capturedAt = canonicalIso(p?.captured_at);
+    if (capturedAt === null) continue;
+    const ms = Date.parse(capturedAt);
+    if (ms < photoCutoff || ms > options.nowMs) continue;
+    photoCount += 1;
+    if (latestCapturedAt === null || capturedAt > latestCapturedAt) {
+      latestCapturedAt = capturedAt;
+    }
+    const q = p?.quality_score;
+    if (typeof q === "number" && Number.isFinite(q) && q >= 0 && q <= 1) {
+      withQualityScore += 1;
+      if (bestQualityScore === null || q > bestQualityScore) bestQualityScore = q;
+    }
+    const angle = cleanText(p?.angle, 32);
+    if (angle !== null) angles.add(angle);
+  }
+  const photoSummary: PhotoSummary = {
+    count: Math.min(photoCount, PLANT_CONTEXT_CAPS.photos),
+    latestCapturedAt,
+    withQualityScore,
+    bestQualityScore,
+    angles: [...angles].sort(),
+  };
+
+  // Conflicting evidence stays visible and is never collapsed.
+  const conflictingEvidence = sensorSummary.conflicts.map(
+    (c) =>
+      `${c.metric}: ${c.readingCount} readings disagree by ${c.spread} (tolerance ${c.tolerance})`,
+  );
+
+  const sourceWarnings: string[] = [];
+  for (const entry of sensorSummary.sourceCounts) {
+    if (entry.source !== "live" && entry.source !== "manual") {
+      sourceWarnings.push(`${entry.count} ${entry.source} reading(s) in window`);
+    }
+  }
+  if (sensorSummary.excludedCount > 0) {
+    sourceWarnings.push(`${sensorSummary.excludedCount} reading(s) excluded from reasoning`);
+  }
+
+  // Deviations are reported only against caller-supplied targets — the
+  // compiler never invents a target band.
+  const notableDeviations: string[] = [];
+  const targets = input.targets ?? null;
+  if (targets) {
+    const check = (
+      metric: SensorGateMetric,
+      range: { min?: number; max?: number } | null | undefined,
+      label: string,
+    ): void => {
+      if (!range) return;
+      const { min, max } = range;
+      const m = sensorSummary.metrics.find((x) => x.metric === metric);
+      if (!m || m.latestValue === null) return;
+      if (typeof min === "number" && m.latestValue < min) {
+        notableDeviations.push(`${label} below target (${m.latestValue} < ${min})`);
+      } else if (typeof max === "number" && m.latestValue > max) {
+        notableDeviations.push(`${label} above target (${m.latestValue} > ${max})`);
+      }
+    };
+    check("temperature_c", targets.temperatureC, "temperature");
+    check("humidity_pct", targets.humidityPct, "humidity");
+    check("vpd_kpa", targets.vpdKpa, "VPD");
+  }
+
+  const previousRecommendations = (input.previousRecommendations ?? [])
+    .map((r) => ({
+      occurredAt: canonicalIso(r?.created_at),
+      summary: cleanText(r?.summary),
+      riskLevel: cleanText(r?.risk_level, 32),
+    }))
+    .filter(
+      (r): r is { occurredAt: string; summary: string; riskLevel: string | null } =>
+        r.occurredAt !== null && r.summary !== null,
+    )
+    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
+    .slice(0, PLANT_CONTEXT_CAPS.previousRecommendations);
+
+  const unresolvedFollowUps = (input.followUps ?? [])
+    .map((f) => ({
+      dueAt: canonicalIso(f?.due_at),
+      question: cleanText(f?.question),
+      status: cleanText(f?.status, 32) ?? "pending",
+    }))
+    .filter(
+      (f): f is { dueAt: string | null; question: string; status: string } =>
+        f.question !== null && f.status !== "recorded" && f.status !== "cancelled",
+    )
+    .sort((a, b) => (a.dueAt ?? "").localeCompare(b.dueAt ?? ""))
+    .slice(0, PLANT_CONTEXT_CAPS.unresolvedFollowUps);
+
+  const gaps = identifyContextGaps({
+    stage: stage !== null,
+    strain: strain !== null,
+    medium: medium !== null,
+    pot_size: potSize !== null,
+    irrigation_architecture: irrigationArchitecture !== null,
+    targets: targets !== null,
+    recent_actions: recentActions.length > 0,
+    sensor_readings: sensorSummary.includedCount > 0,
+    photos: photoSummary.count > 0,
+  });
+
+  // Latest snapshot for the canonical bundle — assembled ONLY from
+  // gate-usable values. When nothing is usable the bundle carries no
+  // snapshot at all rather than a hopeful one.
+  const pick = (metric: SensorGateMetric): number | null =>
+    sensorSummary.metrics.find((m) => m.metric === metric)?.latestValue ?? null;
+  const latestUsable = sensorSummary.latestUsable;
+  const latestSnapshot =
+    latestUsable === null || latestUsable.capturedAt === null
+      ? null
+      : {
+          capturedAt: latestUsable.capturedAt,
+          source: latestUsable.source,
+          quality: "ok" as const,
+          confidence: latestUsable.confidence,
+          temperatureC: pick("temperature_c"),
+          humidityPct: pick("humidity_pct"),
+          vpdKpa: pick("vpd_kpa"),
+          co2Ppm: pick("co2_ppm"),
+          soilMoisturePct: pick("soil_moisture_pct"),
+        };
+
+  const parsed: SkillContractParse<PlantContextBundle> = parsePlantContextBundle({
+    contextVersion: options.contextVersion,
+    growId,
+    tentId: tentId ?? null,
+    plantId,
+    stage: stage ?? null,
+    strain: strain ?? null,
+    isAutoflower: input.identity?.isAutoflower ?? null,
+    ageDays: input.identity?.ageDays ?? null,
+    medium: medium ?? null,
+    potSize: potSize ?? null,
+    latestSnapshot,
+    recentDiaryEntryCount: observations.length,
+    notes: [],
+    targets: targets ?? null,
+  });
+
+  if (parsed.ok === false) return { ok: false, issues: parsed.issues };
+
+  return {
+    ok: true,
+    compilation: {
+      bundle: parsed.value,
+      contextVersion: options.contextVersion,
+      windows,
+      recentActions,
+      observations,
+      compactTimeline,
+      photoSummary,
+      sensorSummary,
+      notableDeviations,
+      conflictingEvidence,
+      missingInformation: gaps.missingInformation,
+      sourceWarnings,
+      previousRecommendations,
+      unresolvedFollowUps,
+      completenessScore: gaps.completenessScore,
+    },
+  };
+}

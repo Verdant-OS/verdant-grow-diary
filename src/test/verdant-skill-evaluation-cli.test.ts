@@ -400,6 +400,36 @@ describe("cli — untrusted fixture input", () => {
     expect(r.code).not.toBe(EXIT_USAGE_OR_IO);
   });
 
+  // Two files declaring one id are two cases wearing a single identity: counts
+  // double, tags keep whichever was written last, and promotion's
+  // required-golden-case check only ever asks whether an id is PRESENT.
+  it("rejects two fixture files declaring the same id", () => {
+    const dir = mkdtempSync(join(tmpdir(), "verdant-eval-dup-"));
+    const out = outDir();
+    try {
+      const record = readFileSync(SOURCE, "utf8");
+      writeFileSync(join(dir, "a.json"), record, "utf8");
+      writeFileSync(join(dir, "b.json"), record, "utf8");
+      const r = main([
+        "--skill-id",
+        "harness-self-test",
+        "--skill-version",
+        "1.0.0",
+        "--now",
+        NOW,
+        "--fixture-dir",
+        dir,
+        "--output-dir",
+        out,
+      ]);
+      expect(r.code).toBe(EXIT_USAGE_OR_IO);
+      expect(r.lines.join(" ")).toContain("Duplicate fixtureId");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(out, { recursive: true, force: true });
+    }
+  });
+
   it("still accepts a well-formed envelope from the same path", () => {
     // Guards the guard: a check that rejected everything would pass the two
     // tests above while breaking the harness.

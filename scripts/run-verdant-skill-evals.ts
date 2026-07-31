@@ -378,9 +378,22 @@ export function main(argv: readonly string[]): MainResult {
     };
   }
 
-  const caseSet = {
-    fixtureIds: loaded.files.map((f) => (f.fixture as { fixtureId: string }).fixtureId).sort(),
-  };
+  // Two files declaring one id are two cases wearing a single identity: the
+  // counts double, `tagsByFixtureId` keeps whichever was written last, and
+  // promotion's required-golden-case check only ever asks whether an id is
+  // PRESENT. Every counted case has to be individually nameable.
+  const allFixtureIds = loaded.files.map((f) => (f.fixture as { fixtureId: string }).fixtureId);
+  const duplicateFixtureIds = [
+    ...new Set(allFixtureIds.filter((id, i) => allFixtureIds.indexOf(id) !== i)),
+  ].sort();
+  if (duplicateFixtureIds.length > 0) {
+    return {
+      code: EXIT_USAGE_OR_IO,
+      lines: duplicateFixtureIds.map((id) => `Duplicate fixtureId across fixture files: ${id}`),
+    };
+  }
+
+  const caseSet = { fixtureIds: [...allFixtureIds].sort() };
 
   const caseResults = loaded.files.map((file) => {
     const reparsed = parseEvaluationFixture(file.fixture);
@@ -544,7 +557,7 @@ export function main(argv: readonly string[]): MainResult {
     generatedAt: now,
     sourceRevision: args.sourceRevision,
     caseResults,
-    metrics: calculateEvaluationMetrics(caseResults, tagsByFixtureId),
+    tagsByFixtureId,
     digest: D,
     artifactPaths,
   });
@@ -570,7 +583,6 @@ export function main(argv: readonly string[]): MainResult {
     attestations: [],
     rollbackTarget: null,
     sourceRevision: args.sourceRevision,
-    reportBindingValid: verifyReportBinding(report, D),
     artifactDisclosureCategories: disclosure,
     generatedAt: now,
     digest: D,

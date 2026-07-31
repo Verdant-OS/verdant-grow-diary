@@ -102,11 +102,29 @@ function report(cases: SkillEvaluationCaseResult[] = [caseResult()], generatedAt
     generatedAt,
     sourceRevision: "abc1234",
     caseResults: cases,
-    metrics: calculateEvaluationMetrics(cases),
     digest: D,
     artifactPaths: ["artifacts/skills/coco-dryback-review/1.0.0/evaluation.json"],
   });
 }
+
+describe("report — the summary is a summary OF the report", () => {
+  it("derives metrics from its own cases rather than accepting them", () => {
+    // Accepting precomputed metrics let a report carry numbers calculated from
+    // a different case collection: schema-invalid cases beside a compliance
+    // rate of 1, self-binding and internally consistent.
+    const r = buildEvaluationReport({
+      skillId: "coco-dryback-review",
+      skillVersion: "1.0.0",
+      generatedAt: NOW,
+      sourceRevision: null,
+      caseResults: [caseResult({ schemaCompliant: false, status: "fail" })],
+      digest: D,
+    });
+    expect(r.metrics.totalCases).toBe(1);
+    expect(r.metrics.schemaComplianceRate.value).toBe(0);
+    expect(r.overallStatus).not.toBe("pass");
+  });
+});
 
 describe("report — proves itself", () => {
   it("carries a verifiable self-digest", () => {

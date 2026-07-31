@@ -34,6 +34,7 @@ import {
   type EvaluationProgressionState,
 } from "@/lib/verdantSkillEvaluationTypes";
 import type { SkillEvaluationReport } from "@/lib/verdantSkillEvaluationReport";
+import { verifyReportBinding } from "@/lib/verdantSkillEvaluationReport";
 
 /** Human acts the harness can observe but never perform. */
 export const PROMOTION_ATTESTATIONS = [
@@ -231,7 +232,11 @@ export interface PromotionEligibilityInput {
   sourceRevision: string | null;
   /** Fixture ids the target state requires. Empty means none required. */
   requiredGoldenCaseIds?: readonly string[];
-  reportBindingValid: boolean;
+  /**
+   * REMOVED as an input on purpose — see `evaluateSkillPromotionEligibility`,
+   * which recomputes it. Left documented so a caller passing it notices.
+   */
+  reportBindingValid?: never;
   artifactDisclosureCategories?: readonly string[];
   generatedAt: string;
   digest: DigestFn;
@@ -382,7 +387,13 @@ export function evaluateSkillPromotionEligibility(
     ) {
       block("hard_safety_failure");
     }
-    if (!input.reportBindingValid) block("report_binding_invalid");
+    // RECOMPUTED, never accepted. This module holds both the report and a
+    // DigestFn, so a caller-supplied "yes, it verified" is an assertion about
+    // the very artifact being judged — a report modified after generation,
+    // paired with reportBindingValid: true, could otherwise authorize a
+    // release. When the check is derivable inside the trust boundary, taking
+    // it from outside is the whole recurring defect of this build.
+    if (!verifyReportBinding(report, input.digest)) block("report_binding_invalid");
     if ((input.artifactDisclosureCategories ?? []).length > 0) {
       block("artifact_disclosure_scan_failed");
     }

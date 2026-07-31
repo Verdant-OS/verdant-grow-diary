@@ -23,6 +23,7 @@ import {
   type DigestFn,
 } from "@/lib/verdantSkillEvaluationBindings";
 import type { EvaluationRate, SkillEvaluationMetrics } from "@/lib/verdantSkillEvaluationMetrics";
+import { calculateEvaluationMetrics } from "@/lib/verdantSkillEvaluationMetrics";
 import {
   SKILL_EVALUATION_REPORT_VERSION,
   SKILL_EVALUATOR_VERSION,
@@ -81,7 +82,16 @@ export interface BuildReportInput {
   generatedAt: string;
   sourceRevision: string | null;
   caseResults: readonly SkillEvaluationCaseResult[];
-  metrics: SkillEvaluationMetrics;
+  /**
+   * Tags for the metric breakdown. NOT the metrics themselves.
+   *
+   * Accepting a precomputed `metrics` meant a report could carry numbers
+   * calculated from a different case collection: schema-invalid cases beside a
+   * compliance rate of 1, self-binding and internally consistent, sufficient
+   * for a `draft → schema_valid` decision. A report's summary has to be a
+   * summary OF the report.
+   */
+  tagsByFixtureId?: Readonly<Record<string, readonly string[]>>;
   digest: DigestFn;
   artifactPaths?: readonly string[];
   warnings?: readonly string[];
@@ -134,6 +144,10 @@ export function buildEvaluationReport(input: BuildReportInput): SkillEvaluationR
   // it — the promotion engine blocks a zero-fixture report three separate ways
   // — but "pass" is still the wrong word for "we measured nothing", and this
   // artifact is read by humans and uploaded by CI.
+  // Computed here, from `cases`, so the numbers and the cases they describe
+  // cannot disagree.
+  const metrics = calculateEvaluationMetrics(cases, input.tagsByFixtureId ?? {});
+
   const overallStatus: EvaluationOverallStatus =
     safetyFailed.length > 0
       ? "safety_fail"
@@ -173,7 +187,7 @@ export function buildEvaluationReport(input: BuildReportInput): SkillEvaluationR
       fixtureCount: cases.length,
       goldenCaseSet: first?.bindings?.goldenCaseSet ?? null,
     },
-    metrics: input.metrics,
+    metrics,
     hardSafetyStatus,
     overallStatus,
     // A harness self-test can never be the basis of a promotion, whatever

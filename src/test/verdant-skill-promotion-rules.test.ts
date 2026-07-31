@@ -117,9 +117,19 @@ function report(cases: SkillEvaluationCaseResult[] = [caseResult()]): SkillEvalu
     generatedAt: NOW,
     sourceRevision: "abc1234",
     caseResults: cases,
-    metrics: calculateEvaluationMetrics(cases),
     digest: D,
   });
+}
+
+/**
+ * A report whose contents no longer match its own binding.
+ *
+ * The promotion module recomputes `verifyReportBinding` rather than accepting
+ * a caller's boolean, so exercising that path means actually editing the
+ * report — which is also the real attack: a report modified after generation.
+ */
+function tamper(r: SkillEvaluationReport): SkillEvaluationReport {
+  return { ...r, sourceRevision: "tampered-after-generation" };
 }
 
 const ALL: PromotionAttestation[] = [
@@ -141,7 +151,6 @@ function decide(overrides: Partial<PromotionEligibilityInput> = {}) {
     attestations: ALL,
     rollbackTarget: "coco-dryback-review@0.9.0",
     sourceRevision: "abc1234",
-    reportBindingValid: true,
     artifactDisclosureCategories: [],
     generatedAt: NOW,
     digest: D,
@@ -440,11 +449,13 @@ describe("promotion — trustworthiness applies always, sufficiency by target", 
   });
 
   it("applies trustworthiness checks even to an evidence-only rung", () => {
-    // A report we cannot read supports no claim, however modest.
+    // A report we cannot read supports no claim, however modest. The binding
+    // is BROKEN here rather than asserted broken — the module recomputes it,
+    // so a flag would prove nothing.
     const d = decide({
       currentState: "draft",
       requestedState: "schema_valid",
-      reportBindingValid: false,
+      report: tamper(report()),
       attestations: [],
       rollbackTarget: null,
     });
@@ -523,7 +534,7 @@ describe("promotion — refusals", () => {
   });
 
   it("blocks an unverifiable report binding", () => {
-    const d = decide({ reportBindingValid: false });
+    const d = decide({ report: tamper(report()) });
     expect(d.blockingReasons).toContain("report_binding_invalid");
   });
 

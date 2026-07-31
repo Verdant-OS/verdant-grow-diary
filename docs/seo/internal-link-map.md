@@ -2,10 +2,12 @@
 
 ## Release status
 
-Implementation is complete on `codex/seo-foundation-publish-lighting`, rebased onto the current
-deploy head after PR #560 merged because that PR owned the shared guide registry and sitemap base.
-The two lighting routes are production-ready in this branch; they are not claimed as deployed until
-this branch is merged and published.
+PR #595 is merged, and both lighting routes are live on `https://verdantgrowdiary.com`. The public
+verification at `2026-07-31T19:18:39.6233761Z` returned HTTP 200 for both pages; each canonical URL
+appears exactly once in the 51-URL sitemap. Production manifest
+`92d8330af90d983d3bcc1ad7507028505b8b14d8` contains the lighting release and analytics repair.
+The newer deploy head differs only in SEO monitoring files, so no additional production publish is
+required for the link inventory below.
 
 ## Implemented contextual links
 

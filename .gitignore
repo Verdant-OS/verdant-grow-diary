@@ -42,6 +42,13 @@ tools/ecowitt-testbench/__pycache__/
 # sanitized, never committed)
 artifacts/
 
+# SEO stewardship source-of-truth artifact (sanitized and contract-tested)
+!artifacts/
+artifacts/*
+!artifacts/seo/
+artifacts/seo/*
+!artifacts/seo/seo-readiness-status.json
+
 # Verdant SEO monitoring — local OAuth token cache
 .seo/
 

@@ -265,6 +265,7 @@ describe("VerdantSkillInputEnvelope", () => {
             authorization: "should-never-survive",
             "x-api-key": "should-never-survive",
             launchWindow: "eyJzaG91bGQtbmV2ZXItc3Vydml2ZQ",
+            modelNote: "sk-NEVERSURVIVE1234567890",
           },
         }),
       ),
@@ -273,6 +274,7 @@ describe("VerdantSkillInputEnvelope", () => {
     const serialized = serializeSkillContract(v);
     expect(serialized).not.toContain("never-survive");
     expect(serialized).not.toContain("eyJ");
+    expect(serialized).not.toContain("NEVERSURVIVE");
   });
 
   it("rejects a wrong contract version instead of silently accepting it", () => {
@@ -326,6 +328,52 @@ describe("PlantContextBundle", () => {
     expect(cured.stage).toBe("curing");
     expectIssues(parsePlantContextBundle(makeBundle({ stage: "vegging" })));
     expectIssues(parsePlantContextBundle(makeBundle({ stage: "dry" })));
+  });
+
+  it("rejects ok quality on snapshots whose source already denies trust", () => {
+    for (const source of ["stale", "invalid"]) {
+      expectIssues(
+        parsePlantContextBundle(
+          makeBundle({
+            latestSnapshot: { capturedAt: T0, source, quality: "ok" },
+          }),
+        ),
+      );
+    }
+    const coherent = expectOk(
+      parsePlantContextBundle(
+        makeBundle({
+          latestSnapshot: { capturedAt: T0, source: "invalid", quality: "invalid" },
+        }),
+      ),
+    );
+    expect(coherent.latestSnapshot?.quality).toBe("invalid");
+  });
+
+  it("carries optional per-reading confidence, bounded to [0, 1]", () => {
+    const withConfidence = expectOk(
+      parsePlantContextBundle(
+        makeBundle({
+          latestSnapshot: { capturedAt: T0, source: "live", quality: "ok", confidence: 0.35 },
+        }),
+      ),
+    );
+    expect(withConfidence.latestSnapshot?.confidence).toBe(0.35);
+    const nullConfidence = expectOk(
+      parsePlantContextBundle(
+        makeBundle({
+          latestSnapshot: { capturedAt: T0, source: "live", quality: "ok", confidence: null },
+        }),
+      ),
+    );
+    expect(nullConfidence.latestSnapshot?.confidence).toBeNull();
+    expectIssues(
+      parsePlantContextBundle(
+        makeBundle({
+          latestSnapshot: { capturedAt: T0, source: "live", quality: "ok", confidence: 1.5 },
+        }),
+      ),
+    );
   });
 
   it("rejects unknown snapshot source labels (deny-by-default trust)", () => {

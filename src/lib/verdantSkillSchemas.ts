@@ -237,10 +237,12 @@ function normalizeRecordKey(key: string): string {
 /**
  * String values that look like credentials are dropped too, regardless of
  * key name — defense in depth for values pasted under a benign key. The
- * shapes covered: vendor secret-key prefixes, JWT-style base64 JSON, and
- * bearer-prefixed strings.
+ * shapes covered: vendor secret-key prefixes (both underscore forms like
+ * sk_live_ and hyphenated OpenAI/Anthropic-style sk-… keys), JWT-style
+ * base64 JSON, and bearer-prefixed strings.
  */
-const SENSITIVE_VALUE_RE = /^(sk|pk|rk)_(live|test)_|^eyJ[A-Za-z0-9_-]{8,}|^bearer\s/i;
+const SENSITIVE_VALUE_RE =
+  /^(sk|pk|rk)_(live|test)_|^sk-[A-Za-z0-9_-]{8,}|^eyJ[A-Za-z0-9_-]{8,}|^bearer\s/i;
 
 function isSensitiveRecordEntry(key: string, value: unknown): boolean {
   if (SENSITIVE_KEY_RE.test(normalizeRecordKey(key))) return true;
@@ -325,16 +327,33 @@ const targetRangeSchema = z
   .object({ min: finiteNumberSchema, max: finiteNumberSchema })
   .refine((r) => r.min <= r.max, "target_range_inverted");
 
-const skillSensorSnapshotSchema = z.object({
-  capturedAt: isoTimestampSchema,
-  source: sensorSourceSchema,
-  quality: readingQualitySchema,
-  temperatureC: finiteNumberSchema.nullish(),
-  humidityPct: finiteNumberSchema.nullish(),
-  vpdKpa: finiteNumberSchema.nullish(),
-  co2Ppm: finiteNumberSchema.nullish(),
-  soilMoisturePct: finiteNumberSchema.nullish(),
-});
+const skillSensorSnapshotSchema = z
+  .object({
+    capturedAt: isoTimestampSchema,
+    source: sensorSourceSchema,
+    quality: readingQualitySchema,
+    /**
+     * Per-reading trust confidence from the sensor layer, 0..1. Optional
+     * for backward compatibility; explicit null (unknown) is preserved.
+     */
+    confidence: unitIntervalSchema.nullish(),
+    temperatureC: finiteNumberSchema.nullish(),
+    humidityPct: finiteNumberSchema.nullish(),
+    vpdKpa: finiteNumberSchema.nullish(),
+    co2Ppm: finiteNumberSchema.nullish(),
+    soilMoisturePct: finiteNumberSchema.nullish(),
+  })
+  .superRefine((s, ctx) => {
+    // Bad or unknown telemetry must never be labeled healthy: a snapshot
+    // whose source label already denies trust cannot carry "ok" quality.
+    if (s.quality === "ok" && (s.source === "stale" || s.source === "invalid")) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["quality"],
+        message: "quality_contradicts_source",
+      });
+    }
+  });
 export type SkillSensorSnapshot = z.infer<typeof skillSensorSnapshotSchema>;
 
 export const plantContextBundleSchema = z.object({

@@ -59,6 +59,7 @@ export const SKILL_APPLICABILITY_REASONS = [
   "grow_setting_unsupported",
   "grow_setting_unknown",
   "missing_required_sensor_metric",
+  "required_sensor_metric_conflicted",
   "autoflower_status_unknown",
   "missing_required_context",
   "missing_optional_context",
@@ -179,9 +180,15 @@ export function evaluateSkillApplicability(
       reasons.add("medium_unsupported");
     }
   }
-  if (envelope.irrigationArchitectures.length > 0 && irrigation !== null) {
-    if (
-      irrigation !== "unknown" &&
+  if (envelope.irrigationArchitectures.length > 0) {
+    if (irrigation === null || irrigation === "unknown") {
+      // Closed allow-list + unknown architecture: absence is not
+      // agreement here either. Handled below as missing context.
+      reasons.add("irrigation_unknown");
+      if (!missingRequired.includes("irrigation_architecture")) {
+        missingRequired.push("irrigation_architecture");
+      }
+    } else if (
       !envelope.irrigationArchitectures.includes(irrigation as SkillIrrigationArchitecture)
     ) {
       reasons.add("irrigation_unsupported");
@@ -244,6 +251,17 @@ export function evaluateSkillApplicability(
     if (entry === undefined || entry.usableCount === 0) {
       reasons.add("missing_required_sensor_metric");
       provenanceBlockers.add(`no_usable_${required}`);
+      if (!missingRequired.includes("sensor_readings")) {
+        missingRequired.push("sensor_readings");
+      }
+      continue;
+    }
+    // A metric the skill DEPENDS on, whose devices disagree, has no
+    // single trustworthy value — that must block the run, not merely
+    // downgrade it to partially applicable.
+    if (entry.conflicted) {
+      reasons.add("required_sensor_metric_conflicted");
+      provenanceBlockers.add(`conflicted_${required}`);
       if (!missingRequired.includes("sensor_readings")) {
         missingRequired.push("sensor_readings");
       }

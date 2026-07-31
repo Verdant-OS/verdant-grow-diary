@@ -338,6 +338,24 @@ describe("registry", () => {
     expect(built.registry.resolveLatest("coco-dryback-review")).toBeNull();
   });
 
+  it("freezes registered manifests so a caller cannot widen a grant", () => {
+    const built = buildSkillRegistry([makeManifest()]);
+    expect(built.ok).toBe(true);
+    if (built.ok === false) return;
+    const m = built.registry.list()[0];
+    expect(Object.isFrozen(m)).toBe(true);
+    expect(Object.isFrozen(m.permissions)).toBe(true);
+    expect(Object.isFrozen(m.operatingEnvelope)).toBe(true);
+    // A registry entry is a governance record: mutation must not stick.
+    const before = [...m.permissions];
+    try {
+      (m.permissions as string[]).push("analyze_photos");
+    } catch {
+      // Frozen arrays throw in strict mode — either way, no change.
+    }
+    expect(built.registry.list()[0].permissions).toEqual(before);
+  });
+
   it("compares semver numerically, not lexically", () => {
     expect(compareSkillVersions("1.10.0", "1.9.0")).toBeGreaterThan(0);
     expect(compareSkillVersions("2.0.0", "10.0.0")).toBeLessThan(0);
@@ -426,6 +444,32 @@ describe("applicability — the spec's coco dryback cases", () => {
     expect(r.missingRequiredContext).toContain("sensor_readings");
   });
 
+  it("does not treat an unknown irrigation architecture as agreement", () => {
+    // Envelope has a closed irrigation allow-list; the flag that would
+    // separately demand a known architecture is OFF. An unknown value
+    // must still not pass the allow-list.
+    const permissive = manifest({
+      operatingEnvelope: {
+        growSettings: [],
+        media: [],
+        irrigationArchitectures: ["top_feed_drain_to_waste"],
+        requiresKnownIrrigationArchitecture: false,
+        requiresKnownAutoflowerStatus: false,
+        minUsableSensorReadings: 0,
+        requiredSensorMetrics: [],
+      },
+      requiredContext: [],
+      excludedConditions: { media: [], irrigationArchitectures: [], growSettings: [] },
+    });
+    const r = evaluateSkillApplicability({
+      manifest: permissive,
+      compilation: compileContext({ identity: { plantType: "photoperiod" } }),
+    });
+    expect(r.verdict).toBe("insufficient_context");
+    expect(r.reasons).toContain("irrigation_unknown");
+    expect(skillMayRun(r)).toBe(false);
+  });
+
   it("does not treat an absent grow setting as agreement with a closed envelope", () => {
     const r = evaluateSkillApplicability({
       manifest: manifest(),
@@ -487,6 +531,47 @@ describe("applicability — the spec's coco dryback cases", () => {
     });
     expect(r.verdict).toBe("insufficient_context");
     expect(r.reasons).toContain("missing_required_sensor_metric");
+  });
+
+  it("blocks a run when a REQUIRED metric's devices disagree", () => {
+    const r = evaluateSkillApplicability({
+      manifest: manifest(),
+      compilation: compileContext({
+        sensorReadings: [
+          {
+            metric: "temperature_c",
+            value: 25,
+            unit: "°C",
+            captured_at: hoursAgo(0.1),
+            source: "live",
+          },
+          // Two plant-scoped moisture devices disagreeing wildly.
+          {
+            metric: "soil_moisture_pct",
+            value: 20,
+            unit: "%",
+            captured_at: hoursAgo(0.1),
+            source: "live",
+            plant_id: PLANT,
+            device_id: "probe-a",
+          },
+          {
+            metric: "soil_moisture_pct",
+            value: 70,
+            unit: "%",
+            captured_at: hoursAgo(0.1),
+            source: "live",
+            plant_id: PLANT,
+            device_id: "probe-b",
+          },
+        ],
+      }),
+      growSetting: "tent",
+    });
+    expect(r.verdict).toBe("insufficient_context");
+    expect(r.reasons).toContain("required_sensor_metric_conflicted");
+    expect(r.provenanceBlockers).toContain("conflicted_soil_moisture_pct");
+    expect(skillMayRun(r)).toBe(false);
   });
 
   it("reports partial applicability when only optional context is missing", () => {

@@ -75,6 +75,19 @@ export function findDuplicateSkillKeys(
   return [...duplicates].sort();
 }
 
+/**
+ * Deep-freeze a registered manifest. A registry entry is a governance
+ * record: a caller must not be able to widen a registered permission
+ * set or envelope after the fact by mutating the object it was handed.
+ */
+function deepFreeze<T>(value: T): T {
+  if (value === null || typeof value !== "object") return value;
+  for (const key of Object.keys(value as Record<string, unknown>)) {
+    deepFreeze((value as Record<string, unknown>)[key]);
+  }
+  return Object.freeze(value);
+}
+
 function sortManifests(manifests: VerdantSkillManifest[]): VerdantSkillManifest[] {
   return [...manifests].sort((a, b) => {
     const idCmp = a.id.localeCompare(b.id);
@@ -123,7 +136,7 @@ export function buildSkillRegistry(rawManifests: readonly unknown[]): BuildSkill
 
   if (issues.length > 0) return { ok: false, issues: issues.sort() };
 
-  const sorted = sortManifests(manifests);
+  const sorted = sortManifests(manifests).map((m) => deepFreeze(m));
   const byKey = new Map<string, VerdantSkillManifest>();
   for (const m of sorted) byKey.set(skillManifestKey(m), m);
 

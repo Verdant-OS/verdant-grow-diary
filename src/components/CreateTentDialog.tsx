@@ -44,6 +44,10 @@ interface Props {
   initiallyOpen?: boolean;
 }
 
+function emptyTentForm() {
+  return { name: "", size: "", brand: "", stage: "seedling" };
+}
+
 export default function CreateTentDialog({
   trigger,
   defaultGrowId,
@@ -55,7 +59,7 @@ export default function CreateTentDialog({
   const qc = useQueryClient();
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ name: "", size: "", brand: "", stage: "seedling" });
+  const [form, setForm] = useState(emptyTentForm);
 
   const targetGrowId = useMemo(
     () =>
@@ -130,13 +134,18 @@ export default function CreateTentDialog({
     trackFunnelEvent("tent_created");
     qc.invalidateQueries({ queryKey: ["tents"] });
     qc.invalidateQueries({ queryKey: ["grow", "tents"] });
-    setForm({ name: "", size: "", brand: "", stage: "seedling" });
+    setForm(emptyTentForm());
     setOpen(false);
     if (data && onCreated) onCreated(data as { id: string; name: string });
   }
 
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) setForm(emptyTentForm());
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger ?? (
           <Button size="sm" className="gradient-leaf text-primary-foreground gap-1">

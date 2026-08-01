@@ -1969,6 +1969,72 @@ test("derives scoped cultivar health disposition from append-only histories", ()
   ]);
 });
 
+test("keeps quarantine open while any scoped episode remains active", () => {
+  const stillOpen = quarantineEvent("open", "quarantine:event:open-still-active", {
+    episodeId: "quarantine:episode:still-active",
+    occurredOn: "2026-07-31T12:00:00Z",
+  });
+  const laterOpen = quarantineEvent("open", "quarantine:event:open-later-released", {
+    episodeId: "quarantine:episode:later-released",
+    occurredOn: "2026-08-01T00:00:00Z",
+  });
+  const laterRelease = quarantineEvent("release", "quarantine:event:release-later", {
+    episodeId: "quarantine:episode:later-released",
+    occurredOn: "2026-08-03T12:00:00Z",
+  });
+  const record = cultivarHealthFixture({
+    quarantines: [stillOpen, laterOpen, laterRelease],
+  });
+  const disposition = record.identity.provenance.currentHealthDisposition.subjects[0];
+
+  assert.equal(disposition.quarantineState, "open");
+  assert.deepEqual(disposition.currentQuarantineEventIds, [
+    "quarantine:event:open-still-active",
+    "quarantine:event:release-later",
+  ]);
+  assert.deepEqual(validateCultivarHealthSemantics(record), {
+    status: "pass",
+    screeningEventCount: 1,
+    quarantineEventCount: 3,
+    subjectCount: 1,
+  });
+});
+
+test("projects the terminal event from every quarantine episode", () => {
+  const firstOpen = quarantineEvent("open", "quarantine:event:open-first", {
+    episodeId: "quarantine:episode:first",
+    occurredOn: "2026-07-31T12:00:00Z",
+  });
+  const secondOpen = quarantineEvent("open", "quarantine:event:open-second", {
+    episodeId: "quarantine:episode:second",
+    occurredOn: "2026-08-01T00:00:00Z",
+  });
+  const firstRelease = quarantineEvent("release", "quarantine:event:release-first", {
+    episodeId: "quarantine:episode:first",
+    occurredOn: "2026-08-03T12:00:00Z",
+  });
+  const secondDispose = quarantineEvent("dispose", "quarantine:event:dispose-second", {
+    episodeId: "quarantine:episode:second",
+    occurredOn: "2026-08-04T12:00:00Z",
+  });
+  const record = cultivarHealthFixture({
+    quarantines: [firstOpen, secondOpen, firstRelease, secondDispose],
+  });
+  const disposition = record.identity.provenance.currentHealthDisposition.subjects[0];
+
+  assert.equal(disposition.quarantineState, "disposed");
+  assert.deepEqual(disposition.currentQuarantineEventIds, [
+    "quarantine:event:dispose-second",
+    "quarantine:event:release-first",
+  ]);
+  assert.deepEqual(validateCultivarHealthSemantics(record), {
+    status: "pass",
+    screeningEventCount: 1,
+    quarantineEventCount: 4,
+    subjectCount: 1,
+  });
+});
+
 test("fails cultivar release closed when screening evidence is stale, scoped wrong, or contradicted", () => {
   {
     const negative = screeningEvent("negative", "screening:hlvd:negative-1", {

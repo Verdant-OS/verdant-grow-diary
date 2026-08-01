@@ -45,7 +45,18 @@ function requireNonemptyString(value, label) {
 
 function requireDate(value, label) {
   requireNonemptyString(value, label);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(Date.parse(`${value}T00:00:00Z`))) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) {
+    fail(`${label} must be an ISO date`);
+  }
+  const parsed = new Date(`${value}T00:00:00Z`);
+  const [, year, month, day] = match;
+  if (
+    !Number.isFinite(parsed.getTime()) ||
+    parsed.getUTCFullYear() !== Number(year) ||
+    parsed.getUTCMonth() + 1 !== Number(month) ||
+    parsed.getUTCDate() !== Number(day)
+  ) {
     fail(`${label} must be an ISO date`);
   }
 }

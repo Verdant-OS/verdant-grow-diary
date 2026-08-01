@@ -1443,26 +1443,38 @@ export function deriveCultivarHealthDisposition(record) {
       const quarantines = quarantineHistory.filter(
         (event) => cultivarHealthKey(event.scope, event.target) === key,
       );
-      const latestQuarantineTime =
-        quarantines.length === 0
-          ? null
-          : Math.max(
-              ...quarantines.map((event) =>
-                requireValidTimestamp(event.occurredOn, `${event.eventId} occurredOn`),
-              ),
-            );
-      const currentQuarantines =
-        latestQuarantineTime === null
-          ? []
-          : quarantines.filter(
-              (event) =>
-                requireValidTimestamp(event.occurredOn, `${event.eventId} occurredOn`) ===
-                latestQuarantineTime,
-            );
+      const terminalByEpisode = new Map();
+      for (const [historyIndex, event] of quarantines.entries()) {
+        const occurredOn = requireValidTimestamp(event.occurredOn, `${event.eventId} occurredOn`);
+        const prior = terminalByEpisode.get(event.episodeId);
+        if (
+          !prior ||
+          occurredOn > prior.occurredOn ||
+          (occurredOn === prior.occurredOn && historyIndex > prior.historyIndex)
+        ) {
+          terminalByEpisode.set(event.episodeId, { event, occurredOn, historyIndex });
+        }
+      }
+      const currentQuarantines = [...terminalByEpisode.values()];
+      const latestCurrentQuarantine = currentQuarantines.reduce(
+        (latest, candidate) =>
+          latest === null ||
+          candidate.occurredOn > latest.occurredOn ||
+          (candidate.occurredOn === latest.occurredOn &&
+            candidate.historyIndex > latest.historyIndex)
+            ? candidate
+            : latest,
+        null,
+      );
+      const hasActiveEpisode = currentQuarantines.some(
+        ({ event }) => quarantineStateForAction(event.action) === "open",
+      );
       const quarantineState =
-        currentQuarantines.length === 0
+        latestCurrentQuarantine === null
           ? "not_started"
-          : quarantineStateForAction(currentQuarantines.at(-1).action);
+          : hasActiveEpisode
+            ? "open"
+            : quarantineStateForAction(latestCurrentQuarantine.event.action);
 
       return {
         scope: structuredClone(subject.scope),
@@ -1472,7 +1484,7 @@ export function deriveCultivarHealthDisposition(record) {
         discordanceState,
         currentScreeningEventIds: currentScreenings.map((event) => event.eventId).sort(),
         conflictingScreeningEventIds,
-        currentQuarantineEventIds: currentQuarantines.map((event) => event.eventId).sort(),
+        currentQuarantineEventIds: currentQuarantines.map(({ event }) => event.eventId).sort(),
         derivedFromScreeningEventIds: screenings.map((event) => event.eventId),
         derivedFromQuarantineEventIds: quarantines.map((event) => event.eventId),
         limitations: [

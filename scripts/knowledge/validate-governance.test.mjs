@@ -151,6 +151,45 @@ test("derives researched and superseded intent without rewriting roadmap records
   );
 });
 
+test("rejects normalized impossible lifecycle dates and accepts real UTC calendar boundaries", () => {
+  for (const impossibleDate of [
+    "2026-02-29",
+    "2026-02-30",
+    "2026-04-31",
+    "2026-00-01",
+    "2026-13-01",
+    "2026-01-00",
+  ]) {
+    const registry = structuredClone(intentRegistry);
+    const entry = lifecycleEntry();
+    entry.events = [entry.events[0]];
+    entry.events[0].occurredOn = impossibleDate;
+    entry.events[0].researchReceipt.collectedOn = impossibleDate;
+    registry.entries.push(entry);
+
+    assert.throws(
+      () => validateIntentResearchRegistry(registry, roadmap),
+      /must be an ISO date/,
+      `${impossibleDate} must not normalize into a different UTC calendar date`,
+    );
+  }
+
+  for (const realDate of ["2028-02-29", "2026-04-30", "2026-12-31"]) {
+    const registry = structuredClone(intentRegistry);
+    const entry = lifecycleEntry();
+    entry.events = [entry.events[0]];
+    entry.events[0].occurredOn = realDate;
+    entry.events[0].researchReceipt.collectedOn = realDate;
+    registry.entries.push(entry);
+
+    assert.equal(
+      validateIntentResearchRegistry(registry, roadmap).currentIntentStatuses.researched,
+      1,
+      `${realDate} must remain a valid UTC calendar date`,
+    );
+  }
+});
+
 test("proves intent research history is append-only across registry revisions", () => {
   const previous = structuredClone(intentRegistry);
   previous.entries.push({

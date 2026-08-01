@@ -6,10 +6,7 @@
  *
  * Pure: no React, no Supabase.
  */
-import {
-  GROW_SETUP_MESSAGES,
-  GROW_SETUP_START_ROOM_HREF,
-} from "@/constants/growSetupMessages";
+import { GROW_SETUP_MESSAGES, GROW_SETUP_START_ROOM_HREF } from "@/constants/growSetupMessages";
 
 export type CreateBindingEntity = "tent" | "plant";
 
@@ -237,4 +234,22 @@ export function resolveInitialPlantTentId(input: {
     targetGrowId: input.targetGrowId,
   });
   return compat.compatible ? tentId : "none";
+}
+
+/**
+ * When a caller supplies defaultTentId (e.g. Add plant to this tent), an
+ * incompatible/orphan tent must block create — not silently degrade to tentless.
+ */
+export function evaluateSuppliedDefaultTentBinding(input: {
+  defaultTentId?: string | null;
+  tentGrowId?: string | null;
+  targetGrowId?: string | null;
+}): TentCompatibilityResult | null {
+  const defaultId = trimId(input.defaultTentId);
+  if (!defaultId) return null;
+  return evaluateTentGrowCompatibility({
+    selectedTentId: defaultId,
+    tentGrowId: input.tentGrowId,
+    targetGrowId: input.targetGrowId,
+  });
 }

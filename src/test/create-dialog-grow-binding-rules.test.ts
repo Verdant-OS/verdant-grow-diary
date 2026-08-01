@@ -5,6 +5,7 @@ import {
   canWriteCreateGrowId,
   evaluateTentGrowCompatibility,
   resolveInitialPlantTentId,
+  evaluateSuppliedDefaultTentBinding,
 } from "@/lib/createDialogGrowBindingRules";
 import { GROW_SETUP_START_ROOM_HREF } from "@/constants/growSetupMessages";
 
@@ -47,10 +48,7 @@ describe("resolveCreateTargetGrowId", () => {
 
 describe("buildCreateGrowBindingHardStop", () => {
   it("blocks zero grows with Start your room path", () => {
-    const v = buildCreateGrowBindingHardStop(
-      { targetGrowId: null, growCount: 0 },
-      "plant",
-    );
+    const v = buildCreateGrowBindingHardStop({ targetGrowId: null, growCount: 0 }, "plant");
     expect(v.blockSubmit).toBe(true);
     expect(v.showStartRoomHardStop).toBe(true);
     expect(v.startRoomHref).toBe(GROW_SETUP_START_ROOM_HREF);
@@ -70,19 +68,13 @@ describe("buildCreateGrowBindingHardStop", () => {
   });
 
   it("blocks when grows exist but no resolvable target", () => {
-    const v = buildCreateGrowBindingHardStop(
-      { targetGrowId: null, growCount: 2 },
-      "tent",
-    );
+    const v = buildCreateGrowBindingHardStop({ targetGrowId: null, growCount: 2 }, "tent");
     expect(v.blockSubmit).toBe(true);
     expect(v.showPickGrowHint).toBe(true);
   });
 
   it("allows submit when target is set", () => {
-    const v = buildCreateGrowBindingHardStop(
-      { targetGrowId: "g1", growCount: 1 },
-      "tent",
-    );
+    const v = buildCreateGrowBindingHardStop({ targetGrowId: "g1", growCount: 1 }, "tent");
     expect(v.blockSubmit).toBe(false);
     expect(canWriteCreateGrowId("g1")).toBe(true);
     expect(canWriteCreateGrowId(null)).toBe(false);
@@ -147,5 +139,26 @@ describe("tent compatibility", () => {
         targetGrowId: "g1",
       }),
     ).toBe("t1");
+  });
+
+  it("evaluateSuppliedDefaultTentBinding flags orphan supplied tent", () => {
+    const r = evaluateSuppliedDefaultTentBinding({
+      defaultTentId: "t-orphan",
+      tentGrowId: null,
+      targetGrowId: "g1",
+    });
+    expect(r).not.toBeNull();
+    expect(r?.compatible).toBe(false);
+    expect(r?.kind).toBe("orphan_tent");
+  });
+
+  it("evaluateSuppliedDefaultTentBinding is null without defaultTentId", () => {
+    expect(
+      evaluateSuppliedDefaultTentBinding({
+        defaultTentId: null,
+        tentGrowId: null,
+        targetGrowId: "g1",
+      }),
+    ).toBeNull();
   });
 });

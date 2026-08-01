@@ -12,6 +12,7 @@ const PLANT = readFileSync(resolve(ROOT, "src/components/CreatePlantDialog.tsx")
 describe("create plant tent compatibility", () => {
   it("dialog clears incompatible tent and surfaces mismatch UI", () => {
     expect(PLANT).toMatch(/evaluateTentGrowCompatibility/);
+    expect(PLANT).toMatch(/evaluateSuppliedDefaultTentBinding/);
     expect(PLANT).toMatch(/resolveInitialPlantTentId/);
     expect(PLANT).toMatch(/create-plant-tent-mismatch/);
     expect(PLANT).toMatch(/clearTentSelection|tent_id:\s*"none"/);

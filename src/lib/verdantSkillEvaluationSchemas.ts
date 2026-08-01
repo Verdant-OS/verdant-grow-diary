@@ -435,18 +435,6 @@ const executionPolicySchema = z
     // Written as an equivalence rather than as four `if`s, because the last
     // two rounds each added one more direction to a check that needed all of
     // them, and an equivalence cannot be half-written.
-    // NOT constrained here: `observation_only`.
-    //
-    // Codex is right that the governor emits it only when no verdict allows
-    // and none blocks, so listing it beside an allowance is a decision it
-    // cannot produce. I wrote that as a biconditional — implied whenever there
-    // are no verdicts — and it immediately failed fixtures whose outcome is
-    // `monitor` or `request_more_information` with no verdicts, which the
-    // governor also emits in that state. The one-directional rule (an
-    // allowance forbids it) is probably right, but "probably" is not a
-    // standard to add a safety invariant on, and I have not read the
-    // governor's outcome derivation closely enough to state it. Left open
-    // deliberately rather than guessed at.
     const verdictImplied: Record<string, boolean> = {
       block_action: policy.proposalVerdicts.some((v) => v.verdict === "block"),
       allow_low_risk_manual_action: policy.proposalVerdicts.some((v) => v.verdict === "allow"),
@@ -461,6 +449,22 @@ const executionPolicySchema = z
             : `outcomes_claim_${outcome}_without_a_verdict_implying_it`,
         });
       }
+    }
+
+    // The governor adds observation_only only when there is neither an allow
+    // nor a block outcome. It may legitimately accompany monitor or
+    // request_more_information, so this is intentionally one-directional
+    // rather than an incorrect "only outcome" or no-verdict biconditional.
+    if (
+      policy.outcomes.includes("observation_only") &&
+      (policy.outcomes.includes("allow_low_risk_manual_action") ||
+        policy.outcomes.includes("block_action"))
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["outcomes"],
+        message: "observation_only_cannot_coexist_with_action_outcome",
+      });
     }
 
     const expected = anyActionable ? "low_risk_manual_only" : "none";

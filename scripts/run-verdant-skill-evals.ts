@@ -590,6 +590,14 @@ export function main(argv: readonly string[]): MainResult {
   if (!Number.isFinite(args.repeat)) {
     return { code: EXIT_USAGE_OR_IO, lines: ["--repeat must be a positive integer"] };
   }
+  if (args.jsonOnly) {
+    return {
+      code: EXIT_USAGE_OR_IO,
+      lines: [
+        "--json-only is unsupported: evaluation runs require a complete four-file artifact set",
+      ],
+    };
+  }
   const skillId = args.selfTest ? "harness-self-test" : args.skillId;
   const skillVersion = args.selfTest ? "1.0.0" : args.skillVersion;
   if (skillId === null || skillVersion === null) {

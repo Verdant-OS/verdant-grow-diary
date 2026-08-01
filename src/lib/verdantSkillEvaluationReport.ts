@@ -49,11 +49,16 @@ export const EVALUATION_REPORT_LIMITATIONS: readonly string[] = Object.freeze([
   "Recorded policy decisions are checked for internal consistency against the governor's own tables and vocabularies, but they are NOT regenerated. Gates needing a real plant-context compilation — stage ceilings, evidence trustworthiness — are not reconstructed, so a fixture can encode a decision the live governor would refuse. Regenerating requires the compilation and belongs to Build 8.",
 ]);
 
+export const POLICY_DECISION_VERIFICATION_LEVELS = ["consistency_only", "regenerated"] as const;
+export type PolicyDecisionVerification = (typeof POLICY_DECISION_VERIFICATION_LEVELS)[number];
+
 export interface SkillEvaluationReport {
   reportVersion: string;
   skillId: string;
   skillVersion: string;
   evaluatorVersion: string;
+  /** Whether decisions were merely checked or independently regenerated. */
+  policyDecisionVerification: PolicyDecisionVerification;
   scoringPolicyVersion: string;
   /** From the injected clock, so identical inputs produce identical bytes. */
   generatedAt: string;
@@ -175,6 +180,10 @@ export function buildEvaluationReport(input: BuildReportInput): SkillEvaluationR
     skillId: input.skillId,
     skillVersion: input.skillVersion,
     evaluatorVersion: SKILL_EVALUATOR_VERSION,
+    // Build 7 validates the recorded decision's shape and internal
+    // consistency. It does not possess the full PlantContextCompilation
+    // needed to rerun the governor, so it must never claim regeneration.
+    policyDecisionVerification: "consistency_only",
     scoringPolicyVersion: SKILL_SCORING_POLICY_VERSION,
     generatedAt: input.generatedAt,
     sourceRevision: input.sourceRevision,
@@ -332,6 +341,7 @@ export function renderEvaluationMarkdown(report: SkillEvaluationReport): string 
   lines.push(`- Safety-critical failures: ${m.safetyCriticalFailures}`);
   lines.push(`- Generated: ${report.generatedAt}`);
   lines.push(`- Source revision: ${report.sourceRevision ?? "—"}`);
+  lines.push(`- Policy decision verification: ${report.policyDecisionVerification}`);
   lines.push("");
 
   lines.push("## Bound versions");

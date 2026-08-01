@@ -71,6 +71,8 @@ export const PROMOTION_BLOCKING_REASONS = [
    * implementation code changed but manifest/policy/evidence digests did not.
    */
   "source_revision_mismatch",
+  /** Build 7 consistency checks cannot authorize an exposure increase. */
+  "policy_decision_not_regenerated",
 ] as const;
 export type PromotionBlockingReason = (typeof PROMOTION_BLOCKING_REASONS)[number];
 
@@ -376,6 +378,9 @@ export function evaluateSkillPromotionEligibility(
         reportRevision !== decisionRevision
       ) {
         block("source_revision_mismatch");
+      }
+      if (report.policyDecisionVerification !== "regenerated") {
+        block("policy_decision_not_regenerated");
       }
     }
   }

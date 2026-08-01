@@ -7,7 +7,7 @@
  * ordinary scoring miss.
  */
 
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, it, expect } from "vitest";
@@ -894,6 +894,48 @@ describe("cli — untrusted fixture input", () => {
     expect(r.lines.join(" ")).toContain("without_a_verdict_implying_it");
   });
 
+  it("rejects observation_only beside an allowed action", () => {
+    const r = runWithMutated((record) => {
+      const execution = record.execution as Record<string, unknown>;
+      (execution.output as Record<string, unknown>).proposals = [PROPOSAL];
+      const policy = execution.policy as Record<string, unknown>;
+      policy.proposalVerdicts = [verdictFor("manual_only")];
+      policy.actionEligibility = "low_risk_manual_only";
+      policy.outcomes = ["allow_low_risk_manual_action", "observation_only"];
+      permitAction(record);
+    });
+    expect(r.code).toBe(EXIT_USAGE_OR_IO);
+    expect(r.lines.join(" ")).toContain("observation_only_cannot_coexist_with_action_outcome");
+  });
+
+  it("rejects observation_only beside a blocked action", () => {
+    const r = runWithMutated((record) => {
+      const execution = record.execution as Record<string, unknown>;
+      (execution.output as Record<string, unknown>).proposals = [PROPOSAL];
+      const policy = execution.policy as Record<string, unknown>;
+      policy.proposalVerdicts = [{ ...verdictFor("manual_only"), verdict: "block" }];
+      policy.actionEligibility = "none";
+      policy.outcomes = ["block_action", "observation_only"];
+    });
+    expect(r.code).toBe(EXIT_USAGE_OR_IO);
+    expect(r.lines.join(" ")).toContain("observation_only_cannot_coexist_with_action_outcome");
+  });
+
+  it("allows observation_only beside non-action outcomes", () => {
+    for (const outcome of ["monitor", "request_more_information"] as const) {
+      const r = runWithMutated((record) => {
+        const policy = (record.execution as { policy: Record<string, unknown> }).policy;
+        policy.proposalVerdicts = [];
+        policy.actionEligibility = "none";
+        policy.outcomes = [outcome, "observation_only"];
+      });
+      expect(r.code, outcome).not.toBe(EXIT_USAGE_OR_IO);
+      expect(r.lines.join(" "), outcome).not.toContain(
+        "observation_only_cannot_coexist_with_action_outcome",
+      );
+    }
+  });
+
   it("rejects outcomes omitting the block a verdict implies", () => {
     const r = runWithMutated((record) => {
       const execution = record.execution as Record<string, unknown>;
@@ -1107,6 +1149,17 @@ describe("cli — untrusted fixture input", () => {
 });
 
 describe("cli — self-test run", () => {
+  it("rejects json-only mode before writing an incomplete artifact set", () => {
+    const { result, out } = selfTest(["--json-only"]);
+    try {
+      expect(result.code).toBe(EXIT_USAGE_OR_IO);
+      expect(result.lines.join(" ")).toContain("complete four-file artifact set");
+      expect(readdirSync(out)).toEqual([]);
+    } finally {
+      rmSync(out, { recursive: true, force: true });
+    }
+  });
+
   it("passes and writes all four artifacts", () => {
     const { result, out } = selfTest(["--repeat", "2"]);
     try {

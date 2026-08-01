@@ -133,6 +133,20 @@ function report(cases: SkillEvaluationCaseResult[] = [caseResult()]): SkillEvalu
   });
 }
 
+/** Build 8 stand-in: promotion may consume, but Build 7 may not emit, this claim. */
+function regeneratedReport(
+  cases: SkillEvaluationCaseResult[] = [caseResult()],
+): SkillEvaluationReport {
+  const r = report(cases);
+  const regenerated: SkillEvaluationReport = {
+    ...r,
+    policyDecisionVerification: "regenerated",
+    reportBinding: null,
+  };
+  regenerated.reportBinding = computeBoundDigest("evaluation_report", regenerated, D);
+  return regenerated;
+}
+
 /**
  * A report whose contents no longer match its own binding.
  *
@@ -156,7 +170,7 @@ function decide(overrides: Partial<PromotionEligibilityInput> = {}) {
     targetSkillVersion: "1.0.0",
     currentState: "internal_sandbox",
     requestedState: "limited_beta",
-    report: report(),
+    report: regeneratedReport(),
     currentManifestDigest: MANIFEST_DIGEST,
     currentPolicyDigest: POLICY_DIGEST,
     currentEvidenceCorpusDigest: CORPUS_DIGEST,
@@ -170,6 +184,18 @@ function decide(overrides: Partial<PromotionEligibilityInput> = {}) {
 }
 
 describe("promotion — the happy path is the narrow one", () => {
+  it("blocks exposure when the report only consistency-checked recorded decisions", () => {
+    const d = decide({ report: report() });
+    expect(d.eligible).toBe(false);
+    expect(d.blockingReasons).toContain("policy_decision_not_regenerated");
+    expect(d.authorizedManifestLifecycle).toBeNull();
+  });
+
+  it("does not make decision regeneration a condition for withdrawal", () => {
+    const d = decide({ requestedState: "paused", report: report() });
+    expect(d.blockingReasons).not.toContain("policy_decision_not_regenerated");
+  });
+
   it("allows limited beta only with everything in place", () => {
     const d = decide();
     expect(d.eligible).toBe(true);

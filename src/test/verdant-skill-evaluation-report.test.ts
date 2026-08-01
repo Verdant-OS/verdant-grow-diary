@@ -209,6 +209,8 @@ describe("report — honest status", () => {
 
   it("states its own limitations in the artifact", () => {
     const r = report();
+    expect(r.policyDecisionVerification).toBe("consistency_only");
+    expect(renderEvaluationMarkdown(r)).toContain("Policy decision verification: consistency_only");
     expect(r.limitations).toEqual([...EVALUATION_REPORT_LIMITATIONS]);
     expect(r.limitations.join(" ")).toContain("not calibration");
     expect(r.limitations.join(" ")).toContain("No provider was called");

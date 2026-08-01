@@ -17,6 +17,10 @@ describe("create dialog hard-stop wiring", () => {
     expect(TENT).toMatch(/grow_id:\s*targetGrowId/);
     expect(TENT).toMatch(/growsError/);
     expect(TENT).not.toMatch(/if\s*\(defaultGrowId\)\s*payload\.grow_id/);
+    // Close/reopen must reset draft state (no stale name after dismiss).
+    expect(TENT).toMatch(/function handleOpenChange/);
+    expect(TENT).toMatch(/if\s*\(!next\)\s*resetForm\(\)/);
+    expect(TENT).toMatch(/onOpenChange=\{handleOpenChange\}/);
   });
 
   it("CreatePlantDialog fail-closed tent + grow contracts with debounced retries", () => {
@@ -29,5 +33,13 @@ describe("create dialog hard-stop wiring", () => {
     expect(PLANT).toMatch(/tentRetry\.gate\.disabled/);
     expect(PLANT).toMatch(/grow_id:\s*targetGrowId/);
     expect(PLANT).toMatch(/plantCreateAllowsTentless/);
+    // Background refetch must not authorize a stale supplied tent write.
+    expect(PLANT).toMatch(/isFetching:\s*tentsFetching/);
+    expect(PLANT).toMatch(/tentsFetching:\s*!!defaultTentId\s*&&\s*tentsFetching/);
+    // Unavailable/orphan/mismatch clear only after verified compatible replacement.
+    expect(PLANT).toMatch(/explicitCompatiblePick/);
+    expect(PLANT).toMatch(
+      /kind === "unavailable"[\s\S]*!explicitCompatiblePick|!explicitCompatiblePick[\s\S]*kind === "unavailable"/,
+    );
   });
 });

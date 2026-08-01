@@ -265,6 +265,8 @@ export interface SuppliedTentView {
 export function evaluateSuppliedTentBinding(input: {
   suppliedTentId?: string | null;
   tentsLoading?: boolean;
+  /** Background refetch — treat as pending so stale cached tents cannot authorize writes. */
+  tentsFetching?: boolean;
   tentsError?: boolean;
   suppliedTentRow?: { id: string; grow_id?: string | null } | null;
   targetGrowId?: string | null;
@@ -295,7 +297,7 @@ export function evaluateSuppliedTentBinding(input: {
     };
   }
 
-  if (input.tentsLoading || !input.tentsLoaded) {
+  if (input.tentsLoading || input.tentsFetching || !input.tentsLoaded) {
     return {
       kind: "pending",
       tentId: supplied,
@@ -396,10 +398,11 @@ export function evaluateTentGrowCompatibility(input: {
   /** When true (Add Plant to This Tent), "none" is not an allowed escape. */
   requireTentForWrite?: boolean;
   tentsLoading?: boolean;
+  tentsFetching?: boolean;
 }): TentCompatibilityResult {
   const tentId = trimId(input.selectedTentId);
 
-  if (input.tentsLoading && tentId && tentId !== "none") {
+  if ((input.tentsLoading || input.tentsFetching) && tentId && tentId !== "none") {
     return {
       kind: "pending",
       compatible: false,
@@ -485,21 +488,25 @@ export function resolveInitialPlantTentId(input: {
   tentGrowId?: string | null;
   targetGrowId?: string | null;
   tentsLoading?: boolean;
+  tentsFetching?: boolean;
   tentsError?: boolean;
   tentsLoaded?: boolean;
 }): string {
   const tentId = trimId(input.defaultTentId);
   if (!tentId) return "none";
 
+  const tentsSettled =
+    input.tentsLoaded && !input.tentsLoading && !input.tentsFetching;
+
   const supplied = evaluateSuppliedTentBinding({
     suppliedTentId: tentId,
     tentsLoading: input.tentsLoading,
+    tentsFetching: input.tentsFetching,
     tentsError: input.tentsError,
     tentsLoaded: input.tentsLoaded,
-    suppliedTentRow:
-      input.tentsLoaded && !input.tentsLoading
-        ? { id: tentId, grow_id: input.tentGrowId ?? null }
-        : null,
+    suppliedTentRow: tentsSettled
+      ? { id: tentId, grow_id: input.tentGrowId ?? null }
+      : null,
     targetGrowId: input.targetGrowId,
   });
 

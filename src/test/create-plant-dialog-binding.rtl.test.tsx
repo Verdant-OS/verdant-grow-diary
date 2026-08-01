@@ -8,6 +8,18 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+// Radix Select requires pointer-capture APIs that jsdom does not implement.
+const elementPrototype = Element.prototype as Element & {
+  hasPointerCapture?: () => boolean;
+  setPointerCapture?: () => void;
+  releasePointerCapture?: () => void;
+  scrollIntoView?: () => void;
+};
+if (!elementPrototype.hasPointerCapture) elementPrototype.hasPointerCapture = () => false;
+if (!elementPrototype.setPointerCapture) elementPrototype.setPointerCapture = () => {};
+if (!elementPrototype.releasePointerCapture) elementPrototype.releasePointerCapture = () => {};
+if (!elementPrototype.scrollIntoView) elementPrototype.scrollIntoView = () => {};
+
 const insertMock = vi.hoisted(() => vi.fn());
 const singleMock = vi.hoisted(() => vi.fn());
 const selectMock = vi.hoisted(() => vi.fn(() => ({ single: singleMock })));
@@ -59,6 +71,7 @@ vi.mock("@/store/grows", () => ({
 const tentsState = vi.hoisted(() => ({
   data: [] as Array<{ id: string; name: string; grow_id: string | null }>,
   isLoading: false,
+  isFetching: false,
   isError: false,
   isFetched: true,
   refetch: vi.fn(),
@@ -119,6 +132,7 @@ beforeEach(() => {
     { id: T_ORPHAN, name: "Orphan", grow_id: null },
   ];
   tentsState.isLoading = false;
+  tentsState.isFetching = false;
   tentsState.isError = false;
   tentsState.isFetched = true;
   tentsState.refetch = vi.fn();
@@ -192,6 +206,43 @@ describe("CreatePlantDialog RTL binding", () => {
     await userEvent.type(screen.getByTestId("create-plant-name"), "Plant Y");
     await userEvent.click(submit);
     expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("background tent refetch keeps supplied tent pending — zero inserts", async () => {
+    tentsState.isLoading = false;
+    tentsState.isFetching = true;
+    tentsState.isFetched = true;
+    renderDialog({ defaultGrowId: G1, defaultTentId: T1 });
+    expect(screen.getByTestId("create-plant-tent-pending")).toBeInTheDocument();
+    const submit = screen.getByTestId("plant-create-submit");
+    expect(submit).toBeDisabled();
+    await userEvent.type(screen.getByTestId("create-plant-name"), "Stale Plant");
+    await userEvent.click(submit);
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("unavailable supplied tent allows verified compatible replacement", async () => {
+    const T_MISSING = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+    const T_ALT = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+    tentsState.data = [{ id: T_ALT, name: "Tent B", grow_id: G1 }];
+    renderDialog({ defaultGrowId: G1, defaultTentId: T_MISSING });
+    expect(screen.getByTestId("create-plant-tent-unavailable")).toBeInTheDocument();
+    expect(screen.getByTestId("plant-create-submit")).toBeDisabled();
+
+    await userEvent.click(screen.getByTestId("create-plant-tent-select"));
+    const option = await screen.findByRole("option", { name: "Tent B" });
+    await userEvent.click(option);
+    await waitFor(() => {
+      expect(screen.queryByTestId("create-plant-tent-unavailable")).toBeNull();
+    });
+    await userEvent.type(screen.getByTestId("create-plant-name"), "Recovered");
+    await userEvent.click(screen.getByTestId("plant-create-submit"));
+    await waitFor(() => {
+      expect(insertMock).toHaveBeenCalled();
+    });
+    const payload = insertMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload.grow_id).toBe(G1);
+    expect(payload.tent_id).toBe(T_ALT);
   });
 
   it("happy path writes grow_id and tent_id", async () => {

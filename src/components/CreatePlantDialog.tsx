@@ -98,6 +98,7 @@ export default function CreatePlantDialog({
   const {
     data: allTents = [],
     isLoading: tentsLoading,
+    isFetching: tentsFetching,
     isError: tentsError,
     isFetched: tentsFetched,
     refetch: refetchTents,
@@ -139,6 +140,7 @@ export default function CreatePlantDialog({
       evaluateSuppliedTentBinding({
         suppliedTentId: defaultTentId,
         tentsLoading,
+        tentsFetching: !!defaultTentId && tentsFetching,
         tentsError,
         tentsLoaded,
         suppliedTentRow: suppliedTentRow
@@ -146,7 +148,15 @@ export default function CreatePlantDialog({
           : null,
         targetGrowId,
       }),
-    [defaultTentId, tentsLoading, tentsError, tentsLoaded, suppliedTentRow, targetGrowId],
+    [
+      defaultTentId,
+      tentsLoading,
+      tentsFetching,
+      tentsError,
+      tentsLoaded,
+      suppliedTentRow,
+      targetGrowId,
+    ],
   );
 
   const requireTentForWrite =
@@ -161,6 +171,7 @@ export default function CreatePlantDialog({
     tentGrowId: suppliedTentRow?.grow_id ?? null,
     targetGrowId,
     tentsLoading,
+    tentsFetching: !!defaultTentId && tentsFetching,
     tentsError,
     tentsLoaded,
   });
@@ -201,14 +212,18 @@ export default function CreatePlantDialog({
         requireTent ||
         !!defaultTentId),
     tentsLoading,
+    tentsFetching: !!defaultTentId && tentsFetching,
   });
 
+  // Unavailable/orphan/mismatch clear only after a verified compatible replacement.
+  // Pending always blocks (includes background refetch of a supplied tent).
   const tentBlocksWrite =
-    suppliedTent.blockSubmit &&
-    (suppliedTent.kind === "pending" ||
-      suppliedTent.kind === "unavailable" ||
-      ((suppliedTent.kind === "orphan" || suppliedTent.kind === "mismatch") &&
-        !explicitCompatiblePick)) ||
+    (suppliedTent.blockSubmit &&
+      (suppliedTent.kind === "pending" ||
+        ((suppliedTent.kind === "unavailable" ||
+          suppliedTent.kind === "orphan" ||
+          suppliedTent.kind === "mismatch") &&
+          !explicitCompatiblePick))) ||
     tentCompat.blockSubmit;
 
   const formBlocked =
@@ -438,7 +453,7 @@ export default function CreatePlantDialog({
             <span className="text-muted-foreground">{suppliedTent.body}</span>
           </p>
         )}
-        {suppliedTent.kind === "unavailable" && (
+        {suppliedTent.kind === "unavailable" && !explicitCompatiblePick && (
           <div
             className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs space-y-2"
             data-testid="create-plant-tent-unavailable"

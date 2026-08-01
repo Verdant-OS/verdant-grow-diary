@@ -152,6 +152,32 @@ describe("supplied tent contract", () => {
     expect(s.blockSubmit).toBe(true);
   });
 
+  it("treats background tent refetch as pending (no stale ready)", () => {
+    const s = evaluateSuppliedTentBinding({
+      suppliedTentId: "t1",
+      tentsLoading: false,
+      tentsFetching: true,
+      tentsLoaded: true,
+      suppliedTentRow: { id: "t1", grow_id: "g1" },
+      targetGrowId: "g1",
+    });
+    expect(s.kind).toBe("pending");
+    expect(s.blockSubmit).toBe(true);
+  });
+
+  it("blocks missing supplied tent as unavailable (replacement must be explicit)", () => {
+    const s = evaluateSuppliedTentBinding({
+      suppliedTentId: "t-missing",
+      tentsLoaded: true,
+      tentsLoading: false,
+      suppliedTentRow: null,
+      targetGrowId: "g1",
+    });
+    expect(s.kind).toBe("unavailable");
+    expect(s.blockSubmit).toBe(true);
+    expect(s.requireCompatibleTentSelection).toBe(true);
+  });
+
   it("blocks orphan/mismatch without clearing to tentless", () => {
     expect(
       evaluateSuppliedTentBinding({

@@ -87,7 +87,6 @@ export default function CreatePlantDialog({
   const { user } = useAuth();
   const { grows = [], activeGrowId, loading: growsLoading } = useGrows();
   const qc = useQueryClient();
-  const { grows, activeGrowId, loading: growsLoading, error: growsError, refresh } = useGrows();
   const { data: allTents = [] } = useTents();
 
   const targetGrowId = useMemo(
@@ -178,7 +177,6 @@ export default function CreatePlantDialog({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    e.stopPropagation();
     if (!user) {
       toast.error("Not signed in");
       return;
@@ -196,16 +194,6 @@ export default function CreatePlantDialog({
       toast.error("Choose the connected tent before creating this plant.");
       return;
     }
-    if (
-      tentState.kind === "tent_unavailable" ||
-      tentState.kind === "tent_not_in_setup" ||
-      tentState.kind === "different_setup"
-    ) {
-      setTentConflict(tentState);
-      setForm((f) => ({ ...f, tent_id: "none" }));
-      return;
-    }
-
     setBusy(true);
     const trimmedStrain = form.strain.trim();
     const payload: Record<string, unknown> = {
@@ -246,46 +234,6 @@ export default function CreatePlantDialog({
     setOpen(false);
     if (data && onCreated) onCreated(data as { id: string; name: string });
   }
-
-  function handleNestedTentCreated(tent: { id: string; name: string }) {
-    // Preserve every entered plant field; select the new tent only after
-    // verifying it belongs to the same resolved grow (the nested dialog
-    // was itself bound to resolvedGrowId).
-    if (!resolvedGrowId) return;
-    const verification = evaluatePlantTentBinding({
-      resolvedGrowId,
-      selectedTentId: tent.id,
-      requireTent,
-      // The newly created tent is grow-bound by the nested dialog; include
-      // it so verification can pass before the tents query refreshes.
-      tents: [...tentRows, { id: tent.id, grow_id: resolvedGrowId }],
-    });
-    if (verification.kind !== "ready") {
-      setTentConflict(verification);
-      return;
-    }
-    setForm((f) => ({ ...f, tent_id: tent.id }));
-    setTentConflict(null);
-  }
-
-  const showCreateForm = binding.kind === "ready";
-  const liveTentState =
-    showCreateForm && form.tent_id !== "none"
-      ? evaluatePlantTentBinding({
-          resolvedGrowId: binding.growId,
-          selectedTentId: form.tent_id,
-          requireTent,
-          tents: tentRows,
-        })
-      : null;
-  const activeConflict =
-    tentConflict ??
-    (liveTentState &&
-    (liveTentState.kind === "different_setup" ||
-      liveTentState.kind === "tent_not_in_setup" ||
-      liveTentState.kind === "tent_unavailable")
-      ? liveTentState
-      : null);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -387,32 +335,38 @@ export default function CreatePlantDialog({
               Only a name and stage are required to get started.
             </p>
           </div>
-        )}
-        {(binding.kind === "requested_setup_unavailable" || binding.kind === "choose_setup") && (
-          <div className="grid gap-3 py-2" data-testid="create-binding-choose-setup">
-            <p className="text-sm font-medium">{growSetupMessages.setupUnavailable.title}</p>
-            <p className="text-sm text-muted-foreground">
-              {growSetupMessages.setupUnavailable.body}
-            </p>
-            <Button asChild variant="outline">
-              <Link to={binding.chooseHref}>{growSetupMessages.setupUnavailable.cta}</Link>
-            </Button>
+          <div>
+            <Label>Stage</Label>
+            <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {STAGES.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>
+                    {s.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        )}
-        {showCreateForm && (
-          <>
-            <p className="text-xs text-muted-foreground -mt-1">
-              Start simple. You can add genetics, medium, dates, and notes later. Verdant works best
-              once your first plant memory exists.
-            </p>
-            <p
-              className="rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-xs"
-              data-testid="create-binding-context"
+          <div>
+            <Label>Type (optional)</Label>
+            <Select
+              value={form.plant_type}
+              onValueChange={(v) => setForm({ ...form, plant_type: v })}
             >
-              <span className="font-medium">
-                {growSetupMessages.create.addingTo(binding.setupName)}
-              </span>{" "}
-              <span className="text-muted-foreground">{growSetupMessages.create.addingToHint}</span>
+              <SelectTrigger data-testid="create-plant-type-select">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unknown">Not sure</SelectItem>
+                <SelectItem value="autoflower">Autoflower</SelectItem>
+                <SelectItem value="photoperiod">Photoperiod</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Helps AI Doctor stay gentle and keeps pheno comparisons honest.
             </p>
           </div>
           <div>
@@ -425,64 +379,68 @@ export default function CreatePlantDialog({
                   <Button
                     type="button"
                     size="sm"
-                    variant="outline"
-                    onClick={clearTentConflict}
-                    data-testid="create-binding-choose-tent"
+                    variant="ghost"
+                    className="h-7 px-2 gap-1 text-xs"
                   >
-                    {growSetupMessages.mismatch.ctaChooseTent}
+                    <Plus className="h-3 w-3" /> Add new tent
                   </Button>
-                  <Button asChild size="sm" variant="ghost">
-                    <Link to="/grows">{growSetupMessages.mismatch.ctaSwitchSetup}</Link>
-                  </Button>
-                </div>
-              </div>
+                }
+              />
+            </div>
+            <Select value={form.tent_id} onValueChange={(v) => setForm({ ...form, tent_id: v })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {!requireTent && <SelectItem value="none">No tent</SelectItem>}
+                {tents.map((t: { id: string; name: string }) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {tents.length === 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                No tents yet. Create a tent first.
+              </p>
             )}
-            <form onSubmit={submit} className="grid gap-3">
+          </div>
+          <details className="rounded-md border border-border/40 px-3 py-2">
+            <summary className="cursor-pointer text-xs text-muted-foreground select-none">
+              Optional details (enrich later)
+            </summary>
+            <div className="grid gap-3 pt-3">
               <div>
-                <Label>Name</Label>
+                <Label>Strain (optional)</Label>
                 <Input
-                  required
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="Plant A"
+                  value={form.strain}
+                  onChange={(e) => setForm({ ...form, strain: e.target.value })}
+                  placeholder="Blue Dream"
                 />
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  Only a name and stage are required to get started.
-                </p>
               </div>
               <div>
-                <Label>Stage</Label>
-                <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
+                <Label>Health</Label>
+                <Select value={form.health} onValueChange={(v) => setForm({ ...form, health: v })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {STAGES.map((s) => (
-                      <SelectItem key={s.value} value={s.value}>
-                        {s.label}
+                    {HEALTH.map((h) => (
+                      <SelectItem key={h.value} value={h.value}>
+                        {h.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label>Type (optional)</Label>
-                <Select
-                  value={form.plant_type}
-                  onValueChange={(v) => setForm({ ...form, plant_type: v })}
-                >
-                  <SelectTrigger data-testid="create-plant-type-select">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unknown">Not sure</SelectItem>
-                    <SelectItem value="autoflower">Autoflower</SelectItem>
-                    <SelectItem value="photoperiod">Photoperiod</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  Helps AI Doctor stay gentle and keeps pheno comparisons honest.
-                </p>
+                <Label>Started at (optional)</Label>
+                <Input
+                  type="date"
+                  value={form.started_at}
+                  onChange={(e) => setForm({ ...form, started_at: e.target.value })}
+                />
               </div>
             </div>
           </details>

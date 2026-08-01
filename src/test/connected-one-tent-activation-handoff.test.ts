@@ -50,8 +50,8 @@ describe("connected One-Tent activation handoff", () => {
     // Guided activation still requires a compatible tent.
     expect(PLANTS).toMatch(/requireTent=\{activationIntent\}/);
     // General creation may omit a tent but may not omit a verified grow.
-    expect(PLANT_DIALOG).toMatch(/grow_id:\s*binding\.growId/);
-    expect(TENT_DIALOG).toMatch(/buildTentInsertPayload\(/);
+    expect(PLANT_DIALOG).toMatch(/grow_id:\s*targetGrowId/);
+    expect(TENT_DIALOG).toMatch(/grow_id:\s*targetGrowId/);
   });
 
   it("uses one relationship-aware Dashboard checklist and removes the duplicate", () => {

@@ -5,6 +5,7 @@
  * choose_setup | ready.
  *
  * Explicit requested setup that cannot be verified NEVER falls back to active.
+ * Any grow-list load or refresh blocks writes, even when cached rows exist.
  * Supplied tent + loading/error/conflict NEVER degrades into a tentless write.
  *
  * Pure: no React, no Supabase.
@@ -49,6 +50,7 @@ export interface ResolveCreateTargetGrowResult {
 
 /**
  * Resolve write target:
+ * - loading/error → unresolved; cached rows are not write-authoritative
  * - explicit pageDefaultGrowId present + known → use it
  * - explicit present + unknown after successful load → unavailable (no active fallback)
  * - no explicit → active grow if known
@@ -65,12 +67,6 @@ export function resolveCreateTargetGrowId(input: {
   const explicitRequest = !!page;
 
   if (input.growsLoading || input.growsError) {
-    if (page && isKnownGrowId(page, input.grows)) {
-      return { targetGrowId: page, requestedSetupUnavailable: false, explicitRequest };
-    }
-    if (!page && active && isKnownGrowId(active, input.grows)) {
-      return { targetGrowId: active, requestedSetupUnavailable: false, explicitRequest };
-    }
     return { targetGrowId: null, requestedSetupUnavailable: false, explicitRequest };
   }
 
@@ -136,6 +132,24 @@ export function buildCreateGrowBindingView(
     retryLabel: GROW_SETUP_MESSAGES.readErrorRetry,
   };
 
+  // An active initial load or retry is the current truth, even when a prior
+  // settled read error is still present in provider state during revalidation.
+  if (input.growsLoading) {
+    return {
+      ...base,
+      kind: "loading",
+      blockSubmit: true,
+      showStartRoomHardStop: false,
+      showPickGrowHint: false,
+      showLoading: true,
+      showReadError: false,
+      showRequestedUnavailable: false,
+      toastMessage: GROW_SETUP_MESSAGES.loadingToast,
+      title: GROW_SETUP_MESSAGES.loadingTitle,
+      body: GROW_SETUP_MESSAGES.loadingBody,
+    };
+  }
+
   if (input.growsError) {
     return {
       ...base,
@@ -149,22 +163,6 @@ export function buildCreateGrowBindingView(
       toastMessage: GROW_SETUP_MESSAGES.readErrorTitle,
       title: GROW_SETUP_MESSAGES.readErrorTitle,
       body: GROW_SETUP_MESSAGES.readErrorBody,
-    };
-  }
-
-  if (input.growsLoading && growCount === 0) {
-    return {
-      ...base,
-      kind: "loading",
-      blockSubmit: true,
-      showStartRoomHardStop: false,
-      showPickGrowHint: false,
-      showLoading: true,
-      showReadError: false,
-      showRequestedUnavailable: false,
-      toastMessage: GROW_SETUP_MESSAGES.loadingToast,
-      title: GROW_SETUP_MESSAGES.loadingTitle,
-      body: GROW_SETUP_MESSAGES.loadingBody,
     };
   }
 
@@ -184,7 +182,7 @@ export function buildCreateGrowBindingView(
     };
   }
 
-  if (!input.growsLoading && growCount === 0) {
+  if (growCount === 0) {
     return {
       ...base,
       kind: "no_setup",

@@ -59,6 +59,34 @@ describe("resolveCreateTargetGrowId", () => {
     expect(r.requestedSetupUnavailable).toBe(true);
     expect(r.explicitRequest).toBe(true);
   });
+
+  it("does not resolve a cached requested or active setup while grows refresh", () => {
+    expect(
+      resolveCreateTargetGrowId({
+        pageDefaultGrowId: "g2",
+        activeGrowId: "g1",
+        grows,
+        growsLoading: true,
+      }),
+    ).toEqual({
+      targetGrowId: null,
+      requestedSetupUnavailable: false,
+      explicitRequest: true,
+    });
+
+    expect(
+      resolveCreateTargetGrowId({
+        pageDefaultGrowId: null,
+        activeGrowId: "g1",
+        grows,
+        growsLoading: true,
+      }),
+    ).toEqual({
+      targetGrowId: null,
+      requestedSetupUnavailable: false,
+      explicitRequest: false,
+    });
+  });
 });
 
 describe("buildCreateGrowBindingView", () => {
@@ -75,7 +103,7 @@ describe("buildCreateGrowBindingView", () => {
     expect(v.body).not.toMatch(/grow_id|orphan|lineage/i);
   });
 
-  it("distinguishes grow read error from zero-setup", () => {
+  it("distinguishes a settled grow read error from zero-setup", () => {
     const v = buildCreateGrowBindingView(
       {
         pageDefaultGrowId: null,
@@ -92,6 +120,25 @@ describe("buildCreateGrowBindingView", () => {
     expect(v.retryLabel).toMatch(/Retry/i);
   });
 
+  it("shows loading while retrying after a settled grow read error", () => {
+    const v = buildCreateGrowBindingView(
+      {
+        pageDefaultGrowId: "g1",
+        activeGrowId: "g1",
+        grows,
+        growsLoading: true,
+        growsError: true,
+      },
+      "plant",
+    );
+    expect(v.kind).toBe("loading");
+    expect(v.blockSubmit).toBe(true);
+    expect(v.targetGrowId).toBeNull();
+    expect(v.showLoading).toBe(true);
+    expect(v.showReadError).toBe(false);
+    expect(v.showStartRoomHardStop).toBe(false);
+  });
+
   it("blocks while loading with empty grow list", () => {
     const v = buildCreateGrowBindingView(
       {
@@ -105,6 +152,40 @@ describe("buildCreateGrowBindingView", () => {
     expect(v.kind).toBe("loading");
     expect(v.blockSubmit).toBe(true);
     expect(v.showStartRoomHardStop).toBe(false);
+  });
+
+  it("blocks while refreshing a cached valid setup", () => {
+    const v = buildCreateGrowBindingView(
+      {
+        pageDefaultGrowId: "g2",
+        activeGrowId: "g1",
+        grows,
+        growsLoading: true,
+      },
+      "plant",
+    );
+    expect(v.kind).toBe("loading");
+    expect(v.blockSubmit).toBe(true);
+    expect(v.targetGrowId).toBeNull();
+    expect(v.showLoading).toBe(true);
+    expect(canWriteCreateGrowId(v.targetGrowId)).toBe(false);
+  });
+
+  it("keeps an invalid explicit setup in loading state until refresh settles", () => {
+    const v = buildCreateGrowBindingView(
+      {
+        pageDefaultGrowId: "ghost",
+        activeGrowId: "g1",
+        grows,
+        growsLoading: true,
+      },
+      "plant",
+    );
+    expect(v.kind).toBe("loading");
+    expect(v.blockSubmit).toBe(true);
+    expect(v.targetGrowId).toBeNull();
+    expect(v.showRequestedUnavailable).toBe(false);
+    expect(v.showPickGrowHint).toBe(false);
   });
 
   it("blocks when grows exist but no resolvable target", () => {

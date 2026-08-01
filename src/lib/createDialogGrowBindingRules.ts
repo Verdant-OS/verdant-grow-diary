@@ -1,17 +1,20 @@
 /**
- * createDialogGrowBindingRules — pure resolver for create tent/plant grow binding.
+ * createDialogGrowBindingRules — pure fail-closed contract for create tent/plant.
  *
- * Fail closed when no resolvable setup; never optional-omit grow_id on write.
- * Hard-stop CTA uses one-tent activation on /grows (not a new route).
+ * States: loading | read_error | no_setup | requested_setup_unavailable |
+ * choose_setup | ready.
+ *
+ * Explicit requested setup that cannot be verified NEVER falls back to active.
+ * Supplied tent + loading/error/conflict NEVER degrades into a tentless write.
  *
  * Pure: no React, no Supabase.
  */
-import {
-  GROW_SETUP_MESSAGES,
-  GROW_SETUP_START_ROOM_HREF,
-} from "@/constants/growSetupMessages";
+import { GROW_SETUP_MESSAGES, GROW_SETUP_START_ROOM_HREF } from "@/constants/growSetupMessages";
 
 export type CreateBindingEntity = "tent" | "plant";
+
+export type CreateGrowBindingKind =
+  "loading" | "read_error" | "no_setup" | "requested_setup_unavailable" | "choose_setup" | "ready";
 
 export interface GrowListItem {
   id: string;
@@ -33,19 +36,50 @@ export function isKnownGrowId(
   return grows.some((g) => g.id === id);
 }
 
+export interface ResolveCreateTargetGrowResult {
+  targetGrowId: string | null;
+  requestedSetupUnavailable: boolean;
+  explicitRequest: boolean;
+}
+
 /**
- * Precedence: page/URL default, then active grow — only if present in loaded grows.
+ * Resolve write target:
+ * - explicit pageDefaultGrowId present + known → use it
+ * - explicit present + unknown after successful load → unavailable (no active fallback)
+ * - no explicit → active grow if known
  */
 export function resolveCreateTargetGrowId(input: {
   pageDefaultGrowId?: string | null;
   activeGrowId?: string | null;
   grows: readonly GrowListItem[];
-}): string | null {
+  growsLoading?: boolean;
+  growsError?: boolean;
+}): ResolveCreateTargetGrowResult {
   const page = trimId(input.pageDefaultGrowId);
-  if (page && isKnownGrowId(page, input.grows)) return page;
   const active = trimId(input.activeGrowId);
-  if (active && isKnownGrowId(active, input.grows)) return active;
-  return null;
+  const explicitRequest = !!page;
+
+  if (input.growsLoading || input.growsError) {
+    if (page && isKnownGrowId(page, input.grows)) {
+      return { targetGrowId: page, requestedSetupUnavailable: false, explicitRequest };
+    }
+    if (!page && active && isKnownGrowId(active, input.grows)) {
+      return { targetGrowId: active, requestedSetupUnavailable: false, explicitRequest };
+    }
+    return { targetGrowId: null, requestedSetupUnavailable: false, explicitRequest };
+  }
+
+  if (page) {
+    if (isKnownGrowId(page, input.grows)) {
+      return { targetGrowId: page, requestedSetupUnavailable: false, explicitRequest };
+    }
+    return { targetGrowId: null, requestedSetupUnavailable: true, explicitRequest };
+  }
+
+  if (active && isKnownGrowId(active, input.grows)) {
+    return { targetGrowId: active, requestedSetupUnavailable: false, explicitRequest };
+  }
+  return { targetGrowId: null, requestedSetupUnavailable: false, explicitRequest };
 }
 
 export function resolveSetupName(
@@ -59,126 +93,371 @@ export function resolveSetupName(
   return name && name.length > 0 ? name : null;
 }
 
-export interface CreateGrowBindingHardStopView {
+export interface CreateGrowBindingView {
+  kind: CreateGrowBindingKind;
   blockSubmit: boolean;
+  targetGrowId: string | null;
   showStartRoomHardStop: boolean;
   showPickGrowHint: boolean;
   showLoading: boolean;
+  showReadError: boolean;
+  showRequestedUnavailable: boolean;
   toastMessage: string | null;
   startRoomHref: string;
-  hardStopTitle: string;
-  hardStopBody: string;
-  hardStopCta: string;
-  hardStopSecondary: string;
+  title: string;
+  body: string;
+  primaryCta: string;
+  secondaryCta: string;
+  retryLabel: string;
 }
 
-export function buildCreateGrowBindingHardStop(
+export function buildCreateGrowBindingView(
   input: {
-    targetGrowId: string | null | undefined;
-    growCount: number;
+    pageDefaultGrowId?: string | null;
+    activeGrowId?: string | null;
+    grows: readonly GrowListItem[];
     growsLoading?: boolean;
+    growsError?: boolean;
   },
   entity: CreateBindingEntity,
-): CreateGrowBindingHardStopView {
-  const growCount =
-    typeof input.growCount === "number" && Number.isFinite(input.growCount)
-      ? Math.max(0, Math.floor(input.growCount))
-      : 0;
-  const hasTarget = !!trimId(input.targetGrowId);
-  const loading = !!input.growsLoading && growCount === 0;
+): CreateGrowBindingView {
+  const growCount = input.grows.length;
+  const resolved = resolveCreateTargetGrowId(input);
+  const base = {
+    targetGrowId: resolved.targetGrowId,
+    startRoomHref: GROW_SETUP_START_ROOM_HREF,
+    primaryCta: GROW_SETUP_MESSAGES.hardStopCta,
+    secondaryCta: GROW_SETUP_MESSAGES.hardStopSecondary,
+    retryLabel: GROW_SETUP_MESSAGES.readErrorRetry,
+  };
 
-  if (loading) {
+  if (input.growsError) {
     return {
+      ...base,
+      kind: "read_error",
+      blockSubmit: true,
+      showStartRoomHardStop: false,
+      showPickGrowHint: false,
+      showLoading: false,
+      showReadError: true,
+      showRequestedUnavailable: false,
+      toastMessage: GROW_SETUP_MESSAGES.readErrorTitle,
+      title: GROW_SETUP_MESSAGES.readErrorTitle,
+      body: GROW_SETUP_MESSAGES.readErrorBody,
+    };
+  }
+
+  if (input.growsLoading && growCount === 0) {
+    return {
+      ...base,
+      kind: "loading",
       blockSubmit: true,
       showStartRoomHardStop: false,
       showPickGrowHint: false,
       showLoading: true,
+      showReadError: false,
+      showRequestedUnavailable: false,
       toastMessage: GROW_SETUP_MESSAGES.loadingToast,
-      startRoomHref: GROW_SETUP_START_ROOM_HREF,
-      hardStopTitle: "",
-      hardStopBody: "",
-      hardStopCta: GROW_SETUP_MESSAGES.hardStopCta,
-      hardStopSecondary: GROW_SETUP_MESSAGES.hardStopSecondary,
+      title: GROW_SETUP_MESSAGES.loadingTitle,
+      body: GROW_SETUP_MESSAGES.loadingBody,
     };
   }
 
-  if (growCount === 0) {
+  if (resolved.requestedSetupUnavailable) {
     return {
+      ...base,
+      kind: "requested_setup_unavailable",
+      blockSubmit: true,
+      showStartRoomHardStop: false,
+      showPickGrowHint: false,
+      showLoading: false,
+      showReadError: false,
+      showRequestedUnavailable: true,
+      toastMessage: GROW_SETUP_MESSAGES.requestedUnavailableTitle,
+      title: GROW_SETUP_MESSAGES.requestedUnavailableTitle,
+      body: GROW_SETUP_MESSAGES.requestedUnavailableBody,
+    };
+  }
+
+  if (!input.growsLoading && growCount === 0) {
+    return {
+      ...base,
+      kind: "no_setup",
       blockSubmit: true,
       showStartRoomHardStop: true,
       showPickGrowHint: false,
       showLoading: false,
+      showReadError: false,
+      showRequestedUnavailable: false,
       toastMessage: GROW_SETUP_MESSAGES.hardStopTitle,
-      startRoomHref: GROW_SETUP_START_ROOM_HREF,
-      hardStopTitle: GROW_SETUP_MESSAGES.hardStopTitle,
-      hardStopBody: GROW_SETUP_MESSAGES.hardStopBody,
-      hardStopCta: GROW_SETUP_MESSAGES.hardStopCta,
-      hardStopSecondary: GROW_SETUP_MESSAGES.hardStopSecondary,
+      title: GROW_SETUP_MESSAGES.hardStopTitle,
+      body: GROW_SETUP_MESSAGES.hardStopBody,
     };
   }
 
-  if (!hasTarget) {
+  if (!resolved.targetGrowId) {
     return {
+      ...base,
+      kind: "choose_setup",
       blockSubmit: true,
       showStartRoomHardStop: false,
       showPickGrowHint: true,
       showLoading: false,
+      showReadError: false,
+      showRequestedUnavailable: false,
       toastMessage: GROW_SETUP_MESSAGES.pickSetupToast(entity),
-      startRoomHref: GROW_SETUP_START_ROOM_HREF,
-      hardStopTitle: "",
-      hardStopBody: "",
-      hardStopCta: GROW_SETUP_MESSAGES.hardStopCta,
-      hardStopSecondary: GROW_SETUP_MESSAGES.hardStopSecondary,
+      title: "",
+      body: GROW_SETUP_MESSAGES.pickSetupToast(entity),
     };
   }
 
   return {
+    ...base,
+    kind: "ready",
     blockSubmit: false,
     showStartRoomHardStop: false,
     showPickGrowHint: false,
     showLoading: false,
+    showReadError: false,
+    showRequestedUnavailable: false,
     toastMessage: null,
-    startRoomHref: GROW_SETUP_START_ROOM_HREF,
-    hardStopTitle: "",
-    hardStopBody: "",
-    hardStopCta: GROW_SETUP_MESSAGES.hardStopCta,
-    hardStopSecondary: GROW_SETUP_MESSAGES.hardStopSecondary,
+    title: "",
+    body: "",
   };
 }
 
-/** True only when a non-empty grow id is ready for payload.grow_id. */
 export function canWriteCreateGrowId(targetGrowId: string | null | undefined): boolean {
   return !!trimId(targetGrowId);
 }
 
-export type TentCompatibilityKind = "ok" | "missing_target" | "orphan_tent" | "mismatch";
+// --- Supplied / selected tent contract ------------------------------------
+
+export type SuppliedTentKind = "none" | "pending" | "unavailable" | "orphan" | "mismatch" | "ready";
+
+export interface SuppliedTentView {
+  kind: SuppliedTentKind;
+  tentId: string | null;
+  blockSubmit: boolean;
+  requireCompatibleTentSelection: boolean;
+  /**
+   * When true, an explicit grower pick of a different tent that matches the
+   * target setup may clear the supplied-tent submit block.
+   * Read errors stay false — Retry only, never write on stale/error tent data.
+   */
+  allowCompatibleReplacement: boolean;
+  title: string;
+  body: string;
+  showRetry: boolean;
+}
+
+const SUPPLIED_TENT_NONE: SuppliedTentView = {
+  kind: "none",
+  tentId: null,
+  blockSubmit: false,
+  requireCompatibleTentSelection: false,
+  allowCompatibleReplacement: false,
+  title: "",
+  body: "",
+  showRetry: false,
+};
+
+/**
+ * Contract for a tent supplied by the page (e.g. TentDetail "Add plant to this tent").
+ * Never degrades a supplied tent into an unrestricted tentless create.
+ */
+export function evaluateSuppliedTentBinding(input: {
+  suppliedTentId?: string | null;
+  tentsLoading?: boolean;
+  /** Background refetch must stay pending — cached rows are not yet revalidated. */
+  tentsFetching?: boolean;
+  tentsError?: boolean;
+  suppliedTentRow?: { id: string; grow_id?: string | null } | null;
+  targetGrowId?: string | null;
+  tentsLoaded?: boolean;
+}): SuppliedTentView {
+  const supplied = trimId(input.suppliedTentId);
+  if (!supplied) {
+    return SUPPLIED_TENT_NONE;
+  }
+
+  if (input.tentsError) {
+    return {
+      kind: "unavailable",
+      tentId: supplied,
+      blockSubmit: true,
+      requireCompatibleTentSelection: true,
+      // Fail closed on tent read failure — Retry only, no replacement write path.
+      allowCompatibleReplacement: false,
+      title: GROW_SETUP_MESSAGES.tentUnavailableTitle,
+      body: GROW_SETUP_MESSAGES.tentUnavailableBody,
+      showRetry: true,
+    };
+  }
+
+  // Initial load OR background refetch: never treat cached rows as verified.
+  if (input.tentsLoading || input.tentsFetching || !input.tentsLoaded) {
+    return {
+      kind: "pending",
+      tentId: supplied,
+      blockSubmit: true,
+      requireCompatibleTentSelection: true,
+      allowCompatibleReplacement: false,
+      title: GROW_SETUP_MESSAGES.tentPendingTitle,
+      body: GROW_SETUP_MESSAGES.tentPendingBody,
+      showRetry: false,
+    };
+  }
+
+  const row = input.suppliedTentRow;
+  if (!row || row.id !== supplied) {
+    return {
+      kind: "unavailable",
+      tentId: supplied,
+      blockSubmit: true,
+      requireCompatibleTentSelection: true,
+      // Successful load proved the supplied tent is gone — grower may pick another
+      // compatible tent for this setup. Still never tentless-escape.
+      allowCompatibleReplacement: true,
+      title: GROW_SETUP_MESSAGES.tentUnavailableTitle,
+      body: GROW_SETUP_MESSAGES.tentUnavailableBody,
+      showRetry: true,
+    };
+  }
+
+  const target = trimId(input.targetGrowId);
+  const tentGrow = trimId(row.grow_id);
+
+  if (!target) {
+    return {
+      kind: "pending",
+      tentId: supplied,
+      blockSubmit: true,
+      requireCompatibleTentSelection: true,
+      allowCompatibleReplacement: false,
+      title: GROW_SETUP_MESSAGES.tentPendingTitle,
+      body: GROW_SETUP_MESSAGES.tentPendingBody,
+      showRetry: false,
+    };
+  }
+
+  if (!tentGrow) {
+    return {
+      kind: "orphan",
+      tentId: supplied,
+      blockSubmit: true,
+      requireCompatibleTentSelection: true,
+      allowCompatibleReplacement: true,
+      title: GROW_SETUP_MESSAGES.tentOrphanTitle,
+      body: GROW_SETUP_MESSAGES.tentOrphanBody,
+      showRetry: false,
+    };
+  }
+
+  if (tentGrow !== target) {
+    return {
+      kind: "mismatch",
+      tentId: supplied,
+      blockSubmit: true,
+      requireCompatibleTentSelection: true,
+      allowCompatibleReplacement: true,
+      title: GROW_SETUP_MESSAGES.tentMismatchTitle,
+      body: GROW_SETUP_MESSAGES.tentMismatchBody,
+      showRetry: false,
+    };
+  }
+
+  return {
+    kind: "ready",
+    tentId: supplied,
+    blockSubmit: false,
+    requireCompatibleTentSelection: false,
+    allowCompatibleReplacement: false,
+    title: "",
+    body: "",
+    showRetry: false,
+  };
+}
+
+/**
+ * Whether the supplied-tent contract still blocks submit.
+ * An explicit compatible replacement clears the block only when the pure view
+ * allows it (orphan/mismatch/missing-after-load). Tent read errors never clear.
+ */
+export function suppliedTentBlocksWrite(
+  supplied: SuppliedTentView,
+  explicitCompatiblePick: boolean,
+): boolean {
+  if (!supplied.blockSubmit) return false;
+  if (supplied.kind === "pending") return true;
+  if (
+    explicitCompatiblePick &&
+    supplied.allowCompatibleReplacement &&
+    (supplied.kind === "orphan" || supplied.kind === "mismatch" || supplied.kind === "unavailable")
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export type TentCompatibilityKind =
+  | "ok"
+  | "missing_target"
+  | "orphan_tent"
+  | "mismatch"
+  | "pending"
+  | "unavailable"
+  | "required_missing";
 
 export interface TentCompatibilityResult {
   kind: TentCompatibilityKind;
   compatible: boolean;
   title: string;
   body: string;
-  /** When true, clear tent selection and block submit. */
+  /** Never true for a still-supplied tent — callers must not tentless-escape. */
   clearTentSelection: boolean;
+  blockSubmit: boolean;
 }
 
-/**
- * Selected tent must match target setup when a tent is chosen.
- * "none" / empty tent is compatible for generic plant create (unless requireTent elsewhere).
- */
 export function evaluateTentGrowCompatibility(input: {
   selectedTentId: string | null | undefined;
   tentGrowId: string | null | undefined;
   targetGrowId: string | null | undefined;
+  /** When true (Add Plant to This Tent), "none" is not an allowed escape. */
+  requireTentForWrite?: boolean;
+  tentsLoading?: boolean;
+  tentsFetching?: boolean;
 }): TentCompatibilityResult {
   const tentId = trimId(input.selectedTentId);
+
+  if ((input.tentsLoading || input.tentsFetching) && tentId && tentId !== "none") {
+    return {
+      kind: "pending",
+      compatible: false,
+      title: GROW_SETUP_MESSAGES.tentPendingTitle,
+      body: GROW_SETUP_MESSAGES.tentPendingBody,
+      clearTentSelection: false,
+      blockSubmit: true,
+    };
+  }
+
   if (!tentId || tentId === "none") {
+    if (input.requireTentForWrite) {
+      return {
+        kind: "required_missing",
+        compatible: false,
+        title: GROW_SETUP_MESSAGES.tentRequiredTitle,
+        body: GROW_SETUP_MESSAGES.tentRequiredBody,
+        clearTentSelection: false,
+        blockSubmit: true,
+      };
+    }
     return {
       kind: "ok",
       compatible: true,
       title: "",
       body: "",
       clearTentSelection: false,
+      blockSubmit: false,
     };
   }
 
@@ -189,7 +468,8 @@ export function evaluateTentGrowCompatibility(input: {
       compatible: false,
       title: GROW_SETUP_MESSAGES.hardStopTitle,
       body: GROW_SETUP_MESSAGES.hardStopBody,
-      clearTentSelection: true,
+      clearTentSelection: false,
+      blockSubmit: true,
     };
   }
 
@@ -200,7 +480,8 @@ export function evaluateTentGrowCompatibility(input: {
       compatible: false,
       title: GROW_SETUP_MESSAGES.tentOrphanTitle,
       body: GROW_SETUP_MESSAGES.tentOrphanBody,
-      clearTentSelection: true,
+      clearTentSelection: false,
+      blockSubmit: true,
     };
   }
 
@@ -210,7 +491,8 @@ export function evaluateTentGrowCompatibility(input: {
       compatible: false,
       title: GROW_SETUP_MESSAGES.tentMismatchTitle,
       body: GROW_SETUP_MESSAGES.tentMismatchBody,
-      clearTentSelection: true,
+      clearTentSelection: false,
+      blockSubmit: true,
     };
   }
 
@@ -220,21 +502,48 @@ export function evaluateTentGrowCompatibility(input: {
     title: "",
     body: "",
     clearTentSelection: false,
+    blockSubmit: false,
   };
 }
 
-/** Initial tent_id for plant form: drop incompatible defaultTentId. */
+/**
+ * Initial tent form value. Supplied tent is preserved until known-compatible;
+ * never silent "none" while a supplied tent is still required.
+ */
 export function resolveInitialPlantTentId(input: {
   defaultTentId?: string | null;
   tentGrowId?: string | null;
   targetGrowId?: string | null;
+  tentsLoading?: boolean;
+  tentsFetching?: boolean;
+  tentsError?: boolean;
+  tentsLoaded?: boolean;
 }): string {
   const tentId = trimId(input.defaultTentId);
   if (!tentId) return "none";
-  const compat = evaluateTentGrowCompatibility({
-    selectedTentId: tentId,
-    tentGrowId: input.tentGrowId,
+
+  const tentsSettled = !!input.tentsLoaded && !input.tentsLoading && !input.tentsFetching;
+
+  const supplied = evaluateSuppliedTentBinding({
+    suppliedTentId: tentId,
+    tentsLoading: input.tentsLoading,
+    tentsFetching: input.tentsFetching,
+    tentsError: input.tentsError,
+    tentsLoaded: input.tentsLoaded,
+    suppliedTentRow: tentsSettled ? { id: tentId, grow_id: input.tentGrowId ?? null } : null,
     targetGrowId: input.targetGrowId,
   });
-  return compat.compatible ? tentId : "none";
+
+  if (supplied.kind === "ready") return tentId;
+  if (supplied.kind !== "none") return tentId;
+  return "none";
+}
+
+export function plantCreateAllowsTentless(input: {
+  suppliedTentId?: string | null;
+  requireTent?: boolean;
+}): boolean {
+  if (input.requireTent) return false;
+  if (trimId(input.suppliedTentId)) return false;
+  return true;
 }

@@ -126,7 +126,10 @@ describe("CreatePlantDialog — first-run simplification", () => {
 
   it("preserves existing richer fields (health, started_at, tent picker) for editing", () => {
     expect(CREATE_PLANT).toMatch(/Health/);
-    expect(CREATE_PLANT).toMatch(/Tent\{requireTent \? "" : " \(optional\)"\}/);
+    // Optional label is gated by plantCreateAllowsTentless (supplied tent / requireTent).
+    expect(CREATE_PLANT).toMatch(
+      /Tent[\s\S]*?requireTentForWrite[\s\S]*?plantCreateAllowsTentless\([\s\S]*?\)[\s\S]*?\? ""[\s\S]*?: " \(optional\)"/,
+    );
     expect(CREATE_PLANT).toMatch(/Add new tent/);
   });
 

@@ -53,7 +53,9 @@ describe("Quick creation shortcuts — CreatePlantDialog → Add new tent", () =
   });
 
   it("auto-selects the newly created tent on onCreated callback", () => {
-    expect(CREATE_PLANT).toMatch(/onCreated=\{\(t\)\s*=>\s*setForm\(\(f\)\s*=>\s*\(\{\s*\.\.\.f,\s*tent_id:\s*t\.id\s*\}\)\)\}/);
+    expect(CREATE_PLANT).toMatch(/onCreated=\{\(t\)\s*=>\s*\{/);
+    expect(CREATE_PLANT).toMatch(/tent_id:\s*t\.id/);
+    expect(CREATE_PLANT).toMatch(/setExplicitCompatiblePick\(true\)/);
   });
 
   it("preserves plant form data via functional setState (no full reset)", () => {
@@ -75,15 +77,21 @@ describe("Quick creation shortcuts — CreatePlantDialog → Add new tent", () =
 
 describe("Quick creation shortcuts — CreateTentDialog onCreated contract", () => {
   it("exposes an optional onCreated callback in its Props", () => {
-    expect(CREATE_TENT).toMatch(/onCreated\?:\s*\(tent:\s*\{\s*id:\s*string;\s*name:\s*string\s*\}\)\s*=>\s*void/);
+    expect(CREATE_TENT).toMatch(
+      /onCreated\?:\s*\(tent:\s*\{\s*id:\s*string;\s*name:\s*string\s*\}\)\s*=>\s*void/,
+    );
   });
 
-  it("returns the inserted row via select(\"id, name\").single()", () => {
-    expect(CREATE_TENT).toMatch(/\.insert\(payload as never\)\s*\.select\("id, name"\)\s*\.single\(\)/);
+  it('returns the inserted row via select("id, name").single()', () => {
+    expect(CREATE_TENT).toMatch(
+      /\.insert\(payload as never\)\s*\.select\("id, name"\)\s*\.single\(\)/,
+    );
   });
 
   it("invokes onCreated only on successful insert", () => {
-    expect(CREATE_TENT).toMatch(/if\s*\(data\s*&&\s*onCreated\)\s*onCreated\(data as \{ id: string; name: string \}\)/);
+    expect(CREATE_TENT).toMatch(
+      /if\s*\(data\s*&&\s*onCreated\)\s*onCreated\(data as \{ id: string; name: string \}\)/,
+    );
   });
 });
 

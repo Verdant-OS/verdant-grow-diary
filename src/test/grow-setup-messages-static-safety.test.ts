@@ -19,6 +19,15 @@ describe("grow setup messages static safety", () => {
     expect(MSG).toMatch(/one_tent_activation/);
   });
 
+  it("hardStopBody matches grow-first destination without guided-wizard claim", () => {
+    expect(GROW_SETUP_MESSAGES.hardStopBody).toBe(
+      "You need a setup before adding a tent or plant. Create your grow next—then add a tent and plant so Quick Log works.",
+    );
+    expect(GROW_SETUP_MESSAGES.hardStopBody.toLowerCase()).not.toMatch(
+      /we(?:'|’)ll walk|guided path|walk grow/,
+    );
+  });
+
   it("grower-facing strings avoid banned tokens", () => {
     const surfaces = Object.values(GROW_SETUP_MESSAGES)
       .map((v) => (typeof v === "function" ? v("plant") : v))

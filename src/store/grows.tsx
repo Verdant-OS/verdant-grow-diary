@@ -4,6 +4,7 @@ import { useAuth } from "./auth";
 import type { GrowRow } from "@/lib/db";
 import { ENTRY_CREATED_EVENT } from "@/lib/dailyCheckRefreshRules";
 import { growIdFromEntryCreatedDetail } from "@/lib/quickLogPostSaveScopeRules";
+import { getStoredActiveGrowId, setStoredActiveGrowId } from "@/lib/activeGrowPreferences";
 
 export type Grow = GrowRow;
 
@@ -21,17 +22,29 @@ const GrowsCtx = createContext<Ctx>({} as Ctx);
 export function GrowsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [grows, setGrows] = useState<Grow[]>([]);
-  const [activeGrowId, _setActive] = useState<string | null>(() =>
-    localStorage.getItem("verdant.activeGrow"),
-  );
+  // Start null until user id is known — never read bare shared key without scoping.
+  const [activeGrowId, _setActive] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const setActiveGrowId = useCallback((id: string | null) => {
-    _setActive(id);
-    if (id) localStorage.setItem("verdant.activeGrow", id);
-    else localStorage.removeItem("verdant.activeGrow");
-  }, []);
+  const setActiveGrowId = useCallback(
+    (id: string | null) => {
+      _setActive(id);
+      if (user?.id) {
+        setStoredActiveGrowId(user.id, id);
+      }
+    },
+    [user?.id],
+  );
+
+  // Load / clear per-user active grow when auth identity changes.
+  useEffect(() => {
+    if (!user?.id) {
+      _setActive(null);
+      return;
+    }
+    _setActive(getStoredActiveGrowId(user.id));
+  }, [user?.id]);
 
   const refresh = useCallback(async () => {
     if (!user) {
@@ -61,12 +74,13 @@ export function GrowsProvider({ children }: { children: ReactNode }) {
     refresh();
   }, [refresh]);
 
-  // Auto-select first grow if none selected
+  // Auto-select first grow if none selected (or stored grow is gone).
   useEffect(() => {
+    if (!user?.id) return;
     if (!activeGrowId && grows.length > 0) setActiveGrowId(grows[0].id);
     if (activeGrowId && grows.length > 0 && !grows.find((g) => g.id === activeGrowId))
       setActiveGrowId(grows[0].id);
-  }, [grows, activeGrowId, setActiveGrowId]);
+  }, [user?.id, grows, activeGrowId, setActiveGrowId]);
 
   // After Quick Log (any surface), pin active grow to the grow that received
   // the log so /logs and dashboard scope show the new entry immediately.

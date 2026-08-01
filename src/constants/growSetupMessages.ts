@@ -13,7 +13,7 @@ export const GROW_SETUP_FINISH_SETUP_HREF = "/grow-lineage" as const;
 export const growSetup = {
   noSetup: {
     title: "Start your room first",
-    body: "You need a setup before adding a tent or plant. Next you’ll name your grow—then we’ll add tent and plant so Quick Log works right away.",
+    body: "You need a setup before adding a tent or plant. Create your grow next—then add a tent and plant so Quick Log works.",
     ctaStart: "Start your room",
     ctaDismiss: "Not now",
   },

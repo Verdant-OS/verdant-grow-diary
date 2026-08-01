@@ -12,6 +12,14 @@ export const GROW_SETUP_MESSAGES = {
   hardStopCta: "Start your room",
   hardStopSecondary: "Not now",
   loadingToast: "Still loading your setups — try again in a moment",
+  loadingTitle: "Loading your setups…",
+  loadingBody: "We’re checking which setup this should use. Nothing has been created yet.",
+  readErrorTitle: "Current setup unavailable",
+  readErrorBody: "Nothing has been created. Check your connection and try again.",
+  readErrorRetry: "Retry",
+  requestedUnavailableTitle: "That setup isn’t available",
+  requestedUnavailableBody:
+    "We couldn’t use the setup you asked for. Nothing has been created. Open your setups list and pick a valid one.",
   pickSetupToast: (entity: "tent" | "plant") =>
     `Pick which setup this ${entity} belongs to first`,
   addingTo: (setupName: string) => `Adding to ${setupName}`,
@@ -19,7 +27,15 @@ export const GROW_SETUP_MESSAGES = {
   tentMismatchTitle: "This tent is in another setup",
   tentMismatchBody: "Choose a tent in your current setup, or switch setups.",
   tentOrphanTitle: "Finish setup",
-  tentOrphanBody: "This tent isn’t linked to a setup yet. Choose another tent, or finish setup first.",
+  tentOrphanBody:
+    "This tent isn’t linked to a setup yet. Choose another tent, or finish setup first.",
+  tentPendingTitle: "Checking this tent…",
+  tentPendingBody: "We’re confirming the tent you picked. Nothing has been created yet.",
+  tentUnavailableTitle: "This tent isn’t available",
+  tentUnavailableBody:
+    "We couldn’t load that tent. Nothing has been created. Retry, or choose another tent.",
+  tentRequiredTitle: "Choose the tent",
+  tentRequiredBody: "You started from a tent. Pick a compatible tent before creating a plant.",
   chooseTent: "Choose tent",
   switchSetup: "Switch setup",
   finishSetup: "Finish setup",

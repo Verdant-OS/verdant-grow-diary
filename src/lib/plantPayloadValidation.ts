@@ -6,6 +6,8 @@
  *    payloads that would fail the DB CHECK/NOT NULL constraints, so the UI
  *    never posts a plant missing `name`, a valid `stage`/`health`, or a
  *    canonical `plant_type`.
+ *  - Client create path requires `grow_id` (UUID) so new plants cannot ship
+ *    unbound. Inbound row reads still allow legacy null grow links.
  *  - `validatePlantRowResponse` guards inbound rows from Lovable Cloud so a
  *    row missing `plant_type` (schema drift, cached response, RPC bypass)
  *    cannot reach the UI silently as a "photoperiod" default.
@@ -26,6 +28,8 @@ const uuid = z.string().regex(UUID_RE, "must be a UUID");
  * Outbound insert payload contract. Mirrors the plants-table NOT NULL/CHECK
  * columns. `plant_type` is required and canonicalized before it leaves the
  * client — "unknown" is a legitimate value, blank/garbage is not.
+ * `grow_id` is required for new client creates (setup binding fail-closed).
+ * `tent_id` stays optional outside guided activation.
  */
 export const PlantInsertPayloadSchema = z
   .object({
@@ -36,7 +40,7 @@ export const PlantInsertPayloadSchema = z
     health: z.enum(HEALTHS),
     plant_type: z.enum(PLANT_TYPE_VALUES as readonly [PlantType, ...PlantType[]]),
     tent_id: uuid.optional(),
-    grow_id: uuid.optional(),
+    grow_id: uuid,
     started_at: z.string().datetime().optional(),
   })
   .strict();

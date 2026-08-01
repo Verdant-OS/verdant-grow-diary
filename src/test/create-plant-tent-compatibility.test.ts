@@ -1,39 +1,49 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import {
+  evaluateSuppliedTentBinding,
   evaluateTentGrowCompatibility,
-  resolveInitialPlantTentId,
+  plantCreateAllowsTentless,
 } from "@/lib/createDialogGrowBindingRules";
 
-const ROOT = resolve(__dirname, "../..");
-const PLANT = readFileSync(resolve(ROOT, "src/components/CreatePlantDialog.tsx"), "utf8");
-
 describe("create plant tent compatibility", () => {
-  it("dialog clears incompatible tent and surfaces mismatch UI", () => {
-    expect(PLANT).toMatch(/evaluateTentGrowCompatibility/);
-    expect(PLANT).toMatch(/resolveInitialPlantTentId/);
-    expect(PLANT).toMatch(/create-plant-tent-mismatch/);
-    expect(PLANT).toMatch(/clearTentSelection|tent_id:\s*"none"/);
+  it("supplied tent never allows tentless escape", () => {
+    expect(plantCreateAllowsTentless({ suppliedTentId: "t1" })).toBe(false);
   });
 
-  it("orphan default tent cannot remain selected under known grow", () => {
-    expect(
-      resolveInitialPlantTentId({
-        defaultTentId: "t-bad",
-        tentGrowId: null,
+  it("pending/error/conflict block submit with zero silent clear-to-none", () => {
+    for (const r of [
+      evaluateSuppliedTentBinding({
+        suppliedTentId: "t1",
+        tentsLoading: true,
+        tentsLoaded: false,
         targetGrowId: "g1",
       }),
-    ).toBe("none");
+      evaluateSuppliedTentBinding({
+        suppliedTentId: "t1",
+        tentsError: true,
+        tentsLoaded: true,
+        targetGrowId: "g1",
+      }),
+      evaluateSuppliedTentBinding({
+        suppliedTentId: "t1",
+        tentsLoaded: true,
+        suppliedTentRow: { id: "t1", grow_id: null },
+        targetGrowId: "g1",
+      }),
+    ]) {
+      expect(r.blockSubmit).toBe(true);
+      expect(r.tentId).toBe("t1");
+    }
   });
 
-  it("mismatch tent blocks write path", () => {
+  it("requireTentForWrite blocks none selection", () => {
     const r = evaluateTentGrowCompatibility({
-      selectedTentId: "t1",
-      tentGrowId: "other",
+      selectedTentId: "none",
+      tentGrowId: null,
       targetGrowId: "g1",
+      requireTentForWrite: true,
     });
     expect(r.compatible).toBe(false);
-    expect(r.clearTentSelection).toBe(true);
+    expect(r.blockSubmit).toBe(true);
   });
 });

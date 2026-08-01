@@ -2,22 +2,30 @@
 
 Product rules for **Create tent** / **Create plant** on the production deploy branch.
 
-## Behavior
+## States
 
-- Resolved setup = page `?growId=` (when valid) then **current active setup**.
-- **Always** write `grow_id` on successful create; never optional-omit.
-- Zero setups → hard-stop: **Start your room first** → `/grows?intent=one_tent_activation`.
-- Orphan / mismatched tent selection cannot reach insert.
+| Kind | Grower sees | Submit |
+| --- | --- | --- |
+| `loading` | Loading your setups… | blocked |
+| `read_error` | Current setup unavailable + **Retry** | blocked (never Start your room) |
+| `no_setup` | Start your room first | blocked → `/grows?intent=one_tent_activation` |
+| `requested_setup_unavailable` | That setup isn’t available | blocked (no active fallback) |
+| `choose_setup` | Pick which setup… | blocked |
+| `ready` | Adding to {name} | allowed when tent contract ok |
 
-## Grower-facing copy
+## Supplied tent (“Add Plant to This Tent”)
 
-| Situation | Copy |
+| Kind | Behavior |
 | --- | --- |
-| No setup | Start your room first / need a setup before adding tent or plant |
-| Primary CTA | Start your room |
-| Known setup | Adding to {name} / This will live in your current setup |
-| Wrong tent | This tent is in another setup |
+| pending | Keep tent id; block submit |
+| unavailable | Retry; block submit |
+| orphan / mismatch | Presenter blocked; explicit compatible tent required; **zero inserts** |
+| ready | Write with grow_id + tent_id |
 
-Do **not** show: `grow_id`, orphan, lineage, backfill.
+Never degrade a supplied tent into an unrestricted tentless create.
 
-Source: `src/constants/growSetupMessages.ts`, `src/lib/createDialogGrowBindingRules.ts`.
+## Client insert schema
+
+`PlantInsertPayloadSchema.grow_id` is **required UUID**. Legacy null-linked rows remain readable on inbound guards.
+
+Source: `createDialogGrowBindingRules.ts`, `growSetupMessages.ts`, `plantPayloadValidation.ts`.

@@ -7,25 +7,20 @@ const TENT = readFileSync(resolve(ROOT, "src/components/CreateTentDialog.tsx"), 
 const PLANT = readFileSync(resolve(ROOT, "src/components/CreatePlantDialog.tsx"), "utf8");
 
 describe("create dialog hard-stop wiring", () => {
-  it("CreateTentDialog hard-stops and always writes grow_id from resolver", () => {
-    expect(TENT).toMatch(/buildCreateGrowBindingHardStop/);
-    expect(TENT).toMatch(/resolveCreateTargetGrowId/);
+  it("CreateTentDialog uses binding view + grow_id write + read error path", () => {
+    expect(TENT).toMatch(/buildCreateGrowBindingView/);
     expect(TENT).toMatch(/create-tent-hard-stop/);
-    expect(TENT).toMatch(/create-tent-start-room-cta/);
-    expect(TENT).toMatch(/hardStop\.startRoomHref|one_tent_activation/);
+    expect(TENT).toMatch(/create-tent-read-error/);
+    expect(TENT).toMatch(/create-tent-requested-unavailable/);
     expect(TENT).toMatch(/grow_id:\s*targetGrowId/);
-    expect(TENT).toMatch(/hardStop\.blockSubmit/);
+    expect(TENT).toMatch(/binding\.blockSubmit/);
   });
 
-  it("CreatePlantDialog hard-stops and always writes grow_id", () => {
-    expect(PLANT).toMatch(/buildCreateGrowBindingHardStop/);
-    expect(PLANT).toMatch(/create-plant-hard-stop/);
-    expect(PLANT).toMatch(/create-plant-start-room-cta/);
+  it("CreatePlantDialog supplied-tent pending/error/conflict wiring", () => {
+    expect(PLANT).toMatch(/evaluateSuppliedTentBinding/);
+    expect(PLANT).toMatch(/create-plant-tent-pending/);
+    expect(PLANT).toMatch(/create-plant-tent-unavailable/);
+    expect(PLANT).toMatch(/create-plant-read-error/);
     expect(PLANT).toMatch(/grow_id:\s*targetGrowId/);
-    expect(PLANT).toMatch(/evaluateTentGrowCompatibility/);
-  });
-
-  it("no optional omit of grow_id on tent submit", () => {
-    expect(TENT).not.toMatch(/if\s*\(defaultGrowId\)\s*payload\.grow_id/);
   });
 });

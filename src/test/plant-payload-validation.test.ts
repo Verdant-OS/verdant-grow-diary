@@ -7,6 +7,7 @@ import {
 
 const UUID_A = "11111111-1111-1111-1111-111111111111";
 const UUID_B = "22222222-2222-2222-2222-222222222222";
+const UUID_G = "33333333-3333-3333-3333-333333333333";
 
 describe("validatePlantInsertPayload", () => {
   const base = {
@@ -16,12 +17,33 @@ describe("validatePlantInsertPayload", () => {
     stage: "seedling",
     health: "healthy",
     plant_type: "unknown",
+    grow_id: UUID_G,
   };
 
-  it("accepts a canonical payload", () => {
+  it("accepts a canonical payload with grow_id", () => {
     const r = validatePlantInsertPayload(base);
     expect(r.ok).toBe(true);
     expect(r.value?.plant_type).toBe("unknown");
+    expect(r.value?.grow_id).toBe(UUID_G);
+  });
+
+  it("rejects missing grow_id", () => {
+    const { grow_id: _g, ...rest } = base;
+    const r = validatePlantInsertPayload(rest);
+    expect(r.ok).toBe(false);
+    expect(r.errors.join()).toMatch(/grow_id/i);
+  });
+
+  it("rejects invalid grow_id", () => {
+    const r = validatePlantInsertPayload({ ...base, grow_id: "not-a-uuid" });
+    expect(r.ok).toBe(false);
+    expect(r.errors.join()).toMatch(/grow_id/i);
+  });
+
+  it("allows optional tent_id", () => {
+    const r = validatePlantInsertPayload({ ...base, tent_id: UUID_B });
+    expect(r.ok).toBe(true);
+    expect(r.value?.tent_id).toBe(UUID_B);
   });
 
   it("rejects a missing name", () => {
@@ -70,8 +92,13 @@ describe("validatePlantRowResponse", () => {
     expect(r.value?.plant_type).toBe("unknown");
   });
 
-  it("passes through valid rows", () => {
-    const r = validatePlantRowResponse({ id: UUID_A, name: "P", plant_type: "autoflower" });
+  it("passes through valid rows (legacy null grow still readable)", () => {
+    const r = validatePlantRowResponse({
+      id: UUID_A,
+      name: "P",
+      plant_type: "autoflower",
+      grow_id: null,
+    });
     expect(r.ok).toBe(true);
     expect(r.value?.plant_type).toBe("autoflower");
   });

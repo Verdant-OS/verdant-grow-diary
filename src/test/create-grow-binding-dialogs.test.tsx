@@ -305,6 +305,55 @@ describe("create dialogs — remaining fail-closed behavior", () => {
     expect(mocks.inserts).toHaveLength(0);
   });
 
+  it("closes and resets an open nested tent writer when the supplied-tent read blocks", async () => {
+    useReadyGrow();
+    const compatibleTent = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+    mocks.tents.data = [{ id: compatibleTent, name: "Compatible Tent", grow_id: mocks.growId }];
+    const user = userEvent.setup();
+    renderDialog(<CreatePlantDialog initiallyOpen defaultTentId={compatibleTent} />);
+
+    await user.click(await screen.findByRole("button", { name: "Add new tent" }));
+    const tentName = screen.getByPlaceholderText("Tent #1");
+    await user.type(tentName, "Must reset");
+    expect(screen.getByTestId("tent-create-submit")).toBeEnabled();
+
+    mocks.tents.isFetching = true;
+    // The mocked hook is not reactive; this parent state update models the
+    // render that React Query emits when isFetching changes in production.
+    fireEvent.change(screen.getByPlaceholderText("Plant A"), {
+      target: { value: "Pending render" },
+    });
+
+    expect(screen.getByTestId("create-plant-tent-pending")).toBeInTheDocument();
+    expect(screen.queryByTestId("tent-create-submit")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add new tent" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("plant-create-submit")).toBeDisabled();
+    expect(mocks.inserts.filter((call) => call.table === "tents")).toHaveLength(0);
+    expect(mocks.inserts.filter((call) => call.table === "plants")).toHaveLength(0);
+
+    mocks.tents.isFetching = false;
+    mocks.tents.isError = true;
+    fireEvent.change(screen.getByPlaceholderText("Plant A"), {
+      target: { value: "Error render" },
+    });
+
+    expect(screen.getByTestId("create-plant-tent-unavailable")).toBeInTheDocument();
+    expect(screen.getByTestId("create-plant-tent-retry")).toBeInTheDocument();
+    expect(screen.queryByTestId("tent-create-submit")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add new tent" })).not.toBeInTheDocument();
+    expect(mocks.inserts.filter((call) => call.table === "tents")).toHaveLength(0);
+    expect(mocks.inserts.filter((call) => call.table === "plants")).toHaveLength(0);
+
+    mocks.tents.isError = false;
+    fireEvent.change(screen.getByPlaceholderText("Plant A"), {
+      target: { value: "Recovered render" },
+    });
+    await user.click(await screen.findByRole("button", { name: "Add new tent" }));
+
+    expect(screen.getByPlaceholderText("Tent #1")).toHaveValue("");
+    expect(mocks.inserts).toHaveLength(0);
+  });
+
   it("keeps fields and accepts a verified nested tent while the remote list loads", async () => {
     useReadyGrow();
     mocks.tents.isLoading = true;

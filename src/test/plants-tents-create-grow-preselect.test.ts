@@ -76,7 +76,7 @@ describe("Plants/Tents — preselect grow on create", () => {
   it("Create dialogs fail closed without resolvable target", () => {
     // Pin the full gate formula — not just one token from the expression.
     expect(CREATE_TENT).toMatch(
-      /const formBlocked = binding\.blockSubmit \|\| !canWriteCreateGrowId\(targetGrowId\)/,
+      /const formBlocked =\s*writeBlocked \|\| binding\.blockSubmit \|\| !canWriteCreateGrowId\(targetGrowId\)/,
     );
     expect(CREATE_PLANT).toMatch(
       /const formBlocked[\s\S]*binding\.blockSubmit[\s\S]*!canWriteCreateGrowId\(targetGrowId\)[\s\S]*tentBlocksWrite/,

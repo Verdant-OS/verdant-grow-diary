@@ -72,6 +72,9 @@ describe("Quick creation shortcuts — CreatePlantDialog → Add new tent", () =
 
   it("forwards only the resolved grow to the nested tent creator", () => {
     expect(CREATE_PLANT).toMatch(
+      /<CreateTentDialog[\s\S]*?writeBlocked=\{nestedTentCreateBlocked\}/,
+    );
+    expect(CREATE_PLANT).toMatch(
       /<CreateTentDialog[\s\S]*?defaultGrowId=\{targetGrowId\s*\?\?\s*undefined\}/,
     );
     expect(CREATE_PLANT).not.toMatch(

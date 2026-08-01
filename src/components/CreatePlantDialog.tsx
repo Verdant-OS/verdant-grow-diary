@@ -669,6 +669,7 @@ export default function CreatePlantDialog({
                 </Label>
                 {nestedTentCreatorMounted && (
                   <CreateTentDialog
+                    writeBlocked={nestedTentCreateBlocked}
                     defaultGrowId={targetGrowId ?? undefined}
                     onCreated={handleNestedTentCreated}
                     trigger={

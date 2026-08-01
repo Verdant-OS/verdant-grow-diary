@@ -102,8 +102,7 @@ export function validatePlantGrowContextForMerge(
   if (!s) {
     return {
       ok: false,
-      reason:
-        "This plant is missing grow context. Assign it to a tent in a grow before merging.",
+      reason: "This plant is missing grow context. Assign it to a tent in a grow before merging.",
       sourceEffectiveGrowId: s,
       targetEffectiveGrowId: t,
     };
@@ -111,8 +110,7 @@ export function validatePlantGrowContextForMerge(
   if (!t) {
     return {
       ok: false,
-      reason:
-        "Target plant is missing grow context. Assign it to a tent in a grow before merging.",
+      reason: "Target plant is missing grow context. Assign it to a tent in a grow before merging.",
       sourceEffectiveGrowId: s,
       targetEffectiveGrowId: t,
     };
@@ -136,4 +134,87 @@ export function findPlantsMissingGrowContext<T extends PlantGrowContextInput>(
   plants: readonly T[],
 ): T[] {
   return plants.filter((p) => !p.grow_id);
+}
+
+export type PlantGrowContextRescueKind =
+  "already_ok" | "repair_from_tent" | "needs_tent" | "needs_setup";
+
+export interface PlantGrowContextRescueView {
+  kind: PlantGrowContextRescueKind;
+  /** When non-null, one-click write uses this payload (ONLY grow_id from tent). */
+  payload: { grow_id: string } | null;
+  title: string;
+  description: string;
+  ctaLabel: string | null;
+  secondaryHref: string | null;
+  secondaryLabel: string | null;
+  targetSetupLabel: string | null;
+}
+
+/**
+ * Plant Detail rescue view-model. Tent-derived repair only — never assigns
+ * active grow or rewrites tents.
+ */
+export function resolvePlantGrowContextRescueView(input: {
+  plant: PlantGrowContextInput;
+  tents?: readonly TentGrowLink[];
+  tentSetupName?: string | null;
+}): PlantGrowContextRescueView {
+  const tents = input.tents ?? [];
+  const plant = input.plant;
+
+  if (plant.grow_id) {
+    return {
+      kind: "already_ok",
+      payload: null,
+      title: "",
+      description: "",
+      ctaLabel: null,
+      secondaryHref: null,
+      secondaryLabel: null,
+      targetSetupLabel: null,
+    };
+  }
+
+  if (canRepairPlantGrowContextFromTent(plant, tents)) {
+    const payload = buildPlantGrowContextRepairPayload(plant, tents)!;
+    const label = input.tentSetupName?.trim() || null;
+    return {
+      kind: "repair_from_tent",
+      payload,
+      title: "Finish setup for this plant",
+      description:
+        "This plant sits in a tent that already belongs to a setup, but the plant wasn't linked yet. One click links it so Quick Log and your timeline work.",
+      ctaLabel: label ? `Link to tent setup (${label})` : "Link to tent setup",
+      secondaryHref: null,
+      secondaryLabel: null,
+      targetSetupLabel: label,
+    };
+  }
+
+  if (!plant.tent_id) {
+    return {
+      kind: "needs_tent",
+      payload: null,
+      title: "Assign this plant to a tent",
+      description:
+        "Quick Log and your timeline need a tent in a setup. Assign a tent first, then return here if linking is still needed.",
+      ctaLabel: null,
+      secondaryHref: null,
+      secondaryLabel: null,
+      targetSetupLabel: null,
+    };
+  }
+
+  return {
+    kind: "needs_setup",
+    payload: null,
+    title: "Finish setup",
+    description:
+      "This tent isn't linked to a setup yet. Finish setup for the tent, or choose another tent, before logging for this plant.",
+    ctaLabel: null,
+    secondaryHref: "/grows?intent=one_tent_activation",
+    secondaryLabel: "Finish setup",
+    targetSetupLabel: null,
+  };
 }

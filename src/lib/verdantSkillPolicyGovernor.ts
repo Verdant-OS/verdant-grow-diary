@@ -499,25 +499,186 @@ function collectStrings(value: unknown, path: string, out: { path: string; text:
  * carry a full irrigation instruction in `hypotheses[].rationale` — the
  * `proposals_require_ok_status` invariant gates proposals, and nothing else.
  */
-const GOVERNED_RESULT_KEYS: Record<keyof SkillRunResult, "governed" | "exempt_structural"> = {
-  contractVersion: "exempt_structural",
-  runId: "exempt_structural",
-  skillId: "exempt_structural",
-  skillVersion: "exempt_structural",
-  status: "exempt_structural",
-  startedAt: "exempt_structural",
-  completedAt: "exempt_structural",
-  contextVersion: "exempt_structural",
-  evidence: "governed",
-  hypotheses: "governed",
-  confidence: "exempt_structural",
-  proposals: "governed",
-  followUps: "governed",
-  error: "governed",
-};
+export const GOVERNED_RESULT_KEYS: Record<keyof SkillRunResult, "governed" | "exempt_structural"> =
+  {
+    contractVersion: "exempt_structural",
+    runId: "exempt_structural",
+    skillId: "exempt_structural",
+    skillVersion: "exempt_structural",
+    status: "exempt_structural",
+    startedAt: "exempt_structural",
+    completedAt: "exempt_structural",
+    contextVersion: "exempt_structural",
+    evidence: "governed",
+    hypotheses: "governed",
+    confidence: "exempt_structural",
+    proposals: "governed",
+    followUps: "governed",
+    error: "governed",
+  };
+
+/**
+ * EVERY rule code that causes `block()` — structural as well as linguistic.
+ *
+ * The linguistic ones come from BLOCKING_FAMILIES below; these are raised
+ * structurally and have no prose to detect, so a consumer scanning only the
+ * families misses them entirely.
+ *
+ * This listed FIVE when written, and there are nine. The search that produced
+ * it required the code on the same line as `block(`, and four calls span
+ * lines — so a list asserting its own completeness was wrong the moment it
+ * was committed. When adding a code, check every `block(` site across
+ * newlines, not by eye.
+ */
+export const STRUCTURAL_BLOCKING_RULE_CODES: readonly SkillPolicyRuleCode[] = Object.freeze([
+  "autoflower_stress_blocked",
+  "capability_exceeds_manifest",
+  "confidence_below_action_floor",
+  "plant_identity_contradictory",
+  "proposal_evidence_untrustworthy",
+  "risk_exceeds_confidence_ceiling",
+  "risk_exceeds_declared_class",
+  "stage_forbids_intervention_class",
+  "unresolved_follow_up_open",
+]);
+
+/**
+ * Rule codes that `blockAll()` seeds onto every proposal (`manifestBlocks`).
+ *
+ * These fire with `subject: "run"` and `proposalId: null`. The live governor
+ * starts every proposal as blocked when any of these are present. An offline
+ * harness that only correlates `firedRules` by non-null `proposalId` therefore
+ * never sees them contradict an attached `allow` verdict — the P1 this list
+ * exists to close. Keep in lockstep with every `blockAll(` site.
+ *
+ * Informational run-scoped fires (`cap()`, stage notes, withheld-channel
+ * linguistic hits) are intentionally absent: they lower ceilings or withhold
+ * non-proposal prose without forcing every proposal to block.
+ */
+export const RUN_SCOPED_BLOCKING_RULE_CODES: readonly SkillPolicyRuleCode[] = Object.freeze([
+  "applicability_blocked",
+  "applicability_manifest_mismatch",
+  "confidence_input_mismatch",
+  "contract_version_mismatch",
+  "contract_violation",
+  "context_version_mismatch",
+  "evidence_policy_unsatisfied",
+  "manifest_lifecycle_blocked",
+  "manifest_run_mismatch",
+  "proposal_without_grant",
+  "run_status_not_ok",
+]);
+
+/**
+ * Proposal-local note() codes: always subject "proposal" with a non-null
+ * proposalId. Not blocking by themselves, but they still have a canonical
+ * attachment shape the live governor never violates.
+ */
+export const PROPOSAL_SCOPED_NOTE_RULE_CODES: readonly SkillPolicyRuleCode[] = Object.freeze([
+  "autoflower_status_unknown",
+  "autoflower_stress_capped",
+  "declared_risk_below_derived_floor",
+  "intervention_class_unknown",
+  "prior_recommendation_unresolved",
+  "recent_intervention_same_class",
+]);
+
+/**
+ * Informational run-scoped fires (`cap()`, stage notes, confidence ceilings).
+ * Always `subject: "run"` and `proposalId: null` — never a proposal attachment.
+ */
+export const RUN_SCOPED_INFORMATIONAL_RULE_CODES: readonly SkillPolicyRuleCode[] = Object.freeze([
+  "applicability_partial",
+  "completeness_low",
+  "conflicting_telemetry",
+  "contested_evidence_surfaced",
+  "contested_evidence_withheld",
+  "evidence_confidence_overstated",
+  "evidence_review_stale",
+  "missing_required_context",
+  "no_evidence_retrieved",
+  "photo_only_evidence",
+  "photo_quality_poor",
+  "photo_quality_unknown",
+  "photo_single_view",
+  "provenance_blocked",
+  "stage_forbids_proposals",
+  "stage_unknown",
+]);
+
+/**
+ * Canonical subject + proposalId shape the live governor emits for a code.
+ *
+ * Used by the evaluation fixture schema so a fabricated
+ * `{ code: "proposal_without_grant", subject: "evidence", proposalId: null }`
+ * cannot strip a run-wide block by parking it on a channel the evaluator
+ * ignores. Linguistic families may appear on proposals (blocked content) or
+ * at run scope / withheld channels (proposalId null); everything else is
+ * either run/null or proposal/id.
+ */
+export type CanonicalFiredRuleSubject =
+  | "run"
+  | "proposal"
+  | "hypothesis"
+  | "follow_up"
+  | "evidence";
+
+export interface CanonicalFiredRuleShape {
+  /** Subjects the governor can attach this code under. */
+  readonly allowedSubjects: readonly CanonicalFiredRuleSubject[];
+  /**
+   * - `null` — proposalId must be null
+   * - `required` — proposalId must be a non-empty string
+   * - `by_subject` — null when subject is not "proposal"; required when it is
+   */
+  readonly proposalId: "null" | "required" | "by_subject";
+}
+
+export function canonicalFiredRuleShape(code: SkillPolicyRuleCode): CanonicalFiredRuleShape {
+  if ((RUN_SCOPED_BLOCKING_RULE_CODES as readonly string[]).includes(code)) {
+    return { allowedSubjects: ["run"], proposalId: "null" };
+  }
+  if ((RUN_SCOPED_INFORMATIONAL_RULE_CODES as readonly string[]).includes(code)) {
+    return { allowedSubjects: ["run"], proposalId: "null" };
+  }
+  if ((STRUCTURAL_BLOCKING_RULE_CODES as readonly string[]).includes(code)) {
+    return { allowedSubjects: ["proposal"], proposalId: "required" };
+  }
+  if ((PROPOSAL_SCOPED_NOTE_RULE_CODES as readonly string[]).includes(code)) {
+    return { allowedSubjects: ["proposal"], proposalId: "required" };
+  }
+  // Linguistic blocking families: proposal-local blocks, or run/withheld
+  // channel bookkeeping (subject run / hypothesis / follow_up / evidence).
+  if (BLOCKING_FAMILIES.some((family) => family.code === code)) {
+    return {
+      allowedSubjects: ["run", "proposal", "hypothesis", "follow_up", "evidence"],
+      proposalId: "by_subject",
+    };
+  }
+  // Fail closed for any code that gained a fire site without a shape entry:
+  // run/null is the governor's default for unattached structural fires.
+  return { allowedSubjects: ["run"], proposalId: "null" };
+}
+
+/** True when a recorded fired rule matches the governor's emission shape. */
+export function isCanonicalFiredRule(rule: {
+  code: string;
+  subject: string;
+  proposalId: string | null;
+}): boolean {
+  if (!(SKILL_POLICY_RULE_CODES as readonly string[]).includes(rule.code)) return false;
+  const shape = canonicalFiredRuleShape(rule.code as SkillPolicyRuleCode);
+  if (!(shape.allowedSubjects as readonly string[]).includes(rule.subject)) return false;
+  const id = rule.proposalId;
+  if (shape.proposalId === "null") return id === null;
+  if (shape.proposalId === "required") return typeof id === "string" && id.length > 0;
+  // by_subject
+  if (rule.subject === "proposal") return typeof id === "string" && id.length > 0;
+  return id === null;
+}
 
 /** Families that block outright: no legitimate use in an advisory proposal. */
-const BLOCKING_FAMILIES: readonly {
+export const BLOCKING_FAMILIES: readonly {
   readonly code: SkillPolicyRuleCode;
   readonly patterns: readonly RegExp[];
   /** Prohibition-aware: "Do not turn on the fan" is not an instruction. */

@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-08-01.2**
+**Sentinel-Version: 2026-08-01.3**
 
 This is Verdant's universal Sentinel Code. Every agent inherits these durable product,
 engineering, data, safety, and release rules. Platform-specific bootstraps live at the
@@ -587,3 +587,41 @@ Use these values literally. Never turn a blocked or unmeasured verification into
 Never invent search volume, traffic, keyword difficulty, CPC, domain rating, backlink
 counts, conversion rates, audience sizes, sensor health, or deployment/indexing outcomes.
 Record the authorized source and provenance for every material measurement.
+
+---
+
+## Cursor Cloud specific instructions
+
+Durable notes for cloud agents. The VM startup update script already runs
+`bun install --frozen-lockfile`, so dependencies are refreshed before you start; do not
+re-run installs unless a run fails on a missing/updated package.
+
+- **Stack & authoritative run guide.** React + Vite + TypeScript SPA (port **8080**) backed
+  by a **hosted** Supabase project. The public anon key and URL are committed in `.env`, so
+  **no local Supabase stack is needed to run the app**. The authoritative run/build/test
+  guide is `.claude/skills/run-verdant-grow-diary/SKILL.md`; `README.md` has the overview.
+  Read the skill before driving the app — do not duplicate its commands here.
+- **Package manager is bun.** In the Cursor Cloud VM `bun install --frozen-lockfile` works
+  against the public registry — the SKILL's private-registry `403` warning does **not** apply
+  here, so prefer bun over the npm fallback. `bun` is symlinked at `/usr/local/bin/bun` so it
+  resolves in non-login shells (including the startup update script).
+- **Dev server.** `bun run dev -- --host 127.0.0.1 --port 8080`, then browse
+  `http://127.0.0.1:8080`. Bind IPv4 (`127.0.0.1`) and port 8080 explicitly — Vite's default
+  host `::` is unreliable in this container (see the SKILL "Gotchas").
+- **Lint / typecheck / test / build.** `bun run lint`, `bun run typecheck`,
+  `bunx vitest run <files>` (the full suite is very large — prefer targeted files or the
+  `test:full:shard*` scripts), `bun run build` (its postbuild step runs the SEO/JSON-LD
+  validators).
+- **Browser / e2e.** Playwright chromium is installed at the default `~/.cache/ms-playwright`
+  (not `/opt/pw-browsers` as the SKILL mentions); `.claude/skills/run-verdant-grow-diary/driver.mjs`
+  falls back to bundled chromium automatically. If a browser is ever missing after a
+  dependency bump, run `bunx playwright install chromium`. Mocked specs
+  (`--project=chromium-mocked`) need no credentials; authenticated flows need real Supabase
+  creds and the golden-path UI spec skips as BLOCKED without a managed session.
+- **Credential-free smoke surfaces.** To exercise core functionality without logging in:
+  `/quick-log` (Quick Log starter — saves a draft locally), `/tools/vpd-calculator`, and
+  `/internal/demo-proof-walkthrough`.
+- **Governance edit gate.** If you change **any** governance file (`AGENTS.md`, `CLAUDE.md`,
+  `GEMINI.md`, `.grok/rules/**`, `docs/agents/**`) you must bump `Sentinel-Version` in **all**
+  of them in the same commit — the `sentinel-version-parity` CI gate enforces both PARITY
+  (all versions equal) and BUMP (changed content requires a new version).

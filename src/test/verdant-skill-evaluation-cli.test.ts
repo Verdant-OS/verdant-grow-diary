@@ -596,6 +596,57 @@ describe("cli — untrusted fixture input", () => {
     }
   });
 
+  it("rejects two verdicts for the same proposal", () => {
+    // Collapsing to a Set erased duplicates before the membership check, so an
+    // allow and a block for one proposal both passed and still drove the
+    // derived eligibility.
+    const r = runWithMutated((record) => {
+      const execution = record.execution as Record<string, unknown>;
+      (execution.output as Record<string, unknown>).proposals = [PROPOSAL];
+      const policy = execution.policy as Record<string, unknown>;
+      policy.proposalVerdicts = [
+        verdictFor("manual_only"),
+        { ...verdictFor("none"), verdict: "block" },
+      ];
+      policy.actionEligibility = "low_risk_manual_only";
+    });
+    expect(r.code).toBe(EXIT_USAGE_OR_IO);
+    expect(r.lines.join(" ")).toContain("more than one policy verdict");
+  });
+
+  // A safety check keyed on an open vocabulary is a safety check with an
+  // opt-out: the evaluator recognises equipment-control findings by exact
+  // code, so a plausible typo avoided device_control_emitted entirely.
+  it("rejects a fired-rule code outside the governor vocabulary", () => {
+    for (const code of ["device_control_instructions", "made_up_rule", "DEVICE_CONTROL"]) {
+      const r = runWithMutated((record) => {
+        (record.execution as { policy: Record<string, unknown> }).policy.firedRules = [
+          { code, basis: "linguistic", subject: "run", proposalId: null, detail: "x" },
+        ];
+      });
+      expect(r.code, code).toBe(EXIT_USAGE_OR_IO);
+    }
+  });
+
+  it("requires the bound context to say which context it is", () => {
+    const r = runWithMutated((record) => {
+      delete (record.execution as { context: Record<string, unknown> }).context.contextVersion;
+    });
+    expect(r.code).toBe(EXIT_USAGE_OR_IO);
+  });
+
+  it("returns a usage error, not a crash, when the run result names another context", () => {
+    // This mismatch used to throw from inside the case-building map, escaping
+    // main() and terminating with the interpreter's status — the exact
+    // exit-code collapse the 1/2 split exists to prevent.
+    const r = runWithMutated((record) => {
+      (record.execution as { output: Record<string, unknown> }).output.contextVersion =
+        "ctx-somewhere-else";
+    });
+    expect(r.code).toBe(EXIT_USAGE_OR_IO);
+    expect(r.lines.join(" ")).toContain("but was bound to");
+  });
+
   it("still accepts a well-formed envelope from the same path", () => {
     // Guards the guard: a check that rejected everything would pass the two
     // tests above while breaking the harness.

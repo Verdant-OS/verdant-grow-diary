@@ -45,6 +45,7 @@ import {
   parseEvaluationFixture,
   parseExecutionRecord,
 } from "@/lib/verdantSkillEvaluationSchemas";
+import type { VerdantSkillEvaluationFixture } from "@/lib/verdantSkillEvaluationSchemas";
 
 import { calculateEvaluationMetrics } from "@/lib/verdantSkillEvaluationMetrics";
 import {
@@ -137,6 +138,17 @@ function writeAtomic(path: string, contents: string): void {
 interface SelfTestFixtureFile {
   fixture: unknown;
   execution: Record<string, unknown>;
+  /**
+   * The PARSED fixture, kept from the single validation in `loadFixtures`.
+   *
+   * The schema trims, so the raw and parsed identities can differ — and every
+   * site that reached for `fixture.fixtureId` directly was reading the raw one
+   * while the case results carried the parsed one. Fixing that site by site
+   * produced a duplicate guard on parsed ids and a tag map on raw ones, which
+   * silently dropped a case from `casesByTag`. Parsing once and carrying the
+   * result removes the divergence instead of tracking it.
+   */
+  parsed: VerdantSkillEvaluationFixture;
 }
 
 /** Load and validate every fixture in a directory. */
@@ -260,6 +272,20 @@ function loadFixtures(
       issues.push(`${name}: missing or malformed "execution" envelope`);
       continue;
     }
+    // The run result names the context version it ran against; the bound
+    // context names itself. Checked HERE, in the preflight, because throwing
+    // from inside the case-building map escapes `main()` and terminates with
+    // the interpreter's status — the exact exit-code collapse the 1/2 split
+    // exists to prevent, which I had already fixed once on another path.
+    const ctxBound = (record.execution.context as { contextVersion?: unknown })?.contextVersion;
+    const ctxOutput = (record.execution.output as { contextVersion?: unknown })?.contextVersion;
+    if (typeof ctxOutput === "string" && ctxBound !== ctxOutput) {
+      issues.push(
+        `${name}: run result names context ${ctxOutput} but was bound to ${String(ctxBound)}`,
+      );
+      continue;
+    }
+
     const check = parseEvaluationFixture(record.fixture);
     if (check.ok === false) {
       issues.push(...check.issues.map((i) => `${name}: ${i}`));
@@ -287,7 +313,21 @@ function loadFixtures(
         .map((p) => (p as { proposalId?: unknown })?.proposalId)
         .filter((id): id is string => typeof id === "string"),
     );
-    const verdictIds = new Set(execPolicy.proposalVerdicts.map((v) => v.proposalId));
+    // Duplicates FIRST: collapsing to a Set erased them, so an `allow` and a
+    // `block` for the same proposal passed membership and still drove the
+    // derived eligibility. The governor emits exactly one verdict per
+    // proposal.
+    const verdictIdList = execPolicy.proposalVerdicts.map((v) => v.proposalId);
+    const duplicateVerdictIds = [
+      ...new Set(verdictIdList.filter((id, i) => verdictIdList.indexOf(id) !== i)),
+    ].sort();
+    if (duplicateVerdictIds.length > 0) {
+      issues.push(
+        `${name}: more than one policy verdict for proposal(s): ${duplicateVerdictIds.join(", ")}`,
+      );
+      continue;
+    }
+    const verdictIds = new Set(verdictIdList);
     const unattached = [...verdictIds].filter((id) => !outputProposalIds.has(id)).sort();
     const unjudged = [...outputProposalIds].filter((id) => !verdictIds.has(id)).sort();
     if (unattached.length > 0 || unjudged.length > 0) {
@@ -301,7 +341,7 @@ function loadFixtures(
       }
       continue;
     }
-    files.push(record);
+    files.push({ ...record, parsed: check.fixture });
   }
   if (issues.length > 0) return { ok: false, issues: issues.sort() };
   return { ok: true, files };
@@ -356,7 +396,7 @@ export function main(argv: readonly string[]): MainResult {
   // CLI identity too, the mismatch still verifies, letting cases for skill
   // A produce a report labelled skill B.
   const identityMismatches = loaded.files
-    .map((f) => f.fixture as { fixtureId: string; skillId: string; skillVersion: string })
+    .map((f) => f.parsed)
     .filter((f) => f.skillId !== skillId || f.skillVersion !== skillVersion)
     .map((f) => f.fixtureId)
     .sort();
@@ -379,7 +419,7 @@ export function main(argv: readonly string[]): MainResult {
         .applicability;
       return a?.skillId !== skillId || a?.skillVersion !== skillVersion;
     })
-    .map((f) => (f.fixture as { fixtureId: string }).fixtureId)
+    .map((f) => f.parsed.fixtureId)
     .sort();
   if (applicabilityMismatches.length > 0) {
     return {
@@ -406,7 +446,7 @@ export function main(argv: readonly string[]): MainResult {
       const m = (f.execution as { manifest?: { id?: string; version?: string } }).manifest;
       return m?.id !== skillId || m?.version !== skillVersion;
     })
-    .map((f) => (f.fixture as { fixtureId: string }).fixtureId)
+    .map((f) => f.parsed.fixtureId)
     .sort();
   if (manifestMismatches.length > 0) {
     return {
@@ -426,7 +466,7 @@ export function main(argv: readonly string[]): MainResult {
       if (parsed.ok === false) return false;
       return parsed.value.skillId !== skillId || parsed.value.skillVersion !== skillVersion;
     })
-    .map((f) => (f.fixture as { fixtureId: string }).fixtureId)
+    .map((f) => f.parsed.fixtureId)
     .sort();
   if (outputIdentityMismatches.length > 0) {
     return {
@@ -445,11 +485,7 @@ export function main(argv: readonly string[]): MainResult {
   // "hst-003-expected-abstention " with a trailing space is a distinct string
   // here and the same identity everywhere downstream — which defeated this
   // very guard and put two case results under one name.
-  const allFixtureIds = loaded.files.map((f) => {
-    const parsed = parseEvaluationFixture(f.fixture);
-    if (parsed.ok === false) throw new Error(parsed.issues.join("; "));
-    return parsed.fixture.fixtureId;
-  });
+  const allFixtureIds = loaded.files.map((f) => f.parsed.fixtureId);
   const duplicateFixtureIds = [
     ...new Set(allFixtureIds.filter((id, i) => allFixtureIds.indexOf(id) !== i)),
   ].sort();
@@ -463,11 +499,7 @@ export function main(argv: readonly string[]): MainResult {
   const caseSet = { fixtureIds: [...allFixtureIds].sort() };
 
   const caseResults = loaded.files.map((file) => {
-    const reparsed = parseEvaluationFixture(file.fixture);
-    // Already validated by loadFixtures; re-parsed here to get the typed
-    // value rather than casting, so a schema change cannot slip past.
-    if (reparsed.ok === false) throw new Error(reparsed.issues.join("; "));
-    const fixture = reparsed.fixture;
+    const fixture = file.parsed;
     const e = file.execution;
 
     // A fixture may demand more repetitions than the caller asked for. Taking
@@ -529,22 +561,6 @@ export function main(argv: readonly string[]): MainResult {
     // Derived, never trusted. A fixture asserting that its own malformed
     // output is schema-compliant would otherwise produce a green compliance
     // rate and satisfy the promotion gate.
-    // The run result names the context version it ran against; the bindings
-    // name the context itself. Neither was compared to the other, so a result
-    // produced against a different context could ride inside a case whose
-    // provenance attested to this one.
-    const boundContextVersion = (e.context as { contextVersion?: unknown })?.contextVersion;
-    const outputContextVersion = (e.output as { contextVersion?: unknown })?.contextVersion;
-    if (
-      typeof boundContextVersion === "string" &&
-      typeof outputContextVersion === "string" &&
-      boundContextVersion !== outputContextVersion
-    ) {
-      throw new Error(
-        `Fixture ${fixture.fixtureId} run result names context ${outputContextVersion} but was bound to ${boundContextVersion}`,
-      );
-    }
-
     const outputParse = parseSkillRunResult(e.output);
     const outputSchemaValid = outputParse.ok === true;
     const parsedOutput = outputParse.ok === true ? outputParse.value : null;
@@ -606,8 +622,7 @@ export function main(argv: readonly string[]): MainResult {
 
   const tagsByFixtureId: Record<string, readonly string[]> = {};
   for (const file of loaded.files) {
-    const f = file.fixture as { fixtureId: string; tags: string[] };
-    tagsByFixtureId[f.fixtureId] = f.tags;
+    tagsByFixtureId[file.parsed.fixtureId] = file.parsed.tags;
   }
 
   const outDir = resolve(ROOT, args.outputDir ?? `artifacts/skills/${skillId}/${skillVersion}`);

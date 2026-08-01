@@ -18,7 +18,7 @@ import {
   type EvaluationConfidenceExpectation,
   type EvaluationFixtureKind,
 } from "@/lib/verdantSkillEvaluationTypes";
-import { SKILL_POLICY_OUTCOMES } from "@/lib/verdantSkillPolicyGovernor";
+import { SKILL_POLICY_OUTCOMES, SKILL_POLICY_RULE_CODES } from "@/lib/verdantSkillPolicyGovernor";
 import { SKILL_APPLICABILITY_VERDICTS } from "@/lib/verdantSkillApplicabilityRules";
 import {
   SKILL_RISK_LEVELS,
@@ -285,7 +285,13 @@ const executionApplicabilitySchema = z
  */
 const executionFiredRuleSchema = z
   .object({
-    code: z.string().min(1),
+    // The governor's OWN codes. Any string was accepted, and the evaluator
+    // recognises equipment-control findings by exact code — so a record could
+    // replace `device_control_instruction` with a plausible typo, keep the
+    // eligible manual proposal carrying the instruction, and never raise
+    // `device_control_emitted`. A safety check keyed on an open vocabulary is
+    // a safety check with an opt-out.
+    code: z.enum(SKILL_POLICY_RULE_CODES),
   })
   .passthrough();
 
@@ -364,7 +370,10 @@ export const verdantSkillExecutionRecordSchema = z
     // than the full manifest schema: the fixtures carry deliberate stubs, and
     // the identity is the part that has to be real.
     manifest: z.object({ id: z.string().min(1), version: z.string().min(1) }).passthrough(),
-    context: z.record(z.unknown()),
+    // A context that does not say WHICH context it is cannot establish that an
+    // output belongs to it: the version comparison simply skipped when this
+    // was absent, so a schema-valid output could name any context at all.
+    context: z.object({ contextVersion: z.string().min(1) }).passthrough(),
     applicability: executionApplicabilitySchema,
     evidenceCorpus: z.record(z.unknown()),
     evidenceRegistryVersion: z.string().min(1),

@@ -2,22 +2,41 @@
 
 Product rules for **Create tent** / **Create plant** on the production deploy branch.
 
-## Behavior
+## States
 
-- Resolved setup = page `?growId=` (when valid) then **current active setup**.
-- **Always** write `grow_id` on successful create; never optional-omit.
-- Zero setups → hard-stop: **Start your room first** → `/grows?intent=one_tent_activation`.
-- Orphan / mismatched tent selection cannot reach insert.
+| Kind | Grower sees | Submit |
+| --- | --- | --- |
+| `loading` | Loading your setup | blocked |
+| `read_error` | Current setup unavailable + **Retry** | blocked (never “Start your room”) |
+| `no_setup` | Start your room first | blocked → `/grows?intent=one_tent_activation` |
+| `requested_setup_unavailable` | That setup isn’t available | blocked (**no** active-grow fallback) |
+| `choose_setup` | Pick which setup… | blocked |
+| `ready` | Adding to {name} | allowed with `grow_id` |
 
-## Grower-facing copy
+## Supplied tent (“Add Plant to This Tent”)
 
-| Situation | Copy |
+| Kind | Behavior |
 | --- | --- |
-| No setup | Start your room first / need a setup before adding tent or plant |
-| Primary CTA | Start your room |
-| Known setup | Adding to {name} / This will live in your current setup |
-| Wrong tent | This tent is in another setup |
+| pending | Keep tent id; block submit; **no** tentless create |
+| unavailable | Retry; block submit |
+| orphan / mismatch | Blocked presenter; require explicit compatible tent |
+| ready | Write `grow_id` + `tent_id` |
 
-Do **not** show: `grow_id`, orphan, lineage, backfill.
+## Retry (create dialog only)
 
-Source: `src/constants/growSetupMessages.ts`, `src/lib/createDialogGrowBindingRules.ts`.
+| Rule | Policy |
+| --- | --- |
+| Strategy | **Fixed 1.5s cooldown + in-flight lock** (human click) |
+| Not used | Full jitter exponential (that is for **sensor bridge ingest**) |
+| Auto background retry | Forbidden |
+| After Retry | Re-evaluate pure state machine only |
+
+See [`retry-strategy-by-surface.md`](./retry-strategy-by-surface.md).
+
+## Schema
+
+- Client plant **insert** requires `grow_id: uuid` (`PlantInsertPayloadSchema`).
+- `tent_id` optional outside guided / supplied-tent paths.
+- Legacy null-linked rows remain readable.
+
+Source: `src/constants/growSetupMessages.ts`, `src/lib/createDialogGrowBindingRules.ts`, `src/lib/createDialogRetryRules.ts`.

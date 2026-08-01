@@ -253,10 +253,27 @@ export interface SuppliedTentView {
   tentId: string | null;
   blockSubmit: boolean;
   requireCompatibleTentSelection: boolean;
+  /**
+   * When true, an explicit grower pick of a different tent that matches the
+   * target setup may clear the supplied-tent submit block.
+   * Read errors stay false — Retry only, never write on stale/error tent data.
+   */
+  allowCompatibleReplacement: boolean;
   title: string;
   body: string;
   showRetry: boolean;
 }
+
+const SUPPLIED_TENT_NONE: SuppliedTentView = {
+  kind: "none",
+  tentId: null,
+  blockSubmit: false,
+  requireCompatibleTentSelection: false,
+  allowCompatibleReplacement: false,
+  title: "",
+  body: "",
+  showRetry: false,
+};
 
 /**
  * Contract for a tent supplied by the page (e.g. TentDetail "Add plant to this tent").
@@ -272,15 +289,7 @@ export function evaluateSuppliedTentBinding(input: {
 }): SuppliedTentView {
   const supplied = trimId(input.suppliedTentId);
   if (!supplied) {
-    return {
-      kind: "none",
-      tentId: null,
-      blockSubmit: false,
-      requireCompatibleTentSelection: false,
-      title: "",
-      body: "",
-      showRetry: false,
-    };
+    return SUPPLIED_TENT_NONE;
   }
 
   if (input.tentsError) {
@@ -289,6 +298,8 @@ export function evaluateSuppliedTentBinding(input: {
       tentId: supplied,
       blockSubmit: true,
       requireCompatibleTentSelection: true,
+      // Fail closed on tent read failure — Retry only, no replacement write path.
+      allowCompatibleReplacement: false,
       title: GROW_SETUP_MESSAGES.tentUnavailableTitle,
       body: GROW_SETUP_MESSAGES.tentUnavailableBody,
       showRetry: true,
@@ -301,6 +312,7 @@ export function evaluateSuppliedTentBinding(input: {
       tentId: supplied,
       blockSubmit: true,
       requireCompatibleTentSelection: true,
+      allowCompatibleReplacement: false,
       title: GROW_SETUP_MESSAGES.tentPendingTitle,
       body: GROW_SETUP_MESSAGES.tentPendingBody,
       showRetry: false,
@@ -314,6 +326,9 @@ export function evaluateSuppliedTentBinding(input: {
       tentId: supplied,
       blockSubmit: true,
       requireCompatibleTentSelection: true,
+      // Successful load proved the supplied tent is gone — grower may pick another
+      // compatible tent for this setup. Still never tentless-escape.
+      allowCompatibleReplacement: true,
       title: GROW_SETUP_MESSAGES.tentUnavailableTitle,
       body: GROW_SETUP_MESSAGES.tentUnavailableBody,
       showRetry: true,
@@ -329,6 +344,7 @@ export function evaluateSuppliedTentBinding(input: {
       tentId: supplied,
       blockSubmit: true,
       requireCompatibleTentSelection: true,
+      allowCompatibleReplacement: false,
       title: GROW_SETUP_MESSAGES.tentPendingTitle,
       body: GROW_SETUP_MESSAGES.tentPendingBody,
       showRetry: false,
@@ -341,6 +357,7 @@ export function evaluateSuppliedTentBinding(input: {
       tentId: supplied,
       blockSubmit: true,
       requireCompatibleTentSelection: true,
+      allowCompatibleReplacement: true,
       title: GROW_SETUP_MESSAGES.tentOrphanTitle,
       body: GROW_SETUP_MESSAGES.tentOrphanBody,
       showRetry: false,
@@ -353,6 +370,7 @@ export function evaluateSuppliedTentBinding(input: {
       tentId: supplied,
       blockSubmit: true,
       requireCompatibleTentSelection: true,
+      allowCompatibleReplacement: true,
       title: GROW_SETUP_MESSAGES.tentMismatchTitle,
       body: GROW_SETUP_MESSAGES.tentMismatchBody,
       showRetry: false,
@@ -364,10 +382,34 @@ export function evaluateSuppliedTentBinding(input: {
     tentId: supplied,
     blockSubmit: false,
     requireCompatibleTentSelection: false,
+    allowCompatibleReplacement: false,
     title: "",
     body: "",
     showRetry: false,
   };
+}
+
+/**
+ * Whether the supplied-tent contract still blocks submit.
+ * An explicit compatible replacement clears the block only when the pure view
+ * allows it (orphan/mismatch/missing-after-load). Tent read errors never clear.
+ */
+export function suppliedTentBlocksWrite(
+  supplied: SuppliedTentView,
+  explicitCompatiblePick: boolean,
+): boolean {
+  if (!supplied.blockSubmit) return false;
+  if (supplied.kind === "pending") return true;
+  if (
+    explicitCompatiblePick &&
+    supplied.allowCompatibleReplacement &&
+    (supplied.kind === "orphan" ||
+      supplied.kind === "mismatch" ||
+      supplied.kind === "unavailable")
+  ) {
+    return false;
+  }
+  return true;
 }
 
 export type TentCompatibilityKind =

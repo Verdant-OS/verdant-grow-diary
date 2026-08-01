@@ -35,6 +35,7 @@ import {
   plantCreateAllowsTentless,
   resolveInitialPlantTentId,
   resolveSetupName,
+  suppliedTentBlocksWrite,
 } from "@/lib/createDialogGrowBindingRules";
 import { GROW_SETUP_MESSAGES } from "@/constants/growSetupMessages";
 import { useCreateBindingRetry } from "@/hooks/useCreateBindingRetry";
@@ -97,11 +98,14 @@ export default function CreatePlantDialog({
   const qc = useQueryClient();
   const {
     data: allTents = [],
-    isLoading: tentsLoading,
+    isLoading: tentsQueryLoading,
+    isFetching: tentsFetching,
     isError: tentsError,
     isFetched: tentsFetched,
     refetch: refetchTents,
   } = useTents();
+  // Background refetch must not treat cached supplied tents as verified.
+  const tentsLoading = tentsQueryLoading || tentsFetching;
 
   const runGrowRefresh = useCallback(() => refreshGrows(), [refreshGrows]);
   const runTentRefresh = useCallback(() => refetchTents(), [refetchTents]);
@@ -204,11 +208,7 @@ export default function CreatePlantDialog({
   });
 
   const tentBlocksWrite =
-    suppliedTent.blockSubmit &&
-    (suppliedTent.kind === "pending" ||
-      suppliedTent.kind === "unavailable" ||
-      ((suppliedTent.kind === "orphan" || suppliedTent.kind === "mismatch") &&
-        !explicitCompatiblePick)) ||
+    suppliedTentBlocksWrite(suppliedTent, explicitCompatiblePick) ||
     tentCompat.blockSubmit;
 
   const formBlocked =
@@ -438,7 +438,8 @@ export default function CreatePlantDialog({
             <span className="text-muted-foreground">{suppliedTent.body}</span>
           </p>
         )}
-        {suppliedTent.kind === "unavailable" && (
+        {suppliedTent.kind === "unavailable" &&
+          !(suppliedTent.allowCompatibleReplacement && explicitCompatiblePick) && (
           <div
             className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs space-y-2"
             data-testid="create-plant-tent-unavailable"

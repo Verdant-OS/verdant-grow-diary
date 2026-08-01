@@ -59,6 +59,7 @@ vi.mock("@/store/grows", () => ({
 const tentsState = vi.hoisted(() => ({
   data: [] as Array<{ id: string; name: string; grow_id: string | null }>,
   isLoading: false,
+  isFetching: false,
   isError: false,
   isFetched: true,
   refetch: vi.fn(),
@@ -84,6 +85,17 @@ vi.mock("@/lib/entitlements/freeTierGates", () => ({
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 import CreatePlantDialog from "@/components/CreatePlantDialog";
+
+const elementPrototype = Element.prototype as Element & {
+  hasPointerCapture?: () => boolean;
+  setPointerCapture?: () => void;
+  releasePointerCapture?: () => void;
+  scrollIntoView?: () => void;
+};
+elementPrototype.hasPointerCapture ??= () => false;
+elementPrototype.setPointerCapture ??= () => {};
+elementPrototype.releasePointerCapture ??= () => {};
+elementPrototype.scrollIntoView ??= () => {};
 
 const G1 = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const T1 = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -119,6 +131,7 @@ beforeEach(() => {
     { id: T_ORPHAN, name: "Orphan", grow_id: null },
   ];
   tentsState.isLoading = false;
+  tentsState.isFetching = false;
   tentsState.isError = false;
   tentsState.isFetched = true;
   tentsState.refetch = vi.fn();
@@ -180,6 +193,49 @@ describe("CreatePlantDialog RTL binding", () => {
     const submit = screen.getByTestId("plant-create-submit");
     expect(submit).toBeDisabled();
     await userEvent.type(screen.getByTestId("create-plant-name"), "Plant X");
+    await userEvent.click(submit);
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("background tent refetch treats cached supplied tent as pending — zero inserts", async () => {
+    tentsState.isLoading = false;
+    tentsState.isFetching = true;
+    tentsState.isFetched = true;
+    tentsState.data = [{ id: T1, name: "Tent A", grow_id: G1 }];
+    renderDialog({ defaultGrowId: G1, defaultTentId: T1 });
+    expect(screen.getByTestId("create-plant-tent-pending")).toBeInTheDocument();
+    const submit = screen.getByTestId("plant-create-submit");
+    expect(submit).toBeDisabled();
+    await userEvent.type(screen.getByTestId("create-plant-name"), "Stale Cache");
+    await userEvent.click(submit);
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("tent read error blocks submit — Retry only, zero inserts", async () => {
+    tentsState.isError = true;
+    tentsState.data = [{ id: T1, name: "Tent A", grow_id: G1 }];
+    renderDialog({ defaultGrowId: G1, defaultTentId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee" });
+    expect(screen.getByTestId("create-plant-tent-unavailable")).toBeInTheDocument();
+    expect(screen.getByTestId("create-plant-tent-retry")).toBeInTheDocument();
+    const submit = screen.getByTestId("plant-create-submit");
+    expect(submit).toBeDisabled();
+    await userEvent.type(screen.getByTestId("create-plant-name"), "Blocked");
+    await userEvent.click(submit);
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("missing supplied tent after successful load blocks until replaced — zero tentless inserts", async () => {
+    tentsState.data = [{ id: T1, name: "Tent A", grow_id: G1 }];
+    renderDialog({
+      defaultGrowId: G1,
+      defaultTentId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+    });
+    expect(screen.getByTestId("create-plant-tent-unavailable")).toBeInTheDocument();
+    const submit = screen.getByTestId("plant-create-submit");
+    expect(submit).toBeDisabled();
+    await userEvent.type(screen.getByTestId("create-plant-name"), "Recovered");
+    // No "No tent" escape on supplied-tent paths.
+    expect(screen.queryByText("No tent")).toBeNull();
     await userEvent.click(submit);
     expect(insertMock).not.toHaveBeenCalled();
   });

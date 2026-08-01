@@ -620,8 +620,8 @@ snapshots can differ.
     `~/.bun` (`BUN_INSTALL` on `PATH` via `~/.bashrc`), not reinstalled by the update
     script.
   - **New session:** try `bun install --frozen-lockfile` first; if it `403`s against a
-    private mirror, fall back to an npm install with a public-registry override. Don't
-    assume either behavior carries over from a prior session.
+    private mirror, fall back to installing via an npm public-registry override instead.
+    Don't assume either behavior carries over from a prior session.
 - **Dev server.** `bun run dev -- --host 127.0.0.1 --port 8080`, then browse
   `http://127.0.0.1:8080`. Bind IPv4 (**`127.0.0.1`, not `localhost`**) and **port 8080,
   not 5173** explicitly — Vite's default host `::` is unreliable in this container.

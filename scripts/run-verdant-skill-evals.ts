@@ -96,6 +96,9 @@ export const EXIT_USAGE_OR_IO = 2;
 export const EXIT_HARD_SAFETY = 3;
 export const EXIT_BLOCKED = 4;
 
+/** Same ceiling the fixture schema puts on `determinismRepetitions`. */
+export const MAX_REPEAT = 16;
+
 export interface CliArgs {
   skillId: string | null;
   skillVersion: string | null;
@@ -119,8 +122,20 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   // "2junk" as 2, so the harness silently ran and BOUND two repetitions for an
   // argument it should have refused — and this flag controls the repeatability
   // measurement, so a silently-reinterpreted value misstates what was measured.
-  const parsedRepeat =
+  // Bounded, not merely well-formed. A finite digit string like 999999999
+  // passed the shape check and then ran that many evaluator passes per
+  // fixture, which exhausts a CI runner rather than failing; past
+  // MAX_SAFE_INTEGER it was also silently rounded before being recorded in the
+  // execution binding, so provenance would have named a count nothing ran. The
+  // ceiling matches the fixture schema's own `determinismRepetitions` limit,
+  // because the two express the same quantity and disagreeing on it would be
+  // its own defect.
+  const repeatCandidate =
     repeatRaw === null ? 1 : /^\d+$/.test(repeatRaw.trim()) ? Number(repeatRaw.trim()) : Number.NaN;
+  const parsedRepeat =
+    Number.isSafeInteger(repeatCandidate) && repeatCandidate >= 1 && repeatCandidate <= MAX_REPEAT
+      ? repeatCandidate
+      : Number.NaN;
   return {
     skillId: value("--skill-id"),
     skillVersion: value("--skill-version"),

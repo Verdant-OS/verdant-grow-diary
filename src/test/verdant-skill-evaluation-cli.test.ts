@@ -58,6 +58,16 @@ describe("cli — argument contract", () => {
     }
   });
 
+  it("refuses a repeat count that would exhaust the runner", () => {
+    // A finite digit string passed the shape check and then ran that many
+    // evaluator passes per fixture; past MAX_SAFE_INTEGER it was also silently
+    // rounded before being recorded in the binding.
+    for (const bad of ["17", "999999999", "9007199254740993"]) {
+      expect(parseCliArgs(["--repeat", bad]).repeat, bad).toBeNaN();
+    }
+    expect(parseCliArgs(["--repeat", "16"]).repeat).toBe(16);
+  });
+
   it("still accepts a plain positive integer", () => {
     for (const good of ["1", "3", "16"]) {
       expect(parseCliArgs(["--repeat", good]).repeat, good).toBe(Number(good));

@@ -94,11 +94,12 @@ export default function Plants() {
   const navigate = useNavigate();
   const {
     grows,
+    activeGrowId,
     loading: growsLoading = false,
     error: growsError = null,
     refresh: refreshGrows,
   } = useGrows();
-  const validGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
+  const validGrowId = isValidScopedGrow ? (urlGrowId ?? undefined) : undefined;
   const scopeState = classifyPlantsScopeState({
     hasRequestedGrow: !!urlGrowId,
     isLoading: growsLoading,
@@ -298,7 +299,7 @@ export default function Plants() {
           scopeState === "unscoped" || scopeState === "valid" ? (
             <CreatePlantDialog
               key={activationIntent ? "one-tent-activation" : "standard-create"}
-              defaultGrowId={validGrowId}
+              defaultGrowId={validGrowId ?? activeGrowId ?? undefined}
               defaultTentId={activationTent?.id}
               requireTent={activationIntent}
               initiallyOpen={activationIntent}

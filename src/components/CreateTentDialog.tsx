@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
+import { useGrows } from "@/store/grows";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +28,12 @@ import { Link } from "react-router-dom";
 import { useTents } from "@/hooks/use-tents";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { evaluateTentCreationGate, FREE_TIER_UPGRADE_PATH } from "@/lib/entitlements/freeTierGates";
+import { formatAddingToSetup, growSetup } from "@/constants/growSetupMessages";
+import {
+  buildHardStopView,
+  resolveTargetGrow,
+  START_YOUR_ROOM_HREF,
+} from "@/lib/createDialogGrowBindingRules";
 
 interface Props {
   trigger?: React.ReactNode;
@@ -36,6 +43,8 @@ interface Props {
   initiallyOpen?: boolean;
 }
 
+const EMPTY_FORM = { name: "", size: "", brand: "", stage: "seedling" };
+
 export default function CreateTentDialog({
   trigger,
   defaultGrowId,
@@ -44,9 +53,21 @@ export default function CreateTentDialog({
 }: Props) {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const { grows, activeGrowId, loading: growsLoading } = useGrows();
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ name: "", size: "", brand: "", stage: "seedling" });
+  const [form, setForm] = useState(EMPTY_FORM);
+
+  const targetGrow = resolveTargetGrow({
+    pageDefaultGrowId: defaultGrowId,
+    activeGrowId,
+    grows,
+  });
+  const hardStop = buildHardStopView({
+    targetGrow,
+    growCount: grows.length,
+    growsLoading,
+  });
 
   // Free-tier tent gate (multiTent=false → single tent). useTents already
   // filters archived tents. Fails open while entitlements load.
@@ -61,8 +82,25 @@ export default function CreateTentDialog({
     (tents ?? []).length,
   );
 
+  function resetForm() {
+    setForm(EMPTY_FORM);
+  }
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen) resetForm();
+    setOpen(nextOpen);
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (hardStop.blockSubmit) {
+      toast.error(hardStop.title);
+      return;
+    }
+    if (!targetGrow) {
+      toast.error(hardStop.title || growSetup.noSetup.title);
+      return;
+    }
     if (!tentGate.allowed) {
       toast.error(tentGate.blockedCopy);
       return;
@@ -78,9 +116,8 @@ export default function CreateTentDialog({
       size: form.size.trim() || null,
       brand: form.brand.trim() || null,
       stage: form.stage,
+      grow_id: targetGrow.id,
     };
-    // Preselect grow context when provided. RLS enforces ownership server-side.
-    if (defaultGrowId) payload.grow_id = defaultGrowId;
     const { data, error } = await supabase
       .from("tents")
       .insert(payload as never)
@@ -95,13 +132,13 @@ export default function CreateTentDialog({
     trackFunnelEvent("tent_created");
     qc.invalidateQueries({ queryKey: ["tents"] });
     qc.invalidateQueries({ queryKey: ["grow", "tents"] });
-    setForm({ name: "", size: "", brand: "", stage: "seedling" });
+    resetForm();
     setOpen(false);
     if (data && onCreated) onCreated(data as { id: string; name: string });
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger ?? (
           <Button size="sm" className="gradient-leaf text-primary-foreground gap-1">
@@ -117,6 +154,36 @@ export default function CreateTentDialog({
           Start simple. You can add size, brand, and stage later. Verdant works best once your first
           plant memory exists.
         </p>
+        {hardStop.blockSubmit ? (
+          <div
+            className="grid gap-3 rounded-xl border border-border/60 bg-muted/40 p-4"
+            data-testid="tent-create-setup-hard-stop"
+            role="status"
+            aria-label={hardStop.ariaLabel}
+          >
+            <div>
+              <p className="font-medium">{hardStop.title}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{hardStop.body}</p>
+            </div>
+            {!hardStop.showLoading && (
+              <div className="flex flex-wrap gap-2">
+                <Button asChild className="gradient-leaf text-primary-foreground">
+                  <Link to={START_YOUR_ROOM_HREF} data-testid="tent-create-start-room">
+                    {hardStop.primaryLabel}
+                  </Link>
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => handleOpenChange(false)}>
+                  {growSetup.noSetup.ctaDismiss}
+                </Button>
+              </div>
+            )}
+          </div>
+        ) : targetGrow ? (
+          <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-sm">
+            <p className="font-medium">{formatAddingToSetup(targetGrow.name)}</p>
+            <p className="text-xs text-muted-foreground">{growSetup.create.knownBody}</p>
+          </div>
+        ) : null}
         {!tentGate.allowed && (
           <p
             className="rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
@@ -128,69 +195,72 @@ export default function CreateTentDialog({
             </Link>
           </p>
         )}
-        <form onSubmit={submit} className="grid gap-3">
-          <div>
-            <Label>Name</Label>
-            <Input
-              required
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Tent #1"
-            />
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Only a name is required to get started.
-            </p>
-          </div>
-          <details className="rounded-md border border-border/40 px-3 py-2">
-            <summary className="cursor-pointer text-xs text-muted-foreground select-none">
-              Optional details (enrich later)
-            </summary>
-            <div className="grid gap-3 pt-3">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label>Size (optional)</Label>
-                  <Input
-                    value={form.size}
-                    onChange={(e) => setForm({ ...form, size: e.target.value })}
-                    placeholder="4x4"
-                  />
-                </div>
-                <div>
-                  <Label>Brand (optional)</Label>
-                  <Input
-                    value={form.brand}
-                    onChange={(e) => setForm({ ...form, brand: e.target.value })}
-                    placeholder="Gorilla"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label>Stage (optional)</Label>
-                <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STAGES.filter((s) =>
-                      ["seedling", "veg", "flower", "flush", "harvest"].includes(s.value),
-                    ).map((s) => (
-                      <SelectItem key={s.value} value={s.value}>
-                        {s.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+        {!hardStop.blockSubmit && (
+          <form onSubmit={submit} className="grid gap-3">
+            <div>
+              <Label>Name</Label>
+              <Input
+                required
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="Tent #1"
+                data-testid="tent-create-name"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Only a name is required to get started.
+              </p>
             </div>
-          </details>
-          <Button
-            disabled={busy || !tentGate.allowed}
-            className="gradient-leaf text-primary-foreground"
-            data-testid="tent-create-submit"
-          >
-            Create tent
-          </Button>
-        </form>
+            <details className="rounded-md border border-border/40 px-3 py-2">
+              <summary className="cursor-pointer text-xs text-muted-foreground select-none">
+                Optional details (enrich later)
+              </summary>
+              <div className="grid gap-3 pt-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label>Size (optional)</Label>
+                    <Input
+                      value={form.size}
+                      onChange={(e) => setForm({ ...form, size: e.target.value })}
+                      placeholder="4x4"
+                    />
+                  </div>
+                  <div>
+                    <Label>Brand (optional)</Label>
+                    <Input
+                      value={form.brand}
+                      onChange={(e) => setForm({ ...form, brand: e.target.value })}
+                      placeholder="Gorilla"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>Stage (optional)</Label>
+                  <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STAGES.filter((s) =>
+                        ["seedling", "veg", "flower", "flush", "harvest"].includes(s.value),
+                      ).map((s) => (
+                        <SelectItem key={s.value} value={s.value}>
+                          {s.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </details>
+            <Button
+              disabled={busy || !tentGate.allowed || hardStop.blockSubmit}
+              className="gradient-leaf text-primary-foreground"
+              data-testid="tent-create-submit"
+            >
+              Create tent
+            </Button>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );

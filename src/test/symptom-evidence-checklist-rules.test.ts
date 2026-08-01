@@ -334,6 +334,77 @@ describe("symptom evidence checklist", () => {
     expect(category(view, "lighting").items[0].sourceLabel).toBe("Unverified source");
   });
 
+  it("excludes diary-companion measurements from a live parent evidence row", () => {
+    const parentId = "live-environment-grow-event";
+    const rows = buildSymptomEvidenceTimelineRows({
+      growId: "grow-1",
+      recentLaneEntries: [
+        {
+          id: parentId,
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          entry_at: "2026-07-31T12:00:00Z",
+          entry_type: "environment_check",
+          note: "Trusted sensor snapshot.",
+          details: {
+            event_type: "environment_check",
+            sensor_snapshot: { temp_c: 23, humidity_pct: 58 },
+          },
+        },
+      ],
+      diaryEntries: [
+        {
+          id: "fabricated-environment-diary-companion",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          entry_at: "2026-07-31T12:00:00Z",
+          note: "Client-controlled companion.",
+          details: {
+            event_type: "environment_check",
+            linked_grow_event_id: parentId,
+            source: "live",
+            checkType: "light",
+            environment_check: { temp_c: 99, humidity_pct: 100, vpd_kpa: 0 },
+          },
+        },
+      ],
+      growEvents: [
+        {
+          id: parentId,
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "environment_check",
+          source: "live",
+        },
+      ],
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      id: parentId,
+      source: "live",
+    });
+    expect(rows[0].details).toEqual({
+      event_type: "environment_check",
+      sensor_snapshot: { temp_c: 23, humidity_pct: 58 },
+    });
+
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: rows,
+    })!;
+    expect(category(view, "environment").items[0]).toMatchObject({
+      id: parentId,
+      sourceLabel: "live",
+      detailLines: ["Temperature: 23 °C", "Humidity: 58 % RH"],
+    });
+    expect(category(view, "lighting").items).toEqual([]);
+  });
+
   it("preserves canonical companion evidence while keeping grow-event provenance authoritative", () => {
     const parentId = "environment-grow-event";
     const rows = buildSymptomEvidenceTimelineRows({

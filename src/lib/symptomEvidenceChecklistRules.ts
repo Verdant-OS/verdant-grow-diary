@@ -192,10 +192,20 @@ function companionMatchesParent(
   return !parentEventType || !companionEventType || parentEventType === companionEventType;
 }
 
+function canSafelyMergeCompanionDetails(parent: SymptomEvidenceRawEntry): boolean {
+  const parentSource = safeString(parent.source, 24)?.toLowerCase() ?? null;
+  return (
+    !parentSource ||
+    parentSource === "manual" ||
+    !Object.prototype.hasOwnProperty.call(SOURCE_LABELS, parentSource)
+  );
+}
+
 /**
- * Preserve structured diary-companion evidence while keeping the merged
- * Timeline lane's one-row-per-event identity and the grow_events row's source
- * as the only authoritative provenance seam.
+ * Preserve structured diary-companion evidence only when its row-level label
+ * can honestly remain manual or unverified. Canonical non-manual parents keep
+ * only their native lane details because this model cannot express per-field
+ * provenance without falsely promoting client-controlled companion fields.
  */
 export function buildSymptomEvidenceTimelineRows(
   input: BuildSymptomEvidenceTimelineRowsInput,
@@ -223,7 +233,10 @@ export function buildSymptomEvidenceTimelineRows(
     const companion = id ? companionByGrowEventId.get(id) : undefined;
     const companionDetails = companion ? safeDetails(companion.details) : {};
     const laneDetails = safeDetails(row.details);
-    const details = companion ? { ...companionDetails, ...laneDetails } : laneDetails;
+    const details =
+      companion && parent && canSafelyMergeCompanionDetails(parent)
+        ? { ...companionDetails, ...laneDetails }
+        : laneDetails;
     return {
       ...row,
       grow_id: row.grow_id ?? parent?.grow_id ?? input.growId,

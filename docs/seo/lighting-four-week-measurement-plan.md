@@ -41,28 +41,29 @@ recorded.
 
 ## Current blockers
 
-The public release identity is complete, but production and measurement-contract defects remain:
+The public release and technical SEO identity are complete, but an analytics collection defect and
+authenticated-access gates remain:
 
-- PR #597 is merged and live in production manifest
-  `0c61cc572de32a8a7af975ace14659dfb77a0a43`.
-- Intercepted browser evidence preserves each exact lighting-guide path and page-specific title,
-  keeps protected IDs masked, and transmitted no verification events. It also found automatic GA4
-  page views without Verdant's explicit `page_path` alongside the app-owned SPA events.
+- PR #597 is merged and remains live in production manifest
+  `e623aa9d913698ca6795b3d6b75bd069d9a67681`.
+- Intercepted browser evidence across eight navigation actions preserved each exact lighting-guide
+  path and page-specific title, kept protected IDs masked, and transmitted no verification events.
+  It observed eight exact app-owned page views plus four automatic GA4 page views without Verdant's
+  explicit `page_path`.
 - The owner-confirmed GA4 production stream is `Verdant Grow Diary`, stream URL
   `https://verdantgrowdiary.com`, stream ID `15065867361`, and measurement ID `G-B3QRSZEM9S`;
   production loads and targets that exact measurement ID. The property ID is still unconfirmed.
 - The current public probe returns HTTP 200 for both guides, the sitemap, robots, and version
   manifest. The 51-URL sitemap contains each lighting route exactly once, and robots protects app
   prefixes.
-- Workflow [30681587094](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30681587094)
+- Workflow [30687660034](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30687660034)
   succeeded across all 51 URLs, but its GSC operation was `SKIPPED`, access was `BLOCKED`,
   execution was `SKIPPED`, OAuth was not configured, and it made 0 API attempts.
-- Production manifest `2560d83a6b740cb9d6c4521bc6edc083977d51fc` is an ancestor of deploy head
-  `591081b387ae9a6d9eb00aeb1f4ed9b43c90cc7d`; the committed delta is sensor-adapter hardening and
-  release content match remains `PASS`. The local JSON-LD repair does require a publish after merge.
-- Direct-load indexability remains `PASS`, but cross-guide client navigation leaves conflicting
-  prior-route/current-route page-level JSON-LD in the hydrated DOM. The bounded local repair passes
-  its built navigation matrix but is not production evidence until published.
+- Production manifest and deploy head match at
+  `e623aa9d913698ca6795b3d6b75bd069d9a67681`; release content match remains `PASS`.
+- PR #624 is live. Its production direct/cross-guide/history/refresh/repeat/new-tab matrix found one
+  current `WebPage`, `FAQPage`, `BreadcrumbList`, and `Article` identity set per page state, with
+  zero duplicate identities, zero stale prior-route objects, and zero JSON-LD parse errors.
 
 Three owner gates remain:
 

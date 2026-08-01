@@ -93,7 +93,7 @@ describe("buildCreateGrowBindingView", () => {
     expect(v.body).not.toMatch(/grow_id|orphan|lineage/i);
   });
 
-  it("distinguishes grow read error from zero-setup", () => {
+  it("distinguishes a settled grow read error from zero-setup", () => {
     const v = buildCreateGrowBindingView(
       {
         pageDefaultGrowId: null,
@@ -108,6 +108,25 @@ describe("buildCreateGrowBindingView", () => {
     expect(v.showReadError).toBe(true);
     expect(v.title).toMatch(/unavailable/i);
     expect(v.retryLabel).toMatch(/Retry/i);
+  });
+
+  it("shows loading while retrying after a settled grow read error", () => {
+    const v = buildCreateGrowBindingView(
+      {
+        pageDefaultGrowId: "g1",
+        activeGrowId: "g1",
+        grows,
+        growsLoading: true,
+        growsError: true,
+      },
+      "plant",
+    );
+    expect(v.kind).toBe("loading");
+    expect(v.blockSubmit).toBe(true);
+    expect(v.targetGrowId).toBeNull();
+    expect(v.showLoading).toBe(true);
+    expect(v.showReadError).toBe(false);
+    expect(v.showStartRoomHardStop).toBe(false);
   });
 
   it("blocks while loading with empty grow list", () => {

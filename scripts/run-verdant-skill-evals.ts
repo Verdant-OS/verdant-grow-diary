@@ -64,7 +64,11 @@ import {
   renderPromotionMarkdown,
 } from "@/lib/verdantSkillPromotionRules";
 import { SKILL_EVALUATION_BINDING_VERSION } from "@/lib/verdantSkillEvaluationBindings";
-import { parseSkillRunResult, serializeSkillContract } from "@/lib/verdantSkillSchemas";
+import {
+  SKILL_RISK_LEVELS,
+  parseSkillRunResult,
+  serializeSkillContract,
+} from "@/lib/verdantSkillSchemas";
 import { sha256Digest } from "./lib/verdantSkillEvaluationDigest";
 
 /** Message text without assuming the thrown value is an Error. */
@@ -327,6 +331,37 @@ function loadFixtures(
       );
       continue;
     }
+    // Correlating IDS was only half of it: the VALUES have to agree too. The
+    // governor computes `effectiveRiskLevel = max(declared, derivedFloor)`, so
+    // an effective risk BELOW the proposal's declared risk is a decision it
+    // cannot produce — and the evaluator reads only the recorded effective
+    // risk, so a "high" proposal paired with a fabricated "low" allow verdict
+    // rode through as a green must_act case that V1 would have blocked.
+    const riskRank = (level: unknown): number =>
+      (SKILL_RISK_LEVELS as readonly string[]).indexOf(String(level));
+    const proposalRisk = new Map(
+      (Array.isArray(execOutput?.proposals) ? execOutput.proposals : []).map((p) => [
+        (p as { proposalId?: string })?.proposalId,
+        (p as { riskLevel?: string })?.riskLevel,
+      ]),
+    );
+    const understatedRisk = execPolicy.proposalVerdicts
+      .filter((v) => {
+        const declared = proposalRisk.get(v.proposalId);
+        if (declared === undefined) return false;
+        return (
+          riskRank((v as { effectiveRiskLevel?: string }).effectiveRiskLevel) < riskRank(declared)
+        );
+      })
+      .map((v) => v.proposalId)
+      .sort();
+    if (understatedRisk.length > 0) {
+      issues.push(
+        `${name}: verdict effective risk is below the proposal's declared risk for: ${understatedRisk.join(", ")}`,
+      );
+      continue;
+    }
+
     const verdictIds = new Set(verdictIdList);
     const unattached = [...verdictIds].filter((id) => !outputProposalIds.has(id)).sort();
     const unjudged = [...outputProposalIds].filter((id) => !verdictIds.has(id)).sort();

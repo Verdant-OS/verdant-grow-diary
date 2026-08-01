@@ -20,7 +20,11 @@ import { fileURLToPath } from "node:url";
 // reimplemented here. A second copy of the binding rules in the validator
 // would be a second thing to keep in sync, and the one that drifts is the one
 // nobody runs locally.
-import { verifyReportBinding } from "../src/lib/verdantSkillEvaluationReport.ts";
+import {
+  renderEvaluationMarkdown,
+  verifyReportBinding,
+} from "../src/lib/verdantSkillEvaluationReport.ts";
+import { renderPromotionMarkdown } from "../src/lib/verdantSkillPromotionRules.ts";
 import { sha256Digest } from "./lib/verdantSkillEvaluationDigest.ts";
 import { computeBoundDigest } from "../src/lib/verdantSkillEvaluationBindings.ts";
 import { PROGRESSION_TO_MANIFEST_LIFECYCLE } from "../src/lib/verdantSkillEvaluationTypes.ts";
@@ -117,31 +121,20 @@ for (const dir of dirs) {
 
   if (existsSync(evalMdPath)) {
     const md = readFileSync(evalMdPath, "utf8");
-    // JSON and Markdown must agree, or one of them is lying.
-    if (!md.includes(`Cases: ${report.metrics?.totalCases}`)) {
-      note("markdown_case_count_disagrees_with_json", evalMdPath);
-    }
+    // REGENERATED and compared whole, not field by field.
+    //
+    // Each round of review found another rendered fact the comparison had
+    // missed — counts, then the overall verdict, then hard safety, then the
+    // identity header — because a list of fields to check is a list someone
+    // has to keep complete. The Markdown is a pure function of the report, so
+    // rendering it again and comparing the bytes covers every field there is,
+    // including ones added later.
     if (
-      !md.includes(`${report.metrics?.passedCases} passed, ${report.metrics?.failedCases} failed`)
+      md !==
+      `${renderEvaluationMarkdown(report)}
+`
     ) {
-      note("markdown_pass_fail_disagrees_with_json", evalMdPath);
-    }
-    // The VERDICT fields too, not only the counts. A `--json-only` rerun into
-    // an existing directory deliberately leaves the previous evaluation.md in
-    // place, so a report can go from an ordinary failure to a safety failure
-    // or a blocked state while keeping identical case counts — and both checks
-    // above still pass while the Markdown states the opposite verdict.
-    if (!md.includes(`# Skill evaluation — ${report.skillId}@${report.skillVersion}`)) {
-      note("markdown_identity_disagrees_with_json", evalMdPath);
-    }
-    if (!md.includes(`- Overall: **${String(report.overallStatus).toUpperCase()}**`)) {
-      note("markdown_overall_disagrees_with_json", evalMdPath);
-    }
-    if (!md.includes(`- Hard safety: **${report.hardSafetyStatus}**`)) {
-      note("markdown_hard_safety_disagrees_with_json", evalMdPath);
-    }
-    if (!md.includes(`- Safety-critical failures: ${report.metrics?.safetyCriticalFailures}`)) {
-      note("markdown_safety_failures_disagree_with_json", evalMdPath);
+      note("markdown_disagrees_with_json", evalMdPath);
     }
   }
 
@@ -243,15 +236,12 @@ for (const dir of dirs) {
     }
     if (decisionForMd !== null) {
       const promoMd = readFileSync(promoMdPath, "utf8");
-      if (!promoMd.includes(`- Eligible: **${decisionForMd.eligible ? "YES" : "NO"}**`)) {
-        note("promotion_markdown_verdict_disagrees_with_json", promoMdPath);
-      }
       if (
-        !promoMd.includes(
-          `# Promotion decision — ${decisionForMd.currentState} → ${decisionForMd.requestedState}`,
-        )
+        promoMd !==
+        `${renderPromotionMarkdown(decisionForMd)}
+`
       ) {
-        note("promotion_markdown_transition_disagrees_with_json", promoMdPath);
+        note("promotion_markdown_disagrees_with_json", promoMdPath);
       }
     }
   }

@@ -647,6 +647,51 @@ describe("cli — untrusted fixture input", () => {
     expect(r.lines.join(" ")).toContain("but was bound to");
   });
 
+  // Correlating IDS was only half of it: the VALUES have to agree too. The
+  // governor computes effectiveRiskLevel = max(declared, derivedFloor), so an
+  // effective risk BELOW the proposal's declared risk is a decision it cannot
+  // produce — and the evaluator reads only the recorded effective risk.
+  it("rejects a verdict whose effective risk is below the proposal's declared risk", () => {
+    for (const [declared, effective] of [
+      ["high", "low"],
+      ["critical", "medium"],
+      ["medium", "low"],
+    ]) {
+      const r = runWithMutated((record) => {
+        const execution = record.execution as Record<string, unknown>;
+        (execution.output as Record<string, unknown>).proposals = [
+          { ...PROPOSAL, riskLevel: declared },
+        ];
+        const policy = execution.policy as Record<string, unknown>;
+        policy.proposalVerdicts = [{ ...verdictFor("manual_only"), effectiveRiskLevel: effective }];
+        policy.actionEligibility = "low_risk_manual_only";
+      });
+      expect(r.code, `${declared}->${effective}`).toBe(EXIT_USAGE_OR_IO);
+      expect(r.lines.join(" "), `${declared}->${effective}`).toContain("below the proposal");
+    }
+  });
+
+  it("accepts an effective risk at or above the declared one", () => {
+    // Guards the guard: the governor RAISES risk, so equal and higher are both
+    // legitimate and only lower is impossible.
+    for (const [declared, effective] of [
+      ["low", "low"],
+      ["low", "high"],
+      ["medium", "critical"],
+    ]) {
+      const r = runWithMutated((record) => {
+        const execution = record.execution as Record<string, unknown>;
+        (execution.output as Record<string, unknown>).proposals = [
+          { ...PROPOSAL, riskLevel: declared },
+        ];
+        const policy = execution.policy as Record<string, unknown>;
+        policy.proposalVerdicts = [{ ...verdictFor("manual_only"), effectiveRiskLevel: effective }];
+        policy.actionEligibility = "low_risk_manual_only";
+      });
+      expect(r.code, `${declared}->${effective}`).not.toBe(EXIT_USAGE_OR_IO);
+    }
+  });
+
   it("still accepts a well-formed envelope from the same path", () => {
     // Guards the guard: a check that rejected everything would pass the two
     // tests above while breaking the harness.

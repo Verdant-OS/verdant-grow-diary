@@ -41,18 +41,27 @@ const growsState = vi.hoisted(() => ({
   grows: [] as Array<{ id: string; name: string }>,
   activeGrowId: null as string | null,
   loading: false,
+  error: null as string | null,
+  refresh: vi.fn(),
 }));
 
 const tentsState = vi.hoisted(() => ({
   data: [] as Array<{ id: string; name: string; grow_id: string | null }>,
   isLoading: false,
+  isFetching: false,
   isError: false,
   isFetched: true,
   refetch: vi.fn(),
 }));
 
 vi.mock("@/store/grows", () => ({
-  useGrows: () => growsState,
+  useGrows: () => ({
+    grows: growsState.grows,
+    activeGrowId: growsState.activeGrowId,
+    loading: growsState.loading,
+    error: growsState.error,
+    refresh: growsState.refresh,
+  }),
 }));
 
 vi.mock("@/hooks/use-tents", () => ({
@@ -104,14 +113,17 @@ describe("CreatePlantDialog fail-closed binding", () => {
     growsState.grows = [];
     growsState.activeGrowId = null;
     growsState.loading = false;
+    growsState.error = null;
+    growsState.refresh = vi.fn();
     tentsState.data = [];
     tentsState.isLoading = false;
+    tentsState.isFetching = false;
     tentsState.isError = false;
     tentsState.isFetched = true;
     tentsState.refetch = vi.fn();
   });
 
-  it("zero grows blocks submit and routes to one-tent activation", () => {
+  it("zero grows withholds form and routes to one-tent activation", () => {
     renderDialog();
 
     expect(screen.getByTestId("create-plant-hard-stop")).toBeInTheDocument();
@@ -120,7 +132,8 @@ describe("CreatePlantDialog fail-closed binding", () => {
       GROW_SETUP_START_ROOM_HREF,
     );
     expect(GROW_SETUP_START_ROOM_HREF).toContain("one_tent_activation");
-    expect(screen.getByTestId("plant-create-submit")).toBeDisabled();
+    expect(screen.queryByTestId("create-plant-form")).toBeNull();
+    expect(screen.queryByTestId("plant-create-submit")).toBeNull();
     expect(insertMock).not.toHaveBeenCalled();
   });
 
@@ -149,7 +162,7 @@ describe("CreatePlantDialog fail-closed binding", () => {
     expect(payload.name).toBe("Plant A");
   });
 
-  it("blocks orphan defaultTentId — submit disabled and zero inserts", async () => {
+  it("orphan supplied tent blocks write — no tentless insert", async () => {
     growsState.grows = [{ id: GROW_ACTIVE, name: "Spring Veg" }];
     growsState.activeGrowId = GROW_ACTIVE;
     tentsState.data = [{ id: TENT_ORPHAN, name: "Orphan Tent", grow_id: null }];
@@ -165,7 +178,7 @@ describe("CreatePlantDialog fail-closed binding", () => {
     expect(insertMock).not.toHaveBeenCalled();
   });
 
-  it("blocks mismatched defaultTentId until a compatible tent is chosen", () => {
+  it("scopes tent options to the target setup so mismatched tents cannot be selected", () => {
     growsState.grows = [
       { id: GROW_ACTIVE, name: "Spring Veg" },
       { id: GROW_OTHER, name: "Other" },
@@ -181,6 +194,7 @@ describe("CreatePlantDialog fail-closed binding", () => {
     expect(screen.getByTestId("create-plant-tent-mismatch")).toBeInTheDocument();
     expect(screen.queryByText("Other Tent")).not.toBeInTheDocument();
     expect(screen.getByTestId("plant-create-submit")).toBeDisabled();
+    expect(insertMock).not.toHaveBeenCalled();
   });
 
   it("requireTent keeps submit disabled until a tent is chosen", () => {
@@ -216,5 +230,14 @@ describe("CreatePlantDialog fail-closed binding", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /New plant/i }));
     expect((screen.getByPlaceholderText("Plant A") as HTMLInputElement).value).toBe("");
+  });
+
+  it("read_error is not no_setup — Retry only", () => {
+    growsState.error = "rls failed";
+    renderDialog();
+    expect(screen.getByTestId("create-plant-read-error")).toBeInTheDocument();
+    expect(screen.queryByTestId("create-plant-hard-stop")).toBeNull();
+    expect(screen.queryByTestId("create-plant-form")).toBeNull();
+    expect(GROW_SETUP_MESSAGES.readErrorRetry.length).toBeGreaterThan(0);
   });
 });

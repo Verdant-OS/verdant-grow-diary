@@ -7,6 +7,7 @@ import {
   evaluateSuppliedTentBinding,
   resolveInitialPlantTentId,
   plantCreateAllowsTentless,
+  suppliedTentBlocksWrite,
 } from "@/lib/createDialogGrowBindingRules";
 import { GROW_SETUP_START_ROOM_HREF } from "@/constants/growSetupMessages";
 
@@ -140,7 +141,22 @@ describe("supplied tent contract", () => {
     expect(s.tentId).toBe("t1");
   });
 
-  it("blocks tent read error with retry", () => {
+  it("keeps supplied tent pending while cached tents refetch (isFetching)", () => {
+    const s = evaluateSuppliedTentBinding({
+      suppliedTentId: "t1",
+      tentsLoading: false,
+      tentsFetching: true,
+      tentsLoaded: true,
+      suppliedTentRow: { id: "t1", grow_id: "g1" },
+      targetGrowId: "g1",
+    });
+    expect(s.kind).toBe("pending");
+    expect(s.blockSubmit).toBe(true);
+    expect(s.tentId).toBe("t1");
+    expect(suppliedTentBlocksWrite(s, false)).toBe(true);
+  });
+
+  it("blocks tent read error with retry and forbids replacement escape", () => {
     const s = evaluateSuppliedTentBinding({
       suppliedTentId: "t1",
       tentsError: true,
@@ -150,25 +166,44 @@ describe("supplied tent contract", () => {
     expect(s.kind).toBe("unavailable");
     expect(s.showRetry).toBe(true);
     expect(s.blockSubmit).toBe(true);
+    expect(s.allowCompatibleReplacement).toBe(false);
+    expect(suppliedTentBlocksWrite(s, true)).toBe(true);
+  });
+
+  it("missing tent after successful load allows explicit compatible replacement only", () => {
+    const s = evaluateSuppliedTentBinding({
+      suppliedTentId: "ghost",
+      tentsLoaded: true,
+      tentsLoading: false,
+      suppliedTentRow: null,
+      targetGrowId: "g1",
+    });
+    expect(s.kind).toBe("unavailable");
+    expect(s.allowCompatibleReplacement).toBe(true);
+    expect(suppliedTentBlocksWrite(s, false)).toBe(true);
+    expect(suppliedTentBlocksWrite(s, true)).toBe(false);
   });
 
   it("blocks orphan/mismatch without clearing to tentless", () => {
-    expect(
-      evaluateSuppliedTentBinding({
-        suppliedTentId: "t1",
-        tentsLoaded: true,
-        suppliedTentRow: { id: "t1", grow_id: null },
-        targetGrowId: "g1",
-      }).kind,
-    ).toBe("orphan");
-    expect(
-      evaluateSuppliedTentBinding({
-        suppliedTentId: "t1",
-        tentsLoaded: true,
-        suppliedTentRow: { id: "t1", grow_id: "g2" },
-        targetGrowId: "g1",
-      }).kind,
-    ).toBe("mismatch");
+    const orphan = evaluateSuppliedTentBinding({
+      suppliedTentId: "t1",
+      tentsLoaded: true,
+      suppliedTentRow: { id: "t1", grow_id: null },
+      targetGrowId: "g1",
+    });
+    expect(orphan.kind).toBe("orphan");
+    expect(orphan.allowCompatibleReplacement).toBe(true);
+    expect(suppliedTentBlocksWrite(orphan, false)).toBe(true);
+    expect(suppliedTentBlocksWrite(orphan, true)).toBe(false);
+
+    const mismatch = evaluateSuppliedTentBinding({
+      suppliedTentId: "t1",
+      tentsLoaded: true,
+      suppliedTentRow: { id: "t1", grow_id: "g2" },
+      targetGrowId: "g1",
+    });
+    expect(mismatch.kind).toBe("mismatch");
+    expect(mismatch.allowCompatibleReplacement).toBe(true);
   });
 
   it("resolveInitialPlantTentId preserves supplied id while pending", () => {
@@ -192,5 +227,17 @@ describe("supplied tent contract", () => {
     expect(r.compatible).toBe(false);
     expect(r.kind).toBe("required_missing");
     expect(plantCreateAllowsTentless({ suppliedTentId: "t1" })).toBe(false);
+  });
+
+  it("pending never clears via explicitCompatiblePick alone", () => {
+    const pending = evaluateSuppliedTentBinding({
+      suppliedTentId: "t1",
+      tentsFetching: true,
+      tentsLoaded: true,
+      suppliedTentRow: { id: "t1", grow_id: "g1" },
+      targetGrowId: "g1",
+    });
+    expect(pending.kind).toBe("pending");
+    expect(suppliedTentBlocksWrite(pending, true)).toBe(true);
   });
 });

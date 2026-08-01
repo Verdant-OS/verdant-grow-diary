@@ -97,13 +97,11 @@ export default function CreateTentDialog({
 
   const formBlocked = binding.blockSubmit || !canWriteCreateGrowId(targetGrowId);
 
-  function resetForm() {
-    setForm(EMPTY_TENT_FORM);
-  }
-
   function handleOpenChange(next: boolean) {
     setOpen(next);
-    if (!next) resetForm();
+    if (!next) {
+      setForm(EMPTY_TENT_FORM);
+    }
   }
 
   async function submit(e: React.FormEvent) {
@@ -143,7 +141,7 @@ export default function CreateTentDialog({
     trackFunnelEvent("tent_created");
     qc.invalidateQueries({ queryKey: ["tents"] });
     qc.invalidateQueries({ queryKey: ["grow", "tents"] });
-    resetForm();
+    setForm(EMPTY_TENT_FORM);
     setOpen(false);
     if (data && onCreated) onCreated(data as { id: string; name: string });
   }
@@ -290,69 +288,71 @@ export default function CreateTentDialog({
           </p>
         )}
 
-        <form onSubmit={submit} className="grid gap-3" data-testid="create-tent-form">
-          <div>
-            <Label>Name</Label>
-            <Input
-              required
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Tent #1"
-            />
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Only a name is required to get started.
-            </p>
-          </div>
-          <details className="rounded-md border border-border/40 px-3 py-2">
-            <summary className="cursor-pointer text-xs text-muted-foreground select-none">
-              Optional details (enrich later)
-            </summary>
-            <div className="grid gap-3 pt-3">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label>Size (optional)</Label>
-                  <Input
-                    value={form.size}
-                    onChange={(e) => setForm({ ...form, size: e.target.value })}
-                    placeholder="4x4"
-                  />
-                </div>
-                <div>
-                  <Label>Brand (optional)</Label>
-                  <Input
-                    value={form.brand}
-                    onChange={(e) => setForm({ ...form, brand: e.target.value })}
-                    placeholder="Gorilla"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label>Stage (optional)</Label>
-                <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STAGES.filter((s) =>
-                      ["seedling", "veg", "flower", "flush", "harvest"].includes(s.value),
-                    ).map((s) => (
-                      <SelectItem key={s.value} value={s.value}>
-                        {s.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+        {!formBlocked && (
+          <form onSubmit={submit} className="grid gap-3" data-testid="create-tent-form">
+            <div>
+              <Label>Name</Label>
+              <Input
+                required
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="Tent #1"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Only a name is required to get started.
+              </p>
             </div>
-          </details>
-          <Button
-            disabled={busy || !tentGate.allowed || formBlocked}
-            className="gradient-leaf text-primary-foreground"
-            data-testid="tent-create-submit"
-          >
-            Create tent
-          </Button>
-        </form>
+            <details className="rounded-md border border-border/40 px-3 py-2">
+              <summary className="cursor-pointer text-xs text-muted-foreground select-none">
+                Optional details (enrich later)
+              </summary>
+              <div className="grid gap-3 pt-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label>Size (optional)</Label>
+                    <Input
+                      value={form.size}
+                      onChange={(e) => setForm({ ...form, size: e.target.value })}
+                      placeholder="4x4"
+                    />
+                  </div>
+                  <div>
+                    <Label>Brand (optional)</Label>
+                    <Input
+                      value={form.brand}
+                      onChange={(e) => setForm({ ...form, brand: e.target.value })}
+                      placeholder="Gorilla"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>Stage (optional)</Label>
+                  <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STAGES.filter((s) =>
+                        ["seedling", "veg", "flower", "flush", "harvest"].includes(s.value),
+                      ).map((s) => (
+                        <SelectItem key={s.value} value={s.value}>
+                          {s.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </details>
+            <Button
+              disabled={busy || !tentGate.allowed || formBlocked}
+              className="gradient-leaf text-primary-foreground"
+              data-testid="tent-create-submit"
+            >
+              Create tent
+            </Button>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );

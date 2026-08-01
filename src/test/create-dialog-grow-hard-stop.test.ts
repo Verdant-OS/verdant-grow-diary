@@ -23,6 +23,10 @@ describe("create dialog hard-stop wiring", () => {
     expect(PLANT).toMatch(/buildCreateGrowBindingView/);
     expect(PLANT).toMatch(/useCreateBindingRetry/);
     expect(PLANT).toMatch(/evaluateSuppliedTentBinding/);
+    expect(PLANT).toMatch(/suppliedTentBlocksWrite/);
+    // Background refetch must keep supplied tents pending — do not drop isFetching.
+    expect(PLANT).toMatch(/isFetching:\s*tentsFetching/);
+    expect(PLANT).toMatch(/tentsQueryLoading\s*\|\|\s*tentsFetching/);
     expect(PLANT).toMatch(/create-plant-hard-stop/);
     expect(PLANT).toMatch(/create-plant-read-error/);
     expect(PLANT).toMatch(/create-plant-tent-pending/);

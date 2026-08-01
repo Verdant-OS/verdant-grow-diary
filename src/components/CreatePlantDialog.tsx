@@ -35,6 +35,7 @@ import {
   plantCreateAllowsTentless,
   resolveInitialPlantTentId,
   resolveSetupName,
+  suppliedTentBlocksWrite,
 } from "@/lib/createDialogGrowBindingRules";
 import { GROW_SETUP_MESSAGES } from "@/constants/growSetupMessages";
 import { useCreateBindingRetry } from "@/hooks/useCreateBindingRetry";
@@ -97,11 +98,14 @@ export default function CreatePlantDialog({
   const qc = useQueryClient();
   const {
     data: allTents = [],
-    isLoading: tentsLoading,
+    isLoading: tentsQueryLoading,
+    isFetching: tentsFetching,
     isError: tentsError,
     isFetched: tentsFetched,
     refetch: refetchTents,
   } = useTents();
+  // Dialog-level pending flag for presenters; pure rules also receive tentsFetching.
+  const tentsLoading = tentsQueryLoading || tentsFetching;
 
   const runGrowRefresh = useCallback(() => refreshGrows(), [refreshGrows]);
   const runTentRefresh = useCallback(() => refetchTents(), [refetchTents]);
@@ -136,6 +140,7 @@ export default function CreatePlantDialog({
       evaluateSuppliedTentBinding({
         suppliedTentId: defaultTentId,
         tentsLoading,
+        tentsFetching,
         tentsError,
         tentsLoaded,
         suppliedTentRow: suppliedTentRow
@@ -143,7 +148,15 @@ export default function CreatePlantDialog({
           : null,
         targetGrowId,
       }),
-    [defaultTentId, tentsLoading, tentsError, tentsLoaded, suppliedTentRow, targetGrowId],
+    [
+      defaultTentId,
+      tentsLoading,
+      tentsFetching,
+      tentsError,
+      tentsLoaded,
+      suppliedTentRow,
+      targetGrowId,
+    ],
   );
 
   const requireTentForWrite =
@@ -156,6 +169,7 @@ export default function CreatePlantDialog({
     tentGrowId: suppliedTentRow?.grow_id ?? null,
     targetGrowId,
     tentsLoading,
+    tentsFetching,
     tentsError,
     tentsLoaded,
   });
@@ -198,15 +212,13 @@ export default function CreatePlantDialog({
         requireTent ||
         !!defaultTentId),
     tentsLoading,
+    tentsFetching,
   });
 
+  // Pending/read-error always block. Orphan/mismatch/missing-after-load clear
+  // only via allowCompatibleReplacement + explicitCompatiblePick — never tentless.
   const tentBlocksWrite =
-    (suppliedTent.blockSubmit &&
-      (suppliedTent.kind === "pending" ||
-        suppliedTent.kind === "unavailable" ||
-        ((suppliedTent.kind === "orphan" || suppliedTent.kind === "mismatch") &&
-          !explicitCompatiblePick))) ||
-    tentCompat.blockSubmit;
+    suppliedTentBlocksWrite(suppliedTent, explicitCompatiblePick) || tentCompat.blockSubmit;
 
   const formBlocked = binding.blockSubmit || !canWriteCreateGrowId(targetGrowId) || tentBlocksWrite;
 
@@ -434,44 +446,45 @@ export default function CreatePlantDialog({
             <span className="text-muted-foreground">{suppliedTent.body}</span>
           </p>
         )}
-        {suppliedTent.kind === "unavailable" && (
-          <div
-            className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs space-y-2"
-            data-testid="create-plant-tent-unavailable"
-            role="alert"
-          >
-            <p className="font-semibold">{suppliedTent.title}</p>
-            <p className="text-muted-foreground">{suppliedTent.body}</p>
-            {suppliedTent.showRetry && (
-              <>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  data-testid="create-plant-tent-retry"
-                  disabled={tentRetry.gate.disabled}
-                  aria-disabled={tentRetry.gate.disabled}
-                  title={
-                    tentRetry.gate.reason === "cooldown"
-                      ? GROW_SETUP_MESSAGES.retryCooldownHint
-                      : undefined
-                  }
-                  onClick={() => void tentRetry.attempt()}
-                >
-                  {GROW_SETUP_MESSAGES.readErrorRetry}
-                </Button>
-                {tentRetry.gate.reason === "cooldown" && (
-                  <p
-                    className="text-[11px] text-muted-foreground"
-                    data-testid="create-plant-tent-retry-cooldown"
+        {suppliedTent.kind === "unavailable" &&
+          !(suppliedTent.allowCompatibleReplacement && explicitCompatiblePick) && (
+            <div
+              className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs space-y-2"
+              data-testid="create-plant-tent-unavailable"
+              role="alert"
+            >
+              <p className="font-semibold">{suppliedTent.title}</p>
+              <p className="text-muted-foreground">{suppliedTent.body}</p>
+              {suppliedTent.showRetry && (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    data-testid="create-plant-tent-retry"
+                    disabled={tentRetry.gate.disabled}
+                    aria-disabled={tentRetry.gate.disabled}
+                    title={
+                      tentRetry.gate.reason === "cooldown"
+                        ? GROW_SETUP_MESSAGES.retryCooldownHint
+                        : undefined
+                    }
+                    onClick={() => void tentRetry.attempt()}
                   >
-                    {GROW_SETUP_MESSAGES.retryCooldownHint}
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-        )}
+                    {GROW_SETUP_MESSAGES.readErrorRetry}
+                  </Button>
+                  {tentRetry.gate.reason === "cooldown" && (
+                    <p
+                      className="text-[11px] text-muted-foreground"
+                      data-testid="create-plant-tent-retry-cooldown"
+                    >
+                      {GROW_SETUP_MESSAGES.retryCooldownHint}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         {(suppliedTent.kind === "orphan" || suppliedTent.kind === "mismatch") &&
           !explicitCompatiblePick && (
             <p
@@ -494,154 +507,159 @@ export default function CreatePlantDialog({
           </p>
         )}
 
-        <form onSubmit={submit} className="grid gap-3" data-testid="create-plant-form">
-          <div>
-            <Label>Name</Label>
-            <Input
-              required
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Plant A"
-              data-testid="create-plant-name"
-            />
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Only a name and stage are required to get started.
-            </p>
-          </div>
-          <div>
-            <Label>Stage</Label>
-            <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STAGES.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>
-                    {s.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Type (optional)</Label>
-            <Select
-              value={form.plant_type}
-              onValueChange={(v) => setForm({ ...form, plant_type: v })}
-            >
-              <SelectTrigger data-testid="create-plant-type-select">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="unknown">Not sure</SelectItem>
-                <SelectItem value="autoflower">Autoflower</SelectItem>
-                <SelectItem value="photoperiod">Photoperiod</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <Label>
-                Tent
-                {requireTentForWrite ||
-                !plantCreateAllowsTentless({
-                  suppliedTentId: defaultTentId,
-                  requireTent,
-                })
-                  ? ""
-                  : " (optional)"}
-              </Label>
-              <CreateTentDialog
-                defaultGrowId={targetGrowId ?? defaultGrowId}
-                onCreated={(t) => {
-                  setForm((f) => ({ ...f, tent_id: t.id }));
-                  setExplicitCompatiblePick(true);
-                }}
-                trigger={
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 px-2 gap-1 text-xs"
-                  >
-                    <Plus className="h-3 w-3" /> Add new tent
-                  </Button>
-                }
+        {!binding.blockSubmit && (
+          <form onSubmit={submit} className="grid gap-3" data-testid="create-plant-form">
+            <div>
+              <Label>Name</Label>
+              <Input
+                required
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="Plant A"
+                data-testid="create-plant-name"
               />
-            </div>
-            <Select value={form.tent_id} onValueChange={onTentSelect}>
-              <SelectTrigger data-testid="create-plant-tent-select">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {plantCreateAllowsTentless({
-                  suppliedTentId: defaultTentId,
-                  requireTent,
-                }) && <SelectItem value="none">No tent</SelectItem>}
-                {tents.map((t: { id: string; name: string }) => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.name}
-                  </SelectItem>
-                ))}
-                {defaultTentId &&
-                  !tents.some((t) => t.id === defaultTentId) &&
-                  form.tent_id === defaultTentId && (
-                    <SelectItem value={defaultTentId}>Selected tent (needs review)</SelectItem>
-                  )}
-              </SelectContent>
-            </Select>
-            {tents.length === 0 && (
-              <p className="text-xs text-muted-foreground mt-1">
-                No tents yet. Create a tent first.
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Only a name and stage are required to get started.
               </p>
-            )}
-          </div>
-          <details className="rounded-md border border-border/40 px-3 py-2">
-            <summary className="cursor-pointer text-xs text-muted-foreground select-none">
-              Optional details (enrich later)
-            </summary>
-            <div className="grid gap-3 pt-3">
-              <div>
-                <Label>Strain (optional)</Label>
-                <Input
-                  value={form.strain}
-                  onChange={(e) => setForm({ ...form, strain: e.target.value })}
-                  placeholder="Blue Dream"
-                />
-              </div>
-              <div>
-                <Label>Health</Label>
-                <Select value={form.health} onValueChange={(v) => setForm({ ...form, health: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {HEALTH.map((h) => (
-                      <SelectItem key={h.value} value={h.value}>
-                        {h.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Started at (optional)</Label>
-                <Input
-                  type="date"
-                  value={form.started_at}
-                  onChange={(e) => setForm({ ...form, started_at: e.target.value })}
-                />
-              </div>
             </div>
-          </details>
-          <Button
-            disabled={busy || formBlocked || !tentCompat.compatible}
-            className="gradient-leaf text-primary-foreground"
-            data-testid="plant-create-submit"
-          >
-            Create plant
-          </Button>
-        </form>
+            <div>
+              <Label>Stage</Label>
+              <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STAGES.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Type (optional)</Label>
+              <Select
+                value={form.plant_type}
+                onValueChange={(v) => setForm({ ...form, plant_type: v })}
+              >
+                <SelectTrigger data-testid="create-plant-type-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unknown">Not sure</SelectItem>
+                  <SelectItem value="autoflower">Autoflower</SelectItem>
+                  <SelectItem value="photoperiod">Photoperiod</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <Label>
+                  Tent
+                  {requireTentForWrite ||
+                  !plantCreateAllowsTentless({
+                    suppliedTentId: defaultTentId,
+                    requireTent,
+                  })
+                    ? ""
+                    : " (optional)"}
+                </Label>
+                <CreateTentDialog
+                  defaultGrowId={targetGrowId ?? defaultGrowId}
+                  onCreated={(t) => {
+                    setForm((f) => ({ ...f, tent_id: t.id }));
+                    setExplicitCompatiblePick(true);
+                  }}
+                  trigger={
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 gap-1 text-xs"
+                    >
+                      <Plus className="h-3 w-3" /> Add new tent
+                    </Button>
+                  }
+                />
+              </div>
+              <Select value={form.tent_id} onValueChange={onTentSelect}>
+                <SelectTrigger data-testid="create-plant-tent-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {plantCreateAllowsTentless({
+                    suppliedTentId: defaultTentId,
+                    requireTent,
+                  }) && <SelectItem value="none">No tent</SelectItem>}
+                  {tents.map((t: { id: string; name: string }) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                  {defaultTentId &&
+                    !tents.some((t) => t.id === defaultTentId) &&
+                    form.tent_id === defaultTentId && (
+                      <SelectItem value={defaultTentId}>Selected tent (needs review)</SelectItem>
+                    )}
+                </SelectContent>
+              </Select>
+              {tents.length === 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  No tents yet. Create a tent first.
+                </p>
+              )}
+            </div>
+            <details className="rounded-md border border-border/40 px-3 py-2">
+              <summary className="cursor-pointer text-xs text-muted-foreground select-none">
+                Optional details (enrich later)
+              </summary>
+              <div className="grid gap-3 pt-3">
+                <div>
+                  <Label>Strain (optional)</Label>
+                  <Input
+                    value={form.strain}
+                    onChange={(e) => setForm({ ...form, strain: e.target.value })}
+                    placeholder="Blue Dream"
+                  />
+                </div>
+                <div>
+                  <Label>Health</Label>
+                  <Select
+                    value={form.health}
+                    onValueChange={(v) => setForm({ ...form, health: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {HEALTH.map((h) => (
+                        <SelectItem key={h.value} value={h.value}>
+                          {h.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Started at (optional)</Label>
+                  <Input
+                    type="date"
+                    value={form.started_at}
+                    onChange={(e) => setForm({ ...form, started_at: e.target.value })}
+                  />
+                </div>
+              </div>
+            </details>
+            <Button
+              disabled={busy || formBlocked || !tentCompat.compatible}
+              className="gradient-leaf text-primary-foreground"
+              data-testid="plant-create-submit"
+            >
+              Create plant
+            </Button>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -14,8 +14,15 @@ describe("create plant tent compatibility", () => {
   it("dialog never tentless-escapes a supplied tent", () => {
     expect(PLANT).toMatch(/evaluateSuppliedTentBinding/);
     expect(PLANT).toMatch(/plantCreateAllowsTentless/);
+    expect(PLANT).toMatch(/suppliedTentBlocksWrite/);
     expect(PLANT).toMatch(/create-plant-tent-pending/);
+    expect(PLANT).toMatch(/tentsFetching/);
+    expect(PLANT).toMatch(/explicitCompatiblePick/);
     expect(plantCreateAllowsTentless({ suppliedTentId: "t1" })).toBe(false);
+    // Inline tentBlocksWrite composition must not reappear and drift from the pure helper.
+    expect(PLANT).not.toMatch(
+      /suppliedTent\.blockSubmit\s*&&\s*\([\s\S]*suppliedTent\.kind\s*===\s*"pending"/,
+    );
   });
 
   it("orphan/mismatch block submit with zero clear-to-none contract", () => {
@@ -35,5 +42,18 @@ describe("create plant tent compatibility", () => {
       requireTentForWrite: true,
     });
     expect(noneBlocked.compatible).toBe(false);
+  });
+
+  it("background refetch keeps supplied tent pending even with a cached matching row", () => {
+    const pending = evaluateSuppliedTentBinding({
+      suppliedTentId: "t1",
+      tentsLoaded: true,
+      tentsLoading: false,
+      tentsFetching: true,
+      suppliedTentRow: { id: "t1", grow_id: "g1" },
+      targetGrowId: "g1",
+    });
+    expect(pending.kind).toBe("pending");
+    expect(pending.blockSubmit).toBe(true);
   });
 });

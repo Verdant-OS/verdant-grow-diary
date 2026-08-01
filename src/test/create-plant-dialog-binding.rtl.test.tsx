@@ -59,6 +59,7 @@ vi.mock("@/store/grows", () => ({
 const tentsState = vi.hoisted(() => ({
   data: [] as Array<{ id: string; name: string; grow_id: string | null }>,
   isLoading: false,
+  isFetching: false,
   isError: false,
   isFetched: true,
   refetch: vi.fn(),
@@ -83,11 +84,36 @@ vi.mock("@/lib/entitlements/freeTierGates", () => ({
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
+vi.mock("@/components/CreateTentDialog", () => ({
+  default: ({ onCreated }: { onCreated?: (t: { id: string; name: string }) => void }) => (
+    <button
+      type="button"
+      data-testid="mock-create-tent"
+      onClick={() => onCreated?.({ id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", name: "Tent B" })}
+    >
+      Add new tent
+    </button>
+  ),
+}));
+
 import CreatePlantDialog from "@/components/CreatePlantDialog";
+
+const elementPrototype = Element.prototype as Element & {
+  hasPointerCapture?: () => boolean;
+  setPointerCapture?: () => void;
+  releasePointerCapture?: () => void;
+  scrollIntoView?: () => void;
+};
+elementPrototype.hasPointerCapture ??= () => false;
+elementPrototype.setPointerCapture ??= () => {};
+elementPrototype.releasePointerCapture ??= () => {};
+elementPrototype.scrollIntoView ??= () => {};
 
 const G1 = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const T1 = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const T2 = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 const T_ORPHAN = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+const T_GONE = "ffffffff-ffff-4fff-8fff-ffffffffffff";
 
 function renderDialog(props: {
   defaultGrowId?: string;
@@ -116,16 +142,18 @@ beforeEach(() => {
   growsState.refresh = vi.fn();
   tentsState.data = [
     { id: T1, name: "Tent A", grow_id: G1 },
+    { id: T2, name: "Tent B", grow_id: G1 },
     { id: T_ORPHAN, name: "Orphan", grow_id: null },
   ];
   tentsState.isLoading = false;
+  tentsState.isFetching = false;
   tentsState.isError = false;
   tentsState.isFetched = true;
   tentsState.refetch = vi.fn();
 });
 
 describe("CreatePlantDialog RTL binding", () => {
-  it("zero-grow hard-stop keeps form visible but submit blocked", () => {
+  it("withholds form on zero-grow hard-stop (Start your room)", () => {
     growsState.grows = [];
     growsState.activeGrowId = null;
     renderDialog({});
@@ -134,20 +162,18 @@ describe("CreatePlantDialog RTL binding", () => {
       "href",
       "/grows?intent=one_tent_activation",
     );
-    expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
-    expect(screen.getByTestId("plant-create-submit")).toBeDisabled();
+    expect(screen.queryByTestId("create-plant-form")).toBeNull();
     expect(insertMock).not.toHaveBeenCalled();
   });
 
-  it("shows Retry on grow read error — form visible, submit blocked", () => {
+  it("shows Retry on grow read error — not Start your room", () => {
     growsState.grows = [];
     growsState.error = "rls failed";
     renderDialog({});
     expect(screen.getByTestId("create-plant-read-error")).toBeInTheDocument();
     expect(screen.getByTestId("create-plant-retry")).toBeInTheDocument();
     expect(screen.queryByTestId("create-plant-hard-stop")).toBeNull();
-    expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
-    expect(screen.getByTestId("plant-create-submit")).toBeDisabled();
+    expect(screen.queryByTestId("create-plant-form")).toBeNull();
   });
 
   it("debounces grow Retry — multi-click fires refresh once", async () => {
@@ -167,8 +193,7 @@ describe("CreatePlantDialog RTL binding", () => {
     growsState.activeGrowId = G1;
     renderDialog({ defaultGrowId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" });
     expect(screen.getByTestId("create-plant-requested-unavailable")).toBeInTheDocument();
-    expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
-    expect(screen.getByTestId("plant-create-submit")).toBeDisabled();
+    expect(screen.queryByTestId("create-plant-form")).toBeNull();
     expect(insertMock).not.toHaveBeenCalled();
   });
 
@@ -183,6 +208,61 @@ describe("CreatePlantDialog RTL binding", () => {
     await userEvent.type(screen.getByTestId("create-plant-name"), "Plant X");
     await userEvent.click(submit);
     expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps supplied tent pending during background refetch — cached row is not trusted", async () => {
+    tentsState.isLoading = false;
+    tentsState.isFetching = true;
+    tentsState.isFetched = true;
+    tentsState.data = [{ id: T1, name: "Tent A", grow_id: G1 }];
+    renderDialog({ defaultGrowId: G1, defaultTentId: T1 });
+    expect(screen.getByTestId("create-plant-tent-pending")).toBeInTheDocument();
+    const submit = screen.getByTestId("plant-create-submit");
+    expect(submit).toBeDisabled();
+    await userEvent.type(screen.getByTestId("create-plant-name"), "Stale Cache");
+    await userEvent.click(submit);
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("tent read error blocks submit — Retry only, zero inserts", async () => {
+    tentsState.isError = true;
+    tentsState.data = [{ id: T1, name: "Tent A", grow_id: G1 }];
+    renderDialog({ defaultGrowId: G1, defaultTentId: T_GONE });
+    expect(screen.getByTestId("create-plant-tent-unavailable")).toBeInTheDocument();
+    expect(screen.getByTestId("create-plant-tent-retry")).toBeInTheDocument();
+    const submit = screen.getByTestId("plant-create-submit");
+    expect(submit).toBeDisabled();
+    await userEvent.type(screen.getByTestId("create-plant-name"), "Blocked");
+    // Read-error must not clear via CreateTent recovery — Retry only.
+    await userEvent.click(screen.getByTestId("mock-create-tent"));
+    expect(screen.getByTestId("create-plant-tent-unavailable")).toBeInTheDocument();
+    expect(submit).toBeDisabled();
+    await userEvent.click(submit);
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("unavailable supplied tent can recover via verified compatible replacement", async () => {
+    renderDialog({ defaultGrowId: G1, defaultTentId: T_GONE });
+    expect(screen.getByTestId("create-plant-tent-unavailable")).toBeInTheDocument();
+    expect(screen.getByTestId("plant-create-submit")).toBeDisabled();
+    expect(screen.queryByText("No tent")).toBeNull();
+
+    // CreateTentDialog onCreated is the supported recovery path in jsdom
+    // (Radix Select pointer-capture is unavailable here).
+    await userEvent.click(screen.getByTestId("mock-create-tent"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("create-plant-tent-unavailable")).toBeNull();
+    });
+    expect(screen.getByTestId("plant-create-submit")).not.toBeDisabled();
+    await userEvent.type(screen.getByTestId("create-plant-name"), "Recovered");
+    await userEvent.click(screen.getByTestId("plant-create-submit"));
+    await waitFor(() => {
+      expect(insertMock).toHaveBeenCalled();
+    });
+    const payload = insertMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload.grow_id).toBe(G1);
+    expect(payload.tent_id).toBe(T2);
   });
 
   it("orphan supplied tent cannot tentless-insert", async () => {

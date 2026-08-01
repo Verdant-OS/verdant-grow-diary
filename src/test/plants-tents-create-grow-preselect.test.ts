@@ -52,8 +52,25 @@ describe("Plants/Tents — preselect grow on create", () => {
   });
 
   it("Create dialogs fail closed without resolvable target", () => {
-    expect(CREATE_TENT).toMatch(/formBlocked|binding\.blockSubmit/);
-    expect(CREATE_PLANT).toMatch(/formBlocked|binding\.blockSubmit/);
+    // Pin the full gate formula — not just one token from the expression.
+    expect(CREATE_TENT).toMatch(
+      /const formBlocked = binding\.blockSubmit \|\| !canWriteCreateGrowId\(targetGrowId\)/,
+    );
+    expect(CREATE_PLANT).toMatch(
+      /const formBlocked[\s\S]*binding\.blockSubmit[\s\S]*!canWriteCreateGrowId\(targetGrowId\)[\s\S]*tentBlocksWrite/,
+    );
+    expect(CREATE_PLANT).toMatch(/if \(formBlocked \|\| !targetGrowId\)/);
+    expect(CREATE_TENT).toMatch(/if \(formBlocked\)/);
+    // Disabled wiring must route through formBlocked (not binding.blockSubmit alone).
+    expect(CREATE_TENT).toMatch(/disabled=\{busy \|\| !tentGate\.allowed \|\| formBlocked\}/);
+    expect(CREATE_PLANT).toMatch(/disabled=\{busy \|\| formBlocked/);
+    expect(CREATE_TENT).not.toMatch(/hardStop\.blockSubmit/);
+    expect(CREATE_PLANT).not.toMatch(/hardStop\.blockSubmit/);
+  });
+
+  it("CreatePlantDialog pins tent refetch + pure suppliedTentBlocksWrite gate", () => {
+    expect(CREATE_PLANT).toMatch(/isFetching:\s*tentsFetching/);
+    expect(CREATE_PLANT).toMatch(/suppliedTentBlocksWrite\(/);
   });
 
   it("Edit flows are not touched (create dialogs only)", () => {

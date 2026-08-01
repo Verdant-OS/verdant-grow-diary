@@ -47,11 +47,11 @@ describe("grow setup messages static safety", () => {
     expect(PLANT).toMatch(/create-plant-retry/);
   });
 
-  it("pins both supplied-tent recovery actions", () => {
-    expect(GROW_SETUP_MESSAGES.chooseTent).toBe("Choose another tent");
-    expect(GROW_SETUP_MESSAGES.switchSetup).toBe("Switch setup");
-    expect(PLANT).toMatch(/GROW_SETUP_MESSAGES\.chooseTent/);
-    expect(PLANT).toMatch(/GROW_SETUP_MESSAGES\.switchSetup/);
+  it("pins the supplied-tent Finish setup recovery action", () => {
+    expect(GROW_SETUP_MESSAGES.finishSetup).toBe("Finish setup");
+    expect(PLANT).toMatch(/finishSetupHref/);
+    expect(PLANT).toMatch(/finishSetupLabel/);
+    expect(PLANT).toMatch(/create-plant-finish-setup-cta/);
   });
 
   it("rules module stays pure", () => {

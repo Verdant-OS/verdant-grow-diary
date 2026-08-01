@@ -569,6 +569,114 @@ export const RUN_SCOPED_BLOCKING_RULE_CODES: readonly SkillPolicyRuleCode[] = Ob
   "run_status_not_ok",
 ]);
 
+/**
+ * Proposal-local note() codes: always subject "proposal" with a non-null
+ * proposalId. Not blocking by themselves, but they still have a canonical
+ * attachment shape the live governor never violates.
+ */
+export const PROPOSAL_SCOPED_NOTE_RULE_CODES: readonly SkillPolicyRuleCode[] = Object.freeze([
+  "autoflower_status_unknown",
+  "autoflower_stress_capped",
+  "declared_risk_below_derived_floor",
+  "intervention_class_unknown",
+  "prior_recommendation_unresolved",
+  "recent_intervention_same_class",
+]);
+
+/**
+ * Informational run-scoped fires (`cap()`, stage notes, confidence ceilings).
+ * Always `subject: "run"` and `proposalId: null` — never a proposal attachment.
+ */
+export const RUN_SCOPED_INFORMATIONAL_RULE_CODES: readonly SkillPolicyRuleCode[] = Object.freeze([
+  "applicability_partial",
+  "completeness_low",
+  "conflicting_telemetry",
+  "contested_evidence_surfaced",
+  "contested_evidence_withheld",
+  "evidence_confidence_overstated",
+  "evidence_review_stale",
+  "missing_required_context",
+  "no_evidence_retrieved",
+  "photo_only_evidence",
+  "photo_quality_poor",
+  "photo_quality_unknown",
+  "photo_single_view",
+  "provenance_blocked",
+  "stage_forbids_proposals",
+  "stage_unknown",
+]);
+
+/**
+ * Canonical subject + proposalId shape the live governor emits for a code.
+ *
+ * Used by the evaluation fixture schema so a fabricated
+ * `{ code: "proposal_without_grant", subject: "evidence", proposalId: null }`
+ * cannot strip a run-wide block by parking it on a channel the evaluator
+ * ignores. Linguistic families may appear on proposals (blocked content) or
+ * at run scope / withheld channels (proposalId null); everything else is
+ * either run/null or proposal/id.
+ */
+export type CanonicalFiredRuleSubject =
+  | "run"
+  | "proposal"
+  | "hypothesis"
+  | "follow_up"
+  | "evidence";
+
+export interface CanonicalFiredRuleShape {
+  /** Subjects the governor can attach this code under. */
+  readonly allowedSubjects: readonly CanonicalFiredRuleSubject[];
+  /**
+   * - `null` — proposalId must be null
+   * - `required` — proposalId must be a non-empty string
+   * - `by_subject` — null when subject is not "proposal"; required when it is
+   */
+  readonly proposalId: "null" | "required" | "by_subject";
+}
+
+export function canonicalFiredRuleShape(code: SkillPolicyRuleCode): CanonicalFiredRuleShape {
+  if ((RUN_SCOPED_BLOCKING_RULE_CODES as readonly string[]).includes(code)) {
+    return { allowedSubjects: ["run"], proposalId: "null" };
+  }
+  if ((RUN_SCOPED_INFORMATIONAL_RULE_CODES as readonly string[]).includes(code)) {
+    return { allowedSubjects: ["run"], proposalId: "null" };
+  }
+  if ((STRUCTURAL_BLOCKING_RULE_CODES as readonly string[]).includes(code)) {
+    return { allowedSubjects: ["proposal"], proposalId: "required" };
+  }
+  if ((PROPOSAL_SCOPED_NOTE_RULE_CODES as readonly string[]).includes(code)) {
+    return { allowedSubjects: ["proposal"], proposalId: "required" };
+  }
+  // Linguistic blocking families: proposal-local blocks, or run/withheld
+  // channel bookkeeping (subject run / hypothesis / follow_up / evidence).
+  if (BLOCKING_FAMILIES.some((family) => family.code === code)) {
+    return {
+      allowedSubjects: ["run", "proposal", "hypothesis", "follow_up", "evidence"],
+      proposalId: "by_subject",
+    };
+  }
+  // Fail closed for any code that gained a fire site without a shape entry:
+  // run/null is the governor's default for unattached structural fires.
+  return { allowedSubjects: ["run"], proposalId: "null" };
+}
+
+/** True when a recorded fired rule matches the governor's emission shape. */
+export function isCanonicalFiredRule(rule: {
+  code: string;
+  subject: string;
+  proposalId: string | null;
+}): boolean {
+  if (!(SKILL_POLICY_RULE_CODES as readonly string[]).includes(rule.code)) return false;
+  const shape = canonicalFiredRuleShape(rule.code as SkillPolicyRuleCode);
+  if (!(shape.allowedSubjects as readonly string[]).includes(rule.subject)) return false;
+  const id = rule.proposalId;
+  if (shape.proposalId === "null") return id === null;
+  if (shape.proposalId === "required") return typeof id === "string" && id.length > 0;
+  // by_subject
+  if (rule.subject === "proposal") return typeof id === "string" && id.length > 0;
+  return id === null;
+}
+
 /** Families that block outright: no legitimate use in an advisory proposal. */
 export const BLOCKING_FAMILIES: readonly {
   readonly code: SkillPolicyRuleCode;

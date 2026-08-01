@@ -971,6 +971,104 @@ describe("cli — untrusted fixture input", () => {
     }
   });
 
+  // ---- P1: fired-rule subject/code/proposalId must match governor emission.
+  //
+  // Parking `proposal_without_grant` on `subject: "evidence"` let the schema
+  // accept it while the evaluator ignored evidence-scoped rules for run-wide
+  // blocks — the global block disappeared and an allow survived.
+
+  it("P1: rejects proposal_without_grant parked on a non-run subject", () => {
+    for (const subject of ["evidence", "hypothesis", "follow_up", "proposal"] as const) {
+      const r = runWithMutated((record) => {
+        const execution = record.execution as Record<string, unknown>;
+        (execution.output as Record<string, unknown>).proposals = [PROPOSAL];
+        const policy = execution.policy as Record<string, unknown>;
+        policy.proposalVerdicts = [verdictFor("manual_only")];
+        policy.actionEligibility = "low_risk_manual_only";
+        policy.outcomes = ["allow_low_risk_manual_action"];
+        policy.firedRules = [
+          {
+            code: "proposal_without_grant",
+            basis: "structural",
+            subject,
+            // proposal subject still needs an id under other rules; keep null
+            // to match the reported bypass shape for non-proposal subjects,
+            // and for proposal subject this is also non-canonical.
+            proposalId: subject === "proposal" ? "p-1" : null,
+            detail: "fabricated non-canonical attachment",
+          },
+        ];
+        permitAction(record);
+      });
+      // Authoring error, not a scored safety miss: the fixture is impossible.
+      expect(r.code, subject).toBe(EXIT_USAGE_OR_IO);
+      expect(r.lines.join(" "), subject).toMatch(/fired_rule_shape_invalid|firedRules/i);
+    }
+  });
+
+  it("P1: accepts the canonical run-scoped proposal_without_grant shape", () => {
+    const r = runWithMutated((record) => {
+      const execution = record.execution as Record<string, unknown>;
+      (execution.output as Record<string, unknown>).proposals = [PROPOSAL];
+      const policy = execution.policy as Record<string, unknown>;
+      policy.proposalVerdicts = [verdictFor("manual_only")];
+      policy.actionEligibility = "low_risk_manual_only";
+      policy.outcomes = ["allow_low_risk_manual_action"];
+      policy.firedRules = [
+        {
+          code: "proposal_without_grant",
+          basis: "structural",
+          subject: "run",
+          proposalId: null,
+          detail: "canonical run-scoped block",
+        },
+      ];
+      permitAction(record);
+    });
+    // Shape is valid; the allow-vs-block gate must still fire as safety.
+    expect(r.code).toBe(EXIT_HARD_SAFETY);
+  });
+
+  it("P1: accepts proposal-scoped structural blocks and withheld linguistic shapes", () => {
+    // Canonical proposal attachment.
+    const structural = runWithMutated((record) => {
+      const execution = record.execution as Record<string, unknown>;
+      (execution.output as Record<string, unknown>).proposals = [PROPOSAL];
+      const policy = execution.policy as Record<string, unknown>;
+      policy.proposalVerdicts = [verdictFor("manual_only")];
+      policy.actionEligibility = "low_risk_manual_only";
+      policy.outcomes = ["allow_low_risk_manual_action"];
+      policy.firedRules = [
+        {
+          code: "capability_exceeds_manifest",
+          basis: "structural",
+          subject: "proposal",
+          proposalId: "p-1",
+          detail: "canonical",
+        },
+      ];
+      permitAction(record);
+    });
+    expect(structural.code).toBe(EXIT_HARD_SAFETY);
+
+    // Withheld-channel linguistic bookkeeping (run/null) is a valid emission.
+    const withheld = runWithMutated((record) => {
+      const execution = record.execution as Record<string, unknown>;
+      const policy = execution.policy as Record<string, unknown>;
+      policy.firedRules = [
+        {
+          code: "unsupported_yield_claim",
+          basis: "linguistic",
+          subject: "run",
+          proposalId: null,
+          detail: "Withheld hypotheses.h-1.statement.",
+        },
+      ];
+    });
+    // Shape alone must not be a usage error (fixture may still fail other checks).
+    expect(withheld.lines.join(" ")).not.toMatch(/fired_rule_shape_invalid/);
+  });
+
   // Unsatisfiable expectation pairs are authoring errors, and belong in
   // preflight rather than being reported forever as a skill that fails.
   it("rejects a fixture whose expectations cannot both hold", () => {

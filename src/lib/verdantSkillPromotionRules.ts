@@ -64,6 +64,13 @@ export const PROMOTION_BLOCKING_REASONS = [
   "artifact_disclosure_scan_failed",
   "unknown_target_state",
   "transition_not_permitted",
+  /**
+   * Exposure-increasing transitions require the decision's source revision to
+   * be the same non-null revision the evaluation report was produced from.
+   * Without this, a green report from revision A can authorize revision B when
+   * implementation code changed but manifest/policy/evidence digests did not.
+   */
+  "source_revision_mismatch",
 ] as const;
 export type PromotionBlockingReason = (typeof PROMOTION_BLOCKING_REASONS)[number];
 
@@ -340,6 +347,37 @@ export function evaluateSkillPromotionEligibility(
   }
   if (report.skillVersion !== input.targetSkillVersion) {
     block("report_for_other_skill_version");
+  }
+
+  // Exposure-increasing transitions: the evaluated report must name the same
+  // non-null source revision the decision will record. Manifest/policy/corpus
+  // digests alone do not catch implementation-code changes that leave those
+  // digests untouched; without this, revision A can authorize revision B.
+  // Withdrawal is unrestricted — removing exposure must not wait on a green
+  // report or a revision pin.
+  if (!isWithdrawal) {
+    const exposureIncreasing =
+      // Non-null lifecycle target (internal_sandbox, limited_beta, verified, …)
+      (PROGRESSION_TO_MANIFEST_LIFECYCLE[input.requestedState] ?? null) !== null ||
+      // Release-bearing gate tables even when lifecycle mapping is null
+      // (monitored_release).
+      requiredGates.includes("rollback_target") ||
+      requiredGates.includes("internal_sandbox_attested");
+    if (exposureIncreasing) {
+      const reportRevision = report.sourceRevision;
+      const decisionRevision = input.sourceRevision;
+      if (
+        reportRevision === null ||
+        reportRevision === undefined ||
+        reportRevision === "" ||
+        decisionRevision === null ||
+        decisionRevision === undefined ||
+        decisionRevision === "" ||
+        reportRevision !== decisionRevision
+      ) {
+        block("source_revision_mismatch");
+      }
+    }
   }
 
   if (!isWithdrawal) {

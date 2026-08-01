@@ -612,6 +612,68 @@ describe("promotion — withdrawal and determinism", () => {
     }
   });
 
+  // ---- P1: source revision must match for exposure-increasing transitions.
+  //
+  // Manifest/policy/corpus digests alone do not catch implementation-code
+  // changes that leave those digests untouched. A green report from revision A
+  // must not authorize revision B.
+
+  it("P1: matching non-null revisions keep a release-bearing advance eligible", () => {
+    const d = decide({ sourceRevision: "abc1234" });
+    expect(d.eligible).toBe(true);
+    expect(d.blockingReasons).not.toContain("source_revision_mismatch");
+    expect(d.sourceRevision).toBe("abc1234");
+  });
+
+  it("P1: a decision revision that differs from the report is blocked", () => {
+    const d = decide({ sourceRevision: "different-rev-bbbb" });
+    expect(d.eligible).toBe(false);
+    expect(d.blockingReasons).toContain("source_revision_mismatch");
+    expect(d.authorizedManifestLifecycle).toBeNull();
+  });
+
+  it("P1: a null decision revision cannot authorize exposure", () => {
+    const d = decide({ sourceRevision: null });
+    expect(d.eligible).toBe(false);
+    expect(d.blockingReasons).toContain("source_revision_mismatch");
+  });
+
+  it("P1: a null report revision cannot authorize exposure", () => {
+    const r = report();
+    const d = decide({
+      report: { ...r, sourceRevision: null },
+      sourceRevision: "abc1234",
+    });
+    // Binding will also fail because we mutated the report — but the revision
+    // reason must still be present as its own refusal.
+    expect(d.blockingReasons).toContain("source_revision_mismatch");
+    expect(d.eligible).toBe(false);
+  });
+
+  it("P1: empty-string revisions are treated as missing, not as a match", () => {
+    const r = report();
+    const d = decide({
+      report: { ...r, sourceRevision: "" },
+      sourceRevision: "",
+    });
+    expect(d.blockingReasons).toContain("source_revision_mismatch");
+    expect(d.eligible).toBe(false);
+  });
+
+  it("P1: withdrawal stays unrestricted even with mismatched or null revisions", () => {
+    for (const state of ["paused", "deprecated", "withdrawn", "superseded"] as const) {
+      const d = decide({
+        requestedState: state,
+        sourceRevision: "totally-different",
+        report: { ...report(), sourceRevision: null },
+        attestations: [],
+        rollbackTarget: null,
+      });
+      expect(d.eligible, state).toBe(true);
+      expect(d.blockingReasons, state).not.toContain("source_revision_mismatch");
+    }
+  });
+
   it("produces a deterministic decision digest", () => {
     const a = decide();
     const b = decide();

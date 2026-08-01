@@ -18,7 +18,11 @@ import {
   type EvaluationConfidenceExpectation,
   type EvaluationFixtureKind,
 } from "@/lib/verdantSkillEvaluationTypes";
-import { SKILL_POLICY_OUTCOMES, SKILL_POLICY_RULE_CODES } from "@/lib/verdantSkillPolicyGovernor";
+import {
+  SKILL_POLICY_OUTCOMES,
+  SKILL_POLICY_RULE_CODES,
+  isCanonicalFiredRule,
+} from "@/lib/verdantSkillPolicyGovernor";
 import { CONTEXT_SLOTS } from "@/lib/plantContextBundleCompiler";
 import { SKILL_APPLICABILITY_VERDICTS } from "@/lib/verdantSkillApplicabilityRules";
 import {
@@ -342,7 +346,27 @@ const executionFiredRuleSchema = z
     // a safety check with an opt-out.
     code: z.enum(SKILL_POLICY_RULE_CODES),
   })
-  .passthrough();
+  .passthrough()
+  .superRefine((rule, ctx) => {
+    // Subject alone is not enough: a run-wide structural block parked on
+    // `subject: "evidence"` is still accepted by the enum, and the evaluator
+    // then ignores evidence-scoped rules when applying run-scoped blocks —
+    // so `proposal_without_grant` disappears and an allow verdict survives.
+    // Shapes come from the governor's own emission tables.
+    if (
+      !isCanonicalFiredRule({
+        code: rule.code,
+        subject: rule.subject,
+        proposalId: rule.proposalId,
+      })
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `fired_rule_shape_invalid:${rule.code}/${rule.subject}/${rule.proposalId === null ? "null" : "id"}`,
+        path: ["code"],
+      });
+    }
+  });
 
 /**
  * One proposal verdict. Elements again, for the same reason as fired rules:

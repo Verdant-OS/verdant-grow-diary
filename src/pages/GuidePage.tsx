@@ -26,6 +26,7 @@ import {
   buildArticleJsonLd,
   buildBreadcrumbListJsonLd,
   buildFaqPageJsonLd,
+  buildWebPageJsonLd,
   safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
 import { buildGuideQuickLogStarterHref } from "@/lib/quickLogStarterLinks";
@@ -82,6 +83,12 @@ export default function GuidePage() {
   useEffect(() => {
     if (!guide) return;
     const guideUrl = `${VERDANT_SITE_ORIGIN}/guides/${guide.slug}`;
+    const webpage = buildWebPageJsonLd({
+      title: guide.title,
+      description: guide.description,
+      url: guideUrl,
+      siteUrl: VERDANT_SITE_ORIGIN,
+    });
     const faq = buildFaqPageJsonLd({
       pageUrl: guideUrl,
       questions: guide.faq,
@@ -102,28 +109,29 @@ export default function GuidePage() {
           siteUrl: VERDANT_SITE_ORIGIN,
         })
       : null;
-    const faqScript = document.createElement("script");
-    faqScript.type = "application/ld+json";
-    faqScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-faq`);
-    faqScript.text = safeJsonLdStringify(faq);
-    document.head.appendChild(faqScript);
-    const crumbScript = document.createElement("script");
-    crumbScript.type = "application/ld+json";
-    crumbScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-breadcrumb`);
-    crumbScript.text = safeJsonLdStringify(crumbs);
-    document.head.appendChild(crumbScript);
-    const articleScript = article ? document.createElement("script") : null;
-    if (articleScript) {
-      articleScript.type = "application/ld+json";
-      articleScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-article`);
-      articleScript.text = safeJsonLdStringify(article);
-      document.head.appendChild(articleScript);
-    }
-    return () => {
-      faqScript.remove();
-      crumbScript.remove();
-      articleScript?.remove();
-    };
+    // Clean up the route-local JSON-LD baked into the initial HTML before
+    // React assumes ownership. Otherwise hydration duplicates the same FAQ,
+    // breadcrumb, and article, while later SPA navigation leaves a stale
+    // WebPage identity from the first route in the document head.
+    document
+      .querySelectorAll('script[type="application/ld+json"][data-static-route-ldjson]')
+      .forEach((script) => script.remove());
+
+    const docs: Array<[string, unknown]> = [
+      [`guide-${guide.slug}-webpage`, webpage],
+      [`guide-${guide.slug}-faq`, faq],
+      [`guide-${guide.slug}-breadcrumb`, crumbs],
+    ];
+    if (article) docs.push([`guide-${guide.slug}-article`, article]);
+    const scripts = docs.map(([id, data]) => {
+      const script = document.createElement("script");
+      script.type = "application/ld+json";
+      script.setAttribute("data-page-ldjson", id);
+      script.text = safeJsonLdStringify(data);
+      document.head.appendChild(script);
+      return script;
+    });
+    return () => scripts.forEach((script) => script.remove());
   }, [guide]);
 
   if (!guide) {

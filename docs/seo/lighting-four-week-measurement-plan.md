@@ -1,6 +1,6 @@
 # Lighting four-week measurement plan
 
-**Verdict:** BLOCKED — GA4/GSC OWNER SETUP REQUIRED
+**Verdict:** NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND
 **Day 0:** UNSET
 **Four-week clock:** NOT_STARTED
 **Timezone:** America/Chicago
@@ -41,32 +41,37 @@ recorded.
 
 ## Current blockers
 
-The production and measurement-contract gates are complete:
+The public release identity is complete, but production and measurement-contract defects remain:
 
 - PR #597 is merged and live in production manifest
   `0c61cc572de32a8a7af975ace14659dfb77a0a43`.
 - Intercepted browser evidence preserves each exact lighting-guide path and page-specific title,
-  reports no duplicate views, keeps protected IDs masked, and transmitted no verification events.
+  keeps protected IDs masked, and transmitted no verification events. It also found automatic GA4
+  page views without Verdant's explicit `page_path` alongside the app-owned SPA events.
 - The owner-confirmed GA4 production stream is `Verdant Grow Diary`, stream URL
   `https://verdantgrowdiary.com`, stream ID `15065867361`, and measurement ID `G-B3QRSZEM9S`;
   production loads and targets that exact measurement ID. The property ID is still unconfirmed.
 - The current public probe returns HTTP 200 for both guides, the sitemap, robots, and version
   manifest. The 51-URL sitemap contains each lighting route exactly once, and robots protects app
   prefixes.
-- Workflow [30671654959](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30671654959)
+- Workflow [30681587094](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30681587094)
   succeeded across all 51 URLs, but its GSC operation was `SKIPPED`, access was `BLOCKED`,
   execution was `SKIPPED`, OAuth was not configured, and it made 0 API attempts.
-- Deploy head `0c61cc572de32a8a7af975ace14659dfb77a0a43` exactly matches the production manifest. There is
-  no pending public-app publish, and release content match remains `PASS`.
+- Production manifest `2560d83a6b740cb9d6c4521bc6edc083977d51fc` is an ancestor of deploy head
+  `591081b387ae9a6d9eb00aeb1f4ed9b43c90cc7d`; the committed delta is sensor-adapter hardening and
+  release content match remains `PASS`. The local JSON-LD repair does require a publish after merge.
 - Direct-load indexability remains `PASS`, but cross-guide client navigation leaves conflicting
-  prior-route/current-route page-level JSON-LD in the hydrated DOM. This is the next P1 technical
-  SEO repair and is not treated as an authenticated reporting baseline or a reason to backdate Day 0.
+  prior-route/current-route page-level JSON-LD in the hydrated DOM. The bounded local repair passes
+  its built navigation matrix but is not production evidence until published.
 
-Two owner access gates remain:
+Three owner gates remain:
 
-1. Confirm the existing Verdant GA4 property identity and provide read-only authenticated
+1. Disable Enhanced Measurement page views based on browser-history changes in the existing
+   production stream, retaining Verdant's explicit SPA page-view owner, then authorize a controlled
+   re-verification.
+2. Confirm the existing Verdant GA4 property identity and provide read-only authenticated
    reporting access. The production stream identity itself is complete.
-2. Configure the existing owner-controlled, read-only Search Console OAuth workflow, or provide
+3. Configure the existing owner-controlled, read-only Search Console OAuth workflow, or provide
    another authorized authenticated Search Console session.
 
 Use the [analytics owner setup checklist](./analytics-owner-setup-checklist.md). Do not send

@@ -11,6 +11,54 @@
 
 import type { FaqEntry } from "../constants/verdantSeoCopy";
 
+export interface WebPageJsonLd {
+  readonly "@context": "https://schema.org";
+  readonly "@type": "WebPage";
+  readonly "@id": string;
+  readonly url: string;
+  readonly name: string;
+  readonly description: string;
+  readonly isPartOf: {
+    readonly "@type": "WebSite";
+    readonly "@id": string;
+  };
+}
+
+/** Build one route-owned WebPage identity for static output and hydration. */
+export function buildWebPageJsonLd({
+  title,
+  description,
+  url,
+  siteUrl,
+}: {
+  title: string;
+  description: string;
+  url: string;
+  siteUrl: string;
+}): WebPageJsonLd {
+  if (!title.trim()) throw new Error("buildWebPageJsonLd: title required");
+  if (!description.trim()) throw new Error("buildWebPageJsonLd: description required");
+  if (!/^https?:\/\//i.test(url)) {
+    throw new Error(`buildWebPageJsonLd: url must be absolute (got "${url}")`);
+  }
+  if (!/^https?:\/\//i.test(siteUrl)) {
+    throw new Error(`buildWebPageJsonLd: siteUrl must be absolute (got "${siteUrl}")`);
+  }
+  const normalizedSiteUrl = siteUrl.replace(/\/$/, "");
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "@id": `${url}#webpage`,
+    url,
+    name: title,
+    description,
+    isPartOf: {
+      "@type": "WebSite",
+      "@id": `${normalizedSiteUrl}/#website`,
+    },
+  };
+}
+
 export interface FaqPageJsonLd {
   readonly "@context": "https://schema.org";
   readonly "@type": "FAQPage";

@@ -103,6 +103,8 @@ describe("lighting analytics owner setup checklist", () => {
     expect(CHECKLIST).toMatch(/Exact owner action\s+\| Codex can verify afterward/);
     expect(CHECKLIST).toContain("Tell Codex only that access is ready");
     expect(CHECKLIST).toMatch(/Enhanced measurement review\s+\| `BLOCKED_BY_ACCESS`/);
+    expect(CHECKLIST).toContain("Page changes based on browser history events");
+    expect(CHECKLIST).toContain("pushState");
     expect(CHECKLIST).toMatch(/Production hostname\s+\| `BLOCKED_BY_ACCESS`/);
   });
 

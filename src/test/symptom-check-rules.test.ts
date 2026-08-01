@@ -14,23 +14,52 @@ describe("guided Symptom Check rules", () => {
 
   it("requires a visible sign, valid stage, and explicit confirmation", () => {
     expect(
-      validateGuidedSymptomCheck({ symptomId: null, stage: "flower", stageConfirmed: true }),
+      validateGuidedSymptomCheck({
+        plantId: "plant-1",
+        symptomId: null,
+        stage: "flower",
+        stageConfirmed: true,
+      }),
     ).toEqual({
       ok: false,
       reason: "Choose the visible sign you observed.",
     });
     expect(
-      validateGuidedSymptomCheck({ symptomId: "yellowing", stage: "bad", stageConfirmed: true }).ok,
+      validateGuidedSymptomCheck({
+        plantId: "plant-1",
+        symptomId: "yellowing",
+        stage: "bad",
+        stageConfirmed: true,
+      }).ok,
     ).toBe(false);
     expect(
-      validateGuidedSymptomCheck({ symptomId: "yellowing", stage: "flower", stageConfirmed: false })
-        .ok,
+      validateGuidedSymptomCheck({
+        plantId: "plant-1",
+        symptomId: "yellowing",
+        stage: "flower",
+        stageConfirmed: false,
+      }).ok,
     ).toBe(false);
+  });
+
+  it("requires one selected plant before a guided Symptom Check can validate", () => {
+    expect(
+      validateGuidedSymptomCheck({
+        plantId: null,
+        symptomId: "yellowing",
+        stage: "flower",
+        stageConfirmed: true,
+      }),
+    ).toEqual({
+      ok: false,
+      reason: "Select a plant before saving this Symptom Check.",
+    });
   });
 
   it("preserves the canonical stored sign code and one confirmed stage detail", () => {
     expect(
       validateGuidedSymptomCheck({
+        plantId: "plant-1",
         symptomId: "tip_damage",
         stage: "flower",
         stageConfirmed: true,

@@ -129,6 +129,29 @@ describe("QuickLogAllActivitiesSection — shared taxonomy", () => {
     expect(launcher.querySelector(".min-w-0")).not.toBeNull();
   });
 
+  it("requires a selected plant for Symptom Check without blocking the plant-scoped launcher", () => {
+    const missingPlant = mountSection({ plantId: null });
+    const blockedLauncher = screen.getByTestId("quick-log-all-activities-start-symptom-check");
+    expect(blockedLauncher).toBeDisabled();
+    expect(
+      screen.getByTestId("quick-log-all-activities-symptom-check-plant-required"),
+    ).toHaveTextContent("Select a plant to start a Symptom Check.");
+    fireEvent.click(blockedLauncher);
+    expect(screen.queryByTestId("quick-log-all-activities-form")).not.toBeInTheDocument();
+    expect(rpcMock).not.toHaveBeenCalled();
+    missingPlant.unmount();
+
+    mountSection({ plantId: PLANT });
+    const allowedLauncher = screen.getByTestId("quick-log-all-activities-start-symptom-check");
+    expect(allowedLauncher).toBeEnabled();
+    fireEvent.click(allowedLauncher);
+    expect(screen.getByTestId("quick-log-all-activities-form")).toHaveAttribute(
+      "data-activity-id",
+      "issue_observation",
+    );
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
   it("uses the full visible symptom labels while preserving canonical test identities", () => {
     mountSection();
     fireEvent.click(screen.getByTestId("quick-log-all-activities-start-symptom-check"));
@@ -431,6 +454,29 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
       observationLocation: "lower_leaves",
     });
     expect(args.p_details).not.toHaveProperty("observation_stage");
+  });
+
+  it("keeps ordinary Issue/Observation available at tent scope without a selected plant", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-tent-observation" },
+      error: null,
+    });
+    mountSection({ plantId: null });
+    selectActivity("issue_observation");
+    await screen.findByTestId("quick-log-all-activities-form");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-observedSign"), {
+      target: { value: "spots" },
+    });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-note"), {
+      target: { value: "Tent-level observation; no plant selected." },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [rpcName, args] = rpcMock.mock.calls[0];
+    expect(rpcName).toBe("quicklog_save_event");
+    expect(args.p_tent_id).toBe(TENT);
+    expect(args.p_plant_id).toBeNull();
   });
 
   it("guided Symptom Check never writes on selection and requires confirmed stage", async () => {

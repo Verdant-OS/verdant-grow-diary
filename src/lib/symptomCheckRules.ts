@@ -4,6 +4,7 @@ import { buildTimelineEntryAnchorId } from "@/lib/timelineEntryAnchorRules";
 import { timelinePath } from "@/lib/routes";
 
 export interface GuidedSymptomCheckDraft {
+  readonly plantId?: unknown;
   readonly symptomId: CannabisSymptomId | null;
   readonly stage: unknown;
   readonly stageConfirmed: boolean;
@@ -22,9 +23,16 @@ export function resolveGuidedSymptomStage(value: unknown): CanonicalGrowStage | 
   return typeof value === "string" ? normalizeGrowStage(value) : null;
 }
 
+export function hasGuidedSymptomPlant(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
 export function validateGuidedSymptomCheck(
   draft: GuidedSymptomCheckDraft,
 ): GuidedSymptomCheckValidation {
+  if (!hasGuidedSymptomPlant(draft.plantId)) {
+    return { ok: false, reason: "Select a plant before saving this Symptom Check." };
+  }
   const symptom = findCannabisSymptomById(draft.symptomId);
   if (!symptom) return { ok: false, reason: "Choose the visible sign you observed." };
 

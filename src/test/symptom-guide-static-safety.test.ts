@@ -16,6 +16,13 @@ describe("Symptom Check static safety", () => {
     expect(QUICK_LOG).not.toMatch(/service_role|device.?control/i);
   });
 
+  it("rechecks guided Symptom Check plant identity before the persistence seam", () => {
+    expect(QUICK_LOG).toMatch(/validateGuidedSymptomCheck\(\{\s*plantId,\s*symptomId:/);
+    expect(QUICK_LOG.indexOf("validateGuidedSymptomCheck({")).toBeLessThan(
+      QUICK_LOG.indexOf("const result = await save({"),
+    );
+  });
+
   it("pins a pure 14-day, past-only, scope-aware Timeline evidence path", () => {
     expect(RULES).toContain("SYMPTOM_EVIDENCE_LOOKBACK_DAYS = 14");
     expect(RULES).toContain("candidate.occurredMs <= symptomMs");

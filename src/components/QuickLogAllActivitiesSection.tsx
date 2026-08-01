@@ -73,6 +73,7 @@ import { findCannabisSymptomByObservedSign } from "@/constants/cannabisSymptomTy
 import type { CanonicalGrowStage } from "@/constants/growStages";
 import {
   buildSymptomTimelineHref,
+  hasGuidedSymptomPlant,
   resolveGuidedSymptomStage,
   validateGuidedSymptomCheck,
 } from "@/lib/symptomCheckRules";
@@ -188,6 +189,7 @@ export default function QuickLogAllActivitiesSection({
     () => buildQuickLogTargetIdentity({ growId, tentId, plantId }),
     [growId, plantId, tentId],
   );
+  const hasSymptomPlant = hasGuidedSymptomPlant(plantId);
   const currentTargetKey = useMemo(() => buildQuickLogTargetKey(currentTarget), [currentTarget]);
   const previousTargetKeyRef = useRef(currentTargetKey);
   const [selectedDraft, setSelectedDraft] = useState<QuickLogActivityDraftBinding | null>(null);
@@ -390,7 +392,7 @@ export default function QuickLogAllActivitiesSection({
   );
 
   const handleStartSymptomCheck = useCallback(() => {
-    if (isMutationBlocked()) return;
+    if (isMutationBlocked() || !hasSymptomPlant) return;
     setErrorReason(null);
     setErrorForActivity(null);
     setStructuredWaterError(null);
@@ -400,7 +402,7 @@ export default function QuickLogAllActivitiesSection({
     setGuidedSymptomCheck(true);
     setGuidedSymptomStage(resolveGuidedSymptomStage(plantStage));
     setGuidedSymptomStageConfirmed(false);
-  }, [currentTarget, isMutationBlocked, plantStage]);
+  }, [currentTarget, hasSymptomPlant, isMutationBlocked, plantStage]);
 
   const handleSave = useCallback(async () => {
     if (isMutationBlocked()) return;
@@ -505,6 +507,7 @@ export default function QuickLogAllActivitiesSection({
     if (guidedSymptomCheck && selected.id === "issue_observation") {
       const symptom = findCannabisSymptomByObservedSign(detailValues.observedSign);
       const guidedValidation = validateGuidedSymptomCheck({
+        plantId,
         symptomId: symptom?.id ?? null,
         stage: guidedSymptomStage,
         stageConfirmed: guidedSymptomStageConfirmed,
@@ -792,7 +795,14 @@ export default function QuickLogAllActivitiesSection({
         variant="outline"
         className="h-auto min-h-[44px] w-full items-start justify-start whitespace-normal px-3 py-2.5 text-left sm:items-center"
         onClick={handleStartSymptomCheck}
-        disabled={mutationBlocked || noContext || !!externalPersistenceBlockReason}
+        disabled={
+          mutationBlocked || noContext || !hasSymptomPlant || !!externalPersistenceBlockReason
+        }
+        aria-describedby={
+          !hasSymptomPlant && !noContext
+            ? `${testIdPrefix}-symptom-check-plant-required`
+            : undefined
+        }
         data-testid={`${testIdPrefix}-start-symptom-check`}
       >
         <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:gap-2">
@@ -802,6 +812,17 @@ export default function QuickLogAllActivitiesSection({
           </span>
         </span>
       </Button>
+
+      {!hasSymptomPlant && !noContext && (
+        <p
+          id={`${testIdPrefix}-symptom-check-plant-required`}
+          role="note"
+          className="text-xs text-muted-foreground"
+          data-testid={`${testIdPrefix}-symptom-check-plant-required`}
+        >
+          Select a plant to start a Symptom Check.
+        </p>
+      )}
 
       {structuredWaterError && (
         <p
@@ -1169,7 +1190,8 @@ export default function QuickLogAllActivitiesSection({
                 detailNumbersInvalid ||
                 (guidedSymptomCheck &&
                   selected.id === "issue_observation" &&
-                  (!findCannabisSymptomByObservedSign(detailValues.observedSign) ||
+                  (!hasSymptomPlant ||
+                    !findCannabisSymptomByObservedSign(detailValues.observedSign) ||
                     !guidedSymptomStage ||
                     !guidedSymptomStageConfirmed))
               }

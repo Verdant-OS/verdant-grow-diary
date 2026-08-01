@@ -26,6 +26,9 @@ integration task.
 Shared Sentinel Code was integrated into the deploy branch through [PR #626](https://github.com/Verdant-OS/verdant-grow-diary/pull/626), merged at
 `e623aa9d913698ca6795b3d6b75bd069d9a67681` on 2026-08-01T06:19:31Z.
 
+Active reconciliation: [PR #635](https://github.com/Verdant-OS/verdant-grow-diary/pull/635)
+(`codex/sentinel-governance-reconcile` -> `verdant-grow-diary`).
+
 ---
 
 ## Production status

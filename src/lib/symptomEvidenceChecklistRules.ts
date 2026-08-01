@@ -30,6 +30,12 @@ export interface SymptomEvidenceRawEntry {
   readonly note?: unknown;
   readonly details?: unknown;
   readonly source?: unknown;
+  /**
+   * Derived Timeline row id that is known to render an anchor. This is
+   * populated by buildSymptomEvidenceTimelineRows; database row ids alone do
+   * not prove that the Timeline presenter mounted a matching element.
+   */
+  readonly timeline_anchor_entry_id?: unknown;
 }
 
 export interface SymptomEvidenceItemView {
@@ -84,6 +90,7 @@ interface NormalizedEntry {
   readonly note: string;
   readonly details: Record<string, unknown>;
   readonly source: string | null;
+  readonly timelineAnchorEntryId: string | null;
 }
 
 const CATEGORY_TITLES: Readonly<Record<SymptomEvidenceCategoryId, string>> = {
@@ -162,6 +169,7 @@ function normalizeEntry(entry: SymptomEvidenceRawEntry): NormalizedEntry {
     // A diary JSON details.source field is grower-controlled legacy metadata,
     // not proof that a reading or observation came from a trusted live path.
     source: safeString(entry.source, 24)?.toLowerCase() ?? null,
+    timelineAnchorEntryId: safeId(entry.timeline_anchor_entry_id),
   };
 }
 
@@ -170,6 +178,8 @@ export interface BuildSymptomEvidenceTimelineRowsInput {
   readonly recentLaneEntries: ReadonlyArray<SymptomEvidenceRawEntry>;
   readonly diaryEntries: ReadonlyArray<SymptomEvidenceRawEntry>;
   readonly growEvents: ReadonlyArray<SymptomEvidenceRawEntry>;
+  /** Diary row ids whose primary or companion-alias anchors are mounted. */
+  readonly renderedDiaryEntryIds: ReadonlySet<string>;
 }
 
 function companionMatchesParent(
@@ -211,6 +221,14 @@ function canSafelyMergeCompanionDetails(parent: SymptomEvidenceRawEntry): boolea
 export function buildSymptomEvidenceTimelineRows(
   input: BuildSymptomEvidenceTimelineRowsInput,
 ): SymptomEvidenceRawEntry[] {
+  const loadedDiaryEntryIds = new Set(
+    input.diaryEntries.map((row) => safeId(row.id)).filter((id): id is string => Boolean(id)),
+  );
+  const renderedDiaryEntryIds = new Set(
+    [...input.renderedDiaryEntryIds]
+      .map((id) => safeId(id))
+      .filter((id): id is string => Boolean(id)),
+  );
   const growEventById = new Map<string, SymptomEvidenceRawEntry>();
   for (const row of input.growEvents) {
     const id = safeId(row.id);
@@ -234,6 +252,15 @@ export function buildSymptomEvidenceTimelineRows(
     const companion = id ? companionByGrowEventId.get(id) : undefined;
     const companionDetails = companion ? safeDetails(companion.details) : {};
     const laneDetails = safeDetails(row.details);
+    const anchorOwnerDiaryEntryId = parent
+      ? safeId(companion?.id)
+      : id && loadedDiaryEntryIds.has(id)
+        ? id
+        : null;
+    const timelineAnchorEntryId =
+      id && anchorOwnerDiaryEntryId && renderedDiaryEntryIds.has(anchorOwnerDiaryEntryId)
+        ? id
+        : null;
     const details =
       companion && parent && canSafelyMergeCompanionDetails(parent)
         ? { ...companionDetails, ...laneDetails }
@@ -256,6 +283,11 @@ export function buildSymptomEvidenceTimelineRows(
       // provenance; an unmatched diary row stays unverified (except the
       // explicit canonical manual Environment Check envelope handled later).
       source: parent?.source ?? null,
+      // A grow-event id becomes linkable only when a validated diary
+      // companion renders its hidden alias. Unmatched diary rows use their
+      // visible primary anchor; grow-event-only rows intentionally stay
+      // unlinked because Timeline does not render a matching element.
+      timeline_anchor_entry_id: timelineAnchorEntryId,
     };
   });
 }
@@ -405,7 +437,9 @@ function categoryView(
     totalMatches: matches.length,
     verifyNext: CATEGORY_VERIFY_NEXT[id],
     items: matches.slice(0, MAX_ITEMS_PER_CATEGORY).map((entry) => {
-      const timelineAnchor = entry.id === "unknown" ? null : buildTimelineEntryAnchorId(entry.id);
+      const timelineAnchor = entry.timelineAnchorEntryId
+        ? buildTimelineEntryAnchorId(entry.timelineAnchorEntryId)
+        : null;
       return {
         id: entry.id,
         occurredAt: entry.occurredAt!,

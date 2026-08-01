@@ -1028,6 +1028,7 @@ export default function Timeline() {
       recentLaneEntries: recentLaneRawEntries,
       diaryEntries: entries,
       growEvents,
+      renderedDiaryEntryIds: new Set(filtered.map((entry) => entry.id)),
     });
     for (const entry of entries) {
       const view = buildSymptomEvidenceChecklist({
@@ -1050,6 +1051,7 @@ export default function Timeline() {
     effectiveStartDate,
     entries,
     entriesTotal,
+    filtered,
     growEvents,
     recentLaneRawEntries,
   ]);

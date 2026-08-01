@@ -380,6 +380,7 @@ describe("symptom evidence checklist", () => {
           source: "live",
         },
       ],
+      renderedDiaryEntryIds: new Set(["fabricated-environment-diary-companion"]),
     });
 
     expect(rows).toHaveLength(1);
@@ -448,6 +449,7 @@ describe("symptom evidence checklist", () => {
           source: "manual",
         },
       ],
+      renderedDiaryEntryIds: new Set(["environment-diary-companion"]),
     });
 
     expect(rows).toHaveLength(1);
@@ -468,6 +470,161 @@ describe("symptom evidence checklist", () => {
       detailLines: ["Temperature: 25 °C", "Humidity: 62 % RH"],
     });
     expect(category(view, "lighting").items.map((item) => item.id)).toEqual([parentId]);
+  });
+
+  it("suppresses a Timeline link when grow-event-only evidence has no rendered entry anchor", () => {
+    const parentId = "watering-grow-event-only";
+    const rows = buildSymptomEvidenceTimelineRows({
+      growId: "grow-1",
+      recentLaneEntries: [
+        {
+          id: parentId,
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          entry_at: "2026-07-31T12:00:00Z",
+          entry_type: "watering",
+          note: "Watered 700 mL.",
+        },
+      ],
+      diaryEntries: [],
+      growEvents: [
+        {
+          id: parentId,
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "watering",
+          source: "manual",
+        },
+      ],
+      renderedDiaryEntryIds: new Set(),
+    });
+
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: rows,
+    })!;
+
+    expect(category(view, "watering").items[0]).toMatchObject({
+      id: parentId,
+      timelineAnchor: null,
+      timelineHref: null,
+    });
+  });
+
+  it("keeps the exact grow-event anchor when a rendered diary companion owns its alias", () => {
+    const parentId = "watering-grow-event-with-companion";
+    const rows = buildSymptomEvidenceTimelineRows({
+      growId: "grow-1",
+      recentLaneEntries: [
+        {
+          id: parentId,
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          entry_at: "2026-07-31T12:00:00Z",
+          entry_type: "watering",
+          note: "Watered 700 mL.",
+        },
+      ],
+      diaryEntries: [
+        {
+          id: "watering-diary-companion",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          entry_at: "2026-07-31T12:00:00Z",
+          event_type: "watering",
+          details: { linked_grow_event_id: parentId },
+        },
+      ],
+      growEvents: [
+        {
+          id: parentId,
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "watering",
+          source: "manual",
+        },
+      ],
+      renderedDiaryEntryIds: new Set(["watering-diary-companion"]),
+    });
+
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: rows,
+    })!;
+
+    expect(category(view, "watering").items[0]).toMatchObject({
+      id: parentId,
+      timelineAnchor: `timeline-entry-${parentId}`,
+      timelineHref: `/timeline?growId=grow-1#timeline-entry-${parentId}`,
+    });
+  });
+
+  it("keeps loaded companion evidence but unlinks it when the companion row is filtered out", () => {
+    const parentId = "watering-grow-event-with-hidden-companion";
+    const rows = buildSymptomEvidenceTimelineRows({
+      growId: "grow-1",
+      recentLaneEntries: [
+        {
+          id: parentId,
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          entry_at: "2026-07-31T12:00:00Z",
+          entry_type: "watering",
+          note: "Watered after checking dryback.",
+        },
+      ],
+      diaryEntries: [
+        {
+          id: "watering-diary-companion-hidden-by-stage-filter",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          entry_at: "2026-07-31T12:00:00Z",
+          event_type: "watering",
+          details: {
+            linked_grow_event_id: parentId,
+            watering_amount_ml: 700,
+          },
+        },
+      ],
+      growEvents: [
+        {
+          id: parentId,
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "watering",
+          source: "manual",
+        },
+      ],
+      renderedDiaryEntryIds: new Set(),
+    });
+
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: rows,
+    })!;
+
+    expect(category(view, "watering")).toMatchObject({
+      status: "recorded",
+      totalMatches: 1,
+    });
+    expect(category(view, "watering").items[0]).toMatchObject({
+      id: parentId,
+      detailLines: ["Volume: 700 mL"],
+      timelineAnchor: null,
+      timelineHref: null,
+    });
   });
 
   it("returns symptom identity, location, time, hub path, and category-specific verification prompts", () => {

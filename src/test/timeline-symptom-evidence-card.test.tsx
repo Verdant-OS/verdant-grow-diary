@@ -1,8 +1,13 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import SymptomEvidenceChecklistCard from "@/components/SymptomEvidenceChecklistCard";
-import { buildSymptomEvidenceChecklist } from "@/lib/symptomEvidenceChecklistRules";
+import {
+  buildSymptomEvidenceChecklist,
+  buildSymptomEvidenceTimelineRows,
+} from "@/lib/symptomEvidenceChecklistRules";
 
 describe("Timeline Symptom Evidence card", () => {
   it("renders four ordered categories, honest provenance, guide, and exact entry link", () => {
@@ -30,6 +35,7 @@ describe("Timeline Symptom Evidence card", () => {
           event_type: "environment",
           source: "manual",
           note: "Canopy observation",
+          timeline_anchor_entry_id: "env-1",
         },
       ],
       historyComplete: false,
@@ -74,5 +80,84 @@ describe("Timeline Symptom Evidence card", () => {
       "/guides/cannabis-leaf-symptoms",
     );
     expect(screen.queryByRole("link", { name: "Add missing context" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the symptom card and loaded evidence visible when a filter hides the anchor owner", () => {
+    const parentId = "watering-grow-event-with-filtered-companion";
+    const entries = buildSymptomEvidenceTimelineRows({
+      growId: "grow-1",
+      recentLaneEntries: [
+        {
+          id: parentId,
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          entry_at: "2026-07-31T12:00:00Z",
+          entry_type: "watering",
+          note: "Watered after checking dryback.",
+        },
+      ],
+      diaryEntries: [
+        {
+          id: "watering-diary-companion-hidden-by-stage-filter",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          entry_at: "2026-07-31T12:00:00Z",
+          event_type: "watering",
+          details: {
+            linked_grow_event_id: parentId,
+            watering_amount_ml: 700,
+          },
+        },
+      ],
+      growEvents: [
+        {
+          id: parentId,
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "watering",
+          source: "manual",
+        },
+      ],
+      renderedDiaryEntryIds: new Set(),
+    });
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: {
+        id: "symptom",
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: "plant-1",
+        entry_at: "2026-08-01T12:00:00Z",
+        event_type: "observation",
+        details: {
+          subtype: "issue",
+          observedSign: "spots",
+          observation_stage: "flower",
+        },
+      },
+      entries,
+      historyComplete: true,
+    })!;
+
+    render(
+      <MemoryRouter initialEntries={["/timeline?growId=grow-1"]}>
+        <SymptomEvidenceChecklistCard view={view} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("symptom-evidence-checklist")).toBeVisible();
+    expect(screen.getByText("Watered after checking dryback.")).toBeVisible();
+    expect(screen.getByText("Volume: 700 mL")).toBeVisible();
+    expect(screen.queryByRole("link", { name: "View entry" })).not.toBeInTheDocument();
+  });
+
+  it("derives linkable diary anchors from Timeline's filtered rows", () => {
+    const source = readFileSync(resolve(process.cwd(), "src/pages/Timeline.tsx"), "utf8");
+
+    expect(source).toMatch(
+      /renderedDiaryEntryIds:\s*new Set\(filtered\.map\(\(entry\) => entry\.id\)\)/,
+    );
   });
 });

@@ -127,22 +127,8 @@ export function buildCreateGrowBindingView(
     retryLabel: GROW_SETUP_MESSAGES.readErrorRetry,
   };
 
-  if (input.growsError) {
-    return {
-      ...base,
-      kind: "read_error",
-      blockSubmit: true,
-      showStartRoomHardStop: false,
-      showPickGrowHint: false,
-      showLoading: false,
-      showReadError: true,
-      showRequestedUnavailable: false,
-      toastMessage: GROW_SETUP_MESSAGES.readErrorTitle,
-      title: GROW_SETUP_MESSAGES.readErrorTitle,
-      body: GROW_SETUP_MESSAGES.readErrorBody,
-    };
-  }
-
+  // An active initial load or retry is the current truth, even when a prior
+  // settled read error is still present in provider state during revalidation.
   if (input.growsLoading) {
     return {
       ...base,
@@ -156,6 +142,22 @@ export function buildCreateGrowBindingView(
       toastMessage: GROW_SETUP_MESSAGES.loadingToast,
       title: GROW_SETUP_MESSAGES.loadingTitle,
       body: GROW_SETUP_MESSAGES.loadingBody,
+    };
+  }
+
+  if (input.growsError) {
+    return {
+      ...base,
+      kind: "read_error",
+      blockSubmit: true,
+      showStartRoomHardStop: false,
+      showPickGrowHint: false,
+      showLoading: false,
+      showReadError: true,
+      showRequestedUnavailable: false,
+      toastMessage: GROW_SETUP_MESSAGES.readErrorTitle,
+      title: GROW_SETUP_MESSAGES.readErrorTitle,
+      body: GROW_SETUP_MESSAGES.readErrorBody,
     };
   }
 

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "artifactType": "knowledge_trust_infrastructure_registry",
-  "baselineStableIdentityDigest": "4cf7e552a5f61bd447ee906f90f9227334b7b0f25b70ab8f69840266677a7312",
+  "baselineStableIdentityDigest": "6e26d211cb82fda321e55aa8e4d4f815c7e00c131a3dbc7a26a79d6c1cf2a324",
   "roadmapRelationship": "outside_first_500",
   "publicRoutingPolicy": "Every entry is non-routable until it receives a separate brief, evidence review, product-truth review, and atomic release receipt.",
   "systemRoutes": [

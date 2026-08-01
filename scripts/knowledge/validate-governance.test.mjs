@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  loadIntentRegistryAtRevision,
+  runGovernanceValidation,
   validateIntentResearchAppendOnly,
   validateIntentResearchRegistry,
   validateTrustInfrastructureRegistry,
@@ -173,6 +177,190 @@ test("proves intent research history is append-only across registry revisions", 
     () => validateIntentResearchAppendOnly(previous, deleted),
     /intent entry cannot be deleted/,
   );
+});
+
+test("the governance CLI enforces append-only history against an explicit local baseline", async (t) => {
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "verdant-knowledge-history-"));
+  const scriptPath = path.join(scriptDir, "validate-governance.mjs");
+  const previous = structuredClone(intentRegistry);
+  previous.entries.push({
+    ...lifecycleEntry(),
+    events: [lifecycleEntry().events[0]],
+  });
+
+  function run(previousRegistry, currentRegistry) {
+    const previousPath = path.join(tempDir, "previous.json");
+    const currentPath = path.join(tempDir, "current.json");
+    writeFileSync(previousPath, `${JSON.stringify(previousRegistry, null, 2)}\n`);
+    writeFileSync(currentPath, `${JSON.stringify(currentRegistry, null, 2)}\n`);
+    return spawnSync(
+      process.execPath,
+      [scriptPath, "--baseline-file", previousPath, "--current-file", currentPath],
+      { cwd: root, encoding: "utf8" },
+    );
+  }
+
+  try {
+    await t.test("rejects a deleted entry", () => {
+      const current = structuredClone(intentRegistry);
+      const result = run(previous, current);
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /intent entry cannot be deleted/);
+    });
+
+    await t.test("rejects a rewritten prior event", () => {
+      const current = structuredClone(previous);
+      current.entries[0].events[0].reason = "Rewritten after the fact.";
+      const result = run(previous, current);
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /must preserve prior events exactly/);
+    });
+
+    await t.test("accepts an appended event", () => {
+      const current = structuredClone(previous);
+      current.entries[0].events.push(lifecycleEntry().events[1]);
+      const result = run(previous, current);
+      assert.equal(result.status, 0, result.stderr);
+      const report = JSON.parse(result.stdout);
+      assert.deepEqual(report.intentHistory, { status: "pass", appendedEventCount: 1 });
+      assert.equal(report.intentHistoryBaseline.source, "file");
+    });
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("required governance validation fails when CI supplies no history base", () => {
+  const result = spawnSync(process.execPath, [path.join(scriptDir, "validate-governance.mjs")], {
+    cwd: root,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      KNOWLEDGE_BASE_REVISION: "",
+      KNOWLEDGE_HISTORY_REQUIRED: "true",
+    },
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /history comparison requires an exact base revision/);
+});
+
+test("the Git-revision path distinguishes absence from invalid or rewritten history", async (t) => {
+  const repositoryRoot = mkdtempSync(path.join(os.tmpdir(), "verdant-knowledge-git-history-"));
+  const registryPath = path.join(
+    repositoryRoot,
+    "docs",
+    "knowledge-library",
+    "intent-research-registry.json",
+  );
+  const currentPath = path.join(repositoryRoot, "current.json");
+
+  function git(...args) {
+    return execFileSync("git", args, {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      windowsHide: true,
+    }).trim();
+  }
+
+  function commitRegistry(contents, message) {
+    mkdirSync(path.dirname(registryPath), { recursive: true });
+    writeFileSync(registryPath, contents);
+    git("add", "docs/knowledge-library/intent-research-registry.json");
+    git("commit", "-q", "-m", message);
+    return git("rev-parse", "HEAD");
+  }
+
+  try {
+    git("init", "-q");
+    git("config", "core.autocrlf", "false");
+    git("config", "user.email", "knowledge-history@example.invalid");
+    git("config", "user.name", "Knowledge History Test");
+    writeFileSync(path.join(repositoryRoot, "README.md"), "initial\n");
+    git("add", "README.md");
+    git("commit", "-q", "-m", "initial");
+    const absentRevision = git("rev-parse", "HEAD");
+
+    await t.test("reports an actually absent base path as initial history", () => {
+      assert.deepEqual(loadIntentRegistryAtRevision(absentRevision, repositoryRoot), {
+        exists: false,
+        registry: null,
+      });
+    });
+
+    const previous = structuredClone(intentRegistry);
+    previous.entries.push({
+      ...lifecycleEntry(),
+      events: [lifecycleEntry().events[0]],
+    });
+    const previousRevision = commitRegistry(`${JSON.stringify(previous, null, 2)}\n`, "history");
+
+    await t.test("loads a present registry from Git rather than the working tree", () => {
+      const loaded = loadIntentRegistryAtRevision(previousRevision, repositoryRoot);
+      assert.equal(loaded.exists, true);
+      assert.deepEqual(loaded.registry, previous);
+    });
+
+    await t.test("rejects deleted and rewritten history through the real Git seam", () => {
+      writeFileSync(currentPath, `${JSON.stringify(intentRegistry, null, 2)}\n`);
+      assert.throws(
+        () =>
+          runGovernanceValidation({
+            baseRevision: previousRevision,
+            currentFile: currentPath,
+            repositoryRoot,
+          }),
+        /intent entry cannot be deleted/,
+      );
+
+      const rewritten = structuredClone(previous);
+      rewritten.entries[0].events[0].reason = "Rewritten after the fact.";
+      writeFileSync(currentPath, `${JSON.stringify(rewritten, null, 2)}\n`);
+      assert.throws(
+        () =>
+          runGovernanceValidation({
+            baseRevision: previousRevision,
+            currentFile: currentPath,
+            repositoryRoot,
+          }),
+        /must preserve prior events exactly/,
+      );
+    });
+
+    const falsyRevision = commitRegistry("null\n", "falsy history");
+    await t.test("treats a tracked falsy JSON value as invalid history, not absence", () => {
+      assert.deepEqual(loadIntentRegistryAtRevision(falsyRevision, repositoryRoot), {
+        exists: true,
+        registry: null,
+      });
+      writeFileSync(currentPath, `${JSON.stringify(intentRegistry, null, 2)}\n`);
+      assert.throws(
+        () =>
+          runGovernanceValidation({
+            baseRevision: falsyRevision,
+            currentFile: currentPath,
+            repositoryRoot,
+          }),
+        /append-only comparison requires previous and current registries/,
+      );
+    });
+
+    const malformedRevision = commitRegistry("{\n", "malformed history");
+    await t.test("rejects malformed base JSON", () => {
+      assert.throws(
+        () => loadIntentRegistryAtRevision(malformedRevision, repositoryRoot),
+        /base-revision intent registry is invalid JSON/,
+      );
+    });
+
+    await t.test("rejects an unavailable full object ID", () => {
+      assert.throws(
+        () => loadIntentRegistryAtRevision("0".repeat(40), repositoryRoot),
+        /base revision is unavailable/,
+      );
+    });
+  } finally {
+    rmSync(repositoryRoot, { recursive: true, force: true });
+  }
 });
 
 test("machine-governs trust routes and L1 groupings outside the first 500", () => {

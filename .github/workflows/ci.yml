@@ -1,6 +1,10 @@
 name: CI
 
 on:
+  # Intentionally unfiltered: this required workflow must run for every code
+  # change and for Knowledge Library changes under docs/knowledge-library/**,
+  # scripts/knowledge/**, package.json, bun.lock, and package-lock.json. Do not
+  # add paths or paths-ignore here: this is the repository-wide required gate.
   workflow_dispatch:
   push:
     # `verdant-grow-diary` is the repository default branch — `main` alone
@@ -106,6 +110,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          # The append-only intent-history gate reads the exact target/base
+          # revision with git show. A shallow PR checkout cannot prove that.
+          fetch-depth: 0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -122,6 +130,16 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      # Stop-ship: validate the current Knowledge Library contracts and compare
+      # append-only intent receipts with the exact target/base revision. The
+      # first library commit may have no prior registry; all later revisions
+      # must preserve every prior entry and event exactly by value.
+      - name: Knowledge Library contracts and append-only history
+        env:
+          KNOWLEDGE_BASE_REVISION: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+          KNOWLEDGE_HISTORY_REQUIRED: "true"
+        run: bun run knowledge:validate
 
       # ripgrep (rg) is required by scripts/scan-gamification-direct-inserts.mjs
       # (the "Gamification direct-insert scan" step). It is not preinstalled on

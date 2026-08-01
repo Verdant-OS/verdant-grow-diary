@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   CONVERSION_PROMISES,
+  IMMUTABLE_ROADMAP_ALLOCATION_FIELDS,
   NO_PRODUCT_CTA_PROMISE,
   PRODUCT_TRUTH_SOURCE_ROLE,
   SAFETY_NO_PRODUCT_CTA_PROMISE,
@@ -13,6 +14,7 @@ import {
   collectCanonicalPillarNames,
   collectCanonicalSiteMapPillarPaths,
   collectCurrentRegistryPaths,
+  stableIdentityDigest,
   validateRoadmap,
 } from "./validate-roadmap.mjs";
 
@@ -105,7 +107,7 @@ test("the roadmap is explicitly a candidate contract, not an authored corpus or 
   assert.match(roadmap.priorityModel.note, /not (?:an? )?SEO|not a search/i);
   assert.equal(
     roadmap.stableIdentityDigest,
-    "4cf7e552a5f61bd447ee906f90f9227334b7b0f25b70ab8f69840266677a7312",
+    "6e26d211cb82fda321e55aa8e4d4f815c7e00c131a3dbc7a26a79d6c1cf2a324",
   );
   assert.match(roadmap.publicationRule, /not publication approval/i);
   assert.match(roadmap.publicationRule, /human-reviewed/i);
@@ -372,7 +374,7 @@ test("rejects invalid controlled vocabularies", async (t) => {
   }
 });
 
-test("stable IDs are decoupled from mutable contiguous priority", () => {
+test("stable IDs remain decoupled from contiguous v1 priority", () => {
   assert.notEqual(baseline.pages[10].id, "KL-011");
   assert.deepEqual(
     baseline.pages.map((target) => target.priority),
@@ -390,6 +392,42 @@ test("rejects moving stable IDs onto different canonical paths", () => {
   const second = page(roadmap, "KL-019");
   [first.id, second.id] = [second.id, first.id];
   assertInvalid(roadmap, /stable ID-to-path mapping does not match/);
+});
+
+test("the immutable digest covers exact v1 identity and allocation fields", () => {
+  assert.deepEqual(IMMUTABLE_ROADMAP_ALLOCATION_FIELDS, [
+    "id",
+    "path",
+    "priority",
+    "wave",
+    "pillar",
+    "pillarRank",
+    "parentPath",
+    "pageFamily",
+  ]);
+  assert.deepEqual(baseline.stableIdentityFields, IMMUTABLE_ROADMAP_ALLOCATION_FIELDS);
+
+  for (const field of IMMUTABLE_ROADMAP_ALLOCATION_FIELDS.slice(2)) {
+    const reallocated = cloneRoadmap();
+    page(reallocated, "KL-012")[field] = `changed-${field}`;
+    assert.notEqual(stableIdentityDigest(reallocated.pages), baseline.stableIdentityDigest, field);
+  }
+
+  const reordered = cloneRoadmap();
+  const leftIndex = reordered.pages.findIndex((target) => target.id === "KL-012");
+  const rightIndex = reordered.pages.findIndex((target) => target.id === "KL-014");
+  const left = reordered.pages[leftIndex];
+  const right = reordered.pages[rightIndex];
+  [left.priority, right.priority] = [right.priority, left.priority];
+  [reordered.pages[leftIndex], reordered.pages[rightIndex]] = [right, left];
+  assertInvalid(reordered, /v1 identity and allocation snapshot/);
+
+  const researchOnly = cloneRoadmap();
+  page(researchOnly, "KL-012").prioritySignals.searchDemand = "reviewed-later";
+  page(researchOnly, "KL-012").priorityLane = "reviewed-later";
+  page(researchOnly, "KL-001").searchBrief.observedIntent = "A later research interpretation.";
+  page(researchOnly, "KL-001").intentStatus = "researched";
+  assert.equal(stableIdentityDigest(researchOnly.pages), baseline.stableIdentityDigest);
 });
 
 test("orders foundations, current-route remediation, high-consequence safety, live routes, then backlog", () => {

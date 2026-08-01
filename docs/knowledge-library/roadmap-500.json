@@ -4,7 +4,17 @@
   "artifactScope": "Records are prioritized page candidates, not publication-ready authored drafts. Only briefStatus=draft|reviewed carries an editorial brief; pending records contain metadata and safety boundaries only.",
   "generatedOn": "2026-08-01",
   "totalPages": 500,
-  "stableIdentityDigest": "4cf7e552a5f61bd447ee906f90f9227334b7b0f25b70ab8f69840266677a7312",
+  "stableIdentityFields": [
+    "id",
+    "path",
+    "priority",
+    "wave",
+    "pillar",
+    "pillarRank",
+    "parentPath",
+    "pageFamily"
+  ],
+  "stableIdentityDigest": "6e26d211cb82fda321e55aa8e4d4f815c7e00c131a3dbc7a26a79d6c1cf2a324",
   "publicationRule": "Route presence, brief status, and roadmap order are not publication approval. Release only evidence-complete, human-reviewed cohorts.",
   "priorityModel": {
     "basis": "dependency_risk_current_route_sequence",

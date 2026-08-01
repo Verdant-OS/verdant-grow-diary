@@ -353,7 +353,22 @@ const REVIEWED_PILLAR_RELATED_PATHS = Object.freeze({
   ],
 });
 const CALIBRATION_CHILD_IDS = Object.freeze(["KL-023", "KL-033", "KL-043", "KL-303", "KL-313"]);
-const STABLE_IDENTITY_DIGEST = "4cf7e552a5f61bd447ee906f90f9227334b7b0f25b70ab8f69840266677a7312";
+const STABLE_IDENTITY_DIGEST = "6e26d211cb82fda321e55aa8e4d4f815c7e00c131a3dbc7a26a79d6c1cf2a324";
+const STABLE_ID_PATH_DIGEST = "4cf7e552a5f61bd447ee906f90f9227334b7b0f25b70ab8f69840266677a7312";
+
+// These fields are the immutable v1 identity/allocation contract. Editorial,
+// research, readiness, and route-state fields deliberately remain outside the
+// digest so their governed lifecycles can advance without rewriting v1.
+export const IMMUTABLE_ROADMAP_ALLOCATION_FIELDS = Object.freeze([
+  "id",
+  "path",
+  "priority",
+  "wave",
+  "pillar",
+  "pillarRank",
+  "parentPath",
+  "pageFamily",
+]);
 
 function fail(message) {
   throw new Error(`Knowledge roadmap invalid: ${message}`);
@@ -413,12 +428,24 @@ function briefAsset(page) {
   return `${assetMethod}. Inputs: ${assetInputs.join("; ")}. Output: ${assetOutput}.`;
 }
 
-function stableIdentityDigest(pages) {
-  const identitySnapshot = [...pages]
+export function stableIdentityDigest(pages) {
+  const identitySnapshot = [
+    JSON.stringify(IMMUTABLE_ROADMAP_ALLOCATION_FIELDS),
+    ...[...pages]
+      .sort((left, right) => left.id.localeCompare(right.id))
+      .map((page) =>
+        JSON.stringify(IMMUTABLE_ROADMAP_ALLOCATION_FIELDS.map((field) => page[field])),
+      ),
+  ].join("\n");
+  return createHash("sha256").update(identitySnapshot).digest("hex");
+}
+
+function stableIdPathDigest(pages) {
+  const snapshot = [...pages]
     .sort((left, right) => left.id.localeCompare(right.id))
     .map((page) => `${page.id}\0${page.path}\n`)
     .join("");
-  return createHash("sha256").update(identitySnapshot).digest("hex");
+  return createHash("sha256").update(snapshot).digest("hex");
 }
 
 function riskClassAtLeast(actual, minimum) {
@@ -855,9 +882,15 @@ export function validateRoadmap(
   }
   const computedIdentityDigest = stableIdentityDigest(pages);
   if (
-    roadmap.stableIdentityDigest !== STABLE_IDENTITY_DIGEST ||
-    computedIdentityDigest !== STABLE_IDENTITY_DIGEST
+    !Array.isArray(roadmap.stableIdentityFields) ||
+    roadmap.stableIdentityFields.length !== IMMUTABLE_ROADMAP_ALLOCATION_FIELDS.length ||
+    roadmap.stableIdentityFields.some(
+      (field, index) => field !== IMMUTABLE_ROADMAP_ALLOCATION_FIELDS[index],
+    )
   ) {
+    fail(`stableIdentityFields must name the exact v1 identity and allocation contract`);
+  }
+  if (stableIdPathDigest(pages) !== STABLE_ID_PATH_DIGEST) {
     fail(`stable ID-to-path mapping does not match the v1 identity snapshot`);
   }
   for (const [index, page] of pages.entries()) {
@@ -1424,6 +1457,13 @@ export function validateRoadmap(
   }
   if (inventedLive.length) {
     fail(`roadmap marks non-registry routes live: ${inventedLive.join(", ")}`);
+  }
+
+  if (
+    roadmap.stableIdentityDigest !== STABLE_IDENTITY_DIGEST ||
+    computedIdentityDigest !== STABLE_IDENTITY_DIGEST
+  ) {
+    fail(`roadmap does not match the v1 identity and allocation snapshot`);
   }
 
   const warnings = pages

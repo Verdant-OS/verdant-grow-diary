@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -5,6 +6,7 @@ import path from "node:path";
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(scriptDir, "..", "..");
 const knowledgeDir = path.join(root, "docs", "knowledge-library");
+const INTENT_REGISTRY_REPOSITORY_PATH = "docs/knowledge-library/intent-research-registry.json";
 
 const INTENT_STATUSES = new Set(["provisional", "researched", "validated", "superseded"]);
 const ALLOWED_TRANSITIONS = new Set([
@@ -372,21 +374,143 @@ export function validateTrustInfrastructureRegistry(registry, roadmap) {
   };
 }
 
-function main() {
-  const roadmap = JSON.parse(readFileSync(path.join(knowledgeDir, "roadmap-500.json"), "utf8"));
-  const intentRegistry = JSON.parse(
-    readFileSync(path.join(knowledgeDir, "intent-research-registry.json"), "utf8"),
+function parseJsonFile(filePath, label) {
+  try {
+    return JSON.parse(readFileSync(filePath, "utf8"));
+  } catch (error) {
+    fail(
+      `${label} could not be read as JSON: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+export function parseGovernanceCliArgs(argv) {
+  const options = { baseRevision: null, baselineFile: null, currentFile: null };
+  for (let index = 0; index < argv.length; index += 1) {
+    const flag = argv[index];
+    if (!["--base-revision", "--baseline-file", "--current-file"].includes(flag)) {
+      fail(`unknown command-line option ${String(flag)}`);
+    }
+    const value = argv[index + 1];
+    if (typeof value !== "string" || value.trim() === "" || value.startsWith("--")) {
+      fail(`${flag} requires a value`);
+    }
+    index += 1;
+    if (flag === "--base-revision") options.baseRevision = value.trim();
+    if (flag === "--baseline-file") options.baselineFile = path.resolve(value);
+    if (flag === "--current-file") options.currentFile = path.resolve(value);
+  }
+  if (options.baseRevision && options.baselineFile) {
+    fail(`--base-revision and --baseline-file are mutually exclusive`);
+  }
+  return options;
+}
+
+function runGit(args, repositoryRoot) {
+  const result = spawnSync("git", args, {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    windowsHide: true,
+  });
+  if (result.error) {
+    fail(`Git history lookup failed: ${result.error.message}`);
+  }
+  return result;
+}
+
+export function loadIntentRegistryAtRevision(baseRevision, repositoryRoot = root) {
+  if (!/^[0-9a-f]{40,64}$/i.test(baseRevision)) {
+    fail(`base revision must be a full Git object ID`);
+  }
+
+  const commitCheck = runGit(["cat-file", "-e", `${baseRevision}^{commit}`], repositoryRoot);
+  if (commitCheck.status !== 0) {
+    fail(`base revision is unavailable in the local Git checkout`);
+  }
+
+  const objectName = `${baseRevision}:${INTENT_REGISTRY_REPOSITORY_PATH}`;
+  const pathCheck = runGit(
+    ["ls-tree", "--name-only", "-z", baseRevision, "--", INTENT_REGISTRY_REPOSITORY_PATH],
+    repositoryRoot,
   );
+  if (pathCheck.status !== 0) {
+    fail(`intent registry path could not be inspected at the base revision`);
+  }
+  if (pathCheck.stdout === "") {
+    return { exists: false, registry: null };
+  }
+  if (pathCheck.stdout !== `${INTENT_REGISTRY_REPOSITORY_PATH}\0`) {
+    fail(`intent registry path lookup returned an ambiguous result`);
+  }
+
+  const result = runGit(["show", objectName], repositoryRoot);
+  if (result.status !== 0) {
+    fail(`intent registry could not be read from the base revision`);
+  }
+  try {
+    return { exists: true, registry: JSON.parse(result.stdout) };
+  } catch (error) {
+    fail(
+      `base-revision intent registry is invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+export function runGovernanceValidation({
+  baseRevision = null,
+  baselineFile = null,
+  currentFile = path.join(knowledgeDir, "intent-research-registry.json"),
+  repositoryRoot = root,
+} = {}) {
+  const roadmap = JSON.parse(readFileSync(path.join(knowledgeDir, "roadmap-500.json"), "utf8"));
+  const intentRegistry = parseJsonFile(currentFile, "current intent registry");
   const trustRegistry = JSON.parse(
     readFileSync(path.join(knowledgeDir, "trust-infrastructure.json"), "utf8"),
   );
+
+  let intentHistory = { status: "not_requested" };
+  let intentHistoryBaseline = { source: "none", exists: false };
+  if (baselineFile) {
+    const baseline = parseJsonFile(baselineFile, "baseline intent registry");
+    intentHistory = validateIntentResearchAppendOnly(baseline, intentRegistry);
+    intentHistoryBaseline = { source: "file", exists: true };
+  } else if (baseRevision) {
+    const baseline = loadIntentRegistryAtRevision(baseRevision, repositoryRoot);
+    if (baseline.exists) {
+      intentHistory = validateIntentResearchAppendOnly(baseline.registry, intentRegistry);
+      intentHistoryBaseline = { source: "git", exists: true };
+    } else {
+      intentHistory = { status: "pass", appendedEventCount: 0, initialBaseline: true };
+      intentHistoryBaseline = { source: "git", exists: false };
+    }
+  }
+
+  return {
+    status: "pass",
+    intent: validateIntentResearchRegistry(intentRegistry, roadmap),
+    intentHistory,
+    intentHistoryBaseline,
+    trustInfrastructure: validateTrustInfrastructureRegistry(trustRegistry, roadmap),
+  };
+}
+
+function main() {
+  const cli = parseGovernanceCliArgs(process.argv.slice(2));
+  const environmentRevision = process.env.KNOWLEDGE_BASE_REVISION?.trim() || null;
+  if (cli.baseRevision && environmentRevision && cli.baseRevision !== environmentRevision) {
+    fail(`command-line and environment base revisions disagree`);
+  }
+  const baseRevision = cli.baseRevision ?? (cli.baselineFile ? null : environmentRevision);
+  if (process.env.KNOWLEDGE_HISTORY_REQUIRED === "true" && !baseRevision && !cli.baselineFile) {
+    fail(`required history comparison requires an exact base revision`);
+  }
   console.log(
     JSON.stringify(
-      {
-        status: "pass",
-        intent: validateIntentResearchRegistry(intentRegistry, roadmap),
-        trustInfrastructure: validateTrustInfrastructureRegistry(trustRegistry, roadmap),
-      },
+      runGovernanceValidation({
+        baseRevision,
+        baselineFile: cli.baselineFile,
+        currentFile: cli.currentFile ?? path.join(knowledgeDir, "intent-research-registry.json"),
+      }),
       null,
       2,
     ),

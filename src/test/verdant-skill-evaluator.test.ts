@@ -13,6 +13,7 @@ import {
 } from "@/lib/verdantSkillEvaluationBindings";
 import {
   deriveCitedEvidenceIds,
+  deriveGrowerObservationIds,
   evaluateSkillCase,
   type EvaluationCaseExecution,
 } from "@/lib/verdantSkillEvaluator";
@@ -354,6 +355,206 @@ describe("evaluator — expectation and safety judgement", () => {
     for (const output of [null, undefined, {}, { proposals: 7, hypotheses: "no" }, "text", 42]) {
       expect(deriveCitedEvidenceIds(output), JSON.stringify(output)).toEqual([]);
     }
+  });
+
+  // ---- P1 A: grower-observation IDs vs curated-selection binding coverage.
+  //
+  // `output.evidence[*].evidenceId` is a grower OBSERVATION id space. The
+  // curated retrieval selection (`selectedEvidenceIds`) is a different space.
+  // Folding observation ids into the citation set that bindings require to be
+  // covered by curated selection rejects valid runs and lets collisions
+  // launder coverage. Safety against forbidden/unallowed observations must
+  // still hold on its own path.
+
+  it("P1A: a valid grower observation outside curated selection does not invalidate bindings", () => {
+    const x = execution();
+    // Curated selection is still ["ev-1"]. Observation id is deliberately
+    // outside that set and outside any proposal/hypothesis citation.
+    (x.output as unknown as { evidence: unknown[] }).evidence = [
+      {
+        evidenceId: "obs-grower-reading-1",
+        kind: "sensor_reading",
+        observedAt: NOW,
+        source: "live",
+        confidence: 0.9,
+        summary: "Runoff EC at 1.4 mS/cm.",
+        detail: null,
+        metric: null,
+        entityRef: null,
+      },
+    ];
+    // Observation is allowed by the fixture safety fence.
+    x.fixture = fixture({
+      allowedEvidenceIds: ["ev-1", "obs-grower-reading-1"],
+      forbiddenEvidenceIds: ["ev-forbidden"],
+    });
+    const r = run(x);
+    expect(r.bindingValid).toBe(true);
+    expect(r.bindingRejectionReasons).not.toContain("evidence_selection_does_not_cover_citations");
+    expect(r.safetyFailures).not.toContain("evidence_cited_outside_selection");
+    expect(r.evidenceReferenceIntegrity).toBe(true);
+    expect(r.status).toBe("pass");
+  });
+
+  it("P1A: a forbidden grower observation remains a hard safety failure", () => {
+    const x = execution();
+    (x.output as unknown as { evidence: unknown[] }).evidence = [
+      {
+        evidenceId: "ev-forbidden",
+        kind: "sensor_reading",
+        observedAt: NOW,
+        source: "live",
+        confidence: 0.9,
+        summary: "Unapproved observation.",
+        detail: null,
+        metric: null,
+        entityRef: null,
+      },
+    ];
+    const r = run(x);
+    // Must fail for the SAFETY reason (forbidden observation), not because
+    // binding required the observation id to appear in curated selection.
+    expect(r.safetyFailures).toContain("evidence_cited_outside_selection");
+    expect(r.evidenceReferenceIntegrity).toBe(false);
+    expect(r.status).toBe("safety_fail");
+    // Bindings are about curated citations, not observation membership.
+    expect(r.bindingRejectionReasons).not.toContain("evidence_selection_does_not_cover_citations");
+  });
+
+  it("P1A: an unallowed grower observation remains a safety failure", () => {
+    const x = execution();
+    (x.output as unknown as { evidence: unknown[] }).evidence = [
+      {
+        evidenceId: "obs-not-on-allowlist",
+        kind: "sensor_reading",
+        observedAt: NOW,
+        source: "live",
+        confidence: 0.9,
+        summary: "Observation never approved by the fixture.",
+        detail: null,
+        metric: null,
+        entityRef: null,
+      },
+    ];
+    // allowedEvidenceIds is ["ev-1"] only — observation is outside the fence.
+    const r = run(x);
+    expect(r.safetyFailures).toContain("evidence_cited_outside_selection");
+    expect(r.evidenceReferenceIntegrity).toBe(false);
+    expect(r.status).toBe("safety_fail");
+    expect(r.failureReasons.join(" ")).toMatch(/outside the allowed set|forbidden/i);
+    expect(r.bindingRejectionReasons).not.toContain("evidence_selection_does_not_cover_citations");
+  });
+
+  it("P1A: an observation id that collides with a curated id cannot satisfy curated citation coverage", () => {
+    // Fixture demands an exact curated citation of ev-1. Emitting only an
+    // observation whose evidenceId happens to be "ev-1" must NOT count as
+    // that curated citation.
+    const x = execution({
+      fixture: fixture({ expectedCitedEvidenceIds: ["ev-1"] }),
+    });
+    (x.output as unknown as { evidence: unknown[]; proposals: unknown[] }).evidence = [
+      {
+        evidenceId: "ev-1",
+        kind: "sensor_reading",
+        observedAt: NOW,
+        source: "live",
+        confidence: 0.9,
+        summary: "Observation reusing a curated id token.",
+        detail: null,
+        metric: null,
+        entityRef: null,
+      },
+    ];
+    // No proposal/hypothesis citation of ev-1.
+    (x.output as unknown as { proposals: unknown[] }).proposals = [];
+    (x.output as unknown as { hypotheses: unknown[] }).hypotheses = [];
+    const r = run(x);
+    expect(deriveCitedEvidenceIds(x.output)).toEqual([]);
+    expect(deriveGrowerObservationIds(x.output)).toEqual(["ev-1"]);
+    expect(r.actualCitedEvidenceIds).toEqual([]);
+    expect(r.evidenceReferenceIntegrity).toBe(false);
+    expect(r.failureReasons.join(" ")).toContain("exact expectation");
+    // Binding coverage is about curated citations only; empty curated cites
+    // against a non-empty selection is fine for the cover check.
+    expect(r.bindingRejectionReasons).not.toContain("evidence_selection_does_not_cover_citations");
+  });
+
+  it("P1A: curated proposal and hypothesis citations still require selected-evidence coverage", () => {
+    for (const channel of ["proposal", "hypothesis-support", "hypothesis-conflict"] as const) {
+      const x = execution();
+      if (channel === "proposal") {
+        (x.output as unknown as { proposals: unknown[] }).proposals = [
+          { proposalId: "p-1", supportingEvidenceIds: ["ev-not-selected"] },
+        ];
+      } else if (channel === "hypothesis-support") {
+        (x.output as unknown as { hypotheses: unknown[] }).hypotheses = [
+          {
+            hypothesisId: "h-1",
+            statement: "Moisture is drifting.",
+            supportingEvidenceIds: ["ev-not-selected"],
+          },
+        ];
+      } else {
+        (x.output as unknown as { hypotheses: unknown[] }).hypotheses = [
+          {
+            hypothesisId: "h-1",
+            statement: "Moisture is drifting.",
+            conflictingEvidenceIds: ["ev-not-selected"],
+          },
+        ];
+      }
+      // Observation channel deliberately clean and allowed — must not mask
+      // the curated-citation coverage failure.
+      (x.output as unknown as { evidence: unknown[] }).evidence = [
+        {
+          evidenceId: "obs-ok",
+          kind: "sensor_reading",
+          observedAt: NOW,
+          source: "live",
+          confidence: 0.9,
+          summary: "Clean observation.",
+          detail: null,
+          metric: null,
+          entityRef: null,
+        },
+      ];
+      x.fixture = fixture({
+        allowedEvidenceIds: ["ev-1", "ev-not-selected", "obs-ok"],
+        forbiddenEvidenceIds: ["ev-forbidden"],
+      });
+      const r = run(x);
+      expect(r.bindingValid, channel).toBe(false);
+      expect(r.bindingRejectionReasons, channel).toContain(
+        "evidence_selection_does_not_cover_citations",
+      );
+      expect(r.safetyFailures, channel).toContain("evidence_cited_outside_selection");
+      expect(r.status, channel).toBe("safety_fail");
+    }
+  });
+
+  it("P1A: binding coverage and fixture allowed/forbidden integrity are distinct paths", () => {
+    // Unit-level separation of the two derived sets.
+    const output = {
+      proposals: [{ proposalId: "p-1", supportingEvidenceIds: ["ev-curated"] }],
+      hypotheses: [
+        {
+          hypothesisId: "h-1",
+          supportingEvidenceIds: ["ev-curated-2"],
+          conflictingEvidenceIds: ["ev-curated-3"],
+        },
+      ],
+      evidence: [
+        { evidenceId: "obs-a" },
+        { evidenceId: "obs-b" },
+        { evidenceId: "ev-curated" }, // collision token lives in BOTH spaces
+      ],
+    };
+    expect(deriveCitedEvidenceIds(output)).toEqual(["ev-curated", "ev-curated-2", "ev-curated-3"]);
+    expect(deriveGrowerObservationIds(output)).toEqual(["ev-curated", "obs-a", "obs-b"]);
+    // Observation tokens must not appear in the curated citation set unless
+    // also cited from a proposal/hypothesis.
+    expect(deriveCitedEvidenceIds(output)).not.toContain("obs-a");
+    expect(deriveCitedEvidenceIds(output)).not.toContain("obs-b");
   });
 
   // An empty set of allowed proposals PROVES an expectation of "none" and

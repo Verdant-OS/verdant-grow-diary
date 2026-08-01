@@ -1298,6 +1298,12 @@ export function validateRoadmap(
         fail(`${page.id} authored brief requires a search brief`);
       }
       validateAuthoredBrief(page, pathMap);
+      if (
+        page.briefStatus === "reviewed" &&
+        (page.linkBriefStatus !== "reviewed" || page.searchBriefStatus !== "validated")
+      ) {
+        fail(`${page.id} reviewed brief requires reviewed links and validated search evidence`);
+      }
     }
   }
 
@@ -1364,35 +1370,8 @@ export function validateRoadmap(
   }
 
   const briefStatuses = countBy(pages, "briefStatus");
-  const draftIds = pages.filter((page) => page.briefStatus === "draft").map((page) => page.id);
-  const expectedDraftIds = Array.from(
-    { length: 10 },
-    (_, index) => `KL-${String(index + 1).padStart(3, "0")}`,
-  );
-  if (
-    briefStatuses.get("draft") !== 10 ||
-    briefStatuses.get("needs_editorial_brief") !== 490 ||
-    (briefStatuses.get("reviewed") ?? 0) !== 0 ||
-    draftIds.join("|") !== expectedDraftIds.join("|")
-  ) {
-    fail(`v1 must contain exactly ten draft pillar seeds and 490 pending candidates`);
-  }
   const linkBriefStatuses = countBy(pages, "linkBriefStatus");
-  if (
-    linkBriefStatuses.get("draft") !== 10 ||
-    linkBriefStatuses.get("needs_review") !== 490 ||
-    (linkBriefStatuses.get("reviewed") ?? 0) !== 0
-  ) {
-    fail(`v1 link briefs must be draft only for the ten pillar seeds`);
-  }
   const searchBriefStatuses = countBy(pages, "searchBriefStatus");
-  if (
-    searchBriefStatuses.get("draft") !== 10 ||
-    searchBriefStatuses.get("needs_research") !== 490 ||
-    (searchBriefStatuses.get("validated") ?? 0) !== 0
-  ) {
-    fail(`v1 search briefs must be draft only for the ten pillar seeds`);
-  }
   for (const [label, values] of [
     [
       "readerOutcome",

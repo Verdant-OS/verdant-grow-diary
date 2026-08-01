@@ -1539,15 +1539,15 @@ export function validateCultivarHealthSemantics(record) {
       }
     }
     const recordedOn = requireValidTimestamp(event.recordedOn, `${event.eventId} recordedOn`);
-    if (event.collectedOn !== null && event.resultedOn !== null) {
-      const collectedOn = requireValidTimestamp(
-        `${event.collectedOn}T00:00:00Z`,
-        `${event.eventId} collectedOn`,
-      );
-      const resultedOn = requireValidTimestamp(
-        `${event.resultedOn}T00:00:00Z`,
-        `${event.eventId} resultedOn`,
-      );
+    const collectedOn =
+      event.collectedOn === null
+        ? null
+        : requireValidTimestamp(`${event.collectedOn}T00:00:00Z`, `${event.eventId} collectedOn`);
+    const resultedOn =
+      event.resultedOn === null
+        ? null
+        : requireValidTimestamp(`${event.resultedOn}T00:00:00Z`, `${event.eventId} resultedOn`);
+    if (collectedOn !== null && resultedOn !== null) {
       if (collectedOn > resultedOn || resultedOn > recordedOn) {
         fail(`screening event ${event.eventId} has impossible collection/result chronology`);
       }
@@ -1564,6 +1564,27 @@ export function validateCultivarHealthSemantics(record) {
         cultivarHealthKey(prior.scope, prior.target) !== key
       ) {
         fail(`screening event ${event.eventId} has an invalid prior-event reference`);
+      }
+      const priorRecordedOn = requireValidTimestamp(
+        prior.recordedOn,
+        `${prior.eventId} recordedOn`,
+      );
+      const priorCollectedOn =
+        prior.collectedOn === null
+          ? null
+          : requireValidTimestamp(`${prior.collectedOn}T00:00:00Z`, `${prior.eventId} collectedOn`);
+      const priorResultedOn =
+        prior.resultedOn === null
+          ? null
+          : requireValidTimestamp(`${prior.resultedOn}T00:00:00Z`, `${prior.eventId} resultedOn`);
+      if (
+        recordedOn <= priorRecordedOn ||
+        (collectedOn !== null && priorCollectedOn !== null && collectedOn < priorCollectedOn) ||
+        (resultedOn !== null && priorResultedOn !== null && resultedOn < priorResultedOn)
+      ) {
+        fail(
+          `screening event ${event.eventId} must chronologically follow referenced screening event ${referencedId}`,
+        );
       }
     }
     if (event.supersedesEventId) {
@@ -1636,8 +1657,14 @@ export function validateCultivarHealthSemantics(record) {
         fail(`quarantine release ${event.eventId} lacks a current scoped negative`);
       }
       for (const negative of negatives) {
+        const latestOpenDate = new Date(latestOpen).toISOString().slice(0, 10);
+        if (negative.collectedOn === latestOpenDate) {
+          fail(
+            `quarantine release ${event.eventId} cannot prove that date-only collection evidence followed the latest open`,
+          );
+        }
         const collectedOn = requireValidTimestamp(
-          `${negative.collectedOn}T23:59:59Z`,
+          `${negative.collectedOn}T00:00:00Z`,
           `${negative.eventId} collectedOn`,
         );
         if (collectedOn < latestOpen) {

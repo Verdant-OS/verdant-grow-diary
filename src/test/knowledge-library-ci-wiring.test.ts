@@ -26,6 +26,7 @@ describe("Knowledge Library required CI wiring", () => {
     ]) {
       expect(command).toContain(requiredScript);
     }
+    expect(command).not.toContain("--baseline-file");
     const step = stepBlock("Knowledge Library contracts and append-only history");
     expect(step).toContain("run: bun run knowledge:validate");
     expect(step).toContain('KNOWLEDGE_HISTORY_REQUIRED: "true"');

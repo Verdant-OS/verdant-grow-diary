@@ -8,6 +8,7 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(scriptDir, "..", "..");
 const knowledgeDir = path.join(root, "docs", "knowledge-library");
 const INTENT_REGISTRY_REPOSITORY_PATH = "docs/knowledge-library/intent-research-registry.json";
+const ROADMAP_REPOSITORY_PATH = "docs/knowledge-library/roadmap-500.json";
 
 const INTENT_STATUSES = new Set(["provisional", "researched", "validated", "superseded"]);
 const ALLOWED_TRANSITIONS = new Set([
@@ -18,6 +19,37 @@ const ALLOWED_TRANSITIONS = new Set([
   "validated->superseded",
   "validated->provisional",
   "superseded->provisional",
+]);
+const ROADMAP_EDITORIAL_STATUS_SEQUENCES = Object.freeze({
+  briefStatus: Object.freeze(["needs_editorial_brief", "draft", "reviewed"]),
+  linkBriefStatus: Object.freeze(["needs_review", "draft", "reviewed"]),
+  searchBriefStatus: Object.freeze(["needs_research", "draft", "validated"]),
+});
+const FINALIZED_ROADMAP_EDITORIAL_PAYLOADS = Object.freeze([
+  Object.freeze({
+    statusField: "briefStatus",
+    finalStatus: "reviewed",
+    label: "reviewed authored brief",
+    fields: Object.freeze([
+      "readerOutcome",
+      "nonProductNextStep",
+      "originalAsset",
+      "priorityRationale",
+      "brief",
+    ]),
+  }),
+  Object.freeze({
+    statusField: "linkBriefStatus",
+    finalStatus: "reviewed",
+    label: "reviewed link brief",
+    fields: Object.freeze(["relatedPaths"]),
+  }),
+  Object.freeze({
+    statusField: "searchBriefStatus",
+    finalStatus: "validated",
+    label: "validated search brief",
+    fields: Object.freeze(["searchBrief"]),
+  }),
 ]);
 const EXPECTED_SYSTEM_ROUTE_PATHS = new Set([
   "/guides/glossary",
@@ -84,6 +116,84 @@ function canonicalJson(value) {
       .join(",")}}`;
   }
   return JSON.stringify(value);
+}
+
+export function validateRoadmapEditorialTransitions(previousRoadmap, currentRoadmap) {
+  if (
+    !isRecord(previousRoadmap) ||
+    !isRecord(currentRoadmap) ||
+    !Array.isArray(previousRoadmap.pages) ||
+    !Array.isArray(currentRoadmap.pages)
+  ) {
+    fail("roadmap editorial history requires previous and current roadmap pages");
+  }
+  if (previousRoadmap.pages.length !== currentRoadmap.pages.length) {
+    fail("roadmap editorial history cannot add or delete page identities");
+  }
+
+  const currentById = new Map();
+  for (const page of currentRoadmap.pages) {
+    requireNonemptyString(page?.id, "current roadmap page id");
+    if (currentById.has(page.id)) fail(`current roadmap repeats page id ${page.id}`);
+    currentById.set(page.id, page);
+  }
+
+  const transitionedPageIds = new Set();
+  let fieldTransitionCount = 0;
+  const previousIds = new Set();
+  for (const previousPage of previousRoadmap.pages) {
+    requireNonemptyString(previousPage?.id, "previous roadmap page id");
+    if (previousIds.has(previousPage.id)) {
+      fail(`previous roadmap repeats page id ${previousPage.id}`);
+    }
+    previousIds.add(previousPage.id);
+    const currentPage = currentById.get(previousPage.id);
+    if (!currentPage || currentPage.path !== previousPage.path) {
+      fail(`roadmap editorial history changed page identity ${previousPage.id}`);
+    }
+
+    for (const [field, sequence] of Object.entries(ROADMAP_EDITORIAL_STATUS_SEQUENCES)) {
+      const previousIndex = sequence.indexOf(previousPage[field]);
+      const currentIndex = sequence.indexOf(currentPage[field]);
+      if (previousIndex < 0 || currentIndex < 0) {
+        fail(`${previousPage.id} roadmap editorial history has invalid ${field}`);
+      }
+      if (currentIndex < previousIndex) {
+        fail(
+          `${previousPage.id} ${field} cannot regress editorial lifecycle state from ${previousPage[field]} to ${currentPage[field]}`,
+        );
+      }
+      if (currentIndex > previousIndex + 1) {
+        fail(
+          `${previousPage.id} ${field} cannot skip editorial lifecycle state from ${previousPage[field]} to ${currentPage[field]}`,
+        );
+      }
+      if (currentIndex > previousIndex) {
+        transitionedPageIds.add(previousPage.id);
+        fieldTransitionCount += 1;
+      }
+    }
+    for (const payload of FINALIZED_ROADMAP_EDITORIAL_PAYLOADS) {
+      if (
+        previousPage[payload.statusField] !== payload.finalStatus ||
+        currentPage[payload.statusField] !== payload.finalStatus
+      ) {
+        continue;
+      }
+      for (const field of payload.fields) {
+        if (canonicalJson(previousPage[field]) !== canonicalJson(currentPage[field])) {
+          fail(`${previousPage.id} ${payload.label} payload cannot change in place`);
+        }
+      }
+    }
+  }
+
+  return {
+    status: "pass",
+    pageCount: currentRoadmap.pages.length,
+    transitionedPageCount: transitionedPageIds.size,
+    fieldTransitionCount,
+  };
 }
 
 function deriveL1GroupingIdentityDigest(pillarGroupings) {
@@ -463,7 +573,7 @@ function runGit(args, repositoryRoot) {
   return result;
 }
 
-export function loadIntentRegistryAtRevision(baseRevision, repositoryRoot = root) {
+function loadJsonAtRevision(baseRevision, repositoryPath, label, repositoryRoot) {
   if (!/^[0-9a-f]{40,64}$/i.test(baseRevision)) {
     fail(`base revision must be a full Git object ID`);
   }
@@ -473,41 +583,62 @@ export function loadIntentRegistryAtRevision(baseRevision, repositoryRoot = root
     fail(`base revision is unavailable in the local Git checkout`);
   }
 
-  const objectName = `${baseRevision}:${INTENT_REGISTRY_REPOSITORY_PATH}`;
+  const objectName = `${baseRevision}:${repositoryPath}`;
   const pathCheck = runGit(
-    ["ls-tree", "--name-only", "-z", baseRevision, "--", INTENT_REGISTRY_REPOSITORY_PATH],
+    ["ls-tree", "--name-only", "-z", baseRevision, "--", repositoryPath],
     repositoryRoot,
   );
   if (pathCheck.status !== 0) {
-    fail(`intent registry path could not be inspected at the base revision`);
+    fail(`${label} path could not be inspected at the base revision`);
   }
   if (pathCheck.stdout === "") {
-    return { exists: false, registry: null };
+    return { exists: false, value: null };
   }
-  if (pathCheck.stdout !== `${INTENT_REGISTRY_REPOSITORY_PATH}\0`) {
-    fail(`intent registry path lookup returned an ambiguous result`);
+  if (pathCheck.stdout !== `${repositoryPath}\0`) {
+    fail(`${label} path lookup returned an ambiguous result`);
   }
 
   const result = runGit(["show", objectName], repositoryRoot);
   if (result.status !== 0) {
-    fail(`intent registry could not be read from the base revision`);
+    fail(`${label} could not be read from the base revision`);
   }
   try {
-    return { exists: true, registry: JSON.parse(result.stdout) };
+    return { exists: true, value: JSON.parse(result.stdout) };
   } catch (error) {
     fail(
-      `base-revision intent registry is invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
+      `base-revision ${label} is invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
+}
+
+export function loadIntentRegistryAtRevision(baseRevision, repositoryRoot = root) {
+  const loaded = loadJsonAtRevision(
+    baseRevision,
+    INTENT_REGISTRY_REPOSITORY_PATH,
+    "intent registry",
+    repositoryRoot,
+  );
+  return { exists: loaded.exists, registry: loaded.value };
+}
+
+export function loadRoadmapAtRevision(baseRevision, repositoryRoot = root) {
+  const loaded = loadJsonAtRevision(
+    baseRevision,
+    ROADMAP_REPOSITORY_PATH,
+    "roadmap",
+    repositoryRoot,
+  );
+  return { exists: loaded.exists, roadmap: loaded.value };
 }
 
 export function runGovernanceValidation({
   baseRevision = null,
   baselineFile = null,
   currentFile = path.join(knowledgeDir, "intent-research-registry.json"),
+  currentRoadmapFile = path.join(knowledgeDir, "roadmap-500.json"),
   repositoryRoot = root,
 } = {}) {
-  const roadmap = JSON.parse(readFileSync(path.join(knowledgeDir, "roadmap-500.json"), "utf8"));
+  const roadmap = parseJsonFile(currentRoadmapFile, "current roadmap");
   const intentRegistry = parseJsonFile(currentFile, "current intent registry");
   const trustRegistry = JSON.parse(
     readFileSync(path.join(knowledgeDir, "trust-infrastructure.json"), "utf8"),
@@ -515,6 +646,8 @@ export function runGovernanceValidation({
 
   let intentHistory = { status: "not_requested" };
   let intentHistoryBaseline = { source: "none", exists: false };
+  let roadmapEditorialHistory = { status: "not_requested" };
+  let roadmapEditorialHistoryBaseline = { source: "none", exists: false };
   if (baselineFile) {
     const baseline = parseJsonFile(baselineFile, "baseline intent registry");
     intentHistory = validateIntentResearchAppendOnly(baseline, intentRegistry);
@@ -529,12 +662,30 @@ export function runGovernanceValidation({
       intentHistoryBaseline = { source: "git", exists: false };
     }
   }
+  if (baseRevision) {
+    const baseline = loadRoadmapAtRevision(baseRevision, repositoryRoot);
+    if (baseline.exists) {
+      roadmapEditorialHistory = validateRoadmapEditorialTransitions(baseline.roadmap, roadmap);
+      roadmapEditorialHistoryBaseline = { source: "git", exists: true };
+    } else {
+      roadmapEditorialHistory = {
+        status: "pass",
+        pageCount: roadmap.pages.length,
+        transitionedPageCount: 0,
+        fieldTransitionCount: 0,
+        initialBaseline: true,
+      };
+      roadmapEditorialHistoryBaseline = { source: "git", exists: false };
+    }
+  }
 
   return {
     status: "pass",
     intent: validateIntentResearchRegistry(intentRegistry, roadmap),
     intentHistory,
     intentHistoryBaseline,
+    roadmapEditorialHistory,
+    roadmapEditorialHistoryBaseline,
     trustInfrastructure: validateTrustInfrastructureRegistry(trustRegistry, roadmap),
   };
 }
@@ -542,11 +693,17 @@ export function runGovernanceValidation({
 function main() {
   const cli = parseGovernanceCliArgs(process.argv.slice(2));
   const environmentRevision = process.env.KNOWLEDGE_BASE_REVISION?.trim() || null;
+  const historyRequired = process.env.KNOWLEDGE_HISTORY_REQUIRED === "true";
   if (cli.baseRevision && environmentRevision && cli.baseRevision !== environmentRevision) {
     fail(`command-line and environment base revisions disagree`);
   }
+  if (historyRequired && cli.baselineFile) {
+    fail(
+      `required history comparison rejects --baseline-file and requires the exact Git base revision`,
+    );
+  }
   const baseRevision = cli.baseRevision ?? (cli.baselineFile ? null : environmentRevision);
-  if (process.env.KNOWLEDGE_HISTORY_REQUIRED === "true" && !baseRevision && !cli.baselineFile) {
+  if (historyRequired && !baseRevision) {
     fail(`required history comparison requires an exact base revision`);
   }
   console.log(

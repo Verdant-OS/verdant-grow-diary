@@ -1364,7 +1364,7 @@ test("keeps sensor and cultivar documentation aligned with machine-enforced trut
   );
 
   assert.match(graph, /Cultivar health evidence is append-only and subject-scoped/i);
-  assert.match(graph, /A correction adds a new event with `supersedesEventId`/i);
+  assert.match(graph, /A correction adds a later-recorded event with `supersedesEventId`/i);
   assert.match(graph, /It may say `negative_scoped`.*never “clean” or “pathogen free,”/i);
   assert.match(standards, /A negative result is always `negative_scoped`/i);
   assert.match(
@@ -1983,6 +1983,13 @@ test("keeps quarantine open while any scoped episode remains active", () => {
     occurredOn: "2026-08-03T12:00:00Z",
   });
   const record = cultivarHealthFixture({
+    screenings: [
+      screeningEvent("negative", "screening:hlvd:negative-1", {
+        collectedOn: "2026-08-02",
+        resultedOn: "2026-08-02",
+        recordedOn: "2026-08-02T12:00:00Z",
+      }),
+    ],
     quarantines: [stillOpen, laterOpen, laterRelease],
   });
   const disposition = record.identity.provenance.currentHealthDisposition.subjects[0];
@@ -2082,6 +2089,9 @@ test("fails cultivar release closed when screening evidence is stale, scoped wro
   {
     const negative = screeningEvent("negative", "screening:hlvd:negative-1");
     const positive = screeningEvent("positive", "screening:hlvd:positive-1", {
+      collectedOn: "2026-08-02",
+      resultedOn: "2026-08-02",
+      recordedOn: "2026-08-02T12:00:01Z",
       retestOfEventIds: [negative.eventId],
     });
     const invalid = cultivarHealthFixture({ screenings: [negative, positive] });
@@ -2093,6 +2103,7 @@ test("fails cultivar release closed when screening evidence is stale, scoped wro
   {
     const negative = screeningEvent("negative", "screening:hlvd:negative-1");
     const correction = screeningEvent("positive", "screening:hlvd:correction-1", {
+      recordedOn: "2026-08-02T12:00:01Z",
       supersedesEventId: negative.eventId,
       correctionReason: "Correct the result after the laboratory amended its report.",
     });
@@ -2117,6 +2128,81 @@ test("fails cultivar release closed when screening evidence is stale, scoped wro
       () => validateCultivarHealthSemantics(invalid),
       /relies on pre-quarantine evidence/,
     );
+  }
+});
+
+test("requires release evidence to be demonstrably later than the latest quarantine open", () => {
+  const sameDayNegative = screeningEvent("negative", "screening:hlvd:negative-1", {
+    collectedOn: "2026-07-31",
+    resultedOn: "2026-08-01",
+    recordedOn: "2026-08-01T12:00:00Z",
+  });
+  const ambiguous = cultivarHealthFixture({ screenings: [sameDayNegative] });
+  assert.throws(
+    () => validateCultivarHealthSemantics(ambiguous),
+    /release .* cannot prove that date-only collection evidence followed the latest open/,
+  );
+
+  const nextDayNegative = screeningEvent("negative", "screening:hlvd:negative-1", {
+    collectedOn: "2026-08-01",
+    resultedOn: "2026-08-02",
+    recordedOn: "2026-08-02T12:00:00Z",
+  });
+  const demonstrablyLater = cultivarHealthFixture({ screenings: [nextDayNegative] });
+  assert.deepEqual(validateCultivarHealthSemantics(demonstrablyLater), {
+    status: "pass",
+    screeningEventCount: 1,
+    quarantineEventCount: 2,
+    subjectCount: 1,
+  });
+});
+
+test("requires corrections and retests to chronologically follow every referenced event", () => {
+  const prior = screeningEvent("negative", "screening:hlvd:negative-1");
+  const referenceShapes = [
+    {
+      supersedesEventId: prior.eventId,
+      correctionReason: "Correct the result after the laboratory amended its report.",
+    },
+    { retestOfEventIds: [prior.eventId] },
+  ];
+
+  for (const reference of referenceShapes) {
+    for (const chronology of [
+      { collectedOn: "2026-07-31", recordedOn: "2026-08-03T12:00:00Z" },
+      {
+        collectedOn: "2026-08-01",
+        resultedOn: "2026-08-01",
+        recordedOn: "2026-08-03T12:00:00Z",
+      },
+      { recordedOn: "2026-08-02T11:59:59Z" },
+      { recordedOn: "2026-08-02T12:00:00Z" },
+    ]) {
+      const successor = screeningEvent("negative", "screening:hlvd:successor-1", {
+        ...reference,
+        ...chronology,
+      });
+      const invalid = cultivarHealthFixture({
+        screenings: [prior, successor],
+        quarantines: [],
+      });
+      assert.throws(
+        () => validateCultivarHealthSemantics(invalid),
+        /must chronologically follow referenced screening event/,
+      );
+    }
+
+    const successor = screeningEvent("negative", "screening:hlvd:successor-1", {
+      ...reference,
+      recordedOn: "2026-08-02T12:00:01Z",
+    });
+    const valid = cultivarHealthFixture({ screenings: [prior, successor], quarantines: [] });
+    assert.deepEqual(validateCultivarHealthSemantics(valid), {
+      status: "pass",
+      screeningEventCount: 2,
+      quarantineEventCount: 0,
+      subjectCount: 1,
+    });
   }
 });
 

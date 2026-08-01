@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-07-31.1**
+**Sentinel-Version: 2026-08-01.1**
 
 This file is the universal constitution every Verdant agent inherits — Codex, Claude,
 Grok, Gemini, the Security reviewer, and the Council Chair. It was previously titled
@@ -464,7 +464,11 @@ Every change should make Verdant more trustworthy.
 
 ## Agent Role Routing
 
-Before using tools or changing files, identify your assigned role and read its file.
+Before changing files, identify your assigned role and read its file.
+
+Reading that file is explicitly permitted before the startup gate below — see
+**Context acquisition** there. Most agents do not auto-load their role or the current
+state, so acquiring context necessarily requires a read.
 
 | Agent            | Role file                              |
 | ---------------- | -------------------------------------- |
@@ -490,8 +494,8 @@ Handoffs follow `docs/agents/HANDOFF_PROTOCOL.md`.
 
 ## Mandatory Startup Gate
 
-Before analysis, research, commands, edits, writes, outreach, deployment, or
-recommendations, return:
+Before analysis, research, edits, writes, outreach, deployment, or recommendations,
+return:
 
 ```text
 SENTINEL_ACK
@@ -512,6 +516,28 @@ If a required file is missing or instructions conflict, return:
 ```text
 STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE
 ```
+
+### Context acquisition — permitted before the ACK
+
+Only Claude auto-loads its role and the current state (via `CLAUDE.md` imports). Codex,
+Grok, Gemini, Security, and the Council Chair must read those files with a tool or
+command. So **read-only commands whose sole purpose is acquiring the context this gate
+requires you to cite are explicitly permitted before the ACK**, specifically:
+
+- reading `AGENTS.md`, `docs/agents/CURRENT_STATE.md`, and your own role file
+- listing or reading files solely to locate the above
+- `grok inspect`, or an equivalent command that reports which context files loaded
+
+Nothing else. No edits, no writes, no network calls, no analysis or recommendation, and
+no reading of application code — those wait for the ACK.
+
+The gate exists to stop an agent *acting* unscoped, not to stop it *learning its scope*.
+Forbidding the reads would leave every non-Claude agent with two options: block
+immediately, or claim in `files_read:` to have read files it could not open. A rule whose
+only compliant outcomes are deadlock or a false statement is worse than no rule.
+
+`files_read:` must list exactly what you actually read. If a required file could not be
+read, that is `STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE`, never an ACK that names it.
 
 Do not continue until the context issue is resolved.
 

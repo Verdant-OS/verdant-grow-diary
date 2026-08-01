@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
+import { useGrows } from "@/store/grows";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +28,13 @@ import { Link } from "react-router-dom";
 import { useTents } from "@/hooks/use-tents";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { evaluateTentCreationGate, FREE_TIER_UPGRADE_PATH } from "@/lib/entitlements/freeTierGates";
+import {
+  buildCreateGrowBindingHardStop,
+  canWriteCreateGrowId,
+  resolveCreateTargetGrowId,
+  resolveSetupName,
+} from "@/lib/createDialogGrowBindingRules";
+import { GROW_SETUP_MESSAGES } from "@/constants/growSetupMessages";
 
 interface Props {
   trigger?: React.ReactNode;
@@ -43,10 +51,33 @@ export default function CreateTentDialog({
   initiallyOpen = false,
 }: Props) {
   const { user } = useAuth();
+  const { grows = [], activeGrowId, loading: growsLoading } = useGrows();
   const qc = useQueryClient();
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ name: "", size: "", brand: "", stage: "seedling" });
+
+  const targetGrowId = useMemo(
+    () =>
+      resolveCreateTargetGrowId({
+        pageDefaultGrowId: defaultGrowId,
+        activeGrowId,
+        grows,
+      }),
+    [defaultGrowId, activeGrowId, grows],
+  );
+  const hardStop = useMemo(
+    () =>
+      buildCreateGrowBindingHardStop(
+        { targetGrowId, growCount: grows.length, growsLoading },
+        "tent",
+      ),
+    [targetGrowId, grows.length, growsLoading],
+  );
+  const setupName = useMemo(
+    () => resolveSetupName(targetGrowId, grows),
+    [targetGrowId, grows],
+  );
 
   // Free-tier tent gate (multiTent=false → single tent). useTents already
   // filters archived tents. Fails open while entitlements load.
@@ -71,6 +102,10 @@ export default function CreateTentDialog({
       toast.error("Not signed in");
       return;
     }
+    if (hardStop.blockSubmit || !canWriteCreateGrowId(targetGrowId)) {
+      if (hardStop.toastMessage) toast.error(hardStop.toastMessage);
+      return;
+    }
     setBusy(true);
     const payload: Record<string, unknown> = {
       user_id: user.id,
@@ -78,9 +113,9 @@ export default function CreateTentDialog({
       size: form.size.trim() || null,
       brand: form.brand.trim() || null,
       stage: form.stage,
+      // Fail closed: always write grow_id when submitting.
+      grow_id: targetGrowId,
     };
-    // Preselect grow context when provided. RLS enforces ownership server-side.
-    if (defaultGrowId) payload.grow_id = defaultGrowId;
     const { data, error } = await supabase
       .from("tents")
       .insert(payload as never)
@@ -117,6 +152,66 @@ export default function CreateTentDialog({
           Start simple. You can add size, brand, and stage later. Verdant works best once your first
           plant memory exists.
         </p>
+        {hardStop.showStartRoomHardStop && (
+          <div
+            className="rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 space-y-2"
+            data-testid="create-tent-hard-stop"
+            role="alert"
+          >
+            <p className="text-sm font-semibold" data-testid="create-tent-hard-stop-title">
+              {hardStop.hardStopTitle}
+            </p>
+            <p className="text-xs text-muted-foreground">{hardStop.hardStopBody}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm" className="gradient-leaf text-primary-foreground">
+                <Link to={hardStop.startRoomHref} data-testid="create-tent-start-room-cta">
+                  {hardStop.hardStopCta}
+                </Link>
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                data-testid="create-tent-hard-stop-dismiss"
+              >
+                {hardStop.hardStopSecondary}
+              </Button>
+            </div>
+          </div>
+        )}
+        {hardStop.showPickGrowHint && !hardStop.showStartRoomHardStop && (
+          <p
+            className="rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+            data-testid="create-tent-pick-setup"
+          >
+            {GROW_SETUP_MESSAGES.pickSetupToast("tent")}{" "}
+            <Link
+              to={hardStop.startRoomHref}
+              className="underline underline-offset-2"
+              data-testid="create-tent-pick-setup-cta"
+            >
+              {hardStop.hardStopCta}
+            </Link>
+          </p>
+        )}
+        {canWriteCreateGrowId(targetGrowId) && (
+          <p
+            className="text-xs rounded-md border border-primary/30 bg-primary/10 px-3 py-2"
+            data-testid="create-tent-target-setup"
+          >
+            <span className="font-medium">
+              {setupName
+                ? GROW_SETUP_MESSAGES.addingTo(setupName)
+                : GROW_SETUP_MESSAGES.addingToHint}
+            </span>
+            {setupName ? (
+              <span className="block text-muted-foreground mt-0.5">
+                {GROW_SETUP_MESSAGES.addingToHint}
+              </span>
+            ) : null}
+          </p>
+        )}
         {!tentGate.allowed && (
           <p
             className="rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
@@ -184,7 +279,7 @@ export default function CreateTentDialog({
             </div>
           </details>
           <Button
-            disabled={busy || !tentGate.allowed}
+            disabled={busy || !tentGate.allowed || hardStop.blockSubmit}
             className="gradient-leaf text-primary-foreground"
             data-testid="tent-create-submit"
           >

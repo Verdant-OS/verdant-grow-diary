@@ -1,5 +1,8 @@
 name: MCP local RLS integration
 
+permissions:
+  contents: read
+
 # Runs the Verdant MCP read-only RLS integration harness against a fresh
 # LOCAL Supabase started by the Supabase CLI on the runner. No hosted
 # Supabase, no production secrets — the "service role" used here is the

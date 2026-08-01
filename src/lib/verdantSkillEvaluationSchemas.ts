@@ -223,6 +223,18 @@ export const verdantSkillEvaluationFixtureSchema = z
     }
 
     // Synthetic only — checked over everything the fixture carries.
+    // A fixture authorising NO evidence while expecting a citation is
+    // self-contradictory: any output satisfying the expectation now trips
+    // `evidence_cited_outside_selection`. That is an authoring error and
+    // belongs in preflight, not reported as unsafe runtime behaviour.
+    if (f.allowedEvidenceIds.length === 0 && (f.expectedCitedEvidenceIds ?? []).length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["expectedCitedEvidenceIds"],
+        message: "expects_citations_while_authorising_no_evidence",
+      });
+    }
+
     const categories = detectProductionDataCategories(JSON.stringify(f));
     for (const category of categories) {
       add(`fixture_contains_production_data:${category}`, ["context"]);

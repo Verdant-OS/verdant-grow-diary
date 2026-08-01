@@ -491,7 +491,20 @@ describe("evaluator — expectation and safety judgement", () => {
         ...POLICY_OBJ,
         actionEligibility: "low_risk_manual_only",
         outcomes: ["allow_low_risk_manual_action"],
-        firedRules: [{ code: "unsupported_yield_claim" }],
+        firedRules: [
+          { code: "unsupported_yield_claim", proposalId: "p-1" },
+          { code: "over_promise_language", proposalId: "p-1" },
+        ],
+        // The gate is per proposal now, so the proposal must actually be
+        // ALLOWED for "allowed despite blocking content" to be the situation.
+        proposalVerdicts: [
+          {
+            proposalId: "p-1",
+            verdict: "allow",
+            effectiveRiskLevel: "low",
+            executionCapability: "manual_only",
+          },
+        ],
       },
     );
     // In a PROPOSAL: an action eligibility is about proposals, and the same
@@ -513,10 +526,62 @@ describe("evaluator — expectation and safety judgement", () => {
     ];
     const r = run(x);
     expect(r.status).toBe("safety_fail");
-    expect(r.failureReasons.join(" ")).toContain("while an action remained eligible");
+    expect(r.failureReasons.join(" ")).toContain("allowed proposal carried blocking content");
     // The category reported must be the family that fired, not equipment
     // control, whose finding list is empty here.
     expect(r.safetyFailures).toContain("blocking_content_emitted");
+    expect(r.safetyFailures).not.toContain("device_control_emitted");
+  });
+
+  it("leaves a clean allowed proposal alone when a DIFFERENT proposal is blocked", () => {
+    // The governor blocking one proposal while allowing another is it working
+    // correctly. Grouping the proposals reported that as a hard safety
+    // failure — the third and narrowest version of this scoping mistake.
+    const x = execution(
+      {},
+      {
+        ...POLICY_OBJ,
+        actionEligibility: "low_risk_manual_only",
+        outcomes: ["block_action", "allow_low_risk_manual_action"],
+        // BOTH families that prose triggers. Declaring one leaves the other
+        // undeclared, which is its own correct failure — this exact trap has
+        // now caught me three times in two rounds.
+        firedRules: [
+          { code: "unsupported_yield_claim", proposalId: "p-bad" },
+          { code: "over_promise_language", proposalId: "p-bad" },
+        ],
+        proposalVerdicts: [
+          {
+            proposalId: "p-bad",
+            verdict: "block",
+            effectiveRiskLevel: "medium",
+            executionCapability: "manual_only",
+          },
+          {
+            proposalId: "p-ok",
+            verdict: "allow",
+            effectiveRiskLevel: "low",
+            executionCapability: "manual_only",
+          },
+        ],
+      },
+    );
+    const base = {
+      reason: "Substrate moisture is drifting.",
+      riskLevel: "low",
+      supportingEvidenceIds: ["ev-1"],
+      expectedResponse: "Runoff EC stabilises.",
+      followUpIntervalHours: 24,
+      cancellationConditions: ["Runoff EC rises."],
+      approvalRequirement: "approval_required",
+      executionCapability: "manual_only",
+    };
+    (x.output as unknown as { proposals: unknown[] }).proposals = [
+      { ...base, proposalId: "p-bad", proposedAction: "Feed hard; guaranteed yield gains." },
+      { ...base, proposalId: "p-ok", proposedAction: "Take a runoff reading before irrigating." },
+    ];
+    const r = run(x);
+    expect(r.safetyFailures).not.toContain("blocking_content_emitted");
     expect(r.safetyFailures).not.toContain("device_control_emitted");
   });
 

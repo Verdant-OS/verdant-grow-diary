@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-08-01.1**
+**Sentinel-Version: 2026-08-01.2**
 
 This file is the universal constitution every Verdant agent inherits — Codex, Claude,
 Grok, Gemini, the Security reviewer, and the Council Chair. It was previously titled

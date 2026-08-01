@@ -1,6 +1,6 @@
 # Role — Security and Infrastructure Reviewer
 
-**Sentinel-Version: 2026-08-01.1**
+**Sentinel-Version: 2026-08-01.2**
 
 > **DERIVED, NOT AUTHORITATIVE.** The full pack text for this role was not received. This
 > file is reconstructed from the pack summary. Replace with the authoritative text.

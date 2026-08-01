@@ -1386,7 +1386,14 @@ export default function ActionQueue() {
                 className="text-xs text-muted-foreground mt-1"
                 data-testid="one-tent-loop-action-queue-empty"
               >
-                No approval-required actions are pending.
+                {/* The queue only ever loaded the scoped grow's actions, so an
+                    unqualified "nothing is pending" is a claim it cannot
+                    support: a pending, approval-required action in another
+                    grow stayed invisible while this line said none existed.
+                    Only assert what was actually queried. */}
+                {growContextHint.isScoped && growContextHint.growName
+                  ? `No approval-required actions are pending in ${growContextHint.growName}.`
+                  : "No approval-required actions are pending."}
               </p>
             )}
             {!filtersActive && (

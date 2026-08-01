@@ -132,9 +132,18 @@ describe("ActionQueue — One-Tent Loop landing polish", () => {
   });
 
   it("renders the One-Tent Loop empty-state line when no pending actions", async () => {
+    // Scoped to grow "G1" by the useGrows mock above, so the line must say so.
+    // An unqualified "none are pending" was a claim the page could not support:
+    // it only queried the scoped grow, so a pending approval-required action in
+    // another grow stayed invisible behind a global-sounding denial.
     renderPage();
     const empty = await screen.findByTestId("one-tent-loop-action-queue-empty");
-    expect(empty.textContent).toBe("No approval-required actions are pending.");
+    expect(empty.textContent).toBe(
+      "No approval-required actions are pending in G1.",
+    );
+    expect(empty.textContent).not.toBe(
+      "No approval-required actions are pending.",
+    );
   });
 
   it("does not trigger any Supabase writes on render", async () => {

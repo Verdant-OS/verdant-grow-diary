@@ -129,6 +129,16 @@ describe("static wiring — the gates are actually read at the creation seams", 
     expect(TENT_DIALOG).toMatch(/tent-create-gate-notice/);
   });
 
+  it("CreateTentDialog fail-closed binding withholds the form when blocked", () => {
+    expect(TENT_DIALOG).toMatch(/buildCreateGrowBindingView/);
+    expect(TENT_DIALOG).toMatch(/growsError/);
+    expect(TENT_DIALOG).toMatch(/useCreateBindingRetry/);
+    expect(TENT_DIALOG).toMatch(/formBlocked/);
+    expect(TENT_DIALOG).toMatch(/!formBlocked &&/);
+    expect(TENT_DIALOG).toMatch(/grow_id:\s*targetGrowId/);
+    expect(TENT_DIALOG).not.toMatch(/if\s*\(defaultGrowId\)\s*payload\.grow_id/);
+  });
+
   it("both seams fail open while loading or when entitlement lookup fails", () => {
     expect(GROWS).toMatch(
       /entLoading \|\| entitlementLookupFailed\s*\? null\s*: entitlement\.capabilities/,

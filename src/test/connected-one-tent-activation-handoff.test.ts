@@ -46,7 +46,10 @@ describe("connected One-Tent activation handoff", () => {
   it("keeps general-purpose creation nullable outside guided activation", () => {
     expect(TENT_DIALOG).toMatch(/initiallyOpen\s*=\s*false/);
     expect(PLANT_DIALOG).toMatch(/requireTent\s*=\s*false/);
-    expect(PLANT_DIALOG).toMatch(/!requireTent\s*&&\s*<SelectItem value="none"/);
+    // Tentless "No tent" remains available only when plantCreateAllowsTentless allows it.
+    expect(PLANT_DIALOG).toMatch(
+      /plantCreateAllowsTentless\(\{[\s\S]*?requireTent,[\s\S]*?\}\)\s*&&\s*<SelectItem value="none">/,
+    );
   });
 
   it("uses one relationship-aware Dashboard checklist and removes the duplicate", () => {

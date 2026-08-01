@@ -72,9 +72,9 @@ describe("PlantMergeDialog grow-context fallback", () => {
 
 describe("CreatePlantDialog grow-context hardening", () => {
   it("always writes grow_id from resolved target (page default or active setup)", () => {
-    expect(CREATE).toMatch(/resolveCreateTargetGrowId/);
+    expect(CREATE).toMatch(/buildCreateGrowBindingView/);
     expect(CREATE).toMatch(/grow_id:\s*targetGrowId/);
-    expect(CREATE).toMatch(/canWriteCreateGrowId|hardStop\.blockSubmit/);
+    expect(CREATE).toMatch(/canWriteCreateGrowId|formBlocked/);
   });
 
   it("still prefers page defaultGrowId via resolver (URL activation path)", () => {

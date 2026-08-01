@@ -151,6 +151,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Post-sign-in start-screen choice (diary-first default).",
   },
   {
+    path: "/start-room",
+    access: "auth",
+    description: "Guided first-session grow → tent → plant with guaranteed binding.",
+  },
+  {
     path: "/operator/ai-doctor-phase1",
     access: "operator",
     description: "Operator AI Doctor Phase 1 results page.",

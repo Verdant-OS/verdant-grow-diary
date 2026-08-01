@@ -223,10 +223,18 @@ export default function PlantDetail() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const contextTentId = searchParams.get("tentId");
+  const openQuickLogParam = searchParams.get("openQuickLog");
   const { data: plant, isLoading, isError, refetch } = useGrowPlant(id);
   const { data: tent } = useGrowTent(plant?.tentId);
   const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null]);
   const tentMeta = getGrowDataMeta(["grow", "tent", plant?.tentId ?? null]);
+
+  // First-session / deep-link: open PlantQuickLog once when ?openQuickLog=1
+  useEffect(() => {
+    if (openQuickLogParam !== "1") return;
+    if (!plant?.id) return;
+    setQuickLogOpen(true);
+  }, [openQuickLogParam, plant?.id]);
 
   // Bounded-loading guard: if the plant query never settles (slow network,
   // hung Supabase request, etc.) we must not leave the grower on a blank

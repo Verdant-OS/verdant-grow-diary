@@ -106,7 +106,7 @@ describe("checklist links point to safe existing routes", () => {
   });
 
   it.each([
-    ["create_grow", "/grows"],
+    ["create_grow", "/start-room"],
     ["add_tent", "/tents"],
     ["add_plant", "/plants"],
     ["first_log", "/"],

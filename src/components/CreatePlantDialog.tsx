@@ -457,6 +457,7 @@ export default function CreatePlantDialog({
             className="rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 space-y-2"
             data-testid="create-plant-hard-stop"
             role="alert"
+            aria-label={binding.title || GROW_SETUP_MESSAGES.hardStopTitle}
           >
             <p className="text-sm font-semibold" data-testid="create-plant-hard-stop-title">
               {binding.title}
@@ -564,29 +565,27 @@ export default function CreatePlantDialog({
         {(suppliedTent.kind === "orphan" || suppliedTent.kind === "mismatch") &&
           suppliedTentStillBlocksWrite && (
             <div
-              className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"
+              className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs space-y-2"
               data-testid="create-plant-tent-mismatch"
               role="alert"
+              aria-label={suppliedTent.title}
             >
-              <span className="font-semibold block">{suppliedTent.title}</span>
-              <span className="text-muted-foreground">
+              <p className="font-semibold">{suppliedTent.title}</p>
+              <p className="text-muted-foreground">
                 {suppliedTent.kind === "mismatch" && setupName
                   ? GROW_SETUP_MESSAGES.tentMismatchBodyForSetup(setupName)
                   : suppliedTent.body}
-              </span>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setTentSelectOpen(true)}
-                >
-                  {GROW_SETUP_MESSAGES.chooseTent}
+              </p>
+              {suppliedTent.finishSetupHref ? (
+                <Button asChild size="sm" variant="outline">
+                  <Link
+                    to={suppliedTent.finishSetupHref}
+                    data-testid="create-plant-finish-setup-cta"
+                  >
+                    {suppliedTent.finishSetupLabel}
+                  </Link>
                 </Button>
-                <Button asChild type="button" size="sm" variant="ghost">
-                  <Link to={binding.chooseSetupHref}>{GROW_SETUP_MESSAGES.switchSetup}</Link>
-                </Button>
-              </div>
+              ) : null}
             </div>
           )}
         {!tentCompat.compatible && form.tent_id !== "none" && (

@@ -11,9 +11,11 @@
  */
 import {
   GROW_SETUP_CHOOSE_SETUP_HREF,
+  GROW_SETUP_FINISH_SETUP_HREF,
   GROW_SETUP_GENERIC_NAME,
   GROW_SETUP_MESSAGES,
   GROW_SETUP_START_ROOM_HREF,
+  growSetup,
 } from "@/constants/growSetupMessages";
 
 export type CreateBindingEntity = "tent" | "plant";
@@ -265,6 +267,9 @@ export interface SuppliedTentView {
   title: string;
   body: string;
   showRetry: boolean;
+  /** Present for orphan/mismatch — Finish setup → /grow-lineage. */
+  finishSetupHref: string | null;
+  finishSetupLabel: string;
 }
 
 const SUPPLIED_TENT_NONE: SuppliedTentView = {
@@ -276,6 +281,8 @@ const SUPPLIED_TENT_NONE: SuppliedTentView = {
   title: "",
   body: "",
   showRetry: false,
+  finishSetupHref: null,
+  finishSetupLabel: GROW_SETUP_MESSAGES.finishSetup,
 };
 
 /**
@@ -308,6 +315,8 @@ export function evaluateSuppliedTentBinding(input: {
       title: GROW_SETUP_MESSAGES.tentUnavailableTitle,
       body: GROW_SETUP_MESSAGES.tentUnavailableBody,
       showRetry: true,
+      finishSetupHref: null,
+      finishSetupLabel: GROW_SETUP_MESSAGES.finishSetup,
     };
   }
 
@@ -322,6 +331,8 @@ export function evaluateSuppliedTentBinding(input: {
       title: GROW_SETUP_MESSAGES.tentPendingTitle,
       body: GROW_SETUP_MESSAGES.tentPendingBody,
       showRetry: false,
+      finishSetupHref: null,
+      finishSetupLabel: GROW_SETUP_MESSAGES.finishSetup,
     };
   }
 
@@ -338,6 +349,8 @@ export function evaluateSuppliedTentBinding(input: {
       title: GROW_SETUP_MESSAGES.tentUnavailableTitle,
       body: GROW_SETUP_MESSAGES.tentUnavailableBody,
       showRetry: true,
+      finishSetupHref: null,
+      finishSetupLabel: GROW_SETUP_MESSAGES.finishSetup,
     };
   }
 
@@ -354,6 +367,8 @@ export function evaluateSuppliedTentBinding(input: {
       title: GROW_SETUP_MESSAGES.tentPendingTitle,
       body: GROW_SETUP_MESSAGES.tentPendingBody,
       showRetry: false,
+      finishSetupHref: null,
+      finishSetupLabel: GROW_SETUP_MESSAGES.finishSetup,
     };
   }
 
@@ -367,6 +382,8 @@ export function evaluateSuppliedTentBinding(input: {
       title: GROW_SETUP_MESSAGES.tentOrphanTitle,
       body: GROW_SETUP_MESSAGES.tentOrphanBody,
       showRetry: false,
+      finishSetupHref: GROW_SETUP_FINISH_SETUP_HREF,
+      finishSetupLabel: GROW_SETUP_MESSAGES.finishSetup,
     };
   }
 
@@ -380,6 +397,8 @@ export function evaluateSuppliedTentBinding(input: {
       title: GROW_SETUP_MESSAGES.tentMismatchTitle,
       body: GROW_SETUP_MESSAGES.tentMismatchBody,
       showRetry: false,
+      finishSetupHref: GROW_SETUP_FINISH_SETUP_HREF,
+      finishSetupLabel: GROW_SETUP_MESSAGES.finishSetup,
     };
   }
 
@@ -392,6 +411,8 @@ export function evaluateSuppliedTentBinding(input: {
     title: "",
     body: "",
     showRetry: false,
+    finishSetupHref: null,
+    finishSetupLabel: GROW_SETUP_MESSAGES.finishSetup,
   };
 }
 
@@ -567,4 +588,100 @@ export function plantCreateAllowsTentless(input: {
   if (input.requireTent) return false;
   if (trimId(input.suppliedTentId)) return false;
   return true;
+}
+
+/** Never render an opaque id as the setup display name. */
+export function sanitizeSetupDisplayName(
+  rawName: string | null | undefined,
+  growId: string | null | undefined,
+): string {
+  const name = typeof rawName === "string" ? rawName.trim() : "";
+  const id = trimId(growId);
+  if (!name) return growSetup.create.genericSetupLabel;
+  if (id && name === id) return growSetup.create.genericSetupLabel;
+  if (UUID_LIKE.test(name)) return growSetup.create.genericSetupLabel;
+  if (name.length > 80) return `${name.slice(0, 77)}…`;
+  return name;
+}
+
+export interface ResolvedTargetGrow {
+  id: string;
+  name: string;
+}
+
+/**
+ * Task API: pageDefaultGrowId wins when known; otherwise activeGrowId.
+ * Display name never leaks a raw UUID.
+ */
+export function resolveTargetGrow(input: {
+  pageDefaultGrowId?: string | null;
+  activeGrowId?: string | null;
+  grows: readonly GrowListItem[];
+  growsLoading?: boolean;
+  growsError?: boolean;
+}): ResolvedTargetGrow | null {
+  const resolved = resolveCreateTargetGrowId(input);
+  const id = trimId(resolved.targetGrowId);
+  if (!id) return null;
+  const hit = input.grows.find((g) => g.id === id);
+  return { id, name: sanitizeSetupDisplayName(hit?.name, id) };
+}
+
+/** Task API wrapper around buildCreateGrowBindingView. */
+export function buildHardStopView(input: {
+  targetGrow: ResolvedTargetGrow | null;
+  growCount: number;
+  growsLoading?: boolean;
+  growsError?: boolean;
+  entity?: CreateBindingEntity;
+}): CreateGrowBindingView {
+  return buildCreateGrowBindingView(
+    {
+      pageDefaultGrowId: input.targetGrow?.id ?? null,
+      activeGrowId: null,
+      grows: input.targetGrow
+        ? [{ id: input.targetGrow.id, name: input.targetGrow.name }]
+        : Array.from({ length: Math.max(0, input.growCount) }, (_, i) => ({
+            id: `grow-placeholder-${i}`,
+            name: `Setup ${i + 1}`,
+          })),
+      growsLoading: input.growsLoading,
+      growsError: input.growsError,
+    },
+    input.entity ?? "tent",
+  );
+}
+
+export type TentGrowCompatibilityCheck =
+  | { ok: true }
+  | { ok: false; reason: "missing_target" | "missing_setup" | "different_setup" };
+
+/**
+ * Task API: tent must share the resolved target grow.
+ * Null tent grow + known target → missing_setup; mismatched → different_setup.
+ */
+export function checkTentGrowCompatibility(input: {
+  targetGrowId: string | null | undefined;
+  tent:
+    | {
+        id?: string | null;
+        grow_id?: string | null;
+        growId?: string | null;
+      }
+    | null
+    | undefined;
+}): TentGrowCompatibilityCheck {
+  const tentId = trimId(input.tent?.id);
+  if (!tentId) return { ok: true };
+  const tentGrow = trimId(input.tent?.grow_id) ?? trimId(input.tent?.growId);
+  const result = evaluateTentGrowCompatibility({
+    selectedTentId: tentId,
+    tentGrowId: tentGrow,
+    targetGrowId: input.targetGrowId,
+  });
+  if (result.compatible) return { ok: true };
+  if (result.kind === "missing_target") return { ok: false, reason: "missing_target" };
+  if (result.kind === "orphan_tent") return { ok: false, reason: "missing_setup" };
+  if (result.kind === "mismatch") return { ok: false, reason: "different_setup" };
+  return { ok: false, reason: "missing_target" };
 }

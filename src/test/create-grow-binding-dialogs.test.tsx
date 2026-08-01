@@ -148,8 +148,16 @@ describe("create dialogs — remaining fail-closed behavior", () => {
     expect(await screen.findByTestId("create-plant-tent-mismatch")).toHaveTextContent(
       "This tent is in another setup",
     );
-    expect(screen.getByRole("link", { name: "Switch setup" })).toHaveAttribute("href", "/grows");
-    fireEvent.click(screen.getByRole("button", { name: "Choose another tent" }));
+    expect(screen.getByRole("link", { name: "Finish setup" })).toHaveAttribute(
+      "href",
+      "/grow-lineage",
+    );
+    fireEvent.pointerDown(screen.getByTestId("create-plant-tent-select"), {
+      button: 0,
+      ctrlKey: false,
+      pointerType: "mouse",
+    });
+    fireEvent.click(screen.getByTestId("create-plant-tent-select"));
     expect(await screen.findByRole("option", { name: "Compatible Tent" })).toBeVisible();
     const submit = screen.getByTestId("plant-create-submit");
     expect(submit).toBeDisabled();

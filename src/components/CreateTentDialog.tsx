@@ -235,6 +235,7 @@ export default function CreateTentDialog({
             className="rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 space-y-2"
             data-testid="create-tent-hard-stop"
             role="alert"
+            aria-label={binding.title || GROW_SETUP_MESSAGES.hardStopTitle}
           >
             <p className="text-sm font-semibold" data-testid="create-tent-hard-stop-title">
               {binding.title}

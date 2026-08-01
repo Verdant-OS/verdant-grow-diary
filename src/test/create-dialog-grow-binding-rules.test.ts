@@ -1,18 +1,24 @@
 import { describe, it, expect } from "vitest";
 import {
   resolveCreateTargetGrowId,
+  resolveTargetGrow,
   buildCreateGrowBindingView,
+  buildHardStopView,
   canWriteCreateGrowId,
+  checkTentGrowCompatibility,
   evaluateTentGrowCompatibility,
   evaluateSuppliedTentBinding,
   resolveInitialPlantTentId,
   resolveSetupName,
   plantCreateAllowsTentless,
+  sanitizeSetupDisplayName,
   suppliedTentBlocksWrite,
 } from "@/lib/createDialogGrowBindingRules";
 import {
   GROW_SETUP_CHOOSE_SETUP_HREF,
+  GROW_SETUP_FINISH_SETUP_HREF,
   GROW_SETUP_START_ROOM_HREF,
+  growSetup,
 } from "@/constants/growSetupMessages";
 
 const grows = [
@@ -279,5 +285,93 @@ describe("supplied tent contract", () => {
     expect(suppliedTentBlocksWrite(pending, true, { replacementIsLocallyVerified: true })).toBe(
       false,
     );
+  });
+
+  it("orphan/mismatch supplied tents expose Finish setup href", () => {
+    const orphan = evaluateSuppliedTentBinding({
+      suppliedTentId: "t1",
+      tentsLoaded: true,
+      suppliedTentRow: { id: "t1", grow_id: null },
+      targetGrowId: "g1",
+    });
+    expect(orphan.kind).toBe("orphan");
+    expect(orphan.finishSetupHref).toBe(GROW_SETUP_FINISH_SETUP_HREF);
+
+    const mismatch = evaluateSuppliedTentBinding({
+      suppliedTentId: "t1",
+      tentsLoaded: true,
+      suppliedTentRow: { id: "t1", grow_id: "g2" },
+      targetGrowId: "g1",
+    });
+    expect(mismatch.kind).toBe("mismatch");
+    expect(mismatch.finishSetupHref).toBe(GROW_SETUP_FINISH_SETUP_HREF);
+  });
+});
+
+describe("resolveTargetGrow / display-name safety", () => {
+  it("returns id+name and never leaks a raw UUID", () => {
+    const uuid = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    expect(sanitizeSetupDisplayName(uuid, uuid)).toBe(growSetup.create.genericSetupLabel);
+    expect(
+      resolveTargetGrow({
+        pageDefaultGrowId: uuid,
+        activeGrowId: null,
+        grows: [{ id: uuid, name: uuid }],
+      })?.name,
+    ).toBe(growSetup.create.genericSetupLabel);
+    expect(
+      resolveTargetGrow({
+        pageDefaultGrowId: null,
+        activeGrowId: "g1",
+        grows,
+      }),
+    ).toEqual({ id: "g1", name: "Spring" });
+  });
+
+  it("handles blank and very long setup names", () => {
+    expect(sanitizeSetupDisplayName("   ", "g1")).toBe(growSetup.create.genericSetupLabel);
+    const long = "A".repeat(120);
+    expect(sanitizeSetupDisplayName(long, "g1").length).toBeLessThanOrEqual(80);
+  });
+});
+
+describe("checkTentGrowCompatibility / buildHardStopView", () => {
+  it("covers the tent/grow compatibility matrix", () => {
+    expect(checkTentGrowCompatibility({ targetGrowId: "g1", tent: null }).ok).toBe(true);
+    expect(
+      checkTentGrowCompatibility({
+        targetGrowId: "g1",
+        tent: { id: "t1", grow_id: null },
+      }),
+    ).toEqual({ ok: false, reason: "missing_setup" });
+    expect(
+      checkTentGrowCompatibility({
+        targetGrowId: "g1",
+        tent: { id: "t1", growId: "g2" },
+      }),
+    ).toEqual({ ok: false, reason: "different_setup" });
+    expect(
+      checkTentGrowCompatibility({
+        targetGrowId: null,
+        tent: { id: "t1", grow_id: "g1" },
+      }),
+    ).toEqual({ ok: false, reason: "missing_target" });
+    expect(
+      checkTentGrowCompatibility({
+        targetGrowId: "g1",
+        tent: { id: "t1", grow_id: "g1" },
+      }).ok,
+    ).toBe(true);
+  });
+
+  it("buildHardStopView blocks zero grows", () => {
+    const v = buildHardStopView({
+      targetGrow: null,
+      growCount: 0,
+      entity: "plant",
+    });
+    expect(v.blockSubmit).toBe(true);
+    expect(v.showStartRoomHardStop).toBe(true);
+    expect(canWriteCreateGrowId(null)).toBe(false);
   });
 });

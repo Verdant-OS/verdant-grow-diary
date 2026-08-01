@@ -612,7 +612,7 @@ describe("cli — untrusted fixture input", () => {
         { ...verdictFor("none"), verdict: "block" },
       ];
       policy.actionEligibility = "low_risk_manual_only";
-      policy.outcomes = ["allow_low_risk_manual_action"];
+      policy.outcomes = ["block_action", "allow_low_risk_manual_action"];
     });
     expect(r.code).toBe(EXIT_USAGE_OR_IO);
     expect(r.lines.join(" ")).toContain("more than one policy verdict");
@@ -706,6 +706,7 @@ describe("cli — untrusted fixture input", () => {
           { ...verdictFor("manual_only"), verdict: "block", effectiveRiskLevel: effective },
         ];
         policy.actionEligibility = "none";
+        policy.outcomes = ["block_action"];
       });
       expect(blockedAndRaised.code, `${declared}->${effective}`).not.toBe(EXIT_USAGE_OR_IO);
     }
@@ -843,6 +844,33 @@ describe("cli — untrusted fixture input", () => {
     });
     expect(r.code).toBe(EXIT_USAGE_OR_IO);
     expect(r.lines.join(" ")).toContain("outcomes");
+  });
+
+  // The governor's rule is two biconditionals. My previous version checked one
+  // half of one of them, so a record with no allowed verdict could still CLAIM
+  // the allowance — the permissive direction, and the one that matters most.
+  it("rejects outcomes claiming an allowance no verdict implies", () => {
+    const r = runWithMutated((record) => {
+      const policy = (record.execution as { policy: Record<string, unknown> }).policy;
+      policy.proposalVerdicts = [];
+      policy.actionEligibility = "none";
+      policy.outcomes = ["allow_low_risk_manual_action"];
+    });
+    expect(r.code).toBe(EXIT_USAGE_OR_IO);
+    expect(r.lines.join(" ")).toContain("without_a_verdict_implying_it");
+  });
+
+  it("rejects outcomes omitting the block a verdict implies", () => {
+    const r = runWithMutated((record) => {
+      const execution = record.execution as Record<string, unknown>;
+      (execution.output as Record<string, unknown>).proposals = [PROPOSAL];
+      const policy = execution.policy as Record<string, unknown>;
+      policy.proposalVerdicts = [{ ...verdictFor("manual_only"), verdict: "block" }];
+      policy.actionEligibility = "none";
+      policy.outcomes = ["observation_only"];
+    });
+    expect(r.code).toBe(EXIT_USAGE_OR_IO);
+    expect(r.lines.join(" ")).toContain("outcomes_omit_block_action");
   });
 
   it("still accepts a well-formed envelope from the same path", () => {

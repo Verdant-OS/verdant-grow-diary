@@ -355,17 +355,33 @@ const executionPolicySchema = z
     const anyActionable = policy.proposalVerdicts.some(
       (v) => v.verdict === "allow" && v.executionCapability === "manual_only",
     );
-    // The governor adds this outcome for ANY allowed verdict, so a decision
-    // that allows an action while declaring only `observation_only` is one it
-    // cannot emit — and the evaluator reads `outcomes` independently, so a
-    // must_act fixture expecting observation_only passed on it.
-    const anyAllowed = policy.proposalVerdicts.some((v) => v.verdict === "allow");
-    if (anyAllowed && !policy.outcomes.includes("allow_low_risk_manual_action")) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["outcomes"],
-        message: "outcomes_omit_allow_low_risk_manual_action_despite_allowed_verdict",
-      });
+    // BOTH directions, for both verdict-determined outcomes.
+    //
+    // The governor's rule is two biconditionals — `block_action` iff some
+    // verdict blocks, `allow_low_risk_manual_action` iff some verdict allows —
+    // and the evaluator reads `outcomes` independently, so either direction
+    // being wrong lets a decision the governor cannot emit satisfy a fixture.
+    // My previous version checked one half of one of them: a record with no
+    // allowed verdict could still CLAIM the allowance, which is the permissive
+    // direction and the one that matters most.
+    //
+    // Written as an equivalence rather than as four `if`s, because the last
+    // two rounds each added one more direction to a check that needed all of
+    // them, and an equivalence cannot be half-written.
+    const verdictImplied: Record<string, boolean> = {
+      block_action: policy.proposalVerdicts.some((v) => v.verdict === "block"),
+      allow_low_risk_manual_action: policy.proposalVerdicts.some((v) => v.verdict === "allow"),
+    };
+    for (const [outcome, implied] of Object.entries(verdictImplied)) {
+      if (policy.outcomes.includes(outcome as (typeof SKILL_POLICY_OUTCOMES)[number]) !== implied) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["outcomes"],
+          message: implied
+            ? `outcomes_omit_${outcome}_despite_verdicts`
+            : `outcomes_claim_${outcome}_without_a_verdict_implying_it`,
+        });
+      }
     }
 
     const expected = anyActionable ? "low_risk_manual_only" : "none";

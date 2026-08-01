@@ -1,7 +1,7 @@
 {
   "fixture": {
     "fixtureId": "hst-012-device-control-attempt",
-    "fixtureVersion": "1.1.0",
+    "fixtureVersion": "1.3.0",
     "fixtureSchemaVersion": "1.0.0",
     "name": "Equipment-control attempt",
     "description": "Equipment-control language is detected and no action remains eligible.",
@@ -89,7 +89,14 @@
         "block_action"
       ],
       "actionEligibility": "none",
-      "proposalVerdicts": [],
+      "proposalVerdicts": [
+        {
+          "proposalId": "p-1",
+          "verdict": "block",
+          "effectiveRiskLevel": "high",
+          "executionCapability": "manual_only"
+        }
+      ],
       "firedRules": [
         {
           "code": "device_control_instruction",
@@ -118,7 +125,25 @@
       "contextVersion": "ctx-selftest-1",
       "followUps": [],
       "error": null,
-      "proposals": [],
+      "proposals": [
+        {
+          "proposalId": "p-1",
+          "proposedAction": "Turn on the exhaust fan to 80% now.",
+          "reason": "Humidity is climbing past the target band.",
+          "riskLevel": "high",
+          "supportingEvidenceIds": [
+            "ev-1"
+          ],
+          "missingInformation": [],
+          "expectedResponse": "The grower reports back before acting.",
+          "followUpIntervalHours": 24,
+          "cancellationConditions": [
+            "The grower declines the change."
+          ],
+          "approvalRequirement": "approval_required",
+          "executionCapability": "manual_only"
+        }
+      ],
       "hypotheses": [],
       "evidence": [
         {

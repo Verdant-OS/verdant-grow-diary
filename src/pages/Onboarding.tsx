@@ -26,6 +26,8 @@ import {
   setStartScreenChoice,
   type StartScreenChoice,
 } from "@/lib/startScreenPreferences";
+import { shouldPreferStartYourRoom } from "@/lib/startYourRoomRules";
+import { Sprout } from "lucide-react";
 import {
   buildStarterQuickLogPrefill,
   STARTER_SETUP_BUTTON_LABEL,
@@ -50,7 +52,7 @@ import {
 
 export default function Onboarding() {
   const { user, loading } = useAuth();
-  const { refresh: refreshGrows } = useGrows();
+  const { grows = [], loading: growsLoading, refresh: refreshGrows } = useGrows();
   const queryClient = useQueryClient();
   const nav = useNavigate();
   const [searchParams] = useSearchParams();
@@ -60,6 +62,7 @@ export default function Onboarding() {
   const [csvHistoryImportHref, setCsvHistoryImportHref] = useState<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const csvHistoryIntent = readCsvHistoryOnboardingIntent(searchParams);
+  const preferRoom = shouldPreferStartYourRoom(grows.length);
 
   useEffect(() => {
     // Land focus on the heading so screen readers announce context first and
@@ -67,7 +70,7 @@ export default function Onboarding() {
     headingRef.current?.focus();
   }, []);
 
-  if (loading) return null;
+  if (loading || growsLoading) return null;
   if (!user) return <Navigate to="/auth" replace />;
 
   function go(c: StartScreenChoice, save: boolean) {
@@ -127,13 +130,40 @@ export default function Onboarding() {
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">
       <div className="w-full max-w-md glass rounded-2xl p-6">
+        {preferRoom && !csvHistoryIntent ? (
+          <div
+            className="mb-5 rounded-xl border border-primary/40 bg-primary/10 p-4 space-y-3"
+            data-testid="onboarding-start-room-hero"
+          >
+            <div className="flex items-start gap-2">
+              <Sprout className="h-5 w-5 text-primary shrink-0 mt-0.5" aria-hidden />
+              <div>
+                <h2 className="text-base font-display font-semibold">Start your room</h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Recommended for first session: create grow → tent → plant in one path so Quick
+                  Log works immediately.
+                </p>
+              </div>
+            </div>
+            <Button
+              className="w-full gradient-leaf text-primary-foreground"
+              onClick={() => nav("/start-room", { replace: true })}
+              data-testid="onboarding-start-room-cta"
+            >
+              Start your room
+            </Button>
+          </div>
+        ) : null}
+
         <h1
           ref={headingRef}
           tabIndex={-1}
           id="onboarding-heading"
           className="text-2xl font-display font-bold mb-1 outline-none"
         >
-          Where do you want Verdant to open first?
+          {preferRoom && !csvHistoryIntent
+            ? "Or choose where to open first"
+            : "Where do you want Verdant to open first?"}
         </h1>
         <p className="text-sm text-muted-foreground mb-1">
           {csvHistoryIntent

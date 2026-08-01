@@ -1,9 +1,6 @@
 # Verdant Sentinel Code
 
-Gemini CLI and Gemini Code Assist load this file as persistent project context. The block
-below is a self-contained, full mirror of the universal constitution in `AGENTS.md`, not
-a link or a safety-only summary. It lets Gemini apply every durable product, engineering,
-data, safety, and release rule even when it cannot resolve a separate repository file.
+**Sentinel-Version: 2026-08-01.5**
 
 `AGENTS.md` remains canonical. The exact mirrored constitution is delimited below so CI
 can reject content drift as well as version drift.

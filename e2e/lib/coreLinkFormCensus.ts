@@ -343,6 +343,7 @@ export const AUTHENTICATED_CORE_CENSUS_ROUTES = [
     expectedContent: [{ kind: "test-id", value: "tent-detail-metric-chips" }],
   },
   { path: "/onboarding", label: "Onboarding", fieldPolicy: "fill-safe-fields" },
+  { path: "/start-room", label: "Start your room", fieldPolicy: "fill-safe-fields" },
   { path: "/health", label: "App health", fieldPolicy: "audit-only" },
 ] as const satisfies readonly CoreCensusRoute[];
 

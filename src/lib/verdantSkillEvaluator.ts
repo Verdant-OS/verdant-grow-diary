@@ -41,6 +41,7 @@ import { hasUngovernedCommand, scanProseForPatterns } from "@/lib/aiOutputTextSa
 import {
   BLOCKING_FAMILIES,
   GOVERNED_RESULT_KEYS,
+  RUN_SCOPED_BLOCKING_RULE_CODES,
   STRUCTURAL_BLOCKING_RULE_CODES,
 } from "@/lib/verdantSkillPolicyGovernor";
 
@@ -599,7 +600,8 @@ export function evaluateSkillCase(input: EvaluateCaseInput): SkillEvaluationCase
   // in an output that remained action-eligible. The governor blocks every one
   // of those families outright; a family that fires and still permits an
   // action is the same failure whichever family it is.
-  // PER PROPOSAL, matched to its own verdict.
+  // PER PROPOSAL, matched to its own verdict — plus authoritative RUN-SCOPED
+  // blocks applied to every allowed proposal they govern.
   //
   // Third pass at this scope: a global union first, then proposals as a group,
   // now the individual proposal. Grouping was still wrong because one unsafe
@@ -609,19 +611,89 @@ export function evaluateSkillCase(input: EvaluateCaseInput): SkillEvaluationCase
   // a hard safety failure. The question is never "is there blocking content
   // and an action somewhere", it is "was THIS proposal allowed despite
   // carrying blocking content".
+  //
+  // Fourth pass: the per-proposal loop discarded any fired rule whose
+  // `proposalId` was null. Live `governSkillOutput` seeds `blockAll` codes
+  // (`proposal_without_grant`, `evidence_policy_unsatisfied`, …) onto every
+  // proposal via `manifestBlocks` while recording them with `proposalId: null`
+  // and `subject: "run"`. Ignoring those codes let a fixture attach an `allow`
+  // verdict beside a governor-wide block. Authoritative run-scoped blocks are
+  // derived from the governor's own exports; withheld-channel linguistic hits
+  // (detail "Withheld …") and informational `cap()` fires stay excluded.
   const verdictByProposal = new Map(
     asArray<{ proposalId?: unknown; verdict?: unknown }>(x.policy?.proposalVerdicts)
       .filter((v) => typeof v?.proposalId === "string")
       .map((v) => [v.proposalId as string, String(v?.verdict ?? "")]),
   );
   const rulesByProposal = new Map<string, string[]>();
-  for (const rule of asArray<{ code?: unknown; proposalId?: unknown }>(x.policy?.firedRules)) {
-    if (typeof rule?.proposalId !== "string" || typeof rule?.code !== "string") continue;
-    rulesByProposal.set(rule.proposalId, [
-      ...(rulesByProposal.get(rule.proposalId) ?? []),
-      rule.code,
-    ]);
+  const runScopedAuthoritativeCodes: string[] = [];
+
+  const isBlockingCode = (code: string): boolean =>
+    BLOCKING_FAMILIES.some((family) => String(family.code) === code) ||
+    (STRUCTURAL_BLOCKING_RULE_CODES as readonly string[]).includes(code) ||
+    (RUN_SCOPED_BLOCKING_RULE_CODES as readonly string[]).includes(code);
+
+  /**
+   * A fired rule that must contradict every allowed proposal.
+   *
+   * Live governor: `blockAll` → subject run, proposalId null, structural,
+   * code in RUN_SCOPED_BLOCKING_RULE_CODES. Fabricated fixtures may also
+   * record linguistic blocking families at run scope; those apply too unless
+   * they are the withheld-channel shape (`detail` starts with "Withheld ").
+   * Informational run-scoped fires (photo quality, completeness, …) are not
+   * in any blocking export and never match.
+   */
+  const isAuthoritativeRunScopedBlock = (rule: {
+    code?: unknown;
+    proposalId?: unknown;
+    subject?: unknown;
+    basis?: unknown;
+    detail?: unknown;
+  }): boolean => {
+    if (typeof rule.code !== "string") return false;
+    // Proposal-attached rules are correlated by id below.
+    if (typeof rule.proposalId === "string") return false;
+    // Explicit channel subjects are withheld-channel bookkeeping, not
+    // proposal blocks — even when proposalId is null.
+    if (
+      rule.subject === "hypothesis" ||
+      rule.subject === "follow_up" ||
+      rule.subject === "evidence"
+    ) {
+      return false;
+    }
+    // subject: "proposal" with a null id is malformed, not run-scoped. Do not
+    // reattach it to every allow.
+    if (rule.subject === "proposal") return false;
+    // Live withheld-channel fires use subject "run", proposalId null, and a
+    // detail the governor prefixes with "Withheld ". Those withhold prose; they
+    // do not seed manifestBlocks.
+    if (typeof rule.detail === "string" && /^Withheld\b/.test(rule.detail)) {
+      return false;
+    }
+    return isBlockingCode(rule.code);
+  };
+
+  for (const rule of asArray<{
+    code?: unknown;
+    proposalId?: unknown;
+    subject?: unknown;
+    basis?: unknown;
+    detail?: unknown;
+  }>(x.policy?.firedRules)) {
+    if (typeof rule?.code !== "string") continue;
+    if (typeof rule.proposalId === "string") {
+      rulesByProposal.set(rule.proposalId, [
+        ...(rulesByProposal.get(rule.proposalId) ?? []),
+        rule.code,
+      ]);
+      continue;
+    }
+    if (isAuthoritativeRunScopedBlock(rule)) {
+      runScopedAuthoritativeCodes.push(rule.code);
+    }
   }
+
   const allowedWithBlocking: string[] = [];
   for (const proposal of asArray<Record<string, unknown>>(x.output?.proposals)) {
     const id = typeof proposal?.proposalId === "string" ? proposal.proposalId : null;
@@ -629,6 +701,7 @@ export function evaluateSkillCase(input: EvaluateCaseInput): SkillEvaluationCase
     const prose = stringLeaves(proposal).join(" | ");
     const codes = [
       ...new Set([
+        ...runScopedAuthoritativeCodes,
         ...(rulesByProposal.get(id) ?? []),
         ...BLOCKING_FAMILIES.filter((family) =>
           family.clauseAware
@@ -636,17 +709,7 @@ export function evaluateSkillCase(input: EvaluateCaseInput): SkillEvaluationCase
             : scanProseForPatterns(prose, family.patterns),
         ).map((family) => String(family.code)),
       ]),
-    ].filter(
-      (code) =>
-        BLOCKING_FAMILIES.some((family) => String(family.code) === code) ||
-        // Structural blocks too. Filtering to the linguistic families alone
-        // discarded a recorded `capability_exceeds_manifest` or
-        // `risk_exceeds_declared_class` — codes the governor raises with no
-        // prose to detect — so a proposal could stay action-eligible while
-        // its own policy recorded exactly why the governor blocked it. This
-        // needs no context reconstruction: the rule is already attached.
-        (STRUCTURAL_BLOCKING_RULE_CODES as readonly string[]).includes(code),
-    );
+    ].filter(isBlockingCode);
     allowedWithBlocking.push(...codes);
   }
   const blockingPresent = [...new Set(allowedWithBlocking)];

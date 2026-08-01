@@ -542,6 +542,33 @@ export const STRUCTURAL_BLOCKING_RULE_CODES: readonly SkillPolicyRuleCode[] = Ob
   "unresolved_follow_up_open",
 ]);
 
+/**
+ * Rule codes that `blockAll()` seeds onto every proposal (`manifestBlocks`).
+ *
+ * These fire with `subject: "run"` and `proposalId: null`. The live governor
+ * starts every proposal as blocked when any of these are present. An offline
+ * harness that only correlates `firedRules` by non-null `proposalId` therefore
+ * never sees them contradict an attached `allow` verdict — the P1 this list
+ * exists to close. Keep in lockstep with every `blockAll(` site.
+ *
+ * Informational run-scoped fires (`cap()`, stage notes, withheld-channel
+ * linguistic hits) are intentionally absent: they lower ceilings or withhold
+ * non-proposal prose without forcing every proposal to block.
+ */
+export const RUN_SCOPED_BLOCKING_RULE_CODES: readonly SkillPolicyRuleCode[] = Object.freeze([
+  "applicability_blocked",
+  "applicability_manifest_mismatch",
+  "confidence_input_mismatch",
+  "contract_version_mismatch",
+  "contract_violation",
+  "context_version_mismatch",
+  "evidence_policy_unsatisfied",
+  "manifest_lifecycle_blocked",
+  "manifest_run_mismatch",
+  "proposal_without_grant",
+  "run_status_not_ok",
+]);
+
 /** Families that block outright: no legitimate use in an advisory proposal. */
 export const BLOCKING_FAMILIES: readonly {
   readonly code: SkillPolicyRuleCode;

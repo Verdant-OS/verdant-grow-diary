@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
+  GROW_SETUP_FINISH_SETUP_HREF,
   GROW_SETUP_MESSAGES,
   GROW_SETUP_START_ROOM_HREF,
 } from "@/constants/growSetupMessages";
@@ -173,6 +174,10 @@ describe("CreatePlantDialog fail-closed binding", () => {
     renderDialog({ defaultTentId: TENT_ORPHAN });
 
     expect(screen.getByTestId("create-plant-tent-mismatch")).toBeInTheDocument();
+    expect(screen.getByTestId("create-plant-finish-setup-cta")).toHaveAttribute(
+      "href",
+      GROW_SETUP_FINISH_SETUP_HREF,
+    );
     expect(screen.getByTestId("plant-create-submit")).toBeDisabled();
     fireEvent.change(screen.getByPlaceholderText("Plant A"), {
       target: { value: "Plant A" },
@@ -181,7 +186,7 @@ describe("CreatePlantDialog fail-closed binding", () => {
     expect(insertMock).not.toHaveBeenCalled();
   });
 
-  it("scopes tent options to the target setup so mismatched tents cannot be selected", () => {
+  it("mismatched supplied tent blocks write with Finish setup CTA", () => {
     growsState.grows = [
       { id: GROW_ACTIVE, name: "Spring Veg" },
       { id: GROW_OTHER, name: "Other" },
@@ -195,6 +200,10 @@ describe("CreatePlantDialog fail-closed binding", () => {
     renderDialog({ defaultTentId: TENT_OTHER });
 
     expect(screen.getByTestId("create-plant-tent-mismatch")).toBeInTheDocument();
+    expect(screen.getByTestId("create-plant-finish-setup-cta")).toHaveAttribute(
+      "href",
+      GROW_SETUP_FINISH_SETUP_HREF,
+    );
     expect(screen.queryByText("Other Tent")).not.toBeInTheDocument();
     expect(screen.getByTestId("plant-create-submit")).toBeDisabled();
     expect(insertMock).not.toHaveBeenCalled();

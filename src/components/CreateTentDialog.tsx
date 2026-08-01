@@ -82,10 +82,7 @@ export default function CreateTentDialog({
     [defaultGrowId, activeGrowId, grows, growsLoading, growsError],
   );
   const targetGrowId = binding.targetGrowId;
-  const setupName = useMemo(
-    () => resolveSetupName(targetGrowId, grows),
-    [targetGrowId, grows],
-  );
+  const setupName = useMemo(() => resolveSetupName(targetGrowId, grows), [targetGrowId, grows]);
 
   const { data: tents } = useTents();
   const {
@@ -200,7 +197,10 @@ export default function CreateTentDialog({
               {binding.retryLabel}
             </Button>
             {growRetry.gate.reason === "cooldown" && (
-              <p className="text-[11px] text-muted-foreground" data-testid="create-tent-retry-cooldown">
+              <p
+                className="text-[11px] text-muted-foreground"
+                data-testid="create-tent-retry-cooldown"
+              >
                 {GROW_SETUP_MESSAGES.retryCooldownHint}
               </p>
             )}
@@ -221,6 +221,7 @@ export default function CreateTentDialog({
             className="rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 space-y-2"
             data-testid="create-tent-hard-stop"
             role="alert"
+            aria-label={binding.title || GROW_SETUP_MESSAGES.hardStopTitle}
           >
             <p className="text-sm font-semibold" data-testid="create-tent-hard-stop-title">
               {binding.title}

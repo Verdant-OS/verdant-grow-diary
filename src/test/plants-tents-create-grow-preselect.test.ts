@@ -39,10 +39,32 @@ describe("Plants/Tents — preselect grow on create", () => {
     expect(CREATE_PLANT).toMatch(/grow_id:\s*targetGrowId/);
   });
 
+  it("Create dialogs fall back to activeGrowId when page defaultGrowId is absent", () => {
+    expect(CREATE_PLANT).toMatch(/useGrows\(\)/);
+    expect(CREATE_TENT).toMatch(/useGrows\(\)/);
+    expect(CREATE_PLANT).toMatch(/activeGrowId/);
+    expect(CREATE_TENT).toMatch(/activeGrowId/);
+    expect(CREATE_PLANT).toMatch(/pageDefaultGrowId:\s*defaultGrowId/);
+    expect(CREATE_TENT).toMatch(/pageDefaultGrowId:\s*defaultGrowId/);
+  });
+
+  it("URL pageDefaultGrowId still wins over activeGrowId when both are present", () => {
+    const rules = readFileSync(resolve(ROOT, "src/lib/createDialogGrowBindingRules.ts"), "utf8");
+    const pageIdx = rules.indexOf("const page = trimId(input.pageDefaultGrowId)");
+    const activeIdx = rules.indexOf("const active = trimId(input.activeGrowId)");
+    expect(pageIdx).toBeGreaterThan(-1);
+    expect(activeIdx).toBeGreaterThan(pageIdx);
+  });
+
   it("CreatePlantDialog scopes tent options to the resolved target setup", () => {
     expect(CREATE_PLANT).toMatch(
       /targetGrowId[\s\S]*?\.filter\([\s\S]*?t\.grow_id\s*===\s*targetGrowId/,
     );
+  });
+
+  it("CreatePlantDialog wires Finish setup CTA for orphan/mismatch supplied tents", () => {
+    expect(CREATE_PLANT).toMatch(/create-plant-finish-setup-cta/);
+    expect(CREATE_PLANT).toMatch(/finishSetupHref/);
   });
 
   it("CreateTentDialog always writes grow_id from binding view when allowed", () => {

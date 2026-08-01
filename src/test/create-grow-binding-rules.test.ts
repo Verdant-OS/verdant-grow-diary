@@ -300,7 +300,7 @@ describe("buildTentInsertPayload", () => {
     for (const state of states) {
       const result = buildTentInsertPayload(state, USER, draft);
       expect(result.ok).toBe(false);
-      if (!result.ok) expect(result.reason).toBe(state.kind);
+      if (result.ok === false) expect(result.reason).toBe(state.kind);
     }
   });
 });

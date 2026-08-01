@@ -15,6 +15,7 @@ import { useSensorReadings } from "@/hooks/useMockData";
 import { useGrowPlants } from "@/hooks/useGrowData";
 import { useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
+import { useGrows } from "@/store/grows";
 import { tentDetailPath, tentsPath } from "@/lib/routes";
 import {
   convertCelsiusForDisplay,
@@ -40,7 +41,10 @@ function formatTentPlantHealthCopy(copy: string): string {
 export default function Tents() {
   // Shared URL `?growId=` resolution against RLS-loaded grows.
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
-  const validGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
+  const { activeGrowId } = useGrows();
+  // URL scope wins; otherwise create into the active setup so unscoped /tents
+  // never inserts unbound tents (Quick Log / Action Queue require grow_id).
+  const validGrowId = isValidScopedGrow ? (urlGrowId ?? undefined) : (activeGrowId ?? undefined);
   const { data: tents = [], isLoading } = useGrowTents(urlGrowId ?? undefined);
   const { data: readings = [] } = useSensorReadings();
   // AUD-001 fix: use real plants (Supabase, RLS-scoped) instead of mock
@@ -51,7 +55,12 @@ export default function Tents() {
 
   return (
     <div>
-      <GrowBreadcrumbs growId={urlGrowId} growName={scopedGrowName} current="Tents" section="tents" />
+      <GrowBreadcrumbs
+        growId={urlGrowId}
+        growName={scopedGrowName}
+        current="Tents"
+        section="tents"
+      />
       <PageHeader
         title="Tents"
         description="Your grow tents — environment, lighting, and assigned plants."
@@ -76,13 +85,18 @@ export default function Tents() {
         testId="tents-data-source-disclosure"
       />
 
-
       {isLoading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[0, 1, 2].map((i) => <div key={i} className="glass rounded-2xl h-48 animate-pulse" />)}
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="glass rounded-2xl h-48 animate-pulse" />
+          ))}
         </div>
       ) : tents.length === 0 ? (
-        <EmptyState icon={<Box className="h-6 w-6" />} title="No tents yet" description="Set up your first tent to start tracking." />
+        <EmptyState
+          icon={<Box className="h-6 w-6" />}
+          title="No tents yet"
+          description="Set up your first tent to start tracking."
+        />
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {tents.map((t) => {
@@ -93,27 +107,56 @@ export default function Tents() {
               : null;
             return (
               <div key={t.id} className="relative animate-fade-in">
-                <Link to={tentDetailPath(t.id)} className="glass rounded-2xl p-5 hover:border-primary/50 transition group flex flex-col gap-3">
+                <Link
+                  to={tentDetailPath(t.id)}
+                  className="glass rounded-2xl p-5 hover:border-primary/50 transition group flex flex-col gap-3"
+                >
                   <div className="flex items-start justify-between pr-8">
                     <div>
-                      <h3 className="font-display text-lg font-semibold group-hover:text-primary transition">{t.name}</h3>
-                      <p className="text-xs text-muted-foreground">{t.brand} · {t.size}</p>
+                      <h3 className="font-display text-lg font-semibold group-hover:text-primary transition">
+                        {t.name}
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        {t.brand} · {t.size}
+                      </p>
                     </div>
                     <StageBadge stage={t.stage} />
                   </div>
 
                   <div className="flex flex-wrap gap-1.5">
-                    {last && <MetricChip label="T" value={(convertCelsiusForDisplay(last.temp) ?? 0).toFixed(1)} unit={getTemperatureUnitSymbol()} status={environmentMetricChipStatus(classifyTempAgainstStage(last.temp ?? null, { stage: t.stage }))} />}
-                    {last && <MetricChip label="RH" value={last.rh} unit="%" status={environmentMetricChipStatus(classifyRhAgainstStage(last.rh ?? null, { stage: t.stage }))} />}
-                    {last && vpdClassification && <MetricChip label="VPD" value={last.vpd} unit=" kPa" status={vpdMetricChipStatus(vpdClassification)} />}
+                    {last && (
+                      <MetricChip
+                        label="T"
+                        value={(convertCelsiusForDisplay(last.temp) ?? 0).toFixed(1)}
+                        unit={getTemperatureUnitSymbol()}
+                        status={environmentMetricChipStatus(
+                          classifyTempAgainstStage(last.temp ?? null, { stage: t.stage }),
+                        )}
+                      />
+                    )}
+                    {last && (
+                      <MetricChip
+                        label="RH"
+                        value={last.rh}
+                        unit="%"
+                        status={environmentMetricChipStatus(
+                          classifyRhAgainstStage(last.rh ?? null, { stage: t.stage }),
+                        )}
+                      />
+                    )}
+                    {last && vpdClassification && (
+                      <MetricChip
+                        label="VPD"
+                        value={last.vpd}
+                        unit=" kPa"
+                        status={vpdMetricChipStatus(vpdClassification)}
+                      />
+                    )}
                   </div>
 
                   {last?.vpd != null && normalizeVpdStage(t.stage) === "unknown" && (
-                    <VpdStageMissingBadge
-                      testId="tents-list-vpd-stage-missing-badge"
-                    />
+                    <VpdStageMissingBadge testId="tents-list-vpd-stage-missing-badge" />
                   )}
-
 
                   {(() => {
                     const health = deriveTentHealthChip({
@@ -131,7 +174,9 @@ export default function Tents() {
                       <div className="mt-auto flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/40">
                         <span>{plantCount} plants</span>
                         <span className="inline-flex items-center gap-1">
-                          <Lightbulb className={`h-3 w-3 ${t.light.on ? "text-[hsl(var(--warning))]" : "text-muted-foreground"}`} />
+                          <Lightbulb
+                            className={`h-3 w-3 ${t.light.on ? "text-[hsl(var(--warning))]" : "text-muted-foreground"}`}
+                          />
                           {formatTentLightStatus({ on: t.light.on, schedule: t.light.schedule })}
                         </span>
                         <span

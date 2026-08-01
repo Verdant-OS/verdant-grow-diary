@@ -1,5 +1,16 @@
 import { Link } from "react-router-dom";
-import { Sprout, Filter, Archive, GitMerge, Search, CheckCircle2, Circle, ArrowRight, Sparkles, Gauge } from "lucide-react";
+import {
+  Sprout,
+  Filter,
+  Archive,
+  GitMerge,
+  Search,
+  CheckCircle2,
+  Circle,
+  ArrowRight,
+  Sparkles,
+  Gauge,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
@@ -50,16 +61,16 @@ function formatPlantHealthAriaLabel(health: string | null | undefined): string {
 export default function Plants() {
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const navigate = useNavigate();
-  const { grows } = useGrows();
-  const validGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
+  const { grows, activeGrowId } = useGrows();
+  // URL scope wins; otherwise create into the active setup so unscoped /plants
+  // never inserts plants without grow_id (PlantQuickLog requires grow context).
+  const validGrowId = isValidScopedGrow ? (urlGrowId ?? undefined) : (activeGrowId ?? undefined);
   const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState("");
   const { data: activePlants = [] } = useGrowPlants(undefined, urlGrowId ?? undefined);
-  const { data: allPlants = [] } = useGrowPlants(
-    undefined,
-    urlGrowId ?? undefined,
-    { includeArchived: true },
-  );
+  const { data: allPlants = [] } = useGrowPlants(undefined, urlGrowId ?? undefined, {
+    includeArchived: true,
+  });
   // Cross-grow plant list (for grow-filter option counts). Scoped to active
   // (non-archived/merged) plants — the grow filter intentionally only counts
   // plants growers normally work with.
@@ -115,9 +126,7 @@ export default function Plants() {
   );
 
   const hasArchived = shouldShowArchivedToggle(allPlants);
-  const archivedCount = allPlants.filter(
-    (p) => isArchivedPlant(p) || isMergedPlant(p),
-  ).length;
+  const archivedCount = allPlants.filter((p) => isArchivedPlant(p) || isMergedPlant(p)).length;
 
   // Pipeline: archived visibility → grow scope (already in query) →
   // tent tab → plant search. Each step is independent and labeled in the UI.
@@ -158,7 +167,12 @@ export default function Plants() {
 
   return (
     <div>
-      <GrowBreadcrumbs growId={urlGrowId} growName={scopedGrowName} current="Plants" section="plants" />
+      <GrowBreadcrumbs
+        growId={urlGrowId}
+        growName={scopedGrowName}
+        current="Plants"
+        section="plants"
+      />
       <PageHeader
         title="Plants"
         description="Every plant you're tracking, across every tent."
@@ -169,10 +183,7 @@ export default function Plants() {
       {/* Grow filter + plant search row — the two controls are deliberately
           labeled separately so the grow filter is not mistaken for a plant
           picker. */}
-      <div
-        className="mb-3 grid gap-3 sm:grid-cols-2"
-        data-testid="plants-filter-controls"
-      >
+      <div className="mb-3 grid gap-3 sm:grid-cols-2" data-testid="plants-filter-controls">
         <div data-testid="plants-grow-filter">
           <label
             htmlFor="plants-grow-filter-select"
@@ -241,10 +252,7 @@ export default function Plants() {
       >
         <span data-testid="plants-filter-summary">{summaryLine}</span>
         {summary.archivedHiddenCount > 0 && !showArchived && (
-          <span
-            className="text-muted-foreground/80"
-            data-testid="plants-archived-hidden-note"
-          >
+          <span className="text-muted-foreground/80" data-testid="plants-archived-hidden-note">
             · {summary.archivedHiddenCount} archived/merged hidden
           </span>
         )}
@@ -293,16 +301,8 @@ export default function Plants() {
           body={HELP_COPY.simulatedData}
           testKey="plants-simulated-data"
         />
-        <InfoPopover
-          title="Stale data"
-          body={HELP_COPY.staleData}
-          testKey="plants-stale-data"
-        />
-        <InfoPopover
-          title="Mixed data"
-          body={HELP_COPY.mixedData}
-          testKey="plants-mixed-data"
-        />
+        <InfoPopover title="Stale data" body={HELP_COPY.staleData} testKey="plants-stale-data" />
+        <InfoPopover title="Mixed data" body={HELP_COPY.mixedData} testKey="plants-mixed-data" />
         <InfoPopover
           title="Archived / merged plants"
           body={HELP_COPY.archivedMergedPlants}
@@ -379,7 +379,7 @@ export default function Plants() {
             const dailyCheckEntry = dailyCheckByPlant.get(p.id);
             const checkedToday = !isInactive && dailyCheckEntry?.checkedToday === true;
             const showDailyCheckBadge = !isInactive && dailyCheckByPlant.has(p.id);
-            const methodLabel = checkedToday ? dailyCheckEntry?.methodLabel ?? null : null;
+            const methodLabel = checkedToday ? (dailyCheckEntry?.methodLabel ?? null) : null;
             return (
               <div key={p.id} className="relative animate-fade-in">
                 <Link
@@ -476,11 +476,21 @@ export default function Plants() {
                           data-testid="plant-card-daily-check-action-note"
                           data-method="note"
                           aria-label={`Add note for ${p.name}`}
-                          data-href={buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "note" })}
+                          data-href={buildDailyCheckEntryHref({
+                            plantId: p.id,
+                            source: "plants",
+                            method: "note",
+                          })}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            navigate(buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "note" }));
+                            navigate(
+                              buildDailyCheckEntryHref({
+                                plantId: p.id,
+                                source: "plants",
+                                method: "note",
+                              }),
+                            );
                           }}
                           className="inline-flex items-center gap-1 rounded-md border border-border bg-background/40 text-[10px] px-2 py-1 hover:bg-accent transition"
                         >
@@ -491,11 +501,21 @@ export default function Plants() {
                           data-testid="plant-card-daily-check-action-sensor"
                           data-method="sensor"
                           aria-label={`Add sensor snapshot for ${p.name}`}
-                          data-href={buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "sensor" })}
+                          data-href={buildDailyCheckEntryHref({
+                            plantId: p.id,
+                            source: "plants",
+                            method: "sensor",
+                          })}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            navigate(buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "sensor" }));
+                            navigate(
+                              buildDailyCheckEntryHref({
+                                plantId: p.id,
+                                source: "plants",
+                                method: "sensor",
+                              }),
+                            );
                           }}
                           className="inline-flex items-center gap-1 rounded-md border border-border bg-background/40 text-[10px] px-2 py-1 hover:bg-accent transition"
                         >

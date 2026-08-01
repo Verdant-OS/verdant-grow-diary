@@ -43,14 +43,28 @@ function makeClient(opts: {
       }
       if (table === "plants") {
         return {
-          update: (values: unknown) => ({
-            eq: async (_col: string, val: string) => {
+          update: (values: unknown) => {
+            const state: { id?: string } = {};
+            const finalize = async () => {
               const at = plantIdx++;
-              plantUpdates.push({ id: val, values });
+              plantUpdates.push({ id: state.id as string, values });
               const fail = opts.plantUpdateErrorAt === at;
               return { error: fail ? { message: "rls" } : null };
-            },
-          }),
+            };
+            const builder: {
+              eq: (col: string, val: string) => typeof builder;
+              is: (col: string, val: null) => typeof builder;
+              then: PromiseLike<{ error: unknown }>["then"];
+            } = {
+              eq: (_col: string, val: string) => {
+                state.id = val;
+                return builder;
+              },
+              is: () => builder,
+              then: (onfulfilled, onrejected) => finalize().then(onfulfilled, onrejected),
+            };
+            return builder;
+          },
         };
       }
       throw new Error(`unexpected table ${table}`);
@@ -104,7 +118,9 @@ describe("phenoHuntService", () => {
         name: "Hunt",
       });
       expect(plantUpdates).toEqual([
+        { id: "p1", values: { grow_id: "g1" } },
         { id: "p1", values: { pheno_hunt_id: "h1", candidate_label: "#1" } },
+        { id: "p2", values: { grow_id: "g1" } },
         { id: "p2", values: { pheno_hunt_id: "h1", candidate_label: "#2" } },
       ]);
     });
@@ -120,17 +136,14 @@ describe("phenoHuntService", () => {
         },
         client,
       );
-      expect(plantUpdates[0].values).toMatchObject({ candidate_label: "BB-A" });
+      expect(plantUpdates[1].values).toMatchObject({ candidate_label: "BB-A" });
       // Blank override falls back to default.
-      expect(plantUpdates[1].values).toMatchObject({ candidate_label: "#2" });
+      expect(plantUpdates[3].values).toMatchObject({ candidate_label: "#2" });
     });
 
     it("does not send client-supplied user_id (trigger fills it)", async () => {
       const { client, huntInsert } = makeClient({});
-      await createPhenoHunt(
-        { growId: "g1", name: "Hunt", plantIds: ["p1"] },
-        client,
-      );
+      await createPhenoHunt({ growId: "g1", name: "Hunt", plantIds: ["p1"] }, client);
       expect(Object.keys(huntInsert.mock.calls[0][0])).not.toContain("user_id");
     });
 
@@ -150,10 +163,7 @@ describe("phenoHuntService", () => {
         plantUpdateErrorAt: 1,
       });
       await expect(
-        createPhenoHunt(
-          { growId: "g1", name: "Hunt", plantIds: ["p1", "p2"] },
-          client,
-        ),
+        createPhenoHunt({ growId: "g1", name: "Hunt", plantIds: ["p1", "p2"] }, client),
       ).rejects.toThrow(/Could not tag candidate plant/);
       expect(huntDelete).toHaveBeenCalledWith({ col: "id", val: "h1" });
     });
@@ -188,9 +198,7 @@ function makeDeleteClient(opts: {
             eq: async (_c: string, _v: string) => {
               calls.push({ op: "plants.select" });
               return {
-                data: opts.selectError
-                  ? null
-                  : (opts.linkedIds ?? []).map((id) => ({ id })),
+                data: opts.selectError ? null : (opts.linkedIds ?? []).map((id) => ({ id })),
                 error: opts.selectError ?? null,
               };
             },
@@ -244,10 +252,7 @@ describe("deletePhenoHunt", () => {
   it("skips the untag step when no plants are linked", async () => {
     const { client, calls } = makeDeleteClient({ linkedIds: [] });
     await deletePhenoHunt({ huntId: "h1" }, client);
-    expect(calls.map((c) => c.op)).toEqual([
-      "plants.select",
-      "pheno_hunts.delete",
-    ]);
+    expect(calls.map((c) => c.op)).toEqual(["plants.select", "pheno_hunts.delete"]);
   });
 
   it("does not delete the hunt when untag fails", async () => {
@@ -255,9 +260,7 @@ describe("deletePhenoHunt", () => {
       linkedIds: ["p1"],
       untagError: { message: "rls" },
     });
-    await expect(deletePhenoHunt({ huntId: "h1" }, client)).rejects.toThrow(
-      /untag/,
-    );
+    await expect(deletePhenoHunt({ huntId: "h1" }, client)).rejects.toThrow(/untag/);
     expect(calls.map((c) => c.op)).not.toContain("pheno_hunts.delete");
   });
 
@@ -266,9 +269,7 @@ describe("deletePhenoHunt", () => {
       linkedIds: ["p1"],
       deleteError: { message: "denied" },
     });
-    await expect(
-      deletePhenoHunt({ huntId: "h1" }, client),
-    ).rejects.toBeInstanceOf(PhenoHuntError);
+    await expect(deletePhenoHunt({ huntId: "h1" }, client)).rejects.toBeInstanceOf(PhenoHuntError);
   });
 
   it("never issues a plants delete operation", async () => {
@@ -279,8 +280,6 @@ describe("deletePhenoHunt", () => {
 
   it("rejects when huntId is missing", async () => {
     const { client } = makeDeleteClient({});
-    await expect(deletePhenoHunt({ huntId: "" }, client)).rejects.toThrow(
-      /Hunt id/,
-    );
+    await expect(deletePhenoHunt({ huntId: "" }, client)).rejects.toThrow(/Hunt id/);
   });
 });

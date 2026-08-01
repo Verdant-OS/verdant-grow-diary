@@ -355,7 +355,6 @@ export default function Timeline() {
     setLoading(false);
   }
 
-   
   useEffect(() => {
     load();
   }, [activeGrowId, user]);
@@ -363,7 +362,7 @@ export default function Timeline() {
     const h = () => load();
     window.addEventListener("verdant:entry-created", h);
     return () => window.removeEventListener("verdant:entry-created", h);
-  });
+  }, [activeGrowId, user]);
 
   const stageCounts = useMemo(() => {
     const m: Record<string, number> = {};

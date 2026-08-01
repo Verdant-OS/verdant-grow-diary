@@ -23,11 +23,7 @@
  * The test suite enforces this.
  */
 
-export type OnboardingStepKey =
-  | "create_grow"
-  | "add_tent"
-  | "add_plant"
-  | "first_log";
+export type OnboardingStepKey = "create_grow" | "add_tent" | "add_plant" | "first_log";
 
 export interface OnboardingStep {
   key: OnboardingStepKey;
@@ -69,7 +65,8 @@ export const ONBOARDING_COMPLETED_HEADLINE = "Your grow memory is active";
 
 /** Routes the checklist links to — kept narrow to safe, existing pages. */
 export const ONBOARDING_ROUTES = {
-  create_grow: "/grows",
+  // Guided first-session path guarantees grow→tent→plant binding.
+  create_grow: "/start-room",
   add_tent: "/tents",
   add_plant: "/plants",
   // Routes to the Dashboard, which surfaces the QuickLog CTA once a
@@ -85,16 +82,15 @@ export function buildOnboardingChecklistViewModel(
   const hasGrow = (input.growCount ?? 0) > 0;
   const hasTent = (input.tentCount ?? 0) > 0;
   const hasPlant = (input.plantCount ?? 0) > 0;
-  const hasFirstSignal =
-    (input.diaryEntryCount ?? 0) > 0 || (input.sensorReadingCount ?? 0) > 0;
+  const hasFirstSignal = (input.diaryEntryCount ?? 0) > 0 || (input.sensorReadingCount ?? 0) > 0;
 
   const steps: OnboardingStep[] = [
     {
       key: "create_grow",
       title: "Create your first grow",
-      description: "Name your run and set basic targets.",
+      description: "Guided path: grow → tent → plant, linked for Quick Log.",
       href: ONBOARDING_ROUTES.create_grow,
-      ctaLabel: "Create grow",
+      ctaLabel: "Start your room",
       complete: hasGrow,
     },
     {

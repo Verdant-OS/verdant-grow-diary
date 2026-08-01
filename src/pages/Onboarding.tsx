@@ -1,5 +1,9 @@
 // Post-sign-in start-screen choice. Diary-first by default.
 //
+// For empty accounts (zero grows), primary CTA is "Start your room" — a
+// guided grow → tent → plant path with guaranteed binding — so first-run
+// users are not scattered across /grows, /tents, and /plants.
+//
 // Safety:
 //  - No backend write. No schema change. No grow/sensor mutation.
 //  - All routes pass through sanitizeAuthRedirect.
@@ -16,6 +20,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, Navigate, Link } from "react-router-dom";
 import { useAuth } from "@/store/auth";
+import { useGrows } from "@/store/grows";
 import { Button } from "@/components/ui/button";
 import {
   DEFAULT_START_SCREEN,
@@ -24,12 +29,16 @@ import {
   setStartScreenChoice,
   type StartScreenChoice,
 } from "@/lib/startScreenPreferences";
+import { shouldPreferStartYourRoom } from "@/lib/startYourRoomRules";
+import { Sprout } from "lucide-react";
 
 export default function Onboarding() {
   const { user, loading } = useAuth();
+  const { grows, loading: growsLoading } = useGrows();
   const nav = useNavigate();
   const [choice, setChoice] = useState<StartScreenChoice>(DEFAULT_START_SCREEN);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const preferRoom = shouldPreferStartYourRoom(grows.length);
 
   useEffect(() => {
     // Land focus on the heading so screen readers announce context first and
@@ -37,7 +46,7 @@ export default function Onboarding() {
     headingRef.current?.focus();
   }, []);
 
-  if (loading) return null;
+  if (loading || growsLoading) return null;
   if (!user) return <Navigate to="/auth" replace />;
 
   function go(c: StartScreenChoice, save: boolean) {
@@ -48,13 +57,40 @@ export default function Onboarding() {
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">
       <div className="w-full max-w-md glass rounded-2xl p-6">
+        {preferRoom ? (
+          <div
+            className="mb-5 rounded-xl border border-primary/40 bg-primary/10 p-4 space-y-3"
+            data-testid="onboarding-start-room-hero"
+          >
+            <div className="flex items-start gap-2">
+              <Sprout className="h-5 w-5 text-primary shrink-0 mt-0.5" aria-hidden />
+              <div>
+                <h2 className="text-base font-display font-semibold">Start your room</h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Recommended for first session: create grow → tent → plant in one path so Quick Log
+                  works immediately.
+                </p>
+              </div>
+            </div>
+            <Button
+              className="w-full gradient-leaf text-primary-foreground"
+              onClick={() => nav("/start-room", { replace: true })}
+              data-testid="onboarding-start-room-cta"
+            >
+              Start your room
+            </Button>
+          </div>
+        ) : null}
+
         <h1
           ref={headingRef}
           tabIndex={-1}
           id="onboarding-heading"
           className="text-2xl font-display font-bold mb-1 outline-none"
         >
-          Where do you want Verdant to open first?
+          {preferRoom
+            ? "Or choose where to open first"
+            : "Where do you want Verdant to open first?"}
         </h1>
         <p className="text-sm text-muted-foreground mb-1">
           Start with your grow diary first. You can change this later.
@@ -106,10 +142,7 @@ export default function Onboarding() {
         </fieldset>
 
         <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
-          <Button
-            variant="ghost"
-            onClick={() => go(DEFAULT_START_SCREEN, false)}
-          >
+          <Button variant="ghost" onClick={() => go(DEFAULT_START_SCREEN, false)}>
             Skip for now
           </Button>
           <Button

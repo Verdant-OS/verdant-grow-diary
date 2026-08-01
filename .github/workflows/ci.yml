@@ -94,6 +94,30 @@ jobs:
         if: always()
         run: bun run report:ai-doctor-output-evaluation
 
+      # Build 7 — Skill Evaluation Harness. Kept independently trustworthy:
+      # this gate must stay meaningful even if the unrelated full suite exits
+      # nonzero because of the known OneTentLiveProof timer leak.
+      - name: Skill evaluation harness tests
+        run: bun run test:skill-evals
+
+      - name: Skill evaluation harness self-test
+        run: bun run skill-evals:self-test
+
+      - name: Validate generated evaluation artifacts
+        run: bun scripts/validate-skill-eval-artifacts.mjs
+
+      # NOT `if: always()`. The validator's entire job is deciding whether this
+      # set is safe to upload, and one of its violations is
+      # `artifact_disclosure` — so uploading on failure publishes exactly the
+      # secret-shaped content the check exists to catch. A failed run keeps its
+      # logs; it does not get to ship its artifacts.
+      - name: Upload skill evaluation artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: skill-evaluation-artifacts
+          path: artifacts/skills/
+          if-no-files-found: ignore
+
       - name: Upload AI Doctor evaluation report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

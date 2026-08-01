@@ -16,7 +16,10 @@ const CREATE_TENT = readFileSync(resolve(ROOT, "src/components/CreateTentDialog.
 describe("Plants/Tents — preselect grow on create", () => {
   it("Plants validates URL growId against the user's RLS-loaded grows via useScopedGrow", () => {
     expect(PLANTS).toMatch(/useScopedGrow\(\)/);
-    expect(PLANTS).toMatch(/validGrowId\s*=\s*isValidScopedGrow\s*\?\s*urlGrowId\s*\?\?\s*undefined\s*:\s*undefined/);
+    // URL scope wins when valid; otherwise fall back to active grow.
+    expect(PLANTS).toMatch(
+      /validGrowId\s*=\s*isValidScopedGrow\s*\?\s*\(urlGrowId\s*\?\?\s*undefined\)\s*:\s*\(activeGrowId\s*\?\?\s*undefined\)/,
+    );
   });
 
   it("Plants passes validGrowId into CreatePlantDialog", () => {
@@ -25,7 +28,9 @@ describe("Plants/Tents — preselect grow on create", () => {
 
   it("Tents validates URL growId against the user's RLS-loaded grows via useScopedGrow", () => {
     expect(TENTS).toMatch(/useScopedGrow\(\)/);
-    expect(TENTS).toMatch(/validGrowId\s*=\s*isValidScopedGrow\s*\?\s*urlGrowId\s*\?\?\s*undefined\s*:\s*undefined/);
+    expect(TENTS).toMatch(
+      /validGrowId\s*=\s*isValidScopedGrow\s*\?\s*\(urlGrowId\s*\?\?\s*undefined\)\s*:\s*\(activeGrowId\s*\?\?\s*undefined\)/,
+    );
   });
 
   it("Tents passes validGrowId into CreateTentDialog", () => {
@@ -34,37 +39,39 @@ describe("Plants/Tents — preselect grow on create", () => {
 
   it("CreatePlantDialog accepts defaultGrowId and writes grow_id on insert", () => {
     expect(CREATE_PLANT).toMatch(/defaultGrowId\?\s*:\s*string/);
-    expect(CREATE_PLANT).toMatch(/payload\.grow_id\s*=\s*defaultGrowId/);
+    expect(CREATE_PLANT).toMatch(/grow_id:\s*targetGrowId/);
   });
 
   it("CreatePlantDialog scopes tent options to the resolved target grow", () => {
-    // targetGrowId = page context first, then the grower's explicit in-dialog
-    // selection (see create-dialog-grow-binding-guard tests).
-    expect(CREATE_PLANT).toMatch(/targetGrowId\s*=\s*defaultGrowId\s*\?\?\s*\(form\.grow_id\s*\|\|\s*undefined\)/);
-    expect(CREATE_PLANT).toMatch(/allTents[\s\S]*?\.filter\([\s\S]*?t\.grow_id\s*===\s*targetGrowId/);
+    expect(CREATE_PLANT).toMatch(
+      /targetGrowId\s*=\s*defaultGrowId\s*\?\?\s*\(form\.grow_id\s*\|\|\s*undefined\)/,
+    );
+    expect(CREATE_PLANT).toMatch(
+      /allTents[\s\S]*?\.filter\([\s\S]*?t\.grow_id\s*===\s*targetGrowId/,
+    );
   });
 
   it("CreateTentDialog accepts defaultGrowId and writes grow_id on insert", () => {
     expect(CREATE_TENT).toMatch(/defaultGrowId\?\s*:\s*string/);
-    expect(CREATE_TENT).toMatch(/if\s*\(defaultGrowId\)\s*payload\.grow_id\s*=\s*defaultGrowId/);
+    expect(CREATE_TENT).toMatch(/grow_id:\s*targetGrowId/);
   });
 
-  it("Create dialogs do not run when invalid growId is passed (falsy validGrowId yields no grow_id)", () => {
-    // Both insert paths gate grow_id behind the truthy defaultGrowId prop.
-    expect(CREATE_PLANT).not.toMatch(/payload\.grow_id\s*=\s*growId/);
-    expect(CREATE_TENT).not.toMatch(/payload\.grow_id\s*=\s*growId/);
+  it("Create dialogs do not bind via a bare growId variable", () => {
+    expect(CREATE_PLANT).not.toMatch(/payload\.grow_id\s*=\s*growId\b/);
+    expect(CREATE_TENT).not.toMatch(/payload\.grow_id\s*=\s*growId\b/);
   });
 
   it("Edit flows are not touched by URL growId (create dialogs only)", () => {
-    // The dialogs are creation-only; no edit-grow logic introduced.
-    expect(CREATE_PLANT).not.toMatch(/update\(/);
-    expect(CREATE_TENT).not.toMatch(/update\(/);
+    expect(CREATE_PLANT).not.toMatch(/\.update\(/);
+    expect(CREATE_TENT).not.toMatch(/\.update\(/);
   });
 
   it("does not introduce ai-coach, device-control, or service_role surface", () => {
     for (const src of [PLANTS, TENTS, CREATE_PLANT, CREATE_TENT]) {
       expect(src).not.toMatch(/ai-coach|ai_coach/);
-      expect(src).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i);
+      expect(src).not.toMatch(
+        /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i,
+      );
     }
   });
 });

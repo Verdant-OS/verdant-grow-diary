@@ -18,6 +18,7 @@ import {
   isSoilMoistureRealistic,
   isSoilTempCRealistic,
   isVpdRealistic,
+  SOIL_EC_MSCM_RANGE,
 } from "@/lib/sensorTruthRules";
 import {
   SENSOR_ADAPTER_REDACTED_PAYLOAD_REF,
@@ -42,7 +43,7 @@ import {
 import { calculateAirVpdKpa, fahrenheitToCelsius } from "@/lib/vpdRules";
 
 export const ECOWITT_MQTT_SENSOR_ADAPTER_ID = "ecowitt_mqtt_normalizer" as const;
-export const ECOWITT_MQTT_SENSOR_ADAPTER_VERSION = "1.0.0" as const;
+export const ECOWITT_MQTT_SENSOR_ADAPTER_VERSION = "1.0.1" as const;
 export const ECOWITT_MQTT_SENSOR_PROVIDER = "ecowitt" as const;
 export const ECOWITT_MQTT_SENSOR_TRANSPORT = "mqtt" as const;
 
@@ -91,6 +92,11 @@ interface TimestampParseResult {
   warning: Extract<SensorAdapterWarning, "missing_timestamp" | "malformed_timestamp"> | null;
 }
 
+interface ReceivedAtParseResult {
+  received_at: string | null;
+  warning: Extract<SensorAdapterWarning, "malformed_received_at" | "future_received_at"> | null;
+}
+
 interface NormalizedPayloadKeysResult {
   payload: Record<string, unknown>;
   duplicate_keys: ReadonlySet<string>;
@@ -120,9 +126,12 @@ interface ReadingWithPairing {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SAFE_REF_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/;
-const MAC_RE = /\b(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b/i;
-const PRIVATE_IP_RE =
-  /\b(?:10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2})\b/i;
+const MAC_RE =
+  /(?:\b(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b|\b(?:[0-9a-f]{4}\.){2}[0-9a-f]{4}\b|(?:^|[^0-9a-f])[0-9a-f]{12}(?=$|[^0-9a-f]))/i;
+const IPV4_CANDIDATE_RE = /\d+(?:\.\d+){3,}/g;
+const IPV6_CANDIDATE_RE = /[0-9a-f:]+(?:%[a-z0-9._-]+)?/gi;
+const COMMON_CREDENTIAL_PREFIX_RE =
+  /(?:\bsk[-_](?:live|test|proj)(?:[-_][a-z0-9_-]+)?|\bgh[pousr]_[a-z0-9_]+|\bgithub_pat_[a-z0-9_]+|\bxox[a-z0-9]-[a-z0-9-]+|\bAKIA[A-Z0-9]{8,}|\bAIza[a-z0-9_-]+)/i;
 const SECRET_VALUE_RE =
   /(?:\bvbt_[a-z0-9._-]+\b|(?:passkey|password|secret|token|api[_-]?key|apikey|service[_-]?role|bridge[_-]?token|station(?:type|id|identifier)?|mac)|\bbearer\s+\S+|\beyJ[a-z0-9_-]+\.[a-z0-9_-]+\.[a-z0-9_-]+\b)/i;
 const SENSITIVE_OUTPUT_KEY_RE =
@@ -197,6 +206,83 @@ function finiteNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function isNonPublicOrLocalIpv4(candidate: string): boolean {
+  const octets = candidate.split(".").map(Number);
+  if (octets.length !== 4 || octets.some((octet) => !Number.isInteger(octet) || octet > 255)) {
+    return false;
+  }
+  const [first, second, third] = octets;
+  return (
+    first === 0 ||
+    first === 10 ||
+    first === 127 ||
+    (first === 100 && second >= 64 && second <= 127) ||
+    (first === 169 && second === 254) ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 0 && (third === 0 || third === 2)) ||
+    (first === 192 && second === 168) ||
+    (first === 198 && (second === 18 || second === 19 || (second === 51 && third === 100))) ||
+    (first === 203 && second === 0 && third === 113) ||
+    first >= 224
+  );
+}
+
+function containsNonPublicOrLocalIpv4(value: string): boolean {
+  return (value.match(IPV4_CANDIDATE_RE) ?? []).some(isNonPublicOrLocalIpv4);
+}
+
+function parseIpv6Segments(candidate: string): number[] | null {
+  const address = candidate.split("%", 1)[0].toLowerCase();
+  if (!address.includes(":") || !/^[0-9a-f:]+$/.test(address)) return null;
+
+  const compressionParts = address.split("::");
+  if (compressionParts.length > 2) return null;
+  const parseSide = (side: string): string[] | null => {
+    if (!side) return [];
+    const segments = side.split(":");
+    return segments.every((segment) => /^[0-9a-f]{1,4}$/.test(segment)) ? segments : null;
+  };
+  const head = parseSide(compressionParts[0]);
+  const tail = parseSide(compressionParts[1] ?? "");
+  if (head === null || tail === null) return null;
+
+  let segments: string[];
+  if (compressionParts.length === 2) {
+    const omittedCount = 8 - head.length - tail.length;
+    if (omittedCount < 1) return null;
+    segments = [...head, ...Array<string>(omittedCount).fill("0"), ...tail];
+  } else {
+    if (head.length !== 8) return null;
+    segments = head;
+  }
+  return segments.map((segment) => Number.parseInt(segment, 16));
+}
+
+function isNonPublicOrLocalIpv6(candidate: string): boolean {
+  const segments = parseIpv6Segments(candidate);
+  if (segments === null) return false;
+  const first = segments[0];
+  const loopback = segments.slice(0, 7).every((segment) => segment === 0) && segments[7] === 1;
+  const unspecified = segments.every((segment) => segment === 0);
+  const uniqueLocal = (first & 0xfe00) === 0xfc00;
+  const linkLocal = (first & 0xffc0) === 0xfe80;
+  return loopback || unspecified || uniqueLocal || linkLocal;
+}
+
+function containsNonPublicOrLocalIpv6(value: string): boolean {
+  return (value.match(IPV6_CANDIDATE_RE) ?? []).some(isNonPublicOrLocalIpv6);
+}
+
+function containsSensitiveValue(value: string): boolean {
+  return (
+    SECRET_VALUE_RE.test(value) ||
+    COMMON_CREDENTIAL_PREFIX_RE.test(value) ||
+    MAC_RE.test(value) ||
+    containsNonPublicOrLocalIpv4(value) ||
+    containsNonPublicOrLocalIpv6(value)
+  );
+}
+
 function canonicalizeTimestamp(
   raw: unknown,
   options: { allow_naive_ecowitt_utc: boolean },
@@ -240,8 +326,25 @@ function canonicalizeTimestamp(
   return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
 }
 
-function normalizeReceivedAt(value: string): string | null {
-  return canonicalizeTimestamp(value, { allow_naive_ecowitt_utc: false });
+function normalizeReceivedAt(args: {
+  value: string;
+  now_ms: number;
+  policy: SensorAdapterFreshnessPolicy;
+}): ReceivedAtParseResult {
+  const receivedAt = canonicalizeTimestamp(args.value, {
+    allow_naive_ecowitt_utc: false,
+  });
+  if (receivedAt === null) {
+    return { received_at: null, warning: "malformed_received_at" };
+  }
+  if (
+    isValidSensorAdapterFreshnessPolicy(args.policy) &&
+    Number.isFinite(args.now_ms) &&
+    Date.parse(receivedAt) - args.now_ms > args.policy.future_clock_skew_ms
+  ) {
+    return { received_at: receivedAt, warning: "future_received_at" };
+  }
+  return { received_at: receivedAt, warning: null };
 }
 
 function parseCapturedAt(payload: Record<string, unknown>): TimestampParseResult {
@@ -428,9 +531,7 @@ function safeReference(value: unknown): {
   if (!trimmed) return { value: null, redacted: false };
   if (
     !SAFE_REF_RE.test(trimmed) ||
-    MAC_RE.test(trimmed) ||
-    PRIVATE_IP_RE.test(trimmed) ||
-    SECRET_VALUE_RE.test(trimmed) ||
+    containsSensitiveValue(trimmed) ||
     /(?:station|gateway)/i.test(trimmed)
   ) {
     return { value: null, redacted: true };
@@ -634,6 +735,9 @@ function normalizeEc(numeric: number, unit: EcowittMqttReportedUnit | null): Nor
   if (unit === "mS/cm" && isSoilEcUnitMismatchSuspected(numeric)) {
     return invalid("ec_unit_mismatch");
   }
+  if (unit === "µS/cm" && numeric > SOIL_EC_MSCM_RANGE.min && numeric <= SOIL_EC_MSCM_RANGE.max) {
+    return invalid("ec_unit_mismatch");
+  }
   const converted = toCanonicalMscm(numeric, unit);
   if (converted === null || !isSoilEcMscmRealistic(converted)) {
     return invalid("ec_out_of_range");
@@ -688,13 +792,17 @@ function buildObservedReading(args: {
   freshness_warnings: readonly SensorAdapterWarning[];
   captured_at: string | null;
   received_at: string | null;
+  received_at_warning: Extract<
+    SensorAdapterWarning,
+    "malformed_received_at" | "future_received_at"
+  > | null;
   duplicate_raw_field: boolean;
 }): SensorAdapterReading {
   const mappingInvalid =
     args.target.duplicate ||
     args.target.tent_id === null ||
     args.target.warnings.includes("invalid_plant_mapping") ||
-    args.received_at === null ||
+    args.received_at_warning !== null ||
     args.freshness_source === "invalid" ||
     args.duplicate_raw_field;
   const validity: SensorAdapterValidity =
@@ -705,7 +813,7 @@ function buildObservedReading(args: {
     ...args.target.warnings,
     ...args.normalized.warnings,
     ...(args.duplicate_raw_field ? (["duplicate_raw_field"] as const) : []),
-    ...(args.received_at === null ? (["malformed_received_at"] as const) : []),
+    ...(args.received_at_warning ? [args.received_at_warning] : []),
     ...(args.descriptor.value_origin === "source_reported"
       ? (["source_reported_vpd_reference_only"] as const)
       : []),
@@ -764,7 +872,9 @@ function buildObservedReading(args: {
         ? "invalid"
         : args.descriptor.value_origin === "source_reported"
           ? "reference_only"
-          : "ready",
+          : source === "stale"
+            ? "blocked_stale"
+            : "ready",
   };
 }
 
@@ -914,7 +1024,7 @@ function deriveVpdReadings(inputs: readonly ReadingWithPairing[]): {
       value_origin: "derived",
       comparison_role: "primary",
       reading_id: readingId,
-      ingest_boundary_status: "ready",
+      ingest_boundary_status: source === "stale" ? "blocked_stale" : "ready",
     });
   }
 
@@ -1004,10 +1114,7 @@ function sanitizeRedactedPayload(value: unknown): {
       continue;
     }
     if (typeof raw === "string") {
-      out[key] =
-        SECRET_VALUE_RE.test(raw) || MAC_RE.test(raw) || PRIVATE_IP_RE.test(raw)
-          ? "[redacted]"
-          : raw;
+      out[key] = containsSensitiveValue(raw) ? "[redacted]" : raw;
     }
   }
 
@@ -1047,7 +1154,11 @@ export function adaptEcowittMqttSensorPayload(
     duplicateRawFields.has("captured_at") || duplicateRawFields.has("dateutc")
       ? ({ captured_at: null, warning: "malformed_timestamp" } as const)
       : parseCapturedAt(payload);
-  const receivedAt = normalizeReceivedAt(input.received_at);
+  const receivedAt = normalizeReceivedAt({
+    value: input.received_at,
+    now_ms: input.now_ms,
+    policy: input.freshness_policy,
+  });
   const freshness = classifySensorAdapterFreshness({
     captured_at: timestamp.captured_at,
     now_ms: input.now_ms,
@@ -1083,7 +1194,8 @@ export function adaptEcowittMqttSensorPayload(
         freshness_source: freshness.source,
         freshness_warnings: freshnessWarnings,
         captured_at: timestamp.captured_at,
-        received_at: receivedAt,
+        received_at: receivedAt.received_at,
+        received_at_warning: receivedAt.warning,
         duplicate_raw_field: duplicateRawFields.has(rawField),
       }),
       pairing_ref: target.pairing_ref,
@@ -1111,7 +1223,7 @@ export function adaptEcowittMqttSensorPayload(
     ...(!isValidSensorAdapterFreshnessPolicy(input.freshness_policy)
       ? (["invalid_freshness_policy"] as const)
       : []),
-    ...(receivedAt === null ? (["malformed_received_at"] as const) : []),
+    ...(receivedAt.warning ? [receivedAt.warning] : []),
     ...(readings.length === 0 ? (["no_supported_metrics"] as const) : []),
   ]);
 

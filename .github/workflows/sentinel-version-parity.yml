@@ -1,0 +1,54 @@
+name: Sentinel version parity
+
+# GEMINI.md mirrors the safety-critical core of AGENTS.md because Gemini cannot follow a
+# link to obtain context. This job fails when the governance files drift out of version
+# agreement, so a change to the core rules has to touch the mirror in the same commit.
+on:
+  pull_request:
+    paths:
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "GEMINI.md"
+      - ".grok/rules/**"
+      - "docs/agents/**"
+      - "scripts/check-sentinel-version-parity.mjs"
+      - ".github/workflows/sentinel-version-parity.yml"
+  push:
+    branches:
+      - main
+      - verdant-grow-diary
+    paths:
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "GEMINI.md"
+      - ".grok/rules/**"
+      - "docs/agents/**"
+      - "scripts/check-sentinel-version-parity.mjs"
+      - ".github/workflows/sentinel-version-parity.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    name: Governance files agree on Sentinel-Version
+    runs-on: ubuntu-latest
+    steps:
+      # Org policy requires every action pinned to a full-length commit SHA.
+      # fetch-depth: 0 because the BUMP half needs real history — `git merge-base` cannot
+      # resolve a base from the default shallow clone, and an unresolvable base is a hard
+      # failure in CI by design.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20"
+
+      # No dependencies: the checker uses only node:fs and git, so it runs before install.
+      - name: Check Sentinel-Version parity and bump
+        env:
+          # Empty on push events; the script falls back to origin/main.
+          SENTINEL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/check-sentinel-version-parity.mjs

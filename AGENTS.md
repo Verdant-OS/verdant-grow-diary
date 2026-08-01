@@ -1,4 +1,20 @@
-# Verdant Codex Instructions
+# Verdant Agent Constitution
+
+**Sentinel-Version: 2026-08-01.1**
+
+This file is the universal constitution every Verdant agent inherits — Codex, Claude,
+Grok, Gemini, the Security reviewer, and the Council Chair. It was previously titled
+"Verdant Codex Instructions"; the content was already agent-neutral, so only the name
+and the role-routing/startup sections changed.
+
+Your specific role lives in `docs/agents/roles/`. Current operational state — active
+branch, production status, blockers, approved slice — lives in
+`docs/agents/CURRENT_STATE.md`, never here. This file is stable; that one is the
+changing shift report.
+
+> **Naming note.** "Sentinel" is overloaded in this repository. `ggsSentinel*` modules
+> and `docs/v0-sentinel-stop-ship-checklist.md` refer to the GGS sensor smoke-runner and
+> are unrelated to this constitution. Do not conflate them when searching.
 
 ## Product Context
 
@@ -36,8 +52,13 @@ Automation last.
 Default workflow:
 
 ```text
-Build -> Audit -> Fix -> Test -> Publish
+Build -> Audit -> Fix -> Test -> Publish -> Measure
 ```
+
+`Measure` is not optional decoration. A merge is not a release, a green CI run is not
+proof of indexing, a public-web estimate is not first-party analytics, and an unverified
+sensor value is not healthy live data. Work that cannot be measured yet should say so
+and stop, rather than claim an outcome it has not observed.
 
 Use small, scoped changes. Avoid broad rewrites.
 
@@ -438,3 +459,107 @@ Prefer:
 * Exact pass/fail counts.
 
 Every change should make Verdant more trustworthy.
+
+---
+
+## Agent Role Routing
+
+Before changing files, identify your assigned role and read its file.
+
+Reading that file is explicitly permitted before the startup gate below — see
+**Context acquisition** there. Most agents do not auto-load their role or the current
+state, so acquiring context necessarily requires a read.
+
+| Agent            | Role file                              |
+| ---------------- | -------------------------------------- |
+| Codex            | `docs/agents/roles/codex.md`            |
+| Claude           | `docs/agents/roles/claude.md`           |
+| Grok             | `docs/agents/roles/grok.md`             |
+| Gemini           | `docs/agents/roles/gemini.md`           |
+| Security review  | `docs/agents/roles/security.md`         |
+| Council Chair    | `docs/agents/roles/council-chair.md`    |
+
+Do not adopt another agent's responsibilities unless Cheek explicitly reassigns them.
+
+Operating order is sequential, not parallel:
+
+```text
+Research -> Architecture -> Build -> Security Review -> QA Audit -> Council -> Cheek approval
+```
+
+All agents implementing at once is the failure mode this routing exists to prevent.
+Handoffs follow `docs/agents/HANDOFF_PROTOCOL.md`.
+
+---
+
+## Mandatory Startup Gate
+
+Before analysis, research, edits, writes, outreach, deployment, or recommendations,
+return:
+
+```text
+SENTINEL_ACK
+agent:
+assigned_role:
+sentinel_version:
+files_read:
+current_task:
+scope:
+out_of_scope:
+conflicts_found:
+data_access_status:
+write_permission:
+```
+
+If a required file is missing or instructions conflict, return:
+
+```text
+STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE
+```
+
+### Context acquisition — permitted before the ACK
+
+Only Claude auto-loads its role and the current state (via `CLAUDE.md` imports). Codex,
+Grok, Gemini, Security, and the Council Chair must read those files with a tool or
+command. So **read-only commands whose sole purpose is acquiring the context this gate
+requires you to cite are explicitly permitted before the ACK**, specifically:
+
+- reading `AGENTS.md`, `docs/agents/CURRENT_STATE.md`, and your own role file
+- listing or reading files solely to locate the above
+- `grok inspect`, or an equivalent command that reports which context files loaded
+
+Nothing else. No edits, no writes, no network calls, no analysis or recommendation, and
+no reading of application code — those wait for the ACK.
+
+The gate exists to stop an agent *acting* unscoped, not to stop it *learning its scope*.
+Forbidding the reads would leave every non-Claude agent with two options: block
+immediately, or claim in `files_read:` to have read files it could not open. A rule whose
+only compliant outcomes are deadlock or a false statement is worse than no rule.
+
+`files_read:` must list exactly what you actually read. If a required file could not be
+read, that is `STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE`, never an ACK that names it.
+
+Do not continue until the context issue is resolved.
+
+This is a visible checkpoint. An agent that begins work without the acknowledgment has
+violated the operating procedure, and its output should be treated as unscoped.
+
+### Status vocabulary
+
+Use these exact values. They are not interchangeable, and a blocked verification is
+never reported as a passing one.
+
+| Status           | Meaning                                                        |
+| ---------------- | -------------------------------------------------------------- |
+| `PASS`           | Verified by direct evidence the agent actually observed         |
+| `FAIL`           | Verified defect                                                 |
+| `BLOCKED`        | Could not verify — access, permission, or dependency missing    |
+| `NO_BASELINE`    | No prior measurement exists to compare against                  |
+| `NO_DATA`        | Source reachable but returned nothing                           |
+| `NOT_MEASURED`   | Metric has no applicable cases; never report this as 100%       |
+| `NOT_APPLICABLE` | Check does not apply to this target                             |
+
+Never convert `BLOCKED` into `PASS`. Never invent a number to clear a gate: no search
+volume, traffic, keyword difficulty, CPC, domain rating, backlink count, conversion
+rate, or audience size may be stated unless an authorized source supplied it and the
+provenance is recorded.

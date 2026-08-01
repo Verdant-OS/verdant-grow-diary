@@ -671,24 +671,56 @@ describe("cli — untrusted fixture input", () => {
     }
   });
 
-  it("accepts an effective risk at or above the declared one", () => {
-    // Guards the guard: the governor RAISES risk, so equal and higher are both
-    // legitimate and only lower is impossible.
+  it("accepts an allowed verdict at the V1 ceiling, and a raised risk when BLOCKED", () => {
+    // Guards the guard, corrected. My first version of this test asserted that
+    // any risk at or above the declared one loads, which encoded only the
+    // floor rule — the governor RAISES risk — and missed that V1 permits
+    // action solely at low risk. Raising risk is legitimate; raising it and
+    // still ALLOWING is not.
+    const allowedAtCeiling = runWithMutated((record) => {
+      const execution = record.execution as Record<string, unknown>;
+      (execution.output as Record<string, unknown>).proposals = [{ ...PROPOSAL, riskLevel: "low" }];
+      const policy = execution.policy as Record<string, unknown>;
+      policy.proposalVerdicts = [{ ...verdictFor("manual_only"), effectiveRiskLevel: "low" }];
+      policy.actionEligibility = "low_risk_manual_only";
+    });
+    expect(allowedAtCeiling.code).not.toBe(EXIT_USAGE_OR_IO);
+
     for (const [declared, effective] of [
-      ["low", "low"],
       ["low", "high"],
       ["medium", "critical"],
     ]) {
-      const r = runWithMutated((record) => {
+      const blockedAndRaised = runWithMutated((record) => {
         const execution = record.execution as Record<string, unknown>;
         (execution.output as Record<string, unknown>).proposals = [
           { ...PROPOSAL, riskLevel: declared },
         ];
         const policy = execution.policy as Record<string, unknown>;
-        policy.proposalVerdicts = [{ ...verdictFor("manual_only"), effectiveRiskLevel: effective }];
+        policy.proposalVerdicts = [
+          { ...verdictFor("manual_only"), verdict: "block", effectiveRiskLevel: effective },
+        ];
+        policy.actionEligibility = "none";
+      });
+      expect(blockedAndRaised.code, `${declared}->${effective}`).not.toBe(EXIT_USAGE_OR_IO);
+    }
+  });
+
+  it("rejects an allowed verdict above the V1 risk ceiling", () => {
+    // Round 17 rejected understatement and left the other end open: a `high`
+    // proposal with an ALLOW verdict at `high` satisfied the floor rule, yet
+    // V1 permits action only at low risk.
+    for (const level of ["medium", "high", "critical"]) {
+      const r = runWithMutated((record) => {
+        const execution = record.execution as Record<string, unknown>;
+        (execution.output as Record<string, unknown>).proposals = [
+          { ...PROPOSAL, riskLevel: level },
+        ];
+        const policy = execution.policy as Record<string, unknown>;
+        policy.proposalVerdicts = [{ ...verdictFor("manual_only"), effectiveRiskLevel: level }];
         policy.actionEligibility = "low_risk_manual_only";
       });
-      expect(r.code, `${declared}->${effective}`).not.toBe(EXIT_USAGE_OR_IO);
+      expect(r.code, level).toBe(EXIT_USAGE_OR_IO);
+      expect(r.lines.join(" "), level).toContain("V1 risk ceiling");
     }
   });
 

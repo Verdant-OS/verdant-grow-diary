@@ -59,6 +59,7 @@ import {
   verifyReportBinding,
 } from "@/lib/verdantSkillEvaluationReport";
 import { deriveCitedEvidenceIds, evaluateSkillCase } from "@/lib/verdantSkillEvaluator";
+import { V1_MAX_ALLOWED_RISK } from "@/lib/verdantSkillPolicyGovernor";
 import {
   evaluateSkillPromotionEligibility,
   renderPromotionMarkdown,
@@ -310,7 +311,9 @@ function loadFixtures(
     // compared" shape this build keeps finding. Membership is verified in both
     // directions because either gap is a decision the governor could not have
     // produced for the recorded output.
-    const execPolicy = record.execution.policy as { proposalVerdicts: { proposalId: string }[] };
+    const execPolicy = record.execution.policy as {
+      proposalVerdicts: { proposalId: string; verdict: string; effectiveRiskLevel: string }[];
+    };
     const execOutput = record.execution.output as { proposals?: unknown };
     const outputProposalIds = new Set(
       (Array.isArray(execOutput?.proposals) ? execOutput.proposals : [])
@@ -358,6 +361,31 @@ function loadFixtures(
     if (understatedRisk.length > 0) {
       issues.push(
         `${name}: verdict effective risk is below the proposal's declared risk for: ${understatedRisk.join(", ")}`,
+      );
+      continue;
+    }
+    // And the CEILING, not only the floor. Round 17 rejected understatement
+    // and left the other end open: a `high` proposal with an ALLOW verdict at
+    // `high` satisfied the floor rule, yet V1 permits action only at low risk,
+    // so the governor cannot emit it. The floor and the ceiling are different
+    // rules — one says a verdict may not understate its proposal, the other
+    // says V1 does not act on risk at all above `low` — and fixing one
+    // direction is not fixing the invariant.
+    //
+    // Only ALLOW verdicts are capped. A block verdict at critical risk is the
+    // governor working correctly.
+    const overCeiling = execPolicy.proposalVerdicts
+      .filter(
+        (v) =>
+          v.verdict === "allow" &&
+          riskRank((v as { effectiveRiskLevel?: string }).effectiveRiskLevel) >
+            riskRank(V1_MAX_ALLOWED_RISK),
+      )
+      .map((v) => v.proposalId)
+      .sort();
+    if (overCeiling.length > 0) {
+      issues.push(
+        `${name}: allowed verdict above the V1 risk ceiling (${V1_MAX_ALLOWED_RISK}) for: ${overCeiling.join(", ")}`,
       );
       continue;
     }

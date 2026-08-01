@@ -246,8 +246,29 @@ for (const dir of dirs) {
     }
   }
 
-  for (const path of [evalJsonPath, evalMdPath, promoJsonPath, promoMdPath]) {
-    if (!existsSync(path)) continue;
+  // EVERY entry in the directory, not the four this script knows the names of.
+  //
+  // CI uploads `artifacts/skills/` recursively, so anything that lands here
+  // gets published — a stray debug.json, a dumped payload, a stale log — while
+  // a disclosure scan over four named files reports nothing. The set that is
+  // scanned has to be the set that is uploaded, or the scan is a statement
+  // about the wrong thing.
+  const EXPECTED_ENTRIES = new Set([
+    "evaluation.json",
+    "evaluation.md",
+    "promotion-decision.json",
+    "promotion-decision.md",
+  ]);
+  for (const entry of readdirSync(dir).sort()) {
+    const path = join(dir, entry);
+    if (!statSync(path).isFile()) {
+      note("unexpected_artifact_entry", path);
+      continue;
+    }
+    // Unrecognised files are refused outright rather than merely scanned: the
+    // patterns catch shapes we thought of, and an artifact directory should
+    // contain exactly what the harness wrote.
+    if (!EXPECTED_ENTRIES.has(entry)) note("unexpected_artifact_entry", path);
     const text = readFileSync(path, "utf8");
     for (const { code, re } of DISCLOSURE_PATTERNS) {
       // Report the CATEGORY only — echoing the match would re-leak it.

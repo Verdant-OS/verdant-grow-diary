@@ -14,7 +14,7 @@
  */
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 // Run under bun, not node, so the real verifier can be IMPORTED rather than
 // reimplemented here. A second copy of the binding rules in the validator
@@ -47,13 +47,49 @@ const note = (rule, message) => violations.push({ rule, message });
 function walkVersionDirs(root) {
   const out = [];
   if (!existsSync(root)) return out;
-  for (const skill of readdirSync(root)) {
-    const skillDir = join(root, skill);
-    if (!statSync(skillDir).isDirectory()) continue;
-    for (const version of readdirSync(skillDir)) {
-      const versionDir = join(skillDir, version);
-      if (statSync(versionDir).isDirectory()) out.push(versionDir);
+  // Wrapped: an unreadable directory is an I/O problem (exit 2), not an
+  // artifact violation (exit 1), and an uncaught throw here would have been
+  // neither.
+  try {
+    for (const skill of readdirSync(root)) {
+      const skillDir = join(root, skill);
+      if (!statSync(skillDir).isDirectory()) continue;
+      for (const version of readdirSync(skillDir)) {
+        const versionDir = join(skillDir, version);
+        if (statSync(versionDir).isDirectory()) out.push(versionDir);
+      }
     }
+  } catch (error) {
+    console.error(`✗ cannot read ${root}: ${error instanceof Error ? error.message : error}`);
+    process.exit(2);
+  }
+  return out;
+}
+
+/**
+ * EVERY file under the upload root, at any depth.
+ *
+ * Third finding in three rounds about the gap between what is checked and what
+ * ships. First the upload ran on failure; then only four named files were
+ * scanned; then only files inside a two-level version directory — while CI
+ * uploads `artifacts/skills/` recursively the whole time. Each fix covered one
+ * more level of a tree it should simply have walked.
+ */
+function walkAllFiles(root) {
+  const out = [];
+  if (!existsSync(root)) return out;
+  const visit = (dir) => {
+    for (const entry of readdirSync(dir).sort()) {
+      const path = join(dir, entry);
+      if (statSync(path).isDirectory()) visit(path);
+      else out.push(path);
+    }
+  };
+  try {
+    visit(root);
+  } catch (error) {
+    console.error(`✗ cannot read ${root}: ${error instanceof Error ? error.message : error}`);
+    process.exit(2);
   }
   return out;
 }
@@ -93,6 +129,12 @@ for (const dir of dirs) {
     continue;
   }
 
+  if (report === null || typeof report !== "object" || Array.isArray(report)) {
+    // A scalar or null evaluation.json crashed the validator on the next
+    // property access — an uncaught TypeError instead of a violation.
+    note("report_is_not_an_object", evalJsonPath);
+    continue;
+  }
   if (typeof report.reportVersion !== "string") note("missing_report_version", evalJsonPath);
   if (report.reportBinding === null || report.reportBinding === undefined) {
     note("report_not_self_bound", evalJsonPath);
@@ -146,13 +188,25 @@ for (const dir of dirs) {
   // everything it green-lights.
   if (existsSync(promoJsonPath)) {
     let decision;
+    let decisionParsed = false;
     try {
       decision = JSON.parse(readFileSync(promoJsonPath, "utf8"));
+      decisionParsed = true;
     } catch {
       note("unparseable_json", promoJsonPath);
-      decision = null;
     }
-    if (decision !== null) {
+    // `null` is a value JSON.parse RETURNS, so it could not double as the
+    // "already reported" sentinel: a file containing literal `null` skipped
+    // every check below and validated clean — beside a markdown a human reads
+    // as "Eligible: YES". Deleting the artifact was caught; nullifying it was
+    // not. Parse success is tracked separately now, and a decision that is not
+    // an object is a violation rather than a reason to skip.
+    if (
+      decisionParsed &&
+      (decision === null || typeof decision !== "object" || Array.isArray(decision))
+    ) {
+      note("decision_is_not_an_object", promoJsonPath);
+    } else if (decisionParsed) {
       if (typeof decision.decisionVersion !== "string") {
         note("missing_decision_version", promoJsonPath);
       }
@@ -234,7 +288,11 @@ for (const dir of dirs) {
     } catch {
       // Already reported as unparseable above.
     }
-    if (decisionForMd !== null) {
+    if (
+      decisionForMd !== null &&
+      typeof decisionForMd === "object" &&
+      !Array.isArray(decisionForMd)
+    ) {
       const promoMd = readFileSync(promoMdPath, "utf8");
       if (
         promoMd !==
@@ -245,35 +303,32 @@ for (const dir of dirs) {
       }
     }
   }
+}
 
-  // EVERY entry in the directory, not the four this script knows the names of.
-  //
-  // CI uploads `artifacts/skills/` recursively, so anything that lands here
-  // gets published — a stray debug.json, a dumped payload, a stale log — while
-  // a disclosure scan over four named files reports nothing. The set that is
-  // scanned has to be the set that is uploaded, or the scan is a statement
-  // about the wrong thing.
-  const EXPECTED_ENTRIES = new Set([
-    "evaluation.json",
-    "evaluation.md",
-    "promotion-decision.json",
-    "promotion-decision.md",
-  ]);
-  for (const entry of readdirSync(dir).sort()) {
-    const path = join(dir, entry);
-    if (!statSync(path).isFile()) {
-      note("unexpected_artifact_entry", path);
-      continue;
-    }
-    // Unrecognised files are refused outright rather than merely scanned: the
-    // patterns catch shapes we thought of, and an artifact directory should
-    // contain exactly what the harness wrote.
-    if (!EXPECTED_ENTRIES.has(entry)) note("unexpected_artifact_entry", path);
-    const text = readFileSync(path, "utf8");
-    for (const { code, re } of DISCLOSURE_PATTERNS) {
-      // Report the CATEGORY only — echoing the match would re-leak it.
-      if (re.test(text)) note("artifact_disclosure", `${path}: ${code}`);
-    }
+// The upload tree, whole. `EXPECTED_ENTRIES` is relative to a version
+// directory; anything else anywhere under the root is refused outright,
+// because the artifact tree should contain exactly what the harness wrote and
+// the disclosure patterns only catch shapes we thought of.
+const EXPECTED_ENTRIES = new Set([
+  "evaluation.json",
+  "evaluation.md",
+  "promotion-decision.json",
+  "promotion-decision.md",
+]);
+for (const path of walkAllFiles(ARTIFACT_ROOT)) {
+  // `relative` + `sep` rather than a hand-escaped character class: the first
+  // version of this line lost its backslash to escaping and split only on
+  // forward slashes, so on Windows every path became one segment.
+  const rel = relative(ARTIFACT_ROOT, path).split(sep);
+  // skill/version/name — anything shallower or deeper is not something the
+  // harness writes.
+  if (rel.length !== 3 || !EXPECTED_ENTRIES.has(rel[2])) {
+    note("unexpected_artifact_entry", path);
+  }
+  const text = readFileSync(path, "utf8");
+  for (const { code, re } of DISCLOSURE_PATTERNS) {
+    // Report the CATEGORY only — echoing the match would re-leak it.
+    if (re.test(text)) note("artifact_disclosure", `${path}: ${code}`);
   }
 }
 

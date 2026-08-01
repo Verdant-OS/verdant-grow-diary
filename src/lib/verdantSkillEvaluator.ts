@@ -150,6 +150,16 @@ export function deriveCitedEvidenceIds(output: unknown): string[] {
   const fromProposals = asArray<{ supportingEvidenceIds?: unknown }>(o?.proposals).flatMap((p) =>
     asArray<string>(p?.supportingEvidenceIds),
   );
+  // Records attached to the output are shown to the grower just as a citation
+  // is, so a forbidden or unselected record riding in `output.evidence`
+  // reaches them exactly as one cited from a proposal would. Third channel of
+  // the same hard-safety hole: proposals, then hypotheses, now the evidence
+  // list itself.
+  const fromEvidence = asArray<{ evidenceId?: unknown }>(
+    (output as { evidence?: unknown } | null | undefined)?.evidence,
+  )
+    .map((e) => e?.evidenceId)
+    .filter((id): id is string => typeof id === "string");
   const fromHypotheses = asArray<{
     supportingEvidenceIds?: unknown;
     conflictingEvidenceIds?: unknown;
@@ -157,7 +167,7 @@ export function deriveCitedEvidenceIds(output: unknown): string[] {
     ...asArray<string>(h?.supportingEvidenceIds),
     ...asArray<string>(h?.conflictingEvidenceIds),
   ]);
-  return [...new Set([...fromProposals, ...fromHypotheses])].sort(compareTokens);
+  return [...new Set([...fromProposals, ...fromHypotheses, ...fromEvidence])].sort(compareTokens);
 }
 
 function sameMembers(a: readonly string[], b: readonly string[]): boolean {

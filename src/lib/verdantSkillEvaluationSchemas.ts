@@ -19,6 +19,7 @@ import {
   type EvaluationFixtureKind,
 } from "@/lib/verdantSkillEvaluationTypes";
 import { SKILL_POLICY_OUTCOMES, SKILL_POLICY_RULE_CODES } from "@/lib/verdantSkillPolicyGovernor";
+import { CONTEXT_SLOTS } from "@/lib/plantContextBundleCompiler";
 import { SKILL_APPLICABILITY_VERDICTS } from "@/lib/verdantSkillApplicabilityRules";
 import {
   SKILL_RISK_LEVELS,
@@ -163,7 +164,7 @@ export const verdantSkillEvaluationFixtureSchema = z
     modelAdapterFixtureId: idTokenSchema.nullable(),
     expectedPolicyOutcome: z.enum(SKILL_POLICY_OUTCOMES).nullable(),
     expectedAbstention: z.enum(EVALUATION_ABSTENTION_EXPECTATIONS),
-    expectedMissingInformationKeys: z.array(z.string().trim().min(1).max(64)).max(32),
+    expectedMissingInformationKeys: z.array(z.enum(CONTEXT_SLOTS)).max(32),
     expectedRiskLevel: z.enum(SKILL_RISK_LEVELS).nullable(),
     expectedActionEligibility: z.enum(["none", "low_risk_manual_only"]).nullable(),
     // The V1 ceiling. A fixture cannot expect a capability the contracts
@@ -269,7 +270,12 @@ const executionApplicabilitySchema = z
     // checkable at all — the CLI compares it against the requested skill.
     skillId: z.string().min(1),
     skillVersion: z.string().min(1),
-    missingRequiredContext: z.array(z.string()),
+    // The CLOSED slot vocabulary, like `verdict` one field above. Fabricated
+    // tokens were published as a "measured" 100% missing-context detection
+    // rate for gaps the applicability engine is structurally incapable of
+    // emitting — while the identical fabrication in `verdict` was rejected by
+    // its enum. Two fields in one object, one closed and one open.
+    missingRequiredContext: z.array(z.enum(CONTEXT_SLOTS)),
   })
   .passthrough();
 

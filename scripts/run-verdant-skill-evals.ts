@@ -312,7 +312,12 @@ function loadFixtures(
     // directions because either gap is a decision the governor could not have
     // produced for the recorded output.
     const execPolicy = record.execution.policy as {
-      proposalVerdicts: { proposalId: string; verdict: string; effectiveRiskLevel: string }[];
+      proposalVerdicts: {
+        proposalId: string;
+        verdict: string;
+        effectiveRiskLevel: string;
+        executionCapability: string;
+      }[];
     };
     const execOutput = record.execution.output as { proposals?: unknown };
     const outputProposalIds = new Set(
@@ -386,6 +391,32 @@ function loadFixtures(
     if (overCeiling.length > 0) {
       issues.push(
         `${name}: allowed verdict above the V1 risk ceiling (${V1_MAX_ALLOWED_RISK}) for: ${overCeiling.join(", ")}`,
+      );
+      continue;
+    }
+
+    // Capability too. The governor COPIES the proposal's executionCapability
+    // into its verdict, so a `manual_only` proposal whose allow verdict records
+    // `none` is a decision it cannot emit — and the eligibility refinement then
+    // derives actionEligibility "none" from the forged verdict, letting a
+    // safety-critical must_abstain case pass. Id, risk and capability: the
+    // three things the governor carries across, correlated together.
+    const proposalCapability = new Map(
+      (Array.isArray(execOutput?.proposals) ? execOutput.proposals : []).map((p) => [
+        (p as { proposalId?: string })?.proposalId,
+        (p as { executionCapability?: string })?.executionCapability,
+      ]),
+    );
+    const capabilityMismatch = execPolicy.proposalVerdicts
+      .filter((v) => {
+        const declared = proposalCapability.get(v.proposalId);
+        return declared !== undefined && declared !== v.executionCapability;
+      })
+      .map((v) => v.proposalId)
+      .sort();
+    if (capabilityMismatch.length > 0) {
+      issues.push(
+        `${name}: verdict execution capability disagrees with the proposal for: ${capabilityMismatch.join(", ")}`,
       );
       continue;
     }
@@ -744,7 +775,6 @@ export function main(argv: readonly string[]): MainResult {
     attestations: [],
     rollbackTarget: null,
     sourceRevision: args.sourceRevision,
-    artifactDisclosureCategories: disclosure,
     generatedAt: now,
     digest: D,
   });

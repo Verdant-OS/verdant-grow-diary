@@ -34,7 +34,7 @@ import {
   type EvaluationProgressionState,
 } from "@/lib/verdantSkillEvaluationTypes";
 import type { SkillEvaluationReport } from "@/lib/verdantSkillEvaluationReport";
-import { verifyReportBinding } from "@/lib/verdantSkillEvaluationReport";
+import { scanArtifactForDisclosure, verifyReportBinding } from "@/lib/verdantSkillEvaluationReport";
 
 /** Human acts the harness can observe but never perform. */
 export const PROMOTION_ATTESTATIONS = [
@@ -237,7 +237,8 @@ export interface PromotionEligibilityInput {
    * which recomputes it. Left documented so a caller passing it notices.
    */
   reportBindingValid?: never;
-  artifactDisclosureCategories?: readonly string[];
+  /** Derived internally; see `evaluateSkillPromotionEligibility`. */
+  artifactDisclosureCategories?: never;
   generatedAt: string;
   digest: DigestFn;
 }
@@ -403,7 +404,12 @@ export function evaluateSkillPromotionEligibility(
     // release. When the check is derivable inside the trust boundary, taking
     // it from outside is the whole recurring defect of this build.
     if (!verifyReportBinding(report, input.digest)) block("report_binding_invalid");
-    if ((input.artifactDisclosureCategories ?? []).length > 0) {
+    // SCANNED here, not believed. This module holds the report and the
+    // scanner, exactly as it holds the report and the DigestFn — and the same
+    // argument applies: a caller-supplied "nothing was disclosed" is an
+    // assertion about the artifact being judged. Round 12 fixed this for
+    // reportBindingValid and left its sibling one field away.
+    if (scanArtifactForDisclosure(report).length > 0) {
       block("artifact_disclosure_scan_failed");
     }
     if (!SUPPORTED_EVALUATOR_VERSIONS_FOR_PROMOTION.includes(report.evaluatorVersion)) {

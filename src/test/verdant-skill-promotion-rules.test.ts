@@ -163,7 +163,6 @@ function decide(overrides: Partial<PromotionEligibilityInput> = {}) {
     attestations: ALL,
     rollbackTarget: "coco-dryback-review@0.9.0",
     sourceRevision: "abc1234",
-    artifactDisclosureCategories: [],
     generatedAt: NOW,
     digest: D,
     ...overrides,
@@ -572,7 +571,12 @@ describe("promotion — refusals", () => {
   });
 
   it("blocks when the artifact disclosure scan found anything", () => {
-    const d = decide({ artifactDisclosureCategories: ["email_address"] });
+    // The report must actually CARRY a disclosure now: the module runs the
+    // scan itself, so a caller-supplied category list proves nothing.
+    const d = decide({
+      report: report([caseResult({ failureReasons: ["contact grower@example.com"] })]),
+    });
+    expect(d.eligible).toBe(false);
     expect(d.blockingReasons).toContain("artifact_disclosure_scan_failed");
   });
 

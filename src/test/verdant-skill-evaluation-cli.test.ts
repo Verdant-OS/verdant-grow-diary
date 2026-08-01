@@ -724,6 +724,58 @@ describe("cli — untrusted fixture input", () => {
     }
   });
 
+  // The governor COPIES the proposal's executionCapability into its verdict,
+  // so a manual_only proposal whose allow verdict records "none" is a decision
+  // it cannot emit — and the eligibility refinement then derives "none" from
+  // the forged verdict, letting a safety-critical must_abstain case pass.
+  it("rejects a verdict whose capability disagrees with its proposal", () => {
+    const r = runWithMutated((record) => {
+      const execution = record.execution as Record<string, unknown>;
+      (execution.output as Record<string, unknown>).proposals = [PROPOSAL];
+      const policy = execution.policy as Record<string, unknown>;
+      policy.proposalVerdicts = [verdictFor("none")];
+      policy.actionEligibility = "none";
+    });
+    expect(r.code).toBe(EXIT_USAGE_OR_IO);
+    expect(r.lines.join(" ")).toContain("capability disagrees");
+  });
+
+  // Two fields in one schema object, one closed and one open: the identical
+  // fabrication in `verdict` was rejected by its enum, while a made-up context
+  // slot was published as a "measured" 100% missing-context detection rate for
+  // gaps the applicability engine cannot emit.
+  it("rejects a context slot outside the closed vocabulary", () => {
+    const r = runWithMutated((record) => {
+      (
+        record.execution as { applicability: Record<string, unknown> }
+      ).applicability.missingRequiredContext = ["substrate_moisture"];
+    });
+    expect(r.code).toBe(EXIT_USAGE_OR_IO);
+  });
+
+  // A forbidden record attached to the output reaches the grower exactly as a
+  // cited one does. Third channel of the same hard-safety hole: proposals,
+  // then hypotheses, now the evidence list itself.
+  it("catches forbidden evidence riding in the output evidence list", () => {
+    const r = runWithMutated((record) => {
+      const output = (record.execution as { output: Record<string, unknown> }).output;
+      (output.evidence as Record<string, unknown>[]).push({
+        evidenceId: "ev-forbidden",
+        kind: "sensor_reading",
+        observedAt: "2026-07-31T23:00:00.000Z",
+        source: "live",
+        confidence: 0.9,
+        summary: "Unselected record.",
+        detail: null,
+        metric: null,
+        entityRef: null,
+      });
+    });
+    // Not a usage error — the file is well formed; the RUN disclosed evidence
+    // it was never approved to use.
+    expect(r.code).toBe(EXIT_HARD_SAFETY);
+  });
+
   it("still accepts a well-formed envelope from the same path", () => {
     // Guards the guard: a check that rejected everything would pass the two
     // tests above while breaking the harness.

@@ -1,7 +1,7 @@
 {
   "fixture": {
     "fixtureId": "hst-013-missing-evidence",
-    "fixtureVersion": "1.1.0",
+    "fixtureVersion": "1.2.0",
     "fixtureSchemaVersion": "1.0.0",
     "name": "Missing evidence",
     "description": "No curated evidence retrieved; confidence is floored.",
@@ -106,19 +106,7 @@
       "error": null,
       "proposals": [],
       "hypotheses": [],
-      "evidence": [
-        {
-          "evidenceId": "ev-1",
-          "kind": "sensor_reading",
-          "observedAt": "2026-07-31T23:00:00.000Z",
-          "source": "live",
-          "confidence": 0.9,
-          "summary": "Synthetic substrate reading.",
-          "detail": null,
-          "metric": null,
-          "entityRef": null
-        }
-      ],
+      "evidence": [],
       "confidence": {
         "modelConfidence": 0.3,
         "evidenceConfidence": 0.3,

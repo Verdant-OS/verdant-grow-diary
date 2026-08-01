@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feature/symptom-evidence-check
+  pull_request:
+    branches:
+      - verdant-grow-diary
 
 permissions:
   contents: write

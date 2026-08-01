@@ -6,6 +6,7 @@ import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
 import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
 import PlantDetailDataSourceDisclosure from "@/components/PlantDetailDataSourceDisclosure";
+import PlantGrowContextRescueCard from "@/components/PlantGrowContextRescueCard";
 import AssignTentDialog from "@/components/AssignTentDialog";
 import PlantTentEnvironmentPanel from "@/components/PlantTentEnvironmentPanel";
 import { PlantBlueprintOverlaySection } from "@/components/PlantBlueprintOverlaySection";
@@ -401,6 +402,12 @@ export default function PlantDetail() {
       <PlantDetailDataSourceDisclosure
         metas={[plantMeta, tentMeta]}
         testId="plant-detail-data-source-disclosure"
+      />
+
+      <PlantGrowContextRescueCard
+        plantId={plant.id}
+        plantGrowId={plant.growId ?? null}
+        plantTentId={plant.tentId ?? null}
       />
 
       <PlantQuickStatusStrip

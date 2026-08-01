@@ -35,4 +35,3 @@ describe("create dialog hard-stop wiring", () => {
     expect(PLANT).toMatch(/plantCreateAllowsTentless/);
   });
 });
-

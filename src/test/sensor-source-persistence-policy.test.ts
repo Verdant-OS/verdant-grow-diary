@@ -24,6 +24,20 @@ describe("snapshotFromReadings — source mapping", () => {
     const s = snapshotFromReadings([row("temperature_c", 22, "pi_bridge")]);
     expect(s?.source).toBe("live");
   });
+  it("never promotes an unlabeled source to live", () => {
+    // Regression: the source resolver ended in a catch-all `: "live"`, so any
+    // row whose source was not exactly manual/sim/csv became "Live" — the one
+    // claim that must never be made without evidence, since Live asserts a
+    // connected sensor is currently feeding the room.
+    const s = snapshotFromReadings([
+      { ts: TS, metric: "temperature_c", value: 22, source: null },
+    ]);
+    expect(s?.source).not.toBe("live");
+  });
+  it("never promotes an unrecognised source to live", () => {
+    const s = snapshotFromReadings([row("temperature_c", 22, "some-new-vendor")]);
+    expect(s?.source).not.toBe("live");
+  });
   it("maps sim rows to sim (not live)", () => {
     const s = snapshotFromReadings([row("temperature_c", 22, "sim")]);
     expect(s?.source).toBe("sim");

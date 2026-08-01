@@ -1,14 +1,16 @@
 # Lighting launch verification
 
-**Generated:** 2026-08-01T03:59:17.0220380Z
+**Generated:** 2026-08-01T15:57:30.7455630Z
 **Production host:** https://verdantgrowdiary.com
 **Merged PR:** [#595](https://github.com/Verdant-OS/verdant-grow-diary/pull/595)
 **Merge commit:** `1223c56c9db586160a2798d017c2e78d1de1dd5a`
 **Measurement repair:** [#597](https://github.com/Verdant-OS/verdant-grow-diary/pull/597),
 commit `51363737ca97e74f861558f082b849bbbd389aa2`
 **Lovable project:** `66255e7b-892c-4be5-8686-ab1cfc3666db`
-**Production build manifest commit:** `2560d83a6b740cb9d6c4521bc6edc083977d51fc`
-**Deploy branch head:** `591081b387ae9a6d9eb00aeb1f4ed9b43c90cc7d`
+**Structured-data repair:** [#624](https://github.com/Verdant-OS/verdant-grow-diary/pull/624),
+commit `b62aac5d4b0e9296bfdbee4c46e03fc35f350c0c`
+**Production build manifest commit:** `e623aa9d913698ca6795b3d6b75bd069d9a67681`
+**Deploy branch head:** `e623aa9d913698ca6795b3d6b75bd069d9a67681`
 **Production deployment ID:** not exposed by the current production response
 
 ## Launch verdict
@@ -16,18 +18,17 @@ commit `51363737ca97e74f861558f082b849bbbd389aa2`
 **NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND**
 
 Both pages are published, publicly reachable, intentionally indexable, and match the content merged
-in PR #595. The explicit page-identity repair from PR #597 is live: each tested navigation queued
-one exact route path, title, and query-free location, and protected identifiers remained masked.
-Two production defects prevent a ready verdict: route JSON-LD is duplicate/stale after hydration,
-and GA4's tag also emits automatic page views without Verdant's explicit `page_path` alongside the
-app-owned SPA events. All collection requests were fulfilled locally, so no verification events
-were transmitted to GA4.
+in PR #595. The explicit page-identity repair from PR #597 and structured-data ownership repair from
+PR #624 are live. Across eight direct, cross-guide, history, refresh, repeat, and new-tab states,
+each page exposed its exact route path, title, query-free location, canonical, and one current set of
+page-level JSON-LD identities. Protected identifiers remained masked.
 
-The JSON-LD ownership defect has a bounded local repair with a passing built-browser navigation
-matrix, but production still needs that repair merged and published. The automatic GA4 page-view
-source requires an owner-side Enhanced Measurement review because authenticated stream settings
-are unavailable. Authenticated GA4 reporting and Search Console inspection are also unavailable,
-so Day 0 remains unset.
+One production instrumentation defect still prevents a ready verdict: GA4's tag emitted four
+automatic page views without Verdant's explicit `page_path` alongside eight exact app-owned SPA
+events. All collection requests were fulfilled locally, so no verification events were transmitted
+to GA4. The automatic source requires an owner-side Enhanced Measurement review because
+authenticated stream settings are unavailable. Authenticated GA4 reporting and Search Console
+inspection are also unavailable, so Day 0 remains unset.
 
 The owner-confirmed GA4 production stream is `Verdant Grow Diary`, stream URL
 `https://verdantgrowdiary.com`, stream ID `15065867361`, and measurement ID `G-B3QRSZEM9S`.
@@ -37,18 +38,16 @@ numeric property ID and authenticated reporting baseline remain unavailable to C
 ## Publication and release evidence
 
 - `https://verdantgrowdiary.com/version.json` identifies production build commit
-  `2560d83a6b740cb9d6c4521bc6edc083977d51fc`, built at
-  `2026-08-01T01:40:18.366Z`.
-- Repository ancestry proves the PR #595 merge commit and PR #597 repair commit are ancestors of
-  that production manifest commit.
-- The production manifest is an ancestor of deploy head. The committed delta through
-  `591081b387ae9a6d9eb00aeb1f4ed9b43c90cc7d` is EcoWitt adapter hardening only; no public SEO or
-  analytics runtime changed, so release content still matches production. This bounded slice adds
-  a public guide JSON-LD runtime repair and therefore requires a new publish after merge.
+  `e623aa9d913698ca6795b3d6b75bd069d9a67681`, built at
+  `2026-08-01T06:20:32.105Z`.
+- Repository ancestry proves the PR #595 release, PR #597 analytics repair, and PR #624
+  structured-data repair commits are all ancestors of that production manifest commit.
+- Production and deploy branch head match at `e623aa9d913698ca6795b3d6b75bd069d9a67681`.
+  This bounded slice changes only readiness evidence; no runtime publish is required.
 - The current production response does not expose a Lovable deployment ID, so none is inferred.
 - Both release-specific URLs, titles, descriptions, H1s, Article/FAQ schema, sitemap entries, and
   cross-links are present in production.
-- The public probe at `2026-08-01T03:58:28.982Z` returned HTTP 200 for `version.json`, both
+- The public probe at `2026-08-01T15:20:20.962Z` returned HTTP 200 for `version.json`, both
   lighting guides, `sitemap.xml`, and `robots.txt`. The sitemap contains 51 URLs and each lighting
   route exactly once; robots declares the production sitemap and protects app prefixes.
 
@@ -99,18 +98,14 @@ numeric property ID and authenticated reporting baseline remain unavailable to C
 | JSON-LD parse errors                 |                      0 |                      0 |
 | Fabricated review/rating fields      |                      0 |                      0 |
 
-On a direct load, the statically generated route document and hydrated page emit identical FAQ,
-BreadcrumbList, and Article object pairs. Those objects parse, match the visible content, and do
-not fabricate claims. Authenticated Search Console enhancement evidence is still required before
-treating rich-result eligibility as confirmed.
+PR #624 gives hydration one route owner for `WebPage`, `FAQPage`, `BreadcrumbList`, and `Article`.
+The production matrix covered direct load, both cross-guide directions, back, forward, refresh,
+repeated navigation, and a new tab. Every state parsed with one current page-level identity set,
+zero duplicate identities, zero stale prior-route objects, and four FAQ questions matching visible
+copy. Authenticated Search Console enhancement evidence is still required before treating
+rich-result eligibility as confirmed.
 
-**Verified P1 technical SEO defect:** after cross-guide client navigation, the prior route's static
-objects remain while the current route's runtime objects mount, so the target DOM advertises
-conflicting page identities. Direct loads also duplicate FAQPage, BreadcrumbList, and Article.
-The bounded local repair gives hydration one route owner for WebPage, FAQPage, BreadcrumbList, and
-Article. Targeted regression coverage and the built local direct/back/forward/refresh/repeat/new-tab
-matrix observed zero duplicate or stale route objects without changing visible copy or schema
-claims. Production remains failed until that repair is published and reverified.
+**P1 technical SEO repair: PASS — FIXED AND PRODUCTION VERIFIED**
 
 ## Sitemap and robots
 
@@ -168,12 +163,12 @@ page_title = Cannabis Light Stress: Burn, Bleaching, or Heat? | Verdant
 
 The browser verification fulfilled the collection endpoint locally, so the inspected payloads did
 not add verification traffic to the production property. Protected token-bearing paths remained
-masked. Verdant queued exactly one explicit event for every observed route transition, including
-both direct loads, both cross-guide directions, back, forward, refresh, repeated navigation, and a
-new tab.
+masked. Verdant emitted eight exact explicit events across eight observed navigation actions:
+direct deep-link load, both cross-guide directions, back, forward, refresh, repeated navigation,
+and a new tab.
 
-The collection endpoint also received tag-generated `page_view` events without Verdant's explicit
-`page_path` during direct/history navigation. That is consistent with GA4 Enhanced Measurement's
+The collection endpoint also received four tag-generated `page_view` events without Verdant's
+explicit `page_path` during history, refresh, and repeated navigation. That is consistent with GA4 Enhanced Measurement's
 separate browser-history page-view option and would double-count some navigation if left enabled
 beside Verdant's explicit SPA owner. The owner must disable the advanced "page changes based on
 browser history events" option in the existing stream, retain the explicit app emitter, and then
@@ -188,13 +183,13 @@ authorize the same controlled re-verification.
 - **GA4 baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
 - **GSC baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
 - **GA4 production stream identity:** PASS — owner-confirmed values match the deployed host and tag.
-- At `2026-08-01T03:59:17.0220380Z`, name-only GitHub secret listings found none of the expected GA4
+- At `2026-08-01T15:57:30.7455630Z`, name-only GitHub secret listings found none of the expected GA4
   or GSC reporting secrets configured at repository scope or in the `verdant-production`,
   `verdant-sandbox`, and `copilot` environments; `.seo/gsc-token.local.json` is also absent. The
   workflow and documentation reference the expected `GSC_*` names, but no credential value was
   read or recorded in this verification.
-- The latest SEO workflow on deploy head `591081b3…`
-  ([run 30681587094](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30681587094))
+- The latest SEO workflow on deploy head `e623aa9d9…`
+  ([run 30687660034](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30687660034))
   succeeded and evaluated all 51 sitemap URLs. Its GSC operation was `SKIPPED`, access was
   `BLOCKED`, execution was `SKIPPED`, OAuth was not configured, and it made 0 GSC API attempts.
   Workflow success is not an authenticated GSC baseline.
@@ -204,8 +199,9 @@ authorize the same controlled re-verification.
 - Machine-readable handoff: the current blocked state is recorded in
   [`artifacts/seo/seo-readiness-status.json`](../../artifacts/seo/seo-readiness-status.json).
 
-The current bounded slice is `P1 LIGHTING_DUPLICATE_HYDRATED_JSON_LD`; its local repair is verified
-and requires merge, publish, and production re-verification. The next P1 is owner-blocked:
+The current bounded slice is `P3 STALE_PRODUCTION_JSON_LD_READINESS_EVIDENCE`; it aligns the existing
+human and machine-readable handoff with the production proof without changing runtime code. The
+highest remaining defect is owner-blocked P0:
 `GA4_ENHANCED_MEASUREMENT_HISTORY_PAGE_VIEWS`.
 
 Day 0 remains `UNSET`, and the four-week clock remains `NOT_STARTED`, until both authenticated

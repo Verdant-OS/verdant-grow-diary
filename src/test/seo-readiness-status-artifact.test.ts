@@ -46,7 +46,7 @@ describe("SEO readiness status artifact", () => {
       status_vocabulary: EXPECTED_STATUS_VOCABULARY,
       production_status: "PASS",
       analytics_identity_status: "FAIL",
-      technical_seo_status: "FAIL",
+      technical_seo_status: "PASS",
       ga4_access_status: "BLOCKED",
       gsc_access_status: "BLOCKED",
       day_0_status: "UNSET",
@@ -62,23 +62,22 @@ describe("SEO readiness status artifact", () => {
   it("pins repository, deploy, and production identities with observed equality", () => {
     expect(READINESS.run_context).toEqual({
       repository: "Verdant-OS/verdant-grow-diary",
-      branch: "codex/fix-guide-jsonld-hydration",
-      head: "591081b387ae9a6d9eb00aeb1f4ed9b43c90cc7d",
+      branch: "codex/refresh-seo-measurement-readiness",
+      head: "e623aa9d913698ca6795b3d6b75bd069d9a67681",
       deploy_branch: "verdant-grow-diary",
-      deploy_branch_head: "591081b387ae9a6d9eb00aeb1f4ed9b43c90cc7d",
+      deploy_branch_head: "e623aa9d913698ca6795b3d6b75bd069d9a67681",
       head_equals_deploy_branch_head: true,
-      working_tree_status: "DIRTY_READINESS_WORK",
+      working_tree_status: "CLEAN_AT_AUDIT_START",
     });
     expect(READINESS.production).toMatchObject({
       host: "https://verdantgrowdiary.com",
-      observed_at: "2026-08-01T03:58:28.982Z",
-      manifest_commit: "2560d83a6b740cb9d6c4521bc6edc083977d51fc",
-      build_time: "2026-08-01T01:40:18.366Z",
-      matches_deploy_branch_head: false,
+      observed_at: "2026-08-01T15:20:20.962Z",
+      manifest_commit: "e623aa9d913698ca6795b3d6b75bd069d9a67681",
+      build_time: "2026-08-01T06:20:32.105Z",
+      matches_deploy_branch_head: true,
       manifest_is_ancestor_of_deploy_branch_head: true,
-      source_delta_since_manifest:
-        "ECOWITT_ADAPTER_HARDENING_ONLY_NO_PUBLIC_SEO_OR_ANALYTICS_RUNTIME_CHANGE",
-      production_publish_required: true,
+      source_delta_since_manifest: "NONE_DEPLOY_MATCHES_PRODUCTION",
+      production_publish_required: false,
       release_content_match: "PASS",
       sitemap_url_count: 51,
       robots_declares_production_sitemap: true,
@@ -107,24 +106,33 @@ describe("SEO readiness status artifact", () => {
     );
   });
 
-  it("keeps direct-load indexability distinct from the route-runtime structured-data failure", () => {
-    expect(READINESS.technical_seo_status).toBe("FAIL");
+  it("records the deployed route-runtime structured-data repair as production verified", () => {
+    expect(READINESS.technical_seo_status).toBe("PASS");
     expect(READINESS.technical_seo).toMatchObject({
-      lighting_pages: "FAIL",
+      lighting_pages: "PASS",
       direct_load_indexability: "PASS",
-      route_runtime_structured_data: "FAIL",
+      route_runtime_structured_data: "PASS",
+      local_route_runtime_structured_data: "NOT_APPLICABLE",
+      production_navigation_states_verified: 8,
       robots: "PASS",
       sitemap: "PASS",
       protected_route_exclusion: "PASS",
     });
     expect((BASELINE.launch_gates as Record<string, string>).route_runtime_structured_data).toBe(
-      "fail_non_blocking",
+      "pass",
+    );
+    expect(BASELINE.public_probe).toEqual(
+      expect.objectContaining({
+        production_navigation_states_verified: 8,
+        structured_data_duplicate_identities_observed: 0,
+        structured_data_parse_errors_observed: 0,
+      }),
     );
   });
 
   it("separates passing collection evidence from unavailable authenticated baselines", () => {
     expect(READINESS.analytics_identity).toMatchObject({
-      last_full_verified_at: "2026-08-01T03:58:28.982Z",
+      last_full_verified_at: "2026-08-01T15:20:20.962Z",
       verification_method: "INTERCEPTED_BROWSER_COLLECTION_REQUESTS",
       test_events_transmitted: false,
       stream_identity_status: "PASS",
@@ -142,6 +150,12 @@ describe("SEO readiness status artifact", () => {
       explicit_spa_page_view_identity: "PASS",
       automatic_history_page_views: "FAIL_OWNER_REVIEW_REQUIRED",
       protected_id_masking: "PASS",
+      verification_counts: {
+        navigation_actions: 8,
+        exact_explicit_page_views: 8,
+        automatic_page_views_without_explicit_page_path: 4,
+        verification_events_transmitted: 0,
+      },
     });
     expect(READINESS.ga4).toEqual({
       status: "BLOCKED",
@@ -166,7 +180,7 @@ describe("SEO readiness status artifact", () => {
       baseline_status: "BLOCKED",
       authenticated_reporting_available: false,
       latest_workflow_run:
-        "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30681587094",
+        "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30687660034",
       latest_workflow_status: "PASS",
       operation_status: "SKIPPED",
       access_status: "BLOCKED",
@@ -258,24 +272,29 @@ describe("SEO readiness status artifact", () => {
         expect.objectContaining({
           id: "LIGHTING_DUPLICATE_HYDRATED_JSON_LD",
           priority: "P1",
-          status: "LOCAL_FIX_VERIFIED_REQUIRES_DEPLOY",
+          status: "FIXED_AND_PRODUCTION_VERIFIED",
         }),
         expect.objectContaining({
           id: "GA4_ENHANCED_MEASUREMENT_DUPLICATE_PAGE_VIEWS",
-          priority: "P1",
+          priority: "P0",
           status: "VERIFIED_UNFIXED_OWNER_ACTION_REQUIRED",
+        }),
+        expect.objectContaining({
+          id: "STALE_PRODUCTION_JSON_LD_READINESS_EVIDENCE",
+          priority: "P3",
+          status: "FIXED_AND_LOCAL_VERIFIED",
         }),
       ]),
     );
     expect(READINESS.current_slice).toEqual({
-      priority: "P1",
-      id: "LIGHTING_DUPLICATE_HYDRATED_JSON_LD",
-      status: "LOCAL_FIX_VERIFIED_REQUIRES_DEPLOY",
+      priority: "P3",
+      id: "STALE_PRODUCTION_JSON_LD_READINESS_EVIDENCE",
+      status: "FIXED_AND_LOCAL_VERIFIED",
       evidence:
-        "One route-owned WebPage, FAQPage, BreadcrumbList, and Article set replaces static route JSON-LD on hydration and stays current through cross-guide navigation.",
+        "Existing readiness artifacts now identify e623aa9d9 as the matching production/deploy head and record the eight-state production JSON-LD pass.",
     });
     expect(READINESS.next_slice).toEqual({
-      priority: "P1",
+      priority: "P0",
       id: "GA4_ENHANCED_MEASUREMENT_HISTORY_PAGE_VIEWS",
       status: "BLOCKED_BY_OWNER_ACCESS",
     });
@@ -296,7 +315,7 @@ describe("SEO readiness status artifact", () => {
 
   it("contains no credentials, private paths, or fake zero metrics", () => {
     expect(READINESS.reporting_access_configuration).toEqual({
-      observed_at: "2026-08-01T03:59:17.0220380Z",
+      observed_at: "2026-08-01T15:57:30.7455630Z",
       audit_method: "GITHUB_SECRET_NAME_LISTING",
       configured_scopes_checked: [
         "repository",

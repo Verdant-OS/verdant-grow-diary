@@ -53,6 +53,7 @@ export default function Tents() {
   // Shared URL `?growId=` resolution against RLS-loaded grows.
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const {
+    activeGrowId,
     loading: growsLoading = false,
     error: growsError = null,
     refresh: refreshGrows,
@@ -126,7 +127,7 @@ export default function Tents() {
           canCreateTent ? (
             <CreateTentDialog
               key={activationIntent ? "one-tent-activation" : "standard-create"}
-              defaultGrowId={validGrowId}
+              defaultGrowId={validGrowId ?? activeGrowId ?? undefined}
               initiallyOpen={activationIntent}
               onCreated={
                 activationIntent && validGrowId

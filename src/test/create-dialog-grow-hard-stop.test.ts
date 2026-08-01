@@ -9,7 +9,7 @@ const PLANT = readFileSync(resolve(ROOT, "src/components/CreatePlantDialog.tsx")
 describe("create dialog hard-stop wiring", () => {
   it("CreateTentDialog hard-stops and always writes grow_id from resolver", () => {
     expect(TENT).toMatch(/buildCreateGrowBindingHardStop/);
-    expect(TENT).toMatch(/resolveCreateTargetGrowId/);
+    expect(TENT).toMatch(/resolveTargetGrow/);
     expect(TENT).toMatch(/create-tent-hard-stop/);
     expect(TENT).toMatch(/create-tent-start-room-cta/);
     expect(TENT).toMatch(/hardStop\.startRoomHref|one_tent_activation/);

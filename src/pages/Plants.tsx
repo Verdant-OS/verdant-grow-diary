@@ -94,6 +94,7 @@ export default function Plants() {
   const navigate = useNavigate();
   const {
     grows,
+    activeGrowId,
     loading: growsLoading = false,
     error: growsError = null,
     refresh: refreshGrows,
@@ -298,7 +299,7 @@ export default function Plants() {
           scopeState === "unscoped" || scopeState === "valid" ? (
             <CreatePlantDialog
               key={activationIntent ? "one-tent-activation" : "standard-create"}
-              defaultGrowId={validGrowId}
+              defaultGrowId={validGrowId ?? activeGrowId ?? undefined}
               defaultTentId={activationTent?.id}
               requireTent={activationIntent}
               initiallyOpen={activationIntent}

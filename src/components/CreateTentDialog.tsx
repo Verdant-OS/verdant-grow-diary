@@ -33,6 +33,7 @@ import {
   canWriteCreateGrowId,
   resolveCreateTargetGrowId,
   resolveSetupName,
+  resolveTargetGrow,
 } from "@/lib/createDialogGrowBindingRules";
 import { GROW_SETUP_MESSAGES } from "@/constants/growSetupMessages";
 
@@ -57,15 +58,16 @@ export default function CreateTentDialog({
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ name: "", size: "", brand: "", stage: "seedling" });
 
-  const targetGrowId = useMemo(
+  const targetGrow = useMemo(
     () =>
-      resolveCreateTargetGrowId({
+      resolveTargetGrow({
         pageDefaultGrowId: defaultGrowId,
         activeGrowId,
         grows,
       }),
     [defaultGrowId, activeGrowId, grows],
   );
+  const targetGrowId = targetGrow?.id ?? null;
   const hardStop = useMemo(
     () =>
       buildCreateGrowBindingHardStop(
@@ -74,10 +76,7 @@ export default function CreateTentDialog({
       ),
     [targetGrowId, grows.length, growsLoading],
   );
-  const setupName = useMemo(
-    () => resolveSetupName(targetGrowId, grows),
-    [targetGrowId, grows],
-  );
+  const setupName = targetGrow?.name ?? resolveSetupName(targetGrowId, grows);
 
   // Free-tier tent gate (multiTent=false → single tent). useTents already
   // filters archived tents. Fails open while entitlements load.
@@ -135,8 +134,17 @@ export default function CreateTentDialog({
     if (data && onCreated) onCreated(data as { id: string; name: string });
   }
 
+  function resetForm() {
+    setForm({ name: "", size: "", brand: "", stage: "seedling" });
+  }
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen) resetForm();
+    setOpen(nextOpen);
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger ?? (
           <Button size="sm" className="gradient-leaf text-primary-foreground gap-1">
@@ -157,6 +165,7 @@ export default function CreateTentDialog({
             className="rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 space-y-2"
             data-testid="create-tent-hard-stop"
             role="alert"
+            aria-label={hardStop.hardStopTitle}
           >
             <p className="text-sm font-semibold" data-testid="create-tent-hard-stop-title">
               {hardStop.hardStopTitle}
@@ -172,7 +181,7 @@ export default function CreateTentDialog({
                 type="button"
                 size="sm"
                 variant="outline"
-                onClick={() => setOpen(false)}
+                onClick={() => handleOpenChange(false)}
                 data-testid="create-tent-hard-stop-dismiss"
               >
                 {hardStop.hardStopSecondary}
@@ -223,6 +232,7 @@ export default function CreateTentDialog({
             </Link>
           </p>
         )}
+        {!hardStop.blockSubmit && (
         <form onSubmit={submit} className="grid gap-3">
           <div>
             <Label>Name</Label>
@@ -286,6 +296,7 @@ export default function CreateTentDialog({
             Create tent
           </Button>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -131,11 +131,15 @@ describe("scoped-grow navigation contract — create defaults remain grow-aware"
     expect(TIMELINE).toMatch(/grows\.some\(\s*\(g\)\s*=>\s*g\.id\s*===\s*urlGrowId\s*\)/);
     expect(TIMELINE).toMatch(/setActiveGrowId\(urlGrowId\)/);
   });
-  it("Plants passes validGrowId into CreatePlantDialog defaultGrowId", () => {
-    expect(PLANTS).toMatch(/<CreatePlantDialog\b[\s\S]*?defaultGrowId=\{validGrowId\}/);
+  it("Plants passes validGrowId with activeGrowId fallback into CreatePlantDialog", () => {
+    expect(PLANTS).toMatch(
+      /<CreatePlantDialog\b[\s\S]*?defaultGrowId=\{validGrowId\s*\?\?\s*activeGrowId\s*\?\?\s*undefined\}/,
+    );
   });
-  it("Tents passes validGrowId into CreateTentDialog defaultGrowId", () => {
-    expect(TENTS).toMatch(/<CreateTentDialog\b[\s\S]*?defaultGrowId=\{validGrowId\}/);
+  it("Tents passes validGrowId with activeGrowId fallback into CreateTentDialog", () => {
+    expect(TENTS).toMatch(
+      /<CreateTentDialog\b[\s\S]*?defaultGrowId=\{validGrowId\s*\?\?\s*activeGrowId\s*\?\?\s*undefined\}/,
+    );
   });
 });
 

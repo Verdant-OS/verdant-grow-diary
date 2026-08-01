@@ -1,9 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
   resolveCreateTargetGrowId,
+  resolveTargetGrow,
   buildCreateGrowBindingHardStop,
+  buildHardStopView,
   canWriteCreateGrowId,
   evaluateTentGrowCompatibility,
+  checkTentGrowCompatibility,
   resolveInitialPlantTentId,
 } from "@/lib/createDialogGrowBindingRules";
 import { GROW_SETUP_START_ROOM_HREF } from "@/constants/growSetupMessages";
@@ -12,6 +15,8 @@ const grows = [
   { id: "g1", name: "Spring" },
   { id: "g2", name: "Fall" },
 ];
+
+const UUID_NAME = "11111111-1111-4111-8111-111111111111";
 
 describe("resolveCreateTargetGrowId", () => {
   it("prefers page default when known", () => {
@@ -42,6 +47,92 @@ describe("resolveCreateTargetGrowId", () => {
         grows,
       }),
     ).toBeNull();
+  });
+});
+
+describe("resolveTargetGrow", () => {
+  it("returns id and display name without leaking raw ids", () => {
+    expect(
+      resolveTargetGrow({
+        pageDefaultGrowId: null,
+        activeGrowId: "g1",
+        grows,
+      }),
+    ).toEqual({ id: "g1", name: "Spring" });
+  });
+
+  it("falls back to Current setup for blank or uuid-looking names", () => {
+    expect(
+      resolveTargetGrow({
+        pageDefaultGrowId: "g1",
+        activeGrowId: null,
+        grows: [{ id: "g1", name: "" }],
+      }),
+    ).toEqual({ id: "g1", name: "Current setup" });
+    expect(
+      resolveTargetGrow({
+        pageDefaultGrowId: "g1",
+        activeGrowId: null,
+        grows: [{ id: "g1", name: UUID_NAME }],
+      }),
+    ).toEqual({ id: "g1", name: "Current setup" });
+  });
+
+  it("truncates very long setup names for display", () => {
+    const longName = "A".repeat(120);
+    const resolved = resolveTargetGrow({
+      pageDefaultGrowId: "g1",
+      activeGrowId: null,
+      grows: [{ id: "g1", name: longName }],
+    });
+    expect(resolved?.name.length).toBeLessThanOrEqual(80);
+    expect(resolved?.name.endsWith("…")).toBe(true);
+  });
+});
+
+describe("buildHardStopView", () => {
+  it("mirrors zero-grow and loading states", () => {
+    expect(
+      buildHardStopView({ targetGrow: null, growCount: 0, growsLoading: false }),
+    ).toMatchObject({
+      blockSubmit: true,
+      showStartRoomHardStop: true,
+      primaryLabel: "Start your room",
+    });
+    expect(
+      buildHardStopView({ targetGrow: null, growCount: 0, growsLoading: true }),
+    ).toMatchObject({
+      blockSubmit: true,
+      showLoading: true,
+    });
+  });
+
+  it("never puts opaque ids in setupName", () => {
+    const view = buildHardStopView({
+      targetGrow: { id: "g1", name: "Current setup" },
+      growCount: 1,
+      growsLoading: false,
+    });
+    expect(view.setupName).toBe("Current setup");
+    expect(view.setupName).not.toMatch(UUID_NAME);
+  });
+});
+
+describe("checkTentGrowCompatibility", () => {
+  it("maps tent/grow matrix to spec reasons", () => {
+    expect(
+      checkTentGrowCompatibility({ targetGrowId: "g1", tent: { grow_id: "g1" } }),
+    ).toEqual({ ok: true });
+    expect(
+      checkTentGrowCompatibility({ targetGrowId: "g1", tent: { grow_id: null } }),
+    ).toEqual({ ok: false, reason: "missing_setup" });
+    expect(
+      checkTentGrowCompatibility({ targetGrowId: "g1", tent: { grow_id: "g2" } }),
+    ).toEqual({ ok: false, reason: "different_setup" });
+    expect(checkTentGrowCompatibility({ targetGrowId: null, tent: { grow_id: "g1" } })).toEqual({
+      ok: false,
+      reason: "missing_target",
+    });
   });
 });
 

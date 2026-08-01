@@ -4,10 +4,10 @@ Product rules for **Create tent** / **Create plant** on the production deploy br
 
 ## Behavior
 
-- Resolved setup = page `?growId=` (when valid) then **current active setup**.
+- Resolved setup = page `?growId=` (when valid) then **current active setup** (`useGrows().activeGrowId`).
 - **Always** write `grow_id` on successful create; never optional-omit.
 - Zero setups → hard-stop: **Start your room first** → `/grows?intent=one_tent_activation`.
-- Orphan / mismatched tent selection cannot reach insert.
+- Orphan / mismatched tent selection cannot reach insert; show **Finish setup** → `/grow-lineage`.
 
 ## Grower-facing copy
 
@@ -15,9 +15,11 @@ Product rules for **Create tent** / **Create plant** on the production deploy br
 | --- | --- |
 | No setup | Start your room first / need a setup before adding tent or plant |
 | Primary CTA | Start your room |
+| Secondary CTA | Not now |
 | Known setup | Adding to {name} / This will live in your current setup |
 | Wrong tent | This tent is in another setup |
+| Tent needs setup | Finish setup → `/grow-lineage` |
 
-Do **not** show: `grow_id`, orphan, lineage, backfill.
+Do **not** show: `grow_id`, orphan, unbound, lineage repair, backfill, migration, constraint.
 
 Source: `src/constants/growSetupMessages.ts`, `src/lib/createDialogGrowBindingRules.ts`.

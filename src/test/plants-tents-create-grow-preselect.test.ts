@@ -28,8 +28,11 @@ describe("Plants/Tents — preselect grow on create", () => {
     expect(PLANTS).toMatch(VALID_GROW_ID_RE);
   });
 
-  it("Plants passes validGrowId into CreatePlantDialog", () => {
-    expect(PLANTS).toMatch(/<CreatePlantDialog\b[\s\S]*?defaultGrowId=\{validGrowId\}/);
+  it("Plants prefers validGrowId and falls back to the current setup", () => {
+    expect(PLANTS).toMatch(/activeGrowId/);
+    expect(PLANTS).toMatch(
+      /<CreatePlantDialog\b[\s\S]*?defaultGrowId=\{validGrowId\s*\?\?\s*activeGrowId\s*\?\?\s*undefined\}/,
+    );
   });
 
   it("Tents validates URL growId against the user's RLS-loaded grows via useScopedGrow", () => {
@@ -37,13 +40,16 @@ describe("Plants/Tents — preselect grow on create", () => {
     expect(TENTS).toMatch(VALID_GROW_ID_RE);
   });
 
-  it("Tents passes validGrowId into CreateTentDialog", () => {
-    expect(TENTS).toMatch(/<CreateTentDialog\b[\s\S]*?defaultGrowId=\{validGrowId\}/);
+  it("Tents prefers validGrowId and falls back to the current setup", () => {
+    expect(TENTS).toMatch(/activeGrowId/);
+    expect(TENTS).toMatch(
+      /<CreateTentDialog\b[\s\S]*?defaultGrowId=\{validGrowId\s*\?\?\s*activeGrowId\s*\?\?\s*undefined\}/,
+    );
   });
 
   it("CreatePlantDialog accepts defaultGrowId and always writes grow_id on insert when allowed", () => {
     expect(CREATE_PLANT).toMatch(/defaultGrowId\?\s*:\s*string/);
-    expect(CREATE_PLANT).toMatch(/resolveCreateTargetGrowId/);
+    expect(CREATE_PLANT).toMatch(/resolveTargetGrow/);
     expect(CREATE_PLANT).toMatch(/grow_id:\s*targetGrowId/);
   });
 
@@ -53,7 +59,7 @@ describe("Plants/Tents — preselect grow on create", () => {
 
   it("CreateTentDialog accepts defaultGrowId and always writes grow_id on insert when allowed", () => {
     expect(CREATE_TENT).toMatch(/defaultGrowId\?\s*:\s*string/);
-    expect(CREATE_TENT).toMatch(/resolveCreateTargetGrowId/);
+    expect(CREATE_TENT).toMatch(/resolveTargetGrow/);
     expect(CREATE_TENT).toMatch(/grow_id:\s*targetGrowId/);
   });
 

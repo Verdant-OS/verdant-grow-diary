@@ -9,7 +9,11 @@
 import {
   GROW_SETUP_MESSAGES,
   GROW_SETUP_START_ROOM_HREF,
+  growSetup,
 } from "@/constants/growSetupMessages";
+
+export const START_YOUR_ROOM_HREF = GROW_SETUP_START_ROOM_HREF;
+export const FINISH_SETUP_HREF = "/grow-lineage" as const;
 
 export type CreateBindingEntity = "tent" | "plant";
 
@@ -17,6 +21,14 @@ export interface GrowListItem {
   id: string;
   name?: string | null;
 }
+
+export interface ResolvedTargetGrow {
+  id: string;
+  name: string;
+}
+
+const UUID_LIKE_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function trimId(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -33,19 +45,11 @@ export function isKnownGrowId(
   return grows.some((g) => g.id === id);
 }
 
-/**
- * Precedence: page/URL default, then active grow — only if present in loaded grows.
- */
-export function resolveCreateTargetGrowId(input: {
-  pageDefaultGrowId?: string | null;
-  activeGrowId?: string | null;
-  grows: readonly GrowListItem[];
-}): string | null {
-  const page = trimId(input.pageDefaultGrowId);
-  if (page && isKnownGrowId(page, input.grows)) return page;
-  const active = trimId(input.activeGrowId);
-  if (active && isKnownGrowId(active, input.grows)) return active;
-  return null;
+function formatSetupDisplayName(rawName: string | null | undefined): string {
+  const name = rawName?.trim();
+  if (!name) return "Current setup";
+  if (UUID_LIKE_RE.test(name)) return "Current setup";
+  return name.length > 80 ? `${name.slice(0, 77)}…` : name;
 }
 
 export function resolveSetupName(
@@ -56,7 +60,41 @@ export function resolveSetupName(
   if (!id) return null;
   const hit = grows.find((g) => g.id === id);
   const name = hit?.name?.trim();
-  return name && name.length > 0 ? name : null;
+  if (!name) return null;
+  return formatSetupDisplayName(name);
+}
+
+/**
+ * Spec resolver: page default when known, else active grow — returns id + display name.
+ */
+export function resolveTargetGrow(input: {
+  pageDefaultGrowId?: string | null;
+  activeGrowId?: string | null;
+  grows?: ReadonlyArray<GrowListItem | null | undefined> | null;
+}): ResolvedTargetGrow | null {
+  const grows = (input.grows ?? []).filter((g): g is GrowListItem => !!g?.id);
+  const page = trimId(input.pageDefaultGrowId);
+  if (page && isKnownGrowId(page, grows)) {
+    const hit = grows.find((g) => g.id === page);
+    return { id: page, name: formatSetupDisplayName(hit?.name) };
+  }
+  const active = trimId(input.activeGrowId);
+  if (active && isKnownGrowId(active, grows)) {
+    const hit = grows.find((g) => g.id === active);
+    return { id: active, name: formatSetupDisplayName(hit?.name) };
+  }
+  return null;
+}
+
+/**
+ * Precedence: page/URL default, then active grow — only if present in loaded grows.
+ */
+export function resolveCreateTargetGrowId(input: {
+  pageDefaultGrowId?: string | null;
+  activeGrowId?: string | null;
+  grows: readonly GrowListItem[];
+}): string | null {
+  return resolveTargetGrow(input)?.id ?? null;
 }
 
 export interface CreateGrowBindingHardStopView {
@@ -144,6 +182,76 @@ export function buildCreateGrowBindingHardStop(
     hardStopCta: GROW_SETUP_MESSAGES.hardStopCta,
     hardStopSecondary: GROW_SETUP_MESSAGES.hardStopSecondary,
   };
+}
+
+export interface HardStopView {
+  blockSubmit: boolean;
+  showLoading: boolean;
+  showStartRoomHardStop: boolean;
+  showPickSetupHint: boolean;
+  startRoomHref: string;
+  title: string;
+  body: string;
+  primaryLabel: string;
+  secondaryLabel: string;
+  setupName: string | null;
+}
+
+/** Spec view-model builder — never surfaces opaque ids as display names. */
+export function buildHardStopView(input: {
+  targetGrow: ResolvedTargetGrow | null;
+  growCount: number;
+  growsLoading: boolean;
+}): HardStopView {
+  const entity: CreateBindingEntity = "plant";
+  const legacy = buildCreateGrowBindingHardStop(
+    { targetGrowId: input.targetGrow?.id ?? null, growCount: input.growCount, growsLoading: input.growsLoading },
+    entity,
+  );
+  return {
+    blockSubmit: legacy.blockSubmit,
+    showLoading: legacy.showLoading,
+    showStartRoomHardStop: legacy.showStartRoomHardStop,
+    showPickSetupHint: legacy.showPickGrowHint,
+    startRoomHref: legacy.startRoomHref,
+    title: legacy.showLoading
+      ? growSetup.create.loadingTitle
+      : legacy.showStartRoomHardStop
+        ? growSetup.noSetup.title
+        : legacy.showPickGrowHint
+          ? growSetup.create.chooseTitle
+          : "",
+    body: legacy.showLoading
+      ? growSetup.create.loadingBody
+      : legacy.showStartRoomHardStop
+        ? growSetup.noSetup.body
+        : legacy.showPickGrowHint
+          ? growSetup.create.chooseBody
+          : "",
+    primaryLabel: legacy.showStartRoomHardStop || legacy.showPickGrowHint ? growSetup.noSetup.ctaStart : "",
+    secondaryLabel: growSetup.noSetup.ctaDismiss,
+    setupName: input.targetGrow?.name ?? null,
+  };
+}
+
+export type TentGrowCompatibility =
+  | { ok: true }
+  | { ok: false; reason: "missing_target" | "missing_setup" | "different_setup" };
+
+/** Spec tent/grow guard for default tent + target grow pairing. */
+export function checkTentGrowCompatibility(input: {
+  targetGrowId: string | null | undefined;
+  tent: { grow_id?: string | null } | null | undefined;
+}): TentGrowCompatibility {
+  const result = evaluateTentGrowCompatibility({
+    selectedTentId: input.tent ? "selected" : "none",
+    tentGrowId: input.tent?.grow_id ?? null,
+    targetGrowId: input.targetGrowId,
+  });
+  if (result.compatible) return { ok: true };
+  if (result.kind === "missing_target") return { ok: false, reason: "missing_target" };
+  if (result.kind === "orphan_tent") return { ok: false, reason: "missing_setup" };
+  return { ok: false, reason: "different_setup" };
 }
 
 /** True only when a non-empty grow id is ready for payload.grow_id. */

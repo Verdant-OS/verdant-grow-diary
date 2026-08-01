@@ -23,9 +23,15 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const uuid = z.string().regex(UUID_RE, "must be a UUID");
 
 /**
- * Outbound insert payload contract. Mirrors the plants-table NOT NULL/CHECK
- * columns. `plant_type` is required and canonicalized before it leaves the
- * client — "unknown" is a legitimate value, blank/garbage is not.
+ * Outbound insert payload contract for canonical client-created plants.
+ * Mirrors the plants-table NOT NULL/CHECK columns. `plant_type` is required
+ * and canonicalized before it leaves the client — "unknown" is a legitimate
+ * value, blank/garbage is not.
+ *
+ * `grow_id` is required for new inserts so canonical creation stays grow-bound.
+ * Legacy rows may still have null grow_id in the database; inbound response
+ * validation remains backward-compatible and does not reject those rows solely
+ * because grow_id is null.
  */
 export const PlantInsertPayloadSchema = z
   .object({
@@ -36,7 +42,7 @@ export const PlantInsertPayloadSchema = z
     health: z.enum(HEALTHS),
     plant_type: z.enum(PLANT_TYPE_VALUES as readonly [PlantType, ...PlantType[]]),
     tent_id: uuid.optional(),
-    grow_id: uuid.optional(),
+    grow_id: uuid,
     started_at: z.string().datetime().optional(),
   })
   .strict();

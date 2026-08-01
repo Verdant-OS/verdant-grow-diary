@@ -16,12 +16,29 @@ describe("validatePlantInsertPayload", () => {
     stage: "seedling",
     health: "healthy",
     plant_type: "unknown",
+    grow_id: UUID_B,
   };
 
-  it("accepts a canonical payload", () => {
+  it("accepts a grow-bound canonical payload", () => {
     const r = validatePlantInsertPayload(base);
     expect(r.ok).toBe(true);
     expect(r.value?.plant_type).toBe("unknown");
+    expect(r.value?.grow_id).toBe(UUID_B);
+  });
+
+  it("rejects a missing grow_id", () => {
+    const { grow_id: _growId, ...rest } = base;
+    expect(validatePlantInsertPayload(rest).ok).toBe(false);
+  });
+
+  it("rejects an invalid grow_id", () => {
+    expect(validatePlantInsertPayload({ ...base, grow_id: "not-uuid" }).ok).toBe(false);
+  });
+
+  it("keeps tent_id optional on a grow-bound payload", () => {
+    const r = validatePlantInsertPayload(base);
+    expect(r.ok).toBe(true);
+    expect(r.value?.tent_id).toBeUndefined();
   });
 
   it("rejects a missing name", () => {

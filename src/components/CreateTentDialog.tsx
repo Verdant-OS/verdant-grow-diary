@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
+import { useGrows } from "@/store/grows";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +28,16 @@ import { Link } from "react-router-dom";
 import { useTents } from "@/hooks/use-tents";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { evaluateTentCreationGate, FREE_TIER_UPGRADE_PATH } from "@/lib/entitlements/freeTierGates";
+import {
+  buildTentInsertPayload,
+  resolveCreateGrowBinding,
+  type CreateGrowOption,
+} from "@/lib/createGrowBindingRules";
+import {
+  growSetupMessages,
+} from "@/constants/growSetupMessages";
+
+const EMPTY_GROWS: CreateGrowOption[] = [];
 
 interface Props {
   trigger?: React.ReactNode;
@@ -36,6 +47,8 @@ interface Props {
   initiallyOpen?: boolean;
 }
 
+const EMPTY_FORM = { name: "", size: "", brand: "", stage: "seedling" };
+
 export default function CreateTentDialog({
   trigger,
   defaultGrowId,
@@ -44,12 +57,30 @@ export default function CreateTentDialog({
 }: Props) {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const {
+    grows: loadedGrows,
+    activeGrowId,
+    loading: growsLoading,
+    error: growsError,
+    refresh: refreshGrows,
+  } = useGrows();
+  const grows = loadedGrows ?? EMPTY_GROWS;
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ name: "", size: "", brand: "", stage: "seedling" });
+  const [form, setForm] = useState(EMPTY_FORM);
 
-  // Free-tier tent gate (multiTent=false → single tent). useTents already
-  // filters archived tents. Fails open while entitlements load.
+  const growBinding = useMemo(
+    () =>
+      resolveCreateGrowBinding({
+        grows,
+        growsLoading,
+        growsError,
+        requestedGrowId: defaultGrowId,
+        activeGrowId,
+      }),
+    [grows, growsLoading, growsError, defaultGrowId, activeGrowId],
+  );
+
   const { data: tents } = useTents();
   const {
     loading: entLoading,
@@ -61,8 +92,16 @@ export default function CreateTentDialog({
     (tents ?? []).length,
   );
 
+  useEffect(() => {
+    if (!open) {
+      setForm(EMPTY_FORM);
+      setBusy(false);
+    }
+  }, [open]);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (growBinding.kind !== "ready") return;
     if (!tentGate.allowed) {
       toast.error(tentGate.blockedCopy);
       return;
@@ -71,16 +110,16 @@ export default function CreateTentDialog({
       toast.error("Not signed in");
       return;
     }
-    setBusy(true);
-    const payload: Record<string, unknown> = {
+    const payload = buildTentInsertPayload(growBinding, {
       user_id: user.id,
       name: form.name.trim(),
       size: form.size.trim() || null,
       brand: form.brand.trim() || null,
       stage: form.stage,
-    };
-    // Preselect grow context when provided. RLS enforces ownership server-side.
-    if (defaultGrowId) payload.grow_id = defaultGrowId;
+    });
+    if (!payload) return;
+
+    setBusy(true);
     const { data, error } = await supabase
       .from("tents")
       .insert(payload as never)
@@ -95,24 +134,73 @@ export default function CreateTentDialog({
     trackFunnelEvent("tent_created");
     qc.invalidateQueries({ queryKey: ["tents"] });
     qc.invalidateQueries({ queryKey: ["grow", "tents"] });
-    setForm({ name: "", size: "", brand: "", stage: "seedling" });
+    setForm(EMPTY_FORM);
     setOpen(false);
     if (data && onCreated) onCreated(data as { id: string; name: string });
   }
 
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger ?? (
-          <Button size="sm" className="gradient-leaf text-primary-foreground gap-1">
-            <Plus className="h-4 w-4" /> New tent
+  function renderBody() {
+    if (growBinding.kind === "loading") {
+      return (
+        <p className="text-sm text-muted-foreground" data-testid="create-tent-loading">
+          Loading your current setup…
+        </p>
+      );
+    }
+
+    if (growBinding.kind === "read_error") {
+      return (
+        <div className="grid gap-3" data-testid="create-tent-read-error">
+          <p className="text-sm font-medium">{growSetupMessages.readError.title}</p>
+          <p className="text-xs text-muted-foreground">{growSetupMessages.readError.body}</p>
+          <Button type="button" variant="outline" onClick={() => void refreshGrows()}>
+            {growSetupMessages.readError.cta}
           </Button>
-        )}
-      </DialogTrigger>
-      <DialogContent className="glass max-w-md">
-        <DialogHeader>
-          <DialogTitle className="font-display">New tent</DialogTitle>
-        </DialogHeader>
+        </div>
+      );
+    }
+
+    if (growBinding.kind === "no_setup") {
+      return (
+        <div className="grid gap-3" data-testid="create-tent-no-setup">
+          <p className="text-sm font-medium">{growSetupMessages.noSetup.title}</p>
+          <p className="text-xs text-muted-foreground">{growSetupMessages.noSetup.body}</p>
+          <div className="flex gap-2">
+            <Button asChild className="gradient-leaf text-primary-foreground">
+              <Link to={growBinding.startHref}>{growSetupMessages.noSetup.ctaPrimary}</Link>
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              {growSetupMessages.noSetup.ctaSecondary}
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    if (
+      growBinding.kind === "requested_setup_unavailable" ||
+      growBinding.kind === "choose_setup"
+    ) {
+      return (
+        <div className="grid gap-3" data-testid="create-tent-setup-unavailable">
+          <p className="text-sm font-medium">{growSetupMessages.setupUnavailable.title}</p>
+          <p className="text-xs text-muted-foreground">{growSetupMessages.setupUnavailable.body}</p>
+          <Button asChild variant="outline">
+            <Link to={growBinding.chooseHref}>{growSetupMessages.setupUnavailable.cta}</Link>
+          </Button>
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <div
+          className="rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-xs"
+          data-testid="create-tent-setup-context"
+        >
+          <p className="font-medium">{growSetupMessages.create.addingTo(growBinding.setupName)}</p>
+          <p className="text-muted-foreground">{growSetupMessages.create.addingToHint}</p>
+        </div>
         <p className="text-xs text-muted-foreground -mt-1">
           Start simple. You can add size, brand, and stage later. Verdant works best once your first
           plant memory exists.
@@ -191,6 +279,24 @@ export default function CreateTentDialog({
             Create tent
           </Button>
         </form>
+      </>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        {trigger ?? (
+          <Button size="sm" className="gradient-leaf text-primary-foreground gap-1">
+            <Plus className="h-4 w-4" /> New tent
+          </Button>
+        )}
+      </DialogTrigger>
+      <DialogContent className="glass max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-display">New tent</DialogTitle>
+        </DialogHeader>
+        {renderBody()}
       </DialogContent>
     </Dialog>
   );

@@ -6,16 +6,18 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { stripSourceComments } from "./utils/stripSourceComments";
 
 const ROOT = resolve(__dirname, "../..");
 const PLANTS = readFileSync(resolve(ROOT, "src/pages/Plants.tsx"), "utf8");
 const TENTS = readFileSync(resolve(ROOT, "src/pages/Tents.tsx"), "utf8");
-const CREATE_PLANT = readFileSync(resolve(ROOT, "src/components/CreatePlantDialog.tsx"), "utf8");
-const CREATE_TENT = readFileSync(resolve(ROOT, "src/components/CreateTentDialog.tsx"), "utf8");
+const CREATE_PLANT = stripSourceComments(
+  readFileSync(resolve(ROOT, "src/components/CreatePlantDialog.tsx"), "utf8"),
+);
+const CREATE_TENT = stripSourceComments(
+  readFileSync(resolve(ROOT, "src/components/CreateTentDialog.tsx"), "utf8"),
+);
 
-// Same expression with or without Prettier's parentheses around the nullish
-// coalescing — the wiring pinned here (URL growId validated against the
-// RLS-loaded grows via useScopedGrow) is identical in both shapes.
 const VALID_GROW_ID_RE =
   /validGrowId\s*=\s*isValidScopedGrow\s*\?\s*\(?\s*urlGrowId\s*\?\?\s*undefined\s*\)?\s*:\s*undefined/;
 
@@ -38,30 +40,28 @@ describe("Plants/Tents — preselect grow on create", () => {
     expect(TENTS).toMatch(/<CreateTentDialog\b[\s\S]*?defaultGrowId=\{validGrowId\}/);
   });
 
-  it("CreatePlantDialog accepts defaultGrowId and writes grow_id on insert", () => {
-    expect(CREATE_PLANT).toMatch(/defaultGrowId\?\s*:\s*string/);
-    expect(CREATE_PLANT).toMatch(/payload\.grow_id\s*=\s*defaultGrowId/);
+  it("CreatePlantDialog resolves grow binding via useGrows and requires grow_id on insert", () => {
+    expect(CREATE_PLANT).toMatch(/useGrows\(\)/);
+    expect(CREATE_PLANT).toMatch(/resolveCreateGrowBinding/);
+    expect(CREATE_PLANT).toMatch(/grow_id:\s*growBinding\.growId/);
   });
 
-  it("CreatePlantDialog scopes tent options to the preselected grow", () => {
-    expect(CREATE_PLANT).toMatch(
-      /allTents[\s\S]*?\.filter\([\s\S]*?t\.grow_id\s*===\s*defaultGrowId/,
-    );
+  it("CreatePlantDialog scopes tent options to the resolved grow", () => {
+    expect(CREATE_PLANT).toMatch(/tent\.grow_id\s*===\s*growBinding\.growId/);
   });
 
-  it("CreateTentDialog accepts defaultGrowId and writes grow_id on insert", () => {
-    expect(CREATE_TENT).toMatch(/defaultGrowId\?\s*:\s*string/);
-    expect(CREATE_TENT).toMatch(/if\s*\(defaultGrowId\)\s*payload\.grow_id\s*=\s*defaultGrowId/);
+  it("CreateTentDialog resolves grow binding via useGrows and buildTentInsertPayload", () => {
+    expect(CREATE_TENT).toMatch(/useGrows\(\)/);
+    expect(CREATE_TENT).toMatch(/resolveCreateGrowBinding/);
+    expect(CREATE_TENT).toMatch(/buildTentInsertPayload/);
   });
 
-  it("Create dialogs do not run when invalid growId is passed (falsy validGrowId yields no grow_id)", () => {
-    // Both insert paths gate grow_id behind the truthy defaultGrowId prop.
-    expect(CREATE_PLANT).not.toMatch(/payload\.grow_id\s*=\s*growId/);
-    expect(CREATE_TENT).not.toMatch(/payload\.grow_id\s*=\s*growId/);
+  it("Create dialogs fail closed when grow binding is not ready", () => {
+    expect(CREATE_PLANT).toMatch(/growBinding\.kind\s*!==\s*"ready"/);
+    expect(CREATE_TENT).toMatch(/growBinding\.kind\s*!==\s*"ready"/);
   });
 
   it("Edit flows are not touched by URL growId (create dialogs only)", () => {
-    // The dialogs are creation-only; no edit-grow logic introduced.
     expect(CREATE_PLANT).not.toMatch(/update\(/);
     expect(CREATE_TENT).not.toMatch(/update\(/);
   });

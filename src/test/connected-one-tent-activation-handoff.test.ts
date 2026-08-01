@@ -43,10 +43,12 @@ describe("connected One-Tent activation handoff", () => {
     expect(PLANTS).toMatch(/new CustomEvent\(PLANT_QUICKLOG_PREFILL_EVENT/);
   });
 
-  it("keeps general-purpose creation nullable outside guided activation", () => {
+  it("keeps general-purpose creation tentless but grow-bound outside guided activation", () => {
     expect(TENT_DIALOG).toMatch(/initiallyOpen\s*=\s*false/);
     expect(PLANT_DIALOG).toMatch(/requireTent\s*=\s*false/);
     expect(PLANT_DIALOG).toMatch(/!requireTent\s*&&\s*<SelectItem value="none"/);
+    expect(PLANT_DIALOG).toMatch(/grow_id:\s*growBinding\.growId/);
+    expect(PLANT_DIALOG).toMatch(/resolveCreateGrowBinding/);
   });
 
   it("uses one relationship-aware Dashboard checklist and removes the duplicate", () => {

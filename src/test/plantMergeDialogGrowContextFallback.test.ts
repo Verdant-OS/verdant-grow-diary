@@ -71,14 +71,15 @@ describe("PlantMergeDialog grow-context fallback", () => {
 });
 
 describe("CreatePlantDialog grow-context hardening", () => {
-  it("derives grow_id from the selected tent when defaultGrowId is missing", () => {
-    expect(CREATE).toMatch(/selectedTent\?\.grow_id/);
-    expect(CREATE).toMatch(/payload\.grow_id\s*=\s*selectedTent\.grow_id/);
+  it("binds grow_id from verified grow binding instead of inferring from tent alone", () => {
+    expect(CREATE).toMatch(/resolveCreateGrowBinding/);
+    expect(CREATE).toMatch(/grow_id:\s*growBinding\.growId/);
+    expect(CREATE).not.toMatch(/payload\.grow_id\s*=\s*selectedTent\.grow_id/);
   });
 
-  it("still preserves defaultGrowId when explicitly preselected", () => {
-    expect(CREATE).toMatch(/if\s*\(defaultGrowId\)/);
-    expect(CREATE).toMatch(/payload\.grow_id\s*=\s*defaultGrowId/);
+  it("validates requested defaultGrowId against the RLS-loaded grow list", () => {
+    expect(CREATE).toMatch(/requestedGrowId:\s*defaultGrowId/);
+    expect(CREATE).toMatch(/growBinding\.kind\s*!==\s*"ready"/);
   });
 
   it("does not introduce any cross-grow override", () => {

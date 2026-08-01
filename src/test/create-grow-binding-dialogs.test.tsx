@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   tents: {
     data: [] as Array<{ id: string; name: string; grow_id: string | null }>,
     isLoading: false,
+    isFetching: false,
     isError: false,
     isFetched: true,
     refetch: vi.fn(async () => undefined),
@@ -105,6 +106,7 @@ beforeEach(() => {
   mocks.grows.error = null;
   mocks.tents.data = [];
   mocks.tents.isLoading = false;
+  mocks.tents.isFetching = false;
   mocks.tents.isError = false;
   mocks.tents.isFetched = true;
   mocks.inserts.length = 0;
@@ -267,6 +269,39 @@ describe("create dialogs — remaining fail-closed behavior", () => {
     expect(screen.getByTestId("create-plant-target-setup")).toHaveTextContent(
       "Adding to South Room",
     );
+    expect(mocks.inserts).toHaveLength(0);
+  });
+
+  it("reopen waits for a fresh supplied-tent read before remounting the nested creator", async () => {
+    useReadyGrow();
+    const compatibleTent = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+    mocks.tents.data = [{ id: compatibleTent, name: "Compatible Tent", grow_id: mocks.growId }];
+    const user = userEvent.setup();
+    const view = renderDialog(<CreatePlantDialog initiallyOpen defaultTentId={compatibleTent} />);
+
+    expect(await screen.findByRole("button", { name: "Add new tent" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close" }));
+
+    mocks.tents.isFetching = true;
+    view.rerenderDialog();
+    await user.click(screen.getByRole("button", { name: "New plant" }));
+
+    expect(screen.getByTestId("create-plant-tent-pending")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add new tent" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("plant-create-submit")).toBeDisabled();
+
+    mocks.tents.isFetching = false;
+    mocks.tents.isError = true;
+    view.rerenderDialog();
+    fireEvent.change(screen.getByPlaceholderText("Plant A"), {
+      target: { value: "Still blocked" },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("create-plant-tent-unavailable")).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("create-plant-tent-retry")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add new tent" })).not.toBeInTheDocument();
     expect(mocks.inserts).toHaveLength(0);
   });
 

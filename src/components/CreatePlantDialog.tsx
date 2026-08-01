@@ -114,6 +114,7 @@ export default function CreatePlantDialog({
   } = useTents();
   const [nestedTents, setNestedTents] = useState<TentRow[]>([]);
   const [pendingNestedTentId, setPendingNestedTentId] = useState<string | null>(null);
+  const [nestedTentCreatorMounted, setNestedTentCreatorMounted] = useState(false);
   const [tentSelectOpen, setTentSelectOpen] = useState(false);
   // Dialog-level pending flag for presenters; pure rules also receive tentsFetching.
   const tentsLoading = tentsQueryLoading || tentsFetching;
@@ -269,6 +270,13 @@ export default function CreatePlantDialog({
   const nestedTentCreateBlocked =
     suppliedTent.blockSubmit && !suppliedTent.allowCompatibleReplacement;
 
+  // Wait for the first authoritative supplied-tent read before adding a
+  // second tents observer for the nested creator. Once mounted, keep it mounted
+  // across refetch/error transitions so that observer cannot toggle itself.
+  useEffect(() => {
+    if (open && !nestedTentCreateBlocked) setNestedTentCreatorMounted(true);
+  }, [open, nestedTentCreateBlocked]);
+
   const formBlocked = binding.blockSubmit || !canWriteCreateGrowId(targetGrowId) || tentBlocksWrite;
 
   function handleOpenChange(next: boolean) {
@@ -278,6 +286,7 @@ export default function CreatePlantDialog({
       setForm(emptyForm(initialTentId));
       setNestedTents([]);
       setPendingNestedTentId(null);
+      setNestedTentCreatorMounted(false);
       setTentSelectOpen(false);
     }
   }
@@ -375,6 +384,7 @@ export default function CreatePlantDialog({
     setExplicitCompatiblePick(false);
     setNestedTents([]);
     setPendingNestedTentId(null);
+    setNestedTentCreatorMounted(false);
     setOpen(false);
     if (data && onCreated) onCreated(data as { id: string; name: string });
   }
@@ -657,19 +667,27 @@ export default function CreatePlantDialog({
                     ? ""
                     : " (optional)"}
                 </Label>
-                {!nestedTentCreateBlocked && (
+                {nestedTentCreatorMounted && (
                   <CreateTentDialog
                     defaultGrowId={targetGrowId ?? undefined}
                     onCreated={handleNestedTentCreated}
                     trigger={
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 px-2 gap-1 text-xs"
-                      >
-                        <Plus className="h-3 w-3" /> Add new tent
-                      </Button>
+                      nestedTentCreateBlocked ? (
+                        <span
+                          hidden
+                          aria-hidden="true"
+                          data-testid="create-plant-nested-tent-trigger-placeholder"
+                        />
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 gap-1 text-xs"
+                        >
+                          <Plus className="h-3 w-3" /> Add new tent
+                        </Button>
+                      )
                     }
                   />
                 )}

@@ -45,7 +45,9 @@ describe("Quick creation shortcuts — TentDetail → Add Plant", () => {
 
 describe("Quick creation shortcuts — CreatePlantDialog → Add new tent", () => {
   it("imports CreateTentDialog", () => {
-    expect(CREATE_PLANT).toMatch(/import CreateTentDialog from "@\/components\/CreateTentDialog"/);
+    expect(CREATE_PLANT).toMatch(
+      /import CreateTentDialog, \{ type CreatedTent \} from "@\/components\/CreateTentDialog"/,
+    );
   });
 
   it("renders an inline 'Add new tent' shortcut", () => {
@@ -53,15 +55,15 @@ describe("Quick creation shortcuts — CreatePlantDialog → Add new tent", () =
   });
 
   it("auto-selects the newly created tent on onCreated callback", () => {
-    expect(CREATE_PLANT).toMatch(/onCreated=\{\(t\)\s*=>\s*\{/);
-    expect(CREATE_PLANT).toMatch(/tent_id:\s*t\.id/);
+    expect(CREATE_PLANT).toMatch(/onCreated=\{handleNestedTentCreated\}/);
+    expect(CREATE_PLANT).toMatch(/setPendingNestedTentId\(tent\.id\)/);
     expect(CREATE_PLANT).toMatch(/setExplicitCompatiblePick\(true\)/);
   });
 
   it("preserves plant form data via functional setState (no full reset)", () => {
     // The onCreated callback must use the functional setter so other entered
     // fields (name/strain/etc.) are preserved when a tent is created mid-flow.
-    expect(CREATE_PLANT).toMatch(/setForm\(\(f\)\s*=>\s*\(\{\s*\.\.\.f/);
+    expect(CREATE_PLANT).toMatch(/setForm\(\(current\)\s*=>\s*\(\{\s*\.\.\.current/);
   });
 
   it("shows an empty-state hint when no tents exist", () => {
@@ -77,15 +79,20 @@ describe("Quick creation shortcuts — CreatePlantDialog → Add new tent", () =
 
 describe("Quick creation shortcuts — CreateTentDialog onCreated contract", () => {
   it("exposes an optional onCreated callback in its Props", () => {
-    expect(CREATE_TENT).toMatch(/onCreated\?:\s*\(tent:\s*\{\s*id:\s*string;\s*name:\s*string\s*\}\)\s*=>\s*void/);
+    expect(CREATE_TENT).toMatch(/export interface CreatedTent[\s\S]*?grow_id:\s*string/);
+    expect(CREATE_TENT).toMatch(/onCreated\?:\s*\(tent:\s*CreatedTent\)\s*=>\s*void/);
   });
 
-  it("returns the inserted row via select(\"id, name\").single()", () => {
-    expect(CREATE_TENT).toMatch(/\.insert\(payload as never\)\s*\.select\("id, name"\)\s*\.single\(\)/);
+  it("returns the inserted row with its verified setup binding", () => {
+    expect(CREATE_TENT).toMatch(
+      /\.insert\(payload as never\)\s*\.select\("id, name, grow_id"\)\s*\.single\(\)/,
+    );
   });
 
   it("invokes onCreated only on successful insert", () => {
-    expect(CREATE_TENT).toMatch(/if\s*\(data\s*&&\s*onCreated\)\s*onCreated\(data as \{ id: string; name: string \}\)/);
+    expect(CREATE_TENT).toMatch(
+      /if\s*\(data\s*&&\s*onCreated\)\s*onCreated\(data as CreatedTent\)/,
+    );
   });
 });
 

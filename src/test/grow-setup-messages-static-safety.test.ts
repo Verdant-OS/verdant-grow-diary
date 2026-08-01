@@ -35,6 +35,13 @@ describe("grow setup messages static safety", () => {
     expect(PLANT).toMatch(/create-plant-retry/);
   });
 
+  it("pins both supplied-tent recovery actions", () => {
+    expect(GROW_SETUP_MESSAGES.chooseTent).toBe("Choose another tent");
+    expect(GROW_SETUP_MESSAGES.switchSetup).toBe("Switch setup");
+    expect(PLANT).toMatch(/GROW_SETUP_MESSAGES\.chooseTent/);
+    expect(PLANT).toMatch(/GROW_SETUP_MESSAGES\.switchSetup/);
+  });
+
   it("rules module stays pure", () => {
     expect(RULES).not.toMatch(/from ["']react["']|from ["']@\/integrations\/supabase/);
   });

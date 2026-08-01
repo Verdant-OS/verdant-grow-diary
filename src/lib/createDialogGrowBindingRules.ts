@@ -10,6 +10,8 @@
  * Pure: no React, no Supabase.
  */
 import {
+  GROW_SETUP_CHOOSE_SETUP_HREF,
+  GROW_SETUP_GENERIC_NAME,
   GROW_SETUP_MESSAGES,
   GROW_SETUP_START_ROOM_HREF,
 } from "@/constants/growSetupMessages";
@@ -35,13 +37,20 @@ function trimId(value: unknown): string | null {
   return t.length > 0 ? t : null;
 }
 
+const UUID_LIKE = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+
+function exactlyOneById<T extends { id: string }>(id: string, rows: readonly T[]): T | null {
+  const matches = rows.filter((row) => trimId(row.id) === id);
+  return matches.length === 1 ? matches[0] : null;
+}
+
 export function isKnownGrowId(
   growId: string | null | undefined,
   grows: readonly GrowListItem[],
 ): boolean {
   const id = trimId(growId);
   if (!id) return false;
-  return grows.some((g) => g.id === id);
+  return exactlyOneById(id, grows) !== null;
 }
 
 export interface ResolveCreateTargetGrowResult {
@@ -68,12 +77,6 @@ export function resolveCreateTargetGrowId(input: {
   const explicitRequest = !!page;
 
   if (input.growsLoading || input.growsError) {
-    if (page && isKnownGrowId(page, input.grows)) {
-      return { targetGrowId: page, requestedSetupUnavailable: false, explicitRequest };
-    }
-    if (!page && active && isKnownGrowId(active, input.grows)) {
-      return { targetGrowId: active, requestedSetupUnavailable: false, explicitRequest };
-    }
     return { targetGrowId: null, requestedSetupUnavailable: false, explicitRequest };
   }
 
@@ -96,9 +99,11 @@ export function resolveSetupName(
 ): string | null {
   const id = trimId(growId);
   if (!id) return null;
-  const hit = grows.find((g) => g.id === id);
+  const hit = exactlyOneById(id, grows);
+  if (!hit) return null;
   const name = hit?.name?.trim();
-  return name && name.length > 0 ? name : null;
+  if (!name || name === id || UUID_LIKE.test(name)) return GROW_SETUP_GENERIC_NAME;
+  return name;
 }
 
 export interface CreateGrowBindingView {
@@ -117,6 +122,8 @@ export interface CreateGrowBindingView {
   primaryCta: string;
   secondaryCta: string;
   retryLabel: string;
+  chooseSetupHref: string;
+  chooseSetupLabel: string;
 }
 
 export function buildCreateGrowBindingView(
@@ -134,6 +141,8 @@ export function buildCreateGrowBindingView(
   const base = {
     targetGrowId: resolved.targetGrowId,
     startRoomHref: GROW_SETUP_START_ROOM_HREF,
+    chooseSetupHref: GROW_SETUP_CHOOSE_SETUP_HREF,
+    chooseSetupLabel: GROW_SETUP_MESSAGES.chooseSetupCta,
     primaryCta: GROW_SETUP_MESSAGES.hardStopCta,
     secondaryCta: GROW_SETUP_MESSAGES.hardStopSecondary,
     retryLabel: GROW_SETUP_MESSAGES.readErrorRetry,
@@ -155,7 +164,7 @@ export function buildCreateGrowBindingView(
     };
   }
 
-  if (input.growsLoading && growCount === 0) {
+  if (input.growsLoading) {
     return {
       ...base,
       kind: "loading",
@@ -187,7 +196,7 @@ export function buildCreateGrowBindingView(
     };
   }
 
-  if (!input.growsLoading && growCount === 0) {
+  if (growCount === 0) {
     return {
       ...base,
       kind: "no_setup",
@@ -240,13 +249,7 @@ export function canWriteCreateGrowId(targetGrowId: string | null | undefined): b
 
 // --- Supplied / selected tent contract ------------------------------------
 
-export type SuppliedTentKind =
-  | "none"
-  | "pending"
-  | "unavailable"
-  | "orphan"
-  | "mismatch"
-  | "ready";
+export type SuppliedTentKind = "none" | "pending" | "unavailable" | "orphan" | "mismatch" | "ready";
 
 export interface SuppliedTentView {
   kind: SuppliedTentKind;
@@ -477,8 +480,9 @@ export function evaluateTentGrowCompatibility(input: {
 }
 
 /**
- * Initial tent form value. Supplied tent is preserved until known-compatible;
- * never silent "none" while a supplied tent is still required.
+ * Initial tent form value. Only a verified compatible tent may survive into
+ * form state; presenter conflict state remains responsible for blocking an
+ * unsafe supplied tent until the grower picks a compatible replacement.
  */
 export function resolveInitialPlantTentId(input: {
   defaultTentId?: string | null;
@@ -503,9 +507,7 @@ export function resolveInitialPlantTentId(input: {
     targetGrowId: input.targetGrowId,
   });
 
-  if (supplied.kind === "ready") return tentId;
-  if (supplied.kind !== "none") return tentId;
-  return "none";
+  return supplied.kind === "ready" ? tentId : "none";
 }
 
 export function plantCreateAllowsTentless(input: {

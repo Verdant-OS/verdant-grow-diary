@@ -6,9 +6,13 @@ import {
   evaluateTentGrowCompatibility,
   evaluateSuppliedTentBinding,
   resolveInitialPlantTentId,
+  resolveSetupName,
   plantCreateAllowsTentless,
 } from "@/lib/createDialogGrowBindingRules";
-import { GROW_SETUP_START_ROOM_HREF } from "@/constants/growSetupMessages";
+import {
+  GROW_SETUP_CHOOSE_SETUP_HREF,
+  GROW_SETUP_START_ROOM_HREF,
+} from "@/constants/growSetupMessages";
 
 const grows = [
   { id: "g1", name: "Spring" },
@@ -49,6 +53,22 @@ describe("resolveCreateTargetGrowId", () => {
     expect(r.targetGrowId).toBeNull();
     expect(r.requestedSetupUnavailable).toBe(true);
     expect(r.explicitRequest).toBe(true);
+  });
+
+  it("fails closed when the requested id appears more than once", () => {
+    const r = resolveCreateTargetGrowId({
+      pageDefaultGrowId: "g1",
+      activeGrowId: "g2",
+      grows: [...grows, { id: "g1", name: "Duplicate" }],
+    });
+    expect(r.targetGrowId).toBeNull();
+    expect(r.requestedSetupUnavailable).toBe(true);
+  });
+
+  it("uses generic presenter copy for blank or id-shaped setup names", () => {
+    const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    expect(resolveSetupName(id, [{ id, name: "" }])).toBe("your current setup");
+    expect(resolveSetupName(id, [{ id, name: id }])).toBe("your current setup");
   });
 });
 
@@ -98,6 +118,21 @@ describe("buildCreateGrowBindingView", () => {
     expect(v.showStartRoomHardStop).toBe(false);
   });
 
+  it("blocks while loading even when cached grows still exist", () => {
+    const v = buildCreateGrowBindingView(
+      {
+        pageDefaultGrowId: "g1",
+        activeGrowId: "g1",
+        grows,
+        growsLoading: true,
+      },
+      "tent",
+    );
+    expect(v.kind).toBe("loading");
+    expect(v.targetGrowId).toBeNull();
+    expect(v.blockSubmit).toBe(true);
+  });
+
   it("blocks when grows exist but no resolvable target", () => {
     const v = buildCreateGrowBindingView(
       { pageDefaultGrowId: null, activeGrowId: null, grows },
@@ -124,6 +159,7 @@ describe("buildCreateGrowBindingView", () => {
     );
     expect(v.kind).toBe("requested_setup_unavailable");
     expect(v.targetGrowId).toBeNull();
+    expect(v.chooseSetupHref).toBe(GROW_SETUP_CHOOSE_SETUP_HREF);
   });
 });
 
@@ -171,7 +207,7 @@ describe("supplied tent contract", () => {
     ).toBe("mismatch");
   });
 
-  it("resolveInitialPlantTentId preserves supplied id while pending", () => {
+  it("resolveInitialPlantTentId clears a supplied id while pending", () => {
     expect(
       resolveInitialPlantTentId({
         defaultTentId: "t1",
@@ -179,7 +215,7 @@ describe("supplied tent contract", () => {
         tentsLoaded: false,
         targetGrowId: "g1",
       }),
-    ).toBe("t1");
+    ).toBe("none");
   });
 
   it("requireTentForWrite blocks none when supplied", () => {

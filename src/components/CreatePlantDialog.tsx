@@ -98,6 +98,7 @@ export default function CreatePlantDialog({
   const {
     data: allTents = [],
     isLoading: tentsLoading,
+    isFetching: tentsFetching,
     isError: tentsError,
     isFetched: tentsFetched,
     refetch: refetchTents,
@@ -123,15 +124,12 @@ export default function CreatePlantDialog({
     [defaultGrowId, activeGrowId, grows, growsLoading, growsError],
   );
   const targetGrowId = binding.targetGrowId;
-  const setupName = useMemo(
-    () => resolveSetupName(targetGrowId, grows),
-    [targetGrowId, grows],
-  );
+  const setupName = useMemo(() => resolveSetupName(targetGrowId, grows), [targetGrowId, grows]);
 
   const tentRows = allTents as TentRow[];
   const tentsLoaded = tentsFetched && !tentsLoading;
   const suppliedTentRow = defaultTentId
-    ? tentRows.find((t) => t.id === defaultTentId) ?? null
+    ? (tentRows.find((t) => t.id === defaultTentId) ?? null)
     : null;
 
   const suppliedTent = useMemo(
@@ -139,6 +137,7 @@ export default function CreatePlantDialog({
       evaluateSuppliedTentBinding({
         suppliedTentId: defaultTentId,
         tentsLoading,
+        tentsFetching,
         tentsError,
         tentsLoaded,
         suppliedTentRow: suppliedTentRow
@@ -146,21 +145,28 @@ export default function CreatePlantDialog({
           : null,
         targetGrowId,
       }),
-    [defaultTentId, tentsLoading, tentsError, tentsLoaded, suppliedTentRow, targetGrowId],
+    [
+      defaultTentId,
+      tentsLoading,
+      tentsFetching,
+      tentsError,
+      tentsLoaded,
+      suppliedTentRow,
+      targetGrowId,
+    ],
   );
 
   const requireTentForWrite =
     requireTent || !!defaultTentId || suppliedTent.requireCompatibleTentSelection;
 
-  const tents = targetGrowId
-    ? tentRows.filter((t) => t.grow_id === targetGrowId)
-    : tentRows;
+  const tents = targetGrowId ? tentRows.filter((t) => t.grow_id === targetGrowId) : tentRows;
 
   const initialTentId = resolveInitialPlantTentId({
     defaultTentId,
     tentGrowId: suppliedTentRow?.grow_id ?? null,
     targetGrowId,
     tentsLoading,
+    tentsFetching,
     tentsError,
     tentsLoaded,
   });
@@ -177,16 +183,18 @@ export default function CreatePlantDialog({
     if (defaultTentId && form.tent_id === "none" && !explicitCompatiblePick) {
       setForm((f) => ({ ...f, tent_id: defaultTentId }));
     }
-    if (suppliedTent.kind === "ready" && form.tent_id !== defaultTentId && !explicitCompatiblePick) {
+    if (
+      suppliedTent.kind === "ready" &&
+      form.tent_id !== defaultTentId &&
+      !explicitCompatiblePick
+    ) {
       setForm((f) => ({ ...f, tent_id: defaultTentId! }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultTentId, suppliedTent.kind, targetGrowId]);
 
   const selectedTentGrowId =
-    form.tent_id !== "none"
-      ? tentRows.find((t) => t.id === form.tent_id)?.grow_id ?? null
-      : null;
+    form.tent_id !== "none" ? (tentRows.find((t) => t.id === form.tent_id)?.grow_id ?? null) : null;
 
   const tentCompat = evaluateTentGrowCompatibility({
     selectedTentId: form.tent_id,
@@ -201,18 +209,21 @@ export default function CreatePlantDialog({
         requireTent ||
         !!defaultTentId),
     tentsLoading,
+    tentsFetching,
   });
 
+  // Pending always blocks. Unavailable/orphan/mismatch clear only after a
+  // verified compatible replacement (explicitCompatiblePick), never via tentless.
   const tentBlocksWrite =
-    suppliedTent.blockSubmit &&
-    (suppliedTent.kind === "pending" ||
-      suppliedTent.kind === "unavailable" ||
-      ((suppliedTent.kind === "orphan" || suppliedTent.kind === "mismatch") &&
-        !explicitCompatiblePick)) ||
+    (suppliedTent.blockSubmit &&
+      (suppliedTent.kind === "pending" ||
+        ((suppliedTent.kind === "unavailable" ||
+          suppliedTent.kind === "orphan" ||
+          suppliedTent.kind === "mismatch") &&
+          !explicitCompatiblePick))) ||
     tentCompat.blockSubmit;
 
-  const formBlocked =
-    binding.blockSubmit || !canWriteCreateGrowId(targetGrowId) || tentBlocksWrite;
+  const formBlocked = binding.blockSubmit || !canWriteCreateGrowId(targetGrowId) || tentBlocksWrite;
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
@@ -438,7 +449,7 @@ export default function CreatePlantDialog({
             <span className="text-muted-foreground">{suppliedTent.body}</span>
           </p>
         )}
-        {suppliedTent.kind === "unavailable" && (
+        {suppliedTent.kind === "unavailable" && !explicitCompatiblePick && (
           <div
             className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs space-y-2"
             data-testid="create-plant-tent-unavailable"
@@ -487,18 +498,16 @@ export default function CreatePlantDialog({
               <span className="text-muted-foreground">{suppliedTent.body}</span>
             </p>
           )}
-        {!tentCompat.compatible &&
-          form.tent_id !== "none" &&
-          suppliedTent.kind === "ready" && (
-            <p
-              className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"
-              data-testid="create-plant-tent-compat"
-              role="alert"
-            >
-              <span className="font-semibold block">{tentCompat.title}</span>
-              <span className="text-muted-foreground">{tentCompat.body}</span>
-            </p>
-          )}
+        {!tentCompat.compatible && form.tent_id !== "none" && suppliedTent.kind === "ready" && (
+          <p
+            className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"
+            data-testid="create-plant-tent-compat"
+            role="alert"
+          >
+            <span className="font-semibold block">{tentCompat.title}</span>
+            <span className="text-muted-foreground">{tentCompat.body}</span>
+          </p>
+        )}
 
         {!binding.blockSubmit && (
           <form onSubmit={submit} className="grid gap-3" data-testid="create-plant-form">

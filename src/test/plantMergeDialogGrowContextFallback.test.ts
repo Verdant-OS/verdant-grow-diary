@@ -71,10 +71,14 @@ describe("PlantMergeDialog grow-context fallback", () => {
 });
 
 describe("CreatePlantDialog grow-context hardening", () => {
-  it("always writes grow_id from resolved target (page default or active setup)", () => {
+  it("always writes grow_id from fail-closed binding view (never active-fallback escape)", () => {
+    // Pin the post-#645 binding owner — not the pre-refactor resolver call site.
     expect(CREATE).toMatch(/buildCreateGrowBindingView/);
     expect(CREATE).toMatch(/grow_id:\s*targetGrowId/);
-    expect(CREATE).toMatch(/canWriteCreateGrowId|formBlocked/);
+    expect(CREATE).toMatch(/formBlocked/);
+    expect(CREATE).toMatch(/canWriteCreateGrowId\(targetGrowId\)/);
+    // Component must not call the resolver directly (binding view owns fallback rules).
+    expect(CREATE).not.toMatch(/resolveCreateTargetGrowId\s*\(/);
   });
 
   it("still prefers page defaultGrowId via resolver (URL activation path)", () => {
@@ -84,6 +88,11 @@ describe("CreatePlantDialog grow-context hardening", () => {
 
   it("does not introduce any cross-grow override", () => {
     expect(CREATE).not.toMatch(/allowCrossGrow/);
+  });
+
+  it("treats tent background refetch as pending (cached rows are not verified)", () => {
+    expect(CREATE).toMatch(/isFetching:\s*tentsFetching/);
+    expect(CREATE).toMatch(/tentsFetching/);
   });
 });
 

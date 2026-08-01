@@ -9,20 +9,12 @@
  *
  * Pure: no React, no Supabase.
  */
-import {
-  GROW_SETUP_MESSAGES,
-  GROW_SETUP_START_ROOM_HREF,
-} from "@/constants/growSetupMessages";
+import { GROW_SETUP_MESSAGES, GROW_SETUP_START_ROOM_HREF } from "@/constants/growSetupMessages";
 
 export type CreateBindingEntity = "tent" | "plant";
 
 export type CreateGrowBindingKind =
-  | "loading"
-  | "read_error"
-  | "no_setup"
-  | "requested_setup_unavailable"
-  | "choose_setup"
-  | "ready";
+  "loading" | "read_error" | "no_setup" | "requested_setup_unavailable" | "choose_setup" | "ready";
 
 export interface GrowListItem {
   id: string;
@@ -240,13 +232,7 @@ export function canWriteCreateGrowId(targetGrowId: string | null | undefined): b
 
 // --- Supplied / selected tent contract ------------------------------------
 
-export type SuppliedTentKind =
-  | "none"
-  | "pending"
-  | "unavailable"
-  | "orphan"
-  | "mismatch"
-  | "ready";
+export type SuppliedTentKind = "none" | "pending" | "unavailable" | "orphan" | "mismatch" | "ready";
 
 export interface SuppliedTentView {
   kind: SuppliedTentKind;
@@ -265,6 +251,8 @@ export interface SuppliedTentView {
 export function evaluateSuppliedTentBinding(input: {
   suppliedTentId?: string | null;
   tentsLoading?: boolean;
+  /** Background refetch must stay pending — cached rows are not yet revalidated. */
+  tentsFetching?: boolean;
   tentsError?: boolean;
   suppliedTentRow?: { id: string; grow_id?: string | null } | null;
   targetGrowId?: string | null;
@@ -295,7 +283,8 @@ export function evaluateSuppliedTentBinding(input: {
     };
   }
 
-  if (input.tentsLoading || !input.tentsLoaded) {
+  // Initial load OR background refetch: never treat cached rows as verified.
+  if (input.tentsLoading || input.tentsFetching || !input.tentsLoaded) {
     return {
       kind: "pending",
       tentId: supplied,
@@ -396,10 +385,11 @@ export function evaluateTentGrowCompatibility(input: {
   /** When true (Add Plant to This Tent), "none" is not an allowed escape. */
   requireTentForWrite?: boolean;
   tentsLoading?: boolean;
+  tentsFetching?: boolean;
 }): TentCompatibilityResult {
   const tentId = trimId(input.selectedTentId);
 
-  if (input.tentsLoading && tentId && tentId !== "none") {
+  if ((input.tentsLoading || input.tentsFetching) && tentId && tentId !== "none") {
     return {
       kind: "pending",
       compatible: false,
@@ -485,21 +475,22 @@ export function resolveInitialPlantTentId(input: {
   tentGrowId?: string | null;
   targetGrowId?: string | null;
   tentsLoading?: boolean;
+  tentsFetching?: boolean;
   tentsError?: boolean;
   tentsLoaded?: boolean;
 }): string {
   const tentId = trimId(input.defaultTentId);
   if (!tentId) return "none";
 
+  const tentsSettled = !!input.tentsLoaded && !input.tentsLoading && !input.tentsFetching;
+
   const supplied = evaluateSuppliedTentBinding({
     suppliedTentId: tentId,
     tentsLoading: input.tentsLoading,
+    tentsFetching: input.tentsFetching,
     tentsError: input.tentsError,
     tentsLoaded: input.tentsLoaded,
-    suppliedTentRow:
-      input.tentsLoaded && !input.tentsLoading
-        ? { id: tentId, grow_id: input.tentGrowId ?? null }
-        : null,
+    suppliedTentRow: tentsSettled ? { id: tentId, grow_id: input.tentGrowId ?? null } : null,
     targetGrowId: input.targetGrowId,
   });
 

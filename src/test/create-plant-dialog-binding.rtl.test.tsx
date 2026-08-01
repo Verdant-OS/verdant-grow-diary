@@ -59,6 +59,7 @@ vi.mock("@/store/grows", () => ({
 const tentsState = vi.hoisted(() => ({
   data: [] as Array<{ id: string; name: string; grow_id: string | null }>,
   isLoading: false,
+  isFetching: false,
   isError: false,
   isFetched: true,
   refetch: vi.fn(),
@@ -83,11 +84,25 @@ vi.mock("@/lib/entitlements/freeTierGates", () => ({
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
+vi.mock("@/components/CreateTentDialog", () => ({
+  default: ({ onCreated }: { onCreated?: (t: { id: string; name: string }) => void }) => (
+    <button
+      type="button"
+      data-testid="mock-create-tent"
+      onClick={() => onCreated?.({ id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", name: "Tent B" })}
+    >
+      Add new tent
+    </button>
+  ),
+}));
+
 import CreatePlantDialog from "@/components/CreatePlantDialog";
 
 const G1 = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const T1 = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const T2 = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 const T_ORPHAN = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+const T_GONE = "ffffffff-ffff-4fff-8fff-ffffffffffff";
 
 function renderDialog(props: {
   defaultGrowId?: string;
@@ -116,9 +131,11 @@ beforeEach(() => {
   growsState.refresh = vi.fn();
   tentsState.data = [
     { id: T1, name: "Tent A", grow_id: G1 },
+    { id: T2, name: "Tent B", grow_id: G1 },
     { id: T_ORPHAN, name: "Orphan", grow_id: null },
   ];
   tentsState.isLoading = false;
+  tentsState.isFetching = false;
   tentsState.isError = false;
   tentsState.isFetched = true;
   tentsState.refetch = vi.fn();
@@ -151,9 +168,7 @@ describe("CreatePlantDialog RTL binding", () => {
   it("debounces grow Retry — multi-click fires refresh once", async () => {
     growsState.grows = [];
     growsState.error = "rls failed";
-    const slow = vi.fn(
-      () => new Promise<void>((resolve) => setTimeout(resolve, 80)),
-    );
+    const slow = vi.fn(() => new Promise<void>((resolve) => setTimeout(resolve, 80)));
     growsState.refresh = slow;
     renderDialog({});
     const btn = screen.getByTestId("create-plant-retry");
@@ -182,6 +197,42 @@ describe("CreatePlantDialog RTL binding", () => {
     await userEvent.type(screen.getByTestId("create-plant-name"), "Plant X");
     await userEvent.click(submit);
     expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps supplied tent pending during background refetch — cached row is not trusted", async () => {
+    tentsState.isLoading = false;
+    tentsState.isFetching = true;
+    tentsState.isFetched = true;
+    renderDialog({ defaultGrowId: G1, defaultTentId: T1 });
+    expect(screen.getByTestId("create-plant-tent-pending")).toBeInTheDocument();
+    const submit = screen.getByTestId("plant-create-submit");
+    expect(submit).toBeDisabled();
+    await userEvent.type(screen.getByTestId("create-plant-name"), "Stale Cache");
+    await userEvent.click(submit);
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("unavailable supplied tent can recover via verified compatible replacement", async () => {
+    renderDialog({ defaultGrowId: G1, defaultTentId: T_GONE });
+    expect(screen.getByTestId("create-plant-tent-unavailable")).toBeInTheDocument();
+    expect(screen.getByTestId("plant-create-submit")).toBeDisabled();
+
+    // CreateTentDialog onCreated is the supported recovery path in jsdom
+    // (Radix Select pointer-capture is unavailable here).
+    await userEvent.click(screen.getByTestId("mock-create-tent"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("create-plant-tent-unavailable")).toBeNull();
+    });
+    expect(screen.getByTestId("plant-create-submit")).not.toBeDisabled();
+    await userEvent.type(screen.getByTestId("create-plant-name"), "Recovered");
+    await userEvent.click(screen.getByTestId("plant-create-submit"));
+    await waitFor(() => {
+      expect(insertMock).toHaveBeenCalled();
+    });
+    const payload = insertMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload.grow_id).toBe(G1);
+    expect(payload.tent_id).toBe(T2);
   });
 
   it("orphan supplied tent cannot tentless-insert", async () => {

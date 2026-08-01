@@ -140,6 +140,20 @@ describe("supplied tent contract", () => {
     expect(s.tentId).toBe("t1");
   });
 
+  it("keeps supplied tent pending while cached tents refetch (isFetching)", () => {
+    const s = evaluateSuppliedTentBinding({
+      suppliedTentId: "t1",
+      tentsLoading: false,
+      tentsFetching: true,
+      tentsLoaded: true,
+      suppliedTentRow: { id: "t1", grow_id: "g1" },
+      targetGrowId: "g1",
+    });
+    expect(s.kind).toBe("pending");
+    expect(s.blockSubmit).toBe(true);
+    expect(s.tentId).toBe("t1");
+  });
+
   it("blocks tent read error with retry", () => {
     const s = evaluateSuppliedTentBinding({
       suppliedTentId: "t1",

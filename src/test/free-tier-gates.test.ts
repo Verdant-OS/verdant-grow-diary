@@ -130,7 +130,7 @@ describe("static wiring — the gates are actually read at the creation seams", 
   it("CreateTentDialog evaluates the tent gate, guards submit(), and gates the CTA", () => {
     expect(TENT_DIALOG).toMatch(/evaluateTentCreationGate\(/);
     expect(TENT_DIALOG).toMatch(/if \(!tentGate\.allowed\)/);
-    expect(TENT_DIALOG).toMatch(/disabled=\{busy \|\| !tentGate\.allowed\}/);
+    expect(TENT_DIALOG).toMatch(/disabled=\{busy \|\| !tentGate\.allowed \|\| hardStop\.blockSubmit\}/);
     expect(TENT_DIALOG).toMatch(/tent-create-gate-notice/);
   });
 

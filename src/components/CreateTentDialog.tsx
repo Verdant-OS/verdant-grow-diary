@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -28,8 +28,13 @@ import { Link } from "react-router-dom";
 import { useTents } from "@/hooks/use-tents";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { evaluateTentCreationGate, FREE_TIER_UPGRADE_PATH } from "@/lib/entitlements/freeTierGates";
-import { buildTentInsertPayload, resolveCreateGrowBinding } from "@/lib/createGrowBindingRules";
-import { growSetupMessages } from "@/constants/growSetupMessages";
+import {
+  buildCreateGrowBindingHardStop,
+  canWriteCreateGrowId,
+  resolveCreateTargetGrowId,
+  resolveSetupName,
+} from "@/lib/createDialogGrowBindingRules";
+import { GROW_SETUP_MESSAGES } from "@/constants/growSetupMessages";
 
 interface Props {
   trigger?: React.ReactNode;
@@ -41,7 +46,7 @@ interface Props {
   onOpenChange?: (open: boolean) => void;
 }
 
-const INITIAL_FORM = { name: "", size: "", brand: "", stage: "seedling" };
+const EMPTY_TENT_FORM = { name: "", size: "", brand: "", stage: "seedling" };
 
 export default function CreateTentDialog({
   trigger,
@@ -51,11 +56,34 @@ export default function CreateTentDialog({
   onOpenChange,
 }: Props) {
   const { user } = useAuth();
+  const { grows = [], activeGrowId, loading: growsLoading } = useGrows();
   const qc = useQueryClient();
   const { grows, activeGrowId, loading: growsLoading, error: growsError, refresh } = useGrows();
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ name: "", size: "", brand: "", stage: "seedling" });
+  const [form, setForm] = useState(EMPTY_TENT_FORM);
+
+  const targetGrowId = useMemo(
+    () =>
+      resolveCreateTargetGrowId({
+        pageDefaultGrowId: defaultGrowId,
+        activeGrowId,
+        grows,
+      }),
+    [defaultGrowId, activeGrowId, grows],
+  );
+  const hardStop = useMemo(
+    () =>
+      buildCreateGrowBindingHardStop(
+        { targetGrowId, growCount: grows.length, growsLoading },
+        "tent",
+      ),
+    [targetGrowId, grows.length, growsLoading],
+  );
+  const setupName = useMemo(
+    () => resolveSetupName(targetGrowId, grows),
+    [targetGrowId, grows],
+  );
 
   // Every tent creation binds to a verified current setup or fails closed.
   // The requested grow (when a caller preselects one) is matched against the
@@ -81,11 +109,13 @@ export default function CreateTentDialog({
     (tents ?? []).length,
   );
 
-  // Cancel/close/reopen must derive a fresh safe initial state.
+  function resetForm() {
+    setForm(EMPTY_TENT_FORM);
+  }
+
   function handleOpenChange(next: boolean) {
     setOpen(next);
-    onOpenChange?.(next);
-    if (!next) setForm({ ...INITIAL_FORM });
+    if (!next) resetForm();
   }
 
   async function submit(e: React.FormEvent) {
@@ -102,20 +132,20 @@ export default function CreateTentDialog({
       toast.error("Not signed in");
       return;
     }
-    // Only a ready binding can produce an insert payload; every canonical
-    // tent insert carries the verified resolved grow id.
-    const built = buildTentInsertPayload(binding, user.id, {
-      name: form.name,
-      size: form.size.trim() || null,
-      brand: form.brand.trim() || null,
-      stage: form.stage,
-    });
-    if (!built.ok) {
-      toast.error(growSetupMessages.setupUnavailable.body);
+    if (hardStop.blockSubmit || !canWriteCreateGrowId(targetGrowId)) {
+      if (hardStop.toastMessage) toast.error(hardStop.toastMessage);
       return;
     }
     setBusy(true);
-    const payload = built.payload;
+    const payload: Record<string, unknown> = {
+      user_id: user.id,
+      name: form.name.trim(),
+      size: form.size.trim() || null,
+      brand: form.brand.trim() || null,
+      stage: form.stage,
+      // Fail closed: always write grow_id when submitting.
+      grow_id: targetGrowId,
+    };
     const { data, error } = await supabase
       .from("tents")
       .insert(payload as never)
@@ -130,8 +160,8 @@ export default function CreateTentDialog({
     trackFunnelEvent("tent_created");
     qc.invalidateQueries({ queryKey: ["tents"] });
     qc.invalidateQueries({ queryKey: ["grow", "tents"] });
-    // Notify the parent before closing so nested CreatePlantDialog can
-    // preserve its form fields while the tent dialog is still considered open.
+    resetForm();
+    setOpen(false);
     if (data && onCreated) onCreated(data as { id: string; name: string });
     setForm({ name: "", size: "", brand: "", stage: "seedling" });
     handleOpenChange(false);
@@ -150,7 +180,71 @@ export default function CreateTentDialog({
         <DialogHeader>
           <DialogTitle className="font-display">New tent</DialogTitle>
         </DialogHeader>
-        {binding.kind === "loading" && (
+        <p className="text-xs text-muted-foreground -mt-1">
+          Start simple. You can add size, brand, and stage later. Verdant works best once your first
+          plant memory exists.
+        </p>
+        {hardStop.showStartRoomHardStop && (
+          <div
+            className="rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 space-y-2"
+            data-testid="create-tent-hard-stop"
+            role="alert"
+          >
+            <p className="text-sm font-semibold" data-testid="create-tent-hard-stop-title">
+              {hardStop.hardStopTitle}
+            </p>
+            <p className="text-xs text-muted-foreground">{hardStop.hardStopBody}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm" className="gradient-leaf text-primary-foreground">
+                <Link to={hardStop.startRoomHref} data-testid="create-tent-start-room-cta">
+                  {hardStop.hardStopCta}
+                </Link>
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                data-testid="create-tent-hard-stop-dismiss"
+              >
+                {hardStop.hardStopSecondary}
+              </Button>
+            </div>
+          </div>
+        )}
+        {hardStop.showPickGrowHint && !hardStop.showStartRoomHardStop && (
+          <p
+            className="rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+            data-testid="create-tent-pick-setup"
+          >
+            {GROW_SETUP_MESSAGES.pickSetupToast("tent")}{" "}
+            <Link
+              to={hardStop.startRoomHref}
+              className="underline underline-offset-2"
+              data-testid="create-tent-pick-setup-cta"
+            >
+              {hardStop.hardStopCta}
+            </Link>
+          </p>
+        )}
+        {canWriteCreateGrowId(targetGrowId) && (
+          <p
+            className="text-xs rounded-md border border-primary/30 bg-primary/10 px-3 py-2"
+            data-testid="create-tent-target-setup"
+          >
+            <span className="font-medium">
+              {setupName
+                ? GROW_SETUP_MESSAGES.addingTo(setupName)
+                : GROW_SETUP_MESSAGES.addingToHint}
+            </span>
+            {setupName ? (
+              <span className="block text-muted-foreground mt-0.5">
+                {GROW_SETUP_MESSAGES.addingToHint}
+              </span>
+            ) : null}
+          </p>
+        )}
+        {!tentGate.allowed && (
           <p
             role="status"
             aria-live="polite"
@@ -236,59 +330,16 @@ export default function CreateTentDialog({
                   Only a name is required to get started.
                 </p>
               </div>
-              <details className="rounded-md border border-border/40 px-3 py-2">
-                <summary className="cursor-pointer text-xs text-muted-foreground select-none">
-                  Optional details (enrich later)
-                </summary>
-                <div className="grid gap-3 pt-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label>Size (optional)</Label>
-                      <Input
-                        value={form.size}
-                        onChange={(e) => setForm({ ...form, size: e.target.value })}
-                        placeholder="4x4"
-                      />
-                    </div>
-                    <div>
-                      <Label>Brand (optional)</Label>
-                      <Input
-                        value={form.brand}
-                        onChange={(e) => setForm({ ...form, brand: e.target.value })}
-                        placeholder="Gorilla"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Stage (optional)</Label>
-                    <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {STAGES.filter((s) =>
-                          ["seedling", "veg", "flower", "flush", "harvest"].includes(s.value),
-                        ).map((s) => (
-                          <SelectItem key={s.value} value={s.value}>
-                            {s.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </details>
-              <Button
-                type="submit"
-                disabled={busy || !tentGate.allowed}
-                className="gradient-leaf text-primary-foreground"
-                data-testid="tent-create-submit"
-              >
-                Create tent
-              </Button>
-            </form>
-          </>
-        )}
+            </div>
+          </details>
+          <Button
+            disabled={busy || !tentGate.allowed || hardStop.blockSubmit}
+            className="gradient-leaf text-primary-foreground"
+            data-testid="tent-create-submit"
+          >
+            Create tent
+          </Button>
+        </form>
       </DialogContent>
     </Dialog>
   );

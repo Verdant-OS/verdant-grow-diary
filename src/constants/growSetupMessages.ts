@@ -1,46 +1,35 @@
 /**
- * growSetupMessages — typed grower-facing copy for the create-dialog
- * grow-binding states.
- *
- * Only messages used by the tent/plant create dialogs live here. Values are
- * plain text (no HTML) and use grower language only — no database or schema
- * vocabulary ever reaches the UI through this catalog.
- *
- * Not an i18n framework: no runtime locale files, no dependencies.
+ * Grower-facing copy for create-time setup binding (create tent/plant only).
+ * No grow_id / orphan / lineage / backfill tokens.
  */
 
-export const growSetupMessages = {
-  noSetup: {
-    title: "Start your room first",
-    body:
-      "You need a setup before adding a tent or plant. " +
-      "We’ll walk grow → tent → plant so Quick Log works right away.",
-    ctaPrimary: "Start your room",
-    ctaSecondary: "Not now",
-  },
-  create: {
-    addingTo: (setupName: string): string => `Adding to ${setupName}`,
-    addingToHint: "This will live in your current setup.",
-  },
-  setupUnavailable: {
-    title: "Choose a current setup",
-    body: "We couldn’t verify the setup for this form. Choose a setup before creating.",
-    cta: "Choose setup",
-  },
-  readError: {
-    title: "Current setup unavailable",
-    body: "We couldn’t confirm your setups. Nothing has been created.",
-    cta: "Retry",
-  },
-  mismatch: {
-    tentTitle: "This tent is in another setup",
-    tentBody: (setupName: string): string =>
-      `Choose a tent in ${setupName}, or switch setups.`,
-    unlinkedTentTitle: "This tent is not in a setup",
-    unlinkedTentBody: "Link this tent to a setup before adding a plant here.",
-    ctaChooseTent: "Choose another tent",
-    ctaSwitchSetup: "Switch setup",
-  },
+export const GROW_SETUP_START_ROOM_HREF = "/grows?intent=one_tent_activation" as const;
+
+export const GROW_SETUP_MESSAGES = {
+  hardStopTitle: "Start your room first",
+  hardStopBody:
+    "You need a setup before adding a tent or plant. Next you’ll name your grow—then we’ll add tent and plant so Quick Log works right away.",
+  hardStopCta: "Start your room",
+  hardStopSecondary: "Not now",
+  loadingToast: "Still loading your setups — try again in a moment",
+  pickSetupToast: (entity: "tent" | "plant") =>
+    `Pick which setup this ${entity} belongs to first`,
+  addingTo: (setupName: string) => `Adding to ${setupName}`,
+  addingToHint: "This will live in your current setup.",
+  tentMismatchTitle: "This tent is in another setup",
+  tentMismatchBody: "Choose a tent in your current setup, or switch setups.",
+  tentOrphanTitle: "Finish setup",
+  tentOrphanBody: "This tent isn’t linked to a setup yet. Choose another tent, or finish setup first.",
+  chooseTent: "Choose tent",
+  switchSetup: "Switch setup",
+  finishSetup: "Finish setup",
 } as const;
 
-export type GrowSetupMessages = typeof growSetupMessages;
+/** Tokens that must never appear in grower-facing create-binding UI. */
+export const GROW_SETUP_BANNED_UI_TOKENS = [
+  "grow_id",
+  "orphan",
+  "lineage",
+  "backfill",
+  "null grow",
+] as const;

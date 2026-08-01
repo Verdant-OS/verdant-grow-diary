@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -28,11 +28,14 @@ import { Link } from "react-router-dom";
 import CreateTentDialog from "@/components/CreateTentDialog";
 import { validatePlantInsertPayload } from "@/lib/plantPayloadValidation";
 import {
-  evaluatePlantTentBinding,
-  resolveCreateGrowBinding,
-  type PlantTentBindingState,
-} from "@/lib/createGrowBindingRules";
-import { growSetupMessages } from "@/constants/growSetupMessages";
+  buildCreateGrowBindingHardStop,
+  canWriteCreateGrowId,
+  evaluateTentGrowCompatibility,
+  resolveCreateTargetGrowId,
+  resolveInitialPlantTentId,
+  resolveSetupName,
+} from "@/lib/createDialogGrowBindingRules";
+import { GROW_SETUP_MESSAGES } from "@/constants/growSetupMessages";
 
 const STAGES = [
   { value: "seedling", label: "Seedling" },
@@ -49,6 +52,8 @@ const HEALTH = [
   { value: "issue", label: "Issue" },
 ];
 
+type TentRow = { id: string; name: string; grow_id: string | null };
+
 interface Props {
   trigger?: React.ReactNode;
   defaultTentId?: string;
@@ -59,45 +64,7 @@ interface Props {
   onCreated?: (plant: { id: string; name: string }) => void;
 }
 
-interface PlantFormState {
-  name: string;
-  strain: string;
-  tent_id: string;
-  stage: string;
-  health: string;
-  started_at: string;
-  plant_type: string;
-}
-
-type TentRow = { id: string; name: string; grow_id: string | null };
-
-/**
- * Decide the safe initial tent selection for a dialog open.
- * Compatible default tents are retained; incompatible/unlinked/unavailable
- * defaults are cleared so the original id can never reach a payload.
- */
-function initialTentSelection(
-  defaultTentId: string | undefined,
-  resolvedGrowId: string | null,
-  requireTent: boolean,
-  tents: ReadonlyArray<TentRow>,
-): { tent_id: string; conflict: PlantTentBindingState | null } {
-  if (!defaultTentId || !resolvedGrowId) {
-    return { tent_id: "none", conflict: null };
-  }
-  const evaluation = evaluatePlantTentBinding({
-    resolvedGrowId,
-    selectedTentId: defaultTentId,
-    requireTent,
-    tents,
-  });
-  if (evaluation.kind === "ready") {
-    return { tent_id: evaluation.tentId, conflict: null };
-  }
-  return { tent_id: "none", conflict: evaluation };
-}
-
-function blankForm(tentId: string): PlantFormState {
+function emptyForm(tentId: string) {
   return {
     name: "",
     strain: "",
@@ -105,7 +72,6 @@ function blankForm(tentId: string): PlantFormState {
     stage: "seedling",
     health: "healthy",
     started_at: "",
-    // "unknown" = Not sure. Deliberately never defaults to photoperiod.
     plant_type: "unknown",
   };
 }
@@ -119,82 +85,95 @@ export default function CreatePlantDialog({
   onCreated,
 }: Props) {
   const { user } = useAuth();
+  const { grows = [], activeGrowId, loading: growsLoading } = useGrows();
   const qc = useQueryClient();
   const { grows, activeGrowId, loading: growsLoading, error: growsError, refresh } = useGrows();
   const { data: allTents = [] } = useTents();
-  const tentRows = allTents as TentRow[];
 
-  // Current setup is the source of creation truth. The requested grow prop
-  // is only trusted after it matches an RLS-loaded grow.
-  const binding = resolveCreateGrowBinding({
-    grows,
-    growsLoading: !!growsLoading,
-    growsError,
-    requestedGrowId: defaultGrowId ?? null,
-    activeGrowId,
-  });
-  const resolvedGrowId = binding.kind === "ready" ? binding.growId : null;
-
-  // Filter tent options by the verified resolved grow, not the raw prop.
-  const tents = resolvedGrowId
-    ? tentRows.filter((t) => t.grow_id === resolvedGrowId)
-    : [];
-
-  const initial = initialTentSelection(
-    defaultTentId,
-    resolvedGrowId,
-    requireTent,
-    tentRows,
+  const targetGrowId = useMemo(
+    () =>
+      resolveCreateTargetGrowId({
+        pageDefaultGrowId: defaultGrowId,
+        activeGrowId,
+        grows,
+      }),
+    [defaultGrowId, activeGrowId, grows],
   );
+  const hardStop = useMemo(
+    () =>
+      buildCreateGrowBindingHardStop(
+        { targetGrowId, growCount: grows.length, growsLoading },
+        "plant",
+      ),
+    [targetGrowId, grows.length, growsLoading],
+  );
+  const setupName = useMemo(
+    () => resolveSetupName(targetGrowId, grows),
+    [targetGrowId, grows],
+  );
+
+  const tentRows = allTents as TentRow[];
+  // Scope tent options to the resolved target setup when known.
+  const tents = targetGrowId
+    ? tentRows.filter((t) => t.grow_id === targetGrowId)
+    : tentRows;
+
+  const defaultTentGrowId = defaultTentId
+    ? tentRows.find((t) => t.id === defaultTentId)?.grow_id ?? null
+    : null;
+  const initialTentId = resolveInitialPlantTentId({
+    defaultTentId,
+    tentGrowId: defaultTentGrowId,
+    targetGrowId,
+  });
 
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState<PlantFormState>(() => blankForm(initial.tent_id));
-  const [tentConflict, setTentConflict] = useState<PlantTentBindingState | null>(
-    () => initial.conflict,
-  );
-  // Nested CreateTentDialog shares the Radix dialog stack; when it closes,
-  // Radix may also fire the parent's onOpenChange(false). Ignore that
-  // spurious close so plant form fields survive nested tent creation.
-  const nestedTentOpenRef = useRef(false);
-  const ignoreParentCloseRef = useRef(false);
+  const [form, setForm] = useState(() => emptyForm(initialTentId));
 
-  // Re-derive a fresh safe initial state whenever the dialog opens so a
-  // cancel/close/reopen never retains a stale tent or setup selection.
-  function resetSafeState() {
-    const next = initialTentSelection(defaultTentId, resolvedGrowId, requireTent, tentRows);
-    setForm(blankForm(next.tent_id));
-    setTentConflict(next.conflict);
-  }
-
-  function handleNestedTentOpenChange(next: boolean) {
-    if (next) {
-      nestedTentOpenRef.current = true;
-      return;
+  // Reset tent when open or target changes; never keep incompatible defaultTentId.
+  useEffect(() => {
+    if (!open) return;
+    const tentGrow =
+      form.tent_id !== "none"
+        ? tentRows.find((t) => t.id === form.tent_id)?.grow_id ?? null
+        : null;
+    const selectedCompat = evaluateTentGrowCompatibility({
+      selectedTentId: form.tent_id,
+      tentGrowId: tentGrow,
+      targetGrowId,
+    });
+    if (selectedCompat.clearTentSelection && form.tent_id !== "none") {
+      setForm((f) => ({ ...f, tent_id: "none" }));
     }
-    // Nested just closed. Keep the plant dialog open through the Radix
-    // stack unwind by ignoring the next parent close attempt.
-    ignoreParentCloseRef.current = true;
-    nestedTentOpenRef.current = false;
-  }
+    // Also re-resolve default when dialog opens with a new defaultTentId
+    const nextInitial = resolveInitialPlantTentId({
+      defaultTentId,
+      tentGrowId: defaultTentGrowId,
+      targetGrowId,
+    });
+    if (form.tent_id === "none" && nextInitial !== "none") {
+      setForm((f) => ({ ...f, tent_id: nextInitial }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional open/target gate
+  }, [open, targetGrowId, defaultTentId, defaultTentGrowId]);
+
+  const selectedTentGrowId =
+    form.tent_id !== "none"
+      ? tentRows.find((t) => t.id === form.tent_id)?.grow_id ?? null
+      : null;
+  const tentCompat = evaluateTentGrowCompatibility({
+    selectedTentId: form.tent_id,
+    tentGrowId: selectedTentGrowId,
+    targetGrowId,
+  });
 
   function handleOpenChange(next: boolean) {
-    if (!next && nestedTentOpenRef.current) return;
-    if (!next && ignoreParentCloseRef.current) {
-      ignoreParentCloseRef.current = false;
-      return;
-    }
     setOpen(next);
-    if (next) resetSafeState();
-    else {
-      setForm(blankForm("none"));
-      setTentConflict(null);
+    if (!next) {
+      // Cancel/reopen: clear incompatible tent selection.
+      setForm(emptyForm(initialTentId));
     }
-  }
-
-  function clearTentConflict() {
-    setForm((f) => ({ ...f, tent_id: "none" }));
-    setTentConflict(null);
   }
 
   async function submit(e: React.FormEvent) {
@@ -204,20 +183,16 @@ export default function CreatePlantDialog({
       toast.error("Not signed in");
       return;
     }
-    if (binding.kind !== "ready") {
-      toast.error(growSetupMessages.setupUnavailable.body);
+    if (hardStop.blockSubmit || !canWriteCreateGrowId(targetGrowId)) {
+      if (hardStop.toastMessage) toast.error(hardStop.toastMessage);
       return;
     }
-
-    // Evaluate the live selection against the resolved grow before any
-    // payload is built. A conflicting tent never reaches the insert.
-    const tentState = evaluatePlantTentBinding({
-      resolvedGrowId: binding.growId,
-      selectedTentId: form.tent_id,
-      requireTent,
-      tents: tentRows,
-    });
-    if (tentState.kind === "tent_required") {
+    if (!tentCompat.compatible) {
+      toast.error(tentCompat.title || GROW_SETUP_MESSAGES.tentMismatchTitle);
+      return;
+    }
+    const selectedTent = tents.find((tent) => tent.id === form.tent_id);
+    if (requireTent && !selectedTent) {
       toast.error("Choose the connected tent before creating this plant.");
       return;
     }
@@ -240,10 +215,10 @@ export default function CreatePlantDialog({
       stage: form.stage,
       health: form.health,
       plant_type: form.plant_type,
-      // Every canonical plant insert carries a verified grow_id.
-      grow_id: binding.growId,
+      // Fail closed: always write grow_id when submitting.
+      grow_id: targetGrowId,
     };
-    if (tentState.kind === "ready") payload.tent_id = tentState.tentId;
+    if (form.tent_id && form.tent_id !== "none") payload.tent_id = form.tent_id;
     if (form.started_at) payload.started_at = new Date(form.started_at).toISOString();
 
     const validation = validatePlantInsertPayload(payload);
@@ -267,8 +242,7 @@ export default function CreatePlantDialog({
     trackFunnelEvent("plant_created");
     qc.invalidateQueries({ queryKey: ["plants"] });
     qc.invalidateQueries({ queryKey: ["grow", "plants"] });
-    setForm(blankForm("none"));
-    setTentConflict(null);
+    setForm(emptyForm(initialTentId));
     setOpen(false);
     if (data && onCreated) onCreated(data as { id: string; name: string });
   }
@@ -326,42 +300,92 @@ export default function CreatePlantDialog({
         <DialogHeader>
           <DialogTitle className="font-display">New plant</DialogTitle>
         </DialogHeader>
-        {binding.kind === "loading" && (
-          <p
-            role="status"
-            aria-live="polite"
-            className="text-sm text-muted-foreground py-4"
-            data-testid="create-binding-loading"
+        <p className="text-xs text-muted-foreground -mt-1">
+          Start simple. You can add genetics, medium, dates, and notes later. Verdant works best
+          once your first plant memory exists.
+        </p>
+        {hardStop.showStartRoomHardStop && (
+          <div
+            className="rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 space-y-2"
+            data-testid="create-plant-hard-stop"
+            role="alert"
           >
-            Checking your current setup…
-          </p>
-        )}
-        {binding.kind === "read_error" && (
-          <div className="grid gap-3 py-2" data-testid="create-binding-read-error">
-            <p className="text-sm font-medium">{growSetupMessages.readError.title}</p>
-            <p className="text-sm text-muted-foreground">{growSetupMessages.readError.body}</p>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => refresh?.()}
-              data-testid="create-binding-retry"
-            >
-              {growSetupMessages.readError.cta}
-            </Button>
+            <p className="text-sm font-semibold" data-testid="create-plant-hard-stop-title">
+              {hardStop.hardStopTitle}
+            </p>
+            <p className="text-xs text-muted-foreground">{hardStop.hardStopBody}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm" className="gradient-leaf text-primary-foreground">
+                <Link to={hardStop.startRoomHref} data-testid="create-plant-start-room-cta">
+                  {hardStop.hardStopCta}
+                </Link>
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                data-testid="create-plant-hard-stop-dismiss"
+              >
+                {hardStop.hardStopSecondary}
+              </Button>
+            </div>
           </div>
         )}
-        {binding.kind === "no_setup" && (
-          <div className="grid gap-3 py-2" data-testid="create-binding-no-setup">
-            <p className="text-sm font-medium">{growSetupMessages.noSetup.title}</p>
-            <p className="text-sm text-muted-foreground">{growSetupMessages.noSetup.body}</p>
-            <Button asChild className="gradient-leaf text-primary-foreground">
-              <Link to={binding.startHref} data-testid="create-binding-start-room">
-                {growSetupMessages.noSetup.ctaPrimary}
-              </Link>
-            </Button>
-            <Button type="button" variant="ghost" onClick={() => handleOpenChange(false)}>
-              {growSetupMessages.noSetup.ctaSecondary}
-            </Button>
+        {hardStop.showPickGrowHint && !hardStop.showStartRoomHardStop && (
+          <p
+            className="rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+            data-testid="create-plant-pick-setup"
+          >
+            {GROW_SETUP_MESSAGES.pickSetupToast("plant")}{" "}
+            <Link
+              to={hardStop.startRoomHref}
+              className="underline underline-offset-2"
+              data-testid="create-plant-pick-setup-cta"
+            >
+              {hardStop.hardStopCta}
+            </Link>
+          </p>
+        )}
+        {canWriteCreateGrowId(targetGrowId) && (
+          <p
+            className="text-xs rounded-md border border-primary/30 bg-primary/10 px-3 py-2"
+            data-testid="create-plant-target-setup"
+          >
+            <span className="font-medium">
+              {setupName
+                ? GROW_SETUP_MESSAGES.addingTo(setupName)
+                : GROW_SETUP_MESSAGES.addingToHint}
+            </span>
+            {setupName ? (
+              <span className="block text-muted-foreground mt-0.5">
+                {GROW_SETUP_MESSAGES.addingToHint}
+              </span>
+            ) : null}
+          </p>
+        )}
+        {!tentCompat.compatible && form.tent_id !== "none" && (
+          <p
+            className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"
+            data-testid="create-plant-tent-mismatch"
+            role="alert"
+          >
+            <span className="font-semibold block">{tentCompat.title}</span>
+            <span className="text-muted-foreground">{tentCompat.body}</span>
+          </p>
+        )}
+        <form onSubmit={submit} className="grid gap-3">
+          <div>
+            <Label>Name</Label>
+            <Input
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Plant A"
+            />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Only a name and stage are required to get started.
+            </p>
           </div>
         )}
         {(binding.kind === "requested_setup_unavailable" || binding.kind === "choose_setup") && (
@@ -390,22 +414,14 @@ export default function CreatePlantDialog({
               </span>{" "}
               <span className="text-muted-foreground">{growSetupMessages.create.addingToHint}</span>
             </p>
-            {activeConflict && (
-              <div
-                className="rounded-xl border border-border/60 bg-muted/40 px-3 py-2 grid gap-2"
-                data-testid="create-binding-tent-conflict"
-              >
-                <p className="text-sm font-medium">
-                  {activeConflict.kind === "tent_not_in_setup"
-                    ? growSetupMessages.mismatch.unlinkedTentTitle
-                    : growSetupMessages.mismatch.tentTitle}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {activeConflict.kind === "tent_not_in_setup"
-                    ? growSetupMessages.mismatch.unlinkedTentBody
-                    : growSetupMessages.mismatch.tentBody(binding.setupName)}
-                </p>
-                <div className="flex flex-wrap gap-2">
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <Label>Tent{requireTent ? "" : " (optional)"}</Label>
+              <CreateTentDialog
+                defaultGrowId={targetGrowId ?? defaultGrowId}
+                onCreated={(t) => setForm((f) => ({ ...f, tent_id: t.id }))}
+                trigger={
                   <Button
                     type="button"
                     size="sm"
@@ -468,105 +484,21 @@ export default function CreatePlantDialog({
                   Helps AI Doctor stay gentle and keeps pheno comparisons honest.
                 </p>
               </div>
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <Label>Tent{requireTent ? "" : " (optional)"}</Label>
-                  <CreateTentDialog
-                    defaultGrowId={resolvedGrowId ?? undefined}
-                    onCreated={handleNestedTentCreated}
-                    onOpenChange={handleNestedTentOpenChange}
-                    trigger={
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 px-2 gap-1 text-xs"
-                      >
-                        <Plus className="h-3 w-3" /> Add new tent
-                      </Button>
-                    }
-                  />
-                </div>
-                <Select
-                  value={form.tent_id}
-                  onValueChange={(v) => {
-                    setForm({ ...form, tent_id: v });
-                    setTentConflict(null);
-                  }}
-                >
-                  <SelectTrigger data-testid="create-plant-tent-select">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {!requireTent && <SelectItem value="none">No tent</SelectItem>}
-                    {tents.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {tents.length === 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    No tents yet. Create a tent first.
-                  </p>
-                )}
-              </div>
-              <details className="rounded-md border border-border/40 px-3 py-2">
-                <summary className="cursor-pointer text-xs text-muted-foreground select-none">
-                  Optional details (enrich later)
-                </summary>
-                <div className="grid gap-3 pt-3">
-                  <div>
-                    <Label>Strain (optional)</Label>
-                    <Input
-                      value={form.strain}
-                      onChange={(e) => setForm({ ...form, strain: e.target.value })}
-                      placeholder="Blue Dream"
-                    />
-                  </div>
-                  <div>
-                    <Label>Health</Label>
-                    <Select
-                      value={form.health}
-                      onValueChange={(v) => setForm({ ...form, health: v })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {HEALTH.map((h) => (
-                          <SelectItem key={h.value} value={h.value}>
-                            {h.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Started at (optional)</Label>
-                    <Input
-                      type="date"
-                      value={form.started_at}
-                      onChange={(e) => setForm({ ...form, started_at: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </details>
-              <Button
-                disabled={
-                  busy ||
-                  !!activeConflict ||
-                  (requireTent && form.tent_id === "none")
-                }
-                className="gradient-leaf text-primary-foreground"
-                data-testid="plant-create-submit"
-              >
-                Create plant
-              </Button>
-            </form>
-          </>
-        )}
+            </div>
+          </details>
+          <Button
+            disabled={
+              busy ||
+              hardStop.blockSubmit ||
+              !tentCompat.compatible ||
+              (requireTent && form.tent_id === "none")
+            }
+            className="gradient-leaf text-primary-foreground"
+            data-testid="plant-create-submit"
+          >
+            Create plant
+          </Button>
+        </form>
       </DialogContent>
     </Dialog>
   );

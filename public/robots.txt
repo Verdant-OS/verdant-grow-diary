@@ -14,6 +14,7 @@ Disallow: /register
 Disallow: /unsubscribe
 Disallow: /.lovable/
 Disallow: /onboarding
+Disallow: /start-room
 Disallow: /dashboard
 Disallow: /daily-check
 Disallow: /tents
@@ -59,6 +60,7 @@ Disallow: /register
 Disallow: /unsubscribe
 Disallow: /.lovable/
 Disallow: /onboarding
+Disallow: /start-room
 Disallow: /dashboard
 Disallow: /daily-check
 Disallow: /tents
@@ -104,6 +106,7 @@ Disallow: /register
 Disallow: /unsubscribe
 Disallow: /.lovable/
 Disallow: /onboarding
+Disallow: /start-room
 Disallow: /dashboard
 Disallow: /daily-check
 Disallow: /tents

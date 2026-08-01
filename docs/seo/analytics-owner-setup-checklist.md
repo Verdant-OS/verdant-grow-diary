@@ -1,6 +1,6 @@
 # Lighting analytics owner setup checklist
 
-**Last verified (UTC):** 2026-08-01T03:59:17.0220380Z
+**Last reconciled against production (UTC):** 2026-08-01T16:33:05.7922236Z
 
 **Production host:** `https://verdantgrowdiary.com`
 
@@ -13,12 +13,14 @@ MEASUREMENT DAY 0: UNSET
 FOUR-WEEK CLOCK: NOT STARTED
 ```
 
-This is the owner-facing handoff for the two lighting guides. PR #595 and the PR #597 analytics
-repair are live; public direct-load/indexability checks and explicit GA4 route identities pass. A
-controlled collection-endpoint test found automatic GA4 page views alongside Verdant's explicit
-SPA events, so the singleton collection contract fails pending the Enhanced Measurement change
-below. The route-runtime structured-data defect has a local repair pending publish. The owner has
-now confirmed the production stream name, stream URL, stream ID, and measurement ID, and the
+This is the owner-facing handoff for the two lighting guides. PR #595, the PR #597 analytics
+repair, and the PR #624 structured-data ownership repair are live. The PR #624 eight-state
+production browser matrix found one current page-level JSON-LD identity set with zero duplicate or
+stale objects, so no further publication is required for that repair. Public
+direct-load/indexability checks and explicit GA4 route identities pass. A controlled
+collection-endpoint test found automatic GA4 page views alongside Verdant's explicit SPA events,
+so the singleton collection contract fails pending the Enhanced Measurement change below. The owner
+has confirmed the production stream name, stream URL, stream ID, and measurement ID, and the
 deployed tag matches that measurement ID. The GA4 property identity and authenticated reporting
 access are still unavailable to Codex, as is authenticated Search Console access.
 
@@ -52,7 +54,7 @@ Google documents the Enhanced Measurement page-view advanced setting as a listen
 `pushState`, `popState`, and `replaceState`. Verdant already owns SPA page views explicitly, so
 both sources must not remain enabled together. See
 [Enhanced measurement events](https://support.google.com/analytics/answer/9216061) and
-[Google tag configuration](https://developers.google.com/tag-platform/gtagjs/configure).
+[Measure pageviews](https://developers.google.com/analytics/devguides/collection/ga4/views).
 
 | Expected page path                                           | Expected page title                                           |
 | ------------------------------------------------------------ | ------------------------------------------------------------- |

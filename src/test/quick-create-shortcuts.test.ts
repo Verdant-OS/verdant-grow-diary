@@ -67,9 +67,9 @@ describe("Quick creation shortcuts — CreatePlantDialog → Add new tent", () =
     expect(CREATE_PLANT).toMatch(/No tents yet\. Create a tent first\./);
   });
 
-  it("forwards the resolved grow id into the nested tent creator", () => {
+  it("forwards the preselected grow to the nested tent creator", () => {
     expect(CREATE_PLANT).toMatch(
-      /<CreateTentDialog[\s\S]*?defaultGrowId=\{resolvedGrowId\s*\?\?\s*undefined\}/,
+      /<CreateTentDialog[\s\S]*?defaultGrowId=\{targetGrowId\s*\?\?\s*defaultGrowId\}/,
     );
   });
 });

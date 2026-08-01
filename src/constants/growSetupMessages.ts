@@ -4,8 +4,8 @@
  * Typed catalog only. No i18n runtime, no en.json, no React.
  * Include only messages used by the create tent/plant grow-binding slice.
  *
- * Never put schema terms (grow_id, orphan, unbound, lineage, backfill,
- * migration, constraint, foreign key) in these values.
+ * Values must stay grower-safe: no schema identifiers, repair jargon,
+ * or internal ids in the strings below.
  */
 
 export const growSetupMessages = {

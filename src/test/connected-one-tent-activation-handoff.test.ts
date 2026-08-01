@@ -43,10 +43,15 @@ describe("connected One-Tent activation handoff", () => {
     expect(PLANTS).toMatch(/new CustomEvent\(PLANT_QUICKLOG_PREFILL_EVENT/);
   });
 
-  it("keeps general-purpose creation nullable outside guided activation", () => {
+  it("keeps general creation tent-optional while requiring a verified grow", () => {
     expect(TENT_DIALOG).toMatch(/initiallyOpen\s*=\s*false/);
     expect(PLANT_DIALOG).toMatch(/requireTent\s*=\s*false/);
     expect(PLANT_DIALOG).toMatch(/!requireTent\s*&&\s*<SelectItem value="none"/);
+    // Guided activation still requires a compatible tent; general creation may omit tent.
+    expect(PLANT_DIALOG).toMatch(/requireTent/);
+    // General creation may not omit a verified grow binding.
+    expect(PLANT_DIALOG).toMatch(/grow_id:\s*binding\.growId/);
+    expect(TENT_DIALOG).toMatch(/buildGrowBoundTentInsertPayload/);
   });
 
   it("uses one relationship-aware Dashboard checklist and removes the duplicate", () => {

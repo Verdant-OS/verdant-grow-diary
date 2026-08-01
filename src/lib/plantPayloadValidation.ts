@@ -3,12 +3,17 @@
  *
  * Two directions, one contract:
  *  - `validatePlantInsertPayload` normalizes and rejects outbound insert
- *    payloads that would fail the DB CHECK/NOT NULL constraints, so the UI
- *    never posts a plant missing `name`, a valid `stage`/`health`, or a
- *    canonical `plant_type`.
+ *    payloads that would fail client-create invariants or DB CHECK/NOT NULL
+ *    constraints, so the UI never posts a plant missing `name`, a valid
+ *    `stage`/`health`, a canonical `plant_type`, or a verified `grow_id`.
  *  - `validatePlantRowResponse` guards inbound rows from Lovable Cloud so a
  *    row missing `plant_type` (schema drift, cached response, RPC bypass)
  *    cannot reach the UI silently as a "photoperiod" default.
+ *
+ * Client-create invariant: new plant inserts must include `grow_id`.
+ * This is not a claim that the database column is NOT NULL — legacy
+ * null-linked rows may still exist and remain readable via response
+ * validation below.
  *
  * Pure: no I/O, no React, no Supabase. Callers decide what to do with the
  * result — throw, toast, drop the row, etc.
@@ -23,9 +28,12 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const uuid = z.string().regex(UUID_RE, "must be a UUID");
 
 /**
- * Outbound insert payload contract. Mirrors the plants-table NOT NULL/CHECK
- * columns. `plant_type` is required and canonicalized before it leaves the
- * client — "unknown" is a legitimate value, blank/garbage is not.
+ * Outbound insert payload contract. Mirrors plants-table NOT NULL/CHECK
+ * columns plus Verdant's client-create grow-binding invariant.
+ * `plant_type` is required and canonicalized before it leaves the client —
+ * "unknown" is a legitimate value, blank/garbage is not.
+ * `grow_id` is required for new inserts; `tent_id` remains optional.
+ * Inbound/legacy rows with null grow_id are not validated by this schema.
  */
 export const PlantInsertPayloadSchema = z
   .object({
@@ -36,7 +44,7 @@ export const PlantInsertPayloadSchema = z
     health: z.enum(HEALTHS),
     plant_type: z.enum(PLANT_TYPE_VALUES as readonly [PlantType, ...PlantType[]]),
     tent_id: uuid.optional(),
-    grow_id: uuid.optional(),
+    grow_id: uuid,
     started_at: z.string().datetime().optional(),
   })
   .strict();

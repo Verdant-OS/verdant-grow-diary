@@ -44,6 +44,14 @@ function readJsonLd(marker: string): unknown {
   return JSON.parse(el.textContent);
 }
 
+function appendStaticRouteJsonLd(data: unknown) {
+  const script = document.createElement("script");
+  script.type = "application/ld+json";
+  script.setAttribute("data-static-route-ldjson", "true");
+  script.text = JSON.stringify(data);
+  document.head.appendChild(script);
+}
+
 describe("/guides hub — public render", () => {
   it("renders without an authenticated user or protected shell", () => {
     renderAt("/guides");
@@ -180,6 +188,62 @@ describe("/guides/:slug detail — public render", () => {
     } | null;
     expect(article?.datePublished).toBe("2026-07-30");
     expect(article?.dateModified).toBe("2026-07-30");
+  });
+
+  it("replaces static route JSON-LD with one current guide-owned set across hydration and navigation", async () => {
+    const distance = VERDANT_SEO_GUIDES.find(
+      (guide) => guide.slug === "cannabis-grow-light-distance-and-schedule",
+    )!;
+    const stress = VERDANT_SEO_GUIDES.find(
+      (guide) => guide.slug === "cannabis-light-stress-light-burn-bleaching-or-heat",
+    )!;
+    const staleUrl = "https://verdantgrowdiary.com/guides/stale-static-route";
+    for (const type of ["WebPage", "FAQPage", "BreadcrumbList", "Article"]) {
+      appendStaticRouteJsonLd({ "@context": "https://schema.org", "@type": type, url: staleUrl });
+    }
+
+    renderAt(`/guides/${distance.slug}`);
+
+    await waitFor(() => {
+      expect(document.head.querySelectorAll("script[data-static-route-ldjson]")).toHaveLength(0);
+      expect(
+        document.head.querySelectorAll(`script[data-page-ldjson^="guide-${distance.slug}-"]`),
+      ).toHaveLength(4);
+    });
+    expect((readJsonLd(`guide-${distance.slug}-webpage`) as { url: string }).url).toBe(
+      `https://verdantgrowdiary.com/guides/${distance.slug}`,
+    );
+    expect(document.head.textContent).not.toContain(staleUrl);
+
+    const crossGuideLink = document.querySelector<HTMLAnchorElement>(
+      `a[href="/guides/${stress.slug}"]`,
+    );
+    expect(crossGuideLink).toBeTruthy();
+    fireEvent.click(crossGuideLink!);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("guide-page")).toHaveAttribute("data-guide-slug", stress.slug);
+      expect(
+        document.head.querySelectorAll(`script[data-page-ldjson^="guide-${stress.slug}-"]`),
+      ).toHaveLength(4);
+    });
+    expect(
+      document.head.querySelectorAll(`script[data-page-ldjson^="guide-${distance.slug}-"]`),
+    ).toHaveLength(0);
+    const currentUrl = `https://verdantgrowdiary.com/guides/${stress.slug}`;
+    const currentScripts = Array.from(
+      document.head.querySelectorAll<HTMLScriptElement>(
+        `script[data-page-ldjson^="guide-${stress.slug}-"]`,
+      ),
+    );
+    expect(currentScripts.map((script) => script.text).join("\n")).toContain(currentUrl);
+    expect(currentScripts.map((script) => script.text)).toHaveLength(
+      new Set(currentScripts.map((script) => script.text)).size,
+    );
+    expect(document.head.textContent).not.toContain(staleUrl);
+    expect(document.head.textContent).not.toContain(
+      `https://verdantgrowdiary.com/guides/${distance.slug}`,
+    );
   });
 
   it("omits Article schema when a legacy guide has no verified publication date", () => {

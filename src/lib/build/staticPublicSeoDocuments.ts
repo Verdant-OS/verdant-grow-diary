@@ -28,6 +28,7 @@ import {
   buildCultivarCollectionJsonLd,
   buildFaqPageJsonLd,
   buildSoftwareApplicationJsonLd,
+  buildWebPageJsonLd,
 } from "../seoStructuredData";
 import type { StaticSocialRouteMetadata } from "./staticSocialRouteHtml";
 
@@ -59,18 +60,7 @@ function buildStaticWebPageJsonLd(metadata: {
   readonly description: string;
   readonly url: string;
 }) {
-  return {
-    "@context": "https://schema.org",
-    "@type": "WebPage",
-    "@id": `${metadata.url}#webpage`,
-    url: metadata.url,
-    name: metadata.title,
-    description: metadata.description,
-    isPartOf: {
-      "@type": "WebSite",
-      "@id": `${VERDANT_SITE_ORIGIN}/#website`,
-    },
-  } as const;
+  return buildWebPageJsonLd({ ...metadata, siteUrl: VERDANT_SITE_ORIGIN });
 }
 
 function buildStaticGuideJsonLd(guide: (typeof VERDANT_SEO_GUIDES)[number]) {

@@ -35,17 +35,17 @@ const EXPECTED_STATUS_VOCABULARY = [
 ];
 
 describe("SEO readiness status artifact", () => {
-  it("keeps the exact canonical blocked-mode contract", () => {
+  it("keeps the exact canonical blocked-mode contract and defect verdict", () => {
     expect(READINESS).toMatchObject({
       schema_version: 1,
       scope: "LIGHTING_LAUNCH_MEASUREMENT",
       timezone: "America/Chicago",
       artifact_semantics: "POINT_IN_TIME_EVIDENCE_SNAPSHOT",
       operating_mode: "MODE_A_ACCESS_BLOCKED_READINESS_WORK",
-      verdict: "BLOCKED — GA4/GSC OWNER SETUP REQUIRED",
+      verdict: "NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND",
       status_vocabulary: EXPECTED_STATUS_VOCABULARY,
       production_status: "PASS",
-      analytics_identity_status: "PASS",
+      analytics_identity_status: "FAIL",
       technical_seo_status: "FAIL",
       ga4_access_status: "BLOCKED",
       gsc_access_status: "BLOCKED",
@@ -62,22 +62,23 @@ describe("SEO readiness status artifact", () => {
   it("pins repository, deploy, and production identities with observed equality", () => {
     expect(READINESS.run_context).toEqual({
       repository: "Verdant-OS/verdant-grow-diary",
-      branch: "codex/ga4-stream-identity",
-      head: "0c61cc572de32a8a7af975ace14659dfb77a0a43",
+      branch: "codex/fix-guide-jsonld-hydration",
+      head: "591081b387ae9a6d9eb00aeb1f4ed9b43c90cc7d",
       deploy_branch: "verdant-grow-diary",
-      deploy_branch_head: "0c61cc572de32a8a7af975ace14659dfb77a0a43",
+      deploy_branch_head: "591081b387ae9a6d9eb00aeb1f4ed9b43c90cc7d",
       head_equals_deploy_branch_head: true,
       working_tree_status: "DIRTY_READINESS_WORK",
     });
     expect(READINESS.production).toMatchObject({
       host: "https://verdantgrowdiary.com",
-      observed_at: "2026-07-31T23:10:32.9711027Z",
-      manifest_commit: "0c61cc572de32a8a7af975ace14659dfb77a0a43",
-      build_time: "2026-07-31T22:57:00.211Z",
-      matches_deploy_branch_head: true,
+      observed_at: "2026-08-01T03:58:28.982Z",
+      manifest_commit: "2560d83a6b740cb9d6c4521bc6edc083977d51fc",
+      build_time: "2026-08-01T01:40:18.366Z",
+      matches_deploy_branch_head: false,
       manifest_is_ancestor_of_deploy_branch_head: true,
-      source_delta_since_manifest: "NONE",
-      production_publish_required: false,
+      source_delta_since_manifest:
+        "ECOWITT_ADAPTER_HARDENING_ONLY_NO_PUBLIC_SEO_OR_ANALYTICS_RUNTIME_CHANGE",
+      production_publish_required: true,
       release_content_match: "PASS",
       sitemap_url_count: 51,
       robots_declares_production_sitemap: true,
@@ -123,7 +124,7 @@ describe("SEO readiness status artifact", () => {
 
   it("separates passing collection evidence from unavailable authenticated baselines", () => {
     expect(READINESS.analytics_identity).toMatchObject({
-      last_full_verified_at: "2026-07-31T17:14:59.0979608Z",
+      last_full_verified_at: "2026-08-01T03:58:28.982Z",
       verification_method: "INTERCEPTED_BROWSER_COLLECTION_REQUESTS",
       test_events_transmitted: false,
       stream_identity_status: "PASS",
@@ -137,14 +138,16 @@ describe("SEO readiness status artifact", () => {
       property_id: null,
       guide_page_identity: "PASS",
       route_specific_titles: "PASS",
-      duplicate_page_views: "PASS",
+      duplicate_page_views: "FAIL",
+      explicit_spa_page_view_identity: "PASS",
+      automatic_history_page_views: "FAIL_OWNER_REVIEW_REQUIRED",
       protected_id_masking: "PASS",
     });
     expect(READINESS.ga4).toEqual({
       status: "BLOCKED",
       reason: "AUTHENTICATED_ACCESS_UNAVAILABLE",
       baseline_status: "BLOCKED",
-      collection_contract_status: "PASS",
+      collection_contract_status: "FAIL",
       stream_identity_status: "PASS",
       property_identity_status: "BLOCKED",
       stream: {
@@ -163,7 +166,7 @@ describe("SEO readiness status artifact", () => {
       baseline_status: "BLOCKED",
       authenticated_reporting_available: false,
       latest_workflow_run:
-        "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30671654959",
+        "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30681587094",
       latest_workflow_status: "PASS",
       operation_status: "SKIPPED",
       access_status: "BLOCKED",
@@ -227,10 +230,15 @@ describe("SEO readiness status artifact", () => {
     });
   });
 
-  it("records only the two owner blockers and a point-in-time bounded-slice handoff", () => {
+  it("records the three owner blockers and the point-in-time bounded-slice handoff", () => {
     expect(READINESS.open_blockers).toEqual([
       expect.objectContaining({
         id: "GA4_AUTHENTICATED_ACCESS",
+        status: "BLOCKED",
+        owner: "OWNER",
+      }),
+      expect.objectContaining({
+        id: "GA4_ENHANCED_MEASUREMENT_HISTORY_PAGE_VIEWS",
         status: "BLOCKED",
         owner: "OWNER",
       }),
@@ -250,21 +258,26 @@ describe("SEO readiness status artifact", () => {
         expect.objectContaining({
           id: "LIGHTING_DUPLICATE_HYDRATED_JSON_LD",
           priority: "P1",
-          status: "VERIFIED_UNFIXED",
+          status: "LOCAL_FIX_VERIFIED_REQUIRES_DEPLOY",
+        }),
+        expect.objectContaining({
+          id: "GA4_ENHANCED_MEASUREMENT_DUPLICATE_PAGE_VIEWS",
+          priority: "P1",
+          status: "VERIFIED_UNFIXED_OWNER_ACTION_REQUIRED",
         }),
       ]),
     );
     expect(READINESS.current_slice).toEqual({
-      priority: "P2",
-      id: "GA4_PRODUCTION_STREAM_IDENTITY",
-      status: "COMPLETE_AT_GENERATION",
+      priority: "P1",
+      id: "LIGHTING_DUPLICATE_HYDRATED_JSON_LD",
+      status: "LOCAL_FIX_VERIFIED_REQUIRES_DEPLOY",
       evidence:
-        "Owner-confirmed stream values match the deployed production tag and canonical host; property identity and reporting access remain blocked.",
+        "One route-owned WebPage, FAQPage, BreadcrumbList, and Article set replaces static route JSON-LD on hydration and stays current through cross-guide navigation.",
     });
     expect(READINESS.next_slice).toEqual({
       priority: "P1",
-      id: "LIGHTING_DUPLICATE_HYDRATED_JSON_LD",
-      status: "NOT_STARTED",
+      id: "GA4_ENHANCED_MEASUREMENT_HISTORY_PAGE_VIEWS",
+      status: "BLOCKED_BY_OWNER_ACCESS",
     });
     expect(RAW_ARTIFACT).not.toContain("PENDING_MERGE");
   });
@@ -283,7 +296,7 @@ describe("SEO readiness status artifact", () => {
 
   it("contains no credentials, private paths, or fake zero metrics", () => {
     expect(READINESS.reporting_access_configuration).toEqual({
-      observed_at: "2026-07-31T23:10:32.9711027Z",
+      observed_at: "2026-08-01T03:59:17.0220380Z",
       audit_method: "GITHUB_SECRET_NAME_LISTING",
       configured_scopes_checked: [
         "repository",
@@ -332,7 +345,7 @@ describe("SEO readiness status artifact", () => {
     );
     const internalLinkMap = readFileSync(resolve(ROOT, "docs/seo/internal-link-map.md"), "utf8");
     expect(launchVerification).toContain("../../artifacts/seo/seo-readiness-status.json");
-    expect(launchVerification).toContain("BLOCKED — GA4/GSC OWNER SETUP REQUIRED");
+    expect(launchVerification).toContain("NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND");
     expect(internalLinkMap).toContain("both lighting routes are live");
     expect(internalLinkMap).not.toContain("they are not claimed as deployed");
   });

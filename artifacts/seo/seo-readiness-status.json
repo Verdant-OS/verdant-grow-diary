@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "scope": "LIGHTING_LAUNCH_MEASUREMENT",
-  "generated_at": "2026-07-31T23:10:32.9711027Z",
-  "generated_at_chicago": "2026-07-31T18:10:32.9711027-05:00",
+  "generated_at": "2026-08-01T03:59:17.0220380Z",
+  "generated_at_chicago": "2026-07-31T22:59:17.0220380-05:00",
   "timezone": "America/Chicago",
   "artifact_semantics": "POINT_IN_TIME_EVIDENCE_SNAPSHOT",
   "operating_mode": "MODE_A_ACCESS_BLOCKED_READINESS_WORK",
-  "verdict": "BLOCKED — GA4/GSC OWNER SETUP REQUIRED",
+  "verdict": "NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND",
   "status_vocabulary": [
     "PASS",
     "FAIL",
@@ -17,7 +17,7 @@
     "NOT_APPLICABLE"
   ],
   "production_status": "PASS",
-  "analytics_identity_status": "PASS",
+  "analytics_identity_status": "FAIL",
   "technical_seo_status": "FAIL",
   "ga4_access_status": "BLOCKED",
   "gsc_access_status": "BLOCKED",
@@ -25,23 +25,23 @@
   "four_week_clock_status": "NOT_STARTED",
   "run_context": {
     "repository": "Verdant-OS/verdant-grow-diary",
-    "branch": "codex/ga4-stream-identity",
-    "head": "0c61cc572de32a8a7af975ace14659dfb77a0a43",
+    "branch": "codex/fix-guide-jsonld-hydration",
+    "head": "591081b387ae9a6d9eb00aeb1f4ed9b43c90cc7d",
     "deploy_branch": "verdant-grow-diary",
-    "deploy_branch_head": "0c61cc572de32a8a7af975ace14659dfb77a0a43",
+    "deploy_branch_head": "591081b387ae9a6d9eb00aeb1f4ed9b43c90cc7d",
     "head_equals_deploy_branch_head": true,
     "working_tree_status": "DIRTY_READINESS_WORK"
   },
   "production": {
     "host": "https://verdantgrowdiary.com",
-    "observed_at": "2026-07-31T23:10:32.9711027Z",
+    "observed_at": "2026-08-01T03:58:28.982Z",
     "version_url": "https://verdantgrowdiary.com/version.json",
-    "manifest_commit": "0c61cc572de32a8a7af975ace14659dfb77a0a43",
-    "build_time": "2026-07-31T22:57:00.211Z",
-    "matches_deploy_branch_head": true,
+    "manifest_commit": "2560d83a6b740cb9d6c4521bc6edc083977d51fc",
+    "build_time": "2026-08-01T01:40:18.366Z",
+    "matches_deploy_branch_head": false,
     "manifest_is_ancestor_of_deploy_branch_head": true,
-    "source_delta_since_manifest": "NONE",
-    "production_publish_required": false,
+    "source_delta_since_manifest": "ECOWITT_ADAPTER_HARDENING_ONLY_NO_PUBLIC_SEO_OR_ANALYTICS_RUNTIME_CHANGE",
+    "production_publish_required": true,
     "release_content_match": "PASS",
     "sitemap_url_count": 51,
     "robots_declares_production_sitemap": true,
@@ -78,7 +78,7 @@
     "analytics_repair_status": "LIVE"
   },
   "analytics_identity": {
-    "last_full_verified_at": "2026-07-31T17:14:59.0979608Z",
+    "last_full_verified_at": "2026-08-01T03:58:28.982Z",
     "verification_method": "INTERCEPTED_BROWSER_COLLECTION_REQUESTS",
     "test_events_transmitted": false,
     "stream_identity_status": "PASS",
@@ -92,22 +92,25 @@
     "property_id": null,
     "guide_page_identity": "PASS",
     "route_specific_titles": "PASS",
-    "duplicate_page_views": "PASS",
+    "duplicate_page_views": "FAIL",
+    "explicit_spa_page_view_identity": "PASS",
+    "automatic_history_page_views": "FAIL_OWNER_REVIEW_REQUIRED",
     "protected_id_masking": "PASS",
     "evidence": "docs/seo/lighting-launch-verification.md"
   },
   "technical_seo": {
-    "last_http_verified_at": "2026-07-31T23:10:32.9711027Z",
+    "last_http_verified_at": "2026-08-01T03:58:28.982Z",
     "lighting_pages": "FAIL",
     "direct_load_indexability": "PASS",
     "route_runtime_structured_data": "FAIL",
+    "local_route_runtime_structured_data": "PASS_REQUIRES_DEPLOY",
     "robots": "PASS",
     "sitemap": "PASS",
     "protected_route_exclusion": "PASS",
     "evidence": "docs/seo/lighting-launch-verification.md"
   },
   "reporting_access_configuration": {
-    "observed_at": "2026-07-31T23:10:32.9711027Z",
+    "observed_at": "2026-08-01T03:59:17.0220380Z",
     "audit_method": "GITHUB_SECRET_NAME_LISTING",
     "configured_scopes_checked": [
       "repository",
@@ -131,7 +134,7 @@
     "status": "BLOCKED",
     "reason": "AUTHENTICATED_ACCESS_UNAVAILABLE",
     "baseline_status": "BLOCKED",
-    "collection_contract_status": "PASS",
+    "collection_contract_status": "FAIL",
     "stream_identity_status": "PASS",
     "property_identity_status": "BLOCKED",
     "stream": {
@@ -150,7 +153,7 @@
     "baseline_status": "BLOCKED",
     "authenticated_reporting_available": false,
     "local_oauth_token_available": false,
-    "latest_workflow_run": "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30671654959",
+    "latest_workflow_run": "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30681587094",
     "latest_workflow_status": "PASS",
     "operation_status": "SKIPPED",
     "access_status": "BLOCKED",
@@ -176,6 +179,13 @@
       "owner": "OWNER",
       "reason": "AUTHENTICATED_ACCESS_UNAVAILABLE",
       "required_action": "Confirm the GA4 property identity and provide owner-approved read-only reporting access. The production stream identity is already owner-confirmed."
+    },
+    {
+      "id": "GA4_ENHANCED_MEASUREMENT_HISTORY_PAGE_VIEWS",
+      "status": "BLOCKED",
+      "owner": "OWNER",
+      "reason": "AUTOMATIC_PAGE_VIEWS_OBSERVED_ALONGSIDE_EXPLICIT_SPA_EVENTS",
+      "required_action": "In the existing production stream, disable the Enhanced Measurement advanced option for page changes based on browser history events, retain Verdant's explicit SPA page_view emitter, and authorize a controlled re-verification."
     },
     {
       "id": "GSC_AUTHENTICATED_ACCESS",
@@ -205,20 +215,26 @@
     {
       "id": "LIGHTING_DUPLICATE_HYDRATED_JSON_LD",
       "priority": "P1",
-      "status": "VERIFIED_UNFIXED",
-      "evidence": "Direct loads hydrate identical duplicate FAQPage, BreadcrumbList, and Article objects. After cross-guide client navigation, the prior route's static objects remain beside the current route's runtime objects; all objects parse but page identities conflict."
+      "status": "LOCAL_FIX_VERIFIED_REQUIRES_DEPLOY",
+      "evidence": "Production still duplicates route schema. The bounded fix establishes one hydrated owner for WebPage, FAQPage, BreadcrumbList, and Article; targeted tests and a built local direct/navigation matrix report zero duplicate or stale route objects."
+    },
+    {
+      "id": "GA4_ENHANCED_MEASUREMENT_DUPLICATE_PAGE_VIEWS",
+      "priority": "P1",
+      "status": "VERIFIED_UNFIXED_OWNER_ACTION_REQUIRED",
+      "evidence": "Collection-endpoint interception observed Verdant's exact explicit SPA page_view plus tag-generated page_view events without the explicit page_path during direct/history navigation. Google documents the Enhanced Measurement browser-history option as a separate page_view source."
     }
   ],
   "current_slice": {
-    "priority": "P2",
-    "id": "GA4_PRODUCTION_STREAM_IDENTITY",
-    "status": "COMPLETE_AT_GENERATION",
-    "evidence": "Owner-confirmed stream values match the deployed production tag and canonical host; property identity and reporting access remain blocked."
+    "priority": "P1",
+    "id": "LIGHTING_DUPLICATE_HYDRATED_JSON_LD",
+    "status": "LOCAL_FIX_VERIFIED_REQUIRES_DEPLOY",
+    "evidence": "One route-owned WebPage, FAQPage, BreadcrumbList, and Article set replaces static route JSON-LD on hydration and stays current through cross-guide navigation."
   },
   "next_slice": {
     "priority": "P1",
-    "id": "LIGHTING_DUPLICATE_HYDRATED_JSON_LD",
-    "status": "NOT_STARTED"
+    "id": "GA4_ENHANCED_MEASUREMENT_HISTORY_PAGE_VIEWS",
+    "status": "BLOCKED_BY_OWNER_ACCESS"
   },
   "monitoring_repair": {
     "status": "MERGED_AND_POST_MERGE_VERIFIED",
@@ -234,8 +250,8 @@
       "urls_evaluated": 51,
       "gsc_api_attempts": 0
     },
-    "production_publish_required": false,
-    "production_publish_reason": "Production manifest and deploy head match; no pending public app release exists."
+    "production_publish_required": true,
+    "production_publish_reason": "The locally verified route JSON-LD ownership repair changes public app runtime and must be merged and published before production re-verification."
   },
   "artifact_paths": {
     "readiness_status": "artifacts/seo/seo-readiness-status.json",

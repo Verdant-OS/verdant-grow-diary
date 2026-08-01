@@ -86,9 +86,7 @@ describe("sensorHistoryWindowStartIso", () => {
   const NOW = new Date("2026-07-15T12:00:00.000Z");
 
   it("free (90 days) → ISO exactly 90 days back", () => {
-    expect(sensorHistoryWindowStartIso(FREE_CAPABILITIES, NOW)).toBe(
-      "2026-04-16T12:00:00.000Z",
-    );
+    expect(sensorHistoryWindowStartIso(FREE_CAPABILITIES, NOW)).toBe("2026-04-16T12:00:00.000Z");
   });
 
   it("pro (null) → unbounded", () => {
@@ -115,10 +113,7 @@ describe("blocked copy honesty", () => {
 describe("static wiring — the gates are actually read at the creation seams", () => {
   const ROOT = resolve(__dirname, "../..");
   const GROWS = readFileSync(resolve(ROOT, "src/pages/Grows.tsx"), "utf8");
-  const TENT_DIALOG = readFileSync(
-    resolve(ROOT, "src/components/CreateTentDialog.tsx"),
-    "utf8",
-  );
+  const TENT_DIALOG = readFileSync(resolve(ROOT, "src/components/CreateTentDialog.tsx"), "utf8");
 
   it("Grows.tsx evaluates the grow gate, guards create(), and gates the CTA", () => {
     expect(GROWS).toMatch(/evaluateGrowCreationGate\(/);
@@ -130,7 +125,7 @@ describe("static wiring — the gates are actually read at the creation seams", 
   it("CreateTentDialog evaluates the tent gate, guards submit(), and gates the CTA", () => {
     expect(TENT_DIALOG).toMatch(/evaluateTentCreationGate\(/);
     expect(TENT_DIALOG).toMatch(/if \(!tentGate\.allowed\)/);
-    expect(TENT_DIALOG).toMatch(/disabled=\{busy \|\| !tentGate\.allowed \|\| hardStop\.blockSubmit\}/);
+    expect(TENT_DIALOG).toMatch(/disabled=\{busy \|\| !tentGate\.allowed \|\| formBlocked\}/);
     expect(TENT_DIALOG).toMatch(/tent-create-gate-notice/);
   });
 
@@ -144,10 +139,7 @@ describe("static wiring — the gates are actually read at the creation seams", 
   });
 
   it("the gate module itself stays pure — no React, Supabase, or clock reads", () => {
-    const MODULE = readFileSync(
-      resolve(ROOT, "src/lib/entitlements/freeTierGates.ts"),
-      "utf8",
-    );
+    const MODULE = readFileSync(resolve(ROOT, "src/lib/entitlements/freeTierGates.ts"), "utf8");
     expect(MODULE).not.toMatch(/from "react"|supabase|fetch\(|Date\.now\(\)|new Date\(\)/);
     expect(MODULE).not.toMatch(/service_role/);
   });

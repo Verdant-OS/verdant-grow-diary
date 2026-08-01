@@ -52,8 +52,19 @@ describe("Plants/Tents — preselect grow on create", () => {
   });
 
   it("Create dialogs fail closed without resolvable target", () => {
-    expect(CREATE_TENT).toMatch(/formBlocked|binding\.blockSubmit/);
-    expect(CREATE_PLANT).toMatch(/formBlocked|binding\.blockSubmit/);
+    // Require the unified formBlocked gate — do not accept a weaker
+    // binding.blockSubmit-only pin that could skip tent-side blocks.
+    expect(CREATE_TENT).toMatch(/\bformBlocked\b/);
+    expect(CREATE_PLANT).toMatch(/\bformBlocked\b/);
+    expect(CREATE_TENT).toMatch(/disabled=\{busy \|\| !tentGate\.allowed \|\| formBlocked\}/);
+    expect(CREATE_PLANT).toMatch(/disabled=\{busy \|\| formBlocked/);
+    expect(CREATE_TENT).not.toMatch(/hardStop\.blockSubmit/);
+    expect(CREATE_PLANT).not.toMatch(/hardStop\.blockSubmit/);
+  });
+
+  it("CreatePlantDialog pins tent refetch + pure suppliedTentBlocksWrite gate", () => {
+    expect(CREATE_PLANT).toMatch(/isFetching:\s*tentsFetching/);
+    expect(CREATE_PLANT).toMatch(/suppliedTentBlocksWrite\(/);
   });
 
   it("Edit flows are not touched (create dialogs only)", () => {

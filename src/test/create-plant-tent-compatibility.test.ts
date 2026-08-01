@@ -14,10 +14,15 @@ describe("create plant tent compatibility", () => {
   it("dialog never tentless-escapes a supplied tent", () => {
     expect(PLANT).toMatch(/evaluateSuppliedTentBinding/);
     expect(PLANT).toMatch(/plantCreateAllowsTentless/);
+    expect(PLANT).toMatch(/suppliedTentBlocksWrite/);
     expect(PLANT).toMatch(/create-plant-tent-pending/);
     expect(PLANT).toMatch(/tentsFetching/);
     expect(PLANT).toMatch(/explicitCompatiblePick/);
     expect(plantCreateAllowsTentless({ suppliedTentId: "t1" })).toBe(false);
+    // Inline tentBlocksWrite composition must not reappear and drift from the pure helper.
+    expect(PLANT).not.toMatch(
+      /suppliedTent\.blockSubmit\s*&&\s*\([\s\S]*suppliedTent\.kind\s*===\s*"pending"/,
+    );
   });
 
   it("orphan/mismatch block submit with zero clear-to-none contract", () => {

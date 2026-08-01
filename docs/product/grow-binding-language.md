@@ -17,7 +17,7 @@ Product rules for **Create tent** / **Create plant** on the production deploy br
 
 | Kind | Behavior |
 | --- | --- |
-| pending | Keep tent id; block submit; **no** tentless create. Includes background tent refetch (`isFetching`) — cached rows are not treated as verified while a fetch is in flight. |
+| pending | Keep tent id; block submit; **no** tentless create. Includes initial load **and** background refetch (`isFetching`) — cached rows are not treated as verified while a fetch is in flight. |
 | unavailable (tent read error) | Retry; block submit; **no** compatible-replacement escape |
 | unavailable (missing after successful load) | Retry; block submit until grower explicitly picks another tent that matches the target setup; still **no** tentless create |
 | orphan / mismatch | Blocked presenter; require explicit compatible tent |

@@ -228,4 +228,16 @@ describe("supplied tent contract", () => {
     expect(r.kind).toBe("required_missing");
     expect(plantCreateAllowsTentless({ suppliedTentId: "t1" })).toBe(false);
   });
+
+  it("pending never clears via explicitCompatiblePick alone", () => {
+    const pending = evaluateSuppliedTentBinding({
+      suppliedTentId: "t1",
+      tentsFetching: true,
+      tentsLoaded: true,
+      suppliedTentRow: { id: "t1", grow_id: "g1" },
+      targetGrowId: "g1",
+    });
+    expect(pending.kind).toBe("pending");
+    expect(suppliedTentBlocksWrite(pending, true)).toBe(true);
+  });
 });

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -7,8 +7,20 @@ import { useTents } from "@/hooks/use-tents";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import CreateTentDialog from "@/components/CreateTentDialog";
@@ -36,7 +48,7 @@ interface Props {
 
 export default function CreatePlantDialog({ trigger, defaultTentId, defaultGrowId }: Props) {
   const { user } = useAuth();
-  const { grows = [] } = useGrows();
+  const { grows = [], activeGrowId, loading: growsLoading } = useGrows();
   const qc = useQueryClient();
   const { data: allTents = [] } = useTents();
   const [open, setOpen] = useState(false);
@@ -51,14 +63,27 @@ export default function CreatePlantDialog({ trigger, defaultTentId, defaultGrowI
     started_at: "",
   });
 
-  // Resolve which grow the new plant will belong to: an explicit page context
-  // wins, otherwise the grower's in-dialog selection. When neither resolves
-  // and grows exist, submit is blocked — never silently bind to a stale grow.
+  // Page context wins; otherwise seed from active grow so unscoped /plants
+  // creates still land in the grower's current setup.
+  useEffect(() => {
+    if (!open || defaultGrowId) return;
+    if (form.grow_id) return;
+    if (activeGrowId && grows.some((g) => g.id === activeGrowId)) {
+      setForm((f) => ({ ...f, grow_id: activeGrowId }));
+    }
+  }, [open, defaultGrowId, activeGrowId, grows, form.grow_id]);
+
+  // Resolve which grow the new plant will belong to:
+  //   1) explicit page defaultGrowId
+  //   2) in-dialog selection (seeded from active grow)
+  //   3) (submit-time) tent-derived grow as last resort
   const targetGrowId = defaultGrowId ?? (form.grow_id || undefined);
   const targetGrowName = targetGrowId
-    ? grows.find((g) => g.id === targetGrowId)?.name ?? "Selected grow"
+    ? (grows.find((g) => g.id === targetGrowId)?.name ?? "Selected grow")
     : null;
   const needsGrowSelection = !defaultGrowId && grows.length > 0;
+  const growsStillLoading = growsLoading && grows.length === 0;
+  const missingGrowWhileOwned = !targetGrowId && grows.length > 0;
 
   // Scope tent options to the resolved target grow when present.
   const tents = targetGrowId
@@ -73,7 +98,11 @@ export default function CreatePlantDialog({ trigger, defaultTentId, defaultGrowI
       toast.error("Not signed in");
       return;
     }
-    if (needsGrowSelection && !form.grow_id) {
+    if (growsStillLoading) {
+      toast.error("Still loading your grows — try again in a moment");
+      return;
+    }
+    if (missingGrowWhileOwned) {
       toast.error("Pick which grow this plant belongs to first");
       return;
     }
@@ -87,10 +116,8 @@ export default function CreatePlantDialog({ trigger, defaultTentId, defaultGrowI
       health: form.health,
     };
     if (form.tent_id && form.tent_id !== "none") payload.tent_id = form.tent_id;
-    // Preselect grow context when provided. RLS enforces ownership server-side.
-    // Fall back to the grower's explicit in-dialog selection, then derive
-    // grow_id from the selected tent so newly-created plants never end up
-    // with a tent assignment but null grow.
+    // Prefer page context, then explicit/active selection, then tent-derived
+    // grow so newly-created plants never end up with a tent but null grow.
     if (defaultGrowId) {
       payload.grow_id = defaultGrowId;
     } else if (form.grow_id) {
@@ -100,6 +127,13 @@ export default function CreatePlantDialog({ trigger, defaultTentId, defaultGrowI
         (t) => t.id === form.tent_id,
       );
       if (selectedTent?.grow_id) payload.grow_id = selectedTent.grow_id;
+    }
+    // Fail closed: if grower owns grows and we still have no grow_id, abort
+    // rather than insert an unbound plant (blocks Quick Log later).
+    if (grows.length > 0 && !payload.grow_id) {
+      setBusy(false);
+      toast.error("Pick which grow this plant belongs to first");
+      return;
     }
     if (form.started_at) payload.started_at = new Date(form.started_at).toISOString();
 
@@ -112,7 +146,15 @@ export default function CreatePlantDialog({ trigger, defaultTentId, defaultGrowI
     toast.success("Plant created");
     qc.invalidateQueries({ queryKey: ["plants"] });
     qc.invalidateQueries({ queryKey: ["grow", "plants"] });
-    setForm({ name: "", strain: "", grow_id: "", tent_id: defaultTentId ?? "none", stage: "seedling", health: "healthy", started_at: "" });
+    setForm({
+      name: "",
+      strain: "",
+      grow_id: "",
+      tent_id: defaultTentId ?? "none",
+      stage: "seedling",
+      health: "healthy",
+      started_at: "",
+    });
     setOpen(false);
   }
 
@@ -130,20 +172,41 @@ export default function CreatePlantDialog({ trigger, defaultTentId, defaultGrowI
           <DialogTitle className="font-display">New plant</DialogTitle>
         </DialogHeader>
         {targetGrowName ? (
-          <div data-testid="create-plant-target-grow" className="rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-xs -mt-1">
+          <div
+            data-testid="create-plant-target-grow"
+            className="rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-xs -mt-1"
+          >
             Creating in grow: <span className="font-medium text-foreground">{targetGrowName}</span>
+            {!defaultGrowId && activeGrowId === targetGrowId ? (
+              <span className="text-muted-foreground"> (active setup)</span>
+            ) : null}
+          </div>
+        ) : growsStillLoading ? (
+          <div
+            data-testid="create-plant-grows-loading"
+            className="rounded-md border border-border/60 bg-secondary/30 px-3 py-2 text-xs -mt-1"
+          >
+            Loading your grows…
           </div>
         ) : grows.length > 0 ? (
-          <div data-testid="create-plant-grow-required" className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs -mt-1">
+          <div
+            data-testid="create-plant-grow-required"
+            className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs -mt-1"
+          >
             No grow selected — pick which grow this plant belongs to below.
           </div>
         ) : (
-          <div data-testid="create-plant-no-grow-note" className="rounded-md border border-border/60 bg-secondary/30 px-3 py-2 text-xs -mt-1">
-            No grows yet — this plant will be created without a grow. You can link it later in Lineage Repair.
+          <div
+            data-testid="create-plant-no-grow-note"
+            className="rounded-md border border-border/60 bg-secondary/30 px-3 py-2 text-xs -mt-1"
+          >
+            No grows yet — this plant will be created without a grow. You can link it later in
+            Lineage Repair.
           </div>
         )}
         <p className="text-xs text-muted-foreground -mt-1">
-          Start simple. You can add genetics, medium, dates, and notes later. Verdant works best once your first plant memory exists.
+          Start simple. You can add genetics, medium, dates, and notes later. Verdant works best
+          once your first plant memory exists.
         </p>
         <form onSubmit={submit} className="grid gap-3">
           {needsGrowSelection && (
@@ -167,27 +230,47 @@ export default function CreatePlantDialog({ trigger, defaultTentId, defaultGrowI
                   }))
                 }
               >
-                <SelectTrigger data-testid="create-plant-grow-select"><SelectValue placeholder="Select a grow" /></SelectTrigger>
+                <SelectTrigger data-testid="create-plant-grow-select">
+                  <SelectValue placeholder="Select a grow" />
+                </SelectTrigger>
                 <SelectContent>
                   {grows.map((g) => (
-                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                    <SelectItem key={g.id} value={g.id}>
+                      {g.name}
+                      {g.id === activeGrowId ? " (active)" : ""}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-[11px] text-muted-foreground mt-1">Required so the plant lands in the right grow.</p>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Required so the plant lands in the right grow.
+              </p>
             </div>
           )}
           <div>
             <Label>Name</Label>
-            <Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Plant A" />
-            <p className="text-[11px] text-muted-foreground mt-1">Only a name and stage are required to get started.</p>
+            <Input
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Plant A"
+            />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Only a name and stage are required to get started.
+            </p>
           </div>
           <div>
             <Label>Stage</Label>
             <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                {STAGES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                {STAGES.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>
+                    {s.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -198,48 +281,81 @@ export default function CreatePlantDialog({ trigger, defaultTentId, defaultGrowI
                 defaultGrowId={targetGrowId}
                 onCreated={(t) => setForm((f) => ({ ...f, tent_id: t.id }))}
                 trigger={
-                  <Button type="button" size="sm" variant="ghost" className="h-7 px-2 gap-1 text-xs">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 gap-1 text-xs"
+                  >
                     <Plus className="h-3 w-3" /> Add new tent
                   </Button>
                 }
               />
             </div>
             <Select value={form.tent_id} onValueChange={(v) => setForm({ ...form, tent_id: v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger data-testid="create-plant-tent-select">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">No tent</SelectItem>
                 {tents.map((t: { id: string; name: string }) => (
-                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             {tents.length === 0 && (
-              <p className="text-xs text-muted-foreground mt-1">No tents yet. Create a tent first.</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                No tents yet in this grow. Create a tent first.
+              </p>
             )}
           </div>
           <details className="rounded-md border border-border/40 px-3 py-2">
-            <summary className="cursor-pointer text-xs text-muted-foreground select-none">Optional details (enrich later)</summary>
+            <summary className="cursor-pointer text-xs text-muted-foreground select-none">
+              Optional details (enrich later)
+            </summary>
             <div className="grid gap-3 pt-3">
               <div>
                 <Label>Strain (optional)</Label>
-                <Input value={form.strain} onChange={(e) => setForm({ ...form, strain: e.target.value })} placeholder="Blue Dream" />
+                <Input
+                  value={form.strain}
+                  onChange={(e) => setForm({ ...form, strain: e.target.value })}
+                  placeholder="Blue Dream"
+                />
               </div>
               <div>
                 <Label>Health</Label>
                 <Select value={form.health} onValueChange={(v) => setForm({ ...form, health: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    {HEALTH.map((h) => <SelectItem key={h.value} value={h.value}>{h.label}</SelectItem>)}
+                    {HEALTH.map((h) => (
+                      <SelectItem key={h.value} value={h.value}>
+                        {h.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label>Started at (optional)</Label>
-                <Input type="date" value={form.started_at} onChange={(e) => setForm({ ...form, started_at: e.target.value })} />
+                <Input
+                  type="date"
+                  value={form.started_at}
+                  onChange={(e) => setForm({ ...form, started_at: e.target.value })}
+                />
               </div>
             </div>
           </details>
-          <Button disabled={busy} className="gradient-leaf text-primary-foreground">Create plant</Button>
+          <Button
+            disabled={busy || growsStillLoading || missingGrowWhileOwned}
+            className="gradient-leaf text-primary-foreground"
+            data-testid="create-plant-submit"
+          >
+            Create plant
+          </Button>
         </form>
       </DialogContent>
     </Dialog>

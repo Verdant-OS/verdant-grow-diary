@@ -11,6 +11,8 @@
  *    until an explicit in-dialog grow selection is made (no silent unbound or
  *    mis-bound inserts);
  *  - the explicit selection is written to payload.grow_id;
+ *  - dialogs seed from activeGrowId when page defaultGrowId is absent so
+ *    unscoped /tents and /plants create into the current setup;
  *  - GrowLineageRepair backfills plants.grow_id when a tent is assigned to a
  *    grow, and surfaces plants whose grow_id disagrees with their tent's grow
  *    (EditPlantDialog moves tent_id but never writes grow_id).
@@ -23,11 +25,20 @@ const ROOT = resolve(__dirname, "../..");
 const CREATE_TENT = readFileSync(resolve(ROOT, "src/components/CreateTentDialog.tsx"), "utf8");
 const CREATE_PLANT = readFileSync(resolve(ROOT, "src/components/CreatePlantDialog.tsx"), "utf8");
 const REPAIR = readFileSync(resolve(ROOT, "src/pages/GrowLineageRepair.tsx"), "utf8");
+const TENTS_PAGE = readFileSync(resolve(ROOT, "src/pages/Tents.tsx"), "utf8");
+const PLANTS_PAGE = readFileSync(resolve(ROOT, "src/pages/Plants.tsx"), "utf8");
 
 describe("CreateTentDialog — target grow visibility + explicit binding", () => {
   it("resolves the target grow from page context first, then in-dialog selection", () => {
     expect(CREATE_TENT).toMatch(
       /targetGrowId\s*=\s*defaultGrowId\s*\?\?\s*\(form\.grow_id\s*\|\|\s*undefined\)/,
+    );
+  });
+
+  it("seeds in-dialog grow from activeGrowId when page default is absent", () => {
+    expect(CREATE_TENT).toMatch(/activeGrowId/);
+    expect(CREATE_TENT).toMatch(
+      /setForm\(\(f\)\s*=>\s*\(\{\s*\.\.\.f,\s*grow_id:\s*activeGrowId\s*\}\)\)/,
     );
   });
 
@@ -38,20 +49,24 @@ describe("CreateTentDialog — target grow visibility + explicit binding", () =>
   });
 
   it("renders an explicit grow selector when no grow context resolves", () => {
-    expect(CREATE_TENT).toMatch(/needsGrowSelection\s*=\s*!defaultGrowId\s*&&\s*grows\.length\s*>\s*0/);
+    expect(CREATE_TENT).toMatch(
+      /needsGrowSelection\s*=\s*!defaultGrowId\s*&&\s*grows\.length\s*>\s*0/,
+    );
     expect(CREATE_TENT).toContain('data-testid="create-tent-grow-select"');
     expect(CREATE_TENT).toMatch(/No grow selected/);
   });
 
-  it("blocks submit before the tents insert while the grow is unresolved", () => {
-    const guardIdx = CREATE_TENT.indexOf("if (needsGrowSelection && !form.grow_id)");
+  it("blocks submit while grows are loading or unresolved", () => {
+    expect(CREATE_TENT).toMatch(/growsStillLoading/);
+    expect(CREATE_TENT).toMatch(/missingGrowWhileOwned/);
+    const guardIdx = CREATE_TENT.indexOf("if (missingGrowWhileOwned)");
     const insertIdx = CREATE_TENT.indexOf('.from("tents")');
     expect(guardIdx).toBeGreaterThan(-1);
     expect(insertIdx).toBeGreaterThan(guardIdx);
   });
 
-  it("writes the explicit in-dialog selection to grow_id", () => {
-    expect(CREATE_TENT).toMatch(/else if\s*\(form\.grow_id\)\s*payload\.grow_id\s*=\s*form\.grow_id/);
+  it("writes the resolved targetGrowId to grow_id", () => {
+    expect(CREATE_TENT).toMatch(/if\s*\(targetGrowId\)\s*payload\.grow_id\s*=\s*targetGrowId/);
   });
 
   it("labels the zero-grows first-run path instead of failing silently", () => {
@@ -67,6 +82,13 @@ describe("CreatePlantDialog — target grow visibility + explicit binding", () =
     );
   });
 
+  it("seeds in-dialog grow from activeGrowId when page default is absent", () => {
+    expect(CREATE_PLANT).toMatch(/activeGrowId/);
+    expect(CREATE_PLANT).toMatch(
+      /setForm\(\(f\)\s*=>\s*\(\{\s*\.\.\.f,\s*grow_id:\s*activeGrowId\s*\}\)\)/,
+    );
+  });
+
   it("displays the resolved target grow prominently in the dialog", () => {
     expect(CREATE_PLANT).toContain('data-testid="create-plant-target-grow"');
     expect(CREATE_PLANT).toMatch(/Creating in grow/);
@@ -74,13 +96,15 @@ describe("CreatePlantDialog — target grow visibility + explicit binding", () =
   });
 
   it("renders an explicit grow selector when no grow context resolves", () => {
-    expect(CREATE_PLANT).toMatch(/needsGrowSelection\s*=\s*!defaultGrowId\s*&&\s*grows\.length\s*>\s*0/);
+    expect(CREATE_PLANT).toMatch(
+      /needsGrowSelection\s*=\s*!defaultGrowId\s*&&\s*grows\.length\s*>\s*0/,
+    );
     expect(CREATE_PLANT).toContain('data-testid="create-plant-grow-select"');
     expect(CREATE_PLANT).toMatch(/No grow selected/);
   });
 
   it("blocks submit before the plants insert while the grow is unresolved", () => {
-    const guardIdx = CREATE_PLANT.indexOf("if (needsGrowSelection && !form.grow_id)");
+    const guardIdx = CREATE_PLANT.indexOf("if (missingGrowWhileOwned)");
     const insertIdx = CREATE_PLANT.indexOf('.from("plants")');
     expect(guardIdx).toBeGreaterThan(-1);
     expect(insertIdx).toBeGreaterThan(guardIdx);
@@ -95,6 +119,10 @@ describe("CreatePlantDialog — target grow visibility + explicit binding", () =
     expect(tentDerivedIdx).toBeGreaterThan(explicitIdx);
   });
 
+  it("fail-closes when grower owns grows but payload still has no grow_id", () => {
+    expect(CREATE_PLANT).toMatch(/grows\.length\s*>\s*0\s*&&\s*!payload\.grow_id/);
+  });
+
   it("clears a selected tent that does not belong to the newly selected grow", () => {
     expect(CREATE_PLANT).toMatch(/t\.id\s*===\s*f\.tent_id\s*&&\s*t\.grow_id\s*===\s*v/);
   });
@@ -102,6 +130,18 @@ describe("CreatePlantDialog — target grow visibility + explicit binding", () =
   it("labels the zero-grows first-run path instead of failing silently", () => {
     expect(CREATE_PLANT).toContain('data-testid="create-plant-no-grow-note"');
     expect(CREATE_PLANT).toMatch(/No grows yet/);
+  });
+});
+
+describe("Tents/Plants pages — unscoped create uses active grow", () => {
+  it("Tents falls back to activeGrowId when URL grow scope is absent", () => {
+    expect(TENTS_PAGE).toMatch(/activeGrowId/);
+    expect(TENTS_PAGE).toMatch(/isValidScopedGrow[\s\S]{0,80}activeGrowId/);
+  });
+
+  it("Plants falls back to activeGrowId when URL grow scope is absent", () => {
+    expect(PLANTS_PAGE).toMatch(/activeGrowId/);
+    expect(PLANTS_PAGE).toMatch(/isValidScopedGrow[\s\S]{0,80}activeGrowId/);
   });
 });
 
@@ -144,8 +184,6 @@ describe("GrowLineageRepair — plants follow their tent's grow", () => {
   });
 
   it("still never touches service_role or device-control surfaces", () => {
-    expect(REPAIR).not.toMatch(
-      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|service_role/i,
-    );
+    expect(REPAIR).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|service_role/i);
   });
 });

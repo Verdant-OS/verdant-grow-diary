@@ -20,7 +20,7 @@
  *
  * Pure: no React, no Supabase, no I/O.
  */
-import { STAGES } from "@/lib/grow";
+import { STAGES, type CanonicalQuickLogStage } from "@/lib/grow";
 
 /** Canonical stage value used when the stage is genuinely unknown. */
 export const UNKNOWN_STAGE = "" as const;
@@ -34,7 +34,7 @@ export const UNKNOWN_STAGE = "" as const;
  * normalize and Quick Log would show the wrong default stage. Keyed by the
  * lowercased incoming value/label.
  */
-const STAGE_ALIASES: Record<string, (typeof STAGES)[number]["value"]> = {
+const STAGE_ALIASES: Record<string, CanonicalQuickLogStage> = {
   cure: "drying",
   curing: "drying",
 };
@@ -49,7 +49,7 @@ const STAGE_ALIASES: Record<string, (typeof STAGES)[number]["value"]> = {
  * (plant-side "cure" → "drying") are resolved first. Anything else — empty
  * string, whitespace, unknown text, non-strings — normalizes to `null`.
  */
-export function normalizeQuickLogStage(raw: unknown): string | null {
+export function normalizeQuickLogStage(raw: unknown): CanonicalQuickLogStage | null {
   if (typeof raw !== "string") return null;
   const needle = raw.trim().toLowerCase();
   if (needle === "") return null;
@@ -89,7 +89,11 @@ export interface HarvestStageEligibility {
 export function evaluateHarvestStageEligibility(raw: unknown): HarvestStageEligibility {
   const normalizedStage = normalizeQuickLogStage(raw);
 
-  if (normalizedStage === "flower" || normalizedStage === "flush" || normalizedStage === "harvest") {
+  if (
+    normalizedStage === "flower" ||
+    normalizedStage === "flush" ||
+    normalizedStage === "harvest"
+  ) {
     return { eligible: true, normalizedStage, reason: "eligible" };
   }
 

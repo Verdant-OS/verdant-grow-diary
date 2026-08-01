@@ -4,10 +4,16 @@ import {
   resolveGuidedSymptomStage,
   validateGuidedSymptomCheck,
 } from "@/lib/symptomCheckRules";
+import { STAGES } from "@/lib/grow";
 
 describe("guided Symptom Check rules", () => {
-  it("prefills only a canonical stage and never invents vegetative", () => {
+  it("prefills only the canonical Quick Log stage vocabulary", () => {
+    for (const stage of STAGES) {
+      expect(resolveGuidedSymptomStage(stage.value)).toBe(stage.value);
+    }
     expect(resolveGuidedSymptomStage("Flowering")).toBe("flower");
+    expect(resolveGuidedSymptomStage("Vegetative")).toBe("veg");
+    expect(resolveGuidedSymptomStage("cure")).toBe("drying");
     expect(resolveGuidedSymptomStage("unknown")).toBeNull();
     expect(resolveGuidedSymptomStage(null)).toBeNull();
   });
@@ -75,6 +81,30 @@ describe("guided Symptom Check rules", () => {
       },
     });
   });
+
+  it.each([
+    ["flush", "flush"],
+    ["cure", "drying"],
+  ] as const)(
+    "persists a valid %s plant stage as canonical %s evidence",
+    (plantStage, expectedStage) => {
+      expect(
+        validateGuidedSymptomCheck({
+          plantId: "plant-1",
+          symptomId: "spots",
+          stage: plantStage,
+          stageConfirmed: true,
+        }),
+      ).toEqual({
+        ok: true,
+        stage: expectedStage,
+        details: {
+          observedSign: "spots",
+          observation_stage: expectedStage,
+        },
+      });
+    },
+  );
 
   it("builds a grow-scoped timeline link and only anchors a safe returned id", () => {
     expect(buildSymptomTimelineHref("grow 1", "event-1")).toBe(

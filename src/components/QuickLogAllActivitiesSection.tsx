@@ -70,7 +70,7 @@ import { QUICK_LOG_V2_OPEN_EVENT, buildQuickLogV2OpenIntent } from "@/lib/quickL
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { findCannabisSymptomByObservedSign } from "@/constants/cannabisSymptomTypes";
-import type { CanonicalGrowStage } from "@/constants/growStages";
+import type { CanonicalQuickLogStage } from "@/lib/grow";
 import {
   buildSymptomTimelineHref,
   hasGuidedSymptomPlant,
@@ -202,7 +202,7 @@ export default function QuickLogAllActivitiesSection({
   // keyed by field spec key. Sanitized before persistence.
   const [detailValues, setDetailValues] = useState<Record<string, string>>({});
   const [guidedSymptomCheck, setGuidedSymptomCheck] = useState(false);
-  const [guidedSymptomStage, setGuidedSymptomStage] = useState<CanonicalGrowStage | null>(null);
+  const [guidedSymptomStage, setGuidedSymptomStage] = useState<CanonicalQuickLogStage | null>(null);
   const [guidedSymptomStageConfirmed, setGuidedSymptomStageConfirmed] = useState(false);
   // Photo activity: a real image is REQUIRED before Save — a photo entry with
   // no image must never be confirmable. Uploaded to the private diary-photos

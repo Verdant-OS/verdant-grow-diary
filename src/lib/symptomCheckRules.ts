@@ -1,5 +1,6 @@
 import { findCannabisSymptomById, type CannabisSymptomId } from "@/constants/cannabisSymptomTypes";
-import { normalizeGrowStage, type CanonicalGrowStage } from "@/constants/growStages";
+import type { CanonicalQuickLogStage } from "@/lib/grow";
+import { normalizeQuickLogStage } from "@/lib/quickLogStageDefaultRules";
 import { buildTimelineEntryAnchorId } from "@/lib/timelineEntryAnchorRules";
 import { timelinePath } from "@/lib/routes";
 
@@ -14,13 +15,13 @@ export interface GuidedSymptomCheckDraft {
 export type GuidedSymptomCheckValidation =
   | {
       readonly ok: true;
-      readonly stage: CanonicalGrowStage;
+      readonly stage: CanonicalQuickLogStage;
       readonly details: Readonly<Record<string, string>>;
     }
   | { readonly ok: false; readonly reason: string };
 
-export function resolveGuidedSymptomStage(value: unknown): CanonicalGrowStage | null {
-  return typeof value === "string" ? normalizeGrowStage(value) : null;
+export function resolveGuidedSymptomStage(value: unknown): CanonicalQuickLogStage | null {
+  return normalizeQuickLogStage(value);
 }
 
 export function hasGuidedSymptomPlant(value: unknown): value is string {

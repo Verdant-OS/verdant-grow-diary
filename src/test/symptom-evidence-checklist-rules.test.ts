@@ -480,7 +480,7 @@ describe("symptom evidence checklist", () => {
     expect(view.title).toBe(
       "Yellowing / discoloration: verify the record before changing anything",
     );
-    expect(view.observationStageLabel).toBe("Flower");
+    expect(view.observationStageLabel).toBe("Flowering");
     expect(view.observationLocationLabel).toBe("Lower leaves");
     expect(view.observedAt).toBe("2026-08-01T12:00:00.000Z");
     expect(view.hubPath).toBe("/guides/cannabis-leaf-symptoms");
@@ -490,6 +490,23 @@ describe("symptom evidence checklist", () => {
       expect.stringMatching(/feeding/i),
       expect.stringMatching(/light/i),
     ]);
+  });
+
+  it.each([
+    ["flush", "Flushing"],
+    ["cure", "Drying / Curing"],
+    ["drying", "Drying / Curing"],
+  ] as const)("presents %s evidence with canonical stage label %s", (storedStage, label) => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: {
+        ...symptom,
+        details: { ...symptom.details, observation_stage: storedStage },
+      },
+      entries: [],
+      historyComplete: true,
+    })!;
+
+    expect(view.observationStageLabel).toBe(label);
   });
 
   it("returns null for a generic issue or unsupported sign", () => {

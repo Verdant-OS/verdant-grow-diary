@@ -1,18 +1,18 @@
 import { Label } from "@/components/ui/label";
 import { CANNABIS_SYMPTOM_DEFINITIONS } from "@/constants/cannabisSymptomTypes";
-import { GROW_STAGES, type CanonicalGrowStage } from "@/constants/growStages";
+import { STAGES, type CanonicalQuickLogStage } from "@/lib/grow";
 import { getQuickLogActivityDetailFields } from "@/lib/quickLogActivityDetailFields";
 
 interface QuickLogSymptomCheckFieldsProps {
   readonly symptomObservedSign: string;
   readonly observationLocation: string;
-  readonly stage: CanonicalGrowStage | null;
+  readonly stage: CanonicalQuickLogStage | null;
   readonly stageConfirmed: boolean;
   readonly disabled: boolean;
   readonly testIdPrefix: string;
   readonly onSymptomObservedSignChange: (value: string) => void;
   readonly onObservationLocationChange: (value: string) => void;
-  readonly onStageChange: (value: CanonicalGrowStage | null) => void;
+  readonly onStageChange: (value: CanonicalQuickLogStage | null) => void;
   readonly onStageConfirmedChange: (value: boolean) => void;
 }
 
@@ -97,14 +97,14 @@ export default function QuickLogSymptomCheckFields({
             id={`${testIdPrefix}-symptom-stage`}
             value={stage ?? ""}
             onChange={(event) =>
-              onStageChange((event.target.value || null) as CanonicalGrowStage | null)
+              onStageChange((event.target.value || null) as CanonicalQuickLogStage | null)
             }
             disabled={disabled}
             className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
             data-testid={`${testIdPrefix}-symptom-stage`}
           >
             <option value="">Choose stage</option>
-            {Object.values(GROW_STAGES).map((item) => (
+            {STAGES.map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
               </option>

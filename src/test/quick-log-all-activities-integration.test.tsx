@@ -11,7 +11,7 @@
  *  - failed saves do not dispatch and do not add saved items
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
 import React from "react";
 import { MemoryRouter } from "react-router-dom";
 
@@ -23,6 +23,7 @@ import {
   saveTemperatureUnitPreference,
   clearTemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
+import { STAGES } from "@/lib/grow";
 
 const rpcMock = vi.fn();
 // Photo activity goes diary-only: storage upload + diary_entries insert.
@@ -510,6 +511,55 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
       await screen.findByTestId("quick-log-all-activities-review-symptom-evidence"),
     ).toHaveAttribute("href", "/timeline?growId=grow-1#timeline-entry-e-symptom");
   });
+
+  it("guided Symptom Check renders every canonical Quick Log stage option", () => {
+    mountSection();
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-start-symptom-check"));
+
+    const stageSelect = screen.getByTestId("quick-log-all-activities-symptom-stage");
+    expect(
+      within(stageSelect)
+        .getAllByRole("option")
+        .map((option) => ({
+          label: option.textContent,
+          value: (option as HTMLOptionElement).value,
+        })),
+    ).toEqual([
+      { label: "Choose stage", value: "" },
+      ...STAGES.map((stage) => ({ label: stage.label, value: stage.value })),
+    ]);
+  });
+
+  it.each([
+    ["flush", "flush"],
+    ["cure", "drying"],
+  ] as const)(
+    "guided Symptom Check prefills %s and persists canonical %s evidence",
+    async (plantStage, expectedStage) => {
+      rpcMock.mockResolvedValueOnce({
+        data: { ok: true, grow_event_id: `e-symptom-${expectedStage}` },
+        error: null,
+      });
+      mountSection({ plantStage });
+      fireEvent.click(screen.getByTestId("quick-log-all-activities-start-symptom-check"));
+
+      expect(screen.getByTestId("quick-log-all-activities-symptom-stage")).toHaveValue(
+        expectedStage,
+      );
+      fireEvent.click(screen.getByTestId("quick-log-all-activities-symptom-spots"));
+      fireEvent.change(screen.getByTestId("quick-log-all-activities-note"), {
+        target: { value: "Visible spots recorded without a diagnosis." },
+      });
+      fireEvent.click(screen.getByTestId("quick-log-all-activities-symptom-stage-confirmed"));
+      fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+      await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+      expect(rpcMock.mock.calls[0][1].p_details).toMatchObject({
+        observedSign: "spots",
+        observation_stage: expectedStage,
+      });
+    },
+  );
 
   it("guided Symptom Check fails closed when the plant stage is unknown", async () => {
     mountSection({ plantStage: "unknown" });

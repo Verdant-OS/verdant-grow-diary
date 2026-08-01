@@ -1,7 +1,8 @@
 import { findCannabisSymptomByObservedSign } from "@/constants/cannabisSymptomTypes";
 import { classifyTimelineLightingSignal } from "@/lib/timelineLightingGuideRules";
 import { buildTimelineEntryAnchorId } from "@/lib/timelineEntryAnchorRules";
-import { formatGrowStageLabel, normalizeGrowStage } from "@/constants/growStages";
+import { stageLabel } from "@/lib/grow";
+import { normalizeQuickLogStage } from "@/lib/quickLogStageDefaultRules";
 import { describeQuickLogActivityDetails } from "@/lib/quickLogActivityDetailFields";
 import { timelinePath } from "@/lib/routes";
 
@@ -491,12 +492,12 @@ export function buildSymptomEvidenceChecklist(
     title: `${symptomDefinition.label}: verify the record before changing anything`,
     symptomLabel: symptomDefinition.label,
     observationStageLabel: (() => {
-      const stage = normalizeGrowStage(
+      const stage = normalizeQuickLogStage(
         typeof symptom.details.observation_stage === "string"
           ? symptom.details.observation_stage
           : null,
       );
-      return stage ? formatGrowStageLabel(stage) : null;
+      return stage ? stageLabel(stage) : null;
     })(),
     observationLocationLabel,
     observedAt: symptom.occurredAt!,

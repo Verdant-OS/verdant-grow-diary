@@ -106,19 +106,14 @@ export default function CreatePlantDialog({
       ),
     [targetGrowId, grows.length, growsLoading],
   );
-  const setupName = useMemo(
-    () => resolveSetupName(targetGrowId, grows),
-    [targetGrowId, grows],
-  );
+  const setupName = useMemo(() => resolveSetupName(targetGrowId, grows), [targetGrowId, grows]);
 
   const tentRows = allTents as TentRow[];
   // Scope tent options to the resolved target setup when known.
-  const tents = targetGrowId
-    ? tentRows.filter((t) => t.grow_id === targetGrowId)
-    : tentRows;
+  const tents = targetGrowId ? tentRows.filter((t) => t.grow_id === targetGrowId) : tentRows;
 
   const defaultTentGrowId = defaultTentId
-    ? tentRows.find((t) => t.id === defaultTentId)?.grow_id ?? null
+    ? (tentRows.find((t) => t.id === defaultTentId)?.grow_id ?? null)
     : null;
   const initialTentId = resolveInitialPlantTentId({
     defaultTentId,
@@ -135,7 +130,7 @@ export default function CreatePlantDialog({
     if (!open) return;
     const tentGrow =
       form.tent_id !== "none"
-        ? tentRows.find((t) => t.id === form.tent_id)?.grow_id ?? null
+        ? (tentRows.find((t) => t.id === form.tent_id)?.grow_id ?? null)
         : null;
     const selectedCompat = evaluateTentGrowCompatibility({
       selectedTentId: form.tent_id,
@@ -157,15 +152,23 @@ export default function CreatePlantDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional open/target gate
   }, [open, targetGrowId, defaultTentId, defaultTentGrowId]);
 
+  const defaultTentCompat = defaultTentId
+    ? evaluateTentGrowCompatibility({
+        selectedTentId: defaultTentId,
+        tentGrowId: defaultTentGrowId,
+        targetGrowId,
+      })
+    : null;
   const selectedTentGrowId =
-    form.tent_id !== "none"
-      ? tentRows.find((t) => t.id === form.tent_id)?.grow_id ?? null
-      : null;
+    form.tent_id !== "none" ? (tentRows.find((t) => t.id === form.tent_id)?.grow_id ?? null) : null;
   const tentCompat = evaluateTentGrowCompatibility({
     selectedTentId: form.tent_id,
     tentGrowId: selectedTentGrowId,
     targetGrowId,
   });
+  const tentMismatch =
+    (defaultTentCompat && !defaultTentCompat.compatible ? defaultTentCompat : null) ??
+    (!tentCompat.compatible && form.tent_id !== "none" ? tentCompat : null);
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
@@ -185,8 +188,8 @@ export default function CreatePlantDialog({
       if (hardStop.toastMessage) toast.error(hardStop.toastMessage);
       return;
     }
-    if (!tentCompat.compatible) {
-      toast.error(tentCompat.title || GROW_SETUP_MESSAGES.tentMismatchTitle);
+    if (tentMismatch) {
+      toast.error(tentMismatch.title || GROW_SETUP_MESSAGES.tentMismatchTitle);
       return;
     }
     const selectedTent = tents.find((tent) => tent.id === form.tent_id);
@@ -257,6 +260,7 @@ export default function CreatePlantDialog({
             className="rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 space-y-2"
             data-testid="create-plant-hard-stop"
             role="alert"
+            aria-label={hardStop.hardStopTitle}
           >
             <p className="text-sm font-semibold" data-testid="create-plant-hard-stop-title">
               {hardStop.hardStopTitle}
@@ -312,15 +316,23 @@ export default function CreatePlantDialog({
             ) : null}
           </p>
         )}
-        {!tentCompat.compatible && form.tent_id !== "none" && (
-          <p
-            className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"
+        {tentMismatch && (
+          <div
+            className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs space-y-2"
             data-testid="create-plant-tent-mismatch"
             role="alert"
+            aria-label={tentMismatch.title}
           >
-            <span className="font-semibold block">{tentCompat.title}</span>
-            <span className="text-muted-foreground">{tentCompat.body}</span>
-          </p>
+            <span className="font-semibold block">{tentMismatch.title}</span>
+            <span className="text-muted-foreground block">{tentMismatch.body}</span>
+            <Link
+              to="/grow-lineage"
+              className="inline-flex text-xs font-medium underline underline-offset-2"
+              data-testid="create-plant-finish-setup-cta"
+            >
+              {GROW_SETUP_MESSAGES.finishSetup}
+            </Link>
+          </div>
         )}
         <form onSubmit={submit} className="grid gap-3">
           <div>
@@ -448,7 +460,7 @@ export default function CreatePlantDialog({
             disabled={
               busy ||
               hardStop.blockSubmit ||
-              !tentCompat.compatible ||
+              !!tentMismatch ||
               (requireTent && form.tent_id === "none")
             }
             className="gradient-leaf text-primary-foreground"

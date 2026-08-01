@@ -11,12 +11,13 @@ Product rules for **Create tent** / **Create plant** on the production deploy br
 
 ## Grower-facing copy
 
-| Situation | Copy |
-| --- | --- |
-| No setup | Start your room first / need a setup before adding tent or plant |
-| Primary CTA | Start your room |
-| Known setup | Adding to {name} / This will live in your current setup |
-| Wrong tent | This tent is in another setup |
+| Situation   | Copy                                                             |
+| ----------- | ---------------------------------------------------------------- |
+| No setup    | Start your room first / need a setup before adding tent or plant |
+| Primary CTA | Start your room                                                  |
+| Known setup | Adding to {name} / This will live in your current setup          |
+| Wrong tent  | This tent is in another setup                                    |
+| Orphan tent | Finish setup → `/grow-lineage`                                   |
 
 Do **not** show: `grow_id`, orphan, lineage, backfill.
 

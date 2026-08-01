@@ -48,7 +48,9 @@ describe("Plants/Tents — preselect grow on create", () => {
   });
 
   it("CreatePlantDialog scopes tent options to the resolved target setup", () => {
-    expect(CREATE_PLANT).toMatch(/targetGrowId[\s\S]*?\.filter\([\s\S]*?t\.grow_id\s*===\s*targetGrowId/);
+    expect(CREATE_PLANT).toMatch(
+      /targetGrowId[\s\S]*?\.filter\([\s\S]*?t\.grow_id\s*===\s*targetGrowId/,
+    );
   });
 
   it("CreateTentDialog accepts defaultGrowId and always writes grow_id on insert when allowed", () => {
@@ -60,6 +62,22 @@ describe("Plants/Tents — preselect grow on create", () => {
   it("Create dialogs fail closed without resolvable target (no unbound insert)", () => {
     expect(CREATE_TENT).toMatch(/hardStop\.blockSubmit|canWriteCreateGrowId/);
     expect(CREATE_PLANT).toMatch(/hardStop\.blockSubmit|canWriteCreateGrowId/);
+  });
+
+  it("Create dialogs fall back to activeGrowId inside the dialog when unscoped", () => {
+    expect(CREATE_TENT).toMatch(/useGrows\(\)/);
+    expect(CREATE_TENT).toMatch(/activeGrowId/);
+    expect(CREATE_TENT).toMatch(/resolveCreateTargetGrowId/);
+    expect(CREATE_PLANT).toMatch(/useGrows\(\)/);
+    expect(CREATE_PLANT).toMatch(/activeGrowId/);
+    expect(CREATE_PLANT).toMatch(/resolveCreateTargetGrowId/);
+  });
+
+  it("URL growId precedence stays in resolver (page default before active)", () => {
+    expect(CREATE_TENT).toMatch(/pageDefaultGrowId:\s*defaultGrowId/);
+    expect(CREATE_TENT).toMatch(/activeGrowId/);
+    expect(CREATE_PLANT).toMatch(/pageDefaultGrowId:\s*defaultGrowId/);
+    expect(CREATE_PLANT).toMatch(/activeGrowId/);
   });
 
   it("Edit flows are not touched by URL growId (create dialogs only)", () => {

@@ -53,9 +53,15 @@ export default function CreateTentDialog({
   const { user } = useAuth();
   const { grows = [], activeGrowId, loading: growsLoading } = useGrows();
   const qc = useQueryClient();
+  const emptyForm = () => ({ name: "", size: "", brand: "", stage: "seedling" });
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ name: "", size: "", brand: "", stage: "seedling" });
+  const [form, setForm] = useState(emptyForm);
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) setForm(emptyForm());
+  }
 
   const targetGrowId = useMemo(
     () =>
@@ -74,10 +80,7 @@ export default function CreateTentDialog({
       ),
     [targetGrowId, grows.length, growsLoading],
   );
-  const setupName = useMemo(
-    () => resolveSetupName(targetGrowId, grows),
-    [targetGrowId, grows],
-  );
+  const setupName = useMemo(() => resolveSetupName(targetGrowId, grows), [targetGrowId, grows]);
 
   // Free-tier tent gate (multiTent=false → single tent). useTents already
   // filters archived tents. Fails open while entitlements load.
@@ -130,13 +133,13 @@ export default function CreateTentDialog({
     trackFunnelEvent("tent_created");
     qc.invalidateQueries({ queryKey: ["tents"] });
     qc.invalidateQueries({ queryKey: ["grow", "tents"] });
-    setForm({ name: "", size: "", brand: "", stage: "seedling" });
+    setForm(emptyForm());
     setOpen(false);
     if (data && onCreated) onCreated(data as { id: string; name: string });
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger ?? (
           <Button size="sm" className="gradient-leaf text-primary-foreground gap-1">
@@ -157,6 +160,7 @@ export default function CreateTentDialog({
             className="rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 space-y-2"
             data-testid="create-tent-hard-stop"
             role="alert"
+            aria-label={hardStop.hardStopTitle}
           >
             <p className="text-sm font-semibold" data-testid="create-tent-hard-stop-title">
               {hardStop.hardStopTitle}

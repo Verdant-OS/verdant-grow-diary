@@ -6,10 +6,8 @@
  *
  * Pure: no React, no Supabase.
  */
-import {
-  GROW_SETUP_MESSAGES,
-  GROW_SETUP_START_ROOM_HREF,
-} from "@/constants/growSetupMessages";
+import { GROW_SETUP_MESSAGES, GROW_SETUP_START_ROOM_HREF } from "@/constants/growSetupMessages";
+import { isUuid } from "@/lib/isUuid";
 
 export type CreateBindingEntity = "tent" | "plant";
 
@@ -56,7 +54,8 @@ export function resolveSetupName(
   if (!id) return null;
   const hit = grows.find((g) => g.id === id);
   const name = hit?.name?.trim();
-  return name && name.length > 0 ? name : null;
+  if (!name || name.length === 0 || isUuid(name)) return null;
+  return name;
 }
 
 export interface CreateGrowBindingHardStopView {

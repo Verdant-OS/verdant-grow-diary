@@ -5,6 +5,7 @@ import {
   canWriteCreateGrowId,
   evaluateTentGrowCompatibility,
   resolveInitialPlantTentId,
+  resolveSetupName,
 } from "@/lib/createDialogGrowBindingRules";
 import { GROW_SETUP_START_ROOM_HREF } from "@/constants/growSetupMessages";
 
@@ -47,10 +48,7 @@ describe("resolveCreateTargetGrowId", () => {
 
 describe("buildCreateGrowBindingHardStop", () => {
   it("blocks zero grows with Start your room path", () => {
-    const v = buildCreateGrowBindingHardStop(
-      { targetGrowId: null, growCount: 0 },
-      "plant",
-    );
+    const v = buildCreateGrowBindingHardStop({ targetGrowId: null, growCount: 0 }, "plant");
     expect(v.blockSubmit).toBe(true);
     expect(v.showStartRoomHardStop).toBe(true);
     expect(v.startRoomHref).toBe(GROW_SETUP_START_ROOM_HREF);
@@ -70,19 +68,13 @@ describe("buildCreateGrowBindingHardStop", () => {
   });
 
   it("blocks when grows exist but no resolvable target", () => {
-    const v = buildCreateGrowBindingHardStop(
-      { targetGrowId: null, growCount: 2 },
-      "tent",
-    );
+    const v = buildCreateGrowBindingHardStop({ targetGrowId: null, growCount: 2 }, "tent");
     expect(v.blockSubmit).toBe(true);
     expect(v.showPickGrowHint).toBe(true);
   });
 
   it("allows submit when target is set", () => {
-    const v = buildCreateGrowBindingHardStop(
-      { targetGrowId: "g1", growCount: 1 },
-      "tent",
-    );
+    const v = buildCreateGrowBindingHardStop({ targetGrowId: "g1", growCount: 1 }, "tent");
     expect(v.blockSubmit).toBe(false);
     expect(canWriteCreateGrowId("g1")).toBe(true);
     expect(canWriteCreateGrowId(null)).toBe(false);
@@ -147,5 +139,32 @@ describe("tent compatibility", () => {
         targetGrowId: "g1",
       }),
     ).toBe("t1");
+  });
+});
+
+describe("resolveSetupName", () => {
+  it("returns trimmed setup name when present", () => {
+    expect(resolveSetupName("g1", grows)).toBe("Spring");
+  });
+
+  it("never leaks a raw UUID as the display name", () => {
+    const uuidGrow = [
+      {
+        id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        name: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      },
+    ];
+    expect(resolveSetupName("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", uuidGrow)).toBeNull();
+  });
+
+  it("handles blank or missing setup names", () => {
+    expect(resolveSetupName("g1", [{ id: "g1", name: "   " }])).toBeNull();
+    expect(resolveSetupName("g1", [{ id: "g1", name: null }])).toBeNull();
+    expect(resolveSetupName("g1", [])).toBeNull();
+  });
+
+  it("handles very long setup names without truncation in resolver", () => {
+    const longName = "A".repeat(200);
+    expect(resolveSetupName("g1", [{ id: "g1", name: longName }])).toBe(longName);
   });
 });

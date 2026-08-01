@@ -12,17 +12,40 @@ export const GROW_SETUP_MESSAGES = {
   hardStopCta: "Start your room",
   hardStopSecondary: "Not now",
   loadingToast: "Still loading your setups — try again in a moment",
-  pickSetupToast: (entity: "tent" | "plant") =>
-    `Pick which setup this ${entity} belongs to first`,
+  pickSetupToast: (entity: "tent" | "plant") => `Pick which setup this ${entity} belongs to first`,
   addingTo: (setupName: string) => `Adding to ${setupName}`,
   addingToHint: "This will live in your current setup.",
   tentMismatchTitle: "This tent is in another setup",
   tentMismatchBody: "Choose a tent in your current setup, or switch setups.",
   tentOrphanTitle: "Finish setup",
-  tentOrphanBody: "This tent isn’t linked to a setup yet. Choose another tent, or finish setup first.",
+  tentOrphanBody:
+    "This tent isn’t linked to a setup yet. Choose another tent, or finish setup first.",
   chooseTent: "Choose tent",
   switchSetup: "Switch setup",
   finishSetup: "Finish setup",
+} as const;
+
+/** Grouped contract keys for grow-setup-language-contract tests. */
+export const growSetup = {
+  noSetup: {
+    title: GROW_SETUP_MESSAGES.hardStopTitle,
+    body: GROW_SETUP_MESSAGES.hardStopBody,
+    ctaStart: GROW_SETUP_MESSAGES.hardStopCta,
+    ctaDismiss: GROW_SETUP_MESSAGES.hardStopSecondary,
+  },
+  create: {
+    addingTo: GROW_SETUP_MESSAGES.addingTo,
+    addingToHint: GROW_SETUP_MESSAGES.addingToHint,
+    pickSetupToast: GROW_SETUP_MESSAGES.pickSetupToast,
+    loadingToast: GROW_SETUP_MESSAGES.loadingToast,
+  },
+  mismatch: {
+    tentTitle: GROW_SETUP_MESSAGES.tentMismatchTitle,
+    tentBody: GROW_SETUP_MESSAGES.tentMismatchBody,
+    orphanTitle: GROW_SETUP_MESSAGES.tentOrphanTitle,
+    orphanBody: GROW_SETUP_MESSAGES.tentOrphanBody,
+    finishSetup: GROW_SETUP_MESSAGES.finishSetup,
+  },
 } as const;
 
 /** Tokens that must never appear in grower-facing create-binding UI. */

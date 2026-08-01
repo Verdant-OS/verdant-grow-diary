@@ -464,6 +464,16 @@ describe("cli — untrusted fixture input", () => {
     approvalRequirement: "approval_required",
     executionCapability: "manual_only",
   };
+  /** Raises confidence to where the governor permits an action at all. */
+  const permitAction = (record: Record<string, unknown>) => {
+    const output = (record.execution as Record<string, unknown>).output as Record<string, unknown>;
+    output.confidence = {
+      modelConfidence: 0.9,
+      evidenceConfidence: 0.9,
+      systemConfidence: 0.9,
+      derivation: "min_model_evidence_v1",
+    };
+  };
   const verdictFor = (executionCapability: string) => ({
     proposalId: "p-1",
     verdict: "allow",
@@ -482,6 +492,7 @@ describe("cli — untrusted fixture input", () => {
       (execution.output as Record<string, unknown>).proposals = [PROPOSAL];
       policy.proposalVerdicts = [verdictFor("manual_only")];
       policy.outcomes = ["allow_low_risk_manual_action"];
+      permitAction(record);
       policy.actionEligibility = "none";
     });
     expect(contradicting.code).toBe(EXIT_USAGE_OR_IO);
@@ -514,6 +525,7 @@ describe("cli — untrusted fixture input", () => {
       (execution.output as Record<string, unknown>).proposals = [PROPOSAL];
       policy.proposalVerdicts = [verdictFor("manual_only")];
       policy.outcomes = ["allow_low_risk_manual_action"];
+      permitAction(record);
       policy.actionEligibility = "low_risk_manual_only";
     });
     expect(acting.code).not.toBe(EXIT_USAGE_OR_IO);
@@ -526,6 +538,7 @@ describe("cli — untrusted fixture input", () => {
       const policy = (record.execution as { policy: Record<string, unknown> }).policy;
       policy.proposalVerdicts = [verdictFor("none")];
       policy.outcomes = ["allow_low_risk_manual_action"];
+      permitAction(record);
       policy.actionEligibility = "none";
     });
     expect(r.code).toBe(EXIT_USAGE_OR_IO);
@@ -613,6 +626,7 @@ describe("cli — untrusted fixture input", () => {
       ];
       policy.actionEligibility = "low_risk_manual_only";
       policy.outcomes = ["block_action", "allow_low_risk_manual_action"];
+      permitAction(record);
     });
     expect(r.code).toBe(EXIT_USAGE_OR_IO);
     expect(r.lines.join(" ")).toContain("more than one policy verdict");
@@ -669,6 +683,7 @@ describe("cli — untrusted fixture input", () => {
         const policy = execution.policy as Record<string, unknown>;
         policy.proposalVerdicts = [{ ...verdictFor("manual_only"), effectiveRiskLevel: effective }];
         policy.outcomes = ["allow_low_risk_manual_action"];
+        permitAction(record);
         policy.actionEligibility = "low_risk_manual_only";
       });
       expect(r.code, `${declared}->${effective}`).toBe(EXIT_USAGE_OR_IO);
@@ -688,6 +703,7 @@ describe("cli — untrusted fixture input", () => {
       const policy = execution.policy as Record<string, unknown>;
       policy.proposalVerdicts = [{ ...verdictFor("manual_only"), effectiveRiskLevel: "low" }];
       policy.outcomes = ["allow_low_risk_manual_action"];
+      permitAction(record);
       policy.actionEligibility = "low_risk_manual_only";
     });
     expect(allowedAtCeiling.code).not.toBe(EXIT_USAGE_OR_IO);
@@ -716,7 +732,11 @@ describe("cli — untrusted fixture input", () => {
     // Round 17 rejected understatement and left the other end open: a `high`
     // proposal with an ALLOW verdict at `high` satisfied the floor rule, yet
     // V1 permits action only at low risk.
-    for (const level of ["medium", "high", "critical"]) {
+    // `critical` is omitted deliberately: at the confidence these fixtures
+    // carry it exceeds the CONFIDENCE cap first, which is a different and
+    // equally correct rejection covered by its own test. Two real rules can
+    // both refuse one input; the test should name the one it is about.
+    for (const level of ["medium", "high"]) {
       const r = runWithMutated((record) => {
         const execution = record.execution as Record<string, unknown>;
         (execution.output as Record<string, unknown>).proposals = [
@@ -725,6 +745,7 @@ describe("cli — untrusted fixture input", () => {
         const policy = execution.policy as Record<string, unknown>;
         policy.proposalVerdicts = [{ ...verdictFor("manual_only"), effectiveRiskLevel: level }];
         policy.outcomes = ["allow_low_risk_manual_action"];
+        permitAction(record);
         policy.actionEligibility = "low_risk_manual_only";
       });
       expect(r.code, level).toBe(EXIT_USAGE_OR_IO);
@@ -743,6 +764,7 @@ describe("cli — untrusted fixture input", () => {
       const policy = execution.policy as Record<string, unknown>;
       policy.proposalVerdicts = [verdictFor("none")];
       policy.outcomes = ["allow_low_risk_manual_action"];
+      permitAction(record);
       policy.actionEligibility = "none";
     });
     expect(r.code).toBe(EXIT_USAGE_OR_IO);
@@ -823,6 +845,7 @@ describe("cli — untrusted fixture input", () => {
       const policy = execution.policy as Record<string, unknown>;
       policy.proposalVerdicts = [{ ...verdictFor("manual_only"), effectiveRiskLevel: "low" }];
       policy.outcomes = ["allow_low_risk_manual_action"];
+      permitAction(record);
       policy.actionEligibility = "low_risk_manual_only";
     });
     expect(r.code).toBe(EXIT_USAGE_OR_IO);
@@ -855,6 +878,7 @@ describe("cli — untrusted fixture input", () => {
       policy.proposalVerdicts = [];
       policy.actionEligibility = "none";
       policy.outcomes = ["allow_low_risk_manual_action"];
+      permitAction(record);
     });
     expect(r.code).toBe(EXIT_USAGE_OR_IO);
     expect(r.lines.join(" ")).toContain("without_a_verdict_implying_it");
@@ -871,6 +895,28 @@ describe("cli — untrusted fixture input", () => {
     });
     expect(r.code).toBe(EXIT_USAGE_OR_IO);
     expect(r.lines.join(" ")).toContain("outcomes_omit_block_action");
+  });
+
+  // MAX_RISK_BY_CONFIDENCE caps the risk an action may carry, and below 0.5 no
+  // action is permitted at all — so an allow verdict beside a low-confidence
+  // output is a decision the governor blocks with confidence_below_action_floor.
+  it("rejects an allowed verdict the output's confidence does not permit", () => {
+    const r = runWithMutated((record) => {
+      const execution = record.execution as Record<string, unknown>;
+      (execution.output as Record<string, unknown>).proposals = [PROPOSAL];
+      (execution.output as Record<string, unknown>).confidence = {
+        modelConfidence: 0.4,
+        evidenceConfidence: 0.4,
+        systemConfidence: 0.4,
+        derivation: "min_model_evidence_v1",
+      };
+      const policy = execution.policy as Record<string, unknown>;
+      policy.proposalVerdicts = [verdictFor("manual_only")];
+      policy.actionEligibility = "low_risk_manual_only";
+      policy.outcomes = ["allow_low_risk_manual_action"];
+    });
+    expect(r.code).toBe(EXIT_USAGE_OR_IO);
+    expect(r.lines.join(" ")).toContain("systemConfidence");
   });
 
   it("still accepts a well-formed envelope from the same path", () => {

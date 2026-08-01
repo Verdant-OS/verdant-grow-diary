@@ -340,8 +340,13 @@ export function evaluateSkillCase(input: EvaluateCaseInput): SkillEvaluationCase
   const allowed = new Set(f.allowedEvidenceIds);
   const forbidden = new Set(f.forbiddenEvidenceIds);
   const citedForbidden = cited.filter((id) => forbidden.has(id));
-  const citedUnallowed =
-    f.allowedEvidenceIds.length > 0 ? cited.filter((id) => !allowed.has(id)) : [];
+  // An empty allowlist authorises NOTHING; it does not switch the check off.
+  // `evidenceReferenceIntegrity` has no "unchecked" state, so treating empty
+  // as unconstrained let a fixture that explicitly approved no evidence cite
+  // freely and still report integrity true. This is the rule round 2 set for
+  // `expectedMissingInformationKeys` and the selection expectation, left
+  // unapplied here.
+  const citedUnallowed = cited.filter((id) => !allowed.has(id));
   let evidenceReferenceIntegrity = citedForbidden.length === 0 && citedUnallowed.length === 0;
   if (citedForbidden.length > 0) {
     fail(`Cited forbidden evidence: ${citedForbidden.join(", ")}.`);

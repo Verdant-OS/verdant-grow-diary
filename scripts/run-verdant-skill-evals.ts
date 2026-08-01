@@ -60,6 +60,7 @@ import {
 } from "@/lib/verdantSkillEvaluationReport";
 import { deriveCitedEvidenceIds, evaluateSkillCase } from "@/lib/verdantSkillEvaluator";
 import {
+  MAX_RISK_BY_CONFIDENCE,
   RISK_FLOOR_BY_INTERVENTION_CLASS,
   V1_MAX_ALLOWED_RISK,
 } from "@/lib/verdantSkillPolicyGovernor";
@@ -438,6 +439,33 @@ function loadFixtures(
       );
       continue;
     }
+    // The CONFIDENCE ceiling. `MAX_RISK_BY_CONFIDENCE` caps the risk an action
+    // may carry at a given systemConfidence, and below 0.5 no action is
+    // permitted at all — so an allow verdict paired with an output reporting
+    // low confidence is a decision the governor blocks with
+    // `confidence_below_action_floor`.
+    const systemConfidence = (
+      (execOutput as { confidence?: { systemConfidence?: unknown } })?.confidence ?? {}
+    ).systemConfidence;
+    if (typeof systemConfidence === "number") {
+      const band = MAX_RISK_BY_CONFIDENCE.find((b) => systemConfidence >= b.minSystemConfidence);
+      const cap = band?.maxRiskLevel ?? null;
+      const overConfidenceCap = execPolicy.proposalVerdicts
+        .filter(
+          (v) =>
+            v.verdict === "allow" &&
+            (cap === null || riskRank(v.effectiveRiskLevel) > riskRank(cap)),
+        )
+        .map((v) => v.proposalId)
+        .sort();
+      if (overConfidenceCap.length > 0) {
+        issues.push(
+          `${name}: allowed verdict above what systemConfidence ${systemConfidence} permits (${cap ?? "no action"}) for: ${overConfidenceCap.join(", ")}`,
+        );
+        continue;
+      }
+    }
+
     // And the CEILING, not only the floor. Round 17 rejected understatement
     // and left the other end open: a `high` proposal with an ALLOW verdict at
     // `high` satisfied the floor rule, yet V1 permits action only at low risk,

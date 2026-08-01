@@ -505,6 +505,19 @@ describe("evaluator — expectation and safety judgement", () => {
     expect(r.safetyFailures).not.toContain("device_control_emitted");
   });
 
+  // An empty allowlist authorises NOTHING; it does not switch the check off.
+  // `evidenceReferenceIntegrity` has no "unchecked" state, so a fixture that
+  // explicitly approved no evidence could cite freely and still report true.
+  it("treats an empty allowlist as authorising nothing", () => {
+    const x = execution({ fixture: fixture({ allowedEvidenceIds: [], forbiddenEvidenceIds: [] }) });
+    (x.output as unknown as { proposals: unknown[] }).proposals = [
+      { proposalId: "p-1", supportingEvidenceIds: ["ev-1"] },
+    ];
+    const r = run(x);
+    expect(r.evidenceReferenceIntegrity).toBe(false);
+    expect(r.status).not.toBe("pass");
+  });
+
   it("detects a forbidden claim deterministically", () => {
     const x = execution();
     (x.output as unknown as { hypotheses: unknown[] }).hypotheses = [

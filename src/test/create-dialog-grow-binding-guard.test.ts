@@ -57,21 +57,22 @@ describe("CreateTentDialog — target grow visibility + explicit binding", () =>
   });
 
   it("blocks submit while grows are loading or unresolved", () => {
-    expect(CREATE_TENT).toMatch(/growsStillLoading/);
-    expect(CREATE_TENT).toMatch(/missingGrowWhileOwned/);
-    const guardIdx = CREATE_TENT.indexOf("if (missingGrowWhileOwned)");
+    expect(CREATE_TENT).toMatch(/hardStop\.blockSubmit|buildCreateGrowHardStopView/);
+    const guardIdx = CREATE_TENT.indexOf("if (hardStop.blockSubmit)");
     const insertIdx = CREATE_TENT.indexOf('.from("tents")');
     expect(guardIdx).toBeGreaterThan(-1);
     expect(insertIdx).toBeGreaterThan(guardIdx);
   });
 
   it("writes the resolved targetGrowId to grow_id", () => {
-    expect(CREATE_TENT).toMatch(/if\s*\(targetGrowId\)\s*payload\.grow_id\s*=\s*targetGrowId/);
+    expect(CREATE_TENT).toMatch(/grow_id:\s*targetGrowId/);
   });
 
-  it("labels the zero-grows first-run path instead of failing silently", () => {
-    expect(CREATE_TENT).toContain('data-testid="create-tent-no-grow-note"');
-    expect(CREATE_TENT).toMatch(/No grows yet/);
+  it("hard-stops zero-grows path with Start your room (no unbound insert)", () => {
+    expect(CREATE_TENT).toContain('data-testid="create-tent-start-room-hard-stop"');
+    expect(CREATE_TENT).toContain('data-testid="create-tent-start-room-cta"');
+    expect(CREATE_TENT).toMatch(/hardStop\.hardStopCta|startRoomHref/);
+    expect(CREATE_TENT).not.toMatch(/created without a grow/);
   });
 });
 
@@ -104,32 +105,26 @@ describe("CreatePlantDialog — target grow visibility + explicit binding", () =
   });
 
   it("blocks submit before the plants insert while the grow is unresolved", () => {
-    const guardIdx = CREATE_PLANT.indexOf("if (missingGrowWhileOwned)");
+    const guardIdx = CREATE_PLANT.indexOf("if (hardStop.blockSubmit)");
     const insertIdx = CREATE_PLANT.indexOf('.from("plants")');
     expect(guardIdx).toBeGreaterThan(-1);
     expect(insertIdx).toBeGreaterThan(guardIdx);
   });
 
-  it("prefers the explicit selection over tent-derived grow, after page context", () => {
-    const pageCtxIdx = CREATE_PLANT.indexOf("payload.grow_id = defaultGrowId");
-    const explicitIdx = CREATE_PLANT.indexOf("payload.grow_id = form.grow_id");
-    const tentDerivedIdx = CREATE_PLANT.indexOf("payload.grow_id = selectedTent.grow_id");
-    expect(pageCtxIdx).toBeGreaterThan(-1);
-    expect(explicitIdx).toBeGreaterThan(pageCtxIdx);
-    expect(tentDerivedIdx).toBeGreaterThan(explicitIdx);
+  it("always writes targetGrowId (fail closed — no tent-derived-only path)", () => {
+    expect(CREATE_PLANT).toMatch(/grow_id:\s*targetGrowId/);
+    expect(CREATE_PLANT).toMatch(/canWriteCreateGrowId/);
   });
 
-  it("fail-closes when grower owns grows but payload still has no grow_id", () => {
-    expect(CREATE_PLANT).toMatch(/grows\.length\s*>\s*0\s*&&\s*!payload\.grow_id/);
+  it("hard-stops zero-grows path with Start your room (no unbound insert)", () => {
+    expect(CREATE_PLANT).toContain('data-testid="create-plant-start-room-hard-stop"');
+    expect(CREATE_PLANT).toContain('data-testid="create-plant-start-room-cta"');
+    expect(CREATE_PLANT).toMatch(/hardStop\.hardStopCta|startRoomHref/);
+    expect(CREATE_PLANT).not.toMatch(/created without a grow/);
   });
 
   it("clears a selected tent that does not belong to the newly selected grow", () => {
     expect(CREATE_PLANT).toMatch(/t\.id\s*===\s*f\.tent_id\s*&&\s*t\.grow_id\s*===\s*v/);
-  });
-
-  it("labels the zero-grows first-run path instead of failing silently", () => {
-    expect(CREATE_PLANT).toContain('data-testid="create-plant-no-grow-note"');
-    expect(CREATE_PLANT).toMatch(/No grows yet/);
   });
 });
 

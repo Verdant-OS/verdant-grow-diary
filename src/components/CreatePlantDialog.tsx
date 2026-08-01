@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -24,6 +25,10 @@ import {
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import CreateTentDialog from "@/components/CreateTentDialog";
+import {
+  buildCreateGrowHardStopView,
+  canWriteCreateGrowId,
+} from "@/lib/createDialogGrowHardStopRules";
 
 const STAGES = [
   { value: "seedling", label: "Seedling" },
@@ -83,7 +88,18 @@ export default function CreatePlantDialog({ trigger, defaultTentId, defaultGrowI
     : null;
   const needsGrowSelection = !defaultGrowId && grows.length > 0;
   const growsStillLoading = growsLoading && grows.length === 0;
-  const missingGrowWhileOwned = !targetGrowId && grows.length > 0;
+  const hardStop = useMemo(
+    () =>
+      buildCreateGrowHardStopView(
+        {
+          targetGrowId,
+          growCount: grows.length,
+          growsLoading: growsStillLoading,
+        },
+        "plant",
+      ),
+    [targetGrowId, grows.length, growsStillLoading],
+  );
 
   // Scope tent options to the resolved target grow when present.
   const tents = targetGrowId
@@ -98,11 +114,11 @@ export default function CreatePlantDialog({ trigger, defaultTentId, defaultGrowI
       toast.error("Not signed in");
       return;
     }
-    if (growsStillLoading) {
-      toast.error("Still loading your grows — try again in a moment");
+    if (hardStop.blockSubmit) {
+      toast.error(hardStop.toastMessage ?? "Pick a grow first");
       return;
     }
-    if (missingGrowWhileOwned) {
+    if (!canWriteCreateGrowId(targetGrowId)) {
       toast.error("Pick which grow this plant belongs to first");
       return;
     }
@@ -114,27 +130,9 @@ export default function CreatePlantDialog({ trigger, defaultTentId, defaultGrowI
       strain: trimmedStrain || null,
       stage: form.stage,
       health: form.health,
+      grow_id: targetGrowId,
     };
     if (form.tent_id && form.tent_id !== "none") payload.tent_id = form.tent_id;
-    // Prefer page context, then explicit/active selection, then tent-derived
-    // grow so newly-created plants never end up with a tent but null grow.
-    if (defaultGrowId) {
-      payload.grow_id = defaultGrowId;
-    } else if (form.grow_id) {
-      payload.grow_id = form.grow_id;
-    } else if (form.tent_id && form.tent_id !== "none") {
-      const selectedTent = (allTents as Array<{ id: string; grow_id: string | null }>).find(
-        (t) => t.id === form.tent_id,
-      );
-      if (selectedTent?.grow_id) payload.grow_id = selectedTent.grow_id;
-    }
-    // Fail closed: if grower owns grows and we still have no grow_id, abort
-    // rather than insert an unbound plant (blocks Quick Log later).
-    if (grows.length > 0 && !payload.grow_id) {
-      setBusy(false);
-      toast.error("Pick which grow this plant belongs to first");
-      return;
-    }
     if (form.started_at) payload.started_at = new Date(form.started_at).toISOString();
 
     const { error } = await supabase.from("plants").insert(payload as never);
@@ -181,29 +179,38 @@ export default function CreatePlantDialog({ trigger, defaultTentId, defaultGrowI
               <span className="text-muted-foreground"> (active setup)</span>
             ) : null}
           </div>
-        ) : growsStillLoading ? (
+        ) : hardStop.showLoading ? (
           <div
             data-testid="create-plant-grows-loading"
             className="rounded-md border border-border/60 bg-secondary/30 px-3 py-2 text-xs -mt-1"
           >
             Loading your grows…
           </div>
-        ) : grows.length > 0 ? (
+        ) : hardStop.showPickGrowHint ? (
           <div
             data-testid="create-plant-grow-required"
             className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs -mt-1"
           >
             No grow selected — pick which grow this plant belongs to below.
           </div>
-        ) : (
+        ) : hardStop.showStartRoomHardStop ? (
           <div
-            data-testid="create-plant-no-grow-note"
-            className="rounded-md border border-border/60 bg-secondary/30 px-3 py-2 text-xs -mt-1"
+            data-testid="create-plant-start-room-hard-stop"
+            className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-3 -mt-1 space-y-2"
           >
-            No grows yet — this plant will be created without a grow. You can link it later in
-            Lineage Repair.
+            <p className="text-sm font-medium">{hardStop.hardStopTitle}</p>
+            <p className="text-xs text-muted-foreground">{hardStop.hardStopBody}</p>
+            <Button asChild size="sm" className="gradient-leaf text-primary-foreground">
+              <Link
+                to={hardStop.startRoomHref}
+                data-testid="create-plant-start-room-cta"
+                onClick={() => setOpen(false)}
+              >
+                {hardStop.hardStopCta}
+              </Link>
+            </Button>
           </div>
-        )}
+        ) : null}
         <p className="text-xs text-muted-foreground -mt-1">
           Start simple. You can add genetics, medium, dates, and notes later. Verdant works best
           once your first plant memory exists.
@@ -254,6 +261,7 @@ export default function CreatePlantDialog({ trigger, defaultTentId, defaultGrowI
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="Plant A"
+              disabled={hardStop.showStartRoomHardStop}
             />
             <p className="text-[11px] text-muted-foreground mt-1">
               Only a name and stage are required to get started.
@@ -350,7 +358,7 @@ export default function CreatePlantDialog({ trigger, defaultTentId, defaultGrowI
             </div>
           </details>
           <Button
-            disabled={busy || growsStillLoading || missingGrowWhileOwned}
+            disabled={busy || hardStop.blockSubmit}
             className="gradient-leaf text-primary-foreground"
             data-testid="create-plant-submit"
           >

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -23,6 +24,10 @@ import {
 import { STAGES } from "@/lib/grow";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
+import {
+  buildCreateGrowHardStopView,
+  canWriteCreateGrowId,
+} from "@/lib/createDialogGrowHardStopRules";
 
 interface Props {
   trigger?: React.ReactNode;
@@ -67,7 +72,18 @@ export default function CreateTentDialog({ trigger, defaultGrowId, onCreated }: 
   // grower can override the active-grow seed.
   const needsGrowSelection = !defaultGrowId && grows.length > 0;
   const growsStillLoading = growsLoading && grows.length === 0;
-  const missingGrowWhileOwned = !targetGrowId && grows.length > 0;
+  const hardStop = useMemo(
+    () =>
+      buildCreateGrowHardStopView(
+        {
+          targetGrowId,
+          growCount: grows.length,
+          growsLoading: growsStillLoading,
+        },
+        "tent",
+      ),
+    [targetGrowId, grows.length, growsStillLoading],
+  );
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -75,11 +91,11 @@ export default function CreateTentDialog({ trigger, defaultGrowId, onCreated }: 
       toast.error("Not signed in");
       return;
     }
-    if (growsStillLoading) {
-      toast.error("Still loading your grows — try again in a moment");
+    if (hardStop.blockSubmit) {
+      toast.error(hardStop.toastMessage ?? "Pick a grow first");
       return;
     }
-    if (missingGrowWhileOwned) {
+    if (!canWriteCreateGrowId(targetGrowId)) {
       toast.error("Pick which grow this tent belongs to first");
       return;
     }
@@ -90,9 +106,8 @@ export default function CreateTentDialog({ trigger, defaultGrowId, onCreated }: 
       size: form.size.trim() || null,
       brand: form.brand.trim() || null,
       stage: form.stage,
+      grow_id: targetGrowId,
     };
-    // Always write the resolved target. RLS enforces ownership server-side.
-    if (targetGrowId) payload.grow_id = targetGrowId;
     const { data, error } = await supabase
       .from("tents")
       .insert(payload as never)
@@ -134,29 +149,38 @@ export default function CreateTentDialog({ trigger, defaultGrowId, onCreated }: 
               <span className="text-muted-foreground"> (active setup)</span>
             ) : null}
           </div>
-        ) : growsStillLoading ? (
+        ) : hardStop.showLoading ? (
           <div
             data-testid="create-tent-grows-loading"
             className="rounded-md border border-border/60 bg-secondary/30 px-3 py-2 text-xs -mt-1"
           >
             Loading your grows…
           </div>
-        ) : grows.length > 0 ? (
+        ) : hardStop.showPickGrowHint ? (
           <div
             data-testid="create-tent-grow-required"
             className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs -mt-1"
           >
             No grow selected — pick which grow this tent belongs to below.
           </div>
-        ) : (
+        ) : hardStop.showStartRoomHardStop ? (
           <div
-            data-testid="create-tent-no-grow-note"
-            className="rounded-md border border-border/60 bg-secondary/30 px-3 py-2 text-xs -mt-1"
+            data-testid="create-tent-start-room-hard-stop"
+            className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-3 -mt-1 space-y-2"
           >
-            No grows yet — this tent will be created without a grow. You can link it later in
-            Lineage Repair.
+            <p className="text-sm font-medium">{hardStop.hardStopTitle}</p>
+            <p className="text-xs text-muted-foreground">{hardStop.hardStopBody}</p>
+            <Button asChild size="sm" className="gradient-leaf text-primary-foreground">
+              <Link
+                to={hardStop.startRoomHref}
+                data-testid="create-tent-start-room-cta"
+                onClick={() => setOpen(false)}
+              >
+                {hardStop.hardStopCta}
+              </Link>
+            </Button>
           </div>
-        )}
+        ) : null}
         <p className="text-xs text-muted-foreground -mt-1">
           Start simple. You can add size, brand, and stage later. Verdant works best once your first
           plant memory exists.
@@ -190,6 +214,7 @@ export default function CreateTentDialog({ trigger, defaultGrowId, onCreated }: 
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="Tent #1"
+              disabled={hardStop.showStartRoomHardStop}
             />
             <p className="text-[11px] text-muted-foreground mt-1">
               Only a name is required to get started.
@@ -238,7 +263,7 @@ export default function CreateTentDialog({ trigger, defaultGrowId, onCreated }: 
             </div>
           </details>
           <Button
-            disabled={busy || growsStillLoading || missingGrowWhileOwned}
+            disabled={busy || hardStop.blockSubmit}
             className="gradient-leaf text-primary-foreground"
             data-testid="create-tent-submit"
           >

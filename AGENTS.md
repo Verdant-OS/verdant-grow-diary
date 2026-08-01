@@ -1,4 +1,20 @@
-# Verdant Codex Instructions
+# Verdant Agent Constitution
+
+**Sentinel-Version: 2026-07-31.1**
+
+This file is the universal constitution every Verdant agent inherits — Codex, Claude,
+Grok, Gemini, the Security reviewer, and the Council Chair. It was previously titled
+"Verdant Codex Instructions"; the content was already agent-neutral, so only the name
+and the role-routing/startup sections changed.
+
+Your specific role lives in `docs/agents/roles/`. Current operational state — active
+branch, production status, blockers, approved slice — lives in
+`docs/agents/CURRENT_STATE.md`, never here. This file is stable; that one is the
+changing shift report.
+
+> **Naming note.** "Sentinel" is overloaded in this repository. `ggsSentinel*` modules
+> and `docs/v0-sentinel-stop-ship-checklist.md` refer to the GGS sensor smoke-runner and
+> are unrelated to this constitution. Do not conflate them when searching.
 
 ## Product Context
 
@@ -36,8 +52,13 @@ Automation last.
 Default workflow:
 
 ```text
-Build -> Audit -> Fix -> Test -> Publish
+Build -> Audit -> Fix -> Test -> Publish -> Measure
 ```
+
+`Measure` is not optional decoration. A merge is not a release, a green CI run is not
+proof of indexing, a public-web estimate is not first-party analytics, and an unverified
+sensor value is not healthy live data. Work that cannot be measured yet should say so
+and stop, rather than claim an outcome it has not observed.
 
 Use small, scoped changes. Avoid broad rewrites.
 
@@ -438,3 +459,81 @@ Prefer:
 * Exact pass/fail counts.
 
 Every change should make Verdant more trustworthy.
+
+---
+
+## Agent Role Routing
+
+Before using tools or changing files, identify your assigned role and read its file.
+
+| Agent            | Role file                              |
+| ---------------- | -------------------------------------- |
+| Codex            | `docs/agents/roles/codex.md`            |
+| Claude           | `docs/agents/roles/claude.md`           |
+| Grok             | `docs/agents/roles/grok.md`             |
+| Gemini           | `docs/agents/roles/gemini.md`           |
+| Security review  | `docs/agents/roles/security.md`         |
+| Council Chair    | `docs/agents/roles/council-chair.md`    |
+
+Do not adopt another agent's responsibilities unless Cheek explicitly reassigns them.
+
+Operating order is sequential, not parallel:
+
+```text
+Research -> Architecture -> Build -> Security Review -> QA Audit -> Council -> Cheek approval
+```
+
+All agents implementing at once is the failure mode this routing exists to prevent.
+Handoffs follow `docs/agents/HANDOFF_PROTOCOL.md`.
+
+---
+
+## Mandatory Startup Gate
+
+Before analysis, research, commands, edits, writes, outreach, deployment, or
+recommendations, return:
+
+```text
+SENTINEL_ACK
+agent:
+assigned_role:
+sentinel_version:
+files_read:
+current_task:
+scope:
+out_of_scope:
+conflicts_found:
+data_access_status:
+write_permission:
+```
+
+If a required file is missing or instructions conflict, return:
+
+```text
+STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE
+```
+
+Do not continue until the context issue is resolved.
+
+This is a visible checkpoint. An agent that begins work without the acknowledgment has
+violated the operating procedure, and its output should be treated as unscoped.
+
+### Status vocabulary
+
+Use these exact values. They are not interchangeable, and a blocked verification is
+never reported as a passing one.
+
+| Status           | Meaning                                                        |
+| ---------------- | -------------------------------------------------------------- |
+| `PASS`           | Verified by direct evidence the agent actually observed         |
+| `FAIL`           | Verified defect                                                 |
+| `BLOCKED`        | Could not verify — access, permission, or dependency missing    |
+| `NO_BASELINE`    | No prior measurement exists to compare against                  |
+| `NO_DATA`        | Source reachable but returned nothing                           |
+| `NOT_MEASURED`   | Metric has no applicable cases; never report this as 100%       |
+| `NOT_APPLICABLE` | Check does not apply to this target                             |
+
+Never convert `BLOCKED` into `PASS`. Never invent a number to clear a gate: no search
+volume, traffic, keyword difficulty, CPC, domain rating, backlink count, conversion
+rate, or audience size may be stated unless an authorized source supplied it and the
+provenance is recorded.

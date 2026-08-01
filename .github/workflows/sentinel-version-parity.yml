@@ -1,0 +1,45 @@
+name: Sentinel version parity
+
+# GEMINI.md mirrors the safety-critical core of AGENTS.md because Gemini cannot follow a
+# link to obtain context. This job fails when the governance files drift out of version
+# agreement, so a change to the core rules has to touch the mirror in the same commit.
+on:
+  pull_request:
+    paths:
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "GEMINI.md"
+      - ".grok/rules/**"
+      - "docs/agents/**"
+      - "scripts/check-sentinel-version-parity.mjs"
+      - ".github/workflows/sentinel-version-parity.yml"
+  push:
+    branches:
+      - main
+      - verdant-grow-diary
+    paths:
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "GEMINI.md"
+      - ".grok/rules/**"
+      - "docs/agents/**"
+      - "scripts/check-sentinel-version-parity.mjs"
+      - ".github/workflows/sentinel-version-parity.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    name: Governance files agree on Sentinel-Version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # No dependencies: the checker uses only node:fs so it runs before any install.
+      - name: Check Sentinel-Version parity
+        run: node scripts/check-sentinel-version-parity.mjs

@@ -19,15 +19,16 @@ inside the active governance handoff.
 | `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `e623aa9d913698ca6795b3d6b75bd069d9a67681`                  |
 | `main`               | Integration branch. It is not production parity. | `2bd6fa6016add1d3ea9f50415355601cbaefb37f` at the SEO audit |
 
-Do not infer production behavior from `main`. It is thousands of commits behind the
-deploy branch and carries materially different route and policy context.
+`main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
+`main`, and do not backport deploy-only governance or data rules without a scoped branch
+integration task.
 
 The deploy-branch governance integration is complete in PR #626. The current bounded
 readiness branch is `codex/refresh-seo-measurement-readiness`, based on deploy head
 `e623aa9d9136`.
 
-Supabase production project referenced by the deploy branch:
-`knkwiiywfkbqznbxwqfh`.
+Active reconciliation: [PR #635](https://github.com/Verdant-OS/verdant-grow-diary/pull/635)
+(`codex/sentinel-governance-reconcile` -> `verdant-grow-diary`).
 
 ---
 
@@ -116,8 +117,8 @@ Out of scope:
 4. Record Day 0 only after the singleton analytics contract and both authenticated baselines pass.
 5. Handle the unrelated sandbox/commerce workflow failures in separate scoped work.
 
-No new content family, automation, device control, or schema change is approved by this
-state file.
+No new content family, automation, device control, schema change, or direct production
+write is approved by this state file.
 
 ---
 

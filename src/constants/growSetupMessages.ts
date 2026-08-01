@@ -10,7 +10,7 @@ export const GROW_SETUP_GENERIC_NAME = "your current setup" as const;
 export const GROW_SETUP_MESSAGES = {
   hardStopTitle: "Start your room first",
   hardStopBody:
-    "You need a setup before adding a tent or plant. We’ll walk grow → tent → plant so Quick Log works right away.",
+    "You need a setup before adding a tent or plant. Next you’ll name your grow—then we’ll add tent and plant so Quick Log works right away.",
   hardStopCta: "Start your room",
   hardStopSecondary: "Not now",
 

@@ -103,11 +103,13 @@ export default function CreateTentDialog({
 
   const formBlocked = binding.blockSubmit || !canWriteCreateGrowId(targetGrowId);
 
+  function resetForm() {
+    setForm(EMPTY_TENT_FORM);
+  }
+
   function handleOpenChange(next: boolean) {
     setOpen(next);
-    if (!next) {
-      setForm(EMPTY_TENT_FORM);
-    }
+    if (!next) resetForm();
   }
 
   async function submit(e: React.FormEvent) {
@@ -151,7 +153,7 @@ export default function CreateTentDialog({
     qc.invalidateQueries({ queryKey: ["tents"] });
     qc.invalidateQueries({ queryKey: ["grow", "tents"] });
     if (data && onCreated) onCreated(data as CreatedTent);
-    setForm(EMPTY_TENT_FORM);
+    resetForm();
     setOpen(false);
   }
 

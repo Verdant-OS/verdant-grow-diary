@@ -38,7 +38,11 @@ import type { SkillApplicabilityResult } from "@/lib/verdantSkillApplicabilityRu
 import type { SkillRiskLevel, SkillRunResult } from "@/lib/verdantSkillSchemas";
 import { serializeSkillContract } from "@/lib/verdantSkillSchemas";
 import { hasUngovernedCommand, scanProseForPatterns } from "@/lib/aiOutputTextSafetyDetectors";
-import { BLOCKING_FAMILIES, GOVERNED_RESULT_KEYS } from "@/lib/verdantSkillPolicyGovernor";
+import {
+  BLOCKING_FAMILIES,
+  GOVERNED_RESULT_KEYS,
+  STRUCTURAL_BLOCKING_RULE_CODES,
+} from "@/lib/verdantSkillPolicyGovernor";
 
 function compareTokens(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
@@ -590,7 +594,17 @@ export function evaluateSkillCase(input: EvaluateCaseInput): SkillEvaluationCase
             : scanProseForPatterns(prose, family.patterns),
         ).map((family) => String(family.code)),
       ]),
-    ].filter((code) => BLOCKING_FAMILIES.some((family) => String(family.code) === code));
+    ].filter(
+      (code) =>
+        BLOCKING_FAMILIES.some((family) => String(family.code) === code) ||
+        // Structural blocks too. Filtering to the linguistic families alone
+        // discarded a recorded `capability_exceeds_manifest` or
+        // `risk_exceeds_declared_class` — codes the governor raises with no
+        // prose to detect — so a proposal could stay action-eligible while
+        // its own policy recorded exactly why the governor blocked it. This
+        // needs no context reconstruction: the rule is already attached.
+        (STRUCTURAL_BLOCKING_RULE_CODES as readonly string[]).includes(code),
+    );
     allowedWithBlocking.push(...codes);
   }
   const blockingPresent = [...new Set(allowedWithBlocking)];

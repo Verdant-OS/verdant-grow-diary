@@ -949,6 +949,52 @@ describe("cli — untrusted fixture input", () => {
     }
   });
 
+  // Codes the governor raises with no prose to detect. Filtering the
+  // recorded rules to the linguistic families discarded them, so a proposal
+  // stayed action-eligible while its own policy recorded exactly why the
+  // governor blocked it.
+  it("rejects an allowed proposal carrying a structural block", () => {
+    for (const code of ["capability_exceeds_manifest", "risk_exceeds_declared_class"]) {
+      const r = runWithMutated((record) => {
+        const execution = record.execution as Record<string, unknown>;
+        (execution.output as Record<string, unknown>).proposals = [PROPOSAL];
+        const policy = execution.policy as Record<string, unknown>;
+        policy.proposalVerdicts = [verdictFor("manual_only")];
+        policy.actionEligibility = "low_risk_manual_only";
+        policy.outcomes = ["allow_low_risk_manual_action"];
+        policy.firedRules = [
+          { code, basis: "structural", subject: "proposal", proposalId: "p-1", detail: "x" },
+        ];
+        permitAction(record);
+      });
+      expect(r.code, code).toBe(EXIT_HARD_SAFETY);
+    }
+  });
+
+  // Unsatisfiable expectation pairs are authoring errors, and belong in
+  // preflight rather than being reported forever as a skill that fails.
+  it("rejects a fixture whose expectations cannot both hold", () => {
+    const cases: [string, string][] = [
+      ["must_act", "none"],
+      ["must_abstain", "low_risk_manual_only"],
+    ];
+    for (const [abstention, eligibility] of cases) {
+      const r = runWithMutated((record) => {
+        const fixture = record.fixture as Record<string, unknown>;
+        fixture.expectedAbstention = abstention;
+        fixture.expectedActionEligibility = eligibility;
+      });
+      expect(r.code, `${abstention}/${eligibility}`).toBe(EXIT_USAGE_OR_IO);
+    }
+  });
+
+  it("rejects a misspelled applicability expectation as a fixture error", () => {
+    const r = runWithMutated((record) => {
+      (record.fixture as Record<string, unknown>).expectedApplicability = "applicble";
+    });
+    expect(r.code).toBe(EXIT_USAGE_OR_IO);
+  });
+
   it("still accepts a well-formed envelope from the same path", () => {
     // Guards the guard: a check that rejected everything would pass the two
     // tests above while breaking the harness.

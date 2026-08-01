@@ -499,22 +499,39 @@ function collectStrings(value: unknown, path: string, out: { path: string; text:
  * carry a full irrigation instruction in `hypotheses[].rationale` — the
  * `proposals_require_ok_status` invariant gates proposals, and nothing else.
  */
-export const GOVERNED_RESULT_KEYS: Record<keyof SkillRunResult, "governed" | "exempt_structural"> = {
-  contractVersion: "exempt_structural",
-  runId: "exempt_structural",
-  skillId: "exempt_structural",
-  skillVersion: "exempt_structural",
-  status: "exempt_structural",
-  startedAt: "exempt_structural",
-  completedAt: "exempt_structural",
-  contextVersion: "exempt_structural",
-  evidence: "governed",
-  hypotheses: "governed",
-  confidence: "exempt_structural",
-  proposals: "governed",
-  followUps: "governed",
-  error: "governed",
-};
+export const GOVERNED_RESULT_KEYS: Record<keyof SkillRunResult, "governed" | "exempt_structural"> =
+  {
+    contractVersion: "exempt_structural",
+    runId: "exempt_structural",
+    skillId: "exempt_structural",
+    skillVersion: "exempt_structural",
+    status: "exempt_structural",
+    startedAt: "exempt_structural",
+    completedAt: "exempt_structural",
+    contextVersion: "exempt_structural",
+    evidence: "governed",
+    hypotheses: "governed",
+    confidence: "exempt_structural",
+    proposals: "governed",
+    followUps: "governed",
+    error: "governed",
+  };
+
+/**
+ * EVERY rule code that causes `block()` — structural as well as linguistic.
+ *
+ * The linguistic ones come from BLOCKING_FAMILIES below; these five are
+ * raised structurally and have no prose to detect, so a consumer scanning
+ * only the families misses them entirely. Kept beside the families because
+ * anything added to `block()` belongs in one of the two.
+ */
+export const STRUCTURAL_BLOCKING_RULE_CODES: readonly SkillPolicyRuleCode[] = Object.freeze([
+  "capability_exceeds_manifest",
+  "risk_exceeds_declared_class",
+  "confidence_below_action_floor",
+  "proposal_evidence_untrustworthy",
+  "unresolved_follow_up_open",
+]);
 
 /** Families that block outright: no legitimate use in an advisory proposal. */
 export const BLOCKING_FAMILIES: readonly {

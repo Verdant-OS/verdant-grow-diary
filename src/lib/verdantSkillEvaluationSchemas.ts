@@ -157,7 +157,10 @@ export const verdantSkillEvaluationFixtureSchema = z
     fixtureKind: z.enum(EVALUATION_FIXTURE_KINDS),
     context: z.record(z.unknown()),
     contextContractVersion: z.string().trim().min(1).max(64),
-    expectedApplicability: z.string().trim().min(1).max(64).nullable(),
+    // The same four verdicts the runtime can produce. A misspelling here
+    // was unsatisfiable, so the CLI reported exit 1 as if the skill failed
+    // rather than exit 2 for a malformed fixture.
+    expectedApplicability: z.enum(SKILL_APPLICABILITY_VERDICTS).nullable(),
     evidenceInputs: z.record(z.unknown()).nullable(),
     expectedSelectedEvidenceIds: z.array(idTokenSchema).max(64),
     modelDraft: z.record(z.unknown()).nullable(),
@@ -232,6 +235,28 @@ export const verdantSkillEvaluationFixtureSchema = z
         code: z.ZodIssueCode.custom,
         path: ["expectedCitedEvidenceIds"],
         message: "expects_citations_while_authorising_no_evidence",
+      });
+    }
+
+    // `evaluateSkillCase` defines acting as exactly `low_risk_manual_only`,
+    // so these pairs describe a run that cannot exist. An authoring error
+    // should be refused in preflight, not reported forever as a skill that
+    // fails.
+    if (f.expectedAbstention === "must_act" && f.expectedActionEligibility === "none") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["expectedActionEligibility"],
+        message: "must_act_requires_low_risk_manual_only",
+      });
+    }
+    if (
+      f.expectedAbstention === "must_abstain" &&
+      f.expectedActionEligibility === "low_risk_manual_only"
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["expectedActionEligibility"],
+        message: "must_abstain_forbids_low_risk_manual_only",
       });
     }
 

@@ -1,10 +1,12 @@
 name: Symptom Check branch E2E (mocked)
 
-# Branch-backed, non-destructive browser proof for the grower-facing loop:
-# Plant Detail -> full Quick Log -> Symptom Check -> canonical RPC boundary ->
-# Timeline evidence checklist. The spec runs the local branch app and intercepts
-# every remote HTTPS request; no real account, Supabase row, function, AI call,
-# Action Queue item, or device is touched.
+# Branch-backed, non-destructive browser proofs for the grower-facing loop and
+# public symptom guides. The authenticated spec covers Plant Detail -> full
+# Quick Log -> Symptom Check -> canonical RPC boundary -> Timeline evidence
+# checklist. The public burden spec covers the guide hub and focused guides at
+# four viewport sizes and asserts that they issue no backend writes. The
+# authenticated spec intercepts every remote HTTPS request; no real account,
+# Supabase row, function, AI call, Action Queue item, or device is touched.
 
 on:
   workflow_dispatch:
@@ -12,20 +14,18 @@ on:
     branches: [verdant-grow-diary]
     paths:
       - "e2e/symptom-check-branch.spec.ts"
-      - "src/components/GlobalFastAddButton.tsx"
-      - "src/components/QuickLog.tsx"
-      - "src/components/QuickLogAllActivitiesSection.tsx"
-      - "src/components/QuickLogSymptomCheckFields.tsx"
-      - "src/components/SymptomEvidenceChecklistCard.tsx"
-      - "src/constants/cannabisSymptomReference.ts"
-      - "src/constants/cannabisSymptomTypes.ts"
-      - "src/hooks/useQuickLogActivitySave.ts"
-      - "src/lib/symptomEvidenceChecklistRules.ts"
-      - "src/lib/symptomCheckRules.ts"
-      - "src/lib/timelineDiaryEntryDetailPresentationRules.ts"
-      - "src/pages/PlantDetail.tsx"
-      - "src/pages/Timeline.tsx"
+      - "e2e/symptom-guides-burden.spec.ts"
+      - "src/**"
+      - ".env"
+      - ".env.development"
+      - "index.html"
       - "playwright.config.ts"
+      - "vite.config.ts"
+      - "tailwind.config.ts"
+      - "postcss.config.js"
+      - "tsconfig.json"
+      - "tsconfig.app.json"
+      - "tsconfig.node.json"
       - "package.json"
       - "bun.lock"
       - "bun.lockb"
@@ -63,7 +63,7 @@ jobs:
       - name: Install Chromium only (with dependencies)
         run: bunx playwright install chromium --with-deps
 
-      - name: Run branch-backed Symptom Check proof
+      - name: Run branch-backed Symptom Check and public guide burden proofs
         run: bun run test:symptom-check:e2e
 
       - name: Upload Playwright report

@@ -42,7 +42,7 @@ describe("CreateTentDialog — first-run simplification", () => {
   it("shows 'Enrich later' guidance copy", () => {
     expect(CREATE_TENT).toMatch(/Start simple\./);
     expect(CREATE_TENT).toMatch(/add size, brand, and stage later/);
-    expect(CREATE_TENT).toMatch(/Verdant works best once your first\s+plant memory exists\./);
+    expect(CREATE_TENT).toMatch(/Verdant works best once your\s+first\s+plant memory exists\./);
   });
 
   it("marks optional fields as optional in the UI", () => {
@@ -65,8 +65,12 @@ describe("CreateTentDialog — first-run simplification", () => {
   });
 
   it("sends null (not empty strings) for blank optional fields", () => {
-    expect(CREATE_TENT).toMatch(/size:\s*form\.size\.trim\(\)\s*\|\|\s*null/);
-    expect(CREATE_TENT).toMatch(/brand:\s*form\.brand\.trim\(\)\s*\|\|\s*null/);
+    // Null coercion lives in buildGrowBoundTentInsertPayload so every tent
+    // insert path (dialog + inline) shares the same contract.
+    const RULES = readFileSync(resolve(ROOT, "src/lib/createGrowBindingRules.ts"), "utf8");
+    expect(CREATE_TENT).toMatch(/buildGrowBoundTentInsertPayload/);
+    expect(RULES).toMatch(/size:\s*input\.size\.trim\(\)\s*\|\|\s*null/);
+    expect(RULES).toMatch(/brand:\s*input\.brand\.trim\(\)\s*\|\|\s*null/);
   });
 
   it("does not introduce forbidden claims", () => {

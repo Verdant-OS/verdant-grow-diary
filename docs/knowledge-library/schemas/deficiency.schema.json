@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://verdantgrowdiary.com/schemas/knowledge/deficiency.schema.json",
+  "title": "Verdant deficiency and toxicity diagnostic page",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "pageManifest",
+    "slug",
+    "name",
+    "classification",
+    "applicability",
+    "observablePattern",
+    "differentials",
+    "confirmation",
+    "cautiousResponse",
+    "whatNotToConclude",
+    "followUp",
+    "escalation",
+    "prevention",
+    "claims",
+    "sources",
+    "editorial",
+    "conversion"
+  ],
+  "properties": {
+    "pageManifest": { "$ref": "common.schema.json#/$defs/pageManifest" },
+    "slug": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "name": { "type": "string", "minLength": 4 },
+    "classification": {
+      "enum": ["deficiency", "toxicity", "lockout", "abiotic_stress", "mixed_or_unknown"]
+    },
+    "applicability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stageIds",
+        "mediumIds",
+        "facilityIds",
+        "jurisdictionIds",
+        "includedContexts",
+        "excludedContexts"
+      ],
+      "properties": {
+        "stageIds": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "mediumIds": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "facilityIds": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "jurisdictionIds": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "includedContexts": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "excludedContexts": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+      }
+    },
+    "observablePattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "symptomIds",
+        "firstSeen",
+        "progression",
+        "leafLocation",
+        "tissuePattern",
+        "wholePlantContext",
+        "photoProtocol"
+      ],
+      "properties": {
+        "symptomIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "firstSeen": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "progression": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "leafLocation": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "tissuePattern": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "wholePlantContext": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "photoProtocol": { "type": "array", "minItems": 3, "items": { "type": "string" } }
+      }
+    },
+    "differentials": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "conditionId",
+          "condition",
+          "whyItLooksSimilar",
+          "confirmingClaimIds",
+          "disconfirmingClaimIds",
+          "evidenceThatSeparatesIt"
+        ],
+        "properties": {
+          "conditionId": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "condition": { "type": "string", "minLength": 3 },
+          "whyItLooksSimilar": { "type": "string", "minLength": 8 },
+          "confirmingClaimIds": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "common.schema.json#/$defs/nodeId" },
+            "uniqueItems": true
+          },
+          "disconfirmingClaimIds": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "common.schema.json#/$defs/nodeId" },
+            "uniqueItems": true
+          },
+          "evidenceThatSeparatesIt": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "confirmation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolIds",
+        "requiredHistory",
+        "measurements",
+        "rootZoneChecks",
+        "environmentChecks",
+        "stopConditions",
+        "confidenceRule"
+      ],
+      "properties": {
+        "protocolIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "requiredHistory": { "type": "array", "minItems": 2, "items": { "type": "string" } },
+        "measurements": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "rootZoneChecks": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "environmentChecks": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "stopConditions": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "confidenceRule": { "type": "string", "minLength": 20 }
+      }
+    },
+    "cautiousResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stabilizeFirst", "oneChangeAtATime", "avoid", "record"],
+      "properties": {
+        "stabilizeFirst": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "oneChangeAtATime": { "const": true },
+        "avoid": { "type": "array", "minItems": 2, "items": { "type": "string" } },
+        "record": { "type": "array", "minItems": 3, "items": { "type": "string" } }
+      }
+    },
+    "whatNotToConclude": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "type": "string", "minLength": 8 }
+    },
+    "followUp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["intervalHours", "observations", "successEvidence", "failureEvidence"],
+      "properties": {
+        "intervalHours": { "type": "integer", "minimum": 1 },
+        "observations": { "type": "array", "minItems": 2, "items": { "type": "string" } },
+        "successEvidence": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "failureEvidence": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+      }
+    },
+    "escalation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["urgency", "triggers", "nextStep", "professionalBoundary"],
+      "properties": {
+        "urgency": { "enum": ["observe", "prompt_review", "urgent_professional_review"] },
+        "triggers": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "nextStep": { "type": "string", "minLength": 12 },
+        "professionalBoundary": { "type": "string", "minLength": 12 }
+      }
+    },
+    "prevention": { "type": "array", "minItems": 2, "items": { "type": "string" } },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "common.schema.json#/$defs/claim" }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 3,
+      "items": { "$ref": "common.schema.json#/$defs/source" }
+    },
+    "editorial": { "$ref": "common.schema.json#/$defs/editorial" },
+    "conversion": { "$ref": "common.schema.json#/$defs/conversion" }
+  },
+  "allOf": [
+    {
+      "type": "object",
+      "properties": {
+        "pageManifest": {
+          "type": "object",
+          "properties": {
+            "metadata": {
+              "type": "object",
+              "properties": {
+                "pageType": { "const": "deficiency" },
+                "pageFamily": { "const": "diagnostic" }
+              }
+            },
+            "graph": {
+              "type": "object",
+              "properties": {
+                "node": {
+                  "type": "object",
+                  "properties": { "type": { "const": "Condition" } }
+                },
+                "differentialIds": { "type": "array", "minItems": 3 }
+              }
+            }
+          }
+        }
+      }
+    },
+    { "$ref": "common.schema.json#/$defs/pageSafetyReviewGate" }
+  ]
+}

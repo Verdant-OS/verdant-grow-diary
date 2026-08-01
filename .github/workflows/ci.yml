@@ -1,6 +1,10 @@
 name: CI
 
 on:
+  # Intentionally unfiltered: this required workflow must run for every code
+  # change and for Knowledge Library changes under docs/knowledge-library/**,
+  # scripts/knowledge/**, package.json, bun.lock, and package-lock.json. Do not
+  # add paths or paths-ignore here: this is the repository-wide required gate.
   workflow_dispatch:
   push:
     # `verdant-grow-diary` is the repository default branch — `main` alone
@@ -106,6 +110,73 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          # The append-only intent-history gate reads the exact target/base
+          # revision with git show. A shallow PR checkout cannot prove that.
+          fetch-depth: 0
+
+      - name: Resolve exact Knowledge Library base revision
+        id: knowledge-base
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          MERGE_GROUP_BASE_REF: ${{ github.event.merge_group.base_ref }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          case "$GITHUB_EVENT_NAME" in
+            pull_request)
+              candidate="$PR_BASE_SHA"
+              ;;
+            merge_group)
+              if [[ "$MERGE_GROUP_BASE_REF" != refs/heads/* ]] || ! git check-ref-format "$MERGE_GROUP_BASE_REF"; then
+                echo "::error title=Knowledge history base ref invalid::merge_group did not provide one valid branch ref"
+                exit 1
+              fi
+              remote_base_ref="refs/remotes/origin/${MERGE_GROUP_BASE_REF#refs/heads/}"
+              if ! git cat-file -e "${remote_base_ref}^{commit}"; then
+                echo "::error title=Knowledge history base unavailable::merge_group base ref is absent after the full checkout"
+                exit 1
+              fi
+              if ! candidate="$(git merge-base "$GITHUB_SHA" "$remote_base_ref")"; then
+                echo "::error title=Knowledge history base unavailable::merge_group head has no base commit with its trusted base ref"
+                exit 1
+              fi
+              ;;
+            push)
+              candidate="$PUSH_BEFORE_SHA"
+              ;;
+            workflow_dispatch)
+              case "$GITHUB_REF" in
+                refs/heads/main|refs/heads/verdant-grow-diary)
+                  ;;
+                *)
+                  echo "::error title=Knowledge history dispatch ref rejected::workflow_dispatch is restricted to the protected target branches"
+                  exit 1
+                  ;;
+              esac
+              if ! candidate="$(git rev-parse --verify "${GITHUB_SHA}^1")"; then
+                echo "::error title=Knowledge history base unavailable::workflow_dispatch requires a checked-out commit with a first parent"
+                exit 1
+              fi
+              ;;
+            *)
+              echo "::error title=Knowledge history event unsupported::cannot resolve a base for $GITHUB_EVENT_NAME"
+              exit 1
+              ;;
+          esac
+
+          if [[ ! "$candidate" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error title=Knowledge history base invalid::$GITHUB_EVENT_NAME did not provide one exact 40-character commit SHA"
+            exit 1
+          fi
+          if ! git cat-file -e "${candidate}^{commit}"; then
+            echo "::error title=Knowledge history base unavailable::the resolved base commit is absent after the full checkout"
+            exit 1
+          fi
+
+          resolved="$(git rev-parse --verify "${candidate}^{commit}")"
+          echo "base_revision=$resolved" >> "$GITHUB_OUTPUT"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -122,6 +193,16 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      # Stop-ship: validate the current Knowledge Library contracts and compare
+      # append-only intent receipts with the exact target/base revision. The
+      # first library commit may have no prior registry; all later revisions
+      # must preserve every prior entry and event exactly by value.
+      - name: Knowledge Library contracts and append-only history
+        env:
+          KNOWLEDGE_BASE_REVISION: ${{ steps.knowledge-base.outputs.base_revision }}
+          KNOWLEDGE_HISTORY_REQUIRED: "true"
+        run: bun run knowledge:validate
 
       # ripgrep (rg) is required by scripts/scan-gamification-direct-inserts.mjs
       # (the "Gamification direct-insert scan" step). It is not preinstalled on

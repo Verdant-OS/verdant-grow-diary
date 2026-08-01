@@ -16,7 +16,7 @@ inside the active governance handoff.
 
 | Branch               | Role                                             | Verified head                              |
 | -------------------- | ------------------------------------------------ | ------------------------------------------ |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `e623aa9d913698ca6795b3d6b75bd069d9a67681` |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `df51d6b0697761a022d7301e6c9b459a1c94c4ac` |
 | `main`               | Integration branch. It is not production parity. | `2bd6fa6016add1d3ea9f50415355601cbaefb37f` |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
@@ -25,6 +25,10 @@ integration task.
 
 Shared Sentinel Code was integrated into the deploy branch through [PR #626](https://github.com/Verdant-OS/verdant-grow-diary/pull/626), merged at
 `e623aa9d913698ca6795b3d6b75bd069d9a67681` on 2026-08-01T06:19:31Z.
+
+[PR #636](https://github.com/Verdant-OS/verdant-grow-diary/pull/636) then added the
+Cursor Cloud development instructions and advanced the deploy branch to
+`df51d6b0697761a022d7301e6c9b459a1c94c4ac` on 2026-08-01T18:58:29Z.
 
 Active reconciliation: [PR #635](https://github.com/Verdant-OS/verdant-grow-diary/pull/635)
 (`codex/sentinel-governance-reconcile` -> `verdant-grow-diary`).
@@ -38,8 +42,8 @@ Verified directly on 2026-08-01:
 | Axis                                        | Status                                                                |
 | ------------------------------------------- | --------------------------------------------------------------------- |
 | `https://verdantgrowdiary.com/version.json` | `PASS` — HTTP 200                                                     |
-| Production commit                           | `e623aa9d913698ca6795b3d6b75bd069d9a67681`                            |
-| Production build time                       | `2026-08-01T06:20:32.105Z`                                            |
+| Production commit                           | `df51d6b0697761a022d7301e6c9b459a1c94c4ac`                            |
+| Production build time                       | `2026-08-01T18:59:45.706Z`                                            |
 | Public sitemap / robots                     | `NOT_MEASURED` — not rechecked in this governance-only reconciliation |
 | GA4 authenticated baseline                  | `BLOCKED` — authenticated owner access unavailable                    |
 | GSC authenticated baseline                  | `BLOCKED` — authenticated owner access unavailable                    |
@@ -53,15 +57,15 @@ authenticated measurement baseline.
 
 ## Latest deploy-head validation
 
-PR #626's required-check snapshot contained **71 `SUCCESS`**, **2 `SKIPPED`**, and
-**1 `NEUTRAL`** result (74 total). The dedicated **Governance files agree on
+PR #636's check snapshot contained **54 `SUCCESS`**, **4 `SKIPPED`**, and
+**1 `NEUTRAL`** result (59 total). The dedicated **Governance files agree on
 Sentinel-Version** check passed:
 
 | Check                                      | Status | Evidence                                                                                                     |
 | ------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------ |
-| Governance files agree on Sentinel-Version | `PASS` | [run 30687310370](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30687310370/job/91335605848) |
+| Governance files agree on Sentinel-Version | `PASS` | [run 30712115247](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30712115247/job/91401265184) |
 
-The production version endpoint confirms that the PR #626 merge commit is deployed. This
+The production version endpoint confirms that the PR #636 merge commit is deployed. This
 does not prove authenticated analytics, Search Console indexing, or live database health.
 
 ---

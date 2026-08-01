@@ -47,6 +47,13 @@ describe("grow setup messages static safety", () => {
     expect(PLANT).toMatch(/create-plant-retry/);
   });
 
+  it("pins the supplied-tent Finish setup recovery action", () => {
+    expect(GROW_SETUP_MESSAGES.finishSetup).toBe("Finish setup");
+    expect(PLANT).toMatch(/finishSetupHref/);
+    expect(PLANT).toMatch(/finishSetupLabel/);
+    expect(PLANT).toMatch(/create-plant-finish-setup-cta/);
+  });
+
   it("rules module stays pure", () => {
     expect(RULES).not.toMatch(/from ["']react["']|from ["']@\/integrations\/supabase/);
   });

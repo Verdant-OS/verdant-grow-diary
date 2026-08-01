@@ -11,7 +11,9 @@
  * Pure: no React, no Supabase.
  */
 import {
+  GROW_SETUP_CHOOSE_SETUP_HREF,
   GROW_SETUP_FINISH_SETUP_HREF,
+  GROW_SETUP_GENERIC_NAME,
   GROW_SETUP_MESSAGES,
   GROW_SETUP_START_ROOM_HREF,
   growSetup,
@@ -20,7 +22,12 @@ import {
 export type CreateBindingEntity = "tent" | "plant";
 
 export type CreateGrowBindingKind =
-  "loading" | "read_error" | "no_setup" | "requested_setup_unavailable" | "choose_setup" | "ready";
+  | "loading"
+  | "read_error"
+  | "no_setup"
+  | "requested_setup_unavailable"
+  | "choose_setup"
+  | "ready";
 
 export interface GrowListItem {
   id: string;
@@ -33,13 +40,20 @@ function trimId(value: unknown): string | null {
   return t.length > 0 ? t : null;
 }
 
+const UUID_LIKE = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+
+function exactlyOneById<T extends { id: string }>(id: string, rows: readonly T[]): T | null {
+  const matches = rows.filter((row) => trimId(row.id) === id);
+  return matches.length === 1 ? matches[0] : null;
+}
+
 export function isKnownGrowId(
   growId: string | null | undefined,
   grows: readonly GrowListItem[],
 ): boolean {
   const id = trimId(growId);
   if (!id) return false;
-  return grows.some((g) => g.id === id);
+  return exactlyOneById(id, grows) !== null;
 }
 
 export interface ResolveCreateTargetGrowResult {
@@ -89,9 +103,11 @@ export function resolveSetupName(
 ): string | null {
   const id = trimId(growId);
   if (!id) return null;
-  const hit = grows.find((g) => g.id === id);
+  const hit = exactlyOneById(id, grows);
+  if (!hit) return null;
   const name = hit?.name?.trim();
-  return name && name.length > 0 ? name : null;
+  if (!name || name === id || UUID_LIKE.test(name)) return GROW_SETUP_GENERIC_NAME;
+  return name;
 }
 
 export interface CreateGrowBindingView {
@@ -110,6 +126,8 @@ export interface CreateGrowBindingView {
   primaryCta: string;
   secondaryCta: string;
   retryLabel: string;
+  chooseSetupHref: string;
+  chooseSetupLabel: string;
 }
 
 export function buildCreateGrowBindingView(
@@ -127,6 +145,8 @@ export function buildCreateGrowBindingView(
   const base = {
     targetGrowId: resolved.targetGrowId,
     startRoomHref: GROW_SETUP_START_ROOM_HREF,
+    chooseSetupHref: GROW_SETUP_CHOOSE_SETUP_HREF,
+    chooseSetupLabel: GROW_SETUP_MESSAGES.chooseSetupCta,
     primaryCta: GROW_SETUP_MESSAGES.hardStopCta,
     secondaryCta: GROW_SETUP_MESSAGES.hardStopSecondary,
     retryLabel: GROW_SETUP_MESSAGES.readErrorRetry,
@@ -402,17 +422,22 @@ export function evaluateSuppliedTentBinding(input: {
 
 /**
  * Whether the supplied-tent contract still blocks submit.
- * An explicit compatible replacement clears the block only when the pure view
- * allows it (orphan/mismatch/missing-after-load). Tent read errors never clear.
+ * An explicit, verified compatible replacement clears the block only when the
+ * pure view allows it (orphan/mismatch/missing-after-load). A locally verified
+ * nested tent may also replace a supplied tent while the remote list is still
+ * pending. Tent read errors remain Retry-only and never clear through a pick.
  */
 export function suppliedTentBlocksWrite(
   supplied: SuppliedTentView,
-  explicitCompatiblePick: boolean,
+  hasVerifiedCompatibleReplacement: boolean,
+  options: { replacementIsLocallyVerified?: boolean } = {},
 ): boolean {
   if (!supplied.blockSubmit) return false;
-  if (supplied.kind === "pending") return true;
+  if (supplied.kind === "pending") {
+    return !(hasVerifiedCompatibleReplacement && options.replacementIsLocallyVerified === true);
+  }
   if (
-    explicitCompatiblePick &&
+    hasVerifiedCompatibleReplacement &&
     supplied.allowCompatibleReplacement &&
     (supplied.kind === "orphan" || supplied.kind === "mismatch" || supplied.kind === "unavailable")
   ) {
@@ -529,8 +554,9 @@ export function evaluateTentGrowCompatibility(input: {
 }
 
 /**
- * Initial tent form value. Supplied tent is preserved until known-compatible;
- * never silent "none" while a supplied tent is still required.
+ * Initial tent form value. Only a verified compatible tent may survive into
+ * form state; presenter conflict state remains responsible for blocking an
+ * unsafe supplied tent until the grower picks a compatible replacement.
  */
 export function resolveInitialPlantTentId(input: {
   defaultTentId?: string | null;
@@ -556,9 +582,7 @@ export function resolveInitialPlantTentId(input: {
     targetGrowId: input.targetGrowId,
   });
 
-  if (supplied.kind === "ready") return tentId;
-  if (supplied.kind !== "none") return tentId;
-  return "none";
+  return supplied.kind === "ready" ? tentId : "none";
 }
 
 export function plantCreateAllowsTentless(input: {
@@ -569,8 +593,6 @@ export function plantCreateAllowsTentless(input: {
   if (trimId(input.suppliedTentId)) return false;
   return true;
 }
-
-const UUID_LIKE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /** Never render an opaque id as the setup display name. */
 export function sanitizeSetupDisplayName(
@@ -635,7 +657,8 @@ export function buildHardStopView(input: {
 }
 
 export type TentGrowCompatibilityCheck =
-  { ok: true } | { ok: false; reason: "missing_target" | "missing_setup" | "different_setup" };
+  | { ok: true }
+  | { ok: false; reason: "missing_target" | "missing_setup" | "different_setup" };
 
 /**
  * Task API: tent must share the resolved target grow.

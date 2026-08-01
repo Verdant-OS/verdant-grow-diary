@@ -35,13 +35,7 @@ const growsState = vi.hoisted(() => ({
 }));
 
 vi.mock("@/store/grows", () => ({
-  useGrows: () => ({
-    grows: growsState.grows,
-    activeGrowId: growsState.activeGrowId,
-    loading: growsState.loading,
-    error: growsState.error,
-    refresh: growsState.refresh,
-  }),
+  useGrows: () => growsState,
 }));
 
 vi.mock("@/hooks/use-tents", () => ({
@@ -86,7 +80,7 @@ describe("CreateTentDialog fail-closed binding", () => {
     growsState.refresh = vi.fn();
   });
 
-  it("zero grows withholds form and routes to one-tent activation", () => {
+  it("zero grows blocks submit and routes to one-tent activation", () => {
     renderDialog();
 
     expect(screen.getByTestId("create-tent-hard-stop")).toBeInTheDocument();
@@ -98,8 +92,7 @@ describe("CreateTentDialog fail-closed binding", () => {
       GROW_SETUP_START_ROOM_HREF,
     );
     expect(GROW_SETUP_START_ROOM_HREF).toContain("one_tent_activation");
-    expect(screen.queryByTestId("create-tent-form")).toBeNull();
-    expect(screen.queryByTestId("tent-create-submit")).toBeNull();
+    expect(screen.queryByTestId("tent-create-submit")).not.toBeInTheDocument();
     expect(insertMock).not.toHaveBeenCalled();
   });
 

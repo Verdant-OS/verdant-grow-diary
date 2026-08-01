@@ -71,8 +71,8 @@ describe("growSetup language contract", () => {
     for (const token of GROW_SETUP_BANNED_UI_TOKENS) {
       expect(copy.toLowerCase()).not.toContain(token.toLowerCase());
     }
-    // Dialog sources still use internal kind/column identifiers (e.g. kind:"orphan",
-    // grow_id) from the #645 state machine — those are not grower-facing copy.
+    // Dialog sources still use internal kind/column identifiers and query
+    // projections from the state machine — those are not grower-facing copy.
     const quoted = [
       ...TENT.matchAll(/["'`]([^"'`\\]|\\.)*["'`]/g),
       ...PLANT.matchAll(/["'`]([^"'`\\]|\\.)*["'`]/g),
@@ -80,7 +80,9 @@ describe("growSetup language contract", () => {
       .map((m) => m[0])
       .filter(
         (s) =>
-          !/^["'`](grow_id|orphan|mismatch|pending|ready|unavailable|loading|error)["'`]$/.test(s),
+          !/^["'`](grow_id|orphan|mismatch|pending|ready|unavailable|loading|error)["'`]$/.test(
+            s,
+          ) && !/^["'`]id, name, grow_id["'`]$/.test(s),
       )
       .join("\n");
     for (const token of GROW_SETUP_BANNED_UI_TOKENS) {

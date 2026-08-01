@@ -5,6 +5,8 @@
  */
 
 export const GROW_SETUP_START_ROOM_HREF = "/grows?intent=one_tent_activation" as const;
+export const GROW_SETUP_CHOOSE_SETUP_HREF = "/grows" as const;
+export const GROW_SETUP_GENERIC_NAME = "your current setup" as const;
 export const GROW_SETUP_FINISH_SETUP_HREF = "/grow-lineage" as const;
 
 /** Nested keys used by the language contract (growSetup.noSetup.* / create.* / mismatch.*). */
@@ -49,13 +51,14 @@ export const GROW_SETUP_MESSAGES = {
   loadingToast: growSetup.create.loadingToast,
 
   readErrorTitle: "Current setup unavailable",
-  readErrorBody: "Nothing has been created. Your setups could not be loaded.",
+  readErrorBody: "We couldn’t confirm your setups. Nothing has been created.",
   readErrorRetry: "Retry",
   retryCooldownHint: "Wait a moment before trying again",
 
-  requestedUnavailableTitle: "That setup isn’t available",
+  requestedUnavailableTitle: "Choose a current setup",
   requestedUnavailableBody:
-    "The setup you opened isn’t available right now. Nothing was created. Choose another setup or go back.",
+    "We couldn’t verify the setup for this form. Choose a setup before creating.",
+  chooseSetupCta: "Choose setup",
 
   pickSetupToast: growSetup.create.pickSetupToast,
 
@@ -64,6 +67,8 @@ export const GROW_SETUP_MESSAGES = {
 
   tentMismatchTitle: growSetup.mismatch.differentTitle,
   tentMismatchBody: growSetup.mismatch.differentBody,
+  tentMismatchBodyForSetup: (setupName: string) =>
+    `Choose a tent in ${setupName}, or switch setups.`,
   tentOrphanTitle: growSetup.mismatch.missingSetupTitle,
   tentOrphanBody: growSetup.mismatch.missingSetupBody,
   tentPendingTitle: "Checking this tent",
@@ -89,5 +94,6 @@ export const GROW_SETUP_BANNED_UI_TOKENS = [
   "backfill",
   "migration",
   "constraint",
+  "foreign key",
   "null grow",
 ] as const;

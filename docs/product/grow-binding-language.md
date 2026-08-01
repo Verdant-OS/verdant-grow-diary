@@ -9,19 +9,21 @@ Product rules for **Create tent** / **Create plant** on the production deploy br
 | `loading`                     | Loading your setup                    | blocked                                       |
 | `read_error`                  | Current setup unavailable + **Retry** | blocked (never “Start your room”)             |
 | `no_setup`                    | Start your room first                 | blocked → `/grows?intent=one_tent_activation` |
-| `requested_setup_unavailable` | That setup isn’t available            | blocked (**no** active-grow fallback)         |
+| `requested_setup_unavailable` | Choose a current setup                | blocked (**no** active-grow fallback)         |
 | `choose_setup`                | Pick which setup…                     | blocked                                       |
 | `ready`                       | Adding to {name}                      | allowed with `grow_id`                        |
 
 ## Supplied tent (“Add Plant to This Tent”)
 
-| Kind                                        | Behavior                                                                                                                                                                                  |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| pending                                     | Keep tent id; block submit; **no** tentless create. Includes initial load **and** background refetch (`isFetching`) — cached rows are not treated as verified while a fetch is in flight. |
-| unavailable (tent read error)               | Retry; block submit; **no** compatible-replacement escape                                                                                                                                 |
-| unavailable (missing after successful load) | Retry; block submit until grower explicitly picks another tent that matches the target setup; still **no** tentless create                                                                |
-| orphan / mismatch                           | Blocked presenter; **Finish setup** → `/grow-lineage`; require explicit compatible tent                                                                                                   |
-| ready                                       | Write `grow_id` + `tent_id`                                                                                                                                                               |
+| Kind                                        | Behavior                                                                                                         |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| pending                                     | Clear unsafe form value; retain conflict context; block submit; **no** tentless create                           |
+| unavailable (tent read error)               | Clear unsafe form value; Retry only; **no** compatible-replacement or nested-create escape                       |
+| unavailable (missing after successful load) | Clear unsafe form value; explicitly choose/create a verified compatible tent                                     |
+| orphan / mismatch                           | Clear unsafe form value; **Finish setup** → `/grow-lineage`; require an explicit verified compatible replacement |
+| ready                                       | Write `grow_id` + `tent_id`                                                                                      |
+
+Initial loading and background refetch (`isFetching`) both count as pending; cached remote rows are not treated as verified while a fetch is in flight or after a read failure. A tent returned by the nested creator is locally verified against the resolved setup and may be selected while the background tent list is still loading. A tent read error remains Retry-only.
 
 ## Grower-facing copy (`growSetup.*`)
 

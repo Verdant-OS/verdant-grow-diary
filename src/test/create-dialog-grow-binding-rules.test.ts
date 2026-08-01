@@ -9,11 +9,13 @@ import {
   evaluateTentGrowCompatibility,
   evaluateSuppliedTentBinding,
   resolveInitialPlantTentId,
+  resolveSetupName,
   plantCreateAllowsTentless,
   sanitizeSetupDisplayName,
   suppliedTentBlocksWrite,
 } from "@/lib/createDialogGrowBindingRules";
 import {
+  GROW_SETUP_CHOOSE_SETUP_HREF,
   GROW_SETUP_FINISH_SETUP_HREF,
   GROW_SETUP_START_ROOM_HREF,
   growSetup,
@@ -58,6 +60,22 @@ describe("resolveCreateTargetGrowId", () => {
     expect(r.targetGrowId).toBeNull();
     expect(r.requestedSetupUnavailable).toBe(true);
     expect(r.explicitRequest).toBe(true);
+  });
+
+  it("fails closed when the requested id appears more than once", () => {
+    const r = resolveCreateTargetGrowId({
+      pageDefaultGrowId: "g1",
+      activeGrowId: "g2",
+      grows: [...grows, { id: "g1", name: "Duplicate" }],
+    });
+    expect(r.targetGrowId).toBeNull();
+    expect(r.requestedSetupUnavailable).toBe(true);
+  });
+
+  it("uses generic presenter copy for blank or id-shaped setup names", () => {
+    const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    expect(resolveSetupName(id, [{ id, name: "" }])).toBe("your current setup");
+    expect(resolveSetupName(id, [{ id, name: id }])).toBe("your current setup");
   });
 
   it("does not resolve a cached requested or active setup while grows refresh", () => {
@@ -214,6 +232,7 @@ describe("buildCreateGrowBindingView", () => {
     );
     expect(v.kind).toBe("requested_setup_unavailable");
     expect(v.targetGrowId).toBeNull();
+    expect(v.chooseSetupHref).toBe(GROW_SETUP_CHOOSE_SETUP_HREF);
   });
 });
 
@@ -257,6 +276,7 @@ describe("supplied tent contract", () => {
     expect(s.blockSubmit).toBe(true);
     expect(s.allowCompatibleReplacement).toBe(false);
     expect(suppliedTentBlocksWrite(s, true)).toBe(true);
+    expect(suppliedTentBlocksWrite(s, true, { replacementIsLocallyVerified: true })).toBe(true);
   });
 
   it("missing tent after successful load allows explicit compatible replacement only", () => {
@@ -295,7 +315,7 @@ describe("supplied tent contract", () => {
     expect(mismatch.allowCompatibleReplacement).toBe(true);
   });
 
-  it("resolveInitialPlantTentId preserves supplied id while pending", () => {
+  it("resolveInitialPlantTentId clears a supplied id while pending", () => {
     expect(
       resolveInitialPlantTentId({
         defaultTentId: "t1",
@@ -303,7 +323,7 @@ describe("supplied tent contract", () => {
         tentsLoaded: false,
         targetGrowId: "g1",
       }),
-    ).toBe("t1");
+    ).toBe("none");
   });
 
   it("requireTentForWrite blocks none when supplied", () => {
@@ -328,6 +348,9 @@ describe("supplied tent contract", () => {
     });
     expect(pending.kind).toBe("pending");
     expect(suppliedTentBlocksWrite(pending, true)).toBe(true);
+    expect(suppliedTentBlocksWrite(pending, true, { replacementIsLocallyVerified: true })).toBe(
+      false,
+    );
   });
 
   it("orphan/mismatch supplied tents expose Finish setup href", () => {

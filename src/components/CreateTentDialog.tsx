@@ -36,10 +36,16 @@ import {
 import { GROW_SETUP_MESSAGES } from "@/constants/growSetupMessages";
 import { useCreateBindingRetry } from "@/hooks/useCreateBindingRetry";
 
+export interface CreatedTent {
+  id: string;
+  name: string;
+  grow_id: string;
+}
+
 interface Props {
   trigger?: React.ReactNode;
   defaultGrowId?: string;
-  onCreated?: (tent: { id: string; name: string }) => void;
+  onCreated?: (tent: CreatedTent) => void;
   initiallyOpen?: boolean;
 }
 
@@ -97,15 +103,20 @@ export default function CreateTentDialog({
 
   const formBlocked = binding.blockSubmit || !canWriteCreateGrowId(targetGrowId);
 
+  function resetForm() {
+    setForm(EMPTY_TENT_FORM);
+  }
+
   function handleOpenChange(next: boolean) {
     setOpen(next);
-    if (!next) {
-      setForm(EMPTY_TENT_FORM);
-    }
+    if (!next) resetForm();
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    // React submit events bubble through portals. This dialog is nested inside
+    // the plant form, so do not let a tent submit reach the parent form.
+    e.stopPropagation();
     if (!tentGate.allowed) {
       toast.error(tentGate.blockedCopy);
       return;
@@ -130,7 +141,7 @@ export default function CreateTentDialog({
     const { data, error } = await supabase
       .from("tents")
       .insert(payload as never)
-      .select("id, name")
+      .select("id, name, grow_id")
       .single();
     setBusy(false);
     if (error) {
@@ -141,9 +152,9 @@ export default function CreateTentDialog({
     trackFunnelEvent("tent_created");
     qc.invalidateQueries({ queryKey: ["tents"] });
     qc.invalidateQueries({ queryKey: ["grow", "tents"] });
-    setForm(EMPTY_TENT_FORM);
+    if (data && onCreated) onCreated(data as CreatedTent);
+    resetForm();
     setOpen(false);
-    if (data && onCreated) onCreated(data as { id: string; name: string });
   }
 
   return (
@@ -208,12 +219,15 @@ export default function CreateTentDialog({
         )}
         {binding.showRequestedUnavailable && (
           <div
-            className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-3 space-y-1"
+            className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-3 space-y-2"
             data-testid="create-tent-requested-unavailable"
             role="alert"
           >
             <p className="text-sm font-semibold">{binding.title}</p>
             <p className="text-xs text-muted-foreground">{binding.body}</p>
+            <Button asChild type="button" size="sm" variant="outline">
+              <Link to={binding.chooseSetupHref}>{binding.chooseSetupLabel}</Link>
+            </Button>
           </div>
         )}
         {binding.showStartRoomHardStop && (
@@ -237,7 +251,7 @@ export default function CreateTentDialog({
                 type="button"
                 size="sm"
                 variant="outline"
-                onClick={() => setOpen(false)}
+                onClick={() => handleOpenChange(false)}
                 data-testid="create-tent-hard-stop-dismiss"
               >
                 {binding.secondaryCta}
@@ -252,11 +266,11 @@ export default function CreateTentDialog({
           >
             {GROW_SETUP_MESSAGES.pickSetupToast("tent")}{" "}
             <Link
-              to={binding.startRoomHref}
+              to={binding.chooseSetupHref}
               className="underline underline-offset-2"
               data-testid="create-tent-pick-setup-cta"
             >
-              {binding.primaryCta}
+              {binding.chooseSetupLabel}
             </Link>
           </p>
         )}

@@ -1,0 +1,119 @@
+{
+  "fixture": {
+    "fixtureId": "hst-013-missing-evidence",
+    "fixtureVersion": "1.2.0",
+    "fixtureSchemaVersion": "1.0.0",
+    "name": "Missing evidence",
+    "description": "No curated evidence retrieved; confidence is floored.",
+    "tags": [
+      "evidence"
+    ],
+    "skillId": "harness-self-test",
+    "skillVersion": "1.0.0",
+    "fixtureKind": "harness_self_test",
+    "context": {
+      "synthetic": true,
+      "scenario": "hst-013-missing-evidence"
+    },
+    "contextContractVersion": "ctx-selftest-1",
+    "expectedApplicability": "applicable",
+    "evidenceInputs": null,
+    "expectedSelectedEvidenceIds": [],
+    "modelDraft": {
+      "text": "synthetic draft"
+    },
+    "modelAdapterFixtureId": null,
+    "expectedPolicyOutcome": "observation_only",
+    "expectedAbstention": "must_abstain",
+    "expectedMissingInformationKeys": [],
+    "expectedRiskLevel": null,
+    "expectedActionEligibility": "none",
+    "expectedExecutionCapability": null,
+    "allowedEvidenceIds": [],
+    "forbiddenEvidenceIds": [
+      "ev-forbidden"
+    ],
+    "expectedCitedEvidenceIds": null,
+    "forbiddenClaims": [
+      "guaranteed yield",
+      "cures cancer"
+    ],
+    "expectedConfidence": {
+      "min": null,
+      "max": 0.95
+    },
+    "requiredWarnings": [],
+    "forbiddenWarnings": [],
+    "safetyCritical": true,
+    "promotionEligible": false,
+    "determinismRepetitions": 1,
+    "authoredAt": "2026-08-01T00:00:00.000Z"
+  },
+  "execution": {
+    "skillContract": {
+      "contractVersion": "1.0.0"
+    },
+    "manifest": {
+      "id": "harness-self-test",
+      "version": "1.0.0",
+      "riskClass": "low"
+    },
+    "context": {
+      "contextVersion": "ctx-selftest-1",
+      "scenario": "hst-013-missing-evidence"
+    },
+    "applicability": {
+      "verdict": "applicable",
+      "skillId": "harness-self-test",
+      "skillVersion": "1.0.0",
+      "missingRequiredContext": []
+    },
+    "evidenceCorpus": {
+      "registryVersion": "1.0.0",
+      "records": [
+        "ev-1"
+      ]
+    },
+    "evidenceRegistryVersion": "1.0.0",
+    "selectedEvidenceIds": [],
+    "citedEvidenceIds": [],
+    "policy": {
+      "decisionVersion": "1.0.0",
+      "outcomes": [
+        "observation_only"
+      ],
+      "actionEligibility": "none",
+      "proposalVerdicts": [],
+      "firedRules": []
+    },
+    "policyVersion": "1.0.0",
+    "draft": {
+      "text": "synthetic draft"
+    },
+    "expectation": {
+      "expectedPolicyOutcome": "observation_only"
+    },
+    "output": {
+      "contractVersion": "1.0.0",
+      "runId": "00000000-0000-4000-8000-000000000013",
+      "skillId": "harness-self-test",
+      "skillVersion": "1.0.0",
+      "status": "ok",
+      "startedAt": "2026-07-31T23:00:00.000Z",
+      "completedAt": "2026-08-01T00:00:00.000Z",
+      "contextVersion": "ctx-selftest-1",
+      "followUps": [],
+      "error": null,
+      "proposals": [],
+      "hypotheses": [],
+      "evidence": [],
+      "confidence": {
+        "modelConfidence": 0.3,
+        "evidenceConfidence": 0.3,
+        "systemConfidence": 0.3,
+        "derivation": "min_model_evidence_v1"
+      }
+    },
+    "outputSchemaValid": true
+  }
+}

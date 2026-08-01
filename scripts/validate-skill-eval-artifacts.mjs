@@ -1,0 +1,343 @@
+#!/usr/bin/env bun
+/**
+ * validate-skill-eval-artifacts — checks what the harness actually wrote.
+ *
+ * Running the harness green proves the harness ran. It does not prove the
+ * files on disk are parseable, internally consistent, or safe to upload — and
+ * CI uploads them, after which a reader will trust them. So this validates the
+ * artifact, not the run.
+ *
+ * Exit codes follow the repository convention:
+ *   0  artifacts valid
+ *   1  artifact violation
+ *   2  usage or I/O error
+ */
+
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+// Run under bun, not node, so the real verifier can be IMPORTED rather than
+// reimplemented here. A second copy of the binding rules in the validator
+// would be a second thing to keep in sync, and the one that drifts is the one
+// nobody runs locally.
+import {
+  renderEvaluationMarkdown,
+  verifyReportBinding,
+} from "../src/lib/verdantSkillEvaluationReport.ts";
+import { detectProductionDataCategories } from "../src/lib/verdantSkillEvaluationSchemas.ts";
+import { renderPromotionMarkdown } from "../src/lib/verdantSkillPromotionRules.ts";
+import { sha256Digest } from "./lib/verdantSkillEvaluationDigest.ts";
+import { computeBoundDigest } from "../src/lib/verdantSkillEvaluationBindings.ts";
+import { PROGRESSION_TO_MANIFEST_LIFECYCLE } from "../src/lib/verdantSkillEvaluationTypes.ts";
+
+const ROOT = resolve(fileURLToPath(import.meta.url), "../..");
+const ARTIFACT_ROOT = resolve(ROOT, process.argv[2] ?? "artifacts/skills");
+
+/** Shapes that must never reach an uploaded artifact. */
+// NO LOCAL COPY. This was a hand-maintained list beside the shared
+// `detectProductionDataCategories`, and it had already drifted: the shared
+// detector classifies `api_key_assignment` as a disclosure and this list had
+// never heard of it, so an artifact carrying `api_key: <secret>` passed and CI
+// uploaded it. Third time a copied list has drifted from its source in this
+// build — the Markdown field comparison and the governor's blocking families
+// were the others.
+
+const violations = [];
+const note = (rule, message) => violations.push({ rule, message });
+
+function walkVersionDirs(root) {
+  const out = [];
+  if (!existsSync(root)) return out;
+  // Wrapped: an unreadable directory is an I/O problem (exit 2), not an
+  // artifact violation (exit 1), and an uncaught throw here would have been
+  // neither.
+  try {
+    for (const skill of readdirSync(root)) {
+      const skillDir = join(root, skill);
+      if (!statSync(skillDir).isDirectory()) continue;
+      for (const version of readdirSync(skillDir)) {
+        const versionDir = join(skillDir, version);
+        if (statSync(versionDir).isDirectory()) out.push(versionDir);
+      }
+    }
+  } catch (error) {
+    console.error(`✗ cannot read ${root}: ${error instanceof Error ? error.message : error}`);
+    process.exit(2);
+  }
+  return out;
+}
+
+/**
+ * EVERY file under the upload root, at any depth.
+ *
+ * Third finding in three rounds about the gap between what is checked and what
+ * ships. First the upload ran on failure; then only four named files were
+ * scanned; then only files inside a two-level version directory — while CI
+ * uploads `artifacts/skills/` recursively the whole time. Each fix covered one
+ * more level of a tree it should simply have walked.
+ */
+function walkAllFiles(root) {
+  const out = [];
+  if (!existsSync(root)) return out;
+  const visit = (dir) => {
+    for (const entry of readdirSync(dir).sort()) {
+      const path = join(dir, entry);
+      if (statSync(path).isDirectory()) visit(path);
+      else out.push(path);
+    }
+  };
+  try {
+    visit(root);
+  } catch (error) {
+    console.error(`✗ cannot read ${root}: ${error instanceof Error ? error.message : error}`);
+    process.exit(2);
+  }
+  return out;
+}
+
+const dirs = walkVersionDirs(ARTIFACT_ROOT);
+if (dirs.length === 0) {
+  console.error(`✗ skill evaluation artifacts: none found under ${ARTIFACT_ROOT}`);
+  process.exit(2);
+}
+
+for (const dir of dirs) {
+  const evalJsonPath = join(dir, "evaluation.json");
+  const evalMdPath = join(dir, "evaluation.md");
+  const promoJsonPath = join(dir, "promotion-decision.json");
+  // The harness writes FOUR artifacts and the required list named three, so a
+  // missing promotion markdown produced no violation and the later disclosure
+  // loop simply skipped the absent file — CI uploading an incomplete set from
+  // a validator that exited 0.
+  const promoMdPath = join(dir, "promotion-decision.md");
+
+  for (const required of [evalJsonPath, evalMdPath, promoJsonPath, promoMdPath]) {
+    if (!existsSync(required)) note("missing_artifact", required);
+  }
+  // A leftover temp file means a write was interrupted; the sibling artifact
+  // cannot be trusted even if it parses.
+  for (const name of readdirSync(dir)) {
+    if (name.endsWith(".tmp")) note("stray_temp_file", join(dir, name));
+  }
+  if (!existsSync(evalJsonPath)) continue;
+
+  let report;
+  const rawJson = readFileSync(evalJsonPath, "utf8");
+  try {
+    report = JSON.parse(rawJson);
+  } catch {
+    note("unparseable_json", evalJsonPath);
+    continue;
+  }
+
+  if (report === null || typeof report !== "object" || Array.isArray(report)) {
+    // A scalar or null evaluation.json crashed the validator on the next
+    // property access — an uncaught TypeError instead of a violation.
+    note("report_is_not_an_object", evalJsonPath);
+    continue;
+  }
+  if (typeof report.reportVersion !== "string") note("missing_report_version", evalJsonPath);
+  if (report.reportBinding === null || report.reportBinding === undefined) {
+    note("report_not_self_bound", evalJsonPath);
+  } else if (!verifyReportBinding(report, sha256Digest)) {
+    // RECOMPUTED, not merely present. Checking that a self-binding exists
+    // proves an artifact was signed, never that it still says what it said
+    // when it was: an artifact edited after writing — overallStatus flipped to
+    // pass, a failing case removed — kept its untouched binding and validated
+    // clean. The binding is only worth having if something recomputes it.
+    note("report_binding_does_not_verify", evalJsonPath);
+  }
+  if (!Array.isArray(report.limitations) || report.limitations.length === 0) {
+    note("artifact_states_no_limitations", evalJsonPath);
+  }
+
+  // A zero-denominator rate must never render as a number.
+  for (const [key, value] of Object.entries(report.metrics ?? {})) {
+    if (value === null || typeof value !== "object" || !("status" in value)) continue;
+    if (value.status === "not_measured" && value.value !== null) {
+      note("not_measured_rate_carries_a_value", `${evalJsonPath}: ${key}`);
+    }
+    if (value.status === "measured" && value.denominator === 0) {
+      note("measured_rate_with_zero_denominator", `${evalJsonPath}: ${key}`);
+    }
+  }
+
+  if (existsSync(evalMdPath)) {
+    const md = readFileSync(evalMdPath, "utf8");
+    // REGENERATED and compared whole, not field by field.
+    //
+    // Each round of review found another rendered fact the comparison had
+    // missed — counts, then the overall verdict, then hard safety, then the
+    // identity header — because a list of fields to check is a list someone
+    // has to keep complete. The Markdown is a pure function of the report, so
+    // rendering it again and comparing the bytes covers every field there is,
+    // including ones added later.
+    if (
+      md !==
+      `${renderEvaluationMarkdown(report)}
+`
+    ) {
+      note("markdown_disagrees_with_json", evalMdPath);
+    }
+  }
+
+  // The promotion decision, PARSED — not merely scanned as text.
+  //
+  // It was read only for disclosure patterns, so a truncated or otherwise
+  // invalid decision artifact passed validation and CI uploaded it. A
+  // validator that claims to check parseability has to actually parse
+  // everything it green-lights.
+  if (existsSync(promoJsonPath)) {
+    let decision;
+    let decisionParsed = false;
+    try {
+      decision = JSON.parse(readFileSync(promoJsonPath, "utf8"));
+      decisionParsed = true;
+    } catch {
+      note("unparseable_json", promoJsonPath);
+    }
+    // `null` is a value JSON.parse RETURNS, so it could not double as the
+    // "already reported" sentinel: a file containing literal `null` skipped
+    // every check below and validated clean — beside a markdown a human reads
+    // as "Eligible: YES". Deleting the artifact was caught; nullifying it was
+    // not. Parse success is tracked separately now, and a decision that is not
+    // an object is a violation rather than a reason to skip.
+    if (
+      decisionParsed &&
+      (decision === null || typeof decision !== "object" || Array.isArray(decision))
+    ) {
+      note("decision_is_not_an_object", promoJsonPath);
+    } else if (decisionParsed) {
+      if (typeof decision.decisionVersion !== "string") {
+        note("missing_decision_version", promoJsonPath);
+      }
+      if (typeof decision.eligible !== "boolean") {
+        note("decision_states_no_verdict", promoJsonPath);
+      }
+      if (!Array.isArray(decision.blockingReasons)) {
+        note("decision_states_no_blocking_reasons", promoJsonPath);
+      }
+      // The decision is self-bound the same way the report is, and recomputing
+      // one while trusting the other leaves the authorization artifact — the
+      // one that says YES — as the unchecked half. Editing it to set
+      // eligible:true, add a lifecycle and clear the blocking reasons passed
+      // every shape and agreement check above, because nothing recomputed
+      // this.
+      if (typeof decision.decisionDigest !== "string" || decision.decisionDigest === "") {
+        note("decision_not_self_bound", promoJsonPath);
+      } else {
+        const recomputed = computeBoundDigest(
+          "promotion_decision",
+          { ...decision, decisionDigest: "" },
+          sha256Digest,
+        );
+        if (recomputed.value !== decision.decisionDigest) {
+          note("decision_digest_does_not_verify", promoJsonPath);
+        }
+      }
+      // Deliberately NOT "every eligible decision must name a lifecycle".
+      //
+      // That rule, as I first wrote it, was wrong: the evidence-only targets
+      // (`schema_valid`, `golden_cases_passed`, …) and the withdrawal states
+      // map to null BY DESIGN, because they authorize no manifest mutation.
+      // The unconditional form would have failed CI on a legitimate artifact —
+      // a validator rule that rejects correct output is worse than the gap it
+      // was meant to close. The honest check is agreement between the decision
+      // and the progression model it claims to follow.
+      const mapped = PROGRESSION_TO_MANIFEST_LIFECYCLE[decision.requestedState];
+      if (decision.eligible === true && mapped !== undefined) {
+        if (decision.authorizedManifestLifecycle !== mapped) {
+          note("decision_lifecycle_disagrees_with_progression_model", promoJsonPath);
+        }
+      }
+      // The two artifacts describe one decision and must agree.
+      if (decision.eligible === true && report?.promotionEligible === false) {
+        note("decision_disagrees_with_report", promoJsonPath);
+      }
+      // And the decision must be bound to THIS report. A valid, self-digested
+      // decision left over from a different evaluation passes every agreement
+      // check above whenever both reports are promotable and share a
+      // transition — the decision already carries the report binding it judged,
+      // so comparing it is the whole check.
+      if (report?.reportBinding) {
+        const claimed = decision.evaluationReportBinding;
+        const actual = report.reportBinding;
+        const sameEnvelope =
+          claimed !== null &&
+          claimed !== undefined &&
+          claimed.value === actual.value &&
+          claimed.artifactType === actual.artifactType &&
+          claimed.algorithm === actual.algorithm &&
+          claimed.bindingVersion === actual.bindingVersion &&
+          claimed.serializerVersion === actual.serializerVersion;
+        if (!sameEnvelope) {
+          note("decision_not_bound_to_adjacent_report", promoJsonPath);
+        }
+      }
+    }
+  }
+
+  // The human-readable half must say what the digest-verified half says. A
+  // stale promotion markdown — left behind by a --json-only rerun into an
+  // existing directory — or an edited one reading "Eligible: YES" over a
+  // blocked decision was only scanned for disclosure patterns and passed.
+  // The artifact a person reads is the one that misleads them.
+  if (existsSync(promoJsonPath) && existsSync(promoMdPath)) {
+    let decisionForMd = null;
+    try {
+      decisionForMd = JSON.parse(readFileSync(promoJsonPath, "utf8"));
+    } catch {
+      // Already reported as unparseable above.
+    }
+    if (
+      decisionForMd !== null &&
+      typeof decisionForMd === "object" &&
+      !Array.isArray(decisionForMd)
+    ) {
+      const promoMd = readFileSync(promoMdPath, "utf8");
+      if (
+        promoMd !==
+        `${renderPromotionMarkdown(decisionForMd)}
+`
+      ) {
+        note("promotion_markdown_disagrees_with_json", promoMdPath);
+      }
+    }
+  }
+}
+
+// The upload tree, whole. `EXPECTED_ENTRIES` is relative to a version
+// directory; anything else anywhere under the root is refused outright,
+// because the artifact tree should contain exactly what the harness wrote and
+// the disclosure patterns only catch shapes we thought of.
+const EXPECTED_ENTRIES = new Set([
+  "evaluation.json",
+  "evaluation.md",
+  "promotion-decision.json",
+  "promotion-decision.md",
+]);
+for (const path of walkAllFiles(ARTIFACT_ROOT)) {
+  // `relative` + `sep` rather than a hand-escaped character class: the first
+  // version of this line lost its backslash to escaping and split only on
+  // forward slashes, so on Windows every path became one segment.
+  const rel = relative(ARTIFACT_ROOT, path).split(sep);
+  // skill/version/name — anything shallower or deeper is not something the
+  // harness writes.
+  if (rel.length !== 3 || !EXPECTED_ENTRIES.has(rel[2])) {
+    note("unexpected_artifact_entry", path);
+  }
+  const text = readFileSync(path, "utf8");
+  // Category names only — echoing the match would re-leak it.
+  for (const code of detectProductionDataCategories(text)) {
+    note("artifact_disclosure", `${path}: ${code}`);
+  }
+}
+
+if (violations.length > 0) {
+  console.error(`✗ skill evaluation artifacts: ${violations.length} violation(s)`);
+  for (const v of violations) console.error(`  - [${v.rule}] ${v.message}`);
+  process.exit(1);
+}
+
+console.log(`✓ skill evaluation artifacts: 0 violations (${dirs.length} version dir(s))`);
+process.exit(0);

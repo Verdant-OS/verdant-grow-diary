@@ -30,12 +30,17 @@ import { validatePlantInsertPayload } from "@/lib/plantPayloadValidation";
 import {
   buildCreateGrowBindingHardStop,
   canWriteCreateGrowId,
+  evaluateDefaultTentBinding,
   evaluateTentGrowCompatibility,
+  formatDisplaySetupName,
   resolveCreateTargetGrowId,
   resolveInitialPlantTentId,
-  resolveSetupName,
 } from "@/lib/createDialogGrowBindingRules";
-import { GROW_SETUP_MESSAGES } from "@/constants/growSetupMessages";
+import {
+  GROW_SETUP_FINISH_SETUP_HREF,
+  GROW_SETUP_MESSAGES,
+  growSetup,
+} from "@/constants/growSetupMessages";
 
 const STAGES = [
   { value: "seedling", label: "Seedling" },
@@ -101,24 +106,22 @@ export default function CreatePlantDialog({
   const hardStop = useMemo(
     () =>
       buildCreateGrowBindingHardStop(
-        { targetGrowId, growCount: grows.length, growsLoading },
+        { targetGrowId, growCount: grows.length, growsLoading, grows },
         "plant",
       ),
     [targetGrowId, grows.length, growsLoading],
   );
   const setupName = useMemo(
-    () => resolveSetupName(targetGrowId, grows),
+    () => (targetGrowId ? formatDisplaySetupName(targetGrowId, grows) : null),
     [targetGrowId, grows],
   );
 
   const tentRows = allTents as TentRow[];
   // Scope tent options to the resolved target setup when known.
-  const tents = targetGrowId
-    ? tentRows.filter((t) => t.grow_id === targetGrowId)
-    : tentRows;
+  const tents = targetGrowId ? tentRows.filter((t) => t.grow_id === targetGrowId) : tentRows;
 
   const defaultTentGrowId = defaultTentId
-    ? tentRows.find((t) => t.id === defaultTentId)?.grow_id ?? null
+    ? (tentRows.find((t) => t.id === defaultTentId)?.grow_id ?? null)
     : null;
   const initialTentId = resolveInitialPlantTentId({
     defaultTentId,
@@ -135,7 +138,7 @@ export default function CreatePlantDialog({
     if (!open) return;
     const tentGrow =
       form.tent_id !== "none"
-        ? tentRows.find((t) => t.id === form.tent_id)?.grow_id ?? null
+        ? (tentRows.find((t) => t.id === form.tent_id)?.grow_id ?? null)
         : null;
     const selectedCompat = evaluateTentGrowCompatibility({
       selectedTentId: form.tent_id,
@@ -158,14 +161,22 @@ export default function CreatePlantDialog({
   }, [open, targetGrowId, defaultTentId, defaultTentGrowId]);
 
   const selectedTentGrowId =
-    form.tent_id !== "none"
-      ? tentRows.find((t) => t.id === form.tent_id)?.grow_id ?? null
-      : null;
+    form.tent_id !== "none" ? (tentRows.find((t) => t.id === form.tent_id)?.grow_id ?? null) : null;
+  const defaultTentBinding = evaluateDefaultTentBinding({
+    defaultTentId,
+    tentGrowId: defaultTentGrowId,
+    targetGrowId,
+  });
   const tentCompat = evaluateTentGrowCompatibility({
     selectedTentId: form.tent_id,
     tentGrowId: selectedTentGrowId,
     targetGrowId,
   });
+  const tentBindingIssue = !defaultTentBinding.compatible
+    ? defaultTentBinding
+    : !tentCompat.compatible && form.tent_id !== "none"
+      ? tentCompat
+      : null;
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
@@ -185,8 +196,12 @@ export default function CreatePlantDialog({
       if (hardStop.toastMessage) toast.error(hardStop.toastMessage);
       return;
     }
-    if (!tentCompat.compatible) {
+    if (!tentCompat.compatible && form.tent_id !== "none") {
       toast.error(tentCompat.title || GROW_SETUP_MESSAGES.tentMismatchTitle);
+      return;
+    }
+    if (!defaultTentBinding.compatible) {
+      toast.error(defaultTentBinding.title || GROW_SETUP_MESSAGES.tentOrphanTitle);
       return;
     }
     const selectedTent = tents.find((tent) => tent.id === form.tent_id);
@@ -257,6 +272,7 @@ export default function CreatePlantDialog({
             className="rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 space-y-2"
             data-testid="create-plant-hard-stop"
             role="alert"
+            aria-label={hardStop.hardStopAriaLabel}
           >
             <p className="text-sm font-semibold" data-testid="create-plant-hard-stop-title">
               {hardStop.hardStopTitle}
@@ -301,26 +317,34 @@ export default function CreatePlantDialog({
             data-testid="create-plant-target-setup"
           >
             <span className="font-medium">
-              {setupName
+              {setupName && setupName !== growSetup.create.genericSetupLabel
                 ? GROW_SETUP_MESSAGES.addingTo(setupName)
                 : GROW_SETUP_MESSAGES.addingToHint}
             </span>
-            {setupName ? (
+            {setupName && setupName !== growSetup.create.genericSetupLabel ? (
               <span className="block text-muted-foreground mt-0.5">
                 {GROW_SETUP_MESSAGES.addingToHint}
               </span>
             ) : null}
           </p>
         )}
-        {!tentCompat.compatible && form.tent_id !== "none" && (
-          <p
-            className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"
+        {tentBindingIssue && (
+          <div
+            className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs space-y-2"
             data-testid="create-plant-tent-mismatch"
             role="alert"
+            aria-label={tentBindingIssue.title}
           >
-            <span className="font-semibold block">{tentCompat.title}</span>
-            <span className="text-muted-foreground">{tentCompat.body}</span>
-          </p>
+            <span className="font-semibold block">{tentBindingIssue.title}</span>
+            <span className="text-muted-foreground block">{tentBindingIssue.body}</span>
+            {tentBindingIssue.showFinishSetupCta && (
+              <Button asChild size="sm" variant="outline" className="h-7">
+                <Link to={GROW_SETUP_FINISH_SETUP_HREF} data-testid="create-plant-finish-setup-cta">
+                  {GROW_SETUP_MESSAGES.finishSetup}
+                </Link>
+              </Button>
+            )}
+          </div>
         )}
         <form onSubmit={submit} className="grid gap-3">
           <div>
@@ -448,6 +472,7 @@ export default function CreatePlantDialog({
             disabled={
               busy ||
               hardStop.blockSubmit ||
+              !defaultTentBinding.compatible ||
               !tentCompat.compatible ||
               (requireTent && form.tent_id === "none")
             }

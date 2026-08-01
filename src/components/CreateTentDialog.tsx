@@ -31,10 +31,12 @@ import { evaluateTentCreationGate, FREE_TIER_UPGRADE_PATH } from "@/lib/entitlem
 import {
   buildCreateGrowBindingHardStop,
   canWriteCreateGrowId,
+  formatDisplaySetupName,
   resolveCreateTargetGrowId,
-  resolveSetupName,
 } from "@/lib/createDialogGrowBindingRules";
-import { GROW_SETUP_MESSAGES } from "@/constants/growSetupMessages";
+import { GROW_SETUP_MESSAGES, growSetup } from "@/constants/growSetupMessages";
+
+const EMPTY_TENT_FORM = { name: "", size: "", brand: "", stage: "seedling" };
 
 interface Props {
   trigger?: React.ReactNode;
@@ -55,7 +57,7 @@ export default function CreateTentDialog({
   const qc = useQueryClient();
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ name: "", size: "", brand: "", stage: "seedling" });
+  const [form, setForm] = useState(EMPTY_TENT_FORM);
 
   const targetGrowId = useMemo(
     () =>
@@ -69,13 +71,13 @@ export default function CreateTentDialog({
   const hardStop = useMemo(
     () =>
       buildCreateGrowBindingHardStop(
-        { targetGrowId, growCount: grows.length, growsLoading },
+        { targetGrowId, growCount: grows.length, growsLoading, grows },
         "tent",
       ),
     [targetGrowId, grows.length, growsLoading],
   );
   const setupName = useMemo(
-    () => resolveSetupName(targetGrowId, grows),
+    () => (targetGrowId ? formatDisplaySetupName(targetGrowId, grows) : null),
     [targetGrowId, grows],
   );
 
@@ -130,13 +132,20 @@ export default function CreateTentDialog({
     trackFunnelEvent("tent_created");
     qc.invalidateQueries({ queryKey: ["tents"] });
     qc.invalidateQueries({ queryKey: ["grow", "tents"] });
-    setForm({ name: "", size: "", brand: "", stage: "seedling" });
+    setForm(EMPTY_TENT_FORM);
     setOpen(false);
     if (data && onCreated) onCreated(data as { id: string; name: string });
   }
 
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) {
+      setForm(EMPTY_TENT_FORM);
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger ?? (
           <Button size="sm" className="gradient-leaf text-primary-foreground gap-1">
@@ -157,6 +166,7 @@ export default function CreateTentDialog({
             className="rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 space-y-2"
             data-testid="create-tent-hard-stop"
             role="alert"
+            aria-label={hardStop.hardStopAriaLabel}
           >
             <p className="text-sm font-semibold" data-testid="create-tent-hard-stop-title">
               {hardStop.hardStopTitle}
@@ -201,11 +211,11 @@ export default function CreateTentDialog({
             data-testid="create-tent-target-setup"
           >
             <span className="font-medium">
-              {setupName
+              {setupName && setupName !== growSetup.create.genericSetupLabel
                 ? GROW_SETUP_MESSAGES.addingTo(setupName)
                 : GROW_SETUP_MESSAGES.addingToHint}
             </span>
-            {setupName ? (
+            {setupName && setupName !== growSetup.create.genericSetupLabel ? (
               <span className="block text-muted-foreground mt-0.5">
                 {GROW_SETUP_MESSAGES.addingToHint}
               </span>

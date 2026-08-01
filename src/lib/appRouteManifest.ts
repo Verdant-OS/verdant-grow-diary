@@ -471,6 +471,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Authenticated agent integrations settings.",
   },
   { path: "/signup", access: "redirect", description: "→ /auth" },
+  {
+    path: "/start-room",
+    access: "auth",
+    description:
+      "Guided first-session path: grow → tent → plant with guaranteed grow_id binding for Quick Log.",
+  },
   { path: "/strains", access: "redirect", description: "→ /cultivars" },
   { path: "/strains/:slug", access: "redirect", description: "→ /cultivars/:slug" },
   { path: "/tasks", access: "redirect", description: "→ /actions" },

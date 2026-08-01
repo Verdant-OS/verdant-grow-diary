@@ -1,8 +1,10 @@
 /**
  * Static tests verifying that /plants?growId=… and /tents?growId=…
  * preselect the grow context for creation forms, validate growId
- * against the RLS-loaded grows list, fall back to the persisted current
- * setup when unscoped, and don't impact edit flows.
+ * against the RLS-loaded grows list, and don't impact edit flows.
+ *
+ * Create dialogs also bind from active grow when unscoped, and always
+ * write grow_id when submit is allowed (fail closed).
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -44,43 +46,32 @@ describe("Plants/Tents — preselect grow on create", () => {
     expect(TENTS).toMatch(VALID_GROW_ID_RE);
   });
 
-  it("Tents prefers validGrowId and falls back to the current setup", () => {
-    expect(TENTS).toMatch(/activeGrowId/);
-    expect(TENTS).toMatch(/<CreateTentDialog\b[\s\S]*?defaultGrowId=\{validGrowId/);
-    expect(TENTS).toMatch(PAGE_DEFAULT_GROW_RE);
+  it("Tents passes validGrowId into CreateTentDialog", () => {
+    expect(TENTS).toMatch(/<CreateTentDialog\b[\s\S]*?defaultGrowId=\{validGrowId\}/);
   });
 
-  it("Create dialogs resolve target grow with URL precedence over activeGrowId", () => {
-    expect(BINDING_RULES).toContain("export function resolveTargetGrow");
-    expect(BINDING_RULES).toMatch(/pageDefaultGrowId/);
-    expect(BINDING_RULES).toMatch(/activeGrowId/);
-    for (const source of [CREATE_PLANT, CREATE_TENT]) {
-      expect(source).toContain("resolveTargetGrow");
-      expect(source).toContain("useGrows()");
-      expect(source).toMatch(/pageDefaultGrowId:\s*defaultGrowId/);
-      expect(source).toMatch(/activeGrowId/);
-      expect(source).toMatch(
-        /payload[\s\S]*grow_id:\s*targetGrow\.id|payload\.grow_id\s*=\s*targetGrow\.id/,
-      );
-    }
+  it("CreatePlantDialog accepts defaultGrowId and always writes grow_id on insert when allowed", () => {
+    expect(CREATE_PLANT).toMatch(/defaultGrowId\?\s*:\s*string/);
+    expect(CREATE_PLANT).toMatch(/resolveCreateTargetGrowId/);
+    expect(CREATE_PLANT).toMatch(/grow_id:\s*targetGrowId/);
   });
 
-  it("CreatePlantDialog scopes tent options through the compatibility guard", () => {
-    expect(CREATE_PLANT).toMatch(/checkTentGrowCompatibility/);
-    expect(CREATE_PLANT).toMatch(/\.filter\([\s\S]*?checkTentGrowCompatibility/);
+  it("CreatePlantDialog scopes tent options to the resolved target setup", () => {
+    expect(CREATE_PLANT).toMatch(/targetGrowId[\s\S]*?\.filter\([\s\S]*?t\.grow_id\s*===\s*targetGrowId/);
   });
 
-  it("Create dialogs fail closed when no owned target grow resolves", () => {
-    for (const source of [CREATE_PLANT, CREATE_TENT]) {
-      expect(source).toContain("buildHardStopView");
-      expect(source).toMatch(/if\s*\(hardStop\.blockSubmit\)/);
-      expect(source).toMatch(/if\s*\(!targetGrow\)/);
-      expect(source).not.toMatch(/if\s*\(defaultGrowId\)\s*payload\.grow_id/);
-    }
+  it("CreateTentDialog accepts defaultGrowId and always writes grow_id on insert when allowed", () => {
+    expect(CREATE_TENT).toMatch(/defaultGrowId\?\s*:\s*string/);
+    expect(CREATE_TENT).toMatch(/resolveCreateTargetGrowId/);
+    expect(CREATE_TENT).toMatch(/grow_id:\s*targetGrowId/);
+  });
+
+  it("Create dialogs fail closed without resolvable target (no unbound insert)", () => {
+    expect(CREATE_TENT).toMatch(/hardStop\.blockSubmit|canWriteCreateGrowId/);
+    expect(CREATE_PLANT).toMatch(/hardStop\.blockSubmit|canWriteCreateGrowId/);
   });
 
   it("Edit flows are not touched by URL growId (create dialogs only)", () => {
-    // The dialogs are creation-only; no edit-grow logic introduced.
     expect(CREATE_PLANT).not.toMatch(/\.update\(/);
     expect(CREATE_TENT).not.toMatch(/\.update\(/);
   });

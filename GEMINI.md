@@ -1,6 +1,6 @@
 # Verdant Sentinel Code
 
-**Sentinel-Version: 2026-08-01.3**
+**Sentinel-Version: 2026-08-01.5**
 
 Gemini CLI and Gemini Code Assist load this file as persistent project context. The rules
 below are embedded rather than linked, because a link is not context — Gemini must be able

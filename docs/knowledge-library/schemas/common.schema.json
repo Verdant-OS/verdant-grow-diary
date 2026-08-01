@@ -1,0 +1,1930 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://verdantgrowdiary.com/schemas/knowledge/common.schema.json",
+  "title": "Verdant knowledge-library common contracts",
+  "$defs": {
+    "nodeId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*:[a-z0-9][a-z0-9._:-]*$"
+    },
+    "nodeType": {
+      "enum": [
+        "Topic",
+        "Cultivar",
+        "Stage",
+        "Metric",
+        "Sensor",
+        "Symptom",
+        "Condition",
+        "Protocol",
+        "Equipment",
+        "EvidenceSource",
+        "ProductAction",
+        "Claim",
+        "Author",
+        "Reviewer",
+        "Method",
+        "Observation",
+        "Run",
+        "Phenotype",
+        "Trait",
+        "Medium",
+        "Facility",
+        "Unit",
+        "Outcome",
+        "Jurisdiction",
+        "Capability",
+        "Integration"
+      ]
+    },
+    "pageOwningNodeType": {
+      "enum": ["Topic", "Cultivar", "Sensor", "Condition", "Protocol", "Equipment", "Method"]
+    },
+    "riskClass": { "enum": ["R0", "R1", "R2", "R3"] },
+    "contentDomain": {
+      "enum": [
+        "fundamentals",
+        "environment",
+        "sensors",
+        "irrigation",
+        "nutrition",
+        "health",
+        "genetics",
+        "stages",
+        "harvest",
+        "equipment"
+      ]
+    },
+    "riskDomain": {
+      "enum": [
+        "standard",
+        "pathogen",
+        "biosecurity",
+        "pesticide",
+        "electrical",
+        "fire_safety",
+        "hvac_safety",
+        "co2_safety",
+        "chemical_safety"
+      ]
+    },
+    "edgeType": {
+      "enum": [
+        "parent_of",
+        "requires",
+        "next_step",
+        "measured_by",
+        "uses_unit",
+        "derived_from",
+        "observed_as",
+        "mimics",
+        "differential_of",
+        "confirmed_by",
+        "disconfirmed_by",
+        "managed_by",
+        "occurs_during",
+        "affects",
+        "applies_to",
+        "has_lineage_claim",
+        "has_observed_trait",
+        "supported_by",
+        "authored_by",
+        "reviewed_by",
+        "uses_method",
+        "observed_in",
+        "observes",
+        "has_phenotype",
+        "grown_in",
+        "produced_outcome",
+        "has_capability",
+        "exposes_capability",
+        "integrates_with",
+        "valid_in",
+        "logged_as",
+        "next_action",
+        "supersedes",
+        "related_to"
+      ]
+    },
+    "graphNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "label", "aliases", "status", "description"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nodeId" },
+        "type": { "$ref": "#/$defs/nodeType" },
+        "label": { "type": "string", "minLength": 2 },
+        "aliases": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 2 },
+          "uniqueItems": true
+        },
+        "status": { "enum": ["proposed", "active", "disputed", "deprecated", "retired"] },
+        "description": { "type": "string", "minLength": 8 }
+      }
+    },
+    "graphEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "sourceId",
+        "sourceType",
+        "targetId",
+        "targetType",
+        "cardinality",
+        "symmetric",
+        "status",
+        "effectiveFrom",
+        "effectiveThrough",
+        "provenance"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^edge:[a-z0-9][a-z0-9._:-]*$" },
+        "type": { "$ref": "#/$defs/edgeType" },
+        "sourceId": { "$ref": "#/$defs/nodeId" },
+        "sourceType": { "$ref": "#/$defs/nodeType" },
+        "targetId": { "$ref": "#/$defs/nodeId" },
+        "targetType": { "$ref": "#/$defs/nodeType" },
+        "cardinality": {
+          "enum": ["one_to_one", "one_to_many", "many_to_one", "many_to_many"]
+        },
+        "symmetric": { "type": "boolean" },
+        "status": { "enum": ["proposed", "active", "disputed", "deprecated", "retired"] },
+        "effectiveFrom": { "type": ["string", "null"], "format": "date" },
+        "effectiveThrough": { "type": ["string", "null"], "format": "date" },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["claimIds", "sourceIds", "reviewerIds", "limitations"],
+          "properties": {
+            "claimIds": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/nodeId" },
+              "uniqueItems": true
+            },
+            "sourceIds": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/nodeId" },
+              "uniqueItems": true
+            },
+            "reviewerIds": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/nodeId" },
+              "uniqueItems": true
+            },
+            "limitations": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 4 }
+            }
+          }
+        }
+      },
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "parent_of" },
+            "sourceType": { "const": "Topic" },
+            "targetType": { "$ref": "#/$defs/pageOwningNodeType" },
+            "cardinality": { "const": "one_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "requires" },
+            "sourceType": { "$ref": "#/$defs/pageOwningNodeType" },
+            "targetType": { "$ref": "#/$defs/pageOwningNodeType" },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "next_step" },
+            "sourceType": { "$ref": "#/$defs/pageOwningNodeType" },
+            "targetType": { "$ref": "#/$defs/pageOwningNodeType" },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "measured_by" },
+            "sourceType": { "const": "Metric" },
+            "targetType": { "enum": ["Sensor", "Equipment", "Method"] },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "uses_unit" },
+            "sourceType": { "enum": ["Metric", "Claim", "Observation", "Outcome"] },
+            "targetType": { "const": "Unit" },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "derived_from" },
+            "sourceType": { "const": "Metric" },
+            "targetType": { "const": "Metric" },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "observed_as" },
+            "sourceType": { "const": "Condition" },
+            "targetType": { "const": "Symptom" },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "mimics" },
+            "sourceType": { "const": "Condition" },
+            "targetType": { "const": "Condition" },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": true }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "differential_of" },
+            "sourceType": { "enum": ["Topic", "Condition"] },
+            "targetType": { "const": "Condition" },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "confirmed_by" },
+            "sourceType": { "const": "Condition" },
+            "targetType": { "enum": ["Observation", "Method", "Protocol", "Claim"] },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "disconfirmed_by" },
+            "sourceType": { "const": "Condition" },
+            "targetType": { "enum": ["Observation", "Method", "Protocol", "Claim"] },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "managed_by" },
+            "sourceType": { "const": "Condition" },
+            "targetType": { "const": "Protocol" },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "occurs_during" },
+            "sourceType": { "enum": ["Topic", "Condition", "Observation", "Run"] },
+            "targetType": { "const": "Stage" },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "affects" },
+            "sourceType": { "enum": ["Condition", "Medium", "Equipment", "Protocol"] },
+            "targetType": { "enum": ["Metric", "Trait", "Outcome"] },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "applies_to" },
+            "sourceType": { "enum": ["Protocol", "Method", "Equipment", "Integration", "Claim"] },
+            "targetType": { "enum": ["Medium", "Stage", "Facility", "Jurisdiction"] },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "has_lineage_claim" },
+            "sourceType": { "enum": ["Cultivar", "Phenotype"] },
+            "targetType": { "const": "Cultivar" },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "has_observed_trait" },
+            "sourceType": { "enum": ["Cultivar", "Phenotype"] },
+            "targetType": { "const": "Trait" },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "supported_by" },
+            "sourceType": { "const": "Claim" },
+            "targetType": { "const": "EvidenceSource" },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "authored_by" },
+            "sourceType": {
+              "anyOf": [{ "$ref": "#/$defs/pageOwningNodeType" }, { "const": "Claim" }]
+            },
+            "targetType": { "const": "Author" },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "reviewed_by" },
+            "sourceType": {
+              "anyOf": [{ "$ref": "#/$defs/pageOwningNodeType" }, { "const": "Claim" }]
+            },
+            "targetType": { "const": "Reviewer" },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "uses_method" },
+            "sourceType": { "enum": ["Metric", "Observation", "Outcome", "Claim"] },
+            "targetType": { "const": "Method" },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "observed_in" },
+            "sourceType": { "enum": ["Observation", "Outcome", "Phenotype"] },
+            "targetType": { "const": "Run" },
+            "cardinality": { "const": "many_to_one" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "observes" },
+            "sourceType": { "const": "Observation" },
+            "targetType": { "enum": ["Metric", "Symptom", "Trait", "Outcome"] },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "has_phenotype" },
+            "sourceType": { "const": "Cultivar" },
+            "targetType": { "const": "Phenotype" },
+            "cardinality": { "const": "one_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "grown_in" },
+            "sourceType": { "const": "Run" },
+            "targetType": { "enum": ["Medium", "Facility"] },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "produced_outcome" },
+            "sourceType": { "const": "Run" },
+            "targetType": { "const": "Outcome" },
+            "cardinality": { "const": "one_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "has_capability" },
+            "sourceType": { "enum": ["Equipment", "Sensor"] },
+            "targetType": { "const": "Capability" },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "exposes_capability" },
+            "sourceType": { "const": "Integration" },
+            "targetType": { "const": "Capability" },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "integrates_with" },
+            "sourceType": { "enum": ["Equipment", "Sensor"] },
+            "targetType": { "const": "Integration" },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "valid_in" },
+            "sourceType": { "enum": ["Claim", "Protocol", "Method", "Integration"] },
+            "targetType": { "const": "Jurisdiction" },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "logged_as" },
+            "sourceType": { "enum": ["Observation", "Outcome"] },
+            "targetType": { "const": "ProductAction" },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "next_action" },
+            "sourceType": { "$ref": "#/$defs/pageOwningNodeType" },
+            "targetType": { "const": "ProductAction" },
+            "cardinality": { "const": "one_to_one" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "supersedes" },
+            "sourceType": { "$ref": "#/$defs/nodeType" },
+            "targetType": { "$ref": "#/$defs/nodeType" },
+            "cardinality": { "const": "many_to_one" },
+            "symmetric": { "const": false }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "related_to" },
+            "sourceType": { "$ref": "#/$defs/nodeType" },
+            "targetType": { "$ref": "#/$defs/nodeType" },
+            "cardinality": { "const": "many_to_many" },
+            "symmetric": { "const": true }
+          },
+          "required": ["type", "sourceType", "targetType", "cardinality", "symmetric"]
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "status": { "const": "active" },
+              "type": {
+                "enum": [
+                  "measured_by",
+                  "uses_unit",
+                  "derived_from",
+                  "observed_as",
+                  "mimics",
+                  "confirmed_by",
+                  "disconfirmed_by",
+                  "managed_by",
+                  "occurs_during",
+                  "affects",
+                  "applies_to",
+                  "has_lineage_claim",
+                  "has_observed_trait",
+                  "supported_by",
+                  "uses_method",
+                  "observed_in",
+                  "observes",
+                  "has_phenotype",
+                  "grown_in",
+                  "produced_outcome",
+                  "has_capability",
+                  "exposes_capability",
+                  "integrates_with",
+                  "valid_in",
+                  "logged_as"
+                ]
+              }
+            },
+            "required": ["status", "type"]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "claimIds": { "type": "array", "minItems": 1 },
+                  "sourceIds": { "type": "array", "minItems": 1 }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "status": { "const": "active" },
+              "type": {
+                "enum": [
+                  "parent_of",
+                  "requires",
+                  "next_step",
+                  "differential_of",
+                  "authored_by",
+                  "reviewed_by",
+                  "next_action",
+                  "supersedes",
+                  "related_to"
+                ]
+              }
+            },
+            "required": ["status", "type"]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "reviewerIds": { "type": "array", "minItems": 1 }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "pageGraph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node",
+        "parentId",
+        "prerequisiteIds",
+        "lateralIds",
+        "nextStepIds",
+        "differentialIds",
+        "edges"
+      ],
+      "properties": {
+        "node": {
+          "allOf": [
+            { "$ref": "#/$defs/graphNode" },
+            {
+              "type": "object",
+              "properties": { "type": { "$ref": "#/$defs/pageOwningNodeType" } }
+            }
+          ]
+        },
+        "parentId": { "$ref": "#/$defs/nodeId" },
+        "prerequisiteIds": {
+          "type": "array",
+          "minItems": 0,
+          "items": { "$ref": "#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "lateralIds": {
+          "type": "array",
+          "minItems": 0,
+          "items": { "$ref": "#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "nextStepIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "differentialIds": {
+          "type": "array",
+          "minItems": 0,
+          "items": { "$ref": "#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "edges": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/graphEdge" }
+        }
+      }
+    },
+    "pageMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "id",
+        "slug",
+        "path",
+        "pageType",
+        "pageFamily",
+        "pillarId",
+        "contentDomains",
+        "riskClass",
+        "riskDomains",
+        "canonicalIntent",
+        "readerOutcome",
+        "scope",
+        "nonScope",
+        "language",
+        "aliases"
+      ],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "id": { "$ref": "#/$defs/nodeId" },
+        "slug": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "path": {
+          "type": "string",
+          "pattern": "^/(?:guides|cultivars)/[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "pageType": {
+          "enum": ["topic", "cultivar", "sensor", "deficiency", "equipment", "protocol", "method"]
+        },
+        "pageFamily": {
+          "enum": [
+            "pillar",
+            "cluster",
+            "reference",
+            "protocol",
+            "diagnostic",
+            "comparison",
+            "worked-example",
+            "entity",
+            "glossary",
+            "method",
+            "profile",
+            "governance"
+          ]
+        },
+        "pillarId": { "$ref": "#/$defs/nodeId" },
+        "contentDomains": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/contentDomain" },
+          "uniqueItems": true
+        },
+        "riskClass": { "$ref": "#/$defs/riskClass" },
+        "riskDomains": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/riskDomain" },
+          "uniqueItems": true
+        },
+        "canonicalIntent": { "type": "string", "minLength": 10 },
+        "readerOutcome": { "type": "string", "minLength": 12 },
+        "scope": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "nonScope": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "language": { "const": "en-US" },
+        "aliases": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 2 },
+          "uniqueItems": true
+        }
+      }
+    },
+    "faqPageConsumerReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "consumerName",
+        "consumerPurpose",
+        "consumerDocumentationSourceId",
+        "documentationVerifiedOn",
+        "contractVersion",
+        "visibleQuestionIds",
+        "googleRichResultExpected",
+        "limitations"
+      ],
+      "properties": {
+        "consumerName": { "type": "string", "minLength": 3 },
+        "consumerPurpose": { "type": "string", "minLength": 12 },
+        "consumerDocumentationSourceId": { "$ref": "#/$defs/nodeId" },
+        "documentationVerifiedOn": { "type": "string", "format": "date" },
+        "contractVersion": { "type": "string", "minLength": 1 },
+        "visibleQuestionIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "googleRichResultExpected": { "const": false },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 8 }
+        }
+      }
+    },
+    "pageSeo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "h1",
+        "description",
+        "canonicalPath",
+        "indexing",
+        "breadcrumbNodeIds",
+        "structuredDataTypes",
+        "faqPageReceipt"
+      ],
+      "properties": {
+        "title": { "type": "string", "minLength": 10, "maxLength": 65 },
+        "h1": { "type": "string", "minLength": 10 },
+        "description": { "type": "string", "minLength": 40, "maxLength": 170 },
+        "canonicalPath": {
+          "type": "string",
+          "pattern": "^/(?:guides|cultivars)/[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "indexing": { "enum": ["index", "noindex"] },
+        "breadcrumbNodeIds": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "structuredDataTypes": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "enum": ["WebPage", "Article", "BreadcrumbList", "FAQPage", "Dataset", "CollectionPage"]
+          },
+          "uniqueItems": true
+        },
+        "faqPageReceipt": {
+          "anyOf": [{ "$ref": "#/$defs/faqPageConsumerReceipt" }, { "type": "null" }]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "structuredDataTypes": {
+                "type": "array",
+                "contains": { "const": "FAQPage" },
+                "minContains": 1
+              }
+            },
+            "required": ["structuredDataTypes"]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "faqPageReceipt": { "$ref": "#/$defs/faqPageConsumerReceipt" }
+            }
+          },
+          "else": {
+            "type": "object",
+            "properties": { "faqPageReceipt": { "type": "null" } }
+          }
+        }
+      ]
+    },
+    "originalAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "title",
+        "description",
+        "creatorIds",
+        "method",
+        "license",
+        "sourceUrl",
+        "accessibilityDescription",
+        "limitations"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/nodeId" },
+        "kind": {
+          "enum": [
+            "diagram",
+            "checklist",
+            "worksheet",
+            "matrix",
+            "table",
+            "calibration_record",
+            "anonymized_example",
+            "photo_series",
+            "interactive"
+          ]
+        },
+        "title": { "type": "string", "minLength": 5 },
+        "description": { "type": "string", "minLength": 12 },
+        "creatorIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "method": { "type": "string", "minLength": 12 },
+        "license": { "type": "string", "minLength": 3 },
+        "sourceUrl": { "type": ["string", "null"], "format": "uri" },
+        "accessibilityDescription": { "type": "string", "minLength": 8 },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 4 }
+        }
+      }
+    },
+    "applicabilityDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reason", "reviewerId", "reviewedOn"],
+      "properties": {
+        "status": { "enum": ["required", "not_applicable"] },
+        "reason": { "type": ["string", "null"] },
+        "reviewerId": { "$ref": "#/$defs/nodeId" },
+        "reviewedOn": { "type": "string", "format": "date" }
+      },
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "status": { "const": "required" },
+            "reason": { "type": "null" }
+          },
+          "required": ["status", "reason"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": { "const": "not_applicable" },
+            "reason": { "type": "string", "minLength": 12 }
+          },
+          "required": ["status", "reason"]
+        }
+      ]
+    },
+    "blockApplicability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["procedureOrComparison", "confoundersOrDifferentials", "stopAndFollowUp"],
+      "properties": {
+        "procedureOrComparison": { "$ref": "#/$defs/applicabilityDecision" },
+        "confoundersOrDifferentials": {
+          "$ref": "#/$defs/applicabilityDecision"
+        },
+        "stopAndFollowUp": { "$ref": "#/$defs/applicabilityDecision" }
+      }
+    },
+    "linkApplicability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prerequisite", "contextualLateral", "differential"],
+      "properties": {
+        "prerequisite": { "$ref": "#/$defs/applicabilityDecision" },
+        "contextualLateral": { "$ref": "#/$defs/applicabilityDecision" },
+        "differential": { "$ref": "#/$defs/applicabilityDecision" }
+      }
+    },
+    "pageManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metadata",
+        "graph",
+        "seo",
+        "originalAsset",
+        "blockApplicability",
+        "linkApplicability"
+      ],
+      "properties": {
+        "metadata": { "$ref": "#/$defs/pageMetadata" },
+        "graph": { "$ref": "#/$defs/pageGraph" },
+        "seo": { "$ref": "#/$defs/pageSeo" },
+        "originalAsset": { "$ref": "#/$defs/originalAsset" },
+        "blockApplicability": { "$ref": "#/$defs/blockApplicability" },
+        "linkApplicability": { "$ref": "#/$defs/linkApplicability" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "linkApplicability": {
+                "type": "object",
+                "properties": {
+                  "prerequisite": {
+                    "type": "object",
+                    "properties": { "status": { "const": "required" } },
+                    "required": ["status"]
+                  }
+                },
+                "required": ["prerequisite"]
+              }
+            },
+            "required": ["linkApplicability"]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "graph": {
+                "type": "object",
+                "properties": { "prerequisiteIds": { "type": "array", "minItems": 1 } }
+              }
+            }
+          },
+          "else": {
+            "type": "object",
+            "properties": {
+              "graph": {
+                "type": "object",
+                "properties": { "prerequisiteIds": { "type": "array", "maxItems": 0 } }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "linkApplicability": {
+                "type": "object",
+                "properties": {
+                  "contextualLateral": {
+                    "type": "object",
+                    "properties": { "status": { "const": "required" } },
+                    "required": ["status"]
+                  }
+                },
+                "required": ["contextualLateral"]
+              }
+            },
+            "required": ["linkApplicability"]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "graph": {
+                "type": "object",
+                "properties": { "lateralIds": { "type": "array", "minItems": 2 } }
+              }
+            }
+          },
+          "else": {
+            "type": "object",
+            "properties": {
+              "graph": {
+                "type": "object",
+                "properties": { "lateralIds": { "type": "array", "maxItems": 0 } }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "linkApplicability": {
+                "type": "object",
+                "properties": {
+                  "differential": {
+                    "type": "object",
+                    "properties": { "status": { "const": "required" } },
+                    "required": ["status"]
+                  }
+                },
+                "required": ["differential"]
+              }
+            },
+            "required": ["linkApplicability"]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "graph": {
+                "type": "object",
+                "properties": { "differentialIds": { "type": "array", "minItems": 3 } }
+              }
+            }
+          },
+          "else": {
+            "type": "object",
+            "properties": {
+              "graph": {
+                "type": "object",
+                "properties": { "differentialIds": { "type": "array", "maxItems": 0 } }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "metadata": {
+                "type": "object",
+                "properties": { "pageFamily": { "const": "diagnostic" } },
+                "required": ["pageFamily"]
+              }
+            },
+            "required": ["metadata"]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "linkApplicability": {
+                "type": "object",
+                "properties": {
+                  "differential": {
+                    "type": "object",
+                    "properties": { "status": { "const": "required" } },
+                    "required": ["status"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "metadata": {
+                "type": "object",
+                "properties": { "pageFamily": { "const": "pillar" } },
+                "required": ["pageFamily"]
+              }
+            },
+            "required": ["metadata"]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "linkApplicability": {
+                "type": "object",
+                "properties": {
+                  "prerequisite": {
+                    "type": "object",
+                    "properties": { "status": { "const": "not_applicable" } },
+                    "required": ["status"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "metadata": {
+                "type": "object",
+                "properties": {
+                  "pageFamily": {
+                    "enum": [
+                      "reference",
+                      "protocol",
+                      "diagnostic",
+                      "comparison",
+                      "worked-example",
+                      "entity",
+                      "glossary"
+                    ]
+                  }
+                },
+                "required": ["pageFamily"]
+              }
+            },
+            "required": ["metadata"]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "linkApplicability": {
+                "type": "object",
+                "properties": {
+                  "contextualLateral": {
+                    "type": "object",
+                    "properties": { "status": { "const": "required" } },
+                    "required": ["status"]
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "nodeId",
+        "title",
+        "url",
+        "publisher",
+        "authorIds",
+        "evidenceTier",
+        "publishedOn",
+        "versionDate",
+        "accessedOn",
+        "stableIdentifier",
+        "archiveLocator",
+        "limitations",
+        "license"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "nodeId": { "$ref": "#/$defs/nodeId" },
+        "title": { "type": "string", "minLength": 5 },
+        "url": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "publisher": { "type": "string", "minLength": 2 },
+        "authorIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "publishedOn": { "type": ["string", "null"], "format": "date" },
+        "versionDate": { "type": ["string", "null"], "format": "date" },
+        "accessedOn": { "type": "string", "format": "date" },
+        "evidenceTier": { "enum": ["A", "B", "C", "D"] },
+        "stableIdentifier": { "type": ["string", "null"], "minLength": 3 },
+        "archiveLocator": {
+          "type": ["string", "null"],
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 4 }
+        },
+        "license": { "type": ["string", "null"] }
+      }
+    },
+    "sourceLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "roles", "locator"],
+      "properties": {
+        "sourceId": { "$ref": "#/$defs/nodeId" },
+        "roles": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": [
+              "supports",
+              "limits",
+              "contradicts",
+              "defines_method",
+              "controls_requirement",
+              "documents_product"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "locator": { "type": "string", "minLength": 2 }
+      }
+    },
+    "claimApplicability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stageIds", "mediumIds", "facilityIds", "jurisdictionIds", "scopeNote"],
+      "properties": {
+        "stageIds": { "type": "array", "items": { "$ref": "#/$defs/nodeId" }, "uniqueItems": true },
+        "mediumIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "facilityIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "jurisdictionIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "scopeNote": { "type": "string", "minLength": 4 }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "nodeId",
+        "section",
+        "claimType",
+        "text",
+        "wordingState",
+        "evidenceState",
+        "riskClass",
+        "riskDomains",
+        "sourceLinks",
+        "methodIds",
+        "observationIds",
+        "applicability",
+        "limitations",
+        "authorId",
+        "evidenceReviewerIds",
+        "cultivationReviewerIds",
+        "approvalDecision",
+        "approvedOn",
+        "invalidationTriggers",
+        "nextReviewOn"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "nodeId": { "$ref": "#/$defs/nodeId" },
+        "section": { "type": "string", "minLength": 2 },
+        "claimType": {
+          "enum": [
+            "definition",
+            "measurement",
+            "mechanism",
+            "causal",
+            "association",
+            "range",
+            "safety",
+            "legal",
+            "product_capability",
+            "provenance",
+            "field_observation",
+            "recommendation"
+          ]
+        },
+        "text": { "type": "string", "minLength": 10 },
+        "wordingState": {
+          "enum": ["draft", "bounded", "approved", "revision_required", "withdrawn"]
+        },
+        "evidenceState": {
+          "enum": [
+            "measured",
+            "supported",
+            "source_reported",
+            "field_tendency",
+            "hypothesis",
+            "unknown",
+            "disputed"
+          ]
+        },
+        "riskClass": { "$ref": "#/$defs/riskClass" },
+        "riskDomains": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/riskDomain" },
+          "uniqueItems": true
+        },
+        "sourceLinks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/sourceLink" },
+          "uniqueItems": true
+        },
+        "methodIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "observationIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "applicability": { "$ref": "#/$defs/claimApplicability" },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 4 }
+        },
+        "authorId": { "$ref": "#/$defs/nodeId" },
+        "evidenceReviewerIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "cultivationReviewerIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "approvalDecision": {
+          "enum": ["pending", "approved", "changes_requested", "blocked"]
+        },
+        "approvedOn": { "type": ["string", "null"], "format": "date" },
+        "invalidationTriggers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 4 }
+        },
+        "nextReviewOn": { "type": "string", "format": "date" },
+        "numericContext": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["unitId", "methodId", "populationOrContext", "measuredOn"],
+          "properties": {
+            "unitId": { "$ref": "#/$defs/nodeId" },
+            "methodId": { "$ref": "#/$defs/nodeId" },
+            "populationOrContext": { "type": "string", "minLength": 4 },
+            "measuredOn": { "type": ["string", "null"], "format": "date" }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "evidenceState": { "enum": ["measured", "supported", "source_reported"] }
+            },
+            "required": ["evidenceState"]
+          },
+          "then": {
+            "type": "object",
+            "properties": { "sourceLinks": { "type": "array", "minItems": 1 } }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": { "evidenceState": { "const": "measured" } },
+            "required": ["evidenceState"]
+          },
+          "then": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": { "methodIds": { "type": "array", "minItems": 1 } }
+              },
+              {
+                "type": "object",
+                "properties": { "observationIds": { "type": "array", "minItems": 1 } }
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": { "approvalDecision": { "const": "approved" } },
+            "required": ["approvalDecision"]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "wordingState": { "const": "approved" },
+              "approvedOn": { "type": "string", "format": "date" },
+              "evidenceReviewerIds": { "type": "array", "minItems": 1 },
+              "cultivationReviewerIds": { "type": "array", "minItems": 1 }
+            }
+          }
+        }
+      ]
+    },
+    "personRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodeId",
+        "profileSubjectId",
+        "displayName",
+        "roleSummary",
+        "experienceStatement",
+        "credentials",
+        "profilePath"
+      ],
+      "properties": {
+        "nodeId": { "$ref": "#/$defs/nodeId" },
+        "profileSubjectId": { "$ref": "#/$defs/nodeId" },
+        "displayName": { "type": "string", "minLength": 2 },
+        "roleSummary": { "type": "string", "minLength": 4 },
+        "experienceStatement": { "type": "string", "minLength": 8 },
+        "credentials": { "type": "array", "items": { "type": "string", "minLength": 3 } },
+        "profilePath": { "type": ["string", "null"], "pattern": "^/" }
+      }
+    },
+    "signoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewer",
+        "role",
+        "decision",
+        "reviewedOn",
+        "notes",
+        "conflictsReviewed",
+        "skipReason"
+      ],
+      "properties": {
+        "reviewer": { "$ref": "#/$defs/personRef" },
+        "role": {
+          "enum": [
+            "cultivation",
+            "evidence",
+            "product_truth",
+            "copy_accessibility",
+            "seo_technical",
+            "safety"
+          ]
+        },
+        "decision": {
+          "enum": ["pending", "approved", "changes_requested", "blocked", "not_applicable"]
+        },
+        "reviewedOn": { "type": ["string", "null"], "format": "date" },
+        "notes": { "type": "string", "minLength": 4 },
+        "conflictsReviewed": { "type": "boolean" },
+        "skipReason": { "type": ["string", "null"] }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": { "decision": { "const": "not_applicable" } },
+            "required": ["decision"]
+          },
+          "then": {
+            "type": "object",
+            "properties": { "skipReason": { "type": "string", "minLength": 12 } }
+          },
+          "else": {
+            "type": "object",
+            "properties": { "skipReason": { "type": "null" } }
+          }
+        }
+      ]
+    },
+    "approvedSignoff": {
+      "allOf": [
+        { "$ref": "#/$defs/signoff" },
+        {
+          "type": "object",
+          "properties": {
+            "decision": { "const": "approved" },
+            "reviewedOn": { "type": "string", "format": "date" }
+          },
+          "required": ["decision", "reviewedOn"]
+        }
+      ]
+    },
+    "nullableSignoff": {
+      "anyOf": [{ "$ref": "#/$defs/signoff" }, { "type": "null" }]
+    },
+    "notApplicableSignoff": {
+      "allOf": [
+        { "$ref": "#/$defs/signoff" },
+        {
+          "type": "object",
+          "properties": {
+            "decision": { "const": "not_applicable" },
+            "skipReason": { "type": "string", "minLength": 12 }
+          },
+          "required": ["decision", "skipReason"]
+        }
+      ]
+    },
+    "approvedOrNotApplicableSignoff": {
+      "anyOf": [{ "$ref": "#/$defs/approvedSignoff" }, { "$ref": "#/$defs/notApplicableSignoff" }]
+    },
+    "r3SafetySignoff": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/signoff" },
+            {
+              "not": {
+                "type": "object",
+                "properties": { "decision": { "const": "not_applicable" } },
+                "required": ["decision"]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "editorial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "managingEditor",
+        "author",
+        "maintainer",
+        "signoffs",
+        "publishedOn",
+        "modifiedOn",
+        "nextReviewOn",
+        "reviewIntervalDays",
+        "updateTriggers",
+        "version",
+        "changeSummary",
+        "changeHistory",
+        "conflictsOfInterest",
+        "corrections",
+        "correctionPath"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "idea",
+            "triaged",
+            "briefed",
+            "sourced",
+            "drafted",
+            "evidence_review",
+            "cultivation_review",
+            "safety_review",
+            "product_truth_review",
+            "technical_review",
+            "copy_accessibility_review",
+            "ready",
+            "published",
+            "monitored",
+            "refresh_due",
+            "revision_required",
+            "blocked",
+            "blocked_evidence",
+            "corrected",
+            "withdrawn",
+            "archived",
+            "rejected"
+          ]
+        },
+        "managingEditor": { "$ref": "#/$defs/personRef" },
+        "author": { "$ref": "#/$defs/personRef" },
+        "maintainer": { "$ref": "#/$defs/personRef" },
+        "signoffs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cultivation",
+            "evidence",
+            "productTruth",
+            "copyAccessibility",
+            "seoTechnical",
+            "safety"
+          ],
+          "properties": {
+            "cultivation": {
+              "allOf": [
+                { "$ref": "#/$defs/nullableSignoff" },
+                {
+                  "if": { "type": "object" },
+                  "then": {
+                    "type": "object",
+                    "properties": { "role": { "const": "cultivation" } }
+                  }
+                }
+              ]
+            },
+            "evidence": {
+              "allOf": [
+                { "$ref": "#/$defs/nullableSignoff" },
+                {
+                  "if": { "type": "object" },
+                  "then": {
+                    "type": "object",
+                    "properties": { "role": { "const": "evidence" } }
+                  }
+                }
+              ]
+            },
+            "productTruth": {
+              "allOf": [
+                { "$ref": "#/$defs/nullableSignoff" },
+                {
+                  "if": { "type": "object" },
+                  "then": {
+                    "type": "object",
+                    "properties": { "role": { "const": "product_truth" } }
+                  }
+                }
+              ]
+            },
+            "copyAccessibility": {
+              "allOf": [
+                { "$ref": "#/$defs/nullableSignoff" },
+                {
+                  "if": { "type": "object" },
+                  "then": {
+                    "type": "object",
+                    "properties": { "role": { "const": "copy_accessibility" } }
+                  }
+                }
+              ]
+            },
+            "seoTechnical": {
+              "allOf": [
+                { "$ref": "#/$defs/nullableSignoff" },
+                {
+                  "if": { "type": "object" },
+                  "then": {
+                    "type": "object",
+                    "properties": { "role": { "const": "seo_technical" } }
+                  }
+                }
+              ]
+            },
+            "safety": {
+              "allOf": [
+                { "$ref": "#/$defs/nullableSignoff" },
+                {
+                  "if": { "type": "object" },
+                  "then": {
+                    "type": "object",
+                    "properties": { "role": { "const": "safety" } }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "publishedOn": { "type": ["string", "null"], "format": "date" },
+        "modifiedOn": { "type": ["string", "null"], "format": "date" },
+        "nextReviewOn": { "type": ["string", "null"], "format": "date" },
+        "reviewIntervalDays": { "type": "integer", "minimum": 1 },
+        "updateTriggers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 4 }
+        },
+        "version": { "type": "string", "pattern": "^[1-9][0-9]*\\.[0-9]+$" },
+        "changeSummary": { "type": "string", "minLength": 4 },
+        "changeHistory": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["version", "changedOn", "summary", "authorId"],
+            "properties": {
+              "version": { "type": "string", "pattern": "^[1-9][0-9]*\\.[0-9]+$" },
+              "changedOn": { "type": "string", "format": "date" },
+              "summary": { "type": "string", "minLength": 4 },
+              "authorId": { "$ref": "#/$defs/nodeId" }
+            }
+          }
+        },
+        "conflictsOfInterest": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["personId", "relationship", "disposition"],
+            "properties": {
+              "personId": { "$ref": "#/$defs/nodeId" },
+              "relationship": { "type": "string", "minLength": 4 },
+              "disposition": { "type": "string", "minLength": 4 }
+            }
+          }
+        },
+        "corrections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "reportedOn", "correctedOn", "summary", "affectedClaimIds"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+              "reportedOn": { "type": "string", "format": "date" },
+              "correctedOn": { "type": ["string", "null"], "format": "date" },
+              "summary": { "type": "string", "minLength": 4 },
+              "affectedClaimIds": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "$ref": "#/$defs/nodeId" },
+                "uniqueItems": true
+              }
+            }
+          }
+        },
+        "correctionPath": { "type": ["string", "null"], "pattern": "^/" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "status": { "enum": ["published", "monitored", "refresh_due", "corrected"] }
+            },
+            "required": ["status"]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "publishedOn": { "type": "string", "format": "date" },
+              "modifiedOn": { "type": "string", "format": "date" },
+              "nextReviewOn": { "type": "string", "format": "date" },
+              "correctionPath": { "type": "string", "pattern": "^/" },
+              "signoffs": {
+                "type": "object",
+                "properties": {
+                  "cultivation": { "$ref": "#/$defs/approvedSignoff" },
+                  "evidence": { "$ref": "#/$defs/approvedSignoff" },
+                  "productTruth": { "$ref": "#/$defs/approvedSignoff" },
+                  "copyAccessibility": { "$ref": "#/$defs/approvedSignoff" },
+                  "seoTechnical": { "$ref": "#/$defs/approvedSignoff" },
+                  "safety": { "$ref": "#/$defs/approvedOrNotApplicableSignoff" }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "pageSafetyReviewGate": {
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "pageManifest": {
+                "type": "object",
+                "properties": {
+                  "metadata": {
+                    "type": "object",
+                    "properties": { "riskClass": { "const": "R3" } },
+                    "required": ["riskClass"]
+                  }
+                },
+                "required": ["metadata"]
+              }
+            },
+            "required": ["pageManifest"]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "editorial": {
+                "type": "object",
+                "properties": {
+                  "signoffs": {
+                    "type": "object",
+                    "properties": { "safety": { "$ref": "#/$defs/r3SafetySignoff" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "productAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodeId", "label", "path", "truthStatement"],
+      "properties": {
+        "nodeId": { "$ref": "#/$defs/nodeId" },
+        "label": { "type": "string", "minLength": 3 },
+        "path": {
+          "enum": ["/quick-log", "/tools/vpd-calculator", "/cultivars", "/guides", "/pricing"]
+        },
+        "truthStatement": { "type": "string", "minLength": 12 }
+      }
+    },
+    "nonProductNextStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "instruction"],
+      "properties": {
+        "label": { "type": "string", "minLength": 3 },
+        "instruction": { "type": "string", "minLength": 12 }
+      }
+    },
+    "conversion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "productAction", "nonProductNextStep"],
+      "properties": {
+        "mode": { "enum": ["product_action", "non_product_only", "safety_only"] },
+        "productAction": {
+          "anyOf": [{ "$ref": "#/$defs/productAction" }, { "type": "null" }]
+        },
+        "nonProductNextStep": { "$ref": "#/$defs/nonProductNextStep" },
+        "nonProductReason": { "type": "string", "minLength": 12 },
+        "safetyReason": { "type": "string", "minLength": 12 }
+      },
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "mode": { "const": "non_product_only" },
+            "productAction": { "type": "null" },
+            "nonProductReason": { "type": "string", "minLength": 12 }
+          },
+          "required": ["mode", "productAction"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "mode": { "const": "product_action" },
+            "productAction": { "$ref": "#/$defs/productAction" }
+          },
+          "required": ["mode", "productAction"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "mode": { "const": "safety_only" },
+            "productAction": { "type": "null" },
+            "safetyReason": { "type": "string", "minLength": 12 }
+          },
+          "required": ["mode", "productAction", "safetyReason"]
+        }
+      ]
+    }
+  }
+}

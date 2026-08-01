@@ -46,10 +46,7 @@ export const WEBHOOK_ALLOWED_SOURCES = [
 export type WebhookSource = (typeof WEBHOOK_ALLOWED_SOURCES)[number];
 
 export function isWebhookSource(s: unknown): s is WebhookSource {
-  return (
-    typeof s === "string" &&
-    (WEBHOOK_ALLOWED_SOURCES as readonly string[]).includes(s)
-  );
+  return typeof s === "string" && (WEBHOOK_ALLOWED_SOURCES as readonly string[]).includes(s);
 }
 
 /**
@@ -104,6 +101,7 @@ export type CanonicalMetric =
   | "vpd_kpa"
   | "co2_ppm"
   | "soil_moisture_pct"
+  | "soil_temp_c"
   | "ph"
   | "ec"
   | "ppfd";
@@ -139,6 +137,13 @@ const METRIC_ALIASES: Record<string, MetricRule> = {
   co2_ppm: { canonical: "co2_ppm", min: 250, max: 5000 },
   soil_moisture_pct: { canonical: "soil_moisture_pct", min: 0, max: 100 },
   soil_moisture: { canonical: "soil_moisture_pct", min: 0, max: 100 },
+  soil_temp_c: { canonical: "soil_temp_c", min: -20, max: 80 },
+  soil_temp_f: {
+    canonical: "soil_temp_c",
+    min: -20,
+    max: 80,
+    convert: (v) => (v - 32) * (5 / 9),
+  },
   ph: { canonical: "ph", min: 3, max: 10 },
   ec: { canonical: "ec", min: 0, max: 10 },
   ec_ms_cm: { canonical: "ec", min: 0, max: 10 },
@@ -206,8 +211,7 @@ export interface WebhookIngestNormalizationResult {
 }
 
 const FUTURE_TOLERANCE_MS = 5 * 60 * 1000;
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isNonEmptyString(v: unknown): v is string {
   return typeof v === "string" && v.length > 0;
@@ -342,8 +346,7 @@ export function normalizeWebhookIngestPayload(
         device_id:
           input.metadata &&
           typeof input.metadata === "object" &&
-          typeof (input.metadata as Record<string, unknown>).device_id ===
-            "string"
+          typeof (input.metadata as Record<string, unknown>).device_id === "string"
             ? ((input.metadata as Record<string, unknown>).device_id as string)
             : null,
         raw_payload: sanitizeRawPayload(input) as unknown as NormalizedRow["raw_payload"],
@@ -378,9 +381,7 @@ export function normalizeWebhookIngestPayload(
  * before persisting into `raw_payload`. The DB row's `user_id` is set by
  * the column DEFAULT (`auth.uid()`) — never by the request body.
  */
-export function sanitizeRawPayload(
-  input: WebhookIngestPayload,
-): Record<string, unknown> {
+export function sanitizeRawPayload(input: WebhookIngestPayload): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   if (isNonEmptyString(input.tent_id)) out.tent_id = input.tent_id;
   // Persist the canonical (trimmed/lowercased) source when the caller's
@@ -392,12 +393,9 @@ export function sanitizeRawPayload(
   } else if (isNonEmptyString(input.source)) {
     out.source = input.source;
   }
-  if (isNonEmptyString(input.captured_at))
-    out.captured_at = input.captured_at;
-  if (input.metrics && typeof input.metrics === "object")
-    out.metrics = input.metrics;
-  if (input.metadata && typeof input.metadata === "object")
-    out.metadata = input.metadata;
+  if (isNonEmptyString(input.captured_at)) out.captured_at = input.captured_at;
+  if (input.metrics && typeof input.metrics === "object") out.metrics = input.metrics;
+  if (input.metadata && typeof input.metadata === "object") out.metadata = input.metadata;
   // Vendor lineage: trimmed string only; empty/whitespace-only and
   // non-string values are dropped. Vendor is lineage metadata only —
   // never used for auth, ownership, or routing.

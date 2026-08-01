@@ -56,6 +56,10 @@ const DOCS_ONLY_ALLOW = [
   /^\.grok\/rules\//,
   /^README\.md$/,
   /^\.github\/PULL_REQUEST_TEMPLATE/,
+  // Merge-gate tooling shipped with the hygiene skill
+  /^scripts\/check-pr-merge-ready\.mjs$/,
+  /^scripts\/check-sentinel-version-parity\.mjs$/,
+  /^package\.json$/,
 ];
 
 function sh(cmd, argv, opts = {}) {

@@ -9,6 +9,16 @@ Codified after PR #630 (grow-binding loop). Summary:
 3. **Leaf hooks** — prefer no `useNavigate` for optional actions; guard `useGrows` methods; mock providers when required.
 4. **Copy matchers** — use `\s+` (and optional groups) so Prettier line wraps do not flake static tests.
 
+## Automated merge checks
+
+```bash
+bun run check:pr-merge-ready -- <pr-number>
+bun run check:pr-merge-ready -- <pr-number> --docs-only   # skill/docs/governance only
+node scripts/check-sentinel-version-parity.mjs            # after AGENTS.md edits
+```
+
+`check:pr-merge-ready` fails closed on draft PRs, non-mergeable state, pending/failed required checks, and (with `--docs-only`) unexpected app paths. It does not merge.
+
 Run:
 
 ```bash

@@ -142,6 +142,29 @@ Rules:
 
 ---
 
+## Pre-merge automation
+
+Automate the PR merge gate (open / not draft / mergeable / CI / optional docs-only):
+
+```bash
+# Any PR:
+bun run check:pr-merge-ready -- <pr-number>
+
+# Docs / skill / AGENTS-only PRs:
+bun run check:pr-merge-ready -- <pr-number> --docs-only
+
+# Machine-readable:
+node scripts/check-pr-merge-ready.mjs <pr-number> --json
+```
+
+Exit `0` only when ready. The script **does not merge**; when green:
+
+```bash
+gh pr merge <pr-number> --squash --delete-branch
+```
+
+Governance PRs that edit `AGENTS.md` must **bump `Sentinel-Version` in all 12 governance files** in the same commit (`node scripts/check-sentinel-version-parity.mjs`).
+
 ## Pre-push checklist (agent)
 
 When the change set touches routes, create dialogs, grow binding, or leaf

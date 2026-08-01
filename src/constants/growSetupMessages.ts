@@ -19,6 +19,7 @@ export const GROW_SETUP_MESSAGES = {
   readErrorTitle: "Current setup unavailable",
   readErrorBody: "Nothing has been created. Your setups could not be loaded.",
   readErrorRetry: "Retry",
+  retryCooldownHint: "Wait a moment before trying again",
 
   requestedUnavailableTitle: "That setup isn’t available",
   requestedUnavailableBody:

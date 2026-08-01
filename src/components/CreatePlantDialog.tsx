@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -37,6 +37,7 @@ import {
   resolveSetupName,
 } from "@/lib/createDialogGrowBindingRules";
 import { GROW_SETUP_MESSAGES } from "@/constants/growSetupMessages";
+import { useCreateBindingRetry } from "@/hooks/useCreateBindingRetry";
 
 const STAGES = [
   { value: "seedling", label: "Seedling" },
@@ -101,6 +102,11 @@ export default function CreatePlantDialog({
     isFetched: tentsFetched,
     refetch: refetchTents,
   } = useTents();
+
+  const runGrowRefresh = useCallback(() => refreshGrows(), [refreshGrows]);
+  const runTentRefresh = useCallback(() => refetchTents(), [refetchTents]);
+  const growRetry = useCreateBindingRetry(runGrowRefresh);
+  const tentRetry = useCreateBindingRetry(runTentRefresh);
 
   const binding = useMemo(
     () =>
@@ -330,10 +336,25 @@ export default function CreatePlantDialog({
               size="sm"
               variant="outline"
               data-testid="create-plant-retry"
-              onClick={() => void refreshGrows()}
+              disabled={growRetry.gate.disabled}
+              aria-disabled={growRetry.gate.disabled}
+              title={
+                growRetry.gate.reason === "cooldown"
+                  ? GROW_SETUP_MESSAGES.retryCooldownHint
+                  : undefined
+              }
+              onClick={() => void growRetry.attempt()}
             >
               {binding.retryLabel}
             </Button>
+            {growRetry.gate.reason === "cooldown" && (
+              <p
+                className="text-[11px] text-muted-foreground"
+                data-testid="create-plant-retry-cooldown"
+              >
+                {GROW_SETUP_MESSAGES.retryCooldownHint}
+              </p>
+            )}
           </div>
         )}
         {binding.showRequestedUnavailable && (
@@ -426,15 +447,32 @@ export default function CreatePlantDialog({
             <p className="font-semibold">{suppliedTent.title}</p>
             <p className="text-muted-foreground">{suppliedTent.body}</p>
             {suppliedTent.showRetry && (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                data-testid="create-plant-tent-retry"
-                onClick={() => void refetchTents()}
-              >
-                {GROW_SETUP_MESSAGES.readErrorRetry}
-              </Button>
+              <>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  data-testid="create-plant-tent-retry"
+                  disabled={tentRetry.gate.disabled}
+                  aria-disabled={tentRetry.gate.disabled}
+                  title={
+                    tentRetry.gate.reason === "cooldown"
+                      ? GROW_SETUP_MESSAGES.retryCooldownHint
+                      : undefined
+                  }
+                  onClick={() => void tentRetry.attempt()}
+                >
+                  {GROW_SETUP_MESSAGES.readErrorRetry}
+                </Button>
+                {tentRetry.gate.reason === "cooldown" && (
+                  <p
+                    className="text-[11px] text-muted-foreground"
+                    data-testid="create-plant-tent-retry-cooldown"
+                  >
+                    {GROW_SETUP_MESSAGES.retryCooldownHint}
+                  </p>
+                )}
+              </>
             )}
           </div>
         )}
@@ -462,7 +500,6 @@ export default function CreatePlantDialog({
             </p>
           )}
 
-        {/* Form: withhold create controls while grow binding blocked; tent pending still shows form fields but submit stays blocked */}
         {!binding.blockSubmit && (
           <form onSubmit={submit} className="grid gap-3" data-testid="create-plant-form">
             <div>
@@ -513,7 +550,8 @@ export default function CreatePlantDialog({
               <div className="flex items-center justify-between mb-1">
                 <Label>
                   Tent
-                  {requireTentForWrite || !plantCreateAllowsTentless({
+                  {requireTentForWrite ||
+                  !plantCreateAllowsTentless({
                     suppliedTentId: defaultTentId,
                     requireTent,
                   })

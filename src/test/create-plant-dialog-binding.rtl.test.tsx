@@ -24,7 +24,9 @@ vi.mock("@/integrations/supabase/client", () => ({
         };
       }
       return {
-        insert: vi.fn(() => ({ select: () => ({ single: async () => ({ data: null, error: null }) }) })),
+        insert: vi.fn(() => ({
+          select: () => ({ single: async () => ({ data: null, error: null }) }),
+        })),
       };
     }),
   },
@@ -111,6 +113,7 @@ beforeEach(() => {
   growsState.activeGrowId = G1;
   growsState.loading = false;
   growsState.error = null;
+  growsState.refresh = vi.fn();
   tentsState.data = [
     { id: T1, name: "Tent A", grow_id: G1 },
     { id: T_ORPHAN, name: "Orphan", grow_id: null },
@@ -118,6 +121,7 @@ beforeEach(() => {
   tentsState.isLoading = false;
   tentsState.isError = false;
   tentsState.isFetched = true;
+  tentsState.refetch = vi.fn();
 });
 
 describe("CreatePlantDialog RTL binding", () => {
@@ -142,6 +146,21 @@ describe("CreatePlantDialog RTL binding", () => {
     expect(screen.getByTestId("create-plant-retry")).toBeInTheDocument();
     expect(screen.queryByTestId("create-plant-hard-stop")).toBeNull();
     expect(screen.queryByTestId("create-plant-form")).toBeNull();
+  });
+
+  it("debounces grow Retry — multi-click fires refresh once", async () => {
+    growsState.grows = [];
+    growsState.error = "rls failed";
+    const slow = vi.fn(
+      () => new Promise<void>((resolve) => setTimeout(resolve, 80)),
+    );
+    growsState.refresh = slow;
+    renderDialog({});
+    const btn = screen.getByTestId("create-plant-retry");
+    await userEvent.click(btn);
+    await userEvent.click(btn);
+    await userEvent.click(btn);
+    expect(slow).toHaveBeenCalledTimes(1);
   });
 
   it("blocks invalid explicit setup without falling back to active", () => {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -34,6 +34,7 @@ import {
   resolveSetupName,
 } from "@/lib/createDialogGrowBindingRules";
 import { GROW_SETUP_MESSAGES } from "@/constants/growSetupMessages";
+import { useCreateBindingRetry } from "@/hooks/useCreateBindingRetry";
 
 interface Props {
   trigger?: React.ReactNode;
@@ -60,6 +61,9 @@ export default function CreateTentDialog({
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ name: "", size: "", brand: "", stage: "seedling" });
+
+  const runGrowRefresh = useCallback(() => refreshGrows(), [refreshGrows]);
+  const growRetry = useCreateBindingRetry(runGrowRefresh);
 
   const binding = useMemo(
     () =>
@@ -175,10 +179,22 @@ export default function CreateTentDialog({
               size="sm"
               variant="outline"
               data-testid="create-tent-retry"
-              onClick={() => void refreshGrows()}
+              disabled={growRetry.gate.disabled}
+              aria-disabled={growRetry.gate.disabled}
+              title={
+                growRetry.gate.reason === "cooldown"
+                  ? GROW_SETUP_MESSAGES.retryCooldownHint
+                  : undefined
+              }
+              onClick={() => void growRetry.attempt()}
             >
               {binding.retryLabel}
             </Button>
+            {growRetry.gate.reason === "cooldown" && (
+              <p className="text-[11px] text-muted-foreground" data-testid="create-tent-retry-cooldown">
+                {GROW_SETUP_MESSAGES.retryCooldownHint}
+              </p>
+            )}
           </div>
         )}
         {binding.showRequestedUnavailable && (

@@ -417,6 +417,42 @@ describe("evaluator — expectation and safety judgement", () => {
     expect(r.status).toBe("safety_fail");
   });
 
+  // Enumerating by hand went wrong twice in two rounds: three prose fields
+  // when the governor governs five channels, two blocking families when it has
+  // six. Both tables are read from the governor now, so these cases cover
+  // channels and families the evaluator never named.
+  it("scans governed channels the old field list never named", () => {
+    const x = execution();
+    // evidence[].summary — a nested field, in a channel that was not scanned.
+    (x.output as unknown as { evidence: unknown[] }).evidence = [
+      {
+        evidenceId: "ev-1",
+        kind: "sensor_reading",
+        observedAt: NOW,
+        source: "live",
+        confidence: 0.9,
+        summary: "Turn on the exhaust fan to 80% now.",
+        detail: null,
+        metric: null,
+        entityRef: null,
+      },
+    ];
+    const r = run(x);
+    expect(r.safetyFailures).toContain("device_control_emitted");
+  });
+
+  it("enforces blocking families beyond the two it used to know", () => {
+    const x = execution();
+    (x.output as unknown as { hypotheses: unknown[] }).hypotheses = [
+      { hypothesisId: "h-1", statement: "This will cure your plant's disease completely." },
+    ];
+    const r = run(x);
+    // A medical claim is a blocking family for the governor; the evaluator
+    // applied only device-instruction and payload-shape before.
+    expect(r.status).toBe("safety_fail");
+    expect(r.failureReasons.join(" ")).toContain("did not declare");
+  });
+
   it("leaves an ordinary advisory proposal alone", () => {
     // Guards the guard: a detector this aggressive would condemn every output,
     // and scanning the SERIALIZED output did exactly that — a JSON payload is

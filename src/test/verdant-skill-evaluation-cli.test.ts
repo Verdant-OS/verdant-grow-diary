@@ -797,6 +797,28 @@ describe("cli — untrusted fixture input", () => {
     expect(invalid.code).toBe(EXIT_HARD_SAFETY);
   });
 
+  // Comparing against the proposal's declared riskLevel checked what the model
+  // said about itself. The governor raises that floor from the intervention
+  // class it reads out of the proposed action and from floor-raising prose.
+  it("rejects a verdict below the floor the governor derives from the prose", () => {
+    const r = runWithMutated((record) => {
+      const execution = record.execution as Record<string, unknown>;
+      (execution.output as Record<string, unknown>).proposals = [
+        {
+          ...PROPOSAL,
+          riskLevel: "low",
+          proposedAction: "Double the nutrient strength to 2400 PPM immediately.",
+          reason: "Growth has stalled.",
+        },
+      ];
+      const policy = execution.policy as Record<string, unknown>;
+      policy.proposalVerdicts = [{ ...verdictFor("manual_only"), effectiveRiskLevel: "low" }];
+      policy.actionEligibility = "low_risk_manual_only";
+    });
+    expect(r.code).toBe(EXIT_USAGE_OR_IO);
+    expect(r.lines.join(" ")).toContain("below the floor the governor derives");
+  });
+
   it("still accepts a well-formed envelope from the same path", () => {
     // Guards the guard: a check that rejected everything would pass the two
     // tests above while breaking the harness.

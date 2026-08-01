@@ -59,7 +59,16 @@ import {
   verifyReportBinding,
 } from "@/lib/verdantSkillEvaluationReport";
 import { deriveCitedEvidenceIds, evaluateSkillCase } from "@/lib/verdantSkillEvaluator";
-import { V1_MAX_ALLOWED_RISK } from "@/lib/verdantSkillPolicyGovernor";
+import {
+  RISK_FLOOR_BY_INTERVENTION_CLASS,
+  V1_MAX_ALLOWED_RISK,
+} from "@/lib/verdantSkillPolicyGovernor";
+import {
+  AGGRESSIVE_IRRIGATION_PATTERNS,
+  AGGRESSIVE_NUTRIENT_PATTERNS,
+  deriveInterventionClass,
+  scanProseForPatterns,
+} from "@/lib/aiOutputTextSafetyDetectors";
 import {
   evaluateSkillPromotionEligibility,
   renderPromotionMarkdown,
@@ -365,6 +374,54 @@ function loadFixtures(
         (p as { riskLevel?: string })?.riskLevel,
       ]),
     );
+    // The DERIVED floor, not only the declared level.
+    //
+    // Comparing against `proposal.riskLevel` alone checked what the model said
+    // about itself. The governor raises that floor from the intervention class
+    // it reads out of the proposed action and from floor-raising prose, so an
+    // aggressive nutrient proposal declaring `low` with an allow verdict at
+    // `low` satisfied both earlier checks while the governor would have
+    // derived at least `medium` and V1 would have blocked the action.
+    //
+    // Reusing the governor's own table and detectors, not a copy. The
+    // STAGE-gated part of its floor needs a real PlantContextCompilation,
+    // which these fixtures deliberately stub, so this reproduces the
+    // context-independent floor and Build 8 — which will have the compilation
+    // — can regenerate the decision outright and drop this entirely.
+    const derivedFloorFor = (p: Record<string, unknown>): string => {
+      const action = typeof p?.proposedAction === "string" ? p.proposedAction : "";
+      const reason = typeof p?.reason === "string" ? p.reason : "";
+      let floor = RISK_FLOOR_BY_INTERVENTION_CLASS[deriveInterventionClass(action)];
+      const prose = `${action} ${reason}`;
+      if (
+        scanProseForPatterns(prose, AGGRESSIVE_NUTRIENT_PATTERNS) ||
+        scanProseForPatterns(prose, AGGRESSIVE_IRRIGATION_PATTERNS)
+      ) {
+        floor = riskRank(floor) >= riskRank("medium") ? floor : "medium";
+      }
+      return floor;
+    };
+    const proposalById = new Map(
+      (Array.isArray(execOutput?.proposals) ? execOutput.proposals : []).map((p) => [
+        (p as { proposalId?: string })?.proposalId,
+        p as Record<string, unknown>,
+      ]),
+    );
+    const belowDerivedFloor = execPolicy.proposalVerdicts
+      .filter((v) => {
+        const p = proposalById.get(v.proposalId);
+        if (p === undefined) return false;
+        return riskRank(v.effectiveRiskLevel) < riskRank(derivedFloorFor(p));
+      })
+      .map((v) => v.proposalId)
+      .sort();
+    if (belowDerivedFloor.length > 0) {
+      issues.push(
+        `${name}: verdict effective risk is below the floor the governor derives for: ${belowDerivedFloor.join(", ")}`,
+      );
+      continue;
+    }
+
     const understatedRisk = execPolicy.proposalVerdicts
       .filter((v) => {
         const declared = proposalRisk.get(v.proposalId);

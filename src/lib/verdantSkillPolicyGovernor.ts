@@ -499,7 +499,7 @@ function collectStrings(value: unknown, path: string, out: { path: string; text:
  * carry a full irrigation instruction in `hypotheses[].rationale` — the
  * `proposals_require_ok_status` invariant gates proposals, and nothing else.
  */
-const GOVERNED_RESULT_KEYS: Record<keyof SkillRunResult, "governed" | "exempt_structural"> = {
+export const GOVERNED_RESULT_KEYS: Record<keyof SkillRunResult, "governed" | "exempt_structural"> = {
   contractVersion: "exempt_structural",
   runId: "exempt_structural",
   skillId: "exempt_structural",
@@ -517,7 +517,7 @@ const GOVERNED_RESULT_KEYS: Record<keyof SkillRunResult, "governed" | "exempt_st
 };
 
 /** Families that block outright: no legitimate use in an advisory proposal. */
-const BLOCKING_FAMILIES: readonly {
+export const BLOCKING_FAMILIES: readonly {
   readonly code: SkillPolicyRuleCode;
   readonly patterns: readonly RegExp[];
   /** Prohibition-aware: "Do not turn on the fan" is not an instruction. */

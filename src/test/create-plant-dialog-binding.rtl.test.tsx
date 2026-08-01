@@ -213,6 +213,7 @@ describe("CreatePlantDialog RTL binding", () => {
     tentsState.data = [];
     renderDialog({ defaultGrowId: G1, defaultTentId: T1 });
     expect(screen.getByTestId("create-plant-tent-pending")).toBeInTheDocument();
+    expect(screen.queryByTestId("mock-create-tent")).toBeNull();
     const submit = screen.getByTestId("plant-create-submit");
     expect(submit).toBeDisabled();
     await userEvent.type(screen.getByTestId("create-plant-name"), "Plant X");
@@ -240,13 +241,11 @@ describe("CreatePlantDialog RTL binding", () => {
     renderDialog({ defaultGrowId: G1, defaultTentId: T_GONE });
     expect(screen.getByTestId("create-plant-tent-unavailable")).toBeInTheDocument();
     expect(screen.getByTestId("create-plant-tent-retry")).toBeInTheDocument();
+    expect(screen.queryByTestId("mock-create-tent")).toBeNull();
     const submit = screen.getByTestId("plant-create-submit");
     expect(submit).toBeDisabled();
     await userEvent.type(screen.getByTestId("create-plant-name"), "Blocked");
-    // Read-error must not clear via CreateTent recovery — Retry only.
-    await userEvent.click(screen.getByTestId("mock-create-tent"));
-    expect(screen.getByTestId("create-plant-tent-unavailable")).toBeInTheDocument();
-    expect(submit).toBeDisabled();
+    // Read-error exposes no nested write path — Retry only.
     await userEvent.click(submit);
     expect(insertMock).not.toHaveBeenCalled();
   });
@@ -256,6 +255,7 @@ describe("CreatePlantDialog RTL binding", () => {
     expect(screen.getByTestId("create-plant-tent-unavailable")).toBeInTheDocument();
     expect(screen.getByTestId("plant-create-submit")).toBeDisabled();
     expect(screen.queryByText("No tent")).toBeNull();
+    expect(screen.getByTestId("mock-create-tent")).toBeInTheDocument();
 
     // CreateTentDialog onCreated is the supported recovery path in jsdom
     // (Radix Select pointer-capture is unavailable here).

@@ -263,6 +263,11 @@ export default function CreatePlantDialog({
     { replacementIsLocallyVerified: selectedTentIsLocallyVerified },
   );
   const tentBlocksWrite = suppliedTentStillBlocksWrite || tentCompat.blockSubmit;
+  // A pending/read-error supplied tent is not a replacement workflow. Keep the
+  // nested tent writer unavailable until the source rows are verified or the
+  // binding contract explicitly permits a compatible replacement.
+  const nestedTentCreateBlocked =
+    suppliedTent.blockSubmit && !suppliedTent.allowCompatibleReplacement;
 
   const formBlocked = binding.blockSubmit || !canWriteCreateGrowId(targetGrowId) || tentBlocksWrite;
 
@@ -653,20 +658,22 @@ export default function CreatePlantDialog({
                     ? ""
                     : " (optional)"}
                 </Label>
-                <CreateTentDialog
-                  defaultGrowId={targetGrowId ?? undefined}
-                  onCreated={handleNestedTentCreated}
-                  trigger={
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 px-2 gap-1 text-xs"
-                    >
-                      <Plus className="h-3 w-3" /> Add new tent
-                    </Button>
-                  }
-                />
+                {!nestedTentCreateBlocked && (
+                  <CreateTentDialog
+                    defaultGrowId={targetGrowId ?? undefined}
+                    onCreated={handleNestedTentCreated}
+                    trigger={
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 gap-1 text-xs"
+                      >
+                        <Plus className="h-3 w-3" /> Add new tent
+                      </Button>
+                    }
+                  />
+                )}
               </div>
               <Select
                 open={tentSelectOpen}

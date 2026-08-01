@@ -49,6 +49,7 @@ export type SensorAdapterComparisonRole = "primary" | "reference";
 export type SensorAdapterIngestBoundaryStatus =
   | "ready"
   | "reference_only"
+  | "blocked_stale"
   | "blocked_channel_collision"
   | "invalid";
 
@@ -67,6 +68,7 @@ export type SensorAdapterWarning =
   | "missing_timestamp"
   | "malformed_timestamp"
   | "malformed_received_at"
+  | "future_received_at"
   | "future_timestamp"
   | "reading_late"
   | "stale_reading"

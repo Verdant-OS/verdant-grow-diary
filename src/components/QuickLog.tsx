@@ -344,7 +344,6 @@ export default function QuickLog({
   useEffect(() => {
     if (!open) return;
     snapshotUserTouchedRef.current = false;
-     
   }, [open, selectedPlant?.tent_id]);
 
   useEffect(() => {
@@ -557,7 +556,9 @@ export default function QuickLog({
       if (!result.ok) {
         const reason = result.reason ?? "save_failed";
         const message = quickLogReasonToOperatorMessage(reason);
-        setSaveError(`${message} Your input is still here — retry when you have re-selected a valid grow, tent, and plant.`);
+        setSaveError(
+          `${message} Your input is still here — retry when you have re-selected a valid grow, tent, and plant.`,
+        );
         // Surface the (allow-listed) reason code alongside the friendly
         // copy so the operator and tests can correlate the failure with
         // logs without exposing tokens, endpoints, or raw payloads.
@@ -607,7 +608,13 @@ export default function QuickLog({
       queryClient.invalidateQueries({ queryKey: ["diary_entries"] });
       window.dispatchEvent(
         new CustomEvent("verdant:entry-created", {
-          detail: { createdAt: new Date().toISOString() },
+          detail: {
+            createdAt: new Date().toISOString(),
+            growId: activeGrowId,
+            plantId: selectedPlant.id,
+            tentId: selectedPlant.tent_id ?? null,
+            source: "quick_log",
+          },
         }),
       );
     } catch (err: unknown) {

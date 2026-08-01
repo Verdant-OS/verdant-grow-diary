@@ -51,6 +51,11 @@ import {
   type QuickLogActionChip,
   type ResponseCheckStatus,
 } from "@/lib/tenSecondQuickCheckRules";
+import {
+  buildEntryCreatedScopeDetail,
+  timelineHrefAfterQuickLogSave,
+} from "@/lib/quickLogPostSaveScopeRules";
+import { useGrows } from "@/store/grows";
 
 interface Props {
   open: boolean;
@@ -90,6 +95,7 @@ export default function PlantQuickLog({
 }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { setActiveGrowId } = useGrows();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const libraryFileRef = useRef<HTMLInputElement | null>(null);
   const { data: logs } = usePlantManualSensorLogs(open ? plantId : null);
@@ -259,15 +265,38 @@ export default function PlantQuickLog({
         return;
       }
 
-      toast.success("Log saved to timeline.");
+      toast.success("Log saved to timeline.", {
+        action: timelineHrefAfterQuickLogSave(growId)
+          ? {
+              label: "View timeline",
+              onClick: () => {
+                const href = timelineHrefAfterQuickLogSave(growId);
+                if (href && typeof window !== "undefined") {
+                  window.location.assign(href);
+                }
+              },
+            }
+          : undefined,
+      });
       applyQuickLogV2Refresh(queryClient, {
         targetType: "plant",
         targetId: plantId,
         tentId: tentId ?? null,
       });
+      // Pin active grow before dispatch so Timeline's activeGrowId effect
+      // reloads the scope that received this log.
+      if (growId && typeof setActiveGrowId === "function") {
+        setActiveGrowId(growId);
+      }
       window.dispatchEvent(
         new CustomEvent("verdant:entry-created", {
-          detail: { plantId, createdAt: new Date().toISOString() },
+          detail: buildEntryCreatedScopeDetail({
+            growId,
+            plantId,
+            tentId: tentId ?? null,
+            createdAt: new Date().toISOString(),
+            source: "plant_quick_log",
+          }),
         }),
       );
       resetForm();

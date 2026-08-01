@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
+import { useGrows } from "@/store/grows";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -10,8 +11,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, AlertTriangle, Wrench, Check } from "lucide-react";
+import { Loader2, AlertTriangle, Wrench, Check, Link2 } from "lucide-react";
 import { toast } from "sonner";
+import { bulkAssignOrphansToGrow } from "@/hooks/useLineageOrphans";
+import { formatBulkAssignResult } from "@/lib/lineageOrphanRules";
 
 interface TentRow {
   id: string;
@@ -37,6 +40,7 @@ interface GrowRow {
 
 export default function GrowLineageRepair() {
   const { user } = useAuth();
+  const { activeGrowId, activeGrow } = useGrows();
   const [tents, setTents] = useState<TentRow[]>([]);
   const [linkedTents, setLinkedTents] = useState<LinkedTentRow[]>([]);
   const [plants, setPlants] = useState<PlantRow[]>([]);
@@ -44,12 +48,14 @@ export default function GrowLineageRepair() {
   const [selection, setSelection] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [unboundPlantCount, setUnboundPlantCount] = useState(0);
 
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     // SECURITY: only fetch rows owned by auth.uid(). RLS also enforces this.
-    const [tentsRes, growsRes, linkedTentsRes, plantsRes] = await Promise.all([
+    const [tentsRes, growsRes, linkedTentsRes, plantsRes, unboundPlantsRes] = await Promise.all([
       supabase
         .from("tents")
         .select("id,name,created_at,grow_id")
@@ -75,15 +81,23 @@ export default function GrowLineageRepair() {
         .eq("user_id", user.id)
         .not("tent_id", "is", null)
         .eq("is_archived", false),
+      supabase
+        .from("plants")
+        .select("id")
+        .eq("user_id", user.id)
+        .is("grow_id", null)
+        .eq("is_archived", false),
     ]);
     if (tentsRes.error) toast.error(tentsRes.error.message);
     if (growsRes.error) toast.error(growsRes.error.message);
     if (linkedTentsRes.error) toast.error(linkedTentsRes.error.message);
     if (plantsRes.error) toast.error(plantsRes.error.message);
+    if (unboundPlantsRes.error) toast.error(unboundPlantsRes.error.message);
     setTents((tentsRes.data ?? []) as TentRow[]);
     setGrows((growsRes.data ?? []) as GrowRow[]);
     setLinkedTents((linkedTentsRes.data ?? []) as LinkedTentRow[]);
     setPlants((plantsRes.data ?? []) as PlantRow[]);
+    setUnboundPlantCount((unboundPlantsRes.data ?? []).length);
     setLoading(false);
   }, [user]);
 
@@ -170,17 +184,43 @@ export default function GrowLineageRepair() {
     await load();
   }
 
+  async function bulkAssignToActiveGrow() {
+    if (!user || !activeGrowId || bulkBusy) return;
+    if (!grows.some((g) => g.id === activeGrowId)) {
+      toast.error("You do not own the active grow");
+      return;
+    }
+    setBulkBusy(true);
+    const result = await bulkAssignOrphansToGrow({
+      userId: user.id,
+      growId: activeGrowId,
+      ownedGrowIds: grows.map((g) => g.id),
+    });
+    setBulkBusy(false);
+    if (result.ok === false) {
+      toast.error(result.message);
+      return;
+    }
+    toast.success(
+      formatBulkAssignResult({
+        tentsUpdated: result.tentsUpdated,
+        plantsUpdated: result.plantsUpdated,
+      }),
+    );
+    await load();
+  }
+
+  const orphanTotal = tents.length + unboundPlantCount;
+  const canBulk = !!activeGrowId && orphanTotal > 0 && grows.some((g) => g.id === activeGrowId);
+
   return (
     <div className="container max-w-4xl py-6 space-y-6">
       <div className="flex items-center gap-3">
         <Wrench className="h-6 w-6 text-primary" />
         <div>
-          <h1 className="text-2xl font-display font-semibold">
-            Grow Lineage Repair
-          </h1>
+          <h1 className="text-2xl font-display font-semibold">Grow Lineage Repair</h1>
           <p className="text-sm text-muted-foreground">
-            Assign unlinked tents to one of your grows so the Action Queue can
-            target them safely.
+            Assign unlinked tents to one of your grows so the Action Queue can target them safely.
           </p>
         </div>
       </div>
@@ -189,10 +229,43 @@ export default function GrowLineageRepair() {
         <AlertTriangle className="h-4 w-4" />
         <AlertTitle>Assignments affect Action Queue targeting</AlertTitle>
         <AlertDescription>
-          Once a tent is linked to a grow, suggested actions can reference it.
-          Suggestions still require approval; nothing is sent to devices.
+          Once a tent is linked to a grow, suggested actions can reference it. Suggestions still
+          require approval; nothing is sent to devices.
         </AlertDescription>
       </Alert>
+
+      {!loading && orphanTotal > 0 ? (
+        <div
+          className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-2"
+          data-testid="lineage-bulk-assign-panel"
+        >
+          <p className="text-sm font-medium">Bulk assign orphans</p>
+          <p className="text-xs text-muted-foreground">
+            {tents.length} unlinked tent{tents.length === 1 ? "" : "s"} · {unboundPlantCount} plant
+            {unboundPlantCount === 1 ? "" : "s"} with null grow_id.
+            {activeGrow
+              ? ` Active grow: ${activeGrow.name}.`
+              : " Set an active grow on My Grows first."}
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            className="gap-1.5 gradient-leaf text-primary-foreground"
+            disabled={!canBulk || bulkBusy}
+            onClick={bulkAssignToActiveGrow}
+            data-testid="lineage-bulk-assign-active-grow"
+          >
+            {bulkBusy ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Link2 className="h-3.5 w-3.5" />
+            )}
+            {activeGrow
+              ? `Assign all to active grow (${activeGrow.name})`
+              : "Assign all to active grow"}
+          </Button>
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="flex items-center gap-2 text-muted-foreground">
@@ -220,16 +293,12 @@ export default function GrowLineageRepair() {
               <div className="flex items-center gap-2">
                 <Select
                   value={selection[t.id] ?? ""}
-                  onValueChange={(v) =>
-                    setSelection((s) => ({ ...s, [t.id]: v }))
-                  }
+                  onValueChange={(v) => setSelection((s) => ({ ...s, [t.id]: v }))}
                   disabled={grows.length === 0}
                 >
                   <SelectTrigger className="w-56">
                     <SelectValue
-                      placeholder={
-                        grows.length === 0 ? "No grows yet" : "Select a grow"
-                      }
+                      placeholder={grows.length === 0 ? "No grows yet" : "Select a grow"}
                     />
                   </SelectTrigger>
                   <SelectContent>
@@ -245,11 +314,7 @@ export default function GrowLineageRepair() {
                   onClick={() => save(t.id)}
                   disabled={busyId === t.id || !selection[t.id]}
                 >
-                  {busyId === t.id ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    "Save"
-                  )}
+                  {busyId === t.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
                 </Button>
               </div>
             </div>
@@ -262,9 +327,8 @@ export default function GrowLineageRepair() {
           Plants out of sync with their tent's grow
         </h2>
         <p className="text-sm text-muted-foreground">
-          Moving a plant between tents never rewrites its grow link, so these
-          plants still point at a stale (or missing) grow. Relink them to
-          their tent's grow.
+          Moving a plant between tents never rewrites its grow link, so these plants still point at
+          a stale (or missing) grow. Relink them to their tent's grow.
         </p>
       </div>
 
@@ -286,7 +350,7 @@ export default function GrowLineageRepair() {
             const targetGrowName =
               grows.find((g) => g.id === tent.grow_id)?.name ?? "its tent's grow";
             const currentGrowName = plant.grow_id
-              ? grows.find((g) => g.id === plant.grow_id)?.name ?? "another grow"
+              ? (grows.find((g) => g.id === plant.grow_id)?.name ?? "another grow")
               : "unassigned";
             return (
               <div

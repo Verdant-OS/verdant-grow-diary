@@ -10,6 +10,8 @@ import AppShell from "@/components/AppShell";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import Onboarding from "./pages/Onboarding";
+import StartYourRoom from "./pages/StartYourRoom";
+
 import Dashboard from "./pages/Dashboard";
 import Tents from "./pages/Tents";
 import TentDetail from "./pages/TentDetail";
@@ -136,6 +138,7 @@ const App = () => (
                     <Route element={<AppShell />}>
                       <Route path="/" element={<Dashboard />} />
                       <Route path="/onboarding" element={<Onboarding />} />
+                      <Route path="/start-room" element={<StartYourRoom />} />
                       {/* Legacy Live Dashboard route — consolidated into the
                     main Dashboard. Redirect preserves old bookmarks. */}
                       <Route path="/grow-room" element={<Navigate to="/" replace />} />
@@ -171,7 +174,10 @@ const App = () => (
                       <Route path="/grow-lineage" element={<GrowLineageRepair />} />
                       <Route path="/grows" element={<Grows />} />
                       <Route path="/grows/:growId" element={<GrowDetail />} />
-                      <Route path="/grows/:growId/pheno-compare" element={<GrowPhenoComparison />} />
+                      <Route
+                        path="/grows/:growId/pheno-compare"
+                        element={<GrowPhenoComparison />}
+                      />
                       <Route path="/pheno-hunts/new" element={<PhenoHuntNew />} />
                       <Route path="/breeding/new" element={<BreedingLogNew />} />
                       <Route path="/reports" element={<Reports />} />

@@ -5,6 +5,7 @@ import {
   GROW_SETUP_MESSAGES,
   GROW_SETUP_BANNED_UI_TOKENS,
   GROW_SETUP_START_ROOM_HREF,
+  growSetup,
 } from "@/constants/growSetupMessages";
 
 const ROOT = resolve(__dirname, "../..");
@@ -17,6 +18,17 @@ describe("grow setup messages static safety", () => {
   it("CTA uses one-tent activation on grows", () => {
     expect(GROW_SETUP_START_ROOM_HREF).toBe("/grows?intent=one_tent_activation");
     expect(MSG).toMatch(/one_tent_activation/);
+  });
+
+  it("hardStopBody matches grow-first destination without guided-wizard claim", () => {
+    const expected =
+      "You need a setup before adding a tent or plant. Create your grow next—then add a tent and plant so Quick Log works.";
+    expect(growSetup.noSetup.body).toBe(expected);
+    expect(GROW_SETUP_MESSAGES.hardStopBody).toBe(expected);
+    expect(GROW_SETUP_MESSAGES.hardStopBody).toBe(growSetup.noSetup.body);
+    expect(GROW_SETUP_MESSAGES.hardStopBody.toLowerCase()).not.toMatch(
+      /we(?:'|’)ll walk|guided path|walk grow/,
+    );
   });
 
   it("grower-facing strings avoid banned tokens", () => {

@@ -170,7 +170,6 @@ export function classifyTimelineLightingSignal(
   input: TimelineLightingGuideInput | null | undefined,
 ): TimelineLightingSignal {
   if (!input) return null;
-  if (input.details?.checkType === "light") return "setup";
   const evidence = [
     ...(typeof input.note === "string" ? [input.note] : []),
     ...collectEvidenceText(input.details),
@@ -182,5 +181,6 @@ export function classifyTimelineLightingSignal(
   if (DIRECT_STRESS_SIGNAL.test(evidence) || (hasSetupSignal && RESPONSE_SIGNAL.test(evidence))) {
     return "stress";
   }
+  if (input.details?.checkType === "light") return "setup";
   return hasSetupSignal ? "setup" : null;
 }

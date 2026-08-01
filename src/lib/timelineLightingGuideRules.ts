@@ -52,6 +52,8 @@ const DIRECT_STRESS_SIGNAL =
 const RESPONSE_SIGNAL =
   /\b(?:curl(?:ed|ing)?|taco(?:ed|ing)?|canoe(?:d|ing)?|pale|crispy|scorch(?:ed|ing)?|dry[-_\s]?tip|top[-_\s]?growth)\b/i;
 
+export type TimelineLightingSignal = "setup" | "stress" | null;
+
 function collectEvidenceText(value: unknown, depth = 0, output: string[] = []): string[] {
   if (output.length >= 200 || depth > 3 || value == null) return output;
 
@@ -157,21 +159,28 @@ export function resolveTimelineLightingGuide(
   input: TimelineLightingGuideInput | null | undefined,
 ): TimelineLightingGuideView | null {
   if (!input) return null;
+  const signal = classifyTimelineLightingSignal(input);
+  if (signal === "stress") return STRESS_VIEW;
+  if (signal === "setup") return SETUP_VIEW;
+  return null;
+}
 
+/** Shared explicit-light classifier for read-only evidence surfaces. */
+export function classifyTimelineLightingSignal(
+  input: TimelineLightingGuideInput | null | undefined,
+): TimelineLightingSignal {
+  if (!input) return null;
+  if (input.details?.checkType === "light") return "setup";
   const evidence = [
     ...(typeof input.note === "string" ? [input.note] : []),
     ...collectEvidenceText(input.details),
   ]
     .join(" ")
     .replace(/[_-]+/g, " ");
-
   if (!evidence.trim()) return null;
-
   const hasSetupSignal = SETUP_SIGNAL.test(evidence);
-  const hasDirectStressSignal = DIRECT_STRESS_SIGNAL.test(evidence);
-  const hasLightingResponseSignal = hasSetupSignal && RESPONSE_SIGNAL.test(evidence);
-
-  if (hasDirectStressSignal || hasLightingResponseSignal) return STRESS_VIEW;
-  if (hasSetupSignal) return SETUP_VIEW;
-  return null;
+  if (DIRECT_STRESS_SIGNAL.test(evidence) || (hasSetupSignal && RESPONSE_SIGNAL.test(evidence))) {
+    return "stress";
+  }
+  return hasSetupSignal ? "setup" : null;
 }

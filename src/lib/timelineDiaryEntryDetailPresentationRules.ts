@@ -56,6 +56,8 @@ export const HIDDEN_DIARY_DETAIL_KEYS: ReadonlySet<string> = new Set([
   // a schema version marker and a grow_events join id.
   "quick_log_version",
   "linked_grow_event_id",
+  // Guided Symptom Check stage is presented by its dedicated evidence card.
+  "observation_stage",
   // Redundant with the dedicated photo render, which reads the row-level
   // photo_url column directly.
   "photo_url",
@@ -98,10 +100,7 @@ function detailsRecord(details: unknown): Record<string, unknown> {
  * (e.g. learning-loop rows, keyed off the row's `event_type`) — pass the
  * caller's own classification for those.
  */
-export function isFullySuppressedTimelineDetail(
-  details: unknown,
-  suppress = false,
-): boolean {
+export function isFullySuppressedTimelineDetail(details: unknown, suppress = false): boolean {
   if (suppress) return true;
   const record = detailsRecord(details);
   return typeof record.kind === "string" && SUPPRESSED_DETAIL_KINDS.has(record.kind);

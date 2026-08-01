@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TimelineEmptyState from "@/components/TimelineEmptyState";
 import TimelineLightingGuideCard from "@/components/TimelineLightingGuideCard";
+import SymptomEvidenceChecklistCard from "@/components/SymptomEvidenceChecklistCard";
 import {
   resolveTimelineEmptyState,
   TIMELINE_EMPTY_STATE_FALLBACK,
 } from "@/lib/timelineEmptyStateRules";
 import { resolveTimelineLightingGuide } from "@/lib/timelineLightingGuideRules";
+import { buildSymptomEvidenceChecklist } from "@/lib/symptomEvidenceChecklistRules";
 import type { FastAddSelectionContext } from "@/lib/fastAddActionRules";
 import PageHeader from "@/components/PageHeader";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
@@ -1008,6 +1010,53 @@ export default function Timeline() {
     }
     return out;
   }, [entries, growEvents]);
+
+  const symptomEvidenceByEntryId = useMemo(() => {
+    const result = new Map<string, NonNullable<ReturnType<typeof buildSymptomEvidenceChecklist>>>();
+    const historyComplete =
+      coreRead.status === "success" &&
+      entriesTotal !== null &&
+      entriesTotal <= entries.length &&
+      growEvents.length < 100 &&
+      !effectiveStartDate &&
+      !effectiveEndDate;
+    const evidenceRows = recentLaneRawEntries.map((raw) => {
+      const row = raw as unknown as Record<string, unknown>;
+      const details =
+        row.details && typeof row.details === "object" && !Array.isArray(row.details)
+          ? (row.details as Record<string, unknown>)
+          : {};
+      return {
+        ...row,
+        grow_id: typeof row.grow_id === "string" ? row.grow_id : activeGrowId,
+        event_type: row.event_type ?? row.entry_type ?? details.event_type ?? row.action ?? null,
+        source: row.source ?? details.source ?? null,
+      };
+    });
+    for (const entry of entries) {
+      const view = buildSymptomEvidenceChecklist({
+        symptomEntry: {
+          ...entry,
+          grow_id: activeGrowId,
+          event_type: entry.details?.event_type,
+          source: entry.details?.source,
+        },
+        entries: evidenceRows,
+        historyComplete,
+      });
+      if (view) result.set(entry.id, view);
+    }
+    return result;
+  }, [
+    activeGrowId,
+    coreRead.status,
+    effectiveEndDate,
+    effectiveStartDate,
+    entries,
+    entriesTotal,
+    growEvents.length,
+    recentLaneRawEntries,
+  ]);
 
   // Pure normalized timeline view-model. Drives per-entry tags/warnings and a
   // future-proof empty/limited disclosure. Includes invalid entries so
@@ -2027,6 +2076,16 @@ export default function Timeline() {
                                 >
                                   <TimelineLightingGuideCard
                                     view={lightingGuideByEntryId.get(e.id)!}
+                                  />
+                                </div>
+                              ) : null}
+                              {symptomEvidenceByEntryId.has(e.id) ? (
+                                <div
+                                  onClick={(event) => event.stopPropagation()}
+                                  onKeyDown={(event) => event.stopPropagation()}
+                                >
+                                  <SymptomEvidenceChecklistCard
+                                    view={symptomEvidenceByEntryId.get(e.id)!}
                                   />
                                 </div>
                               ) : null}

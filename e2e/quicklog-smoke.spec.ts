@@ -152,6 +152,7 @@ test.describe("Quick Log smoke checklist", () => {
   test("authenticated end-to-end checklist", async ({ page }, testInfo) => {
     const report = new SmokeChecklistReporter();
     let observedRpcTargetId: string | null = null;
+    let observedSymptomPayload: Record<string, unknown> | null = null;
 
     page.on("request", (request) => {
       let pathname: string;
@@ -163,6 +164,24 @@ test.describe("Quick Log smoke checklist", () => {
       if (!pathname.endsWith("/rpc/quicklog_save_manual")) return;
       const candidate = readObservedQuickLogTargetId(request);
       if (candidate) observedRpcTargetId = candidate;
+    });
+    page.on("request", (request) => {
+      let pathname: string;
+      try {
+        pathname = new URL(request.url()).pathname;
+      } catch {
+        return;
+      }
+      if (!pathname.endsWith("/rpc/quicklog_save_event")) return;
+      try {
+        const payload = request.postDataJSON() as Record<string, unknown>;
+        const details = payload.p_details as Record<string, unknown> | null;
+        if (payload.p_event_type === "observation" && details?.subtype === "issue") {
+          observedSymptomPayload = payload;
+        }
+      } catch {
+        // A malformed request remains unmatched and fails the assertion below.
+      }
     });
 
     try {
@@ -416,6 +435,64 @@ test.describe("Quick Log smoke checklist", () => {
         await expect(reopened.getByTestId("quick-log-post-save")).toHaveCount(0);
         await expect(reopened.getByTestId("quicklog-note")).toHaveValue("");
         return "clean dialog";
+      });
+
+      await report.run(24, "Open guided Symptom Check without writing", async () => {
+        observedSymptomPayload = null;
+        await dialog.getByTestId("quick-log-dialog-all-activities-start-symptom-check").click();
+        await expect(
+          dialog.getByTestId("quick-log-dialog-all-activities-symptom-fields"),
+        ).toBeVisible();
+        expect(observedSymptomPayload).toBeNull();
+        return "guided fields visible; no save RPC emitted";
+      });
+
+      await report.run(25, "Choose visible sign and confirm stage", async () => {
+        await dialog.getByTestId("quick-log-dialog-all-activities-symptom-yellowing").click();
+        const stage = dialog.getByTestId("quick-log-dialog-all-activities-symptom-stage");
+        if ((await stage.inputValue()) === "") await stage.selectOption("flower");
+        await dialog.getByTestId("quick-log-dialog-all-activities-symptom-stage-confirmed").check();
+        await dialog
+          .getByTestId("quick-log-dialog-all-activities-note")
+          .fill("Smoke checklist: lower-leaf yellowing observed; cause not assumed.");
+        await expect(dialog.getByTestId("quick-log-dialog-all-activities-save")).toBeEnabled();
+        return "visible sign, stage confirmation, and observation note prepared";
+      });
+
+      await report.run(26, "Save canonical issue observation", async () => {
+        await dialog.getByTestId("quick-log-dialog-all-activities-save").click();
+        await expect.poll(() => observedSymptomPayload?.p_event_type ?? null).toBe("observation");
+        const details = observedSymptomPayload?.p_details as Record<string, unknown> | undefined;
+        expect(details).toMatchObject({
+          subtype: "issue",
+          event_type: "observation",
+          observedSign: "discoloration",
+        });
+        expect(details?.observation_stage).toMatch(/^(seedling|vegetative|flower|harvest)$/);
+        return "existing quicklog_save_event route confirmed the canonical issue payload";
+      });
+
+      await report.run(27, "Open grow-scoped evidence review", async () => {
+        const reviewLink = dialog.getByTestId(
+          "quick-log-dialog-all-activities-review-symptom-evidence",
+        );
+        await expect(reviewLink).toHaveAttribute(
+          "href",
+          /\/timeline\?growId=[^#]+#timeline-entry-[A-Za-z0-9_-]+$/,
+        );
+        await reviewLink.click();
+        await expect(page).toHaveURL(/\/timeline\?growId=[^#]+#timeline-entry-[A-Za-z0-9_-]+$/);
+        return "real returned event id anchored the grow-scoped Timeline URL";
+      });
+
+      await report.run(28, "Timeline renders the four-category evidence checklist", async () => {
+        const checklist = page.getByTestId("symptom-evidence-checklist").first();
+        await expect(checklist).toBeVisible({ timeout: 15_000 });
+        for (const heading of ["Environment Check", "Watering", "Feeding", "Lighting"]) {
+          await expect(checklist.getByRole("heading", { name: heading })).toBeVisible();
+        }
+        await expect(checklist).toContainText(/not a diagnosis/i);
+        return "four ordered evidence categories visible with non-diagnostic disclosure";
       });
     } finally {
       // Always write the smoke report to a stable path so CI can upload it

@@ -1,0 +1,55 @@
+import { expect, test } from "@playwright/test";
+
+const ROUTES = [
+  "/guides/cannabis-plant-symptoms",
+  "/guides/cannabis-leaves-turning-yellow",
+  "/guides/cannabis-leaf-spots-lesions",
+  "/guides/cannabis-burnt-crispy-leaf-tips",
+] as const;
+
+const VIEWPORTS = [
+  { name: "small-phone", width: 320, height: 720 },
+  { name: "phone", width: 390, height: 844 },
+  { name: "tablet", width: 768, height: 1024 },
+  { name: "desktop", width: 1440, height: 1000 },
+] as const;
+
+test.describe("public symptom guides — responsive burden", () => {
+  for (const viewport of VIEWPORTS) {
+    for (const route of ROUTES) {
+      test(`${viewport.name}: ${route}`, async ({ page }) => {
+        const writeRequests: string[] = [];
+        page.on("request", (request) => {
+          if (
+            request.method() !== "GET" &&
+            /\/(?:rest\/v1|storage\/v1|functions\/v1|rpc)\//.test(request.url())
+          ) {
+            writeRequests.push(`${request.method()} ${request.url()}`);
+          }
+        });
+        await page.setViewportSize({ width: viewport.width, height: viewport.height });
+        await page.goto(route, { waitUntil: "domcontentloaded" });
+        await expect(page.getByTestId("guide-page")).toBeVisible();
+        await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+        await expect(page.getByTestId("symptom-reference-table")).toBeVisible();
+        await expect(page.getByRole("columnheader", { name: "Do not assume" })).toBeVisible();
+        await expect(page.getByRole("link", { name: /quick log/i }).first()).toBeVisible();
+
+        const overflow = await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        );
+        expect(overflow).toBeLessThanOrEqual(1);
+        expect(writeRequests).toEqual([]);
+      });
+    }
+  }
+
+  test("guide hub exposes the symptom entry point", async ({ page }) => {
+    await page.goto("/guides", { waitUntil: "domcontentloaded" });
+    const link = page.getByRole("link", { name: "Open the cannabis symptom hub" });
+    await expect(link).toBeVisible();
+    await link.click();
+    await expect(page).toHaveURL(/\/guides\/cannabis-plant-symptoms$/);
+    await expect(page.getByTestId("symptom-reference-table")).toBeVisible();
+  });
+});

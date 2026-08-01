@@ -100,6 +100,24 @@ export default function GuidesIndex() {
         <h2 className="font-display text-2xl font-semibold mb-6">Start here</h2>
         <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-5">
           <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
+            Evidence-first symptom checks
+          </p>
+          <h3 className="mt-2 font-display text-xl font-semibold">
+            Record the visible sign before naming a cause
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Compare yellowing, spots or lesions, and burnt or crispy tips against the plant's
+            environment, watering, feeding, and lighting history. One photo is not a diagnosis.
+          </p>
+          <Link
+            to="/guides/cannabis-plant-symptoms"
+            className="mt-4 inline-flex text-sm font-semibold text-primary hover:underline"
+          >
+            Open the cannabis symptom hub
+          </Link>
+        </div>
+        <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-5">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
             Indoor lighting decisions
           </p>
           <h3 className="mt-2 font-display text-xl font-semibold">

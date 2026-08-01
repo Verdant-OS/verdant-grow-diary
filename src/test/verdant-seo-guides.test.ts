@@ -69,6 +69,11 @@ const EXPECTED_SLUGS: ReadonlyArray<string> = [
   "cannabis-light-stress-light-burn-bleaching-or-heat",
   // Cultivar comparison cluster: pheno expression showcase.
   "oreoz-vs-gelonade-comparison",
+  // Evidence-first symptom hub and focused visible-sign guides.
+  "cannabis-plant-symptoms",
+  "cannabis-leaves-turning-yellow",
+  "cannabis-leaf-spots-lesions",
+  "cannabis-burnt-crispy-leaf-tips",
 ];
 
 describe("Verdant grower guide FAQ (/guides)", () => {
@@ -120,8 +125,8 @@ describe("Verdant grower guide FAQ (/guides)", () => {
   });
 });
 
-describe("Verdant SEO guide pages (24)", () => {
-  it("defines exactly the twenty-four expected slugs, in order", () => {
+describe("Verdant SEO guide pages (28)", () => {
+  it("defines exactly the twenty-eight expected slugs, in order", () => {
     expect(VERDANT_GUIDE_SLUGS).toEqual(EXPECTED_SLUGS);
   });
 

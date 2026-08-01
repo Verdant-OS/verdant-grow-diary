@@ -24,11 +24,13 @@
  *     / defoliate", no harvest readiness, no diagnosis language.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import QuickLogActivityPicker from "@/components/QuickLogActivityPicker";
+import QuickLogSymptomCheckFields from "@/components/QuickLogSymptomCheckFields";
 import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
 import { useAuth } from "@/store/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,6 +69,13 @@ import {
 import { QUICK_LOG_V2_OPEN_EVENT, buildQuickLogV2OpenIntent } from "@/lib/quickLogV2OpenIntent";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+import { findCannabisSymptomByObservedSign } from "@/constants/cannabisSymptomTypes";
+import type { CanonicalGrowStage } from "@/constants/growStages";
+import {
+  buildSymptomTimelineHref,
+  resolveGuidedSymptomStage,
+  validateGuidedSymptomCheck,
+} from "@/lib/symptomCheckRules";
 
 export interface QuickLogAllActivitiesSectionProps {
   growId: string | null | undefined;
@@ -110,6 +119,7 @@ export interface QuickLogAllActivitiesSaveTarget {
 export interface QuickLogAllActivitiesSaveSuccess {
   readonly activityId: QuickLogActivityId;
   readonly target: QuickLogAllActivitiesSaveTarget;
+  readonly growEventId: string | null;
 }
 
 /** Map a QuickLogActivityId to the "What was saved" DailyCheck source. */
@@ -153,6 +163,8 @@ interface SavedRecord {
   activityId: QuickLogActivityId;
   item: DailyCheckSavedItem;
   target: QuickLogAllActivitiesSaveTarget;
+  growEventId: string | null;
+  symptomCheck: boolean;
 }
 
 export default function QuickLogAllActivitiesSection({
@@ -187,6 +199,9 @@ export default function QuickLogAllActivitiesSection({
   // Generic per-activity structured detail values (e.g. training technique),
   // keyed by field spec key. Sanitized before persistence.
   const [detailValues, setDetailValues] = useState<Record<string, string>>({});
+  const [guidedSymptomCheck, setGuidedSymptomCheck] = useState(false);
+  const [guidedSymptomStage, setGuidedSymptomStage] = useState<CanonicalGrowStage | null>(null);
+  const [guidedSymptomStageConfirmed, setGuidedSymptomStageConfirmed] = useState(false);
   // Photo activity: a real image is REQUIRED before Save — a photo entry with
   // no image must never be confirmable. Uploaded to the private diary-photos
   // bucket; the diary row's photo_url column carries the bare storage path.
@@ -238,6 +253,9 @@ export default function QuickLogAllActivitiesSection({
     setHarvestDry("");
     setHarvestUnit("g");
     setDetailValues({});
+    setGuidedSymptomCheck(false);
+    setGuidedSymptomStage(null);
+    setGuidedSymptomStageConfirmed(false);
     envCheckTempEntryUnitRef.current = null;
     setPhotoFile(null);
     setErrorReason(null);
@@ -265,6 +283,9 @@ export default function QuickLogAllActivitiesSection({
     setHarvestDry("");
     setHarvestUnit("g");
     setDetailValues({});
+    setGuidedSymptomCheck(false);
+    setGuidedSymptomStage(null);
+    setGuidedSymptomStageConfirmed(false);
     envCheckTempEntryUnitRef.current = null;
     setPhotoFile(null);
     if (requestedActivityAvailability?.disabled) {
@@ -327,6 +348,9 @@ export default function QuickLogAllActivitiesSection({
       setErrorReason(null);
       setErrorForActivity(null);
       setStructuredWaterError(null);
+      setGuidedSymptomCheck(false);
+      setGuidedSymptomStage(null);
+      setGuidedSymptomStageConfirmed(false);
       if (a.id === "watering") {
         if (externalPersistenceBlockReason) {
           setStructuredWaterError(externalPersistenceBlockReason);
@@ -364,6 +388,19 @@ export default function QuickLogAllActivitiesSection({
       tentId,
     ],
   );
+
+  const handleStartSymptomCheck = useCallback(() => {
+    if (isMutationBlocked()) return;
+    setErrorReason(null);
+    setErrorForActivity(null);
+    setStructuredWaterError(null);
+    setSelectedDraft(bindQuickLogActivityDraft("issue_observation", currentTarget));
+    setNote("");
+    setDetailValues({});
+    setGuidedSymptomCheck(true);
+    setGuidedSymptomStage(resolveGuidedSymptomStage(plantStage));
+    setGuidedSymptomStageConfirmed(false);
+  }, [currentTarget, isMutationBlocked, plantStage]);
 
   const handleSave = useCallback(async () => {
     if (isMutationBlocked()) return;
@@ -465,6 +502,22 @@ export default function QuickLogAllActivitiesSection({
     if (activityDetails) {
       Object.assign(extraDetails, activityDetails);
     }
+    if (guidedSymptomCheck && selected.id === "issue_observation") {
+      const symptom = findCannabisSymptomByObservedSign(detailValues.observedSign);
+      const guidedValidation = validateGuidedSymptomCheck({
+        symptomId: symptom?.id ?? null,
+        stage: guidedSymptomStage,
+        stageConfirmed: guidedSymptomStageConfirmed,
+        observationLocation: detailValues.observationLocation,
+      });
+      if (!guidedValidation.ok) {
+        const failure = guidedValidation as { readonly ok: false; readonly reason: string };
+        setErrorReason(failure.reason);
+        setErrorForActivity(selected.id);
+        return;
+      }
+      Object.assign(extraDetails, guidedValidation.details);
+    }
 
     const capturedTarget = Object.freeze({
       growId,
@@ -477,6 +530,7 @@ export default function QuickLogAllActivitiesSection({
 
     try {
       const idempotencyKey = newIdempotencyKey(selected.id);
+      let savedGrowEventId: string | null = null;
       if (selected.id === "photo") {
         // Photo goes diary-only through the proven QuickLog photo-attachment
         // path (upload to the private diary-photos bucket, then one
@@ -589,6 +643,7 @@ export default function QuickLogAllActivitiesSection({
           setErrorForActivity(selected.id);
           return;
         }
+        savedGrowEventId = result.growEventId ?? null;
       }
 
       // Success path — build saved-item using the SHARED helper so no
@@ -608,12 +663,18 @@ export default function QuickLogAllActivitiesSection({
               activityId: selected.id,
               item: items[0],
               target: capturedTarget,
+              growEventId: savedGrowEventId,
+              symptomCheck: guidedSymptomCheck && selected.id === "issue_observation",
             },
           ]);
         }
       }
       try {
-        onSaveSuccess?.({ activityId: selected.id, target: capturedTarget });
+        onSaveSuccess?.({
+          activityId: selected.id,
+          target: capturedTarget,
+          growEventId: savedGrowEventId,
+        });
       } catch {
         // Persistence already succeeded. A caller-owned local cleanup
         // failure must not turn a confirmed write into a false save error.
@@ -623,6 +684,9 @@ export default function QuickLogAllActivitiesSection({
       setHarvestDry("");
       setHarvestUnit("g");
       setDetailValues({});
+      setGuidedSymptomCheck(false);
+      setGuidedSymptomStage(null);
+      setGuidedSymptomStageConfirmed(false);
       envCheckTempEntryUnitRef.current = null;
       setPhotoFile(null);
       setSelectedDraft(null);
@@ -661,6 +725,9 @@ export default function QuickLogAllActivitiesSection({
     externalPersistenceBlockReason,
     activeEnvCheckTempUnit,
     onSaveSuccess,
+    guidedSymptomCheck,
+    guidedSymptomStage,
+    guidedSymptomStageConfirmed,
   ]);
 
   const noContext = !growId;
@@ -720,6 +787,20 @@ export default function QuickLogAllActivitiesSection({
         testIdPrefix={`${testIdPrefix}-picker`}
       />
 
+      <Button
+        type="button"
+        variant="outline"
+        className="min-h-[44px] w-full justify-start"
+        onClick={handleStartSymptomCheck}
+        disabled={mutationBlocked || noContext || !!externalPersistenceBlockReason}
+        data-testid={`${testIdPrefix}-start-symptom-check`}
+      >
+        Symptom Check
+        <span className="ml-2 text-xs font-normal text-muted-foreground">
+          Guided observation — no diagnosis
+        </span>
+      </Button>
+
       {structuredWaterError && (
         <p
           role="alert"
@@ -751,99 +832,126 @@ export default function QuickLogAllActivitiesSection({
             </p>
           )}
 
-          {getQuickLogActivityDetailFields(selected.id, activeEnvCheckTempUnit).length > 0 && (
-            <div
-              className="grid grid-cols-1 sm:grid-cols-2 gap-2"
-              data-testid={`${testIdPrefix}-detail-fields`}
-            >
-              {getQuickLogActivityDetailFields(selected.id, activeEnvCheckTempUnit).map((field) => (
-                <div key={field.key} className="space-y-1">
-                  <Label
-                    htmlFor={`${testIdPrefix}-detail-${field.key}`}
-                    className="text-[11px] text-muted-foreground"
-                  >
-                    {field.label}
-                    {field.unit ? ` (${field.unit})` : ""} (optional)
-                  </Label>
-                  {field.kind === "select" ? (
-                    <select
-                      id={`${testIdPrefix}-detail-${field.key}`}
-                      data-testid={`${testIdPrefix}-detail-${field.key}`}
-                      value={detailValues[field.key] ?? ""}
-                      onChange={(e) => {
-                        if (isMutationBlocked()) return;
-                        const v = e.target.value;
-                        setDetailValues((prev) => ({ ...prev, [field.key]: v }));
-                      }}
-                      disabled={mutationBlocked}
-                      className="w-full text-sm h-9 rounded-md border border-input bg-background px-2"
-                    >
-                      <option value="">Not recorded</option>
-                      {(field.options ?? []).map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <>
-                      <Input
-                        id={`${testIdPrefix}-detail-${field.key}`}
-                        data-testid={`${testIdPrefix}-detail-${field.key}`}
-                        value={detailValues[field.key] ?? ""}
-                        onChange={(e) => {
-                          if (isMutationBlocked()) return;
-                          const v = e.target.value;
-                          if (field.temperatureCelsius) {
-                            // Pin the unit the instant this draft goes
-                            // empty → non-empty (using the LIVE preference at
-                            // that moment), so label/bounds/save agree even
-                            // if the preference changes mid-entry. Clearing
-                            // the field releases the pin.
-                            const wasEmpty = (detailValues[field.key] ?? "").trim() === "";
-                            const isEmpty = v.trim() === "";
-                            if (wasEmpty && !isEmpty) {
-                              envCheckTempEntryUnitRef.current = temperatureUnit;
-                            } else if (isEmpty) {
-                              envCheckTempEntryUnitRef.current = null;
+          {guidedSymptomCheck && selected.id === "issue_observation" ? (
+            <QuickLogSymptomCheckFields
+              symptomObservedSign={detailValues.observedSign ?? ""}
+              observationLocation={detailValues.observationLocation ?? ""}
+              stage={guidedSymptomStage}
+              stageConfirmed={guidedSymptomStageConfirmed}
+              disabled={mutationBlocked}
+              testIdPrefix={testIdPrefix}
+              onSymptomObservedSignChange={(value) =>
+                setDetailValues((previous) => ({ ...previous, observedSign: value }))
+              }
+              onObservationLocationChange={(value) =>
+                setDetailValues((previous) => ({ ...previous, observationLocation: value }))
+              }
+              onStageChange={(value) => {
+                setGuidedSymptomStage(value);
+                setGuidedSymptomStageConfirmed(false);
+              }}
+              onStageConfirmedChange={setGuidedSymptomStageConfirmed}
+            />
+          ) : (
+            getQuickLogActivityDetailFields(selected.id, activeEnvCheckTempUnit).length > 0 && (
+              <div
+                className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+                data-testid={`${testIdPrefix}-detail-fields`}
+              >
+                {getQuickLogActivityDetailFields(selected.id, activeEnvCheckTempUnit).map(
+                  (field) => (
+                    <div key={field.key} className="space-y-1">
+                      <Label
+                        htmlFor={`${testIdPrefix}-detail-${field.key}`}
+                        className="text-[11px] text-muted-foreground"
+                      >
+                        {field.label}
+                        {field.unit ? ` (${field.unit})` : ""} (optional)
+                      </Label>
+                      {field.kind === "select" ? (
+                        <select
+                          id={`${testIdPrefix}-detail-${field.key}`}
+                          data-testid={`${testIdPrefix}-detail-${field.key}`}
+                          value={detailValues[field.key] ?? ""}
+                          onChange={(e) => {
+                            if (isMutationBlocked()) return;
+                            const v = e.target.value;
+                            setDetailValues((prev) => ({ ...prev, [field.key]: v }));
+                          }}
+                          disabled={mutationBlocked}
+                          className="w-full text-sm h-9 rounded-md border border-input bg-background px-2"
+                        >
+                          <option value="">Not recorded</option>
+                          {(field.options ?? []).map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <>
+                          <Input
+                            id={`${testIdPrefix}-detail-${field.key}`}
+                            data-testid={`${testIdPrefix}-detail-${field.key}`}
+                            value={detailValues[field.key] ?? ""}
+                            onChange={(e) => {
+                              if (isMutationBlocked()) return;
+                              const v = e.target.value;
+                              if (field.temperatureCelsius) {
+                                // Pin the unit the instant this draft goes
+                                // empty → non-empty (using the LIVE preference at
+                                // that moment), so label/bounds/save agree even
+                                // if the preference changes mid-entry. Clearing
+                                // the field releases the pin.
+                                const wasEmpty = (detailValues[field.key] ?? "").trim() === "";
+                                const isEmpty = v.trim() === "";
+                                if (wasEmpty && !isEmpty) {
+                                  envCheckTempEntryUnitRef.current = temperatureUnit;
+                                } else if (isEmpty) {
+                                  envCheckTempEntryUnitRef.current = null;
+                                }
+                              }
+                              setDetailValues((prev) => ({ ...prev, [field.key]: v }));
+                            }}
+                            disabled={mutationBlocked}
+                            inputMode={field.kind === "number" ? "decimal" : undefined}
+                            // Text detail is capped at the persistence limit IN the
+                            // input, so nothing a grower types is ever silently
+                            // truncated behind a success receipt.
+                            maxLength={
+                              field.kind === "text" ? QUICK_LOG_DETAIL_TEXT_MAX : undefined
                             }
-                          }
-                          setDetailValues((prev) => ({ ...prev, [field.key]: v }));
-                        }}
-                        disabled={mutationBlocked}
-                        inputMode={field.kind === "number" ? "decimal" : undefined}
-                        // Text detail is capped at the persistence limit IN the
-                        // input, so nothing a grower types is ever silently
-                        // truncated behind a success receipt.
-                        maxLength={field.kind === "text" ? QUICK_LOG_DETAIL_TEXT_MAX : undefined}
-                        aria-invalid={
-                          field.kind === "number"
-                            ? !(
-                                detailNumberValidations.find((v) => v.key === field.key)?.ok ?? true
-                              )
-                            : undefined
-                        }
-                        placeholder={field.placeholder}
-                        className="text-sm"
-                      />
-                      {field.kind === "number" &&
-                        (() => {
-                          const v = detailNumberValidations.find((x) => x.key === field.key);
-                          return v && !v.ok ? (
-                            <p
-                              role="alert"
-                              className="text-[11px] text-destructive"
-                              data-testid={`${testIdPrefix}-detail-${field.key}-error`}
-                            >
-                              {v.error}
-                            </p>
-                          ) : null;
-                        })()}
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
+                            aria-invalid={
+                              field.kind === "number"
+                                ? !(
+                                    detailNumberValidations.find((v) => v.key === field.key)?.ok ??
+                                    true
+                                  )
+                                : undefined
+                            }
+                            placeholder={field.placeholder}
+                            className="text-sm"
+                          />
+                          {field.kind === "number" &&
+                            (() => {
+                              const v = detailNumberValidations.find((x) => x.key === field.key);
+                              return v && !v.ok ? (
+                                <p
+                                  role="alert"
+                                  className="text-[11px] text-destructive"
+                                  data-testid={`${testIdPrefix}-detail-${field.key}-error`}
+                                >
+                                  {v.error}
+                                </p>
+                              ) : null;
+                            })()}
+                        </>
+                      )}
+                    </div>
+                  ),
+                )}
+              </div>
+            )
           )}
 
           {selected.id === "photo" && (
@@ -1056,7 +1164,12 @@ export default function QuickLogAllActivitiesSection({
                 (requiresNote && note.trim().length === 0) ||
                 (selected.id === "harvest" && harvestWeightsInvalid) ||
                 (selected.id === "photo" && !photoFile) ||
-                detailNumbersInvalid
+                detailNumbersInvalid ||
+                (guidedSymptomCheck &&
+                  selected.id === "issue_observation" &&
+                  (!findCannabisSymptomByObservedSign(detailValues.observedSign) ||
+                    !guidedSymptomStage ||
+                    !guidedSymptomStageConfirmed))
               }
               data-testid={`${testIdPrefix}-save`}
             >
@@ -1070,6 +1183,9 @@ export default function QuickLogAllActivitiesSection({
                 if (isMutationBlocked()) return;
                 setSelectedDraft(null);
                 setNote("");
+                setGuidedSymptomCheck(false);
+                setGuidedSymptomStage(null);
+                setGuidedSymptomStageConfirmed(false);
                 setErrorReason(null);
                 setErrorForActivity(null);
               }}
@@ -1110,7 +1226,20 @@ export default function QuickLogAllActivitiesSection({
                 data-target-tent-id={s.target.tentId ?? undefined}
                 data-target-plant-id={s.target.plantId ?? undefined}
               >
-                {s.item.label}
+                <span>{s.item.label}</span>
+                {s.symptomCheck &&
+                  (() => {
+                    const href = buildSymptomTimelineHref(s.target.growId, s.growEventId);
+                    return href ? (
+                      <Link
+                        to={href}
+                        className="ml-2 font-medium text-primary underline underline-offset-2"
+                        data-testid={`${testIdPrefix}-review-symptom-evidence`}
+                      >
+                        Review evidence
+                      </Link>
+                    ) : null;
+                  })()}
               </li>
             ))}
           </ul>

@@ -8,7 +8,7 @@ export const GROW_SETUP_START_ROOM_HREF = "/grows?intent=one_tent_activation" as
 export const GROW_SETUP_MESSAGES = {
   hardStopTitle: "Start your room first",
   hardStopBody:
-    "You need a setup before adding a tent or plant. We’ll walk grow → tent → plant so Quick Log works right away.",
+    "You need a setup before adding a tent or plant. Next you’ll name your grow—then we’ll add tent and plant so Quick Log works right away.",
   hardStopCta: "Start your room",
   hardStopSecondary: "Not now",
   loadingToast: "Still loading your setups — try again in a moment",

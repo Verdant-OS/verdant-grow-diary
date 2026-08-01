@@ -46,7 +46,10 @@ describe("connected One-Tent activation handoff", () => {
   it("keeps general creation tent-optional while requiring a verified grow", () => {
     expect(TENT_DIALOG).toMatch(/initiallyOpen\s*=\s*false/);
     expect(PLANT_DIALOG).toMatch(/requireTent\s*=\s*false/);
-    expect(PLANT_DIALOG).toMatch(/!requireTent\s*&&\s*<SelectItem value="none"/);
+    // Tentless "No tent" remains available only when plantCreateAllowsTentless allows it.
+    expect(PLANT_DIALOG).toMatch(
+      /plantCreateAllowsTentless\(\{[\s\S]*?requireTent,[\s\S]*?\}\)\s*&&\s*<SelectItem value="none">/,
+    );
     // Guided activation still requires a compatible tent.
     expect(PLANTS).toMatch(/requireTent=\{activationIntent\}/);
     // General creation may omit a tent but may not omit a verified grow.

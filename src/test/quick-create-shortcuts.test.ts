@@ -53,7 +53,9 @@ describe("Quick creation shortcuts — CreatePlantDialog → Add new tent", () =
   });
 
   it("auto-selects the newly created tent on onCreated callback", () => {
-    expect(CREATE_PLANT).toMatch(/onCreated=\{\(t\)\s*=>\s*setForm\(\(f\)\s*=>\s*\(\{\s*\.\.\.f,\s*tent_id:\s*t\.id\s*\}\)\)\}/);
+    expect(CREATE_PLANT).toMatch(/onCreated=\{\(t\)\s*=>\s*\{/);
+    expect(CREATE_PLANT).toMatch(/tent_id:\s*t\.id/);
+    expect(CREATE_PLANT).toMatch(/setExplicitCompatiblePick\(true\)/);
   });
 
   it("preserves plant form data via functional setState (no full reset)", () => {

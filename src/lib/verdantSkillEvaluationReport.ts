@@ -46,6 +46,7 @@ export const EVALUATION_REPORT_LIMITATIONS: readonly string[] = Object.freeze([
   "Unsupported-claim detection is deterministic substring matching over fixture-authored strings. It proves the absence of stated phrases, not semantic factuality.",
   "Fixtures are synthetic. Results describe runtime behaviour on constructed input, not field performance.",
   "A rate reported as not_measured had no applicable cases. It is not a score of any kind.",
+  "Recorded policy decisions are checked for internal consistency against the governor's own tables and vocabularies, but they are NOT regenerated. Gates needing a real plant-context compilation — stage ceilings, evidence trustworthiness — are not reconstructed, so a fixture can encode a decision the live governor would refuse. Regenerating requires the compilation and belongs to Build 8.",
 ]);
 
 export interface SkillEvaluationReport {

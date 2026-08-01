@@ -35,6 +35,7 @@ import {
   plantCreateAllowsTentless,
   resolveInitialPlantTentId,
   resolveSetupName,
+  suppliedTentBlocksWrite,
 } from "@/lib/createDialogGrowBindingRules";
 import { GROW_SETUP_MESSAGES } from "@/constants/growSetupMessages";
 import { useCreateBindingRetry } from "@/hooks/useCreateBindingRetry";
@@ -105,7 +106,8 @@ export default function CreatePlantDialog({
   const qc = useQueryClient();
   const {
     data: loadedTents = EMPTY_TENT_ROWS,
-    isLoading: tentsLoading,
+    isLoading: tentsQueryLoading,
+    isFetching: tentsFetching,
     isError: tentsError,
     isFetched: tentsFetched,
     refetch: refetchTents,
@@ -113,6 +115,8 @@ export default function CreatePlantDialog({
   const [nestedTents, setNestedTents] = useState<TentRow[]>([]);
   const [pendingNestedTentId, setPendingNestedTentId] = useState<string | null>(null);
   const [tentSelectOpen, setTentSelectOpen] = useState(false);
+  // Dialog-level pending flag for presenters; pure rules also receive tentsFetching.
+  const tentsLoading = tentsQueryLoading || tentsFetching;
 
   const runGrowRefresh = useCallback(() => refreshGrows(), [refreshGrows]);
   const runTentRefresh = useCallback(() => refetchTents(), [refetchTents]);
@@ -155,6 +159,7 @@ export default function CreatePlantDialog({
       evaluateSuppliedTentBinding({
         suppliedTentId: defaultTentId,
         tentsLoading,
+        tentsFetching,
         tentsError,
         tentsLoaded,
         suppliedTentRow: suppliedTentRow
@@ -162,7 +167,15 @@ export default function CreatePlantDialog({
           : null,
         targetGrowId,
       }),
-    [defaultTentId, tentsLoading, tentsError, tentsLoaded, suppliedTentRow, targetGrowId],
+    [
+      defaultTentId,
+      tentsLoading,
+      tentsFetching,
+      tentsError,
+      tentsLoaded,
+      suppliedTentRow,
+      targetGrowId,
+    ],
   );
 
   const requireTentForWrite =
@@ -182,6 +195,7 @@ export default function CreatePlantDialog({
     tentGrowId: suppliedTentRow?.grow_id ?? null,
     targetGrowId,
     tentsLoading,
+    tentsFetching,
     tentsError,
     tentsLoaded,
   });
@@ -193,8 +207,8 @@ export default function CreatePlantDialog({
   const [explicitCompatiblePick, setExplicitCompatiblePick] = useState(false);
 
   useEffect(() => {
-    if (!open || !defaultTentId || explicitCompatiblePick) return;
-    const nextTentId = suppliedTent.kind === "ready" ? defaultTentId : "none";
+    if (!open || explicitCompatiblePick) return;
+    const nextTentId = defaultTentId && suppliedTent.kind === "ready" ? defaultTentId : "none";
     setForm((current) =>
       current.tent_id === nextTentId ? current : { ...current, tent_id: nextTentId },
     );
@@ -238,10 +252,17 @@ export default function CreatePlantDialog({
     // A tent returned by the nested creator is verified by that insert result;
     // a still-loading background list must not invalidate it.
     tentsLoading: tentsLoading && !selectedTentIsLocallyVerified,
+    tentsFetching: tentsFetching && !selectedTentIsLocallyVerified,
   });
 
-  const tentBlocksWrite =
-    (suppliedTent.blockSubmit && !hasVerifiedCompatibleReplacement) || tentCompat.blockSubmit;
+  // Pending/read-error always block. Orphan/mismatch/missing-after-load clear
+  // only through a provenance-verified replacement — never tentless.
+  const suppliedTentStillBlocksWrite = suppliedTentBlocksWrite(
+    suppliedTent,
+    hasVerifiedCompatibleReplacement,
+    { replacementIsLocallyVerified: selectedTentIsLocallyVerified },
+  );
+  const tentBlocksWrite = suppliedTentStillBlocksWrite || tentCompat.blockSubmit;
 
   const formBlocked = binding.blockSubmit || !canWriteCreateGrowId(targetGrowId) || tentBlocksWrite;
 
@@ -487,7 +508,7 @@ export default function CreatePlantDialog({
           </p>
         )}
 
-        {suppliedTent.kind === "pending" && !hasVerifiedCompatibleReplacement && (
+        {suppliedTent.kind === "pending" && suppliedTentStillBlocksWrite && (
           <p
             className="rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-xs"
             data-testid="create-plant-tent-pending"
@@ -497,7 +518,7 @@ export default function CreatePlantDialog({
             <span className="text-muted-foreground">{suppliedTent.body}</span>
           </p>
         )}
-        {suppliedTent.kind === "unavailable" && !hasVerifiedCompatibleReplacement && (
+        {suppliedTent.kind === "unavailable" && suppliedTentStillBlocksWrite && (
           <div
             className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs space-y-2"
             data-testid="create-plant-tent-unavailable"
@@ -536,7 +557,7 @@ export default function CreatePlantDialog({
           </div>
         )}
         {(suppliedTent.kind === "orphan" || suppliedTent.kind === "mismatch") &&
-          !hasVerifiedCompatibleReplacement && (
+          suppliedTentStillBlocksWrite && (
             <div
               className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"
               data-testid="create-plant-tent-mismatch"
@@ -633,7 +654,7 @@ export default function CreatePlantDialog({
                     : " (optional)"}
                 </Label>
                 <CreateTentDialog
-                  defaultGrowId={targetGrowId ?? defaultGrowId}
+                  defaultGrowId={targetGrowId ?? undefined}
                   onCreated={handleNestedTentCreated}
                   trigger={
                     <Button

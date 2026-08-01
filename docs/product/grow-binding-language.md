@@ -15,14 +15,15 @@ Product rules for **Create tent** / **Create plant** on the production deploy br
 
 ## Supplied tent (“Add Plant to This Tent”)
 
-| Kind              | Behavior                                                                                                      |
-| ----------------- | ------------------------------------------------------------------------------------------------------------- |
-| pending           | Clear unsafe form value; retain conflict context; block submit; **no** tentless create                        |
-| unavailable       | Clear unsafe form value; Retry or explicitly choose/create a verified compatible tent                         |
-| orphan / mismatch | Clear unsafe form value; show **Choose another tent** + **Switch setup**; require an explicit compatible tent |
-| ready             | Write `grow_id` + `tent_id`                                                                                   |
+| Kind                                  | Behavior                                                                                                      |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| pending                               | Clear unsafe form value; retain conflict context; block submit; **no** tentless create                        |
+| unavailable (tent read error)         | Clear unsafe form value; Retry only; **no** compatible-replacement escape                                     |
+| unavailable (missing after good read) | Clear unsafe form value; explicitly choose/create a verified compatible tent                                  |
+| orphan / mismatch                     | Clear unsafe form value; show **Choose another tent** + **Switch setup**; require an explicit compatible tent |
+| ready                                 | Write `grow_id` + `tent_id`                                                                                   |
 
-Cached remote tent rows are ignored while the tent read is failing. A tent returned by the nested creator is locally verified against the resolved setup and may be selected while the background tent list is still loading.
+Initial loading and background refetch (`isFetching`) both count as pending; cached remote rows are not treated as verified while a fetch is in flight or after a read failure. A tent returned by the nested creator is locally verified against the resolved setup and may be selected while the background tent list is still loading. A tent read error remains Retry-only.
 
 ## Retry (create dialog only)
 

@@ -9,6 +9,7 @@
 import {
   GROW_SETUP_MESSAGES,
   GROW_SETUP_START_ROOM_HREF,
+  growSetup,
 } from "@/constants/growSetupMessages";
 
 export type CreateBindingEntity = "tent" | "plant";
@@ -17,6 +18,13 @@ export interface GrowListItem {
   id: string;
   name?: string | null;
 }
+
+export interface ResolvedTargetGrow {
+  id: string;
+  name: string;
+}
+
+const UUID_LIKE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function trimId(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -33,6 +41,25 @@ export function isKnownGrowId(
   return grows.some((g) => g.id === id);
 }
 
+export function looksLikeOpaqueId(value: string | null | undefined): boolean {
+  const trimmed = trimId(value);
+  if (!trimmed) return false;
+  return UUID_LIKE_RE.test(trimmed);
+}
+
+/**
+ * Grower-facing setup label — never an opaque id string.
+ */
+export function formatDisplaySetupName(
+  growId: string | null | undefined,
+  grows: readonly GrowListItem[],
+): string {
+  const raw = resolveSetupName(growId, grows);
+  if (!raw) return growSetup.create.genericSetupLabel;
+  if (looksLikeOpaqueId(raw)) return growSetup.create.genericSetupLabel;
+  return raw;
+}
+
 /**
  * Precedence: page/URL default, then active grow — only if present in loaded grows.
  */
@@ -46,6 +73,20 @@ export function resolveCreateTargetGrowId(input: {
   const active = trimId(input.activeGrowId);
   if (active && isKnownGrowId(active, input.grows)) return active;
   return null;
+}
+
+/** Task-spec alias: returns id + display-safe name. */
+export function resolveTargetGrow(input: {
+  pageDefaultGrowId?: string | null;
+  activeGrowId?: string | null;
+  grows: readonly GrowListItem[];
+}): ResolvedTargetGrow | null {
+  const id = resolveCreateTargetGrowId(input);
+  if (!id) return null;
+  return {
+    id,
+    name: formatDisplaySetupName(id, input.grows),
+  };
 }
 
 export function resolveSetupName(
@@ -70,6 +111,8 @@ export interface CreateGrowBindingHardStopView {
   hardStopBody: string;
   hardStopCta: string;
   hardStopSecondary: string;
+  /** Accessibility label for the hard-stop banner (never a raw id). */
+  hardStopAriaLabel: string;
 }
 
 export function buildCreateGrowBindingHardStop(
@@ -77,6 +120,7 @@ export function buildCreateGrowBindingHardStop(
     targetGrowId: string | null | undefined;
     growCount: number;
     growsLoading?: boolean;
+    grows?: readonly GrowListItem[];
   },
   entity: CreateBindingEntity,
 ): CreateGrowBindingHardStopView {
@@ -86,6 +130,9 @@ export function buildCreateGrowBindingHardStop(
       : 0;
   const hasTarget = !!trimId(input.targetGrowId);
   const loading = !!input.growsLoading && growCount === 0;
+  const grows = input.grows ?? [];
+
+  const baseSecondary = GROW_SETUP_MESSAGES.hardStopSecondary;
 
   if (loading) {
     return {
@@ -98,7 +145,8 @@ export function buildCreateGrowBindingHardStop(
       hardStopTitle: "",
       hardStopBody: "",
       hardStopCta: GROW_SETUP_MESSAGES.hardStopCta,
-      hardStopSecondary: GROW_SETUP_MESSAGES.hardStopSecondary,
+      hardStopSecondary: baseSecondary,
+      hardStopAriaLabel: "Loading your setups",
     };
   }
 
@@ -113,7 +161,8 @@ export function buildCreateGrowBindingHardStop(
       hardStopTitle: GROW_SETUP_MESSAGES.hardStopTitle,
       hardStopBody: GROW_SETUP_MESSAGES.hardStopBody,
       hardStopCta: GROW_SETUP_MESSAGES.hardStopCta,
-      hardStopSecondary: GROW_SETUP_MESSAGES.hardStopSecondary,
+      hardStopSecondary: baseSecondary,
+      hardStopAriaLabel: GROW_SETUP_MESSAGES.hardStopTitle,
     };
   }
 
@@ -128,10 +177,12 @@ export function buildCreateGrowBindingHardStop(
       hardStopTitle: "",
       hardStopBody: "",
       hardStopCta: GROW_SETUP_MESSAGES.hardStopCta,
-      hardStopSecondary: GROW_SETUP_MESSAGES.hardStopSecondary,
+      hardStopSecondary: baseSecondary,
+      hardStopAriaLabel: GROW_SETUP_MESSAGES.pickSetupToast(entity),
     };
   }
 
+  const setupLabel = formatDisplaySetupName(input.targetGrowId, grows);
   return {
     blockSubmit: false,
     showStartRoomHardStop: false,
@@ -142,8 +193,30 @@ export function buildCreateGrowBindingHardStop(
     hardStopTitle: "",
     hardStopBody: "",
     hardStopCta: GROW_SETUP_MESSAGES.hardStopCta,
-    hardStopSecondary: GROW_SETUP_MESSAGES.hardStopSecondary,
+    hardStopSecondary: baseSecondary,
+    hardStopAriaLabel: GROW_SETUP_MESSAGES.addingTo(setupLabel),
   };
+}
+
+/** Task-spec alias. */
+export function buildHardStopView(
+  input: {
+    targetGrow: ResolvedTargetGrow | null;
+    growCount: number;
+    growsLoading?: boolean;
+    grows?: readonly GrowListItem[];
+  },
+  entity: CreateBindingEntity,
+): CreateGrowBindingHardStopView {
+  return buildCreateGrowBindingHardStop(
+    {
+      targetGrowId: input.targetGrow?.id ?? null,
+      growCount: input.growCount,
+      growsLoading: input.growsLoading,
+      grows: input.grows,
+    },
+    entity,
+  );
 }
 
 /** True only when a non-empty grow id is ready for payload.grow_id. */
@@ -151,7 +224,7 @@ export function canWriteCreateGrowId(targetGrowId: string | null | undefined): b
   return !!trimId(targetGrowId);
 }
 
-export type TentCompatibilityKind = "ok" | "missing_target" | "orphan_tent" | "mismatch";
+export type TentCompatibilityKind = "ok" | "missing_target" | "missing_setup" | "different_setup";
 
 export interface TentCompatibilityResult {
   kind: TentCompatibilityKind;
@@ -160,12 +233,32 @@ export interface TentCompatibilityResult {
   body: string;
   /** When true, clear tent selection and block submit. */
   clearTentSelection: boolean;
+  showFinishSetupCta: boolean;
 }
 
-/**
- * Selected tent must match target setup when a tent is chosen.
- * "none" / empty tent is compatible for generic plant create (unless requireTent elsewhere).
- */
+export type TentGrowCompatibilityInput = {
+  targetGrowId: string | null | undefined;
+  tent?: { grow_id?: string | null } | null;
+};
+
+/** Task-spec name: tent object with grow_id. */
+export function checkTentGrowCompatibility(
+  input: TentGrowCompatibilityInput,
+): TentCompatibilityResult {
+  if (!input.tent) {
+    return evaluateTentGrowCompatibility({
+      selectedTentId: "none",
+      tentGrowId: null,
+      targetGrowId: input.targetGrowId,
+    });
+  }
+  return evaluateTentGrowCompatibility({
+    selectedTentId: "selected-tent",
+    tentGrowId: input.tent.grow_id,
+    targetGrowId: input.targetGrowId,
+  });
+}
+
 export function evaluateTentGrowCompatibility(input: {
   selectedTentId: string | null | undefined;
   tentGrowId: string | null | undefined;
@@ -179,6 +272,7 @@ export function evaluateTentGrowCompatibility(input: {
       title: "",
       body: "",
       clearTentSelection: false,
+      showFinishSetupCta: false,
     };
   }
 
@@ -190,27 +284,30 @@ export function evaluateTentGrowCompatibility(input: {
       title: GROW_SETUP_MESSAGES.hardStopTitle,
       body: GROW_SETUP_MESSAGES.hardStopBody,
       clearTentSelection: true,
+      showFinishSetupCta: false,
     };
   }
 
   const tentGrow = trimId(input.tentGrowId);
   if (!tentGrow) {
     return {
-      kind: "orphan_tent",
+      kind: "missing_setup",
       compatible: false,
       title: GROW_SETUP_MESSAGES.tentOrphanTitle,
       body: GROW_SETUP_MESSAGES.tentOrphanBody,
       clearTentSelection: true,
+      showFinishSetupCta: true,
     };
   }
 
   if (tentGrow !== target) {
     return {
-      kind: "mismatch",
+      kind: "different_setup",
       compatible: false,
       title: GROW_SETUP_MESSAGES.tentMismatchTitle,
       body: GROW_SETUP_MESSAGES.tentMismatchBody,
       clearTentSelection: true,
+      showFinishSetupCta: true,
     };
   }
 
@@ -220,6 +317,7 @@ export function evaluateTentGrowCompatibility(input: {
     title: "",
     body: "",
     clearTentSelection: false,
+    showFinishSetupCta: false,
   };
 }
 
@@ -237,4 +335,28 @@ export function resolveInitialPlantTentId(input: {
     targetGrowId: input.targetGrowId,
   });
   return compat.compatible ? tentId : "none";
+}
+
+/** When defaultTentId is supplied, block if that tent does not match target setup. */
+export function evaluateDefaultTentBinding(input: {
+  defaultTentId?: string | null;
+  tentGrowId?: string | null;
+  targetGrowId?: string | null;
+}): TentCompatibilityResult {
+  const tentId = trimId(input.defaultTentId);
+  if (!tentId) {
+    return {
+      kind: "ok",
+      compatible: true,
+      title: "",
+      body: "",
+      clearTentSelection: false,
+      showFinishSetupCta: false,
+    };
+  }
+  return evaluateTentGrowCompatibility({
+    selectedTentId: tentId,
+    tentGrowId: input.tentGrowId,
+    targetGrowId: input.targetGrowId,
+  });
 }

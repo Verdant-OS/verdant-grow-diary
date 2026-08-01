@@ -266,6 +266,280 @@ describe("symptom evidence checklist", () => {
     expect(category(view, "environment").items[0].detailLines).toEqual([]);
   });
 
+  it.each([
+    ["watering", "watering", { watering_amount_ml: 700 }, ["Volume: 700 mL"]],
+    ["feeding", "feeding", { input_ec: 1.4 }, ["Input EC: 1.4 mS/cm"]],
+  ] as const)(
+    "keeps canonical %s evidence in its activity lane and also surfaces its attached environment snapshot",
+    (eventType, activityCategory, activityDetails, activityDetailLines) => {
+      const view = buildSymptomEvidenceChecklist({
+        symptomEntry: symptom,
+        historyComplete: true,
+        entries: [
+          {
+            id: `${eventType}-with-environment`,
+            grow_id: "grow-1",
+            tent_id: "tent-1",
+            plant_id: "plant-1",
+            occurred_at: "2026-07-31T12:00:00Z",
+            event_type: eventType,
+            source: "manual",
+            details: {
+              ...activityDetails,
+              sensor_snapshot: {
+                source: "manual",
+                captured_at: "2026-07-31T12:00:00Z",
+                metrics: {
+                  temperature_c: 24.5,
+                  humidity_pct: 61,
+                  vpd_kpa: 1.08,
+                },
+              },
+            },
+          },
+        ],
+      })!;
+
+      expect(category(view, activityCategory)).toMatchObject({
+        status: "recorded",
+        totalMatches: 1,
+      });
+      expect(category(view, activityCategory).items[0].detailLines).toEqual(activityDetailLines);
+      expect(category(view, "environment")).toMatchObject({
+        status: "recorded",
+        totalMatches: 1,
+      });
+      expect(category(view, "environment").items[0]).toMatchObject({
+        id: `${eventType}-with-environment`,
+        sourceLabel: "Manual observation",
+        detailLines: ["Temperature: 24.5 °C", "Humidity: 61 % RH", "VPD: 1.08 kPa"],
+      });
+    },
+  );
+
+  it("fails closed on malformed or unlabeled nested snapshots without losing watering evidence", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "watering-with-unlabeled-snapshot",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "watering",
+          source: "manual",
+          details: {
+            watering_amount_ml: 500,
+            sensor_snapshot: {
+              captured_at: "2026-07-31T12:00:00Z",
+              metrics: { temperature_c: 24 },
+            },
+          },
+        },
+        {
+          id: "watering-with-string-metrics",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T13:00:00Z",
+          event_type: "watering",
+          source: "manual",
+          details: {
+            watering_amount_ml: 600,
+            sensor_snapshot: {
+              source: "manual",
+              captured_at: "2026-07-31T13:00:00Z",
+              metrics: { temperature_c: "24" },
+            },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "watering").totalMatches).toBe(2);
+    expect(category(view, "environment").items).toEqual([]);
+  });
+
+  it("does not count an attached snapshot whose air metrics are all implausible", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "watering-with-implausible-snapshot",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "watering",
+          source: "manual",
+          details: {
+            watering_amount_ml: 500,
+            sensor_snapshot: {
+              source: "manual",
+              captured_at: "2026-07-31T12:00:00Z",
+              metrics: {
+                temperature_c: 61,
+                humidity_pct: 101,
+                vpd_kpa: 10.1,
+              },
+            },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "watering").totalMatches).toBe(1);
+    expect(category(view, "environment").items).toEqual([]);
+  });
+
+  it("keeps only plausible air metrics when an attached snapshot mixes valid and invalid values", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "feeding-with-partial-valid-snapshot",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "feeding",
+          source: "manual",
+          details: {
+            input_ec: 1.3,
+            sensor_snapshot: {
+              source: "manual",
+              captured_at: "2026-07-31T12:00:00Z",
+              metrics: {
+                temperature_c: 24.5,
+                humidity_pct: 101,
+                vpd_kpa: -0.1,
+              },
+            },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "feeding").totalMatches).toBe(1);
+    expect(category(view, "environment").items[0]).toMatchObject({
+      id: "feeding-with-partial-valid-snapshot",
+      sourceLabel: "Manual observation",
+      detailLines: ["Temperature: 24.5 °C"],
+    });
+  });
+
+  it("never fills a partial canonical envelope from conflicting fallback measurements", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "watering-with-conflicting-fallbacks",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "watering",
+          source: "manual",
+          details: {
+            temperature_c: 31,
+            humidity_pct: 40,
+            vpd_kpa: 2.2,
+            environment_check: {
+              temp_c: 32,
+              humidity_pct: 41,
+              vpd_kpa: 2.3,
+            },
+            sensor_snapshot: {
+              source: "manual",
+              captured_at: "2026-07-31T12:00:00Z",
+              temperature_c: 33,
+              humidity_pct: 42,
+              vpd_kpa: 2.4,
+              metrics: { humidity_pct: 61 },
+            },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "environment").items[0]).toMatchObject({
+      id: "watering-with-conflicting-fallbacks",
+      sourceLabel: "Manual observation",
+      detailLines: ["Humidity: 61 % RH"],
+    });
+  });
+
+  it("downgrades stale, future, and untrusted-live attached snapshots instead of presenting them as live", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "stale-live-snapshot",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "watering",
+          source: "live",
+          details: {
+            sensor_snapshot: {
+              source: "live",
+              captured_at: "2026-07-31T11:00:00Z",
+              metrics: { humidity_pct: 60 },
+            },
+          },
+        },
+        {
+          id: "future-live-snapshot",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T13:00:00Z",
+          event_type: "feeding",
+          source: "live",
+          details: {
+            sensor_snapshot: {
+              source: "live",
+              captured_at: "2026-07-31T13:01:00Z",
+              metrics: { vpd_kpa: 1.1 },
+            },
+          },
+        },
+        {
+          id: "client-live-claim",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T14:00:00Z",
+          event_type: "watering",
+          source: "manual",
+          details: {
+            sensor_snapshot: {
+              source: "live",
+              captured_at: "2026-07-31T14:00:00Z",
+              metrics: { temperature_c: 25 },
+            },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "environment").items.map((item) => [item.id, item.sourceLabel])).toEqual([
+      ["client-live-claim", "Unverified source"],
+      ["future-live-snapshot", "invalid"],
+      ["stale-live-snapshot", "stale"],
+    ]);
+    expect(JSON.stringify(category(view, "environment").items)).not.toContain(
+      '"sourceLabel":"live"',
+    );
+  });
+
   it("normalizes control characters without exposing hidden payload text", () => {
     const view = buildSymptomEvidenceChecklist({
       symptomEntry: symptom,

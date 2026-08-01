@@ -10,7 +10,9 @@ import { resolveTimelineLightingGuide } from "@/lib/timelineLightingGuideRules";
 import {
   buildSymptomEvidenceChecklist,
   buildSymptomEvidenceTimelineRows,
+  SYMPTOM_EVIDENCE_LOOKBACK_DAYS,
 } from "@/lib/symptomEvidenceChecklistRules";
+import { isTimelineSymptomEvidenceWindowComplete } from "@/lib/timelineSymptomEvidenceWindowCoverageRules";
 import type { FastAddSelectionContext } from "@/lib/fastAddActionRules";
 import PageHeader from "@/components/PageHeader";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
@@ -341,6 +343,7 @@ export default function Timeline() {
   const [entriesTotal, setEntriesTotal] = useState<number | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [growEvents, setGrowEvents] = useState<GrowEventRowForRecent[]>([]);
+  const [growEventsTotal, setGrowEventsTotal] = useState<number | null>(null);
   const [actionEvents, setActionEvents] = useState<ActionQueueEvent[]>([]);
   const [alertEvents, setAlertEvents] = useState<AlertEventRow[]>([]);
 
@@ -488,6 +491,7 @@ export default function Timeline() {
       setEntries([]);
       setEntriesTotal(null);
       setGrowEvents([]);
+      setGrowEventsTotal(null);
       setActionEvents([]);
       setAlertEvents([]);
       setPartialReadSources([]);
@@ -505,6 +509,7 @@ export default function Timeline() {
       setEntries([]);
       setEntriesTotal(null);
       setGrowEvents([]);
+      setGrowEventsTotal(null);
       setActionEvents([]);
       setAlertEvents([]);
       setPartialReadSources([]);
@@ -557,7 +562,7 @@ export default function Timeline() {
 
       let growEventsQuery = supabase
         .from("grow_events")
-        .select(ROOT_ZONE_GROW_EVENT_SELECT)
+        .select(ROOT_ZONE_GROW_EVENT_SELECT, { count: "exact" })
         .eq("grow_id", activeGrowId)
         .eq("is_deleted", false)
         .order("occurred_at", { ascending: false })
@@ -577,6 +582,9 @@ export default function Timeline() {
       setEntries(coreRows);
       setEntriesTotal(typeof entriesResult.count === "number" ? entriesResult.count : null);
       setGrowEvents(nextGrowEvents);
+      setGrowEventsTotal(
+        typeof growEventsResult.count === "number" ? growEventsResult.count : null,
+      );
       setActionEvents([]);
       setAlertEvents([]);
       setPartialReadSources([]);
@@ -1016,13 +1024,26 @@ export default function Timeline() {
 
   const symptomEvidenceByEntryId = useMemo(() => {
     const result = new Map<string, NonNullable<ReturnType<typeof buildSymptomEvidenceChecklist>>>();
-    const historyComplete =
-      coreRead.status === "success" &&
-      entriesTotal !== null &&
-      entriesTotal <= entries.length &&
-      growEvents.length < 100 &&
-      !effectiveStartDate &&
-      !effectiveEndDate;
+    if (!activeReadKey || coreRead.status !== "success" || coreRead.readKey !== activeReadKey)
+      return result;
+
+    const canAssessWindowCoverage = !effectiveStartDate && !effectiveEndDate;
+    const diaryHasMore = entriesTotal === null ? null : entriesTotal > entries.length;
+    const growEventsHasMore = growEventsTotal === null ? null : growEventsTotal > growEvents.length;
+    const diaryEvidenceTimestamps = entries.map((row) => row.entry_at);
+    const growEventEvidenceTimestamps = growEvents.map((row) => row.occurred_at);
+    const evidenceSourceLanes = [
+      {
+        timestamps: diaryEvidenceTimestamps,
+        hasMore: diaryHasMore,
+        coverageMode: "exhaustion_only",
+      },
+      {
+        timestamps: growEventEvidenceTimestamps,
+        hasMore: growEventsHasMore,
+        coverageMode: "contiguous_newest_page",
+      },
+    ] as const;
     const evidenceRows = buildSymptomEvidenceTimelineRows({
       growId: activeGrowId,
       recentLaneEntries: recentLaneRawEntries,
@@ -1031,6 +1052,13 @@ export default function Timeline() {
       renderedDiaryEntryIds: new Set(filtered.map((entry) => entry.id)),
     });
     for (const entry of entries) {
+      const historyComplete =
+        canAssessWindowCoverage &&
+        isTimelineSymptomEvidenceWindowComplete({
+          observationAt: entry.entry_at,
+          lookbackDays: SYMPTOM_EVIDENCE_LOOKBACK_DAYS,
+          sourceLanes: evidenceSourceLanes,
+        });
       const view = buildSymptomEvidenceChecklist({
         symptomEntry: {
           ...entry,
@@ -1046,6 +1074,8 @@ export default function Timeline() {
     return result;
   }, [
     activeGrowId,
+    activeReadKey,
+    coreRead.readKey,
     coreRead.status,
     effectiveEndDate,
     effectiveStartDate,
@@ -1053,6 +1083,7 @@ export default function Timeline() {
     entriesTotal,
     filtered,
     growEvents,
+    growEventsTotal,
     recentLaneRawEntries,
   ]);
 

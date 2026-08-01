@@ -4,7 +4,20 @@ import { buildTimelineEntryAnchorId } from "@/lib/timelineEntryAnchorRules";
 import { stageLabel } from "@/lib/grow";
 import { normalizeQuickLogStage } from "@/lib/quickLogStageDefaultRules";
 import { describeQuickLogActivityDetails } from "@/lib/quickLogActivityDetailFields";
+import {
+  normalizeQuickLogSnapshotMetrics,
+  type CanonicalQuickLogSensorSnapshotMetrics,
+} from "@/lib/quick-log/quickLogSnapshotMetricNormalizer";
 import { timelinePath } from "@/lib/routes";
+import {
+  isHumidityValid,
+  isTemperatureValid,
+  isVpdValid,
+} from "@/lib/sensorReadingNormalizationRules";
+import {
+  resolveSensorSnapshotDisplay,
+  type SensorSnapshotMetricInput,
+} from "@/lib/sensorSnapshotFreshnessRules";
 
 export const SYMPTOM_EVIDENCE_LOOKBACK_DAYS = 14;
 const LOOKBACK_MS = SYMPTOM_EVIDENCE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
@@ -90,7 +103,13 @@ interface NormalizedEntry {
   readonly note: string;
   readonly details: Record<string, unknown>;
   readonly source: string | null;
+  readonly environmentSnapshot: CanonicalEnvironmentSnapshotEvidence | null;
   readonly timelineAnchorEntryId: string | null;
+}
+
+interface CanonicalEnvironmentSnapshotEvidence {
+  readonly sourceLabel: string;
+  readonly metrics: CanonicalQuickLogSensorSnapshotMetrics;
 }
 
 const CATEGORY_TITLES: Readonly<Record<SymptomEvidenceCategoryId, string>> = {
@@ -119,6 +138,79 @@ const SOURCE_LABELS: Readonly<Record<string, string>> = {
   stale: "stale",
   invalid: "invalid",
 };
+
+function normalizeCanonicalEnvironmentSnapshot(
+  details: Record<string, unknown>,
+  rowSource: string | null,
+  occurredMs: number | null,
+): CanonicalEnvironmentSnapshotEvidence | null {
+  const rawSnapshot = details.sensor_snapshot;
+  if (!rawSnapshot || typeof rawSnapshot !== "object" || Array.isArray(rawSnapshot)) return null;
+  const snapshot = rawSnapshot as Record<string, unknown>;
+  const source = safeString(snapshot.source, 24)?.toLowerCase() ?? null;
+  if (!source || !Object.prototype.hasOwnProperty.call(SOURCE_LABELS, source)) return null;
+  const capturedAt = safeString(snapshot.captured_at, 64);
+  if (!capturedAt || !Number.isFinite(Date.parse(capturedAt)) || occurredMs === null) return null;
+
+  const metrics = normalizeQuickLogSnapshotMetrics(snapshot.metrics);
+  const environmentMetrics = {
+    ...(typeof metrics.temperature === "number" && isTemperatureValid(metrics.temperature)
+      ? { temperature: metrics.temperature }
+      : {}),
+    ...(typeof metrics.humidity === "number" && isHumidityValid(metrics.humidity)
+      ? { humidity: metrics.humidity }
+      : {}),
+    ...(typeof metrics.vpd === "number" && isVpdValid(metrics.vpd) ? { vpd: metrics.vpd } : {}),
+  };
+  if (Object.keys(environmentMetrics).length === 0) return null;
+
+  // A diary companion can be grower-edited. Its nested source may describe
+  // manual/csv/demo/stale evidence, but it cannot promote itself to live
+  // unless the authoritative row-level source independently says live.
+  const liveProvenanceTrusted = source !== "live" || rowSource === "live";
+  const displayMetrics: SensorSnapshotMetricInput[] = [];
+  if (typeof environmentMetrics.temperature === "number") {
+    displayMetrics.push({
+      key: "temp",
+      value: environmentMetrics.temperature,
+      unit: "°C",
+      kind: "environment",
+    });
+  }
+  if (typeof environmentMetrics.humidity === "number") {
+    displayMetrics.push({
+      key: "rh",
+      value: environmentMetrics.humidity,
+      unit: "%",
+      kind: "environment",
+    });
+  }
+  if (typeof environmentMetrics.vpd === "number") {
+    displayMetrics.push({
+      key: "vpd",
+      value: environmentMetrics.vpd,
+      unit: "kPa",
+      kind: "environment",
+    });
+  }
+  const display = resolveSensorSnapshotDisplay(
+    {
+      source: liveProvenanceTrusted ? source : null,
+      capturedAt,
+      metrics: displayMetrics,
+    },
+    { now: occurredMs },
+  );
+
+  return {
+    sourceLabel: liveProvenanceTrusted
+      ? display.effectiveSource === "manual"
+        ? "Manual observation"
+        : SOURCE_LABELS[display.effectiveSource]
+      : "Unverified source",
+    metrics: environmentMetrics,
+  };
+}
 
 function safeString(value: unknown, max = 220): string | null {
   if (typeof value !== "string") return null;
@@ -154,6 +246,10 @@ function normalizeEntry(entry: SymptomEvidenceRawEntry): NormalizedEntry {
     safeId(details.linked_grow_event_id),
     safeId(details.grow_event_id),
   ].filter((value): value is string => Boolean(value));
+  // Only the explicit row-level source seam is eligible for provenance.
+  // A diary JSON details.source field is grower-controlled legacy metadata,
+  // not proof that a reading or observation came from a trusted live path.
+  const source = safeString(entry.source, 24)?.toLowerCase() ?? null;
   return {
     id: id ?? "unknown",
     logicalIds: [...new Set(logicalIds)],
@@ -165,10 +261,12 @@ function normalizeEntry(entry: SymptomEvidenceRawEntry): NormalizedEntry {
     eventType,
     note: safeString(entry.note, 220) ?? "",
     details,
-    // Only the explicit row-level source seam is eligible for provenance.
-    // A diary JSON details.source field is grower-controlled legacy metadata,
-    // not proof that a reading or observation came from a trusted live path.
-    source: safeString(entry.source, 24)?.toLowerCase() ?? null,
+    source,
+    environmentSnapshot: normalizeCanonicalEnvironmentSnapshot(
+      details,
+      source,
+      Number.isFinite(parsed) ? parsed : null,
+    ),
     timelineAnchorEntryId: safeId(entry.timeline_anchor_entry_id),
   };
 }
@@ -319,10 +417,12 @@ function isSameLogicalEvent(candidate: NormalizedEntry, symptom: NormalizedEntry
 }
 
 function classifyEntryCategories(entry: NormalizedEntry): ReadonlyArray<SymptomEvidenceCategoryId> {
-  if (/water/.test(entry.eventType)) return ["watering"];
-  if (/feed|nutrient/.test(entry.eventType)) return ["feeding"];
   const categories: SymptomEvidenceCategoryId[] = [];
-  if (/environment|sensor|climate/.test(entry.eventType)) categories.push("environment");
+  if (/water/.test(entry.eventType)) categories.push("watering");
+  else if (/feed|nutrient/.test(entry.eventType)) categories.push("feeding");
+  if (/environment|sensor|climate/.test(entry.eventType) || entry.environmentSnapshot) {
+    categories.push("environment");
+  }
   if (classifyTimelineLightingSignal({ note: entry.note, details: entry.details })) {
     categories.push("lighting");
   }
@@ -330,6 +430,9 @@ function classifyEntryCategories(entry: NormalizedEntry): ReadonlyArray<SymptomE
 }
 
 function sourceLabel(entry: NormalizedEntry, category: SymptomEvidenceCategoryId): string {
+  if (category === "environment" && entry.environmentSnapshot) {
+    return entry.environmentSnapshot.sourceLabel;
+  }
   const hasCanonicalEnvironmentCheck =
     entry.details.environment_check !== null &&
     typeof entry.details.environment_check === "object" &&
@@ -377,9 +480,15 @@ function friendlyDetails(
     if (value !== null && result.length < 3) result.push(`${label}: ${value} ${unit}`);
   };
   if (category === "environment") {
-    add("Temperature", numericDetail(d, ["temperature_c", "temp_c"]), "°C");
-    add("Humidity", numericDetail(d, ["humidity_pct", "rh_pct"]), "% RH");
-    add("VPD", numericDetail(d, ["vpd_kpa"]), "kPa");
+    if (entry.environmentSnapshot) {
+      add("Temperature", entry.environmentSnapshot.metrics.temperature ?? null, "°C");
+      add("Humidity", entry.environmentSnapshot.metrics.humidity ?? null, "% RH");
+      add("VPD", entry.environmentSnapshot.metrics.vpd ?? null, "kPa");
+    } else {
+      add("Temperature", numericDetail(d, ["temperature_c", "temp_c"]), "°C");
+      add("Humidity", numericDetail(d, ["humidity_pct", "rh_pct"]), "% RH");
+      add("VPD", numericDetail(d, ["vpd_kpa"]), "kPa");
+    }
   } else if (category === "watering") {
     add("Volume", numericDetail(d, ["watering_amount_ml", "volume_ml", "amount_ml"]), "mL");
     add("Input pH", numericDetail(d, ["ph", "input_ph"]), "pH");

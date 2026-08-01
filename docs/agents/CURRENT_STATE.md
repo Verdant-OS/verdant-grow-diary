@@ -17,7 +17,7 @@ inside the active governance handoff.
 | Branch               | Role                                             | Verified head                              |
 | -------------------- | ------------------------------------------------ | ------------------------------------------ |
 | `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `df51d6b0697761a022d7301e6c9b459a1c94c4ac` |
-| `main`               | Integration branch. It is not production parity. | `2bd6fa6016add1d3ea9f50415355601cbaefb37f` |
+| `main`               | Integration branch. It is not production parity. | `7d9027d5dbeca3d86021507eed5de3c54b8c416e` |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
 `main`, and do not backport deploy-only governance or data rules without a scoped branch
@@ -65,6 +65,18 @@ Sentinel-Version** check passed:
 | ------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------ |
 | Governance files agree on Sentinel-Version | `PASS` | [run 30712115247](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30712115247/job/91401265184) |
 
+Direct post-merge checks on deployed commit `df51d6b0697761a022d7301e6c9b459a1c94c4ac`
+contained **41 `SUCCESS`**, **2 `SKIPPED`**, and **2 `FAILURE`** results (45 total):
+
+| Check                                      | CI status | Evidence                                                                                                                                                      |
+| ------------------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Verify pinned Verdant sandbox schema       | `FAIL`    | `psql` exited 2 while reading `pg_catalog`; [run 30713743868](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30713743868/job/91405686256)      |
+| Assert money migrations applied in SANDBOX | `FAIL`    | `tracker_query_failed`; applied state `UNKNOWN`; [run 30713743905](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30713743905/job/91405717617) |
+
+These are verified CI failures, while the sandbox schema and migration state remain
+`BLOCKED`/`UNKNOWN`: the logs prove the checks could not complete their database queries,
+not that migrations are absent or that the database password is necessarily wrong.
+
 The production version endpoint confirms that the PR #636 merge commit is deployed. This
 does not prove authenticated analytics, Search Console indexing, or live database health.
 
@@ -100,9 +112,12 @@ Out of scope:
    Cheek approves it.
 2. A `main` backport is a separate branch-integration decision; the two branches diverge
    and the deploy branch contains newer safety and data rules.
-3. Cheek supplies or resets the real sandbox database password in the correctly scoped
-   GitHub environment secret; never commit or paste the credential into repository files.
-4. Rerun the required core and money migration guards with no code change.
+3. Cheek investigates the `verdant-sandbox` database connection secret and workflow
+   wiring. Current evidence is `psql` exit 2 / `tracker_query_failed`, which does not
+   distinguish a wrong password from another connection or session failure; never commit
+   or paste credentials into repository files.
+4. After access or wiring is corrected, rerun the required core and money migration guards
+   with no code change.
 5. Record authenticated GA4/GSC Day 0 only after both sources are reachable.
 6. Start the four-week measurement clock only after the public pages are reachable and
    the authenticated baseline is recorded.

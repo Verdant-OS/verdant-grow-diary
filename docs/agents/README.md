@@ -13,7 +13,7 @@ platform actually auto-loads.
 ROOT — auto-loaded by the platforms
   AGENTS.md                      universal constitution (canonical)
   CLAUDE.md                      imports constitution + state + Claude role
-  GEMINI.md                      mirrors the safety core + Gemini role
+  GEMINI.md                      mirrors the full constitution + Gemini role
   .grok/rules/verdant-grok-role.md   Grok's automatic role rules
 
 ROLE DOCUMENTS
@@ -53,15 +53,16 @@ that was not assigned. Roles stay in separate files for that reason.
 
 ## Version parity
 
-`AGENTS.md` and `GEMINI.md` both carry `Sentinel-Version`. `GEMINI.md` mirrors the
-safety-critical core because Gemini cannot follow a link to get context.
+`AGENTS.md` and `GEMINI.md` both carry `Sentinel-Version`. `GEMINI.md` embeds the full
+universal constitution because Gemini cannot follow a link to get context.
 
 Duplication invites drift, so `.github/workflows/sentinel-version-parity.yml` fails the
-build when the two versions differ. Changing the core rules means bumping the version in
-both files in the same commit — the check forces the touch, it does not diff prose.
+build when the two versions differ or when the embedded Gemini constitution differs from
+`AGENTS.md`. Changing the constitution means bumping the version in both files in the
+same commit.
 
-Bump the version on any change to the safety core, the status vocabulary, the startup
-gate, or the operating order.
+Bump the version on any change to the universal constitution, the status vocabulary, the
+startup gate, or the operating order.
 
 Validate the governance contract with:
 

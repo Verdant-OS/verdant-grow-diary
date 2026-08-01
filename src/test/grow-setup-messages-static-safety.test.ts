@@ -5,6 +5,7 @@ import {
   GROW_SETUP_MESSAGES,
   GROW_SETUP_BANNED_UI_TOKENS,
   GROW_SETUP_START_ROOM_HREF,
+  growSetup,
 } from "@/constants/growSetupMessages";
 
 const ROOT = resolve(__dirname, "../..");
@@ -28,6 +29,8 @@ describe("grow setup messages static safety", () => {
       GROW_SETUP_MESSAGES.tentMismatchTitle,
       GROW_SETUP_MESSAGES.tentMismatchBody,
       GROW_SETUP_MESSAGES.tentOrphanBody,
+      growSetup.noSetup.body,
+      growSetup.mismatch.missingSetupBody,
     ].join("\n");
     for (const token of GROW_SETUP_BANNED_UI_TOKENS) {
       expect(surfaces.toLowerCase()).not.toContain(token.toLowerCase());

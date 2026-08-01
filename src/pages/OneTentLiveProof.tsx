@@ -9,7 +9,7 @@
  * Steps that cannot be safely inferred render as
  * "Needs operator confirmation".
  */
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import PageHeader from "@/components/PageHeader";
@@ -92,6 +92,17 @@ export default function OneTentLiveProof() {
 
   const queryClient = useQueryClient();
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copyStatusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Both timers only flip local UI state. Clearing them on the next call is not
+  // enough: if the page unmounts while one is pending, the callback sets state
+  // on a torn-down tree.
+  useEffect(
+    () => () => {
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+      if (copyStatusTimer.current) clearTimeout(copyStatusTimer.current);
+    },
+    [],
+  );
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     try {
@@ -445,7 +456,13 @@ export default function OneTentLiveProof() {
             } catch {
               setCopyStatus("error");
             } finally {
-              setTimeout(() => setCopyStatus("idle"), 1500);
+              if (copyStatusTimer.current) {
+                clearTimeout(copyStatusTimer.current);
+              }
+              copyStatusTimer.current = setTimeout(
+                () => setCopyStatus("idle"),
+                1500,
+              );
             }
           }}
         >

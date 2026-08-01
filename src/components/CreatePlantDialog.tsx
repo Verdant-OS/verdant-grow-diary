@@ -218,8 +218,7 @@ export default function CreatePlantDialog({
   // Pending/read-error always block. Orphan/mismatch/missing-after-load clear
   // only via allowCompatibleReplacement + explicitCompatiblePick — never tentless.
   const tentBlocksWrite =
-    suppliedTentBlocksWrite(suppliedTent, explicitCompatiblePick) ||
-    tentCompat.blockSubmit;
+    suppliedTentBlocksWrite(suppliedTent, explicitCompatiblePick) || tentCompat.blockSubmit;
 
   const formBlocked = binding.blockSubmit || !canWriteCreateGrowId(targetGrowId) || tentBlocksWrite;
 
@@ -381,6 +380,7 @@ export default function CreatePlantDialog({
             className="rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 space-y-2"
             data-testid="create-plant-hard-stop"
             role="alert"
+            aria-label={binding.title || GROW_SETUP_MESSAGES.hardStopTitle}
           >
             <p className="text-sm font-semibold" data-testid="create-plant-hard-stop-title">
               {binding.title}
@@ -449,53 +449,64 @@ export default function CreatePlantDialog({
         )}
         {suppliedTent.kind === "unavailable" &&
           !(suppliedTent.allowCompatibleReplacement && explicitCompatiblePick) && (
-          <div
-            className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs space-y-2"
-            data-testid="create-plant-tent-unavailable"
-            role="alert"
-          >
-            <p className="font-semibold">{suppliedTent.title}</p>
-            <p className="text-muted-foreground">{suppliedTent.body}</p>
-            {suppliedTent.showRetry && (
-              <>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  data-testid="create-plant-tent-retry"
-                  disabled={tentRetry.gate.disabled}
-                  aria-disabled={tentRetry.gate.disabled}
-                  title={
-                    tentRetry.gate.reason === "cooldown"
-                      ? GROW_SETUP_MESSAGES.retryCooldownHint
-                      : undefined
-                  }
-                  onClick={() => void tentRetry.attempt()}
-                >
-                  {GROW_SETUP_MESSAGES.readErrorRetry}
-                </Button>
-                {tentRetry.gate.reason === "cooldown" && (
-                  <p
-                    className="text-[11px] text-muted-foreground"
-                    data-testid="create-plant-tent-retry-cooldown"
-                  >
-                    {GROW_SETUP_MESSAGES.retryCooldownHint}
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-        )}
-        {(suppliedTent.kind === "orphan" || suppliedTent.kind === "mismatch") &&
-          !explicitCompatiblePick && (
-            <p
-              className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"
-              data-testid="create-plant-tent-mismatch"
+            <div
+              className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs space-y-2"
+              data-testid="create-plant-tent-unavailable"
               role="alert"
             >
-              <span className="font-semibold block">{suppliedTent.title}</span>
-              <span className="text-muted-foreground">{suppliedTent.body}</span>
-            </p>
+              <p className="font-semibold">{suppliedTent.title}</p>
+              <p className="text-muted-foreground">{suppliedTent.body}</p>
+              {suppliedTent.showRetry && (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    data-testid="create-plant-tent-retry"
+                    disabled={tentRetry.gate.disabled}
+                    aria-disabled={tentRetry.gate.disabled}
+                    title={
+                      tentRetry.gate.reason === "cooldown"
+                        ? GROW_SETUP_MESSAGES.retryCooldownHint
+                        : undefined
+                    }
+                    onClick={() => void tentRetry.attempt()}
+                  >
+                    {GROW_SETUP_MESSAGES.readErrorRetry}
+                  </Button>
+                  {tentRetry.gate.reason === "cooldown" && (
+                    <p
+                      className="text-[11px] text-muted-foreground"
+                      data-testid="create-plant-tent-retry-cooldown"
+                    >
+                      {GROW_SETUP_MESSAGES.retryCooldownHint}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        {(suppliedTent.kind === "orphan" || suppliedTent.kind === "mismatch") &&
+          !explicitCompatiblePick && (
+            <div
+              className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs space-y-2"
+              data-testid="create-plant-tent-mismatch"
+              role="alert"
+              aria-label={suppliedTent.title}
+            >
+              <p className="font-semibold">{suppliedTent.title}</p>
+              <p className="text-muted-foreground">{suppliedTent.body}</p>
+              {suppliedTent.finishSetupHref ? (
+                <Button asChild size="sm" variant="outline">
+                  <Link
+                    to={suppliedTent.finishSetupHref}
+                    data-testid="create-plant-finish-setup-cta"
+                  >
+                    {suppliedTent.finishSetupLabel}
+                  </Link>
+                </Button>
+              ) : null}
+            </div>
           )}
         {!tentCompat.compatible && form.tent_id !== "none" && suppliedTent.kind === "ready" && (
           <p

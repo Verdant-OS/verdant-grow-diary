@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-08-01.3**
+**Sentinel-Version: 2026-08-01.4**
 
 This is Verdant's universal Sentinel Code. Every agent inherits these durable product,
 engineering, data, safety, and release rules. Platform-specific bootstraps live at the
@@ -617,10 +617,13 @@ re-run installs unless a run fails on a missing/updated package.
   falls back to bundled chromium automatically. If a browser is ever missing after a
   dependency bump, run `bunx playwright install chromium`. Mocked specs
   (`--project=chromium-mocked`) need no credentials; authenticated flows need real Supabase
-  creds and the golden-path UI spec skips as BLOCKED without a managed session.
+  creds and the golden-path UI spec skips as BLOCKED without a managed session. When running
+  mocked specs against an already-running dev server, set `E2E_BASE_URL=http://127.0.0.1:8080`
+  (with an explicit spec filter) so Playwright reuses it instead of spawning its own server on
+  5173 — otherwise you can hit a 5173 port conflict or, for unfiltered runs, real Supabase.
 - **Credential-free smoke surfaces.** To exercise core functionality without logging in:
-  `/quick-log` (Quick Log starter — saves a draft locally), `/tools/vpd-calculator`, and
-  `/internal/demo-proof-walkthrough`.
+  `/quick-log` (Quick Log starter — saves a draft locally), `/tools/vpd-calculator`,
+  `/pheno-comparison`, and `/internal/demo-proof-walkthrough`.
 - **Governance edit gate.** If you change **any** governance file (`AGENTS.md`, `CLAUDE.md`,
   `GEMINI.md`, `.grok/rules/**`, `docs/agents/**`) you must bump `Sentinel-Version` in **all**
   of them in the same commit — the `sentinel-version-parity` CI gate enforces both PARITY

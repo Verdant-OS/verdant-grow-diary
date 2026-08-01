@@ -235,15 +235,27 @@ function loadFixtures(
     // runId, and now the two paths the contract actually defines. The lesson
     // that took: an exemption is only ever as wide as the authority that
     // justifies it, and "same name" is not that authority.
+    // ...and only when the value actually IS a uuid. Blanking whatever sits at
+    // `runId` meant a fixture carrying `runId: "sk_live_..."` or a bearer token
+    // had that value removed BEFORE the production-data scan ran; the later
+    // schema failure reports an invalid run result without naming or removing
+    // the secret sitting in a committed file. An exemption conditioned on a
+    // field NAME rather than on the value's shape exempts whatever is put
+    // there. Sixth iteration on this one scope, and the first that checks what
+    // it is exempting.
+    const CONTRACT_UUID =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const redactIfUuid = (v: unknown): unknown =>
+      typeof v === "string" && CONTRACT_UUID.test(v) ? null : v;
     const redactContractIds = (value: unknown): unknown => {
       if (value === null || typeof value !== "object" || Array.isArray(value)) return value;
       const out = { ...(value as Record<string, unknown>) };
-      if ("runId" in out) out.runId = null;
+      if ("runId" in out) out.runId = redactIfUuid(out.runId);
       if (Array.isArray(out.followUps)) {
         out.followUps = out.followUps.map((f) => {
           if (f === null || typeof f !== "object" || Array.isArray(f)) return f;
           const copy = { ...(f as Record<string, unknown>) };
-          if ("runId" in copy) copy.runId = null;
+          if ("runId" in copy) copy.runId = redactIfUuid(copy.runId);
           return copy;
         });
       }

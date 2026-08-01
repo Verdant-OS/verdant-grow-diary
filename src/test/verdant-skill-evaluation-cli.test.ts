@@ -776,6 +776,27 @@ describe("cli — untrusted fixture input", () => {
     expect(r.code).toBe(EXIT_HARD_SAFETY);
   });
 
+  // An exemption conditioned on a field NAME rather than the value's shape
+  // exempts whatever is put there: a secret at `runId` was blanked BEFORE the
+  // production-data scan, and the later schema failure names an invalid run
+  // result without naming or removing the secret in a committed file.
+  it("exempts runId only when the value is actually a uuid", () => {
+    for (const secret of ["sk_live_abcdefghijklmnop", "bearer aaaaaaaaaaaaaaaa"]) {
+      const r = runWithMutated((record) => {
+        (record.execution as { output: Record<string, unknown> }).output.runId = secret;
+      });
+      expect(r.code, secret).toBe(EXIT_USAGE_OR_IO);
+      expect(r.lines.join(" "), secret).toContain("production-shaped data");
+    }
+
+    // A merely non-uuid runId is a SCHEMA failure, not a disclosure — a
+    // different exit code, and worth pinning so the two are not conflated.
+    const invalid = runWithMutated((record) => {
+      (record.execution as { output: Record<string, unknown> }).output.runId = "not-a-uuid";
+    });
+    expect(invalid.code).toBe(EXIT_HARD_SAFETY);
+  });
+
   it("still accepts a well-formed envelope from the same path", () => {
     // Guards the guard: a check that rejected everything would pass the two
     // tests above while breaking the harness.

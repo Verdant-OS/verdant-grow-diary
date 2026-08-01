@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "artifactType": "knowledge_intent_research_registry",
+  "baselineRoadmapPath": "roadmap-500.json",
+  "baselineStableIdentityDigest": "4cf7e552a5f61bd447ee906f90f9227334b7b0f25b70ab8f69840266677a7312",
+  "defaultIntentStatus": "provisional",
+  "mutationPolicy": "Append lifecycle events here; never rewrite roadmap-500.json to record research, validation, or supersession.",
+  "entries": []
+}

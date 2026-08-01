@@ -1,0 +1,1243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://verdantgrowdiary.com/schemas/knowledge/sensor.schema.json",
+  "title": "Verdant sensor reference page",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "metricContract": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "metricKey": { "const": "air_temp_c" },
+            "metricId": { "const": "metric:air-temperature" },
+            "unitId": { "const": "unit:celsius" }
+          },
+          "required": ["metricKey", "metricId", "unitId"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "metricKey": { "const": "humidity_pct" },
+            "metricId": { "const": "metric:relative-humidity" },
+            "unitId": { "const": "unit:percent-relative-humidity" }
+          },
+          "required": ["metricKey", "metricId", "unitId"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "metricKey": { "const": "vpd_kpa" },
+            "metricId": { "const": "metric:vpd-air" },
+            "unitId": { "const": "unit:kilopascal" }
+          },
+          "required": ["metricKey", "metricId", "unitId"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "metricKey": { "const": "leaf_temp_c" },
+            "metricId": { "const": "metric:leaf-temperature" },
+            "unitId": { "const": "unit:celsius" }
+          },
+          "required": ["metricKey", "metricId", "unitId"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "metricKey": { "const": "leaf_vpd_kpa" },
+            "metricId": { "const": "metric:vpd-leaf" },
+            "unitId": { "const": "unit:kilopascal" }
+          },
+          "required": ["metricKey", "metricId", "unitId"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "metricKey": { "const": "co2_ppm" },
+            "metricId": { "const": "metric:carbon-dioxide-concentration" },
+            "unitId": { "const": "unit:parts-per-million" }
+          },
+          "required": ["metricKey", "metricId", "unitId"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "metricKey": { "const": "soil_moisture_pct" },
+            "metricId": { "const": "metric:soil-moisture-relative" },
+            "unitId": { "const": "unit:percent" }
+          },
+          "required": ["metricKey", "metricId", "unitId"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "metricKey": { "const": "soil_temp_c" },
+            "metricId": { "const": "metric:soil-temperature" },
+            "unitId": { "const": "unit:celsius" }
+          },
+          "required": ["metricKey", "metricId", "unitId"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "metricKey": { "const": "soil_ec_mscm" },
+            "metricId": { "const": "metric:soil-electrical-conductivity" },
+            "unitId": { "const": "unit:millisiemens-per-centimeter" }
+          },
+          "required": ["metricKey", "metricId", "unitId"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "metricKey": { "const": "reservoir_ph" },
+            "metricId": { "const": "metric:reservoir-ph" },
+            "unitId": { "const": "unit:ph" }
+          },
+          "required": ["metricKey", "metricId", "unitId"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "metricKey": { "const": "reservoir_ec_mscm" },
+            "metricId": { "const": "metric:reservoir-electrical-conductivity" },
+            "unitId": { "const": "unit:millisiemens-per-centimeter" }
+          },
+          "required": ["metricKey", "metricId", "unitId"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "metricKey": { "const": "ppfd" },
+            "metricId": { "const": "metric:ppfd" },
+            "unitId": { "const": "unit:micromole-per-square-meter-per-second" }
+          },
+          "required": ["metricKey", "metricId", "unitId"]
+        }
+      ]
+    },
+    "derivationInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metricId",
+        "unitId",
+        "observationId",
+        "capturedAt",
+        "source",
+        "qualityState",
+        "freshnessAgeSeconds",
+        "visibility"
+      ],
+      "properties": {
+        "metricId": { "$ref": "common.schema.json#/$defs/nodeId" },
+        "unitId": { "$ref": "common.schema.json#/$defs/nodeId" },
+        "observationId": { "$ref": "common.schema.json#/$defs/nodeId" },
+        "capturedAt": { "type": "string", "format": "date-time" },
+        "source": { "enum": ["live", "manual", "csv", "demo", "stale", "invalid"] },
+        "qualityState": {
+          "enum": ["ok", "lower_confidence", "stale", "invalid", "unknown"]
+        },
+        "freshnessAgeSeconds": { "type": "number", "minimum": 0 },
+        "visibility": { "enum": ["page_measurement", "vendor_internal"] }
+      }
+    },
+    "derivationRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "methodId",
+        "formulaVersion",
+        "formulaExpression",
+        "computedAt",
+        "maxInputAgeSeconds",
+        "maxTimestampSkewSeconds",
+        "inputs",
+        "inputQualityRequirements",
+        "uncertaintyStatement",
+        "vendorMethodSourceId",
+        "limitations"
+      ],
+      "properties": {
+        "methodId": { "$ref": "common.schema.json#/$defs/nodeId" },
+        "formulaVersion": { "type": "string", "minLength": 2 },
+        "formulaExpression": { "type": ["string", "null"], "minLength": 8 },
+        "computedAt": { "type": "string", "format": "date-time" },
+        "maxInputAgeSeconds": { "type": "integer", "minimum": 0 },
+        "maxTimestampSkewSeconds": { "type": "integer", "minimum": 0 },
+        "inputs": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/derivationInput" },
+          "uniqueItems": true
+        },
+        "inputQualityRequirements": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "string", "minLength": 4 },
+          "uniqueItems": true
+        },
+        "uncertaintyStatement": { "type": "string", "minLength": 12 },
+        "vendorMethodSourceId": {
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/nodeId" }, { "type": "null" }]
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 4 }
+        }
+      }
+    },
+    "highRhCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verificationId",
+        "targetRelativeHumidityPct",
+        "methodId",
+        "referenceInstrumentId",
+        "checkedAt",
+        "referenceRelativeHumidityPct",
+        "deviceAsFoundRelativeHumidityPct",
+        "asFoundDeviationPctPoints",
+        "adjustmentPerformed",
+        "deviceAsLeftRelativeHumidityPct",
+        "asLeftDeviationPctPoints",
+        "uncertaintyPctPoints",
+        "acceptanceCriteria",
+        "disposition",
+        "limitations"
+      ],
+      "properties": {
+        "verificationId": {
+          "type": "string",
+          "pattern": "^verification:[a-z0-9][a-z0-9._:-]*$"
+        },
+        "targetRelativeHumidityPct": { "type": "number", "minimum": 75, "maximum": 100 },
+        "methodId": { "$ref": "common.schema.json#/$defs/nodeId" },
+        "referenceInstrumentId": { "$ref": "common.schema.json#/$defs/nodeId" },
+        "checkedAt": { "type": "string", "format": "date-time" },
+        "referenceRelativeHumidityPct": {
+          "type": "number",
+          "minimum": 75,
+          "maximum": 100
+        },
+        "deviceAsFoundRelativeHumidityPct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "asFoundDeviationPctPoints": { "type": "number" },
+        "adjustmentPerformed": { "type": "boolean" },
+        "deviceAsLeftRelativeHumidityPct": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "asLeftDeviationPctPoints": { "type": ["number", "null"] },
+        "uncertaintyPctPoints": { "type": "number", "minimum": 0 },
+        "acceptanceCriteria": { "type": "string", "minLength": 12 },
+        "disposition": { "enum": ["pass", "fail", "limited"] },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 4 }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": { "adjustmentPerformed": { "const": false } },
+            "required": ["adjustmentPerformed"]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "deviceAsLeftRelativeHumidityPct": { "type": "null" },
+              "asLeftDeviationPctPoints": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": { "adjustmentPerformed": { "const": true } },
+            "required": ["adjustmentPerformed"]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "deviceAsLeftRelativeHumidityPct": { "type": "number" },
+              "asLeftDeviationPctPoints": { "type": "number" }
+            }
+          }
+        }
+      ]
+    },
+    "leafTemperatureBasis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "methodId",
+        "referenceInstrumentId",
+        "measuredAt",
+        "airTemperatureC",
+        "leafTemperatureC",
+        "offsetC",
+        "sampleCount",
+        "samplingLocations",
+        "lightState",
+        "uncertaintyC",
+        "applications",
+        "evidenceSourceIds",
+        "limitations"
+      ],
+      "properties": {
+        "methodId": { "$ref": "common.schema.json#/$defs/nodeId" },
+        "referenceInstrumentId": { "$ref": "common.schema.json#/$defs/nodeId" },
+        "measuredAt": { "type": "string", "format": "date-time" },
+        "airTemperatureC": { "type": "number" },
+        "leafTemperatureC": { "type": "number" },
+        "offsetC": { "type": "number" },
+        "sampleCount": { "type": "integer", "minimum": 1 },
+        "samplingLocations": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 3 }
+        },
+        "lightState": { "enum": ["on_stable", "off", "transition", "unknown"] },
+        "uncertaintyC": { "type": "number", "minimum": 0 },
+        "applications": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": ["context_only_for_air_vpd", "formula_input_for_leaf_vpd"]
+          },
+          "uniqueItems": true
+        },
+        "evidenceSourceIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 4 }
+        }
+      }
+    },
+    "verificationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metricId",
+        "unitId",
+        "referenceValue",
+        "asFoundValue",
+        "asFoundDeviation",
+        "asLeftValue",
+        "asLeftDeviation",
+        "uncertainty",
+        "disposition"
+      ],
+      "properties": {
+        "metricId": { "$ref": "common.schema.json#/$defs/nodeId" },
+        "unitId": { "$ref": "common.schema.json#/$defs/nodeId" },
+        "referenceValue": { "type": "number" },
+        "asFoundValue": { "type": "number" },
+        "asFoundDeviation": { "type": "number" },
+        "asLeftValue": { "type": ["number", "null"] },
+        "asLeftDeviation": { "type": ["number", "null"] },
+        "uncertainty": { "type": "number", "minimum": 0 },
+        "disposition": { "enum": ["pass", "fail", "limited"] }
+      }
+    },
+    "verificationRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verificationId",
+        "verifiedAt",
+        "nextDueOn",
+        "methodId",
+        "referenceInstrumentId",
+        "results",
+        "sourceIds",
+        "reviewerId",
+        "supersedesVerificationId",
+        "limitations"
+      ],
+      "properties": {
+        "verificationId": {
+          "type": "string",
+          "pattern": "^verification:[a-z0-9][a-z0-9._:-]*$"
+        },
+        "verifiedAt": { "type": "string", "format": "date-time" },
+        "nextDueOn": { "type": "string", "format": "date" },
+        "methodId": { "$ref": "common.schema.json#/$defs/nodeId" },
+        "referenceInstrumentId": { "$ref": "common.schema.json#/$defs/nodeId" },
+        "results": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/verificationResult" },
+          "uniqueItems": true
+        },
+        "sourceIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "reviewerId": { "$ref": "common.schema.json#/$defs/nodeId" },
+        "supersedesVerificationId": {
+          "type": ["string", "null"],
+          "pattern": "^verification:[a-z0-9][a-z0-9._:-]*$"
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 4 }
+        }
+      }
+    }
+  },
+  "required": [
+    "pageManifest",
+    "slug",
+    "name",
+    "deviceIdentity",
+    "measurements",
+    "placement",
+    "calibration",
+    "transport",
+    "capabilities",
+    "truthModel",
+    "failureModes",
+    "claims",
+    "sources",
+    "editorial",
+    "conversion"
+  ],
+  "properties": {
+    "pageManifest": { "$ref": "common.schema.json#/$defs/pageManifest" },
+    "slug": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "name": { "type": "string", "minLength": 3 },
+    "deviceIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sensorNodeId",
+        "manufacturer",
+        "model",
+        "hardwareRevision",
+        "firmwareVersion",
+        "documentationVersion",
+        "channelId",
+        "channelLabel",
+        "channelType",
+        "protocolFieldNames",
+        "manualSourceId"
+      ],
+      "properties": {
+        "sensorNodeId": { "$ref": "common.schema.json#/$defs/nodeId" },
+        "manufacturer": { "type": ["string", "null"] },
+        "model": { "type": ["string", "null"] },
+        "hardwareRevision": { "type": ["string", "null"] },
+        "firmwareVersion": { "type": ["string", "null"] },
+        "documentationVersion": { "type": ["string", "null"] },
+        "channelId": { "type": ["string", "null"] },
+        "channelLabel": { "type": ["string", "null"] },
+        "channelType": { "type": ["string", "null"] },
+        "protocolFieldNames": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "manualSourceId": {
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/nodeId" }, { "type": "null" }]
+        }
+      }
+    },
+    "measurements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metricId",
+          "metricKey",
+          "directOrDerived",
+          "vpdBasis",
+          "unitId",
+          "authorityStatus",
+          "resolution",
+          "accuracy",
+          "operatingRange",
+          "derivation"
+        ],
+        "properties": {
+          "metricId": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "metricKey": {
+            "enum": [
+              "air_temp_c",
+              "humidity_pct",
+              "vpd_kpa",
+              "leaf_temp_c",
+              "leaf_vpd_kpa",
+              "co2_ppm",
+              "soil_moisture_pct",
+              "soil_temp_c",
+              "soil_ec_mscm",
+              "reservoir_ph",
+              "reservoir_ec_mscm",
+              "ppfd"
+            ]
+          },
+          "directOrDerived": { "enum": ["direct", "derived", "vendor_derived"] },
+          "vpdBasis": { "enum": ["not_applicable", "air", "leaf", "vendor"] },
+          "unitId": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "authorityStatus": {
+            "enum": ["authoritative", "lower_confidence", "not_authoritative"]
+          },
+          "resolution": { "type": ["string", "null"] },
+          "accuracy": { "type": ["string", "null"] },
+          "operatingRange": { "type": ["string", "null"] },
+          "derivation": {
+            "anyOf": [{ "$ref": "#/$defs/derivationRecord" }, { "type": "null" }]
+          }
+        },
+        "allOf": [
+          { "$ref": "#/$defs/metricContract" },
+          {
+            "if": {
+              "type": "object",
+              "properties": { "directOrDerived": { "const": "direct" } },
+              "required": ["directOrDerived"]
+            },
+            "then": {
+              "type": "object",
+              "properties": { "derivation": { "type": "null" } }
+            }
+          },
+          {
+            "if": {
+              "type": "object",
+              "properties": { "directOrDerived": { "const": "derived" } },
+              "required": ["directOrDerived"]
+            },
+            "then": {
+              "type": "object",
+              "properties": {
+                "derivation": {
+                  "allOf": [
+                    { "$ref": "#/$defs/derivationRecord" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "formulaExpression": { "type": "string", "minLength": 8 },
+                        "vendorMethodSourceId": { "type": "null" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "type": "object",
+              "properties": { "directOrDerived": { "const": "vendor_derived" } },
+              "required": ["directOrDerived"]
+            },
+            "then": {
+              "type": "object",
+              "properties": {
+                "derivation": {
+                  "allOf": [
+                    { "$ref": "#/$defs/derivationRecord" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "vendorMethodSourceId": {
+                          "$ref": "common.schema.json#/$defs/nodeId"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "type": "object",
+              "properties": {
+                "metricKey": { "enum": ["vpd_kpa", "leaf_vpd_kpa"] }
+              },
+              "required": ["metricKey"]
+            },
+            "then": {
+              "type": "object",
+              "properties": {
+                "directOrDerived": { "enum": ["derived", "vendor_derived"] }
+              }
+            }
+          },
+          {
+            "if": {
+              "type": "object",
+              "properties": { "metricKey": { "const": "vpd_kpa" } },
+              "required": ["metricKey"]
+            },
+            "then": {
+              "type": "object",
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "directOrDerived": { "const": "derived" },
+                    "vpdBasis": { "const": "air" }
+                  },
+                  "required": ["directOrDerived", "vpdBasis"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "directOrDerived": { "const": "vendor_derived" },
+                    "vpdBasis": { "const": "vendor" }
+                  },
+                  "required": ["directOrDerived", "vpdBasis"]
+                }
+              ],
+              "properties": {
+                "derivation": {
+                  "type": "object",
+                  "properties": {
+                    "inputs": {
+                      "type": "array",
+                      "minItems": 2,
+                      "contains": {
+                        "type": "object",
+                        "properties": {
+                          "metricId": { "const": "metric:air-temperature" }
+                        },
+                        "required": ["metricId"]
+                      },
+                      "minContains": 1
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "inputs": {
+                          "type": "array",
+                          "contains": {
+                            "type": "object",
+                            "properties": {
+                              "metricId": { "const": "metric:relative-humidity" }
+                            },
+                            "required": ["metricId"]
+                          },
+                          "minContains": 1
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "type": "object",
+              "properties": { "metricKey": { "const": "leaf_vpd_kpa" } },
+              "required": ["metricKey"]
+            },
+            "then": {
+              "type": "object",
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "directOrDerived": { "const": "derived" },
+                    "vpdBasis": { "const": "leaf" }
+                  },
+                  "required": ["directOrDerived", "vpdBasis"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "directOrDerived": { "const": "vendor_derived" },
+                    "vpdBasis": { "const": "vendor" }
+                  },
+                  "required": ["directOrDerived", "vpdBasis"]
+                }
+              ],
+              "properties": {
+                "derivation": {
+                  "type": "object",
+                  "properties": {
+                    "inputs": {
+                      "type": "array",
+                      "minItems": 3,
+                      "contains": {
+                        "type": "object",
+                        "properties": {
+                          "metricId": { "const": "metric:air-temperature" }
+                        },
+                        "required": ["metricId"]
+                      },
+                      "minContains": 1
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "inputs": {
+                          "type": "array",
+                          "contains": {
+                            "type": "object",
+                            "properties": {
+                              "metricId": { "const": "metric:relative-humidity" }
+                            },
+                            "required": ["metricId"]
+                          },
+                          "minContains": 1
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "inputs": {
+                          "type": "array",
+                          "contains": {
+                            "type": "object",
+                            "properties": {
+                              "metricId": { "const": "metric:leaf-temperature" }
+                            },
+                            "required": ["metricId"]
+                          },
+                          "minContains": 1
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "type": "object",
+              "properties": {
+                "metricKey": {
+                  "enum": [
+                    "air_temp_c",
+                    "humidity_pct",
+                    "leaf_temp_c",
+                    "co2_ppm",
+                    "soil_moisture_pct",
+                    "soil_temp_c",
+                    "soil_ec_mscm",
+                    "reservoir_ph",
+                    "reservoir_ec_mscm",
+                    "ppfd"
+                  ]
+                }
+              },
+              "required": ["metricKey"]
+            },
+            "then": {
+              "type": "object",
+              "properties": { "vpdBasis": { "const": "not_applicable" } }
+            }
+          }
+        ]
+      }
+    },
+    "placement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "location",
+        "canopyRelationship",
+        "radiantHeatShielding",
+        "airflow",
+        "representativenessChecks"
+      ],
+      "properties": {
+        "location": { "type": "string", "minLength": 4 },
+        "canopyRelationship": { "type": "string", "minLength": 4 },
+        "radiantHeatShielding": { "type": "string", "minLength": 4 },
+        "airflow": { "type": "string", "minLength": 4 },
+        "representativenessChecks": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 3 }
+        }
+      }
+    },
+    "calibration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolId",
+        "verificationStatus",
+        "currentVerificationId",
+        "verificationHistory",
+        "highRhCheck",
+        "leafTemperatureBasis",
+        "intervalDays",
+        "unverifiedPolicy"
+      ],
+      "properties": {
+        "protocolId": { "$ref": "common.schema.json#/$defs/nodeId" },
+        "verificationStatus": {
+          "enum": ["unverified", "current", "due", "expired", "failed", "limited"]
+        },
+        "currentVerificationId": {
+          "type": ["string", "null"],
+          "pattern": "^verification:[a-z0-9][a-z0-9._:-]*$"
+        },
+        "verificationHistory": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/verificationRecord" },
+          "uniqueItems": true
+        },
+        "highRhCheck": {
+          "anyOf": [{ "$ref": "#/$defs/highRhCheck" }, { "type": "null" }]
+        },
+        "leafTemperatureBasis": {
+          "anyOf": [{ "$ref": "#/$defs/leafTemperatureBasis" }, { "type": "null" }]
+        },
+        "intervalDays": { "type": "integer", "minimum": 1 },
+        "unverifiedPolicy": { "type": "string", "minLength": 10 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": { "verificationStatus": { "const": "unverified" } },
+            "required": ["verificationStatus"]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "currentVerificationId": { "type": "null" },
+              "verificationHistory": { "type": "array", "maxItems": 0 }
+            }
+          },
+          "else": {
+            "type": "object",
+            "properties": {
+              "currentVerificationId": {
+                "type": "string",
+                "pattern": "^verification:[a-z0-9][a-z0-9._:-]*$"
+              },
+              "verificationHistory": { "type": "array", "minItems": 1 }
+            }
+          }
+        }
+      ]
+    },
+    "transport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "integrationId",
+        "mode",
+        "protocol",
+        "status",
+        "readOnly",
+        "directDeviceControl",
+        "verifiedOn",
+        "verifiedVersions",
+        "evidenceSourceIds",
+        "credentialBoundary",
+        "limitations"
+      ],
+      "properties": {
+        "integrationId": {
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/nodeId" }, { "type": "null" }]
+        },
+        "mode": { "enum": ["manual", "csv", "read_only_live", "none"] },
+        "protocol": {
+          "enum": [
+            "manual",
+            "csv",
+            "mqtt",
+            "http_webhook",
+            "vendor_cloud",
+            "local_bridge",
+            "other",
+            "not_applicable"
+          ]
+        },
+        "status": {
+          "enum": [
+            "not_assessed",
+            "documented",
+            "verified_read_only",
+            "planned",
+            "blocked",
+            "unsupported",
+            "retired",
+            "not_applicable"
+          ]
+        },
+        "readOnly": { "const": true },
+        "directDeviceControl": { "const": false },
+        "verifiedOn": { "type": ["string", "null"], "format": "date" },
+        "verifiedVersions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "evidenceSourceIds": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "credentialBoundary": { "type": "string", "minLength": 12 },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 4 }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": { "status": { "const": "verified_read_only" } },
+            "required": ["status"]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "integrationId": { "$ref": "common.schema.json#/$defs/nodeId" },
+              "mode": { "const": "read_only_live" },
+              "verifiedOn": { "type": "string", "format": "date" },
+              "verifiedVersions": { "type": "array", "minItems": 1 },
+              "evidenceSourceIds": { "type": "array", "minItems": 1 }
+            }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": { "mode": { "const": "none" } },
+            "required": ["mode"]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "integrationId": { "type": "null" },
+              "protocol": { "const": "not_applicable" },
+              "status": { "const": "not_applicable" },
+              "verifiedOn": { "type": "null" },
+              "verifiedVersions": { "type": "array", "maxItems": 0 },
+              "evidenceSourceIds": { "type": "array", "maxItems": 0 }
+            }
+          }
+        }
+      ]
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "capabilityId",
+          "name",
+          "owner",
+          "status",
+          "supportedMetricIds",
+          "evidenceSourceIds",
+          "readOnly",
+          "verdantMayInvoke",
+          "limitations"
+        ],
+        "properties": {
+          "capabilityId": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "name": { "type": "string", "minLength": 3 },
+          "owner": { "enum": ["native_device", "verdant_integration"] },
+          "status": {
+            "enum": ["documented", "verified", "planned", "blocked", "unsupported", "retired"]
+          },
+          "supportedMetricIds": {
+            "type": "array",
+            "items": { "$ref": "common.schema.json#/$defs/nodeId" },
+            "uniqueItems": true
+          },
+          "evidenceSourceIds": {
+            "type": "array",
+            "items": { "$ref": "common.schema.json#/$defs/nodeId" },
+            "uniqueItems": true
+          },
+          "readOnly": { "type": "boolean" },
+          "verdantMayInvoke": { "const": false },
+          "limitations": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 4 }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "type": "object",
+              "properties": { "owner": { "const": "verdant_integration" } },
+              "required": ["owner"]
+            },
+            "then": {
+              "type": "object",
+              "properties": { "readOnly": { "const": true } }
+            }
+          },
+          {
+            "if": {
+              "type": "object",
+              "properties": { "status": { "enum": ["documented", "verified"] } },
+              "required": ["status"]
+            },
+            "then": {
+              "type": "object",
+              "properties": { "evidenceSourceIds": { "type": "array", "minItems": 1 } }
+            }
+          }
+        ]
+      }
+    },
+    "truthModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowedSources",
+        "freshnessWindow",
+        "confidenceFactors",
+        "invalidConditions",
+        "displayRules"
+      ],
+      "properties": {
+        "allowedSources": {
+          "type": "array",
+          "const": ["live", "manual", "csv", "demo", "stale", "invalid"]
+        },
+        "freshnessWindow": { "type": "string", "minLength": 4 },
+        "confidenceFactors": {
+          "type": "array",
+          "minItems": 3,
+          "items": { "type": "string", "minLength": 3 }
+        },
+        "invalidConditions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 3 }
+        },
+        "displayRules": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 3 }
+        }
+      }
+    },
+    "failureModes": {
+      "type": "array",
+      "minItems": 3,
+      "items": { "type": "string", "minLength": 3 }
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "common.schema.json#/$defs/claim" }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 3,
+      "items": { "$ref": "common.schema.json#/$defs/source" }
+    },
+    "editorial": { "$ref": "common.schema.json#/$defs/editorial" },
+    "conversion": { "$ref": "common.schema.json#/$defs/conversion" }
+  },
+  "allOf": [
+    {
+      "type": "object",
+      "properties": {
+        "pageManifest": {
+          "type": "object",
+          "properties": {
+            "metadata": {
+              "type": "object",
+              "properties": {
+                "pageType": { "const": "sensor" },
+                "pageFamily": { "const": "entity" }
+              }
+            },
+            "graph": {
+              "type": "object",
+              "properties": {
+                "node": {
+                  "type": "object",
+                  "properties": { "type": { "const": "Sensor" } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "measurements": {
+            "type": "array",
+            "contains": {
+              "type": "object",
+              "properties": {
+                "metricKey": {
+                  "enum": ["humidity_pct", "vpd_kpa", "leaf_vpd_kpa"]
+                }
+              },
+              "required": ["metricKey"]
+            },
+            "minContains": 1
+          }
+        },
+        "required": ["measurements"]
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "calibration": {
+            "type": "object",
+            "properties": { "highRhCheck": { "$ref": "#/$defs/highRhCheck" } }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "measurements": {
+            "type": "array",
+            "contains": {
+              "type": "object",
+              "properties": {
+                "metricKey": { "enum": ["vpd_kpa", "leaf_vpd_kpa"] }
+              },
+              "required": ["metricKey"]
+            },
+            "minContains": 1
+          }
+        },
+        "required": ["measurements"]
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "calibration": {
+            "type": "object",
+            "properties": {
+              "verificationStatus": { "const": "current" },
+              "currentVerificationId": {
+                "type": "string",
+                "pattern": "^verification:[a-z0-9][a-z0-9._:-]*$"
+              },
+              "leafTemperatureBasis": {
+                "$ref": "#/$defs/leafTemperatureBasis"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "measurements": {
+            "type": "array",
+            "contains": {
+              "type": "object",
+              "properties": { "metricKey": { "const": "vpd_kpa" } },
+              "required": ["metricKey"]
+            },
+            "minContains": 1
+          }
+        },
+        "required": ["measurements"]
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "calibration": {
+            "type": "object",
+            "properties": {
+              "leafTemperatureBasis": {
+                "type": "object",
+                "properties": {
+                  "applications": {
+                    "type": "array",
+                    "contains": { "const": "context_only_for_air_vpd" },
+                    "minContains": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "measurements": {
+            "type": "array",
+            "contains": {
+              "type": "object",
+              "properties": { "metricKey": { "const": "leaf_vpd_kpa" } },
+              "required": ["metricKey"]
+            },
+            "minContains": 1
+          }
+        },
+        "required": ["measurements"]
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "calibration": {
+            "type": "object",
+            "properties": {
+              "leafTemperatureBasis": {
+                "type": "object",
+                "properties": {
+                  "applications": {
+                    "type": "array",
+                    "contains": { "const": "formula_input_for_leaf_vpd" },
+                    "minContains": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    { "$ref": "common.schema.json#/$defs/pageSafetyReviewGate" }
+  ]
+}

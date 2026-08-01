@@ -1,0 +1,659 @@
+{
+  "version": 1,
+  "artifactType": "knowledge_trust_infrastructure_registry",
+  "baselineStableIdentityDigest": "4cf7e552a5f61bd447ee906f90f9227334b7b0f25b70ab8f69840266677a7312",
+  "roadmapRelationship": "outside_first_500",
+  "publicRoutingPolicy": "Every entry is non-routable until it receives a separate brief, evidence review, product-truth review, and atomic release receipt.",
+  "systemRoutes": [
+    {
+      "id": "trust:glossary",
+      "path": "/guides/glossary",
+      "kind": "glossary",
+      "roadmapMembership": "outside_first_500",
+      "publicRoutable": false
+    },
+    {
+      "id": "trust:protocols",
+      "path": "/guides/protocols",
+      "kind": "collection",
+      "roadmapMembership": "outside_first_500",
+      "publicRoutable": false
+    },
+    {
+      "id": "trust:symptoms",
+      "path": "/guides/symptoms",
+      "kind": "collection",
+      "roadmapMembership": "outside_first_500",
+      "publicRoutable": false
+    },
+    {
+      "id": "trust:metrics",
+      "path": "/guides/metrics",
+      "kind": "collection",
+      "roadmapMembership": "outside_first_500",
+      "publicRoutable": false
+    },
+    {
+      "id": "trust:methods",
+      "path": "/guides/methods",
+      "kind": "method_collection",
+      "roadmapMembership": "outside_first_500",
+      "publicRoutable": false
+    },
+    {
+      "id": "trust:authors",
+      "path": "/guides/authors",
+      "kind": "profile_collection",
+      "roadmapMembership": "outside_first_500",
+      "publicRoutable": false
+    },
+    {
+      "id": "trust:about",
+      "path": "/guides/about-the-library",
+      "kind": "governance",
+      "roadmapMembership": "outside_first_500",
+      "publicRoutable": false
+    },
+    {
+      "id": "trust:evidence-policy",
+      "path": "/guides/evidence-policy",
+      "kind": "governance",
+      "roadmapMembership": "outside_first_500",
+      "publicRoutable": false
+    },
+    {
+      "id": "trust:editorial-policy",
+      "path": "/guides/editorial-policy",
+      "kind": "governance",
+      "roadmapMembership": "outside_first_500",
+      "publicRoutable": false
+    },
+    {
+      "id": "trust:corrections",
+      "path": "/guides/corrections",
+      "kind": "governance",
+      "roadmapMembership": "outside_first_500",
+      "publicRoutable": false
+    }
+  ],
+  "pillarGroupings": [
+    {
+      "pillarPageId": "KL-001",
+      "pillarKey": "fundamentals",
+      "groups": [
+        {
+          "id": "ia-group:p1:grow-identity-and-setup",
+          "label": "Grow identity and setup",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p1:daily-room-walk",
+          "label": "Daily room walk",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p1:evidence-capture",
+          "label": "Evidence capture",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p1:attribution-and-timeline",
+          "label": "Attribution and timeline",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p1:team-operations",
+          "label": "Team operations",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p1:cycle-learning-and-stewardship",
+          "label": "Cycle learning and stewardship",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        }
+      ]
+    },
+    {
+      "pillarPageId": "KL-002",
+      "pillarKey": "environment",
+      "groups": [
+        {
+          "id": "ia-group:p2:thermal-and-humidity-fundamentals",
+          "label": "Thermal and humidity fundamentals",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p2:vpd-and-leaf-basis",
+          "label": "VPD and leaf basis",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p2:airflow-co2-and-microclimates",
+          "label": "Airflow, CO2, and microclimates",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p2:capacity-and-transitions",
+          "label": "Capacity and transitions",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p2:lighting-and-photobiology",
+          "label": "Lighting and photobiology",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p2:drift-and-failure-response",
+          "label": "Drift and failure response",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        }
+      ]
+    },
+    {
+      "pillarPageId": "KL-003",
+      "pillarKey": "sensors",
+      "groups": [
+        {
+          "id": "ia-group:p3:provenance-and-identity",
+          "label": "Provenance and identity",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p3:calibration-and-validation",
+          "label": "Calibration and validation",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p3:placement-and-time",
+          "label": "Placement and time",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p3:metrology-and-units",
+          "label": "Metrology and units",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p3:ingest-and-transport-truth",
+          "label": "Ingest and transport truth",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p3:derived-metrics-and-anomalies",
+          "label": "Derived metrics and anomalies",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p3:evidence-use-and-maintenance",
+          "label": "Evidence use and maintenance",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        }
+      ]
+    },
+    {
+      "pillarPageId": "KL-004",
+      "pillarKey": "irrigation",
+      "groups": [
+        {
+          "id": "ia-group:p4:media-and-container-system",
+          "label": "Media and container system",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p4:irrigation-event-design",
+          "label": "Irrigation event design",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p4:dryback-and-water-status",
+          "label": "Dryback and water status",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p4:input-and-runoff-evidence",
+          "label": "Input and runoff evidence",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p4:drainage-oxygen-and-temperature",
+          "label": "Drainage, oxygen, and temperature",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p4:delivery-uniformity",
+          "label": "Delivery uniformity",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p4:root-zone-differential-and-change-control",
+          "label": "Root-zone differential and change control",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        }
+      ]
+    },
+    {
+      "pillarPageId": "KL-005",
+      "pillarKey": "nutrition",
+      "groups": [
+        {
+          "id": "ia-group:p5:source-water",
+          "label": "Source water",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p5:concentration-and-units",
+          "label": "Concentration and units",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p5:mixing-and-stock-solutions",
+          "label": "Mixing and stock solutions",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p5:ph-and-alkalinity",
+          "label": "pH and alkalinity",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p5:program-and-recipe-records",
+          "label": "Program and recipe records",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p5:input-runoff-root-zone-interpretation",
+          "label": "Input/runoff/root-zone interpretation",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p5:crop-response-and-differentials",
+          "label": "Crop response and differentials",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        }
+      ]
+    },
+    {
+      "pillarPageId": "KL-006",
+      "pillarKey": "health",
+      "groups": [
+        {
+          "id": "ia-group:p6:symptom-observation",
+          "label": "Symptom observation",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p6:differential-method",
+          "label": "Differential method",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p6:abiotic-nutritional-conditions",
+          "label": "Abiotic/nutritional conditions",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p6:pests-and-beneficial-context",
+          "label": "Pests and beneficial context",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p6:pathogens-and-testing",
+          "label": "Pathogens and testing",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p6:quarantine-and-biosecurity",
+          "label": "Quarantine and biosecurity",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p6:scouting-and-thresholds",
+          "label": "Scouting and thresholds",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p6:treatment-record-and-label-boundary",
+          "label": "Treatment record and label boundary",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p6:close-out-and-prevention",
+          "label": "Close-out and prevention",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        }
+      ]
+    },
+    {
+      "pillarPageId": "KL-007",
+      "pillarKey": "genetics",
+      "groups": [
+        {
+          "id": "ia-group:p7:provenance-and-identity",
+          "label": "Provenance and identity",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p7:lineage-and-propagation-chain",
+          "label": "Lineage and propagation chain",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p7:propagation-methods",
+          "label": "Propagation methods",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p7:health-status-and-quarantine",
+          "label": "Health status and quarantine",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p7:phenotype-evidence",
+          "label": "Phenotype evidence",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p7:pheno-hunt-design",
+          "label": "Pheno-hunt design",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p7:cultivar-reference",
+          "label": "Cultivar reference",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p7:preservation-and-disposition",
+          "label": "Preservation and disposition",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        }
+      ]
+    },
+    {
+      "pillarPageId": "KL-008",
+      "pillarKey": "stages",
+      "groups": [
+        {
+          "id": "ia-group:p8:plant-structure-and-function",
+          "label": "Plant structure and function",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p8:carbon-water-and-energy",
+          "label": "Carbon, water, and energy",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p8:root-shoot-and-nutrient-movement",
+          "label": "Root/shoot and nutrient movement",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p8:germination-and-seedling",
+          "label": "Germination and seedling",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p8:vegetative-and-transition",
+          "label": "Vegetative and transition",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p8:flower-development",
+          "label": "Flower development",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p8:canopy-architecture",
+          "label": "Canopy architecture",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p8:training-pruning-and-defoliation",
+          "label": "Training, pruning, and defoliation",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        }
+      ]
+    },
+    {
+      "pillarPageId": "KL-009",
+      "pillarKey": "harvest",
+      "groups": [
+        {
+          "id": "ia-group:p9:readiness-and-planning",
+          "label": "Readiness and planning",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p9:harvest-measurement",
+          "label": "Harvest measurement",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p9:drying-environment",
+          "label": "Drying environment",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p9:moisture-and-loss-accounting",
+          "label": "Moisture and loss accounting",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p9:trimming-grading-and-defects",
+          "label": "Trimming, grading, and defects",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p9:cure-and-storage",
+          "label": "Cure and storage",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p9:lab-and-sensory-evidence",
+          "label": "Lab and sensory evidence",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p9:outcome-and-next-run-learning",
+          "label": "Outcome and next-run learning",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        }
+      ]
+    },
+    {
+      "pillarPageId": "KL-010",
+      "pillarKey": "equipment",
+      "groups": [
+        {
+          "id": "ia-group:p10:requirement-and-selection",
+          "label": "Requirement and selection",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p10:environmental-systems",
+          "label": "Environmental systems",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p10:irrigation-hardware",
+          "label": "Irrigation hardware",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p10:lighting-hardware",
+          "label": "Lighting hardware",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p10:sensors-and-gateways",
+          "label": "Sensors and gateways",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p10:network-and-local-reliability",
+          "label": "Network and local reliability",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p10:maintenance-calibration-and-retirement",
+          "label": "Maintenance, calibration, and retirement",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        },
+        {
+          "id": "ia-group:p10:exports-and-read-only-integration-status",
+          "label": "Exports and read-only integration status",
+          "roadmapMembership": "outside_first_500",
+          "publicRoutable": false,
+          "publicPath": null
+        }
+      ]
+    }
+  ]
+}

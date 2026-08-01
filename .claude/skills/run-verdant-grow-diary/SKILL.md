@@ -35,14 +35,25 @@ it as-is — do **not** reinstall. If it is absent, do NOT reach for
 registry mirror (`*.pkg.dev/lovable-core-prod`) that 403s outside the Lovable
 sandbox, and a registry override cannot rewrite bun's locked URLs. The
 **verified bootstrap** is npm with a public-registry override (npm re-resolves;
-602 packages in ~14s here):
+602 packages in ~14s here). Prefer the race-hardened Cursor Cloud path:
+
+```bash
+bash .cursor/install-deps.sh
+```
+
+Manual equivalent (if you cannot use that script):
 
 ```bash
 printf 'registry=https://registry.npmjs.org/\n' > .npmrc.tmp
-npm_config_userconfig=$PWD/.npmrc.tmp npm install --no-audit --no-fund
+HUSKY=0 npm_config_userconfig=$PWD/.npmrc.tmp npm install --no-audit --no-fund
 rm .npmrc.tmp
 git checkout -- package-lock.json   # npm rewrites resolved URLs; restore it
 ```
+
+`git checkout -- package-lock.json` can fail with exit 128 during Cloud boot when
+another process holds `.git/index.lock`. `.cursor/install-deps.sh` retries that
+restore, skips reinstall when `node_modules` is already healthy, and treats
+Playwright browser install as best-effort when a cache is already present.
 
 ---
 

@@ -1,4 +1,18 @@
-# Verdant Codex Instructions
+# Verdant Agent Constitution
+
+**Sentinel-Version: 2026-08-01.2**
+
+This is Verdant's universal Sentinel Code. Every agent inherits these durable product,
+engineering, data, safety, and release rules. Platform-specific bootstraps live at the
+repository root; detailed responsibilities live in `docs/agents/roles/`.
+
+Operational facts that change — active branch and PR, production status, blockers,
+validation evidence, approved slice, and agent assignments — belong in
+`docs/agents/CURRENT_STATE.md`, not in this constitution.
+
+> **Naming note:** `ggsSentinel*` modules and
+> `docs/v0-sentinel-stop-ship-checklist.md` refer to the GGS sensor smoke runner. They
+> are unrelated to this agent-governance Sentinel Code.
 
 ## Product Context
 
@@ -36,8 +50,12 @@ Automation last.
 Default workflow:
 
 ```text
-Build -> Audit -> Fix -> Test -> Publish
+Build -> Audit -> Fix -> Test -> Publish -> Measure
 ```
+
+A merge is not a deployment. Green CI is not proof of indexing. A public estimate is not
+authenticated analytics. An unverified sensor value is not healthy live data. When an
+outcome cannot be measured, report the blocker instead of claiming success.
 
 Use small, scoped changes. Avoid broad rewrites.
 
@@ -492,3 +510,80 @@ Prefer:
 - Exact pass/fail counts.
 
 Every change should make Verdant more trustworthy.
+
+---
+
+# Agent Role Routing
+
+Before using tools beyond read-only context acquisition or changing files, identify your
+assigned role and read its file.
+
+- Codex must read `docs/agents/roles/codex.md`.
+- Grok must read `docs/agents/roles/grok.md`.
+- Claude must read `docs/agents/roles/claude.md`.
+- Gemini must read `docs/agents/roles/gemini.md`.
+- Security reviewer must read `docs/agents/roles/security.md`.
+- Council Chair must read `docs/agents/roles/council-chair.md`.
+
+Do not adopt another agent's responsibilities unless Cheek explicitly reassigns them.
+
+Use `docs/agents/HANDOFF_PROTOCOL.md` for cross-role work. The default sequence is:
+
+```text
+Research -> Architecture -> Build -> Security Review -> QA Audit -> Council -> Cheek approval
+```
+
+The current task may require only a scoped subset of those roles. Do not create parallel
+implementations of the same slice.
+
+The only action permitted before the gate below is read-only acquisition of
+`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, and the assigned role file so the
+acknowledgment can be truthful. Listing files solely to locate those three documents, or
+using a platform context-discovery command such as `grok inspect`, is also permitted.
+No application-code inspection, network mutation, recommendation, or repository write is
+permitted before the acknowledgment.
+
+MANDATORY STARTUP GATE
+
+Before analysis, research, commands, edits, writes, outreach, deployment,
+or recommendations, return:
+
+```text
+SENTINEL_ACK
+agent:
+assigned_role:
+sentinel_version:
+files_read:
+current_task:
+scope:
+out_of_scope:
+conflicts_found:
+data_access_status:
+write_permission:
+```
+
+If a required file is missing or conflicting, return:
+
+```text
+STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE
+```
+
+Do not continue until the context issue is resolved.
+
+## Status Vocabulary
+
+Use these values literally. Never turn a blocked or unmeasured verification into a pass.
+
+| Status           | Meaning                                                              |
+| ---------------- | -------------------------------------------------------------------- |
+| `PASS`           | Direct evidence verified the check                                   |
+| `FAIL`           | Direct evidence verified a defect                                    |
+| `BLOCKED`        | Access, permission, credential, or dependency prevented verification |
+| `NO_BASELINE`    | No earlier measurement exists for comparison                         |
+| `NO_DATA`        | The authorized source was reachable but returned no data             |
+| `NOT_MEASURED`   | The metric was not measured; this is never a perfect score           |
+| `NOT_APPLICABLE` | The check does not apply to this target                              |
+
+Never invent search volume, traffic, keyword difficulty, CPC, domain rating, backlink
+counts, conversion rates, audience sizes, sensor health, or deployment/indexing outcomes.
+Record the authorized source and provenance for every material measurement.

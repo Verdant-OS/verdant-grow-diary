@@ -51,6 +51,32 @@ describe("resolveCreateTargetGrowId", () => {
     expect(r.requestedSetupUnavailable).toBe(true);
     expect(r.explicitRequest).toBe(true);
   });
+
+  it("does not resolve a cached requested or active setup while grows refresh", () => {
+    const requested = resolveCreateTargetGrowId({
+      pageDefaultGrowId: "g2",
+      activeGrowId: "g1",
+      grows,
+      growsLoading: true,
+    });
+    expect(requested).toEqual({
+      targetGrowId: null,
+      requestedSetupUnavailable: false,
+      explicitRequest: true,
+    });
+
+    const active = resolveCreateTargetGrowId({
+      pageDefaultGrowId: null,
+      activeGrowId: "g1",
+      grows,
+      growsLoading: true,
+    });
+    expect(active).toEqual({
+      targetGrowId: null,
+      requestedSetupUnavailable: false,
+      explicitRequest: false,
+    });
+  });
 });
 
 describe("buildCreateGrowBindingView", () => {
@@ -97,6 +123,40 @@ describe("buildCreateGrowBindingView", () => {
     expect(v.kind).toBe("loading");
     expect(v.blockSubmit).toBe(true);
     expect(v.showStartRoomHardStop).toBe(false);
+  });
+
+  it("blocks while refreshing a cached valid setup", () => {
+    const v = buildCreateGrowBindingView(
+      {
+        pageDefaultGrowId: "g2",
+        activeGrowId: "g1",
+        grows,
+        growsLoading: true,
+      },
+      "plant",
+    );
+    expect(v.kind).toBe("loading");
+    expect(v.blockSubmit).toBe(true);
+    expect(v.targetGrowId).toBeNull();
+    expect(v.showLoading).toBe(true);
+    expect(canWriteCreateGrowId(v.targetGrowId)).toBe(false);
+  });
+
+  it("keeps an invalid explicit setup in loading state until refresh settles", () => {
+    const v = buildCreateGrowBindingView(
+      {
+        pageDefaultGrowId: "ghost",
+        activeGrowId: "g1",
+        grows,
+        growsLoading: true,
+      },
+      "plant",
+    );
+    expect(v.kind).toBe("loading");
+    expect(v.blockSubmit).toBe(true);
+    expect(v.targetGrowId).toBeNull();
+    expect(v.showRequestedUnavailable).toBe(false);
+    expect(v.showPickGrowHint).toBe(false);
   });
 
   it("blocks when grows exist but no resolvable target", () => {

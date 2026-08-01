@@ -15,7 +15,6 @@
  * source set to "manual" by the pure helper in src/lib/quickLogRules.ts.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Camera, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -96,7 +95,6 @@ export default function PlantQuickLog({
 }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const { setActiveGrowId } = useGrows();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const libraryFileRef = useRef<HTMLInputElement | null>(null);
@@ -273,7 +271,9 @@ export default function PlantQuickLog({
               label: "View timeline",
               onClick: () => {
                 const href = timelineHrefAfterQuickLogSave(growId);
-                if (href) navigate(href);
+                if (href && typeof window !== "undefined") {
+                  window.location.assign(href);
+                }
               },
             }
           : undefined,
@@ -285,7 +285,9 @@ export default function PlantQuickLog({
       });
       // Pin active grow before dispatch so Timeline's activeGrowId effect
       // reloads the scope that received this log.
-      if (growId) setActiveGrowId(growId);
+      if (growId && typeof setActiveGrowId === "function") {
+        setActiveGrowId(growId);
+      }
       window.dispatchEvent(
         new CustomEvent("verdant:entry-created", {
           detail: buildEntryCreatedScopeDetail({

@@ -7,6 +7,8 @@ const ROUTES = [
   "/guides/cannabis-burnt-crispy-leaf-tips",
 ] as const;
 
+const HUB_ROUTE = ROUTES[0];
+
 const VIEWPORTS = [
   { name: "small-phone", width: 320, height: 720 },
   { name: "phone", width: 390, height: 844 },
@@ -43,7 +45,16 @@ test.describe("public symptom guides — responsive burden", () => {
         await expect(
           page.getByRole("region", { name: "Scrollable symptom evidence table" }),
         ).toHaveAttribute("tabindex", "0");
-        await expect(page.getByRole("link", { name: /quick log/i }).first()).toBeVisible();
+        const evidenceHubLink = page.getByRole("link", {
+          name: "Open the symptom evidence hub",
+          exact: true,
+        });
+        if (route === HUB_ROUTE) {
+          await expect(evidenceHubLink).toHaveCount(0);
+        } else {
+          await expect(evidenceHubLink).toBeVisible();
+          await expect(evidenceHubLink).toHaveAttribute("href", HUB_ROUTE);
+        }
 
         const overflow = await page.evaluate(
           () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -60,6 +71,20 @@ test.describe("public symptom guides — responsive burden", () => {
     await expect(link).toBeVisible();
     await link.click();
     await expect(page).toHaveURL(/\/guides\/cannabis-leaf-symptoms$/);
+    await expect(page.getByTestId("symptom-reference-table")).toBeVisible();
+  });
+
+  test("focused guide CTA opens the symptom evidence hub", async ({ page }) => {
+    await page.goto("/guides/cannabis-leaves-turning-yellow", {
+      waitUntil: "domcontentloaded",
+    });
+    const link = page.getByRole("link", {
+      name: "Open the symptom evidence hub",
+      exact: true,
+    });
+    await expect(link).toHaveAttribute("href", HUB_ROUTE);
+    await link.click();
+    await expect(page).toHaveURL(new RegExp(`${HUB_ROUTE}$`));
     await expect(page.getByTestId("symptom-reference-table")).toBeVisible();
   });
 });

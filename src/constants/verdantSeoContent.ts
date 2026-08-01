@@ -1649,18 +1649,6 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     intro:
       "A visible sign is the start of an investigation, not the name of a cause. Record where it appears, the confirmed plant stage, and what changed nearby. Then compare environment, watering, feeding, and lighting history before deciding what deserves a controlled follow-up.",
     referenceTable: CANNABIS_SYMPTOM_REFERENCE_TABLE,
-    cta: {
-      label: "Open Quick Log",
-      to: "/quick-log",
-      heading: "Preserve the observation while it is fresh",
-      description:
-        "Choose the plant in Quick Log, record the visible sign and stage, and add a short note. Nothing is diagnosed or changed automatically.",
-      prompts: [
-        "Photograph affected and unaffected growth from repeatable angles",
-        "Record whether the pattern starts low, high, or across the whole plant",
-        "Keep the observation tied to the correct grow, tent, and plant",
-      ],
-    },
     sections: [
       {
         heading: "Start with what is visible",
@@ -1717,11 +1705,11 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "Yellowing describes a color change. It does not, by itself, identify a nutrient deficiency, pH problem, watering problem, root issue, light response, or normal aging. The safest first move is to preserve the pattern and compare it with recent plant history.",
     referenceTable: symptomReferenceTableFor("yellowing"),
     cta: {
-      label: "Record yellowing in Quick Log",
-      to: "/quick-log",
-      heading: "Capture the pattern before changing inputs",
+      label: "Open the symptom evidence hub",
+      to: "/guides/cannabis-leaf-symptoms",
+      heading: "Compare yellowing evidence before changing inputs",
       description:
-        "Record the visible sign and confirmed stage. The grower reviews and saves; Verdant does not diagnose or adjust equipment.",
+        "Use the symptom evidence hub to compare this visible pattern with environment, watering, feeding, and lighting context before deciding what to verify next.",
     },
     sections: [
       {
@@ -1776,11 +1764,11 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "Spots and lesions can overlap across physical damage, residue, spray response, pests, pathogens, environment, root-zone problems, and nutrition. A single photograph should not turn that overlap into certainty. Record the distribution and compare how the pattern changes.",
     referenceTable: symptomReferenceTableFor("spots"),
     cta: {
-      label: "Record spots in Quick Log",
-      to: "/quick-log",
-      heading: "Build a traceable observation",
+      label: "Open the symptom evidence hub",
+      to: "/guides/cannabis-leaf-symptoms",
+      heading: "Compare spots and lesions without naming a cause",
       description:
-        "Record the sign, stage, location, and photo. Verdant preserves the evidence and leaves the decision with the grower.",
+        "Use the symptom evidence hub to compare this visible pattern with environment, watering, feeding, and lighting context before deciding what to verify next.",
     },
     sections: [
       {
@@ -1838,11 +1826,11 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "Dry brown tips and edges are easy to label and hard to explain from appearance alone. Record where they occur, whether damage is progressing, and what changed before comparing feeding, root-zone, light, and heat evidence.",
     referenceTable: symptomReferenceTableFor("tip_damage"),
     cta: {
-      label: "Record tip damage in Quick Log",
-      to: "/quick-log",
-      heading: "Preserve the baseline before another change",
+      label: "Open the symptom evidence hub",
+      to: "/guides/cannabis-leaf-symptoms",
+      heading: "Compare tip-damage evidence before another change",
       description:
-        "Record the visible sign, confirmed stage, and location. Nothing is diagnosed, queued, or controlled automatically.",
+        "Use the symptom evidence hub to compare this visible pattern with environment, watering, feeding, and lighting context before deciding what to verify next.",
     },
     sections: [
       {

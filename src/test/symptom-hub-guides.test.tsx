@@ -24,22 +24,35 @@ afterEach(() => {
 });
 
 describe("public symptom hub and guides", () => {
-  it.each(SLUGS)(
-    "publishes %s with editorial provenance, Quick Log CTA, and cautious language",
-    (slug) => {
-      const guide = findGuideBySlug(slug)!;
-      expect(guide).not.toBeNull();
-      expect(guide.publishedOn).toBe("2026-08-01");
-      expect(guide.modifiedOn).toBe("2026-08-01");
-      expect(guide.cta?.to).toBe("/quick-log");
-      expect(guide.referenceTable?.rows.length).toBeGreaterThan(0);
-      const copy = JSON.stringify(guide);
-      expect(copy).toMatch(/not a diagnosis|does not|do not|without/i);
-      expect(copy).not.toMatch(
-        /auto[- ]?(?:diagnos|treat|adjust|control)|guaranteed cure|definitely deficient/i,
-      );
-    },
-  );
+  it.each(SLUGS)("publishes %s with editorial provenance and cautious language", (slug) => {
+    const guide = findGuideBySlug(slug)!;
+    expect(guide).not.toBeNull();
+    expect(guide.publishedOn).toBe("2026-08-01");
+    expect(guide.modifiedOn).toBe("2026-08-01");
+    expect(guide.referenceTable?.rows.length).toBeGreaterThan(0);
+    const copy = JSON.stringify(guide);
+    expect(copy).toMatch(/not a diagnosis|does not|do not|without/i);
+    expect(copy).not.toMatch(
+      /auto[- ]?(?:diagnos|treat|adjust|control)|guaranteed cure|definitely deficient/i,
+    );
+  });
+
+  it("keeps every symptom-guide CTA destination truthful to its label and contract", () => {
+    const hub = findGuideBySlug("cannabis-leaf-symptoms")!;
+    expect(hub.cta).toBeUndefined();
+
+    for (const slug of SLUGS.slice(1)) {
+      const cta = findGuideBySlug(slug)?.cta;
+      expect(cta).toMatchObject({
+        label: "Open the symptom evidence hub",
+        to: "/guides/cannabis-leaf-symptoms",
+      });
+
+      const ctaCopy = `${cta?.label} ${cta?.heading} ${cta?.description}`;
+      expect(ctaCopy).toMatch(/compare|evidence|verify/i);
+      expect(ctaCopy).not.toMatch(/quick log|\brecord\b|\bsave\b|diary entry/i);
+    }
+  });
 
   it("uses one shared accessible table and one exact no-stack rule", () => {
     render(<SymptomReferenceTable table={CANNABIS_SYMPTOM_REFERENCE_TABLE} />);

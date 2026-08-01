@@ -14,23 +14,17 @@ inside the active governance handoff.
 
 ## Branch topology
 
-| Branch               | Role                                             | Verified head                                                      |
-| -------------------- | ------------------------------------------------ | ------------------------------------------------------------------ |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `b62aac5d4b0e9296bfdbee4c46e03fc35f350c0c`                         |
-| `main`               | Integration branch. It is not production parity. | `eac141272adbc80ac94cb0dccf61fa7b472a164e` at the governance audit |
+| Branch               | Role                                             | Verified head                              |
+| -------------------- | ------------------------------------------------ | ------------------------------------------ |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `e623aa9d913698ca6795b3d6b75bd069d9a67681` |
+| `main`               | Integration branch. It is not production parity. | `2bd6fa6016add1d3ea9f50415355601cbaefb37f` |
 
-Do not infer production behavior from `main`. It is thousands of commits behind the
-deploy branch and carries materially different route and policy context.
+`main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
+`main`, and do not backport deploy-only governance or data rules without a scoped branch
+integration task.
 
-Current governance integration branch:
-`codex/sentinel-agent-governance`, based on deploy head `b62aac5d4b0e`.
-
-Source implementation: PR #625, merged to `main`. The deploy integration must preserve
-newer deploy-only rules, including migration immutability and the
-`public.subscriptions` billing source of truth.
-
-Supabase production project referenced by the deploy branch:
-`knkwiiywfkbqznbxwqfh`.
+Shared Sentinel Code was integrated into the deploy branch through [PR #626](https://github.com/Verdant-OS/verdant-grow-diary/pull/626), merged at
+`e623aa9d913698ca6795b3d6b75bd069d9a67681` on 2026-08-01T06:19:31Z.
 
 ---
 
@@ -38,16 +32,15 @@ Supabase production project referenced by the deploy branch:
 
 Verified directly on 2026-08-01:
 
-| Axis                                        | Status                                                                       |
-| ------------------------------------------- | ---------------------------------------------------------------------------- |
-| `https://verdantgrowdiary.com/version.json` | `PASS` — HTTP 200                                                            |
-| Production commit                           | `b62aac5d4b0e9296bfdbee4c46e03fc35f350c0c`                                   |
-| Production build time                       | `2026-08-01T04:24:27.477Z`                                                   |
-| Public sitemap                              | `PASS` — HTTP 200, 51 `<loc>` entries                                        |
-| robots.txt                                  | `PASS` — HTTP 200, production sitemap declared and protected prefixes listed |
-| GA4 authenticated baseline                  | `BLOCKED`                                                                    |
-| GSC authenticated baseline                  | `BLOCKED`                                                                    |
-| Four-week measurement clock                 | `NOT_STARTED`                                                                |
+| Axis                                        | Status                                                                |
+| ------------------------------------------- | --------------------------------------------------------------------- |
+| `https://verdantgrowdiary.com/version.json` | `PASS` — HTTP 200                                                     |
+| Production commit                           | `e623aa9d913698ca6795b3d6b75bd069d9a67681`                            |
+| Production build time                       | `2026-08-01T06:20:32.105Z`                                            |
+| Public sitemap / robots                     | `NOT_MEASURED` — not rechecked in this governance-only reconciliation |
+| GA4 authenticated baseline                  | `BLOCKED` — authenticated owner access unavailable                    |
+| GSC authenticated baseline                  | `BLOCKED` — authenticated owner access unavailable                    |
+| Four-week measurement clock                 | `NOT_STARTED` — no authenticated Day 0 baseline                       |
 
 No page-level traffic, impression, click, position, or CTR claim is authorized while the
 authenticated GA4/GSC baseline remains blocked. Stream identity alone is not an
@@ -57,42 +50,31 @@ authenticated measurement baseline.
 
 ## Latest deploy-head validation
 
-GitHub Actions observed for deploy head `b62aac5d4b0e`:
+PR #626's required-check snapshot contained **71 `SUCCESS`**, **2 `SKIPPED`**, and
+**1 `NEUTRAL`** result (74 total). The dedicated **Governance files agree on
+Sentinel-Version** check passed:
 
-| Check                                      | Status | Evidence          |
-| ------------------------------------------ | ------ | ----------------- |
-| CI                                         | `PASS` | run `30683844844` |
-| Full Vitest Suite (PR gate)                | `PASS` | run `30683844850` |
-| Typecheck (tsgo) + build                   | `PASS` | run `30683844838` |
-| Security regression                        | `PASS` | run `30683844848` |
-| Security DB Local                          | `PASS` | run `30683844862` |
-| CodeQL                                     | `PASS` | run `30683844713` |
-| Core Link and Form Census                  | `PASS` | run `30683844903` |
-| Required core schema present               | `FAIL` | run `30683844944` |
-| Required money-critical migrations present | `FAIL` | run `30683844865` |
+| Check                                      | Status | Evidence                                                                                                     |
+| ------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------ |
+| Governance files agree on Sentinel-Version | `PASS` | [run 30687310370](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30687310370/job/91335605848) |
 
-The two schema-guard failures are not converted to a code pass. They require the
-sandbox database credential/environment wiring to be resolved and the workflows rerun
-before the deploy branch can be described as fully green.
-
-PR #625's main-branch governance implementation passed eight full-suite shards,
-lint/typecheck/test/build, One-Tent Loop, CodeQL, and its Sentinel parity job. Those
-results are source-implementation evidence, not deploy-branch integration evidence.
+The production version endpoint confirms that the PR #626 merge commit is deployed. This
+does not prove authenticated analytics, Search Console indexing, or live database health.
 
 ---
 
 ## Current approved slice
 
-**Agent governance integration only.**
+**Agent-governance reconciliation only.**
 
 In scope:
 
-- port PR #625's platform bootstraps, role routing, handoff protocol, and parity guard to
-  the deploy branch
-- preserve all newer deploy-branch safety, migration, billing, sensor, and testing rules
-- archive the discovered local legacy master prompt under
-  `docs/archive/legacy/verdant-master-prompt-legacy.md`
-- validate the governance contract and open one small deploy-branch PR
+- retain the deployed shared Sentinel layout: root bootstraps, role routing, handoff
+  protocol, current state, and legacy-prompt archive
+- make `GEMINI.md` a full self-contained mirror of `AGENTS.md`, rather than a
+  safety-only subset
+- make CI reject both Sentinel-Version drift and full-constitution drift
+- keep the current-state record aligned with the deployed branch and evidence
 
 Out of scope:
 
@@ -100,32 +82,36 @@ Out of scope:
 - schema, RLS, authentication, migrations, or Edge Functions
 - deployment or Lovable publishing
 - GA4/GSC activation
-- changing the two failing schema-guard workflows or their secrets
+- changing the two schema-guard workflows or their secrets
+- a separate backport to the divergent `main` branch
 
 ---
 
 ## Known blockers and next approved slice
 
-1. Finish and merge the governance integration only if its relevant checks pass.
-2. Cheek supplies or resets the real sandbox database password in the correctly scoped
+1. Merge the governance-reconciliation change only after its focused checks pass and
+   Cheek approves it.
+2. A `main` backport is a separate branch-integration decision; the two branches diverge
+   and the deploy branch contains newer safety and data rules.
+3. Cheek supplies or resets the real sandbox database password in the correctly scoped
    GitHub environment secret; never commit or paste the credential into repository files.
-3. Rerun the required core and money migration guards with no code change.
-4. Record authenticated GA4/GSC Day 0 only after both sources are reachable.
-5. Start the four-week measurement clock only after the public pages are reachable and
+4. Rerun the required core and money migration guards with no code change.
+5. Record authenticated GA4/GSC Day 0 only after both sources are reachable.
+6. Start the four-week measurement clock only after the public pages are reachable and
    the authenticated baseline is recorded.
 
-No new content family, automation, device control, or schema change is approved by this
-state file.
+No new content family, automation, device control, schema change, or direct production
+write is approved by this state file.
 
 ---
 
 ## Agents currently assigned
 
-| Agent             | Assignment                                          |
-| ----------------- | --------------------------------------------------- |
-| Codex             | Deploy-branch governance integration and validation |
-| Claude            | Source implementation complete in PR #625 on `main` |
-| Grok              | Unassigned                                          |
-| Security reviewer | Unassigned                                          |
-| Gemini            | Unassigned                                          |
-| Council Chair     | Unassigned                                          |
+| Agent             | Assignment                                                      |
+| ----------------- | --------------------------------------------------------------- |
+| Codex             | Deploy-branch Sentinel governance reconciliation and validation |
+| Claude            | Unassigned                                                      |
+| Grok              | Unassigned                                                      |
+| Security reviewer | Unassigned                                                      |
+| Gemini            | Unassigned                                                      |
+| Council Chair     | Unassigned                                                      |

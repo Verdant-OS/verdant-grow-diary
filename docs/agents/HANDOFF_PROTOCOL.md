@@ -1,6 +1,6 @@
 # Verdant Agent Handoff Protocol
 
-**Sentinel-Version: 2026-08-01.2**
+**Sentinel-Version: 2026-08-01.3**
 
 Operating order is sequential. Parallel implementation by all agents is the failure this
 protocol exists to prevent.

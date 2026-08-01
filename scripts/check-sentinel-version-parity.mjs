@@ -112,12 +112,22 @@ if (geminiText && !(geminiText.includes(CORE_BEGIN) && geminiText.includes(CORE_
 
 // ------------------------------------------------------------------ BUMP
 
-/** Explicit base wins; otherwise the merge-base with the integration branch. */
+/**
+ * Explicit base first, then the merge-base with an integration branch.
+ *
+ * The explicit value falls through rather than being fatal: CI supplies it from event
+ * payloads that are empty on some triggers and all-zeros for a new branch, and a bogus
+ * base should degrade to the default rather than fail a PR for a reason unrelated to
+ * governance.
+ */
 function resolveBase() {
   const explicit = process.env.SENTINEL_BASE_SHA || process.argv[2];
-  const candidates = explicit
-    ? [explicit]
-    : ["origin/main", "origin/verdant-grow-diary", "main"];
+  const candidates = [
+    ...(explicit ? [explicit] : []),
+    "origin/main",
+    "origin/verdant-grow-diary",
+    "main",
+  ];
 
   for (const ref of candidates) {
     try {

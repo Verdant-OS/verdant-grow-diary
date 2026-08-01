@@ -53,7 +53,8 @@ describe("Quick creation shortcuts — CreatePlantDialog → Add new tent", () =
   });
 
   it("auto-selects the newly created tent on onCreated callback", () => {
-    expect(CREATE_PLANT).toMatch(/onCreated=\{\(t\)\s*=>\s*setForm\(\(f\)\s*=>\s*\(\{\s*\.\.\.f,\s*tent_id:\s*t\.id\s*\}\)\)\}/);
+    expect(CREATE_PLANT).toMatch(/onCreated=\{handleNestedTentCreated\}/);
+    expect(CREATE_PLANT).toMatch(/setForm\(\(f\)\s*=>\s*\(\{\s*\.\.\.f,\s*tent_id:\s*tent\.id\s*\}\)\)/);
   });
 
   it("preserves plant form data via functional setState (no full reset)", () => {
@@ -66,8 +67,10 @@ describe("Quick creation shortcuts — CreatePlantDialog → Add new tent", () =
     expect(CREATE_PLANT).toMatch(/No tents yet\. Create a tent first\./);
   });
 
-  it("forwards the preselected grow to the nested tent creator", () => {
-    expect(CREATE_PLANT).toMatch(/<CreateTentDialog[\s\S]*?defaultGrowId=\{defaultGrowId\}/);
+  it("forwards the resolved grow id into the nested tent creator", () => {
+    expect(CREATE_PLANT).toMatch(
+      /<CreateTentDialog[\s\S]*?defaultGrowId=\{resolvedGrowId\s*\?\?\s*undefined\}/,
+    );
   });
 });
 

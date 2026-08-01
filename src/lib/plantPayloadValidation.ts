@@ -4,11 +4,16 @@
  * Two directions, one contract:
  *  - `validatePlantInsertPayload` normalizes and rejects outbound insert
  *    payloads that would fail the DB CHECK/NOT NULL constraints, so the UI
- *    never posts a plant missing `name`, a valid `stage`/`health`, or a
- *    canonical `plant_type`.
+ *    never posts a plant missing `name`, a valid `stage`/`health`, a
+ *    canonical `plant_type`, or a verified `grow_id`. Requiring `grow_id`
+ *    here is a Verdant client-create invariant: every canonical new-plant
+ *    insert must be grow-bound. The database column may still contain
+ *    legacy null-linked rows; this does not claim the column is NOT NULL.
  *  - `validatePlantRowResponse` guards inbound rows from Lovable Cloud so a
  *    row missing `plant_type` (schema drift, cached response, RPC bypass)
- *    cannot reach the UI silently as a "photoperiod" default.
+ *    cannot reach the UI silently as a "photoperiod" default. Inbound
+ *    validation stays backward-compatible with legacy null `grow_id` rows —
+ *    it does not reject them solely because grow_id is null.
  *
  * Pure: no I/O, no React, no Supabase. Callers decide what to do with the
  * result — throw, toast, drop the row, etc.
@@ -24,8 +29,10 @@ const uuid = z.string().regex(UUID_RE, "must be a UUID");
 
 /**
  * Outbound insert payload contract. Mirrors the plants-table NOT NULL/CHECK
- * columns. `plant_type` is required and canonicalized before it leaves the
- * client — "unknown" is a legitimate value, blank/garbage is not.
+ * columns plus Verdant's client-create grow-binding invariant. `plant_type`
+ * is required and canonicalized before it leaves the client — "unknown" is
+ * a legitimate value, blank/garbage is not. `grow_id` is required on every
+ * canonical new-plant insert; `tent_id` remains optional.
  */
 export const PlantInsertPayloadSchema = z
   .object({
@@ -36,7 +43,7 @@ export const PlantInsertPayloadSchema = z
     health: z.enum(HEALTHS),
     plant_type: z.enum(PLANT_TYPE_VALUES as readonly [PlantType, ...PlantType[]]),
     tent_id: uuid.optional(),
-    grow_id: uuid.optional(),
+    grow_id: uuid,
     started_at: z.string().datetime().optional(),
   })
   .strict();

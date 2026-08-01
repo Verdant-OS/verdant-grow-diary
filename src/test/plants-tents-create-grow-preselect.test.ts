@@ -38,26 +38,27 @@ describe("Plants/Tents — preselect grow on create", () => {
     expect(TENTS).toMatch(/<CreateTentDialog\b[\s\S]*?defaultGrowId=\{validGrowId\}/);
   });
 
-  it("CreatePlantDialog accepts defaultGrowId and writes grow_id on insert", () => {
+  it("CreatePlantDialog accepts defaultGrowId and always writes a verified grow_id on insert", () => {
     expect(CREATE_PLANT).toMatch(/defaultGrowId\?\s*:\s*string/);
-    expect(CREATE_PLANT).toMatch(/payload\.grow_id\s*=\s*defaultGrowId/);
+    expect(CREATE_PLANT).toMatch(/resolveCreateGrowBinding\(/);
+    expect(CREATE_PLANT).toMatch(/grow_id:\s*binding\.growId/);
   });
 
-  it("CreatePlantDialog scopes tent options to the preselected grow", () => {
+  it("CreatePlantDialog scopes tent options to the resolved grow, not the raw prop", () => {
     expect(CREATE_PLANT).toMatch(
-      /allTents[\s\S]*?\.filter\([\s\S]*?t\.grow_id\s*===\s*defaultGrowId/,
+      /tentRows\.filter\(\s*\(t\)\s*=>\s*t\.grow_id\s*===\s*resolvedGrowId\s*\)/,
     );
   });
 
-  it("CreateTentDialog accepts defaultGrowId and writes grow_id on insert", () => {
+  it("CreateTentDialog accepts defaultGrowId and always writes a verified grow_id on insert", () => {
     expect(CREATE_TENT).toMatch(/defaultGrowId\?\s*:\s*string/);
-    expect(CREATE_TENT).toMatch(/if\s*\(defaultGrowId\)\s*payload\.grow_id\s*=\s*defaultGrowId/);
+    expect(CREATE_TENT).toMatch(/buildTentInsertPayload\(/);
+    expect(CREATE_TENT).toMatch(/resolveCreateGrowBinding\(/);
   });
 
-  it("Create dialogs do not run when invalid growId is passed (falsy validGrowId yields no grow_id)", () => {
-    // Both insert paths gate grow_id behind the truthy defaultGrowId prop.
-    expect(CREATE_PLANT).not.toMatch(/payload\.grow_id\s*=\s*growId/);
-    expect(CREATE_TENT).not.toMatch(/payload\.grow_id\s*=\s*growId/);
+  it("Create dialogs refuse to insert when the grow binding is not ready", () => {
+    expect(CREATE_TENT).toMatch(/if\s*\(!built\.ok\)/);
+    expect(CREATE_PLANT).toMatch(/if\s*\(binding\.kind\s*!==\s*"ready"\)/);
   });
 
   it("Edit flows are not touched by URL growId (create dialogs only)", () => {

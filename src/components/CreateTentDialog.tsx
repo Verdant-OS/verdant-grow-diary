@@ -43,6 +43,8 @@ interface Props {
   initiallyOpen?: boolean;
 }
 
+const EMPTY_TENT_FORM = { name: "", size: "", brand: "", stage: "seedling" };
+
 export default function CreateTentDialog({
   trigger,
   defaultGrowId,
@@ -60,7 +62,7 @@ export default function CreateTentDialog({
   const qc = useQueryClient();
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ name: "", size: "", brand: "", stage: "seedling" });
+  const [form, setForm] = useState(EMPTY_TENT_FORM);
 
   const runGrowRefresh = useCallback(() => refreshGrows(), [refreshGrows]);
   const growRetry = useCreateBindingRetry(runGrowRefresh);
@@ -97,6 +99,13 @@ export default function CreateTentDialog({
   );
 
   const formBlocked = binding.blockSubmit || !canWriteCreateGrowId(targetGrowId);
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) {
+      setForm(EMPTY_TENT_FORM);
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -135,13 +144,13 @@ export default function CreateTentDialog({
     trackFunnelEvent("tent_created");
     qc.invalidateQueries({ queryKey: ["tents"] });
     qc.invalidateQueries({ queryKey: ["grow", "tents"] });
-    setForm({ name: "", size: "", brand: "", stage: "seedling" });
+    setForm(EMPTY_TENT_FORM);
     setOpen(false);
     if (data && onCreated) onCreated(data as { id: string; name: string });
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger ?? (
           <Button size="sm" className="gradient-leaf text-primary-foreground gap-1">

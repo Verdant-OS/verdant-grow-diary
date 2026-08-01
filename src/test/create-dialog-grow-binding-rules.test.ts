@@ -141,6 +141,21 @@ describe("supplied tent contract", () => {
     expect(s.tentId).toBe("t1");
   });
 
+  it("keeps supplied tent pending while cached tents refetch (isFetching)", () => {
+    const s = evaluateSuppliedTentBinding({
+      suppliedTentId: "t1",
+      tentsLoading: false,
+      tentsFetching: true,
+      tentsLoaded: true,
+      suppliedTentRow: { id: "t1", grow_id: "g1" },
+      targetGrowId: "g1",
+    });
+    expect(s.kind).toBe("pending");
+    expect(s.blockSubmit).toBe(true);
+    expect(s.tentId).toBe("t1");
+    expect(suppliedTentBlocksWrite(s, false)).toBe(true);
+  });
+
   it("blocks tent read error with retry and forbids replacement escape", () => {
     const s = evaluateSuppliedTentBinding({
       suppliedTentId: "t1",
@@ -153,19 +168,6 @@ describe("supplied tent contract", () => {
     expect(s.blockSubmit).toBe(true);
     expect(s.allowCompatibleReplacement).toBe(false);
     expect(suppliedTentBlocksWrite(s, true)).toBe(true);
-  });
-
-  it("treats background refetch as pending (cached rows unverified)", () => {
-    const s = evaluateSuppliedTentBinding({
-      suppliedTentId: "t1",
-      tentsLoading: true,
-      tentsLoaded: false,
-      suppliedTentRow: { id: "t1", grow_id: "g1" },
-      targetGrowId: "g1",
-    });
-    expect(s.kind).toBe("pending");
-    expect(s.blockSubmit).toBe(true);
-    expect(suppliedTentBlocksWrite(s, false)).toBe(true);
   });
 
   it("missing tent after successful load allows explicit compatible replacement only", () => {

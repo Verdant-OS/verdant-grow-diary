@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-08-01.3**
+**Sentinel-Version: 2026-08-01.4**
 
 This is Verdant's universal Sentinel Code. Every agent inherits these durable product,
 engineering, data, safety, and release rules. Platform-specific bootstraps live at the
@@ -592,36 +592,64 @@ Record the authorized source and provenance for every material measurement.
 
 ## Cursor Cloud specific instructions
 
-Durable notes for cloud agents. The VM startup update script already runs
-`bun install --frozen-lockfile`, so dependencies are refreshed before you start; do not
-re-run installs unless a run fails on a missing/updated package.
+Durable, non-obvious notes for running this app in a Cursor Cloud VM. Full, verified
+runbook lives in `.claude/skills/run-verdant-grow-diary/SKILL.md` — read it for details;
+this section only captures the gotchas that are easy to get wrong. Two independent
+Cursor Cloud sessions have reported on this environment; where they disagreed, both
+observations are kept below rather than one silently overwriting the other, since VM
+snapshots can differ.
 
-- **Stack & authoritative run guide.** React + Vite + TypeScript SPA (port **8080**) backed
-  by a **hosted** Supabase project. The public anon key and URL are committed in `.env`, so
-  **no local Supabase stack is needed to run the app**. The authoritative run/build/test
-  guide is `.claude/skills/run-verdant-grow-diary/SKILL.md`; `README.md` has the overview.
-  Read the skill before driving the app — do not duplicate its commands here.
-- **Package manager is bun.** In the Cursor Cloud VM `bun install --frozen-lockfile` works
-  against the public registry — the SKILL's private-registry `403` warning does **not** apply
-  here, so prefer bun over the npm fallback. `bun` is symlinked at `/usr/local/bin/bun` so it
-  resolves in non-login shells (including the startup update script).
+- **Stack & authoritative run guide.** React + Vite + TypeScript SPA (port **8080**)
+  backed by a **hosted** Supabase project — no local Supabase stack is needed to run the
+  app. The public anon key and URL are committed in `.env`. The authoritative
+  run/build/test guide is `.claude/skills/run-verdant-grow-diary/SKILL.md`; `README.md`
+  has the overview. Read the skill before driving the app — do not duplicate its commands
+  here.
+- **Package manager — install method is snapshot-dependent; verify before assuming.**
+  Repo scripts run under **`bun`** in both observed snapshots, but install behavior
+  differed:
+  - One session found `bun install --frozen-lockfile` works fine against the public
+    registry, and the VM startup script already runs it — no reinstall needed unless a
+    run fails on a missing/updated package. `bun` was symlinked at `/usr/local/bin/bun`
+    there, resolving in non-login shells.
+  - A different session found `bun install` **fails**: `bun.lock` pinned ~137 tarball
+    URLs on a private Lovable registry mirror (`*.pkg.dev/lovable-core-prod`) that
+    `403`s outside the Lovable sandbox, and no registry override could rewrite bun's
+    locked URLs. That session's startup script installed via an **npm public-registry
+    override** instead, and `bun` itself was a pre-baked system dependency under
+    `~/.bun` (`BUN_INSTALL` on `PATH` via `~/.bashrc`), not reinstalled by the update
+    script.
+  - **New session:** try `bun install --frozen-lockfile` first; if it `403`s against a
+    private mirror, fall back to an npm install with a public-registry override. Don't
+    assume either behavior carries over from a prior session.
 - **Dev server.** `bun run dev -- --host 127.0.0.1 --port 8080`, then browse
-  `http://127.0.0.1:8080`. Bind IPv4 (`127.0.0.1`) and port 8080 explicitly — Vite's default
-  host `::` is unreliable in this container (see the SKILL "Gotchas").
-- **Lint / typecheck / test / build.** `bun run lint`, `bun run typecheck`,
-  `bunx vitest run <files>` (the full suite is very large — prefer targeted files or the
-  `test:full:shard*` scripts), `bun run build` (its postbuild step runs the SEO/JSON-LD
-  validators).
-- **Browser / e2e.** Playwright chromium is installed at the default `~/.cache/ms-playwright`
-  (not `/opt/pw-browsers` as the SKILL mentions); `.claude/skills/run-verdant-grow-diary/driver.mjs`
-  falls back to bundled chromium automatically. If a browser is ever missing after a
-  dependency bump, run `bunx playwright install chromium`. Mocked specs
-  (`--project=chromium-mocked`) need no credentials; authenticated flows need real Supabase
-  creds and the golden-path UI spec skips as BLOCKED without a managed session.
-- **Credential-free smoke surfaces.** To exercise core functionality without logging in:
-  `/quick-log` (Quick Log starter — saves a draft locally), `/tools/vpd-calculator`, and
-  `/internal/demo-proof-walkthrough`.
-- **Governance edit gate.** If you change **any** governance file (`AGENTS.md`, `CLAUDE.md`,
-  `GEMINI.md`, `.grok/rules/**`, `docs/agents/**`) you must bump `Sentinel-Version` in **all**
-  of them in the same commit — the `sentinel-version-parity` CI gate enforces both PARITY
-  (all versions equal) and BUMP (changed content requires a new version).
+  `http://127.0.0.1:8080`. Bind IPv4 (**`127.0.0.1`, not `localhost`**) and **port 8080,
+  not 5173** explicitly — Vite's default host `::` is unreliable in this container.
+  Unauthenticated `/` client-side redirects to `/welcome` / `/auth`, so an HTTP 200 on
+  `/` is still just the SPA shell.
+- **Lint / typecheck / test / build.** `bun run lint` (expect 0 errors, many
+  pre-existing warnings), `bun run typecheck`, `bun run build` (its postbuild step runs
+  the SEO/JSON-LD validators). Unit path is `bunx vitest run <files>` — the full suite
+  is very large, prefer targeted files or the `test:full:shard*` scripts.
+- **Browser / e2e.** Playwright chromium installs to `~/.cache/ms-playwright` (baked
+  into the snapshot in one session); `.claude/skills/run-verdant-grow-diary/driver.mjs`
+  falls back to bundled chromium automatically either way — run
+  `bunx playwright install chromium` if a browser is ever missing after a dependency
+  bump. For mocked UI flows use `--project=chromium-mocked` **with an explicit spec
+  filter** and set `E2E_BASE_URL=http://127.0.0.1:8080` to reuse the already-running dev
+  server — without it, some specs spawn their own server on 5173 (port conflicts) or can
+  hit real Supabase. A couple of mocked specs are known-flaky (e.g. a timing/viewport
+  assertion in `auth-loading`); treat only _new_ failures in specs you touched as
+  signal.
+- **Authenticated flows need real credentials.** The core One-Tent Loop authenticated
+  e2e (`bun run e2e:one-tent:ui`) emits a `blocked` receipt and skips without a seeded
+  session JSON / real Supabase login — that's expected, not a setup failure.
+- **Credential-free smoke surfaces.** Public interactive routes render real
+  functionality without login and are good smoke targets: `/quick-log` (Quick Log
+  starter — saves a draft locally), `/tools/vpd-calculator`, `/pheno-comparison`,
+  `/welcome`, and `/internal/demo-proof-walkthrough`.
+- **Governance edit gate.** If you change **any** governance file (`AGENTS.md`,
+  `CLAUDE.md`, `GEMINI.md`, `.grok/rules/**`, `docs/agents/**`) you must bump
+  `Sentinel-Version` in **all** of them in the same commit — the
+  `sentinel-version-parity` CI gate enforces both PARITY (all versions equal) and BUMP
+  (changed content requires a new version).

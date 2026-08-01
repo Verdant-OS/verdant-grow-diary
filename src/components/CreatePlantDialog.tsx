@@ -37,7 +37,7 @@ import {
   resolveSetupName,
   suppliedTentBlocksWrite,
 } from "@/lib/createDialogGrowBindingRules";
-import { GROW_SETUP_MESSAGES } from "@/constants/growSetupMessages";
+import { GROW_SETUP_FINISH_LINEAGE_HREF, GROW_SETUP_MESSAGES } from "@/constants/growSetupMessages";
 import { useCreateBindingRetry } from "@/hooks/useCreateBindingRetry";
 
 const STAGES = [
@@ -381,6 +381,7 @@ export default function CreatePlantDialog({
             className="rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 space-y-2"
             data-testid="create-plant-hard-stop"
             role="alert"
+            aria-label={binding.ariaLabel}
           >
             <p className="text-sm font-semibold" data-testid="create-plant-hard-stop-title">
               {binding.title}
@@ -488,14 +489,20 @@ export default function CreatePlantDialog({
         )}
         {(suppliedTent.kind === "orphan" || suppliedTent.kind === "mismatch") &&
           !explicitCompatiblePick && (
-            <p
-              className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"
+            <div
+              className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs space-y-2"
               data-testid="create-plant-tent-mismatch"
               role="alert"
+              aria-label={GROW_SETUP_MESSAGES.mismatchAriaLabel}
             >
               <span className="font-semibold block">{suppliedTent.title}</span>
-              <span className="text-muted-foreground">{suppliedTent.body}</span>
-            </p>
+              <span className="text-muted-foreground block">{suppliedTent.body}</span>
+              <Button asChild size="sm" variant="outline" className="h-7">
+                <Link to={GROW_SETUP_FINISH_LINEAGE_HREF} data-testid="create-plant-finish-setup-cta">
+                  {GROW_SETUP_MESSAGES.finishSetup}
+                </Link>
+              </Button>
+            </div>
           )}
         {!tentCompat.compatible && form.tent_id !== "none" && suppliedTent.kind === "ready" && (
           <p

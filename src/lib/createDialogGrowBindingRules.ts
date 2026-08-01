@@ -21,6 +21,14 @@ export interface GrowListItem {
   name?: string | null;
 }
 
+export interface ResolvedTargetGrow {
+  id: string;
+  name: string;
+}
+
+const GENERIC_SETUP_LABEL = "your setup";
+const UUID_LIKE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function trimId(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const t = value.trim();
@@ -34,6 +42,31 @@ export function isKnownGrowId(
   const id = trimId(growId);
   if (!id) return false;
   return grows.some((g) => g.id === id);
+}
+
+function formatSetupDisplayName(growId: string, grows: readonly GrowListItem[]): string {
+  const raw = grows.find((g) => g.id === growId)?.name?.trim() ?? "";
+  if (!raw) return GENERIC_SETUP_LABEL;
+  if (UUID_LIKE.test(raw)) return GENERIC_SETUP_LABEL;
+  return raw;
+}
+
+/**
+ * Spec helper: resolved target grow with display name (UUID-safe).
+ */
+export function resolveTargetGrow(input: {
+  pageDefaultGrowId?: string | null;
+  activeGrowId?: string | null;
+  grows: readonly GrowListItem[];
+  growsLoading?: boolean;
+  growsError?: boolean;
+}): ResolvedTargetGrow | null {
+  const resolved = resolveCreateTargetGrowId(input);
+  if (!resolved.targetGrowId) return null;
+  return {
+    id: resolved.targetGrowId,
+    name: formatSetupDisplayName(resolved.targetGrowId, input.grows),
+  };
 }
 
 export interface ResolveCreateTargetGrowResult {
@@ -88,9 +121,8 @@ export function resolveSetupName(
 ): string | null {
   const id = trimId(growId);
   if (!id) return null;
-  const hit = grows.find((g) => g.id === id);
-  const name = hit?.name?.trim();
-  return name && name.length > 0 ? name : null;
+  const name = formatSetupDisplayName(id, grows);
+  return name === GENERIC_SETUP_LABEL ? null : name;
 }
 
 export interface CreateGrowBindingView {
@@ -109,6 +141,21 @@ export interface CreateGrowBindingView {
   primaryCta: string;
   secondaryCta: string;
   retryLabel: string;
+  ariaLabel: string;
+}
+
+/** Spec alias: hard-stop slice of the full binding view. */
+export function buildHardStopView(
+  input: {
+    pageDefaultGrowId?: string | null;
+    activeGrowId?: string | null;
+    grows: readonly GrowListItem[];
+    growsLoading?: boolean;
+    growsError?: boolean;
+  },
+  entity: CreateBindingEntity,
+): CreateGrowBindingView {
+  return buildCreateGrowBindingView(input, entity);
 }
 
 export function buildCreateGrowBindingView(
@@ -129,6 +176,7 @@ export function buildCreateGrowBindingView(
     primaryCta: GROW_SETUP_MESSAGES.hardStopCta,
     secondaryCta: GROW_SETUP_MESSAGES.hardStopSecondary,
     retryLabel: GROW_SETUP_MESSAGES.readErrorRetry,
+    ariaLabel: GROW_SETUP_MESSAGES.hardStopAriaLabel,
   };
 
   if (input.growsError) {
@@ -506,6 +554,34 @@ export function evaluateTentGrowCompatibility(input: {
     clearTentSelection: false,
     blockSubmit: false,
   };
+}
+
+export type TentCompatibilityReason = "missing_target" | "missing_setup" | "different_setup";
+
+export type TentCompatibilityCheck =
+  | { ok: true }
+  | { ok: false; reason: TentCompatibilityReason; title: string; body: string };
+
+/** Spec helper: simplified tent/grow compatibility check for supplied tent rows. */
+export function checkTentGrowCompatibility(input: {
+  targetGrowId: string | null | undefined;
+  tent: { id: string; grow_id?: string | null } | null | undefined;
+}): TentCompatibilityCheck {
+  const tent = input.tent;
+  if (!tent?.id) return { ok: true };
+  const result = evaluateTentGrowCompatibility({
+    selectedTentId: tent.id,
+    tentGrowId: tent.grow_id ?? null,
+    targetGrowId: input.targetGrowId,
+  });
+  if (result.compatible) return { ok: true };
+  const reason: TentCompatibilityReason =
+    result.kind === "missing_target"
+      ? "missing_target"
+      : result.kind === "orphan_tent"
+        ? "missing_setup"
+        : "different_setup";
+  return { ok: false, reason, title: result.title, body: result.body };
 }
 
 /**

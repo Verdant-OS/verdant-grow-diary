@@ -1,9 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
   resolveCreateTargetGrowId,
+  resolveTargetGrow,
   buildCreateGrowBindingView,
+  buildHardStopView,
   canWriteCreateGrowId,
   evaluateTentGrowCompatibility,
+  checkTentGrowCompatibility,
   evaluateSuppliedTentBinding,
   resolveInitialPlantTentId,
   plantCreateAllowsTentless,
@@ -15,6 +18,82 @@ const grows = [
   { id: "g1", name: "Spring" },
   { id: "g2", name: "Fall" },
 ];
+
+const UUID_NAME = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+
+describe("resolveTargetGrow (spec API)", () => {
+  it("returns id and display name when page default is known", () => {
+    expect(
+      resolveTargetGrow({
+        pageDefaultGrowId: "g2",
+        activeGrowId: "g1",
+        grows,
+      }),
+    ).toEqual({ id: "g2", name: "Fall" });
+  });
+
+  it("never leaks a raw UUID as the setup display name", () => {
+    const target = resolveTargetGrow({
+      pageDefaultGrowId: UUID_NAME,
+      activeGrowId: null,
+      grows: [{ id: UUID_NAME, name: UUID_NAME }],
+    });
+    expect(target?.name).toBe("your setup");
+    expect(target?.name).not.toMatch(/^[0-9a-f-]{36}$/i);
+  });
+
+  it("uses generic label when setup name is blank", () => {
+    const target = resolveTargetGrow({
+      pageDefaultGrowId: "g-blank",
+      activeGrowId: null,
+      grows: [{ id: "g-blank", name: "   " }],
+    });
+    expect(target?.name).toBe("your setup");
+  });
+});
+
+describe("buildHardStopView (spec API)", () => {
+  it("mirrors no_setup hard stop for zero grows", () => {
+    const v = buildHardStopView(
+      { pageDefaultGrowId: null, activeGrowId: null, grows: [] },
+      "plant",
+    );
+    expect(v.blockSubmit).toBe(true);
+    expect(v.showStartRoomHardStop).toBe(true);
+    expect(v.startRoomHref).toBe(GROW_SETUP_START_ROOM_HREF);
+    expect(v.title).toMatch(/Start your room first/i);
+    expect(v.ariaLabel.length).toBeGreaterThan(0);
+  });
+});
+
+describe("checkTentGrowCompatibility (spec API)", () => {
+  it("accepts matching tent", () => {
+    expect(
+      checkTentGrowCompatibility({
+        targetGrowId: "g1",
+        tent: { id: "t1", grow_id: "g1" },
+      }).ok,
+    ).toBe(true);
+  });
+
+  it("rejects orphan tent when target known", () => {
+    const check = checkTentGrowCompatibility({
+      targetGrowId: "g1",
+      tent: { id: "t1", grow_id: null },
+    });
+    expect(check.ok).toBe(false);
+    if (check.ok === false) expect(check.reason).toBe("missing_setup");
+  });
+
+  it("rejects mismatched tent grow", () => {
+    const check = checkTentGrowCompatibility({
+      targetGrowId: "g1",
+      tent: { id: "t1", grow_id: "g2" },
+    });
+    expect(check.ok).toBe(false);
+    if (check.ok === false) expect(check.reason).toBe("different_setup");
+  });
+});
 
 describe("resolveCreateTargetGrowId", () => {
   it("prefers page default when known", () => {

@@ -4,6 +4,7 @@
  */
 
 export const GROW_SETUP_START_ROOM_HREF = "/grows?intent=one_tent_activation" as const;
+export const GROW_SETUP_FINISH_LINEAGE_HREF = "/grow-lineage" as const;
 
 export const GROW_SETUP_MESSAGES = {
   hardStopTitle: "Start your room first",
@@ -46,13 +47,43 @@ export const GROW_SETUP_MESSAGES = {
   chooseTent: "Choose tent",
   switchSetup: "Switch setup",
   finishSetup: "Finish setup",
+  hardStopAriaLabel: "Setup required before creating",
+  mismatchAriaLabel: "Tent setup mismatch",
+} as const;
+
+/** Approved nested keys for contract tests and docs. */
+export const growSetup = {
+  noSetup: {
+    title: GROW_SETUP_MESSAGES.hardStopTitle,
+    body: GROW_SETUP_MESSAGES.hardStopBody,
+    primaryCta: GROW_SETUP_MESSAGES.hardStopCta,
+    secondaryCta: GROW_SETUP_MESSAGES.hardStopSecondary,
+    href: GROW_SETUP_START_ROOM_HREF,
+    ariaLabel: GROW_SETUP_MESSAGES.hardStopAriaLabel,
+  },
+  create: {
+    addingTo: GROW_SETUP_MESSAGES.addingTo,
+    addingToHint: GROW_SETUP_MESSAGES.addingToHint,
+  },
+  mismatch: {
+    differentSetupTitle: GROW_SETUP_MESSAGES.tentMismatchTitle,
+    differentSetupBody: GROW_SETUP_MESSAGES.tentMismatchBody,
+    missingSetupTitle: GROW_SETUP_MESSAGES.tentOrphanTitle,
+    missingSetupBody: GROW_SETUP_MESSAGES.tentOrphanBody,
+    finishSetupCta: GROW_SETUP_MESSAGES.finishSetup,
+    finishSetupHref: GROW_SETUP_FINISH_LINEAGE_HREF,
+    ariaLabel: GROW_SETUP_MESSAGES.mismatchAriaLabel,
+  },
 } as const;
 
 /** Tokens that must never appear in grower-facing create-binding UI. */
 export const GROW_SETUP_BANNED_UI_TOKENS = [
   "grow_id",
   "orphan",
-  "lineage",
+  "unbound",
+  "lineage repair",
   "backfill",
+  "migration",
+  "constraint",
   "null grow",
 ] as const;

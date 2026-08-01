@@ -23,6 +23,7 @@ import QuickLogV2Fab from "@/components/QuickLogV2Fab";
 import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
 import PlantLogStreakMarker from "@/components/PlantLogStreakMarker";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
+import PlantGrowContextRescueCard from "@/components/PlantGrowContextRescueCard";
 import PlantDetailPhotoStrip from "@/components/PlantDetailPhotoStrip";
 import PlantDetailRecentActivityRecap from "@/components/PlantDetailRecentActivityRecap";
 import PlantDetailHarvestWatchCard from "@/components/PlantDetailHarvestWatchCard";
@@ -40,7 +41,10 @@ import PlantProfileContextCard from "@/components/PlantProfileContextCard";
 import { updatePlantProfileMetadata } from "@/lib/plantProfileMetadataUpdate";
 import PlantDetailTimelineEvidenceReadinessLaunch from "@/components/PlantDetailTimelineEvidenceReadinessLaunch";
 import PlantDetailAskDoctorHelper from "@/components/PlantDetailAskDoctorHelper";
-import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID, PLANT_PHOTOS_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
+import {
+  PLANT_RELATIVE_TIMELINE_ANCHOR_ID,
+  PLANT_PHOTOS_ANCHOR_ID,
+} from "@/lib/plantDetailQuickActions";
 import PlantDetailSectionNav from "@/components/PlantDetailSectionNav";
 import { PLANT_DETAIL_SECTION_ANCHORS } from "@/lib/plantDetailSectionAnchors";
 
@@ -76,11 +80,7 @@ import {
 } from "@/lib/plantDetailBlockedStateViewModel";
 import { useSearchParams } from "react-router-dom";
 
-function BlockedStateBackLink({
-  action,
-}: {
-  action: PlantDetailBlockedStateAction;
-}) {
+function BlockedStateBackLink({ action }: { action: PlantDetailBlockedStateAction }) {
   return (
     <Button asChild variant="ghost" className="min-h-11">
       <Link to={action.path} data-testid={action.testId}>
@@ -97,13 +97,9 @@ function BlockedStateView({
   view: PlantDetailBlockedStateView;
   onRetry?: () => void;
 }) {
-  const isMissingLike =
-    view.kind === "not-found" || view.kind === "archived";
+  const isMissingLike = view.kind === "not-found" || view.kind === "archived";
   return (
-    <div
-      data-testid={view.testId}
-      role={view.kind === "loading-slow" ? "alert" : undefined}
-    >
+    <div data-testid={view.testId} role={view.kind === "loading-slow" ? "alert" : undefined}>
       <EmptyState
         icon={
           isMissingLike ? (
@@ -146,9 +142,7 @@ function BlockedStateView({
               </Button>
             )}
             <BlockedStateBackLink action={view.primaryBack} />
-            {view.secondaryBack && (
-              <BlockedStateBackLink action={view.secondaryBack} />
-            )}
+            {view.secondaryBack && <BlockedStateBackLink action={view.secondaryBack} />}
           </div>
         }
       />
@@ -190,8 +184,8 @@ function ArchivedTimelineReadOnlyView({
           <div>
             <div className="font-medium">Archived timeline — read-only</div>
             <p className="text-xs text-amber-200/80 mt-0.5">
-              Showing preserved history for {plant.name}. No write actions are
-              available in this view.
+              Showing preserved history for {plant.name}. No write actions are available in this
+              view.
             </p>
           </div>
         </div>
@@ -216,11 +210,7 @@ function ArchivedTimelineReadOnlyView({
             tentId={plant.tentId}
           />
           <ManualSnapshotTimelineSection scope="plant" plantId={plant.id} />
-          <QuickLogGroupedTimelineSection
-            scope="plant"
-            plantId={plant.id}
-            tentId={plant.tentId}
-          />
+          <QuickLogGroupedTimelineSection scope="plant" plantId={plant.id} tentId={plant.tentId} />
           <TimelineMemorySection scope="plant" plantId={plant.id} />
         </div>
       </div>
@@ -228,16 +218,23 @@ function ArchivedTimelineReadOnlyView({
   );
 }
 
-
 export default function PlantDetail() {
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const contextTentId = searchParams.get("tentId");
+  const openQuickLogParam = searchParams.get("openQuickLog");
   const { data: plant, isLoading, isError, refetch } = useGrowPlant(id);
   const { data: tent } = useGrowTent(plant?.tentId);
   const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null]);
   const tentMeta = getGrowDataMeta(["grow", "tent", plant?.tentId ?? null]);
+
+  // First-session / deep-link: open PlantQuickLog once when ?openQuickLog=1
+  useEffect(() => {
+    if (openQuickLogParam !== "1") return;
+    if (!plant?.id) return;
+    setQuickLogOpen(true);
+  }, [openQuickLogParam, plant?.id]);
 
   // Bounded-loading guard: if the plant query never settles (slow network,
   // hung Supabase request, etc.) we must not leave the grower on a blank
@@ -251,10 +248,7 @@ export default function PlantDetail() {
       return;
     }
     setLoadTimedOut(false);
-    const handle = setTimeout(
-      () => setLoadTimedOut(true),
-      PLANT_DETAIL_LOAD_TIMEOUT_MS,
-    );
+    const handle = setTimeout(() => setLoadTimedOut(true), PLANT_DETAIL_LOAD_TIMEOUT_MS);
     return () => clearTimeout(handle);
   }, [id, isLoading]);
 
@@ -314,8 +308,7 @@ export default function PlantDetail() {
     );
   }
 
-  const archivedTimelineMode =
-    searchParams.get("mode") === "archived-timeline";
+  const archivedTimelineMode = searchParams.get("mode") === "archived-timeline";
 
   if (blockedView && blockedView.kind === "archived") {
     if (archivedTimelineMode && plant) {
@@ -345,9 +338,6 @@ export default function PlantDetail() {
       </div>
     );
   }
-
-
-
 
   const ageDays = Math.floor((Date.now() - new Date(plant.startedAt).getTime()) / 86400000);
   return (
@@ -403,6 +393,14 @@ export default function PlantDetail() {
         tentId={plant.tentId ?? null}
         tentName={tent?.name ?? null}
       />
+      <PlantGrowContextRescueCard
+        plantId={plant.id}
+        plantGrowId={plant.growId ?? null}
+        plantTentId={plant.tentId ?? null}
+        onRepaired={() => {
+          void refetch();
+        }}
+      />
       <PlantDetailAskDoctorHelper
         plantId={plant.id}
         stage={plant.stage ?? null}
@@ -446,10 +444,7 @@ export default function PlantDetail() {
         plantId={plant.id}
         onAddQuickCheck={() => setQuickLogOpen(true)}
       />
-      <PlantDetailHarvestWatchCard
-        plantId={plant.id}
-        hasPlantPhoto={!!plant.photo}
-      />
+      <PlantDetailHarvestWatchCard plantId={plant.id} hasPlantPhoto={!!plant.photo} />
       <PlantDetailHarvestEvidenceReportMount plantId={plant.id} />
       <PlantDetailAiDoctorReadiness
         plantId={plant.id}
@@ -496,18 +491,9 @@ export default function PlantDetail() {
         plantName={plant.name}
         tentName={tent?.name ?? null}
       />
-      <PlantDetailAiDoctorReadinessGate
-        plantId={plant.id}
-        plant={plant}
-        hasSafeAiDoctorFlow
-      />
-      <PlantDetailAiDoctorSafeReviewStart
-        plantId={plant.id}
-        plant={plant}
-      />
-      <AiDoctorReviewResultPreview
-        testIdPrefix="plant-detail"
-      />
+      <PlantDetailAiDoctorReadinessGate plantId={plant.id} plant={plant} hasSafeAiDoctorFlow />
+      <PlantDetailAiDoctorSafeReviewStart plantId={plant.id} plant={plant} />
+      <AiDoctorReviewResultPreview testIdPrefix="plant-detail" />
       <PlantDetailAiDoctorLiveReview
         plantId={plant.id}
         plant={plant}
@@ -515,15 +501,13 @@ export default function PlantDetail() {
         tentId={plant.tentId ?? null}
       />
 
-      <div id="plant-ai-doctor-context-panel" tabIndex={-1} className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
-        <PlantDetailAiDoctorContextPanel
-          plantId={plant.id}
-          plant={plant}
-        />
+      <div
+        id="plant-ai-doctor-context-panel"
+        tabIndex={-1}
+        className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+      >
+        <PlantDetailAiDoctorContextPanel plantId={plant.id} plant={plant} />
       </div>
-
-
-
 
       {!isActivePlant(plant) && (
         <ArchivedPlantBanner plantId={plant.id} lastNote={plant.lastNote} />
@@ -668,10 +652,7 @@ export default function PlantDetail() {
             plantId={plant.id}
             onUpdate={() => setQuickLogOpen(true)}
           />
-          <PlantSensorSourceBreakdownCard
-            plantId={plant.id}
-            className="mt-1"
-          />
+          <PlantSensorSourceBreakdownCard plantId={plant.id} className="mt-1" />
           <PlantTentEnvironmentPanel
             tentId={plant.tentId ?? null}
             tentName={tent?.name ?? null}
@@ -706,8 +687,6 @@ export default function PlantDetail() {
             tentId={plant.tentId ?? null}
           />
           <TimelineMemorySection scope="plant" plantId={plant.id} />
-
-
 
           <section
             aria-labelledby="plant-daily-grow-check-section-heading"
@@ -778,7 +757,6 @@ export default function PlantDetail() {
           >
             <PlantAiDoctorSessionsPanel plantId={plant.id} />
           </div>
-
         </div>
       </div>
     </div>

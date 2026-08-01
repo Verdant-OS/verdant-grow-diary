@@ -18,12 +18,12 @@ describe("Tents list — stage-aware Temp/RH wiring", () => {
   });
   it("wires Temperature MetricChip through classifyTempAgainstStage", () => {
     expect(TENTS).toMatch(
-      /label="T"[\s\S]*environmentMetricChipStatus\(classifyTempAgainstStage\(/,
+      /label="T"[\s\S]*environmentMetricChipStatus\(\s*classifyTempAgainstStage\(/,
     );
   });
   it("wires RH MetricChip through classifyRhAgainstStage", () => {
     expect(TENTS).toMatch(
-      /label="RH"[\s\S]*environmentMetricChipStatus\(classifyRhAgainstStage\(/,
+      /label="RH"[\s\S]*environmentMetricChipStatus\(\s*classifyRhAgainstStage\(/,
     );
   });
   it("removes hardcoded temp threshold expressions", () => {

@@ -44,6 +44,7 @@ describe("dispatchQuickLogV2EntryCreated", () => {
       createdAt: "2026-06-19T12:00:00.000Z",
       growEventId: "ge_new_1",
       source: "quick_log_v2",
+      growId: "grow_1",
     });
     expect(ok).toBe(true);
     expect(captured).toHaveLength(1);
@@ -52,6 +53,7 @@ describe("dispatchQuickLogV2EntryCreated", () => {
       createdAt: "2026-06-19T12:00:00.000Z",
       growEventId: "ge_new_1",
       source: "quick_log_v2",
+      growId: "grow_1",
     });
   });
 
@@ -61,9 +63,7 @@ describe("dispatchQuickLogV2EntryCreated", () => {
       growEventId: "ge_feed_1",
       source: "quick_log_v2_feed",
     });
-    expect((captured[0].detail as { source: string }).source).toBe(
-      "quick_log_v2_feed",
-    );
+    expect((captured[0].detail as { source: string }).source).toBe("quick_log_v2_feed");
   });
 
   it("tolerates a null growEventId (some save paths don't return one)", () => {
@@ -84,8 +84,7 @@ describe("dispatchQuickLogV2EntryCreated", () => {
       growEventId: null,
       source: "quick_log_v2",
     });
-    (window as { dispatchEvent: typeof originalDispatch }).dispatchEvent =
-      originalDispatch;
+    (window as { dispatchEvent: typeof originalDispatch }).dispatchEvent = originalDispatch;
     expect(ok).toBe(false);
     expect(captured).toHaveLength(0);
   });
@@ -95,16 +94,11 @@ describe("dispatchQuickLogV2EntryCreated", () => {
 // Source-level contract — both save branches dispatch, only on success
 // ---------------------------------------------------------------------------
 
-const SHEET_SRC = readFileSync(
-  resolve(__dirname, "../components/QuickLogV2Sheet.tsx"),
-  "utf8",
-);
+const SHEET_SRC = readFileSync(resolve(__dirname, "../components/QuickLogV2Sheet.tsx"), "utf8");
 
 describe("QuickLogV2Sheet — source-level dispatch contract", () => {
   it("imports the dispatch helper from the rules layer", () => {
-    expect(SHEET_SRC).toMatch(
-      /from\s+["']@\/lib\/quickLogV2EntryCreatedEvent["']/,
-    );
+    expect(SHEET_SRC).toMatch(/from\s+["']@\/lib\/quickLogV2EntryCreatedEvent["']/);
     expect(SHEET_SRC).toMatch(/dispatchQuickLogV2EntryCreated/);
   });
 
@@ -123,9 +117,7 @@ describe("QuickLogV2Sheet — source-level dispatch contract", () => {
         .map((needle) => SHEET_SRC.indexOf(needle))
         .filter((i) => i >= 0),
     );
-    const firstDispatchIdx = SHEET_SRC.indexOf(
-      "dispatchQuickLogV2EntryCreated(",
-    );
+    const firstDispatchIdx = SHEET_SRC.indexOf("dispatchQuickLogV2EntryCreated(");
     expect(firstSaveIdx).toBeGreaterThan(0);
     expect(firstDispatchIdx).toBeGreaterThan(firstSaveIdx);
   });

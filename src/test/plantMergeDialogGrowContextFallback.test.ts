@@ -71,14 +71,16 @@ describe("PlantMergeDialog grow-context fallback", () => {
 });
 
 describe("CreatePlantDialog grow-context hardening", () => {
-  it("derives grow_id from the selected tent when defaultGrowId is missing", () => {
-    expect(CREATE).toMatch(/selectedTent\?\.grow_id/);
-    expect(CREATE).toMatch(/payload\.grow_id\s*=\s*selectedTent\.grow_id/);
+  it("always writes an explicit target grow_id (fail closed — no tent-only guess)", () => {
+    expect(CREATE).toMatch(/grow_id:\s*targetGrowId/);
+    expect(CREATE).toMatch(/canWriteCreateGrowId/);
+    expect(CREATE).toMatch(/hardStop\.blockSubmit|buildCreateGrowHardStopView/);
   });
 
-  it("still preserves defaultGrowId when explicitly preselected", () => {
-    expect(CREATE).toMatch(/if\s*\(defaultGrowId\)/);
-    expect(CREATE).toMatch(/payload\.grow_id\s*=\s*defaultGrowId/);
+  it("resolves target grow from page default then dialog selection", () => {
+    expect(CREATE).toMatch(
+      /targetGrowId\s*=\s*defaultGrowId\s*\?\?\s*\(form\.grow_id\s*\|\|\s*undefined\)/,
+    );
   });
 
   it("does not introduce any cross-grow override", () => {

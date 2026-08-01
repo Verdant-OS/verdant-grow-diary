@@ -520,16 +520,25 @@ export const GOVERNED_RESULT_KEYS: Record<keyof SkillRunResult, "governed" | "ex
 /**
  * EVERY rule code that causes `block()` — structural as well as linguistic.
  *
- * The linguistic ones come from BLOCKING_FAMILIES below; these five are
- * raised structurally and have no prose to detect, so a consumer scanning
- * only the families misses them entirely. Kept beside the families because
- * anything added to `block()` belongs in one of the two.
+ * The linguistic ones come from BLOCKING_FAMILIES below; these are raised
+ * structurally and have no prose to detect, so a consumer scanning only the
+ * families misses them entirely.
+ *
+ * This listed FIVE when written, and there are nine. The search that produced
+ * it required the code on the same line as `block(`, and four calls span
+ * lines — so a list asserting its own completeness was wrong the moment it
+ * was committed. When adding a code, check every `block(` site across
+ * newlines, not by eye.
  */
 export const STRUCTURAL_BLOCKING_RULE_CODES: readonly SkillPolicyRuleCode[] = Object.freeze([
+  "autoflower_stress_blocked",
   "capability_exceeds_manifest",
-  "risk_exceeds_declared_class",
   "confidence_below_action_floor",
+  "plant_identity_contradictory",
   "proposal_evidence_untrustworthy",
+  "risk_exceeds_confidence_ceiling",
+  "risk_exceeds_declared_class",
+  "stage_forbids_intervention_class",
   "unresolved_follow_up_open",
 ]);
 

@@ -328,6 +328,12 @@ const executionApplicabilitySchema = z
  */
 const executionFiredRuleSchema = z
   .object({
+    // WHAT the rule is about. The governor always attaches a structural block
+    // to a proposal, and the evaluator groups rules by proposalId — so a rule
+    // omitting these was silently skipped, letting the proposal keep an allow
+    // verdict that its own recorded block should have contradicted.
+    subject: z.enum(["run", "proposal", "hypothesis", "follow_up", "evidence"]),
+    proposalId: z.string().min(1).nullable(),
     // The governor's OWN codes. Any string was accepted, and the evaluator
     // recognises equipment-control findings by exact code — so a record could
     // replace `device_control_instruction` with a plausible typo, keep the
@@ -405,6 +411,18 @@ const executionPolicySchema = z
     // Written as an equivalence rather than as four `if`s, because the last
     // two rounds each added one more direction to a check that needed all of
     // them, and an equivalence cannot be half-written.
+    // NOT constrained here: `observation_only`.
+    //
+    // Codex is right that the governor emits it only when no verdict allows
+    // and none blocks, so listing it beside an allowance is a decision it
+    // cannot produce. I wrote that as a biconditional — implied whenever there
+    // are no verdicts — and it immediately failed fixtures whose outcome is
+    // `monitor` or `request_more_information` with no verdicts, which the
+    // governor also emits in that state. The one-directional rule (an
+    // allowance forbids it) is probably right, but "probably" is not a
+    // standard to add a safety invariant on, and I have not read the
+    // governor's outcome derivation closely enough to state it. Left open
+    // deliberately rather than guessed at.
     const verdictImplied: Record<string, boolean> = {
       block_action: policy.proposalVerdicts.some((v) => v.verdict === "block"),
       allow_low_risk_manual_action: policy.proposalVerdicts.some((v) => v.verdict === "allow"),

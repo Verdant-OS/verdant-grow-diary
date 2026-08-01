@@ -605,23 +605,27 @@ snapshots can differ.
   run/build/test guide is `.claude/skills/run-verdant-grow-diary/SKILL.md`; `README.md`
   has the overview. Read the skill before driving the app — do not duplicate its commands
   here.
-- **Package manager — install method is snapshot-dependent; verify before assuming.**
-  Repo scripts run under **`bun`** in both observed snapshots, but install behavior
-  differed:
-  - One session found `bun install --frozen-lockfile` works fine against the public
-    registry, and the VM startup script already runs it — no reinstall needed unless a
-    run fails on a missing/updated package. `bun` was symlinked at `/usr/local/bin/bun`
+- **Package manager — check `node_modules` first; don't blindly retry installs.** Repo
+  scripts run under **`bun`** in both observed snapshots. Per
+  `.claude/skills/run-verdant-grow-diary/SKILL.md`: if `node_modules` already exists
+  (managed environments pre-provision it), use it as-is — do not reinstall. If it's
+  absent, do **not** reach for `bun install --frozen-lockfile` first; go straight to the
+  SKILL's verified npm public-registry-override bootstrap. Install behavior has differed
+  across sessions, which is why the SKILL doesn't recommend trying bun first:
+  - One session found `bun install --frozen-lockfile` worked fine against the public
+    registry, and the VM startup script already ran it — no reinstall needed unless a
+    run failed on a missing/updated package. `bun` was symlinked at `/usr/local/bin/bun`
     there, resolving in non-login shells.
-  - A different session found `bun install` **fails**: `bun.lock` pinned ~137 tarball
+  - A different session found `bun install` **failed**: `bun.lock` pinned ~137 tarball
     URLs on a private Lovable registry mirror (`*.pkg.dev/lovable-core-prod`) that
     `403`s outside the Lovable sandbox, and no registry override could rewrite bun's
     locked URLs. That session's startup script installed via an **npm public-registry
     override** instead, and `bun` itself was a pre-baked system dependency under
     `~/.bun` (`BUN_INSTALL` on `PATH` via `~/.bashrc`), not reinstalled by the update
     script.
-  - **New session:** try `bun install --frozen-lockfile` first; if it `403`s against a
-    private mirror, fall back to installing via an npm public-registry override instead.
-    Don't assume either behavior carries over from a prior session.
+  - Don't assume either session's behavior carries over to a new one — check
+    `node_modules` first, and if an install is actually needed, prefer the SKILL's
+    verified bootstrap over guessing.
 - **Dev server.** `bun run dev -- --host 127.0.0.1 --port 8080`, then browse
   `http://127.0.0.1:8080`. Bind IPv4 (**`127.0.0.1`, not `localhost`**) and **port 8080,
   not 5173** explicitly — Vite's default host `::` is unreliable in this container.

@@ -1,18 +1,27 @@
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import SymptomReferenceTable from "@/components/SymptomReferenceTable";
 import {
   CANNABIS_SYMPTOM_REFERENCE_TABLE,
   SYMPTOM_NO_STACK_RULE,
 } from "@/constants/cannabisSymptomReference";
 import { findGuideBySlug } from "@/constants/verdantSeoContent";
+import GuidePage from "@/pages/GuidePage";
 
 const SLUGS = [
-  "cannabis-plant-symptoms",
+  "cannabis-leaf-symptoms",
   "cannabis-leaves-turning-yellow",
   "cannabis-leaf-spots-lesions",
   "cannabis-burnt-crispy-leaf-tips",
 ] as const;
+
+afterEach(() => {
+  cleanup();
+  document
+    .querySelectorAll('script[type="application/ld+json"][data-page-ldjson]')
+    .forEach((script) => script.remove());
+});
 
 describe("public symptom hub and guides", () => {
   it.each(SLUGS)(
@@ -38,15 +47,75 @@ describe("public symptom hub and guides", () => {
       screen.getByRole("table", { name: CANNABIS_SYMPTOM_REFERENCE_TABLE.caption }),
     ).toBeInTheDocument();
     expect(screen.getAllByRole("row")).toHaveLength(4);
-    expect(SYMPTOM_NO_STACK_RULE).toMatch(/change one variable at a time/i);
-    expect(SYMPTOM_NO_STACK_RULE).toMatch(/record the change/i);
+    expect(screen.getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
+      "Visible pattern",
+      "Evidence to compare",
+      "What to log next",
+      "What not to assume",
+    ]);
+    expect(screen.getByText("Yellowing / discoloration")).toBeInTheDocument();
+    expect(screen.getByText("Burnt, crispy, or damaged tips")).toBeInTheDocument();
+    for (const row of CANNABIS_SYMPTOM_REFERENCE_TABLE.rows) {
+      expect(row.whatToLogNext.trim().length).toBeGreaterThan(0);
+      expect(screen.getByText(row.whatToLogNext)).toBeInTheDocument();
+    }
+    expect(SYMPTOM_NO_STACK_RULE).toBe(
+      "Avoid changing feeding, watering, lighting, and airflow at the same time. Preserve a baseline, change one justified variable, and record the response.",
+    );
+  });
+
+  it("makes the wide reference table keyboard-focusable and explains horizontal scrolling", () => {
+    render(<SymptomReferenceTable table={CANNABIS_SYMPTOM_REFERENCE_TABLE} />);
+    const region = screen.getByRole("region", { name: /symptom evidence table/i });
+    expect(region).toHaveAttribute("tabindex", "0");
+    expect(region).toHaveAttribute("aria-describedby");
+    expect(
+      screen.getByText(
+        "Swipe horizontally, or focus this table and use the arrow keys, to compare all four evidence columns.",
+      ),
+    ).toBeVisible();
   });
 
   it("cross-links the symptom hub and all three focused guides", () => {
-    const hub = findGuideBySlug("cannabis-plant-symptoms")!;
-    expect(hub.related).toEqual(expect.arrayContaining(SLUGS.slice(1)));
-    for (const slug of SLUGS.slice(1)) {
-      expect(findGuideBySlug(slug)?.related).toContain("cannabis-plant-symptoms");
+    const hub = findGuideBySlug("cannabis-leaf-symptoms")!;
+    const focusedSlugs = SLUGS.slice(1);
+    expect(hub.related).toEqual(expect.arrayContaining(focusedSlugs));
+    for (const slug of focusedSlugs) {
+      const expectedLinks = [
+        "cannabis-leaf-symptoms",
+        ...focusedSlugs.filter((item) => item !== slug),
+      ];
+      expect(findGuideBySlug(slug)?.related).toEqual(expect.arrayContaining(expectedLinks));
+    }
+  });
+
+  it("emits one FAQPage document whose questions and answers mirror the visible hub FAQ", async () => {
+    const hub = findGuideBySlug("cannabis-leaf-symptoms")!;
+    render(
+      <MemoryRouter initialEntries={["/guides/cannabis-leaf-symptoms"]}>
+        <Routes>
+          <Route path="/guides/:slug" element={<GuidePage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const marker = 'script[data-page-ldjson="guide-cannabis-leaf-symptoms-faq"]';
+    await waitFor(() => expect(document.head.querySelectorAll(marker)).toHaveLength(1));
+    const script = document.head.querySelector<HTMLScriptElement>(marker)!;
+    const faq = JSON.parse(script.textContent ?? "null") as {
+      "@type": string;
+      mainEntity: Array<{ name: string; acceptedAnswer: { text: string } }>;
+    };
+
+    expect(faq["@type"]).toBe("FAQPage");
+    expect(faq.mainEntity.map((entry) => entry.name)).toEqual(
+      hub.faq.map((entry) => entry.question),
+    );
+    expect(faq.mainEntity.map((entry) => entry.acceptedAnswer.text)).toEqual(
+      hub.faq.map((entry) => entry.answer),
+    );
+    for (const item of hub.faq) {
+      expect(screen.getByRole("button", { name: item.question })).toBeVisible();
     }
   });
 });

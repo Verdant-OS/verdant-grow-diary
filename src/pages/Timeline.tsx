@@ -7,7 +7,10 @@ import {
   TIMELINE_EMPTY_STATE_FALLBACK,
 } from "@/lib/timelineEmptyStateRules";
 import { resolveTimelineLightingGuide } from "@/lib/timelineLightingGuideRules";
-import { buildSymptomEvidenceChecklist } from "@/lib/symptomEvidenceChecklistRules";
+import {
+  buildSymptomEvidenceChecklist,
+  buildSymptomEvidenceTimelineRows,
+} from "@/lib/symptomEvidenceChecklistRules";
 import type { FastAddSelectionContext } from "@/lib/fastAddActionRules";
 import PageHeader from "@/components/PageHeader";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
@@ -1020,18 +1023,11 @@ export default function Timeline() {
       growEvents.length < 100 &&
       !effectiveStartDate &&
       !effectiveEndDate;
-    const evidenceRows = recentLaneRawEntries.map((raw) => {
-      const row = raw as unknown as Record<string, unknown>;
-      const details =
-        row.details && typeof row.details === "object" && !Array.isArray(row.details)
-          ? (row.details as Record<string, unknown>)
-          : {};
-      return {
-        ...row,
-        grow_id: typeof row.grow_id === "string" ? row.grow_id : activeGrowId,
-        event_type: row.event_type ?? row.entry_type ?? details.event_type ?? row.action ?? null,
-        source: row.source ?? details.source ?? null,
-      };
+    const evidenceRows = buildSymptomEvidenceTimelineRows({
+      growId: activeGrowId,
+      recentLaneEntries: recentLaneRawEntries,
+      diaryEntries: entries,
+      growEvents,
     });
     for (const entry of entries) {
       const view = buildSymptomEvidenceChecklist({
@@ -1054,7 +1050,7 @@ export default function Timeline() {
     effectiveStartDate,
     entries,
     entriesTotal,
-    growEvents.length,
+    growEvents,
     recentLaneRawEntries,
   ]);
 

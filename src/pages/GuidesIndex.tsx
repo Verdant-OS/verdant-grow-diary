@@ -28,7 +28,8 @@ import {
 } from "@/lib/seoStructuredData";
 
 const PAGE_URL = "https://verdantgrowdiary.com/guides";
-const FEATURED_LIGHTING_GUIDE_SLUGS = new Set([
+const FEATURED_GUIDE_SLUGS = new Set([
+  "cannabis-leaf-symptoms",
   "cannabis-grow-light-distance-and-schedule",
   "cannabis-light-stress-light-burn-bleaching-or-heat",
 ]);
@@ -110,7 +111,7 @@ export default function GuidesIndex() {
             environment, watering, feeding, and lighting history. One photo is not a diagnosis.
           </p>
           <Link
-            to="/guides/cannabis-plant-symptoms"
+            to="/guides/cannabis-leaf-symptoms"
             className="mt-4 inline-flex text-sm font-semibold text-primary hover:underline"
           >
             Open the cannabis symptom hub
@@ -162,7 +163,7 @@ export default function GuidesIndex() {
           </Link>
         </div>
         <ul className="space-y-4">
-          {VERDANT_SEO_GUIDES.filter((g) => !FEATURED_LIGHTING_GUIDE_SLUGS.has(g.slug)).map((g) => (
+          {VERDANT_SEO_GUIDES.filter((g) => !FEATURED_GUIDE_SLUGS.has(g.slug)).map((g) => (
             <li
               key={g.slug}
               className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors"

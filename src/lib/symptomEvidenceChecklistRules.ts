@@ -2,6 +2,7 @@ import { findCannabisSymptomByObservedSign } from "@/constants/cannabisSymptomTy
 import { classifyTimelineLightingSignal } from "@/lib/timelineLightingGuideRules";
 import { buildTimelineEntryAnchorId } from "@/lib/timelineEntryAnchorRules";
 import { formatGrowStageLabel, normalizeGrowStage } from "@/constants/growStages";
+import { describeQuickLogActivityDetails } from "@/lib/quickLogActivityDetailFields";
 import { timelinePath } from "@/lib/routes";
 
 export const SYMPTOM_EVIDENCE_LOOKBACK_DAYS = 14;
@@ -23,6 +24,7 @@ export interface SymptomEvidenceRawEntry {
   readonly entry_at?: unknown;
   readonly occurred_at?: unknown;
   readonly event_type?: unknown;
+  readonly entry_type?: unknown;
   readonly action?: unknown;
   readonly note?: unknown;
   readonly details?: unknown;
@@ -45,13 +47,18 @@ export interface SymptomEvidenceCategoryView {
   readonly status: SymptomEvidenceStatus;
   readonly statusText: string;
   readonly totalMatches: number;
+  readonly verifyNext: string;
   readonly items: ReadonlyArray<SymptomEvidenceItemView>;
 }
 
 export interface SymptomEvidenceChecklistView {
+  readonly title: string;
   readonly symptomLabel: string;
   readonly observationStageLabel: string | null;
+  readonly observationLocationLabel: string | null;
+  readonly observedAt: string;
   readonly guidePath: string;
+  readonly hubPath: string;
   readonly overallState: SymptomEvidenceOverallState;
   readonly windowLabel: string;
   readonly categories: ReadonlyArray<SymptomEvidenceCategoryView>;
@@ -66,6 +73,7 @@ export interface BuildSymptomEvidenceChecklistInput {
 
 interface NormalizedEntry {
   readonly id: string;
+  readonly logicalIds: ReadonlyArray<string>;
   readonly growId: string | null;
   readonly tentId: string | null;
   readonly plantId: string | null;
@@ -84,6 +92,17 @@ const CATEGORY_TITLES: Readonly<Record<SymptomEvidenceCategoryId, string>> = {
   lighting: "Lighting",
 };
 
+const CATEGORY_VERIFY_NEXT: Readonly<Record<SymptomEvidenceCategoryId, string>> = {
+  environment:
+    "Compare the recorded Environment Check, timestamp, source, canopy placement, calibration basis, and leaf-temperature basis.",
+  watering:
+    "Compare watering timing, volume, input pH and EC, runoff, and dryback notes for this plant.",
+  feeding:
+    "Compare feeding timing, recipe, input EC and pH, runoff, and the plant response you recorded.",
+  lighting:
+    "Compare light notes, PPFD or DLI when measured, fixture distance, schedule, and recent position changes for this tent.",
+};
+
 const SOURCE_LABELS: Readonly<Record<string, string>> = {
   live: "live",
   manual: "manual",
@@ -95,10 +114,11 @@ const SOURCE_LABELS: Readonly<Record<string, string>> = {
 
 function safeString(value: unknown, max = 220): string | null {
   if (typeof value !== "string") return null;
-  const cleaned = value
-    .replace(/[\u0000-\u001f\u007f]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const withoutControlCharacters = Array.from(value, (character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    return codePoint <= 0x1f || codePoint === 0x7f ? " " : character;
+  }).join("");
+  const cleaned = withoutControlCharacters.replace(/\s+/g, " ").trim();
   return cleaned ? cleaned.slice(0, max) : null;
 }
 
@@ -116,11 +136,19 @@ function safeDetails(value: unknown): Record<string, unknown> {
 function normalizeEntry(entry: SymptomEvidenceRawEntry): NormalizedEntry {
   const occurredAt = safeString(entry.occurred_at ?? entry.entry_at, 64);
   const parsed = occurredAt ? Date.parse(occurredAt) : Number.NaN;
+  const details = safeDetails(entry.details);
   const eventType = (
-    safeString(entry.event_type ?? safeDetails(entry.details).event_type ?? entry.action, 64) ?? ""
+    safeString(entry.event_type ?? entry.entry_type ?? details.event_type ?? entry.action, 64) ?? ""
   ).toLowerCase();
+  const id = safeId(entry.id);
+  const logicalIds = [
+    id,
+    safeId(details.linked_grow_event_id),
+    safeId(details.grow_event_id),
+  ].filter((value): value is string => Boolean(value));
   return {
-    id: safeId(entry.id) ?? "unknown",
+    id: id ?? "unknown",
+    logicalIds: [...new Set(logicalIds)],
     growId: safeId(entry.grow_id),
     tentId: safeId(entry.tent_id),
     plantId: safeId(entry.plant_id),
@@ -128,10 +156,94 @@ function normalizeEntry(entry: SymptomEvidenceRawEntry): NormalizedEntry {
     occurredMs: Number.isFinite(parsed) ? parsed : null,
     eventType,
     note: safeString(entry.note, 220) ?? "",
-    details: safeDetails(entry.details),
-    source:
-      safeString(entry.source ?? safeDetails(entry.details).source, 24)?.toLowerCase() ?? null,
+    details,
+    // Only the explicit row-level source seam is eligible for provenance.
+    // A diary JSON details.source field is grower-controlled legacy metadata,
+    // not proof that a reading or observation came from a trusted live path.
+    source: safeString(entry.source, 24)?.toLowerCase() ?? null,
   };
+}
+
+export interface BuildSymptomEvidenceTimelineRowsInput {
+  readonly growId?: unknown;
+  readonly recentLaneEntries: ReadonlyArray<SymptomEvidenceRawEntry>;
+  readonly diaryEntries: ReadonlyArray<SymptomEvidenceRawEntry>;
+  readonly growEvents: ReadonlyArray<SymptomEvidenceRawEntry>;
+}
+
+function companionMatchesParent(
+  companion: SymptomEvidenceRawEntry,
+  parent: SymptomEvidenceRawEntry,
+): boolean {
+  const companionDetails = safeDetails(companion.details);
+  const parentPlantId = safeId(parent.plant_id);
+  const companionPlantId = safeId(companion.plant_id);
+  if (parentPlantId && companionPlantId && parentPlantId !== companionPlantId) return false;
+
+  const parentTentId = safeId(parent.tent_id);
+  const companionTentId = safeId(companion.tent_id);
+  if (parentTentId && companionTentId && parentTentId !== companionTentId) return false;
+
+  const parentEventType = safeString(parent.event_type ?? parent.entry_type ?? parent.action, 64);
+  const companionEventType = safeString(
+    companion.event_type ?? companion.entry_type ?? companionDetails.event_type ?? companion.action,
+    64,
+  );
+  return !parentEventType || !companionEventType || parentEventType === companionEventType;
+}
+
+/**
+ * Preserve structured diary-companion evidence while keeping the merged
+ * Timeline lane's one-row-per-event identity and the grow_events row's source
+ * as the only authoritative provenance seam.
+ */
+export function buildSymptomEvidenceTimelineRows(
+  input: BuildSymptomEvidenceTimelineRowsInput,
+): SymptomEvidenceRawEntry[] {
+  const growEventById = new Map<string, SymptomEvidenceRawEntry>();
+  for (const row of input.growEvents) {
+    const id = safeId(row.id);
+    if (id && !growEventById.has(id)) growEventById.set(id, row);
+  }
+
+  const companionByGrowEventId = new Map<string, SymptomEvidenceRawEntry>();
+  for (const row of input.diaryEntries) {
+    const details = safeDetails(row.details);
+    const linkedId = safeId(details.linked_grow_event_id ?? details.grow_event_id);
+    if (!linkedId || companionByGrowEventId.has(linkedId)) continue;
+    const parent = growEventById.get(linkedId);
+    if (parent && companionMatchesParent(row, parent)) {
+      companionByGrowEventId.set(linkedId, row);
+    }
+  }
+
+  return input.recentLaneEntries.map((row) => {
+    const id = safeId(row.id);
+    const parent = id ? growEventById.get(id) : undefined;
+    const companion = id ? companionByGrowEventId.get(id) : undefined;
+    const companionDetails = companion ? safeDetails(companion.details) : {};
+    const laneDetails = safeDetails(row.details);
+    const details = companion ? { ...companionDetails, ...laneDetails } : laneDetails;
+    return {
+      ...row,
+      grow_id: row.grow_id ?? parent?.grow_id ?? input.growId,
+      tent_id: row.tent_id ?? parent?.tent_id ?? companion?.tent_id,
+      plant_id: row.plant_id ?? parent?.plant_id ?? companion?.plant_id,
+      occurred_at:
+        row.occurred_at ??
+        row.entry_at ??
+        parent?.occurred_at ??
+        companion?.occurred_at ??
+        companion?.entry_at,
+      event_type:
+        parent?.event_type ?? row.event_type ?? row.entry_type ?? details.event_type ?? row.action,
+      details,
+      // Never promote diary details.source. A matched grow_events row owns
+      // provenance; an unmatched diary row stays unverified (except the
+      // explicit canonical manual Environment Check envelope handled later).
+      source: parent?.source ?? null,
+    };
+  });
 }
 
 function isWithinWindow(candidate: NormalizedEntry, symptomMs: number): boolean {
@@ -147,8 +259,17 @@ function samePlant(candidate: NormalizedEntry, symptom: NormalizedEntry): boolea
 }
 
 function sameTentOrPlant(candidate: NormalizedEntry, symptom: NormalizedEntry): boolean {
-  if (samePlant(candidate, symptom)) return true;
-  return Boolean(symptom.tentId && candidate.tentId === symptom.tentId);
+  if (symptom.tentId) {
+    if (candidate.tentId) return candidate.tentId === symptom.tentId;
+    return samePlant(candidate, symptom);
+  }
+  return samePlant(candidate, symptom);
+}
+
+function isSameLogicalEvent(candidate: NormalizedEntry, symptom: NormalizedEntry): boolean {
+  if (candidate.logicalIds.length === 0 || symptom.logicalIds.length === 0) return false;
+  const symptomIds = new Set(symptom.logicalIds);
+  return candidate.logicalIds.some((id) => symptomIds.has(id));
 }
 
 function classifyEntryCategories(entry: NormalizedEntry): ReadonlyArray<SymptomEvidenceCategoryId> {
@@ -163,9 +284,13 @@ function classifyEntryCategories(entry: NormalizedEntry): ReadonlyArray<SymptomE
 }
 
 function sourceLabel(entry: NormalizedEntry, category: SymptomEvidenceCategoryId): string {
+  const hasCanonicalEnvironmentCheck =
+    entry.details.environment_check !== null &&
+    typeof entry.details.environment_check === "object" &&
+    !Array.isArray(entry.details.environment_check);
   if (
     category === "environment" &&
-    (entry.source === "manual" || (!entry.source && entry.eventType === "environment"))
+    (entry.source === "manual" || (!entry.source && hasCanonicalEnvironmentCheck))
   ) {
     return "Manual observation";
   }
@@ -185,7 +310,11 @@ function numericDetail(
     for (const key of keys) {
       const value = scope[key];
       const parsed =
-        typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+        typeof value === "number"
+          ? value
+          : typeof value === "string" && value.trim().length > 0
+            ? Number(value)
+            : Number.NaN;
       if (Number.isFinite(parsed)) return parsed;
     }
   }
@@ -260,6 +389,7 @@ function categoryView(
     status,
     statusText,
     totalMatches: matches.length,
+    verifyNext: CATEGORY_VERIFY_NEXT[id],
     items: matches.slice(0, MAX_ITEMS_PER_CATEGORY).map((entry) => {
       const timelineAnchor = entry.id === "unknown" ? null : buildTimelineEntryAnchorId(entry.id);
       return {
@@ -283,7 +413,9 @@ export function buildSymptomEvidenceChecklist(
   if (
     symptom.eventType !== "observation" ||
     symptom.details.subtype !== "issue" ||
-    !symptomDefinition
+    !symptomDefinition ||
+    symptom.occurredAt === null ||
+    symptom.occurredMs === null
   ) {
     return null;
   }
@@ -298,7 +430,7 @@ export function buildSymptomEvidenceChecklist(
     for (const raw of input.entries) {
       const entry = normalizeEntry(raw);
       if (
-        entry.id === symptom.id ||
+        isSameLogicalEvent(entry, symptom) ||
         entry.growId !== symptom.growId ||
         !isWithinWindow(entry, symptom.occurredMs)
       ) {
@@ -338,7 +470,12 @@ export function buildSymptomEvidenceChecklist(
     ),
   );
   const recordedCount = categories.filter((category) => category.status === "recorded").length;
+  const observationLocationLabel =
+    describeQuickLogActivityDetails("issue_observation", symptom.details).find(
+      (line) => line.key === "observationLocation",
+    )?.value ?? null;
   return {
+    title: `${symptomDefinition.label}: verify the record before changing anything`,
     symptomLabel: symptomDefinition.label,
     observationStageLabel: (() => {
       const stage = normalizeGrowStage(
@@ -348,7 +485,10 @@ export function buildSymptomEvidenceChecklist(
       );
       return stage ? formatGrowStageLabel(stage) : null;
     })(),
+    observationLocationLabel,
+    observedAt: symptom.occurredAt!,
     guidePath: symptomDefinition.guidePath,
+    hubPath: "/guides/cannabis-leaf-symptoms",
     overallState:
       recordedCount === categories.length && input.historyComplete
         ? "ready_to_compare"

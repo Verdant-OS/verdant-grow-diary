@@ -122,6 +122,24 @@ beforeEach(() => {
 });
 
 describe("QuickLogAllActivitiesSection — shared taxonomy", () => {
+  it("keeps the Symptom Check launcher wrap-safe at 320px without changing the shared Button", () => {
+    mountSection();
+    const launcher = screen.getByTestId("quick-log-all-activities-start-symptom-check");
+    expect(launcher).toHaveClass("h-auto", "whitespace-normal", "text-left");
+    expect(launcher.querySelector(".min-w-0")).not.toBeNull();
+  });
+
+  it("uses the full visible symptom labels while preserving canonical test identities", () => {
+    mountSection();
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-start-symptom-check"));
+    expect(screen.getByTestId("quick-log-all-activities-symptom-yellowing")).toHaveTextContent(
+      "Yellowing / discoloration",
+    );
+    expect(screen.getByTestId("quick-log-all-activities-symptom-tip_damage")).toHaveTextContent(
+      "Burnt, crispy, or damaged tips",
+    );
+  });
+
   it("selects a requested supported activity, seeds its note, and never saves automatically", async () => {
     mountSection({
       requestedActivityId: "feeding",

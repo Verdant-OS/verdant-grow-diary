@@ -790,14 +790,16 @@ export default function QuickLogAllActivitiesSection({
       <Button
         type="button"
         variant="outline"
-        className="min-h-[44px] w-full justify-start"
+        className="h-auto min-h-[44px] w-full items-start justify-start whitespace-normal px-3 py-2.5 text-left sm:items-center"
         onClick={handleStartSymptomCheck}
         disabled={mutationBlocked || noContext || !!externalPersistenceBlockReason}
         data-testid={`${testIdPrefix}-start-symptom-check`}
       >
-        Symptom Check
-        <span className="ml-2 text-xs font-normal text-muted-foreground">
-          Guided observation — no diagnosis
+        <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+          <span className="leading-tight">Symptom Check</span>
+          <span className="text-xs font-normal leading-tight text-muted-foreground">
+            Guided observation — no diagnosis
+          </span>
         </span>
       </Button>
 

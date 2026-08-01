@@ -14,7 +14,12 @@ describe("Timeline Symptom Evidence card", () => {
         plant_id: "plant-1",
         entry_at: "2026-08-01T12:00:00Z",
         event_type: "observation",
-        details: { subtype: "issue", observedSign: "spots", observation_stage: "flower" },
+        details: {
+          subtype: "issue",
+          observedSign: "spots",
+          observation_stage: "flower",
+          observationLocation: "upper_growth",
+        },
       },
       entries: [
         {
@@ -38,12 +43,24 @@ describe("Timeline Symptom Evidence card", () => {
     expect(
       screen.getByRole("complementary", { name: /evidence checklist for spots/i }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", {
+        name: "Spots / lesions: verify the record before changing anything",
+      }),
+    ).toBeInTheDocument();
     expect(screen.getByText(/confirmed stage: flower/i)).toBeInTheDocument();
+    expect(screen.getByText(/location: upper \/ new growth/i)).toBeInTheDocument();
+    expect(screen.getByText(/8\/1\/2026/i)).toHaveAttribute("datetime", "2026-08-01T12:00:00.000Z");
     expect(
       screen.getAllByRole("heading", { level: 4 }).map((heading) => heading.textContent),
     ).toEqual(["Environment Check", "Watering", "Feeding", "Lighting"]);
     expect(screen.getByText("Manual observation")).toBeInTheDocument();
+    expect(screen.getByText("1 matching record")).toBeInTheDocument();
+    expect(screen.getAllByText(/what to verify next:/i)).toHaveLength(4);
     expect(screen.getByRole("note")).toHaveTextContent(/history is not loaded/i);
+    expect(
+      screen.getByText(/avoid changing feeding, watering, lighting, and airflow/i),
+    ).toBeVisible();
     expect(screen.getByRole("link", { name: "View entry" })).toHaveAttribute(
       "href",
       "/timeline?growId=grow-1#timeline-entry-env-1",
@@ -52,5 +69,10 @@ describe("Timeline Symptom Evidence card", () => {
       "href",
       "/guides/cannabis-leaf-spots-lesions",
     );
+    expect(screen.getByRole("link", { name: "Open the symptom hub" })).toHaveAttribute(
+      "href",
+      "/guides/cannabis-leaf-symptoms",
+    );
+    expect(screen.queryByRole("link", { name: "Add missing context" })).not.toBeInTheDocument();
   });
 });

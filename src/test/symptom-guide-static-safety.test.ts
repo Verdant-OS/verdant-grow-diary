@@ -27,7 +27,7 @@ describe("Symptom Check static safety", () => {
 
   it("publishes every canonical symptom route", () => {
     for (const path of [
-      "cannabis-plant-symptoms",
+      "cannabis-leaf-symptoms",
       "cannabis-leaves-turning-yellow",
       "cannabis-leaf-spots-lesions",
       "cannabis-burnt-crispy-leaf-tips",

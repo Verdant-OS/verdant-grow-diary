@@ -4,6 +4,7 @@ export interface SymptomReferenceRow {
   readonly symptomId: CannabisSymptomId;
   readonly visibleSign: string;
   readonly compareFirst: string;
+  readonly whatToLogNext: string;
   readonly doNotAssume: string;
 }
 
@@ -16,6 +17,7 @@ const ROWS: ReadonlyArray<SymptomReferenceRow> = CANNABIS_SYMPTOM_DEFINITIONS.ma
   symptomId: item.id,
   visibleSign: item.label,
   compareFirst: item.verificationTopics.join(", "),
+  whatToLogNext: item.whatToLogNext,
   doNotAssume: item.whatNotToAssume,
 }));
 
@@ -32,4 +34,4 @@ export function symptomReferenceTableFor(symptomId: CannabisSymptomId): SymptomR
 }
 
 export const SYMPTOM_NO_STACK_RULE =
-  "Change one variable at a time when the plant is stable enough to observe. Record the change, keep the rest steady, and compare new growth before stacking another correction.";
+  "Avoid changing feeding, watering, lighting, and airflow at the same time. Preserve a baseline, change one justified variable, and record the response.";

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 const ROUTES = [
-  "/guides/cannabis-plant-symptoms",
+  "/guides/cannabis-leaf-symptoms",
   "/guides/cannabis-leaves-turning-yellow",
   "/guides/cannabis-leaf-spots-lesions",
   "/guides/cannabis-burnt-crispy-leaf-tips",
@@ -32,7 +32,17 @@ test.describe("public symptom guides — responsive burden", () => {
         await expect(page.getByTestId("guide-page")).toBeVisible();
         await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
         await expect(page.getByTestId("symptom-reference-table")).toBeVisible();
-        await expect(page.getByRole("columnheader", { name: "Do not assume" })).toBeVisible();
+        for (const column of [
+          "Visible pattern",
+          "Evidence to compare",
+          "What to log next",
+          "What not to assume",
+        ]) {
+          await expect(page.getByRole("columnheader", { name: column })).toBeVisible();
+        }
+        await expect(
+          page.getByRole("region", { name: "Scrollable symptom evidence table" }),
+        ).toHaveAttribute("tabindex", "0");
         await expect(page.getByRole("link", { name: /quick log/i }).first()).toBeVisible();
 
         const overflow = await page.evaluate(
@@ -49,7 +59,7 @@ test.describe("public symptom guides — responsive burden", () => {
     const link = page.getByRole("link", { name: "Open the cannabis symptom hub" });
     await expect(link).toBeVisible();
     await link.click();
-    await expect(page).toHaveURL(/\/guides\/cannabis-plant-symptoms$/);
+    await expect(page).toHaveURL(/\/guides\/cannabis-leaf-symptoms$/);
     await expect(page.getByTestId("symptom-reference-table")).toBeVisible();
   });
 });

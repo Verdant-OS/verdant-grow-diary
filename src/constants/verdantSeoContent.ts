@@ -526,7 +526,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         heading: "Environment and observation beat guessing",
         body: "A stable grow room, a careful eye, and a simple log turn symptoms into a traceable investigation. Vapor-pressure deficit (VPD), light intensity, airflow, and root-zone health provide more useful context than a single product. If context is missing, the safest answer is to gather more evidence before treating.",
         links: [
-          { label: "Start with the cannabis symptom hub", to: "/guides/cannabis-plant-symptoms" },
+          { label: "Start with the cannabis symptom hub", to: "/guides/cannabis-leaf-symptoms" },
           { label: "Track VPD with source-labeled readings", to: "/guides/grow-room-vpd-tracker" },
           {
             label: "Compare possible light and heat stress",
@@ -555,7 +555,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "cannabis-grow-light-distance-and-schedule",
       "cannabis-light-stress-light-burn-bleaching-or-heat",
       "cannabis-nutrient-schedule",
-      "cannabis-plant-symptoms",
+      "cannabis-leaf-symptoms",
       "grow-room-vpd-tracker",
       "grow-diary-app",
     ],
@@ -1640,7 +1640,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     modifiedOn: "2026-07-30",
   },
   {
-    slug: "cannabis-plant-symptoms",
+    slug: "cannabis-leaf-symptoms",
     title: "Cannabis Plant Symptoms: Evidence-First Checks | Verdant",
     h1: "Cannabis plant symptoms: record the sign, then compare the evidence",
     description:
@@ -1755,7 +1755,9 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
     ],
     related: [
-      "cannabis-plant-symptoms",
+      "cannabis-leaf-symptoms",
+      "cannabis-leaf-spots-lesions",
+      "cannabis-burnt-crispy-leaf-tips",
       "plant-watering-log",
       "cannabis-nutrient-schedule",
       "grow-room-vpd-tracker",
@@ -1815,7 +1817,9 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
     ],
     related: [
-      "cannabis-plant-symptoms",
+      "cannabis-leaf-symptoms",
+      "cannabis-leaves-turning-yellow",
+      "cannabis-burnt-crispy-leaf-tips",
       "sensor-truth-grow-room",
       "daily-grow-log-checklist",
       "bud-rot-prevention-identification",
@@ -1878,7 +1882,9 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
     ],
     related: [
-      "cannabis-plant-symptoms",
+      "cannabis-leaf-symptoms",
+      "cannabis-leaves-turning-yellow",
+      "cannabis-leaf-spots-lesions",
       "cannabis-nutrient-schedule",
       "plant-watering-log",
       "cannabis-light-stress-light-burn-bleaching-or-heat",

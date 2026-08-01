@@ -70,7 +70,7 @@ const EXPECTED_SLUGS: ReadonlyArray<string> = [
   // Cultivar comparison cluster: pheno expression showcase.
   "oreoz-vs-gelonade-comparison",
   // Evidence-first symptom hub and focused visible-sign guides.
-  "cannabis-plant-symptoms",
+  "cannabis-leaf-symptoms",
   "cannabis-leaves-turning-yellow",
   "cannabis-leaf-spots-lesions",
   "cannabis-burnt-crispy-leaf-tips",

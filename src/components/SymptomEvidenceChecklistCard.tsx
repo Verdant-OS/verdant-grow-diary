@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { SYMPTOM_NO_STACK_RULE } from "@/constants/cannabisSymptomReference";
 import type { SymptomEvidenceChecklistView } from "@/lib/symptomEvidenceChecklistRules";
 
 const STATUS_LABEL = {
@@ -21,12 +22,17 @@ export default function SymptomEvidenceChecklistCard({
       <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-primary">
         Symptom evidence check
       </p>
-      <h3 className="mt-1 text-sm font-semibold">Compare before concluding</h3>
+      <h3 className="mt-1 text-sm font-semibold">{view.title}</h3>
       <p className="mt-1 text-xs text-muted-foreground">
         Visible sign: {view.symptomLabel}.{" "}
         {view.observationStageLabel
           ? `Confirmed stage: ${view.observationStageLabel}. `
           : "Stage was not recorded. "}
+        {view.observationLocationLabel
+          ? `Location: ${view.observationLocationLabel}. `
+          : "Location was not recorded. "}
+        Observed{" "}
+        <time dateTime={view.observedAt}>{new Date(view.observedAt).toLocaleString()}</time>.{" "}
         {view.windowLabel}. This is recorded context, not a diagnosis.
       </p>
       {!view.historyComplete && (
@@ -51,6 +57,12 @@ export default function SymptomEvidenceChecklistCard({
               </span>
             </div>
             <p className="mt-1 text-[11px] text-muted-foreground">{category.statusText}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {category.totalMatches} matching {category.totalMatches === 1 ? "record" : "records"}
+            </p>
+            <p className="mt-1 text-[11px] text-foreground/85">
+              <span className="font-medium">What to verify next:</span> {category.verifyNext}
+            </p>
             {category.items.length > 0 && (
               <ul className="mt-2 space-y-2">
                 {category.items.map((item) => (
@@ -87,12 +99,13 @@ export default function SymptomEvidenceChecklistCard({
           </section>
         ))}
       </div>
+      <p className="mt-3 text-xs text-muted-foreground">{SYMPTOM_NO_STACK_RULE}</p>
       <div className="mt-3 flex flex-wrap gap-3 text-xs">
         <Link to={view.guidePath} className="font-medium text-primary underline underline-offset-2">
           Review the symptom guide
         </Link>
-        <Link to="/quick-log" className="font-medium text-primary underline underline-offset-2">
-          Add missing context
+        <Link to={view.hubPath} className="font-medium text-primary underline underline-offset-2">
+          Open the symptom hub
         </Link>
       </div>
     </aside>

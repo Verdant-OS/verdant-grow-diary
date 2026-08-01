@@ -5,6 +5,7 @@
  * choose_setup | ready.
  *
  * Explicit requested setup that cannot be verified NEVER falls back to active.
+ * Any grow-list load or refresh blocks writes, even when cached rows exist.
  * Supplied tent + loading/error/conflict NEVER degrades into a tentless write.
  *
  * Pure: no React, no Supabase.
@@ -63,6 +64,7 @@ export interface ResolveCreateTargetGrowResult {
 
 /**
  * Resolve write target:
+ * - loading/error → unresolved; cached rows are not write-authoritative
  * - explicit pageDefaultGrowId present + known → use it
  * - explicit present + unknown after successful load → unavailable (no active fallback)
  * - no explicit → active grow if known
@@ -150,22 +152,8 @@ export function buildCreateGrowBindingView(
     retryLabel: GROW_SETUP_MESSAGES.readErrorRetry,
   };
 
-  if (input.growsError) {
-    return {
-      ...base,
-      kind: "read_error",
-      blockSubmit: true,
-      showStartRoomHardStop: false,
-      showPickGrowHint: false,
-      showLoading: false,
-      showReadError: true,
-      showRequestedUnavailable: false,
-      toastMessage: GROW_SETUP_MESSAGES.readErrorTitle,
-      title: GROW_SETUP_MESSAGES.readErrorTitle,
-      body: GROW_SETUP_MESSAGES.readErrorBody,
-    };
-  }
-
+  // An active initial load or retry is the current truth, even when a prior
+  // settled read error is still present in provider state during revalidation.
   if (input.growsLoading) {
     return {
       ...base,
@@ -179,6 +167,22 @@ export function buildCreateGrowBindingView(
       toastMessage: GROW_SETUP_MESSAGES.loadingToast,
       title: GROW_SETUP_MESSAGES.loadingTitle,
       body: GROW_SETUP_MESSAGES.loadingBody,
+    };
+  }
+
+  if (input.growsError) {
+    return {
+      ...base,
+      kind: "read_error",
+      blockSubmit: true,
+      showStartRoomHardStop: false,
+      showPickGrowHint: false,
+      showLoading: false,
+      showReadError: true,
+      showRequestedUnavailable: false,
+      toastMessage: GROW_SETUP_MESSAGES.readErrorTitle,
+      title: GROW_SETUP_MESSAGES.readErrorTitle,
+      body: GROW_SETUP_MESSAGES.readErrorBody,
     };
   }
 

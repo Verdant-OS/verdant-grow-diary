@@ -52,10 +52,16 @@ describe("Plants/Tents — preselect grow on create", () => {
   });
 
   it("Create dialogs fail closed without resolvable target", () => {
-    // Require the unified formBlocked gate — do not accept a weaker
-    // binding.blockSubmit-only pin that could skip tent-side blocks.
-    expect(CREATE_TENT).toMatch(/\bformBlocked\b/);
-    expect(CREATE_PLANT).toMatch(/\bformBlocked\b/);
+    // Pin the full gate formula — not just one token from the expression.
+    expect(CREATE_TENT).toMatch(
+      /const formBlocked = binding\.blockSubmit \|\| !canWriteCreateGrowId\(targetGrowId\)/,
+    );
+    expect(CREATE_PLANT).toMatch(
+      /const formBlocked[\s\S]*binding\.blockSubmit[\s\S]*!canWriteCreateGrowId\(targetGrowId\)[\s\S]*tentBlocksWrite/,
+    );
+    expect(CREATE_PLANT).toMatch(/if \(formBlocked \|\| !targetGrowId\)/);
+    expect(CREATE_TENT).toMatch(/if \(formBlocked\)/);
+    // Disabled wiring must route through formBlocked (not binding.blockSubmit alone).
     expect(CREATE_TENT).toMatch(/disabled=\{busy \|\| !tentGate\.allowed \|\| formBlocked\}/);
     expect(CREATE_PLANT).toMatch(/disabled=\{busy \|\| formBlocked/);
     expect(CREATE_TENT).not.toMatch(/hardStop\.blockSubmit/);

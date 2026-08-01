@@ -75,8 +75,10 @@ describe("CreatePlantDialog grow-context hardening", () => {
     // Pin the post-#645 binding owner — not the pre-refactor resolver call site.
     expect(CREATE).toMatch(/buildCreateGrowBindingView/);
     expect(CREATE).toMatch(/grow_id:\s*targetGrowId/);
-    expect(CREATE).toMatch(/formBlocked/);
-    expect(CREATE).toMatch(/canWriteCreateGrowId\(targetGrowId\)/);
+    expect(CREATE).toMatch(
+      /const formBlocked[\s\S]*binding\.blockSubmit[\s\S]*!canWriteCreateGrowId\(targetGrowId\)/,
+    );
+    expect(CREATE).toMatch(/if \(formBlocked \|\| !targetGrowId\)/);
     // Component must not call the resolver directly (binding view owns fallback rules).
     expect(CREATE).not.toMatch(/resolveCreateTargetGrowId\s*\(/);
   });

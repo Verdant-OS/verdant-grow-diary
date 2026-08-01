@@ -587,3 +587,41 @@ Use these values literally. Never turn a blocked or unmeasured verification into
 Never invent search volume, traffic, keyword difficulty, CPC, domain rating, backlink
 counts, conversion rates, audience sizes, sensor health, or deployment/indexing outcomes.
 Record the authorized source and provenance for every material measurement.
+
+---
+
+## Cursor Cloud specific instructions
+
+Durable, non-obvious notes for running this app in a Cursor Cloud VM. Full, verified
+runbook lives in `.claude/skills/run-verdant-grow-diary/SKILL.md` — read it for details;
+this section only captures the gotchas that are easy to get wrong.
+
+- **App shape:** React + Vite + TypeScript SPA backed by a _hosted_ Supabase project.
+  There is no local Supabase stack in this environment.
+- **Package manager split (important):** repo scripts run under **`bun`**, but
+  dependencies must be installed with **`npm`**, not `bun install`. `bun.lock` pins ~137
+  tarball URLs on a private Lovable registry mirror (`*.pkg.dev/lovable-core-prod`) that
+  `403`s outside the Lovable sandbox, and no registry override can rewrite bun's locked
+  URLs. The startup update script handles install via an npm public-registry override.
+  **Do not run `bun install` / `bun install --frozen-lockfile`** here — it will fail
+  against the private mirror.
+- **`bun` is a system dependency** installed under `~/.bun` and on `PATH` via `~/.bashrc`
+  (`BUN_INSTALL`). It is not reinstalled by the update script; it lives in the VM snapshot.
+- **Dev server:** `bun run dev -- --host 127.0.0.1 --port 8080`. Always target
+  **`127.0.0.1`, not `localhost`** (vite binds `host: "::"` by default which is unreliable
+  here) and **port 8080, not 5173**. Unauthenticated `/` client-side redirects to
+  `/welcome` / `/auth`, so an HTTP 200 on `/` is still the SPA shell.
+- **Lint/typecheck/build:** `bun run lint` (expect 0 errors, many pre-existing warnings),
+  `bun run typecheck`, `bun run build`. Unit path is `bunx vitest run <file>`.
+- **Playwright:** browsers install to `~/.cache/ms-playwright` (baked into the snapshot).
+  For mocked UI flows use `--project=chromium-mocked` **with an explicit spec filter** and
+  set `E2E_BASE_URL=http://127.0.0.1:8080` to reuse the already-running dev server.
+  Without `E2E_BASE_URL` some specs spawn their own server on 5173 (port conflicts) or can
+  hit real Supabase. A couple of mocked specs are known-flaky (e.g. a timing/viewport
+  assertion in `auth-loading`); treat only _new_ failures in specs you touched as signal.
+- **Authenticated flows need real credentials:** the core One-Tent Loop authenticated e2e
+  (`bun run e2e:one-tent:ui`) emits a `blocked` receipt and skips without a seeded session
+  JSON / real Supabase login. It is not a setup failure.
+- **No-auth ways to exercise real product UI:** public interactive routes such as
+  `/tools/vpd-calculator`, `/pheno-comparison`, and `/welcome` render real functionality
+  without login and are good smoke targets.

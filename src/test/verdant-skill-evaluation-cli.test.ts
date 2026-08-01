@@ -481,6 +481,7 @@ describe("cli — untrusted fixture input", () => {
       const policy = execution.policy as Record<string, unknown>;
       (execution.output as Record<string, unknown>).proposals = [PROPOSAL];
       policy.proposalVerdicts = [verdictFor("manual_only")];
+      policy.outcomes = ["allow_low_risk_manual_action"];
       policy.actionEligibility = "none";
     });
     expect(contradicting.code).toBe(EXIT_USAGE_OR_IO);
@@ -512,6 +513,7 @@ describe("cli — untrusted fixture input", () => {
       const policy = execution.policy as Record<string, unknown>;
       (execution.output as Record<string, unknown>).proposals = [PROPOSAL];
       policy.proposalVerdicts = [verdictFor("manual_only")];
+      policy.outcomes = ["allow_low_risk_manual_action"];
       policy.actionEligibility = "low_risk_manual_only";
     });
     expect(acting.code).not.toBe(EXIT_USAGE_OR_IO);
@@ -523,6 +525,7 @@ describe("cli — untrusted fixture input", () => {
     const r = runWithMutated((record) => {
       const policy = (record.execution as { policy: Record<string, unknown> }).policy;
       policy.proposalVerdicts = [verdictFor("none")];
+      policy.outcomes = ["allow_low_risk_manual_action"];
       policy.actionEligibility = "none";
     });
     expect(r.code).toBe(EXIT_USAGE_OR_IO);
@@ -609,6 +612,7 @@ describe("cli — untrusted fixture input", () => {
         { ...verdictFor("none"), verdict: "block" },
       ];
       policy.actionEligibility = "low_risk_manual_only";
+      policy.outcomes = ["allow_low_risk_manual_action"];
     });
     expect(r.code).toBe(EXIT_USAGE_OR_IO);
     expect(r.lines.join(" ")).toContain("more than one policy verdict");
@@ -664,6 +668,7 @@ describe("cli — untrusted fixture input", () => {
         ];
         const policy = execution.policy as Record<string, unknown>;
         policy.proposalVerdicts = [{ ...verdictFor("manual_only"), effectiveRiskLevel: effective }];
+        policy.outcomes = ["allow_low_risk_manual_action"];
         policy.actionEligibility = "low_risk_manual_only";
       });
       expect(r.code, `${declared}->${effective}`).toBe(EXIT_USAGE_OR_IO);
@@ -682,6 +687,7 @@ describe("cli — untrusted fixture input", () => {
       (execution.output as Record<string, unknown>).proposals = [{ ...PROPOSAL, riskLevel: "low" }];
       const policy = execution.policy as Record<string, unknown>;
       policy.proposalVerdicts = [{ ...verdictFor("manual_only"), effectiveRiskLevel: "low" }];
+      policy.outcomes = ["allow_low_risk_manual_action"];
       policy.actionEligibility = "low_risk_manual_only";
     });
     expect(allowedAtCeiling.code).not.toBe(EXIT_USAGE_OR_IO);
@@ -717,6 +723,7 @@ describe("cli — untrusted fixture input", () => {
         ];
         const policy = execution.policy as Record<string, unknown>;
         policy.proposalVerdicts = [{ ...verdictFor("manual_only"), effectiveRiskLevel: level }];
+        policy.outcomes = ["allow_low_risk_manual_action"];
         policy.actionEligibility = "low_risk_manual_only";
       });
       expect(r.code, level).toBe(EXIT_USAGE_OR_IO);
@@ -734,6 +741,7 @@ describe("cli — untrusted fixture input", () => {
       (execution.output as Record<string, unknown>).proposals = [PROPOSAL];
       const policy = execution.policy as Record<string, unknown>;
       policy.proposalVerdicts = [verdictFor("none")];
+      policy.outcomes = ["allow_low_risk_manual_action"];
       policy.actionEligibility = "none";
     });
     expect(r.code).toBe(EXIT_USAGE_OR_IO);
@@ -813,10 +821,28 @@ describe("cli — untrusted fixture input", () => {
       ];
       const policy = execution.policy as Record<string, unknown>;
       policy.proposalVerdicts = [{ ...verdictFor("manual_only"), effectiveRiskLevel: "low" }];
+      policy.outcomes = ["allow_low_risk_manual_action"];
       policy.actionEligibility = "low_risk_manual_only";
     });
     expect(r.code).toBe(EXIT_USAGE_OR_IO);
     expect(r.lines.join(" ")).toContain("below the floor the governor derives");
+  });
+
+  // The governor adds this outcome for ANY allowed verdict, so a decision that
+  // allows an action while declaring only observation_only is one it cannot
+  // emit — and the evaluator reads `outcomes` independently, so a must_act
+  // fixture expecting observation_only passed on it.
+  it("rejects outcomes that omit the allowance their own verdict implies", () => {
+    const r = runWithMutated((record) => {
+      const execution = record.execution as Record<string, unknown>;
+      (execution.output as Record<string, unknown>).proposals = [PROPOSAL];
+      const policy = execution.policy as Record<string, unknown>;
+      policy.proposalVerdicts = [verdictFor("manual_only")];
+      policy.actionEligibility = "low_risk_manual_only";
+      policy.outcomes = ["observation_only"];
+    });
+    expect(r.code).toBe(EXIT_USAGE_OR_IO);
+    expect(r.lines.join(" ")).toContain("outcomes");
   });
 
   it("still accepts a well-formed envelope from the same path", () => {

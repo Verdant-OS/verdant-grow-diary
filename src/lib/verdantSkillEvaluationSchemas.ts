@@ -355,6 +355,19 @@ const executionPolicySchema = z
     const anyActionable = policy.proposalVerdicts.some(
       (v) => v.verdict === "allow" && v.executionCapability === "manual_only",
     );
+    // The governor adds this outcome for ANY allowed verdict, so a decision
+    // that allows an action while declaring only `observation_only` is one it
+    // cannot emit — and the evaluator reads `outcomes` independently, so a
+    // must_act fixture expecting observation_only passed on it.
+    const anyAllowed = policy.proposalVerdicts.some((v) => v.verdict === "allow");
+    if (anyAllowed && !policy.outcomes.includes("allow_low_risk_manual_action")) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["outcomes"],
+        message: "outcomes_omit_allow_low_risk_manual_action_despite_allowed_verdict",
+      });
+    }
+
     const expected = anyActionable ? "low_risk_manual_only" : "none";
     if (policy.actionEligibility !== expected) {
       ctx.addIssue({

@@ -24,6 +24,7 @@ import {
   renderEvaluationMarkdown,
   verifyReportBinding,
 } from "../src/lib/verdantSkillEvaluationReport.ts";
+import { detectProductionDataCategories } from "../src/lib/verdantSkillEvaluationSchemas.ts";
 import { renderPromotionMarkdown } from "../src/lib/verdantSkillPromotionRules.ts";
 import { sha256Digest } from "./lib/verdantSkillEvaluationDigest.ts";
 import { computeBoundDigest } from "../src/lib/verdantSkillEvaluationBindings.ts";
@@ -33,13 +34,13 @@ const ROOT = resolve(fileURLToPath(import.meta.url), "../..");
 const ARTIFACT_ROOT = resolve(ROOT, process.argv[2] ?? "artifacts/skills");
 
 /** Shapes that must never reach an uploaded artifact. */
-const DISCLOSURE_PATTERNS = [
-  { code: "email_address", re: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/ },
-  { code: "jwt", re: /(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}/ },
-  { code: "vendor_secret_key", re: /(?<![A-Za-z0-9_-])(sk|pk|rk)_(live|test)_/ },
-  { code: "bearer_token", re: /bearer\s+[A-Za-z0-9._~+/=-]{8,}/i },
-  { code: "service_role", re: /service_role/i },
-];
+// NO LOCAL COPY. This was a hand-maintained list beside the shared
+// `detectProductionDataCategories`, and it had already drifted: the shared
+// detector classifies `api_key_assignment` as a disclosure and this list had
+// never heard of it, so an artifact carrying `api_key: <secret>` passed and CI
+// uploaded it. Third time a copied list has drifted from its source in this
+// build — the Markdown field comparison and the governor's blocking families
+// were the others.
 
 const violations = [];
 const note = (rule, message) => violations.push({ rule, message });
@@ -326,9 +327,9 @@ for (const path of walkAllFiles(ARTIFACT_ROOT)) {
     note("unexpected_artifact_entry", path);
   }
   const text = readFileSync(path, "utf8");
-  for (const { code, re } of DISCLOSURE_PATTERNS) {
-    // Report the CATEGORY only — echoing the match would re-leak it.
-    if (re.test(text)) note("artifact_disclosure", `${path}: ${code}`);
+  // Category names only — echoing the match would re-leak it.
+  for (const code of detectProductionDataCategories(text)) {
+    note("artifact_disclosure", `${path}: ${code}`);
   }
 }
 

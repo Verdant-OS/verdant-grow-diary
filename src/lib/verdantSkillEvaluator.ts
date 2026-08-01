@@ -37,7 +37,7 @@ import type { SkillPolicyDecision, SkillPolicyOutcome } from "@/lib/verdantSkill
 import type { SkillApplicabilityResult } from "@/lib/verdantSkillApplicabilityRules";
 import type { SkillRiskLevel, SkillRunResult } from "@/lib/verdantSkillSchemas";
 import { serializeSkillContract } from "@/lib/verdantSkillSchemas";
-import { scanProseForPatterns } from "@/lib/aiOutputTextSafetyDetectors";
+import { hasUngovernedCommand, scanProseForPatterns } from "@/lib/aiOutputTextSafetyDetectors";
 import { BLOCKING_FAMILIES, GOVERNED_RESULT_KEYS } from "@/lib/verdantSkillPolicyGovernor";
 
 function compareTokens(a: string, b: string): number {
@@ -490,8 +490,19 @@ export function evaluateSkillCase(input: EvaluateCaseInput): SkillEvaluationCase
     .join(" | ");
 
   // Blocking families the OUTPUT exhibits, whatever the recorded decision says.
+  //
+  // Each family with ITS OWN detector. The `clauseAware` flag on the table is
+  // not decoration: the governor runs those families through
+  // `hasUngovernedCommand`, which reads clause by clause and lets a
+  // PROHIBITION through — "do not turn on the fan" is advice about what not to
+  // do, and the "What not to do" channel is a thing skills are supposed to
+  // have. Scanning unconditionally reported an instruction there and failed
+  // the case, which is a check denying something true; I read this flag last
+  // round and used only half of what it meant.
   const derivedBlockingCodes = BLOCKING_FAMILIES.filter((family) =>
-    scanProseForPatterns(outputProse, family.patterns),
+    family.clauseAware
+      ? hasUngovernedCommand(outputProse, family.patterns)
+      : scanProseForPatterns(outputProse, family.patterns),
   ).map((family) => String(family.code));
 
   const recordedCodes = asArray<{ code?: string }>(x.policy?.firedRules)

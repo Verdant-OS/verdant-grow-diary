@@ -22,10 +22,21 @@ Product rules for **Create tent** / **Create plant** on the production deploy br
 | orphan / mismatch | Blocked presenter; require explicit compatible tent |
 | ready | Write `grow_id` + `tent_id` |
 
+## Retry (create dialog only)
+
+| Rule | Policy |
+| --- | --- |
+| Strategy | **Fixed 1.5s cooldown + in-flight lock** (human click) |
+| Not used | Full jitter exponential (that is for **sensor bridge ingest**) |
+| Auto background retry | Forbidden |
+| After Retry | Re-evaluate pure state machine only |
+
+See [`retry-strategy-by-surface.md`](./retry-strategy-by-surface.md).
+
 ## Schema
 
 - Client plant **insert** requires `grow_id: uuid` (`PlantInsertPayloadSchema`).
 - `tent_id` optional outside guided / supplied-tent paths.
 - Legacy null-linked rows remain readable.
 
-Source: `src/constants/growSetupMessages.ts`, `src/lib/createDialogGrowBindingRules.ts`.
+Source: `src/constants/growSetupMessages.ts`, `src/lib/createDialogGrowBindingRules.ts`, `src/lib/createDialogRetryRules.ts`.

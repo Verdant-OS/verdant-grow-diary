@@ -1,6 +1,12 @@
 /**
  * createDialogRetryRules — pure debounce/cooldown for create-binding Retry.
  *
+ * Policy (see docs/product/retry-strategy-by-surface.md):
+ *   Create-dialog Retry → fixed 1.5s cooldown + in-flight lock (human click).
+ *   Sensor bridge ingest → full jitter exponential (NOT this module).
+ *   React Query → library retries for read recovery.
+ *   AI Doctor / export → mostly human one-shot labels.
+ *
  * Prevents double-fire on grow refresh / tent refetch while fail-closed
  * states (read_error, tent unavailable) are shown. Does not change
  * state-machine kinds — only gates the re-fetch action.
@@ -8,8 +14,14 @@
  * Pure: no React, no timers, no I/O.
  */
 
-/** Minimum gap between successful Retry clicks (ms). */
+/** Minimum gap between successful Retry clicks (ms). Fixed — not exponential. */
 export const CREATE_BINDING_RETRY_COOLDOWN_MS = 1500;
+
+/**
+ * Strategy tag for static tests / audits. Do not change to "full_jitter_expo"
+ * without a product decision — that strategy belongs to bridge ingest.
+ */
+export const CREATE_BINDING_RETRY_STRATEGY = "fixed_cooldown_in_flight" as const;
 
 export interface CreateBindingRetryGate {
   /** True when a new attempt may start now. */

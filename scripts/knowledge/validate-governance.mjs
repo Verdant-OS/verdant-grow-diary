@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -30,6 +31,11 @@ const EXPECTED_SYSTEM_ROUTE_PATHS = new Set([
   "/guides/editorial-policy",
   "/guides/corrections",
 ]);
+// SHA-256 of the reviewed (pillarPageId, pillarKey, group id, group label)
+// tuples in trust-infrastructure.json. This pins the contract without copying
+// the 74-row grouping table into executable validation code.
+const EXPECTED_L1_GROUPING_IDENTITY_DIGEST =
+  "bee9db27778a0adaa3ebdd6560438d880a46263c7da5b6426109d4c4802b4729";
 
 function fail(message) {
   throw new Error(`Knowledge governance invalid: ${message}`);
@@ -80,7 +86,21 @@ function canonicalJson(value) {
   return JSON.stringify(value);
 }
 
-function validateResearchReceipt(receipt, pageId) {
+function deriveL1GroupingIdentityDigest(pillarGroupings) {
+  const identities = pillarGroupings
+    .flatMap((pillar) =>
+      pillar.groups.map((group) => ({
+        pillarPageId: pillar.pillarPageId,
+        pillarKey: pillar.pillarKey,
+        id: group.id,
+        label: group.label,
+      })),
+    )
+    .sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
+  return createHash("sha256").update(canonicalJson(identities)).digest("hex");
+}
+
+function validateResearchReceipt(receipt, pageId, occurredOn) {
   if (!isRecord(receipt)) {
     fail(`${pageId} researched transition requires a complete search-research receipt`);
   }
@@ -103,6 +123,9 @@ function validateResearchReceipt(receipt, pageId) {
     fail(`${pageId} research receipt version must be a positive integer`);
   }
   requireDate(receipt.collectedOn, `${pageId} research receipt collectedOn`);
+  if (receipt.collectedOn > occurredOn) {
+    fail(`${pageId} research receipt collectedOn cannot be later than its lifecycle event`);
+  }
   for (const field of ["dominantPageTypes", "serpFeatures", "competingCanonicals"]) {
     if (!Array.isArray(receipt[field]))
       fail(`${pageId} research receipt ${field} must be an array`);
@@ -126,11 +149,14 @@ function validateResearchReceipt(receipt, pageId) {
   }
 }
 
-function validateValidationReceipt(receipt, pageId) {
+function validateValidationReceipt(receipt, pageId, occurredOn) {
   if (!isRecord(receipt)) fail(`${pageId} validated transition requires a validation receipt`);
   requireNonemptyString(receipt.receiptId, `${pageId} validation receiptId`);
   requireNonemptyString(receipt.summary, `${pageId} validation summary`);
   requireDate(receipt.validatedOn, `${pageId} validation date`);
+  if (receipt.validatedOn > occurredOn) {
+    fail(`${pageId} validation date cannot be later than its lifecycle event`);
+  }
   if (!Array.isArray(receipt.evidenceSourceIds) || receipt.evidenceSourceIds.length === 0) {
     fail(`${pageId} validation receipt requires evidence source identities`);
   }
@@ -269,11 +295,11 @@ export function validateIntentResearchRegistry(registry, roadmap) {
         fail(`${entry.pageId} lifecycle events must be chronological`);
       }
       if (event.toStatus === "researched")
-        validateResearchReceipt(event.researchReceipt, entry.pageId);
+        validateResearchReceipt(event.researchReceipt, entry.pageId, event.occurredOn);
       else if (event.researchReceipt !== null)
         fail(`${entry.pageId} non-research event cannot carry research evidence`);
       if (event.toStatus === "validated")
-        validateValidationReceipt(event.validationReceipt, entry.pageId);
+        validateValidationReceipt(event.validationReceipt, entry.pageId, event.occurredOn);
       else if (event.validationReceipt !== null)
         fail(`${entry.pageId} non-validation event cannot carry validation evidence`);
       if (event.toStatus === "superseded") {
@@ -375,6 +401,14 @@ export function validateTrustInfrastructureRegistry(registry, roadmap) {
   }
   requireUnique(groupingIds, "L1 grouping IDs");
   if (l1GroupingCount !== 74) fail("trust registry must preserve all 74 reviewed L1 groupings");
+  if (
+    deriveL1GroupingIdentityDigest(registry.pillarGroupings) !==
+    EXPECTED_L1_GROUPING_IDENTITY_DIGEST
+  ) {
+    fail(
+      "trust registry must preserve the reviewed L1 grouping identities, labels, and pillar membership",
+    );
+  }
 
   return {
     status: "pass",

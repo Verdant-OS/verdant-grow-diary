@@ -55,6 +55,16 @@ function researchedReceipt(overrides = {}) {
   };
 }
 
+function validationReceipt(overrides = {}) {
+  return {
+    receiptId: "validation:KL-011:v1",
+    summary: "Observed use confirms that the page still serves the recorded reader job.",
+    validatedOn: "2026-09-01",
+    evidenceSourceIds: ["source:validation-study:1"],
+    ...overrides,
+  };
+}
+
 function lifecycleEntry() {
   return {
     pageId: "KL-011",
@@ -188,6 +198,72 @@ test("rejects normalized impossible lifecycle dates and accepts real UTC calenda
       `${realDate} must remain a valid UTC calendar date`,
     );
   }
+});
+
+test("requires research and validation evidence to exist no later than its lifecycle event", () => {
+  for (const collectedOn of ["2026-07-31", "2026-08-01"]) {
+    const registry = structuredClone(intentRegistry);
+    const entry = lifecycleEntry();
+    entry.events = [entry.events[0]];
+    entry.events[0].researchReceipt.collectedOn = collectedOn;
+    registry.entries.push(entry);
+    assert.equal(
+      validateIntentResearchRegistry(registry, roadmap).currentIntentStatuses.researched,
+      1,
+    );
+  }
+
+  const futureResearch = structuredClone(intentRegistry);
+  const researched = lifecycleEntry();
+  researched.events = [researched.events[0]];
+  researched.events[0].researchReceipt.collectedOn = "2026-08-02";
+  futureResearch.entries.push(researched);
+  assert.throws(
+    () => validateIntentResearchRegistry(futureResearch, roadmap),
+    /research receipt collectedOn cannot be later than its lifecycle event/,
+  );
+
+  for (const validatedOn of ["2026-08-31", "2026-09-01"]) {
+    const registry = structuredClone(intentRegistry);
+    const entry = lifecycleEntry();
+    entry.events[1] = {
+      eventId: "intent-event:KL-011:validated:v2",
+      sequence: 2,
+      fromStatus: "researched",
+      toStatus: "validated",
+      occurredOn: "2026-09-01",
+      actorId: "reviewer:seo-technical-1",
+      reason: "Post-publication evidence validates the recorded reader job.",
+      researchReceipt: null,
+      validationReceipt: validationReceipt({ validatedOn }),
+      supersessionReceipt: null,
+    };
+    registry.entries.push(entry);
+    assert.equal(
+      validateIntentResearchRegistry(registry, roadmap).currentIntentStatuses.validated,
+      1,
+    );
+  }
+
+  const futureValidation = structuredClone(intentRegistry);
+  const validated = lifecycleEntry();
+  validated.events[1] = {
+    eventId: "intent-event:KL-011:validated:v2",
+    sequence: 2,
+    fromStatus: "researched",
+    toStatus: "validated",
+    occurredOn: "2026-09-01",
+    actorId: "reviewer:seo-technical-1",
+    reason: "Post-publication evidence validates the recorded reader job.",
+    researchReceipt: null,
+    validationReceipt: validationReceipt({ validatedOn: "2026-09-02" }),
+    supersessionReceipt: null,
+  };
+  futureValidation.entries.push(validated);
+  assert.throws(
+    () => validateIntentResearchRegistry(futureValidation, roadmap),
+    /validation date cannot be later than its lifecycle event/,
+  );
 });
 
 test("proves intent research history is append-only across registry revisions", () => {
@@ -423,6 +499,41 @@ test("machine-governs trust routes and L1 groupings outside the first 500", () =
   assert.throws(
     () => validateTrustInfrastructureRegistry(overlappingRoute, roadmap),
     /trust route overlaps the immutable first-500 roadmap/,
+  );
+});
+
+test("pins every reviewed L1 grouping identity, label, and pillar membership", () => {
+  const swappedIds = structuredClone(trustRegistry);
+  [swappedIds.pillarGroupings[0].groups[0].id, swappedIds.pillarGroupings[0].groups[1].id] = [
+    swappedIds.pillarGroupings[0].groups[1].id,
+    swappedIds.pillarGroupings[0].groups[0].id,
+  ];
+  assert.throws(
+    () => validateTrustInfrastructureRegistry(swappedIds, roadmap),
+    /reviewed L1 grouping identities, labels, and pillar membership/,
+  );
+
+  const swappedLabels = structuredClone(trustRegistry);
+  [
+    swappedLabels.pillarGroupings[0].groups[0].label,
+    swappedLabels.pillarGroupings[0].groups[1].label,
+  ] = [
+    swappedLabels.pillarGroupings[0].groups[1].label,
+    swappedLabels.pillarGroupings[0].groups[0].label,
+  ];
+  assert.throws(
+    () => validateTrustInfrastructureRegistry(swappedLabels, roadmap),
+    /reviewed L1 grouping identities, labels, and pillar membership/,
+  );
+
+  const movedGroup = structuredClone(trustRegistry);
+  [movedGroup.pillarGroupings[0].groups[0], movedGroup.pillarGroupings[1].groups[0]] = [
+    movedGroup.pillarGroupings[1].groups[0],
+    movedGroup.pillarGroupings[0].groups[0],
+  ];
+  assert.throws(
+    () => validateTrustInfrastructureRegistry(movedGroup, roadmap),
+    /reviewed L1 grouping identities, labels, and pillar membership/,
   );
 });
 

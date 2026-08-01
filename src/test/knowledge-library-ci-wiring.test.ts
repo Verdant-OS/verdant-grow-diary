@@ -40,14 +40,42 @@ describe("Knowledge Library required CI wiring", () => {
     );
   });
 
-  it("checks out history and passes the exact event base revision", () => {
+  it("resolves a trusted base commit for every workflow event after the full checkout", () => {
     const testJob = CI.slice(CI.indexOf("\n  test:"), CI.indexOf("\n  full-suite:"));
     expect(testJob).toMatch(/uses: actions\/checkout@[\s\S]*fetch-depth: 0/);
 
-    const step = stepBlock("Knowledge Library contracts and append-only history");
-    expect(step).toContain("github.event.pull_request.base.sha");
-    expect(step).toContain("github.event.merge_group.base_sha");
-    expect(step).toContain("github.event.before");
+    const resolver = stepBlock("Resolve exact Knowledge Library base revision");
+    expect(testJob.indexOf("fetch-depth: 0")).toBeLessThan(
+      testJob.indexOf("Resolve exact Knowledge Library base revision"),
+    );
+    expect(testJob.indexOf("Resolve exact Knowledge Library base revision")).toBeLessThan(
+      testJob.indexOf("Knowledge Library contracts and append-only history"),
+    );
+    expect(resolver).toContain("github.event.pull_request.base.sha");
+    expect(resolver).toContain("github.event.merge_group.base_ref");
+    expect(resolver).not.toContain("github.event.merge_group.base_sha");
+    expect(resolver).toContain("github.event.before");
+    for (const eventName of ["pull_request", "merge_group", "push", "workflow_dispatch"]) {
+      expect(resolver).toContain(`${eventName})`);
+    }
+    expect(resolver).toContain('git check-ref-format "$MERGE_GROUP_BASE_REF"');
+    expect(resolver).toContain(
+      'remote_base_ref="refs/remotes/origin/${MERGE_GROUP_BASE_REF#refs/heads/}"',
+    );
+    expect(resolver).toContain('git merge-base "$GITHUB_SHA" "$remote_base_ref"');
+    expect(resolver).toContain("refs/heads/main|refs/heads/verdant-grow-diary)");
+    expect(resolver).toContain("workflow_dispatch is restricted to the protected target branches");
+    expect(resolver).toContain('git rev-parse --verify "${GITHUB_SHA}^1"');
+    expect(resolver).toContain('git cat-file -e "${candidate}^{commit}"');
+    expect(resolver).toContain('echo "base_revision=$resolved" >> "$GITHUB_OUTPUT"');
+
+    const validation = stepBlock("Knowledge Library contracts and append-only history");
+    expect(validation).toContain(
+      "KNOWLEDGE_BASE_REVISION: ${{ steps.knowledge-base.outputs.base_revision }}",
+    );
+    expect(validation).not.toContain("github.event.pull_request.base.sha");
+    expect(validation).not.toContain("github.event.merge_group.base_sha");
+    expect(validation).not.toContain("github.event.before");
   });
 
   it("keeps the repository-wide required workflow unfiltered", () => {

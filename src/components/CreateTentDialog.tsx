@@ -43,6 +43,8 @@ interface Props {
   initiallyOpen?: boolean;
 }
 
+const EMPTY_TENT_FORM = { name: "", size: "", brand: "", stage: "seedling" };
+
 export default function CreateTentDialog({
   trigger,
   defaultGrowId,
@@ -60,7 +62,7 @@ export default function CreateTentDialog({
   const qc = useQueryClient();
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ name: "", size: "", brand: "", stage: "seedling" });
+  const [form, setForm] = useState(EMPTY_TENT_FORM);
 
   const runGrowRefresh = useCallback(() => refreshGrows(), [refreshGrows]);
   const growRetry = useCreateBindingRetry(runGrowRefresh);
@@ -80,10 +82,7 @@ export default function CreateTentDialog({
     [defaultGrowId, activeGrowId, grows, growsLoading, growsError],
   );
   const targetGrowId = binding.targetGrowId;
-  const setupName = useMemo(
-    () => resolveSetupName(targetGrowId, grows),
-    [targetGrowId, grows],
-  );
+  const setupName = useMemo(() => resolveSetupName(targetGrowId, grows), [targetGrowId, grows]);
 
   const { data: tents } = useTents();
   const {
@@ -97,6 +96,15 @@ export default function CreateTentDialog({
   );
 
   const formBlocked = binding.blockSubmit || !canWriteCreateGrowId(targetGrowId);
+
+  function resetForm() {
+    setForm(EMPTY_TENT_FORM);
+  }
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) resetForm();
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -135,13 +143,13 @@ export default function CreateTentDialog({
     trackFunnelEvent("tent_created");
     qc.invalidateQueries({ queryKey: ["tents"] });
     qc.invalidateQueries({ queryKey: ["grow", "tents"] });
-    setForm({ name: "", size: "", brand: "", stage: "seedling" });
+    resetForm();
     setOpen(false);
     if (data && onCreated) onCreated(data as { id: string; name: string });
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger ?? (
           <Button size="sm" className="gradient-leaf text-primary-foreground gap-1">
@@ -191,7 +199,10 @@ export default function CreateTentDialog({
               {binding.retryLabel}
             </Button>
             {growRetry.gate.reason === "cooldown" && (
-              <p className="text-[11px] text-muted-foreground" data-testid="create-tent-retry-cooldown">
+              <p
+                className="text-[11px] text-muted-foreground"
+                data-testid="create-tent-retry-cooldown"
+              >
                 {GROW_SETUP_MESSAGES.retryCooldownHint}
               </p>
             )}
@@ -279,71 +290,69 @@ export default function CreateTentDialog({
           </p>
         )}
 
-        {!formBlocked && (
-          <form onSubmit={submit} className="grid gap-3" data-testid="create-tent-form">
-            <div>
-              <Label>Name</Label>
-              <Input
-                required
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Tent #1"
-              />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Only a name is required to get started.
-              </p>
-            </div>
-            <details className="rounded-md border border-border/40 px-3 py-2">
-              <summary className="cursor-pointer text-xs text-muted-foreground select-none">
-                Optional details (enrich later)
-              </summary>
-              <div className="grid gap-3 pt-3">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label>Size (optional)</Label>
-                    <Input
-                      value={form.size}
-                      onChange={(e) => setForm({ ...form, size: e.target.value })}
-                      placeholder="4x4"
-                    />
-                  </div>
-                  <div>
-                    <Label>Brand (optional)</Label>
-                    <Input
-                      value={form.brand}
-                      onChange={(e) => setForm({ ...form, brand: e.target.value })}
-                      placeholder="Gorilla"
-                    />
-                  </div>
+        <form onSubmit={submit} className="grid gap-3" data-testid="create-tent-form">
+          <div>
+            <Label>Name</Label>
+            <Input
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Tent #1"
+            />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Only a name is required to get started.
+            </p>
+          </div>
+          <details className="rounded-md border border-border/40 px-3 py-2">
+            <summary className="cursor-pointer text-xs text-muted-foreground select-none">
+              Optional details (enrich later)
+            </summary>
+            <div className="grid gap-3 pt-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>Size (optional)</Label>
+                  <Input
+                    value={form.size}
+                    onChange={(e) => setForm({ ...form, size: e.target.value })}
+                    placeholder="4x4"
+                  />
                 </div>
                 <div>
-                  <Label>Stage (optional)</Label>
-                  <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STAGES.filter((s) =>
-                        ["seedling", "veg", "flower", "flush", "harvest"].includes(s.value),
-                      ).map((s) => (
-                        <SelectItem key={s.value} value={s.value}>
-                          {s.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Brand (optional)</Label>
+                  <Input
+                    value={form.brand}
+                    onChange={(e) => setForm({ ...form, brand: e.target.value })}
+                    placeholder="Gorilla"
+                  />
                 </div>
               </div>
-            </details>
-            <Button
-              disabled={busy || !tentGate.allowed || formBlocked}
-              className="gradient-leaf text-primary-foreground"
-              data-testid="tent-create-submit"
-            >
-              Create tent
-            </Button>
-          </form>
-        )}
+              <div>
+                <Label>Stage (optional)</Label>
+                <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STAGES.filter((s) =>
+                      ["seedling", "veg", "flower", "flush", "harvest"].includes(s.value),
+                    ).map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </details>
+          <Button
+            disabled={busy || !tentGate.allowed || formBlocked}
+            className="gradient-leaf text-primary-foreground"
+            data-testid="tent-create-submit"
+          >
+            Create tent
+          </Button>
+        </form>
       </DialogContent>
     </Dialog>
   );

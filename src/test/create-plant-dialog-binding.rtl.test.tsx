@@ -125,7 +125,7 @@ beforeEach(() => {
 });
 
 describe("CreatePlantDialog RTL binding", () => {
-  it("withholds form on zero-grow hard-stop (Start your room)", () => {
+  it("zero-grow hard-stop keeps form visible but submit blocked", () => {
     growsState.grows = [];
     growsState.activeGrowId = null;
     renderDialog({});
@@ -134,26 +134,26 @@ describe("CreatePlantDialog RTL binding", () => {
       "href",
       "/grows?intent=one_tent_activation",
     );
-    expect(screen.queryByTestId("create-plant-form")).toBeNull();
+    expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
+    expect(screen.getByTestId("plant-create-submit")).toBeDisabled();
     expect(insertMock).not.toHaveBeenCalled();
   });
 
-  it("shows Retry on grow read error — not Start your room", () => {
+  it("shows Retry on grow read error — form visible, submit blocked", () => {
     growsState.grows = [];
     growsState.error = "rls failed";
     renderDialog({});
     expect(screen.getByTestId("create-plant-read-error")).toBeInTheDocument();
     expect(screen.getByTestId("create-plant-retry")).toBeInTheDocument();
     expect(screen.queryByTestId("create-plant-hard-stop")).toBeNull();
-    expect(screen.queryByTestId("create-plant-form")).toBeNull();
+    expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
+    expect(screen.getByTestId("plant-create-submit")).toBeDisabled();
   });
 
   it("debounces grow Retry — multi-click fires refresh once", async () => {
     growsState.grows = [];
     growsState.error = "rls failed";
-    const slow = vi.fn(
-      () => new Promise<void>((resolve) => setTimeout(resolve, 80)),
-    );
+    const slow = vi.fn(() => new Promise<void>((resolve) => setTimeout(resolve, 80)));
     growsState.refresh = slow;
     renderDialog({});
     const btn = screen.getByTestId("create-plant-retry");
@@ -167,7 +167,8 @@ describe("CreatePlantDialog RTL binding", () => {
     growsState.activeGrowId = G1;
     renderDialog({ defaultGrowId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" });
     expect(screen.getByTestId("create-plant-requested-unavailable")).toBeInTheDocument();
-    expect(screen.queryByTestId("create-plant-form")).toBeNull();
+    expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
+    expect(screen.getByTestId("plant-create-submit")).toBeDisabled();
     expect(insertMock).not.toHaveBeenCalled();
   });
 

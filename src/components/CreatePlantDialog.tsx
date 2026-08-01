@@ -123,15 +123,12 @@ export default function CreatePlantDialog({
     [defaultGrowId, activeGrowId, grows, growsLoading, growsError],
   );
   const targetGrowId = binding.targetGrowId;
-  const setupName = useMemo(
-    () => resolveSetupName(targetGrowId, grows),
-    [targetGrowId, grows],
-  );
+  const setupName = useMemo(() => resolveSetupName(targetGrowId, grows), [targetGrowId, grows]);
 
   const tentRows = allTents as TentRow[];
   const tentsLoaded = tentsFetched && !tentsLoading;
   const suppliedTentRow = defaultTentId
-    ? tentRows.find((t) => t.id === defaultTentId) ?? null
+    ? (tentRows.find((t) => t.id === defaultTentId) ?? null)
     : null;
 
   const suppliedTent = useMemo(
@@ -152,9 +149,7 @@ export default function CreatePlantDialog({
   const requireTentForWrite =
     requireTent || !!defaultTentId || suppliedTent.requireCompatibleTentSelection;
 
-  const tents = targetGrowId
-    ? tentRows.filter((t) => t.grow_id === targetGrowId)
-    : tentRows;
+  const tents = targetGrowId ? tentRows.filter((t) => t.grow_id === targetGrowId) : tentRows;
 
   const initialTentId = resolveInitialPlantTentId({
     defaultTentId,
@@ -177,16 +172,18 @@ export default function CreatePlantDialog({
     if (defaultTentId && form.tent_id === "none" && !explicitCompatiblePick) {
       setForm((f) => ({ ...f, tent_id: defaultTentId }));
     }
-    if (suppliedTent.kind === "ready" && form.tent_id !== defaultTentId && !explicitCompatiblePick) {
+    if (
+      suppliedTent.kind === "ready" &&
+      form.tent_id !== defaultTentId &&
+      !explicitCompatiblePick
+    ) {
       setForm((f) => ({ ...f, tent_id: defaultTentId! }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultTentId, suppliedTent.kind, targetGrowId]);
 
   const selectedTentGrowId =
-    form.tent_id !== "none"
-      ? tentRows.find((t) => t.id === form.tent_id)?.grow_id ?? null
-      : null;
+    form.tent_id !== "none" ? (tentRows.find((t) => t.id === form.tent_id)?.grow_id ?? null) : null;
 
   const tentCompat = evaluateTentGrowCompatibility({
     selectedTentId: form.tent_id,
@@ -204,15 +201,14 @@ export default function CreatePlantDialog({
   });
 
   const tentBlocksWrite =
-    suppliedTent.blockSubmit &&
-    (suppliedTent.kind === "pending" ||
-      suppliedTent.kind === "unavailable" ||
-      ((suppliedTent.kind === "orphan" || suppliedTent.kind === "mismatch") &&
-        !explicitCompatiblePick)) ||
+    (suppliedTent.blockSubmit &&
+      (suppliedTent.kind === "pending" ||
+        suppliedTent.kind === "unavailable" ||
+        ((suppliedTent.kind === "orphan" || suppliedTent.kind === "mismatch") &&
+          !explicitCompatiblePick))) ||
     tentCompat.blockSubmit;
 
-  const formBlocked =
-    binding.blockSubmit || !canWriteCreateGrowId(targetGrowId) || tentBlocksWrite;
+  const formBlocked = binding.blockSubmit || !canWriteCreateGrowId(targetGrowId) || tentBlocksWrite;
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
@@ -487,172 +483,165 @@ export default function CreatePlantDialog({
               <span className="text-muted-foreground">{suppliedTent.body}</span>
             </p>
           )}
-        {!tentCompat.compatible &&
-          form.tent_id !== "none" &&
-          suppliedTent.kind === "ready" && (
-            <p
-              className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"
-              data-testid="create-plant-tent-compat"
-              role="alert"
-            >
-              <span className="font-semibold block">{tentCompat.title}</span>
-              <span className="text-muted-foreground">{tentCompat.body}</span>
-            </p>
-          )}
+        {!tentCompat.compatible && form.tent_id !== "none" && suppliedTent.kind === "ready" && (
+          <p
+            className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"
+            data-testid="create-plant-tent-compat"
+            role="alert"
+          >
+            <span className="font-semibold block">{tentCompat.title}</span>
+            <span className="text-muted-foreground">{tentCompat.body}</span>
+          </p>
+        )}
 
-        {!binding.blockSubmit && (
-          <form onSubmit={submit} className="grid gap-3" data-testid="create-plant-form">
-            <div>
-              <Label>Name</Label>
-              <Input
-                required
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Plant A"
-                data-testid="create-plant-name"
+        <form onSubmit={submit} className="grid gap-3" data-testid="create-plant-form">
+          <div>
+            <Label>Name</Label>
+            <Input
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Plant A"
+              data-testid="create-plant-name"
+            />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Only a name and stage are required to get started.
+            </p>
+          </div>
+          <div>
+            <Label>Stage</Label>
+            <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {STAGES.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>
+                    {s.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Type (optional)</Label>
+            <Select
+              value={form.plant_type}
+              onValueChange={(v) => setForm({ ...form, plant_type: v })}
+            >
+              <SelectTrigger data-testid="create-plant-type-select">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unknown">Not sure</SelectItem>
+                <SelectItem value="autoflower">Autoflower</SelectItem>
+                <SelectItem value="photoperiod">Photoperiod</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <Label>
+                Tent
+                {requireTentForWrite ||
+                !plantCreateAllowsTentless({
+                  suppliedTentId: defaultTentId,
+                  requireTent,
+                })
+                  ? ""
+                  : " (optional)"}
+              </Label>
+              <CreateTentDialog
+                defaultGrowId={targetGrowId ?? defaultGrowId}
+                onCreated={(t) => {
+                  setForm((f) => ({ ...f, tent_id: t.id }));
+                  setExplicitCompatiblePick(true);
+                }}
+                trigger={
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 gap-1 text-xs"
+                  >
+                    <Plus className="h-3 w-3" /> Add new tent
+                  </Button>
+                }
               />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Only a name and stage are required to get started.
+            </div>
+            <Select value={form.tent_id} onValueChange={onTentSelect}>
+              <SelectTrigger data-testid="create-plant-tent-select">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {plantCreateAllowsTentless({
+                  suppliedTentId: defaultTentId,
+                  requireTent,
+                }) && <SelectItem value="none">No tent</SelectItem>}
+                {tents.map((t: { id: string; name: string }) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name}
+                  </SelectItem>
+                ))}
+                {defaultTentId &&
+                  !tents.some((t) => t.id === defaultTentId) &&
+                  form.tent_id === defaultTentId && (
+                    <SelectItem value={defaultTentId}>Selected tent (needs review)</SelectItem>
+                  )}
+              </SelectContent>
+            </Select>
+            {tents.length === 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                No tents yet. Create a tent first.
               </p>
-            </div>
-            <div>
-              <Label>Stage</Label>
-              <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STAGES.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>
-                      {s.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Type (optional)</Label>
-              <Select
-                value={form.plant_type}
-                onValueChange={(v) => setForm({ ...form, plant_type: v })}
-              >
-                <SelectTrigger data-testid="create-plant-type-select">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unknown">Not sure</SelectItem>
-                  <SelectItem value="autoflower">Autoflower</SelectItem>
-                  <SelectItem value="photoperiod">Photoperiod</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <Label>
-                  Tent
-                  {requireTentForWrite ||
-                  !plantCreateAllowsTentless({
-                    suppliedTentId: defaultTentId,
-                    requireTent,
-                  })
-                    ? ""
-                    : " (optional)"}
-                </Label>
-                <CreateTentDialog
-                  defaultGrowId={targetGrowId ?? defaultGrowId}
-                  onCreated={(t) => {
-                    setForm((f) => ({ ...f, tent_id: t.id }));
-                    setExplicitCompatiblePick(true);
-                  }}
-                  trigger={
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 px-2 gap-1 text-xs"
-                    >
-                      <Plus className="h-3 w-3" /> Add new tent
-                    </Button>
-                  }
+            )}
+          </div>
+          <details className="rounded-md border border-border/40 px-3 py-2">
+            <summary className="cursor-pointer text-xs text-muted-foreground select-none">
+              Optional details (enrich later)
+            </summary>
+            <div className="grid gap-3 pt-3">
+              <div>
+                <Label>Strain (optional)</Label>
+                <Input
+                  value={form.strain}
+                  onChange={(e) => setForm({ ...form, strain: e.target.value })}
+                  placeholder="Blue Dream"
                 />
               </div>
-              <Select value={form.tent_id} onValueChange={onTentSelect}>
-                <SelectTrigger data-testid="create-plant-tent-select">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {plantCreateAllowsTentless({
-                    suppliedTentId: defaultTentId,
-                    requireTent,
-                  }) && <SelectItem value="none">No tent</SelectItem>}
-                  {tents.map((t: { id: string; name: string }) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.name}
-                    </SelectItem>
-                  ))}
-                  {defaultTentId &&
-                    !tents.some((t) => t.id === defaultTentId) &&
-                    form.tent_id === defaultTentId && (
-                      <SelectItem value={defaultTentId}>Selected tent (needs review)</SelectItem>
-                    )}
-                </SelectContent>
-              </Select>
-              {tents.length === 0 && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  No tents yet. Create a tent first.
-                </p>
-              )}
-            </div>
-            <details className="rounded-md border border-border/40 px-3 py-2">
-              <summary className="cursor-pointer text-xs text-muted-foreground select-none">
-                Optional details (enrich later)
-              </summary>
-              <div className="grid gap-3 pt-3">
-                <div>
-                  <Label>Strain (optional)</Label>
-                  <Input
-                    value={form.strain}
-                    onChange={(e) => setForm({ ...form, strain: e.target.value })}
-                    placeholder="Blue Dream"
-                  />
-                </div>
-                <div>
-                  <Label>Health</Label>
-                  <Select
-                    value={form.health}
-                    onValueChange={(v) => setForm({ ...form, health: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {HEALTH.map((h) => (
-                        <SelectItem key={h.value} value={h.value}>
-                          {h.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Started at (optional)</Label>
-                  <Input
-                    type="date"
-                    value={form.started_at}
-                    onChange={(e) => setForm({ ...form, started_at: e.target.value })}
-                  />
-                </div>
+              <div>
+                <Label>Health</Label>
+                <Select value={form.health} onValueChange={(v) => setForm({ ...form, health: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {HEALTH.map((h) => (
+                      <SelectItem key={h.value} value={h.value}>
+                        {h.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </details>
-            <Button
-              disabled={busy || formBlocked || !tentCompat.compatible}
-              className="gradient-leaf text-primary-foreground"
-              data-testid="plant-create-submit"
-            >
-              Create plant
-            </Button>
-          </form>
-        )}
+              <div>
+                <Label>Started at (optional)</Label>
+                <Input
+                  type="date"
+                  value={form.started_at}
+                  onChange={(e) => setForm({ ...form, started_at: e.target.value })}
+                />
+              </div>
+            </div>
+          </details>
+          <Button
+            disabled={busy || formBlocked || !tentCompat.compatible}
+            className="gradient-leaf text-primary-foreground"
+            data-testid="plant-create-submit"
+          >
+            Create plant
+          </Button>
+        </form>
       </DialogContent>
     </Dialog>
   );

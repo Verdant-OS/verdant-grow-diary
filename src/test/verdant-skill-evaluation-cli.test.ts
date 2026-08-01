@@ -929,6 +929,26 @@ describe("cli — untrusted fixture input", () => {
     expect(r.lines.join(" ")).toContain("systemConfidence");
   });
 
+  // `skillMayRun` is false for not_applicable and insufficient_context, and
+  // the governor blocks EVERY proposal in that case — so an allow verdict
+  // beside such an applicability is a decision it cannot emit.
+  it("rejects an allowed verdict for a run the skill may not run", () => {
+    for (const verdict of ["not_applicable", "insufficient_context"]) {
+      const r = runWithMutated((record) => {
+        const execution = record.execution as Record<string, unknown>;
+        (execution.applicability as Record<string, unknown>).verdict = verdict;
+        (execution.output as Record<string, unknown>).proposals = [PROPOSAL];
+        const policy = execution.policy as Record<string, unknown>;
+        policy.proposalVerdicts = [verdictFor("manual_only")];
+        policy.actionEligibility = "low_risk_manual_only";
+        policy.outcomes = ["allow_low_risk_manual_action"];
+        permitAction(record);
+      });
+      expect(r.code, verdict).toBe(EXIT_USAGE_OR_IO);
+      expect(r.lines.join(" "), verdict).toContain("may not run");
+    }
+  });
+
   it("still accepts a well-formed envelope from the same path", () => {
     // Guards the guard: a check that rejected everything would pass the two
     // tests above while breaking the harness.

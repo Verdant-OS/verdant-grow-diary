@@ -533,6 +533,27 @@ function loadFixtures(
       continue;
     }
 
+    // `skillMayRun` is false for `not_applicable` and `insufficient_context`,
+    // and the governor blocks EVERY proposal in that case — so an allow verdict
+    // beside such a verdict is a decision it cannot emit. A fixture could
+    // otherwise expect that applicability AND `must_act` and pass on both.
+    const recordedApplicability = record.execution.applicability as { verdict: string };
+    const mayRun =
+      recordedApplicability.verdict === "applicable" ||
+      recordedApplicability.verdict === "partially_applicable";
+    if (!mayRun) {
+      const allowedDespite = execPolicy.proposalVerdicts
+        .filter((v) => v.verdict === "allow")
+        .map((v) => v.proposalId)
+        .sort();
+      if (allowedDespite.length > 0) {
+        issues.push(
+          `${name}: allowed verdict for a run the skill may not run (${recordedApplicability.verdict}): ${allowedDespite.join(", ")}`,
+        );
+        continue;
+      }
+    }
+
     const verdictIds = new Set(verdictIdList);
     const unattached = [...verdictIds].filter((id) => !outputProposalIds.has(id)).sort();
     const unjudged = [...outputProposalIds].filter((id) => !verdictIds.has(id)).sort();

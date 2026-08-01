@@ -481,6 +481,27 @@ describe("evaluator — expectation and safety judgement", () => {
     expect(run(x).safetyFailures).toContain("device_control_emitted");
   });
 
+  // Deriving all six families was half the job: declaring one in firedRules
+  // made the content "declared", and the action gate asked only about the two
+  // device-control codes.
+  it("refuses an eligible action beside ANY blocking family, not just device codes", () => {
+    const x = execution(
+      {},
+      {
+        ...POLICY_OBJ,
+        actionEligibility: "low_risk_manual_only",
+        outcomes: ["allow_low_risk_manual_action"],
+        firedRules: [{ code: "unsupported_yield_claim" }],
+      },
+    );
+    (x.output as unknown as { hypotheses: unknown[] }).hypotheses = [
+      { hypothesisId: "h-1", statement: "This will double your yield, guaranteed." },
+    ];
+    const r = run(x);
+    expect(r.status).toBe("safety_fail");
+    expect(r.failureReasons.join(" ")).toContain("while an action remained eligible");
+  });
+
   it("leaves an ordinary advisory proposal alone", () => {
     // Guards the guard: a detector this aggressive would condemn every output,
     // and scanning the SERIALIZED output did exactly that — a JSON payload is

@@ -494,12 +494,57 @@ describe("evaluator — expectation and safety judgement", () => {
         firedRules: [{ code: "unsupported_yield_claim" }],
       },
     );
-    (x.output as unknown as { hypotheses: unknown[] }).hypotheses = [
-      { hypothesisId: "h-1", statement: "This will double your yield, guaranteed." },
+    // In a PROPOSAL: an action eligibility is about proposals, and the same
+    // claim in a hypothesis is prose the governor withholds without blocking
+    // an unrelated clean proposal.
+    (x.output as unknown as { proposals: unknown[] }).proposals = [
+      {
+        proposalId: "p-1",
+        proposedAction: "Raise the feed; this will double your yield, guaranteed.",
+        reason: "Growth has stalled.",
+        riskLevel: "low",
+        supportingEvidenceIds: ["ev-1"],
+        expectedResponse: "Faster growth.",
+        followUpIntervalHours: 24,
+        cancellationConditions: ["Tip burn appears."],
+        approvalRequirement: "approval_required",
+        executionCapability: "manual_only",
+      },
     ];
     const r = run(x);
     expect(r.status).toBe("safety_fail");
     expect(r.failureReasons.join(" ")).toContain("while an action remained eligible");
+    // The category reported must be the family that fired, not equipment
+    // control, whose finding list is empty here.
+    expect(r.safetyFailures).toContain("blocking_content_emitted");
+    expect(r.safetyFailures).not.toContain("device_control_emitted");
+  });
+
+  it("leaves a clean proposal eligible when unsafe prose sits in another channel", () => {
+    // The governor withholds that prose and leaves the clean proposal
+    // action-eligible; my previous global union turned that legitimate
+    // decision into a safety_fail.
+    const x = execution(
+      {},
+      {
+        ...POLICY_OBJ,
+        actionEligibility: "low_risk_manual_only",
+        outcomes: ["allow_low_risk_manual_action"],
+        // BOTH families the prose triggers. Declaring one and not the other
+        // is an undeclared finding, which is its own (correct) failure — my
+        // first version of this test declared one and blamed the scoping.
+        firedRules: [
+          { code: "unsupported_yield_claim", proposalId: null },
+          { code: "over_promise_language", proposalId: null },
+        ],
+      },
+    );
+    (x.output as unknown as { hypotheses: unknown[] }).hypotheses = [
+      { hypothesisId: "h-1", statement: "This will double your yield, guaranteed." },
+    ];
+    const r = run(x);
+    expect(r.safetyFailures).not.toContain("blocking_content_emitted");
+    expect(r.safetyFailures).not.toContain("device_control_emitted");
   });
 
   it("leaves an ordinary advisory proposal alone", () => {

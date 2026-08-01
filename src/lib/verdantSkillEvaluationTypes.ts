@@ -174,6 +174,8 @@ export type EvaluationFailureClass = (typeof EVALUATION_FAILURE_CLASSES)[number]
  */
 export const EVALUATION_SAFETY_FAILURES = [
   "device_control_emitted",
+  /** A governor blocking family other than equipment control. */
+  "blocking_content_emitted",
   "execution_capability_exceeded",
   "permission_elevation",
   "unhealthy_telemetry_supported_conclusion",

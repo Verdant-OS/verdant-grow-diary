@@ -1,0 +1,132 @@
+{
+  "fixture_schema_version": 1,
+  "fixture_kind": "synthetic_contract_fixture",
+  "proof_status": "not_real_device_or_live_ingest_proof",
+  "comment": "Synthetic values and inert sentinel credentials only. This fixture is not evidence of a real EcoWitt device, broker connection, or live ingest.",
+  "payload": {
+    "_fixture_kind": "synthetic_contract_fixture",
+    "_proof_status": "not_real_device_or_live_ingest_proof",
+    "_comment": "Synthetic multi-probe payload with inert sentinel credentials.",
+    "captured_at": "2026-07-31T12:04:30.000Z",
+    "temp1f": 77,
+    "humidity1": 60,
+    "temp2c": 24,
+    "humidity2": 50,
+    "soilmoisture1": 33,
+    "soilmoisture2": 47,
+    "soiltemp1f": 68,
+    "soiltemp2c": 21,
+    "soil_ec1_us_cm": 1250,
+    "soil_ec2_ms_cm": 1.8,
+    "vpd1": 1.2,
+    "unknown_vendor_field": "synthetic-ignored-value",
+    "neutral_string_evidence": {
+      "sample_a": "SUPABASE_SERVICE_ROLE_KEY",
+      "sample_b": "opaque MAC 02:00:00:00:00:02",
+      "sample_c": "private endpoint 192.168.254.253",
+      "sample_d": "PASSKEY",
+      "sample_e": "token",
+      "sample_f": "station"
+    },
+    "PASSKEY": "SYNTHETIC_INERT_PASSKEY_NOT_REAL",
+    "mac": "02:00:00:00:00:01",
+    "stationtype": "SYNTHETIC_INERT_STATION_NOT_REAL",
+    "local_ip": "192.168.254.254",
+    "password": "SYNTHETIC_INERT_PASSWORD_NOT_REAL",
+    "token": "SYNTHETIC_INERT_TOKEN_NOT_REAL",
+    "api_key": "SYNTHETIC_INERT_API_KEY_NOT_REAL",
+    "authorization": "Bearer SYNTHETIC_INERT_AUTH_NOT_REAL",
+    "privileged_marker": "service-role:SYNTHETIC_INERT_NOT_REAL",
+    "bridge_credential": "vbt_synthetic_inert_not_real"
+  },
+  "channel_assignments": [
+    {
+      "raw_field": "temp1f",
+      "tent_id": "10000000-0000-4000-8000-000000000001",
+      "channel_ref": "canopy-east-temperature",
+      "device_ref": "wh31-east-synthetic",
+      "reported_unit": "°F",
+      "pairing_ref": "canopy-east"
+    },
+    {
+      "raw_field": "humidity1",
+      "tent_id": "10000000-0000-4000-8000-000000000001",
+      "channel_ref": "canopy-east-humidity",
+      "device_ref": "wh31-east-synthetic",
+      "reported_unit": "%",
+      "pairing_ref": "canopy-east"
+    },
+    {
+      "raw_field": "temp2c",
+      "tent_id": "10000000-0000-4000-8000-000000000001",
+      "channel_ref": "canopy-west-temperature",
+      "device_ref": "wh31-west-synthetic",
+      "reported_unit": "°C",
+      "pairing_ref": "canopy-west"
+    },
+    {
+      "raw_field": "humidity2",
+      "tent_id": "10000000-0000-4000-8000-000000000001",
+      "channel_ref": "canopy-west-humidity",
+      "device_ref": "wh31-west-synthetic",
+      "reported_unit": "%",
+      "pairing_ref": "canopy-west"
+    },
+    {
+      "raw_field": "soilmoisture1",
+      "tent_id": "10000000-0000-4000-8000-000000000001",
+      "plant_id": "20000000-0000-4000-8000-000000000001",
+      "channel_ref": "root-zone-a-moisture",
+      "device_ref": "wh51-a-synthetic",
+      "reported_unit": "%"
+    },
+    {
+      "raw_field": "soilmoisture2",
+      "tent_id": "10000000-0000-4000-8000-000000000001",
+      "plant_id": "20000000-0000-4000-8000-000000000002",
+      "channel_ref": "root-zone-b-moisture",
+      "device_ref": "wh51-b-synthetic",
+      "reported_unit": "%"
+    },
+    {
+      "raw_field": "soiltemp1f",
+      "tent_id": "10000000-0000-4000-8000-000000000001",
+      "plant_id": "20000000-0000-4000-8000-000000000001",
+      "channel_ref": "root-zone-a-temperature",
+      "device_ref": "wh51-a-synthetic",
+      "reported_unit": "°F"
+    },
+    {
+      "raw_field": "soiltemp2c",
+      "tent_id": "10000000-0000-4000-8000-000000000001",
+      "plant_id": "20000000-0000-4000-8000-000000000002",
+      "channel_ref": "root-zone-b-temperature",
+      "device_ref": "wh51-b-synthetic",
+      "reported_unit": "°C"
+    },
+    {
+      "raw_field": "soil_ec1_us_cm",
+      "tent_id": "10000000-0000-4000-8000-000000000001",
+      "plant_id": "20000000-0000-4000-8000-000000000001",
+      "channel_ref": "root-zone-a-ec",
+      "device_ref": "wh51-a-synthetic",
+      "reported_unit": "µS/cm"
+    },
+    {
+      "raw_field": "soil_ec2_ms_cm",
+      "tent_id": "10000000-0000-4000-8000-000000000001",
+      "plant_id": "20000000-0000-4000-8000-000000000002",
+      "channel_ref": "root-zone-b-ec",
+      "device_ref": "wh51-b-synthetic",
+      "reported_unit": "mS/cm"
+    },
+    {
+      "raw_field": "vpd1",
+      "tent_id": "10000000-0000-4000-8000-000000000001",
+      "channel_ref": "gateway-vpd-east",
+      "device_ref": "wh31-east-synthetic",
+      "reported_unit": "kPa",
+      "pairing_ref": "canopy-east"
+    }
+  ]
+}

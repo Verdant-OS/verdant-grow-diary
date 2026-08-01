@@ -28,4 +28,13 @@ describe("create dialog hard-stop wiring", () => {
   it("no optional omit of grow_id on tent submit", () => {
     expect(TENT).not.toMatch(/if\s*\(defaultGrowId\)\s*payload\.grow_id/);
   });
+
+  it("cancel/close/reopen resets controlled form state", () => {
+    expect(TENT).toMatch(/handleOpenChange/);
+    expect(TENT).toMatch(/emptyTentForm/);
+    expect(TENT).toMatch(/onOpenChange=\{handleOpenChange\}/);
+    expect(PLANT).toMatch(/handleOpenChange/);
+    expect(PLANT).toMatch(/emptyForm/);
+    expect(PLANT).toMatch(/onOpenChange=\{handleOpenChange\}/);
+  });
 });

@@ -44,6 +44,10 @@ interface Props {
   initiallyOpen?: boolean;
 }
 
+function emptyTentForm() {
+  return { name: "", size: "", brand: "", stage: "seedling" };
+}
+
 export default function CreateTentDialog({
   trigger,
   defaultGrowId,
@@ -55,7 +59,7 @@ export default function CreateTentDialog({
   const qc = useQueryClient();
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ name: "", size: "", brand: "", stage: "seedling" });
+  const [form, setForm] = useState(emptyTentForm);
 
   const targetGrowId = useMemo(
     () =>
@@ -74,10 +78,7 @@ export default function CreateTentDialog({
       ),
     [targetGrowId, grows.length, growsLoading],
   );
-  const setupName = useMemo(
-    () => resolveSetupName(targetGrowId, grows),
-    [targetGrowId, grows],
-  );
+  const setupName = useMemo(() => resolveSetupName(targetGrowId, grows), [targetGrowId, grows]);
 
   // Free-tier tent gate (multiTent=false → single tent). useTents already
   // filters archived tents. Fails open while entitlements load.
@@ -91,6 +92,13 @@ export default function CreateTentDialog({
     entLoading || entitlementLookupFailed ? null : entitlement.capabilities,
     (tents ?? []).length,
   );
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) {
+      setForm(emptyTentForm());
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -130,13 +138,13 @@ export default function CreateTentDialog({
     trackFunnelEvent("tent_created");
     qc.invalidateQueries({ queryKey: ["tents"] });
     qc.invalidateQueries({ queryKey: ["grow", "tents"] });
-    setForm({ name: "", size: "", brand: "", stage: "seedling" });
+    setForm(emptyTentForm());
     setOpen(false);
     if (data && onCreated) onCreated(data as { id: string; name: string });
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger ?? (
           <Button size="sm" className="gradient-leaf text-primary-foreground gap-1">

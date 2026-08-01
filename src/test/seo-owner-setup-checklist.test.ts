@@ -57,6 +57,16 @@ describe("lighting analytics owner setup checklist", () => {
     expect(CHECKLIST).toMatch(/property identity and authenticated reporting\s+access/);
   });
 
+  it("records the deployed structured-data repair without leaving a pending-publish handoff", () => {
+    expect(CHECKLIST).toContain("PR #624 structured-data ownership repair are live");
+    expect(CHECKLIST).toMatch(/eight-state\s+production browser matrix/);
+    expect(CHECKLIST).toContain("no further publication is required for that repair");
+    expect(CHECKLIST).not.toContain("local repair pending publish");
+    expect(CHECKLIST).toContain(
+      "https://developers.google.com/analytics/devguides/collection/ga4/views",
+    );
+  });
+
   it("keeps the stream tuple and blocked property boundary in both measurement handoffs", () => {
     for (const document of [LAUNCH_VERIFICATION, MEASUREMENT_PLAN]) {
       expect(document).toContain("Verdant Grow Diary");

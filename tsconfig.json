@@ -19,9 +19,15 @@
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
     "noImplicitReturns": true,
-    "noPropertyAccessFromIndexSignature": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
+    // TanStack Router hard-requires `strictNullChecks` (kept on via `strict`).
+    // These three extra-strict flags were NOT part of the pre-migration
+    // tsconfig and are not required by the framework; enabling them over a
+    // ~1,700-file codebase would mean thousands of mechanical rewrites in one
+    // migration turn. Left off deliberately so the migration does not smuggle
+    // in an unrelated type-hygiene program.
+    "noPropertyAccessFromIndexSignature": false,
+    "noUncheckedIndexedAccess": false,
+    "exactOptionalPropertyTypes": false,
     "noUncheckedSideEffectImports": true,
     "paths": {
       "@/*": ["./src/*"]

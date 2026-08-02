@@ -6,7 +6,5 @@
  * under `strict` without turning on `allowJs` (which would type-check the
  * scripts themselves — out of scope for the framework migration).
  */
-declare module "*.mjs" {
-  const value: any;
-  export = value;
-}
+// Shorthand ambient declaration: every import (default or named) resolves to `any`.
+declare module "*.mjs";

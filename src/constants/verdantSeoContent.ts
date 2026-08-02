@@ -504,7 +504,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "Classify grow-room sensor readings by source, freshness, calibration, placement, units, agreement, and failure evidence before using derived VPD.",
     targetKeyword: "grow room sensor log",
     intro:
-      "A grow room sensor log should preserve the evidence behind every value, not treat the number as truth by default. Classify the stream before interpreting it: who or what produced it, when it was captured, whether the units are plausible, where the probe sat, how it compared with a reference at operating conditions, and whether it agrees with the room. VPD is calculated, not directly measured, so air VPD can never be more trustworthy than its temperature and humidity inputs or its leaf-temperature basis.",
+      "A grow room sensor log should preserve the evidence behind every value, not treat the number as truth by default. Classify the stream before interpreting it: who or what produced it, when it was captured, whether the units are plausible, where the probe sat, how it compared with a reference at operating conditions, and whether it agrees with the room. VPD is calculated, not directly measured, so air VPD can never be more trustworthy than its temperature and humidity inputs; a leaf-based difference also depends on its leaf-temperature basis.",
     sections: [
       {
         heading: "Start with source, identity, and time",
@@ -594,8 +594,10 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         },
         {
           evidence: "Derived metrics",
-          usable: "Every required input and calculation basis meets the claimed confidence.",
-          conditional: "Incomplete but labeled inputs support only a bounded comparison.",
+          usable:
+            "Air VPD has trustworthy air temperature and RH; a leaf-based difference also has a measured leaf-temperature basis.",
+          conditional:
+            "A bounded air-VPD comparison is labeled as air VPD; leaf VPD is not claimed without a measured leaf basis.",
           untrusted: "Missing, guessed, stale, or invalid inputs become a healthy derived value.",
         },
       ],

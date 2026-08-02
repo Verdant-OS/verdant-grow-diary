@@ -94,5 +94,13 @@ describe("public VPD and sensor-truth evidence contract", () => {
 
     const copy = JSON.stringify(guide).toLowerCase();
     expect(copy).not.toMatch(/universal (?:ideal |perfect )?vpd target/);
+
+    const sensorTruthCopy = JSON.stringify(findGuideBySlug("sensor-truth-grow-room")).toLowerCase();
+    expect(sensorTruthCopy).toContain(
+      "air vpd can never be more trustworthy than its temperature and humidity inputs",
+    );
+    expect(sensorTruthCopy).toContain(
+      "a leaf-based difference also depends on its leaf-temperature basis",
+    );
   });
 });

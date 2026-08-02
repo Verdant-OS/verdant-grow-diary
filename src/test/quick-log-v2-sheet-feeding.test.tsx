@@ -117,9 +117,11 @@ describe("QuickLogV2Sheet — structured feeding", () => {
       "utf8",
     );
     expect(source).toMatch(
-      /showTimelineConfirmation\(FEEDING_SAVE_SUCCESS_MESSAGE,[\s\S]*?targetType:\s*null,[\s\S]*?targetId:\s*null,[\s\S]*?growEventId/,
+      /showTimelineConfirmation\(FEEDING_SAVE_SUCCESS_MESSAGE,[\s\S]*?growId:\s*resolved\.growId[\s\S]*?targetType:\s*\(resolved\.targetType[\s\S]*?growEventId/,
     );
-    expect(source).toMatch(/postSave\.action === "feed" \? null : postSave\.targetType/);
+    expect(source).toMatch(
+      /buildQuickLogTimelineNavTarget\(\{[\s\S]*?growId:\s*postSave\.growId[\s\S]*?growEventId:\s*postSave\.growEventId/,
+    );
     const feedingPanel = readFileSync(
       resolve(process.cwd(), "src/components/FeedingHistoryPanel.tsx"),
       "utf8",

@@ -41,7 +41,7 @@ export interface PostGrowReflectionDryRunScenarioResult {
   failureReason: string | null;
   outputConfidence: ReflectionConfidence | null;
   validationOptions: {
-    sensorCoveragePct: number;
+    sensorCoveragePct: number | null;
     knownGapCount: number;
     minEvidenceReferences: number;
   };

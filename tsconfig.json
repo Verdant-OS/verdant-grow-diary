@@ -25,6 +25,13 @@
     // ~1,700-file codebase would mean thousands of mechanical rewrites in one
     // migration turn. Left off deliberately so the migration does not smuggle
     // in an unrelated type-hygiene program.
+    // `noImplicitAny` was OFF in the pre-migration tsconfig. ~160 of the hits
+    // are vitest contract tests destructuring untyped `scripts/*.mjs` tooling
+    // exports, which have no declarations to infer from. Every implicit-any in
+    // application code (src/components, src/lib, src/hooks, supabase/functions)
+    // was annotated during the migration instead; re-enabling this flag is a
+    // tracked follow-up against the test tree, not migration work.
+    "noImplicitAny": false,
     "noPropertyAccessFromIndexSignature": false,
     "noUncheckedIndexedAccess": false,
     "exactOptionalPropertyTypes": false,

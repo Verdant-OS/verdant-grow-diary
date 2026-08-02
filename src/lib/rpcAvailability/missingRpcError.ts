@@ -110,7 +110,7 @@ export function isMissingRpcError(
  */
 export class MissingAuditRpcError extends Error {
   readonly rpcName: string;
-  readonly cause: unknown;
+  override readonly cause: unknown;
 
   constructor(rpcName: string, cause: unknown) {
     super(

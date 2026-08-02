@@ -75,18 +75,20 @@ export function readPendingOAuthSignupAcquisition(
     const raw = storage.getItem(OAUTH_SIGNUP_ACQUISITION_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<PendingOAuthSignupAcquisition>;
+    const source = parsed.source;
+    const startedAt = parsed.startedAt;
     const valid =
-      isPaidAcquisitionSource(parsed.source) &&
-      typeof parsed.startedAt === "number" &&
-      Number.isFinite(parsed.startedAt) &&
-      parsed.startedAt >= 0 &&
-      now >= parsed.startedAt &&
-      now - parsed.startedAt <= OAUTH_SIGNUP_ACQUISITION_TTL_MS;
-    if (!valid) {
+      isPaidAcquisitionSource(source) &&
+      typeof startedAt === "number" &&
+      Number.isFinite(startedAt) &&
+      startedAt >= 0 &&
+      now >= startedAt &&
+      now - startedAt <= OAUTH_SIGNUP_ACQUISITION_TTL_MS;
+    if (!valid || !isPaidAcquisitionSource(source) || typeof startedAt !== "number") {
       removePending(storage);
       return null;
     }
-    return { source: parsed.source, startedAt: parsed.startedAt };
+    return { source, startedAt };
   } catch {
     removePending(storage);
     return null;

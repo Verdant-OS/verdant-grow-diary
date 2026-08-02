@@ -732,7 +732,7 @@ export default function TentDetail() {
                         id: p.id,
                         name: p.name,
                         strain: p.strain,
-                        stage: p.stage,
+                        stage: p.stage ?? "",
                         health: p.health,
                         startedAt: p.startedAt,
                         tentId: p.tentId ?? tent.id,

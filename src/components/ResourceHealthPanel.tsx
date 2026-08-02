@@ -36,7 +36,7 @@ interface ResourceCheck {
   name: string;
   path: string;
   /** Optional additional validation on the fetched response. */
-  validate?: (res: Response, body: string) => Promise<string | void> | string | void;
+  validate?: (res: Response, body: string) => Promise<string | undefined> | string | undefined;
   /** If true, response must be valid JSON. */
   json?: boolean;
   status: ResourceStatus;
@@ -75,6 +75,7 @@ const initial: ResourceCheck[] = [
       if (!body.includes("<urlset") && !body.includes("<sitemapindex")) {
         return "missing <urlset> / <sitemapindex> root";
       }
+      return undefined;
     },
   },
   {
@@ -151,7 +152,7 @@ export function ResourceHealthPanel() {
               };
             }
           }
-          let extra: string | void;
+          let extra: string | undefined = undefined;
           if (check.validate) {
             extra = await check.validate(res, body);
           }

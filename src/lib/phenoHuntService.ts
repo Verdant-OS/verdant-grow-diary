@@ -36,7 +36,7 @@ export interface CreatePhenoHuntResult {
 export class PhenoHuntError extends Error {
   constructor(
     message: string,
-    public cause?: unknown,
+    public override cause?: unknown,
   ) {
     super(message);
     this.name = "PhenoHuntError";

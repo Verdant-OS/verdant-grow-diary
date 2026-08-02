@@ -50,7 +50,12 @@ export function useLocation(): CompatLocation {
 
 /** react-router `useParams()`. Non-strict so any route can read any param. */
 export function useParams<T extends Record<string, string | undefined>>(): T {
-  return useTanStackParams({ strict: false }) as T;
+  // TanStack's non-strict overload is not expressible against the generated
+  // route register without naming a `from`; the shim is intentionally
+  // route-agnostic, so the options object is passed through untyped.
+  return (useTanStackParams as unknown as (options: { strict: false }) => T)({
+    strict: false,
+  });
 }
 
 /** Always true — the app is always inside the TanStack router. */
@@ -64,20 +69,38 @@ export interface CompatNavigateOptions {
   preventScrollReset?: boolean;
 }
 
+/** react-router `To` object form: `{ pathname, search, hash }`. */
+export interface CompatToObject {
+  pathname?: string;
+  search?: string;
+  hash?: string;
+}
+
+export type CompatTo = string | CompatToObject;
+
 export type CompatNavigateFunction = {
-  (to: string, options?: CompatNavigateOptions): void;
+  (to: CompatTo, options?: CompatNavigateOptions): void;
   (delta: number): void;
 };
 
+/** Flattens react-router's `To` object into a single path string. */
+function flattenTo(to: CompatTo): string {
+  if (typeof to === "string") return to;
+  const search = to.search ? (to.search.startsWith("?") ? to.search : `?${to.search}`) : "";
+  const hash = to.hash ? (to.hash.startsWith("#") ? to.hash : `#${to.hash}`) : "";
+  return `${to.pathname ?? ""}${search}${hash}`;
+}
+
 /**
- * react-router `useNavigate()`. Supports both `navigate("/path", { replace })`
- * and history-delta calls such as `navigate(-1)`.
+ * react-router `useNavigate()`. Supports `navigate("/path", { replace })`,
+ * the `{ pathname, search, hash }` object form, and history-delta calls such
+ * as `navigate(-1)`.
  */
 export function useNavigate(): CompatNavigateFunction {
   const navigate = useTanStackNavigate();
   const router = useRouter();
 
-  return ((to: string | number, options?: CompatNavigateOptions) => {
+  return ((to: CompatTo | number, options?: CompatNavigateOptions) => {
     if (typeof to === "number") {
       if (to === 0) return;
       // TanStack's history exposes go/back/forward; -1 is the common case.
@@ -86,13 +109,14 @@ export function useNavigate(): CompatNavigateFunction {
       return;
     }
     void navigate({
-      to,
+      to: flattenTo(to),
       replace: options?.replace ?? false,
       ...(options?.state !== undefined ? { state: options.state as never } : {}),
       resetScroll: options?.preventScrollReset !== true,
     } as never);
   }) as CompatNavigateFunction;
 }
+
 
 export interface CompatLinkProps
   extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> {

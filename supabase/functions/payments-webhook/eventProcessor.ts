@@ -128,7 +128,7 @@ export interface CustomerUpsertRow {
 }
 
 // Loose shapes — the Paddle SDK returns camelCase but we defensively read.
-interface EventLike {
+export interface EventLike {
   eventType?: string;
   data?: SubscriptionData | TransactionData | CustomerData;
 }

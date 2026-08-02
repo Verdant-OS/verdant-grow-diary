@@ -276,7 +276,9 @@ export function buildQuickLogSnapshotStrip(
   );
 
   const status = narrowStatus(classification.status);
-  const capturedMs = new Date(snapshot.ts).getTime();
+  // `isEmpty` above already rejected a missing `ts`; re-read it as non-null.
+  const capturedAtIso = snapshot.ts ?? "";
+  const capturedMs = new Date(capturedAtIso).getTime();
   const ageLabel = Number.isFinite(capturedMs)
     ? formatAge(capturedMs, now.getTime())
     : null;
@@ -462,7 +464,9 @@ export function buildQuickLogStripFromTentState(
   }
 
   const status = narrowStrict(snapshot.status);
-  const capturedMs = Date.parse(snapshot.captured_at);
+  // `isEmpty` above already rejected a missing `captured_at`.
+  const capturedAtIso = snapshot.captured_at ?? "";
+  const capturedMs = Date.parse(capturedAtIso);
   const ageLabel = Number.isFinite(capturedMs)
     ? formatAge(capturedMs, now.getTime())
     : null;

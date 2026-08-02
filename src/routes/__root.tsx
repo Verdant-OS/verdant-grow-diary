@@ -116,7 +116,7 @@ function RootErrorComponent({ error }: { error: Error }) {
     <RootDocument>
       <div
         // Branded fallback rendered instead of the framework default.
-        dangerouslySetInnerHTML={{ __html: renderErrorPage(error) }}
+        dangerouslySetInnerHTML={{ __html: renderErrorPage() }}
       />
     </RootDocument>
   );

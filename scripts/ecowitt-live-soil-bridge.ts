@@ -810,7 +810,7 @@ async function runCli(): Promise<void> {
   );
   client.on("message", async (...args: unknown[]) => {
     if (env.once && (onceMessageInFlight || onceComplete)) return;
-    onceMessageInFlight = env.once;
+    onceMessageInFlight = env.once === true;
     const msg = args[1] as { toString: (enc: string) => string };
     try {
       const result = await handleMqttMessage(msg.toString("utf8"), {

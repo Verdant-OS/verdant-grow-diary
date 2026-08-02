@@ -21,7 +21,7 @@ export interface PostGrowReflectionAdapterRequest {
   prompt: string;
   validationOptions: Required<PostGrowReflectionValidationOptions>;
   metadata: {
-    sensorCoveragePct: number;
+    sensorCoveragePct: number | null;
     knownGapCount: number;
     eventCount: number;
     sourceTags: string[];

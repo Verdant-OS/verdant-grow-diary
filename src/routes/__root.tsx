@@ -20,7 +20,6 @@ import { useGoogleAnalyticsPageViews } from "@/hooks/useGoogleAnalyticsPageViews
 import { clearGrowDataMeta } from "@/hooks/useGrowData";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
 import { renderErrorPage } from "@/lib/error-page";
-import { queryClient } from "@/router";
 import appCss from "@/styles.css?url";
 
 const SITE_URL = "https://verdantgrowdiary.com";
@@ -130,9 +129,12 @@ function RootErrorComponent({ error }: { error: Error }) {
  * Source-disclosure metadata lives outside React Query and needs the same
  * identity fence so one grower's status cannot flash for the next account.
  */
-function clearQueryCacheBeforeAuthIdentityChange() {
-  queryClient.clear();
-  clearGrowDataMeta();
+function useClearQueryCacheBeforeAuthIdentityChange() {
+  const { queryClient } = Route.useRouteContext();
+  return () => {
+    queryClient.clear();
+    clearGrowDataMeta();
+  };
 }
 
 function AnalyticsShell() {
@@ -173,13 +175,14 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  const onBeforeAuthIdentityChange = useClearQueryCacheBeforeAuthIdentityChange();
   return (
     <RootDocument>
       <RootErrorBoundary>
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <AuthProvider onBeforeAuthIdentityChange={clearQueryCacheBeforeAuthIdentityChange}>
+          <AuthProvider onBeforeAuthIdentityChange={onBeforeAuthIdentityChange}>
             <OAuthPostAuthRedirect />
             <GrowsProvider>
               <PaymentTestModeBanner />

@@ -61,11 +61,10 @@ const documents = STATIC_PUBLIC_OUTPUT_DOCUMENTS.map((document) => {
       renderPng(document.metadata.title, document.metadata.description, canonicalPath),
     );
   }
-  const { bodyFallbackHtml: _bodyFallbackHtml, ...metadata } = document.metadata;
   return {
     path: document.path,
     fileName: document.fileName,
-    metadata: { ...metadata, image: `${VERDANT_SITE_ORIGIN}/${ogFileName}` },
+    metadata: resolveStaticDocumentMetadata(document),
   };
 });
 

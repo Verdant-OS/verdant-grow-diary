@@ -64,6 +64,21 @@ export interface GuideSource {
   readonly note: string;
 }
 
+export interface GuideEvidenceTableRow {
+  readonly evidence: string;
+  readonly usable: string;
+  readonly conditional: string;
+  readonly untrusted: string;
+}
+
+export interface GuideEvidenceTable {
+  readonly heading: string;
+  readonly description: string;
+  /** Concise accessible name for the table itself. */
+  readonly ariaLabel: string;
+  readonly rows: ReadonlyArray<GuideEvidenceTableRow>;
+}
+
 export interface SeoGuidePage {
   readonly slug: string;
   readonly title: string;
@@ -79,6 +94,8 @@ export interface SeoGuidePage {
   readonly cta?: GuideCallToAction;
   /** Visible editorial sources. Never copied into claims beyond their scope. */
   readonly sources?: ReadonlyArray<GuideSource>;
+  /** Optional evidence gate for decisions that need scannable trust states. */
+  readonly evidenceTable?: GuideEvidenceTable;
   /** Repository-backed publication/review provenance for Article JSON-LD. */
   readonly publishedOn?: string;
   readonly modifiedOn?: string;
@@ -249,25 +266,29 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
   },
   {
     slug: "grow-room-vpd-tracker",
-    title: "Grow Room VPD Tracker With Honest Sensor Context | Verdant",
-    h1: "How to use a grow room VPD tracker without losing the light and heat context",
+    title: "Accurate Grow Room VPD: Sensor & Leaf Checks | Verdant",
+    h1: "How to calculate grow room VPD from trustworthy inputs",
     description:
-      "Track grow room VPD from source-labeled temperature and humidity, compare stage, light and heat context, and never treat stale or demo readings as healthy live data.",
+      "Calculate grow room VPD from verified temperature, humidity, leaf-temperature, placement, and calibration evidence without mistaking an estimate for sensor truth.",
     targetKeyword: "grow room VPD tracker",
     intro:
-      "A grow room VPD tracker is useful only when the temperature and humidity underneath it are honest and the reading stays attached to what the plant experienced. VPD can help explain water demand, but it cannot by itself separate excess light, local heat, airflow, or root-zone stress. Verdant keeps the source, time, stage, and nearby grow event visible so the number stays context instead of becoming a verdict.",
+      "A grow room VPD tracker is only as trustworthy as the evidence behind its inputs. VPD is calculated, not directly measured, and it inherits every error in air temperature, relative humidity, leaf-temperature basis, probe placement, and time. A screen can update every minute and still be wrong for the canopy. Treat the result as authoritative only when its inputs have current evidence; otherwise label it air VPD, conditional, stale, or untrusted and verify what is missing before changing the room.",
     sections: [
       {
-        heading: "Source labels on every reading",
-        body: "Verdant labels every temperature and humidity reading as live, manual, csv, demo, stale, or invalid. VPD is computed from those readings, and if the underlying value is stale or invalid, the VPD is flagged too — never rendered as healthy.",
+        heading: "Start with the calculation, not the display label",
+        body: "Air VPD combines saturation vapor pressure at the measured air temperature with actual vapor pressure derived from relative humidity. A plant-facing vapor-pressure difference also needs a measured leaf-temperature basis. Record which calculation you are using, its units, the source of each input, and the captured time. Never describe a controller's derived VPD field as directly measured.",
         links: [
           { label: "Understand sensor truth", to: "/guides/sensor-truth-grow-room" },
           { label: "Open the stage-aware VPD calculator", to: "/tools/vpd-calculator" },
         ],
       },
       {
-        heading: "Read VPD beside stage, light, and local heat",
-        body: "VPD targets shift across seedling, vegetative growth, and flower, but stage is only part of the picture. A higher light dose can increase water demand, and a warm pocket at the top of the canopy can differ from the room sensor. Compare the reading time with fixture changes, canopy position, PPFD source, and leaf response instead of treating one VPD value as the cause.",
+        heading: "Verify temperature and high-range humidity",
+        body: "Compare the grow-room temperature probe with a suitable reference at operating conditions, then record the reference identity, both readings, and any offset. For humidity, Verdant's practical minimum is an independent stable comparison at or above 75% RH with chamber temperature and method recorded. One point is a check, not a complete calibration; use more than one point when the room spans a wide range and follow the reference or instrument procedure rather than improvising a chemical setup.",
+      },
+      {
+        heading: "Measure the leaf-temperature offset under normal lights",
+        body: "Sample representative leaves across the canopy while the room is at normal light, airflow, and irrigation conditions. Record the leaf instrument, measurement locations, air temperature at the same time, and the observed leaf-temperature offset. If leaf temperature was not measured, keep the result labeled air VPD; do not apply a guessed offset or call it leaf VPD.",
         links: [
           {
             label: "Measure grow-light distance, PPFD, and DLI",
@@ -280,23 +301,17 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         ],
       },
       {
-        heading: "Manual and CSV VPD are first-class",
-        body: "If your controller does not stream live data, you can log temp/RH manually or import a CSV. The reading is labeled 'manual' or 'csv' and treated honestly — not upgraded to 'live'.",
+        heading: "Put the probe at the canopy and document the point",
+        body: "Place the air probe at representative canopy height, protected from direct fixture radiation, irrigation spray, and local humidifier, dehumidifier, heater, or fan extremes. One probe describes one point. Map more than one position when the room has gradients, and log the height and location so a later reading is comparable.",
+      },
+      {
+        heading: "Keep identity, calibration, confidence, and response together",
+        body: "A usable record carries sensor identity, source label, captured time, units, placement, reference method, calibration date, and any applied offset. An older or unverified sensor remains lower confidence even when its transport is live. Read the result beside stage, light, airflow, root-zone history, and plant response; recheck over a stable window before reacting. Verdant never changes equipment from this number, and the grower decides.",
         links: [
           {
-            label: "What to log with an environment change",
+            label: "What to record with an environment change",
             to: "/guides/what-to-log-in-a-grow-journal",
           },
-        ],
-      },
-      {
-        heading: "No blind automation on top of VPD",
-        body: "Verdant never opens vents, changes fan speeds, or triggers humidifiers based on VPD. Suggestions stay approval-required. The grower decides.",
-      },
-      {
-        heading: "Log the baseline before you react",
-        body: "When a canopy looks stressed, save the temperature and humidity source, captured time, plant stage, fixture setting and distance, watering timing, and a repeatable photo. Recheck during the next light period and after a stable observation window. That sequence helps distinguish a room event from a lighting or root-zone look-alike without stacking corrections.",
-        links: [
           { label: "Draft an environment note in Quick Log", to: "/quick-log" },
           {
             label: "Use the daily grow log checklist",
@@ -305,11 +320,86 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         ],
       },
     ],
+    evidenceTable: {
+      heading: "VPD evidence gate",
+      description:
+        "Use this gate before a derived value informs a room decision. Conditional evidence can still be logged and compared, but it must not be presented as authoritative or healthy live truth.",
+      ariaLabel: "VPD evidence gate",
+      rows: [
+        {
+          evidence: "Temperature",
+          usable:
+            "Compared with a suitable reference at operating conditions; result and offset logged.",
+          conditional:
+            "Plausible reading, but reference check is old, remote from the operating range, or incomplete.",
+          untrusted:
+            "Unknown units, implausible value, failed comparison, or no attributable sensor.",
+        },
+        {
+          evidence: "Relative humidity",
+          usable:
+            "Independent stable comparison includes a high point at or above 75% RH; method and chamber temperature logged.",
+          conditional:
+            "Only a single informal comparison or a check outside the humidity range being interpreted.",
+          untrusted:
+            "Stuck, condensed, contaminated, implausible, or materially disagrees with a credible reference.",
+        },
+        {
+          evidence: "Leaf-temperature basis",
+          usable:
+            "Representative canopy leaves measured under normal lights; leaf-temperature offset and method logged.",
+          conditional: "No leaf measurement; result is labeled air VPD only, not leaf VPD.",
+          untrusted: "A default or guessed leaf-temperature offset is presented as measured.",
+        },
+        {
+          evidence: "Probe placement",
+          usable:
+            "Representative canopy location and height recorded; shielded from direct local extremes.",
+          conditional:
+            "Location is known but one point cannot represent a documented room gradient.",
+          untrusted:
+            "Placement is unknown or dominated by fixture radiation, spray, wall, door, or equipment discharge.",
+        },
+        {
+          evidence: "Identity and time",
+          usable:
+            "Sensor ID, source, units, captured time, calibration date, and applied offsets are attached.",
+          conditional:
+            "One provenance field is missing or overdue, so the reading stays lower confidence.",
+          untrusted:
+            "Unknown sensor, unknown time, stale value presented as current, or source upgraded without evidence.",
+        },
+        {
+          evidence: "Derived result",
+          usable:
+            "Formula and input basis are explicit; output is labeled air VPD or leaf-based difference accurately.",
+          conditional:
+            "Inputs are plausible but incomplete; output is visibly conditional and cannot drive a confident recommendation.",
+          untrusted:
+            "Missing or invalid inputs are converted to a healthy number or described as directly measured.",
+        },
+      ],
+    },
     faq: [
       {
-        question: "How should growers track VPD safely?",
+        question: "Is VPD measured directly by a grow-room sensor?",
         answer:
-          "Track VPD from source-labeled temperature and humidity readings, read it in the context of the current stage, and never treat demo or stale values as healthy live data. Verdant computes VPD only from labeled readings and flags stale or invalid inputs.",
+          "No. VPD is calculated, not directly measured. Air VPD is derived from air temperature and relative humidity. A leaf-based vapor-pressure difference also needs a measured leaf-temperature basis. The calculation inherits the uncertainty, placement, freshness, and provenance of every input.",
+      },
+      {
+        question: "Can I use VPD without measuring leaf temperature?",
+        answer:
+          "Yes, as air VPD, not leaf VPD. It can describe the drying power of the measured air at that point, but it does not prove the vapor-pressure gradient at the leaf. Keep the limitation visible and do not apply a guessed leaf-temperature offset.",
+      },
+      {
+        question: "Is one 75% RH check a complete humidity calibration?",
+        answer:
+          "No. A stable comparison at or above 75% RH is Verdant's practical high-humidity minimum, not a full characterization of the sensor. Record the method and temperature, and use multiple appropriate points or a calibrated reference when the operating range or consequence requires stronger evidence.",
+      },
+      {
+        question: "How often should a grow-room sensor be rechecked?",
+        answer:
+          "Use the manufacturer's interval and shorten it when conditions or consequences justify it. Recheck after condensation, contamination, relocation, cleaning, unexplained drift, or disagreement with another credible instrument. Until the check is current, keep the sensor lower confidence.",
       },
     ],
     related: [
@@ -320,12 +410,27 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     ],
     sources: [
       {
-        label: "Chandra et al. — photosynthetic response to light and temperature",
-        href: "https://pmc.ncbi.nlm.nih.gov/articles/PMC3550641/",
-        note: "A controlled cannabis gas-exchange study supporting the need to interpret temperature with light context. It does not establish a universal VPD target or diagnose a room.",
+        label: "Greenspan — humidity fixed points of saturated aqueous solutions (NIST)",
+        href: "https://nvlpubs.nist.gov/nistpubs/jres/081/1/V81.N01.A06.pdf",
+        note: "Primary metrology reference for equilibrium relative-humidity fixed points across temperatures. It supports recognized humidity-reference concepts, not an improvised calibration procedure.",
+      },
+      {
+        label: "FAO Irrigation and Drainage Paper 56 — meteorological data",
+        href: "https://www.fao.org/4/X0490E/x0490e07.htm",
+        note: "Authoritative equations and definitions showing vapor-pressure deficit as a derived difference built from temperature and humidity data. It does not define cannabis setpoints.",
+      },
+      {
+        label: "Vincent et al. — reporting environmental conditions in plant science",
+        href: "https://pmc.ncbi.nlm.nih.gov/articles/PMC12571154/",
+        note: "Peer-reviewed measurement guidance distinguishing ambient VPD from a leaf-to-air vapor-pressure difference and explaining the role of leaf temperature.",
+      },
+      {
+        label: "USDA ARS — measuring the greenhouse environment",
+        href: "https://www.ars.usda.gov/ARSUserFiles/50820500/Publications/Frantz187999_2005_GrnHseEnv.pdf",
+        note: "Technical measurement guide supporting point-specific air measurements, spatial checks, and canopy or leaf-temperature measurement. It does not make one location representative of a whole room.",
       },
     ],
-    modifiedOn: "2026-07-30",
+    modifiedOn: "2026-08-02",
   },
   {
     slug: "ac-infinity-data-logging",
@@ -393,28 +498,32 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
   },
   {
     slug: "sensor-truth-grow-room",
-    title: "Grow Room Sensor Log: Source, Time, and Confidence | Verdant",
-    h1: "What makes a grow room sensor log trustworthy?",
+    title: "Grow Room Sensor Accuracy: A Trust Decision Matrix | Verdant",
+    h1: "How to decide whether a grow-room sensor reading is trustworthy",
     description:
-      "Build a trustworthy grow room sensor log with source, captured time, confidence, and honest PPFD or environment measurement provenance.",
+      "Classify grow-room sensor readings by source, freshness, calibration, placement, units, agreement, and failure evidence before using derived VPD.",
     targetKeyword: "grow room sensor log",
     intro:
-      "A grow room sensor log is useful only when every number is honest about where it came from, when it was captured, and how much confidence it deserves. Verdant keeps source, captured_at, and confidence with the reading. That same discipline matters when a grower records PPFD: a meter reading, manufacturer map, phone estimate, and unknown value must not collapse into the same claim.",
+      "A grow room sensor log should preserve the evidence behind every value, not treat the number as truth by default. Classify the stream before interpreting it: who or what produced it, when it was captured, whether the units are plausible, where the probe sat, how it compared with a reference at operating conditions, and whether it agrees with the room. VPD is calculated, not directly measured, so air VPD can never be more trustworthy than its temperature and humidity inputs; a leaf-based difference also depends on its leaf-temperature basis.",
     sections: [
       {
-        heading: "The six source labels",
-        body: "Verdant uses exactly six sources: live, manual, csv, demo, stale, and invalid. Live means a fresh reading from a real sensor. Manual is a grower entry. CSV is imported history. Demo is example data. Stale is a real reading that has aged out. Invalid is telemetry that failed a safety check.",
+        heading: "Start with source, identity, and time",
+        body: "Verdant presents six grower-facing truth states: live, manual, csv, demo, stale, and invalid. Transport names do not override those states. Keep the sensor identity, original source, captured time, received time when available, and units attached. A live transport with unknown identity or stale evidence is not automatically trustworthy.",
         links: [{ label: "Track VPD with honest inputs", to: "/guides/grow-room-vpd-tracker" }],
       },
       {
-        heading: "Bad telemetry is flagged, not hidden",
-        body: "Humidity stuck at 0 or 100, pH outside a realistic range, or a reading with a bad captured_at is labeled invalid and shown as such. Verdant refuses to render it as healthy live data.",
+        heading: "Verify temperature and humidity at operating conditions",
+        body: "Compare the temperature probe with a suitable reference near the room's normal operating range. For humidity, Verdant's practical minimum includes an independent stable high-humidity comparison at or above 75% RH, with the method and chamber temperature recorded. One point is a check rather than full calibration. Log the calibration date, result, and any offset; an older or unverified sensor remains lower confidence.",
       },
       {
-        heading: "Provenance travels with the reading",
-        body: "Vendor lineage lives in the raw payload so Verdant can trace where a reading actually came from. Nothing is silently upgraded from 'csv' to 'live'.",
+        heading: "Placement is part of the measurement",
+        body: "Record the canopy height and room position. Shield environment probes from direct fixture radiation, irrigation spray, and local equipment discharge. One point cannot prove uniform conditions across a room; compare positions when a gradient matters. A calibrated probe in the wrong location is still conditional or untrusted for the claimed canopy.",
         links: [
           { label: "Review hardware integration options", to: "/hardware-integrations" },
+          {
+            label: "Set a repeatable light-distance and canopy baseline",
+            to: "/guides/cannabis-grow-light-distance-and-schedule",
+          },
           {
             label: "Attach trustworthy context to a grow journal",
             to: "/guides/what-to-log-in-a-grow-journal",
@@ -422,18 +531,18 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         ],
       },
       {
-        heading: "Light measurements need their own provenance",
-        body: "PPFD describes the measurement point, not the whole canopy. Record the method, device or map source, canopy position, fixture setting, height, and time. Label an app estimate as an estimate and a manufacturer map as a map. Repeating the same grid and method after a change is more useful than comparing numbers collected in different ways.",
+        heading: "Check units and failure states before deriving anything",
+        body: "Reject impossible values, unknown unit conversions, future timestamps, and stuck or contradictory streams. Air VPD requires attributable air temperature and relative humidity; a leaf-based difference also requires a measured leaf-temperature offset under representative lights. If that basis is absent, label the result air VPD. Stale, invalid, demo, unit-ambiguous, or unverified inputs can never become healthy live truth through a calculation.",
         links: [
           {
-            label: "Make a repeatable PPFD and DLI baseline",
-            to: "/guides/cannabis-grow-light-distance-and-schedule",
+            label: "Review the VPD evidence gate",
+            to: "/guides/grow-room-vpd-tracker",
           },
         ],
       },
       {
         heading: "Keep the reading beside the plant response",
-        body: "A trustworthy value becomes useful when it sits beside the event it may help explain: a fixture change, watering, feed, symptom, or repeat photo. Verdant keeps that context on the timeline so a later review can compare sequence and source instead of treating one number as a diagnosis.",
+        body: "A usable value becomes more informative beside the event it may help explain: a light change, watering, feeding, symptom, or repeat photo. Preserve corrections instead of silently rewriting history. Verdant keeps this context on the timeline so a later review can compare sequence and evidence without turning one number into a diagnosis.",
         links: [
           {
             label: "Compare light burn, bleaching, heat, and look-alikes",
@@ -443,11 +552,71 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         ],
       },
     ],
+    evidenceTable: {
+      heading: "Sensor-trust decision matrix",
+      description:
+        "Classify the claimed use, not just the number. A stream may be usable for one local comparison while remaining conditional for a whole-room or derived-metric claim.",
+      ariaLabel: "Sensor trust decision matrix",
+      rows: [
+        {
+          evidence: "Source and identity",
+          usable: "Original source and stable sensor identity are preserved.",
+          conditional: "Source is known but device identity or transport lineage is incomplete.",
+          untrusted: "Source is unknown, upgraded, or demo/manual data is presented as live.",
+        },
+        {
+          evidence: "Freshness",
+          usable: "Captured time is valid and current for the stated use.",
+          conditional:
+            "Real historical reading is labeled stale or used only for retrospective comparison.",
+          untrusted: "Missing, future, or stale time is presented as current.",
+        },
+        {
+          evidence: "Reference and calibration",
+          usable:
+            "Operating-range comparison, calibration date, result, and offset are documented.",
+          conditional: "Reference evidence is old, single-point, or outside the interpreted range.",
+          untrusted:
+            "Failed, absent, or unattributable reference evidence supports a confident claim.",
+        },
+        {
+          evidence: "Placement",
+          usable:
+            "Claim matches the documented canopy position and representative measurement point.",
+          conditional: "Local point is valid, but room gradient or height coverage is unknown.",
+          untrusted: "Unknown or distorted location is presented as whole-canopy truth.",
+        },
+        {
+          evidence: "Units and plausibility",
+          usable: "Canonical unit, conversion history, and plausible range are explicit.",
+          conditional: "Value is plausible but conversion or device resolution limits comparison.",
+          untrusted: "Unit mismatch, impossible range, stuck value, or contradictory payload.",
+        },
+        {
+          evidence: "Derived metrics",
+          usable:
+            "Air VPD has trustworthy air temperature and RH; a leaf-based difference also has a measured leaf-temperature basis.",
+          conditional:
+            "A bounded air-VPD comparison is labeled as air VPD; leaf VPD is not claimed without a measured leaf basis.",
+          untrusted: "Missing, guessed, stale, or invalid inputs become a healthy derived value.",
+        },
+      ],
+    },
     faq: [
       {
-        question: "Why should grow sensor readings be source-labeled?",
+        question: "What makes a grow-room sensor reading trustworthy?",
         answer:
-          "Because a stale, demo, or invalid reading is dangerous when it is treated as current. Source labels let growers and AI Doctor tell the difference between a live tent reading and last week's CSV import. Verdant enforces this on every reading.",
+          "Trust requires more than a plausible number: source and identity, valid captured time, canonical units, reference or calibration evidence, representative placement, and a failure-state check. Missing evidence lowers the allowed confidence rather than being filled in by assumption.",
+      },
+      {
+        question: "Does live mean calibrated and accurate?",
+        answer:
+          "No. Live describes transport and freshness, not calibration or placement. An older or unverified live sensor remains lower confidence until it has current comparison evidence at operating conditions and a documented calibration date.",
+      },
+      {
+        question: "Can a sensor report VPD directly?",
+        answer:
+          "A device may report a VPD field, but VPD is calculated, not directly measured. Verify the temperature, humidity, formula, units, and leaf-temperature basis. Without measured leaf temperature, call the result air VPD rather than leaf VPD.",
       },
     ],
     related: [
@@ -458,12 +627,27 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     ],
     sources: [
       {
-        label: "Rodriguez-Morrison et al. — local and whole-plant light response",
-        href: "https://pmc.ncbi.nlm.nih.gov/articles/PMC8144505/",
-        note: "A controlled indoor study showing that a local leaf measurement and a whole-plant response are different contexts. It does not make any unverified sensor source trustworthy.",
+        label: "Greenspan — humidity fixed points of saturated aqueous solutions (NIST)",
+        href: "https://nvlpubs.nist.gov/nistpubs/jres/081/1/V81.N01.A06.pdf",
+        note: "Primary metrology reference for humidity fixed points and their temperature dependence. It supports reference evidence, not a blanket claim that one field check fully calibrates a sensor.",
+      },
+      {
+        label: "FAO Irrigation and Drainage Paper 56 — meteorological data",
+        href: "https://www.fao.org/4/X0490E/x0490e07.htm",
+        note: "Authoritative definition and calculation context for vapor pressure and VPD from temperature and humidity measurements.",
+      },
+      {
+        label: "Vincent et al. — reporting environmental conditions in plant science",
+        href: "https://pmc.ncbi.nlm.nih.gov/articles/PMC12571154/",
+        note: "Peer-reviewed guidance on reporting measurement location and distinguishing ambient VPD from a leaf-to-air vapor-pressure difference.",
+      },
+      {
+        label: "USDA ARS — measuring the greenhouse environment",
+        href: "https://www.ars.usda.gov/ARSUserFiles/50820500/Publications/Frantz187999_2005_GrnHseEnv.pdf",
+        note: "Technical guidance supporting calibration checks, point-specific air measurements, spatial sampling, and canopy or leaf-temperature context.",
       },
     ],
-    modifiedOn: "2026-07-30",
+    modifiedOn: "2026-08-02",
   },
   {
     slug: "ai-grow-doctor",

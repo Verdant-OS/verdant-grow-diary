@@ -20,6 +20,12 @@ import {
   buildPhenoHuntCandidateOrFilter,
   PHENO_HUNT_EMPTY_CANDIDATES,
 } from "@/lib/phenoHuntCandidateQueryRules";
+import {
+  buildCandidateSelectionPreflight,
+  clearSelection,
+  selectAllIds,
+  toggleIdInSet,
+} from "@/lib/phenoHuntCandidateSelectionRules";
 
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { canWriteFeatureData } from "@/lib/featureEntitlements";
@@ -165,13 +171,17 @@ export default function PhenoHuntNew() {
   const canSave = vm.canCreate && !saving && !!user;
 
   const toggleCandidate = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setSelected((prev) => toggleIdInSet(prev, id));
   };
+
+  const selectionPreflight = useMemo(
+    () =>
+      buildCandidateSelectionPreflight({
+        availablePlantIds: plants.map((p) => p.id),
+        selectedIds: selected,
+      }),
+    [plants, selected],
+  );
 
   const toggleGoal = (id: PhenoEvidenceGoalId) => {
     setEvidenceGoals((prev) => (prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]));
@@ -361,30 +371,68 @@ export default function PhenoHuntNew() {
               </div>
             </div>
           ) : (
-            <ul className="space-y-2" data-testid="ph-plant-list">
-              {plants.map((p) => {
-                const checked = selected.has(p.id);
-                return (
-                  <li
-                    key={p.id}
-                    className="flex items-center gap-3 rounded-xl border border-border/60 bg-background/35 p-3 transition-colors hover:bg-secondary/30"
-                  >
-                    <Checkbox
-                      id={`ph-${p.id}`}
-                      checked={checked}
-                      onCheckedChange={() => toggleCandidate(p.id)}
-                      data-testid={`ph-toggle-${p.id}`}
-                    />
-                    <label htmlFor={`ph-${p.id}`} className="flex-1 min-w-0 cursor-pointer">
-                      <div className="text-sm font-medium truncate">{p.name}</div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {p.strain ?? "Unknown strain"}
-                      </div>
-                    </label>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={!selectionPreflight.canSelectAll}
+                  onClick={() => setSelected(selectAllIds(plants.map((p) => p.id)))}
+                  data-testid="ph-select-all"
+                >
+                  {selectionPreflight.selectAllLabel}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={!selectionPreflight.canClear}
+                  onClick={() => setSelected(clearSelection())}
+                  data-testid="ph-clear-selection"
+                >
+                  {selectionPreflight.clearLabel}
+                </Button>
+                <span
+                  className="text-xs text-muted-foreground"
+                  data-testid="ph-selection-preflight"
+                >
+                  {selectionPreflight.preflightMessage}
+                </span>
+              </div>
+              {selectionPreflight.comparisonHint ? (
+                <p
+                  className="text-xs rounded-md border border-primary/30 bg-primary/10 px-3 py-2"
+                  data-testid="ph-comparison-hint"
+                >
+                  {selectionPreflight.comparisonHint}
+                </p>
+              ) : null}
+              <ul className="space-y-2" data-testid="ph-plant-list">
+                {plants.map((p) => {
+                  const checked = selected.has(p.id);
+                  return (
+                    <li
+                      key={p.id}
+                      className="flex items-center gap-3 rounded-xl border border-border/60 bg-background/35 p-3 transition-colors hover:bg-secondary/30"
+                    >
+                      <Checkbox
+                        id={`ph-${p.id}`}
+                        checked={checked}
+                        onCheckedChange={() => toggleCandidate(p.id)}
+                        data-testid={`ph-toggle-${p.id}`}
+                      />
+                      <label htmlFor={`ph-${p.id}`} className="flex-1 min-w-0 cursor-pointer">
+                        <div className="text-sm font-medium truncate">{p.name}</div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {p.strain ?? "Unknown strain"}
+                        </div>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           )}
         </section>
       )}
@@ -475,6 +523,12 @@ export default function PhenoHuntNew() {
               ))}
             </ul>
           ) : null}
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="pheno-confirmation-selection-preflight"
+          >
+            {selectionPreflight.preflightMessage}
+          </p>
         </section>
       )}
 

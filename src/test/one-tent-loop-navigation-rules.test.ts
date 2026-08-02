@@ -119,8 +119,17 @@ describe("oneTentLoopNavigationRules", () => {
     }
   });
 
-  it("routes quick-log → timeline and preserves a valid Timeline tent as a Sensors intent", () => {
-    expect(resolveOneTentLoopNextStep("quick-log").href).toBe("/timeline");
+  it("routes quick-log → the exact grow Timeline and fails closed without a setup", () => {
+    expect(resolveOneTentLoopNextStep("quick-log")).toMatchObject({
+      href: null,
+      disabled: true,
+      disabledReason: ONE_TENT_LOOP_DISABLED_COPY,
+    });
+    expect(resolveOneTentLoopNextStep("quick-log", { growId: "grow-1" })).toMatchObject({
+      href: "/timeline?growId=grow-1",
+      disabled: false,
+      disabledReason: null,
+    });
     expect(resolveOneTentLoopNextStep("timeline").href).toBe("/sensors");
     expect(
       resolveOneTentLoopNextStep("timeline", {

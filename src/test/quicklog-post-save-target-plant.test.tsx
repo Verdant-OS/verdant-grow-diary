@@ -14,7 +14,10 @@ import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/re
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const { rpcMock, snapshotState } = vi.hoisted(() => ({
-  rpcMock: vi.fn().mockResolvedValue({ data: { ok: true }, error: null }),
+  rpcMock: vi.fn().mockResolvedValue({
+    data: { ok: true, grow_event_id: "legacy-event" },
+    error: null,
+  }),
   snapshotState: {
     status: "ready" as "ready" | "loading" | "empty",
     payload: {
@@ -78,7 +81,10 @@ function renderQL(props: Parameters<typeof QuickLog>[0]) {
 
 beforeEach(() => {
   rpcMock.mockClear();
-  rpcMock.mockResolvedValue({ data: { ok: true }, error: null });
+  rpcMock.mockResolvedValue({
+    data: { ok: true, grow_event_id: "legacy-event" },
+    error: null,
+  });
   snapshotState.status = "ready";
   snapshotState.payload = {
     status: "fresh_live",
@@ -89,7 +95,7 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("QuickLog post-save target plant action", () => {
-  it("reveals a 'View {target plant}' action with the saved plant id after save", async () => {
+  it("reveals a canonical grow-scoped View diary action after save", async () => {
     renderQL({
       open: true,
       onOpenChange: () => {},
@@ -103,12 +109,21 @@ describe("QuickLog post-save target plant action", () => {
     fireEvent.submit(form);
     const link = (await screen.findByTestId("quick-log-view-target-plant")) as HTMLAnchorElement;
     expect(link.tagName).toBe("A");
-    expect(link.getAttribute("href")).toBe("/plants/p2");
+    expect(link.getAttribute("href")).toBe(
+      "/timeline?growId=g1&plantId=p2&tentId=t1#timeline-entry-legacy-event",
+    );
+    expect(link.getAttribute("data-target-grow-id")).toBe("g1");
     expect(link.getAttribute("data-target-plant-id")).toBe("p2");
-    expect(link.textContent ?? "").toMatch(/View timeline/);
+    expect(link.textContent ?? "").toMatch(/View diary/);
+    expect(screen.getByTestId("quick-log-post-save-title")).toHaveTextContent(
+      "Saved to your diary",
+    );
+    expect(screen.getByTestId("quick-log-post-save-description")).toHaveTextContent(
+      "Added to Grow #1.",
+    );
   });
 
-  it("View target plant button is keyboard reachable and focusable", async () => {
+  it("View diary action is keyboard reachable and focusable", async () => {
     renderQL({
       open: true,
       onOpenChange: () => {},

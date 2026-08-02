@@ -1,58 +1,73 @@
 /**
- * quickLogTimelineNavigationTarget — pure helper that maps a resolved
- * QuickLog v2 save scope (plant or tent) plus an optional saved event
- * id to a deterministic in-app navigation target for the "View in
- * Timeline" confirmation action.
+ * quickLogTimelineNavigationTarget — pure helper that maps a confirmed
+ * Quick Log save into the canonical grow-scoped Timeline destination.
  *
  * Hard constraints:
- *  - Pure. No React, no router imports, no DOM access, no I/O.
- *  - Never invents an entry id; falls back to the timeline SECTION
- *    anchor when no `growEventId` is supplied.
- *  - Never duplicates timeline business logic — only emits a
- *    {path, hash, href} record. The caller (sheet/toast) routes.
- *  - Stable anchor format: `timeline-entry-<id>` when an id exists,
- *    otherwise `timeline` for the section.
+ *  - Pure. No React, router, DOM, network, or persistence access.
+ *  - A confirmed grow id is mandatory. Missing identity fails closed.
+ *  - The global Timeline owns grow-scoped reads and async entry anchors.
+ *  - Plant/tent query filters are additive context, never authorization.
+ *  - No event id means no invented hash target.
  */
+
+import { timelinePath } from "@/lib/routes";
+import { buildTimelineEntryAnchorId } from "@/lib/timelineEntryAnchorRules";
 
 export type QuickLogTimelineScopeType = "plant" | "tent";
 
 export interface QuickLogTimelineNavScope {
+  /** Server-verified grow that owns the saved record. */
+  growId: string | null | undefined;
   targetType: QuickLogTimelineScopeType | null | undefined;
   targetId: string | null | undefined;
-  /** Saved diary/grow_event id returned by quicklog_save_manual, if any. */
+  /** Plant saves may preserve their verified tent as additive context. */
+  tentId?: string | null;
+  /** Saved grow_events id returned by the writer, when available. */
   growEventId?: string | null;
 }
 
 export interface QuickLogTimelineNavTarget {
-  /** Route path, e.g. `/plants/<id>`, `/tents/<id>`, or `/timeline`. */
+  /** Canonical `/timeline?growId=...` path plus optional filters. */
   path: string;
-  /** Fragment without the leading `#`. */
+  /** Fragment without `#`; blank when no real event id exists. */
   hash: string;
-  /** Convenience `path + "#" + hash`. */
+  /** Convenience path plus optional fragment. */
   href: string;
 }
 
-const TIMELINE_SECTION_ANCHOR = "timeline";
-
-function isNonEmptyString(v: unknown): v is string {
-  return typeof v === "string" && v.trim().length > 0;
+function normalizedId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 export function buildQuickLogTimelineNavTarget(
   scope: QuickLogTimelineNavScope,
-): QuickLogTimelineNavTarget {
-  const hash = isNonEmptyString(scope?.growEventId)
-    ? `timeline-entry-${scope.growEventId!.trim()}`
-    : TIMELINE_SECTION_ANCHOR;
+): QuickLogTimelineNavTarget | null {
+  const growId = normalizedId(scope?.growId);
+  if (!growId) return null;
 
-  let path = "/timeline";
-  if (scope?.targetType === "plant" && isNonEmptyString(scope.targetId)) {
-    path = `/plants/${scope.targetId.trim()}`;
-  } else if (scope?.targetType === "tent" && isNonEmptyString(scope.targetId)) {
-    path = `/tents/${scope.targetId.trim()}`;
+  const targetId = normalizedId(scope?.targetId);
+  const tentId = normalizedId(scope?.tentId);
+  const filters = new URLSearchParams();
+
+  if (scope?.targetType === "plant" && targetId) {
+    filters.set("plantId", targetId);
+    if (tentId) filters.set("tentId", tentId);
+  } else if (scope?.targetType === "tent" && targetId) {
+    filters.set("tentId", targetId);
+  } else if (tentId) {
+    filters.set("tentId", tentId);
   }
 
-  return { path, hash, href: `${path}#${hash}` };
+  const filterQuery = filters.toString();
+  const path = filterQuery ? `${timelinePath(growId)}&${filterQuery}` : timelinePath(growId);
+  const hash = buildTimelineEntryAnchorId(scope?.growEventId) ?? "";
+  return {
+    path,
+    hash,
+    href: hash ? `${path}#${hash}` : path,
+  };
 }
 
-export const QUICK_LOG_TIMELINE_CTA_LABEL = "View in Timeline";
+export const QUICK_LOG_TIMELINE_CTA_LABEL = "View diary" as const;

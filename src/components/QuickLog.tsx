@@ -111,7 +111,7 @@ import {
   readResponseCheckStatus,
   type ResponseCheckStatus,
 } from "@/lib/tenSecondQuickCheckRules";
-import { plantDetailPath } from "@/lib/routes";
+import { buildQuickLogTimelineNavTarget } from "@/lib/quickLogTimelineNavigationTarget";
 import {
   EARLY_STAGE_MILESTONES,
   EARLY_STAGE_VIGOR_OPTIONS,
@@ -247,6 +247,9 @@ const QUICK_OBSERVATION_CHIPS = [
 type SavedTarget = {
   id: string;
   name: string;
+  growId: string | null;
+  tentId: string | null;
+  growEventId: string | null;
   tentName: string | null;
   growName: string | null;
   eventType: string;
@@ -1204,6 +1207,9 @@ export default function QuickLog({
       setSavedTarget({
         id: savePlant.id,
         name: plantLabel,
+        growId: saveTarget.growId ?? null,
+        tentId: saveTarget.tentId ?? null,
+        growEventId: result.growEventId ?? null,
         tentName: saveTent.name ?? null,
         growName: saveGrow?.name ?? null,
         eventType: saveEventType,
@@ -1295,6 +1301,15 @@ export default function QuickLog({
         ? "plant details"
         : "tent details";
   const selectedResponseStatus = readResponseCheckStatus(note);
+  const savedTimelineTarget = savedTarget
+    ? buildQuickLogTimelineNavTarget({
+        growId: savedTarget.growId,
+        targetType: "plant",
+        targetId: savedTarget.id,
+        tentId: savedTarget.tentId,
+        growEventId: savedTarget.growEventId,
+      })
+    : null;
 
   return (
     <Dialog
@@ -2795,26 +2810,34 @@ export default function QuickLog({
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <a
-                    ref={viewPlantBtnRef}
-                    href={plantDetailPath(savedTarget.id)}
-                    data-testid="quick-log-view-target-plant"
-                    data-target-plant-id={savedTarget.id}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    onClick={() => {
-                      if (typeof document !== "undefined") {
-                        (document.activeElement as HTMLElement | null)?.blur?.();
-                      }
-                      // Match the Dialog wrapper's close path: without reset()
-                      // the component (kept mounted in AppShell) reopens showing
-                      // the stale post-save panel instead of a fresh form.
-                      onOpenChange(false);
-                      reset();
-                    }}
-                  >
-                    {QUICK_LOG_POST_SAVE_VIEW_LABEL}
-                    <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                  </a>
+                  {savedTimelineTarget ? (
+                    <a
+                      ref={viewPlantBtnRef}
+                      href={savedTimelineTarget.href}
+                      data-testid="quick-log-view-target-plant"
+                      data-target-grow-id={savedTarget.growId ?? undefined}
+                      data-target-plant-id={savedTarget.id}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      onClick={() => {
+                        if (typeof document !== "undefined") {
+                          (document.activeElement as HTMLElement | null)?.blur?.();
+                        }
+                        // Match the Dialog wrapper's close path: without reset()
+                        // the component (kept mounted in AppShell) reopens showing
+                        // the stale post-save panel instead of a fresh form.
+                        onOpenChange(false);
+                        reset();
+                      }}
+                    >
+                      {QUICK_LOG_POST_SAVE_VIEW_LABEL}
+                      <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                    </a>
+                  ) : (
+                    <Button type="button" disabled data-testid="quick-log-view-target-plant">
+                      {QUICK_LOG_POST_SAVE_VIEW_LABEL}
+                      <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     variant="outline"
@@ -2829,7 +2852,7 @@ export default function QuickLog({
                     data-testid="quick-log-post-save-close"
                     onClick={() => {
                       // Same reset-on-close as the Dialog wrapper path — see
-                      // the View-plant handler above.
+                      // the View-diary handler above.
                       onOpenChange(false);
                       reset();
                     }}

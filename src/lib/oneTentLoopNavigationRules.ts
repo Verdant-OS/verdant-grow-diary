@@ -9,6 +9,7 @@
  */
 
 import { buildSensorsTentRouteHref } from "@/lib/sensorRouteTentIntentRules";
+import { timelinePath } from "@/lib/routes";
 import {
   buildPlantQuickLogPrefill,
   type PlantQuickLogPrefill,
@@ -163,8 +164,10 @@ export function resolveOneTentLoopNextStep(
         if (quickLogPrefill) return enableQuickLog(base, quickLogPrefill);
       }
       return base;
-    case "quick-log":
-      return enable(base, "/timeline");
+    case "quick-log": {
+      const confirmedGrowId = typeof growId === "string" ? growId.trim() : "";
+      return confirmedGrowId ? enable(base, timelinePath(confirmedGrowId)) : base;
+    }
     case "timeline":
       // Carry an explicitly selected timeline tent into Sensors as a
       // UUID-only intent. Sensors still validates it against authenticated

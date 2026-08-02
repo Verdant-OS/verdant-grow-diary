@@ -11,7 +11,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
-import { clearTemperatureUnitPreference, saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+import {
+  clearTemperatureUnitPreference,
+  saveTemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 const rpcMock = vi.fn();
 const storageRemove = vi.fn().mockResolvedValue({ data: null, error: null });
@@ -111,15 +114,17 @@ beforeEach(() => {
 });
 
 describe("QuickLogV2Sheet — structured feeding", () => {
-  it("routes feed confirmations to the real global typed-history anchor", () => {
+  it("keeps feed confirmations on the same verified grow/target route contract", () => {
     const source = readFileSync(
       resolve(process.cwd(), "src/components/QuickLogV2Sheet.tsx"),
       "utf8",
     );
-    expect(source).toMatch(
-      /showTimelineConfirmation\(FEEDING_SAVE_SUCCESS_MESSAGE,[\s\S]*?targetType:\s*null,[\s\S]*?targetId:\s*null,[\s\S]*?growEventId/,
-    );
-    expect(source).toMatch(/postSave\.action === "feed" \? null : postSave\.targetType/);
+    expect(source).toContain("showTimelineConfirmation(FEEDING_SAVE_SUCCESS_MESSAGE, {");
+    expect(source).toContain("growId: resolved.growId,");
+    expect(source).toContain('targetType: resolved.targetType as "plant" | "tent",');
+    expect(source).toContain("targetId: resolved.targetId as string,");
+    expect(source).toContain("growEventId,");
+    expect(source).not.toMatch(/postSave\.action === "feed" \? null/);
     const feedingPanel = readFileSync(
       resolve(process.cwd(), "src/components/FeedingHistoryPanel.tsx"),
       "utf8",

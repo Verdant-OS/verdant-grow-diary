@@ -8,7 +8,7 @@ const TIMELINE = readFileSync(resolve(ROOT, "src/pages/Timeline.tsx"), "utf8");
 const DETAIL = readFileSync(resolve(ROOT, "src/pages/ActionDetail.tsx"), "utf8");
 
 describe("Action Queue → Detail navigation", () => {
-  it("ActionQueue imports Link from react-router-dom", () => {
+  it("ActionQueue imports Link from @/lib/react-router-compat", () => {
     expect(ACTION_QUEUE).toMatch(/import \{[^}]*\bLink\b[^}]*\} from "@/lib/react-router-compat"/);
   });
 

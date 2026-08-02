@@ -116,7 +116,7 @@ describe("AI Doctor Confidence Audit — static safety", () => {
     });
   }
 
-  it("page only imports from react, react-router-dom, and the local view model", () => {
+  it("page only imports from react, @/lib/react-router-compat, and the local view model", () => {
     const src = readFile(PAGE_PATH);
     const fromMatches = src.match(/from\s+["'][^"']+["']/g) || [];
     for (const match of fromMatches) {

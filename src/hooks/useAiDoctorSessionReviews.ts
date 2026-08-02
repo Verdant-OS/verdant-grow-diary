@@ -11,6 +11,8 @@
  *   - Relies on RLS + the standard authenticated client (no privileged keys).
  *   - Read-only against the review event table; no other tables touched.
  *   - No AI calls.
+ *   - PostgREST requests use TanStack Query's AbortSignal so cancelQueries
+ *     (optimistic review marks) also abort the in-flight HTTP attempt.
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,9 +21,9 @@ import {
   type AiDoctorSessionReviewEvent,
   type AiDoctorSessionReviewState,
 } from "@/lib/aiDoctorSessionReviewStatusRules";
+import { rethrowIfAbortError } from "@/lib/supabaseAbort";
 
-const REVIEW_SELECT =
-  "id,user_id,session_id,event_type,note,created_at";
+const REVIEW_SELECT = "id,user_id,session_id,event_type,note,created_at";
 
 export const AI_DOCTOR_SESSION_REVIEWS_MAX_ROWS = 1000;
 
@@ -43,16 +45,12 @@ function normalizeSessionIds(
 ): string[] | null {
   if (sessionIds === null || sessionIds === undefined) return null;
   if (!Array.isArray(sessionIds)) return [];
-  const cleaned = sessionIds.filter(
-    (id): id is string => typeof id === "string" && id.length > 0,
-  );
+  const cleaned = sessionIds.filter((id): id is string => typeof id === "string" && id.length > 0);
   // De-dupe + sort for a stable query key.
   return Array.from(new Set(cleaned)).sort();
 }
 
-export function useAiDoctorSessionReviews(
-  sessionIds?: ReadonlyArray<string> | null,
-) {
+export function useAiDoctorSessionReviews(sessionIds?: ReadonlyArray<string> | null) {
   const scope = normalizeSessionIds(sessionIds);
   // Empty array means caller explicitly scoped to no sessions → skip the fetch.
   const enabled = scope === null || scope.length > 0;
@@ -60,10 +58,8 @@ export function useAiDoctorSessionReviews(
   return useQuery({
     queryKey: ["ai_doctor_session_reviews", scope],
     enabled,
-    queryFn: async (): Promise<UseAiDoctorSessionReviewsResult> => {
-      let q = supabase
-        .from("ai_doctor_session_reviews" as never)
-        .select(REVIEW_SELECT);
+    queryFn: async ({ signal }): Promise<UseAiDoctorSessionReviewsResult> => {
+      let q = supabase.from("ai_doctor_session_reviews" as never).select(REVIEW_SELECT);
 
       if (scope !== null) {
         q = q.in("session_id", scope);
@@ -71,8 +67,10 @@ export function useAiDoctorSessionReviews(
 
       const { data, error } = await q
         .order("created_at", { ascending: true })
-        .limit(AI_DOCTOR_SESSION_REVIEWS_MAX_ROWS);
+        .limit(AI_DOCTOR_SESSION_REVIEWS_MAX_ROWS)
+        .abortSignal(signal);
 
+      rethrowIfAbortError(error);
       if (error) throw error;
 
       const events = (data ?? []) as AiDoctorSessionReviewEvent[];

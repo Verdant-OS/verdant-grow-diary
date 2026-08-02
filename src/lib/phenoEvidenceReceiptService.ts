@@ -13,12 +13,16 @@
  *  - rows are hard-capped; hitting the cap marks the result truncated.
  * Every returned row is still re-validated by the strict receipt parser in
  * the pure packet model — this service filters for efficiency, not trust.
+ *
+ * Optional AbortSignal aborts the PostgREST fetch; aborts rethrow and must
+ * never be mapped to ok:false empty coverage.
  */
 import { supabase } from "@/integrations/supabase/client";
 import {
   PHENO_EVIDENCE_RECEIPT_KIND,
   type RawPhenoEvidenceDiaryRow,
 } from "@/lib/phenoEvidenceCaptureRules";
+import { rethrowIfAbortError } from "@/lib/supabaseAbort";
 
 /** Max candidates per batch read (≥ one workspace page, cohort max 6). */
 export const PHENO_EVIDENCE_PACKET_MAX_PLANT_IDS = 60;
@@ -61,6 +65,7 @@ function boundedId(value: unknown): string | null {
 export async function loadPhenoEvidenceReceiptRows(input: {
   huntId: string;
   plantIds: ReadonlyArray<string>;
+  signal?: AbortSignal;
 }): Promise<LoadPhenoEvidenceReceiptRowsResult> {
   const huntId = boundedId(input.huntId);
   if (!huntId) return { ok: false, error: "Missing hunt id." };
@@ -81,7 +86,7 @@ export async function loadPhenoEvidenceReceiptRows(input: {
   // The generated types don't model JSON-path filters, so the two
   // `details->>…` filters use the same sanctioned `as never` cast as the
   // existing single-plant read in usePhenoEvidenceCaptureContext.
-  const { data, error } = await supabase
+  let q = supabase
     .from("diary_entries")
     .select("id, plant_id, tent_id, grow_id, entry_at, photo_url, details")
     .in("plant_id", plantIds)
@@ -91,6 +96,13 @@ export async function loadPhenoEvidenceReceiptRows(input: {
     .order("id", { ascending: true })
     .limit(PHENO_EVIDENCE_PACKET_ROW_CAP);
 
+  if (input.signal) {
+    q = q.abortSignal(input.signal);
+  }
+
+  const { data, error } = await q;
+
+  rethrowIfAbortError(error);
   if (error) return { ok: false, error: "Could not load manual evidence receipts." };
 
   const rows = (data ?? []) as unknown as RawPhenoEvidenceDiaryRow[];

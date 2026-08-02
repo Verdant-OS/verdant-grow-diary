@@ -29,10 +29,13 @@ jobs:
       - name: Apply assertion-based product patch
         run: python scripts/.issue-675-apply.py
 
+      - name: Apply assertion-based test migration
+        run: python scripts/.issue-675-tests.py
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Format product files
+      - name: Format touched files
         run: >-
           bunx prettier --write
           src/lib/quickLogTimelineNavigationTarget.ts
@@ -40,11 +43,35 @@ jobs:
           src/lib/oneTentLoopNavigationRules.ts
           src/components/QuickLogV2Sheet.tsx
           src/components/QuickLog.tsx
+          src/test/quick-log-timeline-navigation-target.test.ts
+          src/test/quick-log-timeline-cta-integration.test.tsx
+          src/test/quicklog-post-save-target-plant.test.tsx
+          src/test/one-tent-loop-navigation-rules.test.ts
+          src/test/quick-log-save-hardening-rules.test.ts
+          src/test/quick-log-save-guard-rules.test.ts
+          src/test/quick-log-v2-sheet-feeding.test.tsx
+          e2e/quick-log-activation-handoff.spec.ts
 
       - name: Typecheck
         run: bun run typecheck
 
-      - name: Lint touched product files
+      - name: Targeted Quick Log and Timeline tests
+        run: >-
+          bunx vitest run
+          src/test/quick-log-timeline-navigation-target.test.ts
+          src/test/quick-log-timeline-cta-integration.test.tsx
+          src/test/quicklog-post-save-target-plant.test.tsx
+          src/test/one-tent-loop-navigation-rules.test.ts
+          src/test/quick-log-save-hardening-rules.test.ts
+          src/test/quick-log-save-guard-rules.test.ts
+          src/test/quick-log-v2-sheet-feeding.test.tsx
+          src/test/quick-log-v2-sheet-watering.test.tsx
+          src/test/timeline-entry-anchor-rules.test.ts
+          src/test/timeline-hash-anchor-handoff.test.tsx
+          src/test/timeline-page-read-state.test.tsx
+          src/test/scoped-grow-navigation-contract.test.tsx
+
+      - name: Lint touched files
         run: >-
           bunx eslint
           src/lib/quickLogTimelineNavigationTarget.ts
@@ -52,11 +79,19 @@ jobs:
           src/lib/oneTentLoopNavigationRules.ts
           src/components/QuickLogV2Sheet.tsx
           src/components/QuickLog.tsx
+          src/test/quick-log-timeline-navigation-target.test.ts
+          src/test/quick-log-timeline-cta-integration.test.tsx
+          src/test/quicklog-post-save-target-plant.test.tsx
+          src/test/one-tent-loop-navigation-rules.test.ts
+          src/test/quick-log-save-hardening-rules.test.ts
+          src/test/quick-log-save-guard-rules.test.ts
+          src/test/quick-log-v2-sheet-feeding.test.tsx
+          e2e/quick-log-activation-handoff.spec.ts
 
       - name: Build
         run: bun run build
 
-      - name: Commit implementation
+      - name: Commit implementation and tests
         shell: bash
         run: |
           git config user.name "Verdant Automation"
@@ -66,6 +101,14 @@ jobs:
             src/lib/quickLogSaveGuardRules.ts \
             src/lib/oneTentLoopNavigationRules.ts \
             src/components/QuickLogV2Sheet.tsx \
-            src/components/QuickLog.tsx
+            src/components/QuickLog.tsx \
+            src/test/quick-log-timeline-navigation-target.test.ts \
+            src/test/quick-log-timeline-cta-integration.test.tsx \
+            src/test/quicklog-post-save-target-plant.test.tsx \
+            src/test/one-tent-loop-navigation-rules.test.ts \
+            src/test/quick-log-save-hardening-rules.test.ts \
+            src/test/quick-log-save-guard-rules.test.ts \
+            src/test/quick-log-v2-sheet-feeding.test.tsx \
+            e2e/quick-log-activation-handoff.spec.ts
           git commit -m "fix(quick-log): scope post-save diary navigation"
           git push origin HEAD:agent/issue-675-grow-scoped-timeline

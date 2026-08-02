@@ -32,6 +32,9 @@ jobs:
       - name: Apply assertion-based test migration
         run: python scripts/.issue-675-tests.py
 
+      - name: Apply focused test fixes
+        run: python scripts/.issue-675-test-fixes.py
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 

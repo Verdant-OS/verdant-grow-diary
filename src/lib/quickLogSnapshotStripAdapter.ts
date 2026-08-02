@@ -29,11 +29,7 @@ import {
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
 
-export type QuickLogSnapshotStripStatus =
-  | "usable"
-  | "stale"
-  | "invalid"
-  | "no_data";
+export type QuickLogSnapshotStripStatus = "usable" | "stale" | "invalid" | "no_data";
 
 export type QuickLogSnapshotStripAction =
   | { kind: "none" }
@@ -140,7 +136,20 @@ export function formatCapturedAtAbsolute(iso: string | null | undefined): string
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return null;
   const d = new Date(ms);
-  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const MONTHS = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
   const mo = MONTHS[d.getUTCMonth()];
   const day = d.getUTCDate();
   const yr = d.getUTCFullYear();
@@ -151,8 +160,6 @@ export function formatCapturedAtAbsolute(iso: string | null | undefined): string
   if (h === 0) h = 12;
   return `${mo} ${day}, ${yr}, ${h}:${m} ${ampm} UTC`;
 }
-
-
 
 function formatAge(capturedMs: number, nowMs: number): string {
   const diff = Math.max(0, nowMs - capturedMs);
@@ -237,11 +244,7 @@ export function buildQuickLogSnapshotStrip(
 
   // No tent selected or loader still in flight or empty snapshot ⇒ no_data.
   const isEmpty =
-    !snapshot ||
-    !hasTent ||
-    loading ||
-    snapshot.source === "unavailable" ||
-    !snapshot.ts;
+    !snapshot || !hasTent || loading || snapshot.source === "unavailable" || !snapshot.ts;
 
   if (isEmpty) {
     const classification = classifyAuditRow(null, { now });
@@ -276,10 +279,11 @@ export function buildQuickLogSnapshotStrip(
   );
 
   const status = narrowStatus(classification.status);
-  const capturedMs = new Date(snapshot.ts).getTime();
-  const ageLabel = Number.isFinite(capturedMs)
-    ? formatAge(capturedMs, now.getTime())
-    : null;
+  const capturedMs =
+    typeof snapshot.ts === "string" || typeof snapshot.ts === "number"
+      ? new Date(snapshot.ts).getTime()
+      : Number.NaN;
+  const ageLabel = Number.isFinite(capturedMs) ? formatAge(capturedMs, now.getTime()) : null;
 
   // Resolve title/description/action with the attach-toggle override:
   // when a snapshot is technically usable but the grower has toggled
@@ -295,12 +299,11 @@ export function buildQuickLogSnapshotStrip(
   // in a detached-toggle state, prefer the edit action so growers can
   // correct/update the manual reading directly. Never applied for live,
   // sim, demo, csv, or unknown sources.
-  const finalAction: QuickLogSnapshotStripAction =
-    usableButDetached
-      ? { kind: "none" }
-      : src === "manual" && (status === "usable" || status === "stale")
-        ? MANUAL_SNAPSHOT_EDIT_ACTION
-        : baseAction;
+  const finalAction: QuickLogSnapshotStripAction = usableButDetached
+    ? { kind: "none" }
+    : src === "manual" && (status === "usable" || status === "stale")
+      ? MANUAL_SNAPSHOT_EDIT_ACTION
+      : baseAction;
 
   return {
     status,
@@ -374,10 +377,7 @@ function narrowStrict(s: StrictSnapshotStatus): QuickLogSnapshotStripStatus {
   }
 }
 
-function synthClassification(
-  status: QuickLogSnapshotStripStatus,
-  label: string,
-): Classification {
+function synthClassification(status: QuickLogSnapshotStripStatus, label: string): Classification {
   const reason =
     status === "usable"
       ? "fresh_accepted"
@@ -462,10 +462,9 @@ export function buildQuickLogStripFromTentState(
   }
 
   const status = narrowStrict(snapshot.status);
-  const capturedMs = Date.parse(snapshot.captured_at);
-  const ageLabel = Number.isFinite(capturedMs)
-    ? formatAge(capturedMs, now.getTime())
-    : null;
+  const capturedMs =
+    typeof snapshot.captured_at === "string" ? Date.parse(snapshot.captured_at) : Number.NaN;
+  const ageLabel = Number.isFinite(capturedMs) ? formatAge(capturedMs, now.getTime()) : null;
 
   const usableButDetached = status === "usable" && !attached;
   const title = usableButDetached ? "Sensor snapshot available" : TITLES[status];

@@ -43,8 +43,8 @@ export interface Diagnosis {
   possibleCauses: string[];
   immediateAction: string | null;
   whatNotToDo: string[];
-  followUp24h: DiagnosisFollowUp;
-  recoveryPlan3d: DiagnosisFollowUp;
+  followUp24h: DiagnosisFollowUp | null;
+  recoveryPlan3d: DiagnosisFollowUp | null;
   riskLevel: DiagnosisRiskLevel;
   /** Max 2 entries, always approval-required. */
   suggestedActions: DiagnosisSuggestedAction[];
@@ -65,8 +65,7 @@ export const MAX_SUGGESTED_ACTIONS = 2;
 export const LOW_CONFIDENCE_THRESHOLD = 0.5;
 
 /** Approval-required helper copy shown alongside every suggestion. */
-export const SUGGESTION_APPROVAL_COPY =
-  "AI suggestion — requires your approval.";
+export const SUGGESTION_APPROVAL_COPY = "AI suggestion — requires your approval.";
 
 /** Global safety helper copy for the diagnosis surface. */
 export const DIAGNOSIS_SAFETY_COPY =
@@ -79,9 +78,7 @@ export const CAUTIOUS_FALLBACK: Diagnosis = {
   likelyIssue: null,
   confidence: 0,
   evidence: [],
-  missingInformation: [
-    "Recent diary entry, photo, or sensor snapshot is missing.",
-  ],
+  missingInformation: ["Recent diary entry, photo, or sensor snapshot is missing."],
   possibleCauses: [],
   immediateAction: null,
   whatNotToDo: [
@@ -210,8 +207,7 @@ function coerceFollowUp(v: unknown, defaults: DiagnosisFollowUp): DiagnosisFollo
     return defaults;
   }
   if (!isObject(v)) return defaults;
-  const summary =
-    asTrimmedString(v.summary, 400) ?? defaults.summary;
+  const summary = asTrimmedString(v.summary, 400) ?? defaults.summary;
   const checklist = asStringArray(v.checklist, 6, 200).map((s) =>
     redactDeviceControl(stripOverPromises(s)),
   );
@@ -249,8 +245,7 @@ export function validateAndSanitizeDiagnosis(input: unknown): SanitizeReport {
     };
   }
 
-  const summary =
-    asTrimmedString(input.summary, 600) ?? CAUTIOUS_FALLBACK.summary;
+  const summary = asTrimmedString(input.summary, 600) ?? CAUTIOUS_FALLBACK.summary;
   const likelyIssue = asTrimmedString(input.likelyIssue, 200);
 
   const rawConfidence = (input as { confidence?: unknown }).confidence;
@@ -267,8 +262,8 @@ export function validateAndSanitizeDiagnosis(input: unknown): SanitizeReport {
     redactDeviceControl(stripOverPromises(s)),
   );
 
-  let missingInformation = asStringArray(input.missingInformation, 12, 400).map(
-    (s) => stripOverPromises(s),
+  let missingInformation = asStringArray(input.missingInformation, 12, 400).map((s) =>
+    stripOverPromises(s),
   );
 
   const possibleCauses = asStringArray(input.possibleCauses, 10, 400).map((s) =>
@@ -277,34 +272,34 @@ export function validateAndSanitizeDiagnosis(input: unknown): SanitizeReport {
 
   let immediateAction = asTrimmedString(input.immediateAction, 400);
   if (immediateAction && containsDeviceControl(immediateAction)) {
-    notes.push(
-      "Immediate action contained device-control language; replaced with null.",
-    );
+    notes.push("Immediate action contained device-control language; replaced with null.");
     immediateAction = null;
   }
   if (immediateAction) {
     immediateAction = stripOverPromises(immediateAction);
   }
 
-  const whatNotToDo = asStringArray(input.whatNotToDo, 10, 400).map((s) =>
-    stripOverPromises(s),
-  );
+  const whatNotToDo = asStringArray(input.whatNotToDo, 10, 400).map((s) => stripOverPromises(s));
 
   const followUp24h = coerceFollowUp(
     input.followUp24h,
-    CAUTIOUS_FALLBACK.followUp24h,
+    CAUTIOUS_FALLBACK.followUp24h ?? {
+      summary: "Log one observation in the next 24 hours.",
+      checklist: ["Add a note or photo", "Capture a sensor snapshot"],
+    },
   );
   const recoveryPlan3d = coerceFollowUp(
     input.recoveryPlan3d,
-    CAUTIOUS_FALLBACK.recoveryPlan3d,
+    CAUTIOUS_FALLBACK.recoveryPlan3d ?? {
+      summary: "Build a small baseline over the next 3 days before changing inputs.",
+      checklist: ["Daily note", "Daily photo", "Watering log"],
+    },
   );
 
   const riskLevel = coerceRiskLevel(input.riskLevel);
 
   // ---- Suggested actions ---------------------------------------------------
-  const rawActions = Array.isArray(input.suggestedActions)
-    ? input.suggestedActions
-    : [];
+  const rawActions = Array.isArray(input.suggestedActions) ? input.suggestedActions : [];
   const sanitizedActions: DiagnosisSuggestedAction[] = [];
   let droppedForDeviceControl = 0;
   for (const raw of rawActions) {
@@ -328,7 +323,10 @@ export function validateAndSanitizeDiagnosis(input: unknown): SanitizeReport {
       approvalRequired: true,
     });
   }
-  if (Array.isArray(input.suggestedActions) && input.suggestedActions.length > MAX_SUGGESTED_ACTIONS) {
+  if (
+    Array.isArray(input.suggestedActions) &&
+    input.suggestedActions.length > MAX_SUGGESTED_ACTIONS
+  ) {
     notes.push(
       `Suggested actions trimmed from ${input.suggestedActions.length} to ${MAX_SUGGESTED_ACTIONS}.`,
     );

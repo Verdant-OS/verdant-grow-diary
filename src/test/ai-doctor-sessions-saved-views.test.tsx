@@ -21,7 +21,14 @@ import {
 // supabase noop mock
 const rangeSpy = vi.fn(() => Promise.resolve({ data: [], error: null }));
 const orderSpy = vi.fn(() => ({ range: rangeSpy }));
-const chain: any = {
+type QueryChain = {
+  eq: (...args: unknown[]) => QueryChain;
+  not: (...args: unknown[]) => QueryChain;
+  gte: (...args: unknown[]) => QueryChain;
+  or: (...args: unknown[]) => QueryChain;
+  order: typeof orderSpy;
+};
+const chain: QueryChain = {
   eq: vi.fn(function () {
     return chain;
   }),
@@ -112,9 +119,9 @@ describe("aiDoctorSessionsSavedViewsRules — pure helpers", () => {
     });
     expect(res.ok).toBe(true);
     if (!res.ok) return;
-    expect(res.view.label).toBe("High risk");
-    expect(res.view.filters.risk).toBe("high");
-    expect(res.view.createdAt).toBe("2026-01-01T00:00:00.000Z");
+    expect(res.view!.label).toBe("High risk");
+    expect(res.view!.filters.risk).toBe("high");
+    expect(res.view!.createdAt).toBe("2026-01-01T00:00:00.000Z");
     expect(res.views).toHaveLength(1);
   });
 

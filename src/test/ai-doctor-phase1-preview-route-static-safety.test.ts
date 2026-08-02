@@ -61,33 +61,24 @@ describe("ai-doctor-phase1-preview — static safety (page + fixtures)", () => {
     expect(src).not.toMatch(/\.rpc\(/);
   });
 
-  it.each(targets)(
-    "[%s] does not reference action_queue or alerts tables",
-    (_, src) => {
-      expect(src).not.toMatch(/\baction_queue\b/);
-      expect(src).not.toMatch(/from\(["']alerts["']\)/);
-    },
-  );
+  it.each(targets)("[%s] does not reference action_queue or alerts tables", (_, src) => {
+    expect(src).not.toMatch(/\baction_queue\b/);
+    expect(src).not.toMatch(/from\(["']alerts["']\)/);
+  });
 
-  it.each(targets)(
-    "[%s] does not reference service_role or bridge token",
-    (_, src) => {
-      expect(src).not.toMatch(/service_role/);
-      expect(src).not.toMatch(/bridge token/);
-    },
-  );
+  it.each(targets)("[%s] does not reference service_role or bridge token", (_, src) => {
+    expect(src).not.toMatch(/service_role/);
+    expect(src).not.toMatch(/bridge token/);
+  });
 
-  it.each(targets)(
-    "[%s] does not contain executable device-control names",
-    (_, src) => {
-      expect(src).not.toMatch(/controlDevice/i);
-      expect(src).not.toMatch(/sendCommand/i);
-      expect(src).not.toMatch(/turnOn/i);
-      expect(src).not.toMatch(/turnOff/i);
-      expect(src).not.toMatch(/setFan/i);
-      expect(src).not.toMatch(/setLight/i);
-    },
-  );
+  it.each(targets)("[%s] does not contain executable device-control names", (_, src) => {
+    expect(src).not.toMatch(/controlDevice/i);
+    expect(src).not.toMatch(/sendCommand/i);
+    expect(src).not.toMatch(/turnOn/i);
+    expect(src).not.toMatch(/turnOff/i);
+    expect(src).not.toMatch(/setFan/i);
+    expect(src).not.toMatch(/setLight/i);
+  });
 
   it.each(targets)("[%s] does not import model/API clients", (_, src) => {
     expect(src).not.toMatch(/openai/i);
@@ -98,7 +89,7 @@ describe("ai-doctor-phase1-preview — static safety (page + fixtures)", () => {
 
   it("page imports only react, @/lib/react-router-compat, preview panel, and fixtures library", () => {
     expect(pageSrc).toMatch(/from\s+["']react["']/);
-    expect(pageSrc).toMatch(/from\s+["']@/lib/react-router-compat["']/);
+    expect(pageSrc).toMatch(/from\s+["']@\/lib\/react-router-compat["']/);
     expect(pageSrc).toMatch(/from\s+["']@\/components\/AiDoctorPhase1PreviewPanel["']/);
     expect(pageSrc).toMatch(/from\s+["']@\/lib\/aiDoctorPhase1PreviewFixtures["']/);
   });

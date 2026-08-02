@@ -75,9 +75,9 @@ describe("resolvePaddleConfig", () => {
     expect(cfg.available).toBe(true);
     if (cfg.available) {
       expect(cfg.environment).toBe(PADDLE_SANDBOX_ENV);
-      expect(cfg.priceIds["pro-monthly"]).toBe("pri_sandbox_pro_monthly");
-      expect(cfg.priceIds["pro-annual"]).toBe("pri_sandbox_pro_annual");
-      expect(cfg.priceIds["founder-lifetime"]).toBe("pri_sandbox_founder");
+      expect(cfg.priceIds!["pro-monthly"]).toBe("pri_sandbox_pro_monthly");
+      expect(cfg.priceIds!["pro-annual"]).toBe("pri_sandbox_pro_annual");
+      expect(cfg.priceIds!["founder-lifetime"]).toBe("pri_sandbox_founder");
     }
   });
 

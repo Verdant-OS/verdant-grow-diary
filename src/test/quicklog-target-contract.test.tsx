@@ -2,7 +2,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { clearLocalStorageForTest, setLocalStorageItemForTest, getLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  setLocalStorageItemForTest,
+  getLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 const harness = vi.hoisted(() => ({
   activeGrowId: "g1" as string | null,
@@ -563,7 +567,7 @@ describe("Quick Log canonical target contract", () => {
       JSON.parse(getLocalStorageItemForTest("verdant.quickLog.lastTarget.v1") ?? "{}"),
     ).toEqual(expect.objectContaining({ plantId: "p1", growId: "g1", tentId: "t1" }));
     const invalidatedKeys = invalidateSpy.mock.calls.map(([options]) =>
-      JSON.stringify(options.queryKey),
+      JSON.stringify(options!.queryKey),
     );
     expect(invalidatedKeys).toContain(JSON.stringify(["plant_recent_activity", "p1"]));
     expect(invalidatedKeys).toContain(JSON.stringify(["tent_recent_activity", "t1"]));

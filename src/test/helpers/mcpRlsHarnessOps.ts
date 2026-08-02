@@ -203,13 +203,19 @@ export class HarnessLog {
 export interface ManifestToolLike {
   name: string;
   inputSchema?: {
-    properties?: Record<string, Record<string, unknown>>;
-    required?: string[];
-  };
+    properties?: Record<string, Record<string, unknown> | unknown>;
+    required?: readonly string[] | string[];
+    [key: string]: unknown;
+  } | null;
+  [key: string]: unknown;
 }
 
 export type ParamKind =
-  "pagination-limit" | "pagination-cursor" | "boolean-filter" | "date-filter" | "scope-filter";
+  | "pagination-limit"
+  | "pagination-cursor"
+  | "boolean-filter"
+  | "date-filter"
+  | "scope-filter";
 
 export interface DerivedParam {
   name: string;
@@ -229,7 +235,7 @@ const SCOPE_PARAM_RE = /^(grow|tent|plant)_?[iI]d$/;
  * not understand.
  */
 export function derivePaginationFilterParams(tool: ManifestToolLike): DerivedParam[] {
-  const props = tool.inputSchema?.properties ?? {};
+  const props = (tool.inputSchema?.properties ?? {}) as Record<string, Record<string, unknown>>;
   const required = new Set(tool.inputSchema?.required ?? []);
   const out: DerivedParam[] = [];
   for (const [name, schema] of Object.entries(props)) {

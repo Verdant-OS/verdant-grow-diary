@@ -45,8 +45,6 @@ import { buildCopyableTraceLinkFromHighlight } from "@/lib/actionQueueTraceLinkC
 import CopyTraceLinkButton from "@/components/CopyTraceLinkButton";
 import { buildRetryTraceViewModel } from "@/lib/actionQueueRetryTraceViewModel";
 
-
-
 export interface ActionQueueDetailDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -129,14 +127,8 @@ function DrawerSkeleton() {
         <Skeleton className="h-5 w-20" />
         <Skeleton className="h-5 w-24" />
       </div>
-      <Skeleton
-        className="h-3 w-1/3"
-        data-testid="action-queue-detail-drawer-skeleton-source"
-      />
-      <Skeleton
-        className="h-12 w-full"
-        data-testid="action-queue-detail-drawer-skeleton-reason"
-      />
+      <Skeleton className="h-3 w-1/3" data-testid="action-queue-detail-drawer-skeleton-source" />
+      <Skeleton className="h-12 w-full" data-testid="action-queue-detail-drawer-skeleton-reason" />
       <div className="space-y-1" data-testid="action-queue-detail-drawer-skeleton-context">
         <Skeleton className="h-3 w-full" />
         <Skeleton className="h-3 w-5/6" />
@@ -175,21 +167,20 @@ function ActionQueueDetailDrawerBody({
   onApprove,
   onReject,
   onRetryTrace,
-}: Required<Pick<ActionQueueDetailDrawerProps, "row">> &
-  Pick<
-    ActionQueueDetailDrawerProps,
-    | "lookups"
-    | "busy"
-    | "canApprove"
-    | "canReject"
-    | "statusHistory"
-    | "traceFailed"
-    | "retrying"
-    | "currentActionsParams"
-    | "onApprove"
-    | "onReject"
-    | "onRetryTrace"
-  >) {
+}: { row: ActionDrawerInput } & Pick<
+  ActionQueueDetailDrawerProps,
+  | "lookups"
+  | "busy"
+  | "canApprove"
+  | "canReject"
+  | "statusHistory"
+  | "traceFailed"
+  | "retrying"
+  | "currentActionsParams"
+  | "onApprove"
+  | "onReject"
+  | "onRetryTrace"
+>) {
   const vm = buildActionDrawerViewModel(row, lookups);
   const sourceLink = buildActionQueueSourceLink({
     source: row.source ?? null,
@@ -202,28 +193,17 @@ function ActionQueueDetailDrawerBody({
   return (
     <div className="space-y-4">
       <SheetHeader>
-        <SheetTitle data-testid="action-queue-detail-drawer-title">
-          {vm.titleLabel}
-        </SheetTitle>
+        <SheetTitle data-testid="action-queue-detail-drawer-title">{vm.titleLabel}</SheetTitle>
       </SheetHeader>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Badge
-          variant="outline"
-          data-testid="action-queue-detail-drawer-status"
-        >
+        <Badge variant="outline" data-testid="action-queue-detail-drawer-status">
           {vm.statusLabel}
         </Badge>
-        <Badge
-          variant="outline"
-          data-testid="action-queue-detail-drawer-risk"
-        >
+        <Badge variant="outline" data-testid="action-queue-detail-drawer-risk">
           {vm.riskLabel}
         </Badge>
-        <Badge
-          variant="outline"
-          data-testid="action-queue-detail-drawer-source"
-        >
+        <Badge variant="outline" data-testid="action-queue-detail-drawer-source">
           Source: {vm.sourceLabel}
         </Badge>
         {(() => {
@@ -269,17 +249,12 @@ function ActionQueueDetailDrawerBody({
                   data-testid="action-queue-detail-drawer-diary-trace-link"
                   data-trace-highlight={link.highlight}
                   data-trace-kind={link.kind}
-                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                 >
                   <ExternalLink className="h-3 w-3" aria-hidden />
                   {link.label}
                 </a>
-                {copy && (
-                  <CopyTraceLinkButton
-                    url={copy.url}
-                    testIdSuffix="drawer"
-                  />
-                )}
+                {copy && <CopyTraceLinkButton url={copy.url} testIdSuffix="drawer" />}
               </div>
             );
           }
@@ -297,7 +272,6 @@ function ActionQueueDetailDrawerBody({
         })()}
       </div>
 
-
       {/* Go to source — pure helper decides safety. */}
       <div data-testid="action-queue-detail-drawer-source-link-row">
         {sourceLink ? (
@@ -305,7 +279,7 @@ function ActionQueueDetailDrawerBody({
             href={sourceLink.href}
             data-testid="action-queue-detail-drawer-source-link"
             data-source-kind={sourceLink.kind}
-            className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
           >
             <ExternalLink className="h-3 w-3" aria-hidden />
             {sourceLink.label}
@@ -322,13 +296,8 @@ function ActionQueueDetailDrawerBody({
 
       {vm.recommendationText && (
         <section>
-          <h3 className="text-xs uppercase tracking-wider text-muted-foreground">
-            Recommendation
-          </h3>
-          <p
-            className="text-sm mt-1"
-            data-testid="action-queue-detail-drawer-recommendation"
-          >
+          <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Recommendation</h3>
+          <p className="text-sm mt-1" data-testid="action-queue-detail-drawer-recommendation">
             {vm.recommendationText}
           </p>
         </section>
@@ -336,53 +305,32 @@ function ActionQueueDetailDrawerBody({
 
       {vm.reasonText && (
         <section>
-          <h3 className="text-xs uppercase tracking-wider text-muted-foreground">
-            Reason
-          </h3>
-          <p
-            className="text-sm mt-1"
-            data-testid="action-queue-detail-drawer-reason"
-          >
+          <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Reason</h3>
+          <p className="text-sm mt-1" data-testid="action-queue-detail-drawer-reason">
             {vm.reasonText}
           </p>
         </section>
       )}
 
       <section>
-        <h3 className="text-xs uppercase tracking-wider text-muted-foreground">
-          Target
-        </h3>
-        <p
-          className="text-sm mt-1"
-          data-testid="action-queue-detail-drawer-target"
-        >
+        <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Target</h3>
+        <p className="text-sm mt-1" data-testid="action-queue-detail-drawer-target">
           {vm.targetLabel}
         </p>
       </section>
 
       <section>
-        <h3 className="text-xs uppercase tracking-wider text-muted-foreground">
-          Related context
-        </h3>
+        <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Related context</h3>
         {vm.hasRelatedContext ? (
-          <ul
-            className="text-sm mt-1 space-y-1"
-            data-testid="action-queue-detail-drawer-context"
-          >
+          <ul className="text-sm mt-1 space-y-1" data-testid="action-queue-detail-drawer-context">
             {vm.growLabel && (
-              <li data-testid="action-queue-detail-drawer-grow">
-                Grow: {vm.growLabel}
-              </li>
+              <li data-testid="action-queue-detail-drawer-grow">Grow: {vm.growLabel}</li>
             )}
             {vm.tentLabel && (
-              <li data-testid="action-queue-detail-drawer-tent">
-                Tent: {vm.tentLabel}
-              </li>
+              <li data-testid="action-queue-detail-drawer-tent">Tent: {vm.tentLabel}</li>
             )}
             {vm.plantLabel && (
-              <li data-testid="action-queue-detail-drawer-plant">
-                Plant: {vm.plantLabel}
-              </li>
+              <li data-testid="action-queue-detail-drawer-plant">Plant: {vm.plantLabel}</li>
             )}
           </ul>
         ) : (
@@ -396,9 +344,7 @@ function ActionQueueDetailDrawerBody({
       </section>
 
       <section>
-        <h3 className="text-xs uppercase tracking-wider text-muted-foreground">
-          Status history
-        </h3>
+        <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Status history</h3>
         {history.length === 0 ? (
           <p
             className="text-sm mt-1 text-muted-foreground"
@@ -407,10 +353,7 @@ function ActionQueueDetailDrawerBody({
             {STATUS_HISTORY_EMPTY_COPY}
           </p>
         ) : (
-          <ul
-            className="text-sm mt-1 space-y-1"
-            data-testid="action-queue-detail-drawer-history"
-          >
+          <ul className="text-sm mt-1 space-y-1" data-testid="action-queue-detail-drawer-history">
             {history.map((h) => (
               <li
                 key={h.idempotency_key}
@@ -441,10 +384,7 @@ function ActionQueueDetailDrawerBody({
             data-trace-state={retryVm.state}
             className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-foreground"
           >
-            <AlertTriangle
-              className="h-4 w-4 shrink-0 text-destructive"
-              aria-hidden
-            />
+            <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" aria-hidden />
             <div className="flex-1 space-y-1">
               {retryVm.explanationLines.map((line, i) => (
                 <p
@@ -475,7 +415,6 @@ function ActionQueueDetailDrawerBody({
           </div>
         );
       })()}
-
 
       <div
         className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-foreground"

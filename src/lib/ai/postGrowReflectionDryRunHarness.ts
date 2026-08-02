@@ -17,7 +17,8 @@ import {
 import type { GrowContext, ReflectionConfidence } from "./postGrowReflectionTypes";
 import type { PostGrowReflectionValidationIssue } from "./postGrowReflectionOutputValidator";
 
-export const POST_GROW_REFLECTION_DRY_RUN_HARNESS_VERSION = "post-grow-reflection-dry-run-harness-v1";
+export const POST_GROW_REFLECTION_DRY_RUN_HARNESS_VERSION =
+  "post-grow-reflection-dry-run-harness-v1";
 
 export type PostGrowReflectionDryRunExpectedStatus = "validated" | "rejected";
 
@@ -138,6 +139,7 @@ export function runPostGrowReflectionDryRunHarness(
     const outputConfidence =
       adapterResult.status === "validated" ? adapterResult.output.confidence : null;
 
+    const opts = adapterResult.request.validationOptions;
     return {
       id: scenario.id,
       label: scenario.label,
@@ -149,7 +151,12 @@ export function runPostGrowReflectionDryRunHarness(
       issueCodes: codes,
       failureReason,
       outputConfidence,
-      validationOptions: adapterResult.request.validationOptions,
+      validationOptions: {
+        ...opts,
+        sensorCoveragePct: opts.sensorCoveragePct ?? 0,
+        knownGapCount: opts.knownGapCount ?? 0,
+        minEvidenceReferences: opts.minEvidenceReferences ?? 0,
+      },
     };
   });
 

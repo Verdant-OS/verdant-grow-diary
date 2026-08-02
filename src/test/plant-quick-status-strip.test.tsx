@@ -10,7 +10,7 @@ import { resolve } from "node:path";
 import React from "react";
 import { render, screen } from "@testing-library/react";
 
-vi.mock("@/lib/react-router-compat", () => ({
+vi.mock("react-router-dom", () => ({
   Link: ({
     to,
     children,
@@ -57,7 +57,6 @@ const PLANT_STARTED = "2026-04-01T00:00:00Z";
 
 function tItem(over: Partial<RelativeTimelineItem> & { id: string }): RelativeTimelineItem {
   return {
-    id: over.id,
     eventType: "note",
     title: "t",
     occurredAt: "2026-04-05T00:00:00Z",

@@ -19,8 +19,6 @@ function snap(
   },
 ): SensorSnapshot {
   return {
-    source: o.source,
-    ts: o.ts,
     temp: null,
     rh: null,
     vpd: null,
@@ -191,9 +189,12 @@ vi.mock("@/integrations/supabase/client", () => ({
           eq: () => ({
             order: () => ({
               limit: () => {
-                const __c: any = {
-                  abortSignal: () => __c,
-                  then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+                const __c = {
+                  abortSignal: (): typeof __c => __c,
+                  then: (
+                    onfulfilled?: (value: unknown) => unknown,
+                    onrejected?: (reason: unknown) => unknown,
+                  ) => Promise.resolve({ data: [], error: null }).then(onfulfilled, onrejected),
                 };
                 return __c;
               },

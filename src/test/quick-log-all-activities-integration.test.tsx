@@ -28,7 +28,7 @@ import { STAGES } from "@/lib/grow";
 const rpcMock = vi.fn();
 // Photo activity goes diary-only: storage upload + diary_entries insert.
 const storageUploadMock = vi.fn(async (..._args: unknown[]) => ({
-  data: { path: "p" },
+  data: { path: "p" } as { path: string } | null,
   error: null as { message: string } | null,
 }));
 const storageRemoveMock = vi.fn(async (..._args: unknown[]) => ({ data: null, error: null }));

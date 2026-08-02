@@ -158,11 +158,14 @@ function validationOptions(
   result: PostGrowReflectionAdapterResult,
 ): PostGrowReflectionCandidatePasteValidationOptions {
   const opts = result.request.validationOptions;
+  const sensorCoveragePct = opts.sensorCoveragePct ?? 0;
+  const knownGapCount = opts.knownGapCount ?? 0;
+  const minEvidenceReferences = opts.minEvidenceReferences ?? 0;
   return {
-    sensorCoveragePct: opts.sensorCoveragePct,
-    knownGapCount: opts.knownGapCount,
-    minEvidenceReferences: opts.minEvidenceReferences,
-    label: `sensorCoveragePct=${opts.sensorCoveragePct}; knownGapCount=${opts.knownGapCount}; minEvidenceReferences=${opts.minEvidenceReferences}`,
+    sensorCoveragePct,
+    knownGapCount,
+    minEvidenceReferences,
+    label: `sensorCoveragePct=${sensorCoveragePct}; knownGapCount=${knownGapCount}; minEvidenceReferences=${minEvidenceReferences}`,
   };
 }
 

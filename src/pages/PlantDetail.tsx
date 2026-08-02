@@ -173,8 +173,8 @@ function ArchivedTimelineReadOnlyView({
   plant: {
     id: string;
     name: string;
-    strain: string;
-    stage: string;
+    strain: string | null;
+    stage: string | null;
     startedAt: string;
     tentId: string | null;
     growId: string | null;
@@ -207,7 +207,7 @@ function ArchivedTimelineReadOnlyView({
       </div>
       <PageHeader
         title={plant.name}
-        description={plant.strain}
+        description={plant.strain ?? undefined}
         icon={<Sprout className="h-5 w-5" />}
         actions={<StageBadge stage={plant.stage} />}
       />
@@ -360,6 +360,21 @@ export default function PlantDetail() {
     );
   }
 
+  // Ready path requires a resolved plant row. Blocked states above cover
+  // loading / error / not-found / archived; this guard narrows for SNC.
+  if (!plant) {
+    return (
+      <div>
+        <GrowDataSourceDisclosure
+          resource="plants"
+          hasAnyData={false}
+          metas={[plantMeta]}
+          testId="plant-detail-data-source-disclosure"
+        />
+      </div>
+    );
+  }
+
   const ageDays = Math.floor((Date.now() - new Date(plant.startedAt).getTime()) / 86400000);
   const harvestWatchEligible = isHarvestWatchEligible({
     stage: plant.stage,
@@ -375,7 +390,7 @@ export default function PlantDetail() {
       </Button>
       <PageHeader
         title={plant.name}
-        description={plant.strain}
+        description={plant.strain ?? undefined}
         icon={<Sprout className="h-5 w-5" />}
         actions={
           <div className="flex items-center gap-2">
@@ -447,7 +462,7 @@ export default function PlantDetail() {
         id={PLANT_PHOTOS_ANCHOR_ID}
         tabIndex={-1}
         aria-label="Plant photos section"
-        className="scroll-mt-16 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+        className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
       >
         <PlantDetailPhotoStrip
           plantId={plant.id}
@@ -486,7 +501,7 @@ export default function PlantDetail() {
             id: plant.id,
             name: plant.name,
             strain: plant.strain,
-            stage: plant.stage,
+            stage: plant.stage ?? "",
             health: plant.health,
             startedAt: plant.startedAt,
             tentId: plant.tentId ?? null,
@@ -503,7 +518,7 @@ export default function PlantDetail() {
         id={PLANT_DETAIL_SECTION_ANCHORS.overview}
         tabIndex={-1}
         aria-label="Plant overview section"
-        className="min-w-0 space-y-4 scroll-mt-16 rounded-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+        className="min-w-0 space-y-4 scroll-mt-16 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <div className="grid min-w-0 gap-4 lg:grid-cols-3">
           <div className="min-w-0 rounded-2xl glass overflow-hidden lg:col-span-1">
@@ -727,7 +742,7 @@ export default function PlantDetail() {
           id={PLANT_DETAIL_SECTION_ANCHORS.alerts}
           tabIndex={-1}
           aria-label="Plant alerts section"
-          className="min-w-0 scroll-mt-16 rounded-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+          className="min-w-0 scroll-mt-16 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <PlantAssignedTentAlertsPanel
             tentId={plant.tentId ?? null}
@@ -739,7 +754,7 @@ export default function PlantDetail() {
           id={PLANT_DETAIL_SECTION_ANCHORS.actions}
           tabIndex={-1}
           aria-label="Plant actions section"
-          className="min-w-0 scroll-mt-16 rounded-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+          className="min-w-0 scroll-mt-16 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <PlantAssignedTentActionsPanel
             tentId={plant.tentId ?? null}
@@ -766,7 +781,7 @@ export default function PlantDetail() {
             id={PLANT_RELATIVE_TIMELINE_ANCHOR_ID}
             tabIndex={-1}
             aria-label="Plant Relative Timeline section"
-            className="min-w-0 scroll-mt-16 rounded-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+            className="min-w-0 scroll-mt-16 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <PlantRelativeTimelineSection
               plantId={plant.id}
@@ -824,7 +839,7 @@ export default function PlantDetail() {
             id={PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}
             tabIndex={-1}
             aria-label="Plant AI Doctor review"
-            className="min-w-0 scroll-mt-16 space-y-3 rounded-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+            className="min-w-0 scroll-mt-16 space-y-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <PlantDetailAiDoctorReadiness
               plantId={plant.id}
@@ -863,7 +878,7 @@ export default function PlantDetail() {
           <div
             id={PLANT_AI_DOCTOR_CONTEXT_PANEL_ANCHOR_ID}
             tabIndex={-1}
-            className="min-w-0 scroll-mt-16 rounded-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+            className="min-w-0 scroll-mt-16 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <PlantDetailAiDoctorContextPanel plantId={plant.id} plant={plant} />
           </div>
@@ -871,7 +886,7 @@ export default function PlantDetail() {
             id={PLANT_DETAIL_SECTION_ANCHORS.doctor}
             tabIndex={-1}
             aria-label="Plant Doctor sessions section"
-            className="min-w-0 scroll-mt-16 rounded-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+            className="min-w-0 scroll-mt-16 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <PlantAiDoctorSessionsPanel plantId={plant.id} />
           </div>

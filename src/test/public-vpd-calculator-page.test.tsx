@@ -32,9 +32,9 @@ afterEach(() => {
     .querySelectorAll('[data-page-ldjson="public-vpd-calculator-faq"]')
     .forEach((node) => node.remove());
   if (originalClipboard) Object.defineProperty(navigator, "clipboard", originalClipboard);
-  else delete (navigator as Navigator & { clipboard?: Clipboard }).clipboard;
+  else Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
   if (originalShare) Object.defineProperty(navigator, "share", originalShare);
-  else delete (navigator as Navigator & { share?: Navigator["share"] }).share;
+  else Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
 });
 
 describe("public VPD calculator page", () => {

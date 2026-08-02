@@ -201,18 +201,18 @@ describe("/reset-password — message announcement coverage", () => {
 
   it("checking state uses role=status with aria-live=polite", async () => {
     // Keep getSession pending so we observe the "checking" state.
-    let resolveSession: ((v: typeof sessionResult) => void) | null = null;
+    let resolveSession: ((v: typeof sessionResult) => void) | undefined;
     getSessionMock.mockImplementationOnce(
       () =>
-        new Promise((res) => {
+        new Promise<typeof sessionResult>((res) => {
           resolveSession = res;
-        }) as Promise<typeof sessionResult>,
+        }),
     );
     renderReset();
     const status = await screen.findByRole("status");
     expect(status).toHaveTextContent(/checking reset link/i);
     expect(status.getAttribute("aria-live")).toBe("polite");
-    resolveSession?.({ data: { session: { user: { id: "u-1" } } } });
+    resolveSession!({ data: { session: { user: { id: "u-1" } } } });
   });
 
   it("confirm mismatch is announced via aria-live=polite as user types", async () => {

@@ -12,10 +12,7 @@
  * the workspace layering rule (business logic outside JSX / edge glue).
  */
 
-import {
-  SUBSCRIPTION_PLAN_IDS,
-  type CreditPackId,
-} from "../_shared/lib/lib/paidPlanAllowlist.ts";
+import { SUBSCRIPTION_PLAN_IDS, type CreditPackId } from "../_shared/lib/lib/paidPlanAllowlist.ts";
 
 // Local copy of PaddleEnv so this pure module never pulls the Deno-only
 // shared util into the frontend typecheck graph (unit tests import it
@@ -128,7 +125,7 @@ export interface CustomerUpsertRow {
 }
 
 // Loose shapes — the Paddle SDK returns camelCase but we defensively read.
-interface EventLike {
+export interface EventLike {
   eventType?: string;
   data?: SubscriptionData | TransactionData | CustomerData;
 }

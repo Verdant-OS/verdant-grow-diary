@@ -131,17 +131,18 @@ export function usePlantDetailDisclosureNavigation({
     (targetValue, preferredTarget, options) => {
       const target = resolvePlantDetailDisclosureTarget(targetValue);
       if (!target) return;
-      if (target.group) {
+      const group = target.group;
+      if (group) {
         setDisclosureState((current) => {
           const scopeMatches = current.plantId === plantId && current.routeHash === location.hash;
           const currentGroups = scopeMatches
             ? current.openGroups
             : openStateFor(resolvePlantDetailDisclosureTarget(location.hash)?.group ?? null);
-          if (scopeMatches && currentGroups[target.group]) return current;
+          if (scopeMatches && currentGroups[group]) return current;
           return {
             plantId,
             routeHash: location.hash,
-            openGroups: { ...currentGroups, [target.group]: true },
+            openGroups: { ...currentGroups, [group]: true },
           };
         });
       }
@@ -181,15 +182,16 @@ export function usePlantDetailDisclosureNavigation({
     const handleHashChange = () => {
       const target = resolvePlantDetailDisclosureTarget(window.location.hash);
       if (!target) return;
-      if (target.group) {
+      const group = target.group;
+      if (group) {
         setDisclosureState((current) => {
           const currentGroups =
             current.plantId === plantId ? current.openGroups : openStateFor(null);
-          if (current.plantId === plantId && currentGroups[target.group]) return current;
+          if (current.plantId === plantId && currentGroups[group]) return current;
           return {
             plantId,
             routeHash: location.hash,
-            openGroups: { ...currentGroups, [target.group]: true },
+            openGroups: { ...currentGroups, [group]: true },
           };
         });
       }

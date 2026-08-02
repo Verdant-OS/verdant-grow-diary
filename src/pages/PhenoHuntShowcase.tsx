@@ -91,9 +91,9 @@ function LivePackCard({ c, ranked }: { c: ContenderInput; ranked: boolean }) {
               </Badge>
             </span>
           </div>
-          {c.aroma.length > 0 && (
+          {(c.aroma ?? []).length > 0 && (
             <div className="mt-1.5 flex flex-wrap gap-1">
-              {c.aroma.map((a) => (
+              {(c.aroma ?? []).map((a) => (
                 <span
                   key={a}
                   className="rounded-full bg-indigo-500/15 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 dark:text-indigo-300"

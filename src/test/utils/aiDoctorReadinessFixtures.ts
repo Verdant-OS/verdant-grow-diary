@@ -10,9 +10,7 @@
  */
 import { compileAiDoctorContextFromRows } from "@/lib/aiDoctorEngine";
 import type { AiDoctorContext } from "@/lib/aiDoctorEngine";
-import type {
-  AiDoctorReadinessSourceBadge,
-} from "@/lib/aiDoctorReadinessViewModel";
+import type { AiDoctorReadinessSourceBadge } from "@/lib/aiDoctorReadinessViewModel";
 import type { SensorSourceTag } from "@/lib/aiDoctorContextCompiler";
 
 export const READINESS_FIXTURE_NOW = new Date("2026-06-10T12:00:00Z");
@@ -62,7 +60,7 @@ export const READINESS_FIXTURE_PLANT = Object.freeze({
   id: "p1",
   name: "Plant A",
   strain: "Northern Lights",
-  stage: "veg" as const,
+  stage: "veg" as string | null,
   grow_id: "g1",
   tent_id: "t1",
 });
@@ -70,12 +68,17 @@ export const READINESS_FIXTURE_PLANT = Object.freeze({
 export interface BuildReadinessContextArgs {
   growEvents?: ReadonlyArray<Record<string, unknown>>;
   sensorReadings?: ReadonlyArray<Record<string, unknown>>;
-  plant?: Partial<typeof READINESS_FIXTURE_PLANT>;
+  plant?: Partial<{
+    id: string;
+    name: string;
+    strain: string;
+    stage: string | null;
+    grow_id: string;
+    tent_id: string;
+  }>;
 }
 
-export function buildReadinessContext(
-  args: BuildReadinessContextArgs = {},
-): AiDoctorContext {
+export function buildReadinessContext(args: BuildReadinessContextArgs = {}): AiDoctorContext {
   return compileAiDoctorContextFromRows({
     plant: { ...READINESS_FIXTURE_PLANT, ...(args.plant ?? {}) },
     growEvents: args.growEvents ?? [],
@@ -106,8 +109,7 @@ export function buildReadingForSource(
   return reading;
 }
 
-export interface BuildReadinessPanelPropsArgs
-  extends BuildReadinessContextArgs {
+export interface BuildReadinessPanelPropsArgs extends BuildReadinessContextArgs {
   openAlertsCount?: number;
 }
 

@@ -42,10 +42,24 @@ export type OneTentActivationEvidenceState =
   | { status: "ok"; summary: ConnectedActivationEvidenceSummary }
   | { status: "unavailable"; summary: ConnectedActivationEvidenceSummary };
 
+type QueryableActivationScope = {
+  growId: string;
+  tentId: string;
+  plantId: string;
+};
+
 function isQueryableScope(
   scope: ConnectedActivationScope | null | undefined,
-): scope is Required<ConnectedActivationScope> {
-  return !!(scope && isUuid(scope.growId) && isUuid(scope.tentId) && isUuid(scope.plantId));
+): scope is QueryableActivationScope {
+  return !!(
+    scope &&
+    typeof scope.growId === "string" &&
+    isUuid(scope.growId) &&
+    typeof scope.tentId === "string" &&
+    isUuid(scope.tentId) &&
+    typeof scope.plantId === "string" &&
+    isUuid(scope.plantId)
+  );
 }
 
 export function oneTentActivationEvidenceQueryKey(
@@ -61,7 +75,7 @@ export function oneTentActivationEvidenceQueryKey(
 }
 
 async function loadConnectedActivationEvidence(
-  scope: Required<ConnectedActivationScope>,
+  scope: QueryableActivationScope,
 ): Promise<ConnectedActivationEvidenceSummary> {
   const [diaryResult, growEventResult] = await Promise.all([
     supabase
@@ -104,7 +118,7 @@ export function useOneTentActivationEvidence(
   const query = useQuery({
     queryKey,
     enabled,
-    queryFn: () => loadConnectedActivationEvidence(scope as Required<ConnectedActivationScope>),
+    queryFn: () => loadConnectedActivationEvidence(scope as QueryableActivationScope),
     staleTime: 30_000,
   });
 

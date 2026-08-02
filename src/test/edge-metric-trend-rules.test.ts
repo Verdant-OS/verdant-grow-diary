@@ -4,6 +4,7 @@ import {
   bucketRequestMetrics,
   bucketSnapshots,
   distinctOutcomes,
+  type RequestMetricBucket,
   distinctValues,
   TREND_RANGES,
   type EdgeMetricEventRow,
@@ -137,7 +138,7 @@ describe("distinct helpers", () => {
   });
 
   it("distinctOutcomes collects across buckets", () => {
-    const buckets = [
+    const buckets: RequestMetricBucket[] = [
       {
         bucketStartMs: 1,
         total: 1,

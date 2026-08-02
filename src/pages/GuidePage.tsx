@@ -345,7 +345,9 @@ export default function GuidePage() {
                     key={entry.question}
                     value={value}
                     id={value}
-                    ref={(el) => (faqItemRefs.current[value] = el)}
+                    ref={(el) => {
+                      faqItemRefs.current[value] = el;
+                    }}
                     tabIndex={-1}
                     data-highlighted={isHighlighted ? "true" : undefined}
                     className={

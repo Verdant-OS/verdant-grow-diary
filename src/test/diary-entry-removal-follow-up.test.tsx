@@ -7,7 +7,9 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const { deleteEq, deleteFn, toastSuccess, toastError } = vi.hoisted(() => {
-  const deleteEq = vi.fn(() => Promise.resolve({ error: null }));
+  const deleteEq = vi.fn(() =>
+    Promise.resolve({ error: null as { code: string; message: string } | null }),
+  );
   const deleteFn = vi.fn(() => ({ eq: deleteEq }));
   return {
     deleteEq,
@@ -27,9 +29,7 @@ import DiaryEntryRemoveButton from "@/components/DiaryEntryRemoveButton";
 
 function render(ui: React.ReactElement) {
   const client = new QueryClient();
-  return rtlRender(
-    React.createElement(QueryClientProvider, { client }, ui),
-  );
+  return rtlRender(React.createElement(QueryClientProvider, { client }, ui));
 }
 
 const VIEWER = { currentUserId: "user-1" };
@@ -76,9 +76,7 @@ describe("DiaryEntryRemoveButton — follow-up visibility", () => {
     expect(await screen.findByTestId("diary-entry-remove-followup")).toBeTruthy();
     expect(screen.getByText("Add to correct plant")).toBeTruthy();
     expect(
-      screen.getByText(
-        "Open Quick Log and choose the correct plant for this entry.",
-      ),
+      screen.getByText("Open Quick Log and choose the correct plant for this entry."),
     ).toBeTruthy();
   });
 
@@ -157,14 +155,9 @@ describe("DiaryEntryRemoveButton — follow-up handoff", () => {
       expect(detail.plantId).toBeUndefined();
       expect(detail.plantName).toBeUndefined();
       // Note prefill defaults on.
-      expect(detail.note).toBe(
-        "Re-entering log after removing it from the wrong plant.",
-      );
+      expect(detail.note).toBe("Re-entering log after removing it from the wrong plant.");
     } finally {
-      window.removeEventListener(
-        "verdant:open-quicklog",
-        listener as EventListener,
-      );
+      window.removeEventListener("verdant:open-quicklog", listener as EventListener);
     }
   });
 
@@ -188,10 +181,7 @@ describe("DiaryEntryRemoveButton — follow-up handoff", () => {
       const detail = events[0].detail as Record<string, unknown>;
       expect(detail.note).toBeUndefined();
     } finally {
-      window.removeEventListener(
-        "verdant:open-quicklog",
-        listener as EventListener,
-      );
+      window.removeEventListener("verdant:open-quicklog", listener as EventListener);
     }
   });
 
@@ -206,9 +196,7 @@ describe("DiaryEntryRemoveButton — follow-up handoff", () => {
       />,
     );
     await performRemoval();
-    expect(
-      screen.getByLabelText("Add corrected Quick Log to the correct plant"),
-    ).toBeTruthy();
+    expect(screen.getByLabelText("Add corrected Quick Log to the correct plant")).toBeTruthy();
   });
 
   it("follow-up dispatch does NOT call supabase or toast (no direct writes)", async () => {

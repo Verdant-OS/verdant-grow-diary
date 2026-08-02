@@ -207,7 +207,7 @@ export default function GrowDetail() {
         className="mb-4"
       />
 
-      <GrowStatusCard status={status} growId={growId} />
+      <GrowStatusCard status={status} growId={growId ?? grow.id} />
 
       <section className="grid grid-cols-1 sm:grid-cols-2 gap-3" aria-label="Grow hub links">
         <HubLink

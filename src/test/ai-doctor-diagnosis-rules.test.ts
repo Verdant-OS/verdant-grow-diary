@@ -60,8 +60,8 @@ describe("validateAndSanitizeDiagnosis — schema", () => {
     expect(diagnosis!.riskLevel).toBe("medium");
     expect(diagnosis!.evidence).toHaveLength(2);
     expect(diagnosis!.possibleCauses).toHaveLength(2);
-    expect(diagnosis!.followUp24h.checklist).toContain("Log a photo");
-    expect(diagnosis!.recoveryPlan3d.summary).toMatch(/stabilize/i);
+    expect(diagnosis!.followUp24h!.checklist).toContain("Log a photo");
+    expect(diagnosis!.recoveryPlan3d!.summary).toMatch(/stabilize/i);
     expect(diagnosis!.suggestedActions).toHaveLength(1);
     expect(diagnosis!.suggestedActions[0].approvalRequired).toBe(true);
     expect(notes).toEqual([]);
@@ -169,8 +169,7 @@ describe("validateAndSanitizeDiagnosis — safety clamps", () => {
   it("strips over-promising yield/recovery language", () => {
     const { diagnosis } = validateAndSanitizeDiagnosis({
       ...completeInput,
-      summary:
-        "This plant will fully recover and we guarantee maximize yield within days.",
+      summary: "This plant will fully recover and we guarantee maximize yield within days.",
       whatNotToDo: ["Do not 100% certain over-prune."],
     });
     expect(diagnosis!.summary).not.toMatch(/guarantee|will fully recover|maximize yield/i);

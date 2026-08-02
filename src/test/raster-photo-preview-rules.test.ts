@@ -77,7 +77,8 @@ describe("calculateRasterPhotoCoverCrop", () => {
     [Number.NaN, 100],
     [100, Number.POSITIVE_INFINITY],
     [100, 100, -1, 720],
-  ])("fails closed for invalid dimensions", (width, height, targetWidth, targetHeight) => {
+  ] as number[][])("fails closed for invalid dimensions", (...args: number[]) => {
+    const [width, height, targetWidth, targetHeight] = args;
     expect(calculateRasterPhotoCoverCrop(width, height, targetWidth, targetHeight)).toBeNull();
   });
 

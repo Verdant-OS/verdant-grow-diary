@@ -29,9 +29,12 @@ vi.mock("@/integrations/supabase/client", () => ({
         eq: (_col: string, _value: string) => ({
           order: () => ({
             limit: () => {
-              const __c: any = {
-                abortSignal: () => __c,
-                then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+              const __c = {
+                abortSignal: (): typeof __c => __c,
+                then: (
+                  onfulfilled?: (value: unknown) => unknown,
+                  onrejected?: (reason: unknown) => unknown,
+                ) => Promise.resolve({ data: [], error: null }).then(onfulfilled, onrejected),
               };
               return __c;
             },
@@ -96,7 +99,7 @@ describe("buildCautionNote (pure helper)", () => {
         riskLevel: "low",
         evidence: ["x"],
         missingInformation: [],
-      } as Diagnosis,
+      } as unknown as Diagnosis,
       displayedConfidence: 0.9,
     });
     const note = buildCautionNote(vm);

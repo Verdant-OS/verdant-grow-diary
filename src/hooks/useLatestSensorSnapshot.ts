@@ -98,6 +98,9 @@ export function useLatestSensorSnapshot(
           }
         }
         // 2) Fall back to latest diary_entries.details.sensor_snapshot.
+        if (!growId) {
+          return staleSensorCandidate ?? EMPTY_SNAPSHOT;
+        }
         const { data: diaryRows, error: diaryErr } = await supabase
           .from("diary_entries")
           .select("entry_at,details,tent_id")

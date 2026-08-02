@@ -198,7 +198,7 @@ describe("PhenoDocumentationSections — rendering & persistence", () => {
       if (ownDescriptor) {
         Object.defineProperty(window, "localStorage", ownDescriptor);
       } else {
-        delete (window as Window & { localStorage?: Storage }).localStorage;
+        Object.defineProperty(window, "localStorage", { value: undefined, configurable: true });
       }
     }
   });

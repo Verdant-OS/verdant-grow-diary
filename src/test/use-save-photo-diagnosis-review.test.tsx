@@ -4,7 +4,7 @@ import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { fromMock, insertMock, toastError, toastSuccess } = vi.hoisted(() => {
-  const insertMock = vi.fn(() => Promise.resolve({ error: null }));
+  const insertMock = vi.fn(() => Promise.resolve({ error: null as { message: string } | null }));
   const fromMock = vi.fn(() => ({ insert: insertMock }));
   return {
     fromMock,

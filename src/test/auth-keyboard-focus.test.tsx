@@ -71,8 +71,7 @@ function renderReset() {
 function getTabOrder(): HTMLElement[] {
   // Include disabled buttons — they still occupy a DOM order slot and we
   // want to assert ordering, not focusability.
-  const selector =
-    'a[href], button, input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  const selector = 'a[href], button, input:not([disabled]), [tabindex]:not([tabindex="-1"])';
   return Array.from(document.querySelectorAll<HTMLElement>(selector)).filter(
     (el) => !el.hasAttribute("aria-hidden"),
   );
@@ -131,11 +130,13 @@ describe("/auth — keyboard tab order", () => {
   });
 
   it("during loading the submit button is visible and disabled (no stuck state)", async () => {
-    let resolveSignIn: (() => void) | null = null;
+    let resolveSignIn: (() => void) | undefined;
     signInMock.mockImplementationOnce(
       () =>
         new Promise((res) => {
-          resolveSignIn = () => res(signInResult);
+          resolveSignIn = () => {
+            res(signInResult);
+          };
         }),
     );
     renderAuth();
@@ -149,7 +150,7 @@ describe("/auth — keyboard tab order", () => {
     const loading = await screen.findByRole("button", { name: /signing in…/i });
     expect(loading).toBeDisabled();
     expect(loading).toBeVisible();
-    resolveSignIn?.();
+    resolveSignIn!();
     await waitFor(() => expect(signInMock).toHaveBeenCalledTimes(1));
   });
 });
@@ -218,17 +219,17 @@ describe("/reset-password — keyboard tab order & focus", () => {
     fireEvent.change(screen.getByLabelText(/^confirm new password$/i), {
       target: { value: "abcdefg1" },
     });
-    await waitFor(() =>
-      expect(screen.queryByText(/passwords do not match yet/i)).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByText(/passwords do not match yet/i)).toBeNull());
   });
 
   it("loading disables submit and the loading button stays visible", async () => {
-    let resolveUpd: (() => void) | null = null;
+    let resolveUpd: (() => void) | undefined;
     updateUserMock.mockImplementationOnce(
       () =>
         new Promise((res) => {
-          resolveUpd = () => res(updateUserResult);
+          resolveUpd = () => {
+            res(updateUserResult);
+          };
         }),
     );
     renderReset();
@@ -241,7 +242,7 @@ describe("/reset-password — keyboard tab order & focus", () => {
     const loading = await screen.findByRole("button", { name: /updating password…/i });
     expect(loading).toBeDisabled();
     expect(loading).toBeVisible();
-    resolveUpd?.();
+    resolveUpd!();
     await waitFor(() => expect(updateUserMock).toHaveBeenCalledTimes(1));
   });
 });

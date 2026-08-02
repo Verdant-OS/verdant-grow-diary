@@ -47,7 +47,9 @@ export interface AiDoctorReadinessEventLike {
   details?: unknown;
 }
 
-function readDetails(event: AiDoctorReadinessEventLike | null | undefined): Record<string, unknown> | null {
+function readDetails(
+  event: AiDoctorReadinessEventLike | null | undefined,
+): Record<string, unknown> | null {
   if (!event || typeof event !== "object") return null;
   const details = (event as { details?: unknown }).details;
   if (details == null || typeof details !== "object" || Array.isArray(details)) return null;
@@ -89,9 +91,7 @@ export function buildAiDoctorReadinessTimelineBadge(
   const snapshotAtIso =
     typeof rawAt === "string" && Number.isFinite(Date.parse(rawAt)) ? rawAt : null;
   const ageMinutes =
-    typeof rawAge === "number" && Number.isFinite(rawAge) && rawAge >= 0
-      ? rawAge
-      : null;
+    typeof rawAge === "number" && Number.isFinite(rawAge) && rawAge >= 0 ? rawAge : null;
   const checkedAtMs =
     typeof rawCheckedAt === "string" && Number.isFinite(Date.parse(rawCheckedAt))
       ? Date.parse(rawCheckedAt)
@@ -115,7 +115,11 @@ export function buildAiDoctorReadinessTimelineBadge(
     return gradeAtCheck === rawFreshness;
   })();
 
-  if ((rawFreshness === "fresh" || rawFreshness === "stale") && evidenceIsCoherent) {
+  if (
+    (rawFreshness === "fresh" || rawFreshness === "stale") &&
+    evidenceIsCoherent &&
+    ageMinutes != null
+  ) {
     const ageText = formatAgeAtCheck(ageMinutes);
     if (rawFreshness === "fresh") {
       return {

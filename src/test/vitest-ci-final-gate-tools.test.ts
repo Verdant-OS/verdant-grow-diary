@@ -295,7 +295,7 @@ describe("16-shard aggregate report", () => {
   });
 
   function make16() {
-    const filesByShard = [];
+    const filesByShard: string[][] = [];
     for (let i = 1; i <= 16; i++) filesByShard.push([`src/shard${i}.test.ts`]);
     return buildSyntheticFixture({ shardTotal: 16, filesByShard });
   }

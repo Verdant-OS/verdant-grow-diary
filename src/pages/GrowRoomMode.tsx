@@ -14,7 +14,7 @@
  */
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import {
   AlertTriangle,
   ArrowRight,

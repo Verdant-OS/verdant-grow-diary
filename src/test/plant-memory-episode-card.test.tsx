@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { PlantMemoryEpisodeCard } from "../components/PlantMemoryEpisodeCard";
 import { NextRunPlaybook } from "../components/NextRunPlaybook";
 import { buildNextRunPlaybook } from "../lib/nextRunPlaybookRules";

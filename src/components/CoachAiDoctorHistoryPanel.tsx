@@ -6,7 +6,7 @@
  * No writes. No AI re-run. No queue actions.
  */
 import { Stethoscope, ShieldAlert, Info } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

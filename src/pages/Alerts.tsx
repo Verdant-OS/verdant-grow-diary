@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from "react";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Bell } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { Link, MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Link, MemoryRouter, Route, Routes, useLocation, useNavigate } from "@/lib/react-router-compat";
 import { describe, expect, it, vi } from "vitest";
 
 const TENT_ID = "30000000-0000-4000-8000-000000000001";

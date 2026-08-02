@@ -6,7 +6,7 @@
  * anchor. Read-only — no diary writes, no readings, no diagnoses, no
  * alerts,
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Activity, Camera, ListOrdered, MessageSquare, NotebookPen, Scissors } from "lucide-react";
 
 import { Button } from "@/components/ui/button";

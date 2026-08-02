@@ -11,7 +11,7 @@
  * - Same-origin redirect_uri, validated before use.
  */
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plug, PlugZap, ShieldAlert } from "lucide-react";

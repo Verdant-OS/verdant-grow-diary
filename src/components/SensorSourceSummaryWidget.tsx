@@ -10,7 +10,7 @@
  *
  * Pure presenter. No I/O. No writes. No AI calls.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import {
   SENSOR_SOURCE_KINDS,
   SENSOR_SOURCE_SHORT_LABEL,

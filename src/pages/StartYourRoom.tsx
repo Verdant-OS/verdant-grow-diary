@@ -5,7 +5,7 @@
  * works immediately. No device control, no Action Queue, no Edge Functions.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "@/lib/react-router-compat";
 import { Loader2, Sprout, Box, Leaf, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 

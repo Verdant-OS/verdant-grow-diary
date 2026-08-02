@@ -16,7 +16,7 @@
  */
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import GlobalFastAddButton from "@/components/GlobalFastAddButton";
 import {
   FAST_ADD_ACTIONS,

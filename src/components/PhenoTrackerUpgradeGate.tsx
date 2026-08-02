@@ -1,5 +1,5 @@
 import { type ReactNode, useMemo } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation } from "@/lib/react-router-compat";
 import { Sprout } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";

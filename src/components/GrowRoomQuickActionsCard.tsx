@@ -6,7 +6,7 @@
  * context as the event detail. It does NOT perform any writes, device
  * control, or automation, and never looks up additional context.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import {
   ArrowRight,
   ClipboardCheck,

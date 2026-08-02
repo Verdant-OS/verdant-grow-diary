@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { matchRoutes } from "react-router-dom";
+import { matchRoutes } from "@/lib/react-router-compat";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
 
 const ROOT = resolve(__dirname, "../..");

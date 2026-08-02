@@ -9,7 +9,7 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import DashboardDataSourceDisclosure from "@/components/DashboardDataSourceDisclosure";
 import type { GrowDataSourceMeta } from "@/hooks/useGrowData";
 

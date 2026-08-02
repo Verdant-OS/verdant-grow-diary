@@ -18,7 +18,7 @@
  * No device-control surface. No elevated keys. RLS enforces ownership.
  */
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams } from "@/lib/react-router-compat";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { alertDetailPath } from "@/lib/routes";

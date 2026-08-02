@@ -6,7 +6,7 @@
  * No Supabase, no AI calls, no Action Queue writes, no device control.
  */
 import { useEffect, useId, useRef, useState } from "react";
-import { Link, Navigate, useLocation, useParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useParams } from "@/lib/react-router-compat";
 import BrandLogo from "@/components/BrandLogo";
 import CustomerComparisonGuideQrOption from "@/components/customer/CustomerComparisonGuideQrOption";
 import SymptomReferenceTable from "@/components/SymptomReferenceTable";

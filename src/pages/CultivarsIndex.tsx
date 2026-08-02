@@ -5,7 +5,7 @@
  * labeled sample/reference data only. No private grow reads or writes.
  */
 import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "@/lib/react-router-compat";
 import { Search } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
 import GlobalSearchDialog from "@/components/GlobalSearchDialog";

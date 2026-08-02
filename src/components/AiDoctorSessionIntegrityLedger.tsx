@@ -13,7 +13,7 @@
  *     `aiDoctorSessionLedgerViewModel.ts`; this component only renders it.
  */
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ShieldCheck, Copy, Check, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

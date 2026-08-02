@@ -19,7 +19,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import SensorsIngestNormalizer from "@/pages/SensorsIngestNormalizer";
 
 const writeMethodSpies = vi.hoisted(() => ({

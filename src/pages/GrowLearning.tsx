@@ -8,7 +8,7 @@
  *  - No effectiveness score, no "best intervention" ranking, no automatic
  *    repeat/avoid promotion.
  */
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link } from "@/lib/react-router-compat";
 import { GraduationCap } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { usePlantMemoryEpisodes } from "@/hooks/usePlantMemoryEpisodes";

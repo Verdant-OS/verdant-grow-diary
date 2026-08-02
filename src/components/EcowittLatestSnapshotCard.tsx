@@ -20,7 +20,7 @@ import {
 } from "@/hooks/useEcowittLatestSnapshot";
 import { ECOWITT_DERIVED_VPD_LABEL } from "@/lib/ecowittReadingViewModel";
 import SensorSourceProvenanceBadge from "@/components/SensorSourceProvenanceBadge";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { fahrenheitToCelsius, getTemperatureUnitSymbol } from "@/lib/temperatureUnitPreference";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 

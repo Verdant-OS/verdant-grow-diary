@@ -5,7 +5,7 @@
  * write rows, diagnose a plant, create alerts, or generate Action Queue items.
  */
 import { useEffect } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "@/lib/react-router-compat";
 import BrandLogo from "@/components/BrandLogo";
 import CultivarBlueprintCrossSell from "@/components/CultivarBlueprintCrossSell";
 import CultivarFollowButton from "@/components/CultivarFollowButton";

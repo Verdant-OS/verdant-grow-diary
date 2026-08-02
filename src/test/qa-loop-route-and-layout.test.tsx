@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-compat";
 import RouteAliasRedirect from "@/components/RouteAliasRedirect";
 
 // Lightweight stand-in for the real Action Queue page to avoid pulling in its

@@ -4,7 +4,7 @@
  * `buildDashboardSensorHealthSummary` view-model. No data fetching, no
  * writes, no AI calls, no device control.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { AlertCircle, AlertTriangle, CheckCircle2, HelpCircle, Loader2, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {

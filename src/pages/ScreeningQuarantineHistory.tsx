@@ -8,7 +8,7 @@
  * any) posture. The route `kind` is validated against the supported subject-kind
  * union and fails closed for anything else.
  */
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link } from "@/lib/react-router-compat";
 import { ShieldAlert, Loader2, AlertTriangle } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";

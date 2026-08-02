@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Wrench, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 

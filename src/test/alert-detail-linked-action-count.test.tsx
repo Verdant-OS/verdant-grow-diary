@@ -25,7 +25,7 @@ async function flushAsync(ms = 30) {
     await new Promise((r) => setTimeout(r, ms));
   });
 }
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import AlertDetail from "@/pages/AlertDetail";
 import { actionDetailPath, actionQueueAlertContextPath } from "@/lib/routes";
 

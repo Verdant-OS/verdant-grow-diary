@@ -1,5 +1,5 @@
 import { type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
   buildLegalPageJsonLd,

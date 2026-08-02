@@ -9,7 +9,7 @@
  *
  * No writes, no AI calls, no device control, no checkout logic.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { CheckCircle2, Circle, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePlantLogDays } from "@/hooks/usePlantLogDays";

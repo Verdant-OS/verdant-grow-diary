@@ -11,7 +11,7 @@
  * to the UI surface.
  */
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import {
   isSessionSuggestionEligibleForActionQueue,

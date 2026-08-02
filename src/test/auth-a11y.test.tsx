@@ -6,7 +6,7 @@
 //  - focus management on submit error
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 
 let signInResult: { error: { message: string } | null } = { error: null };
 let signUpResult: { data: { user: null }; error: { message: string } | null } = {

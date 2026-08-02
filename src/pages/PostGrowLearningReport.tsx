@@ -6,7 +6,7 @@
  * no device control, and no schema changes.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "@/lib/react-router-compat";
 import { ArrowLeft, Leaf, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 

@@ -7,7 +7,7 @@
  * create Action Queue items, call models, or control devices.
  */
 import * as React from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "@/lib/react-router-compat";
 import {
   buildAiDoctorConfidenceAuditViewModel,
   type AiDoctorConfidenceAuditRule,

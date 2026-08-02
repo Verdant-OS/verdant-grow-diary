@@ -15,7 +15,7 @@
  *  - All business rules live in `@/lib/fastAddActionRules`.
  */
 import { useCallback, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "@/lib/react-router-compat";
 import { Plus } from "lucide-react";
 import {
   FAST_ADD_ACTIONS,

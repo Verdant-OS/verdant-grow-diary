@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import McpApiReference from "@/pages/McpApiReference";
 import { EcowittIngestValidationPanel } from "@/components/EcowittIngestValidationPanel";
 import type { EcowittIngestValidationInput } from "@/lib/ecowittIngestValidationViewModel";

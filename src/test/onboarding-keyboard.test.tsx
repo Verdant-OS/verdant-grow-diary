@@ -1,7 +1,7 @@
 // Onboarding keyboard / radiogroup / "Change later" behavior.
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   clearLocalStorageForTest,
@@ -9,8 +9,8 @@ import {
 } from "./helpers/localStorageTestHelper";
 
 const navMock = vi.fn();
-vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+vi.mock("@/lib/react-router-compat", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/react-router-compat")>("@/lib/react-router-compat");
   return { ...actual, useNavigate: () => navMock };
 });
 

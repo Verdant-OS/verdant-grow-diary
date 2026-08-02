@@ -12,7 +12,7 @@
  * notice and never presents "no matches" as a verified empty conclusion.
  */
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "@/lib/react-router-compat";
 import { Command as CommandPrimitive } from "cmdk";
 import {
   AlertTriangle,

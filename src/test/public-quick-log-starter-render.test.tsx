@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import QuickLogStarter from "@/pages/QuickLogStarter";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
 import { PUBLIC_QUICK_LOG_STARTER_COPY as COPY } from "@/constants/publicQuickLogStarterCopy";

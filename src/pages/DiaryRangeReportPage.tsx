@@ -13,7 +13,7 @@
  *    <img> nodes so they print.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "@/lib/react-router-compat";
 import { Loader2, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useGrows } from "@/store/grows";

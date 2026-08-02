@@ -6,7 +6,7 @@
  * so visible copy and FAQPage JSON-LD cannot drift.
  */
 import { useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import BrandLogo from "@/components/BrandLogo";
 import DiaryFaqLinkStatsPanel from "@/components/DiaryFaqLinkStatsPanel";
 import { usePageSeo } from "@/hooks/usePageSeo";

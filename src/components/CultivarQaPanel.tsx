@@ -7,7 +7,7 @@
  * never as a fabricated answer.
  */
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import type { VerdantCultivarProfile } from "@/constants/verdantCultivars";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { useCultivarQa } from "@/hooks/useCultivarQa";

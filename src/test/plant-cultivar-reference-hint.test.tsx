@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import PlantCultivarReferenceHint from "@/components/PlantCultivarReferenceHint";
 
 function renderHint(strain: string | null, plantId = "plant-1") {

@@ -4,7 +4,7 @@
  * Derived from existing manual sensor readings (for the plant's current
  * tent) and QuickLog diary entries scoped to the plant. No writes.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ClipboardCheck, ArrowRight, CheckCircle2, Gauge, Info, Sparkles } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 

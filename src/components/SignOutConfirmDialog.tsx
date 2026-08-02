@@ -9,7 +9,7 @@
 //    redirects to a safe internal page
 // On cancel: leaves the user in place.
 import { useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "@/lib/react-router-compat";
 import {
   AlertDialog,
   AlertDialogAction,

@@ -9,7 +9,7 @@
  *  - Copy stays observational. Never claims an action caused / fixed an
  *    issue. Never ranks groups as best / worst.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Badge } from "@/components/ui/badge";
 import { actionDetailPath, alertDetailPath } from "@/lib/routes";
 import {

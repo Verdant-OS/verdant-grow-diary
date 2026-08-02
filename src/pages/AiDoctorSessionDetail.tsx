@@ -5,7 +5,7 @@
  * Does NOT re-run AI. Does NOT create Action Queue items. Does NOT mutate data.
  * RLS scopes ownership via auth.uid().
  */
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "@/lib/react-router-compat";
 import {
   ArrowLeft,
   Stethoscope,

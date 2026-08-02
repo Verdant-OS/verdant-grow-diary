@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { ReactNode } from "react";
 import { render, screen, act, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import MobileNav, { moreGroups, more } from "@/components/MobileNav";
 

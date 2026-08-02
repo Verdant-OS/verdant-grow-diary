@@ -18,7 +18,7 @@
  *  - Card list items use semantic <ul>/<li>; the "•" bullet is
  *    aria-hidden so screen readers don't read it.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import BrandLogo from "@/components/BrandLogo";

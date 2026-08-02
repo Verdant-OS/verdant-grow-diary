@@ -11,7 +11,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import CustomerModeGuide from "@/pages/CustomerModeGuide";
 
 function renderAt(path: string) {

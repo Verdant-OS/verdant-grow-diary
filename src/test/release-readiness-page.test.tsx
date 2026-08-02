@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import ReleaseReadiness from "@/pages/ReleaseReadiness";
 import {
   RELEASE_READINESS_VIEW_MODEL,

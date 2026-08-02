@@ -12,7 +12,7 @@
  *    surface owned by Timeline.tsx and must never be shown as "empty".
  */
 import { useCallback, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "@/lib/react-router-compat";
 import { Sprout } from "lucide-react";
 import {
   FAST_ADD_PICKER_CTAS,

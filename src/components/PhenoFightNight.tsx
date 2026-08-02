@@ -11,7 +11,7 @@
  * never picks for them. Presentational + local UI state only: no I/O, no writes.
  */
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import PhenoComparabilityBanner from "@/components/PhenoComparabilityBanner";

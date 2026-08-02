@@ -9,7 +9,7 @@
  * no calendar / notification / email / scheduling, no edge function invokes.
  */
 import { useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { AlertTriangle, ArrowDownToLine, Bell, Clock, ListTodo, Sprout } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";

@@ -3,7 +3,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 vi.mock("@/hooks/useHasRole", () => ({
   useHasRole: () => ({ status: "granted", granted: true, error: null }),

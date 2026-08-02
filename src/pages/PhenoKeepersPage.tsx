@@ -7,7 +7,7 @@
  * drives no device. No AI, no Action Queue, no automation.
  */
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "@/lib/react-router-compat";
 import { usePhenoKeepers } from "@/hooks/usePhenoKeepers";
 import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 import {

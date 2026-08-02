@@ -30,7 +30,7 @@ async function clickAct(el: Element) {
     fireEvent.click(el);
   });
 }
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import AlertDetail from "@/pages/AlertDetail";
 
 // --- Configurable fixtures --------------------------------------------------

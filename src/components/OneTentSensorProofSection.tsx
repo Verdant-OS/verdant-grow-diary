@@ -9,7 +9,7 @@
  *  - Consumes a sanitized view model; never renders raw payloads, secrets,
  *    tokens, bridge ids, owning auth ids, or internal identifiers.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import type {
   OneTentSensorProofTone,

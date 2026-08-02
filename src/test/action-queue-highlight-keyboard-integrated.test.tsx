@@ -12,7 +12,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Routes, Route, useSearchParams } from "react-router-dom";
+import { MemoryRouter, Routes, Route, useSearchParams } from "@/lib/react-router-compat";
 import ActionQueue from "@/pages/ActionQueue";
 
 const insertSpy = vi.fn();

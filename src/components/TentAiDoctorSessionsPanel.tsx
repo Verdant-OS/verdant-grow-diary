@@ -5,7 +5,7 @@
  * No writes. No queue action buttons. History view only.
  */
 import { Stethoscope, ShieldAlert, Info } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";

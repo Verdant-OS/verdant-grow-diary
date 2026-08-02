@@ -7,7 +7,7 @@
  *  - Presentational only. No I/O, no writes, no automation.
  *  - Copy is observational. Never claims reports are healthy or complete.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ArrowRight, Sparkles } from "lucide-react";
 import {
   REPORTS_HUB_ONBOARDING_SUBTITLE,

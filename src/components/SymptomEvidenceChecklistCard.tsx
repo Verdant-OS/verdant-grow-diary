@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { SYMPTOM_NO_STACK_RULE } from "@/constants/cannabisSymptomReference";
 import type { SymptomEvidenceChecklistView } from "@/lib/symptomEvidenceChecklistRules";
 

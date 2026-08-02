@@ -19,7 +19,7 @@ import {
   useLocation,
   useParams,
   useSearchParams,
-} from "react-router-dom";
+} from "@/lib/react-router-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 interface StoredSensorReading {

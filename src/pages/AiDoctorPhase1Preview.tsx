@@ -12,7 +12,7 @@
  * presenter-only with zero action surface.
  */
 import * as React from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { AiDoctorPhase1PreviewPanel } from "@/components/AiDoctorPhase1PreviewPanel";
 import {
   AI_DOCTOR_PHASE1_PREVIEW_CASES,

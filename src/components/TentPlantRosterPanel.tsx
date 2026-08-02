@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "@/lib/react-router-compat";
 import type { TentPlantRosterViewModel } from "@/lib/tentPlantRosterViewModel";
 import {
   buildTentPlantRosterQuickActions,

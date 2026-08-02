@@ -12,7 +12,7 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import CustomerModeCannabisCareFaq from "@/pages/CustomerModeCannabisCareFaq";
 import { CANNABIS_PLANT_CARE_FAQ } from "@/constants/cannabisPlantCareFaq";
 

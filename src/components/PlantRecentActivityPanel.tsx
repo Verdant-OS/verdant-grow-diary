@@ -4,7 +4,7 @@
  * Reads from the existing `diary_entries` table (same source QuickLog writes
  * to). No writes. No sensor_readings access. No action_queue / alerts.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ArrowRight, Camera, Gauge, NotebookPen, Wrench } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

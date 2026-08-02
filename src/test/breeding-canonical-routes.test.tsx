@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, useLocation } from "@/lib/react-router-compat";
 import { describe, expect, it, vi } from "vitest";
 import StartBreedingLogButton from "@/components/StartBreedingLogButton";
 import { APP_ROUTES } from "@/lib/appRouteManifest";

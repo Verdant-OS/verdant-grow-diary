@@ -9,7 +9,7 @@
  *    action_queue writes, no diary writes.
  *  - Copy is calm; nothing here implies AI confidence is strong.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import type {
   AiDoctorContextQuickAction,

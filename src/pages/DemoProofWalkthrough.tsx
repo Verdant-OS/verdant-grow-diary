@@ -9,7 +9,7 @@
  *    `@/lib/demoProofWalkthroughViewModel` and links to existing routes
  *    instead of duplicating proof components.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ClipboardCheck } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";

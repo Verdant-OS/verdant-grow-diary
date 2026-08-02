@@ -42,7 +42,7 @@ import { buildActionResponseMemoryCardViewModel } from "@/lib/actionResponseMemo
 import { useActionResponseMemory } from "@/hooks/useActionResponseMemory";
 import ActionResponseMemoryCard from "@/components/ActionResponseMemoryCard";
 import { Button } from "@/components/ui/button";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "@/lib/react-router-compat";
 import {
   SENSOR_PLANT_PARAM,
   SENSOR_SOURCES_PARAM,

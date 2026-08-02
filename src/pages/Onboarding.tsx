@@ -14,7 +14,7 @@
 //    persisting a preference.
 //  - "Change later" copy points to Settings.
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, Navigate, Link, useSearchParams } from "react-router-dom";
+import { useNavigate, Navigate, Link, useSearchParams } from "@/lib/react-router-compat";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";

@@ -6,7 +6,7 @@
  * the apex after a verified client session exists.
  */
 import { useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "@/lib/react-router-compat";
 import { useAuth } from "@/store/auth";
 import { consumePendingOAuthPostAuthRedirect } from "@/lib/oauthPostAuthRedirectRules";
 

@@ -1,4 +1,4 @@
-import { useLocation } from "react-router-dom";
+import { useLocation } from "@/lib/react-router-compat";
 import { usePageSeo } from "@/hooks/usePageSeo";
 
 const NotFound = () => {

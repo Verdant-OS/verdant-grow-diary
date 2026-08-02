@@ -5,7 +5,7 @@
  * usePlantRecentActivity. No new table. No writes. No sensor_readings,
  * alerts, or action_queue access. Past entries are never rewritten.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ArrowRight, Move } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";

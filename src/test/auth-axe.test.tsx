@@ -2,7 +2,7 @@
 // Mocked Supabase only — no network, no real account, no real reset.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { axe } from "vitest-axe";
 
 vi.mock("@/integrations/supabase/client", () => ({

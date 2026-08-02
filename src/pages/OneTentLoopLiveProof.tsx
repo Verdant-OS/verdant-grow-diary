@@ -15,7 +15,7 @@
  *  - Never renders raw payloads, tokens, bridge secrets, or service keys.
  */
 import * as React from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { useGrows } from "@/store/grows";
 import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";

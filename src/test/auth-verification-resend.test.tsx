@@ -1,7 +1,7 @@
 // Targeted tests for auth error classifier + verification-required UI surface.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import {
   classifyAuthError,
   EMAIL_VERIFICATION_REQUIRED_MESSAGE,

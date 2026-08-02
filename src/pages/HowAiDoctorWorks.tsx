@@ -6,7 +6,7 @@
  * Action Queue writes, no device control. Copy is source-labeled and
  * avoids forbidden automation / device-control language.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import BrandLogo from "@/components/BrandLogo";
 import { Button } from "@/components/ui/button";
 import { usePageSeo } from "@/hooks/usePageSeo";

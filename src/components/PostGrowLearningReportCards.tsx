@@ -1,7 +1,7 @@
 import type React from "react";
 import { useCallback, useId, useRef, useState } from "react";
 import { Download, HelpCircle, Image as ImageIcon, Info, ListChecks, Printer } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { toast } from "sonner";
 import SensorProvenanceLegend from "@/components/SensorProvenanceLegend";
 

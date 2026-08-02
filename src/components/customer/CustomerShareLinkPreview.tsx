@@ -8,7 +8,7 @@
  *  - Treats shareId as opaque, normalized only for URL safety.
  */
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import {
   buildCustomerSharePreview,
   CUSTOMER_SHARE_LINK_PREVIEW_DISCLAIMER,

@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { MemoryRouter, Routes, Route } from "@/lib/react-router-compat";
 import EcowittLiveBringup from "@/pages/EcowittLiveBringup";
 import {
   ECOWITT_BRINGUP_STEP_IDS,

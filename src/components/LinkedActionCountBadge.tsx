@@ -10,7 +10,7 @@
  *    pure view-model helper.
  *  - Copy intentionally avoids automation/execution/transition verbs.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Badge } from "@/components/ui/badge";
 import { actionDetailPath, actionQueueAlertContextPath } from "@/lib/routes";
 import type { AlertLinkedActionsSummary } from "@/lib/alertsLinkedActionsViewModel";

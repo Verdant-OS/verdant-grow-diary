@@ -12,7 +12,7 @@
  * no fake-live data. Mounted outside AppShell so no operator chrome renders.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";

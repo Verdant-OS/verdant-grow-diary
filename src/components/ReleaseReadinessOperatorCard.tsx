@@ -11,7 +11,7 @@
  *  - no IDs, role rows, RPC names, or tokens rendered.
  *  - explicitly labels the destination as static / manual (not a live CI feed).
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ClipboardList } from "lucide-react";
 import {
   Card,

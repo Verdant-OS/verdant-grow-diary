@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import Feedback from "../Feedback";
 import Contact from "../Contact";
 import LegalFooterLinks, { LEGAL_FOOTER_LINKS } from "@/components/LegalFooterLinks";

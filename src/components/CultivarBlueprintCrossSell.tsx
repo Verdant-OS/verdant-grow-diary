@@ -8,7 +8,7 @@
  * claim to compare this specific cultivar. Reuses the shipped `blueprint`
  * capability gate; no new billing infra.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import type { VerdantCultivarProfile } from "@/constants/verdantCultivars";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { canUseCapability } from "@/lib/entitlements/capabilityAccess";

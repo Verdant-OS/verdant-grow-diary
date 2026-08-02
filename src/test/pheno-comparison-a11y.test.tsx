@@ -21,7 +21,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, within, cleanup } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import PhenoComparison from "@/pages/PhenoComparison";
 import { PHENO_COMPARISON_SENSOR_SOURCES } from "@/lib/phenoComparisonRules";
 

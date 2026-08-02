@@ -5,7 +5,7 @@
  * the pure rules layer. No writes. No action_queue handoff from this panel.
  * Recommendations are never invented — only fields already stored render.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ArrowRight, Bell, AlertCircle, AlertTriangle, Info, Eye } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

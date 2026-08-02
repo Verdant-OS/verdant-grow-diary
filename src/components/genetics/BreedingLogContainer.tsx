@@ -22,7 +22,7 @@ import {
   shouldWarnPossibleDuplicate,
 } from "@/lib/genetics/breedingSubmissionRecoveryRules";
 import { logsPath } from "@/lib/routes";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { useAuth } from "@/store/auth";
 
 interface Props {

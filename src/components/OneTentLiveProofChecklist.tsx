@@ -2,7 +2,7 @@
  * OneTentLiveProofChecklist — presenter for the guided proof checklist.
  * All status/copy comes from `buildOneTentLiveProofViewModel`.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Circle, AlertCircle, HelpCircle } from "lucide-react";
 import type {

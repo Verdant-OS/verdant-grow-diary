@@ -4,7 +4,7 @@
  * kind (which itself branches on the server-supplied credit.plan_id).
  * No fetching, no entitlements logic.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import PaywallCta from "@/components/PaywallCta";
 import {
   buildAiCreditLimitNoticeViewModel,

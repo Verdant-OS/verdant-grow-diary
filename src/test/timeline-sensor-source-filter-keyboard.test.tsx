@@ -11,7 +11,7 @@
 import { describe, it, expect } from "vitest";
 import React, { useEffect, useMemo, useState } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter, useSearchParams } from "react-router-dom";
+import { MemoryRouter, useSearchParams } from "@/lib/react-router-compat";
 import {
   SENSOR_SOURCES_PARAM,
   encodeSensorSourcesParam,

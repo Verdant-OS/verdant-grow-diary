@@ -7,7 +7,7 @@
  */
 import type { ReactNode } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/store/auth", () => ({

@@ -5,7 +5,7 @@
  * rules so Dashboard and Plant Detail never drift apart.
  */
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { CheckCircle2, Circle, Sprout, ArrowRight, Sparkles, Gauge } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 

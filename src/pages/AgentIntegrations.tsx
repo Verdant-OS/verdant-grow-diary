@@ -9,7 +9,7 @@
  * Route: /settings/agent-integrations
  */
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ArrowLeft, Copy, ExternalLink, ShieldCheck, FileText } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";

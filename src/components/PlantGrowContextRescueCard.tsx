@@ -5,7 +5,7 @@
  * Writes ONLY `plants.grow_id`. No tent rewrites, logs, sensors, or Action Queue.
  */
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { AlertTriangle, Link2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";

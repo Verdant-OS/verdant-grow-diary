@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { UserCircle } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import PageHeader from "@/components/PageHeader";

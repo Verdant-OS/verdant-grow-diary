@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "@/lib/react-router-compat";
 import { ChevronRight } from "lucide-react";
 import { useGrows } from "@/store/grows";
 import {

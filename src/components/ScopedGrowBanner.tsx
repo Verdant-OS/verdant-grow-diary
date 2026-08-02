@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 
 export type ScopedGrowLabel = "plants" | "tents" | "logs" | "timeline" | "actions" | "dashboard" | "alerts";
 

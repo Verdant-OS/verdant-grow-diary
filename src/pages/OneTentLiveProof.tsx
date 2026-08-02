@@ -10,7 +10,7 @@
  * "Needs operator confirmation".
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { useQueryClient } from "@tanstack/react-query";
 import PageHeader from "@/components/PageHeader";
 import { ClipboardCheck, RefreshCw, Printer, Copy } from "lucide-react";

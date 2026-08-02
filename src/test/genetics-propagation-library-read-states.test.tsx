@@ -7,7 +7,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import GeneticsLibrary from "@/pages/GeneticsLibrary";
 import AccessionDetail from "@/pages/AccessionDetail";
 import PropagationBatchDetail from "@/pages/PropagationBatchDetail";

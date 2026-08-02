@@ -121,7 +121,7 @@ describe("AI Doctor Confidence Audit — static safety", () => {
     const fromMatches = src.match(/from\s+["'][^"']+["']/g) || [];
     for (const match of fromMatches) {
       const isReact = match.includes('"react"');
-      const isRouter = match.includes('"react-router-dom"');
+      const isRouter = match.includes('"@/lib/react-router-compat"');
       const isViewModel = match.includes("aiDoctorConfidenceAuditViewModel");
       expect(isReact || isRouter || isViewModel).toBe(true);
     }
@@ -146,7 +146,7 @@ describe("AI Doctor Confidence Audit — static safety", () => {
     for (const match of fromMatches) {
       if (match.includes("aiDoctorConfidenceAuditViewModel")) continue;
       if (match.includes('"react"')) continue;
-      if (match.includes('"react-router-dom"')) continue;
+      if (match.includes('"@/lib/react-router-compat"')) continue;
       expect(match).not.toMatch(/model|edge|ingest|alert|action/i);
     }
   });

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Check, ShieldCheck } from "lucide-react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "@/lib/react-router-compat";
 
 import BrandLogo from "@/components/BrandLogo";
 import FounderShareCard from "@/components/FounderShareCard";

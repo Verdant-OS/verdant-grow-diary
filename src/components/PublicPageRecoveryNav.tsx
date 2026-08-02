@@ -1,4 +1,4 @@
-import { Link, useInRouterContext } from "react-router-dom";
+import { Link, useInRouterContext } from "@/lib/react-router-compat";
 
 import { LEGAL_FOOTER_LINKS } from "@/components/LegalFooterLinks";
 import { cn } from "@/lib/utils";

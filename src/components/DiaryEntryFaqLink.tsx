@@ -8,7 +8,7 @@
  * calls AI, or touches device control.
  */
 import { HelpCircle } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import {
   buildDiaryFaqLink,
   type DiaryFaqLinkInput,

@@ -6,7 +6,7 @@
  * Copy stays observational: "Record what changed after completed actions."
  * No claim that an action fixed, healed, or resolved any issue.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ArrowRight, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { actionDetailPath } from "@/lib/routes";

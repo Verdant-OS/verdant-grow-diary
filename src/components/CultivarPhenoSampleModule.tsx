@@ -7,7 +7,7 @@
  * Cross-links to Verdant's real diary-first features (Pheno comparison,
  * Pheno expression showcase, start a diary).
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import type { VerdantCultivarProfile } from "@/constants/verdantCultivars";
 
 interface Props {

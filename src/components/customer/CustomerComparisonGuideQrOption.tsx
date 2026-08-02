@@ -6,7 +6,7 @@
  */
 
 import { QRCodeSVG } from "qrcode.react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import {
   NEXT_DOOR_CUSTOMER_BRAND,
   NEXT_DOOR_CUSTOMER_COMPARISON_PATH,

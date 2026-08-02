@@ -13,7 +13,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-compat";
 import OperatorAiDoctorPhase1, {
   OPERATOR_AI_DOCTOR_PHASE1_ROUTE,
   AI_DOCTOR_PHASE1_SENSOR_ANCHOR_ID,

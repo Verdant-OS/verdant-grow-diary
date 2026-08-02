@@ -11,7 +11,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import PhenoComparison from "@/pages/PhenoComparison";
 
 // Safety: assert the page does not import supabase, AI, or write helpers.

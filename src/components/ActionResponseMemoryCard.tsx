@@ -13,7 +13,7 @@
  */
 
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ClipboardCheck } from "lucide-react";
 import SensorSourceBadge from "@/components/sensor/SensorSourceBadge";
 import { actionDetailPath } from "@/lib/routes";

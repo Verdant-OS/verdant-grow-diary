@@ -1,4 +1,4 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link } from "@/lib/react-router-compat";
 import { AlertTriangle, Archive, ArrowLeft, ArrowRight, Box, GitMerge, Sprout } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import PlantCultivarReferenceHint from "@/components/PlantCultivarReferenceHint";
@@ -92,7 +92,7 @@ import {
   type PlantDetailBlockedStateAction,
   type PlantDetailBlockedStateView,
 } from "@/lib/plantDetailBlockedStateViewModel";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "@/lib/react-router-compat";
 import { PlantMemoryEpisodesSection } from "@/components/PlantMemoryEpisodesSection";
 
 function BlockedStateBackLink({ action }: { action: PlantDetailBlockedStateAction }) {

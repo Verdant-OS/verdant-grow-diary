@@ -5,7 +5,7 @@
  * QuickLog diary entries. No writes. No new persistence. Never claims
  * "completed" — only describes activity that has been observed today.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ClipboardCheck, ArrowRight, Clock } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 

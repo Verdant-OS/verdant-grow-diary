@@ -118,9 +118,7 @@ describe("PhenoHuntNew empty state", () => {
   async function goToCandidatesStep() {
     await screen.findByTestId("pheno-step-basics");
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
-    await waitFor(() =>
-      expect(screen.getByTestId("pheno-step-candidates")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("pheno-step-candidates")).toBeInTheDocument());
   }
 
   it("shows empty state CTA when the grow has no plants", async () => {
@@ -129,10 +127,12 @@ describe("PhenoHuntNew empty state", () => {
     await goToCandidatesStep();
     const cta = (await screen.findByTestId("ph-empty-cta")) as HTMLElement;
     const anchor = cta.querySelector("a") ?? cta;
-    expect(anchor.getAttribute("href")).toBe("/grows/g1");
+    expect(anchor.getAttribute("href")).toBe("/plants?growId=g1");
     expect(screen.getByTestId("ph-empty").textContent).toMatch(
-      /No plants in this grow yet/i,
+      /No candidate plants for this grow yet/i,
     );
+    expect(screen.getByTestId("ph-empty-start-room")).toBeInTheDocument();
+    expect(screen.getByTestId("ph-empty-lineage")).toBeInTheDocument();
   });
 
   it("keeps the candidate list when plants exist", async () => {
@@ -142,9 +142,7 @@ describe("PhenoHuntNew empty state", () => {
     ]);
     renderPage();
     await goToCandidatesStep();
-    await waitFor(() =>
-      expect(screen.getByTestId("ph-plant-list")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("ph-plant-list")).toBeInTheDocument());
     expect(screen.queryByTestId("ph-empty")).toBeNull();
     expect(screen.getByTestId("ph-toggle-p1")).toBeInTheDocument();
     expect(screen.getByTestId("ph-toggle-p2")).toBeInTheDocument();
@@ -174,10 +172,6 @@ describe("deterministic candidate label generation", () => {
     sel.add("a");
     expect(Array.from(sel)).toEqual(["b", "c", "a"]);
     // Labels follow the resulting order.
-    expect(Array.from(sel).map((_, i) => defaultCandidateLabel(i))).toEqual([
-      "#1",
-      "#2",
-      "#3",
-    ]);
+    expect(Array.from(sel).map((_, i) => defaultCandidateLabel(i))).toEqual(["#1", "#2", "#3"]);
   });
 });

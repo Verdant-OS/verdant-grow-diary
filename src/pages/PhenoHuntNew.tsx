@@ -16,7 +16,10 @@ import {
   phenoHuntSaveErrorMessage,
   PHENO_TRACKER_PRO_REQUIRED_MESSAGE,
 } from "@/lib/phenoHuntService";
-import { buildGrowScopedPlantsOrFilter } from "@/lib/growAttributionRules";
+import {
+  buildPhenoHuntCandidateOrFilter,
+  PHENO_HUNT_EMPTY_CANDIDATES,
+} from "@/lib/phenoHuntCandidateQueryRules";
 
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { canWriteFeatureData } from "@/lib/featureEntitlements";
@@ -89,42 +92,52 @@ export default function PhenoHuntNew() {
         setLoading(false);
         return;
       }
-      // Candidate attribution (BUG-A): a plant belongs to this grow when its
-      // own grow_id matches OR it lives in one of the grow's tents, so
-      // orphan-attributed plants (tent in grow, plant.grow_id null) still
-      // appear as candidates. Tent ids are fetched first for the OR filter.
-      const { data: tentRows } = await supabase
+      // Dual-binding candidates: plant.grow_id match OR plant in a grow tent.
+      // Tent-scoped hunts also include grow-bound plants with no tent yet.
+      const { data: tentRows, error: tentErr } = await supabase
         .from("tents")
         .select("id")
         .eq("grow_id", growId);
       if (cancelled) return;
+      if (tentErr) {
+        toast.error(tentErr.message);
+      }
       const tentIds = ((tentRows ?? []) as { id?: string | null }[])
         .map((t) => t.id ?? "")
         .filter((id) => id.length > 0);
-      const [{ data: growRow }, { data: plantRows }] = await Promise.all([
+      const orFilter = buildPhenoHuntCandidateOrFilter({
+        growId,
+        tentIdsInGrow: tentIds,
+        tentScopeId: tentId,
+      });
+      const [{ data: growRow, error: growErr }, plantsRes] = await Promise.all([
         supabase.from("grows").select("id,name").eq("id", growId).maybeSingle(),
-        (() => {
-          let q = supabase
-            .from("plants")
-            .select("id,name,strain,tent_id")
-            .or(buildGrowScopedPlantsOrFilter(growId, tentIds))
-            .eq("is_archived", false);
-          if (tentId) q = q.eq("tent_id", tentId);
-          return q;
-        })(),
+        orFilter
+          ? supabase
+              .from("plants")
+              .select("id,name,strain,tent_id,grow_id")
+              .or(orFilter)
+              .eq("is_archived", false)
+          : Promise.resolve({ data: [], error: null }),
       ]);
       if (cancelled) return;
+      if (growErr) toast.error(growErr.message);
+      if (plantsRes.error) {
+        toast.error(plantsRes.error.message);
+        setPlants([]);
+      } else {
+        setPlants(
+          (plantsRes.data ?? []).map((p) => ({
+            id: p.id,
+            name: p.name,
+            strain: p.strain ?? null,
+          })),
+        );
+      }
       if (growRow) {
         setGrow({ id: growRow.id, name: growRow.name });
         setName(defaultHuntName(growRow.name));
       }
-      setPlants(
-        (plantRows ?? []).map((p) => ({
-          id: p.id,
-          name: p.name,
-          strain: p.strain ?? null,
-        })),
-      );
       setLoading(false);
     })();
     return () => {
@@ -331,14 +344,21 @@ export default function PhenoHuntNew() {
               className="space-y-3 rounded-2xl border border-dashed border-border/80 bg-muted/20 p-6 text-center"
               data-testid="ph-empty"
             >
-              <h3 className="text-sm font-semibold">No plants in this grow yet</h3>
-              <p className="text-xs text-muted-foreground">
-                Add a plant before starting a Pheno Hunt. Candidates are tagged plants, not separate
-                records.
-              </p>
-              <Button asChild size="sm" data-testid="ph-empty-cta">
-                <Link to={`/grows/${growId}`}>Go to grow to add a plant</Link>
-              </Button>
+              <h3 className="text-sm font-semibold">{PHENO_HUNT_EMPTY_CANDIDATES.title}</h3>
+              <p className="text-xs text-muted-foreground">{PHENO_HUNT_EMPTY_CANDIDATES.body}</p>
+              <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                <Button asChild size="sm" data-testid="ph-empty-cta">
+                  <Link to={`/plants?growId=${encodeURIComponent(growId)}`}>
+                    {PHENO_HUNT_EMPTY_CANDIDATES.ctaPlants}
+                  </Link>
+                </Button>
+                <Button asChild size="sm" variant="outline" data-testid="ph-empty-start-room">
+                  <Link to="/start-room">{PHENO_HUNT_EMPTY_CANDIDATES.ctaStartRoom}</Link>
+                </Button>
+                <Button asChild size="sm" variant="ghost" data-testid="ph-empty-lineage">
+                  <Link to="/grow-lineage">{PHENO_HUNT_EMPTY_CANDIDATES.ctaLineage}</Link>
+                </Button>
+              </div>
             </div>
           ) : (
             <ul className="space-y-2" data-testid="ph-plant-list">

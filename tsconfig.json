@@ -9,8 +9,6 @@
 
     "moduleResolution": "Bundler",
     "allowImportingTsExtensions": true,
-    // Test/tooling modules import plain .mjs scripts from scripts/ and .claude/.
-    "allowJs": true,
     "verbatimModuleSyntax": false,
     "noEmit": true,
 

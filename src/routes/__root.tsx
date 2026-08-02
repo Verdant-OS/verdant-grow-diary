@@ -91,7 +91,6 @@ export const Route = createRootRouteWithContext<RootRouteContext>()({
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
       { rel: "apple-touch-icon", sizes: "180x180", href: "/brand/verdant-logo-180.png" },
       { rel: "manifest", href: "/site.webmanifest" },
-      { rel: "canonical", href: SITE_URL },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "stylesheet", href: FONT_HREF },

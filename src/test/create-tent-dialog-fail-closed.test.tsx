@@ -2,10 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  GROW_SETUP_MESSAGES,
-  GROW_SETUP_START_ROOM_HREF,
-} from "@/constants/growSetupMessages";
+import { GROW_SETUP_MESSAGES, GROW_SETUP_START_ROOM_HREF } from "@/constants/growSetupMessages";
 
 const insertMock = vi.fn();
 const singleMock = vi.fn();
@@ -89,7 +86,7 @@ describe("CreateTentDialog fail-closed binding", () => {
     growsState.refresh = vi.fn();
   });
 
-  it("zero grows withholds form and routes to one-tent activation", () => {
+  it("zero grows withholds form and routes to Start your room", () => {
     renderDialog();
 
     expect(screen.getByTestId("create-tent-hard-stop")).toBeInTheDocument();
@@ -100,7 +97,7 @@ describe("CreateTentDialog fail-closed binding", () => {
       "href",
       GROW_SETUP_START_ROOM_HREF,
     );
-    expect(GROW_SETUP_START_ROOM_HREF).toContain("one_tent_activation");
+    expect(GROW_SETUP_START_ROOM_HREF).toBe("/start-room");
     expect(screen.queryByTestId("create-tent-form")).toBeNull();
     expect(screen.queryByTestId("tent-create-submit")).toBeNull();
     expect(insertMock).not.toHaveBeenCalled();

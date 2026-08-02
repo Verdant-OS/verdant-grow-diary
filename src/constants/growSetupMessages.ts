@@ -3,12 +3,13 @@
  * No grow_id / orphan / lineage / backfill tokens in UI strings.
  */
 
-export const GROW_SETUP_START_ROOM_HREF = "/grows?intent=one_tent_activation" as const;
+/** Guided first-session path — grow → tent → plant with binding guaranteed. */
+export const GROW_SETUP_START_ROOM_HREF = "/start-room" as const;
 
 export const GROW_SETUP_MESSAGES = {
   hardStopTitle: "Start your room first",
   hardStopBody:
-    "You need a setup before adding a tent or plant. Next you’ll name your grow—then we’ll add tent and plant so Quick Log works right away.",
+    "You need a setup before adding a tent or plant. Start your room to create grow, tent, and plant together so Quick Log works right away.",
   hardStopCta: "Start your room",
   hardStopSecondary: "Not now",
 
@@ -25,8 +26,7 @@ export const GROW_SETUP_MESSAGES = {
   requestedUnavailableBody:
     "The setup you opened isn’t available right now. Nothing was created. Choose another setup or go back.",
 
-  pickSetupToast: (entity: "tent" | "plant") =>
-    `Pick which setup this ${entity} belongs to first`,
+  pickSetupToast: (entity: "tent" | "plant") => `Pick which setup this ${entity} belongs to first`,
 
   addingTo: (setupName: string) => `Adding to ${setupName}`,
   addingToHint: "This will live in your current setup.",
@@ -41,7 +41,8 @@ export const GROW_SETUP_MESSAGES = {
   tentUnavailableTitle: "Tent unavailable",
   tentUnavailableBody: "We couldn’t load this tent. Nothing was created. Retry or choose another.",
   tentRequiredTitle: "Choose a tent",
-  tentRequiredBody: "This plant must stay on the tent you picked. Choose a compatible tent to continue.",
+  tentRequiredBody:
+    "This plant must stay on the tent you picked. Choose a compatible tent to continue.",
 
   chooseTent: "Choose tent",
   switchSetup: "Switch setup",

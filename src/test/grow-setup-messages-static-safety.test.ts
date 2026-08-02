@@ -14,9 +14,9 @@ const TENT = readFileSync(resolve(ROOT, "src/components/CreateTentDialog.tsx"), 
 const PLANT = readFileSync(resolve(ROOT, "src/components/CreatePlantDialog.tsx"), "utf8");
 
 describe("grow setup messages static safety", () => {
-  it("CTA uses one-tent activation on grows", () => {
-    expect(GROW_SETUP_START_ROOM_HREF).toBe("/grows?intent=one_tent_activation");
-    expect(MSG).toMatch(/one_tent_activation/);
+  it("CTA routes to guided Start your room", () => {
+    expect(GROW_SETUP_START_ROOM_HREF).toBe("/start-room");
+    expect(MSG).toMatch(/start-room/);
   });
 
   it("grower-facing strings avoid banned tokens", () => {

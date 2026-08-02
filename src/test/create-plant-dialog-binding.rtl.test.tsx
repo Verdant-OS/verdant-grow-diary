@@ -160,7 +160,7 @@ describe("CreatePlantDialog RTL binding", () => {
     expect(screen.getByTestId("create-plant-hard-stop")).toBeInTheDocument();
     expect(screen.getByTestId("create-plant-start-room-cta")).toHaveAttribute(
       "href",
-      "/grows?intent=one_tent_activation",
+      "/start-room",
     );
     expect(screen.queryByTestId("create-plant-form")).toBeNull();
     expect(insertMock).not.toHaveBeenCalled();

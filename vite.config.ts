@@ -201,11 +201,12 @@ function staticSocialRouteDocuments(): Plugin {
       const manifest = STATIC_PUBLIC_OUTPUT_DOCUMENTS.map((document) => {
         const slug = ogImageSlugForPath(new URL(document.metadata.url).pathname);
         const ogFileName = `og/${slug}.png`;
+        const { bodyFallbackHtml: _bodyFallbackHtml, ...metadata } = document.metadata;
         return {
           path: document.path,
           fileName: document.fileName,
           metadata: {
-            ...document.metadata,
+            ...metadata,
             image: `${VERDANT_SITE_ORIGIN}/${ogFileName}`,
           },
         };

@@ -8,6 +8,11 @@ export interface StaticSocialRouteMetadata {
   robots?: "index, follow" | "noindex, follow";
   /** Optional route-specific JSON-LD blocks for non-JavaScript crawlers. */
   jsonLd?: ReadonlyArray<unknown>;
+  /**
+   * Optional semantic document rendered only when JavaScript is unavailable.
+   * It must be generated from trusted, escaped build-time content.
+   */
+  bodyFallbackHtml?: string;
 }
 
 function escapeHtml(value: string): string {
@@ -81,6 +86,22 @@ function injectJsonLd(html: string, jsonLd: ReadonlyArray<unknown> | undefined):
   return withoutPrevious.replace("</head>", `${scripts}\n  </head>`);
 }
 
+function injectBodyFallback(html: string, bodyFallbackHtml: string | undefined): string {
+  if (!bodyFallbackHtml) return html;
+  if (!html.includes("<body>")) {
+    throw new Error("Static social route source is missing <body>");
+  }
+
+  // The source is Vite's single shell, but keep this transform idempotent for
+  // build-tool reuse and tests. The marker is deliberately limited to the
+  // exact document generated below; arbitrary <noscript> blocks are preserved.
+  const fallbackPattern =
+    /\s*<noscript\s+data-static-route-fallback(?:=["'][^"']*["'])?\s*>[\s\S]*?<\/noscript>/i;
+  const withoutPrevious = html.replace(fallbackPattern, "");
+  const fallback = `\n    <noscript data-static-route-fallback="true">${bodyFallbackHtml}</noscript>`;
+  return withoutPrevious.replace("<body>", `<body>${fallback}`);
+}
+
 /**
  * Builds a route-specific HTML entry for non-JavaScript social crawlers while
  * preserving the exact Vite-built app shell and asset references.
@@ -116,5 +137,5 @@ export function buildStaticSocialRouteHtml(
     ? html.replace(canonicalPattern, canonicalTag)
     : html.replace("</head>", `  ${canonicalTag}\n  </head>`);
 
-  return injectJsonLd(html, metadata.jsonLd);
+  return injectBodyFallback(injectJsonLd(html, metadata.jsonLd), metadata.bodyFallbackHtml);
 }

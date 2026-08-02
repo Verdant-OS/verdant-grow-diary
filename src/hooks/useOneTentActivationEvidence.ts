@@ -112,7 +112,7 @@ export function useOneTentActivationEvidence(
   const query = useQuery({
     queryKey,
     enabled,
-    queryFn: () => loadConnectedActivationEvidence(scope as Required<ConnectedActivationScope>),
+    queryFn: () => loadConnectedActivationEvidence(scope as QueryableActivationScope),
     staleTime: 30_000,
   });
 

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -47,6 +47,7 @@ interface Props {
   defaultGrowId?: string;
   onCreated?: (tent: CreatedTent) => void;
   initiallyOpen?: boolean;
+  writeBlocked?: boolean;
 }
 
 const EMPTY_TENT_FORM = { name: "", size: "", brand: "", stage: "seedling" };
@@ -56,6 +57,7 @@ export default function CreateTentDialog({
   defaultGrowId,
   onCreated,
   initiallyOpen = false,
+  writeBlocked = false,
 }: Props) {
   const { user } = useAuth();
   const {
@@ -101,13 +103,20 @@ export default function CreateTentDialog({
     (tents ?? []).length,
   );
 
-  const formBlocked = binding.blockSubmit || !canWriteCreateGrowId(targetGrowId);
+  const formBlocked = writeBlocked || binding.blockSubmit || !canWriteCreateGrowId(targetGrowId);
 
   function resetForm() {
     setForm(EMPTY_TENT_FORM);
   }
 
+  useEffect(() => {
+    if (!writeBlocked) return;
+    setOpen(false);
+    setForm(EMPTY_TENT_FORM);
+  }, [writeBlocked]);
+
   function handleOpenChange(next: boolean) {
+    if (next && writeBlocked) return;
     setOpen(next);
     if (!next) resetForm();
   }
@@ -158,7 +167,7 @@ export default function CreateTentDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open && !writeBlocked} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger ?? (
           <Button size="sm" className="gradient-leaf text-primary-foreground gap-1">

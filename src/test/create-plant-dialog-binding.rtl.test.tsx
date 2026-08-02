@@ -7,6 +7,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { isValidElement, type ReactNode } from "react";
 
 const insertMock = vi.hoisted(() => vi.fn());
 const singleMock = vi.hoisted(() => vi.fn());
@@ -87,23 +88,32 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock("@/components/CreateTentDialog", () => ({
   default: ({
     onCreated,
+    trigger,
   }: {
     onCreated?: (t: { id: string; name: string; grow_id: string }) => void;
-  }) => (
-    <button
-      type="button"
-      data-testid="mock-create-tent"
-      onClick={() =>
-        onCreated?.({
-          id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
-          name: "Tent B",
-          grow_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        })
-      }
-    >
-      Add new tent
-    </button>
-  ),
+    trigger?: ReactNode;
+  }) => {
+    const triggerTestId = isValidElement<{ "data-testid"?: string }>(trigger)
+      ? trigger.props["data-testid"]
+      : null;
+    if (triggerTestId === "create-plant-nested-tent-trigger-placeholder") return null;
+
+    return (
+      <button
+        type="button"
+        data-testid="mock-create-tent"
+        onClick={() =>
+          onCreated?.({
+            id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+            name: "Tent B",
+            grow_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          })
+        }
+      >
+        Add new tent
+      </button>
+    );
+  },
 }));
 
 import CreatePlantDialog from "@/components/CreatePlantDialog";

@@ -3,6 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./auth";
 import type { GrowRow } from "@/lib/db";
 import type { User } from "@supabase/supabase-js";
+import {
+  readScopedActiveGrowId,
+  writeActiveGrowId,
+  resolveActiveGrowAfterLoad,
+} from "@/lib/activeGrowStorageRules";
 
 export type Grow = GrowRow;
 
@@ -17,18 +22,13 @@ interface Ctx {
 }
 const GrowsCtx = createContext<Ctx>({} as Ctx);
 
-/**
- * Active-grow selection is private per authenticated account. The legacy
- * unscoped key is intentionally not read: it cannot be safely attributed to
- * a user and must never carry an old account's grow id into a new session.
- */
-function activeGrowStorageKey(ownerId: string | null): string | null {
-  return ownerId ? `verdant.activeGrow.${ownerId}` : null;
-}
-
-function readActiveGrowId(ownerId: string | null): string | null {
-  const storageKey = activeGrowStorageKey(ownerId);
-  return storageKey ? localStorage.getItem(storageKey) : null;
+function browserStorage(): Storage | null {
+  try {
+    if (typeof window === "undefined") return null;
+    return window.localStorage;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -48,18 +48,24 @@ export function GrowsProvider({ children }: { children: ReactNode }) {
 
 function GrowsProviderForOwner({ children, user }: { children: ReactNode; user: User | null }) {
   const ownerId = user?.id ?? null;
-  const storageKey = activeGrowStorageKey(ownerId);
   const [grows, setGrows] = useState<Grow[]>([]);
-  const [activeGrowId, _setActive] = useState<string | null>(() => readActiveGrowId(ownerId));
+  const [activeGrowId, _setActive] = useState<string | null>(() =>
+    readScopedActiveGrowId(ownerId, browserStorage()),
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const setActiveGrowId = (id: string | null) => {
-    _setActive(id);
-    if (!storageKey) return;
-    if (id) localStorage.setItem(storageKey, id);
-    else localStorage.removeItem(storageKey);
-  };
+  const setActiveGrowId = useCallback(
+    (id: string | null) => {
+      _setActive(id);
+      writeActiveGrowId({
+        userId: ownerId,
+        growId: id,
+        storage: browserStorage(),
+      });
+    },
+    [ownerId],
+  );
 
   const refresh = useCallback(async () => {
     if (!user) {
@@ -86,15 +92,29 @@ function GrowsProviderForOwner({ children, user }: { children: ReactNode; user: 
   }, [user]);
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, [refresh]);
 
-  // Auto-select first grow if none selected
+  // Auto-select / migrate bare key / drop stale ids once grows load.
   useEffect(() => {
-    if (!activeGrowId && grows.length > 0) setActiveGrowId(grows[0].id);
-    if (activeGrowId && grows.length > 0 && !grows.find((g) => g.id === activeGrowId))
-      setActiveGrowId(grows[0].id);
-  }, [grows, activeGrowId]);
+    if (loading) return;
+    const next = resolveActiveGrowAfterLoad({
+      userId: ownerId,
+      ownedGrowIds: grows.map((g) => g.id),
+      currentActiveGrowId: activeGrowId,
+      storage: browserStorage(),
+    });
+    if (next !== activeGrowId) {
+      setActiveGrowId(next);
+    } else if (next) {
+      // Ensure bare legacy key is scrubbed even when scoped id is already correct.
+      writeActiveGrowId({
+        userId: ownerId,
+        growId: next,
+        storage: browserStorage(),
+      });
+    }
+  }, [grows, activeGrowId, ownerId, loading, setActiveGrowId]);
 
   const activeGrow = grows.find((g) => g.id === activeGrowId) ?? null;
 

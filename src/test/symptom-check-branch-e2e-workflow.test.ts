@@ -60,7 +60,7 @@ describe("Symptom Check branch E2E workflow", () => {
       "tailwind.config.ts",
       "postcss.config.js",
       "tsconfig.json",
-      "tsconfig.app.json",
+      "tsconfig.json",
       "tsconfig.node.json",
       "package.json",
       "bun.lock",

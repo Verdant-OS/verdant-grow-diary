@@ -6,7 +6,7 @@ name: Typecheck (tsgo) + build
 #   * `ci.yml` runs the heavy lint/test/build gate, but only on pushes to
 #     `main` and `verdant-grow-diary` — pushes to feature branches get no
 #     signal until a PR is opened.
-#   * `typecheck.yml` runs `tsc -p tsconfig.app.json --noEmit` on PRs and
+#   * `typecheck.yml` runs `tsc -p tsconfig.json --noEmit` on PRs and
 #     pushes to `main` only.
 #
 # This workflow is the cheap always-on gate: `tsgo --noEmit` (the same

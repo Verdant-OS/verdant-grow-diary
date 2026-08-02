@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useAuth } from "@/store/auth";
 import { resolveRootEntrySurface } from "@/lib/rootEntryRules";
 

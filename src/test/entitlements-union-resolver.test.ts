@@ -3,11 +3,17 @@
  *
  * Covers pickStrongestBilling precedence + the resolveUnionEntitlements
  * composer end-to-end (adapter → picker → pure resolver → source stamp).
+ *
+ * Also anchors the multi-row Lovable window helpers (pickEntitlingLovableRow /
+ * lovableRowEntitles) shared with the server union lookup — these must stay
+ * pure-unit covered so Founder Lifetime cannot be shadowed by a newer row.
  */
 import { describe, it, expect } from "vitest";
 import {
   pickStrongestBilling,
   resolveUnionEntitlements,
+  pickEntitlingLovableRow,
+  lovableRowEntitles,
   type BillingSubscriptionRow,
   type LovableSubscriptionRow,
 } from "@/lib/entitlements";
@@ -287,5 +293,166 @@ describe("resolveUnionEntitlements", () => {
       now: NOW,
     });
     expect(a).toEqual(b);
+  });
+});
+
+describe("lovableRowEntitles", () => {
+  it("returns true for active sandbox pro_monthly in sandbox env", () => {
+    expect(lovableRowEntitles(lovable(), "sandbox", NOW)).toBe(true);
+  });
+
+  it("returns false when environment mismatches (sandbox row / live expected)", () => {
+    expect(lovableRowEntitles(lovable({ environment: "sandbox" }), "live", NOW)).toBe(false);
+  });
+
+  it("returns false for expired rows past paid-through", () => {
+    expect(
+      lovableRowEntitles(
+        lovable({ status: "expired", current_period_end: PAST }),
+        "sandbox",
+        NOW,
+      ),
+    ).toBe(false);
+  });
+
+  it("returns true for founder_lifetime with null period end", () => {
+    expect(
+      lovableRowEntitles(
+        lovable({
+          price_id: "founder_lifetime",
+          product_id: "founder_lifetime",
+          paddle_subscription_id: "lifetime_1",
+          current_period_end: null,
+        }),
+        "sandbox",
+        NOW,
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("pickEntitlingLovableRow", () => {
+  it("returns null for an empty window", () => {
+    expect(pickEntitlingLovableRow([], "sandbox", NOW)).toBeNull();
+  });
+
+  it("returns the only active pro row", () => {
+    const row = lovable({ paddle_subscription_id: "sub_pro" });
+    expect(pickEntitlingLovableRow([row], "sandbox", NOW)).toBe(row);
+  });
+
+  it("REGRESSION: newer canceled Pro does not shadow older Founder Lifetime", () => {
+    // Rows arrive newest-first (created_at desc, paddle_subscription_id desc).
+    const newerCanceledPro = lovable({
+      paddle_subscription_id: "sub_01zzz",
+      price_id: "pro_monthly",
+      status: "canceled",
+      current_period_end: PAST,
+      created_at: "2026-05-20T00:00:00.000Z",
+    });
+    const olderFounder = lovable({
+      paddle_subscription_id: "lifetime_txn_01abc",
+      product_id: "founder_lifetime",
+      price_id: "founder_lifetime",
+      status: "active",
+      current_period_end: null,
+      created_at: "2026-01-01T00:00:00.000Z",
+    });
+
+    const picked = pickEntitlingLovableRow(
+      [newerCanceledPro, olderFounder],
+      "sandbox",
+      NOW,
+    );
+    expect(picked).toBe(olderFounder);
+    expect(picked?.price_id).toBe("founder_lifetime");
+  });
+
+  it("REGRESSION: newer ACTIVE Pro still loses to Founder Lifetime (lifetime-first)", () => {
+    const newerActivePro = lovable({
+      paddle_subscription_id: "sub_pro_new",
+      price_id: "pro_monthly",
+      status: "active",
+      created_at: "2026-05-20T00:00:00.000Z",
+    });
+    const olderFounder = lovable({
+      paddle_subscription_id: "lifetime_txn_01abc",
+      product_id: "founder_lifetime",
+      price_id: "founder_lifetime",
+      status: "active",
+      current_period_end: null,
+      created_at: "2026-01-01T00:00:00.000Z",
+    });
+
+    const picked = pickEntitlingLovableRow(
+      [newerActivePro, olderFounder],
+      "sandbox",
+      NOW,
+    );
+    expect(picked).toBe(olderFounder);
+  });
+
+  it("falls back to newest row when nothing entitles (degraded display)", () => {
+    const newestExpired = lovable({
+      paddle_subscription_id: "sub_new",
+      status: "expired",
+      current_period_end: PAST,
+      created_at: "2026-05-01T00:00:00.000Z",
+    });
+    const olderExpired = lovable({
+      paddle_subscription_id: "sub_old",
+      status: "canceled",
+      current_period_end: PAST,
+      created_at: "2026-01-01T00:00:00.000Z",
+    });
+
+    const picked = pickEntitlingLovableRow(
+      [newestExpired, olderExpired],
+      "sandbox",
+      NOW,
+    );
+    expect(picked).toBe(newestExpired);
+  });
+
+  it("picks the newest entitling recurring when no lifetime is present", () => {
+    const newerPro = lovable({
+      paddle_subscription_id: "sub_new_pro",
+      price_id: "pro_monthly",
+      created_at: "2026-05-01T00:00:00.000Z",
+    });
+    const olderPro = lovable({
+      paddle_subscription_id: "sub_old_pro",
+      price_id: "pro_annual",
+      created_at: "2026-01-01T00:00:00.000Z",
+    });
+
+    // Window is newest-first; first entitling recurring should win.
+    expect(pickEntitlingLovableRow([newerPro, olderPro], "sandbox", NOW)).toBe(newerPro);
+  });
+
+  it("ignores rows from the wrong billing environment", () => {
+    const sandboxOnly = lovable({
+      environment: "sandbox",
+      paddle_subscription_id: "sub_sandbox",
+    });
+    const picked = pickEntitlingLovableRow([sandboxOnly], "live", NOW);
+    // Wrong env → not entitling → falls back to newest (only) row for degraded display.
+    expect(picked).toBe(sandboxOnly);
+    expect(lovableRowEntitles(sandboxOnly, "live", NOW)).toBe(false);
+  });
+
+  it("is deterministic for identical inputs", () => {
+    const rows = [
+      lovable({ paddle_subscription_id: "a" }),
+      lovable({
+        paddle_subscription_id: "lifetime_1",
+        price_id: "founder_lifetime",
+        product_id: "founder_lifetime",
+        current_period_end: null,
+      }),
+    ];
+    expect(pickEntitlingLovableRow(rows, "sandbox", NOW)).toEqual(
+      pickEntitlingLovableRow(rows, "sandbox", NOW),
+    );
   });
 });

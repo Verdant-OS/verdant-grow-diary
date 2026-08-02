@@ -111,7 +111,7 @@ import {
   readResponseCheckStatus,
   type ResponseCheckStatus,
 } from "@/lib/tenSecondQuickCheckRules";
-import { plantDetailPath } from "@/lib/routes";
+import { buildQuickLogTimelineNavTarget } from "@/lib/quickLogTimelineNavigationTarget";
 import {
   EARLY_STAGE_MILESTONES,
   EARLY_STAGE_VIGOR_OPTIONS,
@@ -249,6 +249,9 @@ type SavedTarget = {
   name: string;
   tentName: string | null;
   growName: string | null;
+  growId: string | null;
+  tentId: string | null;
+  growEventId: string | null;
   eventType: string;
   savedAt: string;
 };
@@ -1206,6 +1209,9 @@ export default function QuickLog({
         name: plantLabel,
         tentName: saveTent.name ?? null,
         growName: saveGrow?.name ?? null,
+        growId: saveTarget.growId ?? null,
+        tentId: saveTarget.tentId ?? null,
+        growEventId: result.growEventId ?? null,
         eventType: saveEventType,
         savedAt: new Date().toISOString(),
       });
@@ -2795,26 +2801,53 @@ export default function QuickLog({
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <a
-                    ref={viewPlantBtnRef}
-                    href={plantDetailPath(savedTarget.id)}
-                    data-testid="quick-log-view-target-plant"
-                    data-target-plant-id={savedTarget.id}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    onClick={() => {
-                      if (typeof document !== "undefined") {
-                        (document.activeElement as HTMLElement | null)?.blur?.();
-                      }
-                      // Match the Dialog wrapper's close path: without reset()
-                      // the component (kept mounted in AppShell) reopens showing
-                      // the stale post-save panel instead of a fresh form.
-                      onOpenChange(false);
-                      reset();
-                    }}
-                  >
-                    {QUICK_LOG_POST_SAVE_VIEW_LABEL}
-                    <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                  </a>
+                  {(() => {
+                    const diaryNav = buildQuickLogTimelineNavTarget({
+                      growId: savedTarget.growId,
+                      targetType: "plant",
+                      targetId: savedTarget.id,
+                      tentId: savedTarget.tentId,
+                      plantId: savedTarget.id,
+                      growEventId: savedTarget.growEventId,
+                    });
+                    if (!diaryNav) {
+                      return (
+                        <Button
+                          type="button"
+                          disabled
+                          data-testid="quick-log-view-target-plant"
+                          data-target-plant-id={savedTarget.id}
+                          className="inline-flex items-center justify-center gap-1.5"
+                        >
+                          {QUICK_LOG_POST_SAVE_VIEW_LABEL}
+                          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                        </Button>
+                      );
+                    }
+                    return (
+                      <a
+                        ref={viewPlantBtnRef}
+                        href={diaryNav.href}
+                        data-testid="quick-log-view-target-plant"
+                        data-target-plant-id={savedTarget.id}
+                        data-target-grow-id={savedTarget.growId ?? undefined}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        onClick={() => {
+                          if (typeof document !== "undefined") {
+                            (document.activeElement as HTMLElement | null)?.blur?.();
+                          }
+                          // Match the Dialog wrapper's close path: without reset()
+                          // the component (kept mounted in AppShell) reopens showing
+                          // the stale post-save panel instead of a fresh form.
+                          onOpenChange(false);
+                          reset();
+                        }}
+                      >
+                        {QUICK_LOG_POST_SAVE_VIEW_LABEL}
+                        <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                      </a>
+                    );
+                  })()}
                   <Button
                     type="button"
                     variant="outline"

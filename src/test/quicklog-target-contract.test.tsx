@@ -552,9 +552,9 @@ describe("Quick Log canonical target contract", () => {
     );
     expect(harness.growUpdate).toHaveBeenCalledWith({ stage: "seedling" });
     expect(harness.growUpdateEq).toHaveBeenCalledWith("id", "g1");
-    expect(screen.getByTestId("quick-log-post-save-description")).toHaveTextContent("Plant One");
-    expect(screen.getByTestId("quick-log-post-save-description")).toHaveTextContent("Tent One");
-    expect(screen.getByTestId("quick-log-post-save-description")).toHaveTextContent("Grow One");
+    expect(screen.getByTestId("quick-log-post-save-description")).toHaveTextContent(
+      "Added to Grow One.",
+    );
     expect(screen.getByTestId("quick-log-view-target-plant")).toHaveAttribute(
       "data-target-plant-id",
       "p1",

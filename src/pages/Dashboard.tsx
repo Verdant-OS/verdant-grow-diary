@@ -31,6 +31,7 @@ import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLo
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { useGrows } from "@/store/grows";
 import OnboardingChecklistCard from "@/components/OnboardingChecklistCard";
+import DashboardStartPhenoHuntCard from "@/components/DashboardStartPhenoHuntCard";
 import PublicQuickLogHandoffCard from "@/components/PublicQuickLogHandoffCard";
 import OnboardingProgressPill from "@/components/OnboardingProgressPill";
 import DashboardZeroTentEmptyState from "@/components/DashboardZeroTentEmptyState";
@@ -360,6 +361,10 @@ export default function Dashboard() {
       <div className="my-3">
         <PublicQuickLogHandoffCard className="mb-3" />
         <OnboardingChecklistCard vm={onboardingVm} />
+      </div>
+
+      <div className="my-3">
+        <DashboardStartPhenoHuntCard scopedGrowId={scopedGrowId} scopedGrowName={scopedGrowName} />
       </div>
 
       <div className="my-3">

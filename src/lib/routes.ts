@@ -36,6 +36,15 @@ export const phenoHuntsPath = (): string => "/pheno-hunts";
 export const phenoHuntWorkspacePath = (huntId: string): string =>
   `/pheno-hunts/${encodeURIComponent(huntId)}/workspace`;
 
+/** New Pheno Hunt wizard, pre-scoped to a grow (and optional tent). */
+export const phenoHuntNewPath = (growId?: string | null, tentId?: string | null): string => {
+  const params = new URLSearchParams();
+  if (growId) params.set("growId", growId);
+  if (tentId) params.set("tentId", tentId);
+  const qs = params.toString();
+  return qs ? `/pheno-hunts/new?${qs}` : "/pheno-hunts/new";
+};
+
 /** Grow-scoped breeding event entry, optionally narrowed to one tent. */
 export const breedingLogNewPath = (growId: string, tentId?: string | null): string => {
   const params = new URLSearchParams({ growId });

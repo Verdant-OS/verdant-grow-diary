@@ -6,6 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import * as governanceModule from "./validate-governance.mjs";
 import {
   loadIntentRegistryAtRevision,
   runGovernanceValidation,
@@ -24,6 +25,20 @@ const intentRegistry = JSON.parse(
 const trustRegistry = JSON.parse(
   readFileSync(path.join(knowledgeDir, "trust-infrastructure.json"), "utf8"),
 );
+
+function editorialRoadmap(briefStatus, linkBriefStatus, searchBriefStatus) {
+  return {
+    pages: [
+      {
+        id: "KL-011",
+        path: "/guides/how-to-start-a-grow-journal",
+        briefStatus,
+        linkBriefStatus,
+        searchBriefStatus,
+      },
+    ],
+  };
+}
 
 function researchedReceipt(overrides = {}) {
   return {
@@ -113,6 +128,87 @@ test("keeps the immutable 500-page baseline separate from mutable intent researc
     lifecycleEventCount: 0,
     currentIntentStatuses: { provisional: 500 },
   });
+});
+
+test("roadmap editorial status follows the pending to draft to reviewed lifecycle", () => {
+  assert.equal(typeof governanceModule.validateRoadmapEditorialTransitions, "function");
+  const validateTransitions = governanceModule.validateRoadmapEditorialTransitions;
+
+  const pending = editorialRoadmap("needs_editorial_brief", "needs_review", "needs_research");
+  const draft = editorialRoadmap("draft", "draft", "draft");
+  const reviewed = editorialRoadmap("reviewed", "reviewed", "validated");
+
+  assert.throws(
+    () => validateTransitions(pending, reviewed),
+    /cannot skip editorial lifecycle state/,
+  );
+  assert.throws(
+    () => validateTransitions(reviewed, draft),
+    /cannot regress editorial lifecycle state/,
+  );
+  assert.deepEqual(validateTransitions(pending, draft), {
+    status: "pass",
+    pageCount: 1,
+    transitionedPageCount: 1,
+    fieldTransitionCount: 3,
+  });
+  assert.deepEqual(validateTransitions(draft, reviewed), {
+    status: "pass",
+    pageCount: 1,
+    transitionedPageCount: 1,
+    fieldTransitionCount: 3,
+  });
+});
+
+test("finalized roadmap editorial evidence cannot be rewritten in place", () => {
+  const reviewed = editorialRoadmap("reviewed", "reviewed", "validated");
+  Object.assign(reviewed.pages[0], {
+    readerOutcome: "Produce one complete grow-journal setup checklist.",
+    nonProductNextStep: "Record one timestamped observation before changing anything.",
+    originalAsset: "A complete grow-journal setup card.",
+    priorityRationale: "This page owns the first-record setup decision.",
+    brief: {
+      decision: "Choose the minimum reconstructable first grow-journal record.",
+      applicability: "Use when starting or repairing a grow journal.",
+    },
+    relatedPaths: ["/guides/grow-diary-app", "/guides/what-to-log-in-a-grow-journal"],
+    searchBrief: {
+      queryFamily: ["start a grow journal"],
+      serpIntent: "Learn the minimum fields for a reconstructable first entry.",
+    },
+  });
+
+  for (const [label, mutate, pattern] of [
+    [
+      "authored brief",
+      (page) => {
+        page.brief.decision = "Rewrite the reviewed decision in place.";
+      },
+      /reviewed authored brief payload cannot change/,
+    ],
+    [
+      "link brief",
+      (page) => {
+        page.relatedPaths = ["/guides/unreviewed-link"];
+      },
+      /reviewed link brief payload cannot change/,
+    ],
+    [
+      "search brief",
+      (page) => {
+        page.searchBrief.serpIntent = "Rewrite the validated search evidence in place.";
+      },
+      /validated search brief payload cannot change/,
+    ],
+  ]) {
+    const rewritten = structuredClone(reviewed);
+    mutate(rewritten.pages[0]);
+    assert.throws(
+      () => governanceModule.validateRoadmapEditorialTransitions(reviewed, rewritten),
+      pattern,
+      label,
+    );
+  }
 });
 
 test("derives researched and superseded intent without rewriting roadmap records", () => {
@@ -311,7 +407,15 @@ test("the governance CLI enforces append-only history against an explicit local 
     return spawnSync(
       process.execPath,
       [scriptPath, "--baseline-file", previousPath, "--current-file", currentPath],
-      { cwd: root, encoding: "utf8" },
+      {
+        cwd: root,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          KNOWLEDGE_BASE_REVISION: "",
+          KNOWLEDGE_HISTORY_REQUIRED: "false",
+        },
+      },
     );
   }
 
@@ -357,6 +461,111 @@ test("required governance validation fails when CI supplies no history base", ()
   });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /history comparison requires an exact base revision/);
+});
+
+test("required governance validation rejects the local baseline-file escape hatch", () => {
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "verdant-required-knowledge-history-"));
+  const baselinePath = path.join(tempDir, "baseline.json");
+  const currentPath = path.join(tempDir, "current.json");
+  writeFileSync(baselinePath, `${JSON.stringify(intentRegistry, null, 2)}\n`);
+  writeFileSync(currentPath, `${JSON.stringify(intentRegistry, null, 2)}\n`);
+
+  try {
+    const baseRevision = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: root,
+      encoding: "utf8",
+      windowsHide: true,
+    }).trim();
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.join(scriptDir, "validate-governance.mjs"),
+        "--baseline-file",
+        baselinePath,
+        "--current-file",
+        currentPath,
+      ],
+      {
+        cwd: root,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          KNOWLEDGE_BASE_REVISION: baseRevision,
+          KNOWLEDGE_HISTORY_REQUIRED: "true",
+        },
+      },
+    );
+    assert.notEqual(result.status, 0);
+    assert.match(
+      result.stderr,
+      /required history comparison rejects --baseline-file and requires the exact Git base revision/,
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("the exact Git base gates roadmap editorial transitions while local validation stays usable", () => {
+  const repositoryRoot = mkdtempSync(path.join(os.tmpdir(), "verdant-roadmap-history-"));
+  const trackedRoadmapPath = path.join(
+    repositoryRoot,
+    "docs",
+    "knowledge-library",
+    "roadmap-500.json",
+  );
+  const currentRoadmapPath = path.join(repositoryRoot, "current-roadmap.json");
+
+  function git(...args) {
+    return execFileSync("git", args, {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      windowsHide: true,
+    }).trim();
+  }
+
+  try {
+    git("init", "-q");
+    git("config", "core.autocrlf", "false");
+    git("config", "user.email", "roadmap-history@example.invalid");
+    git("config", "user.name", "Roadmap History Test");
+    mkdirSync(path.dirname(trackedRoadmapPath), { recursive: true });
+    writeFileSync(trackedRoadmapPath, `${JSON.stringify(roadmap, null, 2)}\n`);
+    git("add", "docs/knowledge-library/roadmap-500.json");
+    git("commit", "-q", "-m", "roadmap baseline");
+    const baseRevision = git("rev-parse", "HEAD");
+
+    const reviewedRoadmap = structuredClone(roadmap);
+    const reviewedSeed = reviewedRoadmap.pages.find((page) => page.id === "KL-001");
+    reviewedSeed.briefStatus = "reviewed";
+    reviewedSeed.linkBriefStatus = "reviewed";
+    reviewedSeed.searchBriefStatus = "validated";
+    writeFileSync(currentRoadmapPath, `${JSON.stringify(reviewedRoadmap, null, 2)}\n`);
+
+    const requiredReport = runGovernanceValidation({
+      baseRevision,
+      currentRoadmapFile: currentRoadmapPath,
+      repositoryRoot,
+    });
+    assert.deepEqual(requiredReport.roadmapEditorialHistory, {
+      status: "pass",
+      pageCount: 500,
+      transitionedPageCount: 1,
+      fieldTransitionCount: 3,
+    });
+    assert.deepEqual(requiredReport.roadmapEditorialHistoryBaseline, {
+      source: "git",
+      exists: true,
+    });
+
+    const localReport = runGovernanceValidation({ currentRoadmapFile: currentRoadmapPath });
+    assert.deepEqual(localReport.roadmapEditorialHistory, { status: "not_requested" });
+    assert.deepEqual(localReport.roadmapEditorialHistoryBaseline, {
+      source: "none",
+      exists: false,
+    });
+  } finally {
+    rmSync(repositoryRoot, { recursive: true, force: true });
+  }
 });
 
 test("the Git-revision path distinguishes absence from invalid or rewritten history", async (t) => {

@@ -35,6 +35,51 @@ function page(roadmap, id) {
   return match;
 }
 
+function addAuthoredGrowJournalBrief(target) {
+  target.briefStatus = "draft";
+  target.linkBriefStatus = "draft";
+  target.searchBriefStatus = "draft";
+  target.readerOutcome =
+    "After this page, the reader can produce one complete grow journal setup checklist and identify every missing record field before beginning daily entries.";
+  target.nonProductNextStep =
+    "Next, write one grow journal entry with a timestamp, plant context, observation, action, reason, and follow-up question before changing anything.";
+  target.brief = {
+    decision:
+      "Use this grow journal page to decide which identity, observation, action, evidence, and follow-up fields belong in the first entry.",
+    applicability:
+      "Applies when a grower is starting a new record or repairing an incomplete daily logging routine.",
+    informationGain:
+      "Separates the minimum reconstructable journal record from optional detail so missing context remains visible instead of being guessed later.",
+    assetMethod:
+      "Build a grow journal setup card that traces one observation through its action and follow-up",
+    assetInputs: [
+      "plant and room identity fields",
+      "timestamped observation and action",
+      "reason and expected outcome",
+      "evidence and follow-up references",
+    ],
+    assetOutput:
+      "A grow journal setup card with required, optional, missing, and follow-up fields for one complete entry",
+  };
+  target.originalAsset = `${target.brief.assetMethod}. Inputs: ${target.brief.assetInputs.join("; ")}. Output: ${target.brief.assetOutput}.`;
+  target.relatedPaths = ["/guides/what-to-log-in-a-grow-journal", "/guides/grow-journal-template"];
+  target.searchBrief = {
+    queryFamily: ["start a grow journal", "first cannabis grow journal entry"],
+    serpIntent:
+      "Learn how to start a grow journal with enough context to reconstruct decisions without collecting unnecessary or unverifiable detail.",
+    distinctInformationGain:
+      "Provides a minimum reconstructable first-entry contract and a field-by-field setup card rather than another generic list of suggested grow notes.",
+    competingCanonical: {
+      path: "/guides/grow-diary-app",
+      relationship: "hub_child",
+      rationale:
+        "The pillar owns the complete plant-memory lifecycle while this child is limited to creating the first usable grow journal record.",
+    },
+    consolidationTrigger:
+      "Consolidate this page if it expands into the complete plant-memory lifecycle instead of retaining its narrower first-record setup decision.",
+  };
+}
+
 function assertInvalid(roadmap, pattern, options = {}) {
   assert.throws(() => validateRoadmap(roadmap, { registryPaths, ...options }), pattern);
 }
@@ -49,12 +94,16 @@ test("the 500-page roadmap separates metadata backlog from authored seed briefs"
   assert.equal(report.plannedCount, 500 - registryPaths.size);
   assert.equal(report.orphanCount, 0);
   assert.equal(report.siteMapPillarCount, 10);
-  assert.deepEqual(report.briefStatuses, {
-    draft: 10,
-    needs_editorial_brief: 490,
-  });
-  assert.deepEqual(report.linkBriefStatuses, { draft: 10, needs_review: 490 });
-  assert.deepEqual(report.searchBriefStatuses, { draft: 10, needs_research: 490 });
+  for (const statusCounts of [
+    report.briefStatuses,
+    report.linkBriefStatuses,
+    report.searchBriefStatuses,
+  ]) {
+    assert.equal(
+      Object.values(statusCounts).reduce((sum, count) => sum + count, 0),
+      500,
+    );
+  }
   assert.deepEqual(report.intentStatuses, { provisional: 500 });
   assert.deepEqual(report.routeStatuses, {
     live: registryPaths.size,
@@ -228,13 +277,7 @@ test("rejects reintroducing legacy status or template fields", async (t) => {
   });
 });
 
-test("only the ten pillar seeds contain authored semantics", () => {
-  const drafts = baseline.pages.filter((target) => target.briefStatus === "draft");
-  assert.deepEqual(
-    drafts.map((target) => target.id),
-    Array.from({ length: 10 }, (_, index) => `KL-${String(index + 1).padStart(3, "0")}`),
-  );
-
+test("separates pending metadata from authored brief states", () => {
   for (const target of baseline.pages) {
     if (target.briefStatus === "needs_editorial_brief") {
       for (const field of [
@@ -251,18 +294,40 @@ test("only the ten pillar seeds contain authored semantics", () => {
       assert.equal(target.linkBriefStatus, "needs_review", target.id);
       assert.equal(target.searchBriefStatus, "needs_research", target.id);
     } else {
-      assert.equal(target.pageFamily, "pillar", target.id);
-      assert.equal(target.linkBriefStatus, "draft", target.id);
-      assert.equal(target.searchBriefStatus, "draft", target.id);
+      assert.ok(["draft", "reviewed"].includes(target.briefStatus), target.id);
+      assert.ok(["draft", "reviewed"].includes(target.linkBriefStatus), target.id);
+      assert.ok(["draft", "validated"].includes(target.searchBriefStatus), target.id);
       assert.equal(target.relatedPaths.length, 2, target.id);
     }
   }
 });
 
-test("does not claim a pillar brief is reviewed in v1", () => {
-  const roadmap = cloneRoadmap();
-  page(roadmap, "KL-001").briefStatus = "reviewed";
-  assertInvalid(roadmap, /v1 must contain exactly ten draft pillar seeds/);
+test("allows editorial briefs to advance without rewriting immutable allocation", () => {
+  const reviewedSeed = cloneRoadmap();
+  const seed = page(reviewedSeed, "KL-001");
+  seed.briefStatus = "reviewed";
+  seed.linkBriefStatus = "reviewed";
+  seed.searchBriefStatus = "validated";
+  assert.equal(stableIdentityDigest(reviewedSeed.pages), baseline.stableIdentityDigest);
+  assert.equal(validateRoadmap(reviewedSeed, { registryPaths }).status, "pass");
+
+  const draftedCandidate = cloneRoadmap();
+  addAuthoredGrowJournalBrief(page(draftedCandidate, "KL-011"));
+  assert.equal(stableIdentityDigest(draftedCandidate.pages), baseline.stableIdentityDigest);
+  assert.equal(validateRoadmap(draftedCandidate, { registryPaths }).status, "pass");
+});
+
+test("requires reviewed briefs to carry reviewed links and validated search evidence", () => {
+  for (const incompleteState of [
+    { linkBriefStatus: "draft", searchBriefStatus: "validated" },
+    { linkBriefStatus: "reviewed", searchBriefStatus: "draft" },
+  ]) {
+    const roadmap = cloneRoadmap();
+    const seed = page(roadmap, "KL-001");
+    seed.briefStatus = "reviewed";
+    Object.assign(seed, incompleteState);
+    assertInvalid(roadmap, /reviewed brief requires reviewed links and validated search evidence/);
+  }
 });
 
 test("rejects semantic prose on a pending editorial record", async (t) => {

@@ -19,8 +19,6 @@ function snap(
   overrides: Partial<SensorSnapshot> & { source: SensorSnapshot["source"]; ts: string | null },
 ): SensorSnapshot {
   return {
-    source: overrides.source,
-    ts: overrides.ts,
     temp: null,
     rh: null,
     vpd: null,

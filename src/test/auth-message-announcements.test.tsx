@@ -212,7 +212,7 @@ describe("/reset-password — message announcement coverage", () => {
     const status = await screen.findByRole("status");
     expect(status).toHaveTextContent(/checking reset link/i);
     expect(status.getAttribute("aria-live")).toBe("polite");
-    resolveSession?.({ data: { session: { user: { id: "u-1" } } } });
+    (resolveSession as ((v: typeof sessionResult) => void) | null)?.({ data: { session: { user: { id: "u-1" } } } });
   });
 
   it("confirm mismatch is announced via aria-live=polite as user types", async () => {

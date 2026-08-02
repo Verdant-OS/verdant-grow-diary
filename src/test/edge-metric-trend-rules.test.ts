@@ -7,6 +7,7 @@ import {
   distinctValues,
   TREND_RANGES,
   type EdgeMetricEventRow,
+  type RequestMetricBucket,
 } from "@/lib/edgeMetricTrendRules";
 
 const NOW = Date.parse("2026-07-27T12:00:00.000Z");
@@ -137,7 +138,7 @@ describe("distinct helpers", () => {
   });
 
   it("distinctOutcomes collects across buckets", () => {
-    const buckets = [
+    const buckets: RequestMetricBucket[] = [
       {
         bucketStartMs: 1,
         total: 1,

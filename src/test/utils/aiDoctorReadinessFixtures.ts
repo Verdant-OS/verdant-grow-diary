@@ -67,10 +67,14 @@ export const READINESS_FIXTURE_PLANT = Object.freeze({
   tent_id: "t1",
 });
 
+export type ReadinessFixturePlantOverride = {
+  [K in keyof typeof READINESS_FIXTURE_PLANT]?: (typeof READINESS_FIXTURE_PLANT)[K] | null;
+};
+
 export interface BuildReadinessContextArgs {
   growEvents?: ReadonlyArray<Record<string, unknown>>;
   sensorReadings?: ReadonlyArray<Record<string, unknown>>;
-  plant?: Partial<typeof READINESS_FIXTURE_PLANT>;
+  plant?: ReadinessFixturePlantOverride;
 }
 
 export function buildReadinessContext(

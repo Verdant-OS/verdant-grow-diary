@@ -62,7 +62,7 @@ const WEAK_NOTE = (capturedAt: string) =>
 describe("aiDoctorEnvironmentCheckRules — parser hardening", () => {
   it("does not throw on malformed / empty / null note bodies", () => {
     expect(() => parseEnvironmentCheckNote("")).not.toThrow();
-    expect(() => parseEnvironmentCheckNote(null)).not.toThrow();
+    expect(() => parseEnvironmentCheckNote(null as never)).not.toThrow();
     expect(() => parseEnvironmentCheckNote("\u0000\n• broken")).not.toThrow();
   });
 
@@ -149,7 +149,7 @@ describe("selectBestEnvironmentCheckEvent", () => {
     expect(() => selectBestEnvironmentCheckEvent(null)).not.toThrow();
     expect(() =>
       selectBestEnvironmentCheckEvent([
-        null,
+        null as never,
         { occurredAt: null, noteBody: undefined },
       ]),
     ).not.toThrow();

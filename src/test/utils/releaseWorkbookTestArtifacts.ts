@@ -120,7 +120,7 @@ function positiveDuration(value: number, label: string): number {
 function isProcessRunning(pid: number | undefined): boolean {
   if (!Number.isSafeInteger(pid) || (pid ?? 0) <= 0) return false;
   try {
-    process.kill(pid, 0);
+    process.kill(pid as number, 0);
     return true;
   } catch (error) {
     return (error as NodeJS.ErrnoException).code !== "ESRCH";

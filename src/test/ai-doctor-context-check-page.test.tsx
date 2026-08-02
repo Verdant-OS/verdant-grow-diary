@@ -28,9 +28,9 @@ beforeEach(() => mocks.track.mockReset());
 
 afterEach(() => {
   if (originalClipboard) Object.defineProperty(navigator, "clipboard", originalClipboard);
-  else delete (navigator as Navigator & { clipboard?: Clipboard }).clipboard;
+  else delete (navigator as unknown as { clipboard?: Clipboard }).clipboard;
   if (originalShare) Object.defineProperty(navigator, "share", originalShare);
-  else delete (navigator as Navigator & { share?: Navigator["share"] }).share;
+  else delete (navigator as unknown as { share?: Navigator["share"] }).share;
 });
 
 describe("AI Doctor Context Check page", () => {

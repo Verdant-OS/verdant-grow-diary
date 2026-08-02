@@ -255,7 +255,7 @@ describe("check-dependency-security reviewed exceptions", () => {
     ).toThrow(/expectedParentKeys/);
     expect(() =>
       parseReviewedExceptions(
-        exceptionDocument([{ ...VALID_EXCEPTION, expectedBunDirectRootAncestors: undefined }]),
+        exceptionDocument([{ ...VALID_EXCEPTION, expectedBunDirectRootAncestors: undefined as never }]),
       ),
     ).toThrow(/expectedBunDirectRootAncestors/);
     expect(() =>

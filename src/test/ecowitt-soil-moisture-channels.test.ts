@@ -165,7 +165,9 @@ describe("EcoWitt validation view-model — soil_moisture_pct alias coverage", (
         ...rawPayload,
         metadata: { test_sender: true, transport: "webhook" },
       },
-    } as unknown as Parameters<typeof buildEcowittIngestValidationViewModel>[0]["rows"][number];
+    } as unknown as NonNullable<
+      Parameters<typeof buildEcowittIngestValidationViewModel>[0]["rows"]
+    >[number];
   }
 
   it("soilmoisture1=33 → metric row Accepted", () => {

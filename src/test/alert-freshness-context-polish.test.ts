@@ -18,8 +18,6 @@ function snap(
   },
 ): SensorSnapshot {
   return {
-    source: overrides.source,
-    ts: overrides.ts,
     temp: null,
     rh: null,
     vpd: null,

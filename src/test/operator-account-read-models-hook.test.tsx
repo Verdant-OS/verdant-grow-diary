@@ -275,7 +275,7 @@ describe("useOperatorAccountReadModels", () => {
     const { result, rerender } = renderHook(
       ({ selectedTentId }: { selectedTentId: string | null }) =>
         useOperatorAccountReadModels({ selectedTentId }),
-      { wrapper: wrapper(), initialProps: { selectedTentId: null } },
+      { wrapper: wrapper(), initialProps: { selectedTentId: null as string | null } },
     );
 
     await waitFor(() => {

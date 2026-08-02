@@ -85,7 +85,7 @@ function selectPhoto(file: File) {
 
 const clearRect = vi.fn();
 const drawImage = vi.fn();
-let getContextSpy: ReturnType<typeof vi.spyOn>;
+let getContextSpy: { mockRestore: () => void };
 
 beforeEach(() => {
   clearRect.mockReset();

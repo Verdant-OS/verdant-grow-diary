@@ -13,7 +13,7 @@
  * load-bearing safety net that catches regressions where someone removes
  * or moves the dispatch outside the success branch.
  */
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 

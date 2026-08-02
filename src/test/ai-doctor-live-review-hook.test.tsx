@@ -664,7 +664,7 @@ describe("useAiDoctorLiveReview", () => {
           activePlantId: "plant-a",
           activeSensor: initialSensorClassification,
           activeEvidenceAcceptance: INITIAL_EVIDENCE_ACCEPTANCE,
-        },
+        } as HookProps,
       },
     );
 
@@ -780,7 +780,7 @@ describe("useAiDoctorLiveReview", () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(invoke).not.toHaveBeenCalled();
 
-    rerender({ enabled: true, p: null });
+    rerender({ enabled: true, p: null as never });
     act(() => result.current.start());
     await new Promise((r) => setTimeout(r, 20));
     expect(invoke).not.toHaveBeenCalled();

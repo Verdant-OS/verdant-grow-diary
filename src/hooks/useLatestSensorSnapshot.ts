@@ -98,6 +98,8 @@ export function useLatestSensorSnapshot(
           }
         }
         // 2) Fall back to latest diary_entries.details.sensor_snapshot.
+        // `enabled` already gates on growId; re-narrow for the query builder.
+        if (!growId) return staleSensorCandidate;
         const { data: diaryRows, error: diaryErr } = await supabase
           .from("diary_entries")
           .select("entry_at,details,tent_id")

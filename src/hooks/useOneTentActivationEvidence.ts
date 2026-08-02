@@ -26,6 +26,14 @@ import { QUICK_LOG_V2_ENTRY_CREATED_EVENT } from "@/lib/quickLogV2EntryCreatedEv
 import { useAuth } from "@/store/auth";
 import { buildPrivateGrowQueryKey } from "@/lib/growDataQueryKeyRules";
 
+/**
+ * A scope whose ids are all present. `Required<>` only strips optionality, not
+ * the `| null` members, so the query builders still saw nullable ids.
+ */
+type QueryableActivationScope = {
+  [K in keyof ConnectedActivationScope]-?: NonNullable<ConnectedActivationScope[K]>;
+};
+
 export const ONE_TENT_ACTIVATION_EVIDENCE_QUERY_KEY = "one_tent_activation_evidence" as const;
 export const ONE_TENT_ACTIVATION_EVIDENCE_LIMIT = 100;
 
@@ -44,7 +52,7 @@ export type OneTentActivationEvidenceState =
 
 function isQueryableScope(
   scope: ConnectedActivationScope | null | undefined,
-): scope is Required<ConnectedActivationScope> {
+): scope is QueryableActivationScope {
   return !!(scope && isUuid(scope.growId) && isUuid(scope.tentId) && isUuid(scope.plantId));
 }
 
@@ -61,7 +69,7 @@ export function oneTentActivationEvidenceQueryKey(
 }
 
 async function loadConnectedActivationEvidence(
-  scope: Required<ConnectedActivationScope>,
+  scope: QueryableActivationScope,
 ): Promise<ConnectedActivationEvidenceSummary> {
   const [diaryResult, growEventResult] = await Promise.all([
     supabase

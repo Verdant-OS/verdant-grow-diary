@@ -9,6 +9,7 @@ import {
   subscriberInterestReferralButtonLabel,
 } from "@/lib/subscriberInterestReferralRules";
 import type { SubscriberInterestPlanId } from "@/lib/subscriberInterestRules";
+import { getClipboardWriteText, getNativeShare } from "@/lib/webShareCapabilities";
 
 export interface SubscriberInterestShareCardProps {
   planId: SubscriberInterestPlanId;
@@ -23,8 +24,8 @@ export default function SubscriberInterestShareCard({ planId }: SubscriberIntere
   if (!shareData) return null;
 
   async function sharePaidPlan() {
-    const nativeShare = navigator.share?.bind(navigator);
-    const clipboard = navigator.clipboard?.writeText?.bind(navigator.clipboard);
+    const nativeShare = getNativeShare();
+    const clipboard = getClipboardWriteText();
     const source = nativeShare ? "native_share" : "copy_link";
 
     trackPricingEvent("pricing_interest_share_clicked", { plan: planId, source });

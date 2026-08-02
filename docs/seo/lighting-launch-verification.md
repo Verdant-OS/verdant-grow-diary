@@ -47,6 +47,13 @@ numeric property ID and authenticated reporting baseline remain unavailable to C
 - Production manifest and deploy head both resolve to `a2077699…`. The production release now has
   full deploy-branch parity. Lighting release-content verification remains deliberately scoped to the
   two guides; no runtime publish is required for the measurement evidence itself.
+- The point-in-time readiness artifact keeps its evidence-branch audit head
+  (`49370facd379179e3549acae0cb42ca75958f198`) separate from its audited production release
+  (`a20776993bd606f07977674934864b888a407e1c`). The former was one evidence-only commit ahead at
+  snapshot capture and is not represented as deployed content.
+- Its evidence snapshot remains timestamped `2026-08-02T02:55:07.852Z`. The later
+  `2026-08-02T03:32:24.018Z` revision changes provenance and measurement-contract metadata only;
+  it is not a fresh production or analytics verification.
 - The current production response does not expose a Lovable deployment ID, so none is inferred.
 - Both release-specific URLs, titles, descriptions, H1s, Article/FAQ schema, sitemap entries, and
   cross-links are present in production.
@@ -220,15 +227,22 @@ event or runtime behavior.
   succeeded and evaluated all 51 sitemap URLs. Its GSC operation was `SKIPPED`, access was
   `BLOCKED`, execution was `SKIPPED`, OAuth was not configured, and it made 0 GSC API attempts.
   Workflow success is not an authenticated GSC baseline.
+- The checked-in `artifacts/seo/seo-job-summary.*` pair is a historical 2026-07-02 dry-run
+  (two URLs), not the current monitoring evidence. The readiness artifact identifies run
+  `30727208474` and its immutable `seo-monitoring-reports` artifact (`8826754533`) as the current
+  51-URL, access-blocked evidence instead.
 - Owner handoff: complete the status-marked steps in the
   [lighting analytics owner setup checklist](./analytics-owner-setup-checklist.md) without sending
   credentials through chat or committing them.
 - Machine-readable handoff: the current blocked state is recorded in
   [`artifacts/seo/seo-readiness-status.json`](../../artifacts/seo/seo-readiness-status.json).
 
-The current bounded slice is `P3 STALE_SEO_READINESS_EVIDENCE`; it aligns the existing human and
-machine-readable handoff with the current production fingerprint and collection proof without
-changing runtime code. The highest remaining defect is owner-blocked P0:
+The current bounded slice is `P2 LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT`: its event classification
+is `MISSING`, while its metric readiness status is `NOT_MEASURED`; downstream activity is not used
+as attribution. The completed `P3 READINESS_ARTIFACT_PROVENANCE` repair keeps the point-in-time
+evidence-branch head separate from the audited production release and distinguishes current
+monitoring evidence from historical dry-run summaries without changing runtime code. The highest
+remaining defect is owner-blocked P0:
 `GA4_ENHANCED_MEASUREMENT_HISTORY_PAGE_VIEWS`.
 
 Day 0 remains `UNSET`, and the four-week clock remains `NOT_STARTED`, until both authenticated

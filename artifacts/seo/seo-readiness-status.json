@@ -3,6 +3,12 @@
   "scope": "LIGHTING_LAUNCH_MEASUREMENT",
   "generated_at": "2026-08-02T02:55:07.852Z",
   "generated_at_chicago": "2026-08-01T21:55:07.852-05:00",
+  "generated_at_semantics": "EVIDENCE_SNAPSHOT_CAPTURE_TIME",
+  "artifact_revision": {
+    "revised_at": "2026-08-02T03:32:24.018Z",
+    "revision_scope": "PROVENANCE_AND_MEASUREMENT_CONTRACT_METADATA_ONLY",
+    "production_or_analytics_reverification_performed": false
+  },
   "timezone": "America/Chicago",
   "artifact_semantics": "POINT_IN_TIME_EVIDENCE_SNAPSHOT",
   "operating_mode": "MODE_A_ACCESS_BLOCKED_READINESS_WORK",
@@ -13,8 +19,16 @@
     "BLOCKED",
     "NO_BASELINE",
     "NO_DATA",
+    "NOT_MEASURED",
     "SKIPPED",
     "NOT_APPLICABLE"
+  ],
+  "event_classification_vocabulary": [
+    "IMPLEMENTED_AND_VERIFIED",
+    "IMPLEMENTED_NOT_VERIFIED",
+    "MISSING",
+    "NOT_APPLICABLE",
+    "BLOCKED_BY_ACCESS"
   ],
   "production_status": "PASS",
   "analytics_identity_status": "FAIL",
@@ -25,11 +39,13 @@
   "four_week_clock_status": "NOT_STARTED",
   "run_context": {
     "repository": "Verdant-OS/verdant-grow-diary",
-    "branch": "codex/seo-readiness-evidence-20260802",
-    "head": "a20776993bd606f07977674934864b888a407e1c",
+    "audit_branch": "codex/seo-readiness-evidence-20260802",
+    "audit_head": "49370facd379179e3549acae0cb42ca75958f198",
+    "audit_head_is_descendant_of_deploy_branch_head": true,
     "deploy_branch": "verdant-grow-diary",
     "deploy_branch_head": "a20776993bd606f07977674934864b888a407e1c",
-    "head_equals_deploy_branch_head": true,
+    "audited_release_head": "a20776993bd606f07977674934864b888a407e1c",
+    "audited_release_equals_deploy_branch_head": true,
     "working_tree_status": "CLEAN_AT_AUDIT_START"
   },
   "production": {
@@ -110,7 +126,9 @@
   },
   "measurement_contract": {
     "guide_cta_clicks": {
-      "status": "MISSING",
+      "classification": "MISSING",
+      "measurement_status": "NOT_MEASURED",
+      "reason": "MISSING_NOT_IMPLEMENTED",
       "event_name": null,
       "destination": "/quick-log",
       "public_guide_slugs": [
@@ -193,6 +211,21 @@
     "api_attempts": 0,
     "metrics": null
   },
+  "monitoring_evidence": {
+    "workflow_status": "PASS",
+    "workflow_run_url": "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30727208474",
+    "workflow_artifact_name": "seo-monitoring-reports",
+    "workflow_artifact_id": 8826754533,
+    "workflow_artifact_archive_url": "https://api.github.com/repos/Verdant-OS/verdant-grow-diary/actions/artifacts/8826754533/zip",
+    "workflow_head": "a20776993bd606f07977674934864b888a407e1c",
+    "workflow_artifact_created_at": "2026-08-02T01:32:13Z",
+    "urls_evaluated": 51,
+    "gsc_access_status": "BLOCKED",
+    "gsc_execution_status": "SKIPPED",
+    "gsc_api_attempts": 0,
+    "repository_summary_scope": "HISTORICAL_DRY_RUN",
+    "repository_summary_is_current": false
+  },
   "measurement": {
     "day_0_at_utc": null,
     "day_0_at_chicago": null,
@@ -229,7 +262,9 @@
     {
       "id": "LIGHTING_GUIDE_CTA_ATTRIBUTION",
       "priority": "P2",
-      "status": "MISSING",
+      "status": "NOT_MEASURED",
+      "classification": "MISSING",
+      "reason_code": "MISSING_NOT_IMPLEMENTED",
       "event_name": null,
       "destination": "/quick-log",
       "reason": "Both lighting-guide CTAs are plain GuidePage links; no guide-specific CTA-click event is emitted.",
@@ -272,13 +307,19 @@
       "priority": "P3",
       "status": "FIXED_AND_LOCAL_VERIFIED",
       "evidence": "The prior artifacts named an older production fingerprint and older collection counts. This bounded slice aligns the human and machine-readable handoff with a2077699 production proof and the completed intercepted collection matrix without changing runtime code."
+    },
+    {
+      "id": "READINESS_ARTIFACT_PROVENANCE",
+      "priority": "P3",
+      "status": "FIXED_AND_LOCAL_VERIFIED",
+      "evidence": "The point-in-time audit head 49370fac is distinct from the audited production release a2077699, and the current monitoring workflow is distinct from the historical checked-in dry-run summary."
     }
   ],
   "current_slice": {
     "priority": "P2",
     "id": "LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT",
     "status": "DOCUMENTED_MISSING_NO_EVENT_ADDED",
-    "evidence": "The two lighting-guide CTAs resolve to /quick-log without a guide-specific click event. The measurement contract and baseline now classify guide CTA clicks as missing and exclude downstream-event inference."
+    "evidence": "The two lighting-guide CTAs resolve to /quick-log without a guide-specific click event. Their event classification is MISSING and their metric readiness status is NOT_MEASURED, so downstream activity is not used as attribution."
   },
   "next_slice": {
     "priority": "P0",
@@ -310,8 +351,9 @@
     "owner_setup_checklist": "docs/seo/analytics-owner-setup-checklist.md",
     "internal_link_map": "docs/seo/internal-link-map.md",
     "measurement_contract": "docs/v0-loop-event-map.md",
-    "monitoring_summary_json": "artifacts/seo/seo-job-summary.json",
-    "monitoring_summary_markdown": "artifacts/seo/seo-job-summary.md"
+    "current_monitoring_evidence": "docs/seo/lighting-launch-verification.md",
+    "historical_monitoring_summary_json": "artifacts/seo/seo-job-summary.json",
+    "historical_monitoring_summary_markdown": "artifacts/seo/seo-job-summary.md"
   },
   "privacy": {
     "credentials_included": false,

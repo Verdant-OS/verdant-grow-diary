@@ -13,16 +13,20 @@ const RAW_BASELINE = readFileSync(
   "utf8",
 );
 const BASELINE = JSON.parse(RAW_BASELINE) as Record<string, unknown>;
+const LAUNCH_VERIFICATION = readFileSync(
+  resolve(ROOT, "docs/seo/lighting-launch-verification.md"),
+  "utf8",
+);
 const IDENTITY_BEARING_ARTIFACTS = [
   RAW_ARTIFACT,
   RAW_BASELINE,
   readFileSync(resolve(ROOT, "docs/seo/analytics-owner-setup-checklist.md"), "utf8"),
   readFileSync(resolve(ROOT, "docs/seo/lighting-four-week-measurement-plan.md"), "utf8"),
-  readFileSync(resolve(ROOT, "docs/seo/lighting-launch-verification.md"), "utf8"),
+  LAUNCH_VERIFICATION,
 ];
 const JOB_SUMMARY = JSON.parse(
   readFileSync(resolve(ROOT, "artifacts/seo/seo-job-summary.json"), "utf8"),
-) as { mode: string; status: string };
+) as Record<string, unknown>;
 
 const EXPECTED_STATUS_VOCABULARY = [
   "PASS",
@@ -30,6 +34,7 @@ const EXPECTED_STATUS_VOCABULARY = [
   "BLOCKED",
   "NO_BASELINE",
   "NO_DATA",
+  "NOT_MEASURED",
   "SKIPPED",
   "NOT_APPLICABLE",
 ];
@@ -39,11 +44,24 @@ describe("SEO readiness status artifact", () => {
     expect(READINESS).toMatchObject({
       schema_version: 1,
       scope: "LIGHTING_LAUNCH_MEASUREMENT",
+      generated_at_semantics: "EVIDENCE_SNAPSHOT_CAPTURE_TIME",
+      artifact_revision: {
+        revised_at: "2026-08-02T03:32:24.018Z",
+        revision_scope: "PROVENANCE_AND_MEASUREMENT_CONTRACT_METADATA_ONLY",
+        production_or_analytics_reverification_performed: false,
+      },
       timezone: "America/Chicago",
       artifact_semantics: "POINT_IN_TIME_EVIDENCE_SNAPSHOT",
       operating_mode: "MODE_A_ACCESS_BLOCKED_READINESS_WORK",
       verdict: "NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND",
       status_vocabulary: EXPECTED_STATUS_VOCABULARY,
+      event_classification_vocabulary: [
+        "IMPLEMENTED_AND_VERIFIED",
+        "IMPLEMENTED_NOT_VERIFIED",
+        "MISSING",
+        "NOT_APPLICABLE",
+        "BLOCKED_BY_ACCESS",
+      ],
       production_status: "PASS",
       analytics_identity_status: "FAIL",
       technical_seo_status: "PASS",
@@ -59,14 +77,16 @@ describe("SEO readiness status artifact", () => {
     expect(RAW_ARTIFACT).toBe(`${JSON.stringify(READINESS, null, 2)}\n`);
   });
 
-  it("pins repository, deploy, and production identities with current full-branch parity", () => {
+  it("separates the point-in-time evidence head from the audited deploy release", () => {
     expect(READINESS.run_context).toEqual({
       repository: "Verdant-OS/verdant-grow-diary",
-      branch: "codex/seo-readiness-evidence-20260802",
-      head: "a20776993bd606f07977674934864b888a407e1c",
+      audit_branch: "codex/seo-readiness-evidence-20260802",
+      audit_head: "49370facd379179e3549acae0cb42ca75958f198",
+      audit_head_is_descendant_of_deploy_branch_head: true,
       deploy_branch: "verdant-grow-diary",
       deploy_branch_head: "a20776993bd606f07977674934864b888a407e1c",
-      head_equals_deploy_branch_head: true,
+      audited_release_head: "a20776993bd606f07977674934864b888a407e1c",
+      audited_release_equals_deploy_branch_head: true,
       working_tree_status: "CLEAN_AT_AUDIT_START",
     });
     expect(READINESS.production).toMatchObject({
@@ -193,7 +213,32 @@ describe("SEO readiness status artifact", () => {
       metrics: null,
     });
 
-    expect(JOB_SUMMARY).toEqual(expect.objectContaining({ mode: "dry-run", status: "PASS" }));
+    expect(READINESS.monitoring_evidence).toEqual({
+      workflow_status: "PASS",
+      workflow_run_url: "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30727208474",
+      workflow_artifact_name: "seo-monitoring-reports",
+      workflow_artifact_id: 8826754533,
+      workflow_artifact_archive_url:
+        "https://api.github.com/repos/Verdant-OS/verdant-grow-diary/actions/artifacts/8826754533/zip",
+      workflow_head: "a20776993bd606f07977674934864b888a407e1c",
+      workflow_artifact_created_at: "2026-08-02T01:32:13Z",
+      urls_evaluated: 51,
+      gsc_access_status: "BLOCKED",
+      gsc_execution_status: "SKIPPED",
+      gsc_api_attempts: 0,
+      repository_summary_scope: "HISTORICAL_DRY_RUN",
+      repository_summary_is_current: false,
+    });
+    expect(JOB_SUMMARY).toEqual(
+      expect.objectContaining({
+        generated_at: "2026-07-02T23:49:05.536Z",
+        mode: "dry-run",
+        status: "PASS",
+        urls_evaluated: 2,
+        workflow_run_url: null,
+        gsc_access_status: "NOT_APPLICABLE",
+      }),
+    );
     expect(READINESS.gsc_access_status).toBe("BLOCKED");
   });
 
@@ -292,6 +337,11 @@ describe("SEO readiness status artifact", () => {
           priority: "P3",
           status: "FIXED_AND_LOCAL_VERIFIED",
         }),
+        expect.objectContaining({
+          id: "READINESS_ARTIFACT_PROVENANCE",
+          priority: "P3",
+          status: "FIXED_AND_LOCAL_VERIFIED",
+        }),
       ]),
     );
     expect(READINESS.current_slice).toEqual({
@@ -299,7 +349,7 @@ describe("SEO readiness status artifact", () => {
       id: "LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT",
       status: "DOCUMENTED_MISSING_NO_EVENT_ADDED",
       evidence:
-        "The two lighting-guide CTAs resolve to /quick-log without a guide-specific click event. The measurement contract and baseline now classify guide CTA clicks as missing and exclude downstream-event inference.",
+        "The two lighting-guide CTAs resolve to /quick-log without a guide-specific click event. Their event classification is MISSING and their metric readiness status is NOT_MEASURED, so downstream activity is not used as attribution.",
     });
     expect(READINESS.next_slice).toEqual({
       priority: "P0",
@@ -319,6 +369,11 @@ describe("SEO readiness status artifact", () => {
     expect(readFileSync(resolve(ROOT, ".gitignore"), "utf8")).toContain(
       "!artifacts/seo/seo-readiness-status.json",
     );
+    expect(READINESS.artifact_paths).toMatchObject({
+      current_monitoring_evidence: "docs/seo/lighting-launch-verification.md",
+      historical_monitoring_summary_json: "artifacts/seo/seo-job-summary.json",
+      historical_monitoring_summary_markdown: "artifacts/seo/seo-job-summary.md",
+    });
   });
 
   it("contains no credentials, private paths, or fake zero metrics", () => {
@@ -366,13 +421,11 @@ describe("SEO readiness status artifact", () => {
   });
 
   it("is discoverable from the human-readable launch verification", () => {
-    const launchVerification = readFileSync(
-      resolve(ROOT, "docs/seo/lighting-launch-verification.md"),
-      "utf8",
-    );
     const internalLinkMap = readFileSync(resolve(ROOT, "docs/seo/internal-link-map.md"), "utf8");
-    expect(launchVerification).toContain("../../artifacts/seo/seo-readiness-status.json");
-    expect(launchVerification).toContain("NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND");
+    expect(LAUNCH_VERIFICATION).toContain("../../artifacts/seo/seo-readiness-status.json");
+    expect(LAUNCH_VERIFICATION).toContain("NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND");
+    expect(LAUNCH_VERIFICATION).toContain("P2 LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT");
+    expect(LAUNCH_VERIFICATION).toContain("P3 READINESS_ARTIFACT_PROVENANCE");
     expect(internalLinkMap).toContain("both lighting routes are live");
     expect(internalLinkMap).not.toContain("they are not claimed as deployed");
   });

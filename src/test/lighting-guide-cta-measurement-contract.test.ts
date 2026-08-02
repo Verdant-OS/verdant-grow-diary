@@ -82,7 +82,9 @@ describe("lighting-guide CTA measurement contract", () => {
     expect(BASELINE.ga4_access.blocked_fields).not.toContain("cta_clicks");
 
     expect(READINESS.measurement_contract.guide_cta_clicks).toMatchObject({
-      status: "MISSING",
+      classification: "MISSING",
+      measurement_status: "NOT_MEASURED",
+      reason: "MISSING_NOT_IMPLEMENTED",
       event_name: null,
       destination: "/quick-log",
       public_guide_slugs: [...LIGHTING_GUIDE_SLUGS],
@@ -92,7 +94,9 @@ describe("lighting-guide CTA measurement contract", () => {
       expect.objectContaining({
         id: "LIGHTING_GUIDE_CTA_ATTRIBUTION",
         priority: "P2",
-        status: "MISSING",
+        status: "NOT_MEASURED",
+        classification: "MISSING",
+        reason_code: "MISSING_NOT_IMPLEMENTED",
         day_0_blocking: false,
       }),
     );

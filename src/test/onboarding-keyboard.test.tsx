@@ -18,6 +18,19 @@ vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "user-1" }, loading: false, signOut: vi.fn() }),
 }));
 
+// Non-empty grows so Start your room hero stays hidden and classic heading copy remains.
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({
+    grows: [{ id: "g1", name: "Existing" }],
+    loading: false,
+    activeGrowId: "g1",
+    setActiveGrowId: vi.fn(),
+    refresh: vi.fn(),
+    activeGrow: { id: "g1", name: "Existing" },
+    error: null,
+  }),
+}));
+
 import Onboarding from "@/pages/Onboarding";
 
 function renderPage() {

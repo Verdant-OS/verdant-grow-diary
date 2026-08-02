@@ -1,307 +1,134 @@
 import { describe, expect, it } from "vitest";
 import {
-  CREATE_CHOOSE_SETUP_HREF,
-  CREATE_NO_SETUP_START_HREF,
-  buildGrowBoundTentInsertPayload,
-  filterTentsForResolvedGrow,
-  resolveCreateGrowBinding,
-  resolvePlantTentBinding,
-  resolveSafeInitialPlantTentSelection,
-} from "@/lib/createGrowBindingRules";
-import { growSetupMessages } from "@/constants/growSetupMessages";
-
-const GROW_A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
-const GROW_B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
-const TENT_A = "11111111-1111-1111-1111-111111111111";
-const TENT_B = "22222222-2222-2222-2222-222222222222";
-const USER = "99999999-9999-9999-9999-999999999999";
+  buildCreateGrowBindingView,
+  evaluateSuppliedTentBinding,
+  evaluateTentGrowCompatibility,
+  resolveCreateTargetGrowId,
+  resolveSetupName,
+} from "@/lib/createDialogGrowBindingRules";
 
 const grows = [
-  { id: GROW_A, name: "Spring Veg" },
-  { id: GROW_B, name: "Autumn Run" },
+  { id: "g1", name: "North Room" },
+  { id: "g2", name: "South Room" },
 ];
 
-describe("resolveCreateGrowBinding", () => {
-  it("returns loading while the grow list is loading", () => {
+describe("canonical create grow binding", () => {
+  it("returns loading before considering cached rows", () => {
     expect(
-      resolveCreateGrowBinding({
-        grows: [],
-        growsLoading: true,
-        growsError: null,
-        activeGrowId: GROW_A,
-      }),
-    ).toEqual({ kind: "loading" });
+      buildCreateGrowBindingView({ grows, growsLoading: true, activeGrowId: "g1" }, "tent").kind,
+    ).toBe("loading");
   });
 
-  it("returns read_error on failure, never no_setup", () => {
-    const state = resolveCreateGrowBinding({
-      grows: [],
-      growsLoading: false,
-      growsError: "network down",
-      activeGrowId: null,
-    });
-    expect(state).toEqual({ kind: "read_error" });
-    expect(state.kind).not.toBe("no_setup");
+  it("returns read_error instead of no_setup", () => {
+    const state = buildCreateGrowBindingView({ grows: [], growsError: true }, "plant");
+    expect(state.kind).toBe("read_error");
+    expect(state.showStartRoomHardStop).toBe(false);
   });
 
-  it("returns no_setup when zero grows load successfully", () => {
-    expect(
-      resolveCreateGrowBinding({
-        grows: [],
-        growsLoading: false,
-        growsError: null,
-        activeGrowId: null,
-      }),
-    ).toEqual({ kind: "no_setup", startHref: CREATE_NO_SETUP_START_HREF });
-    expect(CREATE_NO_SETUP_START_HREF).toBe("/grows?intent=one_tent_activation");
+  it("returns no_setup only after a successful empty read", () => {
+    expect(buildCreateGrowBindingView({ grows: [] }, "plant").kind).toBe("no_setup");
   });
 
-  it("lets a valid requested grow win over active", () => {
-    expect(
-      resolveCreateGrowBinding({
-        grows,
-        growsLoading: false,
-        growsError: null,
-        requestedGrowId: GROW_B,
-        activeGrowId: GROW_A,
-      }),
-    ).toEqual({
-      kind: "ready",
-      growId: GROW_B,
-      setupName: "Autumn Run",
-      source: "requested",
-    });
-  });
-
-  it("blocks an invalid requested grow and never falls back to active", () => {
-    const state = resolveCreateGrowBinding({
+  it("uses a valid requested setup", () => {
+    const result = resolveCreateTargetGrowId({
+      pageDefaultGrowId: "g2",
+      activeGrowId: "g1",
       grows,
-      growsLoading: false,
-      growsError: null,
-      requestedGrowId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
-      activeGrowId: GROW_A,
     });
-    expect(state).toEqual({
-      kind: "requested_setup_unavailable",
-      chooseHref: CREATE_CHOOSE_SETUP_HREF,
-    });
+    expect(result.targetGrowId).toBe("g2");
   });
 
-  it("resolves the active grow when no request exists", () => {
-    expect(
-      resolveCreateGrowBinding({
-        grows,
-        growsLoading: false,
-        growsError: null,
-        activeGrowId: GROW_A,
-      }),
-    ).toEqual({
-      kind: "ready",
-      growId: GROW_A,
-      setupName: "Spring Veg",
-      source: "current",
-    });
-  });
-
-  it("returns choose_setup when grows exist but active id is stale", () => {
-    expect(
-      resolveCreateGrowBinding({
-        grows,
-        growsLoading: false,
-        growsError: null,
-        activeGrowId: "dddddddd-dddd-dddd-dddd-dddddddddddd",
-      }),
-    ).toEqual({ kind: "choose_setup", chooseHref: CREATE_CHOOSE_SETUP_HREF });
-  });
-
-  it("returns choose_setup when grows exist but active id is null", () => {
-    expect(
-      resolveCreateGrowBinding({
-        grows,
-        growsLoading: false,
-        growsError: null,
-        activeGrowId: null,
-      }),
-    ).toEqual({ kind: "choose_setup", chooseHref: CREATE_CHOOSE_SETUP_HREF });
-  });
-
-  it("uses generic setup copy for blank names and never uses the id", () => {
-    const state = resolveCreateGrowBinding({
-      grows: [{ id: GROW_A, name: "   " }],
-      growsLoading: false,
-      growsError: null,
-      activeGrowId: GROW_A,
-    });
-    expect(state.kind).toBe("ready");
-    if (state.kind !== "ready") return;
-    expect(state.setupName).toBe(growSetupMessages.genericSetupName);
-    expect(state.setupName).not.toBe(GROW_A);
-    expect(growSetupMessages.create.addingTo(state.setupName)).not.toContain(GROW_A);
-  });
-
-  it("returns the same output for the same input", () => {
-    const input = {
+  it("never falls back from an invalid requested setup", () => {
+    const result = resolveCreateTargetGrowId({
+      pageDefaultGrowId: "missing",
+      activeGrowId: "g1",
       grows,
-      growsLoading: false,
-      growsError: null as string | null,
-      requestedGrowId: GROW_A,
-      activeGrowId: GROW_B,
-    };
-    expect(resolveCreateGrowBinding(input)).toEqual(resolveCreateGrowBinding(input));
+    });
+    expect(result.targetGrowId).toBeNull();
+    expect(result.requestedSetupUnavailable).toBe(true);
+  });
+
+  it("uses the active setup only when there is no request", () => {
+    expect(resolveCreateTargetGrowId({ activeGrowId: "g1", grows }).targetGrowId).toBe("g1");
+  });
+
+  it("requires setup choice when the active id is stale", () => {
+    expect(buildCreateGrowBindingView({ activeGrowId: "missing", grows }, "tent").kind).toBe(
+      "choose_setup",
+    );
+  });
+
+  it("never renders an id-shaped value as the setup name", () => {
+    const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    expect(resolveSetupName(id, [{ id, name: id }])).toBe("your current setup");
+  });
+
+  it("fails closed for duplicate ids and is stable under reordering", () => {
+    const duplicateRows = [...grows, { id: "g1", name: "Duplicate" }];
+    const first = resolveCreateTargetGrowId({ pageDefaultGrowId: "g1", grows: duplicateRows });
+    const second = resolveCreateTargetGrowId({
+      pageDefaultGrowId: "g1",
+      grows: [...duplicateRows].reverse(),
+    });
+    expect(first).toEqual(second);
+    expect(first.targetGrowId).toBeNull();
   });
 });
 
-describe("resolvePlantTentBinding", () => {
-  const tents = [
-    { id: TENT_A, grow_id: GROW_A },
-    { id: TENT_B, grow_id: GROW_B },
-    { id: "33333333-3333-3333-3333-333333333333", grow_id: null },
-  ];
-
-  it("allows no tent when requireTent is false", () => {
+describe("canonical plant tent compatibility", () => {
+  it("allows no tent only outside a guided tent requirement", () => {
     expect(
-      resolvePlantTentBinding({
-        resolvedGrowId: GROW_A,
-        selectedTentId: "none",
-        requireTent: false,
-        tents,
-      }),
-    ).toEqual({ kind: "no_tent", allowed: true });
-  });
-
-  it("blocks no tent when requireTent is true", () => {
-    expect(
-      resolvePlantTentBinding({
-        resolvedGrowId: GROW_A,
+      evaluateTentGrowCompatibility({
         selectedTentId: null,
-        requireTent: true,
-        tents,
-      }),
-    ).toEqual({ kind: "tent_required" });
-  });
-
-  it("passes a matching tent", () => {
+        tentGrowId: null,
+        targetGrowId: "g1",
+      }).compatible,
+    ).toBe(true);
     expect(
-      resolvePlantTentBinding({
-        resolvedGrowId: GROW_A,
-        selectedTentId: TENT_A,
-        requireTent: true,
-        tents,
-      }),
-    ).toEqual({ kind: "ready", tentId: TENT_A });
+      evaluateTentGrowCompatibility({
+        selectedTentId: null,
+        tentGrowId: null,
+        targetGrowId: "g1",
+        requireTentForWrite: true,
+      }).kind,
+    ).toBe("required_missing");
   });
 
-  it("blocks a null-grow tent", () => {
+  it("accepts a matching tent", () => {
     expect(
-      resolvePlantTentBinding({
-        resolvedGrowId: GROW_A,
-        selectedTentId: "33333333-3333-3333-3333-333333333333",
-        requireTent: false,
-        tents,
-      }),
-    ).toEqual({ kind: "tent_not_in_setup" });
+      evaluateTentGrowCompatibility({
+        selectedTentId: "t1",
+        tentGrowId: "g1",
+        targetGrowId: "g1",
+      }).compatible,
+    ).toBe(true);
   });
 
-  it("blocks a different-grow tent", () => {
+  it("blocks null-linked and different-setup tents", () => {
     expect(
-      resolvePlantTentBinding({
-        resolvedGrowId: GROW_A,
-        selectedTentId: TENT_B,
-        requireTent: false,
-        tents,
-      }),
-    ).toEqual({ kind: "different_setup" });
-  });
-
-  it("blocks a missing tent row", () => {
+      evaluateTentGrowCompatibility({
+        selectedTentId: "t1",
+        tentGrowId: null,
+        targetGrowId: "g1",
+      }).kind,
+    ).toBe("orphan_tent");
     expect(
-      resolvePlantTentBinding({
-        resolvedGrowId: GROW_A,
-        selectedTentId: "44444444-4444-4444-4444-444444444444",
-        requireTent: false,
-        tents,
-      }),
-    ).toEqual({ kind: "tent_unavailable" });
+      evaluateTentGrowCompatibility({
+        selectedTentId: "t1",
+        tentGrowId: "g2",
+        targetGrowId: "g1",
+      }).kind,
+    ).toBe("mismatch");
   });
 
-  it("is stable under reordered tent inputs", () => {
-    const a = resolvePlantTentBinding({
-      resolvedGrowId: GROW_A,
-      selectedTentId: TENT_A,
-      requireTent: true,
-      tents,
-    });
-    const b = resolvePlantTentBinding({
-      resolvedGrowId: GROW_A,
-      selectedTentId: TENT_A,
-      requireTent: true,
-      tents: [...tents].reverse(),
-    });
-    expect(a).toEqual(b);
-  });
-});
-
-describe("resolveSafeInitialPlantTentSelection + filters + tent payload", () => {
-  const tents = [
-    { id: TENT_A, grow_id: GROW_A },
-    { id: TENT_B, grow_id: null },
-  ];
-
-  it("retains a compatible default tent and clears unsafe ones", () => {
+  it("blocks a supplied id missing from the loaded tent rows", () => {
     expect(
-      resolveSafeInitialPlantTentSelection({
-        resolvedGrowId: GROW_A,
-        defaultTentId: TENT_A,
-        tents,
-      }),
-    ).toEqual({ tentId: TENT_A, conflict: null });
-
-    expect(
-      resolveSafeInitialPlantTentSelection({
-        resolvedGrowId: GROW_A,
-        defaultTentId: TENT_B,
-        tents,
-      }),
-    ).toEqual({ tentId: null, conflict: "tent_not_in_setup" });
-  });
-
-  it("filters tents to the resolved grow only", () => {
-    expect(filterTentsForResolvedGrow(tents, GROW_A).map((t) => t.id)).toEqual([TENT_A]);
-  });
-
-  it("builds a grow-bound tent payload only from ready state", () => {
-    const ready = resolveCreateGrowBinding({
-      grows,
-      growsLoading: false,
-      growsError: null,
-      activeGrowId: GROW_A,
-    });
-    const payload = buildGrowBoundTentInsertPayload({
-      binding: ready,
-      userId: USER,
-      name: " Tent 1 ",
-      size: "",
-      brand: "Gorilla",
-      stage: "veg",
-    });
-    expect(payload).toEqual({
-      user_id: USER,
-      name: "Tent 1",
-      size: null,
-      brand: "Gorilla",
-      stage: "veg",
-      grow_id: GROW_A,
-    });
-
-    expect(
-      buildGrowBoundTentInsertPayload({
-        binding: { kind: "no_setup", startHref: CREATE_NO_SETUP_START_HREF },
-        userId: USER,
-        name: "Tent 1",
-        size: "",
-        brand: "",
-        stage: "veg",
-      }),
-    ).toBeNull();
+      evaluateSuppliedTentBinding({
+        suppliedTentId: "missing",
+        targetGrowId: "g1",
+        tentsLoaded: true,
+        suppliedTentRow: null,
+      }).kind,
+    ).toBe("unavailable");
   });
 });

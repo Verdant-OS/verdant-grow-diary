@@ -28,6 +28,7 @@ const Auth = lazy(() => import("./pages/Auth"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
+const StartYourRoom = lazy(() => import("./pages/StartYourRoom"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Tents = lazy(() => import("./pages/Tents"));
 const TentDetail = lazy(() => import("./pages/TentDetail"));
@@ -340,6 +341,7 @@ const App = () => (
 
                   <Route element={<AppShell />}>
                     <Route path="/onboarding" element={<Onboarding />} />
+                    <Route path="/start-room" element={<StartYourRoom />} />
                     {/* Canonical private Dashboard alias. Several scoped
                         grow flows intentionally build /dashboard?growId=…;
                         render Dashboard here so those links do not fall

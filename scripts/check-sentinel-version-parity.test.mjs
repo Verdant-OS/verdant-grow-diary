@@ -73,9 +73,18 @@ function git(cwd, ...args) {
   );
 }
 
+function canonicalConstitution(version) {
+  return `# AGENTS.md\n\nSentinel-Version: ${version}\n\n${REQUIRED_STARTUP_GATE}\n`;
+}
+
 function writeGovernanceFile(root, path, version = "2026-08-01.1") {
   const absolute = join(root, path);
   mkdirSync(dirname(absolute), { recursive: true });
+
+  if (path === "AGENTS.md") {
+    writeFileSync(absolute, canonicalConstitution(version), "utf8");
+    return;
+  }
 
   const imports =
     path === "CLAUDE.md"
@@ -83,10 +92,9 @@ function writeGovernanceFile(root, path, version = "2026-08-01.1") {
       : "";
   const core =
     path === "GEMINI.md"
-      ? "\n<!-- SENTINEL-CORE:BEGIN -->\ncore rule\n<!-- SENTINEL-CORE:END -->"
+      ? `\n<!-- SENTINEL-CORE:BEGIN -->\n${canonicalConstitution(version)}<!-- SENTINEL-CORE:END -->`
       : "";
-  const gate =
-    path === "AGENTS.md" || ROLE_FILES.includes(path) ? `\n\n${REQUIRED_STARTUP_GATE}` : "";
+  const gate = ROLE_FILES.includes(path) ? `\n\n${REQUIRED_STARTUP_GATE}` : "";
 
   writeFileSync(
     absolute,
@@ -168,19 +176,28 @@ test("fails when GEMINI.md has a different Sentinel-Version", () => {
   assert.match(result.stderr, /does not match AGENTS\.md/);
 });
 
-test("fails when Gemini's embedded safety core is removed", () => {
+test("fails when Gemini's embedded universal constitution is removed", () => {
   const root = makeFixture();
-  replace(
-    root,
-    "GEMINI.md",
-    "<!-- SENTINEL-CORE:BEGIN -->\ncore rule\n<!-- SENTINEL-CORE:END -->",
-    "See AGENTS.md",
+  writeFileSync(
+    join(root, "GEMINI.md"),
+    "# GEMINI.md\n\nSentinel-Version: 2026-08-01.1\n\nSee AGENTS.md\n",
+    "utf8",
   );
 
   const result = runChecker(root);
 
   assert.equal(result.status, 1);
   assert.match(result.stderr, /embedded SENTINEL-CORE block is missing/);
+});
+
+test("fails when Gemini's embedded universal constitution drifts", () => {
+  const root = makeFixture();
+  replace(root, "GEMINI.md", "SENTINEL_ACK", "SENTINEL_ACK_DRIFTED");
+
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /embedded SENTINEL-CORE differs from AGENTS\.md/);
 });
 
 test("fails when governance content changes without a version bump", () => {
@@ -238,7 +255,12 @@ test("passes a coordinated rule update with one shared bumped version", () => {
 
   const agentsPath = join(root, "AGENTS.md");
   writeFileSync(agentsPath, `${readFileSync(agentsPath, "utf8")}\nnew versioned rule\n`, "utf8");
-  replace(root, "GEMINI.md", "core rule", "core rule\nnew versioned rule");
+  const geminiPath = join(root, "GEMINI.md");
+  const synchronizedGemini = readFileSync(geminiPath, "utf8").replace(
+    /<!-- SENTINEL-CORE:BEGIN[^\n]*\n[\s\S]*?\n<!-- SENTINEL-CORE:END -->/,
+    `<!-- SENTINEL-CORE:BEGIN -->\n${readFileSync(agentsPath, "utf8").trimEnd()}\n<!-- SENTINEL-CORE:END -->`,
+  );
+  writeFileSync(geminiPath, synchronizedGemini, "utf8");
 
   const result = runChecker(root);
 

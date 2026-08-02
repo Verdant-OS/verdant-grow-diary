@@ -46,12 +46,17 @@ describe("connected One-Tent activation handoff", () => {
   it("keeps general creation tent-optional while requiring a verified grow", () => {
     expect(TENT_DIALOG).toMatch(/initiallyOpen\s*=\s*false/);
     expect(PLANT_DIALOG).toMatch(/requireTent\s*=\s*false/);
-    expect(PLANT_DIALOG).toMatch(/!requireTent\s*&&\s*<SelectItem value="none"/);
-    // Guided activation still requires a compatible tent; general creation may omit tent.
-    expect(PLANT_DIALOG).toMatch(/requireTent/);
-    // General creation may not omit a verified grow binding.
-    expect(PLANT_DIALOG).toMatch(/grow_id:\s*binding\.growId/);
-    expect(TENT_DIALOG).toMatch(/buildGrowBoundTentInsertPayload/);
+    // Tentless "No tent" remains available only when plantCreateAllowsTentless allows it.
+    expect(PLANT_DIALOG).toMatch(
+      /plantCreateAllowsTentless\(\{[\s\S]*?requireTent,[\s\S]*?\}\)\s*&&\s*<SelectItem value="none">/,
+    );
+    expect(PLANT_DIALOG).toMatch(/grow_id:\s*targetGrowId/);
+    expect(PLANT_DIALOG).toMatch(/if \(form\.tent_id[\s\S]*?payload\.tent_id/);
+    // Guided activation still requires a compatible tent.
+    expect(PLANTS).toMatch(/requireTent=\{activationIntent\}/);
+    // General creation may omit a tent but may not omit a verified grow.
+    expect(PLANT_DIALOG).toMatch(/grow_id:\s*targetGrowId/);
+    expect(TENT_DIALOG).toMatch(/grow_id:\s*targetGrowId/);
   });
 
   it("uses one relationship-aware Dashboard checklist and removes the duplicate", () => {

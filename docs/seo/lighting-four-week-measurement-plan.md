@@ -45,10 +45,10 @@ The public release and technical SEO identity are complete, but an analytics col
 authenticated-access gates remain:
 
 - PR #597 is merged and remains live in production manifest
-  `e623aa9d913698ca6795b3d6b75bd069d9a67681`.
-- Intercepted browser evidence across eight navigation actions preserved each exact lighting-guide
+  `f4c7e8ee78f65fc47494af631e5ffcdd33bcbeb5`.
+- Intercepted browser evidence across nine navigation states preserved each exact lighting-guide
   path and page-specific title, kept protected IDs masked, and transmitted no verification events.
-  It observed eight exact app-owned page views plus four automatic GA4 page views without Verdant's
+  It observed nine exact app-owned page views plus five automatic GA4 page views without Verdant's
   explicit `page_path`.
 - The owner-confirmed GA4 production stream is `Verdant Grow Diary`, stream URL
   `https://verdantgrowdiary.com`, stream ID `15065867361`, and measurement ID `G-B3QRSZEM9S`;
@@ -56,11 +56,12 @@ authenticated-access gates remain:
 - The current public probe returns HTTP 200 for both guides, the sitemap, robots, and version
   manifest. The 51-URL sitemap contains each lighting route exactly once, and robots protects app
   prefixes.
-- Workflow [30687660034](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30687660034)
+- Workflow [30727208474](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30727208474)
   succeeded across all 51 URLs, but its GSC operation was `SKIPPED`, access was `BLOCKED`,
   execution was `SKIPPED`, OAuth was not configured, and it made 0 API attempts.
-- Production manifest and deploy head match at
-  `e623aa9d913698ca6795b3d6b75bd069d9a67681`; release content match remains `PASS`.
+- Production manifest `f4c7e8ee…` is an ancestor of deploy head `a2077699…`; the one
+  post-production commit is Quick Log/test-only. Lighting release content match remains `PASS`, but
+  full deploy-branch parity is not claimed.
 - PR #624 is live. Its production direct/cross-guide/history/refresh/repeat/new-tab matrix found one
   current `WebPage`, `FAQPage`, `BreadcrumbList`, and `Article` identity set per page state, with
   zero duplicate identities, zero stale prior-route objects, and zero JSON-LD parse errors.

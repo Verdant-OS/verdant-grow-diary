@@ -59,26 +59,28 @@ describe("SEO readiness status artifact", () => {
     expect(RAW_ARTIFACT).toBe(`${JSON.stringify(READINESS, null, 2)}\n`);
   });
 
-  it("pins repository, deploy, and production identities with observed equality", () => {
+  it("pins repository, deploy, and production identities without overstating full-branch parity", () => {
     expect(READINESS.run_context).toEqual({
       repository: "Verdant-OS/verdant-grow-diary",
-      branch: "codex/refresh-seo-measurement-readiness",
-      head: "e623aa9d913698ca6795b3d6b75bd069d9a67681",
+      branch: "codex/seo-readiness-evidence-20260802",
+      head: "a20776993bd606f07977674934864b888a407e1c",
       deploy_branch: "verdant-grow-diary",
-      deploy_branch_head: "e623aa9d913698ca6795b3d6b75bd069d9a67681",
+      deploy_branch_head: "a20776993bd606f07977674934864b888a407e1c",
       head_equals_deploy_branch_head: true,
       working_tree_status: "CLEAN_AT_AUDIT_START",
     });
     expect(READINESS.production).toMatchObject({
       host: "https://verdantgrowdiary.com",
-      observed_at: "2026-08-01T15:20:20.962Z",
-      manifest_commit: "e623aa9d913698ca6795b3d6b75bd069d9a67681",
-      build_time: "2026-08-01T06:20:32.105Z",
-      matches_deploy_branch_head: true,
+      observed_at: "2026-08-02T02:05:36.362Z",
+      manifest_commit: "f4c7e8ee78f65fc47494af631e5ffcdd33bcbeb5",
+      build_time: "2026-08-02T00:57:34.186Z",
+      matches_deploy_branch_head: false,
       manifest_is_ancestor_of_deploy_branch_head: true,
-      source_delta_since_manifest: "NONE_DEPLOY_MATCHES_PRODUCTION",
+      source_delta_since_manifest: "ONE_QUICK_LOG_COMMIT_14_FILES",
       production_publish_required: false,
       release_content_match: "PASS",
+      release_content_scope: "LIGHTING_GUIDES_ONLY",
+      full_deploy_branch_parity: "NOT_CURRENT",
       sitemap_url_count: 51,
       robots_declares_production_sitemap: true,
       robots_protects_app_prefixes: true,
@@ -132,7 +134,7 @@ describe("SEO readiness status artifact", () => {
 
   it("separates passing collection evidence from unavailable authenticated baselines", () => {
     expect(READINESS.analytics_identity).toMatchObject({
-      last_full_verified_at: "2026-08-01T15:20:20.962Z",
+      last_full_verified_at: "2026-08-02T02:08:43.179Z",
       verification_method: "INTERCEPTED_BROWSER_COLLECTION_REQUESTS",
       test_events_transmitted: false,
       stream_identity_status: "PASS",
@@ -151,9 +153,9 @@ describe("SEO readiness status artifact", () => {
       automatic_history_page_views: "FAIL_OWNER_REVIEW_REQUIRED",
       protected_id_masking: "PASS",
       verification_counts: {
-        navigation_actions: 8,
-        exact_explicit_page_views: 8,
-        automatic_page_views_without_explicit_page_path: 4,
+        navigation_actions: 9,
+        exact_explicit_page_views: 9,
+        automatic_page_views_without_explicit_page_path: 5,
         verification_events_transmitted: 0,
       },
     });
@@ -180,7 +182,7 @@ describe("SEO readiness status artifact", () => {
       baseline_status: "BLOCKED",
       authenticated_reporting_available: false,
       latest_workflow_run:
-        "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30687660034",
+        "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30727208474",
       latest_workflow_status: "PASS",
       operation_status: "SKIPPED",
       access_status: "BLOCKED",
@@ -209,6 +211,12 @@ describe("SEO readiness status artifact", () => {
     );
     expect(production.production_publish_required).toBe(release.production_publish_required);
     expect(production.observed_at).toBe(publicProbe.observed_at);
+    expect(production.matches_deploy_branch_head).toBe(false);
+    expect(release.production_matches_deploy_branch_head).toBe(false);
+    expect(production.full_deploy_branch_parity).toBe("NOT_CURRENT");
+    expect(release.full_deploy_branch_parity).toBe("not_current");
+    expect(production.release_content_scope).toBe("LIGHTING_GUIDES_ONLY");
+    expect(release.release_content_scope).toBe("lighting_guides_only");
     expect(BASELINE.artifact_semantics).toBe("POINT_IN_TIME_EVIDENCE_SNAPSHOT");
     expect(baselineGa4).toMatchObject({
       stream_identity_status: "pass_owner_confirmed_matches_production",
@@ -280,7 +288,7 @@ describe("SEO readiness status artifact", () => {
           status: "VERIFIED_UNFIXED_OWNER_ACTION_REQUIRED",
         }),
         expect.objectContaining({
-          id: "STALE_PRODUCTION_JSON_LD_READINESS_EVIDENCE",
+          id: "STALE_SEO_READINESS_EVIDENCE",
           priority: "P3",
           status: "FIXED_AND_LOCAL_VERIFIED",
         }),
@@ -288,10 +296,10 @@ describe("SEO readiness status artifact", () => {
     );
     expect(READINESS.current_slice).toEqual({
       priority: "P3",
-      id: "STALE_PRODUCTION_JSON_LD_READINESS_EVIDENCE",
+      id: "STALE_SEO_READINESS_EVIDENCE",
       status: "FIXED_AND_LOCAL_VERIFIED",
       evidence:
-        "Existing readiness artifacts now identify e623aa9d9 as the matching production/deploy head and record the eight-state production JSON-LD pass.",
+        "Existing readiness artifacts now distinguish production f4c7e8ee from deploy head a2077699, retain the lighting-scope release pass, and record the nine-state intercepted collection result.",
     });
     expect(READINESS.next_slice).toEqual({
       priority: "P0",
@@ -315,8 +323,8 @@ describe("SEO readiness status artifact", () => {
 
   it("contains no credentials, private paths, or fake zero metrics", () => {
     expect(READINESS.reporting_access_configuration).toEqual({
-      observed_at: "2026-08-01T15:57:30.7455630Z",
-      audit_method: "GITHUB_SECRET_NAME_LISTING",
+      observed_at: "2026-08-02T02:08:43.179Z",
+      audit_method: "GITHUB_SECRET_NAME_LISTING_AND_CURRENT_DEPLOY_WORKFLOW",
       configured_scopes_checked: [
         "repository",
         "environment:verdant-production",

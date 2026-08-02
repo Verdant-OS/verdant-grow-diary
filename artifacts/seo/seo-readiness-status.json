@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "scope": "LIGHTING_LAUNCH_MEASUREMENT",
-  "generated_at": "2026-08-01T15:57:30.7455630Z",
-  "generated_at_chicago": "2026-08-01T10:57:30.7455630-05:00",
+  "generated_at": "2026-08-02T02:08:43.179Z",
+  "generated_at_chicago": "2026-08-01T21:08:43.185-05:00",
   "timezone": "America/Chicago",
   "artifact_semantics": "POINT_IN_TIME_EVIDENCE_SNAPSHOT",
   "operating_mode": "MODE_A_ACCESS_BLOCKED_READINESS_WORK",
@@ -25,24 +25,26 @@
   "four_week_clock_status": "NOT_STARTED",
   "run_context": {
     "repository": "Verdant-OS/verdant-grow-diary",
-    "branch": "codex/refresh-seo-measurement-readiness",
-    "head": "e623aa9d913698ca6795b3d6b75bd069d9a67681",
+    "branch": "codex/seo-readiness-evidence-20260802",
+    "head": "a20776993bd606f07977674934864b888a407e1c",
     "deploy_branch": "verdant-grow-diary",
-    "deploy_branch_head": "e623aa9d913698ca6795b3d6b75bd069d9a67681",
+    "deploy_branch_head": "a20776993bd606f07977674934864b888a407e1c",
     "head_equals_deploy_branch_head": true,
     "working_tree_status": "CLEAN_AT_AUDIT_START"
   },
   "production": {
     "host": "https://verdantgrowdiary.com",
-    "observed_at": "2026-08-01T15:20:20.962Z",
+    "observed_at": "2026-08-02T02:05:36.362Z",
     "version_url": "https://verdantgrowdiary.com/version.json",
-    "manifest_commit": "e623aa9d913698ca6795b3d6b75bd069d9a67681",
-    "build_time": "2026-08-01T06:20:32.105Z",
-    "matches_deploy_branch_head": true,
+    "manifest_commit": "f4c7e8ee78f65fc47494af631e5ffcdd33bcbeb5",
+    "build_time": "2026-08-02T00:57:34.186Z",
+    "matches_deploy_branch_head": false,
     "manifest_is_ancestor_of_deploy_branch_head": true,
-    "source_delta_since_manifest": "NONE_DEPLOY_MATCHES_PRODUCTION",
+    "source_delta_since_manifest": "ONE_QUICK_LOG_COMMIT_14_FILES",
     "production_publish_required": false,
     "release_content_match": "PASS",
+    "release_content_scope": "LIGHTING_GUIDES_ONLY",
+    "full_deploy_branch_parity": "NOT_CURRENT",
     "sitemap_url_count": 51,
     "robots_declares_production_sitemap": true,
     "robots_protects_app_prefixes": true,
@@ -80,7 +82,7 @@
     "structured_data_repair_status": "LIVE"
   },
   "analytics_identity": {
-    "last_full_verified_at": "2026-08-01T15:20:20.962Z",
+    "last_full_verified_at": "2026-08-02T02:08:43.179Z",
     "verification_method": "INTERCEPTED_BROWSER_COLLECTION_REQUESTS",
     "test_events_transmitted": false,
     "stream_identity_status": "PASS",
@@ -99,15 +101,15 @@
     "automatic_history_page_views": "FAIL_OWNER_REVIEW_REQUIRED",
     "protected_id_masking": "PASS",
     "verification_counts": {
-      "navigation_actions": 8,
-      "exact_explicit_page_views": 8,
-      "automatic_page_views_without_explicit_page_path": 4,
+      "navigation_actions": 9,
+      "exact_explicit_page_views": 9,
+      "automatic_page_views_without_explicit_page_path": 5,
       "verification_events_transmitted": 0
     },
     "evidence": "docs/seo/lighting-launch-verification.md"
   },
   "technical_seo": {
-    "last_http_verified_at": "2026-08-01T15:20:20.962Z",
+    "last_http_verified_at": "2026-08-02T02:07:12.279Z",
     "lighting_pages": "PASS",
     "direct_load_indexability": "PASS",
     "route_runtime_structured_data": "PASS",
@@ -119,8 +121,8 @@
     "evidence": "docs/seo/lighting-launch-verification.md"
   },
   "reporting_access_configuration": {
-    "observed_at": "2026-08-01T15:57:30.7455630Z",
-    "audit_method": "GITHUB_SECRET_NAME_LISTING",
+    "observed_at": "2026-08-02T02:08:43.179Z",
+    "audit_method": "GITHUB_SECRET_NAME_LISTING_AND_CURRENT_DEPLOY_WORKFLOW",
     "configured_scopes_checked": [
       "repository",
       "environment:verdant-production",
@@ -162,7 +164,7 @@
     "baseline_status": "BLOCKED",
     "authenticated_reporting_available": false,
     "local_oauth_token_available": false,
-    "latest_workflow_run": "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30687660034",
+    "latest_workflow_run": "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30727208474",
     "latest_workflow_status": "PASS",
     "operation_status": "SKIPPED",
     "access_status": "BLOCKED",
@@ -227,26 +229,26 @@
       "status": "FIXED_AND_PRODUCTION_VERIFIED",
       "pull_request": "https://github.com/Verdant-OS/verdant-grow-diary/pull/624",
       "merge_commit": "b62aac5d4b0e9296bfdbee4c46e03fc35f350c0c",
-      "evidence": "Production commit e623aa9d9 contains the repair. Eight rendered direct, cross-guide, history, refresh, repeat, and new-tab states each exposed one current WebPage, FAQPage, BreadcrumbList, and Article identity with zero duplicate or stale route objects."
+      "evidence": "Production commit f4c7e8ee contains the repair. Eight rendered direct, cross-guide, history, refresh, repeat, and new-tab states each exposed one current WebPage, FAQPage, BreadcrumbList, and Article identity with zero duplicate or stale route objects."
     },
     {
       "id": "GA4_ENHANCED_MEASUREMENT_DUPLICATE_PAGE_VIEWS",
       "priority": "P0",
       "status": "VERIFIED_UNFIXED_OWNER_ACTION_REQUIRED",
-      "evidence": "Collection-endpoint interception observed Verdant's exact explicit SPA page_view plus tag-generated page_view events without the explicit page_path during direct/history navigation. Google documents the Enhanced Measurement browser-history option as a separate page_view source."
+      "evidence": "Nine collection-endpoint navigation states observed nine exact explicit SPA page_view events plus five tag-generated page_view events without the explicit page_path on SPA/history transitions. Collection was fulfilled locally; no verification event was transmitted."
     },
     {
-      "id": "STALE_PRODUCTION_JSON_LD_READINESS_EVIDENCE",
+      "id": "STALE_SEO_READINESS_EVIDENCE",
       "priority": "P3",
       "status": "FIXED_AND_LOCAL_VERIFIED",
-      "evidence": "The prior artifacts still described PR #624 as awaiting publication after production had advanced to e623aa9d9. This bounded slice aligns the existing human and machine-readable handoff with the production browser proof without changing runtime code."
+      "evidence": "The prior artifacts named an older production fingerprint and older collection counts. This bounded slice aligns the human and machine-readable handoff with f4c7e8ee production proof and the current intercepted collection matrix without changing runtime code."
     }
   ],
   "current_slice": {
     "priority": "P3",
-    "id": "STALE_PRODUCTION_JSON_LD_READINESS_EVIDENCE",
+    "id": "STALE_SEO_READINESS_EVIDENCE",
     "status": "FIXED_AND_LOCAL_VERIFIED",
-    "evidence": "Existing readiness artifacts now identify e623aa9d9 as the matching production/deploy head and record the eight-state production JSON-LD pass."
+    "evidence": "Existing readiness artifacts now distinguish production f4c7e8ee from deploy head a2077699, retain the lighting-scope release pass, and record the nine-state intercepted collection result."
   },
   "next_slice": {
     "priority": "P0",
@@ -268,7 +270,7 @@
       "gsc_api_attempts": 0
     },
     "production_publish_required": false,
-    "production_publish_reason": "PR #624 is already live in production; this bounded slice changes evidence only and does not require a runtime publish."
+    "production_publish_reason": "PR #624 is already live in production; this bounded slice changes readiness evidence only and does not require a runtime publish for the lighting measurement scope."
   },
   "artifact_paths": {
     "readiness_status": "artifacts/seo/seo-readiness-status.json",

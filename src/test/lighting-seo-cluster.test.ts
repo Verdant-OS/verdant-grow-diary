@@ -19,6 +19,13 @@ const OPTIMIZED_EXISTING_SLUGS = [
   "what-to-log-in-a-grow-journal",
   "daily-grow-log-checklist",
 ] as const;
+const EXPECTED_MODIFIED_ON_BY_SLUG: Record<(typeof OPTIMIZED_EXISTING_SLUGS)[number], string> = {
+  "grow-room-vpd-tracker": "2026-08-02",
+  "sensor-truth-grow-room": "2026-08-02",
+  "cannabis-plant-care": "2026-07-30",
+  "what-to-log-in-a-grow-journal": "2026-07-30",
+  "daily-grow-log-checklist": "2026-07-30",
+};
 
 function requiredGuide(slug: string) {
   const guide = findGuideBySlug(slug);
@@ -78,7 +85,7 @@ describe("indoor cannabis lighting SEO cluster", () => {
         guide.sections.flatMap((section) => section.links?.map((link) => link.to) ?? []),
       );
 
-      expect(guide.modifiedOn).toBe("2026-07-30");
+      expect(guide.modifiedOn).toBe(EXPECTED_MODIFIED_ON_BY_SLUG[slug]);
       expect(guide.sections).toHaveLength(5);
       expect(sectionTargets.size).toBeGreaterThanOrEqual(2);
       expect(guide.sources?.length).toBeGreaterThanOrEqual(1);

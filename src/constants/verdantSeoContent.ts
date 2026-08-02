@@ -521,6 +521,10 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         links: [
           { label: "Review hardware integration options", to: "/hardware-integrations" },
           {
+            label: "Set a repeatable light-distance and canopy baseline",
+            to: "/guides/cannabis-grow-light-distance-and-schedule",
+          },
+          {
             label: "Attach trustworthy context to a grow journal",
             to: "/guides/what-to-log-in-a-grow-journal",
           },

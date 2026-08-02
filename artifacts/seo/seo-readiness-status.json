@@ -5,9 +5,9 @@
   "generated_at_chicago": "2026-08-02T00:19:48.245-05:00",
   "generated_at_semantics": "EVIDENCE_SNAPSHOT_CAPTURE_TIME",
   "artifact_revision": {
-    "revised_at": "2026-08-02T05:19:48.245Z",
-    "revision_scope": "POST_DEPLOY_TARGETED_ANALYTICS_REVERIFICATION",
-    "production_or_analytics_reverification_performed": true
+    "revised_at": "2026-08-02T05:43:14.855Z",
+    "revision_scope": "POST_DEPLOY_ANALYTICS_HANDOFF_CONSISTENCY_ONLY",
+    "production_or_analytics_reverification_performed": false
   },
   "timezone": "America/Chicago",
   "artifact_semantics": "POINT_IN_TIME_EVIDENCE_SNAPSHOT",
@@ -322,7 +322,7 @@
     {
       "id": "GA4_ENHANCED_MEASUREMENT_DUPLICATE_PAGE_VIEWS",
       "priority": "P0",
-      "status": "BLOCKED",
+      "status": "FAIL",
       "lifecycle_state": "VERIFIED_UNFIXED_OWNER_ACTION_REQUIRED",
       "evidence": "The completed nine-state matrix observed nine exact explicit SPA page_view events plus five tag-generated page_view events without the explicit page_path on SPA/history transitions. A post-deploy two-state recheck on a2077699 observed two exact explicit events plus one automatic event without the explicit path; all five collection requests in that corrected recheck were fulfilled locally."
     },
@@ -338,7 +338,7 @@
       "priority": "P3",
       "status": "PASS",
       "lifecycle_state": "FIXED_AND_LOCAL_VERIFIED",
-      "evidence": "The point-in-time audit head 49370fac is distinct from the audited production release a2077699, and the current monitoring workflow is distinct from the historical checked-in dry-run summary."
+      "evidence": "The point-in-time audit head c794e4c6ff0debb6ae2a83566b2a73f690a96393 is distinct from the audited production release a20776993bd606f07977674934864b888a407e1c, and the current monitoring workflow is distinct from the historical checked-in dry-run summary."
     }
   ],
   "current_slice": {

@@ -17,6 +17,10 @@ const LAUNCH_VERIFICATION = readFileSync(
   resolve(ROOT, "docs/seo/lighting-launch-verification.md"),
   "utf8",
 );
+const MEASUREMENT_PLAN = readFileSync(
+  resolve(ROOT, "docs/seo/lighting-four-week-measurement-plan.md"),
+  "utf8",
+);
 const IDENTITY_BEARING_ARTIFACTS = [
   RAW_ARTIFACT,
   RAW_BASELINE,
@@ -67,9 +71,9 @@ describe("SEO readiness status artifact", () => {
       scope: "LIGHTING_LAUNCH_MEASUREMENT",
       generated_at_semantics: "EVIDENCE_SNAPSHOT_CAPTURE_TIME",
       artifact_revision: {
-        revised_at: "2026-08-02T05:19:48.245Z",
-        revision_scope: "POST_DEPLOY_TARGETED_ANALYTICS_REVERIFICATION",
-        production_or_analytics_reverification_performed: true,
+        revised_at: "2026-08-02T05:43:14.855Z",
+        revision_scope: "POST_DEPLOY_ANALYTICS_HANDOFF_CONSISTENCY_ONLY",
+        production_or_analytics_reverification_performed: false,
       },
       timezone: "America/Chicago",
       artifact_semantics: "POINT_IN_TIME_EVIDENCE_SNAPSHOT",
@@ -410,7 +414,7 @@ describe("SEO readiness status artifact", () => {
         expect.objectContaining({
           id: "GA4_ENHANCED_MEASUREMENT_DUPLICATE_PAGE_VIEWS",
           priority: "P0",
-          status: "BLOCKED",
+          status: "FAIL",
           lifecycle_state: "VERIFIED_UNFIXED_OWNER_ACTION_REQUIRED",
         }),
         expect.objectContaining({
@@ -427,6 +431,12 @@ describe("SEO readiness status artifact", () => {
         }),
       ]),
     );
+    const provenanceDefect = (READINESS.verified_defects as Array<Record<string, unknown>>).find(
+      (defect) => defect.id === "READINESS_ARTIFACT_PROVENANCE",
+    );
+    const runContext = READINESS.run_context as Record<string, unknown>;
+    expect(provenanceDefect?.evidence).toContain(runContext.audit_head);
+    expect(provenanceDefect?.evidence).toContain(runContext.audited_release_head);
     expect(READINESS.current_slice).toEqual({
       priority: "P2",
       id: "LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT",
@@ -513,6 +523,14 @@ describe("SEO readiness status artifact", () => {
     expect(LAUNCH_VERIFICATION).toContain("P3 READINESS_ARTIFACT_PROVENANCE");
     expect(LAUNCH_VERIFICATION).toContain(
       "A preceding exploratory browser probe omitted `analytics.google.com` from its collection-host",
+    );
+    expect(MEASUREMENT_PLAN).toContain("2026-08-02T05:19:48.245Z");
+    expect(MEASUREMENT_PLAN).toMatch(/fulfilled\s+five\s+collection requests locally/);
+    expect(MEASUREMENT_PLAN).toMatch(/zero\s+escaped\s+collection requests/);
+    expect(MEASUREMENT_PLAN).toContain("its transmission status is not asserted.");
+    expect(MEASUREMENT_PLAN).toMatch(/without replacing the\s+count-bearing nine-state matrix/);
+    expect(MEASUREMENT_PLAN).not.toContain(
+      "A later current-production re-run did not return an inspectable final envelope",
     );
     expect(internalLinkMap).toContain("both lighting routes are live");
     expect(internalLinkMap).not.toContain("they are not claimed as deployed");

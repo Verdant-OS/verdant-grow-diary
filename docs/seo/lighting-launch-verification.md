@@ -51,9 +51,10 @@ numeric property ID and authenticated reporting baseline remain unavailable to C
   (`c794e4c6ff0debb6ae2a83566b2a73f690a96393`) separate from its audited production release
   (`a20776993bd606f07977674934864b888a407e1c`). The former was seven evidence-only commits ahead
   at snapshot capture and is not represented as deployed content.
-- Its current evidence snapshot is timestamped `2026-08-02T05:19:48.245Z`; the revision is
-  classified as `POST_DEPLOY_TARGETED_ANALYTICS_REVERIFICATION`. It adds a targeted analytics
-  recheck only and does not replace the count-bearing nine-state matrix.
+- Its evidence snapshot remains timestamped `2026-08-02T05:19:48.245Z`. The later
+  `2026-08-02T05:43:14.855Z` revision is classified as
+  `POST_DEPLOY_ANALYTICS_HANDOFF_CONSISTENCY_ONLY`; it aligns the handoff with that targeted
+  recheck and does not add a fresh production or analytics verification.
 - The current production response does not expose a Lovable deployment ID, so none is inferred.
 - Both release-specific URLs, titles, descriptions, H1s, Article/FAQ schema, sitemap entries, and
   cross-links are present in production.

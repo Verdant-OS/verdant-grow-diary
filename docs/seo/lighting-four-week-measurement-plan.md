@@ -49,8 +49,13 @@ authenticated-access gates remain:
 - The last completed intercepted browser matrix (`2026-08-02T02:08:43.179Z`) preserved each exact
   lighting-guide path and page-specific title across nine navigation states, kept protected IDs
   masked, and transmitted no verification events. It observed nine exact app-owned page views plus
-  five automatic GA4 page views without Verdant's explicit `page_path`. A later current-production
-  re-run did not return an inspectable final envelope, so its counts are not used here.
+  five automatic GA4 page views without Verdant's explicit `page_path`. A corrected targeted
+  post-deploy recheck (`2026-08-02T05:19:48.245Z`) then covered one direct distance-guide load and
+  one client transition to the stress guide. It fulfilled five collection requests locally, observed
+  two exact app-owned page views plus one automatic page view without the explicit path, and had zero
+  escaped collection requests. This reconfirms the owner-setting defect without replacing the
+  count-bearing nine-state matrix. A preceding exploratory probe omitted `analytics.google.com` from
+  its matcher and is excluded from this evidence; its transmission status is not asserted.
 - The owner-confirmed GA4 production stream is `Verdant Grow Diary`, stream URL
   `https://verdantgrowdiary.com`, stream ID `15065867361`, and measurement ID `G-B3QRSZEM9S`;
   production loads and targets that exact measurement ID. The property ID is still unconfirmed.

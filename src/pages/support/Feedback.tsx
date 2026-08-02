@@ -163,7 +163,7 @@ export default function Feedback() {
     });
     if (!guard.ok) {
       setSubmitState("error");
-      setErrorMessage(guard.message);
+      setErrorMessage(guard.message ?? "Submission blocked.");
       return;
     }
 

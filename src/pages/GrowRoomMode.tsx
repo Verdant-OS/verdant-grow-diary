@@ -181,9 +181,12 @@ export default function GrowRoomMode() {
           for (const [tid, rows] of grouped.entries()) {
             // snapshotFromReadings handles its own ordering / freshness rules.
             // Cast: snapshotFromReadings expects the broader reading row shape.
-            byTent[tid] = snapshotFromReadings(
+            const snapshot = snapshotFromReadings(
               rows as unknown as Parameters<typeof snapshotFromReadings>[0],
             );
+            // No derivable snapshot for this tent ⇒ leave it absent rather
+            // than publishing an empty one the UI could read as healthy.
+            if (snapshot) byTent[tid] = snapshot;
           }
         }
 

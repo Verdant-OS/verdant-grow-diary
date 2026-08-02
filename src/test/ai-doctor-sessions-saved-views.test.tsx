@@ -112,9 +112,9 @@ describe("aiDoctorSessionsSavedViewsRules — pure helpers", () => {
     });
     expect(res.ok).toBe(true);
     if (!res.ok) return;
-    expect(res.view.label).toBe("High risk");
-    expect(res.view.filters.risk).toBe("high");
-    expect(res.view.createdAt).toBe("2026-01-01T00:00:00.000Z");
+    expect(res.view!.label).toBe("High risk");
+    expect(res.view!.filters.risk).toBe("high");
+    expect(res.view!.createdAt).toBe("2026-01-01T00:00:00.000Z");
     expect(res.views).toHaveLength(1);
   });
 

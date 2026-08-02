@@ -251,6 +251,8 @@ interface LegacyRouterShellProps {
   initialIndex?: number;
   /** Accepted for compile compatibility with react-router; ignored. */
   basename?: string;
+  /** Accepted for compile compatibility with react-router v6 future flags; ignored. */
+  future?: Record<string, boolean>;
 }
 
 export function BrowserRouter({ children }: LegacyRouterShellProps) {
@@ -263,5 +265,58 @@ export function Routes({ children }: { children?: ReactNode }) {
   return <>{children}</>;
 }
 export function Route(_props: { path?: string; element?: ReactNode; children?: ReactNode }) {
+  return null;
+}
+
+export interface CompatRouteObject {
+  path: string;
+  id?: string;
+}
+
+export interface CompatRouteMatch<T extends CompatRouteObject = CompatRouteObject> {
+  route: T;
+  params: Record<string, string>;
+  pathname: string;
+}
+
+function matchOne(pattern: string, pathname: string): Record<string, string> | null {
+  if (pattern === "*") return {};
+  const pSegs = pattern.replace(/^\//, "").split("/").filter(Boolean);
+  const uSegs = pathname.replace(/^\//, "").split("/").filter(Boolean);
+  const params: Record<string, string> = {};
+  const splatAt = pSegs.indexOf("*");
+  if (splatAt === -1 && pSegs.length !== uSegs.length) return null;
+  for (let i = 0; i < pSegs.length; i += 1) {
+    const p = pSegs[i];
+    if (p === "*") return params;
+    const u = uSegs[i];
+    if (u === undefined) return null;
+    if (p !== undefined && p.startsWith(":")) params[p.slice(1)] = u;
+    else if (p !== u) return null;
+  }
+  return params;
+}
+
+/**
+ * Minimal react-router `matchRoutes` stand-in for flat route manifests.
+ * Static segments beat params, and `*` is always the last resort.
+ */
+export function matchRoutes<T extends CompatRouteObject>(
+  routes: readonly T[],
+  location: string | { pathname?: string },
+): CompatRouteMatch<T>[] | null {
+  const pathname = typeof location === "string" ? location : (location.pathname ?? "/");
+  const ranked = [...routes]
+    .map((route, index) => ({ route, index }))
+    .sort((a, b) => {
+      const score = (path: string) =>
+        path === "*" ? 2 : path.includes(":") || path.includes("*") ? 1 : 0;
+      const diff = score(a.route.path) - score(b.route.path);
+      return diff !== 0 ? diff : a.index - b.index;
+    });
+  for (const { route } of ranked) {
+    const params = matchOne(route.path, pathname);
+    if (params) return [{ route, params, pathname }];
+  }
   return null;
 }

@@ -149,7 +149,7 @@ describe("/auth — keyboard tab order", () => {
     const loading = await screen.findByRole("button", { name: /signing in…/i });
     expect(loading).toBeDisabled();
     expect(loading).toBeVisible();
-    resolveSignIn?.();
+    (resolveSignIn as (() => void) | null)?.();
     await waitFor(() => expect(signInMock).toHaveBeenCalledTimes(1));
   });
 });
@@ -241,7 +241,7 @@ describe("/reset-password — keyboard tab order & focus", () => {
     const loading = await screen.findByRole("button", { name: /updating password…/i });
     expect(loading).toBeDisabled();
     expect(loading).toBeVisible();
-    resolveUpd?.();
+    (resolveUpd as (() => void) | null)?.();
     await waitFor(() => expect(updateUserMock).toHaveBeenCalledTimes(1));
   });
 });

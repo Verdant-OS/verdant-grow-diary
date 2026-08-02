@@ -19,8 +19,6 @@ function snap(
   },
 ): SensorSnapshot {
   return {
-    source: o.source,
-    ts: o.ts,
     temp: null,
     rh: null,
     vpd: null,

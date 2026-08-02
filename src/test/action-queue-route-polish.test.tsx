@@ -101,9 +101,9 @@ vi.mock("@/integrations/supabase/client", () => {
         order: () => makeThenableResult(),
         limit: () => makeThenableResult(),
         then: (
-          onFulfilled: (r: { data: unknown; error: unknown }) => unknown,
+          onFulfilled: (r: unknown) => unknown,
           onRejected?: (e: unknown) => unknown,
-        ) => resolveActionQuery().then(onFulfilled, onRejected),
+        ) => resolveActionQuery().then((value) => onFulfilled(value), onRejected),
         catch: (onRejected: (e: unknown) => unknown) => resolveActionQuery().catch(onRejected),
       };
       return result;

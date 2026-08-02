@@ -44,8 +44,8 @@ const fixtureDiagnosis: Diagnosis = {
   possibleCauses: [],
   immediateAction: "",
   whatNotToDo: [],
-  followUp24h: null,
-  recoveryPlan3d: null,
+  followUp24h: null as never,
+  recoveryPlan3d: null as never,
   riskLevel: "medium",
   suggestedActions: [],
 };

@@ -68,8 +68,8 @@ function makeRow(overrides: Partial<AiDoctorSessionRow> = {}): AiDoctorSessionRo
     possibleCauses: [],
     immediateAction: "Raise light.",
     whatNotToDo: [],
-    followUp24h: null,
-    recoveryPlan3d: null,
+    followUp24h: null as never,
+    recoveryPlan3d: null as never,
     riskLevel: "medium",
     suggestedActions: [],
   };
@@ -96,7 +96,7 @@ describe("buildCautionNote (pure helper)", () => {
         riskLevel: "low",
         evidence: ["x"],
         missingInformation: [],
-      } as Diagnosis,
+      } as unknown as Diagnosis,
       displayedConfidence: 0.9,
     });
     const note = buildCautionNote(vm);

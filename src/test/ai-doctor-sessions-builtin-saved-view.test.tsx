@@ -61,8 +61,8 @@ function makeRow(
     possibleCauses: [],
     immediateAction: "",
     whatNotToDo: [],
-    followUp24h: null,
-    recoveryPlan3d: null,
+    followUp24h: null as never,
+    recoveryPlan3d: null as never,
     riskLevel: "low",
     suggestedActions: [],
     ...diag,
@@ -158,19 +158,20 @@ describe("built-in saved view is never persisted", () => {
   });
 
   it("readSavedViews returns only persisted (user) views", () => {
+    const data = new Map<string, string>();
     const storage = {
-      _data: new Map<string, string>(),
+      _data: data,
       getItem(k: string) {
-        return this._data.get(k) ?? null;
+        return data.get(k) ?? null;
       },
       setItem(k: string, v: string) {
-        this._data.set(k, v);
+        data.set(k, v);
       },
       removeItem(k: string) {
-        this._data.delete(k);
+        data.delete(k);
       },
       clear() {
-        this._data.clear();
+        data.clear();
       },
       key() {
         return null;

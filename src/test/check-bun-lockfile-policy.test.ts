@@ -177,16 +177,19 @@ describe("evaluatePolicy", () => {
     });
   });
 
-  it.each(["bun.lock", "package-lock.json"])("fails when required %s is missing", (name) => {
+  it.each([["bun.lock"], ["package-lock.json"]])("fails when required %s is missing", (name) => {
     const files = policyFiles();
     delete files[at(name)];
     expect(evaluate(files).errors.join(" ")).toContain(`Required lockfile is missing: ${name}`);
   });
 
-  it.each(FORBIDDEN_LOCKFILES)("fails when forbidden %s exists", (name) => {
-    const files = policyFiles({ extra: { [at(name)]: "x" } });
-    expect(evaluate(files).errors.join(" ")).toContain(`Forbidden lockfile present: ${name}`);
-  });
+  it.each(FORBIDDEN_LOCKFILES.map((name: string) => ({ name })) as Array<{ name: string }>)(
+    "fails when forbidden $name exists",
+    ({ name }) => {
+      const files = policyFiles({ extra: { [at(name)]: "x" } });
+      expect(evaluate(files).errors.join(" ")).toContain(`Forbidden lockfile present: ${name}`);
+    },
+  );
 
   it.each(["^0.24.0", "~0.24.0", "latest", "*"])(
     "fails when @lovable.dev/mcp-js uses %s",
@@ -239,7 +242,7 @@ describe("evaluatePolicy", () => {
   it("fails when an exact npm override is not resolved consistently", () => {
     const manifest = packageJson("0.24.0", { "fast-uri": "3.1.4" });
     const stale = packageLock(manifest);
-    stale.packages["node_modules/fast-uri"].version = "3.0.0";
+    stale.packages["node_modules/fast-uri"]!.version = "3.0.0";
     expect(evaluate(policyFiles({ manifest, npmLock: stale })).errors.join(" ")).toContain(
       "package-lock.json override for fast-uri@3.1.4 is not synchronized",
     );

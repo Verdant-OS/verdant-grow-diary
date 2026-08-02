@@ -30,11 +30,14 @@ export default function RootEntry() {
     hasAuthenticatedUser: Boolean(user),
   });
 
-  if (surface === "loading") return <RootEntryLoader />;
-
+  // The Suspense boundary is rendered unconditionally so the server ("loading")
+  // and first client pass (session may already be cached) produce the same tree
+  // shape — a conditional boundary here caused a hydration mismatch at `/`.
   return (
     <Suspense fallback={<RootEntryLoader />}>
-      {surface === "landing" ? (
+      {surface === "loading" ? (
+        <RootEntryLoader />
+      ) : surface === "landing" ? (
         <Landing canonicalPath="/" />
       ) : (
         <AppShell>

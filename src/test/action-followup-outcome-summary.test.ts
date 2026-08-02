@@ -149,7 +149,7 @@ describe("growDiaryTimelineRules.toTimelineItem — action_followup title", () =
         observed_at: "2026-07-11T12:00:00Z",
       },
     });
-    const item = toTimelineItem(normalized);
+    const item = toTimelineItem(normalized!);
     expect(item.title).toBe("Follow-up · Improved");
   });
 
@@ -161,7 +161,7 @@ describe("growDiaryTimelineRules.toTimelineItem — action_followup title", () =
         action_queue_id: "aq-1",
       },
     });
-    const item = toTimelineItem(normalized);
+    const item = toTimelineItem(normalized!);
     expect(item.title).toBe("Follow-up");
   });
 
@@ -173,7 +173,7 @@ describe("growDiaryTimelineRules.toTimelineItem — action_followup title", () =
         outcome: "AI-inferred",
       },
     });
-    const item = toTimelineItem(normalized);
+    const item = toTimelineItem(normalized!);
     expect(item.title).toBe("Follow-up");
   });
 
@@ -183,7 +183,7 @@ describe("growDiaryTimelineRules.toTimelineItem — action_followup title", () =
       event_type: "watering",
       details: {},
     });
-    const item = toTimelineItem(normalized);
+    const item = toTimelineItem(normalized!);
     expect(item.title).toBe("Watering");
   });
 });

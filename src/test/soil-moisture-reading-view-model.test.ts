@@ -74,7 +74,7 @@ describe("buildSoilMoistureReadingViewModel", () => {
       ...baseInput,
       calibrations: [
         {
-          ...baseInput.calibrations[0],
+          ...baseInput.calibrations![0]!,
           dryRaw: 500,
           wetRaw: 500,
         },
@@ -95,7 +95,7 @@ describe("buildSoilMoistureReadingViewModel", () => {
       rawSource: "demo",
       calibrations: [
         {
-          ...baseInput.calibrations[0],
+          ...baseInput.calibrations![0]!,
           source: "demo",
         },
       ],

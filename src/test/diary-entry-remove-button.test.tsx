@@ -7,7 +7,10 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const { deleteEq, deleteFn, toastSuccess, toastError } = vi.hoisted(() => {
-  const deleteEq = vi.fn(() => Promise.resolve({ error: null }));
+  const deleteEq = vi.fn(
+    (): Promise<{ error: { code: string; message: string } | null }> =>
+      Promise.resolve({ error: null }),
+  );
   const deleteFn = vi.fn(() => ({ eq: deleteEq }));
   return {
     deleteEq,

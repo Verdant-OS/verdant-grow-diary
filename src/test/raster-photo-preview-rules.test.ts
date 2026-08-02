@@ -72,12 +72,12 @@ describe("calculateRasterPhotoCoverCrop", () => {
   });
 
   it.each([
-    [0, 100],
-    [100, 0],
-    [Number.NaN, 100],
-    [100, Number.POSITIVE_INFINITY],
+    [0, 100, undefined, undefined],
+    [100, 0, undefined, undefined],
+    [Number.NaN, 100, undefined, undefined],
+    [100, Number.POSITIVE_INFINITY, undefined, undefined],
     [100, 100, -1, 720],
-  ])("fails closed for invalid dimensions", (width, height, targetWidth, targetHeight) => {
+  ] as Array<[number, number, number | undefined, number | undefined]>)("fails closed for invalid dimensions", (width, height, targetWidth, targetHeight) => {
     expect(calculateRasterPhotoCoverCrop(width, height, targetWidth, targetHeight)).toBeNull();
   });
 

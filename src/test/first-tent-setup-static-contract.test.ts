@@ -57,6 +57,6 @@ describe("First-tent setup gate — QuickLog snapshot attachment", () => {
 describe("First-tent setup empty state safety", () => {
   it("never advertises live/demo data and routes the CTA through react-router", () => {
     expect(EMPTY_STATE.toLowerCase()).not.toMatch(/live|demo|fake/);
-    expect(EMPTY_STATE).toMatch(/from\s+["']@/lib/react-router-compat["']/);
+    expect(EMPTY_STATE).toMatch(/from\s+["']@\/lib\/react-router-compat["']/);
   });
 });

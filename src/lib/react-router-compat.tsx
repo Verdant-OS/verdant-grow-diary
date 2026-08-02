@@ -219,10 +219,20 @@ export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
  * assert on navigation through them need rewriting against the TanStack
  * router. Do not use them in application code.
  */
-export function BrowserRouter({ children }: { children?: ReactNode }) {
+interface LegacyRouterShellProps {
+  children?: ReactNode;
+  /** Accepted for compile compatibility with react-router; ignored. */
+  initialEntries?: unknown;
+  /** Accepted for compile compatibility with react-router; ignored. */
+  initialIndex?: number;
+  /** Accepted for compile compatibility with react-router; ignored. */
+  basename?: string;
+}
+
+export function BrowserRouter({ children }: LegacyRouterShellProps) {
   return <>{children}</>;
 }
-export function MemoryRouter({ children }: { children?: ReactNode }) {
+export function MemoryRouter({ children }: LegacyRouterShellProps) {
   return <>{children}</>;
 }
 export function Routes({ children }: { children?: ReactNode }) {

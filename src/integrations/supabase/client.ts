@@ -14,8 +14,9 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: sessionStorage,
-    persistSession: true,
-    autoRefreshToken: true,
+    // SSR/prerender safety: `sessionStorage` does not exist on the server.
+    storage: typeof window !== 'undefined' ? window.sessionStorage : undefined,
+    persistSession: typeof window !== 'undefined',
+    autoRefreshToken: typeof window !== 'undefined',
   }
 });

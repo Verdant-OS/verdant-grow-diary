@@ -98,7 +98,7 @@ describe("ai-doctor-phase1-preview — static safety (page + fixtures)", () => {
 
   it("page imports only react, @/lib/react-router-compat, preview panel, and fixtures library", () => {
     expect(pageSrc).toMatch(/from\s+["']react["']/);
-    expect(pageSrc).toMatch(/from\s+["']@/lib/react-router-compat["']/);
+    expect(pageSrc).toMatch(/from\s+["']@\/lib\/react-router-compat["']/);
     expect(pageSrc).toMatch(/from\s+["']@\/components\/AiDoctorPhase1PreviewPanel["']/);
     expect(pageSrc).toMatch(/from\s+["']@\/lib\/aiDoctorPhase1PreviewFixtures["']/);
   });

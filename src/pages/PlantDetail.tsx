@@ -338,7 +338,7 @@ export default function PlantDetail() {
           plant={{
             id: plant.id,
             name: plant.name,
-            strain: plant.strain,
+            strain: plant.strain ?? "",
             stage: plant.stage,
             startedAt: plant.startedAt,
             tentId: plant.tentId ?? null,
@@ -359,6 +359,12 @@ export default function PlantDetail() {
       </div>
     );
   }
+
+  // Every plant-absent path (loading, error, not-found, archived) returned
+  // above. This narrowing guard exists for the compiler under strictNullChecks;
+  // reaching it would mean the blocked-state classifier disagreed with the
+  // query result, in which case rendering nothing is the honest fallback.
+  if (!plant) return null;
 
   const ageDays = Math.floor((Date.now() - new Date(plant.startedAt).getTime()) / 86400000);
   const harvestWatchEligible = isHarvestWatchEligible({

@@ -22,6 +22,8 @@
 export interface QuickLogPostSaveSuccess {
   /** Growth event id returned from the server, when available. */
   growEventId: string | null;
+  /** Server-verified grow that owns the saved record. */
+  growId: string | null;
   /** Target the log was attached to. Used for the "View" CTA. */
   targetType: "plant" | "tent";
   targetId: string;
@@ -34,9 +36,9 @@ export interface QuickLogPostSaveSuccess {
   savedAt: string;
 }
 
-export const QUICK_LOG_POST_SAVE_VIEW_LABEL = "View timeline" as const;
+export const QUICK_LOG_POST_SAVE_VIEW_LABEL = "View diary" as const;
 export const QUICK_LOG_POST_SAVE_ANOTHER_LABEL = "Log another" as const;
-export const QUICK_LOG_POST_SAVE_CLOSE_LABEL = "Close" as const;
+export const QUICK_LOG_POST_SAVE_CLOSE_LABEL = "Dismiss" as const;
 
 /**
  * Rotate the client-side idempotency counter. Called when the grower
@@ -91,7 +93,7 @@ export function buildQuickLogPostSaveMessage(action: string, photoAttached: bool
 // hardcode duplicate strings.
 // -------------------------------------------------------------------
 
-export const QUICK_LOG_POST_SAVE_TITLE = "Saved" as const;
+export const QUICK_LOG_POST_SAVE_TITLE = "Saved to your diary" as const;
 
 /**
  * Practical, non-technical retry guidance. Renders in the dedicated
@@ -119,20 +121,9 @@ export interface QuickLogPostSaveDescriptionInput {
  * post-save card. Deterministic. Never claims yield / quality /
  * diagnosis — just confirms what persisted and where.
  */
-export function buildQuickLogPostSaveDescription(
-  input: QuickLogPostSaveDescriptionInput,
-): string {
-  const verb = (input.action ?? "").trim() || "entry";
-  const withPhoto = input.photoAttached ? " with photo" : "";
-  const target = (input.targetName ?? "").trim();
-  const scopeParts: string[] = [];
-  if (target) scopeParts.push(target);
-  const tent = (input.tentName ?? "").trim();
-  if (tent) scopeParts.push(tent);
-  const grow = (input.growName ?? "").trim();
-  if (grow) scopeParts.push(grow);
-  const scope = scopeParts.length ? ` to ${scopeParts.join(" · ")}` : "";
-  return `Logged ${verb}${withPhoto}${scope} · just now`;
+export function buildQuickLogPostSaveDescription(input: QuickLogPostSaveDescriptionInput): string {
+  const growName = (input.growName ?? "").trim();
+  return growName ? `Added to ${growName}.` : "Saved to your diary.";
 }
 
 export interface QuickLogCloseGuardInput {

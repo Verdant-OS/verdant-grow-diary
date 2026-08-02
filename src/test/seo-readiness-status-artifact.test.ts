@@ -295,11 +295,11 @@ describe("SEO readiness status artifact", () => {
       ]),
     );
     expect(READINESS.current_slice).toEqual({
-      priority: "P3",
-      id: "STALE_SEO_READINESS_EVIDENCE",
-      status: "FIXED_AND_LOCAL_VERIFIED",
+      priority: "P2",
+      id: "LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT",
+      status: "DOCUMENTED_MISSING_NO_EVENT_ADDED",
       evidence:
-        "Existing readiness artifacts now identify a2077699 as the matching production and deploy head, retain the lighting-scope release pass, and record the completed nine-state intercepted collection result.",
+        "The two lighting-guide CTAs resolve to /quick-log without a guide-specific click event. The measurement contract and baseline now classify guide CTA clicks as missing and exclude downstream-event inference.",
     });
     expect(READINESS.next_slice).toEqual({
       priority: "P0",

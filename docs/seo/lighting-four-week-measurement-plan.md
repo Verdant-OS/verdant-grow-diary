@@ -89,6 +89,14 @@ implementation evidence, not reporting baselines.
 - **Product conversion:** existing privacy-safe events only; no new analytics vendor.
 - **Comparison:** each checkpoint versus the prior checkpoint and the full cumulative window.
 
+### Guide CTA measurement boundary
+
+Guide CTA clicks are currently `MISSING`: both lighting-guide CTAs are plain
+links to `/quick-log`, with no guide-specific click event. Do not infer a CTA
+click from the destination page view, a later `quick_log_saved`, or any other
+downstream event. This is a documented measurement gap, not a Day 0 blocker;
+exclude it from comparison until a separately authorized implementation exists.
+
 ## Weekly review template
 
 Complete one copy for each page at Weeks 1–4.
@@ -130,18 +138,18 @@ Complete one copy for each page at Weeks 1–4.
 
 ### GA4
 
-| Metric                      | Current | Previous | Change |
-| --------------------------- | ------: | -------: | -----: |
-| Page views                  |         |          |        |
-| Users                       |         |          |        |
-| Organic landing sessions    |         |          |        |
-| Engaged sessions            |         |          |        |
-| Engagement rate             |         |          |        |
-| Average engagement time     |         |          |        |
-| CTA clicks                  |         |          |        |
-| Signup starts               |         |          |        |
-| Signup completions          |         |          |        |
-| First meaningful activation |         |          |        |
+| Metric                                     | Current | Previous | Change |
+| ------------------------------------------ | ------: | -------: | -----: |
+| Page views                                 |         |          |        |
+| Users                                      |         |          |        |
+| Organic landing sessions                   |         |          |        |
+| Engaged sessions                           |         |          |        |
+| Engagement rate                            |         |          |        |
+| Average engagement time                    |         |          |        |
+| Guide CTA clicks (MISSING — do not report) |         |          |        |
+| Signup starts                              |         |          |        |
+| Signup completions                         |         |          |        |
+| First meaningful activation                |         |          |        |
 
 ### Interpretation
 

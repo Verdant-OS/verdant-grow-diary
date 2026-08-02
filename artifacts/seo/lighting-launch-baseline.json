@@ -72,6 +72,9 @@
         "average_engagement_time": null,
         "entrances": null,
         "cta_clicks": null,
+        "cta_clicks_status": "missing_not_implemented",
+        "cta_click_event_name": null,
+        "cta_click_destination": "/quick-log",
         "signup_starts": null,
         "signup_completions": null,
         "first_meaningful_activation": null
@@ -119,6 +122,9 @@
         "average_engagement_time": null,
         "entrances": null,
         "cta_clicks": null,
+        "cta_clicks_status": "missing_not_implemented",
+        "cta_click_event_name": null,
+        "cta_click_destination": "/quick-log",
         "signup_starts": null,
         "signup_completions": null,
         "first_meaningful_activation": null
@@ -162,6 +168,18 @@
     "automatic_page_views_without_explicit_page_path_observed": 5,
     "per_page_measurement_defect": "Enhanced Measurement emitted automatic page_view events without Verdant's explicit page_path alongside Verdant's exact SPA events on five SPA/history transitions.",
     "repair_status": "owner_enhanced_measurement_review_required",
+    "guide_cta_click_measurement": {
+      "status": "missing_not_implemented",
+      "event_name": null,
+      "destination": "/quick-log",
+      "not_inferred_from": [
+        "destination_page_view",
+        "quick_log_saved",
+        "signup",
+        "checkout"
+      ],
+      "day_0_blocking": false
+    },
     "required_access": "Read-only authenticated access to the existing Verdant GA4 property through a reporting session or authorized Data API credential.",
     "blocked_fields": [
       "property",
@@ -173,7 +191,6 @@
       "engagement_rate",
       "average_engagement_time",
       "entrances",
-      "cta_clicks",
       "signup_starts",
       "signup_completions",
       "first_meaningful_activation"

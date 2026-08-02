@@ -9,3 +9,4 @@ node_modules
 src/integrations/supabase/types.ts
 supabase/functions/_shared/lib/integrations/supabase/types.ts
 docs/archive/legacy/verdant-master-prompt-legacy.md
+artifacts/seo/seo-readiness-status.json

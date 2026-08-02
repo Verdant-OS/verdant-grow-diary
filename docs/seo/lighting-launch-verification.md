@@ -191,6 +191,20 @@ evidence until owner-authorized re-verification completes.
 
 **GA4 page-view singleton contract: FAIL — OWNER ENHANCED MEASUREMENT CHANGE REQUIRED**
 
+## Guide CTA measurement gap
+
+Each lighting guide has one prominent public CTA to `/quick-log`, but it is a
+plain `GuidePage` link with no guide-specific CTA-click event. Guide CTA clicks
+are therefore `MISSING`, not zero and not inferred from a destination page
+view, a later `quick_log_saved`, or any other downstream event. No CTA event
+means no user-entered text, user identifier, grow/tent/plant identifier, or
+private route value is emitted.
+
+This documented P2 gap does not block Day 0 after page-view identity and the
+authenticated GA4/GSC baselines are sound. Adding attribution requires a
+separate authorized analytics/privacy slice; this readiness work adds no new
+event or runtime behavior.
+
 ## Authenticated access and monitoring status
 
 - **GA4 baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.

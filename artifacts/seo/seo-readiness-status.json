@@ -108,6 +108,25 @@
     },
     "evidence": "docs/seo/lighting-launch-verification.md"
   },
+  "measurement_contract": {
+    "guide_cta_clicks": {
+      "status": "MISSING",
+      "event_name": null,
+      "destination": "/quick-log",
+      "public_guide_slugs": [
+        "cannabis-grow-light-distance-and-schedule",
+        "cannabis-light-stress-light-burn-bleaching-or-heat"
+      ],
+      "not_inferred_from": [
+        "destination_page_view",
+        "quick_log_saved",
+        "signup",
+        "checkout"
+      ],
+      "day_0_blocking": false,
+      "evidence": "docs/v0-loop-event-map.md"
+    }
+  },
   "technical_seo": {
     "last_http_verified_at": "2026-08-02T02:07:12.279Z",
     "lighting_pages": "PASS",
@@ -206,6 +225,17 @@
       "required_action": "Complete Search Console property verification, sitemap confirmation, and owner-approved read-only access in the owner checklist."
     }
   ],
+  "measurement_gaps": [
+    {
+      "id": "LIGHTING_GUIDE_CTA_ATTRIBUTION",
+      "priority": "P2",
+      "status": "MISSING",
+      "event_name": null,
+      "destination": "/quick-log",
+      "reason": "Both lighting-guide CTAs are plain GuidePage links; no guide-specific CTA-click event is emitted.",
+      "day_0_blocking": false
+    }
+  ],
   "verified_defects": [
     {
       "id": "SEO_MONITORING_STALE_TERMINAL_SUMMARY",
@@ -245,10 +275,10 @@
     }
   ],
   "current_slice": {
-    "priority": "P3",
-    "id": "STALE_SEO_READINESS_EVIDENCE",
-    "status": "FIXED_AND_LOCAL_VERIFIED",
-    "evidence": "Existing readiness artifacts now identify a2077699 as the matching production and deploy head, retain the lighting-scope release pass, and record the completed nine-state intercepted collection result."
+    "priority": "P2",
+    "id": "LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT",
+    "status": "DOCUMENTED_MISSING_NO_EVENT_ADDED",
+    "evidence": "The two lighting-guide CTAs resolve to /quick-log without a guide-specific click event. The measurement contract and baseline now classify guide CTA clicks as missing and exclude downstream-event inference."
   },
   "next_slice": {
     "priority": "P0",

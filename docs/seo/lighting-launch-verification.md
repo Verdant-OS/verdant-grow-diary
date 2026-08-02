@@ -1,6 +1,6 @@
 # Lighting launch verification
 
-**Generated:** 2026-08-01T15:57:30.7455630Z
+**Generated:** 2026-08-02T05:19:48.245Z
 **Production host:** https://verdantgrowdiary.com
 **Merged PR:** [#595](https://github.com/Verdant-OS/verdant-grow-diary/pull/595)
 **Merge commit:** `1223c56c9db586160a2798d017c2e78d1de1dd5a`
@@ -9,8 +9,8 @@ commit `51363737ca97e74f861558f082b849bbbd389aa2`
 **Lovable project:** `66255e7b-892c-4be5-8686-ab1cfc3666db`
 **Structured-data repair:** [#624](https://github.com/Verdant-OS/verdant-grow-diary/pull/624),
 commit `b62aac5d4b0e9296bfdbee4c46e03fc35f350c0c`
-**Production build manifest commit:** `e623aa9d913698ca6795b3d6b75bd069d9a67681`
-**Deploy branch head:** `e623aa9d913698ca6795b3d6b75bd069d9a67681`
+**Production build manifest commit:** `a20776993bd606f07977674934864b888a407e1c`
+**Deploy branch head:** `a20776993bd606f07977674934864b888a407e1c`
 **Production deployment ID:** not exposed by the current production response
 
 ## Launch verdict
@@ -19,16 +19,18 @@ commit `b62aac5d4b0e9296bfdbee4c46e03fc35f350c0c`
 
 Both pages are published, publicly reachable, intentionally indexable, and match the content merged
 in PR #595. The explicit page-identity repair from PR #597 and structured-data ownership repair from
-PR #624 are live. Across eight direct, cross-guide, history, refresh, repeat, and new-tab states,
-each page exposed its exact route path, title, query-free location, canonical, and one current set of
-page-level JSON-LD identities. Protected identifiers remained masked.
+PR #624 are live. The eight-state structured-data matrix still exposes one current set of page-level
+JSON-LD identities per page state, with protected identifiers masked. The last completed nine-state
+app-level collection matrix (`2026-08-02T02:08:43.179Z`) emitted one exact explicit SPA page view
+for each expected route, title, and query-free location.
 
-One production instrumentation defect still prevents a ready verdict: GA4's tag emitted four
-automatic page views without Verdant's explicit `page_path` alongside eight exact app-owned SPA
-events. All collection requests were fulfilled locally, so no verification events were transmitted
-to GA4. The automatic source requires an owner-side Enhanced Measurement review because
-authenticated stream settings are unavailable. Authenticated GA4 reporting and Search Console
-inspection are also unavailable, so Day 0 remains unset.
+One production instrumentation defect still prevents a ready verdict: a controlled nine-state
+collection-endpoint matrix observed nine exact app-owned SPA events plus five automatic page views
+without Verdant's explicit `page_path` on SPA/history transitions. All collection requests were
+fulfilled locally, so no verification events were transmitted to GA4. The automatic source requires
+an owner-side Enhanced Measurement review because authenticated stream settings are unavailable.
+Authenticated GA4 reporting and Search Console inspection are also unavailable, so Day 0 remains
+unset.
 
 The owner-confirmed GA4 production stream is `Verdant Grow Diary`, stream URL
 `https://verdantgrowdiary.com`, stream ID `15065867361`, and measurement ID `G-B3QRSZEM9S`.
@@ -38,20 +40,33 @@ numeric property ID and authenticated reporting baseline remain unavailable to C
 ## Publication and release evidence
 
 - `https://verdantgrowdiary.com/version.json` identifies production build commit
-  `e623aa9d913698ca6795b3d6b75bd069d9a67681`, built at
-  `2026-08-01T06:20:32.105Z`.
+  `a20776993bd606f07977674934864b888a407e1c`, built at
+  `2026-08-02T01:28:54.548Z`.
 - Repository ancestry proves the PR #595 release, PR #597 analytics repair, and PR #624
   structured-data repair commits are all ancestors of that production manifest commit.
-- Production and deploy branch head match at `e623aa9d913698ca6795b3d6b75bd069d9a67681`.
-  This bounded slice changes only readiness evidence; no runtime publish is required.
+- Production manifest and deploy head both resolve to `a2077699…`. The production release now has
+  full deploy-branch parity. Lighting release-content verification remains deliberately scoped to the
+  two guides; no runtime publish is required for the measurement evidence itself.
+- The point-in-time readiness artifact identifies the recheck-bearing evidence head
+  (`913f1b9deb0934d5ce76491cbc945816f4581b73`) separately from its audited production release
+  (`a20776993bd606f07977674934864b888a407e1c`). Its pre-recheck audit-start head
+  (`c794e4c6ff0debb6ae2a83566b2a73f690a96393`) was seven evidence-only commits ahead at audit
+  start and is not represented as deployed content. Neither evidence commit identifies deployed
+  application content.
+- Its evidence snapshot remains timestamped `2026-08-02T05:19:48.245Z`. The later
+  `2026-08-02T08:07:28.792Z` revision is classified as
+  `POST_DEPLOY_ANALYTICS_RECHECK_PROVENANCE_CORRECTION_ONLY`; it corrects the audit-head
+  provenance without adding a fresh production or analytics verification.
 - The current production response does not expose a Lovable deployment ID, so none is inferred.
 - Both release-specific URLs, titles, descriptions, H1s, Article/FAQ schema, sitemap entries, and
   cross-links are present in production.
-- The public probe at `2026-08-01T15:20:20.962Z` returned HTTP 200 for `version.json`, both
+- The raw public probe at `2026-08-02T02:53:25.627Z` returned HTTP 200 for `version.json`, both
   lighting guides, `sitemap.xml`, and `robots.txt`. The sitemap contains 51 URLs and each lighting
-  route exactly once; robots declares the production sitemap and protects app prefixes.
+  route exactly once; robots declares the production sitemap and protects app prefixes. Rendered
+  browser checks at `2026-08-02T02:55:02.718Z` and `2026-08-02T02:55:07.852Z` confirmed both
+  pages' route-scoped metadata, JSON-LD identities, cross-links, and zero application errors.
 
-**Release content match: PASS**
+**Release content match: PASS — LIGHTING GUIDES ONLY; DEPLOYMENT PARITY: PASS**
 
 ## Exact lighting pages
 
@@ -149,7 +164,8 @@ mixed into the GA4 repair.
 
 ## Measurement repair verification
 
-Production now emits explicit `page_view` events for the two pages with:
+The last completed controlled collection matrix observed production emitting explicit `page_view`
+events for the two pages with:
 
 ```text
 page_location = https://verdantgrowdiary.com/guides/cannabis-grow-light-distance-and-schedule
@@ -161,47 +177,82 @@ page_path = /guides/cannabis-light-stress-light-burn-bleaching-or-heat
 page_title = Cannabis Light Stress: Burn, Bleaching, or Heat? | Verdant
 ```
 
-The browser verification fulfilled the collection endpoint locally, so the inspected payloads did
-not add verification traffic to the production property. Protected token-bearing paths remained
-masked. Verdant emitted eight exact explicit events across eight observed navigation actions:
-direct deep-link load, both cross-guide directions, back, forward, refresh, repeated navigation,
-and a new tab.
+That completed matrix fulfilled the collection endpoint locally, so the inspected payloads did not
+add verification traffic to the production property. Protected token-bearing paths remained masked.
+Verdant emitted nine exact explicit events across nine observed navigation states: direct deep-link
+load, refresh on each guide, both cross-guide directions, back, forward, repeated navigation, and a
+new tab.
 
-The collection endpoint also received four tag-generated `page_view` events without Verdant's
-explicit `page_path` during history, refresh, and repeated navigation. That is consistent with GA4 Enhanced Measurement's
-separate browser-history page-view option and would double-count some navigation if left enabled
-beside Verdant's explicit SPA owner. The owner must disable the advanced "page changes based on
-browser history events" option in the existing stream, retain the explicit app emitter, and then
-authorize the same controlled re-verification.
+The collection endpoint also received five tag-generated `page_view` events without Verdant's
+explicit `page_path` during cross-guide, back/forward, and repeated navigation. That is consistent
+with GA4 Enhanced Measurement's separate browser-history page-view option and would double-count
+those navigations if left enabled beside Verdant's explicit SPA owner. The owner must disable the
+advanced "page changes based on browser history events" option in the existing stream, retain the
+explicit app emitter, and then authorize the same controlled re-verification.
+
+The production build subsequently advanced to `a2077699…`; its source delta excludes analytics
+paths, and current source inspection preserves the explicit SPA emitter and bootstrap
+`send_page_view: false`. A corrected targeted post-deploy recheck at `2026-08-02T05:19:48.245Z`
+fulfilled every observed GA collection request locally. Across a direct distance-guide load and a
+client transition to the stress guide, it observed two exact app-owned page views and one separate
+automatic page view without the explicit path: three page views for two navigation actions. The
+interceptor covered `analytics.google.com`, `google-analytics.com`, and
+`stats.g.doubleclick.net`; five collection requests were fulfilled locally and zero escaped.
+
+A preceding exploratory browser probe omitted `analytics.google.com` from its collection-host
+matcher. It is excluded from this evidence, and its transmission status is not asserted. The corrected
+two-state recheck reconfirms the P0 owner-setting defect but does not replace the completed
+`2026-08-02T02:08:43.179Z` nine-state matrix.
 
 **GA4 explicit page identity: PASS**
 
 **GA4 page-view singleton contract: FAIL — OWNER ENHANCED MEASUREMENT CHANGE REQUIRED**
+
+## Guide CTA measurement gap
+
+Each lighting guide has one prominent public CTA to `/quick-log`, but it is a
+plain `GuidePage` link with no guide-specific CTA-click event. Guide CTA clicks
+are therefore `MISSING`, not zero and not inferred from a destination page
+view, a later `quick_log_saved`, or any other downstream event. No CTA event
+means no user-entered text, user identifier, grow/tent/plant identifier, or
+private route value is emitted.
+
+This documented P2 gap does not block Day 0 after page-view identity and the
+authenticated GA4/GSC baselines are sound. Adding attribution requires a
+separate authorized analytics/privacy slice; this readiness work adds no new
+event or runtime behavior.
 
 ## Authenticated access and monitoring status
 
 - **GA4 baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
 - **GSC baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
 - **GA4 production stream identity:** PASS — owner-confirmed values match the deployed host and tag.
-- At `2026-08-01T15:57:30.7455630Z`, name-only GitHub secret listings found none of the expected GA4
+- At `2026-08-02T02:08:43.179Z`, name-only GitHub secret listings found none of the expected GA4
   or GSC reporting secrets configured at repository scope or in the `verdant-production`,
   `verdant-sandbox`, and `copilot` environments; `.seo/gsc-token.local.json` is also absent. The
   workflow and documentation reference the expected `GSC_*` names, but no credential value was
   read or recorded in this verification.
-- The latest SEO workflow on deploy head `e623aa9d9…`
-  ([run 30687660034](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30687660034))
+- The latest SEO workflow on deploy head `a2077699…`
+  ([run 30727208474](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30727208474))
   succeeded and evaluated all 51 sitemap URLs. Its GSC operation was `SKIPPED`, access was
   `BLOCKED`, execution was `SKIPPED`, OAuth was not configured, and it made 0 GSC API attempts.
   Workflow success is not an authenticated GSC baseline.
+- The checked-in `artifacts/seo/seo-job-summary.*` pair is a historical 2026-07-02 dry-run
+  (two URLs), not the current monitoring evidence. The readiness artifact identifies run
+  `30727208474` and its immutable `seo-monitoring-reports` artifact (`8826754533`) as the current
+  51-URL, access-blocked evidence instead.
 - Owner handoff: complete the status-marked steps in the
   [lighting analytics owner setup checklist](./analytics-owner-setup-checklist.md) without sending
   credentials through chat or committing them.
 - Machine-readable handoff: the current blocked state is recorded in
   [`artifacts/seo/seo-readiness-status.json`](../../artifacts/seo/seo-readiness-status.json).
 
-The current bounded slice is `P3 STALE_PRODUCTION_JSON_LD_READINESS_EVIDENCE`; it aligns the existing
-human and machine-readable handoff with the production proof without changing runtime code. The
-highest remaining defect is owner-blocked P0:
+The current bounded slice is `P2 LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT`: its event classification
+is `MISSING`, while its metric readiness status is `NOT_MEASURED`; downstream activity is not used
+as attribution. The completed `P3 READINESS_ARTIFACT_PROVENANCE` repair keeps the point-in-time
+evidence-branch head separate from the audited production release and distinguishes current
+monitoring evidence from historical dry-run summaries without changing runtime code. The highest
+remaining defect is owner-blocked P0:
 `GA4_ENHANCED_MEASUREMENT_HISTORY_PAGE_VIEWS`.
 
 Day 0 remains `UNSET`, and the four-week clock remains `NOT_STARTED`, until both authenticated

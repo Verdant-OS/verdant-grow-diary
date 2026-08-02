@@ -13,16 +13,24 @@ const RAW_BASELINE = readFileSync(
   "utf8",
 );
 const BASELINE = JSON.parse(RAW_BASELINE) as Record<string, unknown>;
+const LAUNCH_VERIFICATION = readFileSync(
+  resolve(ROOT, "docs/seo/lighting-launch-verification.md"),
+  "utf8",
+);
+const MEASUREMENT_PLAN = readFileSync(
+  resolve(ROOT, "docs/seo/lighting-four-week-measurement-plan.md"),
+  "utf8",
+);
 const IDENTITY_BEARING_ARTIFACTS = [
   RAW_ARTIFACT,
   RAW_BASELINE,
   readFileSync(resolve(ROOT, "docs/seo/analytics-owner-setup-checklist.md"), "utf8"),
   readFileSync(resolve(ROOT, "docs/seo/lighting-four-week-measurement-plan.md"), "utf8"),
-  readFileSync(resolve(ROOT, "docs/seo/lighting-launch-verification.md"), "utf8"),
+  LAUNCH_VERIFICATION,
 ];
 const JOB_SUMMARY = JSON.parse(
   readFileSync(resolve(ROOT, "artifacts/seo/seo-job-summary.json"), "utf8"),
-) as { mode: string; status: string };
+) as Record<string, unknown>;
 
 const EXPECTED_STATUS_VOCABULARY = [
   "PASS",
@@ -30,20 +38,55 @@ const EXPECTED_STATUS_VOCABULARY = [
   "BLOCKED",
   "NO_BASELINE",
   "NO_DATA",
+  "NOT_MEASURED",
   "SKIPPED",
   "NOT_APPLICABLE",
 ];
+
+function collectPlainStatusValues(
+  value: unknown,
+  path = "$",
+): Array<{ path: string; value: unknown }> {
+  if (Array.isArray(value)) {
+    return value.flatMap((entry, index) => collectPlainStatusValues(entry, `${path}[${index}]`));
+  }
+
+  if (value === null || typeof value !== "object") {
+    return [];
+  }
+
+  return Object.entries(value as Record<string, unknown>).flatMap(([key, entry]) => {
+    const entryPath = `${path}.${key}`;
+    return [
+      ...(key === "status" ? [{ path: entryPath, value: entry }] : []),
+      ...collectPlainStatusValues(entry, entryPath),
+    ];
+  });
+}
 
 describe("SEO readiness status artifact", () => {
   it("keeps the exact canonical blocked-mode contract and defect verdict", () => {
     expect(READINESS).toMatchObject({
       schema_version: 1,
       scope: "LIGHTING_LAUNCH_MEASUREMENT",
+      generated_at_semantics: "EVIDENCE_SNAPSHOT_CAPTURE_TIME",
+      artifact_revision: {
+        revised_at: "2026-08-02T08:07:28.792Z",
+        revision_scope: "POST_DEPLOY_ANALYTICS_RECHECK_PROVENANCE_CORRECTION_ONLY",
+        production_or_analytics_reverification_performed: false,
+      },
       timezone: "America/Chicago",
       artifact_semantics: "POINT_IN_TIME_EVIDENCE_SNAPSHOT",
       operating_mode: "MODE_A_ACCESS_BLOCKED_READINESS_WORK",
       verdict: "NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND",
       status_vocabulary: EXPECTED_STATUS_VOCABULARY,
+      event_classification_vocabulary: [
+        "IMPLEMENTED_AND_VERIFIED",
+        "IMPLEMENTED_NOT_VERIFIED",
+        "MISSING",
+        "NOT_APPLICABLE",
+        "BLOCKED_BY_ACCESS",
+      ],
       production_status: "PASS",
       analytics_identity_status: "FAIL",
       technical_seo_status: "PASS",
@@ -59,26 +102,51 @@ describe("SEO readiness status artifact", () => {
     expect(RAW_ARTIFACT).toBe(`${JSON.stringify(READINESS, null, 2)}\n`);
   });
 
-  it("pins repository, deploy, and production identities with observed equality", () => {
+  it("keeps every generic status field inside the declared vocabulary", () => {
+    expect(READINESS.status_vocabulary_scope).toBe(
+      "Every object member named exactly status uses status_vocabulary. Lifecycle detail is carried in lifecycle_state; domain-specific *_status fields document their own value sets.",
+    );
+
+    const declaredStatuses = new Set(EXPECTED_STATUS_VOCABULARY);
+    for (const { path, value } of collectPlainStatusValues(READINESS)) {
+      expect(declaredStatuses, path).toContain(value);
+    }
+  });
+
+  it("keeps the human-readable handoff aligned with the artifact revision metadata", () => {
+    const revision = READINESS.artifact_revision as Record<string, unknown>;
+    const targetedRecheck = (READINESS.analytics_identity as Record<string, unknown>)
+      .targeted_post_deploy_recheck as Record<string, unknown>;
+    expect(LAUNCH_VERIFICATION).toContain(`\`${revision.revised_at}\``);
+    expect(LAUNCH_VERIFICATION).toContain(`\`${revision.revision_scope}\``);
+    expect(LAUNCH_VERIFICATION).toContain(`\`${targetedRecheck.recorded_in_commit}\``);
+  });
+
+  it("separates the point-in-time evidence head from the audited deploy release", () => {
     expect(READINESS.run_context).toEqual({
       repository: "Verdant-OS/verdant-grow-diary",
-      branch: "codex/refresh-seo-measurement-readiness",
-      head: "e623aa9d913698ca6795b3d6b75bd069d9a67681",
+      audit_branch: "codex/seo-readiness-evidence-20260802",
+      audit_head: "913f1b9deb0934d5ce76491cbc945816f4581b73",
+      pre_recheck_audit_head: "c794e4c6ff0debb6ae2a83566b2a73f690a96393",
+      audit_head_is_descendant_of_deploy_branch_head: true,
       deploy_branch: "verdant-grow-diary",
-      deploy_branch_head: "e623aa9d913698ca6795b3d6b75bd069d9a67681",
-      head_equals_deploy_branch_head: true,
+      deploy_branch_head: "a20776993bd606f07977674934864b888a407e1c",
+      audited_release_head: "a20776993bd606f07977674934864b888a407e1c",
+      audited_release_equals_deploy_branch_head: true,
       working_tree_status: "CLEAN_AT_AUDIT_START",
     });
     expect(READINESS.production).toMatchObject({
       host: "https://verdantgrowdiary.com",
-      observed_at: "2026-08-01T15:20:20.962Z",
-      manifest_commit: "e623aa9d913698ca6795b3d6b75bd069d9a67681",
-      build_time: "2026-08-01T06:20:32.105Z",
+      observed_at: "2026-08-02T02:53:25.627Z",
+      manifest_commit: "a20776993bd606f07977674934864b888a407e1c",
+      build_time: "2026-08-02T01:28:54.548Z",
       matches_deploy_branch_head: true,
       manifest_is_ancestor_of_deploy_branch_head: true,
       source_delta_since_manifest: "NONE_DEPLOY_MATCHES_PRODUCTION",
       production_publish_required: false,
       release_content_match: "PASS",
+      release_content_scope: "LIGHTING_GUIDES_ONLY",
+      full_deploy_branch_parity: "CURRENT",
       sitemap_url_count: 51,
       robots_declares_production_sitemap: true,
       robots_protects_app_prefixes: true,
@@ -132,9 +200,10 @@ describe("SEO readiness status artifact", () => {
 
   it("separates passing collection evidence from unavailable authenticated baselines", () => {
     expect(READINESS.analytics_identity).toMatchObject({
-      last_full_verified_at: "2026-08-01T15:20:20.962Z",
+      last_full_verified_at: "2026-08-02T02:08:43.179Z",
       verification_method: "INTERCEPTED_BROWSER_COLLECTION_REQUESTS",
       test_events_transmitted: false,
+      test_events_transmitted_scope: "COMPLETED_NINE_STATE_FULL_MATRIX_ONLY",
       stream_identity_status: "PASS",
       stream_identity_evidence: "OWNER_CONFIRMED_VALUES_MATCH_DEPLOYED_PRODUCTION_TAG",
       stream: {
@@ -151,10 +220,30 @@ describe("SEO readiness status artifact", () => {
       automatic_history_page_views: "FAIL_OWNER_REVIEW_REQUIRED",
       protected_id_masking: "PASS",
       verification_counts: {
-        navigation_actions: 8,
-        exact_explicit_page_views: 8,
-        automatic_page_views_without_explicit_page_path: 4,
+        navigation_actions: 9,
+        exact_explicit_page_views: 9,
+        automatic_page_views_without_explicit_page_path: 5,
         verification_events_transmitted: 0,
+      },
+      last_targeted_recheck_at: "2026-08-02T05:19:48.245Z",
+      targeted_post_deploy_recheck: {
+        scope: "DIRECT_DEEP_LINK_AND_CROSS_GUIDE_CLIENT_NAVIGATION",
+        production_manifest_commit: "a20776993bd606f07977674934864b888a407e1c",
+        recorded_in_commit: "913f1b9deb0934d5ce76491cbc945816f4581b73",
+        interceptor_host_coverage: [
+          "analytics.google.com",
+          "google-analytics.com",
+          "stats.g.doubleclick.net",
+        ],
+        collection_requests_fulfilled_locally: 5,
+        escaped_collection_requests: 0,
+        navigation_actions: 2,
+        exact_explicit_page_views: 2,
+        automatic_page_views_without_explicit_page_path: 1,
+        verification_events_transmitted: 0,
+        evidence_scope: "TARGETED_POST_DEPLOY_P0_RECHECK_NOT_A_FULL_MATRIX_REPLACEMENT",
+        excluded_exploratory_probe:
+          "A preceding exploratory browser probe omitted analytics.google.com from its interception matcher and is excluded from evidence; its transmission status is not asserted.",
       },
     });
     expect(READINESS.ga4).toEqual({
@@ -180,7 +269,7 @@ describe("SEO readiness status artifact", () => {
       baseline_status: "BLOCKED",
       authenticated_reporting_available: false,
       latest_workflow_run:
-        "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30687660034",
+        "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30727208474",
       latest_workflow_status: "PASS",
       operation_status: "SKIPPED",
       access_status: "BLOCKED",
@@ -191,7 +280,32 @@ describe("SEO readiness status artifact", () => {
       metrics: null,
     });
 
-    expect(JOB_SUMMARY).toEqual(expect.objectContaining({ mode: "dry-run", status: "PASS" }));
+    expect(READINESS.monitoring_evidence).toEqual({
+      workflow_status: "PASS",
+      workflow_run_url: "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30727208474",
+      workflow_artifact_name: "seo-monitoring-reports",
+      workflow_artifact_id: 8826754533,
+      workflow_artifact_archive_url:
+        "https://api.github.com/repos/Verdant-OS/verdant-grow-diary/actions/artifacts/8826754533/zip",
+      workflow_head: "a20776993bd606f07977674934864b888a407e1c",
+      workflow_artifact_created_at: "2026-08-02T01:32:13Z",
+      urls_evaluated: 51,
+      gsc_access_status: "BLOCKED",
+      gsc_execution_status: "SKIPPED",
+      gsc_api_attempts: 0,
+      repository_summary_scope: "HISTORICAL_DRY_RUN",
+      repository_summary_is_current: false,
+    });
+    expect(JOB_SUMMARY).toEqual(
+      expect.objectContaining({
+        generated_at: "2026-07-02T23:49:05.536Z",
+        mode: "dry-run",
+        status: "PASS",
+        urls_evaluated: 2,
+        workflow_run_url: null,
+        gsc_access_status: "NOT_APPLICABLE",
+      }),
+    );
     expect(READINESS.gsc_access_status).toBe("BLOCKED");
   });
 
@@ -209,9 +323,17 @@ describe("SEO readiness status artifact", () => {
     );
     expect(production.production_publish_required).toBe(release.production_publish_required);
     expect(production.observed_at).toBe(publicProbe.observed_at);
+    expect(production.matches_deploy_branch_head).toBe(true);
+    expect(release.production_matches_deploy_branch_head).toBe(true);
+    expect(production.full_deploy_branch_parity).toBe("CURRENT");
+    expect(release.full_deploy_branch_parity).toBe("current");
+    expect(production.release_content_scope).toBe("LIGHTING_GUIDES_ONLY");
+    expect(release.release_content_scope).toBe("lighting_guides_only");
     expect(BASELINE.artifact_semantics).toBe("POINT_IN_TIME_EVIDENCE_SNAPSHOT");
+    expect(BASELINE.generated_at).toBe(READINESS.generated_at);
     expect(baselineGa4).toMatchObject({
       stream_identity_status: "pass_owner_confirmed_matches_production",
+      production_collection_observation_scope: "COMPLETED_NINE_STATE_FULL_MATRIX_ONLY",
       stream: {
         name: "Verdant Grow Diary",
         url: "https://verdantgrowdiary.com",
@@ -230,6 +352,24 @@ describe("SEO readiness status artifact", () => {
     expect((READINESS.measurement as Record<string, unknown>).measurement_start_at).toBe(
       BASELINE.measurement_start_at,
     );
+    expect(baselineGa4.targeted_post_deploy_recheck).toEqual({
+      observed_at: "2026-08-02T05:19:48.245Z",
+      scope: "direct_deep_link_and_cross_guide_client_navigation",
+      production_manifest_commit: "a20776993bd606f07977674934864b888a407e1c",
+      interceptor_host_coverage: [
+        "analytics.google.com",
+        "google-analytics.com",
+        "stats.g.doubleclick.net",
+      ],
+      collection_requests_fulfilled_locally: 5,
+      escaped_collection_requests: 0,
+      navigation_actions: 2,
+      exact_explicit_page_views: 2,
+      automatic_page_views_without_explicit_page_path: 1,
+      verification_events_transmitted: 0,
+      evidence_scope: "targeted_post_deploy_p0_recheck_not_a_full_matrix_replacement",
+      excluded_exploratory_probe_transmission_status: "unknown_not_evidence",
+    });
   });
 
   it("leaves Day 0 and every weekly checkpoint unset", () => {
@@ -267,36 +407,55 @@ describe("SEO readiness status artifact", () => {
         expect.objectContaining({
           id: "GSC_REGRESSION_NO_BASELINE_SEMANTICS",
           priority: "P3",
-          status: "FIXED_AND_POST_MERGE_VERIFIED",
+          status: "PASS",
+          lifecycle_state: "FIXED_AND_POST_MERGE_VERIFIED",
         }),
         expect.objectContaining({
           id: "LIGHTING_DUPLICATE_HYDRATED_JSON_LD",
           priority: "P1",
-          status: "FIXED_AND_PRODUCTION_VERIFIED",
+          status: "PASS",
+          lifecycle_state: "FIXED_AND_PRODUCTION_VERIFIED",
         }),
         expect.objectContaining({
           id: "GA4_ENHANCED_MEASUREMENT_DUPLICATE_PAGE_VIEWS",
           priority: "P0",
-          status: "VERIFIED_UNFIXED_OWNER_ACTION_REQUIRED",
+          status: "FAIL",
+          lifecycle_state: "VERIFIED_UNFIXED_OWNER_ACTION_REQUIRED",
         }),
         expect.objectContaining({
-          id: "STALE_PRODUCTION_JSON_LD_READINESS_EVIDENCE",
+          id: "STALE_SEO_READINESS_EVIDENCE",
           priority: "P3",
-          status: "FIXED_AND_LOCAL_VERIFIED",
+          status: "PASS",
+          lifecycle_state: "FIXED_AND_LOCAL_VERIFIED",
+        }),
+        expect.objectContaining({
+          id: "READINESS_ARTIFACT_PROVENANCE",
+          priority: "P3",
+          status: "PASS",
+          lifecycle_state: "FIXED_AND_LOCAL_VERIFIED",
         }),
       ]),
     );
+    const provenanceDefect = (READINESS.verified_defects as Array<Record<string, unknown>>).find(
+      (defect) => defect.id === "READINESS_ARTIFACT_PROVENANCE",
+    );
+    const runContext = READINESS.run_context as Record<string, unknown>;
+    expect(provenanceDefect?.evidence).toContain(runContext.audit_head);
+    expect(provenanceDefect?.evidence).toContain(runContext.audited_release_head);
+    expect(provenanceDefect?.evidence).toContain("913f1b9deb0934d5ce76491cbc945816f4581b73");
     expect(READINESS.current_slice).toEqual({
-      priority: "P3",
-      id: "STALE_PRODUCTION_JSON_LD_READINESS_EVIDENCE",
-      status: "FIXED_AND_LOCAL_VERIFIED",
+      priority: "P2",
+      id: "LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT",
+      status: "NOT_MEASURED",
+      lifecycle_state: "DOCUMENTED_MISSING_NO_EVENT_ADDED",
       evidence:
-        "Existing readiness artifacts now identify e623aa9d9 as the matching production/deploy head and record the eight-state production JSON-LD pass.",
+        "The two lighting-guide CTAs resolve to /quick-log without a guide-specific click event. Their event classification is MISSING and their metric readiness status is NOT_MEASURED, so downstream activity is not used as attribution.",
     });
     expect(READINESS.next_slice).toEqual({
       priority: "P0",
       id: "GA4_ENHANCED_MEASUREMENT_HISTORY_PAGE_VIEWS",
-      status: "BLOCKED_BY_OWNER_ACCESS",
+      status: "BLOCKED",
+      lifecycle_state: "BLOCKED_BY_OWNER_ACCESS",
     });
     expect(RAW_ARTIFACT).not.toContain("PENDING_MERGE");
   });
@@ -311,12 +470,17 @@ describe("SEO readiness status artifact", () => {
     expect(readFileSync(resolve(ROOT, ".gitignore"), "utf8")).toContain(
       "!artifacts/seo/seo-readiness-status.json",
     );
+    expect(READINESS.artifact_paths).toMatchObject({
+      current_monitoring_evidence: "docs/seo/lighting-launch-verification.md",
+      historical_monitoring_summary_json: "artifacts/seo/seo-job-summary.json",
+      historical_monitoring_summary_markdown: "artifacts/seo/seo-job-summary.md",
+    });
   });
 
   it("contains no credentials, private paths, or fake zero metrics", () => {
     expect(READINESS.reporting_access_configuration).toEqual({
-      observed_at: "2026-08-01T15:57:30.7455630Z",
-      audit_method: "GITHUB_SECRET_NAME_LISTING",
+      observed_at: "2026-08-02T02:08:43.179Z",
+      audit_method: "GITHUB_SECRET_NAME_LISTING_AND_CURRENT_DEPLOY_WORKFLOW",
       configured_scopes_checked: [
         "repository",
         "environment:verdant-production",
@@ -358,13 +522,22 @@ describe("SEO readiness status artifact", () => {
   });
 
   it("is discoverable from the human-readable launch verification", () => {
-    const launchVerification = readFileSync(
-      resolve(ROOT, "docs/seo/lighting-launch-verification.md"),
-      "utf8",
-    );
     const internalLinkMap = readFileSync(resolve(ROOT, "docs/seo/internal-link-map.md"), "utf8");
-    expect(launchVerification).toContain("../../artifacts/seo/seo-readiness-status.json");
-    expect(launchVerification).toContain("NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND");
+    expect(LAUNCH_VERIFICATION).toContain("../../artifacts/seo/seo-readiness-status.json");
+    expect(LAUNCH_VERIFICATION).toContain("NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND");
+    expect(LAUNCH_VERIFICATION).toContain("P2 LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT");
+    expect(LAUNCH_VERIFICATION).toContain("P3 READINESS_ARTIFACT_PROVENANCE");
+    expect(LAUNCH_VERIFICATION).toContain(
+      "A preceding exploratory browser probe omitted `analytics.google.com` from its collection-host",
+    );
+    expect(MEASUREMENT_PLAN).toContain("2026-08-02T05:19:48.245Z");
+    expect(MEASUREMENT_PLAN).toMatch(/fulfilled\s+five\s+collection requests locally/);
+    expect(MEASUREMENT_PLAN).toMatch(/zero\s+escaped\s+collection requests/);
+    expect(MEASUREMENT_PLAN).toContain("its transmission status is not asserted.");
+    expect(MEASUREMENT_PLAN).toMatch(/without replacing the\s+count-bearing nine-state matrix/);
+    expect(MEASUREMENT_PLAN).not.toContain(
+      "A later current-production re-run did not return an inspectable final envelope",
+    );
     expect(internalLinkMap).toContain("both lighting routes are live");
     expect(internalLinkMap).not.toContain("they are not claimed as deployed");
   });

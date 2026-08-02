@@ -45,22 +45,28 @@ The public release and technical SEO identity are complete, but an analytics col
 authenticated-access gates remain:
 
 - PR #597 is merged and remains live in production manifest
-  `e623aa9d913698ca6795b3d6b75bd069d9a67681`.
-- Intercepted browser evidence across eight navigation actions preserved each exact lighting-guide
-  path and page-specific title, kept protected IDs masked, and transmitted no verification events.
-  It observed eight exact app-owned page views plus four automatic GA4 page views without Verdant's
-  explicit `page_path`.
+  `a20776993bd606f07977674934864b888a407e1c`.
+- The last completed intercepted browser matrix (`2026-08-02T02:08:43.179Z`) preserved each exact
+  lighting-guide path and page-specific title across nine navigation states, kept protected IDs
+  masked, and transmitted no verification events. It observed nine exact app-owned page views plus
+  five automatic GA4 page views without Verdant's explicit `page_path`. A corrected targeted
+  post-deploy recheck (`2026-08-02T05:19:48.245Z`) then covered one direct distance-guide load and
+  one client transition to the stress guide. It fulfilled five collection requests locally, observed
+  two exact app-owned page views plus one automatic page view without the explicit path, and had zero
+  escaped collection requests. This reconfirms the owner-setting defect without replacing the
+  count-bearing nine-state matrix. A preceding exploratory probe omitted `analytics.google.com` from
+  its matcher and is excluded from this evidence; its transmission status is not asserted.
 - The owner-confirmed GA4 production stream is `Verdant Grow Diary`, stream URL
   `https://verdantgrowdiary.com`, stream ID `15065867361`, and measurement ID `G-B3QRSZEM9S`;
   production loads and targets that exact measurement ID. The property ID is still unconfirmed.
 - The current public probe returns HTTP 200 for both guides, the sitemap, robots, and version
   manifest. The 51-URL sitemap contains each lighting route exactly once, and robots protects app
   prefixes.
-- Workflow [30687660034](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30687660034)
+- Workflow [30727208474](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30727208474)
   succeeded across all 51 URLs, but its GSC operation was `SKIPPED`, access was `BLOCKED`,
   execution was `SKIPPED`, OAuth was not configured, and it made 0 API attempts.
-- Production manifest and deploy head match at
-  `e623aa9d913698ca6795b3d6b75bd069d9a67681`; release content match remains `PASS`.
+- Production manifest and deploy head both resolve to `a2077699…`, so full deploy-branch parity is
+  `PASS`. Lighting release-content verification remains scoped to the two guides.
 - PR #624 is live. Its production direct/cross-guide/history/refresh/repeat/new-tab matrix found one
   current `WebPage`, `FAQPage`, `BreadcrumbList`, and `Article` identity set per page state, with
   zero duplicate identities, zero stale prior-route objects, and zero JSON-LD parse errors.
@@ -87,6 +93,14 @@ implementation evidence, not reporting baselines.
 - **GA4:** authenticated existing Verdant GA4 property only.
 - **Product conversion:** existing privacy-safe events only; no new analytics vendor.
 - **Comparison:** each checkpoint versus the prior checkpoint and the full cumulative window.
+
+### Guide CTA measurement boundary
+
+Guide CTA clicks are currently `MISSING`: both lighting-guide CTAs are plain
+links to `/quick-log`, with no guide-specific click event. Do not infer a CTA
+click from the destination page view, a later `quick_log_saved`, or any other
+downstream event. This is a documented measurement gap, not a Day 0 blocker;
+exclude it from comparison until a separately authorized implementation exists.
 
 ## Weekly review template
 
@@ -129,18 +143,18 @@ Complete one copy for each page at Weeks 1–4.
 
 ### GA4
 
-| Metric                      | Current | Previous | Change |
-| --------------------------- | ------: | -------: | -----: |
-| Page views                  |         |          |        |
-| Users                       |         |          |        |
-| Organic landing sessions    |         |          |        |
-| Engaged sessions            |         |          |        |
-| Engagement rate             |         |          |        |
-| Average engagement time     |         |          |        |
-| CTA clicks                  |         |          |        |
-| Signup starts               |         |          |        |
-| Signup completions          |         |          |        |
-| First meaningful activation |         |          |        |
+| Metric                                     | Current | Previous | Change |
+| ------------------------------------------ | ------: | -------: | -----: |
+| Page views                                 |         |          |        |
+| Users                                      |         |          |        |
+| Organic landing sessions                   |         |          |        |
+| Engaged sessions                           |         |          |        |
+| Engagement rate                            |         |          |        |
+| Average engagement time                    |         |          |        |
+| Guide CTA clicks (MISSING — do not report) |         |          |        |
+| Signup starts                              |         |          |        |
+| Signup completions                         |         |          |        |
+| First meaningful activation                |         |          |        |
 
 ### Interpretation
 

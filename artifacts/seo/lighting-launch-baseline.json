@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-01T15:57:30.7455630Z",
+  "generated_at": "2026-08-02T05:19:48.245Z",
   "artifact_semantics": "POINT_IN_TIME_EVIDENCE_SNAPSHOT",
   "measurement_start_at": null,
   "measurement_status": "blocked",
@@ -12,9 +12,9 @@
     "pull_request": 595,
     "merge_commit": "1223c56c9db586160a2798d017c2e78d1de1dd5a",
     "lovable_project_id": "66255e7b-892c-4be5-8686-ab1cfc3666db",
-    "publisher_latest_commit_sha": "e623aa9d913698ca6795b3d6b75bd069d9a67681",
+    "publisher_latest_commit_sha": "a20776993bd606f07977674934864b888a407e1c",
     "production_version_url": "https://verdantgrowdiary.com/version.json",
-    "production_build_time": "2026-08-01T06:20:32.105Z",
+    "production_build_time": "2026-08-02T01:28:54.548Z",
     "production_deployment_id": null,
     "pull_request_merge_in_production_commit": true,
     "measurement_repair_pull_request": 597,
@@ -23,15 +23,17 @@
     "structured_data_repair_pull_request": 624,
     "structured_data_repair_commit": "b62aac5d4b0e9296bfdbee4c46e03fc35f350c0c",
     "structured_data_repair_in_production_commit": true,
-    "deploy_branch_head": "e623aa9d913698ca6795b3d6b75bd069d9a67681",
+    "deploy_branch_head": "a20776993bd606f07977674934864b888a407e1c",
     "production_manifest_is_ancestor_of_deploy_branch_head": true,
     "production_matches_deploy_branch_head": true,
     "source_delta_since_manifest": "none_deploy_matches_production",
     "production_publish_required": false,
-    "release_content_match": "pass"
+    "release_content_match": "pass",
+    "release_content_scope": "lighting_guides_only",
+    "full_deploy_branch_parity": "current"
   },
   "public_probe": {
-    "observed_at": "2026-08-01T15:20:20.962Z",
+    "observed_at": "2026-08-02T02:53:25.627Z",
     "version_http_status": 200,
     "lighting_pages_http_status": 200,
     "sitemap_http_status": 200,
@@ -70,6 +72,9 @@
         "average_engagement_time": null,
         "entrances": null,
         "cta_clicks": null,
+        "cta_clicks_status": "NOT_MEASURED",
+        "cta_click_event_name": null,
+        "cta_click_destination": "/quick-log",
         "signup_starts": null,
         "signup_completions": null,
         "first_meaningful_activation": null
@@ -117,6 +122,9 @@
         "average_engagement_time": null,
         "entrances": null,
         "cta_clicks": null,
+        "cta_clicks_status": "NOT_MEASURED",
+        "cta_click_event_name": null,
+        "cta_click_destination": "/quick-log",
         "signup_starts": null,
         "signup_completions": null,
         "first_meaningful_activation": null
@@ -153,13 +161,46 @@
     },
     "property_id": null,
     "production_collection_observed": true,
-    "production_collection_observed_at": "2026-08-01T15:20:20.962Z",
+    "production_collection_observed_at": "2026-08-02T02:08:43.179Z",
     "production_collection_observation_sent_to_property": false,
-    "navigation_actions_verified": 8,
-    "exact_explicit_page_views_observed": 8,
-    "automatic_page_views_without_explicit_page_path_observed": 4,
-    "per_page_measurement_defect": "Enhanced Measurement emitted automatic page_view events alongside Verdant's exact explicit SPA events during direct/history navigation.",
+    "production_collection_observation_scope": "COMPLETED_NINE_STATE_FULL_MATRIX_ONLY",
+    "targeted_post_deploy_recheck": {
+      "observed_at": "2026-08-02T05:19:48.245Z",
+      "scope": "direct_deep_link_and_cross_guide_client_navigation",
+      "production_manifest_commit": "a20776993bd606f07977674934864b888a407e1c",
+      "interceptor_host_coverage": [
+        "analytics.google.com",
+        "google-analytics.com",
+        "stats.g.doubleclick.net"
+      ],
+      "collection_requests_fulfilled_locally": 5,
+      "escaped_collection_requests": 0,
+      "navigation_actions": 2,
+      "exact_explicit_page_views": 2,
+      "automatic_page_views_without_explicit_page_path": 1,
+      "verification_events_transmitted": 0,
+      "evidence_scope": "targeted_post_deploy_p0_recheck_not_a_full_matrix_replacement",
+      "excluded_exploratory_probe_transmission_status": "unknown_not_evidence"
+    },
+    "navigation_actions_verified": 9,
+    "exact_explicit_page_views_observed": 9,
+    "automatic_page_views_without_explicit_page_path_observed": 5,
+    "per_page_measurement_defect": "Enhanced Measurement emitted automatic page_view events without Verdant's explicit page_path alongside Verdant's exact SPA events on five SPA/history transitions.",
     "repair_status": "owner_enhanced_measurement_review_required",
+    "guide_cta_click_measurement": {
+      "status": "NOT_MEASURED",
+      "classification": "MISSING",
+      "reason_code": "MISSING_NOT_IMPLEMENTED",
+      "event_name": null,
+      "destination": "/quick-log",
+      "not_inferred_from": [
+        "destination_page_view",
+        "quick_log_saved",
+        "signup",
+        "checkout"
+      ],
+      "day_0_blocking": false
+    },
     "required_access": "Read-only authenticated access to the existing Verdant GA4 property through a reporting session or authorized Data API credential.",
     "blocked_fields": [
       "property",
@@ -171,7 +212,6 @@
       "engagement_rate",
       "average_engagement_time",
       "entrances",
-      "cta_clicks",
       "signup_starts",
       "signup_completions",
       "first_meaningful_activation"
@@ -179,7 +219,7 @@
   },
   "gsc_access": {
     "status": "blocked_authenticated_access_unavailable",
-    "workflow_run": "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30687660034",
+    "workflow_run": "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30727208474",
     "workflow_status": "success_with_gsc_operation_skipped",
     "workflow_operation_status": "skipped",
     "workflow_access_status": "blocked",
@@ -212,6 +252,7 @@
   "launch_gates": {
     "both_pages_http_200": "pass",
     "release_content_match": "pass",
+    "full_deploy_branch_parity": "current",
     "intentional_indexability": "pass",
     "canonicals": "pass",
     "sitemap_and_robots": "pass",

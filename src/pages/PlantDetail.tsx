@@ -338,7 +338,7 @@ export default function PlantDetail() {
           plant={{
             id: plant.id,
             name: plant.name,
-            strain: plant.strain,
+            strain: plant.strain ?? "",
             stage: plant.stage,
             startedAt: plant.startedAt,
             tentId: plant.tentId ?? null,

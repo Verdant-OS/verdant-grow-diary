@@ -29,6 +29,9 @@ jobs:
       - name: Apply assertion-based product patch
         run: python scripts/.issue-675-apply.py
 
+      - name: Apply presenter null-safety fix
+        run: python scripts/.issue-675-product-fixes.py
+
       - name: Apply assertion-based test migration
         run: python scripts/.issue-675-tests.py
 

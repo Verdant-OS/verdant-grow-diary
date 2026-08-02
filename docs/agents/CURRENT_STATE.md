@@ -88,10 +88,11 @@ branch as fully green; they require their own scoped owner/integration follow-up
 with status `DOCUMENTED_MISSING_NO_EVENT_ADDED`. It records the guide CTA as
 `MISSING`/`NOT_MEASURED`; it does not authorize a new event or runtime instrumentation.
 
-**Mandatory governance handoff (this branch):** Refresh stale operating-state facts and
-align the permanent `SKIPPED` status vocabulary across the canonical constitution, its
-mirrors, and role prompts. This is docs/governance reconciliation only; it does not change
-the approved product or analytics implementation scope.
+**Mandatory governance handoff (this branch):** Refresh stale operating-state facts, align
+the permanent `SKIPPED` status vocabulary, and correct the signed-out root-route runbook
+description across the canonical constitution and its mirrors/role prompts. This is
+docs/governance reconciliation only; it does not change the approved product or analytics
+implementation scope.
 
 In scope:
 

@@ -41,7 +41,7 @@ export interface PostGrowReflectionPreviewSectionRow {
 }
 
 export interface PostGrowReflectionPreviewValidationOptions {
-  sensorCoveragePct: number;
+  sensorCoveragePct: number | null;
   knownGapCount: number;
   minEvidenceReferences: number;
   label: string;

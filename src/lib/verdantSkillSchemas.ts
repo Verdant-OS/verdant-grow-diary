@@ -283,10 +283,10 @@ const flagsSchema = z
 const envelopeObjectSchema = z
   .object({
     schemaVersion: z.literal(VERDANT_SKILL_ENVELOPE_SCHEMA_VERSION, {
-      error: "unsupported_schema_version",
+      message: "unsupported_schema_version",
     }),
     contractVersion: z.literal(VERDANT_SKILL_RUNTIME_CONTRACT_VERSION, {
-      error: "unsupported_contract_version",
+      message: "unsupported_contract_version",
     }),
     skillId: slugSchema,
     skillVersion: SkillVersionSchema,

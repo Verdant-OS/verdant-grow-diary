@@ -44,7 +44,7 @@ function listLabel(values: string[]): string {
 }
 
 function validationOptionsLabel(options: {
-  sensorCoveragePct: number;
+  sensorCoveragePct: number | null;
   knownGapCount: number;
   minEvidenceReferences: number;
 }): string {

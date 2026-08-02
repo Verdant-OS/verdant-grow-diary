@@ -71,9 +71,28 @@ export default function SymptomEvidenceChecklistCard({
                     className="border-t border-border/50 pt-2 text-[11px]"
                   >
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground">
-                      <time dateTime={item.occurredAt}>
-                        {new Date(item.occurredAt).toLocaleString()}
-                      </time>
+                      <span>
+                        Event{" "}
+                        <time
+                          aria-label={`Event time: ${new Date(item.occurredAt).toLocaleString()}`}
+                          dateTime={item.occurredAt}
+                        >
+                          {new Date(item.occurredAt).toLocaleString()}
+                        </time>
+                      </span>
+                      {item.snapshotCapturedAt && item.snapshotCapturedAt !== item.occurredAt && (
+                        <span>
+                          Snapshot captured{" "}
+                          <time
+                            aria-label={`Snapshot captured time: ${new Date(
+                              item.snapshotCapturedAt,
+                            ).toLocaleString()}`}
+                            dateTime={item.snapshotCapturedAt}
+                          >
+                            {new Date(item.snapshotCapturedAt).toLocaleString()}
+                          </time>
+                        </span>
+                      )}
                       <span>{item.sourceLabel}</span>
                       {item.timelineHref && (
                         <Link

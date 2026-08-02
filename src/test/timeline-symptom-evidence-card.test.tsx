@@ -10,6 +10,102 @@ import {
 } from "@/lib/symptomEvidenceChecklistRules";
 
 describe("Timeline Symptom Evidence card", () => {
+  it("labels the parent event time separately from an attached snapshot capture time", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: {
+        id: "symptom",
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: "plant-1",
+        entry_at: "2026-08-01T12:00:00Z",
+        event_type: "observation",
+        details: {
+          subtype: "issue",
+          observedSign: "spots",
+          observation_stage: "flower",
+        },
+      },
+      entries: [
+        {
+          id: "environment-with-distinct-capture",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "environment",
+          source: "manual",
+          details: {
+            sensor_snapshot: {
+              source: "manual",
+              captured_at: "2026-07-31T11:45:00Z",
+              metrics: { humidity_pct: 61 },
+            },
+          },
+        },
+      ],
+      historyComplete: true,
+    })!;
+
+    render(
+      <MemoryRouter initialEntries={["/timeline?growId=grow-1"]}>
+        <SymptomEvidenceChecklistCard view={view} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByLabelText(/^Event time:/)).toHaveAttribute(
+      "datetime",
+      "2026-07-31T12:00:00.000Z",
+    );
+    expect(screen.getByLabelText(/^Snapshot captured time:/)).toHaveAttribute(
+      "datetime",
+      "2026-07-31T11:45:00.000Z",
+    );
+  });
+
+  it("does not duplicate the snapshot clock when capture and event times are equal", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: {
+        id: "symptom",
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: "plant-1",
+        entry_at: "2026-08-01T12:00:00Z",
+        event_type: "observation",
+        details: { subtype: "issue", observedSign: "spots", observation_stage: "flower" },
+      },
+      entries: [
+        {
+          id: "environment-with-equal-clocks",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "environment",
+          source: "manual",
+          details: {
+            sensor_snapshot: {
+              source: "manual",
+              captured_at: "2026-07-31T12:00:00Z",
+              metrics: { humidity_pct: 61 },
+            },
+          },
+        },
+      ],
+      historyComplete: true,
+    })!;
+
+    render(
+      <MemoryRouter initialEntries={["/timeline?growId=grow-1"]}>
+        <SymptomEvidenceChecklistCard view={view} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByLabelText(/^Event time:/)).toHaveAttribute(
+      "datetime",
+      "2026-07-31T12:00:00.000Z",
+    );
+    expect(screen.queryByLabelText(/^Snapshot captured time:/)).not.toBeInTheDocument();
+  });
+
   it("renders four ordered categories, honest provenance, guide, and exact entry link", () => {
     const view = buildSymptomEvidenceChecklist({
       symptomEntry: {

@@ -103,7 +103,10 @@ import TimelineCsvContextPanel from "@/components/TimelineCsvContextPanel";
 import PhenoHuntTimelineSection from "@/components/PhenoHuntTimelineSection";
 import { cn } from "@/lib/utils";
 import { getEventType } from "@/lib/diary";
-import { buildGrowDiaryTimeline } from "@/lib/growDiaryTimelineRules";
+import {
+  buildGrowDiaryTimeline,
+  resolveTimelineDiaryEntryStage,
+} from "@/lib/growDiaryTimelineRules";
 import { MEASUREMENT_DETAIL_KEYS } from "@/lib/timelineEntryClassification";
 import { presentTimelineDiaryEntryDetails } from "@/lib/timelineDiaryEntryDetailPresentationRules";
 import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
@@ -785,7 +788,7 @@ export default function Timeline() {
   const stageCounts = useMemo(() => {
     const m: Record<string, number> = {};
     entries.forEach((e) => {
-      const stage = normalizeQuickLogStage(e.stage);
+      const stage = resolveTimelineDiaryEntryStage(e);
       if (stage) m[stage] = (m[stage] || 0) + 1;
     });
     return m;
@@ -888,7 +891,7 @@ export default function Timeline() {
 
   const filtered = useMemo(() => {
     const afterStageEvent = entries.filter((e) => {
-      if (stageFilter !== "all" && normalizeQuickLogStage(e.stage) !== stageFilter) return false;
+      if (stageFilter !== "all" && resolveTimelineDiaryEntryStage(e) !== stageFilter) return false;
       if (eventFilter !== "all" && !entryKinds(e).includes(eventFilter)) return false;
       return true;
     });
@@ -993,7 +996,7 @@ export default function Timeline() {
         entry_at: e.entry_at,
         plant_id: e.plant_id,
         tent_id: e.tent_id,
-        stage: e.stage,
+        stage: resolveTimelineDiaryEntryStage(e),
         note: e.note,
         photo_url: e.photo_url,
         details,
@@ -1097,7 +1100,7 @@ export default function Timeline() {
         grow_id: activeGrowId ?? null,
         plant_id: e.plant_id,
         tent_id: e.tent_id,
-        stage: e.stage,
+        stage: resolveTimelineDiaryEntryStage(e),
         entry_at: e.entry_at,
         entry_type: (e.details && (e.details.event_type as string | undefined)) ?? "note",
         note: e.note,
@@ -1114,7 +1117,7 @@ export default function Timeline() {
   const groupedByStage = useMemo(() => {
     const groups: { stage: string; items: Entry[] }[] = [];
     filtered.forEach((e) => {
-      const key = e.stage || "unknown";
+      const key = resolveTimelineDiaryEntryStage(e) ?? "unknown";
       const last = groups[groups.length - 1];
       if (last && last.stage === key) last.items.push(e);
       else groups.push({ stage: key, items: [e] });
@@ -2062,7 +2065,7 @@ export default function Timeline() {
                                 </span>
                                 <span className="inline-flex items-center gap-1 text-primary">
                                   <Sprout className="h-3 w-3" />
-                                  {stageLabel(e.stage)}
+                                  {stageLabel(resolveTimelineDiaryEntryStage(e))}
                                 </span>
                                 {plantName && (
                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40 text-[11px]">
@@ -2228,7 +2231,7 @@ export default function Timeline() {
                                     snapAgeMs > TIMELINE_SNAPSHOT_STALE_MS;
                                   const vpdClassification = classifyVpdAgainstStage({
                                     value: sensor.vpd ?? null,
-                                    stage: e.stage ?? null,
+                                    stage: resolveTimelineDiaryEntryStage(e),
                                     stale: snapStale,
                                   });
                                   const rawSource =
@@ -2410,7 +2413,7 @@ export default function Timeline() {
                 id: row.id,
                 note: row.note,
                 photo_url: row.photo_url,
-                stage: row.stage,
+                stage: resolveTimelineDiaryEntryStage(row),
                 entry_at: row.entry_at,
                 plant_id: row.plant_id,
                 tent_id: row.tent_id,

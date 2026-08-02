@@ -11,6 +11,9 @@
 import { normalizeDiaryEntry, type NormalizedDiaryEntry } from "./diaryEntryRules";
 import { normalizeDiaryNoteText } from "./diaryNoteFormatting";
 import { composeActionFollowUpTitle } from "./actionFollowUpEvidenceViewModel";
+import { findCannabisSymptomByObservedSign } from "@/constants/cannabisSymptomTypes";
+import type { CanonicalQuickLogStage } from "@/lib/grow";
+import { normalizeQuickLogStage } from "@/lib/quickLogStageDefaultRules";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -65,6 +68,12 @@ export interface BuildGrowDiaryTimelineInput {
   filter?: GrowDiaryTimelineFilter;
   /** Maximum length of notePreview. Default 160. */
   notePreviewMaxLength?: number;
+}
+
+export interface TimelineDiaryStageEntryLike {
+  readonly stage?: unknown;
+  readonly eventType?: unknown;
+  readonly details?: unknown;
 }
 
 // ---------------------------------------------------------------------------
@@ -139,15 +148,16 @@ const VENDOR_DISPLAY_LABELS: Record<string, string> = {
  * dash/underscore/space only, 32-char cap) so a raw enum value never
  * looks like trusted live telemetry.
  */
-export function resolveDiarySensorSourceLabel(
-  source: string | null | undefined,
-): string | null {
+export function resolveDiarySensorSourceLabel(source: string | null | undefined): string | null {
   if (typeof source !== "string") return null;
   const trimmed = source.trim();
   if (!trimmed) return null;
   const key = trimmed.toLowerCase();
   if (SOURCE_DISPLAY_LABELS[key]) return SOURCE_DISPLAY_LABELS[key];
-  const sanitized = key.replace(/[^a-z0-9_\-\s]/g, "").slice(0, 32).trim();
+  const sanitized = key
+    .replace(/[^a-z0-9_\-\s]/g, "")
+    .slice(0, 32)
+    .trim();
   if (!sanitized) return null;
   return sanitized.charAt(0).toUpperCase() + sanitized.slice(1);
 }
@@ -158,9 +168,7 @@ export function resolveDiarySensorSourceLabel(
  * routing. Unknown vendors fall back to a sanitized echo so the badge
  * cannot be styled as authoritative.
  */
-export function resolveDiarySensorVendorLabel(
-  vendor: string | null | undefined,
-): string | null {
+export function resolveDiarySensorVendorLabel(vendor: string | null | undefined): string | null {
   if (typeof vendor !== "string") return null;
   const trimmed = vendor.trim();
   if (!trimmed) return null;
@@ -223,10 +231,7 @@ function isNormalizedEntry(v: unknown): v is NormalizedDiaryEntry {
   );
 }
 
-function titleForEventType(
-  eventType: string,
-  extras?: Record<string, unknown> | null,
-): string {
+function titleForEventType(eventType: string, extras?: Record<string, unknown> | null): string {
   const key = (eventType || "").toLowerCase().trim();
   if (key === "action_followup") {
     return composeActionFollowUpTitle(extras?.outcome);
@@ -254,10 +259,60 @@ function clipNotePreview(note: string, maxLen: number): string {
   return flat.slice(0, Math.max(0, maxLen - 1)).trimEnd() + "…";
 }
 
-function buildSubtitle(entry: NormalizedDiaryEntry): string {
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function normalizedToken(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim().toLowerCase() : null;
+}
+
+/**
+ * Resolve one diary row's effective stage for Timeline presentation.
+ *
+ * A recognized top-level diary stage is authoritative. Guided Symptom Check
+ * companions intentionally persist their confirmed stage inside
+ * `details.observation_stage`, because the canonical event writer does not
+ * populate `diary_entries.stage`. That fallback is accepted only when the row
+ * still proves the complete guided-observation identity: observation event,
+ * issue subtype, and one supported observed sign. Generic or malformed rows
+ * cannot promote arbitrary details into a trusted stage label.
+ *
+ * `normalizeDiaryEntry` preserves unknown detail keys under `details.extras`,
+ * so this resolver understands both raw Supabase rows and normalized entries.
+ */
+export function resolveTimelineDiaryEntryStage(
+  entry: TimelineDiaryStageEntryLike | null | undefined,
+): CanonicalQuickLogStage | null {
+  if (!entry) return null;
+
+  const storedStage = normalizeQuickLogStage(entry.stage);
+  if (storedStage) return storedStage;
+
+  const details = asRecord(entry.details);
+  if (!details) return null;
+  const normalizedExtras =
+    typeof details.declaredEventType === "string" ? asRecord(details.extras) : null;
+  const readDetail = (key: string): unknown => details[key] ?? normalizedExtras?.[key];
+
+  const eventType =
+    normalizedToken(entry.eventType) ??
+    normalizedToken(details.event_type) ??
+    normalizedToken(details.eventType) ??
+    normalizedToken(details.declaredEventType);
+  if (eventType !== "observation") return null;
+  if (normalizedToken(readDetail("subtype")) !== "issue") return null;
+  if (!findCannabisSymptomByObservedSign(readDetail("observedSign"))) return null;
+
+  return normalizeQuickLogStage(readDetail("observation_stage"));
+}
+
+function buildSubtitle(entry: NormalizedDiaryEntry, stage: CanonicalQuickLogStage | null): string {
   const parts: string[] = [];
   if (entry.dayOfGrow != null) parts.push(`Day ${entry.dayOfGrow}`);
-  if (entry.stage) parts.push(entry.stage);
+  if (stage) parts.push(stage);
   if (entry.details.wateringAmountMl != null) {
     parts.push(`${entry.details.wateringAmountMl} ml`);
   }
@@ -302,11 +357,19 @@ function matchesEventType(ev: string, filter: string | string[] | null | undefin
   return set.has((ev ?? "").toLowerCase());
 }
 
-function matchesStage(stage: string | null, filter: string | string[] | null | undefined): boolean {
+function matchesStage(
+  entry: TimelineDiaryStageEntryLike,
+  filter: string | string[] | null | undefined,
+): boolean {
   if (filter == null) return true;
   const list = Array.isArray(filter) ? filter : [filter];
-  const set = new Set(list.map((s) => (s ?? "").toLowerCase()));
-  return set.has((stage ?? "").toLowerCase());
+  const set = new Set(
+    list
+      .map((stage) => normalizeQuickLogStage(stage))
+      .filter((stage): stage is CanonicalQuickLogStage => stage !== null),
+  );
+  const resolved = resolveTimelineDiaryEntryStage(entry);
+  return resolved !== null && set.has(resolved);
 }
 
 // ---------------------------------------------------------------------------
@@ -319,27 +382,24 @@ export function toTimelineItem(
 ): GrowDiaryTimelineItem {
   const maxLen = opts.notePreviewMaxLength ?? DEFAULT_NOTE_PREVIEW_MAX;
   const timestamp = entry.createdAt ? Date.parse(entry.createdAt) : null;
+  const stage = resolveTimelineDiaryEntryStage(entry);
   return {
     id: entry.id,
     title: titleForEventType(entry.eventType, entry.details.extras ?? null),
-    subtitle: buildSubtitle(entry),
+    subtitle: buildSubtitle(entry, stage),
     timestamp: Number.isFinite(timestamp as number) ? (timestamp as number) : null,
     timestampLabel: entry.createdAtLabel,
     growId: entry.growId,
     plantId: entry.plantId,
     tentId: entry.tentId,
-    stage: entry.stage,
+    stage,
     eventType: entry.eventType,
     notePreview: clipNotePreview(entry.note, maxLen),
     hasPhoto: !!entry.photoUrl,
     hasSensorSnapshot: !!entry.details.sensorSnapshot,
     sensorSnapshotState: entry.details.sensorSnapshot?.state ?? null,
-    sensorSourceLabel: resolveDiarySensorSourceLabel(
-      entry.details.sensorSnapshot?.source ?? null,
-    ),
-    sensorVendorLabel: resolveDiarySensorVendorLabel(
-      entry.details.sensorSnapshot?.vendor ?? null,
-    ),
+    sensorSourceLabel: resolveDiarySensorSourceLabel(entry.details.sensorSnapshot?.source ?? null),
+    sensorVendorLabel: resolveDiarySensorVendorLabel(entry.details.sensorSnapshot?.vendor ?? null),
     tags: buildTags(entry),
     warnings: entry.warnings.slice(),
     isUsefulForAiContext: entry.isValidForAiContext,
@@ -380,7 +440,7 @@ export function buildGrowDiaryTimeline(
     if (filter.plantId != null && e.plantId !== filter.plantId) return false;
     if (filter.tentId != null && e.tentId !== filter.tentId) return false;
     if (!matchesEventType(e.eventType, filter.eventType)) return false;
-    if (!matchesStage(e.stage, filter.stage)) return false;
+    if (!matchesStage(e, filter.stage)) return false;
     if (startEpoch != null || endEpoch != null) {
       const t = e.createdAt ? Date.parse(e.createdAt) : NaN;
       if (!Number.isFinite(t)) return false;

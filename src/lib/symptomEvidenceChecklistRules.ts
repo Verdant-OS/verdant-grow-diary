@@ -54,6 +54,7 @@ export interface SymptomEvidenceRawEntry {
 export interface SymptomEvidenceItemView {
   readonly id: string;
   readonly occurredAt: string;
+  readonly snapshotCapturedAt: string | null;
   readonly sourceLabel: string;
   readonly summary: string;
   readonly detailLines: ReadonlyArray<string>;
@@ -104,12 +105,20 @@ interface NormalizedEntry {
   readonly details: Record<string, unknown>;
   readonly source: string | null;
   readonly environmentSnapshot: CanonicalEnvironmentSnapshotEvidence | null;
+  readonly fallbackEnvironment: FallbackEnvironmentEvidence;
   readonly timelineAnchorEntryId: string | null;
 }
 
 interface CanonicalEnvironmentSnapshotEvidence {
+  readonly capturedAt: string;
+  readonly capturedMs: number;
   readonly sourceLabel: string;
   readonly metrics: CanonicalQuickLogSensorSnapshotMetrics;
+}
+
+interface FallbackEnvironmentEvidence {
+  readonly metrics: CanonicalQuickLogSensorSnapshotMetrics;
+  readonly hasRejectedMetric: boolean;
 }
 
 const CATEGORY_TITLES: Readonly<Record<SymptomEvidenceCategoryId, string>> = {
@@ -150,7 +159,8 @@ function normalizeCanonicalEnvironmentSnapshot(
   const source = safeString(snapshot.source, 24)?.toLowerCase() ?? null;
   if (!source || !Object.prototype.hasOwnProperty.call(SOURCE_LABELS, source)) return null;
   const capturedAt = safeString(snapshot.captured_at, 64);
-  if (!capturedAt || !Number.isFinite(Date.parse(capturedAt)) || occurredMs === null) return null;
+  const capturedMs = capturedAt ? Date.parse(capturedAt) : Number.NaN;
+  if (!capturedAt || !Number.isFinite(capturedMs) || occurredMs === null) return null;
 
   const metrics = normalizeQuickLogSnapshotMetrics(snapshot.metrics);
   const environmentMetrics = {
@@ -196,13 +206,15 @@ function normalizeCanonicalEnvironmentSnapshot(
   const display = resolveSensorSnapshotDisplay(
     {
       source: liveProvenanceTrusted ? source : null,
-      capturedAt,
+      capturedAt: new Date(capturedMs).toISOString(),
       metrics: displayMetrics,
     },
     { now: occurredMs },
   );
 
   return {
+    capturedAt: new Date(capturedMs).toISOString(),
+    capturedMs,
     sourceLabel: liveProvenanceTrusted
       ? display.effectiveSource === "manual"
         ? "Manual observation"
@@ -231,6 +243,16 @@ function safeDetails(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+}
+
+function hasCanonicalSnapshotEnvelope(details: Record<string, unknown>): boolean {
+  if (!Object.prototype.hasOwnProperty.call(details, "sensor_snapshot")) return false;
+  const rawSnapshot = details.sensor_snapshot;
+  if (rawSnapshot === null || rawSnapshot === undefined) return false;
+  if (typeof rawSnapshot !== "object" || Array.isArray(rawSnapshot)) return true;
+  return ["source", "captured_at", "metrics"].some((key) =>
+    Object.prototype.hasOwnProperty.call(rawSnapshot, key),
+  );
 }
 
 function normalizeEntry(entry: SymptomEvidenceRawEntry): NormalizedEntry {
@@ -267,6 +289,7 @@ function normalizeEntry(entry: SymptomEvidenceRawEntry): NormalizedEntry {
       source,
       Number.isFinite(parsed) ? parsed : null,
     ),
+    fallbackEnvironment: normalizeFallbackEnvironmentEvidence(details),
     timelineAnchorEntryId: safeId(entry.timeline_anchor_entry_id),
   };
 }
@@ -398,6 +421,29 @@ function isWithinWindow(candidate: NormalizedEntry, symptomMs: number): boolean 
   );
 }
 
+function isCategoryWithinWindow(
+  candidate: NormalizedEntry,
+  category: SymptomEvidenceCategoryId,
+  symptomMs: number,
+): boolean {
+  if (category === "environment" && candidate.environmentSnapshot) {
+    return (
+      candidate.environmentSnapshot.capturedMs <= symptomMs &&
+      candidate.environmentSnapshot.capturedMs >= symptomMs - LOOKBACK_MS
+    );
+  }
+  return isWithinWindow(candidate, symptomMs);
+}
+
+function categoryTimestampMs(
+  candidate: NormalizedEntry,
+  category: SymptomEvidenceCategoryId,
+): number {
+  return category === "environment" && candidate.environmentSnapshot
+    ? candidate.environmentSnapshot.capturedMs
+    : (candidate.occurredMs ?? 0);
+}
+
 function samePlant(candidate: NormalizedEntry, symptom: NormalizedEntry): boolean {
   return Boolean(symptom.plantId && candidate.plantId === symptom.plantId);
 }
@@ -420,7 +466,22 @@ function classifyEntryCategories(entry: NormalizedEntry): ReadonlyArray<SymptomE
   const categories: SymptomEvidenceCategoryId[] = [];
   if (/water/.test(entry.eventType)) categories.push("watering");
   else if (/feed|nutrient/.test(entry.eventType)) categories.push("feeding");
-  if (/environment|sensor|climate/.test(entry.eventType) || entry.environmentSnapshot) {
+  const hasFallbackMetric = Object.keys(entry.fallbackEnvironment.metrics).length > 0;
+  const invalidFallbackOnly = entry.fallbackEnvironment.hasRejectedMetric && !hasFallbackMetric;
+  const malformedCanonicalSnapshot =
+    hasCanonicalSnapshotEnvelope(entry.details) && !entry.environmentSnapshot;
+  const environmentCheck = safeDetails(entry.details.environment_check);
+  const hasQualitativeEnvironmentEvidence = Boolean(
+    entry.note ||
+    safeString(entry.details.checkType, 64) ||
+    safeString(environmentCheck.checkType, 64) ||
+    safeString(environmentCheck.note, 220),
+  );
+  if (
+    entry.environmentSnapshot ||
+    (/environment|sensor|climate/.test(entry.eventType) &&
+      ((!invalidFallbackOnly && !malformedCanonicalSnapshot) || hasQualitativeEnvironmentEvidence))
+  ) {
     categories.push("environment");
   }
   if (classifyTimelineLightingSignal({ note: entry.note, details: entry.details })) {
@@ -470,6 +531,52 @@ function numericDetail(
   return null;
 }
 
+function normalizeFallbackEnvironmentEvidence(
+  details: Record<string, unknown>,
+): FallbackEnvironmentEvidence {
+  const firstPlausible = (
+    keys: ReadonlyArray<string>,
+    isValid: (value: number | null) => boolean,
+  ): { value: number | null; hasRejectedMetric: boolean } => {
+    let hasRejectedMetric = false;
+    const scopes = [
+      details,
+      safeDetails(details.environment_check),
+      safeDetails(details.sensor_snapshot),
+    ];
+    for (const scope of scopes) {
+      for (const key of keys) {
+        const raw = scope[key];
+        if (raw === null || raw === undefined || (typeof raw === "string" && !raw.trim())) {
+          continue;
+        }
+        const parsed =
+          typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : Number.NaN;
+        if (!Number.isFinite(parsed)) {
+          hasRejectedMetric = true;
+          continue;
+        }
+        if (isValid(parsed)) return { value: parsed, hasRejectedMetric };
+        hasRejectedMetric = true;
+      }
+    }
+    return { value: null, hasRejectedMetric };
+  };
+  const temperature = firstPlausible(["temperature_c", "temp_c"], isTemperatureValid);
+  const humidity = firstPlausible(["humidity_pct", "rh_pct"], isHumidityValid);
+  const vpd = firstPlausible(["vpd_kpa"], isVpdValid);
+  const metrics: CanonicalQuickLogSensorSnapshotMetrics = {
+    ...(temperature.value !== null ? { temperature: temperature.value } : {}),
+    ...(humidity.value !== null ? { humidity: humidity.value } : {}),
+    ...(vpd.value !== null ? { vpd: vpd.value } : {}),
+  };
+  return {
+    metrics,
+    hasRejectedMetric:
+      temperature.hasRejectedMetric || humidity.hasRejectedMetric || vpd.hasRejectedMetric,
+  };
+}
+
 function friendlyDetails(
   entry: NormalizedEntry,
   category: SymptomEvidenceCategoryId,
@@ -484,10 +591,10 @@ function friendlyDetails(
       add("Temperature", entry.environmentSnapshot.metrics.temperature ?? null, "°C");
       add("Humidity", entry.environmentSnapshot.metrics.humidity ?? null, "% RH");
       add("VPD", entry.environmentSnapshot.metrics.vpd ?? null, "kPa");
-    } else {
-      add("Temperature", numericDetail(d, ["temperature_c", "temp_c"]), "°C");
-      add("Humidity", numericDetail(d, ["humidity_pct", "rh_pct"]), "% RH");
-      add("VPD", numericDetail(d, ["vpd_kpa"]), "kPa");
+    } else if (!hasCanonicalSnapshotEnvelope(entry.details)) {
+      add("Temperature", entry.fallbackEnvironment.metrics.temperature ?? null, "°C");
+      add("Humidity", entry.fallbackEnvironment.metrics.humidity ?? null, "% RH");
+      add("VPD", entry.fallbackEnvironment.metrics.vpd ?? null, "kPa");
     }
   } else if (category === "watering") {
     add("Volume", numericDetail(d, ["watering_amount_ml", "volume_ml", "amount_ml"]), "mL");
@@ -552,6 +659,8 @@ function categoryView(
       return {
         id: entry.id,
         occurredAt: entry.occurredAt!,
+        snapshotCapturedAt:
+          id === "environment" ? (entry.environmentSnapshot?.capturedAt ?? null) : null,
         sourceLabel: sourceLabel(entry, id),
         summary: itemSummary(entry, id),
         detailLines: friendlyDetails(entry, id),
@@ -586,15 +695,12 @@ export function buildSymptomEvidenceChecklist(
   if (symptom.occurredMs !== null && symptom.growId) {
     for (const raw of input.entries) {
       const entry = normalizeEntry(raw);
-      if (
-        isSameLogicalEvent(entry, symptom) ||
-        entry.growId !== symptom.growId ||
-        !isWithinWindow(entry, symptom.occurredMs)
-      ) {
+      if (isSameLogicalEvent(entry, symptom) || entry.growId !== symptom.growId) {
         continue;
       }
       const categories = classifyEntryCategories(entry);
       for (const category of categories) {
+        if (!isCategoryWithinWindow(entry, category, symptom.occurredMs)) continue;
         if ((category === "watering" || category === "feeding") && !samePlant(entry, symptom))
           continue;
         if (
@@ -607,9 +713,11 @@ export function buildSymptomEvidenceChecklist(
     }
   }
 
-  const sortNewest = (a: NormalizedEntry, b: NormalizedEntry) =>
-    (b.occurredMs ?? 0) - (a.occurredMs ?? 0) || a.id.localeCompare(b.id);
-  for (const matches of Object.values(categoryMatches)) matches.sort(sortNewest);
+  for (const id of ["environment", "watering", "feeding", "lighting"] as const) {
+    categoryMatches[id].sort(
+      (a, b) => categoryTimestampMs(b, id) - categoryTimestampMs(a, id) || a.id.localeCompare(b.id),
+    );
+  }
 
   const canUsePlantScope = Boolean(
     symptom.growId && symptom.plantId && symptom.occurredMs !== null,

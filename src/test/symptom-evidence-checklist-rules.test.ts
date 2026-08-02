@@ -317,6 +317,59 @@ describe("symptom evidence checklist", () => {
     },
   );
 
+  it("uses attached snapshot capture time for the environment window while preserving the parent event time", () => {
+    const attachedSnapshot = (id: string, capturedAt: string, occurredAt: string) => ({
+      id,
+      grow_id: "grow-1",
+      tent_id: "tent-1",
+      plant_id: "plant-1",
+      occurred_at: occurredAt,
+      event_type: "watering",
+      source: "manual",
+      details: {
+        watering_amount_ml: 500,
+        sensor_snapshot: {
+          source: "manual",
+          captured_at: capturedAt,
+          metrics: { temperature_c: 24.5 },
+        },
+      },
+    });
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        attachedSnapshot(
+          "old-snapshot-new-parent",
+          "2026-07-18T11:59:59.999Z",
+          "2026-07-31T15:00:00Z",
+        ),
+        attachedSnapshot("window-start", "2026-07-18T12:00:00.000Z", "2026-07-31T14:00:00Z"),
+        attachedSnapshot("window-end", "2026-08-01T12:00:00.000Z", "2026-07-31T13:00:00Z"),
+        attachedSnapshot("future-snapshot", "2026-08-01T12:00:00.001Z", "2026-07-31T12:00:00Z"),
+      ],
+    })!;
+
+    expect(category(view, "watering").items.map((item) => item.id)).toEqual([
+      "old-snapshot-new-parent",
+      "window-start",
+      "window-end",
+    ]);
+    expect(category(view, "watering").totalMatches).toBe(4);
+    expect(category(view, "environment").items.map((item) => item.id)).toEqual([
+      "window-end",
+      "window-start",
+    ]);
+    expect(category(view, "environment").items[0]).toMatchObject({
+      occurredAt: "2026-07-31T13:00:00.000Z",
+      snapshotCapturedAt: "2026-08-01T12:00:00.000Z",
+    });
+    expect(category(view, "environment").items[1]).toMatchObject({
+      occurredAt: "2026-07-31T14:00:00.000Z",
+      snapshotCapturedAt: "2026-07-18T12:00:00.000Z",
+    });
+  });
+
   it("fails closed on malformed or unlabeled nested snapshots without losing watering evidence", () => {
     const view = buildSymptomEvidenceChecklist({
       symptomEntry: symptom,
@@ -352,6 +405,35 @@ describe("symptom evidence checklist", () => {
               source: "manual",
               captured_at: "2026-07-31T13:00:00Z",
               metrics: { temperature_c: "24" },
+            },
+          },
+        },
+        {
+          id: "environment-with-missing-capture",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T14:00:00Z",
+          event_type: "environment",
+          source: "manual",
+          details: {
+            sensor_snapshot: {
+              source: "manual",
+              metrics: { temperature_c: 24 },
+            },
+          },
+        },
+        {
+          id: "environment-with-malformed-capture",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T15:00:00Z",
+          event_type: "environment",
+          source: "manual",
+          details: {
+            sensor_snapshot: {
+              source: "manual",
+              captured_at: "not-a-time",
+              metrics: { humidity_pct: 61 },
             },
           },
         },
@@ -429,6 +511,230 @@ describe("symptom evidence checklist", () => {
       id: "feeding-with-partial-valid-snapshot",
       sourceLabel: "Manual observation",
       detailLines: ["Temperature: 24.5 °C"],
+    });
+  });
+
+  it("does not count invalid-only legacy environment measurements as usable evidence", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "invalid-top-level-fallback",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "environment",
+          source: "manual",
+          details: { temperature_c: 61, humidity_pct: 101, vpd_kpa: 10.1 },
+        },
+        {
+          id: "invalid-environment-check-fallback",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T13:00:00Z",
+          event_type: "environment_check",
+          source: "manual",
+          details: {
+            environment_check: { temp_c: -10.1, humidity_pct: -0.1, vpd_kpa: -0.1 },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "environment")).toMatchObject({
+      status: "missing",
+      totalMatches: 0,
+      items: [],
+    });
+    expect(view.overallState).not.toBe("ready_to_compare");
+  });
+
+  it("preserves a qualitative Environment Check while omitting its rejected telemetry", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "qualitative-with-invalid-fallback",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "environment_check",
+          note: "Fan sounded rough during the walkthrough.",
+          source: "manual",
+          details: {
+            checkType: "airflow",
+            environment_check: { temp_c: 61, humidity_pct: 101 },
+          },
+        },
+        {
+          id: "qualitative-with-malformed-snapshot",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T13:00:00Z",
+          event_type: "environment_check",
+          source: "manual",
+          details: {
+            checkType: "equipment",
+            sensor_snapshot: {
+              source: "manual",
+              captured_at: "not-a-time",
+              metrics: { temperature_c: 24 },
+            },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "environment")).toMatchObject({
+      status: "recorded",
+      totalMatches: 2,
+    });
+    expect(category(view, "environment").items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "qualitative-with-invalid-fallback",
+          detailLines: [],
+        }),
+        expect.objectContaining({
+          id: "qualitative-with-malformed-snapshot",
+          detailLines: [],
+        }),
+      ]),
+    );
+  });
+
+  it("rejects explicitly malformed fallback metrics without hiding a later plausible value", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "malformed-only-fallback",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "environment_check",
+          source: "manual",
+          details: {
+            temperature_c: "bad",
+            humidity_pct: Number.POSITIVE_INFINITY,
+            vpd_kpa: { value: 1.2 },
+          },
+        },
+        {
+          id: "malformed-then-plausible",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T13:00:00Z",
+          event_type: "environment_check",
+          source: "manual",
+          details: {
+            temperature_c: Number.NaN,
+            humidity_pct: "bad",
+            environment_check: { temp_c: "24.5", rh_pct: "61" },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "environment")).toMatchObject({
+      status: "recorded",
+      totalMatches: 1,
+    });
+    expect(category(view, "environment").items[0]).toMatchObject({
+      id: "malformed-then-plausible",
+      detailLines: ["Temperature: 24.5 °C", "Humidity: 61 % RH"],
+    });
+  });
+
+  it("keeps plausible legacy environment measurements while omitting rejected siblings", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "mixed-environment-check-fallback",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T13:00:00Z",
+          event_type: "environment_check",
+          source: "manual",
+          details: {
+            environment_check: { temp_c: 24.5, humidity_pct: 101, vpd_kpa: -0.1 },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "environment")).toMatchObject({
+      status: "recorded",
+      totalMatches: 1,
+    });
+    expect(category(view, "environment").items[0]).toMatchObject({
+      id: "mixed-environment-check-fallback",
+      sourceLabel: "Manual observation",
+      detailLines: ["Temperature: 24.5 °C"],
+      snapshotCapturedAt: null,
+    });
+  });
+
+  it("finds the first plausible legacy alias without letting an invalid earlier value mask it", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "later-plausible-fallback",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T13:00:00Z",
+          event_type: "environment_check",
+          source: "manual",
+          details: {
+            temp_c: 61,
+            humidity_pct: 101,
+            vpd_kpa: -0.1,
+            environment_check: {
+              temperature_c: 24.5,
+              rh_pct: 61,
+              vpd_kpa: 1.08,
+            },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "environment").items[0]).toMatchObject({
+      id: "later-plausible-fallback",
+      detailLines: ["Temperature: 24.5 °C", "Humidity: 61 % RH", "VPD: 1.08 kPa"],
+    });
+  });
+
+  it("treats an explicit null snapshot as absent without hiding valid manual fallback evidence", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "null-snapshot-with-environment-check",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T13:00:00Z",
+          event_type: "environment_check",
+          source: "manual",
+          details: {
+            sensor_snapshot: null,
+            environment_check: { temp_c: 24.5, humidity_pct: 61 },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "environment").items[0]).toMatchObject({
+      id: "null-snapshot-with-environment-check",
+      detailLines: ["Temperature: 24.5 °C", "Humidity: 61 % RH"],
     });
   });
 

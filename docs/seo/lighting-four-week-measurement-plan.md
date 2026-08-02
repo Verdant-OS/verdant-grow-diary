@@ -45,11 +45,12 @@ The public release and technical SEO identity are complete, but an analytics col
 authenticated-access gates remain:
 
 - PR #597 is merged and remains live in production manifest
-  `f4c7e8ee78f65fc47494af631e5ffcdd33bcbeb5`.
-- Intercepted browser evidence across nine navigation states preserved each exact lighting-guide
-  path and page-specific title, kept protected IDs masked, and transmitted no verification events.
-  It observed nine exact app-owned page views plus five automatic GA4 page views without Verdant's
-  explicit `page_path`.
+  `a20776993bd606f07977674934864b888a407e1c`.
+- The last completed intercepted browser matrix (`2026-08-02T02:08:43.179Z`) preserved each exact
+  lighting-guide path and page-specific title across nine navigation states, kept protected IDs
+  masked, and transmitted no verification events. It observed nine exact app-owned page views plus
+  five automatic GA4 page views without Verdant's explicit `page_path`. A later current-production
+  re-run did not return an inspectable final envelope, so its counts are not used here.
 - The owner-confirmed GA4 production stream is `Verdant Grow Diary`, stream URL
   `https://verdantgrowdiary.com`, stream ID `15065867361`, and measurement ID `G-B3QRSZEM9S`;
   production loads and targets that exact measurement ID. The property ID is still unconfirmed.
@@ -59,9 +60,8 @@ authenticated-access gates remain:
 - Workflow [30727208474](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30727208474)
   succeeded across all 51 URLs, but its GSC operation was `SKIPPED`, access was `BLOCKED`,
   execution was `SKIPPED`, OAuth was not configured, and it made 0 API attempts.
-- Production manifest `f4c7e8ee…` is an ancestor of deploy head `a2077699…`; the one
-  post-production commit is Quick Log/test-only. Lighting release content match remains `PASS`, but
-  full deploy-branch parity is not claimed.
+- Production manifest and deploy head both resolve to `a2077699…`, so full deploy-branch parity is
+  `PASS`. Lighting release-content verification remains scoped to the two guides.
 - PR #624 is live. Its production direct/cross-guide/history/refresh/repeat/new-tab matrix found one
   current `WebPage`, `FAQPage`, `BreadcrumbList`, and `Article` identity set per page state, with
   zero duplicate identities, zero stale prior-route objects, and zero JSON-LD parse errors.

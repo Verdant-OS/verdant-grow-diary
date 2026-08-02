@@ -1,6 +1,6 @@
 # Lighting launch verification
 
-**Generated:** 2026-08-02T02:08:43.179Z
+**Generated:** 2026-08-02T02:55:07.852Z
 **Production host:** https://verdantgrowdiary.com
 **Merged PR:** [#595](https://github.com/Verdant-OS/verdant-grow-diary/pull/595)
 **Merge commit:** `1223c56c9db586160a2798d017c2e78d1de1dd5a`
@@ -9,7 +9,7 @@ commit `51363737ca97e74f861558f082b849bbbd389aa2`
 **Lovable project:** `66255e7b-892c-4be5-8686-ab1cfc3666db`
 **Structured-data repair:** [#624](https://github.com/Verdant-OS/verdant-grow-diary/pull/624),
 commit `b62aac5d4b0e9296bfdbee4c46e03fc35f350c0c`
-**Production build manifest commit:** `f4c7e8ee78f65fc47494af631e5ffcdd33bcbeb5`
+**Production build manifest commit:** `a20776993bd606f07977674934864b888a407e1c`
 **Deploy branch head:** `a20776993bd606f07977674934864b888a407e1c`
 **Production deployment ID:** not exposed by the current production response
 
@@ -20,9 +20,9 @@ commit `b62aac5d4b0e9296bfdbee4c46e03fc35f350c0c`
 Both pages are published, publicly reachable, intentionally indexable, and match the content merged
 in PR #595. The explicit page-identity repair from PR #597 and structured-data ownership repair from
 PR #624 are live. The eight-state structured-data matrix still exposes one current set of page-level
-JSON-LD identities per page state, with protected identifiers masked. A current nine-state app-level
-matrix also emitted one exact explicit SPA page view for each expected route, title, and query-free
-location.
+JSON-LD identities per page state, with protected identifiers masked. The last completed nine-state
+app-level collection matrix (`2026-08-02T02:08:43.179Z`) emitted one exact explicit SPA page view
+for each expected route, title, and query-free location.
 
 One production instrumentation defect still prevents a ready verdict: a controlled nine-state
 collection-endpoint matrix observed nine exact app-owned SPA events plus five automatic page views
@@ -40,23 +40,23 @@ numeric property ID and authenticated reporting baseline remain unavailable to C
 ## Publication and release evidence
 
 - `https://verdantgrowdiary.com/version.json` identifies production build commit
-  `f4c7e8ee78f65fc47494af631e5ffcdd33bcbeb5`, built at
-  `2026-08-02T00:57:34.186Z`.
+  `a20776993bd606f07977674934864b888a407e1c`, built at
+  `2026-08-02T01:28:54.548Z`.
 - Repository ancestry proves the PR #595 release, PR #597 analytics repair, and PR #624
   structured-data repair commits are all ancestors of that production manifest commit.
-- Production commit `f4c7e8ee…` is an ancestor of current deploy head `a2077699…`. The one
-  post-production commit changes Quick Log source/tests only (14 files), not lighting-guide, sitemap,
-  robots, or analytics route-identity content. This is a lighting-scope release-content pass, not a
-  claim that production equals the full deploy branch. No runtime publish is required for the lighting
-  measurement scope.
+- Production manifest and deploy head both resolve to `a2077699…`. The production release now has
+  full deploy-branch parity. Lighting release-content verification remains deliberately scoped to the
+  two guides; no runtime publish is required for the measurement evidence itself.
 - The current production response does not expose a Lovable deployment ID, so none is inferred.
 - Both release-specific URLs, titles, descriptions, H1s, Article/FAQ schema, sitemap entries, and
   cross-links are present in production.
-- The public probe at `2026-08-02T02:05:36.362Z` returned HTTP 200 for `version.json`, both
+- The raw public probe at `2026-08-02T02:53:25.627Z` returned HTTP 200 for `version.json`, both
   lighting guides, `sitemap.xml`, and `robots.txt`. The sitemap contains 51 URLs and each lighting
-  route exactly once; robots declares the production sitemap and protects app prefixes.
+  route exactly once; robots declares the production sitemap and protects app prefixes. Rendered
+  browser checks at `2026-08-02T02:55:02.718Z` and `2026-08-02T02:55:07.852Z` confirmed both
+  pages' route-scoped metadata, JSON-LD identities, cross-links, and zero application errors.
 
-**Release content match: PASS — LIGHTING GUIDES ONLY**
+**Release content match: PASS — LIGHTING GUIDES ONLY; DEPLOYMENT PARITY: PASS**
 
 ## Exact lighting pages
 
@@ -154,7 +154,8 @@ mixed into the GA4 repair.
 
 ## Measurement repair verification
 
-Production now emits explicit `page_view` events for the two pages with:
+The last completed controlled collection matrix observed production emitting explicit `page_view`
+events for the two pages with:
 
 ```text
 page_location = https://verdantgrowdiary.com/guides/cannabis-grow-light-distance-and-schedule
@@ -166,11 +167,11 @@ page_path = /guides/cannabis-light-stress-light-burn-bleaching-or-heat
 page_title = Cannabis Light Stress: Burn, Bleaching, or Heat? | Verdant
 ```
 
-The browser verification fulfilled the collection endpoint locally, so the inspected payloads did
-not add verification traffic to the production property. Protected token-bearing paths remained
-masked. Verdant emitted nine exact explicit events across nine observed navigation states: direct
-deep-link load, refresh on each guide, both cross-guide directions, back, forward, repeated
-navigation, and a new tab.
+That completed matrix fulfilled the collection endpoint locally, so the inspected payloads did not
+add verification traffic to the production property. Protected token-bearing paths remained masked.
+Verdant emitted nine exact explicit events across nine observed navigation states: direct deep-link
+load, refresh on each guide, both cross-guide directions, back, forward, repeated navigation, and a
+new tab.
 
 The collection endpoint also received five tag-generated `page_view` events without Verdant's
 explicit `page_path` during cross-guide, back/forward, and repeated navigation. That is consistent
@@ -178,6 +179,13 @@ with GA4 Enhanced Measurement's separate browser-history page-view option and wo
 those navigations if left enabled beside Verdant's explicit SPA owner. The owner must disable the
 advanced "page changes based on browser history events" option in the existing stream, retain the
 explicit app emitter, and then authorize the same controlled re-verification.
+
+The production build subsequently advanced to `a2077699…`; its source delta excludes analytics
+paths, and current source inspection preserves the explicit SPA emitter and bootstrap
+`send_page_view: false`. A fresh controlled collection re-run was attempted after that deploy but did not
+return an inspectable final envelope, so no fresh event count or no-transmission claim is inferred
+from that attempt. The completed `2026-08-02T02:08:43.179Z` matrix remains the only count-bearing
+evidence until owner-authorized re-verification completes.
 
 **GA4 explicit page identity: PASS**
 

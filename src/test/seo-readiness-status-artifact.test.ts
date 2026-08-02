@@ -59,7 +59,7 @@ describe("SEO readiness status artifact", () => {
     expect(RAW_ARTIFACT).toBe(`${JSON.stringify(READINESS, null, 2)}\n`);
   });
 
-  it("pins repository, deploy, and production identities without overstating full-branch parity", () => {
+  it("pins repository, deploy, and production identities with current full-branch parity", () => {
     expect(READINESS.run_context).toEqual({
       repository: "Verdant-OS/verdant-grow-diary",
       branch: "codex/seo-readiness-evidence-20260802",
@@ -71,16 +71,16 @@ describe("SEO readiness status artifact", () => {
     });
     expect(READINESS.production).toMatchObject({
       host: "https://verdantgrowdiary.com",
-      observed_at: "2026-08-02T02:05:36.362Z",
-      manifest_commit: "f4c7e8ee78f65fc47494af631e5ffcdd33bcbeb5",
-      build_time: "2026-08-02T00:57:34.186Z",
-      matches_deploy_branch_head: false,
+      observed_at: "2026-08-02T02:53:25.627Z",
+      manifest_commit: "a20776993bd606f07977674934864b888a407e1c",
+      build_time: "2026-08-02T01:28:54.548Z",
+      matches_deploy_branch_head: true,
       manifest_is_ancestor_of_deploy_branch_head: true,
-      source_delta_since_manifest: "ONE_QUICK_LOG_COMMIT_14_FILES",
+      source_delta_since_manifest: "NONE_DEPLOY_MATCHES_PRODUCTION",
       production_publish_required: false,
       release_content_match: "PASS",
       release_content_scope: "LIGHTING_GUIDES_ONLY",
-      full_deploy_branch_parity: "NOT_CURRENT",
+      full_deploy_branch_parity: "CURRENT",
       sitemap_url_count: 51,
       robots_declares_production_sitemap: true,
       robots_protects_app_prefixes: true,
@@ -211,10 +211,10 @@ describe("SEO readiness status artifact", () => {
     );
     expect(production.production_publish_required).toBe(release.production_publish_required);
     expect(production.observed_at).toBe(publicProbe.observed_at);
-    expect(production.matches_deploy_branch_head).toBe(false);
-    expect(release.production_matches_deploy_branch_head).toBe(false);
-    expect(production.full_deploy_branch_parity).toBe("NOT_CURRENT");
-    expect(release.full_deploy_branch_parity).toBe("not_current");
+    expect(production.matches_deploy_branch_head).toBe(true);
+    expect(release.production_matches_deploy_branch_head).toBe(true);
+    expect(production.full_deploy_branch_parity).toBe("CURRENT");
+    expect(release.full_deploy_branch_parity).toBe("current");
     expect(production.release_content_scope).toBe("LIGHTING_GUIDES_ONLY");
     expect(release.release_content_scope).toBe("lighting_guides_only");
     expect(BASELINE.artifact_semantics).toBe("POINT_IN_TIME_EVIDENCE_SNAPSHOT");
@@ -299,7 +299,7 @@ describe("SEO readiness status artifact", () => {
       id: "STALE_SEO_READINESS_EVIDENCE",
       status: "FIXED_AND_LOCAL_VERIFIED",
       evidence:
-        "Existing readiness artifacts now distinguish production f4c7e8ee from deploy head a2077699, retain the lighting-scope release pass, and record the nine-state intercepted collection result.",
+        "Existing readiness artifacts now identify a2077699 as the matching production and deploy head, retain the lighting-scope release pass, and record the completed nine-state intercepted collection result.",
     });
     expect(READINESS.next_slice).toEqual({
       priority: "P0",

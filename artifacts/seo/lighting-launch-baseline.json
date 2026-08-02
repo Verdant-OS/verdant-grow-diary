@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-02T02:08:43.179Z",
+  "generated_at": "2026-08-02T02:55:07.852Z",
   "artifact_semantics": "POINT_IN_TIME_EVIDENCE_SNAPSHOT",
   "measurement_start_at": null,
   "measurement_status": "blocked",
@@ -12,9 +12,9 @@
     "pull_request": 595,
     "merge_commit": "1223c56c9db586160a2798d017c2e78d1de1dd5a",
     "lovable_project_id": "66255e7b-892c-4be5-8686-ab1cfc3666db",
-    "publisher_latest_commit_sha": "f4c7e8ee78f65fc47494af631e5ffcdd33bcbeb5",
+    "publisher_latest_commit_sha": "a20776993bd606f07977674934864b888a407e1c",
     "production_version_url": "https://verdantgrowdiary.com/version.json",
-    "production_build_time": "2026-08-02T00:57:34.186Z",
+    "production_build_time": "2026-08-02T01:28:54.548Z",
     "production_deployment_id": null,
     "pull_request_merge_in_production_commit": true,
     "measurement_repair_pull_request": 597,
@@ -25,15 +25,15 @@
     "structured_data_repair_in_production_commit": true,
     "deploy_branch_head": "a20776993bd606f07977674934864b888a407e1c",
     "production_manifest_is_ancestor_of_deploy_branch_head": true,
-    "production_matches_deploy_branch_head": false,
-    "source_delta_since_manifest": "one_quick_log_commit_14_files",
+    "production_matches_deploy_branch_head": true,
+    "source_delta_since_manifest": "none_deploy_matches_production",
     "production_publish_required": false,
     "release_content_match": "pass",
     "release_content_scope": "lighting_guides_only",
-    "full_deploy_branch_parity": "not_current"
+    "full_deploy_branch_parity": "current"
   },
   "public_probe": {
-    "observed_at": "2026-08-02T02:05:36.362Z",
+    "observed_at": "2026-08-02T02:53:25.627Z",
     "version_http_status": 200,
     "lighting_pages_http_status": 200,
     "sitemap_http_status": 200,
@@ -214,7 +214,7 @@
   "launch_gates": {
     "both_pages_http_200": "pass",
     "release_content_match": "pass",
-    "full_deploy_branch_parity": "not_current",
+    "full_deploy_branch_parity": "current",
     "intentional_indexability": "pass",
     "canonicals": "pass",
     "sitemap_and_robots": "pass",

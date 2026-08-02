@@ -47,14 +47,17 @@ numeric property ID and authenticated reporting baseline remain unavailable to C
 - Production manifest and deploy head both resolve to `a2077699…`. The production release now has
   full deploy-branch parity. Lighting release-content verification remains deliberately scoped to the
   two guides; no runtime publish is required for the measurement evidence itself.
-- The point-in-time readiness artifact keeps its evidence-branch audit head
+- The point-in-time readiness artifact keeps its evidence-branch audit-start head
   (`c794e4c6ff0debb6ae2a83566b2a73f690a96393`) separate from its audited production release
   (`a20776993bd606f07977674934864b888a407e1c`). The former was seven evidence-only commits ahead
-  at snapshot capture and is not represented as deployed content.
+  at audit start and is not represented as deployed content. The targeted post-deploy recheck,
+  captured after that start, is first recorded in its descendant evidence commit
+  (`913f1b9deb0934d5ce76491cbc945816f4581b73`); that commit identifies the committed recheck
+  record, not deployed application content.
 - Its evidence snapshot remains timestamped `2026-08-02T05:19:48.245Z`. The later
-  `2026-08-02T05:43:14.855Z` revision is classified as
-  `POST_DEPLOY_ANALYTICS_HANDOFF_CONSISTENCY_ONLY`; it aligns the handoff with that targeted
-  recheck and does not add a fresh production or analytics verification.
+  `2026-08-02T06:09:23.093Z` revision is classified as
+  `POST_DEPLOY_ANALYTICS_PROVENANCE_CLARIFICATION_ONLY`; it links the targeted recheck to its
+  committed evidence record and does not add a fresh production or analytics verification.
 - The current production response does not expose a Lovable deployment ID, so none is inferred.
 - Both release-specific URLs, titles, descriptions, H1s, Article/FAQ schema, sitemap entries, and
   cross-links are present in production.

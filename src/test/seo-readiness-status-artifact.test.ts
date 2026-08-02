@@ -71,8 +71,8 @@ describe("SEO readiness status artifact", () => {
       scope: "LIGHTING_LAUNCH_MEASUREMENT",
       generated_at_semantics: "EVIDENCE_SNAPSHOT_CAPTURE_TIME",
       artifact_revision: {
-        revised_at: "2026-08-02T05:43:14.855Z",
-        revision_scope: "POST_DEPLOY_ANALYTICS_HANDOFF_CONSISTENCY_ONLY",
+        revised_at: "2026-08-02T06:09:23.093Z",
+        revision_scope: "POST_DEPLOY_ANALYTICS_PROVENANCE_CLARIFICATION_ONLY",
         production_or_analytics_reverification_performed: false,
       },
       timezone: "America/Chicago",
@@ -115,8 +115,11 @@ describe("SEO readiness status artifact", () => {
 
   it("keeps the human-readable handoff aligned with the artifact revision metadata", () => {
     const revision = READINESS.artifact_revision as Record<string, unknown>;
+    const targetedRecheck = (READINESS.analytics_identity as Record<string, unknown>)
+      .targeted_post_deploy_recheck as Record<string, unknown>;
     expect(LAUNCH_VERIFICATION).toContain(`\`${revision.revised_at}\``);
     expect(LAUNCH_VERIFICATION).toContain(`\`${revision.revision_scope}\``);
+    expect(LAUNCH_VERIFICATION).toContain(`\`${targetedRecheck.recorded_in_commit}\``);
   });
 
   it("separates the point-in-time evidence head from the audited deploy release", () => {
@@ -225,6 +228,7 @@ describe("SEO readiness status artifact", () => {
       targeted_post_deploy_recheck: {
         scope: "DIRECT_DEEP_LINK_AND_CROSS_GUIDE_CLIENT_NAVIGATION",
         production_manifest_commit: "a20776993bd606f07977674934864b888a407e1c",
+        recorded_in_commit: "913f1b9deb0934d5ce76491cbc945816f4581b73",
         interceptor_host_coverage: [
           "analytics.google.com",
           "google-analytics.com",
@@ -437,6 +441,7 @@ describe("SEO readiness status artifact", () => {
     const runContext = READINESS.run_context as Record<string, unknown>;
     expect(provenanceDefect?.evidence).toContain(runContext.audit_head);
     expect(provenanceDefect?.evidence).toContain(runContext.audited_release_head);
+    expect(provenanceDefect?.evidence).toContain("913f1b9deb0934d5ce76491cbc945816f4581b73");
     expect(READINESS.current_slice).toEqual({
       priority: "P2",
       id: "LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT",

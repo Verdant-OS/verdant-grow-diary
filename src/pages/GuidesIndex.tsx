@@ -28,7 +28,8 @@ import {
 } from "@/lib/seoStructuredData";
 
 const PAGE_URL = "https://verdantgrowdiary.com/guides";
-const FEATURED_LIGHTING_GUIDE_SLUGS = new Set([
+const FEATURED_GUIDE_SLUGS = new Set([
+  "cannabis-leaf-symptoms",
   "cannabis-grow-light-distance-and-schedule",
   "cannabis-light-stress-light-burn-bleaching-or-heat",
 ]);
@@ -100,6 +101,24 @@ export default function GuidesIndex() {
         <h2 className="font-display text-2xl font-semibold mb-6">Start here</h2>
         <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-5">
           <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
+            Evidence-first symptom checks
+          </p>
+          <h3 className="mt-2 font-display text-xl font-semibold">
+            Record the visible sign before naming a cause
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Compare yellowing, spots or lesions, and burnt or crispy tips against the plant's
+            environment, watering, feeding, and lighting history. One photo is not a diagnosis.
+          </p>
+          <Link
+            to="/guides/cannabis-leaf-symptoms"
+            className="mt-4 inline-flex text-sm font-semibold text-primary hover:underline"
+          >
+            Open the cannabis symptom hub
+          </Link>
+        </div>
+        <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-5">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
             Indoor lighting decisions
           </p>
           <h3 className="mt-2 font-display text-xl font-semibold">
@@ -144,7 +163,7 @@ export default function GuidesIndex() {
           </Link>
         </div>
         <ul className="space-y-4">
-          {VERDANT_SEO_GUIDES.filter((g) => !FEATURED_LIGHTING_GUIDE_SLUGS.has(g.slug)).map((g) => (
+          {VERDANT_SEO_GUIDES.filter((g) => !FEATURED_GUIDE_SLUGS.has(g.slug)).map((g) => (
             <li
               key={g.slug}
               className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors"

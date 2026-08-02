@@ -26,6 +26,12 @@ import {
   OREOZ_GELONADE_DIARY_COMPARISON_PATH,
   OREOZ_GELONADE_GUIDE_QUICK_LOG_PATH,
 } from "./oreozGelonadeExperience";
+import {
+  CANNABIS_SYMPTOM_REFERENCE_TABLE,
+  SYMPTOM_NO_STACK_RULE,
+  symptomReferenceTableFor,
+  type SymptomReferenceTableData,
+} from "./cannabisSymptomReference";
 
 export interface GuideSectionLink {
   readonly label: string;
@@ -76,6 +82,8 @@ export interface SeoGuidePage {
   /** Repository-backed publication/review provenance for Article JSON-LD. */
   readonly publishedOn?: string;
   readonly modifiedOn?: string;
+  /** Optional shared comparison table rendered accessibly below the introduction. */
+  readonly referenceTable?: SymptomReferenceTableData;
 }
 
 /* ------------------------------------------------------------------ */
@@ -516,8 +524,9 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "Environment and observation beat guessing",
-        body: "A stable grow room, a careful eye, and a simple log turn symptoms into diagnosis. Vapor-pressure deficit (VPD), light intensity, airflow, and root-zone health explain most leaf issues better than a single product. If context is missing, the safest answer is to gather more evidence before treating.",
+        body: "A stable grow room, a careful eye, and a simple log turn symptoms into a traceable investigation. Vapor-pressure deficit (VPD), light intensity, airflow, and root-zone health provide more useful context than a single product. If context is missing, the safest answer is to gather more evidence before treating.",
         links: [
+          { label: "Start with the cannabis symptom hub", to: "/guides/cannabis-leaf-symptoms" },
           { label: "Track VPD with source-labeled readings", to: "/guides/grow-room-vpd-tracker" },
           {
             label: "Compare possible light and heat stress",
@@ -546,6 +555,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "cannabis-grow-light-distance-and-schedule",
       "cannabis-light-stress-light-burn-bleaching-or-heat",
       "cannabis-nutrient-schedule",
+      "cannabis-leaf-symptoms",
       "grow-room-vpd-tracker",
       "grow-diary-app",
     ],
@@ -1628,6 +1638,247 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     ],
     publishedOn: "2026-07-30",
     modifiedOn: "2026-07-30",
+  },
+  {
+    slug: "cannabis-leaf-symptoms",
+    title: "Cannabis Plant Symptoms: Evidence-First Checks | Verdant",
+    h1: "Cannabis plant symptoms: record the sign, then compare the evidence",
+    description:
+      "An evidence-first cannabis symptom hub for yellowing, spots or lesions, and burnt or crispy tips—with cautious checks before changing the grow.",
+    targetKeyword: "cannabis plant symptoms",
+    intro:
+      "A visible sign is the start of an investigation, not the name of a cause. Record where it appears, the confirmed plant stage, and what changed nearby. Then compare environment, watering, feeding, and lighting history before deciding what deserves a controlled follow-up.",
+    referenceTable: CANNABIS_SYMPTOM_REFERENCE_TABLE,
+    sections: [
+      {
+        heading: "Start with what is visible",
+        body: "Use plain observations: yellowing, discrete spots or lesions, or dry tips and edges. Add location, timing, progression, and whether new growth differs from older growth. Avoid naming a deficiency, pest, pathogen, or burn until the surrounding evidence supports that comparison.",
+        links: [
+          { label: "Yellowing leaves", to: "/guides/cannabis-leaves-turning-yellow" },
+          { label: "Leaf spots and lesions", to: "/guides/cannabis-leaf-spots-lesions" },
+          { label: "Burnt or crispy tips", to: "/guides/cannabis-burnt-crispy-leaf-tips" },
+        ],
+      },
+      {
+        heading: "Compare the prior 14 days",
+        body: "Look back across the same plant for watering and feeding, and the same plant or tent for environment and explicit lighting context. Missing history is not proof that nothing happened. A partial timeline stays labeled limited so a grower can fill the gap without false certainty.",
+      },
+      {
+        heading: "Make one controlled follow-up",
+        body: SYMPTOM_NO_STACK_RULE,
+        links: [
+          { label: "Daily grow log checklist", to: "/guides/daily-grow-log-checklist" },
+          { label: "Sensor truth in a grow room", to: "/guides/sensor-truth-grow-room" },
+        ],
+      },
+    ],
+    faq: [
+      {
+        question: "Can a photo identify a cannabis plant problem?",
+        answer:
+          "A photo can preserve pattern and progression, but one image rarely establishes cause. Compare stage, location, environment, watering, feeding, lighting, and changes over time.",
+      },
+      {
+        question: "What should I log first when I see a symptom?",
+        answer:
+          "Log the visible sign, confirmed stage, plant location, a short note, and repeatable photos. Then check the prior 14 days of plant and tent evidence before changing more than one variable.",
+      },
+    ],
+    related: [
+      "cannabis-leaves-turning-yellow",
+      "cannabis-leaf-spots-lesions",
+      "cannabis-burnt-crispy-leaf-tips",
+      "cannabis-plant-care",
+      "sensor-truth-grow-room",
+    ],
+    publishedOn: "2026-08-01",
+    modifiedOn: "2026-08-01",
+  },
+  {
+    slug: "cannabis-leaves-turning-yellow",
+    title: "Cannabis Leaves Turning Yellow: What to Check | Verdant",
+    h1: "Cannabis leaves turning yellow: compare the pattern before calling the cause",
+    description:
+      "Record cannabis leaf yellowing by stage and location, then compare root-zone, feeding, environment, and light history without jumping to a deficiency claim.",
+    targetKeyword: "cannabis leaves turning yellow",
+    intro:
+      "Yellowing describes a color change. It does not, by itself, identify a nutrient deficiency, pH problem, watering problem, root issue, light response, or normal aging. The safest first move is to preserve the pattern and compare it with recent plant history.",
+    referenceTable: symptomReferenceTableFor("yellowing"),
+    cta: {
+      label: "Open the symptom evidence hub",
+      to: "/guides/cannabis-leaf-symptoms",
+      heading: "Compare yellowing evidence before changing inputs",
+      description:
+        "Use the symptom evidence hub to compare this visible pattern with environment, watering, feeding, and lighting context before deciding what to verify next.",
+    },
+    sections: [
+      {
+        heading: "Map the pattern and age of growth",
+        body: "Record whether yellowing begins on older lower leaves, newer upper growth, leaf edges, tissue between veins, or across the whole plant. Compare an affected leaf with an unaffected leaf under the same light and photograph both from a repeatable angle.",
+      },
+      {
+        heading: "Compare root-zone and feeding history",
+        body: "Review the same plant's recent watering volume, timing, dryback or substrate observations, input pH and EC when available, runoff, and recorded feeding. A missing measurement remains missing; do not replace it with a guessed value or assume the latest feed caused the change.",
+        links: [
+          { label: "Plant watering log", to: "/guides/plant-watering-log" },
+          { label: "Cannabis nutrient schedule guide", to: "/guides/cannabis-nutrient-schedule" },
+        ],
+      },
+      {
+        heading: "Compare environment and lighting context",
+        body: "Check source-labeled temperature and humidity, canopy position, explicit light changes, and whether the pattern follows the most exposed area. Stale, manual, demo, or invalid readings should never be presented as healthy live evidence.",
+      },
+      { heading: "Avoid stacked corrections", body: SYMPTOM_NO_STACK_RULE },
+    ],
+    faq: [
+      {
+        question: "Do yellow cannabis leaves always mean nitrogen deficiency?",
+        answer:
+          "No. Yellowing is a visible sign shared by multiple conditions and by normal late-cycle aging. Pattern, stage, root-zone history, feeding, environment, and progression matter.",
+      },
+      {
+        question: "Should I feed immediately when leaves turn yellow?",
+        answer:
+          "Not from color alone. Preserve the observation and compare recent watering, feeding, pH or EC evidence, environment, and stage before making a controlled change.",
+      },
+    ],
+    related: [
+      "cannabis-leaf-symptoms",
+      "cannabis-leaf-spots-lesions",
+      "cannabis-burnt-crispy-leaf-tips",
+      "plant-watering-log",
+      "cannabis-nutrient-schedule",
+      "grow-room-vpd-tracker",
+    ],
+    publishedOn: "2026-08-01",
+    modifiedOn: "2026-08-01",
+  },
+  {
+    slug: "cannabis-leaf-spots-lesions",
+    title: "Cannabis Leaf Spots and Lesions: Evidence Checks | Verdant",
+    h1: "Cannabis leaf spots and lesions: preserve distribution, surfaces, and timing",
+    description:
+      "Use an evidence-first checklist for cannabis leaf spots and lesions: distribution, both leaf surfaces, recent inputs, environment, progression, and honest uncertainty.",
+    targetKeyword: "cannabis leaf spots",
+    intro:
+      "Spots and lesions can overlap across physical damage, residue, spray response, pests, pathogens, environment, root-zone problems, and nutrition. A single photograph should not turn that overlap into certainty. Record the distribution and compare how the pattern changes.",
+    referenceTable: symptomReferenceTableFor("spots"),
+    cta: {
+      label: "Open the symptom evidence hub",
+      to: "/guides/cannabis-leaf-symptoms",
+      heading: "Compare spots and lesions without naming a cause",
+      description:
+        "Use the symptom evidence hub to compare this visible pattern with environment, watering, feeding, and lighting context before deciding what to verify next.",
+    },
+    sections: [
+      {
+        heading: "Photograph both leaf surfaces",
+        body: "Capture affected and unaffected leaves, the upper and lower surface, the wider plant, and the neighboring plant if relevant. Record whether marks rub off, cross veins, have sharp or diffuse edges, or are paired with insects, webbing, eggs, residue, or odor without treating any one clue as a confirmed cause.",
+      },
+      {
+        heading: "Check distribution and room context",
+        body: "Map whether spots occur on one plant, one canopy zone, multiple plants, or near an airflow, splash, or contact point. Review same-tent temperature, humidity, condensation, and scouting records while keeping manual and stale evidence clearly labeled.",
+        links: [
+          {
+            label: "Bud rot identification and prevention",
+            to: "/guides/bud-rot-prevention-identification",
+          },
+          { label: "Sensor truth in a grow room", to: "/guides/sensor-truth-grow-room" },
+        ],
+      },
+      {
+        heading: "Compare recent plant inputs",
+        body: "Review the same plant's watering, feeding, foliar contact, handling, and cleaning history. If a record is absent, label the evidence limited instead of saying the event did not happen.",
+      },
+      { heading: "Avoid stacked corrections", body: SYMPTOM_NO_STACK_RULE },
+    ],
+    faq: [
+      {
+        question: "Do leaf spots prove a pest or pathogen?",
+        answer:
+          "No. Spots are not specific enough by themselves. Distribution, both leaf surfaces, progression, room context, scouting, and recent inputs are needed before escalating a hypothesis.",
+      },
+      {
+        question: "What evidence should I preserve?",
+        answer:
+          "Repeatable photos, location, stage, progression, same-plant watering and feeding, same-tent environment, and any scouting or contact observations.",
+      },
+    ],
+    related: [
+      "cannabis-leaf-symptoms",
+      "cannabis-leaves-turning-yellow",
+      "cannabis-burnt-crispy-leaf-tips",
+      "sensor-truth-grow-room",
+      "daily-grow-log-checklist",
+      "bud-rot-prevention-identification",
+    ],
+    publishedOn: "2026-08-01",
+    modifiedOn: "2026-08-01",
+  },
+  {
+    slug: "cannabis-burnt-crispy-leaf-tips",
+    title: "Burnt or Crispy Cannabis Leaf Tips: What to Check | Verdant",
+    h1: "Burnt or crispy cannabis leaf tips: compare feed, roots, light, and heat",
+    description:
+      "An evidence-first guide to burnt or crispy cannabis leaf tips with feed, root-zone, light, heat, and progression checks—without assuming nutrient burn.",
+    targetKeyword: "cannabis leaf tips",
+    intro:
+      "Dry brown tips and edges are easy to label and hard to explain from appearance alone. Record where they occur, whether damage is progressing, and what changed before comparing feeding, root-zone, light, and heat evidence.",
+    referenceTable: symptomReferenceTableFor("tip_damage"),
+    cta: {
+      label: "Open the symptom evidence hub",
+      to: "/guides/cannabis-leaf-symptoms",
+      heading: "Compare tip-damage evidence before another change",
+      description:
+        "Use the symptom evidence hub to compare this visible pattern with environment, watering, feeding, and lighting context before deciding what to verify next.",
+    },
+    sections: [
+      {
+        heading: "Separate exposed zones from whole-plant patterns",
+        body: "Record whether damage is concentrated at the highest canopy, at leaf edges across the plant, on older growth, or near a local hot or dry pocket. Compare affected and shaded tissue and note whether new growth is stable after the observation.",
+      },
+      {
+        heading: "Compare feeding and root-zone evidence",
+        body: "Review the same plant's input EC and pH, runoff EC when recorded, watering volume, timing, drainage, and dryback or substrate observations. Tip damage alone does not prove excess nutrients, and an absent runoff record is not a zero.",
+        links: [
+          { label: "Cannabis nutrient schedule guide", to: "/guides/cannabis-nutrient-schedule" },
+          { label: "Plant watering log", to: "/guides/plant-watering-log" },
+        ],
+      },
+      {
+        heading: "Compare explicit light and heat context",
+        body: "Look for a documented fixture, dimmer, distance, PPFD, schedule, canopy-growth, temperature, humidity, or airflow change. The word light in unrelated notes is not lighting evidence, and room temperature alone may miss a canopy hot spot.",
+        links: [
+          {
+            label: "Light stress and look-alikes",
+            to: "/guides/cannabis-light-stress-light-burn-bleaching-or-heat",
+          },
+        ],
+      },
+      { heading: "Avoid stacked corrections", body: SYMPTOM_NO_STACK_RULE },
+    ],
+    faq: [
+      {
+        question: "Do crispy tips always mean nutrient burn?",
+        answer:
+          "No. Tip damage can overlap with several plant and room conditions. Compare same-plant feeding and root-zone history plus explicit light, heat, and airflow context.",
+      },
+      {
+        question: "Should I flush immediately?",
+        answer:
+          "Not from tip appearance alone. Preserve the evidence, verify measurements and units, and make only a controlled grower-approved change when the history supports it.",
+      },
+    ],
+    related: [
+      "cannabis-leaf-symptoms",
+      "cannabis-leaves-turning-yellow",
+      "cannabis-leaf-spots-lesions",
+      "cannabis-nutrient-schedule",
+      "plant-watering-log",
+      "cannabis-light-stress-light-burn-bleaching-or-heat",
+    ],
+    publishedOn: "2026-08-01",
+    modifiedOn: "2026-08-01",
   },
 ];
 

@@ -34,6 +34,34 @@ describe("resolveTimelineLightingGuide", () => {
     },
   );
 
+  it.each([
+    {
+      source: "note",
+      input: {
+        note: "The exposed tops show possible bleaching after the light check.",
+        details: { checkType: "light" },
+      },
+    },
+    {
+      source: "details",
+      input: {
+        note: "Routine canopy review.",
+        details: { checkType: "light", observations: "Possible heat stress at the tallest top." },
+      },
+    },
+  ])("prefers explicit stress evidence in $source over light-check setup context", ({ input }) => {
+    expect(resolveTimelineLightingGuide(input)?.kind).toBe("stress");
+  });
+
+  it("keeps a routine light check as setup context", () => {
+    expect(
+      resolveTimelineLightingGuide({
+        note: "Recorded the current fixture position.",
+        details: { checkType: "light" },
+      })?.kind,
+    ).toBe("setup");
+  });
+
   it("recognizes a plant-response symptom only when lighting context is explicit", () => {
     expect(
       resolveTimelineLightingGuide({

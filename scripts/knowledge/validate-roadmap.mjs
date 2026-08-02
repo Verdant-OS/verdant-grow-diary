@@ -6,6 +6,12 @@ import path from "node:path";
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(scriptDir, "..", "..");
 const roadmapPath = path.join(root, "docs", "knowledge-library", "roadmap-500.json");
+const postV1PublicRouteCohortsPath = path.join(
+  root,
+  "docs",
+  "knowledge-library",
+  "post-v1-public-route-cohorts.json",
+);
 const siteMapPath = path.join(root, "docs", "knowledge-library", "site-map.md");
 const pillarPagesPath = path.join(root, "docs", "knowledge-library", "pillar-pages.md");
 
@@ -623,6 +629,76 @@ export function collectCurrentRegistryPaths(rootDir = root) {
   return new Set(publicPaths);
 }
 
+export function collectPostV1PublicRouteCohortPaths(rootDir = root) {
+  const cohortPath =
+    rootDir === root
+      ? postV1PublicRouteCohortsPath
+      : path.join(rootDir, "docs", "knowledge-library", "post-v1-public-route-cohorts.json");
+  const registry = JSON.parse(readFileSync(cohortPath, "utf8"));
+
+  if (registry.version !== 1 || registry.artifactType !== "post_v1_public_route_cohorts") {
+    fail(`post-v1 public-route cohort registry must declare version 1 and its artifact type`);
+  }
+  if (
+    typeof registry.artifactScope !== "string" ||
+    !/separately approved public routes/i.test(registry.artifactScope) ||
+    !/immutable v1 roadmap/i.test(registry.artifactScope)
+  ) {
+    fail(`post-v1 public-route cohort registry must explain its immutable-roadmap boundary`);
+  }
+  if (!Array.isArray(registry.cohorts)) {
+    fail(`post-v1 public-route cohort registry must contain cohorts`);
+  }
+
+  const cohortIds = new Set();
+  const paths = [];
+  for (const cohort of registry.cohorts) {
+    if (
+      !cohort ||
+      typeof cohort !== "object" ||
+      typeof cohort.id !== "string" ||
+      !/^PV1-[A-Z0-9-]+$/.test(cohort.id) ||
+      cohortIds.has(cohort.id)
+    ) {
+      fail(`post-v1 public-route cohorts require unique PV1 identifiers`);
+    }
+    cohortIds.add(cohort.id);
+    if (!Number.isInteger(cohort.sourcePullRequest) || cohort.sourcePullRequest < 1) {
+      fail(`${cohort.id} requires its approving source pull request`);
+    }
+    if (
+      typeof cohort.rationale !== "string" ||
+      words(cohort.rationale) < 12 ||
+      !/public|evidence|symptom|guide|cultivar/i.test(cohort.rationale)
+    ) {
+      fail(`${cohort.id} requires a specific public-route rationale`);
+    }
+    if (!Array.isArray(cohort.paths) || cohort.paths.length === 0) {
+      fail(`${cohort.id} requires one or more route paths`);
+    }
+    if (cohort.paths.some((routePath) => typeof routePath !== "string")) {
+      fail(`${cohort.id} contains a non-string route path`);
+    }
+    const sortedPaths = [...cohort.paths].sort((left, right) => left.localeCompare(right));
+    if (cohort.paths.join("|") !== sortedPaths.join("|")) {
+      fail(`${cohort.id} paths must be sorted for deterministic review`);
+    }
+    for (const routePath of cohort.paths) {
+      if (
+        typeof routePath !== "string" ||
+        !/^\/(?:guides|cultivars)\/[a-z0-9-]+$/.test(routePath)
+      ) {
+        fail(`${cohort.id} contains a non-public guide or cultivar route`);
+      }
+      paths.push(routePath);
+    }
+  }
+
+  const repeated = duplicates(paths);
+  if (repeated.length) fail(`duplicate post-v1 public registry path: ${repeated.join(", ")}`);
+  return new Set(paths);
+}
+
 export function collectCanonicalSiteMapPillarPaths(rootDir = root) {
   const source = readFileSync(
     rootDir === root ? siteMapPath : path.join(rootDir, "docs", "knowledge-library", "site-map.md"),
@@ -810,6 +886,7 @@ export function validateRoadmap(
   roadmap,
   {
     registryPaths = collectCurrentRegistryPaths(root),
+    postV1RegistryPaths = collectPostV1PublicRouteCohortPaths(root),
     siteMapPillarPaths = collectCanonicalSiteMapPillarPaths(root),
     canonicalPillarNames = collectCanonicalPillarNames(root),
   } = {},
@@ -1429,10 +1506,30 @@ export function validateRoadmap(
   const roadmapLivePaths = new Set(
     pages.filter((page) => page.routeStatus === "live").map((page) => page.path),
   );
-  const missingLive = [...registryPaths].filter((publicPath) => !roadmapLivePaths.has(publicPath));
+  const roadmapPaths = new Set(pages.map((page) => page.path));
+  const duplicatedPostV1Paths = [...postV1RegistryPaths].filter((publicPath) =>
+    roadmapPaths.has(publicPath),
+  );
+  if (duplicatedPostV1Paths.length) {
+    fail(
+      `post-v1 public registry paths must not overlap immutable roadmap paths: ${duplicatedPostV1Paths.join(", ")}`,
+    );
+  }
+  const missingPostV1 = [...postV1RegistryPaths].filter(
+    (publicPath) => !registryPaths.has(publicPath),
+  );
+  if (missingPostV1.length) {
+    fail(
+      `post-v1 public registry paths missing from the current registry: ${missingPostV1.join(", ")}`,
+    );
+  }
+  const publishedPaths = new Set([...roadmapLivePaths, ...postV1RegistryPaths]);
+  const missingLive = [...registryPaths].filter((publicPath) => !publishedPaths.has(publicPath));
   const inventedLive = [...roadmapLivePaths].filter((publicPath) => !registryPaths.has(publicPath));
   if (missingLive.length) {
-    fail(`public registry pages missing from roadmap live routes: ${missingLive.join(", ")}`);
+    fail(
+      `public registry pages missing from immutable roadmap live routes or approved post-v1 cohorts: ${missingLive.join(", ")}`,
+    );
   }
   if (inventedLive.length) {
     fail(`roadmap marks non-registry routes live: ${inventedLive.join(", ")}`);
@@ -1460,7 +1557,9 @@ export function validateRoadmap(
     totalPages: pages.length,
     pillars: Object.fromEntries(pillarCounts),
     waves: Object.fromEntries(waveCounts),
-    liveCount: roadmapLivePaths.size,
+    liveCount: publishedPaths.size,
+    v1LiveCount: roadmapLivePaths.size,
+    postV1PublicRouteCount: postV1RegistryPaths.size,
     plannedCount: pages.length - roadmapLivePaths.size,
     routeStatuses: Object.fromEntries(countBy(pages, "routeStatus")),
     libraryReadiness: Object.fromEntries(countBy(pages, "libraryReadiness")),

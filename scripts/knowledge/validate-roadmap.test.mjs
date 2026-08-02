@@ -14,6 +14,7 @@ import {
   collectCanonicalPillarNames,
   collectCanonicalSiteMapPillarPaths,
   collectCurrentRegistryPaths,
+  collectPostV1PublicRouteCohortPaths,
   stableIdentityDigest,
   validateRoadmap,
 } from "./validate-roadmap.mjs";
@@ -23,7 +24,17 @@ const root = path.resolve(scriptDir, "..", "..");
 const roadmapPath = path.join(root, "docs", "knowledge-library", "roadmap-500.json");
 const baseline = JSON.parse(readFileSync(roadmapPath, "utf8"));
 const registryPaths = collectCurrentRegistryPaths(root);
+const postV1RegistryPaths = collectPostV1PublicRouteCohortPaths(root);
 const siteMapPillarPaths = collectCanonicalSiteMapPillarPaths(root);
+const v1LivePaths = new Set(
+  baseline.pages.filter((target) => target.routeStatus === "live").map((target) => target.path),
+);
+const symptomGuidePaths = [
+  "/guides/cannabis-burnt-crispy-leaf-tips",
+  "/guides/cannabis-leaf-spots-lesions",
+  "/guides/cannabis-leaf-symptoms",
+  "/guides/cannabis-leaves-turning-yellow",
+];
 
 function cloneRoadmap() {
   return structuredClone(baseline);
@@ -81,17 +92,25 @@ function addAuthoredGrowJournalBrief(target) {
 }
 
 function assertInvalid(roadmap, pattern, options = {}) {
-  assert.throws(() => validateRoadmap(roadmap, { registryPaths, ...options }), pattern);
+  assert.throws(
+    () => validateRoadmap(roadmap, { registryPaths, postV1RegistryPaths, ...options }),
+    pattern,
+  );
 }
 
 test("the 500-page roadmap separates metadata backlog from authored seed briefs", () => {
-  const report = validateRoadmap(cloneRoadmap(), { registryPaths });
+  const report = validateRoadmap(cloneRoadmap(), { registryPaths, postV1RegistryPaths });
 
   assert.equal(report.status, "pass");
   assert.equal(report.totalPages, 500);
   assert.equal("publishedCount" in report, false);
   assert.equal(report.liveCount, registryPaths.size);
-  assert.equal(report.plannedCount, 500 - registryPaths.size);
+  assert.equal(
+    report.plannedCount,
+    500 - baseline.pages.filter((target) => target.routeStatus === "live").length,
+  );
+  assert.equal(report.postV1PublicRouteCount, postV1RegistryPaths.size);
+  assert.deepEqual([...postV1RegistryPaths].sort(), symptomGuidePaths);
   assert.equal(report.orphanCount, 0);
   assert.equal(report.siteMapPillarCount, 10);
   for (const statusCounts of [
@@ -106,8 +125,8 @@ test("the 500-page roadmap separates metadata backlog from authored seed briefs"
   }
   assert.deepEqual(report.intentStatuses, { provisional: 500 });
   assert.deepEqual(report.routeStatuses, {
-    live: registryPaths.size,
-    planned: 500 - registryPaths.size,
+    live: v1LivePaths.size,
+    planned: 500 - v1LivePaths.size,
   });
   assert.deepEqual(report.libraryReadiness, {
     unassessed: 11,
@@ -116,9 +135,9 @@ test("the 500-page roadmap separates metadata backlog from authored seed briefs"
   });
   assert.deepEqual(report.priorityLanes, {
     foundation: 10,
-    current_route_remediation: registryPaths.size - 3,
+    current_route_remediation: v1LivePaths.size - 3,
     high_consequence_safety: 12,
-    core_coverage: 500 - 10 - (registryPaths.size - 3) - 12,
+    core_coverage: 500 - 10 - (v1LivePaths.size - 3) - 12,
   });
   assert.deepEqual(report.pageFamilies, {
     pillar: 10,
@@ -545,6 +564,28 @@ test("route status exactly mirrors the current registry", () => {
   driftedRegistry.delete(page(baseline, "KL-011").path);
   assertInvalid(cloneRoadmap(), /roadmap marks non-registry routes live/, {
     registryPaths: driftedRegistry,
+  });
+});
+
+test("requires every post-v1 public route to have explicit cohort ownership", () => {
+  assertInvalid(
+    cloneRoadmap(),
+    /missing from immutable roadmap live routes or approved post-v1 cohorts/,
+    { postV1RegistryPaths: new Set() },
+  );
+});
+
+test("rejects a post-v1 cohort path that duplicates immutable roadmap ownership", () => {
+  assertInvalid(
+    cloneRoadmap(),
+    /post-v1 public registry paths must not overlap immutable roadmap paths/,
+    { postV1RegistryPaths: new Set([page(baseline, "KL-011").path]) },
+  );
+});
+
+test("rejects a post-v1 cohort path that is not currently public", () => {
+  assertInvalid(cloneRoadmap(), /post-v1 public registry paths missing from the current registry/, {
+    postV1RegistryPaths: new Set(["/guides/not-a-shipped-guide"]),
   });
 });
 

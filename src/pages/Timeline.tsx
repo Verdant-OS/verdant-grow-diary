@@ -1,11 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TimelineEmptyState from "@/components/TimelineEmptyState";
 import TimelineLightingGuideCard from "@/components/TimelineLightingGuideCard";
+import SymptomEvidenceChecklistCard from "@/components/SymptomEvidenceChecklistCard";
 import {
   resolveTimelineEmptyState,
   TIMELINE_EMPTY_STATE_FALLBACK,
 } from "@/lib/timelineEmptyStateRules";
 import { resolveTimelineLightingGuide } from "@/lib/timelineLightingGuideRules";
+import {
+  buildSymptomEvidenceChecklist,
+  buildSymptomEvidenceTimelineRows,
+  SYMPTOM_EVIDENCE_LOOKBACK_DAYS,
+} from "@/lib/symptomEvidenceChecklistRules";
+import { isTimelineSymptomEvidenceWindowComplete } from "@/lib/timelineSymptomEvidenceWindowCoverageRules";
 import type { FastAddSelectionContext } from "@/lib/fastAddActionRules";
 import PageHeader from "@/components/PageHeader";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
@@ -96,7 +103,10 @@ import TimelineCsvContextPanel from "@/components/TimelineCsvContextPanel";
 import PhenoHuntTimelineSection from "@/components/PhenoHuntTimelineSection";
 import { cn } from "@/lib/utils";
 import { getEventType } from "@/lib/diary";
-import { buildGrowDiaryTimeline } from "@/lib/growDiaryTimelineRules";
+import {
+  buildGrowDiaryTimeline,
+  resolveTimelineDiaryEntryStage,
+} from "@/lib/growDiaryTimelineRules";
 import { MEASUREMENT_DETAIL_KEYS } from "@/lib/timelineEntryClassification";
 import { presentTimelineDiaryEntryDetails } from "@/lib/timelineDiaryEntryDetailPresentationRules";
 import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
@@ -336,6 +346,7 @@ export default function Timeline() {
   const [entriesTotal, setEntriesTotal] = useState<number | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [growEvents, setGrowEvents] = useState<GrowEventRowForRecent[]>([]);
+  const [growEventsTotal, setGrowEventsTotal] = useState<number | null>(null);
   const [actionEvents, setActionEvents] = useState<ActionQueueEvent[]>([]);
   const [alertEvents, setAlertEvents] = useState<AlertEventRow[]>([]);
 
@@ -483,6 +494,7 @@ export default function Timeline() {
       setEntries([]);
       setEntriesTotal(null);
       setGrowEvents([]);
+      setGrowEventsTotal(null);
       setActionEvents([]);
       setAlertEvents([]);
       setPartialReadSources([]);
@@ -500,6 +512,7 @@ export default function Timeline() {
       setEntries([]);
       setEntriesTotal(null);
       setGrowEvents([]);
+      setGrowEventsTotal(null);
       setActionEvents([]);
       setAlertEvents([]);
       setPartialReadSources([]);
@@ -552,7 +565,7 @@ export default function Timeline() {
 
       let growEventsQuery = supabase
         .from("grow_events")
-        .select(ROOT_ZONE_GROW_EVENT_SELECT)
+        .select(ROOT_ZONE_GROW_EVENT_SELECT, { count: "exact" })
         .eq("grow_id", activeGrowId)
         .eq("is_deleted", false)
         .order("occurred_at", { ascending: false })
@@ -572,6 +585,9 @@ export default function Timeline() {
       setEntries(coreRows);
       setEntriesTotal(typeof entriesResult.count === "number" ? entriesResult.count : null);
       setGrowEvents(nextGrowEvents);
+      setGrowEventsTotal(
+        typeof growEventsResult.count === "number" ? growEventsResult.count : null,
+      );
       setActionEvents([]);
       setAlertEvents([]);
       setPartialReadSources([]);
@@ -772,7 +788,7 @@ export default function Timeline() {
   const stageCounts = useMemo(() => {
     const m: Record<string, number> = {};
     entries.forEach((e) => {
-      const stage = normalizeQuickLogStage(e.stage);
+      const stage = resolveTimelineDiaryEntryStage(e);
       if (stage) m[stage] = (m[stage] || 0) + 1;
     });
     return m;
@@ -875,7 +891,7 @@ export default function Timeline() {
 
   const filtered = useMemo(() => {
     const afterStageEvent = entries.filter((e) => {
-      if (stageFilter !== "all" && normalizeQuickLogStage(e.stage) !== stageFilter) return false;
+      if (stageFilter !== "all" && resolveTimelineDiaryEntryStage(e) !== stageFilter) return false;
       if (eventFilter !== "all" && !entryKinds(e).includes(eventFilter)) return false;
       return true;
     });
@@ -980,7 +996,7 @@ export default function Timeline() {
         entry_at: e.entry_at,
         plant_id: e.plant_id,
         tent_id: e.tent_id,
-        stage: e.stage,
+        stage: resolveTimelineDiaryEntryStage(e),
         note: e.note,
         photo_url: e.photo_url,
         details,
@@ -1009,6 +1025,71 @@ export default function Timeline() {
     return out;
   }, [entries, growEvents]);
 
+  const symptomEvidenceByEntryId = useMemo(() => {
+    const result = new Map<string, NonNullable<ReturnType<typeof buildSymptomEvidenceChecklist>>>();
+    if (!activeReadKey || coreRead.status !== "success" || coreRead.readKey !== activeReadKey)
+      return result;
+
+    const canAssessWindowCoverage = !effectiveStartDate && !effectiveEndDate;
+    const diaryHasMore = entriesTotal === null ? null : entriesTotal > entries.length;
+    const growEventsHasMore = growEventsTotal === null ? null : growEventsTotal > growEvents.length;
+    const diaryEvidenceTimestamps = entries.map((row) => row.entry_at);
+    const growEventEvidenceTimestamps = growEvents.map((row) => row.occurred_at);
+    const evidenceSourceLanes = [
+      {
+        timestamps: diaryEvidenceTimestamps,
+        hasMore: diaryHasMore,
+        coverageMode: "exhaustion_only",
+      },
+      {
+        timestamps: growEventEvidenceTimestamps,
+        hasMore: growEventsHasMore,
+        coverageMode: "contiguous_newest_page",
+      },
+    ] as const;
+    const evidenceRows = buildSymptomEvidenceTimelineRows({
+      growId: activeGrowId,
+      recentLaneEntries: recentLaneRawEntries,
+      diaryEntries: entries,
+      growEvents,
+      renderedDiaryEntryIds: new Set(filtered.map((entry) => entry.id)),
+    });
+    for (const entry of entries) {
+      const historyComplete =
+        canAssessWindowCoverage &&
+        isTimelineSymptomEvidenceWindowComplete({
+          observationAt: entry.entry_at,
+          lookbackDays: SYMPTOM_EVIDENCE_LOOKBACK_DAYS,
+          sourceLanes: evidenceSourceLanes,
+        });
+      const view = buildSymptomEvidenceChecklist({
+        symptomEntry: {
+          ...entry,
+          grow_id: activeGrowId,
+          event_type: entry.details?.event_type,
+          source: entry.details?.source,
+        },
+        entries: evidenceRows,
+        historyComplete,
+      });
+      if (view) result.set(entry.id, view);
+    }
+    return result;
+  }, [
+    activeGrowId,
+    activeReadKey,
+    coreRead.readKey,
+    coreRead.status,
+    effectiveEndDate,
+    effectiveStartDate,
+    entries,
+    entriesTotal,
+    filtered,
+    growEvents,
+    growEventsTotal,
+    recentLaneRawEntries,
+  ]);
+
   // Pure normalized timeline view-model. Drives per-entry tags/warnings and a
   // future-proof empty/limited disclosure. Includes invalid entries so
   // malformed diary rows still surface as "Limited data" instead of vanishing.
@@ -1019,7 +1100,7 @@ export default function Timeline() {
         grow_id: activeGrowId ?? null,
         plant_id: e.plant_id,
         tent_id: e.tent_id,
-        stage: e.stage,
+        stage: resolveTimelineDiaryEntryStage(e),
         entry_at: e.entry_at,
         entry_type: (e.details && (e.details.event_type as string | undefined)) ?? "note",
         note: e.note,
@@ -1036,7 +1117,7 @@ export default function Timeline() {
   const groupedByStage = useMemo(() => {
     const groups: { stage: string; items: Entry[] }[] = [];
     filtered.forEach((e) => {
-      const key = e.stage || "unknown";
+      const key = resolveTimelineDiaryEntryStage(e) ?? "unknown";
       const last = groups[groups.length - 1];
       if (last && last.stage === key) last.items.push(e);
       else groups.push({ stage: key, items: [e] });
@@ -1984,7 +2065,7 @@ export default function Timeline() {
                                 </span>
                                 <span className="inline-flex items-center gap-1 text-primary">
                                   <Sprout className="h-3 w-3" />
-                                  {stageLabel(e.stage)}
+                                  {stageLabel(resolveTimelineDiaryEntryStage(e))}
                                 </span>
                                 {plantName && (
                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40 text-[11px]">
@@ -2027,6 +2108,16 @@ export default function Timeline() {
                                 >
                                   <TimelineLightingGuideCard
                                     view={lightingGuideByEntryId.get(e.id)!}
+                                  />
+                                </div>
+                              ) : null}
+                              {symptomEvidenceByEntryId.has(e.id) ? (
+                                <div
+                                  onClick={(event) => event.stopPropagation()}
+                                  onKeyDown={(event) => event.stopPropagation()}
+                                >
+                                  <SymptomEvidenceChecklistCard
+                                    view={symptomEvidenceByEntryId.get(e.id)!}
                                   />
                                 </div>
                               ) : null}
@@ -2140,7 +2231,7 @@ export default function Timeline() {
                                     snapAgeMs > TIMELINE_SNAPSHOT_STALE_MS;
                                   const vpdClassification = classifyVpdAgainstStage({
                                     value: sensor.vpd ?? null,
-                                    stage: e.stage ?? null,
+                                    stage: resolveTimelineDiaryEntryStage(e),
                                     stale: snapStale,
                                   });
                                   const rawSource =
@@ -2322,7 +2413,7 @@ export default function Timeline() {
                 id: row.id,
                 note: row.note,
                 photo_url: row.photo_url,
-                stage: row.stage,
+                stage: resolveTimelineDiaryEntryStage(row),
                 entry_at: row.entry_at,
                 plant_id: row.plant_id,
                 tent_id: row.tent_id,

@@ -49,6 +49,7 @@ import {
   QUICK_LOG_GROUPED_TIMELINE_DEFAULT_LIMIT,
   type QuickLogGroupedTimelineScope,
 } from "@/hooks/useQuickLogGroupedTimeline";
+import { resolveTimelineDiaryEntryStage } from "@/lib/growDiaryTimelineRules";
 
 export const TIMELINE_MEMORY_DEFAULT_LIMIT = 100;
 
@@ -63,9 +64,9 @@ function readEventType(details: unknown): string | null {
 }
 
 function readStage(details: unknown): string | null {
-  if (!details || typeof details !== "object") return null;
-  const v = (details as { stage?: unknown }).stage;
-  return typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
+  if (!details || typeof details !== "object" || Array.isArray(details)) return null;
+  const detailsRecord = details as Record<string, unknown>;
+  return resolveTimelineDiaryEntryStage({ stage: detailsRecord.stage, details });
 }
 
 function readSensorSnapshot(details: unknown): unknown {

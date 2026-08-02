@@ -16,6 +16,8 @@ export const STAGES = [
   { value: "drying", label: "Drying / Curing" },
 ] as const;
 
+export type CanonicalQuickLogStage = (typeof STAGES)[number]["value"];
+
 export function stageLabel(value?: string | null) {
   return STAGES.find((s) => s.value === value)?.label ?? value ?? "—";
 }

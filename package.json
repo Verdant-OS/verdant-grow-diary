@@ -37,6 +37,7 @@
     "e2e:one-tent:seed": "node scripts/e2e/seed-one-tent-golden-path.mjs",
     "e2e:one-tent:teardown": "node scripts/e2e/teardown-one-tent-golden-path.mjs",
     "e2e:one-tent:ui": "playwright test e2e/one-tent-loop-golden-path-ui.spec.ts --project=chromium-mocked",
+    "test:symptom-check:e2e": "playwright test e2e/symptom-check-branch.spec.ts e2e/symptom-guides-burden.spec.ts --project=chromium-mocked",
     "check:lockfile": "node scripts/check-bun-lockfile-policy.mjs",
     "check:npm-lock-semantic": "node scripts/check-npm-lock-semantic.mjs",
     "check:sitemap-robots": "node scripts/check-sitemap-robots-parity.mjs",

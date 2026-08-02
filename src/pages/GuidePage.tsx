@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
 import CustomerComparisonGuideQrOption from "@/components/customer/CustomerComparisonGuideQrOption";
+import SymptomReferenceTable from "@/components/SymptomReferenceTable";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
   Accordion,
@@ -188,6 +189,8 @@ export default function GuidePage() {
             ) : null}
           </p>
         )}
+
+        {guide.referenceTable && <SymptomReferenceTable table={guide.referenceTable} />}
 
         {guide.cta && (
           <aside

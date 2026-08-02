@@ -21,7 +21,7 @@ import {
   type AiDoctorSessionReviewEvent,
   type AiDoctorSessionReviewState,
 } from "@/lib/aiDoctorSessionReviewStatusRules";
-import { rethrowIfAbortError } from "@/lib/supabaseAbort";
+import { applyPostgrestAbortSignal, rethrowIfAbortError } from "@/lib/supabaseAbort";
 
 const REVIEW_SELECT = "id,user_id,session_id,event_type,note,created_at";
 
@@ -65,10 +65,10 @@ export function useAiDoctorSessionReviews(sessionIds?: ReadonlyArray<string> | n
         q = q.in("session_id", scope);
       }
 
-      const { data, error } = await q
-        .order("created_at", { ascending: true })
-        .limit(AI_DOCTOR_SESSION_REVIEWS_MAX_ROWS)
-        .abortSignal(signal);
+      const { data, error } = await applyPostgrestAbortSignal(
+        q.order("created_at", { ascending: true }).limit(AI_DOCTOR_SESSION_REVIEWS_MAX_ROWS),
+        signal,
+      );
 
       rethrowIfAbortError(error);
       if (error) throw error;

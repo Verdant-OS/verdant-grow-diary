@@ -7,6 +7,26 @@
  * messages like "current transaction is aborted" as client cancellation.
  */
 
+type AbortableBuilder<T> = T & {
+  abortSignal?: (signal: AbortSignal) => T;
+};
+
+/**
+ * Attach an AbortSignal to a PostgREST builder when the method exists.
+ * Real @supabase/postgrest-js always provides .abortSignal().
+ * Incomplete vitest fluent doubles may omit it — in that case the chain
+ * continues without transport abort (cache cancel still applies). Production
+ * never hits the missing-method path.
+ */
+export function applyPostgrestAbortSignal<T>(builder: T, signal: AbortSignal | undefined): T {
+  if (!signal) return builder;
+  const b = builder as AbortableBuilder<T>;
+  if (typeof b.abortSignal === "function") {
+    return b.abortSignal(signal);
+  }
+  return builder;
+}
+
 function readStringField(error: object, key: string): string | null {
   if (!(key in error)) return null;
   const value = (error as Record<string, unknown>)[key];

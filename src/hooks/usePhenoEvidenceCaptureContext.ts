@@ -11,7 +11,7 @@ import {
   type PhenoEvidenceCoverage,
   type RawPhenoEvidenceDiaryRow,
 } from "@/lib/phenoEvidenceCaptureRules";
-import { rethrowIfAbortError } from "@/lib/supabaseAbort";
+import { applyPostgrestAbortSignal, rethrowIfAbortError } from "@/lib/supabaseAbort";
 
 export const PHENO_EVIDENCE_CAPTURE_RECEIPT_LIMIT = 200;
 
@@ -32,8 +32,10 @@ async function loadPhenoEvidenceCaptureContext(
   plantId: string,
   signal?: AbortSignal,
 ): Promise<PhenoEvidenceCaptureContext> {
-  let huntQuery = supabase.from("pheno_hunts").select("id, name, evidence_goals").eq("id", huntId);
-  if (signal) huntQuery = huntQuery.abortSignal(signal);
+  const huntQuery = applyPostgrestAbortSignal(
+    supabase.from("pheno_hunts").select("id, name, evidence_goals").eq("id", huntId),
+    signal,
+  );
 
   const { data: hunt, error: huntError } = await huntQuery.maybeSingle();
 
@@ -42,14 +44,16 @@ async function loadPhenoEvidenceCaptureContext(
     throw new Error("pheno_hunt_unavailable");
   }
 
-  let diaryQuery = supabase
-    .from("diary_entries")
-    .select("id, plant_id, tent_id, grow_id, entry_at, photo_url, details")
-    .eq("plant_id", plantId)
-    .eq("details->>kind" as never, PHENO_EVIDENCE_RECEIPT_KIND as never)
-    .order("entry_at", { ascending: false })
-    .limit(PHENO_EVIDENCE_CAPTURE_RECEIPT_LIMIT);
-  if (signal) diaryQuery = diaryQuery.abortSignal(signal);
+  const diaryQuery = applyPostgrestAbortSignal(
+    supabase
+      .from("diary_entries")
+      .select("id, plant_id, tent_id, grow_id, entry_at, photo_url, details")
+      .eq("plant_id", plantId)
+      .eq("details->>kind" as never, PHENO_EVIDENCE_RECEIPT_KIND as never)
+      .order("entry_at", { ascending: false })
+      .limit(PHENO_EVIDENCE_CAPTURE_RECEIPT_LIMIT),
+    signal,
+  );
 
   const { data: diaryRows, error: diaryError } = await diaryQuery;
 

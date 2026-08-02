@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { isSupabaseAbortError, rethrowIfAbortError } from "@/lib/supabaseAbort";
+import {
+  applyPostgrestAbortSignal,
+  isSupabaseAbortError,
+  rethrowIfAbortError,
+} from "@/lib/supabaseAbort";
 
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
@@ -53,6 +57,32 @@ describe("isSupabaseAbortError / rethrowIfAbortError", () => {
   });
 });
 
+describe("applyPostgrestAbortSignal", () => {
+  it("calls builder.abortSignal when present", () => {
+    const ac = new AbortController();
+    const seen: AbortSignal[] = [];
+    const builder = {
+      abortSignal(signal: AbortSignal) {
+        seen.push(signal);
+        return { ...builder, tagged: true };
+      },
+    };
+    const out = applyPostgrestAbortSignal(builder, ac.signal);
+    expect(seen).toEqual([ac.signal]);
+    expect(out).toMatchObject({ tagged: true });
+  });
+
+  it("returns the builder unchanged when abortSignal is missing (test doubles)", () => {
+    const builder = { then: () => {} };
+    expect(applyPostgrestAbortSignal(builder, new AbortController().signal)).toBe(builder);
+  });
+
+  it("returns the builder unchanged when signal is undefined", () => {
+    const builder = { abortSignal: () => ({ ok: true }) };
+    expect(applyPostgrestAbortSignal(builder, undefined)).toBe(builder);
+  });
+});
+
 describe("priority PostgREST readers wire AbortSignal", () => {
   const directAbortFiles = [
     "src/hooks/use-plants.ts",
@@ -62,10 +92,10 @@ describe("priority PostgREST readers wire AbortSignal", () => {
     "src/lib/phenoEvidenceReceiptService.ts",
   ];
 
-  it("each direct PostgREST reader calls .abortSignal", () => {
+  it("each priority reader uses applyPostgrestAbortSignal", () => {
     for (const f of directAbortFiles) {
       const src = read(f);
-      expect(src, f).toMatch(/\.abortSignal\(/);
+      expect(src, f).toMatch(/applyPostgrestAbortSignal/);
       expect(src, f).toMatch(/rethrowIfAbortError/);
     }
   });
@@ -88,5 +118,6 @@ describe("priority PostgREST readers wire AbortSignal", () => {
     const src = read("src/lib/phenoEvidenceReceiptService.ts");
     expect(src).toMatch(/rethrowIfAbortError\(error\)/);
     expect(src).toMatch(/signal\?: AbortSignal/);
+    expect(src).toMatch(/applyPostgrestAbortSignal/);
   });
 });

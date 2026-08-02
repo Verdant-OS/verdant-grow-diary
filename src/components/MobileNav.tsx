@@ -169,7 +169,7 @@ export default function MobileNav() {
               aria-label="More navigation destinations"
               tabIndex={0}
               data-testid="mobile-more-scroll-region"
-              className="mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain pb-[calc(1.5rem+env(safe-area-inset-bottom))] pr-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain pb-[calc(1.5rem+env(safe-area-inset-bottom))] pr-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               {moreGroups.map((group) => (
                 <section

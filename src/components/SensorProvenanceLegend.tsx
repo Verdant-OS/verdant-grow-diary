@@ -45,7 +45,7 @@ const SensorProvenanceLegend = forwardRef<
       data-testid={testId}
       aria-labelledby={resolvedHeadingId}
       className={cn(
-        "glass rounded-2xl p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        "glass rounded-2xl p-4 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         className,
       )}
     >
@@ -69,7 +69,7 @@ const SensorProvenanceLegend = forwardRef<
             >
               <Badge
                 variant={row.healthy ? "outline" : "secondary"}
-                className="self-start text-[10px] shrink-0 max-w-full break-words focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="self-start text-[10px] shrink-0 max-w-full break-words focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 title={row.description}
                 aria-label={ariaLabel}
                 tabIndex={0}

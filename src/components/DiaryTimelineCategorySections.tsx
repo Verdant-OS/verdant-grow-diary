@@ -156,7 +156,7 @@ export function DiaryTimelineCategorySections<
           type="button"
           onClick={() => setAll(true)}
           data-testid={`${testIdPrefix}-expand-all`}
-          className="text-xs rounded-md border border-border/50 bg-secondary/30 px-2 py-1 text-foreground hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+          className="text-xs rounded-md border border-border/50 bg-secondary/30 px-2 py-1 text-foreground hover:bg-secondary/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
         >
           Expand all
         </button>
@@ -164,7 +164,7 @@ export function DiaryTimelineCategorySections<
           type="button"
           onClick={() => setAll(false)}
           data-testid={`${testIdPrefix}-collapse-all`}
-          className="text-xs rounded-md border border-border/50 bg-secondary/30 px-2 py-1 text-foreground hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+          className="text-xs rounded-md border border-border/50 bg-secondary/30 px-2 py-1 text-foreground hover:bg-secondary/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
         >
           Collapse all
         </button>
@@ -172,7 +172,7 @@ export function DiaryTimelineCategorySections<
           type="button"
           onClick={reset}
           data-testid={`${testIdPrefix}-reset`}
-          className="text-xs rounded-md border border-border/40 bg-transparent px-2 py-1 text-muted-foreground hover:bg-secondary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+          className="text-xs rounded-md border border-border/40 bg-transparent px-2 py-1 text-muted-foreground hover:bg-secondary/30 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
         >
           Reset sections
         </button>
@@ -220,7 +220,7 @@ export function DiaryTimelineCategorySections<
               onClick={() => toggle(section.id)}
               data-testid={`${testIdPrefix}-section-toggle`}
               data-section-id={section.id}
-              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-lg"
+              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-lg"
             >
               <span className="flex items-center gap-2">
                 <span>{section.label}</span>

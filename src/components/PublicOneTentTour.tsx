@@ -123,7 +123,7 @@ export default function PublicOneTentTour({
                     moveTabFocus(step.id, event.key);
                   }
                 }}
-                className={`rounded-xl border px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                className={`rounded-xl border px-3 py-3 text-left transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                   selected
                     ? "border-primary/60 bg-primary/10 text-foreground"
                     : "border-border/60 bg-background/60 text-muted-foreground hover:border-primary/30 hover:text-foreground"

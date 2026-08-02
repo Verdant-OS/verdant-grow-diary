@@ -29,7 +29,7 @@ const ICON: Record<PlantDetailQuickActionKind, typeof NotebookPen> = {
 };
 
 const FOCUS_CLASSES =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 interface Props {
   plantId: string | null | undefined;

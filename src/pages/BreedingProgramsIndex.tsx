@@ -96,7 +96,7 @@ export default function BreedingProgramsIndex() {
             <Card className="group h-full overflow-hidden rounded-3xl border-border/60 bg-card/65 shadow-card transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-elevated">
               <Link
                 to={`/breeding/${p.id}`}
-                className="block h-full p-5 transition-colors hover:bg-secondary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="block h-full p-5 transition-colors hover:bg-secondary/20 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 data-testid={`breeding-program-link-${p.id}`}
               >
                 <CardHeader className="min-w-0 space-y-3 p-0 pb-3">

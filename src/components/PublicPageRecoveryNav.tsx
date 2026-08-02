@@ -13,7 +13,7 @@ interface PublicPageRecoveryNavProps {
 }
 
 const LINK_CLASSES =
-  "rounded-sm underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+  "rounded-sm underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
 /**
  * Small recovery path for standalone public pages that render outside AppShell.

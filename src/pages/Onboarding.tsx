@@ -159,7 +159,7 @@ export default function Onboarding() {
           ref={headingRef}
           tabIndex={-1}
           id="onboarding-heading"
-          className="text-2xl font-display font-bold mb-1 outline-none"
+          className="text-2xl font-display font-bold mb-1 outline-hidden"
         >
           {preferRoom && !csvHistoryIntent
             ? "Or choose where to open first"
@@ -321,7 +321,7 @@ export default function Onboarding() {
           You can change this later from{" "}
           <Link
             to="/settings"
-            className="underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+            className="underline underline-offset-2 hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded"
           >
             Settings
           </Link>

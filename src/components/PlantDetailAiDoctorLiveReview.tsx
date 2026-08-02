@@ -883,7 +883,7 @@ function PlantDetailAiDoctorLiveReviewScope({
               <span>{AI_DOCTOR_HISTORY_SAVED_COPY}</span>
               <Link
                 to={aiDoctorSessionDetailPath(review.persistence.sessionId)}
-                className="font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="font-medium underline underline-offset-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 data-testid="plant-ai-doctor-history-saved-link"
               >
                 View saved session

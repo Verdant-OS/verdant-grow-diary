@@ -147,7 +147,7 @@ export default function TentPlantRosterPanel({
                 data-testid="tent-plant-roster-show-archived-toggle"
                 aria-label={viewModel.archivedToggleAccessibleLabel}
                 aria-describedby="tent-plant-roster-show-archived-help"
-                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded"
+                className="focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded"
               />
               <span>{viewModel.archivedToggleLabel}</span>
             </label>
@@ -386,7 +386,7 @@ function TentPlantRosterRowActions({
         ref={(el) => {
           summaryRef.current = el;
         }}
-        className="cursor-pointer list-none rounded-md border px-2 py-1 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="cursor-pointer list-none rounded-md border px-2 py-1 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         aria-label={triggerLabel}
         data-testid={`tent-plant-roster-row-${rowId}-actions-trigger`}
         onKeyDown={handleSummaryKeyDown}
@@ -402,7 +402,7 @@ function TentPlantRosterRowActions({
       >
         {entries.map((entry) => {
           const baseClass =
-            "block w-full text-left rounded-sm px-2 py-1 text-xs hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:text-inherit";
+            "block w-full text-left rounded-sm px-2 py-1 text-xs hover:bg-accent hover:text-accent-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:text-inherit";
           const unavailable =
             entry.disabled === true || (entry.event !== "open-quicklog" && !entry.href);
           const aria =

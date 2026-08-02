@@ -153,7 +153,7 @@ export default function DiaryEntryRemoveButton({
             aria-label={FOLLOW_UP_ACCESSIBLE_LABEL}
             title={FOLLOW_UP_HELPER_COPY}
             data-testid="diary-entry-remove-followup-button"
-            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] border border-primary/40 text-primary hover:bg-primary/10 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] border border-primary/40 text-primary hover:bg-primary/10 transition focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             {FOLLOW_UP_BUTTON_LABEL}
           </button>

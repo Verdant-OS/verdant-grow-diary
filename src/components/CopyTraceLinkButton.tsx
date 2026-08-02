@@ -93,7 +93,7 @@ export default function CopyTraceLinkButton({
         data-testid={buttonTestId}
         data-copy-state={status}
         aria-label={COPY_TRACE_LINK_LABEL}
-        className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm disabled:opacity-60"
+        className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-sm disabled:opacity-60"
       >
         <Copy className="h-3 w-3" aria-hidden />
         {COPY_TRACE_LINK_LABEL}

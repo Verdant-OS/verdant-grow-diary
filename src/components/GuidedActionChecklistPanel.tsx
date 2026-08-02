@@ -281,7 +281,7 @@ export default function GuidedActionChecklistPanel({
                     <button
                       type="button"
                       onClick={() => handleDismiss(item.id)}
-                      className="inline-flex items-center gap-1 rounded-sm px-1.5 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="inline-flex items-center gap-1 rounded-sm px-1.5 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                       aria-label={`Dismiss ${item.title} for 12 hours`}
                       title="Dismiss for 12 hours"
                       data-testid={`guided-action-checklist-dismiss-${item.id}`}

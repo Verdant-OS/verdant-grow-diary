@@ -405,7 +405,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                 aria-label="Clear search (Esc)"
                 title="Clear search (Esc)"
                 data-testid="global-search-clear"
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground opacity-70 transition hover:bg-muted hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground opacity-70 transition hover:bg-muted hover:opacity-100 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>
@@ -438,7 +438,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                 <button
                   type="button"
                   onClick={resetFilters}
-                  className="rounded-sm px-1.5 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="rounded-sm px-1.5 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/10 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                   data-testid="global-search-filters-reset"
                 >
                   Show all
@@ -464,7 +464,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                       onClick={() => toggleType(t)}
                       disabled={isDisabled}
                       className={cn(
-                        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
                         isOn
                           ? "border-primary/40 bg-primary/10 text-foreground hover:bg-primary/20"
                           : "border-border bg-background text-muted-foreground line-through opacity-70 hover:opacity-100",

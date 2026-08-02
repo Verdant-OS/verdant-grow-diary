@@ -14,7 +14,7 @@ import {
 describe("AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES", () => {
   it("includes the expected focus-visible ring tokens", () => {
     expect(AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES).toMatch(
-      /\bfocus-visible:outline-none\b/,
+      /\bfocus-visible:outline-hidden\b/,
     );
     expect(AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES).toMatch(
       /\bfocus-visible:ring-2\b/,
@@ -26,7 +26,7 @@ describe("AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES", () => {
 
   it("never hides outlines without a focus replacement", () => {
     expect(AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES).not.toMatch(
-      /\boutline-none\b(?!.*focus-visible:ring)/,
+      /\boutline-hidden\b(?!.*focus-visible:ring)/,
     );
   });
 });

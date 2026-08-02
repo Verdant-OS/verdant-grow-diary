@@ -282,7 +282,7 @@ export function EnvironmentStabilityCard({
               <li key={row.kind} className="inline-flex">
                 <Badge
                   variant={row.healthy ? "outline" : "secondary"}
-                  className="text-[10px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="text-[10px] focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   title={row.description}
                   aria-label={ariaLabel}
                   tabIndex={0}
@@ -302,7 +302,7 @@ export function EnvironmentStabilityCard({
           aria-expanded={legendOpen}
           aria-controls={legendPanelId}
           data-testid="post-grow-provenance-help-toggle"
-          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
+          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground underline underline-offset-2 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
         >
           <HelpCircle className="h-3 w-3" aria-hidden="true" />
           What do these badges mean?

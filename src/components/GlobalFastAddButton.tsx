@@ -97,7 +97,7 @@ export default function GlobalFastAddButton({
         aria-haspopup="menu"
         aria-expanded={open}
         data-testid="global-fast-add-trigger"
-        className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-secondary/40 px-4 min-h-11 min-w-11 text-sm font-medium hover:bg-secondary/70 active:bg-secondary/80 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background touch-manipulation"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-secondary/40 px-4 min-h-11 min-w-11 text-sm font-medium hover:bg-secondary/70 active:bg-secondary/80 transition focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background touch-manipulation"
       >
         <Plus className="h-5 w-5" aria-hidden="true" />
         Quick Log
@@ -120,7 +120,7 @@ export default function GlobalFastAddButton({
                   onClick={() => handle(a.id)}
                   data-testid={`global-fast-add-action-${a.id}`}
                   data-action-id={a.id}
-                  className="w-full text-left px-3 min-h-11 flex items-center rounded-md text-sm hover:bg-secondary/60 active:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
+                  className="w-full text-left px-3 min-h-11 flex items-center rounded-md text-sm hover:bg-secondary/60 active:bg-secondary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
                 >
                   {a.label}
                 </button>
@@ -156,7 +156,7 @@ export default function GlobalFastAddButton({
                       setOpen(false);
                       setNotice(null);
                     }}
-                    className="text-sm px-3 min-h-11 inline-flex items-center rounded-md border border-border/60 hover:bg-secondary/60 active:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
+                    className="text-sm px-3 min-h-11 inline-flex items-center rounded-md border border-border/60 hover:bg-secondary/60 active:bg-secondary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
                   >
                     {cta.label}
                   </button>

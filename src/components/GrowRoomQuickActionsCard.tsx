@@ -46,7 +46,7 @@ interface Props {
 
 // Visible focus ring tuned for keyboard + mobile tap-and-hold.
 const FOCUS_CLASSES =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 function dispatchQuickLog(payload: GrowRoomQuickLogEventPayload | null) {
   if (typeof window === "undefined") return;

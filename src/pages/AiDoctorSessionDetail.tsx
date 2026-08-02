@@ -990,7 +990,7 @@ function LinkedActionQueueSection({ vm }: { vm: LinkedActionsViewModel }) {
       {vm.primaryFocusHref && primaryItem ? (
         <Link
           to={vm.primaryFocusHref}
-          className="inline-flex items-center gap-1 text-xs underline text-primary rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="inline-flex items-center gap-1 text-xs underline text-primary rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           data-testid="ai-doctor-session-detail-linked-action-queue-primary-link"
           data-action-queue-id={primaryItem.id}
           aria-label={describeLinkedAction(primaryItem)}
@@ -1008,7 +1008,7 @@ function LinkedActionQueueSection({ vm }: { vm: LinkedActionsViewModel }) {
             >
               <Link
                 to={item.focusHref}
-                className="underline text-primary rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="underline text-primary rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 data-testid="ai-doctor-session-detail-linked-action-queue-item-link"
                 aria-label={describeLinkedAction(item)}
               >

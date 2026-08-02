@@ -178,7 +178,7 @@ function EvidenceCard({
                             tabIndex={-1}
                             data-evidence-row={i}
                             className={
-                              "font-mono outline-none transition-colors " +
+                              "font-mono outline-hidden transition-colors " +
                               (isHi ? "bg-primary/20 ring-1 ring-primary rounded px-1" : "")
                             }
                           >

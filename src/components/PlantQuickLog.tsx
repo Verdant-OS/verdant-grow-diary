@@ -436,7 +436,7 @@ export default function PlantQuickLog({
           <section
             ref={responseSectionRef}
             tabIndex={-1}
-            className="grid gap-3 rounded-xl border border-border/50 bg-secondary/10 p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="grid gap-3 rounded-xl border border-border/50 bg-secondary/10 p-3 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             aria-labelledby="plant-quick-log-response-heading"
             data-testid="plant-quick-log-response-section"
           >

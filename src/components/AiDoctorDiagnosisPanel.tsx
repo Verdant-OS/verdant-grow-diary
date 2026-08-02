@@ -436,7 +436,7 @@ export default function AiDoctorDiagnosisPanel({
               aria-expanded={basisOpen}
               aria-controls={tid("ai-doctor-diagnosis-evidence-body")}
               data-testid={tid("ai-doctor-diagnosis-evidence-toggle")}
-              className="ml-auto inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2 py-0.5 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+              className="ml-auto inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2 py-0.5 text-[11px] font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
             >
               {basisOpen ? "Hide details" : "Show details"}
             </button>
@@ -510,7 +510,7 @@ export default function AiDoctorDiagnosisPanel({
             type="button"
             onClick={() => setPreviewOpen(true)}
             data-testid={tid("ai-doctor-diagnosis-preview-report")}
-            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
             aria-label="Preview AI Doctor Report"
           >
             Preview report
@@ -521,7 +521,7 @@ export default function AiDoctorDiagnosisPanel({
             disabled={pendingExport !== null}
             aria-busy={pendingExport === "report"}
             data-testid={tid("ai-doctor-diagnosis-download-report")}
-            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 disabled:opacity-60 disabled:cursor-not-allowed"
             aria-label="Download AI Doctor Report as PDF"
           >
             {pendingExport === "report" ? "Checking…" : "Download AI Doctor Report"}
@@ -532,7 +532,7 @@ export default function AiDoctorDiagnosisPanel({
             disabled={pendingExport !== null}
             aria-busy={pendingExport === "csv"}
             data-testid={tid("ai-doctor-diagnosis-download-csv")}
-            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 disabled:opacity-60 disabled:cursor-not-allowed"
             aria-label="Download AI Doctor Evidence CSV"
           >
             {pendingExport === "csv" ? "Checking…" : "Download Evidence CSV"}
@@ -543,7 +543,7 @@ export default function AiDoctorDiagnosisPanel({
             disabled={pendingExport !== null}
             aria-busy={pendingExport === "package"}
             data-testid={tid("ai-doctor-diagnosis-download-package")}
-            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 disabled:opacity-60 disabled:cursor-not-allowed"
             aria-label="Download AI Doctor PDF and Evidence CSV package"
           >
             {pendingExport === "package" ? "Checking…" : "Download package"}
@@ -753,7 +753,7 @@ function CitationDetailModal({
               onClick={onClose}
               data-testid={`${testId}-back`}
               aria-label="Back to recommendation"
-              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
             >
               Back to recommendation
             </button>
@@ -763,7 +763,7 @@ function CitationDetailModal({
               onClick={onClose}
               aria-label="Close evidence details"
               data-testid={`${testId}-close`}
-              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
             >
               Close
             </button>
@@ -781,7 +781,7 @@ function CitationDetailModal({
           placeholder="Filter by metric, status, source…"
           aria-label={EVIDENCE_SEARCH_INPUT_LABEL}
           data-testid={`${testId}-search`}
-          className="w-full rounded-md border border-border/60 bg-background/40 px-2 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="w-full rounded-md border border-border/60 bg-background/40 px-2 py-1 text-[11px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
         />
         <ul
           data-testid={`${testId}-search-results`}
@@ -801,7 +801,7 @@ function CitationDetailModal({
                   type="button"
                   onClick={() => handleSelectSearchItem(it)}
                   data-testid={`${testId}-search-item-${it.id}`}
-                  className="block w-full text-left px-2 py-1 text-[11px] hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="block w-full text-left px-2 py-1 text-[11px] hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <span className="font-medium">{it.label}</span>
                   {it.metricKey ? (
@@ -862,7 +862,7 @@ function CitationDetailModal({
             type="button"
             onClick={onJump}
             data-testid={`${testId}-jump`}
-            className="rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
           >
             Jump to Evidence used
           </button>
@@ -938,7 +938,7 @@ function ReportPreviewPanel({
               aria-busy={exportPending}
               data-testid={`${testId}-print`}
               aria-label="Print AI Doctor Report"
-              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
             >
               Print
             </button>
@@ -948,7 +948,7 @@ function ReportPreviewPanel({
               disabled={exportPending}
               data-testid={`${testId}-pdf`}
               aria-label="Download PDF"
-              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
             >
               Download PDF
             </button>
@@ -958,7 +958,7 @@ function ReportPreviewPanel({
               disabled={exportPending}
               data-testid={`${testId}-csv`}
               aria-label="Download Evidence CSV"
-              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
             >
               Download Evidence CSV
             </button>
@@ -968,7 +968,7 @@ function ReportPreviewPanel({
               disabled={exportPending}
               data-testid={`${testId}-close`}
               aria-label="Close preview"
-              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
             >
               Close
             </button>
@@ -1133,7 +1133,7 @@ function CitedSection({
               aria-haspopup="dialog"
               onClick={(e) => onOpenCitation(it.citation, e.currentTarget as HTMLButtonElement)}
               className={
-                "inline-flex items-center rounded border px-1 py-0 text-[10px] font-medium align-middle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 " +
+                "inline-flex items-center rounded border px-1 py-0 text-[10px] font-medium align-middle focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 " +
                 (it.citation.healthy
                   ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
                   : "border-amber-500/40 bg-amber-500/10 text-amber-200")

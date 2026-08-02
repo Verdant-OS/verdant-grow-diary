@@ -1457,14 +1457,14 @@ export default function ActionQueue() {
                     <div className="flex flex-wrap gap-2 pt-1">
                       <Link
                         to={timelinePath()}
-                        className="text-xs text-primary hover:underline rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="text-xs text-primary hover:underline rounded-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         data-testid="action-queue-empty-next-steps-timeline"
                       >
                         View Timeline
                       </Link>
                       <Link
                         to="/sensors"
-                        className="text-xs text-primary hover:underline rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="text-xs text-primary hover:underline rounded-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         data-testid="action-queue-empty-next-steps-sensors"
                       >
                         Add Sensor Snapshot
@@ -1520,7 +1520,7 @@ export default function ActionQueue() {
                           pendingRowRefs.current.get(next.id)?.focus();
                         }
                       }}
-                      className={`rounded-xl border bg-secondary/30 p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background ${
+                      className={`rounded-xl border bg-secondary/30 p-3 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background ${
                         isHighlightedTrace
                           ? "border-primary/60 bg-primary/5 ring-2 ring-primary/70 ring-offset-2 ring-offset-background"
                           : "border-border/60"
@@ -1693,7 +1693,7 @@ export default function ActionQueue() {
                         <button
                           type="button"
                           onClick={() => setDrawerRow(row)}
-                          className="ml-auto text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm self-center"
+                          className="ml-auto text-xs text-primary hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm self-center"
                           data-testid="action-queue-row-explain"
                           aria-describedby={titleId}
                         >
@@ -1701,7 +1701,7 @@ export default function ActionQueue() {
                         </button>
                         <Link
                           to={actionDetailPath(row.id)}
-                          className="text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm self-center"
+                          className="text-xs text-primary hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm self-center"
                           aria-describedby={titleId}
                         >
                           View Details
@@ -1881,7 +1881,7 @@ export default function ActionQueue() {
 
                         <Link
                           to={actionDetailPath(row.id)}
-                          className="text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
+                          className="text-xs text-primary hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
                           aria-describedby={titleId}
                         >
                           View Details
@@ -1902,7 +1902,7 @@ export default function ActionQueue() {
                             return (
                               <Link
                                 to={link.href}
-                                className="text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                                className="text-xs text-primary hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                                 data-testid="action-queue-row-diary-trace-link"
                                 data-trace-highlight={link.highlight}
                                 data-trace-kind={link.kind}

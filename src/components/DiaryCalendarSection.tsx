@@ -634,7 +634,7 @@ export default function DiaryCalendarSection({
                                                 : ENVIRONMENT_CHECK_SHOW_DETAILS_ARIA
                                             }
                                             data-testid="diary-calendar-env-toggle"
-                                            className="mt-1 inline-flex items-center text-[11px] font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
+                                            className="mt-1 inline-flex items-center text-[11px] font-medium text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
                                           >
                                             {expanded
                                               ? ENVIRONMENT_CHECK_HIDE_DETAILS_LABEL

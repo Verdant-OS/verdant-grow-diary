@@ -319,7 +319,7 @@ export default function AccountPreferences() {
                             {href ? (
                               <Link
                                 to={href}
-                                className="hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                                className="hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded"
                               >
                                 {label}
                               </Link>

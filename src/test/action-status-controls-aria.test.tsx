@@ -204,7 +204,7 @@ describe("ActionDetail — status-control aria wiring", () => {
 
 describe("shared Button primitive — focus-visible preserved", () => {
   it("renders a focus-visible ring on all interactive status controls", () => {
-    expect(BUTTON).toMatch(/focus-visible:outline-none/);
+    expect(BUTTON).toMatch(/focus-visible:outline-hidden/);
     expect(BUTTON).toMatch(/focus-visible:ring-2/);
     expect(BUTTON).toMatch(/focus-visible:ring-ring/);
   });

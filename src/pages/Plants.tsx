@@ -459,7 +459,7 @@ export default function Plants() {
             aria-label="Filter plants by grow"
             value={showUnassignedOnly ? UNASSIGNED_GROW_FILTER_ID : (urlGrowId ?? "")}
             onChange={(e) => handleGrowFilterChange(e.target.value)}
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring"
           >
             {growFilterOptions.map((o) => (
               <option

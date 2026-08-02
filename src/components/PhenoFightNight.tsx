@@ -64,7 +64,7 @@ function SidePicker({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={cn(
-          "max-w-full cursor-pointer truncate rounded-md border border-border bg-card px-2 py-1 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring",
+          "max-w-full cursor-pointer truncate rounded-md border border-border bg-card px-2 py-1 text-sm font-semibold outline-hidden focus:ring-2 focus:ring-ring",
           accent,
         )}
       >

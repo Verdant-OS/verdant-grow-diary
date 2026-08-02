@@ -119,8 +119,17 @@ describe("oneTentLoopNavigationRules", () => {
     }
   });
 
-  it("routes quick-log → timeline and preserves a valid Timeline tent as a Sensors intent", () => {
-    expect(resolveOneTentLoopNextStep("quick-log").href).toBe("/timeline");
+  it("routes quick-log → grow-scoped timeline; stays disabled without growId", () => {
+    // No setup known → fail closed (never bare /timeline).
+    const missing = resolveOneTentLoopNextStep("quick-log");
+    expect(missing.disabled).toBe(true);
+    expect(missing.href).toBeNull();
+
+    const withGrow = resolveOneTentLoopNextStep("quick-log", { growId: "g1" });
+    expect(withGrow.disabled).toBe(false);
+    expect(withGrow.href).toBe("/timeline?growId=g1");
+    expect(withGrow.href).not.toBe("/timeline");
+
     expect(resolveOneTentLoopNextStep("timeline").href).toBe("/sensors");
     expect(
       resolveOneTentLoopNextStep("timeline", {

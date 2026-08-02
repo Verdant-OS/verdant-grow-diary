@@ -6,7 +6,7 @@
  *
  * Responsibilities:
  *  - Represent post-save "success" state so the UI can offer clear
- *    next actions (view timeline / log another / close) instead of
+ *    next actions (view diary / log another / dismiss) instead of
  *    leaving the form in a stale interactable state.
  *  - Provide a client-side idempotency-key rotation strategy so that
  *    "Log another" starts a fresh save cycle and a stale saved
@@ -22,7 +22,12 @@
 export interface QuickLogPostSaveSuccess {
   /** Growth event id returned from the server, when available. */
   growEventId: string | null;
-  /** Target the log was attached to. Used for the "View" CTA. */
+  /**
+   * Verified grow the save was written against. Required to build a
+   * durable grow-scoped Timeline CTA. Never invent a fallback grow.
+   */
+  growId: string | null;
+  /** Target the log was attached to. Used for plant/tent URL filters. */
   targetType: "plant" | "tent";
   targetId: string;
   tentId: string | null;
@@ -34,9 +39,9 @@ export interface QuickLogPostSaveSuccess {
   savedAt: string;
 }
 
-export const QUICK_LOG_POST_SAVE_VIEW_LABEL = "View timeline" as const;
+export const QUICK_LOG_POST_SAVE_VIEW_LABEL = "View diary" as const;
 export const QUICK_LOG_POST_SAVE_ANOTHER_LABEL = "Log another" as const;
-export const QUICK_LOG_POST_SAVE_CLOSE_LABEL = "Close" as const;
+export const QUICK_LOG_POST_SAVE_CLOSE_LABEL = "Dismiss" as const;
 
 /**
  * Rotate the client-side idempotency counter. Called when the grower
@@ -91,7 +96,7 @@ export function buildQuickLogPostSaveMessage(action: string, photoAttached: bool
 // hardcode duplicate strings.
 // -------------------------------------------------------------------
 
-export const QUICK_LOG_POST_SAVE_TITLE = "Saved" as const;
+export const QUICK_LOG_POST_SAVE_TITLE = "Saved to your diary" as const;
 
 /**
  * Practical, non-technical retry guidance. Renders in the dedicated
@@ -106,7 +111,7 @@ export interface QuickLogPostSaveDescriptionInput {
   targetName: string | null;
   /** Optional tent name to append when the target is a plant. */
   tentName?: string | null;
-  /** Optional grow name to append after tent name. */
+  /** Optional grow / setup name (preferred for "Added to {setup}."). */
   growName?: string | null;
   /** Free-text action verb (e.g. "note", "feeding", "watering"). */
   action: string | null;
@@ -115,24 +120,17 @@ export interface QuickLogPostSaveDescriptionInput {
 }
 
 /**
- * Build the description line shown under the "Saved" title in the
- * post-save card. Deterministic. Never claims yield / quality /
- * diagnosis — just confirms what persisted and where.
+ * Build the description line shown under the post-save title.
+ * Deterministic. Never claims yield / quality / diagnosis — just
+ * confirms which setup received the entry.
  */
-export function buildQuickLogPostSaveDescription(
-  input: QuickLogPostSaveDescriptionInput,
-): string {
-  const verb = (input.action ?? "").trim() || "entry";
-  const withPhoto = input.photoAttached ? " with photo" : "";
-  const target = (input.targetName ?? "").trim();
-  const scopeParts: string[] = [];
-  if (target) scopeParts.push(target);
-  const tent = (input.tentName ?? "").trim();
-  if (tent) scopeParts.push(tent);
-  const grow = (input.growName ?? "").trim();
-  if (grow) scopeParts.push(grow);
-  const scope = scopeParts.length ? ` to ${scopeParts.join(" · ")}` : "";
-  return `Logged ${verb}${withPhoto}${scope} · just now`;
+export function buildQuickLogPostSaveDescription(input: QuickLogPostSaveDescriptionInput): string {
+  const setup =
+    (input.growName ?? "").trim() ||
+    (input.targetName ?? "").trim() ||
+    (input.tentName ?? "").trim();
+  if (setup) return `Added to ${setup}.`;
+  return "Added to your diary.";
 }
 
 export interface QuickLogCloseGuardInput {

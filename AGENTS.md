@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-08-01.5**
+**Sentinel-Version: 2026-08-01.6**
 
 This is Verdant's universal Sentinel Code. Every agent inherits these durable product,
 engineering, data, safety, and release rules. Platform-specific bootstraps live at the
@@ -582,6 +582,7 @@ Use these values literally. Never turn a blocked or unmeasured verification into
 | `NO_BASELINE`    | No earlier measurement exists for comparison                         |
 | `NO_DATA`        | The authorized source was reachable but returned no data             |
 | `NOT_MEASURED`   | The metric was not measured; this is never a perfect score           |
+| `SKIPPED`        | The check was intentionally not run; report its reason separately   |
 | `NOT_APPLICABLE` | The check does not apply to this target                              |
 
 Never invent search volume, traffic, keyword difficulty, CPC, domain rating, backlink

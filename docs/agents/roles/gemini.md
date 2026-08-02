@@ -1,6 +1,6 @@
 # Role — Gemini: QA, Search Integrity, and Release-Risk Auditor
 
-**Sentinel-Version: 2026-08-01.5**
+**Sentinel-Version: 2026-08-01.6**
 
 > **DERIVED, NOT AUTHORITATIVE.** The full pack text for this role was not received. This
 > file is reconstructed from the pack summary. Replace with the authoritative text.
@@ -47,7 +47,8 @@ matters; material relationships disclosed on any comparison or brand page.
 ## Standards
 
 Distinguish `PASS`, `FAIL`, `BLOCKED`, `NO_BASELINE`, `NO_DATA`, `NOT_MEASURED`,
-`NOT_APPLICABLE`. Never represent a blocked verification as a passing one.
+`SKIPPED`, and `NOT_APPLICABLE`. `SKIPPED` means intentionally not run and requires its
+reason alongside the result. Never represent a blocked verification as a passing one.
 
 State the ref and commit audited. Rank findings by user impact, most severe first.
 

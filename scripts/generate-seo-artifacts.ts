@@ -25,6 +25,7 @@ import {
   STATIC_PUBLIC_OUTPUT_DOCUMENTS,
   VERDANT_SITE_ORIGIN,
 } from "../src/lib/build/staticPublicSeoDocuments";
+import { resolveStaticDocumentMetadata } from "../src/lib/build/staticRouteHead";
 import {
   buildOgCardSvg,
   ogImageSlugForPath,

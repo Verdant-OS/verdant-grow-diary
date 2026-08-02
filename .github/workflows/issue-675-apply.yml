@@ -1,0 +1,67 @@
+name: Issue 675 implementation
+
+on:
+  push:
+    branches:
+      - agent/issue-675-grow-scoped-timeline
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout implementation branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Apply assertion-based product patch
+        run: python scripts/.issue-675-apply.py
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Format product files
+        run: >-
+          bunx prettier --write
+          src/lib/quickLogTimelineNavigationTarget.ts
+          src/lib/quickLogSaveGuardRules.ts
+          src/lib/oneTentLoopNavigationRules.ts
+          src/components/QuickLogV2Sheet.tsx
+          src/components/QuickLog.tsx
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Lint touched product files
+        run: >-
+          bunx eslint
+          src/lib/quickLogTimelineNavigationTarget.ts
+          src/lib/quickLogSaveGuardRules.ts
+          src/lib/oneTentLoopNavigationRules.ts
+          src/components/QuickLogV2Sheet.tsx
+          src/components/QuickLog.tsx
+
+      - name: Build
+        run: bun run build
+
+      - name: Commit implementation
+        shell: bash
+        run: |
+          git config user.name "Verdant Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add \
+            src/lib/quickLogTimelineNavigationTarget.ts \
+            src/lib/quickLogSaveGuardRules.ts \
+            src/lib/oneTentLoopNavigationRules.ts \
+            src/components/QuickLogV2Sheet.tsx \
+            src/components/QuickLog.tsx
+          git commit -m "fix(quick-log): scope post-save diary navigation"
+          git push

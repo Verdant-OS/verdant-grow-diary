@@ -17,13 +17,11 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as BreederBetaRouteImport } from './routes/breeder-beta'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CreatorBetaRouteImport } from './routes/creator-beta'
-import { Route as CultivarsRouteImport } from './routes/cultivars'
 import { Route as DemoRouteImport } from './routes/demo'
 import { Route as FeaturesRouteImport } from './routes/features'
 import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as FounderRouteImport } from './routes/founder'
 import { Route as GlossaryRouteImport } from './routes/glossary'
-import { Route as GuidesRouteImport } from './routes/guides'
 import { Route as HardwareIntegrationsRouteImport } from './routes/hardware-integrations'
 import { Route as HowAiDoctorWorksRouteImport } from './routes/how-ai-doctor-works'
 import { Route as LoginRouteImport } from './routes/login'
@@ -39,7 +37,6 @@ import { Route as RefundsRouteImport } from './routes/refunds'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
-import { Route as StrainsRouteImport } from './routes/strains'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TermsOfServiceRouteImport } from './routes/terms-of-service'
 import { Route as UnsubscribeRouteImport } from './routes/unsubscribe'
@@ -74,8 +71,10 @@ import { Route as AppTimelineRouteImport } from './routes/_app/timeline'
 import { Route as BillingPlanRouteImport } from './routes/billing.$plan'
 import { Route as CheckoutCancelRouteImport } from './routes/checkout.cancel'
 import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
+import { Route as CultivarsIndexRouteImport } from './routes/cultivars.index'
 import { Route as CultivarsSlugRouteImport } from './routes/cultivars.$slug'
 import { Route as DocsMcpApiRouteImport } from './routes/docs.mcp-api'
+import { Route as GuidesIndexRouteImport } from './routes/guides.index'
 import { Route as GuidesSlugRouteImport } from './routes/guides.$slug'
 import { Route as GuidesGrowStageCareGuideRouteImport } from './routes/guides.grow-stage-care-guide'
 import { Route as InternalContextualPhenoComparisonDemoRouteImport } from './routes/internal.contextual-pheno-comparison-demo'
@@ -83,6 +82,7 @@ import { Route as InternalDemoProofWalkthroughRouteImport } from './routes/inter
 import { Route as InternalPhenoHuntDemoRouteImport } from './routes/internal.pheno-hunt-demo'
 import { Route as PartnersCsvPreviewRouteImport } from './routes/partners.csv-preview'
 import { Route as SensorsCsvPreviewRouteImport } from './routes/sensors.csv-preview'
+import { Route as StrainsIndexRouteImport } from './routes/strains.index'
 import { Route as StrainsSlugRouteImport } from './routes/strains.$slug'
 import { Route as ToolsVpdCalculatorRouteImport } from './routes/tools.vpd-calculator'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
@@ -189,11 +189,6 @@ const CreatorBetaRoute = CreatorBetaRouteImport.update({
   path: '/creator-beta',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CultivarsRoute = CultivarsRouteImport.update({
-  id: '/cultivars',
-  path: '/cultivars',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const DemoRoute = DemoRouteImport.update({
   id: '/demo',
   path: '/demo',
@@ -217,11 +212,6 @@ const FounderRoute = FounderRouteImport.update({
 const GlossaryRoute = GlossaryRouteImport.update({
   id: '/glossary',
   path: '/glossary',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GuidesRoute = GuidesRouteImport.update({
-  id: '/guides',
-  path: '/guides',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HardwareIntegrationsRoute = HardwareIntegrationsRouteImport.update({
@@ -297,11 +287,6 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const StrainsRoute = StrainsRouteImport.update({
-  id: '/strains',
-  path: '/strains',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TermsRoute = TermsRouteImport.update({
@@ -473,26 +458,36 @@ const CheckoutSuccessRoute = CheckoutSuccessRouteImport.update({
   path: '/checkout/success',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CultivarsIndexRoute = CultivarsIndexRouteImport.update({
+  id: '/cultivars/',
+  path: '/cultivars/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CultivarsSlugRoute = CultivarsSlugRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
-  getParentRoute: () => CultivarsRoute,
+  id: '/cultivars/$slug',
+  path: '/cultivars/$slug',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const DocsMcpApiRoute = DocsMcpApiRouteImport.update({
   id: '/docs/mcp-api',
   path: '/docs/mcp-api',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GuidesIndexRoute = GuidesIndexRouteImport.update({
+  id: '/guides/',
+  path: '/guides/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GuidesSlugRoute = GuidesSlugRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
-  getParentRoute: () => GuidesRoute,
+  id: '/guides/$slug',
+  path: '/guides/$slug',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const GuidesGrowStageCareGuideRoute =
   GuidesGrowStageCareGuideRouteImport.update({
-    id: '/grow-stage-care-guide',
-    path: '/grow-stage-care-guide',
-    getParentRoute: () => GuidesRoute,
+    id: '/guides/grow-stage-care-guide',
+    path: '/guides/grow-stage-care-guide',
+    getParentRoute: () => rootRouteImport,
   } as any)
 const InternalContextualPhenoComparisonDemoRoute =
   InternalContextualPhenoComparisonDemoRouteImport.update({
@@ -521,10 +516,15 @@ const SensorsCsvPreviewRoute = SensorsCsvPreviewRouteImport.update({
   path: '/sensors/csv-preview',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StrainsIndexRoute = StrainsIndexRouteImport.update({
+  id: '/strains/',
+  path: '/strains/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StrainsSlugRoute = StrainsSlugRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
-  getParentRoute: () => StrainsRoute,
+  id: '/strains/$slug',
+  path: '/strains/$slug',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ToolsVpdCalculatorRoute = ToolsVpdCalculatorRouteImport.update({
   id: '/tools/vpd-calculator',
@@ -898,13 +898,11 @@ export interface FileRoutesByFullPath {
   '/breeder-beta': typeof BreederBetaRoute
   '/contact': typeof ContactRoute
   '/creator-beta': typeof CreatorBetaRoute
-  '/cultivars': typeof CultivarsRouteWithChildren
   '/demo': typeof DemoRoute
   '/features': typeof FeaturesRoute
   '/feedback': typeof FeedbackRoute
   '/founder': typeof FounderRoute
   '/glossary': typeof GlossaryRoute
-  '/guides': typeof GuidesRouteWithChildren
   '/hardware-integrations': typeof HardwareIntegrationsRoute
   '/how-ai-doctor-works': typeof HowAiDoctorWorksRoute
   '/login': typeof LoginRoute
@@ -920,7 +918,6 @@ export interface FileRoutesByFullPath {
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
-  '/strains': typeof StrainsRouteWithChildren
   '/terms': typeof TermsRoute
   '/terms-of-service': typeof TermsOfServiceRoute
   '/unsubscribe': typeof UnsubscribeRoute
@@ -965,6 +962,9 @@ export interface FileRoutesByFullPath {
   '/sensors/csv-preview': typeof SensorsCsvPreviewRoute
   '/strains/$slug': typeof StrainsSlugRoute
   '/tools/vpd-calculator': typeof ToolsVpdCalculatorRoute
+  '/cultivars/': typeof CultivarsIndexRoute
+  '/guides/': typeof GuidesIndexRoute
+  '/strains/': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/diagnostics': typeof AppOperatorDiagnosticsRoute
   '/ingest-inspector': typeof AppOperatorIngestInspectorRoute
@@ -1038,13 +1038,11 @@ export interface FileRoutesByTo {
   '/breeder-beta': typeof BreederBetaRoute
   '/contact': typeof ContactRoute
   '/creator-beta': typeof CreatorBetaRoute
-  '/cultivars': typeof CultivarsRouteWithChildren
   '/demo': typeof DemoRoute
   '/features': typeof FeaturesRoute
   '/feedback': typeof FeedbackRoute
   '/founder': typeof FounderRoute
   '/glossary': typeof GlossaryRoute
-  '/guides': typeof GuidesRouteWithChildren
   '/hardware-integrations': typeof HardwareIntegrationsRoute
   '/how-ai-doctor-works': typeof HowAiDoctorWorksRoute
   '/login': typeof LoginRoute
@@ -1060,7 +1058,6 @@ export interface FileRoutesByTo {
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
-  '/strains': typeof StrainsRouteWithChildren
   '/terms': typeof TermsRoute
   '/terms-of-service': typeof TermsOfServiceRoute
   '/unsubscribe': typeof UnsubscribeRoute
@@ -1105,6 +1102,9 @@ export interface FileRoutesByTo {
   '/sensors/csv-preview': typeof SensorsCsvPreviewRoute
   '/strains/$slug': typeof StrainsSlugRoute
   '/tools/vpd-calculator': typeof ToolsVpdCalculatorRoute
+  '/cultivars': typeof CultivarsIndexRoute
+  '/guides': typeof GuidesIndexRoute
+  '/strains': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/diagnostics': typeof AppOperatorDiagnosticsRoute
   '/ingest-inspector': typeof AppOperatorIngestInspectorRoute
@@ -1180,13 +1180,11 @@ export interface FileRoutesById {
   '/breeder-beta': typeof BreederBetaRoute
   '/contact': typeof ContactRoute
   '/creator-beta': typeof CreatorBetaRoute
-  '/cultivars': typeof CultivarsRouteWithChildren
   '/demo': typeof DemoRoute
   '/features': typeof FeaturesRoute
   '/feedback': typeof FeedbackRoute
   '/founder': typeof FounderRoute
   '/glossary': typeof GlossaryRoute
-  '/guides': typeof GuidesRouteWithChildren
   '/hardware-integrations': typeof HardwareIntegrationsRoute
   '/how-ai-doctor-works': typeof HowAiDoctorWorksRoute
   '/login': typeof LoginRoute
@@ -1202,7 +1200,6 @@ export interface FileRoutesById {
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
-  '/strains': typeof StrainsRouteWithChildren
   '/terms': typeof TermsRoute
   '/terms-of-service': typeof TermsOfServiceRoute
   '/unsubscribe': typeof UnsubscribeRoute
@@ -1248,6 +1245,9 @@ export interface FileRoutesById {
   '/sensors/csv-preview': typeof SensorsCsvPreviewRoute
   '/strains/$slug': typeof StrainsSlugRoute
   '/tools/vpd-calculator': typeof ToolsVpdCalculatorRoute
+  '/cultivars/': typeof CultivarsIndexRoute
+  '/guides/': typeof GuidesIndexRoute
+  '/strains/': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/_app/_operator/diagnostics': typeof AppOperatorDiagnosticsRoute
   '/_app/_operator/ingest-inspector': typeof AppOperatorIngestInspectorRoute
@@ -1323,13 +1323,11 @@ export interface FileRouteTypes {
     | '/breeder-beta'
     | '/contact'
     | '/creator-beta'
-    | '/cultivars'
     | '/demo'
     | '/features'
     | '/feedback'
     | '/founder'
     | '/glossary'
-    | '/guides'
     | '/hardware-integrations'
     | '/how-ai-doctor-works'
     | '/login'
@@ -1345,7 +1343,6 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/signup'
-    | '/strains'
     | '/terms'
     | '/terms-of-service'
     | '/unsubscribe'
@@ -1390,6 +1387,9 @@ export interface FileRouteTypes {
     | '/sensors/csv-preview'
     | '/strains/$slug'
     | '/tools/vpd-calculator'
+    | '/cultivars/'
+    | '/guides/'
+    | '/strains/'
     | '/.lovable/oauth/consent'
     | '/diagnostics'
     | '/ingest-inspector'
@@ -1463,13 +1463,11 @@ export interface FileRouteTypes {
     | '/breeder-beta'
     | '/contact'
     | '/creator-beta'
-    | '/cultivars'
     | '/demo'
     | '/features'
     | '/feedback'
     | '/founder'
     | '/glossary'
-    | '/guides'
     | '/hardware-integrations'
     | '/how-ai-doctor-works'
     | '/login'
@@ -1485,7 +1483,6 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/signup'
-    | '/strains'
     | '/terms'
     | '/terms-of-service'
     | '/unsubscribe'
@@ -1530,6 +1527,9 @@ export interface FileRouteTypes {
     | '/sensors/csv-preview'
     | '/strains/$slug'
     | '/tools/vpd-calculator'
+    | '/cultivars'
+    | '/guides'
+    | '/strains'
     | '/.lovable/oauth/consent'
     | '/diagnostics'
     | '/ingest-inspector'
@@ -1604,13 +1604,11 @@ export interface FileRouteTypes {
     | '/breeder-beta'
     | '/contact'
     | '/creator-beta'
-    | '/cultivars'
     | '/demo'
     | '/features'
     | '/feedback'
     | '/founder'
     | '/glossary'
-    | '/guides'
     | '/hardware-integrations'
     | '/how-ai-doctor-works'
     | '/login'
@@ -1626,7 +1624,6 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/signup'
-    | '/strains'
     | '/terms'
     | '/terms-of-service'
     | '/unsubscribe'
@@ -1672,6 +1669,9 @@ export interface FileRouteTypes {
     | '/sensors/csv-preview'
     | '/strains/$slug'
     | '/tools/vpd-calculator'
+    | '/cultivars/'
+    | '/guides/'
+    | '/strains/'
     | '/.lovable/oauth/consent'
     | '/_app/_operator/diagnostics'
     | '/_app/_operator/ingest-inspector'
@@ -1747,13 +1747,11 @@ export interface RootRouteChildren {
   BreederBetaRoute: typeof BreederBetaRoute
   ContactRoute: typeof ContactRoute
   CreatorBetaRoute: typeof CreatorBetaRoute
-  CultivarsRoute: typeof CultivarsRouteWithChildren
   DemoRoute: typeof DemoRoute
   FeaturesRoute: typeof FeaturesRoute
   FeedbackRoute: typeof FeedbackRoute
   FounderRoute: typeof FounderRoute
   GlossaryRoute: typeof GlossaryRoute
-  GuidesRoute: typeof GuidesRouteWithChildren
   HardwareIntegrationsRoute: typeof HardwareIntegrationsRoute
   HowAiDoctorWorksRoute: typeof HowAiDoctorWorksRoute
   LoginRoute: typeof LoginRoute
@@ -1769,7 +1767,6 @@ export interface RootRouteChildren {
   RegisterRoute: typeof RegisterRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
-  StrainsRoute: typeof StrainsRouteWithChildren
   TermsRoute: typeof TermsRoute
   TermsOfServiceRoute: typeof TermsOfServiceRoute
   UnsubscribeRoute: typeof UnsubscribeRoute
@@ -1778,13 +1775,20 @@ export interface RootRouteChildren {
   BillingPlanRoute: typeof BillingPlanRoute
   CheckoutCancelRoute: typeof CheckoutCancelRoute
   CheckoutSuccessRoute: typeof CheckoutSuccessRoute
+  CultivarsSlugRoute: typeof CultivarsSlugRoute
   DocsMcpApiRoute: typeof DocsMcpApiRoute
+  GuidesSlugRoute: typeof GuidesSlugRoute
+  GuidesGrowStageCareGuideRoute: typeof GuidesGrowStageCareGuideRoute
   InternalContextualPhenoComparisonDemoRoute: typeof InternalContextualPhenoComparisonDemoRoute
   InternalDemoProofWalkthroughRoute: typeof InternalDemoProofWalkthroughRoute
   InternalPhenoHuntDemoRoute: typeof InternalPhenoHuntDemoRoute
   PartnersCsvPreviewRoute: typeof PartnersCsvPreviewRoute
   SensorsCsvPreviewRoute: typeof SensorsCsvPreviewRoute
+  StrainsSlugRoute: typeof StrainsSlugRoute
   ToolsVpdCalculatorRoute: typeof ToolsVpdCalculatorRoute
+  CultivarsIndexRoute: typeof CultivarsIndexRoute
+  GuidesIndexRoute: typeof GuidesIndexRoute
+  StrainsIndexRoute: typeof StrainsIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   CustomerGuideOreozVsGelonadeComparisonRoute: typeof CustomerGuideOreozVsGelonadeComparisonRoute
   PhenoHuntsIdCompareRoute: typeof PhenoHuntsIdCompareRoute
@@ -1849,13 +1853,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CreatorBetaRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/cultivars': {
-      id: '/cultivars'
-      path: '/cultivars'
-      fullPath: '/cultivars'
-      preLoaderRoute: typeof CultivarsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/demo': {
       id: '/demo'
       path: '/demo'
@@ -1889,13 +1886,6 @@ declare module '@tanstack/react-router' {
       path: '/glossary'
       fullPath: '/glossary'
       preLoaderRoute: typeof GlossaryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/guides': {
-      id: '/guides'
-      path: '/guides'
-      fullPath: '/guides'
-      preLoaderRoute: typeof GuidesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hardware-integrations': {
@@ -2001,13 +1991,6 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/strains': {
-      id: '/strains'
-      path: '/strains'
-      fullPath: '/strains'
-      preLoaderRoute: typeof StrainsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/terms': {
@@ -2248,12 +2231,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CheckoutSuccessRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cultivars/': {
+      id: '/cultivars/'
+      path: '/cultivars'
+      fullPath: '/cultivars/'
+      preLoaderRoute: typeof CultivarsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/cultivars/$slug': {
       id: '/cultivars/$slug'
-      path: '/$slug'
+      path: '/cultivars/$slug'
       fullPath: '/cultivars/$slug'
       preLoaderRoute: typeof CultivarsSlugRouteImport
-      parentRoute: typeof CultivarsRoute
+      parentRoute: typeof rootRouteImport
     }
     '/docs/mcp-api': {
       id: '/docs/mcp-api'
@@ -2262,19 +2252,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsMcpApiRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/guides/': {
+      id: '/guides/'
+      path: '/guides'
+      fullPath: '/guides/'
+      preLoaderRoute: typeof GuidesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/guides/$slug': {
       id: '/guides/$slug'
-      path: '/$slug'
+      path: '/guides/$slug'
       fullPath: '/guides/$slug'
       preLoaderRoute: typeof GuidesSlugRouteImport
-      parentRoute: typeof GuidesRoute
+      parentRoute: typeof rootRouteImport
     }
     '/guides/grow-stage-care-guide': {
       id: '/guides/grow-stage-care-guide'
-      path: '/grow-stage-care-guide'
+      path: '/guides/grow-stage-care-guide'
       fullPath: '/guides/grow-stage-care-guide'
       preLoaderRoute: typeof GuidesGrowStageCareGuideRouteImport
-      parentRoute: typeof GuidesRoute
+      parentRoute: typeof rootRouteImport
     }
     '/internal/contextual-pheno-comparison-demo': {
       id: '/internal/contextual-pheno-comparison-demo'
@@ -2311,12 +2308,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SensorsCsvPreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/strains/': {
+      id: '/strains/'
+      path: '/strains'
+      fullPath: '/strains/'
+      preLoaderRoute: typeof StrainsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/strains/$slug': {
       id: '/strains/$slug'
-      path: '/$slug'
+      path: '/strains/$slug'
       fullPath: '/strains/$slug'
       preLoaderRoute: typeof StrainsSlugRouteImport
-      parentRoute: typeof StrainsRoute
+      parentRoute: typeof rootRouteImport
     }
     '/tools/vpd-calculator': {
       id: '/tools/vpd-calculator'
@@ -3115,42 +3119,6 @@ const AppRouteChildren: AppRouteChildren = {
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
-interface CultivarsRouteChildren {
-  CultivarsSlugRoute: typeof CultivarsSlugRoute
-}
-
-const CultivarsRouteChildren: CultivarsRouteChildren = {
-  CultivarsSlugRoute: CultivarsSlugRoute,
-}
-
-const CultivarsRouteWithChildren = CultivarsRoute._addFileChildren(
-  CultivarsRouteChildren,
-)
-
-interface GuidesRouteChildren {
-  GuidesSlugRoute: typeof GuidesSlugRoute
-  GuidesGrowStageCareGuideRoute: typeof GuidesGrowStageCareGuideRoute
-}
-
-const GuidesRouteChildren: GuidesRouteChildren = {
-  GuidesSlugRoute: GuidesSlugRoute,
-  GuidesGrowStageCareGuideRoute: GuidesGrowStageCareGuideRoute,
-}
-
-const GuidesRouteWithChildren =
-  GuidesRoute._addFileChildren(GuidesRouteChildren)
-
-interface StrainsRouteChildren {
-  StrainsSlugRoute: typeof StrainsSlugRoute
-}
-
-const StrainsRouteChildren: StrainsRouteChildren = {
-  StrainsSlugRoute: StrainsSlugRoute,
-}
-
-const StrainsRouteWithChildren =
-  StrainsRoute._addFileChildren(StrainsRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
@@ -3160,13 +3128,11 @@ const rootRouteChildren: RootRouteChildren = {
   BreederBetaRoute: BreederBetaRoute,
   ContactRoute: ContactRoute,
   CreatorBetaRoute: CreatorBetaRoute,
-  CultivarsRoute: CultivarsRouteWithChildren,
   DemoRoute: DemoRoute,
   FeaturesRoute: FeaturesRoute,
   FeedbackRoute: FeedbackRoute,
   FounderRoute: FounderRoute,
   GlossaryRoute: GlossaryRoute,
-  GuidesRoute: GuidesRouteWithChildren,
   HardwareIntegrationsRoute: HardwareIntegrationsRoute,
   HowAiDoctorWorksRoute: HowAiDoctorWorksRoute,
   LoginRoute: LoginRoute,
@@ -3182,7 +3148,6 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterRoute: RegisterRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
-  StrainsRoute: StrainsRouteWithChildren,
   TermsRoute: TermsRoute,
   TermsOfServiceRoute: TermsOfServiceRoute,
   UnsubscribeRoute: UnsubscribeRoute,
@@ -3191,14 +3156,21 @@ const rootRouteChildren: RootRouteChildren = {
   BillingPlanRoute: BillingPlanRoute,
   CheckoutCancelRoute: CheckoutCancelRoute,
   CheckoutSuccessRoute: CheckoutSuccessRoute,
+  CultivarsSlugRoute: CultivarsSlugRoute,
   DocsMcpApiRoute: DocsMcpApiRoute,
+  GuidesSlugRoute: GuidesSlugRoute,
+  GuidesGrowStageCareGuideRoute: GuidesGrowStageCareGuideRoute,
   InternalContextualPhenoComparisonDemoRoute:
     InternalContextualPhenoComparisonDemoRoute,
   InternalDemoProofWalkthroughRoute: InternalDemoProofWalkthroughRoute,
   InternalPhenoHuntDemoRoute: InternalPhenoHuntDemoRoute,
   PartnersCsvPreviewRoute: PartnersCsvPreviewRoute,
   SensorsCsvPreviewRoute: SensorsCsvPreviewRoute,
+  StrainsSlugRoute: StrainsSlugRoute,
   ToolsVpdCalculatorRoute: ToolsVpdCalculatorRoute,
+  CultivarsIndexRoute: CultivarsIndexRoute,
+  GuidesIndexRoute: GuidesIndexRoute,
+  StrainsIndexRoute: StrainsIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   CustomerGuideOreozVsGelonadeComparisonRoute:
     CustomerGuideOreozVsGelonadeComparisonRoute,

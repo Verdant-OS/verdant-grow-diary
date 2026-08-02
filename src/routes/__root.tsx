@@ -21,6 +21,7 @@ import { clearGrowDataMeta } from "@/hooks/useGrowData";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
 import { renderErrorPage } from "@/lib/error-page";
 import appCss from "@/styles.css?url";
+import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "@/lib/build/siteSoftwareApplicationJsonLd";
 
 const SITE_URL = "https://verdantgrowdiary.com";
 const SITE_NAME = "Verdant Grow Diary";
@@ -90,7 +91,6 @@ export const Route = createRootRouteWithContext<RootRouteContext>()({
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
       { rel: "apple-touch-icon", sizes: "180x180", href: "/brand/verdant-logo-180.png" },
       { rel: "manifest", href: "/site.webmanifest" },
-      { rel: "canonical", href: SITE_URL },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "stylesheet", href: FONT_HREF },
@@ -104,6 +104,10 @@ export const Route = createRootRouteWithContext<RootRouteContext>()({
         children: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());gtag("config","${GA_MEASUREMENT_ID}",{send_page_view:false});`,
       },
       { type: "application/ld+json", children: JSON.stringify(SITE_JSON_LD) },
+      {
+        type: "application/ld+json",
+        children: JSON.stringify(SITE_SOFTWARE_APPLICATION_JSON_LD),
+      },
     ],
   }),
   component: RootComponent,

@@ -1,13 +1,13 @@
 {
-  "version": "0.0.0+20260802.d9a866681729-dirty",
+  "version": "0.0.0+20260802.f8a8f7a19ba8",
   "packageVersion": "0.0.0",
-  "commit": "d9a866681729f1b79d0b1d4aa1fc5a6a82af5a69",
-  "shortCommit": "d9a866681729",
-  "ref": "edit/edt-123de41d-138c-4cda-a494-6e9005606cd0",
+  "commit": "f8a8f7a19ba886404b4aa3dedc130086f1cb9eb5",
+  "shortCommit": "f8a8f7a19ba8",
+  "ref": "edit/edt-8e004de4-7f2b-4ed1-8bcc-4c15d27137e1",
   "tag": null,
-  "commitTime": "2026-08-02T12:00:34Z",
-  "buildTime": "2026-08-02T12:00:39.440Z",
-  "dirty": true,
+  "commitTime": "2026-08-02T12:12:44Z",
+  "buildTime": "2026-08-02T12:12:58.550Z",
+  "dirty": false,
   "ciRunId": null,
   "ciRunUrl": null
 }

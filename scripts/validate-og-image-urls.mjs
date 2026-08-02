@@ -165,12 +165,15 @@ export function validateImageUrl({ distDir, file, tag, url }) {
 
   if (issues.length > 0) return issues;
 
-  // Map https://verdantgrowdiary.com/og/foo.png → dist/og/foo.png
-  const localPath = join(distDir, parsed.pathname);
-  if (!existsSync(localPath)) {
+  // Map https://verdantgrowdiary.com/og/foo.png → dist/og/foo.png (Vite SPA output)
+  // or dist/client/og/foo.png (TanStack Start / Nitro client output).
+  const candidates = [join(distDir, parsed.pathname), join(distDir, "client", parsed.pathname)];
+  const localPath = candidates.find((candidate) => existsSync(candidate));
+  if (!localPath) {
     push(`no file at dist${parsed.pathname} — did the build emit this asset?`);
     return issues;
   }
+
 
   const expectedCt = contentTypeForExtension(localPath);
   if (!expectedCt || !expectedCt.startsWith("image/")) {

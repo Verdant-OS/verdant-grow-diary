@@ -360,6 +360,12 @@ export default function PlantDetail() {
     );
   }
 
+  // Every plant-absent path (loading, error, not-found, archived) returned
+  // above. This narrowing guard exists for the compiler under strictNullChecks;
+  // reaching it would mean the blocked-state classifier disagreed with the
+  // query result, in which case rendering nothing is the honest fallback.
+  if (!plant) return null;
+
   const ageDays = Math.floor((Date.now() - new Date(plant.startedAt).getTime()) / 86400000);
   const harvestWatchEligible = isHarvestWatchEligible({
     stage: plant.stage,

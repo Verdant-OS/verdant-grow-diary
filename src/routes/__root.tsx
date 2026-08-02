@@ -21,6 +21,7 @@ import { clearGrowDataMeta } from "@/hooks/useGrowData";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
 import { renderErrorPage } from "@/lib/error-page";
 import appCss from "@/styles.css?url";
+import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "@/lib/build/siteSoftwareApplicationJsonLd";
 
 const SITE_URL = "https://verdantgrowdiary.com";
 const SITE_NAME = "Verdant Grow Diary";
@@ -104,6 +105,10 @@ export const Route = createRootRouteWithContext<RootRouteContext>()({
         children: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());gtag("config","${GA_MEASUREMENT_ID}",{send_page_view:false});`,
       },
       { type: "application/ld+json", children: JSON.stringify(SITE_JSON_LD) },
+      {
+        type: "application/ld+json",
+        children: JSON.stringify(SITE_SOFTWARE_APPLICATION_JSON_LD),
+      },
     ],
   }),
   component: RootComponent,

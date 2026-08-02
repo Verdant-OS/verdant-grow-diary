@@ -70,7 +70,13 @@ vi.mock("@/integrations/supabase/client", () => {
     select: () => ({
       eq: (_col: string, value: string) => ({
         order: () => ({
-          limit: () => Promise.resolve({ data: [], error: null }),
+          limit: () => {
+            const c: any = {
+              abortSignal: () => c,
+              then: (r: any) => Promise.resolve({ data: [], error: null }).then(r),
+            };
+            return c;
+          },
         }),
         maybeSingle: () =>
           Promise.resolve(
@@ -85,11 +91,23 @@ vi.mock("@/integrations/supabase/client", () => {
     select: () => ({
       in: () => ({
         order: () => ({
-          limit: () => Promise.resolve({ data: [], error: null }),
+          limit: () => {
+            const c: any = {
+              abortSignal: () => c,
+              then: (r: any) => Promise.resolve({ data: [], error: null }).then(r),
+            };
+            return c;
+          },
         }),
       }),
       order: () => ({
-        limit: () => Promise.resolve({ data: [], error: null }),
+        limit: () => {
+          const c: any = {
+            abortSignal: () => c,
+            then: (r: any) => Promise.resolve({ data: [], error: null }).then(r),
+          };
+          return c;
+        },
       }),
     }),
     insert: () => Promise.resolve({ data: null, error: null }),
@@ -101,7 +119,13 @@ vi.mock("@/integrations/supabase/client", () => {
       in: () => chain,
       like: () => chain,
       order: () => chain,
-      limit: () => Promise.resolve({ data: linkedRows, error: null }),
+      limit: () => {
+        const __c: any = {
+          abortSignal: () => __c,
+          then: (r: any, j?: any) => Promise.resolve({ data: linkedRows, error: null }).then(r, j),
+        };
+        return __c;
+      },
     };
     return chain;
   };

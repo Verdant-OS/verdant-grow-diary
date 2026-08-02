@@ -25,7 +25,13 @@ vi.mock("@/integrations/supabase/client", () => {
       in: () => chain,
       like: () => chain,
       order: () => chain,
-      limit: () => Promise.resolve({ data: linkedRows, error: null }),
+      limit: () => {
+        const __c: any = {
+          abortSignal: () => __c,
+          then: (r: any, j?: any) => Promise.resolve({ data: linkedRows, error: null }).then(r, j),
+        };
+        return __c;
+      },
     };
     return chain;
   };
@@ -99,17 +105,13 @@ describe("StructuredDiagnosisCard — saved session link", () => {
 
   it("does not render the link when no session id is provided", () => {
     renderCard({ sessionId: null });
-    expect(
-      screen.queryByTestId("coach-ai-doctor-diagnosis-saved-session-link"),
-    ).toBeNull();
+    expect(screen.queryByTestId("coach-ai-doctor-diagnosis-saved-session-link")).toBeNull();
   });
 
   it("preserves the Add to Action Queue button", () => {
     renderCard({ sessionId: SESSION_ID });
     expect(
-      screen.getByTestId(
-        "coach-ai-doctor-diagnosis-suggested-action-0-add-button",
-      ),
+      screen.getByTestId("coach-ai-doctor-diagnosis-suggested-action-0-add-button"),
     ).toBeTruthy();
   });
 
@@ -133,9 +135,7 @@ describe("StructuredDiagnosisCard — saved session link", () => {
 
   it("does not leak [session:<id>] tokens or target_device into the link", () => {
     renderCard({ sessionId: SESSION_ID });
-    const link = screen.getByTestId(
-      "coach-ai-doctor-diagnosis-saved-session-link",
-    );
+    const link = screen.getByTestId("coach-ai-doctor-diagnosis-saved-session-link");
     const text = (link.textContent ?? "").toLowerCase();
     expect(text).not.toContain("[session:");
     expect(text).not.toContain("target_device");
@@ -143,9 +143,7 @@ describe("StructuredDiagnosisCard — saved session link", () => {
 
   it("copy does not imply automation, execution, or device control", () => {
     renderCard({ sessionId: SESSION_ID });
-    const link = screen.getByTestId(
-      "coach-ai-doctor-diagnosis-saved-session-link",
-    );
+    const link = screen.getByTestId("coach-ai-doctor-diagnosis-saved-session-link");
     const lower = (link.textContent ?? "").toLowerCase();
     for (const tok of [
       "automate",
@@ -167,10 +165,7 @@ describe("StructuredDiagnosisCard — saved session link", () => {
 
 // --- Static safety scan ------------------------------------------------------
 const ROOT = resolve(__dirname, "../..");
-const CARD = readFileSync(
-  resolve(ROOT, "src/components/StructuredDiagnosisCard.tsx"),
-  "utf8",
-);
+const CARD = readFileSync(resolve(ROOT, "src/components/StructuredDiagnosisCard.tsx"), "utf8");
 
 describe("StructuredDiagnosisCard — static safety (saved session link)", () => {
   it("does not import the Supabase client", () => {

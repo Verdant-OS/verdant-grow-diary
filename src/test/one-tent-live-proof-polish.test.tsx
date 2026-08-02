@@ -12,16 +12,25 @@ const NOW = Date.parse("2026-06-23T12:00:00Z");
 const FRESH_TS = new Date(NOW - 5 * 60_000).toISOString();
 const STALE_TS = new Date(NOW - STALE_THRESHOLD_MS - 60_000).toISOString();
 
-function snap(o: Partial<SensorSnapshot> & {
-  source: SensorSnapshot["source"];
-  ts: string | null;
-}): SensorSnapshot {
+function snap(
+  o: Partial<SensorSnapshot> & {
+    source: SensorSnapshot["source"];
+    ts: string | null;
+  },
+): SensorSnapshot {
   return {
     source: o.source,
     ts: o.ts,
-    temp: null, rh: null, vpd: null, co2: null,
-    soil: null, soil_ec: null, soil_temp: null, ppfd: null,
-    device_id: null, csvVendor: null,
+    temp: null,
+    rh: null,
+    vpd: null,
+    co2: null,
+    soil: null,
+    soil_ec: null,
+    soil_temp: null,
+    ppfd: null,
+    device_id: null,
+    csvVendor: null,
     ...o,
   };
 }
@@ -169,11 +178,8 @@ const followupSpy = vi.fn((..._args: unknown[]) => ({
   loading: false,
 }));
 vi.mock("@/hooks/useOneTentLiveProofTimelineFollowup", () => ({
-  useOneTentLiveProofTimelineFollowup: (
-    g: string | null,
-    a: string | null,
-    n: number,
-  ) => followupSpy(g, a, n) as never,
+  useOneTentLiveProofTimelineFollowup: (g: string | null, a: string | null, n: number) =>
+    followupSpy(g, a, n) as never,
 }));
 const supabaseFromSpy = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
@@ -183,7 +189,15 @@ vi.mock("@/integrations/supabase/client", () => ({
       return {
         select: () => ({
           eq: () => ({
-            order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+            order: () => ({
+              limit: () => {
+                const __c: any = {
+                  abortSignal: () => __c,
+                  then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+                };
+                return __c;
+              },
+            }),
           }),
         }),
       };
@@ -207,9 +221,9 @@ function renderPage() {
 describe("OneTentLiveProof page — refresh + deep links + safety", () => {
   it("renders the read-only safety reminder", () => {
     renderPage();
-    expect(
-      screen.getByTestId("one-tent-live-proof-readonly-note").textContent ?? "",
-    ).toMatch(/only reads proof status/i);
+    expect(screen.getByTestId("one-tent-live-proof-readonly-note").textContent ?? "").toMatch(
+      /only reads proof status/i,
+    );
   });
   it("renders the Refresh proof status button", () => {
     renderPage();
@@ -228,8 +242,7 @@ describe("OneTentLiveProof page — refresh + deep links + safety", () => {
   it("step 3 deep-links to exact alert detail when known", () => {
     renderPage();
     const el = screen.getByTestId("one-tent-live-proof-step-3-cta");
-    const href =
-      el.getAttribute("href") ?? el.querySelector("a")?.getAttribute("href");
+    const href = el.getAttribute("href") ?? el.querySelector("a")?.getAttribute("href");
     expect(href).toBe("/alerts/alert-9");
   });
   it("step 4 + 5 deep-link to exact action detail when known", () => {

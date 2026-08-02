@@ -209,9 +209,7 @@ describe("filterActionFollowUpExistingPhotoCandidates", () => {
   });
 
   it("returns [] for missing context or empty input", () => {
-    expect(
-      filterActionFollowUpExistingPhotoCandidates([], CTX),
-    ).toEqual([]);
+    expect(filterActionFollowUpExistingPhotoCandidates([], CTX)).toEqual([]);
     expect(
       filterActionFollowUpExistingPhotoCandidates(
         [makeCandidate({ id: "c", durableReference: REF_PLANT })],
@@ -240,16 +238,19 @@ describe("isAcceptedActionFollowUpPhotoReference", () => {
 // Candidate query
 // ---------------------------------------------------------------------------
 
-function makeSupabaseMock(
-  rows: Array<Record<string, unknown>>,
-  error: unknown = null,
-) {
+function makeSupabaseMock(rows: Array<Record<string, unknown>>, error: unknown = null) {
   const chain: Record<string, unknown> = {};
   Object.assign(chain, {
     select: () => chain,
     eq: () => chain,
     not: () => chain,
-    limit: () => Promise.resolve({ data: rows, error }),
+    limit: () => {
+      const __c: any = {
+        abortSignal: () => __c,
+        then: (r: any, j?: any) => Promise.resolve({ data: rows, error }).then(r, j),
+      };
+      return __c;
+    },
   });
   return { from: () => chain } as unknown as Parameters<
     typeof loadActionFollowUpExistingPhotoCandidates
@@ -260,16 +261,28 @@ describe("loadActionFollowUpExistingPhotoCandidates", () => {
   it("re-filters loose rows through pure rules; excludes cross-user / wrong-bucket", async () => {
     const rows = [
       {
-        id: "d1", grow_id: GROW, tent_id: TENT, plant_id: PLANT,
-        entry_at: "2026-07-01T00:00:00Z", photo_url: REF_PLANT,
+        id: "d1",
+        grow_id: GROW,
+        tent_id: TENT,
+        plant_id: PLANT,
+        entry_at: "2026-07-01T00:00:00Z",
+        photo_url: REF_PLANT,
       },
       {
-        id: "d2", grow_id: GROW, tent_id: TENT, plant_id: PLANT,
-        entry_at: "2026-07-02T00:00:00Z", photo_url: REF_WRONG_OWNER,
+        id: "d2",
+        grow_id: GROW,
+        tent_id: TENT,
+        plant_id: PLANT,
+        entry_at: "2026-07-02T00:00:00Z",
+        photo_url: REF_WRONG_OWNER,
       },
       {
-        id: "d3", grow_id: GROW, tent_id: TENT, plant_id: PLANT,
-        entry_at: "2026-07-03T00:00:00Z", photo_url: "http://ext/photo.jpg",
+        id: "d3",
+        grow_id: GROW,
+        tent_id: TENT,
+        plant_id: PLANT,
+        entry_at: "2026-07-03T00:00:00Z",
+        photo_url: "http://ext/photo.jpg",
       },
     ];
     const res = await loadActionFollowUpExistingPhotoCandidates(CTX, {
@@ -419,12 +432,8 @@ describe("ActionFollowUpExistingPhotoEvidence", () => {
       "data:image/png;base64,AA",
       "https://x/y?token=abc",
     ]) {
-      const { unmount } = render(
-        <ActionFollowUpExistingPhotoEvidence reference={bad} />,
-      );
-      expect(
-        screen.getByTestId("action-followup-photo-evidence-unavailable"),
-      ).toBeInTheDocument();
+      const { unmount } = render(<ActionFollowUpExistingPhotoEvidence reference={bad} />);
+      expect(screen.getByTestId("action-followup-photo-evidence-unavailable")).toBeInTheDocument();
       // Raw storage or signed URL must never render.
       expect(screen.queryByText(bad)).toBeNull();
       unmount();

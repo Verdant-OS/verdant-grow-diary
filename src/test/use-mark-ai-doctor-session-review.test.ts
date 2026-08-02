@@ -53,8 +53,16 @@ vi.mock("@/integrations/supabase/client", () => {
       forbidden.delete(...args);
       return Promise.resolve({ data: null, error: null });
     },
-    select: () => ({ in: () => ({ order: () => ({ limit: () =>
-      Promise.resolve({ data: [], error: null }) }) }) }),
+    select: () => {
+      const c: any = {
+        abortSignal: () => c,
+        in: () => c,
+        order: () => c,
+        limit: () => c,
+        then: (r: any) => Promise.resolve({ data: [], error: null }).then(r),
+      };
+      return c;
+    },
   });
   return {
     supabase: {
@@ -307,10 +315,7 @@ describe("useMarkAiDoctorSessionReview — mutation", () => {
 
 // --- Static safety scan ------------------------------------------------------
 const ROOT = resolve(__dirname, "../..");
-const HOOK_SRC = readFileSync(
-  resolve(ROOT, "src/hooks/useMarkAiDoctorSessionReview.ts"),
-  "utf8",
-);
+const HOOK_SRC = readFileSync(resolve(ROOT, "src/hooks/useMarkAiDoctorSessionReview.ts"), "utf8");
 
 describe("useMarkAiDoctorSessionReview — safety scan", () => {
   it("uses INSERT only — no update/upsert/delete/rpc/functions.invoke", () => {
@@ -350,9 +355,7 @@ describe("useMarkAiDoctorSessionReview — safety scan", () => {
     expect(iface).toBeDefined();
     expect(iface!).not.toContain("user_id");
     // And the payload builder must not assign user_id either.
-    const builder = HOOK_SRC.match(
-      /export function buildReviewInsertPayload[\s\S]*?\n\}/,
-    )?.[0];
+    const builder = HOOK_SRC.match(/export function buildReviewInsertPayload[\s\S]*?\n\}/)?.[0];
     expect(builder).toBeDefined();
     expect(builder!).not.toContain("user_id");
   });

@@ -72,12 +72,18 @@ const reviewScopeCalls: Array<unknown> = [];
 vi.mock("@/integrations/supabase/client", () => {
   const sessionsSelect = () => ({
     eq: (_col: string, value: string) => ({
-      order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+      order: () => ({
+        limit: () => {
+          const __c: any = {
+            abortSignal: () => __c,
+            then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+          };
+          return __c;
+        },
+      }),
       maybeSingle: () =>
         Promise.resolve(
-          value === SESSION_ID
-            ? { data: fixture, error: null }
-            : { data: null, error: null },
+          value === SESSION_ID ? { data: fixture, error: null } : { data: null, error: null },
         ),
     }),
   });
@@ -86,23 +92,32 @@ vi.mock("@/integrations/supabase/client", () => {
       reviewScopeCalls.push(scope);
       return {
         order: () => ({
-          limit: () =>
-            Promise.resolve({ data: reviewEventsForNextTest, error: null }),
+          limit: () => {
+            const __c: any = {
+              abortSignal: () => __c,
+              then: (r: any, j?: any) =>
+                Promise.resolve({ data: reviewEventsForNextTest, error: null }).then(r, j),
+            };
+            return __c;
+          },
         }),
       };
     },
     order: () => ({
-      limit: () =>
-        Promise.resolve({ data: reviewEventsForNextTest, error: null }),
+      limit: () => {
+        const __c: any = {
+          abortSignal: () => __c,
+          then: (r: any, j?: any) =>
+            Promise.resolve({ data: reviewEventsForNextTest, error: null }).then(r, j),
+        };
+        return __c;
+      },
     }),
   });
   return {
     supabase: {
       from: (table: string) => ({
-        select: () =>
-          table === "ai_doctor_session_reviews"
-            ? reviewsSelect()
-            : sessionsSelect(),
+        select: () => (table === "ai_doctor_session_reviews" ? reviewsSelect() : sessionsSelect()),
       }),
     },
   };
@@ -116,10 +131,7 @@ function renderDetail() {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[`/doctor/sessions/${SESSION_ID}`]}>
         <Routes>
-          <Route
-            path="/doctor/sessions/:sessionId"
-            element={<AiDoctorSessionDetail />}
-          />
+          <Route path="/doctor/sessions/:sessionId" element={<AiDoctorSessionDetail />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -150,17 +162,12 @@ describe("AiDoctorSessionDetail — review status panel", () => {
   it("shows 'Not reviewed' when there are no review events", async () => {
     reviewEventsForNextTest = [];
     renderDetail();
-    const panel = await screen.findByTestId(
-      "ai-doctor-session-detail-review-status-panel",
-    );
+    const panel = await screen.findByTestId("ai-doctor-session-detail-review-status-panel");
     expect(panel.getAttribute("data-review-status")).toBe("not_reviewed");
-    expect(
-      screen.getByTestId("ai-doctor-session-detail-review-status-badge")
-        .textContent,
-    ).toMatch(/not reviewed/i);
-    expect(
-      screen.getByTestId("ai-doctor-session-detail-review-status-empty"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-session-detail-review-status-badge").textContent).toMatch(
+      /not reviewed/i,
+    );
+    expect(screen.getByTestId("ai-doctor-session-detail-review-status-empty")).toBeTruthy();
   });
 
   it("shows 'Reviewed' when latest event is marked_reviewed", async () => {
@@ -173,15 +180,12 @@ describe("AiDoctorSessionDetail — review status panel", () => {
     ];
     renderDetail();
     await waitFor(() => {
-      const panel = screen.getByTestId(
-        "ai-doctor-session-detail-review-status-panel",
-      );
+      const panel = screen.getByTestId("ai-doctor-session-detail-review-status-panel");
       expect(panel.getAttribute("data-review-status")).toBe("reviewed");
     });
-    expect(
-      screen.getByTestId("ai-doctor-session-detail-review-status-badge")
-        .textContent,
-    ).toMatch(/^reviewed$/i);
+    expect(screen.getByTestId("ai-doctor-session-detail-review-status-badge").textContent).toMatch(
+      /^reviewed$/i,
+    );
   });
 
   it("shows 'Needs follow-up' when latest event is needs_follow_up", async () => {
@@ -200,15 +204,12 @@ describe("AiDoctorSessionDetail — review status panel", () => {
     ];
     renderDetail();
     await waitFor(() => {
-      const panel = screen.getByTestId(
-        "ai-doctor-session-detail-review-status-panel",
-      );
+      const panel = screen.getByTestId("ai-doctor-session-detail-review-status-panel");
       expect(panel.getAttribute("data-review-status")).toBe("needs_follow_up");
     });
-    expect(
-      screen.getByTestId("ai-doctor-session-detail-review-status-badge")
-        .textContent,
-    ).toMatch(/needs follow-up/i);
+    expect(screen.getByTestId("ai-doctor-session-detail-review-status-badge").textContent).toMatch(
+      /needs follow-up/i,
+    );
   });
 
   it("shows 'Not reviewed' when latest event is cleared", async () => {
@@ -225,20 +226,14 @@ describe("AiDoctorSessionDetail — review status panel", () => {
       }),
     ];
     renderDetail();
-    const panel = await screen.findByTestId(
-      "ai-doctor-session-detail-review-status-panel",
-    );
+    const panel = await screen.findByTestId("ai-doctor-session-detail-review-status-panel");
     await waitFor(() => {
       // After events load, two history items exist (one of them "cleared").
-      const items = screen.queryAllByTestId(
-        "ai-doctor-session-detail-review-status-event",
-      );
+      const items = screen.queryAllByTestId("ai-doctor-session-detail-review-status-event");
       expect(items.length).toBe(2);
     });
     expect(panel.getAttribute("data-review-status")).toBe("not_reviewed");
-    expect(
-      screen.queryByTestId("ai-doctor-session-detail-review-status-empty"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-session-detail-review-status-empty")).toBeNull();
   });
 
   it("renders event history newest-first", async () => {
@@ -261,14 +256,10 @@ describe("AiDoctorSessionDetail — review status panel", () => {
     ];
     renderDetail();
     await waitFor(() => {
-      const items = screen.queryAllByTestId(
-        "ai-doctor-session-detail-review-status-event",
-      );
+      const items = screen.queryAllByTestId("ai-doctor-session-detail-review-status-event");
       expect(items.length).toBe(3);
     });
-    const items = screen.getAllByTestId(
-      "ai-doctor-session-detail-review-status-event",
-    );
+    const items = screen.getAllByTestId("ai-doctor-session-detail-review-status-event");
     expect(items.map((n) => n.getAttribute("data-event-type"))).toEqual([
       "cleared",
       "needs_follow_up",
@@ -286,21 +277,15 @@ describe("AiDoctorSessionDetail — review status panel", () => {
       }),
     ];
     renderDetail();
-    const item = await screen.findByTestId(
-      "ai-doctor-session-detail-review-status-event",
-    );
-    const note = within(item).getByTestId(
-      "ai-doctor-session-detail-review-status-event-note",
-    );
+    const item = await screen.findByTestId("ai-doctor-session-detail-review-status-event");
+    const note = within(item).getByTestId("ai-doctor-session-detail-review-status-event-note");
     expect(note.textContent).toMatch(/recheck vpd/i);
   });
 
   it("calm empty state appears when no events exist", async () => {
     reviewEventsForNextTest = [];
     renderDetail();
-    const empty = await screen.findByTestId(
-      "ai-doctor-session-detail-review-status-empty",
-    );
+    const empty = await screen.findByTestId("ai-doctor-session-detail-review-status-empty");
     expect(empty.textContent).toMatch(/no review activity/i);
   });
 
@@ -321,12 +306,8 @@ describe("AiDoctorSessionDetail — review status panel", () => {
     reviewEventsForNextTest = [];
     renderDetail();
     // ReviewSummarySection still mounts (its known testid stem appears).
-    expect(
-      await screen.findByTestId("ai-doctor-session-detail-review-followup"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-session-detail-evidence"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-session-detail-review-followup")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-session-detail-evidence")).toBeTruthy();
   });
 });
 

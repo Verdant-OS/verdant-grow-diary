@@ -12,7 +12,10 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
 import type { Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
-import { removeLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  removeLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 import {
   BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID,
   BUILTIN_SAVED_VIEW_TOOLTIP,
@@ -27,7 +30,7 @@ let currentRows: AiDoctorSessionRow[] = [];
 vi.mock("@/integrations/supabase/client", () => {
   const result = () => Promise.resolve({ data: currentRows, error: null });
   const chain: Record<string, unknown> = {};
-  const methods = ["select", "eq", "order", "limit", "range", "not", "gte", "or"];
+  const methods = ["select", "eq", "order", "limit", "range", "not", "gte", "or", "abortSignal"];
   for (const m of methods) chain[m] = () => chain;
   chain.then = (resolve: (v: unknown) => unknown) => result().then(resolve);
   return { supabase: { from: () => chain } };
@@ -103,16 +106,11 @@ describe("AiDoctorSessionsIndex — Built-in badge + tooltip", () => {
     currentRows = [makeRow("a")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    expect(
-      screen.queryByTestId("ai-doctor-sessions-saved-views-builtin-badge"),
-    ).toBeNull();
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID } },
-    );
-    const badge = await screen.findByTestId(
-      "ai-doctor-sessions-saved-views-builtin-badge",
-    );
+    expect(screen.queryByTestId("ai-doctor-sessions-saved-views-builtin-badge")).toBeNull();
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID },
+    });
+    const badge = await screen.findByTestId("ai-doctor-sessions-saved-views-builtin-badge");
     expect(badge.textContent).toContain("Built-in");
     expect(badge.getAttribute("title")).toBe(BUILTIN_SAVED_VIEW_TOOLTIP);
     expect(badge.getAttribute("aria-label")).toBe(BUILTIN_SAVED_VIEW_TOOLTIP);
@@ -122,12 +120,8 @@ describe("AiDoctorSessionsIndex — Built-in badge + tooltip", () => {
     currentRows = [makeRow("a")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"),
-    );
-    expect(
-      await screen.findByTestId("ai-doctor-sessions-saved-views-builtin-badge"),
-    ).toBeTruthy();
+    fireEvent.click(screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"));
+    expect(await screen.findByTestId("ai-doctor-sessions-saved-views-builtin-badge")).toBeTruthy();
   });
 
   it("user-created saved views do not get the badge and keep Delete", async () => {
@@ -144,40 +138,31 @@ describe("AiDoctorSessionsIndex — Built-in badge + tooltip", () => {
     currentRows = [makeRow("a")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: "u1" } },
-    );
-    expect(
-      await screen.findByTestId("ai-doctor-sessions-saved-views-delete"),
-    ).toBeTruthy();
-    expect(
-      screen.queryByTestId("ai-doctor-sessions-saved-views-builtin-badge"),
-    ).toBeNull();
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: "u1" },
+    });
+    expect(await screen.findByTestId("ai-doctor-sessions-saved-views-delete")).toBeTruthy();
+    expect(screen.queryByTestId("ai-doctor-sessions-saved-views-builtin-badge")).toBeNull();
   });
 
   it("Delete button stays hidden while built-in is selected", async () => {
     currentRows = [makeRow("a")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID },
+    });
     await screen.findByTestId("ai-doctor-sessions-saved-views-builtin-badge");
-    expect(
-      screen.queryByTestId("ai-doctor-sessions-saved-views-delete"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-sessions-saved-views-delete")).toBeNull();
   });
 
   it("selecting the built-in still applies caution=yes + hasChecklist=yes", async () => {
     currentRows = [makeRow("a")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID },
+    });
     const caution = (await screen.findByTestId(
       "ai-doctor-sessions-index-filter-caution",
     )) as HTMLSelectElement;
@@ -195,10 +180,7 @@ describe("Static safety scan — Built-in badge slice", () => {
     "src/pages/AiDoctorSessionsIndex.tsx",
     "src/lib/aiDoctorSessionsSavedViewsRules.ts",
   ].map((p) => readFileSync(resolve(ROOT, p), "utf8"));
-  const TSX = readFileSync(
-    resolve(ROOT, "src/pages/AiDoctorSessionsIndex.tsx"),
-    "utf8",
-  );
+  const TSX = readFileSync(resolve(ROOT, "src/pages/AiDoctorSessionsIndex.tsx"), "utf8");
   const ALL = FILES.join("\n");
 
   it("no DB writes", () => {

@@ -12,7 +12,10 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
 import type { Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
-import { removeLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  removeLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 import {
   BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID,
   SAVED_VIEWS_STORAGE_KEY,
@@ -26,7 +29,7 @@ let currentRows: AiDoctorSessionRow[] = [];
 vi.mock("@/integrations/supabase/client", () => {
   const result = () => Promise.resolve({ data: currentRows, error: null });
   const chain: Record<string, unknown> = {};
-  const methods = ["select", "eq", "order", "limit", "range", "not", "gte", "or"];
+  const methods = ["select", "eq", "order", "limit", "range", "not", "gte", "or", "abortSignal"];
   for (const m of methods) chain[m] = () => chain;
   chain.then = (resolve: (v: unknown) => unknown) => result().then(resolve);
   return { supabase: { from: () => chain } };
@@ -101,10 +104,9 @@ describe("Saved-view summary preview", () => {
   it("renders the built-in 'Needs my attention' summary when selected", async () => {
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID },
+    });
     const preview = await screen.findByTestId(PREVIEW_TID);
     expect(preview.textContent).toContain("Caution only");
     expect(preview.textContent).toContain("Has review checklist");
@@ -124,10 +126,9 @@ describe("Saved-view summary preview", () => {
     ]);
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: "u1" } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: "u1" },
+    });
     const preview = await screen.findByTestId(PREVIEW_TID);
     expect(preview.textContent).toContain("Risk: Critical");
     expect(preview.textContent).not.toContain("Sort:");
@@ -145,10 +146,9 @@ describe("Saved-view summary preview", () => {
     ]);
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: "u2" } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: "u2" },
+    });
     const preview = await screen.findByTestId(PREVIEW_TID);
     expect(preview.textContent).toContain("Caution only");
     expect(preview.textContent).toContain("Sort: Review priority");
@@ -175,13 +175,9 @@ describe("Saved-view summary preview", () => {
     await screen.findByTestId("ai-doctor-sessions-index-list");
     const select = screen.getByTestId("ai-doctor-sessions-saved-views-select");
     fireEvent.change(select, { target: { value: "u1" } });
-    expect((await screen.findByTestId(PREVIEW_TID)).textContent).toContain(
-      "Risk: Critical",
-    );
+    expect((await screen.findByTestId(PREVIEW_TID)).textContent).toContain("Risk: Critical");
     fireEvent.change(select, { target: { value: "u2" } });
-    expect((await screen.findByTestId(PREVIEW_TID)).textContent).toContain(
-      "Sort: Oldest first",
-    );
+    expect((await screen.findByTestId(PREVIEW_TID)).textContent).toContain("Sort: Oldest first");
   });
 
   it("hides the preview after Clear filters when built-in was auto-selected via the preset", async () => {
@@ -189,13 +185,9 @@ describe("Saved-view summary preview", () => {
     await screen.findByTestId("ai-doctor-sessions-index-list");
     // Use the preset button so selectedSavedViewId stays "" and the
     // built-in is surfaced via auto-sync only.
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"),
-    );
+    fireEvent.click(screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"));
     await screen.findByTestId(PREVIEW_TID);
-    const clear = await screen.findByTestId(
-      "ai-doctor-sessions-index-clear-filters",
-    );
+    const clear = await screen.findByTestId("ai-doctor-sessions-index-clear-filters");
     fireEvent.click(clear);
     expect(screen.queryByTestId(PREVIEW_TID)).toBeNull();
   });
@@ -203,14 +195,8 @@ describe("Saved-view summary preview", () => {
 
 describe("Static safety scan — summary preview slice", () => {
   const ROOT = resolve(__dirname, "../..");
-  const TSX = readFileSync(
-    resolve(ROOT, "src/pages/AiDoctorSessionsIndex.tsx"),
-    "utf8",
-  );
-  const RULES = readFileSync(
-    resolve(ROOT, "src/lib/aiDoctorSessionsSavedViewsRules.ts"),
-    "utf8",
-  );
+  const TSX = readFileSync(resolve(ROOT, "src/pages/AiDoctorSessionsIndex.tsx"), "utf8");
+  const RULES = readFileSync(resolve(ROOT, "src/lib/aiDoctorSessionsSavedViewsRules.ts"), "utf8");
   const FILTERS_LIB = readFileSync(
     resolve(ROOT, "src/lib/aiDoctorSessionsIndexFilters.ts"),
     "utf8",

@@ -21,7 +21,14 @@ vi.mock("@/integrations/supabase/client", () => ({
       select: () => ({
         eq: () => ({
           order: () => ({
-            limit: () => Promise.resolve({ data: currentRows, error: null }),
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) =>
+                  Promise.resolve({ data: currentRows, error: null }).then(r, j),
+              };
+              return __c;
+            },
           }),
         }),
       }),
@@ -86,30 +93,20 @@ beforeEach(() => {
 
 describe("PlantAiDoctorSessionsPanel — indicators", () => {
   it("shows caution for low-confidence session", async () => {
-    currentRows = [
-      makeRow("a", {}, { displayed_confidence: 0.3, raw_confidence: 0.3 }),
-    ];
+    currentRows = [makeRow("a", {}, { displayed_confidence: 0.3, raw_confidence: 0.3 })];
     renderWithProviders(<PlantAiDoctorSessionsPanel plantId="p1" />);
-    expect(
-      await screen.findByTestId("plant-ai-doctor-session-caution-indicator"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("plant-ai-doctor-session-caution-indicator")).toBeTruthy();
   });
 
   it("shows caution for elevated-risk session", async () => {
     currentRows = [makeRow("a", { riskLevel: "high" })];
     renderWithProviders(<PlantAiDoctorSessionsPanel plantId="p1" />);
-    expect(
-      await screen.findByTestId("plant-ai-doctor-session-caution-indicator"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("plant-ai-doctor-session-caution-indicator")).toBeTruthy();
   });
 
   it("shows limited-context indicator when context missing", async () => {
     currentRows = [
-      makeRow(
-        "a",
-        { evidence: [] },
-        { plant_id: null, tent_id: null, grow_id: null },
-      ),
+      makeRow("a", { evidence: [] }, { plant_id: null, tent_id: null, grow_id: null }),
     ];
     renderWithProviders(<PlantAiDoctorSessionsPanel plantId="p1" />);
     expect(
@@ -127,30 +124,20 @@ describe("PlantAiDoctorSessionsPanel — indicators", () => {
 
 describe("TentAiDoctorSessionsPanel — indicators", () => {
   it("shows caution for low-confidence session", async () => {
-    currentRows = [
-      makeRow("a", {}, { displayed_confidence: 0.3, raw_confidence: 0.3 }),
-    ];
+    currentRows = [makeRow("a", {}, { displayed_confidence: 0.3, raw_confidence: 0.3 })];
     renderWithProviders(<TentAiDoctorSessionsPanel tentId="t1" />);
-    expect(
-      await screen.findByTestId("tent-ai-doctor-session-caution-indicator"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("tent-ai-doctor-session-caution-indicator")).toBeTruthy();
   });
 
   it("shows caution for elevated-risk session", async () => {
     currentRows = [makeRow("a", { riskLevel: "high" })];
     renderWithProviders(<TentAiDoctorSessionsPanel tentId="t1" />);
-    expect(
-      await screen.findByTestId("tent-ai-doctor-session-caution-indicator"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("tent-ai-doctor-session-caution-indicator")).toBeTruthy();
   });
 
   it("shows limited-context indicator when context missing", async () => {
     currentRows = [
-      makeRow(
-        "a",
-        { evidence: [] },
-        { plant_id: null, tent_id: null, grow_id: null },
-      ),
+      makeRow("a", { evidence: [] }, { plant_id: null, tent_id: null, grow_id: null }),
     ];
     renderWithProviders(<TentAiDoctorSessionsPanel tentId="t1" />);
     expect(
@@ -168,30 +155,20 @@ describe("TentAiDoctorSessionsPanel — indicators", () => {
 
 describe("CoachAiDoctorHistoryPanel — indicators", () => {
   it("shows caution for low-confidence session", async () => {
-    currentRows = [
-      makeRow("a", {}, { displayed_confidence: 0.3, raw_confidence: 0.3 }),
-    ];
+    currentRows = [makeRow("a", {}, { displayed_confidence: 0.3, raw_confidence: 0.3 })];
     renderWithProviders(<CoachAiDoctorHistoryPanel growId="g1" />);
-    expect(
-      await screen.findByTestId("coach-ai-doctor-history-caution-indicator"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("coach-ai-doctor-history-caution-indicator")).toBeTruthy();
   });
 
   it("shows caution for elevated-risk session", async () => {
     currentRows = [makeRow("a", { riskLevel: "high" })];
     renderWithProviders(<CoachAiDoctorHistoryPanel growId="g1" />);
-    expect(
-      await screen.findByTestId("coach-ai-doctor-history-caution-indicator"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("coach-ai-doctor-history-caution-indicator")).toBeTruthy();
   });
 
   it("shows limited-context indicator when context missing", async () => {
     currentRows = [
-      makeRow(
-        "a",
-        { evidence: [] },
-        { plant_id: null, tent_id: null, grow_id: null },
-      ),
+      makeRow("a", { evidence: [] }, { plant_id: null, tent_id: null, grow_id: null }),
     ];
     renderWithProviders(<CoachAiDoctorHistoryPanel growId="g1" />);
     expect(

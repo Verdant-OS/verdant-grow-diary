@@ -58,21 +58,13 @@ describe("Review-status filter — pure helpers", () => {
 
   it("isFiltersActive flags any non-'any' review status as active", () => {
     expect(isFiltersActive(DEFAULT_FILTERS)).toBe(false);
-    expect(
-      isFiltersActive({ ...DEFAULT_FILTERS, reviewStatus: "reviewed" }),
-    ).toBe(true);
-    expect(
-      isFiltersActive({ ...DEFAULT_FILTERS, reviewStatus: "not_reviewed" }),
-    ).toBe(true);
-    expect(
-      isFiltersActive({ ...DEFAULT_FILTERS, reviewStatus: "needs_follow_up" }),
-    ).toBe(true);
+    expect(isFiltersActive({ ...DEFAULT_FILTERS, reviewStatus: "reviewed" })).toBe(true);
+    expect(isFiltersActive({ ...DEFAULT_FILTERS, reviewStatus: "not_reviewed" })).toBe(true);
+    expect(isFiltersActive({ ...DEFAULT_FILTERS, reviewStatus: "needs_follow_up" })).toBe(true);
   });
 
   it("serialize/parse round-trips review status and omits the default", () => {
-    expect(serializeFilters(DEFAULT_FILTERS)).not.toHaveProperty(
-      FILTER_PARAM_KEYS.reviewStatus,
-    );
+    expect(serializeFilters(DEFAULT_FILTERS)).not.toHaveProperty(FILTER_PARAM_KEYS.reviewStatus);
     const f: SessionsIndexFilters = {
       ...DEFAULT_FILTERS,
       reviewStatus: "needs_follow_up",
@@ -83,9 +75,9 @@ describe("Review-status filter — pure helpers", () => {
   });
 
   it("formatActiveFilterLabels produces the required review labels", () => {
-    expect(
-      formatActiveFilterLabels({ ...DEFAULT_FILTERS, reviewStatus: "reviewed" }),
-    ).toContain("Review: Reviewed");
+    expect(formatActiveFilterLabels({ ...DEFAULT_FILTERS, reviewStatus: "reviewed" })).toContain(
+      "Review: Reviewed",
+    );
     expect(
       formatActiveFilterLabels({
         ...DEFAULT_FILTERS,
@@ -98,11 +90,9 @@ describe("Review-status filter — pure helpers", () => {
         reviewStatus: "needs_follow_up",
       }),
     ).toContain("Review: Needs follow-up");
-    expect(
-      formatActiveFilterLabels(DEFAULT_FILTERS).some((l) =>
-        l.startsWith("Review:"),
-      ),
-    ).toBe(false);
+    expect(formatActiveFilterLabels(DEFAULT_FILTERS).some((l) => l.startsWith("Review:"))).toBe(
+      false,
+    );
   });
 
   function tinyRow(id: string): FilterableSessionRow {
@@ -154,11 +144,7 @@ describe("Review-status filter — pure helpers", () => {
       ["a", "reviewed"],
       ["b", "needs_follow_up"],
     ]);
-    const out = applyClientSideFilters(
-      rows,
-      { ...DEFAULT_FILTERS, reviewStatus: "reviewed" },
-      m,
-    );
+    const out = applyClientSideFilters(rows, { ...DEFAULT_FILTERS, reviewStatus: "reviewed" }, m);
     expect(out.map((r) => r.id)).toEqual(["a"]);
   });
 
@@ -213,14 +199,8 @@ describe("Review-status filter — saved views", () => {
   });
 
   it("viewSignature differs by review status (dedup-safe)", () => {
-    const a = viewSignature(
-      { ...DEFAULT_FILTERS, reviewStatus: "reviewed" },
-      0,
-    );
-    const b = viewSignature(
-      { ...DEFAULT_FILTERS, reviewStatus: "needs_follow_up" },
-      0,
-    );
+    const a = viewSignature({ ...DEFAULT_FILTERS, reviewStatus: "reviewed" }, 0);
+    const b = viewSignature({ ...DEFAULT_FILTERS, reviewStatus: "needs_follow_up" }, 0);
     const c = viewSignature(DEFAULT_FILTERS, 0);
     expect(a).not.toBe(b);
     expect(a).not.toBe(c);
@@ -240,9 +220,7 @@ describe("Review-status filter — saved views", () => {
   });
 
   it("built-in 'Needs my attention' view does NOT set a review filter", () => {
-    const builtIn = BUILTIN_SAVED_VIEWS.find(
-      (v) => v.id === BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID,
-    );
+    const builtIn = BUILTIN_SAVED_VIEWS.find((v) => v.id === BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID);
     expect(builtIn?.filters.reviewStatus).toBe("any");
   });
 });
@@ -265,7 +243,17 @@ vi.mock("@/integrations/supabase/client", () => {
   function makeChain(initial: unknown[]) {
     let current = initial;
     const chain: Record<string, unknown> = {};
-    const passthrough = ["select", "eq", "order", "limit", "range", "not", "gte", "or"];
+    const passthrough = [
+      "select",
+      "eq",
+      "order",
+      "limit",
+      "range",
+      "not",
+      "gte",
+      "or",
+      "abortSignal",
+    ];
     for (const m of passthrough) chain[m] = () => chain;
     chain.in = (_column: string, values: unknown) => {
       if (Array.isArray(values)) {
@@ -289,10 +277,7 @@ vi.mock("@/integrations/supabase/client", () => {
   };
 });
 
-function makeRow(
-  id: string,
-  over: Partial<AiDoctorSessionRow> = {},
-): AiDoctorSessionRow {
+function makeRow(id: string, over: Partial<AiDoctorSessionRow> = {}): AiDoctorSessionRow {
   const diagnosis: Diagnosis = {
     summary: "ok",
     likelyIssue: "ok",
@@ -372,9 +357,7 @@ describe("Review-status filter — UI integration", () => {
   it("defaults to 'any' and shows all rows; chips remain visible", async () => {
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    const select = (await screen.findByTestId(
-      SELECT_TID,
-    )) as HTMLSelectElement;
+    const select = (await screen.findByTestId(SELECT_TID)) as HTMLSelectElement;
     expect(select.value).toBe("any");
     expect(screen.getAllByTestId(ROW_TID)).toHaveLength(3);
     await waitFor(() => expect(screen.getAllByTestId(CHIP_TID).length).toBeGreaterThan(0)); // at least one chip rendered
@@ -431,9 +414,7 @@ describe("Review-status filter — UI integration", () => {
     fireEvent.change(screen.getByTestId(SELECT_TID), {
       target: { value: "reviewed" },
     });
-    const labels = await screen.findAllByTestId(
-      "ai-doctor-sessions-index-active-filter-label",
-    );
+    const labels = await screen.findAllByTestId("ai-doctor-sessions-index-active-filter-label");
     expect(labels.map((l) => l.textContent)).toContain("Review: Reviewed");
   });
 
@@ -444,9 +425,7 @@ describe("Review-status filter — UI integration", () => {
     fireEvent.change(screen.getByTestId(SELECT_TID), {
       target: { value: "needs_follow_up" },
     });
-    const clear = await screen.findByTestId(
-      "ai-doctor-sessions-index-clear-filters",
-    );
+    const clear = await screen.findByTestId("ai-doctor-sessions-index-clear-filters");
     fireEvent.click(clear);
     await waitFor(() => {
       const select = screen.getByTestId(SELECT_TID) as HTMLSelectElement;
@@ -457,9 +436,7 @@ describe("Review-status filter — UI integration", () => {
   it("hydrates the select from the URL", async () => {
     renderPage("/doctor/sessions?reviewStatus=needs_follow_up");
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    const select = (await screen.findByTestId(
-      SELECT_TID,
-    )) as HTMLSelectElement;
+    const select = (await screen.findByTestId(SELECT_TID)) as HTMLSelectElement;
     expect(select.value).toBe("needs_follow_up");
   });
 });
@@ -468,18 +445,9 @@ describe("Review-status filter — UI integration", () => {
 
 describe("Static safety scan — review-status filter slice", () => {
   const ROOT = resolve(__dirname, "../..");
-  const TSX = readFileSync(
-    resolve(ROOT, "src/pages/AiDoctorSessionsIndex.tsx"),
-    "utf8",
-  );
-  const FILTERS = readFileSync(
-    resolve(ROOT, "src/lib/aiDoctorSessionsIndexFilters.ts"),
-    "utf8",
-  );
-  const SAVED = readFileSync(
-    resolve(ROOT, "src/lib/aiDoctorSessionsSavedViewsRules.ts"),
-    "utf8",
-  );
+  const TSX = readFileSync(resolve(ROOT, "src/pages/AiDoctorSessionsIndex.tsx"), "utf8");
+  const FILTERS = readFileSync(resolve(ROOT, "src/lib/aiDoctorSessionsIndexFilters.ts"), "utf8");
+  const SAVED = readFileSync(resolve(ROOT, "src/lib/aiDoctorSessionsSavedViewsRules.ts"), "utf8");
   const ALL = `${TSX}\n${FILTERS}\n${SAVED}`;
 
   it("no DB writes in lib files", () => {

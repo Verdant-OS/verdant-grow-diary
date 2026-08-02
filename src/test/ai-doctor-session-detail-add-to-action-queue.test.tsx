@@ -28,10 +28,7 @@ const GROW_ID = "grow-1";
 const TENT_ID = "tent-1";
 const PLANT_ID = "plant-1";
 
-function makeDiagnosis(opts?: {
-  approvalRequired?: boolean;
-  detail?: string;
-}): Diagnosis {
+function makeDiagnosis(opts?: { approvalRequired?: boolean; detail?: string }): Diagnosis {
   return {
     summary: "Mild stress observed.",
     likelyIssue: "Heat stress",
@@ -93,7 +90,15 @@ vi.mock("@/integrations/supabase/client", () => {
   const sessionsBuilder = () => ({
     select: () => ({
       eq: (_col: string, value: string) => ({
-        order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+        order: () => ({
+          limit: () => {
+            const __c: any = {
+              abortSignal: () => __c,
+              then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+            };
+            return __c;
+          },
+        }),
         maybeSingle: () =>
           Promise.resolve(
             value === currentFixture.id
@@ -108,11 +113,23 @@ vi.mock("@/integrations/supabase/client", () => {
     select: () => ({
       in: () => ({
         order: () => ({
-          limit: () => Promise.resolve({ data: [], error: null }),
+          limit: () => {
+            const c: any = {
+              abortSignal: () => c,
+              then: (r: any) => Promise.resolve({ data: [], error: null }).then(r),
+            };
+            return c;
+          },
         }),
       }),
       order: () => ({
-        limit: () => Promise.resolve({ data: [], error: null }),
+        limit: () => {
+          const c: any = {
+            abortSignal: () => c,
+            then: (r: any) => Promise.resolve({ data: [], error: null }).then(r),
+          };
+          return c;
+        },
       }),
     }),
     insert: () => Promise.resolve({ data: null, error: null }),
@@ -134,15 +151,20 @@ vi.mock("@/integrations/supabase/client", () => {
         filters[`like_${col}`] = value;
         return chain;
       },
-      limit: () =>
-        Promise.resolve({ data: actionQueueProbeRows, error: null }),
+      limit: () => {
+        const __c: any = {
+          abortSignal: () => __c,
+          then: (r: any, j?: any) =>
+            Promise.resolve({ data: actionQueueProbeRows, error: null }).then(r, j),
+        };
+        return __c;
+      },
       insert: (payload: Record<string, unknown>) => {
         actionQueueInsertCalls.push(payload);
         if (nextActionQueueInsertError) {
           return {
             select: () => ({
-              single: () =>
-                Promise.resolve({ data: null, error: nextActionQueueInsertError }),
+              single: () => Promise.resolve({ data: null, error: nextActionQueueInsertError }),
             }),
           };
         }
@@ -212,10 +234,7 @@ function renderDetail() {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[`/doctor/sessions/${SESSION_ID}`]}>
         <Routes>
-          <Route
-            path="/doctor/sessions/:sessionId"
-            element={<AiDoctorSessionDetail />}
-          />
+          <Route path="/doctor/sessions/:sessionId" element={<AiDoctorSessionDetail />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -234,13 +253,10 @@ beforeEach(() => {
 describe("AiDoctorSessionDetail — Add to Action Queue button", () => {
   it("renders 'Add to Action Queue' for an eligible suggestion", async () => {
     renderDetail();
-    const btn = await screen.findByTestId(
-      "ai-doctor-session-detail-add-to-action-queue-button",
-    );
+    const btn = await screen.findByTestId("ai-doctor-session-detail-add-to-action-queue-button");
     expect(btn.textContent).toContain("Add to Action Queue");
     expect(
-      screen.getByTestId("ai-doctor-session-detail-add-to-action-queue-helper")
-        .textContent,
+      screen.getByTestId("ai-doctor-session-detail-add-to-action-queue-helper").textContent,
     ).toMatch(/approval-required/i);
   });
 
@@ -258,16 +274,12 @@ describe("AiDoctorSessionDetail — Add to Action Queue button", () => {
     };
     renderDetail();
     await screen.findByTestId("ai-doctor-session-detail-review-action");
-    expect(
-      screen.queryByTestId("ai-doctor-session-detail-add-to-action-queue-button"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-session-detail-add-to-action-queue-button")).toBeNull();
   });
 
   it("click inserts exactly one pending_approval ai_doctor action and shows success label", async () => {
     renderDetail();
-    const btn = await screen.findByTestId(
-      "ai-doctor-session-detail-add-to-action-queue-button",
-    );
+    const btn = await screen.findByTestId("ai-doctor-session-detail-add-to-action-queue-button");
     await act(async () => {
       fireEvent.click(btn);
     });
@@ -277,16 +289,12 @@ describe("AiDoctorSessionDetail — Add to Action Queue button", () => {
     expect(payload.status).toBe("pending_approval");
     expect("user_id" in payload).toBe(false);
     expect("target_device" in payload).toBe(false);
-    await waitFor(() =>
-      expect(btn.textContent).toContain("Added to Action Queue"),
-    );
+    await waitFor(() => expect(btn.textContent).toContain("Added to Action Queue"));
   });
 
   it("shows a link to the created action after a successful insert", async () => {
     renderDetail();
-    const btn = await screen.findByTestId(
-      "ai-doctor-session-detail-add-to-action-queue-button",
-    );
+    const btn = await screen.findByTestId("ai-doctor-session-detail-add-to-action-queue-button");
     await act(async () => {
       fireEvent.click(btn);
     });
@@ -300,13 +308,12 @@ describe("AiDoctorSessionDetail — Add to Action Queue button", () => {
   it("shows 'Adding…' while the insert is in flight", async () => {
     // Make the probe return after a tick so we can observe loading state.
     renderDetail();
-    const btn = await screen.findByTestId(
-      "ai-doctor-session-detail-add-to-action-queue-button",
-    );
+    const btn = await screen.findByTestId("ai-doctor-session-detail-add-to-action-queue-button");
     fireEvent.click(btn);
     await waitFor(() =>
       expect(
-        screen.getByTestId("ai-doctor-session-detail-add-to-action-queue")
+        screen
+          .getByTestId("ai-doctor-session-detail-add-to-action-queue")
           .getAttribute("data-state"),
       ).toMatch(/loading|inserted/),
     );
@@ -324,19 +331,13 @@ describe("AiDoctorSessionDetail — Add to Action Queue button", () => {
       },
     ];
     renderDetail();
-    const btn = await screen.findByTestId(
-      "ai-doctor-session-detail-add-to-action-queue-button",
-    );
+    const btn = await screen.findByTestId("ai-doctor-session-detail-add-to-action-queue-button");
     await act(async () => {
       fireEvent.click(btn);
     });
-    await waitFor(() =>
-      expect(btn.textContent).toContain("Already in Action Queue"),
-    );
+    await waitFor(() => expect(btn.textContent).toContain("Already in Action Queue"));
     expect(actionQueueInsertCalls.length).toBe(0);
-    const link = screen.getByTestId(
-      "ai-doctor-session-detail-add-to-action-queue-link",
-    );
+    const link = screen.getByTestId("ai-doctor-session-detail-add-to-action-queue-link");
     expect(link.getAttribute("data-action-queue-id")).toBe("aq-existing-7");
   });
 
@@ -345,49 +346,37 @@ describe("AiDoctorSessionDetail — Add to Action Queue button", () => {
       message: "new row violates row-level security policy",
     };
     renderDetail();
-    const btn = await screen.findByTestId(
-      "ai-doctor-session-detail-add-to-action-queue-button",
-    );
+    const btn = await screen.findByTestId("ai-doctor-session-detail-add-to-action-queue-button");
     await act(async () => {
       fireEvent.click(btn);
     });
-    const err = await screen.findByTestId(
-      "ai-doctor-session-detail-add-to-action-queue-error",
-    );
+    const err = await screen.findByTestId("ai-doctor-session-detail-add-to-action-queue-error");
     expect(err.textContent ?? "").toMatch(/no equipment changes were made/i);
     expect(btn.textContent).toContain("Could not add");
   });
 
   it("UI never exposes raw [session:<id>] token", async () => {
     renderDetail();
-    const btn = await screen.findByTestId(
-      "ai-doctor-session-detail-add-to-action-queue-button",
-    );
+    const btn = await screen.findByTestId("ai-doctor-session-detail-add-to-action-queue-button");
     await act(async () => {
       fireEvent.click(btn);
     });
     await waitFor(() => expect(actionQueueInsertCalls.length).toBe(1));
-    const root = screen.getByTestId(
-      "ai-doctor-session-detail-add-to-action-queue",
-    );
+    const root = screen.getByTestId("ai-doctor-session-detail-add-to-action-queue");
     expect(root.textContent ?? "").not.toContain(`[session:${SESSION_ID}]`);
     expect(root.textContent ?? "").not.toContain(SESSION_ID);
   });
 
   it("UI does not mention target_device anywhere", async () => {
     renderDetail();
-    const root = await screen.findByTestId(
-      "ai-doctor-session-detail-add-to-action-queue",
-    );
+    const root = await screen.findByTestId("ai-doctor-session-detail-add-to-action-queue");
     expect((root.textContent ?? "").toLowerCase()).not.toContain("target_device");
     expect((root.textContent ?? "").toLowerCase()).not.toContain("device");
   });
 
   it("never calls update / upsert / delete / rpc / functions.invoke during click", async () => {
     renderDetail();
-    const btn = await screen.findByTestId(
-      "ai-doctor-session-detail-add-to-action-queue-button",
-    );
+    const btn = await screen.findByTestId("ai-doctor-session-detail-add-to-action-queue-button");
     await act(async () => {
       fireEvent.click(btn);
     });
@@ -406,10 +395,7 @@ const COMPONENT = readFileSync(
   resolve(ROOT, "src/components/AiDoctorSessionActionQueueButton.tsx"),
   "utf8",
 );
-const PAGE = readFileSync(
-  resolve(ROOT, "src/pages/AiDoctorSessionDetail.tsx"),
-  "utf8",
-);
+const PAGE = readFileSync(resolve(ROOT, "src/pages/AiDoctorSessionDetail.tsx"), "utf8");
 
 describe("AiDoctorSessionActionQueueButton — safety scan", () => {
   it("component does not embed direct DB writes (delegates to the mutation hook)", () => {

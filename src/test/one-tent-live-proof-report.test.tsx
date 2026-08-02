@@ -117,9 +117,7 @@ describe("missing-evidence breakdown (view-model)", () => {
   });
   it("step 6 needs-confirmation when no timeline back-pointer", () => {
     const vm = buildOneTentLiveProofViewModel(CTX, EMPTY_SIGNALS);
-    expect(vm.steps[5].missingEvidence).toMatch(
-      /needs operator confirmation/i,
-    );
+    expect(vm.steps[5].missingEvidence).toMatch(/needs operator confirmation/i);
     expect(vm.steps[5].missingEvidence).toMatch(/timeline back-pointer/i);
   });
   it("complete steps have no missing-evidence", () => {
@@ -164,12 +162,8 @@ describe("shortcutLinks (view-model)", () => {
   });
   it("alert + action fall back to grow-scoped when ids missing", () => {
     const vm = buildOneTentLiveProofViewModel(CTX, EMPTY_SIGNALS);
-    expect(vm.shortcutLinks.find((l) => l.id === "alert")!.href).toBe(
-      "/alerts?growId=grow-1",
-    );
-    expect(vm.shortcutLinks.find((l) => l.id === "action")!.href).toBe(
-      "/actions?growId=grow-1",
-    );
+    expect(vm.shortcutLinks.find((l) => l.id === "alert")!.href).toBe("/alerts?growId=grow-1");
+    expect(vm.shortcutLinks.find((l) => l.id === "action")!.href).toBe("/actions?growId=grow-1");
   });
   it("timeline shortcut uses grow-scoped fallback (no row anchor)", () => {
     const vm = buildOneTentLiveProofViewModel(CTX, FULL_SIGNALS);
@@ -279,7 +273,13 @@ vi.mock("@/integrations/supabase/client", () => ({
       select: () => ({
         eq: () => ({
           order: () => ({
-            limit: () => Promise.resolve({ data: [], error: null }),
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+              };
+              return __c;
+            },
           }),
         }),
       }),
@@ -305,9 +305,7 @@ describe("OneTentLiveProof page — refresh sections, shortcuts, print, copy", (
     renderPage();
     fireEvent.click(screen.getByTestId("one-tent-live-proof-refresh"));
     const el = screen.getByTestId("one-tent-live-proof-refresh-sections");
-    expect(el.textContent ?? "").toMatch(
-      /snapshots.*alerts.*actions.*timeline/i,
-    );
+    expect(el.textContent ?? "").toMatch(/snapshots.*alerts.*actions.*timeline/i);
   });
   it("renders shortcut buttons with safe fallback hrefs", () => {
     renderPage();
@@ -349,18 +347,14 @@ describe("OneTentLiveProof page — refresh sections, shortcuts, print, copy", (
   });
   it("renders Copy proof summary button", () => {
     renderPage();
-    expect(
-      screen.getByTestId("one-tent-live-proof-copy-summary"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("one-tent-live-proof-copy-summary")).toBeInTheDocument();
   });
   it("renders the printable report section with checklist statuses", () => {
     renderPage();
     const report = screen.getByTestId("one-tent-live-proof-report");
     expect(report.textContent ?? "").toMatch(/One-Tent Live Proof Report/);
     for (const id of [1, 2, 3, 4, 5, 6]) {
-      expect(
-        screen.getByTestId(`one-tent-live-proof-report-step-${id}`),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId(`one-tent-live-proof-report-step-${id}`)).toBeInTheDocument();
     }
   });
   it("missing evidence is rendered for incomplete checklist steps", () => {

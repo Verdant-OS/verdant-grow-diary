@@ -39,6 +39,27 @@ const EXPECTED_STATUS_VOCABULARY = [
   "NOT_APPLICABLE",
 ];
 
+function collectPlainStatusValues(
+  value: unknown,
+  path = "$",
+): Array<{ path: string; value: unknown }> {
+  if (Array.isArray(value)) {
+    return value.flatMap((entry, index) => collectPlainStatusValues(entry, `${path}[${index}]`));
+  }
+
+  if (value === null || typeof value !== "object") {
+    return [];
+  }
+
+  return Object.entries(value as Record<string, unknown>).flatMap(([key, entry]) => {
+    const entryPath = `${path}.${key}`;
+    return [
+      ...(key === "status" ? [{ path: entryPath, value: entry }] : []),
+      ...collectPlainStatusValues(entry, entryPath),
+    ];
+  });
+}
+
 describe("SEO readiness status artifact", () => {
   it("keeps the exact canonical blocked-mode contract and defect verdict", () => {
     expect(READINESS).toMatchObject({
@@ -46,8 +67,8 @@ describe("SEO readiness status artifact", () => {
       scope: "LIGHTING_LAUNCH_MEASUREMENT",
       generated_at_semantics: "EVIDENCE_SNAPSHOT_CAPTURE_TIME",
       artifact_revision: {
-        revised_at: "2026-08-02T03:32:24.018Z",
-        revision_scope: "PROVENANCE_AND_MEASUREMENT_CONTRACT_METADATA_ONLY",
+        revised_at: "2026-08-02T04:36:17.280Z",
+        revision_scope: "STATUS_TAXONOMY_AND_MEASUREMENT_CONTRACT_METADATA_ONLY",
         production_or_analytics_reverification_performed: false,
       },
       timezone: "America/Chicago",
@@ -75,6 +96,17 @@ describe("SEO readiness status artifact", () => {
     expect(String(READINESS.generated_at)).toMatch(/Z$/);
     expect(String(READINESS.generated_at_chicago)).toMatch(/-05:00$/);
     expect(RAW_ARTIFACT).toBe(`${JSON.stringify(READINESS, null, 2)}\n`);
+  });
+
+  it("keeps every generic status field inside the declared vocabulary", () => {
+    expect(READINESS.status_vocabulary_scope).toBe(
+      "Every object member named exactly status uses status_vocabulary. Lifecycle detail is carried in lifecycle_state; domain-specific *_status fields document their own value sets.",
+    );
+
+    const declaredStatuses = new Set(EXPECTED_STATUS_VOCABULARY);
+    for (const { path, value } of collectPlainStatusValues(READINESS)) {
+      expect(declaredStatuses, path).toContain(value);
+    }
   });
 
   it("separates the point-in-time evidence head from the audited deploy release", () => {
@@ -320,41 +352,48 @@ describe("SEO readiness status artifact", () => {
         expect.objectContaining({
           id: "GSC_REGRESSION_NO_BASELINE_SEMANTICS",
           priority: "P3",
-          status: "FIXED_AND_POST_MERGE_VERIFIED",
+          status: "PASS",
+          lifecycle_state: "FIXED_AND_POST_MERGE_VERIFIED",
         }),
         expect.objectContaining({
           id: "LIGHTING_DUPLICATE_HYDRATED_JSON_LD",
           priority: "P1",
-          status: "FIXED_AND_PRODUCTION_VERIFIED",
+          status: "PASS",
+          lifecycle_state: "FIXED_AND_PRODUCTION_VERIFIED",
         }),
         expect.objectContaining({
           id: "GA4_ENHANCED_MEASUREMENT_DUPLICATE_PAGE_VIEWS",
           priority: "P0",
-          status: "VERIFIED_UNFIXED_OWNER_ACTION_REQUIRED",
+          status: "BLOCKED",
+          lifecycle_state: "VERIFIED_UNFIXED_OWNER_ACTION_REQUIRED",
         }),
         expect.objectContaining({
           id: "STALE_SEO_READINESS_EVIDENCE",
           priority: "P3",
-          status: "FIXED_AND_LOCAL_VERIFIED",
+          status: "PASS",
+          lifecycle_state: "FIXED_AND_LOCAL_VERIFIED",
         }),
         expect.objectContaining({
           id: "READINESS_ARTIFACT_PROVENANCE",
           priority: "P3",
-          status: "FIXED_AND_LOCAL_VERIFIED",
+          status: "PASS",
+          lifecycle_state: "FIXED_AND_LOCAL_VERIFIED",
         }),
       ]),
     );
     expect(READINESS.current_slice).toEqual({
       priority: "P2",
       id: "LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT",
-      status: "DOCUMENTED_MISSING_NO_EVENT_ADDED",
+      status: "NOT_MEASURED",
+      lifecycle_state: "DOCUMENTED_MISSING_NO_EVENT_ADDED",
       evidence:
         "The two lighting-guide CTAs resolve to /quick-log without a guide-specific click event. Their event classification is MISSING and their metric readiness status is NOT_MEASURED, so downstream activity is not used as attribution.",
     });
     expect(READINESS.next_slice).toEqual({
       priority: "P0",
       id: "GA4_ENHANCED_MEASUREMENT_HISTORY_PAGE_VIEWS",
-      status: "BLOCKED_BY_OWNER_ACCESS",
+      status: "BLOCKED",
+      lifecycle_state: "BLOCKED_BY_OWNER_ACCESS",
     });
     expect(RAW_ARTIFACT).not.toContain("PENDING_MERGE");
   });

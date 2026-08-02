@@ -67,14 +67,16 @@ describe("lighting-guide CTA measurement contract", () => {
     for (const page of BASELINE.pages) {
       expect(page.ga4).toMatchObject({
         cta_clicks: null,
-        cta_clicks_status: "missing_not_implemented",
+        cta_clicks_status: "NOT_MEASURED",
         cta_click_event_name: null,
         cta_click_destination: "/quick-log",
       });
     }
 
     expect(BASELINE.ga4_access.guide_cta_click_measurement).toMatchObject({
-      status: "missing_not_implemented",
+      status: "NOT_MEASURED",
+      classification: "MISSING",
+      reason_code: "MISSING_NOT_IMPLEMENTED",
       event_name: null,
       destination: "/quick-log",
       day_0_blocking: false,

@@ -72,7 +72,7 @@
         "average_engagement_time": null,
         "entrances": null,
         "cta_clicks": null,
-        "cta_clicks_status": "missing_not_implemented",
+        "cta_clicks_status": "NOT_MEASURED",
         "cta_click_event_name": null,
         "cta_click_destination": "/quick-log",
         "signup_starts": null,
@@ -122,7 +122,7 @@
         "average_engagement_time": null,
         "entrances": null,
         "cta_clicks": null,
-        "cta_clicks_status": "missing_not_implemented",
+        "cta_clicks_status": "NOT_MEASURED",
         "cta_click_event_name": null,
         "cta_click_destination": "/quick-log",
         "signup_starts": null,
@@ -169,7 +169,9 @@
     "per_page_measurement_defect": "Enhanced Measurement emitted automatic page_view events without Verdant's explicit page_path alongside Verdant's exact SPA events on five SPA/history transitions.",
     "repair_status": "owner_enhanced_measurement_review_required",
     "guide_cta_click_measurement": {
-      "status": "missing_not_implemented",
+      "status": "NOT_MEASURED",
+      "classification": "MISSING",
+      "reason_code": "MISSING_NOT_IMPLEMENTED",
       "event_name": null,
       "destination": "/quick-log",
       "not_inferred_from": [

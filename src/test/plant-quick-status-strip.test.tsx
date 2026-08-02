@@ -10,7 +10,7 @@ import { resolve } from "node:path";
 import React from "react";
 import { render, screen } from "@testing-library/react";
 
-vi.mock("react-router-dom", () => ({
+vi.mock("@/lib/react-router-compat", () => ({
   Link: ({
     to,
     children,

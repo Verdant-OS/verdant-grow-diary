@@ -42,7 +42,7 @@ import { buildActionResponseMemoryCardViewModel } from "@/lib/actionResponseMemo
 import { useActionResponseMemory } from "@/hooks/useActionResponseMemory";
 import ActionResponseMemoryCard from "@/components/ActionResponseMemoryCard";
 import { Button } from "@/components/ui/button";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "@/lib/react-router-compat";
 import {
   SENSOR_PLANT_PARAM,
   SENSOR_SOURCES_PARAM,
@@ -1397,7 +1397,7 @@ export default function Timeline() {
             placeholder={TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER}
             aria-label={TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER}
             data-testid="timeline-search-input"
-            className="flex-1 min-w-[12rem] rounded-md border border-border/50 bg-background/60 px-3 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="flex-1 min-w-[12rem] rounded-md border border-border/50 bg-background/60 px-3 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/40"
           />
           {plantOptions.length > 0 && (
             <select
@@ -1918,7 +1918,7 @@ export default function Timeline() {
                       className={cn(
                         "glass rounded-2xl overflow-hidden animate-fade-in",
                         isHighlighted &&
-                          "ring-2 ring-primary ring-offset-2 ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                          "ring-2 ring-primary ring-offset-2 ring-offset-background focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary",
                       )}
                     >
                       {linkedGrowEventAnchorId && linkedGrowEventAnchorId !== primaryAnchorId ? (
@@ -1946,7 +1946,7 @@ export default function Timeline() {
                                 }}
                                 aria-label={`Open photo: ${alt}`}
                                 data-testid="timeline-photo-open"
-                                className="block w-full focus:outline-none focus:ring-2 focus:ring-primary/60"
+                                className="block w-full focus:outline-hidden focus:ring-2 focus:ring-primary/60"
                               >
                                 <img
                                   src={e.photo_url}
@@ -1972,7 +1972,7 @@ export default function Timeline() {
                         </div>
                       )}
                       <div
-                        className="p-4 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        className="p-4 cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-primary/40"
                         role="button"
                         tabIndex={0}
                         data-testid="timeline-entry-body"
@@ -2159,7 +2159,7 @@ export default function Timeline() {
                                     <Link
                                       to={actionDetailPath(loopActionId)}
                                       data-testid="timeline-view-original-action"
-                                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                                       onClick={(ev) => ev.stopPropagation()}
                                     >
                                       <ListChecks className="h-3 w-3" aria-hidden />
@@ -2170,7 +2170,7 @@ export default function Timeline() {
                                     <Link
                                       to={growLearningPath(loopGrowId)}
                                       data-testid="timeline-view-learning-episode"
-                                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                                       onClick={(ev) => ev.stopPropagation()}
                                     >
                                       View full learning episode
@@ -2198,7 +2198,7 @@ export default function Timeline() {
                                         to={viewLink.href}
                                         data-testid={VIEW_IN_ACTIONS_TESTID}
                                         data-view-in-actions-highlight={viewLink.highlight}
-                                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                                         onClick={(ev) => ev.stopPropagation()}
                                       >
                                         <ListChecks className="h-3 w-3" aria-hidden />

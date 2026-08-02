@@ -5,7 +5,7 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import OneTentProofRecord from "@/pages/OneTentProofRecord";
 import { ALLOWED_SOURCE_LABELS } from "@/lib/oneTentProofRecordExportRules";
 

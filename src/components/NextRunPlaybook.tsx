@@ -3,7 +3,7 @@
  * learning decisions. No automatic promotion (improved→repeat,
  * worsened→avoid never happens here — see nextRunPlaybookRules.ts).
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Badge } from "@/components/ui/badge";
 import { actionDetailPath } from "@/lib/routes";
 import {

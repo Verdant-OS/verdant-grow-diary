@@ -17,7 +17,7 @@
  * remain QuickLog note text only. CO2 is context-only.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "@/lib/react-router-compat";
 import {
   AlertTriangle,
   ArrowLeft,

@@ -8,7 +8,7 @@
  * Mirrors docs/one-tent-loop-smoke-test.md.
  */
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 
 interface ChecklistItem {
   label: string;

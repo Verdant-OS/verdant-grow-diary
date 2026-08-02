@@ -13,7 +13,7 @@
  */
 
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ClipboardCheck } from "lucide-react";
 import SensorSourceBadge from "@/components/sensor/SensorSourceBadge";
 import { actionDetailPath } from "@/lib/routes";
@@ -134,7 +134,7 @@ export default function ActionResponseMemoryCard({
         <Link
           to={actionDetailPath(viewModel.actionId)}
           data-testid="action-response-memory-view-action"
-          className="inline-flex items-center min-h-11 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+          className="inline-flex items-center min-h-11 text-xs text-primary hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
         >
           {ACTION_RESPONSE_VIEW_ACTION_LABEL} →
         </Link>

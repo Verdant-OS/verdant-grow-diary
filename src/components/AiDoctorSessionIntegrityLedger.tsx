@@ -13,7 +13,7 @@
  *     `aiDoctorSessionLedgerViewModel.ts`; this component only renders it.
  */
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ShieldCheck, Copy, Check, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -71,7 +71,7 @@ function IdChip({
       </code>
       <button
         type="button"
-        className="inline-flex items-center rounded p-0.5 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="inline-flex items-center rounded p-0.5 text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
         onClick={() => onCopy(id)}
         data-testid={`${testIdPrefix}-copy`}
         aria-label={`Copy ${testIdPrefix.replace(/-/g, " ")}`}
@@ -244,7 +244,7 @@ export default function AiDoctorSessionIntegrityLedger() {
             }}
             disabled={isRefetching}
             data-testid="ai-doctor-session-integrity-ledger-error-retry"
-            className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
           >
             {isRefetching ? "Retrying…" : "Retry"}
           </Button>
@@ -328,7 +328,7 @@ export default function AiDoctorSessionIntegrityLedger() {
                       <TableCell className="text-right align-top">
                         <Link
                           to={`/doctor/sessions/${entry.id}`}
-                          className="text-primary underline text-xs rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="text-primary underline text-xs rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                           data-testid="ai-doctor-session-integrity-ledger-view-link"
                         >
                           View session
@@ -406,7 +406,7 @@ export default function AiDoctorSessionIntegrityLedger() {
                 <EvidenceBadge evidence={entry.evidence} />
                 <Link
                   to={`/doctor/sessions/${entry.id}`}
-                  className="text-primary underline text-xs rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="text-primary underline text-xs rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                   data-testid="ai-doctor-session-integrity-ledger-card-view-link"
                 >
                   View session

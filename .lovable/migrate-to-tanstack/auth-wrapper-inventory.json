@@ -1,0 +1,89 @@
+{
+  "generatedAt": "step-5-part-1",
+  "source": "/tmp/migrate-to-tanstack/App.tsx.bak (580 lines, 114 route entries)",
+  "wrappers": [
+    {
+      "name": "AppShell",
+      "file": "src/components/AppShell.tsx",
+      "kind": "authenticated layout route",
+      "mechanism": "useRequireAuth() + server session revalidation, renders <Outlet />",
+      "usage": "layout <Route element={<AppShell />}> wrapping 60 authenticated routes",
+      "tanstackTarget": "src/routes/_app.tsx (pathless layout route)",
+      "routes": [
+        "/onboarding", "/start-room", "/dashboard", "/grow-room", "/daily-check",
+        "/tents", "/tents/:id", "/plants", "/plants/:id", "/sensors", "/timeline",
+        "/logs", "/tasks", "/alerts", "/alerts/:alertId", "/doctor", "/ai-doctor",
+        "/doctor/sessions", "/doctor/sessions/:sessionId", "/actions",
+        "/actions/:actionId", "/action-queue", "/grow-lineage", "/genetics",
+        "/genetics/accessions/:id", "/genetics/batches/:id",
+        "/genetics/trace/:kind/:id", "/genetics/health/:kind/:id", "/grows",
+        "/grows/:growId", "/grows/:growId/learning", "/pheno-hunts",
+        "/pheno-hunts/new", "/pheno-hunts/:id/workspace", "/pheno-hunts/:id/keepers",
+        "/breeding", "/breeding/new", "/breeding/log/new", "/breeding/:programId",
+        "/reports", "/reports/diary-range", "/reports/post-grow/:growId",
+        "/diary/environment-summary", "/diary/pheno-expression-comparison",
+        "/diary/strains/:slug", "/settings", "/settings/agent-integrations",
+        "/account/preferences", "/invite", "/health"
+      ]
+    },
+    {
+      "name": "RequireOperatorRole",
+      "file": "src/components/RequireOperatorRole.tsx",
+      "kind": "role guard layout route (nested inside AppShell)",
+      "mechanism": "server-side has_role('operator'); renders <Outlet /> or access-restricted state",
+      "usage": "layout <Route element={<RequireOperatorRole />}> nested inside the AppShell layout route",
+      "tanstackTarget": "src/routes/_app/_operator.tsx (pathless layout route nested under _app)",
+      "routes": [
+        "/demo/one-tent-live-proof", "/operator/ecowitt", "/operator/ai-doctor-phase1",
+        "/operator/paddle-processing-audit", "/operator/billing-subscription-updates",
+        "/operator/billing-entitlement-resolution", "/operator/subscriber-growth",
+        "/operator/one-tent-proof-record", "/operator/one-tent-live-proof",
+        "/operator/ecowitt-bridge-status", "/operator/ecowitt-bridge-debug",
+        "/operator/ecowitt-live-bringup", "/operator/ecowitt-tent-preview",
+        "/operator/one-tent-loop-smoke-test", "/operator/post-grow-reflection-dry-run",
+        "/operator/demo-preview", "/operator/support-inbox", "/operator/credits-audit",
+        "/operator/edge-metrics", "/operator/edge-alerts", "/operator/schema-audit",
+        "/operator/mode", "/operator/release-readiness", "/diagnostics",
+        "/pi-ingest-status", "/ingest-inspector", "/internal/ai-doctor-phase1-preview",
+        "/internal/one-tent-loop-proof", "/one-tent-loop-proof",
+        "/internal/sensor-truth-audit", "/internal/ai-doctor-confidence-audit",
+        "/admin/leads", "/leads", "/sensors/ecowitt-audit", "/sensors/ingest-normalizer"
+      ]
+    },
+    {
+      "name": "PhenoTrackerUpgradeGate",
+      "file": "src/components/PhenoTrackerUpgradeGate.tsx",
+      "kind": "entitlement guard, JSX-children wrapper (not a layout route)",
+      "mechanism": "entitlement check; renders upgrade card for Free/expired users",
+      "usage": "element={<PhenoTrackerUpgradeGate><Page /></PhenoTrackerUpgradeGate>}",
+      "tanstackTarget": "keep as a JSX wrapper inside each generated route component",
+      "routes": [
+        "/pheno-hunts",
+        "/pheno-hunts/new",
+        "/pheno-hunts/:id/workspace",
+        "/pheno-hunts/:id/keepers",
+        "/diary/strains/:slug"
+      ]
+    },
+    {
+      "name": "AgreementReconsentGate",
+      "file": "src/components/AgreementReconsentGate.tsx",
+      "kind": "global gate rendered as a sibling above <Routes>",
+      "mechanism": "blocks the app until required agreements are re-consented",
+      "usage": "rendered inside GrowsProvider, above <Routes>",
+      "tanstackTarget": "__root.tsx, rendered above <Outlet />"
+    },
+    {
+      "name": "OAuthPostAuthRedirect",
+      "file": "src/components/OAuthPostAuthRedirect.tsx",
+      "kind": "global post-auth navigation side effect",
+      "mechanism": "navigates to the stored intended path once a session hydrates",
+      "usage": "rendered inside AuthProvider, above GrowsProvider",
+      "tanstackTarget": "__root.tsx, rendered above <Outlet />"
+    }
+  ],
+  "notes": [
+    "Ungated-by-design public routes that read private data via RLS only: /pheno-hunts/:id/compare, /pheno-hunts/:id/showcase, /pheno-comparison. Historical diary records are intentionally never hidden as a billing punishment — do not add an entitlement gate to these during the migration.",
+    "Server-side enforcement backs both guards (has_role('operator') RLS, has_pheno_tracker_entitlement RLS + candidate-number trigger). The client wrappers are presentation-only and must be preserved, not relied on."
+  ]
+}

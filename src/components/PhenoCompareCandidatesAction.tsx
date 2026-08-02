@@ -9,7 +9,7 @@
  * keyboard and screen-reader users understand why — never hover-only.
  */
 import { useId } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import {
   PHENO_COMPARISON_HELP_COPY,

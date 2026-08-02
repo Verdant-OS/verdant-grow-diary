@@ -8,7 +8,7 @@
 
 /** Focus-visible ring used by every Phase 1 navigation link/CTA. */
 export const AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+  "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
 /** Thumb-friendly minimum height for navigation links/CTAs. */
 export const AI_DOCTOR_PHASE1_TOUCH_TARGET_CLASSES = "min-h-10";

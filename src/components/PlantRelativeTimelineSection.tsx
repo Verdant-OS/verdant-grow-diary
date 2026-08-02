@@ -7,7 +7,7 @@
  * control. No reminder scheduling. No calendar event tables.
  */
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Camera, Gauge, ImageUp, NotebookPen, Sprout } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -467,7 +467,7 @@ export default function PlantRelativeTimelineSection({
                     data-count={chip.count}
                     onClick={() => setFilter(chip.key)}
                     className={cn(
-                      "shrink-0 inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border transition-colors min-h-[32px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                      "shrink-0 inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border transition-colors min-h-[32px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
                       chip.selected
                         ? "bg-primary text-primary-foreground border-primary"
                         : isMuted

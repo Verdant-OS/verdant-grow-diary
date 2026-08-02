@@ -15,7 +15,7 @@
  *  - never reads tokens or secrets.
  *  - never logs the user object.
  */
-import { Outlet } from "react-router-dom";
+import { Outlet } from "@/lib/react-router-compat";
 import { ShieldAlert } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useHasRole } from "@/hooks/useHasRole";

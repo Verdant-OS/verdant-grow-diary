@@ -14,7 +14,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { MemoryRouter, Routes, Route } from "@/lib/react-router-compat";
 import AiDoctorPhase1Preview from "@/pages/AiDoctorPhase1Preview";
 import { AI_DOCTOR_PHASE1_PREVIEW_CASES } from "@/lib/aiDoctorPhase1PreviewFixtures";
 

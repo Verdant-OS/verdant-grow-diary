@@ -1,5 +1,5 @@
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "@/lib/react-router-compat";
 import { AlertTriangle, Box, Lightbulb, LoaderCircle } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";

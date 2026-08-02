@@ -8,7 +8,7 @@
  *  - Treats shareId as opaque, normalized only for URL safety.
  */
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import {
   buildCustomerSharePreview,
   CUSTOMER_SHARE_LINK_PREVIEW_DISCLAIMER,
@@ -66,7 +66,7 @@ export default function CustomerShareLinkPreview({
         placeholder="Enter an opaque share id"
         autoComplete="off"
         spellCheck={false}
-        className="mt-1 w-full rounded-md border border-border bg-background px-3 min-h-11 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="mt-1 w-full rounded-md border border-border bg-background px-3 min-h-11 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
       />
 
       <div className="mt-4 flex flex-col gap-2">
@@ -80,7 +80,7 @@ export default function CustomerShareLinkPreview({
           <Link
             to={preview.path}
             data-testid="customer-share-link-preview-open"
-            className="inline-flex items-center justify-center rounded-md border border-border/60 bg-secondary/40 px-4 min-h-11 text-sm font-medium hover:bg-secondary/70 active:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex items-center justify-center rounded-md border border-border/60 bg-secondary/40 px-4 min-h-11 text-sm font-medium hover:bg-secondary/70 active:bg-secondary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
           >
             Open preview
           </Link>

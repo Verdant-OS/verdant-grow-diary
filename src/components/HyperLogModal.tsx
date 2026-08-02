@@ -778,7 +778,7 @@ function DemoInput({
       value={value}
       placeholder={placeholder}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-lg bg-[#0d0d0d] border border-white/[0.08] px-3 py-2 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-[#00C853]/60 font-mono"
+      className="w-full rounded-lg bg-[#0d0d0d] border border-white/[0.08] px-3 py-2 text-xs text-white placeholder:text-white/30 focus:outline-hidden focus:border-[#00C853]/60 font-mono"
     />
   );
 }
@@ -798,7 +798,7 @@ function DemoSelect({
       {...rest}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-lg bg-[#0d0d0d] border border-white/[0.08] px-3 py-2 text-xs text-white focus:outline-none focus:border-[#00C853]/60 font-mono"
+      className="w-full rounded-lg bg-[#0d0d0d] border border-white/[0.08] px-3 py-2 text-xs text-white focus:outline-hidden focus:border-[#00C853]/60 font-mono"
     >
       {options.map((o) => (
         <option key={o} value={o} className="bg-[#0d0d0d]">
@@ -826,7 +826,7 @@ function DemoTextarea({
       placeholder={placeholder}
       rows={minRows}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full resize-none rounded-lg bg-[#0d0d0d] border border-white/[0.08] px-3 py-2 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-[#00C853]/60 font-mono"
+      className="w-full resize-none rounded-lg bg-[#0d0d0d] border border-white/[0.08] px-3 py-2 text-xs text-white placeholder:text-white/30 focus:outline-hidden focus:border-[#00C853]/60 font-mono"
     />
   );
 }

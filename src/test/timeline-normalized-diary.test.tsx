@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render as rtlRender, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import DiaryEntryBadges from "@/components/DiaryEntryBadges";
 import { buildGrowDiaryTimeline } from "@/lib/growDiaryTimelineRules";
 

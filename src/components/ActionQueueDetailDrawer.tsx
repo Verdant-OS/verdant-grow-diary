@@ -269,7 +269,7 @@ function ActionQueueDetailDrawerBody({
                   data-testid="action-queue-detail-drawer-diary-trace-link"
                   data-trace-highlight={link.highlight}
                   data-trace-kind={link.kind}
-                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                 >
                   <ExternalLink className="h-3 w-3" aria-hidden />
                   {link.label}
@@ -305,7 +305,7 @@ function ActionQueueDetailDrawerBody({
             href={sourceLink.href}
             data-testid="action-queue-detail-drawer-source-link"
             data-source-kind={sourceLink.kind}
-            className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
           >
             <ExternalLink className="h-3 w-3" aria-hidden />
             {sourceLink.label}

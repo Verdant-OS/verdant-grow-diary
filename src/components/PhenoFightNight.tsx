@@ -11,7 +11,7 @@
  * never picks for them. Presentational + local UI state only: no I/O, no writes.
  */
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import PhenoComparabilityBanner from "@/components/PhenoComparabilityBanner";
@@ -64,7 +64,7 @@ function SidePicker({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={cn(
-          "max-w-full cursor-pointer truncate rounded-md border border-border bg-card px-2 py-1 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring",
+          "max-w-full cursor-pointer truncate rounded-md border border-border bg-card px-2 py-1 text-sm font-semibold outline-hidden focus:ring-2 focus:ring-ring",
           accent,
         )}
       >

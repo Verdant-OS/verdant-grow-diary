@@ -8,7 +8,7 @@
  * Pure delegation to `buildLegacyBillingRedirect`.
  */
 
-import { Navigate, useParams, useSearchParams } from "react-router-dom";
+import { Navigate, useParams, useSearchParams } from "@/lib/react-router-compat";
 import { buildLegacyBillingRedirect } from "@/lib/legacyCheckoutRedirect";
 
 export default function LegacyBillingRedirect() {

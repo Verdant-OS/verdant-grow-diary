@@ -3,7 +3,7 @@
  * all copy/derivation comes from the queue view model; the row emits an
  * intent via onAction and never writes or automates anything.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { actionDetailPath } from "@/lib/routes";

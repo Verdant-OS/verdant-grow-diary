@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useInRouterContext, useLocation } from "react-router-dom";
+import { useInRouterContext, useLocation } from "@/lib/react-router-compat";
 
 import { PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
 

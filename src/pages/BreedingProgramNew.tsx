@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "@/lib/react-router-compat";
 import { ArrowLeft, Dna, Sparkles } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -200,7 +200,7 @@ export default function BreedingProgramNew() {
                 id="gen"
                 value={form.starting_generation}
                 onChange={(e) => set("starting_generation", e.target.value)}
-                className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2"
               >
                 {BREEDING_GENERATIONS.map((g) => (
                   <option key={g} value={g}>

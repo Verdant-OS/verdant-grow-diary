@@ -9,7 +9,7 @@
  * tool contracts change.
  */
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Check, Copy } from "lucide-react";
 import { toast } from "sonner";
 import BrandLogo from "@/components/BrandLogo";
@@ -51,7 +51,7 @@ function Code({ children, copyLabel }: { children: string; copyLabel?: string })
         onClick={onCopy}
         aria-label={copied ? "Copied" : (copyLabel ?? "Copy to clipboard")}
         data-testid="mcp-api-copy-button"
-        className="absolute top-2 right-2 inline-flex items-center gap-1 rounded-md border border-border bg-background/80 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+        className="absolute top-2 right-2 inline-flex items-center gap-1 rounded-md border border-border bg-background/80 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-background focus:outline-hidden focus:ring-2 focus:ring-ring"
       >
         {copied ? (
           <Check className="h-3.5 w-3.5" aria-hidden />

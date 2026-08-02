@@ -9,7 +9,7 @@
  * dismissal is wanted later).
  */
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { matchCultivarForStrain } from "@/lib/plantCultivarHint";
 
 interface Props {

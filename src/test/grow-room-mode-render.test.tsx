@@ -4,7 +4,7 @@
  */
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 const EMPTY_ALERTS: never[] = [];
 const TENT_ID = "tent-1";

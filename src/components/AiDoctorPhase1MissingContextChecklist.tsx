@@ -18,7 +18,7 @@
  * and only render when a safe plant-scoped route exists.
  */
 import * as React from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import type { AiDoctorContextPayload } from "@/lib/aiDoctorEnginePhase1Foundation";
 import { plantDetailPath } from "@/lib/routes";
 import { AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES } from "@/lib/aiDoctorPhase1A11yClassNames";

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Navigate, useNavigate, useSearchParams, Link } from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams, Link } from "@/lib/react-router-compat";
 import { ArrowLeft, Leaf, Gauge, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -508,7 +508,7 @@ export default function Auth() {
         <div className="mb-4">
           <Link
             to="/welcome"
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden /> Back to home
           </Link>
@@ -589,7 +589,7 @@ export default function Auth() {
                       // focus handled on next paint
                       window.setTimeout(() => forgotEmailRef.current?.focus(), 0);
                     }}
-                    className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                    className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded"
                   >
                     Forgot password?
                   </button>

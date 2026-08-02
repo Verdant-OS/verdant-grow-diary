@@ -6,7 +6,7 @@
  * Paddle reviewers and search engines discover the legal pages through
  * these links, so every public/app/customer footer renders this component.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 
 export const LEGAL_FOOTER_LINKS = [
   { to: "/terms", label: "Terms" },

@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import SensorsIngestNormalizer from "@/pages/SensorsIngestNormalizer";
 
 // Spy on Supabase client to ensure the page never invokes any write

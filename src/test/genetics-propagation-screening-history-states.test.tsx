@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { MemoryRouter, Routes, Route } from "@/lib/react-router-compat";
 import ScreeningQuarantineHistory from "@/pages/ScreeningQuarantineHistory";
 import { useSubjectScreening, useSubjectQuarantine } from "@/hooks/useGeneticsTrace";
 

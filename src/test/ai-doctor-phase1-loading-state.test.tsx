@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { AiDoctorPhase1LoadingState } from "@/components/AiDoctorPhase1LoadingState";
 import OperatorAiDoctorPhase1, {
   OPERATOR_AI_DOCTOR_PHASE1_ROUTE,

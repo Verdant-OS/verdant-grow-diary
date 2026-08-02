@@ -13,7 +13,7 @@
  *  - All aggregation lives in `src/lib/reportsHubViewModel.ts`.
  *  - Copy is observational. Never claims an action fixed an issue.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { LineChart, ArrowRight } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";

@@ -156,7 +156,7 @@ export default function SensorSnapshotDetailsDrawer({
             <SheetClose
               data-testid="snapshot-drawer-close"
               aria-label={SNAPSHOT_DRAWER_CLOSE_LABEL}
-              className="absolute right-12 top-4 rounded-sm border border-border/60 px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              className="absolute right-12 top-4 rounded-sm border border-border/60 px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground focus:outline-hidden focus:ring-2 focus:ring-ring"
             >
               <span className="inline-flex items-center gap-1">
                 <X className="h-3 w-3" /> Close

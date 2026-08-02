@@ -1148,7 +1148,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             <div className="mt-2">
               <a
                 href="#canonical-ingest-validation-details"
-                className="inline-flex items-center text-[11px] underline text-muted-foreground rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="inline-flex items-center text-[11px] underline text-muted-foreground rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 data-testid="sensors-testbench-result-readiness-badge"
                 data-status={validationUi.status}
                 aria-label={validationAriaLabel}
@@ -1427,7 +1427,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
 
         {/* Canonical payload validation summary — view-model driven. */}
         <div
-          className="mt-3 border-t border-border/40 pt-2 text-xs rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="mt-3 border-t border-border/40 pt-2 text-xs rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           id="canonical-ingest-validation-details"
           ref={validationDetailsRef}
           tabIndex={-1}

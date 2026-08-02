@@ -1,4 +1,4 @@
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation } from "@/lib/react-router-compat";
 import { buildRouteAliasTarget } from "@/lib/routeAliasRules";
 
 interface RouteAliasRedirectProps {

@@ -14,7 +14,7 @@
  * No writes. No automation. No device strings. No new queries beyond what the
  * existing panels would issue anyway (React Query dedupes by key).
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { AlertTriangle, Bell, Box, Gauge, ListTodo } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { usePlantTentLatestReadings } from "@/hooks/usePlantTentLatestReadings";

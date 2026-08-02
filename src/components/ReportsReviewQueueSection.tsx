@@ -10,7 +10,7 @@
  *    `src/lib/reportsHubReviewQueue.ts`.
  *  - Copy is observational. Never claims an action fixed or healed anything.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ArrowRight, ClipboardCheck, HelpCircle } from "lucide-react";
 import {
   REPORTS_REVIEW_QUEUE_EMPTY_COPY,

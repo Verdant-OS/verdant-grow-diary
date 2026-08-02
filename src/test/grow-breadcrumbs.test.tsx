@@ -17,7 +17,7 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
+import { MemoryRouter, Routes, Route, useLocation } from "@/lib/react-router-compat";
 import GrowBreadcrumbs, { buildSwitcherTarget } from "@/components/GrowBreadcrumbs";
 
 vi.mock("@/store/grows", () => ({

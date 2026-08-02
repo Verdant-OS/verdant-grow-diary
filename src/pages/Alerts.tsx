@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from "react";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Bell } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -562,7 +562,7 @@ function AlertCard({
           <h3 id={titleId} className="text-sm font-medium m-0">
             <Link
               to={alertDetailPath(a.id)}
-              className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
+              className="hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
             >
               {a.title}
             </Link>

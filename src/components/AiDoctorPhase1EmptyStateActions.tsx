@@ -7,7 +7,7 @@
  * carry the current plantId / growId / tentId as query params when present.
  */
 import * as React from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { plantDetailPath, plantsPath } from "@/lib/routes";
 
 export interface AiDoctorPhase1CtaContext {

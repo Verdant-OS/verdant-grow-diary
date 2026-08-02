@@ -1,7 +1,7 @@
 // Keyboard-only navigation and focus-order tests for /auth and /reset-password.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 
 let signInResult: { error: { message: string } | null } = { error: null };
 let updateUserResult: { error: { message: string } | null } = { error: null };

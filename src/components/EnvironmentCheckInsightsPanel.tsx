@@ -55,7 +55,7 @@ export default function EnvironmentCheckInsightsPanel({
         data-testid="env-check-insights-toggle"
         className={cn(
           "flex w-full items-start gap-2 text-left",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 rounded-md",
+          "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/60 rounded-md",
         )}
       >
         <Sparkles className="h-3.5 w-3.5 mt-0.5 text-primary shrink-0" aria-hidden />

@@ -4,7 +4,7 @@
  */
 import { afterEach, describe, it, expect, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import PhenoHuntDemo from "@/pages/PhenoHuntDemo";
 import { DEMO_CANDIDATES } from "@/lib/demo/phenoHuntDemoFixture";
 

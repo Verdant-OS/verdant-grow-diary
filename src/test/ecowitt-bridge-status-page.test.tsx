@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter } from "@/lib/react-router-compat";
 import EcowittBridgeStatus from "@/pages/EcowittBridgeStatus";
 import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 

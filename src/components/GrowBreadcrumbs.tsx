@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "@/lib/react-router-compat";
 import { ChevronRight } from "lucide-react";
 import { useGrows } from "@/store/grows";
 import {
@@ -158,7 +158,7 @@ function GrowSwitcher({
           if (!id) return;
           navigate(buildSwitcherTarget(section, id));
         }}
-        className="ml-1 h-6 rounded-md bg-secondary/50 border border-border/50 text-[11px] px-1 hover:bg-secondary focus:outline-none focus:ring-1 focus:ring-primary"
+        className="ml-1 h-6 rounded-md bg-secondary/50 border border-border/50 text-[11px] px-1 hover:bg-secondary focus:outline-hidden focus:ring-1 focus:ring-primary"
       >
         {!currentGrowId && (
           <option value="" disabled>

@@ -1,0 +1,462 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Verdant design system — ported from the Classic Tailwind v3 setup
+ * (src/index.css + tailwind.config.ts) to Tailwind v4.
+ *
+ * Raw tokens stay in HSL channel form (`150 18% 6%`) exactly as the Classic
+ * theme defined them, so every existing `hsl(var(--token))` reference in
+ * component CSS keeps working. The @theme inline block wraps each one in
+ * hsl() so Tailwind utility classes (bg-primary, text-leaf, …) resolve.
+ */
+
+@theme inline {
+  --font-sans: Inter, system-ui, sans-serif;
+  --font-display: "Space Grotesk", Inter, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --radius-sm: calc(var(--radius) - 8px);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-ring-offset-background: hsl(var(--background));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-info: hsl(var(--info));
+  --color-info-foreground: hsl(var(--info-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-leaf: hsl(var(--leaf));
+  --color-moss: hsl(var(--moss));
+  --color-soil: hsl(var(--soil));
+  --color-sidebar: hsl(var(--sidebar-background));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
+  --animate-shimmer: shimmer 1.8s linear infinite;
+}
+
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 12px hsl(var(--primary) / 0);
+  }
+}
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+:root {
+  /* Verdant dark botanical theme - default dark */
+  --background: 150 18% 6%;
+  --foreground: 90 25% 92%;
+
+  --card: 150 16% 9%;
+  --card-foreground: 90 25% 92%;
+
+  --popover: 150 18% 8%;
+  --popover-foreground: 90 25% 92%;
+
+  --primary: 95 60% 55%; /* lime accent */
+  --primary-foreground: 150 25% 8%;
+
+  --secondary: 150 20% 14%;
+  --secondary-foreground: 90 20% 88%;
+
+  --muted: 150 12% 14%;
+  --muted-foreground: 145 10% 60%;
+
+  --accent: 145 50% 35%; /* deep green */
+  --accent-foreground: 90 30% 95%;
+
+  --destructive: 0 70% 55%;
+  --destructive-foreground: 0 0% 98%;
+
+  --warning: 38 92% 55%;
+  --warning-foreground: 30 30% 10%;
+
+  --success: 140 60% 45%;
+  --success-foreground: 0 0% 98%;
+
+  --info: 200 70% 55%;
+  --info-foreground: 0 0% 98%;
+
+  --border: 150 18% 18%;
+  --input: 150 18% 16%;
+  --ring: 95 60% 55%;
+
+  --radius: 0.85rem;
+
+  /* Verdant tokens */
+  --leaf: 130 50% 40%;
+  --leaf-glow: 95 70% 60%;
+  --moss: 140 30% 22%;
+  --soil: 25 30% 18%;
+
+  --gradient-verdant: linear-gradient(135deg, hsl(140 55% 18%), hsl(150 30% 8%));
+  --gradient-leaf: linear-gradient(135deg, hsl(130 60% 40%), hsl(95 70% 55%));
+  --gradient-glass: linear-gradient(160deg, hsl(150 25% 14% / 0.85), hsl(150 20% 8% / 0.6));
+  --gradient-hero:
+    radial-gradient(circle at 20% 0%, hsl(95 60% 30% / 0.35), transparent 50%),
+    radial-gradient(circle at 90% 100%, hsl(140 50% 25% / 0.4), transparent 60%);
+
+  --shadow-glow: 0 0 40px hsl(95 70% 50% / 0.25);
+  --shadow-card: 0 8px 24px -8px hsl(150 50% 4% / 0.6);
+  --shadow-elevated: 0 20px 50px -20px hsl(150 60% 3% / 0.8);
+
+  --transition-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --sidebar-background: 150 22% 5%;
+  --sidebar-foreground: 90 15% 80%;
+  --sidebar-primary: 95 60% 55%;
+  --sidebar-primary-foreground: 150 25% 8%;
+  --sidebar-accent: 150 18% 11%;
+  --sidebar-accent-foreground: 90 25% 92%;
+  --sidebar-border: 150 18% 14%;
+  --sidebar-ring: 95 60% 55%;
+}
+
+/* Customer mode brighter alt theme via .customer-mode */
+.customer-mode {
+  --background: 80 30% 96%;
+  --foreground: 150 30% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 150 30% 12%;
+  --primary: 140 55% 30%;
+  --primary-foreground: 0 0% 100%;
+  --muted: 80 20% 92%;
+  --muted-foreground: 150 15% 35%;
+  --border: 140 20% 85%;
+  --input: 140 20% 88%;
+  --ring: 140 55% 30%;
+  --gradient-hero: linear-gradient(135deg, hsl(95 70% 60%), hsl(140 50% 35%));
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  html,
+  body,
+  #root {
+    min-height: 100vh;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-family:
+      "Inter",
+      system-ui,
+      -apple-system,
+      sans-serif;
+    background-image: var(--gradient-hero);
+    background-attachment: fixed;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: "Space Grotesk", "Inter", sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  @media (max-width: 640px) {
+    body {
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    input,
+    textarea,
+    select,
+    button,
+    [role="button"],
+    [role="combobox"] {
+      font-size: 16px;
+      line-height: 1.5;
+    }
+  }
+}
+
+/* Container utility — Tailwind v4 drops the v3 `container` theme options, so
+   the Classic centered/padded container is re-expressed explicitly. */
+@utility container {
+  margin-inline: auto;
+  padding-inline: 1rem;
+  width: 100%;
+  @media (min-width: 1400px) {
+    max-width: 1400px;
+  }
+}
+
+@layer components {
+  .glass {
+    background: var(--gradient-glass);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid hsl(var(--border));
+    box-shadow: var(--shadow-card);
+  }
+  .glow-accent {
+    box-shadow: var(--shadow-glow);
+  }
+  .gradient-leaf {
+    background: var(--gradient-leaf);
+  }
+  .gradient-verdant {
+    background: var(--gradient-verdant);
+  }
+  .text-leaf {
+    color: hsl(var(--leaf-glow));
+  }
+  .label-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 9999px;
+    padding: 0.125rem 0.5rem;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 999px;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.4s var(--transition-smooth) both;
+  }
+  .animate-slide-up {
+    animation: slideUp 0.5s var(--transition-smooth) both;
+  }
+
+  @media (max-width: 640px) {
+    .text-\[10px\],
+    .text-xs {
+      font-size: 0.875rem;
+      line-height: 1.25rem;
+    }
+
+    .text-sm {
+      font-size: 1rem;
+      line-height: 1.5rem;
+    }
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Print rules for Environment Summary Report (and any printable section). */
+@media screen {
+  .print-only {
+    display: none !important;
+  }
+}
+@media print {
+  .print-hidden {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  body * {
+    visibility: hidden;
+  }
+  [data-print-section="environment-summary-report"],
+  [data-print-section="environment-summary-report"] *,
+  [data-print-section="harvest-evidence-report"],
+  [data-print-section="harvest-evidence-report"] *,
+  [data-print-section="diary-range-report"],
+  [data-print-section="diary-range-report"] *,
+  [data-print-section="ai-doctor-report"],
+  [data-print-section="ai-doctor-report"] * {
+    visibility: visible;
+  }
+  [data-print-section="environment-summary-report"],
+  [data-print-section="harvest-evidence-report"],
+  [data-print-section="diary-range-report"],
+  [data-print-section="ai-doctor-report"] {
+    position: absolute;
+    inset: 0;
+    padding: 16px;
+    background: #fff;
+    color: #000;
+  }
+}
+
+/* Environment Summary Report — improved print rules. */
+@media print {
+  @page {
+    margin: 12mm;
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-family:
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
+      font-size: 10px;
+      color: #555;
+    }
+    @bottom-left {
+      content: "Verdant — Environment Summary";
+      font-family:
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
+      font-size: 10px;
+      color: #888;
+    }
+  }
+  @page :first {
+    @bottom-right {
+      content: "Page 1 of " counter(pages);
+    }
+  }
+  [data-print-card],
+  [data-print-issue-card],
+  [data-print-drilldown-row] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  [data-print-chart] {
+    max-width: 100%;
+    width: 100%;
+    overflow: visible;
+  }
+  .print-cover-page {
+    padding: 18mm 12mm;
+    break-after: page;
+    page-break-after: always;
+  }
+  .print-cover-title {
+    font-size: clamp(22px, 4.5vw, 36px);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+  .print-cover-subtitle {
+    font-size: clamp(13px, 1.8vw, 17px);
+    line-height: 1.35;
+  }
+  .print-cover-meta,
+  .print-cover-summary,
+  .print-cover-safety {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .print-cover-section {
+    margin-top: 8mm;
+  }
+  .print-page-indicator {
+    font-size: 10px;
+    color: #666;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  /* Drilldown print mode: hide the full-report-only block. */
+  [data-print-section="environment-summary-report"][data-print-mode="drilldown"]
+    [data-print-full-report-only] {
+    display: none !important;
+  }
+  /* Make printable tables/cards fit page width. */
+  [data-print-section="environment-summary-report"] table,
+  [data-print-section="environment-summary-report"] [data-print-card] {
+    max-width: 100%;
+    width: 100%;
+  }
+}

@@ -91,7 +91,7 @@ export default function TimelinePhotoLightbox({
           onClick={onClose}
           aria-label="Close photo viewer"
           data-testid="timeline-photo-lightbox-close"
-          className="rounded-full bg-black/60 p-2 text-white hover:bg-black/80 focus:outline-none focus:ring-2 focus:ring-white/60"
+          className="rounded-full bg-black/60 p-2 text-white hover:bg-black/80 focus:outline-hidden focus:ring-2 focus:ring-white/60"
         >
           <X className="h-5 w-5" />
         </button>
@@ -103,7 +103,7 @@ export default function TimelinePhotoLightbox({
           onClick={handlePrev}
           aria-label="Previous photo"
           data-testid="timeline-photo-lightbox-prev"
-          className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white hover:bg-black/80 focus:outline-none focus:ring-2 focus:ring-white/60"
+          className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white hover:bg-black/80 focus:outline-hidden focus:ring-2 focus:ring-white/60"
         >
           <ChevronLeft className="h-6 w-6" />
         </button>
@@ -115,7 +115,7 @@ export default function TimelinePhotoLightbox({
           onClick={handleNext}
           aria-label="Next photo"
           data-testid="timeline-photo-lightbox-next"
-          className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white hover:bg-black/80 focus:outline-none focus:ring-2 focus:ring-white/60"
+          className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white hover:bg-black/80 focus:outline-hidden focus:ring-2 focus:ring-white/60"
         >
           <ChevronRight className="h-6 w-6" />
         </button>

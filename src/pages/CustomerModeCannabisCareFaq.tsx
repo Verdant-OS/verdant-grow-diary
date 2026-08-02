@@ -11,7 +11,7 @@
  *   - Pure presenter page; content comes from shared constants.
  */
 import { useEffect } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "@/lib/react-router-compat";
 import LegalFooterLinks from "@/components/LegalFooterLinks";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {

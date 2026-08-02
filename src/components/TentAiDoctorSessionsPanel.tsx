@@ -5,7 +5,7 @@
  * No writes. No queue action buttons. History view only.
  */
 import { Stethoscope, ShieldAlert, Info } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -166,7 +166,7 @@ function SessionRow({ row }: { row: AiDoctorSessionRow }) {
       <div className="pt-1">
         <Link
           to={`/doctor/sessions/${row.id}`}
-          className="text-xs text-primary underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="text-xs text-primary underline rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
           data-testid="tent-ai-doctor-session-view-link"
           aria-label={`Open AI Doctor session${likelyIssue ? `: ${likelyIssue}` : row.created_at ? ` from ${fmtDate(row.created_at)}` : ""}`}
         >
@@ -229,7 +229,7 @@ export default function TentAiDoctorSessionsPanel({ tentId }: Props) {
               onClick={() => { void refetch(); }}
               disabled={isRefetching}
               data-testid="tent-ai-doctor-sessions-error-retry"
-              className="inline-flex items-center rounded border bg-background px-2 py-1 text-xs hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+              className="inline-flex items-center rounded border bg-background px-2 py-1 text-xs hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
             >
               {isRefetching ? "Retrying…" : "Retry"}
             </button>

@@ -6,7 +6,7 @@
  * No Supabase, no AI calls, no Action Queue writes, no device control.
  */
 import { useEffect, useId, useRef, useState } from "react";
-import { Link, Navigate, useLocation, useParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useParams } from "@/lib/react-router-compat";
 import BrandLogo from "@/components/BrandLogo";
 import CustomerComparisonGuideQrOption from "@/components/customer/CustomerComparisonGuideQrOption";
 import SymptomReferenceTable from "@/components/SymptomReferenceTable";
@@ -273,7 +273,7 @@ export default function GuidePage() {
               aria-label={`Scrollable ${guide.evidenceTable.ariaLabel}`}
               aria-describedby={evidenceTableInstructionsId}
               tabIndex={0}
-              className="mt-5 max-w-full overflow-x-auto rounded-lg border border-border/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="mt-5 max-w-full overflow-x-auto rounded-lg border border-border/70 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <table
                 aria-label={guide.evidenceTable.ariaLabel}
@@ -350,8 +350,8 @@ export default function GuidePage() {
                     data-highlighted={isHighlighted ? "true" : undefined}
                     className={
                       isHighlighted
-                        ? "rounded-md ring-2 ring-primary/70 bg-primary/5 motion-safe:transition-colors motion-safe:duration-500 scroll-mt-24 outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                        : "motion-safe:transition-colors motion-safe:duration-500 scroll-mt-24 outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        ? "rounded-md ring-2 ring-primary/70 bg-primary/5 motion-safe:transition-colors motion-safe:duration-500 scroll-mt-24 outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+                        : "motion-safe:transition-colors motion-safe:duration-500 scroll-mt-24 outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
                     }
                   >
                     <AccordionTrigger className="text-left px-2">{entry.question}</AccordionTrigger>
@@ -428,7 +428,7 @@ export default function GuidePage() {
             <a
               href="/verdant-bud-rot-prevention-checklist.pdf"
               download
-              className="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              className="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               data-testid="guide-bud-rot-checklist-download-link"
             >
               Download checklist (PDF)

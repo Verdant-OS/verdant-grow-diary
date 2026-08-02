@@ -6,7 +6,7 @@
  * no health claims based on check frequency.
  */
 import { useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Activity, ArrowRight, CheckCircle2, Gauge, Info, Sparkles } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 

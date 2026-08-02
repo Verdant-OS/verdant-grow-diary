@@ -2,7 +2,7 @@
  * Accession detail — the source-material record with explicit provenance and
  * non-destructive archive. Links onward to lineage trace and screening history.
  */
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link } from "@/lib/react-router-compat";
 import { Dna, Loader2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";

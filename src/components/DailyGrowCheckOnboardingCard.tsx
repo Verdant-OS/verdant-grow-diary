@@ -3,7 +3,7 @@
  * surfaces the single most useful next setup step for the Daily Grow Check
  * loop. Reuses existing add/edit/move surfaces. No writes here.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ArrowRight, ClipboardCheck, HelpCircle, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";

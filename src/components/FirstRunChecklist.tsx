@@ -6,7 +6,7 @@
  * via a tiny local localStorage wrapper. No data fetching.
  */
 import { useCallback, useSyncExternalStore } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { CheckCircle2, Circle, Sprout, X, RotateCcw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

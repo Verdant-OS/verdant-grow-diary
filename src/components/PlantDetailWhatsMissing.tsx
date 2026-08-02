@@ -7,7 +7,7 @@
  */
 import { useMemo } from "react";
 import { HelpCircle, Plus, Upload, Activity } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 
 import {
   buildPlantDetailWhatsMissing,

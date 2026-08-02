@@ -3,7 +3,7 @@
  * keeper, clone, or cross. Reads the subject from the route, resolves the trace
  * server-side, and renders it as a semantic, keyboard-operable tree.
  */
-import { useParams } from "react-router-dom";
+import { useParams } from "@/lib/react-router-compat";
 import { GitBranch, Loader2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";

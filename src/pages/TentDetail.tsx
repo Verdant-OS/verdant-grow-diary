@@ -3,7 +3,7 @@ import EcowittLatestSnapshotCard from "@/components/EcowittLatestSnapshotCard";
 import EnvironmentStabilityCard from "@/components/EnvironmentStabilityCard";
 import TentAiDoctorSessionsPanel from "@/components/TentAiDoctorSessionsPanel";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
-import { useParams, Link, useSearchParams } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "@/lib/react-router-compat";
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/store/auth";
 import { formatDistanceToNow } from "date-fns";

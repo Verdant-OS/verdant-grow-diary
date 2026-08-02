@@ -8,7 +8,7 @@ import {
   PaddleCheckoutCatalogUnavailableError,
 } from "@/lib/paddle";
 import { useAuth } from "@/store/auth";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "@/lib/react-router-compat";
 import { toast } from "@/hooks/use-toast";
 import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
 import {

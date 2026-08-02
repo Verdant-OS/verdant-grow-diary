@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "@/lib/react-router-compat";
 import { AlertCircle, ArrowLeft, BookOpenCheck, ClipboardCheck, Loader2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -297,7 +297,7 @@ export default function BreedingProgramDetail() {
                                 </label>
                                 <select
                                   id={evidenceSelectId}
-                                  className="mt-1 h-9 w-full rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                                  className="mt-1 h-9 w-full rounded-md border border-input bg-background px-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2"
                                   defaultValue=""
                                   onChange={(e) => {
                                     if (e.target.value) {

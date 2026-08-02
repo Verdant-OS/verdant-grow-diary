@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import AgentIntegrations from "@/pages/AgentIntegrations";
 import type { HarnessAdapter } from "@/lib/mcp/verifyMcpToolAccess";
 

@@ -5,7 +5,7 @@
  */
 
 import { Sprout } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import {
   buildFirstTentSetupCopy,

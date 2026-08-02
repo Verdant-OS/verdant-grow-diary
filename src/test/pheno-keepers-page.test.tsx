@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import type { UsePhenoKeepersState } from "@/hooks/usePhenoKeepers";
 import { SELF_DONOR_VALUE } from "@/lib/phenoCrossFormViewModel";
 

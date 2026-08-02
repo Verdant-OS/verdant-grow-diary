@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { describe, expect, it } from "vitest";
 
 import Glossary from "@/pages/Glossary";

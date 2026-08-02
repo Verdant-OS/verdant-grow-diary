@@ -19,7 +19,7 @@ export default function SymptomReferenceTable({
         aria-label="Scrollable symptom evidence table"
         aria-describedby={scrollInstructionsId}
         tabIndex={0}
-        className="overflow-x-auto rounded-lg border border-border/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="overflow-x-auto rounded-lg border border-border/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         data-testid="symptom-reference-table"
       >
         <table className="w-full min-w-[880px] border-collapse text-left text-sm">

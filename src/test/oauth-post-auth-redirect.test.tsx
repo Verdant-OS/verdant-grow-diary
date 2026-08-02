@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import OAuthPostAuthRedirect from "@/components/OAuthPostAuthRedirect";
 import {

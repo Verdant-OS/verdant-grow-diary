@@ -6,7 +6,7 @@
  * No writes. No AI re-run. No queue actions.
  */
 import { Stethoscope, ShieldAlert, Info } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -152,7 +152,7 @@ function HistoryRow({ row }: { row: AiDoctorSessionRow }) {
         ) : null}
         <Link
           to={`/doctor/sessions/${row.id}`}
-          className="text-primary underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="text-primary underline rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
           data-testid="coach-ai-doctor-history-view-link"
           aria-label={`Open AI Doctor session${d?.likelyIssue ? `: ${d.likelyIssue}` : row.created_at ? ` from ${fmtDate(row.created_at)}` : ""}`}
         >
@@ -188,7 +188,7 @@ export default function CoachAiDoctorHistoryPanel({ growId }: Props) {
         </p>
         <Link
           to="/doctor/sessions"
-          className="text-[11px] text-primary underline pt-0.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="text-[11px] text-primary underline pt-0.5 rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
           data-testid="coach-ai-doctor-history-view-all-link"
         >
           View all sessions
@@ -228,7 +228,7 @@ export default function CoachAiDoctorHistoryPanel({ growId }: Props) {
               onClick={() => { void refetch(); }}
               disabled={isRefetching}
               data-testid="coach-ai-doctor-history-error-retry"
-              className="inline-flex items-center rounded border bg-background px-2 py-1 text-xs hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+              className="inline-flex items-center rounded border bg-background px-2 py-1 text-xs hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
             >
               {isRefetching ? "Retrying…" : "Retry"}
             </button>

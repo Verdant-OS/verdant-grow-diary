@@ -10,7 +10,7 @@
  *
  * Pure presenter. No I/O. No writes. No AI calls.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import {
   SENSOR_SOURCE_KINDS,
   SENSOR_SOURCE_SHORT_LABEL,
@@ -122,7 +122,7 @@ export default function SensorSourceSummaryWidget({
           data-testid={`sensor-source-summary-link-${kind}`}
           className={cn(
             baseCls,
-            "w-full hover:bg-background/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+            "w-full hover:bg-background/70 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/60",
           )}
         >
           {inner}

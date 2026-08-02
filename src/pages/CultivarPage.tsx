@@ -5,7 +5,7 @@
  * write rows, diagnose a plant, create alerts, or generate Action Queue items.
  */
 import { useEffect } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "@/lib/react-router-compat";
 import BrandLogo from "@/components/BrandLogo";
 import CultivarBlueprintCrossSell from "@/components/CultivarBlueprintCrossSell";
 import CultivarFollowButton from "@/components/CultivarFollowButton";
@@ -195,7 +195,7 @@ export default function CultivarPage() {
               <li key={section.key}>
                 <a
                   href={`#${sectionId(section.key)}`}
-                  className="inline-flex min-h-[40px] items-center rounded-full border border-border/70 px-3 py-1.5 text-muted-foreground hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                  className="inline-flex min-h-[40px] items-center rounded-full border border-border/70 px-3 py-1.5 text-muted-foreground hover:border-primary/40 hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/60"
                 >
                   {section.title}
                 </a>
@@ -204,7 +204,7 @@ export default function CultivarPage() {
             <li>
               <a
                 href="#sources"
-                className="inline-flex min-h-[40px] items-center rounded-full border border-border/70 px-3 py-1.5 text-muted-foreground hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                className="inline-flex min-h-[40px] items-center rounded-full border border-border/70 px-3 py-1.5 text-muted-foreground hover:border-primary/40 hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/60"
               >
                 Sources
               </a>

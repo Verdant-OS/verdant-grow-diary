@@ -71,7 +71,7 @@ export default function PhenoEvidenceQuickLogPanel({
                   data-testid={`quick-log-pheno-evidence-goal-${goal.id}`}
                   data-recorded={goal.recorded ? "true" : "false"}
                   onClick={() => onSelectedGoalChange(selected ? null : goal.id)}
-                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${
                     selected
                       ? "border-emerald-600 bg-emerald-500/20 text-foreground"
                       : "border-border/60 bg-background text-foreground hover:bg-secondary/60"

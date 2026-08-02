@@ -8,7 +8,7 @@
  * - Never renders internal IDs as visible copy.
  * - Action Queue wording is always approval-required.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {

@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import "@testing-library/jest-dom/vitest";
 import ManualSnapshotTimelineCard from "@/components/ManualSnapshotTimelineCard";
 import {

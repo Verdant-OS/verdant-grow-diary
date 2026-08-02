@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import LegalFooterLinks from "@/components/LegalFooterLinks";
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/BrandLogo";

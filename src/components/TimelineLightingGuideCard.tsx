@@ -4,7 +4,7 @@
  *
  * No reads, writes, diagnosis, automation, or device control.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import type { TimelineLightingGuideView } from "@/lib/timelineLightingGuideRules";
 
 export interface TimelineLightingGuideCardProps {

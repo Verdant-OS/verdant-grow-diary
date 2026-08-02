@@ -12,7 +12,7 @@
  *  - performs no writes on click; navigation only.
  *  - never renders user IDs, role rows, RPC names, or tokens.
  */
-import { NavLink } from "react-router-dom";
+import { NavLink } from "@/lib/react-router-compat";
 import { ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useHasRole } from "@/hooks/useHasRole";

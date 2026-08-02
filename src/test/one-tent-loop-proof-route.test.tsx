@@ -11,7 +11,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { MemoryRouter, Routes, Route } from "@/lib/react-router-compat";
 import OneTentLoopProof from "@/pages/OneTentLoopProof";
 import { ONE_TENT_LOOP_PROOF_STEP_IDS } from "@/lib/oneTentLoopProofViewModel";
 

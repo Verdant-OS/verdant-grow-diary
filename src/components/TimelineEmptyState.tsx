@@ -12,7 +12,7 @@
  *    surface owned by Timeline.tsx and must never be shown as "empty".
  */
 import { useCallback, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "@/lib/react-router-compat";
 import { Sprout } from "lucide-react";
 import {
   FAST_ADD_PICKER_CTAS,
@@ -105,7 +105,7 @@ export default function TimelineEmptyState({
               onClick={() => handle(action.actionId)}
               data-testid={`timeline-empty-state-action-${action.actionId}`}
               data-action-id={action.actionId}
-              className="inline-flex items-center rounded-lg border border-border/60 bg-secondary/40 px-4 min-h-11 text-sm font-medium hover:bg-secondary/70 active:bg-secondary/80 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background touch-manipulation"
+              className="inline-flex items-center rounded-lg border border-border/60 bg-secondary/40 px-4 min-h-11 text-sm font-medium hover:bg-secondary/70 active:bg-secondary/80 transition focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background touch-manipulation"
             >
               {action.label}
             </button>
@@ -119,7 +119,7 @@ export default function TimelineEmptyState({
             type="button"
             onClick={onClearFilters}
             data-testid="timeline-empty-state-clear-filters"
-            className="inline-flex items-center rounded-lg border border-border/60 px-4 min-h-11 text-sm hover:bg-secondary/60 active:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
+            className="inline-flex items-center rounded-lg border border-border/60 px-4 min-h-11 text-sm hover:bg-secondary/60 active:bg-secondary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
           >
             Clear filters
           </button>
@@ -162,7 +162,7 @@ export default function TimelineEmptyState({
                 type="button"
                 data-testid={`timeline-empty-state-cta-${cta.id}`}
                 onClick={() => go(cta.to)}
-                className="text-sm px-3 min-h-11 inline-flex items-center rounded-md border border-border/60 hover:bg-secondary/60 active:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
+                className="text-sm px-3 min-h-11 inline-flex items-center rounded-md border border-border/60 hover:bg-secondary/60 active:bg-secondary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
               >
                 {cta.label}
               </button>

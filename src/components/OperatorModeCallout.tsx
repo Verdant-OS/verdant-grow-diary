@@ -9,7 +9,7 @@
  *  - no writes; navigation only.
  *  - no IDs, role rows, RPC names, or tokens rendered.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import ReportsReviewQueueSection from "@/components/ReportsReviewQueueSection";
 import type { ReportsReviewItem } from "@/lib/reportsHubReviewQueue";
 

@@ -132,7 +132,7 @@ export default function PhenoCandidateEvidenceCoverage({
                   data-testid={`${testId}-record-${goal.id}`}
                   aria-label={`Record ${goal.label} evidence`}
                   onClick={() => record(goal.id)}
-                  className="inline-flex items-center rounded-full border border-border bg-background px-2 py-0.5 hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="inline-flex items-center rounded-full border border-border bg-background px-2 py-0.5 hover:bg-secondary/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   Record {goal.label} evidence
                 </button>

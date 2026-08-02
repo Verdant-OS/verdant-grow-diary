@@ -13,7 +13,7 @@
  * as a valid ranking / keeper-picking surface.
  */
 import { useMemo } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "@/lib/react-router-compat";
 import { timelinePath } from "@/lib/routes";
 import PhenoComparisonView from "@/components/PhenoComparisonView";
 import { usePhenoHuntCandidates } from "@/hooks/usePhenoHuntCandidates";

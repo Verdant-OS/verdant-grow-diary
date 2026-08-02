@@ -1570,7 +1570,7 @@ export default function QuickLog({
                         type="button"
                         data-testid="quick-log-review-jump-mismatch"
                         onClick={focusPlant}
-                        className="text-[12px] underline text-amber-200 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="text-[12px] underline text-amber-200 rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         Check target
                       </button>
@@ -1582,7 +1582,7 @@ export default function QuickLog({
                         type="button"
                         data-testid="quick-log-review-jump-snapshot"
                         onClick={focusAttach}
-                        className="text-[12px] underline text-amber-200 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="text-[12px] underline text-amber-200 rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         Check sensor truth
                       </button>
@@ -1594,7 +1594,7 @@ export default function QuickLog({
                         type="button"
                         data-testid="quick-log-review-jump-watering"
                         onClick={focusWatering}
-                        className="text-[12px] underline text-amber-200 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="text-[12px] underline text-amber-200 rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         Add Watering (ml)
                       </button>
@@ -1864,7 +1864,7 @@ export default function QuickLog({
                     ref={attachWrapperRef}
                     tabIndex={-1}
                     data-testid="quick-log-snapshot-attach-section"
-                    className={`flex items-center justify-between gap-2 rounded-lg border p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${attachDisabled ? "border-border/40 opacity-60" : "border-border/60"}`}
+                    className={`flex items-center justify-between gap-2 rounded-lg border p-3 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${attachDisabled ? "border-border/40 opacity-60" : "border-border/60"}`}
                   >
                     <span className="text-sm">Attach sensor snapshot</span>
                     <Switch
@@ -1963,7 +1963,7 @@ export default function QuickLog({
                       setNote((previous) => appendQuickLogObservation(previous, chip.text));
                       setSaveError(null);
                     }}
-                    className="rounded-full border border-border/60 bg-secondary/30 px-2.5 py-1 text-[11px] text-foreground hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="rounded-full border border-border/60 bg-secondary/30 px-2.5 py-1 text-[11px] text-foreground hover:bg-secondary/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     {chip.label}
                   </button>
@@ -1990,7 +1990,7 @@ export default function QuickLog({
                       aria-label={`Response check: ${status}`}
                       aria-pressed={selectedResponseStatus === status}
                       onClick={() => handleResponseCheck(status)}
-                      className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${
                         selectedResponseStatus === status
                           ? "border-primary/70 bg-primary/10 text-primary"
                           : "border-border/60 bg-secondary/30 text-foreground hover:bg-secondary/60"
@@ -2126,7 +2126,7 @@ export default function QuickLog({
                                 if (isMainDraftMutationLocked()) return;
                                 setEarlyMilestone(selected ? null : m.value);
                               }}
-                              className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                              className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${
                                 selected
                                   ? "border-primary bg-primary/15 text-foreground"
                                   : "border-border/60 bg-secondary/30 text-foreground hover:bg-secondary/60"
@@ -2156,7 +2156,7 @@ export default function QuickLog({
                                 if (isMainDraftMutationLocked()) return;
                                 setEarlyVigor(selected ? null : v.value);
                               }}
-                              className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                              className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${
                                 selected
                                   ? "border-primary bg-primary/15 text-foreground"
                                   : "border-border/60 bg-secondary/30 text-foreground hover:bg-secondary/60"
@@ -2831,7 +2831,7 @@ export default function QuickLog({
                         data-testid="quick-log-view-target-plant"
                         data-target-plant-id={savedTarget.id}
                         data-target-grow-id={savedTarget.growId ?? undefined}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         onClick={() => {
                           if (typeof document !== "undefined") {
                             (document.activeElement as HTMLElement | null)?.blur?.();

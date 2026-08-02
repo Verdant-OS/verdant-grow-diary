@@ -205,7 +205,7 @@ export function AiDoctorEvidencePanel({ vm }: Props) {
                 key={row.key}
                 id={`evidence-envcheck-${safeSlug(row.key)}`}
                 tabIndex={-1}
-                className="flex flex-wrap items-center gap-2 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="flex flex-wrap items-center gap-2 text-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
                 data-testid={`latest-env-check-row-${row.key}`}
               >
                 <span className="font-medium">{row.label}</span>
@@ -302,7 +302,7 @@ export function AiDoctorEvidencePanel({ vm }: Props) {
             aria-label="Missing context"
             data-testid="evidence-missing-section"
             tabIndex={-1}
-            className="space-y-1 border-t pt-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="space-y-1 border-t pt-2 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
           >
             <h4 className="text-sm font-semibold">{missingGroup.title}</h4>
             {vm.missing.length === 0 ? (
@@ -317,7 +317,7 @@ export function AiDoctorEvidencePanel({ vm }: Props) {
                     id={`evidence-missing-${safeSlug(m.code)}`}
                     tabIndex={-1}
                     data-testid={`evidence-missing-${m.code}`}
-                    className="flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="flex items-center gap-2 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
                   >
                     <Badge variant="outline" aria-label="Missing">
                       Missing

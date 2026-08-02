@@ -9,7 +9,7 @@
  */
 
 import { useId, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import type {
   TentPlantActivityPanelRow,
   TentPlantActivityPanelsViewModel,
@@ -104,7 +104,7 @@ function EvidenceNotesSection({ panel }: { panel: TentPlantActivityPanelRow }) {
         aria-describedby={`${helperId} ${cautionId}`}
         rows={3}
         data-testid={`${panel.testId}-evidence-notes-textarea`}
-        className="w-full text-xs rounded-md border border-border bg-background p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="w-full text-xs rounded-md border border-border bg-background p-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
       />
       <p
         id={cautionId}
@@ -125,7 +125,7 @@ function EvidenceNotesSection({ panel }: { panel: TentPlantActivityPanelRow }) {
             panel.quickLogDisabledReason ??
             (trimmed.length === 0 ? "Draft a note to enable." : undefined)
           }
-          className="text-xs px-2.5 py-1 rounded-full border bg-secondary text-secondary-foreground border-border disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="text-xs px-2.5 py-1 rounded-full border bg-secondary text-secondary-foreground border-border disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           {TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_CTA_COPY}
         </button>
@@ -363,7 +363,7 @@ export default function TentPlantActivityPanels({
                   disabled={panel.quickLogDisabled}
                   title={panel.quickLogDisabledReason ?? undefined}
                   onClick={() => emitQuickLog(panel)}
-                  className="text-xs px-2.5 py-1 rounded-full border bg-primary text-primary-foreground border-primary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  className="text-xs px-2.5 py-1 rounded-full border bg-primary text-primary-foreground border-primary disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   {panel.quickLogCtaLabel}
                 </button>
@@ -371,7 +371,7 @@ export default function TentPlantActivityPanels({
                   to={panel.diaryHref}
                   aria-label={panel.diaryAccessibleLabel}
                   data-testid={`${panel.testId}-diary-link`}
-                  className="text-xs underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                  className="text-xs underline underline-offset-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                 >
                   View diary
                 </Link>
@@ -382,7 +382,7 @@ export default function TentPlantActivityPanels({
                   data-anchor-blocked={
                     panel.photosAnchorBlocked ? "true" : undefined
                   }
-                  className="text-xs underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                  className="text-xs underline underline-offset-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                 >
                   View photos
                 </Link>

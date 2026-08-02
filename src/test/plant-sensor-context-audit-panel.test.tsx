@@ -4,7 +4,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render as renderTestingLibrary, screen, fireEvent } from "@testing-library/react";
 import type { ReactElement } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import fs from "node:fs";
 import path from "node:path";
 import PlantSensorContextAuditPanel from "@/components/PlantSensorContextAuditPanel";

@@ -18,7 +18,7 @@
  *  - Card list items use semantic <ul>/<li>; the "•" bullet is
  *    aria-hidden so screen readers don't read it.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import BrandLogo from "@/components/BrandLogo";
@@ -135,7 +135,7 @@ export default function BetaLanding({ variant, copy, currentSearch }: BetaLandin
       <header className="px-6 py-5 flex items-center justify-between max-w-6xl mx-auto">
         <Link
           to="/welcome"
-          className="flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+          className="flex items-center gap-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded"
           aria-label="Verdant home"
         >
           <BrandLogo size="md" showText />

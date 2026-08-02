@@ -7,7 +7,7 @@
  * to 5 latest photos for the current plant. Mobile-friendly horizontal
  * strip. No uploads or writes.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Image as ImageIcon, Upload, AlertCircle, ClipboardCheck } from "lucide-react";
 
 import { useDiaryEntries } from "@/hooks/use-diary-entries";

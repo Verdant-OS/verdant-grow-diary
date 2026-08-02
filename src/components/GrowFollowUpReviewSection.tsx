@@ -10,7 +10,7 @@
  * through saveRunLearningDecision. No automation, no device control.
  */
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "@/lib/react-router-compat";
 import { usePlantMemoryEpisodes } from "@/hooks/usePlantMemoryEpisodes";
 import { saveRunLearningDecision } from "@/lib/plantMemoryEpisodeService";
 import { buildOutcomeFollowUpQueue } from "@/lib/outcomeFollowUpQueueViewModel";

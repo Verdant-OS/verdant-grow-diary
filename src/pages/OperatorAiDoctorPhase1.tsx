@@ -15,7 +15,7 @@
  *     read-only Phase 1 result locally with the pure foundation engine.
  */
 import * as React from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "@/lib/react-router-compat";
 import { plantDetailPath, plantsPath } from "@/lib/routes";
 import {
   AiDoctorPhase1PlantPicker,

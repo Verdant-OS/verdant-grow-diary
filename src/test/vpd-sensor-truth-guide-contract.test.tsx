@@ -47,8 +47,12 @@ describe("public VPD and sensor-truth evidence contract", () => {
     renderGuide("grow-room-vpd-tracker");
 
     const table = screen.getByRole("table", { name: /vpd evidence gate/i });
+    const scrollRegion = screen.getByRole("region", { name: /scrollable vpd evidence gate/i });
     const rows = within(table).getAllByRole("row");
 
+    expect(scrollRegion).toHaveAttribute("tabindex", "0");
+    expect(scrollRegion).toHaveAttribute("aria-describedby");
+    expect(screen.getByText(/focus this table and use the arrow keys/i)).toBeInTheDocument();
     expect(rows).toHaveLength(7);
     expect(within(table).getByText("Temperature")).toBeVisible();
     expect(within(table).getByText("Relative humidity")).toBeVisible();

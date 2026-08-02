@@ -5,7 +5,7 @@
  * so visible copy and FAQPage JSON-LD share a single source of truth.
  * No Supabase, no AI calls, no Action Queue writes, no device control.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
 import CustomerComparisonGuideQrOption from "@/components/customer/CustomerComparisonGuideQrOption";
@@ -43,6 +43,7 @@ export default function GuidePage() {
   const [openFaq, setOpenFaq] = useState<string>(initialFaqValue ?? "");
   const [highlightedFaq, setHighlightedFaq] = useState<string | undefined>(initialFaqValue);
   const faqItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const evidenceTableInstructionsId = useId();
 
   useEffect(() => {
     const resolved = resolveGuideFaqFromHash(guide, location.hash);
@@ -260,7 +261,20 @@ export default function GuidePage() {
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
               {guide.evidenceTable.description}
             </p>
-            <div className="mt-5 max-w-full overflow-x-auto rounded-lg border border-border/70">
+            <p
+              id={evidenceTableInstructionsId}
+              className="mb-2 text-xs text-muted-foreground sm:sr-only"
+            >
+              Swipe horizontally, or focus this table and use the arrow keys, to compare all
+              evidence states.
+            </p>
+            <div
+              role="region"
+              aria-label={`Scrollable ${guide.evidenceTable.ariaLabel}`}
+              aria-describedby={evidenceTableInstructionsId}
+              tabIndex={0}
+              className="mt-5 max-w-full overflow-x-auto rounded-lg border border-border/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
               <table
                 aria-label={guide.evidenceTable.ariaLabel}
                 className="min-w-[720px] w-full border-collapse text-left text-sm"

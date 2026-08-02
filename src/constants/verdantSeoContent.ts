@@ -420,7 +420,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         note: "Authoritative equations and definitions showing vapor-pressure deficit as a derived difference built from temperature and humidity data. It does not define cannabis setpoints.",
       },
       {
-        label: "Tisné et al. — reporting environmental conditions in plant science",
+        label: "Vincent et al. — reporting environmental conditions in plant science",
         href: "https://pmc.ncbi.nlm.nih.gov/articles/PMC12571154/",
         note: "Peer-reviewed measurement guidance distinguishing ambient VPD from a leaf-to-air vapor-pressure difference and explaining the role of leaf temperature.",
       },
@@ -635,7 +635,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         note: "Authoritative definition and calculation context for vapor pressure and VPD from temperature and humidity measurements.",
       },
       {
-        label: "Tisné et al. — reporting environmental conditions in plant science",
+        label: "Vincent et al. — reporting environmental conditions in plant science",
         href: "https://pmc.ncbi.nlm.nih.gov/articles/PMC12571154/",
         note: "Peer-reviewed guidance on reporting measurement location and distinguishing ambient VPD from a leaf-to-air vapor-pressure difference.",
       },

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import AlertDetail from "@/pages/AlertDetail";
 
-export const Route = createFileRoute("/alerts/$alertId")({
+export const Route = createFileRoute("/_app/alerts/$alertId")({
   component: RouteComponent,
 });
 

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import OperatorCreditsAudit from "@/pages/OperatorCreditsAudit";
 
-export const Route = createFileRoute("/operator/credits-audit")({
+export const Route = createFileRoute("/_app/_operator/operator/credits-audit")({
   component: RouteComponent,
 });
 

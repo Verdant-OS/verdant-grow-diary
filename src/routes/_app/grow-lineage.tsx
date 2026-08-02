@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import GrowLineageRepair from "@/pages/GrowLineageRepair";
 
-export const Route = createFileRoute("/grow-lineage")({
+export const Route = createFileRoute("/_app/grow-lineage")({
   component: RouteComponent,
 });
 

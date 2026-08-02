@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import Tents from "@/pages/Tents";
 
-export const Route = createFileRoute("/tents")({
+export const Route = createFileRoute("/_app/tents")({
   component: RouteComponent,
 });
 

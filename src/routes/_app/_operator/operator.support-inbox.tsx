@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import OperatorSupportInbox from "@/pages/OperatorSupportInbox";
 
-export const Route = createFileRoute("/operator/support-inbox")({
+export const Route = createFileRoute("/_app/_operator/operator/support-inbox")({
   component: RouteComponent,
 });
 

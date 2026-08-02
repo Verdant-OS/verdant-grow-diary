@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import GrowerInvite from "@/pages/GrowerInvite";
 
-export const Route = createFileRoute("/invite")({
+export const Route = createFileRoute("/_app/invite")({
   component: RouteComponent,
 });
 

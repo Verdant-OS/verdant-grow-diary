@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import AiDoctorSessionDetail from "@/pages/AiDoctorSessionDetail";
 
-export const Route = createFileRoute("/doctor/sessions/$sessionId")({
+export const Route = createFileRoute("/_app/doctor/sessions/$sessionId")({
   component: RouteComponent,
 });
 

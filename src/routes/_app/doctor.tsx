@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import AiDoctorStart from "@/pages/AiDoctorStart";
 
-export const Route = createFileRoute("/doctor")({
+export const Route = createFileRoute("/_app/doctor")({
   component: RouteComponent,
 });
 

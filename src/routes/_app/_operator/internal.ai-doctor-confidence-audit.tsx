@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import AiDoctorConfidenceAudit from "@/pages/AiDoctorConfidenceAudit";
 
-export const Route = createFileRoute("/internal/ai-doctor-confidence-audit")({
+export const Route = createFileRoute("/_app/_operator/internal/ai-doctor-confidence-audit")({
   component: RouteComponent,
 });
 

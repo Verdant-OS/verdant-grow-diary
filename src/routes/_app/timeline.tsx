@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import Timeline from "@/pages/Timeline";
 
-export const Route = createFileRoute("/timeline")({
+export const Route = createFileRoute("/_app/timeline")({
   component: RouteComponent,
 });
 

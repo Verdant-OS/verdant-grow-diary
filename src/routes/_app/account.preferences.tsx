@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import AccountPreferences from "@/pages/AccountPreferences";
 
-export const Route = createFileRoute("/account/preferences")({
+export const Route = createFileRoute("/_app/account/preferences")({
   component: RouteComponent,
 });
 

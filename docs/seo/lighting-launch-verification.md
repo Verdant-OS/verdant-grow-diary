@@ -1,6 +1,6 @@
 # Lighting launch verification
 
-**Generated:** 2026-08-02T02:55:07.852Z
+**Generated:** 2026-08-02T05:19:48.245Z
 **Production host:** https://verdantgrowdiary.com
 **Merged PR:** [#595](https://github.com/Verdant-OS/verdant-grow-diary/pull/595)
 **Merge commit:** `1223c56c9db586160a2798d017c2e78d1de1dd5a`
@@ -48,13 +48,12 @@ numeric property ID and authenticated reporting baseline remain unavailable to C
   full deploy-branch parity. Lighting release-content verification remains deliberately scoped to the
   two guides; no runtime publish is required for the measurement evidence itself.
 - The point-in-time readiness artifact keeps its evidence-branch audit head
-  (`49370facd379179e3549acae0cb42ca75958f198`) separate from its audited production release
-  (`a20776993bd606f07977674934864b888a407e1c`). The former was one evidence-only commit ahead at
-  snapshot capture and is not represented as deployed content.
-- Its evidence snapshot remains timestamped `2026-08-02T02:55:07.852Z`. The later
-  `2026-08-02T04:36:17.280Z` revision is classified as
-  `STATUS_TAXONOMY_AND_MEASUREMENT_CONTRACT_METADATA_ONLY`; it is not a fresh production or
-  analytics verification.
+  (`c794e4c6ff0debb6ae2a83566b2a73f690a96393`) separate from its audited production release
+  (`a20776993bd606f07977674934864b888a407e1c`). The former was seven evidence-only commits ahead
+  at snapshot capture and is not represented as deployed content.
+- Its current evidence snapshot is timestamped `2026-08-02T05:19:48.245Z`; the revision is
+  classified as `POST_DEPLOY_TARGETED_ANALYTICS_REVERIFICATION`. It adds a targeted analytics
+  recheck only and does not replace the count-bearing nine-state matrix.
 - The current production response does not expose a Lovable deployment ID, so none is inferred.
 - Both release-specific URLs, titles, descriptions, H1s, Article/FAQ schema, sitemap entries, and
   cross-links are present in production.
@@ -190,10 +189,17 @@ explicit app emitter, and then authorize the same controlled re-verification.
 
 The production build subsequently advanced to `a2077699…`; its source delta excludes analytics
 paths, and current source inspection preserves the explicit SPA emitter and bootstrap
-`send_page_view: false`. A fresh controlled collection re-run was attempted after that deploy but did not
-return an inspectable final envelope, so no fresh event count or no-transmission claim is inferred
-from that attempt. The completed `2026-08-02T02:08:43.179Z` matrix remains the only count-bearing
-evidence until owner-authorized re-verification completes.
+`send_page_view: false`. A corrected targeted post-deploy recheck at `2026-08-02T05:19:48.245Z`
+fulfilled every observed GA collection request locally. Across a direct distance-guide load and a
+client transition to the stress guide, it observed two exact app-owned page views and one separate
+automatic page view without the explicit path: three page views for two navigation actions. The
+interceptor covered `analytics.google.com`, `google-analytics.com`, and
+`stats.g.doubleclick.net`; five collection requests were fulfilled locally and zero escaped.
+
+A preceding exploratory browser probe omitted `analytics.google.com` from its collection-host
+matcher. It is excluded from this evidence, and its transmission status is not asserted. The corrected
+two-state recheck reconfirms the P0 owner-setting defect but does not replace the completed
+`2026-08-02T02:08:43.179Z` nine-state matrix.
 
 **GA4 explicit page identity: PASS**
 

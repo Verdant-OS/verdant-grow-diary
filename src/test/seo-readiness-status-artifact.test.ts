@@ -67,9 +67,9 @@ describe("SEO readiness status artifact", () => {
       scope: "LIGHTING_LAUNCH_MEASUREMENT",
       generated_at_semantics: "EVIDENCE_SNAPSHOT_CAPTURE_TIME",
       artifact_revision: {
-        revised_at: "2026-08-02T04:36:17.280Z",
-        revision_scope: "STATUS_TAXONOMY_AND_MEASUREMENT_CONTRACT_METADATA_ONLY",
-        production_or_analytics_reverification_performed: false,
+        revised_at: "2026-08-02T05:19:48.245Z",
+        revision_scope: "POST_DEPLOY_TARGETED_ANALYTICS_REVERIFICATION",
+        production_or_analytics_reverification_performed: true,
       },
       timezone: "America/Chicago",
       artifact_semantics: "POINT_IN_TIME_EVIDENCE_SNAPSHOT",
@@ -119,7 +119,7 @@ describe("SEO readiness status artifact", () => {
     expect(READINESS.run_context).toEqual({
       repository: "Verdant-OS/verdant-grow-diary",
       audit_branch: "codex/seo-readiness-evidence-20260802",
-      audit_head: "49370facd379179e3549acae0cb42ca75958f198",
+      audit_head: "c794e4c6ff0debb6ae2a83566b2a73f690a96393",
       audit_head_is_descendant_of_deploy_branch_head: true,
       deploy_branch: "verdant-grow-diary",
       deploy_branch_head: "a20776993bd606f07977674934864b888a407e1c",
@@ -216,6 +216,25 @@ describe("SEO readiness status artifact", () => {
         automatic_page_views_without_explicit_page_path: 5,
         verification_events_transmitted: 0,
       },
+      last_targeted_recheck_at: "2026-08-02T05:19:48.245Z",
+      targeted_post_deploy_recheck: {
+        scope: "DIRECT_DEEP_LINK_AND_CROSS_GUIDE_CLIENT_NAVIGATION",
+        production_manifest_commit: "a20776993bd606f07977674934864b888a407e1c",
+        interceptor_host_coverage: [
+          "analytics.google.com",
+          "google-analytics.com",
+          "stats.g.doubleclick.net",
+        ],
+        collection_requests_fulfilled_locally: 5,
+        escaped_collection_requests: 0,
+        navigation_actions: 2,
+        exact_explicit_page_views: 2,
+        automatic_page_views_without_explicit_page_path: 1,
+        verification_events_transmitted: 0,
+        evidence_scope: "TARGETED_POST_DEPLOY_P0_RECHECK_NOT_A_FULL_MATRIX_REPLACEMENT",
+        excluded_exploratory_probe:
+          "A preceding exploratory browser probe omitted analytics.google.com from its interception matcher and is excluded from evidence; its transmission status is not asserted.",
+      },
     });
     expect(READINESS.ga4).toEqual({
       status: "BLOCKED",
@@ -301,6 +320,7 @@ describe("SEO readiness status artifact", () => {
     expect(production.release_content_scope).toBe("LIGHTING_GUIDES_ONLY");
     expect(release.release_content_scope).toBe("lighting_guides_only");
     expect(BASELINE.artifact_semantics).toBe("POINT_IN_TIME_EVIDENCE_SNAPSHOT");
+    expect(BASELINE.generated_at).toBe(READINESS.generated_at);
     expect(baselineGa4).toMatchObject({
       stream_identity_status: "pass_owner_confirmed_matches_production",
       stream: {
@@ -321,6 +341,24 @@ describe("SEO readiness status artifact", () => {
     expect((READINESS.measurement as Record<string, unknown>).measurement_start_at).toBe(
       BASELINE.measurement_start_at,
     );
+    expect(baselineGa4.targeted_post_deploy_recheck).toEqual({
+      observed_at: "2026-08-02T05:19:48.245Z",
+      scope: "direct_deep_link_and_cross_guide_client_navigation",
+      production_manifest_commit: "a20776993bd606f07977674934864b888a407e1c",
+      interceptor_host_coverage: [
+        "analytics.google.com",
+        "google-analytics.com",
+        "stats.g.doubleclick.net",
+      ],
+      collection_requests_fulfilled_locally: 5,
+      escaped_collection_requests: 0,
+      navigation_actions: 2,
+      exact_explicit_page_views: 2,
+      automatic_page_views_without_explicit_page_path: 1,
+      verification_events_transmitted: 0,
+      evidence_scope: "targeted_post_deploy_p0_recheck_not_a_full_matrix_replacement",
+      excluded_exploratory_probe_transmission_status: "unknown_not_evidence",
+    });
   });
 
   it("leaves Day 0 and every weekly checkpoint unset", () => {
@@ -471,6 +509,9 @@ describe("SEO readiness status artifact", () => {
     expect(LAUNCH_VERIFICATION).toContain("NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND");
     expect(LAUNCH_VERIFICATION).toContain("P2 LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT");
     expect(LAUNCH_VERIFICATION).toContain("P3 READINESS_ARTIFACT_PROVENANCE");
+    expect(LAUNCH_VERIFICATION).toContain(
+      "A preceding exploratory browser probe omitted `analytics.google.com` from its collection-host",
+    );
     expect(internalLinkMap).toContain("both lighting routes are live");
     expect(internalLinkMap).not.toContain("they are not claimed as deployed");
   });

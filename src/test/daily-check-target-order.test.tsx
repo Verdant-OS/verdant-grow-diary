@@ -74,7 +74,16 @@ const baseMockPlants = [
     is_archived: false,
   },
 ];
-let mockPlants = baseMockPlants.map((plant) => ({ ...plant }));
+type MockPlant = {
+  id: string;
+  name: string;
+  strain: string | null;
+  grow_id: string | null;
+  tent_id: string | null;
+  stage: string;
+  is_archived: boolean;
+};
+let mockPlants: MockPlant[] = baseMockPlants.map((plant) => ({ ...plant }));
 
 const baseMockTents = [
   { id: "t1", name: "Default Tent", grow_id: "g1" },

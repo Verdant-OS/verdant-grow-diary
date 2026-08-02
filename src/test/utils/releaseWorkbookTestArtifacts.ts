@@ -118,7 +118,7 @@ function positiveDuration(value: number, label: string): number {
 }
 
 function isProcessRunning(pid: number | undefined): boolean {
-  if (!Number.isSafeInteger(pid) || (pid ?? 0) <= 0) return false;
+  if (pid === undefined || !Number.isSafeInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
     return true;

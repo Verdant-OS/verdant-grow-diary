@@ -56,7 +56,7 @@ function jobBlocks(workflow: string): string[] {
     }
   }
 
-  const candidates = [];
+  const candidates: { entry: MappingEntry; indent: number; index: number }[] = [];
   for (let index = jobsLine.index + 1; index < sectionEnd; index += 1) {
     const entry = mappingEntry(lines[index]);
     if (entry) candidates.push({ entry, indent: indentation(lines[index]), index });
@@ -122,7 +122,7 @@ function isPullRequestCapable(workflow: string): boolean {
     return /(?:^|[\s,[{])["']?pull_request(?:_target)?["']?(?=$|[\s,\]}:])/.test(inlineSource);
   }
 
-  const eventCandidates = [];
+  const eventCandidates: { entry: MappingEntry; indent: number }[] = [];
   for (let index = onLine.index + 1; index < lines.length; index += 1) {
     const line = lines[index];
     if (!line.trim() || line.trimStart().startsWith("#")) continue;

@@ -60,8 +60,8 @@ describe("validateAndSanitizeDiagnosis — schema", () => {
     expect(diagnosis!.riskLevel).toBe("medium");
     expect(diagnosis!.evidence).toHaveLength(2);
     expect(diagnosis!.possibleCauses).toHaveLength(2);
-    expect(diagnosis!.followUp24h.checklist).toContain("Log a photo");
-    expect(diagnosis!.recoveryPlan3d.summary).toMatch(/stabilize/i);
+    expect(diagnosis!.followUp24h!.checklist).toContain("Log a photo");
+    expect(diagnosis!.recoveryPlan3d!.summary).toMatch(/stabilize/i);
     expect(diagnosis!.suggestedActions).toHaveLength(1);
     expect(diagnosis!.suggestedActions[0].approvalRequired).toBe(true);
     expect(notes).toEqual([]);

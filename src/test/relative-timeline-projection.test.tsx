@@ -369,7 +369,6 @@ describe("groupRelativeTimelineByStage — pure rules", () => {
   }
   function item(over: Partial<RelativeTimelineItem> & { id: string }): RelativeTimelineItem {
     return {
-      id: over.id,
       eventType: "note",
       title: "t",
       occurredAt: "2026-04-05T00:00:00Z",
@@ -607,7 +606,6 @@ import { fireEvent } from "@testing-library/react";
 
 function tItem(over: Partial<RelativeTimelineItem> & { id: string }): RelativeTimelineItem {
   return {
-    id: over.id,
     eventType: "note",
     title: "t",
     occurredAt: "2026-04-05T00:00:00Z",

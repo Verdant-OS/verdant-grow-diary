@@ -26,6 +26,7 @@ import {
   decide,
   transactionPriceIdNeedingLookup,
   type Decision,
+  type EventLike,
   type PaddleEnv,
 } from "./eventProcessor.ts";
 
@@ -61,10 +62,8 @@ export interface ExistingEventRow {
   processing_status: ProcessingStatus;
 }
 
-export interface EventLikeWithId {
+export interface EventLikeWithId extends EventLike {
   eventId?: string;
-  eventType?: string;
-  data?: unknown;
 }
 
 export interface MarkPatch {

@@ -97,7 +97,7 @@ describe("normalizeVpdStage classifies adapter output correctly", () => {
   };
 
   it("badge fires when adapter receives a null stage", () => {
-    const t = mapTentRow({ ...baseTent, stage: null });
+    const t = mapTentRow({ ...baseTent, stage: null } as unknown as Parameters<typeof mapTentRow>[0]);
     expect(normalizeVpdStage(t.stage)).toBe("unknown");
   });
 
@@ -137,9 +137,9 @@ describe("normalizeVpdStage classifies adapter output correctly", () => {
       created_at: "x",
       updated_at: "x",
     };
-    expect(normalizeVpdStage(mapPlantRow(basePlant).stage)).toBe("unknown");
+    expect(normalizeVpdStage(mapPlantRow(basePlant as unknown as Parameters<typeof mapPlantRow>[0]).stage)).toBe("unknown");
     expect(
-      normalizeVpdStage(mapPlantRow({ ...basePlant, stage: "veg" }).stage),
+      normalizeVpdStage(mapPlantRow({ ...basePlant, stage: "veg" } as unknown as Parameters<typeof mapPlantRow>[0]).stage),
     ).toBe("veg");
   });
 });

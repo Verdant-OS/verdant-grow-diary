@@ -110,6 +110,7 @@ function FollowUpBlock({
   followUp: Diagnosis["followUp24h"];
   testId: string;
 }) {
+  if (!followUp) return null;
   return (
     <div
       data-testid={testId}

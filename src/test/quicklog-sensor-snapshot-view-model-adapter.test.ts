@@ -220,8 +220,8 @@ describe("adaptQuickLogSensorContextInput — metrics and safety", () => {
     expect(metrics.find((m) => m.key === "rh")?.value).toBe(55);
     expect(metrics.find((m) => m.key === "vpd")?.value).toBe(1.1);
     expect(metrics.find((m) => m.key === "soil")?.value).toBe(40);
-    // co2 is null upstream → omitted, never invented as zero
-    expect(metrics.find((m) => m.key === "co2")).toBeUndefined();
+    // co2 is null upstream → omitted, never invented as zero (co2 not a SensorSnapshotMetricKey)
+    expect(metrics.map((m) => m.key as string)).not.toContain("co2");
   });
 
   it("omits null metrics rather than inventing zeros", () => {

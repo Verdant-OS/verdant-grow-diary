@@ -43,8 +43,8 @@ export interface Diagnosis {
   possibleCauses: string[];
   immediateAction: string | null;
   whatNotToDo: string[];
-  followUp24h: DiagnosisFollowUp;
-  recoveryPlan3d: DiagnosisFollowUp;
+  followUp24h: DiagnosisFollowUp | null;
+  recoveryPlan3d: DiagnosisFollowUp | null;
   riskLevel: DiagnosisRiskLevel;
   /** Max 2 entries, always approval-required. */
   suggestedActions: DiagnosisSuggestedAction[];
@@ -292,11 +292,17 @@ export function validateAndSanitizeDiagnosis(input: unknown): SanitizeReport {
 
   const followUp24h = coerceFollowUp(
     input.followUp24h,
-    CAUTIOUS_FALLBACK.followUp24h,
+    CAUTIOUS_FALLBACK.followUp24h ?? {
+      summary: "Log one observation in the next 24 hours.",
+      checklist: ["Add a note or photo", "Capture a sensor snapshot"],
+    },
   );
   const recoveryPlan3d = coerceFollowUp(
     input.recoveryPlan3d,
-    CAUTIOUS_FALLBACK.recoveryPlan3d,
+    CAUTIOUS_FALLBACK.recoveryPlan3d ?? {
+      summary: "Build a small baseline over the next 3 days before changing inputs.",
+      checklist: ["Daily note", "Daily photo", "Watering log"],
+    },
   );
 
   const riskLevel = coerceRiskLevel(input.riskLevel);

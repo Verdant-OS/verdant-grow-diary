@@ -252,9 +252,9 @@ function makeSupabaseMock(rows: Array<Record<string, unknown>>, error: unknown =
       return __c;
     },
   });
-  return { from: () => chain } as unknown as Parameters<
-    typeof loadActionFollowUpExistingPhotoCandidates
-  >[1]["supabase"];
+  return { from: () => chain } as unknown as NonNullable<
+    Parameters<typeof loadActionFollowUpExistingPhotoCandidates>[1]
+  >["supabase"];
 }
 
 describe("loadActionFollowUpExistingPhotoCandidates", () => {
@@ -306,7 +306,7 @@ describe("loadActionFollowUpExistingPhotoCandidates", () => {
       from: () => {
         throw new Error("network");
       },
-    } as unknown as Parameters<typeof loadActionFollowUpExistingPhotoCandidates>[1]["supabase"];
+    } as unknown as NonNullable<Parameters<typeof loadActionFollowUpExistingPhotoCandidates>[1]>["supabase"];
     const res = await loadActionFollowUpExistingPhotoCandidates(CTX, {
       supabase: bad,
     });

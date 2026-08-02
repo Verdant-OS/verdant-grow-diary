@@ -62,7 +62,7 @@ export const READINESS_FIXTURE_PLANT = Object.freeze({
   id: "p1",
   name: "Plant A",
   strain: "Northern Lights",
-  stage: "veg" as const,
+  stage: "veg" as string | null,
   grow_id: "g1",
   tent_id: "t1",
 });
@@ -70,7 +70,14 @@ export const READINESS_FIXTURE_PLANT = Object.freeze({
 export interface BuildReadinessContextArgs {
   growEvents?: ReadonlyArray<Record<string, unknown>>;
   sensorReadings?: ReadonlyArray<Record<string, unknown>>;
-  plant?: Partial<typeof READINESS_FIXTURE_PLANT>;
+  plant?: Partial<{
+    id: string;
+    name: string;
+    strain: string;
+    stage: string | null;
+    grow_id: string;
+    tent_id: string;
+  }>;
 }
 
 export function buildReadinessContext(

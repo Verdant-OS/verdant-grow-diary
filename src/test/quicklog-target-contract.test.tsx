@@ -563,7 +563,7 @@ describe("Quick Log canonical target contract", () => {
       JSON.parse(getLocalStorageItemForTest("verdant.quickLog.lastTarget.v1") ?? "{}"),
     ).toEqual(expect.objectContaining({ plantId: "p1", growId: "g1", tentId: "t1" }));
     const invalidatedKeys = invalidateSpy.mock.calls.map(([options]) =>
-      JSON.stringify(options.queryKey),
+      JSON.stringify(options!.queryKey),
     );
     expect(invalidatedKeys).toContain(JSON.stringify(["plant_recent_activity", "p1"]));
     expect(invalidatedKeys).toContain(JSON.stringify(["tent_recent_activity", "t1"]));

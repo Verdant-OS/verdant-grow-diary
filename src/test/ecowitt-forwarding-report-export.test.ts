@@ -147,15 +147,12 @@ describe("buildSanitizedForwardingReport", () => {
   it("coerces non-finite numbers and non-string errors safely", () => {
     const report = buildSanitizedForwardingReport({
       status: status({
-        // @ts-expect-error intentional garbage input from a degraded listener
         retry_count: "3",
-        // @ts-expect-error intentional garbage
         max_retry_attempts: Number.NaN,
-        // @ts-expect-error intentional garbage
         last_forward_error: 404,
-        // @ts-expect-error intentional garbage
         last_forward_status: "200",
-      }),
+        // intentional garbage from a degraded listener — runtime coercion under test
+      } as never),
       nowIso: NOW_ISO,
     });
 

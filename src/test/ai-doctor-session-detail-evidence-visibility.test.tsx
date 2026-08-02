@@ -96,7 +96,7 @@ describe("buildCautionNote (pure helper)", () => {
         riskLevel: "low",
         evidence: ["x"],
         missingInformation: [],
-      } as Diagnosis,
+      } as unknown as Diagnosis,
       displayedConfidence: 0.9,
     });
     const note = buildCautionNote(vm);

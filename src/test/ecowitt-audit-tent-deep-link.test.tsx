@@ -43,10 +43,27 @@ vi.mock("@/integrations/supabase/client", () => ({
         eq: () => ({
           eq: () => ({
             order: () => ({
-              order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+              order: () => ({
+                limit: () => {
+                  const __c: any = {
+                    abortSignal: () => __c,
+                    then: (r: any, j?: any) =>
+                      Promise.resolve({ data: [], error: null }).then(r, j),
+                  };
+                  return __c;
+                },
+              }),
             }),
           }),
-          order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+          order: () => ({
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+              };
+              return __c;
+            },
+          }),
         }),
       }),
     }),
@@ -102,9 +119,7 @@ describe("EcowittIngestAudit — URL-driven tent selection", () => {
   it("initializes selected tent from ?tentId= (Flower opens with Flower selected)", async () => {
     renderAuditAt(`/sensors/ecowitt-audit?tentId=${FLOWER_TENT}`);
     await waitFor(() => {
-      const sel = screen.getByTestId(
-        "ecowitt-audit-tent-select",
-      ) as HTMLSelectElement;
+      const sel = screen.getByTestId("ecowitt-audit-tent-select") as HTMLSelectElement;
       expect(sel.value).toBe(FLOWER_TENT);
       expect(sel.value).not.toBe(SEEDLING_TENT);
     });
@@ -113,9 +128,7 @@ describe("EcowittIngestAudit — URL-driven tent selection", () => {
   it("invalid tent id renders the safe fallback copy", async () => {
     renderAuditAt(`/sensors/ecowitt-audit?tentId=does-not-exist`);
     await waitFor(() => {
-      expect(
-        screen.getByTestId("ecowitt-audit-invalid-tent"),
-      ).toHaveTextContent(
+      expect(screen.getByTestId("ecowitt-audit-invalid-tent")).toHaveTextContent(
         "The requested tent could not be selected. Choose a tent to view EcoWitt ingest evidence.",
       );
     });
@@ -123,9 +136,7 @@ describe("EcowittIngestAudit — URL-driven tent selection", () => {
 
   it("dropdown change updates the URL ?tentId= without removing other params", async () => {
     renderAuditAt(`/sensors/ecowitt-audit?keep=me&tentId=${SEEDLING_TENT}`);
-    const sel = (await screen.findByTestId(
-      "ecowitt-audit-tent-select",
-    )) as HTMLSelectElement;
+    const sel = (await screen.findByTestId("ecowitt-audit-tent-select")) as HTMLSelectElement;
     fireEvent.change(sel, { target: { value: FLOWER_TENT } });
     await waitFor(() => {
       expect(sel.value).toBe(FLOWER_TENT);

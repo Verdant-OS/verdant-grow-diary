@@ -42,7 +42,15 @@ vi.mock("@/integrations/supabase/client", () => ({
       update: () => ({ eq: vi.fn() }),
       select: () => ({
         eq: () => ({
-          order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+          order: () => ({
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+              };
+              return __c;
+            },
+          }),
         }),
       }),
     }),
@@ -63,9 +71,7 @@ vi.mock("@/store/grows", () => ({
 }));
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
-    data: [
-      { id: "plant-1", name: "Verdant Test Plant", tent_id: "tent-1", grow_id: "grow-1" },
-    ],
+    data: [{ id: "plant-1", name: "Verdant Test Plant", tent_id: "tent-1", grow_id: "grow-1" }],
   }),
 }));
 vi.mock("@/hooks/use-tents", () => ({
@@ -159,17 +165,13 @@ describe("Quick Log Environment Check — save behavior", () => {
 
   it("labels room temperature with the active unit (fahrenheit by default)", () => {
     const dialog = openEnvironmentForm();
-    expect(
-      within(dialog).getByLabelText("Room temperature (°F)"),
-    ).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Room temperature (°F)")).toBeInTheDocument();
   });
 
   it("labels room temperature in Celsius and stores temp_c when the preference is celsius", async () => {
     saveTemperatureUnitPreference("celsius");
     const dialog = openEnvironmentForm();
-    expect(
-      within(dialog).getByLabelText("Room temperature (°C)"),
-    ).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Room temperature (°C)")).toBeInTheDocument();
     const ta = dialog.querySelector("textarea") as HTMLTextAreaElement;
     fireEvent.change(ta, { target: { value: "Reading." } });
     fireEvent.change(within(dialog).getByTestId("quick-log-env-room-temp-f"), {

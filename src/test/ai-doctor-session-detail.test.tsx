@@ -57,20 +57,40 @@ vi.mock("@/integrations/supabase/client", () => {
       from: () => ({
         select: () => ({
           eq: (_col: string, value: string) => ({
-            order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+            order: () => ({
+              limit: () => {
+                const __c: any = {
+                  abortSignal: () => __c,
+                  then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+                };
+                return __c;
+              },
+            }),
             maybeSingle: () =>
               Promise.resolve(
-                value === "sess-1"
-                  ? { data: fixture, error: null }
-                  : { data: null, error: null },
+                value === "sess-1" ? { data: fixture, error: null } : { data: null, error: null },
               ),
           }),
           in: () => ({
             order: () => ({
-              limit: () => Promise.resolve({ data: [], error: null }),
+              limit: () => {
+                const c: any = {
+                  abortSignal: () => c,
+                  then: (r: any) => Promise.resolve({ data: [], error: null }).then(r),
+                };
+                return c;
+              },
             }),
           }),
-          order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+          order: () => ({
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+              };
+              return __c;
+            },
+          }),
         }),
       }),
     },

@@ -78,7 +78,15 @@ vi.mock("@/integrations/supabase/client", () => {
   const sessionsBuilder = () => ({
     select: () => ({
       eq: (_col: string, value: string) => ({
-        order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+        order: () => ({
+          limit: () => {
+            const __c: any = {
+              abortSignal: () => __c,
+              then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+            };
+            return __c;
+          },
+        }),
         maybeSingle: () =>
           Promise.resolve(
             value === currentFixture.id
@@ -92,9 +100,25 @@ vi.mock("@/integrations/supabase/client", () => {
   const reviewsBuilder = () => ({
     select: () => ({
       in: () => ({
-        order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+        order: () => ({
+          limit: () => {
+            const __c: any = {
+              abortSignal: () => __c,
+              then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+            };
+            return __c;
+          },
+        }),
       }),
-      order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+      order: () => ({
+        limit: () => {
+          const __c: any = {
+            abortSignal: () => __c,
+            then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+          };
+          return __c;
+        },
+      }),
     }),
     insert: () => Promise.resolve({ data: null, error: null }),
   });
@@ -106,7 +130,13 @@ vi.mock("@/integrations/supabase/client", () => {
       in: () => chain,
       like: () => chain,
       order: () => chain,
-      limit: () => Promise.resolve({ data: linkedRows, error: null }),
+      limit: () => {
+        const __c: any = {
+          abortSignal: () => __c,
+          then: (r: any, j?: any) => Promise.resolve({ data: linkedRows, error: null }).then(r, j),
+        };
+        return __c;
+      },
     };
     return chain;
   };
@@ -146,10 +176,7 @@ function renderDetail() {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[`/doctor/sessions/${SESSION_ID}`]}>
         <Routes>
-          <Route
-            path="/doctor/sessions/:sessionId"
-            element={<AiDoctorSessionDetail />}
-          />
+          <Route path="/doctor/sessions/:sessionId" element={<AiDoctorSessionDetail />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -226,9 +253,7 @@ describe("AiDoctorSessionDetail — 'Created from this session' chip", () => {
     expect(marked.getAttribute("data-action-queue-id")).toBe("aq-fan");
 
     // The first suggestion ("Raise light") should not be marked.
-    const items = within(list).getAllByTestId(
-      "ai-doctor-session-detail-review-action",
-    );
+    const items = within(list).getAllByTestId("ai-doctor-session-detail-review-action");
     const raiseLight = items.find((li) => li.textContent?.startsWith("Raise light"));
     expect(raiseLight).toBeTruthy();
     expect(
@@ -244,9 +269,7 @@ describe("AiDoctorSessionDetail — 'Created from this session' chip", () => {
     await findReviewActionsList();
     await waitFor(() => {
       expect(
-        screen.queryByTestId(
-          "ai-doctor-session-detail-review-action-created-from-session-chip",
-        ),
+        screen.queryByTestId("ai-doctor-session-detail-review-action-created-from-session-chip"),
       ).toBeNull();
     });
   });
@@ -262,9 +285,7 @@ describe("AiDoctorSessionDetail — 'Created from this session' chip", () => {
       },
     ];
     renderDetail();
-    expect(
-      await screen.findByTestId("ai-doctor-session-detail-linked-action-queue"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-session-detail-linked-action-queue")).toBeTruthy();
   });
 
   it("preserves the existing Add to Action Queue button", async () => {
@@ -338,18 +359,12 @@ describe("AiDoctorSessionDetail — 'Created from this session' chip", () => {
 
 // --- Static safety scan ------------------------------------------------------
 const ROOT = resolve(__dirname, "../..");
-const PAGE = readFileSync(
-  resolve(ROOT, "src/pages/AiDoctorSessionDetail.tsx"),
-  "utf8",
-);
+const PAGE = readFileSync(resolve(ROOT, "src/pages/AiDoctorSessionDetail.tsx"), "utf8");
 const HOOK = readFileSync(
   resolve(ROOT, "src/hooks/useAiDoctorSessionLinkedActionQueueItems.ts"),
   "utf8",
 );
-const VM = readFileSync(
-  resolve(ROOT, "src/lib/aiDoctorSessionLinkedActionsViewModel.ts"),
-  "utf8",
-);
+const VM = readFileSync(resolve(ROOT, "src/lib/aiDoctorSessionLinkedActionsViewModel.ts"), "utf8");
 
 describe("Created-from-session chip — static safety", () => {
   it("no new action_queue write chains in the page", () => {

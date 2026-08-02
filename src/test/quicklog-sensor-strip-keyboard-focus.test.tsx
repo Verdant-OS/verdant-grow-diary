@@ -18,7 +18,15 @@ vi.mock("@/integrations/supabase/client", () => ({
       update: () => ({ eq: () => Promise.resolve({ error: null }) }),
       select: () => ({
         eq: () => ({
-          order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+          order: () => ({
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+              };
+              return __c;
+            },
+          }),
         }),
       }),
     }),
@@ -86,9 +94,7 @@ describe("QuickLog — attach switch session helper + focus order", () => {
     expect(helper).toHaveTextContent(
       "Applies to this log only. Closing Quick Log resets this choice.",
     );
-    expect(helper.textContent ?? "").not.toMatch(
-      /localStorage|persist|remembered/i,
-    );
+    expect(helper.textContent ?? "").not.toMatch(/localStorage|persist|remembered/i);
   });
 
   it("attach Switch is described by the session helper", () => {
@@ -96,9 +102,7 @@ describe("QuickLog — attach switch session helper + focus order", () => {
     const sw = screen.getByRole("switch", {
       name: /attach sensor snapshot to this log/i,
     });
-    expect(sw.getAttribute("aria-describedby")).toBe(
-      "quick-log-snapshot-session-helper",
-    );
+    expect(sw.getAttribute("aria-describedby")).toBe("quick-log-snapshot-session-helper");
   });
 
   it("attach Switch precedes the strip /sensors action in DOM/tab order", () => {
@@ -115,9 +119,7 @@ describe("QuickLog — attach switch session helper + focus order", () => {
 
   it("strip action link is a real anchor with href='/sensors'", () => {
     renderQL();
-    const action = screen.getByTestId(
-      "quicklog-sensor-snapshot-action",
-    ) as HTMLAnchorElement;
+    const action = screen.getByTestId("quicklog-sensor-snapshot-action") as HTMLAnchorElement;
     expect(action.tagName).toBe("A");
     expect(action.getAttribute("href")).toBe("/sensors");
   });

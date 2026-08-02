@@ -36,7 +36,13 @@ vi.mock("@/integrations/supabase/client", () => {
       select: () => chain,
       eq: () => chain,
       order: () => chain,
-      limit: () => Promise.resolve({ data: rowsMock, error: null }),
+      limit: () => {
+        const __c: any = {
+          abortSignal: () => __c,
+          then: (r: any, j?: any) => Promise.resolve({ data: rowsMock, error: null }).then(r, j),
+        };
+        return __c;
+      },
     };
     return chain;
   };
@@ -266,9 +272,7 @@ describe("EcowittLatestSnapshotCard — proof card behavior", () => {
         ),
       );
       expect(screen.getByTestId("ecowitt-source-badge")).toHaveTextContent("Invalid");
-      expect(screen.getByTestId("ecowitt-metric-vpd_kpa")).toHaveTextContent(
-        "Unavailable",
-      );
+      expect(screen.getByTestId("ecowitt-metric-vpd_kpa")).toHaveTextContent("Unavailable");
       expect(screen.queryByText(/^Ecowitt$/)).not.toBeInTheDocument();
     },
   );

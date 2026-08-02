@@ -13,11 +13,14 @@ function makeChain() {
       calls.push({ method, args });
       return chain;
     };
-  for (const m of ["select", "in", "eq", "order"]) chain[m] = record(m);
+  for (const m of ["select", "in", "eq", "order", "abortSignal"]) chain[m] = record(m);
   chain.limit = (...args: unknown[]) => {
     calls.push({ method: "limit", args });
-    return Promise.resolve(resolveWith);
+    return chain;
   };
+  // Thenable terminal — matches PostgREST builder await.
+  chain.then = (onFulfilled: (v: unknown) => unknown, onRejected?: (e: unknown) => unknown) =>
+    Promise.resolve(resolveWith).then(onFulfilled, onRejected);
   return chain;
 }
 
@@ -114,9 +117,7 @@ describe("loadPhenoEvidenceReceiptRows — bounded batch read", () => {
   });
 
   it("fails closed on missing hunt id / empty ids / query error", async () => {
-    expect((await loadPhenoEvidenceReceiptRows({ huntId: "  ", plantIds: ["p1"] })).ok).toBe(
-      false,
-    );
+    expect((await loadPhenoEvidenceReceiptRows({ huntId: "  ", plantIds: ["p1"] })).ok).toBe(false);
     expect(fromMock).not.toHaveBeenCalled();
     expect((await loadPhenoEvidenceReceiptRows({ huntId: "h", plantIds: [] })).ok).toBe(false);
     resolveWith = { data: null, error: { message: "boom" } };
@@ -128,5 +129,31 @@ describe("loadPhenoEvidenceReceiptRows — bounded batch read", () => {
     await loadPhenoEvidenceReceiptRows({ huntId: "hunt-1", plantIds: ["p1"] });
     const serialized = JSON.stringify(calls);
     expect(serialized).not.toMatch(/user_id|owner_id/);
+  });
+
+  it("forwards AbortSignal to PostgREST via abortSignal", async () => {
+    const ac = new AbortController();
+    await loadPhenoEvidenceReceiptRows({
+      huntId: "hunt-1",
+      plantIds: ["p1"],
+      signal: ac.signal,
+    });
+    const abortCall = calls.find((c) => c.method === "abortSignal");
+    expect(abortCall?.args[0]).toBe(ac.signal);
+  });
+
+  it("omits abortSignal when no signal is provided", async () => {
+    await loadPhenoEvidenceReceiptRows({ huntId: "hunt-1", plantIds: ["p1"] });
+    expect(calls.some((c) => c.method === "abortSignal")).toBe(false);
+  });
+
+  it("rethrows abort-shaped errors instead of ok:false empty coverage", async () => {
+    resolveWith = {
+      data: null,
+      error: { name: "AbortError", message: "The user aborted a request." },
+    };
+    await expect(
+      loadPhenoEvidenceReceiptRows({ huntId: "hunt-1", plantIds: ["p1"] }),
+    ).rejects.toBeInstanceOf(DOMException);
   });
 });

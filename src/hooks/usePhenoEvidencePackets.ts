@@ -8,6 +8,9 @@
  * workspace/comparison coverage without a reload. Stale responses are dropped
  * structurally: hunt or id-set changes produce a different query key, and
  * packets are derived from the key-matched result only.
+ *
+ * TanStack Query AbortSignal is forwarded to PostgREST so key changes and
+ * cancel do not leave orphaned receipt batch HTTP calls.
  */
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -39,9 +42,7 @@ export function usePhenoEvidencePackets(input: {
   configuredGoals: unknown;
 }): UsePhenoEvidencePacketsResult {
   const huntId =
-    typeof input.huntId === "string" && input.huntId.trim().length > 0
-      ? input.huntId.trim()
-      : null;
+    typeof input.huntId === "string" && input.huntId.trim().length > 0 ? input.huntId.trim() : null;
 
   // Deterministic key part: dedupe + sort so the same id-set (in any order)
   // shares one cached batch, and any membership change forms a new key.
@@ -58,8 +59,12 @@ export function usePhenoEvidencePackets(input: {
   const query = useQuery<LoadPhenoEvidenceReceiptRowsResult>({
     queryKey: ["pheno_evidence_receipts", "packets", huntId, idsKey],
     enabled,
-    queryFn: () =>
-      loadPhenoEvidenceReceiptRows({ huntId: huntId!, plantIds: idsKey.split(",") }),
+    queryFn: ({ signal }) =>
+      loadPhenoEvidenceReceiptRows({
+        huntId: huntId!,
+        plantIds: idsKey.split(","),
+        signal,
+      }),
   });
 
   const result = query.data ?? null;

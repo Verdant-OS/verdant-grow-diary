@@ -9,7 +9,12 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import AiDoctorSessionDetail from "@/pages/AiDoctorSessionDetail";
-import { buildReviewSummaryViewModel, riskTone, isHighRiskLevel, pctFromUnit } from "@/lib/aiDoctorSessionDetailViewModel";
+import {
+  buildReviewSummaryViewModel,
+  riskTone,
+  isHighRiskLevel,
+  pctFromUnit,
+} from "@/lib/aiDoctorSessionDetailViewModel";
 import type { Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
 import type { AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
 
@@ -63,7 +68,15 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: () => ({
       select: () => ({
         eq: () => ({
-          order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+          order: () => ({
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+              };
+              return __c;
+            },
+          }),
           maybeSingle: () => Promise.resolve({ data: currentRow, error: null }),
         }),
       }),
@@ -141,7 +154,9 @@ describe("AiDoctorSessionDetail — Review Summary rendering", () => {
     renderRoute(<AiDoctorSessionDetail />);
     expect(await screen.findByTestId("ai-doctor-session-detail-review-summary")).toBeTruthy();
     expect(screen.getByTestId("ai-doctor-session-detail-review-risk").textContent).toMatch(/high/i);
-    expect(screen.getByTestId("ai-doctor-session-detail-review-confidence").textContent).toMatch(/70/);
+    expect(screen.getByTestId("ai-doctor-session-detail-review-confidence").textContent).toMatch(
+      /70/,
+    );
   });
 
   it("renders evidence and missing-information lists", async () => {
@@ -219,7 +234,17 @@ describe("AiDoctorSessionDetail — safety scan", () => {
     expect(ALL).not.toContain("service_role");
     expect(ALL).not.toContain("action_queue");
     expect(ALL).not.toContain("alert_events");
-    const banned = ["mqtt", "auto-execute", "actuate", "device.command", "relay.on", "relay.off", "home-assistant", "home_assistant", "smart plug"];
+    const banned = [
+      "mqtt",
+      "auto-execute",
+      "actuate",
+      "device.command",
+      "relay.on",
+      "relay.off",
+      "home-assistant",
+      "home_assistant",
+      "smart plug",
+    ];
     for (const tok of banned) expect(ALL).not.toContain(tok);
   });
 });

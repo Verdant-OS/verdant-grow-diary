@@ -21,7 +21,15 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: () => ({
       select: () => ({
         eq: () => ({
-          order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+          order: () => ({
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+              };
+              return __c;
+            },
+          }),
           maybeSingle: () => Promise.resolve({ data: currentFixture, error: null }),
         }),
       }),
@@ -38,10 +46,7 @@ function renderRoute(row: AiDoctorSessionRow | null) {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={["/doctor/sessions/sess-x"]}>
         <Routes>
-          <Route
-            path="/doctor/sessions/:sessionId"
-            element={<AiDoctorSessionDetail />}
-          />
+          <Route path="/doctor/sessions/:sessionId" element={<AiDoctorSessionDetail />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -89,8 +94,7 @@ beforeEach(() => {
 
 const VERIFY = "Verify the diagnosis against the plant photos and recent logs.";
 const REVIEW_RISK = "Review the risk level before taking corrective action.";
-const CONFIRM_CONTEXT =
-  "Confirm plant, tent, sensor, watering, and feeding context.";
+const CONFIRM_CONTEXT = "Confirm plant, tent, sensor, watering, and feeding context.";
 
 describe("buildCautionReviewChecklist — pure helper", () => {
   it("returns empty for no tokens", () => {
@@ -121,11 +125,7 @@ describe("buildCautionReviewChecklist — pure helper", () => {
 
   it("dedupes duplicate tokens", () => {
     expect(
-      buildCautionReviewChecklist([
-        "low confidence",
-        "low confidence",
-        "unrecorded confidence",
-      ]),
+      buildCautionReviewChecklist(["low confidence", "low confidence", "unrecorded confidence"]),
     ).toEqual([VERIFY]);
   });
 
@@ -142,9 +142,7 @@ describe("AiDoctorSessionDetail — caution checklist rendering", () => {
         { displayed_confidence: 0.2, raw_confidence: 0.2 },
       ),
     );
-    const checklist = await screen.findByTestId(
-      "ai-doctor-session-detail-caution-checklist",
-    );
+    const checklist = await screen.findByTestId("ai-doctor-session-detail-caution-checklist");
     const items = checklist.querySelectorAll(
       '[data-testid="ai-doctor-session-detail-caution-checklist-item"]',
     );
@@ -157,9 +155,7 @@ describe("AiDoctorSessionDetail — caution checklist rendering", () => {
 
   it("renders only the relevant checklist item for a single reason", async () => {
     renderRoute(makeRow({ riskLevel: "high" }));
-    const checklist = await screen.findByTestId(
-      "ai-doctor-session-detail-caution-checklist",
-    );
+    const checklist = await screen.findByTestId("ai-doctor-session-detail-caution-checklist");
     const items = checklist.querySelectorAll(
       '[data-testid="ai-doctor-session-detail-caution-checklist-item"]',
     );
@@ -170,27 +166,19 @@ describe("AiDoctorSessionDetail — caution checklist rendering", () => {
     renderRoute(makeRow());
     // Allow the detail page to settle.
     await screen.findByText(/AI Doctor session/i).catch(() => null);
-    expect(
-      screen.queryByTestId("ai-doctor-session-detail-caution-checklist"),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId("ai-doctor-session-detail-caution-note"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-session-detail-caution-checklist")).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-session-detail-caution-note")).toBeNull();
   });
 });
 
 describe("Static safety scan — caution checklist slice", () => {
   const ROOT = resolve(__dirname, "../..");
-  const tsxFiles = [
-    "src/pages/AiDoctorSessionDetail.tsx",
-  ];
+  const tsxFiles = ["src/pages/AiDoctorSessionDetail.tsx"];
   const helperFile = readFileSync(
     resolve(ROOT, "src/lib/aiDoctorSessionDetailViewModel.ts"),
     "utf8",
   );
-  const tsxSources = tsxFiles.map((p) =>
-    readFileSync(resolve(ROOT, p), "utf8"),
-  );
+  const tsxSources = tsxFiles.map((p) => readFileSync(resolve(ROOT, p), "utf8"));
   const ALL = [helperFile, ...tsxSources].join("\n");
 
   it("no writes", () => {

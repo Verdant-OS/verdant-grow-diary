@@ -33,7 +33,17 @@ vi.mock("@/integrations/supabase/client", () => {
   function makeChain(initial: unknown[]) {
     let current = initial;
     const chain: Record<string, unknown> = {};
-    const passthrough = ["select", "eq", "order", "limit", "range", "not", "gte", "or"];
+    const passthrough = [
+      "select",
+      "eq",
+      "order",
+      "limit",
+      "range",
+      "not",
+      "gte",
+      "or",
+      "abortSignal",
+    ];
     for (const m of passthrough) chain[m] = () => chain;
     chain.in = (column: string, values: unknown) => {
       reviewInCalls.push({ column, values });
@@ -58,10 +68,7 @@ vi.mock("@/integrations/supabase/client", () => {
   };
 });
 
-function makeRow(
-  id: string,
-  over: Partial<AiDoctorSessionRow> = {},
-): AiDoctorSessionRow {
+function makeRow(id: string, over: Partial<AiDoctorSessionRow> = {}): AiDoctorSessionRow {
   const diagnosis: Diagnosis = {
     summary: "ok",
     likelyIssue: "ok",
@@ -140,9 +147,7 @@ describe("Review-status chip on session rows", () => {
     expect(chip.textContent).toContain("Reviewed");
     expect(chip.getAttribute("data-review-status")).toBe("reviewed");
     expect(chip.getAttribute("data-review-tone")).toBe("muted");
-    expect(chip.getAttribute("data-latest-event-at")).toBe(
-      "2026-05-28T10:00:00Z",
-    );
+    expect(chip.getAttribute("data-latest-event-at")).toBe("2026-05-28T10:00:00Z");
     expect(chip.getAttribute("title")).toContain("Reviewed");
     expect(chip.getAttribute("title")).toContain("2026-05-28T10:00:00Z");
   });
@@ -204,9 +209,7 @@ describe("Review-status chip on session rows", () => {
     const call = reviewInCalls[reviewInCalls.length - 1];
     expect(call.column).toBe("session_id");
     expect(Array.isArray(call.values)).toBe(true);
-    expect(new Set(call.values as string[])).toEqual(
-      new Set(["s1", "s2", "s3"]),
-    );
+    expect(new Set(call.values as string[])).toEqual(new Set(["s1", "s2", "s3"]));
   });
 
   it("preserves existing row cues (action count) alongside chip", async () => {
@@ -224,26 +227,17 @@ describe("Review-status chip on session rows", () => {
     await screen.findByTestId("ai-doctor-sessions-index-list");
     await screen.findByTestId(CHIP_TID);
     // Existing per-row indicators still render.
-    expect(
-      screen.getAllByTestId("ai-doctor-sessions-index-action-count").length,
-    ).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("ai-doctor-sessions-index-action-count").length).toBeGreaterThan(
+      0,
+    );
   });
 });
 
 describe("Static safety scan — review-status chip slice", () => {
   const ROOT = resolve(__dirname, "../..");
-  const TSX = readFileSync(
-    resolve(ROOT, "src/pages/AiDoctorSessionsIndex.tsx"),
-    "utf8",
-  );
-  const RULES = readFileSync(
-    resolve(ROOT, "src/lib/aiDoctorSessionReviewStatusRules.ts"),
-    "utf8",
-  );
-  const HOOK = readFileSync(
-    resolve(ROOT, "src/hooks/useAiDoctorSessionReviews.ts"),
-    "utf8",
-  );
+  const TSX = readFileSync(resolve(ROOT, "src/pages/AiDoctorSessionsIndex.tsx"), "utf8");
+  const RULES = readFileSync(resolve(ROOT, "src/lib/aiDoctorSessionReviewStatusRules.ts"), "utf8");
+  const HOOK = readFileSync(resolve(ROOT, "src/hooks/useAiDoctorSessionReviews.ts"), "utf8");
   const ALL = `${TSX}\n${RULES}\n${HOOK}`;
 
   it("no DB writes anywhere in this slice", () => {

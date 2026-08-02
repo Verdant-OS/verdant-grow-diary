@@ -27,9 +27,7 @@ vi.mock("@/components/GrowTargetsEditor", () => ({ default: () => null }));
 
 describe("alertsRouteView — pure helpers", () => {
   it("formatAlertSourceLabel maps known slugs and tokenizes unknown ones", () => {
-    expect(formatAlertSourceLabel("environment_alerts")).toBe(
-      "Environment monitor",
-    );
+    expect(formatAlertSourceLabel("environment_alerts")).toBe("Environment monitor");
     expect(formatAlertSourceLabel("ai_doctor")).toBe("AI Doctor");
     expect(formatAlertSourceLabel("manual")).toBe("Manual entry");
     expect(formatAlertSourceLabel("custom_thing")).toBe("Custom Thing");
@@ -99,9 +97,7 @@ const ALERT = {
 const listAlertsMock = vi.fn();
 
 vi.mock("@/lib/alerts", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/alerts")>(
-    "@/lib/alerts",
-  );
+  const actual = await vi.importActual<typeof import("@/lib/alerts")>("@/lib/alerts");
   return {
     ...actual,
     listAlerts: (...args: unknown[]) => listAlertsMock(...args),
@@ -118,7 +114,13 @@ vi.mock("@/integrations/supabase/client", () => {
     eq: () => chain,
     in: () => chain,
     order: () => chain,
-    limit: () => Promise.resolve({ data: [], error: null }),
+    limit: () => {
+      const __c: any = {
+        abortSignal: () => __c,
+        then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+      };
+      return __c;
+    },
     then: (resolve: (r: { data: unknown; error: null }) => unknown) =>
       resolve({ data: [], error: null }),
   };
@@ -181,9 +183,7 @@ describe("Alerts route — missing grow/tent context", () => {
     renderAt("/alerts?growId=does-not-exist");
     const fallback = await screen.findByTestId("alerts-missing-context");
     expect(fallback.getAttribute("role")).toBe("status");
-    expect(fallback.textContent).toMatch(
-      /Select a grow or tent to review alerts\./,
-    );
+    expect(fallback.textContent).toMatch(/Select a grow or tent to review alerts\./);
     expect(fallback.textContent).toMatch(/scoped to a grow or tent/i);
     expect(screen.queryByTestId("alerts-loading-skeleton")).toBeNull();
     expect(fallback.textContent).not.toContain("g1");
@@ -195,9 +195,7 @@ describe("Alerts route — empty + error + retry", () => {
   it("renders the No open alerts. empty copy", async () => {
     listAlertsMock.mockResolvedValue([]);
     renderAt("/alerts");
-    await waitFor(() =>
-      expect(screen.queryByTestId("alerts-loading-skeleton")).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("alerts-loading-skeleton")).toBeNull());
     expect(screen.getByText("No open alerts.")).toBeTruthy();
     expect(
       screen.getByText(/Check targets or enter a fresh manual snapshot if you expected one/i),
@@ -210,17 +208,13 @@ describe("Alerts route — empty + error + retry", () => {
     renderAt("/alerts");
     const errorBox = await screen.findByTestId("alerts-unavailable");
     expect(errorBox.textContent).toMatch(/Alerts unavailable/);
-    expect(errorBox.textContent).toMatch(
-      /Check your connection and try again/,
-    );
+    expect(errorBox.textContent).toMatch(/Check your connection and try again/);
     const retry = within(errorBox).getByRole("button", {
       name: /retry loading alerts/i,
     });
     fireEvent.click(retry);
     await waitFor(() => expect(listAlertsMock).toHaveBeenCalledTimes(2));
-    await waitFor(() =>
-      expect(screen.queryByTestId("alerts-unavailable")).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("alerts-unavailable")).toBeNull());
     expect(screen.getByText("No open alerts.")).toBeTruthy();
   });
 
@@ -270,15 +264,11 @@ describe("Alerts route — alert row accessibility", () => {
       expect(a).toBeTruthy();
       return a as HTMLElement;
     });
-    expect(
-      within(article).getByLabelText("Severity: Warning"),
-    ).toBeTruthy();
+    expect(within(article).getByLabelText("Severity: Warning")).toBeTruthy();
     expect(within(article).getByLabelText("Status: Open")).toBeTruthy();
     const source = within(article).getByTestId("alert-row-source");
     expect(source.textContent).toBe("Environment monitor");
-    expect(source.getAttribute("aria-label")).toBe(
-      "Source: Environment monitor",
-    );
+    expect(source.getAttribute("aria-label")).toBe("Source: Environment monitor");
     const time = article.querySelector("time");
     expect(time?.getAttribute("aria-label")).toMatch(/^First seen /);
     expect(time?.getAttribute("datetime")).toBe(ALERT.first_seen_at);
@@ -336,11 +326,7 @@ describe("Alerts route — alert row accessibility", () => {
     });
     expect(titleLink.className).toMatch(/focus-visible:ring-2/);
     expect(titleLink.className).toMatch(/focus-visible:ring-offset-2/);
-    for (const tid of [
-      "alert-row-acknowledge",
-      "alert-row-resolve",
-      "alert-row-dismiss",
-    ]) {
+    for (const tid of ["alert-row-acknowledge", "alert-row-resolve", "alert-row-dismiss"]) {
       const btn = within(article).getByTestId(tid);
       // shadcn Button default ships focus-visible ring styling
       expect(btn.className).toMatch(/focus-visible:/);
@@ -373,10 +359,7 @@ describe("Alerts route — alert row accessibility", () => {
 // ---------------------------------------------------------------------------
 const ROOT = resolve(__dirname, "../..");
 const PAGE = readFileSync(resolve(ROOT, "src/pages/Alerts.tsx"), "utf8");
-const VIEW = readFileSync(
-  resolve(ROOT, "src/lib/alertsRouteView.ts"),
-  "utf8",
-);
+const VIEW = readFileSync(resolve(ROOT, "src/lib/alertsRouteView.ts"), "utf8");
 
 describe("Alerts route polish — static safety", () => {
   it("polish helper introduces no I/O, writes, or privileged access", () => {

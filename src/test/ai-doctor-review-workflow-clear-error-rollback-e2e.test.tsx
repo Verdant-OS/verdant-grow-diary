@@ -98,7 +98,7 @@ vi.mock("@/integrations/supabase/client", () => {
   function reviewsChain() {
     let current = reviewRows;
     const chain: Record<string, unknown> = {};
-    const passthrough = ["select", "order", "limit", "range", "not", "gte", "or"];
+    const passthrough = ["select", "order", "limit", "range", "not", "gte", "or", "abortSignal"];
     for (const m of passthrough) chain[m] = () => chain;
     chain.in = (_col: string, values: unknown) => {
       if (Array.isArray(values)) {
@@ -144,14 +144,30 @@ vi.mock("@/integrations/supabase/client", () => {
 
   function sessionsChain() {
     const chain: Record<string, unknown> = {};
-    const passthrough = ["select", "order", "limit", "range", "not", "gte", "or", "in"];
+    const passthrough = [
+      "select",
+      "order",
+      "limit",
+      "range",
+      "not",
+      "gte",
+      "or",
+      "in",
+      "abortSignal",
+    ];
     for (const m of passthrough) chain[m] = () => chain;
     chain.eq = (col: string, value: string) => {
       if (col === "id") {
         const match = sessionRows.find((r) => r.id === value) ?? null;
         return {
           order: () => ({
-            limit: () => Promise.resolve({ data: [], error: null }),
+            limit: () => {
+              const c: any = {
+                abortSignal: () => c,
+                then: (r: any) => Promise.resolve({ data: [], error: null }).then(r),
+              };
+              return c;
+            },
           }),
           maybeSingle: () => Promise.resolve({ data: match, error: null }),
         };

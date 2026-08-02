@@ -32,7 +32,7 @@ let currentRows: AiDoctorSessionRow[] = [];
 vi.mock("@/integrations/supabase/client", () => {
   const result = () => Promise.resolve({ data: currentRows, error: null });
   const chain: Record<string, unknown> = {};
-  const methods = ["select", "eq", "order", "limit", "range", "not", "gte", "or"];
+  const methods = ["select", "eq", "order", "limit", "range", "not", "gte", "or", "abortSignal"];
   for (const m of methods) chain[m] = () => chain;
   chain.then = (resolve: (v: unknown) => unknown) => result().then(resolve);
   return { supabase: { from: () => chain } };
@@ -101,14 +101,10 @@ describe("row predicates", () => {
   });
   it("rowConfidenceBucket reflects displayed_confidence", () => {
     expect(
-      rowConfidenceBucket(
-        makeRow("a", {}, { displayed_confidence: 0.3, raw_confidence: 0.9 }),
-      ),
+      rowConfidenceBucket(makeRow("a", {}, { displayed_confidence: 0.3, raw_confidence: 0.9 })),
     ).toBe("low");
     expect(
-      rowConfidenceBucket(
-        makeRow("a", {}, { displayed_confidence: 0.95, raw_confidence: 0.5 }),
-      ),
+      rowConfidenceBucket(makeRow("a", {}, { displayed_confidence: 0.95, raw_confidence: 0.5 })),
     ).toBe("high");
     expect(
       rowConfidenceBucket(
@@ -124,11 +120,7 @@ describe("row predicates", () => {
 
 describe("applyClientSideFilters", () => {
   const healthy = makeRow("healthy");
-  const lowConf = makeRow(
-    "low",
-    {},
-    { displayed_confidence: 0.3, raw_confidence: 0.3 },
-  );
+  const lowConf = makeRow("low", {}, { displayed_confidence: 0.3, raw_confidence: 0.3 });
   const highRisk = makeRow("hr", { riskLevel: "high" });
   const unknownConf = makeRow(
     "uk",
@@ -147,37 +139,27 @@ describe("applyClientSideFilters", () => {
   });
   it("caution=yes keeps only caution sessions", () => {
     expect(
-      applyClientSideFilters(rows, { ...DEFAULT_FILTERS, caution: "yes" }).map(
-        (r) => r.id,
-      ),
+      applyClientSideFilters(rows, { ...DEFAULT_FILTERS, caution: "yes" }).map((r) => r.id),
     ).toEqual(["low", "hr", "uk"]);
   });
   it("caution=no inverts", () => {
     expect(
-      applyClientSideFilters(rows, { ...DEFAULT_FILTERS, caution: "no" }).map(
-        (r) => r.id,
-      ),
+      applyClientSideFilters(rows, { ...DEFAULT_FILTERS, caution: "no" }).map((r) => r.id),
     ).toEqual(["healthy"]);
   });
   it("hasChecklist=yes keeps only sessions with checklist items", () => {
     expect(
-      applyClientSideFilters(rows, { ...DEFAULT_FILTERS, hasChecklist: "yes" }).map(
-        (r) => r.id,
-      ),
+      applyClientSideFilters(rows, { ...DEFAULT_FILTERS, hasChecklist: "yes" }).map((r) => r.id),
     ).toEqual(["low", "hr", "uk"]);
   });
   it("confidence=low keeps only low-confidence sessions", () => {
     expect(
-      applyClientSideFilters(rows, { ...DEFAULT_FILTERS, confidence: "low" }).map(
-        (r) => r.id,
-      ),
+      applyClientSideFilters(rows, { ...DEFAULT_FILTERS, confidence: "low" }).map((r) => r.id),
     ).toEqual(["low"]);
   });
   it("confidence=unknown matches unrecorded confidence", () => {
     expect(
-      applyClientSideFilters(rows, { ...DEFAULT_FILTERS, confidence: "unknown" }).map(
-        (r) => r.id,
-      ),
+      applyClientSideFilters(rows, { ...DEFAULT_FILTERS, confidence: "unknown" }).map((r) => r.id),
     ).toEqual(["uk"]);
   });
   it("combined filters are deterministic", () => {
@@ -200,11 +182,7 @@ describe("filter formatting + parsing", () => {
         hasChecklist: "yes",
         confidence: "unknown",
       }),
-    ).toEqual([
-      "Caution only",
-      "Has review checklist",
-      "Confidence: Unknown",
-    ]);
+    ).toEqual(["Caution only", "Has review checklist", "Confidence: Unknown"]);
   });
   it("isFiltersActive detects new filters", () => {
     expect(isFiltersActive({ ...DEFAULT_FILTERS, caution: "yes" })).toBe(true);
@@ -222,9 +200,9 @@ describe("filter formatting + parsing", () => {
     expect(parseFilters(serializeFilters(f))).toEqual(f);
   });
   it("parseFilters normalizes garbage values", () => {
-    expect(
-      parseFilters({ caution: "always", hasChecklist: "maybe", confidence: "huge" }),
-    ).toEqual(DEFAULT_FILTERS);
+    expect(parseFilters({ caution: "always", hasChecklist: "maybe", confidence: "huge" })).toEqual(
+      DEFAULT_FILTERS,
+    );
   });
 });
 
@@ -252,10 +230,7 @@ beforeEach(() => {
 
 describe("AiDoctorSessionsIndex — caution/checklist/confidence filter UI", () => {
   it("default state shows all sessions", async () => {
-    currentRows = [
-      makeRow("healthy"),
-      makeRow("hr", { riskLevel: "high" }),
-    ];
+    currentRows = [makeRow("healthy"), makeRow("hr", { riskLevel: "high" })];
     renderPage();
     const list = await screen.findByTestId("ai-doctor-sessions-index-list");
     expect(within(list).getAllByTestId("ai-doctor-sessions-index-row").length).toBe(2);
@@ -285,10 +260,9 @@ describe("AiDoctorSessionsIndex — caution/checklist/confidence filter UI", () 
     currentRows = [makeRow("healthy"), makeRow("hr", { riskLevel: "high" })];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-index-filter-has-checklist"),
-      { target: { value: "yes" } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-index-filter-has-checklist"), {
+      target: { value: "yes" },
+    });
     const list = await screen.findByTestId("ai-doctor-sessions-index-list");
     const ids = within(list)
       .getAllByTestId("ai-doctor-sessions-index-row")
@@ -309,20 +283,18 @@ describe("AiDoctorSessionsIndex — caution/checklist/confidence filter UI", () 
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
 
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-index-filter-confidence"),
-      { target: { value: "high" } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-index-filter-confidence"), {
+      target: { value: "high" },
+    });
     let list = await screen.findByTestId("ai-doctor-sessions-index-list");
     let ids = within(list)
       .getAllByTestId("ai-doctor-sessions-index-row")
       .map((n) => n.getAttribute("data-session-id"));
     expect(ids).toEqual(["a"]);
 
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-index-filter-confidence"),
-      { target: { value: "unknown" } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-index-filter-confidence"), {
+      target: { value: "unknown" },
+    });
     list = await screen.findByTestId("ai-doctor-sessions-index-list");
     ids = within(list)
       .getAllByTestId("ai-doctor-sessions-index-row")
@@ -337,9 +309,7 @@ describe("AiDoctorSessionsIndex — caution/checklist/confidence filter UI", () 
     fireEvent.change(screen.getByTestId("ai-doctor-sessions-index-filter-caution"), {
       target: { value: "yes" },
     });
-    expect(
-      await screen.findByTestId("ai-doctor-sessions-index-empty-filtered"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-sessions-index-empty-filtered")).toBeTruthy();
   });
 
   it("Clear filters resets caution/checklist/confidence to defaults", async () => {
@@ -349,10 +319,9 @@ describe("AiDoctorSessionsIndex — caution/checklist/confidence filter UI", () 
     fireEvent.change(screen.getByTestId("ai-doctor-sessions-index-filter-caution"), {
       target: { value: "yes" },
     });
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-index-filter-confidence"),
-      { target: { value: "low" } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-index-filter-confidence"), {
+      target: { value: "low" },
+    });
     fireEvent.click(screen.getByTestId("ai-doctor-sessions-index-clear-filters"));
     const cautionSel = (await screen.findByTestId(
       "ai-doctor-sessions-index-filter-caution",
@@ -368,9 +337,7 @@ describe("AiDoctorSessionsIndex — caution/checklist/confidence filter UI", () 
     currentRows = [makeRow("a")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    const risk = screen.getByTestId(
-      "ai-doctor-sessions-index-filter-risk",
-    ) as HTMLSelectElement;
+    const risk = screen.getByTestId("ai-doctor-sessions-index-filter-risk") as HTMLSelectElement;
     fireEvent.change(risk, { target: { value: "high" } });
     expect(risk.value).toBe("high");
   });
@@ -384,10 +351,7 @@ describe("Static safety scan — review-workflow filters slice", () => {
     "src/lib/aiDoctorSessionsSavedViewsRules.ts",
     "src/hooks/use-ai-doctor-sessions.ts",
   ].map((p) => readFileSync(resolve(ROOT, p), "utf8"));
-  const TSX = readFileSync(
-    resolve(ROOT, "src/pages/AiDoctorSessionsIndex.tsx"),
-    "utf8",
-  );
+  const TSX = readFileSync(resolve(ROOT, "src/pages/AiDoctorSessionsIndex.tsx"), "utf8");
   const ALL = FILES.join("\n");
 
   it("no writes", () => {

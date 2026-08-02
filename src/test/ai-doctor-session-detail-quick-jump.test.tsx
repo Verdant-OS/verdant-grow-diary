@@ -36,7 +36,15 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: () => ({
       select: () => ({
         eq: () => ({
-          order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+          order: () => ({
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+              };
+              return __c;
+            },
+          }),
           maybeSingle: () => Promise.resolve({ data: currentRow, error: null }),
         }),
       }),
@@ -123,12 +131,8 @@ describe("AiDoctorSessionDetail — quick-jump links", () => {
 
   it("preserves Copy link and Open in new tab controls in the header", async () => {
     renderRoute(<AiDoctorSessionDetail />);
-    expect(
-      await screen.findByTestId("ai-doctor-session-detail-copy-link-button"),
-    ).toBeTruthy();
-    expect(
-      await screen.findByTestId("ai-doctor-session-detail-open-new-tab-link"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-session-detail-copy-link-button")).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-session-detail-open-new-tab-link")).toBeTruthy();
   });
 });
 

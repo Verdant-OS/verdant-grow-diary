@@ -26,7 +26,15 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: () => ({
       select: () => ({
         eq: () => ({
-          order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+          order: () => ({
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+              };
+              return __c;
+            },
+          }),
           maybeSingle: () => Promise.resolve({ data: currentFixture, error: null }),
         }),
       }),
@@ -122,9 +130,7 @@ describe("AiDoctorSessionDetail — caution reason explainer", () => {
     );
     renderRoute(row);
     const el = await screen.findByTestId("ai-doctor-session-detail-caution-reason");
-    expect(el.textContent).toBe(
-      "Review because: low confidence, elevated risk, missing info.",
-    );
+    expect(el.textContent).toBe("Review because: low confidence, elevated risk, missing info.");
     expect(el.textContent).toBe(expectedReasonFor(row));
   });
 
@@ -140,12 +146,8 @@ describe("AiDoctorSessionDetail — caution reason explainer", () => {
     renderRoute(row);
     // Wait for the page to render first
     await screen.findByText(/AI Doctor session/i).catch(() => null);
-    expect(
-      screen.queryByTestId("ai-doctor-session-detail-caution-note"),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId("ai-doctor-session-detail-caution-reason"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-session-detail-caution-note")).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-session-detail-caution-reason")).toBeNull();
   });
 
   it("sets title and aria-label to the explainer text when caution applies", async () => {
@@ -159,10 +161,7 @@ describe("AiDoctorSessionDetail — caution reason explainer", () => {
 
 describe("Static safety scan — detail-page caution reason slice", () => {
   const ROOT = resolve(__dirname, "../..");
-  const file = readFileSync(
-    resolve(ROOT, "src/pages/AiDoctorSessionDetail.tsx"),
-    "utf8",
-  );
+  const file = readFileSync(resolve(ROOT, "src/pages/AiDoctorSessionDetail.tsx"), "utf8");
 
   it("no writes", () => {
     expect(file).not.toMatch(/\.insert\(/);

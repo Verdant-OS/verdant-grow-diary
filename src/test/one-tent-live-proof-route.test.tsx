@@ -54,7 +54,15 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: () => ({
       select: () => ({
         eq: () => ({
-          order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+          order: () => ({
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+              };
+              return __c;
+            },
+          }),
         }),
       }),
     }),
@@ -76,22 +84,16 @@ describe("OneTentLiveProof page", () => {
   it("renders title, description, and safety badges", () => {
     renderPage();
     expect(screen.getByText("One-Tent Live Proof")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("one-tent-live-proof-safety-badges"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("one-tent-live-proof-safety-badges")).toBeInTheDocument();
     expect(screen.getAllByText(/No fake live data/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/No device control/i).length).toBeGreaterThan(0);
   });
 
   it("renders the proof checklist with six steps", () => {
     renderPage();
-    expect(
-      screen.getByTestId("one-tent-live-proof-checklist"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("one-tent-live-proof-checklist")).toBeInTheDocument();
     for (const id of [1, 2, 3, 4, 5, 6]) {
-      expect(
-        screen.getByTestId(`one-tent-live-proof-step-${id}`),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId(`one-tent-live-proof-step-${id}`)).toBeInTheDocument();
     }
   });
 
@@ -99,11 +101,7 @@ describe("OneTentLiveProof page", () => {
     renderPage();
     const href = (id: number) => {
       const el = screen.getByTestId(`one-tent-live-proof-step-${id}-cta`);
-      return (
-        el.getAttribute("href") ??
-        el.querySelector("a")?.getAttribute("href") ??
-        ""
-      );
+      return el.getAttribute("href") ?? el.querySelector("a")?.getAttribute("href") ?? "";
     };
     expect(href(2)).toContain("/sensors");
     expect(href(2)).toContain("#manual-reading");
@@ -116,19 +114,17 @@ describe("OneTentLiveProof page", () => {
 
   it("shows needs-operator-confirmation for steps that cannot be safely inferred", () => {
     renderPage();
-    expect(
-      screen.getByTestId("one-tent-live-proof-step-5-status").textContent,
-    ).toMatch(/Needs operator confirmation/i);
-    expect(
-      screen.getByTestId("one-tent-live-proof-step-6-status").textContent,
-    ).toMatch(/Needs operator confirmation/i);
+    expect(screen.getByTestId("one-tent-live-proof-step-5-status").textContent).toMatch(
+      /Needs operator confirmation/i,
+    );
+    expect(screen.getByTestId("one-tent-live-proof-step-6-status").textContent).toMatch(
+      /Needs operator confirmation/i,
+    );
   });
 
   it("does not expose raw internal IDs in visible copy", () => {
     renderPage();
-    const summary = screen.getByTestId(
-      "one-tent-live-proof-selection-summary",
-    ).textContent ?? "";
+    const summary = screen.getByTestId("one-tent-live-proof-selection-summary").textContent ?? "";
     expect(summary).not.toContain("grow-1");
     expect(summary).not.toContain("tent-1");
   });

@@ -15,14 +15,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { removeLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
-import {
-  render,
-  screen,
-  waitFor,
-  fireEvent,
-  act,
-  cleanup,
-} from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, act, cleanup } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import AiDoctorSessionDetail from "@/pages/AiDoctorSessionDetail";
@@ -74,8 +67,7 @@ function makeRow(id: string): AiDoctorSessionRow {
 
 let sessionRows: AiDoctorSessionRow[] = [];
 let reviewRows: AiDoctorSessionReviewEvent[] = [];
-const insertCalls: Array<{ table: string; payload: Record<string, unknown> }> =
-  [];
+const insertCalls: Array<{ table: string; payload: Record<string, unknown> }> = [];
 let nextInsertError: { message: string } | null = {
   message: RLS_ERROR_MESSAGE,
 };
@@ -92,13 +84,11 @@ vi.mock("@/integrations/supabase/client", () => {
   function reviewsChain() {
     let current = reviewRows;
     const chain: Record<string, unknown> = {};
-    const passthrough = ["select", "order", "limit", "range", "not", "gte", "or"];
+    const passthrough = ["select", "order", "limit", "range", "not", "gte", "or", "abortSignal"];
     for (const m of passthrough) chain[m] = () => chain;
     chain.in = (_col: string, values: unknown) => {
       if (Array.isArray(values)) {
-        current = reviewRows.filter((r) =>
-          (values as string[]).includes(r.session_id),
-        );
+        current = reviewRows.filter((r) => (values as string[]).includes(r.session_id));
       }
       return chain;
     };
@@ -114,8 +104,7 @@ vi.mock("@/integrations/supabase/client", () => {
         id: `srv-${insertCalls.length}`,
         user_id: "server-assigned",
         session_id: String(payload.session_id),
-        event_type:
-          payload.event_type as AiDoctorSessionReviewEvent["event_type"],
+        event_type: payload.event_type as AiDoctorSessionReviewEvent["event_type"],
         note: (payload.note as string | undefined) ?? null,
         created_at: new Date(
           Date.parse("2026-05-29T10:00:00Z") + insertCalls.length * 1000,
@@ -141,22 +130,37 @@ vi.mock("@/integrations/supabase/client", () => {
 
   function sessionsChain() {
     const chain: Record<string, unknown> = {};
-    const passthrough = ["select", "order", "limit", "range", "not", "gte", "or", "in"];
+    const passthrough = [
+      "select",
+      "order",
+      "limit",
+      "range",
+      "not",
+      "gte",
+      "or",
+      "in",
+      "abortSignal",
+    ];
     for (const m of passthrough) chain[m] = () => chain;
     chain.eq = (col: string, value: string) => {
       if (col === "id") {
         const match = sessionRows.find((r) => r.id === value) ?? null;
         return {
           order: () => ({
-            limit: () => Promise.resolve({ data: [], error: null }),
+            limit: () => {
+              const c: any = {
+                abortSignal: () => c,
+                then: (r: any) => Promise.resolve({ data: [], error: null }).then(r),
+              };
+              return c;
+            },
           }),
           maybeSingle: () => Promise.resolve({ data: match, error: null }),
         };
       }
       return chain;
     };
-    chain.maybeSingle = () =>
-      Promise.resolve({ data: sessionRows[0] ?? null, error: null });
+    chain.maybeSingle = () => Promise.resolve({ data: sessionRows[0] ?? null, error: null });
     chain.then = (resolveFn: (v: unknown) => unknown) =>
       Promise.resolve({ data: sessionRows, error: null }).then(resolveFn);
     chain.update = (...a: unknown[]) => {
@@ -169,9 +173,7 @@ vi.mock("@/integrations/supabase/client", () => {
   return {
     supabase: {
       from: (table: string) =>
-        table === "ai_doctor_session_reviews"
-          ? reviewsChain()
-          : sessionsChain(),
+        table === "ai_doctor_session_reviews" ? reviewsChain() : sessionsChain(),
       rpc: (...args: unknown[]) => {
         forbidden.rpc(...args);
         return Promise.resolve({ data: null, error: null });
@@ -202,10 +204,7 @@ function renderDetail(client: QueryClient) {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[`/doctor/sessions/${SESSION_ID}`]}>
         <Routes>
-          <Route
-            path="/doctor/sessions/:sessionId"
-            element={<AiDoctorSessionDetail />}
-          />
+          <Route path="/doctor/sessions/:sessionId" element={<AiDoctorSessionDetail />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -238,131 +237,109 @@ beforeEach(() => {
 // ---------------- the failure workflow ----------------
 
 describe("AI Doctor review workflow — Needs follow-up error rollback", () => {
-  it(
-    "Needs follow-up insert is denied → optimistic state rolls back end-to-end",
-    async () => {
-      // 1+2: Detail page shows Not reviewed.
-      const client = makeClient();
-      renderDetail(client);
-      await waitFor(() => {
-        const panel = screen.getByTestId(
-          "ai-doctor-session-detail-review-status-panel",
-        );
-        expect(panel.getAttribute("data-review-status")).toBe("not_reviewed");
-      });
+  it("Needs follow-up insert is denied → optimistic state rolls back end-to-end", async () => {
+    // 1+2: Detail page shows Not reviewed.
+    const client = makeClient();
+    renderDetail(client);
+    await waitFor(() => {
+      const panel = screen.getByTestId("ai-doctor-session-detail-review-status-panel");
+      expect(panel.getAttribute("data-review-status")).toBe("not_reviewed");
+    });
 
-      // 3+4: Click Needs follow-up (mock is configured to reject).
-      const followBtn = screen.getByTestId(
-        "ai-doctor-session-detail-review-needs-follow-up",
+    // 3+4: Click Needs follow-up (mock is configured to reject).
+    const followBtn = screen.getByTestId("ai-doctor-session-detail-review-needs-follow-up");
+    await act(async () => {
+      fireEvent.click(followBtn);
+    });
+
+    // Exactly one INSERT was attempted with the expected append-only shape.
+    await waitFor(() => expect(insertCalls.length).toBe(1));
+    expect(insertCalls[0].table).toBe("ai_doctor_session_reviews");
+    expect(insertCalls[0].payload).toEqual({
+      session_id: SESSION_ID,
+      event_type: "needs_follow_up",
+    });
+    expect("user_id" in insertCalls[0].payload).toBe(false);
+
+    // 5: Inline error renders calmly.
+    const err = await screen.findByTestId("ai-doctor-session-detail-review-error");
+    expect((err.textContent ?? "").toLowerCase()).toMatch(/row-level security/);
+
+    // 6: Projection rolls back to not_reviewed.
+    await waitFor(() => {
+      const panel = screen.getByTestId("ai-doctor-session-detail-review-status-panel");
+      expect(panel.getAttribute("data-review-status")).toBe("not_reviewed");
+    });
+
+    // 7: Event history retains no failed optimistic event.
+    const items = screen.queryAllByTestId("ai-doctor-session-detail-review-status-event");
+    expect(items.length).toBe(0);
+
+    // 8: Sessions index shows no needs_follow_up chip.
+    cleanup();
+    renderIndex(client);
+    await screen.findByTestId("ai-doctor-sessions-index-list");
+    await waitFor(() => {
+      const chips = screen.queryAllByTestId("ai-doctor-sessions-index-review-status-chip");
+      const followChip = chips.find(
+        (c) => c.getAttribute("data-review-status") === "needs_follow_up",
       );
-      await act(async () => {
-        fireEvent.click(followBtn);
-      });
+      expect(followChip).toBeFalsy();
+    });
 
-      // Exactly one INSERT was attempted with the expected append-only shape.
-      await waitFor(() => expect(insertCalls.length).toBe(1));
-      expect(insertCalls[0].table).toBe("ai_doctor_session_reviews");
-      expect(insertCalls[0].payload).toEqual({
-        session_id: SESSION_ID,
-        event_type: "needs_follow_up",
-      });
-      expect("user_id" in insertCalls[0].payload).toBe(false);
+    // 9: "Needs follow-up: 0 visible" renders.
+    const visibleChip = await screen.findByTestId(
+      "ai-doctor-sessions-index-needs-follow-up-visible-chip",
+    );
+    await waitFor(() => expect(visibleChip.textContent).toBe("Needs follow-up: 0 visible"));
 
-      // 5: Inline error renders calmly.
-      const err = await screen.findByTestId(
-        "ai-doctor-session-detail-review-error",
-      );
-      expect((err.textContent ?? "").toLowerCase()).toMatch(
-        /row-level security/,
-      );
+    // 10: reviewStatus=needs_follow_up filter excludes the row.
+    const reviewFilter = (await screen.findByTestId(
+      "ai-doctor-sessions-index-filter-review-status",
+    )) as HTMLSelectElement;
+    fireEvent.change(reviewFilter, { target: { value: "needs_follow_up" } });
+    await waitFor(() => {
+      const rows = screen.queryAllByTestId("ai-doctor-sessions-index-row");
+      expect(rows.length).toBe(0);
+    });
 
-      // 6: Projection rolls back to not_reviewed.
-      await waitFor(() => {
-        const panel = screen.getByTestId(
-          "ai-doctor-session-detail-review-status-panel",
-        );
-        expect(panel.getAttribute("data-review-status")).toBe("not_reviewed");
-      });
+    // Reset filter so the built-in saved view owns URL state next.
+    fireEvent.change(reviewFilter, { target: { value: "all" } });
+    await waitFor(() => {
+      const rows = screen.getAllByTestId("ai-doctor-sessions-index-row");
+      expect(rows.length).toBe(2);
+    });
 
-      // 7: Event history retains no failed optimistic event.
-      const items = screen.queryAllByTestId(
-        "ai-doctor-session-detail-review-status-event",
-      );
-      expect(items.length).toBe(0);
+    // 11: Clicking the visible-count chip applies the built-in saved view
+    // (same path as Jump to Needs follow-up) and yields zero matches.
+    fireEvent.click(visibleChip);
+    const savedSelect = (await screen.findByTestId(
+      "ai-doctor-sessions-saved-views-select",
+    )) as HTMLSelectElement;
+    await waitFor(() => expect(savedSelect.value).toBe(BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID));
+    await waitFor(() => {
+      const rows = screen.queryAllByTestId("ai-doctor-sessions-index-row");
+      expect(rows.length).toBe(0);
+    });
 
-      // 8: Sessions index shows no needs_follow_up chip.
-      cleanup();
-      renderIndex(client);
-      await screen.findByTestId("ai-doctor-sessions-index-list");
-      await waitFor(() => {
-        const chips = screen.queryAllByTestId(
-          "ai-doctor-sessions-index-review-status-chip",
-        );
-        const followChip = chips.find(
-          (c) => c.getAttribute("data-review-status") === "needs_follow_up",
-        );
-        expect(followChip).toBeFalsy();
-      });
+    // 12: reviewStatus=not_reviewed still includes the row.
+    const reviewFilter2 = (await screen.findByTestId(
+      "ai-doctor-sessions-index-filter-review-status",
+    )) as HTMLSelectElement;
+    fireEvent.change(reviewFilter2, { target: { value: "not_reviewed" } });
+    await waitFor(() => {
+      const rows = screen.getAllByTestId("ai-doctor-sessions-index-row");
+      expect(rows.length).toBe(2);
+    });
 
-      // 9: "Needs follow-up: 0 visible" renders.
-      const visibleChip = await screen.findByTestId(
-        "ai-doctor-sessions-index-needs-follow-up-visible-chip",
-      );
-      await waitFor(() =>
-        expect(visibleChip.textContent).toBe("Needs follow-up: 0 visible"),
-      );
-
-      // 10: reviewStatus=needs_follow_up filter excludes the row.
-      const reviewFilter = (await screen.findByTestId(
-        "ai-doctor-sessions-index-filter-review-status",
-      )) as HTMLSelectElement;
-      fireEvent.change(reviewFilter, { target: { value: "needs_follow_up" } });
-      await waitFor(() => {
-        const rows = screen.queryAllByTestId("ai-doctor-sessions-index-row");
-        expect(rows.length).toBe(0);
-      });
-
-      // Reset filter so the built-in saved view owns URL state next.
-      fireEvent.change(reviewFilter, { target: { value: "all" } });
-      await waitFor(() => {
-        const rows = screen.getAllByTestId("ai-doctor-sessions-index-row");
-        expect(rows.length).toBe(2);
-      });
-
-      // 11: Clicking the visible-count chip applies the built-in saved view
-      // (same path as Jump to Needs follow-up) and yields zero matches.
-      fireEvent.click(visibleChip);
-      const savedSelect = (await screen.findByTestId(
-        "ai-doctor-sessions-saved-views-select",
-      )) as HTMLSelectElement;
-      await waitFor(() =>
-        expect(savedSelect.value).toBe(BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID),
-      );
-      await waitFor(() => {
-        const rows = screen.queryAllByTestId("ai-doctor-sessions-index-row");
-        expect(rows.length).toBe(0);
-      });
-
-      // 12: reviewStatus=not_reviewed still includes the row.
-      const reviewFilter2 = (await screen.findByTestId(
-        "ai-doctor-sessions-index-filter-review-status",
-      )) as HTMLSelectElement;
-      fireEvent.change(reviewFilter2, { target: { value: "not_reviewed" } });
-      await waitFor(() => {
-        const rows = screen.getAllByTestId("ai-doctor-sessions-index-row");
-        expect(rows.length).toBe(2);
-      });
-
-      // 13+14: Exactly one attempted insert; no other write paths invoked.
-      expect(insertCalls.length).toBe(1);
-      expect(forbidden.update).not.toHaveBeenCalled();
-      expect(forbidden.upsert).not.toHaveBeenCalled();
-      expect(forbidden.delete).not.toHaveBeenCalled();
-      expect(forbidden.rpc).not.toHaveBeenCalled();
-      expect(forbidden.functionsInvoke).not.toHaveBeenCalled();
-    },
-    20_000,
-  );
+    // 13+14: Exactly one attempted insert; no other write paths invoked.
+    expect(insertCalls.length).toBe(1);
+    expect(forbidden.update).not.toHaveBeenCalled();
+    expect(forbidden.upsert).not.toHaveBeenCalled();
+    expect(forbidden.delete).not.toHaveBeenCalled();
+    expect(forbidden.rpc).not.toHaveBeenCalled();
+    expect(forbidden.functionsInvoke).not.toHaveBeenCalled();
+  }, 20_000);
 });
 
 // ---------------- static safety scan ----------------
@@ -378,9 +355,7 @@ describe("AI Doctor follow-up error-rollback workflow — static safety scan", (
     "src/lib/aiDoctorSessionsIndexFilters.ts",
     "src/lib/aiDoctorSessionsSavedViewsRules.ts",
   ];
-  const SRC = Object.fromEntries(
-    FILES.map((f) => [f, readFileSync(resolve(ROOT, f), "utf8")]),
-  );
+  const SRC = Object.fromEntries(FILES.map((f) => [f, readFileSync(resolve(ROOT, f), "utf8")]));
   const ALL = Object.values(SRC).join("\n");
 
   it("only the mutation hook writes to ai_doctor_session_reviews (insert-only)", () => {
@@ -407,9 +382,7 @@ describe("AI Doctor follow-up error-rollback workflow — static safety scan", (
   it("no writes targeting action_queue / alerts / tasks", () => {
     for (const table of ["action_queue", "alerts", "alert_events", "tasks"]) {
       expect(ALL).not.toMatch(
-        new RegExp(
-          `from\\(["']${table}["']\\)[\\s\\S]{0,200}\\.(insert|update|upsert|delete)\\(`,
-        ),
+        new RegExp(`from\\(["']${table}["']\\)[\\s\\S]{0,200}\\.(insert|update|upsert|delete)\\(`),
       );
     }
   });

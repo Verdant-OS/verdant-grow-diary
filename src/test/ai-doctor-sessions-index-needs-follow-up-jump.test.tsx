@@ -37,7 +37,17 @@ vi.mock("@/integrations/supabase/client", () => {
   function makeChain(initial: unknown[]) {
     let current = initial;
     const chain: Record<string, unknown> = {};
-    const passthrough = ["select", "eq", "order", "limit", "range", "not", "gte", "or"];
+    const passthrough = [
+      "select",
+      "eq",
+      "order",
+      "limit",
+      "range",
+      "not",
+      "gte",
+      "or",
+      "abortSignal",
+    ];
     for (const m of passthrough) chain[m] = () => chain;
     chain.in = (_column: string, values: unknown) => {
       if (Array.isArray(values)) {
@@ -54,9 +64,7 @@ vi.mock("@/integrations/supabase/client", () => {
   return {
     supabase: {
       from: (table: string) =>
-        table === "ai_doctor_session_reviews"
-          ? makeChain(reviewRows)
-          : makeChain(sessionRows),
+        table === "ai_doctor_session_reviews" ? makeChain(reviewRows) : makeChain(sessionRows),
     },
   };
 });
@@ -188,21 +196,15 @@ describe("AiDoctorSessionsIndex — Jump to Needs follow-up chip", () => {
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
     const chip = await screen.findByTestId(CHIP_TID);
-    await waitFor(() =>
-      expect(chip.textContent).toBe("Needs follow-up: 1 visible"),
-    );
+    await waitFor(() => expect(chip.textContent).toBe("Needs follow-up: 1 visible"));
   });
 
   it("does not interfere with the built-in 'Needs my attention' preset", async () => {
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"),
-    );
+    fireEvent.click(screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"));
     const select = (await screen.findByTestId(SELECT_TID)) as HTMLSelectElement;
-    await waitFor(() =>
-      expect(select.value).toBe(BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID),
-    );
+    await waitFor(() => expect(select.value).toBe(BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID));
     // The chip remains visible and clickable; it does not silently navigate.
     const chip = await screen.findByTestId(CHIP_TID);
     expect(chip.tagName).toBe("BUTTON");
@@ -213,14 +215,8 @@ describe("AiDoctorSessionsIndex — Jump to Needs follow-up chip", () => {
 
 describe("Static safety scan — Jump chip slice", () => {
   const ROOT = resolve(__dirname, "../..");
-  const TSX = readFileSync(
-    resolve(ROOT, "src/pages/AiDoctorSessionsIndex.tsx"),
-    "utf8",
-  );
-  const RULES = readFileSync(
-    resolve(ROOT, "src/lib/aiDoctorSessionsSavedViewsRules.ts"),
-    "utf8",
-  );
+  const TSX = readFileSync(resolve(ROOT, "src/pages/AiDoctorSessionsIndex.tsx"), "utf8");
+  const RULES = readFileSync(resolve(ROOT, "src/lib/aiDoctorSessionsSavedViewsRules.ts"), "utf8");
   const ALL = `${TSX}\n${RULES}`;
 
   it("no DB writes", () => {
@@ -265,8 +261,6 @@ describe("Static safety scan — Jump chip slice", () => {
     expect(TSX).not.toMatch(/["']builtin:needs-follow-up["']/);
     // Filter values (e.g. reviewStatus="needs_follow_up") are not hand-rolled
     // for this chip's click handler; the helper/applySavedView path owns it.
-    expect(TSX).not.toMatch(
-      /onClick=\{[^}]*reviewStatus[^}]*needs_follow_up/,
-    );
+    expect(TSX).not.toMatch(/onClick=\{[^}]*reviewStatus[^}]*needs_follow_up/);
   });
 });

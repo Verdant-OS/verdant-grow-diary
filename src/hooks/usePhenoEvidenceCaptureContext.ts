@@ -1,6 +1,7 @@
 /**
  * Read-only Pheno evidence capture context for the selected Quick Log plant.
  * Hunt ownership and diary ownership are enforced by existing RLS policies.
+ * PostgREST reads accept an AbortSignal from TanStack Query.
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +11,7 @@ import {
   type PhenoEvidenceCoverage,
   type RawPhenoEvidenceDiaryRow,
 } from "@/lib/phenoEvidenceCaptureRules";
+import { applyPostgrestAbortSignal, rethrowIfAbortError } from "@/lib/supabaseAbort";
 
 export const PHENO_EVIDENCE_CAPTURE_RECEIPT_LIMIT = 200;
 
@@ -28,25 +30,34 @@ export interface UsePhenoEvidenceCaptureContextResult {
 async function loadPhenoEvidenceCaptureContext(
   huntId: string,
   plantId: string,
+  signal?: AbortSignal,
 ): Promise<PhenoEvidenceCaptureContext> {
-  const { data: hunt, error: huntError } = await supabase
-    .from("pheno_hunts")
-    .select("id, name, evidence_goals")
-    .eq("id", huntId)
-    .maybeSingle();
+  const huntQuery = applyPostgrestAbortSignal(
+    supabase.from("pheno_hunts").select("id, name, evidence_goals").eq("id", huntId),
+    signal,
+  );
 
+  const { data: hunt, error: huntError } = await huntQuery.maybeSingle();
+
+  rethrowIfAbortError(huntError);
   if (huntError || !hunt) {
     throw new Error("pheno_hunt_unavailable");
   }
 
-  const { data: diaryRows, error: diaryError } = await supabase
-    .from("diary_entries")
-    .select("id, plant_id, tent_id, grow_id, entry_at, photo_url, details")
-    .eq("plant_id", plantId)
-    .eq("details->>kind" as never, PHENO_EVIDENCE_RECEIPT_KIND as never)
-    .order("entry_at", { ascending: false })
-    .limit(PHENO_EVIDENCE_CAPTURE_RECEIPT_LIMIT);
+  const diaryQuery = applyPostgrestAbortSignal(
+    supabase
+      .from("diary_entries")
+      .select("id, plant_id, tent_id, grow_id, entry_at, photo_url, details")
+      .eq("plant_id", plantId)
+      .eq("details->>kind" as never, PHENO_EVIDENCE_RECEIPT_KIND as never)
+      .order("entry_at", { ascending: false })
+      .limit(PHENO_EVIDENCE_CAPTURE_RECEIPT_LIMIT),
+    signal,
+  );
 
+  const { data: diaryRows, error: diaryError } = await diaryQuery;
+
+  rethrowIfAbortError(diaryError);
   if (diaryError) {
     throw new Error("pheno_evidence_receipts_unavailable");
   }
@@ -72,7 +83,7 @@ export function usePhenoEvidenceCaptureContext(
   const query = useQuery({
     queryKey: ["pheno_evidence_receipts", huntId, plantId],
     enabled,
-    queryFn: () => loadPhenoEvidenceCaptureContext(huntId!, plantId!),
+    queryFn: ({ signal }) => loadPhenoEvidenceCaptureContext(huntId!, plantId!, signal),
   });
 
   if (!enabled) return { status: "disabled", context: null };

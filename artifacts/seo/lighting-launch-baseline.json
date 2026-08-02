@@ -163,6 +163,7 @@
     "production_collection_observed": true,
     "production_collection_observed_at": "2026-08-02T02:08:43.179Z",
     "production_collection_observation_sent_to_property": false,
+    "production_collection_observation_scope": "COMPLETED_NINE_STATE_FULL_MATRIX_ONLY",
     "targeted_post_deploy_recheck": {
       "observed_at": "2026-08-02T05:19:48.245Z",
       "scope": "direct_deep_link_and_cross_guide_client_navigation",

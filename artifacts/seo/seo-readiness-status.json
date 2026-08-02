@@ -103,6 +103,7 @@
     "last_targeted_recheck_at": "2026-08-02T05:19:48.245Z",
     "verification_method": "INTERCEPTED_BROWSER_COLLECTION_REQUESTS",
     "test_events_transmitted": false,
+    "test_events_transmitted_scope": "COMPLETED_NINE_STATE_FULL_MATRIX_ONLY",
     "stream_identity_status": "PASS",
     "stream_identity_evidence": "OWNER_CONFIRMED_VALUES_MATCH_DEPLOYED_PRODUCTION_TAG",
     "stream": {

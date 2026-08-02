@@ -195,6 +195,7 @@ describe("SEO readiness status artifact", () => {
       last_full_verified_at: "2026-08-02T02:08:43.179Z",
       verification_method: "INTERCEPTED_BROWSER_COLLECTION_REQUESTS",
       test_events_transmitted: false,
+      test_events_transmitted_scope: "COMPLETED_NINE_STATE_FULL_MATRIX_ONLY",
       stream_identity_status: "PASS",
       stream_identity_evidence: "OWNER_CONFIRMED_VALUES_MATCH_DEPLOYED_PRODUCTION_TAG",
       stream: {
@@ -323,6 +324,7 @@ describe("SEO readiness status artifact", () => {
     expect(BASELINE.generated_at).toBe(READINESS.generated_at);
     expect(baselineGa4).toMatchObject({
       stream_identity_status: "pass_owner_confirmed_matches_production",
+      production_collection_observation_scope: "COMPLETED_NINE_STATE_FULL_MATRIX_ONLY",
       stream: {
         name: "Verdant Grow Diary",
         url: "https://verdantgrowdiary.com",

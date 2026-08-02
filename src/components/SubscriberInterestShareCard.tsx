@@ -24,6 +24,9 @@ export default function SubscriberInterestShareCard({ planId }: SubscriberIntere
   if (!shareData) return null;
 
   async function sharePaidPlan() {
+    // Re-checked inside the handler: the early return above narrows the render
+    // path, but not this hoisted function declaration's captured binding.
+    if (!shareData) return;
     const nativeShare = getNativeShare();
     const clipboard = getClipboardWriteText();
     const source = nativeShare ? "native_share" : "copy_link";

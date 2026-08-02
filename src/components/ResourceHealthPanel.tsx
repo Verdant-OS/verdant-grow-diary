@@ -75,6 +75,7 @@ const initial: ResourceCheck[] = [
       if (!body.includes("<urlset") && !body.includes("<sitemapindex")) {
         return "missing <urlset> / <sitemapindex> root";
       }
+      return undefined;
     },
   },
   {
@@ -151,7 +152,7 @@ export function ResourceHealthPanel() {
               };
             }
           }
-          let extra: string | void;
+          let extra: string | undefined = undefined;
           if (check.validate) {
             extra = await check.validate(res, body);
           }

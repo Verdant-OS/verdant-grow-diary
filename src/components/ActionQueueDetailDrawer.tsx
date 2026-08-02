@@ -175,7 +175,7 @@ function ActionQueueDetailDrawerBody({
   onApprove,
   onReject,
   onRetryTrace,
-}: Required<Pick<ActionQueueDetailDrawerProps, "row">> &
+}: { row: NonNullable<ActionQueueDetailDrawerProps["row"]> } &
   Pick<
     ActionQueueDetailDrawerProps,
     | "lookups"

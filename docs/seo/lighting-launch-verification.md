@@ -52,8 +52,9 @@ numeric property ID and authenticated reporting baseline remain unavailable to C
   (`a20776993bd606f07977674934864b888a407e1c`). The former was one evidence-only commit ahead at
   snapshot capture and is not represented as deployed content.
 - Its evidence snapshot remains timestamped `2026-08-02T02:55:07.852Z`. The later
-  `2026-08-02T03:32:24.018Z` revision changes provenance and measurement-contract metadata only;
-  it is not a fresh production or analytics verification.
+  `2026-08-02T04:36:17.280Z` revision is classified as
+  `STATUS_TAXONOMY_AND_MEASUREMENT_CONTRACT_METADATA_ONLY`; it is not a fresh production or
+  analytics verification.
 - The current production response does not expose a Lovable deployment ID, so none is inferred.
 - Both release-specific URLs, titles, descriptions, H1s, Article/FAQ schema, sitemap entries, and
   cross-links are present in production.

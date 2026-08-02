@@ -109,6 +109,12 @@ describe("SEO readiness status artifact", () => {
     }
   });
 
+  it("keeps the human-readable handoff aligned with the artifact revision metadata", () => {
+    const revision = READINESS.artifact_revision as Record<string, unknown>;
+    expect(LAUNCH_VERIFICATION).toContain(`\`${revision.revised_at}\``);
+    expect(LAUNCH_VERIFICATION).toContain(`\`${revision.revision_scope}\``);
+  });
+
   it("separates the point-in-time evidence head from the audited deploy release", () => {
     expect(READINESS.run_context).toEqual({
       repository: "Verdant-OS/verdant-grow-diary",

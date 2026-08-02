@@ -21,6 +21,8 @@ export default function SubscriberInterestShareCard({ planId }: SubscriberIntere
   const shareData = buildSubscriberInterestReferralData(planId);
 
   if (!shareData) return null;
+  // Local const so nested async handlers retain non-null narrowing under SNC.
+  const referral = shareData;
 
   async function sharePaidPlan() {
     const nativeShare = navigator.share?.bind(navigator);
@@ -31,13 +33,13 @@ export default function SubscriberInterestShareCard({ planId }: SubscriberIntere
 
     try {
       if (nativeShare) {
-        await nativeShare(shareData);
+        await nativeShare(referral);
         setStatus("idle");
         trackPricingEvent("pricing_interest_share_completed", { plan: planId, source });
         return;
       }
       if (clipboard) {
-        await clipboard(shareData.url);
+        await clipboard(referral.url);
         setStatus("copied");
         trackPricingEvent("pricing_interest_share_completed", { plan: planId, source });
         return;

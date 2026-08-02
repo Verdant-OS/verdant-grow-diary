@@ -175,8 +175,7 @@ function ActionQueueDetailDrawerBody({
   onApprove,
   onReject,
   onRetryTrace,
-}: Required<Pick<ActionQueueDetailDrawerProps, "row">> &
-  Pick<
+}: { row: ActionDrawerInput } & Pick<
     ActionQueueDetailDrawerProps,
     | "lookups"
     | "busy"

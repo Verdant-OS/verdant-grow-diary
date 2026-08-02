@@ -138,6 +138,7 @@ export function runPostGrowReflectionDryRunHarness(
     const outputConfidence =
       adapterResult.status === "validated" ? adapterResult.output.confidence : null;
 
+    const opts = adapterResult.request.validationOptions;
     return {
       id: scenario.id,
       label: scenario.label,
@@ -149,7 +150,12 @@ export function runPostGrowReflectionDryRunHarness(
       issueCodes: codes,
       failureReason,
       outputConfidence,
-      validationOptions: adapterResult.request.validationOptions,
+      validationOptions: {
+        ...opts,
+        sensorCoveragePct: opts.sensorCoveragePct ?? 0,
+        knownGapCount: opts.knownGapCount ?? 0,
+        minEvidenceReferences: opts.minEvidenceReferences ?? 0,
+      },
     };
   });
 

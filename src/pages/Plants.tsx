@@ -898,7 +898,7 @@ export default function Plants() {
                       id: p.id,
                       name: p.name,
                       strain: p.strain ?? null,
-                      stage: p.stage,
+                      stage: p.stage ?? "",
                       health: p.health,
                       startedAt: p.startedAt ?? null,
                       tentId: p.tentId ?? null,

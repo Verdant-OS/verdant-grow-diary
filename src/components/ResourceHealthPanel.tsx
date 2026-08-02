@@ -151,7 +151,7 @@ export function ResourceHealthPanel() {
               };
             }
           }
-          let extra: string | void;
+          let extra: string | void = undefined;
           if (check.validate) {
             extra = await check.validate(res, body);
           }

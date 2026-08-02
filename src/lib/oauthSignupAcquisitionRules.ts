@@ -86,7 +86,13 @@ export function readPendingOAuthSignupAcquisition(
       removePending(storage);
       return null;
     }
-    return { source: parsed.source, startedAt: parsed.startedAt };
+    const source = parsed.source;
+    const startedAt = parsed.startedAt;
+    if (source == null || startedAt == null) {
+      removePending(storage);
+      return null;
+    }
+    return { source, startedAt };
   } catch {
     removePending(storage);
     return null;

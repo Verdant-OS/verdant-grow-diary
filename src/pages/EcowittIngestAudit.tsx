@@ -161,14 +161,18 @@ export default function EcowittIngestAudit() {
   );
 
   const handleLogEnvironmentCheck = async (draft: DiaryEnvironmentCheckDraft) => {
-    if (!draft.eligible || !draft.rpcPayload.p_target_id) {
+    const targetId = draft.rpcPayload.p_target_id;
+    if (!draft.eligible || !targetId) {
       return { ok: false };
     }
     const existing = mergedLoggedEvents.find((event) => event.capturedAt === draft.occurredAt);
     if (existing) {
       return { ok: true, growEventId: existing.growEventId };
     }
-    const result = await saveQuickLog(draft.rpcPayload);
+    const result = await saveQuickLog({
+      ...draft.rpcPayload,
+      p_target_id: targetId,
+    });
     if (!result.ok) {
       return { ok: false };
     }

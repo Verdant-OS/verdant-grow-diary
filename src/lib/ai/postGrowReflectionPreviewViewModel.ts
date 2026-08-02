@@ -208,10 +208,10 @@ export function buildPostGrowReflectionPreviewViewModel(
     labels,
     sections: buildSections(output),
     validationOptions: {
-      sensorCoveragePct: opts.sensorCoveragePct,
-      knownGapCount: opts.knownGapCount,
-      minEvidenceReferences: opts.minEvidenceReferences,
-      label: `sensorCoveragePct=${opts.sensorCoveragePct}; knownGapCount=${opts.knownGapCount}; minEvidenceReferences=${opts.minEvidenceReferences}`,
+      sensorCoveragePct: opts.sensorCoveragePct ?? 0,
+      knownGapCount: opts.knownGapCount ?? 0,
+      minEvidenceReferences: opts.minEvidenceReferences ?? 0,
+      label: `sensorCoveragePct=${opts.sensorCoveragePct ?? 0}; knownGapCount=${opts.knownGapCount ?? 0}; minEvidenceReferences=${opts.minEvidenceReferences ?? 0}`,
     },
     emptyMessage: null,
   };

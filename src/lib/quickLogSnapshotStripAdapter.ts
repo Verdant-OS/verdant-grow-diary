@@ -276,7 +276,10 @@ export function buildQuickLogSnapshotStrip(
   );
 
   const status = narrowStatus(classification.status);
-  const capturedMs = new Date(snapshot.ts).getTime();
+  const capturedMs =
+    typeof snapshot.ts === "string" || typeof snapshot.ts === "number"
+      ? new Date(snapshot.ts).getTime()
+      : Number.NaN;
   const ageLabel = Number.isFinite(capturedMs)
     ? formatAge(capturedMs, now.getTime())
     : null;
@@ -462,7 +465,8 @@ export function buildQuickLogStripFromTentState(
   }
 
   const status = narrowStrict(snapshot.status);
-  const capturedMs = Date.parse(snapshot.captured_at);
+  const capturedMs =
+    typeof snapshot.captured_at === "string" ? Date.parse(snapshot.captured_at) : Number.NaN;
   const ageLabel = Number.isFinite(capturedMs)
     ? formatAge(capturedMs, now.getTime())
     : null;

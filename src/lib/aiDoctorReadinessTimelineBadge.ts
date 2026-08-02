@@ -115,7 +115,11 @@ export function buildAiDoctorReadinessTimelineBadge(
     return gradeAtCheck === rawFreshness;
   })();
 
-  if ((rawFreshness === "fresh" || rawFreshness === "stale") && evidenceIsCoherent) {
+  if (
+    (rawFreshness === "fresh" || rawFreshness === "stale") &&
+    evidenceIsCoherent &&
+    ageMinutes != null
+  ) {
     const ageText = formatAgeAtCheck(ageMinutes);
     if (rawFreshness === "fresh") {
       return {

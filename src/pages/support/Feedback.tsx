@@ -163,7 +163,7 @@ export default function Feedback() {
     });
     if (!guard.ok) {
       setSubmitState("error");
-      setErrorMessage(guard.message);
+      setErrorMessage(guard.message ?? "Unable to submit right now.");
       return;
     }
 

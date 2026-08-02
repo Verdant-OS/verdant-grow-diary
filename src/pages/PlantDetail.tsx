@@ -173,8 +173,8 @@ function ArchivedTimelineReadOnlyView({
   plant: {
     id: string;
     name: string;
-    strain: string;
-    stage: string;
+    strain: string | null;
+    stage: string | null;
     startedAt: string;
     tentId: string | null;
     growId: string | null;
@@ -207,7 +207,7 @@ function ArchivedTimelineReadOnlyView({
       </div>
       <PageHeader
         title={plant.name}
-        description={plant.strain}
+        description={plant.strain ?? undefined}
         icon={<Sprout className="h-5 w-5" />}
         actions={<StageBadge stage={plant.stage} />}
       />
@@ -360,6 +360,21 @@ export default function PlantDetail() {
     );
   }
 
+  // Ready path requires a resolved plant row. Blocked states above cover
+  // loading / error / not-found / archived; this guard narrows for SNC.
+  if (!plant) {
+    return (
+      <div>
+        <GrowDataSourceDisclosure
+          resource="plants"
+          hasAnyData={false}
+          metas={[plantMeta]}
+          testId="plant-detail-data-source-disclosure"
+        />
+      </div>
+    );
+  }
+
   const ageDays = Math.floor((Date.now() - new Date(plant.startedAt).getTime()) / 86400000);
   const harvestWatchEligible = isHarvestWatchEligible({
     stage: plant.stage,
@@ -375,7 +390,7 @@ export default function PlantDetail() {
       </Button>
       <PageHeader
         title={plant.name}
-        description={plant.strain}
+        description={plant.strain ?? undefined}
         icon={<Sprout className="h-5 w-5" />}
         actions={
           <div className="flex items-center gap-2">
@@ -486,7 +501,7 @@ export default function PlantDetail() {
             id: plant.id,
             name: plant.name,
             strain: plant.strain,
-            stage: plant.stage,
+            stage: plant.stage ?? "",
             health: plant.health,
             startedAt: plant.startedAt,
             tentId: plant.tentId ?? null,

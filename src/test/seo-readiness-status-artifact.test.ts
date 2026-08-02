@@ -71,8 +71,8 @@ describe("SEO readiness status artifact", () => {
       scope: "LIGHTING_LAUNCH_MEASUREMENT",
       generated_at_semantics: "EVIDENCE_SNAPSHOT_CAPTURE_TIME",
       artifact_revision: {
-        revised_at: "2026-08-02T06:09:23.093Z",
-        revision_scope: "POST_DEPLOY_ANALYTICS_PROVENANCE_CLARIFICATION_ONLY",
+        revised_at: "2026-08-02T08:07:28.792Z",
+        revision_scope: "POST_DEPLOY_ANALYTICS_RECHECK_PROVENANCE_CORRECTION_ONLY",
         production_or_analytics_reverification_performed: false,
       },
       timezone: "America/Chicago",
@@ -126,7 +126,8 @@ describe("SEO readiness status artifact", () => {
     expect(READINESS.run_context).toEqual({
       repository: "Verdant-OS/verdant-grow-diary",
       audit_branch: "codex/seo-readiness-evidence-20260802",
-      audit_head: "c794e4c6ff0debb6ae2a83566b2a73f690a96393",
+      audit_head: "913f1b9deb0934d5ce76491cbc945816f4581b73",
+      pre_recheck_audit_head: "c794e4c6ff0debb6ae2a83566b2a73f690a96393",
       audit_head_is_descendant_of_deploy_branch_head: true,
       deploy_branch: "verdant-grow-diary",
       deploy_branch_head: "a20776993bd606f07977674934864b888a407e1c",

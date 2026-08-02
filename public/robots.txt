@@ -19,6 +19,7 @@ Disallow: /dashboard
 Disallow: /daily-check
 Disallow: /tents
 Disallow: /plants
+Allow: /sensors/csv-preview
 Disallow: /sensors
 Disallow: /logs
 Disallow: /timeline
@@ -65,6 +66,7 @@ Disallow: /dashboard
 Disallow: /daily-check
 Disallow: /tents
 Disallow: /plants
+Allow: /sensors/csv-preview
 Disallow: /sensors
 Disallow: /logs
 Disallow: /timeline
@@ -111,6 +113,7 @@ Disallow: /dashboard
 Disallow: /daily-check
 Disallow: /tents
 Disallow: /plants
+Allow: /sensors/csv-preview
 Disallow: /sensors
 Disallow: /logs
 Disallow: /timeline

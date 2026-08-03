@@ -24,7 +24,9 @@ interface Ctx {
 const AuthCtx = createContext<Ctx>({
   user: null,
   session: null,
-  loading: true,
+  // Outside AuthProvider (pure marketing SSR), treat as signed-out with no
+  // pending session probe — avoids infinite "loading" without a provider.
+  loading: false,
   signOut: async () => {},
 });
 

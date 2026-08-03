@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { staticRouteHead } from "@/lib/build/staticRouteHead";
 import Contact from "@/pages/support/Contact";
+import { PublicAuthProviders } from "@/components/providers/PublicAuthProviders";
 
 export const Route = createFileRoute("/contact")({
   head: () => staticRouteHead("/contact"),
@@ -8,5 +9,9 @@ export const Route = createFileRoute("/contact")({
 });
 
 function RouteComponent() {
-  return <Contact />;
+  return (
+    <PublicAuthProviders>
+      <Contact />
+    </PublicAuthProviders>
+  );
 }

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { staticRouteHead } from "@/lib/build/staticRouteHead";
 import QuickLogStarter from "@/pages/QuickLogStarter";
+import { PublicAuthProviders } from "@/components/providers/PublicAuthProviders";
 
 export const Route = createFileRoute("/quick-log")({
   head: () => staticRouteHead("/quick-log"),
@@ -8,5 +9,9 @@ export const Route = createFileRoute("/quick-log")({
 });
 
 function RouteComponent() {
-  return <QuickLogStarter />;
+  return (
+    <PublicAuthProviders>
+      <QuickLogStarter />
+    </PublicAuthProviders>
+  );
 }

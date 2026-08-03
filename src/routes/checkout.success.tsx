@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { staticRouteHead } from "@/lib/build/staticRouteHead";
 import CheckoutSuccess from "@/pages/CheckoutSuccess";
+import { PublicAuthProviders } from "@/components/providers/PublicAuthProviders";
 
 export const Route = createFileRoute("/checkout/success")({
   head: () => staticRouteHead("/checkout/success"),
@@ -8,5 +9,9 @@ export const Route = createFileRoute("/checkout/success")({
 });
 
 function RouteComponent() {
-  return <CheckoutSuccess />;
+  return (
+    <PublicAuthProviders>
+      <CheckoutSuccess />
+    </PublicAuthProviders>
+  );
 }

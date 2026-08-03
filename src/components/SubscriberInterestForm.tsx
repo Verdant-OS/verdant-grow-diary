@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import SubscriberInterestShareCard from "@/components/SubscriberInterestShareCard";
-import { supabase } from "@/integrations/supabase/client";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
 import {
   buildSubscriberInterestLead,
@@ -46,6 +45,9 @@ export default function SubscriberInterestForm({
 
     setSubmitting(true);
     setError(null);
+    // Dynamic import: keep the browser Supabase client out of the static
+    // module graph for this form until the grower actually submits.
+    const { supabase } = await import("@/integrations/supabase/client");
     const { error: insertError } = await supabase.from("leads").insert(lead.payload);
     setSubmitting(false);
 

@@ -37,4 +37,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Import Supabase client in hostile SSR runtime
-        run: timeout 90s bunx vite-node --config vite.config.ts scripts/test-supabase-client-ssr-import.ts
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: public-anon-test-key
+        run: timeout 30s bun scripts/test-supabase-client-ssr-import.ts

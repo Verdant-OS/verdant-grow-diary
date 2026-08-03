@@ -24,7 +24,7 @@ describe("Supabase client storage", () => {
   });
 
   it("keeps autoRefreshToken + persistSession enabled in the browser", () => {
-    // Browser path enables both; Node/SSR forces them off.
+    // Browser path enables both; Node/SSR forces them off (inside factory).
     expect(CLIENT).toMatch(/persistSession:\s*isBrowser/);
     expect(CLIENT).toMatch(/autoRefreshToken:\s*isBrowser/);
   });
@@ -36,6 +36,13 @@ describe("Supabase client storage", () => {
   it("defers sessionStorage access behind a lazy adapter (SSR-safe import)", () => {
     expect(CLIENT).toMatch(/createLazySessionStorage/);
     expect(CLIENT).not.toMatch(/storage:\s*typeof window[\s\S]*window\.sessionStorage/);
+  });
+
+  it("defers createClient behind a Proxy singleton (strategy B)", () => {
+    expect(CLIENT).toMatch(/getSupabaseBrowserClient/);
+    expect(CLIENT).toMatch(/new Proxy/);
+    // Must not eagerly call createClient at module top-level export assignment.
+    expect(CLIENT).not.toMatch(/export const supabase = createClient/);
   });
 });
 
@@ -70,9 +77,14 @@ describe("Auth security docs", () => {
 });
 
 describe("src/ static safety", () => {
-  it("never imports the service role key into src/", () => {
+  it("never imports the service role key into client-bound src/", () => {
     const offenders = SRC_FILES.filter((f) => {
       if (isSrcTestFile(f)) return false; // guard tests assert absence
+      // Server-only admin module is allowed to read SUPABASE_SERVICE_ROLE_KEY.
+      // It must stay out of the browser graph (see client.server.ts banner).
+      if (f.replace(/\\/g, "/").endsWith("integrations/supabase/client.server.ts")) {
+        return false;
+      }
       const body = readFileCached(f);
       // Strip sanitizer-style references (regex literals + quoted string literals
       // naming the key, e.g. defensive redaction code). The real escalation

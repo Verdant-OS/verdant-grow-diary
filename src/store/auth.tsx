@@ -60,6 +60,9 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
   );
 
   useEffect(() => {
+    // First property access on `supabase` materializes the browser singleton
+    // (Proxy in client.ts). AuthProvider is the intentional warm path for the
+    // authenticated app shell mounted from __root.
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => applySession(s));
     supabase.auth
       .getSession()

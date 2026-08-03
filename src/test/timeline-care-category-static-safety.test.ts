@@ -48,4 +48,10 @@ describe("supabase client SSR import contract", () => {
     expect(client).not.toMatch(/storage:\s*window\.sessionStorage/);
     expect(client).toMatch(/createLazySessionStorage/);
   });
+
+  it("uses a Proxy singleton so bare import does not call createClient", () => {
+    expect(client).toMatch(/new Proxy/);
+    expect(client).toMatch(/getSupabaseBrowserClient/);
+    expect(client).not.toMatch(/export const supabase = createClient/);
+  });
 });

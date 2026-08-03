@@ -2,15 +2,19 @@
  * @vitest-environment node
  *
  * Import-time safety for `@/integrations/supabase/client` under Node/SSR.
- * The production server (and hostile partial-window shims) must never throw
- * because `window.sessionStorage` is missing or its getter throws.
+ * - createClient must NOT run on bare import (lazy Proxy singleton).
+ * - sessionStorage must NOT be read at module evaluation.
+ * - Hostile partial-window shims must not throw on import or first storage use.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { createClientMock } = vi.hoisted(() => ({
   createClientMock: vi.fn((_url: string, _key: string, _options: unknown) => ({
-    auth: {},
-    from: vi.fn(),
+    auth: {
+      getSession: vi.fn(async () => ({ data: { session: null }, error: null })),
+      onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
+    },
+    from: vi.fn(() => ({ select: vi.fn() })),
   })),
 }));
 
@@ -29,12 +33,15 @@ function restoreGlobalProperty(name: "window" | "sessionStorage", descriptor?: P
   else Reflect.deleteProperty(globalThis, name);
 }
 
-async function importFreshClient() {
+async function importFreshModule() {
   vi.resetModules();
   createClientMock.mockClear();
-  await import("@/integrations/supabase/client");
-  expect(createClientMock).toHaveBeenCalledTimes(1);
-  const options = createClientMock.mock.calls[0]?.[2] as
+  return import("@/integrations/supabase/client");
+}
+
+function authOptionsFromLastCreate() {
+  expect(createClientMock).toHaveBeenCalled();
+  const options = createClientMock.mock.calls.at(-1)?.[2] as
     | {
         auth?: {
           storage?: Storage;
@@ -57,12 +64,47 @@ afterEach(() => {
   restoreGlobalProperty("sessionStorage", originalSessionStorageDescriptor);
 });
 
+describe("Supabase client lazy singleton (strategy B)", () => {
+  it("does not call createClient on bare import", async () => {
+    Reflect.deleteProperty(globalThis, "window");
+    await importFreshModule();
+    expect(createClientMock).toHaveBeenCalledTimes(0);
+  });
+
+  it("calls createClient once on first property access", async () => {
+    Reflect.deleteProperty(globalThis, "window");
+    const { supabase } = await importFreshModule();
+    expect(createClientMock).toHaveBeenCalledTimes(0);
+
+    // First touch materializes the singleton (AuthProvider does this via .auth).
+    void supabase.auth;
+    expect(createClientMock).toHaveBeenCalledTimes(1);
+
+    void supabase.from;
+    expect(createClientMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("getSupabaseBrowserClient materializes the same singleton path", async () => {
+    Reflect.deleteProperty(globalThis, "window");
+    const mod = await importFreshModule();
+    expect(createClientMock).toHaveBeenCalledTimes(0);
+    mod.getSupabaseBrowserClient();
+    expect(createClientMock).toHaveBeenCalledTimes(1);
+    mod.getSupabaseBrowserClient();
+    expect(createClientMock).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("Supabase client SSR / Node import safety", () => {
-  it("imports without window and does not enable session persistence", async () => {
+  it("imports without window and does not enable session persistence on first use", async () => {
     Reflect.deleteProperty(globalThis, "window");
     Reflect.deleteProperty(globalThis, "sessionStorage");
 
-    const auth = await importFreshClient();
+    const { supabase } = await importFreshModule();
+    expect(createClientMock).toHaveBeenCalledTimes(0);
+
+    void supabase.auth;
+    const auth = authOptionsFromLastCreate();
 
     expect(auth.storage).toBeUndefined();
     expect(auth.persistSession).toBe(false);
@@ -82,10 +124,12 @@ describe("Supabase client SSR / Node import safety", () => {
       value: partialWindow,
     });
 
-    // Must not throw at import time.
-    const auth = await importFreshClient();
+    const { supabase } = await importFreshModule();
+    expect(createClientMock).toHaveBeenCalledTimes(0);
 
-    // Lazy adapter may be installed; calling getItem must not throw either.
+    // Must not throw at first use either.
+    void supabase.auth;
+    const auth = authOptionsFromLastCreate();
     expect(() => auth.storage?.getItem("x")).not.toThrow();
     expect(auth.storage?.getItem("x") ?? null).toBeNull();
   });
@@ -105,9 +149,9 @@ describe("Supabase client SSR / Node import safety", () => {
       value: partialWindow,
     });
 
-    await importFreshClient();
-
-    // Construction of the lazy adapter must not touch the getter.
+    await importFreshModule();
+    expect(createClientMock).toHaveBeenCalledTimes(0);
+    // Module eval + lazy adapter factory must not touch the getter.
     expect(sessionStorageReads).toBe(0);
   });
 });

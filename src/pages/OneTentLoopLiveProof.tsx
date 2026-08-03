@@ -656,7 +656,7 @@ export default function OneTentLoopLiveProof(): JSX.Element {
   const view: LiveProofView = React.useMemo(
     () => buildOneTentLoopLiveProofView(evidence),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [JSON.stringify(evidence)],
+    [evidence],
   );
 
   const report = React.useMemo(() => buildOneTentLoopLiveProofTextReport(view), [view]);

@@ -49,7 +49,7 @@ export function redactSecrets(text) {
       .replace(/\bghp_[A-Za-z0-9]{20,}\b/g, "[REDACTED_GH_TOKEN]")
       .replace(/\bnpm_[A-Za-z0-9]{20,}\b/g, "[REDACTED_NPM_TOKEN]")
       // Generic Bearer credentials
-      .replace(/Bearer\s+[A-Za-z0-9._\-]{16,}/gi, "Bearer [REDACTED]")
+      .replace(/Bearer\s+[A-Za-z0-9._-]{16,}/gi, "Bearer [REDACTED]")
       // sk-/pk- style API keys
       .replace(/\b(sk|pk|rk)_[A-Za-z0-9]{16,}\b/g, "[REDACTED_KEY]")
   );

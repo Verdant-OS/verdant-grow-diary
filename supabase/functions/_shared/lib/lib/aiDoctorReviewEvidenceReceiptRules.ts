@@ -454,7 +454,7 @@ function isReceiptRootZoneObservation(value: unknown): value is ReceiptRootZoneO
     value.measuredFields.length > ROOT_ZONE_MEASURED_FIELDS.length ||
     !Array.isArray(value.invalidFields) ||
     value.invalidFields.length > ROOT_ZONE_INVALID_FIELDS.length ||
-    (Object.prototype.hasOwnProperty.call(value, "manualObservationFields") &&
+    (Object.hasOwn(value, "manualObservationFields") &&
       (!Array.isArray(value.manualObservationFields) ||
         value.manualObservationFields.length === 0 ||
         value.manualObservationFields.length > ROOT_ZONE_MANUAL_OBSERVATION_FIELDS.length))
@@ -466,15 +466,15 @@ function isReceiptRootZoneObservation(value: unknown): value is ReceiptRootZoneO
     new Set(value.measuredFields).size === value.measuredFields.length &&
     value.invalidFields.every((field) => isOneOf(field, ROOT_ZONE_INVALID_FIELDS)) &&
     new Set(value.invalidFields).size === value.invalidFields.length &&
-    (!Object.prototype.hasOwnProperty.call(value, "manualObservationFields") ||
+    (!Object.hasOwn(value, "manualObservationFields") ||
       (value.eventType === "watering" &&
         value.source === "manual" &&
         !value.invalidFields.includes("manualObservation"))) &&
-    (!Object.prototype.hasOwnProperty.call(value, "manualObservationFields") ||
+    (!Object.hasOwn(value, "manualObservationFields") ||
       (value.manualObservationFields as unknown[]).every((field) =>
         isOneOf(field, ROOT_ZONE_MANUAL_OBSERVATION_FIELDS),
       )) &&
-    (!Object.prototype.hasOwnProperty.call(value, "manualObservationFields") ||
+    (!Object.hasOwn(value, "manualObservationFields") ||
       new Set(value.manualObservationFields as unknown[]).size ===
         (value.manualObservationFields as unknown[]).length)
   );

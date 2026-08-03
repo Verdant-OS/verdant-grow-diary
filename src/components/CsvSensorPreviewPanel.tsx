@@ -158,7 +158,7 @@ export default function CsvSensorPreviewPanel({
       new Blob([JSON.stringify(report, null, 2)], { type: "application/json" }),
       "verdant-sensor-preview-report.json",
     );
-  }, [result, overrides, window, sampling]);
+  }, [result, overrides, window, sampling, downloadLocalBlob]);
 
   const handleDownloadCsvSummary = useCallback(() => {
     if (!result || !result.ok) return;
@@ -168,7 +168,7 @@ export default function CsvSensorPreviewPanel({
       sampling,
     });
     downloadLocalBlob(new Blob([csv], { type: "text/csv" }), "verdant-sensor-preview-summary.csv");
-  }, [result, overrides, window, sampling]);
+  }, [result, overrides, window, sampling, downloadLocalBlob]);
 
   const handleDownloadPdf = useCallback(() => {
     if (!result || !result.ok) return;
@@ -181,7 +181,7 @@ export default function CsvSensorPreviewPanel({
       new Blob([bytes.buffer as ArrayBuffer], { type: "application/pdf" }),
       "verdant-sensor-preview-report.pdf",
     );
-  }, [result, overrides, window, sampling]);
+  }, [result, overrides, window, sampling, downloadLocalBlob]);
 
   const setOverride = (header: string, value: string) => {
     setOverrides((prev) => {
@@ -345,7 +345,7 @@ export default function CsvSensorPreviewPanel({
               </TableHeader>
               <TableBody>
                 {effective.mappings.map((m) => {
-                  const overrideKey = Object.prototype.hasOwnProperty.call(overrides, m.header)
+                  const overrideKey = Object.hasOwn(overrides, m.header)
                     ? overrides[m.header] === null
                       ? "__unmapped__"
                       : (overrides[m.header] as string)

@@ -73,7 +73,7 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tentId]);
+  }, [load]);
 
   async function mint() {
     setBusy(true);

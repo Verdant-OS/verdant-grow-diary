@@ -51,7 +51,7 @@ export function useActionResponseMemory(args: UseActionResponseMemoryArgs): {
     return () => {
       cancelled = true;
     };
-  }, [user, growId, plantId, nonce]);
+  }, [user, growId, plantId]);
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 

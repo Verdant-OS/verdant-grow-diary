@@ -138,7 +138,7 @@ export function useEnvironmentTrends(
       setState({ status: "unavailable", trends: EMPTY_TRENDS });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, growId, tentKey]);
+  }, [user, growId, tentIds.length, tentIds]);
 
   useEffect(() => {
     load();

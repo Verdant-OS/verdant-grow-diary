@@ -282,7 +282,7 @@ export default function OperatorEdgeAlerts() {
   const filteredFired = useMemo(
     () => (liveQuery.data?.fired ?? []).filter((b) => matchesCommonFilters(b.fn, b.metric)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [liveQuery.data, searchNeedle, metricFilter],
+    [liveQuery.data, matchesCommonFilters],
   );
 
   const filteredSuppressed = useMemo(
@@ -296,7 +296,7 @@ export default function OperatorEdgeAlerts() {
         return true;
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [liveQuery.data, searchNeedle, metricFilter, timeCutoff],
+    [liveQuery.data, timeCutoff, matchesCommonFilters],
   );
 
   const filteredDispatches = useMemo(() => {
@@ -311,7 +311,7 @@ export default function OperatorEdgeAlerts() {
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatchesWithExpiry, searchNeedle, metricFilter, statusFilter, timeCutoff]);
+  }, [dispatchesWithExpiry, statusFilter, timeCutoff, matchesCommonFilters]);
 
   const pageCount = Math.max(1, Math.ceil(filteredDispatches.length / PAGE_SIZE));
 
@@ -334,7 +334,7 @@ export default function OperatorEdgeAlerts() {
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attemptsQuery.data, searchNeedle, metricFilter, timeCutoff]);
+  }, [attemptsQuery.data, timeCutoff, matchesCommonFilters]);
 
   const attemptsPageCount = Math.max(1, Math.ceil(filteredAttempts.length / PAGE_SIZE));
 

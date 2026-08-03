@@ -208,7 +208,7 @@ export function resolveSensorSnapshotStaleWindowMs(args: ResolveStaleWindowArgs 
   const def = args.defaultMs ?? DEFAULT_STALE_WINDOW_MS;
   const overrides = args.overrides ?? SENSOR_SNAPSHOT_STALE_WINDOW_OVERRIDES_MS;
   const src = (args.source ?? "").toString().trim().toLowerCase();
-  if (src && Object.prototype.hasOwnProperty.call(overrides, src)) {
+  if (src && Object.hasOwn(overrides, src)) {
     const v = overrides[src];
     if (Number.isFinite(v) && v > 0) return v;
   }

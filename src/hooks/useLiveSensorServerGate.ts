@@ -124,12 +124,12 @@ export function useLiveSensorServerGate(surface: LiveSensorSurface, scope: LiveS
       aliveRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [surface, scopeKey]);
+  }, [surface, scope]);
 
   const recheck = useCallback(
     () => checkLiveSensorEntitlement(surface, scope),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [surface, scopeKey],
+    [surface, scope],
   );
 
   return {

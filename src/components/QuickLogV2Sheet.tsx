@@ -445,7 +445,14 @@ export default function QuickLogV2Sheet({
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
       resetPhotoSelection();
     }
-  }, [open, defaultTargetKey, defaultAction]);
+  }, [
+    open,
+    defaultTargetKey,
+    defaultAction, // Closing or reopening invalidates any metadata probe still resolving for
+    // the previous draft. A stale completion can never repopulate the sheet.
+    resetVideoSelection,
+    resetPhotoSelection,
+  ]);
 
   // One-shot prefill of the feeding form with last-used defaults. Runs only
   // when the Feed action is active, the form is still pristine, defaults

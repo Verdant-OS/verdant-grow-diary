@@ -241,13 +241,14 @@ export function usePersistEnvironmentAlerts(
   }, [
     enabled,
     growId,
-    tsKey,
-    sourceKey,
-    qualityKey,
-    targetsKey,
     isDemoData,
-    stageKey,
     stageProvided,
+    input.stage,
+    input.snapshot?.metric_refs,
+    input.quality.quality,
+    input.quality,
+    input.targets,
+    input.snapshot,
   ]);
 
   return state;

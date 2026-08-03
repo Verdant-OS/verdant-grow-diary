@@ -280,7 +280,7 @@ describe("verdant skill contracts", () => {
         expect(dump).not.toMatch(/shhh/);
         expect(dump).not.toMatch(/sk-xxxx/);
         expect(dump).not.toMatch(/leak-me/);
-        expect(Object.prototype.hasOwnProperty.call(parsed.envelope, "__proto__")).toBe(false);
+        expect(Object.hasOwn(parsed.envelope, "__proto__")).toBe(false);
       }
       expect(({} as { polluted?: boolean }).polluted).toBeUndefined();
     });

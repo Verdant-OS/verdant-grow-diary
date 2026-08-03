@@ -167,7 +167,7 @@ function usePaddle(config: PaddleConfig): {
       setLoading(false);
     };
     document.head.appendChild(script);
-  }, [config, attempt]);
+  }, [config]);
 
   const retry = useCallback(() => {
     setError(null);

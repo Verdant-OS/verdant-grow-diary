@@ -119,7 +119,7 @@ export function useEnvironmentSummaryReportServerGate(): EnvironmentSummaryRepor
     return () => {
       cancelled = true;
     };
-  }, [attempt]);
+  }, []);
 
   return { ...state, retry };
 }

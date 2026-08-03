@@ -242,7 +242,7 @@ export function buildTentPlantActivityPanelsViewModel(
 ): TentPlantActivityPanelsViewModel {
   const includeArchived = input.includeArchived === true;
   const activity = input.activityByPlantId ?? {};
-  const photosAnchorAvailable = input.photosAnchorAvailable === false ? false : true;
+  const photosAnchorAvailable = input.photosAnchorAvailable !== false;
 
   const plants = Array.isArray(input.plants) ? input.plants : [];
   const visible = plants.filter((p) => (includeArchived ? true : p.isArchived !== true));

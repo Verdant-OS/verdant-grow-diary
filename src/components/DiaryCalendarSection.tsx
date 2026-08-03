@@ -175,7 +175,7 @@ export default function DiaryCalendarSection({
     // Note: we intentionally do not auto-shift away from an empty month
     // chosen by explicit prev/next navigation — empty state will explain.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allGroups]);
+  }, [allGroups, visibleMonth, filter]);
 
   // Month-scoped view of the full dataset (before kind filter).
   const monthGroupsAll = useMemo(

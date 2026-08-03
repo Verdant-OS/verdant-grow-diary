@@ -56,7 +56,7 @@ jobs:
       # on this branch — they exist only on the side branch that authored
       # this surface (e7e4e72d / be8ac1f7) and were written against a lib
       # version that predates the Pheno Hunt foundation now on trunk.
-      # Referencing them made the eslint step below fail unconditionally.
+      # Referencing them made the lint step below fail unconditionally.
       # Reconciling the imported surface with the evolved libs is tracked
       # follow-up work.
       - name: Vitest — Pheno Comparison

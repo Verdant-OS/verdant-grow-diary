@@ -208,7 +208,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     setHistory([]);
     setDiagnosticsHistory([]);
     setLastPayload(null);
-  }, [tentId]);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -246,7 +246,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [tentId, result, minting]);
+  }, [tentId]);
 
   const classification = useMemo(() => classifySensorTestbench({ rows }), [rows]);
 
@@ -317,7 +317,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     // Re-compute when validation flips so the displayed name refreshes when
     // the user opens the panel afresh; the actual download still builds a
     // new timestamp at click time.
-    [validationUi.status],
+    [],
   );
   const inspectorPlainText = useMemo(
     () => (responseInspector ? formatSafeResponseInspectorPlainText(responseInspector) : null),

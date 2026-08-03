@@ -187,7 +187,7 @@ function stripAiDoctorReviewRequestTransportFieldsBounded(
   let exceededNodeBudget = false;
   const stripped: Record<string, unknown> = {};
   for (const key in value) {
-    if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+    if (!Object.hasOwn(value, key)) continue;
     const nestedValue = value[key];
     if (
       key === "grow_id" ||
@@ -236,8 +236,8 @@ function readAliasedTransportValue(
   snakeCase: string,
   camelCase: string,
 ): AliasedTransportValue | null {
-  const hasSnakeCase = Object.prototype.hasOwnProperty.call(value, snakeCase);
-  const hasCamelCase = Object.prototype.hasOwnProperty.call(value, camelCase);
+  const hasSnakeCase = Object.hasOwn(value, snakeCase);
+  const hasCamelCase = Object.hasOwn(value, camelCase);
   if (hasSnakeCase && hasCamelCase) return null;
   if (hasSnakeCase) return { present: true, value: value[snakeCase] };
   if (hasCamelCase) return { present: true, value: value[camelCase] };
@@ -249,7 +249,7 @@ export function parseAiDoctorReviewRequestEnvelope(
 ): ParsedAiDoctorReviewRequestEnvelope | null {
   if (!isPlainRecord(value)) return null;
 
-  const hasEnvelope = Object.prototype.hasOwnProperty.call(value, "packet");
+  const hasEnvelope = Object.hasOwn(value, "packet");
   const rawPacket = hasEnvelope ? value.packet : value;
   if (!isPlainRecord(rawPacket)) return null;
 

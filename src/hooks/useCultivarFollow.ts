@@ -16,6 +16,8 @@ import { hasCultivarGuideUpdate } from "@/lib/cultivarFollowRules";
 // migration is deployed and types are regenerated. Replace with the typed table
 // then. Keeps client compilation green in the meantime.
 function followsTable() {
+  // Transitional until cultivar_follows is in generated Database types.
+  // biome-ignore lint/suspicious/noExplicitAny: pre-migration table not in Database types yet
   return (supabase as unknown as { from: (t: string) => any }).from("cultivar_follows");
 }
 

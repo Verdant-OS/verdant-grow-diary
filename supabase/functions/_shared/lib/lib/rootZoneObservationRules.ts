@@ -129,7 +129,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 }
 
 function hasOwn(record: Record<string, unknown>, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(record, key);
+  return Object.hasOwn(record, key);
 }
 
 function relationRecord(value: unknown): Record<string, unknown> | null {

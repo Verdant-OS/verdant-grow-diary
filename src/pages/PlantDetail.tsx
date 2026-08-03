@@ -271,7 +271,7 @@ export default function PlantDetail() {
     setLoadTimedOut(false);
     const handle = setTimeout(() => setLoadTimedOut(true), PLANT_DETAIL_LOAD_TIMEOUT_MS);
     return () => clearTimeout(handle);
-  }, [id, isLoading]);
+  }, [isLoading]);
 
   const loadState = classifyPlantDetailLoadState({
     isLoading,

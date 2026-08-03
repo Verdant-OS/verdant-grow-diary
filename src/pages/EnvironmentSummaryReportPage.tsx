@@ -50,7 +50,15 @@ import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference"
 type PrintMode = "full_report" | "drilldown";
 
 function toViewModel(
-  entry: any,
+  entry: {
+    id?: string;
+    entryId?: string;
+    entry_at?: string;
+    occurredAt?: string;
+    kind?: string;
+    snapshot?: unknown;
+    payload?: { snapshot?: unknown };
+  },
   tempUnit: TemperatureUnitPreference,
 ): EnvironmentCheckDiaryViewModel | null {
   if (!isEnvironmentCheckKind(entry?.kind)) return null;
@@ -232,7 +240,7 @@ export default function EnvironmentSummaryReportPage() {
     () => readEnvironmentSummaryExportAuditEvents(),
     // refresh key bumps when we record a new event
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [exportHistoryRefreshKey],
+    [],
   );
 
   const handleReopenFromHistory = (input: {

@@ -17,8 +17,6 @@ import {
   parseManagedCookies as parseTs,
   evaluateManagedSession as evalTs,
 } from "../../e2e/helpers/lovableManagedSupabaseSession";
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error - JS mirror imported for parity assertions
 import {
   parseManagedCookies as parseJs,
   evaluateManagedSession as evalJs,

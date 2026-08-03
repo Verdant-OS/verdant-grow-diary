@@ -156,7 +156,7 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
     return () => {
       cancelled = true;
     };
-  }, [id, reloadTick]);
+  }, [id]);
 
   const reload = useCallback(() => setReloadTick((t) => t + 1), []);
 

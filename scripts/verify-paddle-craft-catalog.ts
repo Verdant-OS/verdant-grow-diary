@@ -100,7 +100,7 @@ const PADDLE_API_BASE = {
 } as const;
 
 function parseEnvFlag(argv: readonly string[]): PaddleEnv[] {
-  const idx = argv.findIndex((a) => a === "--env");
+  const idx = argv.indexOf("--env");
   const value = idx >= 0 ? argv[idx + 1] : "both";
   if (value === "sandbox") return ["sandbox"];
   if (value === "live") return ["live"];
@@ -110,7 +110,7 @@ function parseEnvFlag(argv: readonly string[]): PaddleEnv[] {
 }
 
 function parseJsonOutFlag(argv: readonly string[]): string | null {
-  const idx = argv.findIndex((a) => a === "--json-out");
+  const idx = argv.indexOf("--json-out");
   if (idx < 0) return null;
   const value = argv[idx + 1];
   if (!value || value.startsWith("--")) {

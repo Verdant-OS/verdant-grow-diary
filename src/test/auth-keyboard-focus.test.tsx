@@ -173,8 +173,8 @@ describe("/reset-password — keyboard tab order & focus", () => {
         el.textContent?.trim().slice(0, 40) ||
         el.tagName.toLowerCase(),
     );
-    const pwdIdx = ids.findIndex((s) => s === "reset-password");
-    const confirmIdx = ids.findIndex((s) => s === "reset-confirm");
+    const pwdIdx = ids.indexOf("reset-password");
+    const confirmIdx = ids.indexOf("reset-confirm");
     const submitIdx = ids.findIndex((s) => /update password/i.test(s));
     const backIdx = ids.findIndex((s) => /back to sign in/i.test(s));
     expect(pwdIdx).toBeGreaterThanOrEqual(0);

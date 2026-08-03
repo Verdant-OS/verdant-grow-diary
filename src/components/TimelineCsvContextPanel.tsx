@@ -65,7 +65,7 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
       cancelled = true;
       window.removeEventListener("verdant:csv-imported", onImported);
     };
-  }, [growId, tentIds.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [growId, tentIds.length, tentIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const matchedByEntry = useMemo(() => {
     const out = new Map<string, CsvTimelineContextEntry>();

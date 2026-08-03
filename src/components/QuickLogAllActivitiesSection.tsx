@@ -228,7 +228,7 @@ export default function QuickLogAllActivitiesSection({
   const activeEnvCheckTempUnit = envCheckTempEntryUnitRef.current ?? temperatureUnit;
   const requestedActivity =
     typeof requestedActivityId === "string" &&
-    Object.prototype.hasOwnProperty.call(QUICK_LOG_ACTIVITY_DEFINITIONS, requestedActivityId)
+    Object.hasOwn(QUICK_LOG_ACTIVITY_DEFINITIONS, requestedActivityId)
       ? requestedActivityId
       : null;
   const requestedActivityRequestKey = requestedActivity
@@ -710,7 +710,6 @@ export default function QuickLogAllActivitiesSection({
     note,
     requiresNote,
     save,
-    canPersistManualSensor,
     harvestWet,
     harvestDry,
     harvestUnit,

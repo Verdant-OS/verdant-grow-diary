@@ -173,7 +173,7 @@ export default function Sensors() {
     target.scrollIntoView?.({ behavior: "smooth", block: "start" });
     target.focus?.({ preventScroll: true });
     focusedSensorAnchorHashRef.current = location.hash;
-  }, [activeTentId, appliedTentRouteIntentKey, location.hash, tentsQuery.isSuccess]);
+  }, [activeTentId, location.hash, tentsQuery.isSuccess]);
   const correctionCtx = useMemo(() => decodeManualCorrectionHash(location.hash), [location.hash]);
   const urlSensorSources = parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM));
   const filtered = useMemo(

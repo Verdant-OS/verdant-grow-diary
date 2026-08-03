@@ -510,8 +510,12 @@ export default function QuickLog({
     prefillPlantId,
     prefillGrowId,
     prefillRequestKey,
-    dismissedBlockedPrefillKey,
     saveLocked,
+    prefill?.plantId, // Grow/tent launchers without a plant remain explicit manual-selection
+    // flows. Preserve their known grow scope, but never invent a plant.
+    setActiveGrowId,
+    prefillHoldActive,
+    activeGrowId,
   ]);
 
   const scopedPlants = useMemo(
@@ -700,7 +704,7 @@ export default function QuickLog({
   useEffect(() => {
     if (!open || saveInFlightRef.current) return;
     snapshotUserTouchedRef.current = false;
-  }, [open, selectedPlant?.tent_id]);
+  }, [open]);
 
   useEffect(() => {
     if (!open || saveInFlightRef.current) return;
@@ -712,7 +716,7 @@ export default function QuickLog({
   useEffect(() => {
     if (saveInFlightRef.current) return;
     setSelectedPhenoEvidenceGoal(null);
-  }, [open, editorPlantId, selectedPhenoHuntId]);
+  }, []);
 
   // One-shot guard for the evidence-goal handoff seed. It is consumed the
   // moment the goal is seeded and reset only when the dialog closes, so a

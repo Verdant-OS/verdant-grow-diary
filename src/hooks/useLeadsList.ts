@@ -101,7 +101,7 @@ export function useLeadsList(opts: UseLeadsListOptions = {}): UseLeadsListResult
     return () => {
       cancelled = true;
     };
-  }, [opts.leadType, opts.source, opts.status, nonce]);
+  }, [opts.leadType, opts.source, opts.status]);
 
   const updateLead = useCallback<UseLeadsListResult["updateLead"]>(async (id, patch) => {
     // Allow-list: original lead submission fields (name, email, company,

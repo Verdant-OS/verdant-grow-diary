@@ -66,7 +66,7 @@ export function usePhenoHuntCandidates(
     return () => {
       cancelled = true;
     };
-  }, [id, reloadToken]);
+  }, [id]);
 
   return { status, hunt, candidates, error, reload };
 }

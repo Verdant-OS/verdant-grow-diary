@@ -204,10 +204,7 @@ export function sanitizeSupabaseDatabaseUrlForPsql(databaseUrl, targetEnv) {
 }
 
 export function databaseTargetForEnvironment(targetEnv) {
-  if (
-    typeof targetEnv !== "string" ||
-    !Object.prototype.hasOwnProperty.call(SUPABASE_DATABASE_TARGETS, targetEnv)
-  ) {
+  if (typeof targetEnv !== "string" || !Object.hasOwn(SUPABASE_DATABASE_TARGETS, targetEnv)) {
     identityError(
       "unknown_target_environment",
       "TARGET_ENV must be exactly sandbox or production.",

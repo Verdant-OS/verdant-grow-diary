@@ -80,13 +80,13 @@ function sectionRows(section: string, rows: SensorSnapshotDrawerCsvRow[]): strin
 
 function snapshotRows(snapshot: SensorSnapshotDrawerCsvSnapshot): string[] {
   const row: SensorSnapshotDrawerCsvRow = {
-    snapshot_id_present: snapshot.snapshotId ? true : false,
+    snapshot_id_present: !!snapshot.snapshotId,
     captured_at: snapshot.capturedAt,
     source: snapshot.source,
     provider: snapshot.provider,
     transport: snapshot.transport,
-    tent_present: snapshot.tentId ? true : false,
-    plant_present: snapshot.plantId ? true : false,
+    tent_present: !!snapshot.tentId,
+    plant_present: !!snapshot.plantId,
     vpd_kpa: snapshot.vpdKpa === 0 ? null : snapshot.vpdKpa,
     soil_moisture_pct: snapshot.soilMoisturePct,
     humidity_pct: snapshot.humidityPct,

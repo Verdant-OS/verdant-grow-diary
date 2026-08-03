@@ -47,7 +47,7 @@ export function resolvePlantDetailDisclosureTarget(
   target: unknown,
 ): PlantDetailDisclosureTarget | null {
   const anchorId = normalizeAnchorTarget(target);
-  if (!anchorId || !Object.prototype.hasOwnProperty.call(ANCHOR_GROUPS, anchorId)) {
+  if (!anchorId || !Object.hasOwn(ANCHOR_GROUPS, anchorId)) {
     return null;
   }
   const knownAnchorId = anchorId as PlantDetailKnownAnchorId;

@@ -20,7 +20,7 @@ export class SmokeChecklistReporter {
     this.steps.push({ step, label, status, evidence });
   }
 
-  async run(step: number, label: string, fn: () => Promise<string | void>): Promise<void> {
+  async run(step: number, label: string, fn: () => Promise<string | undefined>): Promise<void> {
     try {
       const result = await fn();
       const evidence = typeof result === "string" && result.length > 0 ? result : "ok";

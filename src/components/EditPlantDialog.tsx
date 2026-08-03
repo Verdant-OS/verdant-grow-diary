@@ -143,7 +143,18 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     }
     // Also reset when the target plant id changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, plant.id]);
+  }, [
+    open,
+    resetLocalPhotoState,
+    plant.startedAt,
+    plant.strain,
+    plant.lastNote,
+    plant.stage,
+    plant.tentId,
+    plant.name,
+    plant.plantType,
+    plant.health,
+  ]);
 
   // Object-URL lifecycle (create + decode-probe + revoke) is owned by
   // the preview hook so unsupported HEIC/HEIF browsers see the

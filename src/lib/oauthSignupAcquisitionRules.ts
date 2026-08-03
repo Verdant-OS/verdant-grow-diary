@@ -21,10 +21,7 @@ export interface SignupAcquisitionRpcClient {
 }
 
 function isPaidAcquisitionSource(value: unknown): value is PaidAcquisitionSource {
-  return (
-    typeof value === "string" &&
-    Object.prototype.hasOwnProperty.call(PAID_ACQUISITION_ATTRIBUTIONS, value)
-  );
+  return typeof value === "string" && Object.hasOwn(PAID_ACQUISITION_ATTRIBUTIONS, value);
 }
 
 function removePending(storage: Storage | null): void {

@@ -165,7 +165,7 @@ function useSupportRows() {
     return () => {
       cancelled = true;
     };
-  }, [nonce]);
+  }, []);
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
   return { loading, error, feedback, contact, setFeedback, setContact, reload };

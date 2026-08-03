@@ -469,7 +469,7 @@ export default function ActionQueue() {
   const initialUrlState = useMemo(
     () => parseActionQueueUrlState(searchParams),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    [searchParams],
   );
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(
@@ -595,7 +595,7 @@ export default function ActionQueue() {
   useEffect(() => {
     hasLoadedOnceRef.current = false;
     setLastUpdatedAt(null);
-  }, [effectiveGrowId]);
+  }, []);
 
   useEffect(() => {
     load();
@@ -617,7 +617,7 @@ export default function ActionQueue() {
     if (el && typeof el.scrollIntoView === "function") {
       el.scrollIntoView({ block: "center", behavior: "smooth" });
     }
-  }, [focusedActionId, loading, rows.length]);
+  }, [focusedActionId, loading]);
 
   // Reset to page 1 whenever search/filters/page size change. Skip the
   // very first run so an initial ?page=N from the URL is preserved.
@@ -628,7 +628,7 @@ export default function ActionQueue() {
       return;
     }
     setPage(1);
-  }, [searchQuery, statusFilter, traceExtraFilter, pageSize]);
+  }, []);
 
   // Mirror state → URL via replace-history so typing doesn't spam the
   // back stack. Unrelated params (growId, focus, alert, sensorSources…)
@@ -647,7 +647,7 @@ export default function ActionQueue() {
       setSearchParams(next, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, statusFilter, traceExtraFilter, page, pageSize]);
+  }, [searchQuery, statusFilter, traceExtraFilter, page, pageSize, searchParams, setSearchParams]);
 
   /**
    * Idempotent timeline trace for approve/reject transitions.

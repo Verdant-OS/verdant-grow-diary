@@ -87,7 +87,7 @@ export function AgreementReconsentGate() {
     // and re-query on every nav. `suppressed` already captures the only
     // pathname-derived value that matters. retryToken lets the error state retry.
     // Keyed on userId (a primitive), not the user object — see note above.
-  }, [userId, loading, suppressed, retryToken]);
+  }, [userId, loading, suppressed]);
 
   const open =
     !!user && !loading && !suppressed && !checking && (verifyError || (gaps?.length ?? 0) > 0);

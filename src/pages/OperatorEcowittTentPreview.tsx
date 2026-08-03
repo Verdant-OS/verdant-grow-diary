@@ -62,7 +62,7 @@ export default function OperatorEcowittTentPreview() {
   const [sourceIdentityOverride, setSourceIdentityOverride] = useState<string>("");
 
   // Pin "now" per render of this view to keep the local VM/history consistent.
-  const now = useMemo(() => new Date(), [tentKey, sampleKey]);
+  const now = useMemo(() => new Date(), []);
 
   const vm = useMemo(
     () =>

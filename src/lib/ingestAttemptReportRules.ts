@@ -177,8 +177,8 @@ export function classifyIngestWriteAcknowledgement(
   }
 
   const acknowledgement = parsed as Record<string, unknown>;
-  const hasAccepted = Object.prototype.hasOwnProperty.call(acknowledgement, "accepted");
-  const hasInserted = Object.prototype.hasOwnProperty.call(acknowledgement, "inserted");
+  const hasAccepted = Object.hasOwn(acknowledgement, "accepted");
+  const hasInserted = Object.hasOwn(acknowledgement, "inserted");
 
   // Validate every acknowledgement field that is present before considering
   // either positive signal. A valid sibling must never mask a malformed one.

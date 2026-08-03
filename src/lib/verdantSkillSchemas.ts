@@ -574,7 +574,7 @@ function isAbsentAtPath(input: unknown, path: readonly PropertyKey[]): boolean {
       continue;
     }
     if (!isPlainRecord(cursor)) return true;
-    if (!Object.prototype.hasOwnProperty.call(cursor, String(key))) return true;
+    if (!Object.hasOwn(cursor, String(key))) return true;
     cursor = cursor[String(key)];
   }
   return cursor === undefined;

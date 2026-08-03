@@ -35,7 +35,7 @@ export default function TentPlantTabs({
       onSelect(viewModel.selectedPlantId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewModel.selectionWasReset, viewModel.selectedPlantId]);
+  }, [viewModel.selectionWasReset, viewModel.selectedPlantId, onSelect]);
 
   function focusTabByIndex(index: number) {
     const tabs = listRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]');

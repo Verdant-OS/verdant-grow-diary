@@ -169,7 +169,7 @@ function useCreditsAudit(env: EnvFilter, nonce: number) {
     return () => {
       cancelled = true;
     };
-  }, [env, nonce]);
+  }, [env]);
 
   return { loading, error, data };
 }

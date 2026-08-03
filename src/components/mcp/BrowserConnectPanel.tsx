@@ -67,7 +67,10 @@ export default function BrowserConnectPanel() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [
+    endpoint, // Clean the query string so a refresh doesn't retry the code.
+    navigate,
+  ]);
 
   const onConnect = useCallback(async () => {
     setError(null);
@@ -79,7 +82,7 @@ export default function BrowserConnectPanel() {
       setError((e as Error).message || "Could not start OAuth");
       setPhase("idle");
     }
-  }, [issuer]);
+  }, []);
 
   const onProbe = useCallback(async () => {
     setPhase("probing");

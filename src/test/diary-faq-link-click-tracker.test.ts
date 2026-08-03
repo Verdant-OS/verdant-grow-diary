@@ -73,7 +73,7 @@ describe("diaryFaqLinkClickTracker", () => {
       "timestamp",
       "sessionId",
     ]) {
-      expect(Object.prototype.hasOwnProperty.call(parsed, forbidden)).toBe(false);
+      expect(Object.hasOwn(parsed, forbidden)).toBe(false);
     }
   });
 

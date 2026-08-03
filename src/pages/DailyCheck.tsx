@@ -835,10 +835,10 @@ export default function DailyCheck() {
                 <Button
                   variant="outline"
                   className={`h-auto min-h-11 w-full min-w-0 flex-col items-start gap-1 whitespace-normal py-3 text-left ${
-                    methodHint === "sensor" && !!effectiveTentId ? "ring-2 ring-primary" : ""
+                    methodHint === "sensor" && effectiveTentId ? "ring-2 ring-primary" : ""
                   }`}
                   data-testid="daily-grow-check-choose-snapshot"
-                  data-method-focused={methodHint === "sensor" && !!effectiveTentId ? "1" : "0"}
+                  data-method-focused={methodHint === "sensor" && effectiveTentId ? "1" : "0"}
                   aria-pressed={methodHint === "sensor" && !!effectiveTentId}
                   disabled={!effectiveTentId}
                   onClick={() => setStep("manual")}

@@ -159,7 +159,8 @@ describe("validateAndNormalizeAiDoctorReviewRequestPacket", () => {
     const normalized = validateAndNormalizeAiDoctorReviewRequestPacket(input);
 
     expect(normalized).toEqual(base);
-    expect(Object.prototype.hasOwnProperty.call(normalized, "__proto__")).toBe(false);
+    expect(normalized).not.toBeNull();
+    expect(Object.hasOwn(normalized as object, "__proto__")).toBe(false);
     expect(JSON.stringify(normalized)).not.toContain("ignore me");
     expect(({} as { polluted?: boolean }).polluted).toBeUndefined();
   });

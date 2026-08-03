@@ -169,7 +169,7 @@ function PlantDetailAiDoctorLiveReviewScope({
     trackedSessionIdRef.current = null;
     trackedPostValuePaywallResultRef.current = null;
     pendingAcceptedReviewStartRef.current = null;
-  }, [growId, plantId, tentId]);
+  }, []);
   const { items: evidenceItems } = useTimelineMemory(
     { kind: "plant", plantId, tentId },
     TIMELINE_MEMORY_DEFAULT_LIMIT,

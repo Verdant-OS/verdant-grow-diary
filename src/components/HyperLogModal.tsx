@@ -183,7 +183,7 @@ export function HyperLogModal({
       });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [photos.forEach]);
 
   const updateField = useCallback(
     <K extends keyof HyperLogDemoFormState>(key: K, value: HyperLogDemoFormState[K]) => {

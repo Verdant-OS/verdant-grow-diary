@@ -158,7 +158,7 @@ export default function HealthCheck() {
   useEffect(() => {
     if (!authLoading) void runChecks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading]);
+  }, [authLoading, runChecks]);
 
   const overall: CheckStatus = checks.some((c) => c.status === "fail")
     ? "fail"

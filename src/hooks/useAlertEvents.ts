@@ -47,7 +47,7 @@ export function useAlertEvents(alertId: string | null, reloadKey = 0): UseAlertE
     return () => {
       cancelled = true;
     };
-  }, [alertId, nonce, reloadKey]);
+  }, [alertId]);
 
   return { status, events, error, reload };
 }

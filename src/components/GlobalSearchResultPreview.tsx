@@ -63,7 +63,7 @@ export default function GlobalSearchResultPreview({
 
   useEffect(() => {
     setCopied(false);
-  }, [routePath]);
+  }, []);
 
   const absoluteUrl = routePath
     ? (typeof window !== "undefined" ? window.location.origin : "") + routePath

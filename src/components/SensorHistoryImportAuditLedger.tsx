@@ -47,7 +47,7 @@ export function SensorHistoryImportAuditLedger(props: SensorHistoryImportAuditLe
 
   useEffect(() => {
     setEvents(getRecentSensorHistoryImportAuditEvents(limit, options));
-  }, [limit, options, refreshKey]);
+  }, [limit, options]);
 
   const rows = useMemo(() => events, [events]);
 

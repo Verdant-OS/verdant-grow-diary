@@ -198,7 +198,7 @@ export default function Auth() {
   useEffect(() => {
     if (user) nav(postSignInTarget(), { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, nav]);
+  }, [user, nav, postSignInTarget]);
 
   useEffect(() => {
     if (mode !== "signup") return;
@@ -214,7 +214,7 @@ export default function Auth() {
       setResendNowTick(Date.now());
     }, 1000);
     return () => window.clearInterval(id);
-  }, [resendLastAttemptAt, resendNowTick]);
+  }, [resendLastAttemptAt]);
 
   // Same one-second tick for the "Resend reset email" cooldown.
   useEffect(() => {
@@ -228,7 +228,7 @@ export default function Auth() {
       setResetResendNowTick(Date.now());
     }, 1000);
     return () => window.clearInterval(id);
-  }, [resetResendLastAttemptAt, resetResendNowTick]);
+  }, [resetResendLastAttemptAt]);
 
   if (loading) return null;
 

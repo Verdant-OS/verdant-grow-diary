@@ -118,7 +118,7 @@ export default function DiaryRangeReportPage() {
     return () => {
       cancelled = true;
     };
-  }, [growId, startDate, endDate, serverGateAttempt]);
+  }, [growId, startDate, endDate]);
 
   const gateAllowed = serverGate.status === "allowed";
   const {

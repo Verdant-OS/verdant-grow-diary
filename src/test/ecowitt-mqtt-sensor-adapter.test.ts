@@ -425,7 +425,7 @@ describe("adaptEcowittMqttSensorPayload — timestamp and freshness truth", () =
     receivedAt?: string;
   }): SensorAdapterResult {
     const payload: Record<string, unknown> = { temp1c: 24 };
-    if (Object.prototype.hasOwnProperty.call(args, "capturedAt")) {
+    if (Object.hasOwn(args, "capturedAt")) {
       payload.captured_at = args.capturedAt;
     }
     return adapt({

@@ -79,7 +79,10 @@ export interface VerdantGeneticsXlsxPreviewPanelProps {
    */
   onSave?: (
     args: VerdantGeneticsXlsxSaveArgs,
-  ) => Promise<void | VerdantGeneticsXlsxSaveOutcome> | void | VerdantGeneticsXlsxSaveOutcome;
+  ) =>
+    | Promise<undefined | VerdantGeneticsXlsxSaveOutcome>
+    | undefined
+    | VerdantGeneticsXlsxSaveOutcome;
   /**
    * Optional post-success CTA. When provided, a "View imported history"
    * button is rendered after a successful save outcome. Navigation/filter

@@ -166,7 +166,7 @@ const GGS_REAL_PAYLOAD_SOURCE_DECLARATION_ALIASES = [
 function validateDeclaredSources(raw: Record<string, unknown>): DeclaredSourceValidation {
   const declarations: Array<{ alias: string; value: string }> = [];
   for (const alias of GGS_REAL_PAYLOAD_SOURCE_DECLARATION_ALIASES) {
-    if (!Object.prototype.hasOwnProperty.call(raw, alias)) continue;
+    if (!Object.hasOwn(raw, alias)) continue;
     const candidate = raw[alias];
     if (typeof candidate !== "string" || candidate.trim().length === 0) {
       return { ok: false, details: `${alias}:malformed` };

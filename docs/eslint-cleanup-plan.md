@@ -1,6 +1,6 @@
 # Repo-wide ESLint cleanup plan
 
-> **Superseded for CI:** the PR lint gate is now **Biome** (`bun run lint` /
+> **Superseded:** ESLint/Prettier packages and configs were removed; the PR lint gate is **Biome** (`bun run lint` /
 > `bun run lint:ci`). See [`docs/biome-adoption.md`](./biome-adoption.md).
 > This document remains as historical ESLint cleanup context.
 

@@ -145,7 +145,7 @@ export function acquireQuickLogSensorSnapshot(
     }
     const rawMetric = typeof row.metric === "string" ? row.metric.trim().toLowerCase() : "";
     const metric = METRIC_MAP[rawMetric];
-    if (!metric || Object.prototype.hasOwnProperty.call(metrics, metric)) continue;
+    if (!metric || Object.hasOwn(metrics, metric)) continue;
     const value = finiteNumber(row.value);
     if (value !== null) metrics[metric] = value;
   }

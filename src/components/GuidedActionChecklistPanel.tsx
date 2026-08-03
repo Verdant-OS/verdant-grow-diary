@@ -82,7 +82,7 @@ export default function GuidedActionChecklistPanel({ scopedGrowId, className }: 
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
   useEffect(() => {
     setDismissedIds(readActiveDismissals());
-  }, [scopedGrowId]);
+  }, []);
 
   const items = useMemo<GuidedActionItem[]>(() => {
     if (!scopedGrowId) return [];

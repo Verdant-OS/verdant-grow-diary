@@ -653,7 +653,7 @@ export function CloudCanaryPreviewPanel() {
   const exportJson = useMemo(() => serializeCloudCanaryExportToJson(exportObj), [exportObj]);
   // Slice C-fix: run-timing is presentation-only and NEVER threaded into the
   // serializer (the payload is deterministic). Computed once per render cycle.
-  const runViewedAt = useMemo(() => new Date().toISOString(), [exportObj]);
+  const runViewedAt = useMemo(() => new Date().toISOString(), []);
 
   const handleCopy = async () => {
     try {

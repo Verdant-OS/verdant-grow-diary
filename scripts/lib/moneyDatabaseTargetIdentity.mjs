@@ -13,7 +13,7 @@ const MONEY_TARGETS = Object.freeze({
  */
 export function coreTargetEnvironmentForMoney(targetEnv) {
   if (targetEnv === "unspecified") return null;
-  if (Object.prototype.hasOwnProperty.call(MONEY_TARGETS, targetEnv)) {
+  if (Object.hasOwn(MONEY_TARGETS, targetEnv)) {
     return MONEY_TARGETS[targetEnv];
   }
   throw new Error("TARGET_ENV must be exactly sandbox, live, or unspecified.");

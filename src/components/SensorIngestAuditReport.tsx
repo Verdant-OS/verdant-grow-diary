@@ -152,27 +152,25 @@ export default function SensorIngestAuditReport({
 
   const vm = useMemo(
     () => buildSensorIngestAuditReportViewModel({ ...input, pageSize, filters }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [input, pageSize, providerFilter, capturedFrom, capturedTo, deviceQuery],
+    [input, pageSize, filters],
   );
 
   const firstSyncRef = useRef<boolean>(true);
   useEffect(() => {
     if (!urlEnabled || !urlBinding) return;
+    const binding = urlBinding;
     if (firstSyncRef.current) {
       firstSyncRef.current = false;
       return;
     }
-    const next = applyAuditUrlState(urlBinding.searchParams, auditState);
-    urlBinding.onSearchParamsChange(next);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlEnabled, providerFilter, capturedFrom, capturedTo, deviceQuery, pageSize]);
+    const next = applyAuditUrlState(binding.searchParams, auditState);
+    binding.onSearchParamsChange(next);
+  }, [urlEnabled, urlBinding, auditState]);
 
   useEffect(() => {
     if (!operatorMode) return;
     writeStoredAuditState(auditState);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [operatorMode, providerFilter, capturedFrom, capturedTo, deviceQuery, pageSize]);
+  }, [operatorMode, auditState]);
 
   const rawById = useMemo(() => {
     const m = new Map<string, unknown>();

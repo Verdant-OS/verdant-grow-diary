@@ -181,7 +181,6 @@ export default function OneTentLiveProof() {
     auditProofQuery.status,
     auditProofQuery.rows,
     lastRefreshedAt,
-    refreshNonce,
   ]);
 
   const report = useMemo(() => {

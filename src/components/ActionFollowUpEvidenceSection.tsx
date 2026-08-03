@@ -239,7 +239,7 @@ export default function ActionFollowUpEvidenceSection({
     return () => {
       cancelled = true;
     };
-  }, [action.id, action.growId, reloadNonce]);
+  }, [action.id, action.growId, action]);
 
   // Load existing owned photo candidates (Slice 4c). Failure is silent —
   // the selector shows the safe "unavailable" copy and the form remains
@@ -272,14 +272,7 @@ export default function ActionFollowUpEvidenceSection({
     return () => {
       cancelled = true;
     };
-  }, [
-    authenticatedUserId,
-    action.growId,
-    action.tentId,
-    action.plantId,
-    loadPhotosFn,
-    reloadNonce,
-  ]);
+  }, [authenticatedUserId, action.growId, action.tentId, action.plantId, loadPhotosFn]);
 
   const eligibility = useMemo(
     () =>
@@ -424,57 +417,55 @@ export default function ActionFollowUpEvidenceSection({
         />
       )}
 
-      {query.status === "ready" && !viewModel && (
-        <>
-          {eligibility.eligible ? (
-            showForm ? (
-              <ActionFollowUpEvidenceForm
-                saving={saving}
-                errorMessage={errorMessage}
-                onSubmit={handleSubmit}
-                onCancel={() => {
-                  setShowForm(false);
-                  setErrorMessage(null);
-                }}
-                photoReference={selectedPhotoReference}
-                photoSelectorSlot={
-                  <div className="space-y-3">
-                    <ActionFollowUpExistingPhotoSelector
-                      state={photoState}
-                      value={selectedPhotoReference}
-                      onChange={setSelectedPhotoReference}
-                      disabled={saving}
-                    />
-                    <ActionFollowUpQuickLogHandoffButton
-                      action={{
-                        actionId: action.id,
-                        growId: action.growId,
-                        tentId: action.tentId,
-                        plantId: action.plantId,
-                      }}
-                      disabled={saving}
-                      onPhotoCreated={() => setReloadNonce((n) => n + 1)}
-                    />
-                  </div>
-                }
-              />
-            ) : (
-              <Button
-                size="sm"
-                variant="secondary"
-                data-testid="action-followup-add-btn"
-                onClick={() => setShowForm(true)}
-              >
-                Add follow-up
-              </Button>
-            )
+      {query.status === "ready" &&
+        !viewModel &&
+        (eligibility.eligible ? (
+          showForm ? (
+            <ActionFollowUpEvidenceForm
+              saving={saving}
+              errorMessage={errorMessage}
+              onSubmit={handleSubmit}
+              onCancel={() => {
+                setShowForm(false);
+                setErrorMessage(null);
+              }}
+              photoReference={selectedPhotoReference}
+              photoSelectorSlot={
+                <div className="space-y-3">
+                  <ActionFollowUpExistingPhotoSelector
+                    state={photoState}
+                    value={selectedPhotoReference}
+                    onChange={setSelectedPhotoReference}
+                    disabled={saving}
+                  />
+                  <ActionFollowUpQuickLogHandoffButton
+                    action={{
+                      actionId: action.id,
+                      growId: action.growId,
+                      tentId: action.tentId,
+                      plantId: action.plantId,
+                    }}
+                    disabled={saving}
+                    onPhotoCreated={() => setReloadNonce((n) => n + 1)}
+                  />
+                </div>
+              }
+            />
           ) : (
-            <p className="text-xs text-muted-foreground" data-testid="action-followup-ineligible">
-              {ineligibleCopy}
-            </p>
-          )}
-        </>
-      )}
+            <Button
+              size="sm"
+              variant="secondary"
+              data-testid="action-followup-add-btn"
+              onClick={() => setShowForm(true)}
+            >
+              Add follow-up
+            </Button>
+          )
+        ) : (
+          <p className="text-xs text-muted-foreground" data-testid="action-followup-ineligible">
+            {ineligibleCopy}
+          </p>
+        ))}
     </section>
   );
 }

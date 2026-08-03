@@ -194,7 +194,13 @@ export function usePlantProfilePhotoPreview(
       }
     };
     // We intentionally key on file identity + mime.
-  }, [input.file, input.mimeType]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    input.file,
+    input.mimeType,
+    create, // Revoke previous object URL before starting a new preview.
+    revokeActive,
+    probe,
+  ]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Final unmount safety.
   useEffect(() => {
@@ -202,7 +208,7 @@ export function usePlantProfilePhotoPreview(
       revokeActive();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [revokeActive]);
 
   return { preview };
 }

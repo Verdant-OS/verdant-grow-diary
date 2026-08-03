@@ -33,7 +33,7 @@ export default function PlantPhotoView({
   // a fresh upload replaces the previous photo).
   useEffect(() => {
     setErrored(false);
-  }, [trimmed]);
+  }, []);
   const showPlaceholder = !trimmed || errored;
 
   if (showPlaceholder) {

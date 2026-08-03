@@ -18,5 +18,3 @@ declare global {
     type ElementChildrenAttribute = ReactJSX.ElementChildrenAttribute;
   }
 }
-
-export {};

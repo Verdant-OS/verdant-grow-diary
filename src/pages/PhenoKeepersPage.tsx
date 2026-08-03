@@ -210,7 +210,7 @@ export default function PhenoKeepersPage() {
     setFemale("");
     setDonor("");
     setCrossName("");
-  }, [id]);
+  }, []);
 
   const crossForm = useMemo(
     () =>

@@ -39,6 +39,35 @@ function run(cmd, args, opts = {}) {
   });
 }
 
+/**
+ * Prefer local node_modules/.bin/biome, then bunx, then npx.
+ * Keeps the verifier green in CI (bun) and agent sandboxes (npx/local bin).
+ * @returns {{ cmd: string; argsPrefix: string[] }}
+ */
+function resolveBiomeLauncher() {
+  const local = path.join(root, "node_modules", ".bin", "biome");
+  if (existsSync(local)) {
+    return { cmd: local, argsPrefix: [] };
+  }
+  const bunx = run("bunx", ["--version"]);
+  if (bunx.status === 0) {
+    return { cmd: "bunx", argsPrefix: ["biome"] };
+  }
+  return { cmd: "npx", argsPrefix: ["biome"] };
+}
+
+/**
+ * Prefer `bun run <script>`, fall back to `npm run <script>`.
+ * @param {string} script
+ */
+function runPackageScript(script) {
+  const bun = run("bun", ["--version"]);
+  if (bun.status === 0) {
+    return run("bun", ["run", script], { maxBuffer: 16 * 1024 * 1024 });
+  }
+  return run("npm", ["run", script], { maxBuffer: 16 * 1024 * 1024 });
+}
+
 // --- Phase 0: workspace ---
 record(
   "0.preconditions",
@@ -114,6 +143,8 @@ const biomeJsonPath = path.join(root, "biome.json");
 const hasBiomeJson = existsSync(biomeJsonPath);
 record("1.biome-json", hasBiomeJson, hasBiomeJson ? "biome.json present" : "biome.json missing");
 
+const biomeLaunch = resolveBiomeLauncher();
+
 if (hasBiomeJson) {
   const cfg = readJson("biome.json");
   const a11y = cfg?.linter?.rules?.a11y ?? {};
@@ -126,8 +157,10 @@ if (hasBiomeJson) {
       : `a11y.preset=${JSON.stringify(a11y.preset ?? "(unset)")}`,
   );
 
-  const migrate = run("bunx", ["biome", "migrate"], { maxBuffer: 4 * 1024 * 1024 });
-  const migrateOut = `${migrate.stdout ?? ""}\n${migrate.stderr ?? ""}`;
+  const migrate = run(biomeLaunch.cmd, [...biomeLaunch.argsPrefix, "migrate"], {
+    maxBuffer: 4 * 1024 * 1024,
+  });
+  const migrateOut = `${migrate.stdout ?? ""}\n${migrate.stderr ?? ""}${migrate.error?.message ?? ""}`;
   const upToDate =
     migrate.status === 0 &&
     (/no migration needed/i.test(migrateOut) || /up to date/i.test(migrateOut));
@@ -142,20 +175,22 @@ if (hasBiomeJson) {
 
 // --- Phase 5–6: gates ---
 if (!quick) {
-  const lintCi = run("bun", ["run", "lint:ci"], { maxBuffer: 16 * 1024 * 1024 });
+  const lintCi = runPackageScript("lint:ci");
   record(
     "5.lint-ci",
     lintCi.status === 0,
-    lintCi.status === 0 ? "lint:ci clean" : `lint:ci failed (exit ${lintCi.status})`,
+    lintCi.status === 0
+      ? "lint:ci clean"
+      : `lint:ci failed (exit ${lintCi.status}${lintCi.error ? ` ${lintCi.error.message}` : ""})`,
   );
 
-  const formatCheck = run("bun", ["run", "format:check"], { maxBuffer: 16 * 1024 * 1024 });
+  const formatCheck = runPackageScript("format:check");
   record(
     "6.format-check",
     formatCheck.status === 0,
     formatCheck.status === 0
       ? "format:check clean"
-      : `format:check failed (exit ${formatCheck.status})`,
+      : `format:check failed (exit ${formatCheck.status}${formatCheck.error ? ` ${formatCheck.error.message}` : ""})`,
   );
 } else {
   record("5.lint-ci", true, "skipped (--quick)");

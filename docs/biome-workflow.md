@@ -18,7 +18,7 @@ Adoption narrative: [`docs/biome-adoption.md`](./biome-adoption.md).
 | 6 | Full format | ✅ Done (~2459 files) |
 | 7 | CI + lint-staged | ✅ Done |
 | 8 | Remove ESLint/Prettier | ✅ Done |
-| 9 | Ongoing / verify | 🔄 `bun run verify:biome` (13/13) |
+| 9 | Ongoing / verify | ✅ Done (`verify:biome` 13/13; CI job `biome` green) |
 
 **Legend:** ✅ complete · ⏭️ skipped on purpose · 🔄 maintained via verifier · ❌ blocked / failed
 
@@ -126,3 +126,6 @@ Chip product warnings (`noExplicitAny`, `useExhaustiveDependencies`) in small PR
 bun run verify:biome        # full (lint:ci + format:check)
 bun run verify:biome:quick  # package/config only
 ```
+
+The verifier prefers `node_modules/.bin/biome` and falls back to `bunx` / `npx`, and
+`bun run` / `npm run` for package scripts, so agent sandboxes without Bun on `PATH` still work.

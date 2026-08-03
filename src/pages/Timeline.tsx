@@ -116,6 +116,7 @@ import {
 } from "@/lib/growEventToDiaryRawEntry";
 import { ROOT_ZONE_GROW_EVENT_SELECT } from "@/lib/rootZoneObservationRules";
 import { mergeTimelineSources } from "@/lib/timelineMergeRules";
+import { buildTimelineLocalDateRangeBounds } from "@/lib/timelineDateRangeRules";
 import {
   deriveTimelineEventTypeOptions,
   deriveTimelinePlantOptions,
@@ -208,6 +209,11 @@ const TIMELINE_SNAPSHOT_STALE_MS = 30 * 60 * 1000;
 // ?start/?end convention of the environment summary report.
 const TIMELINE_START_DATE_PARAM = "start";
 const TIMELINE_END_DATE_PARAM = "end";
+
+// The grower's own timezone, read once — used to interpret the plain
+// YYYY-MM-DD date-range filter as the grower's local day rather than a
+// UTC day (issue #587).
+const TIMELINE_LOCAL_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 interface Entry {
   id: string;
@@ -469,6 +475,16 @@ export default function Timeline() {
     appliedStartDate !== null && appliedEndDate !== null && appliedStartDate > appliedEndDate;
   const effectiveStartDate = dateRangeInvalid ? null : appliedStartDate;
   const effectiveEndDate = dateRangeInvalid ? null : appliedEndDate;
+  // Computed once per effective range; both the initial reads and
+  // loadOlder()'s keyset page share these exact bounds (issue #587).
+  const timelineDateRangeBounds = useMemo(
+    () =>
+      buildTimelineLocalDateRangeBounds({
+        startDate: effectiveStartDate,
+        endDate: effectiveEndDate,
+      }),
+    [effectiveStartDate, effectiveEndDate],
+  );
   const activeReadKey = buildTimelinePageReadKey({
     ownerId,
     growId: activeGrowId,
@@ -546,10 +562,10 @@ export default function Timeline() {
         .eq("grow_id", activeGrowId)
         .order("entry_at", { ascending: false })
         .limit(100);
-      if (effectiveStartDate)
-        entriesQuery = entriesQuery.gte("entry_at", `${effectiveStartDate}T00:00:00.000Z`);
-      if (effectiveEndDate)
-        entriesQuery = entriesQuery.lte("entry_at", `${effectiveEndDate}T23:59:59.999Z`);
+      if (timelineDateRangeBounds.startIso)
+        entriesQuery = entriesQuery.gte("entry_at", timelineDateRangeBounds.startIso);
+      if (timelineDateRangeBounds.endIso)
+        entriesQuery = entriesQuery.lte("entry_at", timelineDateRangeBounds.endIso);
       const entriesResult = await entriesQuery;
       if (!isCurrentRequest()) return;
       if (hasTimelineRequiredReadError(entriesResult)) throw entriesResult.error;
@@ -570,10 +586,10 @@ export default function Timeline() {
         .eq("is_deleted", false)
         .order("occurred_at", { ascending: false })
         .limit(100);
-      if (effectiveStartDate)
-        growEventsQuery = growEventsQuery.gte("occurred_at", `${effectiveStartDate}T00:00:00.000Z`);
-      if (effectiveEndDate)
-        growEventsQuery = growEventsQuery.lte("occurred_at", `${effectiveEndDate}T23:59:59.999Z`);
+      if (timelineDateRangeBounds.startIso)
+        growEventsQuery = growEventsQuery.gte("occurred_at", timelineDateRangeBounds.startIso);
+      if (timelineDateRangeBounds.endIso)
+        growEventsQuery = growEventsQuery.lte("occurred_at", timelineDateRangeBounds.endIso);
       const growEventsResult = await growEventsQuery;
       if (!isCurrentRequest()) return;
       if (hasTimelineRequiredReadError(growEventsResult)) throw growEventsResult.error;
@@ -686,7 +702,7 @@ export default function Timeline() {
       setCoreRead({ status: "error", readKey: requestedReadKey });
       setLoading(false);
     }
-  }, [activeGrowId, activeReadKey, effectiveEndDate, effectiveStartDate, user]);
+  }, [activeGrowId, activeReadKey, timelineDateRangeBounds, user]);
 
   /**
    * Keyset "Load older" — fetches the next page strictly before the oldest
@@ -722,10 +738,10 @@ export default function Timeline() {
         .lt("entry_at", cursor)
         .order("entry_at", { ascending: false })
         .limit(100);
-      if (effectiveStartDate)
-        olderQuery = olderQuery.gte("entry_at", `${effectiveStartDate}T00:00:00.000Z`);
-      if (effectiveEndDate)
-        olderQuery = olderQuery.lte("entry_at", `${effectiveEndDate}T23:59:59.999Z`);
+      if (timelineDateRangeBounds.startIso)
+        olderQuery = olderQuery.gte("entry_at", timelineDateRangeBounds.startIso);
+      if (timelineDateRangeBounds.endIso)
+        olderQuery = olderQuery.lte("entry_at", timelineDateRangeBounds.endIso);
       const olderResult = await olderQuery;
       if (!isCurrentPage()) return;
       if (hasTimelineRequiredReadError(olderResult)) throw olderResult.error;
@@ -871,6 +887,11 @@ export default function Timeline() {
     sensorSources: sensorSourceFilter,
     startDate: effectiveStartDate,
     endDate: effectiveEndDate,
+    // Rows are matched against the grower's own local day, agreeing with
+    // the query-level local-day bounds above (issue #587) — otherwise a
+    // row the query correctly fetched could be dropped again here by a
+    // second, stale UTC-day interpretation.
+    timeZone: TIMELINE_LOCAL_TIME_ZONE,
   };
   const evidenceActive = isTimelineEvidenceFilterActive(evidenceFilterInput);
 

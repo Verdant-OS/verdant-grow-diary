@@ -41,7 +41,15 @@ function row(id: string, entryAt: string | null | undefined): TimelineEvidenceRo
 describe("isTimelineDateFilterValue", () => {
   it("accepts only plain ISO calendar dates", () => {
     expect(isTimelineDateFilterValue("2026-07-01")).toBe(true);
-    for (const bad of ["2026-7-1", "07/01/2026", "2026-07-01T00:00:00Z", "", null, undefined, "not-a-date"]) {
+    for (const bad of [
+      "2026-7-1",
+      "07/01/2026",
+      "2026-07-01T00:00:00Z",
+      "",
+      null,
+      undefined,
+      "not-a-date",
+    ]) {
       expect(isTimelineDateFilterValue(bad as string | null | undefined)).toBe(false);
     }
   });
@@ -66,18 +74,18 @@ describe("date-range matching", () => {
   });
 
   it("supports open-ended ranges in either direction", () => {
-    expect(
-      filterTimelineEvidenceRows(rows, { startDate: "2026-07-05" }).map((r) => r.id),
-    ).toEqual(["inside", "end-day", "after"]);
-    expect(
-      filterTimelineEvidenceRows(rows, { endDate: "2026-06-30" }).map((r) => r.id),
-    ).toEqual(["before"]);
+    expect(filterTimelineEvidenceRows(rows, { startDate: "2026-07-05" }).map((r) => r.id)).toEqual([
+      "inside",
+      "end-day",
+      "after",
+    ]);
+    expect(filterTimelineEvidenceRows(rows, { endDate: "2026-06-30" }).map((r) => r.id)).toEqual([
+      "before",
+    ]);
   });
 
   it("hides rows without a parseable timestamp only while a bound is active", () => {
-    expect(
-      timelineEvidenceRowMatches(row("x", null), { startDate: "2026-07-01" }),
-    ).toBe(false);
+    expect(timelineEvidenceRowMatches(row("x", null), { startDate: "2026-07-01" })).toBe(false);
     expect(timelineEvidenceRowMatches(row("x", null), {})).toBe(true);
   });
 
@@ -185,8 +193,14 @@ describe("static wiring — src/pages/Timeline.tsx", () => {
     const lteCount = (src.match(/\.lte\("entry_at"/g) ?? []).length;
     expect(gteCount).toBeGreaterThanOrEqual(2);
     expect(lteCount).toBeGreaterThanOrEqual(2);
-    expect(src).toContain("T00:00:00.000Z");
-    expect(src).toContain("T23:59:59.999Z");
+    // Bounds come from the shared local-day helper, not an inline UTC
+    // string concatenation — a raw YYYY-MM-DD + "T00:00:00.000Z" ignores
+    // the grower's own timezone (issue #587).
+    expect(src).toMatch(/from "@\/lib\/timelineDateRangeRules"/);
+    expect(src).toContain("timelineDateRangeBounds.startIso");
+    expect(src).toContain("timelineDateRangeBounds.endIso");
+    expect(src).not.toContain("T00:00:00.000Z");
+    expect(src).not.toContain("T23:59:59.999Z");
   });
 
   it("threads the dates through the evidence filter input and clear action", () => {

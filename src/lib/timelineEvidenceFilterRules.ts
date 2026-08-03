@@ -40,13 +40,22 @@ export interface TimelineEvidenceFilterInput {
    */
   sensorSources?: ReadonlyArray<TimelineSensorSourceKind> | null;
   /**
-   * Inclusive ISO date bounds (YYYY-MM-DD) compared against the UTC day
-   * of `entry_at` (its ISO date slice). Malformed values are ignored as
-   * "no constraint"; rows without a parseable `entry_at` are hidden while
-   * a bound is active, because their day is unknowable — never guessed.
+   * Inclusive ISO date bounds (YYYY-MM-DD) compared against the day of
+   * `entry_at` in `timeZone` below. Malformed values are ignored as "no
+   * constraint"; rows without a parseable `entry_at` are hidden while a
+   * bound is active, because their day is unknowable — never guessed.
    */
   startDate?: string | null;
   endDate?: string | null;
+  /**
+   * IANA zone `startDate`/`endDate` are interpreted in. Defaults to
+   * `"UTC"` when omitted, so existing callers that never supply a zone
+   * keep their exact prior behavior. Pass the viewer's own zone (e.g.
+   * from `Intl.DateTimeFormat().resolvedOptions().timeZone`) to agree
+   * with a local-day query boundary built upstream — see
+   * `timelineDateRangeRules.ts`.
+   */
+  timeZone?: string | null;
 }
 
 const TIMELINE_FILTER_STALE_MS = 30 * 60 * 1000;
@@ -95,12 +104,34 @@ export function isTimelineDateFilterValue(value: string | null | undefined): val
   return typeof value === "string" && ISO_DATE_RE.test(value);
 }
 
-/** The UTC day (YYYY-MM-DD) of an `entry_at` ISO timestamp, or null. */
-function rowUtcDay(row: TimelineEvidenceRow): string | null {
+/**
+ * The calendar day (YYYY-MM-DD) of an `entry_at` ISO timestamp in
+ * `timeZone`, or null when unparseable. Uses `Intl.DateTimeFormat` with an
+ * explicitly supplied zone rather than the runtime's ambient timezone, so
+ * the result depends only on the two inputs — never on where the process
+ * happens to run.
+ */
+function rowLocalDay(row: TimelineEvidenceRow, timeZone: string): string | null {
   const at = row.entry_at;
   if (typeof at !== "string" || at.length < 10) return null;
-  const day = at.slice(0, 10);
-  return ISO_DATE_RE.test(day) ? day : null;
+  const parsed = new Date(at);
+  if (!Number.isFinite(parsed.getTime())) return null;
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(parsed);
+    const year = parts.find((p) => p.type === "year")?.value;
+    const month = parts.find((p) => p.type === "month")?.value;
+    const day = parts.find((p) => p.type === "day")?.value;
+    if (!year || !month || !day) return null;
+    const result = `${year}-${month}-${day}`;
+    return ISO_DATE_RE.test(result) ? result : null;
+  } catch {
+    return null;
+  }
 }
 
 function normalize(v: unknown): string {
@@ -164,7 +195,9 @@ export function timelineEvidenceRowMatches(
   const start = isTimelineDateFilterValue(input.startDate) ? input.startDate : null;
   const end = isTimelineDateFilterValue(input.endDate) ? input.endDate : null;
   if (start !== null || end !== null) {
-    const day = rowUtcDay(row);
+    const timeZone =
+      typeof input.timeZone === "string" && input.timeZone.trim() !== "" ? input.timeZone : "UTC";
+    const day = rowLocalDay(row, timeZone);
     if (day === null) return false;
     if (start !== null && day < start) return false;
     if (end !== null && day > end) return false;

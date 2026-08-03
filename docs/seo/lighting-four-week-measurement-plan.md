@@ -1,6 +1,6 @@
 # Lighting four-week measurement plan
 
-**Verdict:** NOT READY — PRODUCTION DEFECT FOUND
+**Verdict:** NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND
 **Day 0:** UNSET
 **Four-week clock:** NOT_STARTED
 **Timezone:** America/Chicago
@@ -41,12 +41,14 @@ recorded.
 
 ## Current blockers
 
-The first current blocker is a production-host/origin failure. At `2026-08-03T17:25:08Z`, the apex,
-both lighting routes, and `/version.json` served Squarespace `Coming Soon` with `noindex`; the public
-`/sitemap.xml` and `/robots.txt` returned HTTP 401. No Verdant release fingerprint or GA4 tag was
-observable. The current host must be restored before any baseline or navigation matrix is repeated.
+The production-host/origin failure is fixed. At `2026-08-03T21:57:06.508Z`, the apex, both lighting
+routes, `/version.json`, `/sitemap.xml`, and `/robots.txt` returned HTTP 200 through the expected
+Cloudflare/Lovable edge. Both guides match their intended title, description, H1, canonical, robots,
+Open Graph, FAQPage JSON-LD, sitemap, and GA tag contracts. `version.json` reports an unknown dirty
+commit, so deployed-commit parity remains **NOT VERIFIABLE** even though the lighting release content
+match passes.
 
-The remaining bullets are historical Verdant-release evidence and unresolved analytics/access gates:
+The remaining blockers are analytics runtime and authenticated-access gates:
 
 - PR #597 is merged and was present in the last known Verdant production manifest
   `a20776993bd606f07977674934864b888a407e1c`.
@@ -62,10 +64,8 @@ The remaining bullets are historical Verdant-release evidence and unresolved ana
   its matcher and is excluded from this evidence; its transmission status is not asserted.
 - The owner-confirmed intended GA4 production stream is `Verdant Grow Diary`, stream URL
   `https://verdantgrowdiary.com`, stream ID `15065867361`, and measurement ID `G-B3QRSZEM9S`;
-  the last known Verdant production release loaded and targeted that exact measurement ID. The
-  current Squarespace placeholder does not, and the property ID is still unconfirmed.
-- The last known public probe returned HTTP 200 for both guides, the sitemap, robots, and version
-  manifest. It is not current production proof.
+  the current server-rendered lighting guides load and target that exact measurement ID. The property
+  ID is still unconfirmed.
 - Workflow [30727208474](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30727208474)
   succeeded across all 51 URLs, but its GSC operation was `SKIPPED`, access was `BLOCKED`,
   execution was `SKIPPED`, OAuth was not configured, and it made 0 API attempts.
@@ -75,17 +75,14 @@ The remaining bullets are historical Verdant-release evidence and unresolved ana
   current `WebPage`, `FAQPage`, `BreadcrumbList`, and `Article` identity set per page state, with
   zero duplicate identities, zero stale prior-route objects, and zero JSON-LD parse errors.
 
-Four owner gates remain:
+Three owner gates remain:
 
-1. Restore `verdantgrowdiary.com` and `www.verdantgrowdiary.com` to the intended publisher custom-domain
-   configuration, then authorize an immediate public release and intercepted-analytics recheck. Do
-   not guess DNS values or publish a no-op release.
-2. Disable Enhanced Measurement page views based on browser-history changes in the existing
+1. Disable Enhanced Measurement page views based on browser-history changes in the existing
    production stream, retaining Verdant's explicit SPA page-view owner, then authorize a controlled
    re-verification.
-3. Confirm the existing Verdant GA4 property identity and provide read-only authenticated
+2. Confirm the existing Verdant GA4 property identity and provide read-only authenticated
    reporting access. The production stream identity itself is complete.
-4. Configure the existing owner-controlled, read-only Search Console OAuth workflow, or provide
+3. Configure the existing owner-controlled, read-only Search Console OAuth workflow, or provide
    another authorized authenticated Search Console session.
 
 Use the [analytics owner setup checklist](./analytics-owner-setup-checklist.md). Do not send

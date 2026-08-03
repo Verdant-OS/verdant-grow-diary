@@ -1,6 +1,6 @@
 # Lighting analytics owner setup checklist
 
-**Last reconciled against production (UTC):** 2026-08-03T17:25:08Z
+**Last reconciled against production (UTC):** 2026-08-03T21:57:06.508Z
 
 **Production host:** `https://verdantgrowdiary.com`
 
@@ -14,17 +14,17 @@ FOUR-WEEK CLOCK: NOT STARTED
 ```
 
 This is the owner-facing handoff for the two lighting guides. PR #595, the PR #597 analytics
-repair, and the PR #624 structured-data ownership repair were verified in the last known Verdant
-release. They are not current production proof. At `2026-08-03T17:25:08Z`, the production domain
-served a Squarespace `Coming Soon` page with `noindex` at the apex and both lighting routes, while
-`/sitemap.xml` and `/robots.txt` returned HTTP 401. The owner must restore the intended publisher
-custom-domain configuration before the GA4/GSC setup actions below can produce a valid baseline.
+repair, and the PR #624 structured-data ownership repair have current public release-fingerprint
+evidence. At `2026-08-03T21:57:06.508Z`, the production domain served both intended lighting guides,
+the sitemap, robots, and version endpoint through the expected Cloudflare/Lovable edge. The two
+guides expose their intended metadata, indexability, JSON-LD, and `G-B3QRSZEM9S` tag. The deployed
+commit remains unavailable from `version.json`, so this is not deploy-branch parity proof.
 
 The historical controlled collection-endpoint test across nine navigation states found five
 automatic GA4 page views alongside Verdant's nine explicit SPA events, so the singleton collection
 contract remains unresolved pending the Enhanced Measurement change below. The owner has confirmed
-the intended production stream name, stream URL, stream ID, and measurement ID, but the current
-Squarespace placeholder does not expose that tag. The GA4 property identity and authenticated
+the intended production stream name, stream URL, stream ID, and measurement ID, and the current
+server-rendered guides expose that tag. The GA4 property identity and authenticated
 reporting access are still unavailable to Codex, as is authenticated Search Console access.
 
 Never paste a Google password, OAuth code, client secret, refresh token, access token,
@@ -43,7 +43,7 @@ local ignored storage, or GitHub Actions secrets. The detailed GSC procedure is 
 
 | Setup item                       | State        | Exact owner action                                                                                                                                                                                                                             | Codex can verify afterward                                                                                                                                |
 | -------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Intended publisher custom domain | `INCOMPLETE` | In the intended publisher’s domain settings, restore `verdantgrowdiary.com` and `www.verdantgrowdiary.com` to the Verdant app. Do not guess DNS record values, publish a no-op release, or leave the Squarespace parking configuration active. | Verify that the Verdant `version.json`, both lighting guides, sitemap, robots, metadata, and intercepted analytics identity are publicly reachable again. |
+| Intended publisher custom domain | `COMPLETE` | Keep `verdantgrowdiary.com` and `www.verdantgrowdiary.com` attached to the Verdant app. Do not publish a no-op release merely to change this checklist. | Public recheck confirmed the two guides, `version.json`, sitemap, and robots are reachable again. The intercepted analytics identity still needs a browser-control bridge. |
 
 ## GA4 owner checklist
 
@@ -51,8 +51,8 @@ local ignored storage, or GitHub Actions secrets. The detailed GSC procedure is 
 | --------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Correct Google account and organization       | `INCOMPLETE`        | Sign in to the account that owns Verdant analytics; keep account identity out of repository artifacts.                                                                                                                                     | Confirm the selected account in an owner-approved session.                                                                                                                                                                   |
 | Correct GA4 property                          | `INCOMPLETE`        | Select the single existing production property and record its name and numeric property ID in the approved handoff. The numeric property ID **must not be inferred** from the measurement ID.                                              | Confirm the authenticated property identity.                                                                                                                                                                                 |
-| Production web data stream                    | `COMPLETE`          | Owner-confirmed stream: `Verdant Grow Diary`; stream URL: `https://verdantgrowdiary.com`; stream ID: `15065867361`; measurement ID: `G-B3QRSZEM9S`. Do not create a duplicate property or stream.                                          | Owner-supplied stream identity is recorded; Codex last verified the same measurement ID in the prior Verdant release.                                                                                                        |
-| Production hostname and deployed tag          | `INCOMPLETE`        | Restore the intended publisher custom domain first. After that, confirm the canonical host loads and targets `G-B3QRSZEM9S`; keep preview, Lovable, Vercel, and alternate domains out of the production stream.                            | Recheck the public host and tag after restoration; the current Squarespace placeholder has no Verdant tag.                                                                                                                   |
+| Production web data stream                    | `COMPLETE`          | Owner-confirmed stream: `Verdant Grow Diary`; stream URL: `https://verdantgrowdiary.com`; stream ID: `15065867361`; measurement ID: `G-B3QRSZEM9S`. Do not create a duplicate property or stream.                                          | Owner-supplied stream identity is recorded; the current server-rendered guides include the same measurement ID.                                                                                                              |
+| Production hostname and deployed tag          | `COMPLETE`          | Keep the canonical host targeting `G-B3QRSZEM9S`; keep preview, Lovable, Vercel, and alternate domains out of the production stream.                                            | Public recheck confirmed the canonical host and static tag. The navigation/runtime collection contract remains separately blocked.                                                                                           |
 | Read-only reporting access                    | `INCOMPLETE`        | Grant the designated reporting account property-level `Viewer` access, or provide an owner-approved authenticated reporting session. Do not send credentials.                                                                              | Capture the GA4 baseline.                                                                                                                                                                                                    |
 | Enhanced measurement review                   | `BLOCKED_BY_ACCESS` | In the existing production stream, open Enhanced Measurement > Page views > advanced settings and disable **Page changes based on browser history events**. Retain Verdant's explicit SPA `page_view` emitter; do not create a new stream. | Repeat the nine-state direct-load, cross-guide, history, refresh, repeat, and new-tab check with collection blocked locally; require **one intentional `page_view` per navigation and zero duplicate automatic page views**. |
 | Internal and developer traffic handling       | `BLOCKED_BY_ACCESS` | Decide how owner/developer verification traffic is identified; test a filter before activating it.                                                                                                                                         | Confirm filter state with a controlled, privacy-safe test.                                                                                                                                                                   |
@@ -86,17 +86,15 @@ both sources must not remain enabled together. See
 
 ## Owner handoff sequence
 
-1. Restore the intended publisher custom domain and wait for the public Verdant release to serve
-   `version.json`, both lighting guides, `sitemap.xml`, and `robots.txt` again.
-2. In the existing GA4 stream, disable Enhanced Measurement page views based on browser-history
+1. In the existing GA4 stream, disable Enhanced Measurement page views based on browser-history
    changes, then complete the property identity, read-only access, and filter decisions. The
    production stream identity is already recorded above.
-3. Complete the Search Console property, verification, sitemap, and read-only access decisions.
-4. Tell Codex only that access is ready, which approved access path to use, and whether indexing
+2. Complete the Search Console property, verification, sitemap, and read-only access decisions.
+3. Tell Codex only that access is ready, which approved access path to use, and whether indexing
    requests are authorized. Do not send credential values.
-5. Codex reverifies the public release and properties, captures genuine `NO_DATA` or measured values, and starts Day 0
+4. Codex reverifies the public release and properties, captures genuine `NO_DATA` or measured values, and starts Day 0
    only after both authenticated baselines exist.
 
 Until then, the access verdict remains **BLOCKED — GA4/GSC OWNER SETUP REQUIRED**. The overall
-launch verdict is **NOT READY — PRODUCTION DEFECT FOUND**, Day 0 is `UNSET`, and
+launch verdict is **NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND**, Day 0 is `UNSET`, and
 the four-week clock is `NOT_STARTED`.

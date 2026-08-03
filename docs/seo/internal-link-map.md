@@ -2,12 +2,16 @@
 
 ## Release status
 
-The source registry contains the links below, and the last known Verdant production verification
-confirmed them. That is historical only. At `2026-08-03T17:25:08Z`, the public domain served a
-Squarespace `Coming Soon` page with `noindex` for both lighting routes; the public sitemap and
-robots endpoints returned HTTP 401. The link inventory cannot currently establish public discovery
-until the owner restores the intended publisher custom-domain configuration and Codex reruns the
-production link probe.
+The source registry contains the links below. At `2026-08-03T21:57:06.508Z`, the current public
+recheck confirmed both lighting routes return their expected release fingerprints, are present in
+the 55-URL sitemap, and are not blocked by robots. This establishes sitemap discovery readiness,
+not Google indexing or authenticated traffic performance. The wider rendered cross-link matrix
+remains historical evidence until a browser-control bridge is available again.
+
+At `2026-08-03T22:05:39.024Z`, the public `/guides` hub linked to both guide paths and each guide
+linked to its lighting sibling. The sitemap contained none of the checked protected application
+prefixes: `/grows`, `/tents`, `/plants`, `/timeline`, `/sensors`, `/doctor`, `/alerts`, `/actions`,
+`/account`, `/settings`, or `/billing`.
 
 ## Implemented contextual links
 

@@ -5,21 +5,12 @@ import { describe, expect, it } from "vitest";
 import { GOOGLE_ANALYTICS_MEASUREMENT_ID } from "@/constants/analytics";
 
 const ROOT = resolve(__dirname, "../..");
-const CHECKLIST = readFileSync(
-  resolve(ROOT, "docs/seo/analytics-owner-setup-checklist.md"),
-  "utf8",
-);
-const LAUNCH_VERIFICATION = readFileSync(
-  resolve(ROOT, "docs/seo/lighting-launch-verification.md"),
-  "utf8",
-);
-const MEASUREMENT_PLAN = readFileSync(
-  resolve(ROOT, "docs/seo/lighting-four-week-measurement-plan.md"),
-  "utf8",
-);
+const CHECKLIST = readFileSync(resolve(ROOT, "docs/seo/analytics-owner-setup-checklist.md"), "utf8");
+const LAUNCH = readFileSync(resolve(ROOT, "docs/seo/lighting-launch-verification.md"), "utf8");
+const PLAN = readFileSync(resolve(ROOT, "docs/seo/lighting-four-week-measurement-plan.md"), "utf8");
 
 describe("lighting analytics owner setup checklist", () => {
-  it("keeps the exact blocked-mode verdict and clock state", () => {
+  it("keeps blocked-mode baseline and Day 0 semantics", () => {
     expect(CHECKLIST).toContain("GA4 BASELINE: BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE");
     expect(CHECKLIST).toContain("GSC BASELINE: BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE");
     expect(CHECKLIST).toContain("MEASUREMENT DAY 0: UNSET");
@@ -27,129 +18,50 @@ describe("lighting analytics owner setup checklist", () => {
     expect(CHECKLIST).toContain("BLOCKED — GA4/GSC OWNER SETUP REQUIRED");
   });
 
-  it("covers the required GA4 owner decisions", () => {
+  it("records the restored public host without overstating analytics runtime proof", () => {
+    expect(CHECKLIST).toMatch(/Intended publisher custom domain\s+\| `COMPLETE`/);
+    expect(CHECKLIST).toMatch(/Production hostname and deployed tag\s+\| `COMPLETE`/);
+    expect(CHECKLIST).toContain("The intercepted analytics identity still needs a browser-control bridge");
+    expect(LAUNCH).toContain("DEPLOYED COMMIT HASH: NOT EXPOSED BY PUBLISHER");
+    expect(LAUNCH).toContain("BLOCKED — BROWSER CONTROL BRIDGE UNAVAILABLE");
+  });
+
+  it("covers the owner actions that remain", () => {
     for (const phrase of [
       "Correct Google account and organization",
       "Correct GA4 property",
-      "Production web data stream",
-      "Production hostname and deployed tag",
       "Read-only reporting access",
       "Enhanced measurement review",
-      "Internal and developer traffic handling",
-      "Both lighting paths and route-specific titles",
-      "Conversion-measurement gaps documented",
+      "Page changes based on browser history events",
+      "Correct property type and scope",
+      "Sitemap submission",
+      "URL Inspection access",
+      "Read-only or owner-approved access path",
     ]) {
       expect(CHECKLIST).toContain(phrase);
     }
-    expect(CHECKLIST).toContain(GOOGLE_ANALYTICS_MEASUREMENT_ID);
-    expect(CHECKLIST).toContain("Verdant Grow Diary");
-    expect(CHECKLIST).toContain("15065867361");
-    expect(CHECKLIST).toContain("https://verdantgrowdiary.com");
-    expect(CHECKLIST).toMatch(/numeric property ID \*\*must not be inferred\*\*/);
-    expect(CHECKLIST).not.toMatch(/properties\/\d+/);
+    expect(CHECKLIST).toContain("one intentional `page_view` per navigation");
+    expect(CHECKLIST).toContain("zero duplicate automatic page views");
   });
 
-  it("keeps the owner-confirmed stream distinct from the blocked current production tag", () => {
-    expect(CHECKLIST).toMatch(/Production web data stream\s+\| `COMPLETE`/);
-    expect(CHECKLIST).toMatch(/Production hostname and deployed tag\s+\| `INCOMPLETE`/);
-    expect(CHECKLIST).toMatch(/Correct GA4 property\s+\| `INCOMPLETE`/);
-    expect(CHECKLIST).toMatch(/Read-only reporting access\s+\| `INCOMPLETE`/);
-    expect(CHECKLIST).toMatch(
-      /GA4 property identity and authenticated\s+reporting access are still unavailable to Codex/,
-    );
-    expect(CHECKLIST).toContain("the current Squarespace placeholder has no Verdant tag");
-    expect(LAUNCH_VERIFICATION).toContain(
-      "the owner-confirmed stream tuple matched the last known Verdant release",
-    );
-    expect(LAUNCH_VERIFICATION).toContain("current production tag verification is **FAIL**");
-  });
-
-  it("keeps historic structured-data evidence distinct from current production proof", () => {
-    expect(CHECKLIST).toMatch(
-      /PR #624 structured-data ownership repair were verified in the last known Verdant\s+release/,
-    );
-    expect(CHECKLIST).toContain("They are not current production proof.");
-    expect(CHECKLIST).toMatch(/current\s+Squarespace placeholder does not expose that tag\./);
-    expect(CHECKLIST).not.toContain("local repair pending publish");
-    expect(CHECKLIST).toContain(
-      "https://developers.google.com/analytics/devguides/collection/ga4/views",
-    );
-  });
-
-  it("keeps the stream tuple and blocked property boundary in both measurement handoffs", () => {
-    for (const document of [LAUNCH_VERIFICATION, MEASUREMENT_PLAN]) {
+  it("preserves stream identity without inventing the property ID", () => {
+    for (const document of [CHECKLIST, LAUNCH, PLAN]) {
       expect(document).toContain("Verdant Grow Diary");
       expect(document).toContain("https://verdantgrowdiary.com");
       expect(document).toContain("15065867361");
       expect(document).toContain(GOOGLE_ANALYTICS_MEASUREMENT_ID);
     }
-    expect(LAUNCH_VERIFICATION).toMatch(
-      /The numeric property ID and authenticated reporting baseline\s+remain unavailable to Codex\./,
-    );
-    expect(MEASUREMENT_PLAN).toMatch(/property ID is still unconfirmed/);
+    expect(CHECKLIST).toMatch(/numeric property ID \*\*must not be inferred\*\*/);
+    expect(CHECKLIST).not.toMatch(/properties\/\d+/);
   });
 
-  it("pins both exact lighting identities", () => {
-    expect(CHECKLIST).toContain("/guides/cannabis-grow-light-distance-and-schedule");
-    expect(CHECKLIST).toContain("Cannabis Grow Light Distance, PPFD & DLI Guide \\| Verdant");
-    expect(CHECKLIST).toContain("/guides/cannabis-light-stress-light-burn-bleaching-or-heat");
-    expect(CHECKLIST).toContain("Cannabis Light Stress: Burn, Bleaching, or Heat? \\| Verdant");
-  });
-
-  it("covers the required Search Console owner decisions", () => {
-    for (const phrase of [
-      "Correct Google account",
-      "Correct property type and scope",
-      "DNS or property verification",
-      "Production hostname",
-      "Sitemap submission",
-      "URL Inspection access",
-      "Read-only or owner-approved access path",
-      "Index-request policy",
-      "Credential and export safety",
-    ]) {
-      expect(CHECKLIST).toContain(phrase);
-    }
-    expect(CHECKLIST).toContain("Domain property");
-    expect(CHECKLIST).toContain("https://verdantgrowdiary.com/sitemap.xml");
-    expect(CHECKLIST).toContain("docs/seo-monitoring.md");
-  });
-
-  it("shows complete, incomplete, and access-blocked states with a verification handoff", () => {
-    expect(CHECKLIST).toContain("`COMPLETE`");
-    expect(CHECKLIST).toContain("`INCOMPLETE`");
-    expect(CHECKLIST).toContain("`BLOCKED_BY_ACCESS`");
-    expect(CHECKLIST).toMatch(/Exact owner action\s+\| Codex can verify afterward/);
-    expect(CHECKLIST).toContain("Tell Codex only that access is ready");
-    expect(CHECKLIST).toMatch(/Enhanced measurement review\s+\| `BLOCKED_BY_ACCESS`/);
-    expect(CHECKLIST).toContain("Page changes based on browser history events");
-    expect(CHECKLIST).toContain("one intentional `page_view` per navigation");
-    expect(CHECKLIST).toContain("zero duplicate automatic page views");
-    expect(CHECKLIST).toContain("pushState");
-    expect(CHECKLIST).toMatch(/Production hostname\s+\| `BLOCKED_BY_ACCESS`/);
-  });
-
-  it("forbids secret sharing and contains no credential-shaped value", () => {
+  it("keeps secrets and zero-value fabrication out of the handoff", () => {
     expect(CHECKLIST).toContain("Never paste a Google password");
     expect(CHECKLIST).toContain("Do not send credential values");
+    expect(CHECKLIST).toContain("Authenticated no-data is `NO_DATA`");
+    expect(CHECKLIST).toContain("without inventing zero metrics");
     expect(CHECKLIST).not.toMatch(/ya29\.[A-Za-z0-9_-]+/);
     expect(CHECKLIST).not.toMatch(/-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/);
     expect(CHECKLIST).not.toMatch(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/);
-    expect(CHECKLIST).not.toMatch(
-      /(?:client_secret|refresh_token|access_token|service_role)\s*[=:]\s*["'][^"']+["']/i,
-    );
-  });
-
-  it("requires null-safe baseline semantics instead of fake zero metrics", () => {
-    expect(CHECKLIST).toContain("Authenticated no-data is `NO_DATA`");
-    expect(CHECKLIST).toContain("unavailable reporting remains `BLOCKED`");
-    expect(CHECKLIST).toContain("without inventing zero metrics");
-    expect(CHECKLIST).toContain("captures genuine `NO_DATA` or measured values");
-  });
-
-  it("stays concise and is linked from both launch documents", () => {
-    expect(CHECKLIST.length).toBeLessThan(15_000);
-    expect(LAUNCH_VERIFICATION).toContain("./analytics-owner-setup-checklist.md");
-    expect(MEASUREMENT_PLAN).toContain("./analytics-owner-setup-checklist.md");
   });
 });

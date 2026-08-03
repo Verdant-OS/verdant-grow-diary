@@ -1,6 +1,6 @@
 # Lighting launch verification
 
-**Generated:** 2026-08-03T17:25:08Z
+**Generated:** 2026-08-03T21:57:06.508Z
 **Production host:** https://verdantgrowdiary.com
 **Merged PR:** [#595](https://github.com/Verdant-OS/verdant-grow-diary/pull/595)
 **Merge commit:** `1223c56c9db586160a2798d017c2e78d1de1dd5a`
@@ -13,31 +13,29 @@ commit `b62aac5d4b0e9296bfdbee4c46e03fc35f350c0c`
 **Deploy branch head:** `7efaaa5ed09a76e01e0555328e204934900f0083`
 **Production deployment ID:** not exposed by the current production response
 
-## Current P0 production recheck
+## Current production recovery recheck
 
-At `2026-08-03T17:25:08Z`, the apex, both lighting routes, and `/version.json`
-returned HTTP 200 from a Squarespace **Coming Soon** page with `noindex`. The
-current `/sitemap.xml` and `/robots.txt` responses return HTTP 401. No response
-exposes a Verdant release fingerprint, `G-B3QRSZEM9S`, a route-specific title, or
-the expected guide content.
+At `2026-08-03T21:57:06.508Z`, the apex served the expected Cloudflare/Lovable
+production response. Both lighting routes, `/version.json`, `/sitemap.xml`, and
+`/robots.txt` returned HTTP 200. The two guides match their route-specific titles,
+descriptions, H1s, absolute canonicals, `index, follow` directives, Open Graph URLs,
+FAQPage JSON-LD, and expected release fingerprints. The GA tag `G-B3QRSZEM9S` is
+present in both server-rendered guide documents; both URLs are present in the 55-URL
+sitemap and robots declares that production sitemap.
 
-This is a production-host/origin failure, not a successful Verdant deployment. The
-current domain must be restored to the intended publisher custom-domain configuration
-before any technical SEO, GA4 identity, or GSC baseline claim can be renewed. Do not
-guess DNS values, publish a no-op release, or infer a deployed commit from source.
-
-**Required owner action:** Restore verdantgrowdiary.com and www.verdantgrowdiary.com to the intended publisher custom-domain configuration, then authorize an immediate production and intercepted-analytics recheck.
-
-The prior August 2 release and analytics observations below remain historical evidence
-only; they do not prove the current public host.
+`/version.json` now returns a current build time but `commit: "unknown"` and
+`dirty: true`. Therefore **DEPLOYED COMMIT HASH: NOT EXPOSED BY PUBLISHER**. This
+does not weaken the lighting-guide content match, but it prevents a deploy-branch
+parity claim. No no-op publish is justified.
 
 ## Launch verdict
 
-**NOT READY — PRODUCTION DEFECT FOUND**
+**NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND**
 
-The current public pages are Squarespace placeholders, not the Verdant lighting guides. They are
-not intentionally indexable, do not expose current guide metadata or structured data, and cannot be
-used for a GA4 page-view or GSC baseline. The current release content match is **FAIL**.
+The production-host defect is fixed and the current static technical contract passes. The lighting
+release-content match is **PASS — LIGHTING GUIDES ONLY**. The deployment commit is not exposed,
+and current browser collection interception is unavailable in this session, so neither fact is
+substituted for analytics-runtime proof.
 
 The last completed Verdant app-level collection matrix
 (`2026-08-02T02:08:43.179Z`) remains historical evidence that the source and prior release emitted
@@ -49,15 +47,15 @@ without Verdant's explicit `page_path` on SPA/history transitions. All collectio
 fulfilled locally, so no verification events were transmitted to GA4. The automatic source requires
 an owner-side Enhanced Measurement review because authenticated stream settings are unavailable.
 Authenticated GA4 reporting and Search Console inspection are also unavailable, so Day 0 remains
-unset. Current production restoration is now the first gate.
+unset. The remaining hard runtime gate is the historical duplicate-page-view observation and its
+required owner-side Enhanced Measurement review.
 
 The owner-confirmed GA4 production stream is `Verdant Grow Diary`, stream URL
 `https://verdantgrowdiary.com`, stream ID `15065867361`, and measurement ID `G-B3QRSZEM9S`.
-The last known Verdant production release loaded and targeted that exact measurement ID. The
-current Squarespace response does not. The numeric property ID and authenticated reporting baseline
-remain unavailable to Codex.
+The current server-rendered guide documents load and target that exact measurement ID. The numeric
+property ID and authenticated reporting baseline remain unavailable to Codex.
 
-## Historical Verdant release evidence (not current production proof)
+## Release evidence and limitations
 
 - `https://verdantgrowdiary.com/version.json` identifies production build commit
   `a20776993bd606f07977674934864b888a407e1c`, built at
@@ -86,9 +84,7 @@ remain unavailable to Codex.
   browser checks at `2026-08-02T02:55:02.718Z` and `2026-08-02T02:55:07.852Z` confirmed both
   pages' route-scoped metadata, JSON-LD identities, cross-links, and zero application errors.
 
-**Historical release content match: PASS — LIGHTING GUIDES ONLY; DEPLOYMENT PARITY: PASS**
-
-**Current release content match: FAIL — Squarespace noindex placeholder; deployment parity: NOT VERIFIABLE**
+**Current release content match: PASS — LIGHTING GUIDES ONLY; DEPLOYMENT PARITY: NOT VERIFIABLE — DEPLOYED COMMIT HASH NOT EXPOSED BY PUBLISHER**
 
 ## Exact lighting pages
 
@@ -248,7 +244,9 @@ event or runtime behavior.
 
 - **GA4 baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
 - **GSC baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
-- **GA4 production stream identity:** HISTORICAL_ONLY — the owner-confirmed stream tuple matched the last known Verdant release; the current Squarespace host has no Verdant tag, so current production tag verification is **FAIL**.
+- **GA4 production stream identity:** the owner-confirmed stream tuple matches the current
+  server-rendered production tag. This is static tag-presence evidence only; it does not prove the
+  singleton runtime collection contract.
 - At `2026-08-02T02:08:43.179Z`, name-only GitHub secret listings found none of the expected GA4
   or GSC reporting secrets configured at repository scope or in the `verdant-production`,
   `verdant-sandbox`, and `copilot` environments; `.seo/gsc-token.local.json` is also absent. The
@@ -269,17 +267,15 @@ event or runtime behavior.
 - Machine-readable handoff: the current blocked state is recorded in
   [`artifacts/seo/seo-readiness-status.json`](../../artifacts/seo/seo-readiness-status.json).
 
-The current bounded slice is `P0 PRODUCTION_HOST_ORIGIN_MISMATCH`: it records the verified public
-host failure without changing DNS, publisher settings, runtime code, or analytics configuration.
-The next owner action is to restore the intended publisher custom-domain configuration, then allow
-an immediate production and intercepted-analytics recheck. The historical P0
-`GA4_ENHANCED_MEASUREMENT_HISTORY_PAGE_VIEWS` defect remains unresolved after that restoration.
+The completed bounded slice is `P0 PRODUCTION_HOST_ORIGIN_MISMATCH`: the external custom-domain
+repair is verified by the current public recheck, without changing DNS, publisher settings, runtime
+code, or analytics configuration. The current P0 is
+`GA4_ENHANCED_MEASUREMENT_HISTORY_PAGE_VIEWS`. The owner must disable the browser-history advanced
+page-view option in the existing production stream, retain Verdant's explicit SPA emitter, and then
+authorize the full non-transmitting intercepted navigation matrix.
 
-Separately, the next unblocked Codex slice is
-`P0 ANALYTICS_CONTRACT_TEST_HARNESS_RECONCILIATION`: the deploy-head default Vitest config imports
-undeclared `@vitejs/plugin-react-swc`, so the analytics contract suite fails before collection; two
-historic analytics tests also still read deleted pre-TanStack `App.tsx` and `index.html` files. That
-source-test repair must remain separate from this production-host evidence update.
+This session has no browser-control bridge, so the current runtime collection result is
+**BLOCKED — BROWSER CONTROL BRIDGE UNAVAILABLE**, not a passing recheck.
 
 Day 0 remains `UNSET`, and the four-week clock remains `NOT_STARTED`, until both authenticated
 baselines are recorded.

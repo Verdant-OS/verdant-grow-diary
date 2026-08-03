@@ -10,14 +10,9 @@
  * URLs and similar secrets MUST NEVER appear in the returned model.
  */
 
+import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 export type TimelineEvidenceSource =
-  | "manual"
-  | "live"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid"
-  | "unknown";
+  "manual" | "live" | "csv" | "demo" | "stale" | "invalid" | "unknown";
 
 const ALLOWED_SOURCES: ReadonlySet<TimelineEvidenceSource> = new Set([
   "manual",
@@ -77,7 +72,7 @@ const SAFE_DETAIL_KEYS: ReadonlySet<string> = new Set([
   "outcome",
 ]);
 
-const TIMELINE_DETAIL_STALE_MS = 30 * 60 * 1000;
+const TIMELINE_DETAIL_STALE_MS = LIVE_CURRENT_STATE_STALE_MS;
 
 export interface TimelineEvidenceDetailInput {
   id: string;
@@ -121,19 +116,10 @@ export interface TimelineMaturityEvidenceSummary {
 }
 
 export type TimelineEvidenceBadge =
-  | "photo"
-  | "sensor"
-  | "note"
-  | "watering"
-  | "feeding"
-  | "stale_sensor"
-  | "maturity_evidence";
+  "photo" | "sensor" | "note" | "watering" | "feeding" | "stale_sensor" | "maturity_evidence";
 
 export type TimelineEvidenceContext =
-  | "strong"
-  | "partial_missing_photo"
-  | "partial_missing_sensor"
-  | "limited";
+  "strong" | "partial_missing_photo" | "partial_missing_sensor" | "limited";
 
 export interface TimelineEvidenceContextHint {
   level: TimelineEvidenceContext;
@@ -173,15 +159,12 @@ function safeNumber(value: unknown): number | null {
 
 function normalizeSource(value: unknown): TimelineEvidenceSource {
   const s = typeof value === "string" ? value.trim().toLowerCase() : "";
-  return (ALLOWED_SOURCES.has(s as TimelineEvidenceSource)
+  return ALLOWED_SOURCES.has(s as TimelineEvidenceSource)
     ? (s as TimelineEvidenceSource)
-    : "unknown");
+    : "unknown";
 }
 
-function readSafeDetail(
-  details: Record<string, unknown> | null | undefined,
-  key: string,
-): unknown {
+function readSafeDetail(details: Record<string, unknown> | null | undefined, key: string): unknown {
   if (!details || !SAFE_DETAIL_KEYS.has(key)) return undefined;
   return details[key];
 }
@@ -191,8 +174,7 @@ function readSensor(
   fallbackEntryAt: string | null,
   nowMs: number,
 ): TimelineEvidenceSensorSummary | null {
-  const raw =
-    readSafeDetail(details, "sensor_snapshot") ?? readSafeDetail(details, "sensor");
+  const raw = readSafeDetail(details, "sensor_snapshot") ?? readSafeDetail(details, "sensor");
   if (!raw || typeof raw !== "object") return null;
   const obj = raw as Record<string, unknown>;
 
@@ -258,10 +240,7 @@ function readMaturityEvidence(
   return hasAnyEvidence ? summary : null;
 }
 
-function buildAltText(
-  plantName: string | null,
-  entryAt: string | null,
-): string {
+function buildAltText(plantName: string | null, entryAt: string | null): string {
   const parts = ["Timeline photo"];
   if (plantName) parts.push(`of ${plantName}`);
   if (entryAt) parts.push(`taken ${entryAt}`);
@@ -277,31 +256,27 @@ function decideContext(
     return {
       level: "strong",
       label: "Useful for AI Doctor context",
-      description:
-        "Photo and recent sensor snapshot — strong evidence for AI Doctor.",
+      description: "Photo and recent sensor snapshot — strong evidence for AI Doctor.",
     };
   }
   if (hasPhoto && !hasSensor) {
     return {
       level: "partial_missing_sensor",
       label: "Missing sensor context",
-      description:
-        "Has a photo but no sensor snapshot — AI Doctor context is partial.",
+      description: "Has a photo but no sensor snapshot — AI Doctor context is partial.",
     };
   }
   if (!hasPhoto && hasSensor) {
     return {
       level: "partial_missing_photo",
       label: "Missing photo context",
-      description:
-        "Has a sensor snapshot but no photo — AI Doctor context is partial.",
+      description: "Has a sensor snapshot but no photo — AI Doctor context is partial.",
     };
   }
   return {
     level: "limited",
     label: "Missing photo/sensor context",
-    description:
-      "No photo and no sensor snapshot — limited evidence for AI Doctor.",
+    description: "No photo and no sensor snapshot — limited evidence for AI Doctor.",
   };
 }
 
@@ -312,8 +287,7 @@ export function buildTimelineEvidenceDetailViewModel(
   if (!input || typeof input.id !== "string" || !input.id) return null;
   const nowMs = typeof options.nowMs === "number" ? options.nowMs : Date.now();
 
-  const details =
-    input.details && typeof input.details === "object" ? input.details : null;
+  const details = input.details && typeof input.details === "object" ? input.details : null;
 
   const eventTypeRaw = safeString(readSafeDetail(details, "event_type")) ?? "note";
   const eventTypeLabel = EVENT_TYPE_LABELS[eventTypeRaw] ?? "Entry";
@@ -347,9 +321,7 @@ export function buildTimelineEvidenceDetailViewModel(
   const feedingPh = safeNumber(readSafeDetail(details, "feeding_ph"));
 
   const watering =
-    eventTypeRaw === "watering" || wateringMl !== null
-      ? { volumeMl: wateringMl }
-      : null;
+    eventTypeRaw === "watering" || wateringMl !== null ? { volumeMl: wateringMl } : null;
   const feeding =
     eventTypeRaw === "feeding" || feedingEc !== null || feedingPh !== null
       ? { ec: feedingEc, ph: feedingPh }

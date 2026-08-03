@@ -120,11 +120,12 @@ describe("buildRecentSensorSnapshotHistory", () => {
   });
 
   it("flags stale rows", () => {
-    const stale = new Date(NOW - 60 * 60 * 1000).toISOString();
-    const fresh = new Date(NOW - 60 * 1000).toISOString();
+    // Manual uses the 24h current-context window; live uses 15 minutes.
+    const staleManual = new Date(NOW - 25 * 60 * 60 * 1000).toISOString();
+    const freshManual = new Date(NOW - 60 * 1000).toISOString();
     const rows = [
-      row(fresh, "temperature_c", 24, "manual"),
-      row(stale, "temperature_c", 22, "manual"),
+      row(freshManual, "temperature_c", 24, "manual"),
+      row(staleManual, "temperature_c", 22, "manual"),
     ];
     const out = buildRecentSensorSnapshotHistory(rows, { now: NOW });
     expect(out[0].stale).toBe(false);

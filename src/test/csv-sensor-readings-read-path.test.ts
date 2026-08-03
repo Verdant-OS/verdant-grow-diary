@@ -24,10 +24,7 @@ import {
   STALE_THRESHOLD_MS,
   type SensorReadingLike,
 } from "@/lib/sensorSnapshot";
-import {
-  getCsvVendorLineage,
-  getCsvVendorLabel,
-} from "@/lib/sensorReadingVendorLineage";
+import { getCsvVendorLineage, getCsvVendorLabel } from "@/lib/sensorReadingVendorLineage";
 
 const TS = "2026-06-01T12:00:00.000Z";
 
@@ -64,14 +61,14 @@ describe("snapshotFromReadings — CSV (Spider Farmer / Vivosun) classification"
     expect(snap?.source).toBe("manual");
   });
 
-  it("CSV-only snapshot still flags as stale when ts is older than 30m", () => {
+  it("CSV-only snapshot still flags as stale when ts is older than the live window", () => {
     const oldTs = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
     const snap = snapshotFromReadings([
       { ts: oldTs, metric: "temperature_c", value: 22, source: "csv" },
     ]);
     expect(snap?.source).toBe("csv");
     expect(isStale(snap?.ts ?? null)).toBe(true);
-    expect(STALE_THRESHOLD_MS).toBe(30 * 60 * 1000);
+    expect(STALE_THRESHOLD_MS).toBe(15 * 60 * 1000);
   });
 });
 
@@ -92,8 +89,9 @@ describe("getCsvVendorLineage — Spider Farmer / Vivosun / AC Infinity", () => 
     expect(v?.sourceApp).toBe("spider_farmer");
     expect(v?.vendorLabel).toBe("Spider Farmer");
     expect(v?.badgeLabel).toBe("CSV history · Spider Farmer");
-    expect(getCsvVendorLabel({ source: "csv", raw_payload: { source_app: "spider_farmer" } }))
-      .toBe("Spider Farmer");
+    expect(getCsvVendorLabel({ source: "csv", raw_payload: { source_app: "spider_farmer" } })).toBe(
+      "Spider Farmer",
+    );
   });
 
   it("returns Vivosun lineage from raw_payload.source_app", () => {
@@ -146,10 +144,7 @@ describe("getCsvVendorLineage — Spider Farmer / Vivosun / AC Infinity", () => 
 });
 
 describe("static safety — vendor lineage helper", () => {
-  const helper = readFileSync(
-    resolve(__dirname, "../lib/sensorReadingVendorLineage.ts"),
-    "utf8",
-  );
+  const helper = readFileSync(resolve(__dirname, "../lib/sensorReadingVendorLineage.ts"), "utf8");
 
   it("does not reference alerts / Action Queue / AI / device control / RLS", () => {
     const forbidden = [

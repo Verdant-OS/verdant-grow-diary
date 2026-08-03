@@ -13,6 +13,7 @@
  *    detail blobs.
  *  - Case-insensitive, trimmed. Empty query returns all rows.
  */
+import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import {
   classifyTimelineSensorSource,
   type TimelineSensorSourceKind,
@@ -49,7 +50,7 @@ export interface TimelineEvidenceFilterInput {
   endDate?: string | null;
 }
 
-const TIMELINE_FILTER_STALE_MS = 30 * 60 * 1000;
+const TIMELINE_FILTER_STALE_MS = LIVE_CURRENT_STATE_STALE_MS;
 
 /**
  * Returns the canonical sensor-source kind for a row's sensor snapshot,

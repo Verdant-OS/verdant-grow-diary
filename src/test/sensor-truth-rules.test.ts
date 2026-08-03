@@ -142,7 +142,9 @@ describe("classifySnapshotTruth", () => {
   });
 
   it("keeps a stale-but-realistic reading classified as stale, not invalid", () => {
-    const r = classifySnapshotTruth(snap({ ts: STALE }), NOW);
+    // Default snap source is manual (24h window). Use live so a 60-minute-old
+    // reading is past the 15-minute live current-state boundary.
+    const r = classifySnapshotTruth(snap({ ts: STALE, source: "live" }), NOW);
     expect(r.stale).toBe(true);
     expect(r.hasInvalid).toBe(false);
     expect(r.snapshot.temp).toBe(24); // value preserved
@@ -163,10 +165,7 @@ describe("classifySnapshotTruth", () => {
   });
 
   it("does not invent a fake-live label for invalid data", () => {
-    const r = classifySnapshotTruth(
-      snap({ source: "manual", temp: 99, rh: 200 }),
-      NOW,
-    );
+    const r = classifySnapshotTruth(snap({ source: "manual", temp: 99, rh: 200 }), NOW);
     // Source is preserved as-is; we never promote it to "live" or
     // downgrade it silently.
     expect(r.snapshot.source).toBe("manual");
@@ -199,9 +198,7 @@ describe("buildTentSensorHeaderView · truth filtering", () => {
     expect(view.hasReadings).toBe(true);
     expect(view.snapshot?.temp).toBeNull();
     expect(view.snapshot?.vpd).toBeNull();
-    expect(view.truth?.invalidFields).toEqual(
-      expect.arrayContaining(["temp", "vpd"]),
-    );
+    expect(view.truth?.invalidFields).toEqual(expect.arrayContaining(["temp", "vpd"]));
     expect(view.truth?.reasonChips).toContain(TRUTH_REASON_CHIP.invalid_temp);
     expect(view.sourceLabel).toBeTruthy();
     // No fake-live promotion.
@@ -221,9 +218,7 @@ describe("buildTentSensorHeaderView · truth filtering", () => {
 });
 
 describe("mapSensorReadingToAiDoctorContext · VPD depends on temp/RH", () => {
-  function reading(
-    overrides: Partial<NormalizedSensorReading> = {},
-  ): NormalizedSensorReading {
+  function reading(overrides: Partial<NormalizedSensorReading> = {}): NormalizedSensorReading {
     return {
       source: "live",
       captured_at: FRESH,
@@ -238,9 +233,7 @@ describe("mapSensorReadingToAiDoctorContext · VPD depends on temp/RH", () => {
   }
 
   it("excludes VPD from usable metrics when temperature is invalid", () => {
-    const ctx = mapSensorReadingToAiDoctorContext(
-      reading({ temperature_c: 999 }),
-    );
+    const ctx = mapSensorReadingToAiDoctorContext(reading({ temperature_c: 999 }));
     expect(ctx.invalidMetrics).toContain("temperature_c");
     expect(ctx.invalidMetrics).toContain("vpd_kpa");
     expect(ctx.usableMetrics).not.toContain("vpd_kpa");
@@ -248,9 +241,7 @@ describe("mapSensorReadingToAiDoctorContext · VPD depends on temp/RH", () => {
   });
 
   it("excludes VPD when humidity is invalid", () => {
-    const ctx = mapSensorReadingToAiDoctorContext(
-      reading({ humidity_pct: 250 }),
-    );
+    const ctx = mapSensorReadingToAiDoctorContext(reading({ humidity_pct: 250 }));
     expect(ctx.invalidMetrics).toContain("humidity_pct");
     expect(ctx.invalidMetrics).toContain("vpd_kpa");
     expect(ctx.usableMetrics).not.toContain("vpd_kpa");

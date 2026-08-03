@@ -108,7 +108,9 @@ describe("integration: compileAiDoctorContextPayloadFromRows → executeAiDoctor
     expect(s.approval_required).toBe(true);
     expect(["medium", "high"]).toContain(s.risk_level);
     const text = `${s.title} ${s.rationale}`.toLowerCase();
-    expect(text).not.toMatch(/\b(turn on|turn off|execute|run command|set humidifier|set fan|api call)\b/);
+    expect(text).not.toMatch(
+      /\b(turn on|turn off|execute|run command|set humidifier|set fan|api call)\b/,
+    );
   });
 
   it("low confidence never emits an action_queue_suggestion even when telemetry is degraded", async () => {
@@ -191,7 +193,14 @@ describe("sensor_summary: per-metric coverage", () => {
   }
 
   it("source separation: live/manual/csv/demo/stale/invalid are never merged for a single metric", () => {
-    const allSources: AiDoctorSensorSource[] = ["live", "manual", "csv", "demo", "stale", "invalid"];
+    const allSources: AiDoctorSensorSource[] = [
+      "live",
+      "manual",
+      "csv",
+      "demo",
+      "stale",
+      "invalid",
+    ];
     const ctx = compileAiDoctorContextPayloadFromRows({
       ...basePlant(),
       sensorReadings: allSources.map((source) => ({
@@ -207,17 +216,18 @@ describe("sensor_summary: per-metric coverage", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Staleness boundary (6h)
+// Staleness boundary (Sensor Truth Canon: live 15m / manual 24h)
 // ---------------------------------------------------------------------------
 
-const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+const LIVE_WINDOW_MS = 15 * 60 * 1000;
+const MANUAL_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-describe("staleness boundary at 6h (deterministic, fixed now)", () => {
-  it("exactly 6h old live reading is NOT stale (rule: age > 6h ⇒ stale; 6h boundary is fresh)", () => {
+describe("staleness boundary source-aware (deterministic, fixed now)", () => {
+  it("exactly 15m old live reading is NOT stale (age > window ⇒ stale)", () => {
     const ctx = compileAiDoctorContextPayloadFromRows({
       ...basePlant(),
       sensorReadings: [
-        { metric: "temperature_c", value: 22, captured_at: iso(SIX_HOURS_MS), source: "live" },
+        { metric: "temperature_c", value: 22, captured_at: iso(LIVE_WINDOW_MS), source: "live" },
       ],
     });
     const snap = ctx.sensor_summary.find((m) => m.metric === "temperature_c")!;
@@ -225,11 +235,16 @@ describe("staleness boundary at 6h (deterministic, fixed now)", () => {
     expect(snap.is_degraded).toBe(false);
   });
 
-  it("just under 6h old live reading is fresh", () => {
+  it("just under 15m old live reading is fresh", () => {
     const ctx = compileAiDoctorContextPayloadFromRows({
       ...basePlant(),
       sensorReadings: [
-        { metric: "temperature_c", value: 22, captured_at: iso(SIX_HOURS_MS - 1000), source: "live" },
+        {
+          metric: "temperature_c",
+          value: 22,
+          captured_at: iso(LIVE_WINDOW_MS - 1000),
+          source: "live",
+        },
       ],
     });
     const snap = ctx.sensor_summary.find((m) => m.metric === "temperature_c")!;
@@ -237,16 +252,53 @@ describe("staleness boundary at 6h (deterministic, fixed now)", () => {
     expect(snap.is_degraded).toBe(false);
   });
 
-  it("just over 6h old live reading is stale/degraded", () => {
+  it("just over 15m old live reading is stale/degraded", () => {
     const ctx = compileAiDoctorContextPayloadFromRows({
       ...basePlant(),
       sensorReadings: [
-        { metric: "temperature_c", value: 22, captured_at: iso(SIX_HOURS_MS + 1000), source: "live" },
+        {
+          metric: "temperature_c",
+          value: 22,
+          captured_at: iso(LIVE_WINDOW_MS + 1000),
+          source: "live",
+        },
       ],
     });
     const snap = ctx.sensor_summary.find((m) => m.metric === "temperature_c")!;
     expect(snap.is_stale).toBe(true);
     expect(snap.is_degraded).toBe(true);
+  });
+
+  it("2h-old manual reading stays fresh under the 24h window", () => {
+    const ctx = compileAiDoctorContextPayloadFromRows({
+      ...basePlant(),
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 22,
+          captured_at: iso(2 * 60 * 60 * 1000),
+          source: "manual",
+        },
+      ],
+    });
+    const snap = ctx.sensor_summary.find((m) => m.metric === "temperature_c")!;
+    expect(snap.is_stale).toBe(false);
+  });
+
+  it("just over 24h old manual reading is stale", () => {
+    const ctx = compileAiDoctorContextPayloadFromRows({
+      ...basePlant(),
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 22,
+          captured_at: iso(MANUAL_WINDOW_MS + 1000),
+          source: "manual",
+        },
+      ],
+    });
+    const snap = ctx.sensor_summary.find((m) => m.metric === "temperature_c")!;
+    expect(snap.is_stale).toBe(true);
   });
 });
 

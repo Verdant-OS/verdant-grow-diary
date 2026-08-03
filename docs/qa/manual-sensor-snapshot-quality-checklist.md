@@ -32,9 +32,9 @@ surfaces.
 
 ## Staleness
 
-- [ ] Snapshot older than `MANUAL_SNAPSHOT_CURRENT_STALE_HOURS = 6` hours
+- [ ] Snapshot older than `MANUAL_SNAPSHOT_CURRENT_STALE_HOURS = 24` hours
       → treated as stale, cannot support current-room decisions.
-- [ ] Snapshot within 6 hours with valid values → can be **Usable**.
+- [ ] Snapshot within 24 hours with valid values → can be **Usable**.
 
 ## Readiness panel integration
 
@@ -112,12 +112,12 @@ bun run ai-doctor:preview-safety
 
 Known good results:
 
-| Check | Expected |
-|-------|----------|
-| `bun run typecheck` | passes |
-| Manual snapshot quality rules | 18/18 passed |
-| Integration (readiness panel + current snapshot) | 5/5 passed |
-| `bun run ai-doctor:preview-safety` | OK |
+| Check                                            | Expected     |
+| ------------------------------------------------ | ------------ |
+| `bun run typecheck`                              | passes       |
+| Manual snapshot quality rules                    | 18/18 passed |
+| Integration (readiness panel + current snapshot) | 5/5 passed   |
+| `bun run ai-doctor:preview-safety`               | OK           |
 
 ## Related docs
 

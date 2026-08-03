@@ -15,10 +15,10 @@ import {
   type AuditRowLike,
   type SnapshotStatus,
 } from "@/lib/sensorSnapshotStatusContract";
+import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 
 const NOW = new Date("2026-05-23T12:00:00Z");
-const minutesAgo = (m: number) =>
-  new Date(NOW.getTime() - m * 60_000).toISOString();
+const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60_000).toISOString();
 const hoursAgo = (h: number) => minutesAgo(h * 60);
 
 afterEach(() => {
@@ -133,16 +133,8 @@ describe("classifyAuditRow", () => {
     expect(c.reason).toBeDefined();
     expect(c.status).not.toBe(c.reason);
     // Reason codes are not status variants.
-    const statuses: SnapshotStatus[] = [
-      "usable",
-      "stale",
-      "invalid",
-      "needs_review",
-      "no_data",
-    ];
-    expect(statuses).not.toContain(
-      c.reason as unknown as SnapshotStatus,
-    );
+    const statuses: SnapshotStatus[] = ["usable", "stale", "invalid", "needs_review", "no_data"];
+    expect(statuses).not.toContain(c.reason as unknown as SnapshotStatus);
   });
 });
 
@@ -167,19 +159,15 @@ describe("resolveStaleWindowMs", () => {
     expect(classifyAuditRow(row, { now: NOW }).status).toBe("stale");
 
     delete PER_SOURCE_STALE_WINDOW_MS.ecowitt;
-    expect(resolveStaleWindowMs("ecowitt")).toBe(DEFAULT_STALE_WINDOW_MS);
+    // Named live-transport aliases fall back to the Sensor Truth Canon live window.
+    expect(resolveStaleWindowMs("ecowitt")).toBe(LIVE_CURRENT_STATE_STALE_MS);
   });
 });
 
 describe("countsAsHealthyEvidence", () => {
   it("true for usable, false for stale/invalid/needs_review/no_data", () => {
     expect(countsAsHealthyEvidence("usable")).toBe(true);
-    for (const s of [
-      "stale",
-      "invalid",
-      "needs_review",
-      "no_data",
-    ] as SnapshotStatus[]) {
+    for (const s of ["stale", "invalid", "needs_review", "no_data"] as SnapshotStatus[]) {
       expect(countsAsHealthyEvidence(s)).toBe(false);
     }
     // Also works against a full Classification.

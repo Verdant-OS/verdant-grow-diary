@@ -16,20 +16,15 @@
  */
 
 import { DEFAULT_AI_COACH_STALE_THRESHOLD_MS } from "../constants/sensorTiming";
+import { resolveCurrentStateStaleWindowMs } from "@/lib/sensorTruthCanon";
 export type AiCoachSnapshotSource =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid"
-  | "unknown";
+  "live" | "manual" | "csv" | "demo" | "stale" | "invalid" | "unknown";
 
 export type AiCoachSnapshotTrust = "low" | "medium" | "high";
 
 export interface BuildAiCoachSensorSnapshotContextOptions {
   now?: Date;
-  /** Defaults to 30 min, matching sensorReadingNormalizationRules.STALE_THRESHOLD_MS. */
+  /** Defaults to Sensor Truth Canon window for the snapshot source (live 15m / manual 24h). */
   staleThresholdMs?: number;
 }
 
@@ -175,11 +170,16 @@ export function buildAiCoachSensorSnapshotContext(
   }
 
   const now = options.now ?? new Date();
-  const staleThresholdMs = options.staleThresholdMs ?? DEFAULT_AI_COACH_STALE_THRESHOLD_MS;
-
   const rawSourceStr = pickString(snapshot, ["source", "data_source", "sensor_source"]);
   const source = normalizeSource(rawSourceStr);
   const captured = parseCapturedAt(snapshot);
+  const staleThresholdMs =
+    options.staleThresholdMs ??
+    (source === "manual"
+      ? resolveCurrentStateStaleWindowMs("manual")
+      : source === "live"
+        ? resolveCurrentStateStaleWindowMs("live")
+        : DEFAULT_AI_COACH_STALE_THRESHOLD_MS);
 
   // Staleness: explicit "stale" source OR captured_at older than threshold OR missing entirely.
   let stale = source === "stale";

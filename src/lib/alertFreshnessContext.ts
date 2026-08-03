@@ -5,7 +5,7 @@
  * Hard rules:
  *   - Pure: no I/O, no React, no Supabase, no time, no randomness.
  *   - Single source of truth for the alert-persistence freshness window:
- *     `STALE_THRESHOLD_MS` from `src/lib/sensorSnapshot.ts`.
+ *     Sensor Truth Canon via `isStale(..., source)` (live 15m / manual 24h).
  *   - Never relabels demo/stale/invalid/csv/diary/unknown telemetry as
  *     healthy or persistable.
  *   - Operator-facing copy must mirror `alertsCanPersist`. We never imply
@@ -23,17 +23,13 @@ import {
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
 
-/** Single shared freshness window, in minutes, for operator-facing copy. */
+/** Live freshness window, in minutes, for operator-facing copy (manual uses 24h). */
 export const STALE_THRESHOLD_MINUTES = Math.round(STALE_THRESHOLD_MS / 60_000);
 
-/** Short human label for the alert persistence window. */
-export const FRESHNESS_WINDOW_LABEL = `${STALE_THRESHOLD_MINUTES}-minute alert window`;
+/** Short human label for the alert persistence window (Sensor Truth Canon). */
+export const FRESHNESS_WINDOW_LABEL = "15-minute live / 24-hour manual alert window";
 
-export type LatestSnapshotFreshness =
-  | "fresh"
-  | "stale"
-  | "missing"
-  | "unavailable";
+export type LatestSnapshotFreshness = "fresh" | "stale" | "missing" | "unavailable";
 
 export interface ClassifyLatestSnapshotArgs {
   /** From useLatestSensorSnapshot — `"ok"` means data loaded successfully. */
@@ -61,7 +57,7 @@ export function classifyLatestSnapshotFreshness(
   const snap = args.snapshot;
   if (!snap || snap.source === "unavailable" || !snap.ts) return "missing";
   const now = args.now ?? Date.now();
-  const stale = isStale(snap.ts, now);
+  const stale = isStale(snap.ts, now, undefined, snap.source);
   if (stale) return "stale";
   if (snap.source === "live" || snap.source === "manual") return "fresh";
   // sim / diary / csv: not eligible for persistence even when "fresh".
@@ -73,14 +69,12 @@ export function classifyLatestSnapshotFreshness(
  * inside the persistable window. This is what we surface as "a recent
  * manual snapshot exists inside the N-minute alert window".
  */
-export function hasRecentManualSnapshot(
-  args: ClassifyLatestSnapshotArgs,
-): boolean {
+export function hasRecentManualSnapshot(args: ClassifyLatestSnapshotArgs): boolean {
   if (args.status !== "ok") return false;
   const snap = args.snapshot;
   if (!snap || snap.source !== "manual" || !snap.ts) return false;
   const now = args.now ?? Date.now();
-  return !isStale(snap.ts, now);
+  return !isStale(snap.ts, now, undefined, snap.source);
 }
 
 /**
@@ -88,15 +82,13 @@ export function hasRecentManualSnapshot(
  * snapshot can persist alerts only when status is loaded, source is
  * `live` or `manual`, and timestamp is inside the freshness window.
  */
-export function snapshotAlertsCanPersist(
-  args: ClassifyLatestSnapshotArgs,
-): boolean {
+export function snapshotAlertsCanPersist(args: ClassifyLatestSnapshotArgs): boolean {
   if (args.status !== "ok") return false;
   const snap = args.snapshot;
   if (!snap || !snap.ts) return false;
   if (snap.source !== "live" && snap.source !== "manual") return false;
   const now = args.now ?? Date.now();
-  return !isStale(snap.ts, now);
+  return !isStale(snap.ts, now, undefined, snap.source);
 }
 
 /**
@@ -104,20 +96,17 @@ export function snapshotAlertsCanPersist(
  * `alertsCanPersist` and the snapshot source. Never implies persistence
  * for csv / diary / sim / unavailable / stale snapshots.
  */
-export function describeLatestSnapshotForAlerts(
-  args: ClassifyLatestSnapshotArgs,
-): string {
+export function describeLatestSnapshotForAlerts(args: ClassifyLatestSnapshotArgs): string {
   if (args.status !== "ok") return "Snapshot status unavailable.";
   const snap = args.snapshot;
   if (!snap || snap.source === "unavailable" || !snap.ts) {
     return "No snapshot available. Enter a manual snapshot to check alerts.";
   }
-  const persistableSource =
-    snap.source === "live" || snap.source === "manual";
+  const persistableSource = snap.source === "live" || snap.source === "manual";
   if (!persistableSource) {
     return "Latest snapshot is for context only. Alerts persist only from fresh manual or live readings.";
   }
-  const stale = isStale(snap.ts, args.now ?? Date.now());
+  const stale = isStale(snap.ts, args.now ?? Date.now(), undefined, snap.source);
   const sourceWord = snap.source === "live" ? "live" : "manual";
   if (stale) {
     return `Latest ${sourceWord} snapshot is stale. Enter a new manual snapshot inside the ${FRESHNESS_WINDOW_LABEL}.`;
@@ -280,10 +269,7 @@ const SOURCE_LABELS: Record<SnapshotSource, string> = {
 
 /** Deterministic relative-time helper. Pure: no Intl.RelativeTimeFormat
  * locale variance. Returns null for null/invalid timestamps. */
-export function formatCapturedAgo(
-  capturedAtMs: number | null,
-  now: number,
-): string | null {
+export function formatCapturedAgo(capturedAtMs: number | null, now: number): string | null {
   if (capturedAtMs === null || !Number.isFinite(capturedAtMs)) return null;
   const diffMs = now - capturedAtMs;
   const future = diffMs < 0;
@@ -315,7 +301,7 @@ export function buildLatestSnapshotDetail(
   const now = args.now ?? Date.now();
   const ms = Date.parse(snap.ts);
   const capturedAgoText = formatCapturedAgo(Number.isFinite(ms) ? ms : null, now);
-  const stale = isStale(snap.ts, now);
+  const stale = isStale(snap.ts, now, undefined, snap.source);
   const insideWindow = !stale;
   const persistableSource = snap.source === "live" || snap.source === "manual";
   const canPersist = persistableSource && insideWindow;
@@ -352,12 +338,7 @@ export interface PickAlertsGrowContextArgs {
   growIdsWithOpenAlerts?: ReadonlyArray<string>;
 }
 
-export type AlertsGrowContextReason =
-  | "scoped"
-  | "active"
-  | "open-alerts"
-  | "most-recent"
-  | "first";
+export type AlertsGrowContextReason = "scoped" | "active" | "open-alerts" | "most-recent" | "first";
 
 export interface AlertsGrowContextSelection {
   growId: string;
@@ -384,7 +365,7 @@ export function pickAlertsGrowContext(
   if (grows.length === 0) return null;
 
   const findById = (id: string | null | undefined) =>
-    id ? grows.find((g) => g.id === id) ?? null : null;
+    id ? (grows.find((g) => g.id === id) ?? null) : null;
 
   const scoped = findById(args.scopedGrowId);
   if (scoped) return toSelection(scoped, "scoped", false);
@@ -454,9 +435,7 @@ export interface SourceChipViewModel {
   canPersist: boolean;
 }
 
-export function buildSourceChip(
-  args: ClassifyLatestSnapshotArgs,
-): SourceChipViewModel {
+export function buildSourceChip(args: ClassifyLatestSnapshotArgs): SourceChipViewModel {
   if (args.status !== "ok") {
     return { label: "Unknown", tone: "caution", qualifier: null, canPersist: false };
   }
@@ -469,7 +448,7 @@ export function buildSourceChip(
       canPersist: false,
     };
   }
-  const stale = isStale(snap.ts, args.now ?? Date.now());
+  const stale = isStale(snap.ts, args.now ?? Date.now(), undefined, snap.source);
   const label = SOURCE_LABELS[snap.source] ?? "Unknown";
   if (snap.source === "manual" || snap.source === "live") {
     if (stale) {
@@ -518,8 +497,7 @@ export function emptyStateSnapshotCta(
   const snap = args.snapshot;
   if (!snap || snap.source === "unavailable" || !snap.ts) {
     return {
-      message:
-        "No snapshot available. Enter a fresh manual snapshot to check alerts.",
+      message: "No snapshot available. Enter a fresh manual snapshot to check alerts.",
       showAddManualSnapshot: true,
       kind: "missing",
     };
@@ -533,7 +511,7 @@ export function emptyStateSnapshotCta(
       kind: "context-only",
     };
   }
-  const stale = isStale(snap.ts, args.now ?? Date.now());
+  const stale = isStale(snap.ts, args.now ?? Date.now(), undefined, snap.source);
   if (stale) {
     return {
       message: `Latest snapshot is outside the ${FRESHNESS_WINDOW_LABEL}. Enter a fresh manual snapshot to check alerts.`,
@@ -564,9 +542,7 @@ export interface DuplicateReassuranceArgs {
  * safe inference. Never claims a duplicate was prevented unless an open
  * alert is known to exist.
  */
-export function duplicateReassuranceCopy(
-  args: DuplicateReassuranceArgs,
-): string | null {
+export function duplicateReassuranceCopy(args: DuplicateReassuranceArgs): string | null {
   if (!args.canPersist) return null;
   if (args.hasMatchingOpenAlert) {
     return "Alert already exists for this latest snapshot. No duplicate was created.";

@@ -21,11 +21,7 @@
  *     and exposes per-field reasons.
  */
 
-import {
-  EMPTY_SNAPSHOT,
-  isStale as isSnapshotStale,
-  type SensorSnapshot,
-} from "@/lib/sensorSnapshot";
+import { EMPTY_SNAPSHOT, isSnapshotStale, type SensorSnapshot } from "@/lib/sensorSnapshot";
 import { tempFFromC } from "@/lib/temperatureUnits";
 
 // ---------------------------------------------------------------------------
@@ -138,9 +134,7 @@ export function isVpdRealistic(v: number | null | undefined): boolean {
 
 export function isSoilMoistureRealistic(v: number | null | undefined): boolean {
   if (v === null || v === undefined) return true;
-  return (
-    finite(v) && v >= SOIL_MOISTURE_PCT_RANGE.min && v <= SOIL_MOISTURE_PCT_RANGE.max
-  );
+  return finite(v) && v >= SOIL_MOISTURE_PCT_RANGE.min && v <= SOIL_MOISTURE_PCT_RANGE.max;
 }
 
 export function isSoilEcMscmRealistic(v: number | null | undefined): boolean {
@@ -162,13 +156,7 @@ export function isPhRealistic(v: number | null | undefined): boolean {
 // Snapshot truth filter
 // ---------------------------------------------------------------------------
 
-export type SnapshotMetricKey =
-  | "temp"
-  | "rh"
-  | "vpd"
-  | "soil"
-  | "soil_ec"
-  | "soil_temp";
+export type SnapshotMetricKey = "temp" | "rh" | "vpd" | "soil" | "soil_ec" | "soil_temp";
 
 export interface SensorTruthAssessment {
   /**
@@ -283,7 +271,7 @@ export function classifySnapshotTruth(
     cleaned.soil_temp = null;
   }
 
-  const stale = isSnapshotStale(snapshot.ts, now);
+  const stale = isSnapshotStale(snapshot, now);
   if (stale) codes.push("stale_reading");
 
   // Dedupe codes preserving order.
@@ -371,9 +359,7 @@ export function classifyManualMetric(
         ? VALID_TRUTH
         : { valid: false, chip: TRUTH_REASON_CHIP.invalid_vpd, reasonCode: "invalid_vpd" };
     case "co2_ppm":
-      return isCo2PpmRealistic(value)
-        ? VALID_TRUTH
-        : { valid: false, chip: "Invalid CO₂" };
+      return isCo2PpmRealistic(value) ? VALID_TRUTH : { valid: false, chip: "Invalid CO₂" };
     case "soil_moisture_pct":
       return isSoilMoistureRealistic(value)
         ? VALID_TRUTH

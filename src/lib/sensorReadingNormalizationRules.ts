@@ -85,7 +85,7 @@ export interface NormalizedSensorReading {
 // Configuration
 // ---------------------------------------------------------------------------
 
-/** Default freshness threshold: 30 minutes in milliseconds. */
+/** Default freshness threshold: 15 minutes (live demotion window). */
 export const STALE_THRESHOLD_MS = SENSOR_READING_NORMALIZATION_STALE_MS;
 
 // ---------------------------------------------------------------------------

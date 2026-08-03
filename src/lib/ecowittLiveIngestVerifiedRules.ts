@@ -8,7 +8,7 @@
  *  - Read-only. No writes, no Supabase, no AI, no Action Queue.
  *  - Never returns tokens, ingest URLs, raw payload, Authorization headers,
  *    PASSKEY, or service-role markers — only short, safe operator copy.
- *  - Uses the canonical STALE_THRESHOLD_MS (30 minutes) so the marker
+ *  - Uses the canonical STALE_THRESHOLD_MS (15 minutes) so the marker
  *    matches the rest of the sensor-truth stack.
  */
 import type {

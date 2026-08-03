@@ -53,9 +53,9 @@ describe("MCP latest sensor snapshot — ECOWITT provenance fence", () => {
     );
     expect(mirror).toContain('vendor === "ecowitt_windows_testbench"');
     expect(mirror).toContain("var SENSOR_CANDIDATE_LIMIT = 25");
-    // The 30-minute stale threshold is still pinned; the regenerated bundle
+    // The 15-minute live stale threshold is still pinned; the regenerated bundle
     // now routes it through the named sensorTiming constant.
-    expect(mirror).toContain("var SENSOR_READING_NORMALIZATION_STALE_MS = 30 * 60 * 1e3");
+    expect(mirror).toContain("var SENSOR_READING_NORMALIZATION_STALE_MS = 15 * 60 * 1e3");
     expect(mirror).toContain("var STALE_THRESHOLD_MS = SENSOR_READING_NORMALIZATION_STALE_MS");
     expect(mirror).toContain("current_live:");
     expect(mirror).toContain("freshness,");

@@ -58,40 +58,73 @@ function basePlant(
 // ---------------------------------------------------------------------------
 
 describe("AI_DOCTOR_SENSOR_STALENESS_WINDOW_* exported constants", () => {
-  it("hours constant is 6 and ms constant is the derived 6h value", () => {
-    expect(AI_DOCTOR_SENSOR_STALENESS_WINDOW_HOURS).toBe(6);
-    expect(AI_DOCTOR_SENSOR_STALENESS_WINDOW_MS).toBe(6 * 60 * 60 * 1000);
+  it("hours constant is 24 (manual current-context) and ms is derived", () => {
+    expect(AI_DOCTOR_SENSOR_STALENESS_WINDOW_HOURS).toBe(24);
+    expect(AI_DOCTOR_SENSOR_STALENESS_WINDOW_MS).toBe(24 * 60 * 60 * 1000);
   });
 
-  it("compiler honors the exported window: age > 6h is stale; age === 6h is fresh", () => {
-    const exactly = compileAiDoctorContextPayloadFromRows(
+  it("compiler honors source-aware windows: live 15m, manual 24h", () => {
+    const liveExactly = compileAiDoctorContextPayloadFromRows(
+      basePlant({
+        sensorReadings: [
+          {
+            metric: "temperature_c",
+            value: 22,
+            captured_at: iso(15 * 60 * 1000),
+            source: "live",
+          },
+        ],
+      }),
+    );
+    const liveJustOver = compileAiDoctorContextPayloadFromRows(
+      basePlant({
+        sensorReadings: [
+          {
+            metric: "temperature_c",
+            value: 22,
+            captured_at: iso(15 * 60 * 1000 + 1),
+            source: "live",
+          },
+        ],
+      }),
+    );
+    expect(liveExactly.sensor_summary.find((m) => m.metric === "temperature_c")!.is_stale).toBe(
+      false,
+    );
+    expect(liveJustOver.sensor_summary.find((m) => m.metric === "temperature_c")!.is_stale).toBe(
+      true,
+    );
+
+    const manualExactly = compileAiDoctorContextPayloadFromRows(
       basePlant({
         sensorReadings: [
           {
             metric: "temperature_c",
             value: 22,
             captured_at: iso(AI_DOCTOR_SENSOR_STALENESS_WINDOW_MS),
-            source: "live",
+            source: "manual",
           },
         ],
       }),
     );
-    const justOver = compileAiDoctorContextPayloadFromRows(
+    const manualJustOver = compileAiDoctorContextPayloadFromRows(
       basePlant({
         sensorReadings: [
           {
             metric: "temperature_c",
             value: 22,
-            captured_at: iso(AI_DOCTOR_SENSOR_STALENESS_WINDOW_MS + 1000),
-            source: "live",
+            captured_at: iso(AI_DOCTOR_SENSOR_STALENESS_WINDOW_MS + 1),
+            source: "manual",
           },
         ],
       }),
     );
-    const tExact = exactly.sensor_summary.find((m) => m.metric === "temperature_c")!;
-    const tOver = justOver.sensor_summary.find((m) => m.metric === "temperature_c")!;
-    expect(tExact.is_stale).toBe(false);
-    expect(tOver.is_stale).toBe(true);
+    expect(manualExactly.sensor_summary.find((m) => m.metric === "temperature_c")!.is_stale).toBe(
+      false,
+    );
+    expect(manualJustOver.sensor_summary.find((m) => m.metric === "temperature_c")!.is_stale).toBe(
+      true,
+    );
   });
 });
 
@@ -169,9 +202,7 @@ describe("per-plant isolation: two compile→execute passes do not leak across p
     // missing_information stays plant-specific.
     expect(rA.missing_information).not.toContain("recent photo (14d)");
     expect(rB.missing_information).toContain("recent photo (14d)");
-    expect(rB.missing_information).toContain(
-      "recent trustworthy sensor reading (7d)",
-    );
+    expect(rB.missing_information).toContain("recent trustworthy sensor reading (7d)");
 
     // Only the eligible plant (A) gets an approval-required suggestion.
     expect(rA.action_queue_suggestion).not.toBeNull();
@@ -352,7 +383,12 @@ function shuffle<T>(arr: readonly T[], seed: number): T[] {
 }
 
 function buildFuzzRows(): CompileAiDoctorContextPayloadFromRowsInput["sensorReadings"] {
-  const rows: Array<{ metric: AiDoctorMetricKey; value: number; captured_at: string; source: AiDoctorSensorSource }> = [];
+  const rows: Array<{
+    metric: AiDoctorMetricKey;
+    value: number;
+    captured_at: string;
+    source: AiDoctorSensorSource;
+  }> = [];
   // Two readings per (metric, source) at varying ages within the 7d window.
   let ageMs = 30_000;
   for (const metric of ALL_METRICS) {
@@ -391,9 +427,7 @@ describe("deterministic fuzz: sensor_summary is stable under row shuffling and r
   for (const seed of [1, 42, 1337, 99991]) {
     it(`shuffled input (seed=${seed}) yields identical sensor_summary + source_breakdown`, () => {
       const shuffled = shuffle(buildFuzzRows() ?? [], seed);
-      const ctx = compileAiDoctorContextPayloadFromRows(
-        basePlant({ sensorReadings: shuffled }),
-      );
+      const ctx = compileAiDoctorContextPayloadFromRows(basePlant({ sensorReadings: shuffled }));
       expect(ctx.sensor_summary).toEqual(base.sensor_summary);
       expect(ctx.source_breakdown).toEqual(base.source_breakdown);
     });
@@ -460,39 +494,69 @@ interface MatrixRow {
 const MATRIX: readonly MatrixRow[] = [
   {
     label: "everything present, clean telemetry → high, no suggestion",
-    recentPhoto: true, oldPhotoOnly: false, recentLog: true,
-    validSensor: true, invalidSensor: false,
-    expectConfidence: "high", expectMissingPhoto: false, expectSuggestion: false,
+    recentPhoto: true,
+    oldPhotoOnly: false,
+    recentLog: true,
+    validSensor: true,
+    invalidSensor: false,
+    expectConfidence: "high",
+    expectMissingPhoto: false,
+    expectSuggestion: false,
   },
   {
     label: "everything present + invalid telemetry → high, approval-required suggestion",
-    recentPhoto: true, oldPhotoOnly: false, recentLog: true,
-    validSensor: true, invalidSensor: true,
-    expectConfidence: "high", expectMissingPhoto: false, expectSuggestion: true,
+    recentPhoto: true,
+    oldPhotoOnly: false,
+    recentLog: true,
+    validSensor: true,
+    invalidSensor: true,
+    expectConfidence: "high",
+    expectMissingPhoto: false,
+    expectSuggestion: true,
   },
   {
     label: "no recent photo, only old photo → medium, missing photo, no suggestion",
-    recentPhoto: false, oldPhotoOnly: true, recentLog: true,
-    validSensor: true, invalidSensor: false,
-    expectConfidence: "medium", expectMissingPhoto: true, expectSuggestion: false,
+    recentPhoto: false,
+    oldPhotoOnly: true,
+    recentLog: true,
+    validSensor: true,
+    invalidSensor: false,
+    expectConfidence: "medium",
+    expectMissingPhoto: true,
+    expectSuggestion: false,
   },
   {
     label: "no photo at all, log + valid sensor → medium, missing photo, no suggestion",
-    recentPhoto: false, oldPhotoOnly: false, recentLog: true,
-    validSensor: true, invalidSensor: false,
-    expectConfidence: "medium", expectMissingPhoto: true, expectSuggestion: false,
+    recentPhoto: false,
+    oldPhotoOnly: false,
+    recentLog: true,
+    validSensor: true,
+    invalidSensor: false,
+    expectConfidence: "medium",
+    expectMissingPhoto: true,
+    expectSuggestion: false,
   },
   {
     label: "no log, no photo, only invalid sensor → low, no suggestion",
-    recentPhoto: false, oldPhotoOnly: false, recentLog: false,
-    validSensor: false, invalidSensor: true,
-    expectConfidence: "low", expectMissingPhoto: true, expectSuggestion: false,
+    recentPhoto: false,
+    oldPhotoOnly: false,
+    recentLog: false,
+    validSensor: false,
+    invalidSensor: true,
+    expectConfidence: "low",
+    expectMissingPhoto: true,
+    expectSuggestion: false,
   },
   {
     label: "log only, no sensors, no photo → low/medium, missing photo, no suggestion",
-    recentPhoto: false, oldPhotoOnly: false, recentLog: true,
-    validSensor: false, invalidSensor: false,
-    expectConfidence: "medium", expectMissingPhoto: true, expectSuggestion: false,
+    recentPhoto: false,
+    oldPhotoOnly: false,
+    recentLog: true,
+    validSensor: false,
+    invalidSensor: false,
+    expectConfidence: "medium",
+    expectMissingPhoto: true,
+    expectSuggestion: false,
   },
 ];
 
@@ -526,10 +590,9 @@ describe("photo-context matrix", () => {
       if (row.oldPhotoOnly) {
         photos.push({ captured_at: iso(40 * 24 * 60 * 60 * 1000) });
       }
-      const logs: Array<{ occurred_at: string; event_type: string; source: string }> =
-        row.recentLog
-          ? [{ occurred_at: iso(60_000), event_type: "watering", source: "manual" }]
-          : [];
+      const logs: Array<{ occurred_at: string; event_type: string; source: string }> = row.recentLog
+        ? [{ occurred_at: iso(60_000), event_type: "watering", source: "manual" }]
+        : [];
 
       const ctx = compileAiDoctorContextPayloadFromRows(
         basePlant({ logs, photos, sensorReadings }),
@@ -564,13 +627,8 @@ describe("photo-context matrix", () => {
 // ---------------------------------------------------------------------------
 
 describe("static safety — aiDoctorEnginePhase1Foundation.ts (contract suite)", () => {
-  const RAW = readFileSync(
-    resolve(__dirname, "../lib/aiDoctorEnginePhase1Foundation.ts"),
-    "utf8",
-  );
-  const SOURCE = RAW
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  const RAW = readFileSync(resolve(__dirname, "../lib/aiDoctorEnginePhase1Foundation.ts"), "utf8");
+  const SOURCE = RAW.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 
   it("does not import Supabase / call external services / write action_queue / control devices", () => {
     expect(SOURCE).not.toMatch(/from\s+["']@\/integrations\/supabase/);
@@ -602,9 +660,7 @@ describe("AiDoctorDiagnosisResult — strict shipped contract", () => {
           },
         ],
         photos: [{ captured_at: iso(60_000) }],
-        logs: [
-          { occurred_at: iso(60_000), event_type: "watering", source: "manual" },
-        ],
+        logs: [{ occurred_at: iso(60_000), event_type: "watering", source: "manual" }],
       }),
     );
     return executeAiDoctorEngine({ context: ctx });

@@ -138,7 +138,7 @@ export function buildDashboardSensorHealthSummary(
   const resolved = resolveSensorSourceLabel({ source: canonical, vendor: null });
   let sourceLabel = resolved.label;
 
-  const stale = isStale(snapshot.ts, now);
+  const stale = isStale(snapshot.ts, now, undefined, snapshot.source);
   const invalid = quality.suspiciousFields.length > 0;
 
   // Source-label truth: stale/invalid override label even if source === live.
@@ -168,7 +168,10 @@ export function buildDashboardSensorHealthSummary(
       tone: "warn",
       statusLabel: STATUS_LABEL.stale,
       headline: "Latest sensor reading is stale.",
-      body: "The most recent reading is older than 30 minutes. Log a manual reading or verify your sensor source.",
+      body:
+        snapshot.source === "manual" || snapshot.source === "diary"
+          ? "The most recent reading is older than 24 hours. Log a manual reading or verify your sensor source."
+          : "The most recent reading is older than 15 minutes. Log a manual reading or verify your sensor source.",
       sourceLabel,
       stale,
       reasons: quality.reasons,

@@ -20,7 +20,9 @@ function vm(input: Parameters<typeof buildTimelineEvidenceDetailViewModel>[0]) {
 describe("timelineEvidenceDetailViewModel", () => {
   it("returns null for invalid inputs", () => {
     expect(buildTimelineEvidenceDetailViewModel(null)).toBeNull();
-    expect(buildTimelineEvidenceDetailViewModel({ id: "" } as unknown as { id: string })).toBeNull();
+    expect(
+      buildTimelineEvidenceDetailViewModel({ id: "" } as unknown as { id: string }),
+    ).toBeNull();
   });
 
   it("renders a diary entry with photo + recent sensor as strong AI Doctor context", () => {
@@ -72,7 +74,7 @@ describe("timelineEvidenceDetailViewModel", () => {
     }
   });
 
-  it("flags stale sensor snapshot when older than 30 minutes", () => {
+  it("flags stale sensor snapshot when older than the live window", () => {
     const m = vm({
       id: "e2",
       photo_url: "https://x/2.jpg",

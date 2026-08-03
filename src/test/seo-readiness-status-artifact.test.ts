@@ -65,20 +65,20 @@ function collectPlainStatusValues(
 }
 
 describe("SEO readiness status artifact", () => {
-  it("keeps the exact canonical blocked-mode contract and defect verdict", () => {
+  it("keeps the exact blocked-mode contract and current production-defect verdict", () => {
     expect(READINESS).toMatchObject({
       schema_version: 1,
       scope: "LIGHTING_LAUNCH_MEASUREMENT",
       generated_at_semantics: "EVIDENCE_SNAPSHOT_CAPTURE_TIME",
       artifact_revision: {
-        revised_at: "2026-08-02T08:07:28.792Z",
-        revision_scope: "POST_DEPLOY_ANALYTICS_RECHECK_PROVENANCE_CORRECTION_ONLY",
-        production_or_analytics_reverification_performed: false,
+        revised_at: "2026-08-03T17:25:08Z",
+        revision_scope: "PRODUCTION_HOST_ORIGIN_RECHECK",
+        production_or_analytics_reverification_performed: true,
       },
       timezone: "America/Chicago",
       artifact_semantics: "POINT_IN_TIME_EVIDENCE_SNAPSHOT",
       operating_mode: "MODE_A_ACCESS_BLOCKED_READINESS_WORK",
-      verdict: "NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND",
+      verdict: "NOT READY — PRODUCTION DEFECT FOUND",
       status_vocabulary: EXPECTED_STATUS_VOCABULARY,
       event_classification_vocabulary: [
         "IMPLEMENTED_AND_VERIFIED",
@@ -87,9 +87,9 @@ describe("SEO readiness status artifact", () => {
         "NOT_APPLICABLE",
         "BLOCKED_BY_ACCESS",
       ],
-      production_status: "PASS",
+      production_status: "FAIL",
       analytics_identity_status: "FAIL",
-      technical_seo_status: "PASS",
+      technical_seo_status: "FAIL",
       ga4_access_status: "BLOCKED",
       gsc_access_status: "BLOCKED",
       day_0_status: "UNSET",
@@ -99,7 +99,7 @@ describe("SEO readiness status artifact", () => {
     expect(Number.isNaN(Date.parse(String(READINESS.generated_at)))).toBe(false);
     expect(String(READINESS.generated_at)).toMatch(/Z$/);
     expect(String(READINESS.generated_at_chicago)).toMatch(/-05:00$/);
-    expect(RAW_ARTIFACT).toBe(`${JSON.stringify(READINESS, null, 2)}\n`);
+    expect(RAW_ARTIFACT.replace(/\r\n/g, "\n")).toBe(`${JSON.stringify(READINESS, null, 2)}\n`);
   });
 
   it("keeps every generic status field inside the declared vocabulary", () => {
@@ -113,70 +113,84 @@ describe("SEO readiness status artifact", () => {
     }
   });
 
-  it("keeps the human-readable handoff aligned with the artifact revision metadata", () => {
+  it("keeps the human-readable handoff aligned with the current production recheck", () => {
     const revision = READINESS.artifact_revision as Record<string, unknown>;
-    const targetedRecheck = (READINESS.analytics_identity as Record<string, unknown>)
-      .targeted_post_deploy_recheck as Record<string, unknown>;
+    const currentRecheck = READINESS.current_production_recheck as Record<string, unknown>;
     expect(LAUNCH_VERIFICATION).toContain(`\`${revision.revised_at}\``);
-    expect(LAUNCH_VERIFICATION).toContain(`\`${revision.revision_scope}\``);
-    expect(LAUNCH_VERIFICATION).toContain(`\`${targetedRecheck.recorded_in_commit}\``);
+    expect(LAUNCH_VERIFICATION).toContain("## Current P0 production recheck");
+    expect(LAUNCH_VERIFICATION).toContain(String(currentRecheck.required_owner_action));
   });
 
-  it("separates the point-in-time evidence head from the audited deploy release", () => {
+  it("records the current deploy head separately from an unavailable public release", () => {
     expect(READINESS.run_context).toEqual({
       repository: "Verdant-OS/verdant-grow-diary",
-      audit_branch: "codex/seo-readiness-evidence-20260802",
-      audit_head: "913f1b9deb0934d5ce76491cbc945816f4581b73",
-      pre_recheck_audit_head: "c794e4c6ff0debb6ae2a83566b2a73f690a96393",
+      audit_branch: "codex/seo-production-host-outage-20260803",
+      audit_head: "7efaaa5ed09a76e01e0555328e204934900f0083",
+      pre_recheck_audit_head: "7efaaa5ed09a76e01e0555328e204934900f0083",
       audit_head_is_descendant_of_deploy_branch_head: true,
       deploy_branch: "verdant-grow-diary",
-      deploy_branch_head: "a20776993bd606f07977674934864b888a407e1c",
-      audited_release_head: "a20776993bd606f07977674934864b888a407e1c",
-      audited_release_equals_deploy_branch_head: true,
+      deploy_branch_head: "7efaaa5ed09a76e01e0555328e204934900f0083",
+      audited_release_head: null,
+      audited_release_equals_deploy_branch_head: false,
       working_tree_status: "CLEAN_AT_AUDIT_START",
     });
     expect(READINESS.production).toMatchObject({
       host: "https://verdantgrowdiary.com",
-      observed_at: "2026-08-02T02:53:25.627Z",
-      manifest_commit: "a20776993bd606f07977674934864b888a407e1c",
-      build_time: "2026-08-02T01:28:54.548Z",
-      matches_deploy_branch_head: true,
-      manifest_is_ancestor_of_deploy_branch_head: true,
-      source_delta_since_manifest: "NONE_DEPLOY_MATCHES_PRODUCTION",
-      production_publish_required: false,
-      release_content_match: "PASS",
+      observed_at: "2026-08-03T17:25:08Z",
+      served_by: "SQUARESPACE_COMING_SOON",
+      manifest_commit: null,
+      build_time: null,
+      matches_deploy_branch_head: false,
+      manifest_is_ancestor_of_deploy_branch_head: false,
+      source_delta_since_manifest: "PUBLIC_HOST_DOES_NOT_EXPOSE_A_VERDANT_RELEASE",
+      production_publish_required: true,
+      release_content_match: "FAIL",
       release_content_scope: "LIGHTING_GUIDES_ONLY",
-      full_deploy_branch_parity: "CURRENT",
-      sitemap_url_count: 51,
-      robots_declares_production_sitemap: true,
-      robots_protects_app_prefixes: true,
+      full_deploy_branch_parity: "NOT_VERIFIABLE_PUBLIC_HOST_NOT_VERDANT",
+      sitemap_url_count: null,
+      robots_declares_production_sitemap: false,
+      robots_protects_app_prefixes: false,
+      last_known_verdant_release: {
+        manifest_commit: "a20776993bd606f07977674934864b888a407e1c",
+        evidence_scope: "HISTORICAL_ONLY_NOT_CURRENT_PRODUCTION_PROOF",
+      },
     });
   });
 
-  it("records version, both unique lighting routes, sitemap, and robots as HTTP 200", () => {
+  it("records that HTTP 200 placeholders do not satisfy the public release contract", () => {
     const endpoints = (READINESS.production as { endpoints: unknown[] }).endpoints;
     expect(endpoints).toEqual(
       expect.arrayContaining([
-        { path: "/version.json", http_status: 200 },
+        {
+          path: "/version.json",
+          http_status: 200,
+          content_identity: "SQUARESPACE_COMING_SOON",
+          robots: "noindex",
+        },
         {
           path: "/guides/cannabis-grow-light-distance-and-schedule",
           http_status: 200,
-          sitemap_occurrences: 1,
+          sitemap_occurrences: null,
+          content_identity: "SQUARESPACE_COMING_SOON",
+          robots: "noindex",
         },
         {
           path: "/guides/cannabis-light-stress-light-burn-bleaching-or-heat",
           http_status: 200,
-          sitemap_occurrences: 1,
+          sitemap_occurrences: null,
+          content_identity: "SQUARESPACE_COMING_SOON",
+          robots: "noindex",
         },
-        { path: "/sitemap.xml", http_status: 200 },
-        { path: "/robots.txt", http_status: 200 },
+        { path: "/sitemap.xml", http_status: 401 },
+        { path: "/robots.txt", http_status: 401 },
       ]),
     );
   });
 
-  it("records the deployed route-runtime structured-data repair as production verified", () => {
-    expect(READINESS.technical_seo_status).toBe("PASS");
+  it("retains historical structured-data evidence without mistaking it for current production", () => {
+    expect(READINESS.technical_seo_status).toBe("FAIL");
     expect(READINESS.technical_seo).toMatchObject({
+      evidence_scope: "HISTORICAL_LAST_KNOWN_VERDANT_RELEASE",
       lighting_pages: "PASS",
       direct_load_indexability: "PASS",
       route_runtime_structured_data: "PASS",
@@ -187,10 +201,11 @@ describe("SEO readiness status artifact", () => {
       protected_route_exclusion: "PASS",
     });
     expect((BASELINE.launch_gates as Record<string, string>).route_runtime_structured_data).toBe(
-      "pass",
+      "not_verifiable_public_host_not_verdant",
     );
     expect(BASELINE.public_probe).toEqual(
       expect.objectContaining({
+        evidence_scope: "HISTORICAL_LAST_KNOWN_VERDANT_RELEASE",
         production_navigation_states_verified: 8,
         structured_data_duplicate_identities_observed: 0,
         structured_data_parse_errors_observed: 0,
@@ -205,7 +220,7 @@ describe("SEO readiness status artifact", () => {
       test_events_transmitted: false,
       test_events_transmitted_scope: "COMPLETED_NINE_STATE_FULL_MATRIX_ONLY",
       stream_identity_status: "PASS",
-      stream_identity_evidence: "OWNER_CONFIRMED_VALUES_MATCH_DEPLOYED_PRODUCTION_TAG",
+      stream_identity_evidence: "OWNER_CONFIRMED_VALUES_MATCHED_LAST_KNOWN_VERDANT_PRODUCTION_TAG",
       stream: {
         name: "Verdant Grow Diary",
         url: "https://verdantgrowdiary.com",
@@ -252,6 +267,7 @@ describe("SEO readiness status artifact", () => {
       baseline_status: "BLOCKED",
       collection_contract_status: "FAIL",
       stream_identity_status: "PASS",
+      current_production_tag_status: "FAIL",
       property_identity_status: "BLOCKED",
       stream: {
         name: "Verdant Grow Diary",
@@ -309,30 +325,39 @@ describe("SEO readiness status artifact", () => {
     expect(READINESS.gsc_access_status).toBe("BLOCKED");
   });
 
-  it("agrees with the refreshed launch baseline", () => {
+  it("keeps the current public-host failure aligned with its historical evidence", () => {
     const production = READINESS.production as Record<string, unknown>;
     const release = BASELINE.release as Record<string, unknown>;
     const publicProbe = BASELINE.public_probe as Record<string, unknown>;
+    const currentRecheck = READINESS.current_production_recheck as Record<string, unknown>;
+    const baselineCurrentRecheck = BASELINE.current_production_recheck as Record<string, unknown>;
     const baselineGa4 = BASELINE.ga4_access as Record<string, unknown>;
     const baselineGsc = BASELINE.gsc_access as Record<string, unknown>;
     const launchGates = BASELINE.launch_gates as Record<string, string>;
 
-    expect(production.manifest_commit).toBe(release.publisher_latest_commit_sha);
-    expect(production.manifest_is_ancestor_of_deploy_branch_head).toBe(
-      release.production_manifest_is_ancestor_of_deploy_branch_head,
-    );
-    expect(production.production_publish_required).toBe(release.production_publish_required);
-    expect(production.observed_at).toBe(publicProbe.observed_at);
-    expect(production.matches_deploy_branch_head).toBe(true);
-    expect(release.production_matches_deploy_branch_head).toBe(true);
-    expect(production.full_deploy_branch_parity).toBe("CURRENT");
-    expect(release.full_deploy_branch_parity).toBe("current");
+    expect(release.evidence_scope).toBe("HISTORICAL_LAST_KNOWN_VERDANT_RELEASE");
+    expect(publicProbe.evidence_scope).toBe("HISTORICAL_LAST_KNOWN_VERDANT_RELEASE");
+    expect(production.observed_at).toBe(currentRecheck.observed_at);
+    expect(production.manifest_commit).toBeNull();
+    expect(production.production_publish_required).toBe(true);
+    expect(production.release_content_match).toBe("FAIL");
+    expect(production.full_deploy_branch_parity).toBe("NOT_VERIFIABLE_PUBLIC_HOST_NOT_VERDANT");
     expect(production.release_content_scope).toBe("LIGHTING_GUIDES_ONLY");
-    expect(release.release_content_scope).toBe("lighting_guides_only");
     expect(BASELINE.artifact_semantics).toBe("POINT_IN_TIME_EVIDENCE_SNAPSHOT");
     expect(BASELINE.generated_at).toBe(READINESS.generated_at);
+    expect(baselineCurrentRecheck).toMatchObject({
+      observed_at: currentRecheck.observed_at,
+      status: "fail_public_host_not_verdant",
+      provider: "squarespace",
+      title: "Coming Soon",
+      robots: "noindex",
+      measurement_id_detected: false,
+      deployed_commit_hash: "NOT_EXPOSED_BY_PUBLISHER",
+    });
     expect(baselineGa4).toMatchObject({
       stream_identity_status: "pass_owner_confirmed_matches_production",
+      current_production_tag_status: "fail_not_detected_on_squarespace_placeholder",
+      current_production_collection_status: "blocked_not_verdant_app",
       production_collection_observation_scope: "COMPLETED_NINE_STATE_FULL_MATRIX_ONLY",
       stream: {
         name: "Verdant Grow Diary",
@@ -345,9 +370,12 @@ describe("SEO readiness status artifact", () => {
     expect((READINESS.gsc as Record<string, unknown>).latest_workflow_run).toBe(
       baselineGsc.workflow_run,
     );
-    expect(READINESS.production_status).toBe(launchGates.release_content_match.toUpperCase());
+    expect(READINESS.production_status).toBe("FAIL");
+    expect(launchGates.release_content_match).toBe("fail");
+    expect(READINESS.technical_seo_status).toBe("FAIL");
+    expect(launchGates.sitemap_and_robots).toBe("fail_http_401");
     expect(READINESS.ga4_access_status).toBe(launchGates.ga4_baseline.toUpperCase());
-    expect(launchGates.ga4_stream_identity).toBe("pass");
+    expect(launchGates.ga4_stream_identity).toBe("fail_not_detected_on_squarespace_placeholder");
     expect(READINESS.gsc_access_status).toBe(launchGates.gsc_baseline.toUpperCase());
     expect((READINESS.measurement as Record<string, unknown>).measurement_start_at).toBe(
       BASELINE.measurement_start_at,
@@ -384,8 +412,13 @@ describe("SEO readiness status artifact", () => {
     });
   });
 
-  it("records the three owner blockers and the point-in-time bounded-slice handoff", () => {
+  it("records the production owner blocker and the current bounded-slice handoff", () => {
     expect(READINESS.open_blockers).toEqual([
+      expect.objectContaining({
+        id: "PRODUCTION_HOST_ORIGIN_MISMATCH",
+        status: "BLOCKED",
+        owner: "OWNER",
+      }),
       expect.objectContaining({
         id: "GA4_AUTHENTICATED_ACCESS",
         status: "BLOCKED",
@@ -404,6 +437,18 @@ describe("SEO readiness status artifact", () => {
     ]);
     expect(READINESS.verified_defects).toEqual(
       expect.arrayContaining([
+        expect.objectContaining({
+          id: "PRODUCTION_HOST_ORIGIN_MISMATCH",
+          priority: "P0",
+          status: "FAIL",
+          lifecycle_state: "VERIFIED_UNFIXED_OWNER_ACTION_REQUIRED",
+        }),
+        expect.objectContaining({
+          id: "ANALYTICS_CONTRACT_TEST_HARNESS",
+          priority: "P0",
+          status: "FAIL",
+          lifecycle_state: "VERIFIED_UNFIXED_SEPARATE_CODE_SLICE",
+        }),
         expect.objectContaining({
           id: "GSC_REGRESSION_NO_BASELINE_SEMANTICS",
           priority: "P3",
@@ -439,23 +484,27 @@ describe("SEO readiness status artifact", () => {
     const provenanceDefect = (READINESS.verified_defects as Array<Record<string, unknown>>).find(
       (defect) => defect.id === "READINESS_ARTIFACT_PROVENANCE",
     );
-    const runContext = READINESS.run_context as Record<string, unknown>;
-    expect(provenanceDefect?.evidence).toContain(runContext.audit_head);
-    expect(provenanceDefect?.evidence).toContain(runContext.audited_release_head);
+    expect(provenanceDefect?.evidence).toContain("a20776993bd606f07977674934864b888a407e1c");
     expect(provenanceDefect?.evidence).toContain("913f1b9deb0934d5ce76491cbc945816f4581b73");
     expect(READINESS.current_slice).toEqual({
-      priority: "P2",
-      id: "LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT",
-      status: "NOT_MEASURED",
-      lifecycle_state: "DOCUMENTED_MISSING_NO_EVENT_ADDED",
+      priority: "P0",
+      id: "PRODUCTION_HOST_ORIGIN_MISMATCH",
+      status: "FAIL",
+      lifecycle_state: "DOCUMENTED_OWNER_RESTORE_REQUIRED",
       evidence:
-        "The two lighting-guide CTAs resolve to /quick-log without a guide-specific click event. Their event classification is MISSING and their metric readiness status is NOT_MEASURED, so downstream activity is not used as attribution.",
+        "The current production host is a noindex Squarespace placeholder rather than the Verdant release. This bounded slice records the defect without changing DNS, publisher settings, runtime code, or analytics configuration.",
     });
     expect(READINESS.next_slice).toEqual({
       priority: "P0",
-      id: "GA4_ENHANCED_MEASUREMENT_HISTORY_PAGE_VIEWS",
+      id: "ANALYTICS_CONTRACT_TEST_HARNESS_RECONCILIATION",
+      status: "FAIL",
+      lifecycle_state: "UNBLOCKED_SOURCE_REPAIR_REQUIRED",
+    });
+    expect(READINESS.next_owner_action).toEqual({
+      priority: "P0",
+      id: "RESTORE_PRODUCTION_HOST_AND_REVERIFY_LIGHTING_RELEASE",
       status: "BLOCKED",
-      lifecycle_state: "BLOCKED_BY_OWNER_ACCESS",
+      lifecycle_state: "BLOCKED_BY_OWNER_PUBLISHER_CONFIGURATION",
     });
     expect(RAW_ARTIFACT).not.toContain("PENDING_MERGE");
   });
@@ -524,9 +573,9 @@ describe("SEO readiness status artifact", () => {
   it("is discoverable from the human-readable launch verification", () => {
     const internalLinkMap = readFileSync(resolve(ROOT, "docs/seo/internal-link-map.md"), "utf8");
     expect(LAUNCH_VERIFICATION).toContain("../../artifacts/seo/seo-readiness-status.json");
-    expect(LAUNCH_VERIFICATION).toContain("NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND");
-    expect(LAUNCH_VERIFICATION).toContain("P2 LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT");
-    expect(LAUNCH_VERIFICATION).toContain("P3 READINESS_ARTIFACT_PROVENANCE");
+    expect(LAUNCH_VERIFICATION).toContain("NOT READY — PRODUCTION DEFECT FOUND");
+    expect(LAUNCH_VERIFICATION).toContain("P0 PRODUCTION_HOST_ORIGIN_MISMATCH");
+    expect(LAUNCH_VERIFICATION).toContain("Squarespace **Coming Soon** page with `noindex`");
     expect(LAUNCH_VERIFICATION).toContain(
       "A preceding exploratory browser probe omitted `analytics.google.com` from its collection-host",
     );
@@ -538,7 +587,7 @@ describe("SEO readiness status artifact", () => {
     expect(MEASUREMENT_PLAN).not.toContain(
       "A later current-production re-run did not return an inspectable final envelope",
     );
-    expect(internalLinkMap).toContain("both lighting routes are live");
-    expect(internalLinkMap).not.toContain("they are not claimed as deployed");
+    expect(internalLinkMap).toContain("last known Verdant production verification");
+    expect(internalLinkMap).toContain("Squarespace `Coming Soon` page with `noindex`");
   });
 });

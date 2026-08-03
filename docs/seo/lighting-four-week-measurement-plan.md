@@ -1,6 +1,6 @@
 # Lighting four-week measurement plan
 
-**Verdict:** NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND
+**Verdict:** NOT READY — PRODUCTION DEFECT FOUND
 **Day 0:** UNSET
 **Four-week clock:** NOT_STARTED
 **Timezone:** America/Chicago
@@ -41,10 +41,14 @@ recorded.
 
 ## Current blockers
 
-The public release and technical SEO identity are complete, but an analytics collection defect and
-authenticated-access gates remain:
+The first current blocker is a production-host/origin failure. At `2026-08-03T17:25:08Z`, the apex,
+both lighting routes, and `/version.json` served Squarespace `Coming Soon` with `noindex`; the public
+`/sitemap.xml` and `/robots.txt` returned HTTP 401. No Verdant release fingerprint or GA4 tag was
+observable. The current host must be restored before any baseline or navigation matrix is repeated.
 
-- PR #597 is merged and remains live in production manifest
+The remaining bullets are historical Verdant-release evidence and unresolved analytics/access gates:
+
+- PR #597 is merged and was present in the last known Verdant production manifest
   `a20776993bd606f07977674934864b888a407e1c`.
 - The last completed intercepted browser matrix (`2026-08-02T02:08:43.179Z`) preserved each exact
   lighting-guide path and page-specific title across nine navigation states, kept protected IDs
@@ -56,29 +60,32 @@ authenticated-access gates remain:
   escaped collection requests. This reconfirms the owner-setting defect without replacing the
   count-bearing nine-state matrix. A preceding exploratory probe omitted `analytics.google.com` from
   its matcher and is excluded from this evidence; its transmission status is not asserted.
-- The owner-confirmed GA4 production stream is `Verdant Grow Diary`, stream URL
+- The owner-confirmed intended GA4 production stream is `Verdant Grow Diary`, stream URL
   `https://verdantgrowdiary.com`, stream ID `15065867361`, and measurement ID `G-B3QRSZEM9S`;
-  production loads and targets that exact measurement ID. The property ID is still unconfirmed.
-- The current public probe returns HTTP 200 for both guides, the sitemap, robots, and version
-  manifest. The 51-URL sitemap contains each lighting route exactly once, and robots protects app
-  prefixes.
+  the last known Verdant production release loaded and targeted that exact measurement ID. The
+  current Squarespace placeholder does not, and the property ID is still unconfirmed.
+- The last known public probe returned HTTP 200 for both guides, the sitemap, robots, and version
+  manifest. It is not current production proof.
 - Workflow [30727208474](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30727208474)
   succeeded across all 51 URLs, but its GSC operation was `SKIPPED`, access was `BLOCKED`,
   execution was `SKIPPED`, OAuth was not configured, and it made 0 API attempts.
-- Production manifest and deploy head both resolve to `a2077699…`, so full deploy-branch parity is
-  `PASS`. Lighting release-content verification remains scoped to the two guides.
-- PR #624 is live. Its production direct/cross-guide/history/refresh/repeat/new-tab matrix found one
+- The last known production manifest and its then-deploy head both resolved to `a2077699…`. The
+  current deploy branch is `7efaaa5…`; current public deploy parity is **NOT VERIFIABLE**.
+- PR #624 was live in the last known Verdant release. Its direct/cross-guide/history/refresh/repeat/new-tab matrix found one
   current `WebPage`, `FAQPage`, `BreadcrumbList`, and `Article` identity set per page state, with
   zero duplicate identities, zero stale prior-route objects, and zero JSON-LD parse errors.
 
-Three owner gates remain:
+Four owner gates remain:
 
-1. Disable Enhanced Measurement page views based on browser-history changes in the existing
+1. Restore `verdantgrowdiary.com` and `www.verdantgrowdiary.com` to the intended publisher custom-domain
+   configuration, then authorize an immediate public release and intercepted-analytics recheck. Do
+   not guess DNS values or publish a no-op release.
+2. Disable Enhanced Measurement page views based on browser-history changes in the existing
    production stream, retaining Verdant's explicit SPA page-view owner, then authorize a controlled
    re-verification.
-2. Confirm the existing Verdant GA4 property identity and provide read-only authenticated
+3. Confirm the existing Verdant GA4 property identity and provide read-only authenticated
    reporting access. The production stream identity itself is complete.
-3. Configure the existing owner-controlled, read-only Search Console OAuth workflow, or provide
+4. Configure the existing owner-controlled, read-only Search Console OAuth workflow, or provide
    another authorized authenticated Search Console session.
 
 Use the [analytics owner setup checklist](./analytics-owner-setup-checklist.md). Do not send

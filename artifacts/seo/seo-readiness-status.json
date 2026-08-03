@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
   "scope": "LIGHTING_LAUNCH_MEASUREMENT",
-  "generated_at": "2026-08-02T05:19:48.245Z",
-  "generated_at_chicago": "2026-08-02T00:19:48.245-05:00",
+  "generated_at": "2026-08-03T17:25:08Z",
+  "generated_at_chicago": "2026-08-03T12:25:08-05:00",
   "generated_at_semantics": "EVIDENCE_SNAPSHOT_CAPTURE_TIME",
   "artifact_revision": {
-    "revised_at": "2026-08-02T08:07:28.792Z",
-    "revision_scope": "POST_DEPLOY_ANALYTICS_RECHECK_PROVENANCE_CORRECTION_ONLY",
-    "production_or_analytics_reverification_performed": false
+    "revised_at": "2026-08-03T17:25:08Z",
+    "revision_scope": "PRODUCTION_HOST_ORIGIN_RECHECK",
+    "production_or_analytics_reverification_performed": true
   },
   "timezone": "America/Chicago",
   "artifact_semantics": "POINT_IN_TIME_EVIDENCE_SNAPSHOT",
   "operating_mode": "MODE_A_ACCESS_BLOCKED_READINESS_WORK",
-  "verdict": "NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND",
+  "verdict": "NOT READY — PRODUCTION DEFECT FOUND",
   "status_vocabulary": [
     "PASS",
     "FAIL",
@@ -31,82 +31,96 @@
     "NOT_APPLICABLE",
     "BLOCKED_BY_ACCESS"
   ],
-  "production_status": "PASS",
+  "production_status": "FAIL",
   "analytics_identity_status": "FAIL",
-  "technical_seo_status": "PASS",
+  "technical_seo_status": "FAIL",
   "ga4_access_status": "BLOCKED",
   "gsc_access_status": "BLOCKED",
   "day_0_status": "UNSET",
   "four_week_clock_status": "NOT_STARTED",
   "run_context": {
     "repository": "Verdant-OS/verdant-grow-diary",
-    "audit_branch": "codex/seo-readiness-evidence-20260802",
-    "audit_head": "913f1b9deb0934d5ce76491cbc945816f4581b73",
-    "pre_recheck_audit_head": "c794e4c6ff0debb6ae2a83566b2a73f690a96393",
+    "audit_branch": "codex/seo-production-host-outage-20260803",
+    "audit_head": "7efaaa5ed09a76e01e0555328e204934900f0083",
+    "pre_recheck_audit_head": "7efaaa5ed09a76e01e0555328e204934900f0083",
     "audit_head_is_descendant_of_deploy_branch_head": true,
     "deploy_branch": "verdant-grow-diary",
-    "deploy_branch_head": "a20776993bd606f07977674934864b888a407e1c",
-    "audited_release_head": "a20776993bd606f07977674934864b888a407e1c",
-    "audited_release_equals_deploy_branch_head": true,
+    "deploy_branch_head": "7efaaa5ed09a76e01e0555328e204934900f0083",
+    "audited_release_head": null,
+    "audited_release_equals_deploy_branch_head": false,
     "working_tree_status": "CLEAN_AT_AUDIT_START"
   },
   "production": {
     "host": "https://verdantgrowdiary.com",
-    "observed_at": "2026-08-02T02:53:25.627Z",
+    "observed_at": "2026-08-03T17:25:08Z",
     "version_url": "https://verdantgrowdiary.com/version.json",
-    "manifest_commit": "a20776993bd606f07977674934864b888a407e1c",
-    "build_time": "2026-08-02T01:28:54.548Z",
-    "matches_deploy_branch_head": true,
-    "manifest_is_ancestor_of_deploy_branch_head": true,
-    "source_delta_since_manifest": "NONE_DEPLOY_MATCHES_PRODUCTION",
-    "production_publish_required": false,
-    "release_content_match": "PASS",
+    "served_by": "SQUARESPACE_COMING_SOON",
+    "manifest_commit": null,
+    "build_time": null,
+    "matches_deploy_branch_head": false,
+    "manifest_is_ancestor_of_deploy_branch_head": false,
+    "source_delta_since_manifest": "PUBLIC_HOST_DOES_NOT_EXPOSE_A_VERDANT_RELEASE",
+    "production_publish_required": true,
+    "release_content_match": "FAIL",
     "release_content_scope": "LIGHTING_GUIDES_ONLY",
-    "full_deploy_branch_parity": "CURRENT",
-    "sitemap_url_count": 51,
-    "robots_declares_production_sitemap": true,
-    "robots_protects_app_prefixes": true,
+    "full_deploy_branch_parity": "NOT_VERIFIABLE_PUBLIC_HOST_NOT_VERDANT",
+    "sitemap_url_count": null,
+    "robots_declares_production_sitemap": false,
+    "robots_protects_app_prefixes": false,
+    "last_known_verdant_release": {
+      "manifest_commit": "a20776993bd606f07977674934864b888a407e1c",
+      "build_time": "2026-08-02T01:28:54.548Z",
+      "observed_at": "2026-08-02T02:53:25.627Z",
+      "evidence_scope": "HISTORICAL_ONLY_NOT_CURRENT_PRODUCTION_PROOF"
+    },
     "endpoints": [
       {
         "path": "/version.json",
-        "http_status": 200
+        "http_status": 200,
+        "content_identity": "SQUARESPACE_COMING_SOON",
+        "robots": "noindex"
       },
       {
         "path": "/guides/cannabis-grow-light-distance-and-schedule",
         "http_status": 200,
-        "sitemap_occurrences": 1
+        "sitemap_occurrences": null,
+        "content_identity": "SQUARESPACE_COMING_SOON",
+        "robots": "noindex"
       },
       {
         "path": "/guides/cannabis-light-stress-light-burn-bleaching-or-heat",
         "http_status": 200,
-        "sitemap_occurrences": 1
+        "sitemap_occurrences": null,
+        "content_identity": "SQUARESPACE_COMING_SOON",
+        "robots": "noindex"
       },
       {
         "path": "/sitemap.xml",
-        "http_status": 200
+        "http_status": 401
       },
       {
         "path": "/robots.txt",
-        "http_status": 200
+        "http_status": 401
       }
     ]
   },
   "release_evidence": {
     "lighting_pull_request": "https://github.com/Verdant-OS/verdant-grow-diary/pull/595",
-    "lighting_status": "LIVE",
+    "lighting_status": "SOURCE_PRESENT_NOT_CURRENTLY_PUBLIC",
     "analytics_repair_pull_request": "https://github.com/Verdant-OS/verdant-grow-diary/pull/597",
-    "analytics_repair_status": "LIVE",
+    "analytics_repair_status": "SOURCE_PRESENT_NOT_CURRENTLY_PUBLIC",
     "structured_data_repair_pull_request": "https://github.com/Verdant-OS/verdant-grow-diary/pull/624",
-    "structured_data_repair_status": "LIVE"
+    "structured_data_repair_status": "SOURCE_PRESENT_NOT_CURRENTLY_PUBLIC"
   },
   "analytics_identity": {
+    "evidence_scope": "HISTORICAL_LAST_KNOWN_VERDANT_RELEASE",
     "last_full_verified_at": "2026-08-02T02:08:43.179Z",
     "last_targeted_recheck_at": "2026-08-02T05:19:48.245Z",
     "verification_method": "INTERCEPTED_BROWSER_COLLECTION_REQUESTS",
     "test_events_transmitted": false,
     "test_events_transmitted_scope": "COMPLETED_NINE_STATE_FULL_MATRIX_ONLY",
     "stream_identity_status": "PASS",
-    "stream_identity_evidence": "OWNER_CONFIRMED_VALUES_MATCH_DEPLOYED_PRODUCTION_TAG",
+    "stream_identity_evidence": "OWNER_CONFIRMED_VALUES_MATCHED_LAST_KNOWN_VERDANT_PRODUCTION_TAG",
     "stream": {
       "name": "Verdant Grow Diary",
       "url": "https://verdantgrowdiary.com",
@@ -146,6 +160,27 @@
     },
     "evidence": "docs/seo/lighting-launch-verification.md"
   },
+  "current_production_recheck": {
+    "observed_at": "2026-08-03T17:25:08Z",
+    "status": "FAIL",
+    "provider": "SQUARESPACE",
+    "title": "Coming Soon",
+    "h1": "verdantgrowdiary.com",
+    "robots": "noindex",
+    "expected_measurement_id": "G-B3QRSZEM9S",
+    "measurement_id_detected": false,
+    "analytics_identity": "FAIL",
+    "analytics_interception": "BLOCKED_NOT_VERDANT_APP",
+    "technical_seo": {
+      "status": "FAIL",
+      "lighting_guides": "GENERIC_PLACEHOLDER_HTTP_200",
+      "sitemap": "HTTP_401",
+      "robots": "HTTP_401",
+      "release_content_match": "FAIL"
+    },
+    "deployed_commit_hash": "NOT_EXPOSED_BY_PUBLISHER",
+    "required_owner_action": "Restore verdantgrowdiary.com and www.verdantgrowdiary.com to the intended publisher custom-domain configuration, then authorize an immediate production and intercepted-analytics recheck."
+  },
   "measurement_contract": {
     "guide_cta_clicks": {
       "classification": "MISSING",
@@ -168,6 +203,7 @@
     }
   },
   "technical_seo": {
+    "evidence_scope": "HISTORICAL_LAST_KNOWN_VERDANT_RELEASE",
     "last_http_verified_at": "2026-08-02T02:07:12.279Z",
     "lighting_pages": "PASS",
     "direct_load_indexability": "PASS",
@@ -206,6 +242,7 @@
     "baseline_status": "BLOCKED",
     "collection_contract_status": "FAIL",
     "stream_identity_status": "PASS",
+    "current_production_tag_status": "FAIL",
     "property_identity_status": "BLOCKED",
     "stream": {
       "name": "Verdant Grow Diary",
@@ -259,6 +296,13 @@
   },
   "open_blockers": [
     {
+      "id": "PRODUCTION_HOST_ORIGIN_MISMATCH",
+      "status": "BLOCKED",
+      "owner": "OWNER",
+      "reason": "PUBLIC_DOMAIN_SERVES_SQUARESPACE_COMING_SOON_INSTEAD_OF_VERDANT",
+      "required_action": "Restore verdantgrowdiary.com and www.verdantgrowdiary.com to the intended publisher custom-domain configuration. Do not guess DNS record values or publish a no-op release; after restoration, authorize an immediate production and intercepted-analytics recheck."
+    },
+    {
       "id": "GA4_AUTHENTICATED_ACCESS",
       "status": "BLOCKED",
       "owner": "OWNER",
@@ -294,6 +338,20 @@
     }
   ],
   "verified_defects": [
+    {
+      "id": "PRODUCTION_HOST_ORIGIN_MISMATCH",
+      "priority": "P0",
+      "status": "FAIL",
+      "lifecycle_state": "VERIFIED_UNFIXED_OWNER_ACTION_REQUIRED",
+      "evidence": "At 2026-08-03T17:25:08Z, the apex, both lighting routes, and version.json returned Squarespace Coming Soon with noindex; sitemap.xml and robots.txt returned HTTP 401. The public response exposes no Verdant commit."
+    },
+    {
+      "id": "ANALYTICS_CONTRACT_TEST_HARNESS",
+      "priority": "P0",
+      "status": "FAIL",
+      "lifecycle_state": "VERIFIED_UNFIXED_SEPARATE_CODE_SLICE",
+      "evidence": "On deploy head 7efaaa5, the default Vitest config imports undeclared @vitejs/plugin-react-swc and fails before collection. Historic analytics tests also read deleted App.tsx and index.html after the TanStack migration. Source evidence does not establish current production behavior."
+    },
     {
       "id": "SEO_MONITORING_STALE_TERMINAL_SUMMARY",
       "priority": "P3",
@@ -344,17 +402,23 @@
     }
   ],
   "current_slice": {
-    "priority": "P2",
-    "id": "LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT",
-    "status": "NOT_MEASURED",
-    "lifecycle_state": "DOCUMENTED_MISSING_NO_EVENT_ADDED",
-    "evidence": "The two lighting-guide CTAs resolve to /quick-log without a guide-specific click event. Their event classification is MISSING and their metric readiness status is NOT_MEASURED, so downstream activity is not used as attribution."
+    "priority": "P0",
+    "id": "PRODUCTION_HOST_ORIGIN_MISMATCH",
+    "status": "FAIL",
+    "lifecycle_state": "DOCUMENTED_OWNER_RESTORE_REQUIRED",
+    "evidence": "The current production host is a noindex Squarespace placeholder rather than the Verdant release. This bounded slice records the defect without changing DNS, publisher settings, runtime code, or analytics configuration."
   },
   "next_slice": {
     "priority": "P0",
-    "id": "GA4_ENHANCED_MEASUREMENT_HISTORY_PAGE_VIEWS",
+    "id": "ANALYTICS_CONTRACT_TEST_HARNESS_RECONCILIATION",
+    "status": "FAIL",
+    "lifecycle_state": "UNBLOCKED_SOURCE_REPAIR_REQUIRED"
+  },
+  "next_owner_action": {
+    "priority": "P0",
+    "id": "RESTORE_PRODUCTION_HOST_AND_REVERIFY_LIGHTING_RELEASE",
     "status": "BLOCKED",
-    "lifecycle_state": "BLOCKED_BY_OWNER_ACCESS"
+    "lifecycle_state": "BLOCKED_BY_OWNER_PUBLISHER_CONFIGURATION"
   },
   "monitoring_repair": {
     "status": "PASS",
@@ -371,8 +435,8 @@
       "urls_evaluated": 51,
       "gsc_api_attempts": 0
     },
-    "production_publish_required": false,
-    "production_publish_reason": "PR #624 is already live in production; this bounded slice changes readiness evidence only and does not require a runtime publish for the lighting measurement scope."
+    "production_publish_required": true,
+    "production_publish_reason": "The public host no longer serves Verdant. The owner must restore the intended publisher custom-domain configuration before a runtime production recheck can pass."
   },
   "artifact_paths": {
     "readiness_status": "artifacts/seo/seo-readiness-status.json",

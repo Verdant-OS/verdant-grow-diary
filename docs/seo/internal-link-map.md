@@ -2,12 +2,12 @@
 
 ## Release status
 
-PR #595 is merged, and both lighting routes are live on `https://verdantgrowdiary.com`. The public
-verification at `2026-07-31T19:18:39.6233761Z` returned HTTP 200 for both pages; each canonical URL
-appears exactly once in the 51-URL sitemap. Production manifest
-`92d8330af90d983d3bcc1ad7507028505b8b14d8` contains the lighting release and analytics repair.
-The newer deploy head differs only in SEO monitoring files, so no additional production publish is
-required for the link inventory below.
+The source registry contains the links below, and the last known Verdant production verification
+confirmed them. That is historical only. At `2026-08-03T17:25:08Z`, the public domain served a
+Squarespace `Coming Soon` page with `noindex` for both lighting routes; the public sitemap and
+robots endpoints returned HTTP 401. The link inventory cannot currently establish public discovery
+until the owner restores the intended publisher custom-domain configuration and Codex reruns the
+production link probe.
 
 ## Implemented contextual links
 

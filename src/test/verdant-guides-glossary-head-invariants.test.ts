@@ -28,31 +28,19 @@ import {
   STATIC_PUBLIC_SEO_DOCUMENTS,
   VERDANT_SITE_ORIGIN,
 } from "@/lib/build/staticPublicSeoDocuments";
-import {
-  VERDANT_SEO_GUIDES,
-  VERDANT_GUIDE_SLUGS,
-} from "@/constants/verdantSeoContent";
-import { buildStaticSocialRouteHtml } from "@/lib/build/staticSocialRouteHtml";
-import {
-  extractHead,
-} from "../../scripts/validate-static-route-head-fidelity.mjs";
+import { VERDANT_SEO_GUIDES, VERDANT_GUIDE_SLUGS } from "@/constants/verdantSeoContent";
+import { staticRouteHead } from "@/lib/build/staticRouteHead";
 import {
   ALLOWED_ROBOTS_DIRECTIVES,
   DEFAULT_ROBOTS_DIRECTIVE,
   EXPECTED_OG_TYPE,
-  EXPECTED_TWITTER_CREATOR,
-  EXPECTED_TWITTER_SITE,
 } from "../../scripts/public-route-head-invariants.config.mjs";
-
-const REPO = resolve(__dirname, "../..");
-const INDEX_HTML = readFileSync(resolve(REPO, "index.html"), "utf8");
 
 const GUIDE_HUB_PATH = "/guides";
 const GLOSSARY_PATH = "/glossary";
+const ROOT_ROUTE = readFileSync(resolve(__dirname, "../../src/routes/__root.tsx"), "utf8");
 
-const REGISTRY_BY_PATH = new Map(
-  STATIC_PUBLIC_SEO_DOCUMENTS.map((doc) => [doc.path, doc]),
-);
+const REGISTRY_BY_PATH = new Map(STATIC_PUBLIC_SEO_DOCUMENTS.map((doc) => [doc.path, doc]));
 
 function guidePath(slug: string): string {
   return `/guides/${slug}`;
@@ -65,12 +53,9 @@ const TARGET_PATHS: ReadonlyArray<string> = [
 ];
 
 describe("Guides + glossary head-tag registry coverage", () => {
-  it.each(TARGET_PATHS)(
-    "%s is registered in STATIC_PUBLIC_SEO_DOCUMENTS",
-    (path) => {
-      expect(REGISTRY_BY_PATH.has(path)).toBe(true);
-    },
-  );
+  it.each(TARGET_PATHS)("%s is registered in STATIC_PUBLIC_SEO_DOCUMENTS", (path) => {
+    expect(REGISTRY_BY_PATH.has(path)).toBe(true);
+  });
 
   it("every registered guide + glossary route has a route-local filename", () => {
     for (const path of TARGET_PATHS) {
@@ -119,9 +104,7 @@ describe("Guides + glossary head-tag content contract", () => {
   });
 
   it("guide + glossary descriptions are unique across the cluster", () => {
-    const descs = TARGET_PATHS.map(
-      (p) => REGISTRY_BY_PATH.get(p)!.metadata.description,
-    );
+    const descs = TARGET_PATHS.map((p) => REGISTRY_BY_PATH.get(p)!.metadata.description);
     expect(new Set(descs).size).toBe(descs.length);
   });
 
@@ -145,55 +128,43 @@ describe("Guides + glossary head-tag content contract", () => {
   });
 });
 
-describe("Guides + glossary pre-rendered head matches global invariants", () => {
-  // Note: JSON-LD injection happens in a later vite plugin against the
-  // dist bundle, so this suite intentionally checks head META tags only.
-  // The postbuild validator (scripts/validate-static-route-head-fidelity.mjs)
-  // owns end-to-end JSON-LD fidelity across every emitted dist/*.html.
-
-
+describe("Guides + glossary SSR head matches global invariants", () => {
   const headFor = (path: string) => {
     const doc = REGISTRY_BY_PATH.get(path)!;
+    const routeHead = staticRouteHead(path);
     return {
       doc,
-      head: extractHead(buildStaticSocialRouteHtml(INDEX_HTML, doc.metadata)) as {
-        title: string | null;
-        canonical: string | null;
-        metas: Map<string, string>;
-      },
+      title: routeHead.meta.find((entry) => "title" in entry)?.title ?? null,
+      canonical: routeHead.links.find((entry) => entry.rel === "canonical")?.href ?? null,
+      metas: new Map(
+        routeHead.meta
+          .filter((entry) => "content" in entry)
+          .map((entry) => [
+            entry.name ? `name:${entry.name}` : `property:${entry.property}`,
+            entry.content,
+          ]),
+      ),
     };
   };
 
-  it.each(TARGET_PATHS)("%s ships og:type=website (never article/profile drift)", (path) => {
-    const { head } = headFor(path);
-    expect(head.metas.get("property:og:type") ?? null).toBe(EXPECTED_OG_TYPE);
+  it("inherits the global OG and Twitter defaults from the root route", () => {
+    expect(ROOT_ROUTE).toContain(`property: "og:type", content: "${EXPECTED_OG_TYPE}"`);
+    expect(ROOT_ROUTE).toContain('name: "twitter:card", content: "summary_large_image"');
+    expect(ROOT_ROUTE).not.toContain('name: "twitter:site"');
+    expect(ROOT_ROUTE).not.toContain('name: "twitter:creator"');
   });
 
   it.each(TARGET_PATHS)("%s ships the expected robots directive", (path) => {
-    const { doc, head } = headFor(path);
+    const head = headFor(path);
     expect(head.metas.get("name:robots") ?? null).toBe(
-      doc.metadata.robots ?? DEFAULT_ROBOTS_DIRECTIVE,
+      head.doc.metadata.robots ?? DEFAULT_ROBOTS_DIRECTIVE,
     );
   });
-
-  it.each(TARGET_PATHS)("%s ships twitter:card=summary_large_image", (path) => {
-    const { head } = headFor(path);
-    expect(head.metas.get("name:twitter:card") ?? null).toBe("summary_large_image");
-  });
-
-  it.each(TARGET_PATHS)(
-    "%s does not ship twitter:site/creator while no handle is configured",
-    (path) => {
-      const { head } = headFor(path);
-      expect(head.metas.get("name:twitter:site") ?? null).toBe(EXPECTED_TWITTER_SITE);
-      expect(head.metas.get("name:twitter:creator") ?? null).toBe(EXPECTED_TWITTER_CREATOR);
-    },
-  );
 
   it.each(TARGET_PATHS)(
     "%s canonical + og:url + twitter:image resolve to the route (no homepage drift)",
     (path) => {
-      const { head } = headFor(path);
+      const head = headFor(path);
       const expectedUrl = `${VERDANT_SITE_ORIGIN}${path}`;
       expect(head.canonical).toBe(expectedUrl);
       expect(head.metas.get("property:og:url") ?? null).toBe(expectedUrl);

@@ -28,7 +28,9 @@ import {
 const REPO = resolve(__dirname, "../..");
 const read = (rel: string) => readFileSync(resolve(REPO, rel), "utf8");
 
-const APP_TSX = read("src/App.tsx");
+const GUIDES_INDEX_ROUTE = read("src/routes/guides.index.tsx");
+const GUIDE_SLUG_ROUTE = read("src/routes/guides.$slug.tsx");
+const ROUTE_TREE = read("src/routeTree.gen.ts");
 const GUIDES_INDEX = read("src/pages/GuidesIndex.tsx");
 const GUIDE_PAGE = read("src/pages/GuidePage.tsx");
 const CONTENT_TS = read("src/constants/verdantSeoContent.ts");
@@ -130,11 +132,11 @@ describe("Verdant SEO guide pages (28)", () => {
     expect(VERDANT_GUIDE_SLUGS).toEqual(EXPECTED_SLUGS);
   });
 
-  it("registers /guides and /guides/:slug in App.tsx", () => {
-    expect(APP_TSX).toMatch(/path="\/guides"/);
-    expect(APP_TSX).toMatch(/path="\/guides\/:slug"/);
-    expect(APP_TSX).toContain("GuidesIndex");
-    expect(APP_TSX).toContain("GuidePage");
+  it("registers /guides and /guides/$slug in TanStack route files", () => {
+    expect(GUIDES_INDEX_ROUTE).toContain('createFileRoute("/guides/")');
+    expect(GUIDE_SLUG_ROUTE).toContain('createFileRoute("/guides/$slug")');
+    expect(GUIDES_INDEX_ROUTE).toContain("GuidesIndex");
+    expect(GUIDE_SLUG_ROUTE).toContain("GuidePage");
   });
 
   it("every guide has H1, intro, sections, FAQ, related, and a target keyword", () => {
@@ -293,7 +295,7 @@ describe("Landing and Pricing OG/Twitter metadata", () => {
 
 describe("retired Customer Mode share routes stay absent from the public guide funnel", () => {
   it("does not mount an unbacked Customer Mode share route", () => {
-    expect(APP_TSX).not.toMatch(/path="\/customer\/:shareId"/);
+    expect(ROUTE_TREE).not.toContain("/customer/$shareId");
     expect(CONTENT_TS).not.toContain('"/customer/guide"');
   });
 

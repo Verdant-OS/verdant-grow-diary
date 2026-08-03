@@ -122,6 +122,9 @@ function stripComments(src) {
 export function scanContent(relPath, content) {
   const violations = [];
   const isFrontend = relPath.startsWith(`src${sep}`) || relPath.startsWith("src/");
+  const normalizedRelPath = relPath.replace(/\\/g, "/");
+  const isServerOnlySource =
+    normalizedRelPath.startsWith("src/") && /\.server\.(ts|tsx|js|jsx|mjs|cjs)$/.test(normalizedRelPath);
   const isTestFile =
     /[\\/](test|tests|__tests__|fixtures)[\\/]/.test(relPath) ||
     /\.test\.(t|j)sx?$/.test(relPath) ||
@@ -146,7 +149,7 @@ export function scanContent(relPath, content) {
   if (isThisScanner) return violations;
 
   // 1. Frontend private/server-only credentials — check only non-comment code.
-  if (isFrontend && !isTestFile && !isFrontendPrivateAllowlisted) {
+  if (isFrontend && !isServerOnlySource && !isTestFile && !isFrontendPrivateAllowlisted) {
     for (const { name, re } of FRONTEND_PRIVATE_PATTERNS) {
       if (re.test(codeOnly)) {
         violations.push({

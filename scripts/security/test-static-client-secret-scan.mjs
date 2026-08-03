@@ -9,6 +9,7 @@ import {
   FORBIDDEN_PATTERNS,
   SCAN_ROOTS,
   EXACT_PATH_ALLOWLIST,
+  isServerOnlySourcePath,
 } from "./static-client-secret-scan.mjs";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -173,6 +174,14 @@ t("allowlist contains only scanner infra", () => {
   for (const p of EXACT_PATH_ALLOWLIST) {
     assert.ok(p.startsWith("scripts/"), `allowlist entry not under scripts/: ${p}`);
   }
+});
+
+t("excludes only server-named source modules from the client scan", () => {
+  assert.equal(isServerOnlySourcePath("src/integrations/supabase/client.server.ts"), true);
+  assert.equal(isServerOnlySourcePath("src/integrations/supabase/client.ts"), false);
+  assert.equal(isServerOnlySourcePath("public/client.server.ts"), false);
+  assert.equal(isServerOnlySourcePath("dist/client.server.js"), false);
+  assert.equal(isServerOnlySourcePath("src/server/client.ts"), false);
 });
 
 t("real repo scan passes", () => {

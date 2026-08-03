@@ -67,6 +67,17 @@ export const PREFIX_ALLOWLIST = [
   "src/integrations/supabase/types.ts",
 ];
 
+/**
+ * Server modules are deliberately named with the TanStack Start `*.server.*`
+ * convention. They are not browser or published-client source and are
+ * therefore outside this scanner's client-facing scope. Do not broaden this
+ * to a directory exemption: ordinary modules in `src/` must remain scanned.
+ */
+export function isServerOnlySourcePath(relPath) {
+  const normalized = relPath.replace(/\\/g, "/");
+  return normalized.startsWith("src/") && /\.server\.(ts|tsx|js|jsx|mjs|cjs)$/.test(normalized);
+}
+
 const MASKED_SYNTAX_KINDS = new Set([
   ts.SyntaxKind.StringLiteral,
   ts.SyntaxKind.NoSubstitutionTemplateLiteral,
@@ -201,6 +212,7 @@ export function scanRepo(rootDir = process.cwd()) {
       const relPath = relative(rootDir, file).replace(/\\/g, "/");
       if (EXACT_PATH_ALLOWLIST.has(relPath)) continue;
       if (PREFIX_ALLOWLIST.some((p) => relPath.startsWith(p))) continue;
+      if (isServerOnlySourcePath(relPath)) continue;
       let src;
       try {
         src = readFileSync(file, "utf8");

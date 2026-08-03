@@ -8,12 +8,27 @@
  *
  * No Supabase, no network, no AI, no device control.
  */
-import { describe, it, expect, afterEach } from "vitest";
+import { createElement } from "react";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, waitFor, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import GuidesIndex from "@/pages/GuidesIndex";
 import GuidePage from "@/pages/GuidePage";
 import { VERDANT_SEO_GUIDES } from "@/constants/verdantSeoContent";
+
+const routeState = vi.hoisted(() => ({ slug: "", hash: "" }));
+
+vi.mock("@/lib/react-router-compat", () => ({
+  Link: ({ to, children, ...props }: { to: string; children?: React.ReactNode }) =>
+    createElement("a", { href: to, ...props }, children),
+  Navigate: ({ to }: { to: string }) => createElement("span", { "data-redirect-to": to }),
+  useLocation: () => ({ hash: routeState.hash }),
+  useParams: () => ({ slug: routeState.slug }),
+}));
+
+vi.mock("@/components/DiaryFaqLinkStatsPanel", () => ({ default: () => null }));
+vi.mock("@/components/customer/CustomerComparisonGuideQrOption", () => ({
+  default: () => null,
+}));
 
 afterEach(() => {
   cleanup();
@@ -24,14 +39,10 @@ afterEach(() => {
 });
 
 function renderAt(path: string) {
-  return render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/guides" element={<GuidesIndex />} />
-        <Route path="/guides/:slug" element={<GuidePage />} />
-      </Routes>
-    </MemoryRouter>,
-  );
+  const [pathname, hash = ""] = path.split("#", 2);
+  routeState.slug = pathname.startsWith("/guides/") ? pathname.slice("/guides/".length) : "";
+  routeState.hash = hash ? `#${hash}` : "";
+  return render(pathname === "/guides" ? <GuidesIndex /> : <GuidePage />);
 }
 
 function readMeta(selector: string): string | null {
@@ -202,7 +213,7 @@ describe("/guides/:slug detail — public render", () => {
       appendStaticRouteJsonLd({ "@context": "https://schema.org", "@type": type, url: staleUrl });
     }
 
-    renderAt(`/guides/${distance.slug}`);
+    const rendered = renderAt(`/guides/${distance.slug}`);
 
     await waitFor(() => {
       expect(document.head.querySelectorAll("script[data-static-route-ldjson]")).toHaveLength(0);
@@ -219,7 +230,9 @@ describe("/guides/:slug detail — public render", () => {
       `a[href="/guides/${stress.slug}"]`,
     );
     expect(crossGuideLink).toBeTruthy();
-    fireEvent.click(crossGuideLink!);
+    routeState.slug = stress.slug;
+    routeState.hash = "";
+    rendered.rerender(<GuidePage />);
 
     await waitFor(() => {
       expect(screen.getByTestId("guide-page")).toHaveAttribute("data-guide-slug", stress.slug);

@@ -276,6 +276,21 @@ test.describe("Plant Detail Symptom Check — local mocked branch proof", () => 
     );
   });
 
+  test("renders the authenticated plant shell with mocked data", async ({ page, baseURL }) => {
+    expect(baseURL, "the mocked proof requires Playwright's local Vite base URL").toBeTruthy();
+    const state = createMockNetworkState();
+    await seedClearlyFakeSession(page);
+    await installFailClosedNetworkMock(page, state);
+
+    await page.goto(`/plants/${FAKE_PLANT_ID}`);
+    await acceptReconsentGateIfShown(page);
+
+    await expect(page.getByRole("heading", { name: FAKE_PLANT.name, exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "This page ran into an unexpected error", exact: true }),
+    ).not.toBeVisible();
+  });
+
   test("saves one confirmed Symptom Check and follows it to the Timeline evidence card", async ({
     page,
     baseURL,

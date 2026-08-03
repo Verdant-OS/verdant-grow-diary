@@ -295,7 +295,9 @@
     "check": "biome check .",
     "biome:migrate": "biome migrate --write",
     "verify:biome": "node scripts/verify-biome-toolchain.mjs",
-    "verify:biome:quick": "node scripts/verify-biome-toolchain.mjs --quick"
+    "verify:biome:quick": "node scripts/verify-biome-toolchain.mjs --quick",
+    "merge:construct": "node scripts/ci/construct-pr-merge-ref.mjs",
+    "test:merge-strategies": "node --test scripts/ci/merge-conflict-resolution-strategies.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

@@ -32,6 +32,19 @@ jobs:
         env:
           DRIFT_REPORT_OUT: edge-shared-drift-report.md
         run: node scripts/report-edge-shared-drift.mjs
+      - name: Materialize exact generated mirror for repair
+        if: always() && steps.verify-mirror.outcome == 'failure'
+        run: |
+          rm -rf edge-shared-expected
+          mkdir -p edge-shared-expected
+          SYNC_TMP_OUT="$PWD/edge-shared-expected" node scripts/sync-edge-shared.mjs --check || true
+      - name: Upload exact generated mirror for repair
+        if: always() && steps.verify-mirror.outcome == 'failure'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: edge-shared-expected-mirror
+          path: edge-shared-expected/**
+          if-no-files-found: error
       - name: Upload drift report artifact
         if: always() && steps.verify-mirror.outcome == 'failure'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

@@ -135,9 +135,12 @@ gh stack link 691 692
 
 | Case | Outcome |
 | --- | --- |
-| #634 stacked on deleted #648 | Unstacked as #701, merged |
-| #691 → #692 manual sensor-truth | Restack onto trunk; land #691 then #692 (or `gh stack merge`) |
-| Flat agent PR (#699 Biome) | Keep unstacked |
+| #634 stacked on deleted #648 | Unstacked as #701, **merged to `main`** as `ecc9ae4b95dcf34163d33465bc442566b359f8e2` (2026-08-03T23:07:46Z) |
+| #681 docs agents state | **Merged to `verdant-grow-diary`** as `dd3b47570458c4afbaf6c2ae2736fccbefb7fedc` (2026-08-03T22:55:11Z) |
+| #691 → #692 manual sensor-truth | Restack onto trunk; land #691 then #692 (or `gh stack merge`) — stack #702 |
+| Flat agent PR (#699 Biome) | Keep unstacked; merge only when required checks green |
+
+Exact merge SHAs also live in `docs/agents/CURRENT_STATE.md` → **Recent merge commit hashes**.
 
 ## See also
 

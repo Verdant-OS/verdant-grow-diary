@@ -4,9 +4,7 @@ import {
   isSupabaseInitializationError,
 } from "@/lib/supabaseInitializationError";
 
-export type SsrErrorCode =
-  | typeof SUPABASE_INITIALIZATION_ERROR_CODE
-  | "SSR_RENDER_FAILED";
+export type SsrErrorCode = typeof SUPABASE_INITIALIZATION_ERROR_CODE | "SSR_RENDER_FAILED";
 
 export interface SsrErrorResponseResult {
   response: Response;
@@ -52,19 +50,16 @@ export function createSsrErrorResponse(input: {
   const classification = classifySsrError(input.error);
   const reference = input.reference?.trim() || createReference();
   const pathname = safePathname(input.request);
-  const response = new Response(
-    renderErrorPage({ kind: classification.pageKind, reference }),
-    {
-      status: 500,
-      headers: {
-        "content-type": "text/html; charset=utf-8",
-        "cache-control": "no-store",
-        "x-robots-tag": "noindex, nofollow",
-        "x-verdant-error-code": classification.code,
-        "x-verdant-error-id": reference,
-      },
+  const response = new Response(renderErrorPage({ kind: classification.pageKind, reference }), {
+    status: 500,
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "x-robots-tag": "noindex, nofollow",
+      "x-verdant-error-code": classification.code,
+      "x-verdant-error-id": reference,
     },
-  );
+  });
 
   return {
     response,

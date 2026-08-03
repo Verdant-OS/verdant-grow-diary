@@ -42,11 +42,7 @@ export type OAuthDiscovery = {
   registration_endpoint?: string;
 };
 
-export type ProbeStatus =
-  | "not_connected"
-  | "connected"
-  | "unauthorized"
-  | "failed";
+export type ProbeStatus = "not_connected" | "connected" | "unauthorized" | "failed";
 
 export type ProbeResult = {
   status: ProbeStatus;
@@ -150,10 +146,7 @@ export function sameOriginRedirect(path: string): string {
   return url.toString();
 }
 
-export async function startAuthorization(
-  issuer: string,
-  redirectPath: string,
-): Promise<void> {
+export async function startAuthorization(issuer: string, redirectPath: string): Promise<void> {
   const storage = requireBrowserSessionStorage();
   const discovery = await fetchDiscovery(issuer);
   const redirectUri = sameOriginRedirect(redirectPath);
@@ -186,10 +179,7 @@ export function readCallbackParams(search: string): CallbackParams | null {
   return { code, state };
 }
 
-export async function completeAuthorization(
-  issuer: string,
-  params: CallbackParams,
-): Promise<void> {
+export async function completeAuthorization(issuer: string, params: CallbackParams): Promise<void> {
   const storage = requireBrowserSessionStorage();
   const raw = storage.getItem(SS_KEYS.pkce);
   if (!raw) throw new Error("No pending authorization in this browser");

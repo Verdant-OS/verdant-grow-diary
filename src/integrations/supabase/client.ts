@@ -2,16 +2,16 @@
 // preserving the Verdant auth-runtime hardening below. Browser sessions use
 // per-tab sessionStorage; SSR/prerender uses explicit transient memory with
 // persistence, refresh timers, and URL-session parsing disabled.
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from './types';
-import { createSupabaseAuthRuntime } from '@/lib/supabaseAuthRuntime';
-import { SupabaseInitializationError } from '@/lib/supabaseInitializationError';
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "./types";
+import { createSupabaseAuthRuntime } from "@/lib/supabaseAuthRuntime";
+import { SupabaseInitializationError } from "@/lib/supabaseInitializationError";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 function requireSupabaseSetting(value: unknown, name: string): string {
-  if (typeof value !== 'string' || value.trim().length === 0) {
+  if (typeof value !== "string" || value.trim().length === 0) {
     throw new Error(`${name} is not configured.`);
   }
   return value;
@@ -20,10 +20,10 @@ function requireSupabaseSetting(value: unknown, name: string): string {
 function initializeSupabaseClient() {
   try {
     const authRuntime = createSupabaseAuthRuntime();
-    const url = requireSupabaseSetting(SUPABASE_URL, 'VITE_SUPABASE_URL');
+    const url = requireSupabaseSetting(SUPABASE_URL, "VITE_SUPABASE_URL");
     const publishableKey = requireSupabaseSetting(
       SUPABASE_PUBLISHABLE_KEY,
-      'VITE_SUPABASE_PUBLISHABLE_KEY',
+      "VITE_SUPABASE_PUBLISHABLE_KEY",
     );
 
     return createClient<Database>(url, publishableKey, {

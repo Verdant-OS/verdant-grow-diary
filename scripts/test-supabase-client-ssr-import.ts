@@ -33,9 +33,7 @@ try {
   assert(oauthModule.hasStoredToken() === false, "SSR OAuth token probe must fail closed");
   oauthModule.disconnect();
 
-  const { SupabaseInitializationError } = await import(
-    "../src/lib/supabaseInitializationError.ts"
-  );
+  const { SupabaseInitializationError } = await import("../src/lib/supabaseInitializationError.ts");
   const { createSsrErrorResponse } = await import("../src/lib/ssrErrorResponse.ts");
 
   const classified = createSsrErrorResponse({

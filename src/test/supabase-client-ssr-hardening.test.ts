@@ -144,10 +144,21 @@ describe("Supabase client SSR auth storage", () => {
 
 describe("production sessionStorage references", () => {
   it("contains no bare sessionStorage member access outside a window-safe resolver", () => {
+    const stripCommentsAndStrings = (source: string) =>
+      source
+        // block comments
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        // line comments
+        .replace(/(^|[^:])\/\/.*$/gm, "$1")
+        // string literals (approx)
+        .replace(/(['"`])(?:\\.|(?!\1)[\s\S])*\1/g, '""');
+
     const offenders = listFilesCached(SRC)
       .filter((file) => /\.(ts|tsx)$/.test(file))
       .filter((file) => !relative(SRC, file).replace(/\\/g, "/").startsWith("test/"))
-      .filter((file) => /(^|[^\w$.])sessionStorage\s*\./m.test(readFileCached(file)))
+      .filter((file) =>
+        /(^|[^\w$.])sessionStorage\s*\./m.test(stripCommentsAndStrings(readFileCached(file))),
+      )
       .map((file) => relative(ROOT, file).replace(/\\/g, "/"));
 
     expect(offenders).toEqual([]);

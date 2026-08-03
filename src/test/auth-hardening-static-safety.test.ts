@@ -72,9 +72,14 @@ describe("Auth security docs", () => {
 });
 
 describe("src/ static safety", () => {
-  it("never imports the service role key into src/", () => {
+  it("never imports the service role key into client-bound src/", () => {
     const offenders = SRC_FILES.filter((f) => {
       if (isSrcTestFile(f)) return false; // guard tests assert absence
+      // Server-only admin client may read SUPABASE_SERVICE_ROLE_KEY.
+      // It must not ship in the browser graph (see client.server.ts banner).
+      if (f.replace(/\\/g, "/").endsWith("integrations/supabase/client.server.ts")) {
+        return false;
+      }
       const body = readFileCached(f);
       // Strip sanitizer-style references (regex literals + quoted string literals
       // naming the key, e.g. defensive redaction code). The real escalation

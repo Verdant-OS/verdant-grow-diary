@@ -4,10 +4,7 @@ export interface SupabaseAuthStorage {
   removeItem(key: string): void;
 }
 
-export type SupabaseAuthStorageKind =
-  | "server_memory"
-  | "browser_session"
-  | "browser_memory";
+export type SupabaseAuthStorageKind = "server_memory" | "browser_session" | "browser_memory";
 
 export interface SupabaseAuthRuntime {
   storage: SupabaseAuthStorage;

@@ -2,6 +2,8 @@
 
 **Status:** Biome is the sole lint/format toolchain for app source.
 
+Phased runbook + verifier: [`docs/biome-workflow.md`](./biome-workflow.md) · `bun run verify:biome`.
+
 | Tool | Role |
 | --- | --- |
 | `@biomejs/biome` | Lint + format + CI gate + lint-staged |

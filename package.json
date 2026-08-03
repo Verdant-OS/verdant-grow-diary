@@ -292,7 +292,10 @@
     "seo:artifacts": "bun scripts/generate-seo-artifacts.ts dist",
     "seo:snapshots": "node scripts/capture-ssr-head-snapshots-with-server.mjs dist",
     "lint:ci": "biome lint . --diagnostic-level=error",
-    "check": "biome check ."
+    "check": "biome check .",
+    "biome:migrate": "biome migrate --write",
+    "verify:biome": "node scripts/verify-biome-toolchain.mjs",
+    "verify:biome:quick": "node scripts/verify-biome-toolchain.mjs --quick"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

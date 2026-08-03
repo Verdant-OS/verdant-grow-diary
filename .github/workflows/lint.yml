@@ -33,3 +33,10 @@ jobs:
       # Fail on errors only; warnings are advisory during migration.
       - name: Run Biome lint (fail on errors)
         run: bun run lint:ci
+
+      - name: Run Biome format check
+        run: bun run format:check
+
+      # Package/config phase gate (skips re-running lint/format — already above).
+      - name: Verify Biome toolchain phases
+        run: bun run verify:biome:quick

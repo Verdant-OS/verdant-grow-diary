@@ -68,4 +68,24 @@ test.describe("analytics consent gate", () => {
     await expect(page.getByTestId("analytics-consent-banner")).toHaveCount(0);
     expect(await page.locator(TAG_SELECTOR).count()).toBe(0);
   });
+
+  test("granted consent persists across reloads and new tabs", async ({ page, context }) => {
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await page.getByTestId("analytics-consent-accept").click();
+    await expect(page.locator(TAG_SELECTOR)).toHaveCount(1);
+
+    await page.goto("/pricing", { waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("analytics-consent-banner")).toHaveCount(0);
+    await expect(page.locator(TAG_SELECTOR)).toHaveCount(1);
+    expect(
+      await page.evaluate((key) => window.localStorage.getItem(key), ANALYTICS_CONSENT_STORAGE_KEY),
+    ).toBe("granted");
+
+    const secondTab = await context.newPage();
+    await secondTab.route("https://www.googletagmanager.com/**", (route) => route.abort());
+    await secondTab.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(secondTab.getByTestId("analytics-consent-banner")).toHaveCount(0);
+    await expect(secondTab.locator(TAG_SELECTOR)).toHaveCount(1);
+    await secondTab.close();
+  });
 });

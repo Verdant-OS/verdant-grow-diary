@@ -6,10 +6,7 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  // Edge Functions use Deno-specific conventions and have dedicated import
-  // and mirror safety checks. Do not apply the browser/Prettier rule set to
-  // them from this app lint configuration.
-  { ignores: ["dist", ".output", ".vinxi", "supabase/functions/**"] },
+  { ignores: ["dist", ".output", ".vinxi"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

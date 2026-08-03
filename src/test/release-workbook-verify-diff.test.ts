@@ -144,6 +144,6 @@ describe("precommit-release-workbooks staged filter", () => {
   });
 
   it("returns empty when nothing relevant is staged", () => {
-    expect(pickRelevantStaged(["src/App.tsx", "README.md"])).toEqual([]);
+    expect(pickRelevantStaged(["src/routes/__root.tsx", "README.md"])).toEqual([]);
   });
 });

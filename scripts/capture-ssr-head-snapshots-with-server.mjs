@@ -4,20 +4,24 @@
  *
  * Build-time counterpart to scripts/capture-ssr-head-snapshots.ts (which needs
  * an externally running app). Here the freshly built server bundle
- * (dist/server/index.mjs — a fetch-handler worker) is imported in-process and
- * every document in dist/seo-manifest.json is rendered through it, writing the
- * real SSR HTML to dist/<fileName> for the head-fidelity gate.
+ * (.output/server/index.mjs — a fetch-handler worker) is imported in-process
+ * and every document in dist/seo-manifest.json is rendered through it, writing
+ * the real SSR HTML to dist/<fileName> for the head-fidelity gate.
  *
  * A bundle that cannot be loaded or a route that does not render is reported as
  * BLOCKED / a listed failure — never silently as passing head fidelity.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const distDir = resolve(process.argv[2] ?? "dist");
-const entry = join(distDir, "server", "index.mjs");
-const manifestPath = join(distDir, "seo-manifest.json");
+import { resolveSsrHeadSnapshotPaths } from "./ssr-head-snapshot-paths.mjs";
+
+const {
+  distDir,
+  serverEntry: entry,
+  manifestPath,
+} = resolveSsrHeadSnapshotPaths(process.argv[2], process.argv[3]);
 const origin = process.env["SEO_SNAPSHOT_ORIGIN"] ?? "https://verdantgrowdiary.com";
 
 if (!existsSync(entry)) {

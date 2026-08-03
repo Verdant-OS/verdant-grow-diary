@@ -4,7 +4,8 @@
  *
  * Build-time counterpart to scripts/capture-ssr-head-snapshots.ts (which needs
  * an externally running app). Here the freshly built server bundle
- * (dist/server/index.mjs — a fetch-handler worker) is imported in-process and
+ * (currently .output/server/index.mjs — a fetch-handler worker) is imported
+ * in-process and
  * every document in dist/seo-manifest.json is rendered through it, writing the
  * real SSR HTML to dist/<fileName> for the head-fidelity gate.
  *
@@ -16,7 +17,10 @@ import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const distDir = resolve(process.argv[2] ?? "dist");
-const entry = join(distDir, "server", "index.mjs");
+// Nitro's production output is deliberately separate from the generated SEO
+// artifacts. Keep the bundle location explicit so the verifier never falls
+// back to an obsolete dist/server convention.
+const entry = resolve(process.argv[3] ?? ".output/server/index.mjs");
 const manifestPath = join(distDir, "seo-manifest.json");
 const origin = process.env["SEO_SNAPSHOT_ORIGIN"] ?? "https://verdantgrowdiary.com";
 

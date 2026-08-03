@@ -10,7 +10,7 @@ const ANALYTICS_FILES = [
   "src/constants/analytics.ts",
   "src/hooks/useGoogleAnalyticsPageViews.ts",
   "src/lib/analyticsPageViewRules.ts",
-  "src/App.tsx",
+  "src/routes/__root.tsx",
 ];
 
 const FORBIDDEN_PATTERNS = [
@@ -24,7 +24,7 @@ const FORBIDDEN_PATTERNS = [
   "alerts delete",
   // Note: a previous "ai " substring guard was removed because it false-positives
   // on legitimate prose like "Supabase / AI /" in route grouping comments inside
-  // src/App.tsx. The narrower analytics-specific patterns below (plus the PII
+  // the root route. The narrower analytics-specific patterns below (plus the PII
   // guards in the second describe block) still prevent analytics code from
   // referencing product data surfaces.
 
@@ -67,26 +67,26 @@ describe("Google Analytics static safety — no PII in path logic", () => {
 
   it("never forwards React Router search params or relies on GA's raw-location fallback", () => {
     const hook = readFile("src/hooks/useGoogleAnalyticsPageViews.ts");
-    const indexHtml = readFile("index.html");
+    const rootRoute = readFile("src/routes/__root.tsx");
     expect(hook).not.toContain("location.search");
     expect(hook).toContain("page_location:");
     expect(hook).toContain("buildSafeAnalyticsPageLocation");
-    expect(indexHtml).toMatch(/send_page_view:\s*false/);
+    expect(rootRoute).toMatch(/send_page_view:\s*false/);
   });
 });
 
 describe("Google Analytics route metadata timing", () => {
-  it("mounts analytics after the lazy route inside Suspense", () => {
-    const app = readFile("src/App.tsx");
-    const suspenseStart = app.indexOf("<Suspense");
-    const routesEnd = app.indexOf("</Routes>", suspenseStart);
-    const analyticsMount = app.indexOf("<AnalyticsShell />", suspenseStart);
-    const suspenseEnd = app.indexOf("</Suspense>", suspenseStart);
+  it("mounts analytics after the route outlet inside Suspense", () => {
+    const rootRoute = readFile("src/routes/__root.tsx");
+    const suspenseStart = rootRoute.indexOf("<Suspense");
+    const outlet = rootRoute.indexOf("<Outlet />", suspenseStart);
+    const analyticsMount = rootRoute.indexOf("<AnalyticsShell />", suspenseStart);
+    const suspenseEnd = rootRoute.indexOf("</Suspense>", suspenseStart);
 
     expect(suspenseStart).toBeGreaterThanOrEqual(0);
-    expect(routesEnd).toBeGreaterThan(suspenseStart);
-    expect(analyticsMount).toBeGreaterThan(routesEnd);
+    expect(outlet).toBeGreaterThan(suspenseStart);
+    expect(analyticsMount).toBeGreaterThan(outlet);
     expect(analyticsMount).toBeLessThan(suspenseEnd);
-    expect(app.match(/<AnalyticsShell \/>/g)).toHaveLength(1);
+    expect(rootRoute.match(/<AnalyticsShell \/>/g)).toHaveLength(1);
   });
 });

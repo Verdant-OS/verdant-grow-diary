@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import {
   HeadContent,
   Outlet,
@@ -17,6 +17,9 @@ import OAuthPostAuthRedirect from "@/components/OAuthPostAuthRedirect";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 import { useGoogleAnalyticsPageViews } from "@/hooks/useGoogleAnalyticsPageViews";
+import { useAnalyticsConsent } from "@/hooks/useAnalyticsConsent";
+import { loadGoogleAnalytics } from "@/lib/googleAnalyticsLoader";
+import { AnalyticsConsentBanner } from "@/components/AnalyticsConsentBanner";
 import { clearGrowDataMeta } from "@/hooks/useGrowData";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
 import { renderErrorPage } from "@/lib/error-page";
@@ -96,13 +99,10 @@ export const Route = createRootRouteWithContext<RootRouteContext>()({
       { rel: "stylesheet", href: FONT_HREF },
     ],
     scripts: [
-      { src: `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`, async: true },
-      {
-        // React sends an explicit pathname-only page_location. GA's automatic
-        // initial view stays disabled so query tokens and hashes never become
-        // the browser-location fallback before the router mounts.
-        children: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());gtag("config","${GA_MEASUREMENT_ID}",{send_page_view:false});`,
-      },
+      // No gtag.js tag here on purpose. Analytics is consent-gated: the tag is
+      // injected by src/lib/googleAnalyticsLoader.ts only after the grower
+      // explicitly accepts in AnalyticsConsentBanner, still with
+      // send_page_view:false so the router owns every page_view.
       { type: "application/ld+json", children: JSON.stringify(SITE_JSON_LD) },
       {
         type: "application/ld+json",
@@ -142,8 +142,14 @@ function useClearQueryCacheBeforeAuthIdentityChange() {
 }
 
 function AnalyticsShell() {
+  const { decision } = useAnalyticsConsent();
+
+  useEffect(() => {
+    if (decision === "granted") loadGoogleAnalytics();
+  }, [decision]);
+
   useGoogleAnalyticsPageViews();
-  return null;
+  return <AnalyticsConsentBanner />;
 }
 
 /** Minimal, dependency-free fallback shown while a route chunk loads. */

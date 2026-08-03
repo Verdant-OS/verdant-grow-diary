@@ -5,7 +5,7 @@
   "pr_head_sha": "a28cd69b803eb1a5af78a90b9ca766e6fa6d4be0",
   "ci_merge_sha": "541dbfca91f3876aca8224ad6d0dfd0250393ed5",
   "source_workflow_run": 30846714026,
-  "smoke_test": "src/test/DemoProofWalkthrough-readonly-banner.test.tsx",
+  "smoke_test": "src/test/action-followup-visibility-rules.test.ts",
   "failures": [
     {
       "batch": 0,

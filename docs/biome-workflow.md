@@ -96,6 +96,7 @@ bun run format:check
 - Workflow job runs `bun run lint:ci` (and preferably `format:check` + `verify:biome`)  
 - `lint-staged` → `biome check --write …`  
 - Editor: Biome recommended via `.vscode/extensions.json`
+- Optional local `.vscode/settings.json` (often gitignored): set `editor.defaultFormatter` to `biomejs.biome` and `eslint.enable: false`
 
 ## Phase 8 — Remove legacy tools
 

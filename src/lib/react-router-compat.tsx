@@ -11,18 +11,36 @@
  *
  * Read-only shim: no data access, no writes, no side effects beyond navigation.
  */
-import { forwardRef, type AnchorHTMLAttributes, type ReactNode } from "react";
+import {
+  Children,
+  createContext,
+  forwardRef,
+  isValidElement,
+  useContext,
+  useEffect,
+  useMemo,
+  type AnchorHTMLAttributes,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import {
   Link as TanStackLink,
   Navigate as TanStackNavigate,
   Outlet as TanStackOutlet,
+  RouterContextProvider,
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
   useNavigate as useTanStackNavigate,
-  useParams as useTanStackParams,
   useRouter,
   useRouterState,
 } from "@tanstack/react-router";
 
 export { TanStackOutlet as Outlet };
+
+/** Params contributed by the legacy `<Routes>` matcher for unit tests. */
+const CompatParamsContext = createContext<Record<string, string> | null>(null);
 
 export interface CompatLocation {
   pathname: string;
@@ -50,17 +68,34 @@ export function useLocation(): CompatLocation {
 
 /** react-router `useParams()`. Non-strict so any route can read any param. */
 export function useParams<T extends Record<string, string | undefined>>(): T {
-  // TanStack's non-strict overload is not expressible against the generated
-  // route register without naming a `from`; the shim is intentionally
-  // route-agnostic, so the options object is passed through untyped.
-  return (useTanStackParams as unknown as (options: { strict: false }) => T)({
-    strict: false,
+  // Prefer params from the legacy `<Routes>` matcher (unit tests). Fall back to
+  // params aggregated from TanStack matches when the real route tree is live.
+  const fromCompat = useContext(CompatParamsContext);
+  const fromMatches = useRouterState({
+    select: (state) => {
+      const params: Record<string, string> = {};
+      for (const match of state.matches) {
+        if (match.params && typeof match.params === "object") {
+          Object.assign(params, match.params);
+        }
+      }
+      return params;
+    },
   });
+  if (fromCompat) {
+    return { ...fromMatches, ...fromCompat } as T;
+  }
+  return fromMatches as T;
 }
 
-/** Always true — the app is always inside the TanStack router. */
+/** True when a TanStack router instance is mounted above this call. */
 export function useInRouterContext(): boolean {
-  return true;
+  try {
+    // useRouter() returns null (and warns) outside a provider — treat that as false.
+    return useRouter() != null;
+  } catch {
+    return false;
+  }
 }
 
 export interface CompatNavigateOptions {
@@ -117,9 +152,7 @@ export function useNavigate(): CompatNavigateFunction {
   }) as CompatNavigateFunction;
 }
 
-
-export interface CompatLinkProps
-  extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> {
+export interface CompatLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> {
   to: string;
   replace?: boolean;
   state?: unknown;
@@ -158,7 +191,8 @@ export const NavLink = forwardRef<HTMLAnchorElement, CompatNavLinkProps>(functio
   ref,
 ) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const isActive = end === true ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
+  const isActive =
+    end === true ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
   const renderProps = { isActive, isPending: false };
   const resolvedClassName = typeof className === "function" ? className(renderProps) : className;
   const resolvedChildren = typeof children === "function" ? children(renderProps) : children;
@@ -234,38 +268,187 @@ export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
 }
 
 /**
- * Legacy router-primitive compile shims.
+ * Test / legacy shell: provide a real TanStack router so compat Link /
+ * useNavigate / useSearchParams work under Vitest.
  *
- * A number of existing unit tests wrap components in `<MemoryRouter>` /
- * `<BrowserRouter>`. Under TanStack Start the real router is provided by the
- * route tree, so these render their children unchanged. They exist so legacy
- * test files keep compiling — they do NOT provide routing, and tests that
- * assert on navigation through them need rewriting against the TanStack
- * router. Do not use them in application code.
+ * Uses `RouterContextProvider` (not `RouterProvider`) so test children render
+ * immediately — `RouterProvider` only mounts route-tree matches and would
+ * blank the tree until an async `router.load()` completes.
+ *
+ * Application code should not use these — the Start route tree owns the
+ * production provider. Hundreds of unit tests still wrap UI in
+ * `<MemoryRouter>` / `<BrowserRouter>` from the react-router era; without a
+ * real provider, TanStack Link throws `Cannot read properties of null
+ * (reading 'isServer')`.
  */
 interface LegacyRouterShellProps {
   children?: ReactNode;
-  /** Accepted for compile compatibility with react-router; ignored. */
+  /** react-router memory history entries (`string` or location-like object). */
   initialEntries?: unknown;
-  /** Accepted for compile compatibility with react-router; ignored. */
+  /** Index into `initialEntries` (default: last entry, matching react-router). */
   initialIndex?: number;
-  /** Accepted for compile compatibility with react-router; ignored. */
+  /** Accepted for compile compatibility; ignored (no basename support). */
   basename?: string;
   /** Accepted for compile compatibility with react-router v6 future flags; ignored. */
   future?: Record<string, boolean>;
 }
 
-export function BrowserRouter({ children }: LegacyRouterShellProps) {
-  return <>{children}</>;
+function normalizeInitialEntries(initialEntries: unknown): string[] {
+  if (!Array.isArray(initialEntries) || initialEntries.length === 0) return ["/"];
+  return initialEntries.map((entry) => {
+    if (typeof entry === "string") {
+      return entry.length > 0 ? entry : "/";
+    }
+    if (entry && typeof entry === "object") {
+      const loc = entry as { pathname?: unknown; search?: unknown; hash?: unknown };
+      const pathname =
+        typeof loc.pathname === "string" && loc.pathname.length > 0 ? loc.pathname : "/";
+      const rawSearch = typeof loc.search === "string" ? loc.search : "";
+      const search = rawSearch ? (rawSearch.startsWith("?") ? rawSearch : `?${rawSearch}`) : "";
+      const rawHash = typeof loc.hash === "string" ? loc.hash : "";
+      const hash = rawHash ? (rawHash.startsWith("#") ? rawHash : `#${rawHash}`) : "";
+      return `${pathname}${search}${hash}`;
+    }
+    return "/";
+  });
 }
-export function MemoryRouter({ children }: LegacyRouterShellProps) {
-  return <>{children}</>;
+
+function createTestMemoryRouter(initialEntries: string[], initialIndex?: number) {
+  // Root + index + splat so buildLocation/matchRoute can resolve any path.
+  // Components are unused under RouterContextProvider (we render test children
+  // ourselves); they exist only so the route tree is valid.
+  const rootRoute = createRootRoute({
+    component: () => null,
+  });
+  const indexRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/",
+    component: () => null,
+  });
+  const splatRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "$",
+    component: () => null,
+  });
+  const history = createMemoryHistory({
+    initialEntries,
+    initialIndex: initialIndex ?? initialEntries.length - 1,
+  });
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([indexRoute, splatRoute]),
+    history,
+    // Vitest/jsdom has `document`, but be explicit so Link does not take the
+    // SSR branch when tools evaluate outside a browser-like global.
+    isServer: false,
+    defaultPendingMinMs: 0,
+    defaultPendingMs: 0,
+  });
+  // Best-effort match population for hooks that read match state. Location is
+  // already available from history before load resolves.
+  void router.load({ sync: true });
+  return router;
 }
-export function Routes({ children }: { children?: ReactNode }) {
-  return <>{children}</>;
+
+function MemoryRouterProvider({ children, initialEntries, initialIndex }: LegacyRouterShellProps) {
+  // Serialize so inline `initialEntries={[...]}` arrays don't rebuild the router
+  // on every parent render (would remount the whole tree mid-test).
+  const entriesKey = useMemo(
+    () => normalizeInitialEntries(initialEntries).join("\0"),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by serialized entries
+    [JSON.stringify(initialEntries ?? null)],
+  );
+  const index = typeof initialIndex === "number" ? initialIndex : undefined;
+
+  const router = useMemo(
+    () => createTestMemoryRouter(entriesKey.length > 0 ? entriesKey.split("\0") : ["/"], index),
+    [entriesKey, index],
+  );
+
+  // RouterProvider mounts Transitioner which subscribes to history and reloads
+  // matches. We only use RouterContextProvider (so test children render without
+  // waiting on Matches), so we must own that subscription ourselves or
+  // navigate / Link / history.back never update useLocation.
+  useEffect(() => {
+    const unsub = router.history.subscribe(() => {
+      void router.load();
+    });
+    void router.load({ sync: true });
+    return unsub;
+  }, [router]);
+
+  return <RouterContextProvider router={router}>{children}</RouterContextProvider>;
 }
-export function Route(_props: { path?: string; element?: ReactNode; children?: ReactNode }) {
+
+/** @deprecated App shell uses TanStack Start. Prefer real routes in product code. */
+export function BrowserRouter(props: LegacyRouterShellProps) {
+  return <MemoryRouterProvider {...props} />;
+}
+
+/** @deprecated App shell uses TanStack Start. Prefer real routes in product code. */
+export function MemoryRouter(props: LegacyRouterShellProps) {
+  return <MemoryRouterProvider {...props} />;
+}
+
+export interface CompatRouteProps {
+  path?: string;
+  element?: ReactNode;
+  children?: ReactNode;
+  index?: boolean;
+}
+
+/**
+ * Declarative route leaf for the legacy `<Routes>` matcher. Renders nothing on
+ * its own — `<Routes>` inspects props and mounts `element` when the path matches.
+ */
+export function Route(_props: CompatRouteProps) {
   return null;
+}
+
+function isRouteElement(node: ReactNode): node is ReactElement<CompatRouteProps> {
+  return isValidElement(node) && node.type === Route;
+}
+
+function routePattern(props: CompatRouteProps): string {
+  if (props.index) return "/";
+  if (typeof props.path === "string" && props.path.length > 0) return props.path;
+  return "/";
+}
+
+function routeMatchScore(pattern: string): number {
+  if (pattern === "*") return 0;
+  if (pattern.includes(":") || pattern.includes("*")) return 1;
+  return 2;
+}
+
+/**
+ * Minimal react-router `<Routes>` matcher for unit tests. Picks the best flat
+ * `<Route path element>` child against the current memory-history pathname.
+ * Nested route trees and relative paths are not supported.
+ */
+export function Routes({ children }: { children?: ReactNode }) {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const routes = Children.toArray(children).filter(isRouteElement);
+
+  let best: ReactElement<CompatRouteProps> | null = null;
+  let bestParams: Record<string, string> = {};
+  let bestScore = -1;
+  for (const route of routes) {
+    const pattern = routePattern(route.props);
+    const params = matchOne(pattern, pathname);
+    if (params == null) continue;
+    const score = routeMatchScore(pattern);
+    if (score > bestScore) {
+      bestScore = score;
+      best = route;
+      bestParams = params;
+    }
+  }
+  if (!best) return null;
+  return (
+    <CompatParamsContext.Provider value={bestParams}>
+      {best.props.element}
+    </CompatParamsContext.Provider>
+  );
 }
 
 export interface CompatRouteObject {

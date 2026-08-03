@@ -20,30 +20,20 @@
 
 export const TIMELINE_HIGHLIGHT_PARAM = "highlight";
 
-export const TIMELINE_HIGHLIGHT_ARIA_LABEL =
-  "Highlighted Action Queue diary trace";
-export const TIMELINE_HIGHLIGHT_TESTID =
-  "timeline-highlighted-action-queue-trace";
+export const TIMELINE_HIGHLIGHT_ARIA_LABEL = "Highlighted Action Queue diary trace";
+export const TIMELINE_HIGHLIGHT_TESTID = "timeline-highlighted-action-queue-trace";
 export const TIMELINE_HIGHLIGHT_NOT_VISIBLE_COPY =
   "Highlighted diary trace is not visible in the current timeline view. Filters or search may be hiding it.";
 export const TIMELINE_HIGHLIGHT_NO_BLOCKERS_COPY =
   "No active filters detected. The trace may not be loaded in this view.";
-export const TIMELINE_HIGHLIGHT_NOT_VISIBLE_TESTID =
-  "timeline-highlight-not-visible";
-export const TIMELINE_HIGHLIGHT_BLOCKERS_TESTID =
-  "timeline-highlight-active-blockers";
-export const TIMELINE_HIGHLIGHT_CLEAR_FILTERS_TESTID =
-  "timeline-highlight-clear-filters";
+export const TIMELINE_HIGHLIGHT_NOT_VISIBLE_TESTID = "timeline-highlight-not-visible";
+export const TIMELINE_HIGHLIGHT_BLOCKERS_TESTID = "timeline-highlight-active-blockers";
+export const TIMELINE_HIGHLIGHT_CLEAR_FILTERS_TESTID = "timeline-highlight-clear-filters";
 export const TIMELINE_HIGHLIGHT_CLEAR_FILTERS_LABEL = "Clear filters";
 
 /** Human-readable names for active blocker detection. Pure, ordered. */
 export type TimelineHighlightBlockerKind =
-  | "search"
-  | "stage"
-  | "event type"
-  | "plant"
-  | "tent"
-  | "sensor source";
+  "search" | "stage" | "event type" | "care type" | "plant" | "tent" | "sensor source";
 
 export interface TimelineHighlightBlockerInput {
   searchQuery?: string | null;
@@ -53,6 +43,8 @@ export interface TimelineHighlightBlockerInput {
   plantFilter?: string | null;
   tentFilter?: string | null;
   sensorSourceCount?: number | null;
+  /** Care category chip (watering / feeding / training / diagnoses). */
+  careCategoryFilter?: string | null;
 }
 
 /**
@@ -67,12 +59,23 @@ export function detectTimelineHighlightBlockers(
   if (typeof input.searchQuery === "string" && input.searchQuery.trim() !== "") {
     out.push("search");
   }
-  if (typeof input.stageFilter === "string" && input.stageFilter !== "" && input.stageFilter !== "all") {
+  if (
+    typeof input.stageFilter === "string" &&
+    input.stageFilter !== "" &&
+    input.stageFilter !== "all"
+  ) {
     out.push("stage");
   }
   const evt = input.eventFilter ?? input.eventTypeFilter ?? null;
   if (typeof evt === "string" && evt !== "" && evt !== "all") {
     out.push("event type");
+  }
+  if (
+    typeof input.careCategoryFilter === "string" &&
+    input.careCategoryFilter !== "" &&
+    input.careCategoryFilter !== "all"
+  ) {
+    out.push("care type");
   }
   if (typeof input.plantFilter === "string" && input.plantFilter !== "") {
     out.push("plant");
@@ -133,8 +136,6 @@ export interface DiaryEntryDetailsLike {
   /** Untyped because the diary `details` column is JSON. */
   details?: unknown;
 }
-
-
 
 /**
  * Returns true ONLY when the entry's `details.idempotency_key` matches

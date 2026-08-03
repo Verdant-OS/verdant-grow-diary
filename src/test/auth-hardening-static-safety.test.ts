@@ -11,25 +11,31 @@ const CLIENT = readFileSync(resolve(SRC, "integrations/supabase/client.ts"), "ut
 const AUTH_DOC = readFileSync(resolve(ROOT, "docs/auth-security.md"), "utf8");
 const RLS_DOC = readFileSync(resolve(ROOT, "docs/qa-rls-checklist.md"), "utf8");
 
-const SRC_FILES = listFilesCached(SRC).filter((p) =>
-  /\.(ts|tsx|js|jsx)$/.test(p),
-);
+const SRC_FILES = listFilesCached(SRC).filter((p) => /\.(ts|tsx|js|jsx)$/.test(p));
 const isSrcTestFile = (filePath: string) =>
   relative(SRC, filePath).replace(/\\/g, "/").startsWith("test/");
 
 describe("Supabase client storage", () => {
   it("uses sessionStorage (not localStorage) for auth persistence", () => {
-    expect(CLIENT).toMatch(/storage:\s*sessionStorage/);
+    // Lazy adapter wraps window.sessionStorage — never localStorage.
+    expect(CLIENT).toMatch(/sessionStorage/);
     expect(CLIENT).not.toMatch(/storage:\s*localStorage/);
+    expect(CLIENT).not.toMatch(/window\.localStorage/);
   });
 
-  it("keeps autoRefreshToken + persistSession enabled", () => {
-    expect(CLIENT).toMatch(/persistSession:\s*true/);
-    expect(CLIENT).toMatch(/autoRefreshToken:\s*true/);
+  it("keeps autoRefreshToken + persistSession enabled in the browser", () => {
+    // Browser path enables both; Node/SSR forces them off.
+    expect(CLIENT).toMatch(/persistSession:\s*isBrowser/);
+    expect(CLIENT).toMatch(/autoRefreshToken:\s*isBrowser/);
   });
 
   it("documents the hardening edit in a comment", () => {
     expect(CLIENT).toMatch(/MINIMAL HARDENING EDIT/);
+  });
+
+  it("defers sessionStorage access behind a lazy adapter (SSR-safe import)", () => {
+    expect(CLIENT).toMatch(/createLazySessionStorage/);
+    expect(CLIENT).not.toMatch(/storage:\s*typeof window[\s\S]*window\.sessionStorage/);
   });
 });
 
@@ -96,9 +102,7 @@ describe("src/ static safety", () => {
     const offenders = SRC_FILES.filter((f) => {
       if (f.endsWith("auth-hardening-static-safety.test.ts")) return false;
       const body = readFileCached(f);
-      return /from\s+['"]@supabase\/ssr['"]|from\s+['"]next\/headers['"]/.test(
-        body,
-      );
+      return /from\s+['"]@supabase\/ssr['"]|from\s+['"]next\/headers['"]/.test(body);
     });
     expect(offenders).toEqual([]);
   });

@@ -36,6 +36,10 @@ import {
   Bell,
   ListChecks,
   ClipboardCheck,
+  Droplets,
+  Utensils,
+  Scissors,
+  Stethoscope,
 } from "lucide-react";
 import { isActionResponseCandidateDetails } from "@/lib/actionResponseMemoryRules";
 import { buildActionResponseMemoryCardViewModel } from "@/lib/actionResponseMemoryViewModel";
@@ -117,13 +121,17 @@ import {
 import { ROOT_ZONE_GROW_EVENT_SELECT } from "@/lib/rootZoneObservationRules";
 import { mergeTimelineSources } from "@/lib/timelineMergeRules";
 import {
+  countTimelineCareCategoryBuckets,
   deriveTimelineEventTypeOptions,
   deriveTimelinePlantOptions,
   deriveTimelineTentOptions,
   filterTimelineEvidenceRows,
   isTimelineDateFilterValue,
   isTimelineEvidenceFilterActive,
+  TIMELINE_CARE_CATEGORY_FILTERS,
+  TIMELINE_CARE_CATEGORY_LABELS,
   TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER,
+  type TimelineCareCategoryFilter,
 } from "@/lib/timelineEvidenceFilterRules";
 import {
   buildMissingActionCopy,
@@ -369,7 +377,10 @@ export default function Timeline() {
   // clear actions stay in sync.
   const [didSeedTentFilter, setDidSeedTentFilter] = useState(false);
   const [eventTypeFilter, setEventTypeFilter] = useState("");
+  /** Care category chips: watering / feeding / training / diagnoses. */
+  const [careCategoryFilter, setCareCategoryFilter] = useState<TimelineCareCategoryFilter>("all");
   const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
+
   const [detailEntryId, setDetailEntryId] = useState<string | null>(null);
   // Source filter state is mirrored to/from the `?sensorSources=` URL
   // query param so the Sensors page summary widget can link directly into
@@ -862,16 +873,19 @@ export default function Timeline() {
     [entries, tentNamesById],
   );
   const eventTypeOptions = useMemo(() => deriveTimelineEventTypeOptions(entries), [entries]);
+  const careCategoryCounts = useMemo(() => countTimelineCareCategoryBuckets(entries), [entries]);
 
   const evidenceFilterInput = {
     query: searchQuery,
     plantId: plantFilter,
     tentId: tentFilter,
     eventType: eventTypeFilter,
+    careCategory: careCategoryFilter,
     sensorSources: sensorSourceFilter,
     startDate: effectiveStartDate,
     endDate: effectiveEndDate,
   };
+
   const evidenceActive = isTimelineEvidenceFilterActive(evidenceFilterInput);
 
   // Selection context handed to the empty-state fast-add buttons. The
@@ -904,6 +918,7 @@ export default function Timeline() {
     plantFilter,
     tentFilter,
     eventTypeFilter,
+    careCategoryFilter,
     sensorSourceFilter,
     effectiveStartDate,
     effectiveEndDate,
@@ -914,6 +929,7 @@ export default function Timeline() {
     setPlantFilter("");
     setTentFilter("");
     setEventTypeFilter("");
+    setCareCategoryFilter("all");
     setSensorSourceFilter([]);
     setStartDateFilter("");
     setEndDateFilter("");
@@ -1494,6 +1510,52 @@ export default function Timeline() {
             Next missing action
           </Button>
         </div>
+        {/* Care category quick filters — watering, feeding, training, diagnoses */}
+        <div
+          className="flex flex-wrap items-center gap-1.5"
+          data-testid="timeline-care-category-filter"
+          aria-label="Filter timeline by care type"
+        >
+          <span className="text-[11px] uppercase tracking-wide text-muted-foreground mr-1">
+            Care type
+          </span>
+          {TIMELINE_CARE_CATEGORY_FILTERS.map((key) => {
+            const active = careCategoryFilter === key;
+            const count = careCategoryCounts[key];
+            const icon =
+              key === "watering" ? (
+                <Droplets className="h-3 w-3" />
+              ) : key === "feeding" ? (
+                <Utensils className="h-3 w-3" />
+              ) : key === "training" ? (
+                <Scissors className="h-3 w-3" />
+              ) : key === "symptoms" ? (
+                <Stethoscope className="h-3 w-3" />
+              ) : null;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setCareCategoryFilter(key)}
+                data-testid={`timeline-care-filter-${key}`}
+                aria-pressed={active}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors",
+                  active
+                    ? "border-primary/50 bg-primary/10 text-foreground"
+                    : "border-border/50 bg-background/60 text-muted-foreground hover:text-foreground",
+                  key !== "all" && count === 0 && !active ? "opacity-50" : "",
+                )}
+              >
+                {icon}
+                <span>{TIMELINE_CARE_CATEGORY_LABELS[key]}</span>
+                {key !== "all" && (
+                  <span className="tabular-nums text-[10px] opacity-80">({count})</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
         {dateRangeInvalid && (
           <p className="text-xs text-destructive" data-testid="timeline-date-range-error">
             Start date must be on or before end date. The range is not applied until it is.
@@ -1651,6 +1713,7 @@ export default function Timeline() {
               stageFilter,
               eventFilter,
               eventTypeFilter,
+              careCategoryFilter,
               plantFilter,
               tentFilter,
               sensorSourceCount: sensorSourceFilter.length,

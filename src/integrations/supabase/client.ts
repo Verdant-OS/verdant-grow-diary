@@ -3,20 +3,66 @@
 // from `localStorage` to `sessionStorage` as part of the Vite Supabase auth
 // hardening slice. See docs/auth-security.md for rationale and tradeoffs.
 // Do not regenerate this file without re-applying that single line change.
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from './types';
+//
+// SSR/import-time safety: never touch `window.sessionStorage` while evaluating
+// this module. Partial SSR shims (or hostile test envs) may define `window`
+// whose `sessionStorage` getter throws. Auth storage is resolved lazily inside
+// Storage methods so Node/SSR imports stay inert.
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "./types";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+/**
+ * Browser sessionStorage adapter that never reads `sessionStorage` at
+ * construction time — only inside method bodies, each guarded with try/catch.
+ * Returns `undefined` on Node/SSR (no window) so createClient skips persist.
+ */
+function createLazySessionStorage(): Storage | undefined {
+  if (typeof window === "undefined") return undefined;
+
+  const read = (): Storage | null => {
+    try {
+      return window.sessionStorage;
+    } catch {
+      return null;
+    }
+  };
+
+  return {
+    get length() {
+      return read()?.length ?? 0;
+    },
+    clear() {
+      read()?.clear();
+    },
+    getItem(key: string) {
+      return read()?.getItem(key) ?? null;
+    },
+    key(index: number) {
+      return read()?.key(index) ?? null;
+    },
+    removeItem(key: string) {
+      read()?.removeItem(key);
+    },
+    setItem(key: string, value: string) {
+      read()?.setItem(key, value);
+    },
+  };
+}
+
+const isBrowser = typeof window !== "undefined";
+const browserSessionStorage = createLazySessionStorage();
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    // SSR/prerender safety: `sessionStorage` does not exist on the server.
-    storage: typeof window !== 'undefined' ? window.sessionStorage : undefined,
-    persistSession: typeof window !== 'undefined',
-    autoRefreshToken: typeof window !== 'undefined',
-  }
+    // Prefer sessionStorage (not localStorage) when a browser storage is available.
+    storage: browserSessionStorage,
+    persistSession: isBrowser && browserSessionStorage !== undefined,
+    autoRefreshToken: isBrowser && browserSessionStorage !== undefined,
+  },
 });

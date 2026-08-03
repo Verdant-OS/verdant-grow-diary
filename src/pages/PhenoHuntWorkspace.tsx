@@ -66,6 +66,8 @@ import { updatePhenoHuntSetup } from "@/lib/phenoHuntService";
 import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 import PhenoCandidateEvidenceCoverage from "@/components/PhenoCandidateEvidenceCoverage";
 import { usePhenoEvidencePackets } from "@/hooks/usePhenoEvidencePackets";
+import { usePlants } from "@/hooks/use-plants";
+import { useTents } from "@/hooks/use-tents";
 import type { PhenoCandidateEvidencePacket } from "@/lib/phenoEvidencePacket";
 import {
   evaluatePhenoCandidateReadiness,
@@ -680,6 +682,22 @@ interface EditorProps {
   onSaveSex: (plantId: string, sex: PhenoSexObservation) => Promise<boolean>;
   growId: string | null;
   tentId: string | null;
+  handoffPlants: ReadonlyArray<{
+    id: string;
+    grow_id?: string | null;
+    tent_id?: string | null;
+    is_archived?: boolean | null;
+    archived_at?: string | null;
+    merged_into_plant_id?: string | null;
+  }> | null;
+  handoffTents: ReadonlyArray<{
+    id: string;
+    grow_id?: string | null;
+    is_archived?: boolean | null;
+    archived_at?: string | null;
+  }> | null;
+  handoffCatalogStatus: "pending" | "ready" | "error";
+  onRetryHandoffCatalog: () => void;
   onQueueRemoval: (input: {
     observationId: string;
     candidateLabel: string;
@@ -742,6 +760,10 @@ const CandidateEditor = memo(function CandidateEditor({
   onSaveSex,
   growId,
   tentId,
+  handoffPlants,
+  handoffTents,
+  handoffCatalogStatus,
+  onRetryHandoffCatalog,
   onQueueRemoval,
   queuing,
   queued,
@@ -871,6 +893,10 @@ const CandidateEditor = memo(function CandidateEditor({
           plantName={candidate.plantLabel ?? null}
           growId={growId}
           tentId={tentId}
+          handoffPlants={handoffPlants}
+          handoffTents={handoffTents}
+          handoffCatalogStatus={handoffCatalogStatus}
+          onRetryHandoffCatalog={onRetryHandoffCatalog}
           allowRecordActions
           data-testid={`workspace-evidence-coverage-${plantId}`}
         />
@@ -1152,6 +1178,33 @@ export default function PhenoHuntWorkspace() {
     plantIds: loadedCandidateIds,
     configuredGoals: ws.hunt?.evidenceGoals ?? [],
   });
+  // Canonical plant/tent catalogs for evidence → Quick Log handoff integrity.
+  // Fail closed while loading; never invent tent from hunt or active grow.
+  const plantsQuery = usePlants();
+  const tentsQuery = useTents();
+  const handoffPlants = useMemo(
+    () => (plantsQuery.data as EditorProps["handoffPlants"]) ?? null,
+    [plantsQuery.data],
+  );
+  const handoffTents = useMemo(
+    () => (tentsQuery.data as EditorProps["handoffTents"]) ?? null,
+    [tentsQuery.data],
+  );
+  const handoffCatalogStatus: EditorProps["handoffCatalogStatus"] =
+    plantsQuery.isError || tentsQuery.isError
+      ? "error"
+      : plantsQuery.isPending ||
+          plantsQuery.isLoading ||
+          tentsQuery.isPending ||
+          tentsQuery.isLoading ||
+          !plantsQuery.data ||
+          !tentsQuery.data
+        ? "pending"
+        : "ready";
+  const onRetryHandoffCatalog = useCallback(() => {
+    void plantsQuery.refetch();
+    void tentsQuery.refetch();
+  }, [plantsQuery, tentsQuery]);
   const { entitlement, refetch: refetchEntitlement } = useMyEntitlements();
   // Owner-only + Pro. Pheno surfaces are owner-only via RLS, so the viewer owns
   // the hunt; the presentation gate is an active Pheno Tracker Pro plan. The
@@ -1787,6 +1840,10 @@ export default function PhenoHuntWorkspace() {
                     onSaveSex={ws.saveSex}
                     growId={ws.hunt?.growId ?? null}
                     tentId={ws.hunt?.tentId ?? null}
+                    handoffPlants={handoffPlants}
+                    handoffTents={handoffTents}
+                    handoffCatalogStatus={handoffCatalogStatus}
+                    onRetryHandoffCatalog={onRetryHandoffCatalog}
                     onQueueRemoval={herm.queueRemoval}
                     queuing={herm.queuing === c.candidateId}
                     queued={herm.queuedPlantIds.has(c.candidateId)}

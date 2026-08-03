@@ -19,6 +19,7 @@ const NEW_FILES = [
   "src/lib/phenoEvidenceReceiptService.ts",
   "src/hooks/usePhenoEvidencePackets.ts",
   "src/lib/phenoEvidenceQuickLogPrefill.ts",
+  "src/lib/phenoEvidenceHandoffRules.ts",
   "src/components/PhenoCandidateEvidenceCoverage.tsx",
 ];
 
@@ -85,17 +86,32 @@ describe("packet-loop slice — Quick Log bridge stays single-path", () => {
     expect(quickLog).toMatch(
       /phenoEvidenceContext\.status !== "ready" \|\| !phenoEvidenceContext\.context\) return;/,
     );
-    expect(quickLog).toMatch(/coverage\.goals\.some\(\(g\) => g\.id === goal\);\s*if \(!configured\) return;/);
+    expect(quickLog).toMatch(
+      /coverage\.goals\.some\(\(g\) => g\.id === goal\);\s*if \(!configured\) return;/,
+    );
   });
 
   it("save-time revalidation against live configured goals is intact", () => {
-    expect(quickLog).toMatch(/coverage\.goals\.some\(\s*\(goal\) => goal\.id === selectedPhenoEvidenceGoal/);
+    expect(quickLog).toMatch(
+      /coverage\.goals\.some\(\s*\(goal\) => goal\.id === selectedPhenoEvidenceGoal/,
+    );
   });
 
   it("the coverage presenter dispatches the EXISTING prefill event, no new modal/route", () => {
     const src = read("src/components/PhenoCandidateEvidenceCoverage.tsx");
     expect(src).toMatch(/PLANT_QUICKLOG_PREFILL_EVENT/);
-    expect(src).not.toMatch(/createPortal|<Dialog|useNavigate|<Route/);
+    expect(src).toMatch(/resolvePhenoEvidenceHandoff/);
+    expect(src).not.toMatch(/createPortal|useNavigate|<Route/);
+    // Link to plant assignment is allowed; Dialog is not a second save path.
+    expect(src).not.toMatch(/from\(["']diary_entries["']\)|\.insert\(/);
+  });
+
+  it("handoff rules reuse canonical Quick Log integrity (no second rule table)", () => {
+    const rules = read("src/lib/phenoEvidenceHandoffRules.ts");
+    expect(rules).toMatch(/resolveQuickLogPrefillTarget/);
+    expect(rules).toMatch(/QUICK_LOG_TARGET_BLOCKED_COPY/);
+    expect(rules).not.toMatch(/activeGrowId/);
+    expect(strip(rules)).not.toMatch(/\.insert\(|diary_entries/);
   });
 });
 

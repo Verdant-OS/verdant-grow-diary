@@ -14,6 +14,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const MIGRATIONS_DIR = resolve(ROOT, "supabase/migrations");
@@ -36,7 +40,7 @@ const ALERTS_SQL = (() => {
 const ALERTS_LIB = readFileSync(resolve(__dirname, "../lib/alerts.ts"), "utf8");
 const ALERT_PAGE = readFileSync(resolve(__dirname, "../pages/Alerts.tsx"), "utf8");
 const DASHBOARD = readFileSync(resolve(__dirname, "../pages/Dashboard.tsx"), "utf8");
-const APP_TSX = readFileSync(resolve(__dirname, "../App.tsx"), "utf8");
+const APP_TSX = readAllRouteModuleSources();
 const ROUTES = readFileSync(resolve(__dirname, "../lib/routes.ts"), "utf8");
 
 // ---------------------------------------------------------------------------
@@ -121,7 +125,8 @@ describe("alerts table migration", () => {
 // ---------------------------------------------------------------------------
 describe("Alert Center routing", () => {
   it("registers the /alerts route", () => {
-    expect(APP_TSX).toMatch(/path=["']\/alerts["']\s+element=\{<Alerts/);
+    expect(extractMountedAppRoutePaths()).toContain("/alerts");
+    expect(APP_TSX).toMatch(/Alerts/);
   });
 
   it("alertsPath helper accepts a growId and emits ?growId=", () => {

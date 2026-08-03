@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 function read(path: string): string {
   return readFileSync(resolve(process.cwd(), path), "utf8");
@@ -8,7 +12,7 @@ function read(path: string): string {
 
 const SQL = read("supabase/migrations/20260714193000_subscriber_growth_operator_snapshot.sql");
 const PAGE = read("src/pages/OperatorSubscriberGrowth.tsx");
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 const MANIFEST = read("src/lib/appRouteManifest.ts");
 const GAMIFICATION_TIER_REFERENCE = ["profiles", "tier"].join(".");
 
@@ -120,7 +124,7 @@ describe("subscriber growth operator snapshot — security and truth fences", ()
 
   it("mounts the page only on the operator route", () => {
     expect(APP).toContain("OperatorSubscriberGrowth");
-    expect(APP).toContain('path="/operator/subscriber-growth"');
+    expect(extractMountedAppRoutePaths()).toContain("/operator/subscriber-growth");
     expect(MANIFEST).toContain('path: "/operator/subscriber-growth"');
     expect(MANIFEST).toContain('access: "operator"');
   });

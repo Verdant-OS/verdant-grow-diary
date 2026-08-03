@@ -1,10 +1,10 @@
 /**
  * Route-snapshot guard: every href used by the Demo Proof Walkthrough
- * must correspond to a route currently mounted in `src/App.tsx`. The
+ * must correspond to a route currently mounted in `src/file routes`. The
  * walkthrough is the operator's tour of the real app — if a step links
  * to a non-existent route, the demo is broken.
  *
- * Source of truth: paths scraped from `src/App.tsx`. The app route
+ * Source of truth: paths scraped from `src/file routes`. The app route
  * manifest is consulted as a secondary cross-check when entries exist.
  */
 import { describe, it, expect } from "vitest";
@@ -12,9 +12,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
 import { buildDemoProofWalkthroughViewModel } from "@/lib/demoProofWalkthroughViewModel";
+import { extractMountedAppRoutePaths } from "./helpers/routeManifestSyncHarness";
 
 function loadAppRoutePaths(): Set<string> {
-  const src = readFileSync(resolve(process.cwd(), "src/App.tsx"), "utf8");
+  const src = readFileSync(resolve(process.cwd(), "src/file routes"), "utf8");
   const paths = new Set<string>();
   const re = /path=["']([^"']+)["']/g;
   let m: RegExpExecArray | null;
@@ -31,7 +32,7 @@ describe("Demo Proof Walkthrough — route snapshot", () => {
   const appPaths = loadAppRoutePaths();
   const vm = buildDemoProofWalkthroughViewModel();
 
-  it("App.tsx exposes the expected real routes the walkthrough relies on", () => {
+  it("file routes exposes the expected real routes the walkthrough relies on", () => {
     const required = [
       "/",
       "/tents",
@@ -45,16 +46,16 @@ describe("Demo Proof Walkthrough — route snapshot", () => {
       "/demo/one-tent-live-proof",
     ];
     for (const p of required) {
-      expect(appPaths.has(p), `App.tsx missing route ${p}`).toBe(true);
+      expect(appPaths.has(p), `file routes missing route ${p}`).toBe(true);
     }
   });
 
-  it("every walkthrough href resolves to a real App.tsx route (query stripped)", () => {
+  it("every walkthrough href resolves to a real file routes route (query stripped)", () => {
     for (const step of vm.steps) {
       const base = stripQuery(step.href);
       expect(
         appPaths.has(base),
-        `walkthrough step ${step.id} href ${step.href} (base ${base}) not in App.tsx`,
+        `walkthrough step ${step.id} href ${step.href} (base ${base}) not in file routes`,
       ).toBe(true);
     }
   });

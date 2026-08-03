@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 function readProjectFile(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -10,7 +14,7 @@ const MIGRATION = readProjectFile(
   "supabase/migrations/20260621003000_paddle_event_processing_operator_audit.sql",
 );
 const PAGE = readProjectFile("src/pages/OperatorPaddleProcessingAudit.tsx");
-const APP = readProjectFile("src/App.tsx");
+const APP = readAllRouteModuleSources();
 
 describe("Paddle processing operator audit static guards", () => {
   it("adds an operator-gated sanitized RPC instead of client table grants", () => {

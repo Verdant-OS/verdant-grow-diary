@@ -3,11 +3,15 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { matchRoutes } from "@/lib/react-router-compat";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (path: string) => readFileSync(resolve(ROOT, path), "utf8");
 
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 const SEO_CONTENT = read("src/constants/verdantSeoContent.ts");
 const MOBILE_ROUTE_SPEC = read("e2e/auth-route-protection-mobile.spec.ts");
 
@@ -20,7 +24,7 @@ describe("retired unbacked Customer Mode share routes", () => {
     expect(APP).not.toMatch(/import\(\s*["']\.\/pages\/CustomerModeCannabisCareFaq["']\s*\)/);
 
     for (const path of RETIRED_CUSTOMER_ROUTES) {
-      expect(APP).not.toContain(`path="${path}"`);
+      expect(extractMountedAppRoutePaths()).not.toContain(path);
     }
   });
 
@@ -32,7 +36,7 @@ describe("retired unbacked Customer Mode share routes", () => {
   });
 
   it("allows only the exact ID-free comparison guide as a public customer route", () => {
-    expect(APP).toContain(`path="${STATIC_CUSTOMER_GUIDE}"`);
+    expect(extractMountedAppRoutePaths()).toContain(STATIC_CUSTOMER_GUIDE);
     expect(APP_ROUTES.find((route) => route.path === STATIC_CUSTOMER_GUIDE)).toMatchObject({
       access: "public",
     });
@@ -46,7 +50,8 @@ describe("retired unbacked Customer Mode share routes", () => {
   it.each(["/customer/invented-share", "/customer/invented-share/cannabis-care"])(
     "%s reaches the catch-all Not Found route",
     (path) => {
-      expect(APP).toContain('<Route path="*" element={<NotFound />} />');
+      expect(extractMountedAppRoutePaths()).toContain("*");
+      expect(APP).toMatch(/NotFound|@\/pages\/NotFound|pages\/NotFound/);
 
       const matches = matchRoutes(
         APP_ROUTES.map((route) => ({

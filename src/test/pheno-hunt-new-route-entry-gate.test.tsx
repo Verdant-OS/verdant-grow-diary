@@ -4,7 +4,7 @@
  *
  * Regression for the bug where a non-Pro account could walk through all six
  * wizard steps and only fail at the final save with a raw RLS error. This
- * mounts the same composition App.tsx registers for the route
+ * mounts the same composition File routes register for the route
  * (PhenoTrackerUpgradeGate wrapping PhenoHuntNew) and proves:
  *   - Free: upgrade card renders, the wizard (steps, save button) never
  *     mounts, and no Supabase query fires at all.
@@ -98,7 +98,7 @@ function mockGrowData() {
 }
 
 function renderRoute() {
-  // Same shape App.tsx registers for the wizard route.
+  // Same shape File routes register for the wizard route.
   return render(
     <MemoryRouter initialEntries={["/pheno-hunts/new?growId=g1"]}>
       <Routes>

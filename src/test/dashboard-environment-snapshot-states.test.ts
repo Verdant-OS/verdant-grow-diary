@@ -10,10 +10,15 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { readDesktopGrowerNavigationSource } from "@/test/utils/growerNavigationSource";
+import {
+  extractMountedAppRoutePaths,
+  getRouteAliasRedirectTarget,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const DASH = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
-const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+const APP = readAllRouteModuleSources();
 const SIDEBAR = readDesktopGrowerNavigationSource();
 const GROW_DETAIL = readFileSync(resolve(ROOT, "src/pages/GrowDetail.tsx"), "utf8");
 const GRM = readFileSync(resolve(ROOT, "src/pages/GrowRoomMode.tsx"), "utf8");
@@ -79,9 +84,8 @@ describe("Source label rules (used by Environment Snapshot via SensorSourceBadge
 
 describe("Legacy Live Dashboard route + copy cleanup", () => {
   it("App redirects /grow-room to /", () => {
-    expect(APP).toMatch(
-      /path=["']\/grow-room["']\s+element=\{<RouteAliasRedirect\s+to=["']\/["']\s*\/>\}/,
-    );
+    expect(extractMountedAppRoutePaths()).toContain("/grow-room");
+    expect(getRouteAliasRedirectTarget("/grow-room")).toBe("/");
   });
 
   it("App no longer mounts GrowRoomMode at any route", () => {

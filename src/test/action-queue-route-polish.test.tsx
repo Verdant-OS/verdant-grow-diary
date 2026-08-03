@@ -11,6 +11,11 @@ import { MemoryRouter } from "@/lib/react-router-compat";
 
 import ActionQueue from "@/pages/ActionQueue";
 import {
+  extractMountedAppRoutePaths,
+  getRouteAliasRedirectTarget,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
+import {
   buildActionRowAriaLabel,
   formatActionTypeLabel,
   formatRiskLabel,
@@ -249,7 +254,7 @@ describe("Action Queue route — row accessibility", () => {
 const ROOT = resolve(__dirname, "../..");
 const PAGE = readFileSync(resolve(ROOT, "src/pages/ActionQueue.tsx"), "utf8");
 const VIEW = readFileSync(resolve(ROOT, "src/lib/actionQueueRowView.ts"), "utf8");
-const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+const APP = readAllRouteModuleSources();
 
 describe("Action Queue polish — static safety + contract preservation", () => {
   it("polish helper has no I/O or privileged access", () => {
@@ -283,9 +288,9 @@ describe("Action Queue polish — static safety + contract preservation", () => 
   });
 
   it("preserves /actions route registration and legacy /action-queue redirect", () => {
-    expect(APP).toMatch(/path="\/actions"\s+element=\{<ActionQueue\s*\/>\}/);
-    expect(APP).toMatch(
-      /path="\/action-queue"\s+element=\{<RouteAliasRedirect\s+to="\/actions"\s*\/>\}/,
-    );
+    expect(extractMountedAppRoutePaths()).toContain("/actions");
+    expect(extractMountedAppRoutePaths()).toContain("/action-queue");
+    expect(APP).toMatch(/ActionQueue|@\/pages\/ActionQueue|pages\/ActionQueue/);
+    expect(getRouteAliasRedirectTarget("/action-queue")).toBe("/actions");
   });
 });

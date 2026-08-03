@@ -9,10 +9,10 @@ runtime migration. Orthogonal to PR #694 (SSR Supabase init).
 
 | # | Criterion | Baseline | Status |
 | --- | --- | --- | --- |
-| C1 | Zero test files open `src/App.tsx` | **79** files reference `App.tsx` (~67 hard reads) | ❌ |
+| C1 | Zero test files open `src/App.tsx` | **0 hard reads** (was 79); residual comments only | ✅ |
 | C2 | `route-manifest-sync` green vs routeTree / routes FS | Harness rewritten (`routeManifestSyncHarness`); **27/27** tests green on local | ✅ harness |
-| C3 | Operator/sensor guard parity uses `_app` + `RequireOperatorRole` layout | Runtime: `_app/_operator.tsx` ✅ · tests still scrape App.tsx ❌ | ⚠️ partial |
-| C4 | Full Vitest not dominated by ENOENT App.tsx | 15-file Full Vitest sample heavily App.tsx / static route debt | ❌ |
+| C3 | Operator/sensor guard parity on `_app` + RequireOperatorRole | Layout tests rewritten; sensor/operator suites green | ✅ |
+| C4 | Full Vitest not dominated by ENOENT App.tsx | Hard ENOENT path eliminated in rewired static suites | ⚠️ partial (full CI TBD) |
 | C5 | STATE.md Step 9 + prerender decision closed or scheduled | Step 9 open; prerender deferred undecided | ❌ |
 
 ---

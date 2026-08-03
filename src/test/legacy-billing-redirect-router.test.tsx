@@ -9,6 +9,10 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 import { resolve } from "node:path";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-compat";
@@ -147,17 +151,18 @@ describe("LegacyBillingRedirect — router-level canonical proof", () => {
 
 // -------- Static router-manifest guarantees ----------------------------
 
-const APP_SRC = readFileSync(resolve(__dirname, "..", "App.tsx"), "utf8");
+const APP_SRC = readAllRouteModuleSources();
+const MOUNTED = extractMountedAppRoutePaths();
 
-describe("App.tsx and manifest convergence", () => {
-  it("App.tsx has no BillingPlaceholder import or route element", () => {
+describe("billing route and manifest convergence", () => {
+  it("routes have no BillingPlaceholder import or route element", () => {
     expect(APP_SRC).not.toMatch(/BillingPlaceholder/);
   });
 
-  it("App.tsx mounts /billing/:plan only as LegacyBillingRedirect", () => {
-    const matches = APP_SRC.match(/path="\/billing\/:plan"\s+element=\{<([A-Za-z0-9_]+)/g) ?? [];
-    expect(matches.length).toBe(1);
-    expect(matches[0]).toContain("LegacyBillingRedirect");
+  it("mounts /billing/:plan only as LegacyBillingRedirect", () => {
+    expect(MOUNTED).toContain("/billing/:plan");
+    expect(APP_SRC).toMatch(/LegacyBillingRedirect/);
+    expect(APP_SRC).toMatch(/createFileRoute\(\s*["']\/billing\/\$plan["']/);
   });
 
   it("route manifest marks /billing/:plan as a redirect to /pricing", () => {

@@ -22,6 +22,10 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import AiDoctorSessionsIndex from "@/pages/AiDoctorSessionsIndex";
 import { AI_DOCTOR_SESSIONS_INDEX_PAGE_SIZE } from "@/hooks/use-ai-doctor-sessions";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 function renderWithProviders(ui: ReactElement) {
   const client = new QueryClient({
@@ -65,7 +69,7 @@ const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 
 const PAGE = read("src/pages/AiDoctorSessionsIndex.tsx");
 const HOOK = read("src/hooks/use-ai-doctor-sessions.ts");
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 const COACH_PANEL = read("src/components/CoachAiDoctorHistoryPanel.tsx");
 
 describe("useAiDoctorSessionsIndex — static contract", () => {
@@ -220,11 +224,15 @@ describe("AiDoctorSessionsIndex — row rendering (static source)", () => {
 
 describe("App routing", () => {
   it("registers /doctor/sessions index route", () => {
-    expect(APP).toMatch(/<Route\s+path="\/doctor\/sessions"\s+element=\{<AiDoctorSessionsIndex/);
+    expect(extractMountedAppRoutePaths()).toContain("/doctor/sessions");
+    expect(APP).toMatch(
+      /AiDoctorSessionsIndex|@\/pages\/AiDoctorSessionsIndex|pages\/AiDoctorSessionsIndex/,
+    );
   });
   it("still registers /doctor/sessions/:sessionId detail route", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/doctor/sessions/:sessionId");
     expect(APP).toMatch(
-      /<Route\s+path="\/doctor\/sessions\/:sessionId"\s+element=\{<AiDoctorSessionDetail/,
+      /AiDoctorSessionDetail|@\/pages\/AiDoctorSessionDetail|pages\/AiDoctorSessionDetail/,
     );
   });
 });

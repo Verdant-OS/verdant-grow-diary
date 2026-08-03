@@ -10,6 +10,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { readAllRouteModuleSources } from "./helpers/routeManifestSyncHarness";
 
 function read(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -26,7 +27,7 @@ function findMigration(substring: string): string {
 
 const PAGE = read("src/pages/OperatorBillingEntitlementResolutionAudit.tsx");
 const VIEW_MODEL = read("src/lib/billingEntitlementResolutionAuditViewModel.ts");
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 const SUB_UPDATE_PAGE = read("src/pages/OperatorBillingSubscriptionUpdateAudit.tsx");
 const MIGRATION = findMigration("billing_entitlement_resolution_operator_audit");
 

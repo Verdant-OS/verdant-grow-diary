@@ -1,8 +1,5 @@
 import { defineConfig, type Plugin } from "vitest/config";
-// Use the declared dep (@vitejs/plugin-react). plugin-react-swc is NOT in
-// package.json / bun.lock — CI `bun install --frozen-lockfile` never installs
-// it, so every vitest process dies at config load (Full Vitest Suite PR gate).
-import react from "@vitejs/plugin-react";
+import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
 /**

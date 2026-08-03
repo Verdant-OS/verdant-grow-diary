@@ -7,7 +7,7 @@ import { GOOGLE_ANALYTICS_MEASUREMENT_ID } from "@/constants/analytics";
 
 describe("Google Analytics measurement ID constant", () => {
   it("exports the correct measurement ID", () => {
-    expect(GOOGLE_ANALYTICS_MEASUREMENT_ID).toBe("G-B3QRSZEM9S");
+    expect(GOOGLE_ANALYTICS_MEASUREMENT_ID).toBe("G-MCXQ9GVS5H");
   });
 
   it("is a non-empty string", () => {

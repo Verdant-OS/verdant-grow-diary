@@ -33,7 +33,7 @@ Authenticated GA4 reporting and Search Console inspection are also unavailable, 
 unset.
 
 The owner-confirmed GA4 production stream is `Verdant Grow Diary`, stream URL
-`https://verdantgrowdiary.com`, stream ID `15065867361`, and measurement ID `G-B3QRSZEM9S`.
+`https://verdantgrowdiary.com`, stream ID `15065867361`, and measurement ID `G-MCXQ9GVS5H`.
 Production loads and targets that exact measurement ID. This closes stream identity only; the
 numeric property ID and authenticated reporting baseline remain unavailable to Codex.
 

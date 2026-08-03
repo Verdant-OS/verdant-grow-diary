@@ -9,16 +9,18 @@ Adoption narrative: [`docs/biome-adoption.md`](./biome-adoption.md).
 
 | Phase | Name | Status |
 | --- | --- | --- |
-| 0 | Preconditions | Done |
-| 1 | Install + scripts | Done (`@biomejs/biome@2.5.6`) |
-| 2 | migrate prettier | Skipped (hand-mapped; Prettier removed) |
-| 3 | migrate eslint | Skipped (hand-mapped; ESLint removed) |
-| 4 | `biome migrate` | Done (`a11y.preset: "none"`) |
-| 5 | Tune error/warn gate | Done (`lint:ci` errors-only) |
-| 6 | Full format | Done (~2459 files) |
-| 7 | CI + lint-staged | Done |
-| 8 | Remove ESLint/Prettier | Done |
-| 9 | Ongoing / verify | `bun run verify:biome` |
+| 0 | Preconditions | ✅ Done |
+| 1 | Install + scripts | ✅ Done (`@biomejs/biome@2.5.6`) |
+| 2 | migrate prettier | ⏭️ Skipped (hand-mapped; Prettier removed) |
+| 3 | migrate eslint | ⏭️ Skipped (hand-mapped; ESLint removed) |
+| 4 | `biome migrate` | ✅ Done (`a11y.preset: "none"`) |
+| 5 | Tune error/warn gate | ✅ Done (`lint:ci` errors-only) |
+| 6 | Full format | ✅ Done (~2459 files) |
+| 7 | CI + lint-staged | ✅ Done |
+| 8 | Remove ESLint/Prettier | ✅ Done |
+| 9 | Ongoing / verify | 🔄 `bun run verify:biome` (13/13) |
+
+**Legend:** ✅ complete · ⏭️ skipped on purpose · 🔄 maintained via verifier · ❌ blocked / failed
 
 ---
 

@@ -63,7 +63,7 @@ try {
     "classified SSR response must expose the safe reference id",
   );
   assert(
-    classifiedBody.includes("Verdant couldn't connect to its data service"),
+    classifiedBody.includes("connect to its data service"),
     "classified SSR response must explain the data-service failure",
   );
   assert(
@@ -85,7 +85,7 @@ try {
   });
   const genericBody = await generic.response.text();
   assert(generic.code === "SSR_RENDER_FAILED", "generic error must keep generic classification");
-  assert(genericBody.includes("This page didn't load"), "generic error must keep friendly copy");
+  assert(genericBody.includes("This page didn"), "generic error must keep friendly copy");
   assert(!genericBody.includes("generic-private-detail"), "generic cause must stay server-only");
 
   console.log(

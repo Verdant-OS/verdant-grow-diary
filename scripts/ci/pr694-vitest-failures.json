@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "pr": 694,
+  "base_sha": "7efaaa5ed09a76e01e0555328e204934900f0083",
+  "pr_head_sha": "a28cd69b803eb1a5af78a90b9ca766e6fa6d4be0",
+  "ci_merge_sha": "541dbfca91f3876aca8224ad6d0dfd0250393ed5",
+  "source_workflow_run": 30846714026,
+  "smoke_test": "src/test/DemoProofWalkthrough-readonly-banner.test.tsx",
+  "failures": [
+    {
+      "batch": 0,
+      "test_file": "src/test/ai-doctor-session-detail-content-polish.test.tsx",
+      "ci_signature": "loading skeleton test id absent"
+    },
+    {
+      "batch": 1,
+      "test_file": "src/test/action-detail-context-links.test.ts",
+      "ci_signature": "ENOENT reading src/App.tsx"
+    },
+    {
+      "batch": 3,
+      "test_file": "src/test/dashboard-grow-scope.test.ts",
+      "ci_signature": "ENOENT reading src/App.tsx"
+    },
+    {
+      "batch": 4,
+      "test_file": "src/test/alert-detail.test.ts",
+      "ci_signature": "ENOENT reading src/App.tsx"
+    },
+    {
+      "batch": 5,
+      "test_file": "src/test/ai-doctor-context-check-surface.test.ts",
+      "ci_signature": "ENOENT reading src/App.tsx"
+    },
+    {
+      "batch": 6,
+      "test_file": "src/test/breeding-canonical-routes.test.tsx",
+      "ci_signature": "ENOENT reading src/App.tsx"
+    },
+    {
+      "batch": 7,
+      "test_file": "src/test/action-queue-route-polish.test.tsx",
+      "ci_signature": "ENOENT reading src/App.tsx"
+    },
+    {
+      "batch": 8,
+      "test_file": "src/test/action-detail.test.ts",
+      "ci_signature": "ENOENT reading src/App.tsx"
+    },
+    {
+      "batch": 9,
+      "test_file": "src/test/checkout-return-completion-tracking.test.tsx",
+      "ci_signature": "analytics spy did not receive checkout_return_completed"
+    },
+    {
+      "batch": 10,
+      "test_file": "src/test/alerts-route-quick-link-contract.test.tsx",
+      "ci_signature": "ENOENT reading src/App.tsx"
+    },
+    {
+      "batch": 11,
+      "test_file": "src/test/operator-role-gate.test.ts",
+      "ci_signature": "ENOENT reading src/App.tsx"
+    },
+    {
+      "batch": 12,
+      "test_file": "src/test/check-bun-lockfile-policy.test.ts",
+      "ci_signature": "lockfile policy mismatch and missing package-lock.json"
+    },
+    {
+      "batch": 13,
+      "test_file": "src/test/check-dependency-security.test.ts",
+      "ci_signature": "expected exit 0, received 2"
+    },
+    {
+      "batch": 14,
+      "test_file": "src/test/ai-doctor-redirect-alias.test.ts",
+      "ci_signature": "ENOENT reading src/App.tsx"
+    },
+    {
+      "batch": 15,
+      "test_file": "src/test/grow-detail.test.ts",
+      "ci_signature": "ENOENT reading src/App.tsx"
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { grantAnalyticsConsent } from "./utils/analyticsConsent";
 
 /**
  * Strict regression gate: a client-side page transition must NEVER produce an
@@ -52,6 +53,7 @@ async function documentSurvived(page: Page): Promise<boolean> {
 test.describe("GA4 config uniqueness across client-side navigation", () => {
   test.beforeEach(async ({ page }) => {
     await page.route("https://www.googletagmanager.com/**", (route) => route.abort());
+    await grantAnalyticsConsent(page);
   });
 
   test("no page transition adds a second gtag('config') call", async ({ page }) => {

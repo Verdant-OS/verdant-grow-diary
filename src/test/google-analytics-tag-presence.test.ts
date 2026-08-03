@@ -1,34 +1,53 @@
 /**
- * Static test: confirms the Google tag script is declared in the TanStack
- * root route head (src/routes/__root.tsx) and uses the correct measurement ID.
- * Replaces the pre-migration index.html check.
+ * Static test: analytics is consent-gated.
+ *
+ * The Google tag must NOT be declared in the TanStack root route head. It is
+ * injected by src/lib/googleAnalyticsLoader.ts only after the grower accepts
+ * in the consent banner, and still with `send_page_view: false` so the router
+ * owns every page_view.
  */
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 
-const ROOT_ROUTE = fs.readFileSync(path.resolve(process.cwd(), "src/routes/__root.tsx"), "utf-8");
+const read = (rel: string) => fs.readFileSync(path.resolve(process.cwd(), rel), "utf-8");
 
-describe("Google Analytics tag presence in __root.tsx head", () => {
-  it("declares the measurement ID", () => {
-    expect(ROOT_ROUTE).toMatch(/["']G-MCXQ9GVS5H["']/);
+const ROOT_ROUTE = read("src/routes/__root.tsx");
+const LOADER = read("src/lib/googleAnalyticsLoader.ts");
+const CONSTANTS = read("src/constants/analytics.ts");
+const HOOK = read("src/hooks/useGoogleAnalyticsPageViews.ts");
+
+describe("Google Analytics consent gate", () => {
+  it("declares the measurement ID in one place", () => {
+    expect(CONSTANTS).toMatch(/["']G-MCXQ9GVS5H["']/);
   });
 
-  it("contains the Google tag gtag.js script src", () => {
-    expect(ROOT_ROUTE).toContain("https://www.googletagmanager.com/gtag/js?id=");
+  it("does not ship the gtag.js tag in the root head", () => {
+    expect(ROOT_ROUTE).not.toContain("https://www.googletagmanager.com/gtag/js?id=");
+  });
+
+  it("mounts the consent banner and the consent-gated loader", () => {
+    expect(ROOT_ROUTE).toContain("AnalyticsConsentBanner");
+    expect(ROOT_ROUTE).toContain("loadGoogleAnalytics");
+    expect(ROOT_ROUTE).toMatch(/decision === "granted"/);
+  });
+
+  it("loads the gtag.js script only from the loader", () => {
+    expect(LOADER).toContain("https://www.googletagmanager.com/gtag/js?id=");
   });
 
   it("disables the raw-location initial page view", () => {
-    expect(ROOT_ROUTE).toMatch(
+    expect(LOADER).toMatch(
       /gtag\(\s*["']config["']\s*,\s*[^)]*?\{\s*send_page_view:\s*false\s*\}\s*\)/,
     );
   });
 
-  it("contains the dataLayer bootstrap", () => {
-    expect(ROOT_ROUTE).toMatch(/window\.dataLayer\s*=\s*window\.dataLayer\s*\|\|\s*\[\]/);
+  it("contains the dataLayer bootstrap and gtag definition", () => {
+    expect(LOADER).toMatch(/dataLayer\s*=\s*w\.dataLayer\s*\|\|\s*\[\]/);
+    expect(LOADER).toMatch(/function gtag\(\.\.\.args: unknown\[\]\)/);
   });
 
-  it("contains the gtag function definition", () => {
-    expect(ROOT_ROUTE).toMatch(/function gtag\(\)\s*\{\s*dataLayer\.push\(arguments\);?\s*\}/);
+  it("blocks page_view events until consent is granted", () => {
+    expect(HOOK).toMatch(/readAnalyticsConsent\(\) !== "granted"/);
   });
 });

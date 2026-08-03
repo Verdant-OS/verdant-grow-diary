@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "@/lib/react-router-compat";
 import { GOOGLE_ANALYTICS_MEASUREMENT_ID } from "@/constants/analytics";
 import { buildSafeAnalyticsPageLocation, sanitizePagePath } from "@/lib/analyticsPageViewRules";
+import { readAnalyticsConsent, subscribeToAnalyticsConsent } from "@/lib/analyticsConsent";
 
 export { sanitizePagePath } from "@/lib/analyticsPageViewRules";
 
@@ -17,6 +18,8 @@ declare global {
 
 function trackPageView(path: string, title: string) {
   if (typeof window === "undefined") return;
+  // Consent gate: no analytics call may run before an explicit "granted".
+  if (readAnalyticsConsent() !== "granted") return;
   if (typeof window.gtag !== "function") return;
   const safePath = sanitizePagePath(path);
   // Send an explicit page_view EVENT, not a repeat `config` call. index.html
@@ -43,7 +46,12 @@ function trackPageView(path: string, title: string) {
 export function useGoogleAnalyticsPageViews() {
   const location = useLocation();
 
+  // Re-run when consent flips so the first view is sent right after Accept.
+  const [consent, setConsent] = useState(() => readAnalyticsConsent());
+  useEffect(() => subscribeToAnalyticsConsent(() => setConsent(readAnalyticsConsent())), []);
+
   useEffect(() => {
+    if (consent !== "granted") return;
     trackPageView(location.pathname, document.title);
-  }, [location.pathname]);
+  }, [location.pathname, consent]);
 }

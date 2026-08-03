@@ -13,7 +13,8 @@ const root = resolve(__dirname, "..", "..");
 const readSrc = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 
-const APP = readSrc("App.tsx");
+const ROUTE_TREE = readSrc("routeTree.gen.ts");
+const BILLING_ROUTE = readSrc("routes/billing.$plan.tsx");
 const PAGE = readSrc("pages/Pricing.tsx");
 const CONSTANTS = readSrc("constants/pricing.ts");
 const UPGRADE_CONFIG = readSrc("config/pricing.ts");
@@ -24,14 +25,15 @@ const SITEMAP = read("public/sitemap.xml");
 
 describe("/pricing route", () => {
   it("is registered as a public route", () => {
-    // Page is code-split (React.lazy dynamic import) rather than eagerly imported.
-    expect(APP).toMatch(/import\(\s*["']\.\/pages\/Pricing["']\s*\)/);
-    expect(APP).toMatch(/path="\/pricing"\s+element=\{<Pricing\s*\/>\}/);
+    expect(ROUTE_TREE).toContain("fullPath: '/pricing'");
   });
 
   it("redirects legacy /billing/:plan to canonical /pricing via LegacyBillingRedirect", () => {
-    expect(APP).toMatch(/import\(\s*["']\.\/pages\/LegacyBillingRedirect["']\s*\)/);
-    expect(APP).toMatch(/path="\/billing\/:plan"\s+element=\{<LegacyBillingRedirect\s*\/>\}/);
+    expect(ROUTE_TREE).toContain("fullPath: '/billing/$plan'");
+    expect(BILLING_ROUTE).toContain(
+      'import LegacyBillingRedirect from "@/pages/LegacyBillingRedirect"',
+    );
+    expect(BILLING_ROUTE).toContain("return <LegacyBillingRedirect />");
   });
 });
 
@@ -504,11 +506,11 @@ describe("sitemap", () => {
 });
 
 describe("No unrelated routes were changed", () => {
-  it("App.tsx routes and the manifest stay in sync (bidirectional)", async () => {
+  it("route tree and the manifest stay in sync (bidirectional)", async () => {
     const { diffAppRoutesAgainstManifest } = await import("./helpers/routeManifestSyncHarness");
     const { APP_ROUTES } = await import("@/lib/appRouteManifest");
 
-    const diff = diffAppRoutesAgainstManifest(APP);
+    const diff = diffAppRoutesAgainstManifest(ROUTE_TREE);
 
     expect(diff.missingFromManifest).toEqual([]);
     expect(diff.missingFromApp).toEqual([]);

@@ -295,7 +295,7 @@
     "check:jsonld-id-canonical-parity": "node scripts/validate-jsonld-id-canonical-parity.mjs dist",
     "typecheck:tsgo": "tsgo --noEmit",
     "seo:artifacts": "bun scripts/generate-seo-artifacts.ts dist",
-    "seo:snapshots": "node scripts/capture-ssr-head-snapshots-with-server.mjs dist"
+    "seo:snapshots": "node scripts/capture-ssr-head-snapshots-with-server.mjs dist .output/server/index.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

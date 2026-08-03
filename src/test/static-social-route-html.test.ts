@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 
 import { FOUNDER_SOCIAL_META } from "@/constants/founderSocialMeta";
 import { buildStaticSocialRouteHtml } from "@/lib/build/staticSocialRouteHtml";
 
-const INDEX_HTML = readFileSync(resolve(process.cwd(), "index.html"), "utf8");
+const INDEX_HTML = `<!doctype html><html><head><title>Verdant</title>
+  <meta name="description" content="" />
+  <meta property="og:title" content="" />
+  <meta property="og:description" content="" />
+  <meta property="og:url" content="" />
+  <meta property="og:image" content="" />
+  <meta property="og:image:alt" content="" />
+  <meta name="twitter:title" content="" />
+  <meta name="twitter:description" content="" />
+  <meta name="twitter:image" content="" />
+  <meta name="robots" content="" />
+</head><body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body></html>`;
 
 function meta(html: string, attr: "name" | "property", key: string): string | null {
   const pattern = new RegExp(

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { grantAnalyticsConsent } from "./utils/analyticsConsent";
 
 /**
  * End-to-end check: the GA4 bootstrap declared in the TanStack root route head
@@ -40,6 +41,7 @@ test.describe("GA4 gtag config executes on main app routes", () => {
   test.beforeEach(async ({ page }) => {
     // Block the real Google tag script: no outbound analytics hit from CI.
     await page.route("https://www.googletagmanager.com/**", (route) => route.abort());
+    await grantAnalyticsConsent(page);
   });
 
   for (const route of PUBLIC_ROUTES) {

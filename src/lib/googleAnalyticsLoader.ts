@@ -33,14 +33,16 @@ export function loadGoogleAnalytics(measurementId: string = GOOGLE_ANALYTICS_MEA
     document.head.appendChild(script);
   }
 
-  window.dataLayer = window.dataLayer || [];
-  const dataLayer = window.dataLayer;
+  const w = window as GtagWindow;
+  w.dataLayer = w.dataLayer || [];
+  const dataLayer = w.dataLayer;
   function gtag(...args: unknown[]) {
     dataLayer.push(args);
   }
-  window.gtag = gtag;
+  w.gtag = gtag;
   gtag("js", new Date());
   gtag("config", measurementId, { send_page_view: false });
+
 }
 
 /** Test seam: has the loader already run in this document? */

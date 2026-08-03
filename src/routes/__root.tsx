@@ -6,7 +6,7 @@ import {
   Scripts,
   createRootRouteWithContext,
 } from "@tanstack/react-router";
-import type { QueryClient } from "@tanstack/react-query";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -184,25 +184,28 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  const { queryClient } = Route.useRouteContext();
   const onBeforeAuthIdentityChange = useClearQueryCacheBeforeAuthIdentityChange();
   return (
     <RootDocument>
       <RootErrorBoundary>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <AuthProvider onBeforeAuthIdentityChange={onBeforeAuthIdentityChange}>
-            <OAuthPostAuthRedirect />
-            <GrowsProvider>
-              <PaymentTestModeBanner />
-              <AgreementReconsentGate />
-              <AnalyticsShell />
-              <Suspense fallback={<PageLoader />}>
-                <Outlet />
-              </Suspense>
-            </GrowsProvider>
-          </AuthProvider>
-        </TooltipProvider>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <AuthProvider onBeforeAuthIdentityChange={onBeforeAuthIdentityChange}>
+              <OAuthPostAuthRedirect />
+              <GrowsProvider>
+                <PaymentTestModeBanner />
+                <AgreementReconsentGate />
+                <AnalyticsShell />
+                <Suspense fallback={<PageLoader />}>
+                  <Outlet />
+                </Suspense>
+              </GrowsProvider>
+            </AuthProvider>
+          </TooltipProvider>
+        </QueryClientProvider>
       </RootErrorBoundary>
     </RootDocument>
   );

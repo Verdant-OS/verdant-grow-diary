@@ -7,13 +7,13 @@ runtime migration. Orthogonal to PR #694 (SSR Supabase init).
 
 **Baseline (head `a28cd69`, 2026-08-03):**
 
-| #   | Criterion                                                    | Baseline                                                                       | Status                   |
-| --- | ------------------------------------------------------------ | ------------------------------------------------------------------------------ | ------------------------ |
-| C1  | Zero test files open `src/App.tsx`                           | **0 hard reads** (was 79); residual comments only                              | ✅                       |
-| C2  | `route-manifest-sync` green vs routeTree / routes FS         | Harness rewritten (`routeManifestSyncHarness`); **27/27** tests green on local | ✅ harness               |
-| C3  | Operator/sensor guard parity on `_app` + RequireOperatorRole | Layout tests rewritten; sensor/operator suites green                           | ✅                       |
-| C4  | Full Vitest not dominated by ENOENT App.tsx                  | Hard ENOENT path eliminated in rewired static suites                           | ⚠️ partial (full CI TBD) |
-| C5  | STATE.md Step 9 + prerender decision closed or scheduled     | Step 9 open; prerender deferred undecided                                      | ❌                       |
+| #   | Criterion                                                    | Baseline                                                                                                                                 | Status                         |
+| --- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| C1  | Zero test files open `src/App.tsx`                           | **0 hard reads** (was 79); residual comments only                                                                                        | ✅                             |
+| C2  | `route-manifest-sync` green vs routeTree / routes FS         | Harness rewritten (`routeManifestSyncHarness`); **27/27** tests green on local                                                           | ✅ harness                     |
+| C3  | Operator/sensor guard parity on `_app` + RequireOperatorRole | Layout tests rewritten; sensor/operator suites green                                                                                     | ✅                             |
+| C4  | Full Vitest not dominated by ENOENT App.tsx                  | Hard ENOENT path eliminated in rewired static suites; Vitest MemoryRouter alias landed so render suites no longer die on null `isServer` | ⚠️ local verified; Full CI TBD |
+| C5  | STATE.md Step 9 + prerender decision closed or scheduled     | Step 9 open; prerender deferred undecided                                                                                                | ❌                             |
 
 ---
 
@@ -116,6 +116,15 @@ On CI Full Vitest (or local batched equivalent):
 grep -c "ENOENT.*App\.tsx" full-vitest.log   # must be 0
 ```
 
+### Local C4 advance (2026-08-03, this branch)
+
+- C1 rewire removed hard App.tsx reads from the 11 proof-package ENOENT files.
+- Vitest resolves `@/lib/react-router-compat` →  
+  `src/test/helpers/reactRouterCompat.vitest.tsx` (real `RouterContextProvider` +
+  memory history; product shim stays a thin no-op).
+- Regression: `src/test/router-harness-memory-router.test.tsx`.
+- Vitest uses declared `@vitejs/plugin-react` (not undeclared SWC plugin).
+
 C4 is a **consequence** of C1–C3; do not “fix” by skipping those tests.
 
 ---
@@ -158,10 +167,10 @@ C5 may ship **after** C1–C4 if product agrees route-test-complete ≠ full mig
 
 ## Sign-off checklist
 
-- [ ] C1 command → 0
-- [ ] C2 vitest → green
-- [ ] C3 operator/sensor vitest → green
-- [ ] C4 Full Vitest log → 0× ENOENT App.tsx
+- [x] C1 command → 0 hard reads (comments only residual)
+- [x] C2 vitest → green
+- [x] C3 operator/sensor vitest → green
+- [ ] C4 Full Vitest log → 0× ENOENT App.tsx (local batch green; Full CI TBD)
 - [ ] C5 STATE.md decision recorded
 - [ ] PR description links this doc and shows before/after counts
 

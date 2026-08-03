@@ -20,24 +20,30 @@ beforeEach(() => {
 // outside RTL's tracking (manual createRoot/portals) doesn't retain DOM
 // nodes, listeners, or component state across files within the same
 // worker process. Cheap and idempotent; does not change test behavior.
+// Node-environment suites (// @vitest-environment node) have no document.
 afterEach(() => {
   cleanup();
-  document.body.replaceChildren();
+  if (typeof document !== "undefined") {
+    document.body.replaceChildren();
+  }
 });
 
-Object.defineProperty(window, "matchMedia", {
-  writable: true,
-  value: (query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: () => {},
-    removeListener: () => {},
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    dispatchEvent: () => {},
-  }),
-});
+// Node-environment suites must not touch `window` at setup evaluation time.
+if (typeof window !== "undefined") {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => {},
+    }),
+  });
+}
 
 Object.defineProperty(window, "scrollTo", {
   writable: true,

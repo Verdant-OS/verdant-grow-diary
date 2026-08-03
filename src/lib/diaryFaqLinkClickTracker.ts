@@ -16,11 +16,9 @@
 
 import type { DiaryFaqTopic } from "@/lib/diaryFaqLinkRules";
 
-export const DIARY_FAQ_LINK_CLICKS_STORAGE_KEY =
-  "verdant.diaryFaqLinkClicks.v1";
+export const DIARY_FAQ_LINK_CLICKS_STORAGE_KEY = "verdant.diaryFaqLinkClicks.v1";
 
-export const DIARY_FAQ_LINK_TRACKING_ENABLED_STORAGE_KEY =
-  "verdant.diaryFaqLinkClicks.enabled.v1";
+export const DIARY_FAQ_LINK_TRACKING_ENABLED_STORAGE_KEY = "verdant.diaryFaqLinkClicks.enabled.v1";
 
 /** Default preference when the operator has not opted out. */
 export const DIARY_FAQ_LINK_TRACKING_DEFAULT_ENABLED = true;
@@ -33,9 +31,7 @@ const KNOWN_TOPICS: readonly DiaryFaqTopic[] = [
   "harvest",
 ];
 
-export type DiaryFaqLinkClickCounts = Readonly<
-  Partial<Record<DiaryFaqTopic, number>>
->;
+export type DiaryFaqLinkClickCounts = Readonly<Partial<Record<DiaryFaqTopic, number>>>;
 
 export interface DiaryFaqLinkClickStorage {
   getItem(key: string): string | null;
@@ -95,9 +91,7 @@ export function isDiaryFaqLinkClickTrackingEnabled(
 ): boolean {
   if (!storage) return DIARY_FAQ_LINK_TRACKING_DEFAULT_ENABLED;
   try {
-    const raw = storage.getItem(
-      DIARY_FAQ_LINK_TRACKING_ENABLED_STORAGE_KEY,
-    );
+    const raw = storage.getItem(DIARY_FAQ_LINK_TRACKING_ENABLED_STORAGE_KEY);
     if (raw === null) return DIARY_FAQ_LINK_TRACKING_DEFAULT_ENABLED;
     if (raw === "true") return true;
     if (raw === "false") return false;
@@ -118,10 +112,7 @@ export function setDiaryFaqLinkClickTrackingEnabled(
 ): void {
   if (!storage) return;
   try {
-    storage.setItem(
-      DIARY_FAQ_LINK_TRACKING_ENABLED_STORAGE_KEY,
-      enabled ? "true" : "false",
-    );
+    storage.setItem(DIARY_FAQ_LINK_TRACKING_ENABLED_STORAGE_KEY, enabled ? "true" : "false");
   } catch {
     // ignore
   }
@@ -140,23 +131,16 @@ export function recordDiaryFaqLinkClick(
   if (!isDiaryFaqLinkClickTrackingEnabled(storage)) {
     return readDiaryFaqLinkClickCounts(storage);
   }
-  const current = { ...readDiaryFaqLinkClickCounts(storage) } as Record<
-    DiaryFaqTopic,
-    number
-  >;
+  const current = { ...readDiaryFaqLinkClickCounts(storage) } as Record<DiaryFaqTopic, number>;
   current[topic] = Math.min((current[topic] ?? 0) + 1, 1_000_000);
   try {
-    storage.setItem(
-      DIARY_FAQ_LINK_CLICKS_STORAGE_KEY,
-      JSON.stringify(current),
-    );
+    storage.setItem(DIARY_FAQ_LINK_CLICKS_STORAGE_KEY, JSON.stringify(current));
   } catch {
     // Storage may be full or disabled — the click just doesn't get
     // recorded. The user-facing link still navigates.
   }
   return current;
 }
-
 
 /** Remove all recorded click counts. Silent on error. */
 export function clearDiaryFaqLinkClickCounts(

@@ -67,7 +67,10 @@ export default function BrowserConnectPanel() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [
+    endpoint, // Clean the query string so a refresh doesn't retry the code.
+    navigate,
+  ]);
 
   const onConnect = useCallback(async () => {
     setError(null);
@@ -79,7 +82,7 @@ export default function BrowserConnectPanel() {
       setError((e as Error).message || "Could not start OAuth");
       setPhase("idle");
     }
-  }, [issuer]);
+  }, []);
 
   const onProbe = useCallback(async () => {
     setPhase("probing");
@@ -125,9 +128,7 @@ export default function BrowserConnectPanel() {
       </div>
       <p className="text-sm text-muted-foreground">
         Runs the real OAuth 2.1 flow against the Verdant MCP server as{" "}
-        <span className="font-medium text-foreground">
-          {user?.email ?? "the signed-in grower"}
-        </span>
+        <span className="font-medium text-foreground">{user?.email ?? "the signed-in grower"}</span>
         , then calls <code className="font-mono">list_grows</code> to confirm tools are reachable
         for your account. The access token lives only in this browser tab's memory and is never
         displayed.
@@ -206,7 +207,10 @@ export default function BrowserConnectPanel() {
               <div className="text-xs text-muted-foreground">
                 Tools discovered via tools/list: {result.toolCount}
                 {result.toolNames && result.toolNames.length > 0 ? (
-                  <> — <span className="font-mono">{result.toolNames.join(", ")}</span></>
+                  <>
+                    {" "}
+                    — <span className="font-mono">{result.toolNames.join(", ")}</span>
+                  </>
                 ) : null}
               </div>
             ) : null}

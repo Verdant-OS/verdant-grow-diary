@@ -791,19 +791,6 @@ describe("Action Queue safety — same-grow lineage (plants/tents must share gro
   );
 });
 
-/**
- * pi_bridge scanner allow-list hardening.
- *
- * These tests guard the narrow allow-list used by the pi_bridge / raspberry_pi_bridge
- * context scan above. The allow-list MUST stay file-specific (exact file paths only).
- * It must NEVER expand into a directory-level wildcard such as `src/constants/*`,
- * because that would silently allow any future constants file to bypass the
- * Action Queue / device-control safety scanner.
- *
- * This is test-hardening only. No production behavior, schema, RLS, Edge Functions,
- * auth, AI, Action Queue writes, sensor ingest, automation, or device control are
- * affected.
- */
 describe("pi_bridge scanner allow-list hardening", () => {
   const THIS_TEST_SRC = readFileSync(resolve(ROOT, "src/test/action-queue-safety.test.ts"), "utf8");
   // Isolate just the pi_bridge scanner region so unrelated text in this file
@@ -817,17 +804,23 @@ describe("pi_bridge scanner allow-list hardening", () => {
 
   it("keeps pi_bridge allow-list file-specific", () => {
     expect(PI_REGION.length).toBeGreaterThan(0);
-    // Both allow-listed files must appear as exact resolve(ROOT, "...ts") paths.
+    // All allow-listed files must appear as exact resolve(ROOT, "...ts") paths.
     expect(PI_REGION).toMatch(
       /resolve\(ROOT,\s*["']src\/constants\/sensorIngestProvenance\.ts["']\)/,
     );
     expect(PI_REGION).toMatch(
       /resolve\(ROOT,\s*["']src\/constants\/sensorProviderLabels\.ts["']\)/,
     );
+    expect(PI_REGION).toMatch(/resolve\(ROOT,\s*["']src\/lib\/aiDoctorContextCompiler\.ts["']\)/);
+    expect(PI_REGION).toMatch(
+      /resolve\(\s*ROOT,\s*["']supabase\/functions\/_shared\/lib\/lib\/aiDoctorContextCompiler\.ts["']\s*,?\s*\)/,
+    );
     // The skip MUST be an exact equality check (`path === ...`), never a
     // startsWith / includes / glob match against a directory prefix.
     expect(PI_REGION).toMatch(/path === PROVIDER_LABELS_PATH/);
     expect(PI_REGION).toMatch(/path === SENSOR_INGEST_PROVENANCE_PATH/);
+    expect(PI_REGION).toMatch(/path === AI_DOCTOR_CONTEXT_COMPILER_PATH/);
+    expect(PI_REGION).toMatch(/path === AI_DOCTOR_CONTEXT_COMPILER_MIRROR_PATH/);
     expect(PI_REGION).not.toMatch(/\.startsWith\(/);
     expect(PI_REGION).not.toMatch(/\.includes\(/);
     expect(PI_REGION).not.toMatch(/minimatch|micromatch|globby|fast-glob/i);
@@ -841,6 +834,11 @@ describe("pi_bridge scanner allow-list hardening", () => {
       /["']constants\/\*/,
       /["']\*\*\/constants\//,
       /["']src\/constants\/\*\*/,
+      // AI Doctor / lib broad prefixes must not replace exact-file allows.
+      /["']src\/lib\/\*/,
+      /["']src\/lib\/\*\*/,
+      /["']supabase\/functions\/_shared\/\*/,
+      /["']supabase\/functions\/_shared\/lib\/\*/,
     ];
     for (const re of FORBIDDEN_PATTERNS) {
       expect(PI_REGION, `pi_bridge allow-list must not include broad pattern: ${re}`).not.toMatch(
@@ -872,5 +870,31 @@ describe("pi_bridge scanner allow-list hardening", () => {
       PI_REGION.match(/resolve\(ROOT,\s*["']src\/constants\/sensorProviderLabels\.ts["']\)/g) ?? []
     ).length;
     expect(exactRefCount).toBeGreaterThanOrEqual(1);
+  });
+
+  it("keeps aiDoctorContextCompiler.ts (src + edge mirror) allowed only as exact file paths", () => {
+    // Src twin: single resolve path for LIVE_VENDORS classify-only Set.
+    expect(PI_REGION).toMatch(/resolve\(ROOT,\s*["']src\/lib\/aiDoctorContextCompiler\.ts["']\)/);
+    // Generated edge mirror twin (sync-edge-shared); must stay path-exact too.
+    expect(PI_REGION).toMatch(
+      /resolve\(\s*ROOT,\s*["']supabase\/functions\/_shared\/lib\/lib\/aiDoctorContextCompiler\.ts["']\s*,?\s*\)/,
+    );
+    expect(PI_REGION).toMatch(/path === AI_DOCTOR_CONTEXT_COMPILER_PATH/);
+    expect(PI_REGION).toMatch(/path === AI_DOCTOR_CONTEXT_COMPILER_MIRROR_PATH/);
+
+    const compilerSrc = readFileSync(resolve(ROOT, "src/lib/aiDoctorContextCompiler.ts"), "utf8");
+    expect(compilerSrc).toMatch(/pi_bridge/);
+    expect(compilerSrc).not.toMatch(
+      /fetch\(|mqtt:\/\/|mqtt\.connect|\.publish\(|\.post\(|\.trigger\(|http:\/\/|https:\/\//i,
+    );
+
+    const mirrorSrc = readFileSync(
+      resolve(ROOT, "supabase/functions/_shared/lib/lib/aiDoctorContextCompiler.ts"),
+      "utf8",
+    );
+    expect(mirrorSrc).toMatch(/pi_bridge/);
+    expect(mirrorSrc).not.toMatch(
+      /fetch\(|mqtt:\/\/|mqtt\.connect|\.publish\(|\.post\(|\.trigger\(/i,
+    );
   });
 });

@@ -91,11 +91,7 @@ export function buildGgsSoilSnapshotAttachDraft(
     return block("tent_mismatch", { tent_id: latest.tent_id ?? null });
   }
   const requestedPlant = options.plantId ?? null;
-  if (
-    requestedPlant !== null &&
-    latest.plant_id !== null &&
-    latest.plant_id !== requestedPlant
-  ) {
+  if (requestedPlant !== null && latest.plant_id !== null && latest.plant_id !== requestedPlant) {
     return block("plant_mismatch", {
       tent_id: latest.tent_id,
       plant_id: latest.plant_id,
@@ -131,14 +127,11 @@ export function buildGgsSoilSnapshotAttachDraft(
     status: latest.status,
     confidence: latest.confidence,
     tent_id: latest.tent_id,
-    plant_id:
-      requestedPlant !== null ? requestedPlant : latest.plant_id ?? null,
+    plant_id: requestedPlant !== null ? requestedPlant : (latest.plant_id ?? null),
     captured_at: latest.captured_at,
     readings: latest.readings,
     warnings: latest.warnings,
     attachLabel:
-      latest.source === "manual"
-        ? "Attach manual GGS snapshot"
-        : "Attach GGS soil snapshot",
+      latest.source === "manual" ? "Attach manual GGS snapshot" : "Attach GGS soil snapshot",
   };
 }

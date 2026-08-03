@@ -1,7 +1,4 @@
-import type {
-  CultivarSeedExpression,
-  VerdantCultivarProfile,
-} from "@/constants/verdantCultivars";
+import type { CultivarSeedExpression, VerdantCultivarProfile } from "@/constants/verdantCultivars";
 
 export interface CultivarSummaryRow {
   label: string;
@@ -21,10 +18,7 @@ export function formatCultivarSeedExpression(value: CultivarSeedExpression): str
   }
 }
 
-export function formatReportedPercentRange(
-  min: number | null,
-  max: number | null,
-): string {
+export function formatReportedPercentRange(min: number | null, max: number | null): string {
   if (min == null || max == null) return "Information limited";
   if (min === max) return `${min}% reported`;
   return `${min}–${max}% reported`;

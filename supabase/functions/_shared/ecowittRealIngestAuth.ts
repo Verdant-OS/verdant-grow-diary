@@ -41,8 +41,7 @@ export function validateEcoWittBridgeAuthorization(
   headerValue: string | null | undefined,
   expectedToken: string | null | undefined,
 ): EcoWittRealIngestAuthResult {
-  const hasExpected =
-    typeof expectedToken === "string" && expectedToken.length > 0;
+  const hasExpected = typeof expectedToken === "string" && expectedToken.length > 0;
 
   if (headerValue == null || typeof headerValue !== "string") {
     return result("unauthorized", "missing_authorization_header");

@@ -53,9 +53,7 @@ describe("plantTentMovementDisplayRules · isPlantTentMovementEntry", () => {
   });
 
   it("ignores unrelated diary entries (watering, feeding, photos)", () => {
-    expect(
-      isPlantTentMovementEntry({ id: "d4", note: "Watered 1L", details: {} }),
-    ).toBe(false);
+    expect(isPlantTentMovementEntry({ id: "d4", note: "Watered 1L", details: {} })).toBe(false);
     expect(
       isPlantTentMovementEntry({
         id: "d5",

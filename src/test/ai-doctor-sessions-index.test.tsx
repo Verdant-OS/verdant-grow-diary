@@ -21,9 +21,11 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import AiDoctorSessionsIndex from "@/pages/AiDoctorSessionsIndex";
+import { AI_DOCTOR_SESSIONS_INDEX_PAGE_SIZE } from "@/hooks/use-ai-doctor-sessions";
 import {
-  AI_DOCTOR_SESSIONS_INDEX_PAGE_SIZE,
-} from "@/hooks/use-ai-doctor-sessions";
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 function renderWithProviders(ui: ReactElement) {
   const client = new QueryClient({
@@ -67,7 +69,7 @@ const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 
 const PAGE = read("src/pages/AiDoctorSessionsIndex.tsx");
 const HOOK = read("src/hooks/use-ai-doctor-sessions.ts");
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 const COACH_PANEL = read("src/components/CoachAiDoctorHistoryPanel.tsx");
 
 describe("useAiDoctorSessionsIndex — static contract", () => {
@@ -106,9 +108,9 @@ describe("useAiDoctorSessionsIndex — runtime behavior", () => {
 describe("AiDoctorSessionsIndex — render", () => {
   it("renders title and helper copy", async () => {
     renderWithProviders(<AiDoctorSessionsIndex />);
-    expect(
-      (await screen.findByTestId("ai-doctor-sessions-index-title")).textContent,
-    ).toMatch(/AI Doctor Sessions/i);
+    expect((await screen.findByTestId("ai-doctor-sessions-index-title")).textContent).toMatch(
+      /AI Doctor Sessions/i,
+    );
     expect(screen.getByTestId("ai-doctor-sessions-index-helper").textContent).toMatch(
       /saved diagnosis snapshots/i,
     );
@@ -177,10 +179,14 @@ describe("AiDoctorSessionsIndex — ?view=ledger backward-compatible URL behavio
     renderWithProvidersAt(<AiDoctorSessionsIndex />, "/doctor/sessions?view=ledger");
     await screen.findByTestId("ai-doctor-session-integrity-ledger");
     expect(
-      screen.getByTestId("ai-doctor-sessions-index-view-switch-ledger").getAttribute("aria-pressed"),
+      screen
+        .getByTestId("ai-doctor-sessions-index-view-switch-ledger")
+        .getAttribute("aria-pressed"),
     ).toBe("true");
     expect(
-      screen.getByTestId("ai-doctor-sessions-index-view-switch-history").getAttribute("aria-pressed"),
+      screen
+        .getByTestId("ai-doctor-sessions-index-view-switch-history")
+        .getAttribute("aria-pressed"),
     ).toBe("false");
   });
 });
@@ -218,13 +224,15 @@ describe("AiDoctorSessionsIndex — row rendering (static source)", () => {
 
 describe("App routing", () => {
   it("registers /doctor/sessions index route", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/doctor/sessions");
     expect(APP).toMatch(
-      /<Route\s+path="\/doctor\/sessions"\s+element=\{<AiDoctorSessionsIndex/,
+      /AiDoctorSessionsIndex|@\/pages\/AiDoctorSessionsIndex|pages\/AiDoctorSessionsIndex/,
     );
   });
   it("still registers /doctor/sessions/:sessionId detail route", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/doctor/sessions/:sessionId");
     expect(APP).toMatch(
-      /<Route\s+path="\/doctor\/sessions\/:sessionId"\s+element=\{<AiDoctorSessionDetail/,
+      /AiDoctorSessionDetail|@\/pages\/AiDoctorSessionDetail|pages\/AiDoctorSessionDetail/,
     );
   });
 });

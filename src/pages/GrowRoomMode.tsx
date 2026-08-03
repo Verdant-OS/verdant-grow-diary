@@ -220,7 +220,7 @@ export default function GrowRoomMode() {
     return () => {
       cancelled = true;
     };
-  }, [tentKey, tentIds]);
+  }, [tentIds]);
 
   const alertInputs: GrowRoomAlertInput[] = useMemo(
     () =>

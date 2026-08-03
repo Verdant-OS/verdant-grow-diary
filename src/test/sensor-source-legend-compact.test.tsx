@@ -3,10 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, within } from "@testing-library/react";
 import SensorSourceLegendCompact from "@/components/SensorSourceLegendCompact";
-import {
-  SENSOR_SOURCE_LEGEND,
-  getSensorSourceLegend,
-} from "@/lib/sensorSourceLegendViewModel";
+import { SENSOR_SOURCE_LEGEND, getSensorSourceLegend } from "@/lib/sensorSourceLegendViewModel";
 
 describe("sensorSourceLegendViewModel", () => {
   it("exposes all 8 entries in stable order", () => {
@@ -40,9 +37,7 @@ describe("sensorSourceLegendViewModel", () => {
   });
 
   it("legend copy contains no FUD words", () => {
-    const all = SENSOR_SOURCE_LEGEND.map(
-      (e) => `${e.label} ${e.description}`,
-    ).join(" ");
+    const all = SENSOR_SOURCE_LEGEND.map((e) => `${e.label} ${e.description}`).join(" ");
     expect(all).not.toMatch(/blindspot/i);
     expect(all).not.toMatch(/failure/i);
     expect(all).not.toMatch(/broken/i);
@@ -56,9 +51,7 @@ describe("SensorSourceLegendCompact", () => {
     render(<SensorSourceLegendCompact />);
     const root = screen.getByTestId("sensor-source-legend-compact");
     for (const entry of SENSOR_SOURCE_LEGEND) {
-      const row = within(root).getByTestId(
-        `sensor-source-legend-entry-${entry.kind}`,
-      );
+      const row = within(root).getByTestId(`sensor-source-legend-entry-${entry.kind}`);
       expect(row).toHaveTextContent(entry.label);
       expect(row).toHaveTextContent(entry.description);
       expect(row.getAttribute("data-tone")).toBe(entry.tone);
@@ -68,14 +61,8 @@ describe("SensorSourceLegendCompact", () => {
 
 describe("legend static safety", () => {
   const ROOT = resolve(__dirname, "../..");
-  const VM = readFileSync(
-    resolve(ROOT, "src/lib/sensorSourceLegendViewModel.ts"),
-    "utf8",
-  );
-  const COMP = readFileSync(
-    resolve(ROOT, "src/components/SensorSourceLegendCompact.tsx"),
-    "utf8",
-  );
+  const VM = readFileSync(resolve(ROOT, "src/lib/sensorSourceLegendViewModel.ts"), "utf8");
+  const COMP = readFileSync(resolve(ROOT, "src/components/SensorSourceLegendCompact.tsx"), "utf8");
 
   it("view model is import-free and side-effect-free", () => {
     expect(VM).not.toMatch(/^import\s+/m);

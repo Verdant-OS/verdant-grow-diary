@@ -300,7 +300,7 @@ export default function GgsRealPayloadIngestPanel({
                     <strong>{result.rejected}</strong>
                   </>
                 ) : (
-                  <>{failureFeedback?.description}</>
+                  failureFeedback?.description
                 )}
               </AlertDescription>
             </Alert>

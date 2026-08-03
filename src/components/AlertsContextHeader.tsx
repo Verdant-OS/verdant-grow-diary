@@ -47,16 +47,13 @@ function formatRange(min: number | null, max: number | null): string {
 
 const CHIP_TONE_CLASS: Record<SourceChipTone, string> = {
   // Success/eligible — reserved for fresh manual/live only.
-  eligible:
-    "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  eligible: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
   // Warning — stale manual/live.
-  warning:
-    "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  warning: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
   // Context-only — csv/diary/sim.
   context: "border-border bg-muted text-muted-foreground",
   // Caution — invalid/unavailable/unknown.
-  caution:
-    "border-destructive/40 bg-destructive/10 text-destructive",
+  caution: "border-destructive/40 bg-destructive/10 text-destructive",
 };
 
 export default function AlertsContextHeader({
@@ -93,9 +90,7 @@ export default function AlertsContextHeader({
               Using <strong>{vm.stageLabel}</strong> targets.{" "}
             </span>
           ) : (
-            <span data-testid={`${testId}-stage-missing`}>
-              No active stage target set.{" "}
-            </span>
+            <span data-testid={`${testId}-stage-missing`}>No active stage target set. </span>
           )}
           {vm.ranges.rh ? (
             <span data-testid={`${testId}-range-rh`}>
@@ -111,8 +106,7 @@ export default function AlertsContextHeader({
           ) : null}
           {vm.ranges.vpd ? (
             <span data-testid={`${testId}-range-vpd`}>
-              VPD {formatRange(vm.ranges.vpd.min, vm.ranges.vpd.max)}{" "}
-              {vm.ranges.vpd.unit}.{" "}
+              VPD {formatRange(vm.ranges.vpd.min, vm.ranges.vpd.max)} {vm.ranges.vpd.unit}.{" "}
             </span>
           ) : null}
         </p>
@@ -147,9 +141,7 @@ export default function AlertsContextHeader({
           aria-label={`Latest snapshot source: ${chip.label}${chip.qualifier ? ` (${chip.qualifier})` : ""}`}
         >
           {chip.label}
-          {chip.qualifier ? (
-            <span className="opacity-75">· {chip.qualifier}</span>
-          ) : null}
+          {chip.qualifier ? <span className="opacity-75">· {chip.qualifier}</span> : null}
         </span>
         <button
           type="button"
@@ -172,25 +164,17 @@ export default function AlertsContextHeader({
           aria-label={SOURCE_ELIGIBILITY_HELP.title}
         >
           <p className="font-medium">{SOURCE_ELIGIBILITY_HELP.title}</p>
-          <p data-testid={`${testId}-source-help-eligible`}>
-            {SOURCE_ELIGIBILITY_HELP.eligible}
-          </p>
+          <p data-testid={`${testId}-source-help-eligible`}>{SOURCE_ELIGIBILITY_HELP.eligible}</p>
           <p data-testid={`${testId}-source-help-context-only`}>
             {SOURCE_ELIGIBILITY_HELP.contextOnly}
           </p>
-          <p
-            className="text-muted-foreground"
-            data-testid={`${testId}-source-help-why`}
-          >
+          <p className="text-muted-foreground" data-testid={`${testId}-source-help-why`}>
             {SOURCE_ELIGIBILITY_HELP.why}
           </p>
         </div>
       ) : null}
 
-      <p
-        className="text-[11px] text-muted-foreground"
-        data-testid={`${testId}-freshness-window`}
-      >
+      <p className="text-[11px] text-muted-foreground" data-testid={`${testId}-freshness-window`}>
         {persistNote}
       </p>
       {message ? (
@@ -232,11 +216,7 @@ export default function AlertsContextHeader({
         </p>
       ) : null}
       {growId ? (
-        <GrowTargetsEditor
-          open={editorOpen}
-          onOpenChange={setEditorOpen}
-          growId={growId}
-        />
+        <GrowTargetsEditor open={editorOpen} onOpenChange={setEditorOpen} growId={growId} />
       ) : null}
     </section>
   );

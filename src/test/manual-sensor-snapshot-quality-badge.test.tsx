@@ -71,9 +71,7 @@ describe("ManualSensorSnapshotQualityBadge", () => {
       },
       { nowMs: NOW },
     );
-    const { container } = render(
-      <ManualSensorSnapshotQualityBadge evaluation={evaluation} />,
-    );
+    const { container } = render(<ManualSensorSnapshotQualityBadge evaluation={evaluation} />);
     const text = container.textContent ?? "";
     expect(text).not.toMatch(/raw_payload/i);
     expect(text).not.toMatch(/service_role/i);

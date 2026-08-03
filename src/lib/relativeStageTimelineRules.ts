@@ -13,13 +13,7 @@
 // Stage presets
 // ---------------------------------------------------------------------------
 
-export type RelativeStageKey =
-  | "seedling"
-  | "clone"
-  | "vegetation"
-  | "flower"
-  | "dry"
-  | "cure";
+export type RelativeStageKey = "seedling" | "clone" | "vegetation" | "flower" | "dry" | "cure";
 
 export interface RelativeStagePreset {
   /** Stable machine key. Never change once shipped. */
@@ -251,8 +245,7 @@ export function buildStageShiftRecommendationDraft(
   if (!preset) return null;
 
   const observedEpoch = toEpoch(input.observedAt ?? null);
-  const observedAt =
-    observedEpoch != null ? new Date(observedEpoch).toISOString() : null;
+  const observedAt = observedEpoch != null ? new Date(observedEpoch).toISOString() : null;
 
   const evidence = Array.isArray(input.evidence)
     ? input.evidence.filter((e): e is string => typeof e === "string" && !!e)

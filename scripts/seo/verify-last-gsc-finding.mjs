@@ -184,7 +184,7 @@ function runRegressionOnlyMode({ config, allowlistPath, previousPath, now }) {
     "",
     `Mode: **fail-only-previously-resolved-expired**`,
     `Status: **${status}**`,
-    `Previous verification: ${previous ? "\`" + previousPath + "\`" : "_`NO_BASELINE` — no previous run, cannot regress_"}`,
+    `Previous verification: ${previous ? "`" + previousPath + "`" : "_`NO_BASELINE` — no previous run, cannot regress_"}`,
     `Regressions: **${regressions.length}** (exit ${regressions.length > 0 ? "4" : "0"})`,
     "",
     "| URL | Previously resolved | Expired allowlist coverage | Regression |",

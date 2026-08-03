@@ -10,7 +10,7 @@ import {
 } from "@/lib/createDialogRetryRules";
 
 export function useCreateBindingRetry(
-  run: () => void | Promise<unknown>,
+  run: () => undefined | Promise<unknown>,
   options?: { cooldownMs?: number },
 ) {
   const cooldownMs = options?.cooldownMs ?? CREATE_BINDING_RETRY_COOLDOWN_MS;
@@ -30,7 +30,7 @@ export function useCreateBindingRetry(
     if (gate.reason !== "cooldown") return;
     const id = window.setInterval(() => setNowMs(Date.now()), 200);
     return () => window.clearInterval(id);
-  }, [gate.reason, lastAttemptAtMs]);
+  }, [gate.reason]);
 
   const attempt = useCallback(async () => {
     const now = Date.now();

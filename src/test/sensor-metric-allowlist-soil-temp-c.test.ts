@@ -12,8 +12,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const MIGRATION =
-  "supabase/migrations/20260617164759_407c0f40-1f3a-4ac8-a25e-289c175f87fc.sql";
+const MIGRATION = "supabase/migrations/20260617164759_407c0f40-1f3a-4ac8-a25e-289c175f87fc.sql";
 
 const sql = readFileSync(resolve(process.cwd(), MIGRATION), "utf8");
 

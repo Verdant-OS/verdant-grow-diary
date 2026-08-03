@@ -47,10 +47,7 @@ export function constantTimeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-export async function hmacSha256Hex(
-  secret: string,
-  message: string,
-): Promise<string> {
+export async function hmacSha256Hex(secret: string, message: string): Promise<string> {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
@@ -113,24 +110,13 @@ export async function verifyPaddleWebhookSignature(
     return { ok: false, reason: "invalid_signature_header" };
   }
 
-  if (
-    typeof opts.maxAgeSeconds === "number" ||
-    typeof opts.maxFutureSkewSeconds === "number"
-  ) {
+  if (typeof opts.maxAgeSeconds === "number" || typeof opts.maxFutureSkewSeconds === "number") {
     const now =
-      typeof opts.nowSeconds === "number"
-        ? opts.nowSeconds
-        : Math.floor(Date.now() / 1000);
-    if (
-      typeof opts.maxAgeSeconds === "number" &&
-      now - tsNum > opts.maxAgeSeconds
-    ) {
+      typeof opts.nowSeconds === "number" ? opts.nowSeconds : Math.floor(Date.now() / 1000);
+    if (typeof opts.maxAgeSeconds === "number" && now - tsNum > opts.maxAgeSeconds) {
       return { ok: false, reason: "timestamp_stale" };
     }
-    if (
-      typeof opts.maxFutureSkewSeconds === "number" &&
-      tsNum - now > opts.maxFutureSkewSeconds
-    ) {
+    if (typeof opts.maxFutureSkewSeconds === "number" && tsNum - now > opts.maxFutureSkewSeconds) {
       return { ok: false, reason: "timestamp_future" };
     }
   }

@@ -26,13 +26,7 @@ const MISSING_RPC_MESSAGE_PATTERNS: readonly RegExp[] = [
   /unknown function/i,
 ];
 
-const NESTED_ERROR_KEYS: readonly string[] = [
-  "error",
-  "cause",
-  "originalError",
-  "context",
-  "data",
-];
+const NESTED_ERROR_KEYS: readonly string[] = ["error", "cause", "originalError", "context", "data"];
 
 function readString(source: Record<string, unknown>, key: string): string | null {
   const value = source[key];
@@ -69,10 +63,7 @@ export function isMissingRpcError(
   seen.add(error as object);
 
   const row = error as Record<string, unknown>;
-  const rpcPattern = new RegExp(
-    rpcName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-    "i",
-  );
+  const rpcPattern = new RegExp(rpcName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
 
   const blobParts = ["message", "details", "hint", "body", "statusText", "description"]
     .map((k) => readString(row, k))
@@ -113,9 +104,7 @@ export class MissingAuditRpcError extends Error {
   override readonly cause: unknown;
 
   constructor(rpcName: string, cause: unknown) {
-    super(
-      `Audit RPC "${rpcName}" is missing or out of sync with the deployed schema.`,
-    );
+    super(`Audit RPC "${rpcName}" is missing or out of sync with the deployed schema.`);
     this.name = "MissingAuditRpcError";
     this.rpcName = rpcName;
     this.cause = cause;

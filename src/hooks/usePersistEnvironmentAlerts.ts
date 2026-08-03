@@ -20,30 +20,15 @@
  *     via the returned state, never silently retried into automation.
  */
 import { useEffect, useRef, useState } from "react";
-import type {
-  SensorSnapshot,
-  SensorSnapshotMetricRefKey,
-} from "@/lib/sensorSnapshot";
+import type { SensorSnapshot, SensorSnapshotMetricRefKey } from "@/lib/sensorSnapshot";
 import type { SensorQualityResult } from "@/lib/sensorQuality";
 import type { TargetComparisonResult } from "@/lib/environmentTargetComparison";
-import {
-  buildEnvironmentAlerts,
-  type EnvironmentAlert,
-} from "@/lib/environmentAlerts";
-import {
-  derivedAlertKey,
-  selectPersistableAlerts,
-} from "@/lib/environmentAlertPersistence";
+import { buildEnvironmentAlerts, type EnvironmentAlert } from "@/lib/environmentAlerts";
+import { derivedAlertKey, selectPersistableAlerts } from "@/lib/environmentAlertPersistence";
 import { listAlerts, saveAlert, logAlertEvent } from "@/lib/alerts";
 import { buildSensorSnapshotEvidenceRefs } from "@/lib/sensorSnapshotEvidenceRefRules";
 
-export type PersistStatus =
-  | "idle"
-  | "skipped"
-  | "checking"
-  | "writing"
-  | "done"
-  | "error";
+export type PersistStatus = "idle" | "skipped" | "checking" | "writing" | "done" | "error";
 
 export interface PersistEnvironmentAlertsState {
   status: PersistStatus;
@@ -92,12 +77,12 @@ export function usePersistEnvironmentAlerts(
           .map((m) => `${m.metric}:${m.state}`)
           .sort()
           .join("|")
-      : input.targets?.status ?? "missing_targets";
+      : (input.targets?.status ?? "missing_targets");
   const enabled = input.enabled !== false;
   const growId = input.growId ?? null;
   const isDemoData = input.isDemoData === true;
   const stageProvided = "stage" in input;
-  const stageKey = stageProvided ? input.stage ?? "__unknown__" : "__legacy__";
+  const stageKey = stageProvided ? (input.stage ?? "__unknown__") : "__legacy__";
 
   useEffect(() => {
     if (!enabled || !growId) {
@@ -202,11 +187,8 @@ export function usePersistEnvironmentAlerts(
           // lookup, no prose inference). Only metric-scoped alerts whose
           // metric key matches a known sensor metric can resolve a ref.
           const metricRef =
-            typeof a.metric === "string" &&
-            input.snapshot?.metric_refs
-              ? input.snapshot.metric_refs[
-                  a.metric as SensorSnapshotMetricRefKey
-                ] ?? null
+            typeof a.metric === "string" && input.snapshot?.metric_refs
+              ? (input.snapshot.metric_refs[a.metric as SensorSnapshotMetricRefKey] ?? null)
               : null;
           const refs = metricRef
             ? buildSensorSnapshotEvidenceRefs({
@@ -256,7 +238,18 @@ export function usePersistEnvironmentAlerts(
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, growId, tsKey, sourceKey, qualityKey, targetsKey, isDemoData, stageKey, stageProvided]);
+  }, [
+    enabled,
+    growId,
+    isDemoData,
+    stageProvided,
+    input.stage,
+    input.snapshot?.metric_refs,
+    input.quality.quality,
+    input.quality,
+    input.targets,
+    input.snapshot,
+  ]);
 
   return state;
 }

@@ -61,9 +61,7 @@ const EVENT_TYPE_BY_INPUT: Readonly<Record<QuickLogSuccessInput, QuickLogSuccess
   });
 
 export function isQuickLogSuccessInput(input: unknown): input is QuickLogSuccessInput {
-  return (
-    typeof input === "string" && Object.prototype.hasOwnProperty.call(EVENT_TYPE_BY_INPUT, input)
-  );
+  return typeof input === "string" && Object.hasOwn(EVENT_TYPE_BY_INPUT, input);
 }
 
 export function resolveQuickLogSuccessEventType(input: unknown): QuickLogSuccessEventType | null {

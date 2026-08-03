@@ -15,10 +15,7 @@ export interface UseAlertEventsState {
   reload: () => void;
 }
 
-export function useAlertEvents(
-  alertId: string | null,
-  reloadKey = 0,
-): UseAlertEventsState {
+export function useAlertEvents(alertId: string | null, reloadKey = 0): UseAlertEventsState {
   const [status, setStatus] = useState<AlertEventsStatus>("idle");
   const [events, setEvents] = useState<AlertEventRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +47,7 @@ export function useAlertEvents(
     return () => {
       cancelled = true;
     };
-  }, [alertId, nonce, reloadKey]);
+  }, [alertId]);
 
   return { status, events, error, reload };
 }

@@ -24,10 +24,7 @@ function makeDiaryItem(opts: {
   };
 }
 
-function makeSnapshotItem(opts: {
-  key: string;
-  occurredAt: string;
-}): TimelineMemoryItem {
+function makeSnapshotItem(opts: { key: string; occurredAt: string }): TimelineMemoryItem {
   return {
     kind: "manual_sensor_snapshot",
     key: opts.key,
@@ -187,10 +184,6 @@ describe("buildTimelineDayGroups", () => {
       makeDiaryItem({ key: "c", occurredAt: localIso(2026, 6, 3, 10) }),
     ];
     const groups = buildTimelineDayGroups(items);
-    expect(groups.map((g) => g.dayKey)).toEqual([
-      "2026-06-03",
-      "2026-06-01",
-      "2026-05-28",
-    ]);
+    expect(groups.map((g) => g.dayKey)).toEqual(["2026-06-03", "2026-06-01", "2026-05-28"]);
   });
 });

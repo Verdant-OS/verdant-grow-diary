@@ -86,7 +86,11 @@ export function simulateAllowlistForUrls(urls, allowlist, now = nowIso()) {
       ? []
       : activeIssues
           .filter((e) => matchesAny(url, e.url_patterns ?? []))
-          .map((e) => ({ id: e.id, issue_types: e.issue_types ?? [], expires_on: e.expires_on ?? null }));
+          .map((e) => ({
+            id: e.id,
+            issue_types: e.issue_types ?? [],
+            expires_on: e.expires_on ?? null,
+          }));
     const matchedNoindex = isNever
       ? []
       : activeNoindex
@@ -121,9 +125,7 @@ export function simulateAllowlistForUrls(urls, allowlist, now = nowIso()) {
       never_allowlisted: isNever,
       would_be_expected_noindex: matchedNoindex.length > 0,
       matched_expected_noindex_entries: matchedNoindex,
-      would_suppress_issue_types: [
-        ...new Set(matchedIssues.flatMap((m) => m.issue_types)),
-      ],
+      would_suppress_issue_types: [...new Set(matchedIssues.flatMap((m) => m.issue_types))],
       matched_allowlisted_issue_entries: matchedIssues,
       matched_expired_entries: matchedExpired,
       classification,
@@ -173,8 +175,7 @@ export function applyAllowlist(url, issues, allowlist, now = nowIso()) {
   const suppressed = [];
   for (const issue of issues) {
     const match = entries.find(
-      (e) =>
-        (e.issue_types ?? []).includes(issue.code) && matchesAny(url, e.url_patterns ?? []),
+      (e) => (e.issue_types ?? []).includes(issue.code) && matchesAny(url, e.url_patterns ?? []),
     );
     if (match) {
       suppressed.push({ ...issue, suppressed_by: match.id });
@@ -192,7 +193,7 @@ export function applyAllowlist(url, issues, allowlist, now = nowIso()) {
  */
 export function validateAllowlist(allowlist) {
   const errs = [];
-  const arr = (name) => Array.isArray(allowlist[name]) ? allowlist[name] : [];
+  const arr = (name) => (Array.isArray(allowlist[name]) ? allowlist[name] : []);
   const check = (name) => {
     for (const e of arr(name)) {
       if (!e.id || typeof e.id !== "string") errs.push(`${name}: entry missing id`);

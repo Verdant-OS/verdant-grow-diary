@@ -267,7 +267,7 @@ export function usePhenoHuntWorkspace(
     roundsLoadingRef.current = new Set();
     setRoundsByKey({});
     setRoundLoadStates({});
-  }, [id]);
+  }, []);
 
   // Reset + load page 0 whenever the hunt or the server-side filters change.
   useEffect(() => {
@@ -346,7 +346,7 @@ export function usePhenoHuntWorkspace(
     return () => {
       cancelled = true;
     };
-  }, [id, filters, reloadTick]);
+  }, [id, filters]);
 
   const reload = useCallback(() => setReloadTick((tick) => tick + 1), []);
 

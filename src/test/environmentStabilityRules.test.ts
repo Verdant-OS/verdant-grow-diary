@@ -89,9 +89,7 @@ describe("environmentStabilityRules.computeEnvironmentStability", () => {
       now: NOW,
     });
     expect(r.sparse).toBe(true);
-    expect(r.message).toBe(
-      "Limited data — stability estimate may be incomplete.",
-    );
+    expect(r.message).toBe("Limited data — stability estimate may be incomplete.");
   });
 
   it("unavailable message names the evidence class and the derived-VPD exclusion", () => {
@@ -149,10 +147,9 @@ describe("environmentStabilityRules.computeEnvironmentStability", () => {
   });
 
   it("ignores readings marked stale", () => {
-    const readings: StabilityReadingInput[] = readingsEveryHour(
-      Array(24).fill(1.8),
-      { startHoursAgo: 23 },
-    ).map((r) => ({ ...r, stale: true }));
+    const readings: StabilityReadingInput[] = readingsEveryHour(Array(24).fill(1.8), {
+      startHoursAgo: 23,
+    }).map((r) => ({ ...r, stale: true }));
     const r = computeEnvironmentStability(readings, {
       stage: "veg",
       now: NOW,
@@ -161,10 +158,9 @@ describe("environmentStabilityRules.computeEnvironmentStability", () => {
   });
 
   it("ignores readings whose source is demo/mock", () => {
-    const readings: StabilityReadingInput[] = readingsEveryHour(
-      Array(24).fill(1.8),
-      { startHoursAgo: 23 },
-    ).map((r) => ({ ...r, source: "demo" }));
+    const readings: StabilityReadingInput[] = readingsEveryHour(Array(24).fill(1.8), {
+      startHoursAgo: 23,
+    }).map((r) => ({ ...r, source: "demo" }));
     const r = computeEnvironmentStability(readings, {
       stage: "veg",
       now: NOW,
@@ -180,10 +176,9 @@ describe("environmentStabilityRules.computeEnvironmentStability", () => {
   });
 
   it("is deterministic across repeated invocations", () => {
-    const readings = readingsEveryHour(
-      [1.0, 1.0, 1.8, 1.8, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-      { startHoursAgo: 9 },
-    );
+    const readings = readingsEveryHour([1.0, 1.0, 1.8, 1.8, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], {
+      startHoursAgo: 9,
+    });
     const a = computeEnvironmentStability(readings, {
       stage: "veg",
       now: NOW,

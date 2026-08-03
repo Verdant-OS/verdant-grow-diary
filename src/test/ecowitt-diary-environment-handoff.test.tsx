@@ -417,10 +417,12 @@ describe("EcowittIngestValidationPanel — copy + export", () => {
 
 describe("CSV serializer", () => {
   it("emits one row per (attempt × metric), capped to last 10 attempts, with redacted output", async () => {
-    const { buildEcowittValidationExport, serializeExportCsv } =
-      await import("@/lib/ecowittValidationExportRules");
-    const { buildEcowittIngestValidationViewModel } =
-      await import("@/lib/ecowittIngestValidationViewModel");
+    const { buildEcowittValidationExport, serializeExportCsv } = await import(
+      "@/lib/ecowittValidationExportRules"
+    );
+    const { buildEcowittIngestValidationViewModel } = await import(
+      "@/lib/ecowittIngestValidationViewModel"
+    );
     const rows = Array.from({ length: 25 }, (_, i) => ({
       id: `r${i}`,
       source: "ecowitt",

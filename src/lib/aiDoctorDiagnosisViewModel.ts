@@ -12,10 +12,7 @@
  */
 
 import type { DiagnosisResult } from "./aiDoctorEngine";
-import type {
-  ConfidenceLevel,
-  ConfidenceResult,
-} from "./aiDoctorConfidenceEdgeClient";
+import type { ConfidenceLevel, ConfidenceResult } from "./aiDoctorConfidenceEdgeClient";
 
 export interface DiagnosisDisplayConfidence {
   /** Final, user-facing confidence — sourced from automated result. */
@@ -97,10 +94,7 @@ export function adaptDiagnosisResultToViewModel(
   const missing_context = questions;
 
   return {
-    summary: safeString(
-      r.summary,
-      "No diagnosis available yet — observe and re-check.",
-    ),
+    summary: safeString(r.summary, "No diagnosis available yet — observe and re-check."),
     key_observations: safeArray(r.key_observations),
     contributing_factors: safeArray(r.contributing_factors),
     recommended_actions: safeArray(r.recommended_actions),

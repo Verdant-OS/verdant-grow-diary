@@ -46,11 +46,11 @@ function runValidate(env, extraArgs = []) {
     HOME: process.env.HOME ?? "",
     ...env,
   };
-  const r = spawnSync(
-    "bun",
-    ["run", BRIDGE, "config", "validate", ...extraArgs],
-    { encoding: "utf8", env: cleanEnv, timeout: 20_000 },
-  );
+  const r = spawnSync("bun", ["run", BRIDGE, "config", "validate", ...extraArgs], {
+    encoding: "utf8",
+    env: cleanEnv,
+    timeout: 20_000,
+  });
   return { status: r.status, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
 }
 
@@ -122,7 +122,10 @@ for (const file of files) {
     typeof errEnv?.code === "string" && allowed.includes(errEnv.code),
     `got code=${errEnv?.code ?? "<none>"}`,
   );
-  check("no mqtt import / network attempt", !/ECONNREFUSED|mqtt_connected|Cannot find module 'mqtt'/i.test(r.stderr));
+  check(
+    "no mqtt import / network attempt",
+    !/ECONNREFUSED|mqtt_connected|Cannot find module 'mqtt'/i.test(r.stderr),
+  );
 }
 
 console.log("");

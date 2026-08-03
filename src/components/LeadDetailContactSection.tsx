@@ -11,10 +11,7 @@ export interface LeadDetailContactSectionProps {
   vm: LeadDetailViewModel;
 }
 
-export default function LeadDetailContactSection({
-  lead,
-  vm,
-}: LeadDetailContactSectionProps) {
+export default function LeadDetailContactSection({ lead, vm }: LeadDetailContactSectionProps) {
   async function copyEmail() {
     try {
       await navigator.clipboard.writeText(lead.email);

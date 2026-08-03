@@ -58,8 +58,7 @@ export interface PhenoComparisonActionState {
   readonly nextStepTarget: string | null;
 }
 
-export const PHENO_COMPARISON_HELP_COPY =
-  "Add the missing evidence before comparing candidates.";
+export const PHENO_COMPARISON_HELP_COPY = "Add the missing evidence before comparing candidates.";
 
 /**
  * Stable in-workspace anchor IDs for each missing-evidence id. Anchors that
@@ -79,10 +78,7 @@ export const PHENO_WORKSPACE_ANCHORS = {
   replication_readiness: null,
 } as const satisfies Record<PhenoMissingEvidenceItem["id"], string | null>;
 
-function workspaceTarget(
-  huntId: string | null | undefined,
-  anchor: string | null,
-): string | null {
+function workspaceTarget(huntId: string | null | undefined, anchor: string | null): string | null {
   if (typeof huntId !== "string" || huntId.trim() === "") return null;
   const base = `/pheno-hunts/${huntId}/workspace`;
   return anchor ? `${base}#${anchor}` : null;
@@ -93,14 +89,9 @@ export function buildPhenoComparisonActionState(
 ): PhenoComparisonActionState {
   const items: PhenoMissingEvidenceItem[] = [];
   let readiness: PhenoWorkspaceComparisonReadiness = "not_ready";
-  const hasHunt =
-    typeof input.huntId === "string" && input.huntId.trim() !== "";
+  const hasHunt = typeof input.huntId === "string" && input.huntId.trim() !== "";
 
-  const push = (
-    id: PhenoMissingEvidenceItem["id"],
-    message: string,
-    label: string,
-  ) => {
+  const push = (id: PhenoMissingEvidenceItem["id"], message: string, label: string) => {
     const anchor = PHENO_WORKSPACE_ANCHORS[id];
     const target = workspaceTarget(input.huntId, anchor);
     items.push({
@@ -141,9 +132,7 @@ export function buildPhenoComparisonActionState(
   }
 
   const enabled = readiness === "comparison_ready" && !!input.huntId;
-  const label = enabled
-    ? "Compare candidates"
-    : PHENO_STATUS_LABELS.notComparisonReadyYet;
+  const label = enabled ? "Compare candidates" : PHENO_STATUS_LABELS.notComparisonReadyYet;
 
   const primaryReason =
     readiness === "missing_evidence"
@@ -156,8 +145,7 @@ export function buildPhenoComparisonActionState(
             ? ""
             : PHENO_COMPARISON_HELP_COPY;
 
-  const nextStepTarget =
-    enabled && input.huntId ? `/pheno-hunts/${input.huntId}/compare` : null;
+  const nextStepTarget = enabled && input.huntId ? `/pheno-hunts/${input.huntId}/compare` : null;
 
   return {
     enabled,
@@ -219,8 +207,7 @@ export function derivePhenoCompareReadinessFromCandidates(
   const hasHarvestSignal = (c: PhenoCandidateInput): boolean =>
     hasSmoke(c) || !!c.expression?.labResult;
 
-  const allHavePheno =
-    candidateCount > 0 && list.every(hasPhenoSignal);
+  const allHavePheno = candidateCount > 0 && list.every(hasPhenoSignal);
   const anyHarvest = list.some(hasHarvestSignal);
   const anyCure = list.some(hasSmoke);
 

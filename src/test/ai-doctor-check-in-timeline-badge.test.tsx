@@ -23,10 +23,7 @@ import {
 } from "@/lib/aiDoctorCheckInEventBadge";
 
 const ROOT = process.cwd();
-const HELPER_SRC = readFileSync(
-  resolve(ROOT, "src/lib/aiDoctorCheckInEventBadge.ts"),
-  "utf8",
-);
+const HELPER_SRC = readFileSync(resolve(ROOT, "src/lib/aiDoctorCheckInEventBadge.ts"), "utf8");
 const BADGE_SRC = readFileSync(
   resolve(ROOT, "src/components/AiDoctorCheckInTimelineBadge.tsx"),
   "utf8",
@@ -34,9 +31,7 @@ const BADGE_SRC = readFileSync(
 
 describe("isAiDoctorCheckInEvent", () => {
   it("returns true when details.kind matches", () => {
-    expect(
-      isAiDoctorCheckInEvent({ details: { kind: "ai_doctor_check_in" } }),
-    ).toBe(true);
+    expect(isAiDoctorCheckInEvent({ details: { kind: "ai_doctor_check_in" } })).toBe(true);
   });
 
   it("returns false for ordinary observation events", () => {
@@ -49,22 +44,14 @@ describe("isAiDoctorCheckInEvent", () => {
     expect(isAiDoctorCheckInEvent(undefined)).toBe(false);
     expect(isAiDoctorCheckInEvent({})).toBe(false);
     expect(isAiDoctorCheckInEvent({ details: null })).toBe(false);
-    expect(
-      isAiDoctorCheckInEvent({ details: "ai_doctor_check_in" as unknown }),
-    ).toBe(false);
-    expect(isAiDoctorCheckInEvent({ details: { kind: 42 as unknown } })).toBe(
-      false,
-    );
+    expect(isAiDoctorCheckInEvent({ details: "ai_doctor_check_in" as unknown })).toBe(false);
+    expect(isAiDoctorCheckInEvent({ details: { kind: 42 as unknown } })).toBe(false);
   });
 });
 
 describe("AiDoctorCheckInTimelineBadge", () => {
   it("renders the AI Doctor check-in sub-badge for matching events", () => {
-    render(
-      <AiDoctorCheckInTimelineBadge
-        event={{ details: { kind: "ai_doctor_check_in" } }}
-      />,
-    );
+    render(<AiDoctorCheckInTimelineBadge event={{ details: { kind: "ai_doctor_check_in" } }} />);
     const badge = screen.getByTestId("ai-doctor-check-in-timeline-badge");
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveTextContent(AI_DOCTOR_CHECK_IN_BADGE_LABEL);
@@ -73,13 +60,9 @@ describe("AiDoctorCheckInTimelineBadge", () => {
 
   it("does not render for ordinary observation events", () => {
     const { container } = render(
-      <AiDoctorCheckInTimelineBadge
-        event={{ details: { kind: "observation", note: "ok" } }}
-      />,
+      <AiDoctorCheckInTimelineBadge event={{ details: { kind: "observation", note: "ok" } }} />,
     );
-    expect(
-      screen.queryByTestId("ai-doctor-check-in-timeline-badge"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ai-doctor-check-in-timeline-badge")).not.toBeInTheDocument();
     expect(container.firstChild).toBeNull();
   });
 
@@ -93,20 +76,14 @@ describe("AiDoctorCheckInTimelineBadge", () => {
       { details: { kind: 42 } },
     ];
     for (const c of cases) {
-      const { container, unmount } = render(
-        <AiDoctorCheckInTimelineBadge event={c as never} />,
-      );
+      const { container, unmount } = render(<AiDoctorCheckInTimelineBadge event={c as never} />);
       expect(container.firstChild).toBeNull();
       unmount();
     }
   });
 
   it("never renders the primary event-type label itself (sub-badge only)", () => {
-    render(
-      <AiDoctorCheckInTimelineBadge
-        event={{ details: { kind: "ai_doctor_check_in" } }}
-      />,
-    );
+    render(<AiDoctorCheckInTimelineBadge event={{ details: { kind: "ai_doctor_check_in" } }} />);
     // Sub-badge text only — must not echo "Note", "Observation", or event_type.
     expect(screen.queryByText(/^Note$/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/^Observation$/i)).not.toBeInTheDocument();

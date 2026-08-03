@@ -22,9 +22,7 @@ import {
   buildDailyCheckPostSubmitActions,
   parseDailyCheckEntrySource,
 } from "@/lib/dailyCheckPostSubmitRules";
-import {
-  buildDashboardDailyGrowCheckPanel,
-} from "@/lib/dashboardDailyGrowCheckPanelRules";
+import { buildDashboardDailyGrowCheckPanel } from "@/lib/dashboardDailyGrowCheckPanelRules";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
@@ -42,9 +40,7 @@ describe("Entry-source-aware CTAs · href contract", () => {
     const panel = buildDashboardDailyGrowCheckPanel({
       now: new Date("2026-05-24T12:00:00Z"),
       scopedGrowId: null,
-      plants: [
-        { id: "p-a", name: "A", tentId: "t1", growId: null, isArchived: false },
-      ],
+      plants: [{ id: "p-a", name: "A", tentId: "t1", growId: null, isArchived: false }],
       tents: [{ id: "t1", name: "Tent" }],
       manualReadings: [],
       diaryEntries: [],
@@ -53,21 +49,15 @@ describe("Entry-source-aware CTAs · href contract", () => {
   });
 
   it("Plant Detail consistency card href carries from=plant-detail", () => {
-    expect(PLANT_CARD).toMatch(
-      /\/daily-check\?plantId=\$\{plantId\}&from=plant-detail/,
-    );
+    expect(PLANT_CARD).toMatch(/\/daily-check\?plantId=\$\{plantId\}&from=plant-detail/);
   });
 
   it("Plant Detail history card href carries from=plant-detail", () => {
-    expect(PLANT_HISTORY).toMatch(
-      /\/daily-check\?plantId=\$\{plantId\}&from=plant-detail/,
-    );
+    expect(PLANT_HISTORY).toMatch(/\/daily-check\?plantId=\$\{plantId\}&from=plant-detail/);
   });
 
   it("Plant Detail page top-of-card button carries from=plant-detail", () => {
-    expect(PLANT_PAGE).toMatch(
-      /\/daily-check\?plantId=\$\{plant\.id\}&from=plant-detail/,
-    );
+    expect(PLANT_PAGE).toMatch(/\/daily-check\?plantId=\$\{plant\.id\}&from=plant-detail/);
   });
 
   it("source parser is the single source of truth for valid `from` values", () => {
@@ -98,14 +88,12 @@ describe("Source-aware post-submit primary CTA selection", () => {
   });
 
   it("missing/unknown source ⇒ Dashboard primary (safe default)", () => {
+    expect(buildDailyCheckPostSubmitActions({ plantId: "p-1" }).find((x) => x.primary)!.key).toBe(
+      "dashboard",
+    );
     expect(
-      buildDailyCheckPostSubmitActions({ plantId: "p-1" }).find((x) => x.primary)!
+      buildDailyCheckPostSubmitActions({ plantId: "p-1", source: null }).find((x) => x.primary)!
         .key,
-    ).toBe("dashboard");
-    expect(
-      buildDailyCheckPostSubmitActions({ plantId: "p-1", source: null }).find(
-        (x) => x.primary,
-      )!.key,
     ).toBe("dashboard");
   });
 });
@@ -146,9 +134,7 @@ describe("Static safety · no forbidden wording or write/control surface", () =>
   // Strip comments so docstring negative-assertions ("never automation",
   // "no action_queue") do not register as real surfaces.
   function stripComments(src: string): string {
-    return src
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+    return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
   }
   const FILES: Record<string, string> = {
     POST_RULES: stripComments(POST_RULES),

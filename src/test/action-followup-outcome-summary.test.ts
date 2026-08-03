@@ -37,12 +37,9 @@ const EXPECTED_LABELS: Record<string, string> = {
 };
 
 describe("actionFollowUpOutcomeLabel — shared mapping", () => {
-  it.each(Object.entries(EXPECTED_LABELS))(
-    "maps %s → %s",
-    (outcome, label) => {
-      expect(actionFollowUpOutcomeLabel(outcome)).toBe(label);
-    },
-  );
+  it.each(Object.entries(EXPECTED_LABELS))("maps %s → %s", (outcome, label) => {
+    expect(actionFollowUpOutcomeLabel(outcome)).toBe(label);
+  });
 
   it("returns null for missing outcome", () => {
     expect(actionFollowUpOutcomeLabel(undefined)).toBeNull();
@@ -78,37 +75,31 @@ describe("composeActionFollowUpTitle — shared title builder", () => {
   it("emits Follow-up · <Outcome> for valid outcomes", () => {
     expect(composeActionFollowUpTitle("improved")).toBe("Follow-up · Improved");
     expect(composeActionFollowUpTitle("declined")).toBe("Follow-up · Declined");
-    expect(composeActionFollowUpTitle("too_soon")).toBe(
-      "Follow-up · Too soon to tell",
-    );
+    expect(composeActionFollowUpTitle("too_soon")).toBe("Follow-up · Too soon to tell");
   });
 
   it("falls back to legacy marker for missing outcome", () => {
-    expect(composeActionFollowUpTitle(undefined)).toBe(
-      ACTION_FOLLOWUP_LEGACY_LABEL,
-    );
+    expect(composeActionFollowUpTitle(undefined)).toBe(ACTION_FOLLOWUP_LEGACY_LABEL);
     expect(composeActionFollowUpTitle(null)).toBe(ACTION_FOLLOWUP_LEGACY_LABEL);
   });
 
   it("falls back to legacy marker for invalid outcome", () => {
-    expect(composeActionFollowUpTitle("succeeded")).toBe(
-      ACTION_FOLLOWUP_LEGACY_LABEL,
-    );
+    expect(composeActionFollowUpTitle("succeeded")).toBe(ACTION_FOLLOWUP_LEGACY_LABEL);
     expect(composeActionFollowUpTitle(123)).toBe(ACTION_FOLLOWUP_LEGACY_LABEL);
   });
 });
 
 describe("diaryTimelineActionLabel — action_followup outcome integration", () => {
   it("renders the shared outcome label when details.outcome is valid", () => {
-    expect(
-      diaryTimelineActionLabel("action_followup", { outcome: "improved" }),
-    ).toBe("Follow-up · Improved");
-    expect(
-      diaryTimelineActionLabel("action_followup", { outcome: "unchanged" }),
-    ).toBe("Follow-up · No clear change");
-    expect(
-      diaryTimelineActionLabel("action_followup", { outcome: "unclear" }),
-    ).toBe("Follow-up · Unclear");
+    expect(diaryTimelineActionLabel("action_followup", { outcome: "improved" })).toBe(
+      "Follow-up · Improved",
+    );
+    expect(diaryTimelineActionLabel("action_followup", { outcome: "unchanged" })).toBe(
+      "Follow-up · No clear change",
+    );
+    expect(diaryTimelineActionLabel("action_followup", { outcome: "unclear" })).toBe(
+      "Follow-up · Unclear",
+    );
   });
 
   it("preserves legacy marker when details is omitted", () => {
@@ -116,9 +107,7 @@ describe("diaryTimelineActionLabel — action_followup outcome integration", () 
   });
 
   it("preserves legacy marker for invalid outcome", () => {
-    expect(
-      diaryTimelineActionLabel("action_followup", { outcome: "bogus" }),
-    ).toBe("Follow-up");
+    expect(diaryTimelineActionLabel("action_followup", { outcome: "bogus" })).toBe("Follow-up");
   });
 
   it("leaves other kinds untouched", () => {

@@ -39,7 +39,11 @@ describe("buildPaddleSignatureHeader", () => {
 
   it("changes signature when secret changes", () => {
     const a = buildPaddleSignatureHeader({ rawBody: RAW, secret: FAKE_SECRET, timestamp: TS });
-    const b = buildPaddleSignatureHeader({ rawBody: RAW, secret: OTHER_FAKE_SECRET, timestamp: TS });
+    const b = buildPaddleSignatureHeader({
+      rawBody: RAW,
+      secret: OTHER_FAKE_SECRET,
+      timestamp: TS,
+    });
     expect(a).not.toBe(b);
   });
 

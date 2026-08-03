@@ -121,9 +121,7 @@ function fulfillRows(
   const accept = request.headers()["accept"] ?? "";
   const wantsObject = accept.includes("vnd.pgrst.object");
   const body = wantsObject ? JSON.stringify(rows[0] ?? null) : JSON.stringify(rows);
-  const contentType = wantsObject
-    ? "application/vnd.pgrst.object+json"
-    : "application/json";
+  const contentType = wantsObject ? "application/vnd.pgrst.object+json" : "application/json";
   return route.fulfill({ status: 200, contentType, body });
 }
 
@@ -155,9 +153,7 @@ async function mockSignedInSupabase(page: Page) {
   await page.route(/\/functions\/v1\//, (route) =>
     route.fulfill({ status: 404, contentType: "application/json", body: "{}" }),
   );
-  await page.route(/google-analytics\.com|googletagmanager\.com/, (route) =>
-    route.abort(),
-  );
+  await page.route(/google-analytics\.com|googletagmanager\.com/, (route) => route.abort());
 }
 
 async function acceptReconsentGateIfShown(page: Page) {
@@ -190,9 +186,7 @@ test.describe("Plant Detail Quick Log watering read path", () => {
     await acceptReconsentGateIfShown(page);
 
     // ---- 1. Recap item: Watering, never Note --------------------------
-    const recapItem = page
-      .getByTestId("plant-detail-recent-activity-recap-item")
-      .first();
+    const recapItem = page.getByTestId("plant-detail-recent-activity-recap-item").first();
     await expect(recapItem).toBeVisible();
     await expect(recapItem).toHaveAttribute("data-category", "watering");
     const recapText = (await recapItem.innerText()).trim();
@@ -214,10 +208,7 @@ test.describe("Plant Detail Quick Log watering read path", () => {
       .filter({ visible: true })
       .first();
     await expect(panelRow).toBeVisible();
-    await expect(panelRow).toHaveAttribute(
-      "data-effective-event-type",
-      "watering",
-    );
+    await expect(panelRow).toHaveAttribute("data-effective-event-type", "watering");
     const badge = panelRow.getByTestId("plant-recent-activity-event-type");
     const badgeText = (await badge.innerText()).trim();
     expect(badgeText).toMatch(/watering/i);

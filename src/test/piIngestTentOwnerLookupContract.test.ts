@@ -20,39 +20,15 @@ describe("pi-ingest tent-owner lookup — contract doc", () => {
     ["mentions tent_id", /`?tent_id`?/],
     ["mentions tentOwnerUserId", /`?tentOwnerUserId`?/],
     ["mentions evaluateBridgeAuthorization", /evaluateBridgeAuthorization/],
-    [
-      "server-side only",
-      /server-side[\s\S]{0,80}(only|Edge\s+Function)/i,
-    ],
-    [
-      "no browser/client bundle",
-      /MUST\s+NOT\s+run[\s\S]{0,200}browser\/client\s+bundles?/i,
-    ],
-    [
-      "no React component lookup",
-      /MUST\s+NOT\s+run[\s\S]{0,200}React\s+components?/i,
-    ],
-    [
-      "must read tents.user_id",
-      /must\s+read\s+(from\s+)?`?tents\.user_id`?/i,
-    ],
-    [
-      "do not trust client-provided user_id",
-      /must\s+not\s+trust\s+client-provided\s+`?user_id`?/i,
-    ],
-    [
-      "do not trust bridge-provided owner id",
-      /must\s+not\s+trust\s+bridge-provided\s+owner\s+id/i,
-    ],
-    [
-      "cross-user tent inserts rejected",
-      /Cross-user\s+tent\s+inserts\s+must\s+be\s+rejected/i,
-    ],
+    ["server-side only", /server-side[\s\S]{0,80}(only|Edge\s+Function)/i],
+    ["no browser/client bundle", /MUST\s+NOT\s+run[\s\S]{0,200}browser\/client\s+bundles?/i],
+    ["no React component lookup", /MUST\s+NOT\s+run[\s\S]{0,200}React\s+components?/i],
+    ["must read tents.user_id", /must\s+read\s+(from\s+)?`?tents\.user_id`?/i],
+    ["do not trust client-provided user_id", /must\s+not\s+trust\s+client-provided\s+`?user_id`?/i],
+    ["do not trust bridge-provided owner id", /must\s+not\s+trust\s+bridge-provided\s+owner\s+id/i],
+    ["cross-user tent inserts rejected", /Cross-user\s+tent\s+inserts\s+must\s+be\s+rejected/i],
     ["unknown tent fails closed", /Unknown\s+`?tent_id`?\s+fails\s+closed/i],
-    [
-      "missing tent id fails closed",
-      /Missing\s+`?tent_id`?\s+fails\s+closed/i,
-    ],
+    ["missing tent id fails closed", /Missing\s+`?tent_id`?\s+fails\s+closed/i],
     [
       "failed lookup inserts zero sensor rows",
       /failed\s+lookup\s+inserts\s+zero\s+`?sensor_readings`?\s+rows/i,
@@ -93,9 +69,7 @@ function walk(dir: string, acc: string[] = []): string[] {
 
 describe("pi-ingest tent-owner lookup — repo guardrails", () => {
   it("no tent-owner lookup helper exists in src/lib yet", () => {
-    const files = walk(resolve(ROOT, "src/lib")).filter((p) =>
-      /\.(ts|tsx)$/.test(p),
-    );
+    const files = walk(resolve(ROOT, "src/lib")).filter((p) => /\.(ts|tsx)$/.test(p));
     for (const f of files) {
       const base = f.split("/").pop() ?? "";
       expect(
@@ -118,9 +92,7 @@ describe("pi-ingest tent-owner lookup — repo guardrails", () => {
       (p) => /\.(ts|tsx)$/.test(p) && /piIngest/i.test(p),
     );
     for (const f of files) {
-      expect(readFileSync(f, "utf8"), `service_role in ${f}`).not.toMatch(
-        /service_role/i,
-      );
+      expect(readFileSync(f, "utf8"), `service_role in ${f}`).not.toMatch(/service_role/i);
     }
   });
 

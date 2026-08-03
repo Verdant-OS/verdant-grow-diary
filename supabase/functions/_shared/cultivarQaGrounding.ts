@@ -265,7 +265,7 @@ export function parseCultivarQaRequest(value: unknown): ParsedCultivarQaRequest 
   const body = asObject(value);
   const rawSlug = body?.cultivarSlug;
   const cultivarSlug = typeof rawSlug === "string" ? rawSlug.trim() : "";
-  const context = Object.prototype.hasOwnProperty.call(SERVER_CULTIVAR_QA_CONTEXTS, cultivarSlug)
+  const context = Object.hasOwn(SERVER_CULTIVAR_QA_CONTEXTS, cultivarSlug)
     ? SERVER_CULTIVAR_QA_CONTEXTS[cultivarSlug]
     : undefined;
   if (!context) return { ok: false, reason: "unknown_cultivar" };

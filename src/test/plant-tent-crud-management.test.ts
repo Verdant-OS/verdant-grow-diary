@@ -52,9 +52,7 @@ describe("plantTentRelationshipRules · getEligiblePlantsForTentAttach", () => {
 
   it("excludes archived and cross-grow plants", () => {
     const out = getEligiblePlantsForTentAttach(plants, "t1", "g1");
-    const ids = [...out.unassigned, ...out.otherTent, ...out.currentTent].map(
-      (p) => p.id,
-    );
+    const ids = [...out.unassigned, ...out.otherTent, ...out.currentTent].map((p) => p.id);
     expect(ids).not.toContain("p4");
     expect(ids).not.toContain("p5");
   });
@@ -216,7 +214,9 @@ describe("EditPlantDialog · safe field-level updates", () => {
   });
 
   it("update payload never touches user_id or grow_id", () => {
-    const updates = [...EDIT_DIALOG.matchAll(/payload:\s*Record<string,\s*unknown>\s*=\s*\{([\s\S]*?)\};/g)];
+    const updates = [
+      ...EDIT_DIALOG.matchAll(/payload:\s*Record<string,\s*unknown>\s*=\s*\{([\s\S]*?)\};/g),
+    ];
     expect(updates.length).toBeGreaterThan(0);
     for (const m of updates) {
       expect(m[1]).not.toMatch(/\buser_id\b/);

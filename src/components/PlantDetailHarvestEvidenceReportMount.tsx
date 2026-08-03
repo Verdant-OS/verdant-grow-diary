@@ -18,16 +18,10 @@ interface Props {
   className?: string;
 }
 
-export default function PlantDetailHarvestEvidenceReportMount({
-  plantId,
-}: Props) {
-  const { plantInputs, isLoading, isError } =
-    useHarvestEvidenceReportData(plantId);
+export default function PlantDetailHarvestEvidenceReportMount({ plantId }: Props) {
+  const { plantInputs, isLoading, isError } = useHarvestEvidenceReportData(plantId);
 
-  const report = useMemo(
-    () => buildHarvestEvidenceReport(plantInputs),
-    [plantInputs],
-  );
+  const report = useMemo(() => buildHarvestEvidenceReport(plantInputs), [plantInputs]);
 
   if (!plantId) return null;
 
@@ -38,9 +32,7 @@ export default function PlantDetailHarvestEvidenceReportMount({
         aria-label="Harvest evidence report loading"
         data-testid="plant-detail-harvest-evidence-report-loading"
       >
-        <p className="text-xs text-muted-foreground">
-          Loading harvest evidence report…
-        </p>
+        <p className="text-xs text-muted-foreground">Loading harvest evidence report…</p>
       </section>
     );
   }
@@ -60,15 +52,9 @@ export default function PlantDetailHarvestEvidenceReportMount({
   }
 
   return (
-    <div
-      data-testid="plant-detail-harvest-evidence-report-mount"
-      className="flex flex-col gap-2"
-    >
+    <div data-testid="plant-detail-harvest-evidence-report-mount" className="flex flex-col gap-2">
       <div className="flex justify-end print-hidden">
-        <HarvestEvidenceReportExportButton
-          report={report}
-          isLoading={isLoading}
-        />
+        <HarvestEvidenceReportExportButton report={report} isLoading={isLoading} />
       </div>
       <HarvestEvidenceReportPanel report={report} />
     </div>

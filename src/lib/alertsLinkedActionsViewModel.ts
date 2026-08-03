@@ -37,9 +37,7 @@ export function buildAlertsLinkedActionsViewModel(
   rows: ReadonlyArray<LinkedActionRowInput | null | undefined>,
   visibleAlertIds: ReadonlyArray<string>,
 ): Map<string, AlertLinkedActionsSummary> {
-  const allowed = new Set(
-    visibleAlertIds.filter((id) => typeof id === "string" && id.length > 0),
-  );
+  const allowed = new Set(visibleAlertIds.filter((id) => typeof id === "string" && id.length > 0));
   const grouped = new Map<string, string[]>();
   for (const row of rows) {
     if (!row || typeof row.id !== "string") continue;

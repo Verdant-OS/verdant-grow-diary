@@ -21,11 +21,7 @@
  *    or looks up plant context — callers must pass what they already have.
  *  - Copy is observational and avoids control / certainty language.
  */
-import {
-  alertsPath,
-  dashboardPath,
-  sensorsPath,
-} from "@/lib/routes";
+import { alertsPath, dashboardPath, sensorsPath } from "@/lib/routes";
 
 export type GrowRoomLauncherKind =
   | "quicklog"
@@ -80,10 +76,7 @@ export interface GrowRoomLauncherInput {
   recordOutcomeAvailable?: boolean;
 }
 
-const LABELS: Record<
-  GrowRoomLauncherKind,
-  { label: string; description: string }
-> = {
+const LABELS: Record<GrowRoomLauncherKind, { label: string; description: string }> = {
   quicklog: {
     label: "Quick Log",
     description: "Open the diary entry sheet to log an observation, watering, feeding, or photo.",

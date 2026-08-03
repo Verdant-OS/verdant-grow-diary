@@ -18,9 +18,7 @@ import { REQUIRED_MONEY_MIGRATIONS } from "./required-money-migrations.mjs";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const MIGRATIONS_DIR = join(REPO_ROOT, "supabase", "migrations");
 
-const missing = REQUIRED_MONEY_MIGRATIONS.filter(
-  (f) => !existsSync(join(MIGRATIONS_DIR, f)),
-);
+const missing = REQUIRED_MONEY_MIGRATIONS.filter((f) => !existsSync(join(MIGRATIONS_DIR, f)));
 
 if (missing.length > 0) {
   console.error("✗ Missing money-critical migration files:");
@@ -33,6 +31,4 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
-console.log(
-  `✓ All ${REQUIRED_MONEY_MIGRATIONS.length} money-critical migration files present.`,
-);
+console.log(`✓ All ${REQUIRED_MONEY_MIGRATIONS.length} money-critical migration files present.`);

@@ -77,10 +77,7 @@ export default function ManualSnapshotTimelineSection(props: Props) {
             No manual sensor snapshots yet.
           </p>
         ) : (
-          <ul
-            className="space-y-3"
-            data-testid="manual-snapshot-timeline-section-list"
-          >
+          <ul className="space-y-3" data-testid="manual-snapshot-timeline-section-list">
             {cards.map((card) => (
               <li key={card.id}>
                 <ManualSnapshotTimelineCard card={card} />

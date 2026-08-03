@@ -206,8 +206,8 @@ function runSubscriberInterestRls() {
   const required = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
   const hasAnonKey = Boolean(
     process.env.SUPABASE_ANON_KEY ??
-    process.env.SUPABASE_PUBLISHABLE_KEY ??
-    process.env.VITE_SUPABASE_ANON_KEY,
+      process.env.SUPABASE_PUBLISHABLE_KEY ??
+      process.env.VITE_SUPABASE_ANON_KEY,
   );
   if (!required.every((name) => Boolean(process.env[name])) || !hasAnonKey) {
     return {

@@ -69,10 +69,7 @@ export function useGlobalSearch(query: string): UseGlobalSearchReturn {
   // stay available even if the private RPC is loading or fails — a private
   // failure must never be presented as a verified empty result.
   const cultivarResults = useMemo(
-    () =>
-      enabled
-        ? searchCultivarReferences(VERDANT_CULTIVARS, debounced, MAX_RESULTS)
-        : [],
+    () => (enabled ? searchCultivarReferences(VERDANT_CULTIVARS, debounced, MAX_RESULTS) : []),
     [enabled, debounced],
   );
 

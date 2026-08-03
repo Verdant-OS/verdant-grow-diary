@@ -66,9 +66,7 @@ export function validateEcWithUnit(
 }
 
 /** Air-temp plausibility, Celsius (canonical store). */
-export function validateTempC(
-  value: string | number | null | undefined,
-): PlausibilityIssue | null {
+export function validateTempC(value: string | number | null | undefined): PlausibilityIssue | null {
   const n = num(value);
   if (n === null) return null;
   if (n < -10 || n > 60) {

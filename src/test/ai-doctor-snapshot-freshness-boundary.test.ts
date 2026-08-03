@@ -62,18 +62,14 @@ describe("AI Doctor 48h snapshot freshness — boundary transitions", () => {
   });
 
   it("one ms past the 48h cutoff → stale → partial readiness", () => {
-    const r = evaluateAiDoctorContext(
-      baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS + ONE_MS),
-    );
+    const r = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS + ONE_MS));
     expect(r.readiness).toBe("partial");
     expect(r.evidence).toContain("recent-manual-sensor-snapshot");
     expect(r.evidence).not.toContain("fresh-manual-sensor-snapshot");
   });
 
   it("one ms before the 48h cutoff → fresh → strong readiness", () => {
-    const r = evaluateAiDoctorContext(
-      baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS - ONE_MS),
-    );
+    const r = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS - ONE_MS));
     expect(r.readiness).toBe("strong");
     expect(r.evidence).toContain("fresh-manual-sensor-snapshot");
   });
@@ -90,9 +86,7 @@ describe("AI Doctor 48h snapshot freshness — boundary transitions", () => {
   });
 
   it("gate: 1ms-past-cutoff (partial) + safe flow → keeps quick actions, primary=open_ai_doctor", () => {
-    const r = evaluateAiDoctorContext(
-      baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS + ONE_MS),
-    );
+    const r = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS + ONE_MS));
     const gate = buildAiDoctorReadinessGate({
       readiness: r.readiness,
       hasSafeAiDoctorFlow: true,
@@ -103,9 +97,7 @@ describe("AI Doctor 48h snapshot freshness — boundary transitions", () => {
   });
 
   it("gate: 1ms-past-cutoff (partial) + no safe flow → quick actions, primary=focus_anchor (add-context)", () => {
-    const r = evaluateAiDoctorContext(
-      baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS + ONE_MS),
-    );
+    const r = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS + ONE_MS));
     const gate = buildAiDoctorReadinessGate({
       readiness: r.readiness,
       hasSafeAiDoctorFlow: false,
@@ -127,12 +119,8 @@ describe("AI Doctor 48h snapshot freshness — boundary transitions", () => {
   });
 
   it("stale → fresh transition flips readiness partial → strong and hides quick actions (safe flow on)", () => {
-    const stale = evaluateAiDoctorContext(
-      baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS + ONE_MS),
-    );
-    const fresh = evaluateAiDoctorContext(
-      baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS - ONE_MS),
-    );
+    const stale = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS + ONE_MS));
+    const fresh = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS - ONE_MS));
     expect(stale.readiness).toBe("partial");
     expect(fresh.readiness).toBe("strong");
 
@@ -152,12 +140,8 @@ describe("AI Doctor 48h snapshot freshness — boundary transitions", () => {
   });
 
   it("fresh → stale transition flips readiness strong → partial and re-shows quick actions (safe flow on)", () => {
-    const fresh = evaluateAiDoctorContext(
-      baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS - ONE_MS),
-    );
-    const stale = evaluateAiDoctorContext(
-      baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS + ONE_MS),
-    );
+    const fresh = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS - ONE_MS));
+    const stale = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS + ONE_MS));
     const gFresh = buildAiDoctorReadinessGate({
       readiness: fresh.readiness,
       hasSafeAiDoctorFlow: true,
@@ -172,12 +156,8 @@ describe("AI Doctor 48h snapshot freshness — boundary transitions", () => {
   });
 
   it("no-safe-flow transition: primary stays focus_anchor on both sides of the cutoff", () => {
-    const stale = evaluateAiDoctorContext(
-      baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS + ONE_MS),
-    );
-    const fresh = evaluateAiDoctorContext(
-      baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS - ONE_MS),
-    );
+    const stale = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS + ONE_MS));
+    const fresh = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS - ONE_MS));
     const gStale = buildAiDoctorReadinessGate({
       readiness: stale.readiness,
       hasSafeAiDoctorFlow: false,
@@ -196,12 +176,8 @@ describe("AI Doctor 48h snapshot freshness — boundary transitions", () => {
   it("boundary is deterministic across repeated evaluations at the same instant", () => {
     const a1 = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS));
     const a2 = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS));
-    const b1 = evaluateAiDoctorContext(
-      baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS + ONE_MS),
-    );
-    const b2 = evaluateAiDoctorContext(
-      baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS + ONE_MS),
-    );
+    const b1 = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS + ONE_MS));
+    const b2 = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS + ONE_MS));
     expect(a1.readiness).toBe(a2.readiness);
     expect(a1.evidence).toEqual(a2.evidence);
     expect(b1.readiness).toBe(b2.readiness);

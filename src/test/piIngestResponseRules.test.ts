@@ -6,10 +6,7 @@ import {
   shapePiIngestResponse,
   shapePiIngestSuccessResponse,
 } from "@/lib/piIngestResponseRules";
-import type {
-  PiIngestPipelineResult,
-  PiIngestPipelineStage,
-} from "@/lib/piIngestPipeline";
+import type { PiIngestPipelineResult, PiIngestPipelineStage } from "@/lib/piIngestPipeline";
 
 function failure(
   stage: PiIngestPipelineStage,
@@ -25,14 +22,10 @@ function failure(
         stage,
         code,
         message,
-        ...(extras.issueRetry !== undefined
-          ? { retryAfterMs: extras.issueRetry }
-          : {}),
+        ...(extras.issueRetry !== undefined ? { retryAfterMs: extras.issueRetry } : {}),
       },
     ],
-    ...(extras.retryAfterMs !== undefined
-      ? { retryAfterMs: extras.retryAfterMs }
-      : {}),
+    ...(extras.retryAfterMs !== undefined ? { retryAfterMs: extras.retryAfterMs } : {}),
   };
 }
 
@@ -52,26 +45,18 @@ describe("shapePiIngestSuccessResponse", () => {
   });
 
   it("rejects non-integer inserted", () => {
-    expect(() =>
-      shapePiIngestSuccessResponse({ inserted: 1.5 }),
-    ).toThrow(/inserted/);
-    expect(() =>
-      shapePiIngestSuccessResponse({ inserted: -1 }),
-    ).toThrow(/inserted/);
+    expect(() => shapePiIngestSuccessResponse({ inserted: 1.5 })).toThrow(/inserted/);
+    expect(() => shapePiIngestSuccessResponse({ inserted: -1 })).toThrow(/inserted/);
   });
 
   it("rejects non-integer rejected", () => {
-    expect(() =>
-      shapePiIngestSuccessResponse({ inserted: 0, rejected: -1 }),
-    ).toThrow(/rejected/);
+    expect(() => shapePiIngestSuccessResponse({ inserted: 0, rejected: -1 })).toThrow(/rejected/);
   });
 });
 
 describe("shapePiIngestFailureResponse — status per stage", () => {
   it("auth -> 401", () => {
-    const r = shapePiIngestFailureResponse(
-      failure("auth", "invalid_signature", "bad sig"),
-    );
+    const r = shapePiIngestFailureResponse(failure("auth", "invalid_signature", "bad sig"));
     expect(r.status).toBe(401);
     expect(r.body).toEqual({
       ok: false,
@@ -82,25 +67,21 @@ describe("shapePiIngestFailureResponse — status per stage", () => {
   });
 
   it("envelope -> 400", () => {
-    expect(
-      shapePiIngestFailureResponse(failure("envelope", "missing_tent_id", "x"))
-        .status,
-    ).toBe(400);
+    expect(shapePiIngestFailureResponse(failure("envelope", "missing_tent_id", "x")).status).toBe(
+      400,
+    );
   });
 
   it("normalization -> 400", () => {
     expect(
-      shapePiIngestFailureResponse(
-        failure("normalization", "normalization_error", "x"),
-      ).status,
+      shapePiIngestFailureResponse(failure("normalization", "normalization_error", "x")).status,
     ).toBe(400);
   });
 
   it("batch_scope -> 400", () => {
-    expect(
-      shapePiIngestFailureResponse(failure("batch_scope", "unauthorized", "x"))
-        .status,
-    ).toBe(400);
+    expect(shapePiIngestFailureResponse(failure("batch_scope", "unauthorized", "x")).status).toBe(
+      400,
+    );
   });
 
   it("abuse_guard -> 429 with Retry-After (top-level)", () => {
@@ -122,17 +103,13 @@ describe("shapePiIngestFailureResponse — status per stage", () => {
   });
 
   it("abuse_guard -> 429 with no retry hint still includes Retry-After >= 1", () => {
-    const r = shapePiIngestFailureResponse(
-      failure("abuse_guard", "batch_too_large", "too big"),
-    );
+    const r = shapePiIngestFailureResponse(failure("abuse_guard", "batch_too_large", "too big"));
     expect(r.status).toBe(429);
     expect(r.headers["Retry-After"]).toBe("1");
   });
 
   it("failure body never includes inserted/rejected counts", () => {
-    const r = shapePiIngestFailureResponse(
-      failure("envelope", "missing_tent_id", "x"),
-    );
+    const r = shapePiIngestFailureResponse(failure("envelope", "missing_tent_id", "x"));
     expect((r.body as unknown as Record<string, unknown>).inserted).toBeUndefined();
     expect((r.body as unknown as Record<string, unknown>).rejected).toBeUndefined();
   });
@@ -180,10 +157,7 @@ describe("shapePiIngestResponse — discriminated dispatch", () => {
 });
 
 describe("piIngestResponseRules — static safety", () => {
-  const SRC = readFileSync(
-    resolve(__dirname, "../lib/piIngestResponseRules.ts"),
-    "utf8",
-  );
+  const SRC = readFileSync(resolve(__dirname, "../lib/piIngestResponseRules.ts"), "utf8");
 
   it("does not import supabase", () => {
     expect(SRC).not.toMatch(/@\/integrations\/supabase|@supabase\//);

@@ -30,7 +30,7 @@ export default function SubscriberInterestForm({
   useEffect(() => {
     setSubmitted(false);
     setError(null);
-  }, [planId, leadSource]);
+  }, []);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

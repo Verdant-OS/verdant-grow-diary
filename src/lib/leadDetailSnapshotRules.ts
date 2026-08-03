@@ -5,14 +5,8 @@
  * Composes outputs of the existing rule modules into a single view model.
  */
 import type { LeadRow } from "@/hooks/useLeadsList";
-import {
-  recommendNextAction,
-  type LeadNextAction,
-} from "@/lib/leadNextActionRules";
-import {
-  scoreLeadQuality,
-  type LeadQualityScore,
-} from "@/lib/leadQualityScoreRules";
+import { recommendNextAction, type LeadNextAction } from "@/lib/leadNextActionRules";
+import { scoreLeadQuality, type LeadQualityScore } from "@/lib/leadQualityScoreRules";
 import { buildLeadActivityTimeline } from "@/lib/leadActivityRules";
 import {
   KNOWN_LEAD_STATUSES as KNOWN_STATUSES,
@@ -96,9 +90,7 @@ export function buildLeadDetailSnapshot(
   const statusKnown = KNOWN_STATUSES.has(statusRaw);
   const sourceKnown = isMeaningful(source.source);
   const leadTypeKnown = isMeaningful(source.lead_type);
-  const { label: createdLabel, valid: createdValid } = formatDateLabel(
-    source.created_at,
-  );
+  const { label: createdLabel, valid: createdValid } = formatDateLabel(source.created_at);
 
   const nextAction = recommendNextAction(source, now);
   const quality = scoreLeadQuality(source, now);
@@ -110,8 +102,7 @@ export function buildLeadDetailSnapshot(
   if (!sourceKnown) warnings.push("Missing source");
   if (!leadTypeKnown) warnings.push("Missing lead type");
   if (!createdValid) warnings.push("Missing or invalid created_at");
-  if (!isMeaningful(source.name) && !isFallback)
-    warnings.push("Missing name");
+  if (!isMeaningful(source.name) && !isFallback) warnings.push("Missing name");
 
   return {
     leadId: source.id,

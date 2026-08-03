@@ -63,7 +63,11 @@ describe("isActionFollowupRow / filterFollowupRows", () => {
     expect(isActionFollowupRow({ details: { event_type: "watering" } })).toBe(false);
   });
   it("filterFollowupRows drops non-followup rows", () => {
-    const rows = [row(), { details: { event_type: "action_outcome" } }, null as unknown as RawFollowupDiaryRow];
+    const rows = [
+      row(),
+      { details: { event_type: "action_outcome" } },
+      null as unknown as RawFollowupDiaryRow,
+    ];
     expect(filterFollowupRows(rows)).toHaveLength(1);
   });
 });

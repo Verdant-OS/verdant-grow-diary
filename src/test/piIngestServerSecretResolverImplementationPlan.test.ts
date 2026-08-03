@@ -6,10 +6,7 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  listTsFilesCached,
-  readFileCached,
-} from "./helpers/cachedSrcTextScan";
+import { listTsFilesCached, readFileCached } from "./helpers/cachedSrcTextScan";
 
 // Standardised scanner guardrail timeout + slow-test telemetry.
 // Replaces the previous per-file vi.setConfig bump. No scanner pattern,
@@ -17,12 +14,8 @@ import {
 import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
 installScannerGuardrail({ file: __filename });
 
-
 const ROOT = resolve(__dirname, "../..");
-const PLAN_PATH = resolve(
-  ROOT,
-  "docs/pi-ingest-server-secret-resolver-implementation-plan.md",
-);
+const PLAN_PATH = resolve(ROOT, "docs/pi-ingest-server-secret-resolver-implementation-plan.md");
 const FN_DIR = resolve(ROOT, "supabase/functions/pi-ingest-readings");
 const FN_INDEX = resolve(FN_DIR, "index.ts");
 
@@ -60,29 +53,22 @@ describe("server-secret resolver implementation plan — required sections", () 
 
 describe("server-secret resolver implementation plan — content invariants", () => {
   it("names the future resolver file", () => {
-    expect(PLAN).toContain(
-      "supabase/functions/pi-ingest-readings/secretResolver.ts",
-    );
+    expect(PLAN).toContain("supabase/functions/pi-ingest-readings/secretResolver.ts");
   });
   it("names the optional crypto wrapper file", () => {
-    expect(PLAN).toContain(
-      "supabase/functions/pi-ingest-readings/crypto.ts",
-    );
+    expect(PLAN).toContain("supabase/functions/pi-ingest-readings/crypto.ts");
   });
   it("documents Edge-Function-only runtime boundary", () => {
     expect(PLAN).toMatch(/only inside the [`*]*pi-ingest-readings[`*]*\s+Edge Function/i);
     expect(PLAN).toMatch(/must\s+\**not\**[^\n]*src\/lib/i);
     expect(PLAN).toMatch(/must\s+\**not\**[^\n]*browser\/client bundle/i);
   });
-  it.each([
-    "secret_ciphertext",
-    "secret_nonce",
-    "secret_key_version",
-    "secret_status",
-    "bridgeId",
-  ])("declares input field %s", (field) => {
-    expect(PLAN).toContain(field);
-  });
+  it.each(["secret_ciphertext", "secret_nonce", "secret_key_version", "secret_status", "bridgeId"])(
+    "declares input field %s",
+    (field) => {
+      expect(PLAN).toContain(field);
+    },
+  );
   it.each([
     "missing_credential",
     "inactive_credential",
@@ -134,8 +120,7 @@ describe("server-secret resolver implementation plan — repo state", () => {
     // Anything resolver-named MUST stay in this folder only — checked
     // by the src/ scan below.
     expect(
-      entries.includes("secretResolver.ts") ||
-        entries.includes("secretResolver.test.ts"),
+      entries.includes("secretResolver.ts") || entries.includes("secretResolver.test.ts"),
       "secretResolver should live under the Edge Function dir",
     ).toBe(true);
   });
@@ -145,7 +130,6 @@ describe("server-secret resolver implementation plan — repo state", () => {
     expect(FN_SRC).toMatch(/from\s+["']\.\/secretResolver(\.ts)?["']/);
     expect(FN_SRC).toMatch(/\bresolveBridgeSecret\s*\(/);
   });
-
 
   it("Edge Function ingestion path remains decryption-free and has no direct writes", () => {
     if (!FN_SRC) return;
@@ -164,14 +148,14 @@ describe("server-secret resolver implementation plan — repo state", () => {
     }
   });
 
-
   it("no src/ file imports a resolver from the Edge Function dir", () => {
     const offenders: string[] = [];
     for (const p of listTsFilesCached(resolve(ROOT, "src"))) {
       const text = readFileCached(p);
       if (
-        /from\s+["'][^"']*supabase\/functions\/pi-ingest-readings\/(secretResolver|crypto)["']/
-          .test(text)
+        /from\s+["'][^"']*supabase\/functions\/pi-ingest-readings\/(secretResolver|crypto)["']/.test(
+          text,
+        )
       ) {
         offenders.push(p);
       }
@@ -183,10 +167,7 @@ describe("server-secret resolver implementation plan — repo state", () => {
     const offenders: string[] = [];
     for (const p of listTsFilesCached(resolve(ROOT, "src"))) {
       const text = readFileCached(p);
-      if (
-        /crypto\.subtle\.decrypt\s*\(/.test(text) ||
-        /\bcreateDecipheriv\s*\(/.test(text)
-      ) {
+      if (/crypto\.subtle\.decrypt\s*\(/.test(text) || /\bcreateDecipheriv\s*\(/.test(text)) {
         offenders.push(p);
       }
     }

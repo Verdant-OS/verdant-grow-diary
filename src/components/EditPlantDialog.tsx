@@ -143,7 +143,18 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     }
     // Also reset when the target plant id changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, plant.id]);
+  }, [
+    open,
+    resetLocalPhotoState,
+    plant.startedAt,
+    plant.strain,
+    plant.lastNote,
+    plant.stage,
+    plant.tentId,
+    plant.name,
+    plant.plantType,
+    plant.health,
+  ]);
 
   // Object-URL lifecycle (create + decode-probe + revoke) is owned by
   // the preview hook so unsupported HEIC/HEIF browsers see the
@@ -165,7 +176,6 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     setPhotoErr(null);
     setClearPhoto(false);
   }
-
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -243,10 +253,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
       });
       if (cleanup.status === "removed" || cleanup.status === "not_needed") {
         cleanupToast = { kind: "success", msg: "Plant photo updated." };
-      } else if (
-        cleanup.status === "protected" ||
-        cleanup.status === "skipped_for_safety"
-      ) {
+      } else if (cleanup.status === "protected" || cleanup.status === "skipped_for_safety") {
         cleanupToast = {
           kind: "info",
           msg: "Plant photo updated. The previous file was left in storage for safety.",
@@ -280,12 +287,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1"
-            data-testid="edit-plant-trigger"
-          >
+          <Button size="sm" variant="outline" className="gap-1" data-testid="edit-plant-trigger">
             <Pencil className="h-4 w-4" /> Edit Plant
           </Button>
         )}
@@ -309,10 +311,8 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
                     onReplace={() => libraryInputRef.current?.click()}
                     onRemove={() => {
                       setSelected(null);
-                      if (cameraInputRef.current)
-                        cameraInputRef.current.value = "";
-                      if (libraryInputRef.current)
-                        libraryInputRef.current.value = "";
+                      if (cameraInputRef.current) cameraInputRef.current.value = "";
+                      if (libraryInputRef.current) libraryInputRef.current.value = "";
                     }}
                     testId="edit-plant-photo-preview"
                   />
@@ -398,10 +398,8 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
                       className="h-7 px-2 gap-1"
                       onClick={() => {
                         setSelected(null);
-                        if (cameraInputRef.current)
-                          cameraInputRef.current.value = "";
-                        if (libraryInputRef.current)
-                          libraryInputRef.current.value = "";
+                        if (cameraInputRef.current) cameraInputRef.current.value = "";
+                        if (libraryInputRef.current) libraryInputRef.current.value = "";
                       }}
                       data-testid="edit-plant-photo-remove-selection"
                     >
@@ -438,9 +436,8 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
                   </div>
                 ) : null}
                 <p className="text-[11px] text-muted-foreground">
-                  This updates the plant profile photo. It does not add a
-                  timeline log. Replacing the profile photo does not delete
-                  older diary photos.
+                  This updates the plant profile photo. It does not add a timeline log. Replacing
+                  the profile photo does not delete older diary photos.
                 </p>
                 {photoErr && (
                   <p
@@ -473,10 +470,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
           </div>
           <div>
             <Label>Tent</Label>
-            <Select
-              value={form.tent_id}
-              onValueChange={(v) => setForm({ ...form, tent_id: v })}
-            >
+            <Select value={form.tent_id} onValueChange={(v) => setForm({ ...form, tent_id: v })}>
               <SelectTrigger data-testid="edit-plant-tent">
                 <SelectValue />
               </SelectTrigger>
@@ -493,10 +487,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label>Stage</Label>
-              <Select
-                value={form.stage}
-                onValueChange={(v) => setForm({ ...form, stage: v })}
-              >
+              <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -511,10 +502,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
             </div>
             <div>
               <Label>Health</Label>
-              <Select
-                value={form.health}
-                onValueChange={(v) => setForm({ ...form, health: v })}
-              >
+              <Select value={form.health} onValueChange={(v) => setForm({ ...form, health: v })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -544,8 +532,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
               </SelectContent>
             </Select>
             <p className="text-[11px] text-muted-foreground mt-1">
-              Autoflower vs photoperiod — keeps AI guidance gentle and pheno
-              comparisons honest.
+              Autoflower vs photoperiod — keeps AI guidance gentle and pheno comparisons honest.
             </p>
           </div>
           <div>
@@ -553,9 +540,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
             <Input
               type="date"
               value={form.started_at}
-              onChange={(e) =>
-                setForm({ ...form, started_at: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, started_at: e.target.value })}
             />
           </div>
           <div>

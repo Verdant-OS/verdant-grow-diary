@@ -12,9 +12,13 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
-const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+const APP = readAllRouteModuleSources();
 const PAGE =
   readFileSync(resolve(ROOT, "src/pages/GrowDetail.tsx"), "utf8") +
   "\n" +
@@ -23,9 +27,10 @@ const PAGE =
   readFileSync(resolve(ROOT, "src/lib/growStatus.ts"), "utf8");
 
 describe("GrowDetail", () => {
-  it("registers /grows/:growId route in App.tsx", () => {
-    expect(APP).toMatch(/path="\/grows\/:growId"\s+element=\{<GrowDetail\s*\/>\}/);
-    expect(APP).toMatch(/import\(\s*["']\.\/pages\/GrowDetail["']\s*\)/);
+  it("registers /grows/:growId route in file routes", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/grows/:growId");
+    expect(APP).toMatch(/GrowDetail/);
+    expect(APP).toMatch(/@\/pages\/GrowDetail|pages\/GrowDetail/);
   });
 
   it("uses useParams growId from URL", () => {

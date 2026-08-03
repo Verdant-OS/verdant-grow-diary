@@ -9,12 +9,9 @@
 
 import { CanonicalEcowittTentSnapshot } from "./ecowittTentSnapshot";
 
-export const ECOWITT_DIARY_PREVIEW_NOTICE =
-  "Preview only. No diary entry will be saved." as const;
-export const ECOWITT_DIARY_PREVIEW_DISABLED_LABEL =
-  "Save disabled in preview" as const;
-export const ECOWITT_DIARY_PREVIEW_ATTACH_LABEL =
-  "Attach to diary" as const;
+export const ECOWITT_DIARY_PREVIEW_NOTICE = "Preview only. No diary entry will be saved." as const;
+export const ECOWITT_DIARY_PREVIEW_DISABLED_LABEL = "Save disabled in preview" as const;
+export const ECOWITT_DIARY_PREVIEW_ATTACH_LABEL = "Attach to diary" as const;
 
 export interface EcowittDiaryAttachPreview {
   notice: typeof ECOWITT_DIARY_PREVIEW_NOTICE;

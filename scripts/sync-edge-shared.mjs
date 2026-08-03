@@ -49,8 +49,7 @@ const ALLOWED_ALIAS_EXACT = {
   "@/integrations/supabase/types": path.join("integrations", "supabase", "types.ts"),
 };
 
-const IMPORT_RE =
-  /((?:^|\n)\s*(?:import|export)(?:\s+[\s\S]*?\s+from)?\s*["'])([^"']+)(["'])/g;
+const IMPORT_RE = /((?:^|\n)\s*(?:import|export)(?:\s+[\s\S]*?\s+from)?\s*["'])([^"']+)(["'])/g;
 const DYNAMIC_IMPORT_RE = /(\bimport\s*\(\s*["'])([^"']+)(["']\s*\))/g;
 const INLINE_TYPE_IMPORT_RE = /(import\(\s*["'])([^"']+)(["']\s*\))/g;
 
@@ -329,12 +328,10 @@ async function main() {
   // output dir via SYNC_TMP_OUT so they can diff committed mirror files
   // against the freshly generated content to compute a real line number.
   const outRoot = CHECK
-    ? (process.env.SYNC_TMP_OUT
-        ? (await fs.mkdir(process.env.SYNC_TMP_OUT, { recursive: true }),
-          process.env.SYNC_TMP_OUT)
-        : await fs.mkdtemp(path.join(os.tmpdir(), "edge-shared-")))
+    ? process.env.SYNC_TMP_OUT
+      ? (await fs.mkdir(process.env.SYNC_TMP_OUT, { recursive: true }), process.env.SYNC_TMP_OUT)
+      : await fs.mkdtemp(path.join(os.tmpdir(), "edge-shared-"))
     : MIRROR_ABS;
-
 
   const entries = await findEntryFiles();
   const collected = await collectFromEntries(entries);
@@ -439,9 +436,7 @@ async function main() {
             return resolved !== null && isMirrorable(resolved);
           })();
         if (badAlias || badRelative) {
-          drift.push(
-            `ENTRY not rewritten: ${path.relative(ROOT, entry)} still imports "${spec}"`,
-          );
+          drift.push(`ENTRY not rewritten: ${path.relative(ROOT, entry)} still imports "${spec}"`);
           break;
         }
       }

@@ -95,16 +95,13 @@ describe("buildOneTentLoopProofViewModel", () => {
     expect(sensor.status).not.toBe("ready");
     // No step text claims "live data is ready" or "live sensor data verified"
     for (const s of vm.steps) {
-      const text = [
-        ...s.evidence,
-        ...s.missing_pieces,
-        ...s.safety_notes,
-        s.next_fix,
-      ]
+      const text = [...s.evidence, ...s.missing_pieces, ...s.safety_notes, s.next_fix]
         .join(" ")
         .toLowerCase();
       expect(text).not.toMatch(/live (sensor )?data (is )?(ready|verified|proven)/);
-      expect(text).not.toMatch(/end-to-end live (sensor )?(data|proof) (is )?(ready|verified|proven|complete)/);
+      expect(text).not.toMatch(
+        /end-to-end live (sensor )?(data|proof) (is )?(ready|verified|proven|complete)/,
+      );
     }
   });
 
@@ -130,9 +127,7 @@ describe("buildOneTentLoopProofViewModel", () => {
   });
 
   it("uses the injected `now` for generated_at (Date)", () => {
-    const vm = buildOneTentLoopProofViewModel(
-      new Date("2026-07-15T12:34:56.000Z"),
-    );
+    const vm = buildOneTentLoopProofViewModel(new Date("2026-07-15T12:34:56.000Z"));
     expect(vm.generated_at).toBe("2026-07-15T12:34:56.000Z");
   });
 

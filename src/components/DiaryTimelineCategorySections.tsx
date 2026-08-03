@@ -87,10 +87,7 @@ export function DiaryTimelineCategorySections<
   storageKey,
 }: DiaryTimelineCategorySectionsProps<T>) {
   const sections = useMemo(() => buildDiaryTimelineSections(items), [items]);
-  const summary = useMemo(
-    () => buildDiaryTimelineSectionSummary(sections),
-    [sections],
-  );
+  const summary = useMemo(() => buildDiaryTimelineSectionSummary(sections), [sections]);
   const evidenceSummary = useMemo(
     () => buildDiaryTimelineEvidenceQualitySummary(sections),
     [sections],
@@ -98,19 +95,15 @@ export function DiaryTimelineCategorySections<
 
   // Load saved state on mount (or fall back to defaults). Saved state
   // only overrides known section IDs; malformed storage is ignored.
-  const [expanded, setExpanded] = useState<DiaryTimelineSectionExpandedState>(
-    () => {
-      const saved = parseDiaryTimelineSectionState(safeReadStorage(storageKey));
-      return mergeSavedDiaryTimelineSectionState(sections, saved);
-    },
-  );
+  const [expanded, setExpanded] = useState<DiaryTimelineSectionExpandedState>(() => {
+    const saved = parseDiaryTimelineSectionState(safeReadStorage(storageKey));
+    return mergeSavedDiaryTimelineSectionState(sections, saved);
+  });
 
   // When the set of sections changes (e.g. filter applied), keep the
   // user's saved choices but ensure every known id has a default.
   useEffect(() => {
-    setExpanded((prev) =>
-      mergeSavedDiaryTimelineSectionState(sections, prev),
-    );
+    setExpanded((prev) => mergeSavedDiaryTimelineSectionState(sections, prev));
     // sections identity changes when items change — safe to depend on.
   }, [sections]);
 
@@ -143,15 +136,8 @@ export function DiaryTimelineCategorySections<
   }
 
   return (
-    <section
-      aria-label={ariaLabel}
-      data-testid={testIdPrefix}
-      className="space-y-2"
-    >
-      <div
-        className="flex flex-wrap items-center gap-2"
-        data-testid={`${testIdPrefix}-controls`}
-      >
+    <section aria-label={ariaLabel} data-testid={testIdPrefix} className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2" data-testid={`${testIdPrefix}-controls`}>
         <button
           type="button"
           onClick={() => setAll(true)}
@@ -214,9 +200,7 @@ export function DiaryTimelineCategorySections<
               type="button"
               aria-expanded={isOpen}
               aria-controls={panelId}
-              aria-label={`${section.label} (${section.count}) — ${
-                isOpen ? "collapse" : "expand"
-              }`}
+              aria-label={`${section.label} (${section.count}) — ${isOpen ? "collapse" : "expand"}`}
               onClick={() => toggle(section.id)}
               data-testid={`${testIdPrefix}-section-toggle`}
               data-section-id={section.id}

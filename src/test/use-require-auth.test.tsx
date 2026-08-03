@@ -19,9 +19,7 @@ vi.mock("@/lib/react-router-compat", async () => {
 
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 
-const wrapper = ({ children }: { children: ReactNode }) => (
-  <MemoryRouter>{children}</MemoryRouter>
-);
+const wrapper = ({ children }: { children: ReactNode }) => <MemoryRouter>{children}</MemoryRouter>;
 
 describe("useRequireAuth", () => {
   it("redirects unauthenticated user to /auth", async () => {

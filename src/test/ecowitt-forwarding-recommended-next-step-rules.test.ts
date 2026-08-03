@@ -37,9 +37,7 @@ const BASE: LocalForwardingStatus = {
 
 describe("ecowittForwardingRecommendedNextStepRules", () => {
   it("returns offline copy when fetch state is offline", () => {
-    expect(
-      recommendForwardingNextStep({ state: "offline", reason: "x" }).kind,
-    ).toBe("offline");
+    expect(recommendForwardingNextStep({ state: "offline", reason: "x" }).kind).toBe("offline");
   });
 
   it("classifies token_revoked / token_expired / forbidden_tent", () => {
@@ -92,15 +90,13 @@ describe("ecowittForwardingRecommendedNextStepRules", () => {
   });
 
   it("surfaces config gaps before failure copy", () => {
-    expect(
-      recommendForStatus({ ...BASE, forwarding_enabled: false }).kind,
-    ).toBe("forwarding_disabled");
-    expect(
-      recommendForStatus({ ...BASE, bridge_token_configured: false }).kind,
-    ).toBe("bridge_token_missing");
-    expect(recommendForStatus({ ...BASE, tent_id_valid: false }).kind).toBe(
-      "tent_id_invalid",
+    expect(recommendForStatus({ ...BASE, forwarding_enabled: false }).kind).toBe(
+      "forwarding_disabled",
     );
+    expect(recommendForStatus({ ...BASE, bridge_token_configured: false }).kind).toBe(
+      "bridge_token_missing",
+    );
+    expect(recommendForStatus({ ...BASE, tent_id_valid: false }).kind).toBe("tent_id_invalid");
   });
 
   it("healthy state returns healthy", () => {

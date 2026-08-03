@@ -1,8 +1,5 @@
 // Deno tests for the server-only tent-owner lookup helper.
-import {
-  assert,
-  assertEquals,
-} from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   loadTentOwnerUserId,
   TENT_OWNER_LOOKUP_COLUMNS,
@@ -174,13 +171,9 @@ Deno.test("failure result never leaks another user's owner id or sensor data", a
 // ---------- Static guardrails ----------
 
 Deno.test("tent-owner lookup source has no forbidden surfaces", async () => {
-  const src = await Deno.readTextFile(
-    new URL("./tentOwnerLookup.ts", import.meta.url),
-  );
+  const src = await Deno.readTextFile(new URL("./tentOwnerLookup.ts", import.meta.url));
   // Strip comments so contract prose doesn't trigger forbidden-token checks.
-  const code = src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
   const forbidden: Array<[string, RegExp]> = [
     ["createClient", /\bcreateClient\s*\(/],
     ["service_role", /service_role/i],

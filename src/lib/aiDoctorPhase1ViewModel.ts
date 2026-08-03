@@ -33,11 +33,7 @@ export interface AiDoctorPhase1ViewModelInput {
   now?: string | Date;
 }
 
-export type AiDoctorPhase1MissingInfoSeverity =
-  | "none"
-  | "low"
-  | "medium"
-  | "high";
+export type AiDoctorPhase1MissingInfoSeverity = "none" | "low" | "medium" | "high";
 
 export interface AiDoctorPhase1SummaryCard {
   title: string;
@@ -154,22 +150,14 @@ function nowIso(now: string | Date | undefined): string {
   return "1970-01-01T00:00:00.000Z";
 }
 
-function describeSourceCounts(
-  sq: AiDoctorConfidenceSourceQuality,
-): string[] {
+function describeSourceCounts(sq: AiDoctorConfidenceSourceQuality): string[] {
   const items: string[] = [];
-  if (sq.live_count > 0)
-    items.push(`Live readings (trustworthy): ${sq.live_count}`);
-  if (sq.manual_count > 0)
-    items.push(`Manual readings (trustworthy): ${sq.manual_count}`);
-  if (sq.csv_count > 0)
-    items.push(`CSV / imported readings (historical): ${sq.csv_count}`);
-  if (sq.demo_count > 0)
-    items.push(`Demo readings (sample data, not real-time): ${sq.demo_count}`);
-  if (sq.stale_count > 0)
-    items.push(`Stale readings (not current): ${sq.stale_count}`);
-  if (sq.invalid_count > 0)
-    items.push(`Invalid readings (rejected): ${sq.invalid_count}`);
+  if (sq.live_count > 0) items.push(`Live readings (trustworthy): ${sq.live_count}`);
+  if (sq.manual_count > 0) items.push(`Manual readings (trustworthy): ${sq.manual_count}`);
+  if (sq.csv_count > 0) items.push(`CSV / imported readings (historical): ${sq.csv_count}`);
+  if (sq.demo_count > 0) items.push(`Demo readings (sample data, not real-time): ${sq.demo_count}`);
+  if (sq.stale_count > 0) items.push(`Stale readings (not current): ${sq.stale_count}`);
+  if (sq.invalid_count > 0) items.push(`Invalid readings (rejected): ${sq.invalid_count}`);
   if (items.length === 0) items.push("No recent sensor readings available.");
   return items;
 }
@@ -197,9 +185,7 @@ function buildContextItems(context: Phase1PlantContextPayload): string[] {
   if (context.stage) items.push(`Stage: ${context.stage}`);
   if (context.tent_id) items.push(`Tent: ${context.tent_id}`);
   if (context.grow_id) items.push(`Grow: ${context.grow_id}`);
-  items.push(
-    `Recent grow events (14d): ${context.recent_grow_events.length}`,
-  );
+  items.push(`Recent grow events (14d): ${context.recent_grow_events.length}`);
   return items;
 }
 
@@ -211,8 +197,7 @@ function buildLimitations(
   const limits: string[] = [];
   if (!sq.has_recent_trustworthy_sensor_data)
     limits.push("No live or manual sensor readings in the last 7 days.");
-  if (!sq.has_recent_grow_events)
-    limits.push("No grow events logged in the last 14 days.");
+  if (!sq.has_recent_grow_events) limits.push("No grow events logged in the last 14 days.");
   if (sq.stale_count > 0 || sq.invalid_count > 0)
     limits.push("Some readings are stale or invalid — not current and not reliable.");
   if (
@@ -244,13 +229,9 @@ function buildMonitoringPriorities(
   return items;
 }
 
-function evaluateVisionPoor(
-  vision: Phase1VisionAnalysisResult | undefined,
-): boolean {
+function evaluateVisionPoor(vision: Phase1VisionAnalysisResult | undefined): boolean {
   if (!vision) return true;
-  const q = Number.isFinite(vision.image_quality_score)
-    ? vision.image_quality_score
-    : 0;
+  const q = Number.isFinite(vision.image_quality_score) ? vision.image_quality_score : 0;
   const obsCount =
     vision.leaf_observations.length +
     vision.structural_observations.length +
@@ -288,11 +269,7 @@ export function buildAiDoctorPhase1ViewModel(
   const missingCount = diagnosis.missing_information.length;
 
   const rawLevel = confidence.level;
-  const displayedLevel = downgradeConfidenceForDisplay(
-    rawLevel,
-    sq,
-    missingCount,
-  );
+  const displayedLevel = downgradeConfidenceForDisplay(rawLevel, sq, missingCount);
 
   const hasDemoOrCsvOnly =
     !sq.has_recent_trustworthy_sensor_data &&
@@ -303,9 +280,7 @@ export function buildAiDoctorPhase1ViewModel(
 
   // ----- Summary card -----
   const summaryCard: AiDoctorPhase1SummaryCard = {
-    title: context.plant_name
-      ? `AI Doctor — ${context.plant_name}`
-      : "AI Doctor — Phase 1",
+    title: context.plant_name ? `AI Doctor — ${context.plant_name}` : "AI Doctor — Phase 1",
     summary: diagnosis.summary,
     likely_issue: diagnosis.likely_issue,
     risk_level: diagnosis.risk_level,
@@ -342,14 +317,11 @@ export function buildAiDoctorPhase1ViewModel(
     what_not_to_do: uniqueSorted(diagnosis.what_not_to_do),
     twenty_four_hour_follow_up: diagnosis.twenty_four_hour_follow_up,
     three_day_recovery_plan: diagnosis.three_day_recovery_plan,
-    monitoring_priorities: uniqueSorted(
-      buildMonitoringPriorities(diagnosis, sq),
-    ),
+    monitoring_priorities: uniqueSorted(buildMonitoringPriorities(diagnosis, sq)),
   };
 
   // ----- Action Queue panel (advisory, approval-required) -----
-  const isLowOrVeryLow =
-    displayedLevel === "very_low" || displayedLevel === "low";
+  const isLowOrVeryLow = displayedLevel === "very_low" || displayedLevel === "low";
   let actionQueuePanel: AiDoctorPhase1ActionQueuePanel;
   if (diagnosis.action_queue_suggestion) {
     actionQueuePanel = {
@@ -377,8 +349,7 @@ export function buildAiDoctorPhase1ViewModel(
 
   // ----- Safety panel -----
   const overdiagnosisWarning =
-    isLowOrVeryLow ||
-    confidence.safety_flags.includes("avoid_overdiagnosis")
+    isLowOrVeryLow || confidence.safety_flags.includes("avoid_overdiagnosis")
       ? OVERDIAGNOSIS_WARNING
       : null;
 
@@ -424,13 +395,9 @@ function buildSourceTruthWarning(
 ): string {
   const parts: string[] = [];
   if (hasDemoOrCsvOnly)
-    parts.push(
-      "Only demo or imported (CSV) data is available — not real-time sensor data.",
-    );
+    parts.push("Only demo or imported (CSV) data is available — not real-time sensor data.");
   if (hasStaleOrInvalid)
-    parts.push(
-      "Some readings are stale or invalid — not current and not reliable.",
-    );
+    parts.push("Some readings are stale or invalid — not current and not reliable.");
   if (!sq.has_recent_trustworthy_sensor_data && !hasDemoOrCsvOnly)
     parts.push("No trustworthy (live or manual) sensor data is available.");
   return parts.join(" ");

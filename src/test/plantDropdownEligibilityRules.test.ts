@@ -52,19 +52,12 @@ describe("getEffectivePlantGrowId", () => {
   });
 
   it("falls back to the assigned tent's grow_id when grow_id is null", () => {
-    expect(
-      getEffectivePlantGrowId(
-        p("a", { grow_id: null, tent_id: TENT_A }),
-        tents,
-      ),
-    ).toBe(GROW);
+    expect(getEffectivePlantGrowId(p("a", { grow_id: null, tent_id: TENT_A }), tents)).toBe(GROW);
   });
 
   it("returns null when neither grow_id nor tent grow context can resolve", () => {
     expect(getEffectivePlantGrowId(p("a"), tents)).toBeNull();
-    expect(
-      getEffectivePlantGrowId(p("a", { tent_id: "unknown-tent" }), tents),
-    ).toBeNull();
+    expect(getEffectivePlantGrowId(p("a", { tent_id: "unknown-tent" }), tents)).toBeNull();
   });
 });
 
@@ -90,38 +83,22 @@ describe("classifyPlantForDropdown — quick_log", () => {
   const opts = { context: "quick_log" as const, growId: GROW };
 
   it("includes plant whose grow_id matches", () => {
-    expect(
-      shouldIncludePlantInDropdown(p("a", { grow_id: GROW }), tents, opts),
-    ).toBe(true);
+    expect(shouldIncludePlantInDropdown(p("a", { grow_id: GROW }), tents, opts)).toBe(true);
   });
 
   it("includes plant with null grow_id when tent-derived grow matches (the bug)", () => {
     expect(
-      shouldIncludePlantInDropdown(
-        p("a", { grow_id: null, tent_id: TENT_A }),
-        tents,
-        opts,
-      ),
+      shouldIncludePlantInDropdown(p("a", { grow_id: null, tent_id: TENT_A }), tents, opts),
     ).toBe(true);
   });
 
   it("excludes cross-grow plants", () => {
-    expect(
-      shouldIncludePlantInDropdown(
-        p("a", { grow_id: OTHER_GROW }),
-        tents,
-        opts,
-      ),
-    ).toBe(false);
+    expect(shouldIncludePlantInDropdown(p("a", { grow_id: OTHER_GROW }), tents, opts)).toBe(false);
   });
 
   it("excludes archived plants by default", () => {
     expect(
-      shouldIncludePlantInDropdown(
-        p("a", { grow_id: GROW, is_archived: true }),
-        tents,
-        opts,
-      ),
+      shouldIncludePlantInDropdown(p("a", { grow_id: GROW, is_archived: true }), tents, opts),
     ).toBe(false);
   });
 
@@ -142,38 +119,24 @@ describe("classifyPlantForDropdown — merge_target", () => {
   };
 
   it("excludes the source plant", () => {
-    expect(
-      classifyPlantForDropdown(p("source", { grow_id: GROW }), tents, opts),
-    ).toBeNull();
+    expect(classifyPlantForDropdown(p("source", { grow_id: GROW }), tents, opts)).toBeNull();
   });
 
   it("includes same-effective-grow targets even when raw grow_id is null", () => {
     expect(
-      shouldIncludePlantInDropdown(
-        p("target", { grow_id: null, tent_id: TENT_B }),
-        tents,
-        opts,
-      ),
+      shouldIncludePlantInDropdown(p("target", { grow_id: null, tent_id: TENT_B }), tents, opts),
     ).toBe(true);
   });
 
   it("excludes cross-grow targets", () => {
-    expect(
-      shouldIncludePlantInDropdown(
-        p("target", { grow_id: OTHER_GROW }),
-        tents,
-        opts,
-      ),
-    ).toBe(false);
+    expect(shouldIncludePlantInDropdown(p("target", { grow_id: OTHER_GROW }), tents, opts)).toBe(
+      false,
+    );
   });
 
   it("excludes archived targets", () => {
     expect(
-      shouldIncludePlantInDropdown(
-        p("target", { grow_id: GROW, is_archived: true }),
-        tents,
-        opts,
-      ),
+      shouldIncludePlantInDropdown(p("target", { grow_id: GROW, is_archived: true }), tents, opts),
     ).toBe(false);
   });
 });
@@ -187,21 +150,13 @@ describe("classifyPlantForDropdown — add_existing_to_tent", () => {
 
   it("includes unassigned same-grow plants", () => {
     expect(
-      shouldIncludePlantInDropdown(
-        p("a", { grow_id: GROW, tent_id: null }),
-        tents,
-        opts,
-      ),
+      shouldIncludePlantInDropdown(p("a", { grow_id: GROW, tent_id: null }), tents, opts),
     ).toBe(true);
   });
 
   it("includes other-tent same-grow plants (eligible as a move)", () => {
     expect(
-      shouldIncludePlantInDropdown(
-        p("a", { grow_id: GROW, tent_id: TENT_B }),
-        tents,
-        opts,
-      ),
+      shouldIncludePlantInDropdown(p("a", { grow_id: GROW, tent_id: TENT_B }), tents, opts),
     ).toBe(true);
   });
 
@@ -218,11 +173,7 @@ describe("classifyPlantForDropdown — add_existing_to_tent", () => {
 
   it("includes plant with null grow_id when tent-derived grow matches (the bug)", () => {
     expect(
-      shouldIncludePlantInDropdown(
-        p("a", { grow_id: null, tent_id: TENT_B }),
-        tents,
-        opts,
-      ),
+      shouldIncludePlantInDropdown(p("a", { grow_id: null, tent_id: TENT_B }), tents, opts),
     ).toBe(true);
   });
 });
@@ -285,26 +236,18 @@ describe("getPlantDropdownOptions + sortPlantDropdownOptions", () => {
 
 describe("summarizePlantDropdown + formatPlantDropdownHelper", () => {
   it("reports hidden archived count", () => {
-    const plants = [
-      p("a", { grow_id: GROW }),
-      p("b", { grow_id: GROW, is_archived: true }),
-    ];
+    const plants = [p("a", { grow_id: GROW }), p("b", { grow_id: GROW, is_archived: true })];
     const s = summarizePlantDropdown(plants, tents, {
       context: "quick_log",
       growId: GROW,
     });
     expect(s.visible).toBe(1);
     expect(s.hiddenArchived).toBe(1);
-    expect(formatPlantDropdownHelper(s, "My Grow")).toMatch(
-      /1 archived\/merged hidden/i,
-    );
+    expect(formatPlantDropdownHelper(s, "My Grow")).toMatch(/1 archived\/merged hidden/i);
   });
 
   it("reports missing grow context count", () => {
-    const plants = [
-      p("a", { grow_id: GROW }),
-      p("b" /* no grow, no tent */),
-    ];
+    const plants = [p("a", { grow_id: GROW }), p("b" /* no grow, no tent */)];
     const s = summarizePlantDropdown(plants, tents, {
       context: "merge_target",
       growId: GROW,
@@ -317,10 +260,7 @@ describe("summarizePlantDropdown + formatPlantDropdownHelper", () => {
   });
 
   it("reports cross-grow hidden count without leaking other-grow names", () => {
-    const plants = [
-      p("a", { grow_id: GROW }),
-      p("b", { grow_id: OTHER_GROW }),
-    ];
+    const plants = [p("a", { grow_id: GROW }), p("b", { grow_id: OTHER_GROW })];
     const s = summarizePlantDropdown(plants, tents, {
       context: "quick_log",
       growId: GROW,
@@ -352,12 +292,10 @@ describe("AddExistingPlantDialog wiring", () => {
 
   it("verifies effective grow id client-side using the centralized rule", () => {
     expect(ADD_EXISTING).toMatch(/getEffectivePlantGrowId/);
-    expect(ADD_EXISTING).toMatch(
-      /from\s+["']@\/lib\/plantDropdownEligibilityRules["']/,
-    );
+    expect(ADD_EXISTING).toMatch(/from\s+["']@\/lib\/plantDropdownEligibilityRules["']/);
   });
 
-  it("does not regress to a bare `.eq(\"grow_id\", growId)` as the sole filter", () => {
+  it('does not regress to a bare `.eq("grow_id", growId)` as the sole filter', () => {
     // Allowed in the OR string, banned as a standalone .eq call on the
     // plants query — that's what dropped the third plant.
     expect(ADD_EXISTING).not.toMatch(/\.eq\(\s*["']grow_id["']\s*,\s*growId/);

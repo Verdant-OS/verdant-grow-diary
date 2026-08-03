@@ -251,13 +251,13 @@ function hasExactDataKeys(record: Record<string, unknown>, expected: readonly st
   }
   return expected.every((key) => {
     const descriptor = Object.getOwnPropertyDescriptor(record, key);
-    return Boolean(descriptor && Object.prototype.hasOwnProperty.call(descriptor, "value"));
+    return Boolean(descriptor && Object.hasOwn(descriptor, "value"));
   });
 }
 
 function dataValue(record: Record<string, unknown>, key: string): unknown {
   const descriptor = Object.getOwnPropertyDescriptor(record, key);
-  if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, "value")) {
+  if (!descriptor || !Object.hasOwn(descriptor, "value")) {
     throw new Error("Accessor properties are not accepted.");
   }
   return descriptor.value;
@@ -673,7 +673,7 @@ export function projectRootZoneEventContextFromDetails(
       ROOT_ZONE_EVENT_CONTEXT_DETAILS_KEY,
     );
     if (!descriptor) return { status: "absent" };
-    if (!Object.prototype.hasOwnProperty.call(descriptor, "value")) return { status: "invalid" };
+    if (!Object.hasOwn(descriptor, "value")) return { status: "invalid" };
     const context = normalizeRootZoneEventContextEnvelopeV1(descriptor.value);
     const eventTimestamp = normalizeCanonicalTimestamp(eventOccurredAt);
     if (

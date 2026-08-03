@@ -39,10 +39,7 @@ import {
   type HarvestDetailsValidation,
 } from "./harvestCureRules";
 import { normalizeHarvestWeightToGrams } from "./harvestWeightUnitNormalization";
-import {
-  QUICK_LOG_WEIGHT_UNITS,
-  type QuickLogWeightUnit,
-} from "@/constants/quickLogActivityTypes";
+import { QUICK_LOG_WEIGHT_UNITS, type QuickLogWeightUnit } from "@/constants/quickLogActivityTypes";
 
 /**
  * Minimal, server-shaped sensor snapshot envelope accepted by the
@@ -191,12 +188,8 @@ function applyHarvestVocabAConversion(
   error?: HarvestDetailsValidation;
 } {
   if (!raw) return { harvest: {} as HarvestDetailsInput, originals: {} };
-  const {
-    wet_weight_input,
-    dry_weight_input,
-    weight_unit,
-    ...rest
-  } = raw as HarvestDetailsInput & HarvestVocabAInput;
+  const { wet_weight_input, dry_weight_input, weight_unit, ...rest } = raw as HarvestDetailsInput &
+    HarvestVocabAInput;
 
   const hasWet = isVocabAWeightPresent(wet_weight_input);
   const hasDry = isVocabAWeightPresent(dry_weight_input);

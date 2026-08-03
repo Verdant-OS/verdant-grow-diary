@@ -68,8 +68,7 @@ export function buildPostGrowLearningLoopSummary(
   const counts = summarizeGrowLearning(episodes);
   const playbook = buildNextRunPlaybook(episodes);
 
-  const section = (name: string) =>
-    playbook.groups.find((g) => g.section === name)?.items ?? [];
+  const section = (name: string) => playbook.groups.find((g) => g.section === name)?.items ?? [];
 
   const repeat = cap(section("repeat").map(lineFromItem));
   const avoid = cap(section("avoid").map(lineFromItem));
@@ -104,10 +103,7 @@ export function buildPostGrowLearningLoopSummary(
   }
 
   const isEmpty =
-    repeat.length === 0 &&
-    avoid.length === 0 &&
-    adjust.length === 0 &&
-    openQuestions.length === 0;
+    repeat.length === 0 && avoid.length === 0 && adjust.length === 0 && openQuestions.length === 0;
 
   return {
     counts,
@@ -154,17 +150,13 @@ export function renderLearningLoopSectionHtml(
     parts.push(`<em>${escapeHtml(line.evidenceNote)}</em>`);
     return `<li>${parts.join(" — ")}</li>`;
   };
-  const listBlock = (
-    heading: string,
-    lines: readonly PostGrowLearningLoopLine[],
-  ): string => {
+  const listBlock = (heading: string, lines: readonly PostGrowLearningLoopLine[]): string => {
     if (lines.length === 0) return "";
     return `<h3>${escapeHtml(heading)}</h3><ul>${lines.map(lineHtml).join("")}</ul>`;
   };
 
   const countsRows = SUMMARY_METRIC_ORDER.map(
-    (key) =>
-      `<li>${escapeHtml(SUMMARY_METRIC_LABELS[key])}: ${summary.counts[key]}</li>`,
+    (key) => `<li>${escapeHtml(SUMMARY_METRIC_LABELS[key])}: ${summary.counts[key]}</li>`,
   ).join("");
 
   const evidenceBlock =

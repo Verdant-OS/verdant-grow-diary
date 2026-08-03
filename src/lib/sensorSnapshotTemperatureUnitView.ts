@@ -23,10 +23,7 @@ import type {
   SensorSnapshotMetricDisplay,
 } from "@/lib/sensorSnapshotFreshnessRules";
 
-const TEMP_METRIC_KEYS = new Set<SensorSnapshotMetricDisplay["key"]>([
-  "temp",
-  "soil",
-]);
+const TEMP_METRIC_KEYS = new Set<SensorSnapshotMetricDisplay["key"]>(["temp", "soil"]);
 
 /**
  * Soil-moisture chips use key="soil" with unit="%". Soil-temperature
@@ -72,15 +69,12 @@ export function applyTemperatureUnitToSnapshotMetrics(
     // Convert into canonical Celsius first (no-op when already °C),
     // then into the preferred display unit. Guarantees no double
     // conversion: F→C→F yields F exactly; C→C→F converts once.
-    const asCelsius = isFahrenheitUnit(metric.unit)
-      ? (parsed - 32) * (5 / 9)
-      : parsed;
+    const asCelsius = isFahrenheitUnit(metric.unit) ? (parsed - 32) * (5 / 9) : parsed;
 
     const displayedNumber = convertCelsiusForDisplay(asCelsius, preference);
     if (displayedNumber === null) return { ...metric };
 
-    const digits =
-      Math.abs(displayedNumber) >= 100 ? 0 : 1;
+    const digits = Math.abs(displayedNumber) >= 100 ? 0 : 1;
 
     return {
       key: metric.key,

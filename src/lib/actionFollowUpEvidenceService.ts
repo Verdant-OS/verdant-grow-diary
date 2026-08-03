@@ -16,10 +16,7 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { supabase as defaultSupabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
-import {
-  ACTION_FOLLOWUP_EVENT_TYPE,
-  followupMatchesAction,
-} from "@/lib/actionFollowupRules";
+import { ACTION_FOLLOWUP_EVENT_TYPE, followupMatchesAction } from "@/lib/actionFollowupRules";
 import {
   validateActionFollowUpDraft,
   type ActionFollowUpDraft,

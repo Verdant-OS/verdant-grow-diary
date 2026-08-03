@@ -66,10 +66,7 @@ describe("buildContenders comparability", () => {
   });
 
   it("culls do not poison comparability (they are off the board already)", () => {
-    const b = buildContenders([
-      contender(1, "photoperiod"),
-      contender(2, null, "flower", "cull"),
-    ]);
+    const b = buildContenders([contender(1, "photoperiod"), contender(2, null, "flower", "cull")]);
     expect(b.comparability).toBe("comparable");
   });
 
@@ -103,10 +100,7 @@ describe("buildFight comparability", () => {
   });
 
   it("same-type adjacent-stage pair is comparable", () => {
-    const f = buildFight(
-      contender(1, "autoflower", "veg"),
-      contender(2, "autoflower", "flower"),
-    )!;
+    const f = buildFight(contender(1, "autoflower", "veg"), contender(2, "autoflower", "flower"))!;
     expect(f.comparability.comparable).toBe(true);
   });
 });
@@ -133,7 +127,11 @@ describe("PhenoContendersBoard presenter honesty", () => {
   });
 
   it("unknown type renders the Type unknown badge — never a silent default", () => {
-    render(<PhenoContendersBoard board={buildContenders([contender(1, null), contender(2, "photoperiod")])} />);
+    render(
+      <PhenoContendersBoard
+        board={buildContenders([contender(1, null), contender(2, "photoperiod")])}
+      />,
+    );
     expect(screen.getByTestId("pheno-contenders-type-1").textContent).toBe("Type unknown");
     expect(screen.getByTestId("pheno-comparability-banner").textContent).toMatch(
       /Plant type is unknown/,

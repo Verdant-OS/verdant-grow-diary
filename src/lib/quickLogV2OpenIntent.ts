@@ -20,10 +20,7 @@ export interface BuildQuickLogV2OpenIntentInput {
 
 function validTargetId(value: unknown): value is string {
   return (
-    typeof value === "string" &&
-    value.length > 0 &&
-    value === value.trim() &&
-    !/[\s:]/.test(value)
+    typeof value === "string" && value.length > 0 && value === value.trim() && !/[\s:]/.test(value)
   );
 }
 

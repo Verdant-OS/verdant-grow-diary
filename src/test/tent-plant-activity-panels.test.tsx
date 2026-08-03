@@ -94,12 +94,8 @@ describe("TentPlantActivityPanels", () => {
       />,
     );
 
-    expect(
-      screen.queryByTestId("tent-plant-activity-panel-p1-harvest-watch"),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId("tent-plant-activity-panel-p1-evidence-notes"),
-    ).toBeNull();
+    expect(screen.queryByTestId("tent-plant-activity-panel-p1-harvest-watch")).toBeNull();
+    expect(screen.queryByTestId("tent-plant-activity-panel-p1-evidence-notes")).toBeNull();
   });
 
   it("Add Quick Log CTA dispatches verdant:open-quicklog with the prefill", () => {
@@ -108,9 +104,7 @@ describe("TentPlantActivityPanels", () => {
       received.push((ev as CustomEvent).detail as Record<string, unknown>);
     window.addEventListener("verdant:open-quicklog", listener as EventListener);
     wrap(<TentPlantActivityPanels viewModel={vm()} />);
-    (
-      screen.getByTestId("tent-plant-activity-panel-p1-add-quicklog") as HTMLButtonElement
-    ).click();
+    (screen.getByTestId("tent-plant-activity-panel-p1-add-quicklog") as HTMLButtonElement).click();
     window.removeEventListener("verdant:open-quicklog", listener as EventListener);
     expect(received).toHaveLength(1);
     expect(received[0]).toMatchObject({
@@ -144,17 +138,13 @@ describe("TentPlantActivityPanels", () => {
 
   it("renders the shared environment reminder copy", () => {
     wrap(<TentPlantActivityPanels viewModel={vm()} />);
-    expect(
-      screen.getByTestId("tent-plant-activity-panels-shared-env-reminder"),
-    ).toHaveTextContent("Tent environment is shared. Plant response is tracked per plant.");
+    expect(screen.getByTestId("tent-plant-activity-panels-shared-env-reminder")).toHaveTextContent(
+      "Tent environment is shared. Plant response is tracked per plant.",
+    );
   });
 
   it("renders empty copy when there are no plants", () => {
-    wrap(
-      <TentPlantActivityPanels
-        viewModel={vm({ plants: [], activityByPlantId: {} })}
-      />,
-    );
+    wrap(<TentPlantActivityPanels viewModel={vm({ plants: [], activityByPlantId: {} })} />);
     expect(screen.getByTestId("tent-plant-activity-panels-empty")).toHaveTextContent(
       "No plants assigned to this tent yet.",
     );
@@ -167,32 +157,24 @@ describe("TentPlantActivityPanels", () => {
   });
 
   it("Add Quick Log button is disabled when prefill is incomplete", () => {
-    wrap(
-      <TentPlantActivityPanels
-        viewModel={vm({ tentId: null, growId: null })}
-      />,
-    );
-    const cta = screen.getByTestId("tent-plant-activity-panel-p1-add-quicklog") as HTMLButtonElement;
+    wrap(<TentPlantActivityPanels viewModel={vm({ tentId: null, growId: null })} />);
+    const cta = screen.getByTestId(
+      "tent-plant-activity-panel-p1-add-quicklog",
+    ) as HTMLButtonElement;
     expect(cta.disabled).toBe(true);
   });
 
   it("renders Harvest Watch help text + caution near the public state", () => {
     wrap(<TentPlantActivityPanels viewModel={vm()} />);
-    const help = screen.getByTestId(
-      "tent-plant-activity-panel-p1-harvest-watch-help",
-    );
+    const help = screen.getByTestId("tent-plant-activity-panel-p1-harvest-watch-help");
     expect(help).toHaveTextContent(/Start checking direct harvest evidence/i);
     expect(help).toHaveTextContent(/Harvest Watch is evidence-only\./);
   });
 
   it("renders fallback Harvest Watch help text when state is missing", () => {
     wrap(<TentPlantActivityPanels viewModel={vm()} />);
-    const help = screen.getByTestId(
-      "tent-plant-activity-panel-p2-harvest-watch-help",
-    );
-    expect(help).toHaveTextContent(
-      /Not enough context to determine a review state\./,
-    );
+    const help = screen.getByTestId("tent-plant-activity-panel-p2-harvest-watch-help");
+    expect(help).toHaveTextContent(/Not enough context to determine a review state\./);
     expect(help).toHaveTextContent(/Harvest Watch is evidence-only\./);
   });
 
@@ -201,9 +183,7 @@ describe("TentPlantActivityPanels", () => {
     const region = screen.getByTestId("tent-plant-activity-panels-loading");
     expect(region).toBeInTheDocument();
     expect(region.getAttribute("aria-busy")).toBe("true");
-    expect(
-      screen.getByTestId("tent-plant-activity-panels-skeleton-list"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("tent-plant-activity-panels-skeleton-list")).toBeInTheDocument();
     // No real panels render while loading
     expect(screen.queryByTestId("tent-plant-activity-panel-p1")).toBeNull();
     expect(screen.queryByTestId("tent-plant-activity-panel-p2")).toBeNull();
@@ -222,23 +202,15 @@ describe("TentPlantActivityPanels", () => {
   });
 
   it("skeletons are replaced by real panels once loading completes", () => {
-    const { rerender } = wrap(
-      <TentPlantActivityPanels viewModel={vm()} isLoading />,
-    );
-    expect(
-      screen.getByTestId("tent-plant-activity-panels-loading"),
-    ).toBeInTheDocument();
+    const { rerender } = wrap(<TentPlantActivityPanels viewModel={vm()} isLoading />);
+    expect(screen.getByTestId("tent-plant-activity-panels-loading")).toBeInTheDocument();
     rerender(
       <MemoryRouter>
         <TentPlantActivityPanels viewModel={vm()} isLoading={false} />
       </MemoryRouter>,
     );
-    expect(
-      screen.queryByTestId("tent-plant-activity-panels-loading"),
-    ).toBeNull();
-    expect(
-      screen.getByTestId("tent-plant-activity-panel-p1"),
-    ).toBeInTheDocument();
+    expect(screen.queryByTestId("tent-plant-activity-panels-loading")).toBeNull();
+    expect(screen.getByTestId("tent-plant-activity-panel-p1")).toBeInTheDocument();
   });
 
   it("skeleton count matches visible plant count when no override is provided", () => {
@@ -251,55 +223,35 @@ describe("TentPlantActivityPanels", () => {
   });
 
   it("skeleton count is 1 when a single plant tab is selected", () => {
-    wrap(
-      <TentPlantActivityPanels
-        viewModel={vm({ selectedPlantId: "p2" })}
-        isLoading
-      />,
-    );
+    wrap(<TentPlantActivityPanels viewModel={vm({ selectedPlantId: "p2" })} isLoading />);
     const list = screen.getByTestId("tent-plant-activity-panels-skeleton-list");
     expect(list.getAttribute("data-skeleton-count")).toBe("1");
     expect(screen.queryByTestId("tent-plant-activity-panels-skeleton-1")).toBeNull();
   });
 
   it("archived hidden excludes archived plants from skeleton count", () => {
-    const plants = [
-      ...PLANTS,
-      { id: "p3", name: "Archived", isArchived: true },
-    ];
-    wrap(
-      <TentPlantActivityPanels
-        viewModel={vm({ plants, includeArchived: false })}
-        isLoading
-      />,
-    );
+    const plants = [...PLANTS, { id: "p3", name: "Archived", isArchived: true }];
+    wrap(<TentPlantActivityPanels viewModel={vm({ plants, includeArchived: false })} isLoading />);
     expect(
-      screen.getByTestId("tent-plant-activity-panels-skeleton-list").getAttribute("data-skeleton-count"),
+      screen
+        .getByTestId("tent-plant-activity-panels-skeleton-list")
+        .getAttribute("data-skeleton-count"),
     ).toBe("2");
   });
 
   it("archived shown includes archived plants in skeleton count", () => {
-    const plants = [
-      ...PLANTS,
-      { id: "p3", name: "Archived", isArchived: true },
-    ];
-    wrap(
-      <TentPlantActivityPanels
-        viewModel={vm({ plants, includeArchived: true })}
-        isLoading
-      />,
-    );
+    const plants = [...PLANTS, { id: "p3", name: "Archived", isArchived: true }];
+    wrap(<TentPlantActivityPanels viewModel={vm({ plants, includeArchived: true })} isLoading />);
     expect(
-      screen.getByTestId("tent-plant-activity-panels-skeleton-list").getAttribute("data-skeleton-count"),
+      screen
+        .getByTestId("tent-plant-activity-panels-skeleton-list")
+        .getAttribute("data-skeleton-count"),
     ).toBe("3");
   });
 
   it("no visible plants renders a single compact placeholder, never fake plant cards", () => {
     wrap(
-      <TentPlantActivityPanels
-        viewModel={vm({ plants: [], activityByPlantId: {} })}
-        isLoading
-      />,
+      <TentPlantActivityPanels viewModel={vm({ plants: [], activityByPlantId: {} })} isLoading />,
     );
     const list = screen.getByTestId("tent-plant-activity-panels-skeleton-list");
     expect(list.getAttribute("data-skeleton-count")).toBe("1");
@@ -340,9 +292,7 @@ describe("TentPlantActivityPanels", () => {
       received.push((ev as CustomEvent).detail as Record<string, unknown>);
     window.addEventListener("verdant:open-quicklog", listener as EventListener);
     wrap(<TentPlantActivityPanels viewModel={vm()} />);
-    (
-      screen.getByTestId("tent-plant-activity-panel-p2-add-quicklog") as HTMLButtonElement
-    ).click();
+    (screen.getByTestId("tent-plant-activity-panel-p2-add-quicklog") as HTMLButtonElement).click();
     window.removeEventListener("verdant:open-quicklog", listener as EventListener);
     expect(received).toHaveLength(1);
     expect(received[0]).toMatchObject({
@@ -357,11 +307,7 @@ describe("TentPlantActivityPanels", () => {
   });
 
   it("empty-state CTA disables when required context is missing", () => {
-    wrap(
-      <TentPlantActivityPanels
-        viewModel={vm({ tentId: null, growId: null })}
-      />,
-    );
+    wrap(<TentPlantActivityPanels viewModel={vm({ tentId: null, growId: null })} />);
     const cta = screen.getByTestId(
       "tent-plant-activity-panel-p2-add-quicklog",
     ) as HTMLButtonElement;

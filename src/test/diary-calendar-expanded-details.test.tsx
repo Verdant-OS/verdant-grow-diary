@@ -85,9 +85,7 @@ describe("diaryCalendarViewModel — expanded details", () => {
   });
 
   it("empty event with no details and no note shows calm fallback", () => {
-    const ev = firstEvent([
-      { id: "x", entry_at: "2026-06-10T09:00:00Z", event_type: "watering" },
-    ]);
+    const ev = firstEvent([{ id: "x", entry_at: "2026-06-10T09:00:00Z", event_type: "watering" }]);
     expect(ev.details.fields).toEqual([]);
     expect(ev.details.ecPreview).toBeNull();
     expect(ev.details.fallback).toBe(DIARY_CALENDAR_DETAILS_EMPTY);
@@ -109,7 +107,9 @@ describe("diaryCalendarViewModel — expanded details", () => {
       },
     ]);
     const serialized = JSON.stringify(ev.details);
-    expect(serialized).not.toMatch(/raw_payload|service_role|tok_LEAK|srv_LEAK|uid_LEAK|arbitrary_xyz|bearer_token/i);
+    expect(serialized).not.toMatch(
+      /raw_payload|service_role|tok_LEAK|srv_LEAK|uid_LEAK|arbitrary_xyz|bearer_token/i,
+    );
     expect(ev.details.fields).toEqual([]);
   });
 
@@ -175,14 +175,10 @@ describe("DiaryCalendarSection — expanded details rendering", () => {
   it("renders the empty-details fallback for an empty event", () => {
     render(
       <DiaryCalendarSection
-        rawEntries={[
-          { id: "x", entry_at: "2026-06-10T09:00:00Z", event_type: "diagnosis" },
-        ]}
+        rawEntries={[{ id: "x", entry_at: "2026-06-10T09:00:00Z", event_type: "diagnosis" }]}
       />,
     );
-    expect(
-      screen.getByText(/No extra details saved for this entry\./i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/No extra details saved for this entry\./i)).toBeInTheDocument();
   });
 
   it("expanded UI does not leak raw payload / service_role / token strings", () => {

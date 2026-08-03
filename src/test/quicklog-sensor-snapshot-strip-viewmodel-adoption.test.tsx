@@ -13,10 +13,7 @@ import {
   type SensorSnapshot as StrictSensorSnapshot,
   type SensorSnapshotStatus,
 } from "@/lib/latestSensorSnapshotRules";
-import type {
-  LatestTentSensorSnapshotState,
-  LatestTentSensorSnapshotStatus,
-} from "@/lib/sensor";
+import type { LatestTentSensorSnapshotState, LatestTentSensorSnapshotStatus } from "@/lib/sensor";
 
 const NOW = new Date("2026-06-02T12:00:00Z");
 const FIVE_MIN_AGO = "2026-06-02T11:55:00Z";
@@ -28,14 +25,11 @@ vi.mock("@/lib/sensor", async (orig) => {
   const real = await orig<typeof import("@/lib/sensor")>();
   return {
     ...real,
-    useLatestTentSensorSnapshot: (...args: unknown[]) =>
-      mockUseLatestTentSensorSnapshot(...args),
+    useLatestTentSensorSnapshot: (...args: unknown[]) => mockUseLatestTentSensorSnapshot(...args),
   };
 });
 
-function freshSnapshot(
-  partial: Partial<StrictSensorSnapshot> = {},
-): StrictSensorSnapshot {
+function freshSnapshot(partial: Partial<StrictSensorSnapshot> = {}): StrictSensorSnapshot {
   return {
     ...EMPTY_SENSOR_SNAPSHOT,
     sensor_snapshot_id: "snap-1",
@@ -65,9 +59,7 @@ function stateReady(snap: StrictSensorSnapshot): LatestTentSensorSnapshotState {
   return { status: "ready", snapshot: snap, lastUpdatedAt: NOW.getTime() };
 }
 
-function stateAs(
-  status: LatestTentSensorSnapshotStatus,
-): LatestTentSensorSnapshotState {
+function stateAs(status: LatestTentSensorSnapshotStatus): LatestTentSensorSnapshotState {
   return {
     status,
     snapshot: { ...EMPTY_SENSOR_SNAPSHOT },
@@ -89,9 +81,7 @@ describe("QuickLogSensorSnapshotStrip — view-model adoption advisory", () => {
   it("fresh live snapshot — no advisory is rendered", () => {
     mockUseLatestTentSensorSnapshot.mockReturnValue(stateReady(freshSnapshot()));
     render(<QuickLogSensorSnapshotStrip tentId="t1" />);
-    expect(
-      screen.queryByTestId("quicklog-sensor-snapshot-advisory"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("quicklog-sensor-snapshot-advisory")).not.toBeInTheDocument();
   });
 
   it("fresh manual snapshot — no advisory is rendered", () => {
@@ -99,19 +89,13 @@ describe("QuickLogSensorSnapshotStrip — view-model adoption advisory", () => {
       stateReady(freshSnapshot({ source: "manual" })),
     );
     render(<QuickLogSensorSnapshotStrip tentId="t1" />);
-    expect(
-      screen.queryByTestId("quicklog-sensor-snapshot-advisory"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("quicklog-sensor-snapshot-advisory")).not.toBeInTheDocument();
   });
 
   it("fresh csv snapshot — no advisory is rendered", () => {
-    mockUseLatestTentSensorSnapshot.mockReturnValue(
-      stateReady(freshSnapshot({ source: "csv" })),
-    );
+    mockUseLatestTentSensorSnapshot.mockReturnValue(stateReady(freshSnapshot({ source: "csv" })));
     render(<QuickLogSensorSnapshotStrip tentId="t1" />);
-    expect(
-      screen.queryByTestId("quicklog-sensor-snapshot-advisory"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("quicklog-sensor-snapshot-advisory")).not.toBeInTheDocument();
   });
 
   it("stale snapshot — renders stale advisory copy from the view-model", () => {
@@ -149,9 +133,7 @@ describe("QuickLogSensorSnapshotStrip — view-model adoption advisory", () => {
   });
 
   it("demo snapshot — renders demo advisory and never reads as live/current", () => {
-    mockUseLatestTentSensorSnapshot.mockReturnValue(
-      stateReady(freshSnapshot({ source: "demo" })),
-    );
+    mockUseLatestTentSensorSnapshot.mockReturnValue(stateReady(freshSnapshot({ source: "demo" })));
     render(<QuickLogSensorSnapshotStrip tentId="t1" />);
     const advisory = screen.getByTestId("quicklog-sensor-snapshot-advisory");
     expect(advisory).toHaveAttribute("data-advisory-kind", "demo");

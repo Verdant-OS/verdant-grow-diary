@@ -10,9 +10,7 @@
  */
 import { compileAiDoctorContextFromRows } from "@/lib/aiDoctorEngine";
 import type { AiDoctorContext } from "@/lib/aiDoctorEngine";
-import type {
-  AiDoctorReadinessSourceBadge,
-} from "@/lib/aiDoctorReadinessViewModel";
+import type { AiDoctorReadinessSourceBadge } from "@/lib/aiDoctorReadinessViewModel";
 import type { SensorSourceTag } from "@/lib/aiDoctorContextCompiler";
 
 export const READINESS_FIXTURE_NOW = new Date("2026-06-10T12:00:00Z");
@@ -77,9 +75,7 @@ export interface BuildReadinessContextArgs {
   plant?: ReadinessFixturePlantOverride;
 }
 
-export function buildReadinessContext(
-  args: BuildReadinessContextArgs = {},
-): AiDoctorContext {
+export function buildReadinessContext(args: BuildReadinessContextArgs = {}): AiDoctorContext {
   return compileAiDoctorContextFromRows({
     plant: { ...READINESS_FIXTURE_PLANT, ...(args.plant ?? {}) },
     growEvents: args.growEvents ?? [],
@@ -110,8 +106,7 @@ export function buildReadingForSource(
   return reading;
 }
 
-export interface BuildReadinessPanelPropsArgs
-  extends BuildReadinessContextArgs {
+export interface BuildReadinessPanelPropsArgs extends BuildReadinessContextArgs {
   openAlertsCount?: number;
 }
 

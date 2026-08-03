@@ -123,11 +123,7 @@ function EnvBadge({ value }: { value: string | null }) {
   return (
     <Badge
       variant="outline"
-      className={
-        isLive
-          ? "border-emerald-800 text-emerald-300"
-          : "border-amber-800 text-amber-300"
-      }
+      className={isLive ? "border-emerald-800 text-emerald-300" : "border-amber-800 text-amber-300"}
     >
       {value}
     </Badge>
@@ -173,7 +169,7 @@ function useCreditsAudit(env: EnvFilter, nonce: number) {
     return () => {
       cancelled = true;
     };
-  }, [env, nonce]);
+  }, [env]);
 
   return { loading, error, data };
 }
@@ -207,15 +203,25 @@ function GrantsTable({ rows }: { rows: GrantRow[] }) {
           {rows.map((r) => (
             <tr key={r.id} className="border-t border-border/40 align-top">
               <Td>{fmt(r.created_at)}</Td>
-              <Td><IdCell value={r.id} /></Td>
-              <Td><IdCell value={r.user_id} /></Td>
+              <Td>
+                <IdCell value={r.id} />
+              </Td>
+              <Td>
+                <IdCell value={r.user_id} />
+              </Td>
               <Td className="text-right font-mono">{r.credits}</Td>
               <Td>{r.kind ?? "—"}</Td>
               <Td>{r.sku ?? "—"}</Td>
               <Td>{r.source ?? "—"}</Td>
-              <Td><EnvBadge value={r.environment} /></Td>
-              <Td><IdCell value={r.paddle_transaction_id} /></Td>
-              <Td><IdCell value={r.reverses} /></Td>
+              <Td>
+                <EnvBadge value={r.environment} />
+              </Td>
+              <Td>
+                <IdCell value={r.paddle_transaction_id} />
+              </Td>
+              <Td>
+                <IdCell value={r.reverses} />
+              </Td>
               <Td className="font-mono text-[11px] text-muted-foreground">{r.grant_ref ?? "—"}</Td>
               <Td>{fmt(r.expires_at)}</Td>
             </tr>
@@ -249,15 +255,25 @@ function SpendsTable({ rows }: { rows: SpendRow[] }) {
           {rows.map((r) => (
             <tr key={r.id} className="border-t border-border/40 align-top">
               <Td>{fmt(r.created_at)}</Td>
-              <Td><IdCell value={r.id} /></Td>
-              <Td><IdCell value={r.user_id} /></Td>
-              <Td><IdCell value={r.grow_id} /></Td>
+              <Td>
+                <IdCell value={r.id} />
+              </Td>
+              <Td>
+                <IdCell value={r.user_id} />
+              </Td>
+              <Td>
+                <IdCell value={r.grow_id} />
+              </Td>
               <Td className="font-mono">{r.period_key ?? "—"}</Td>
               <Td className="text-right font-mono">{r.weight ?? "—"}</Td>
               <Td>{r.model_tier ?? "—"}</Td>
               <Td>{r.feature ?? "—"}</Td>
-              <Td><StatusBadge value={r.status} /></Td>
-              <Td><IdCell value={r.refund_of} /></Td>
+              <Td>
+                <StatusBadge value={r.status} />
+              </Td>
+              <Td>
+                <IdCell value={r.refund_of} />
+              </Td>
             </tr>
           ))}
         </tbody>
@@ -289,14 +305,24 @@ function ReferralsTable({ rows }: { rows: ReferralRow[] }) {
           {rows.map((r) => (
             <tr key={r.id} className="border-t border-border/40 align-top">
               <Td>{fmt(r.created_at)}</Td>
-              <Td><IdCell value={r.id} /></Td>
-              <Td><IdCell value={r.referrer_user_id} /></Td>
-              <Td><IdCell value={r.referee_user_id} /></Td>
+              <Td>
+                <IdCell value={r.id} />
+              </Td>
+              <Td>
+                <IdCell value={r.referrer_user_id} />
+              </Td>
+              <Td>
+                <IdCell value={r.referee_user_id} />
+              </Td>
               <Td className="font-mono">{r.code ?? "—"}</Td>
-              <Td><StatusBadge value={r.status} /></Td>
+              <Td>
+                <StatusBadge value={r.status} />
+              </Td>
               <Td className="text-right font-mono">{r.referrer_credits ?? 0}</Td>
               <Td className="text-right font-mono">{r.referee_credits ?? 0}</Td>
-              <Td><EnvBadge value={r.environment} /></Td>
+              <Td>
+                <EnvBadge value={r.environment} />
+              </Td>
               <Td>{fmt(r.converted_at)}</Td>
             </tr>
           ))}
@@ -308,7 +334,9 @@ function ReferralsTable({ rows }: { rows: ReferralRow[] }) {
 
 function Th({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <th className={`px-2 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground ${className ?? ""}`}>
+    <th
+      className={`px-2 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground ${className ?? ""}`}
+    >
       {children}
     </th>
   );
@@ -343,12 +371,15 @@ export default function OperatorCreditsAudit() {
   const reload = useCallback(() => setNonce((n) => n + 1), []);
   const { loading, error, data } = useCreditsAudit(env, nonce);
 
-  const counts = useMemo(() => ({
-    grants: data?.grants.length ?? 0,
-    spends: data?.spends.length ?? 0,
-    refunds: data?.refunds.length ?? 0,
-    referrals: data?.referrals.length ?? 0,
-  }), [data]);
+  const counts = useMemo(
+    () => ({
+      grants: data?.grants.length ?? 0,
+      spends: data?.spends.length ?? 0,
+      refunds: data?.refunds.length ?? 0,
+      referrals: data?.referrals.length ?? 0,
+    }),
+    [data],
+  );
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
@@ -356,8 +387,8 @@ export default function OperatorCreditsAudit() {
         <div>
           <h1 className="text-2xl font-semibold">Credits &amp; referrals audit</h1>
           <p className="text-sm text-muted-foreground">
-            Operator-only, read-only. Row IDs, timestamps, enums, and owner UUIDs only —
-            no email, name, or profile fields.
+            Operator-only, read-only. Row IDs, timestamps, enums, and owner UUIDs only — no email,
+            name, or profile fields.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -380,9 +411,7 @@ export default function OperatorCreditsAudit() {
       {error && (
         <Card className="border-destructive/50">
           <CardContent className="p-4 text-sm text-destructive">
-            {error === "operator_required"
-              ? "Operator role required."
-              : `Failed to load: ${error}`}
+            {error === "operator_required" ? "Operator role required." : `Failed to load: ${error}`}
           </CardContent>
         </Card>
       )}
@@ -419,7 +448,9 @@ export default function OperatorCreditsAudit() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">AI credit grants</CardTitle>
                 </CardHeader>
-                <CardContent><GrantsTable rows={data.grants} /></CardContent>
+                <CardContent>
+                  <GrantsTable rows={data.grants} />
+                </CardContent>
               </Card>
             </TabsContent>
 
@@ -428,7 +459,9 @@ export default function OperatorCreditsAudit() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">AI credit spends</CardTitle>
                 </CardHeader>
-                <CardContent><SpendsTable rows={data.spends} /></CardContent>
+                <CardContent>
+                  <SpendsTable rows={data.spends} />
+                </CardContent>
               </Card>
             </TabsContent>
 
@@ -437,7 +470,9 @@ export default function OperatorCreditsAudit() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">Refunds (spends with refund_of set)</CardTitle>
                 </CardHeader>
-                <CardContent><SpendsTable rows={data.refunds} /></CardContent>
+                <CardContent>
+                  <SpendsTable rows={data.refunds} />
+                </CardContent>
               </Card>
             </TabsContent>
 
@@ -446,7 +481,9 @@ export default function OperatorCreditsAudit() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">Referral conversions</CardTitle>
                 </CardHeader>
-                <CardContent><ReferralsTable rows={data.referrals} /></CardContent>
+                <CardContent>
+                  <ReferralsTable rows={data.referrals} />
+                </CardContent>
               </Card>
             </TabsContent>
           </Tabs>

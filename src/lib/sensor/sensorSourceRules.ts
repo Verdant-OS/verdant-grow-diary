@@ -7,14 +7,7 @@
  * never to "live" or another healthy label.
  */
 
-export const SENSOR_SOURCES = [
-  "live",
-  "manual",
-  "csv",
-  "demo",
-  "stale",
-  "invalid",
-] as const;
+export const SENSOR_SOURCES = ["live", "manual", "csv", "demo", "stale", "invalid"] as const;
 
 export type SensorSource = (typeof SENSOR_SOURCES)[number];
 
@@ -52,9 +45,7 @@ const SOURCE_LABEL: Record<SensorSource, string> = {
  * the client fence uses, so the two can never disagree about which raw
  * tokens are eligible.
  */
-export function rawSensorSourceValuesFor(
-  targets: ReadonlyArray<SensorSource>,
-): string[] {
+export function rawSensorSourceValuesFor(targets: ReadonlyArray<SensorSource>): string[] {
   return Object.entries(ALIAS)
     .filter(([, canonical]) => targets.includes(canonical))
     .map(([raw]) => raw)

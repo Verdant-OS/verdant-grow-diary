@@ -17,8 +17,7 @@ export const PHENO_STRESS_INTENSITIES = ["low", "moderate", "high"] as const;
 export type PhenoStressIntensity = (typeof PHENO_STRESS_INTENSITIES)[number];
 
 export const PHENO_STRESS_RECOMMENDATIONS = ["keep", "watch", "reject"] as const;
-export type PhenoStressRecommendation =
-  (typeof PHENO_STRESS_RECOMMENDATIONS)[number];
+export type PhenoStressRecommendation = (typeof PHENO_STRESS_RECOMMENDATIONS)[number];
 
 export interface PhenoStressDraft {
   readonly plantId: string; // candidate ID
@@ -58,14 +57,11 @@ const isDate = (raw: string): boolean =>
 
 const nonEmpty = (raw: string): boolean => raw.trim().length > 0;
 
-export function validatePhenoStressDraft(
-  draft: PhenoStressDraft,
-): PhenoStressValidation {
+export function validatePhenoStressDraft(draft: PhenoStressDraft): PhenoStressValidation {
   const issues: PhenoStressIssues = {};
 
   if (!nonEmpty(draft.plantId)) issues.plantId = "Candidate is required.";
-  if (!nonEmpty(draft.stressFactor))
-    issues.stressFactor = "Stress factor is required.";
+  if (!nonEmpty(draft.stressFactor)) issues.stressFactor = "Stress factor is required.";
 
   if (!nonEmpty(draft.status)) {
     issues.status = "Planned or observed is required.";
@@ -75,19 +71,13 @@ export function validatePhenoStressDraft(
 
   if (!nonEmpty(draft.intensity)) {
     issues.intensity = "Intensity is required.";
-  } else if (
-    !(PHENO_STRESS_INTENSITIES as readonly string[]).includes(draft.intensity)
-  ) {
+  } else if (!(PHENO_STRESS_INTENSITIES as readonly string[]).includes(draft.intensity)) {
     issues.intensity = "Intensity must be low, moderate, or high.";
   }
 
   if (!nonEmpty(draft.recommendation)) {
     issues.recommendation = "Recommendation is required.";
-  } else if (
-    !(PHENO_STRESS_RECOMMENDATIONS as readonly string[]).includes(
-      draft.recommendation,
-    )
-  ) {
+  } else if (!(PHENO_STRESS_RECOMMENDATIONS as readonly string[]).includes(draft.recommendation)) {
     issues.recommendation = "Recommendation must be keep, watch, or reject.";
   }
 

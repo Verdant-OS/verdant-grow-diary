@@ -151,7 +151,7 @@ function optionalDisplayLabel<T extends string>(
   labels: Readonly<Record<T, string>>,
 ): { status: "absent" } | { status: "invalid" } | { status: "valid"; valueLabel: string } {
   if (value === undefined) return { status: "absent" };
-  if (typeof value !== "string" || !Object.prototype.hasOwnProperty.call(labels, value)) {
+  if (typeof value !== "string" || !Object.hasOwn(labels, value)) {
     return { status: "invalid" };
   }
   return { status: "valid", valueLabel: labels[value as T] };

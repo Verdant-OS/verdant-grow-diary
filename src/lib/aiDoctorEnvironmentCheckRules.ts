@@ -13,8 +13,7 @@
 
 import { DIARY_ENVIRONMENT_CHECK_TITLE } from "./ecowittDiaryEnvironmentCheckRules";
 
-export const AI_DOCTOR_ENV_CHECK_SOURCE_LABEL =
-  "local EcoWitt validation / test-local evidence";
+export const AI_DOCTOR_ENV_CHECK_SOURCE_LABEL = "local EcoWitt validation / test-local evidence";
 
 export type EnvCheckMetricStatus = "accepted" | "rejected" | "not_checked";
 
@@ -26,8 +25,7 @@ export const REQUIRED_ENVIRONMENT_METRICS = [
   "co2_ppm",
   "soil_moisture_pct",
 ] as const;
-export type RequiredEnvironmentMetric =
-  (typeof REQUIRED_ENVIRONMENT_METRICS)[number];
+export type RequiredEnvironmentMetric = (typeof REQUIRED_ENVIRONMENT_METRICS)[number];
 
 export interface EnvCheckMetric {
   key: string;
@@ -80,10 +78,7 @@ export interface AiDoctorEnvironmentCheckContext {
 export interface AiDoctorEnvironmentCheckAbsent {
   kind: "absent";
   present: false;
-  reason:
-    | "no_event"
-    | "unparseable"
-    | "missing_captured_at";
+  reason: "no_event" | "unparseable" | "missing_captured_at";
   /** Cautious copy AI Doctor should surface when evidence is missing/weak. */
   cautionCopy: string;
 }
@@ -100,9 +95,7 @@ export type AiDoctorEnvironmentCheckResult =
  * Returns true when a grow_event note body was produced by the EcoWitt
  * local validation → diary Environment Check handoff.
  */
-export function isEcowittEnvironmentCheckNote(
-  noteBody: string | null | undefined,
-): boolean {
+export function isEcowittEnvironmentCheckNote(noteBody: string | null | undefined): boolean {
   if (typeof noteBody !== "string" || noteBody.length === 0) return false;
   return (
     noteBody.includes(DIARY_ENVIRONMENT_CHECK_TITLE) &&
@@ -117,11 +110,7 @@ export function isEcowittEnvironmentCheckNote(
 const METRIC_LINE_RE =
   /^\s*•\s+(.+?):\s+(accepted|rejected|not_checked)\s+\(value=([^)]*)\)(?:\s+—\s+(.*))?$/;
 
-const DERIVED_KEY_HINTS = new Set([
-  "vpd_kpa",
-  "vpd",
-  "derived_vpd",
-]);
+const DERIVED_KEY_HINTS = new Set(["vpd_kpa", "vpd", "derived_vpd"]);
 
 function normalizeKey(label: string): string {
   return label
@@ -227,19 +216,14 @@ function buildSummary(
   );
 }
 
-function buildSafetyNotes(
-  status: EnvCheckOverallStatus,
-  metrics: EnvCheckMetric[],
-): string[] {
+function buildSafetyNotes(status: EnvCheckOverallStatus, metrics: EnvCheckMetric[]): string[] {
   const notes: string[] = [
     "Environment Check evidence is from local EcoWitt validation (test/local data). Do not treat as live telemetry.",
     "Do not suggest device control actions or automation changes from Environment Check evidence.",
     "Sensor telemetry alone cannot confirm or deny plant health with certainty.",
   ];
   if (status === "rejected") {
-    notes.push(
-      "Validation status is rejected: do not treat metrics as healthy.",
-    );
+    notes.push("Validation status is rejected: do not treat metrics as healthy.");
   }
   if (metrics.some((m) => m.status === "rejected")) {
     const rejectedKeys = metrics
@@ -252,9 +236,7 @@ function buildSafetyNotes(
     notes.push("Some metrics were not_checked — they cannot be assumed healthy.");
   }
   if (metrics.some((m) => m.derived)) {
-    notes.push(
-      "Derived VPD is included as context only — it is not a raw sensor reading.",
-    );
+    notes.push("Derived VPD is included as context only — it is not a raw sensor reading.");
   }
   return notes;
 }
@@ -323,20 +305,9 @@ export function buildAiDoctorEnvironmentCheckContext(
     notCheckedCount: notChecked,
     derivedNotes,
     warnings,
-    contextSummary: buildSummary(
-      event.occurredAt,
-      parsed.status,
-      accepted,
-      rejected,
-      notChecked,
-    ),
+    contextSummary: buildSummary(event.occurredAt, parsed.status, accepted, rejected, notChecked),
     safetyNotes: buildSafetyNotes(parsed.status, parsed.metrics),
-    confidenceImpact: pickConfidenceImpact(
-      parsed.status,
-      rejected,
-      notChecked,
-      accepted,
-    ),
+    confidenceImpact: pickConfidenceImpact(parsed.status, rejected, notChecked, accepted),
   };
 }
 
@@ -348,9 +319,7 @@ export function selectLatestEnvironmentCheckEvent(
   events: readonly EnvironmentCheckEventInput[] | null | undefined,
 ): EnvironmentCheckEventInput | null {
   if (!Array.isArray(events) || events.length === 0) return null;
-  const candidates = events.filter((e) =>
-    isEcowittEnvironmentCheckNote(e?.noteBody),
-  );
+  const candidates = events.filter((e) => isEcowittEnvironmentCheckNote(e?.noteBody));
   if (candidates.length === 0) return null;
   const sorted = [...candidates].sort((a, b) => {
     const at = a.occurredAt ?? "";
@@ -400,9 +369,7 @@ export function classifyEnvironmentCheckQuality(
   const parsed = parseEnvironmentCheckNote(event.noteBody as string);
   const required = new Set<string>(REQUIRED_ENVIRONMENT_METRICS);
   const supported = parsed.metrics.filter((m) => m.supported || required.has(m.key));
-  const acceptedRequired = supported.filter(
-    (m) => required.has(m.key) && m.status === "accepted",
-  );
+  const acceptedRequired = supported.filter((m) => required.has(m.key) && m.status === "accepted");
   const rejected = supported.filter((m) => m.status === "rejected");
   const notChecked = supported.filter((m) => m.status === "not_checked");
   const accepted = supported.filter((m) => m.status === "accepted");
@@ -410,11 +377,7 @@ export function classifyEnvironmentCheckQuality(
   let selectedStatus: EnvCheckSelectedStatus = "missing";
   if (parsed.status === "rejected" && accepted.length === 0) {
     selectedStatus = "rejected";
-  } else if (
-    supported.length > 0 &&
-    accepted.length === 0 &&
-    notChecked.length > 0
-  ) {
+  } else if (supported.length > 0 && accepted.length === 0 && notChecked.length > 0) {
     selectedStatus = "not_checked";
   } else if (accepted.length > 0 && (rejected.length > 0 || notChecked.length > 0)) {
     selectedStatus = "mixed";
@@ -469,9 +432,7 @@ export function selectBestEnvironmentCheckEvent(
     totalCandidateCount: 0,
   };
   if (!Array.isArray(events) || events.length === 0) return empty;
-  const candidates = events.filter(
-    (e) => !!e && isEcowittEnvironmentCheckNote(e.noteBody),
-  );
+  const candidates = events.filter((e) => !!e && isEcowittEnvironmentCheckNote(e.noteBody));
   if (candidates.length === 0) return empty;
 
   const enriched = candidates.map((e) => ({
@@ -481,10 +442,7 @@ export function selectBestEnvironmentCheckEvent(
     title: eventTitleForTieBreak(e),
   }));
 
-  const cmp = (
-    a: (typeof enriched)[number],
-    b: (typeof enriched)[number],
-  ): number => {
+  const cmp = (a: (typeof enriched)[number], b: (typeof enriched)[number]): number => {
     const aAcc = a.quality.hasAcceptedRequired ? 1 : 0;
     const bAcc = b.quality.hasAcceptedRequired ? 1 : 0;
     if (aAcc !== bAcc) return bAcc - aAcc; // accepted first
@@ -540,56 +498,53 @@ export function buildEnvironmentCheckChecklist(args: {
   event: EnvironmentCheckEventInput | null | undefined;
   hasLiveSensorContext: boolean;
 }): EnvironmentCheckChecklist {
-  const parsed = args.event && isEcowittEnvironmentCheckNote(args.event.noteBody)
-    ? parseEnvironmentCheckNote(args.event.noteBody as string)
-    : { status: "unknown" as EnvCheckOverallStatus, metrics: [] as EnvCheckMetric[] };
+  const parsed =
+    args.event && isEcowittEnvironmentCheckNote(args.event.noteBody)
+      ? parseEnvironmentCheckNote(args.event.noteBody as string)
+      : { status: "unknown" as EnvCheckOverallStatus, metrics: [] as EnvCheckMetric[] };
   const byKey = new Map<string, EnvCheckMetric>();
   for (const m of parsed.metrics) {
     if (!byKey.has(m.key)) byKey.set(m.key, m);
   }
-  const items: EnvironmentCheckChecklistItem[] = REQUIRED_ENVIRONMENT_METRICS.map(
-    (key) => {
-      const m = byKey.get(key);
-      if (m && m.status === "accepted") {
-        return {
-          key,
-          label: CHECKLIST_LABELS[key],
-          state: "complete" as ChecklistItemState,
-          reason: "Accepted in latest Environment Check.",
-        };
-      }
-      if (!m) {
-        return {
-          key,
-          label: CHECKLIST_LABELS[key],
-          state: "needed" as ChecklistItemState,
-          reason: "Not captured.",
-        };
-      }
-      const reason =
-        m.status === "rejected"
-          ? `Rejected${m.reason ? `: ${m.reason}` : ""}.`
-          : m.status === "not_checked"
-            ? "Not checked."
-            : "Needs capture.";
+  const items: EnvironmentCheckChecklistItem[] = REQUIRED_ENVIRONMENT_METRICS.map((key) => {
+    const m = byKey.get(key);
+    if (m && m.status === "accepted") {
+      return {
+        key,
+        label: CHECKLIST_LABELS[key],
+        state: "complete" as ChecklistItemState,
+        reason: "Accepted in latest Environment Check.",
+      };
+    }
+    if (!m) {
       return {
         key,
         label: CHECKLIST_LABELS[key],
         state: "needed" as ChecklistItemState,
-        reason,
+        reason: "Not captured.",
       };
-    },
-  );
+    }
+    const reason =
+      m.status === "rejected"
+        ? `Rejected${m.reason ? `: ${m.reason}` : ""}.`
+        : m.status === "not_checked"
+          ? "Not checked."
+          : "Needs capture.";
+    return {
+      key,
+      label: CHECKLIST_LABELS[key],
+      state: "needed" as ChecklistItemState,
+      reason,
+    };
+  });
 
   const hasNeeded = items.some((i) => i.state === "needed");
   const allComplete = !hasNeeded;
   let cautionCopy = "";
   if (allComplete && !args.hasLiveSensorContext) {
-    cautionCopy =
-      "Environment Check is useful context, but not live telemetry.";
+    cautionCopy = "Environment Check is useful context, but not live telemetry.";
   } else if (!args.hasLiveSensorContext) {
-    cautionCopy =
-      "Live telemetry is still missing. Treat this as context, not live sensor truth.";
+    cautionCopy = "Live telemetry is still missing. Treat this as context, not live sensor truth.";
   }
 
   return { items, hasNeeded, cautionCopy };

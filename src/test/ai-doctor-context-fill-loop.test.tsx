@@ -104,7 +104,7 @@ describe("AI Doctor Context — fill-loop regression: manual snapshot", () => {
   });
 
   it("snapshot within window appears in evidence and is not also listed as missing", () => {
-    const justUnderWindow = (AI_DOCTOR_RECENT_WINDOW_MS / HOUR) - 1; // ~6d 23h
+    const justUnderWindow = AI_DOCTOR_RECENT_WINDOW_MS / HOUR - 1; // ~6d 23h
     const r = evaluateAiDoctorContext({
       plant: plant(),
       recentEvents: [ev(1, "watering"), ev(2, "notes")],
@@ -204,21 +204,15 @@ describe("AI Doctor Context — fill-loop regression: plant photo (pure rules)",
 
 describe("AI Doctor Context — shared recency-window source of truth", () => {
   it("rules and shared config agree on the recent-event window (7 days)", () => {
-    expect(AI_DOCTOR_RECENT_WINDOW_MS).toBe(
-      AI_DOCTOR_CONTEXT_READINESS_CONFIG.recentEventWindowMs,
-    );
+    expect(AI_DOCTOR_RECENT_WINDOW_MS).toBe(AI_DOCTOR_CONTEXT_READINESS_CONFIG.recentEventWindowMs);
     expect(AI_DOCTOR_RECENT_WINDOW_MS).toBe(
       AI_DOCTOR_RECENT_EVENT_WINDOW_DAYS * 24 * 60 * 60 * 1000,
     );
   });
 
   it("rules and shared config agree on the snapshot-fresh window (48 hours)", () => {
-    expect(AI_DOCTOR_SNAPSHOT_FRESH_MS).toBe(
-      AI_DOCTOR_CONTEXT_READINESS_CONFIG.snapshotFreshMs,
-    );
-    expect(AI_DOCTOR_SNAPSHOT_FRESH_MS).toBe(
-      AI_DOCTOR_SNAPSHOT_FRESH_HOURS * 60 * 60 * 1000,
-    );
+    expect(AI_DOCTOR_SNAPSHOT_FRESH_MS).toBe(AI_DOCTOR_CONTEXT_READINESS_CONFIG.snapshotFreshMs);
+    expect(AI_DOCTOR_SNAPSHOT_FRESH_MS).toBe(AI_DOCTOR_SNAPSHOT_FRESH_HOURS * 60 * 60 * 1000);
   });
 
   it("a snapshot exactly inside the recent window is counted as recent", () => {
@@ -254,9 +248,9 @@ describe("AI Doctor Context — Coach ambiguous plant fallback", () => {
     );
     const panel = screen.getByTestId("coach-ai-doctor-context-panel");
     expect(panel.getAttribute("data-ambiguous")).toBe("true");
-    expect(
-      screen.getByTestId("coach-ai-doctor-context-ambiguous-notice").textContent,
-    ).toBe(COACH_AI_DOCTOR_CONTEXT_AMBIGUOUS_COPY);
+    expect(screen.getByTestId("coach-ai-doctor-context-ambiguous-notice").textContent).toBe(
+      COACH_AI_DOCTOR_CONTEXT_AMBIGUOUS_COPY,
+    );
     // Calm, instructive — no diagnosis claims, no AI confidence wording.
     expect(COACH_AI_DOCTOR_CONTEXT_AMBIGUOUS_COPY).toMatch(/select a plant/i);
   });

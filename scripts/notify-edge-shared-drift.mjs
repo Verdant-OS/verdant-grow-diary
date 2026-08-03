@@ -34,9 +34,7 @@ const repo = process.env.GITHUB_REPOSITORY;
 const event = process.env.GITHUB_EVENT_NAME || "";
 const sha = process.env.GITHUB_SHA || "";
 const runId = process.env.GITHUB_RUN_ID || "";
-const runUrl = repo && runId
-  ? `https://github.com/${repo}/actions/runs/${runId}`
-  : "";
+const runUrl = repo && runId ? `https://github.com/${repo}/actions/runs/${runId}` : "";
 
 if (!repo) {
   console.warn("[notify-drift] GITHUB_REPOSITORY not set — skipping.");
@@ -69,11 +67,14 @@ const body = [
   "<details><summary>Per-file drift report</summary>",
   "",
   reportBody.length > 55_000
-    ? reportBody.slice(0, 55_000) + "\n\n_…truncated; see workflow artifact `edge-shared-drift-report`._"
+    ? reportBody.slice(0, 55_000) +
+      "\n\n_…truncated; see workflow artifact `edge-shared-drift-report`._"
     : reportBody,
   "",
   "</details>",
-].filter(Boolean).join("\n");
+]
+  .filter(Boolean)
+  .join("\n");
 
 function gh(args, opts = {}) {
   const res = spawnSync("gh", args, {
@@ -101,9 +102,11 @@ function notifyPullRequest(prNumber) {
   if (existingId) {
     gh([
       "api",
-      "--method", "PATCH",
+      "--method",
+      "PATCH",
       `repos/${repo}/issues/comments/${existingId}`,
-      "-f", `body=${body}`,
+      "-f",
+      `body=${body}`,
     ]);
     console.log(`[notify-drift] Updated PR comment ${existingId} on #${prNumber}.`);
   } else {
@@ -115,43 +118,56 @@ function notifyPullRequest(prNumber) {
 function notifyPush() {
   // Find an open tracking issue by marker; otherwise open one.
   const list = gh([
-    "issue", "list",
-    "--repo", repo,
-    "--state", "open",
-    "--search", `"${MARKER}" in:body`,
-    "--json", "number,body",
-    "-q", ".[0].number",
+    "issue",
+    "list",
+    "--repo",
+    repo,
+    "--state",
+    "open",
+    "--search",
+    `"${MARKER}" in:body`,
+    "--json",
+    "number,body",
+    "-q",
+    ".[0].number",
   ]);
   const existing = list.stdout.trim();
 
   if (existing) {
-    gh([
-      "issue", "comment", existing,
-      "--repo", repo,
-      "--body", body,
-    ]);
+    gh(["issue", "comment", existing, "--repo", repo, "--body", body]);
     console.log(`[notify-drift] Commented on tracking issue #${existing}.`);
   } else {
     // Ensure label exists (ignore failure — label may already exist).
     gh([
-      "label", "create", LABEL,
-      "--repo", repo,
-      "--color", "b60205",
-      "--description", "Edge shared-lib mirror drift detected in CI",
+      "label",
+      "create",
+      LABEL,
+      "--repo",
+      repo,
+      "--color",
+      "b60205",
+      "--description",
+      "Edge shared-lib mirror drift detected in CI",
     ]);
     const create = gh([
-      "issue", "create",
-      "--repo", repo,
-      "--title", ISSUE_TITLE,
-      "--label", LABEL,
-      "--body", body,
+      "issue",
+      "create",
+      "--repo",
+      repo,
+      "--title",
+      ISSUE_TITLE,
+      "--label",
+      LABEL,
+      "--body",
+      body,
     ]);
     console.log(`[notify-drift] Opened tracking issue:\n${create.stdout.trim()}`);
   }
 }
 
-const prNumber = process.env.PR_NUMBER
-  || (event === "pull_request" && process.env.GITHUB_REF?.match(/refs\/pull\/(\d+)\//)?.[1]);
+const prNumber =
+  process.env.PR_NUMBER ||
+  (event === "pull_request" && process.env.GITHUB_REF?.match(/refs\/pull\/(\d+)\//)?.[1]);
 
 if (event === "pull_request" && prNumber) {
   notifyPullRequest(prNumber);

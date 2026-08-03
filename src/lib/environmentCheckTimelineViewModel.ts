@@ -60,10 +60,7 @@ export interface EnvironmentCheckTimelineViewModel {
   notLive: true;
 }
 
-const ENV_KIND_ALIASES: ReadonlySet<string> = new Set([
-  "environment",
-  "environment_check",
-]);
+const ENV_KIND_ALIASES: ReadonlySet<string> = new Set(["environment", "environment_check"]);
 
 const NOTE_MAX = 200;
 
@@ -134,12 +131,8 @@ function buildFields(
   // source converts exactly once, at string-build time, to match `tempUnit`
   // — never double-converted, never left in the wrong unit just because the
   // stored shape happened to be Fahrenheit-only.
-  const tempC = asFiniteNumber(
-    envelope.temp_c ?? envelope.tempC ?? envelope.air_temp_c,
-  );
-  const tempF = asFiniteNumber(
-    envelope.room_temp_f ?? envelope.tempF ?? envelope.air_temp_f,
-  );
+  const tempC = asFiniteNumber(envelope.temp_c ?? envelope.tempC ?? envelope.air_temp_c);
+  const tempF = asFiniteNumber(envelope.room_temp_f ?? envelope.tempF ?? envelope.air_temp_f);
   if (tempC != null) {
     fields.push({
       key: "temp",
@@ -160,9 +153,7 @@ function buildFields(
     });
   }
 
-  const rh = asFiniteNumber(
-    envelope.humidity_pct ?? envelope.rhPercent ?? envelope.rh_percent,
-  );
+  const rh = asFiniteNumber(envelope.humidity_pct ?? envelope.rhPercent ?? envelope.rh_percent);
   if (rh != null) {
     fields.push({ key: "humidity", label: "RH", value: `${rh.toFixed(0)}%` });
   }

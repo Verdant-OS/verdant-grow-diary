@@ -35,25 +35,19 @@ export default function TentPlantTabs({
       onSelect(viewModel.selectedPlantId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewModel.selectionWasReset, viewModel.selectedPlantId]);
+  }, [viewModel.selectionWasReset, viewModel.selectedPlantId, onSelect]);
 
   function focusTabByIndex(index: number) {
-    const tabs = listRef.current?.querySelectorAll<HTMLButtonElement>(
-      '[role="tab"]',
-    );
+    const tabs = listRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
     if (!tabs || tabs.length === 0) return;
     const safe = ((index % tabs.length) + tabs.length) % tabs.length;
     tabs[safe]?.focus();
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    const tabs = listRef.current?.querySelectorAll<HTMLButtonElement>(
-      '[role="tab"]',
-    );
+    const tabs = listRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
     if (!tabs || tabs.length === 0) return;
-    const current = Array.from(tabs).indexOf(
-      document.activeElement as HTMLButtonElement,
-    );
+    const current = Array.from(tabs).indexOf(document.activeElement as HTMLButtonElement);
     if (e.key === "ArrowRight") {
       e.preventDefault();
       focusTabByIndex(current + 1);

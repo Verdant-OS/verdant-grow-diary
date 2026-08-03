@@ -16,18 +16,10 @@
  *     concern with its own safe path.
  */
 
-import {
-  VPD_STAGE_TARGETS,
-  type VpdStageTarget,
-} from "@/constants/vpdTargets";
+import { VPD_STAGE_TARGETS, type VpdStageTarget } from "@/constants/vpdTargets";
 import { normalizeToCanonicalVpdTargetStage } from "@/lib/vpdStageNormalizationRules";
 
-export type VpdTargetClassification =
-  | "low"
-  | "in_band"
-  | "high"
-  | "stage_unknown"
-  | "unavailable";
+export type VpdTargetClassification = "low" | "in_band" | "high" | "stage_unknown" | "unavailable";
 
 export interface EvaluateVpdAgainstStageTargetInput {
   vpdKpa: number | null | undefined;

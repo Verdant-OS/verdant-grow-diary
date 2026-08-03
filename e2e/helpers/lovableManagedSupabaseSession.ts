@@ -69,7 +69,10 @@ export type ManagedSessionBlockedReason =
   | "target_project_mismatch";
 
 export type ManagedSessionRestoreStrategy =
-  "storage_session" | "storage_plus_cookies" | "cookies_only" | "none";
+  | "storage_session"
+  | "storage_plus_cookies"
+  | "cookies_only"
+  | "none";
 
 /** A validated, normalized cookie safe to hand to Playwright addCookies. */
 export interface NormalizedManagedCookie {

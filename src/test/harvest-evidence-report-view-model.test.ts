@@ -18,21 +18,22 @@ import {
   type HarvestEvidenceReportPlantInput,
 } from "@/lib/harvestEvidenceReportViewModel";
 
-function row(o: Partial<{
-  id: string;
-  note: string | null;
-  hasPhoto: boolean;
-  eventType: string;
-  occurredAt: string | null;
-}>) {
+function row(
+  o: Partial<{
+    id: string;
+    note: string | null;
+    hasPhoto: boolean;
+    eventType: string;
+    occurredAt: string | null;
+  }>,
+) {
   return {
     id: o.id ?? "r1",
     note: o.note ?? null,
     notePreview: null,
     hasPhoto: o.hasPhoto ?? false,
     eventType: o.eventType ?? "observation",
-    occurredAt:
-      o.occurredAt === undefined ? "2025-06-10T10:00:00.000Z" : o.occurredAt,
+    occurredAt: o.occurredAt === undefined ? "2025-06-10T10:00:00.000Z" : o.occurredAt,
     occurredAtLabel: "Jun 10",
   };
 }
@@ -78,7 +79,9 @@ describe("buildHarvestEvidenceReport — grouping & counts", () => {
     const p = r.plants[0];
     expect(p.windows.length).toBe(2);
     // Sorted oldest → newest
-    expect(p.windows[0].startsAt && p.windows[0].startsAt < (p.windows[1].startsAt ?? "")).toBe(true);
+    expect(p.windows[0].startsAt && p.windows[0].startsAt < (p.windows[1].startsAt ?? "")).toBe(
+      true,
+    );
   });
 
   it("uses Unassigned inspection window when occurredAt is missing", () => {
@@ -92,9 +95,7 @@ describe("buildHarvestEvidenceReport — grouping & counts", () => {
     const labels = r.plants[0].windows.map((w) => w.label);
     expect(labels).toContain(HARVEST_EVIDENCE_REPORT_UNASSIGNED_WINDOW_LABEL);
     // Unassigned sorts last.
-    expect(r.plants[0].windows.at(-1)?.label).toBe(
-      HARVEST_EVIDENCE_REPORT_UNASSIGNED_WINDOW_LABEL,
-    );
+    expect(r.plants[0].windows.at(-1)?.label).toBe(HARVEST_EVIDENCE_REPORT_UNASSIGNED_WINDOW_LABEL);
   });
 
   it("counts trichome, pistil, bud, and close flower photo evidence", () => {
@@ -127,9 +128,7 @@ describe("buildHarvestEvidenceReport — grouping & counts", () => {
       {
         plantId: "p1",
         plantName: "Alpha",
-        rows: [
-          row({ id: "p", note: "", eventType: "photo", hasPhoto: true }),
-        ],
+        rows: [row({ id: "p", note: "", eventType: "photo", hasPhoto: true })],
       },
     ]);
     expect(r.totals.trichomeInspections).toBe(0);
@@ -155,9 +154,7 @@ describe("buildHarvestEvidenceReport — grouping & counts", () => {
       {
         plantId: "p1",
         plantName: "Alpha",
-        rows: [
-          row({ id: "a", note: "Trichome amber" }),
-        ],
+        rows: [row({ id: "a", note: "Trichome amber" })],
       },
     ]);
     const w = r.plants[0].windows[0];
@@ -207,10 +204,7 @@ describe("buildHarvestEvidenceReport — grouping & counts", () => {
 });
 
 describe("buildHarvestEvidenceReport — static safety", () => {
-  const SRC = readFileSync(
-    resolve(__dirname, "../lib/harvestEvidenceReportViewModel.ts"),
-    "utf8",
-  );
+  const SRC = readFileSync(resolve(__dirname, "../lib/harvestEvidenceReportViewModel.ts"), "utf8");
 
   it("does not import sensor_readings, AI, alerts, Action Queue, supabase, or device control", () => {
     expect(SRC).not.toMatch(/sensor_readings/);

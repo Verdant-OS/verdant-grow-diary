@@ -7,7 +7,5 @@
     "no Action Queue item is created",
     "will not run equipment commands"
   ],
-  "allowedLineMarkers": [
-    "AI-DOCTOR-PREVIEW-SAFETY: ALLOW"
-  ]
+  "allowedLineMarkers": ["AI-DOCTOR-PREVIEW-SAFETY: ALLOW"]
 }

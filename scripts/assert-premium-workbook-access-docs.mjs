@@ -23,10 +23,7 @@ import { join, relative } from "node:path";
 const ROOT = process.cwd();
 const DOCS_DIR = join(ROOT, "docs");
 const PLACEHOLDER = "{{PREMIUM_WORKBOOK_COPY_URL}}";
-const COMMERCIAL_SPEC = join(
-  DOCS_DIR,
-  "commercial-release-review-traceability-workbook-spec.md",
-);
+const COMMERCIAL_SPEC = join(DOCS_DIR, "commercial-release-review-traceability-workbook-spec.md");
 
 export const REQUIRED_FALLBACK_TEXT =
   "Workbook copy link not configured. Premium subscribers should contact support or check back after the workbook link is configured.";
@@ -77,7 +74,7 @@ export const FORBIDDEN_SECRET_PATTERNS = [
   },
   {
     name: "SUPABASE_SERVICE_ROLE_KEY-literal",
-    re: /SUPABASE_SERVICE_ROLE_KEY\s*=\s*['"]?[A-Za-z0-9._\-]{20,}/i,
+    re: /SUPABASE_SERVICE_ROLE_KEY\s*=\s*['"]?[A-Za-z0-9._-]{20,}/i,
   },
   {
     name: "entitlement-secret-literal",
@@ -92,7 +89,10 @@ export const FORBIDDEN_SECRET_PATTERNS = [
 export const TYPO_PLACEHOLDER = "{{PREMIMUM_WORKBOOK_COPY_URL}}";
 
 export const PREMIUM_SCOPED_FORBIDDEN = [
-  { name: "typo-placeholder/PREMIMUM_WORKBOOK_COPY_URL", re: /\{\{\s*PREMIMUM_WORKBOOK_COPY_URL\s*\}\}/ },
+  {
+    name: "typo-placeholder/PREMIMUM_WORKBOOK_COPY_URL",
+    re: /\{\{\s*PREMIMUM_WORKBOOK_COPY_URL\s*\}\}/,
+  },
   { name: "bare-service_role-in-premium-context", re: /\bservice_role\b/ },
 ];
 
@@ -174,7 +174,10 @@ export function scanText(text) {
 export function checkSpecRequiredCopy(text) {
   // Normalize whitespace so blockquote line-wrapping (`> foo\n> bar`)
   // matches the canonical single-line required-copy strings.
-  const norm = text.replace(/^\s*>\s?/gm, " ").replace(/\s+/g, " ").trim();
+  const norm = text
+    .replace(/^\s*>\s?/gm, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   const missing = [];
   if (!text.includes(PLACEHOLDER)) missing.push("placeholder");
   if (!norm.includes(REQUIRED_FALLBACK_TEXT)) missing.push("fallback-text");
@@ -195,8 +198,7 @@ function main() {
   for (const file of files) {
     const text = readFileSync(file, "utf8");
     const isCommercial = file === COMMERCIAL_SPEC;
-    const hasPlaceholderRef =
-      text.includes(PLACEHOLDER) || /PREMIUM_WORKBOOK_COPY_URL/.test(text);
+    const hasPlaceholderRef = text.includes(PLACEHOLDER) || /PREMIUM_WORKBOOK_COPY_URL/.test(text);
     if (!hasPlaceholderRef && !isCommercial) continue;
     inScope.push(file);
     placeholderCount += (text.match(/\{\{PREMIUM_WORKBOOK_COPY_URL\}\}/g) || []).length;
@@ -205,9 +207,7 @@ function main() {
     for (const v of violations) {
       stopShip = true;
       totalViolations++;
-      console.error(
-        `${relative(ROOT, file)}:${v.line} [${v.rule}] ${v.text}`,
-      );
+      console.error(`${relative(ROOT, file)}:${v.line} [${v.rule}] ${v.text}`);
     }
   }
 
@@ -222,9 +222,7 @@ function main() {
   if (commercialMissing.length) {
     stopShip = true;
     for (const m of commercialMissing) {
-      console.error(
-        `${relative(ROOT, COMMERCIAL_SPEC)}: missing required copy — ${m}`,
-      );
+      console.error(`${relative(ROOT, COMMERCIAL_SPEC)}: missing required copy — ${m}`);
     }
   }
 

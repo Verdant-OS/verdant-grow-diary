@@ -33,15 +33,16 @@ export interface ContractValidationResult {
 }
 
 /** Forwarded transport payload (bridge → webhook). May use source="ecowitt". */
-export function validateForwardedTransportPayload(
-  payload: unknown,
-): ContractValidationResult {
+export function validateForwardedTransportPayload(payload: unknown): ContractValidationResult {
   const errors: string[] = [];
   if (!payload || typeof payload !== "object") {
     return { ok: false, errors: ["payload is not an object"] };
   }
   const p = payload as Record<string, unknown>;
-  if (p.source !== "ecowitt" && !CANONICAL_STORED_SOURCES.includes(p.source as CanonicalStoredSource)) {
+  if (
+    p.source !== "ecowitt" &&
+    !CANONICAL_STORED_SOURCES.includes(p.source as CanonicalStoredSource)
+  ) {
     errors.push(`forwarded source not allowed: ${String(p.source)}`);
   }
   if (typeof p.captured_at !== "string") errors.push("captured_at missing");

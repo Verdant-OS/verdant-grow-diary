@@ -13,8 +13,7 @@ import {
 } from "../lib/earlyStageAiDoctorContextRules";
 
 const NOW = new Date("2026-06-10T12:00:00Z");
-const iso = (offsetMs: number) =>
-  new Date(NOW.getTime() - offsetMs).toISOString();
+const iso = (offsetMs: number) => new Date(NOW.getTime() - offsetMs).toISOString();
 
 const basePlant = {
   id: "p1",

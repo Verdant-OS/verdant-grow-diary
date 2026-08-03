@@ -110,17 +110,11 @@ export function sortStats(rows: GroupStats[]): GroupStats[] {
   });
 }
 
-export function groupBySource(
-  leads: LeadRow[],
-  now: number = Date.now(),
-): GroupStats[] {
+export function groupBySource(leads: LeadRow[], now: number = Date.now()): GroupStats[] {
   return groupBy(leads, (l) => l.source, now);
 }
 
-export function groupByLeadType(
-  leads: LeadRow[],
-  now: number = Date.now(),
-): GroupStats[] {
+export function groupByLeadType(leads: LeadRow[], now: number = Date.now()): GroupStats[] {
   return groupBy(leads, (l) => l.lead_type, now);
 }
 

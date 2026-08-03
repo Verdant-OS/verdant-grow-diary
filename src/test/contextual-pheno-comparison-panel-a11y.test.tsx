@@ -18,9 +18,7 @@ import { buildContextualPhenoComparisonView } from "@/lib/contextualPhenoCompari
 import { CONTEXTUAL_PHENO_COMPARISON_DEMO_PLANT_INPUTS } from "@/test/fixtures/contextualPhenoComparisonFixtures";
 
 function renderPanel() {
-  const view = buildContextualPhenoComparisonView(
-    CONTEXTUAL_PHENO_COMPARISON_DEMO_PLANT_INPUTS,
-  );
+  const view = buildContextualPhenoComparisonView(CONTEXTUAL_PHENO_COMPARISON_DEMO_PLANT_INPUTS);
   return { view, ...render(<ContextualPhenoComparisonPanel view={view} />) };
 }
 
@@ -28,9 +26,7 @@ describe("ContextualPhenoComparisonPanel accessibility", () => {
   it("renders one h3 per plant in deterministic order", () => {
     const { view } = renderPanel();
     const h3s = screen.getAllByRole("heading", { level: 3 });
-    expect(h3s.map((h) => h.textContent)).toEqual(
-      view.plants.map((p) => p.plantLabel),
-    );
+    expect(h3s.map((h) => h.textContent)).toEqual(view.plants.map((p) => p.plantLabel));
   });
 
   it("each plant card has h4 section headers for Evidence and Environment", () => {
@@ -71,9 +67,7 @@ describe("ContextualPhenoComparisonPanel accessibility", () => {
     );
     expect(trusted.length).toBeGreaterThan(0);
     trusted.forEach((node) => {
-      expect((node.getAttribute("title") ?? "").toLowerCase()).not.toContain(
-        "caution",
-      );
+      expect((node.getAttribute("title") ?? "").toLowerCase()).not.toContain("caution");
       expect(node.textContent ?? "").not.toMatch(/caution/i);
     });
   });

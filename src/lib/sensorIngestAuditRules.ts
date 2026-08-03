@@ -42,9 +42,7 @@ function isIsoLike(s: unknown): s is string {
  * Build a sanitized audit record. Returns null when any field is invalid so
  * callers can skip writing rather than persisting garbage.
  */
-export function buildIngestAuditRecord(
-  input: BuildIngestAuditInput,
-): IngestAuditRecord | null {
+export function buildIngestAuditRecord(input: BuildIngestAuditInput): IngestAuditRecord | null {
   if (input.authKind !== "jwt" && input.authKind !== "bridge") return null;
   if (!isUuidLike(input.userId)) return null;
   if (!isUuidLike(input.tentId)) return null;
@@ -64,11 +62,7 @@ export function buildIngestAuditRecord(
   }
 
   const bridgeTokenId =
-    input.authKind === "bridge" && isUuidLike(input.bridgeTokenId)
-      ? input.bridgeTokenId
-      : null;
-
-
+    input.authKind === "bridge" && isUuidLike(input.bridgeTokenId) ? input.bridgeTokenId : null;
 
   return {
     user_id: input.userId,

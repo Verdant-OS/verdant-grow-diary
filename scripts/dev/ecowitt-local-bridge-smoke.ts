@@ -115,7 +115,11 @@ export async function runSmoke(
   await sub.close();
 
   if (!received) {
-    return { ok: false, reason: "no_mqtt_message — check Mosquitto and bridge publish logs", matched: false };
+    return {
+      ok: false,
+      reason: "no_mqtt_message — check Mosquitto and bridge publish logs",
+      matched: false,
+    };
   }
   // Confirm payload looks like our FAKE LOCAL TEST.
   try {
@@ -159,10 +163,7 @@ async function defaultSubscribe(
 async function main(): Promise<void> {
   // eslint-disable-next-line no-console
   console.log(`[ecowitt-bridge-smoke] starting — ${FAKE_TEST_LABEL}`);
-  const result = await runSmoke(
-    {},
-    { fetchImpl: fetch, subscribe: defaultSubscribe },
-  );
+  const result = await runSmoke({}, { fetchImpl: fetch, subscribe: defaultSubscribe });
   if (result.ok) {
     // eslint-disable-next-line no-console
     console.log("[ecowitt-bridge-smoke] PASS:", result.reason);

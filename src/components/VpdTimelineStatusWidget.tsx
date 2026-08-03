@@ -50,34 +50,21 @@ export default function VpdTimelineStatusWidget({
       <div className="flex items-center gap-1.5">
         <span className="font-medium text-foreground">{vm.vpdLabel}</span>
         {vm.vpdKpa !== null && (
-          <span
-            className="text-muted-foreground"
-            data-testid={`${testId}-value`}
-          >
+          <span className="text-muted-foreground" data-testid={`${testId}-value`}>
             ≈ {vm.vpdKpa.toFixed(2)} kPa
           </span>
         )}
-        <span
-          className={toneTextClass[vm.tone]}
-          data-testid={`${testId}-status`}
-        >
+        <span className={toneTextClass[vm.tone]} data-testid={`${testId}-status`}>
           · {vm.statusLabel}
         </span>
       </div>
       <div className="flex items-center gap-1.5 text-muted-foreground">
-        <span data-testid={`${testId}-stage`}>
-          {vm.canonicalStageLabel ?? "Stage unknown"}
-        </span>
+        <span data-testid={`${testId}-stage`}>{vm.canonicalStageLabel ?? "Stage unknown"}</span>
         {vm.targetBandLabel && (
-          <span data-testid={`${testId}-band`}>
-            · target {vm.targetBandLabel}
-          </span>
+          <span data-testid={`${testId}-band`}>· target {vm.targetBandLabel}</span>
         )}
       </div>
-      <span
-        data-testid={`${testId}-guidance`}
-        className="text-muted-foreground"
-      >
+      <span data-testid={`${testId}-guidance`} className="text-muted-foreground">
         {vm.guidanceLabel}
       </span>
     </div>

@@ -30,27 +30,15 @@ describe("breeding schema safety", () => {
   });
 
   it("enables RLS on every breeding table", () => {
-    for (const t of [
-      "breeding_programs",
-      "breeding_program_steps",
-      "breeding_step_evidence",
-    ]) {
-      expect(migration).toMatch(
-        new RegExp(`ALTER TABLE public\\.${t} ENABLE ROW LEVEL SECURITY`),
-      );
+    for (const t of ["breeding_programs", "breeding_program_steps", "breeding_step_evidence"]) {
+      expect(migration).toMatch(new RegExp(`ALTER TABLE public\\.${t} ENABLE ROW LEVEL SECURITY`));
     }
   });
 
   it("grants owner CRUD to authenticated and ALL to service_role, never to anon", () => {
-    for (const t of [
-      "breeding_programs",
-      "breeding_program_steps",
-      "breeding_step_evidence",
-    ]) {
+    for (const t of ["breeding_programs", "breeding_program_steps", "breeding_step_evidence"]) {
       expect(migration).toMatch(
-        new RegExp(
-          `GRANT SELECT, INSERT, UPDATE, DELETE ON public\\.${t} TO authenticated`,
-        ),
+        new RegExp(`GRANT SELECT, INSERT, UPDATE, DELETE ON public\\.${t} TO authenticated`),
       );
       expect(migration).toMatch(new RegExp(`GRANT ALL ON public\\.${t} TO service_role`));
       expect(migration).not.toMatch(new RegExp(`GRANT [^;]*ON public\\.${t}[^;]*TO anon`));

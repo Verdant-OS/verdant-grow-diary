@@ -59,14 +59,15 @@ export default function ActionFollowUpEvidenceCard({
           {viewModel.note}
         </p>
       ) : (
-        <p className="text-xs text-muted-foreground italic" data-testid="action-followup-no-observation">
+        <p
+          className="text-xs text-muted-foreground italic"
+          data-testid="action-followup-no-observation"
+        >
           {ACTION_FOLLOWUP_NO_OBSERVATION_COPY}
         </p>
       )}
 
-      <p className="text-xs text-muted-foreground">
-        Linked to {viewModel.actionLabel}
-      </p>
+      <p className="text-xs text-muted-foreground">Linked to {viewModel.actionLabel}</p>
 
       {viewModel.sensorSnapshotId && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">

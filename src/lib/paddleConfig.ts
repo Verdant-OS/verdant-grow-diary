@@ -30,7 +30,6 @@
  * Entitlements (e.g. Pro access) are NEVER granted from the client.
  */
 
-
 export const PADDLE_SANDBOX_ENV = "sandbox" as const;
 
 export type PaddlePlanSlug = "pro-monthly" | "pro-annual" | "founder-lifetime";
@@ -48,7 +47,6 @@ export interface PaddleConfig {
   clientToken?: string;
   priceIds?: Record<PaddlePlanSlug, string>;
 }
-
 
 interface PaddleEnvSource {
   VITE_PADDLE_ENVIRONMENT?: string;
@@ -70,9 +68,7 @@ function readImportMetaEnv(): PaddleEnvSource {
 /**
  * Resolve the Paddle config. Pure function: no network, no side effects.
  */
-export function resolvePaddleConfig(
-  source: PaddleEnvSource = readImportMetaEnv(),
-): PaddleConfig {
+export function resolvePaddleConfig(source: PaddleEnvSource = readImportMetaEnv()): PaddleConfig {
   const env = (source.VITE_PADDLE_ENVIRONMENT ?? "").trim().toLowerCase();
 
   if (!env) {

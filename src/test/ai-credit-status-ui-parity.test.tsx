@@ -55,24 +55,16 @@ describe("AI credit service-degraded view model (upstream_credit_exhausted)", ()
 
 describe("<AiCreditServiceDegradedNotice />", () => {
   it("doctor surface renders Doctor copy and no paywall/link/button", () => {
-    const { container } = render(
-      <AiCreditServiceDegradedNotice surface="doctor" />,
-    );
-    expect(
-      screen.getByTestId("doctor-upstream-credit-exhausted-notice"),
-    ).toBeTruthy();
+    const { container } = render(<AiCreditServiceDegradedNotice surface="doctor" />);
+    expect(screen.getByTestId("doctor-upstream-credit-exhausted-notice")).toBeTruthy();
     expect(container.textContent).toContain("AI Doctor is briefly unavailable.");
     expect(container.querySelector("a")).toBeNull();
     expect(container.querySelector("button")).toBeNull();
   });
 
   it("coach surface renders Coach copy and no paywall/link/button", () => {
-    const { container } = render(
-      <AiCreditServiceDegradedNotice surface="coach" />,
-    );
-    expect(
-      screen.getByTestId("coach-upstream-credit-exhausted-notice"),
-    ).toBeTruthy();
+    const { container } = render(<AiCreditServiceDegradedNotice surface="coach" />);
+    expect(screen.getByTestId("coach-upstream-credit-exhausted-notice")).toBeTruthy();
     expect(container.textContent).toContain("AI Coach is briefly unavailable.");
     expect(container.querySelector("a")).toBeNull();
     expect(container.querySelector("button")).toBeNull();
@@ -104,10 +96,7 @@ describe("Adapter passes credit envelopes through unchanged", () => {
   });
 
   it("passes upstream_credit_exhausted through", () => {
-    const outcome = adaptCreditedAiResponse(
-      { ok: false, reason: "upstream_credit_exhausted" },
-      ok,
-    );
+    const outcome = adaptCreditedAiResponse({ ok: false, reason: "upstream_credit_exhausted" }, ok);
     expect(outcome.ok).toBe(false);
     if (outcome.ok === false) {
       expect(outcome.reason).toBe("upstream_credit_exhausted");
@@ -118,9 +107,7 @@ describe("Adapter passes credit envelopes through unchanged", () => {
 describe("Remaining badge — hidden for missing/invalid/replayed credit (both surfaces)", () => {
   for (const surface of ["doctor", "coach"] as const) {
     it(`${surface}: hidden when credit is null`, () => {
-      const { container } = render(
-        <AiCreditRemainingBadge credit={null} surface={surface} />,
-      );
+      const { container } = render(<AiCreditRemainingBadge credit={null} surface={surface} />);
       expect(container.firstChild).toBeNull();
     });
 
@@ -136,10 +123,7 @@ describe("Remaining badge — hidden for missing/invalid/replayed credit (both s
 
     it(`${surface}: hidden for replayed-only payload (no remaining)`, () => {
       const { container } = render(
-        <AiCreditRemainingBadge
-          credit={{ replayed: true } as never}
-          surface={surface}
-        />,
+        <AiCreditRemainingBadge credit={{ replayed: true } as never} surface={surface} />,
       );
       expect(container.firstChild).toBeNull();
     });

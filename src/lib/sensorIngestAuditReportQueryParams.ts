@@ -103,10 +103,11 @@ export function parseAuditUrlState(
   const deviceQuery = isSafeDeviceQuery(deviceRaw) ? deviceRaw : "";
 
   const sizeNum = Number(get(AUDIT_URL_PARAM_PAGE_SIZE));
-  const pageSize: AuditReportPageSize =
-    (AUDIT_REPORT_PAGE_SIZES as ReadonlyArray<number>).includes(sizeNum)
-      ? (sizeNum as AuditReportPageSize)
-      : AUDIT_REPORT_DEFAULT_PAGE_SIZE;
+  const pageSize: AuditReportPageSize = (AUDIT_REPORT_PAGE_SIZES as ReadonlyArray<number>).includes(
+    sizeNum,
+  )
+    ? (sizeNum as AuditReportPageSize)
+    : AUDIT_REPORT_DEFAULT_PAGE_SIZE;
 
   return { provider, fromDateInput, toDateInput, deviceQuery, pageSize };
 }

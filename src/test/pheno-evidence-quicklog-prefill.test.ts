@@ -35,9 +35,7 @@ describe("buildPhenoEvidenceGoalQuickLogPrefill", () => {
     expect(
       buildPhenoEvidenceGoalQuickLogPrefill({ ...BASE, configuredGoals: ["structure"] }),
     ).toBeNull();
-    expect(
-      buildPhenoEvidenceGoalQuickLogPrefill({ ...BASE, goalId: "not_a_goal" }),
-    ).toBeNull();
+    expect(buildPhenoEvidenceGoalQuickLogPrefill({ ...BASE, goalId: "not_a_goal" })).toBeNull();
     expect(
       buildPhenoEvidenceGoalQuickLogPrefill({ ...BASE, configuredGoals: "garbage" }),
     ).toBeNull();

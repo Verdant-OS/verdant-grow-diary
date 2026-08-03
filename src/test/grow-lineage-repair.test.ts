@@ -10,10 +10,13 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve, join } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const PAGE_PATH = resolve(ROOT, "src/pages/GrowLineageRepair.tsx");
-const APP_PATH = resolve(ROOT, "src/App.tsx");
 const SIDEBAR_PATH = resolve(ROOT, "src/components/AppSidebar.tsx");
 const NAVIGATION_RULES_PATH = resolve(ROOT, "src/lib/growerNavigationRules.ts");
 
@@ -67,12 +70,12 @@ describe("Grow Lineage Repair — page contract", () => {
     expect(SRC).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|service_role/i);
   });
 
-  it("is wired into App routes and sidebar", () => {
-    const app = readFileSync(APP_PATH, "utf8");
+  it("is wired into file routes and sidebar", () => {
+    const app = readAllRouteModuleSources();
     const sb = readFileSync(SIDEBAR_PATH, "utf8");
     const navigationRules = readFileSync(NAVIGATION_RULES_PATH, "utf8");
+    expect(extractMountedAppRoutePaths()).toContain("/grow-lineage");
     expect(app).toMatch(/GrowLineageRepair/);
-    expect(app).toMatch(/path=["']\/grow-lineage["']/);
     expect(sb).toMatch(/LABS_NAVIGATION_DESTINATIONS/);
     expect(navigationRules).toMatch(/to:\s*["']\/grow-lineage["']/);
   });

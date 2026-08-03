@@ -47,9 +47,7 @@ export interface ActionQueueDraft {
   audit_note: string;
 }
 
-export type DraftResult =
-  | { ok: true; draft: ActionQueueDraft }
-  | { ok: false; reason: string };
+export type DraftResult = { ok: true; draft: ActionQueueDraft } | { ok: false; reason: string };
 
 const SEVERITY_TO_RISK: Record<AlertSeverity, ActionRisk> = {
   info: "low",
@@ -121,7 +119,6 @@ export function buildActionQueueDraftFromAlert(alert: AlertLike): DraftResult {
   if (SYNTHETIC_METRICS.has(alert.metric.trim().toLowerCase())) {
     return { ok: false, reason: "synthetic_metric" };
   }
-
 
   const backPointer = `[alert:${alert.id}]`;
   const suggested = recommendedActionForAlert(alert);

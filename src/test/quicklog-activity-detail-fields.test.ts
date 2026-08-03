@@ -93,7 +93,8 @@ describe("spec shape", () => {
     // Every option is a visible sign, never a cause/diagnosis. (Note: "burnt
     // edges" describes appearance and is allowed; "nutrient burn" — a cause —
     // is not.)
-    const banned = /(deficien|nitrogen|phosphor|potassium|calcium|septoria|fungus|overwater|nutrient burn|lockout|diagnos)/i;
+    const banned =
+      /(deficien|nitrogen|phosphor|potassium|calcium|septoria|fungus|overwater|nutrient burn|lockout|diagnos)/i;
     for (const o of sign.options ?? []) expect(o.label).not.toMatch(banned);
   });
 
@@ -170,7 +171,9 @@ describe("sanitizeQuickLogActivityDetails", () => {
   it("drops blank, whitespace, and non-string values", () => {
     expect(sanitizeQuickLogActivityDetails("training", { technique: "" })).toBeNull();
     expect(sanitizeQuickLogActivityDetails("training", { technique: "   " })).toBeNull();
-    expect(sanitizeQuickLogActivityDetails("training", { technique: 3 as unknown as string })).toBeNull();
+    expect(
+      sanitizeQuickLogActivityDetails("training", { technique: 3 as unknown as string }),
+    ).toBeNull();
   });
 
   it("ignores unknown keys and never emits reserved identity keys", () => {
@@ -202,7 +205,10 @@ describe("sanitizeQuickLogActivityDetails", () => {
     ).toEqual({ intensity: "medium", canopyArea: "lower", technique: "defoliation" });
     // out-of-set intensity dropped (canonical set has no "moderate"), valid area kept
     expect(
-      sanitizeQuickLogActivityDetails("defoliation", { intensity: "moderate", canopyArea: "upper" }),
+      sanitizeQuickLogActivityDetails("defoliation", {
+        intensity: "moderate",
+        canopyArea: "upper",
+      }),
     ).toEqual({ canopyArea: "upper", technique: "defoliation" });
   });
 
@@ -253,11 +259,7 @@ describe("sanitizeQuickLogActivityDetails", () => {
     // 150°F is a real, physically valid temperature but outside the
     // Fahrenheit-adjusted 14..140 band — must drop, not silently convert.
     expect(
-      sanitizeQuickLogActivityDetails(
-        "environment_check",
-        { temp_c: "150" },
-        "fahrenheit",
-      ),
+      sanitizeQuickLogActivityDetails("environment_check", { temp_c: "150" }, "fahrenheit"),
     ).toBeNull();
     // 100°F is in-band and converts (100°F → 37.78°C).
     expect(
@@ -403,10 +405,7 @@ describe("describeQuickLogDetailsFromExtras (activity-id-free render path)", () 
     // row) must still degrade to no line — the plausibility floor is always
     // evaluated in the stored (°C) basis, never the display unit.
     expect(
-      describeQuickLogDetailsFromExtras(
-        { environment_check: { temp_c: 999 } },
-        "fahrenheit",
-      ),
+      describeQuickLogDetailsFromExtras({ environment_check: { temp_c: 999 } }, "fahrenheit"),
     ).toEqual([]);
   });
 });

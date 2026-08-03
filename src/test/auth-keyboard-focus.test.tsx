@@ -71,8 +71,7 @@ function renderReset() {
 function getTabOrder(): HTMLElement[] {
   // Include disabled buttons — they still occupy a DOM order slot and we
   // want to assert ordering, not focusability.
-  const selector =
-    'a[href], button, input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  const selector = 'a[href], button, input:not([disabled]), [tabindex]:not([tabindex="-1"])';
   return Array.from(document.querySelectorAll<HTMLElement>(selector)).filter(
     (el) => !el.hasAttribute("aria-hidden"),
   );
@@ -174,8 +173,8 @@ describe("/reset-password — keyboard tab order & focus", () => {
         el.textContent?.trim().slice(0, 40) ||
         el.tagName.toLowerCase(),
     );
-    const pwdIdx = ids.findIndex((s) => s === "reset-password");
-    const confirmIdx = ids.findIndex((s) => s === "reset-confirm");
+    const pwdIdx = ids.indexOf("reset-password");
+    const confirmIdx = ids.indexOf("reset-confirm");
     const submitIdx = ids.findIndex((s) => /update password/i.test(s));
     const backIdx = ids.findIndex((s) => /back to sign in/i.test(s));
     expect(pwdIdx).toBeGreaterThanOrEqual(0);
@@ -218,9 +217,7 @@ describe("/reset-password — keyboard tab order & focus", () => {
     fireEvent.change(screen.getByLabelText(/^confirm new password$/i), {
       target: { value: "abcdefg1" },
     });
-    await waitFor(() =>
-      expect(screen.queryByText(/passwords do not match yet/i)).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByText(/passwords do not match yet/i)).toBeNull());
   });
 
   it("loading disables submit and the loading button stays visible", async () => {

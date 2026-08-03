@@ -526,9 +526,7 @@ export function dedupeMergedManualGrowActivityRows<
   }
 
   const siblingKey = (row: G, epochMs: number) =>
-    [nonBlankId(row.tent_id) ?? "", nonBlankId(row.plant_id) ?? "", String(epochMs)].join(
-      "|",
-    );
+    [nonBlankId(row.tent_id) ?? "", nonBlankId(row.plant_id) ?? "", String(epochMs)].join("|");
   const nonEnvironmentKeys = new Set<string>();
   const spinePairKeys = new Set<string>();
   for (const { row, epochMs } of spineById.values()) {
@@ -569,9 +567,7 @@ export function dedupeMergedManualGrowActivityRows<
 }
 
 /** Count the merged manual activity across both persisted shapes. */
-export function countMergedManualGrowActivity(
-  input: MergedManualGrowActivityInput,
-): number {
+export function countMergedManualGrowActivity(input: MergedManualGrowActivityInput): number {
   const rows = dedupeMergedManualGrowActivityRows(input);
   return rows.growEvents.length + rows.diaryEntries.length;
 }

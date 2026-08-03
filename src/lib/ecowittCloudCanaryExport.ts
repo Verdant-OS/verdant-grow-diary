@@ -20,10 +20,7 @@ import {
   isEcowittMissingMetricCode,
   type EcowittMissingMetricCode,
 } from "@/constants/ecowittMissingMetricCodes";
-import {
-  assertExportHeadersSafe,
-  assertExportSafe,
-} from "@/lib/exportRedactionRules";
+import { assertExportHeadersSafe, assertExportSafe } from "@/lib/exportRedactionRules";
 
 export interface CloudCanaryExportRow {
   fixture_name: string;
@@ -95,9 +92,7 @@ export function buildCloudCanaryExport(
   ): EcowittSuspiciousFlagCode[] => {
     for (const c of codes) {
       if (!isEcowittSuspiciousFlagCode(c)) {
-        throw new Error(
-          `[cloud-canary-export] Unknown suspicious flag code "${c}" at ${where}.`,
-        );
+        throw new Error(`[cloud-canary-export] Unknown suspicious flag code "${c}" at ${where}.`);
       }
     }
     return [...codes].sort() as EcowittSuspiciousFlagCode[];
@@ -108,9 +103,7 @@ export function buildCloudCanaryExport(
   ): EcowittMissingMetricCode[] => {
     for (const c of codes) {
       if (!isEcowittMissingMetricCode(c)) {
-        throw new Error(
-          `[cloud-canary-export] Unknown missing metric code "${c}" at ${where}.`,
-        );
+        throw new Error(`[cloud-canary-export] Unknown missing metric code "${c}" at ${where}.`);
       }
     }
     return [...codes].sort() as EcowittMissingMetricCode[];
@@ -156,10 +149,7 @@ export function buildCloudCanaryExport(
     preview_state: vm.state,
     rows,
     totals,
-    suspicious_flag_codes: validateSuspiciousCodes(
-      vm.suspicious_flag_codes,
-      "top-level aggregate",
-    ),
+    suspicious_flag_codes: validateSuspiciousCodes(vm.suspicious_flag_codes, "top-level aggregate"),
     missing_metric_codes: validateMissingMetricCodes(
       vm.missing_metric_codes,
       "top-level aggregate",
@@ -225,4 +215,3 @@ export function serializeCloudCanaryExportToJson(exp: CloudCanaryExport): string
   assertExportSafe(out, "ecowitt-cloud-canary-json");
   return out;
 }
-

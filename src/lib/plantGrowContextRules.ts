@@ -137,7 +137,10 @@ export function findPlantsMissingGrowContext<T extends PlantGrowContextInput>(
 }
 
 export type PlantGrowContextRescueKind =
-  "already_ok" | "repair_from_tent" | "needs_tent" | "needs_setup";
+  | "already_ok"
+  | "repair_from_tent"
+  | "needs_tent"
+  | "needs_setup";
 
 export interface PlantGrowContextRescueView {
   kind: PlantGrowContextRescueKind;

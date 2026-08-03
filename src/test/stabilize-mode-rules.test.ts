@@ -1,10 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  evaluateStabilizeMode,
-  type StabilizeModeInput,
-} from "@/lib/stabilizeModeRules";
+import { evaluateStabilizeMode, type StabilizeModeInput } from "@/lib/stabilizeModeRules";
 
 const NOW = "2026-06-09T12:00:00.000Z";
 const HOUR = 60 * 60 * 1000;
@@ -99,9 +96,7 @@ describe("evaluateStabilizeMode", () => {
   });
 
   it("2+ major changes in 48h returns stabilize", () => {
-    const r = evaluateStabilizeMode(
-      base({ recent_major_change_count_48h: 2 }),
-    );
+    const r = evaluateStabilizeMode(base({ recent_major_change_count_48h: 2 }));
     expect(r.level).toBe("stabilize");
   });
 
@@ -205,10 +200,7 @@ describe("evaluateStabilizeMode", () => {
   });
 
   it("source file uses no Date.now and no I/O", () => {
-    const src = readFileSync(
-      resolve(__dirname, "../lib/stabilizeModeRules.ts"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(__dirname, "../lib/stabilizeModeRules.ts"), "utf8");
     expect(src).not.toMatch(/Date\.now\s*\(/);
     expect(src).not.toMatch(/fetch\(|supabase|service_role|functions\.invoke/);
     expect(src).not.toMatch(/from\(['"]action_queue['"]\)|from\(['"]alerts['"]\)/);

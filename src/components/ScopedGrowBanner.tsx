@@ -1,6 +1,13 @@
 import { Link } from "@/lib/react-router-compat";
 
-export type ScopedGrowLabel = "plants" | "tents" | "logs" | "timeline" | "actions" | "dashboard" | "alerts";
+export type ScopedGrowLabel =
+  | "plants"
+  | "tents"
+  | "logs"
+  | "timeline"
+  | "actions"
+  | "dashboard"
+  | "alerts";
 
 interface ScopedGrowBannerProps {
   growId?: string | null;

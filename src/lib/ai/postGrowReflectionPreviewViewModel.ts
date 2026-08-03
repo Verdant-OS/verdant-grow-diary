@@ -85,9 +85,9 @@ const EMPTY_MESSAGE =
   "No validated reflection preview is available. Review rejected scenarios before continuing.";
 
 function presetLabels(): PostGrowReflectionPreviewLabel[] {
-  return (Object.keys(POST_GROW_REFLECTION_PREVIEW_LABELS) as PostGrowReflectionPreviewLabelKey[]).map(
-    (key) => ({ key, text: POST_GROW_REFLECTION_PREVIEW_LABELS[key] }),
-  );
+  return (
+    Object.keys(POST_GROW_REFLECTION_PREVIEW_LABELS) as PostGrowReflectionPreviewLabelKey[]
+  ).map((key) => ({ key, text: POST_GROW_REFLECTION_PREVIEW_LABELS[key] }));
 }
 
 function buildSections(output: ReflectionOutput): PostGrowReflectionPreviewSectionRow[] {
@@ -99,8 +99,18 @@ function buildSections(output: ReflectionOutput): PostGrowReflectionPreviewSecti
       paragraph: output.executive_reflection,
     },
     { key: "key_wins", label: "Key wins", kind: "list", items: [...output.key_wins] },
-    { key: "repeat_next_run", label: "Repeat next run", kind: "list", items: [...output.repeat_next_run] },
-    { key: "adjust_or_avoid", label: "Adjust or avoid", kind: "list", items: [...output.adjust_or_avoid] },
+    {
+      key: "repeat_next_run",
+      label: "Repeat next run",
+      kind: "list",
+      items: [...output.repeat_next_run],
+    },
+    {
+      key: "adjust_or_avoid",
+      label: "Adjust or avoid",
+      kind: "list",
+      items: [...output.adjust_or_avoid],
+    },
     {
       key: "post_harvest_specific_insights",
       label: "Post-harvest specific insights",

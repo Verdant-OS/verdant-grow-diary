@@ -37,10 +37,7 @@ function draft(
   };
 }
 
-function success(
-  drafts: NormalizedSensorReadingDraft[],
-  keys: string[],
-): PiIngestPipelineResult {
+function success(drafts: NormalizedSensorReadingDraft[], keys: string[]): PiIngestPipelineResult {
   return {
     ok: true,
     ownerUserId: OWNER,
@@ -79,9 +76,7 @@ describe("buildPiIngestInsertPlan", () => {
     const drafts = [draft("temperature_c", 24.2), draft("humidity_pct", 58)];
     const a = buildPiIngestInsertPlan(success(drafts, [KEY_A, KEY_B]));
     const b = buildPiIngestInsertPlan(success(drafts, [KEY_A, KEY_B]));
-    expect(a.items.map((i) => i.idempotencyKey)).toEqual(
-      b.items.map((i) => i.idempotencyKey),
-    );
+    expect(a.items.map((i) => i.idempotencyKey)).toEqual(b.items.map((i) => i.idempotencyKey));
   });
 
   it("returns an empty plan when there are zero drafts/keys", () => {
@@ -100,21 +95,13 @@ describe("buildPiIngestInsertPlan", () => {
 
   it("throws when drafts and keys lengths disagree", () => {
     const drafts = [draft("temperature_c", 24.2), draft("humidity_pct", 58)];
-    expect(() => buildPiIngestInsertPlan(success(drafts, [KEY_A]))).toThrow(
-      /length mismatch/,
-    );
+    expect(() => buildPiIngestInsertPlan(success(drafts, [KEY_A]))).toThrow(/length mismatch/);
   });
 });
 
 describe("partitionAgainstExistingKeys", () => {
-  const drafts = [
-    draft("temperature_c", 24.2),
-    draft("humidity_pct", 58),
-    draft("vpd_kpa", 1.18),
-  ];
-  const plan = buildPiIngestInsertPlan(
-    success(drafts, [KEY_A, KEY_B, KEY_C]),
-  );
+  const drafts = [draft("temperature_c", 24.2), draft("humidity_pct", 58), draft("vpd_kpa", 1.18)];
+  const plan = buildPiIngestInsertPlan(success(drafts, [KEY_A, KEY_B, KEY_C]));
 
   it("returns all items as toInsert when no keys exist", () => {
     const p = partitionAgainstExistingKeys(plan, new Set<string>());
@@ -129,10 +116,7 @@ describe("partitionAgainstExistingKeys", () => {
   });
 
   it("returns all items as duplicates when every key exists", () => {
-    const p = partitionAgainstExistingKeys(
-      plan,
-      new Set([KEY_A, KEY_B, KEY_C]),
-    );
+    const p = partitionAgainstExistingKeys(plan, new Set([KEY_A, KEY_B, KEY_C]));
     expect(p.toInsert.length).toBe(0);
     expect(p.duplicates.length).toBe(3);
   });
@@ -163,17 +147,16 @@ describe("summarizeInsertPlanPartition", () => {
   });
 
   it("handles an empty partition", () => {
-    expect(
-      summarizeInsertPlanPartition({ toInsert: [], duplicates: [] }),
-    ).toEqual({ total: 0, toInsert: 0, duplicates: 0 });
+    expect(summarizeInsertPlanPartition({ toInsert: [], duplicates: [] })).toEqual({
+      total: 0,
+      toInsert: 0,
+      duplicates: 0,
+    });
   });
 });
 
 describe("static safety", () => {
-  const src = readFileSync(
-    resolve(__dirname, "../lib/piIngestInsertPlanRules.ts"),
-    "utf8",
-  );
+  const src = readFileSync(resolve(__dirname, "../lib/piIngestInsertPlanRules.ts"), "utf8");
   it("does not import Supabase, React, or perform I/O", () => {
     expect(src).not.toMatch(/@\/integrations\/supabase/);
     expect(src).not.toMatch(/from\s+["']react/);

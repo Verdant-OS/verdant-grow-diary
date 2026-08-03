@@ -65,7 +65,7 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
       cancelled = true;
       window.removeEventListener("verdant:csv-imported", onImported);
     };
-  }, [growId, tentIds.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [growId, tentIds.length, tentIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const matchedByEntry = useMemo(() => {
     const out = new Map<string, CsvTimelineContextEntry>();
@@ -96,10 +96,7 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
   if (matchedByEntry.size === 0) return null;
 
   return (
-    <section
-      data-testid="timeline-csv-context-panel"
-      className="mt-4 space-y-2"
-    >
+    <section data-testid="timeline-csv-context-panel" className="mt-4 space-y-2">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         CSV environment context
       </h3>
@@ -108,9 +105,8 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
         data-testid="timeline-csv-context-readonly-banner"
         className="rounded-md border border-amber-500/40 bg-amber-500/5 p-2 text-[11px] text-amber-200"
       >
-        CSV context is read-only. Verdant shows this history only when the
-        source is explicitly labeled csv. Live and manual sensor readings
-        remain separate.
+        CSV context is read-only. Verdant shows this history only when the source is explicitly
+        labeled csv. Live and manual sensor readings remain separate.
       </div>
       {[...matchedByEntry.values()].map((c) => (
         <CsvTimelineEnvironmentChip

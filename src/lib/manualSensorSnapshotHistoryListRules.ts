@@ -88,10 +88,7 @@ const METRIC_LABEL: Record<ChangeContextMetric, string> = {
   reservoir_ph: "pH",
 };
 
-function formatMetricChip(
-  key: ChangeContextMetric,
-  value: number,
-): HistoryMetricChip | null {
+function formatMetricChip(key: ChangeContextMetric, value: number): HistoryMetricChip | null {
   if (!Number.isFinite(value)) return null;
   switch (key) {
     case "temperature_c": {

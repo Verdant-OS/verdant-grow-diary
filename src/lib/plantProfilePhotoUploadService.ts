@@ -57,12 +57,10 @@ export async function uploadPlantProfilePhoto(
     plantId: input.plantId,
     extension,
   });
-  const { error } = await storage
-    .from(PLANT_PROFILE_PHOTO_BUCKET)
-    .upload(path, input.file, {
-      contentType: input.mime,
-      upsert: false,
-    });
+  const { error } = await storage.from(PLANT_PROFILE_PHOTO_BUCKET).upload(path, input.file, {
+    contentType: input.mime,
+    upsert: false,
+  });
   if (error) {
     // Sanitized: do not leak provider text back to the grower.
     throw new Error("plant-profile-photo-upload-failed");
@@ -70,10 +68,7 @@ export async function uploadPlantProfilePhoto(
   return {
     bucket: PLANT_PROFILE_PHOTO_BUCKET,
     path,
-    reference: formatPlantProfilePhotoStorageReference(
-      PLANT_PROFILE_PHOTO_BUCKET,
-      path,
-    ),
+    reference: formatPlantProfilePhotoStorageReference(PLANT_PROFILE_PHOTO_BUCKET, path),
   };
 }
 

@@ -59,8 +59,20 @@ describe("buildAiDoctorCheckInPreviewView", () => {
       ctx(
         [],
         [
-          { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live", quality: "stale" },
-          { metric: "humidity_pct", value: 55, captured_at: ago(HOUR), source: "live", quality: "invalid" },
+          {
+            metric: "temperature_c",
+            value: 24,
+            captured_at: ago(HOUR),
+            source: "live",
+            quality: "stale",
+          },
+          {
+            metric: "humidity_pct",
+            value: 55,
+            captured_at: ago(HOUR),
+            source: "live",
+            quality: "invalid",
+          },
         ],
       ),
     );
@@ -69,10 +81,7 @@ describe("buildAiDoctorCheckInPreviewView", () => {
 
   it("labels demo-only telemetry as demo-only, not live", () => {
     const v = buildAiDoctorCheckInPreviewView(
-      ctx(
-        [],
-        [{ metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "demo" }],
-      ),
+      ctx([], [{ metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "demo" }]),
     );
     expect(v.limitations.some((l) => l.code === "demo_only")).toBe(true);
   });
@@ -89,10 +98,7 @@ describe("buildAiDoctorCheckInPreviewView", () => {
 
   it("static guard: view-model source has no write/model/API imports", async () => {
     const { readFileSync } = await import("node:fs");
-    const src = readFileSync(
-      "src/lib/aiDoctorCheckInPreviewViewModel.ts",
-      "utf8",
-    );
+    const src = readFileSync("src/lib/aiDoctorCheckInPreviewViewModel.ts", "utf8");
     expect(src).not.toMatch(/integrations\/supabase/);
     expect(src).not.toMatch(/functions\s*\.\s*invoke/);
     expect(src).not.toMatch(/\bfetch\s*\(/);

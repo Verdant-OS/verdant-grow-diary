@@ -2502,7 +2502,7 @@ function validateCommonContract(common) {
       const encoded = JSON.stringify(value);
       return (
         ["cultivation", "evidence", "productTruth", "copyAccessibility", "seoTechnical"].every(
-          (role) => encoded.includes(`\"${role}\"`),
+          (role) => encoded.includes(`"${role}"`),
         ) &&
         (encoded.match(/approvedSignoff/g) ?? []).length >= 5 &&
         encoded.includes("approvedOrNotApplicableSignoff")

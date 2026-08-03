@@ -1,5 +1,7 @@
 import { defineConfig, type Plugin } from "vitest/config";
-import react from "@vitejs/plugin-react-swc";
+// Use the declared dep (@vitejs/plugin-react). plugin-react-swc is NOT always
+// present under frozen CI installs — point Vitest at the package.json dep.
+import react from "@vitejs/plugin-react";
 import path from "path";
 
 /**
@@ -25,6 +27,8 @@ function stripMjsShebang(): Plugin {
   };
 }
 
+const srcRoot = path.resolve(__dirname, "./src");
+
 export default defineConfig({
   root: __dirname,
   plugins: [stripMjsShebang(), react()],
@@ -38,6 +42,14 @@ export default defineConfig({
     server: { deps: { inline: [/[\\/]scripts[\\/].*\.mjs$/] } },
   },
   resolve: {
-    alias: { "@": path.resolve(__dirname, "./src") },
+    alias: {
+      // Vitest-only: real TanStack MemoryRouter provider for legacy tests.
+      // Production vite config continues to resolve the product shim.
+      "@/lib/react-router-compat": path.resolve(
+        srcRoot,
+        "test/helpers/reactRouterCompat.vitest.tsx",
+      ),
+      "@": srcRoot,
+    },
   },
 });

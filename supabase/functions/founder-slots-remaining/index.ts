@@ -68,8 +68,8 @@ function json(status: number, body: object, headers: Record<string, string> = {}
 // (bad npm subpath, network hiccup, ESM parse error) is captured as an
 // alertable `startup_import_failed` event instead of a silent module-load
 // crash that the platform surfaces to callers as a bare HTTP 500.
-type CreateClientFn = (typeof import("npm:@supabase/supabase-js@2"))["createClient"];
-type BuildPayloadFn = (typeof import("./contract.ts"))["buildFounderSlotsPayload"];
+type CreateClientFn = typeof import("npm:@supabase/supabase-js@2")["createClient"];
+type BuildPayloadFn = typeof import("./contract.ts")["buildFounderSlotsPayload"];
 
 interface Deps {
   createClient: CreateClientFn;

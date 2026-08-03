@@ -29,7 +29,9 @@ describe("pheno scale — migration (indexes + latest-sex view)", () => {
 
   it("grants only SELECT to authenticated and refreshes PostgREST", () => {
     expect(sql).toMatch(/GRANT SELECT ON public\.pheno_sex_observations_latest TO authenticated/);
-    expect(sql).not.toMatch(/GRANT (ALL|INSERT|UPDATE|DELETE) ON public\.pheno_sex_observations_latest/);
+    expect(sql).not.toMatch(
+      /GRANT (ALL|INSERT|UPDATE|DELETE) ON public\.pheno_sex_observations_latest/,
+    );
     expect(sql).toMatch(/NOTIFY pgrst/);
   });
 });
@@ -44,7 +46,9 @@ describe("pheno scale — bounded reads", () => {
 
   it("decision-log history read is bounded", () => {
     const src = read("src/lib/phenoKeeperDecisionLogService.ts");
-    expect(src).toMatch(/\.order\("decided_at", \{ ascending: false \}\)[\s\S]{0,400}\.limit\(500\)/);
+    expect(src).toMatch(
+      /\.order\("decided_at", \{ ascending: false \}\)[\s\S]{0,400}\.limit\(500\)/,
+    );
   });
 });
 

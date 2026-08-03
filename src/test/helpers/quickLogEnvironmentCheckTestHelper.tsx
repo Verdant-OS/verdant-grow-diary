@@ -25,12 +25,7 @@ export interface RenderQuickLogEnvCheckOptions {
   propsOverrides?: Record<string, unknown>;
 }
 
-export type QuickLogEnvCheckMeasurement =
-  | "room-temp-f"
-  | "humidity"
-  | "vpd"
-  | "ec"
-  | "water-temp";
+export type QuickLogEnvCheckMeasurement = "room-temp-f" | "humidity" | "vpd" | "ec" | "water-temp";
 
 const MEASUREMENT_TESTIDS: Record<QuickLogEnvCheckMeasurement, string> = {
   "room-temp-f": "quick-log-env-room-temp-f",
@@ -86,7 +81,12 @@ export function renderQuickLogEnvironmentCheck(
     ...(opts.prefillOverrides ?? {}),
   };
   renderWithClient(
-    <QuickLog open onOpenChange={() => undefined} prefill={prefill} {...(opts.propsOverrides ?? {})} />,
+    <QuickLog
+      open
+      onOpenChange={() => undefined}
+      prefill={prefill}
+      {...(opts.propsOverrides ?? {})}
+    />,
   );
   const dialog = screen.getByRole("dialog");
   const section = within(dialog).getByTestId("quick-log-environment-check-section");
@@ -99,7 +99,7 @@ export function renderQuickLogEnvironmentCheck(
   };
 
   const getPreviewSlot = () =>
-    (screen.queryByTestId("quick-log-env-normalization-preview-slot") as HTMLElement | null);
+    screen.queryByTestId("quick-log-env-normalization-preview-slot") as HTMLElement | null;
   const getPreviewPanel = () => {
     const slot = getPreviewSlot();
     if (!slot) return null;
@@ -119,7 +119,9 @@ export function renderQuickLogEnvironmentCheck(
   const getPreviewTentStatus = () => {
     const slot = getPreviewSlot();
     if (!slot) return null;
-    return within(slot).queryByTestId("sensor-normalization-preview-tent-status") as HTMLElement | null;
+    return within(slot).queryByTestId(
+      "sensor-normalization-preview-tent-status",
+    ) as HTMLElement | null;
   };
   const getPreviewWarningLabels = () => {
     const slot = getPreviewSlot();

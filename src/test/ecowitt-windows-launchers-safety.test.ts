@@ -83,8 +83,12 @@ describe("ecowitt windows launchers — generated content safety", () => {
   });
 
   it("repo-command launchers begin with cd /d <repo-root> so they work from anywhere", () => {
-    expect(launchers["02-start-http-bridge.cmd"]).toMatch(/^@echo off\r\nchcp 65001 >nul\r\ncd \/d "C:\\repo"/);
-    expect(launchers["04-run-verdant-dry-run.cmd"]).toMatch(/^@echo off\r\nchcp 65001 >nul\r\ncd \/d "C:\\repo"/);
+    expect(launchers["02-start-http-bridge.cmd"]).toMatch(
+      /^@echo off\r\nchcp 65001 >nul\r\ncd \/d "C:\\repo"/,
+    );
+    expect(launchers["04-run-verdant-dry-run.cmd"]).toMatch(
+      /^@echo off\r\nchcp 65001 >nul\r\ncd \/d "C:\\repo"/,
+    );
   });
 
   it("test launcher clearly labels FAKE LOCAL TEST PAYLOAD", () => {

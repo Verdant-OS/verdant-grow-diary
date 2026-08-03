@@ -28,18 +28,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Play, PlugZap, RotateCcw, ShieldAlert } from "lucide-react";
-import {
-  callMcpTool,
-  hasStoredToken,
-  type ToolCallOutcome,
-} from "@/lib/mcp/browserOAuthClient";
+import { callMcpTool, hasStoredToken, type ToolCallOutcome } from "@/lib/mcp/browserOAuthClient";
 import { MCP_MANIFEST, getSupabaseOrigin } from "@/lib/mcp/manifestView";
 import { loadLastValidInputs, saveLastValidInputs } from "@/lib/mcp/lastValidInputs";
 
-type ToolName =
-  | "list_grows"
-  | "list_recent_diary_entries"
-  | "get_latest_sensor_snapshot";
+type ToolName = "list_grows" | "list_recent_diary_entries" | "get_latest_sensor_snapshot";
 
 interface RunState {
   loading: boolean;
@@ -75,8 +68,8 @@ export function diffArgs(
   const b = curr ?? {};
   const keys = Array.from(new Set([...Object.keys(a), ...Object.keys(b)])).sort();
   return keys.map((key) => {
-    const inA = Object.prototype.hasOwnProperty.call(a, key);
-    const inB = Object.prototype.hasOwnProperty.call(b, key);
+    const inA = Object.hasOwn(a, key);
+    const inB = Object.hasOwn(b, key);
     const from = a[key];
     const to = b[key];
     let kind: ArgDiffKind;
@@ -93,8 +86,7 @@ function formatArgValue(v: unknown): string {
   return JSON.stringify(v);
 }
 
-const UUID_RE =
-  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 // ---------- pure validators ----------
 
@@ -275,8 +267,6 @@ function guidanceFor(category: OutcomeCategory): GuidanceCopy | null {
   }
 }
 
-
-
 function ToolCard({
   toolName,
   endpoint,
@@ -300,10 +290,7 @@ function ToolCard({
 }) {
   const [state, setState] = useState<RunState>(EMPTY);
 
-  const tool = useMemo(
-    () => MCP_MANIFEST.tools.find((t) => t.name === toolName)!,
-    [toolName],
-  );
+  const tool = useMemo(() => MCP_MANIFEST.tools.find((t) => t.name === toolName)!, [toolName]);
 
   const invalid = fieldErrors.length > 0;
 
@@ -314,9 +301,6 @@ function ToolCard({
   const [justApplied, setJustApplied] = useState(false);
   const [preApplySnapshot, setPreApplySnapshot] = useState<Record<string, unknown> | null>(null);
   const [copiedArgs, setCopiedArgs] = useState(false);
-
-
-
 
   const run = useCallback(async () => {
     if (invalid) return;
@@ -345,7 +329,6 @@ function ToolCard({
     const category = classifyOutcome(outcome);
     if (category && onRunOutcome) onRunOutcome(outcome, category);
   }, [invalid, buildArgs, endpoint, toolName, onAuthLost, onRunOutcome]);
-
 
   const requestRetry = useCallback(() => {
     if (confirmBeforeRetry) {
@@ -388,7 +371,10 @@ function ToolCard({
           data-testid={`tool-explorer-validation-${toolName}`}
           className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive space-y-1"
         >
-          <p className="font-medium">Fix {fieldErrors.length === 1 ? "1 field" : `${fieldErrors.length} fields`} before running:</p>
+          <p className="font-medium">
+            Fix {fieldErrors.length === 1 ? "1 field" : `${fieldErrors.length} fields`} before
+            running:
+          </p>
           <ul className="list-disc pl-5">
             {fieldErrors.map((e) => (
               <li key={e.id}>
@@ -445,238 +431,230 @@ function ToolCard({
         ) : null}
       </div>
 
-      {state.previousArgs && state.args && showDiff ? (() => {
-        const entries = diffArgs(state.previousArgs, state.args);
-        const changed = entries.filter((e) => e.kind !== "unchanged");
-        const visible = onlyChanged ? changed : entries;
-        const unchangedCount = entries.length - changed.length;
-        const counts = {
-          added: changed.filter((e) => e.kind === "added").length,
-          removed: changed.filter((e) => e.kind === "removed").length,
-          changed: changed.filter((e) => e.kind === "changed").length,
-        };
-        const tagStyles = {
-          added: {
-            label: "added",
-            badge:
-              "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
-            newChip:
-              "bg-emerald-500/10 text-emerald-800 dark:text-emerald-200 border-emerald-500/30",
-            oldChip: "",
-          },
-          removed: {
-            label: "removed",
-            badge: "bg-destructive/15 text-destructive border-destructive/30",
-            newChip: "",
-            oldChip:
-              "bg-destructive/10 text-destructive border-destructive/30 line-through",
-          },
-          changed: {
-            label: "changed",
-            badge:
-              "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
-            newChip:
-              "bg-emerald-500/10 text-emerald-800 dark:text-emerald-200 border-emerald-500/30",
-            oldChip:
-              "bg-destructive/10 text-destructive border-destructive/30 line-through",
-          },
-          unchanged: {
-            label: "unchanged",
-            badge:
-              "bg-muted text-muted-foreground border-border",
-            newChip: "bg-muted/60 text-muted-foreground border-border",
-            oldChip: "bg-muted/60 text-muted-foreground border-border",
-          },
-        } as const;
-        const onlyChangedId = `tool-explorer-only-changed-${toolName}`;
-        return (
-          <div
-            id={`tool-explorer-diff-${toolName}`}
-            data-testid={`tool-explorer-diff-${toolName}`}
-            className="rounded-md border bg-muted/40 p-3 text-xs space-y-3"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <p className="font-medium text-sm">Changes since previous request</p>
-                {changed.length === 0 ? (
-                  <span className="text-muted-foreground">(no fields changed)</span>
-                ) : (
-                  <span className="text-muted-foreground" aria-label="change summary">
-                    {counts.added} added · {counts.changed} changed · {counts.removed} removed
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {state.args ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={async () => {
-                      const json = JSON.stringify(state.args, null, 2);
-                      try {
-                        await navigator.clipboard.writeText(json);
-                      } catch {
-                        // clipboard may be unavailable (insecure context, denied
-                        // permission); fall through so the button still confirms
-                        // to the user rather than throwing.
-                      }
-                      setCopiedArgs(true);
-                      window.setTimeout(() => setCopiedArgs(false), 1500);
-                    }}
-                    data-testid={`tool-explorer-copy-args-${toolName}`}
-                    aria-label="Copy the current request arguments as JSON"
-                  >
-                    {copiedArgs ? "Copied" : "Copy applied args as JSON"}
-                  </Button>
-                ) : null}
-                {onApplyArgs && changed.length > 0 && state.args ? (
-                  <>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        // Snapshot current form values BEFORE overwriting them
-                        // so Undo can restore exactly what was on screen.
-                        setPreApplySnapshot(buildArgs());
-                        onApplyArgs(state.args!);
-                        setJustApplied(true);
-                      }}
-                      data-testid={`tool-explorer-apply-changes-${toolName}`}
-                      aria-label="Apply changed values to the form for retry"
-                    >
-                      Apply changes to form
-                    </Button>
-                    {justApplied && preApplySnapshot ? (
+      {state.previousArgs && state.args && showDiff
+        ? (() => {
+            const entries = diffArgs(state.previousArgs, state.args);
+            const changed = entries.filter((e) => e.kind !== "unchanged");
+            const visible = onlyChanged ? changed : entries;
+            const unchangedCount = entries.length - changed.length;
+            const counts = {
+              added: changed.filter((e) => e.kind === "added").length,
+              removed: changed.filter((e) => e.kind === "removed").length,
+              changed: changed.filter((e) => e.kind === "changed").length,
+            };
+            const tagStyles = {
+              added: {
+                label: "added",
+                badge:
+                  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+                newChip:
+                  "bg-emerald-500/10 text-emerald-800 dark:text-emerald-200 border-emerald-500/30",
+                oldChip: "",
+              },
+              removed: {
+                label: "removed",
+                badge: "bg-destructive/15 text-destructive border-destructive/30",
+                newChip: "",
+                oldChip: "bg-destructive/10 text-destructive border-destructive/30 line-through",
+              },
+              changed: {
+                label: "changed",
+                badge: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+                newChip:
+                  "bg-emerald-500/10 text-emerald-800 dark:text-emerald-200 border-emerald-500/30",
+                oldChip: "bg-destructive/10 text-destructive border-destructive/30 line-through",
+              },
+              unchanged: {
+                label: "unchanged",
+                badge: "bg-muted text-muted-foreground border-border",
+                newChip: "bg-muted/60 text-muted-foreground border-border",
+                oldChip: "bg-muted/60 text-muted-foreground border-border",
+              },
+            } as const;
+            const onlyChangedId = `tool-explorer-only-changed-${toolName}`;
+            return (
+              <div
+                id={`tool-explorer-diff-${toolName}`}
+                data-testid={`tool-explorer-diff-${toolName}`}
+                className="rounded-md border bg-muted/40 p-3 text-xs space-y-3"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <p className="font-medium text-sm">Changes since previous request</p>
+                    {changed.length === 0 ? (
+                      <span className="text-muted-foreground">(no fields changed)</span>
+                    ) : (
+                      <span className="text-muted-foreground" aria-label="change summary">
+                        {counts.added} added · {counts.changed} changed · {counts.removed} removed
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {state.args ? (
                       <Button
                         type="button"
                         size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          onApplyArgs(preApplySnapshot);
-                          setPreApplySnapshot(null);
-                          setJustApplied(false);
+                        variant="outline"
+                        onClick={async () => {
+                          const json = JSON.stringify(state.args, null, 2);
+                          try {
+                            await navigator.clipboard.writeText(json);
+                          } catch {
+                            // clipboard may be unavailable (insecure context, denied
+                            // permission); fall through so the button still confirms
+                            // to the user rather than throwing.
+                          }
+                          setCopiedArgs(true);
+                          window.setTimeout(() => setCopiedArgs(false), 1500);
                         }}
-                        data-testid={`tool-explorer-undo-apply-${toolName}`}
-                        aria-label="Undo — restore the form values from before Apply"
+                        data-testid={`tool-explorer-copy-args-${toolName}`}
+                        aria-label="Copy the current request arguments as JSON"
                       >
-                        Undo
+                        {copiedArgs ? "Copied" : "Copy applied args as JSON"}
                       </Button>
                     ) : null}
-                    {justApplied ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={requestRetry}
-                        disabled={state.loading || invalid || !connected || retryPending}
-                        aria-haspopup={confirmBeforeRetry ? "dialog" : undefined}
-                        aria-expanded={retryPending || undefined}
-                        data-testid={`tool-explorer-retry-now-${toolName}`}
-                        aria-label="Retry now with the applied values"
-                      >
-                        <RotateCcw className="mr-2 h-4 w-4" aria-hidden />
-                        Retry now
-                      </Button>
-                    ) : null}
-                  </>
-
-                ) : null}
-              </div>
-
-
-            </div>
-
-            {entries.length > 0 ? (
-              <div className="flex items-center gap-2">
-                <Switch
-                  id={onlyChangedId}
-                  checked={onlyChanged}
-                  onCheckedChange={(v) => setOnlyChanged(Boolean(v))}
-                  data-testid={`tool-explorer-only-changed-${toolName}`}
-                  aria-describedby={`${onlyChangedId}-desc`}
-                />
-                <Label htmlFor={onlyChangedId} className="text-xs font-normal">
-                  Show only changed args
-                </Label>
-                <span
-                  id={`${onlyChangedId}-desc`}
-                  className="text-muted-foreground"
-                >
-                  {onlyChanged
-                    ? unchangedCount > 0
-                      ? `(${unchangedCount} unchanged hidden)`
-                      : "(nothing hidden)"
-                    : `(showing all ${entries.length})`}
-                </span>
-              </div>
-            ) : null}
-            {visible.length > 0 ? (
-              <ul className="space-y-2">
-                {visible.map((e) => {
-                  const t = tagStyles[e.kind];
-                  const isUnchanged = e.kind === "unchanged";
-                  return (
-                    <li
-                      key={e.key}
-                      className={`grid gap-1 rounded border p-2 sm:grid-cols-[auto_1fr] sm:gap-x-3 ${
-                        isUnchanged ? "bg-background/30 opacity-70" : "bg-background/60"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${t.badge}`}
+                    {onApplyArgs && changed.length > 0 && state.args ? (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            // Snapshot current form values BEFORE overwriting them
+                            // so Undo can restore exactly what was on screen.
+                            setPreApplySnapshot(buildArgs());
+                            onApplyArgs(state.args!);
+                            setJustApplied(true);
+                          }}
+                          data-testid={`tool-explorer-apply-changes-${toolName}`}
+                          aria-label="Apply changed values to the form for retry"
                         >
-                          {t.label}
-                        </span>
-                        <span className="font-mono text-xs font-semibold">{e.key}</span>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2 font-mono">
-                        {isUnchanged ? (
-                          <span
-                            className={`inline-block max-w-full truncate rounded border px-1.5 py-0.5 ${t.newChip}`}
-                            title={formatArgValue(e.to)}
+                          Apply changes to form
+                        </Button>
+                        {justApplied && preApplySnapshot ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              onApplyArgs(preApplySnapshot);
+                              setPreApplySnapshot(null);
+                              setJustApplied(false);
+                            }}
+                            data-testid={`tool-explorer-undo-apply-${toolName}`}
+                            aria-label="Undo — restore the form values from before Apply"
                           >
-                            {formatArgValue(e.to)}
-                          </span>
-                        ) : (
-                          <>
-                            {e.kind !== "added" ? (
-                              <span
-                                className={`inline-block max-w-full truncate rounded border px-1.5 py-0.5 ${t.oldChip}`}
-                                title={formatArgValue(e.from)}
-                                aria-label={`previous value ${formatArgValue(e.from)}`}
-                              >
-                                {formatArgValue(e.from)}
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground italic">(not set)</span>
-                            )}
-                            <span aria-hidden="true" className="text-muted-foreground">→</span>
-                            {e.kind !== "removed" ? (
+                            Undo
+                          </Button>
+                        ) : null}
+                        {justApplied ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={requestRetry}
+                            disabled={state.loading || invalid || !connected || retryPending}
+                            aria-haspopup={confirmBeforeRetry ? "dialog" : undefined}
+                            aria-expanded={retryPending || undefined}
+                            data-testid={`tool-explorer-retry-now-${toolName}`}
+                            aria-label="Retry now with the applied values"
+                          >
+                            <RotateCcw className="mr-2 h-4 w-4" aria-hidden />
+                            Retry now
+                          </Button>
+                        ) : null}
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+
+                {entries.length > 0 ? (
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id={onlyChangedId}
+                      checked={onlyChanged}
+                      onCheckedChange={(v) => setOnlyChanged(Boolean(v))}
+                      data-testid={`tool-explorer-only-changed-${toolName}`}
+                      aria-describedby={`${onlyChangedId}-desc`}
+                    />
+                    <Label htmlFor={onlyChangedId} className="text-xs font-normal">
+                      Show only changed args
+                    </Label>
+                    <span id={`${onlyChangedId}-desc`} className="text-muted-foreground">
+                      {onlyChanged
+                        ? unchangedCount > 0
+                          ? `(${unchangedCount} unchanged hidden)`
+                          : "(nothing hidden)"
+                        : `(showing all ${entries.length})`}
+                    </span>
+                  </div>
+                ) : null}
+                {visible.length > 0 ? (
+                  <ul className="space-y-2">
+                    {visible.map((e) => {
+                      const t = tagStyles[e.kind];
+                      const isUnchanged = e.kind === "unchanged";
+                      return (
+                        <li
+                          key={e.key}
+                          className={`grid gap-1 rounded border p-2 sm:grid-cols-[auto_1fr] sm:gap-x-3 ${
+                            isUnchanged ? "bg-background/30 opacity-70" : "bg-background/60"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${t.badge}`}
+                            >
+                              {t.label}
+                            </span>
+                            <span className="font-mono text-xs font-semibold">{e.key}</span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 font-mono">
+                            {isUnchanged ? (
                               <span
                                 className={`inline-block max-w-full truncate rounded border px-1.5 py-0.5 ${t.newChip}`}
                                 title={formatArgValue(e.to)}
-                                aria-label={`new value ${formatArgValue(e.to)}`}
                               >
                                 {formatArgValue(e.to)}
                               </span>
                             ) : (
-                              <span className="text-muted-foreground italic">(removed)</span>
+                              <>
+                                {e.kind !== "added" ? (
+                                  <span
+                                    className={`inline-block max-w-full truncate rounded border px-1.5 py-0.5 ${t.oldChip}`}
+                                    title={formatArgValue(e.from)}
+                                    aria-label={`previous value ${formatArgValue(e.from)}`}
+                                  >
+                                    {formatArgValue(e.from)}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground italic">(not set)</span>
+                                )}
+                                <span aria-hidden="true" className="text-muted-foreground">
+                                  →
+                                </span>
+                                {e.kind !== "removed" ? (
+                                  <span
+                                    className={`inline-block max-w-full truncate rounded border px-1.5 py-0.5 ${t.newChip}`}
+                                    title={formatArgValue(e.to)}
+                                    aria-label={`new value ${formatArgValue(e.to)}`}
+                                  >
+                                    {formatArgValue(e.to)}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground italic">(removed)</span>
+                                )}
+                              </>
                             )}
-                          </>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : null}
-          </div>
-        );
-      })() : null}
-
-
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+              </div>
+            );
+          })()
+        : null}
 
       {(() => {
         const category = classifyOutcome(state.outcome);
@@ -760,9 +738,9 @@ function ToolCard({
               >
                 <p className="font-medium">Re-run this tool?</p>
                 <p>
-                  The three built-in tools are read-only, but confirming avoids
-                  repeating side effects if a future tool ever isn't. The retry
-                  will send the current arguments as-is.
+                  The three built-in tools are read-only, but confirming avoids repeating side
+                  effects if a future tool ever isn't. The retry will send the current arguments
+                  as-is.
                 </p>
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   <Button
@@ -789,13 +767,7 @@ function ToolCard({
         );
       })()}
 
-
-
-      <div
-        role="status"
-        aria-live="polite"
-        data-testid={`tool-explorer-result-${toolName}`}
-      >
+      <div role="status" aria-live="polite" data-testid={`tool-explorer-result-${toolName}`}>
         {state.outcome ? (
           <pre className="bg-muted text-foreground text-xs rounded-md p-4 overflow-x-auto border border-border max-h-96">
             <code>{formatResult(state.outcome)}</code>
@@ -843,7 +815,9 @@ export default function McpToolExplorer() {
     [],
   );
   const listDiaryCache = useMemo(
-    () => loadLastValidInputs<{ growId: string; diaryLimit: string }>("list_recent_diary_entries") ?? {},
+    () =>
+      loadLastValidInputs<{ growId: string; diaryLimit: string }>("list_recent_diary_entries") ??
+      {},
     [],
   );
   const sensorCache = useMemo(
@@ -880,7 +854,12 @@ export default function McpToolExplorer() {
   // returns an ok, non-error outcome — the exact fields the grower just
   // corrected, ready to pre-fill on the next visit.
   const persistOnOk = useCallback(
-    (tool: ToolName, outcome: ToolCallOutcome, category: OutcomeCategory, snapshot: Record<string, unknown>) => {
+    (
+      tool: ToolName,
+      outcome: ToolCallOutcome,
+      category: OutcomeCategory,
+      snapshot: Record<string, unknown>,
+    ) => {
       if (category !== "ok") return;
       if (outcome.status !== "ok" || outcome.result.isError) return;
       saveLastValidInputs(tool, snapshot);
@@ -931,9 +910,9 @@ export default function McpToolExplorer() {
           <div>
             <h2 className="text-2xl font-semibold tracking-tight">Try the tools</h2>
             <p className="text-sm text-muted-foreground max-w-prose">
-              Run each MCP tool from this page using the browser OAuth session you
-              minted on Settings → Agent integrations. Calls are made as your
-              signed-in account and are RLS-scoped to your own data.
+              Run each MCP tool from this page using the browser OAuth session you minted on
+              Settings → Agent integrations. Calls are made as your signed-in account and are
+              RLS-scoped to your own data.
             </p>
           </div>
           {connected ? (
@@ -953,8 +932,8 @@ export default function McpToolExplorer() {
           >
             <ShieldAlert className="h-4 w-4 shrink-0 text-amber-500" aria-hidden />
             <span className="flex-1">
-              This explorer needs a browser OAuth session. Connect once from
-              Settings → Agent integrations, then return here.
+              This explorer needs a browser OAuth session. Connect once from Settings → Agent
+              integrations, then return here.
             </span>
             <Button asChild size="sm">
               <Link to="/settings/agent-integrations">
@@ -1071,7 +1050,6 @@ export default function McpToolExplorer() {
           if (n !== undefined) args.limit = n;
           return args;
         }}
-
       >
         <div className="space-y-1">
           <Label htmlFor="list-diary-grow">
@@ -1086,9 +1064,7 @@ export default function McpToolExplorer() {
             }}
             onBlur={() => setGrowIdTouched(true)}
             aria-invalid={growIdTouched && !!growIdError}
-            aria-describedby={
-              growIdTouched && growIdError ? "list-diary-grow-error" : undefined
-            }
+            aria-describedby={growIdTouched && growIdError ? "list-diary-grow-error" : undefined}
             placeholder="e.g. 3f2e1a4b-…-9d2f"
             spellCheck={false}
           />
@@ -1096,8 +1072,8 @@ export default function McpToolExplorer() {
             <FieldError id="list-diary-grow-error" message={growIdError} />
           ) : (
             <p className="text-xs text-muted-foreground">
-              Tip: run <code className="font-mono">list_grows</code> above to copy an
-              id from your own grows.
+              Tip: run <code className="font-mono">list_grows</code> above to copy an id from your
+              own grows.
             </p>
           )}
         </div>
@@ -1166,8 +1142,8 @@ export default function McpToolExplorer() {
             <FieldError id="sensor-tent-error" message={tentIdError} />
           ) : (
             <p id="sensor-tent-hint" className="text-xs text-muted-foreground">
-              Only <code className="font-mono">current_live=true</code> readings are
-              current live telemetry — every other label stays as-is.
+              Only <code className="font-mono">current_live=true</code> readings are current live
+              telemetry — every other label stays as-is.
             </p>
           )}
         </div>

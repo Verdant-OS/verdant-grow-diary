@@ -256,7 +256,7 @@ function normalizeQualifiedIdentifier(identifier) {
 }
 
 function stripLeadingSqlTrivia(stmt) {
-  let sql = stmt.trimStart();
+  const sql = stmt.trimStart();
   while (sql) {
     if (sql.startsWith("--")) {
       const newline = sql.indexOf("\n");

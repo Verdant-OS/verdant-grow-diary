@@ -279,9 +279,7 @@ function adjustRiskForContext(
  */
 export function createActionSuggestion(input: HandoffInput): HandoffResult {
   const { alert, sensorContext, sensorContextId, now } = input;
-  const timelineEvents = normalizeOriginatingTimelineEvents(
-    input.originatingTimelineEvents,
-  );
+  const timelineEvents = normalizeOriginatingTimelineEvents(input.originatingTimelineEvents);
 
   // Validate alert
   if (!alert) return { ok: false, reason: "missing_alert" };

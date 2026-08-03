@@ -35,9 +35,7 @@ describe("RepresentativeCsvPreview — timeline preview", () => {
     ].join("\n");
     await uploadCsv(csv);
     const section = await screen.findByRole("region", { name: /timeline preview/i });
-    expect(
-      within(section).getByText(/Preview only — nothing is saved\./i),
-    ).toBeInTheDocument();
+    expect(within(section).getByText(/Preview only — nothing is saved\./i)).toBeInTheDocument();
     expect(
       within(section).getAllByText(/csv \/ representative sample \/ not live/i).length,
     ).toBeGreaterThan(0);

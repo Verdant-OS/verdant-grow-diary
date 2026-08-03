@@ -32,11 +32,7 @@ describe("SensorSnapshotDetailsDrawer", () => {
 
   it("missing VPD renders 'Not available', never 0", () => {
     render(
-      <SensorSnapshotDetailsDrawer
-        open
-        onOpenChange={() => {}}
-        data={{ ...base, vpdKpa: 0 }}
-      />,
+      <SensorSnapshotDetailsDrawer open onOpenChange={() => {}} data={{ ...base, vpdKpa: 0 }} />,
     );
     expect(screen.getByTestId("snapshot-drawer-vpd").textContent).toMatch(/Not available/);
   });

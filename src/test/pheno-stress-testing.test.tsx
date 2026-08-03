@@ -20,9 +20,7 @@ describe("PhenoStressTestingSection", () => {
     const section = screen.getByTestId("pheno-stress-testing");
     expect(section).toBeInTheDocument();
     expect(section.getAttribute("data-pheno-factor-id")).toBe("stress_testing");
-    expect(
-      screen.getByRole("heading", { name: /stress testing/i, level: 2 }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /stress testing/i, level: 2 })).toBeInTheDocument();
   });
 
   it("renders every listed stress factor option", () => {
@@ -41,9 +39,7 @@ describe("PhenoStressTestingSection", () => {
 
   it("stores planned vs observed status on a candidate stress observation", () => {
     render(
-      <PhenoStressTestingSection
-        candidates={[{ candidateId: "c-1", candidateLabel: "Cand 1" }]}
-      />,
+      <PhenoStressTestingSection candidates={[{ candidateId: "c-1", candidateLabel: "Cand 1" }]} />,
     );
     fireEvent.change(screen.getByTestId("pheno-stress-candidate"), {
       target: { value: "c-1" },

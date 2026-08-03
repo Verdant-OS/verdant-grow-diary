@@ -2,10 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-const DOC_PATH = resolve(
-  process.cwd(),
-  "docs/testing/typed-event-rls-checklist.md",
-);
+const DOC_PATH = resolve(process.cwd(), "docs/testing/typed-event-rls-checklist.md");
 
 describe("typed-event RLS/RPC manual verification checklist", () => {
   it("doc exists", () => {

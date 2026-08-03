@@ -59,7 +59,7 @@ export function useOneTentLiveProofTimelineFollowup(
     return () => {
       cancelled = true;
     };
-  }, [growId, completedActionId, externalNonce]);
+  }, [growId, completedActionId]);
 
   return state;
 }

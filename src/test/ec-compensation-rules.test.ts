@@ -149,10 +149,7 @@ describe("computeEcCompensation — safety blocks", () => {
 
 describe("ecCompensationRules — static safety", () => {
   it("module imports no Supabase / network / cron surfaces", () => {
-    const src = readFileSync(
-      resolve(__dirname, "../lib/ecCompensationRules.ts"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(__dirname, "../lib/ecCompensationRules.ts"), "utf8");
     expect(src).not.toMatch(/from\s+["']@\/integrations\/supabase/);
     expect(src).not.toMatch(/supabase-js/);
     expect(src).not.toMatch(/\bfetch\s*\(/);

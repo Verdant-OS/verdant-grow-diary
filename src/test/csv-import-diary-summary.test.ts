@@ -16,7 +16,10 @@ const OWNERSHIP: OwnershipContext = {
 };
 const NOW = new Date("2026-06-04T12:00:00.000Z");
 
-function input(rows: PreviewRowInput[], o: Partial<BuildCsvImportPlanInput> = {}): BuildCsvImportPlanInput {
+function input(
+  rows: PreviewRowInput[],
+  o: Partial<BuildCsvImportPlanInput> = {},
+): BuildCsvImportPlanInput {
   return {
     filename: "export.csv",
     fileSizeBytes: 1024,

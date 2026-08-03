@@ -118,10 +118,7 @@ describe("environmentSummaryExportAuditRules", () => {
   });
 
   it("safely resets on corrupt storage", () => {
-    storage.setItem(
-      ENVIRONMENT_SUMMARY_EXPORT_AUDIT_STORAGE_KEY,
-      "this-is-not-json{{",
-    );
+    storage.setItem(ENVIRONMENT_SUMMARY_EXPORT_AUDIT_STORAGE_KEY, "this-is-not-json{{");
     const events = readEnvironmentSummaryExportAuditEvents({ storage });
     expect(events).toEqual([]);
     expect(storage.getItem(ENVIRONMENT_SUMMARY_EXPORT_AUDIT_STORAGE_KEY)).toBeNull();
@@ -144,21 +141,16 @@ describe("environmentSummaryExportAuditRules", () => {
   it("does not import or call Supabase", async () => {
     // Static guard: the module file must not import Supabase.
     const fs = await import("node:fs/promises");
-    const src = await fs.readFile(
-      "src/lib/environmentSummaryExportAuditRules.ts",
-      "utf8",
-    );
+    const src = await fs.readFile("src/lib/environmentSummaryExportAuditRules.ts", "utf8");
     expect(src).not.toMatch(/from\s+["']@\/integrations\/supabase/);
     expect(src).not.toMatch(/supabase\.from\(/);
     expect(src).not.toMatch(/fetch\(/);
   });
 
   it("does not send network requests", () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch" as any)
-      .mockImplementation((() => {
-        throw new Error("fetch not allowed");
-      }) as any);
+    const fetchSpy = vi.spyOn(globalThis, "fetch" as any).mockImplementation((() => {
+      throw new Error("fetch not allowed");
+    }) as any);
     recordEnvironmentSummaryExportAuditEvent(
       {
         eventType: "full_report_print_opened",

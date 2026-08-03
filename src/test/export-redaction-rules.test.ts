@@ -48,9 +48,9 @@ describe("exportRedactionRules — forbidden keys", () => {
   });
 
   it("findForbiddenHeaders returns offenders only", () => {
-    expect(
-      findForbiddenHeaders(["metric", "value", "target_device", "captured_at"]),
-    ).toEqual(["target_device"]);
+    expect(findForbiddenHeaders(["metric", "value", "target_device", "captured_at"])).toEqual([
+      "target_device",
+    ]);
     expect(findForbiddenHeaders(["metric", "value", "unit"])).toEqual([]);
   });
 });
@@ -67,10 +67,7 @@ describe("exportRedactionRules — allowlists", () => {
       target_device: "device_abc_001",
       bridge_token: BRIDGE_TOKEN,
     };
-    const { row: safe, droppedKeys } = sanitizeExportRow(
-      row,
-      "sensor_snapshot",
-    );
+    const { row: safe, droppedKeys } = sanitizeExportRow(row, "sensor_snapshot");
     expect(safe).toEqual({
       metric: "temp_c",
       value: 24.5,
@@ -78,9 +75,7 @@ describe("exportRedactionRules — allowlists", () => {
       source: "live",
       captured_at: "2026-05-27T10:00:00Z",
     });
-    expect(droppedKeys.sort()).toEqual(
-      ["bridge_token", "raw_payload", "target_device"].sort(),
-    );
+    expect(droppedKeys.sort()).toEqual(["bridge_token", "raw_payload", "target_device"].sort());
   });
 
   it("keeps every canonical source label", () => {
@@ -170,15 +165,12 @@ describe("exportRedactionRules — rows and serialized scans", () => {
   it("detectExportLeaks flags forbidden header columns", () => {
     const csv = `metric,value,target_device,captured_at\n`;
     const leaks = detectExportLeaks(csv);
-    expect(leaks.some((l) => l.includes("forbidden_key:target_device"))).toBe(
-      true,
-    );
+    expect(leaks.some((l) => l.includes("forbidden_key:target_device"))).toBe(true);
   });
 
   it("clean CSV returns no leaks", () => {
     const csv =
-      `metric,value,unit,source,captured_at\n` +
-      `temp_c,22,C,live,2026-05-27T10:00:00Z\n`;
+      `metric,value,unit,source,captured_at\n` + `temp_c,22,C,live,2026-05-27T10:00:00Z\n`;
     expect(detectExportLeaks(csv)).toEqual([]);
   });
 });
@@ -187,20 +179,13 @@ describe("exportRedactionRules — pattern source is shared", () => {
   it("re-exports SENSITIVE_DEVICE_PATTERNS from actionQueueRedactionRules", () => {
     expect(Array.isArray(SENSITIVE_DEVICE_PATTERNS)).toBe(true);
     const names = SENSITIVE_DEVICE_PATTERNS.map((p) => p.name);
-    expect(names).toEqual(
-      expect.arrayContaining(["mac_address", "bridge_token"]),
-    );
+    expect(names).toEqual(expect.arrayContaining(["mac_address", "bridge_token"]));
   });
 });
 
 describe("exportRedactionRules — allowlist sanity", () => {
   it("no forbidden key is ever on an allowlist", () => {
-    const kinds = [
-      "sensor_snapshot",
-      "timeline",
-      "action_queue",
-      "environment_summary",
-    ] as const;
+    const kinds = ["sensor_snapshot", "timeline", "action_queue", "environment_summary"] as const;
     for (const k of kinds) {
       for (const col of getExportAllowlist(k)) {
         expect(isForbiddenExportKey(col)).toBe(false);
@@ -288,33 +273,24 @@ describe("exportRedactionRules — static scan of export builders", () => {
 describe("assertExportSafe / assertExportHeadersSafe", () => {
   it("passes a clean CSV body", () => {
     const csv =
-      `metric,value,unit,source,captured_at\n` +
-      `temp_c,22,C,live,2026-05-27T10:00:00Z\n`;
+      `metric,value,unit,source,captured_at\n` + `temp_c,22,C,live,2026-05-27T10:00:00Z\n`;
     expect(() => assertExportSafe(csv, "test")).not.toThrow();
   });
 
   it("throws when a MAC-like value contaminates the body", () => {
     const csv = `metric,value,source\n` + `temp_c,22,${MAC}\n`;
-    expect(() => assertExportSafe(csv, "test")).toThrowError(
-      /export-redaction.*test.*mac_address/,
-    );
+    expect(() => assertExportSafe(csv, "test")).toThrowError(/export-redaction.*test.*mac_address/);
   });
 
   it("throws when a forbidden key appears in headers", () => {
     expect(() =>
-      assertExportHeadersSafe(
-        ["metric", "value", "target_device"],
-        "test",
-      ),
+      assertExportHeadersSafe(["metric", "value", "target_device"], "test"),
     ).toThrowError(/target_device/);
   });
 
   it("passes a clean header list", () => {
     expect(() =>
-      assertExportHeadersSafe(
-        ["metric", "value", "unit", "source", "captured_at"],
-        "test",
-      ),
+      assertExportHeadersSafe(["metric", "value", "unit", "source", "captured_at"], "test"),
     ).not.toThrow();
   });
 });
@@ -347,7 +323,9 @@ describe("retrofit — every enumerated export builder routes through the centra
     it(`${file} imports and calls assertExportSafe`, () => {
       const abs = join(process.cwd(), file);
       const src = readFileSync(abs, "utf8");
-      expect(src).toMatch(/from\s+["']\.\.?\/exportRedactionRules["']|from\s+["']@\/lib\/exportRedactionRules["']/);
+      expect(src).toMatch(
+        /from\s+["']\.\.?\/exportRedactionRules["']|from\s+["']@\/lib\/exportRedactionRules["']/,
+      );
       expect(src).toMatch(/assertExportSafe\s*\(/);
       if (needsHeaders) {
         expect(src).toMatch(/assertExportHeadersSafe\s*\(/);
@@ -360,10 +338,7 @@ describe("retrofit — every enumerated export builder routes through the centra
     // an *import preview* of user-supplied CSV cells, not an export of
     // DB rows. If a future change starts emitting DB rows from it, this
     // test should be updated to require the same guardrail wiring.
-    const abs = join(
-      process.cwd(),
-      "src/lib/verdantGeneticsImportPreviewRules.ts",
-    );
+    const abs = join(process.cwd(), "src/lib/verdantGeneticsImportPreviewRules.ts");
     const src = readFileSync(abs, "utf8");
     // No DB-row egress markers expected.
     expect(src).not.toMatch(/from\s+["'].*supabase.*["']/);

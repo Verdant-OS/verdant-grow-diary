@@ -11,12 +11,7 @@ const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
 const PRESENTER = "components/QuickLogGroupedTimelineSection.tsx";
 const REVIEW_VM = "lib/quickLogGroupedReviewViewModel.ts";
 
-const FORBIDDEN_WORDS = [
-  /\blive\b/i,
-  /\bsynced\b/i,
-  /\bconnected\b/i,
-  /\bimported\b/i,
-];
+const FORBIDDEN_WORDS = [/\blive\b/i, /\bsynced\b/i, /\bconnected\b/i, /\bimported\b/i];
 const DEVICE_WORDS = [
   /\bdevice control\b/i,
   /\bpump\b/i,
@@ -78,9 +73,7 @@ describe("Grouped Timeline Review Panel — static safety", () => {
 
   it("presenter imports labels/builders from the review view-model", () => {
     const src = read(PRESENTER);
-    expect(src).toMatch(
-      /from\s+["']@\/lib\/quickLogGroupedReviewViewModel["']/,
-    );
+    expect(src).toMatch(/from\s+["']@\/lib\/quickLogGroupedReviewViewModel["']/);
     expect(src).toMatch(/reviewTriggerLabel/);
     expect(src).toMatch(/isReviewableQuickLogEntry/);
     expect(src).toMatch(/buildQuickLogReviewActionSection/);

@@ -43,10 +43,7 @@ describe("buildActionQueueTraceIdempotencyKey", () => {
 });
 
 describe("buildActionQueueTraceDraft — approved", () => {
-  const draft = buildActionQueueTraceDraft(
-    { ...BASE_INPUT, kind: "approved" },
-    FIXED_NOW,
-  );
+  const draft = buildActionQueueTraceDraft({ ...BASE_INPUT, kind: "approved" }, FIXED_NOW);
 
   it("uses 'Action approved' label in the visible note", () => {
     expect(draft.note.startsWith("Action approved:")).toBe(true);
@@ -74,9 +71,7 @@ describe("buildActionQueueTraceDraft — approved", () => {
     expect(draft.details.plant_id).toBe("p-1");
     expect(draft.details.source).toBe("ai_doctor");
     expect(draft.details.action_type).toBe("lower_humidity");
-    expect(draft.details.idempotency_key).toBe(
-      "action-queue:aq-1:approved",
-    );
+    expect(draft.details.idempotency_key).toBe("action-queue:aq-1:approved");
   });
 
   it("asserts device_control: false in details payload", () => {
@@ -101,15 +96,10 @@ describe("buildActionQueueTraceDraft — approved", () => {
 
 describe("buildActionQueueTraceDraft — rejected", () => {
   it("uses 'Action rejected' label", () => {
-    const draft = buildActionQueueTraceDraft(
-      { ...BASE_INPUT, kind: "rejected" },
-      FIXED_NOW,
-    );
+    const draft = buildActionQueueTraceDraft({ ...BASE_INPUT, kind: "rejected" }, FIXED_NOW);
     expect(draft.note.startsWith("Action rejected:")).toBe(true);
     expect(draft.details.trace_kind).toBe("rejected");
-    expect(draft.details.idempotency_key).toBe(
-      "action-queue:aq-1:rejected",
-    );
+    expect(draft.details.idempotency_key).toBe("action-queue:aq-1:rejected");
   });
 });
 

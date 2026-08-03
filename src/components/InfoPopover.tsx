@@ -1,9 +1,5 @@
 import { Info } from "lucide-react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -24,13 +20,7 @@ interface Props {
  *
  * Pure presentation. No I/O.
  */
-export default function InfoPopover({
-  title,
-  body,
-  testKey,
-  ariaLabel,
-  className,
-}: Props) {
+export default function InfoPopover({ title, body, testKey, ariaLabel, className }: Props) {
   return (
     <Popover>
       <PopoverTrigger asChild>

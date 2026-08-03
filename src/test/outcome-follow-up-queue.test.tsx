@@ -122,16 +122,18 @@ describe("OutcomeFollowUpQueue", () => {
     renderQueue([episode("a", "improved"), episode("b", "worsened")]);
     const region = screen.getByRole("region", { name: /follow-up review/i });
     const text = region.textContent ?? "";
-    expect(text).toMatch(/grower-recorded|Other factors may have contributed|More follow-up is needed/);
-    expect(text).not.toMatch(/caused|fixed the plant|proved effective|guaranteed|best intervention/i);
+    expect(text).toMatch(
+      /grower-recorded|Other factors may have contributed|More follow-up is needed/,
+    );
+    expect(text).not.toMatch(
+      /caused|fixed the plant|proved effective|guaranteed|best intervention/i,
+    );
     // The footer keeps the "nothing is automatic" boundary visible.
     expect(text).toMatch(/nothing is automatic/i);
   });
 
   it("exposes the safe decision CTA for decision-pending episodes", () => {
     renderQueue([episode("a", "improved")]);
-    expect(
-      screen.getByRole("button", { name: /choose next-run decision/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /choose next-run decision/i })).toBeInTheDocument();
   });
 });

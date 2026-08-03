@@ -69,12 +69,8 @@ describe("buildLegalPageJsonLd", () => {
 
   it("rejects invalid paths and empty fields", () => {
     expect(() => buildLegalPageCanonicalUrl("privacy")).toThrow();
-    expect(() =>
-      buildLegalPageJsonLd({ path: "/privacy", name: " ", description: "d" }),
-    ).toThrow();
-    expect(() =>
-      buildLegalPageJsonLd({ path: "/privacy", name: "n", description: "" }),
-    ).toThrow();
+    expect(() => buildLegalPageJsonLd({ path: "/privacy", name: " ", description: "d" })).toThrow();
+    expect(() => buildLegalPageJsonLd({ path: "/privacy", name: "n", description: "" })).toThrow();
   });
 
   it("emits no undefined/null fields and no secret-shaped strings", () => {

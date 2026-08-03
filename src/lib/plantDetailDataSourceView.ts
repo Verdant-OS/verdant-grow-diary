@@ -29,18 +29,9 @@
 import type { GrowDataSource } from "@/hooks/useGrowData";
 import type { SnapshotSource } from "@/lib/sensorSnapshot";
 
-export type PlantDetailDataSourceLabel =
-  | "Live"
-  | "Manual"
-  | "Demo"
-  | "Stale"
-  | "Unavailable";
+export type PlantDetailDataSourceLabel = "Live" | "Manual" | "Demo" | "Stale" | "Unavailable";
 
-export type PlantDetailDataSourceBadgeVariant =
-  | "default"
-  | "secondary"
-  | "outline"
-  | "destructive";
+export type PlantDetailDataSourceBadgeVariant = "default" | "secondary" | "outline" | "destructive";
 
 export interface PlantDetailDataSourceInput {
   /** Combined record-store source from combineGrowDataMeta. */
@@ -68,10 +59,7 @@ const BADGE_TEXT: Record<PlantDetailDataSourceLabel, string> = {
   Unavailable: "Unavailable",
 };
 
-const VARIANT_BY_LABEL: Record<
-  PlantDetailDataSourceLabel,
-  PlantDetailDataSourceBadgeVariant
-> = {
+const VARIANT_BY_LABEL: Record<PlantDetailDataSourceLabel, PlantDetailDataSourceBadgeVariant> = {
   Live: "default",
   Manual: "secondary",
   Demo: "outline",
@@ -102,8 +90,7 @@ const HELP: Record<
       "This is sample or simulated data so you can explore Verdant. It is not live tent data, not a real reading, and never drives persisted alerts or grow decisions.",
   },
   Stale: {
-    description:
-      "Readings may be outdated. Latest reading is older than the freshness window.",
+    description: "Readings may be outdated. Latest reading is older than the freshness window.",
     helpTitle: "Stale data",
     helpBody:
       "The latest sensor or manual reading for this plant is older than Verdant's freshness window, so it may not reflect current tent conditions. Capture a fresh reading before acting on it.",
@@ -132,9 +119,7 @@ export function buildPlantDetailDataSourceView(
   };
 }
 
-function resolveLabel(
-  input: PlantDetailDataSourceInput,
-): PlantDetailDataSourceLabel {
+function resolveLabel(input: PlantDetailDataSourceInput): PlantDetailDataSourceLabel {
   const { recordSource, snapshotSource, isStale } = input;
 
   // 1. Demo / sample always wins — never let demo look live.
@@ -145,10 +130,7 @@ function resolveLabel(
   if (recordSource === "mixed") return "Demo";
 
   // 2. Unavailable when nothing trustworthy is known.
-  if (
-    recordSource === "unavailable" &&
-    (!snapshotSource || snapshotSource === "unavailable")
-  ) {
+  if (recordSource === "unavailable" && (!snapshotSource || snapshotSource === "unavailable")) {
     return "Unavailable";
   }
 

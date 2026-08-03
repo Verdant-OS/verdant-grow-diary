@@ -239,7 +239,7 @@ export function buildEcowittLiveProofViewModel(
   const candidate =
     candidateRow !== null ? classifyEcowittProofRow(candidateRow, physicalHistory, nowMs) : null;
 
-  const isLegacyBridgeSource = candidate?.sourceKind === "legacy_ecowitt" ? true : false;
+  const isLegacyBridgeSource = candidate?.sourceKind === "legacy_ecowitt";
 
   const candidateCapturedAt = candidateRow?.captured_at ?? candidateRow?.ts ?? null;
 

@@ -2,13 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveCaller, hasRole, type Caller } from "@/lib/permissions";
 
-export type LeadStatus =
-  | "new"
-  | "reviewed"
-  | "contacted"
-  | "follow_up"
-  | "closed"
-  | "spam";
+export type LeadStatus = "new" | "reviewed" | "contacted" | "follow_up" | "closed" | "spam";
 
 export interface LeadRow {
   id: string;
@@ -35,12 +29,7 @@ export interface UseLeadsListResult {
   reload: () => void;
   updateLead: (
     id: string,
-    patch: Partial<
-      Pick<
-        LeadRow,
-        "status" | "operator_notes" | "contacted_at" | "follow_up_at"
-      >
-    >,
+    patch: Partial<Pick<LeadRow, "status" | "operator_notes" | "contacted_at" | "follow_up_at">>,
   ) => Promise<{ error: string | null }>;
 }
 
@@ -112,48 +101,38 @@ export function useLeadsList(opts: UseLeadsListOptions = {}): UseLeadsListResult
     return () => {
       cancelled = true;
     };
-  }, [opts.leadType, opts.source, opts.status, nonce]);
+  }, [opts.leadType, opts.source, opts.status]);
 
-  const updateLead = useCallback<UseLeadsListResult["updateLead"]>(
-    async (id, patch) => {
-      // Allow-list: original lead submission fields (name, email, company,
-      // role, lead_type, source, message) are immutable from the UI.
-      const ALLOWED = [
-        "status",
-        "operator_notes",
-        "contacted_at",
-        "follow_up_at",
-      ] as const;
-      const safePatch: {
-        status?: LeadStatus;
-        operator_notes?: string | null;
-        contacted_at?: string | null;
-        follow_up_at?: string | null;
-      } = {};
-      for (const k of ALLOWED) {
-        if (k in patch) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (safePatch as any)[k] = (patch as any)[k];
-        }
+  const updateLead = useCallback<UseLeadsListResult["updateLead"]>(async (id, patch) => {
+    // Allow-list: original lead submission fields (name, email, company,
+    // role, lead_type, source, message) are immutable from the UI.
+    const ALLOWED = ["status", "operator_notes", "contacted_at", "follow_up_at"] as const;
+    const safePatch: {
+      status?: LeadStatus;
+      operator_notes?: string | null;
+      contacted_at?: string | null;
+      follow_up_at?: string | null;
+    } = {};
+    for (const k of ALLOWED) {
+      if (k in patch) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (safePatch as any)[k] = (patch as any)[k];
       }
-      const { data, error: uErr } = await supabase
-        .from("leads")
-        .update(safePatch)
-        .eq("id", id)
-        .select(
-          "id, created_at, updated_at, name, email, company, role, lead_type, source, message, status, operator_notes, contacted_at, follow_up_at",
-        )
-        .maybeSingle();
-      if (uErr) return { error: uErr.message };
-      if (data) {
-        setLeads((prev) =>
-          prev.map((l) => (l.id === id ? ({ ...l, ...(data as LeadRow) }) : l)),
-        );
-      }
-      return { error: null };
-    },
-    [],
-  );
+    }
+    const { data, error: uErr } = await supabase
+      .from("leads")
+      .update(safePatch)
+      .eq("id", id)
+      .select(
+        "id, created_at, updated_at, name, email, company, role, lead_type, source, message, status, operator_notes, contacted_at, follow_up_at",
+      )
+      .maybeSingle();
+    if (uErr) return { error: uErr.message };
+    if (data) {
+      setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...(data as LeadRow) } : l)));
+    }
+    return { error: null };
+  }, []);
 
   return {
     loading,

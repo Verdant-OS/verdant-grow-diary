@@ -12,13 +12,7 @@
  *   - Autoflower-sensitive recommendations stay conservative.
  */
 
-export type SensorSourceCategory =
-  | "live"
-  | "manual"
-  | "demo"
-  | "stale"
-  | "invalid"
-  | "imported";
+export type SensorSourceCategory = "live" | "manual" | "demo" | "stale" | "invalid" | "imported";
 
 export type PlantStage =
   | "seedling"

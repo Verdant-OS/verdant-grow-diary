@@ -111,10 +111,7 @@ describe("analyze-progress — run directory input", () => {
       path.join(dir, "progress.jsonl"),
       assigned.map((f) => JSON.stringify(fileEvent(f))).join("\n") + "\n",
     );
-    fs.writeFileSync(
-      path.join(dir, "shard-files.json"),
-      JSON.stringify({ files: assigned }),
-    );
+    fs.writeFileSync(path.join(dir, "shard-files.json"), JSON.stringify({ files: assigned }));
     const r = analyzePath(dir);
     expect(r.assignedCount).toBe(2);
     expect(r.realEventCount).toBe(2);

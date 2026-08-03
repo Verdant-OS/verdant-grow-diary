@@ -60,10 +60,7 @@ export interface AlertWhyContextOnly {
   text: string;
 }
 
-export type AlertWhyContext =
-  | AlertWhyStageContext
-  | AlertWhyContextOnly
-  | AlertWhyUnavailable;
+export type AlertWhyContext = AlertWhyStageContext | AlertWhyContextOnly | AlertWhyUnavailable;
 
 const UNAVAILABLE: AlertWhyUnavailable = {
   kind: "unavailable",

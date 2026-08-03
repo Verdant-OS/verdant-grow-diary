@@ -68,7 +68,6 @@ export default function PlantDetailPhotoStrip({
     hasPrivatePhotoError,
   } = useDiaryPhotoDisplayRows(rawDiary as ReadonlyArray<DiaryPhotoDisplayRow> | null | undefined);
 
-
   const latestReviewsByPhotoId = useMemo(
     () => projectLatestPhotoDiagnosisReviewsByPhoto(rawDiary),
     [rawDiary],
@@ -206,7 +205,6 @@ export default function PlantDetailPhotoStrip({
             Add a photo to start building visual plant memory.
           </p>
         </div>
-
       ) : (
         <ul
           data-testid="plant-detail-photo-strip-list"

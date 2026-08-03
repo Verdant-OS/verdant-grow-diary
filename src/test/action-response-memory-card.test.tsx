@@ -66,7 +66,14 @@ function memory(over?: {
       },
     ],
     sensorRows: over?.sensorSnapshotId
-      ? [{ id: over.sensorSnapshotId, tent_id: "tent-1", source: "manual", captured_at: "2026-07-02T11:00:00Z" }]
+      ? [
+          {
+            id: over.sensorSnapshotId,
+            tent_id: "tent-1",
+            source: "manual",
+            captured_at: "2026-07-02T11:00:00Z",
+          },
+        ]
       : [],
   });
   return memories[0];
@@ -149,7 +156,9 @@ describe("links and internal ids", () => {
   });
 
   it("6. no internal id or storage path appears as visible or accessible text", () => {
-    const { container } = renderCard(memory({ photoReference: STORAGE_REF, sensorSnapshotId: SNAP_ID }));
+    const { container } = renderCard(
+      memory({ photoReference: STORAGE_REF, sensorSnapshotId: SNAP_ID }),
+    );
     const text = container.textContent ?? "";
     expect(text).not.toContain(ROW_ID);
     expect(text).not.toContain(ACTION_ID);

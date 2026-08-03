@@ -350,15 +350,10 @@ describe("buildPhenoEvidencePackets — batch grouping", () => {
 
 describe("separation from structured readiness", () => {
   it("the packet module never imports the readiness model or ranks anything", () => {
-    const src = readFileSync(
-      resolve(process.cwd(), "src/lib/phenoEvidencePacket.ts"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(process.cwd(), "src/lib/phenoEvidencePacket.ts"), "utf8");
     // Comments may DOCUMENT the separation; the code itself must not import
     // the readiness model or emit readiness values.
-    const stripped = src
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+    const stripped = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
     expect(stripped).not.toMatch(/phenoCandidateReadiness/);
     expect(stripped).not.toMatch(/comparison_ready/);
     expect(stripped.toLowerCase()).not.toMatch(

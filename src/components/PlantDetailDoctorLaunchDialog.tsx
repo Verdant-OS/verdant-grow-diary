@@ -150,7 +150,7 @@ export default function PlantDetailDoctorLaunchDialog({
 
   useEffect(() => {
     setOpen(false);
-  }, [plantId]);
+  }, []);
 
   const { data: rawRows } = usePlantRecentActivity(plantId);
   const { items: evidenceItems } = useTimelineMemory(

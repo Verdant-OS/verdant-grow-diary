@@ -20,12 +20,7 @@ export type AssignedTentActionStatus =
   | "simulated"
   | string;
 
-export type AssignedTentActionRisk =
-  | "low"
-  | "medium"
-  | "high"
-  | "critical"
-  | string;
+export type AssignedTentActionRisk = "low" | "medium" | "high" | "critical" | string;
 
 export interface AssignedTentActionInputRow {
   id: string;
@@ -62,9 +57,7 @@ export const ASSIGNED_TENT_ACTIONS_DEFAULT_LIMIT = 5;
 
 const ALERT_BACK_POINTER_RE = /\[alert:([a-zA-Z0-9_-]+)\]/;
 
-export function extractAlertBackPointerId(
-  reason: string | null | undefined,
-): string | null {
+export function extractAlertBackPointerId(reason: string | null | undefined): string | null {
   if (!reason) return null;
   const m = ALERT_BACK_POINTER_RE.exec(reason);
   return m ? m[1] : null;

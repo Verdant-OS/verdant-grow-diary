@@ -22,10 +22,7 @@
  */
 
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import {
-  buildSigningString,
-  computeHmacSha256Hex,
-} from "../_shared/lib/lib/piIngestAuthRules.ts";
+import { buildSigningString, computeHmacSha256Hex } from "../_shared/lib/lib/piIngestAuthRules.ts";
 
 const REQUIRED_ENV = [
   "PI_INGEST_SMOKE_FUNCTION_URL",
@@ -58,9 +55,7 @@ function readConfig(): SmokeConfig | null {
   const bridgeSecret = get("PI_INGEST_SMOKE_BRIDGE_SECRET");
   const tentId = get("PI_INGEST_SMOKE_TENT_ID");
   if (missing.length > 0) {
-    console.log(
-      `[pi-ingest-readings smoke] skipped — missing env: ${missing.join(", ")}`,
-    );
+    console.log(`[pi-ingest-readings smoke] skipped — missing env: ${missing.join(", ")}`);
     return null;
   }
   const tsOverride = Deno.env.get("PI_INGEST_SMOKE_TIMESTAMP_MS");
@@ -94,10 +89,7 @@ function buildEnvelope(cfg: SmokeConfig): string {
   });
 }
 
-async function signHeaders(
-  cfg: SmokeConfig,
-  rawBody: string,
-): Promise<Record<string, string>> {
+async function signHeaders(cfg: SmokeConfig, rawBody: string): Promise<Record<string, string>> {
   const u = new URL(cfg.url);
   const ts = String(Math.floor(cfg.nowMs / 1000));
   const signingString = buildSigningString("POST", u.pathname, ts, rawBody);
@@ -170,13 +162,10 @@ Deno.test("pi-ingest-readings deployed smoke: full ingest → replay → tampere
   );
 
   // 3) Tampered signature → 401, no internals leaked
-  const tamperedSig = headers["x-bridge-signature"].slice(0, -1) +
+  const tamperedSig =
+    headers["x-bridge-signature"].slice(0, -1) +
     (headers["x-bridge-signature"].endsWith("a") ? "b" : "a");
-  const tampered = await post(
-    cfg,
-    { ...headers, "x-bridge-signature": tamperedSig },
-    rawBody,
-  );
+  const tampered = await post(cfg, { ...headers, "x-bridge-signature": tamperedSig }, rawBody);
   assertEquals(tampered.status, 401, `tampered expected 401, got ${tampered.status}`);
   assertNoLeak(tampered.json);
 

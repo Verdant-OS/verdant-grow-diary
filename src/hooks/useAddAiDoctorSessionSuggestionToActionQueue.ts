@@ -75,11 +75,7 @@ export async function probeExistingAiDoctorActionQueueRows(
 export function useAddAiDoctorSessionSuggestionToActionQueue() {
   const queryClient = useQueryClient();
 
-  return useMutation<
-    AddAiDoctorSessionSuggestionResult,
-    Error,
-    AddAiDoctorSessionSuggestionInput
-  >({
+  return useMutation<AddAiDoctorSessionSuggestionResult, Error, AddAiDoctorSessionSuggestionInput>({
     mutationFn: async ({ session, action }) => {
       const draftResult = buildActionQueueDraftFromAiDoctorSession(session, action);
       if (!draftResult.ok) {
@@ -90,9 +86,7 @@ export function useAddAiDoctorSessionSuggestionToActionQueue() {
 
       // Dedupe probe — never blocks insert on terminal-status rows.
       const candidates = await probeExistingAiDoctorActionQueueRows(session);
-      const match = candidates.find((row) =>
-        sessionActionMatchesExisting(row, session, action),
-      );
+      const match = candidates.find((row) => sessionActionMatchesExisting(row, session, action));
       if (match) {
         return { status: "duplicate_skipped", existingActionQueueId: match.id };
       }

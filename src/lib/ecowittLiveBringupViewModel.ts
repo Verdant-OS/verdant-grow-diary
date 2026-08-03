@@ -70,14 +70,12 @@ const STEPS: readonly EcowittBringupStep[] = Object.freeze([
     id: "mosquitto-running",
     label: "Confirm Mosquitto broker is running",
     status: "blocked",
-    operator_action:
-      "Start the local Mosquitto broker in verbose mode in its own terminal.",
+    operator_action: "Start the local Mosquitto broker in verbose mode in its own terminal.",
     expected_evidence:
       "Verbose broker log shows listener bound on the expected port and ready to accept client connections.",
     success_criteria:
       "Broker prints 'mosquitto version ... starting' and 'Opening ... listen socket on port'.",
-    blocked_if:
-      "Broker process is not running, port is in use, or no listener is bound.",
+    blocked_if: "Broker process is not running, port is in use, or no listener is bound.",
     safety_notes:
       "Broker logs may include client IPs. Do not share screenshots that reveal home network details.",
   },
@@ -87,14 +85,11 @@ const STEPS: readonly EcowittBringupStep[] = Object.freeze([
     status: "blocked",
     operator_action:
       "Open the EcoWitt mobile app and verify DIY/custom upload is enabled and points at the local listener or bridge.",
-    expected_evidence:
-      "App screenshot showing DIY/custom server URL, path, and upload interval.",
+    expected_evidence: "App screenshot showing DIY/custom server URL, path, and upload interval.",
     success_criteria:
       "App shows upload destination matching the operator's listener and a recent upload timestamp.",
-    blocked_if:
-      "DIY upload is disabled, points at a stale URL, or has not uploaded recently.",
-    safety_notes:
-      "Screenshots may contain WAN IPs or tokens. Redact secrets before sharing.",
+    blocked_if: "DIY upload is disabled, points at a stale URL, or has not uploaded recently.",
+    safety_notes: "Screenshots may contain WAN IPs or tokens. Redact secrets before sharing.",
   },
   {
     id: "listener-reachable",
@@ -102,44 +97,31 @@ const STEPS: readonly EcowittBringupStep[] = Object.freeze([
     status: "blocked",
     operator_action:
       "From the operator workstation, verify the listener/bridge endpoint responds on the LAN.",
-    expected_evidence:
-      "Local health endpoint or TCP connect returns a 2xx / open-socket response.",
-    success_criteria:
-      "Listener responds within a reasonable LAN latency window.",
-    blocked_if:
-      "Endpoint is unreachable, firewalled, or returns a non-2xx status.",
-    safety_notes:
-      "Do not expose the listener to the public internet during bring-up.",
+    expected_evidence: "Local health endpoint or TCP connect returns a 2xx / open-socket response.",
+    success_criteria: "Listener responds within a reasonable LAN latency window.",
+    blocked_if: "Endpoint is unreachable, firewalled, or returns a non-2xx status.",
+    safety_notes: "Do not expose the listener to the public internet during bring-up.",
   },
   {
     id: "mqtt-subscribe",
     label: "Subscribe to MQTT topic",
     status: "blocked",
-    operator_action:
-      "Open a second terminal and subscribe to the EcoWitt MQTT topic tree.",
-    expected_evidence:
-      "Subscriber prints retained or live messages with EcoWitt payload keys.",
-    success_criteria:
-      "Subscriber shows at least one raw payload arriving from the broker.",
-    blocked_if:
-      "No messages appear within a reasonable wait window or auth is rejected.",
-    safety_notes:
-      "Raw payloads can include MAC addresses. Treat as private network data.",
+    operator_action: "Open a second terminal and subscribe to the EcoWitt MQTT topic tree.",
+    expected_evidence: "Subscriber prints retained or live messages with EcoWitt payload keys.",
+    success_criteria: "Subscriber shows at least one raw payload arriving from the broker.",
+    blocked_if: "No messages appear within a reasonable wait window or auth is rejected.",
+    safety_notes: "Raw payloads can include MAC addresses. Treat as private network data.",
   },
   {
     id: "local-valid-payload",
     label: "Send a valid local test payload",
     status: "blocked",
-    operator_action:
-      "Use the local sender script to publish a known-valid EcoWitt-shaped payload.",
-    expected_evidence:
-      "Subscriber sees the payload; backend log shows an accepted normalization.",
+    operator_action: "Use the local sender script to publish a known-valid EcoWitt-shaped payload.",
+    expected_evidence: "Subscriber sees the payload; backend log shows an accepted normalization.",
     success_criteria:
       "Backend records the payload with source label 'live' or 'manual' as appropriate and a present captured_at.",
-    blocked_if:
-      "Backend rejects a valid payload or no record appears.",
-    safety_notes:
-      "Use the bundled fixture payload only. Do not paste live secrets into test data.",
+    blocked_if: "Backend rejects a valid payload or no record appears.",
+    safety_notes: "Use the bundled fixture payload only. Do not paste live secrets into test data.",
   },
   {
     id: "local-invalid-payload",
@@ -147,14 +129,10 @@ const STEPS: readonly EcowittBringupStep[] = Object.freeze([
     status: "blocked",
     operator_action:
       "Use the local sender script with the invalid fixture to publish a malformed payload.",
-    expected_evidence:
-      "Backend logs show a rejection with a clear validation reason.",
-    success_criteria:
-      "Backend refuses the payload and does not classify it as healthy or live.",
-    blocked_if:
-      "Backend silently accepts a malformed payload or stores it as healthy.",
-    safety_notes:
-      "Confirm rejection does not still produce an alert or Action Queue suggestion.",
+    expected_evidence: "Backend logs show a rejection with a clear validation reason.",
+    success_criteria: "Backend refuses the payload and does not classify it as healthy or live.",
+    blocked_if: "Backend silently accepts a malformed payload or stores it as healthy.",
+    safety_notes: "Confirm rejection does not still produce an alert or Action Queue suggestion.",
   },
   {
     id: "backend-accept-reject",
@@ -164,12 +142,9 @@ const STEPS: readonly EcowittBringupStep[] = Object.freeze([
       "Review backend ingest logs or the operator inspector for the two prior payloads.",
     expected_evidence:
       "Two log entries: one accepted with normalized fields, one rejected with reason.",
-    success_criteria:
-      "Accept/reject behavior matches the operator's expectation for each payload.",
-    blocked_if:
-      "Backend evidence is missing, ambiguous, or contradicts the local sender.",
-    safety_notes:
-      "Do not paste log excerpts containing tokens, MAC addresses, or WAN IPs.",
+    success_criteria: "Accept/reject behavior matches the operator's expectation for each payload.",
+    blocked_if: "Backend evidence is missing, ambiguous, or contradicts the local sender.",
+    safety_notes: "Do not paste log excerpts containing tokens, MAC addresses, or WAN IPs.",
   },
   {
     id: "controller-vs-backend",
@@ -194,10 +169,8 @@ const STEPS: readonly EcowittBringupStep[] = Object.freeze([
       "Walk through the GO/NO-GO rules below and choose the matching status. Record the decision off-platform for now.",
     expected_evidence:
       "A written GO, NO-GO, or HOLD note tied to the captured_at window reviewed above.",
-    success_criteria:
-      "Decision is recorded with the evidence that supports it.",
-    blocked_if:
-      "Any required evidence field above is missing or ambiguous.",
+    success_criteria: "Decision is recorded with the evidence that supports it.",
+    blocked_if: "Any required evidence field above is missing or ambiguous.",
     safety_notes:
       "Grower approval remains required for any future action. No automation or device control flows from this page.",
   },
@@ -210,8 +183,7 @@ const COMMANDS: readonly EcowittBringupCommand[] = Object.freeze([
     environment: "Operator workstation (PowerShell)",
     command: '& "C:\\Program Files\\mosquitto\\mosquitto.exe" -v',
     purpose: "Start the local MQTT broker with verbose logging.",
-    safety_note:
-      "Verbose logs may include client IPs. Keep the terminal local to the operator.",
+    safety_note: "Verbose logs may include client IPs. Keep the terminal local to the operator.",
   },
   {
     id: "mqtt-subscribe",
@@ -219,36 +191,30 @@ const COMMANDS: readonly EcowittBringupCommand[] = Object.freeze([
     environment: "Operator workstation (any shell)",
     command: 'mosquitto_sub -t "ecowitt/#" -v',
     purpose: "Watch raw EcoWitt messages flowing through the broker.",
-    safety_note:
-      "Payloads may contain MAC addresses. Treat as private network data.",
+    safety_note: "Payloads may contain MAC addresses. Treat as private network data.",
   },
   {
     id: "local-sender-valid",
     label: "Local sender — valid payload",
     environment: "Repository root",
     command: "bun run dev:send-ecowitt",
-    purpose:
-      "Publish a known-valid EcoWitt-shaped fixture to the broker for end-to-end checks.",
-    safety_note:
-      "Fixture payload only. Do not embed live tokens or production data.",
+    purpose: "Publish a known-valid EcoWitt-shaped fixture to the broker for end-to-end checks.",
+    safety_note: "Fixture payload only. Do not embed live tokens or production data.",
   },
   {
     id: "local-sender-invalid",
     label: "Local sender — invalid payload",
     environment: "Repository root",
     command: "bun run dev:send-ecowitt:invalid",
-    purpose:
-      "Publish a malformed payload to confirm the backend rejects it cleanly.",
-    safety_note:
-      "Rejection must not produce an alert or Action Queue suggestion.",
+    purpose: "Publish a malformed payload to confirm the backend rejects it cleanly.",
+    safety_note: "Rejection must not produce an alert or Action Queue suggestion.",
   },
   {
     id: "edge-function-serve",
     label: "Local Edge Function serve (sensor ingest webhook)",
     environment: "Repository root",
     command: "supabase functions serve sensor-ingest-webhook",
-    purpose:
-      "Serve the ingest webhook locally so the bridge can target a local URL.",
+    purpose: "Serve the ingest webhook locally so the bridge can target a local URL.",
     safety_note:
       "Local-only. Do not expose this port publicly. Tokens are loaded from local env files outside this page's scope.",
   },
@@ -258,8 +224,7 @@ const COMMANDS: readonly EcowittBringupCommand[] = Object.freeze([
     environment: "Operator workstation",
     command: "curl http://localhost:8787/health",
     purpose: "Confirm the local listener is up before sending payloads.",
-    safety_note:
-      "If this returns non-2xx, do not proceed with payload sends.",
+    safety_note: "If this returns non-2xx, do not proceed with payload sends.",
   },
 ]);
 
@@ -277,8 +242,7 @@ const EVIDENCE_FIELDS: readonly EcowittEvidenceField[] = Object.freeze([
     label: "EcoWitt app/controller humidity",
     example: "58 %RH",
     required_for_ready: true,
-    why_it_matters:
-      "Humidity stuck at 0 or 100 is a sensor failure, never a healthy reading.",
+    why_it_matters: "Humidity stuck at 0 or 100 is a sensor failure, never a healthy reading.",
   },
   {
     id: "ecowitt-app-soil-moisture",
@@ -300,16 +264,14 @@ const EVIDENCE_FIELDS: readonly EcowittEvidenceField[] = Object.freeze([
     label: "MQTT raw payload timestamp",
     example: "2026-06-09T22:14:03Z",
     required_for_ready: true,
-    why_it_matters:
-      "Timestamp anchors captured_at. Stale payloads must not display as current.",
+    why_it_matters: "Timestamp anchors captured_at. Stale payloads must not display as current.",
   },
   {
     id: "mqtt-raw-values",
     label: "MQTT raw payload values",
     example: "tempc=24.7, humidity=58, soilmoisture1=32",
     required_for_ready: true,
-    why_it_matters:
-      "Raw values are the ground truth against which normalization is checked.",
+    why_it_matters: "Raw values are the ground truth against which normalization is checked.",
   },
   {
     id: "normalized-payload",
@@ -356,16 +318,14 @@ const EVIDENCE_FIELDS: readonly EcowittEvidenceField[] = Object.freeze([
     label: "Tent ID present",
     example: "tent_abc123",
     required_for_ready: true,
-    why_it_matters:
-      "Readings without a tent are not actionable and must not be silently dropped.",
+    why_it_matters: "Readings without a tent are not actionable and must not be silently dropped.",
   },
   {
     id: "plant-id-present",
     label: "Plant ID present (when relevant)",
     example: "plant_xyz789",
     required_for_ready: false,
-    why_it_matters:
-      "Plant-scoped sensors must carry a plant_id to power AI Doctor context.",
+    why_it_matters: "Plant-scoped sensors must carry a plant_id to power AI Doctor context.",
   },
   {
     id: "operator-screenshot",
@@ -465,9 +425,7 @@ function resolveGeneratedAt(now?: string | Date): string {
   return now.toISOString();
 }
 
-export function buildEcowittLiveBringupViewModel(
-  now?: string | Date,
-): EcowittLiveBringupViewModel {
+export function buildEcowittLiveBringupViewModel(now?: string | Date): EcowittLiveBringupViewModel {
   const vm: EcowittLiveBringupViewModel = {
     title: "EcoWitt Live Bring-Up",
     subtitle:
@@ -487,13 +445,7 @@ export function buildEcowittLiveBringupViewModel(
   return Object.freeze(vm);
 }
 
-export const ECOWITT_BRINGUP_STEP_IDS: readonly string[] = STEPS.map(
-  (s) => s.id,
-);
-export const ECOWITT_BRINGUP_COMMAND_IDS: readonly string[] = COMMANDS.map(
-  (c) => c.id,
-);
-export const ECOWITT_BRINGUP_EVIDENCE_IDS: readonly string[] =
-  EVIDENCE_FIELDS.map((e) => e.id);
-export const ECOWITT_BRINGUP_GO_NO_GO_IDS: readonly string[] =
-  GO_NO_GO_RULES.map((r) => r.id);
+export const ECOWITT_BRINGUP_STEP_IDS: readonly string[] = STEPS.map((s) => s.id);
+export const ECOWITT_BRINGUP_COMMAND_IDS: readonly string[] = COMMANDS.map((c) => c.id);
+export const ECOWITT_BRINGUP_EVIDENCE_IDS: readonly string[] = EVIDENCE_FIELDS.map((e) => e.id);
+export const ECOWITT_BRINGUP_GO_NO_GO_IDS: readonly string[] = GO_NO_GO_RULES.map((r) => r.id);

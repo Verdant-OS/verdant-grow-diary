@@ -24,6 +24,27 @@ import {
 
 export { TanStackOutlet as Outlet };
 
+/**
+ * TanStack stamps internal fields onto history state (`key`, `__TSR_*`,
+ * `__hashScrollIntoViewOptions`, …). React Router exposes user state only
+ * and uses `null` when none remains — strip internals for parity so
+ * checkout/one-shot markers that navigate with `state: null` clear cleanly.
+ */
+function isTanStackInternalStateKey(key: string): boolean {
+  return key === "key" || key.startsWith("__");
+}
+
+function compatLocationState(raw: unknown): unknown {
+  if (raw == null) return null;
+  if (typeof raw !== "object" || Array.isArray(raw)) return raw;
+  const rest: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (isTanStackInternalStateKey(k)) continue;
+    rest[k] = v;
+  }
+  return Object.keys(rest).length === 0 ? null : rest;
+}
+
 export interface CompatLocation {
   pathname: string;
   search: string;
@@ -41,7 +62,7 @@ export function useLocation(): CompatLocation {
         pathname: location.pathname,
         search: location.searchStr ?? "",
         hash: location.hash ? `#${location.hash.replace(/^#/, "")}` : "",
-        state: location.state,
+        state: compatLocationState(location.state),
         key: location.href,
       };
     },
@@ -117,9 +138,7 @@ export function useNavigate(): CompatNavigateFunction {
   }) as CompatNavigateFunction;
 }
 
-
-export interface CompatLinkProps
-  extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> {
+export interface CompatLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> {
   to: string;
   replace?: boolean;
   state?: unknown;
@@ -158,7 +177,8 @@ export const NavLink = forwardRef<HTMLAnchorElement, CompatNavLinkProps>(functio
   ref,
 ) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const isActive = end === true ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
+  const isActive =
+    end === true ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
   const renderProps = { isActive, isPending: false };
   const resolvedClassName = typeof className === "function" ? className(renderProps) : className;
   const resolvedChildren = typeof children === "function" ? children(renderProps) : children;

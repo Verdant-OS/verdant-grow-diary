@@ -25,15 +25,9 @@ export interface DiaryFaqLinkStatsPanelProps {
   className?: string;
 }
 
-export default function DiaryFaqLinkStatsPanel({
-  className,
-}: DiaryFaqLinkStatsPanelProps) {
-  const [ranked, setRanked] = useState(() =>
-    rankDiaryFaqLinkClicks(readDiaryFaqLinkClickCounts()),
-  );
-  const [enabled, setEnabled] = useState(() =>
-    isDiaryFaqLinkClickTrackingEnabled(),
-  );
+export default function DiaryFaqLinkStatsPanel({ className }: DiaryFaqLinkStatsPanelProps) {
+  const [ranked, setRanked] = useState(() => rankDiaryFaqLinkClicks(readDiaryFaqLinkClickCounts()));
+  const [enabled, setEnabled] = useState(() => isDiaryFaqLinkClickTrackingEnabled());
 
   const refresh = useCallback(() => {
     setRanked(rankDiaryFaqLinkClicks(readDiaryFaqLinkClickCounts()));
@@ -53,18 +47,13 @@ export default function DiaryFaqLinkStatsPanel({
     <section
       data-testid="diary-faq-link-stats-panel"
       data-tracking-enabled={String(enabled)}
-      className={cn(
-        "rounded-lg border border-border/60 p-5 bg-card/40",
-        className,
-      )}
+      className={cn("rounded-lg border border-border/60 p-5 bg-card/40", className)}
       aria-label="Your most-linked FAQ topics from the diary"
     >
       <header className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <BarChart3 className="h-4 w-4 text-muted-foreground" aria-hidden />
-          <h2 className="font-display text-lg font-semibold">
-            Your most-linked FAQ topics
-          </h2>
+          <h2 className="font-display text-lg font-semibold">Your most-linked FAQ topics</h2>
         </div>
         {ranked.length > 0 && (
           <button
@@ -84,15 +73,12 @@ export default function DiaryFaqLinkStatsPanel({
 
       <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-border/40 bg-background/40 px-3 py-2">
         <div className="min-w-0">
-          <Label
-            htmlFor="diary-faq-link-tracking-toggle"
-            className="text-sm font-medium"
-          >
+          <Label htmlFor="diary-faq-link-tracking-toggle" className="text-sm font-medium">
             Track Related FAQ clicks in this browser
           </Label>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Local only. No account, entry, or plant data is recorded.
-            Existing counts are kept if you turn this off.
+            Local only. No account, entry, or plant data is recorded. Existing counts are kept if
+            you turn this off.
           </p>
         </div>
         <Switch
@@ -108,10 +94,7 @@ export default function DiaryFaqLinkStatsPanel({
       </div>
 
       {ranked.length === 0 ? (
-        <p
-          data-testid="diary-faq-link-stats-empty"
-          className="mt-4 text-sm text-muted-foreground"
-        >
+        <p data-testid="diary-faq-link-stats-empty" className="mt-4 text-sm text-muted-foreground">
           {enabled
             ? "No Related FAQ clicks recorded yet. Open a Related FAQ link from your diary and the topic will show up here."
             : "Tracking is off. Turn it back on to start counting new Related FAQ clicks."}

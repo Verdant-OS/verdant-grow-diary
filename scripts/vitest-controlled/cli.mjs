@@ -722,8 +722,6 @@ async function executeBatches(
     // Always regenerate summary after each batch.
     writeSummaryArtifacts(runDir);
     if (result.timedOut) {
-      // deadline expired — remaining files stay incomplete; do not fail.
-      continue;
     }
   }
   process.off("SIGINT", onSig);

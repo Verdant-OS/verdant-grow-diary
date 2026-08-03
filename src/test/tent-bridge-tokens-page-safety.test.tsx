@@ -77,9 +77,7 @@ describe("TentBridgeTokensCard — page integration safety", () => {
     });
     expect(bridgeTokensSelectSpy).not.toHaveBeenCalled();
     expect(fromSpy).not.toHaveBeenCalledWith("bridge_tokens");
-    expect(
-      screen.getByText(/No bridge tokens yet/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/No bridge tokens yet/i)).toBeInTheDocument();
     assertNoLeaks();
   });
 
@@ -92,13 +90,9 @@ describe("TentBridgeTokensCard — page integration safety", () => {
         details: "PostgrestError raw SQL detail",
       },
     });
-    render(
-      <TentBridgeTokensCard tentId="11111111-1111-1111-1111-111111111111" />,
-    );
+    render(<TentBridgeTokensCard tentId="11111111-1111-1111-1111-111111111111" />);
     await screen.findByTestId("bridge-token-load-failed");
-    expect(
-      screen.getByText(/Bridge token status unavailable/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Bridge token status unavailable/i)).toBeInTheDocument();
     expect(screen.getByText(/Token secrets were not loaded/i)).toBeInTheDocument();
     assertNoLeaks();
   });
@@ -120,9 +114,7 @@ describe("TentBridgeTokensCard — page integration safety", () => {
       ],
       error: null,
     });
-    render(
-      <TentBridgeTokensCard tentId="22222222-2222-2222-2222-222222222222" />,
-    );
+    render(<TentBridgeTokensCard tentId="22222222-2222-2222-2222-222222222222" />);
     await screen.findByText(/esp32-shelf-1/);
     assertNoLeaks();
   });

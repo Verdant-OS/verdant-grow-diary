@@ -4,9 +4,7 @@ import { resolve } from "node:path";
 import { evaluateBridgeTentScope } from "@/lib/piIngestBridgeTentScopeRules";
 import type { BridgeCredentialMetadata } from "@/lib/piIngestBridgeCredentialMetadataResolver";
 
-function cred(
-  overrides: Partial<BridgeCredentialMetadata> = {},
-): BridgeCredentialMetadata {
+function cred(overrides: Partial<BridgeCredentialMetadata> = {}): BridgeCredentialMetadata {
   return {
     id: "id-1",
     userId: "user-1",
@@ -24,23 +22,21 @@ function cred(
 
 describe("evaluateBridgeTentScope — happy path", () => {
   it("returns ok when tent is in allowedTentIds", () => {
-    expect(
-      evaluateBridgeTentScope({ credential: cred(), tentId: "tent-1" }),
-    ).toEqual({ ok: true });
-    expect(
-      evaluateBridgeTentScope({ credential: cred(), tentId: "tent-2" }),
-    ).toEqual({ ok: true });
+    expect(evaluateBridgeTentScope({ credential: cred(), tentId: "tent-1" })).toEqual({ ok: true });
+    expect(evaluateBridgeTentScope({ credential: cred(), tentId: "tent-2" })).toEqual({ ok: true });
   });
 });
 
 describe("evaluateBridgeTentScope — rejections", () => {
   it("rejects unknown_bridge when credential is null/undefined", () => {
-    expect(
-      evaluateBridgeTentScope({ credential: null, tentId: "tent-1" }),
-    ).toEqual({ ok: false, reason: "unknown_bridge" });
-    expect(
-      evaluateBridgeTentScope({ credential: undefined, tentId: "tent-1" }),
-    ).toEqual({ ok: false, reason: "unknown_bridge" });
+    expect(evaluateBridgeTentScope({ credential: null, tentId: "tent-1" })).toEqual({
+      ok: false,
+      reason: "unknown_bridge",
+    });
+    expect(evaluateBridgeTentScope({ credential: undefined, tentId: "tent-1" })).toEqual({
+      ok: false,
+      reason: "unknown_bridge",
+    });
   });
 
   it("rejects inactive credential", () => {
@@ -54,16 +50,18 @@ describe("evaluateBridgeTentScope — rejections", () => {
 
   it("rejects missing_tent_id for null/undefined/empty tentId", () => {
     for (const t of [null, undefined, "", "   "]) {
-      expect(
-        evaluateBridgeTentScope({ credential: cred(), tentId: t }),
-      ).toEqual({ ok: false, reason: "missing_tent_id" });
+      expect(evaluateBridgeTentScope({ credential: cred(), tentId: t })).toEqual({
+        ok: false,
+        reason: "missing_tent_id",
+      });
     }
   });
 
   it("rejects tent_not_allowed when tent is not in allowedTentIds", () => {
-    expect(
-      evaluateBridgeTentScope({ credential: cred(), tentId: "tent-99" }),
-    ).toEqual({ ok: false, reason: "tent_not_allowed" });
+    expect(evaluateBridgeTentScope({ credential: cred(), tentId: "tent-99" })).toEqual({
+      ok: false,
+      reason: "tent_not_allowed",
+    });
   });
 
   it("rejects tent_not_allowed when allowedTentIds is empty", () => {
@@ -89,9 +87,10 @@ describe("evaluateBridgeTentScope — rejections", () => {
 
 describe("evaluateBridgeTentScope — precedence", () => {
   it("unknown_bridge beats every other reason", () => {
-    expect(
-      evaluateBridgeTentScope({ credential: null, tentId: null }),
-    ).toEqual({ ok: false, reason: "unknown_bridge" });
+    expect(evaluateBridgeTentScope({ credential: null, tentId: null })).toEqual({
+      ok: false,
+      reason: "unknown_bridge",
+    });
   });
 
   it("inactive beats missing_tent_id and tent_not_allowed", () => {
@@ -123,10 +122,7 @@ describe("evaluateBridgeTentScope — defensive input", () => {
 });
 
 describe("evaluateBridgeTentScope — static safety", () => {
-  const RAW = readFileSync(
-    resolve(__dirname, "../lib/piIngestBridgeTentScopeRules.ts"),
-    "utf8",
-  );
+  const RAW = readFileSync(resolve(__dirname, "../lib/piIngestBridgeTentScopeRules.ts"), "utf8");
   const SRC = RAW.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 
   it.each([

@@ -47,7 +47,7 @@ export function useLeadEvents(leadId: string | null, refreshKey: number = 0) {
     return () => {
       cancelled = true;
     };
-  }, [leadId, refreshKey]);
+  }, [leadId]);
 
   return { events, loading, error };
 }

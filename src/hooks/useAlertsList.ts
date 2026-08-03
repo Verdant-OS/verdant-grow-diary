@@ -67,7 +67,7 @@ export function useAlertsList(
     return () => {
       cancelled = true;
     };
-  }, [growId, queryStatus, querySeverity, nonce, enabled]);
+  }, [growId, queryStatus, querySeverity, enabled]);
 
   return { status, alerts, error, reload };
 }

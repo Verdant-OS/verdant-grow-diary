@@ -1,7 +1,7 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-02 UTC / 2026-08-01 America/Chicago
-**Updated by:** Codex (Implementation and Integration Lead)
+**Last updated:** 2026-08-03 UTC / 2026-08-03 America/Chicago  
+**Updated by:** Grok Build (merge hygiene + #699 train)
 
 This is the changing shift report. Permanent rules live in `/AGENTS.md`; do not edit
 that constitution to record branch, deployment, blocker, or assignment changes.
@@ -16,8 +16,8 @@ inside the active governance handoff.
 
 | Branch               | Role                                             | Verified head                                               |
 | -------------------- | ------------------------------------------------ | ----------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `a20776993bd606f07977674934864b888a407e1c`                  |
-| `main`               | Integration branch. It is not production parity. | `2bd6fa6016add1d3ea9f50415355601cbaefb37f` at this snapshot |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `069636b6f58b9122bd57241efca897518967d400`                  |
+| `main`               | Integration branch. It is not production parity. | `ecc9ae4b95dcf34163d33465bc442566b359f8e2` at this snapshot |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
 `main`, and do not backport deploy-only governance or data rules without a scoped branch
@@ -31,6 +31,20 @@ The deploy-branch governance integration is complete in PR #626, and reconciliat
 It changes readiness evidence, artifacts, and tests only; it is **not** deployment evidence.
 
 ---
+
+
+---
+
+## Recent merge commit hashes (exact)
+
+| PR | Title | Base | Merge commit (full SHA) | Merged at (UTC) |
+| -- | ----- | ---- | ----------------------- | --------------- |
+| [#681](https://github.com/Verdant-OS/verdant-grow-diary/pull/681) | docs(agents): refresh current operating state | `verdant-grow-diary` | `dd3b47570458c4afbaf6c2ae2736fccbefb7fedc` | 2026-08-03T22:55:11Z |
+| [#701](https://github.com/Verdant-OS/verdant-grow-diary/pull/701) | docs(skill): CI contract hygiene (PR #630 lessons) | `main` | `ecc9ae4b95dcf34163d33465bc442566b359f8e2` | 2026-08-03T23:07:46Z |
+
+Closed without merge: **#634** (superseded by #701), **#688** / **#689** (SNC obsolete; base has `"strict": true`).
+
+Active (no merge SHA yet): **#699** head `2fac5c65506a6db79ec22af0b88521b4b5eb235b`; stack **#702** (#691→#692) parked until green.
 
 ## Production status
 

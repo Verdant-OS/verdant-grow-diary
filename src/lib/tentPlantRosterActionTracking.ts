@@ -17,10 +17,7 @@
 
 export const TENT_ROSTER_ACTION_EVENT = "verdant:tent-roster-action" as const;
 
-export type TentPlantRosterTrackingAction =
-  | "view_diary"
-  | "add_quick_log"
-  | "view_photos";
+export type TentPlantRosterTrackingAction = "view_diary" | "add_quick_log" | "view_photos";
 
 export interface TentPlantRosterTrackingDetail {
   action: TentPlantRosterTrackingAction;

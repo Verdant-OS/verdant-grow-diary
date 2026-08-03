@@ -208,7 +208,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   // Reset pagination whenever the query, filters, or new results arrive.
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE);
-  }, [query, results, enabledTypes]);
+  }, []);
 
   const visibleResults = useMemo(
     () => filteredResults.slice(0, visibleCount),
@@ -357,7 +357,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     const map = new Map<string, GlobalSearchResult>();
     for (const row of visibleResults) map.set(rowKey(row), row);
     return map;
-  }, [visibleResults]);
+  }, [visibleResults, rowKey]);
   const activeValue = previewRow ? rowKey(previewRow) : undefined;
 
   return (
@@ -751,7 +751,11 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                               label: string;
                               testId: string;
                               fallbackType:
-                                "observation" | "watering" | "feeding" | "environment" | null;
+                                | "observation"
+                                | "watering"
+                                | "feeding"
+                                | "environment"
+                                | null;
                             }>
                           ).map(({ actionId, label, testId, fallbackType }) => (
                             <Button

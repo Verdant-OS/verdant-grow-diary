@@ -82,9 +82,7 @@ describe("ecowittLiveEvidenceTemplates — static safety", () => {
     resolve(__dirname, "../../src/lib/ecowittLiveEvidenceTemplates.ts"),
     "utf8",
   );
-  const noComments = src
-    .replace(/\/\/.*$/gm, "")
-    .replace(/\/\*[\s\S]*?\*\//g, "");
+  const noComments = src.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
   it("does not call Date.now()", () => {
     expect(noComments).not.toMatch(/Date\.now\s*\(/);
   });

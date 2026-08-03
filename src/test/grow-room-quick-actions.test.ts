@@ -24,10 +24,7 @@ import {
 
 const ROOT = resolve(__dirname, "../..");
 const PAGE = readFileSync(resolve(ROOT, "src/pages/GrowRoomMode.tsx"), "utf8");
-const RULES = readFileSync(
-  resolve(ROOT, "src/lib/growRoomQuickActionRules.ts"),
-  "utf8",
-);
+const RULES = readFileSync(resolve(ROOT, "src/lib/growRoomQuickActionRules.ts"), "utf8");
 
 const tent = { id: "tent-1", name: "Veg Tent", grow_id: "grow-1" };
 
@@ -49,16 +46,12 @@ describe("getPrimaryPlantForTent", () => {
   });
 
   it("ignores archived plants", () => {
-    const result = getPrimaryPlantForTent(tent.id, [
-      plant({ id: "a", is_archived: true }),
-    ]);
+    const result = getPrimaryPlantForTent(tent.id, [plant({ id: "a", is_archived: true })]);
     expect(result).toBeNull();
   });
 
   it("ignores plants attached to other tents", () => {
-    const result = getPrimaryPlantForTent(tent.id, [
-      plant({ id: "a", tent_id: "tent-other" }),
-    ]);
+    const result = getPrimaryPlantForTent(tent.id, [plant({ id: "a", tent_id: "tent-other" })]);
     expect(result).toBeNull();
   });
 
@@ -146,9 +139,7 @@ describe("buildGrowRoomQuickActionLinks", () => {
 
   it("Plant-scoped prefill is null when no plant context exists", () => {
     const noPlant = buildGrowRoomQuickActionLinks({ tent, plantId: null });
-    expect(noPlant.find((l) => l.kind === "quick_log")!.quickLogPrefill?.plantId).toBe(
-      null,
-    );
+    expect(noPlant.find((l) => l.kind === "quick_log")!.quickLogPrefill?.plantId).toBe(null);
   });
 
   it("never returns an executable device-command surface", () => {
@@ -194,21 +185,11 @@ describe("GrowRoomMode page · quick action wiring", () => {
     // helper, so verify the testId prefix and that the helper supplies all
     // six kinds.
     expect(PAGE).toMatch(/grow-room-action-\$\{action\.kind\}/);
-    const kinds = buildGrowRoomQuickActionLinks({ tent, plantId: null }).map(
-      (l) => l.kind,
-    );
-    for (const k of [
-      "quick_log",
-      "watering",
-      "feeding",
-      "photo",
-      "daily_check",
-      "view_tent",
-    ]) {
+    const kinds = buildGrowRoomQuickActionLinks({ tent, plantId: null }).map((l) => l.kind);
+    for (const k of ["quick_log", "watering", "feeding", "photo", "daily_check", "view_tent"]) {
       expect(kinds).toContain(k);
     }
   });
-
 
   it("wires QuickLog dialog with prefill from quick-action click", () => {
     expect(PAGE).toMatch(/from\s+"@\/components\/QuickLog"/);
@@ -255,9 +236,7 @@ describe("GrowRoomMode page · static safety", () => {
 
   it("introduces no alert persistence writes", () => {
     expect(PAGE).not.toMatch(/usePersistEnvironmentAlerts/);
-    expect(PAGE).not.toMatch(
-      /\.from\(\s*["']alerts["']\s*\)\s*\.(insert|update|delete|upsert)\(/,
-    );
+    expect(PAGE).not.toMatch(/\.from\(\s*["']alerts["']\s*\)\s*\.(insert|update|delete|upsert)\(/);
   });
 
   it("does not reference pi-ingest / Edge Functions / service_role", () => {

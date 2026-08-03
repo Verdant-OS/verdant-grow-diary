@@ -31,8 +31,8 @@ describe("duplicate safety — the property that must never regress", () => {
     // Every other reason returns before or below the ledger write, so only
     // this one proves the key is spent. If a second reason ever starts
     // retiring, someone must prove it cannot duplicate a committed event.
-    const retiring = BREEDING_LOG_SAVE_EVENT_REASONS.filter(
-      (r) => shouldRetireSubmissionKey(resolveBreedingSubmissionKeyDisposition(r)),
+    const retiring = BREEDING_LOG_SAVE_EVENT_REASONS.filter((r) =>
+      shouldRetireSubmissionKey(resolveBreedingSubmissionKeyDisposition(r)),
     );
     expect(retiring.sort()).toEqual(["idempotency_key_conflict", "invalid_idempotency_key"]);
   });

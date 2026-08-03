@@ -62,4 +62,3 @@ test.describe("GA4 tag smoke", () => {
     expect(configCall?.[2]).toMatchObject({ send_page_view: false });
   });
 });
-

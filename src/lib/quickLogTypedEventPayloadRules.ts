@@ -90,11 +90,7 @@ export const TRAINING_TECHNIQUES: ReadonlySet<string> = new Set([
   "other",
 ]);
 
-export const TRAINING_INTENSITIES: ReadonlySet<string> = new Set([
-  "light",
-  "medium",
-  "heavy",
-]);
+export const TRAINING_INTENSITIES: ReadonlySet<string> = new Set(["light", "medium", "heavy"]);
 
 // ---------------------------------------------------------------------------
 // Coercion helpers (pure)
@@ -221,45 +217,72 @@ function checkCo2(v: unknown, code: string): FieldResult {
 
 const SUBTYPE_KNOWN_KEYS: Record<TypedEventKind, ReadonlySet<string>> = {
   watering: new Set([
-    "volume_ml", "watering_amount_ml", "wateringAmountMl",
-    "watering_amount", "wateringAmount",
-    "watering_amount_l", "wateringAmountL",
-    "ph", "pH", "ec", "EC",
-    "runoff_ml", "runoffMl",
-    "runoff_ph", "runoffPh",
-    "runoff_ec", "runoffEc",
+    "volume_ml",
+    "watering_amount_ml",
+    "wateringAmountMl",
+    "watering_amount",
+    "wateringAmount",
+    "watering_amount_l",
+    "wateringAmountL",
+    "ph",
+    "pH",
+    "ec",
+    "EC",
+    "runoff_ml",
+    "runoffMl",
+    "runoff_ph",
+    "runoffPh",
+    "runoff_ec",
+    "runoffEc",
   ]),
   feeding: new Set([
-    "ph", "pH", "ec", "EC",
-    "volume_ml", "watering_amount_ml", "wateringAmountMl",
-    "watering_amount", "wateringAmount",
-    "watering_amount_l", "wateringAmountL",
-    "nutrient_brand", "nutrientBrand", "brand",
-    "recipe", "nutrients",
+    "ph",
+    "pH",
+    "ec",
+    "EC",
+    "volume_ml",
+    "watering_amount_ml",
+    "wateringAmountMl",
+    "watering_amount",
+    "wateringAmount",
+    "watering_amount_l",
+    "wateringAmountL",
+    "nutrient_brand",
+    "nutrientBrand",
+    "brand",
+    "recipe",
+    "nutrients",
   ]),
-  photo: new Set([
-    "photo_url", "photoUrl",
-    "caption",
-    "taken_at", "takenAt",
-  ]),
+  photo: new Set(["photo_url", "photoUrl", "caption", "taken_at", "takenAt"]),
   observation: new Set([
-    "symptom_type", "symptomType", "symptoms",
+    "symptom_type",
+    "symptomType",
+    "symptoms",
     "severity",
-    "affected_area", "affectedArea",
+    "affected_area",
+    "affectedArea",
     "details",
   ]),
-  training: new Set([
-    "technique",
-    "intensity",
-    "affected_nodes", "affectedNodes",
-  ]),
+  training: new Set(["technique", "intensity", "affected_nodes", "affectedNodes"]),
   environment: new Set([
-    "temperature_c", "temperatureC", "temp", "temperature",
-    "humidity_pct", "humidityPct", "rh", "humidity",
-    "vpd_kpa", "vpdKpa", "vpd",
-    "co2_ppm", "co2Ppm", "co2",
-    "light_on", "lightOn",
-    "light_hours", "lightHours",
+    "temperature_c",
+    "temperatureC",
+    "temp",
+    "temperature",
+    "humidity_pct",
+    "humidityPct",
+    "rh",
+    "humidity",
+    "vpd_kpa",
+    "vpdKpa",
+    "vpd",
+    "co2_ppm",
+    "co2Ppm",
+    "co2",
+    "light_on",
+    "lightOn",
+    "light_hours",
+    "lightHours",
   ]),
 };
 
@@ -292,9 +315,7 @@ function pick(d: Record<string, unknown> | null | undefined, ...keys: string[]):
 // Watering volume normalizer (ml or l)
 // ---------------------------------------------------------------------------
 
-function readVolumeMl(
-  d: Record<string, unknown> | null | undefined,
-): FieldResult {
+function readVolumeMl(d: Record<string, unknown> | null | undefined): FieldResult {
   if (!d) return {};
   if (d.watering_amount_l != null || d.wateringAmountL != null) {
     const lRaw = d.watering_amount_l ?? d.wateringAmountL;
@@ -370,10 +391,7 @@ export function quickLogToTypedEventPayload(
       if (ph.error) return { ok: false, reason: ph.error, warnings };
       const ec = checkEc(pick(details, "ec", "EC"), "ec");
       if (ec.error) return { ok: false, reason: ec.error, warnings };
-      const runoffMl = checkVolumeMl(
-        pick(details, "runoff_ml", "runoffMl"),
-        "runoff_volume",
-      );
+      const runoffMl = checkVolumeMl(pick(details, "runoff_ml", "runoffMl"), "runoff_volume");
       if (runoffMl.error) return { ok: false, reason: runoffMl.error, warnings };
       const runoffPh = checkPh(pick(details, "runoff_ph", "runoffPh"), "runoff_ph");
       if (runoffPh.error) return { ok: false, reason: runoffPh.error, warnings };
@@ -395,11 +413,9 @@ export function quickLogToTypedEventPayload(
       if (ec.error) return { ok: false, reason: ec.error, warnings };
       const vol = readVolumeMl(details);
       if (vol.error) return { ok: false, reason: vol.error, warnings };
-      const brand = toStringOrNull(
-        pick(details, "nutrient_brand", "nutrientBrand", "brand"),
-      );
+      const brand = toStringOrNull(pick(details, "nutrient_brand", "nutrientBrand", "brand"));
       const recipeRaw = pick(details, "recipe", "nutrients");
-      let recipe: unknown = undefined;
+      let recipe: unknown;
       if (recipeRaw != null) {
         if (isPlainObject(recipeRaw) || Array.isArray(recipeRaw)) {
           recipe = recipeRaw;
@@ -417,14 +433,12 @@ export function quickLogToTypedEventPayload(
     }
     case "photo": {
       const photo_url =
-        toStringOrNull(pick(details, "photo_url", "photoUrl")) ??
-        toStringOrNull(draft.photo_url);
+        toStringOrNull(pick(details, "photo_url", "photoUrl")) ?? toStringOrNull(draft.photo_url);
       if (!photo_url) {
         return { ok: false, reason: "photo_url:missing", warnings };
       }
       const caption = toStringOrNull(pick(details, "caption")) ?? note;
-      const taken_at =
-        toIsoOrNull(pick(details, "taken_at", "takenAt")) ?? occurred_at;
+      const taken_at = toIsoOrNull(pick(details, "taken_at", "takenAt")) ?? occurred_at;
       subtypePayload.photo_url = photo_url;
       if (caption) subtypePayload.caption = caption;
       if (taken_at) subtypePayload.taken_at = taken_at;
@@ -450,11 +464,8 @@ export function quickLogToTypedEventPayload(
         }
         severity = severityRaw;
       }
-      const affected_area = toStringOrNull(
-        pick(details, "affected_area", "affectedArea"),
-      );
-      const detailsText =
-        toStringOrNull(pick(details, "details")) ?? note;
+      const affected_area = toStringOrNull(pick(details, "affected_area", "affectedArea"));
+      const detailsText = toStringOrNull(pick(details, "details")) ?? note;
 
       if (symptom_type) subtypePayload.symptom_type = symptom_type;
       if (severity) subtypePayload.severity = severity;
@@ -508,15 +519,12 @@ export function quickLogToTypedEventPayload(
       if (vpd.error) return { ok: false, reason: vpd.error, warnings };
       const co2 = checkCo2(pick(details, "co2_ppm", "co2Ppm", "co2"), "co2_ppm");
       if (co2.error) return { ok: false, reason: co2.error, warnings };
-      const lightHours = checkLightHours(
-        pick(details, "light_hours", "lightHours"),
-        "light_hours",
-      );
+      const lightHours = checkLightHours(pick(details, "light_hours", "lightHours"), "light_hours");
       if (lightHours.error) {
         return { ok: false, reason: lightHours.error, warnings };
       }
       const lightOnRaw = pick(details, "light_on", "lightOn");
-      let light_on: boolean | undefined = undefined;
+      let light_on: boolean | undefined;
       if (lightOnRaw != null) {
         if (typeof lightOnRaw === "boolean") light_on = lightOnRaw;
         else if (lightOnRaw === "true") light_on = true;
@@ -582,9 +590,7 @@ const RPC_READINESS: Record<TypedEventKind, TypedEventWriteReadiness> = {
  * Callers MUST refuse to perform a typed write when this returns
  * "rpc_missing" — the non-atomic two-step insert path is unsafe.
  */
-export function getTypedEventWriteReadiness(
-  eventType: string,
-): TypedEventWriteReadiness {
+export function getTypedEventWriteReadiness(eventType: string): TypedEventWriteReadiness {
   if (!KNOWN_EVENT_TYPES.has(eventType as TypedEventKind)) {
     return "rpc_missing";
   }

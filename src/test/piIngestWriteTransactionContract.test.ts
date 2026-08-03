@@ -43,24 +43,45 @@ describe("pi-ingest write-transaction contract — required content", () => {
   it.each([
     ["atomic write requirement", /atomic/i],
     ["both succeed or neither succeeds", /both\s+succeed\s+or\s+neither\s+succeeds/i],
-    ["no idempotency key for failed sensor row", /no\s+idempotency\s+key\s+may\s+be\s+recorded\s+for\s+a\s+sensor\s+row\s+that\s+failed/i],
-    ["no sensor row without idempotency key", /no\s+sensor\s+row\s+may\s+be\s+inserted\s+without\s+its\s+idempotency\s+key/i],
+    [
+      "no idempotency key for failed sensor row",
+      /no\s+idempotency\s+key\s+may\s+be\s+recorded\s+for\s+a\s+sensor\s+row\s+that\s+failed/i,
+    ],
+    [
+      "no sensor row without idempotency key",
+      /no\s+sensor\s+row\s+may\s+be\s+inserted\s+without\s+its\s+idempotency\s+key/i,
+    ],
     ["idempotency is per-reading", /per-?reading/i],
     ["forbids requestHash", /no\s+`?requestHash`?/i],
     ["forbids request_hash", /no\s+`?request_hash`?/i],
-    ["no idempotency_key column on sensor_readings", /sensor_readings[\s\S]{0,80}MUST NOT[\s\S]{0,80}idempotency_key/],
+    [
+      "no idempotency_key column on sensor_readings",
+      /sensor_readings[\s\S]{0,80}MUST NOT[\s\S]{0,80}idempotency_key/,
+    ],
     ["unique constraint (user_id, idempotency_key)", /\(user_id,\s*idempotency_key\)/],
     ["server-resolved user_id", /server-resolved\s+`?user_id`?/i],
-    ["no client-provided user_id", /(no|MUST\s+NOT\s+accept)\s+(a\s+)?client-(provided|controlled)\s+(owner\s+id|`?user_id`?)/i],
+    [
+      "no client-provided user_id",
+      /(no|MUST\s+NOT\s+accept)\s+(a\s+)?client-(provided|controlled)\s+(owner\s+id|`?user_id`?)/i,
+    ],
     ["recommends RPC / SQL transaction", /RPC[\s\S]{0,80}transaction|Postgres\s+(RPC|function)/i],
-    ["no alerts writes", /no\s+alerts?\s+writes|no\s+direct\s+alert\s+writes|MUST\s+NOT\s+create\s+alerts/i],
-    ["no Action Queue writes", /no\s+`?action_queue`?\s+writes|MUST\s+NOT\s+create\s+Action\s+Queue/i],
+    [
+      "no alerts writes",
+      /no\s+alerts?\s+writes|no\s+direct\s+alert\s+writes|MUST\s+NOT\s+create\s+alerts/i,
+    ],
+    [
+      "no Action Queue writes",
+      /no\s+`?action_queue`?\s+writes|MUST\s+NOT\s+create\s+Action\s+Queue/i,
+    ],
     ["no automation/device-control writes", /no\s+automation|device.control/i],
     ["endpoint stays auth_ok_pipeline_not_implemented", /auth_ok_pipeline_not_implemented/],
     ["failure behavior section", /failure\s+behavior/i],
     ["response behavior section", /response\s+behavior/i],
     ["stop-ship conditions section", /stop-ship\s+conditions/i],
-    ["forbids logging key/secret material", /logging[\s\S]{0,160}(idempotency\s+keys|secret|signature)/i],
+    [
+      "forbids logging key/secret material",
+      /logging[\s\S]{0,160}(idempotency\s+keys|secret|signature)/i,
+    ],
   ])("documents: %s", (_label, re) => {
     expect(DOC).toMatch(re);
   });
@@ -105,7 +126,9 @@ describe("pi-ingest write-transaction contract — repo guardrails", () => {
     for (const f of files) {
       const text = readFileSync(f, "utf8");
       expect(text, `alerts write found in ${f}`).not.toMatch(/from\(\s*["']alerts["']\s*\)/);
-      expect(text, `action_queue write found in ${f}`).not.toMatch(/from\(\s*["']action_queue["']\s*\)/);
+      expect(text, `action_queue write found in ${f}`).not.toMatch(
+        /from\(\s*["']action_queue["']\s*\)/,
+      );
     }
   });
 
@@ -113,7 +136,9 @@ describe("pi-ingest write-transaction contract — repo guardrails", () => {
     const files = walk(FN_DIR).filter((p) => /\.(ts)$/.test(p) && !/\.test\.ts$/.test(p));
     for (const f of files) {
       const text = readFileSync(f, "utf8");
-      expect(text, `device-control reference in ${f}`).not.toMatch(/device[_-]?control|automation_trigger|equipment_command/i);
+      expect(text, `device-control reference in ${f}`).not.toMatch(
+        /device[_-]?control|automation_trigger|equipment_command/i,
+      );
     }
   });
 });

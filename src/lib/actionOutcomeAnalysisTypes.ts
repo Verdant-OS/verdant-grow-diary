@@ -20,10 +20,18 @@
 import type { SensorSource } from "@/lib/sensor/sensorSourceRules";
 
 export type ActionOutcomeClassification =
-  "improved" | "unchanged" | "declined" | "mixed" | "insufficient_evidence";
+  | "improved"
+  | "unchanged"
+  | "declined"
+  | "mixed"
+  | "insufficient_evidence";
 
 export type OutcomeAgreement =
-  "agrees" | "partially_agrees" | "conflicts" | "not_comparable" | "no_grower_outcome";
+  | "agrees"
+  | "partially_agrees"
+  | "conflicts"
+  | "not_comparable"
+  | "no_grower_outcome";
 
 export type EvidenceQuality = "high" | "medium" | "low" | "unusable";
 
@@ -98,7 +106,11 @@ export type VerifiedCompletedAction = {
 };
 
 export type GrowerActionFollowUpOutcome =
-  "improved" | "unchanged" | "declined" | "too_soon" | "unclear";
+  | "improved"
+  | "unchanged"
+  | "declined"
+  | "too_soon"
+  | "unclear";
 
 export type GrowerActionFollowUp = {
   actionQueueId: string;

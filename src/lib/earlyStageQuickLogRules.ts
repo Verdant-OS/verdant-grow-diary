@@ -68,10 +68,7 @@ function isEarlyStageString(value: string | null | undefined): boolean {
   return v === "seedling" || v === "germination" || v === "germ";
 }
 
-function isWithinEarlyAgeWindow(
-  plantCreatedAt: string | null | undefined,
-  now: Date,
-): boolean {
+function isWithinEarlyAgeWindow(plantCreatedAt: string | null | undefined, now: Date): boolean {
   if (!plantCreatedAt) return false;
   const created = new Date(plantCreatedAt);
   if (Number.isNaN(created.getTime())) return false;
@@ -91,9 +88,7 @@ function isWithinEarlyAgeWindow(
  */
 export type EarlyStageVisibility = "visible" | "suggested" | "hidden";
 
-export function evaluateEarlyStageVisibility(
-  input: EarlyStageContextInput,
-): EarlyStageVisibility {
+export function evaluateEarlyStageVisibility(input: EarlyStageContextInput): EarlyStageVisibility {
   const now = input.now ?? new Date();
   if (isEarlyStageString(input.stage)) return "visible";
   // Past-early stages explicitly hide the section.
@@ -116,17 +111,11 @@ export function evaluateEarlyStageVisibility(
 }
 
 export function isMilestoneValue(value: unknown): value is EarlyStageMilestone {
-  return (
-    typeof value === "string" &&
-    EARLY_STAGE_MILESTONES.some((m) => m.value === value)
-  );
+  return typeof value === "string" && EARLY_STAGE_MILESTONES.some((m) => m.value === value);
 }
 
 export function isVigorValue(value: unknown): value is EarlyStageVigor {
-  return (
-    typeof value === "string" &&
-    EARLY_STAGE_VIGOR_OPTIONS.some((v) => v.value === value)
-  );
+  return typeof value === "string" && EARLY_STAGE_VIGOR_OPTIONS.some((v) => v.value === value);
 }
 
 export interface EarlyStageDetailsInput {
@@ -156,9 +145,7 @@ export function buildEarlyStageDetails(
   const milestone = isMilestoneValue(input.milestone) ? input.milestone : null;
   const vigor = isVigorValue(input.vigor) ? input.vigor : null;
   const notes =
-    typeof input.notes === "string" && input.notes.trim().length > 0
-      ? input.notes.trim()
-      : null;
+    typeof input.notes === "string" && input.notes.trim().length > 0 ? input.notes.trim() : null;
   if (!milestone && !vigor && !notes) return null;
   const stageRaw = typeof input.stage === "string" ? input.stage.trim() : "";
   return {
@@ -173,16 +160,12 @@ export function buildEarlyStageDetails(
  * Human-readable suffix appended to the diary note so the milestone is
  * visible in timelines that read the note column.
  */
-export function buildEarlyStageNoteSuffix(
-  input: EarlyStageDetailsInput,
-): string {
+export function buildEarlyStageNoteSuffix(input: EarlyStageDetailsInput): string {
   const envelope = buildEarlyStageDetails(input);
   if (!envelope) return "";
   const parts: string[] = [];
   if (envelope.early_stage_milestone) {
-    const opt = EARLY_STAGE_MILESTONES.find(
-      (m) => m.value === envelope.early_stage_milestone,
-    );
+    const opt = EARLY_STAGE_MILESTONES.find((m) => m.value === envelope.early_stage_milestone);
     if (opt) parts.push(`Milestone: ${opt.notePhrase}`);
   }
   if (envelope.vigor) {

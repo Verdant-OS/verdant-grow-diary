@@ -59,9 +59,7 @@ function isFiniteNumber(v: unknown): v is number {
 export const DEFAULT_VPD_DRIFT_ALPHA = 0.3;
 export const DEFAULT_VPD_DRIFT_MIN_READINGS = 6;
 
-export function evaluateVpdDriftEwma(
-  input: EvaluateVpdDriftEwmaInput,
-): VpdDriftResult {
+export function evaluateVpdDriftEwma(input: EvaluateVpdDriftEwmaInput): VpdDriftResult {
   const band = input.band ?? null;
   const low = band && isFiniteNumber(band.lowKpa) ? band.lowKpa : null;
   const high = band && isFiniteNumber(band.highKpa) ? band.highKpa : null;
@@ -150,9 +148,7 @@ export interface AiDoctorVpdDriftContext {
   suggestReview: boolean;
 }
 
-export function buildVpdDriftAiContext(
-  result: VpdDriftResult,
-): AiDoctorVpdDriftContext {
+export function buildVpdDriftAiContext(result: VpdDriftResult): AiDoctorVpdDriftContext {
   const baseNotes: string[] = [
     "VPD drift is advisory only: do not auto-create Action Queue items or device commands from this signal.",
     "Do not recommend nutrient, irrigation, or equipment changes from VPD alone.",

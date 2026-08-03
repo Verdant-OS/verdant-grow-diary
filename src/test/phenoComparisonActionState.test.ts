@@ -133,9 +133,7 @@ describe("buildPhenoComparisonActionState", () => {
       ...base,
       replicationReadinessRecorded: false,
     });
-    const item = s.missingEvidenceItems.find(
-      (i) => i.id === "replication_readiness",
-    );
+    const item = s.missingEvidenceItems.find((i) => i.id === "replication_readiness");
     expect(item?.nextStepTarget).toBeNull();
     expect(item?.nextStepLabel).toBeNull();
   });

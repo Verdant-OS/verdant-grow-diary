@@ -90,21 +90,15 @@ describe("EcowittBridgeDebug page", () => {
       screen.getByTestId("ecowitt-bridge-debug-forwarding-error-report-section"),
     ).toBeInTheDocument();
     // Reuses the widget (refresh + copy buttons come from it).
-    expect(
-      await screen.findByTestId("ecowitt-local-forwarding-refresh"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("ecowitt-local-forwarding-copy-report"),
-    ).toBeInTheDocument();
+    expect(await screen.findByTestId("ecowitt-local-forwarding-refresh")).toBeInTheDocument();
+    expect(screen.getByTestId("ecowitt-local-forwarding-copy-report")).toBeInTheDocument();
   });
 
   it("never renders bridge tokens, ingest URLs, Authorization, PASSKEY, raw payloads, service_role, or JWTs", async () => {
     mockFetch(LEAKY_STATUS);
     renderPage();
     await waitFor(() =>
-      expect(
-        screen.getByTestId("ecowitt-local-forwarding-headline"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("ecowitt-local-forwarding-headline")).toBeInTheDocument(),
     );
     // Scope leak assertions to the dynamic widget content only — the
     // page's static explanatory copy intentionally mentions terms like
@@ -151,7 +145,15 @@ describe("EcowittBridgeDebug page", () => {
 
   it("refresh updates banner + rows after refreshed data returns", async () => {
     // First call: healthy. Second call: failed.
-    const HEALTHY = { ...LEAKY_STATUS, last_forward_status: 200, last_forward_error: null, last_forward_response_error: null, last_forward_response_classification: null, last_forward_response_reason: null, forward_failure_count: 0 };
+    const HEALTHY = {
+      ...LEAKY_STATUS,
+      last_forward_status: 200,
+      last_forward_error: null,
+      last_forward_response_error: null,
+      last_forward_response_classification: null,
+      last_forward_response_reason: null,
+      forward_failure_count: 0,
+    };
     let call = 0;
     const fn = vi.fn(async () => {
       call += 1;
@@ -165,16 +167,14 @@ describe("EcowittBridgeDebug page", () => {
     });
     vi.stubGlobal("fetch", fn);
     renderPage();
-    await waitFor(() =>
-      expect(screen.queryByTestId("ecowitt-local-forwarding-banner")).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("ecowitt-local-forwarding-banner")).toBeNull());
     fireEvent.click(screen.getByTestId("ecowitt-local-forwarding-refresh"));
     await waitFor(() =>
       expect(screen.getByTestId("ecowitt-local-forwarding-banner")).toBeInTheDocument(),
     );
-    expect(
-      screen.getByTestId("ecowitt-local-forwarding-banner-classification"),
-    ).toHaveTextContent("storage_insert_failed");
+    expect(screen.getByTestId("ecowitt-local-forwarding-banner-classification")).toHaveTextContent(
+      "storage_insert_failed",
+    );
   });
 
   it("handles offline/fetch failure with neutral copy and no leakage", async () => {

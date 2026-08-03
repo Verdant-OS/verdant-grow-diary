@@ -60,10 +60,7 @@ import {
  * code=invalid_channel_map_schema instead of being silently dropped by
  * the tolerant parser.
  */
-export function assertBridgeStartupSafe(
-  env: BridgeEnv,
-  rawChannelMapJson?: string | null,
-): void {
+export function assertBridgeStartupSafe(env: BridgeEnv, rawChannelMapJson?: string | null): void {
   assertEcowittSoilChannelMapJsonEnv(rawChannelMapJson ?? null);
   assertSingleTentSoilChannelMap(env.channelMap, env.defaultTentId);
 }
@@ -82,8 +79,7 @@ export interface BridgeEnv {
 }
 
 export function readBridgeEnv(env: NodeJS.ProcessEnv, argv: string[]): BridgeEnv {
-  const dryRun =
-    argv.includes("--dry-run") || env.ECOWITT_BRIDGE_DRY_RUN === "1";
+  const dryRun = argv.includes("--dry-run") || env.ECOWITT_BRIDGE_DRY_RUN === "1";
   return {
     ingestUrl: env.VERDANT_INGEST_URL ?? null,
     bridgeToken: env.VERDANT_BRIDGE_TOKEN ?? null,
@@ -258,8 +254,7 @@ const isMain =
     ? (import.meta as unknown as { main?: boolean }).main === true
     : false;
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface ConfigValidateFieldError {
   path: string;
@@ -385,7 +380,11 @@ export function runConfigValidate(
     return withHint({ ok: false, code: "missing_tent_id", message: "missing VERDANT_TENT_ID" });
   }
   if (!UUID_RE.test(tentId)) {
-    return withHint({ ok: false, code: "invalid_tent_id", message: "VERDANT_TENT_ID must be a UUID" });
+    return withHint({
+      ok: false,
+      code: "invalid_tent_id",
+      message: "VERDANT_TENT_ID must be a UUID",
+    });
   }
   const rawMap = env.ECOWITT_SOIL_CHANNEL_MAP_JSON ?? null;
   try {
@@ -546,9 +545,10 @@ export function buildConfigDebugEnvelope(
  * code when the flag is present but malformed (empty value, missing
  * following argument). Never touches the filesystem.
  */
-export function parseOutFlag(
-  args: string[],
-): { path: string | null; error?: { code: string; message: string } } {
+export function parseOutFlag(args: string[]): {
+  path: string | null;
+  error?: { code: string; message: string };
+} {
   let path: string | null = null;
   for (let i = 0; i < args.length; i += 1) {
     const a = args[i];
@@ -660,9 +660,7 @@ async function runCli(): Promise<void> {
     const res = runConfigValidate(process.env, { includeFixHints });
     if (res.ok) {
       // eslint-disable-next-line no-console
-      console.log(
-        JSON.stringify({ event: "config_ok", check: "ecowitt-bridge" }),
-      );
+      console.log(JSON.stringify({ event: "config_ok", check: "ecowitt-bridge" }));
       if (debug) {
         const dbg = buildConfigDebugEnvelope(process.env, process.argv);
         // Human-readable one-liner mirrors the redacted envelope; safe to
@@ -718,8 +716,6 @@ async function runCli(): Promise<void> {
     return;
   }
 
-
-
   const env = readBridgeEnv(process.env, process.argv);
   const log = (level: "info" | "warn" | "error", msg: string, extra?: unknown) => {
     // eslint-disable-next-line no-console
@@ -727,7 +723,6 @@ async function runCli(): Promise<void> {
     if (extra === undefined) fn(`[ecowitt-bridge] ${msg}`);
     else fn(`[ecowitt-bridge] ${msg}`, redactForLog(extra));
   };
-
 
   if (!env.dryRun) {
     if (!env.ingestUrl) {
@@ -764,7 +759,10 @@ async function runCli(): Promise<void> {
   });
 
   interface MqttLike {
-    connect: (url: string, opts: Record<string, unknown>) => {
+    connect: (
+      url: string,
+      opts: Record<string, unknown>,
+    ) => {
       on: (event: string, cb: (...args: unknown[]) => void) => void;
       subscribe: (topic: string, cb: (err: Error | null) => void) => void;
       end: (force?: boolean) => void;
@@ -782,7 +780,6 @@ async function runCli(): Promise<void> {
     process.exit(2);
     return;
   }
-
 
   const url =
     process.env.ECOWITT_MQTT_URL ??

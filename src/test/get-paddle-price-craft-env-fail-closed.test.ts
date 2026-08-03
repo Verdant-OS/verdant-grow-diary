@@ -21,10 +21,7 @@ const SRC = readFileSync(
   resolve(process.cwd(), "supabase/functions/get-paddle-price/index.ts"),
   "utf8",
 );
-const stripped = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(
-  /(^|[^:])\/\/[^\n]*/g,
-  "$1",
-);
+const stripped = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 
 describe("get-paddle-price — Craft env-var wiring", () => {
   it("reads PADDLE_PRICE_CRAFT_MONTHLY and PADDLE_PRICE_CRAFT_ANNUAL into SERVER_PRICE_CONFIG", () => {
@@ -48,9 +45,7 @@ describe("get-paddle-price — Craft env-var wiring", () => {
 
 describe("get-paddle-price — fail-closed comparison branch", () => {
   it("rejects the gateway result when the configured env var is empty OR mismatched", () => {
-    expect(stripped).toMatch(
-      /configuredId\.length === 0 \|\| paddleId !== configuredId/,
-    );
+    expect(stripped).toMatch(/configuredId\.length === 0 \|\| paddleId !== configuredId/);
     expect(SRC).toMatch(/price_resolution_unavailable/);
   });
 
@@ -100,11 +95,7 @@ describe("get-paddle-price — Craft fail-closed behavior", () => {
   });
 
   it("craft_monthly: PADDLE_PRICE_CRAFT_MONTHLY empty string → 502 price_resolution_unavailable", () => {
-    const res = resolvePaddleId(
-      "craft_monthly",
-      { PADDLE_PRICE_CRAFT_MONTHLY: "" },
-      gatewayId,
-    );
+    const res = resolvePaddleId("craft_monthly", { PADDLE_PRICE_CRAFT_MONTHLY: "" }, gatewayId);
     expect(res.status).toBe(502);
     expect(res.body.error).toBe("price_resolution_unavailable");
   });
@@ -121,11 +112,7 @@ describe("get-paddle-price — Craft fail-closed behavior", () => {
   });
 
   it("craft_monthly: whitespace-only env var never matches a real pri_ id → 502", () => {
-    const res = resolvePaddleId(
-      "craft_monthly",
-      { PADDLE_PRICE_CRAFT_MONTHLY: "   " },
-      gatewayId,
-    );
+    const res = resolvePaddleId("craft_monthly", { PADDLE_PRICE_CRAFT_MONTHLY: "   " }, gatewayId);
     expect(res.status).toBe(502);
     expect(res.body.error).toBe("price_resolution_unavailable");
   });

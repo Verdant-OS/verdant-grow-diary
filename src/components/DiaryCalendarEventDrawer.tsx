@@ -37,9 +37,7 @@ export default function DiaryCalendarEventDrawer({
             <SheetHeader className="text-left">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <SheetTitle className="text-base">
-                    {model.title}
-                  </SheetTitle>
+                  <SheetTitle className="text-base">{model.title}</SheetTitle>
                   <SheetDescription className="sr-only">
                     {DIARY_CALENDAR_DRAWER_DESCRIPTION}
                   </SheetDescription>
@@ -77,9 +75,7 @@ export default function DiaryCalendarEventDrawer({
                 title={model.summary.title}
               >
                 {model.noteSnippet && (
-                  <p className="text-xs whitespace-pre-wrap break-words">
-                    {model.noteSnippet}
-                  </p>
+                  <p className="text-xs whitespace-pre-wrap break-words">{model.noteSnippet}</p>
                 )}
                 <FieldList fields={model.summary.fields} />
                 {!model.noteSnippet && model.summary.fields.length === 0 && (
@@ -92,25 +88,21 @@ export default function DiaryCalendarEventDrawer({
                 title={model.measurements.title}
               >
                 <FieldList fields={model.measurements.fields} />
-                {model.measurements.ecPreview &&
-                  model.measurements.ecPreview.visible && (
-                    <p
-                      className="text-[11px] text-muted-foreground mt-1"
-                      data-testid="diary-calendar-event-drawer-ec-preview"
-                    >
-                      <span className="font-medium text-foreground">
-                        {model.measurements.ecPreview.label}:
-                      </span>{" "}
-                      {model.measurements.ecPreview.valueDisplay}
-                      <span className="ml-1 italic">
-                        ({model.measurements.ecPreview.disclaimer})
-                      </span>
-                    </p>
-                  )}
-                {model.measurements.fields.length === 0 &&
-                  !model.measurements.ecPreview && (
-                    <EmptyLine>No measurements recorded.</EmptyLine>
-                  )}
+                {model.measurements.ecPreview && model.measurements.ecPreview.visible && (
+                  <p
+                    className="text-[11px] text-muted-foreground mt-1"
+                    data-testid="diary-calendar-event-drawer-ec-preview"
+                  >
+                    <span className="font-medium text-foreground">
+                      {model.measurements.ecPreview.label}:
+                    </span>{" "}
+                    {model.measurements.ecPreview.valueDisplay}
+                    <span className="ml-1 italic">({model.measurements.ecPreview.disclaimer})</span>
+                  </p>
+                )}
+                {model.measurements.fields.length === 0 && !model.measurements.ecPreview && (
+                  <EmptyLine>No measurements recorded.</EmptyLine>
+                )}
               </DrawerSectionBlock>
 
               <DrawerSectionBlock
@@ -165,19 +157,13 @@ function DrawerSectionBlock({
       data-testid={testid}
       aria-label={title}
     >
-      <h3 className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">
-        {title}
-      </h3>
+      <h3 className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">{title}</h3>
       {children}
     </section>
   );
 }
 
-function FieldList({
-  fields,
-}: {
-  fields: { label: string; value: string }[];
-}) {
+function FieldList({ fields }: { fields: { label: string; value: string }[] }) {
   if (fields.length === 0) return null;
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">

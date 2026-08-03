@@ -8,8 +8,7 @@ import { resolve } from "node:path";
 import { stripSourceComments } from "@/test/utils/stripSourceComments";
 
 const ROOT = resolve(__dirname, "../..");
-const read = (p: string) =>
-  stripSourceComments(readFileSync(resolve(ROOT, p), "utf8"));
+const read = (p: string) => stripSourceComments(readFileSync(resolve(ROOT, p), "utf8"));
 
 const TARGETS = [
   { name: "aiDoctorContextRules", path: "src/lib/aiDoctorContextRules.ts" },

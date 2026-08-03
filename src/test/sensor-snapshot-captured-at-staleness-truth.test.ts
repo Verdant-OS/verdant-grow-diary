@@ -24,11 +24,7 @@ import {
   classifyQuickLogSnapshotSource,
   shouldEmbedSnapshot,
 } from "@/lib/quickLogSensorSnapshotRules";
-import {
-  computeFreshness,
-  FRESHNESS_FRESH_MAX_HOURS,
-} from "@/lib/manualSensorFreshnessRules";
-
+import { computeFreshness, FRESHNESS_FRESH_MAX_HOURS } from "@/lib/manualSensorFreshnessRules";
 
 const NOW = new Date("2026-06-03T12:00:00.000Z");
 const HOUR = 60 * 60 * 1000;
@@ -63,23 +59,17 @@ describe("captured_at vs occurred_at separation", () => {
 describe("Staleness classification (captured_at-driven)", () => {
   it("fresh manual snapshot within window is fresh", () => {
     const captured_at = new Date(NOW.getTime() - 2 * HOUR).toISOString();
-    expect(
-      computeFreshness({ value: 72, loggedAt: captured_at }, NOW),
-    ).toBe("fresh");
+    expect(computeFreshness({ value: 72, loggedAt: captured_at }, NOW)).toBe("fresh");
   });
 
   it("manual snapshot older than 48h is stale even if parent occurred_at is current", () => {
     const captured_at = new Date(NOW.getTime() - 72 * HOUR).toISOString();
-    expect(
-      computeFreshness({ value: 72, loggedAt: captured_at }, NOW),
-    ).toBe("stale");
+    expect(computeFreshness({ value: 72, loggedAt: captured_at }, NOW)).toBe("stale");
   });
 
   it("missing/malformed captured_at is missing — never fresh", () => {
     expect(computeFreshness(null, NOW)).toBe("missing");
-    expect(
-      computeFreshness({ value: 1, loggedAt: "not-a-date" }, NOW),
-    ).toBe("missing");
+    expect(computeFreshness({ value: 1, loggedAt: "not-a-date" }, NOW)).toBe("missing");
   });
 
   it("future captured_at is not classified as stale (guarded)", () => {
@@ -89,9 +79,7 @@ describe("Staleness classification (captured_at-driven)", () => {
   });
 
   it("Quick Log embed marks live-family stale via captured_at", () => {
-    const captured_at = new Date(
-      NOW.getTime() - (DEFAULT_STALE_WINDOW_MS + HOUR),
-    ).toISOString();
+    const captured_at = new Date(NOW.getTime() - (DEFAULT_STALE_WINDOW_MS + HOUR)).toISOString();
     const label = classifyQuickLogSnapshotSource(
       { source: "live", ts: captured_at, value: 1 },
       NOW.getTime(),
@@ -154,9 +142,7 @@ describe("AI Doctor context never promotes stale captured_at to fresh evidence",
       {
         rowsReceived: 1,
         rowsAccepted: 1,
-        capturedAt: new Date(
-          NOW.getTime() - (DEFAULT_STALE_WINDOW_MS + HOUR),
-        ).toISOString(),
+        capturedAt: new Date(NOW.getTime() - (DEFAULT_STALE_WINDOW_MS + HOUR)).toISOString(),
         source: "manual",
       },
       { now: NOW },
@@ -169,9 +155,7 @@ describe("AI Doctor context never promotes stale captured_at to fresh evidence",
       {
         rowsReceived: 1,
         rowsAccepted: 1,
-        capturedAt: new Date(
-          NOW.getTime() - (DEFAULT_STALE_WINDOW_MS + HOUR),
-        ).toISOString(),
+        capturedAt: new Date(NOW.getTime() - (DEFAULT_STALE_WINDOW_MS + HOUR)).toISOString(),
         source: "manual",
       },
       { now: NOW },

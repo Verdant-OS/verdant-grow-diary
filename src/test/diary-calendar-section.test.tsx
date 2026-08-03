@@ -13,9 +13,7 @@ describe("DiaryCalendarSection", () => {
         /No watering, feeding, training, diagnosis, or environment check events logged for this period\./i,
       ),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Use Quick Log to add your next plant event\./i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Use Quick Log to add your next plant event\./i)).toBeInTheDocument();
   });
 
   it("groups events by date with accessible day headings and chips", () => {
@@ -54,8 +52,8 @@ describe("DiaryCalendarSection", () => {
     // Older day is collapsed; click its day header to expand. Scope to the
     // diary-calendar-day containers so the insights-panel toggle is ignored.
     const days = screen.getAllByTestId("diary-calendar-day");
-    const collapsedDay = days.find((d) =>
-      within(d).queryAllByRole("button", { expanded: false }).length > 0,
+    const collapsedDay = days.find(
+      (d) => within(d).queryAllByRole("button", { expanded: false }).length > 0,
     );
     expect(collapsedDay).toBeDefined();
     fireEvent.click(within(collapsedDay!).getAllByRole("button", { expanded: false })[0]);

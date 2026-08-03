@@ -22,10 +22,30 @@ const BASE_URL = process.env.E2E_BASE_URL || "http://localhost:8080";
 const OUT_DIR = path.resolve("e2e/.auth");
 
 const ROLES = [
-  { key: "free",     emailEnv: "E2E_PHENO_FREE_EMAIL",     passEnv: "E2E_PHENO_FREE_PASSWORD",     out: "pheno-free.json" },
-  { key: "pro",      emailEnv: "E2E_PHENO_PRO_EMAIL",      passEnv: "E2E_PHENO_PRO_PASSWORD",      out: "pheno-pro.json" },
-  { key: "founder",  emailEnv: "E2E_PHENO_FOUNDER_EMAIL",  passEnv: "E2E_PHENO_FOUNDER_PASSWORD",  out: "pheno-founder.json" },
-  { key: "canceled", emailEnv: "E2E_PHENO_CANCELED_EMAIL", passEnv: "E2E_PHENO_CANCELED_PASSWORD", out: "pheno-canceled.json" },
+  {
+    key: "free",
+    emailEnv: "E2E_PHENO_FREE_EMAIL",
+    passEnv: "E2E_PHENO_FREE_PASSWORD",
+    out: "pheno-free.json",
+  },
+  {
+    key: "pro",
+    emailEnv: "E2E_PHENO_PRO_EMAIL",
+    passEnv: "E2E_PHENO_PRO_PASSWORD",
+    out: "pheno-pro.json",
+  },
+  {
+    key: "founder",
+    emailEnv: "E2E_PHENO_FOUNDER_EMAIL",
+    passEnv: "E2E_PHENO_FOUNDER_PASSWORD",
+    out: "pheno-founder.json",
+  },
+  {
+    key: "canceled",
+    emailEnv: "E2E_PHENO_CANCELED_EMAIL",
+    passEnv: "E2E_PHENO_CANCELED_PASSWORD",
+    out: "pheno-canceled.json",
+  },
 ];
 
 function has(name) {
@@ -51,7 +71,9 @@ async function main() {
   try {
     playwright = await import("playwright");
   } catch {
-    try { playwright = await import("@playwright/test"); } catch (e) {
+    try {
+      playwright = await import("@playwright/test");
+    } catch (e) {
       console.error("FAIL: playwright is not installed in this environment.");
       return 1;
     }
@@ -63,7 +85,10 @@ async function main() {
     const email = process.env[r.emailEnv];
     const password = process.env[r.passEnv];
     const outPath = path.join(OUT_DIR, r.out);
-    const sessionSnapshotPath = path.join(OUT_DIR, r.out.replace(/\.json$/, ".session-storage.json"));
+    const sessionSnapshotPath = path.join(
+      OUT_DIR,
+      r.out.replace(/\.json$/, ".session-storage.json"),
+    );
     const browser = await chromium.launch({ headless: true });
     try {
       const context = await browser.newContext();
@@ -71,7 +96,10 @@ async function main() {
       await page.goto(`${BASE_URL.replace(/\/$/, "")}/auth`, { waitUntil: "domcontentloaded" });
       await page.locator("#signin-email").fill(email);
       await page.locator("#signin-password").fill(password);
-      await page.getByRole("button", { name: /sign in|log in|continue/i }).first().click();
+      await page
+        .getByRole("button", { name: /sign in|log in|continue/i })
+        .first()
+        .click();
       // Wait for redirect away from /auth. Do not print the URL (may echo email in query).
       const start = Date.now();
       while (Date.now() - start < 20_000 && page.url().includes("/auth")) {
@@ -95,7 +123,11 @@ async function main() {
       console.log(`  FAIL    ${r.key.padEnd(9)} (unexpected error)`);
       // First line of the error only — locator/launch failures carry no
       // secrets; never print URLs or credentials here.
-      console.log(`          ${String(e?.message ?? e).split("\n")[0].slice(0, 160)}`);
+      console.log(
+        `          ${String(e?.message ?? e)
+          .split("\n")[0]
+          .slice(0, 160)}`,
+      );
       anyFail = true;
     } finally {
       await browser.close();
@@ -104,4 +136,6 @@ async function main() {
   return anyFail ? 1 : 0;
 }
 
-main().then((c) => process.exit(c)).catch(() => process.exit(1));
+main()
+  .then((c) => process.exit(c))
+  .catch(() => process.exit(1));

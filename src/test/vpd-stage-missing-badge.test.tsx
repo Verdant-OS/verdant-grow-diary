@@ -4,18 +4,13 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 
-const SRC = readFileSync(
-  resolve(__dirname, "../components/VpdStageMissingBadge.tsx"),
-  "utf8",
-);
+const SRC = readFileSync(resolve(__dirname, "../components/VpdStageMissingBadge.tsx"), "utf8");
 
 describe("VpdStageMissingBadge component", () => {
   it("renders the exact required copy", () => {
     render(<VpdStageMissingBadge testId="vpd-stage-missing-badge-test" />);
     expect(screen.getByText("Info")).toBeTruthy();
-    expect(
-      screen.getByText("Set plant stage to evaluate VPD targets."),
-    ).toBeTruthy();
+    expect(screen.getByText("Set plant stage to evaluate VPD targets.")).toBeTruthy();
   });
 
   it("applies the supplied testId as data-testid", () => {
@@ -24,9 +19,7 @@ describe("VpdStageMissingBadge component", () => {
   });
 
   it("merges optional className with base classes", () => {
-    render(
-      <VpdStageMissingBadge testId="merge-id" className="mt-7-custom" />,
-    );
+    render(<VpdStageMissingBadge testId="merge-id" className="mt-7-custom" />);
     const el = screen.getByTestId("merge-id");
     expect(el.className).toContain("mt-7-custom");
     expect(el.className).toContain("rounded-lg");

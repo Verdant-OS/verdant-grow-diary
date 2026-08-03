@@ -20,7 +20,9 @@ const MANIFEST_FILE = "supabase/functions/_shared/lib/.sync-manifest.json";
  *   - `ENTRY not rewritten: <rel> still imports "<spec>"`
  */
 export function parseDrift(line) {
-  const trimmed = String(line ?? "").replace(/^\s*-\s*/, "").trim();
+  const trimmed = String(line ?? "")
+    .replace(/^\s*-\s*/, "")
+    .trim();
   if (!trimmed) return null;
 
   let m;
@@ -61,11 +63,7 @@ export function parseDrift(line) {
         "No .sync-manifest.json committed. Run `bun run sync-edge-shared` and commit the result.",
     };
   }
-  if (
-    (m = trimmed.match(
-      /^ENTRY not rewritten:\s+(\S+)\s+still imports\s+"([^"]+)"/,
-    ))
-  ) {
+  if ((m = trimmed.match(/^ENTRY not rewritten:\s+(\S+)\s+still imports\s+"([^"]+)"/))) {
     return {
       file: m[1],
       title: "Edge entry not rewritten",
@@ -81,10 +79,7 @@ export function parseDrift(line) {
  * or they truncate the annotation.
  */
 export function escapeWorkflowCommand(value) {
-  return String(value)
-    .replace(/%/g, "%25")
-    .replace(/\r/g, "%0D")
-    .replace(/\n/g, "%0A");
+  return String(value).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
 }
 
 /**
@@ -183,9 +178,7 @@ export function enrichFinding(finding, ctx) {
     const relInMirror = finding.file.startsWith(mirrorRel + "/")
       ? finding.file.slice(mirrorRel.length + 1)
       : finding.file;
-    const expected = ctx.readExpected
-      ? ctx.readExpected(relInMirror)
-      : null;
+    const expected = ctx.readExpected ? ctx.readExpected(relInMirror) : null;
     if (typeof actual !== "string" || typeof expected !== "string") {
       return finding;
     }
@@ -195,7 +188,6 @@ export function enrichFinding(finding, ctx) {
 
   return finding;
 }
-
 
 /**
  * Parse every line of a checker stderr stream into findings, dropping

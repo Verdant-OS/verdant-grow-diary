@@ -94,7 +94,7 @@ function GrowsProviderForOwner({ children, user }: { children: ReactNode; user: 
     if (!activeGrowId && grows.length > 0) setActiveGrowId(grows[0].id);
     if (activeGrowId && grows.length > 0 && !grows.find((g) => g.id === activeGrowId))
       setActiveGrowId(grows[0].id);
-  }, [grows, activeGrowId]);
+  }, [grows, activeGrowId, setActiveGrowId]);
 
   const activeGrow = grows.find((g) => g.id === activeGrowId) ?? null;
 

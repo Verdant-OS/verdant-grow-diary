@@ -39,7 +39,11 @@ function sh(cmd: string, args: string[], cwd = repo) {
   return r.stdout;
 }
 
-interface RunResult { status: number; stdout: string; stderr: string }
+interface RunResult {
+  status: number;
+  stdout: string;
+  stderr: string;
+}
 
 function run(args: string[]): RunResult {
   try {
@@ -95,10 +99,7 @@ describe("--allow / --allow-file allowlist support", () => {
 
   it("--allow=<path>:<reason> reclassifies edit → allowlisted (exit 0)", () => {
     writeFileSync(join(repo, FILE_A), "-- MUTATED\nselect 99;\n");
-    const r = run([
-      "--json",
-      `--allow=${FILE_A}:restore missing GRANT after review`,
-    ]);
+    const r = run(["--json", `--allow=${FILE_A}:restore missing GRANT after review`]);
     expect(r.status).toBe(0);
     const parsed = JSON.parse(r.stdout);
     expect(parsed.ok).toBe(true);
@@ -132,10 +133,7 @@ describe("--allow / --allow-file allowlist support", () => {
 
   it("accepts a bare filename in --allow (normalized to supabase/migrations/)", () => {
     writeFileSync(join(repo, FILE_A), "-- MUTATED\nselect 99;\n");
-    const r = run([
-      "--json",
-      "--allow=20260101000000_a.sql:normalized path form",
-    ]);
+    const r = run(["--json", "--allow=20260101000000_a.sql:normalized path form"]);
     expect(r.status).toBe(0);
     const parsed = JSON.parse(r.stdout);
     expect(parsed.allowlisted[0].path).toBe(FILE_A);
@@ -169,17 +167,11 @@ describe("--allow / --allow-file allowlist support", () => {
     const r = run(["--json", `--allow=${FILE_A}:stale entry`]);
     expect(r.status).toBe(0);
     const parsed = JSON.parse(r.stdout);
-    expect(parsed.allowlist_unused).toEqual([
-      { path: FILE_A, reason: "stale entry" },
-    ]);
+    expect(parsed.allowlist_unused).toEqual([{ path: FILE_A, reason: "stale entry" }]);
   });
 
   it("--strict-allowlist promotes an unused allow entry to a failure", () => {
-    const r = run([
-      "--json",
-      "--strict-allowlist",
-      `--allow=${FILE_A}:stale entry`,
-    ]);
+    const r = run(["--json", "--strict-allowlist", `--allow=${FILE_A}:stale entry`]);
     expect(r.status).toBe(1);
     const parsed = JSON.parse(r.stdout);
     expect(parsed.allowlist_unused).toHaveLength(1);
@@ -188,10 +180,7 @@ describe("--allow / --allow-file allowlist support", () => {
   it("--allow-file accepts a bare JSON array", () => {
     writeFileSync(join(repo, FILE_A), "-- MUTATED\n");
     const allowPath = join(repo, "allow.json");
-    writeFileSync(
-      allowPath,
-      JSON.stringify([{ path: FILE_A, reason: "PR-123: hotfix" }]),
-    );
+    writeFileSync(allowPath, JSON.stringify([{ path: FILE_A, reason: "PR-123: hotfix" }]));
     const r = run(["--json", `--allow-file=${allowPath}`]);
     expect(r.status).toBe(0);
     const parsed = JSON.parse(r.stdout);
@@ -213,10 +202,7 @@ describe("--allow / --allow-file allowlist support", () => {
 
   it("--allow-file rejects an entry missing reason (exit 2)", () => {
     const allowPath = join(repo, "allow.json");
-    writeFileSync(
-      allowPath,
-      JSON.stringify([{ path: FILE_A, reason: "  " }]),
-    );
+    writeFileSync(allowPath, JSON.stringify([{ path: FILE_A, reason: "  " }]));
     const r = run([`--allow-file=${allowPath}`]);
     expect(r.status).toBe(2);
     expect(r.stderr).toMatch(/missing non-empty "reason"/);

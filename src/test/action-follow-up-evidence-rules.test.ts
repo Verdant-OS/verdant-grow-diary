@@ -30,9 +30,10 @@ describe("evaluateActionFollowUpEligibility", () => {
   });
 
   it("missing actionId is missing_action", () => {
-    expect(
-      evaluateActionFollowUpEligibility({ ...base, actionId: "  " }),
-    ).toEqual({ eligible: false, reason: "missing_action" });
+    expect(evaluateActionFollowUpEligibility({ ...base, actionId: "  " })).toEqual({
+      eligible: false,
+      reason: "missing_action",
+    });
   });
 
   it("suggested action is action_not_completed", () => {
@@ -42,33 +43,38 @@ describe("evaluateActionFollowUpEligibility", () => {
   });
 
   it("approved but not completed is action_not_completed", () => {
-    expect(
-      evaluateActionFollowUpEligibility({ ...base, actionStatus: "approved" }),
-    ).toEqual({ eligible: false, reason: "action_not_completed" });
+    expect(evaluateActionFollowUpEligibility({ ...base, actionStatus: "approved" })).toEqual({
+      eligible: false,
+      reason: "action_not_completed",
+    });
   });
 
   it("rejected action is action_not_completed", () => {
-    expect(
-      evaluateActionFollowUpEligibility({ ...base, actionStatus: "rejected" }),
-    ).toEqual({ eligible: false, reason: "action_not_completed" });
+    expect(evaluateActionFollowUpEligibility({ ...base, actionStatus: "rejected" })).toEqual({
+      eligible: false,
+      reason: "action_not_completed",
+    });
   });
 
   it("cross-user action is wrong_owner", () => {
-    expect(
-      evaluateActionFollowUpEligibility({ ...base, currentUserOwnsAction: false }),
-    ).toEqual({ eligible: false, reason: "wrong_owner" });
+    expect(evaluateActionFollowUpEligibility({ ...base, currentUserOwnsAction: false })).toEqual({
+      eligible: false,
+      reason: "wrong_owner",
+    });
   });
 
   it("missing grow is missing_grow", () => {
-    expect(
-      evaluateActionFollowUpEligibility({ ...base, growId: null }),
-    ).toEqual({ eligible: false, reason: "missing_grow" });
+    expect(evaluateActionFollowUpEligibility({ ...base, growId: null })).toEqual({
+      eligible: false,
+      reason: "missing_grow",
+    });
   });
 
   it("existing follow-up blocks a second primary follow-up", () => {
-    expect(
-      evaluateActionFollowUpEligibility({ ...base, existingFollowUpCount: 1 }),
-    ).toEqual({ eligible: false, reason: "follow_up_already_exists" });
+    expect(evaluateActionFollowUpEligibility({ ...base, existingFollowUpCount: 1 })).toEqual({
+      eligible: false,
+      reason: "follow_up_already_exists",
+    });
   });
 
   it("is deterministic for the same input", () => {
@@ -135,15 +141,17 @@ describe("validateActionFollowUpDraft", () => {
   });
 
   it("requires a note when outcome is declined", () => {
-    expect(
-      validateActionFollowUpDraft({ ...good, outcome: "declined", note: "  " }),
-    ).toEqual({ ok: false, reason: "note_required" });
+    expect(validateActionFollowUpDraft({ ...good, outcome: "declined", note: "  " })).toEqual({
+      ok: false,
+      reason: "note_required",
+    });
   });
 
   it("requires a note when outcome is unclear", () => {
-    expect(
-      validateActionFollowUpDraft({ ...good, outcome: "unclear", note: "" }),
-    ).toEqual({ ok: false, reason: "note_required" });
+    expect(validateActionFollowUpDraft({ ...good, outcome: "unclear", note: "" })).toEqual({
+      ok: false,
+      reason: "note_required",
+    });
   });
 
   it("does not require a note when outcome is improved", () => {
@@ -161,9 +169,10 @@ describe("validateActionFollowUpDraft", () => {
   });
 
   it("rejects blob URLs as photo reference", () => {
-    expect(
-      validateActionFollowUpDraft({ ...good, photoReference: "blob:https://x/abc" }),
-    ).toEqual({ ok: false, reason: "invalid_photo_reference" });
+    expect(validateActionFollowUpDraft({ ...good, photoReference: "blob:https://x/abc" })).toEqual({
+      ok: false,
+      reason: "invalid_photo_reference",
+    });
   });
 
   it("rejects data URLs as photo reference", () => {

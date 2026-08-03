@@ -5,9 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  buildVerdantGeneticsXlsxInsertRows,
-} from "@/lib/verdantGeneticsXlsxInsertRowsAdapter";
+import { buildVerdantGeneticsXlsxInsertRows } from "@/lib/verdantGeneticsXlsxInsertRowsAdapter";
 import {
   parseVerdantGeneticsXlsx,
   type CellGrid,
@@ -306,9 +304,7 @@ describe("buildVerdantGeneticsXlsxInsertRows", () => {
       "utf8",
     );
     // Strip block + line comments so doc-comment vocabulary doesn't trip the guard.
-    const code = src
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
     expect(code).not.toMatch(/from\s+["']react["']/);
     expect(code).not.toMatch(/@\/integrations\/supabase/);
     expect(code).not.toMatch(/supabase/i);

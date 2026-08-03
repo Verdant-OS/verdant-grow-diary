@@ -31,11 +31,7 @@ export interface DailyCheckPlantLike {
   tent_id?: string | null;
 }
 
-export type DailyCheckPlantResolutionStatus =
-  | "valid"
-  | "missing"
-  | "unknown"
-  | "out-of-scope";
+export type DailyCheckPlantResolutionStatus = "valid" | "missing" | "unknown" | "out-of-scope";
 
 export interface DailyCheckPlantResolution {
   status: DailyCheckPlantResolutionStatus;
@@ -83,8 +79,7 @@ export function resolveDailyCheckPlantSelection(
     };
   }
 
-  const match =
-    input.plants.find((p) => p && p.id === requestedPlantId) ?? null;
+  const match = input.plants.find((p) => p && p.id === requestedPlantId) ?? null;
 
   if (!match) {
     // The plant either doesn't exist, is archived, was merged, or the
@@ -101,11 +96,7 @@ export function resolveDailyCheckPlantSelection(
 
   // Grow-scope check. Legacy null-grow_id plants pass through to stay
   // consistent with the wider eligibility rules.
-  if (
-    input.activeGrowId &&
-    match.grow_id &&
-    match.grow_id !== input.activeGrowId
-  ) {
+  if (input.activeGrowId && match.grow_id && match.grow_id !== input.activeGrowId) {
     return {
       status: "out-of-scope",
       plant: null,

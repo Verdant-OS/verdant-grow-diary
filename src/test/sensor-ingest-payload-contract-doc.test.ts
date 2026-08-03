@@ -29,7 +29,16 @@ describe("sensor ingest payload contract doc", () => {
   });
 
   it("lists the supported initial sources", () => {
-    for (const src of ["ecowitt", "manual", "csv", "mqtt", "webhook", "stale", "invalid", "unknown"]) {
+    for (const src of [
+      "ecowitt",
+      "manual",
+      "csv",
+      "mqtt",
+      "webhook",
+      "stale",
+      "invalid",
+      "unknown",
+    ]) {
       expect(lower).toContain(src);
     }
   });
@@ -95,6 +104,8 @@ describe("sensor ingest payload contract doc", () => {
   });
 
   it("forbids service_role bypass before validation", () => {
-    expect(lower).toMatch(/no `?service_role`? before validation|service_role.{0,80}must not be used to bypass/);
+    expect(lower).toMatch(
+      /no `?service_role`? before validation|service_role.{0,80}must not be used to bypass/,
+    );
   });
 });

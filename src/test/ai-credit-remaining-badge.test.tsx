@@ -13,18 +13,14 @@ describe("<AiCreditRemainingBadge />", () => {
 
   it("renders nothing on unknown scope", () => {
     const { container } = render(
-      <AiCreditRemainingBadge
-        credit={{ remaining: 5, scope: "weird", scope_limit: 10 }}
-      />,
+      <AiCreditRemainingBadge credit={{ remaining: 5, scope: "weird", scope_limit: 10 }} />,
     );
     expect(container.firstChild).toBeNull();
   });
 
   it("renders per_grow label, no helper, no link/CTA", () => {
     const { getByTestId, queryByRole, queryByTestId, container } = render(
-      <AiCreditRemainingBadge
-        credit={{ remaining: 2, scope: "per_grow", scope_limit: 3 }}
-      />,
+      <AiCreditRemainingBadge credit={{ remaining: 2, scope: "per_grow", scope_limit: 3 }} />,
     );
     expect(getByTestId("ai-credit-remaining-badge-label").textContent).toBe(
       "2 of 3 AI Doctor credits left for this grow",

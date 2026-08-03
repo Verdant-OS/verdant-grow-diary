@@ -26,9 +26,7 @@ export default function OperatorModeCallout() {
         <CardTitle className="flex items-center gap-2 text-base">
           <ShieldCheck className="h-4 w-4" /> Operator Mode
         </CardTitle>
-        <CardDescription>
-          Open the protected demo preview and operator diagnostics.
-        </CardDescription>
+        <CardDescription>Open the protected demo preview and operator diagnostics.</CardDescription>
       </CardHeader>
       <CardContent>
         <Button asChild data-testid="operator-mode-callout-cta">

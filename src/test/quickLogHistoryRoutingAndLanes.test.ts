@@ -33,14 +33,8 @@ import { normalizeDiaryEntries } from "@/lib/diaryEntryRules";
 
 const ROOT = resolve(__dirname, "../..");
 const TIMELINE = readFileSync(resolve(ROOT, "src/pages/Timeline.tsx"), "utf8");
-const PANELS = readFileSync(
-  resolve(ROOT, "src/components/QuickLogHistoryPanels.tsx"),
-  "utf8",
-);
-const RULES = readFileSync(
-  resolve(ROOT, "src/lib/quickLogHistoryRules.ts"),
-  "utf8",
-);
+const PANELS = readFileSync(resolve(ROOT, "src/components/QuickLogHistoryPanels.tsx"), "utf8");
+const RULES = readFileSync(resolve(ROOT, "src/lib/quickLogHistoryRules.ts"), "utf8");
 
 const FIXED_NOW = Date.parse("2026-05-24T12:00:00Z");
 const FIXED_NOW_ISO = new Date(FIXED_NOW).toISOString();
@@ -82,10 +76,7 @@ function normalize(raws: Array<ReturnType<typeof rawEntry>>) {
 describe("Quick Log lane mapping audit", () => {
   it("every Quick Log dropdown event_type has a defined lane (no silent fallback)", () => {
     for (const t of EVENT_TYPES) {
-      expect(
-        QUICK_LOG_EVENT_LANES,
-        `missing lane for "${t.value}"`,
-      ).toHaveProperty(t.value);
+      expect(QUICK_LOG_EVENT_LANES, `missing lane for "${t.value}"`).toHaveProperty(t.value);
     }
   });
 
@@ -126,10 +117,7 @@ describe("Manual handheld readings parsing", () => {
     ppfdCanopy: "665",
     lightDistance: "45 cm",
   };
-  const note = appendHardwareReadingsToNote(
-    "Placed sticky traps, watered 500ml",
-    readings,
-  );
+  const note = appendHardwareReadingsToNote("Placed sticky traps, watered 500ml", readings);
 
   it("hasManualHandheldReadings detects the deterministic block", () => {
     expect(hasManualHandheldReadings(note)).toBe(true);
@@ -154,17 +142,14 @@ describe("Manual handheld readings parsing", () => {
 // ---------------------------------------------------------------------------
 
 describe("Quick Log per-lane builders", () => {
-  const note = appendHardwareReadingsToNote(
-    "Sticky traps + 25% H2O2 mix + 500ml water",
-    {
-      inputPh: "6.1",
-      inputEc: "1.4",
-      runoffPh: "6.0",
-      runoffEc: "1.6",
-      ppfdCanopy: "665",
-      lightDistance: "45 cm",
-    },
-  );
+  const note = appendHardwareReadingsToNote("Sticky traps + 25% H2O2 mix + 500ml water", {
+    inputPh: "6.1",
+    inputEc: "1.4",
+    runoffPh: "6.0",
+    runoffEc: "1.6",
+    ppfdCanopy: "665",
+    lightDistance: "45 cm",
+  });
   const entries = normalize([
     rawEntry({ id: "p1", event_type: "pest_disease", note, plant_id: "pl-1" }),
     rawEntry({ id: "t1", event_type: "training", note: "Topped main stem" }),

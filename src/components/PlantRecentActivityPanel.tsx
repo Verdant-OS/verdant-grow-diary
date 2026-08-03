@@ -55,7 +55,6 @@ function formatEntryTimestamp(iso: string | null, fallback: string): string {
   }
 }
 
-
 function EntryRow({
   row,
   plantName,
@@ -91,14 +90,21 @@ function EntryRow({
               Manual entry
             </Badge>
           ) : null}
-          <span className="text-xs text-muted-foreground" data-testid="plant-recent-activity-timestamp">
+          <span
+            className="text-xs text-muted-foreground"
+            data-testid="plant-recent-activity-timestamp"
+          >
             {formatEntryTimestamp(row.occurredAt, row.occurredAtLabel)}
           </span>
         </div>
 
         <div className="flex items-center gap-1">
           {row.hasPhoto ? (
-            <Badge variant="outline" className="gap-1" data-testid="plant-recent-activity-photo-badge">
+            <Badge
+              variant="outline"
+              className="gap-1"
+              data-testid="plant-recent-activity-photo-badge"
+            >
               <Camera className="h-3 w-3" /> Photo
             </Badge>
           ) : null}
@@ -186,7 +192,7 @@ export default function PlantRecentActivityPanel({ plantId, plantName }: Props) 
   const enabled = !!plantId;
   const temperatureUnit = useTemperatureUnitPreference();
   const { data, isLoading } = usePlantRecentActivity(plantId);
-  const rawRows = enabled ? data ?? [] : [];
+  const rawRows = enabled ? (data ?? []) : [];
   const rows = buildPlantRecentActivity(rawRows, {
     plantId: plantId ?? null,
   });

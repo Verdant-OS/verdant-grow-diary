@@ -2,10 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const SRC = readFileSync(
-  resolve(__dirname, "../components/PlantQuickLog.tsx"),
-  "utf8",
-);
+const SRC = readFileSync(resolve(__dirname, "../components/PlantQuickLog.tsx"), "utf8");
 
 describe("PlantQuickLog static safety", () => {
   it("does not introduce model, Edge Function, alert, Action Queue, or device-control behavior", () => {

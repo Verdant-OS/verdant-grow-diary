@@ -68,8 +68,7 @@ describe("Plant Detail Harvest Watch mount", () => {
   });
 
   it("PlantDetail.tsx mounts <PlantDetailHarvestWatchCard /> exactly once", () => {
-    const occurrences =
-      PLANT_DETAIL.match(/<PlantDetailHarvestWatchCard\b/g) ?? [];
+    const occurrences = PLANT_DETAIL.match(/<PlantDetailHarvestWatchCard\b/g) ?? [];
     expect(occurrences.length).toBe(1);
     expect(WHATS_MISSING).not.toMatch(/PlantDetailHarvestWatchCard/);
   });
@@ -82,9 +81,7 @@ describe("Plant Detail Harvest Watch mount", () => {
   });
 
   it("mount passes only safe Plant Detail context props", () => {
-    const mountMatch = PLANT_DETAIL.match(
-      /<PlantDetailHarvestWatchCard[\s\S]*?\/>/,
-    );
+    const mountMatch = PLANT_DETAIL.match(/<PlantDetailHarvestWatchCard[\s\S]*?\/>/);
     expect(mountMatch).not.toBeNull();
     const mount = mountMatch![0];
     expect(mount).toMatch(/plantId=/);
@@ -112,9 +109,7 @@ describe("Plant Detail Harvest Watch mount", () => {
     mocks.useGrowPlant.mockReturnValue({ data: null, isLoading: true });
     mocks.usePlantRecentActivity.mockReturnValue({ data: [], isLoading: false });
     render(<PlantDetailHarvestWatchCard plantId="p1" />);
-    expect(
-      screen.getByTestId("plant-detail-harvest-watch-card-loading"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("plant-detail-harvest-watch-card-loading")).toBeInTheDocument();
   });
 
   it("renders mandated evidence-only caution copy on the loaded card", () => {
@@ -138,9 +133,7 @@ describe("Plant Detail Harvest Watch mount", () => {
       isLoading: false,
     });
     render(<PlantDetailHarvestWatchCard plantId="p1" />);
-    const caution = screen.getByTestId(
-      "plant-detail-harvest-watch-evidence-only-caution",
-    );
+    const caution = screen.getByTestId("plant-detail-harvest-watch-evidence-only-caution");
     expect(caution.textContent).toMatch(
       /Harvest Watch is evidence-only\. Confirm with direct plant inspection before making harvest decisions\./,
     );
@@ -173,9 +166,7 @@ describe("Plant Detail Harvest Watch mount", () => {
     render(<PlantDetailHarvestWatchCard plantId="p-seedling" />);
 
     expect(screen.queryByTestId("plant-detail-harvest-watch-card")).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("plant-detail-harvest-watch-card-loading"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("plant-detail-harvest-watch-card-loading")).not.toBeInTheDocument();
   });
 
   it("does not flash a loading Harvest Watch for a resolved seedling", () => {
@@ -191,9 +182,7 @@ describe("Plant Detail Harvest Watch mount", () => {
 
     render(<PlantDetailHarvestWatchCard plantId="p-seedling" />);
 
-    expect(
-      screen.queryByTestId("plant-detail-harvest-watch-card-loading"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("plant-detail-harvest-watch-card-loading")).not.toBeInTheDocument();
   });
 
   it("does not claim loading when the plant lookup resolved without a plant", () => {
@@ -202,8 +191,6 @@ describe("Plant Detail Harvest Watch mount", () => {
 
     render(<PlantDetailHarvestWatchCard plantId="missing-plant" />);
 
-    expect(
-      screen.queryByTestId("plant-detail-harvest-watch-card-loading"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("plant-detail-harvest-watch-card-loading")).not.toBeInTheDocument();
   });
 });

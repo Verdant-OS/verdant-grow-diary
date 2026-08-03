@@ -21,11 +21,7 @@ import { normalizeEcowittVegetationTentPayload } from "./ecowittVegetationTentNo
 
 export type EcowittTentKey = "flower" | "seedling" | "vegetation";
 
-export const SUPPORTED_TENT_KEYS: readonly EcowittTentKey[] = [
-  "flower",
-  "seedling",
-  "vegetation",
-];
+export const SUPPORTED_TENT_KEYS: readonly EcowittTentKey[] = ["flower", "seedling", "vegetation"];
 
 function flowerRootZoneToCanonical(
   v: "ok" | "partial" | "missing",
@@ -45,9 +41,7 @@ export function normalizeEcowittTentPayload(
   const payload: Readonly<Record<string, unknown>> = rawPayload ?? {};
   const capturedAt = options.captured_at_ms ?? null;
   const captured_at_iso =
-    capturedAt !== null && Number.isFinite(capturedAt)
-      ? new Date(capturedAt).toISOString()
-      : null;
+    capturedAt !== null && Number.isFinite(capturedAt) ? new Date(capturedAt).toISOString() : null;
 
   switch (tentKey as EcowittTentKey) {
     case "seedling":
@@ -57,12 +51,8 @@ export function normalizeEcowittTentPayload(
     case "flower": {
       const f = normalizeEcowittFlowerTentPayload(payload, options);
       // Adapt the older Flower snapshot shape to the canonical shape.
-      const degraded = [...f.degraded_reasons].filter(
-        (r) => !r.startsWith("invalid:"),
-      );
-      const invalid = [...f.degraded_reasons].filter((r) =>
-        r.startsWith("invalid:"),
-      );
+      const degraded = [...f.degraded_reasons].filter((r) => !r.startsWith("invalid:"));
+      const invalid = [...f.degraded_reasons].filter((r) => r.startsWith("invalid:"));
       return {
         source: f.source,
         provider: ECOWITT_PROVIDER,

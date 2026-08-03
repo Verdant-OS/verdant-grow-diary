@@ -85,7 +85,6 @@ export function useAiDoctorSession(sessionId: string | null | undefined) {
   });
 }
 
-
 export function useGrowAiDoctorSessions(growId: string | null | undefined) {
   return useQuery({
     queryKey: ["ai_doctor_sessions", "grow", growId ?? null],
@@ -137,9 +136,7 @@ export function useAiDoctorSessionsIndex(
       filters.needsReview,
     ],
     queryFn: async (): Promise<AiDoctorSessionsIndexPage> => {
-      let q = supabase
-        .from("ai_doctor_sessions" as never)
-        .select(SESSION_SELECT);
+      let q = supabase.from("ai_doctor_sessions" as never).select(SESSION_SELECT);
 
       if (filters.risk !== "all") {
         q = q.eq("diagnosis->>riskLevel", filters.risk);
@@ -166,9 +163,7 @@ export function useAiDoctorSessionsIndex(
           .eq("suggested_actions", "[]");
       }
 
-      const { data, error } = await q
-        .order("created_at", { ascending: false })
-        .range(from, to);
+      const { data, error } = await q.order("created_at", { ascending: false }).range(from, to);
       if (error) throw error;
       const all = (data ?? []) as AiDoctorSessionRow[];
       const hasMore = all.length > pageSize;
@@ -181,5 +176,3 @@ export function useAiDoctorSessionsIndex(
     },
   });
 }
-
-

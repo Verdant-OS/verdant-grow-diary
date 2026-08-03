@@ -1078,7 +1078,7 @@ async function main() {
         (data as any)?.ok === false &&
         (data as any)?.status === "invalid" &&
         (data as any)?.reason === "idempotency_key_conflict" &&
-        !Object.prototype.hasOwnProperty.call(data ?? {}, "result"),
+        !Object.hasOwn(data ?? {}, "result"),
       error?.message ?? JSON.stringify(data),
     );
   }
@@ -1123,7 +1123,7 @@ async function main() {
     (refundedReplay as any)?.ok === false &&
       (refundedReplay as any)?.status === "invalid" &&
       (refundedReplay as any)?.reason === "spend_refunded" &&
-      !Object.prototype.hasOwnProperty.call(refundedReplay ?? {}, "result"),
+      !Object.hasOwn(refundedReplay ?? {}, "result"),
     JSON.stringify(refundedReplay),
   );
   const { data: attachAfterRefund } = await serverAttachResult(

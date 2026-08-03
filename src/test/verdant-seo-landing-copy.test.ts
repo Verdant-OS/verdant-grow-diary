@@ -53,9 +53,7 @@ describe("Verdant SEO landing copy", () => {
   });
 
   it("includes required grower-intent phrases in section copy", () => {
-    const combined = VERDANT_SEO_LANDING_SECTIONS.map(
-      (s) => `${s.heading} ${s.body}`,
-    ).join("\n");
+    const combined = VERDANT_SEO_LANDING_SECTIONS.map((s) => `${s.heading} ${s.body}`).join("\n");
     for (const phrase of [
       "grow diary app",
       "grow room VPD tracker",
@@ -92,10 +90,7 @@ describe("Verdant SEO landing copy", () => {
   });
 
   it("has non-empty visible FAQ answers on Landing and Pricing additions", () => {
-    for (const entry of [
-      ...VERDANT_LANDING_FAQ,
-      ...VERDANT_PRICING_FAQ_ADDITIONS,
-    ]) {
+    for (const entry of [...VERDANT_LANDING_FAQ, ...VERDANT_PRICING_FAQ_ADDITIONS]) {
       expect(entry.question.trim().length).toBeGreaterThan(0);
       expect(entry.answer.trim().length).toBeGreaterThan(0);
     }

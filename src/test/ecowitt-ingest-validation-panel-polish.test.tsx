@@ -36,47 +36,31 @@ describe("EcowittIngestValidationPanel — operator polish", () => {
   });
 
   it("renders both copy buttons with the exact commands", () => {
-    render(
-      <EcowittIngestValidationPanel
-        input={{ rows: [], tentId: TENT, now: NOW }}
-      />,
+    render(<EcowittIngestValidationPanel input={{ rows: [], tentId: TENT, now: NOW }} />);
+    expect(screen.getByTestId("copy-accepted-command-button").textContent).toMatch(
+      /Copy accepted test command/,
     );
-    expect(
-      screen.getByTestId("copy-accepted-command-button").textContent,
-    ).toMatch(/Copy accepted test command/);
-    expect(
-      screen.getByTestId("copy-invalid-command-button").textContent,
-    ).toMatch(/Copy invalid test command/);
+    expect(screen.getByTestId("copy-invalid-command-button").textContent).toMatch(
+      /Copy invalid test command/,
+    );
     const hints = screen.getByTestId("validation-cli-hints").textContent ?? "";
     expect(hints).toContain("bun run dev:send-ecowitt");
     expect(hints).toContain("bun run dev:send-ecowitt:invalid");
   });
 
   it("copies the accepted command to clipboard (tent-scoped)", async () => {
-    render(
-      <EcowittIngestValidationPanel
-        input={{ rows: [], tentId: TENT, now: NOW }}
-      />,
-    );
+    render(<EcowittIngestValidationPanel input={{ rows: [], tentId: TENT, now: NOW }} />);
     fireEvent.click(screen.getByTestId("copy-accepted-command-button"));
     await waitFor(() => {
-      expect(writeText).toHaveBeenCalledWith(
-        `VERDANT_TENT_ID=${TENT} bun run dev:send-ecowitt`,
-      );
+      expect(writeText).toHaveBeenCalledWith(`VERDANT_TENT_ID=${TENT} bun run dev:send-ecowitt`);
     });
     await waitFor(() => {
-      expect(
-        screen.getByTestId("copy-accepted-command-button").textContent,
-      ).toBe("Copied");
+      expect(screen.getByTestId("copy-accepted-command-button").textContent).toBe("Copied");
     });
   });
 
   it("copies the invalid command to clipboard (tent-scoped)", async () => {
-    render(
-      <EcowittIngestValidationPanel
-        input={{ rows: [], tentId: TENT, now: NOW }}
-      />,
-    );
+    render(<EcowittIngestValidationPanel input={{ rows: [], tentId: TENT, now: NOW }} />);
     fireEvent.click(screen.getByTestId("copy-invalid-command-button"));
     await waitFor(() => {
       expect(writeText).toHaveBeenCalledWith(
@@ -98,22 +82,10 @@ describe("EcowittIngestValidationPanel — operator polish", () => {
   });
 
   it("renders all five metric validation rows for the latest payload", () => {
-    render(
-      <EcowittIngestValidationPanel
-        input={{ rows: [validRow()], tentId: TENT, now: NOW }}
-      />,
-    );
-    for (const k of [
-      "temp_f",
-      "humidity_pct",
-      "vpd_kpa",
-      "co2_ppm",
-      "soil_moisture_pct",
-    ]) {
+    render(<EcowittIngestValidationPanel input={{ rows: [validRow()], tentId: TENT, now: NOW }} />);
+    for (const k of ["temp_f", "humidity_pct", "vpd_kpa", "co2_ppm", "soil_moisture_pct"]) {
       expect(screen.getByTestId(`metric-row-${k}`)).toBeTruthy();
-      expect(screen.getByTestId(`metric-status-${k}`).textContent).toBe(
-        "accepted",
-      );
+      expect(screen.getByTestId(`metric-status-${k}`).textContent).toBe("accepted");
     }
   });
 
@@ -127,17 +99,9 @@ describe("EcowittIngestValidationPanel — operator polish", () => {
         metadata: { test_sender: true, invalid_test: false },
       },
     });
-    render(
-      <EcowittIngestValidationPanel
-        input={{ rows: [row], tentId: TENT, now: NOW }}
-      />,
-    );
-    expect(screen.getByTestId("metric-status-co2_ppm").textContent).toBe(
-      "missing",
-    );
-    expect(
-      screen.getByTestId("metric-reason-co2_ppm").textContent,
-    ).toMatch(/Not included/);
+    render(<EcowittIngestValidationPanel input={{ rows: [row], tentId: TENT, now: NOW }} />);
+    expect(screen.getByTestId("metric-status-co2_ppm").textContent).toBe("missing");
+    expect(screen.getByTestId("metric-reason-co2_ppm").textContent).toMatch(/Not included/);
   });
 
   it("renders an out-of-range metric as rejected with reason", () => {
@@ -154,51 +118,31 @@ describe("EcowittIngestValidationPanel — operator polish", () => {
         metadata: { test_sender: true, invalid_test: true },
       },
     });
-    render(
-      <EcowittIngestValidationPanel
-        input={{ rows: [row], tentId: TENT, now: NOW }}
-      />,
-    );
-    expect(screen.getByTestId("metric-status-temp_f").textContent).toBe(
-      "rejected",
-    );
+    render(<EcowittIngestValidationPanel input={{ rows: [row], tentId: TENT, now: NOW }} />);
+    expect(screen.getByTestId("metric-status-temp_f").textContent).toBe("rejected");
     expect(screen.getByTestId("metric-reason-temp_f").textContent).toMatch(
       /Outside accepted range/,
     );
-    expect(screen.getByTestId("metric-status-vpd_kpa").textContent).toBe(
-      "rejected",
-    );
+    expect(screen.getByTestId("metric-status-vpd_kpa").textContent).toBe("rejected");
   });
 
   it("renders timeline newest-first and caps at 10", () => {
     const rows = Array.from({ length: 14 }, (_, i) =>
       validRow({
         id: `r-${i}`,
-        captured_at: new Date(
-          NOW.getTime() - (i + 1) * 60_000,
-        ).toISOString(),
+        captured_at: new Date(NOW.getTime() - (i + 1) * 60_000).toISOString(),
         ts: new Date(NOW.getTime() - (i + 1) * 60_000).toISOString(),
       }),
     );
-    render(
-      <EcowittIngestValidationPanel
-        input={{ rows, tentId: TENT, now: NOW }}
-      />,
-    );
+    render(<EcowittIngestValidationPanel input={{ rows, tentId: TENT, now: NOW }} />);
     const timeline = screen.getByTestId("validation-timeline");
-    const items = timeline.querySelectorAll(
-      "[data-testid^='timeline-entry-']",
-    );
+    const items = timeline.querySelectorAll("[data-testid^='timeline-entry-']");
     expect(items.length).toBe(10);
     const firstTs = items[0].getAttribute("data-testid") ?? "";
     const secondTs = items[1].getAttribute("data-testid") ?? "";
     // Newest captured_at (= NOW - 60s) must be first.
-    expect(firstTs).toContain(
-      new Date(NOW.getTime() - 60_000).toISOString(),
-    );
-    expect(secondTs).toContain(
-      new Date(NOW.getTime() - 120_000).toISOString(),
-    );
+    expect(firstTs).toContain(new Date(NOW.getTime() - 60_000).toISOString());
+    expect(secondTs).toContain(new Date(NOW.getTime() - 120_000).toISOString());
   });
 
   it("distinguishes accepted vs rejected (invalid) attempts in the timeline", () => {
@@ -245,9 +189,7 @@ describe("EcowittIngestValidationPanel — operator polish", () => {
       },
     });
     const { container } = render(
-      <EcowittIngestValidationPanel
-        input={{ rows: [row], tentId: TENT, now: NOW }}
-      />,
+      <EcowittIngestValidationPanel input={{ rows: [row], tentId: TENT, now: NOW }} />,
     );
     const html = container.innerHTML;
     expect(html).not.toMatch(/vbt_supersecret_polish/);
@@ -257,9 +199,7 @@ describe("EcowittIngestValidationPanel — operator polish", () => {
 
   it("never displays a Live label and never mentions device control / action queue", () => {
     const { container } = render(
-      <EcowittIngestValidationPanel
-        input={{ rows: [validRow()], tentId: TENT, now: NOW }}
-      />,
+      <EcowittIngestValidationPanel input={{ rows: [validRow()], tentId: TENT, now: NOW }} />,
     );
     const html = container.innerHTML;
     // Body copy may contain "not live sensor telemetry"; what we forbid is a

@@ -273,9 +273,9 @@ export function matchesReviewedPublicStarterDraftRevision(args: {
 }): boolean {
   return Boolean(
     args.storedDraft &&
-    args.reviewedDraftId &&
-    args.reviewedUpdatedAt &&
-    args.storedDraft.id === args.reviewedDraftId &&
-    args.storedDraft.updatedAt === args.reviewedUpdatedAt,
+      args.reviewedDraftId &&
+      args.reviewedUpdatedAt &&
+      args.storedDraft.id === args.reviewedDraftId &&
+      args.storedDraft.updatedAt === args.reviewedUpdatedAt,
   );
 }

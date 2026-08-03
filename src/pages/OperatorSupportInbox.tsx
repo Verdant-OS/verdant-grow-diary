@@ -165,7 +165,7 @@ function useSupportRows() {
     return () => {
       cancelled = true;
     };
-  }, [nonce]);
+  }, []);
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
   return { loading, error, feedback, contact, setFeedback, setContact, reload };
@@ -333,8 +333,8 @@ export default function OperatorSupportInbox() {
         <div>
           <h1 className="text-2xl font-semibold">Support inbox</h1>
           <p className="text-sm text-muted-foreground">
-            Operator-only. Original submissions are read-only; only review status and internal
-            notes can be updated.
+            Operator-only. Original submissions are read-only; only review status and internal notes
+            can be updated.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -401,9 +401,7 @@ export default function OperatorSupportInbox() {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-3">
                         <Stars value={row.overall_rating} />
-                        <CardTitle className="text-base">
-                          Overall {row.overall_rating}/5
-                        </CardTitle>
+                        <CardTitle className="text-base">Overall {row.overall_rating}/5</CardTitle>
                         <ReviewBadge reviewed={reviewed} />
                       </div>
                       <CardDescription className="text-xs">
@@ -426,9 +424,7 @@ export default function OperatorSupportInbox() {
                         Trust: <Stars value={row.trust_rating} />
                       </div>
                     </div>
-                    {row.whats_working && (
-                      <Field label="What's working">{row.whats_working}</Field>
-                    )}
+                    {row.whats_working && <Field label="What's working">{row.whats_working}</Field>}
                     {row.whats_friction && (
                       <Field label="Friction / missing">{row.whats_friction}</Field>
                     )}
@@ -454,9 +450,7 @@ export default function OperatorSupportInbox() {
                       reviewedAt={row.reviewed_at}
                       notes={draftNoteFor(row.id, row.admin_notes)}
                       saving={savingId === row.id}
-                      onNotesChange={(v) =>
-                        setNotesDraft((prev) => ({ ...prev, [row.id]: v }))
-                      }
+                      onNotesChange={(v) => setNotesDraft((prev) => ({ ...prev, [row.id]: v }))}
                       onToggleReviewed={() => toggleReviewed("feedback", row)}
                       onSaveNotes={() =>
                         updateFeedback(row, {
@@ -533,9 +527,7 @@ export default function OperatorSupportInbox() {
                       reviewedAt={row.reviewed_at}
                       notes={draftNoteFor(row.id, row.admin_notes)}
                       saving={savingId === row.id}
-                      onNotesChange={(v) =>
-                        setNotesDraft((prev) => ({ ...prev, [row.id]: v }))
-                      }
+                      onNotesChange={(v) => setNotesDraft((prev) => ({ ...prev, [row.id]: v }))}
                       onToggleReviewed={() => toggleReviewed("contact", row)}
                       onSaveNotes={() =>
                         updateContact(row, {

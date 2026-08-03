@@ -1,7 +1,4 @@
-import {
-  buildLeadActivityTimeline,
-  type LeadActivityEvent,
-} from "@/lib/leadActivityRules";
+import { buildLeadActivityTimeline, type LeadActivityEvent } from "@/lib/leadActivityRules";
 import type { LeadRow } from "@/hooks/useLeadsList";
 
 export interface LeadActivityTimelineProps {
@@ -14,15 +11,10 @@ export interface LeadActivityTimelineProps {
  * Does not perform any I/O. Renders strictly from LeadRow fields via
  * buildLeadActivityTimeline. No external communication.
  */
-export default function LeadActivityTimeline({
-  lead,
-}: LeadActivityTimelineProps) {
+export default function LeadActivityTimeline({ lead }: LeadActivityTimelineProps) {
   if (!lead) {
     return (
-      <p
-        className="text-xs text-muted-foreground"
-        data-testid="lead-activity-timeline-empty"
-      >
+      <p className="text-xs text-muted-foreground" data-testid="lead-activity-timeline-empty">
         No lead selected.
       </p>
     );
@@ -32,20 +24,14 @@ export default function LeadActivityTimeline({
 
   if (events.length === 0) {
     return (
-      <p
-        className="text-xs text-muted-foreground"
-        data-testid="lead-activity-timeline-empty"
-      >
+      <p className="text-xs text-muted-foreground" data-testid="lead-activity-timeline-empty">
         No derived activity available.
       </p>
     );
   }
 
   return (
-    <ol
-      className="space-y-2 text-xs text-muted-foreground"
-      data-testid="lead-activity-timeline"
-    >
+    <ol className="space-y-2 text-xs text-muted-foreground" data-testid="lead-activity-timeline">
       {events.map((ev) => (
         <TimelineRow key={ev.id} event={ev} />
       ))}
@@ -55,15 +41,10 @@ export default function LeadActivityTimeline({
 
 function TimelineRow({ event }: { event: LeadActivityEvent }) {
   return (
-    <li
-      className="rounded-md border border-border/40 bg-card/30 p-2"
-      data-event-type={event.type}
-    >
+    <li className="rounded-md border border-border/40 bg-card/30 p-2" data-event-type={event.type}>
       <div className="flex items-center justify-between gap-2">
         <span className="font-medium text-foreground">{event.label}</span>
-        <span className="tabular-nums">
-          {event.at ? new Date(event.at).toLocaleString() : "—"}
-        </span>
+        <span className="tabular-nums">{event.at ? new Date(event.at).toLocaleString() : "—"}</span>
       </div>
       {event.detail && <div className="mt-1">{event.detail}</div>}
     </li>

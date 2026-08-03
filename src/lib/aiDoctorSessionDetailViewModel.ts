@@ -4,7 +4,11 @@
  * Read-only. No AI calls. No DB writes. No automation.
  * Shapes existing session/diagnosis fields into a calm, scannable review summary.
  */
-import type { Diagnosis, DiagnosisFollowUp, DiagnosisSuggestedAction } from "./aiDoctorDiagnosisRules";
+import type {
+  Diagnosis,
+  DiagnosisFollowUp,
+  DiagnosisSuggestedAction,
+} from "./aiDoctorDiagnosisRules";
 
 export type ReviewRiskTone = "neutral" | "info" | "warn" | "danger";
 
@@ -122,9 +126,7 @@ export function formatDoctorReviewSummaryText(vm: ReviewSummaryViewModel): strin
   const lines: string[] = [];
   lines.push("AI Doctor — Review Summary");
   lines.push(`Risk: ${vm.risk.level}`);
-  lines.push(
-    vm.confidencePct != null ? `Confidence: ${vm.confidencePct}%` : "Confidence: n/a",
-  );
+  lines.push(vm.confidencePct != null ? `Confidence: ${vm.confidencePct}%` : "Confidence: n/a");
   lines.push("");
 
   lines.push("Likely issue:");
@@ -216,7 +218,6 @@ export function buildCautionNote(vm: ReviewSummaryViewModel): CautionNote {
   };
 }
 
-
 /**
  * Compact caution indicator for an `ai_doctor_sessions` row on the index list.
  * Reuses `buildCautionNote` so the index and detail page agree on what counts
@@ -289,13 +290,9 @@ export function buildCautionReasonTokens(vm: ReviewSummaryViewModel): string[] {
  * "Review because: low confidence, elevated risk, missing info." Returns null
  * when there are no tokens (no caution applies).
  */
-export function formatSessionRowCautionReasonText(
-  tokens: string[],
-): string | null {
+export function formatSessionRowCautionReasonText(tokens: string[]): string | null {
   const cleaned = Array.isArray(tokens)
-    ? tokens
-        .map((t) => (typeof t === "string" ? t.trim() : ""))
-        .filter((t) => t.length > 0)
+    ? tokens.map((t) => (typeof t === "string" ? t.trim() : "")).filter((t) => t.length > 0)
     : [];
   if (cleaned.length === 0) return null;
   return `Review because: ${cleaned.join(", ")}.`;
@@ -309,14 +306,10 @@ export function formatSessionRowCautionReasonText(
  * actions based on caution status alone.
  */
 const CAUTION_CHECKLIST_MAP: Record<string, string> = {
-  "low confidence":
-    "Verify the diagnosis against the plant photos and recent logs.",
-  "unrecorded confidence":
-    "Verify the diagnosis against the plant photos and recent logs.",
-  "elevated risk":
-    "Review the risk level before taking corrective action.",
-  "missing info":
-    "Confirm plant, tent, sensor, watering, and feeding context.",
+  "low confidence": "Verify the diagnosis against the plant photos and recent logs.",
+  "unrecorded confidence": "Verify the diagnosis against the plant photos and recent logs.",
+  "elevated risk": "Review the risk level before taking corrective action.",
+  "missing info": "Confirm plant, tent, sensor, watering, and feeding context.",
 };
 
 /**
@@ -352,16 +345,12 @@ export function formatCautionChecklistSummary(count: number): string | null {
 /**
  * Full checklist text for tooltip / aria-label. Returns null when empty.
  */
-export function formatCautionChecklistDescription(
-  items: string[],
-): string | null {
+export function formatCautionChecklistDescription(items: string[]): string | null {
   if (!Array.isArray(items) || items.length === 0) return null;
   return `Review checklist: ${items.join(" ")}`;
 }
 
-export function buildSessionRowCautionIndicator(
-  row: SessionRowLike,
-): SessionRowCautionIndicator {
+export function buildSessionRowCautionIndicator(row: SessionRowLike): SessionRowCautionIndicator {
   const vm = buildReviewSummaryViewModel({
     diagnosis: row.diagnosis ?? null,
     rawConfidence: row.raw_confidence ?? null,
@@ -398,7 +387,6 @@ export function isSessionLimitedContext(row: SessionRowLike): boolean {
   const evidence = Array.isArray(row.diagnosis?.evidence)
     ? row.diagnosis!.evidence.filter((s) => typeof s === "string" && s.trim().length > 0)
     : [];
-  const hasAnyContext =
-    !!row.plant_id || !!row.tent_id || !!row.grow_id || evidence.length > 0;
+  const hasAnyContext = !!row.plant_id || !!row.tent_id || !!row.grow_id || evidence.length > 0;
   return !hasAnyContext;
 }

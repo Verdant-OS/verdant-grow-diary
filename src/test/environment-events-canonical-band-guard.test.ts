@@ -25,11 +25,7 @@ function findLatestTriggerSql(): string {
   const matches: { name: string; sql: string }[] = [];
   for (const name of readdirSync(MIG_DIR)) {
     const sql = readFileSync(join(MIG_DIR, name), "utf8");
-    if (
-      /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+public\.validate_environment_event/i.test(
-        sql,
-      )
-    ) {
+    if (/CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+public\.validate_environment_event/i.test(sql)) {
       matches.push({ name, sql });
     }
   }
@@ -47,9 +43,7 @@ describe("environment_events canonical-band trigger — discoverable", () => {
 
 describe("server trigger pins the canonical band (client↔server drift guard)", () => {
   it("temperature_c is bounded -10..60 °C", () => {
-    expect(sql).toMatch(
-      /temperature_c\s*<\s*-10\s+OR\s+NEW\.temperature_c\s*>\s*60/i,
-    );
+    expect(sql).toMatch(/temperature_c\s*<\s*-10\s+OR\s+NEW\.temperature_c\s*>\s*60/i);
   });
 
   it("humidity_pct is bounded 0..100", () => {

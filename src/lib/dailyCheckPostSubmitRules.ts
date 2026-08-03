@@ -14,7 +14,6 @@
  */
 import { formatHarvestSavedBreakdownDetail } from "@/lib/harvestDetailsRules";
 
-
 export const DAILY_CHECK_SUCCESS_TITLE = "Today's check was logged";
 export const DAILY_CHECK_SUCCESS_BODY =
   "Your Daily Grow Check entry is saved. You can keep going or jump back to your plant.";
@@ -230,9 +229,7 @@ export interface DailyCheckTimelineHrefInput {
  * grower was working in. Pure: no I/O, no time, no randomness. Only
  * non-empty trimmed identifiers are forwarded; nothing is invented.
  */
-export function buildDailyCheckTimelineHref(
-  input: DailyCheckTimelineHrefInput,
-): string {
+export function buildDailyCheckTimelineHref(input: DailyCheckTimelineHrefInput): string {
   const params = new URLSearchParams();
   const growId = (input.growId ?? "").toString().trim();
   const plantId = (input.plantId ?? "").toString().trim();
@@ -314,28 +311,27 @@ export interface DailyCheckSavedItemsInput {
   harvestDetails?: DailyCheckSavedHarvestDetailsInput | null;
 }
 
-const SAVED_LABELS: Record<DailyCheckSavedSource, { key: DailyCheckSavedItemKey; label: string }> = {
-  note: { key: "note", label: DAILY_CHECK_SAVED_ITEM_NOTE_LABEL },
-  sensor: {
-    key: "manual-snapshot",
-    label: DAILY_CHECK_SAVED_ITEM_MANUAL_SNAPSHOT_LABEL,
-  },
-  photo: { key: "photo", label: "Photo" },
-  watering: { key: "watering", label: "Watering" },
-  feeding: { key: "feeding", label: "Feeding" },
-  environment_check: { key: "environment_check", label: "Environment check" },
-  training: { key: "training", label: "Training" },
-  defoliation: { key: "defoliation", label: "Defoliation" },
-  issue_observation: {
-    key: "issue_observation",
-    label: "Issue / observation",
-  },
-  harvest: { key: "harvest", label: "Harvest" },
-};
+const SAVED_LABELS: Record<DailyCheckSavedSource, { key: DailyCheckSavedItemKey; label: string }> =
+  {
+    note: { key: "note", label: DAILY_CHECK_SAVED_ITEM_NOTE_LABEL },
+    sensor: {
+      key: "manual-snapshot",
+      label: DAILY_CHECK_SAVED_ITEM_MANUAL_SNAPSHOT_LABEL,
+    },
+    photo: { key: "photo", label: "Photo" },
+    watering: { key: "watering", label: "Watering" },
+    feeding: { key: "feeding", label: "Feeding" },
+    environment_check: { key: "environment_check", label: "Environment check" },
+    training: { key: "training", label: "Training" },
+    defoliation: { key: "defoliation", label: "Defoliation" },
+    issue_observation: {
+      key: "issue_observation",
+      label: "Issue / observation",
+    },
+    harvest: { key: "harvest", label: "Harvest" },
+  };
 
-export function buildDailyCheckSavedItems(
-  input: DailyCheckSavedItemsInput,
-): DailyCheckSavedItem[] {
+export function buildDailyCheckSavedItems(input: DailyCheckSavedItemsInput): DailyCheckSavedItem[] {
   if (!input) return [];
   const ts = input.submittedAt;
   if (ts == null || !Number.isFinite(ts)) return [];
@@ -350,5 +346,3 @@ export function buildDailyCheckSavedItems(
   }
   return [{ key: entry.key, label }];
 }
-
-

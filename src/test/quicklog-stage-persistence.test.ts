@@ -13,10 +13,7 @@ import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { buildLegacyQuickLogUnifiedPayload } from "@/lib/legacyQuickLogUnifiedSave";
 
 const MIGRATION = readFileSync(
-  resolve(
-    process.cwd(),
-    "supabase/migrations/20260722100000_quicklog_save_manual_stage.sql",
-  ),
+  resolve(process.cwd(), "supabase/migrations/20260722100000_quicklog_save_manual_stage.sql"),
   "utf8",
 );
 

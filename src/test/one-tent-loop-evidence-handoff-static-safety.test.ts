@@ -36,18 +36,9 @@ const SCANNED_FILES = [
 // Scope-limited subset for presenter-mount scanning. We only scan the
 // regions of large pages that touch evidence linkage to avoid flagging
 // unrelated legacy copy elsewhere in those files.
-const MOUNT_SCANNED_FILES = [
-  "src/pages/AlertDetail.tsx",
-  "src/pages/ActionDetail.tsx",
-];
+const MOUNT_SCANNED_FILES = ["src/pages/AlertDetail.tsx", "src/pages/ActionDetail.tsx"];
 
-const WRITE_TOKENS = [
-  "functions.invoke",
-  ".insert(",
-  ".update(",
-  ".delete(",
-  "upsert(",
-];
+const WRITE_TOKENS = ["functions.invoke", ".insert(", ".update(", ".delete(", "upsert("];
 
 const AUTOMATION_PHRASES = [
   "automatically execute",
@@ -63,12 +54,7 @@ const AUTOMATION_PHRASES = [
   "apply pesticide",
 ];
 
-const CERTAINTY_PHRASES = [
-  "guaranteed",
-  "definitely",
-  "certain diagnosis",
-  "diagnosed from photo",
-];
+const CERTAINTY_PHRASES = ["guaranteed", "definitely", "certain diagnosis", "diagnosed from photo"];
 
 const UNTRUSTED_NEIGHBORS = ["invalid", "stale", "demo", "unknown", "untrusted"];
 
@@ -189,10 +175,7 @@ describe("One-Tent Loop Evidence Handoff — static safety", () => {
     const findings = SCANNED_FILES.flatMap(scanFile).filter(
       (f) => f.kind === "automation/device-control",
     );
-    expect(
-      findings.length,
-      `unexpected automation phrases:\n${formatFindings(findings)}`,
-    ).toBe(0);
+    expect(findings.length, `unexpected automation phrases:\n${formatFindings(findings)}`).toBe(0);
   });
 
   it("no certainty claims (guaranteed / definitely / certain diagnosis / diagnosed from photo)", () => {
@@ -241,7 +224,11 @@ describe("One-Tent Loop Evidence Handoff — static safety", () => {
         const end = Math.min(lines.length, idx + 7);
         const block = lines.slice(start, end).join("\n").toLowerCase();
         for (const phrase of BAD) {
-          if (block.includes(phrase) && !block.includes(`do not ${phrase}`) && !block.includes(`never ${phrase}`)) {
+          if (
+            block.includes(phrase) &&
+            !block.includes(`do not ${phrase}`) &&
+            !block.includes(`never ${phrase}`)
+          ) {
             findings.push(`${file}:${idx + 1} mount block contains "${phrase}"`);
           }
         }

@@ -29,9 +29,7 @@ export const CUSTOMER_SHARE_LINK_BASE_PATH = "/customer";
  *  - Cap length at 128 characters.
  *  - Return null when the result is empty.
  */
-export function normalizeShareIdInput(
-  raw: string | null | undefined,
-): string | null {
+export function normalizeShareIdInput(raw: string | null | undefined): string | null {
   if (raw == null) return null;
   const trimmed = String(raw).trim();
   if (trimmed.length === 0) return null;

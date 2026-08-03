@@ -70,7 +70,10 @@ function readingTimestamp(r: SensorSourceSummaryReading): string | null {
   return null;
 }
 
-function withinRange(ts: string | null, range: SensorSourceSummaryRange | null | undefined): boolean {
+function withinRange(
+  ts: string | null,
+  range: SensorSourceSummaryRange | null | undefined,
+): boolean {
   if (!range || (range.from == null && range.to == null)) return true;
   if (!ts) return false;
   const t = Date.parse(ts);
@@ -116,8 +119,7 @@ export function summarizeSensorSources(
   return { counts, total, isEmpty: total === 0 };
 }
 
-export const SENSOR_SOURCE_SUMMARY_EMPTY_TEXT =
-  "No sensor readings found for this range.";
+export const SENSOR_SOURCE_SUMMARY_EMPTY_TEXT = "No sensor readings found for this range.";
 
 export function sensorSourceSummaryRowKinds(): readonly TimelineSensorSourceKind[] {
   return SENSOR_SOURCE_KINDS;

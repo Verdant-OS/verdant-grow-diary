@@ -69,7 +69,11 @@ export function checkSpam(params: {
   return { ok: true };
 }
 
-export function recordSubmission(storageKey: string, contentFingerprint: string, now: number = Date.now()): void {
+export function recordSubmission(
+  storageKey: string,
+  contentFingerprint: string,
+  now: number = Date.now(),
+): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(storageKey, JSON.stringify({ at: now, fp: contentFingerprint }));

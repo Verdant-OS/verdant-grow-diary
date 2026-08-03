@@ -1503,7 +1503,7 @@ test.describe("Verdant UI-overhaul responsive routes", () => {
               .every((element, index) =>
                 Boolean(
                   element!.compareDocumentPosition(elements[index + 1]!) &
-                  Node.DOCUMENT_POSITION_FOLLOWING,
+                    Node.DOCUMENT_POSITION_FOLLOWING,
                 ),
               )
           : false;

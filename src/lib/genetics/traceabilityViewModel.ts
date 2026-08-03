@@ -14,7 +14,11 @@ import { evidenceStateLabel } from "./screeningEvidenceRules";
 export interface TraceNodeEvidenceView {
   readonly state: EvidenceState;
   readonly stateLabel: string;
-  readonly targets: ReadonlyArray<{ readonly target: string; readonly result: string; readonly collectedDate: string | null }>;
+  readonly targets: ReadonlyArray<{
+    readonly target: string;
+    readonly result: string;
+    readonly collectedDate: string | null;
+  }>;
   readonly openQuarantine: boolean;
 }
 

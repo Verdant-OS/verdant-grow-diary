@@ -42,9 +42,7 @@ export interface BuildHyperLogPrefillInput {
 }
 
 /** Map a HyperLog action to the existing Quick Log event_type. */
-export function mapHyperLogActionToEventType(
-  action: HyperLogAction,
-): QuickLogEventType {
+export function mapHyperLogActionToEventType(action: HyperLogAction): QuickLogEventType {
   switch (action) {
     case "water":
       return "watering";

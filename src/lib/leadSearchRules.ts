@@ -49,7 +49,6 @@ export function searchLeads(leads: LeadRow[], query: string): LeadRow[] {
   );
 }
 
-
 // Stable, predictable status ordering: action-needed first, terminal last.
 const STATUS_ORDER: Record<string, number> = {
   new: 0,

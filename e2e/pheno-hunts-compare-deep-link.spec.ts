@@ -80,7 +80,7 @@ async function mockLiveHunt(page: Page, capture: RestBoundaryCapture) {
       return;
     }
 
-    if (!Object.prototype.hasOwnProperty.call(LIVE_REST_READS, table)) {
+    if (!Object.hasOwn(LIVE_REST_READS, table)) {
       capture.unexpected.push(requestLabel);
       await route.abort("blockedbyclient");
       return;

@@ -91,10 +91,7 @@ describe("deriveAiDoctorContextEvidenceFlags — medium / pot_size", () => {
   });
 
   it("keeps unknown true when context value is blank-only", () => {
-    const flags = deriveAiDoctorContextEvidenceFlags(
-      ctx({ medium: "  ", pot_size: "" }),
-      0,
-    );
+    const flags = deriveAiDoctorContextEvidenceFlags(ctx({ medium: "  ", pot_size: "" }), 0);
     expect(flags.hasUnknownMedium).toBe(true);
     expect(flags.hasUnknownPotSize).toBe(true);
   });

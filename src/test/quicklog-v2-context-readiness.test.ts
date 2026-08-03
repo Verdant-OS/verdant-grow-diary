@@ -20,10 +20,7 @@ import {
   type QuickLogV2EnvironmentRow,
 } from "@/lib/quickLogV2ManualSnapshotAdapter";
 import { buildManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewModel";
-import type {
-  TimelineMemoryItem,
-  TimelineManualSnapshotItem,
-} from "@/lib/timelineFilterRules";
+import type { TimelineMemoryItem, TimelineManualSnapshotItem } from "@/lib/timelineFilterRules";
 import { evaluateAiDoctorContextFromSources } from "@/lib/aiDoctorContextViewModel";
 import { buildAiDoctorContextQuickActions } from "@/lib/aiDoctorContextQuickActionsViewModel";
 import type { RootZoneObservationV1 } from "@/lib/rootZoneObservationRules";
@@ -167,10 +164,10 @@ describe("QuickLog v2 environment row → AI Doctor context readiness", () => {
 
   it("recent environment event on a DIFFERENT plant does NOT satisfy readiness for this plant", () => {
     const otherRow = makeRow({ id: "evt-other", plant_id: OTHER_PLANT, tent_id: OTHER_TENT });
-    const records = quickLogV2EnvironmentRowsToManualSnapshotRecords(
-      [otherRow],
-      { kind: "plant", plantId: PLANT_ID },
-    );
+    const records = quickLogV2EnvironmentRowsToManualSnapshotRecords([otherRow], {
+      kind: "plant",
+      plantId: PLANT_ID,
+    });
     expect(records).toHaveLength(0);
     const r = evaluateAiDoctorContextFromSources({
       plant: plantWithStage(),
@@ -182,10 +179,10 @@ describe("QuickLog v2 environment row → AI Doctor context readiness", () => {
 
   it("recent environment event on a DIFFERENT tent does NOT satisfy readiness for this tent", () => {
     const otherRow = makeRow({ id: "evt-other", plant_id: null, tent_id: OTHER_TENT });
-    const records = quickLogV2EnvironmentRowsToManualSnapshotRecords(
-      [otherRow],
-      { kind: "tent", tentId: TENT_ID },
-    );
+    const records = quickLogV2EnvironmentRowsToManualSnapshotRecords([otherRow], {
+      kind: "tent",
+      tentId: TENT_ID,
+    });
     expect(records).toHaveLength(0);
   });
 
@@ -203,9 +200,7 @@ describe("QuickLog v2 environment row → AI Doctor context readiness", () => {
 
   it("rejects rows with wrong event_type or non-manual source (defense in depth)", () => {
     expect(
-      quickLogV2EnvironmentRowToManualSnapshotRecord(
-        makeRow({ event_type: "watering" }),
-      ),
+      quickLogV2EnvironmentRowToManualSnapshotRecord(makeRow({ event_type: "watering" })),
     ).toBeNull();
     expect(
       quickLogV2EnvironmentRowToManualSnapshotRecord(
@@ -233,9 +228,15 @@ describe("QuickLog v2 environment row → AI Doctor context readiness", () => {
       makeRow({ id: "b", plant_id: OTHER_PLANT, tent_id: TENT_ID }),
       makeRow({ id: "c", plant_id: null, tent_id: OTHER_TENT }),
     ];
-    const plantScoped = filterQuickLogV2EnvironmentRowsByScope(rows, { kind: "plant", plantId: PLANT_ID });
+    const plantScoped = filterQuickLogV2EnvironmentRowsByScope(rows, {
+      kind: "plant",
+      plantId: PLANT_ID,
+    });
     expect(plantScoped.map((r) => r.id)).toEqual(["a"]);
-    const tentScoped = filterQuickLogV2EnvironmentRowsByScope(rows, { kind: "tent", tentId: TENT_ID });
+    const tentScoped = filterQuickLogV2EnvironmentRowsByScope(rows, {
+      kind: "tent",
+      tentId: TENT_ID,
+    });
     expect(tentScoped.map((r) => r.id).sort()).toEqual(["a", "b"]);
   });
 });

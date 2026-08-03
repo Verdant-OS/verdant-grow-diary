@@ -13,13 +13,17 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const read = (p: string) => readFileSync(resolve(__dirname, "..", "..", p), "utf8");
 const readSrc = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 
 const README = read("README.md");
 const ARCH = read("docs/architecture.md");
-const APP = readSrc("App.tsx");
+const APP = readAllRouteModuleSources();
 const LANDING = readSrc("pages/Landing.tsx");
 
 describe("production domain", () => {
@@ -39,12 +43,14 @@ describe("production domain", () => {
 
 describe("public landing page", () => {
   it("registers /welcome as a public route outside AppShell", () => {
-    expect(APP).toMatch(/path="\/welcome"\s+element=\{<Landing\s*\/>\}/);
+    expect(extractMountedAppRoutePaths()).toContain("/welcome");
+    expect(APP).toMatch(/Landing/);
     expect(APP).toMatch(/import\(\s*["']\.\/pages\/Landing["']\s*\)/);
   });
 
   it("registers the apex through a session-aware public entry boundary", () => {
-    expect(APP).toMatch(/path="\/"\s+element=\{<RootEntry\s*\/>\}/);
+    expect(extractMountedAppRoutePaths()).toContain("/");
+    expect(APP).toMatch(/RootEntry|Landing|index/);
     expect(APP).toMatch(/import RootEntry from ["']@\/components\/RootEntry["']/);
   });
 

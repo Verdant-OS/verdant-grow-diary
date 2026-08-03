@@ -56,57 +56,54 @@ Deno.test("production deps derive identity through auth.getUser", async () => {
   assertEquals(getUserCalls, 1);
 });
 
-Deno.test(
-  "production deps distinguish invalid credentials from auth availability errors",
-  async () => {
-    const admin = {
-      from: () => {
-        throw new Error("unused");
+Deno.test("production deps distinguish invalid credentials from auth availability errors", async () => {
+  const admin = {
+    from: () => {
+      throw new Error("unused");
+    },
+    rpc: async () => ({ data: null, error: null }),
+  };
+
+  for (const error of [
+    { name: "AuthApiError", status: 401, code: "bad_jwt" },
+    { name: "AuthSessionMissingError", status: 400, code: "session_not_found" },
+    { name: "AuthApiError", status: 403, code: "not_admin" },
+  ]) {
+    const deps = buildOperatorGgsRealPayloadCommitDeps(
+      {
+        auth: {
+          getUser: async () => ({ data: { user: null }, error }),
+        },
       },
-      rpc: async () => ({ data: null, error: null }),
-    };
+      admin,
+    );
+    assertEquals(await deps.getVerifiedUserId("Bearer invalid"), {
+      ok: true,
+      value: null,
+    });
+  }
 
-    for (const error of [
-      { name: "AuthApiError", status: 401, code: "bad_jwt" },
-      { name: "AuthSessionMissingError", status: 400, code: "session_not_found" },
-      { name: "AuthApiError", status: 403, code: "not_admin" },
-    ]) {
-      const deps = buildOperatorGgsRealPayloadCommitDeps(
-        {
-          auth: {
-            getUser: async () => ({ data: { user: null }, error }),
-          },
+  for (const error of [
+    { name: "AuthRetryableFetchError", status: 0 },
+    { name: "AuthRetryableFetchError", status: 503 },
+    { name: "AuthApiError", status: 500, code: "unexpected_failure" },
+    { name: "AuthUnknownError" },
+    { name: "AuthApiError", status: 429, code: "over_request_rate_limit" },
+    new Error("network unavailable"),
+  ]) {
+    const deps = buildOperatorGgsRealPayloadCommitDeps(
+      {
+        auth: {
+          getUser: async () => ({ data: { user: null }, error }),
         },
-        admin,
-      );
-      assertEquals(await deps.getVerifiedUserId("Bearer invalid"), {
-        ok: true,
-        value: null,
-      });
-    }
-
-    for (const error of [
-      { name: "AuthRetryableFetchError", status: 0 },
-      { name: "AuthRetryableFetchError", status: 503 },
-      { name: "AuthApiError", status: 500, code: "unexpected_failure" },
-      { name: "AuthUnknownError" },
-      { name: "AuthApiError", status: 429, code: "over_request_rate_limit" },
-      new Error("network unavailable"),
-    ]) {
-      const deps = buildOperatorGgsRealPayloadCommitDeps(
-        {
-          auth: {
-            getUser: async () => ({ data: { user: null }, error }),
-          },
-        },
-        admin,
-      );
-      assertEquals(await deps.getVerifiedUserId("Bearer retry-later"), {
-        ok: false,
-      });
-    }
-  },
-);
+      },
+      admin,
+    );
+    assertEquals(await deps.getVerifiedUserId("Bearer retry-later"), {
+      ok: false,
+    });
+  }
+});
 
 Deno.test("production deps query exact tent and bridge-token context columns", async () => {
   const calls: Array<{
@@ -190,53 +187,50 @@ Deno.test("production deps query exact tent and bridge-token context columns", a
   ]);
 });
 
-Deno.test(
-  "production deps call the private RPC exactly once with a confirmed complete cohort",
-  async () => {
-    const rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
-    const admin = {
-      from: () => {
-        throw new Error("unused");
+Deno.test("production deps call the private RPC exactly once with a confirmed complete cohort", async () => {
+  const rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
+  const admin = {
+    from: () => {
+      throw new Error("unused");
+    },
+    async rpc(name: string, args: Record<string, unknown>) {
+      rpcCalls.push({ name, args });
+      return { data: [{ inserted: 3, rejected: 0 }], error: null };
+    },
+  };
+  const deps = buildOperatorGgsRealPayloadCommitDeps(
+    {
+      auth: {
+        getUser: async () => ({
+          data: { user: { id: USER_ID } },
+          error: null,
+        }),
       },
-      async rpc(name: string, args: Record<string, unknown>) {
-        rpcCalls.push({ name, args });
-        return { data: [{ inserted: 3, rejected: 0 }], error: null };
-      },
-    };
-    const deps = buildOperatorGgsRealPayloadCommitDeps(
-      {
-        auth: {
-          getUser: async () => ({
-            data: { user: { id: USER_ID } },
-            error: null,
-          }),
-        },
-      },
-      admin,
-    );
-    const result = await deps.commitBatch({
-      userId: USER_ID,
-      bridgeId: BRIDGE_ID,
-      tentId: TENT_ID,
-      rows: [row(), { ...row(), metric: "soil_moisture_pct" }, { ...row(), metric: "soil_temp_c" }],
-    });
-    assertEquals(result, { ok: true, inserted: 3, rejected: 0 });
-    assertEquals(rpcCalls.length, 1);
-    assertEquals(rpcCalls[0], {
-      name: "pi_ingest_commit_batch",
-      args: {
-        p_user_id: USER_ID,
-        p_bridge_id: BRIDGE_ID,
-        p_tent_id: TENT_ID,
-        p_rows: [
-          row(),
-          { ...row(), metric: "soil_moisture_pct" },
-          { ...row(), metric: "soil_temp_c" },
-        ],
-      },
-    });
-  },
-);
+    },
+    admin,
+  );
+  const result = await deps.commitBatch({
+    userId: USER_ID,
+    bridgeId: BRIDGE_ID,
+    tentId: TENT_ID,
+    rows: [row(), { ...row(), metric: "soil_moisture_pct" }, { ...row(), metric: "soil_temp_c" }],
+  });
+  assertEquals(result, { ok: true, inserted: 3, rejected: 0 });
+  assertEquals(rpcCalls.length, 1);
+  assertEquals(rpcCalls[0], {
+    name: "pi_ingest_commit_batch",
+    args: {
+      p_user_id: USER_ID,
+      p_bridge_id: BRIDGE_ID,
+      p_tent_id: TENT_ID,
+      p_rows: [
+        row(),
+        { ...row(), metric: "soil_moisture_pct" },
+        { ...row(), metric: "soil_temp_c" },
+      ],
+    },
+  });
+});
 
 Deno.test("production deps reject every unconfirmed RPC count shape", async () => {
   for (const data of [

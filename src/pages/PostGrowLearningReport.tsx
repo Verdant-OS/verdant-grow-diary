@@ -93,11 +93,11 @@ export default function PostGrowLearningReport() {
     return () => {
       cancelled = true;
     };
-  }, [growId, gateAttempt]);
+  }, [growId]);
 
   useEffect(() => {
     if (report) setLesson(report.lesson.text);
-  }, [report?.lesson.entryId, report?.lesson.text]);
+  }, [report?.lesson.entryId, report?.lesson.text, report]);
 
   async function handleSaveLesson() {
     setBusy(true);

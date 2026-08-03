@@ -68,7 +68,9 @@ const code = assertRequiredCiSecret({
 if (code === 1) {
   console.error(
     `::error::${secretName} secret is not set. Configure it before ${
-      TARGET_ENV === "live" ? "deploying money-critical changes to live" : "merging money-critical changes"
+      TARGET_ENV === "live"
+        ? "deploying money-critical changes to live"
+        : "merging money-critical changes"
     }. Do NOT deploy until this is configured.`,
   );
 }

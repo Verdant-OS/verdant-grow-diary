@@ -45,11 +45,9 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-const fetchSpy = vi
-  .spyOn(globalThis, "fetch" as never)
-  .mockImplementation((() => {
-    throw new Error("fetch not allowed in v1.4 readiness test");
-  }) as never);
+const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
+  throw new Error("fetch not allowed in v1.4 readiness test");
+}) as never);
 
 beforeEach(() => {
   fetchSpy.mockClear();
@@ -72,15 +70,11 @@ describe("AI Doctor Readiness UI v1.4 — source badge trust/caution styling", (
         sensorReadings: [buildReadingForSource(cse.source)],
       });
       render(<AiDoctorContextReadinessPanel context={context} />);
-      const badge = screen.getByTestId(
-        `ai-doctor-context-readiness-panel-source-${cse.source}`,
-      );
+      const badge = screen.getByTestId(`ai-doctor-context-readiness-panel-source-${cse.source}`);
 
       // Stable data hooks
       expect(badge.getAttribute("data-source")).toBe(cse.source);
-      expect(badge.getAttribute("data-trustworthy")).toBe(
-        cse.isTrustworthy ? "true" : "false",
-      );
+      expect(badge.getAttribute("data-trustworthy")).toBe(cse.isTrustworthy ? "true" : "false");
       // Label + count
       expect(badge.textContent ?? "").toContain(cse.label);
       expect(badge.textContent ?? "").toMatch(/·\s*1\b/);
@@ -137,16 +131,10 @@ describe("AI Doctor Readiness UI v1.4 — source badge trust/caution styling", (
     });
     render(<AiDoctorContextReadinessPanel context={context} />);
     for (const source of ["demo", "stale", "invalid"] as const) {
-      const badge = screen.getByTestId(
-        `ai-doctor-context-readiness-panel-source-${source}`,
-      );
+      const badge = screen.getByTestId(`ai-doctor-context-readiness-panel-source-${source}`);
       expect(badge.getAttribute("data-trustworthy")).toBe("false");
-      expect(CAUTION_TONE_CLASSES.every((c) => badge.className.includes(c))).toBe(
-        true,
-      );
-      expect(TRUSTED_TONE_CLASSES.every((c) => badge.className.includes(c))).toBe(
-        false,
-      );
+      expect(CAUTION_TONE_CLASSES.every((c) => badge.className.includes(c))).toBe(true);
+      expect(TRUSTED_TONE_CLASSES.every((c) => badge.className.includes(c))).toBe(false);
     }
   });
 });
@@ -221,18 +209,10 @@ describe("AI Doctor Readiness UI v1.4 — mobile viewport regression (DOM order 
       ]
     `);
     // Limitations + missing-info sections render under mobile width.
-    expect(
-      screen.getByTestId("ai-doctor-context-readiness-panel-limitations"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-context-readiness-panel-missing"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-context-readiness-panel-limitations")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-context-readiness-panel-missing")).toBeTruthy();
     // Quick actions remain reachable.
-    expect(
-      screen.getByTestId(
-        "ai-doctor-context-readiness-panel-quick-actions",
-      ),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-context-readiness-panel-quick-actions")).toBeTruthy();
   });
 
   it("strong context: header order is deterministic on mobile width and omits Limitations/Missing", () => {
@@ -273,24 +253,16 @@ describe("AI Doctor Readiness UI v1.4 — mobile viewport regression (DOM order 
         "Action Queue suggestion preview",
       ]
     `);
-    expect(
-      screen.queryByTestId("ai-doctor-context-readiness-panel-limitations"),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId("ai-doctor-context-readiness-panel-missing"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-context-readiness-panel-limitations")).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-context-readiness-panel-missing")).toBeNull();
     // Sensor source labels list still renders the live badge under mobile.
-    const sources = screen.getByTestId(
-      "ai-doctor-context-readiness-panel-sources",
-    );
+    const sources = screen.getByTestId("ai-doctor-context-readiness-panel-sources");
     expect(sources.querySelectorAll("li").length).toBeGreaterThan(0);
   });
 
   it("mobile snapshot is stable across an innerWidth change (no width-dependent DOM branches)", () => {
     const context = buildReadinessContext({ plant: { stage: null } });
-    const { rerender } = render(
-      <AiDoctorContextReadinessPanel context={context} />,
-    );
+    const { rerender } = render(<AiDoctorContextReadinessPanel context={context} />);
     const panel = screen.getByTestId("ai-doctor-context-readiness-panel");
     const before = Array.from(panel.querySelectorAll("h2, h3")).map((h) =>
       (h.textContent ?? "").trim(),
@@ -306,9 +278,7 @@ describe("AI Doctor Readiness UI v1.4 — mobile viewport regression (DOM order 
     window.dispatchEvent(new Event("resize"));
     rerender(<AiDoctorContextReadinessPanel context={context} />);
     const after = Array.from(
-      screen
-        .getByTestId("ai-doctor-context-readiness-panel")
-        .querySelectorAll("h2, h3"),
+      screen.getByTestId("ai-doctor-context-readiness-panel").querySelectorAll("h2, h3"),
     ).map((h) => (h.textContent ?? "").trim());
 
     expect(after).toEqual(before);

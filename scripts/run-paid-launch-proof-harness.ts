@@ -171,55 +171,125 @@ async function main() {
   const cA = `fake_ctm_${RUN}_a`;
   const sA = `fake_sub_${RUN}_a`;
   await seedLink(userA, cA, sA);
-  const ev1 = await seedEvent({ tag: "a1", customerId: cA, subscriptionId: sA, occurredAt: "2026-07-01T00:00:00Z" });
+  const ev1 = await seedEvent({
+    tag: "a1",
+    customerId: cA,
+    subscriptionId: sA,
+    occurredAt: "2026-07-01T00:00:00Z",
+  });
   let r = await rpc("apply_paddle_subscription_update_with_audit", ev1.processingId);
   check("valid event creates entitlement", r.ok && r.status === "created");
   check("exactly one billing row", (await billingRow(userA))?.plan_id === "pro_monthly");
 
   // 2. duplicate application → noop
   r = await rpc("apply_paddle_subscription_update_with_audit", ev1.processingId);
-  check("duplicate application is a noop", r.ok && r.status === "noop" && r.reason === "already_applied");
+  check(
+    "duplicate application is a noop",
+    r.ok && r.status === "noop" && r.reason === "already_applied",
+  );
 
   // 3. unverified signature → blocked
-  const ev2 = await seedEvent({ tag: "a2", customerId: cA, subscriptionId: sA, signatureVerified: false });
+  const ev2 = await seedEvent({
+    tag: "a2",
+    customerId: cA,
+    subscriptionId: sA,
+    signatureVerified: false,
+  });
   r = await rpc("apply_paddle_subscription_update_with_audit", ev2.processingId);
   check("unverified event blocked", !r.ok && r.reason === "event_not_verified");
 
   // 4. wrong environment → blocked
-  const ev3 = await seedEvent({ tag: "a3", customerId: cA, subscriptionId: sA, environment: "live" });
+  const ev3 = await seedEvent({
+    tag: "a3",
+    customerId: cA,
+    subscriptionId: sA,
+    environment: "live",
+  });
   r = await rpc("apply_paddle_subscription_update_with_audit", ev3.processingId);
-  check("live environment blocked (launch posture)", !r.ok && r.reason === "environment_not_allowed");
+  check(
+    "live environment blocked (launch posture)",
+    !r.ok && r.reason === "environment_not_allowed",
+  );
 
   // 5. unknown plan / missing link → blocked
   const ev4 = await seedEvent({ tag: "a4", customerId: cA, subscriptionId: sA, planId: "free" });
   r = await rpc("apply_paddle_subscription_update_with_audit", ev4.processingId);
   check("unknown plan blocked", !r.ok && r.reason === "unknown_plan");
-  const ev5 = await seedEvent({ tag: "a5", customerId: `fake_ctm_${RUN}_nolink`, subscriptionId: `fake_sub_${RUN}_nolink` });
+  const ev5 = await seedEvent({
+    tag: "a5",
+    customerId: `fake_ctm_${RUN}_nolink`,
+    subscriptionId: `fake_sub_${RUN}_nolink`,
+  });
   r = await rpc("apply_paddle_subscription_update_with_audit", ev5.processingId);
   check("missing verified link blocked", !r.ok && r.reason === "missing_verified_customer_link");
 
   // 6. transitions + ordering
-  const evPd = await seedEvent({ tag: "a6", customerId: cA, subscriptionId: sA, status: "past_due", occurredAt: "2026-07-02T00:00:00Z" });
+  const evPd = await seedEvent({
+    tag: "a6",
+    customerId: cA,
+    subscriptionId: sA,
+    status: "past_due",
+    occurredAt: "2026-07-02T00:00:00Z",
+  });
   r = await rpc("apply_paddle_subscription_update_with_audit", evPd.processingId);
   check("past_due transition applies", r.ok && (await billingRow(userA))?.status === "past_due");
-  const evOld = await seedEvent({ tag: "a7", customerId: cA, subscriptionId: sA, status: "canceled", occurredAt: "2026-06-01T00:00:00Z" });
+  const evOld = await seedEvent({
+    tag: "a7",
+    customerId: cA,
+    subscriptionId: sA,
+    status: "canceled",
+    occurredAt: "2026-06-01T00:00:00Z",
+  });
   r = await rpc("apply_paddle_subscription_update_with_audit", evOld.processingId);
   check(
     "older replayed cancel cannot overwrite newer state",
-    r.ok && r.status === "noop" && r.reason === "stale_event_ordering" && (await billingRow(userA))?.status === "past_due",
+    r.ok &&
+      r.status === "noop" &&
+      r.reason === "stale_event_ordering" &&
+      (await billingRow(userA))?.status === "past_due",
   );
-  const evCancel = await seedEvent({ tag: "a8", customerId: cA, subscriptionId: sA, status: "canceled", occurredAt: "2026-07-03T00:00:00Z" });
+  const evCancel = await seedEvent({
+    tag: "a8",
+    customerId: cA,
+    subscriptionId: sA,
+    status: "canceled",
+    occurredAt: "2026-07-03T00:00:00Z",
+  });
   r = await rpc("apply_paddle_subscription_update_with_audit", evCancel.processingId);
   check("newer cancel applies", r.ok && (await billingRow(userA))?.status === "canceled");
 
   // 7. founder: transaction-only, idempotent, concurrent-safe
   const cB = `fake_ctm_${RUN}_b`;
   await seedLink(userB, cB, null);
-  const evFsub = await seedEvent({ tag: "f0", eventType: "subscription.created", customerId: cB, subscriptionId: null, planId: "founder_lifetime", founder: true });
+  const evFsub = await seedEvent({
+    tag: "f0",
+    eventType: "subscription.created",
+    customerId: cB,
+    subscriptionId: null,
+    planId: "founder_lifetime",
+    founder: true,
+  });
   r = await rpc("allocate_founder_lifetime_with_audit", evFsub.processingId);
-  check("subscription event cannot allocate founder", !r.ok && r.reason === "founder_requires_completed_transaction");
-  const evF1 = await seedEvent({ tag: "f1", eventType: "transaction.completed", customerId: cB, subscriptionId: null, planId: "founder_lifetime", founder: true });
-  const evF2 = await seedEvent({ tag: "f2", eventType: "transaction.completed", customerId: cB, subscriptionId: null, planId: "founder_lifetime", founder: true });
+  check(
+    "subscription event cannot allocate founder",
+    !r.ok && r.reason === "founder_requires_completed_transaction",
+  );
+  const evF1 = await seedEvent({
+    tag: "f1",
+    eventType: "transaction.completed",
+    customerId: cB,
+    subscriptionId: null,
+    planId: "founder_lifetime",
+    founder: true,
+  });
+  const evF2 = await seedEvent({
+    tag: "f2",
+    eventType: "transaction.completed",
+    customerId: cB,
+    subscriptionId: null,
+    planId: "founder_lifetime",
+    founder: true,
+  });
   const [rf1, rf2] = await Promise.all([
     rpc("allocate_founder_lifetime_with_audit", evF1.processingId),
     rpc("allocate_founder_lifetime_with_audit", evF2.processingId),
@@ -229,8 +299,12 @@ async function main() {
   // STRICT: the advisory lock serializes BEFORE the existing-row read, so a
   // same-buyer duplicate race must resolve as exactly one allocation and one
   // already_founder noop — never a unique-violation 'failed'.
-  const allocations = [rf1, rf2].filter((x) => x.status === "created" || x.status === "updated").length;
-  const idempotentNoops = [rf1, rf2].filter((x) => x.status === "noop" && x.reason === "already_founder").length;
+  const allocations = [rf1, rf2].filter(
+    (x) => x.status === "created" || x.status === "updated",
+  ).length;
+  const idempotentNoops = [rf1, rf2].filter(
+    (x) => x.status === "noop" && x.reason === "already_founder",
+  ).length;
   check(
     "same-buyer concurrent duplicates: EXACTLY one allocation + one already_founder noop",
     rowB?.plan_id === "founder_lifetime" &&
@@ -251,8 +325,22 @@ async function main() {
   const cD = `fake_ctm_${RUN}_d`;
   await seedLink(userC, cC, null);
   await seedLink(userD, cD, null);
-  const evFC = await seedEvent({ tag: "fc", eventType: "transaction.completed", customerId: cC, subscriptionId: null, planId: "founder_lifetime", founder: true });
-  const evFD = await seedEvent({ tag: "fd", eventType: "transaction.completed", customerId: cD, subscriptionId: null, planId: "founder_lifetime", founder: true });
+  const evFC = await seedEvent({
+    tag: "fc",
+    eventType: "transaction.completed",
+    customerId: cC,
+    subscriptionId: null,
+    planId: "founder_lifetime",
+    founder: true,
+  });
+  const evFD = await seedEvent({
+    tag: "fd",
+    eventType: "transaction.completed",
+    customerId: cD,
+    subscriptionId: null,
+    planId: "founder_lifetime",
+    founder: true,
+  });
   const [rfc, rfd] = await Promise.all([
     rpc("allocate_founder_lifetime_with_audit", evFC.processingId),
     rpc("allocate_founder_lifetime_with_audit", evFD.processingId),
@@ -289,23 +377,47 @@ async function main() {
   cleanupUsers.push(userE, userF);
   await seedLink(userE, `fake_ctm_${RUN}_e`, null);
   await seedLink(userF, `fake_ctm_${RUN}_f`, null);
-  const evFE = await seedEvent({ tag: "fe", eventType: "transaction.completed", customerId: `fake_ctm_${RUN}_e`, subscriptionId: null, planId: "founder_lifetime", founder: true });
+  const evFE = await seedEvent({
+    tag: "fe",
+    eventType: "transaction.completed",
+    customerId: `fake_ctm_${RUN}_e`,
+    subscriptionId: null,
+    planId: "founder_lifetime",
+    founder: true,
+  });
   r = await rpc("allocate_founder_lifetime_with_audit", evFE.processingId);
-  check("boundary slot 75 allocates", r.ok === true && (await billingRow(userE))?.founder_number === 75);
-  const evFF = await seedEvent({ tag: "ff", eventType: "transaction.completed", customerId: `fake_ctm_${RUN}_f`, subscriptionId: null, planId: "founder_lifetime", founder: true });
+  check(
+    "boundary slot 75 allocates",
+    r.ok === true && (await billingRow(userE))?.founder_number === 75,
+  );
+  const evFF = await seedEvent({
+    tag: "ff",
+    eventType: "transaction.completed",
+    customerId: `fake_ctm_${RUN}_f`,
+    subscriptionId: null,
+    planId: "founder_lifetime",
+    founder: true,
+  });
   r = await rpc("allocate_founder_lifetime_with_audit", evFF.processingId);
-  check("beyond the cap: blocked with founder_cap_reached", !r.ok && r.reason === "founder_cap_reached");
+  check(
+    "beyond the cap: blocked with founder_cap_reached",
+    !r.ok && r.reason === "founder_cap_reached",
+  );
   check("beyond the cap: no entitlement row written", (await billingRow(userF)) === null);
 
   // 8. client-side isolation (RLS)
   const { error: anonRead } = await anon.from("billing_subscriptions").select("*").limit(1);
-  const anonRows = anonRead ? [] : ((await anon.from("billing_subscriptions").select("*").limit(1)).data ?? []);
+  const anonRows = anonRead
+    ? []
+    : ((await anon.from("billing_subscriptions").select("*").limit(1)).data ?? []);
   check("anon reads no billing rows", anonRows.length === 0);
   const { error: anonWrite } = await anon
     .from("billing_subscriptions")
     .insert({ user_id: userA, plan_id: "founder_lifetime", status: "active" });
   check("anon cannot write billing rows", !!anonWrite);
-  const { error: anonRpc } = await anon.rpc("allocate_founder_lifetime", { p_processing_id: ev1.processingId });
+  const { error: anonRpc } = await anon.rpc("allocate_founder_lifetime", {
+    p_processing_id: ev1.processingId,
+  });
   check("anon cannot execute founder RPC", !!anonRpc);
 
   // A REAL signed-in user (JWT-backed client), not just the unsigned anon
@@ -324,7 +436,9 @@ async function main() {
     .from("billing_subscriptions")
     .insert({ user_id: userA, plan_id: "founder_lifetime", status: "active" });
   check("authenticated user cannot write billing rows", !!authedWrite);
-  const { error: authedRpc } = await authed.rpc("allocate_founder_lifetime", { p_processing_id: ev1.processingId });
+  const { error: authedRpc } = await authed.rpc("allocate_founder_lifetime", {
+    p_processing_id: ev1.processingId,
+  });
   check("authenticated user cannot execute the founder RPC", !!authedRpc);
   const { data: slots, error: slotsError } = await authed.rpc("founder_lifetime_slots_remaining");
   check(
@@ -342,7 +456,10 @@ async function main() {
   check("audit rows recorded for success, founder, and blocked paths", (audits?.length ?? 0) >= 3);
   check(
     "audit reasons carry no fake provider ids",
-    !(JSON.stringify(audits ?? []).includes("fake_ctm_") || JSON.stringify(audits ?? []).includes("fake_sub_")),
+    !(
+      JSON.stringify(audits ?? []).includes("fake_ctm_") ||
+      JSON.stringify(audits ?? []).includes("fake_sub_")
+    ),
   );
   const { error: auditUpdate } = await admin
     .from("billing_subscription_update_audit")
@@ -356,7 +473,11 @@ async function main() {
   await admin.from("paddle_events").delete().like("event_id", `fake_evt_${RUN}_%`);
   for (const id of cleanupUsers) await admin.auth.admin.deleteUser(id);
 
-  console.log(failures === 0 ? "PAID-LAUNCH HARNESS: ALL PROOFS PASSED" : `PAID-LAUNCH HARNESS: ${failures} FAILURE(S)`);
+  console.log(
+    failures === 0
+      ? "PAID-LAUNCH HARNESS: ALL PROOFS PASSED"
+      : `PAID-LAUNCH HARNESS: ${failures} FAILURE(S)`,
+  );
   process.exit(failures === 0 ? 0 : 1);
 }
 

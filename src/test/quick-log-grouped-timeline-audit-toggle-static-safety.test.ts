@@ -20,12 +20,7 @@ const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
 const PRESENTER = "components/QuickLogGroupedTimelineSection.tsx";
 const AUDIT_VM = "lib/quickLogTimelineAuditViewModel.ts";
 
-const FORBIDDEN_WORDS = [
-  /\blive\b/i,
-  /\bsynced\b/i,
-  /\bconnected\b/i,
-  /\bimported\b/i,
-];
+const FORBIDDEN_WORDS = [/\blive\b/i, /\bsynced\b/i, /\bconnected\b/i, /\bimported\b/i];
 const DEVICE_WORDS = [
   /\bdevice control\b/i,
   /\bpump\b/i,
@@ -91,9 +86,7 @@ describe("Grouped Timeline Audit Toggle — static safety", () => {
 
   it("presenter delegates audit labels to the view-model (no inline strings)", () => {
     const src = read(PRESENTER);
-    expect(src).toMatch(
-      /from\s+["']@\/lib\/quickLogTimelineAuditViewModel["']/,
-    );
+    expect(src).toMatch(/from\s+["']@\/lib\/quickLogTimelineAuditViewModel["']/);
     expect(src).toMatch(/auditToggleLabel/);
     expect(src).toMatch(/isAuditableQuickLogEntry/);
   });

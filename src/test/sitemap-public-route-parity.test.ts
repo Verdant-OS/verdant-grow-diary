@@ -30,7 +30,6 @@ import {
   STATIC_ONLY_ROUTES,
 } from "../../scripts/public-route-parity.config.mjs";
 
-
 const REPO = resolve(__dirname, "../..");
 const SITEMAP = readFileSync(resolve(REPO, "public/sitemap.xml"), "utf8");
 
@@ -53,9 +52,9 @@ const staticOnly = new Set(STATIC_ONLY_ROUTES as readonly string[]);
 describe("sitemap ↔ STATIC_PUBLIC_SEO_DOCUMENTS parity", () => {
   it("sitemap advertises the project origin only", () => {
     for (const raw of [...SITEMAP.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].trim())) {
-      expect(
-        raw.startsWith(`${VERDANT_SITE_ORIGIN}/`) || raw === `${VERDANT_SITE_ORIGIN}/`,
-      ).toBe(true);
+      expect(raw.startsWith(`${VERDANT_SITE_ORIGIN}/`) || raw === `${VERDANT_SITE_ORIGIN}/`).toBe(
+        true,
+      );
     }
   });
 

@@ -56,7 +56,7 @@ export default function PhenoBreedingObjectiveEditor({
         : [...targets],
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targets]);
+  }, [targets, dirty]);
 
   const available = availableObjectiveAxes(draft);
   const [pendingAxisKey, setPendingAxisKey] = useState<string>(available[0]?.key ?? "");

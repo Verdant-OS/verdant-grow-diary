@@ -15,6 +15,10 @@ import { VERDANT_FORBIDDEN_PUBLIC_PHRASES } from "@/constants/verdantSeoCopy";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
 import { PRICING_ANALYTICS_EVENT, type PricingAnalyticsPayload } from "@/lib/pricingAnalytics";
 import Founder from "@/pages/Founder";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (path: string) => readFileSync(resolve(ROOT, path), "utf8");
@@ -142,10 +146,10 @@ describe("Founder acquisition page", () => {
 });
 
 describe("Founder route, discovery, and safety fences", () => {
-  it("is a public lazy route registered in the app and manifest", () => {
-    const app = read("src/App.tsx");
-    expect(app).toContain('const Founder = lazy(() => import("./pages/Founder"))');
-    expect(app).toContain('<Route path="/founder" element={<Founder />} />');
+  it("is a public route registered in the app and manifest", () => {
+    const app = readAllRouteModuleSources();
+    expect(extractMountedAppRoutePaths()).toContain("/founder");
+    expect(app).toMatch(/Founder|@\/pages\/Founder|pages\/Founder/);
     expect(APP_ROUTES.find((entry) => entry.path === "/founder")?.access).toBe("public");
   });
 

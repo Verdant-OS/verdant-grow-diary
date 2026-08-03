@@ -161,8 +161,14 @@ export function buildVerificationReport(input: VerificationInput): VerificationR
   const counts = fillCounts(VERIFICATION_COUNT_TABLES, input.counts);
   const orphan_grow_references = fillCounts(GROW_ID_REFERENCING_TABLES, input.orphanGrowReferences);
   const orphan_tent_references = fillCounts(TENT_ID_REFERENCING_TABLES, input.orphanTentReferences);
-  const total_orphan_grow_references = Object.values(orphan_grow_references).reduce((a, b) => a + b, 0);
-  const total_orphan_tent_references = Object.values(orphan_tent_references).reduce((a, b) => a + b, 0);
+  const total_orphan_grow_references = Object.values(orphan_grow_references).reduce(
+    (a, b) => a + b,
+    0,
+  );
+  const total_orphan_tent_references = Object.values(orphan_tent_references).reduce(
+    (a, b) => a + b,
+    0,
+  );
   const grows_empty = counts.grows === 0;
   const tents_empty = counts.tents === 0;
   const errors = (input.errors ?? []).filter((e) => typeof e === "string" && e.trim().length > 0);

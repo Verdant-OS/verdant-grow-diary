@@ -34,21 +34,15 @@ const HOOK_OWN_FILES = new Set([
 
 export function pickRelevantStaged(stagedFiles, targets) {
   const targetSet = new Set(targets);
-  return stagedFiles.filter(
-    (f) => HOOK_OWN_FILES.has(f) || targetSet.has(f),
-  );
+  return stagedFiles.filter((f) => HOOK_OWN_FILES.has(f) || targetSet.has(f));
 }
 
 function getStagedFiles() {
-  const res = spawnSync(
-    "git",
-    ["diff", "--cached", "--name-only", "--diff-filter=ACMR"],
-    { encoding: "utf8" },
-  );
+  const res = spawnSync("git", ["diff", "--cached", "--name-only", "--diff-filter=ACMR"], {
+    encoding: "utf8",
+  });
   if (res.status !== 0) {
-    throw new Error(
-      `git diff --cached failed: ${res.stderr?.trim() || "unknown error"}`,
-    );
+    throw new Error(`git diff --cached failed: ${res.stderr?.trim() || "unknown error"}`);
   }
   return res.stdout
     .split(/\r?\n/)
@@ -57,11 +51,9 @@ function getStagedFiles() {
 }
 
 function runScanner() {
-  const res = spawnSync(
-    process.execPath,
-    ["scripts/assert-ai-doctor-preview-safety.mjs"],
-    { stdio: "inherit" },
-  );
+  const res = spawnSync(process.execPath, ["scripts/assert-ai-doctor-preview-safety.mjs"], {
+    stdio: "inherit",
+  });
   return res.status ?? 1;
 }
 
@@ -76,9 +68,7 @@ function main() {
   const targets = discoverTargets();
   const relevant = pickRelevantStaged(staged, targets);
   if (relevant.length === 0) {
-    console.log(
-      "precommit-ai-doctor-preview-safety: no relevant staged files — skipping.",
-    );
+    console.log("precommit-ai-doctor-preview-safety: no relevant staged files — skipping.");
     process.exit(0);
   }
   console.log(

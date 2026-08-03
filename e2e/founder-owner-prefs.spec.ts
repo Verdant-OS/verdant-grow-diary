@@ -59,10 +59,7 @@ async function seedSession(page: Page) {
   );
 }
 
-function mockFoundersReadOnce(
-  page: Page,
-  row: Record<string, unknown> | null,
-) {
+function mockFoundersReadOnce(page: Page, row: Record<string, unknown> | null) {
   return page.route(/\/rest\/v1\/founders(\?|$)/, async (route: Route) => {
     await route.fulfill({
       status: 200,
@@ -104,9 +101,7 @@ test.describe("Founder owner preferences (mocked)", () => {
   test("signed-out visitor does not see the owner prefs form", async ({ page }) => {
     await page.goto("/founder");
     // Public surface still renders.
-    await expect(
-      page.getByRole("heading", { name: /Founder settings/i }),
-    ).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: /Founder settings/i })).toHaveCount(0);
     await expect(page.locator("#founder-show-on-wall")).toHaveCount(0);
     await expect(page.locator("#founder-display-name")).toHaveCount(0);
   });
@@ -135,22 +130,19 @@ test.describe("Founder owner preferences (mocked)", () => {
     // Capture the save-founder-prefs invocation payload.
     let savedBody: Record<string, unknown> | null = null;
     let invokeCount = 0;
-    await page.route(
-      /\/functions\/v1\/save-founder-prefs/,
-      async (route, req) => {
-        invokeCount += 1;
-        try {
-          savedBody = JSON.parse(req.postData() ?? "{}");
-        } catch {
-          savedBody = null;
-        }
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({ ok: true }),
-        });
-      },
-    );
+    await page.route(/\/functions\/v1\/save-founder-prefs/, async (route, req) => {
+      invokeCount += 1;
+      try {
+        savedBody = JSON.parse(req.postData() ?? "{}");
+      } catch {
+        savedBody = null;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true }),
+      });
+    });
 
     await page.goto("/founder");
 
@@ -173,9 +165,7 @@ test.describe("Founder owner preferences (mocked)", () => {
     await page.locator("#founder-optional-link").fill("https://example.com/jane");
     await page.getByRole("button", { name: /Save Founder settings/i }).click();
 
-    await expect
-      .poll(() => invokeCount, { timeout: 5_000 })
-      .toBe(1);
+    await expect.poll(() => invokeCount, { timeout: 5_000 }).toBe(1);
     expect(savedBody).toMatchObject({
       display_name: "Jane Cultivator",
       show_on_wall: true,
@@ -195,26 +185,21 @@ test.describe("Founder owner preferences (mocked)", () => {
     });
 
     let invokeCount = 0;
-    await page.route(
-      /\/functions\/v1\/save-founder-prefs/,
-      async (route) => {
-        invokeCount += 1;
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({ ok: true }),
-        });
-      },
-    );
+    await page.route(/\/functions\/v1\/save-founder-prefs/, async (route) => {
+      invokeCount += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true }),
+      });
+    });
 
     await page.goto("/founder");
 
-    await expect(
-      page.getByRole("heading", { name: /Your Founder settings/i }),
-    ).toBeVisible({ timeout: 15_000 });
-    await expect(
-      page.getByText(/Founder seat has been refunded/i),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Your Founder settings/i })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByText(/Founder seat has been refunded/i)).toBeVisible();
 
     await expect(page.locator("#founder-show-on-wall")).toBeDisabled();
     await expect(page.locator("#founder-display-name")).toBeDisabled();
@@ -254,22 +239,19 @@ test.describe("Founder owner preferences (mocked)", () => {
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
-    await page.route(
-      /\/functions\/v1\/save-founder-prefs/,
-      async (route) => {
-        await gate;
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({ ok: true }),
-        });
-      },
-    );
+    await page.route(/\/functions\/v1\/save-founder-prefs/, async (route) => {
+      await gate;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true }),
+      });
+    });
 
     await page.goto("/founder");
-    await expect(
-      page.getByRole("heading", { name: /Your Founder settings/i }),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: /Your Founder settings/i })).toBeVisible({
+      timeout: 15_000,
+    });
 
     const status = page.getByTestId("founder-prefs-status");
 
@@ -284,9 +266,7 @@ test.describe("Founder owner preferences (mocked)", () => {
     // that would intercept a raw click.
     await page.keyboard.press("Escape").catch(() => {});
     await page.evaluate(() => {
-      const form = document.querySelector<HTMLFormElement>(
-        "form:has(#founder-show-on-wall)",
-      );
+      const form = document.querySelector<HTMLFormElement>("form:has(#founder-show-on-wall)");
       form?.requestSubmit();
     });
 
@@ -298,13 +278,13 @@ test.describe("Founder owner preferences (mocked)", () => {
     // announcement lingers for assistive tech after success.
     release();
     await expect(status).toHaveText("", { timeout: 5_000 });
-    await expect(
-      page.getByRole("button", { name: /Save Founder settings/i }),
-    ).toBeEnabled();
+    await expect(page.getByRole("button", { name: /Save Founder settings/i })).toBeEnabled();
     expect(await page.getByText("Saving Founder settings…").count()).toBe(0);
   });
 
-  test("focus returns to Save button after save completes without a focus trap", async ({ page }) => {
+  test("focus returns to Save button after save completes without a focus trap", async ({
+    page,
+  }) => {
     await seedSession(page);
     await page.route(/\/rest\/v1\/user_agreement_acceptances/, (route) =>
       route.fulfill({
@@ -348,17 +328,15 @@ test.describe("Founder owner preferences (mocked)", () => {
     });
 
     await page.goto("/founder");
-    await expect(
-      page.getByRole("heading", { name: /Your Founder settings/i }),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: /Your Founder settings/i })).toBeVisible({
+      timeout: 15_000,
+    });
     await page.keyboard.press("Escape").catch(() => {});
 
     // Submit via the form so we don't depend on click actionability while
     // any tail-end overlay is still animating out.
     await page.evaluate(() => {
-      const form = document.querySelector<HTMLFormElement>(
-        "form:has(#founder-show-on-wall)",
-      );
+      const form = document.querySelector<HTMLFormElement>("form:has(#founder-show-on-wall)");
       form?.requestSubmit();
     });
 
@@ -366,9 +344,7 @@ test.describe("Founder owner preferences (mocked)", () => {
     // focus must remain somewhere in the document (not null / <body> only
     // if that indicates the page has lost focus entirely).
     await expect(page.getByRole("button", { name: /Saving…/i })).toBeDisabled();
-    const inFlightTag = await page.evaluate(
-      () => document.activeElement?.tagName ?? null,
-    );
+    const inFlightTag = await page.evaluate(() => document.activeElement?.tagName ?? null);
     expect(inFlightTag).not.toBeNull();
 
     // Complete the request — focus should return to the (now re-enabled)
@@ -392,7 +368,9 @@ test.describe("Founder owner preferences (mocked)", () => {
     expect(afterId).not.toBe(beforeId);
   });
 
-  test("status live region clears after save and does not replay on rerenders or second save", async ({ page }) => {
+  test("status live region clears after save and does not replay on rerenders or second save", async ({
+    page,
+  }) => {
     await seedSession(page);
     await page.route(/\/rest\/v1\/user_agreement_acceptances/, (route) =>
       route.fulfill({
@@ -439,9 +417,9 @@ test.describe("Founder owner preferences (mocked)", () => {
     });
 
     await page.goto("/founder");
-    await expect(
-      page.getByRole("heading", { name: /Your Founder settings/i }),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: /Your Founder settings/i })).toBeVisible({
+      timeout: 15_000,
+    });
     await page.keyboard.press("Escape").catch(() => {});
 
     const status = page.getByTestId("founder-prefs-status");
@@ -449,9 +427,7 @@ test.describe("Founder owner preferences (mocked)", () => {
 
     // --- First save -------------------------------------------------------
     await page.evaluate(() => {
-      const form = document.querySelector<HTMLFormElement>(
-        "form:has(#founder-show-on-wall)",
-      );
+      const form = document.querySelector<HTMLFormElement>("form:has(#founder-show-on-wall)");
       form?.requestSubmit();
     });
     await expect(status).toHaveText("Saving Founder settings…");
@@ -462,9 +438,7 @@ test.describe("Founder owner preferences (mocked)", () => {
     // assistive tech to re-read.
     releasers[0]?.();
     await expect(status).toHaveText("", { timeout: 5_000 });
-    await expect(
-      page.getByRole("button", { name: /Save Founder settings/i }),
-    ).toBeEnabled();
+    await expect(page.getByRole("button", { name: /Save Founder settings/i })).toBeEnabled();
     expect(await page.getByText("Saving Founder settings…").count()).toBe(0);
 
     // Exactly one status live region exists — a stale duplicate would cause
@@ -484,9 +458,7 @@ test.describe("Founder owner preferences (mocked)", () => {
 
     // --- Second save -----------------------------------------------------
     await page.evaluate(() => {
-      const form = document.querySelector<HTMLFormElement>(
-        "form:has(#founder-show-on-wall)",
-      );
+      const form = document.querySelector<HTMLFormElement>("form:has(#founder-show-on-wall)");
       form?.requestSubmit();
     });
     await expect(status).toHaveText("Saving Founder settings…");
@@ -503,7 +475,9 @@ test.describe("Founder owner preferences (mocked)", () => {
     void currentRelease;
   });
 
-  test("failed save announces a single error, clears the status region, and re-enables inputs", async ({ page }) => {
+  test("failed save announces a single error, clears the status region, and re-enables inputs", async ({
+    page,
+  }) => {
     await seedSession(page);
     await page.route(/\/rest\/v1\/user_agreement_acceptances/, (route) =>
       route.fulfill({
@@ -550,9 +524,9 @@ test.describe("Founder owner preferences (mocked)", () => {
     });
 
     await page.goto("/founder");
-    await expect(
-      page.getByRole("heading", { name: /Your Founder settings/i }),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: /Your Founder settings/i })).toBeVisible({
+      timeout: 15_000,
+    });
     await page.keyboard.press("Escape").catch(() => {});
 
     const status = page.getByTestId("founder-prefs-status");
@@ -561,9 +535,7 @@ test.describe("Founder owner preferences (mocked)", () => {
 
     // Trigger save.
     await page.evaluate(() => {
-      const form = document.querySelector<HTMLFormElement>(
-        "form:has(#founder-show-on-wall)",
-      );
+      const form = document.querySelector<HTMLFormElement>("form:has(#founder-show-on-wall)");
       form?.requestSubmit();
     });
 
@@ -572,9 +544,7 @@ test.describe("Founder owner preferences (mocked)", () => {
     await expect(page.locator("#founder-show-on-wall")).toBeDisabled();
     await expect(page.locator("#founder-display-name")).toBeDisabled();
     await expect(page.locator("#founder-optional-link")).toBeDisabled();
-    await expect(
-      page.getByRole("button", { name: /Saving…/i }),
-    ).toBeDisabled();
+    await expect(page.getByRole("button", { name: /Saving…/i })).toBeDisabled();
 
     // Complete with failure.
     release();
@@ -594,13 +564,8 @@ test.describe("Founder owner preferences (mocked)", () => {
     await expect(page.locator("#founder-show-on-wall")).toBeEnabled();
     await expect(page.locator("#founder-display-name")).toBeEnabled();
     await expect(page.locator("#founder-optional-link")).toBeEnabled();
-    await expect(
-      page.getByRole("button", { name: /Save Founder settings/i }),
-    ).toBeEnabled();
+    await expect(page.getByRole("button", { name: /Save Founder settings/i })).toBeEnabled();
 
     expect(invokeCount).toBe(1);
   });
 });
-
-
-

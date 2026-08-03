@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { readAllRouteModuleSources } from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
-const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+const APP = readAllRouteModuleSources();
 const INDEX = readFileSync(resolve(ROOT, "index.html"), "utf8");
 const NOT_FOUND = readFileSync(resolve(ROOT, "src/pages/NotFound.tsx"), "utf8");
 

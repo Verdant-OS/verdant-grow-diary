@@ -59,12 +59,16 @@ describe("rescale0to10to1to5", () => {
 
 describe("winnerScoreFromAxes — PhenoID weights (nose30/resin25/structure15/yield15/breeding15)", () => {
   it("all-10 → 100, all-0 → 0", () => {
-    expect(winnerScoreFromAxes({ nose: 10, resin: 10, structure: 10, yield: 10, breeding: 10 })).toBe(100);
+    expect(
+      winnerScoreFromAxes({ nose: 10, resin: 10, structure: 10, yield: 10, breeding: 10 }),
+    ).toBe(100);
     expect(winnerScoreFromAxes({ nose: 0, resin: 0, structure: 0, yield: 0, breeding: 0 })).toBe(0);
   });
   it("computes a mixed set", () => {
     // 8*3 + 7*2.5 + 6*1.5 + 5*1.5 + 7*1.5 = 68.5 → 69
-    expect(winnerScoreFromAxes({ nose: 8, resin: 7, structure: 6, yield: 5, breeding: 7 })).toBe(69);
+    expect(winnerScoreFromAxes({ nose: 8, resin: 7, structure: 6, yield: 5, breeding: 7 })).toBe(
+      69,
+    );
   });
 });
 
@@ -104,7 +108,10 @@ describe("resolveCandidateIdentity", () => {
     expect(resolveCandidateIdentity("12")).toEqual({ candidateNumber: 12, candidateLabel: null });
   });
   it("non-numeric label → candidate_label", () => {
-    expect(resolveCandidateIdentity("Sour Zebra")).toEqual({ candidateNumber: null, candidateLabel: "Sour Zebra" });
+    expect(resolveCandidateIdentity("Sour Zebra")).toEqual({
+      candidateNumber: null,
+      candidateLabel: "Sour Zebra",
+    });
   });
   it("zero / negative / blank are not positive integers", () => {
     expect(resolveCandidateIdentity("0")).toEqual({ candidateNumber: null, candidateLabel: "0" });
@@ -124,7 +131,13 @@ describe("buildPhenoidExtras — nothing dropped", () => {
     cut_status: "vault",
     loud_shortlist: true,
     pack: { label: "Gelato41 x Sherb", index: 3, size: 10 },
-    capture: { mode: "burst", stack_id: "s-77", frame_index: 0, model_id: "t-v3", model_version: "3.1.0" },
+    capture: {
+      mode: "burst",
+      stack_id: "s-77",
+      frame_index: 0,
+      model_id: "t-v3",
+      model_version: "3.1.0",
+    },
   };
   it("preserves the composite + raw axes verbatim", () => {
     const r = buildPhenoidExtras(c);

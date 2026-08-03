@@ -25,9 +25,7 @@ export interface LeadSourceInsightsPanelProps {
  * Read-only presenter for source/type performance insights.
  * Performs no I/O.
  */
-export default function LeadSourceInsightsPanel({
-  leads,
-}: LeadSourceInsightsPanelProps) {
+export default function LeadSourceInsightsPanel({ leads }: LeadSourceInsightsPanelProps) {
   const insights = useMemo(() => buildLeadSourceInsights(leads), [leads]);
 
   return (
@@ -66,17 +64,13 @@ function InsightRow({ item }: { item: LeadSourceInsight }) {
           <div className="font-medium text-foreground">{item.title}</div>
           <div className="text-xs text-muted-foreground">{item.message}</div>
           <div className="mt-1 text-xs text-muted-foreground">
-            <span className="text-foreground">{item.metricLabel}:</span>{" "}
-            {item.metricValue}
+            <span className="text-foreground">{item.metricLabel}:</span> {item.metricValue}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
-            <span className="text-foreground">Suggested:</span>{" "}
-            {item.recommendation}
+            <span className="text-foreground">Suggested:</span> {item.recommendation}
           </div>
         </div>
-        <Badge variant={SEVERITY_VARIANT[item.severity]}>
-          {item.severity}
-        </Badge>
+        <Badge variant={SEVERITY_VARIANT[item.severity]}>{item.severity}</Badge>
       </div>
     </li>
   );

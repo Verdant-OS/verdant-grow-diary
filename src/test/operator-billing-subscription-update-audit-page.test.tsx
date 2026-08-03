@@ -63,10 +63,9 @@ describe("OperatorBillingSubscriptionUpdateAudit render", () => {
     await waitFor(() => {
       expect(screen.getByText("Pro Monthly")).toBeInTheDocument();
     });
-    expect(rpcMock).toHaveBeenCalledWith(
-      "billing_subscription_update_operator_audit",
-      { p_limit: 50 },
-    );
+    expect(rpcMock).toHaveBeenCalledWith("billing_subscription_update_operator_audit", {
+      p_limit: 50,
+    });
     expect(screen.getAllByText("Created").length).toBeGreaterThan(0);
     expect(screen.getByText("new_subscription")).toBeInTheDocument();
     expect(screen.getByText("7")).toBeInTheDocument();
@@ -98,9 +97,7 @@ describe("OperatorBillingSubscriptionUpdateAudit render", () => {
     renderPage();
 
     await waitFor(() => {
-      expect(
-        screen.getByText("Subscription updater audit unavailable."),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Subscription updater audit unavailable.")).toBeInTheDocument();
     });
   });
 });

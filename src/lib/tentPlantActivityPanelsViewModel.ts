@@ -44,9 +44,7 @@ export interface TentPlantActivityPanelsActivityEntry {
 
 export interface TentPlantActivityPanelsInput {
   plants: ReadonlyArray<TentPlantActivityPanelsPlantInput>;
-  activityByPlantId: Readonly<
-    Record<string, TentPlantActivityPanelsActivityEntry>
-  >;
+  activityByPlantId: Readonly<Record<string, TentPlantActivityPanelsActivityEntry>>;
   includeArchived: boolean;
   /** null = "All plants" — show every visible plant's panel. */
   selectedPlantId: string | null;
@@ -124,33 +122,25 @@ export interface TentPlantActivityPanelsViewModel {
   scopedPanelCount: number;
 }
 
-export const TENT_PLANT_ACTIVITY_NO_DIARY_COPY =
-  "No recent diary activity for this plant.";
-export const TENT_PLANT_ACTIVITY_NO_PHOTOS_COPY =
-  "No recent photos for this plant.";
+export const TENT_PLANT_ACTIVITY_NO_DIARY_COPY = "No recent diary activity for this plant.";
+export const TENT_PLANT_ACTIVITY_NO_PHOTOS_COPY = "No recent photos for this plant.";
 export const TENT_PLANT_ACTIVITY_HARVEST_WATCH_FALLBACK_COPY =
   "Harvest Watch available on Plant Detail.";
-export const TENT_PLANT_ACTIVITY_HARVEST_WATCH_CAUTION_COPY =
-  "Harvest Watch is evidence-only.";
+export const TENT_PLANT_ACTIVITY_HARVEST_WATCH_CAUTION_COPY = "Harvest Watch is evidence-only.";
 export const TENT_PLANT_ACTIVITY_HARVEST_WATCH_HELP_FALLBACK_COPY =
   "Not enough context to determine a review state.";
 
-export const TENT_PLANT_ACTIVITY_HARVEST_WATCH_HELP_TEXT: Readonly<
-  Record<string, string>
-> = {
+export const TENT_PLANT_ACTIVITY_HARVEST_WATCH_HELP_TEXT: Readonly<Record<string, string>> = {
   not_enough_evidence: "More direct inspection evidence is needed.",
   too_early_to_call: "Timing or evidence suggests review is not near yet.",
   watch_window: "Start checking direct harvest evidence more closely.",
-  ready_for_manual_review:
-    "Evidence supports manual review; the grower decides.",
-  past_expected_window:
-    "Expected window may have passed; re-check direct evidence.",
+  ready_for_manual_review: "Evidence supports manual review; the grower decides.",
+  past_expected_window: "Expected window may have passed; re-check direct evidence.",
   unknown: "Not enough context to determine a review state.",
 };
 export const TENT_PLANT_ACTIVITY_SHARED_ENV_COPY =
   "Tent environment is shared. Plant response is tracked per plant.";
-export const TENT_PLANT_ACTIVITY_EMPTY_NO_PLANTS_COPY =
-  "No plants assigned to this tent yet.";
+export const TENT_PLANT_ACTIVITY_EMPTY_NO_PLANTS_COPY = "No plants assigned to this tent yet.";
 export const TENT_PLANT_ACTIVITY_EMPTY_SELECTED_PLANT_COPY =
   "No plant-specific activity found for this plant yet.";
 export const TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_LABEL = "Evidence notes";
@@ -160,8 +150,7 @@ export const TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_PLACEHOLDER =
   "Example: Checked trichomes under loupe, noted mostly cloudy with some clear…";
 export const TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_CAUTION_COPY =
   "Harvest Watch is evidence-only. The grower decides.";
-export const TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_CTA_COPY =
-  "Add note to Quick Log";
+export const TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_CTA_COPY = "Add note to Quick Log";
 
 const HARVEST_WATCH_LABELS: Record<
   string,
@@ -216,9 +205,7 @@ function helpTextFor(state: string | null): string {
   return TENT_PLANT_ACTIVITY_HARVEST_WATCH_HELP_FALLBACK_COPY;
 }
 
-function harvestWatchFor(
-  state: string | null | undefined,
-): TentPlantActivityPanelHarvestWatch {
+function harvestWatchFor(state: string | null | undefined): TentPlantActivityPanelHarvestWatch {
   if (typeof state === "string" && state.length > 0) {
     const known = HARVEST_WATCH_LABELS[state];
     if (known) {
@@ -255,13 +242,10 @@ export function buildTentPlantActivityPanelsViewModel(
 ): TentPlantActivityPanelsViewModel {
   const includeArchived = input.includeArchived === true;
   const activity = input.activityByPlantId ?? {};
-  const photosAnchorAvailable =
-    input.photosAnchorAvailable === false ? false : true;
+  const photosAnchorAvailable = input.photosAnchorAvailable !== false;
 
   const plants = Array.isArray(input.plants) ? input.plants : [];
-  const visible = plants.filter((p) =>
-    includeArchived ? true : p.isArchived !== true,
-  );
+  const visible = plants.filter((p) => (includeArchived ? true : p.isArchived !== true));
 
   // Resolve selection: invalid/archived-hidden falls back to "all visible".
   let scoped: TentPlantActivityPanelsPlantInput[];
@@ -284,9 +268,7 @@ export function buildTentPlantActivityPanelsViewModel(
     const name = plantDisplayName(p);
     const a = activity[p.id] ?? {};
     const latestLogAt =
-      typeof a.latestLogAt === "string" && a.latestLogAt.length > 0
-        ? a.latestLogAt
-        : null;
+      typeof a.latestLogAt === "string" && a.latestLogAt.length > 0 ? a.latestLogAt : null;
     const latestLogDateLabel = formatDateLabel(latestLogAt);
     const latestLogSummary =
       typeof a.latestLogSummary === "string" && a.latestLogSummary.length > 0
@@ -320,10 +302,8 @@ export function buildTentPlantActivityPanelsViewModel(
     return {
       id: p.id,
       name,
-      strain:
-        typeof p.strain === "string" && p.strain.length > 0 ? p.strain : null,
-      stage:
-        typeof p.stage === "string" && p.stage.length > 0 ? p.stage : null,
+      strain: typeof p.strain === "string" && p.strain.length > 0 ? p.strain : null,
+      stage: typeof p.stage === "string" && p.stage.length > 0 ? p.stage : null,
       isArchived: p.isArchived === true,
 
       latestLogAt,
@@ -334,9 +314,7 @@ export function buildTentPlantActivityPanelsViewModel(
 
       hasRecentPhoto,
       latestPhotoEntryId,
-      photoEmptyCopy: hasRecentPhoto
-        ? null
-        : TENT_PLANT_ACTIVITY_NO_PHOTOS_COPY,
+      photoEmptyCopy: hasRecentPhoto ? null : TENT_PLANT_ACTIVITY_NO_PHOTOS_COPY,
 
       harvestWatch: isHarvestWatchEligible({
         stage: p.stage,
@@ -358,9 +336,7 @@ export function buildTentPlantActivityPanelsViewModel(
         : `Add Quick Log for ${name}`,
       quickLogPrefill: prefill,
       quickLogDisabled: !prefill,
-      quickLogDisabledReason: prefill
-        ? null
-        : "Plant, tent, or grow context is not loaded yet.",
+      quickLogDisabledReason: prefill ? null : "Plant, tent, or grow context is not loaded yet.",
       isFirstQuickLog,
 
       testId: `tent-plant-activity-panel-${p.id}`,

@@ -11,19 +11,13 @@ import {
   runEcowittDryRun,
   toCanonicalIngestPreview,
 } from "../../scripts/ecowitt-live-soil-dry-run";
-import {
-  handleMqttMessage,
-  forwardWithBackoff,
-} from "../../scripts/ecowitt-live-soil-bridge";
+import { handleMqttMessage, forwardWithBackoff } from "../../scripts/ecowitt-live-soil-bridge";
 import type { CanonicalWebhookPayload } from "@/lib/ecowittLiveSoilIngestRules";
 
 const TENT = "11111111-1111-1111-1111-111111111111";
 const TOKEN = "vbt_TEST_TOKEN_NEVER_LOG_ME_ZZZZ";
 const FIXTURE = JSON.parse(
-  readFileSync(
-    resolve(__dirname, "../../fixtures/ecowitt-live-soil-sample.json"),
-    "utf8",
-  ),
+  readFileSync(resolve(__dirname, "../../fixtures/ecowitt-live-soil-sample.json"), "utf8"),
 ) as Record<string, unknown>;
 
 function cleanFixture() {
@@ -103,9 +97,7 @@ describe("EcoWitt bridge → ingest webhook compatibility (mocked)", () => {
   });
 
   it("never logs the bridge token in plain text", async () => {
-    const fakeFetch = vi.fn(
-      async () => new Response("{}", { status: 200 }),
-    );
+    const fakeFetch = vi.fn(async () => new Response("{}", { status: 200 }));
     const logged: string[] = [];
     await handleMqttMessage(JSON.stringify(cleanFixture()), {
       env: {
@@ -123,8 +115,7 @@ describe("EcoWitt bridge → ingest webhook compatibility (mocked)", () => {
           fetchImpl: fakeFetch as unknown as typeof fetch,
           maxAttempts: 1,
         }),
-      log: (_l, msg, extra) =>
-        logged.push(`${msg} ${extra ? JSON.stringify(extra) : ""}`),
+      log: (_l, msg, extra) => logged.push(`${msg} ${extra ? JSON.stringify(extra) : ""}`),
       now: NOW,
     });
     for (const line of logged) {
@@ -135,28 +126,25 @@ describe("EcoWitt bridge → ingest webhook compatibility (mocked)", () => {
 
   it("does not forward when normalized payload is invalid", async () => {
     const fakeFetch = vi.fn();
-    const result = await handleMqttMessage(
-      JSON.stringify({ tempf: 9999, humidity: 250 }),
-      {
-        env: {
-          ingestUrl: "https://example.invalid/sensor-ingest-webhook",
-          bridgeToken: TOKEN,
-          defaultTentId: TENT,
-          defaultPlantId: null,
-          channelMap: {},
-          dryRun: false,
-        },
-        forward: (p) =>
-          forwardWithBackoff(p, {
-            url: "https://example.invalid/sensor-ingest-webhook",
-            bridgeToken: TOKEN,
-            fetchImpl: fakeFetch as unknown as typeof fetch,
-            maxAttempts: 1,
-          }),
-        log: () => {},
-        now: NOW,
+    const result = await handleMqttMessage(JSON.stringify({ tempf: 9999, humidity: 250 }), {
+      env: {
+        ingestUrl: "https://example.invalid/sensor-ingest-webhook",
+        bridgeToken: TOKEN,
+        defaultTentId: TENT,
+        defaultPlantId: null,
+        channelMap: {},
+        dryRun: false,
       },
-    );
+      forward: (p) =>
+        forwardWithBackoff(p, {
+          url: "https://example.invalid/sensor-ingest-webhook",
+          bridgeToken: TOKEN,
+          fetchImpl: fakeFetch as unknown as typeof fetch,
+          maxAttempts: 1,
+        }),
+      log: () => {},
+      now: NOW,
+    });
     expect(result.accepted).toBe(0);
     expect(fakeFetch).not.toHaveBeenCalled();
   });

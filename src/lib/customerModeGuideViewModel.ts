@@ -35,11 +35,7 @@ export interface CustomerGuideSection {
   isPlaceholder: true;
 }
 
-export type CustomerGuideTimelineCategory =
-  | "milestone"
-  | "care"
-  | "harvest"
-  | "note";
+export type CustomerGuideTimelineCategory = "milestone" | "care" | "harvest" | "note";
 
 /**
  * Public-safe customer-facing event shape.

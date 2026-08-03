@@ -85,7 +85,7 @@ export default function PhotoDiagnosisReviewDialog({
     setObservation("");
     setReviewStatus(existingReview?.reviewStatus ?? "reviewed");
     setSubmitError(null);
-  }, [existingReview?.photoId, existingReview?.reviewStatus, open, photo?.photo_id]);
+  }, [existingReview?.reviewStatus, open]);
 
   const selectedStatus = REVIEW_STATUS_OPTIONS.find((option) => option.value === reviewStatus);
 

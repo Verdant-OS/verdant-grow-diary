@@ -26,12 +26,7 @@ export type AllowedMetric =
 
 export type AllowedSource = "manual" | "pi_bridge" | "sim";
 
-export type AllowedUnit =
-  | "temperature_c"
-  | "temperature_f"
-  | "percent"
-  | "kPa"
-  | "ppm";
+export type AllowedUnit = "temperature_c" | "temperature_f" | "percent" | "kPa" | "ppm";
 
 export const ALLOWED_METRICS: readonly AllowedMetric[] = [
   "temperature_c",
@@ -41,11 +36,7 @@ export const ALLOWED_METRICS: readonly AllowedMetric[] = [
   "soil_moisture_pct",
 ] as const;
 
-export const ALLOWED_SOURCES: readonly AllowedSource[] = [
-  "manual",
-  "pi_bridge",
-  "sim",
-] as const;
+export const ALLOWED_SOURCES: readonly AllowedSource[] = ["manual", "pi_bridge", "sim"] as const;
 
 /**
  * Source persistence policy at the normalization layer.
@@ -104,8 +95,7 @@ function convertUnit(
   switch (metric) {
     case "temperature_c":
       if (unit === "temperature_c") return { ok: true, value };
-      if (unit === "temperature_f")
-        return { ok: true, value: (value - 32) * (5 / 9) };
+      if (unit === "temperature_f") return { ok: true, value: (value - 32) * (5 / 9) };
       return { ok: false, error: `unknown unit for temperature_c: ${unit}` };
     case "humidity_pct":
       if (unit === "percent") return { ok: true, value };
@@ -138,8 +128,7 @@ export function normalizeIngestPayload(
 
   if (!input.tent_id) errors.push("tent_id required");
   if (!input.source) errors.push("source required");
-  else if (!isAllowedSource(input.source))
-    errors.push(`invalid source: ${input.source}`);
+  else if (!isAllowedSource(input.source)) errors.push(`invalid source: ${input.source}`);
 
   let capturedAt: string | null = null;
   if (input.captured_at !== undefined && input.captured_at !== null) {
@@ -149,9 +138,7 @@ export function normalizeIngestPayload(
     } else {
       const now = (opts.now ?? new Date()).getTime();
       if (t > now + FUTURE_TOLERANCE_MS) {
-        errors.push(
-          `captured_at more than 5 minutes in the future: ${input.captured_at}`,
-        );
+        errors.push(`captured_at more than 5 minutes in the future: ${input.captured_at}`);
       } else {
         capturedAt = new Date(t).toISOString();
       }

@@ -23,14 +23,7 @@ import { APP_ROUTES } from "@/lib/appRouteManifest";
 export const ONE_TENT_PROOF_RECORD_KIND = "verdant.one-tent-proof-record" as const;
 export const ONE_TENT_PROOF_RECORD_VERSION = 2 as const;
 
-export type ProofSourceLabel =
-  | "manual"
-  | "live"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid"
-  | "unknown";
+export type ProofSourceLabel = "manual" | "live" | "csv" | "demo" | "stale" | "invalid" | "unknown";
 
 export const ALLOWED_SOURCE_LABELS: ReadonlyArray<ProofSourceLabel> = [
   "manual",
@@ -343,9 +336,7 @@ function getByPath(record: ProofRecord, path: string): unknown {
 }
 
 function computeMissingFields(record: ProofRecord): string[] {
-  const missing = REQUIRED_EVIDENCE_PATHS.filter(
-    (p) => getByPath(record, p) === null,
-  );
+  const missing = REQUIRED_EVIDENCE_PATHS.filter((p) => getByPath(record, p) === null);
   return [...missing].sort();
 }
 
@@ -436,22 +427,16 @@ export function computeProofIntegrity(record: ProofRecord): ProofIntegrity {
  */
 export function canExportProofRecord(record: ProofRecord): boolean {
   const hasScope =
-    record.scope.growId !== null &&
-    record.scope.tentId !== null &&
-    record.scope.plantId !== null;
+    record.scope.growId !== null && record.scope.tentId !== null && record.scope.plantId !== null;
   if (!hasScope) return false;
-  return LOOP_STEP_EVIDENCE_PATHS.some(
-    (p) => getByPath(record, p) !== null,
-  );
+  return LOOP_STEP_EVIDENCE_PATHS.some((p) => getByPath(record, p) !== null);
 }
 
 // ---------------------------------------------------------------------------
 // Record assembly
 // ---------------------------------------------------------------------------
 
-export function buildOneTentProofRecord(
-  input: ProofRecordInput | undefined | null,
-): ProofRecord {
+export function buildOneTentProofRecord(input: ProofRecordInput | undefined | null): ProofRecord {
   const safe = redactRecordInput(input ?? {}) as ProofRecordInput;
   const scope = safe.scope ?? {};
   const quickLog = safe.quickLog ?? {};

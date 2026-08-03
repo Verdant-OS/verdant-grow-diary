@@ -131,21 +131,11 @@ describe("EcoWitt ingest — three-tent realistic fixture", () => {
     const veg = (byTent.get("tent-veg") ?? []).sort();
 
     // flowerTent: temp + RH + derived VPD + soil moisture.
-    expect(flower).toEqual([
-      "humidity_pct",
-      "soil_moisture_pct",
-      "temperature_c",
-      "vpd_kpa",
-    ]);
+    expect(flower).toEqual(["humidity_pct", "soil_moisture_pct", "temperature_c", "vpd_kpa"]);
     // seedlingTent: air only → temp + RH + derived VPD, NO soil.
     expect(seedling).toEqual(["humidity_pct", "temperature_c", "vpd_kpa"]);
     // vegTent: temp + RH + derived VPD + soil.
-    expect(veg).toEqual([
-      "humidity_pct",
-      "soil_moisture_pct",
-      "temperature_c",
-      "vpd_kpa",
-    ]);
+    expect(veg).toEqual(["humidity_pct", "soil_moisture_pct", "temperature_c", "vpd_kpa"]);
 
     // Unmapped soilmoisture7 must show up in `dropped`, never in rows.
     const dropKeys = summary.dropped.map((d) => d.channel_key);
@@ -185,9 +175,7 @@ describe("EcoWitt ingest — three-tent realistic fixture", () => {
       capturedAt: NOW,
     });
 
-    const temp = rows.find(
-      (r) => r.tent_id === "tent-flower" && r.metric === "temperature_c",
-    );
+    const temp = rows.find((r) => r.tent_id === "tent-flower" && r.metric === "temperature_c");
     expect(temp).toBeDefined();
     expect(temp!.value).toBeGreaterThan(24.9);
     expect(temp!.value).toBeLessThan(25.1);

@@ -84,18 +84,12 @@ export function detectEcowittEvidenceUnitWarnings(
           metric_key: key,
           severity: "blocks_live_proof",
           message: `Backend unit '${bRaw || "missing"}' and controller unit '${cRaw || "missing"}' disagree (Fahrenheit vs Celsius) for ${key}.`,
-          operator_fix:
-            "Normalize both readings to the same temperature unit before comparing.",
+          operator_fix: "Normalize both readings to the same temperature unit before comparing.",
         });
       }
       // Missing unit but values look like C-shown-as-F
-      const looksCAsF = (v: number | null) =>
-        v !== null && v >= 10 && v <= 45;
-      if (
-        bU.length === 0 &&
-        cU.length === 0 &&
-        (looksCAsF(bV) || looksCAsF(cV))
-      ) {
+      const looksCAsF = (v: number | null) => v !== null && v >= 10 && v <= 45;
+      if (bU.length === 0 && cU.length === 0 && (looksCAsF(bV) || looksCAsF(cV))) {
         out.push({
           metric_key: key,
           severity: "warning",
@@ -117,24 +111,17 @@ export function detectEcowittEvidenceUnitWarnings(
           metric_key: key,
           severity: "blocks_live_proof",
           message: `Backend unit '${bRaw || "missing"}' and controller unit '${cRaw || "missing"}' disagree (percent vs fraction) for ${key}.`,
-          operator_fix:
-            "Convert both sides to percent before comparing.",
+          operator_fix: "Convert both sides to percent before comparing.",
         });
       }
-      const looksFrac = (v: number | null) =>
-        v !== null && v > 0 && v < 1;
-      const looksPct = (v: number | null) =>
-        v !== null && v >= 1 && v <= 100;
-      if (
-        (looksFrac(bV) && looksPct(cV)) ||
-        (looksPct(bV) && looksFrac(cV))
-      ) {
+      const looksFrac = (v: number | null) => v !== null && v > 0 && v < 1;
+      const looksPct = (v: number | null) => v !== null && v >= 1 && v <= 100;
+      if ((looksFrac(bV) && looksPct(cV)) || (looksPct(bV) && looksFrac(cV))) {
         out.push({
           metric_key: key,
           severity: "blocks_live_proof",
           message: `${key} backend value ${bV} and controller value ${cV} appear to be on different scales (0–1 vs 1–100).`,
-          operator_fix:
-            "Normalize both values to percent (1–100) before comparing.",
+          operator_fix: "Normalize both values to percent (1–100) before comparing.",
         });
       }
     }
@@ -150,8 +137,7 @@ export function detectEcowittEvidenceUnitWarnings(
           metric_key: key,
           severity: "blocks_live_proof",
           message: `Backend unit '${bRaw || "missing"}' and controller unit '${cRaw || "missing"}' disagree (mS/cm vs µS/cm) for ${key}.`,
-          operator_fix:
-            "Normalize both EC readings to the same unit before comparing.",
+          operator_fix: "Normalize both EC readings to the same unit before comparing.",
         });
       }
     }

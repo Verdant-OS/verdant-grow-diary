@@ -19,10 +19,7 @@
  *       `supabase/functions/_shared/assertPhenoTrackerEntitlement.ts`.
  */
 
-import type {
-  PlanId,
-  ResolvedEntitlement,
-} from "@/lib/entitlements/types";
+import type { PlanId, ResolvedEntitlement } from "@/lib/entitlements/types";
 
 /**
  * `advanced_timeline_filters` gates the Pro timeline conveniences

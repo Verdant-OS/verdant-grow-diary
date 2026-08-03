@@ -305,9 +305,7 @@ describe("parseEcowittSoilChannelMap", () => {
     expect(Object.keys(parseEcowittSoilChannelMap("not-json"))).toHaveLength(0);
     expect(Object.keys(parseEcowittSoilChannelMap(JSON.stringify([1, 2])))).toHaveLength(0);
     expect(
-      Object.keys(
-        parseEcowittSoilChannelMap(JSON.stringify({ soilmoisture1: { label: "x" } })),
-      ),
+      Object.keys(parseEcowittSoilChannelMap(JSON.stringify({ soilmoisture1: { label: "x" } }))),
     ).toHaveLength(0);
   });
 });
@@ -326,9 +324,7 @@ describe("redaction + token masking", () => {
   });
 
   it("maskBridgeToken never reveals the full token", () => {
-    expect(maskBridgeToken("vbt_supersecrettoken_123")).not.toContain(
-      "supersecrettoken",
-    );
+    expect(maskBridgeToken("vbt_supersecrettoken_123")).not.toContain("supersecrettoken");
     expect(maskBridgeToken(null)).toBe("[missing]");
   });
 
@@ -371,10 +367,12 @@ describe("handleMqttMessage (bridge orchestration)", () => {
   it("dry-run does not call forward()", async () => {
     const forward = vi.fn();
     const log = vi.fn();
-    const res = await handleMqttMessage(
-      JSON.stringify(basePayload()),
-      { env: { ...baseEnv, dryRun: true }, forward, log, now: NOW },
-    );
+    const res = await handleMqttMessage(JSON.stringify(basePayload()), {
+      env: { ...baseEnv, dryRun: true },
+      forward,
+      log,
+      now: NOW,
+    });
     expect(forward).not.toHaveBeenCalled();
     expect(res.accepted).toBeGreaterThan(0);
   });
@@ -382,10 +380,12 @@ describe("handleMqttMessage (bridge orchestration)", () => {
   it("enabled mode posts to forward() once per accepted payload", async () => {
     const forward = vi.fn(async () => ({ ok: true, status: 200 }));
     const log = vi.fn();
-    const res = await handleMqttMessage(
-      JSON.stringify(basePayload()),
-      { env: baseEnv, forward, log, now: NOW },
-    );
+    const res = await handleMqttMessage(JSON.stringify(basePayload()), {
+      env: baseEnv,
+      forward,
+      log,
+      now: NOW,
+    });
     expect(forward).toHaveBeenCalledTimes(res.accepted);
     expect(res.accepted).toBeGreaterThan(0);
   });
@@ -443,15 +443,27 @@ describe("one-shot bridge proof mode", () => {
   it("stops only after an MQTT message is fully accepted", () => {
     const onceEnv = { once: true };
     expect(shouldCompleteOnceBridge(onceEnv, { accepted: 1, rejected: 0, reasons: [] })).toBe(true);
-    expect(shouldCompleteOnceBridge(onceEnv, { accepted: 0, rejected: 1, reasons: ["malformed_payload"] })).toBe(false);
-    expect(shouldCompleteOnceBridge(onceEnv, { accepted: 1, rejected: 1, reasons: [] })).toBe(false);
-    expect(shouldCompleteOnceBridge({ once: false }, { accepted: 1, rejected: 0, reasons: [] })).toBe(false);
+    expect(
+      shouldCompleteOnceBridge(onceEnv, {
+        accepted: 0,
+        rejected: 1,
+        reasons: ["malformed_payload"],
+      }),
+    ).toBe(false);
+    expect(shouldCompleteOnceBridge(onceEnv, { accepted: 1, rejected: 1, reasons: [] })).toBe(
+      false,
+    );
+    expect(
+      shouldCompleteOnceBridge({ once: false }, { accepted: 1, rejected: 0, reasons: [] }),
+    ).toBe(false);
   });
 });
 
 describe("forwardWithBackoff", () => {
   it("sends Authorization bearer header and returns ok on 2xx", async () => {
-    const fetchImpl = vi.fn(async () => new Response("{}", { status: 200 })) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(
+      async () => new Response("{}", { status: 200 }),
+    ) as unknown as typeof fetch;
     const r = await forwardWithBackoff(
       {
         tent_id: TENT,
@@ -535,16 +547,15 @@ describe("forwardWithBackoff", () => {
 describe("static safety", () => {
   it("bridge script and rules contain no device-control / Supabase / service_role strings", async () => {
     const fs = await import("node:fs/promises");
-    const files = [
-      "src/lib/ecowittLiveSoilIngestRules.ts",
-      "scripts/ecowitt-live-soil-bridge.ts",
-    ];
+    const files = ["src/lib/ecowittLiveSoilIngestRules.ts", "scripts/ecowitt-live-soil-bridge.ts"];
     for (const f of files) {
       const src = await fs.readFile(f, "utf8");
       expect(src).not.toMatch(/service_role/);
       expect(src).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
       expect(src).not.toMatch(/createClient\(/); // no Supabase client
-      expect(src).not.toMatch(/execute_device|setpoint_write|irrigation_control|light_control|fan_control/);
+      expect(src).not.toMatch(
+        /execute_device|setpoint_write|irrigation_control|light_control|fan_control/,
+      );
       expect(src).not.toMatch(/action_queue/);
       // No hardcoded bridge token
       expect(src).not.toMatch(/vbt_[A-Za-z0-9]{8,}/);
@@ -596,10 +607,7 @@ describe("assertSingleTentSoilChannelMap — fail-closed single-tent guard", () 
 
   it("rejects a single-tent map that does not match VERDANT_TENT_ID", () => {
     expect(() =>
-      assertSingleTentSoilChannelMap(
-        { soilmoisture1: { tent_id: OTHER_TENT } },
-        TENT,
-      ),
+      assertSingleTentSoilChannelMap({ soilmoisture1: { tent_id: OTHER_TENT } }, TENT),
     ).toThrow(EcowittBridgeConfigError);
   });
 
@@ -654,7 +662,7 @@ describe("assertSingleTentSoilChannelMap — fail-closed single-tent guard", () 
     const fs = await import("node:fs/promises");
     const src = await fs.readFile("scripts/ecowitt-live-soil-bridge.ts", "utf8");
     const guardIdx = src.indexOf("assertBridgeStartupSafe(env");
-    const importIdx = src.indexOf('import(/* @vite-ignore */ modName)');
+    const importIdx = src.indexOf("import(/* @vite-ignore */ modName)");
     const connectIdx = src.indexOf("mqttMod.connect(");
     expect(guardIdx).toBeGreaterThan(0);
     expect(importIdx).toBeGreaterThan(0);

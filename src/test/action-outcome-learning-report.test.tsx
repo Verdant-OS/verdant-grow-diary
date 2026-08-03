@@ -16,10 +16,7 @@ import { stripSourceComments } from "./utils/stripSourceComments";
 
 const ROOT = resolve(__dirname, "../..");
 const COMP = stripSourceComments(
-  readFileSync(
-    resolve(ROOT, "src/components/ActionOutcomeLearningReport.tsx"),
-    "utf8",
-  ),
+  readFileSync(resolve(ROOT, "src/components/ActionOutcomeLearningReport.tsx"), "utf8"),
 );
 const RULES = stripSourceComments(
   readFileSync(resolve(ROOT, "src/lib/actionOutcomeLearningRules.ts"), "utf8"),
@@ -27,9 +24,7 @@ const RULES = stripSourceComments(
 const HOOK = stripSourceComments(
   readFileSync(resolve(ROOT, "src/hooks/useGrowDetailData.ts"), "utf8"),
 );
-const PAGE = stripSourceComments(
-  readFileSync(resolve(ROOT, "src/pages/GrowDetail.tsx"), "utf8"),
-);
+const PAGE = stripSourceComments(readFileSync(resolve(ROOT, "src/pages/GrowDetail.tsx"), "utf8"));
 
 function renderReport(report: Report, status: "loading" | "ready" | "unavailable" = "ready") {
   return render(
@@ -107,9 +102,7 @@ describe("ActionOutcomeLearningReport render", () => {
 
   it("shows unavailable state", () => {
     renderReport(EMPTY_LEARNING_REPORT, "unavailable");
-    expect(
-      screen.getByText(/Outcome learning report unavailable/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Outcome learning report unavailable/i)).toBeInTheDocument();
   });
 
   it("renders totals chips with correct counts", () => {
@@ -117,9 +110,7 @@ describe("ActionOutcomeLearningReport render", () => {
     expect(screen.getByTestId("learning-total-improved")).toHaveTextContent("2");
     expect(screen.getByTestId("learning-total-unchanged")).toHaveTextContent("1");
     expect(screen.getByTestId("learning-total-worsened")).toHaveTextContent("1");
-    expect(
-      screen.getByTestId("learning-total-more_data_needed"),
-    ).toHaveTextContent("0");
+    expect(screen.getByTestId("learning-total-more_data_needed")).toHaveTextContent("0");
   });
 
   it("renders groups with per-group needs-more-data badge for low samples", () => {
@@ -132,9 +123,7 @@ describe("ActionOutcomeLearningReport render", () => {
     expect(
       groups[1].querySelector("[data-testid='learning-group-needs-more-data']"),
     ).not.toBeNull();
-    expect(
-      groups[0].querySelector("[data-testid='learning-group-needs-more-data']"),
-    ).toBeNull();
+    expect(groups[0].querySelector("[data-testid='learning-group-needs-more-data']")).toBeNull();
   });
 
   it("shows overall needs-more-data hint only when threshold not met", () => {
@@ -144,9 +133,7 @@ describe("ActionOutcomeLearningReport render", () => {
     );
 
     const next = renderReport(FILLED);
-    expect(
-      next.container.querySelector("[data-testid='learning-needs-more-data']"),
-    ).toBeNull();
+    expect(next.container.querySelector("[data-testid='learning-needs-more-data']")).toBeNull();
   });
 
   it("renders recent examples with ActionDetail and AlertDetail links", () => {

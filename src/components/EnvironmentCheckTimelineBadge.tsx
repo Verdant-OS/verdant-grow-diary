@@ -63,18 +63,14 @@ export default function EnvironmentCheckTimelineBadge({
               data-testid={`environment-check-annotation-${a.ruleId}`}
               data-status={a.status}
             >
-              <span className="font-medium text-foreground/80">{a.label}:</span>{" "}
-              {a.message}
+              <span className="font-medium text-foreground/80">{a.label}:</span> {a.message}
             </li>
           ))}
         </ul>
       )}
 
       {viewModel.reviewPrompt && (
-        <p
-          data-testid="environment-check-review-prompt"
-          className="text-[11px] text-amber-300"
-        >
+        <p data-testid="environment-check-review-prompt" className="text-[11px] text-amber-300">
           {viewModel.reviewPrompt}
         </p>
       )}

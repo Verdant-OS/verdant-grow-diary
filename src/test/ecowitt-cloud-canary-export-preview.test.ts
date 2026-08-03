@@ -16,10 +16,7 @@ import {
 } from "@/lib/ecowittCloudCanaryExport";
 import fixtures from "../../fixtures/ecowitt-cloud-canary-payloads.json";
 
-import {
-  MAC_RE,
-  UUID_RE,
-} from "./operator-ecowitt-cloud-canary-per-fixture-table.test";
+import { MAC_RE, UUID_RE } from "./operator-ecowitt-cloud-canary-per-fixture-table.test";
 
 const BANNED = [
   "confirmed",
@@ -74,9 +71,7 @@ function decodeEntities(s: string): string {
 }
 
 function extractPre(html: string, testid: string): string {
-  const re = new RegExp(
-    `<pre[^>]*data-testid="${testid}"[^>]*>([\\s\\S]*?)<\\/pre>`,
-  );
+  const re = new RegExp(`<pre[^>]*data-testid="${testid}"[^>]*>([\\s\\S]*?)<\\/pre>`);
   const m = html.match(re);
   if (!m) throw new Error(`pre[data-testid="${testid}"] not found`);
   return decodeEntities(m[1]);
@@ -85,9 +80,7 @@ function extractPre(html: string, testid: string): string {
 async function renderPanelHtml(): Promise<string> {
   const React = await import("react");
   const { renderToString } = await import("react-dom/server");
-  const { CloudCanaryPreviewPanel } = await import(
-    "@/pages/OperatorEcowittCanary"
-  );
+  const { CloudCanaryPreviewPanel } = await import("@/pages/OperatorEcowittCanary");
   return renderToString(React.createElement(CloudCanaryPreviewPanel));
 }
 
@@ -116,7 +109,6 @@ describe("Slice C — pre-download preview byte-equality with download serialize
     expect(JSON.parse(preview)).toEqual(JSON.parse(json));
   });
 
-
   it("CSV preview reflects both code columns, the TOTAL row, and |-join verbatim", async () => {
     const html = await renderPanelHtml();
     const preview = extractPre(html, "cloud-canary-export-preview-csv");
@@ -129,9 +121,7 @@ describe("Slice C — pre-download preview byte-equality with download serialize
     expect(preview).toMatch(/^TOTAL,/m);
     // At least one row containing a |-joined codes cell (invalid_humidity has
     // multiple suspicious codes).
-    const invLine = preview
-      .split("\n")
-      .find((l) => l.startsWith("invalid_humidity,"))!;
+    const invLine = preview.split("\n").find((l) => l.startsWith("invalid_humidity,"))!;
     expect(invLine).toBeTruthy();
   });
 
@@ -142,9 +132,7 @@ describe("Slice C — pre-download preview byte-equality with download serialize
     const list = [
       {
         id: "captured_at_missing",
-        payload: (fixtures.payloads as Record<string, unknown>)[
-          "captured_at_missing"
-        ],
+        payload: (fixtures.payloads as Record<string, unknown>)["captured_at_missing"],
       },
     ];
     const v = runEcowittCloudCanary(
@@ -171,9 +159,7 @@ describe("Slice C — pre-download preview byte-equality with download serialize
   it("preview DOM contains no MAC/UUID and none of the banned source-honesty words", async () => {
     const html = await renderPanelHtml();
     // Limit to the preview region for a strict assertion.
-    const startIdx = html.indexOf(
-      'data-testid="cloud-canary-export-preview"',
-    );
+    const startIdx = html.indexOf('data-testid="cloud-canary-export-preview"');
     expect(startIdx).toBeGreaterThan(-1);
     const region = html.slice(startIdx);
     const decoded = decodeEntities(region);
@@ -188,10 +174,7 @@ describe("Slice C — pre-download preview byte-equality with download serialize
   it("download buttons and preview source the SAME memoized serializer values (single source of truth)", async () => {
     const { readFileSync } = await import("node:fs");
     const { resolve } = await import("node:path");
-    const src = readFileSync(
-      resolve(process.cwd(), "src/pages/OperatorEcowittCanary.tsx"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(process.cwd(), "src/pages/OperatorEcowittCanary.tsx"), "utf8");
     const start = src.indexOf("export function CloudCanaryPreviewPanel");
     const end = src.indexOf("function RedactionWarningBanner");
     const block = src.slice(start, end);

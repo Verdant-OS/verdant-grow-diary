@@ -68,9 +68,7 @@ export function buildTimelinePhotoLightboxList(
       note: typeof r.note === "string" ? r.note : "",
       stage: typeof r.stage === "string" && r.stage ? r.stage : null,
       plantName:
-        typeof plantNameRaw === "string" && plantNameRaw.trim()
-          ? plantNameRaw.trim()
-          : null,
+        typeof plantNameRaw === "string" && plantNameRaw.trim() ? plantNameRaw.trim() : null,
     });
   }
   return out;
@@ -95,12 +93,7 @@ export function resolveTimelinePhotoNavigation(
   activeIndex: number,
 ): TimelinePhotoNavigationState {
   const total = Array.isArray(list) ? list.length : 0;
-  if (
-    total === 0 ||
-    !Number.isInteger(activeIndex) ||
-    activeIndex < 0 ||
-    activeIndex >= total
-  ) {
+  if (total === 0 || !Number.isInteger(activeIndex) || activeIndex < 0 || activeIndex >= total) {
     return {
       currentIndex: -1,
       previousIndex: null,

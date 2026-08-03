@@ -91,9 +91,7 @@ export function buildReportsHubSummary(input: ReportsHubInput): ReportsHubSummar
   const worsened = safeInt(outcomeSummary.worsened);
   const moreData = safeInt(outcomeSummary.more_data_needed);
 
-  const learningGroups = Array.isArray(outcomeLearning?.groups)
-    ? outcomeLearning.groups.length
-    : 0;
+  const learningGroups = Array.isArray(outcomeLearning?.groups) ? outcomeLearning.groups.length : 0;
 
   const cards: ReportsHubCard[] = [
     {
@@ -144,9 +142,7 @@ export function buildReportsHubSummary(input: ReportsHubInput): ReportsHubSummar
           ? `${alertsOpen} open alert${alertsOpen === 1 ? "" : "s"}`
           : "No open alerts",
       secondaryStats:
-        alertsOpen > 0
-          ? [`Critical ${alertsCritical}`, `Warning ${alertsWarning}`]
-          : [],
+        alertsOpen > 0 ? [`Critical ${alertsCritical}`, `Warning ${alertsWarning}`] : [],
       caveat: null,
       href: alertsPath(growId),
       hrefLabel: "Review alerts",
@@ -176,19 +172,13 @@ export function buildReportsHubSummary(input: ReportsHubInput): ReportsHubSummar
         diaryEntriesTotal > 0
           ? `${diaryEntriesTotal} diary entr${diaryEntriesTotal === 1 ? "y" : "ies"}`
           : "No diary entries yet",
-      secondaryStats:
-        diaryEntriesTotal > 0
-          ? [`Last 7 days: ${diaryEntriesLast7d}`]
-          : [],
+      secondaryStats: diaryEntriesTotal > 0 ? [`Last 7 days: ${diaryEntriesLast7d}`] : [],
       caveat: null,
       href: logsPath(growId),
       hrefLabel: "Open timeline",
       empty: diaryEntriesTotal === 0,
     },
   ];
-
-
-
 
   return {
     cards,

@@ -5,11 +5,7 @@
 import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Circle, AlertCircle, HelpCircle } from "lucide-react";
-import type {
-  ProofStep,
-  ProofStepStatus,
-  ProofViewModel,
-} from "@/lib/oneTentLiveProofViewModel";
+import type { ProofStep, ProofStepStatus, ProofViewModel } from "@/lib/oneTentLiveProofViewModel";
 
 const STATUS_LABEL: Record<ProofStepStatus, string> = {
   pending: "Pending",
@@ -28,8 +24,7 @@ const STATUS_TONE: Record<ProofStepStatus, string> = {
 function StatusIcon({ status }: { status: ProofStepStatus }) {
   if (status === "complete")
     return <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden />;
-  if (status === "stale")
-    return <AlertCircle className="h-4 w-4 text-amber-600" aria-hidden />;
+  if (status === "stale") return <AlertCircle className="h-4 w-4 text-amber-600" aria-hidden />;
   if (status === "needs-confirmation")
     return <HelpCircle className="h-4 w-4 text-amber-600" aria-hidden />;
   return <Circle className="h-4 w-4 text-muted-foreground" aria-hidden />;
@@ -87,11 +82,7 @@ export default function OneTentLiveProofChecklist({
   testId?: string;
 }) {
   return (
-    <ol
-      className="space-y-2"
-      data-testid={testId}
-      aria-label="One-Tent Live Proof checklist"
-    >
+    <ol className="space-y-2" data-testid={testId} aria-label="One-Tent Live Proof checklist">
       {vm.steps.map((s) => (
         <StepRow key={s.id} step={s} />
       ))}

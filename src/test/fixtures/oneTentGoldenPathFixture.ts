@@ -56,13 +56,7 @@ export interface GoldenQuickLog {
   occurred_at: string;
   idempotency_key: string;
 }
-export type GoldenSensorSource =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid";
+export type GoldenSensorSource = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 export interface GoldenSensorSnapshot {
   id: string;
   user_id: string;
@@ -124,8 +118,7 @@ export const ONE_TENT_GOLDEN_QUICK_LOG: GoldenQuickLog = Object.freeze({
   note: ONE_TENT_GOLDEN_QUICK_LOG_NOTE,
   occurred_at: minutesAgo(5),
   // Deterministic: same submission == same key == same row (idempotency).
-  idempotency_key:
-    "golden-idem-plant-0001-observation-2026-07-11T13:55:00Z",
+  idempotency_key: "golden-idem-plant-0001-observation-2026-07-11T13:55:00Z",
 });
 
 export const ONE_TENT_GOLDEN_SNAPSHOT: GoldenSensorSnapshot = Object.freeze({

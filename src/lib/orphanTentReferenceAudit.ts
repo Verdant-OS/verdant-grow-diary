@@ -59,8 +59,10 @@ export function buildOrphanTentAuditSql(table: OrphanTentTable): string {
  * Safe to run read-only; no writes, no DDL.
  */
 export function buildAllOrphanTentAuditSql(): string {
-  return ORPHAN_TENT_TABLES.map(buildOrphanTentAuditSql).join("\nUNION ALL\n") +
-    "\nORDER BY table_name ASC, orphan_count DESC, missing_tent_id ASC";
+  return (
+    ORPHAN_TENT_TABLES.map(buildOrphanTentAuditSql).join("\nUNION ALL\n") +
+    "\nORDER BY table_name ASC, orphan_count DESC, missing_tent_id ASC"
+  );
 }
 
 export interface OrphanTentRow {

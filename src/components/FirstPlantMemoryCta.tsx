@@ -41,15 +41,13 @@ export default function FirstPlantMemoryCta({ prefill, testId }: Props) {
           <NotebookPen className="h-5 w-5" />
         </div>
         <div className="min-w-0">
-          <h3 className="font-display font-semibold text-base">
-            Log your first plant memory
-          </h3>
+          <h3 className="font-display font-semibold text-base">Log your first plant memory</h3>
           <p className="text-sm text-muted-foreground">
             Add note, watering, photo, or manual sensor reading.
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Start simple. One note is enough. You can enrich details later.
-            Manual sensor reading is optional.
+            Start simple. One note is enough. You can enrich details later. Manual sensor reading is
+            optional.
           </p>
         </div>
       </div>

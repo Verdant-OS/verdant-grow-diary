@@ -27,10 +27,7 @@ const isoMinusMs = (ms: number) => new Date(NOW - ms).toISOString();
 
 describe("sensorSnapshotFreshnessRules — timestamp boundary edge cases", () => {
   it("exactly at fresh boundary (ageMs === 0) stays fresh", () => {
-    const r = resolveSensorSnapshotDisplay(
-      { source: "live", capturedAt: isoMinusMs(0) },
-      opts,
-    );
+    const r = resolveSensorSnapshotDisplay({ source: "live", capturedAt: isoMinusMs(0) }, opts);
     expect(r.freshness).toBe("fresh");
     expect(r.effectiveSource).toBe("live");
     expect(isHealthySensorDisplay(r)).toBe(true);
@@ -109,10 +106,7 @@ describe("sensorSnapshotFreshnessRules — timestamp boundary edge cases", () =>
   });
 
   it("invalid timestamp string → invalid, missing_captured_at reason", () => {
-    const r = resolveSensorSnapshotDisplay(
-      { source: "live", capturedAt: "not-a-real-date" },
-      opts,
-    );
+    const r = resolveSensorSnapshotDisplay({ source: "live", capturedAt: "not-a-real-date" }, opts);
     expect(r.effectiveSource).toBe("invalid");
     expect(r.reasonCodes).toContain("missing_captured_at");
     expect(isHealthySensorDisplay(r)).toBe(false);
@@ -151,10 +145,7 @@ describe("sensorSnapshotFreshnessRules — timestamp boundary edge cases", () =>
   });
 
   it("CSV with fresh capturedAt stays csv, never relabeled live", () => {
-    const r = resolveSensorSnapshotDisplay(
-      { source: "csv", capturedAt: isoMinusMs(60_000) },
-      opts,
-    );
+    const r = resolveSensorSnapshotDisplay({ source: "csv", capturedAt: isoMinusMs(60_000) }, opts);
     expect(r.effectiveSource).toBe("csv");
     expect(r.freshness).toBe("fresh");
     expect(r.effectiveSource).not.toBe("live");
@@ -167,10 +158,7 @@ describe("sensorSnapshotFreshnessRules — timestamp boundary edge cases", () =>
 
 describe("sensorSnapshotFreshnessRules — operator-focused next-step copy", () => {
   it("demo warning preserves 'never treated as live' and adds calm next step", () => {
-    const r = resolveSensorSnapshotDisplay(
-      { source: "demo", capturedAt: isoMinusMs(0) },
-      opts,
-    );
+    const r = resolveSensorSnapshotDisplay({ source: "demo", capturedAt: isoMinusMs(0) }, opts);
     expect(r.warning).toMatch(/never treated as live/i);
     expect(r.warning).toMatch(/enter a manual reading/i);
   });
@@ -230,7 +218,9 @@ describe("sensorSnapshotFreshnessRules — operator-focused next-step copy", () 
     ];
     for (const c of cases) {
       const w = (c.warning ?? "").toLowerCase();
-      expect(w).not.toMatch(/turn (on|off)|activate|deactivate|enable hardware|trigger device|publish setpoint|adjust device|control/);
+      expect(w).not.toMatch(
+        /turn (on|off)|activate|deactivate|enable hardware|trigger device|publish setpoint|adjust device|control/,
+      );
       expect(w).not.toMatch(/currently connected|live telemetry|active telemetry/);
     }
   });
@@ -269,21 +259,16 @@ describe("SensorSnapshotCard — Sensor Data page rendering coverage", () => {
     );
     const card = screen.getByTestId("sensor-snapshot-card");
     expect(card.dataset.effectiveSource).toBe("invalid");
-    expect(
-      screen.getByTestId("sensor-snapshot-card-warning"),
-    ).toHaveTextContent(/source is unknown/i);
+    expect(screen.getByTestId("sensor-snapshot-card-warning")).toHaveTextContent(
+      /source is unknown/i,
+    );
   });
 
   it("renders warning copy when captured_at is missing", () => {
-    render(
-      <SensorSnapshotCard
-        snapshot={{ source: "live" }}
-        resolveOptions={{ now: NOW }}
-      />,
+    render(<SensorSnapshotCard snapshot={{ source: "live" }} resolveOptions={{ now: NOW }} />);
+    expect(screen.getByTestId("sensor-snapshot-card-warning")).toHaveTextContent(
+      /missing a capture time/i,
     );
-    expect(
-      screen.getByTestId("sensor-snapshot-card-warning"),
-    ).toHaveTextContent(/missing a capture time/i);
   });
 
   it("renders warning copy when stale", () => {
@@ -299,9 +284,7 @@ describe("SensorSnapshotCard — Sensor Data page rendering coverage", () => {
     );
     const card = screen.getByTestId("sensor-snapshot-card");
     expect(card.dataset.effectiveSource).toBe("stale");
-    expect(
-      screen.getByTestId("sensor-snapshot-card-warning"),
-    ).toHaveTextContent(/stale/i);
+    expect(screen.getByTestId("sensor-snapshot-card-warning")).toHaveTextContent(/stale/i);
   });
 
   it("renders warning copy when invalid (future timestamp)", () => {
@@ -314,9 +297,7 @@ describe("SensorSnapshotCard — Sensor Data page rendering coverage", () => {
         resolveOptions={{ now: NOW }}
       />,
     );
-    expect(
-      screen.getByTestId("sensor-snapshot-card-warning"),
-    ).toHaveTextContent(/future/i);
+    expect(screen.getByTestId("sensor-snapshot-card-warning")).toHaveTextContent(/future/i);
   });
 
   it("renders warning copy when demo", () => {
@@ -328,9 +309,7 @@ describe("SensorSnapshotCard — Sensor Data page rendering coverage", () => {
     );
     const card = screen.getByTestId("sensor-snapshot-card");
     expect(card.dataset.effectiveSource).toBe("demo");
-    expect(
-      screen.getByTestId("sensor-snapshot-card-warning"),
-    ).toHaveTextContent(/demo/i);
+    expect(screen.getByTestId("sensor-snapshot-card-warning")).toHaveTextContent(/demo/i);
   });
 
   it("empty state provides calm next-step guidance, no device control wording", () => {

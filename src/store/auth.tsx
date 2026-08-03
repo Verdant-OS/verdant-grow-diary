@@ -96,7 +96,7 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
     );
     // Keyed by user id (not the object) so a token refresh does not re-fire.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionUserForRedeem?.id]);
+  }, [sessionUserForRedeem?.id, sessionUserForRedeem]);
 
   return (
     <AuthCtx.Provider

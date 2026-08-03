@@ -18,10 +18,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-
-export type LiveSensorSurface =
-  | "live_sensor_stream"
-  | "live_sensor_dashboard_widget";
+export type LiveSensorSurface = "live_sensor_stream" | "live_sensor_dashboard_widget";
 
 export type LiveSensorGateState =
   | "loading"
@@ -44,10 +41,8 @@ export interface LiveSensorGateResult {
   displayPlanId: string | null;
 }
 
-export const LIVE_SENSOR_PAYWALL_HEADLINE =
-  "Live sensor streaming is a Pro feature.";
-export const LIVE_SENSOR_PAYWALL_UPGRADE_COPY =
-  "Upgrade required to use live sensor surfaces.";
+export const LIVE_SENSOR_PAYWALL_HEADLINE = "Live sensor streaming is a Pro feature.";
+export const LIVE_SENSOR_PAYWALL_UPGRADE_COPY = "Upgrade required to use live sensor surfaces.";
 export const LIVE_SENSOR_PAYWALL_COPY = `${LIVE_SENSOR_PAYWALL_HEADLINE} ${LIVE_SENSOR_PAYWALL_UPGRADE_COPY}`;
 
 function classifyDenial(
@@ -71,34 +66,23 @@ export async function checkLiveSensorEntitlement(
     if (scope.plantId) body.plant_id = scope.plantId;
     // billing_env is derived server-side; never sent from the client.
 
-    const { data, error } = await supabase.functions.invoke(
-      "live-sensor-entitlement",
-      { body },
-    );
+    const { data, error } = await supabase.functions.invoke("live-sensor-entitlement", { body });
     const ok =
-      !error &&
-      data &&
-      typeof data === "object" &&
-      (data as Record<string, unknown>).ok === true;
+      !error && data && typeof data === "object" && (data as Record<string, unknown>).ok === true;
     if (ok) {
       const d = data as Record<string, unknown>;
       return {
         ok: true,
         state: "allowed",
         reason: null,
-        displayPlanId:
-          typeof d.display_plan_id === "string" ? d.display_plan_id : null,
+        displayPlanId: typeof d.display_plan_id === "string" ? d.display_plan_id : null,
       };
     }
     const denial = (data ?? null) as Record<string, unknown> | null;
     const reason =
-      (denial && typeof denial.reason === "string"
-        ? denial.reason
-        : null) ?? "upgrade_required";
+      (denial && typeof denial.reason === "string" ? denial.reason : null) ?? "upgrade_required";
     const displayPlanId =
-      denial && typeof denial.display_plan_id === "string"
-        ? denial.display_plan_id
-        : null;
+      denial && typeof denial.display_plan_id === "string" ? denial.display_plan_id : null;
     return {
       ok: false,
       state: classifyDenial(reason),
@@ -121,10 +105,7 @@ export const requireLiveSensorAccess = checkLiveSensorEntitlement;
  * React hook variant. Triggers a preflight on mount + when scope changes;
  * exposes `{ state, result }` with a `"loading"` state during the call.
  */
-export function useLiveSensorServerGate(
-  surface: LiveSensorSurface,
-  scope: LiveSensorScope = {},
-) {
+export function useLiveSensorServerGate(surface: LiveSensorSurface, scope: LiveSensorScope = {}) {
   const [state, setState] = useState<LiveSensorGateState>("loading");
   const [result, setResult] = useState<LiveSensorGateResult | null>(null);
   const aliveRef = useRef(true);
@@ -143,12 +124,12 @@ export function useLiveSensorServerGate(
       aliveRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [surface, scopeKey]);
+  }, [surface, scope]);
 
   const recheck = useCallback(
     () => checkLiveSensorEntitlement(surface, scope),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [surface, scopeKey],
+    [surface, scope],
   );
 
   return {

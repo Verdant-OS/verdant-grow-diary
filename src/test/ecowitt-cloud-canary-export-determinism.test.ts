@@ -18,10 +18,7 @@ import {
   CLOUD_CANARY_EXPORT_JSON_FILENAME,
 } from "@/lib/ecowittCloudCanaryExport";
 import fixtures from "../../fixtures/ecowitt-cloud-canary-payloads.json";
-import {
-  MAC_RE,
-  UUID_RE,
-} from "./operator-ecowitt-cloud-canary-per-fixture-table.test";
+import { MAC_RE, UUID_RE } from "./operator-ecowitt-cloud-canary-per-fixture-table.test";
 
 const ORDER = [
   "happy_multi_channel",
@@ -84,18 +81,14 @@ describe("Slice C-fix — deterministic export payload", () => {
     const json = serializeCloudCanaryExportToJson(buildCloudCanaryExport(vm));
     expect(json).not.toContain("generated_at");
     const parsed = JSON.parse(json);
-    expect(Object.prototype.hasOwnProperty.call(parsed, "generated_at")).toBe(
-      false,
-    );
+    expect(Object.hasOwn(parsed, "generated_at")).toBe(false);
   });
 
   it("captured_at_missing fixture still produces empty missing-metric cells (unchanged)", () => {
     const list = [
       {
         id: "captured_at_missing",
-        payload: (fixtures.payloads as Record<string, unknown>)[
-          "captured_at_missing"
-        ],
+        payload: (fixtures.payloads as Record<string, unknown>)["captured_at_missing"],
       },
     ];
     const v = runEcowittCloudCanary(
@@ -121,9 +114,7 @@ describe("Slice C-fix — UI surfaces filename + run-timing (presentation-only)"
   async function renderPanelHtml(): Promise<string> {
     const React = await import("react");
     const { renderToString } = await import("react-dom/server");
-    const { CloudCanaryPreviewPanel } = await import(
-      "@/pages/OperatorEcowittCanary"
-    );
+    const { CloudCanaryPreviewPanel } = await import("@/pages/OperatorEcowittCanary");
     return renderToString(React.createElement(CloudCanaryPreviewPanel));
   }
 
@@ -139,9 +130,7 @@ describe("Slice C-fix — UI surfaces filename + run-timing (presentation-only)"
   it("renders a run-timing value in the meta block", async () => {
     const html = await renderPanelHtml();
     expect(html).toContain('data-testid="cloud-canary-export-run-timing"');
-    const m = html.match(
-      /data-testid="cloud-canary-export-run-timing"[^>]*>([^<]+)</,
-    );
+    const m = html.match(/data-testid="cloud-canary-export-run-timing"[^>]*>([^<]+)</);
     expect(m).toBeTruthy();
     expect((m![1] || "").trim().length).toBeGreaterThan(0);
   });

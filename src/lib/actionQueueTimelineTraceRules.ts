@@ -116,8 +116,8 @@ export function buildActionQueueTraceDraft(
   now: Date = new Date(),
 ): ActionQueueTraceDraft {
   const reasonSummary = safeReasonSummary(input.reason);
-  const safeTitle = sanitizeActionCopy(input.suggested_change ?? "") ||
-    safeActionType(input.action_type);
+  const safeTitle =
+    sanitizeActionCopy(input.suggested_change ?? "") || safeActionType(input.action_type);
   const label = TRACE_LABEL[input.kind];
   const note = reasonSummary
     ? `${label}: ${safeTitle}. ${reasonSummary}`
@@ -132,10 +132,7 @@ export function buildActionQueueTraceDraft(
     details: {
       kind: "action_queue_trace",
       trace_kind: input.kind,
-      idempotency_key: buildActionQueueTraceIdempotencyKey(
-        input.action_id,
-        input.kind,
-      ),
+      idempotency_key: buildActionQueueTraceIdempotencyKey(input.action_id, input.kind),
       action_id: input.action_id,
       tent_id: input.tent_id ?? null,
       plant_id: input.plant_id ?? null,

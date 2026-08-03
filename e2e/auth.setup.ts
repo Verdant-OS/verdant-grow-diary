@@ -29,8 +29,7 @@ setup("authenticate", async ({ page }) => {
   if (haveStorageState && haveSessionSnapshot) {
     setup.info().annotations.push({
       type: "auth",
-      description:
-        "Reusing existing auth state at e2e/.auth/ (user.json + session-storage.json).",
+      description: "Reusing existing auth state at e2e/.auth/ (user.json + session-storage.json).",
     });
     return;
   }
@@ -77,9 +76,7 @@ setup("authenticate", async ({ page }) => {
     .click();
 
   // Wait for an authenticated landmark — any non-/auth route is sufficient.
-  await expect
-    .poll(() => page.url(), { timeout: 20_000 })
-    .not.toContain("/auth");
+  await expect.poll(() => page.url(), { timeout: 20_000 }).not.toContain("/auth");
 
   await page.context().storageState({ path: STORAGE_PATH });
 
@@ -92,9 +89,7 @@ setup("authenticate", async ({ page }) => {
   // (e.g. *.lovable.app -> verdantgrowdiary.com), and sessionStorage is
   // origin-scoped — injecting on the configured-but-redirected origin would
   // silently leave every authed spec logged out.
-  const entries = await page.evaluate(() =>
-    JSON.stringify(window.sessionStorage),
-  );
+  const entries = await page.evaluate(() => JSON.stringify(window.sessionStorage));
   const signedInOrigin = new URL(page.url()).origin;
   fs.writeFileSync(
     SESSION_STORAGE_PATH,

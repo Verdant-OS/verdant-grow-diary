@@ -158,151 +158,144 @@ Deno.test("does not recursively walk into unexpected nested fields (throwing get
   assertEquals(out.providerReportedTokens, null);
 });
 
-Deno.test(
-  "structural safety: edge function wiring keeps completion persistence protected",
-  async () => {
-    const raw = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
-    assert(
-      raw.indexOf("20260719043000_ai_credit_result_cache.sql") >= 0 &&
-        raw.indexOf("20260719180000_ai_doctor_review_evidence_receipts.sql") >
-          raw.indexOf("20260719043000_ai_credit_result_cache.sql") &&
-        raw.indexOf("Deploy this function") >
-          raw.indexOf("20260719180000_ai_doctor_review_evidence_receipts.sql"),
-      "result-cache and evidence receipt migrations must precede Edge deployment",
-    );
-    assert(
-      /deploy this function[\s\S]{0,100}publish the client with optional session\/collection metadata/i.test(
-        raw,
-      ),
-      "the safe mixed-version rollout must deploy Edge before the metadata-sending client",
-    );
-    // Strip line + block comments so safety assertions only see executable code.
-    const src = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
-    // No direct persistence / writes introduced by the wiring slice.
-    assert(!/action_queue/i.test(src), "must not write action_queue");
-    assert(!/\.from\(\s*['"]alerts['"]/i.test(src), "must not write alerts");
-    assert(!/ai_doctor_sessions/i.test(src), "must not write ai_doctor_sessions");
-    assert(!/\.insert\(/i.test(src), "must not insert directly");
-    assert(!/\.upsert\(/i.test(src), "must not upsert directly");
-    assert(!/\.update\(/i.test(src), "must not update directly");
-    assert(!/\.delete\(/i.test(src), "must not delete directly");
-    const rpcCalls = [...src.matchAll(/\.rpc\(\s*["']([a-z_]+)["']/g)].map((m) => m[1]);
-    assertEquals(
-      rpcCalls.sort(),
-      [
-        "ai_doctor_finalize_review",
-        "ai_credit_refund",
-        "ai_credit_spend",
-        "record_ai_doctor_review_completion",
-      ].sort(),
-    );
-    assert(/SUPABASE_SERVICE_ROLE_KEY/.test(src), "completion writer must stay server-only");
-    const validationIndex = src.indexOf("const v = validateAiDoctorReviewResult(candidate)");
-    const completionCallIndex = src.lastIndexOf(
-      "recordFreshAiDoctorReviewCompletion(userId, spendId)",
-    );
-    const finalizationCallIndex = src.indexOf('creditSupabase.rpc("ai_doctor_finalize_review"');
-    assert(
-      validationIndex >= 0 && finalizationCallIndex > validationIndex,
-      "validated results must be attached before success",
-    );
-    assert(
-      completionCallIndex > finalizationCallIndex &&
-        src.includes('if (finalization === "recorded")'),
-      "only a newly recorded cache attachment may count as a fresh completion",
-    );
-    const replayStart = src.indexOf("const spendDecision = classifyAiDoctorCreditSpend");
-    const replayEnd = src.indexOf("const spendId = spendDecision.spendId", replayStart);
-    assert(replayStart >= 0 && replayEnd > replayStart, "replay boundary must remain explicit");
-    assert(
-      !src.slice(replayStart, replayEnd).includes("recordFreshAiDoctorReviewCompletion"),
-      "cached replays must not count as fresh completions",
-    );
-    const providerIndex = src.indexOf("fetch(GATEWAY_URL");
-    assert(providerIndex > replayEnd, "replay handling must complete before provider fetch");
-    const ambiguityFlag = src.indexOf("let creditSpendMayExist = false");
-    const spendAttempt = src.indexOf("creditSpendMayExist = true", ambiguityFlag);
-    const spendRpc = src.indexOf('creditSupabase.rpc("ai_credit_spend"', spendAttempt);
-    const outerFallback = src.lastIndexOf(
-      'return calmFailure(creditSpendMayExist ? "result_pending" : "http")',
-    );
-    assert(
-      ambiguityFlag >= 0 &&
-        spendAttempt > ambiguityFlag &&
-        spendRpc > spendAttempt &&
-        outerFallback > spendRpc,
-      "unexpected spend-or-later failures must remain same-key replayable",
-    );
-    const scopeStart = src.indexOf("spendObj.feature !== FEATURE", replayStart);
-    const pendingStart = src.indexOf('if (spendDecision.kind === "pending")', scopeStart);
-    assert(
-      scopeStart > replayStart &&
-        pendingStart > scopeStart &&
-        src.slice(scopeStart, pendingStart).includes("spendObj.grow_id !== growId"),
-      "feature, model, and grow scope must match before replay/provider",
-    );
-    assert(
-      src.slice(replayStart, replayEnd).includes('return calmFailure("result_pending")') &&
-        src.slice(replayStart, replayEnd).includes('"result_recording_failed"'),
-      "resultless replays must resolve to pending or a confirmed recording failure",
-    );
-    const successIndex = src.lastIndexOf("return safeOk(v.result");
-    assert(
-      successIndex > finalizationCallIndex,
-      "fresh output must not return before finalization",
-    );
-    assert(src.includes("p_evidence: evidenceReceipt"), "finalizer must receive the safe receipt");
-    assert(
-      src.includes("p_prompt_hmac_sha256") && src.includes("p_prompt_hmac_key_id"),
-      "finalizer must receive a server-keyed prompt HMAC and key identifier",
-    );
-    assert(!/\bp_prompt_sha256\b/.test(src), "finalizer must not receive a raw prompt hash");
-    assert(!/ai_credit_attach_result/.test(src), "new Edge wiring must not call legacy attachment");
-    const ambiguousFinalization = src.indexOf('if (finalization === "ambiguous")');
-    const rejectedFinalization = src.indexOf('if (finalization === "rejected")');
-    assert(
-      ambiguousFinalization > finalizationCallIndex && rejectedFinalization > ambiguousFinalization,
-      "finalization ambiguity and explicit rejection must remain separate",
-    );
-    assert(
+Deno.test("structural safety: edge function wiring keeps completion persistence protected", async () => {
+  const raw = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  assert(
+    raw.indexOf("20260719043000_ai_credit_result_cache.sql") >= 0 &&
+      raw.indexOf("20260719180000_ai_doctor_review_evidence_receipts.sql") >
+        raw.indexOf("20260719043000_ai_credit_result_cache.sql") &&
+      raw.indexOf("Deploy this function") >
+        raw.indexOf("20260719180000_ai_doctor_review_evidence_receipts.sql"),
+    "result-cache and evidence receipt migrations must precede Edge deployment",
+  );
+  assert(
+    /deploy this function[\s\S]{0,100}publish the client with optional session\/collection metadata/i.test(
+      raw,
+    ),
+    "the safe mixed-version rollout must deploy Edge before the metadata-sending client",
+  );
+  // Strip line + block comments so safety assertions only see executable code.
+  const src = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+  // No direct persistence / writes introduced by the wiring slice.
+  assert(!/action_queue/i.test(src), "must not write action_queue");
+  assert(!/\.from\(\s*['"]alerts['"]/i.test(src), "must not write alerts");
+  assert(!/ai_doctor_sessions/i.test(src), "must not write ai_doctor_sessions");
+  assert(!/\.insert\(/i.test(src), "must not insert directly");
+  assert(!/\.upsert\(/i.test(src), "must not upsert directly");
+  assert(!/\.update\(/i.test(src), "must not update directly");
+  assert(!/\.delete\(/i.test(src), "must not delete directly");
+  const rpcCalls = [...src.matchAll(/\.rpc\(\s*["']([a-z_]+)["']/g)].map((m) => m[1]);
+  assertEquals(
+    rpcCalls.sort(),
+    [
+      "ai_doctor_finalize_review",
+      "ai_credit_refund",
+      "ai_credit_spend",
+      "record_ai_doctor_review_completion",
+    ].sort(),
+  );
+  assert(/SUPABASE_SERVICE_ROLE_KEY/.test(src), "completion writer must stay server-only");
+  const validationIndex = src.indexOf("const v = validateAiDoctorReviewResult(candidate)");
+  const completionCallIndex = src.lastIndexOf(
+    "recordFreshAiDoctorReviewCompletion(userId, spendId)",
+  );
+  const finalizationCallIndex = src.indexOf('creditSupabase.rpc("ai_doctor_finalize_review"');
+  assert(
+    validationIndex >= 0 && finalizationCallIndex > validationIndex,
+    "validated results must be attached before success",
+  );
+  assert(
+    completionCallIndex > finalizationCallIndex && src.includes('if (finalization === "recorded")'),
+    "only a newly recorded cache attachment may count as a fresh completion",
+  );
+  const replayStart = src.indexOf("const spendDecision = classifyAiDoctorCreditSpend");
+  const replayEnd = src.indexOf("const spendId = spendDecision.spendId", replayStart);
+  assert(replayStart >= 0 && replayEnd > replayStart, "replay boundary must remain explicit");
+  assert(
+    !src.slice(replayStart, replayEnd).includes("recordFreshAiDoctorReviewCompletion"),
+    "cached replays must not count as fresh completions",
+  );
+  const providerIndex = src.indexOf("fetch(GATEWAY_URL");
+  assert(providerIndex > replayEnd, "replay handling must complete before provider fetch");
+  const ambiguityFlag = src.indexOf("let creditSpendMayExist = false");
+  const spendAttempt = src.indexOf("creditSpendMayExist = true", ambiguityFlag);
+  const spendRpc = src.indexOf('creditSupabase.rpc("ai_credit_spend"', spendAttempt);
+  const outerFallback = src.lastIndexOf(
+    'return calmFailure(creditSpendMayExist ? "result_pending" : "http")',
+  );
+  assert(
+    ambiguityFlag >= 0 &&
+      spendAttempt > ambiguityFlag &&
+      spendRpc > spendAttempt &&
+      outerFallback > spendRpc,
+    "unexpected spend-or-later failures must remain same-key replayable",
+  );
+  const scopeStart = src.indexOf("spendObj.feature !== FEATURE", replayStart);
+  const pendingStart = src.indexOf('if (spendDecision.kind === "pending")', scopeStart);
+  assert(
+    scopeStart > replayStart &&
+      pendingStart > scopeStart &&
+      src.slice(scopeStart, pendingStart).includes("spendObj.grow_id !== growId"),
+    "feature, model, and grow scope must match before replay/provider",
+  );
+  assert(
+    src.slice(replayStart, replayEnd).includes('return calmFailure("result_pending")') &&
+      src.slice(replayStart, replayEnd).includes('"result_recording_failed"'),
+    "resultless replays must resolve to pending or a confirmed recording failure",
+  );
+  const successIndex = src.lastIndexOf("return safeOk(v.result");
+  assert(successIndex > finalizationCallIndex, "fresh output must not return before finalization");
+  assert(src.includes("p_evidence: evidenceReceipt"), "finalizer must receive the safe receipt");
+  assert(
+    src.includes("p_prompt_hmac_sha256") && src.includes("p_prompt_hmac_key_id"),
+    "finalizer must receive a server-keyed prompt HMAC and key identifier",
+  );
+  assert(!/\bp_prompt_sha256\b/.test(src), "finalizer must not receive a raw prompt hash");
+  assert(!/ai_credit_attach_result/.test(src), "new Edge wiring must not call legacy attachment");
+  const ambiguousFinalization = src.indexOf('if (finalization === "ambiguous")');
+  const rejectedFinalization = src.indexOf('if (finalization === "rejected")');
+  assert(
+    ambiguousFinalization > finalizationCallIndex && rejectedFinalization > ambiguousFinalization,
+    "finalization ambiguity and explicit rejection must remain separate",
+  );
+  assert(
+    src
+      .slice(ambiguousFinalization, rejectedFinalization)
+      .includes('return calmFailure("result_pending")') &&
+      !src.slice(ambiguousFinalization, rejectedFinalization).includes("failureAfterRefund"),
+    "ambiguous finalization outcomes must retain the spend for same-key replay",
+  );
+  assert(
+    src.slice(rejectedFinalization, completionCallIndex).includes("failureAfterRefund") &&
       src
-        .slice(ambiguousFinalization, rejectedFinalization)
-        .includes('return calmFailure("result_pending")') &&
-        !src.slice(ambiguousFinalization, rejectedFinalization).includes("failureAfterRefund"),
-      "ambiguous finalization outcomes must retain the spend for same-key replay",
-    );
-    assert(
-      src.slice(rejectedFinalization, completionCallIndex).includes("failureAfterRefund") &&
-        src
-          .slice(rejectedFinalization, completionCallIndex)
-          .includes('"result_finalization_rejected"') &&
-        !src
-          .slice(rejectedFinalization, completionCallIndex)
-          .includes('return calmFailure("result_pending")'),
-      "explicit finalization rejection must attempt the idempotent refund",
-    );
-    assert(
-      src.includes("AI_DOCTOR_RECEIPT_HMAC_KEY_ID") &&
-        src.includes("p_prompt_hmac_key_id: receiptHmacKeyId"),
-      "prompt HMAC key identity must be configured and stored with each receipt",
-    );
-    // No raw upstream payload logging.
-    assert(!/console\.log\([^)]*payload/i.test(src), "must not log raw provider payload");
-    // No capture-store / CSV export wiring in the edge function.
-    assert(!/captureStore|csvExport/i.test(src), "no capture/export wiring");
-    // No threshold/budget enforcement constants added at this boundary.
-    assert(
-      !/TOKEN_BUDGET|COST_THRESHOLD|BACK_PRESSURE/.test(src),
-      "no budgets/thresholds/back-pressure",
-    );
-    // Composer is invoked exactly at the provider response boundary.
-    assert(
-      /attachProviderResponseUsageToAiDoctorPromptMeasurement/.test(src),
-      "composer must be wired",
-    );
-    assert(/measurementWithProviderUsage/.test(src), "must use the named local variable");
-  },
-);
+        .slice(rejectedFinalization, completionCallIndex)
+        .includes('"result_finalization_rejected"') &&
+      !src
+        .slice(rejectedFinalization, completionCallIndex)
+        .includes('return calmFailure("result_pending")'),
+    "explicit finalization rejection must attempt the idempotent refund",
+  );
+  assert(
+    src.includes("AI_DOCTOR_RECEIPT_HMAC_KEY_ID") &&
+      src.includes("p_prompt_hmac_key_id: receiptHmacKeyId"),
+    "prompt HMAC key identity must be configured and stored with each receipt",
+  );
+  // No raw upstream payload logging.
+  assert(!/console\.log\([^)]*payload/i.test(src), "must not log raw provider payload");
+  // No capture-store / CSV export wiring in the edge function.
+  assert(!/captureStore|csvExport/i.test(src), "no capture/export wiring");
+  // No threshold/budget enforcement constants added at this boundary.
+  assert(
+    !/TOKEN_BUDGET|COST_THRESHOLD|BACK_PRESSURE/.test(src),
+    "no budgets/thresholds/back-pressure",
+  );
+  // Composer is invoked exactly at the provider response boundary.
+  assert(
+    /attachProviderResponseUsageToAiDoctorPromptMeasurement/.test(src),
+    "composer must be wired",
+  );
+  assert(/measurementWithProviderUsage/.test(src), "must use the named local variable");
+});
 
 // --- Uncommon provider-response shape coverage --------------------------
 // All of these MUST clear providerReportedTokens to null without throwing

@@ -12,12 +12,7 @@
  *  - Commit is a callback-only handoff; this component performs no I/O.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
   Droplets,
@@ -41,12 +36,7 @@ import {
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
 
-export type HyperLogAction =
-  | "water"
-  | "feed"
-  | "defoliate"
-  | "note"
-  | "environment";
+export type HyperLogAction = "water" | "feed" | "defoliate" | "note" | "environment";
 
 export interface HyperLogDemoFormState {
   waterAmount: string;
@@ -193,7 +183,7 @@ export function HyperLogModal({
       });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [photos.forEach]);
 
   const updateField = useCallback(
     <K extends keyof HyperLogDemoFormState>(key: K, value: HyperLogDemoFormState[K]) => {
@@ -267,7 +257,10 @@ export function HyperLogModal({
     // draft stores canonical °C. Converted exactly once, right here.
     const committedForm: HyperLogDemoFormState = {
       ...form,
-      envTemp: typedTempToCelsiusInput(form.envTemp, envTempEntryUnitRef.current ?? temperatureUnit),
+      envTemp: typedTempToCelsiusInput(
+        form.envTemp,
+        envTempEntryUnitRef.current ?? temperatureUnit,
+      ),
     };
     onCommit?.(selected, committedForm, { photoCount: photos.length });
     onOpenChange(false);
@@ -310,8 +303,7 @@ export function HyperLogModal({
           data-testid="hyperlog-modal"
           className="bg-[#0a0a0a] border border-white/[0.06] rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col max-h-[92vh] font-mono"
           style={{
-            boxShadow:
-              "0 24px 60px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,200,83,0.06)",
+            boxShadow: "0 24px 60px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,200,83,0.06)",
           }}
         >
           {/* Header */}
@@ -341,9 +333,7 @@ export function HyperLogModal({
           <div className="px-5 py-5 space-y-5 overflow-y-auto">
             {/* Action Tiles */}
             <div>
-              <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 mb-2.5">
-                Action
-              </p>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 mb-2.5">Action</p>
               <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                 {ACTION_TILES.map((tile) => {
                   const Icon = tile.icon;
@@ -372,7 +362,10 @@ export function HyperLogModal({
                       }
                       aria-pressed={isActive}
                     >
-                      <Icon className="h-4 w-4" style={isActive ? { color: VERDANT_GREEN } : undefined} />
+                      <Icon
+                        className="h-4 w-4"
+                        style={isActive ? { color: VERDANT_GREEN } : undefined}
+                      />
                       <span className="text-[11px] font-medium tracking-wide">{tile.label}</span>
                     </button>
                   );
@@ -558,11 +551,7 @@ export function HyperLogModal({
                       key={p.id}
                       className="relative aspect-square rounded-lg overflow-hidden border border-white/[0.08] bg-[#0d0d0d]"
                     >
-                      <img
-                        src={p.url}
-                        alt={p.name}
-                        className="h-full w-full object-cover"
-                      />
+                      <img src={p.url} alt={p.name} className="h-full w-full object-cover" />
                       <button
                         type="button"
                         data-testid={`hyperlog-photo-remove-${p.id}`}
@@ -637,13 +626,9 @@ export function HyperLogModal({
                 <p className="text-[11px] uppercase tracking-wider text-white/40">
                   {timelinePreview.headline}
                 </p>
-                <p className="mt-1 text-sm text-white/85 leading-snug">
-                  {timelinePreview.summary}
-                </p>
+                <p className="mt-1 text-sm text-white/85 leading-snug">{timelinePreview.summary}</p>
                 {timelinePreview.meta ? (
-                  <p className="mt-1.5 text-[10px] text-white/40">
-                    {timelinePreview.meta}
-                  </p>
+                  <p className="mt-1.5 text-[10px] text-white/40">{timelinePreview.meta}</p>
                 ) : null}
               </div>
 
@@ -697,11 +682,13 @@ function buildTimelinePreview(
   photoCount: number,
   temperatureUnitSymbol: string,
 ): { headline: string; summary: string; meta: string | null } {
-  const photoMeta = photoCount > 0 ? `${photoCount} photo${photoCount === 1 ? "" : "s"} attached` : null;
+  const photoMeta =
+    photoCount > 0 ? `${photoCount} photo${photoCount === 1 ? "" : "s"} attached` : null;
   if (!action) {
     return {
       headline: "No entry yet",
-      summary: "Choose Feed, Defoliate, Note, or Env Check to see how this entry will appear in the plant memory timeline.",
+      summary:
+        "Choose Feed, Defoliate, Note, or Env Check to see how this entry will appear in the plant memory timeline.",
       meta: null,
     };
   }

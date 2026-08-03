@@ -5,14 +5,10 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  auditLeadDataQuality,
-  sortFindings,
-} from "@/lib/leadDataQualityAuditRules";
+import { auditLeadDataQuality, sortFindings } from "@/lib/leadDataQualityAuditRules";
 import type { LeadRow } from "@/hooks/useLeadsList";
 
-const readSrc = (p: string) =>
-  readFileSync(resolve(__dirname, "..", p), "utf8");
+const readSrc = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 const RULES = readSrc("lib/leadDataQualityAuditRules.ts");
 const COMPONENT = readSrc("components/LeadDataQualityAuditPanel.tsx");
 const PAGE = readSrc("pages/Leads.tsx");

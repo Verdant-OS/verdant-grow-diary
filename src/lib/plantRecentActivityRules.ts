@@ -7,15 +7,11 @@
  *
  * Read-only. Not used for alerts, actions, AI Doctor, or device control.
  */
-import {
-  normalizeDiaryEntries,
-  type NormalizedDiaryEntry,
-} from "@/lib/diaryEntryRules";
+import { normalizeDiaryEntries, type NormalizedDiaryEntry } from "@/lib/diaryEntryRules";
 import { isStale } from "@/lib/sensorSnapshot";
 import { splitHardwareReadingsFromNote } from "@/lib/quickLogHardwareReadingsDisplayRules";
 import { shouldShowPhotoNonDiagnosticLabel } from "@/lib/photoEventNonDiagnosticLabelRules";
 import { resolveQuickLogEventIdentity } from "@/lib/quickLogEventIdentityRules";
-
 
 export interface PlantRecentActivityRow {
   id: string;
@@ -74,7 +70,6 @@ export interface PlantRecentActivityRow {
   showPhotoNonDiagnosticLabel?: boolean;
 }
 
-
 const NOTE_PREVIEW_MAX = 140;
 const DEFAULT_LIMIT = 10;
 
@@ -84,10 +79,7 @@ function previewNote(note: string): string {
   return trimmed.slice(0, NOTE_PREVIEW_MAX - 1).trimEnd() + "…";
 }
 
-function toRow(
-  entry: NormalizedDiaryEntry,
-  now: number,
-): PlantRecentActivityRow {
+function toRow(entry: NormalizedDiaryEntry, now: number): PlantRecentActivityRow {
   const snap = entry.details.sensorSnapshot;
   const snapshotAt = snap?.at ?? null;
   const hasSnapshot = !!snap;
@@ -134,10 +126,7 @@ function toRow(
   };
 }
 
-function compareNewestFirst(
-  a: PlantRecentActivityRow,
-  b: PlantRecentActivityRow,
-): number {
+function compareNewestFirst(a: PlantRecentActivityRow, b: PlantRecentActivityRow): number {
   const aHas = a.occurredAt !== null;
   const bHas = b.occurredAt !== null;
   if (aHas && bHas) {

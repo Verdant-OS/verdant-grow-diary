@@ -22,7 +22,9 @@ const OUT_PATH = path.resolve(
 const RECEIPT_WRITER = "scripts/releases/write-pheno-release-receipt.mjs";
 
 function firstLine(value) {
-  return String(value ?? "").split("\n")[0].slice(0, 220);
+  return String(value ?? "")
+    .split("\n")[0]
+    .slice(0, 220);
 }
 
 export function extractTitle(html) {
@@ -153,7 +155,9 @@ async function main() {
   console.log(`bundle       ${bundleFile}`);
   console.log(`bundle id    ${bundleId}`);
   console.log(`sha256       ${bundleSha256}`);
-  console.log(`expected     ${expectedBuildId ? (artifact.expectedMatch ? "MATCH" : "MISMATCH") : "NOT SET"}`);
+  console.log(
+    `expected     ${expectedBuildId ? (artifact.expectedMatch ? "MATCH" : "MISMATCH") : "NOT SET"}`,
+  );
   console.log(`artifact     ${path.relative(process.cwd(), OUT_PATH)}`);
 
   const receipt = spawnSync(

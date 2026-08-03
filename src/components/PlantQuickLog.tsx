@@ -143,7 +143,7 @@ export default function PlantQuickLog({
     return () => window.cancelAnimationFrame(raf);
   }, [open, focusResponseCheckOnOpen]);
 
-  const currentCapturedAt = useMemo(() => new Date().toISOString(), [open, logs]);
+  const currentCapturedAt = useMemo(() => new Date().toISOString(), []);
 
   useEffect(() => {
     return () => {

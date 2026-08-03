@@ -18,18 +18,25 @@ import {
 import type { HarvestWatchRowViewModel } from "@/lib/harvestWatchViewModel";
 import type { PlantRecentActivityRow } from "@/lib/plantRecentActivityRules";
 
-function makeRow(
-  overrides: Partial<HarvestWatchRowViewModel> = {},
-): HarvestWatchRowViewModel {
+function makeRow(overrides: Partial<HarvestWatchRowViewModel> = {}): HarvestWatchRowViewModel {
   return {
     plantId: "p1",
     plantLabel: "Plant",
     phenotypeLabel: "Pheno",
     daysInFlower: null,
-    readiness: { score: null, gatedReason: "Insufficient evidence" } as unknown as HarvestWatchRowViewModel["readiness"],
+    readiness: {
+      score: null,
+      gatedReason: "Insufficient evidence",
+    } as unknown as HarvestWatchRowViewModel["readiness"],
     readinessDisplay: "Insufficient evidence",
     daysVsHistory: { delta: null, label: "" },
-    dryback: { confidence: "low", label: "", caption: "", visible: false, muted: true } as unknown as HarvestWatchRowViewModel["dryback"],
+    dryback: {
+      confidence: "low",
+      label: "",
+      caption: "",
+      visible: false,
+      muted: true,
+    } as unknown as HarvestWatchRowViewModel["dryback"],
     harvestWindow: {
       startDay: 56,
       endDay: 70,
@@ -40,16 +47,26 @@ function makeRow(
     confidenceLabel: "Low",
     lastPhotoAgeDays: null,
     lastPhotoLabel: "No photos yet",
-    photoPrompt: { state: "ok", confidencePenalty: 0, missedDays: 0, tone: "neutral", message: "" } as unknown as HarvestWatchRowViewModel["photoPrompt"],
+    photoPrompt: {
+      state: "ok",
+      confidencePenalty: 0,
+      missedDays: 0,
+      tone: "neutral",
+      message: "",
+    } as unknown as HarvestWatchRowViewModel["photoPrompt"],
     trend: "unknown",
-    trichome: { state: "not_available", caption: "", visible: false, insight: null, confidence: "low" } as unknown as HarvestWatchRowViewModel["trichome"],
+    trichome: {
+      state: "not_available",
+      caption: "",
+      visible: false,
+      insight: null,
+      confidence: "low",
+    } as unknown as HarvestWatchRowViewModel["trichome"],
     ...overrides,
   };
 }
 
-function makeActivity(
-  overrides: Partial<PlantRecentActivityRow> = {},
-): PlantRecentActivityRow {
+function makeActivity(overrides: Partial<PlantRecentActivityRow> = {}): PlantRecentActivityRow {
   return {
     id: overrides.id ?? "e1",
     eventType: "observation",
@@ -84,30 +101,26 @@ describe("mapToV0ReadinessState", () => {
   });
 
   it("returns not_enough_evidence when trend unknown but some evidence exists", () => {
-    expect(
-      mapToV0ReadinessState({ ...base, row: makeRow(), photoEvidenceCount: 1 }),
-    ).toBe("not_enough_evidence");
+    expect(mapToV0ReadinessState({ ...base, row: makeRow(), photoEvidenceCount: 1 })).toBe(
+      "not_enough_evidence",
+    );
   });
 
   it("returns watch_window when trend is approaching", () => {
     const row = makeRow({ trend: "approaching" });
-    expect(
-      mapToV0ReadinessState({ ...base, row, photoEvidenceCount: 1 }),
-    ).toBe("watch_window");
+    expect(mapToV0ReadinessState({ ...base, row, photoEvidenceCount: 1 })).toBe("watch_window");
   });
 
   it("returns watch_window for trend holding when strongEvidenceCount < 2", () => {
     const row = makeRow({ trend: "holding" });
-    expect(
-      mapToV0ReadinessState({ ...base, row, strongEvidenceCount: 1 }),
-    ).toBe("watch_window");
+    expect(mapToV0ReadinessState({ ...base, row, strongEvidenceCount: 1 })).toBe("watch_window");
   });
 
   it("returns ready_for_manual_review only with trend=holding AND >=2 strong signals", () => {
     const row = makeRow({ trend: "holding" });
-    expect(
-      mapToV0ReadinessState({ ...base, row, strongEvidenceCount: 2 }),
-    ).toBe("ready_for_manual_review");
+    expect(mapToV0ReadinessState({ ...base, row, strongEvidenceCount: 2 })).toBe(
+      "ready_for_manual_review",
+    );
   });
 
   it("a single recent photo alone does NOT produce ready_for_manual_review", () => {
@@ -124,16 +137,16 @@ describe("mapToV0ReadinessState", () => {
   });
 
   it("returns too_early_to_call for trend=early", () => {
-    expect(
-      mapToV0ReadinessState({ ...base, row: makeRow({ trend: "early" }) }),
-    ).toBe("too_early_to_call");
+    expect(mapToV0ReadinessState({ ...base, row: makeRow({ trend: "early" }) })).toBe(
+      "too_early_to_call",
+    );
   });
 
   it("returns too_early_to_call when daysInFlower is well before window start", () => {
     const row = makeRow({ trend: "early" });
-    expect(
-      mapToV0ReadinessState({ ...base, row, daysInFlower: 20, expectedHarvestDay: 60 }),
-    ).toBe("too_early_to_call");
+    expect(mapToV0ReadinessState({ ...base, row, daysInFlower: 20, expectedHarvestDay: 60 })).toBe(
+      "too_early_to_call",
+    );
   });
 
   it("returns past_expected_window when daysInFlower is past window end + 7", () => {
@@ -308,7 +321,13 @@ describe("pickNextInspection", () => {
   });
 
   it("prefill text never contains aggressive harvest instructions", () => {
-    const forbidden = [/harvest now/i, /\bchop\b/i, /\bflush\b/i, /dark period/i, /defoliate aggressively/i];
+    const forbidden = [
+      /harvest now/i,
+      /\bchop\b/i,
+      /\bflush\b/i,
+      /dark period/i,
+      /defoliate aggressively/i,
+    ];
     const kinds = [
       checklist(["trichome_inspection"]),
       checklist(["pistil_observation"]),

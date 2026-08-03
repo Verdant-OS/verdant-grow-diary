@@ -12,10 +12,7 @@ import { resolve } from "node:path";
 import StageBadge from "@/components/StageBadge";
 
 const ROOT = resolve(__dirname, "../..");
-const BADGE_SOURCE = readFileSync(
-  resolve(ROOT, "src/components/StageBadge.tsx"),
-  "utf8",
-);
+const BADGE_SOURCE = readFileSync(resolve(ROOT, "src/components/StageBadge.tsx"), "utf8");
 
 describe("StageBadge canonical rendering", () => {
   it('renders "Veg" for "veg"', () => {
@@ -108,16 +105,12 @@ describe("StageBadge static guardrails", () => {
   it("does not duplicate an alias table inside JSX", () => {
     // The canonical alias map lives in growStages.ts; StageBadge should
     // only reference the normalizer, not inline its own aliases.
-    expect(BADGE_SOURCE).not.toMatch(
-      /vegetation\s*:|vegetate\s*:|blooming?\s*:/i,
-    );
+    expect(BADGE_SOURCE).not.toMatch(/vegetation\s*:|vegetate\s*:|blooming?\s*:/i);
   });
 
   it("has no service_role, fetch, or automation surface", () => {
     expect(BADGE_SOURCE).not.toMatch(/service_role/i);
     expect(BADGE_SOURCE).not.toMatch(/\bfetch\(/);
-    expect(BADGE_SOURCE).not.toMatch(
-      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator/i,
-    );
+    expect(BADGE_SOURCE).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator/i);
   });
 });

@@ -19,7 +19,6 @@ function allMigrations(): string {
     .join("\n\n");
 }
 
-
 function allActionQueueMigrations(): string {
   return readdirSync(MIGRATIONS_DIR)
     .filter((name) => name.endsWith(".sql"))

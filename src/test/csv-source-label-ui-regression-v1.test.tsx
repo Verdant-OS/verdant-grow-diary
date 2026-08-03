@@ -19,20 +19,10 @@
 import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  cleanup,
-  within,
-} from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-library/react";
 
 import { EnvironmentCsvImportModal } from "@/components/EnvironmentCsvImportModal";
-import {
-  CSV_IMPORT_DESCRIPTION,
-  formatCsvPreviewRow,
-} from "@/lib/environmentCsvPreviewCopyRules";
+import { CSV_IMPORT_DESCRIPTION, formatCsvPreviewRow } from "@/lib/environmentCsvPreviewCopyRules";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
@@ -48,16 +38,8 @@ const SAMPLE_CSV =
   "2026-06-01T10:10:00Z,24.1,55\n";
 
 async function openPreviewPhase() {
-  const onConfirm = vi
-    .fn()
-    .mockResolvedValue({ insertedCount: 3, error: null });
-  render(
-    <EnvironmentCsvImportModal
-      open
-      onOpenChange={() => {}}
-      onConfirm={onConfirm}
-    />,
-  );
+  const onConfirm = vi.fn().mockResolvedValue({ insertedCount: 3, error: null });
+  render(<EnvironmentCsvImportModal open onOpenChange={() => {}} onConfirm={onConfirm} />);
   const input = screen.getByTestId("csv-import-file-input") as HTMLInputElement;
   Object.defineProperty(input, "files", {
     value: [new File([SAMPLE_CSV], "export.csv", { type: "text/csv" })],
@@ -87,9 +69,7 @@ async function openPreviewPhase() {
 describe("CSV Source-Label UI Regression v1 — copy rules", () => {
   it("dialog description names CSV explicitly and tags rows as historical CSV context", () => {
     expect(CSV_IMPORT_DESCRIPTION.toLowerCase()).toContain("csv");
-    expect(CSV_IMPORT_DESCRIPTION.toLowerCase()).toContain(
-      "historical csv context",
-    );
+    expect(CSV_IMPORT_DESCRIPTION.toLowerCase()).toContain("historical csv context");
     expect(CSV_IMPORT_DESCRIPTION.toLowerCase()).not.toContain("live");
   });
 
@@ -149,19 +129,9 @@ describe("CSV Source-Label UI Regression v1 — preview phase", () => {
 
 describe("CSV Source-Label UI Regression v1 — done phase keeps CSV label", () => {
   it("done state names imported rows as CSV reading(s) after a successful confirm", async () => {
-    const onConfirm = vi
-      .fn()
-      .mockResolvedValue({ insertedCount: 3, error: null });
-    render(
-      <EnvironmentCsvImportModal
-        open
-        onOpenChange={() => {}}
-        onConfirm={onConfirm}
-      />,
-    );
-    const input = screen.getByTestId(
-      "csv-import-file-input",
-    ) as HTMLInputElement;
+    const onConfirm = vi.fn().mockResolvedValue({ insertedCount: 3, error: null });
+    render(<EnvironmentCsvImportModal open onOpenChange={() => {}} onConfirm={onConfirm} />);
+    const input = screen.getByTestId("csv-import-file-input") as HTMLInputElement;
     Object.defineProperty(input, "files", {
       value: [new File([SAMPLE_CSV], "export.csv", { type: "text/csv" })],
     });
@@ -175,14 +145,10 @@ describe("CSV Source-Label UI Regression v1 — done phase keeps CSV label", () 
     const unit = screen.queryByTestId("csv-import-unit-c");
     if (unit) {
       fireEvent.click(unit);
-      await waitFor(() =>
-        expect(screen.queryByTestId("csv-import-preview")).toBeTruthy(),
-      );
+      await waitFor(() => expect(screen.queryByTestId("csv-import-preview")).toBeTruthy());
     }
     fireEvent.click(screen.getByTestId("csv-import-confirm"));
-    await waitFor(() =>
-      expect(screen.queryByTestId("csv-import-done")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("csv-import-done")).toBeTruthy());
     const done = screen.getByTestId("csv-import-done");
     const text = (done.textContent ?? "").toLowerCase();
     expect(text).toContain("csv");
@@ -200,12 +166,7 @@ describe("CSV Source-Label UI Regression v1 — done phase keeps CSV label", () 
 // 3. Static scan — CSV flow files
 // ---------------------------------------------------------------------------
 describe("CSV Source-Label UI Regression v1 — static scan", () => {
-  const ALL = [
-    PERSISTENCE_SRC,
-    MODAL_SRC,
-    LAUNCHER_SRC,
-    PREVIEW_COPY_SRC,
-  ].join("\n");
+  const ALL = [PERSISTENCE_SRC, MODAL_SRC, LAUNCHER_SRC, PREVIEW_COPY_SRC].join("\n");
 
   const BANNED = [
     "automatically executed",
@@ -239,8 +200,7 @@ describe("CSV Source-Label UI Regression v1 — static scan", () => {
 
   it("CSV/imported/stale/invalid/demo/unknown is never described as healthy", () => {
     const lower = ALL.toLowerCase();
-    const nearHealthy =
-      /(csv|imported|stale|invalid|demo|unknown)[^.]{0,40}\bhealthy\b/;
+    const nearHealthy = /(csv|imported|stale|invalid|demo|unknown)[^.]{0,40}\bhealthy\b/;
     expect(lower).not.toMatch(nearHealthy);
   });
 

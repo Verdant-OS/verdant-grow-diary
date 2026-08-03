@@ -50,16 +50,16 @@ describe("Quick Log Sensor Truth Context v1 — pre-save copy", () => {
 
   it("shows 'Not live device control.'", () => {
     renderCard();
-    expect(
-      screen.getByTestId("manual-reading-helper-not-device-control").textContent,
-    ).toMatch(/not live device control/i);
+    expect(screen.getByTestId("manual-reading-helper-not-device-control").textContent).toMatch(
+      /not live device control/i,
+    );
   });
 
   it("shows 'Not a plant-health diagnosis.'", () => {
     renderCard();
-    expect(
-      screen.getByTestId("manual-reading-helper-not-diagnosis").textContent,
-    ).toMatch(/not a plant-health diagnosis/i);
+    expect(screen.getByTestId("manual-reading-helper-not-diagnosis").textContent).toMatch(
+      /not a plant-health diagnosis/i,
+    );
   });
 
   it("shows missing-readings notice when no metrics are entered", () => {

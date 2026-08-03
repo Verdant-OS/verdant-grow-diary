@@ -9,18 +9,23 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+  getRouteAliasRedirectTarget,
+} from "./helpers/routeManifestSyncHarness";
 
-const APP_TSX = readFileSync(resolve(__dirname, "../../src/App.tsx"), "utf8");
+const APP_TSX = readAllRouteModuleSources();
 
 describe("/ai-doctor redirect alias", () => {
-  it("App.tsx mounts /ai-doctor through the context-preserving alias", () => {
-    expect(APP_TSX).toMatch(
-      /path="\/ai-doctor"\s+element=\{<RouteAliasRedirect\s+to="\/doctor"\s*\/>\}/,
-    );
+  it("File routes mount /ai-doctor through the context-preserving alias", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/ai-doctor");
+    expect(getRouteAliasRedirectTarget("/ai-doctor")).toBe("/doctor");
   });
 
-  it("App.tsx still mounts canonical /doctor route", () => {
-    expect(APP_TSX).toMatch(/path="\/doctor"\s+element=\{<AiDoctorStart\s*\/>\}/);
+  it("file routes still mount canonical /doctor route", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/doctor");
+    expect(APP_TSX).toMatch(/AiDoctorStart|@\/pages\/AiDoctorStart|pages\/AiDoctorStart/);
   });
 
   it("appRouteManifest records /ai-doctor as redirect", () => {

@@ -33,11 +33,9 @@ export const REMOVE_LOG_DIALOG_CONFIRM = "Remove log";
 
 export const REMOVE_LOG_SUCCESS_TOAST = "Log removed.";
 export const REMOVE_PHOTO_LOG_SUCCESS_TOAST = "Photo log removed.";
-export const REMOVE_LOG_ERROR_TOAST =
-  "Couldn't remove this log. Please try again.";
+export const REMOVE_LOG_ERROR_TOAST = "Couldn't remove this log. Please try again.";
 
-export const REMOVE_LOG_FOLLOWUP_HINT =
-  "Add a new Quick Log to the correct plant when ready.";
+export const REMOVE_LOG_FOLLOWUP_HINT = "Add a new Quick Log to the correct plant when ready.";
 
 // ---------------------------------------------------------------------------
 // Eligibility
@@ -113,10 +111,7 @@ export function getRemoveSuccessToast(isPhoto: boolean): string {
  * Accessible aria-label for the per-entry remove control.
  * Falls back gracefully when plant name is missing.
  */
-export function getRemoveButtonAriaLabel(
-  isPhoto: boolean,
-  plantName?: string | null,
-): string {
+export function getRemoveButtonAriaLabel(isPhoto: boolean, plantName?: string | null): string {
   const base = isPhoto ? "Remove photo log" : "Remove log";
   const name = typeof plantName === "string" ? plantName.trim() : "";
   return name.length > 0 ? `${base} for ${name}` : base;

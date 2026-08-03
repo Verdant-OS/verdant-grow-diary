@@ -16,6 +16,8 @@ import { hasCultivarGuideUpdate } from "@/lib/cultivarFollowRules";
 // migration is deployed and types are regenerated. Replace with the typed table
 // then. Keeps client compilation green in the meantime.
 function followsTable() {
+  // Transitional until cultivar_follows is in generated Database types.
+  // biome-ignore lint/suspicious/noExplicitAny: pre-migration table not in Database types yet
   return (supabase as unknown as { from: (t: string) => any }).from("cultivar_follows");
 }
 
@@ -28,9 +30,7 @@ export interface UseCultivarFollowReturn {
   markSeen: () => Promise<void>;
 }
 
-export function useCultivarFollow(
-  cultivar: VerdantCultivarProfile,
-): UseCultivarFollowReturn {
+export function useCultivarFollow(cultivar: VerdantCultivarProfile): UseCultivarFollowReturn {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -109,7 +109,9 @@ export function useCultivarFollow(
   }, [user, isFollowing, cultivar.slug, cultivar.guideVersion]);
 
   const hasUpdate =
-    isFollowing && seenVersion != null && hasCultivarGuideUpdate(seenVersion, cultivar.guideVersion);
+    isFollowing &&
+    seenVersion != null &&
+    hasCultivarGuideUpdate(seenVersion, cultivar.guideVersion);
 
   return { loading, isFollowing, hasUpdate, follow, unfollow, markSeen };
 }

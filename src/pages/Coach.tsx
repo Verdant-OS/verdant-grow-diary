@@ -137,7 +137,7 @@ export default function Coach() {
       contextMeta: plantsMeta,
       questionKind: photoFile ? "visual-diagnosis" : "general",
     });
-  }, [activeGrowId, ctxPlants, ctxSensors, ctxDiary, photoFile]);
+  }, [activeGrowId, ctxPlants, ctxSensors, ctxDiary, photoFile, user?.id]);
 
   // SECURITY: never send user_id from the client. DB default (auth.uid()) wins.
   // status always defaults to pending_approval. No device-control fields.

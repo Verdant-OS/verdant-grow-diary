@@ -119,10 +119,16 @@ describe("billingSubscriptionUpdateAuditViewModel — parse response", () => {
   });
 
   it("maps top-level reason labels for not_authenticated and operator_required", () => {
-    const a = parseBillingSubscriptionUpdateAuditResponse({ ok: false, reason: "not_authenticated" });
+    const a = parseBillingSubscriptionUpdateAuditResponse({
+      ok: false,
+      reason: "not_authenticated",
+    });
     expect(a.reasonLabel).toMatch(/sign in/i);
 
-    const b = parseBillingSubscriptionUpdateAuditResponse({ ok: false, reason: "operator_required" });
+    const b = parseBillingSubscriptionUpdateAuditResponse({
+      ok: false,
+      reason: "operator_required",
+    });
     expect(b.reasonLabel).toMatch(/operator role/i);
   });
 
@@ -168,16 +174,14 @@ describe("billingSubscriptionUpdateAuditViewModel — parse response", () => {
 
 describe("billingSubscriptionUpdateAuditViewModel — sanitized type contract", () => {
   it("operator row key allow-list contains only safe fields", () => {
-    expect([...BILLING_SUBSCRIPTION_UPDATE_AUDIT_OPERATOR_ROW_KEYS].sort()).toEqual(
-      [
-        "candidate_plan_id",
-        "candidate_status",
-        "created_at",
-        "result_reason",
-        "result_status",
-        "subscription_status",
-      ],
-    );
+    expect([...BILLING_SUBSCRIPTION_UPDATE_AUDIT_OPERATOR_ROW_KEYS].sort()).toEqual([
+      "candidate_plan_id",
+      "candidate_status",
+      "created_at",
+      "result_reason",
+      "result_status",
+      "subscription_status",
+    ]);
   });
 
   it("forbidden-key tuple covers known provider/payload exfil vectors", () => {
@@ -220,21 +224,19 @@ describe("billingSubscriptionUpdateAuditViewModel — sanitized type contract", 
       ],
     });
     const keys = Object.keys(vm.latest[0]).sort();
-    expect(keys).toEqual(
-      [
-        "candidatePlanId",
-        "candidatePlanLabel",
-        "candidateStatus",
-        "candidateStatusLabel",
-        "createdAt",
-        "resultReason",
-        "resultReasonLabel",
-        "resultStatus",
-        "resultStatusLabel",
-        "subscriptionStatus",
-        "subscriptionStatusLabel",
-      ],
-    );
+    expect(keys).toEqual([
+      "candidatePlanId",
+      "candidatePlanLabel",
+      "candidateStatus",
+      "candidateStatusLabel",
+      "createdAt",
+      "resultReason",
+      "resultReasonLabel",
+      "resultStatus",
+      "resultStatusLabel",
+      "subscriptionStatus",
+      "subscriptionStatusLabel",
+    ]);
   });
 });
 

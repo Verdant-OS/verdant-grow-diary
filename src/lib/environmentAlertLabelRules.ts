@@ -47,9 +47,7 @@ export const ENVIRONMENT_ALERT_FALLBACK_LABEL = "Environment alert";
  * grower-friendly label. Unknown, missing, or malformed inputs collapse
  * to "Environment alert" so growers never see the raw enum.
  */
-export function formatEnvironmentAlertLabel(
-  alertType: string | null | undefined,
-): string {
+export function formatEnvironmentAlertLabel(alertType: string | null | undefined): string {
   if (typeof alertType !== "string") return ENVIRONMENT_ALERT_FALLBACK_LABEL;
   const key = alertType.trim().toLowerCase();
   if (!key) return ENVIRONMENT_ALERT_FALLBACK_LABEL;

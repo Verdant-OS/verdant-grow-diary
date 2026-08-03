@@ -100,7 +100,7 @@ const PADDLE_API_BASE = {
 } as const;
 
 function parseEnvFlag(argv: readonly string[]): PaddleEnv[] {
-  const idx = argv.findIndex((a) => a === "--env");
+  const idx = argv.indexOf("--env");
   const value = idx >= 0 ? argv[idx + 1] : "both";
   if (value === "sandbox") return ["sandbox"];
   if (value === "live") return ["live"];
@@ -110,7 +110,7 @@ function parseEnvFlag(argv: readonly string[]): PaddleEnv[] {
 }
 
 function parseJsonOutFlag(argv: readonly string[]): string | null {
-  const idx = argv.findIndex((a) => a === "--json-out");
+  const idx = argv.indexOf("--json-out");
   if (idx < 0) return null;
   const value = argv[idx + 1];
   if (!value || value.startsWith("--")) {
@@ -187,8 +187,7 @@ async function discoverActiveCraftExternalIds(
   // We page defensively — Paddle caps per_page at 200 and returns a cursor
   // in `meta.pagination.next` when more rows exist.
   const collected: string[] = [];
-  let url: string | null =
-    `${PADDLE_API_BASE[env]}/prices?status=active&per_page=200`;
+  let url: string | null = `${PADDLE_API_BASE[env]}/prices?status=active&per_page=200`;
   let guard = 0;
   while (url && guard < 20) {
     guard += 1;
@@ -388,9 +387,7 @@ function finalize(
       summary: { pass, fail, skip },
       missingByEnv,
       exitCode: code,
-      keyUnset: results.some(
-        (r) => r.status === "skip" && /_API_KEY not set$/.test(r.detail),
-      ),
+      keyUnset: results.some((r) => r.status === "skip" && /_API_KEY not set$/.test(r.detail)),
       generatedAt: new Date().toISOString(),
     };
     try {

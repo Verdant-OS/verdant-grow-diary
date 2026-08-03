@@ -11,21 +11,13 @@ describe("calibrateSoilMoisture", () => {
       calibratedValue: null,
       reason: "missing_input",
     });
-    expect(calibrateSoilMoisture(150, null, 200).reason).toBe(
-      "missing_input",
-    );
-    expect(calibrateSoilMoisture(150, 100, undefined).reason).toBe(
-      "missing_input",
-    );
+    expect(calibrateSoilMoisture(150, null, 200).reason).toBe("missing_input");
+    expect(calibrateSoilMoisture(150, 100, undefined).reason).toBe("missing_input");
   });
 
   it("returns invalid_input for NaN and Infinity", () => {
-    expect(calibrateSoilMoisture(Number.NaN, 100, 200).reason).toBe(
-      "invalid_input",
-    );
-    expect(calibrateSoilMoisture(Infinity, 100, 200).reason).toBe(
-      "invalid_input",
-    );
+    expect(calibrateSoilMoisture(Number.NaN, 100, 200).reason).toBe("invalid_input");
+    expect(calibrateSoilMoisture(Infinity, 100, 200).reason).toBe("invalid_input");
   });
 
   it("returns identical_points when dryRaw equals wetRaw", () => {

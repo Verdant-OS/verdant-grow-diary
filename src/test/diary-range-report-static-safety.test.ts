@@ -10,6 +10,10 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const read = (rel: string): string => readFileSync(path.resolve(__dirname, "..", rel), "utf8");
 
@@ -17,7 +21,7 @@ const PAGE = read("pages/DiaryRangeReportPage.tsx");
 const RULES = read("lib/diaryRangeReportRules.ts");
 const NAV = read("lib/diaryRangeReportNavigationRules.ts");
 const HOOK = read("hooks/useDiaryRangeReportData.ts");
-const APP = read("App.tsx");
+const APP = readAllRouteModuleSources();
 const MANIFEST = read("lib/appRouteManifest.ts");
 const CSS = read("index.css");
 const GATE_HOOK = read("hooks/usePremiumExportServerGate.ts");
@@ -33,8 +37,8 @@ const TIMELINE = read("pages/Timeline.tsx");
 const POST_GROW = read("pages/PostGrowLearningReport.tsx");
 
 describe("route + manifest registration", () => {
-  it("mounts /reports/diary-range in App.tsx with plain path syntax", () => {
-    expect(APP).toContain('path="/reports/diary-range"');
+  it("mounts /reports/diary-range in file routes with plain path syntax", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/reports/diary-range");
     expect(APP).toContain("DiaryRangeReportPage");
   });
 

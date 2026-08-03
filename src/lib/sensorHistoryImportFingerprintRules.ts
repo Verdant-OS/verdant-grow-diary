@@ -28,9 +28,7 @@ function fnv1a64Hex(input: string): string {
     lo = loMul >>> 0;
     hi = (hiMul + Math.floor(loMul / 0x1_0000_0000)) >>> 0;
   }
-  return (
-    hi.toString(16).padStart(8, "0") + lo.toString(16).padStart(8, "0")
-  );
+  return hi.toString(16).padStart(8, "0") + lo.toString(16).padStart(8, "0");
 }
 
 export interface FingerprintRowInput {
@@ -87,8 +85,7 @@ export function toFingerprintRows(
       metric: r.metric,
       captured_at: r.captured_at,
       value: r.value,
-      sensor_group:
-        rp && typeof rp.sensor_group === "string" ? rp.sensor_group : null,
+      sensor_group: rp && typeof rp.sensor_group === "string" ? rp.sensor_group : null,
     };
   });
 }

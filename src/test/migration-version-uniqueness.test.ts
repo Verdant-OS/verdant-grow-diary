@@ -23,9 +23,7 @@ describe("supabase/migrations version prefixes", () => {
 
   it("every migration filename starts with a 14-digit version prefix", () => {
     for (const f of files) {
-      expect(f, `unexpected migration filename shape: ${f}`).toMatch(
-        VERSION_PREFIX,
-      );
+      expect(f, `unexpected migration filename shape: ${f}`).toMatch(VERSION_PREFIX);
     }
   });
 
@@ -36,9 +34,7 @@ describe("supabase/migrations version prefixes", () => {
       if (!version) continue;
       byVersion.set(version, [...(byVersion.get(version) ?? []), f]);
     }
-    const collisions = [...byVersion.entries()].filter(
-      ([, names]) => names.length > 1,
-    );
+    const collisions = [...byVersion.entries()].filter(([, names]) => names.length > 1);
     expect(
       collisions,
       `duplicate migration versions break supabase db reset: ${collisions

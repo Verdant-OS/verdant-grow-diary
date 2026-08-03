@@ -87,7 +87,7 @@ export function AgreementReconsentGate() {
     // and re-query on every nav. `suppressed` already captures the only
     // pathname-derived value that matters. retryToken lets the error state retry.
     // Keyed on userId (a primitive), not the user object — see note above.
-  }, [userId, loading, suppressed, retryToken]);
+  }, [userId, loading, suppressed]);
 
   const open =
     !!user && !loading && !suppressed && !checking && (verifyError || (gaps?.length ?? 0) > 0);
@@ -177,9 +177,7 @@ export function AgreementReconsentGate() {
         <DialogHeader>
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-primary" aria-hidden />
-            <DialogTitle>
-              {anyPrior ? "Updated agreements" : "Accept our agreements"}
-            </DialogTitle>
+            <DialogTitle>{anyPrior ? "Updated agreements" : "Accept our agreements"}</DialogTitle>
           </div>
           <DialogDescription>
             {anyPrior

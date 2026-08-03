@@ -37,16 +37,12 @@ function getStorage(): Storage | null {
   }
 }
 
-export function tentPlantTabsSelectedKey(
-  tentId: string | null | undefined,
-): string | null {
+export function tentPlantTabsSelectedKey(tentId: string | null | undefined): string | null {
   const id = normalizeTentId(tentId);
   return id ? `${KEY_PREFIX}${id}` : null;
 }
 
-export function readTentPlantTabsSelectedPlantId(
-  tentId: string | null | undefined,
-): string | null {
+export function readTentPlantTabsSelectedPlantId(tentId: string | null | undefined): string | null {
   const key = tentPlantTabsSelectedKey(tentId);
   if (!key) return null;
   const storage = getStorage();

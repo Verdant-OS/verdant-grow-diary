@@ -5,16 +5,8 @@ import { buildIngestAttemptReport } from "@/lib/ingestAttemptReportRules";
 
 describe("IngestAttemptReportDrawer", () => {
   it("renders empty state when no report is provided", () => {
-    render(
-      <IngestAttemptReportDrawer
-        open
-        onOpenChange={() => undefined}
-        report={null}
-      />,
-    );
-    expect(
-      screen.getByTestId("ingest-attempt-report-drawer-empty"),
-    ).toBeInTheDocument();
+    render(<IngestAttemptReportDrawer open onOpenChange={() => undefined} report={null} />);
+    expect(screen.getByTestId("ingest-attempt-report-drawer-empty")).toBeInTheDocument();
   });
 
   it("opens with latest accepted report", () => {
@@ -23,16 +15,11 @@ describe("IngestAttemptReportDrawer", () => {
       token: "vbt_abcdef1234567890",
       response: { status: 202 },
     });
-    render(
-      <IngestAttemptReportDrawer
-        open
-        onOpenChange={() => undefined}
-        report={report}
-      />,
+    render(<IngestAttemptReportDrawer open onOpenChange={() => undefined} report={report} />);
+    expect(screen.getByTestId("ingest-attempt-report-panel")).toHaveAttribute(
+      "data-status",
+      "accepted",
     );
-    expect(
-      screen.getByTestId("ingest-attempt-report-panel"),
-    ).toHaveAttribute("data-status", "accepted");
   });
 
   it("opens with rejected report and reasons", () => {
@@ -41,16 +28,8 @@ describe("IngestAttemptReportDrawer", () => {
       token: "vbt_abcdef1234567890",
       response: { status: 422, body: "reading is stale" },
     });
-    render(
-      <IngestAttemptReportDrawer
-        open
-        onOpenChange={() => undefined}
-        report={report}
-      />,
-    );
-    expect(screen.getByTestId("ingest-attempt-reasons")).toHaveTextContent(
-      /stale timestamp/,
-    );
+    render(<IngestAttemptReportDrawer open onOpenChange={() => undefined} report={report} />);
+    expect(screen.getByTestId("ingest-attempt-reasons")).toHaveTextContent(/stale timestamp/);
   });
 
   it("dry-run state says no network/write occurred", () => {
@@ -59,16 +38,10 @@ describe("IngestAttemptReportDrawer", () => {
       token: "vbt_abcdef1234567890",
       dryRun: true,
     });
-    render(
-      <IngestAttemptReportDrawer
-        open
-        onOpenChange={() => undefined}
-        report={report}
-      />,
+    render(<IngestAttemptReportDrawer open onOpenChange={() => undefined} report={report} />);
+    expect(screen.getByTestId("ingest-attempt-storage-notice")).toHaveTextContent(
+      /Nothing was stored/i,
     );
-    expect(
-      screen.getByTestId("ingest-attempt-storage-notice"),
-    ).toHaveTextContent(/Nothing was stored/i);
   });
 
   it("copy uses redacted payload only", () => {

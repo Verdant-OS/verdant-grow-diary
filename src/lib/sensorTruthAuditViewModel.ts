@@ -15,13 +15,7 @@
 // Public types
 // ---------------------------------------------------------------------------
 
-export type SensorTruthSourceLabel =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid";
+export type SensorTruthSourceLabel = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 
 export interface SensorTruthSourceRule {
   label: SensorTruthSourceLabel;
@@ -104,7 +98,8 @@ const SOURCE_RULE_SEEDS: readonly SourceRuleSeed[] = [
     allowed_use: "Full context for AI Doctor, alerts, and grower decisions.",
     confidence_impact: "Increases confidence when combined with recent history.",
     ui_label_requirement: "Must show 'Live' with captured_at and source name.",
-    safety_notes: "Only label live when the reading was verified against the physical sensor or controller display.",
+    safety_notes:
+      "Only label live when the reading was verified against the physical sensor or controller display.",
   },
   {
     label: "manual",
@@ -112,7 +107,8 @@ const SOURCE_RULE_SEEDS: readonly SourceRuleSeed[] = [
     allowed_use: "Historical context and gap-filling between automated readings.",
     confidence_impact: "Neutral; depends on grower accuracy and timing.",
     ui_label_requirement: "Must show 'Manual' with entry timestamp.",
-    safety_notes: "Do not treat manual as live automation. Manual entries can be wrong or mistimed.",
+    safety_notes:
+      "Do not treat manual as live automation. Manual entries can be wrong or mistimed.",
   },
   {
     label: "csv",
@@ -120,7 +116,8 @@ const SOURCE_RULE_SEEDS: readonly SourceRuleSeed[] = [
     allowed_use: "Historical context, post-grow analysis, and trend backfill.",
     confidence_impact: "Low for current decisions; useful for long-term patterns only.",
     ui_label_requirement: "Must show 'CSV' or 'Imported' with original timestamp.",
-    safety_notes: "Never treat imported data as live. CSV rows may be stale, duplicated, or misaligned with current conditions.",
+    safety_notes:
+      "Never treat imported data as live. CSV rows may be stale, duplicated, or misaligned with current conditions.",
   },
   {
     label: "demo",
@@ -128,7 +125,8 @@ const SOURCE_RULE_SEEDS: readonly SourceRuleSeed[] = [
     allowed_use: "UI demonstration, onboarding, and test environments only.",
     confidence_impact: "Zero. Demo data must not affect AI Doctor confidence or alert thresholds.",
     ui_label_requirement: "Must show 'Demo' prominently on every related card and chart.",
-    safety_notes: "Demo data must never be shown as live. Demo must not trigger alerts or Action Queue items.",
+    safety_notes:
+      "Demo data must never be shown as live. Demo must not trigger alerts or Action Queue items.",
   },
   {
     label: "stale",
@@ -136,7 +134,8 @@ const SOURCE_RULE_SEEDS: readonly SourceRuleSeed[] = [
     allowed_use: "Historical context only. Do not use for present-state decisions.",
     confidence_impact: "Decreases confidence. Stale data is a limitation, not current truth.",
     ui_label_requirement: "Must show 'Stale' with the original captured_at and an age warning.",
-    safety_notes: "Never describe stale as current. A reading from yesterday is not today's environment.",
+    safety_notes:
+      "Never describe stale as current. A reading from yesterday is not today's environment.",
   },
   {
     label: "invalid",
@@ -144,7 +143,8 @@ const SOURCE_RULE_SEEDS: readonly SourceRuleSeed[] = [
     allowed_use: "Flagged for review. May inform sensor maintenance or placement issues.",
     confidence_impact: "Zero or negative. Invalid data reduces trust in the sensor stream.",
     ui_label_requirement: "Must show 'Invalid' with a reason or fallback warning.",
-    safety_notes: "Never describe invalid as healthy. Invalid telemetry is worse than no telemetry.",
+    safety_notes:
+      "Never describe invalid as healthy. Invalid telemetry is worse than no telemetry.",
   },
 ];
 
@@ -160,44 +160,62 @@ const SUSPICIOUS_CHECK_SEEDS: readonly SuspiciousCheckSeed[] = [
   {
     id: "celsius-as-fahrenheit",
     label: "Celsius shown as Fahrenheit",
-    description: "A value that looks like Celsius (e.g., 25) is labeled or interpreted as Fahrenheit, producing an implausible temperature.",
-    why_it_matters: "Temperature errors cascade into VPD, humidity targets, and AI Doctor context. A 25 C room labeled as 25 F looks like a freezer.",
-    expected_handling: "Flag the reading as invalid. Require source verification or manual correction before using in alerts or AI context.",
+    description:
+      "A value that looks like Celsius (e.g., 25) is labeled or interpreted as Fahrenheit, producing an implausible temperature.",
+    why_it_matters:
+      "Temperature errors cascade into VPD, humidity targets, and AI Doctor context. A 25 C room labeled as 25 F looks like a freezer.",
+    expected_handling:
+      "Flag the reading as invalid. Require source verification or manual correction before using in alerts or AI context.",
   },
   {
     id: "us-cm-as-ms-cm",
     label: "µS/cm shown as mS/cm",
-    description: "Electrical conductivity is off by a factor of 1000 due to unit confusion between microsiemens and millisiemens per centimeter.",
-    why_it_matters: "EC errors mislead feeding decisions. 1200 µS/cm is moderate; 1200 mS/cm is impossibly high and would suggest lethal salinity.",
-    expected_handling: "Flag the reading as invalid. Normalize to µS/cm with source documentation before use.",
+    description:
+      "Electrical conductivity is off by a factor of 1000 due to unit confusion between microsiemens and millisiemens per centimeter.",
+    why_it_matters:
+      "EC errors mislead feeding decisions. 1200 µS/cm is moderate; 1200 mS/cm is impossibly high and would suggest lethal salinity.",
+    expected_handling:
+      "Flag the reading as invalid. Normalize to µS/cm with source documentation before use.",
   },
   {
     id: "humidity-stuck-at-0-or-100",
     label: "Humidity stuck at 0 or 100",
-    description: "Relative humidity reads exactly 0% or 100% for an extended period, which is physically unlikely in a typical grow environment.",
-    why_it_matters: "Stuck sensors produce false alerts and bad VPD calculations. 0% suggests a dead sensor; 100% suggests condensation or sensor failure.",
-    expected_handling: "Flag as invalid if the value persists across multiple reads. Prompt sensor check or recalibration.",
+    description:
+      "Relative humidity reads exactly 0% or 100% for an extended period, which is physically unlikely in a typical grow environment.",
+    why_it_matters:
+      "Stuck sensors produce false alerts and bad VPD calculations. 0% suggests a dead sensor; 100% suggests condensation or sensor failure.",
+    expected_handling:
+      "Flag as invalid if the value persists across multiple reads. Prompt sensor check or recalibration.",
   },
   {
     id: "soil-moisture-stuck-at-0-or-100",
     label: "Soil moisture stuck at 0 or 100",
-    description: "Soil moisture reads exactly 0% or 100% for an extended period, suggesting a disconnected or saturated sensor.",
-    why_it_matters: "Watering decisions depend on soil moisture. A stuck sensor can cause overwatering or underwatering if trusted blindly.",
-    expected_handling: "Flag as invalid if the value persists. Recommend physical inspection of the probe and pot.",
+    description:
+      "Soil moisture reads exactly 0% or 100% for an extended period, suggesting a disconnected or saturated sensor.",
+    why_it_matters:
+      "Watering decisions depend on soil moisture. A stuck sensor can cause overwatering or underwatering if trusted blindly.",
+    expected_handling:
+      "Flag as invalid if the value persists. Recommend physical inspection of the probe and pot.",
   },
   {
     id: "ph-outside-realistic-range",
     label: "pH outside realistic range",
-    description: "pH reads below 3.0 or above 10.0, which is outside the plausible range for typical grow reservoirs or soil.",
-    why_it_matters: "Extreme pH values break nutrient uptake models and can trigger unsafe automated dosing recommendations.",
-    expected_handling: "Flag as invalid. Do not suggest nutrient changes from a single extreme pH reading. Recalibrate the probe.",
+    description:
+      "pH reads below 3.0 or above 10.0, which is outside the plausible range for typical grow reservoirs or soil.",
+    why_it_matters:
+      "Extreme pH values break nutrient uptake models and can trigger unsafe automated dosing recommendations.",
+    expected_handling:
+      "Flag as invalid. Do not suggest nutrient changes from a single extreme pH reading. Recalibrate the probe.",
   },
   {
     id: "old-readings-as-current",
     label: "Old readings shown as current",
-    description: "A reading with an old captured_at is rendered or treated as the current environment state.",
-    why_it_matters: "Old data misrepresents the current grow conditions. Decisions based on yesterday's temperature are not safe.",
-    expected_handling: "Label as stale. Do not use for real-time alerts or immediate action recommendations.",
+    description:
+      "A reading with an old captured_at is rendered or treated as the current environment state.",
+    why_it_matters:
+      "Old data misrepresents the current grow conditions. Decisions based on yesterday's temperature are not safe.",
+    expected_handling:
+      "Label as stale. Do not use for real-time alerts or immediate action recommendations.",
   },
 ];
 
@@ -246,9 +264,7 @@ function buildSuspiciousCheck(seed: SuspiciousCheckSeed): SensorTruthSuspiciousC
 /**
  * Pure deterministic builder. Same `now` → same output.
  */
-export function buildSensorTruthAuditViewModel(
-  now?: string | Date,
-): SensorTruthAuditViewModel {
+export function buildSensorTruthAuditViewModel(now?: string | Date): SensorTruthAuditViewModel {
   const source_rules = SOURCE_RULE_SEEDS.map(buildSourceRule);
   const suspicious_checks = SUSPICIOUS_CHECK_SEEDS.map(buildSuspiciousCheck);
 
@@ -273,5 +289,6 @@ export const SENSOR_TRUTH_SOURCE_LABEL_ORDER: readonly SensorTruthSourceLabel[] 
   SOURCE_RULE_SEEDS.map((s) => s.label);
 
 /** Canonical suspicious check IDs — exported for tests and consumers. */
-export const SENSOR_TRUTH_SUSPICIOUS_CHECK_IDS: readonly string[] =
-  SUSPICIOUS_CHECK_SEEDS.map((s) => s.id);
+export const SENSOR_TRUTH_SUSPICIOUS_CHECK_IDS: readonly string[] = SUSPICIOUS_CHECK_SEEDS.map(
+  (s) => s.id,
+);

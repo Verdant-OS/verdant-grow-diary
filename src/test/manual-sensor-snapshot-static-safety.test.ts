@@ -11,8 +11,7 @@ import { resolve } from "node:path";
 import { stripSourceComments } from "@/test/utils/stripSourceComments";
 
 const ROOT = resolve(__dirname, "../..");
-const read = (p: string) =>
-  stripSourceComments(readFileSync(resolve(ROOT, p), "utf8"));
+const read = (p: string) => stripSourceComments(readFileSync(resolve(ROOT, p), "utf8"));
 
 const TARGETS = [
   { name: "manualSensorSnapshotRules", path: "src/lib/manualSensorSnapshotRules.ts" },
@@ -49,7 +48,9 @@ describe("manual sensor snapshot — static safety", () => {
     });
 
     it(`${t.name}: no device-control / automation calls`, () => {
-      expect(src).not.toMatch(/\b(?:executeDeviceCommand|deviceControl|fanOn|pumpOn|lightOn|relay)\b/);
+      expect(src).not.toMatch(
+        /\b(?:executeDeviceCommand|deviceControl|fanOn|pumpOn|lightOn|relay)\b/,
+      );
     });
   }
 });

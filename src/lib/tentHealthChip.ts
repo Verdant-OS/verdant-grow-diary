@@ -10,11 +10,7 @@
  * Presenter-only. No I/O. No React.
  */
 
-export type TentHealthChipVariant =
-  | "healthy"
-  | "alerts"
-  | "empty"
-  | "unknown";
+export type TentHealthChipVariant = "healthy" | "alerts" | "empty" | "unknown";
 
 export interface TentHealthChip {
   variant: TentHealthChipVariant;

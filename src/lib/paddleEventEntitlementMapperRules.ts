@@ -109,10 +109,7 @@ const NON_GRANTING_TRANSACTION_EVENTS = new Set<string>([
   "transaction.canceled",
 ]);
 
-const ADJUSTMENT_EVENTS = new Set<string>([
-  "adjustment.created",
-  "adjustment.updated",
-]);
+const ADJUSTMENT_EVENTS = new Set<string>(["adjustment.created", "adjustment.updated"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -164,11 +161,17 @@ function makeBase(event: RecordedPaddleEventLike): MapperContext {
   };
 }
 
-function block(ctx: MapperContext, reason: PaddleEntitlementBlockReason): NormalizedPaddleEntitlementBlockDecision {
+function block(
+  ctx: MapperContext,
+  reason: PaddleEntitlementBlockReason,
+): NormalizedPaddleEntitlementBlockDecision {
   return { state: "block", reason, ...ctx };
 }
 
-function ignore(ctx: MapperContext, reason: PaddleEntitlementIgnoreReason): NormalizedPaddleEntitlementIgnoreDecision {
+function ignore(
+  ctx: MapperContext,
+  reason: PaddleEntitlementIgnoreReason,
+): NormalizedPaddleEntitlementIgnoreDecision {
   return { state: "ignore", reason, ...ctx };
 }
 
@@ -214,7 +217,9 @@ function planFromPriceId(priceId: string, config: PaddleEntitlementPriceConfig):
 function selectPlan(
   data: Record<string, unknown>,
   config: PaddleEntitlementPriceConfig,
-): { ok: true; priceId: string; planId: PlanId } | { ok: false; reason: "unknown_price_id" | "ambiguous_price_ids" } {
+):
+  | { ok: true; priceId: string; planId: PlanId }
+  | { ok: false; reason: "unknown_price_id" | "ambiguous_price_ids" } {
   const mapped = priceIdsFromObject(data)
     .map((priceId) => ({ priceId, planId: planFromPriceId(priceId, config) }))
     .filter((x): x is { priceId: string; planId: PlanId } => x.planId !== null);
@@ -257,8 +262,10 @@ function currentPeriodEndFromData(data: Record<string, unknown>): string | null 
 }
 
 function cancelAtPeriodEndFromData(data: Record<string, unknown>): boolean {
-  return readBool(readPath(data, ["scheduled_change", "action"])) === null &&
-    readString(readPath(data, ["scheduled_change", "action"])) === "cancel";
+  return (
+    readBool(readPath(data, ["scheduled_change", "action"])) === null &&
+    readString(readPath(data, ["scheduled_change", "action"])) === "cancel"
+  );
 }
 
 function customerIdFromData(data: Record<string, unknown>): string | null {

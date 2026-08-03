@@ -33,9 +33,7 @@ import {
  * preserve the exact grower-entered precision (e.g. "12.50" stays as
  * entered) and so we never invent decimals or units.
  */
-export function sanitizeHarvestWeightInput(
-  raw: string | null | undefined,
-): string | null {
+export function sanitizeHarvestWeightInput(raw: string | null | undefined): string | null {
   if (raw == null) return null;
   const trimmed = String(raw).trim();
   if (trimmed.length === 0) return null;
@@ -111,9 +109,7 @@ export function buildHarvestDetailsPayload(
  * or `NormalizedDiaryDetails.extras.harvest`) into the typed shape,
  * dropping unknown / unsafe fields. Never throws.
  */
-export function readPersistedHarvestDetails(
-  raw: unknown,
-): QuickLogHarvestDetails | null {
+export function readPersistedHarvestDetails(raw: unknown): QuickLogHarvestDetails | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
   const wet =
@@ -124,10 +120,7 @@ export function readPersistedHarvestDetails(
     typeof r.dryWeight === "string" || typeof r.dryWeight === "number"
       ? sanitizeHarvestWeightInput(String(r.dryWeight))
       : null;
-  const unit =
-    typeof r.weightUnit === "string"
-      ? sanitizeHarvestWeightUnit(r.weightUnit)
-      : null;
+  const unit = typeof r.weightUnit === "string" ? sanitizeHarvestWeightUnit(r.weightUnit) : null;
   const out: QuickLogHarvestDetails = {};
   if (wet !== null) out.wetWeight = wet;
   if (dry !== null) out.dryWeight = dry;
@@ -148,11 +141,15 @@ export function readPersistedHarvestDetails(
       ? sanitizeHarvestWeightInput(String(r.original_dry_weight))
       : null;
   const wetGrams =
-    typeof r.wet_weight_grams === "number" && Number.isFinite(r.wet_weight_grams) && r.wet_weight_grams >= 0
+    typeof r.wet_weight_grams === "number" &&
+    Number.isFinite(r.wet_weight_grams) &&
+    r.wet_weight_grams >= 0
       ? r.wet_weight_grams
       : null;
   const dryGrams =
-    typeof r.dry_weight_grams === "number" && Number.isFinite(r.dry_weight_grams) && r.dry_weight_grams >= 0
+    typeof r.dry_weight_grams === "number" &&
+    Number.isFinite(r.dry_weight_grams) &&
+    r.dry_weight_grams >= 0
       ? r.dry_weight_grams
       : null;
   if (origUnit) out.original_weight_unit = origUnit;
@@ -221,8 +218,7 @@ export function formatHarvestWeightWithOriginal(input: {
 // ---------------------------------------------------------------------------
 
 export const HARVEST_WEIGHT_NEGATIVE_ERROR = "Weight cannot be negative.";
-export const HARVEST_WEIGHT_INVALID_ERROR =
-  "Enter a number like 12 or 12.5.";
+export const HARVEST_WEIGHT_INVALID_ERROR = "Enter a number like 12 or 12.5.";
 
 export interface HarvestWeightValidation {
   ok: boolean;

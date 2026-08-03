@@ -8,10 +8,7 @@ import {
   type DiaryFixture,
 } from "@/lib/aiDoctorFixtureContextRules";
 
-const FIXTURE_PATH = resolve(
-  __dirname,
-  "../../fixtures/diary/2026-06-13-multi-tent-baseline.json",
-);
+const FIXTURE_PATH = resolve(__dirname, "../../fixtures/diary/2026-06-13-multi-tent-baseline.json");
 
 function loadFixture(): DiaryFixture {
   return JSON.parse(readFileSync(FIXTURE_PATH, "utf-8")) as DiaryFixture;
@@ -25,17 +22,13 @@ describe("aiDoctorFixtureContextRules", () => {
     expect(ctx.diary.id).toBe(fixture.id);
     expect(ctx.diary.logged_at).toBe(fixture.logged_at);
     expect(ctx.diary.window.reading_count).toBe(57);
-    expect(Date.parse(ctx.diary.window.start)).toBeLessThan(
-      Date.parse(ctx.diary.window.end),
-    );
+    expect(Date.parse(ctx.diary.window.start)).toBeLessThan(Date.parse(ctx.diary.window.end));
   });
 
   it("preserves provenance and emits a non-live source warning", () => {
     expect(ctx.provenance.source).toBe("csv");
     expect(ctx.provenance.is_live).toBe(false);
-    expect(ctx.provenance.source_warning.toLowerCase()).toContain(
-      "not live telemetry",
-    );
+    expect(ctx.provenance.source_warning.toLowerCase()).toContain("not live telemetry");
     expect(ctx.provenance.source_warning).toContain("CSV");
   });
 
@@ -43,9 +36,7 @@ describe("aiDoctorFixtureContextRules", () => {
     expect(ctx.soil_probes).not.toBeNull();
     expect(ctx.soil_probes!.flagged).toBe(true);
     expect(ctx.soil_probes!.bucket).toBe("invalid_or_unknown");
-    expect(ctx.soil_probes!.status.toLowerCase()).not.toMatch(
-      /healthy|nominal|good/,
-    );
+    expect(ctx.soil_probes!.status.toLowerCase()).not.toMatch(/healthy|nominal|good/);
   });
 
   it("compiles tent context deterministically and keeps numeric averages intact", () => {
@@ -81,9 +72,7 @@ describe("aiDoctorFixtureContextRules", () => {
   it("propagates missing-information and do-not guidance from the fixture", () => {
     expect(ctx.missing_information.length).toBeGreaterThan(0);
     expect(ctx.do_not.length).toBeGreaterThan(0);
-    expect(
-      ctx.do_not.some((x) => /nutrient|irrigation|defoliation|equipment/i.test(x)),
-    ).toBe(true);
+    expect(ctx.do_not.some((x) => /nutrient|irrigation|defoliation|equipment/i.test(x))).toBe(true);
   });
 
   it("repeated compilation is deterministic (stable JSON)", () => {
@@ -94,16 +83,12 @@ describe("aiDoctorFixtureContextRules", () => {
 
   it("refuses unknown source labels (sensor-truth guard)", () => {
     const bad = { ...fixture, source: "totally-made-up" } as DiaryFixture;
-    expect(() => compileDoctorContextFromDiaryFixture(bad)).toThrow(
-      /unknown source/i,
-    );
+    expect(() => compileDoctorContextFromDiaryFixture(bad)).toThrow(/unknown source/i);
   });
 
   it("refuses imported fixtures flagged is_live=true", () => {
     const bad = { ...fixture, is_live: true } as DiaryFixture;
-    expect(() => compileDoctorContextFromDiaryFixture(bad)).toThrow(
-      /is_live/i,
-    );
+    expect(() => compileDoctorContextFromDiaryFixture(bad)).toThrow(/is_live/i);
   });
 
   it("drops suggested items that fail safety gating (approval / device-control / device-command)", () => {

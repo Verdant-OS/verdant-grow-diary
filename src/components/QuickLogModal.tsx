@@ -126,12 +126,10 @@ export default function QuickLogModal({
     if (!photoFile || !user) return null;
     const ext = (photoFile.name.split(".").pop() || "jpg").toLowerCase();
     const path = `${user.id}/${growId}/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage
-      .from("diary-photos")
-      .upload(path, photoFile, {
-        contentType: photoFile.type,
-        upsert: false,
-      });
+    const { error } = await supabase.storage.from("diary-photos").upload(path, photoFile, {
+      contentType: photoFile.type,
+      upsert: false,
+    });
     if (error) {
       toast.error(`Photo upload failed: ${error.message}`);
       return null;
@@ -193,7 +191,6 @@ export default function QuickLogModal({
     }
   };
 
-
   const selectedPlantName = plants.find((p) => p.id === plantId)?.name ?? null;
 
   const metricChips = useMemo(() => {
@@ -239,16 +236,18 @@ export default function QuickLogModal({
               </SelectContent>
             </Select>
             {selectedPlantName && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Logging for: {selectedPlantName}
-              </p>
+              <p className="mt-1 text-xs text-muted-foreground">Logging for: {selectedPlantName}</p>
             )}
           </div>
 
           {/* Event type */}
           <div>
             <Label>What happened?</Label>
-            <div className="mt-1 grid grid-cols-3 sm:grid-cols-5 gap-2" role="group" aria-label="Event type">
+            <div
+              className="mt-1 grid grid-cols-3 sm:grid-cols-5 gap-2"
+              role="group"
+              aria-label="Event type"
+            >
               {EVENT_TYPES.map((et) => (
                 <Button
                   key={et.type}
@@ -311,7 +310,12 @@ export default function QuickLogModal({
                   alt="Selected photo preview"
                   className="aspect-[4/3] w-full rounded-md object-cover"
                 />
-                <Button type="button" variant="outline" size="sm" onClick={() => handlePhotoSelected(null)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePhotoSelected(null)}
+                >
                   Remove photo
                 </Button>
               </div>

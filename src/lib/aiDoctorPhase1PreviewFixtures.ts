@@ -87,8 +87,7 @@ interface BuildArgs {
 
 function buildViewModel(a: BuildArgs): AiDoctorPhase1ViewModel {
   const counts = a.source_counts;
-  const has_recent_trustworthy_sensor_data =
-    (counts.live_count + counts.manual_count) > 0;
+  const has_recent_trustworthy_sensor_data = counts.live_count + counts.manual_count > 0;
   return {
     summaryCard: {
       title: a.title,
@@ -119,8 +118,7 @@ function buildViewModel(a: BuildArgs): AiDoctorPhase1ViewModel {
         a.twenty_four ??
         "Re-check the plant and environment in 24 hours after collecting fresh data.",
       three_day_recovery_plan:
-        a.three_day ??
-        "Stabilize environment over 3 days once trustworthy data is available.",
+        a.three_day ?? "Stabilize environment over 3 days once trustworthy data is available.",
       monitoring_priorities: a.monitoring_priorities,
     },
     actionQueuePanel: {
@@ -132,14 +130,12 @@ function buildViewModel(a: BuildArgs): AiDoctorPhase1ViewModel {
         a.advisory_reason ??
         "Advisory only. Grower approval is required before any change is made.",
       disabled_reason:
-        a.advisory_disabled ??
-        "More context needed before turning this into an action.",
+        a.advisory_disabled ?? "More context needed before turning this into an action.",
     },
     safetyPanel: {
       safety_flags: a.safety_flags,
       overdiagnosis_warning: OVERDIAGNOSIS_WARNING,
-      source_truth_warning:
-        a.source_truth_warning === undefined ? null : a.source_truth_warning,
+      source_truth_warning: a.source_truth_warning === undefined ? null : a.source_truth_warning,
       automation_warning: AUTOMATION_WARNING,
     },
     debugMeta: {
@@ -168,20 +164,14 @@ export const AI_DOCTOR_PHASE1_PREVIEW_CASES: AiDoctorPhase1PreviewCase[] = [
   {
     id: "blurry-photo-only",
     label: "Blurry photo only",
-    description:
-      "A single blurry photo with no sensor readings or grow events.",
+    description: "A single blurry photo with no sensor readings or grow events.",
     sourceMode: "none",
     viewModel: buildViewModel({
       title: "AI Doctor — Blurry photo only",
       summary:
         "Only a blurry photo is available. The image is not clear enough to support a confident diagnosis.",
       likely_issue: "Unclear — image quality is too low",
-      status_badges: [
-        "Risk: low",
-        "Confidence: low",
-        "Sample data only",
-        "Weak visual context",
-      ],
+      status_badges: ["Risk: low", "Confidence: low", "Sample data only", "Weak visual context"],
       evidence_items: ["One photo provided (blurry / out of focus)"],
       context_items: ["Plant: demo-plant", "Stage: veg"],
       source_quality_items: ["No live or manual readings", "Photo: low quality"],
@@ -196,8 +186,7 @@ export const AI_DOCTOR_PHASE1_PREVIEW_CASES: AiDoctorPhase1PreviewCase[] = [
         "Soil moisture reading",
         "Recent watering log",
       ],
-      immediate_action:
-        "Capture a sharp, well-lit close-up photo before any diagnosis.",
+      immediate_action: "Capture a sharp, well-lit close-up photo before any diagnosis.",
       what_not_to_do: [
         "Do not change feed or watering based on a blurry photo.",
         "Avoid aggressive interventions without clearer data.",
@@ -207,7 +196,14 @@ export const AI_DOCTOR_PHASE1_PREVIEW_CASES: AiDoctorPhase1PreviewCase[] = [
         "Add fresh sensor readings or manual measurements.",
       ],
       safety_flags: ["avoid_overdiagnosis", "weak_context", "weak_visual"],
-      source_counts: { live_count: 0, manual_count: 0, csv_count: 0, demo_count: 0, stale_count: 0, invalid_count: 0 },
+      source_counts: {
+        live_count: 0,
+        manual_count: 0,
+        csv_count: 0,
+        demo_count: 0,
+        stale_count: 0,
+        invalid_count: 0,
+      },
       has_visual_context: true,
       generated_at: "2026-06-04T12:00:00.000Z",
     }),
@@ -215,20 +211,14 @@ export const AI_DOCTOR_PHASE1_PREVIEW_CASES: AiDoctorPhase1PreviewCase[] = [
   {
     id: "yellowing-no-history",
     label: "Yellowing — no pH/EC/watering/feed history",
-    description:
-      "Yellowing leaves reported without pH, EC, watering, or feeding history.",
+    description: "Yellowing leaves reported without pH, EC, watering, or feeding history.",
     sourceMode: "none",
     viewModel: buildViewModel({
       title: "AI Doctor — Yellowing, no history",
       summary:
         "Yellowing observed, but with no pH, EC, watering, or feeding history the cause cannot be narrowed down.",
       likely_issue: "Possible nutrient or root-zone issue — cause unclear",
-      status_badges: [
-        "Risk: low",
-        "Confidence: low",
-        "Sample data only",
-        "No feeding history",
-      ],
+      status_badges: ["Risk: low", "Confidence: low", "Sample data only", "No feeding history"],
       evidence_items: ["Reported yellowing on lower leaves"],
       context_items: ["Plant: demo-plant", "Stage: veg"],
       source_quality_items: ["No live or manual readings", "No watering or feeding log"],
@@ -254,27 +244,28 @@ export const AI_DOCTOR_PHASE1_PREVIEW_CASES: AiDoctorPhase1PreviewCase[] = [
         "Log next feeding with strength and pH.",
       ],
       safety_flags: ["avoid_overdiagnosis", "weak_context", "missing_feed_history"],
-      source_counts: { live_count: 0, manual_count: 0, csv_count: 0, demo_count: 0, stale_count: 0, invalid_count: 0 },
+      source_counts: {
+        live_count: 0,
+        manual_count: 0,
+        csv_count: 0,
+        demo_count: 0,
+        stale_count: 0,
+        invalid_count: 0,
+      },
       generated_at: "2026-06-04T12:01:00.000Z",
     }),
   },
   {
     id: "drooping-no-rootzone",
     label: "Drooping — no watering/root-zone data",
-    description:
-      "Plant drooping with no watering history or root-zone data.",
+    description: "Plant drooping with no watering history or root-zone data.",
     sourceMode: "none",
     viewModel: buildViewModel({
       title: "AI Doctor — Drooping, no root-zone data",
       summary:
         "Drooping reported without any watering history or root-zone data. Cause cannot be confirmed.",
       likely_issue: "Possible under- or over-watering — cause unclear",
-      status_badges: [
-        "Risk: low",
-        "Confidence: low",
-        "Sample data only",
-        "No watering history",
-      ],
+      status_badges: ["Risk: low", "Confidence: low", "Sample data only", "No watering history"],
       evidence_items: ["Reported drooping leaves"],
       context_items: ["Plant: demo-plant", "Stage: veg"],
       source_quality_items: [
@@ -303,33 +294,31 @@ export const AI_DOCTOR_PHASE1_PREVIEW_CASES: AiDoctorPhase1PreviewCase[] = [
         "Add a manual soil moisture reading.",
       ],
       safety_flags: ["avoid_overdiagnosis", "weak_context", "missing_root_zone"],
-      source_counts: { live_count: 0, manual_count: 0, csv_count: 0, demo_count: 0, stale_count: 0, invalid_count: 0 },
+      source_counts: {
+        live_count: 0,
+        manual_count: 0,
+        csv_count: 0,
+        demo_count: 0,
+        stale_count: 0,
+        invalid_count: 0,
+      },
       generated_at: "2026-06-04T12:02:00.000Z",
     }),
   },
   {
     id: "spotting-no-closeups",
     label: "Spotting — no pest inspection/closeups",
-    description:
-      "Leaf spotting reported without close-up photos or pest inspection.",
+    description: "Leaf spotting reported without close-up photos or pest inspection.",
     sourceMode: "none",
     viewModel: buildViewModel({
       title: "AI Doctor — Leaf spotting, no closeups",
       summary:
         "Leaf spotting reported, but without close-up photos or a pest inspection the cause cannot be identified.",
       likely_issue: "Possible pest, deficiency, or pathogen — cause unclear",
-      status_badges: [
-        "Risk: low",
-        "Confidence: low",
-        "Sample data only",
-        "No close-up inspection",
-      ],
+      status_badges: ["Risk: low", "Confidence: low", "Sample data only", "No close-up inspection"],
       evidence_items: ["Reported spotting on leaves"],
       context_items: ["Plant: demo-plant", "Stage: veg"],
-      source_quality_items: [
-        "No sharp close-up photos",
-        "No pest inspection performed",
-      ],
+      source_quality_items: ["No sharp close-up photos", "No pest inspection performed"],
       limitations: [
         "Spotting can be pests, pathogens, deficiency, or burn.",
         "Without close-up photos and a pest inspection, no cause can be confirmed.",
@@ -352,7 +341,14 @@ export const AI_DOCTOR_PHASE1_PREVIEW_CASES: AiDoctorPhase1PreviewCase[] = [
       ],
       safety_flags: ["avoid_overdiagnosis", "weak_context", "missing_visual_detail"],
       has_visual_context: false,
-      source_counts: { live_count: 0, manual_count: 0, csv_count: 0, demo_count: 0, stale_count: 0, invalid_count: 0 },
+      source_counts: {
+        live_count: 0,
+        manual_count: 0,
+        csv_count: 0,
+        demo_count: 0,
+        stale_count: 0,
+        invalid_count: 0,
+      },
       generated_at: "2026-06-04T12:03:00.000Z",
     }),
   },
@@ -395,22 +391,21 @@ export const AI_DOCTOR_PHASE1_PREVIEW_CASES: AiDoctorPhase1PreviewCase[] = [
       ],
       immediate_action:
         "Take a fresh manual reading or restore live sensor data before any diagnosis.",
-      what_not_to_do: [
-        "Do not treat stale data as current.",
-        "Do not act on invalid readings.",
-      ],
+      what_not_to_do: ["Do not treat stale data as current.", "Do not act on invalid readings."],
       monitoring_priorities: [
         "Re-check sensors flagged as stale or invalid.",
         "Add a fresh manual reading.",
       ],
-      safety_flags: [
-        "avoid_overdiagnosis",
-        "weak_context",
-        "stale_data",
-        "invalid_data",
-      ],
+      safety_flags: ["avoid_overdiagnosis", "weak_context", "stale_data", "invalid_data"],
       source_truth_warning: SOURCE_TRUTH_STALE_INVALID,
-      source_counts: { live_count: 0, manual_count: 0, csv_count: 0, demo_count: 0, stale_count: 3, invalid_count: 2 },
+      source_counts: {
+        live_count: 0,
+        manual_count: 0,
+        csv_count: 0,
+        demo_count: 0,
+        stale_count: 3,
+        invalid_count: 2,
+      },
       has_stale_or_invalid: true,
       generated_at: "2026-06-04T12:04:00.000Z",
     }),
@@ -418,24 +413,15 @@ export const AI_DOCTOR_PHASE1_PREVIEW_CASES: AiDoctorPhase1PreviewCase[] = [
   {
     id: "demo-csv-only",
     label: "Demo / CSV readings only",
-    description:
-      "Only demo or CSV-imported readings — not real-time live data.",
+    description: "Only demo or CSV-imported readings — not real-time live data.",
     sourceMode: "demo",
     viewModel: buildViewModel({
       title: "AI Doctor — Demo / CSV readings only",
       summary:
         "Only demo or CSV-imported readings are available. These are sample data, not real-time, and cannot be treated as live.",
       likely_issue: "Cannot be determined from sample data alone",
-      status_badges: [
-        "Risk: low",
-        "Confidence: low",
-        "Sample data only",
-        "Not real-time",
-      ],
-      evidence_items: [
-        "Demo temperature reading: 24 C",
-        "CSV-imported humidity reading: 55 %",
-      ],
+      status_badges: ["Risk: low", "Confidence: low", "Sample data only", "Not real-time"],
+      evidence_items: ["Demo temperature reading: 24 C", "CSV-imported humidity reading: 55 %"],
       context_items: ["Plant: demo-plant", "Stage: veg"],
       source_quality_items: [
         "Demo readings (sample data, not real-time): 2",
@@ -446,13 +432,8 @@ export const AI_DOCTOR_PHASE1_PREVIEW_CASES: AiDoctorPhase1PreviewCase[] = [
         "Demo and CSV readings are sample data, not real-time.",
         "Without live or manual readings, current conditions are unknown.",
       ],
-      missing_items: [
-        "Live sensor reading",
-        "Recent manual reading",
-        "Recent photo",
-      ],
-      immediate_action:
-        "Connect a live source or take a manual reading before any diagnosis.",
+      missing_items: ["Live sensor reading", "Recent manual reading", "Recent photo"],
+      immediate_action: "Connect a live source or take a manual reading before any diagnosis.",
       what_not_to_do: [
         "Do not treat demo or CSV data as live.",
         "Do not make changes based on sample data alone.",
@@ -463,7 +444,14 @@ export const AI_DOCTOR_PHASE1_PREVIEW_CASES: AiDoctorPhase1PreviewCase[] = [
       ],
       safety_flags: ["avoid_overdiagnosis", "weak_context", "demo_or_csv_only"],
       source_truth_warning: SOURCE_TRUTH_DEMO_CSV,
-      source_counts: { live_count: 0, manual_count: 0, csv_count: 3, demo_count: 2, stale_count: 0, invalid_count: 0 },
+      source_counts: {
+        live_count: 0,
+        manual_count: 0,
+        csv_count: 3,
+        demo_count: 2,
+        stale_count: 0,
+        invalid_count: 0,
+      },
       has_demo_or_csv_only: true,
       generated_at: "2026-06-04T12:05:00.000Z",
     }),
@@ -471,20 +459,14 @@ export const AI_DOCTOR_PHASE1_PREVIEW_CASES: AiDoctorPhase1PreviewCase[] = [
   {
     id: "conflicting-weak-signals",
     label: "Conflicting weak signals",
-    description:
-      "Weak signals that conflict with one another — no clear single cause.",
+    description: "Weak signals that conflict with one another — no clear single cause.",
     sourceMode: "mixed",
     viewModel: buildViewModel({
       title: "AI Doctor — Conflicting weak signals",
       summary:
         "Available signals point in different directions and are individually weak. No single cause can be confirmed.",
       likely_issue: "Multiple possible causes — none confirmed",
-      status_badges: [
-        "Risk: low",
-        "Confidence: low",
-        "Conflicting signals",
-        "Sample data only",
-      ],
+      status_badges: ["Risk: low", "Confidence: low", "Conflicting signals", "Sample data only"],
       evidence_items: [
         "Slight yellowing on lower leaves (one photo)",
         "Demo soil moisture: borderline dry",
@@ -519,13 +501,16 @@ export const AI_DOCTOR_PHASE1_PREVIEW_CASES: AiDoctorPhase1PreviewCase[] = [
         "Capture a sharp close-up photo.",
         "Log next watering and feeding.",
       ],
-      safety_flags: [
-        "avoid_overdiagnosis",
-        "weak_context",
-        "conflicting_signals",
-      ],
+      safety_flags: ["avoid_overdiagnosis", "weak_context", "conflicting_signals"],
       source_truth_warning: `${SOURCE_TRUTH_DEMO_CSV} ${SOURCE_TRUTH_STALE_INVALID}`,
-      source_counts: { live_count: 0, manual_count: 0, csv_count: 1, demo_count: 1, stale_count: 1, invalid_count: 0 },
+      source_counts: {
+        live_count: 0,
+        manual_count: 0,
+        csv_count: 1,
+        demo_count: 1,
+        stale_count: 1,
+        invalid_count: 0,
+      },
       has_demo_or_csv_only: false,
       has_stale_or_invalid: true,
       has_visual_context: true,
@@ -534,14 +519,10 @@ export const AI_DOCTOR_PHASE1_PREVIEW_CASES: AiDoctorPhase1PreviewCase[] = [
   },
 ];
 
-export const AI_DOCTOR_PHASE1_PREVIEW_DEFAULT_CASE_ID =
-  AI_DOCTOR_PHASE1_PREVIEW_CASES[0].id;
+export const AI_DOCTOR_PHASE1_PREVIEW_DEFAULT_CASE_ID = AI_DOCTOR_PHASE1_PREVIEW_CASES[0].id;
 
-export function getAiDoctorPhase1PreviewCase(
-  id: string,
-): AiDoctorPhase1PreviewCase {
+export function getAiDoctorPhase1PreviewCase(id: string): AiDoctorPhase1PreviewCase {
   return (
-    AI_DOCTOR_PHASE1_PREVIEW_CASES.find((c) => c.id === id) ??
-    AI_DOCTOR_PHASE1_PREVIEW_CASES[0]
+    AI_DOCTOR_PHASE1_PREVIEW_CASES.find((c) => c.id === id) ?? AI_DOCTOR_PHASE1_PREVIEW_CASES[0]
   );
 }

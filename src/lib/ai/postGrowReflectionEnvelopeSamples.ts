@@ -44,7 +44,8 @@ export function buildContractRejectedPostGrowReflectionEnvelopeSample(): PostGro
   return {
     id: "contract_rejected_missing_candidate",
     label: "Rejected envelope sample",
-    description: "Rejected by the envelope contract before reflection validation because candidate is missing.",
+    description:
+      "Rejected by the envelope contract before reflection validation because candidate is missing.",
     expectedStatus: "envelope_rejected",
     jsonText: prettyJson({
       kind: ENVELOPE_KIND,

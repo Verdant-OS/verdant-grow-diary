@@ -16,11 +16,7 @@
  *    the same guards Quick Log v2 uses. Pure import (no I/O) so v1 and v2
  *    can never disagree on what counts as a physically real reading.
  */
-import {
-  isTemperatureValid,
-  isHumidityValid,
-  isVpdValid,
-} from "./sensorReadingNormalizationRules";
+import { isTemperatureValid, isHumidityValid, isVpdValid } from "./sensorReadingNormalizationRules";
 
 export type EnvironmentCheckWaterTempUnit = "F" | "C";
 
@@ -87,11 +83,7 @@ function parseFinite(raw: string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function clampOrNull(
-  n: number | null,
-  min: number,
-  max: number,
-): number | null {
+function clampOrNull(n: number | null, min: number, max: number): number | null {
   if (n === null) return null;
   if (n < min || n > max) return null;
   return n;
@@ -231,10 +223,7 @@ export type EnvironmentCheckSensorBandResult =
  * out of scope here (no canonical counterpart; unchanged this slice).
  */
 export function validateEnvironmentCheckSensorBand(
-  input: Pick<
-    EnvironmentCheckFormInput,
-    "roomTempF" | "roomTempUnit" | "humidityPct" | "vpdKpa"
-  >,
+  input: Pick<EnvironmentCheckFormInput, "roomTempF" | "roomTempUnit" | "humidityPct" | "vpdKpa">,
 ): EnvironmentCheckSensorBandResult {
   const roomRaw = parseFinite(input.roomTempF);
   if (roomRaw !== null) {
@@ -255,9 +244,7 @@ export function validateEnvironmentCheckSensorBand(
 }
 
 /** True when any measurement field has a parseable, in-range value. */
-export function hasAnyEnvironmentCheckMeasurement(
-  input: EnvironmentCheckFormInput,
-): boolean {
+export function hasAnyEnvironmentCheckMeasurement(input: EnvironmentCheckFormInput): boolean {
   const e = buildEnvironmentCheckDetails({ ...input, note: null });
   return e !== null;
 }

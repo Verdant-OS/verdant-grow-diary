@@ -55,15 +55,10 @@ describe("source normalization (hardening)", () => {
   });
 
   it("end-to-end: payload with ' EcoWitt ' canonicalizes row.source to 'ecowitt'", () => {
-    const r = normalizeWebhookIngestPayload(
-      base({ source: " EcoWitt " }) as never,
-      { now: NOW },
-    );
+    const r = normalizeWebhookIngestPayload(base({ source: " EcoWitt " }) as never, { now: NOW });
     expect(r.ok).toBe(true);
     expect(new Set(r.rows.map((x) => x.source))).toEqual(new Set(["ecowitt"]));
-    expect((r.rows[0].raw_payload as Record<string, unknown>).source).toBe(
-      "ecowitt",
-    );
+    expect((r.rows[0].raw_payload as Record<string, unknown>).source).toBe("ecowitt");
   });
 
   it("historical allow-list still works", () => {
@@ -83,10 +78,7 @@ describe("source normalization (hardening)", () => {
   it("rejects unsupported / partial / fuzzy / empty / whitespace sources", () => {
     for (const bad of ["", "   ", "\t\n", "eco", "mq", "web", "autopilot", "live"]) {
       expect(normalizeWebhookSource(bad)).toBeNull();
-      const r = normalizeWebhookIngestPayload(
-        base({ source: bad }) as never,
-        { now: NOW },
-      );
+      const r = normalizeWebhookIngestPayload(base({ source: bad }) as never, { now: NOW });
       expect(r.ok).toBe(false);
     }
   });
@@ -152,30 +144,22 @@ describe("diary timeline source/vendor presenters", () => {
     expect(resolveDiarySensorSourceLabel("MQTT")).toBe("MQTT");
     expect(resolveDiarySensorSourceLabel("webhook")).toBe("Webhook");
     expect(resolveDiarySensorSourceLabel("csv")).toBe("CSV");
-    expect(resolveDiarySensorSourceLabel("home_assistant_bridge")).toBe(
-      "Home Assistant",
-    );
+    expect(resolveDiarySensorSourceLabel("home_assistant_bridge")).toBe("Home Assistant");
   });
 
   it("never promotes unknown source to 'Live'", () => {
-    expect(resolveDiarySensorSourceLabel("totally_made_up")).not.toMatch(
-      /^Live$/i,
-    );
+    expect(resolveDiarySensorSourceLabel("totally_made_up")).not.toMatch(/^Live$/i);
     expect(resolveDiarySensorSourceLabel(null)).toBeNull();
     expect(resolveDiarySensorSourceLabel("")).toBeNull();
   });
 
   it("renders known vendor lineage labels", () => {
     expect(resolveDiarySensorVendorLabel("ecowitt")).toBe("EcoWitt");
-    expect(resolveDiarySensorVendorLabel("home_assistant")).toBe(
-      "Home Assistant",
-    );
+    expect(resolveDiarySensorVendorLabel("home_assistant")).toBe("Home Assistant");
   });
 
   it("preserves grower-typed unknown vendor as lineage only", () => {
-    expect(resolveDiarySensorVendorLabel("Acme Sensors v2")).toBe(
-      "Acme Sensors v2",
-    );
+    expect(resolveDiarySensorVendorLabel("Acme Sensors v2")).toBe("Acme Sensors v2");
     expect(resolveDiarySensorVendorLabel("   ")).toBeNull();
     expect(resolveDiarySensorVendorLabel(null)).toBeNull();
   });
@@ -185,10 +169,7 @@ describe("diary timeline source/vendor presenters", () => {
 
 describe("CSV mapping docs + sample", () => {
   const docPath = resolve(__dirname, "../../docs/csv-sensor-schema-mapping.md");
-  const csvPath = resolve(
-    __dirname,
-    "../../docs/samples/ecowitt-sensor-readings.csv",
-  );
+  const csvPath = resolve(__dirname, "../../docs/samples/ecowitt-sensor-readings.csv");
 
   it("csv-sensor-schema-mapping.md exists and covers required mappings", () => {
     expect(existsSync(docPath)).toBe(true);

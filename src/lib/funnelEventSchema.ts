@@ -20,10 +20,7 @@
  *    FUNNEL_EVENTS and FUNNEL_PARAM_KEYS.
  */
 
-import type {
-  FunnelEventName,
-  FunnelEventParams,
-} from "@/lib/funnelAnalytics";
+import type { FunnelEventName, FunnelEventParams } from "@/lib/funnelAnalytics";
 import { FUNNEL_PARAM_KEYS } from "@/lib/funnelAnalytics";
 import { PRICING_ANALYTICS_EVENT } from "@/lib/pricingAnalytics";
 
@@ -33,33 +30,32 @@ type FunnelParamKey = (typeof FUNNEL_PARAM_KEYS)[number];
  * Approved keys per funnel event. Exhaustive: every entry in
  * FUNNEL_EVENTS must appear (the wiring test asserts this).
  */
-export const FUNNEL_EVENT_SCHEMA: Readonly<
-  Record<FunnelEventName, ReadonlyArray<FunnelParamKey>>
-> = {
-  signup: ["method"],
-  grow_created: [],
-  tent_created: [],
-  plant_created: [],
-  quick_log_saved: ["event_type"],
-  csv_history_onboarding_ready: ["surface"],
-  csv_import_started: [],
-  csv_import_completed: ["rows"],
-  csv_history_ai_doctor_clicked: ["surface"],
-  ai_doctor_review_started: ["surface"],
-  historical_ai_review_started: [],
-  ai_doctor_result_received: ["surface"],
-  ai_doctor_session_saved: ["surface"],
-  paywall_viewed: ["surface"],
-  paywall_cta_clicked: ["surface", "plan"],
-  checkout_started: ["plan"],
-  checkout_catalog_unavailable: ["plan", "reason"],
-  checkout_recovery_dismissed: ["plan"],
-  checkout_recovery_choose_another_plan: ["plan"],
-  checkout_recovery_retry: ["plan"],
-  checkout_recovery_plan_slug_fallback: ["reason", "length_bucket"],
-  subscription_activated: ["plan", "surface"],
-  checkout_return_completed: ["surface"],
-};
+export const FUNNEL_EVENT_SCHEMA: Readonly<Record<FunnelEventName, ReadonlyArray<FunnelParamKey>>> =
+  {
+    signup: ["method"],
+    grow_created: [],
+    tent_created: [],
+    plant_created: [],
+    quick_log_saved: ["event_type"],
+    csv_history_onboarding_ready: ["surface"],
+    csv_import_started: [],
+    csv_import_completed: ["rows"],
+    csv_history_ai_doctor_clicked: ["surface"],
+    ai_doctor_review_started: ["surface"],
+    historical_ai_review_started: [],
+    ai_doctor_result_received: ["surface"],
+    ai_doctor_session_saved: ["surface"],
+    paywall_viewed: ["surface"],
+    paywall_cta_clicked: ["surface", "plan"],
+    checkout_started: ["plan"],
+    checkout_catalog_unavailable: ["plan", "reason"],
+    checkout_recovery_dismissed: ["plan"],
+    checkout_recovery_choose_another_plan: ["plan"],
+    checkout_recovery_retry: ["plan"],
+    checkout_recovery_plan_slug_fallback: ["reason", "length_bucket"],
+    subscription_activated: ["plan", "surface"],
+    checkout_return_completed: ["surface"],
+  };
 
 // Precomputed per-event Set for O(1) membership checks.
 const SCHEMA_SET: Readonly<Record<FunnelEventName, ReadonlySet<FunnelParamKey>>> =
@@ -81,8 +77,7 @@ export function __resetFunnelSchemaViolationCountForTests(): void {
 
 const IS_DEV =
   (typeof import.meta !== "undefined" &&
-    (import.meta as ImportMeta & { env?: { DEV?: boolean; MODE?: string } })
-      .env?.DEV === true) ||
+    (import.meta as ImportMeta & { env?: { DEV?: boolean; MODE?: string } }).env?.DEV === true) ||
   (typeof process !== "undefined" && process.env?.NODE_ENV !== "production");
 
 function reportViolation(name: FunnelEventName, droppedKeys: string[]) {

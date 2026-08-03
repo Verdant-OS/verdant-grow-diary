@@ -21,7 +21,11 @@ export interface EvidenceStatePillProps {
   className?: string;
 }
 
-export function EvidenceStatePill({ state, openQuarantine = false, className }: EvidenceStatePillProps) {
+export function EvidenceStatePill({
+  state,
+  openQuarantine = false,
+  className,
+}: EvidenceStatePillProps) {
   return (
     <span className={cn("inline-flex items-center gap-1.5 flex-wrap min-w-0", className)}>
       <span

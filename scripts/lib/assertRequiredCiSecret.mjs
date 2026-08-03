@@ -42,12 +42,9 @@ export function assertRequiredCiSecret(input, io = defaultIo()) {
 
   const value = String(input.secretValue ?? "").trim();
   const logPrefix = input.logPrefix ?? "ci-secret-preflight";
-  const heading =
-    input.guardHeading?.trim() || `Required CI secret guard — ${secretName}`;
+  const heading = input.guardHeading?.trim() || `Required CI secret guard — ${secretName}`;
   const fixSteps =
-    input.fixSteps && input.fixSteps.length > 0
-      ? input.fixSteps
-      : defaultFixSteps(secretName);
+    input.fixSteps && input.fixSteps.length > 0 ? input.fixSteps : defaultFixSteps(secretName);
   const reasonLines = input.reasonLines ?? [];
 
   if (value.length > 0) {

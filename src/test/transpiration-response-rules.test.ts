@@ -16,9 +16,7 @@ function addH(iso: string, h: number): string {
   return new Date(Date.parse(iso) + h * 3_600_000).toISOString();
 }
 
-function baseInput(
-  overrides: Partial<TranspirationWindowInput> = {},
-): TranspirationWindowInput {
+function baseInput(overrides: Partial<TranspirationWindowInput> = {}): TranspirationWindowInput {
   const startTime = "2026-06-13T08:00:00.000Z";
   const endTime = "2026-06-13T12:00:00.000Z";
   return {
@@ -52,18 +50,14 @@ describe("evaluateTranspirationWindow", () => {
   });
 
   it("manual + plant_weight_kg → primary metric, medium confidence", () => {
-    const r = evaluateTranspirationWindow(
-      baseInput({ weightSource: "manual" }),
-    );
+    const r = evaluateTranspirationWindow(baseInput({ weightSource: "manual" }));
     expect(r.status).toBe("valid");
     expect(r.confidence).toBe("medium");
     expect(r.waterLossRatePerVpdPerSize).not.toBeNull();
   });
 
   it("valid weight but no size proxy → primary null, supporting present, low + size_unnormalized", () => {
-    const r = evaluateTranspirationWindow(
-      baseInput({ sizeBasis: "none", sizeProxyValue: null }),
-    );
+    const r = evaluateTranspirationWindow(baseInput({ sizeBasis: "none", sizeProxyValue: null }));
     expect(r.status).toBe("valid");
     expect(r.confidence).toBe("low");
     expect(r.waterLossRatePerVpdPerSize).toBeNull();
@@ -117,9 +111,7 @@ describe("evaluateTranspirationWindow", () => {
   });
 
   it("end weight >= start weight → invalid", () => {
-    const r = evaluateTranspirationWindow(
-      baseInput({ startWeightG: 4000, endWeightG: 4200 }),
-    );
+    const r = evaluateTranspirationWindow(baseInput({ startWeightG: 4000, endWeightG: 4200 }));
     expect(r.status).toBe("invalid");
     expect(r.warnings).toContain("end_weight_not_less_than_start");
   });
@@ -132,25 +124,19 @@ describe("evaluateTranspirationWindow", () => {
   });
 
   it("weight-jump-only boundary → insufficient", () => {
-    const r = evaluateTranspirationWindow(
-      baseInput({ boundarySource: "weight_jump_only" }),
-    );
+    const r = evaluateTranspirationWindow(baseInput({ boundarySource: "weight_jump_only" }));
     expect(r.status).toBe("insufficient");
     expect(r.warnings).toContain("unreliable_boundary");
   });
 
   it("stale weight → stale", () => {
-    const r = evaluateTranspirationWindow(
-      baseInput({ now: addH("2026-06-13T12:00:00.000Z", 48) }),
-    );
+    const r = evaluateTranspirationWindow(baseInput({ now: addH("2026-06-13T12:00:00.000Z", 48) }));
     expect(r.status).toBe("stale");
     expect(r.warnings).toContain("stale_weight");
   });
 
   it("soil moisture proxy does not compute weight-based metrics", () => {
-    const r = evaluateTranspirationWindow(
-      baseInput({ weightSource: "soil_moisture_proxy" }),
-    );
+    const r = evaluateTranspirationWindow(baseInput({ weightSource: "soil_moisture_proxy" }));
     expect(r.status).toBe("insufficient");
     expect(r.waterLossRatePerVpd).toBeNull();
     expect(r.waterLossRatePerVpdPerSize).toBeNull();
@@ -167,9 +153,7 @@ describe("evaluateTranspirationWindow", () => {
   });
 
   it("warnings and reasons are deterministically sorted", () => {
-    const r = evaluateTranspirationWindow(
-      baseInput({ sizeBasis: "none", sizeProxyValue: null }),
-    );
+    const r = evaluateTranspirationWindow(baseInput({ sizeBasis: "none", sizeProxyValue: null }));
     const w = r.warnings;
     const sortedW = [...w].sort();
     expect(w).toEqual(sortedW);
@@ -186,10 +170,7 @@ describe("evaluateTranspirationWindow", () => {
 });
 
 describe("transpirationResponseRules static safety", () => {
-  const raw = readFileSync(
-    "src/lib/transpirationResponseRules.ts",
-    "utf8",
-  );
+  const raw = readFileSync("src/lib/transpirationResponseRules.ts", "utf8");
   // Strip block and line comments so prose like "No alerts" / "No device"
   // does not trip the banned-term scanner.
   const src = raw

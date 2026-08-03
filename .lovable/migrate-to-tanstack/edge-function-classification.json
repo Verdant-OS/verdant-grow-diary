@@ -1,39 +1,209 @@
 {
   "note": "Step 8 classification. Every function in this project is either an external-caller surface (webhook / bridge / MCP / cron), referenced from SQL, or bound to one or more CI workflows and deployment scripts that address it at its Supabase URL. Per the skill's default (do not break a load-bearing URL) and this project's scope discipline (no edge-function changes outside requested scope), all 34 are left on Supabase for this migration. Moving them is available as a follow-up.",
   "functions": [
-    { "name": "ai-coach", "classification": "unknown", "signal": "2 src/ call sites but server-side AI credit metering + rate limiting; ci-bound", "outcome": "left" },
-    { "name": "ai-cultivar-qa", "classification": "unknown", "signal": "1 src/ call site; AI credit metering surface", "outcome": "left" },
-    { "name": "ai-doctor-review", "classification": "unknown", "signal": "no src/ call sites; signature-verified; credit-metered", "outcome": "left" },
-    { "name": "auth-email-hook", "classification": "webhook receiver", "signal": "Supabase auth hook, signature-verified, fixed URL", "outcome": "left" },
-    { "name": "checkout-status", "classification": "webhook receiver", "signal": "signature-verified billing surface", "outcome": "left" },
-    { "name": "create-breeding-suggestions", "classification": "cron target", "signal": "referenced in supabase/migrations SQL", "outcome": "left" },
-    { "name": "delete-account", "classification": "unknown", "signal": "no src/ call sites; destructive admin surface", "outcome": "left" },
-    { "name": "ecowitt-ingest", "classification": "webhook receiver", "signal": "EcoWitt bridge posts to fixed URL", "outcome": "left" },
-    { "name": "ecowitt-real-ingest", "classification": "Deno-only dependency", "signal": "deno.land/std import; live bridge ingest URL", "outcome": "left" },
-    { "name": "edge-metrics-alert-check", "classification": "cron target", "signal": "referenced in supabase/migrations SQL (scheduled)", "outcome": "left" },
-    { "name": "edge-metrics-latest", "classification": "unknown", "signal": "no src/ call sites; operator dashboard read", "outcome": "left" },
-    { "name": "environment-summary-report-entitlement", "classification": "unknown", "signal": "1 src/ call site; entitlement authority", "outcome": "left" },
-    { "name": "founder-slots-remaining", "classification": "cron target", "signal": "referenced in supabase/migrations SQL", "outcome": "left" },
-    { "name": "get-paddle-price", "classification": "cron target", "signal": "referenced in SQL; Paddle catalog preflight CI binds to it", "outcome": "left" },
-    { "name": "handle-email-suppression", "classification": "webhook receiver", "signal": "signature-verified email provider callback", "outcome": "left" },
-    { "name": "handle-email-unsubscribe", "classification": "webhook receiver", "signal": "unsubscribe link target, fixed public URL", "outcome": "left" },
-    { "name": "live-sensor-entitlement", "classification": "unknown", "signal": "no src/ call sites; entitlement authority", "outcome": "left" },
-    { "name": "mcp", "classification": "MCP server", "signal": "external AI agent JSON-RPC endpoint, fixed URL", "outcome": "left" },
-    { "name": "mint-bridge-token", "classification": "unknown", "signal": "bridge credential surface consumed by the Windows bridge tooling", "outcome": "left" },
-    { "name": "operator-credits-audit", "classification": "unknown", "signal": "no src/ call sites; service-role audit read", "outcome": "left" },
-    { "name": "operator-ggs-real-payload-commit", "classification": "cron target", "signal": "referenced in supabase/migrations SQL", "outcome": "left" },
-    { "name": "paddle-portal-session", "classification": "unknown", "signal": "Paddle-facing session mint; provider SDK bound", "outcome": "left" },
-    { "name": "paddle-webhook", "classification": "webhook receiver", "signal": "signature-verified; URL registered with Paddle", "outcome": "left" },
-    { "name": "payments-webhook", "classification": "webhook receiver", "signal": "signature-verified; canonical billing lane; URL registered with Paddle", "outcome": "left" },
-    { "name": "pi-ingest-readings", "classification": "webhook receiver", "signal": "signature-verified; Pi bridge posts to fixed URL", "outcome": "left" },
-    { "name": "premium-export-entitlement", "classification": "unknown", "signal": "no src/ call sites; entitlement authority", "outcome": "left" },
-    { "name": "preview-transactional-email", "classification": "unknown", "signal": "no src/ call sites; operator preview surface", "outcome": "left" },
-    { "name": "process-email-queue", "classification": "cron target", "signal": "referenced in supabase/migrations SQL (scheduled drain)", "outcome": "left" },
-    { "name": "redeem-referral", "classification": "cron target", "signal": "referenced in supabase/migrations SQL", "outcome": "left" },
-    { "name": "revoke-bridge-token", "classification": "unknown", "signal": "bridge credential surface", "outcome": "left" },
-    { "name": "rls-selftest", "classification": "unknown", "signal": "runtime RLS harness invoked by CI at its Supabase URL", "outcome": "left" },
-    { "name": "save-founder-prefs", "classification": "unknown", "signal": "2 src/ call sites; service-role founder write path", "outcome": "left" },
-    { "name": "send-transactional-email", "classification": "unknown", "signal": "1 src/ call site; called server-to-server by payments-webhook", "outcome": "left" },
-    { "name": "sensor-ingest-webhook", "classification": "webhook receiver", "signal": "referenced in SQL; primary bridge ingest URL, 22 src/ references", "outcome": "left" }
+    {
+      "name": "ai-coach",
+      "classification": "unknown",
+      "signal": "2 src/ call sites but server-side AI credit metering + rate limiting; ci-bound",
+      "outcome": "left"
+    },
+    {
+      "name": "ai-cultivar-qa",
+      "classification": "unknown",
+      "signal": "1 src/ call site; AI credit metering surface",
+      "outcome": "left"
+    },
+    {
+      "name": "ai-doctor-review",
+      "classification": "unknown",
+      "signal": "no src/ call sites; signature-verified; credit-metered",
+      "outcome": "left"
+    },
+    {
+      "name": "auth-email-hook",
+      "classification": "webhook receiver",
+      "signal": "Supabase auth hook, signature-verified, fixed URL",
+      "outcome": "left"
+    },
+    {
+      "name": "checkout-status",
+      "classification": "webhook receiver",
+      "signal": "signature-verified billing surface",
+      "outcome": "left"
+    },
+    {
+      "name": "create-breeding-suggestions",
+      "classification": "cron target",
+      "signal": "referenced in supabase/migrations SQL",
+      "outcome": "left"
+    },
+    {
+      "name": "delete-account",
+      "classification": "unknown",
+      "signal": "no src/ call sites; destructive admin surface",
+      "outcome": "left"
+    },
+    {
+      "name": "ecowitt-ingest",
+      "classification": "webhook receiver",
+      "signal": "EcoWitt bridge posts to fixed URL",
+      "outcome": "left"
+    },
+    {
+      "name": "ecowitt-real-ingest",
+      "classification": "Deno-only dependency",
+      "signal": "deno.land/std import; live bridge ingest URL",
+      "outcome": "left"
+    },
+    {
+      "name": "edge-metrics-alert-check",
+      "classification": "cron target",
+      "signal": "referenced in supabase/migrations SQL (scheduled)",
+      "outcome": "left"
+    },
+    {
+      "name": "edge-metrics-latest",
+      "classification": "unknown",
+      "signal": "no src/ call sites; operator dashboard read",
+      "outcome": "left"
+    },
+    {
+      "name": "environment-summary-report-entitlement",
+      "classification": "unknown",
+      "signal": "1 src/ call site; entitlement authority",
+      "outcome": "left"
+    },
+    {
+      "name": "founder-slots-remaining",
+      "classification": "cron target",
+      "signal": "referenced in supabase/migrations SQL",
+      "outcome": "left"
+    },
+    {
+      "name": "get-paddle-price",
+      "classification": "cron target",
+      "signal": "referenced in SQL; Paddle catalog preflight CI binds to it",
+      "outcome": "left"
+    },
+    {
+      "name": "handle-email-suppression",
+      "classification": "webhook receiver",
+      "signal": "signature-verified email provider callback",
+      "outcome": "left"
+    },
+    {
+      "name": "handle-email-unsubscribe",
+      "classification": "webhook receiver",
+      "signal": "unsubscribe link target, fixed public URL",
+      "outcome": "left"
+    },
+    {
+      "name": "live-sensor-entitlement",
+      "classification": "unknown",
+      "signal": "no src/ call sites; entitlement authority",
+      "outcome": "left"
+    },
+    {
+      "name": "mcp",
+      "classification": "MCP server",
+      "signal": "external AI agent JSON-RPC endpoint, fixed URL",
+      "outcome": "left"
+    },
+    {
+      "name": "mint-bridge-token",
+      "classification": "unknown",
+      "signal": "bridge credential surface consumed by the Windows bridge tooling",
+      "outcome": "left"
+    },
+    {
+      "name": "operator-credits-audit",
+      "classification": "unknown",
+      "signal": "no src/ call sites; service-role audit read",
+      "outcome": "left"
+    },
+    {
+      "name": "operator-ggs-real-payload-commit",
+      "classification": "cron target",
+      "signal": "referenced in supabase/migrations SQL",
+      "outcome": "left"
+    },
+    {
+      "name": "paddle-portal-session",
+      "classification": "unknown",
+      "signal": "Paddle-facing session mint; provider SDK bound",
+      "outcome": "left"
+    },
+    {
+      "name": "paddle-webhook",
+      "classification": "webhook receiver",
+      "signal": "signature-verified; URL registered with Paddle",
+      "outcome": "left"
+    },
+    {
+      "name": "payments-webhook",
+      "classification": "webhook receiver",
+      "signal": "signature-verified; canonical billing lane; URL registered with Paddle",
+      "outcome": "left"
+    },
+    {
+      "name": "pi-ingest-readings",
+      "classification": "webhook receiver",
+      "signal": "signature-verified; Pi bridge posts to fixed URL",
+      "outcome": "left"
+    },
+    {
+      "name": "premium-export-entitlement",
+      "classification": "unknown",
+      "signal": "no src/ call sites; entitlement authority",
+      "outcome": "left"
+    },
+    {
+      "name": "preview-transactional-email",
+      "classification": "unknown",
+      "signal": "no src/ call sites; operator preview surface",
+      "outcome": "left"
+    },
+    {
+      "name": "process-email-queue",
+      "classification": "cron target",
+      "signal": "referenced in supabase/migrations SQL (scheduled drain)",
+      "outcome": "left"
+    },
+    {
+      "name": "redeem-referral",
+      "classification": "cron target",
+      "signal": "referenced in supabase/migrations SQL",
+      "outcome": "left"
+    },
+    {
+      "name": "revoke-bridge-token",
+      "classification": "unknown",
+      "signal": "bridge credential surface",
+      "outcome": "left"
+    },
+    {
+      "name": "rls-selftest",
+      "classification": "unknown",
+      "signal": "runtime RLS harness invoked by CI at its Supabase URL",
+      "outcome": "left"
+    },
+    {
+      "name": "save-founder-prefs",
+      "classification": "unknown",
+      "signal": "2 src/ call sites; service-role founder write path",
+      "outcome": "left"
+    },
+    {
+      "name": "send-transactional-email",
+      "classification": "unknown",
+      "signal": "1 src/ call site; called server-to-server by payments-webhook",
+      "outcome": "left"
+    },
+    {
+      "name": "sensor-ingest-webhook",
+      "classification": "webhook receiver",
+      "signal": "referenced in SQL; primary bridge ingest URL, 22 src/ references",
+      "outcome": "left"
+    }
   ]
 }

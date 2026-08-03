@@ -19,17 +19,13 @@ function renderIn(node: React.ReactNode) {
 describe("support forms", () => {
   it("Feedback renders privacy note and heading", () => {
     renderIn(<Feedback />);
-    expect(
-      screen.getByText(/never used to train models or shared/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/never used to train models or shared/i)).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
   });
 
   it("Contact renders privacy note and heading", () => {
     renderIn(<Contact />);
-    expect(
-      screen.getByText(/never used to train models or shared/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/never used to train models or shared/i)).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
   });
 

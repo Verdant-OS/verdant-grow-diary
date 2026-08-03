@@ -44,10 +44,7 @@ export function useEvidenceCoverage(): UseEvidenceCoverageState {
     (async () => {
       try {
         const [alertsResp, actionsResp] = await Promise.all([
-          supabase
-            .from("alerts")
-            .select("id,metric,originating_timeline_events")
-            .limit(1000),
+          supabase.from("alerts").select("id,metric,originating_timeline_events").limit(1000),
           supabase
             .from("action_queue")
             .select("id,action_type,originating_timeline_events")

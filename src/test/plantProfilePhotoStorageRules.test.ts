@@ -33,9 +33,10 @@ describe("parsePlantProfilePhotoReference", () => {
   });
 
   it("rejects unknown buckets", () => {
-    expect(
-      parsePlantProfilePhotoReference("storage://public-bucket/x/y.jpg"),
-    ).toEqual({ kind: "invalid", reason: "unknown-bucket" });
+    expect(parsePlantProfilePhotoReference("storage://public-bucket/x/y.jpg")).toEqual({
+      kind: "invalid",
+      reason: "unknown-bucket",
+    });
   });
 
   it("rejects traversal, leading slash, backslash, query, fragment", () => {
@@ -54,9 +55,9 @@ describe("parsePlantProfilePhotoReference", () => {
     expect(parsePlantProfilePhotoReference("https://x/y.jpg")).toMatchObject({
       kind: "external",
     });
-    expect(
-      parsePlantProfilePhotoReference("data:image/png;base64,AAAA"),
-    ).toMatchObject({ kind: "data" });
+    expect(parsePlantProfilePhotoReference("data:image/png;base64,AAAA")).toMatchObject({
+      kind: "data",
+    });
   });
 
   it("marks blob: as preview only", () => {

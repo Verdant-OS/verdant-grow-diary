@@ -55,7 +55,7 @@ export default function StartYourRoom() {
 
   useEffect(() => {
     headingRef.current?.focus();
-  }, [step]);
+  }, []);
 
   const progress = useMemo(() => progressLabel(step), [step]);
 

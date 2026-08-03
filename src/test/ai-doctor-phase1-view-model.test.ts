@@ -88,7 +88,10 @@ function ev(type: string, hoursAgo = 6): GrowEventRowLike {
   return { occurred_at: iso(hoursAgo * HOUR), event_type: type, source: "manual", note: null };
 }
 
-function buildCtx(s: readonly SensorReadingRowLike[], e: readonly GrowEventRowLike[]): PlantContextPayload {
+function buildCtx(
+  s: readonly SensorReadingRowLike[],
+  e: readonly GrowEventRowLike[],
+): PlantContextPayload {
   return compilePlantContextFromRows({ plant: PLANT, growEvents: e, sensorReadings: s, now: NOW });
 }
 
@@ -392,9 +395,7 @@ describe("buildAiDoctorPhase1ViewModel — unit", () => {
       context: ctx,
       now: NOW,
     });
-    expect(["very_low", "low"]).toContain(
-      vm.debugMeta.displayed_confidence_level,
-    );
+    expect(["very_low", "low"]).toContain(vm.debugMeta.displayed_confidence_level);
     expect(vm.actionQueuePanel.disabled_reason).toMatch(/more context/i);
   });
 
@@ -463,9 +464,7 @@ describe("buildAiDoctorPhase1ViewModel — unit", () => {
 
   it("always emits the automation warning", async () => {
     const { vm } = await pipeline([live("temperature_c", 24)], [ev("watering")], visionGood());
-    expect(vm.safetyPanel.automation_warning.toLowerCase()).toMatch(
-      /does not control equipment/,
-    );
+    expect(vm.safetyPanel.automation_warning.toLowerCase()).toMatch(/does not control equipment/);
   });
 
   it("source_truth_warning appears for demo/csv-only and for stale/invalid", async () => {
@@ -512,10 +511,7 @@ describe("buildAiDoctorPhase1ViewModel — golden cases", () => {
         sensorReadings: golden.sensorReadings,
         now,
       });
-      const diagnosis = await generateMultimodalDiagnosisPhase1(
-        golden.visionData,
-        context,
-      );
+      const diagnosis = await generateMultimodalDiagnosisPhase1(golden.visionData, context);
       const confidence = calculateAiDoctorConfidence({
         diagnosis,
         context,
@@ -539,9 +535,7 @@ describe("buildAiDoctorPhase1ViewModel — golden cases", () => {
       expect(a).toEqual(b); // deterministic
 
       // Low / very low display
-      expect(["very_low", "low"]).toContain(
-        a.debugMeta.displayed_confidence_level,
-      );
+      expect(["very_low", "low"]).toContain(a.debugMeta.displayed_confidence_level);
       expect(a.summaryCard.confidence_label).toMatch(/low/i);
 
       // Overdiagnosis warning
@@ -581,9 +575,7 @@ describe("buildAiDoctorPhase1ViewModel — golden cases", () => {
       if (staleOrInvalidOnly) {
         expect(a.safetyPanel.source_truth_warning).not.toBeNull();
         const text = gatherAllVmText(a);
-        expect(text).not.toMatch(
-          /stale.*healthy|invalid.*healthy|stale.*stable|invalid.*stable/,
-        );
+        expect(text).not.toMatch(/stale.*healthy|invalid.*healthy|stale.*stable|invalid.*stable/);
       }
     });
   }

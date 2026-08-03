@@ -18,18 +18,9 @@ const ROOT = resolve(__dirname, "../..");
 const SELF = resolve(__filename);
 const RUNBOOK = resolve(ROOT, "docs/database-integrity-incident-runbook.md");
 
-const SCAN_DIRS = ["src", "scripts", "supabase", "tests"].map((d) =>
-  resolve(ROOT, d),
-);
+const SCAN_DIRS = ["src", "scripts", "supabase", "tests"].map((d) => resolve(ROOT, d));
 
-const SKIP_DIR_NAMES = new Set([
-  "node_modules",
-  "dist",
-  "build",
-  ".git",
-  ".next",
-  "coverage",
-]);
+const SKIP_DIR_NAMES = new Set(["node_modules", "dist", "build", ".git", ".next", "coverage"]);
 const SCAN_EXTS = [".ts", ".tsx", ".js", ".mjs", ".cjs", ".sql", ".json"];
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -65,9 +56,7 @@ function scanAll(): { path: string; text: string }[] {
   return files;
 }
 
-const FORBIDDEN_GROW_UUIDS = [
-  "fee28aa8-c0f3-442a-8c81-3b005f4d83c2",
-];
+const FORBIDDEN_GROW_UUIDS = ["fee28aa8-c0f3-442a-8c81-3b005f4d83c2"];
 
 describe("Database integrity incident guardrails", () => {
   const files = scanAll();
@@ -78,9 +67,8 @@ describe("Database integrity incident guardrails", () => {
   });
 
   it("no file contains 'archived placeholder' tent/grow repair language", () => {
-    const hits = files.filter((f) =>
-      /archived\s+placeholder/i.test(f.text) &&
-      /\btent|\bgrow/i.test(f.text),
+    const hits = files.filter(
+      (f) => /archived\s+placeholder/i.test(f.text) && /\btent|\bgrow/i.test(f.text),
     );
     expect(hits.map((h) => h.path.split(sep).join("/"))).toEqual([]);
   });
@@ -123,9 +111,7 @@ describe("Database integrity incident guardrails", () => {
         /tents_grow_id_fkey/i.test(f.text) ||
         /foreign\s*key.*tent|tent.*foreign\s*key/i.test(f.text);
       if (!mentionsFkRecovery) return false;
-      return /\.from\(\s*["'](tents|grows)["']\s*\)[\s\S]{0,200}\.insert\(/i.test(
-        f.text,
-      );
+      return /\.from\(\s*["'](tents|grows)["']\s*\)[\s\S]{0,200}\.insert\(/i.test(f.text);
     });
     expect(hits.map((h) => h.path.split(sep).join("/"))).toEqual([]);
   });

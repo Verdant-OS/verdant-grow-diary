@@ -153,7 +153,11 @@ test("evaluateMigrationPosture: additive WITH exceptions FAILs contract", () => 
 
 test("evaluateMigrationPosture: non-additive without exceptions FAILs", () => {
   const p = evaluateMigrationPosture({
-    migrationPosture: { status: "PASS", classification: "NON_ADDITIVE_WITH_ROLLBACK_PLAN", exceptions: [] },
+    migrationPosture: {
+      status: "PASS",
+      classification: "NON_ADDITIVE_WITH_ROLLBACK_PLAN",
+      exceptions: [],
+    },
   });
   assert(!p.pass);
   assert(p.problems.some((m) => /requires at least one exception/.test(m)));
@@ -235,7 +239,10 @@ test("validator: complete non-additive posture → GO exit 0", () => {
   const manual = manualWithPosture(nonAdditivePosture);
   const { markdown } = fullyRender(manual);
   const r = fullyValidate(manual, markdown);
-  assert(r.decision === "GO" && r.exitCode === 0, `got ${r.decision}/${r.exitCode} problems=${r.problems.join(";")}`);
+  assert(
+    r.decision === "GO" && r.exitCode === 0,
+    `got ${r.decision}/${r.exitCode} problems=${r.problems.join(";")}`,
+  );
 });
 
 test("validator: additive with unexpected exceptions → FAIL exit 1", () => {
@@ -300,12 +307,19 @@ test("migration-truth pin: 20260709180000 drops both expected operator policies"
     "supabase/migrations/20260709180000_pheno_hunts_owner_only_and_stress_scale_index.sql",
   );
   const sql = fs.readFileSync(file, "utf8");
-  assert(/DROP POLICY IF EXISTS "Operators view all pheno_hunts"\s+ON public\.pheno_hunts/.test(sql));
-  assert(/DROP POLICY IF EXISTS "Operators update all pheno_hunts"\s+ON public\.pheno_hunts/.test(sql));
+  assert(
+    /DROP POLICY IF EXISTS "Operators view all pheno_hunts"\s+ON public\.pheno_hunts/.test(sql),
+  );
+  assert(
+    /DROP POLICY IF EXISTS "Operators update all pheno_hunts"\s+ON public\.pheno_hunts/.test(sql),
+  );
 });
 
 test("migration-truth pin: canonical receipt records the same non-additive exception", () => {
-  const receipt = fs.readFileSync(path.resolve("docs/releases/pheno-tracker-pro-release-receipt.md"), "utf8");
+  const receipt = fs.readFileSync(
+    path.resolve("docs/releases/pheno-tracker-pro-release-receipt.md"),
+    "utf8",
+  );
   assert(receipt.includes("20260709180000_pheno_hunts_owner_only_and_stress_scale_index.sql"));
   assert(receipt.includes("Migration classification: NON_ADDITIVE_WITH_ROLLBACK_PLAN"));
   assert(!receipt.includes("Additive migrations confirmed backward-compatible"));

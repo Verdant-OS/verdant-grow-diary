@@ -19,10 +19,7 @@ function renderAtRoute(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route
-          path="/internal/one-tent-loop-proof"
-          element={<OneTentLoopProof />}
-        />
+        <Route path="/internal/one-tent-loop-proof" element={<OneTentLoopProof />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -63,8 +60,7 @@ describe("OneTentLoopProof page", () => {
 
   it("renders the subtitle clarifying what the page does NOT do", () => {
     renderAtRoute("/internal/one-tent-loop-proof");
-    const s =
-      screen.getByTestId("one-tent-loop-proof-subtitle").textContent ?? "";
+    const s = screen.getByTestId("one-tent-loop-proof-subtitle").textContent ?? "";
     const lower = s.toLowerCase();
     expect(lower).toMatch(/does not validate live sensor data/);
     expect(lower).toMatch(/run ai diagnosis/);

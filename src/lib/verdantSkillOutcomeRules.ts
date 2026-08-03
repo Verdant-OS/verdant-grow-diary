@@ -162,7 +162,7 @@ function readExactRecord(
   if (
     keys.length < requiredKeys.length ||
     keys.length > allowed.size ||
-    requiredKeys.some((key) => !Object.prototype.hasOwnProperty.call(descriptors, key)) ||
+    requiredKeys.some((key) => !Object.hasOwn(descriptors, key)) ||
     keys.some((key) => !allowed.has(key))
   ) {
     return null;

@@ -27,7 +27,10 @@ export const AI_DOCTOR_PHASE1_EVIDENCE_DISCLAIMER =
   "Saved as evidence only. This is not an approved action and does not control equipment." as const;
 
 export type AiDoctorPhase1TimelineBlockedReason =
-  "missing_plant_id" | "missing_grow_id" | "missing_result" | "missing_summary";
+  | "missing_plant_id"
+  | "missing_grow_id"
+  | "missing_result"
+  | "missing_summary";
 
 export interface AiDoctorPhase1TimelinePlantIdentity {
   plant_id?: string | null;
@@ -93,7 +96,8 @@ export interface AiDoctorPhase1TimelineDraftBlocked {
 }
 
 export type AiDoctorPhase1TimelineDraftResult =
-  AiDoctorPhase1TimelineDraftOk | AiDoctorPhase1TimelineDraftBlocked;
+  | AiDoctorPhase1TimelineDraftOk
+  | AiDoctorPhase1TimelineDraftBlocked;
 
 function stableHash(input: string): string {
   let h = 0x811c9dc5;
@@ -108,8 +112,7 @@ function deepFreeze<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
     Object.freeze(value);
     for (const k of Object.keys(value as object)) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      deepFreeze((value as any)[k]);
+      deepFreeze((value as Record<string, unknown>)[k]);
     }
   }
   return value;

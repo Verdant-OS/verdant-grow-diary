@@ -12,9 +12,7 @@ import {
 const TENT = "tent-1";
 const NOW = new Date("2025-01-15T12:00:00Z");
 
-function row(
-  partial: Partial<EcowittIngestAuditProofRow>,
-): EcowittIngestAuditProofRow {
+function row(partial: Partial<EcowittIngestAuditProofRow>): EcowittIngestAuditProofRow {
   return {
     source: "ecowitt",
     tent_id: TENT,
@@ -91,9 +89,7 @@ describe("buildEcowittIngestAuditProof", () => {
   });
 
   it("ignores rows outside the proof window", () => {
-    const oldIso = new Date(
-      NOW.getTime() - ECOWITT_AUDIT_PROOF_WINDOW_MS - 60_000,
-    ).toISOString();
+    const oldIso = new Date(NOW.getTime() - ECOWITT_AUDIT_PROOF_WINDOW_MS - 60_000).toISOString();
     const rows = [
       row({ rows_received: 99, rows_inserted: 99, created_at: oldIso }),
       row({ rows_received: 2, rows_inserted: 2, created_at: NOW.toISOString() }),

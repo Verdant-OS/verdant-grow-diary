@@ -34,9 +34,7 @@ describe("has_role SECURITY DEFINER safety", () => {
   });
 
   it("pins search_path on has_role", () => {
-    expect(ALL_SQL).toMatch(
-      /has_role[\s\S]{0,800}SET\s+search_path\s*=\s*['"]?\s*public/i,
-    );
+    expect(ALL_SQL).toMatch(/has_role[\s\S]{0,800}SET\s+search_path\s*=\s*['"]?\s*public/i);
   });
 
   it("is STABLE and read-only (no INSERT/UPDATE/DELETE inside body)", () => {
@@ -46,9 +44,7 @@ describe("has_role SECURITY DEFINER safety", () => {
   });
 
   it("returns boolean only (no row leakage)", () => {
-    expect(ALL_SQL).toMatch(
-      /FUNCTION\s+public\.has_role[\s\S]*?RETURNS\s+boolean/i,
-    );
+    expect(ALL_SQL).toMatch(/FUNCTION\s+public\.has_role[\s\S]*?RETURNS\s+boolean/i);
   });
 
   it("checks ownership by the supplied _user_id (no auth.uid() override inside body)", () => {

@@ -13,8 +13,7 @@ import { buildCloudCanaryPreviewViewModel } from "@/lib/ecowittCloudCanaryViewMo
 import fixtures from "../../fixtures/ecowitt-cloud-canary-payloads.json";
 
 const MAC_RE = /[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}/;
-const UUID_RE =
-  /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/;
+const UUID_RE = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/;
 const BANNED = [
   "confirmed",
   "certain",
@@ -28,9 +27,7 @@ const BANNED = [
   "healthy",
 ];
 
-const mapping = fixtures.mapping as unknown as Parameters<
-  typeof runEcowittCloudCanary
->[1];
+const mapping = fixtures.mapping as unknown as Parameters<typeof runEcowittCloudCanary>[1];
 const opts = { now: new Date(fixtures.now) };
 
 function fx(ids: string[]) {
@@ -87,20 +84,14 @@ describe("Cloud Canary view-model — empty vs zero-mapped gap states", () => {
     const vm = buildCloudCanaryPreviewViewModel(v);
     expect(vm.is_empty).toBe(false);
     expect(vm.state).toBe("populated");
-    const byName = Object.fromEntries(
-      vm.rows.map((r) => [r.fixture_name, r.state]),
-    );
+    const byName = Object.fromEntries(vm.rows.map((r) => [r.fixture_name, r.state]));
     expect(byName.happy_multi_channel).toBe("normal");
     expect(byName.unmapped_channel).toBe("zero_mapped_gap");
     expect(byName.pressure_present).toBe("normal");
   });
 
   it("row state is deterministic across rebuilds", () => {
-    const v = runEcowittCloudCanary(
-      fx(["happy_multi_channel", "unmapped_channel"]),
-      mapping,
-      opts,
-    );
+    const v = runEcowittCloudCanary(fx(["happy_multi_channel", "unmapped_channel"]), mapping, opts);
     const a = buildCloudCanaryPreviewViewModel(v);
     const b = buildCloudCanaryPreviewViewModel(v);
     expect(a.rows.map((r) => r.state)).toEqual(b.rows.map((r) => r.state));
@@ -120,33 +111,25 @@ describe("Cloud Canary panel — render states (Item 2)", () => {
   });
 
   it("panel source contains a zero-mapped warning with caution copy pointing at mapping config", () => {
-    expect(pageSrc).toContain(
-      'data-testid="cloud-canary-zero-mapped-warning"',
-    );
+    expect(pageSrc).toContain('data-testid="cloud-canary-zero-mapped-warning"');
     expect(pageSrc).toMatch(/Mapping gap/);
-    expect(pageSrc).toMatch(
-      /Readings present but none mapped to a tent — check mapping config\./,
-    );
+    expect(pageSrc).toMatch(/Readings present but none mapped to a tent — check mapping config\./);
   });
 
   it("panel source switches on previewVm.state from the view-model", () => {
     expect(pageSrc).toMatch(/previewVm\.state\s*===\s*"empty"/);
-    expect(pageSrc).toContain('data-row-state={row.state}');
+    expect(pageSrc).toContain("data-row-state={row.state}");
   });
 
   it("rendered panel (gap state present, real fixtures) contains caution copy, no banned/health words, no MAC/UUID", async () => {
     const React = await import("react");
     const { renderToString } = await import("react-dom/server");
-    const { CloudCanaryPreviewPanel } = await import(
-      "@/pages/OperatorEcowittCanary"
-    );
+    const { CloudCanaryPreviewPanel } = await import("@/pages/OperatorEcowittCanary");
     const html = renderToString(React.createElement(CloudCanaryPreviewPanel));
 
     // Real fixtures include 'unmapped_channel' which triggers a gap row
     expect(html).toContain("Mapping gap");
-    expect(html).toContain(
-      "Readings present but none mapped to a tent — check mapping config.",
-    );
+    expect(html).toContain("Readings present but none mapped to a tent — check mapping config.");
     expect(html).toContain('data-row-state="zero_mapped_gap"');
 
     const lower = html.toLowerCase();
@@ -175,9 +158,7 @@ describe("Cloud Canary panel — render states (Item 2)", () => {
   it("mixed render: gap row has caution (amber) treatment; normal rows do not", async () => {
     const React = await import("react");
     const { renderToString } = await import("react-dom/server");
-    const { CloudCanaryPreviewPanel } = await import(
-      "@/pages/OperatorEcowittCanary"
-    );
+    const { CloudCanaryPreviewPanel } = await import("@/pages/OperatorEcowittCanary");
     const html = renderToString(React.createElement(CloudCanaryPreviewPanel));
 
     // Real fixtures contain BOTH normal rows (e.g. happy_multi_channel) and

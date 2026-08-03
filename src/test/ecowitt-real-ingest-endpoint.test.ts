@@ -37,7 +37,9 @@ const validPayload = () => ({
   },
 });
 
-const baseInput = (overrides: Partial<Parameters<typeof handleEcoWittRealIngestRequest>[0]> = {}) => ({
+const baseInput = (
+  overrides: Partial<Parameters<typeof handleEcoWittRealIngestRequest>[0]> = {},
+) => ({
   authorizationHeader: `Bearer ${TOKEN}`,
   expectedToken: TOKEN,
   payload: validPayload(),
@@ -80,7 +82,9 @@ describe("handleEcoWittRealIngestRequest — auth boundary", () => {
   it("never echoes the bearer token in the response", () => {
     const cases = [
       handleEcoWittRealIngestRequest(baseInput()),
-      handleEcoWittRealIngestRequest(baseInput({ authorizationHeader: `Bearer ${TOKEN}`, expectedToken: "different" })),
+      handleEcoWittRealIngestRequest(
+        baseInput({ authorizationHeader: `Bearer ${TOKEN}`, expectedToken: "different" }),
+      ),
       handleEcoWittRealIngestRequest(baseInput({ expectedToken: "" })),
     ];
     for (const r of cases) {

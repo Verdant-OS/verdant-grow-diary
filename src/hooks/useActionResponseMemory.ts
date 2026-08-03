@@ -8,9 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/store/auth";
-import {
-  loadActionResponseMemories,
-} from "@/lib/actionResponseMemoryService";
+import { loadActionResponseMemories } from "@/lib/actionResponseMemoryService";
 import type { ActionResponseMemory } from "@/lib/actionResponseMemoryRules";
 
 export type ActionResponseMemoryState =
@@ -24,9 +22,10 @@ export interface UseActionResponseMemoryArgs {
   readonly plantId?: string | null;
 }
 
-export function useActionResponseMemory(
-  args: UseActionResponseMemoryArgs,
-): { state: ActionResponseMemoryState; reload: () => void } {
+export function useActionResponseMemory(args: UseActionResponseMemoryArgs): {
+  state: ActionResponseMemoryState;
+  reload: () => void;
+} {
   const { user } = useAuth();
   const [state, setState] = useState<ActionResponseMemoryState>({ status: "idle" });
   const [nonce, setNonce] = useState(0);
@@ -52,7 +51,7 @@ export function useActionResponseMemory(
     return () => {
       cancelled = true;
     };
-  }, [user, growId, plantId, nonce]);
+  }, [user, growId, plantId]);
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 

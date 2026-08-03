@@ -169,8 +169,7 @@ export const QUICK_LOG_ACTIVITY_DEFINITIONS: Readonly<
     id: "environment_check",
     label: "Environment check",
     description: "Log an environment observation.",
-    safetyNote:
-      "Environment checks are saved as manual observations, not live sensor data.",
+    safetyNote: "Environment checks are saved as manual observations, not live sensor data.",
     saveRoute: "event",
     eventType: "environment",
     timelineLabel: "Environment check",
@@ -181,8 +180,7 @@ export const QUICK_LOG_ACTIVITY_DEFINITIONS: Readonly<
     id: "training",
     label: "Training",
     description: "Record training performed on this plant.",
-    safetyNote:
-      "Record training performed. This log does not mean the plant was safe to train.",
+    safetyNote: "Record training performed. This log does not mean the plant was safe to train.",
     saveRoute: "event",
     eventType: "training",
     timelineLabel: "Training",
@@ -193,8 +191,7 @@ export const QUICK_LOG_ACTIVITY_DEFINITIONS: Readonly<
     id: "defoliation",
     label: "Defoliation",
     description: "Record leaves removed.",
-    safetyNote:
-      "Record leaves removed. This log does not diagnose recovery or plant stress.",
+    safetyNote: "Record leaves removed. This log does not diagnose recovery or plant stress.",
     saveRoute: "event",
     eventType: "training",
     detailsSubtype: "defoliation",
@@ -222,16 +219,14 @@ export const QUICK_LOG_ACTIVITY_DEFINITIONS: Readonly<
       "Saved as manual, not live sensor data. Missing readings stay unknown, not healthy.",
     saveRoute: "manual_sensor_reading",
     timelineLabel: "Manual snapshot",
-    savedBreakdownLabel:
-      "Manual snapshot — saved as manual, not live sensor data",
+    savedBreakdownLabel: "Manual snapshot — saved as manual, not live sensor data",
     enabled: true,
   },
   harvest: {
     id: "harvest",
     label: "Harvest",
     description: "Record a harvest event.",
-    safetyNote:
-      "Record harvest activity. This does not claim harvest readiness or final yield.",
+    safetyNote: "Record harvest activity. This does not claim harvest readiness or final yield.",
     saveRoute: "event",
     eventType: "harvest",
     timelineLabel: "Harvest",

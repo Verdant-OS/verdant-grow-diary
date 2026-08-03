@@ -19,10 +19,7 @@
  * Pure: no React, no I/O.
  */
 import { describe, it, expect } from "vitest";
-import {
-  evaluateAiDoctorContext,
-  AI_DOCTOR_SNAPSHOT_FRESH_MS,
-} from "@/lib/aiDoctorContextRules";
+import { evaluateAiDoctorContext, AI_DOCTOR_SNAPSHOT_FRESH_MS } from "@/lib/aiDoctorContextRules";
 import {
   buildAiDoctorReadinessGate,
   AI_DOCTOR_READINESS_GATE_ADD_CONTEXT_LABEL,
@@ -95,9 +92,7 @@ const PARTIAL_VARIANTS: ReadonlyArray<{
         { at: iso(-HOUR), category: "watering" },
         { at: iso(-2 * HOUR), category: "notes" },
       ],
-      recentManualSnapshots: [
-        { at: iso(-(AI_DOCTOR_SNAPSHOT_FRESH_MS + HOUR)), severity: "ok" },
-      ],
+      recentManualSnapshots: [{ at: iso(-(AI_DOCTOR_SNAPSHOT_FRESH_MS + HOUR)), severity: "ok" }],
       recentRootZoneObservations: 1,
       now: NOW,
     },
@@ -209,12 +204,12 @@ describe("gate consistency: stale snapshots never mask readiness", () => {
 
 describe("gate consistency: (readiness, safeFlow) → (primary.kind, showQuickActions) matrix", () => {
   const rows = [
-    { readiness: "insufficient" as const, safe: true,  kind: "focus_anchor",  quick: true  },
-    { readiness: "insufficient" as const, safe: false, kind: "focus_anchor",  quick: true  },
-    { readiness: "partial"      as const, safe: true,  kind: "open_ai_doctor", quick: true  },
-    { readiness: "partial"      as const, safe: false, kind: "focus_anchor",   quick: true  },
-    { readiness: "strong"       as const, safe: true,  kind: "open_ai_doctor", quick: false },
-    { readiness: "strong"       as const, safe: false, kind: "focus_anchor",   quick: false },
+    { readiness: "insufficient" as const, safe: true, kind: "focus_anchor", quick: true },
+    { readiness: "insufficient" as const, safe: false, kind: "focus_anchor", quick: true },
+    { readiness: "partial" as const, safe: true, kind: "open_ai_doctor", quick: true },
+    { readiness: "partial" as const, safe: false, kind: "focus_anchor", quick: true },
+    { readiness: "strong" as const, safe: true, kind: "open_ai_doctor", quick: false },
+    { readiness: "strong" as const, safe: false, kind: "focus_anchor", quick: false },
   ];
   for (const r of rows) {
     it(`(${r.readiness}, safe=${r.safe}) → ${r.kind}, quickActions=${r.quick}`, () => {

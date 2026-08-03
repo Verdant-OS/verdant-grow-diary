@@ -157,7 +157,9 @@ describe("wiring guardrails", () => {
   });
 
   it("marker fails toward NOT teasing while the plan is unresolved", () => {
-    expect(MARKER).toMatch(/!entitlementLoading\s*&&\s*entitlement\.effectivePlanId\s*===\s*"free"/);
+    expect(MARKER).toMatch(
+      /!entitlementLoading\s*&&\s*entitlement\.effectivePlanId\s*===\s*"free"/,
+    );
   });
 
   it("marker never hides data — teaser is additive copy with a /pricing link only", () => {

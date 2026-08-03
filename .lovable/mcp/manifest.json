@@ -5,9 +5,7 @@
   "auth": {
     "type": "oauth",
     "issuer": "https://knkwiiywfkbqznbxwqfh.supabase.co/auth/v1",
-    "accepted_audiences": [
-      "authenticated"
-    ]
+    "accepted_audiences": ["authenticated"]
   },
   "mcp": {
     "server": {
@@ -68,9 +66,7 @@
               "description": "Maximum entries to return (1–50). Defaults to 10."
             }
           },
-          "required": [
-            "growId"
-          ],
+          "required": ["growId"],
           "additionalProperties": false,
           "$schema": "http://json-schema.org/draft-07/schema#"
         },
@@ -94,9 +90,7 @@
               "description": "Tent id to fetch the latest readings for."
             }
           },
-          "required": [
-            "tentId"
-          ],
+          "required": ["tentId"],
           "additionalProperties": false,
           "$schema": "http://json-schema.org/draft-07/schema#"
         },

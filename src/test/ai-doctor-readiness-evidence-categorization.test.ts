@@ -47,7 +47,7 @@ describe("readiness categorization: available vs missing", () => {
         hasProfile: true,
         strain: "Blueberry",
         stage: "veg",
-        medium: "",           // blank -> missing
+        medium: "", // blank -> missing
         hasPlantPhoto: false, // absent -> missing
       },
       recentEvents: [
@@ -69,9 +69,7 @@ describe("readiness categorization: available vs missing", () => {
         "fresh-manual-sensor-snapshot",
       ]),
     );
-    expect(r.missing).toEqual(
-      expect.arrayContaining(["medium", "plant-photo"]),
-    );
+    expect(r.missing).toEqual(expect.arrayContaining(["medium", "plant-photo"]));
     // Categorization must be exclusive.
     const overlap = r.evidence.filter((c) => r.missing.includes(c));
     expect(overlap).toEqual([]);
@@ -84,9 +82,7 @@ describe("readiness categorization: available vs missing", () => {
         { at: iso(-HOUR), category: "watering" },
         { at: iso(-2 * HOUR), category: "notes" },
       ],
-      recentManualSnapshots: [
-        { at: iso(-(AI_DOCTOR_SNAPSHOT_FRESH_MS + HOUR)), severity: "ok" },
-      ],
+      recentManualSnapshots: [{ at: iso(-(AI_DOCTOR_SNAPSHOT_FRESH_MS + HOUR)), severity: "ok" }],
       now: NOW,
     });
     expect(r.evidence).toContain("recent-manual-sensor-snapshot");
@@ -124,19 +120,14 @@ describe("readiness categorization: available vs missing", () => {
     expect(r.evidence).not.toContain("recent-timeline-activity");
     expect(r.evidence).not.toContain("recent-manual-sensor-snapshot");
     expect(r.missing).toEqual(
-      expect.arrayContaining([
-        "recent-timeline-activity",
-        "recent-manual-sensor-snapshot",
-      ]),
+      expect.arrayContaining(["recent-timeline-activity", "recent-manual-sensor-snapshot"]),
     );
   });
 
   it("ignores events outside the 7d window in categorization", () => {
     const r = evaluateAiDoctorContext({
       plant: fullPlant,
-      recentEvents: [
-        { at: iso(-(AI_DOCTOR_RECENT_WINDOW_MS + DAY)), category: "watering" },
-      ],
+      recentEvents: [{ at: iso(-(AI_DOCTOR_RECENT_WINDOW_MS + DAY)), category: "watering" }],
       recentManualSnapshots: [],
       now: NOW,
     });
@@ -226,9 +217,7 @@ describe("gate blocks diagnosis only when context is effectively unusable", () =
         { at: iso(-HOUR), category: "watering" },
         { at: iso(-2 * HOUR), category: "notes" },
       ],
-      recentManualSnapshots: [
-        { at: iso(-(AI_DOCTOR_SNAPSHOT_FRESH_MS + HOUR)), severity: "ok" },
-      ],
+      recentManualSnapshots: [{ at: iso(-(AI_DOCTOR_SNAPSHOT_FRESH_MS + HOUR)), severity: "ok" }],
       now: NOW,
     });
     expect(r.readiness).toBe("partial");

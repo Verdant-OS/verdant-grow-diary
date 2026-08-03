@@ -43,7 +43,12 @@ describe("deriveWallDisplayName — mirrors DB view CASE", () => {
   it("show_on_wall=false suppresses every style", () => {
     for (const style of ["custom_name", "first_initial", "number_only", "hidden"] as const) {
       expect(
-        deriveWallDisplayName({ ...base, show_on_wall: false, display_style: style, display_name: "Alice" }),
+        deriveWallDisplayName({
+          ...base,
+          show_on_wall: false,
+          display_style: style,
+          display_name: "Alice",
+        }),
       ).toBeNull();
     }
   });
@@ -114,7 +119,10 @@ describe("founderPrefsSchema — content gate", () => {
 
   it("rejects invalid display_style enum", () => {
     expect(
-      founderPrefsSchema.safeParse({ ...valid, display_style: "custom" as unknown as "custom_name" }).success,
+      founderPrefsSchema.safeParse({
+        ...valid,
+        display_style: "custom" as unknown as "custom_name",
+      }).success,
     ).toBe(false);
   });
 });

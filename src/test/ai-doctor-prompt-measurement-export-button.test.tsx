@@ -22,9 +22,7 @@ describe("AiDoctorPromptMeasurementExportButton", () => {
       }),
     );
     const onDownload = vi.fn();
-    render(
-      <AiDoctorPromptMeasurementExportButton store={store} onDownload={onDownload} />,
-    );
+    render(<AiDoctorPromptMeasurementExportButton store={store} onDownload={onDownload} />);
     const btn = screen.getByRole("button", { name: /Export AI Doctor prompt measurements/i });
     expect(btn).not.toBeDisabled();
     fireEvent.click(btn);

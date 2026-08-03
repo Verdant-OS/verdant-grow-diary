@@ -93,9 +93,7 @@ export function resolveGuideFaqFromHash(
   }
 
   // 3. Question slug — match by slugified question text.
-  const idx = faq.findIndex(
-    (entry: FaqEntry) => slugifyFaqQuestion(entry.question) === hash,
-  );
+  const idx = faq.findIndex((entry: FaqEntry) => slugifyFaqQuestion(entry.question) === hash);
   if (idx >= 0) {
     return { value: `faq-${idx}`, index: idx, matchedBy: "question-slug" };
   }

@@ -420,7 +420,7 @@ export default function Timeline() {
     else next.delete(SENSOR_SOURCES_PARAM);
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sensorSourceFilter]);
+  }, [sensorSourceFilter, searchParams.get, setSearchParams, searchParams]);
 
   // Pro date-range filter (advanced timeline filtering). Client hint via
   // canUseFeature — presentation-only convenience over the grower's own
@@ -457,7 +457,7 @@ export default function Timeline() {
     else next.delete(TIMELINE_END_DATE_PARAM);
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startDateFilter, endDateFilter]);
+  }, [startDateFilter, endDateFilter, searchParams.get, setSearchParams, searchParams]);
 
   // Applied bounds: any valid ISO date applies. Date-range filtering is
   // available on every plan — it is a purely client/query-level narrowing of
@@ -486,7 +486,7 @@ export default function Timeline() {
     if (seededTent && !tentFilter) setTentFilter(seededTent);
     if (seededTent) setDidSeedTentFilter(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, tentFilter, didSeedTentFilter]);
 
   const load = useCallback(async () => {
     const requestId = ++readRequestIdRef.current;
@@ -896,18 +896,7 @@ export default function Timeline() {
       return true;
     });
     return filterTimelineEvidenceRows(afterStageEvent, evidenceFilterInput);
-  }, [
-    entries,
-    stageFilter,
-    eventFilter,
-    searchQuery,
-    plantFilter,
-    tentFilter,
-    eventTypeFilter,
-    sensorSourceFilter,
-    effectiveStartDate,
-    effectiveEndDate,
-  ]);
+  }, [entries, stageFilter, eventFilter, evidenceFilterInput]);
 
   function clearEvidenceFilters() {
     setSearchQuery("");

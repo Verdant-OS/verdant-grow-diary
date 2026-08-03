@@ -121,7 +121,7 @@ function makeDeps(overrides: {
     repoRoot: REPO,
     env: { PATH: "x", ...(overrides.env ?? {}) },
     log: (line: string) => log.push(line),
-    exists: (p: string) => Object.prototype.hasOwnProperty.call(files, path.resolve(p)),
+    exists: (p: string) => Object.hasOwn(files, path.resolve(p)),
     readFile: (p: string) => {
       const key = path.resolve(p);
       if (!(key in files)) throw new Error(`ENOENT: ${p}`);

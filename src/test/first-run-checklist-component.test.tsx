@@ -6,7 +6,11 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import FirstRunChecklist from "@/components/FirstRunChecklist";
 import { FIRST_RUN_DISMISS_STORAGE_KEY } from "@/lib/firstRunChecklistViewModel";
-import { getLocalStorageItemForTest, removeLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  getLocalStorageItemForTest,
+  removeLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 function renderWithRouter(ui: React.ReactElement) {
   return render(<MemoryRouter>{ui}</MemoryRouter>);
@@ -37,54 +41,40 @@ describe("FirstRunChecklist component", () => {
   });
 
   it("renders all five steps with labels and CTAs", () => {
-    renderWithRouter(
-      <FirstRunChecklist growCount={0} tentCount={0} plantCount={0} />,
-    );
+    renderWithRouter(<FirstRunChecklist growCount={0} tentCount={0} plantCount={0} />);
     expect(screen.getByTestId("first-run-step-create_grow")).toBeTruthy();
     expect(screen.getByTestId("first-run-step-add_tent")).toBeTruthy();
     expect(screen.getByTestId("first-run-step-add_plant")).toBeTruthy();
     expect(screen.getByTestId("first-run-step-first_quick_log")).toBeTruthy();
-    expect(
-      screen.getByTestId("first-run-step-first_sensor_snapshot"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("first-run-step-first_sensor_snapshot")).toBeTruthy();
     expect(screen.getByText(/Create grow/)).toBeTruthy();
     expect(screen.getByText(/Add tent/)).toBeTruthy();
     expect(screen.getByText(/Add plant/)).toBeTruthy();
   });
 
   it("dismiss button writes localStorage", () => {
-    renderWithRouter(
-      <FirstRunChecklist growCount={1} tentCount={0} plantCount={0} />,
-    );
+    renderWithRouter(<FirstRunChecklist growCount={1} tentCount={0} plantCount={0} />);
     fireEvent.click(screen.getByTestId("first-run-checklist-dismiss"));
-    expect(
-      getLocalStorageItemForTest(FIRST_RUN_DISMISS_STORAGE_KEY),
-    ).toBe("1");
+    expect(getLocalStorageItemForTest(FIRST_RUN_DISMISS_STORAGE_KEY)).toBe("1");
   });
 
   it("hides when dismissed with partial (non-zero-grow) setup", () => {
     setLocalStorageItemForTest(FIRST_RUN_DISMISS_STORAGE_KEY, "1");
-    renderWithRouter(
-      <FirstRunChecklist growCount={1} tentCount={0} plantCount={0} />,
-    );
+    renderWithRouter(<FirstRunChecklist growCount={1} tentCount={0} plantCount={0} />);
     expect(screen.queryByTestId("first-run-checklist")).toBeNull();
     expect(screen.getByTestId("first-run-checklist-restore")).toBeTruthy();
   });
 
   it("zero-grow override: stays visible even when dismissed", () => {
     setLocalStorageItemForTest(FIRST_RUN_DISMISS_STORAGE_KEY, "1");
-    renderWithRouter(
-      <FirstRunChecklist growCount={0} tentCount={0} plantCount={0} />,
-    );
+    renderWithRouter(<FirstRunChecklist growCount={0} tentCount={0} plantCount={0} />);
     expect(screen.getByTestId("first-run-checklist")).toBeTruthy();
     expect(screen.queryByTestId("first-run-checklist-restore")).toBeNull();
   });
 
   it("'Show setup checklist' restores the card", () => {
     setLocalStorageItemForTest(FIRST_RUN_DISMISS_STORAGE_KEY, "1");
-    renderWithRouter(
-      <FirstRunChecklist growCount={1} tentCount={1} plantCount={0} />,
-    );
+    renderWithRouter(<FirstRunChecklist growCount={1} tentCount={1} plantCount={0} />);
     fireEvent.click(screen.getByTestId("first-run-checklist-restore"));
     expect(screen.getByTestId("first-run-checklist")).toBeTruthy();
     expect(getLocalStorageItemForTest(FIRST_RUN_DISMISS_STORAGE_KEY)).toBeNull();

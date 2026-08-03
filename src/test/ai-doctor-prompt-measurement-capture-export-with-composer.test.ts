@@ -45,10 +45,7 @@ function buildBundleWithProviderUsage(promptName: string, raw: unknown) {
     recordedAt: "2026-06-16T00:00:00.000Z",
     userPromptText: "hello",
   });
-  const withUsage = attachProviderResponseUsageToAiDoctorPromptMeasurement(
-    bundle.measurement,
-    raw,
-  );
+  const withUsage = attachProviderResponseUsageToAiDoctorPromptMeasurement(bundle.measurement, raw);
   return { measurement: withUsage, metadata: bundle.metadata };
 }
 
@@ -100,9 +97,7 @@ describe("operator-only capture/export with provider usage composer", () => {
 
   it("exports blank cells when provider usage is null (missing/malformed)", () => {
     const store = createAiDoctorPromptMeasurementCaptureStore();
-    store.capture(
-      buildBundleWithProviderUsage("ai_doctor_review", { id: "x" }),
-    );
+    store.capture(buildBundleWithProviderUsage("ai_doctor_review", { id: "x" }));
     store.capture(
       buildBundleWithProviderUsage("ai_doctor_review", {
         usage: { prompt_tokens: "not-a-number" },
@@ -132,16 +127,10 @@ describe("operator-only capture/export with provider usage composer", () => {
   it("capture store stays bounded (storage safety bound, not a token budget)", () => {
     const store = createAiDoctorPromptMeasurementCaptureStore(3);
     for (let i = 0; i < 10; i += 1) {
-      store.capture(
-        buildBundleWithProviderUsage(`p_${i}`, RAW_RESPONSE),
-      );
+      store.capture(buildBundleWithProviderUsage(`p_${i}`, RAW_RESPONSE));
     }
     expect(store.size()).toBe(3);
-    expect(store.list().map((c) => c.measurement.promptName)).toEqual([
-      "p_7",
-      "p_8",
-      "p_9",
-    ]);
+    expect(store.list().map((c) => c.measurement.promptName)).toEqual(["p_7", "p_8", "p_9"]);
     expect(CAPTURE_STORE_SAFETY_BOUND).toBeGreaterThan(0);
   });
 

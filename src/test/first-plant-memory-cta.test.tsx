@@ -26,12 +26,8 @@ import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { stripSourceComments } from "./utils/stripSourceComments";
 
 const ROOT = resolve(__dirname, "../..");
-const DASH = stripSourceComments(
-  readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8"),
-);
-const TENT = stripSourceComments(
-  readFileSync(resolve(ROOT, "src/pages/TentDetail.tsx"), "utf8"),
-);
+const DASH = stripSourceComments(readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8"));
+const TENT = stripSourceComments(readFileSync(resolve(ROOT, "src/pages/TentDetail.tsx"), "utf8"));
 const CTA = stripSourceComments(
   readFileSync(resolve(ROOT, "src/components/FirstPlantMemoryCta.tsx"), "utf8"),
 );
@@ -44,9 +40,7 @@ describe("FirstPlantMemoryCta — render", () => {
   it("renders headline, support copy, and friendly hints", () => {
     render(<FirstPlantMemoryCta />);
     expect(screen.getByText(/Log your first plant memory/i)).toBeTruthy();
-    expect(
-      screen.getByText(/Add note, watering, photo, or manual sensor reading/i),
-    ).toBeTruthy();
+    expect(screen.getByText(/Add note, watering, photo, or manual sensor reading/i)).toBeTruthy();
     expect(screen.getByText(/Start simple\. One note is enough/i)).toBeTruthy();
     expect(screen.getByText(/enrich details later/i)).toBeTruthy();
     expect(screen.getByText(/Manual sensor reading is optional/i)).toBeTruthy();
@@ -105,9 +99,7 @@ describe("FirstPlantMemoryCta — safety", () => {
 
 describe("Dashboard no longer renders FirstPlantMemoryCta (single Quick Log entry point)", () => {
   it("does not import the component", () => {
-    expect(DASH).not.toMatch(
-      /from\s+["']@\/components\/FirstPlantMemoryCta["']/,
-    );
+    expect(DASH).not.toMatch(/from\s+["']@\/components\/FirstPlantMemoryCta["']/);
   });
   it("does not render <FirstPlantMemoryCta /> in any branch", () => {
     expect(DASH).not.toMatch(/<FirstPlantMemoryCta\b/);

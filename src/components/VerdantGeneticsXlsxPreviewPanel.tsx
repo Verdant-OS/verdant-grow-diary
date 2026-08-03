@@ -79,7 +79,10 @@ export interface VerdantGeneticsXlsxPreviewPanelProps {
    */
   onSave?: (
     args: VerdantGeneticsXlsxSaveArgs,
-  ) => Promise<void | VerdantGeneticsXlsxSaveOutcome> | void | VerdantGeneticsXlsxSaveOutcome;
+  ) =>
+    | Promise<undefined | VerdantGeneticsXlsxSaveOutcome>
+    | undefined
+    | VerdantGeneticsXlsxSaveOutcome;
   /**
    * Optional post-success CTA. When provided, a "View imported history"
    * button is rendered after a successful save outcome. Navigation/filter
@@ -105,8 +108,7 @@ function fmtDate(iso: string | null | undefined): string {
   return iso.slice(0, 10);
 }
 
-const XLSX_SAVE_SUCCESS_PREFIX =
-  "Imported XLSX sensor history as CSV history." as const;
+const XLSX_SAVE_SUCCESS_PREFIX = "Imported XLSX sensor history as CSV history." as const;
 
 export function VerdantGeneticsXlsxPreviewPanel({
   grid,
@@ -119,20 +121,14 @@ export function VerdantGeneticsXlsxPreviewPanel({
   const [mappingState, setMappingState] = useState(() =>
     buildInitialMappingState(vm.detectedGroups),
   );
-  const [saveStatus, setSaveStatus] = useState<
-    "idle" | "saving" | "success" | "error"
-  >("idle");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [savedCount, setSavedCount] = useState<number>(0);
-  const [saveOutcome, setSaveOutcome] =
-    useState<VerdantGeneticsXlsxSaveOutcome | null>(null);
+  const [saveOutcome, setSaveOutcome] = useState<VerdantGeneticsXlsxSaveOutcome | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedEvidence, setSavedEvidence] =
     useState<VerdantGeneticsXlsxImportEvidenceViewModel | null>(null);
 
-  const readiness = buildMappingReadiness(
-    vm.detectedGroups,
-    mappingState.tentIdBySensorGroup,
-  );
+  const readiness = buildMappingReadiness(vm.detectedGroups, mappingState.tentIdBySensorGroup);
 
   const hasTents = tentOptions.length > 0;
 
@@ -195,8 +191,6 @@ export function VerdantGeneticsXlsxPreviewPanel({
     }
   }
 
-
-
   return (
     <section
       data-testid="verdant-genetics-xlsx-preview"
@@ -206,11 +200,7 @@ export function VerdantGeneticsXlsxPreviewPanel({
         <Badge variant="secondary" data-testid="vg-xlsx-format">
           {VERDANT_GENETICS_FORMAT_LABEL}
         </Badge>
-        <Badge
-          variant="outline"
-          data-testid="vg-xlsx-source-app"
-          className="font-mono"
-        >
+        <Badge variant="outline" data-testid="vg-xlsx-source-app" className="font-mono">
           {vm.sourceApp}
         </Badge>
         <Badge variant="outline" data-testid="vg-xlsx-canonical-source">
@@ -218,10 +208,7 @@ export function VerdantGeneticsXlsxPreviewPanel({
         </Badge>
       </header>
 
-      <p
-        className="text-muted-foreground"
-        data-testid="vg-xlsx-csv-history-copy"
-      >
+      <p className="text-muted-foreground" data-testid="vg-xlsx-csv-history-copy">
         {VERDANT_GENETICS_CSV_HISTORY_COPY}
       </p>
 
@@ -238,19 +225,13 @@ export function VerdantGeneticsXlsxPreviewPanel({
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <Stat
           label="Detected sensor groups"
-          value={
-            vm.detectedGroups.length > 0
-              ? vm.detectedGroups.join(", ")
-              : "—"
-          }
+          value={vm.detectedGroups.length > 0 ? vm.detectedGroups.join(", ") : "—"}
           testId="vg-xlsx-detected-groups"
         />
         <Stat
           label="Date range"
           value={
-            vm.dateRange
-              ? `${fmtDate(vm.dateRange.start)} → ${fmtDate(vm.dateRange.end)}`
-              : "—"
+            vm.dateRange ? `${fmtDate(vm.dateRange.start)} → ${fmtDate(vm.dateRange.end)}` : "—"
           }
           testId="vg-xlsx-date-range"
         />
@@ -277,15 +258,9 @@ export function VerdantGeneticsXlsxPreviewPanel({
       </div>
 
       {vm.suspicious.length > 0 && (
-        <ul
-          data-testid="vg-xlsx-suspicious-list"
-          className="grid gap-1 text-amber-200/90"
-        >
+        <ul data-testid="vg-xlsx-suspicious-list" className="grid gap-1 text-amber-200/90">
           {vm.suspicious.slice(0, 10).map((s, i) => (
-            <li
-              key={`${s.kind}-${i}`}
-              data-testid={`vg-xlsx-suspicious-${s.kind}`}
-            >
+            <li key={`${s.kind}-${i}`} data-testid={`vg-xlsx-suspicious-${s.kind}`}>
               <span className="font-mono">{s.kind}</span> · {s.note}
             </li>
           ))}
@@ -293,10 +268,7 @@ export function VerdantGeneticsXlsxPreviewPanel({
       )}
 
       {vm.rejected.length > 0 && (
-        <ul
-          data-testid="vg-xlsx-rejected-list"
-          className="grid gap-1 text-muted-foreground"
-        >
+        <ul data-testid="vg-xlsx-rejected-list" className="grid gap-1 text-muted-foreground">
           {vm.rejected.slice(0, 10).map((r) => (
             <li
               key={`${r.column_index}-${r.reason}`}
@@ -321,10 +293,7 @@ export function VerdantGeneticsXlsxPreviewPanel({
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
             Sensor group → Tent mapping
           </p>
-          <p
-            className="text-muted-foreground"
-            data-testid="vg-xlsx-mapping-required-copy"
-          >
+          <p className="text-muted-foreground" data-testid="vg-xlsx-mapping-required-copy">
             {XLSX_MAPPING_REQUIRED_COPY}
           </p>
 
@@ -346,10 +315,7 @@ export function VerdantGeneticsXlsxPreviewPanel({
                 className="grid grid-cols-[1fr_auto] items-center gap-2"
                 data-testid={`vg-xlsx-mapping-row-${group}`}
               >
-                <span
-                  className="font-mono text-xs"
-                  data-testid={`vg-xlsx-group-label-${group}`}
-                >
+                <span className="font-mono text-xs" data-testid={`vg-xlsx-group-label-${group}`}>
                   {group}
                 </span>
                 {hasTents ? (
@@ -357,11 +323,7 @@ export function VerdantGeneticsXlsxPreviewPanel({
                     value={selectedTentId || "__none__"}
                     onValueChange={(value) =>
                       setMappingState((prev) =>
-                        setGroupMapping(
-                          prev,
-                          group,
-                          value === "__none__" ? null : value,
-                        ),
+                        setGroupMapping(prev, group, value === "__none__" ? null : value),
                       )
                     }
                   >
@@ -385,9 +347,7 @@ export function VerdantGeneticsXlsxPreviewPanel({
                     </SelectContent>
                   </Select>
                 ) : (
-                  <span className="text-muted-foreground text-[11px]">
-                    —
-                  </span>
+                  <span className="text-muted-foreground text-[11px]">—</span>
                 )}
               </div>
             );
@@ -413,10 +373,7 @@ export function VerdantGeneticsXlsxPreviewPanel({
         </div>
       )}
 
-      <div
-        className="flex flex-wrap items-center gap-2"
-        data-testid="vg-xlsx-import-block"
-      >
+      <div className="flex flex-wrap items-center gap-2" data-testid="vg-xlsx-import-block">
         {onSave ? (
           <>
             <Button
@@ -439,19 +396,14 @@ export function VerdantGeneticsXlsxPreviewPanel({
                 {XLSX_MAPPING_REQUIRED_COPY}
               </span>
             )}
-            {readiness.allMapped &&
-              adapterResult.blocked && (
-                <span
-                  className="text-[11px] text-amber-200/80"
-                  data-testid="vg-xlsx-save-blocked"
-                >
-                  No XLSX sensor readings were imported.
-                  {" "}
-                  {adapterResult.blockedReason === "missing_tent_mapping"
-                    ? "Some sensor groups are unmapped."
-                    : "No readable sensor rows found."}
-                </span>
-              )}
+            {readiness.allMapped && adapterResult.blocked && (
+              <span className="text-[11px] text-amber-200/80" data-testid="vg-xlsx-save-blocked">
+                No XLSX sensor readings were imported.{" "}
+                {adapterResult.blockedReason === "missing_tent_mapping"
+                  ? "Some sensor groups are unmapped."
+                  : "No readable sensor rows found."}
+              </span>
+            )}
             {readiness.allMapped &&
               !adapterResult.blocked &&
               adapterResult.rejectedRowCount > 0 && (
@@ -467,13 +419,10 @@ export function VerdantGeneticsXlsxPreviewPanel({
                 </span>
               )}
             {saveStatus === "success" && (
-              <span
-                className="text-[11px] text-emerald-300/90"
-                data-testid="vg-xlsx-save-success"
-              >
+              <span className="text-[11px] text-emerald-300/90" data-testid="vg-xlsx-save-success">
                 {saveOutcome
-                  ? (saveOutcome.diagnostic
-                    ?? (saveOutcome.inserted === 0 && saveOutcome.duplicates > 0
+                  ? (saveOutcome.diagnostic ??
+                    (saveOutcome.inserted === 0 && saveOutcome.duplicates > 0
                       ? `Imported 0 new readings. Skipped ${saveOutcome.duplicates} duplicate${saveOutcome.duplicates === 1 ? "" : "s"} already present for this tent. No live sensor data was created.`
                       : saveOutcome.duplicates > 0
                         ? `Imported ${saveOutcome.inserted} new reading${saveOutcome.inserted === 1 ? "" : "s"}. Skipped ${saveOutcome.duplicates} duplicate${saveOutcome.duplicates === 1 ? "" : "s"} already present for this tent. No live sensor data was created.`
@@ -545,10 +494,7 @@ export function VerdantGeneticsXlsxPreviewPanel({
             </span>
           </header>
 
-          <p
-            className="text-muted-foreground"
-            data-testid="vg-xlsx-evidence-csv-history-copy"
-          >
+          <p className="text-muted-foreground" data-testid="vg-xlsx-evidence-csv-history-copy">
             {savedEvidence.csvHistoryCopy}
           </p>
 
@@ -582,16 +528,12 @@ export function VerdantGeneticsXlsxPreviewPanel({
           <div className="grid grid-cols-2 gap-2">
             <Stat
               label="Mapped groups"
-              value={savedEvidence.mappedGroups
-                .map((g) => g.sensorGroup)
-                .join(", ")}
+              value={savedEvidence.mappedGroups.map((g) => g.sensorGroup).join(", ")}
               testId="vg-xlsx-evidence-mapped-groups"
             />
             <Stat
               label="Mapped tents"
-              value={savedEvidence.mappedGroups
-                .map((g) => g.tentLabel ?? "—")
-                .join(", ")}
+              value={savedEvidence.mappedGroups.map((g) => g.tentLabel ?? "—").join(", ")}
               testId="vg-xlsx-evidence-mapped-tents"
             />
           </div>
@@ -623,20 +565,10 @@ export function VerdantGeneticsXlsxPreviewPanel({
   );
 }
 
-function Stat({
-  label,
-  value,
-  testId,
-}: {
-  label: string;
-  value: string;
-  testId: string;
-}) {
+function Stat({ label, value, testId }: { label: string; value: string; testId: string }) {
   return (
     <div className="rounded-md border border-border/60 px-2 py-1">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-        {label}
-      </div>
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="font-mono text-xs" data-testid={testId}>
         {value}
       </div>

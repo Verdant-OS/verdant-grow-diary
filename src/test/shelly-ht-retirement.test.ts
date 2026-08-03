@@ -15,10 +15,7 @@ import { resolve } from "node:path";
 // Standardised scanner guardrail timeout + slow-test telemetry.
 // Replaces the previous per-file vi.setConfig bump. No scanner pattern,
 // allowlist, or assertion is changed.
-import {
-  installScannerGuardrail,
-  getCachedTsFiles,
-} from "./support/scannerGuardrailHarness";
+import { installScannerGuardrail, getCachedTsFiles } from "./support/scannerGuardrailHarness";
 installScannerGuardrail({ file: __filename });
 
 const ROOT = resolve(__dirname, "../..");
@@ -53,7 +50,7 @@ describe("Shelly H&T integration is fully retired", () => {
   describe("no active source file invokes a Shelly H&T edge function or imports a retired module", () => {
     const srcFiles = walkSource(resolve(ROOT, "src"));
 
-    it("no `supabase.functions.invoke(\"shelly-ht-*\"` calls remain", () => {
+    it('no `supabase.functions.invoke("shelly-ht-*"` calls remain', () => {
       const hits: string[] = [];
       for (const f of srcFiles) {
         const body = readFileSync(f, "utf8");

@@ -38,9 +38,7 @@ export default function PlantRecentMoveCard({ plantId }: Props) {
       </div>
       <div className="flex-1 min-w-0 truncate" data-testid="plant-recent-move-summary">
         {move.summary}
-        {when ? (
-          <span className="text-xs text-muted-foreground"> · {when}</span>
-        ) : null}
+        {when ? <span className="text-xs text-muted-foreground"> · {when}</span> : null}
       </div>
       {move.nextTentId ? (
         <Link

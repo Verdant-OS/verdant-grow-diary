@@ -11,10 +11,7 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import InfoPopover from "@/components/InfoPopover";
-import {
-  combineGrowDataMeta,
-  type GrowDataSourceMeta,
-} from "@/hooks/useGrowData";
+import { combineGrowDataMeta, type GrowDataSourceMeta } from "@/hooks/useGrowData";
 import type { SnapshotSource } from "@/lib/sensorSnapshot";
 import {
   buildPlantDetailDataSourceView,
@@ -64,17 +61,10 @@ export default function PlantDetailDataSourceDisclosure({
       >
         {view.badgeText}
       </Badge>
-      <span
-        className="text-xs text-muted-foreground"
-        data-testid={`${testId}-description`}
-      >
+      <span className="text-xs text-muted-foreground" data-testid={`${testId}-description`}>
         {view.description}
       </span>
-      <InfoPopover
-        title={view.helpTitle}
-        body={view.helpBody}
-        testKey={`${testId}-source`}
-      />
+      <InfoPopover title={view.helpTitle} body={view.helpBody} testKey={`${testId}-source`} />
     </div>
   );
 }

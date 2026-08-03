@@ -20,15 +20,9 @@
  * A `limited` status is reserved for future use; this rules module does
  * not emit it yet to avoid implying conclusions from weak evidence.
  */
-import type {
-  DiaryTimelineSectionId,
-  DiaryTimelineSection,
-} from "@/lib/diaryTimelineSectionRules";
+import type { DiaryTimelineSectionId, DiaryTimelineSection } from "@/lib/diaryTimelineSectionRules";
 
-export type DiaryTimelineEvidenceQualityStatus =
-  | "present"
-  | "missing"
-  | "limited";
+export type DiaryTimelineEvidenceQualityStatus = "present" | "missing" | "limited";
 
 export interface DiaryTimelineEvidenceQualityForSection {
   sectionId: DiaryTimelineSectionId;
@@ -91,11 +85,12 @@ export function buildDiaryTimelineEvidenceQualityForSection<T>(
     };
   }
   const sectionId = isKnownSectionId(section.id) ? section.id : "other";
-  const count = typeof section.count === "number" && Number.isFinite(section.count)
-    ? section.count
-    : Array.isArray(section.items)
-      ? section.items.length
-      : 0;
+  const count =
+    typeof section.count === "number" && Number.isFinite(section.count)
+      ? section.count
+      : Array.isArray(section.items)
+        ? section.items.length
+        : 0;
   if (count > 0) {
     return {
       sectionId,

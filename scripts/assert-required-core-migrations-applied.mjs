@@ -302,10 +302,7 @@ export function runRequiredCoreMigrationsApplied({
       `psql exit status: ${psqlStatus}.`,
       statusHint,
     ]);
-    writeAudit(
-      "schema_query_failed",
-      `psql returned a non-zero status (${psqlStatus}).`,
-    );
+    writeAudit("schema_query_failed", `psql returned a non-zero status (${psqlStatus}).`);
     return EXIT.SCHEMA_QUERY_FAILED;
   }
 

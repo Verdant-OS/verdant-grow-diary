@@ -36,11 +36,9 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-const fetchSpy = vi
-  .spyOn(globalThis, "fetch" as never)
-  .mockImplementation((() => {
-    throw new Error("fetch not allowed in v1.6 test");
-  }) as never);
+const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
+  throw new Error("fetch not allowed in v1.6 test");
+}) as never);
 
 beforeEach(() => {
   fetchSpy.mockClear();
@@ -57,9 +55,7 @@ function snapshotPanelStructure(): {
   quickActions: string[];
 } {
   const panel = screen.getByTestId("ai-doctor-context-readiness-panel");
-  const sources = panel.querySelector(
-    '[data-testid="ai-doctor-context-readiness-panel-sources"]',
-  );
+  const sources = panel.querySelector('[data-testid="ai-doctor-context-readiness-panel-sources"]');
   const sourceBadges = sources
     ? Array.from(sources.querySelectorAll("li")).map(
         (li) => `${li.getAttribute("data-source")}|${(li.textContent ?? "").trim()}`,
@@ -69,16 +65,12 @@ function snapshotPanelStructure(): {
     '[data-testid="ai-doctor-context-readiness-panel-limitations"]',
   );
   const limitations = limList
-    ? Array.from(limList.querySelectorAll("li")).map(
-        (li) => li.getAttribute("data-testid") ?? "",
-      )
+    ? Array.from(limList.querySelectorAll("li")).map((li) => li.getAttribute("data-testid") ?? "")
     : [];
-  const headers = Array.from(panel.querySelectorAll("h2, h3")).map(
-    (h) => (h.textContent ?? "").trim(),
+  const headers = Array.from(panel.querySelectorAll("h2, h3")).map((h) =>
+    (h.textContent ?? "").trim(),
   );
-  const qa = panel.querySelector(
-    '[data-testid="ai-doctor-context-readiness-panel-quick-actions"]',
-  );
+  const qa = panel.querySelector('[data-testid="ai-doctor-context-readiness-panel-quick-actions"]');
   const quickActions = qa
     ? Array.from(qa.querySelectorAll("button")).map(
         (b) => b.getAttribute("data-quick-action") ?? "",
@@ -94,8 +86,16 @@ function snapshotPanelStructure(): {
 describe("AI Doctor Readiness UI v1.6 — tie ordering determinism", () => {
   it("aggregates duplicate same-source readings into a single badge with cumulative sampleCount", () => {
     const readings = [
-      buildReadingForSource("manual", { metric: "temperature_c", value: 24, captured_at: ago(HOUR) }),
-      buildReadingForSource("manual", { metric: "humidity_pct", value: 55, captured_at: ago(HOUR) }),
+      buildReadingForSource("manual", {
+        metric: "temperature_c",
+        value: 24,
+        captured_at: ago(HOUR),
+      }),
+      buildReadingForSource("manual", {
+        metric: "humidity_pct",
+        value: 55,
+        captured_at: ago(HOUR),
+      }),
       buildReadingForSource("manual", { metric: "vpd_kpa", value: 1.1, captured_at: ago(HOUR) }),
     ];
     render(
@@ -105,9 +105,7 @@ describe("AI Doctor Readiness UI v1.6 — tie ordering determinism", () => {
     );
     const badges = screen.getAllByTestId(/^ai-doctor-context-readiness-panel-source-/);
     // Exactly one badge for the manual source — no duplicate badges.
-    const manualBadges = badges.filter(
-      (b) => b.getAttribute("data-source") === "manual",
-    );
+    const manualBadges = badges.filter((b) => b.getAttribute("data-source") === "manual");
     expect(manualBadges).toHaveLength(1);
     expect(manualBadges[0]!.textContent ?? "").toMatch(/·\s*3\b/);
   });
@@ -182,9 +180,7 @@ describe("AI Doctor Readiness UI v1.6 — tie ordering determinism", () => {
 describe("AI Doctor Readiness UI v1.6 — accessibility semantics", () => {
   it("panel exposes a stable accessible name via aria-labelledby heading", () => {
     render(
-      <AiDoctorContextReadinessPanel
-        context={buildReadinessContext({ plant: { stage: null } })}
-      />,
+      <AiDoctorContextReadinessPanel context={buildReadinessContext({ plant: { stage: null } })} />,
     );
     const region = screen.getByRole("region", {
       name: /AI Doctor Context Readiness/i,
@@ -204,16 +200,12 @@ describe("AI Doctor Readiness UI v1.6 — accessibility semantics", () => {
           })}
         />,
       );
-      const badge = screen.getByTestId(
-        `ai-doctor-context-readiness-panel-source-${cse.source}`,
-      );
+      const badge = screen.getByTestId(`ai-doctor-context-readiness-panel-source-${cse.source}`);
       const text = (badge.textContent ?? "").trim();
       expect(text.length).toBeGreaterThan(0);
       expect(text).toContain(cse.label);
       expect(text).toMatch(/·\s*\d+/);
-      expect(badge.getAttribute("data-trustworthy")).toBe(
-        cse.isTrustworthy ? "true" : "false",
-      );
+      expect(badge.getAttribute("data-trustworthy")).toBe(cse.isTrustworthy ? "true" : "false");
       unmount();
     }
   });
@@ -258,9 +250,7 @@ describe("AI Doctor Readiness UI v1.6 — accessibility semantics", () => {
 
   it("disabled quick-action buttons expose aria-disabled=true and disabled prop", () => {
     render(
-      <AiDoctorContextReadinessPanel
-        context={buildReadinessContext({ plant: { stage: null } })}
-      />,
+      <AiDoctorContextReadinessPanel context={buildReadinessContext({ plant: { stage: null } })} />,
     );
     const btn = screen.getByTestId(
       "ai-doctor-context-readiness-panel-quick-action-fast-add-photo",
@@ -273,14 +263,10 @@ describe("AI Doctor Readiness UI v1.6 — accessibility semantics", () => {
 
   it("limitations and missing-information sections are discoverable by role/text", () => {
     render(
-      <AiDoctorContextReadinessPanel
-        context={buildReadinessContext({ plant: { stage: null } })}
-      />,
+      <AiDoctorContextReadinessPanel context={buildReadinessContext({ plant: { stage: null } })} />,
     );
     expect(screen.getByRole("heading", { name: /Limitations/i })).toBeTruthy();
-    expect(
-      screen.getByRole("heading", { name: /Missing information/i }),
-    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /Missing information/i })).toBeTruthy();
   });
 });
 
@@ -339,9 +325,7 @@ describe("AI Doctor Readiness UI v1.6 — quick-action click + keyboard", () => 
     const onFastAddPhoto = vi.fn();
     // No handler wired → button is disabled by the panel.
     render(
-      <AiDoctorContextReadinessPanel
-        context={buildReadinessContext({ plant: { stage: null } })}
-      />,
+      <AiDoctorContextReadinessPanel context={buildReadinessContext({ plant: { stage: null } })} />,
     );
     const btn = screen.getByTestId(
       "ai-doctor-context-readiness-panel-quick-action-fast-add-photo",

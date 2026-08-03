@@ -60,11 +60,10 @@ export type ImportedHistoryDisclosureViewModel =
   | ImportedHistoryDisclosureHidden;
 
 export function buildAiDoctorImportedHistoryDisclosureViewModel(
-  ctx: Pick<
-    PlantContextPayload,
-    "imported_sensor_history" | "missingLiveSensorReadings"
-  > | null
-  | undefined,
+  ctx:
+    | Pick<PlantContextPayload, "imported_sensor_history" | "missingLiveSensorReadings">
+    | null
+    | undefined,
 ): ImportedHistoryDisclosureViewModel {
   const history = ctx?.imported_sensor_history ?? null;
   if (!history || !history.hasCsvHistory) {
@@ -72,16 +71,14 @@ export function buildAiDoctorImportedHistoryDisclosureViewModel(
   }
   const s = IMPORTED_HISTORY_DISCLOSURE_STRINGS;
   const vendorLabels = (history.vendors ?? []).map((v) => v.vendorLabel);
-  const metrics: ImportedHistoryDisclosureMetric[] = (history.metrics ?? []).map(
-    (m) => ({
-      metric: m.metric,
-      unit: m.unit ?? null,
-      count: m.count,
-      min: m.min,
-      max: m.max,
-      avg: m.avg,
-    }),
-  );
+  const metrics: ImportedHistoryDisclosureMetric[] = (history.metrics ?? []).map((m) => ({
+    metric: m.metric,
+    unit: m.unit ?? null,
+    count: m.count,
+    min: m.min,
+    max: m.max,
+    avg: m.avg,
+  }));
   const missingLive = ctx?.missingLiveSensorReadings === true;
   return {
     visible: true,

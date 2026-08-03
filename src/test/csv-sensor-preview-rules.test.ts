@@ -100,9 +100,7 @@ describe("csvSensorPreviewRules — suspicious flags", () => {
     const headers = ["pH"];
     const rows = [["15.2"], ["6.1"]];
     const flags = detectFlags(headers, rows, suggestMappings(headers));
-    expect(
-      flags.some((f) => f.code === "ph_out_of_range" && f.severity === "error"),
-    ).toBe(true);
+    expect(flags.some((f) => f.code === "ph_out_of_range" && f.severity === "error")).toBe(true);
   });
 
   it("flags stuck humidity at 0", () => {
@@ -129,10 +127,7 @@ describe("csvSensorPreviewRules — suspicious flags", () => {
 
 describe("csvSensorPreviewRules — buildCsvPreview", () => {
   it("labels result as csv source with preview-only status", () => {
-    const r = buildCsvPreview(
-      "timestamp,temperature\n2026-06-01T10:00,24.1\n",
-      "export.csv",
-    );
+    const r = buildCsvPreview("timestamp,temperature\n2026-06-01T10:00,24.1\n", "export.csv");
     expect(r.ok).toBe(true);
     expect(r.sourceLabel).toBe("csv");
     expect(r.statusLabel).toBe("Preview only — not saved");
@@ -274,8 +269,7 @@ describe("csvSensorPreviewRules v2 — sampling", () => {
 });
 
 describe("csvSensorPreviewRules v2 — mapping overrides", () => {
-  const csv =
-    "timestamp,foo,humidity\n2026-06-01T10:00,1,55\n2026-06-01T11:00,2,54\n";
+  const csv = "timestamp,foo,humidity\n2026-06-01T10:00,1,55\n2026-06-01T11:00,2,54\n";
   const base = buildCsvPreview(csv);
 
   it("override changes canonical mapping locally", () => {
@@ -326,9 +320,7 @@ describe("csvSensorPreviewRules v2 — report builder", () => {
     expect(report.rowCount).toBe(2);
     expect(report.proposedMappings.length).toBe(4);
     expect(report.userOverrides).toEqual([{ header: "foo", field: "vpd" }]);
-    expect(
-      report.effectiveMappings.find((m) => m.header === "foo")?.field,
-    ).toBe("vpd");
+    expect(report.effectiveMappings.find((m) => m.header === "foo")?.field).toBe("vpd");
     expect(report.timelinePreview.length).toBe(2);
     expect(report.notes.join(" ")).toMatch(/no database writes/i);
     expect(report.notes.join(" ")).toMatch(/preview only/i);
@@ -337,8 +329,7 @@ describe("csvSensorPreviewRules v2 — report builder", () => {
   it("applies window + sampling to timeline preview", () => {
     const rows = Array.from(
       { length: 200 },
-      (_, i) =>
-        `2026-06-10T${String(i % 24).padStart(2, "0")}:00:00Z,${i}`,
+      (_, i) => `2026-06-10T${String(i % 24).padStart(2, "0")}:00:00Z,${i}`,
     ).join("\n");
     const preview = buildCsvPreview("timestamp,temperature\n" + rows);
     const report = buildCsvPreviewReport(preview, {

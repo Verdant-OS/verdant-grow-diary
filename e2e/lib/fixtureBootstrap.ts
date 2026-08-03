@@ -43,9 +43,7 @@ export function evaluateBootstrapGate(env: BootstrapGate): BootstrapGateResult {
   const errors: string[] = [];
 
   if (env.E2E_FIXTURE_MODE !== "true") {
-    errors.push(
-      "Bootstrap refused: E2E_FIXTURE_MODE must be exactly 'true'.",
-    );
+    errors.push("Bootstrap refused: E2E_FIXTURE_MODE must be exactly 'true'.");
   }
   if (env.E2E_ALLOW_FIXTURE_BOOTSTRAP !== "true") {
     errors.push(
@@ -79,9 +77,7 @@ export function evaluateBootstrapGate(env: BootstrapGate): BootstrapGateResult {
   ] as const) {
     if (!value) {
       if (required) {
-        errors.push(
-          `Bootstrap refused: ${key} is required and must include 'E2E' or 'Test'.`,
-        );
+        errors.push(`Bootstrap refused: ${key} is required and must include 'E2E' or 'Test'.`);
       }
       continue;
     }
@@ -121,11 +117,7 @@ export function pageLooksLikeRealAccount(pageText: string): {
   }
 
   // Conservative deny-list of clearly non-test phrasing.
-  for (const phrase of [
-    "Granddaddy Purple",
-    "Real Grow",
-    "Production",
-  ]) {
+  for (const phrase of ["Granddaddy Purple", "Real Grow", "Production"]) {
     if (text.includes(phrase)) {
       reasons.push(`Page contains non-test phrase '${phrase}'.`);
     }

@@ -48,9 +48,7 @@ describe("pi-ingest smoke runbook cross-links", () => {
 
   it("write transaction contract mentions tampered signature or unknown bridge", () => {
     const txt = readFileSync(contractPath, "utf8").toLowerCase();
-    expect(
-      txt.includes("tampered signature") || txt.includes("unknown bridge"),
-    ).toBe(true);
+    expect(txt.includes("tampered signature") || txt.includes("unknown bridge")).toBe(true);
   });
 
   it("referenced runbook file exists", () => {

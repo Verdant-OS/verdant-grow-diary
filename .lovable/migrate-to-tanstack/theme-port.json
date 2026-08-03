@@ -62,7 +62,11 @@
     },
     { "token": "--sidebar-border", "source": "src/index.css", "reappliedIn": "src/styles.css" },
     { "token": "--sidebar-ring", "source": "src/index.css", "reappliedIn": "src/styles.css" },
-    { "token": ".customer-mode theme block", "source": "src/index.css", "reappliedIn": "src/styles.css" },
+    {
+      "token": ".customer-mode theme block",
+      "source": "src/index.css",
+      "reappliedIn": "src/styles.css"
+    },
     { "token": ".glass", "source": "src/index.css", "reappliedIn": "src/styles.css" },
     { "token": ".glow-accent", "source": "src/index.css", "reappliedIn": "src/styles.css" },
     { "token": ".gradient-leaf", "source": "src/index.css", "reappliedIn": "src/styles.css" },
@@ -73,10 +77,30 @@
     { "token": ".animate-fade-in", "source": "src/index.css", "reappliedIn": "src/styles.css" },
     { "token": ".animate-slide-up", "source": "src/index.css", "reappliedIn": "src/styles.css" },
     { "token": "print report rules", "source": "src/index.css", "reappliedIn": "src/styles.css" },
-    { "token": "font-display / font-sans / font-mono", "source": "tailwind.config.ts", "reappliedIn": "src/styles.css" },
-    { "token": "container (centered, 1rem pad, 1400px)", "source": "tailwind.config.ts", "reappliedIn": "src/styles.css" },
-    { "token": "borderRadius lg/md/sm scale", "source": "tailwind.config.ts", "reappliedIn": "src/styles.css" },
-    { "token": "keyframes accordion-down/up, pulse-glow, shimmer", "source": "tailwind.config.ts", "reappliedIn": "src/styles.css" },
-    { "token": "animations accordion-down/up, pulse-glow, shimmer", "source": "tailwind.config.ts", "reappliedIn": "src/styles.css" }
+    {
+      "token": "font-display / font-sans / font-mono",
+      "source": "tailwind.config.ts",
+      "reappliedIn": "src/styles.css"
+    },
+    {
+      "token": "container (centered, 1rem pad, 1400px)",
+      "source": "tailwind.config.ts",
+      "reappliedIn": "src/styles.css"
+    },
+    {
+      "token": "borderRadius lg/md/sm scale",
+      "source": "tailwind.config.ts",
+      "reappliedIn": "src/styles.css"
+    },
+    {
+      "token": "keyframes accordion-down/up, pulse-glow, shimmer",
+      "source": "tailwind.config.ts",
+      "reappliedIn": "src/styles.css"
+    },
+    {
+      "token": "animations accordion-down/up, pulse-glow, shimmer",
+      "source": "tailwind.config.ts",
+      "reappliedIn": "src/styles.css"
+    }
   ]
 }

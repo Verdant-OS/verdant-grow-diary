@@ -80,7 +80,9 @@ vi.mock("sonner", () => ({
 
 import QuickLog from "@/components/QuickLog";
 
-function renderQuickLog(prefill: Record<string, unknown> = { plantId: "plant-1", growId: "grow-1" }) {
+function renderQuickLog(
+  prefill: Record<string, unknown> = { plantId: "plant-1", growId: "grow-1" },
+) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   const result = render(
     <QueryClientProvider client={client}>
@@ -159,21 +161,24 @@ describe("Quick Log Pheno evidence integration", () => {
 
     // Grower changes to a different configured goal.
     fireEvent.click(within(panel).getByTestId("quick-log-pheno-evidence-goal-aroma"));
-    expect(
-      within(panel).getByTestId("quick-log-pheno-evidence-goal-aroma"),
-    ).toHaveAttribute("aria-checked", "true");
+    expect(within(panel).getByTestId("quick-log-pheno-evidence-goal-aroma")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
 
     // Force the exact refetch that a successful save triggers.
     await client.invalidateQueries({ queryKey: ["pheno_evidence_receipts"] });
 
     // The grower's choice survives; the handoff goal is NOT silently restored.
     await waitFor(() => expect(panel).toHaveAttribute("data-status", "ready"));
-    expect(
-      within(panel).getByTestId("quick-log-pheno-evidence-goal-aroma"),
-    ).toHaveAttribute("aria-checked", "true");
-    expect(
-      within(panel).getByTestId("quick-log-pheno-evidence-goal-structure"),
-    ).toHaveAttribute("aria-checked", "false");
+    expect(within(panel).getByTestId("quick-log-pheno-evidence-goal-aroma")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(within(panel).getByTestId("quick-log-pheno-evidence-goal-structure")).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
   });
 
   it("fails closed for an unavailable hunt but still saves a normal Quick Log", async () => {

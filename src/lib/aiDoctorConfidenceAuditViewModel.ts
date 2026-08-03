@@ -98,8 +98,7 @@ const RULES: readonly AiDoctorConfidenceAuditRule[] = [
     confidence_effect: "Supports higher confidence when paired with other signals.",
     hard_cap: null,
     required_warning: null,
-    why_it_matters:
-      "Recent trustworthy environment data anchors any diagnosis to real conditions.",
+    why_it_matters: "Recent trustworthy environment data anchors any diagnosis to real conditions.",
     expected_ui_behavior:
       "Show source labels (live or manual) and capture timestamps next to readings.",
   },
@@ -111,23 +110,19 @@ const RULES: readonly AiDoctorConfidenceAuditRule[] = [
     confidence_effect: "Supports higher confidence about cause and timing.",
     hard_cap: null,
     required_warning: null,
-    why_it_matters:
-      "Grow history explains what changed recently and rules out spurious causes.",
-    expected_ui_behavior:
-      "Reference the specific recent events in the evidence section.",
+    why_it_matters: "Grow history explains what changed recently and rules out spurious causes.",
+    expected_ui_behavior: "Reference the specific recent events in the evidence section.",
   },
   {
     id: "useful-visual-context",
     label: "Useful visual context available",
-    data_condition:
-      "Clear, in-focus photo of the affected area, ideally with closeups.",
+    data_condition: "Clear, in-focus photo of the affected area, ideally with closeups.",
     confidence_effect: "Supports higher confidence about visible symptoms.",
     hard_cap: null,
     required_warning: null,
     why_it_matters:
       "A clear photo materially improves visual triage compared to blurry or distant shots.",
-    expected_ui_behavior:
-      "Reference which photo or closeups informed the visual assessment.",
+    expected_ui_behavior: "Reference which photo or closeups informed the visual assessment.",
   },
   {
     id: "limited-missing-information",
@@ -139,52 +134,39 @@ const RULES: readonly AiDoctorConfidenceAuditRule[] = [
     required_warning: null,
     why_it_matters:
       "Fewer unknowns means fewer alternative explanations the diagnosis must hedge against.",
-    expected_ui_behavior:
-      "List remaining unknowns explicitly in the missing-information section.",
+    expected_ui_behavior: "List remaining unknowns explicitly in the missing-information section.",
   },
   {
     id: "no-trustworthy-sensor-data",
     label: "No trustworthy sensor data",
-    data_condition:
-      "No recent live or manual readings for the relevant tent or plant.",
+    data_condition: "No recent live or manual readings for the relevant tent or plant.",
     confidence_effect:
       "Confidence must be lowered. Combined with no recent grow events, a hard cap applies.",
     hard_cap: 35,
-    required_warning:
-      "No trustworthy sensor data — environmental conditions are unverified.",
-    why_it_matters:
-      "Without environment data, the diagnosis cannot anchor to real conditions.",
-    expected_ui_behavior:
-      "Show a clear limitation banner and lower the rendered confidence band.",
+    required_warning: "No trustworthy sensor data — environmental conditions are unverified.",
+    why_it_matters: "Without environment data, the diagnosis cannot anchor to real conditions.",
+    expected_ui_behavior: "Show a clear limitation banner and lower the rendered confidence band.",
   },
   {
     id: "no-recent-grow-events",
     label: "No recent grow events",
-    data_condition:
-      "No recent diary, watering, feeding, or stage notes in the relevant window.",
+    data_condition: "No recent diary, watering, feeding, or stage notes in the relevant window.",
     confidence_effect: "Confidence must be lowered.",
     hard_cap: null,
-    required_warning:
-      "No recent grow events — recent care history is unknown.",
-    why_it_matters:
-      "Without recent events, the diagnosis cannot anchor cause and timing.",
-    expected_ui_behavior:
-      "Show a missing-history limitation and ask the grower for a recent log.",
+    required_warning: "No recent grow events — recent care history is unknown.",
+    why_it_matters: "Without recent events, the diagnosis cannot anchor cause and timing.",
+    expected_ui_behavior: "Show a missing-history limitation and ask the grower for a recent log.",
   },
   {
     id: "demo-only-or-csv-only-context",
     label: "Demo-only or CSV-only context",
-    data_condition:
-      "The only available readings are demo fixtures or historical CSV imports.",
-    confidence_effect:
-      "Confidence must not be raised by these sources. A hard cap applies.",
+    data_condition: "The only available readings are demo fixtures or historical CSV imports.",
+    confidence_effect: "Confidence must not be raised by these sources. A hard cap applies.",
     hard_cap: 40,
-    required_warning:
-      "Demo or CSV-only data — not live evidence of current conditions.",
+    required_warning: "Demo or CSV-only data — not live evidence of current conditions.",
     why_it_matters:
       "Demo data is illustrative. CSV is historical import context, never a live signal.",
-    expected_ui_behavior:
-      "Show explicit demo or CSV labels and treat as background context only.",
+    expected_ui_behavior: "Show explicit demo or CSV labels and treat as background context only.",
   },
   {
     id: "stale-only-or-invalid-only-context",
@@ -193,12 +175,10 @@ const RULES: readonly AiDoctorConfidenceAuditRule[] = [
       "The only available readings are stale (out of date) or invalid (malformed or out of range).",
     confidence_effect: "Confidence must be lowered. A hard cap applies.",
     hard_cap: 30,
-    required_warning:
-      "Only stale or invalid readings available — current conditions are unknown.",
+    required_warning: "Only stale or invalid readings available — current conditions are unknown.",
     why_it_matters:
       "Bad or unknown telemetry is worse than no telemetry. It must never read as healthy.",
-    expected_ui_behavior:
-      "Show stale or invalid badges. Do not render a healthy summary.",
+    expected_ui_behavior: "Show stale or invalid badges. Do not render a healthy summary.",
   },
   {
     id: "stale-or-invalid-alongside-other-data",
@@ -208,8 +188,7 @@ const RULES: readonly AiDoctorConfidenceAuditRule[] = [
     confidence_effect:
       "Confidence must be lowered for the affected dimensions and limitations called out.",
     hard_cap: null,
-    required_warning:
-      "Some readings are stale or invalid — exclude them from the assessment.",
+    required_warning: "Some readings are stale or invalid — exclude them from the assessment.",
     why_it_matters:
       "Mixing trustworthy and untrustworthy readings without labels misleads the grower.",
     expected_ui_behavior:
@@ -222,12 +201,9 @@ const RULES: readonly AiDoctorConfidenceAuditRule[] = [
       "Critical context is missing: stage, medium, pot size, recent watering, or recent feeding.",
     confidence_effect: "Confidence must be lowered. A hard cap applies.",
     hard_cap: 45,
-    required_warning:
-      "Major missing information — diagnosis is partial until context is added.",
-    why_it_matters:
-      "Without critical context, alternative causes cannot be ruled out.",
-    expected_ui_behavior:
-      "List the missing fields and ask the grower to add them.",
+    required_warning: "Major missing information — diagnosis is partial until context is added.",
+    why_it_matters: "Without critical context, alternative causes cannot be ruled out.",
+    expected_ui_behavior: "List the missing fields and ask the grower to add them.",
   },
   {
     id: "poor-visual-quality-with-weak-context",
@@ -236,12 +212,9 @@ const RULES: readonly AiDoctorConfidenceAuditRule[] = [
       "The only photo is blurry, dark, distant, or otherwise low quality, and other context is weak.",
     confidence_effect: "Confidence must be lowered. A hard cap applies.",
     hard_cap: 35,
-    required_warning:
-      "Photo quality is poor — visual assessment is limited.",
-    why_it_matters:
-      "A blurry or unclear photo can suggest symptoms that are not actually present.",
-    expected_ui_behavior:
-      "Ask the grower for a clearer closeup and avoid overdiagnosis.",
+    required_warning: "Photo quality is poor — visual assessment is limited.",
+    why_it_matters: "A blurry or unclear photo can suggest symptoms that are not actually present.",
+    expected_ui_behavior: "Ask the grower for a clearer closeup and avoid overdiagnosis.",
   },
   {
     id: "conflicting-weak-signals",
@@ -251,12 +224,9 @@ const RULES: readonly AiDoctorConfidenceAuditRule[] = [
     confidence_effect:
       "Confidence must be lowered. The summary must enumerate the conflicting possibilities.",
     hard_cap: null,
-    required_warning:
-      "Signals are weak and conflicting — multiple possible causes remain.",
-    why_it_matters:
-      "Picking one cause from conflicting weak signals creates false certainty.",
-    expected_ui_behavior:
-      "Show possible causes side by side. Avoid overdiagnosis.",
+    required_warning: "Signals are weak and conflicting — multiple possible causes remain.",
+    why_it_matters: "Picking one cause from conflicting weak signals creates false certainty.",
+    expected_ui_behavior: "Show possible causes side by side. Avoid overdiagnosis.",
   },
 ];
 
@@ -265,46 +235,36 @@ const HARD_CAPS: readonly AiDoctorConfidenceHardCap[] = [
     id: "no-trustworthy-sensors-no-events",
     label: "No trustworthy sensors and no recent events",
     max_score: 35,
-    condition:
-      "There is no recent trustworthy sensor data and no recent grow events.",
-    reason:
-      "Both anchor surfaces are missing. The diagnosis cannot be highly confident.",
+    condition: "There is no recent trustworthy sensor data and no recent grow events.",
+    reason: "Both anchor surfaces are missing. The diagnosis cannot be highly confident.",
   },
   {
     id: "stale-or-invalid-only",
     label: "Stale or invalid readings only",
     max_score: 30,
-    condition:
-      "The only available readings are stale or invalid.",
-    reason:
-      "Bad or unknown telemetry must never raise confidence.",
+    condition: "The only available readings are stale or invalid.",
+    reason: "Bad or unknown telemetry must never raise confidence.",
   },
   {
     id: "demo-or-csv-only",
     label: "Demo or CSV-only data",
     max_score: 40,
-    condition:
-      "The only available context is demo fixtures or historical CSV imports.",
-    reason:
-      "Demo is illustrative. CSV is historical import context, never a live signal.",
+    condition: "The only available context is demo fixtures or historical CSV imports.",
+    reason: "Demo is illustrative. CSV is historical import context, never a live signal.",
   },
   {
     id: "major-missing-information",
     label: "Major missing information",
     max_score: 45,
-    condition:
-      "Critical context such as stage, medium, pot size, or recent watering is missing.",
-    reason:
-      "Without critical context, the diagnosis cannot rule out alternative causes.",
+    condition: "Critical context such as stage, medium, pot size, or recent watering is missing.",
+    reason: "Without critical context, the diagnosis cannot rule out alternative causes.",
   },
   {
     id: "poor-visual-quality-weak-context",
     label: "Poor visual quality plus weak context",
     max_score: 35,
-    condition:
-      "The only photo is low quality and supporting context is weak.",
-    reason:
-      "A blurry photo with weak context is a high-risk surface for overdiagnosis.",
+    condition: "The only photo is low quality and supporting context is weak.",
+    reason: "A blurry photo with weak context is a high-risk surface for overdiagnosis.",
   },
 ];
 
@@ -339,8 +299,7 @@ const SCENARIOS: readonly AiDoctorConfidenceAuditScenario[] = [
       "avoid_overdiagnosis",
     ]),
     confidence_ceiling: 30,
-    operator_takeaway:
-      "Stale or invalid data is a limitation, not current truth.",
+    operator_takeaway: "Stale or invalid data is a limitation, not current truth.",
   },
   {
     id: "major-missing-information",
@@ -355,8 +314,7 @@ const SCENARIOS: readonly AiDoctorConfidenceAuditScenario[] = [
       "avoid_overdiagnosis",
     ]),
     confidence_ceiling: 45,
-    operator_takeaway:
-      "Missing pH/EC/watering/feed/history blocks confident diagnosis.",
+    operator_takeaway: "Missing pH/EC/watering/feed/history blocks confident diagnosis.",
   },
   {
     id: "poor-visual-weak-context",
@@ -371,14 +329,12 @@ const SCENARIOS: readonly AiDoctorConfidenceAuditScenario[] = [
       "avoid_overdiagnosis",
     ]),
     confidence_ceiling: 35,
-    operator_takeaway:
-      "Blurry or low-quality visual context cannot support strong conclusions.",
+    operator_takeaway: "Blurry or low-quality visual context cannot support strong conclusions.",
   },
   {
     id: "no-trustworthy-no-events",
     label: "No trustworthy sensors + no events",
-    description:
-      "There is no recent trustworthy sensor data and no recent grow events.",
+    description: "There is no recent trustworthy sensor data and no recent grow events.",
     context_type: "no-trustworthy-no-events",
     applies_hard_caps: Object.freeze(["no-trustworthy-sensors-no-events"]),
     applies_safety_flags: Object.freeze([
@@ -398,10 +354,7 @@ const SCENARIOS: readonly AiDoctorConfidenceAuditScenario[] = [
       "Available signals point in different directions and none are strong on their own.",
     context_type: "conflicting-weak-signals",
     applies_hard_caps: Object.freeze([]),
-    applies_safety_flags: Object.freeze([
-      "weak_context",
-      "avoid_overdiagnosis",
-    ]),
+    applies_safety_flags: Object.freeze(["weak_context", "avoid_overdiagnosis"]),
     confidence_ceiling: -1,
     operator_takeaway:
       "Conflicting weak signals should produce multiple possible causes, not a single certain diagnosis.",
@@ -470,15 +423,11 @@ export function buildAiDoctorConfidenceAuditViewModel(
     badges: Object.freeze([...BADGES]),
     rules: Object.freeze(RULES.map((r) => Object.freeze({ ...r }))),
     hard_caps: Object.freeze(HARD_CAPS.map((c) => Object.freeze({ ...c }))),
-    high_confidence_requirements: Object.freeze([
-      ...HIGH_CONFIDENCE_REQUIREMENTS,
-    ]),
+    high_confidence_requirements: Object.freeze([...HIGH_CONFIDENCE_REQUIREMENTS]),
     source_quality_notes: Object.freeze([...SOURCE_QUALITY_NOTES]),
     safety_flags: Object.freeze([...SAFETY_FLAGS]),
     forbidden_behavior: Object.freeze([...FORBIDDEN_BEHAVIOR]),
-    scenarios: Object.freeze(
-      SCENARIOS.map((s) => Object.freeze({ ...s })),
-    ),
+    scenarios: Object.freeze(SCENARIOS.map((s) => Object.freeze({ ...s }))),
     generated_at: normalizeNow(now),
   };
   return Object.freeze(vm);

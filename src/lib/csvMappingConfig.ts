@@ -85,9 +85,7 @@ function headerFor(
  * Build a mapping-only config object suitable for client-side download.
  * Pure: never reads sensor rows, parsed values, or user identity.
  */
-export function buildCsvMappingConfig(
-  args: BuildCsvMappingConfigArgs,
-): CsvMappingConfig {
+export function buildCsvMappingConfig(args: BuildCsvMappingConfigArgs): CsvMappingConfig {
   const {
     mapping,
     headers,

@@ -41,8 +41,7 @@ function qualityToStatus(q: ManualSnapshotQuality): SnapshotStatus {
   return "needs_review";
 }
 
-export const TIMELINE_SNAPSHOT_NOT_TRUSTWORTHY_LABEL =
-  "Not trustworthy" as const;
+export const TIMELINE_SNAPSHOT_NOT_TRUSTWORTHY_LABEL = "Not trustworthy" as const;
 
 interface Props {
   /**
@@ -56,10 +55,8 @@ interface Props {
 }
 
 function severityIcon(severity: TimelineSnapshotSummary["severity"]) {
-  if (severity === "invalid")
-    return <XCircle className="h-3.5 w-3.5" aria-hidden />;
-  if (severity === "warning")
-    return <AlertTriangle className="h-3.5 w-3.5" aria-hidden />;
+  if (severity === "invalid") return <XCircle className="h-3.5 w-3.5" aria-hidden />;
+  if (severity === "warning") return <AlertTriangle className="h-3.5 w-3.5" aria-hidden />;
   return null;
 }
 
@@ -120,9 +117,7 @@ export default function TimelineSensorSnapshotSummary({ input, now, className }:
     >
       <header className="flex items-center justify-between gap-2 flex-wrap">
         <SensorSourceBadge
-          source={
-            summary.source === "unknown" ? "invalid" : summary.source
-          }
+          source={summary.source === "unknown" ? "invalid" : summary.source}
           status={status}
           vendor={summary.sourceResolved.vendor}
           testId="timeline-snapshot-summary-source-badge"
@@ -146,10 +141,7 @@ export default function TimelineSensorSnapshotSummary({ input, now, className }:
           <span className="mr-1">Captured</span>
           <time dateTime={summary.capturedAtIso}>{summary.capturedAtIso}</time>
           {ageLabel && (
-            <span
-              data-testid="timeline-snapshot-summary-age"
-              className="ml-1"
-            >
+            <span data-testid="timeline-snapshot-summary-age" className="ml-1">
               · {ageLabel}
             </span>
           )}
@@ -189,18 +181,13 @@ export default function TimelineSensorSnapshotSummary({ input, now, className }:
       )}
 
       {summary.warnings.length > 0 && (
-        <ul
-          className="space-y-1 text-xs"
-          data-testid="timeline-snapshot-summary-warnings"
-        >
+        <ul className="space-y-1 text-xs" data-testid="timeline-snapshot-summary-warnings">
           {summary.warnings.map((w, i) => (
             <li
               key={`w-${i}`}
               className={cn(
                 "flex items-start gap-1.5",
-                summary.severity === "invalid"
-                  ? "text-destructive"
-                  : "text-warning-foreground",
+                summary.severity === "invalid" ? "text-destructive" : "text-warning-foreground",
               )}
               data-testid="timeline-snapshot-summary-warning"
             >

@@ -10,10 +10,7 @@ import { render, screen } from "@testing-library/react";
 // Scanner guardrail: extend per-file timeout to 30s and cache repo walks so
 // the recursive `src/` scan in this file does not flake under shard load
 // (default 5s test timeout can be exceeded by I/O contention alone).
-import {
-  installScannerGuardrail,
-  getCachedTsFiles,
-} from "./support/scannerGuardrailHarness";
+import { installScannerGuardrail, getCachedTsFiles } from "./support/scannerGuardrailHarness";
 
 installScannerGuardrail({ file: __filename });
 import { readFileSync } from "node:fs";
@@ -36,14 +33,10 @@ const ROOT = process.cwd();
 
 describe("PremiumLiveSensorGate — copy regression (exact strings)", () => {
   it("paywall headline constant is the exact required string", () => {
-    expect(LIVE_SENSOR_PAYWALL_HEADLINE).toBe(
-      "Live sensor streaming is a Pro feature.",
-    );
+    expect(LIVE_SENSOR_PAYWALL_HEADLINE).toBe("Live sensor streaming is a Pro feature.");
   });
   it("paywall upgrade copy constant is the exact required string", () => {
-    expect(LIVE_SENSOR_PAYWALL_UPGRADE_COPY).toBe(
-      "Upgrade required to use live sensor surfaces.",
-    );
+    expect(LIVE_SENSOR_PAYWALL_UPGRADE_COPY).toBe("Upgrade required to use live sensor surfaces.");
   });
   it("invalid_request copy is safe and non-empty", () => {
     expect(PREMIUM_LIVE_SENSOR_INVALID_COPY).toBe(
@@ -77,21 +70,15 @@ describe("PremiumLiveSensorGate — copy regression (exact strings)", () => {
         <span>NEVER</span>
       </PremiumLiveSensorGate>,
     );
-    expect(
-      screen.getByText("Live sensor streaming is a Pro feature."),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("Upgrade required to use live sensor surfaces."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Live sensor streaming is a Pro feature.")).toBeInTheDocument();
+    expect(screen.getByText("Upgrade required to use live sensor surfaces.")).toBeInTheDocument();
   });
 });
 
 // --- Integration wrapping a mock premium widget ---------------------------
 
 function MockPremiumSensorWidget() {
-  return (
-    <div data-testid="mock-premium-sensor-widget">LIVE SENSOR STREAM</div>
-  );
+  return <div data-testid="mock-premium-sensor-widget">LIVE SENSOR STREAM</div>;
 }
 
 const allowedOk: LiveSensorGateResult = {
@@ -116,11 +103,7 @@ const deniedRes: LiveSensorGateResult = {
 describe("PremiumLiveSensorGate — integration wrapping a mock premium widget", () => {
   function mount(state: LiveSensorGateState, result: LiveSensorGateResult | null) {
     return render(
-      <PremiumLiveSensorGate
-        surface="live_sensor_stream"
-        state={state}
-        result={result}
-      >
+      <PremiumLiveSensorGate surface="live_sensor_stream" state={state} result={result}>
         <MockPremiumSensorWidget />
       </PremiumLiveSensorGate>,
     );
@@ -133,37 +116,26 @@ describe("PremiumLiveSensorGate — integration wrapping a mock premium widget",
     ["network_error", null] as const,
   ])("does NOT render the mock premium widget in %s state", (state, result) => {
     mount(state, result);
-    expect(
-      screen.queryByTestId("mock-premium-sensor-widget"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("mock-premium-sensor-widget")).not.toBeInTheDocument();
   });
 
   it("renders the mock premium widget ONLY when state=allowed AND result.ok=true", () => {
     mount("allowed", allowedOk);
-    expect(
-      screen.getByTestId("mock-premium-sensor-widget"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("mock-premium-sensor-widget")).toBeInTheDocument();
   });
 
   it("defense-in-depth: state=allowed but result.ok!==true still hides children", () => {
     mount("allowed", allowedButNotOk);
-    expect(
-      screen.queryByTestId("mock-premium-sensor-widget"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("mock-premium-sensor-widget")).not.toBeInTheDocument();
   });
 });
 
 // --- Docs usage-snippet test ---------------------------------------------
 
 describe("docs/paid-launch-entitlement-blocker.md — usage snippet", () => {
-  const DOC = readFileSync(
-    resolve(ROOT, "docs/paid-launch-entitlement-blocker.md"),
-    "utf8",
-  );
+  const DOC = readFileSync(resolve(ROOT, "docs/paid-launch-entitlement-blocker.md"), "utf8");
   it("includes a 'How to wrap future premium live-sensor widgets' section", () => {
-    expect(DOC).toMatch(
-      /How to wrap future premium live-sensor widgets/i,
-    );
+    expect(DOC).toMatch(/How to wrap future premium live-sensor widgets/i);
   });
   it("shows a PremiumLiveSensorGate snippet with surface, scope, and children", () => {
     expect(DOC).toMatch(/<PremiumLiveSensorGate/);
@@ -182,7 +154,6 @@ describe("docs/paid-launch-entitlement-blocker.md — usage snippet", () => {
 });
 
 // --- Static safety: no current free sensor surface was wrapped -----------
-
 
 describe("PremiumLiveSensorGate — no current free sensor surface is wrapped", () => {
   it("only the component file itself, its tests, and docs reference PremiumLiveSensorGate", () => {

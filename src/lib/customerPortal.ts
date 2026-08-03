@@ -14,15 +14,11 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const PORTAL_UNAVAILABLE_MESSAGE =
   "We couldn't open the billing portal. Please try again in a moment or contact support.";
-export const PORTAL_NO_SUBSCRIPTION_MESSAGE =
-  "No active paid subscription found on this account.";
+export const PORTAL_NO_SUBSCRIPTION_MESSAGE = "No active paid subscription found on this account.";
 export const PORTAL_LIFETIME_ONLY_MESSAGE =
   "Founder Lifetime — one-time purchase, nothing to manage.";
 
-export type OpenPortalErrorCode =
-  | "unavailable"
-  | "no_subscription"
-  | "lifetime_only";
+export type OpenPortalErrorCode = "unavailable" | "no_subscription" | "lifetime_only";
 
 export interface OpenPortalResult {
   ok: boolean;
@@ -47,9 +43,10 @@ function messageForCode(code: OpenPortalErrorCode): string {
  */
 export async function openPaddleCustomerPortal(): Promise<OpenPortalResult> {
   try {
-    const { data, error } = await supabase.functions.invoke<
-      { url?: string; error?: string }
-    >("paddle-portal-session", { body: {} });
+    const { data, error } = await supabase.functions.invoke<{ url?: string; error?: string }>(
+      "paddle-portal-session",
+      { body: {} },
+    );
     if (error) {
       // Supabase functions.invoke returns FunctionsHttpError on non-2xx.
       // The response body (with our discriminating `error` code) still rides
@@ -59,8 +56,11 @@ export async function openPaddleCustomerPortal(): Promise<OpenPortalResult> {
       const bodyCode = (() => {
         const body = ctx?.body;
         if (typeof body === "string") {
-          try { return (JSON.parse(body) as { error?: string })?.error ?? null; }
-          catch { return null; }
+          try {
+            return (JSON.parse(body) as { error?: string })?.error ?? null;
+          } catch {
+            return null;
+          }
         }
         if (body && typeof body === "object") {
           return (body as { error?: string }).error ?? null;
@@ -94,7 +94,6 @@ export async function openPaddleCustomerPortal(): Promise<OpenPortalResult> {
 export function portalErrorMessage(code: OpenPortalErrorCode): string {
   return messageForCode(code);
 }
-
 
 /** Small hook to share opening / error state across CTAs on one screen. */
 export function useOpenCustomerPortalState() {

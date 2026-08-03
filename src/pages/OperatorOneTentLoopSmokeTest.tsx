@@ -26,9 +26,24 @@ const GROUPS: ChecklistGroup[] = [
   {
     title: "Grow / Tent / Plant",
     items: [
-      { label: "Grow exists", verify: "Operator has at least one Grow", expected: "Grow renders on /grows", route: "/grows" },
-      { label: "Tent exists", verify: "A Tent under the Grow", expected: "Tent renders on /tents", route: "/tents" },
-      { label: "Plant exists", verify: "A Plant under the Tent", expected: "Plant renders on /plants", route: "/plants" },
+      {
+        label: "Grow exists",
+        verify: "Operator has at least one Grow",
+        expected: "Grow renders on /grows",
+        route: "/grows",
+      },
+      {
+        label: "Tent exists",
+        verify: "A Tent under the Grow",
+        expected: "Tent renders on /tents",
+        route: "/tents",
+      },
+      {
+        label: "Plant exists",
+        verify: "A Plant under the Tent",
+        expected: "Plant renders on /plants",
+        route: "/plants",
+      },
     ],
   },
   {
@@ -58,7 +73,8 @@ const GROUPS: ChecklistGroup[] = [
       {
         label: "Snapshot state correctness",
         verify: "Inspect Sensor Snapshot card",
-        expected: "current / fresh / stale / missing rendered correctly; stale/invalid never reads healthy",
+        expected:
+          "current / fresh / stale / missing rendered correctly; stale/invalid never reads healthy",
       },
       {
         label: "EcoWitt live reading (if bridge running)",
@@ -121,9 +137,8 @@ export default function OperatorOneTentLoopSmokeTest() {
       <header className="space-y-2">
         <h1 className="text-2xl font-semibold">One-Tent Loop Smoke Test</h1>
         <p className="text-sm text-muted-foreground">
-          Read-only operator checklist. Mirrors{" "}
-          <code>docs/one-tent-loop-smoke-test.md</code>. No data is written by
-          this page.
+          Read-only operator checklist. Mirrors <code>docs/one-tent-loop-smoke-test.md</code>. No
+          data is written by this page.
         </p>
       </header>
 

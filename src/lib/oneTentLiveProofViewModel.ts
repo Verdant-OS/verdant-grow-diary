@@ -21,11 +21,7 @@ import {
 import { buildSourceChip, type SourceChipViewModel } from "@/lib/alertFreshnessContext";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
 
-export type ProofStepStatus =
-  | "pending"
-  | "complete"
-  | "stale"
-  | "needs-confirmation";
+export type ProofStepStatus = "pending" | "complete" | "stale" | "needs-confirmation";
 
 export interface ProofStep {
   id: 1 | 2 | 3 | 4 | 5 | 6;
@@ -164,9 +160,7 @@ function step2(chip: SourceChipViewModel, ctx: ProofContextInput): ProofStep {
       id: 2,
       label: LABEL,
       status: "stale",
-      message:
-        "Not ready: no fresh manual snapshot is saved inside the alert window. " +
-        HELPER,
+      message: "Not ready: no fresh manual snapshot is saved inside the alert window. " + HELPER,
       ctaLabel: "Open Manual Snapshot",
       ctaHref: href,
     };
@@ -176,9 +170,7 @@ function step2(chip: SourceChipViewModel, ctx: ProofContextInput): ProofStep {
       id: 2,
       label: LABEL,
       status: "pending",
-      message:
-        "Not ready: latest snapshot is context-only (CSV/diary/simulated). " +
-        HELPER,
+      message: "Not ready: latest snapshot is context-only (CSV/diary/simulated). " + HELPER,
       ctaLabel: "Open Manual Snapshot",
       ctaHref: href,
     };
@@ -187,9 +179,7 @@ function step2(chip: SourceChipViewModel, ctx: ProofContextInput): ProofStep {
     id: 2,
     label: LABEL,
     status: "pending",
-    message:
-      "Not ready: no fresh manual snapshot is saved inside the alert window. " +
-      HELPER,
+    message: "Not ready: no fresh manual snapshot is saved inside the alert window. " + HELPER,
     ctaLabel: "Open Manual Snapshot",
     ctaHref: href,
   };
@@ -202,9 +192,7 @@ function step3(args: {
   matchingAlertId?: string | null;
 }): ProofStep {
   const fallback = alertsPath(args.ctx.grow?.id ?? null);
-  const href = args.matchingAlertId
-    ? alertDetailPath(args.matchingAlertId)
-    : fallback;
+  const href = args.matchingAlertId ? alertDetailPath(args.matchingAlertId) : fallback;
   const ctaLabel = args.matchingAlertId ? "Open alert detail" : "Open Alerts";
   if (args.hasMatchingOpenAlert) {
     return {
@@ -237,9 +225,7 @@ function step4(args: {
   linkedActionId?: string | null;
 }): ProofStep {
   const fallback = actionsPath(args.ctx.grow?.id ?? null);
-  const href = args.linkedActionId
-    ? actionDetailPath(args.linkedActionId)
-    : fallback;
+  const href = args.linkedActionId ? actionDetailPath(args.linkedActionId) : fallback;
   if (args.linkedActionExists) {
     return {
       id: 4,
@@ -269,9 +255,7 @@ function step5(args: {
   linkedActionId?: string | null;
 }): ProofStep {
   const fallback = actionsPath(args.ctx.grow?.id ?? null);
-  const href = args.linkedActionId
-    ? actionDetailPath(args.linkedActionId)
-    : fallback;
+  const href = args.linkedActionId ? actionDetailPath(args.linkedActionId) : fallback;
   const ctaLabel = args.linkedActionId ? "Open action detail" : "Open Action Queue";
   if (args.linkedActionCompleted === true) {
     return {
@@ -385,9 +369,7 @@ export function buildOneTentLiveProofViewModel(
       | ProofStep["id"]
       | undefined) ?? null;
   const proofComplete = decorated.every((s) => s.status === "complete");
-  const needsOperatorConfirmation = decorated.some(
-    (s) => s.status === "needs-confirmation",
-  );
+  const needsOperatorConfirmation = decorated.some((s) => s.status === "needs-confirmation");
   const shortcutLinks = buildShortcutLinks(context, signals);
   return {
     selectionSummary: summarizeContext(context),
@@ -412,8 +394,7 @@ function decorateStep(
   let missingEvidence: string | null = null;
   switch (step.id) {
     case 1:
-      evidenceSummary =
-        step.status === "complete" ? "Grow and tent selected." : "Not selected.";
+      evidenceSummary = step.status === "complete" ? "Grow and tent selected." : "Not selected.";
       missingEvidence =
         step.status === "complete" ? null : "Missing evidence: select a grow and tent.";
       break;
@@ -462,8 +443,7 @@ function decorateStep(
           signals.linkedActionExists && signals.linkedActionCompleted === false
             ? "Linked action still open."
             : "No linked action to complete.";
-        missingEvidence =
-          "Missing evidence: linked Action Queue item is not completed.";
+        missingEvidence = "Missing evidence: linked Action Queue item is not completed.";
       }
       break;
     case 6:
@@ -497,17 +477,13 @@ function buildShortcutLinks(
     {
       id: "alert",
       label: "Open Alert",
-      href: alertExact
-        ? alertDetailPath(signals.matchingAlertId as string)
-        : alertsPath(growId),
+      href: alertExact ? alertDetailPath(signals.matchingAlertId as string) : alertsPath(growId),
       exact: alertExact,
     },
     {
       id: "action",
       label: "Open Action",
-      href: actionExact
-        ? actionDetailPath(signals.linkedActionId as string)
-        : actionsPath(growId),
+      href: actionExact ? actionDetailPath(signals.linkedActionId as string) : actionsPath(growId),
       exact: actionExact,
     },
     {

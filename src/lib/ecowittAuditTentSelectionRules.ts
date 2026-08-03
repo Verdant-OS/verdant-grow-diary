@@ -30,9 +30,7 @@ function normalizeTentId(value: unknown): string | null {
   return trimmed;
 }
 
-function toSearchParams(
-  search: string | URLSearchParams | null | undefined,
-): URLSearchParams {
+function toSearchParams(search: string | URLSearchParams | null | undefined): URLSearchParams {
   if (search == null) return new URLSearchParams();
   if (search instanceof URLSearchParams) return new URLSearchParams(search);
   try {
@@ -64,10 +62,7 @@ export function applyEcowittAuditTentIdToSearch(
   return next;
 }
 
-export type EcowittAuditSelectionSource =
-  | "url"
-  | "default-first-tent"
-  | "none";
+export type EcowittAuditSelectionSource = "url" | "default-first-tent" | "none";
 
 export interface EcowittAuditTentSelection {
   selectedTentId: string | null;
@@ -104,8 +99,7 @@ export function resolveEcowittAuditSelectedTent(
   input: ResolveEcowittAuditSelectedTentInput,
 ): EcowittAuditTentSelection {
   const tents = Array.isArray(input.availableTents) ? input.availableTents : [];
-  const isAvailable = (id: string | null): boolean =>
-    !!id && tents.some((t) => t && t.id === id);
+  const isAvailable = (id: string | null): boolean => !!id && tents.some((t) => t && t.id === id);
 
   const userId = normalizeTentId(input.userSelectedTentId);
   if (userId && isAvailable(userId)) {

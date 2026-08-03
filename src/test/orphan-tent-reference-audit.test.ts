@@ -61,9 +61,21 @@ describe("orphanTentReferenceAudit — redaction & summarization", () => {
 
   it("summarizes per-table totals and never exposes raw uuids in summary previews", () => {
     const rows: OrphanTentRow[] = [
-      { table_name: "sensor_readings", missing_tent_id: "d43e3ea9-5790-4fe2-89f3-7102b7e44b62", orphan_count: 8 },
-      { table_name: "plants", missing_tent_id: "d43e3ea9-5790-4fe2-89f3-7102b7e44b62", orphan_count: 2 },
-      { table_name: "diary_entries", missing_tent_id: "d43e3ea9-5790-4fe2-89f3-7102b7e44b62", orphan_count: 2 },
+      {
+        table_name: "sensor_readings",
+        missing_tent_id: "d43e3ea9-5790-4fe2-89f3-7102b7e44b62",
+        orphan_count: 8,
+      },
+      {
+        table_name: "plants",
+        missing_tent_id: "d43e3ea9-5790-4fe2-89f3-7102b7e44b62",
+        orphan_count: 2,
+      },
+      {
+        table_name: "diary_entries",
+        missing_tent_id: "d43e3ea9-5790-4fe2-89f3-7102b7e44b62",
+        orphan_count: 2,
+      },
     ];
     const summary = summarizeOrphanRows(rows);
     const byTable = Object.fromEntries(summary.map((s) => [s.table, s]));
@@ -81,7 +93,11 @@ describe("orphanTentReferenceAudit — redaction & summarization", () => {
 
   it("renders an operator-safe report with no user_id leakage", () => {
     const rows: OrphanTentRow[] = [
-      { table_name: "sensor_readings", missing_tent_id: "d43e3ea9-5790-4fe2-89f3-7102b7e44b62", orphan_count: 8 },
+      {
+        table_name: "sensor_readings",
+        missing_tent_id: "d43e3ea9-5790-4fe2-89f3-7102b7e44b62",
+        orphan_count: 8,
+      },
     ];
     const text = renderOrphanReport(summarizeOrphanRows(rows));
     expect(text).toMatch(/Orphan tent_id reference audit/);
@@ -94,7 +110,11 @@ describe("orphanTentReferenceAudit — redaction & summarization", () => {
   it("ignores malformed / zero / negative counts", () => {
     const rows = [
       { table_name: "plants", missing_tent_id: "abc", orphan_count: 0 },
-      { table_name: "plants", missing_tent_id: "abc", orphan_count: Number.NaN as unknown as number },
+      {
+        table_name: "plants",
+        missing_tent_id: "abc",
+        orphan_count: Number.NaN as unknown as number,
+      },
       { table_name: "plants", missing_tent_id: "abc", orphan_count: -3 },
     ] as OrphanTentRow[];
     const summary = summarizeOrphanRows(rows);

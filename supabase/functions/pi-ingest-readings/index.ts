@@ -142,7 +142,7 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 function readEnv(name: string): string | null {
-  // @ts-ignore Deno global is provided by the Edge Function runtime.
+  // @ts-expect-error Deno global is provided by the Edge Function runtime.
   const denoEnv = typeof Deno !== "undefined" ? Deno.env : undefined;
   if (!denoEnv || typeof denoEnv.get !== "function") return null;
   const value = denoEnv.get(name);
@@ -492,8 +492,8 @@ export async function handlePiIngestReadingsRequest(
   });
 }
 
-// @ts-ignore Deno runtime entrypoint — only start the server when run directly.
+// @ts-expect-error Deno runtime entrypoint — only start the server when run directly.
 if (typeof Deno !== "undefined" && typeof Deno.serve === "function" && import.meta.main) {
-  // @ts-ignore
+  // @ts-expect-error
   Deno.serve(handlePiIngestReadingsRequest);
 }

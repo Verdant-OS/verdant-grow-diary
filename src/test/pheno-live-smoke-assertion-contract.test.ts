@@ -87,11 +87,12 @@ describe("live smoke assertion contract — required assertions stay affirmative
     },
   );
 
-  it.each(
-    SLICES.flatMap((s) => s.requiredSelectors.map((sel) => [s.name, sel, s.slice] as const)),
-  )("%s asserts %s", (_name, selector, slice) => {
-    expect(slice).toContain(selector);
-  });
+  it.each(SLICES.flatMap((s) => s.requiredSelectors.map((sel) => [s.name, sel, s.slice] as const)))(
+    "%s asserts %s",
+    (_name, selector, slice) => {
+      expect(slice).toContain(selector);
+    },
+  );
 
   it("Spec A skips (never runs anonymously) when the Free session is absent", () => {
     const sliceA = SLICES[0].slice;

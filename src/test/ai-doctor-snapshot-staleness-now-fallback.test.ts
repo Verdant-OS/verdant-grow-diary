@@ -23,7 +23,14 @@ describe("buildAiDoctorSnapshotStalenessExplanation — pluggable nowFallback", 
   });
 
   it("uses nowFallback when args.now is out of safe Date range", () => {
-    for (const bad of [Number.MAX_SAFE_INTEGER, -Number.MAX_SAFE_INTEGER, 1e18, -1e18, Infinity, -Infinity]) {
+    for (const bad of [
+      Number.MAX_SAFE_INTEGER,
+      -Number.MAX_SAFE_INTEGER,
+      1e18,
+      -1e18,
+      Infinity,
+      -Infinity,
+    ]) {
       const result = buildAiDoctorSnapshotStalenessExplanation({
         latestSnapshotAtIso: "2026-01-13T12:00:00.000Z",
         now: bad,

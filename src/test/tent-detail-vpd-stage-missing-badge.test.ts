@@ -6,9 +6,7 @@ const SRC = readFileSync(resolve(__dirname, "../pages/TentDetail.tsx"), "utf8");
 
 describe("TentDetail VPD stage-missing info badge", () => {
   it("still imports the canonical stage-aware VPD helper", () => {
-    expect(SRC).toMatch(
-      /classifyVpdAgainstStage[\s\S]*from\s+["']@\/lib\/vpdStageTargetRules["']/,
-    );
+    expect(SRC).toMatch(/classifyVpdAgainstStage[\s\S]*from\s+["']@\/lib\/vpdStageTargetRules["']/);
   });
 
   it("uses the shared VpdStageMissingBadge component", () => {
@@ -27,7 +25,9 @@ describe("TentDetail VPD stage-missing info badge", () => {
   });
 
   it("badge branch performs no alert/queue/automation writes", () => {
-    const m = SRC.match(/normalizeVpdStage\(tent\.stage\)\s*===\s*"unknown"\s*&&\s*\(([\s\S]*?)\)\}/);
+    const m = SRC.match(
+      /normalizeVpdStage\(tent\.stage\)\s*===\s*"unknown"\s*&&\s*\(([\s\S]*?)\)\}/,
+    );
     expect(m).toBeTruthy();
     expect(m![1]).not.toMatch(
       /saveAlert|logAlertEvent|action_queue|service_role|automation|device.control|from\(['"]alerts['"]\)/i,

@@ -93,8 +93,7 @@ function toIdempotencyRow(
   const r = item.row as Record<string, unknown>;
   const deviceId = typeof r.device_id === "string" ? r.device_id : "";
   const metric = typeof r.metric === "string" ? r.metric : "";
-  const capturedAt =
-    typeof r.captured_at === "string" ? r.captured_at : "";
+  const capturedAt = typeof r.captured_at === "string" ? r.captured_at : "";
   if (deviceId === "") {
     throw new Error(
       "piIngestCommitPlan: sensor row is missing device_id; cannot build idempotency row",
@@ -129,16 +128,12 @@ function toIdempotencyRow(
  * Throws if the pipeline result is a failure (callers must branch on
  * `pipelineResult.ok` first).
  */
-export function buildPiIngestCommitPlan(
-  input: BuildPiIngestCommitPlanInput,
-): PiIngestCommitPlan {
+export function buildPiIngestCommitPlan(input: BuildPiIngestCommitPlanInput): PiIngestCommitPlan {
   if (!input || !input.pipelineResult) {
     throw new Error("buildPiIngestCommitPlan: input.pipelineResult is required");
   }
   if (input.pipelineResult.ok !== true) {
-    throw new Error(
-      "buildPiIngestCommitPlan requires a successful PiIngestPipelineResult",
-    );
+    throw new Error("buildPiIngestCommitPlan requires a successful PiIngestPipelineResult");
   }
 
   const plan = buildPiIngestInsertPlan(input.pipelineResult);
@@ -155,12 +150,10 @@ export function buildPiIngestCommitPlan(
     );
   }
 
-  const duplicates: PiIngestCommitPlanDuplicate[] = partition.duplicates.map(
-    (d) => ({
-      idempotencyKey: d.idempotencyKey,
-      row: ensureNoIdempotencyKeyOnRow(d.row),
-    }),
-  );
+  const duplicates: PiIngestCommitPlanDuplicate[] = partition.duplicates.map((d) => ({
+    idempotencyKey: d.idempotencyKey,
+    row: ensureNoIdempotencyKeyOnRow(d.row),
+  }));
 
   return {
     ownerUserId: plan.ownerUserId,

@@ -4,12 +4,16 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const root = resolve(__dirname, "..", "..");
 const readSrc = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 
-const APP = readSrc("App.tsx");
+const APP = readAllRouteModuleSources();
 const PAGE = readSrc("pages/HardwareIntegrations.tsx");
 const LANDING = readSrc("pages/Landing.tsx");
 const FORM = readSrc("components/LeadCaptureForm.tsx");
@@ -34,7 +38,8 @@ describe("/hardware-integrations route", () => {
   it("is registered as a public route", () => {
     // Page is code-split (React.lazy dynamic import) rather than eagerly imported.
     expect(APP).toMatch(/import\(\s*["']\.\/pages\/HardwareIntegrations["']\s*\)/);
-    expect(APP).toMatch(/path="\/hardware-integrations"\s+element=\{<HardwareIntegrations\s*\/>\}/);
+    expect(extractMountedAppRoutePaths()).toContain("/hardware-integrations");
+    expect(APP).toMatch(/HardwareIntegrations/);
   });
 });
 

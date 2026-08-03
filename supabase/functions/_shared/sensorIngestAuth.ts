@@ -24,13 +24,11 @@ export type AuthError =
   | "server_misconfigured"
   | "auth_lookup_failed";
 
-export interface BridgeTokenLookup {
-  (hash: string): Promise<{ data: BridgeTokenRow | null; error: { message: string } | null }>;
-}
+export type BridgeTokenLookup = (
+  hash: string,
+) => Promise<{ data: BridgeTokenRow | null; error: { message: string } | null }>;
 
-export interface JwtClaimsLookup {
-  (token: string): Promise<{ sub: string | null }>;
-}
+export type JwtClaimsLookup = (token: string) => Promise<{ sub: string | null }>;
 
 export async function sha256Hex(input: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));

@@ -36,12 +36,7 @@ export interface DiaryFaqLink {
   readonly matchedTopic: DiaryFaqTopic;
 }
 
-export type DiaryFaqTopic =
-  | "yellowing"
-  | "environment"
-  | "watering"
-  | "nutrients"
-  | "harvest";
+export type DiaryFaqTopic = "yellowing" | "environment" | "watering" | "nutrients" | "harvest";
 
 /**
  * FAQ index in CANNABIS_PLANT_CARE_FAQ:
@@ -73,13 +68,7 @@ const TOPIC_MATCHERS: ReadonlyArray<{
 }> = [
   {
     topic: "yellowing",
-    regex: keywordRegex([
-      "yellow",
-      "yellowing",
-      "chlorosis",
-      "chlorotic",
-      "pale leaves",
-    ]),
+    regex: keywordRegex(["yellow", "yellowing", "chlorosis", "chlorotic", "pale leaves"]),
     tagMatches: [],
     eventTypeMatches: [],
   },
@@ -175,9 +164,7 @@ const TOPIC_PRIORITY: readonly DiaryFaqTopic[] = [
  * Text matches (notePreview) take precedence over tag/eventType-only
  * matches so activity-only entries still get a helpful link.
  */
-export function detectDiaryFaqTopic(
-  input: DiaryFaqLinkInput,
-): DiaryFaqTopic | null {
+export function detectDiaryFaqTopic(input: DiaryFaqLinkInput): DiaryFaqTopic | null {
   const note = (input.notePreview ?? "").trim();
   const tags = input.tags ?? [];
   const eventType = (input.eventType ?? "").trim().toLowerCase();
@@ -191,8 +178,7 @@ export function detectDiaryFaqTopic(
       continue;
     }
     const tagHit = m.tagMatches.some((t) => tags.includes(t));
-    const eventHit =
-      eventType.length > 0 && m.eventTypeMatches.includes(eventType);
+    const eventHit = eventType.length > 0 && m.eventTypeMatches.includes(eventType);
     if (tagHit || eventHit) {
       structuralMatches.add(m.topic);
     }
@@ -212,9 +198,7 @@ export function detectDiaryFaqTopic(
  * common topic matches. The returned href is a same-app route with a
  * hash anchor that GuidePage's FAQ accordion recognizes.
  */
-export function buildDiaryFaqLink(
-  input: DiaryFaqLinkInput,
-): DiaryFaqLink | null {
+export function buildDiaryFaqLink(input: DiaryFaqLinkInput): DiaryFaqLink | null {
   const topic = detectDiaryFaqTopic(input);
   if (!topic) return null;
   const faqIndex = TOPIC_TO_FAQ_INDEX[topic];

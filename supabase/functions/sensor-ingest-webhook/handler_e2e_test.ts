@@ -215,103 +215,94 @@ async function responseBody(response: Response): Promise<Record<string, unknown>
   return (await response.json()) as Record<string, unknown>;
 }
 
-Deno.test(
-  "sensor webhook handler rejects an ordinary user JWT before any lookup or write",
-  async () => {
-    const state = makeState();
-    const response = await handleRequest(post("ey.fake.user.jwt"), {
-      admin: makeAdmin(state),
-      now: () => NOW,
-      expectedBillingEnvironment: "live",
-    });
+Deno.test("sensor webhook handler rejects an ordinary user JWT before any lookup or write", async () => {
+  const state = makeState();
+  const response = await handleRequest(post("ey.fake.user.jwt"), {
+    admin: makeAdmin(state),
+    now: () => NOW,
+    expectedBillingEnvironment: "live",
+  });
 
-    assertEquals(response.status, 403);
-    assertEquals((await responseBody(response)).error, "bridge_required");
-    assertEquals(state.bridgeLookups, 0);
-    assertEquals(state.persistedRows.length, 0);
-  },
-);
+  assertEquals(response.status, 403);
+  assertEquals((await responseBody(response)).error, "bridge_required");
+  assertEquals(state.bridgeLookups, 0);
+  assertEquals(state.persistedRows.length, 0);
+});
 
-Deno.test(
-  "sensor webhook handler accepts a tent-scoped bridge and persists honest provenance",
-  async () => {
-    const state = makeState();
-    const response = await handleRequest(post(VALID_TOKEN), {
-      admin: makeAdmin(state),
-      now: () => NOW,
-      expectedBillingEnvironment: "live",
-    });
-    const body = await responseBody(response);
+Deno.test("sensor webhook handler accepts a tent-scoped bridge and persists honest provenance", async () => {
+  const state = makeState();
+  const response = await handleRequest(post(VALID_TOKEN), {
+    admin: makeAdmin(state),
+    now: () => NOW,
+    expectedBillingEnvironment: "live",
+  });
+  const body = await responseBody(response);
 
-    assertEquals(response.status, 200);
-    assertEquals(body.ok, true);
-    assertEquals(body.auth, "bridge");
-    assertEquals(body.inserted, 3);
-    assertEquals(state.persistedRows.length, 3);
-    assertEquals(
-      state.subscriptionFilters.some(
-        (filter) => filter.column === "user_id" && filter.value === USER_ID,
-      ),
-      true,
-    );
-    for (const row of state.persistedRows) {
-      assertEquals(row.user_id, USER_ID);
-      assertEquals(row.tent_id, TENT_ID);
-      assertEquals(row.source, "live");
-      assertEquals(row.quality, "ok");
-      assertEquals(row.captured_at, CAPTURED_AT);
-      const raw = row.raw_payload as Record<string, unknown>;
-      assertEquals(raw.vendor, "ecowitt_windows_testbench");
-      const metadata = raw.metadata as Record<string, unknown>;
-      assertEquals(metadata.transport_source, "ecowitt");
-      assertEquals(metadata.verdant_source, "live");
-      assertEquals(metadata.reported_verdant_source, "live");
-      const serialized = JSON.stringify(row);
-      assert(!serialized.includes(SPOOFED_USER_ID));
-      assert(!serialized.includes(VALID_TOKEN));
-    }
-    assertEquals(state.rpcCalls.length, 1);
-    assertEquals(state.rpcCalls[0].name, "bump_bridge_token_usage");
-    assertEquals(state.auditRows.length, 1);
-  },
-);
+  assertEquals(response.status, 200);
+  assertEquals(body.ok, true);
+  assertEquals(body.auth, "bridge");
+  assertEquals(body.inserted, 3);
+  assertEquals(state.persistedRows.length, 3);
+  assertEquals(
+    state.subscriptionFilters.some(
+      (filter) => filter.column === "user_id" && filter.value === USER_ID,
+    ),
+    true,
+  );
+  for (const row of state.persistedRows) {
+    assertEquals(row.user_id, USER_ID);
+    assertEquals(row.tent_id, TENT_ID);
+    assertEquals(row.source, "live");
+    assertEquals(row.quality, "ok");
+    assertEquals(row.captured_at, CAPTURED_AT);
+    const raw = row.raw_payload as Record<string, unknown>;
+    assertEquals(raw.vendor, "ecowitt_windows_testbench");
+    const metadata = raw.metadata as Record<string, unknown>;
+    assertEquals(metadata.transport_source, "ecowitt");
+    assertEquals(metadata.verdant_source, "live");
+    assertEquals(metadata.reported_verdant_source, "live");
+    const serialized = JSON.stringify(row);
+    assert(!serialized.includes(SPOOFED_USER_ID));
+    assert(!serialized.includes(VALID_TOKEN));
+  }
+  assertEquals(state.rpcCalls.length, 1);
+  assertEquals(state.rpcCalls[0].name, "bump_bridge_token_usage");
+  assertEquals(state.auditRows.length, 1);
+});
 
-Deno.test(
-  "sensor webhook handler cannot duplicate a fresh event when it is replayed stale",
-  async () => {
-    const state = makeState();
-    const admin = makeAdmin(state);
+Deno.test("sensor webhook handler cannot duplicate a fresh event when it is replayed stale", async () => {
+  const state = makeState();
+  const admin = makeAdmin(state);
 
-    const freshResponse = await handleRequest(post(VALID_TOKEN), {
-      admin,
-      now: () => NOW,
-      expectedBillingEnvironment: "live",
-    });
-    assertEquals(freshResponse.status, 200);
-    assertEquals((await responseBody(freshResponse)).inserted, 3);
-    assertEquals(state.persistedRows.length, 3);
-    assertEquals(state.rpcCalls.length, 1);
-    assertEquals(state.auditRows.length, 1);
+  const freshResponse = await handleRequest(post(VALID_TOKEN), {
+    admin,
+    now: () => NOW,
+    expectedBillingEnvironment: "live",
+  });
+  assertEquals(freshResponse.status, 200);
+  assertEquals((await responseBody(freshResponse)).inserted, 3);
+  assertEquals(state.persistedRows.length, 3);
+  assertEquals(state.rpcCalls.length, 1);
+  assertEquals(state.auditRows.length, 1);
 
-    const staleResponse = await handleRequest(post(VALID_TOKEN), {
-      admin,
-      now: () => new Date("2026-07-18T12:26:00.000Z"),
-      expectedBillingEnvironment: "live",
-    });
-    const staleBody = await responseBody(staleResponse);
+  const staleResponse = await handleRequest(post(VALID_TOKEN), {
+    admin,
+    now: () => new Date("2026-07-18T12:26:00.000Z"),
+    expectedBillingEnvironment: "live",
+  });
+  const staleBody = await responseBody(staleResponse);
 
-    assertEquals(staleResponse.status, 200);
-    assertEquals(staleBody.ok, true);
-    assertEquals(staleBody.accepted, false);
-    assertEquals(staleBody.inserted, 0);
-    assertEquals(staleBody.reason, "timestamp_stale");
-    assertEquals(staleBody.auth, "bridge");
-    // No second persistence, usage bump, or audit write may occur.
-    assertEquals(state.persistedRows.length, 3);
-    assertEquals(state.rpcCalls.length, 1);
-    assertEquals(state.auditRows.length, 1);
-  },
-);
+  assertEquals(staleResponse.status, 200);
+  assertEquals(staleBody.ok, true);
+  assertEquals(staleBody.accepted, false);
+  assertEquals(staleBody.inserted, 0);
+  assertEquals(staleBody.reason, "timestamp_stale");
+  assertEquals(staleBody.auth, "bridge");
+  // No second persistence, usage bump, or audit write may occur.
+  assertEquals(state.persistedRows.length, 3);
+  assertEquals(state.rpcCalls.length, 1);
+  assertEquals(state.auditRows.length, 1);
+});
 
 Deno.test("sensor webhook handler rejects a revoked bridge without writing", async () => {
   const state = makeState(bridgeRow({ revoked_at: "2026-07-18T11:00:00.000Z" }));

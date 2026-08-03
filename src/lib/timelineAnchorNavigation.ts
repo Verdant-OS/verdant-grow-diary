@@ -83,7 +83,7 @@ export function navigateToTimelineAnchor(
 ): void {
   const currentPath =
     deps.currentPath ??
-    (typeof window !== "undefined" ? window.location?.pathname ?? null : null);
+    (typeof window !== "undefined" ? (window.location?.pathname ?? null) : null);
 
   if (!isSameTimelinePage(target, currentPath)) {
     if (deps.navigate) {
@@ -92,9 +92,7 @@ export function navigateToTimelineAnchor(
     }
     const hardAssign =
       deps.assign ??
-      (typeof window !== "undefined"
-        ? (href: string) => window.location.assign(href)
-        : null);
+      (typeof window !== "undefined" ? (href: string) => window.location.assign(href) : null);
     if (hardAssign) hardAssign(target.href);
     return;
   }

@@ -15,10 +15,15 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { readDesktopGrowerNavigationSource } from "@/test/utils/growerNavigationSource";
+import {
+  extractMountedAppRoutePaths,
+  getRouteAliasRedirectTarget,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const SIDEBAR = readDesktopGrowerNavigationSource();
-const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+const APP = readAllRouteModuleSources();
 const DASH = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
 
 describe("Dashboard + Live Dashboard consolidation · navigation", () => {
@@ -33,9 +38,8 @@ describe("Dashboard + Live Dashboard consolidation · navigation", () => {
   });
 
   it("Legacy /grow-room route redirects to the main Dashboard", () => {
-    expect(APP).toMatch(
-      /path=["']\/grow-room["']\s+element=\{<RouteAliasRedirect\s+to=["']\/["']\s*\/>\}/,
-    );
+    expect(extractMountedAppRoutePaths()).toContain("/grow-room");
+    expect(getRouteAliasRedirectTarget("/grow-room")).toBe("/");
     expect(APP).not.toMatch(/<GrowRoomMode\s*\/?>/);
   });
 

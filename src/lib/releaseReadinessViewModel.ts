@@ -78,8 +78,7 @@ export const RELEASE_READINESS_VIEW_MODEL: ReleaseReadinessViewModel = {
     summary:
       "Verification pending. PR #112 parser-generated full-suite receipt is GO, but the repo-wide Auth loading smoke remains flaky/non-required and outstanding artifact gates have not yet been proven green on main.",
   },
-  sourceLabel:
-    "Static / manual snapshot — not a live CI feed. Reflects documented receipts only.",
+  sourceLabel: "Static / manual snapshot — not a live CI feed. Reflects documented receipts only.",
   checks: [
     {
       id: "pr-112-batched-full-suite",
@@ -183,8 +182,7 @@ export const RELEASE_READINESS_VIEW_MODEL: ReleaseReadinessViewModel = {
     {
       id: "parse-vitest-batches",
       label: "Parse vitest batched workflow logs",
-      command:
-        "node scripts/parse-vitest-batched-workflow-logs.mjs --run-url=<RUN_URL>",
+      command: "node scripts/parse-vitest-batched-workflow-logs.mjs --run-url=<RUN_URL>",
       note: "PR #112 receipt run: 28463133281 (head 4eb63ba, merge commit 5bc657fc).",
     },
   ],

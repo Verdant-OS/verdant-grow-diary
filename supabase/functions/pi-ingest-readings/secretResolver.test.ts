@@ -4,11 +4,7 @@
 // ciphertexts produced inline. They do NOT touch Supabase, the
 // database, env vars (the key provider is injected), or the
 // pi-ingest-readings HTTP handler.
-import {
-  assert,
-  assertEquals,
-  assertNotEquals,
-} from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assert, assertEquals, assertNotEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   defaultEnvKeyProvider,
   type PiIngestSecretKeyProvider,
@@ -45,16 +41,11 @@ async function encryptForTest(
   return { ciphertext: new Uint8Array(ct), nonce };
 }
 
-function fixedKeyProvider(
-  bytes: Uint8Array,
-  version: number,
-): PiIngestSecretKeyProvider {
+function fixedKeyProvider(bytes: Uint8Array, version: number): PiIngestSecretKeyProvider {
   return (v) => (v === version ? bytes : null);
 }
 
-function baseInput(
-  overrides: Partial<ResolveBridgeSecretInput> = {},
-): ResolveBridgeSecretInput {
+function baseInput(overrides: Partial<ResolveBridgeSecretInput> = {}): ResolveBridgeSecretInput {
   return {
     bridgeId: BRIDGE_ID,
     secretCiphertext: new Uint8Array([1, 2, 3]),
@@ -126,18 +117,16 @@ Deno.test("accepts hex-encoded 32-byte key string", async () => {
 // ---------- Status gates ----------
 
 Deno.test("pending_rotation → inactive_credential", async () => {
-  const r = await resolveBridgeSecret(
-    baseInput({ secretStatus: "pending_rotation" }),
-    () => randomBytes(32),
+  const r = await resolveBridgeSecret(baseInput({ secretStatus: "pending_rotation" }), () =>
+    randomBytes(32),
   );
   assertEquals(r.ok, false);
   if (!r.ok) assertEquals(r.reason, "inactive_credential");
 });
 
 Deno.test("disabled → inactive_credential", async () => {
-  const r = await resolveBridgeSecret(
-    baseInput({ secretStatus: "disabled" }),
-    () => randomBytes(32),
+  const r = await resolveBridgeSecret(baseInput({ secretStatus: "disabled" }), () =>
+    randomBytes(32),
   );
   assertEquals(r.ok, false);
   if (!r.ok) assertEquals(r.reason, "inactive_credential");
@@ -156,37 +145,29 @@ Deno.test("unknown secret_status → invalid_secret_status", async () => {
 // ---------- Field gates ----------
 
 Deno.test("empty bridgeId → missing_credential", async () => {
-  const r = await resolveBridgeSecret(
-    baseInput({ bridgeId: "   " }),
-    () => randomBytes(32),
-  );
+  const r = await resolveBridgeSecret(baseInput({ bridgeId: "   " }), () => randomBytes(32));
   assertEquals(r.ok, false);
   if (!r.ok) assertEquals(r.reason, "missing_credential");
 });
 
 Deno.test("empty ciphertext → missing_ciphertext", async () => {
-  const r = await resolveBridgeSecret(
-    baseInput({ secretCiphertext: new Uint8Array() }),
-    () => randomBytes(32),
+  const r = await resolveBridgeSecret(baseInput({ secretCiphertext: new Uint8Array() }), () =>
+    randomBytes(32),
   );
   assertEquals(r.ok, false);
   if (!r.ok) assertEquals(r.reason, "missing_ciphertext");
 });
 
 Deno.test("empty nonce → missing_nonce", async () => {
-  const r = await resolveBridgeSecret(
-    baseInput({ secretNonce: new Uint8Array() }),
-    () => randomBytes(32),
+  const r = await resolveBridgeSecret(baseInput({ secretNonce: new Uint8Array() }), () =>
+    randomBytes(32),
   );
   assertEquals(r.ok, false);
   if (!r.ok) assertEquals(r.reason, "missing_nonce");
 });
 
 Deno.test("non-positive key version → missing_key_version", async () => {
-  const r = await resolveBridgeSecret(
-    baseInput({ secretKeyVersion: 0 }),
-    () => randomBytes(32),
-  );
+  const r = await resolveBridgeSecret(baseInput({ secretKeyVersion: 0 }), () => randomBytes(32));
   assertEquals(r.ok, false);
   if (!r.ok) assertEquals(r.reason, "missing_key_version");
 });
@@ -194,10 +175,7 @@ Deno.test("non-positive key version → missing_key_version", async () => {
 // ---------- Key resolution ----------
 
 Deno.test("unknown key version (>=3) → unknown_key_version", async () => {
-  const r = await resolveBridgeSecret(
-    baseInput({ secretKeyVersion: 99 }),
-    () => randomBytes(32),
-  );
+  const r = await resolveBridgeSecret(baseInput({ secretKeyVersion: 99 }), () => randomBytes(32));
   assertEquals(r.ok, false);
   if (!r.ok) assertEquals(r.reason, "unknown_key_version");
 });
@@ -268,10 +246,7 @@ Deno.test("failure result never contains secret/ciphertext/nonce/key material", 
     btoa(String.fromCharCode(...tampered)),
     "PI_INGEST_SECRET_KEY",
   ]) {
-    assert(
-      !json.includes(forbidden),
-      `failure result leaked forbidden token: ${forbidden}`,
-    );
+    assert(!json.includes(forbidden), `failure result leaked forbidden token: ${forbidden}`);
   }
 });
 
@@ -294,10 +269,7 @@ Deno.test("success result exposes secret only, not ciphertext/nonce/key", async 
       "secret_key_version",
       "PI_INGEST_SECRET_KEY",
     ]) {
-      assert(
-        !json.includes(forbidden),
-        `success result leaked forbidden token: ${forbidden}`,
-      );
+      assert(!json.includes(forbidden), `success result leaked forbidden token: ${forbidden}`);
     }
     assertNotEquals(r.secret, "");
   }
@@ -306,9 +278,7 @@ Deno.test("success result exposes secret only, not ciphertext/nonce/key", async 
 // ---------- Source guardrails ----------
 
 Deno.test("secretResolver.ts source contains no forbidden surfaces", async () => {
-  const src = await Deno.readTextFile(
-    new URL("./secretResolver.ts", import.meta.url),
-  );
+  const src = await Deno.readTextFile(new URL("./secretResolver.ts", import.meta.url));
   const forbidden: Array<[string, RegExp]> = [
     ["createClient", /\bcreateClient\s*\(/],
     ["service_role", /service_role/i],
@@ -332,7 +302,6 @@ Deno.test("index.ts imports the resolver behind the auth gate", async () => {
   assert(/from\s+["']\.\/secretResolver(\.ts)?["']/.test(src));
   assert(/resolveBridgeSecret\s*\(/.test(src));
 });
-
 
 // ---------- Default env provider ----------
 

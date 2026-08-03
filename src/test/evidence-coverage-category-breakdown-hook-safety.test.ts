@@ -7,13 +7,13 @@ describe("useEvidenceCoverage — category-breakdown hook safety", () => {
   const src = readFileSync(HOOK, "utf8");
   // Strip block comments and line comments so the safety-note JSDoc that
   // intentionally names forbidden fields does not trip the scanner.
-  const code = src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/^\s*\/\/.*$/gm, "");
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
   it("selects only safe non-sensitive fields plus originating_timeline_events", () => {
     // Allowed select clauses
-    expect(src).toMatch(/\.from\("alerts"\)[\s\S]*\.select\("id,metric,originating_timeline_events"\)/);
+    expect(src).toMatch(
+      /\.from\("alerts"\)[\s\S]*\.select\("id,metric,originating_timeline_events"\)/,
+    );
     expect(src).toMatch(
       /\.from\("action_queue"\)[\s\S]*\.select\("id,action_type,originating_timeline_events"\)/,
     );

@@ -7,7 +7,9 @@ export const Route = createFileRoute("/_app/pheno-hunts/new")({
 });
 
 function RouteComponent() {
-  return <PhenoTrackerUpgradeGate>
-                          <PhenoHuntNew />
-                        </PhenoTrackerUpgradeGate>;
+  return (
+    <PhenoTrackerUpgradeGate>
+      <PhenoHuntNew />
+    </PhenoTrackerUpgradeGate>
+  );
 }

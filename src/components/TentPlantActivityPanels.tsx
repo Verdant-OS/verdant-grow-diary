@@ -55,12 +55,8 @@ function emitQuickLog(panel: TentPlantActivityPanelRow, note?: string) {
   if (typeof window === "undefined") return;
   const trimmed = typeof note === "string" ? note.trim() : "";
   const detail =
-    trimmed.length > 0
-      ? { ...panel.quickLogPrefill, note: trimmed }
-      : panel.quickLogPrefill;
-  window.dispatchEvent(
-    new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail }),
-  );
+    trimmed.length > 0 ? { ...panel.quickLogPrefill, note: trimmed } : panel.quickLogPrefill;
+  window.dispatchEvent(new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail }));
 }
 
 function EvidenceNotesSection({ panel }: { panel: TentPlantActivityPanelRow }) {
@@ -210,187 +206,177 @@ export default function TentPlantActivityPanels({
         </div>
       ) : (
         <>
-
-      {viewModel.emptyCopy && (
-        <p
-          className="text-sm text-muted-foreground"
-          data-testid="tent-plant-activity-panels-empty"
-          role="status"
-        >
-          {viewModel.emptyCopy}
-        </p>
-      )}
-      {viewModel.panels.length > 0 && (
-        <ul
-          className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
-          data-testid="tent-plant-activity-panels-list"
-        >
-          {viewModel.panels.map((panel) => (
-            <li
-              key={panel.id}
-              className="flex min-h-[10.5rem] min-w-0 flex-col rounded-xl border border-border/50 bg-card p-3"
-              data-testid={panel.testId}
+          {viewModel.emptyCopy && (
+            <p
+              className="text-sm text-muted-foreground"
+              data-testid="tent-plant-activity-panels-empty"
+              role="status"
             >
-              <header className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <h3
-                    className="font-medium truncate"
-                    data-testid={`${panel.testId}-name`}
-                  >
-                    {panel.name}
-                  </h3>
-                  {panel.strain && (
-                    <p
-                      className="text-xs text-muted-foreground truncate"
-                      data-testid={`${panel.testId}-strain`}
-                    >
-                      {panel.strain}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  {panel.isArchived && (
-                    <span
-                      className="text-[11px] rounded-md border px-1.5 py-0.5 text-muted-foreground"
-                      data-testid={`${panel.testId}-archived`}
-                      aria-label={`${panel.name} is archived`}
-                    >
-                      Archived
-                    </span>
-                  )}
-                  {panel.stage && (
-                    <span
-                      className="text-[11px] rounded-md border px-1.5 py-0.5 text-muted-foreground"
-                      data-testid={`${panel.testId}-stage`}
-                    >
-                      {panel.stage}
-                    </span>
-                  )}
-                </div>
-              </header>
+              {viewModel.emptyCopy}
+            </p>
+          )}
+          {viewModel.panels.length > 0 && (
+            <ul
+              className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+              data-testid="tent-plant-activity-panels-list"
+            >
+              {viewModel.panels.map((panel) => (
+                <li
+                  key={panel.id}
+                  className="flex min-h-[10.5rem] min-w-0 flex-col rounded-xl border border-border/50 bg-card p-3"
+                  data-testid={panel.testId}
+                >
+                  <header className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 className="font-medium truncate" data-testid={`${panel.testId}-name`}>
+                        {panel.name}
+                      </h3>
+                      {panel.strain && (
+                        <p
+                          className="text-xs text-muted-foreground truncate"
+                          data-testid={`${panel.testId}-strain`}
+                        >
+                          {panel.strain}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {panel.isArchived && (
+                        <span
+                          className="text-[11px] rounded-md border px-1.5 py-0.5 text-muted-foreground"
+                          data-testid={`${panel.testId}-archived`}
+                          aria-label={`${panel.name} is archived`}
+                        >
+                          Archived
+                        </span>
+                      )}
+                      {panel.stage && (
+                        <span
+                          className="text-[11px] rounded-md border px-1.5 py-0.5 text-muted-foreground"
+                          data-testid={`${panel.testId}-stage`}
+                        >
+                          {panel.stage}
+                        </span>
+                      )}
+                    </div>
+                  </header>
 
-              <div className="mt-2 space-y-1 text-xs">
-                {panel.latestLogDateLabel ? (
-                  <div className="flex items-center gap-2 flex-wrap" data-testid={`${panel.testId}-latest-log-row`}>
-                    <p data-testid={`${panel.testId}-latest-log`}>
-                      Latest log: {panel.latestLogDateLabel}
-                      {panel.latestLogSummary ? ` — ${panel.latestLogSummary}` : ""}
-                    </p>
-                    {viewer && panel.latestLogEntryId ? (
-                      <DiaryEntryRemoveButton
-                        entry={{
-                          id: panel.latestLogEntryId,
-                          kind: "diary",
-                          // Photo flag handled separately by Remove photo log.
-                          photoUrl: null,
-                        }}
-                        viewer={viewer}
-                        plantName={panel.name}
-                        plantId={panel.id}
-                        tentId={tentId ?? null}
-                        growId={growId ?? null}
-                        showFollowUp
-                      />
-                    ) : null}
+                  <div className="mt-2 space-y-1 text-xs">
+                    {panel.latestLogDateLabel ? (
+                      <div
+                        className="flex items-center gap-2 flex-wrap"
+                        data-testid={`${panel.testId}-latest-log-row`}
+                      >
+                        <p data-testid={`${panel.testId}-latest-log`}>
+                          Latest log: {panel.latestLogDateLabel}
+                          {panel.latestLogSummary ? ` — ${panel.latestLogSummary}` : ""}
+                        </p>
+                        {viewer && panel.latestLogEntryId ? (
+                          <DiaryEntryRemoveButton
+                            entry={{
+                              id: panel.latestLogEntryId,
+                              kind: "diary",
+                              // Photo flag handled separately by Remove photo log.
+                              photoUrl: null,
+                            }}
+                            viewer={viewer}
+                            plantName={panel.name}
+                            plantId={panel.id}
+                            tentId={tentId ?? null}
+                            growId={growId ?? null}
+                            showFollowUp
+                          />
+                        ) : null}
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground" data-testid={`${panel.testId}-no-diary`}>
+                        {panel.diaryEmptyCopy}
+                      </p>
+                    )}
+                    {panel.hasRecentPhoto ? (
+                      <div
+                        className="flex items-center gap-2 flex-wrap"
+                        data-testid={`${panel.testId}-recent-photo-row`}
+                      >
+                        <p data-testid={`${panel.testId}-recent-photo`}>Recent photo on file</p>
+                        {viewer && panel.latestPhotoEntryId ? (
+                          <DiaryEntryRemoveButton
+                            entry={{
+                              id: panel.latestPhotoEntryId,
+                              kind: "diary",
+                              // Forces photo-log copy variant.
+                              photoUrl: "x",
+                            }}
+                            viewer={viewer}
+                            plantName={panel.name}
+                            plantId={panel.id}
+                            tentId={tentId ?? null}
+                            growId={growId ?? null}
+                            showFollowUp
+                          />
+                        ) : null}
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground" data-testid={`${panel.testId}-no-photo`}>
+                        {panel.photoEmptyCopy}
+                      </p>
+                    )}
+                    {panel.harvestWatch && (
+                      <>
+                        <p
+                          className="text-muted-foreground"
+                          data-testid={`${panel.testId}-harvest-watch`}
+                        >
+                          {panel.harvestWatch.copy}
+                        </p>
+                        <p
+                          className="text-[11px] text-muted-foreground"
+                          data-testid={`${panel.testId}-harvest-watch-help`}
+                        >
+                          {panel.harvestWatch.helpText} {panel.harvestWatch.cautionText}
+                        </p>
+                      </>
+                    )}
                   </div>
-                ) : (
-                  <p
-                    className="text-muted-foreground"
-                    data-testid={`${panel.testId}-no-diary`}
-                  >
-                    {panel.diaryEmptyCopy}
-                  </p>
-                )}
-                {panel.hasRecentPhoto ? (
-                  <div className="flex items-center gap-2 flex-wrap" data-testid={`${panel.testId}-recent-photo-row`}>
-                    <p data-testid={`${panel.testId}-recent-photo`}>
-                      Recent photo on file
-                    </p>
-                    {viewer && panel.latestPhotoEntryId ? (
-                      <DiaryEntryRemoveButton
-                        entry={{
-                          id: panel.latestPhotoEntryId,
-                          kind: "diary",
-                          // Forces photo-log copy variant.
-                          photoUrl: "x",
-                        }}
-                        viewer={viewer}
-                        plantName={panel.name}
-                        plantId={panel.id}
-                        tentId={tentId ?? null}
-                        growId={growId ?? null}
-                        showFollowUp
-                      />
-                    ) : null}
+
+                  {panel.harvestWatch && <EvidenceNotesSection panel={panel} />}
+
+                  <div className="mt-auto pt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      data-testid={`${panel.testId}-add-quicklog`}
+                      data-is-first-quicklog={panel.isFirstQuickLog ? "true" : "false"}
+                      aria-label={panel.quickLogCtaAccessibleLabel}
+                      aria-disabled={panel.quickLogDisabled || undefined}
+                      disabled={panel.quickLogDisabled}
+                      title={panel.quickLogDisabledReason ?? undefined}
+                      onClick={() => emitQuickLog(panel)}
+                      className="text-xs px-2.5 py-1 rounded-full border bg-primary text-primary-foreground border-primary disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    >
+                      {panel.quickLogCtaLabel}
+                    </button>
+                    <Link
+                      to={panel.diaryHref}
+                      aria-label={panel.diaryAccessibleLabel}
+                      data-testid={`${panel.testId}-diary-link`}
+                      className="text-xs underline underline-offset-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                    >
+                      View diary
+                    </Link>
+                    <Link
+                      to={panel.photosHref}
+                      aria-label={panel.photosAccessibleLabel}
+                      data-testid={`${panel.testId}-photos-link`}
+                      data-anchor-blocked={panel.photosAnchorBlocked ? "true" : undefined}
+                      className="text-xs underline underline-offset-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                    >
+                      View photos
+                    </Link>
                   </div>
-                ) : (
-                  <p
-                    className="text-muted-foreground"
-                    data-testid={`${panel.testId}-no-photo`}
-                  >
-                    {panel.photoEmptyCopy}
-                  </p>
-                )}
-                {panel.harvestWatch && (
-                  <>
-                    <p
-                      className="text-muted-foreground"
-                      data-testid={`${panel.testId}-harvest-watch`}
-                    >
-                      {panel.harvestWatch.copy}
-                    </p>
-                    <p
-                      className="text-[11px] text-muted-foreground"
-                      data-testid={`${panel.testId}-harvest-watch-help`}
-                    >
-                      {panel.harvestWatch.helpText} {panel.harvestWatch.cautionText}
-                    </p>
-                  </>
-                )}
-              </div>
-
-              {panel.harvestWatch && <EvidenceNotesSection panel={panel} />}
-
-
-
-              <div className="mt-auto pt-3 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  data-testid={`${panel.testId}-add-quicklog`}
-                  data-is-first-quicklog={panel.isFirstQuickLog ? "true" : "false"}
-                  aria-label={panel.quickLogCtaAccessibleLabel}
-                  aria-disabled={panel.quickLogDisabled || undefined}
-                  disabled={panel.quickLogDisabled}
-                  title={panel.quickLogDisabledReason ?? undefined}
-                  onClick={() => emitQuickLog(panel)}
-                  className="text-xs px-2.5 py-1 rounded-full border bg-primary text-primary-foreground border-primary disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                >
-                  {panel.quickLogCtaLabel}
-                </button>
-                <Link
-                  to={panel.diaryHref}
-                  aria-label={panel.diaryAccessibleLabel}
-                  data-testid={`${panel.testId}-diary-link`}
-                  className="text-xs underline underline-offset-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
-                >
-                  View diary
-                </Link>
-                <Link
-                  to={panel.photosHref}
-                  aria-label={panel.photosAccessibleLabel}
-                  data-testid={`${panel.testId}-photos-link`}
-                  data-anchor-blocked={
-                    panel.photosAnchorBlocked ? "true" : undefined
-                  }
-                  className="text-xs underline underline-offset-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
-                >
-                  View photos
-                </Link>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+                </li>
+              ))}
+            </ul>
+          )}
         </>
       )}
     </section>

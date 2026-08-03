@@ -29,12 +29,7 @@ const meta = (
 
 describe("DashboardDataSourceDisclosure (presenter)", () => {
   it("shows Demo badge when any section is mock-backed", () => {
-    render(
-      <DashboardDataSourceDisclosure
-        hasAnyData
-        metas={[meta("mock"), meta("mock")]}
-      />,
-    );
+    render(<DashboardDataSourceDisclosure hasAnyData metas={[meta("mock"), meta("mock")]} />);
     const b = screen.getByTestId("dashboard-data-source-badge");
     expect(b.getAttribute("data-label")).toBe("Demo");
     expect(b).toHaveTextContent(/demo/i);
@@ -42,22 +37,14 @@ describe("DashboardDataSourceDisclosure (presenter)", () => {
 
   it("shows Mixed badge when sources include real and mock", () => {
     render(
-      <DashboardDataSourceDisclosure
-        hasAnyData
-        metas={[meta("supabase", false), meta("mock")]}
-      />,
+      <DashboardDataSourceDisclosure hasAnyData metas={[meta("supabase", false), meta("mock")]} />,
     );
     const b = screen.getByTestId("dashboard-data-source-badge");
     expect(b.getAttribute("data-label")).toBe("Mixed");
   });
 
   it("never shows Live for mock-backed metadata", () => {
-    render(
-      <DashboardDataSourceDisclosure
-        hasAnyData
-        metas={[meta("mock"), meta("mock")]}
-      />,
-    );
+    render(<DashboardDataSourceDisclosure hasAnyData metas={[meta("mock"), meta("mock")]} />);
     const b = screen.getByTestId("dashboard-data-source-badge");
     expect(b.getAttribute("data-label")).not.toBe("Live");
   });
@@ -75,33 +62,24 @@ describe("DashboardDataSourceDisclosure (presenter)", () => {
 
   it("shows Unavailable welcome state when there is no usable data", () => {
     render(
-      <DashboardDataSourceDisclosure
-        hasAnyData={false}
-        metas={[meta("unavailable", false)]}
-      />,
+      <DashboardDataSourceDisclosure hasAnyData={false} metas={[meta("unavailable", false)]} />,
     );
     const b = screen.getByTestId("dashboard-data-source-badge");
     expect(b.getAttribute("data-label")).toBe("Unavailable");
-    expect(
-      screen.getByTestId("dashboard-data-source-disclosure"),
-    ).toHaveTextContent(/welcome/i);
+    expect(screen.getByTestId("dashboard-data-source-disclosure")).toHaveTextContent(/welcome/i);
   });
 
   it("falls back to Unavailable when no metas resolved", () => {
-    render(
-      <DashboardDataSourceDisclosure hasAnyData={false} metas={[]} />,
+    render(<DashboardDataSourceDisclosure hasAnyData={false} metas={[]} />);
+    expect(screen.getByTestId("dashboard-data-source-badge").getAttribute("data-label")).toBe(
+      "Unavailable",
     );
-    expect(
-      screen.getByTestId("dashboard-data-source-badge").getAttribute("data-label"),
-    ).toBe("Unavailable");
   });
 });
 
 describe("Dashboard data-source disclosure wiring", () => {
   it("Dashboard imports DashboardDataSourceDisclosure", () => {
-    expect(DASHBOARD).toMatch(
-      /from\s+["']@\/components\/DashboardDataSourceDisclosure["']/,
-    );
+    expect(DASHBOARD).toMatch(/from\s+["']@\/components\/DashboardDataSourceDisclosure["']/);
     expect(DASHBOARD).toMatch(/<DashboardDataSourceDisclosure/);
   });
 

@@ -152,7 +152,9 @@ describe("PostGrowReflectionCandidatePasteValidator", () => {
 
     fireEvent.click(screen.getByText("Clear"));
     expect(screen.queryByText("Invalid JSON")).toBeNull();
-    expect(screen.getByText(/Paste a candidate ReflectionOutput JSON or candidate envelope/)).toBeTruthy();
+    expect(
+      screen.getByText(/Paste a candidate ReflectionOutput JSON or candidate envelope/),
+    ).toBeTruthy();
     expect((screen.getByLabelText("Candidate JSON") as HTMLTextAreaElement).value).toBe("");
   });
 });

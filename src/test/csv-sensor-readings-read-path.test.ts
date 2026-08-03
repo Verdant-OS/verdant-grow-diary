@@ -24,10 +24,7 @@ import {
   STALE_THRESHOLD_MS,
   type SensorReadingLike,
 } from "@/lib/sensorSnapshot";
-import {
-  getCsvVendorLineage,
-  getCsvVendorLabel,
-} from "@/lib/sensorReadingVendorLineage";
+import { getCsvVendorLineage, getCsvVendorLabel } from "@/lib/sensorReadingVendorLineage";
 
 const TS = "2026-06-01T12:00:00.000Z";
 
@@ -92,8 +89,9 @@ describe("getCsvVendorLineage — Spider Farmer / Vivosun / AC Infinity", () => 
     expect(v?.sourceApp).toBe("spider_farmer");
     expect(v?.vendorLabel).toBe("Spider Farmer");
     expect(v?.badgeLabel).toBe("CSV history · Spider Farmer");
-    expect(getCsvVendorLabel({ source: "csv", raw_payload: { source_app: "spider_farmer" } }))
-      .toBe("Spider Farmer");
+    expect(getCsvVendorLabel({ source: "csv", raw_payload: { source_app: "spider_farmer" } })).toBe(
+      "Spider Farmer",
+    );
   });
 
   it("returns Vivosun lineage from raw_payload.source_app", () => {
@@ -146,10 +144,7 @@ describe("getCsvVendorLineage — Spider Farmer / Vivosun / AC Infinity", () => 
 });
 
 describe("static safety — vendor lineage helper", () => {
-  const helper = readFileSync(
-    resolve(__dirname, "../lib/sensorReadingVendorLineage.ts"),
-    "utf8",
-  );
+  const helper = readFileSync(resolve(__dirname, "../lib/sensorReadingVendorLineage.ts"), "utf8");
 
   it("does not reference alerts / Action Queue / AI / device control / RLS", () => {
     const forbidden = [

@@ -87,9 +87,7 @@ describe("verifyMcpToolAccess", () => {
     const adapter: HarnessAdapter = {
       available: true,
       probe: async () => {
-        throw new Error(
-          "Bearer eyJhbGciOi.SECRET.SIG service_role refresh_token=xyz",
-        );
+        throw new Error("Bearer eyJhbGciOi.SECRET.SIG service_role refresh_token=xyz");
       },
     };
     const r = await verifyMcpToolAccess({ adapter });

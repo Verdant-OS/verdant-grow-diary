@@ -16,10 +16,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  DEFAULT_FILTERS,
-  type SessionsIndexFilters,
-} from "@/lib/aiDoctorSessionsIndexFilters";
+import { DEFAULT_FILTERS, type SessionsIndexFilters } from "@/lib/aiDoctorSessionsIndexFilters";
 import {
   BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID,
   BUILTIN_SAVED_VIEWS,
@@ -116,10 +113,7 @@ describe("savedViewToSearchParams writes sort to URL", () => {
   }
 
   it("includes sort param for non-default", () => {
-    const url = savedViewToSearchParams(
-      buildView("review-priority"),
-      new URLSearchParams(),
-    );
+    const url = savedViewToSearchParams(buildView("review-priority"), new URLSearchParams());
     expect(url.get("sort")).toBe("review-priority");
   });
 
@@ -150,16 +144,11 @@ describe("formatSavedViewSummary renders sort label", () => {
   });
 
   it("does NOT include a Sort label for default newest", () => {
-    expect(formatSavedViewSummary(filters({ sort: "newest" }), 0)).not.toContain(
-      "Sort:",
-    );
+    expect(formatSavedViewSummary(filters({ sort: "newest" }), 0)).not.toContain("Sort:");
   });
 
   it("combines sort with other active filters in the summary", () => {
-    const s = formatSavedViewSummary(
-      filters({ caution: "yes", sort: "review-priority" }),
-      0,
-    );
+    const s = formatSavedViewSummary(filters({ caution: "yes", sort: "review-priority" }), 0);
     expect(s).toContain("Caution only");
     expect(s).toContain("Sort: Review priority");
   });

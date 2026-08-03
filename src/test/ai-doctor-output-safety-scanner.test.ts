@@ -54,9 +54,7 @@ describe("aiDoctorOutputSafetyScanner — unsafe phrase detection", () => {
         reason: "Please review and turn on fan to balance VPD.",
       },
     });
-    expect(
-      v.some((x) => x.path === "result.action_queue_suggestion.reason"),
-    ).toBe(true);
+    expect(v.some((x) => x.path === "result.action_queue_suggestion.reason")).toBe(true);
   });
 
   it("flags dosing phrase in immediate_action", () => {
@@ -117,10 +115,7 @@ describe("aiDoctorOutputSafetyScanner — defensive walking", () => {
   });
 
   it("respects rootPath when passed as plain string", () => {
-    const v = scanDiagnosisForUnsafePhrases(
-      { summary: "Guaranteed result." },
-      "case_xyz",
-    );
+    const v = scanDiagnosisForUnsafePhrases({ summary: "Guaranteed result." }, "case_xyz");
     expect(v[0].path).toBe("case_xyz.summary");
   });
 
@@ -167,9 +162,7 @@ describe("aiDoctorOutputSafetyScanner — formatUnsafePhraseReport", () => {
     expect(report).toContain('Phrase: "set fan"');
     expect(report).toContain('Text: "Review and set fan speed higher."');
     // case-a appears before case-b (sorted)
-    expect(report.indexOf("Case: case-a")).toBeLessThan(
-      report.indexOf("Case: case-b"),
-    );
+    expect(report.indexOf("Case: case-a")).toBeLessThan(report.indexOf("Case: case-b"));
   });
 
   it("uses '(uncategorized)' when caseId is missing", () => {
@@ -213,9 +206,7 @@ describe("aiDoctorOutputSafetyScanner — formatUnsafePhraseGitHubAnnotations", 
 
   it("uses default test file path when none is supplied", () => {
     const out = formatUnsafePhraseGitHubAnnotations([sample]);
-    expect(out).toContain(
-      "file=src/test/ai-doctor-output-safety-scanner.test.ts",
-    );
+    expect(out).toContain("file=src/test/ai-doctor-output-safety-scanner.test.ts");
   });
 
   it("sanitizes newline and `::` characters in offending text", () => {
@@ -240,10 +231,9 @@ describe("aiDoctorOutputSafetyScanner — formatUnsafePhraseGitHubAnnotations", 
 
   it("truncates very long offending text", () => {
     const long = "x".repeat(500);
-    const out = formatUnsafePhraseGitHubAnnotations(
-      [{ ...sample, text: long }],
-      { maxTextLength: 40 },
-    );
+    const out = formatUnsafePhraseGitHubAnnotations([{ ...sample, text: long }], {
+      maxTextLength: 40,
+    });
     expect(out).toContain("…");
     // Annotation line should be well below the raw text length.
     expect(out.length).toBeLessThan(400);

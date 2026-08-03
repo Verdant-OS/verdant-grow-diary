@@ -13,8 +13,7 @@
 
 import type { AiDoctorCheckInPreviewView } from "./aiDoctorCheckInPreviewViewModel";
 
-export const AI_DOCTOR_MANUAL_SAVE_SOURCE =
-  "ai_doctor_check_in_manual_save" as const;
+export const AI_DOCTOR_MANUAL_SAVE_SOURCE = "ai_doctor_check_in_manual_save" as const;
 export const AI_DOCTOR_MANUAL_SAVE_KIND = "ai_doctor_check_in" as const;
 export const AI_DOCTOR_ENGINE_VERSION_DEFAULT = "phase1" as const;
 export const AI_DOCTOR_RECEIPT_VERSION_DEFAULT = "v1" as const;
@@ -126,8 +125,7 @@ function deepFreeze<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
     Object.freeze(value);
     for (const k of Object.keys(value as object)) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      deepFreeze((value as any)[k]);
+      deepFreeze((value as Record<string, unknown>)[k]);
     }
   }
   return value;
@@ -170,8 +168,7 @@ export function buildAiDoctorManualSaveDraft(
   if (!identity.tent_id) reasons.push("missing_tent_id");
   if (!identity.grow_id) reasons.push("missing_grow_id");
   if (!receiptText || receiptText.trim() === "") reasons.push("missing_note");
-  if (!view?.summary || view.summary.trim() === "")
-    reasons.push("missing_summary");
+  if (!view?.summary || view.summary.trim() === "") reasons.push("missing_summary");
 
   if (reasons.length > 0) {
     const blocked: AiDoctorManualSaveDraftBlocked = {
@@ -182,8 +179,7 @@ export function buildAiDoctorManualSaveDraft(
   }
 
   const engineVersion = input.engineVersion ?? AI_DOCTOR_ENGINE_VERSION_DEFAULT;
-  const receiptVersion =
-    input.receiptVersion ?? AI_DOCTOR_RECEIPT_VERSION_DEFAULT;
+  const receiptVersion = input.receiptVersion ?? AI_DOCTOR_RECEIPT_VERSION_DEFAULT;
   const now = input.now ?? new Date(0);
   const occurredAt = input.occurredAt ?? now.toISOString();
 

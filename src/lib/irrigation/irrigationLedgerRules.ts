@@ -138,7 +138,11 @@ function mapRow(raw: Record<string, unknown>): IrrigationLedgerRow | null {
   const volumeMl = c ? num(c.volume_ml) : null;
   const ph = c ? num(c.ph) : null;
   // Feeding input EC prefers ec_in, else ec_ms_cm; watering uses ec_ms_cm.
-  const ecMsCm = c ? (kind === "feeding" ? (num(c.ec_in) ?? num(c.ec_ms_cm)) : num(c.ec_ms_cm)) : null;
+  const ecMsCm = c
+    ? kind === "feeding"
+      ? (num(c.ec_in) ?? num(c.ec_ms_cm))
+      : num(c.ec_ms_cm)
+    : null;
   const outputEcMsCm = c && kind === "feeding" ? num(c.ec_out) : null;
   const runoffMl = c ? num(c.runoff_ml) : null;
   const runoffPh = c ? num(c.runoff_ph) : null;
@@ -185,7 +189,9 @@ function compareLedger(a: IrrigationLedgerRow, b: IrrigationLedgerRow): number {
 }
 
 /** Map EVERY non-deleted watering/feeding raw row to a ledger row (never drops). */
-export function buildIrrigationLedger(rawRows: readonly unknown[] | null | undefined): IrrigationLedgerRow[] {
+export function buildIrrigationLedger(
+  rawRows: readonly unknown[] | null | undefined,
+): IrrigationLedgerRow[] {
   const rows = Array.isArray(rawRows) ? rawRows : [];
   const out: IrrigationLedgerRow[] = [];
   for (const raw of rows) {
@@ -205,7 +211,11 @@ export function buildIrrigationLedger(rawRows: readonly unknown[] | null | undef
 export function buildKeysetPage(
   rawRows: readonly unknown[] | null | undefined,
   pageSize: number,
-): { pageRawRows: Record<string, unknown>[]; hasMore: boolean; nextCursor: IrrigationCursor | null } {
+): {
+  pageRawRows: Record<string, unknown>[];
+  hasMore: boolean;
+  nextCursor: IrrigationCursor | null;
+} {
   const rows = (Array.isArray(rawRows) ? rawRows : []).filter(isRecord);
   const size = Math.max(1, Math.floor(pageSize));
   const hasMore = rows.length > size;

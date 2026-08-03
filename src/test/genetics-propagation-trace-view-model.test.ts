@@ -23,7 +23,17 @@ describe("trace view model", () => {
       node_count: 2,
       truncated: false,
       nodes: [
-        { key: "accession:acc-1", kind: "accession", id: "acc-1", depth: 0, label: "Harness Haze", edge_type: null, from: null, evidence: null, gaps: [] },
+        {
+          key: "accession:acc-1",
+          kind: "accession",
+          id: "acc-1",
+          depth: 0,
+          label: "Harness Haze",
+          edge_type: null,
+          from: null,
+          evidence: null,
+          gaps: [],
+        },
         {
           key: "plant:p-1",
           kind: "plant",
@@ -52,7 +62,17 @@ describe("trace view model", () => {
       ok: true,
       subject: { kind: "batch", id: "b-1" },
       nodes: [
-        { key: "batch:b-1", kind: "batch", id: "b-1", depth: 0, label: "B-001", edge_type: null, from: null, evidence: null, gaps: ["unknown_origin"] },
+        {
+          key: "batch:b-1",
+          kind: "batch",
+          id: "b-1",
+          depth: 0,
+          label: "B-001",
+          edge_type: null,
+          from: null,
+          evidence: null,
+          gaps: ["unknown_origin"],
+        },
       ],
       edges: [],
     });

@@ -8,12 +8,7 @@ function read(rel: string): string {
   return readFileSync(join(ROOT, rel), "utf8");
 }
 
-const FORBIDDEN_WORDS = [
-  /\blive\b/i,
-  /\bsynced\b/i,
-  /\bconnected\b/i,
-  /\bimported\b/i,
-];
+const FORBIDDEN_WORDS = [/\blive\b/i, /\bsynced\b/i, /\bconnected\b/i, /\bimported\b/i];
 const FORBIDDEN_WRITES = [
   /from\s+supabase/i,
   /\.from\(\s*['"]alerts['"]/,

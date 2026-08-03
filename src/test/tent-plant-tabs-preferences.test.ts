@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { clearLocalStorageForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 import {
   readTentPlantTabsSelectedPlantId,
   writeTentPlantTabsSelectedPlantId,
@@ -71,28 +74,19 @@ describe("tentPlantTabsPreferences", () => {
     vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
       throw new Error("boom");
     });
-    expect(() =>
-      writeTentPlantTabsSelectedPlantId("tent-a", "plant-1"),
-    ).not.toThrow();
-    expect(() =>
-      writeTentPlantTabsSelectedPlantId("tent-a", null),
-    ).not.toThrow();
+    expect(() => writeTentPlantTabsSelectedPlantId("tent-a", "plant-1")).not.toThrow();
+    expect(() => writeTentPlantTabsSelectedPlantId("tent-a", null)).not.toThrow();
     expect(readTentPlantTabsSelectedPlantId("tent-a")).toBeNull();
     vi.restoreAllMocks();
   });
 
   it("uses the documented per-tent key shape", () => {
-    expect(tentPlantTabsSelectedKey("tent-a")).toBe(
-      "verdant.tentPlantTabs.selected.v1.tent-a",
-    );
+    expect(tentPlantTabsSelectedKey("tent-a")).toBe("verdant.tentPlantTabs.selected.v1.tent-a");
   });
 });
 
 describe("tentPlantTabsPreferences static safety", () => {
-  const content = readFileSync(
-    resolve(__dirname, "../lib/tentPlantTabsPreferences.ts"),
-    "utf8",
-  );
+  const content = readFileSync(resolve(__dirname, "../lib/tentPlantTabsPreferences.ts"), "utf8");
 
   it("does not import Supabase clients", () => {
     expect(content).not.toMatch(/from\s+["']@\/integrations\/supabase/);

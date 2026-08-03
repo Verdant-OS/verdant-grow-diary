@@ -21,10 +21,7 @@ import {
 const ROOT = resolve(__dirname, "../..");
 const GROW_DETAIL_HOOK = readFileSync(resolve(ROOT, "src/hooks/useGrowDetailData.ts"), "utf8");
 const REPORTS_HOOK = readFileSync(resolve(ROOT, "src/hooks/useReportsHubData.ts"), "utf8");
-const DASHBOARD_HOOK = readFileSync(
-  resolve(ROOT, "src/hooks/useDashboardScopedData.ts"),
-  "utf8",
-);
+const DASHBOARD_HOOK = readFileSync(resolve(ROOT, "src/hooks/useDashboardScopedData.ts"), "utf8");
 const DASHBOARD_PAGE = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
 
 const AT = "2026-07-19T12:00:00Z";
@@ -146,10 +143,7 @@ describe("countMergedManualGrowActivity", () => {
   it("dedupe returns the surviving rows for list rendering", () => {
     const rows = dedupeMergedManualGrowActivityRows({
       growEvents: [spine({ id: "keep" })],
-      diaryEntries: [
-        diary({ id: "companion" }),
-        diary({ id: "standalone", entry_at: LATER }),
-      ],
+      diaryEntries: [diary({ id: "companion" }), diary({ id: "standalone", entry_at: LATER })],
     });
     expect(rows.growEvents.map((r) => r.id)).toEqual(["keep"]);
     expect(rows.diaryEntries.map((r) => r.id)).toEqual(["standalone"]);

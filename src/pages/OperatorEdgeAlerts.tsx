@@ -282,7 +282,7 @@ export default function OperatorEdgeAlerts() {
   const filteredFired = useMemo(
     () => (liveQuery.data?.fired ?? []).filter((b) => matchesCommonFilters(b.fn, b.metric)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [liveQuery.data, searchNeedle, metricFilter],
+    [liveQuery.data, matchesCommonFilters],
   );
 
   const filteredSuppressed = useMemo(
@@ -296,7 +296,7 @@ export default function OperatorEdgeAlerts() {
         return true;
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [liveQuery.data, searchNeedle, metricFilter, timeCutoff],
+    [liveQuery.data, timeCutoff, matchesCommonFilters],
   );
 
   const filteredDispatches = useMemo(() => {
@@ -311,7 +311,7 @@ export default function OperatorEdgeAlerts() {
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatchesWithExpiry, searchNeedle, metricFilter, statusFilter, timeCutoff]);
+  }, [dispatchesWithExpiry, statusFilter, timeCutoff, matchesCommonFilters]);
 
   const pageCount = Math.max(1, Math.ceil(filteredDispatches.length / PAGE_SIZE));
 
@@ -334,7 +334,7 @@ export default function OperatorEdgeAlerts() {
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attemptsQuery.data, searchNeedle, metricFilter, timeCutoff]);
+  }, [attemptsQuery.data, timeCutoff, matchesCommonFilters]);
 
   const attemptsPageCount = Math.max(1, Math.ceil(filteredAttempts.length / PAGE_SIZE));
 
@@ -376,9 +376,8 @@ export default function OperatorEdgeAlerts() {
   const drilldownDispatch = useMemo(() => {
     if (!drilldown) return null;
     return (
-      dispatchesWithExpiry.find(
-        (r) => r.fn === drilldown.fn && r.metric === drilldown.metric,
-      ) ?? null
+      dispatchesWithExpiry.find((r) => r.fn === drilldown.fn && r.metric === drilldown.metric) ??
+      null
     );
   }, [drilldown, dispatchesWithExpiry]);
 
@@ -569,7 +568,6 @@ export default function OperatorEdgeAlerts() {
           ) : null}
         </CardContent>
       </Card>
-
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
@@ -859,17 +857,15 @@ export default function OperatorEdgeAlerts() {
           <CardTitle>Webhook attempts</CardTitle>
           <CardDescription>
             Per-attempt delivery history from <code>edge_metrics_webhook_attempts</code>. Each
-            breach fire produces one row per attempt (delivered, transient retry, permanent
-            failure, or exhausted after retries).
+            breach fire produces one row per attempt (delivered, transient retry, permanent failure,
+            or exhausted after retries).
           </CardDescription>
         </CardHeader>
         <CardContent>
           {attemptsQuery.isLoading ? (
             <p className="text-sm text-muted-foreground">Loading attempt history…</p>
           ) : attemptsQuery.error ? (
-            <p className="text-sm text-destructive">
-              {(attemptsQuery.error as Error).message}
-            </p>
+            <p className="text-sm text-destructive">{(attemptsQuery.error as Error).message}</p>
           ) : filteredAttempts.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               {(attemptsQuery.data ?? []).length === 0
@@ -898,8 +894,8 @@ export default function OperatorEdgeAlerts() {
                       r.outcome === "delivered"
                         ? "default"
                         : r.outcome === "exhausted" || r.outcome === "permanent_failure"
-                        ? "destructive"
-                        : "secondary";
+                          ? "destructive"
+                          : "secondary";
                     return (
                       <TableRow
                         key={r.id}
@@ -984,9 +980,7 @@ export default function OperatorEdgeAlerts() {
                     variant="outline"
                     size="sm"
                     className="h-11 flex-1 sm:h-9 sm:flex-none"
-                    onClick={() =>
-                      setAttemptsPage((p) => Math.min(attemptsPageCount - 1, p + 1))
-                    }
+                    onClick={() => setAttemptsPage((p) => Math.min(attemptsPageCount - 1, p + 1))}
                     disabled={attemptsPage >= attemptsPageCount - 1}
                   >
                     Next

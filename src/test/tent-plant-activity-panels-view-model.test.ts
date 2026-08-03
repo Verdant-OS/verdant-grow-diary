@@ -222,9 +222,7 @@ describe("buildTentPlantActivityPanelsViewModel", () => {
       plants: [{ id: "px", name: "  ", isArchived: false }],
       activityByPlantId: {},
     });
-    expect(vm.panels[0].quickLogCtaAccessibleLabel).toBe(
-      "Add first Quick Log for Unnamed plant",
-    );
+    expect(vm.panels[0].quickLogCtaAccessibleLabel).toBe("Add first Quick Log for Unnamed plant");
   });
 
   it("visiblePlantCount tracks the archived filter", () => {
@@ -290,12 +288,8 @@ describe("buildTentPlantActivityPanelsViewModel — Harvest Watch help text", ()
         growId: "g1",
       });
       const p1 = vm.panels[0];
-      expect(p1.harvestWatch!.helpText).toBe(
-        TENT_PLANT_ACTIVITY_HARVEST_WATCH_HELP_TEXT[state],
-      );
-      expect(p1.harvestWatch!.cautionText).toBe(
-        TENT_PLANT_ACTIVITY_HARVEST_WATCH_CAUTION_COPY,
-      );
+      expect(p1.harvestWatch!.helpText).toBe(TENT_PLANT_ACTIVITY_HARVEST_WATCH_HELP_TEXT[state]);
+      expect(p1.harvestWatch!.cautionText).toBe(TENT_PLANT_ACTIVITY_HARVEST_WATCH_CAUTION_COPY);
       expect(p1.harvestWatch!.cautionText).toMatch(/evidence-only/i);
     });
   }
@@ -311,12 +305,8 @@ describe("buildTentPlantActivityPanelsViewModel — Harvest Watch help text", ()
       growId: "g1",
     });
     const p1 = vm.panels[0];
-    expect(p1.harvestWatch!.helpText).toBe(
-      TENT_PLANT_ACTIVITY_HARVEST_WATCH_HELP_TEXT.unknown,
-    );
-    expect(p1.harvestWatch!.copy).toBe(
-      TENT_PLANT_ACTIVITY_HARVEST_WATCH_FALLBACK_COPY,
-    );
+    expect(p1.harvestWatch!.helpText).toBe(TENT_PLANT_ACTIVITY_HARVEST_WATCH_HELP_TEXT.unknown);
+    expect(p1.harvestWatch!.copy).toBe(TENT_PLANT_ACTIVITY_HARVEST_WATCH_FALLBACK_COPY);
   });
 
   it("help text avoids forbidden harvest instruction language", () => {
@@ -339,9 +329,7 @@ describe("tentPlantActivityPanelsViewModel forbidden copy + static safety", () =
   const vmPath = resolve(__dirname, "../lib/tentPlantActivityPanelsViewModel.ts");
   const cmpPath = resolve(__dirname, "../components/TentPlantActivityPanels.tsx");
   function stripComments(raw: string) {
-    return raw
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+    return raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
   }
   const vmContent = stripComments(readFileSync(vmPath, "utf8"));
   const cmpContent = stripComments(readFileSync(cmpPath, "utf8"));

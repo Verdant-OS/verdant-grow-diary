@@ -348,7 +348,7 @@ function normalizeReceivedAt(args: {
 }
 
 function parseCapturedAt(payload: Record<string, unknown>): TimestampParseResult {
-  const hasCaptured = Object.prototype.hasOwnProperty.call(payload, "captured_at");
+  const hasCaptured = Object.hasOwn(payload, "captured_at");
   const key = hasCaptured ? "captured_at" : "dateutc";
   const raw = payload[key];
   if (raw === null || raw === undefined || raw === "") {
@@ -376,7 +376,7 @@ function normalizedPayloadKeys(payload: Record<string, unknown>): NormalizedPayl
   for (const key of Object.keys(payload).sort(lexicalCompare)) {
     const normalizedKey = key.toLowerCase();
     if (UNSAFE_OBJECT_KEYS.has(normalizedKey)) continue;
-    if (Object.prototype.hasOwnProperty.call(out, normalizedKey)) {
+    if (Object.hasOwn(out, normalizedKey)) {
       duplicateKeys.add(normalizedKey);
       continue;
     }

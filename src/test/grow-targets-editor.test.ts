@@ -18,18 +18,11 @@ import {
 const ROOT = resolve(__dirname, "../..");
 const DASHBOARD = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
 const HOOK = readFileSync(resolve(ROOT, "src/hooks/useGrowTargets.ts"), "utf8");
-const EDITOR = readFileSync(
-  resolve(ROOT, "src/components/GrowTargetsEditor.tsx"),
-  "utf8",
-);
-const TYPES = readFileSync(
-  resolve(ROOT, "src/integrations/supabase/types.ts"),
-  "utf8",
-);
+const EDITOR = readFileSync(resolve(ROOT, "src/components/GrowTargetsEditor.tsx"), "utf8");
+const TYPES = readFileSync(resolve(ROOT, "src/integrations/supabase/types.ts"), "utf8");
 
 const AI_COACH_CALL = /["'`]ai-coach["'`]|functions\/ai-coach|ai_coach/;
-const EXTERNAL_CONTROL =
-  /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i;
+const EXTERNAL_CONTROL = /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i;
 const SERVICE_ROLE = /service_role/;
 
 describe("grow_targets schema (generated types)", () => {
@@ -117,9 +110,7 @@ describe("useGrowTargets hook contract", () => {
     expect(HOOK).toMatch(/reload\s*:\s*load/);
   });
   it("introduces no write paths", () => {
-    expect(HOOK).not.toMatch(
-      /\.from\([^)]+\)\s*\.(insert|update|delete|upsert)/,
-    );
+    expect(HOOK).not.toMatch(/\.from\([^)]+\)\s*\.(insert|update|delete|upsert)/);
   });
   it("introduces no ai-coach call", () => {
     expect(AI_COACH_CALL.test(HOOK)).toBe(false);
@@ -286,9 +277,7 @@ describe("GrowTargetsEditor temperature unit preference", () => {
   describe("wiring", () => {
     it("reads the live temperature unit preference", () => {
       expect(EDITOR).toMatch(/useTemperatureUnitPreference/);
-      expect(EDITOR).toMatch(
-        /from ["']@\/hooks\/useTemperatureUnitPreference["']/,
-      );
+      expect(EDITOR).toMatch(/from ["']@\/hooks\/useTemperatureUnitPreference["']/);
     });
 
     it("no longer hardcodes °C as the label for every field", () => {
@@ -323,9 +312,7 @@ describe("Dashboard Target Comparison editor wiring", () => {
   });
   it("uses targets from the hook (not hardcoded defaults)", () => {
     expect(DASHBOARD).toMatch(/targetsState\.targets/);
-    expect(DASHBOARD).not.toMatch(
-      /const\s+\w*[Tt]argets\s*=\s*\{\s*temp\s*:\s*\{\s*min\s*:\s*\d/,
-    );
+    expect(DASHBOARD).not.toMatch(/const\s+\w*[Tt]argets\s*=\s*\{\s*temp\s*:\s*\{\s*min\s*:\s*\d/);
   });
   it("reloads targets after save", () => {
     expect(DASHBOARD).toMatch(/targetsState\.reload\(\)/);

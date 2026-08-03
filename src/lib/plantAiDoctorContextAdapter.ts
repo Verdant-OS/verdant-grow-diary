@@ -51,7 +51,7 @@ export interface PlantAiDoctorAdapterInput {
 /** °F → °C, rounded to 2 decimals; null-safe. */
 export function fahrenheitToCelsius(f: number | null | undefined): number | null {
   if (f === null || f === undefined || !Number.isFinite(f)) return null;
-  return Math.round(((f - 32) * (5 / 9)) * 100) / 100;
+  return Math.round((f - 32) * (5 / 9) * 100) / 100;
 }
 
 export function diaryEntriesToGrowEventRows(
@@ -99,10 +99,7 @@ export function manualSensorLogsToReadingRows(
         source: tagSource,
       });
     }
-    if (
-      typeof log.metrics?.ph === "number" &&
-      Number.isFinite(log.metrics.ph)
-    ) {
+    if (typeof log.metrics?.ph === "number" && Number.isFinite(log.metrics.ph)) {
       out.push({
         metric: "ph",
         value: log.metrics.ph,
@@ -111,10 +108,7 @@ export function manualSensorLogsToReadingRows(
         source: tagSource,
       });
     }
-    if (
-      typeof log.metrics?.ec === "number" &&
-      Number.isFinite(log.metrics.ec)
-    ) {
+    if (typeof log.metrics?.ec === "number" && Number.isFinite(log.metrics.ec)) {
       out.push({
         metric: "ec",
         value: log.metrics.ec,
@@ -131,9 +125,7 @@ export function manualSensorLogsToReadingRows(
  * Build an AI Doctor context payload from RLS-safe Plant Detail sources.
  * Pure and deterministic for a given input + `now`.
  */
-export function buildPlantAiDoctorContext(
-  input: PlantAiDoctorAdapterInput,
-): PlantContextPayload {
+export function buildPlantAiDoctorContext(input: PlantAiDoctorAdapterInput): PlantContextPayload {
   return compilePlantContextFromRows({
     plant: input.plant,
     growEvents: diaryEntriesToGrowEventRows(input.diaryEntries ?? []),

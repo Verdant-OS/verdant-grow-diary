@@ -33,12 +33,7 @@
  * See: docs/vpd-stage-vocabulary.md
  */
 
-export type LegacyVpdStage =
-  | "seedling"
-  | "veg"
-  | "preflower"
-  | "flower"
-  | "late_flower";
+export type LegacyVpdStage = "seedling" | "veg" | "preflower" | "flower" | "late_flower";
 
 export type CanonicalVpdTargetStage =
   | "seedling"
@@ -99,9 +94,7 @@ function strictMatch(input: unknown): string | null {
   return input;
 }
 
-export function isCanonicalVpdTargetStage(
-  input: unknown,
-): input is CanonicalVpdTargetStage {
+export function isCanonicalVpdTargetStage(input: unknown): input is CanonicalVpdTargetStage {
   const s = strictMatch(input);
   return s !== null && (CANONICAL_STAGES as readonly string[]).includes(s);
 }

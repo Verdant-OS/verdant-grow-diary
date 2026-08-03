@@ -38,8 +38,16 @@ describe("buildEcowittLocalEvidencePreviewViewModel", () => {
   it("determinism + completeness: every tent + sample yields fully populated canonical fields", () => {
     for (const tent of TENTS) {
       for (const s of ECOWITT_PREVIEW_SAMPLES) {
-        const a = buildEcowittLocalEvidencePreviewViewModel({ tentKey: tent, sampleKey: s.key, now: NOW });
-        const b = buildEcowittLocalEvidencePreviewViewModel({ tentKey: tent, sampleKey: s.key, now: NOW });
+        const a = buildEcowittLocalEvidencePreviewViewModel({
+          tentKey: tent,
+          sampleKey: s.key,
+          now: NOW,
+        });
+        const b = buildEcowittLocalEvidencePreviewViewModel({
+          tentKey: tent,
+          sampleKey: s.key,
+          now: NOW,
+        });
         expect(JSON.stringify(a)).toBe(JSON.stringify(b));
         const p = a.preview;
         expect(["live", "degraded", "invalid"]).toContain(p.source);
@@ -56,7 +64,11 @@ describe("buildEcowittLocalEvidencePreviewViewModel", () => {
 
   it("valid sample renders LIVE for all three tents", () => {
     for (const tent of TENTS) {
-      const vm = buildEcowittLocalEvidencePreviewViewModel({ tentKey: tent, sampleKey: "valid", now: NOW });
+      const vm = buildEcowittLocalEvidencePreviewViewModel({
+        tentKey: tent,
+        sampleKey: "valid",
+        now: NOW,
+      });
       expect(vm.preview.source).toBe("live");
       expect(vm.is_stale).toBe(false);
       expect(vm.stale_copy).toBeNull();
@@ -64,7 +76,11 @@ describe("buildEcowittLocalEvidencePreviewViewModel", () => {
   });
 
   it("degraded sample renders degraded reasons and stale warning", () => {
-    const vm = buildEcowittLocalEvidencePreviewViewModel({ tentKey: "seedling", sampleKey: "degraded", now: NOW });
+    const vm = buildEcowittLocalEvidencePreviewViewModel({
+      tentKey: "seedling",
+      sampleKey: "degraded",
+      now: NOW,
+    });
     expect(vm.preview.source).toBe("degraded");
     expect(vm.is_stale).toBe(true);
     expect(vm.stale_copy).not.toBeNull();
@@ -72,13 +88,21 @@ describe("buildEcowittLocalEvidencePreviewViewModel", () => {
   });
 
   it("invalid sample renders invalid state for flower (humidity out of range)", () => {
-    const vm = buildEcowittLocalEvidencePreviewViewModel({ tentKey: "flower", sampleKey: "invalid", now: NOW });
+    const vm = buildEcowittLocalEvidencePreviewViewModel({
+      tentKey: "flower",
+      sampleKey: "invalid",
+      now: NOW,
+    });
     expect(vm.preview.source).toBe("invalid");
     expect(vm.preview.invalid_reasons.some((r) => r.includes("humidity_pct"))).toBe(true);
   });
 
   it("redacted raw preview strips any private-looking fields", () => {
-    const vm = buildEcowittLocalEvidencePreviewViewModel({ tentKey: "flower", sampleKey: "valid", now: NOW });
+    const vm = buildEcowittLocalEvidencePreviewViewModel({
+      tentKey: "flower",
+      sampleKey: "valid",
+      now: NOW,
+    });
     const json = JSON.stringify(vm.preview.redacted_raw_preview);
     expect(json).not.toMatch(/PASSKEY/i);
     expect(json).not.toMatch(/\bMAC\b/);
@@ -88,7 +112,11 @@ describe("buildEcowittLocalEvidencePreviewViewModel", () => {
   });
 
   it("read-only and evidence copy are present", () => {
-    const vm = buildEcowittLocalEvidencePreviewViewModel({ tentKey: "flower", sampleKey: "valid", now: NOW });
+    const vm = buildEcowittLocalEvidencePreviewViewModel({
+      tentKey: "flower",
+      sampleKey: "valid",
+      now: NOW,
+    });
     expect(vm.read_only_copy).toMatch(/Read-only preview/i);
     expect(vm.evidence_copy).toMatch(/EcoWitt MQTT sample/i);
   });

@@ -88,8 +88,8 @@ function printBanner(): void {
       "────────────────────────────────────────────────────────────",
       " Verdant • ingest-real-ggs-payload",
       " This script is for REAL physical GGS payloads only.",
-      " Do NOT use invented values with source \"live\".",
-      " Use source \"demo\" only in fixture tests, never for Sentinel",
+      ' Do NOT use invented values with source "live".',
+      ' Use source "demo" only in fixture tests, never for Sentinel',
       " live sign-off.",
       "────────────────────────────────────────────────────────────",
     ].join("\n"),
@@ -157,11 +157,7 @@ async function main(): Promise<void> {
   if (!plan.ok) {
     // eslint-disable-next-line no-console
     console.error(
-      JSON.stringify(
-        { ok: false, reason: plan.reason, details: plan.details ?? null },
-        null,
-        2,
-      ),
+      JSON.stringify({ ok: false, reason: plan.reason, details: plan.details ?? null }, null, 2),
     );
     process.exit(2);
   }

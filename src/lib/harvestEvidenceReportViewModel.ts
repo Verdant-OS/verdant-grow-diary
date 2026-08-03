@@ -34,11 +34,9 @@ export const HARVEST_EVIDENCE_REPORT_NO_ACTIONS_COPY =
   "This report summarizes logged evidence. It does not create alerts, Action Queue items, or harvest instructions.";
 
 /** Required full-empty copy. */
-export const HARVEST_EVIDENCE_REPORT_EMPTY_COPY =
-  "No harvest evidence has been logged yet.";
+export const HARVEST_EVIDENCE_REPORT_EMPTY_COPY = "No harvest evidence has been logged yet.";
 
-export const HARVEST_EVIDENCE_REPORT_UNASSIGNED_WINDOW_LABEL =
-  "Unassigned inspection window";
+export const HARVEST_EVIDENCE_REPORT_UNASSIGNED_WINDOW_LABEL = "Unassigned inspection window";
 
 const STRONG_CATEGORIES: readonly HarvestEvidenceCategory[] = [
   "trichome_inspection",
@@ -151,11 +149,7 @@ function startOfIsoWeekMs(ms: number): number {
   const d = new Date(ms);
   const day = d.getUTCDay(); // 0..6, 0=Sunday
   const daysFromMonday = (day + 6) % 7;
-  const monday = Date.UTC(
-    d.getUTCFullYear(),
-    d.getUTCMonth(),
-    d.getUTCDate() - daysFromMonday,
-  );
+  const monday = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - daysFromMonday);
   return monday;
 }
 
@@ -179,16 +173,13 @@ function classifyAll(
     if (!row || typeof row !== "object") continue;
     const cat = classifyHarvestEvidenceRow(row);
     if (!cat) continue;
-    const occurredAt =
-      typeof row.occurredAt === "string" ? row.occurredAt : null;
+    const occurredAt = typeof row.occurredAt === "string" ? row.occurredAt : null;
     out.push({
       category: cat,
       occurredAt,
       occurredAtMs: parseMs(occurredAt),
       occurredAtLabel:
-        typeof row.occurredAtLabel === "string" && row.occurredAtLabel
-          ? row.occurredAtLabel
-          : "",
+        typeof row.occurredAtLabel === "string" && row.occurredAtLabel ? row.occurredAtLabel : "",
       note: readNote(row),
       hasPhoto: row.hasPhoto === true,
     });
@@ -220,14 +211,10 @@ function bucketIntoWindows(
     explicit.forEach((w, idx) => {
       const startMs = parseMs(w?.startsAt ?? null);
       const endMs = parseMs(w?.endsAt ?? null);
-      const id =
-        typeof w?.id === "string" && w.id ? w.id : `window-${idx}`;
+      const id = typeof w?.id === "string" && w.id ? w.id : `window-${idx}`;
       buckets.set(id, {
         key: id,
-        label:
-          typeof w?.label === "string" && w.label
-            ? w.label
-            : `Inspection window ${idx + 1}`,
+        label: typeof w?.label === "string" && w.label ? w.label : `Inspection window ${idx + 1}`,
         startsAt: typeof w?.startsAt === "string" ? w.startsAt : null,
         endsAt: typeof w?.endsAt === "string" ? w.endsAt : null,
         isUnassigned: false,
@@ -236,12 +223,11 @@ function bucketIntoWindows(
       });
     });
 
-    const sortedExplicit = Array.from(buckets.values())
-      .map((b) => ({
-        b,
-        startMs: parseMs(b.startsAt),
-        endMs: parseMs(b.endsAt),
-      }));
+    const sortedExplicit = Array.from(buckets.values()).map((b) => ({
+      b,
+      startMs: parseMs(b.startsAt),
+      endMs: parseMs(b.endsAt),
+    }));
 
     for (const row of rows) {
       if (row.occurredAtMs == null) {
@@ -372,9 +358,7 @@ function buildPlant(input: HarvestEvidenceReportPlantInput): HarvestEvidenceRepo
       return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
     })
     .map((b) => {
-      const categories = STRONG_CATEGORIES.map((c) =>
-        summarizeCategory(c, b.rows),
-      );
+      const categories = STRONG_CATEGORIES.map((c) => summarizeCategory(c, b.rows));
       const missing = categories.filter((c) => c.status === "missing").length;
       return {
         key: b.key,
@@ -391,13 +375,9 @@ function buildPlant(input: HarvestEvidenceReportPlantInput): HarvestEvidenceRepo
   return {
     plantId: input.plantId,
     plantName:
-      typeof input.plantName === "string" && input.plantName
-        ? input.plantName
-        : input.plantId,
-    strain:
-      typeof input.strain === "string" && input.strain ? input.strain : null,
-    stage:
-      typeof input.stage === "string" && input.stage ? input.stage : null,
+      typeof input.plantName === "string" && input.plantName ? input.plantName : input.plantId,
+    strain: typeof input.strain === "string" && input.strain ? input.strain : null,
+    stage: typeof input.stage === "string" && input.stage ? input.stage : null,
     totalCount: classified.length,
     windows,
   };
@@ -410,14 +390,12 @@ export function buildHarvestEvidenceReport(
     ? plants.filter((p) => p && typeof p === "object" && typeof p.plantId === "string")
     : [];
 
-  const built = safePlants
-    .map(buildPlant)
-    .sort((a, b) => {
-      const an = a.plantName.toLowerCase();
-      const bn = b.plantName.toLowerCase();
-      if (an !== bn) return an < bn ? -1 : 1;
-      return a.plantId < b.plantId ? -1 : a.plantId > b.plantId ? 1 : 0;
-    });
+  const built = safePlants.map(buildPlant).sort((a, b) => {
+    const an = a.plantName.toLowerCase();
+    const bn = b.plantName.toLowerCase();
+    if (an !== bn) return an < bn ? -1 : 1;
+    return a.plantId < b.plantId ? -1 : a.plantId > b.plantId ? 1 : 0;
+  });
 
   let trichome = 0;
   let pistil = 0;

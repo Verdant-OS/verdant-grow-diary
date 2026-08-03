@@ -23,11 +23,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = process.cwd();
-const SPEC = join(
-  ROOT,
-  "docs",
-  "commercial-release-review-traceability-workbook-spec.md",
-);
+const SPEC = join(ROOT, "docs", "commercial-release-review-traceability-workbook-spec.md");
 
 const KNOWN_SHEETS = new Set([
   "Seed_Production_Tracking",
@@ -41,12 +37,10 @@ const KNOWN_SHEETS = new Set([
 
 // Generic targets allowed on the `To` side that aren't a sheet but are
 // referenced as evidence buckets.
-const GENERIC_TARGETS = [
-  /verdant diary/i,
-  /draft text only/i,
-];
+const GENERIC_TARGETS = [/verdant diary/i, /draft text only/i];
 
-const ID_LIKE = /(\bid\b|row id|checklist id|pheno id|line id|backcross line id|seed lot id|review id|column [A-Z]\b|\.[A-Z]{1,2}\s|`[A-Z]{1,2}\s)/i;
+const ID_LIKE =
+  /(\bid\b|row id|checklist id|pheno id|line id|backcross line id|seed lot id|review id|column [A-Z]\b|\.[A-Z]{1,2}\s|`[A-Z]{1,2}\s)/i;
 
 // Mappings the spec is required to publish. Each is matched loosely
 // against the table rows (substring on `from` AND `to`, case-insensitive).
@@ -98,7 +92,10 @@ function extractTraceabilityTable(text) {
     if (!line.startsWith("|")) continue;
     // Skip header + alignment rows.
     if (/^\|\s*-+/.test(line) || /^\|\s*From\s*\|/i.test(line)) continue;
-    const cells = line.split("|").slice(1, -1).map((c) => c.trim());
+    const cells = line
+      .split("|")
+      .slice(1, -1)
+      .map((c) => c.trim());
     if (cells.length >= 3) {
       rows.push({ from: cells[0], to: cells[1], requiredFor: cells[2], lineNumber: i + 1 });
     }
@@ -109,15 +106,18 @@ function extractTraceabilityTable(text) {
 function checkRow(row) {
   const problems = [];
   const fromSheet = row.from.split(".")[0].replace(/[`*]/g, "").trim();
-  const toSheet = row.to.split(".")[0].replace(/[`*]/g, "").trim().replace(/^one or more of\s+/i, "");
+  const toSheet = row.to
+    .split(".")[0]
+    .replace(/[`*]/g, "")
+    .trim()
+    .replace(/^one or more of\s+/i, "");
 
   // Validate sheet membership for `from` (must be a known sheet).
   if (!KNOWN_SHEETS.has(fromSheet)) {
     problems.push(`from-sheet unknown: "${fromSheet}"`);
   }
   // Validate `to` is a known sheet OR an allowed generic target.
-  const toKnown =
-    KNOWN_SHEETS.has(toSheet) || GENERIC_TARGETS.some((re) => re.test(row.to));
+  const toKnown = KNOWN_SHEETS.has(toSheet) || GENERIC_TARGETS.some((re) => re.test(row.to));
   if (!toKnown) {
     problems.push(`to-target unknown: "${toSheet}"`);
   }
@@ -142,7 +142,9 @@ function main() {
 
   const rows = extractTraceabilityTable(text);
   if (rows.length === 0) {
-    console.error("traceability-mapping: §12 Cross-Sheet Traceability Mapping table not found or empty.");
+    console.error(
+      "traceability-mapping: §12 Cross-Sheet Traceability Mapping table not found or empty.",
+    );
     process.exit(1);
   }
 
@@ -154,7 +156,9 @@ function main() {
     if (problems.length) {
       failures += problems.length;
       for (const p of problems) {
-        console.error(`${SPEC}:${row.lineNumber} [mapping-row] ${p} — from="${row.from}" to="${row.to}"`);
+        console.error(
+          `${SPEC}:${row.lineNumber} [mapping-row] ${p} — from="${row.from}" to="${row.to}"`,
+        );
       }
     }
   }

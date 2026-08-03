@@ -96,10 +96,11 @@ describe("searchLeads", () => {
     expect(searchLeads(SAMPLE, "investor").map((l) => l.id)).toEqual(["3"]);
   });
   it("matches source", () => {
-    expect(searchLeads(SAMPLE, "landing").map((l) => l.id).sort()).toEqual([
-      "1",
-      "3",
-    ]);
+    expect(
+      searchLeads(SAMPLE, "landing")
+        .map((l) => l.id)
+        .sort(),
+    ).toEqual(["1", "3"]);
   });
   it("matches message", () => {
     expect(searchLeads(SAMPLE, "sensor").map((l) => l.id)).toEqual(["2"]);
@@ -108,10 +109,11 @@ describe("searchLeads", () => {
     expect(searchLeads(SAMPLE, "conference").map((l) => l.id)).toEqual(["1"]);
   });
   it("is case-insensitive", () => {
-    expect(searchLeads(SAMPLE, "PULSE").map((l) => l.id).sort()).toEqual([
-      "1",
-      "3",
-    ]);
+    expect(
+      searchLeads(SAMPLE, "PULSE")
+        .map((l) => l.id)
+        .sort(),
+    ).toEqual(["1", "3"]);
   });
   it("trims whitespace", () => {
     expect(searchLeads(SAMPLE, "   acme   ").map((l) => l.id)).toEqual(["1"]);
@@ -178,11 +180,7 @@ describe("sortLeads — deterministic", () => {
     expect(a).toEqual(["b", "c", "a"]);
   });
   it("oldest-first is deterministic", () => {
-    expect(sortLeads(sortable, "oldest").map((l) => l.id)).toEqual([
-      "a",
-      "c",
-      "b",
-    ]);
+    expect(sortLeads(sortable, "oldest").map((l) => l.id)).toEqual(["a", "c", "b"]);
   });
   it("follow-up soonest handles missing dates safely (missing last)", () => {
     const ids = sortLeads(sortable, "follow_up_soonest").map((l) => l.id);
@@ -198,11 +196,7 @@ describe("sortLeads — deterministic", () => {
     expect(ids).toEqual(["b", "c", "a"]);
   });
   it("default option is a no-op (input order preserved)", () => {
-    expect(sortLeads(sortable, "default").map((l) => l.id)).toEqual([
-      "a",
-      "b",
-      "c",
-    ]);
+    expect(sortLeads(sortable, "default").map((l) => l.id)).toEqual(["a", "b", "c"]);
   });
 });
 
@@ -226,17 +220,12 @@ describe("default quick-filter sorting unchanged", () => {
     expect(ids[0]).toBe("2");
   });
   it("Follow-Up keeps overdue first, missing last", () => {
-    expect(filterAndSortLeads(leads, "follow_up", NOW).map((l) => l.id)).toEqual(
-      ["3", "4"],
-    );
+    expect(filterAndSortLeads(leads, "follow_up", NOW).map((l) => l.id)).toEqual(["3", "4"]);
   });
 });
 
 describe("/leads page renders result count and empty state", () => {
-  const PAGE = readFileSync(
-    resolve(__dirname, "..", "..", "src/pages/Leads.tsx"),
-    "utf8",
-  );
+  const PAGE = readFileSync(resolve(__dirname, "..", "..", "src/pages/Leads.tsx"), "utf8");
   it("renders Showing X of Y result count", () => {
     expect(PAGE).toMatch(/Showing \{filtered\.length\} of \{leads\.length\}/);
     expect(PAGE).toMatch(/leads-result-count/);
@@ -287,10 +276,11 @@ describe("no new RLS policies for search/sort PR", () => {
     const files = readdirSync(dir)
       .filter((f) => f.endsWith(".sql"))
       .sort();
-    const all = files
-      .map((f) => readFileSync(resolve(dir, f), "utf8"))
-      .join("\n")
-      .match(/CREATE POLICY[^;]*ON\s+public\.leads[^;]*;/gi) ?? [];
+    const all =
+      files
+        .map((f) => readFileSync(resolve(dir, f), "utf8"))
+        .join("\n")
+        .match(/CREATE POLICY[^;]*ON\s+public\.leads[^;]*;/gi) ?? [];
     expect(all.length).toBeGreaterThan(0);
     for (const p of all) expect(p).not.toMatch(/service_role/i);
   });

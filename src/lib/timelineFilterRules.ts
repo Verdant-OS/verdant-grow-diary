@@ -109,12 +109,7 @@ export interface TimelineAiDoctorEvidenceItem {
   kind: "ai_doctor_sensor_evidence_audit";
   key: string;
   occurredAt: string;
-  status:
-    | "usable"
-    | "stale"
-    | "invalid"
-    | "needs_review"
-    | "no_data";
+  status: "usable" | "stale" | "invalid" | "needs_review" | "no_data";
   reasonCode: string | null;
   countsAsHealthyEvidence: boolean;
   mode: "healthy" | "cautionary" | "unsafe" | "missing";

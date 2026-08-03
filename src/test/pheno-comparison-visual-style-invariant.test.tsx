@@ -57,8 +57,7 @@ const FORBIDDEN_STATUS_ATTRS: ReadonlyArray<[string, string]> = [
   ["data-variant", "success"],
 ];
 
-const FORBIDDEN_CLASS_RE =
-  /\b(?:bg|text|border|ring)-(?:green|emerald)-\d/;
+const FORBIDDEN_CLASS_RE = /\b(?:bg|text|border|ring)-(?:green|emerald)-\d/;
 const FORBIDDEN_BADGE_RE = /badge-success|status-ok|is-healthy/;
 
 /**
@@ -101,7 +100,12 @@ function makeUntrustedMatrix(): PhenoCandidateInput[] {
           id: "vs-stale-1",
           source: "stale",
           capturedAt: "2026-01-01T00:00:00.000Z",
-          tempF: 75, rh: 55, vpd: 1.1, ec: 1.5, ph: 6.1, ppfd: 700,
+          tempF: 75,
+          rh: 55,
+          vpd: 1.1,
+          ec: 1.5,
+          ph: 6.1,
+          ppfd: 700,
         },
       ],
     },
@@ -114,7 +118,12 @@ function makeUntrustedMatrix(): PhenoCandidateInput[] {
           id: "vs-invalid-1",
           source: "invalid",
           capturedAt: null,
-          tempF: null, rh: null, vpd: null, ec: null, ph: null, ppfd: null,
+          tempF: null,
+          rh: null,
+          vpd: null,
+          ec: null,
+          ph: null,
+          ppfd: null,
         },
       ],
     },
@@ -127,7 +136,12 @@ function makeUntrustedMatrix(): PhenoCandidateInput[] {
           id: "vs-demo-1",
           source: "demo",
           capturedAt: "2026-06-20T00:00:00.000Z",
-          tempF: 75, rh: 55, vpd: 1.1, ec: 1.5, ph: 6.1, ppfd: 700,
+          tempF: 75,
+          rh: 55,
+          vpd: 1.1,
+          ec: 1.5,
+          ph: 6.1,
+          ppfd: 700,
         },
       ],
     },
@@ -140,7 +154,12 @@ function makeUntrustedMatrix(): PhenoCandidateInput[] {
           id: "vs-unknown-1",
           source: "not-a-real-source",
           capturedAt: "2026-06-20T00:00:00.000Z",
-          tempF: 75, rh: 55, vpd: 1.1, ec: 1.5, ph: 6.1, ppfd: 700,
+          tempF: 75,
+          rh: 55,
+          vpd: 1.1,
+          ec: 1.5,
+          ph: 6.1,
+          ppfd: 700,
         },
       ],
     },
@@ -153,7 +172,12 @@ function makeUntrustedMatrix(): PhenoCandidateInput[] {
           id: "vs-incomplete-1",
           source: "live",
           capturedAt: "2026-06-20T00:00:00.000Z",
-          tempF: 75, rh: null, vpd: null, ec: null, ph: null, ppfd: null,
+          tempF: 75,
+          rh: null,
+          vpd: null,
+          ec: null,
+          ph: null,
+          ppfd: null,
         },
       ],
     },
@@ -183,12 +207,8 @@ describe("PhenoComparison visual-style never-healthy invariant", () => {
         );
         expect(region, `${label} region must render`).not.toBeNull();
         const html = region!.outerHTML;
-        expect(html, `${label}: no green/emerald status classes`).not.toMatch(
-          FORBIDDEN_CLASS_RE,
-        );
-        expect(html, `${label}: no success badge classes`).not.toMatch(
-          FORBIDDEN_BADGE_RE,
-        );
+        expect(html, `${label}: no green/emerald status classes`).not.toMatch(FORBIDDEN_CLASS_RE);
+        expect(html, `${label}: no success badge classes`).not.toMatch(FORBIDDEN_BADGE_RE);
         for (const [attr, val] of FORBIDDEN_STATUS_ATTRS) {
           expect(
             region!.querySelector(`[${attr}="${val}"]`),
@@ -197,9 +217,7 @@ describe("PhenoComparison visual-style never-healthy invariant", () => {
         }
         // Accessible-text + visible-text combined.
         const text = region!.textContent ?? "";
-        expect(containsHealthyStatusLanguage(text), `${label} text`).toBe(
-          false,
-        );
+        expect(containsHealthyStatusLanguage(text), `${label} text`).toBe(false);
       } finally {
         candidateHolder.current = [];
         cleanup();
@@ -237,7 +255,6 @@ describe("PhenoComparison visual-style never-healthy invariant", () => {
     }
   });
 
-
   it("no untrusted snapshot subtree carries a success tone anywhere on the page", () => {
     const { container } = renderWith(makeUntrustedMatrix());
     try {
@@ -262,16 +279,10 @@ describe("PhenoComparison visual-style never-healthy invariant", () => {
 
   it("allows honest denial language on the caveat copy", () => {
     // Sanity check on the helper: denial phrasing must not trip the guard.
-    expect(
-      containsHealthyStatusLanguage(
-        "Reading is invalid — not treated as healthy.",
-      ),
-    ).toBe(false);
-    expect(
-      containsHealthyStatusLanguage("Never shown as healthy."),
-    ).toBe(false);
-    expect(
-      containsHealthyStatusLanguage("Excluded from healthy status."),
-    ).toBe(false);
+    expect(containsHealthyStatusLanguage("Reading is invalid — not treated as healthy.")).toBe(
+      false,
+    );
+    expect(containsHealthyStatusLanguage("Never shown as healthy.")).toBe(false);
+    expect(containsHealthyStatusLanguage("Excluded from healthy status.")).toBe(false);
   });
 });

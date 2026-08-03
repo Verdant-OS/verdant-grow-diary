@@ -115,8 +115,7 @@ vi.mock("@/integrations/supabase/client", () => {
   };
   return {
     supabase: {
-      from: (table: string) =>
-        table === "action_queue" ? makeActionQueueChain() : makeGeneric(),
+      from: (table: string) => (table === "action_queue" ? makeActionQueueChain() : makeGeneric()),
     },
   };
 });
@@ -270,14 +269,11 @@ describe("AlertDetail — Linked action count badge", () => {
       FIND_TIMEOUT,
     )) as HTMLAnchorElement;
     expect(anchor.getAttribute("href") ?? "").toMatch(/^\/actions/);
-    expect(anchor.getAttribute("href") ?? "").toBe(
-      actionQueueAlertContextPath("alert-1"),
-    );
+    expect(anchor.getAttribute("href") ?? "").toBe(actionQueueAlertContextPath("alert-1"));
     expect(anchor.getAttribute("href") ?? "").toContain("alert=alert-1");
     expect(anchor.getAttribute("href") ?? "").not.toContain("aq-open-1");
     expect(anchor.getAttribute("href") ?? "").not.toContain("aq-open-2");
   });
-
 
   it("never leaks raw [alert:<id>] / [session:<id>] tokens or target_device", async () => {
     actionQueueRows = [
@@ -341,10 +337,7 @@ const stripComments = (src: string) =>
     .replace(/^\s*\*.*$/gm, "")
     .replace(/\/\/.*$/gm, "");
 
-const PAGE_SRC = readFileSync(
-  resolve(__dirname, "../..", "src/pages/AlertDetail.tsx"),
-  "utf8",
-);
+const PAGE_SRC = readFileSync(resolve(__dirname, "../..", "src/pages/AlertDetail.tsx"), "utf8");
 const BADGE_SRC = readFileSync(
   resolve(__dirname, "../..", "src/components/LinkedActionCountBadge.tsx"),
   "utf8",

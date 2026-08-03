@@ -14,7 +14,10 @@ import type {
   QuickLogFeedingFormState,
   QuickLogFeedingFormProductRow,
 } from "./quickLogFeedingFormViewModel";
-import { getTemperatureUnitSymbol, type TemperatureUnitPreference } from "./temperatureUnitPreference";
+import {
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "./temperatureUnitPreference";
 
 export const FEEDING_REVIEW_TITLE = "Review feeding log" as const;
 export const FEEDING_REVIEW_DEFAULTS_FLAG = "Includes prefilled feeding defaults" as const;

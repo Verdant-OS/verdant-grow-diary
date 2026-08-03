@@ -38,15 +38,10 @@ describe("buildDashboardDailyGrowCheckPanel · pure rules", () => {
     const panel = buildDashboardDailyGrowCheckPanel({
       now: NOW,
       scopedGrowId: "g1",
-      plants: [
-        plant({ id: "p1", name: "Sour D" }),
-        plant({ id: "p2", name: "Blue Dream" }),
-      ],
+      plants: [plant({ id: "p1", name: "Sour D" }), plant({ id: "p2", name: "Blue Dream" })],
       tents: [{ id: "t1", name: "Tent A" }],
       manualReadings: [],
-      diaryEntries: [
-        { entry_at: TODAY_ISO, id: "d1", plant_id: "p1", tent_id: "t1" },
-      ],
+      diaryEntries: [{ entry_at: TODAY_ISO, id: "d1", plant_id: "p1", tent_id: "t1" }],
     });
 
     expect(panel.total).toBe(2);
@@ -73,9 +68,7 @@ describe("buildDashboardDailyGrowCheckPanel · pure rules", () => {
       ],
       tents: [{ id: "t1", name: "Tent A" }],
       manualReadings: [],
-      diaryEntries: [
-        { entry_at: TODAY_ISO, id: "d1", plant_id: "p1", tent_id: "t1" },
-      ],
+      diaryEntries: [{ entry_at: TODAY_ISO, id: "d1", plant_id: "p1", tent_id: "t1" }],
     });
     expect(panel.rows.map((r) => r.plantId)).toEqual(["p2", "p3", "p1"]);
   });
@@ -186,9 +179,7 @@ describe("buildDashboardDailyGrowCheckPanel · pure rules", () => {
       plants: [plant({ id: "p1", tentId: "t1" })],
       tents: [{ id: "t1", name: "Tent A" }],
       manualReadings: [{ ts: YESTERDAY_ISO, id: "r1", tent_id: "t1" }],
-      diaryEntries: [
-        { entry_at: YESTERDAY_ISO, id: "d1", plant_id: "p1", tent_id: "t1" },
-      ],
+      diaryEntries: [{ entry_at: YESTERDAY_ISO, id: "d1", plant_id: "p1", tent_id: "t1" }],
     });
     expect(panel.rows[0].checkedToday).toBe(false);
   });
@@ -200,9 +191,7 @@ describe("buildDashboardDailyGrowCheckPanel · pure rules", () => {
       plants: [plant({ id: "p1" }), plant({ id: "p2" })],
       tents: [{ id: "t1", name: "Tent A" }],
       manualReadings: [],
-      diaryEntries: [
-        { entry_at: TODAY_ISO, id: "d1", plant_id: "p1", tent_id: "t1" },
-      ],
+      diaryEntries: [{ entry_at: TODAY_ISO, id: "d1", plant_id: "p1", tent_id: "t1" }],
     };
     const a = buildDashboardDailyGrowCheckPanel(args);
     const b = buildDashboardDailyGrowCheckPanel(args);
@@ -256,14 +245,18 @@ describe("DashboardDailyGrowCheckPanel · component", () => {
   it("renders checked and unchecked rows and summary", () => {
     renderPanel();
     const panel = screen.getByTestId("dashboard-daily-grow-check-panel");
-    expect(within(panel).getByTestId("dashboard-daily-grow-check-panel-title"))
-      .toHaveTextContent(/today's grow checks/i);
-    expect(within(panel).getByTestId("dashboard-daily-grow-check-panel-summary"))
-      .toHaveTextContent(/checked 1 of 2 plants today/i);
+    expect(within(panel).getByTestId("dashboard-daily-grow-check-panel-title")).toHaveTextContent(
+      /today's grow checks/i,
+    );
+    expect(within(panel).getByTestId("dashboard-daily-grow-check-panel-summary")).toHaveTextContent(
+      /checked 1 of 2 plants today/i,
+    );
     const rows = within(panel).getAllByTestId("dashboard-daily-grow-check-panel-row");
     expect(rows).toHaveLength(2);
     // Unchecked row shows quick-action buttons, checked row does not
-    expect(within(panel).getAllByTestId("dashboard-daily-grow-check-panel-row-actions")).toHaveLength(1);
+    expect(
+      within(panel).getAllByTestId("dashboard-daily-grow-check-panel-row-actions"),
+    ).toHaveLength(1);
   });
 
   it("unchecked plant Add note action links to /daily-check?plantId=<id>&from=dashboard&method=note", () => {
@@ -274,16 +267,12 @@ describe("DashboardDailyGrowCheckPanel · component", () => {
   });
 });
 
-
 // -----------------------------------------------------------------------
 // Static safety audit
 // -----------------------------------------------------------------------
 describe("Dashboard Daily Grow Check panel · static safety", () => {
   const root = resolve(__dirname, "../..");
-  const rules = readFileSync(
-    resolve(root, "src/lib/dashboardDailyGrowCheckPanelRules.ts"),
-    "utf8",
-  );
+  const rules = readFileSync(resolve(root, "src/lib/dashboardDailyGrowCheckPanelRules.ts"), "utf8");
   const card = readFileSync(
     resolve(root, "src/components/DashboardDailyGrowCheckPanel.tsx"),
     "utf8",

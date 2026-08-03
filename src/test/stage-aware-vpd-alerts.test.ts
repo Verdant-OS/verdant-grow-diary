@@ -38,10 +38,7 @@ const RULES_SRC = readFileSync(
   resolve(__dirname, "../lib/defaultEnvironmentThresholds.ts"),
   "utf8",
 );
-const ALERTS_SRC = readFileSync(
-  resolve(__dirname, "../lib/environmentAlerts.ts"),
-  "utf8",
-);
+const ALERTS_SRC = readFileSync(resolve(__dirname, "../lib/environmentAlerts.ts"), "utf8");
 const HOOK_SRC = readFileSync(
   resolve(__dirname, "../hooks/usePersistEnvironmentAlerts.ts"),
   "utf8",

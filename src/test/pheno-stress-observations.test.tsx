@@ -7,10 +7,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { validatePhenoStressDraft } from "@/lib/pheno/phenoStressObservationValidation";
-import {
-  summarizeStressForCandidate,
-  emptyStressSummary,
-} from "@/lib/pheno/phenoStressSummary";
+import { summarizeStressForCandidate, emptyStressSummary } from "@/lib/pheno/phenoStressSummary";
 import type { PhenoStressObservationRow } from "@/lib/pheno/phenoStressObservationsApi";
 import PhenoStressTestingSection from "@/components/PhenoStressTestingSection";
 import PhenoStressSummaryCard from "@/components/PhenoStressSummaryCard";
@@ -129,9 +126,7 @@ describe("summarizeStressForCandidate", () => {
   });
 
   it("returns empty summary when no rows for candidate", () => {
-    expect(summarizeStressForCandidate("nope", [])).toEqual(
-      emptyStressSummary("nope"),
-    );
+    expect(summarizeStressForCandidate("nope", [])).toEqual(emptyStressSummary("nope"));
   });
 });
 
@@ -157,9 +152,7 @@ describe("PhenoStressTestingSection — persistence + diary + summary", () => {
     render(
       <PhenoStressTestingSection
         candidates={[{ candidateId: "c-1", candidateLabel: "Cand 1" }]}
-        diaryOptions={[
-          { id: "diary-42", label: "2026-07-01 · plant abcd · \"leaf droop noted\"" },
-        ]}
+        diaryOptions={[{ id: "diary-42", label: '2026-07-01 · plant abcd · "leaf droop noted"' }]}
         onPersist={onPersist}
       />,
     );
@@ -246,9 +239,9 @@ describe("PhenoStressTestingSection — persistence + diary + summary", () => {
     expect(card.getAttribute("data-intensity")).toBe("high");
     expect(card.getAttribute("data-recommendation")).toBe("reject");
     expect(card.getAttribute("data-has-diary")).toBe("true");
-    expect(
-      screen.getByTestId("pheno-stress-summary-notes-cand-1").textContent,
-    ).toMatch(/Yellowing/);
+    expect(screen.getByTestId("pheno-stress-summary-notes-cand-1").textContent).toMatch(
+      /Yellowing/,
+    );
   });
 });
 

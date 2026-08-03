@@ -36,19 +36,15 @@ describe("CsvPreviewReviewGate (disabled)", () => {
     const { rerender } = render(
       <CsvPreviewReviewGate hasHardBlockedRows={false} hasAcceptedRows={true} />,
     );
-    expect(
-      screen.getByTestId("csv-preview-review-gate").getAttribute("data-gate-ready"),
-    ).toBe("false");
+    expect(screen.getByTestId("csv-preview-review-gate").getAttribute("data-gate-ready")).toBe(
+      "false",
+    );
 
     rerender(<CsvPreviewReviewGate hasHardBlockedRows={true} hasAcceptedRows={true} />);
-    expect(
-      screen.getByTestId("csv-gate-check-no-blocks").getAttribute("data-ok"),
-    ).toBe("false");
+    expect(screen.getByTestId("csv-gate-check-no-blocks").getAttribute("data-ok")).toBe("false");
 
     rerender(<CsvPreviewReviewGate hasHardBlockedRows={false} hasAcceptedRows={false} />);
-    expect(
-      screen.getByTestId("csv-gate-check-accepted").getAttribute("data-ok"),
-    ).toBe("false");
+    expect(screen.getByTestId("csv-gate-check-accepted").getAttribute("data-ok")).toBe("false");
   });
 
   it("confirmation copy and future-flow copy are present", () => {
@@ -57,8 +53,9 @@ describe("CsvPreviewReviewGate (disabled)", () => {
       screen.getByText(/I confirm this is my data and understand this import is not live data\./),
     ).toBeInTheDocument();
     expect(
-      screen.getAllByText(/Import requires review and will be enabled in a separate approval-required flow\./)
-        .length,
+      screen.getAllByText(
+        /Import requires review and will be enabled in a separate approval-required flow\./,
+      ).length,
     ).toBeGreaterThan(0);
   });
 });

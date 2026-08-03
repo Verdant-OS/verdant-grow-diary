@@ -15,7 +15,11 @@
  *  - Pure: no Supabase, no AI, no Action Queue, no schema, no fetch.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { clearLocalStorageForTest, getLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 import {
   formatTemperatureDisplay,
   loadTemperatureUnitPreference,
@@ -25,10 +29,7 @@ import {
   fahrenheitToCelsius,
   DEFAULT_TEMPERATURE_UNIT,
 } from "@/lib/temperatureUnitPreference";
-import {
-  formatTempFFromC,
-  tempFFromC,
-} from "@/lib/temperatureUnits";
+import { formatTempFFromC, tempFFromC } from "@/lib/temperatureUnits";
 import { formatTempDualF } from "@/lib/temperatureDisplay";
 
 beforeEach(() => {

@@ -38,8 +38,7 @@ import {
 
 const META_TAG_REGEX = /<meta\b[^>]*>/gi;
 const TITLE_REGEX = /<title\b[^>]*>([\s\S]*?)<\/title>/i;
-const CANONICAL_REGEX =
-  /<link\b[^>]*\brel\s*=\s*(?:"canonical"|'canonical'|canonical)[^>]*>/i;
+const CANONICAL_REGEX = /<link\b[^>]*\brel\s*=\s*(?:"canonical"|'canonical'|canonical)[^>]*>/i;
 
 // Attribute-value matchers that robustly handle:
 //   - mixed single / double quoted values ( key="v"  key='v' )
@@ -119,7 +118,6 @@ export function flattenJsonLdNodes(blocks) {
   return nodes;
 }
 
-
 // Decode the HTML-entity forms that legitimately appear in meta/OG
 // attribute values authored via document.createElement/setAttribute
 // or via server-side HTML serialization: named entities, decimal
@@ -148,9 +146,7 @@ function decode(value) {
       return Number.isFinite(cp) ? String.fromCodePoint(cp) : m;
     })
     .replace(/&([a-zA-Z][a-zA-Z0-9]*);/g, (m, name) =>
-      Object.prototype.hasOwnProperty.call(NAMED_ENTITIES, name.toLowerCase())
-        ? NAMED_ENTITIES[name.toLowerCase()]
-        : m,
+      Object.hasOwn(NAMED_ENTITIES, name.toLowerCase()) ? NAMED_ENTITIES[name.toLowerCase()] : m,
     );
 }
 
@@ -176,9 +172,7 @@ export function extractHead(html) {
   }
   const titleMatch = html.match(TITLE_REGEX);
   const canonicalTag = html.match(CANONICAL_REGEX);
-  const canonicalHref = canonicalTag
-    ? pickAttrValue(canonicalTag[0].match(HREF_REGEX))
-    : null;
+  const canonicalHref = canonicalTag ? pickAttrValue(canonicalTag[0].match(HREF_REGEX)) : null;
   return {
     title: titleMatch ? decode(titleMatch[1].trim()) : null,
     canonical: canonicalHref ? decode(canonicalHref) : null,
@@ -198,16 +192,56 @@ function fieldChecks(head, entry) {
   const checks = [
     { label: "<title>", expected: metadata.title, actual: head.title },
     { label: "<link rel=canonical>", expected: metadata.url, actual: head.canonical },
-    { label: 'meta name="description"', expected: metadata.description, actual: head.metas.get("name:description") ?? null },
-    { label: 'meta property="og:title"', expected: metadata.title, actual: head.metas.get("property:og:title") ?? null },
-    { label: 'meta property="og:description"', expected: metadata.description, actual: head.metas.get("property:og:description") ?? null },
-    { label: 'meta property="og:url"', expected: metadata.url, actual: head.metas.get("property:og:url") ?? null },
-    { label: 'meta property="og:image"', expected: metadata.image, actual: head.metas.get("property:og:image") ?? null },
-    { label: 'meta property="og:image:alt"', expected: metadata.imageAlt, actual: head.metas.get("property:og:image:alt") ?? null },
-    { label: 'meta name="twitter:card"', expected: "summary_large_image", actual: head.metas.get("name:twitter:card") ?? null },
-    { label: 'meta name="twitter:title"', expected: metadata.title, actual: head.metas.get("name:twitter:title") ?? null },
-    { label: 'meta name="twitter:description"', expected: metadata.description, actual: head.metas.get("name:twitter:description") ?? null },
-    { label: 'meta name="twitter:image"', expected: metadata.image, actual: head.metas.get("name:twitter:image") ?? null },
+    {
+      label: 'meta name="description"',
+      expected: metadata.description,
+      actual: head.metas.get("name:description") ?? null,
+    },
+    {
+      label: 'meta property="og:title"',
+      expected: metadata.title,
+      actual: head.metas.get("property:og:title") ?? null,
+    },
+    {
+      label: 'meta property="og:description"',
+      expected: metadata.description,
+      actual: head.metas.get("property:og:description") ?? null,
+    },
+    {
+      label: 'meta property="og:url"',
+      expected: metadata.url,
+      actual: head.metas.get("property:og:url") ?? null,
+    },
+    {
+      label: 'meta property="og:image"',
+      expected: metadata.image,
+      actual: head.metas.get("property:og:image") ?? null,
+    },
+    {
+      label: 'meta property="og:image:alt"',
+      expected: metadata.imageAlt,
+      actual: head.metas.get("property:og:image:alt") ?? null,
+    },
+    {
+      label: 'meta name="twitter:card"',
+      expected: "summary_large_image",
+      actual: head.metas.get("name:twitter:card") ?? null,
+    },
+    {
+      label: 'meta name="twitter:title"',
+      expected: metadata.title,
+      actual: head.metas.get("name:twitter:title") ?? null,
+    },
+    {
+      label: 'meta name="twitter:description"',
+      expected: metadata.description,
+      actual: head.metas.get("name:twitter:description") ?? null,
+    },
+    {
+      label: 'meta name="twitter:image"',
+      expected: metadata.image,
+      actual: head.metas.get("name:twitter:image") ?? null,
+    },
   ];
   // Robots: always asserted. Per-route override wins; otherwise the
   // sitewide default from index.html applies. Any value outside
@@ -328,9 +362,7 @@ export function jsonLdChecks(head) {
     }
     if (spec.offerNames) {
       const offers = Array.isArray(node.offers) ? node.offers : [];
-      const actualNames = offers
-        .filter((o) => o && o["@type"] === "Offer")
-        .map((o) => o.name);
+      const actualNames = offers.filter((o) => o && o["@type"] === "Offer").map((o) => o.name);
       const missing = spec.offerNames.filter((n) => !actualNames.includes(n));
       results.push({
         label: `JSON-LD ${spec.type}.offers[] names`,
@@ -342,7 +374,6 @@ export function jsonLdChecks(head) {
   }
   return results;
 }
-
 
 /**
  * Build a structured diff for one route — every checked field, plus a

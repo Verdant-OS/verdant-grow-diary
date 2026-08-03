@@ -19,9 +19,7 @@ type CountsMap = Map<string, AlertLinkedActionsSummary>;
 
 const OPEN_STATUSES = ["pending_approval", "approved", "simulated"] as const;
 
-export function useAlertsLinkedActionCounts(
-  alertIds: ReadonlyArray<string>,
-): CountsMap {
+export function useAlertsLinkedActionCounts(alertIds: ReadonlyArray<string>): CountsMap {
   const [counts, setCounts] = useState<CountsMap>(new Map());
   // Stable dependency for the effect: join the sorted, de-duped ids.
   const idKey = Array.from(new Set(alertIds)).sort().join(",");

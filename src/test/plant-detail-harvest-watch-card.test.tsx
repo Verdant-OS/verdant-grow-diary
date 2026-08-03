@@ -115,9 +115,7 @@ describe("PlantDetailHarvestWatchCard", () => {
         isLoading: false,
       });
 
-      const { container } = render(
-        <PlantDetailHarvestWatchCard plantId="p1" hasPlantPhoto />,
-      );
+      const { container } = render(<PlantDetailHarvestWatchCard plantId="p1" hasPlantPhoto />);
 
       expect(container).toBeEmptyDOMElement();
     },
@@ -152,7 +150,9 @@ describe("Harvest Watch card safety", () => {
   });
 
   it("does not call AI, alerts, Action Queue, or device control", () => {
-    expect(ALL).not.toMatch(/openai|ai_doctor_sessions|askDoctor|aiDoctor|model_call|model\.create/i);
+    expect(ALL).not.toMatch(
+      /openai|ai_doctor_sessions|askDoctor|aiDoctor|model_call|model\.create/i,
+    );
     expect(ALL).not.toMatch(/from\(["']alerts["']\)|from\(["']alert_events["']\)/);
     expect(ALL).not.toMatch(/from\(["']action_queue["']\)|actionQueue|queued action/i);
     expect(ALL).not.toMatch(/mqtt|relay\.on|relay\.off|device\.command|smart plug/i);

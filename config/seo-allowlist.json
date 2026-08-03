@@ -13,12 +13,7 @@
         "https://verdantgrowdiary.com/internal/*",
         "https://verdantgrowdiary.com/admin/*"
       ],
-      "issue_types": [
-        "not_indexed",
-        "noindex_detected",
-        "blocked_by_robots",
-        "verdict_not_pass"
-      ],
+      "issue_types": ["not_indexed", "noindex_detected", "blocked_by_robots", "verdict_not_pass"],
       "expires_on": "2026-12-31"
     }
   ],

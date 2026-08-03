@@ -81,17 +81,13 @@ describe("PlantDetailHarvestEvidenceReportMount", () => {
     mocks.useGrowPlant.mockReturnValue({ data: null, isLoading: true, isError: false });
     mocks.usePlantRecentActivity.mockReturnValue({ data: [], isLoading: false, isError: false });
     render(<PlantDetailHarvestEvidenceReportMount plantId="p1" />);
-    expect(
-      screen.getByTestId("plant-detail-harvest-evidence-report-loading"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("plant-detail-harvest-evidence-report-loading")).toBeInTheDocument();
   });
 
   it("scopes to current plant and surfaces explicit trichome evidence", () => {
     mocks.useGrowPlant.mockReturnValue({ data: PLANT, isLoading: false, isError: false });
     mocks.usePlantRecentActivity.mockReturnValue({
-      data: [
-        row({ id: "n1", note: "Trichomes ~30% cloudy across upper colas." }),
-      ],
+      data: [row({ id: "n1", note: "Trichomes ~30% cloudy across upper colas." })],
       isLoading: false,
       isError: false,
     });

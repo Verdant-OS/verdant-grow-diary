@@ -10,10 +10,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const DASHBOARD = readFileSync(
-  resolve(__dirname, "../../src/pages/Dashboard.tsx"),
-  "utf8",
-);
+const DASHBOARD = readFileSync(resolve(__dirname, "../../src/pages/Dashboard.tsx"), "utf8");
 
 describe("Dashboard · Plants KPI source label", () => {
   it("clarifies the healthy count is user-assigned, not sensor-derived", () => {
@@ -27,8 +24,6 @@ describe("Dashboard · Plants KPI source label", () => {
   });
 
   it("preserves the original healthy count calculation", () => {
-    expect(DASHBOARD).toMatch(
-      /plants\.filter\(\(p\)\s*=>\s*p\.health\s*===\s*"healthy"\)\.length/,
-    );
+    expect(DASHBOARD).toMatch(/plants\.filter\(\(p\)\s*=>\s*p\.health\s*===\s*"healthy"\)\.length/);
   });
 });

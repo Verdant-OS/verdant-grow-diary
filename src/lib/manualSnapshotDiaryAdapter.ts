@@ -19,10 +19,7 @@
  *      ec              → reservoirEc (mS/cm)
  */
 
-import {
-  validateManualSnapshot,
-  type ManualSnapshotInput,
-} from "@/lib/manualSensorSnapshotRules";
+import { validateManualSnapshot, type ManualSnapshotInput } from "@/lib/manualSensorSnapshotRules";
 import type { ManualSnapshotRecord } from "@/lib/manualSensorSnapshotViewModel";
 
 export const MANUAL_SNAPSHOT_DIARY_SOURCE = "manual" as const;

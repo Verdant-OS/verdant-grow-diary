@@ -95,10 +95,7 @@ export function constantTimeEqualHex(a: string, b: string): boolean {
 }
 
 /** Compute HMAC SHA-256 of `message` with `secret`, returned as lowercase hex. */
-export async function computeHmacSha256Hex(
-  secret: string,
-  message: string,
-): Promise<string> {
+export async function computeHmacSha256Hex(secret: string, message: string): Promise<string> {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
@@ -118,22 +115,15 @@ export async function computeHmacSha256Hex(
 
 function resolveCredential(
   bridgeId: string,
-  credentials:
-    | readonly BridgeCredential[]
-    | ReadonlyMap<string, BridgeCredential>,
+  credentials: readonly BridgeCredential[] | ReadonlyMap<string, BridgeCredential>,
 ): BridgeCredential | undefined {
   if (Array.isArray(credentials)) {
-    return (credentials as readonly BridgeCredential[]).find(
-      (c) => c.bridgeId === bridgeId,
-    );
+    return (credentials as readonly BridgeCredential[]).find((c) => c.bridgeId === bridgeId);
   }
   return (credentials as ReadonlyMap<string, BridgeCredential>).get(bridgeId);
 }
 
-function fail(
-  code: BridgeAuthFailureCode,
-  message: string,
-): BridgeAuthResult {
+function fail(code: BridgeAuthFailureCode, message: string): BridgeAuthResult {
   return { ok: false, code, message };
 }
 
@@ -146,17 +136,14 @@ function fail(
  */
 export async function verifyBridgeRequest(
   req: BridgeAuthRequest,
-  credentials:
-    | readonly BridgeCredential[]
-    | ReadonlyMap<string, BridgeCredential>,
+  credentials: readonly BridgeCredential[] | ReadonlyMap<string, BridgeCredential>,
 ): Promise<BridgeAuthResult> {
   const bridgeId = (req.bridgeId ?? "").trim();
   if (!bridgeId) return fail("missing_bridge_id", "bridgeId is required");
 
   const cred = resolveCredential(bridgeId, credentials);
   if (!cred) return fail("unknown_bridge_id", "Unknown bridge id");
-  if (!cred.isActive)
-    return fail("inactive_credential", "Bridge credential is inactive");
+  if (!cred.isActive) return fail("inactive_credential", "Bridge credential is inactive");
 
   const signature = (req.signature ?? "").trim();
   if (!signature) return fail("missing_signature", "signature is required");
@@ -173,22 +160,14 @@ export async function verifyBridgeRequest(
   if (-skew > SIGNING_WINDOW_MS)
     return fail("timestamp_too_old", "timestamp is older than 5 minutes");
   if (skew > SIGNING_WINDOW_MS)
-    return fail(
-      "timestamp_too_far_future",
-      "timestamp is more than 5 minutes in the future",
-    );
+    return fail("timestamp_too_far_future", "timestamp is more than 5 minutes in the future");
 
   const tentId = (req.tentId ?? "").trim();
   if (!tentId) return fail("missing_tent_id", "tentId is required");
   if (!cred.allowedTentIds.includes(tentId))
     return fail("tent_not_allowed", "tentId is not allowed for this bridge");
 
-  const signingString = buildSigningString(
-    req.method,
-    req.path,
-    timestamp,
-    req.rawBody,
-  );
+  const signingString = buildSigningString(req.method, req.path, timestamp, req.rawBody);
   const expected = await computeHmacSha256Hex(cred.secret, signingString);
   // Normalize incoming signature to lowercase hex for comparison only.
   if (!constantTimeEqualHex(expected, signature.toLowerCase()))

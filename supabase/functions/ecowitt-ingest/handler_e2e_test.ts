@@ -83,10 +83,7 @@ function paidSubscription(overrides: Partial<LovableSubscriptionRow> = {}): Lova
 }
 
 function makeState(
-  input: {
-    row?: BridgeTokenRow | null;
-    tents?: TentFixtureRow[];
-  } = {},
+  input: { row?: BridgeTokenRow | null; tents?: TentFixtureRow[] } = {},
 ): FakeState {
   return {
     bridgeRow: input.row === undefined ? bridgeRow() : input.row,
@@ -262,100 +259,91 @@ async function responseBody(response: Response): Promise<Record<string, unknown>
   return (await response.json()) as Record<string, unknown>;
 }
 
-Deno.test(
-  "direct EcoWitt handler rejects an ordinary user JWT before any lookup or write",
-  async () => {
-    const state = makeState();
-    const response = await handleEcoWittIngestRequest(post("ey.fake.user.jwt"), {
-      admin: makeAdmin(state),
-      now: () => NOW,
-      expectedBillingEnvironment: "live",
+Deno.test("direct EcoWitt handler rejects an ordinary user JWT before any lookup or write", async () => {
+  const state = makeState();
+  const response = await handleEcoWittIngestRequest(post("ey.fake.user.jwt"), {
+    admin: makeAdmin(state),
+    now: () => NOW,
+    expectedBillingEnvironment: "live",
+  });
+
+  assertEquals(response.status, 403);
+  assertEquals((await responseBody(response)).error, "bridge_required");
+  assertEquals(state.bridgeLookups, 0);
+  assertEquals(state.tentQueries, 0);
+  assertEquals(state.persistedRows.length, 0);
+});
+
+Deno.test("direct EcoWitt handler accepts a tent-scoped bridge and persists honest provenance", async () => {
+  const fingerprint = await computeEcoWittPasskeyFingerprint(PASSKEY);
+  assert(fingerprint);
+  const state = makeState({ tents: [tentRow(TENT_ID, fingerprint)] });
+  const response = await handleEcoWittIngestRequest(post(VALID_TOKEN), {
+    admin: makeAdmin(state),
+    now: () => NOW,
+    expectedBillingEnvironment: "live",
+  });
+  const body = await responseBody(response);
+
+  assertEquals(response.status, 200);
+  assertEquals(body.ok, true);
+  assertEquals(body.accepted, true);
+  assertEquals(body.auth, "bridge");
+  assertEquals(body.inserted, state.persistedRows.length);
+  assert(state.persistedRows.length > 0);
+  for (const row of state.persistedRows) {
+    assertEquals(row.user_id, USER_ID);
+    assertEquals(row.tent_id, TENT_ID);
+    assertEquals(row.source, "live");
+    assertEquals(row.quality, "ok");
+    assertEquals(row.captured_at, CAPTURED_AT);
+    const raw = row.raw_payload as Record<string, unknown>;
+    assertEquals(raw.provider, "ecowitt");
+    assertEquals(raw.vendor, "ecowitt");
+    assertEquals(raw.timestamp_source, "ecowitt_dateutc");
+    assertEquals(raw.passkey_fingerprint, fingerprint);
+    assertEquals(raw.metadata, {
+      transport_source: "ecowitt",
+      verdant_source: "live",
     });
+    const serialized = JSON.stringify(row);
+    assert(!serialized.includes(PASSKEY));
+    assert(!serialized.includes(SPOOFED_USER_ID));
+    assert(!serialized.includes(VALID_TOKEN));
+  }
+  assertEquals(state.rpcCalls.length, 1);
+  assertEquals(state.rpcCalls[0].name, "bump_bridge_token_usage");
+  assert(
+    state.subscriptionFilters.some(
+      (filter) => filter.column === "user_id" && filter.value === USER_ID,
+    ),
+  );
+  assert(state.tentFilters.some((filter) => filter.column === "id" && filter.value === TENT_ID));
+});
 
-    assertEquals(response.status, 403);
-    assertEquals((await responseBody(response)).error, "bridge_required");
-    assertEquals(state.bridgeLookups, 0);
-    assertEquals(state.tentQueries, 0);
-    assertEquals(state.persistedRows.length, 0);
-  },
-);
+Deno.test("direct EcoWitt handler rejects an already-stale packet and never persists it as live", async () => {
+  const fingerprint = await computeEcoWittPasskeyFingerprint(PASSKEY);
+  assert(fingerprint);
+  const state = makeState({ tents: [tentRow(TENT_ID, fingerprint)] });
+  const stalePayload = {
+    ...payload(),
+    // One second beyond the canonical 30-minute freshness window.
+    dateutc: "2026-07-18 11:29:59",
+  };
+  const response = await handleEcoWittIngestRequest(post(VALID_TOKEN, ENDPOINT, stalePayload), {
+    admin: makeAdmin(state),
+    now: () => NOW,
+    expectedBillingEnvironment: "live",
+  });
+  const body = await responseBody(response);
 
-Deno.test(
-  "direct EcoWitt handler accepts a tent-scoped bridge and persists honest provenance",
-  async () => {
-    const fingerprint = await computeEcoWittPasskeyFingerprint(PASSKEY);
-    assert(fingerprint);
-    const state = makeState({ tents: [tentRow(TENT_ID, fingerprint)] });
-    const response = await handleEcoWittIngestRequest(post(VALID_TOKEN), {
-      admin: makeAdmin(state),
-      now: () => NOW,
-      expectedBillingEnvironment: "live",
-    });
-    const body = await responseBody(response);
-
-    assertEquals(response.status, 200);
-    assertEquals(body.ok, true);
-    assertEquals(body.accepted, true);
-    assertEquals(body.auth, "bridge");
-    assertEquals(body.inserted, state.persistedRows.length);
-    assert(state.persistedRows.length > 0);
-    for (const row of state.persistedRows) {
-      assertEquals(row.user_id, USER_ID);
-      assertEquals(row.tent_id, TENT_ID);
-      assertEquals(row.source, "live");
-      assertEquals(row.quality, "ok");
-      assertEquals(row.captured_at, CAPTURED_AT);
-      const raw = row.raw_payload as Record<string, unknown>;
-      assertEquals(raw.provider, "ecowitt");
-      assertEquals(raw.vendor, "ecowitt");
-      assertEquals(raw.timestamp_source, "ecowitt_dateutc");
-      assertEquals(raw.passkey_fingerprint, fingerprint);
-      assertEquals(raw.metadata, {
-        transport_source: "ecowitt",
-        verdant_source: "live",
-      });
-      const serialized = JSON.stringify(row);
-      assert(!serialized.includes(PASSKEY));
-      assert(!serialized.includes(SPOOFED_USER_ID));
-      assert(!serialized.includes(VALID_TOKEN));
-    }
-    assertEquals(state.rpcCalls.length, 1);
-    assertEquals(state.rpcCalls[0].name, "bump_bridge_token_usage");
-    assert(
-      state.subscriptionFilters.some(
-        (filter) => filter.column === "user_id" && filter.value === USER_ID,
-      ),
-    );
-    assert(state.tentFilters.some((filter) => filter.column === "id" && filter.value === TENT_ID));
-  },
-);
-
-Deno.test(
-  "direct EcoWitt handler rejects an already-stale packet and never persists it as live",
-  async () => {
-    const fingerprint = await computeEcoWittPasskeyFingerprint(PASSKEY);
-    assert(fingerprint);
-    const state = makeState({ tents: [tentRow(TENT_ID, fingerprint)] });
-    const stalePayload = {
-      ...payload(),
-      // One second beyond the canonical 30-minute freshness window.
-      dateutc: "2026-07-18 11:29:59",
-    };
-    const response = await handleEcoWittIngestRequest(post(VALID_TOKEN, ENDPOINT, stalePayload), {
-      admin: makeAdmin(state),
-      now: () => NOW,
-      expectedBillingEnvironment: "live",
-    });
-    const body = await responseBody(response);
-
-    assertEquals(response.status, 200);
-    assertEquals(body.accepted, false);
-    assertEquals(body.inserted, 0);
-    assertEquals(body.reason, "timestamp_stale");
-    assertEquals(state.persistedRows.length, 0);
-    assertEquals(state.rpcCalls.length, 0);
-  },
-);
+  assertEquals(response.status, 200);
+  assertEquals(body.accepted, false);
+  assertEquals(body.inserted, 0);
+  assertEquals(body.reason, "timestamp_stale");
+  assertEquals(state.persistedRows.length, 0);
+  assertEquals(state.rpcCalls.length, 0);
+});
 
 Deno.test("direct EcoWitt handler rejects a revoked bridge without writing", async () => {
   const state = makeState({
@@ -389,35 +377,32 @@ Deno.test("direct EcoWitt handler rejects an expired bridge without writing", as
   assertEquals(state.persistedRows.length, 0);
 });
 
-Deno.test(
-  "direct EcoWitt handler cannot widen a bridge to another tent and writes nothing",
-  async () => {
-    const fingerprint = await computeEcoWittPasskeyFingerprint(PASSKEY);
-    assert(fingerprint);
-    // The matching gateway exists only under another tent. The fake applies the
-    // handler's `.eq("id", bridgeTent)` filter exactly as PostgREST would.
-    const state = makeState({ tents: [tentRow(OTHER_TENT_ID, fingerprint)] });
-    const response = await handleEcoWittIngestRequest(
-      post(VALID_TOKEN, `${ENDPOINT}?tent_id=${OTHER_TENT_ID}`),
-      {
-        admin: makeAdmin(state),
-        now: () => NOW,
-        expectedBillingEnvironment: "live",
-      },
-    );
-    const body = await responseBody(response);
+Deno.test("direct EcoWitt handler cannot widen a bridge to another tent and writes nothing", async () => {
+  const fingerprint = await computeEcoWittPasskeyFingerprint(PASSKEY);
+  assert(fingerprint);
+  // The matching gateway exists only under another tent. The fake applies the
+  // handler's `.eq("id", bridgeTent)` filter exactly as PostgREST would.
+  const state = makeState({ tents: [tentRow(OTHER_TENT_ID, fingerprint)] });
+  const response = await handleEcoWittIngestRequest(
+    post(VALID_TOKEN, `${ENDPOINT}?tent_id=${OTHER_TENT_ID}`),
+    {
+      admin: makeAdmin(state),
+      now: () => NOW,
+      expectedBillingEnvironment: "live",
+    },
+  );
+  const body = await responseBody(response);
 
-    assertEquals(response.status, 200);
-    assertEquals(body.accepted, false);
-    assertEquals(body.inserted, 0);
-    assertEquals(state.persistedRows.length, 0);
-    assertEquals(state.rpcCalls.length, 0);
-    assert(state.tentFilters.some((filter) => filter.column === "id" && filter.value === TENT_ID));
-    assert(
-      !state.tentFilters.some((filter) => filter.column === "id" && filter.value === OTHER_TENT_ID),
-    );
-  },
-);
+  assertEquals(response.status, 200);
+  assertEquals(body.accepted, false);
+  assertEquals(body.inserted, 0);
+  assertEquals(state.persistedRows.length, 0);
+  assertEquals(state.rpcCalls.length, 0);
+  assert(state.tentFilters.some((filter) => filter.column === "id" && filter.value === TENT_ID));
+  assert(
+    !state.tentFilters.some((filter) => filter.column === "id" && filter.value === OTHER_TENT_ID),
+  );
+});
 
 Deno.test("direct EcoWitt handler denies a Free token owner before tent lookup", async () => {
   const state = makeState();

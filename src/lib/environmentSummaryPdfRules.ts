@@ -9,8 +9,7 @@ import type {
   EnvironmentSummaryTopIssue,
 } from "./environmentSummaryReportViewModel";
 
-export const PDF_SAFETY_FOOTER =
-  "Read-only report. No device control or automation was performed.";
+export const PDF_SAFETY_FOOTER = "Read-only report. No device control or automation was performed.";
 
 export interface EnvironmentSummaryPdfPayload {
   title: string;
@@ -31,10 +30,7 @@ function isValidIsoDate(s: unknown): s is string {
   return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
 }
 
-export function buildEnvironmentSummaryPdfFilename(
-  startDate: string,
-  endDate: string,
-): string {
+export function buildEnvironmentSummaryPdfFilename(startDate: string, endDate: string): string {
   const safeStart = isValidIsoDate(startDate) ? startDate : "unknown";
   const safeEnd = isValidIsoDate(endDate) ? endDate : "unknown";
   return `verdant-environment-summary-${safeStart}-to-${safeEnd}.pdf`;
@@ -68,9 +64,7 @@ export function buildEnvironmentSummaryPdfPayload(
 
   sections.push({
     heading: "Source counts",
-    rows: Object.entries(report.sourceCounts).map(
-      ([src, count]) => `${src}: ${count}`,
-    ),
+    rows: Object.entries(report.sourceCounts).map(([src, count]) => `${src}: ${count}`),
   });
 
   if (report.metricCoverage.length > 0) {
@@ -86,16 +80,12 @@ export function buildEnvironmentSummaryPdfPayload(
   if (report.topIssues.length > 0) {
     sections.push({
       heading: "Top issues",
-      rows: report.topIssues.map(
-        (i) => `${i.label} ×${i.count} (${i.severity}) — ${i.prompt}`,
-      ),
+      rows: report.topIssues.map((i) => `${i.label} ×${i.count} (${i.severity}) — ${i.prompt}`),
     });
   }
 
   const selectedIssue =
-    (selectedIssueId &&
-      report.topIssues.find((i) => i.ruleId === selectedIssueId)) ||
-    null;
+    (selectedIssueId && report.topIssues.find((i) => i.ruleId === selectedIssueId)) || null;
 
   if (selectedIssue) {
     sections.push({

@@ -28,15 +28,9 @@ for (const vp of VIEWPORTS) {
     await page.goto("/pheno-comparison", { waitUntil: "domcontentloaded" });
 
     await expect(page.getByTestId("pheno-comparison-page")).toBeVisible();
-    await expect(
-      page.getByTestId("pheno-comparison-read-only-badge"),
-    ).toBeVisible();
-    await expect(
-      page.getByTestId("pheno-comparison-demo-banner"),
-    ).toBeVisible();
-    await expect(
-      page.getByTestId("pheno-comparison-confidence-caveat"),
-    ).toBeVisible();
+    await expect(page.getByTestId("pheno-comparison-read-only-badge")).toBeVisible();
+    await expect(page.getByTestId("pheno-comparison-demo-banner")).toBeVisible();
+    await expect(page.getByTestId("pheno-comparison-confidence-caveat")).toBeVisible();
 
     const legend = page.getByTestId("pheno-comparison-source-legend");
     await expect(legend).toBeVisible();
@@ -50,12 +44,8 @@ for (const vp of VIEWPORTS) {
     expect(await cards.count()).toBeGreaterThanOrEqual(2);
 
     // Incomplete-candidate empty states must still be visible on both viewports.
-    await expect(
-      page.getByTestId("pheno-candidate-demo-cand-bravo-no-photo"),
-    ).toBeVisible();
-    await expect(
-      page.getByTestId("pheno-candidate-demo-cand-charlie-no-photo"),
-    ).toBeVisible();
+    await expect(page.getByTestId("pheno-candidate-demo-cand-bravo-no-photo")).toBeVisible();
+    await expect(page.getByTestId("pheno-candidate-demo-cand-charlie-no-photo")).toBeVisible();
 
     await page.screenshot({
       path: `e2e/screenshots/pheno-comparison-${vp.name}.png`,

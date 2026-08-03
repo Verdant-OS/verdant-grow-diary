@@ -2,9 +2,7 @@ import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 import { PostGrowReflectionPreviewCard } from "@/components/PostGrowReflectionPreviewCard";
-import {
-  buildPostGrowReflectionPreviewViewModel,
-} from "@/lib/ai/postGrowReflectionPreviewViewModel";
+import { buildPostGrowReflectionPreviewViewModel } from "@/lib/ai/postGrowReflectionPreviewViewModel";
 import {
   buildPostGrowReflectionDryRunScenarios,
   runPostGrowReflectionDryRunHarness,

@@ -1,5 +1,10 @@
 export type BillingCustomerLinkAuditStatus = "linked" | "pending_review" | "blocked" | "inactive";
-export type BillingCustomerLinkAuditSource = "checkout" | "webhook" | "operator" | "import" | "unknown";
+export type BillingCustomerLinkAuditSource =
+  | "checkout"
+  | "webhook"
+  | "operator"
+  | "import"
+  | "unknown";
 export type BillingCustomerLinkAuditConfidence = "verified" | "review_required" | "blocked";
 export type BillingCustomerLinkAuditReason = "not_authenticated" | "operator_required";
 
@@ -94,13 +99,20 @@ function asBoolean(value: unknown): boolean {
 }
 
 function asStatus(value: unknown): BillingCustomerLinkAuditStatus {
-  return value === "linked" || value === "pending_review" || value === "blocked" || value === "inactive"
+  return value === "linked" ||
+    value === "pending_review" ||
+    value === "blocked" ||
+    value === "inactive"
     ? value
     : "blocked";
 }
 
 function asSource(value: unknown): BillingCustomerLinkAuditSource {
-  return value === "checkout" || value === "webhook" || value === "operator" || value === "import" || value === "unknown"
+  return value === "checkout" ||
+    value === "webhook" ||
+    value === "operator" ||
+    value === "import" ||
+    value === "unknown"
     ? value
     : "unknown";
 }
@@ -124,11 +136,15 @@ export function formatBillingCustomerLinkSource(source: BillingCustomerLinkAudit
   return SOURCE_LABELS[source];
 }
 
-export function formatBillingCustomerLinkConfidence(confidence: BillingCustomerLinkAuditConfidence): string {
+export function formatBillingCustomerLinkConfidence(
+  confidence: BillingCustomerLinkAuditConfidence,
+): string {
   return CONFIDENCE_LABELS[confidence];
 }
 
-export function parseBillingCustomerLinkAuditResponse(input: unknown): BillingCustomerLinkAuditViewModel {
+export function parseBillingCustomerLinkAuditResponse(
+  input: unknown,
+): BillingCustomerLinkAuditViewModel {
   if (!isRecord(input)) {
     return {
       ok: false,
@@ -149,11 +165,12 @@ export function parseBillingCustomerLinkAuditResponse(input: unknown): BillingCu
   return {
     ok,
     reason: topReason,
-    reasonLabel: topReason === "unknown_response"
-      ? "Link audit response was not recognized."
-      : topReason
-        ? SAFE_REASON_LABELS[topReason]
-        : null,
+    reasonLabel:
+      topReason === "unknown_response"
+        ? "Link audit response was not recognized."
+        : topReason
+          ? SAFE_REASON_LABELS[topReason]
+          : null,
     generatedAt: asString(input.generated_at),
     limit: asNumber(input.limit),
     counts: {

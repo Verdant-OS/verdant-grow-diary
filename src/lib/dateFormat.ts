@@ -29,8 +29,7 @@ export function formatSnapshotTimestamp(
   locale: string | undefined = undefined,
 ): string {
   if (ts === null || ts === undefined || ts === "") return "Unknown time";
-  const d =
-    ts instanceof Date ? ts : new Date(typeof ts === "string" ? ts : Number(ts));
+  const d = ts instanceof Date ? ts : new Date(typeof ts === "string" ? ts : Number(ts));
   if (!(d instanceof Date) || Number.isNaN(d.getTime())) return "Unknown time";
   try {
     return new Intl.DateTimeFormat(locale, SNAPSHOT_FORMAT).format(d);

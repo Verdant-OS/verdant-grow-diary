@@ -84,10 +84,7 @@ export function alertRuleKey(args: {
 }
 
 /** Build a key from an in-memory derived alert. */
-export function derivedAlertKey(
-  alert: EnvironmentAlert,
-  source = "environment_alerts",
-): string {
+export function derivedAlertKey(alert: EnvironmentAlert, source = "environment_alerts"): string {
   return alertRuleKey({
     metric: typeof alert.metric === "string" ? alert.metric : null,
     source,

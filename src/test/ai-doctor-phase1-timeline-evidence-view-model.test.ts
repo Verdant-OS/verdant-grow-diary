@@ -150,7 +150,6 @@ describe("aiDoctorPhase1TimelineEvidenceViewModel", () => {
     expect(s).not.toContain("equipment control");
   });
 
-
   it("falls back to entry_at when occurred_at is missing", () => {
     const vm = buildAiDoctorPhase1TimelineEvidenceViewModel({
       entry_at: "2026-01-02T00:00:00.000Z",

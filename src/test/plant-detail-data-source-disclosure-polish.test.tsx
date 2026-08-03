@@ -18,10 +18,7 @@ import PlantDetailDataSourceDisclosure from "@/components/PlantDetailDataSourceD
 import type { GrowDataSourceMeta } from "@/hooks/useGrowData";
 
 const ROOT = resolve(__dirname, "../..");
-const HELPER = readFileSync(
-  resolve(ROOT, "src/lib/plantDetailDataSourceView.ts"),
-  "utf8",
-);
+const HELPER = readFileSync(resolve(ROOT, "src/lib/plantDetailDataSourceView.ts"), "utf8");
 const COMPONENT = readFileSync(
   resolve(ROOT, "src/components/PlantDetailDataSourceDisclosure.tsx"),
   "utf8",
@@ -48,9 +45,7 @@ const FORBIDDEN = [
   /\breminder/i,
 ];
 
-const meta = (
-  dataSource: GrowDataSourceMeta["dataSource"],
-): GrowDataSourceMeta => ({
+const meta = (dataSource: GrowDataSourceMeta["dataSource"]): GrowDataSourceMeta => ({
   isDemoData: dataSource === "mock" || dataSource === "mixed",
   dataSource,
   sourceReason: "test",
@@ -150,24 +145,22 @@ describe("buildPlantDetailDataSourceView · label resolution", () => {
   });
 
   it("does not label unknown/demo/manual data as Live", () => {
-    const unknownLabels: PlantDetailDataSourceLabel[] = (
-      [
-        buildPlantDetailDataSourceView({ recordSource: "mock" }).label,
-        buildPlantDetailDataSourceView({ recordSource: "unavailable" }).label,
-        buildPlantDetailDataSourceView({
-          recordSource: "supabase",
-          snapshotSource: "manual",
-        }).label,
-        buildPlantDetailDataSourceView({
-          recordSource: "supabase",
-          snapshotSource: "sim",
-        }).label,
-        buildPlantDetailDataSourceView({
-          recordSource: "supabase",
-          snapshotSource: "diary",
-        }).label,
-      ] as PlantDetailDataSourceLabel[]
-    );
+    const unknownLabels: PlantDetailDataSourceLabel[] = [
+      buildPlantDetailDataSourceView({ recordSource: "mock" }).label,
+      buildPlantDetailDataSourceView({ recordSource: "unavailable" }).label,
+      buildPlantDetailDataSourceView({
+        recordSource: "supabase",
+        snapshotSource: "manual",
+      }).label,
+      buildPlantDetailDataSourceView({
+        recordSource: "supabase",
+        snapshotSource: "sim",
+      }).label,
+      buildPlantDetailDataSourceView({
+        recordSource: "supabase",
+        snapshotSource: "diary",
+      }).label,
+    ] as PlantDetailDataSourceLabel[];
     for (const l of unknownLabels) {
       expect(l).not.toBe("Live");
     }
@@ -182,31 +175,20 @@ describe("PlantDetailDataSourceDisclosure · render", () => {
         snapshotSource="live"
       />,
     );
-    const badge = screen.getByTestId(
-      "plant-detail-data-source-disclosure-badge",
-    );
+    const badge = screen.getByTestId("plant-detail-data-source-disclosure-badge");
     expect(badge.getAttribute("data-label")).toBe("Live");
     expect(
-      screen.getByTestId("plant-detail-data-source-disclosure-description")
-        .textContent ?? "",
+      screen.getByTestId("plant-detail-data-source-disclosure-description").textContent ?? "",
     ).toMatch(/live/i);
   });
 
   it("renders Manual label and helper copy when snapshot is manual", () => {
-    render(
-      <PlantDetailDataSourceDisclosure
-        metas={[meta("supabase")]}
-        snapshotSource="manual"
-      />,
-    );
+    render(<PlantDetailDataSourceDisclosure metas={[meta("supabase")]} snapshotSource="manual" />);
     expect(
-      screen
-        .getByTestId("plant-detail-data-source-disclosure-badge")
-        .getAttribute("data-label"),
+      screen.getByTestId("plant-detail-data-source-disclosure-badge").getAttribute("data-label"),
     ).toBe("Manual");
     expect(
-      screen.getByTestId("plant-detail-data-source-disclosure-description")
-        .textContent ?? "",
+      screen.getByTestId("plant-detail-data-source-disclosure-description").textContent ?? "",
     ).toMatch(/entered by/i);
   });
 
@@ -223,71 +205,46 @@ describe("PlantDetailDataSourceDisclosure · render", () => {
     expect(badge.getAttribute("data-label")).toBe("Manual");
     expect(badge.getAttribute("data-label")).not.toBe("Demo");
     expect(
-      screen.getByTestId("plant-detail-data-source-disclosure-description")
-        .textContent ?? "",
+      screen.getByTestId("plant-detail-data-source-disclosure-description").textContent ?? "",
     ).not.toMatch(/sample|simulated/i);
   });
 
   it("renders Demo label and explicitly says not live tent data", () => {
-    render(
-      <PlantDetailDataSourceDisclosure metas={[meta("mock")]} />,
-    );
+    render(<PlantDetailDataSourceDisclosure metas={[meta("mock")]} />);
     expect(
-      screen
-        .getByTestId("plant-detail-data-source-disclosure-badge")
-        .getAttribute("data-label"),
+      screen.getByTestId("plant-detail-data-source-disclosure-badge").getAttribute("data-label"),
     ).toBe("Demo");
     expect(
-      screen.getByTestId("plant-detail-data-source-disclosure-description")
-        .textContent ?? "",
+      screen.getByTestId("plant-detail-data-source-disclosure-description").textContent ?? "",
     ).toMatch(/not live tent data/i);
   });
 
   it("renders Stale label and outdated-reading helper copy", () => {
     render(
-      <PlantDetailDataSourceDisclosure
-        metas={[meta("supabase")]}
-        snapshotSource="live"
-        isStale
-      />,
+      <PlantDetailDataSourceDisclosure metas={[meta("supabase")]} snapshotSource="live" isStale />,
     );
     expect(
-      screen
-        .getByTestId("plant-detail-data-source-disclosure-badge")
-        .getAttribute("data-label"),
+      screen.getByTestId("plant-detail-data-source-disclosure-badge").getAttribute("data-label"),
     ).toBe("Stale");
     expect(
-      screen.getByTestId("plant-detail-data-source-disclosure-description")
-        .textContent ?? "",
+      screen.getByTestId("plant-detail-data-source-disclosure-description").textContent ?? "",
     ).toMatch(/outdated|older/i);
   });
 
   it("renders Unavailable label when no source/status exists", () => {
-    render(
-      <PlantDetailDataSourceDisclosure metas={[meta("unavailable")]} />,
-    );
+    render(<PlantDetailDataSourceDisclosure metas={[meta("unavailable")]} />);
     expect(
-      screen
-        .getByTestId("plant-detail-data-source-disclosure-badge")
-        .getAttribute("data-label"),
+      screen.getByTestId("plant-detail-data-source-disclosure-badge").getAttribute("data-label"),
     ).toBe("Unavailable");
     expect(
-      screen.getByTestId("plant-detail-data-source-disclosure-description")
-        .textContent ?? "",
+      screen.getByTestId("plant-detail-data-source-disclosure-description").textContent ?? "",
     ).toMatch(/no current sensor/i);
   });
 
   it("never labels demo/mock data as Live in rendered output", () => {
-    render(
-      <PlantDetailDataSourceDisclosure
-        metas={[meta("mock")]}
-        snapshotSource="live"
-      />,
-    );
+    render(<PlantDetailDataSourceDisclosure metas={[meta("mock")]} snapshotSource="live" />);
     expect(
-      screen
-        .getByTestId("plant-detail-data-source-disclosure-badge")
-        .getAttribute("data-label"),
+      screen.getByTestId("plant-detail-data-source-disclosure-badge").getAttribute("data-label"),
     ).not.toBe("Live");
   });
 });
@@ -309,19 +266,8 @@ describe("PlantDetailDataSourceDisclosure · static safety", () => {
   });
 
   it("does not leak ids, tokens, raw payloads, or provenance markers in copy", () => {
-    const labels: PlantDetailDataSourceLabel[] = [
-      "Live",
-      "Manual",
-      "Demo",
-      "Stale",
-      "Unavailable",
-    ];
-    for (const recordSource of [
-      "supabase",
-      "mock",
-      "mixed",
-      "unavailable",
-    ] as const) {
+    const labels: PlantDetailDataSourceLabel[] = ["Live", "Manual", "Demo", "Stale", "Unavailable"];
+    for (const recordSource of ["supabase", "mock", "mixed", "unavailable"] as const) {
       for (const snapshotSource of [
         null,
         "live",

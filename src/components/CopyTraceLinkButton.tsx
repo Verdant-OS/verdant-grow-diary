@@ -111,11 +111,7 @@ export default function CopyTraceLinkButton({
         <span
           aria-hidden
           data-testid={`${statusTestId}-visible`}
-          className={
-            status === "success"
-              ? "text-xs text-success"
-              : "text-xs text-destructive"
-          }
+          className={status === "success" ? "text-xs text-success" : "text-xs text-destructive"}
         >
           {message}
         </span>

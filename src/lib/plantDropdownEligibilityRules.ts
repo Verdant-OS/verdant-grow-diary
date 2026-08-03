@@ -158,8 +158,7 @@ export function classifyPlantForDropdown(
 ): PlantDropdownOption | null {
   const effectiveGrowId = getEffectivePlantGrowId(plant, tents);
   const archived = isInactiveDropdownPlant(plant);
-  const includeArchived =
-    opts.includeArchived === true || opts.context === "logs_filter";
+  const includeArchived = opts.includeArchived === true || opts.context === "logs_filter";
 
   // Source plant is always excluded from merge target picker.
   if (opts.context === "merge_target" && opts.sourcePlantId && plant.id === opts.sourcePlantId) {
@@ -296,8 +295,7 @@ export function summarizePlantDropdown(
     hiddenSourcePlant: 0,
     hiddenAlreadyInTent: 0,
   };
-  const includeArchived =
-    opts.includeArchived === true || opts.context === "logs_filter";
+  const includeArchived = opts.includeArchived === true || opts.context === "logs_filter";
   for (const p of plants) {
     if (opts.context === "merge_target" && opts.sourcePlantId === p.id) {
       summary.hiddenSourcePlant += 1;
@@ -317,11 +315,7 @@ export function summarizePlantDropdown(
       summary.hiddenCrossGrow += 1;
       continue;
     }
-    if (
-      opts.context === "add_existing_to_tent" &&
-      opts.tentId &&
-      readTentId(p) === opts.tentId
-    ) {
+    if (opts.context === "add_existing_to_tent" && opts.tentId && readTentId(p) === opts.tentId) {
       summary.hiddenAlreadyInTent += 1;
       continue;
     }

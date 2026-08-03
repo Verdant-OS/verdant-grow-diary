@@ -6,18 +6,30 @@ function readProjectFile(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
 }
 
-const MIGRATION = readProjectFile("supabase/migrations/20260621015000_apply_paddle_subscription_update_rpc.sql");
+const MIGRATION = readProjectFile(
+  "supabase/migrations/20260621015000_apply_paddle_subscription_update_rpc.sql",
+);
 const WEBHOOK = readProjectFile("supabase/functions/paddle-webhook/index.ts");
 
 describe("Paddle subscription update RPC migration", () => {
   it("creates a service-role-only security-definer RPC", () => {
-    expect(MIGRATION).toContain("CREATE OR REPLACE FUNCTION public.apply_paddle_subscription_update");
+    expect(MIGRATION).toContain(
+      "CREATE OR REPLACE FUNCTION public.apply_paddle_subscription_update",
+    );
     expect(MIGRATION).toContain("SECURITY DEFINER");
     expect(MIGRATION).toContain("SET search_path = public, pg_temp");
-    expect(MIGRATION).toContain("GRANT EXECUTE ON FUNCTION public.apply_paddle_subscription_update(uuid) TO service_role");
-    expect(MIGRATION).toContain("REVOKE ALL ON FUNCTION public.apply_paddle_subscription_update(uuid) FROM anon");
-    expect(MIGRATION).toContain("REVOKE ALL ON FUNCTION public.apply_paddle_subscription_update(uuid) FROM authenticated");
-    expect(MIGRATION).not.toMatch(/GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.apply_paddle_subscription_update\(uuid\)\s+TO\s+(anon|authenticated)/i);
+    expect(MIGRATION).toContain(
+      "GRANT EXECUTE ON FUNCTION public.apply_paddle_subscription_update(uuid) TO service_role",
+    );
+    expect(MIGRATION).toContain(
+      "REVOKE ALL ON FUNCTION public.apply_paddle_subscription_update(uuid) FROM anon",
+    );
+    expect(MIGRATION).toContain(
+      "REVOKE ALL ON FUNCTION public.apply_paddle_subscription_update(uuid) FROM authenticated",
+    );
+    expect(MIGRATION).not.toMatch(
+      /GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.apply_paddle_subscription_update\(uuid\)\s+TO\s+(anon|authenticated)/i,
+    );
   });
 
   it("uses verified event, processed event state, and verified customer link gates", () => {
@@ -92,7 +104,7 @@ describe("Paddle subscription update RPC migration", () => {
   });
 
   it("webhook calls the audited wrapper, never the raw updater RPC directly", () => {
-    expect(WEBHOOK).toContain('apply_paddle_subscription_update_with_audit');
+    expect(WEBHOOK).toContain("apply_paddle_subscription_update_with_audit");
     expect(WEBHOOK).not.toMatch(/rpc\(\s*["']apply_paddle_subscription_update["']/);
     expect(WEBHOOK).not.toContain("apply_paddle_entitlement_update");
   });

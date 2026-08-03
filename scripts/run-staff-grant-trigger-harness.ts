@@ -42,7 +42,7 @@ const TAG = `staff-harness-${crypto.randomUUID().slice(0, 8)}`;
 
 // Allow-list emails — must be granted when confirmed.
 const ALLOW_MATT = `matt+${TAG}@verdantgrowdiary.com`; // NOT allow-list (plus alias)
-const ALLOW_CHEEK = `cheekhimself+${TAG}@gmail.com`;   // NOT allow-list (plus alias)
+const ALLOW_CHEEK = `cheekhimself+${TAG}@gmail.com`; // NOT allow-list (plus alias)
 // Exact allow-list — we can only test these once per DB unless we clean up first.
 const EXACT_MATT = "matt@verdantgrowdiary.com";
 const EXACT_CHEEK = "cheekhimself@gmail.com";
@@ -125,10 +125,7 @@ async function main() {
     // Clean any pre-existing staff row (shouldn't be, but be defensive).
     await admin.from("user_roles").delete().eq("user_id", uid).eq("role", "staff");
 
-    check(
-      `${email} unconfirmed does NOT get staff`,
-      !(await hasStaffRole(uid)),
-    );
+    check(`${email} unconfirmed does NOT get staff`, !(await hasStaffRole(uid)));
 
     // Confirm email via admin API — should fire UPDATE trigger.
     const { error: updErr } = await admin.auth.admin.updateUserById(uid, {
@@ -138,10 +135,7 @@ async function main() {
       check(`${email} confirm via admin API succeeds`, false, updErr.message);
     } else {
       check(`${email} confirm via admin API succeeds`, true);
-      check(
-        `${email} gets staff after email_confirmed_at set`,
-        await hasStaffRole(uid),
-      );
+      check(`${email} gets staff after email_confirmed_at set`, await hasStaffRole(uid));
     }
   }
 
@@ -150,10 +144,7 @@ async function main() {
   for (const email of [EXACT_MATT, EXACT_CHEEK]) {
     await deleteByEmail(email);
     const uid = await createUser(email, true);
-    check(
-      `${email} created already-confirmed gets staff on INSERT`,
-      await hasStaffRole(uid),
-    );
+    check(`${email} created already-confirmed gets staff on INSERT`, await hasStaffRole(uid));
   }
 
   // 6. Uppercase/mixed-case allow-list email, confirmed → staff (case-insensitive match).
@@ -161,10 +152,7 @@ async function main() {
     const mixed = "Matt@VerdantGrowDiary.com";
     await deleteByEmail(EXACT_MATT);
     const uid = await createUser(mixed, true);
-    check(
-      `mixed-case ${mixed} gets staff (lower() match)`,
-      await hasStaffRole(uid),
-    );
+    check(`mixed-case ${mixed} gets staff (lower() match)`, await hasStaffRole(uid));
   }
 }
 

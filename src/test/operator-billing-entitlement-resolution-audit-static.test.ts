@@ -20,30 +20,21 @@ function findMigration(substring: string): string {
   const matches = readdirSync(dir).filter((name) =>
     readFileSync(resolve(dir, name), "utf8").includes(substring),
   );
-  if (matches.length === 0)
-    throw new Error(`migration containing ${substring} not found`);
+  if (matches.length === 0) throw new Error(`migration containing ${substring} not found`);
   return readFileSync(resolve(dir, matches[matches.length - 1]), "utf8");
 }
 
 const PAGE = read("src/pages/OperatorBillingEntitlementResolutionAudit.tsx");
-const VIEW_MODEL = read(
-  "src/lib/billingEntitlementResolutionAuditViewModel.ts",
-);
+const VIEW_MODEL = read("src/lib/billingEntitlementResolutionAuditViewModel.ts");
 const APP = read("src/App.tsx");
-const SUB_UPDATE_PAGE = read(
-  "src/pages/OperatorBillingSubscriptionUpdateAudit.tsx",
-);
-const MIGRATION = findMigration(
-  "billing_entitlement_resolution_operator_audit",
-);
+const SUB_UPDATE_PAGE = read("src/pages/OperatorBillingSubscriptionUpdateAudit.tsx");
+const MIGRATION = findMigration("billing_entitlement_resolution_operator_audit");
 
 describe("Operator entitlement resolution audit page — static safety", () => {
   it("calls the sanitized operator RPC only", () => {
     expect(PAGE).toContain("billing_entitlement_resolution_operator_audit");
     expect(PAGE).not.toMatch(/\.from\(["']billing_subscriptions["']\)/);
-    expect(PAGE).not.toMatch(
-      /\.from\(["']billing_subscription_update_audit["']\)/,
-    );
+    expect(PAGE).not.toMatch(/\.from\(["']billing_subscription_update_audit["']\)/);
     expect(PAGE).not.toMatch(/\.from\(["']paddle_events["']\)/);
     expect(PAGE).not.toMatch(/\.from\(["']paddle_event_processing["']\)/);
     expect(PAGE).not.toMatch(/functions\.invoke/);
@@ -148,13 +139,9 @@ describe("billing_entitlement_resolution_operator_audit migration", () => {
   });
 
   it("enforces operator role and clamps limit 1..100", () => {
-    expect(MIGRATION).toContain(
-      "public.has_role(auth.uid(), 'operator'::public.app_role)",
-    );
+    expect(MIGRATION).toContain("public.has_role(auth.uid(), 'operator'::public.app_role)");
     expect(MIGRATION).toContain("operator_required");
-    expect(MIGRATION).toContain(
-      "LEAST(GREATEST(COALESCE(p_limit, 50), 1), 100)",
-    );
+    expect(MIGRATION).toContain("LEAST(GREATEST(COALESCE(p_limit, 50), 1), 100)");
   });
 
   it("revokes from public/anon and grants execute to authenticated + service_role only", () => {
@@ -176,9 +163,7 @@ describe("billing_entitlement_resolution_operator_audit migration", () => {
     // Strip SQL line comments and COMMENT ON documentation so prose that
     // names forbidden tokens (e.g. "no payloads returned") does not trip
     // the guard. Only executable SQL is inspected.
-    const codeOnly = MIGRATION
-      .replace(/--[^\n]*/g, "")
-      .replace(/COMMENT\s+ON[\s\S]*?;/gi, "");
+    const codeOnly = MIGRATION.replace(/--[^\n]*/g, "").replace(/COMMENT\s+ON[\s\S]*?;/gi, "");
     for (const forbidden of [
       "provider_customer_id",
       "provider_subscription_id",

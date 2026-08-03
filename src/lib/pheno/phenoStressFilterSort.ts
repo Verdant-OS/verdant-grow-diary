@@ -16,12 +16,7 @@ export type StressStatusFilter = "all" | PhenoStressStatus;
 export type StressIntensityFilter = "all" | PhenoStressIntensity;
 export type StressRecommendationFilter = "all" | PhenoStressRecommendation;
 
-export type StressSortKey =
-  | "newest"
-  | "oldest"
-  | "intensity"
-  | "recommendation"
-  | "candidate";
+export type StressSortKey = "newest" | "oldest" | "intensity" | "recommendation" | "candidate";
 
 export interface StressFilterSortOptions {
   readonly status?: StressStatusFilter;
@@ -62,12 +57,7 @@ export function filterAndSortStressObservations(
   rows: readonly PhenoStressObservationRow[],
   opts: StressFilterSortOptions = {},
 ): readonly PhenoStressObservationRow[] {
-  const {
-    status = "all",
-    intensity = "all",
-    recommendation = "all",
-    sortBy = "newest",
-  } = opts;
+  const { status = "all", intensity = "all", recommendation = "all", sortBy = "newest" } = opts;
 
   const filtered = rows.filter((r) => {
     if (status !== "all" && r.status !== status) return false;

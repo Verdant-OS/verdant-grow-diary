@@ -31,10 +31,7 @@ export function LinkedActionCountBadge({
 }: LinkedActionCountBadgeProps) {
   if (!summary || summary.count <= 0) return null;
   const isSingle = summary.count === 1 && summary.singleActionId;
-  const label =
-    summary.count === 1
-      ? "Has linked action"
-      : `${summary.count} linked actions`;
+  const label = summary.count === 1 ? "Has linked action" : `${summary.count} linked actions`;
   const containerTestId = `${testIdPrefix}-linked-action`;
   const anchorTestId = `${testIdPrefix}-linked-action-anchor`;
   return (
@@ -43,10 +40,7 @@ export function LinkedActionCountBadge({
       data-alert-id={alertId}
       className="flex items-center gap-2 flex-wrap"
     >
-      <Badge
-        variant="outline"
-        className="text-[10px] uppercase border-primary text-primary"
-      >
+      <Badge variant="outline" className="text-[10px] uppercase border-primary text-primary">
         {label}
       </Badge>
       {isSingle ? (
@@ -68,8 +62,6 @@ export function LinkedActionCountBadge({
           View linked actions
         </Link>
       )}
-
     </div>
   );
 }
-

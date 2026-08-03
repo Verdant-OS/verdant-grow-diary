@@ -51,44 +51,26 @@ function makeContext(events: ReadonlyArray<Record<string, unknown>>) {
 
 describe("AiDoctorContextReadinessPanel quick actions", () => {
   it("renders Fast Add Photo / Add Watering / Add Feeding when missing", () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch" as never)
-      .mockImplementation((() => {
-        throw new Error("fetch not allowed in quick-action panel test");
-      }) as never);
+    const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
+      throw new Error("fetch not allowed in quick-action panel test");
+    }) as never);
 
-    render(
-      <AiDoctorContextReadinessPanel
-        context={makeContext([])}
-        openAlertsCount={0}
-      />,
-    );
+    render(<AiDoctorContextReadinessPanel context={makeContext([])} openAlertsCount={0} />);
     expect(
-      screen.getByTestId(
-        "ai-doctor-context-readiness-panel-quick-action-fast-add-photo",
-      ),
+      screen.getByTestId("ai-doctor-context-readiness-panel-quick-action-fast-add-photo"),
     ).toBeTruthy();
     expect(
-      screen.getByTestId(
-        "ai-doctor-context-readiness-panel-quick-action-add-watering",
-      ),
+      screen.getByTestId("ai-doctor-context-readiness-panel-quick-action-add-watering"),
     ).toBeTruthy();
     expect(
-      screen.getByTestId(
-        "ai-doctor-context-readiness-panel-quick-action-add-feeding",
-      ),
+      screen.getByTestId("ai-doctor-context-readiness-panel-quick-action-add-feeding"),
     ).toBeTruthy();
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
 
   it("renders disabled buttons when no handler is wired (no invented routes)", () => {
-    render(
-      <AiDoctorContextReadinessPanel
-        context={makeContext([])}
-        openAlertsCount={0}
-      />,
-    );
+    render(<AiDoctorContextReadinessPanel context={makeContext([])} openAlertsCount={0} />);
     const button = screen.getByTestId(
       "ai-doctor-context-readiness-panel-quick-action-fast-add-photo",
     ) as HTMLButtonElement;
@@ -108,19 +90,13 @@ describe("AiDoctorContextReadinessPanel quick actions", () => {
       />,
     );
     expect(
-      screen.queryByTestId(
-        "ai-doctor-context-readiness-panel-quick-action-fast-add-photo",
-      ),
+      screen.queryByTestId("ai-doctor-context-readiness-panel-quick-action-fast-add-photo"),
     ).toBeNull();
     expect(
-      screen.queryByTestId(
-        "ai-doctor-context-readiness-panel-quick-action-add-watering",
-      ),
+      screen.queryByTestId("ai-doctor-context-readiness-panel-quick-action-add-watering"),
     ).toBeNull();
     expect(
-      screen.queryByTestId(
-        "ai-doctor-context-readiness-panel-quick-action-add-feeding",
-      ),
+      screen.queryByTestId("ai-doctor-context-readiness-panel-quick-action-add-feeding"),
     ).toBeNull();
   });
 
@@ -142,17 +118,8 @@ describe("AiDoctorContextReadinessPanel quick actions", () => {
   });
 
   it("renders confidence-class copy", () => {
-    render(
-      <AiDoctorContextReadinessPanel
-        context={makeContext([])}
-        openAlertsCount={0}
-      />,
-    );
-    const banner = screen.getByTestId(
-      "ai-doctor-context-readiness-panel-confidence-class-copy",
-    );
-    expect(banner.textContent).toMatch(
-      /Context looks strong|AI Doctor can run|not trustworthy/,
-    );
+    render(<AiDoctorContextReadinessPanel context={makeContext([])} openAlertsCount={0} />);
+    const banner = screen.getByTestId("ai-doctor-context-readiness-panel-confidence-class-copy");
+    expect(banner.textContent).toMatch(/Context looks strong|AI Doctor can run|not trustworthy/);
   });
 });

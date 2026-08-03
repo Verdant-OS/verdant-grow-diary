@@ -45,10 +45,7 @@ export const SYMPTOM_EVENT_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 /** Event types QuickLog emits that map to the "training" bucket. */
-export const TRAINING_EVENT_TYPES: ReadonlySet<string> = new Set([
-  "training",
-  "defoliation",
-]);
+export const TRAINING_EVENT_TYPES: ReadonlySet<string> = new Set(["training", "defoliation"]);
 
 /** Event types that map to the "measurement" bucket (manual snapshots, pH/EC). */
 export const MEASUREMENT_EVENT_TYPES: ReadonlySet<string> = new Set([
@@ -58,10 +55,7 @@ export const MEASUREMENT_EVENT_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 /** Event types that map to the "transplant" bucket. */
-export const TRANSPLANT_EVENT_TYPES: ReadonlySet<string> = new Set([
-  "transplant",
-  "repot",
-]);
+export const TRANSPLANT_EVENT_TYPES: ReadonlySet<string> = new Set(["transplant", "repot"]);
 
 /** Event types that map to the "harvest" bucket. */
 export const HARVEST_EVENT_TYPES: ReadonlySet<string> = new Set([
@@ -115,8 +109,7 @@ export function classifyTimelineEntry(
 ): TimelineFilterCategory {
   if (!input) return "notes";
   const source = input.source ?? null;
-  const type =
-    typeof input.eventType === "string" ? input.eventType.toLowerCase().trim() : "";
+  const type = typeof input.eventType === "string" ? input.eventType.toLowerCase().trim() : "";
 
   if (source === "photo") return "photos";
   if (type === "photo") return "photos";

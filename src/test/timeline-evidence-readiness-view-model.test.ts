@@ -136,9 +136,7 @@ describe("timelineEvidenceReadinessViewModel — source badges & tone", () => {
 
   it("limited tone when context is thin but not untrusted", () => {
     const ctx = makeCtx({
-      growEvents: [
-        { occurred_at: ago(2 * HOUR), event_type: "watering", source: "manual" },
-      ],
+      growEvents: [{ occurred_at: ago(2 * HOUR), event_type: "watering", source: "manual" }],
       sensorReadings: [
         { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "manual" },
       ],
@@ -191,9 +189,7 @@ describe("timelineEvidenceReadinessViewModel — source badges & tone", () => {
 
   it("untrusted tone wins when both trustworthy and untrusted sources exist", () => {
     const ctx = makeCtx({
-      growEvents: [
-        { occurred_at: ago(HOUR), event_type: "watering", source: "manual" },
-      ],
+      growEvents: [{ occurred_at: ago(HOUR), event_type: "watering", source: "manual" }],
       sensorReadings: [
         { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live" },
         { metric: "humidity_pct", value: 55, captured_at: ago(HOUR), source: "demo" },

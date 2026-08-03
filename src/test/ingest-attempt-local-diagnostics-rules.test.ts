@@ -60,8 +60,7 @@ describe("importRunnerReport", () => {
     });
     const r = importRunnerReport(bad);
     expect(r.ok).toBe(false);
-    if (r.ok !== true)
-      expect((r as { reason: string }).reason).toBe("token_leak_blocked");
+    if (r.ok !== true) expect((r as { reason: string }).reason).toBe("token_leak_blocked");
   });
 });
 

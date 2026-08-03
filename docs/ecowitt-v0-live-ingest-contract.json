@@ -33,11 +33,7 @@
     "no alert creation",
     "no AI invocation from readiness"
   ],
-  "stored_row_top_level_columns_must_not_include": [
-    "vendor",
-    "metadata",
-    "idempotency_key"
-  ],
+  "stored_row_top_level_columns_must_not_include": ["vendor", "metadata", "idempotency_key"],
   "regression_commands": [
     "python3 -m unittest test_forwarding_config test_source_labeling test_forwarding_contract",
     "bunx vitest run src/test/ecowitt-live-source-snapshot-visibility.test.ts src/test/ai-doctor-context-ecowitt-live-evidence.test.ts",

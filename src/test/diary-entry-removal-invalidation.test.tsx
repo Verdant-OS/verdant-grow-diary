@@ -103,9 +103,7 @@ describe("useRemoveDiaryEntry — query invalidation", () => {
         plantId: "plant-A",
       });
     });
-    const joined = spy.mock.calls
-      .map((c) => JSON.stringify(c[0]?.queryKey))
-      .join("|");
+    const joined = spy.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey)).join("|");
     expect(joined).toContain("plant-A");
     expect(joined).not.toContain("plant-B");
   });

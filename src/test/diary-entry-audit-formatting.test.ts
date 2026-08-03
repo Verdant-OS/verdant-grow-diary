@@ -44,7 +44,9 @@ describe("diaryEntryAuditFormatting", () => {
     };
     expect(summarizeAuditRow({ ...base, action: "delete" })).toBe("Entry deleted");
     expect(summarizeAuditRow(base)).toBe("Entry updated");
-    expect(summarizeAuditRow({ ...base, changed_fields: { note: { from: "a", to: "b" } } })).toBe("1 field edited");
+    expect(summarizeAuditRow({ ...base, changed_fields: { note: { from: "a", to: "b" } } })).toBe(
+      "1 field edited",
+    );
     expect(
       summarizeAuditRow({
         ...base,

@@ -48,9 +48,7 @@ function printTable(rows) {
     `  ${"-".repeat(nameWidth)}  ${"-".repeat(keyWidth)}  ${"-".repeat(8)}  ${"-".repeat(24)}`,
   );
   for (const r of rows) {
-    console.log(
-      line(r.label, r.key, r.present ? "PRESENT" : "SKIPPED", r.reason),
-    );
+    console.log(line(r.label, r.key, r.present ? "PRESENT" : "SKIPPED", r.reason));
   }
 }
 
@@ -68,9 +66,7 @@ function main() {
       "SKIPPED: no E2E_PHENO_HUNT_ID_* fixture env vars provided. " +
         "Not running Playwright. Not claiming E2E passed.",
     );
-    console.log(
-      "Set at least one of the fixture env vars above to run the suite.",
-    );
+    console.log("Set at least one of the fixture env vars above to run the suite.");
     process.exit(0);
   }
 
@@ -89,9 +85,7 @@ function main() {
   child.on("exit", (code) => process.exit(code ?? 1));
   child.on("error", (err) => {
     console.error(`Failed to launch Playwright: ${err.message}`);
-    console.error(
-      "If Playwright browser binaries are missing, this step is BLOCKED (not passed).",
-    );
+    console.error("If Playwright browser binaries are missing, this step is BLOCKED (not passed).");
     process.exit(1);
   });
 }

@@ -72,9 +72,7 @@ function action(
   return { id, tent_id, grow_id: "g1", status };
 }
 
-function baseInput(
-  overrides: Partial<GrowRoomAggregationInput> = {},
-): GrowRoomAggregationInput {
+function baseInput(overrides: Partial<GrowRoomAggregationInput> = {}): GrowRoomAggregationInput {
   return {
     tents: [],
     alerts: [],
@@ -95,11 +93,7 @@ describe("buildGrowRoomTentCards · aggregation", () => {
           alert("a2", "t1", "info"),
           alert("a3", "t2", "watch"),
         ],
-        actions: [
-          action("ac1", "t1"),
-          action("ac2", "t1"),
-          action("ac3", "t2"),
-        ],
+        actions: [action("ac1", "t1"), action("ac2", "t1"), action("ac3", "t2")],
       }),
     );
     expect(cards).toHaveLength(2);
@@ -241,12 +235,7 @@ describe("buildGrowRoomTentCards · ordering (highest risk first)", () => {
         ],
       }),
     );
-    expect(cards.map((c) => c.tentId)).toEqual([
-      "t-crit",
-      "t-warn",
-      "t-info",
-      "t-none",
-    ]);
+    expect(cards.map((c) => c.tentId)).toEqual(["t-crit", "t-warn", "t-info", "t-none"]);
   });
 
   it("breaks severity ties by pending action count desc", () => {
@@ -254,10 +243,7 @@ describe("buildGrowRoomTentCards · ordering (highest risk first)", () => {
       baseInput({
         tents: [tent("t-a", "A"), tent("t-b", "B")],
         snapshotsByTentId: { "t-a": snap(), "t-b": snap() },
-        alerts: [
-          alert("a1", "t-a", "warning"),
-          alert("a2", "t-b", "warning"),
-        ],
+        alerts: [alert("a1", "t-a", "warning"), alert("a2", "t-b", "warning")],
         actions: [action("ac1", "t-b"), action("ac2", "t-b"), action("ac3", "t-a")],
       }),
     );

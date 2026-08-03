@@ -31,9 +31,7 @@ function patchRow(
 ): EcowittLiveEvidenceFormState {
   return {
     ...state,
-    metric_rows: state.metric_rows.map((r) =>
-      r.key === key ? { ...r, ...patch } : r,
-    ),
+    metric_rows: state.metric_rows.map((r) => (r.key === key ? { ...r, ...patch } : r)),
   };
 }
 
@@ -134,15 +132,13 @@ export const ECOWITT_LIVE_EVIDENCE_TEMPLATES: readonly EcowittLiveEvidenceTempla
     Object.freeze({
       id: "manual_comparison_example" as const,
       label: "Use manual example",
-      description:
-        "Example only. Manual source cannot prove live sensor truth on its own.",
+      description: "Example only. Manual source cannot prove live sensor truth on its own.",
       build: manualComparisonExample,
     }),
     Object.freeze({
       id: "stale_evidence_example" as const,
       label: "Use stale example",
-      description:
-        "Example only. Captured_at is intentionally old so the evaluator returns stale.",
+      description: "Example only. Captured_at is intentionally old so the evaluator returns stale.",
       build: staleEvidenceExample,
     }),
   ]);
@@ -150,7 +146,5 @@ export const ECOWITT_LIVE_EVIDENCE_TEMPLATES: readonly EcowittLiveEvidenceTempla
 export function getEcowittLiveEvidenceTemplate(
   id: EcowittLiveEvidenceTemplateId,
 ): EcowittLiveEvidenceTemplate | null {
-  return (
-    ECOWITT_LIVE_EVIDENCE_TEMPLATES.find((t) => t.id === id) ?? null
-  );
+  return ECOWITT_LIVE_EVIDENCE_TEMPLATES.find((t) => t.id === id) ?? null;
 }

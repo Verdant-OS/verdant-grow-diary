@@ -14,10 +14,7 @@ import {
   STABILITY_DASHBOARD_VERDICT_ORDER,
   type StabilityDashboardModel,
 } from "@/lib/phenoStabilityDashboardRules";
-import {
-  STABILITY_VERDICT_LABELS,
-  type StabilityVerdict,
-} from "@/lib/phenoStabilityRunRules";
+import { STABILITY_VERDICT_LABELS, type StabilityVerdict } from "@/lib/phenoStabilityRunRules";
 
 export interface PhenoStabilityDashboardProps {
   model: StabilityDashboardModel;
@@ -71,7 +68,9 @@ export default function PhenoStabilityDashboard({ model }: PhenoStabilityDashboa
           data-testid="pheno-stability-dashboard-filter-all"
           aria-pressed={filter === "all"}
           className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
-            filter === "all" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"
+            filter === "all"
+              ? "bg-primary text-primary-foreground"
+              : "bg-secondary text-muted-foreground"
           }`}
         >
           All {model.totalKeepers}

@@ -48,10 +48,7 @@ function withQuery(ui: React.ReactElement) {
   return <QueryClientProvider client={qc}>{ui}</QueryClientProvider>;
 }
 
-const SENSORS_SRC = readFileSync(
-  resolve(__dirname, "../pages/Sensors.tsx"),
-  "utf8",
-);
+const SENSORS_SRC = readFileSync(resolve(__dirname, "../pages/Sensors.tsx"), "utf8");
 const LAUNCHER_SRC = readFileSync(
   resolve(__dirname, "../components/EnvironmentCsvImportLauncher.tsx"),
   "utf8",
@@ -67,11 +64,7 @@ describe("CSV import — label/copy regression", () => {
   it("launcher card copy reads as imported CSV context, never live", () => {
     render(
       withQuery(
-        <EnvironmentCsvImportLauncher
-          growId="g1"
-          tentId="t1"
-          testIdPrefix="sensors-csv-import"
-        />,
+        <EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="sensors-csv-import" />,
       ),
     );
     const card = screen.getByTestId("sensors-csv-import-card");
@@ -92,11 +85,7 @@ describe("CSV import — label/copy regression", () => {
   it("CTA button label does not claim live/current sensor activity", () => {
     render(
       withQuery(
-        <EnvironmentCsvImportLauncher
-          growId="g1"
-          tentId="t1"
-          testIdPrefix="sensors-csv-import"
-        />,
+        <EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="sensors-csv-import" />,
       ),
     );
     const btn = screen.getByTestId("sensors-csv-import-button");
@@ -114,11 +103,7 @@ describe("CSV import — raw/private field regression", () => {
   it("launcher render never leaks raw_payload / secrets / private identifiers", () => {
     const { container } = render(
       withQuery(
-        <EnvironmentCsvImportLauncher
-          growId="g1"
-          tentId="t1"
-          testIdPrefix="sensors-csv-import"
-        />,
+        <EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="sensors-csv-import" />,
       ),
     );
     const text = container.textContent ?? "";
@@ -135,10 +120,7 @@ describe("CSV import — raw/private field regression", () => {
   });
 
   it("launcher source has no token/secret/private-id wording", () => {
-    const stripped = LAUNCHER_SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(
-      /\/\/.*$/gm,
-      "",
-    );
+    const stripped = LAUNCHER_SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     expect(stripped).not.toMatch(/service_role/i);
     expect(stripped).not.toMatch(/api[_-]?key/i);
     expect(stripped).not.toMatch(/bridge[_-]?token/i);
@@ -156,18 +138,12 @@ describe("CSV import — mixed valid/invalid row validation", () => {
   it("previews valid rows, flags invalid rows as skipped, never inserts on preview", async () => {
     render(
       withQuery(
-        <EnvironmentCsvImportLauncher
-          growId="g1"
-          tentId="t1"
-          testIdPrefix="sensors-csv-import"
-        />,
+        <EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="sensors-csv-import" />,
       ),
     );
     fireEvent.click(screen.getByTestId("sensors-csv-import-button"));
 
-    const input = screen.getByTestId(
-      "csv-import-file-input",
-    ) as HTMLInputElement;
+    const input = screen.getByTestId("csv-import-file-input") as HTMLInputElement;
 
     // Two valid rows + three invalid rows:
     //   - missing timestamp
@@ -186,16 +162,10 @@ describe("CSV import — mixed valid/invalid row validation", () => {
     Object.defineProperty(input, "files", { value: [file] });
     fireEvent.change(input);
 
-    await waitFor(() =>
-      expect(screen.queryByTestId("csv-import-preview")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("csv-import-preview")).toBeTruthy());
 
-    const valid = Number(
-      screen.getByTestId("csv-import-valid-count").textContent ?? "0",
-    );
-    const skipped = Number(
-      screen.getByTestId("csv-import-skipped-count").textContent ?? "0",
-    );
+    const valid = Number(screen.getByTestId("csv-import-valid-count").textContent ?? "0");
+    const skipped = Number(screen.getByTestId("csv-import-skipped-count").textContent ?? "0");
 
     expect(valid).toBeGreaterThan(0);
     expect(skipped).toBeGreaterThan(0);
@@ -204,9 +174,7 @@ describe("CSV import — mixed valid/invalid row validation", () => {
     expect(insertSpy).not.toHaveBeenCalled();
 
     // Preview must not relabel CSV as live or claim hardware connection.
-    const previewText = (
-      screen.getByTestId("csv-import-preview").textContent ?? ""
-    ).toLowerCase();
+    const previewText = (screen.getByTestId("csv-import-preview").textContent ?? "").toLowerCase();
     expect(previewText).not.toMatch(/\blive\b/);
     expect(previewText).not.toMatch(/real[\s-]?time/);
   });
@@ -214,23 +182,13 @@ describe("CSV import — mixed valid/invalid row validation", () => {
   it("an all-invalid CSV does not crash the component and inserts nothing", async () => {
     render(
       withQuery(
-        <EnvironmentCsvImportLauncher
-          growId="g1"
-          tentId="t1"
-          testIdPrefix="sensors-csv-import"
-        />,
+        <EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="sensors-csv-import" />,
       ),
     );
     fireEvent.click(screen.getByTestId("sensors-csv-import-button"));
 
-    const input = screen.getByTestId(
-      "csv-import-file-input",
-    ) as HTMLInputElement;
-    const csv = [
-      "Timestamp,Temperature (C),RH (%)",
-      ",,",
-      ",not-a-number,",
-    ].join("\n");
+    const input = screen.getByTestId("csv-import-file-input") as HTMLInputElement;
+    const csv = ["Timestamp,Temperature (C),RH (%)", ",,", ",not-a-number,"].join("\n");
     const file = new File([csv], "bad.csv", { type: "text/csv" });
     Object.defineProperty(input, "files", { value: [file] });
     fireEvent.change(input);
@@ -255,19 +213,14 @@ describe("Sensor Data page — CSV import smoke (source-level)", () => {
     expect(SENSORS_SRC).toMatch(/id="csv-import"/);
     expect(SENSORS_SRC).toMatch(/data-testid="sensors-csv-import-anchor"/);
     expect(SENSORS_SRC).toMatch(/<EnvironmentCsvImportLauncher/);
-    expect(SENSORS_SRC).toMatch(
-      /from\s+["']@\/components\/EnvironmentCsvImportLauncher["']/,
-    );
+    expect(SENSORS_SRC).toMatch(/from\s+["']@\/components\/EnvironmentCsvImportLauncher["']/);
     // Surrounding panels still present.
     expect(SENSORS_SRC).toMatch(/data-testid="sensors-manual-reading-anchor"/);
     expect(SENSORS_SRC).toMatch(/<SensorBridgeHealthCard/);
   });
 
   it("Sensors page source never relabels CSV as live and avoids unsafe wiring", () => {
-    const stripped = SENSORS_SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(
-      /\/\/.*$/gm,
-      "",
-    );
+    const stripped = SENSORS_SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     expect(stripped).not.toMatch(/csv[^a-z]+live/i);
     expect(stripped).not.toMatch(/live\s+csv/i);
     expect(stripped).not.toMatch(/raw_payload/);

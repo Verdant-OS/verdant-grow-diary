@@ -1,7 +1,4 @@
-import {
-  assert,
-  assertEquals,
-} from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 
 import {
   loadExistingPiIngestIdempotencyKeys,
@@ -21,9 +18,10 @@ type Call = {
   inValues: readonly string[];
 };
 
-function makeClient(
-  responses: Array<PiIngestIdempotencyLookupResponse | Error>,
-): { client: PiIngestIdempotencyLookupClient; calls: Call[] } {
+function makeClient(responses: Array<PiIngestIdempotencyLookupResponse | Error>): {
+  client: PiIngestIdempotencyLookupClient;
+  calls: Call[];
+} {
   const calls: Call[] = [];
   let i = 0;
   const client: PiIngestIdempotencyLookupClient = {
@@ -44,9 +42,7 @@ function makeClient(
                   });
                   const r = responses[i++];
                   if (r instanceof Error) return Promise.reject(r);
-                  return Promise.resolve(
-                    r ?? { data: [], error: null },
-                  );
+                  return Promise.resolve(r ?? { data: [], error: null });
                 },
               };
             },
@@ -118,9 +114,7 @@ Deno.test("returns matched subset; uses correct table/columns/filters", async ()
 });
 
 Deno.test("dedupes candidateKeys before querying", async () => {
-  const { client, calls } = makeClient([
-    { data: [], error: null },
-  ]);
+  const { client, calls } = makeClient([{ data: [], error: null }]);
   await loadExistingPiIngestIdempotencyKeys(client, {
     bridgeId: "bridge-1",
     candidateKeys: ["k1", "k1", "k2", "", "k2"],
@@ -171,9 +165,7 @@ Deno.test("thrown client error → lookup_failed", async () => {
 });
 
 Deno.test("non-array data → lookup_failed", async () => {
-  const { client } = makeClient([
-    { data: { idempotency_key: "k1" } as unknown, error: null },
-  ]);
+  const { client } = makeClient([{ data: { idempotency_key: "k1" } as unknown, error: null }]);
   const res = await loadExistingPiIngestIdempotencyKeys(client, {
     bridgeId: "bridge-1",
     candidateKeys: ["k1"],
@@ -193,9 +185,7 @@ Deno.test("null data → treated as empty (no matches)", async () => {
 });
 
 Deno.test("malformed row → lookup_failed", async () => {
-  const { client } = makeClient([
-    { data: ["not-an-object"] as unknown[], error: null },
-  ]);
+  const { client } = makeClient([{ data: ["not-an-object"] as unknown[], error: null }]);
   const res = await loadExistingPiIngestIdempotencyKeys(client, {
     bridgeId: "bridge-1",
     candidateKeys: ["k1"],
@@ -237,9 +227,7 @@ Deno.test("missing client → lookup_failed", async () => {
 });
 
 Deno.test("helper file is SELECT-only (no insert/update/delete/rpc)", async () => {
-  const src = await Deno.readTextFile(
-    new URL("./idempotencyLookup.ts", import.meta.url),
-  );
+  const src = await Deno.readTextFile(new URL("./idempotencyLookup.ts", import.meta.url));
   for (const forbidden of [".insert(", ".upsert(", ".update(", ".delete(", ".rpc("]) {
     assertEquals(src.includes(forbidden), false, `must not contain ${forbidden}`);
   }

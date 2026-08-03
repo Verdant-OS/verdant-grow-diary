@@ -21,22 +21,13 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 function mount() {
   return render(
-    <QuickLogAllActivitiesSection
-      growId="g1"
-      tentId="t1"
-      plantId="p1"
-      plantStage="flower"
-    />,
+    <QuickLogAllActivitiesSection growId="g1" tentId="t1" plantId="p1" plantStage="flower" />,
   );
 }
 
 function selectHarvest() {
-  fireEvent.click(
-    screen.getByRole("button", { name: "More activity types" }),
-  );
-  fireEvent.click(
-    screen.getByTestId("quick-log-all-activities-picker-harvest"),
-  );
+  fireEvent.click(screen.getByRole("button", { name: "More activity types" }));
+  fireEvent.click(screen.getByTestId("quick-log-all-activities-picker-harvest"));
 }
 
 beforeEach(() => {
@@ -48,21 +39,10 @@ describe("Harvest Quick Log form", () => {
     mount();
     selectHarvest();
     await screen.findByTestId("quick-log-all-activities-harvest-fields");
-    expect(
-      screen.getByTestId("quick-log-all-activities-harvest-wet"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("quick-log-all-activities-harvest-dry"),
-    ).toBeInTheDocument();
-    const unit = screen.getByTestId(
-      "quick-log-all-activities-harvest-unit",
-    ) as HTMLSelectElement;
-    expect(Array.from(unit.options).map((o) => o.value)).toEqual([
-      "g",
-      "oz",
-      "lb",
-      "kg",
-    ]);
+    expect(screen.getByTestId("quick-log-all-activities-harvest-wet")).toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-all-activities-harvest-dry")).toBeInTheDocument();
+    const unit = screen.getByTestId("quick-log-all-activities-harvest-unit") as HTMLSelectElement;
+    expect(Array.from(unit.options).map((o) => o.value)).toEqual(["g", "oz", "lb", "kg"]);
     expect(screen.getByTestId("quick-log-all-activities-note")).toBeInTheDocument();
   });
 
@@ -90,18 +70,16 @@ describe("Harvest Quick Log form", () => {
     mount();
     selectHarvest();
     await screen.findByTestId("quick-log-all-activities-harvest-fields");
-    fireEvent.change(
-      screen.getByTestId("quick-log-all-activities-harvest-wet"),
-      { target: { value: "120" } },
-    );
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-harvest-wet"), {
+      target: { value: "120" },
+    });
     fireEvent.change(
       screen.getByTestId("quick-log-all-activities-harvest-dry"),
       { target: { value: "" } }, // empty — dropped by sanitizer
     );
-    fireEvent.change(
-      screen.getByTestId("quick-log-all-activities-harvest-unit"),
-      { target: { value: "g" } },
-    );
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-harvest-unit"), {
+      target: { value: "g" },
+    });
     fireEvent.change(screen.getByTestId("quick-log-all-activities-note"), {
       target: { value: "Removed main cola" },
     });
@@ -139,9 +117,7 @@ describe("Harvest Quick Log form", () => {
     expect(rpcMock.mock.calls.length).toBe(1);
     expect(events.length).toBe(0);
     // No saved-item chip should appear.
-    expect(
-      screen.queryByTestId(/quick-log-all-activities-saved-item-/),
-    ).toBeNull();
+    expect(screen.queryByTestId(/quick-log-all-activities-saved-item-/)).toBeNull();
     window.removeEventListener(QUICK_LOG_V2_ENTRY_CREATED_EVENT, handler);
   });
 

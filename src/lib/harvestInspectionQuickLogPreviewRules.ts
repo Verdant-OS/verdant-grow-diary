@@ -25,10 +25,7 @@ export const HARVEST_INSPECTION_PREVIEW_REVIEW_COPY =
   "Review this diary evidence before saving. This does not create an alert, Action Queue item, or harvest instruction." as const;
 
 /** Visible preset labels (mandated copy). */
-export const HARVEST_INSPECTION_PREVIEW_LABEL: Record<
-  HarvestInspectionPreset,
-  string
-> = {
+export const HARVEST_INSPECTION_PREVIEW_LABEL: Record<HarvestInspectionPreset, string> = {
   trichome_inspection: "Trichome inspection",
   pistil_recession: "Pistil / recession observation",
   bud_maturity: "Bud maturity note",
@@ -68,8 +65,7 @@ export function detectHarvestInspectionPreset(
   prefill: HarvestInspectionPrefillLike | null | undefined,
 ): HarvestInspectionPreset | null {
   if (!prefill || typeof prefill !== "object") return null;
-  const explicit =
-    typeof prefill.preset === "string" ? prefill.preset.trim() : "";
+  const explicit = typeof prefill.preset === "string" ? prefill.preset.trim() : "";
   if (explicit && VALID_PRESETS.has(explicit as HarvestInspectionPreset)) {
     return explicit as HarvestInspectionPreset;
   }
@@ -110,7 +106,8 @@ export function buildHarvestInspectionPreviewViewModel(
   prefill: HarvestInspectionPrefillLike | null | undefined,
 ): HarvestInspectionPreviewViewModel {
   const preset = detectHarvestInspectionPreset(prefill);
-  const show = !!prefill && prefill?.source === HARVEST_INSPECTION_PREVIEW_SOURCE && preset !== null;
+  const show =
+    !!prefill && prefill?.source === HARVEST_INSPECTION_PREVIEW_SOURCE && preset !== null;
   return {
     show,
     preset,
@@ -127,12 +124,7 @@ export function buildHarvestInspectionPreviewViewModel(
 // Optional close-flower-photo comparison fields (UI-only this slice)
 // ---------------------------------------------------------------------------
 
-export type HarvestPhotoAngle =
-  | "top"
-  | "side"
-  | "macro"
-  | "whole_cola"
-  | "other";
+export type HarvestPhotoAngle = "top" | "side" | "macro" | "whole_cola" | "other";
 
 export type HarvestPhotoLighting =
   | "natural"
@@ -146,15 +138,14 @@ export interface HarvestPhotoOption<T extends string> {
   label: string;
 }
 
-export const HARVEST_PHOTO_COMPARISON_ANGLES: ReadonlyArray<
-  HarvestPhotoOption<HarvestPhotoAngle>
-> = [
-  { value: "top", label: "Top" },
-  { value: "side", label: "Side" },
-  { value: "macro", label: "Macro" },
-  { value: "whole_cola", label: "Whole cola" },
-  { value: "other", label: "Other" },
-];
+export const HARVEST_PHOTO_COMPARISON_ANGLES: ReadonlyArray<HarvestPhotoOption<HarvestPhotoAngle>> =
+  [
+    { value: "top", label: "Top" },
+    { value: "side", label: "Side" },
+    { value: "macro", label: "Macro" },
+    { value: "whole_cola", label: "Whole cola" },
+    { value: "other", label: "Other" },
+  ];
 
 export const HARVEST_PHOTO_COMPARISON_LIGHTINGS: ReadonlyArray<
   HarvestPhotoOption<HarvestPhotoLighting>
@@ -171,13 +162,7 @@ export interface HarvestPhotoComparison {
   lighting?: HarvestPhotoLighting;
 }
 
-const ANGLES = new Set<HarvestPhotoAngle>([
-  "top",
-  "side",
-  "macro",
-  "whole_cola",
-  "other",
-]);
+const ANGLES = new Set<HarvestPhotoAngle>(["top", "side", "macro", "whole_cola", "other"]);
 const LIGHTINGS = new Set<HarvestPhotoLighting>([
   "natural",
   "grow_light",
@@ -199,8 +184,7 @@ export function normalizeHarvestPhotoComparison(
   const a = typeof input.angle === "string" ? input.angle.trim() : "";
   const l = typeof input.lighting === "string" ? input.lighting.trim() : "";
   if (a && ANGLES.has(a as HarvestPhotoAngle)) out.angle = a as HarvestPhotoAngle;
-  if (l && LIGHTINGS.has(l as HarvestPhotoLighting))
-    out.lighting = l as HarvestPhotoLighting;
+  if (l && LIGHTINGS.has(l as HarvestPhotoLighting)) out.lighting = l as HarvestPhotoLighting;
   if (out.angle === undefined && out.lighting === undefined) return null;
   return out;
 }

@@ -37,8 +37,7 @@ export function ManualSensorSnapshotQualityBadge({
   evaluation,
   className,
 }: ManualSensorSnapshotQualityBadgeProps) {
-  const sourceLabel =
-    MANUAL_SNAPSHOT_QUALITY_SOURCE_LABELS[evaluation.sourceLabel];
+  const sourceLabel = MANUAL_SNAPSHOT_QUALITY_SOURCE_LABELS[evaluation.sourceLabel];
   const status = `Quality: ${evaluation.summary}`;
   return (
     <section
@@ -48,9 +47,7 @@ export function ManualSensorSnapshotQualityBadge({
       data-quality={evaluation.quality}
     >
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant={VARIANT_BY_QUALITY[evaluation.quality]}>
-          {evaluation.summary}
-        </Badge>
+        <Badge variant={VARIANT_BY_QUALITY[evaluation.quality]}>{evaluation.summary}</Badge>
         <span className="text-xs text-muted-foreground">{sourceLabel}</span>
       </div>
       <p className="sr-only" role="status">

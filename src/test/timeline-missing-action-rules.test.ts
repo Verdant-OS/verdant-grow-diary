@@ -50,8 +50,12 @@ describe("resolveMissingActionCategory", () => {
 
   it("maps environment evidence (checks, snapshots, measurements) to environment", () => {
     expect(resolveMissingActionCategory(row("1", "environment", daysAgo(1)))).toBe("environment");
-    expect(resolveMissingActionCategory(row("2", "environment_check", daysAgo(1)))).toBe("environment");
-    expect(resolveMissingActionCategory(row("3", "manual_snapshot", daysAgo(1)))).toBe("environment");
+    expect(resolveMissingActionCategory(row("2", "environment_check", daysAgo(1)))).toBe(
+      "environment",
+    );
+    expect(resolveMissingActionCategory(row("3", "manual_snapshot", daysAgo(1)))).toBe(
+      "environment",
+    );
     expect(resolveMissingActionCategory(row("4", "measurement", daysAgo(1)))).toBe("environment");
   });
 
@@ -214,10 +218,7 @@ describe("copy", () => {
 });
 
 describe("static safety — module source", () => {
-  const src = readFileSync(
-    path.resolve(__dirname, "../lib/timelineMissingActionRules.ts"),
-    "utf8",
-  );
+  const src = readFileSync(path.resolve(__dirname, "../lib/timelineMissingActionRules.ts"), "utf8");
 
   it("stays pure: no I/O, React, DOM, or Supabase", () => {
     expect(src).not.toMatch(/from ["'][^"']*supabase/i);
@@ -238,7 +239,9 @@ describe("static safety — module source", () => {
       /\b(healthy|guaranteed|fixed|urgent|critical|ideal|autopilot|automatically)\b/i,
     );
     expect(src).not.toMatch(/\b(relay|actuator|mqtt|webhook|dispatchCommand)\b/i);
-    expect(src).not.toMatch(/\b(turn|activate)\b[^\n]*\b(fan|light|pump|heater|humidifier|dehumidifier)\b/i);
+    expect(src).not.toMatch(
+      /\b(turn|activate)\b[^\n]*\b(fan|light|pump|heater|humidifier|dehumidifier)\b/i,
+    );
   });
 
   it("suggestion copy stays hedged — 'may be due', never a command", () => {

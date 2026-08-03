@@ -137,9 +137,7 @@ export function evaluateQuickLogActivityAvailability(
 ): QuickLogActivityPickerItem {
   const activity = QUICK_LOG_ACTIVITY_DEFINITIONS[activityId];
   const harvestEligibility =
-    activityId === "harvest"
-      ? evaluateHarvestStageEligibility(plantStage)
-      : null;
+    activityId === "harvest" ? evaluateHarvestStageEligibility(plantStage) : null;
   const stageBlocked = harvestEligibility?.eligible === false;
   const disabled = !activity.enabled || stageBlocked;
   let disabledReason: string | null = null;
@@ -172,8 +170,7 @@ export function evaluateQuickLogPrePersistenceGate({
 }: QuickLogPrePersistenceGateInput): QuickLogPrePersistenceGateResult {
   if (
     !selectedTarget ||
-    buildQuickLogTargetKey(selectedTarget) !==
-      buildQuickLogTargetKey(currentTarget)
+    buildQuickLogTargetKey(selectedTarget) !== buildQuickLogTargetKey(currentTarget)
   ) {
     return {
       allowed: false,
@@ -181,10 +178,7 @@ export function evaluateQuickLogPrePersistenceGate({
     };
   }
 
-  const availability = evaluateQuickLogActivityAvailability(
-    activityId,
-    currentPlantStage,
-  );
+  const availability = evaluateQuickLogActivityAvailability(activityId, currentPlantStage);
 
   return {
     allowed: !availability.disabled,
@@ -212,9 +206,7 @@ export function buildQuickLogActivityPickerViewModel({
   };
 }
 
-export function getQuickLogActivity(
-  id: QuickLogActivityId,
-): QuickLogActivityDefinition {
+export function getQuickLogActivity(id: QuickLogActivityId): QuickLogActivityDefinition {
   return QUICK_LOG_ACTIVITY_DEFINITIONS[id];
 }
 
@@ -222,11 +214,9 @@ export function isQuickLogActivityEnabled(id: QuickLogActivityId): boolean {
   return QUICK_LOG_ACTIVITY_DEFINITIONS[id].enabled;
 }
 
-export function getQuickLogDisabledReason(
-  id: QuickLogActivityId,
-): string | null {
+export function getQuickLogDisabledReason(id: QuickLogActivityId): string | null {
   const def = QUICK_LOG_ACTIVITY_DEFINITIONS[id];
-  return def.enabled ? null : def.disabledReason ?? null;
+  return def.enabled ? null : (def.disabledReason ?? null);
 }
 
 export interface QuickLogPersistencePlan {
@@ -246,9 +236,7 @@ export interface QuickLogPersistencePlan {
  * them. Contextual Harvest eligibility is enforced by the stage-aware
  * picker/section rules before this persistence-only planner is called.
  */
-export function planQuickLogPersistence(
-  id: QuickLogActivityId,
-): QuickLogPersistencePlan | null {
+export function planQuickLogPersistence(id: QuickLogActivityId): QuickLogPersistencePlan | null {
   const def = QUICK_LOG_ACTIVITY_DEFINITIONS[id];
   if (!def.enabled) return null;
   switch (def.saveRoute) {

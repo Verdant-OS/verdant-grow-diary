@@ -150,7 +150,14 @@ describe("normalizeGgsSoilSensorReading — bad data is never healthy", () => {
 
 describe("normalizeGgsSoilSensorReading — raw_payload preservation", () => {
   it("preserves raw_payload verbatim for audit", () => {
-    const input = { captured_at: FRESH, tent_id: "t", soil_moisture: 40, soil_temp_c: 20, soil_ec: 1, secret_field: "x" };
+    const input = {
+      captured_at: FRESH,
+      tent_id: "t",
+      soil_moisture: 40,
+      soil_temp_c: 20,
+      soil_ec: 1,
+      secret_field: "x",
+    };
     const r = normalizeGgsSoilSensorReading(input, { now: NOW });
     expect(r.raw_payload).toBe(input);
   });

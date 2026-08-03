@@ -57,9 +57,7 @@ export default function LeadCommandCenterGuidance({
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Operator Guidance
         </h3>
-        <Badge variant={STATE_VARIANT[result.state]}>
-          {STATE_LABEL[result.state]}
-        </Badge>
+        <Badge variant={STATE_VARIANT[result.state]}>{STATE_LABEL[result.state]}</Badge>
       </div>
       <ul className="mt-3 space-y-2">
         {result.items.map((i) => (
@@ -83,8 +81,7 @@ function GuidanceRow({ item }: { item: LeadCommandCenterGuidanceItem }) {
           <div className="font-medium text-foreground">{item.title}</div>
           <div className="text-xs text-muted-foreground">{item.message}</div>
           <div className="mt-1 text-xs text-muted-foreground">
-            <span className="text-foreground">Suggested:</span>{" "}
-            {item.suggestedAction}
+            <span className="text-foreground">Suggested:</span> {item.suggestedAction}
           </div>
           {item.warnings.length > 0 && (
             <ul className="mt-1 list-inside list-disc text-xs text-muted-foreground">
@@ -94,9 +91,7 @@ function GuidanceRow({ item }: { item: LeadCommandCenterGuidanceItem }) {
             </ul>
           )}
         </div>
-        <Badge variant={STATE_VARIANT[item.state]}>
-          {STATE_LABEL[item.state]}
-        </Badge>
+        <Badge variant={STATE_VARIANT[item.state]}>{STATE_LABEL[item.state]}</Badge>
       </div>
     </li>
   );

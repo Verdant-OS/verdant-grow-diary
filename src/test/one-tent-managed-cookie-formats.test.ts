@@ -18,7 +18,7 @@ import {
   evaluateManagedSession as evalTs,
 } from "../../e2e/helpers/lovableManagedSupabaseSession";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore - JS mirror imported for parity assertions
+// @ts-expect-error - JS mirror imported for parity assertions
 import {
   parseManagedCookies as parseJs,
   evaluateManagedSession as evalJs,
@@ -65,7 +65,9 @@ describe("session cookies (expires <= 0) are accepted, expiry dropped", () => {
 
   it("a positive finite expires is still carried through verbatim", () => {
     const r = parseTs({
-      canonical: JSON.stringify([{ name: "a", value: "v", domain: "x.example", expires: 1800000000 }]),
+      canonical: JSON.stringify([
+        { name: "a", value: "v", domain: "x.example", expires: 1800000000 },
+      ]),
     });
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.cookies[0].expires).toBe(1800000000);
@@ -97,23 +99,27 @@ describe("Chrome/DevTools sameSite aliases", () => {
 describe("genuinely-malformed cookies still fail closed (no regressions)", () => {
   it("unknown sameSite value still rejects", () => {
     expect(
-      parseTs({ canonical: JSON.stringify([{ name: "a", value: "v", domain: "x", sameSite: "sideways" }]) }).ok,
+      parseTs({
+        canonical: JSON.stringify([{ name: "a", value: "v", domain: "x", sameSite: "sideways" }]),
+      }).ok,
     ).toBe(false);
   });
   it("non-number expires still rejects", () => {
     expect(
-      parseTs({ canonical: JSON.stringify([{ name: "a", value: "v", domain: "x", expires: "soon" }]) }).ok,
+      parseTs({
+        canonical: JSON.stringify([{ name: "a", value: "v", domain: "x", expires: "soon" }]),
+      }).ok,
     ).toBe(false);
   });
   it("non-finite numeric expires (Infinity/NaN) still rejects", () => {
     // JSON has no Infinity literal; simulate via an object the parser sees.
-    const r = parseManagedInline([{ name: "a", value: "v", domain: "x", expires: Number.POSITIVE_INFINITY }]);
+    const r = parseManagedInline([
+      { name: "a", value: "v", domain: "x", expires: Number.POSITIVE_INFINITY },
+    ]);
     expect(r.ok).toBe(false);
   });
   it("cookie without domain or url still rejects", () => {
-    expect(
-      parseTs({ canonical: JSON.stringify([{ name: "a", value: "v" }]) }).ok,
-    ).toBe(false);
+    expect(parseTs({ canonical: JSON.stringify([{ name: "a", value: "v" }]) }).ok).toBe(false);
   });
 });
 
@@ -121,7 +127,10 @@ describe("genuinely-malformed cookies still fail closed (no regressions)", () =>
 // (Infinity) by round-tripping through the same code path the env uses.
 function parseManagedInline(list: unknown[]) {
   // Infinity JSON-stringifies to null, so build the raw string manually.
-  const raw = "[" + list.map((c) => JSON.stringify(c).replace('"expires":null', '"expires":1e999')).join(",") + "]";
+  const raw =
+    "[" +
+    list.map((c) => JSON.stringify(c).replace('"expires":null', '"expires":1e999')).join(",") +
+    "]";
   return parseTs({ canonical: raw });
 }
 
@@ -178,7 +187,14 @@ describe("materialize-core pure helpers", () => {
   });
 
   it("validateFullSession requires access+refresh+expires_at+user.id (walk-ready)", () => {
-    expect(validateFullSession({ access_token: "a", refresh_token: "r", expires_at: 1, user: { id: "u" } }).ok).toBe(true);
+    expect(
+      validateFullSession({
+        access_token: "a",
+        refresh_token: "r",
+        expires_at: 1,
+        user: { id: "u" },
+      }).ok,
+    ).toBe(true);
     const partial = validateFullSession({ access_token: "a", user: { id: "u" } });
     expect(partial.ok).toBe(false);
     if (!partial.ok) expect(partial.missing).toEqual(["expires_at", "refresh_token"]);

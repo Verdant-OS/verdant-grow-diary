@@ -344,9 +344,7 @@ export const QUICK_LOG_DETAIL_FIELD_KEYS: ReadonlySet<string> = new Set([
   ...Object.values(QUICK_LOG_ACTIVITY_DETAIL_FIELDS).flatMap((specs) =>
     (specs ?? []).map((s) => s.envelope ?? s.key),
   ),
-  ...Object.values(QUICK_LOG_ACTIVITY_FIXED_DETAILS).flatMap((fixed) =>
-    Object.keys(fixed ?? {}),
-  ),
+  ...Object.values(QUICK_LOG_ACTIVITY_FIXED_DETAILS).flatMap((fixed) => Object.keys(fixed ?? {})),
   // Written by useQuickLogActivitySave's metadata fence (e.g. "defoliation",
   // "issue"); machine routing data, never useful as a raw chip.
   "subtype",

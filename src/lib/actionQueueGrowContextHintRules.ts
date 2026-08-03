@@ -118,17 +118,13 @@ export function buildActionQueueGrowContextHint(
   return {
     kind: "all_grows_multi",
     message: `Showing actions across all ${growsCount} grows.`,
-    helper:
-      "Pick a grow from the grow switcher to focus the queue on one grow at a time.",
+    helper: "Pick a grow from the grow switcher to focus the queue on one grow at a time.",
     growName: null,
     isScoped: false,
   };
 }
 
-function lookupGrowName(
-  grows: ReadonlyArray<MinimalGrow>,
-  id: string,
-): string | null {
+function lookupGrowName(grows: ReadonlyArray<MinimalGrow>, id: string): string | null {
   const g = grows.find((x) => x.id === id);
   return (g?.name ?? null) || null;
 }

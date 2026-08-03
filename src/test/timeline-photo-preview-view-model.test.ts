@@ -4,9 +4,7 @@ import { buildTimelinePhotoPreviewViewModel } from "@/lib/timelinePhotoPreviewVi
 describe("buildTimelinePhotoPreviewViewModel", () => {
   it("returns none for empty input", () => {
     expect(buildTimelinePhotoPreviewViewModel({}).kind).toBe("none");
-    expect(
-      buildTimelinePhotoPreviewViewModel({ photos: [], photoUrl: null }).kind,
-    ).toBe("none");
+    expect(buildTimelinePhotoPreviewViewModel({ photos: [], photoUrl: null }).kind).toBe("none");
   });
 
   it("renders up to 3 thumbnails from photos array", () => {
@@ -66,10 +64,7 @@ describe("buildTimelinePhotoPreviewViewModel", () => {
     });
     expect(vm.kind).toBe("strip");
     if (vm.kind !== "strip") return;
-    expect(vm.thumbnails.map((t) => t.url)).toEqual([
-      "https://example.com/x.jpg",
-      "/y.jpg",
-    ]);
+    expect(vm.thumbnails.map((t) => t.url)).toEqual(["https://example.com/x.jpg", "/y.jpg"]);
   });
 
   it("falls back to single photoUrl when photos array is empty", () => {

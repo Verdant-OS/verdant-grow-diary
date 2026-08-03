@@ -62,7 +62,10 @@ const FORBIDDEN: ReadonlyArray<{ label: string; pattern: RegExp }> = [
   { label: "hands-free grow control", pattern: /hands[-\s]?free\s+grow\s+control/i },
   { label: "set-and-forget automation", pattern: /set[-\s]?and[-\s]?forget\s+automation/i },
   // "blind automation" is only forbidden when NOT negated ("no blind automation" is safe copy).
-  { label: "blind automation (unnegated)", pattern: /(?<!\bno\s)(?<!\bnever\s)(?<!\bwithout\s)blind\s+automation/i },
+  {
+    label: "blind automation (unnegated)",
+    pattern: /(?<!\bno\s)(?<!\bnever\s)(?<!\bwithout\s)blind\s+automation/i,
+  },
   { label: "controls your lights", pattern: /controls\s+your\s+lights/i },
   { label: "controls your fans", pattern: /controls\s+your\s+fans/i },
   { label: "controls irrigation", pattern: /controls\s+irrigation/i },
@@ -157,9 +160,7 @@ describe("Centralized positioning copy stays coherent", () => {
   });
 
   it("tagline is the Plant memory / Sensor truth / Grower-approved decisions line", () => {
-    expect(VERDANT_HERO.tagline).toBe(
-      "Plant memory. Sensor truth. Grower-approved decisions.",
-    );
+    expect(VERDANT_HERO.tagline).toBe("Plant memory. Sensor truth. Grower-approved decisions.");
   });
 
   it("trust body names read-only + approval-required-by-design", () => {

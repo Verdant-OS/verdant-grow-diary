@@ -50,9 +50,8 @@ export function BuildInfoPanel() {
   const bundled = APP_VERSION;
   const bundledBuildTime = buildInfo.buildTime;
   const remoteVersion =
-    remote.status === "ok" ? remote.data.version ?? "—" : remote.status === "loading" ? "…" : "—";
-  const remoteBuildTime =
-    remote.status === "ok" ? remote.data.buildTime : undefined;
+    remote.status === "ok" ? (remote.data.version ?? "—") : remote.status === "loading" ? "…" : "—";
+  const remoteBuildTime = remote.status === "ok" ? remote.data.buildTime : undefined;
 
   type FieldDiff = {
     field: string;
@@ -101,9 +100,7 @@ export function BuildInfoPanel() {
           </dd>
 
           <dt className="font-medium">Ref / tag</dt>
-          <dd className="font-mono break-all">
-            {buildInfo.tag ?? buildInfo.ref ?? "—"}
-          </dd>
+          <dd className="font-mono break-all">{buildInfo.tag ?? buildInfo.ref ?? "—"}</dd>
 
           <dt className="font-medium">/version.json version</dt>
           <dd className="font-mono break-all">{remoteVersion}</dd>
@@ -134,16 +131,13 @@ export function BuildInfoPanel() {
               ))}
             </ul>
             <p className="text-xs text-muted-foreground">
-              Remediation: hard-reload the page (Ctrl/Cmd+Shift+R) to fetch the newer
-              bundle. If drift persists after reload, the deployment is mid-rollout or a
-              CDN/service-worker cache is stale — purge the CDN cache for{" "}
-              <code>/version.json</code> and the JS assets, or unregister the service
-              worker under DevTools → Application.
+              Remediation: hard-reload the page (Ctrl/Cmd+Shift+R) to fetch the newer bundle. If
+              drift persists after reload, the deployment is mid-rollout or a CDN/service-worker
+              cache is stale — purge the CDN cache for <code>/version.json</code> and the JS assets,
+              or unregister the service worker under DevTools → Application.
             </p>
           </div>
         )}
-
-
 
         <p className="text-xs text-muted-foreground">
           Source: <code>src/generated/buildInfo.ts</code> (bundled at build time) and{" "}

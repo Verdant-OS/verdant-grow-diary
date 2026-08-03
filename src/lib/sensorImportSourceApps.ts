@@ -25,18 +25,9 @@ import { parseCsv } from "@/lib/csvSensorImportRules";
 
 export const SENSOR_IMPORT_CANONICAL_SOURCE = "csv" as const;
 
-export type SourceAppId =
-  | "ac_infinity"
-  | "spider_farmer"
-  | "vivosun"
-  | "unknown_source_app";
+export type SourceAppId = "ac_infinity" | "spider_farmer" | "vivosun" | "unknown_source_app";
 
-export type CanonicalMetric =
-  | "temp_f"
-  | "humidity_pct"
-  | "vpd_kpa"
-  | "co2_ppm"
-  | "ppfd_umol_m2_s";
+export type CanonicalMetric = "temp_f" | "humidity_pct" | "vpd_kpa" | "co2_ppm" | "ppfd_umol_m2_s";
 
 export const SOURCE_APP_LABELS: Record<SourceAppId, string> = {
   ac_infinity: "AC Infinity",
@@ -49,7 +40,9 @@ export const SOURCE_APP_LABELS: Record<SourceAppId, string> = {
 
 /** Strip UTF-8 BOM + outer whitespace. Preserves inner casing/punctuation. */
 export function stripBomAndTrim(s: string): string {
-  return String(s ?? "").replace(/^\uFEFF/, "").trim();
+  return String(s ?? "")
+    .replace(/^\uFEFF/, "")
+    .trim();
 }
 
 /** Lowercase + collapse whitespace, BOM-stripped — for header matching only. */
@@ -75,16 +68,12 @@ const SPIDER_FARMER_MARKER = "deviceserialnum";
 const SPIDER_FARMER_ALT = "temperature(°c)";
 const VIVOSUN_MARKERS = ["timestamp(1 min)", "probe temperature", "built-in temperature"];
 
-export function detectSourceApp(
-  rawHeaders: ReadonlyArray<string>,
-): SourceAppDetection {
+export function detectSourceApp(rawHeaders: ReadonlyArray<string>): SourceAppDetection {
   const normed = cleanHeaders(rawHeaders).map((h) => h.toLowerCase());
   const set = new Set(normed);
 
   // Vivosun: distinctive `Timestamp(1 min)` + Probe/Built-in pairs.
-  const vivosunHits = VIVOSUN_MARKERS.filter((m) =>
-    normed.some((h) => h.includes(m)),
-  );
+  const vivosunHits = VIVOSUN_MARKERS.filter((m) => normed.some((h) => h.includes(m)));
   if (vivosunHits.length >= 2) {
     return {
       id: "vivosun",
@@ -167,9 +156,7 @@ function findHeader(
   return null;
 }
 
-export function mapColumnsForSpiderFarmer(
-  rawHeaders: ReadonlyArray<string>,
-): ColumnMapping {
+export function mapColumnsForSpiderFarmer(rawHeaders: ReadonlyArray<string>): ColumnMapping {
   const headers = cleanHeaders(rawHeaders);
   const tempF = findHeader(headers, (l) => l === "temperature(°f)");
   const tempC = findHeader(headers, (l) => l === "temperature(°c)");
@@ -203,14 +190,10 @@ export function mapColumnsForSpiderFarmer(
   return { mapped, timestamp: ts, unmapped, rawProvenance };
 }
 
-export function mapColumnsForVivosun(
-  rawHeaders: ReadonlyArray<string>,
-): ColumnMapping {
+export function mapColumnsForVivosun(rawHeaders: ReadonlyArray<string>): ColumnMapping {
   const headers = cleanHeaders(rawHeaders);
   const ts = findHeader(headers, (l) => l.startsWith("timestamp"));
-  const probeTemp = findHeader(headers, (l) =>
-    /^probe temperature/.test(l),
-  );
+  const probeTemp = findHeader(headers, (l) => /^probe temperature/.test(l));
   const probeHum = findHeader(headers, (l) => /^probe humidity/.test(l));
   const probeVpd = findHeader(headers, (l) => /^probe vpd/.test(l));
   const probeCo2 = findHeader(headers, (l) => /^probe co2/.test(l));
@@ -226,26 +209,18 @@ export function mapColumnsForVivosun(
   const rawProvenance = headers.filter((h) => /^built-in /i.test(h));
 
   const usedSet = new Set<string>(
-    [ts, probeTemp, probeHum, probeVpd, probeCo2, ...rawProvenance].filter(
-      Boolean,
-    ) as string[],
+    [ts, probeTemp, probeHum, probeVpd, probeCo2, ...rawProvenance].filter(Boolean) as string[],
   );
   const unmapped = headers.filter((h) => !usedSet.has(h));
 
   return { mapped, timestamp: ts, unmapped, rawProvenance };
 }
 
-export function mapColumnsForAcInfinity(
-  rawHeaders: ReadonlyArray<string>,
-): ColumnMapping {
+export function mapColumnsForAcInfinity(rawHeaders: ReadonlyArray<string>): ColumnMapping {
   const headers = cleanHeaders(rawHeaders);
   const ts = findHeader(headers, (l) => /^timestamp/.test(l));
-  const tempF = findHeader(headers, (l) =>
-    /^temperature\s*\(\s*°?\s*f\s*\)/.test(l),
-  );
-  const tempC = findHeader(headers, (l) =>
-    /^temperature\s*\(\s*°?\s*c\s*\)/.test(l),
-  );
+  const tempF = findHeader(headers, (l) => /^temperature\s*\(\s*°?\s*f\s*\)/.test(l));
+  const tempC = findHeader(headers, (l) => /^temperature\s*\(\s*°?\s*c\s*\)/.test(l));
   const hum = findHeader(headers, (l) => /^humidity/.test(l) || /^rh\b/.test(l));
   const vpd = findHeader(headers, (l) => /^vpd/.test(l));
   const co2 = findHeader(headers, (l) => /^co2/.test(l));
@@ -260,9 +235,7 @@ export function mapColumnsForAcInfinity(
   const rawProvenance: string[] = [];
   if (tempF && tempC) rawProvenance.push(tempC);
 
-  const usedSet = new Set<string>(
-    [ts, tempF, tempC, hum, vpd, co2].filter(Boolean) as string[],
-  );
+  const usedSet = new Set<string>([ts, tempF, tempC, hum, vpd, co2].filter(Boolean) as string[]);
   const unmapped = headers.filter((h) => !usedSet.has(h));
   return { mapped, timestamp: ts, unmapped, rawProvenance };
 }
@@ -343,10 +316,7 @@ const EC_MSCM_PATTERNS = /\bec\s*\(?\s*ms\s*\/?\s*cm/i;
  * Never persists. Never calls the network. The returned shape powers any
  * preview UI without exposing it to live ingest paths.
  */
-export function summarizeImportPreview(
-  csvText: string,
-  hint?: SourceAppId,
-): SourceAppPreview {
+export function summarizeImportPreview(csvText: string, hint?: SourceAppId): SourceAppPreview {
   const parsed = parseCsv(csvText);
   const headers = cleanHeaders(parsed.headers);
   const detection =
@@ -362,8 +332,7 @@ export function summarizeImportPreview(
   let rejected = 0;
 
   // Column indices for the active mapping.
-  const idx = (h: string | null | undefined): number =>
-    h == null ? -1 : headers.indexOf(h);
+  const idx = (h: string | null | undefined): number => (h == null ? -1 : headers.indexOf(h));
   const tsIdx = idx(mapping.timestamp);
   const metricIdx: Array<{ metric: CanonicalMetric; col: number }> = (
     Object.entries(mapping.mapped) as Array<[CanonicalMetric, string]>
@@ -409,8 +378,7 @@ export function summarizeImportPreview(
   if (co2Col != null && co2Samples.length === 0) {
     warnings.push({
       code: "co2_column_empty",
-      message:
-        "CO₂ column is present but contains no numeric values; CO₂ will not be imported.",
+      message: "CO₂ column is present but contains no numeric values; CO₂ will not be imported.",
       metric: "co2_ppm",
       column: mapping.mapped.co2_ppm,
     });
@@ -474,8 +442,7 @@ export function summarizeImportPreview(
         if (v != null && v > 50) {
           warnings.push({
             code: "ec_unit_suspicion_us_per_cm",
-            message:
-              "EC values exceed 50 mS/cm — likely µS/cm being reported as mS/cm.",
+            message: "EC values exceed 50 mS/cm — likely µS/cm being reported as mS/cm.",
             column: h,
           });
           break;

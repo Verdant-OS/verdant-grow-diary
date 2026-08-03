@@ -24,9 +24,7 @@ describe("CustomerGuideQrBlock", () => {
 
   it("renders the 'Customer guide link' label and absolute URL", () => {
     render(<CustomerGuideQrBlock shareId="share-abc" origin={ORIGIN} />);
-    expect(
-      screen.getByRole("heading", { name: CUSTOMER_GUIDE_QR_LABEL }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: CUSTOMER_GUIDE_QR_LABEL })).toBeInTheDocument();
     const url = screen.getByTestId("customer-guide-qr-url");
     expect(url).toHaveTextContent(`${ORIGIN}/customer/share-abc`);
   });
@@ -52,9 +50,9 @@ describe("CustomerGuideQrBlock", () => {
       "data-available",
       "false",
     );
-    expect(
-      screen.getByTestId("customer-guide-qr-unavailable"),
-    ).toHaveTextContent(CUSTOMER_GUIDE_QR_UNAVAILABLE);
+    expect(screen.getByTestId("customer-guide-qr-unavailable")).toHaveTextContent(
+      CUSTOMER_GUIDE_QR_UNAVAILABLE,
+    );
     // No QR SVG when unavailable.
     expect(screen.queryByTestId("customer-guide-qr-svg-wrap")).toBeNull();
   });

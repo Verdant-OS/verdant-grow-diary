@@ -79,9 +79,7 @@ describe("LegacyBillingRedirect — router-level canonical proof", () => {
 
   it("/billing/founder-lifetime → /pricing?plan=founder_lifetime (founder preselected, billing untouched)", () => {
     renderAt("/billing/founder-lifetime");
-    expect(screen.getByTestId("probe-search").textContent).toBe(
-      "?plan=founder_lifetime",
-    );
+    expect(screen.getByTestId("probe-search").textContent).toBe("?plan=founder_lifetime");
     const main = document.querySelector("main");
     expect(main?.getAttribute("data-preselected-plan")).toBe("founder_lifetime");
     // Founder is one-time — billing toggle stays at page default (annual).
@@ -122,17 +120,12 @@ describe("LegacyBillingRedirect — router-level canonical proof", () => {
   });
 
   it("drops an unsafe external returnTo silently", () => {
-    renderAt(
-      "/billing/pro-monthly?returnTo=" +
-        encodeURIComponent("https://evil.example/steal"),
-    );
+    renderAt("/billing/pro-monthly?returnTo=" + encodeURIComponent("https://evil.example/steal"));
     expect(screen.getByTestId("probe-search").textContent).toBe("?plan=pro_monthly");
   });
 
   it("drops javascript: returnTo silently", () => {
-    renderAt(
-      "/billing/pro-monthly?returnTo=" + encodeURIComponent("javascript:alert(1)"),
-    );
+    renderAt("/billing/pro-monthly?returnTo=" + encodeURIComponent("javascript:alert(1)"));
     expect(screen.getByTestId("probe-search").textContent).toBe("?plan=pro_monthly");
   });
 
@@ -162,8 +155,7 @@ describe("App.tsx and manifest convergence", () => {
   });
 
   it("App.tsx mounts /billing/:plan only as LegacyBillingRedirect", () => {
-    const matches =
-      APP_SRC.match(/path="\/billing\/:plan"\s+element=\{<([A-Za-z0-9_]+)/g) ?? [];
+    const matches = APP_SRC.match(/path="\/billing\/:plan"\s+element=\{<([A-Za-z0-9_]+)/g) ?? [];
     expect(matches.length).toBe(1);
     expect(matches[0]).toContain("LegacyBillingRedirect");
   });

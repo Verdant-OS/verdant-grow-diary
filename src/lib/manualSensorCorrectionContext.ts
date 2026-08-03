@@ -64,7 +64,9 @@ export function encodeManualCorrectionHash(ctx: ManualCorrectionContext): string
  * Decode a URL hash into a correction context. Returns null when the
  * hash is not a correction handoff or is malformed. Never throws.
  */
-export function decodeManualCorrectionHash(hash: string | null | undefined): ManualCorrectionContext | null {
+export function decodeManualCorrectionHash(
+  hash: string | null | undefined,
+): ManualCorrectionContext | null {
   if (!hash) return null;
   const raw = hash.startsWith("#") ? hash.slice(1) : hash;
   const qIdx = raw.indexOf("?");

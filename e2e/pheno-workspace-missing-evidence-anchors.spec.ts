@@ -17,14 +17,10 @@
 import { test, expect } from "./lib/authedTest";
 
 const MISSING_ID = process.env.E2E_PHENO_HUNT_ID_MISSING_EVIDENCE?.trim() || "";
-const REPLICATION_ID =
-  process.env.E2E_PHENO_HUNT_ID_REPLICATION_PENDING?.trim() || "";
+const REPLICATION_ID = process.env.E2E_PHENO_HUNT_ID_REPLICATION_PENDING?.trim() || "";
 
 test.describe("missing-evidence anchors deep-link to workspace, not /compare", () => {
-  test.skip(
-    !MISSING_ID,
-    "Set E2E_PHENO_HUNT_ID_MISSING_EVIDENCE to run anchor deep-link tests",
-  );
+  test.skip(!MISSING_ID, "Set E2E_PHENO_HUNT_ID_MISSING_EVIDENCE to run anchor deep-link tests");
 
   test("clicking a next-step link scrolls to workspace anchor; Compare stays disabled", async ({
     page,
@@ -62,17 +58,12 @@ test.describe("missing-evidence anchors deep-link to workspace, not /compare", (
 
     // Compare stays disabled.
     await expect(action).toHaveAttribute("data-enabled", "false");
-    await expect(
-      page.getByTestId("pheno-workspace-compare-action-disabled"),
-    ).toBeDisabled();
+    await expect(page.getByTestId("pheno-workspace-compare-action-disabled")).toBeDisabled();
   });
 });
 
 test.describe("replication_readiness renders inert", () => {
-  test.skip(
-    !REPLICATION_ID,
-    "Set E2E_PHENO_HUNT_ID_REPLICATION_PENDING to run inert-item tests",
-  );
+  test.skip(!REPLICATION_ID, "Set E2E_PHENO_HUNT_ID_REPLICATION_PENDING to run inert-item tests");
 
   test("replication readiness has no anchor/button; cannot change route/hash or enable Compare", async ({
     page,
@@ -116,9 +107,7 @@ test.describe("replication_readiness renders inert", () => {
 
     // Compare still disabled and no /compare link.
     await expect(action).toHaveAttribute("data-enabled", "false");
-    await expect(
-      page.getByTestId("pheno-workspace-compare-action-disabled"),
-    ).toBeDisabled();
+    await expect(page.getByTestId("pheno-workspace-compare-action-disabled")).toBeDisabled();
     expect(await action.locator('a[href*="/compare"]').count()).toBe(0);
   });
 });

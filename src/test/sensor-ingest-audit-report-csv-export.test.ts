@@ -79,9 +79,7 @@ describe("sensorIngestAuditReportCsvExport", () => {
   });
 
   it("never includes a raw_payload column", () => {
-    const { csv } = buildSensorIngestAuditCsv([
-      makeRow({ rawPayloadRedacted: "SECRET_BLOB_VAL" }),
-    ]);
+    const { csv } = buildSensorIngestAuditCsv([makeRow({ rawPayloadRedacted: "SECRET_BLOB_VAL" })]);
     expect(csv).not.toContain("raw_payload");
     expect(csv).not.toContain("SECRET_BLOB_VAL");
   });

@@ -98,7 +98,7 @@ export default function Plants() {
     error: growsError = null,
     refresh: refreshGrows,
   } = useGrows();
-  const validGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
+  const validGrowId = isValidScopedGrow ? (urlGrowId ?? undefined) : undefined;
   const scopeState = classifyPlantsScopeState({
     hasRequestedGrow: !!urlGrowId,
     isLoading: growsLoading,

@@ -28,7 +28,8 @@ export interface LegacyBillingSubscriptionRow {
 
 export type StepResult = { ok: true } | { ok: false };
 export type LoadSubscriptionsResult =
-  { ok: true; rows: readonly RecurringSubscription[] } | { ok: false };
+  | { ok: true; rows: readonly RecurringSubscription[] }
+  | { ok: false };
 
 export interface AccountDeletionDependencies {
   loadSubscriptions(userId: string): Promise<LoadSubscriptionsResult>;
@@ -46,7 +47,8 @@ export type AccountDeletionFailure =
   | "delete_failed";
 
 export type AccountDeletionWorkflowResult =
-  { ok: true } | { ok: false; error: AccountDeletionFailure };
+  | { ok: true }
+  | { ok: false; error: AccountDeletionFailure };
 
 function isNonEmpty(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
@@ -109,10 +111,7 @@ export function compileAccountSubscriptions(
     // The retired BYO webhook was sandbox-only. Anything other than a
     // complete Paddle link cannot be safely canceled and therefore blocks
     // destructive deletion for operator resolution.
-    if (
-      row.provider !== "paddle" ||
-      !isNonEmpty(row.provider_subscription_id)
-    ) {
+    if (row.provider !== "paddle" || !isNonEmpty(row.provider_subscription_id)) {
       return { ok: false };
     }
     compiled.push({

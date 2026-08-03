@@ -71,14 +71,16 @@ export interface PostGrowReflectionCandidatePasteEmptyResult extends BaseCandida
   inputKind: null;
 }
 
-export interface PostGrowReflectionCandidatePasteInvalidJsonResult extends BaseCandidatePasteResult {
+export interface PostGrowReflectionCandidatePasteInvalidJsonResult
+  extends BaseCandidatePasteResult {
   status: "invalid_json";
   message: string;
   parseError: string;
   inputKind: null;
 }
 
-export interface PostGrowReflectionCandidatePasteEnvelopeRejectedResult extends BaseCandidatePasteResult {
+export interface PostGrowReflectionCandidatePasteEnvelopeRejectedResult
+  extends BaseCandidatePasteResult {
   status: "envelope_rejected";
   message: string;
   inputKind: "envelope";
@@ -86,7 +88,8 @@ export interface PostGrowReflectionCandidatePasteEnvelopeRejectedResult extends 
   failureReason: string;
 }
 
-export interface PostGrowReflectionCandidatePasteValidationFailedResult extends BaseCandidatePasteResult {
+export interface PostGrowReflectionCandidatePasteValidationFailedResult
+  extends BaseCandidatePasteResult {
   status: "validation_failed";
   message: string;
   inputKind: "raw_candidate" | "envelope";

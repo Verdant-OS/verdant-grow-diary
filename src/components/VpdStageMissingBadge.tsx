@@ -11,10 +11,7 @@ export interface VpdStageMissingBadgeProps {
   className?: string;
 }
 
-export default function VpdStageMissingBadge({
-  testId,
-  className,
-}: VpdStageMissingBadgeProps) {
+export default function VpdStageMissingBadge({ testId, className }: VpdStageMissingBadgeProps) {
   return (
     <div
       data-testid={testId}

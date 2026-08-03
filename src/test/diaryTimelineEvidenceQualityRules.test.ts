@@ -68,7 +68,8 @@ describe("buildDiaryTimelineEvidenceQualityForSection", () => {
 
   it("never emits diagnostic/aggressive/actionable wording in copy", () => {
     const sections = buildDiaryTimelineSections(SAMPLE_ITEMS);
-    const banned = /\b(healthy|ideal|fix|urgent|auto|execute|control|actuate|relay|emergency|critical)\b/i;
+    const banned =
+      /\b(healthy|ideal|fix|urgent|auto|execute|control|actuate|relay|emergency|critical)\b/i;
     for (const section of sections) {
       const q = buildDiaryTimelineEvidenceQualityForSection(section);
       expect(q.copy).not.toMatch(banned);

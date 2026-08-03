@@ -31,9 +31,7 @@ const FORBIDDEN: Array<[RegExp, string]> = [
 ];
 
 function strip(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 }
 
 describe("quickLogSensorSnapshotViewModel — safety boundary", () => {

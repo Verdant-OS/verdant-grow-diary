@@ -52,14 +52,12 @@ export function readProgress(progressFile) {
         // deliberately supersedes the prior terminal result for this file.
         files.set(ev.file, ev);
       } else if (attempt < (Number.isSafeInteger(prev.attempt) ? prev.attempt : 0)) {
-        continue;
       } else if (!isTerminalFileStatus(prev.status) && isTerminalFileStatus(ev.status)) {
         // A resumed terminal result supersedes an explicitly provisional
         // event. The inverse is ignored so late provisional callbacks can
         // never erase an authoritative result.
         files.set(ev.file, ev);
       } else if (isTerminalFileStatus(prev.status) && !isTerminalFileStatus(ev.status)) {
-        continue;
       } else if (
         prev.status === ev.status &&
         prev.counts?.passed === ev.counts?.passed &&
@@ -162,14 +160,14 @@ export function summarizeRun(runDir, { authoritativeManifest, expectedFiles } = 
       runMeta.batchProcessFailed === derivedBatchProcessFailed);
   const finalMetadataValid = Boolean(
     Number.isInteger(exitCode) &&
-    runMeta &&
-    Number.isInteger(runMeta.exit) &&
-    runMeta.exit === exitCode &&
-    Array.isArray(runMeta.batchResults) &&
-    typeof runMeta.interrupted === "boolean" &&
-    batchFailureMetadataConsistent &&
-    failedBatchIndexesValid &&
-    (runMeta.exit !== 0 || (!runMeta.interrupted && !batchProcessFailed)),
+      runMeta &&
+      Number.isInteger(runMeta.exit) &&
+      runMeta.exit === exitCode &&
+      Array.isArray(runMeta.batchResults) &&
+      typeof runMeta.interrupted === "boolean" &&
+      batchFailureMetadataConsistent &&
+      failedBatchIndexesValid &&
+      (runMeta.exit !== 0 || (!runMeta.interrupted && !batchProcessFailed)),
   );
   if (
     completedMarker &&

@@ -32,9 +32,7 @@ describe("staff-grant trigger migration", () => {
   const sql = loadTriggerMigration();
 
   it("defines the SECURITY DEFINER function", () => {
-    expect(sql).toMatch(
-      new RegExp(`CREATE OR REPLACE FUNCTION\\s+public\\.${TRIGGER_FN}`, "i"),
-    );
+    expect(sql).toMatch(new RegExp(`CREATE OR REPLACE FUNCTION\\s+public\\.${TRIGGER_FN}`, "i"));
     expect(sql).toMatch(/SECURITY DEFINER/i);
     expect(sql).toMatch(/SET search_path\s*=\s*public/i);
   });

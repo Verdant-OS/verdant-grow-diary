@@ -6,10 +6,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const files = [
-  "src/pages/OperatorEcowittCanary.tsx",
-  "src/lib/ecowittCanaryAuditRules.ts",
-];
+const files = ["src/pages/OperatorEcowittCanary.tsx", "src/lib/ecowittCanaryAuditRules.ts"];
 
 // Always forbidden: real write/automation surfaces.
 const HARD_FORBIDDEN: { pattern: RegExp; name: string }[] = [
@@ -38,9 +35,7 @@ describe("Operator EcoWitt Canary static safety", () => {
     it(`${f} contains no forbidden write/automation surfaces`, () => {
       const src = readFileSync(resolve(process.cwd(), f), "utf8");
       // strip line comments + block comments
-      const stripped = src
-        .replace(/\/\*[\s\S]*?\*\//g, "")
-        .replace(/(^|[^:])\/\/.*$/gm, "$1");
+      const stripped = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
       const patterns = f.endsWith(".tsx")
         ? [...HARD_FORBIDDEN, ...PAGE_ONLY_FORBIDDEN]
         : HARD_FORBIDDEN;

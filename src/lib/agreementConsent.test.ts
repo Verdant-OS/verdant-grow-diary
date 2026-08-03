@@ -4,7 +4,13 @@ import type { AgreementVersion } from "@/constants/agreements";
 
 const AGREEMENTS: AgreementVersion[] = [
   { type: "terms", version: "v2", effectiveDate: "2026-07-13", label: "Terms", href: "/terms" },
-  { type: "privacy", version: "v2", effectiveDate: "2026-07-13", label: "Privacy", href: "/privacy" },
+  {
+    type: "privacy",
+    version: "v2",
+    effectiveDate: "2026-07-13",
+    label: "Privacy",
+    href: "/privacy",
+  },
 ];
 
 describe("computeAgreementGaps", () => {

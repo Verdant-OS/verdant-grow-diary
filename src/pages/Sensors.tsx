@@ -360,8 +360,8 @@ export default function Sensors() {
           className="text-xs text-muted-foreground -mt-2 mb-4"
           data-testid="sensors-derived-vpd-stability-note"
         >
-          A derived VPD estimate is available below; stability tracking requires
-          directly recorded VPD readings.
+          A derived VPD estimate is available below; stability tracking requires directly recorded
+          VPD readings.
         </p>
       )}
       <div className="grid lg:grid-cols-2 gap-4">

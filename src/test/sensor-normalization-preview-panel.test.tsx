@@ -9,7 +9,11 @@ const TENT = "11111111-1111-4111-8111-111111111111";
 const NOW = new Date("2026-06-15T12:00:00Z");
 const FRESH = "2026-06-15T11:50:00Z";
 
-function buildVm(overrides?: { payload?: unknown; tentId?: string | null; capturedAt?: string | null }) {
+function buildVm(overrides?: {
+  payload?: unknown;
+  tentId?: string | null;
+  capturedAt?: string | null;
+}) {
   return buildSensorNormalizationPreviewViewModel({
     payload: overrides?.payload ?? { temperature_c: 24, humidity: 50 },
     options: {
@@ -28,9 +32,9 @@ describe("SensorNormalizationPreviewPanel", () => {
     render(<SensorNormalizationPreviewPanel viewModel={buildVm()} />);
     const panel = screen.getByTestId("sensor-normalization-preview-panel");
     expect(panel.getAttribute("data-writes-enabled")).toBe("false");
-    expect(
-      screen.getByTestId("sensor-normalization-preview-disclaimer").textContent,
-    ).toMatch(/Preview only/i);
+    expect(screen.getByTestId("sensor-normalization-preview-disclaimer").textContent).toMatch(
+      /Preview only/i,
+    );
   });
 
   it("renders source, identity, transport, confidence badges", () => {
@@ -54,9 +58,7 @@ describe("SensorNormalizationPreviewPanel", () => {
   });
 
   it("renders invalid badge and no-metrics empty state when payload has no metrics", () => {
-    render(
-      <SensorNormalizationPreviewPanel viewModel={buildVm({ payload: {} })} />,
-    );
+    render(<SensorNormalizationPreviewPanel viewModel={buildVm({ payload: {} })} />);
     const badges = screen.getAllByTestId("sensor-normalization-preview-badge");
     expect(badges.some((b) => b.textContent === "Invalid")).toBe(true);
     const empty = screen.getByTestId("sensor-normalization-preview-empty-state");
@@ -65,61 +67,41 @@ describe("SensorNormalizationPreviewPanel", () => {
   });
 
   it("renders warning chips with friendly labels", () => {
-    render(
-      <SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />,
-    );
+    render(<SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />);
     const list = screen.getByTestId("sensor-normalization-preview-warnings");
     const items = within(list).getAllByTestId("sensor-normalization-preview-warning");
     expect(items.some((el) => el.getAttribute("data-code") === "missing_tent_id")).toBe(true);
   });
 
   it("renders warning disclosure trigger when warnings exist", () => {
-    render(
-      <SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />,
-    );
+    render(<SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />);
     expect(
       screen.getByTestId("sensor-normalization-preview-warning-disclosure"),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText("Why am I seeing this warning?"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Why am I seeing this warning?")).toBeInTheDocument();
   });
 
   it("does not render warning disclosure when there are no warnings", () => {
     render(<SensorNormalizationPreviewPanel viewModel={buildVm()} />);
-    expect(
-      screen.queryByTestId("sensor-normalization-preview-warning-disclosure"),
-    ).toBeNull();
+    expect(screen.queryByTestId("sensor-normalization-preview-warning-disclosure")).toBeNull();
   });
 
   it("disclosure expanded copy says warnings are data-quality signals, not plant diagnosis", () => {
-    render(
-      <SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />,
-    );
-    const disclosure = screen.getByTestId(
-      "sensor-normalization-preview-warning-disclosure",
-    );
+    render(<SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />);
+    const disclosure = screen.getByTestId("sensor-normalization-preview-warning-disclosure");
     expect(disclosure.textContent).toMatch(/data-quality signals/i);
     expect(disclosure.textContent).toMatch(/not plant diagnosis/i);
   });
 
   it("disclosure expanded copy says warnings do not save sensor readings", () => {
-    render(
-      <SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />,
-    );
-    const disclosure = screen.getByTestId(
-      "sensor-normalization-preview-warning-disclosure",
-    );
+    render(<SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />);
+    const disclosure = screen.getByTestId("sensor-normalization-preview-warning-disclosure");
     expect(disclosure.textContent).toMatch(/do not save sensor readings/i);
   });
 
   it("disclosure expanded copy includes note-only guidance", () => {
-    render(
-      <SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />,
-    );
-    const disclosure = screen.getByTestId(
-      "sensor-normalization-preview-warning-disclosure",
-    );
+    render(<SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />);
+    const disclosure = screen.getByTestId("sensor-normalization-preview-warning-disclosure");
     expect(disclosure.textContent).toMatch(/note-only/i);
     expect(disclosure.textContent).toMatch(/source, timestamp, tent context, and units/i);
   });
@@ -161,9 +143,7 @@ describe("SensorNormalizationPreviewPanel", () => {
   });
 
   it("renders missing-tent empty state with primary and secondary copy", () => {
-    render(
-      <SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />,
-    );
+    render(<SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />);
     const empty = screen.getByTestId("sensor-normalization-preview-empty-state");
     expect(empty.textContent).toMatch(
       /No write-ready metric rows were generated because a valid tent context is missing/i,
@@ -174,23 +154,15 @@ describe("SensorNormalizationPreviewPanel", () => {
   });
 
   it("missing tent state still renders metric summaries when available", () => {
-    render(
-      <SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />,
-    );
-    expect(
-      screen.getByTestId("sensor-normalization-preview-metrics"),
-    ).toBeInTheDocument();
+    render(<SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />);
+    expect(screen.getByTestId("sensor-normalization-preview-metrics")).toBeInTheDocument();
     const rows = screen.getAllByTestId("sensor-normalization-preview-metric-row");
     expect(rows.length).toBeGreaterThan(0);
   });
 
   it("missing tent state does not render long-form rows", () => {
-    render(
-      <SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />,
-    );
-    expect(
-      screen.queryByTestId("sensor-normalization-preview-long-form"),
-    ).toBeNull();
+    render(<SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />);
+    expect(screen.queryByTestId("sensor-normalization-preview-long-form")).toBeNull();
   });
 
   it("long-form section is labeled and includes helper copy", () => {
@@ -262,23 +234,16 @@ describe("SensorNormalizationPreviewPanel", () => {
   });
 
   it("compact variant hides long-form table but shows row-count summary", () => {
-    render(
-      <SensorNormalizationPreviewPanel viewModel={buildVm()} variant="compact" />,
-    );
-    expect(
-      screen.queryByTestId("sensor-normalization-preview-long-form"),
-    ).toBeNull();
+    render(<SensorNormalizationPreviewPanel viewModel={buildVm()} variant="compact" />);
+    expect(screen.queryByTestId("sensor-normalization-preview-long-form")).toBeNull();
     expect(
       screen.getByTestId("sensor-normalization-preview-long-form-summary").textContent,
     ).toMatch(/write-ready row/);
     // Still renders source/identity/transport/confidence/warnings/row count.
     const badges = screen.getAllByTestId("sensor-normalization-preview-badge");
     expect(badges.some((b) => (b.textContent ?? "").includes("Source: csv"))).toBe(true);
-    expect(
-      screen.getByTestId("sensor-normalization-preview-row-count").textContent,
-    ).toMatch(/\d+/);
+    expect(screen.getByTestId("sensor-normalization-preview-row-count").textContent).toMatch(/\d+/);
   });
-
 
   it("static safety: panel does not import write paths or call edges", () => {
     const src = readFileSync(

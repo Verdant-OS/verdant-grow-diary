@@ -21,9 +21,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import AiDoctorSessionsIndex from "@/pages/AiDoctorSessionsIndex";
-import {
-  AI_DOCTOR_SESSIONS_INDEX_PAGE_SIZE,
-} from "@/hooks/use-ai-doctor-sessions";
+import { AI_DOCTOR_SESSIONS_INDEX_PAGE_SIZE } from "@/hooks/use-ai-doctor-sessions";
 
 function renderWithProviders(ui: ReactElement) {
   const client = new QueryClient({
@@ -106,9 +104,9 @@ describe("useAiDoctorSessionsIndex — runtime behavior", () => {
 describe("AiDoctorSessionsIndex — render", () => {
   it("renders title and helper copy", async () => {
     renderWithProviders(<AiDoctorSessionsIndex />);
-    expect(
-      (await screen.findByTestId("ai-doctor-sessions-index-title")).textContent,
-    ).toMatch(/AI Doctor Sessions/i);
+    expect((await screen.findByTestId("ai-doctor-sessions-index-title")).textContent).toMatch(
+      /AI Doctor Sessions/i,
+    );
     expect(screen.getByTestId("ai-doctor-sessions-index-helper").textContent).toMatch(
       /saved diagnosis snapshots/i,
     );
@@ -177,10 +175,14 @@ describe("AiDoctorSessionsIndex — ?view=ledger backward-compatible URL behavio
     renderWithProvidersAt(<AiDoctorSessionsIndex />, "/doctor/sessions?view=ledger");
     await screen.findByTestId("ai-doctor-session-integrity-ledger");
     expect(
-      screen.getByTestId("ai-doctor-sessions-index-view-switch-ledger").getAttribute("aria-pressed"),
+      screen
+        .getByTestId("ai-doctor-sessions-index-view-switch-ledger")
+        .getAttribute("aria-pressed"),
     ).toBe("true");
     expect(
-      screen.getByTestId("ai-doctor-sessions-index-view-switch-history").getAttribute("aria-pressed"),
+      screen
+        .getByTestId("ai-doctor-sessions-index-view-switch-history")
+        .getAttribute("aria-pressed"),
     ).toBe("false");
   });
 });
@@ -218,9 +220,7 @@ describe("AiDoctorSessionsIndex — row rendering (static source)", () => {
 
 describe("App routing", () => {
   it("registers /doctor/sessions index route", () => {
-    expect(APP).toMatch(
-      /<Route\s+path="\/doctor\/sessions"\s+element=\{<AiDoctorSessionsIndex/,
-    );
+    expect(APP).toMatch(/<Route\s+path="\/doctor\/sessions"\s+element=\{<AiDoctorSessionsIndex/);
   });
   it("still registers /doctor/sessions/:sessionId detail route", () => {
     expect(APP).toMatch(

@@ -10,9 +10,7 @@ import { describe, it, expect } from "vitest";
 import React, { useMemo, useState } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 
-import {
-  filterTimelineEvidenceRows,
-} from "@/lib/timelineEvidenceFilterRules";
+import { filterTimelineEvidenceRows } from "@/lib/timelineEvidenceFilterRules";
 import {
   buildTimelinePhotoLightboxList,
   findTimelinePhotoIndexById,
@@ -33,8 +31,26 @@ type Row = {
 };
 
 const ROWS: Row[] = [
-  { id: "e1", note: "Watered today", photo_url: "https://x/1.jpg", stage: "veg", plant_id: "p1", tent_id: "t1", details: { event_type: "watering", plant_name: "Blue Dream" }, entry_at: "2025-01-01T00:00:00Z" },
-  { id: "e2", note: "No photo entry", photo_url: null, stage: "veg", plant_id: "p1", tent_id: "t1", details: { event_type: "note", plant_name: "Blue Dream" }, entry_at: "2025-01-02T00:00:00Z" },
+  {
+    id: "e1",
+    note: "Watered today",
+    photo_url: "https://x/1.jpg",
+    stage: "veg",
+    plant_id: "p1",
+    tent_id: "t1",
+    details: { event_type: "watering", plant_name: "Blue Dream" },
+    entry_at: "2025-01-01T00:00:00Z",
+  },
+  {
+    id: "e2",
+    note: "No photo entry",
+    photo_url: null,
+    stage: "veg",
+    plant_id: "p1",
+    tent_id: "t1",
+    details: { event_type: "note", plant_name: "Blue Dream" },
+    entry_at: "2025-01-02T00:00:00Z",
+  },
   {
     id: "e3",
     note: "Maturity check",
@@ -77,8 +93,18 @@ function Harness() {
 
   return (
     <div>
-      <input data-testid="q" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="search" />
-      <select data-testid="plant" value={plantId} onChange={(e) => setPlantId(e.target.value)} aria-label="plant">
+      <input
+        data-testid="q"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        aria-label="search"
+      />
+      <select
+        data-testid="plant"
+        value={plantId}
+        onChange={(e) => setPlantId(e.target.value)}
+        aria-label="plant"
+      >
         <option value="">All</option>
         <option value="p1">p1</option>
         <option value="p2">p2</option>
@@ -90,7 +116,10 @@ function Harness() {
               <button
                 type="button"
                 data-testid={`open-photo-${e.id}`}
-                onClick={(ev) => { ev.stopPropagation(); setPhotoId(e.id); }}
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  setPhotoId(e.id);
+                }}
                 aria-label="Open photo"
               >
                 photo

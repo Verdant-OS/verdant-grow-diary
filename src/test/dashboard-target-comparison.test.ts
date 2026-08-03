@@ -7,10 +7,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  EMPTY_SNAPSHOT,
-  type SensorSnapshot,
-} from "@/lib/sensorSnapshot";
+import { EMPTY_SNAPSHOT, type SensorSnapshot } from "@/lib/sensorSnapshot";
 import {
   STATUS_HEADLINE,
   compareSnapshotToTargets,
@@ -20,21 +17,14 @@ import {
 const ROOT = resolve(__dirname, "../..");
 const DASHBOARD = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
 const HOOK = readFileSync(resolve(ROOT, "src/hooks/useGrowTargets.ts"), "utf8");
-const HELPER = readFileSync(
-  resolve(ROOT, "src/lib/environmentTargetComparison.ts"),
-  "utf8",
-);
+const HELPER = readFileSync(resolve(ROOT, "src/lib/environmentTargetComparison.ts"), "utf8");
 
 const AI_COACH_CALL = /["'`]ai-coach["'`]|functions\/ai-coach|ai_coach/;
-const EXTERNAL_CONTROL =
-  /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i;
+const EXTERNAL_CONTROL = /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i;
 const SERVICE_ROLE = /service_role/;
-const WRITE_PATH =
-  /\.from\([^)]+\)\s*\.(insert|update|delete|upsert)/;
-const PLANT_HEALTH_HEADLINE =
-  /\b(healthy|unhealthy|disease|deficien|plant\s+health)/i;
-const FAKE_TARGET_DEFAULT =
-  /target[s]?\s*=\s*\{\s*temp\s*:\s*\{\s*min\s*:\s*\d/i;
+const WRITE_PATH = /\.from\([^)]+\)\s*\.(insert|update|delete|upsert)/;
+const PLANT_HEALTH_HEADLINE = /\b(healthy|unhealthy|disease|deficien|plant\s+health)/i;
+const FAKE_TARGET_DEFAULT = /target[s]?\s*=\s*\{\s*temp\s*:\s*\{\s*min\s*:\s*\d/i;
 
 function fresh(snap: Partial<SensorSnapshot>): SensorSnapshot {
   return {
@@ -98,10 +88,7 @@ describe("compareSnapshotToTargets", () => {
   });
 
   it("returns out_of_range when a metric is low", () => {
-    const r = compareSnapshotToTargets(
-      fresh({ temp: 10, rh: 55, vpd: 1.1 }),
-      FULL_TARGETS,
-    );
+    const r = compareSnapshotToTargets(fresh({ temp: 10, rh: 55, vpd: 1.1 }), FULL_TARGETS);
     expect(r.status).toBe("out_of_range");
     const temp = r.metrics.find((m) => m.metric === "temp")!;
     expect(temp.state).toBe("low");
@@ -109,10 +96,7 @@ describe("compareSnapshotToTargets", () => {
   });
 
   it("returns out_of_range when a metric is high", () => {
-    const r = compareSnapshotToTargets(
-      fresh({ temp: 24, rh: 99, vpd: 1.1 }),
-      FULL_TARGETS,
-    );
+    const r = compareSnapshotToTargets(fresh({ temp: 24, rh: 99, vpd: 1.1 }), FULL_TARGETS);
     expect(r.status).toBe("out_of_range");
     const rh = r.metrics.find((m) => m.metric === "rh")!;
     expect(rh.state).toBe("high");
@@ -127,21 +111,13 @@ describe("compareSnapshotToTargets", () => {
 
   it("marks missing_target when target is absent for a metric", () => {
     const partial: GrowTargets = { temp: { min: 20, max: 28 } };
-    const r = compareSnapshotToTargets(
-      fresh({ temp: 24, rh: 55, vpd: 1.1 }),
-      partial,
-    );
+    const r = compareSnapshotToTargets(fresh({ temp: 24, rh: 55, vpd: 1.1 }), partial);
     const rh = r.metrics.find((m) => m.metric === "rh")!;
     expect(rh.state).toBe("missing_target");
   });
 
   it("never returns plant-health language in headlines", () => {
-    for (const status of [
-      "in_range",
-      "out_of_range",
-      "missing_targets",
-      "unavailable",
-    ] as const) {
+    for (const status of ["in_range", "out_of_range", "missing_targets", "unavailable"] as const) {
       expect(PLANT_HEALTH_HEADLINE.test(STATUS_HEADLINE[status])).toBe(false);
     }
   });

@@ -11,19 +11,12 @@
  *    AI request. Sending is intentionally out of scope for this build.
  */
 
-import type {
-  AiDoctorContextResult,
-  AiDoctorContextReadiness,
-} from "@/lib/aiDoctorContextRules";
-import {
-  labelEvidence,
-  labelMissing,
-} from "@/lib/aiDoctorContextViewModel";
+import type { AiDoctorContextResult, AiDoctorContextReadiness } from "@/lib/aiDoctorContextRules";
+import { labelEvidence, labelMissing } from "@/lib/aiDoctorContextViewModel";
 
 export const AI_DOCTOR_SAFE_REVIEW_TITLE = "Cautious review preparation";
 
-export const AI_DOCTOR_SAFE_REVIEW_NO_REQUEST_NOTICE =
-  "No AI request has been sent yet.";
+export const AI_DOCTOR_SAFE_REVIEW_NO_REQUEST_NOTICE = "No AI request has been sent yet.";
 
 export const AI_DOCTOR_SAFE_REVIEW_PARTIAL_NOTICE =
   "This review may have limited confidence because some context is missing.";
@@ -31,8 +24,7 @@ export const AI_DOCTOR_SAFE_REVIEW_PARTIAL_NOTICE =
 export const AI_DOCTOR_SAFE_REVIEW_STRONG_NOTICE =
   "Context is strong enough for a cautious review.";
 
-export const AI_DOCTOR_SAFE_REVIEW_DISABLED_BUTTON_LABEL =
-  "AI review not enabled in this build";
+export const AI_DOCTOR_SAFE_REVIEW_DISABLED_BUTTON_LABEL = "AI review not enabled in this build";
 
 export const AI_DOCTOR_SAFE_REVIEW_START_LABEL = "Start cautious review";
 
@@ -78,9 +70,7 @@ function formatTimelineSummary(result: AiDoctorContextResult): string {
     return "No timeline activity logged in the last 7 days.";
   }
   const wfPart =
-    wf > 0
-      ? `, including ${wf} watering or feeding entr${wf === 1 ? "y" : "ies"}`
-      : "";
+    wf > 0 ? `, including ${wf} watering or feeding entr${wf === 1 ? "y" : "ies"}` : "";
   return `${total} timeline entr${total === 1 ? "y" : "ies"} in the last 7 days${wfPart}.`;
 }
 
@@ -140,8 +130,7 @@ export function buildAiDoctorSafeReviewStart(
       preparation: null,
     };
   }
-  const variant: "partial" | "strong" =
-    readiness === "strong" ? "strong" : "partial";
+  const variant: "partial" | "strong" = readiness === "strong" ? "strong" : "partial";
   return {
     allowStart: true,
     startLabel: AI_DOCTOR_SAFE_REVIEW_START_LABEL,

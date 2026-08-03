@@ -42,52 +42,35 @@ describe("alertActionQueueDedupeRules", () => {
     });
 
     it("flags approved row with matching back-pointer (still non-terminal)", () => {
-      expect(
-        isDuplicatePendingAction(
-          { ...matchingPending, status: "approved" },
-          OPEN_ALERT,
-        ),
-      ).toBe(true);
+      expect(isDuplicatePendingAction({ ...matchingPending, status: "approved" }, OPEN_ALERT)).toBe(
+        true,
+      );
     });
 
     it("does not flag completed/rejected/cancelled rows", () => {
       for (const status of ["completed", "rejected", "cancelled", "dismissed"]) {
-        expect(
-          isDuplicatePendingAction({ ...matchingPending, status }, OPEN_ALERT),
-        ).toBe(false);
+        expect(isDuplicatePendingAction({ ...matchingPending, status }, OPEN_ALERT)).toBe(false);
       }
     });
 
     it("does not flag rows from a different grow", () => {
       expect(
-        isDuplicatePendingAction(
-          { ...matchingPending, grow_id: "other-grow" },
-          OPEN_ALERT,
-        ),
+        isDuplicatePendingAction({ ...matchingPending, grow_id: "other-grow" }, OPEN_ALERT),
       ).toBe(false);
     });
 
     it("does not flag rows from a different source", () => {
-      expect(
-        isDuplicatePendingAction(
-          { ...matchingPending, source: "ai_coach" },
-          OPEN_ALERT,
-        ),
-      ).toBe(false);
+      expect(isDuplicatePendingAction({ ...matchingPending, source: "ai_coach" }, OPEN_ALERT)).toBe(
+        false,
+      );
     });
 
     it("requires the [alert:<id>] back-pointer in reason", () => {
       expect(
-        isDuplicatePendingAction(
-          { ...matchingPending, reason: "no token here" },
-          OPEN_ALERT,
-        ),
+        isDuplicatePendingAction({ ...matchingPending, reason: "no token here" }, OPEN_ALERT),
       ).toBe(false);
       expect(
-        isDuplicatePendingAction(
-          { ...matchingPending, reason: "[alert:OTHER]" },
-          OPEN_ALERT,
-        ),
+        isDuplicatePendingAction({ ...matchingPending, reason: "[alert:OTHER]" }, OPEN_ALERT),
       ).toBe(false);
     });
 
@@ -193,26 +176,19 @@ describe("alertActionQueueDedupeRules", () => {
     it("returns null when nothing matches", () => {
       expect(findExistingPendingAction([], OPEN_ALERT)).toBeNull();
       expect(
-        findExistingPendingAction(
-          [{ ...matchingPending, status: "completed" }],
-          OPEN_ALERT,
-        ),
+        findExistingPendingAction([{ ...matchingPending, status: "completed" }], OPEN_ALERT),
       ).toBeNull();
     });
 
     it("returns the first matching row deterministically", () => {
       const second = { ...matchingPending, id: "act-2" };
-      expect(
-        findExistingPendingAction([matchingPending, second], OPEN_ALERT)?.id,
-      ).toBe("act-1");
+      expect(findExistingPendingAction([matchingPending, second], OPEN_ALERT)?.id).toBe("act-1");
     });
   });
 
   describe("shouldBlockInsert", () => {
     it("blocks when an in-flight request is pending", () => {
-      expect(
-        shouldBlockInsert({ alert: OPEN_ALERT, existingRows: [], inFlight: true }),
-      ).toBe(true);
+      expect(shouldBlockInsert({ alert: OPEN_ALERT, existingRows: [], inFlight: true })).toBe(true);
     });
 
     it("blocks when a duplicate exists (double-click defense)", () => {
@@ -225,9 +201,7 @@ describe("alertActionQueueDedupeRules", () => {
     });
 
     it("does not block when state is can_add", () => {
-      expect(
-        shouldBlockInsert({ alert: OPEN_ALERT, existingRows: [] }),
-      ).toBe(false);
+      expect(shouldBlockInsert({ alert: OPEN_ALERT, existingRows: [] })).toBe(false);
     });
 
     it("blocks ineligible alerts", () => {

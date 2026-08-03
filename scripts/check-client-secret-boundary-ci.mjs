@@ -47,7 +47,10 @@ export function parseArgs(argv) {
 export function sanitizeLine(line) {
   if (typeof line !== "string") return "";
   // Strip anything that looks like a JWT or bearer secret.
-  let s = line.replace(/eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}/g, "[redacted-jwt]");
+  let s = line.replace(
+    /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g,
+    "[redacted-jwt]",
+  );
   s = s.replace(/(SUPABASE_SERVICE_ROLE_KEY|service_role)\s*[:=]\s*\S+/gi, "$1=[redacted]");
   s = s.replace(/Bearer\s+\S+/gi, "Bearer [redacted]");
   s = s.replace(/(token|secret|key|password)\s*[:=]\s*\S+/gi, "$1=[redacted]");
@@ -80,9 +83,7 @@ function runGh(args) {
     throw new Error(`gh CLI not available: ${res.error.message}`);
   }
   if (res.status !== 0) {
-    throw new Error(
-      `gh ${args[0]} exited ${res.status}: ${sanitizeLine(res.stderr || "")}`,
-    );
+    throw new Error(`gh ${args[0]} exited ${res.status}: ${sanitizeLine(res.stderr || "")}`);
   }
   return res.stdout ?? "";
 }

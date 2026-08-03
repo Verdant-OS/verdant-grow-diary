@@ -131,8 +131,10 @@ describe("normalizeQuickLogSnapshotMetrics", () => {
   });
 
   it("returns a CanonicalQuickLogSensorSnapshotMetrics-shaped value", () => {
-    const out: CanonicalQuickLogSensorSnapshotMetrics =
-      normalizeQuickLogSnapshotMetrics({ temperature_c: 23, humidity: 50 });
+    const out: CanonicalQuickLogSensorSnapshotMetrics = normalizeQuickLogSnapshotMetrics({
+      temperature_c: 23,
+      humidity: 50,
+    });
     // Known keys are typed as optional numbers — accessing them must not
     // need a cast at compile time. This call is the actual test: if the
     // type signature regresses, typecheck fails.

@@ -33,8 +33,7 @@ function fail(msg, code = 1) {
 
 async function loadParser() {
   const mod = await import(
-    pathToFileURL(resolve(process.cwd(), "src/lib/releaseReceiptParser.ts"))
-      .href,
+    pathToFileURL(resolve(process.cwd(), "src/lib/releaseReceiptParser.ts")).href
   );
   return mod.parseReleaseReceiptArtifact;
 }

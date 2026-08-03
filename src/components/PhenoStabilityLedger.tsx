@@ -131,10 +131,7 @@ export default function PhenoStabilityLedger({
       {/* Per-axis hold/drift read-out — only axes with a baseline AND a later
           re-score appear (the rules exclude the rest). Never a rank. */}
       {evaluation.axisTrends.length > 0 && (
-        <ul
-          data-testid={`pheno-stability-axes-${keeperId}`}
-          className="space-y-0.5 text-[11px]"
-        >
+        <ul data-testid={`pheno-stability-axes-${keeperId}`} className="space-y-0.5 text-[11px]">
           {evaluation.axisTrends.map((t) => (
             <li
               key={t.axisKey}
@@ -142,7 +139,8 @@ export default function PhenoStabilityLedger({
               className="flex items-center justify-between gap-2"
             >
               <span>
-                {t.axisLabel}: {t.baseline} → {t.laterValues.map((v) => (v === null ? "—" : v)).join(", ")}
+                {t.axisLabel}: {t.baseline} →{" "}
+                {t.laterValues.map((v) => (v === null ? "—" : v)).join(", ")}
               </span>
               <span
                 className={`rounded px-1 py-0.5 text-[10px] font-medium ${
@@ -235,7 +233,10 @@ export default function PhenoStabilityLedger({
           </div>
           <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
             {LOUD_TRAIT_AXES.map((axis) => (
-              <label key={axis.key} className="flex items-center gap-1 text-[10px] text-muted-foreground">
+              <label
+                key={axis.key}
+                className="flex items-center gap-1 text-[10px] text-muted-foreground"
+              >
                 <span className="min-w-0 flex-1 truncate" title={axis.label}>
                   {axis.label}
                 </span>
@@ -277,7 +278,10 @@ export default function PhenoStabilityLedger({
       )}
 
       {error && (
-        <p className="text-[11px] text-destructive" data-testid={`pheno-stability-error-${keeperId}`}>
+        <p
+          className="text-[11px] text-destructive"
+          data-testid={`pheno-stability-error-${keeperId}`}
+        >
           {error}
         </p>
       )}

@@ -18,9 +18,7 @@ export type PlantProfilePhotoNormalization =
 
 const MAX_LEN = 2048;
 
-export function normalizePlantProfilePhotoInput(
-  raw: unknown,
-): PlantProfilePhotoNormalization {
+export function normalizePlantProfilePhotoInput(raw: unknown): PlantProfilePhotoNormalization {
   if (typeof raw !== "string") return { ok: true, kind: "clear", photo_url: null };
   const trimmed = raw.trim();
   if (trimmed.length === 0) {

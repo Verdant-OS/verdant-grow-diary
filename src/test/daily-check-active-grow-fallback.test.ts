@@ -73,9 +73,7 @@ describe("Daily Check grow-context precedence", () => {
   });
 
   it("never invents a grow from an out-of-scope plant (null plant grow is not a match)", () => {
-    expect(
-      resolveDailyCheckGrowId({ selectedPlantGrowId: null, urlGrowId: null }),
-    ).toBeNull();
+    expect(resolveDailyCheckGrowId({ selectedPlantGrowId: null, urlGrowId: null })).toBeNull();
   });
 });
 

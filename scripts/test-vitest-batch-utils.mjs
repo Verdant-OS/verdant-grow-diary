@@ -27,10 +27,10 @@ console.log("vitest-batch-utils");
 
 t("sortTestFiles: deterministic ascending sort", () => {
   assert.deepEqual(sortTestFiles(["b", "a", "c"]), ["a", "b", "c"]);
-  assert.deepEqual(
-    sortTestFiles(["src/test/z.test.ts", "src/test/a.test.ts"]),
-    ["src/test/a.test.ts", "src/test/z.test.ts"],
-  );
+  assert.deepEqual(sortTestFiles(["src/test/z.test.ts", "src/test/a.test.ts"]), [
+    "src/test/a.test.ts",
+    "src/test/z.test.ts",
+  ]);
 });
 
 t("sortTestFiles: rejects non-array", () => {
@@ -106,11 +106,7 @@ t("splitIntoChunks: even split", () => {
 });
 
 t("splitIntoChunks: remainder is final chunk", () => {
-  assert.deepEqual(splitIntoChunks(["a", "b", "c", "d", "e"], 2), [
-    ["a", "b"],
-    ["c", "d"],
-    ["e"],
-  ]);
+  assert.deepEqual(splitIntoChunks(["a", "b", "c", "d", "e"], 2), [["a", "b"], ["c", "d"], ["e"]]);
 });
 
 t("splitIntoChunks: chunkSize >= length returns one chunk", () => {
@@ -151,10 +147,7 @@ t("parseBatchArgs: defaults", () => {
 });
 
 t("parseBatchArgs: parses --retry-failed-chunk-once", () => {
-  assert.equal(
-    parseBatchArgs(["--retry-failed-chunk-once"]).retryFailedChunkOnce,
-    true,
-  );
+  assert.equal(parseBatchArgs(["--retry-failed-chunk-once"]).retryFailedChunkOnce, true);
 });
 
 t("parseBatchArgs: parses flags", () => {

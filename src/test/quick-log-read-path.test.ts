@@ -203,10 +203,7 @@ describe("dedupeQuickLogCompanionsFromDiary", () => {
       tent_id: "tent-1",
       plant_id: null,
     };
-    const result = dedupeQuickLogCompanionsFromDiary(
-      [COMPANION, otherDiary],
-      ["ev-1"],
-    );
+    const result = dedupeQuickLogCompanionsFromDiary([COMPANION, otherDiary], ["ev-1"]);
     expect(result.map((r) => r.id)).toEqual(["diary-2"]);
   });
 

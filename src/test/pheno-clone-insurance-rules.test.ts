@@ -72,9 +72,7 @@ describe("evaluateCloneInsurance — status machine", () => {
   });
 
   it("a cull decision suppresses the nudge", () => {
-    const e = evaluateCloneInsurance(
-      candidate({ stage: "flowering", keeperDecision: "cull" }),
-    );
+    const e = evaluateCloneInsurance(candidate({ stage: "flowering", keeperDecision: "cull" }));
     expect(e.status).toBe("not_applicable");
     expect(e.isActionable).toBe(false);
     expect(e.headline).toBe("Marked to cull");
@@ -135,7 +133,12 @@ describe("summarizeCloneInsurance", () => {
     candidate({ candidateId: "p2", candidateNumber: 2, stage: "flowering" }), // at_risk closing (100)
     candidate({ candidateId: "p3", candidateNumber: 3, stage: "preflower" }), // at_risk prime (150)
     candidate({ candidateId: "p4", candidateNumber: 4, stage: "harvest" }), // may_be_lost (200)
-    candidate({ candidateId: "p5", candidateNumber: 5, hasPreservedClone: true, stage: "flowering" }), // insured
+    candidate({
+      candidateId: "p5",
+      candidateNumber: 5,
+      hasPreservedClone: true,
+      stage: "flowering",
+    }), // insured
     candidate({ candidateId: "p6", candidateNumber: 6, stage: "veg", keeperDecision: "keep" }), // at_risk prime (120)
   ];
 
@@ -162,18 +165,20 @@ describe("summarizeCloneInsurance", () => {
 
 describe("cloneInsuranceBannerCopy", () => {
   it("names live risk, past loss, both, or all-clear", () => {
-    expect(cloneInsuranceBannerCopy(summarizeCloneInsurance([candidate({ stage: "flowering" })]))).toMatch(
-      /could be lost at harvest/,
-    );
-    expect(cloneInsuranceBannerCopy(summarizeCloneInsurance([candidate({ stage: "harvest" })]))).toMatch(
-      /still alive/,
-    );
+    expect(
+      cloneInsuranceBannerCopy(summarizeCloneInsurance([candidate({ stage: "flowering" })])),
+    ).toMatch(/could be lost at harvest/);
+    expect(
+      cloneInsuranceBannerCopy(summarizeCloneInsurance([candidate({ stage: "harvest" })])),
+    ).toMatch(/still alive/);
     const both = summarizeCloneInsurance([
       candidate({ candidateId: "a", stage: "flowering" }),
       candidate({ candidateId: "b", stage: "harvest" }),
     ]);
     expect(cloneInsuranceBannerCopy(both)).toMatch(/already harvested/);
-    const clear = summarizeCloneInsurance([candidate({ hasPreservedClone: true, stage: "flowering" })]);
+    const clear = summarizeCloneInsurance([
+      candidate({ hasPreservedClone: true, stage: "flowering" }),
+    ]);
     expect(cloneInsuranceBannerCopy(clear)).toMatch(/has a clone recorded/);
   });
 });

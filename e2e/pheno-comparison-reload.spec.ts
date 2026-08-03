@@ -32,17 +32,11 @@ test("/pheno-comparison survives a full browser reload without crash or blank sc
   // Page mounted again — not a blank body.
   await expect(page.getByTestId("pheno-comparison-page")).toBeVisible();
   await expect(page.getByTestId("pheno-comparison-grid")).toBeVisible();
-  await expect(
-    page.getByTestId("pheno-comparison-read-only-badge"),
-  ).toBeVisible();
-  await expect(
-    page.getByTestId("pheno-comparison-source-legend"),
-  ).toBeVisible();
+  await expect(page.getByTestId("pheno-comparison-read-only-badge")).toBeVisible();
+  await expect(page.getByTestId("pheno-comparison-source-legend")).toBeVisible();
 
   const bodyText = (await page.locator("body").innerText()).trim();
-  expect(bodyText.length, "body must not be blank after reload").toBeGreaterThan(
-    50,
-  );
+  expect(bodyText.length, "body must not be blank after reload").toBeGreaterThan(50);
 
   const cards = page
     .getByTestId("pheno-comparison-grid")

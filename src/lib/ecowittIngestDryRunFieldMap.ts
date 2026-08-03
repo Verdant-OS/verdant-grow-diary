@@ -96,11 +96,7 @@ export function buildEcowittIngestDryRunFieldMap(
       required: true,
       value: snap.source,
       status:
-        snap.source === "invalid"
-          ? "blocked"
-          : snap.source === "degraded"
-            ? "warning"
-            : "mapped",
+        snap.source === "invalid" ? "blocked" : snap.source === "degraded" ? "warning" : "mapped",
       note:
         snap.source === "invalid"
           ? "Invalid source blocks dry-run send."

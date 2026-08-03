@@ -32,18 +32,26 @@ describe("pheno_ingest — trust boundary", () => {
   });
 
   it("gates on BOTH the top-tier and Pheno Hunt Premium entitlements", () => {
-    expect(sql).toMatch(/NOT\s+public\.has_phenoid_entitlement\(uid\)[\s\S]{0,80}'phenoid_tier_required'/i);
-    expect(sql).toMatch(/NOT\s+public\.has_pheno_tracker_entitlement\(uid\)[\s\S]{0,80}'pheno_tracker_required'/i);
+    expect(sql).toMatch(
+      /NOT\s+public\.has_phenoid_entitlement\(uid\)[\s\S]{0,80}'phenoid_tier_required'/i,
+    );
+    expect(sql).toMatch(
+      /NOT\s+public\.has_pheno_tracker_entitlement\(uid\)[\s\S]{0,80}'pheno_tracker_required'/i,
+    );
   });
 
   it("validates the idempotency key and replays prior results", () => {
     expect(sql).toMatch(/length\(p_idempotency_key\)\s*<\s*8/i);
-    expect(sql).toMatch(/FROM\s+public\.phenoid_ingest_idempotency[\s\S]{0,200}idempotency_key\s*=\s*p_idempotency_key/i);
+    expect(sql).toMatch(
+      /FROM\s+public\.phenoid_ingest_idempotency[\s\S]{0,200}idempotency_key\s*=\s*p_idempotency_key/i,
+    );
     expect(sql).toMatch(/'reused',\s*true/i);
   });
 
   it("writes are atomic under one BEGIN/EXCEPTION block", () => {
-    expect(sql).toMatch(/BEGIN[\s\S]*EXCEPTION[\s\S]*?WHEN\s+OTHERS\s+THEN[\s\S]{0,200}'ingest_failed'/i);
+    expect(sql).toMatch(
+      /BEGIN[\s\S]*EXCEPTION[\s\S]*?WHEN\s+OTHERS\s+THEN[\s\S]{0,200}'ingest_failed'/i,
+    );
     // SQLSTATE only — never SQLERRM.
     expect(sql).toMatch(/'sqlstate',\s*SQLSTATE/i);
     expect(sql).not.toMatch(/\bSQLERRM\b/);
@@ -69,8 +77,12 @@ describe("pheno_ingest — trust boundary", () => {
   });
 
   it("grants EXECUTE to authenticated only (revoked from PUBLIC, no anon)", () => {
-    expect(sql).toMatch(/REVOKE\s+ALL\s+ON\s+FUNCTION\s+public\.pheno_ingest\(text,\s*jsonb\)\s+FROM\s+PUBLIC/i);
-    expect(sql).toMatch(/GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.pheno_ingest\(text,\s*jsonb\)\s+TO\s+authenticated/i);
+    expect(sql).toMatch(
+      /REVOKE\s+ALL\s+ON\s+FUNCTION\s+public\.pheno_ingest\(text,\s*jsonb\)\s+FROM\s+PUBLIC/i,
+    );
+    expect(sql).toMatch(
+      /GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.pheno_ingest\(text,\s*jsonb\)\s+TO\s+authenticated/i,
+    );
     expect(sql).not.toMatch(/pheno_ingest[\s\S]{0,120}TO\s+anon\b/i);
   });
 

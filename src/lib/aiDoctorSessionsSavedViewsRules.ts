@@ -20,10 +20,7 @@ import {
  * Used in the delete-confirmation dialog so growers can verify what
  * they're about to remove. Pure: no side effects.
  */
-export function formatSavedViewSummary(
-  filters: SessionsIndexFilters,
-  page: number,
-): string {
+export function formatSavedViewSummary(filters: SessionsIndexFilters, page: number): string {
   const parts: string[] = [];
   if (isFiltersActive(filters)) {
     parts.push(...formatActiveFilterLabels(filters));
@@ -140,10 +137,8 @@ interface BuildSavedViewInput {
 export function addSavedView(input: BuildSavedViewInput): SaveViewResult {
   const label = normalizeLabel(input.label);
   if (label.length === 0) return { ok: false, error: "empty-label" };
-  if (label.length > SAVED_VIEW_MAX_LABEL_LENGTH)
-    return { ok: false, error: "label-too-long" };
-  if (input.existing.length >= SAVED_VIEWS_MAX)
-    return { ok: false, error: "limit-reached" };
+  if (label.length > SAVED_VIEW_MAX_LABEL_LENGTH) return { ok: false, error: "label-too-long" };
+  if (input.existing.length >= SAVED_VIEWS_MAX) return { ok: false, error: "limit-reached" };
 
   const labelKey = label.toLowerCase();
   if (input.existing.some((v) => v.label.toLowerCase() === labelKey))
@@ -326,7 +321,6 @@ export function matchingBuiltInSavedViewId(
   return null;
 }
 
-
 // ---------------- export / import ----------------
 
 export const SAVED_VIEWS_EXPORT_VERSION = 1;
@@ -342,10 +336,7 @@ export interface SavedViewsExportPayload {
  * (those are regenerated on import) and never includes user identifiers,
  * tokens, or database row ids.
  */
-export function exportSavedViewsToJson(
-  views: SavedView[],
-  now: Date = new Date(),
-): string {
+export function exportSavedViewsToJson(views: SavedView[], now: Date = new Date()): string {
   const payload: SavedViewsExportPayload = {
     version: SAVED_VIEWS_EXPORT_VERSION,
     exportedAt: now.toISOString(),
@@ -359,11 +350,7 @@ export function exportSavedViewsToJson(
   return JSON.stringify(payload, null, 2);
 }
 
-export type ImportError =
-  | "empty-input"
-  | "invalid-json"
-  | "wrong-shape"
-  | "no-valid-views";
+export type ImportError = "empty-input" | "invalid-json" | "wrong-shape" | "no-valid-views";
 
 export interface ImportResult {
   ok: boolean;
@@ -425,9 +412,7 @@ export function importSavedViewsFromJson(input: ImportInput): ImportResult {
     const it = item as Record<string, unknown>;
     const label = typeof it.label === "string" ? it.label : "";
     const filtersInput =
-      it.filters && typeof it.filters === "object"
-        ? (it.filters as Record<string, unknown>)
-        : {};
+      it.filters && typeof it.filters === "object" ? (it.filters as Record<string, unknown>) : {};
     const filters = parseFilters(filtersInput);
     const page =
       typeof it.page === "number" && Number.isFinite(it.page) && it.page >= 0
@@ -460,4 +445,3 @@ export function importSavedViewsFromJson(input: ImportInput): ImportResult {
   }
   return { ok: true, views: merged, added, skipped };
 }
-

@@ -14,12 +14,8 @@ import { listTsFilesCached, readFileCached } from "./helpers/cachedSrcTextScan";
 import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
 installScannerGuardrail({ file: __filename });
 
-
 const ROOT = resolve(__dirname, "../..");
-const DOC_PATH = resolve(
-  ROOT,
-  "docs/pi-ingest-server-secret-resolver-contract.md",
-);
+const DOC_PATH = resolve(ROOT, "docs/pi-ingest-server-secret-resolver-contract.md");
 const DOC = existsSync(DOC_PATH) ? readFileSync(DOC_PATH, "utf8") : "";
 
 describe("pi-ingest server secret resolver — contract doc", () => {
@@ -34,18 +30,9 @@ describe("pi-ingest server secret resolver — contract doc", () => {
     ["mentions secret_key_version", /secret_key_version/],
     ["mentions secret_status", /secret_status/],
     ["mentions bridge_id", /bridge_id/],
-    [
-      "server-side only",
-      /only[\s\S]{0,20}inside\s+the\s+future\s+Supabase\s+Edge\s+Function/i,
-    ],
-    [
-      "no React components",
-      /MUST\s+NOT\s+run[\s\S]{0,200}React\s+components?/i,
-    ],
-    [
-      "no browser/client bundles",
-      /MUST\s+NOT\s+run[\s\S]{0,200}browser\/client\s+bundles?/i,
-    ],
+    ["server-side only", /only[\s\S]{0,20}inside\s+the\s+future\s+Supabase\s+Edge\s+Function/i],
+    ["no React components", /MUST\s+NOT\s+run[\s\S]{0,200}React\s+components?/i],
+    ["no browser/client bundles", /MUST\s+NOT\s+run[\s\S]{0,200}browser\/client\s+bundles?/i],
     [
       "no shared src/lib pure modules",
       /MUST\s+NOT\s+run[\s\S]{0,200}shared\s+`?src\/lib`?\s+pure\s+modules?/i,
@@ -61,14 +48,8 @@ describe("pi-ingest server secret resolver — contract doc", () => {
       "secret never cached across requests",
       /(never[\s\S]{0,40}cache|cach\w*[\s\S]{0,80}outlives\s+the\s+request)/i,
     ],
-    [
-      "unknown key version fails closed",
-      /Unknown\s+key\s+version[\s\S]{0,80}reject/i,
-    ],
-    [
-      "missing env key fails closed",
-      /Missing\s+env\s+key[\s\S]{0,80}reject/i,
-    ],
+    ["unknown key version fails closed", /Unknown\s+key\s+version[\s\S]{0,80}reject/i],
+    ["missing env key fails closed", /Missing\s+env\s+key[\s\S]{0,80}reject/i],
     [
       "decrypt error fails closed without leaking",
       /Decryption\s+error[\s\S]{0,80}without\s+leaking/i,
@@ -81,10 +62,7 @@ describe("pi-ingest server secret resolver — contract doc", () => {
       "failed resolution records zero idempotency keys",
       /Records\s+\*?\*?zero\*?\*?\s+`?pi_ingest_idempotency_keys`?\s+rows/i,
     ],
-    [
-      "key version mapping references env vars",
-      /PI_INGEST_SECRET_KEY_V1/,
-    ],
+    ["key version mapping references env vars", /PI_INGEST_SECRET_KEY_V1/],
     [
       "forbids mapping secret_hash to BridgeCredential.secret",
       /Mapping\s+`?secret_hash`?\s+to\s+`?BridgeCredential\.secret`?/i,
@@ -112,16 +90,10 @@ describe("pi-ingest server secret resolver — repo guardrails", () => {
       const base = f.split("/").pop() ?? "";
       const isTypesOnly = /Types\.ts$/.test(base);
       const looksLikeResolver =
-        /ServerSecretResolver|BridgeSecretResolver|BridgeCredentialResolver/.test(
-          base,
-        );
-      expect(
-        looksLikeResolver && !isTypesOnly,
-        `unexpected secret resolver: ${f}`,
-      ).toBe(false);
+        /ServerSecretResolver|BridgeSecretResolver|BridgeCredentialResolver/.test(base);
+      expect(looksLikeResolver && !isTypesOnly, `unexpected secret resolver: ${f}`).toBe(false);
     }
   });
-
 
   it("pi-ingest-readings Edge Function, if present, performs no decryption inline", () => {
     const fn = resolve(ROOT, "supabase/functions/pi-ingest-readings/index.ts");
@@ -147,12 +119,8 @@ describe("pi-ingest server secret resolver — repo guardrails", () => {
     const files = listTsFilesCached(resolve(ROOT, "src")).filter((p) => p !== SELF);
     for (const f of files) {
       const text = readFileCached(f);
-      expect(text, `crypto.subtle.decrypt in ${f}`).not.toMatch(
-        /crypto\.subtle\.decrypt\s*\(/,
-      );
-      expect(text, `createDecipheriv in ${f}`).not.toMatch(
-        /\bcreateDecipheriv\s*\(/,
-      );
+      expect(text, `crypto.subtle.decrypt in ${f}`).not.toMatch(/crypto\.subtle\.decrypt\s*\(/);
+      expect(text, `createDecipheriv in ${f}`).not.toMatch(/\bcreateDecipheriv\s*\(/);
     }
   });
 
@@ -178,4 +146,3 @@ describe("pi-ingest server secret resolver — repo guardrails", () => {
     }
   });
 });
-

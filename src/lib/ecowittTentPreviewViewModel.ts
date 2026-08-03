@@ -1,10 +1,7 @@
 // Pure presenter view model for the read-only EcoWitt tent preview.
 // Converts a canonical snapshot into display-ready rows. No I/O.
 
-import {
-  CanonicalEcowittTentSnapshot,
-  redactEcowittPayload,
-} from "./ecowittTentSnapshot";
+import { CanonicalEcowittTentSnapshot, redactEcowittPayload } from "./ecowittTentSnapshot";
 
 export const ECOWITT_TENT_PREVIEW_READ_ONLY_COPY =
   "Read-only preview. No database writes." as const;

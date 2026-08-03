@@ -46,8 +46,7 @@ export default function SensorsIngestNormalizer() {
     } catch (err) {
       setState({
         kind: "json-error",
-        parseError:
-          err instanceof Error ? `Invalid JSON — ${err.message}` : "Invalid JSON",
+        parseError: err instanceof Error ? `Invalid JSON — ${err.message}` : "Invalid JSON",
       });
       return;
     }
@@ -78,16 +77,12 @@ export default function SensorsIngestNormalizer() {
         aria-labelledby="webhook-normalizer-input-heading"
         className="rounded-lg border border-border bg-card p-4"
       >
-        <h2
-          id="webhook-normalizer-input-heading"
-          className="mb-2 text-sm font-semibold"
-        >
+        <h2 id="webhook-normalizer-input-heading" className="mb-2 text-sm font-semibold">
           Payload
         </h2>
         <p className="mb-3 text-xs text-muted-foreground">
-          This tool runs entirely in your browser. It never sends network
-          requests, never calls the backend, and never writes any data. No
-          new endpoint is created by this screen.
+          This tool runs entirely in your browser. It never sends network requests, never calls the
+          backend, and never writes any data. No new endpoint is created by this screen.
         </p>
 
         <div className="mb-3 flex flex-wrap gap-2" data-testid="webhook-normalizer-examples">
@@ -121,11 +116,7 @@ export default function SensorsIngestNormalizer() {
         />
 
         <div className="mt-3 flex gap-2">
-          <Button
-            type="button"
-            onClick={handleParse}
-            data-testid="webhook-normalizer-parse"
-          >
+          <Button type="button" onClick={handleParse} data-testid="webhook-normalizer-parse">
             Parse
           </Button>
           <Button
@@ -165,11 +156,7 @@ export default function SensorsIngestNormalizer() {
   );
 }
 
-function NormalizationResult({
-  explanation,
-}: {
-  explanation: WebhookNormalizationExplanation;
-}) {
+function NormalizationResult({ explanation }: { explanation: WebhookNormalizationExplanation }) {
   return (
     <section
       aria-labelledby="webhook-normalizer-results-heading"
@@ -191,9 +178,9 @@ function NormalizationResult({
         data-testid="webhook-normalizer-disclaimer"
       >
         <p className="text-xs text-muted-foreground">
-          <strong>Preview only.</strong> This payload has not been ingested.
-          The normalizer here is the same pure helper used server-side, but
-          no row is written and no edge function is called.
+          <strong>Preview only.</strong> This payload has not been ingested. The normalizer here is
+          the same pure helper used server-side, but no row is written and no edge function is
+          called.
         </p>
       </div>
 
@@ -218,16 +205,15 @@ function NormalizationResult({
               <span data-testid="webhook-normalizer-source-raw">
                 {String(explanation.source.raw ?? "—")}
               </span>
-              <span aria-hidden className="mx-1 opacity-60">→</span>
+              <span aria-hidden className="mx-1 opacity-60">
+                →
+              </span>
               <span data-testid="webhook-normalizer-source-canonical">
                 {explanation.source.canonical ?? "—"}
               </span>
             </div>
             {explanation.source.reason ? (
-              <div
-                className="mt-1 text-destructive"
-                data-testid="webhook-normalizer-source-reason"
-              >
+              <div className="mt-1 text-destructive" data-testid="webhook-normalizer-source-reason">
                 {explanation.source.reason}
               </div>
             ) : null}
@@ -243,7 +229,9 @@ function NormalizationResult({
               <span data-testid="webhook-normalizer-vendor-raw">
                 {String(explanation.vendor.raw ?? "—")}
               </span>
-              <span aria-hidden className="mx-1 opacity-60">→</span>
+              <span aria-hidden className="mx-1 opacity-60">
+                →
+              </span>
               <span data-testid="webhook-normalizer-vendor-canonical">
                 {explanation.vendor.canonical ?? "—"}
               </span>
@@ -251,7 +239,6 @@ function NormalizationResult({
           </div>
         </dl>
       </div>
-
 
       <FieldList
         title="Accepted fields"
@@ -312,9 +299,8 @@ function NormalizationResult({
             </span>
           </h3>
           <p className="mb-2 text-xs text-muted-foreground">
-            These keys were present in the payload but the server treats
-            them as untrusted. They are stripped from{" "}
-            <code>raw_payload</code> and never used to set the row owner.
+            These keys were present in the payload but the server treats them as untrusted. They are
+            stripped from <code>raw_payload</code> and never used to set the row owner.
           </p>
           <ul
             className="list-disc space-y-1 pl-5 text-xs"
@@ -330,10 +316,9 @@ function NormalizationResult({
       <div className="rounded-lg border border-border bg-card p-4">
         <h3 className="mb-2 text-sm font-semibold">Sanitized raw_payload preview</h3>
         <p className="mb-2 text-xs text-muted-foreground">
-          This is what would be persisted into{" "}
-          <code>sensor_readings.raw_payload</code> after stripping{" "}
-          <code>user_id</code> and auth-like fields. Vendor lineage is
-          preserved here for traceability only.
+          This is what would be persisted into <code>sensor_readings.raw_payload</code> after
+          stripping <code>user_id</code> and auth-like fields. Vendor lineage is preserved here for
+          traceability only.
         </p>
         <pre
           data-testid="webhook-normalizer-sanitized"
@@ -360,10 +345,7 @@ function FieldList({
   return (
     <div className="rounded-lg border border-border bg-card p-4" data-testid={testId}>
       <h3 className="mb-2 text-sm font-semibold">
-        {title}{" "}
-        <span className="text-xs font-normal text-muted-foreground">
-          ({items.length})
-        </span>
+        {title} <span className="text-xs font-normal text-muted-foreground">({items.length})</span>
       </h3>
       {items.length === 0 ? (
         <p className="text-xs text-muted-foreground">{emptyLabel}</p>

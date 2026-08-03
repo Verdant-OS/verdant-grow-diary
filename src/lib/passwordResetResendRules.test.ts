@@ -52,13 +52,7 @@ describe("passwordResetResendRules", () => {
 
     it("falls back to the default cooldown when given an invalid value", () => {
       const now = Date.now();
-      expect(
-        canResendResetEmail(
-          now,
-          now - DEFAULT_RESET_EMAIL_COOLDOWN_MS / 2,
-          -1,
-        ),
-      ).toBe(false);
+      expect(canResendResetEmail(now, now - DEFAULT_RESET_EMAIL_COOLDOWN_MS / 2, -1)).toBe(false);
     });
   });
 

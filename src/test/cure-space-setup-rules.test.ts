@@ -47,12 +47,12 @@ describe("validateCureSpaceSetupDetails", () => {
   });
 
   it("rejects invalid buffer_pack_rh", () => {
-    expect(
-      validateCureSpaceSetupDetails({ buffer_pack_rh: 120 }).errors.buffer_pack_rh,
-    ).toBe("invalid_range");
-    expect(
-      validateCureSpaceSetupDetails({ buffer_pack_rh: "abc" }).errors.buffer_pack_rh,
-    ).toBe("invalid_number");
+    expect(validateCureSpaceSetupDetails({ buffer_pack_rh: 120 }).errors.buffer_pack_rh).toBe(
+      "invalid_range",
+    );
+    expect(validateCureSpaceSetupDetails({ buffer_pack_rh: "abc" }).errors.buffer_pack_rh).toBe(
+      "invalid_number",
+    );
   });
 
   it("rejects invalid buffer_install_date", () => {
@@ -68,9 +68,9 @@ describe("validateCureSpaceSetupDetails", () => {
     expect(validateCureSpaceSetupDetails({ stack_delta_t_c: -2 }).value.stack_delta_t_c).toBe(-2);
     expect(validateCureSpaceSetupDetails({ stack_delta_t_c: 0 }).value.stack_delta_t_c).toBe(0);
     expect(validateCureSpaceSetupDetails({ stack_delta_t_c: 5 }).value.stack_delta_t_c).toBe(5);
-    expect(
-      validateCureSpaceSetupDetails({ stack_delta_t_c: 999 }).errors.stack_delta_t_c,
-    ).toBe("invalid_range");
+    expect(validateCureSpaceSetupDetails({ stack_delta_t_c: 999 }).errors.stack_delta_t_c).toBe(
+      "invalid_range",
+    );
   });
 
   it("normalizes enums", () => {

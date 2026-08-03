@@ -1,9 +1,6 @@
 import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
-import {
-  buildPriorityQueue,
-  type LeadPriorityQueueItem,
-} from "@/lib/leadPriorityQueueRules";
+import { buildPriorityQueue, type LeadPriorityQueueItem } from "@/lib/leadPriorityQueueRules";
 import type { LeadNextActionPriority } from "@/lib/leadNextActionRules";
 import type { LeadRow } from "@/hooks/useLeadsList";
 
@@ -46,9 +43,7 @@ export default function LeadPriorityQueuePanel({
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Priority Queue
         </h3>
-        <p className="mt-2 text-sm text-muted-foreground">
-          No leads to prioritise.
-        </p>
+        <p className="mt-2 text-sm text-muted-foreground">No leads to prioritise.</p>
       </div>
     );
   }
@@ -88,17 +83,12 @@ function QueueRow({
   const Inner = (
     <div className="flex w-full items-start justify-between gap-2">
       <div className="min-w-0">
-        <div className="truncate font-medium text-foreground">
-          {item.label}
-        </div>
+        <div className="truncate font-medium text-foreground">{item.label}</div>
         <div className="text-xs text-muted-foreground">
           {item.actionLabel} — {item.reason}
         </div>
         {item.warnings.length > 0 && (
-          <div
-            className="mt-1 text-xs text-destructive"
-            data-testid="queue-row-warnings"
-          >
+          <div className="mt-1 text-xs text-destructive" data-testid="queue-row-warnings">
             {item.warnings.join("; ")}
           </div>
         )}
@@ -116,11 +106,7 @@ function QueueRow({
       data-testid="lead-priority-queue-item"
     >
       {interactive ? (
-        <button
-          type="button"
-          onClick={() => onSelect?.(item.leadId)}
-          className="w-full text-left"
-        >
+        <button type="button" onClick={() => onSelect?.(item.leadId)} className="w-full text-left">
           {Inner}
         </button>
       ) : (

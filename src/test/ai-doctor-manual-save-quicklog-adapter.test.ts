@@ -9,9 +9,7 @@ import { buildAiDoctorManualSaveDraft } from "@/lib/aiDoctorManualSaveDraft";
 import { buildAiDoctorQuickLogSavePayload } from "@/lib/aiDoctorManualSaveQuickLogAdapter";
 import type { AiDoctorCheckInPreviewView } from "@/lib/aiDoctorCheckInPreviewViewModel";
 
-function makeView(
-  overrides: Partial<AiDoctorCheckInPreviewView> = {},
-): AiDoctorCheckInPreviewView {
+function makeView(overrides: Partial<AiDoctorCheckInPreviewView> = {}): AiDoctorCheckInPreviewView {
   return {
     notices: {
       previewOnly: "Preview only — not saved.",
@@ -120,10 +118,7 @@ describe("buildAiDoctorQuickLogSavePayload", () => {
 
   it("static guard: adapter has no Supabase/fetch/RPC imports", async () => {
     const { readFileSync } = await import("node:fs");
-    const src = readFileSync(
-      "src/lib/aiDoctorManualSaveQuickLogAdapter.ts",
-      "utf8",
-    );
+    const src = readFileSync("src/lib/aiDoctorManualSaveQuickLogAdapter.ts", "utf8");
     expect(src).not.toMatch(/integrations\/supabase/);
     expect(src).not.toMatch(/\bfetch\s*\(/);
     expect(src).not.toMatch(/\.rpc\s*\(/);

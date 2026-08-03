@@ -10,11 +10,7 @@ import {
   GROW_REPORT_ENVIRONMENT_CHECKS_TITLE,
 } from "@/lib/growReportEnvironmentCheckViewModel";
 
-const make = (
-  id: string,
-  ts: string,
-  overrides: Record<string, unknown> = {},
-) => ({
+const make = (id: string, ts: string, overrides: Record<string, unknown> = {}) => ({
   id,
   entry_at: ts,
   event_type: "environment",

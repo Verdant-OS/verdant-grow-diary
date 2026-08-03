@@ -32,12 +32,10 @@ export type ReportsReviewItemId =
 /** Short tooltip/help copy for each card type — explains the observable
  *  signal that put the card on the list, without making causal claims. */
 export const REVIEW_ITEM_HELP_TEXT: Record<ReportsReviewItemId, string> = {
-  missing_outcome:
-    "Completed action older than 24 hours with no recorded outcome.",
+  missing_outcome: "Completed action older than 24 hours with no recorded outcome.",
   open_alerts: "Unresolved environment alert for this grow.",
   stale_sensor: "Sensor context is stale or unavailable.",
-  low_sample_learning:
-    "Outcome pattern has too few recorded examples to read confidently.",
+  low_sample_learning: "Outcome pattern has too few recorded examples to read confidently.",
 };
 
 export interface ReportsReviewItem {
@@ -77,9 +75,7 @@ export interface ReportsReviewQueue {
 }
 
 function safeInt(n: unknown): number {
-  return typeof n === "number" && Number.isFinite(n) && n >= 0
-    ? Math.floor(n)
-    : 0;
+  return typeof n === "number" && Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
 }
 
 function parseTs(v: string | null | undefined): number | null {
@@ -105,9 +101,7 @@ function normalizeSeverity(s: string | null): string | null {
   return ALLOWED_SEVERITIES.has(trimmed) ? trimmed : null;
 }
 
-export function buildReportsReviewQueue(
-  input: ReportsReviewQueueInput,
-): ReportsReviewQueue {
+export function buildReportsReviewQueue(input: ReportsReviewQueueInput): ReportsReviewQueue {
   const {
     growId,
     pendingOutcomeReviewCount,
@@ -124,9 +118,7 @@ export function buildReportsReviewQueue(
     lowSampleThreshold,
   } = input;
   const nowMs =
-    typeof input.now === "number" && Number.isFinite(input.now)
-      ? input.now
-      : Date.now();
+    typeof input.now === "number" && Number.isFinite(input.now) ? input.now : Date.now();
 
   const items: ReportsReviewItem[] = [];
 
@@ -138,9 +130,7 @@ export function buildReportsReviewQueue(
         ? actionDetailOutcomePath(firstPendingActionId)
         : growDetailOutcomesPath(growId);
     const oldestMs = parseTs(oldestPendingCompletedAt);
-    const whyParts: string[] = [
-      `${pending} pending review${pending === 1 ? "" : "s"}`,
-    ];
+    const whyParts: string[] = [`${pending} pending review${pending === 1 ? "" : "s"}`];
     if (oldestMs !== null) {
       whyParts.push(`oldest completed ${formatAge(nowMs - oldestMs)}`);
     }
@@ -167,9 +157,7 @@ export function buildReportsReviewQueue(
         : alertsPath(growId);
     const severity = normalizeSeverity(firstOpenAlertSeverity);
     const createdMs = parseTs(firstOpenAlertCreatedAt);
-    const whyParts: string[] = [
-      `${open} open alert${open === 1 ? "" : "s"}`,
-    ];
+    const whyParts: string[] = [`${open} open alert${open === 1 ? "" : "s"}`];
     if (severity) whyParts.push(`latest severity ${severity}`);
     if (createdMs !== null) whyParts.push(`opened ${formatAge(nowMs - createdMs)}`);
     items.push({
@@ -190,9 +178,7 @@ export function buildReportsReviewQueue(
   const latestMs = parseTs(latestSensorCapturedAt);
   const recent = safeInt(recentSensorReadingCount);
   const sensorStale =
-    latestMs === null
-      ? recent === 0
-      : nowMs - latestMs >= STALE_SENSOR_THRESHOLD_MS;
+    latestMs === null ? recent === 0 : nowMs - latestMs >= STALE_SENSOR_THRESHOLD_MS;
   if (sensorStale) {
     const whyThisIsHere =
       latestMs === null

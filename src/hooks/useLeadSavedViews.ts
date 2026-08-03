@@ -49,15 +49,12 @@ export function useLeadSavedViews(): UseLeadSavedViewsResult {
     writeStorage(views);
   }, [views]);
 
-  const saveView = useCallback<UseLeadSavedViewsResult["saveView"]>(
-    (draft) => {
-      const v = buildView(draft);
-      if (!v) return null;
-      setViews((prev) => addView(prev, v));
-      return v;
-    },
-    [],
-  );
+  const saveView = useCallback<UseLeadSavedViewsResult["saveView"]>((draft) => {
+    const v = buildView(draft);
+    if (!v) return null;
+    setViews((prev) => addView(prev, v));
+    return v;
+  }, []);
 
   const renameViewCb = useCallback<UseLeadSavedViewsResult["renameView"]>(
     (id, name) => setViews((prev) => renameView(prev, id, name)),

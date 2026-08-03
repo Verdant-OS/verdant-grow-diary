@@ -42,11 +42,7 @@ const deniedResult: LiveSensorGateResult = {
 describe("PremiumLiveSensorGate", () => {
   it("shows screen-reader-friendly skeleton in loading state and hides children", () => {
     render(
-      <PremiumLiveSensorGate
-        surface="live_sensor_stream"
-        state="loading"
-        result={null}
-      >
+      <PremiumLiveSensorGate surface="live_sensor_stream" state="loading" result={null}>
         {CHILD}
       </PremiumLiveSensorGate>,
     );
@@ -57,11 +53,7 @@ describe("PremiumLiveSensorGate", () => {
 
   it("renders children ONLY when state === allowed and result.ok === true", () => {
     render(
-      <PremiumLiveSensorGate
-        surface="live_sensor_stream"
-        state="allowed"
-        result={allowedResult}
-      >
+      <PremiumLiveSensorGate surface="live_sensor_stream" state="allowed" result={allowedResult}>
         {CHILD}
       </PremiumLiveSensorGate>,
     );
@@ -83,50 +75,32 @@ describe("PremiumLiveSensorGate", () => {
 
   it("renders Pro paywall copy on denied and hides children", () => {
     render(
-      <PremiumLiveSensorGate
-        surface="live_sensor_stream"
-        state="denied"
-        result={deniedResult}
-      >
+      <PremiumLiveSensorGate surface="live_sensor_stream" state="denied" result={deniedResult}>
         {CHILD}
       </PremiumLiveSensorGate>,
     );
     expect(screen.getByText(LIVE_SENSOR_PAYWALL_HEADLINE)).toBeInTheDocument();
-    expect(
-      screen.getByText(LIVE_SENSOR_PAYWALL_UPGRADE_COPY),
-    ).toBeInTheDocument();
+    expect(screen.getByText(LIVE_SENSOR_PAYWALL_UPGRADE_COPY)).toBeInTheDocument();
     expect(screen.queryByTestId("premium-child")).not.toBeInTheDocument();
   });
 
   it("renders safe invalid-request copy and hides children", () => {
     render(
-      <PremiumLiveSensorGate
-        surface="live_sensor_stream"
-        state="invalid_request"
-        result={null}
-      >
+      <PremiumLiveSensorGate surface="live_sensor_stream" state="invalid_request" result={null}>
         {CHILD}
       </PremiumLiveSensorGate>,
     );
-    expect(
-      screen.getByText(PREMIUM_LIVE_SENSOR_INVALID_COPY),
-    ).toBeInTheDocument();
+    expect(screen.getByText(PREMIUM_LIVE_SENSOR_INVALID_COPY)).toBeInTheDocument();
     expect(screen.queryByTestId("premium-child")).not.toBeInTheDocument();
   });
 
   it("renders safe network-error copy and hides children", () => {
     render(
-      <PremiumLiveSensorGate
-        surface="live_sensor_stream"
-        state="network_error"
-        result={null}
-      >
+      <PremiumLiveSensorGate surface="live_sensor_stream" state="network_error" result={null}>
         {CHILD}
       </PremiumLiveSensorGate>,
     );
-    expect(
-      screen.getByText(PREMIUM_LIVE_SENSOR_NETWORK_COPY),
-    ).toBeInTheDocument();
+    expect(screen.getByText(PREMIUM_LIVE_SENSOR_NETWORK_COPY)).toBeInTheDocument();
     expect(screen.queryByTestId("premium-child")).not.toBeInTheDocument();
   });
 

@@ -43,9 +43,7 @@ interface RpcResponse {
 
 export interface UseSaveAiDoctorPhase1TimelineEvidenceApi {
   status: SaveAiDoctorPhase1EvidenceStatus;
-  save: (
-    input: AiDoctorPhase1TimelineDraftInput,
-  ) => Promise<SaveAiDoctorPhase1EvidenceResult>;
+  save: (input: AiDoctorPhase1TimelineDraftInput) => Promise<SaveAiDoctorPhase1EvidenceResult>;
   /** Visible for tests — clears in-session dedupe cache. */
   resetSeen: () => void;
   /** Visible for tests — has a key been seen this session? */
@@ -53,14 +51,11 @@ export interface UseSaveAiDoctorPhase1TimelineEvidenceApi {
 }
 
 export function useSaveAiDoctorPhase1TimelineEvidence(): UseSaveAiDoctorPhase1TimelineEvidenceApi {
-  const [status, setStatus] =
-    useState<SaveAiDoctorPhase1EvidenceStatus>("idle");
+  const [status, setStatus] = useState<SaveAiDoctorPhase1EvidenceStatus>("idle");
   const seenRef = useRef<Set<string>>(new Set());
 
   const save = useCallback(
-    async (
-      input: AiDoctorPhase1TimelineDraftInput,
-    ): Promise<SaveAiDoctorPhase1EvidenceResult> => {
+    async (input: AiDoctorPhase1TimelineDraftInput): Promise<SaveAiDoctorPhase1EvidenceResult> => {
       const draft = buildAiDoctorPhase1TimelineDraft(input);
       if (!isOkPhase1TimelineDraft(draft)) {
         setStatus("blocked");

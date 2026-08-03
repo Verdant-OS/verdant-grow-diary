@@ -496,8 +496,8 @@ function toTentEvidence(t: AnyRow | null): TentEvidence | null {
   if (!t || typeof t.id !== "string") return null;
   const hasTarget = Boolean(
     (t as { target_temp_c?: unknown }).target_temp_c ||
-    (t as { target_rh?: unknown }).target_rh ||
-    (t as { target_vpd?: unknown }).target_vpd,
+      (t as { target_rh?: unknown }).target_rh ||
+      (t as { target_vpd?: unknown }).target_vpd,
   );
   return {
     id: t.id,

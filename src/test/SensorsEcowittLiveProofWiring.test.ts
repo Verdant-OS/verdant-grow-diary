@@ -8,10 +8,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const SOURCE = readFileSync(
-  resolve(process.cwd(), "src/pages/Sensors.tsx"),
-  "utf8",
-);
+const SOURCE = readFileSync(resolve(process.cwd(), "src/pages/Sensors.tsx"), "utf8");
 
 describe("Sensors operator diagnostics — EcoWitt Live Proof wiring", () => {
   it("imports the EcowittLiveProofPanel", () => {
@@ -22,9 +19,7 @@ describe("Sensors operator diagnostics — EcoWitt Live Proof wiring", () => {
 
   it("mounts the panel inside the operator diagnostics section", () => {
     // Operator section is gated by `operator=1` URL param.
-    const operatorSectionIdx = SOURCE.indexOf(
-      'data-testid="sensors-operator-diagnostics"',
-    );
+    const operatorSectionIdx = SOURCE.indexOf('data-testid="sensors-operator-diagnostics"');
     const panelIdx = SOURCE.indexOf("<EcowittLiveProofPanel");
     expect(operatorSectionIdx).toBeGreaterThan(-1);
     expect(panelIdx).toBeGreaterThan(operatorSectionIdx);
@@ -37,15 +32,11 @@ describe("Sensors operator diagnostics — EcoWitt Live Proof wiring", () => {
   });
 
   it("renders the 'currently loaded sensor rows' read-only label", () => {
-    expect(SOURCE).toContain(
-      "Read-only EcoWitt proof from currently loaded sensor rows.",
-    );
+    expect(SOURCE).toContain("Read-only EcoWitt proof from currently loaded sensor rows.");
   });
 
   it("mounts the EcoWitt ingest audit proof panel inside operator diagnostics", () => {
-    const operatorSectionIdx = SOURCE.indexOf(
-      'data-testid="sensors-operator-diagnostics"',
-    );
+    const operatorSectionIdx = SOURCE.indexOf('data-testid="sensors-operator-diagnostics"');
     const auditPanelIdx = SOURCE.indexOf("<EcowittIngestAuditProofPanel");
     expect(operatorSectionIdx).toBeGreaterThan(-1);
     expect(auditPanelIdx).toBeGreaterThan(operatorSectionIdx);
@@ -57,11 +48,8 @@ describe("Sensors operator diagnostics — EcoWitt Live Proof wiring", () => {
     );
   });
 
-
   it("renders proof-unavailable copy when no tent rows are loaded", () => {
-    expect(SOURCE).toContain(
-      "Proof unavailable from currently loaded rows for this tent.",
-    );
+    expect(SOURCE).toContain("Proof unavailable from currently loaded rows for this tent.");
   });
 
   it("does not add a new Supabase write or invoke from this wiring", () => {

@@ -16,7 +16,10 @@ const OWNERSHIP: OwnershipContext = {
 };
 const NOW = new Date("2026-06-04T12:00:00.000Z");
 
-function inputOf(rows: PreviewRowInput[], overrides: Partial<BuildCsvImportPlanInput> = {}): BuildCsvImportPlanInput {
+function inputOf(
+  rows: PreviewRowInput[],
+  overrides: Partial<BuildCsvImportPlanInput> = {},
+): BuildCsvImportPlanInput {
   return {
     filename: "export.csv",
     fileSizeBytes: 1024,
@@ -76,9 +79,7 @@ describe("sensor write draft shape", () => {
   });
 
   it("quality=suspect, confidence=0.6 only for soft flags", () => {
-    const p = buildCsvImportPlan(
-      inputOf([{ ...cleanRow, softFlags: ["mild_drift"] }]),
-    );
+    const p = buildCsvImportPlan(inputOf([{ ...cleanRow, softFlags: ["mild_drift"] }]));
     expect(p.acceptedWrites[0].quality).toBe("suspect");
     expect(p.acceptedWrites[0].raw_payload.confidence).toBe(0.6);
   });

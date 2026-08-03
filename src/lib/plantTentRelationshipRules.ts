@@ -71,10 +71,7 @@ export function getEligibleTentsForPlantMove(
   return { others, current };
 }
 
-export function isPlantAlreadyInTent(
-  plant: Pick<PlantRelRow, "tent_id">,
-  tentId: string,
-): boolean {
+export function isPlantAlreadyInTent(plant: Pick<PlantRelRow, "tent_id">, tentId: string): boolean {
   return plant.tent_id === tentId;
 }
 
@@ -82,10 +79,7 @@ export function isPlantAlreadyInTent(
  * Build the minimal update payload to move a plant to a tent.
  * RLS enforces ownership; this never sets user_id / grow_id / strain / stage.
  */
-export function buildPlantTentMovePayload(
-  _plantId: string,
-  tentId: string,
-): { tent_id: string } {
+export function buildPlantTentMovePayload(_plantId: string, tentId: string): { tent_id: string } {
   return { tent_id: tentId };
 }
 
@@ -93,9 +87,7 @@ export function buildPlantTentMovePayload(
  * Build the minimal update payload to detach a plant from its tent
  * without deleting the plant or its history.
  */
-export function buildRemovePlantFromTentPayload(
-  _plantId: string,
-): { tent_id: null } {
+export function buildRemovePlantFromTentPayload(_plantId: string): { tent_id: null } {
   return { tent_id: null };
 }
 
@@ -103,8 +95,6 @@ export function buildRemovePlantFromTentPayload(
  * Build the minimal update payload to archive (soft-delete) a plant.
  * Diary entries, photos, and sensor readings are intentionally untouched.
  */
-export function buildArchivePlantPayload(
-  _plantId: string,
-): { is_archived: true } {
+export function buildArchivePlantPayload(_plantId: string): { is_archived: true } {
   return { is_archived: true };
 }

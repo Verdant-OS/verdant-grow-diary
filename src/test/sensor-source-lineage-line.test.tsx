@@ -19,9 +19,7 @@ describe("SensorSourceLineageLine", () => {
   it("renders Webhook · Home Assistant", () => {
     render(<SensorSourceLineageLine source="webhook" vendor="home_assistant" />);
     expect(screen.getByTestId("sensor-source-lineage-source").textContent).toBe("Webhook");
-    expect(screen.getByTestId("sensor-source-lineage-vendor").textContent).toBe(
-      "Home Assistant",
-    );
+    expect(screen.getByTestId("sensor-source-lineage-vendor").textContent).toBe("Home Assistant");
   });
 
   it("renders source only when vendor is absent", () => {
@@ -48,8 +46,6 @@ describe("SensorSourceLineageLine", () => {
 
   it("preserves an unknown vendor string verbatim as lineage", () => {
     render(<SensorSourceLineageLine source="mqtt" vendor="future-brand-x" />);
-    expect(screen.getByTestId("sensor-source-lineage-vendor").textContent).toBe(
-      "future-brand-x",
-    );
+    expect(screen.getByTestId("sensor-source-lineage-vendor").textContent).toBe("future-brand-x");
   });
 });

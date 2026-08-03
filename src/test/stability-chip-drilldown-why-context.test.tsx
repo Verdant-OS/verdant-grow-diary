@@ -45,9 +45,7 @@ describe("StabilityChipDrilldown — stage-band why context", () => {
       />,
     );
     open("t-flower");
-    const node = screen.getByTestId(
-      "dashboard-stability-drilldown-t-flower-why-context",
-    );
+    const node = screen.getByTestId("dashboard-stability-drilldown-t-flower-why-context");
     expect(node.textContent).toContain("Flower VPD target: 1.0–1.5 kPa");
     expect(node.getAttribute("data-why-kind")).toBe("stage");
   });
@@ -62,8 +60,7 @@ describe("StabilityChipDrilldown — stage-band why context", () => {
     );
     open("t-veg");
     expect(
-      screen.getByTestId("dashboard-stability-drilldown-t-veg-why-context")
-        .textContent,
+      screen.getByTestId("dashboard-stability-drilldown-t-veg-why-context").textContent,
     ).toContain("Veg VPD target: 0.8–1.2 kPa");
   });
 
@@ -76,9 +73,7 @@ describe("StabilityChipDrilldown — stage-band why context", () => {
       />,
     );
     open("t-unk");
-    const node = screen.getByTestId(
-      "dashboard-stability-drilldown-t-unk-why-context",
-    );
+    const node = screen.getByTestId("dashboard-stability-drilldown-t-unk-why-context");
     expect(node.textContent).toBe("Target context unavailable.");
     expect(node.getAttribute("data-why-kind")).toBe("unavailable");
   });
@@ -92,9 +87,7 @@ describe("StabilityChipDrilldown — stage-band why context", () => {
       />,
     );
     open("t-harv");
-    const node = screen.getByTestId(
-      "dashboard-stability-drilldown-t-harv-why-context",
-    );
+    const node = screen.getByTestId("dashboard-stability-drilldown-t-harv-why-context");
     expect(node.getAttribute("data-why-kind")).toBe("context_only");
     expect(node.textContent).toContain("Harvest");
     expect(node.textContent).toContain("context only");
@@ -110,13 +103,11 @@ describe("StabilityChipDrilldown — stage-band why context", () => {
       />,
     );
     open("t-keep");
+    expect(screen.getByTestId("dashboard-stability-drilldown-t-keep-variant").textContent).toBe(
+      "Outside 24h",
+    );
     expect(
-      screen.getByTestId("dashboard-stability-drilldown-t-keep-variant")
-        .textContent,
-    ).toBe("Outside 24h");
-    expect(
-      screen.getByTestId("dashboard-stability-drilldown-t-keep-why-context")
-        .textContent,
+      screen.getByTestId("dashboard-stability-drilldown-t-keep-why-context").textContent,
     ).toContain("Flower VPD target");
     // Existing 24h numeric fields remain (hours-outside row text).
     expect(screen.getByText("Hours outside band")).toBeTruthy();

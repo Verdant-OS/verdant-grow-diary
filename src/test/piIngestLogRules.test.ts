@@ -192,10 +192,7 @@ describe("redactPiIngestLogRecord", () => {
 });
 
 describe("static safety", () => {
-  const src = readFileSync(
-    resolve(__dirname, "../lib/piIngestLogRules.ts"),
-    "utf8",
-  );
+  const src = readFileSync(resolve(__dirname, "../lib/piIngestLogRules.ts"), "utf8");
   it("does not import Supabase, React, or perform I/O", () => {
     expect(src).not.toMatch(/@\/integrations\/supabase/);
     expect(src).not.toMatch(/from\s+["']react/);

@@ -49,8 +49,8 @@ export function episodeUncertaintyLine(episode: PlantMemoryEpisode): string {
   if (!episode.outcome.status) {
     return "Follow-up is incomplete. More follow-up is needed.";
   }
-  const usable = episode.evidence.sensorSnapshots.some((s) => s.usable) ||
-    episode.evidence.photos.length > 0;
+  const usable =
+    episode.evidence.sensorSnapshots.some((s) => s.usable) || episode.evidence.photos.length > 0;
   if (!usable) {
     return "Evidence is limited. Other factors may have contributed.";
   }
@@ -70,8 +70,10 @@ export function summarizeEpisodeEvidence(episode: PlantMemoryEpisode): EpisodeEv
   const flaggedSensorCount = episode.evidence.sensorSnapshots.length - usableSensorCount;
   const parts: string[] = [];
   if (photoCount > 0) parts.push(`${photoCount} photo${photoCount === 1 ? "" : "s"}`);
-  if (usableSensorCount > 0) parts.push(`${usableSensorCount} sensor reading${usableSensorCount === 1 ? "" : "s"}`);
-  if (flaggedSensorCount > 0) parts.push(`${flaggedSensorCount} flagged reading${flaggedSensorCount === 1 ? "" : "s"}`);
+  if (usableSensorCount > 0)
+    parts.push(`${usableSensorCount} sensor reading${usableSensorCount === 1 ? "" : "s"}`);
+  if (flaggedSensorCount > 0)
+    parts.push(`${flaggedSensorCount} flagged reading${flaggedSensorCount === 1 ? "" : "s"}`);
   return {
     photoCount,
     usableSensorCount,

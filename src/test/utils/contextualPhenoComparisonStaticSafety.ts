@@ -52,41 +52,174 @@ export const CONTEXTUAL_PHENO_COMPARISON_SAFETY_FILES: readonly string[] = [
  */
 export const CONTEXTUAL_PHENO_COMPARISON_CHANGED_FILE_EXTRA: readonly string[] = [];
 
-
-
 export const PHRASE_RULES: readonly PhraseRule[] = [
   // write/API operation
-  { id: "functions-invoke", pattern: /functions\.invoke\b/i, category: "write/API operation", description: "Edge function invoke" },
-  { id: "supabase-insert", pattern: /\.insert\s*\(/i, category: "write/API operation", description: "Supabase insert" },
-  { id: "supabase-update", pattern: /\.update\s*\(/i, category: "write/API operation", description: "Supabase update" },
-  { id: "supabase-delete", pattern: /\.delete\s*\(/i, category: "write/API operation", description: "Supabase delete" },
-  { id: "supabase-upsert", pattern: /\bupsert\s*\(/i, category: "write/API operation", description: "Supabase upsert" },
-  { id: "fetch-call", pattern: /\bfetch\s*\(/i, category: "write/API operation", description: "network fetch" },
+  {
+    id: "functions-invoke",
+    pattern: /functions\.invoke\b/i,
+    category: "write/API operation",
+    description: "Edge function invoke",
+  },
+  {
+    id: "supabase-insert",
+    pattern: /\.insert\s*\(/i,
+    category: "write/API operation",
+    description: "Supabase insert",
+  },
+  {
+    id: "supabase-update",
+    pattern: /\.update\s*\(/i,
+    category: "write/API operation",
+    description: "Supabase update",
+  },
+  {
+    id: "supabase-delete",
+    pattern: /\.delete\s*\(/i,
+    category: "write/API operation",
+    description: "Supabase delete",
+  },
+  {
+    id: "supabase-upsert",
+    pattern: /\bupsert\s*\(/i,
+    category: "write/API operation",
+    description: "Supabase upsert",
+  },
+  {
+    id: "fetch-call",
+    pattern: /\bfetch\s*\(/i,
+    category: "write/API operation",
+    description: "network fetch",
+  },
   // schema/persistence
-  { id: "selection-decisions", pattern: /selection_decisions/i, category: "schema/persistence", description: "blocked selection_decisions schema" },
-  { id: "materialized-view", pattern: /materialized\s+view/i, category: "schema/persistence", description: "blocked materialized view" },
-  { id: "create-policy", pattern: /create\s+policy/i, category: "schema/persistence", description: "RLS policy creation" },
-  { id: "alter-table", pattern: /alter\s+table/i, category: "schema/persistence", description: "schema alteration" },
+  {
+    id: "selection-decisions",
+    pattern: /selection_decisions/i,
+    category: "schema/persistence",
+    description: "blocked selection_decisions schema",
+  },
+  {
+    id: "materialized-view",
+    pattern: /materialized\s+view/i,
+    category: "schema/persistence",
+    description: "blocked materialized view",
+  },
+  {
+    id: "create-policy",
+    pattern: /create\s+policy/i,
+    category: "schema/persistence",
+    description: "RLS policy creation",
+  },
+  {
+    id: "alter-table",
+    pattern: /alter\s+table/i,
+    category: "schema/persistence",
+    description: "schema alteration",
+  },
   // ranking/selection
-  { id: "winner", pattern: /\bwinner\b/i, category: "ranking/selection", description: "ranking language: winner" },
-  { id: "best-pheno", pattern: /\bbest\s+pheno\b/i, category: "ranking/selection", description: "ranking language: best pheno" },
-  { id: "automatically-select", pattern: /\bautomatically\s+select\b/i, category: "ranking/selection", description: "auto-selection" },
-  { id: "auto-select", pattern: /\bauto[ _-]?select\b/i, category: "ranking/selection", description: "auto-selection" },
-  { id: "rank", pattern: /\brank\b/i, category: "ranking/selection", description: "ranking language: rank" },
-  { id: "ranking", pattern: /\branking\b/i, category: "ranking/selection", description: "ranking language: ranking" },
-  { id: "scoreboard", pattern: /\bscoreboard\b/i, category: "ranking/selection", description: "scoreboard" },
+  {
+    id: "winner",
+    pattern: /\bwinner\b/i,
+    category: "ranking/selection",
+    description: "ranking language: winner",
+  },
+  {
+    id: "best-pheno",
+    pattern: /\bbest\s+pheno\b/i,
+    category: "ranking/selection",
+    description: "ranking language: best pheno",
+  },
+  {
+    id: "automatically-select",
+    pattern: /\bautomatically\s+select\b/i,
+    category: "ranking/selection",
+    description: "auto-selection",
+  },
+  {
+    id: "auto-select",
+    pattern: /\bauto[ _-]?select\b/i,
+    category: "ranking/selection",
+    description: "auto-selection",
+  },
+  {
+    id: "rank",
+    pattern: /\brank\b/i,
+    category: "ranking/selection",
+    description: "ranking language: rank",
+  },
+  {
+    id: "ranking",
+    pattern: /\branking\b/i,
+    category: "ranking/selection",
+    description: "ranking language: ranking",
+  },
+  {
+    id: "scoreboard",
+    pattern: /\bscoreboard\b/i,
+    category: "ranking/selection",
+    description: "scoreboard",
+  },
   // certainty/overclaiming
-  { id: "guaranteed", pattern: /\bguaranteed\b/i, category: "certainty/overclaiming", description: "certainty language" },
-  { id: "definitely", pattern: /\bdefinitely\b/i, category: "certainty/overclaiming", description: "certainty language" },
-  { id: "certain", pattern: /\bcertain\b/i, category: "certainty/overclaiming", description: "certainty language" },
+  {
+    id: "guaranteed",
+    pattern: /\bguaranteed\b/i,
+    category: "certainty/overclaiming",
+    description: "certainty language",
+  },
+  {
+    id: "definitely",
+    pattern: /\bdefinitely\b/i,
+    category: "certainty/overclaiming",
+    description: "certainty language",
+  },
+  {
+    id: "certain",
+    pattern: /\bcertain\b/i,
+    category: "certainty/overclaiming",
+    description: "certainty language",
+  },
   // device-control/dosing
-  { id: "device-command", pattern: /\bdevice\s+command\b/i, category: "device-control/dosing", description: "device control" },
-  { id: "automatically-control", pattern: /\bautomatically\s+control\b/i, category: "device-control/dosing", description: "device control" },
-  { id: "set-fan", pattern: /\bset\s+fan\b/i, category: "device-control/dosing", description: "device control" },
-  { id: "set-light", pattern: /\bset\s+light\b/i, category: "device-control/dosing", description: "device control" },
-  { id: "set-irrigation", pattern: /\bset\s+irrigation\b/i, category: "device-control/dosing", description: "device control" },
-  { id: "dose-nutrients", pattern: /\bdose\s+nutrients\b/i, category: "device-control/dosing", description: "device control" },
-  { id: "apply-pesticide", pattern: /\bapply\s+pesticide\b/i, category: "device-control/dosing", description: "device control" },
+  {
+    id: "device-command",
+    pattern: /\bdevice\s+command\b/i,
+    category: "device-control/dosing",
+    description: "device control",
+  },
+  {
+    id: "automatically-control",
+    pattern: /\bautomatically\s+control\b/i,
+    category: "device-control/dosing",
+    description: "device control",
+  },
+  {
+    id: "set-fan",
+    pattern: /\bset\s+fan\b/i,
+    category: "device-control/dosing",
+    description: "device control",
+  },
+  {
+    id: "set-light",
+    pattern: /\bset\s+light\b/i,
+    category: "device-control/dosing",
+    description: "device control",
+  },
+  {
+    id: "set-irrigation",
+    pattern: /\bset\s+irrigation\b/i,
+    category: "device-control/dosing",
+    description: "device control",
+  },
+  {
+    id: "dose-nutrients",
+    pattern: /\bdose\s+nutrients\b/i,
+    category: "device-control/dosing",
+    description: "device control",
+  },
+  {
+    id: "apply-pesticide",
+    pattern: /\bapply\s+pesticide\b/i,
+    category: "device-control/dosing",
+    description: "device control",
+  },
 ];
 
 const HEALTHY_RE = /\bhealthy\b/i;
@@ -184,9 +317,7 @@ export function sanitizeAnnotationMessage(text: string, max = MAX_EXCERPT_LEN): 
 
 /** Format one finding as a GitHub Actions error annotation line. */
 export function formatGithubAnnotation(f: Finding): string {
-  const msg = sanitizeAnnotationMessage(
-    `[${f.category}] "${f.phrase}" — ${f.excerpt}`,
-  );
+  const msg = sanitizeAnnotationMessage(`[${f.category}] "${f.phrase}" — ${f.excerpt}`);
   const linePart = Number.isFinite(f.line) && f.line > 0 ? `,line=${f.line}` : "";
   return `::error file=${f.file}${linePart},title=Contextual Pheno Comparison safety::${msg}`;
 }
@@ -218,9 +349,7 @@ const CONTEXTUAL_PHENO_PATH_RE =
  * Contextual Pheno Comparison static safety surface. Deterministic,
  * stable order, deduped.
  */
-export function filterChangedContextualPhenoFiles(
-  changed: readonly string[],
-): string[] {
+export function filterChangedContextualPhenoFiles(changed: readonly string[]): string[] {
   const allow = new Set<string>([
     ...CONTEXTUAL_PHENO_COMPARISON_SAFETY_FILES,
     ...CONTEXTUAL_PHENO_COMPARISON_CHANGED_FILE_EXTRA,
@@ -270,7 +399,10 @@ export interface FindingJsonRow {
 function sanitizeSnippet(text: string, max: number): string {
   // Remove all C0 control chars (incl. \n, \r, \t) and DEL.
   // eslint-disable-next-line no-control-regex
-  const cleaned = text.replace(/[\x00-\x1f\x7f]/g, " ").replace(/\s+/g, " ").trim();
+  const cleaned = text
+    .replace(/[\x00-\x1f\x7f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   return truncate(cleaned, max);
 }
 
@@ -301,4 +433,3 @@ export function formatFindingsJson(
     });
   return JSON.stringify(rows);
 }
-

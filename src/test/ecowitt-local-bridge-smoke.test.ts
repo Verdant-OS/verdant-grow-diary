@@ -81,15 +81,14 @@ describe("runSmoke", () => {
 
   it("PASS when fake payload arrives on MQTT", async () => {
     const fetchImpl = async () => new Response("ok", { status: 200 });
-    const subscribe = async (
-      _u: string,
-      _t: string,
-      onMessage: (p: string) => void,
-    ) => {
+    const subscribe = async (_u: string, _t: string, onMessage: (p: string) => void) => {
       setTimeout(() => onMessage(fakePayloadJson), 10);
       return { close: async () => {} };
     };
-    const res = await runSmoke({ timeoutMs: 500 }, { fetchImpl: fetchImpl as unknown as typeof fetch, subscribe });
+    const res = await runSmoke(
+      { timeoutMs: 500 },
+      { fetchImpl: fetchImpl as unknown as typeof fetch, subscribe },
+    );
     expect(res.ok).toBe(true);
     expect(res.matched).toBe(true);
   });
@@ -99,7 +98,10 @@ describe("runSmoke", () => {
       throw new Error("ECONNREFUSED");
     };
     const subscribe = async () => ({ close: async () => {} });
-    const res = await runSmoke({ timeoutMs: 100 }, { fetchImpl: fetchImpl as unknown as typeof fetch, subscribe });
+    const res = await runSmoke(
+      { timeoutMs: 100 },
+      { fetchImpl: fetchImpl as unknown as typeof fetch, subscribe },
+    );
     expect(res.ok).toBe(false);
     expect(res.reason).toMatch(/bridge_down/);
     expect(res.reason).toMatch(/dev:ecowitt-http-bridge/);
@@ -110,7 +112,10 @@ describe("runSmoke", () => {
     const subscribe = async () => {
       throw new Error("broker down");
     };
-    const res = await runSmoke({ timeoutMs: 100 }, { fetchImpl: fetchImpl as unknown as typeof fetch, subscribe });
+    const res = await runSmoke(
+      { timeoutMs: 100 },
+      { fetchImpl: fetchImpl as unknown as typeof fetch, subscribe },
+    );
     expect(res.ok).toBe(false);
     expect(res.reason).toMatch(/mqtt_unreachable/);
   });
@@ -118,7 +123,10 @@ describe("runSmoke", () => {
   it("FAIL when no MQTT message arrives in time", async () => {
     const fetchImpl = async () => new Response("ok", { status: 200 });
     const subscribe = async () => ({ close: async () => {} });
-    const res = await runSmoke({ timeoutMs: 100 }, { fetchImpl: fetchImpl as unknown as typeof fetch, subscribe });
+    const res = await runSmoke(
+      { timeoutMs: 100 },
+      { fetchImpl: fetchImpl as unknown as typeof fetch, subscribe },
+    );
     expect(res.ok).toBe(false);
     expect(res.reason).toMatch(/no_mqtt_message/);
   });

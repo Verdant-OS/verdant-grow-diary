@@ -69,9 +69,7 @@ export function calibrateSoilMoisture(
   const max = Math.max(dr, wr);
   const isInverted = dr > wr;
 
-  const percent = isInverted
-    ? ((max - rv) / (max - min)) * 100
-    : ((rv - min) / (max - min)) * 100;
+  const percent = isInverted ? ((max - rv) / (max - min)) * 100 : ((rv - min) / (max - min)) * 100;
 
   const clamped = Math.max(0, Math.min(100, percent));
   const calibratedValue = Math.round(clamped * 10) / 10;

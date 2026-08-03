@@ -117,17 +117,13 @@ describe("FounderOwnerPrefsForm — invoke happy path", () => {
     await waitFor(() => expect(invokeSpy).toHaveBeenCalled());
     expect(refetchSpy).not.toHaveBeenCalled();
     expect(await screen.findByRole("alert")).toHaveTextContent(/update_failed/);
-    expect(toastSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "destructive" }),
-    );
+    expect(toastSpy).toHaveBeenCalledWith(expect.objectContaining({ variant: "destructive" }));
   });
 
   it("locks the form for refunded seats", async () => {
     mockRow = { ...(mockRow as MyFounderRow), status: "refunded" };
     render(<FounderOwnerPrefsForm />);
-    expect(
-      screen.getByRole("button", { name: /save founder settings/i }),
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: /save founder settings/i })).toBeDisabled();
     expect(screen.getByText(/refunded/i)).toBeInTheDocument();
   });
 });

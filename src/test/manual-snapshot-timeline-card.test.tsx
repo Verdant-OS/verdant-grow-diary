@@ -38,9 +38,8 @@ describe("ManualSnapshotTimelineCard", () => {
 
   it("never includes live / synced / connected / imported language", () => {
     render(<ManualSnapshotTimelineCard card={mkCard()} />);
-    const text = screen
-      .getByTestId("manual-snapshot-timeline-card")
-      .textContent?.toLowerCase() ?? "";
+    const text =
+      screen.getByTestId("manual-snapshot-timeline-card").textContent?.toLowerCase() ?? "";
     expect(text).not.toMatch(/\blive\b/);
     expect(text).not.toMatch(/\bsynced\b/);
     expect(text).not.toMatch(/\bconnected\b/);
@@ -49,16 +48,14 @@ describe("ManualSnapshotTimelineCard", () => {
 
   it("shows captured_at and readings", () => {
     render(<ManualSnapshotTimelineCard card={mkCard()} />);
-    const capturedAt = screen.getByTestId(
-      "manual-snapshot-timeline-card-captured-at",
-    );
+    const capturedAt = screen.getByTestId("manual-snapshot-timeline-card-captured-at");
     // Formatter renders a localized human string — never raw ISO.
     expect(capturedAt.textContent ?? "").toMatch(/2026/);
     expect(capturedAt.textContent ?? "").not.toMatch(/T\d{2}:\d{2}/);
     expect(capturedAt.textContent ?? "").not.toMatch(/\.\d{3,}/);
-    expect(
-      screen.getAllByTestId("manual-snapshot-timeline-card-reading").length,
-    ).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("manual-snapshot-timeline-card-reading").length).toBeGreaterThan(
+      0,
+    );
   });
 
   it("renders validation warnings when present", () => {
@@ -70,19 +67,15 @@ describe("ManualSnapshotTimelineCard", () => {
       }),
     });
     render(<ManualSnapshotTimelineCard card={card} />);
-    expect(
-      screen.getAllByTestId("manual-snapshot-timeline-card-warning").length,
-    ).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("manual-snapshot-timeline-card-warning").length).toBeGreaterThan(
+      0,
+    );
   });
 
   it("renders notes when provided", () => {
-    render(
-      <ManualSnapshotTimelineCard
-        card={mkCard({ notes: "tent at lights-on" })}
-      />,
+    render(<ManualSnapshotTimelineCard card={mkCard({ notes: "tent at lights-on" })} />);
+    expect(screen.getByTestId("manual-snapshot-timeline-card-notes")).toHaveTextContent(
+      "tent at lights-on",
     );
-    expect(
-      screen.getByTestId("manual-snapshot-timeline-card-notes"),
-    ).toHaveTextContent("tent at lights-on");
   });
 });

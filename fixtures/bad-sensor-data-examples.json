@@ -23,7 +23,11 @@
       "expected_state": "stale",
       "expected_ui_behavior": "Render value with 'Stale' badge and captured_at. Exclude from live KPIs.",
       "expected_ai_behavior": "Cite as missing_info: 'temperature reading is stale'. Confidence cannot be high.",
-      "must_not_do": ["render as Live", "drive alerts as if fresh", "feed AI Doctor as a fresh signal"]
+      "must_not_do": [
+        "render as Live",
+        "drive alerts as if fresh",
+        "feed AI Doctor as a fresh signal"
+      ]
     },
     {
       "case_id": "bad_null_humidity",

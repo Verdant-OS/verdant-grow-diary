@@ -60,16 +60,10 @@ describe("daily grow check files static safety", () => {
   // Strip JS/TS comments so doc-comments describing what the file MUST NOT do
   // do not trip the static checks.
   function stripComments(src: string): string {
-    return src
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+    return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
   }
 
-  const FORBIDDEN_WORDING = [
-    /\bperfect grow\b/i,
-    /\bguaranteed healthy\b/i,
-    /\bgrow completed\b/i,
-  ];
+  const FORBIDDEN_WORDING = [/\bperfect grow\b/i, /\bguaranteed healthy\b/i, /\bgrow completed\b/i];
   const FORBIDDEN_CODE_PATTERNS = [
     /service_role/,
     /from\(\s*["']action_queue["']/,

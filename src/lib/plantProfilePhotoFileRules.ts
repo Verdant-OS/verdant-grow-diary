@@ -16,8 +16,7 @@ export const PLANT_PROFILE_PHOTO_ALLOWED_MIME = [
   "image/heif",
 ] as const;
 
-export type PlantProfilePhotoMime =
-  (typeof PLANT_PROFILE_PHOTO_ALLOWED_MIME)[number];
+export type PlantProfilePhotoMime = (typeof PLANT_PROFILE_PHOTO_ALLOWED_MIME)[number];
 
 const MIME_EXTENSION: Record<PlantProfilePhotoMime, string> = {
   "image/jpeg": "jpg",
@@ -97,8 +96,6 @@ export function validatePlantProfilePhotoFile(
   };
 }
 
-export function plantProfilePhotoExtensionForMime(
-  mime: PlantProfilePhotoMime,
-): string {
+export function plantProfilePhotoExtensionForMime(mime: PlantProfilePhotoMime): string {
   return MIME_EXTENSION[mime];
 }

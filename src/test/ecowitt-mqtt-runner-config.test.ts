@@ -55,19 +55,13 @@ function env(overrides: Record<string, string | undefined>): NodeJS.ProcessEnv {
 
 describe("ecowitt-mqtt-runner — upstream_mode routing (config only)", () => {
   it("exposes exactly the three valid modes (adapter HaAdapterMode vocabulary)", () => {
-    expect([...RUNNER_UPSTREAM_MODES]).toEqual([
-      "ecowitt_raw",
-      "ha_json",
-      "ha_statestream",
-    ]);
+    expect([...RUNNER_UPSTREAM_MODES]).toEqual(["ecowitt_raw", "ha_json", "ha_statestream"]);
   });
 
   it("resolves each valid mode from config", () => {
     expect(resolveUpstreamMode(env({ UPSTREAM_MODE: "ecowitt_raw" }))).toBe("ecowitt_raw");
     expect(resolveUpstreamMode(env({ UPSTREAM_MODE: "ha_json" }))).toBe("ha_json");
-    expect(resolveUpstreamMode(env({ UPSTREAM_MODE: "ha_statestream" }))).toBe(
-      "ha_statestream",
-    );
+    expect(resolveUpstreamMode(env({ UPSTREAM_MODE: "ha_statestream" }))).toBe("ha_statestream");
   });
 
   it("missing UPSTREAM_MODE fails closed with an error listing valid modes", () => {
@@ -130,7 +124,10 @@ describe("ecowitt-mqtt-runner — HA_MQTT_MAPPING_PATH fail-closed rules", () =>
       ]) {
         let err: unknown = null;
         try {
-          resolveRunnerModeConfig(e, vi.fn(() => VALID_MAPPING_JSON));
+          resolveRunnerModeConfig(
+            e,
+            vi.fn(() => VALID_MAPPING_JSON),
+          );
         } catch (thrown) {
           err = thrown;
         }
@@ -164,9 +161,7 @@ describe("ecowitt-mqtt-runner — HA_MQTT_MAPPING_PATH fail-closed rules", () =>
   });
 
   it("invalid-JSON mapping fails closed without echoing file contents", () => {
-    const readFile = vi.fn(
-      () => '{"version": 1, SECRET_CONTENT_SENTINEL vbt_abcdef0123456789',
-    );
+    const readFile = vi.fn(() => '{"version": 1, SECRET_CONTENT_SENTINEL vbt_abcdef0123456789');
     let err: unknown = null;
     try {
       resolveRunnerModeConfig(
@@ -274,10 +269,7 @@ describe("ecowitt-mqtt-runner — one-process/one-tent boundary", () => {
   it("accepts a single-tent mapping and matching VERDANT_TENT_ID without mutation", () => {
     const before = JSON.stringify(singleTentMapping);
     expect(() =>
-      assertSingleTentHaMapping(
-        singleTentMapping,
-        "00000000-0000-0000-0000-0000000000aa",
-      ),
+      assertSingleTentHaMapping(singleTentMapping, "00000000-0000-0000-0000-0000000000aa"),
     ).not.toThrow();
     expect(JSON.stringify(singleTentMapping)).toBe(before);
   });
@@ -310,17 +302,11 @@ describe("ecowitt-mqtt-runner — one-process/one-tent boundary", () => {
 
   it("rejects a configured tent mismatch without leaking either tent id", () => {
     expect(() =>
-      assertSingleTentHaMapping(
-        singleTentMapping,
-        "00000000-0000-0000-0000-0000000000bb",
-      ),
+      assertSingleTentHaMapping(singleTentMapping, "00000000-0000-0000-0000-0000000000bb"),
     ).toThrow(/must match VERDANT_TENT_ID/);
 
     try {
-      assertSingleTentHaMapping(
-        singleTentMapping,
-        "00000000-0000-0000-0000-0000000000bb",
-      );
+      assertSingleTentHaMapping(singleTentMapping, "00000000-0000-0000-0000-0000000000bb");
     } catch (error) {
       expect((error as Error).message).not.toMatch(/00000000-/);
     }

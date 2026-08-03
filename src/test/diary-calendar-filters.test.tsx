@@ -21,11 +21,7 @@ describe("filterDiaryCalendarGroups", () => {
   it("all returns every supported kind", () => {
     const groups = buildDiaryCalendarViewModel(FIXTURE);
     const all = filterDiaryCalendarGroups(groups, "all");
-    expect(all.flatMap((g) => g.events.map((e) => e.id)).sort()).toEqual([
-      "d1",
-      "f1",
-      "w1",
-    ]);
+    expect(all.flatMap((g) => g.events.map((e) => e.id)).sort()).toEqual(["d1", "f1", "w1"]);
   });
 
   it.each(["watering", "feeding", "diagnosis"] as const)(
@@ -59,26 +55,25 @@ describe("filterDiaryCalendarGroups", () => {
       "environment",
     ]);
   });
-
 });
 
 describe("DiaryCalendarSection — filter chips UI", () => {
   it("renders chips with default All pressed, others not pressed", () => {
     render(<DiaryCalendarSection rawEntries={FIXTURE} />);
-    expect(
-      screen.getByTestId("diary-calendar-filter-all"),
-    ).toHaveAttribute("aria-pressed", "true");
-    expect(
-      screen.getByTestId("diary-calendar-filter-watering"),
-    ).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("diary-calendar-filter-all")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("diary-calendar-filter-watering")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
   });
 
   it("clicking Watering shows only watering events", () => {
     render(<DiaryCalendarSection rawEntries={FIXTURE} />);
     fireEvent.click(screen.getByTestId("diary-calendar-filter-watering"));
-    expect(
-      screen.getByTestId("diary-calendar-filter-watering"),
-    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("diary-calendar-filter-watering")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     const events = screen.getAllByTestId("diary-calendar-event");
     expect(events.length).toBe(1);
     expect(events[0]).toHaveTextContent(/Watering/i);
@@ -105,9 +100,7 @@ describe("DiaryCalendarSection — filter chips UI", () => {
   it("shows filter-aware empty copy when no events match", () => {
     render(
       <DiaryCalendarSection
-        rawEntries={[
-          { id: "w", entry_at: "2026-06-10T09:00:00Z", event_type: "watering" },
-        ]}
+        rawEntries={[{ id: "w", entry_at: "2026-06-10T09:00:00Z", event_type: "watering" }]}
       />,
     );
     fireEvent.click(screen.getByTestId("diary-calendar-filter-feeding"));

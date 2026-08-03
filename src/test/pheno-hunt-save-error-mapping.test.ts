@@ -47,10 +47,8 @@ function makeFakeClient(
     }
     chain.single = () => Promise.resolve(respond(call));
     chain.maybeSingle = () => Promise.resolve(respond(call));
-    chain.then = (
-      onFulfilled: (v: unknown) => unknown,
-      onRejected?: (e: unknown) => unknown,
-    ) => Promise.resolve(respond(call)).then(onFulfilled, onRejected);
+    chain.then = (onFulfilled: (v: unknown) => unknown, onRejected?: (e: unknown) => unknown) =>
+      Promise.resolve(respond(call)).then(onFulfilled, onRejected);
     return chain;
   }
   return { from: builder } as unknown as SupabaseClient;

@@ -98,4 +98,3 @@ describe("QuickLog timeline confirmation — static safety", () => {
     }
   });
 });
-

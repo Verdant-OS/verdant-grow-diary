@@ -100,12 +100,7 @@ export interface V0LoopInput {
   now: string;
 }
 
-export type V0LoopState =
-  | "healthy"
-  | "watch"
-  | "degraded"
-  | "untrusted"
-  | "insufficient_data";
+export type V0LoopState = "healthy" | "watch" | "degraded" | "untrusted" | "insufficient_data";
 
 export interface V0LoopAlert {
   id: string;
@@ -141,12 +136,7 @@ export interface V0LoopResult {
 // ---------------------------------------------------------------------------
 
 /** Severity ordering used for sort + worst-of selection (lower index = worse). */
-const SEVERITY_ORDER: readonly AlertSeverity[] = [
-  "critical",
-  "warning",
-  "watch",
-  "info",
-];
+const SEVERITY_ORDER: readonly AlertSeverity[] = ["critical", "warning", "watch", "info"];
 const SEVERITY_RANK: Record<AlertSeverity, number> = {
   critical: 0,
   warning: 1,
@@ -166,10 +156,7 @@ const METRIC_SPECS: readonly MetricSpec[] = [
   { key: "vpd_kpa", alertMetric: "vpd_kpa", label: "VPD" },
 ];
 
-function deadbandFor(
-  key: MetricSpec["key"],
-  deadband: V0Deadband | null | undefined,
-): number {
+function deadbandFor(key: MetricSpec["key"], deadband: V0Deadband | null | undefined): number {
   if (!deadband) return 0;
   const v = deadband[key];
   return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0;
@@ -421,19 +408,9 @@ export function runV0Loop(input: V0LoopInput): V0LoopResult {
   const rawAlerts = buildThresholdAlerts(input);
   const alerts = sortAlerts(rawAlerts);
 
-  const state = deriveState(
-    sensorContext,
-    alerts,
-    !!input.plant,
-    input.diaryContext,
-  );
+  const state = deriveState(sensorContext, alerts, !!input.plant, input.diaryContext);
 
-  const aiDoctorSummary = buildAiDoctorSummary(
-    state,
-    sensorContext,
-    input.aiDoctor,
-    input.plant,
-  );
+  const aiDoctorSummary = buildAiDoctorSummary(state, sensorContext, input.aiDoctor, input.plant);
 
   const { draft, note } = buildActionDraft(input, state, alerts, sensorContext);
 

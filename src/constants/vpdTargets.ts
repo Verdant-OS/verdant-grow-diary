@@ -25,11 +25,7 @@ export type CanonicalVpdStageKey =
   | "mid_late_flower"
   | "ripening";
 
-export type LegacyVpdStageKey =
-  | "veg"
-  | "preflower"
-  | "flower"
-  | "late_flower";
+export type LegacyVpdStageKey = "veg" | "preflower" | "flower" | "late_flower";
 
 export type VpdStageKey = CanonicalVpdStageKey | LegacyVpdStageKey;
 

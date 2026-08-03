@@ -71,9 +71,7 @@ describe("QuickLog plant/context validation", () => {
     expect(screen.getByTestId("quick-log-plant-error").textContent).toMatch(
       /choose a plant before saving/i,
     );
-    expect(
-      (screen.getByTestId("quick-log-save") as HTMLButtonElement).disabled,
-    ).toBe(true);
+    expect((screen.getByTestId("quick-log-save") as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("does not invoke RPC when Save is clicked without plant", () => {
@@ -84,9 +82,7 @@ describe("QuickLog plant/context validation", () => {
 
   it("inline error uses role=alert for assistive tech", () => {
     renderQL();
-    expect(
-      screen.getByTestId("quick-log-plant-error").getAttribute("role"),
-    ).toBe("alert");
+    expect(screen.getByTestId("quick-log-plant-error").getAttribute("role")).toBe("alert");
   });
 
   it("does not introduce fake live/sensor copy", () => {

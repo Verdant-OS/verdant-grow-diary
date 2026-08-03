@@ -28,14 +28,9 @@ import {
   STATIC_PUBLIC_SEO_DOCUMENTS,
   VERDANT_SITE_ORIGIN,
 } from "@/lib/build/staticPublicSeoDocuments";
-import {
-  VERDANT_SEO_GUIDES,
-  VERDANT_GUIDE_SLUGS,
-} from "@/constants/verdantSeoContent";
+import { VERDANT_SEO_GUIDES, VERDANT_GUIDE_SLUGS } from "@/constants/verdantSeoContent";
 import { buildStaticSocialRouteHtml } from "@/lib/build/staticSocialRouteHtml";
-import {
-  extractHead,
-} from "../../scripts/validate-static-route-head-fidelity.mjs";
+import { extractHead } from "../../scripts/validate-static-route-head-fidelity.mjs";
 import {
   ALLOWED_ROBOTS_DIRECTIVES,
   DEFAULT_ROBOTS_DIRECTIVE,
@@ -50,9 +45,7 @@ const INDEX_HTML = readFileSync(resolve(REPO, "index.html"), "utf8");
 const GUIDE_HUB_PATH = "/guides";
 const GLOSSARY_PATH = "/glossary";
 
-const REGISTRY_BY_PATH = new Map(
-  STATIC_PUBLIC_SEO_DOCUMENTS.map((doc) => [doc.path, doc]),
-);
+const REGISTRY_BY_PATH = new Map(STATIC_PUBLIC_SEO_DOCUMENTS.map((doc) => [doc.path, doc]));
 
 function guidePath(slug: string): string {
   return `/guides/${slug}`;
@@ -65,12 +58,9 @@ const TARGET_PATHS: ReadonlyArray<string> = [
 ];
 
 describe("Guides + glossary head-tag registry coverage", () => {
-  it.each(TARGET_PATHS)(
-    "%s is registered in STATIC_PUBLIC_SEO_DOCUMENTS",
-    (path) => {
-      expect(REGISTRY_BY_PATH.has(path)).toBe(true);
-    },
-  );
+  it.each(TARGET_PATHS)("%s is registered in STATIC_PUBLIC_SEO_DOCUMENTS", (path) => {
+    expect(REGISTRY_BY_PATH.has(path)).toBe(true);
+  });
 
   it("every registered guide + glossary route has a route-local filename", () => {
     for (const path of TARGET_PATHS) {
@@ -119,9 +109,7 @@ describe("Guides + glossary head-tag content contract", () => {
   });
 
   it("guide + glossary descriptions are unique across the cluster", () => {
-    const descs = TARGET_PATHS.map(
-      (p) => REGISTRY_BY_PATH.get(p)!.metadata.description,
-    );
+    const descs = TARGET_PATHS.map((p) => REGISTRY_BY_PATH.get(p)!.metadata.description);
     expect(new Set(descs).size).toBe(descs.length);
   });
 
@@ -150,7 +138,6 @@ describe("Guides + glossary pre-rendered head matches global invariants", () => 
   // dist bundle, so this suite intentionally checks head META tags only.
   // The postbuild validator (scripts/validate-static-route-head-fidelity.mjs)
   // owns end-to-end JSON-LD fidelity across every emitted dist/*.html.
-
 
   const headFor = (path: string) => {
     const doc = REGISTRY_BY_PATH.get(path)!;

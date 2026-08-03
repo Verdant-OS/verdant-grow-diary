@@ -3,10 +3,7 @@
  * edit/delete history. Pulls from `useDiaryEntryAuditTrail`; never mutates.
  */
 import { useDiaryEntryAuditTrail, type DiaryEntryAuditRow } from "@/hooks/useDiaryEntryAuditTrail";
-import {
-  buildFieldChangeRows,
-  summarizeAuditRow,
-} from "@/lib/diaryEntryAuditFormatting";
+import { buildFieldChangeRows, summarizeAuditRow } from "@/lib/diaryEntryAuditFormatting";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -32,9 +29,7 @@ function AuditRow({ row }: { row: DiaryEntryAuditRow }) {
           <Badge variant={isDelete ? "destructive" : "secondary"}>
             {isDelete ? "Deleted" : "Edited"}
           </Badge>
-          <span className="text-sm text-muted-foreground">
-            {summarizeAuditRow(row)}
-          </span>
+          <span className="text-sm text-muted-foreground">{summarizeAuditRow(row)}</span>
         </div>
         <time className="text-xs text-muted-foreground" dateTime={row.changed_at}>
           {formatWhen(row.changed_at)}

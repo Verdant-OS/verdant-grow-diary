@@ -30,8 +30,7 @@ const RULES = read("src/lib/piIngestStatusRules.ts");
 const APP = read("src/App.tsx");
 
 const NOW = new Date("2026-05-23T12:00:00Z");
-const minutesAgo = (m: number) =>
-  new Date(NOW.getTime() - m * 60 * 1000).toISOString();
+const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60 * 1000).toISOString();
 
 describe("computePiIngestStatus — pure rules", () => {
   it("reports no_data when no pi_bridge readings exist", () => {

@@ -42,9 +42,7 @@ function looksLikeUsageObject(value: unknown): boolean {
  * Returns a fresh shallow copy of the usage object so the raw response
  * reference is not leaked. Returns `null` for any other shape.
  */
-export function extractProviderReportedUsageCandidate(
-  providerResponse: unknown,
-): unknown | null {
+export function extractProviderReportedUsageCandidate(providerResponse: unknown): unknown | null {
   if (!isPlainObject(providerResponse)) return null;
 
   const directUsage = (providerResponse as Record<string, unknown>).usage;

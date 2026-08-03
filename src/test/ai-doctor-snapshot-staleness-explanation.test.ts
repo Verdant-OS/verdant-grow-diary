@@ -68,9 +68,7 @@ describe("buildAiDoctorSnapshotStalenessExplanation — strict > boundary", () =
   });
 
   it("one millisecond older than the cutoff is stale", () => {
-    const oneMsPastCutoff = new Date(
-      NOW - AI_DOCTOR_SNAPSHOT_FRESH_MS - 1,
-    ).toISOString();
+    const oneMsPastCutoff = new Date(NOW - AI_DOCTOR_SNAPSHOT_FRESH_MS - 1).toISOString();
     const res = buildAiDoctorSnapshotStalenessExplanation({
       latestSnapshotAtIso: oneMsPastCutoff,
       now: NOW,
@@ -199,9 +197,7 @@ describe("buildAiDoctorSnapshotStalenessExplanation — near-boundary ms offsets
 
   for (const offset of FRESH_OFFSETS_MS) {
     it(`offset ${offset}ms from cutoff → fresh (inclusive boundary)`, () => {
-      const snap = new Date(
-        NOW - AI_DOCTOR_SNAPSHOT_FRESH_MS + Math.abs(offset),
-      ).toISOString();
+      const snap = new Date(NOW - AI_DOCTOR_SNAPSHOT_FRESH_MS + Math.abs(offset)).toISOString();
       // Equivalent: snapshot age = 48h - |offset|, so age <= 48h.
       const res = buildAiDoctorSnapshotStalenessExplanation({
         latestSnapshotAtIso: snap,
@@ -216,9 +212,7 @@ describe("buildAiDoctorSnapshotStalenessExplanation — near-boundary ms offsets
 
   for (const offset of STALE_OFFSETS_MS) {
     it(`offset ${offset}ms past cutoff → stale (strict >)`, () => {
-      const snap = new Date(
-        NOW - AI_DOCTOR_SNAPSHOT_FRESH_MS - offset,
-      ).toISOString();
+      const snap = new Date(NOW - AI_DOCTOR_SNAPSHOT_FRESH_MS - offset).toISOString();
       const res = buildAiDoctorSnapshotStalenessExplanation({
         latestSnapshotAtIso: snap,
         now: NOW,

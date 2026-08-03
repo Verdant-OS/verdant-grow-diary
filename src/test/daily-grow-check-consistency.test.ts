@@ -58,9 +58,7 @@ describe("buildDailyGrowCheckConsistency · pure rules", () => {
   it("counts current-tent manual snapshot days", () => {
     const s = buildDailyGrowCheckConsistency(
       baseInput({
-        manualReadings: [
-          { ts: localIso(2026, 4, 24, 10), id: "m1", tent_id: TENT },
-        ],
+        manualReadings: [{ ts: localIso(2026, 4, 24, 10), id: "m1", tent_id: TENT }],
       }),
     );
     expect(s.checkedDays).toBe(1);
@@ -69,9 +67,7 @@ describe("buildDailyGrowCheckConsistency · pure rules", () => {
   it("does not count diary entries for other plants", () => {
     const s = buildDailyGrowCheckConsistency(
       baseInput({
-        diaryEntries: [
-          { entry_at: localIso(2026, 4, 24), id: "d1", plant_id: "other" },
-        ],
+        diaryEntries: [{ entry_at: localIso(2026, 4, 24), id: "d1", plant_id: "other" }],
       }),
     );
     expect(s.checkedDays).toBe(0);
@@ -81,9 +77,7 @@ describe("buildDailyGrowCheckConsistency · pure rules", () => {
     const s = buildDailyGrowCheckConsistency(
       baseInput({
         plantsInTentCount: 3,
-        manualReadings: [
-          { ts: localIso(2026, 4, 24, 10), id: "m1", tent_id: TENT },
-        ],
+        manualReadings: [{ ts: localIso(2026, 4, 24, 10), id: "m1", tent_id: TENT }],
       }),
     );
     expect(s.checkedDays).toBe(1);
@@ -124,9 +118,7 @@ describe("buildDailyGrowCheckConsistency · pure rules", () => {
     const s = buildDailyGrowCheckConsistency(
       baseInput({
         now: new Date(2026, 4, 25, 0, 5, 0),
-        diaryEntries: [
-          { entry_at: localIso(2026, 4, 24, 23), id: "d1", plant_id: PLANT },
-        ],
+        diaryEntries: [{ entry_at: localIso(2026, 4, 24, 23), id: "d1", plant_id: PLANT }],
       }),
     );
     // Yesterday counted, today empty → streak 0.
@@ -147,10 +139,7 @@ describe("Daily Grow Check consistency · wiring + safety", () => {
     resolve(root, "src/components/PlantDailyGrowCheckConsistencyCard.tsx"),
     "utf8",
   );
-  const rules = readFileSync(
-    resolve(root, "src/lib/dailyGrowCheckConsistencyRules.ts"),
-    "utf8",
-  );
+  const rules = readFileSync(resolve(root, "src/lib/dailyGrowCheckConsistencyRules.ts"), "utf8");
   const page = readFileSync(resolve(root, "src/pages/PlantDetail.tsx"), "utf8");
 
   it("Plant Detail renders the consistency card", () => {

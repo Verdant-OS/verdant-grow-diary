@@ -72,7 +72,10 @@ const STAGE_LABEL: Record<EnvStage, string> = {
   unknown: "Stage unknown",
 };
 
-const TEMP_BANDS: Record<EnvStage, { min: number | null; max: number | null; contextOnly: boolean }> = {
+const TEMP_BANDS: Record<
+  EnvStage,
+  { min: number | null; max: number | null; contextOnly: boolean }
+> = {
   seedling: { min: 22, max: 26, contextOnly: false },
   veg: { min: 22, max: 28, contextOnly: false },
   preflower: { min: 21, max: 27, contextOnly: false },
@@ -82,15 +85,16 @@ const TEMP_BANDS: Record<EnvStage, { min: number | null; max: number | null; con
   unknown: { min: null, max: null, contextOnly: false },
 };
 
-const RH_BANDS: Record<EnvStage, { min: number | null; max: number | null; contextOnly: boolean }> = {
-  seedling: { min: 65, max: 75, contextOnly: false },
-  veg: { min: 55, max: 70, contextOnly: false },
-  preflower: { min: 50, max: 65, contextOnly: false },
-  flower: { min: 40, max: 55, contextOnly: false },
-  late_flower: { min: 35, max: 50, contextOnly: false },
-  harvest: { min: null, max: null, contextOnly: true },
-  unknown: { min: null, max: null, contextOnly: false },
-};
+const RH_BANDS: Record<EnvStage, { min: number | null; max: number | null; contextOnly: boolean }> =
+  {
+    seedling: { min: 65, max: 75, contextOnly: false },
+    veg: { min: 55, max: 70, contextOnly: false },
+    preflower: { min: 50, max: 65, contextOnly: false },
+    flower: { min: 40, max: 55, contextOnly: false },
+    late_flower: { min: 35, max: 50, contextOnly: false },
+    harvest: { min: null, max: null, contextOnly: true },
+    unknown: { min: null, max: null, contextOnly: false },
+  };
 
 /** Round a converted °F display number to 1 decimal (display only). */
 function displayF(celsius: number): number {

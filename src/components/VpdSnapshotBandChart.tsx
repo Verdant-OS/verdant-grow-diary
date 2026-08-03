@@ -44,10 +44,7 @@ export default function VpdSnapshotBandChart({
         aria-label={vm.ariaLabel}
       >
         <span className="font-medium text-foreground">{vm.vpdLabel}</span>
-        <span
-          data-testid={`${testId}-unavailable`}
-          className="text-muted-foreground"
-        >
+        <span data-testid={`${testId}-unavailable`} className="text-muted-foreground">
           {vm.guidanceLabel}
         </span>
       </div>
@@ -64,10 +61,7 @@ export default function VpdSnapshotBandChart({
     >
       <div className="flex items-baseline justify-between gap-2">
         <span className="font-medium text-foreground">{vm.vpdLabel}</span>
-        <span
-          className={toneTextClass[vm.status]}
-          data-testid={`${testId}-value`}
-        >
+        <span className={toneTextClass[vm.status]} data-testid={`${testId}-value`}>
           {vm.currentVpdKpa?.toFixed(2)} kPa
         </span>
       </div>
@@ -99,20 +93,13 @@ export default function VpdSnapshotBandChart({
       </div>
 
       <div className="flex items-center justify-between text-muted-foreground">
-        <span data-testid={`${testId}-stage`}>
-          {vm.canonicalStageLabel ?? "Stage unknown"}
-        </span>
+        <span data-testid={`${testId}-stage`}>{vm.canonicalStageLabel ?? "Stage unknown"}</span>
         {vm.targetBandLabel && (
-          <span data-testid={`${testId}-target-band`}>
-            Target band {vm.targetBandLabel}
-          </span>
+          <span data-testid={`${testId}-target-band`}>Target band {vm.targetBandLabel}</span>
         )}
       </div>
 
-      <span
-        data-testid={`${testId}-guidance`}
-        className="text-muted-foreground"
-      >
+      <span data-testid={`${testId}-guidance`} className="text-muted-foreground">
         {vm.guidanceLabel}
       </span>
       <span className="sr-only">{vm.ariaLabel}</span>

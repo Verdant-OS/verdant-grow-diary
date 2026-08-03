@@ -28,9 +28,6 @@ test("shipped allowlist is structurally valid", () => {
 test("shipped allowlist protects core public routes via never_allowlist", () => {
   const al = loadAllowlist();
   for (const url of REQUIRED_NEVER) {
-    assert.ok(
-      (al.never_allowlist ?? []).includes(url),
-      `never_allowlist must include ${url}`,
-    );
+    assert.ok((al.never_allowlist ?? []).includes(url), `never_allowlist must include ${url}`);
   }
 });

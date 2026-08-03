@@ -64,9 +64,9 @@ describe("quickLogV2Rules", () => {
     const opts = buildQuickLogV2TargetOptions(tents as any, plants as any);
 
     expect(isStaleQuickLogV2TargetSelection(resolveQuickLogV2Target(opts, null))).toBe(false);
-    expect(
-      isStaleQuickLogV2TargetSelection(resolveQuickLogV2Target(opts, "plant:nope")),
-    ).toBe(true);
+    expect(isStaleQuickLogV2TargetSelection(resolveQuickLogV2Target(opts, "plant:nope"))).toBe(
+      true,
+    );
     expect(isStaleQuickLogV2TargetSelection(resolveQuickLogV2Target(opts, "plant:p2"))).toBe(false);
   });
 

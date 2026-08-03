@@ -23,8 +23,7 @@ import { buildEmitterInput } from "./build-release-receipt-input.mjs";
 
 async function loadEmitter() {
   const mod = await import(
-    pathToFileURL(resolve(process.cwd(), "src/lib/releaseReceiptEmitter.ts"))
-      .href
+    pathToFileURL(resolve(process.cwd(), "src/lib/releaseReceiptEmitter.ts")).href
   );
   return mod.emitReleaseReceiptArtifact;
 }
@@ -116,12 +115,7 @@ async function main() {
         "utf8",
       ),
     );
-    const input = buildEmitterInput(
-      baseFlags(),
-      loadCommands("blocked"),
-      blockers,
-      {},
-    );
+    const input = buildEmitterInput(baseFlags(), loadCommands("blocked"), blockers, {});
     const r = emit(input);
     if (!r.ok) throw new Error(`emitter rejected: ${r.errors.join("; ")}`);
     assertEq(r.artifact.status, "blocked", "status");
@@ -133,23 +127,14 @@ async function main() {
     const a = emit(input);
     const b = emit(input);
     if (!a.ok || !b.ok) throw new Error("emitter rejected");
-    assertEq(
-      JSON.stringify(a.artifact),
-      JSON.stringify(b.artifact),
-      "deterministic",
-    );
+    assertEq(JSON.stringify(a.artifact), JSON.stringify(b.artifact), "deterministic");
   });
 
   // 5. Invalid flags rejected
   check("rejects invalid --source", () => {
     let threw = false;
     try {
-      buildEmitterInput(
-        baseFlags({ source: "not_a_source" }),
-        loadCommands("pass"),
-        [],
-        {},
-      );
+      buildEmitterInput(baseFlags({ source: "not_a_source" }), loadCommands("pass"), [], {});
     } catch {
       threw = true;
     }

@@ -109,11 +109,8 @@ export default function PhenoCandidateEvidenceCoverage({
         </p>
       ) : null}
 
-      {packet.state === "unavailable" ? null : packet.configuredGoalCount === 0 &&
-        !compromised ? (
-        <p className="text-muted-foreground">
-          This hunt has no evidence goals configured yet.
-        </p>
+      {packet.state === "unavailable" ? null : packet.configuredGoalCount === 0 && !compromised ? (
+        <p className="text-muted-foreground">This hunt has no evidence goals configured yet.</p>
       ) : (
         <ul className="flex flex-wrap gap-1" data-testid={`${testId}-goals`}>
           {packet.goals.map((goal) => (

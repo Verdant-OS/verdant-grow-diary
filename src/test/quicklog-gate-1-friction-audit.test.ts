@@ -80,7 +80,9 @@ describe("QuickLog Gate 1 friction audit — entry-point source contract", () =>
 
   it("Plant Detail / Plants links include from= source context", () => {
     expect(read("src/pages/PlantDetail.tsx")).toMatch(/from=plant-detail/);
-    expect(read("src/components/PlantDailyGrowCheckConsistencyCard.tsx")).toMatch(/from=plant-detail/);
+    expect(read("src/components/PlantDailyGrowCheckConsistencyCard.tsx")).toMatch(
+      /from=plant-detail/,
+    );
     expect(read("src/components/PlantDailyGrowCheckHistoryCard.tsx")).toMatch(/from=plant-detail/);
     expect(read("src/pages/Plants.tsx")).toMatch(/from=plants/);
   });
@@ -114,9 +116,7 @@ describe("QuickLog Gate 1 friction audit — entry-point source contract", () =>
       const src = read(f);
       expect(src).not.toMatch(/service_role/);
       expect(src).not.toMatch(/\.rpc\(/);
-      expect(src).not.toMatch(
-        /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator/i,
-      );
+      expect(src).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator/i);
     }
   });
 

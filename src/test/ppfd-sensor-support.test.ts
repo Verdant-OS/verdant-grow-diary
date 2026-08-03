@@ -38,10 +38,7 @@ import {
   formatHardwareReadingsBlock,
   hasAnyHardwareReading,
 } from "@/lib/quickLogHardwareReadingsRules";
-import {
-  sensorFieldUnit,
-  formatSensorValue,
-} from "@/lib/sensorFormat";
+import { sensorFieldUnit, formatSensorValue } from "@/lib/sensorFormat";
 import { mapSensorReadingToAiDoctorContext } from "@/lib/aiDoctorSensorContextRules";
 import type { NormalizedSensorReading } from "@/lib/sensorReadingNormalizationRules";
 
@@ -291,11 +288,7 @@ describe("AI Doctor context — PPFD-aware behaviour via NEX-5 surface", () => {
     const ctx = mapSensorReadingToAiDoctorContext(onlyOptional);
     // Must still include the safety reminder that telemetry alone cannot
     // confirm plant health.
-    expect(
-      ctx.safetyNotes.some((n) =>
-        /cannot confirm or deny plant health/i.test(n),
-      ),
-    ).toBe(true);
+    expect(ctx.safetyNotes.some((n) => /cannot confirm or deny plant health/i.test(n))).toBe(true);
   });
 });
 
@@ -315,12 +308,7 @@ describe("PPFD support — static safety", () => {
     expect(lower.includes("service_role")).toBe(false);
     expect(lower.includes("autopilot")).toBe(false);
     expect(/[a-z0-9]_executed\b/.test(lower)).toBe(false);
-    for (const banned of [
-      "turn_on_",
-      "turn_off_",
-      "device_command",
-      "execute_device",
-    ]) {
+    for (const banned of ["turn_on_", "turn_off_", "device_command", "execute_device"]) {
       expect(lower.includes(banned)).toBe(false);
     }
   });

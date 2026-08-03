@@ -30,12 +30,7 @@ export function usePlantAssignedTentActions(
 ): UsePlantAssignedTentActionsResult {
   const enabled = !!tentId;
   const q = useQuery({
-    queryKey: [
-      "plant_assigned_tent_actions",
-      tentId ?? null,
-      growId ?? null,
-      limit,
-    ],
+    queryKey: ["plant_assigned_tent_actions", tentId ?? null, growId ?? null, limit],
     enabled,
     queryFn: async (): Promise<AssignedTentActionInputRow[]> => {
       let query = supabase

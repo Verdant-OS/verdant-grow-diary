@@ -43,16 +43,20 @@ const plant = {
 };
 
 function ctx(
-  overrides: { plantOverride?: typeof plant; events?: ReadonlyArray<Record<string, unknown>>; sensors?: ReadonlyArray<Record<string, unknown>> } = {},
+  overrides: {
+    plantOverride?: typeof plant;
+    events?: ReadonlyArray<Record<string, unknown>>;
+    sensors?: ReadonlyArray<Record<string, unknown>>;
+  } = {},
 ) {
   return compileAiDoctorContextFromRows({
     plant: overrides.plantOverride ?? plant,
-    growEvents:
-      overrides.events ??
-      [{ occurred_at: ago(HOUR), event_type: "watering", source: "manual" }],
-    sensorReadings:
-      overrides.sensors ??
-      [{ metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live" }],
+    growEvents: overrides.events ?? [
+      { occurred_at: ago(HOUR), event_type: "watering", source: "manual" },
+    ],
+    sensorReadings: overrides.sensors ?? [
+      { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live" },
+    ],
     now: NOW,
   });
 }
@@ -78,9 +82,7 @@ describe("AiDoctorCheckInPreviewPanel — manual save confirmation shell", () =>
     render(<AiDoctorCheckInPreviewPanel context={ctx()} />);
     openPreview();
     openSaveConfirm();
-    expect(
-      screen.getByTestId("ai-doctor-manual-save-confirmation-dialog"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-manual-save-confirmation-dialog")).toBeTruthy();
     expect(screen.getByTestId("ai-doctor-manual-save-ready")).toBeTruthy();
   });
 
@@ -88,36 +90,28 @@ describe("AiDoctorCheckInPreviewPanel — manual save confirmation shell", () =>
     render(<AiDoctorCheckInPreviewPanel context={ctx()} />);
     openPreview();
     openSaveConfirm();
-    expect(
-      screen.getByTestId("ai-doctor-manual-save-event-type").textContent,
-    ).toBe("Observation");
-    expect(
-      screen.getByTestId("ai-doctor-manual-save-source").textContent,
-    ).toBe("AI Doctor check-in manual save");
-    expect(
-      screen.getByTestId("ai-doctor-manual-save-safety-labels"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-manual-save-safety-preview-only"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-manual-save-safety-no-live-ai-model"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-manual-save-event-type").textContent).toBe("Observation");
+    expect(screen.getByTestId("ai-doctor-manual-save-source").textContent).toBe(
+      "AI Doctor check-in manual save",
+    );
+    expect(screen.getByTestId("ai-doctor-manual-save-safety-labels")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-manual-save-safety-preview-only")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-manual-save-safety-no-live-ai-model")).toBeTruthy();
   });
 
   it("renders mandatory copy lines about no AI model and no alerts", () => {
     render(<AiDoctorCheckInPreviewPanel context={ctx()} />);
     openPreview();
     openSaveConfirm();
-    expect(
-      screen.getByTestId("ai-doctor-manual-save-copy-no-model").textContent,
-    ).toMatch(/No live AI model was called\./);
-    expect(
-      screen.getByTestId("ai-doctor-manual-save-copy-no-alerts").textContent,
-    ).toMatch(/No alerts or Action Queue items will be created\./);
-    expect(
-      screen.getByTestId("ai-doctor-manual-save-copy-cancel").textContent,
-    ).toMatch(/cancel before anything is saved/i);
+    expect(screen.getByTestId("ai-doctor-manual-save-copy-no-model").textContent).toMatch(
+      /No live AI model was called\./,
+    );
+    expect(screen.getByTestId("ai-doctor-manual-save-copy-no-alerts").textContent).toMatch(
+      /No alerts or Action Queue items will be created\./,
+    );
+    expect(screen.getByTestId("ai-doctor-manual-save-copy-cancel").textContent).toMatch(
+      /cancel before anything is saved/i,
+    );
   });
 
   it("shows limitations when present", () => {
@@ -137,21 +131,15 @@ describe("AiDoctorCheckInPreviewPanel — manual save confirmation shell", () =>
     );
     openPreview();
     openSaveConfirm();
-    expect(
-      screen.getByTestId("ai-doctor-manual-save-limitations"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-manual-save-limitation-demo_only"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-manual-save-limitations")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-manual-save-limitation-demo_only")).toBeTruthy();
   });
 
   it("confirm button is enabled with 'Save to diary' label when draft is ready", () => {
     render(<AiDoctorCheckInPreviewPanel context={ctx()} />);
     openPreview();
     openSaveConfirm();
-    const confirm = screen.getByTestId(
-      "ai-doctor-manual-save-confirm-button",
-    ) as HTMLButtonElement;
+    const confirm = screen.getByTestId("ai-doctor-manual-save-confirm-button") as HTMLButtonElement;
     expect(confirm.disabled).toBe(false);
     expect(confirm.textContent).toMatch(/Save to diary/);
   });
@@ -163,37 +151,24 @@ describe("AiDoctorCheckInPreviewPanel — manual save confirmation shell", () =>
       grow_id: null as unknown as string,
       tent_id: null as unknown as string,
     };
-    render(
-      <AiDoctorCheckInPreviewPanel
-        context={ctx({ plantOverride: blockedPlant })}
-      />,
-    );
+    render(<AiDoctorCheckInPreviewPanel context={ctx({ plantOverride: blockedPlant })} />);
     openPreview();
     openSaveConfirm();
     expect(screen.getByTestId("ai-doctor-manual-save-blocked")).toBeTruthy();
-    expect(
-      screen.queryByTestId("ai-doctor-manual-save-confirm-button"),
-    ).toBeNull();
-    expect(
-      screen.getByTestId("ai-doctor-manual-save-blocked-reasons"),
-    ).toBeTruthy();
+    expect(screen.queryByTestId("ai-doctor-manual-save-confirm-button")).toBeNull();
+    expect(screen.getByTestId("ai-doctor-manual-save-blocked-reasons")).toBeTruthy();
   });
 
   it("copy receipt button still renders alongside save button", () => {
     render(<AiDoctorCheckInPreviewPanel context={ctx()} />);
     openPreview();
     expect(screen.getByTestId("ai-doctor-check-in-copy-button")).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-manual-save-open-button"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-manual-save-open-button")).toBeTruthy();
   });
 
   it("static guard: panel source has no direct Supabase/write/model imports", async () => {
     const { readFileSync } = await import("node:fs");
-    const src = readFileSync(
-      "src/components/AiDoctorCheckInPreviewPanel.tsx",
-      "utf8",
-    );
+    const src = readFileSync("src/components/AiDoctorCheckInPreviewPanel.tsx", "utf8");
     // Panel must NOT touch Supabase, fetch, RPC, model APIs, alerts, or
     // Action Queue mutations directly. The existing safe Quick Log v2 save
     // hook is the only allowed write path.

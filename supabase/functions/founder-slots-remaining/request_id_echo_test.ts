@@ -146,54 +146,48 @@ for (const scenario of scenarios) {
     }
   });
 
-  Deno.test(
-    `x-request-id echo — server mints a UUID when none supplied on ${scenario.name}`,
-    async () => {
-      scenario.prepare();
-      const restore = silenceLogs();
-      try {
-        const res = await handleFounderSlotsRequest(scenario.buildRequest());
-        assertEquals(res.status, scenario.expectedStatus);
-        const headerId = res.headers.get("x-request-id");
-        assert(headerId, "response must always include an x-request-id header");
-        assertMatch(headerId!, UUID_RE, "minted request id must be a lowercase UUID");
-        const body = (await res.json()) as Record<string, unknown>;
-        assertEquals(body.error_code, scenario.expectedErrorCode);
-        assertEquals(
-          body.request_id,
-          headerId,
-          "body request_id must exactly match the response header x-request-id",
-        );
-      } finally {
-        restore();
-        __setDepsLoaderForTesting(null);
-      }
-    },
-  );
+  Deno.test(`x-request-id echo — server mints a UUID when none supplied on ${scenario.name}`, async () => {
+    scenario.prepare();
+    const restore = silenceLogs();
+    try {
+      const res = await handleFounderSlotsRequest(scenario.buildRequest());
+      assertEquals(res.status, scenario.expectedStatus);
+      const headerId = res.headers.get("x-request-id");
+      assert(headerId, "response must always include an x-request-id header");
+      assertMatch(headerId!, UUID_RE, "minted request id must be a lowercase UUID");
+      const body = (await res.json()) as Record<string, unknown>;
+      assertEquals(body.error_code, scenario.expectedErrorCode);
+      assertEquals(
+        body.request_id,
+        headerId,
+        "body request_id must exactly match the response header x-request-id",
+      );
+    } finally {
+      restore();
+      __setDepsLoaderForTesting(null);
+    }
+  });
 
-  Deno.test(
-    `x-request-id echo — malformed client id is replaced with a minted UUID on ${scenario.name}`,
-    async () => {
-      scenario.prepare();
-      const restore = silenceLogs();
-      try {
-        const res = await handleFounderSlotsRequest(
-          scenario.buildRequest({ "x-request-id": "not-a-uuid" }),
-        );
-        assertEquals(res.status, scenario.expectedStatus);
-        const headerId = res.headers.get("x-request-id");
-        assert(headerId, "response must always include an x-request-id header");
-        assert(
-          headerId !== "not-a-uuid",
-          "malformed client-supplied request id must not be echoed verbatim",
-        );
-        assertMatch(headerId!, UUID_RE);
-        const body = (await res.json()) as Record<string, unknown>;
-        assertEquals(body.request_id, headerId);
-      } finally {
-        restore();
-        __setDepsLoaderForTesting(null);
-      }
-    },
-  );
+  Deno.test(`x-request-id echo — malformed client id is replaced with a minted UUID on ${scenario.name}`, async () => {
+    scenario.prepare();
+    const restore = silenceLogs();
+    try {
+      const res = await handleFounderSlotsRequest(
+        scenario.buildRequest({ "x-request-id": "not-a-uuid" }),
+      );
+      assertEquals(res.status, scenario.expectedStatus);
+      const headerId = res.headers.get("x-request-id");
+      assert(headerId, "response must always include an x-request-id header");
+      assert(
+        headerId !== "not-a-uuid",
+        "malformed client-supplied request id must not be echoed verbatim",
+      );
+      assertMatch(headerId!, UUID_RE);
+      const body = (await res.json()) as Record<string, unknown>;
+      assertEquals(body.request_id, headerId);
+    } finally {
+      restore();
+      __setDepsLoaderForTesting(null);
+    }
+  });
 }

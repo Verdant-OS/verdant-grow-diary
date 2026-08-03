@@ -20,9 +20,7 @@
 import { type AiDoctorPromptMeasurement } from "./costDomains";
 import { normalizeProviderReportedTokenUsage } from "./aiDoctorProviderUsageRules";
 
-export {
-  type AiDoctorPromptMeasurement,
-} from "./costDomains";
+export { type AiDoctorPromptMeasurement } from "./costDomains";
 
 /**
  * Attaches a provider-reported token usage object to an existing

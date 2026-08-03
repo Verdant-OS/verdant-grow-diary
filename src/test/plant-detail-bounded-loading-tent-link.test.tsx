@@ -165,14 +165,11 @@ describe("PlantDetail bounded loading", () => {
     expect(slow).toHaveAttribute("role", "alert");
     expect(screen.queryByTestId("plant-detail-loading")).toBeNull();
     // Safe escape route always available in the bounded-loading surface.
-    expect(
-      screen.getByRole("link", { name: /back to plants/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /back to plants/i })).toBeInTheDocument();
     // Bounded retry: clicking Retry calls refetch.
     fireEvent.click(screen.getByTestId("plant-detail-loading-slow-retry"));
     expect(refetch).toHaveBeenCalledTimes(1);
   });
-
 
   it("never mounts AI Doctor surfaces while loading or in a bounded-loading state (no unrelated fetch fan-out)", () => {
     mockState = { data: null, isLoading: true, isError: false };

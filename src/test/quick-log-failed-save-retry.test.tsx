@@ -25,9 +25,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
-    data: [
-      { id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" },
-    ],
+    data: [{ id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" }],
   }),
 }));
 vi.mock("@/hooks/use-tents", () => ({
@@ -57,11 +55,7 @@ function renderSheet(defaultTargetKey: string) {
   });
   render(
     <QueryClientProvider client={client}>
-      <QuickLogV2Sheet
-        open={true}
-        onOpenChange={vi.fn()}
-        defaultTargetKey={defaultTargetKey}
-      />
+      <QuickLogV2Sheet open={true} onOpenChange={vi.fn()} defaultTargetKey={defaultTargetKey} />
     </QueryClientProvider>,
   );
 }
@@ -82,9 +76,7 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
     fireEvent.click(screen.getByRole("button", { name: "Note" }));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    await waitFor(() =>
-      expect(screen.getByTestId("qlv2-error")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("qlv2-error")).toBeInTheDocument());
     expect(screen.getByTestId("qlv2-save-retry")).toBeInTheDocument();
   });
 
@@ -126,9 +118,7 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
     renderSheet("plant:plant-1");
     fireEvent.click(screen.getByRole("button", { name: "Note" }));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() =>
-      expect(screen.getByTestId("qlv2-save-retry")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("qlv2-save-retry")).toBeInTheDocument());
 
     fireEvent.click(screen.getByTestId("qlv2-save-retry"));
     await waitFor(() =>
@@ -163,13 +153,12 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
     renderSheet("plant:plant-1");
     fireEvent.click(screen.getByRole("button", { name: "Note" }));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    return waitFor(() =>
-      expect(screen.getByTestId("qlv2-save-retry")).toBeInTheDocument(),
-    ).then(async () => {
-      fireEvent.click(screen.getByTestId("qlv2-save-retry"));
-      await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(2));
-      expect(rpcMock.mock.calls[1][0]).toBe("quicklog_save_manual");
-    });
+    return waitFor(() => expect(screen.getByTestId("qlv2-save-retry")).toBeInTheDocument()).then(
+      async () => {
+        fireEvent.click(screen.getByTestId("qlv2-save-retry"));
+        await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(2));
+        expect(rpcMock.mock.calls[1][0]).toBe("quicklog_save_manual");
+      },
+    );
   });
 });
-

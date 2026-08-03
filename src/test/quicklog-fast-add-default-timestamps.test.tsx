@@ -16,17 +16,14 @@ const FIXED = new Date("2026-06-04T10:00:00.000Z");
 const now = () => FIXED;
 
 describe("buildFastAddTimestampDefaults", () => {
-  it.each([
-    ["diary_note"],
-    ["watering"],
-    ["feeding"],
-    ["photo"],
-    ["harvest"],
-  ] as const)("defaults occurred_at to now for %s", (id) => {
-    const d = buildFastAddTimestampDefaults(id, now);
-    expect(d.occurred_at).toBe(FIXED.toISOString());
-    expect(d.captured_at).toBeUndefined();
-  });
+  it.each([["diary_note"], ["watering"], ["feeding"], ["photo"], ["harvest"]] as const)(
+    "defaults occurred_at to now for %s",
+    (id) => {
+      const d = buildFastAddTimestampDefaults(id, now);
+      expect(d.occurred_at).toBe(FIXED.toISOString());
+      expect(d.captured_at).toBeUndefined();
+    },
+  );
 
   it.each([["environment"], ["training"]] as const)(
     "defaults both captured_at and occurred_at for %s",
@@ -96,10 +93,7 @@ describe("applyFastAddTimestampDefaults — never overwrites user edits", () => 
 });
 
 describe("fastAddActionRules — static safety", () => {
-  const SRC = readFileSync(
-    resolve(__dirname, "../lib/fastAddActionRules.ts"),
-    "utf8",
-  );
+  const SRC = readFileSync(resolve(__dirname, "../lib/fastAddActionRules.ts"), "utf8");
   it("performs no writes / network / device control", () => {
     expect(SRC).not.toMatch(/service_role/i);
     expect(SRC).not.toMatch(/bridge_token/i);

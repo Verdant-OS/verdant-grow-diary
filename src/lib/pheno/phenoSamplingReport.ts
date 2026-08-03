@@ -45,8 +45,7 @@ export function summarizeByCandidate(
     const avg =
       numeric.length === 0
         ? null
-        : Math.round((numeric.reduce((a, b) => a + b, 0) / numeric.length) * 100) /
-          100;
+        : Math.round((numeric.reduce((a, b) => a + b, 0) / numeric.length) * 100) / 100;
     rows.push({
       candidateId,
       submissions: rows_.length,
@@ -141,16 +140,13 @@ export function buildCandidateReportHtml(
     )
     .join("");
 
-  const introHtml = PHENO_SAMPLING_INTRO_PARAGRAPHS.map(
-    (p) => `<p>${escapeHtml(p)}</p>`,
-  ).join("");
+  const introHtml = PHENO_SAMPLING_INTRO_PARAGRAPHS.map((p) => `<p>${escapeHtml(p)}</p>`).join("");
   const pointsHtml = PHENO_SAMPLING_COMPARISON_POINTS.map(
-    (p) =>
-      `<li><strong>${escapeHtml(p.label)}:</strong> ${escapeHtml(p.description)}</li>`,
+    (p) => `<li><strong>${escapeHtml(p.label)}:</strong> ${escapeHtml(p.description)}</li>`,
   ).join("");
-  const safetyHtml = PHENO_REPORT_SAFETY_LINES.map(
-    (line) => `<li>${escapeHtml(line)}</li>`,
-  ).join("");
+  const safetyHtml = PHENO_REPORT_SAFETY_LINES.map((line) => `<li>${escapeHtml(line)}</li>`).join(
+    "",
+  );
 
   const title = `${PHENO_SAMPLING_HEADING} — ${candidate.candidateLabel ?? candidate.candidateId}`;
 

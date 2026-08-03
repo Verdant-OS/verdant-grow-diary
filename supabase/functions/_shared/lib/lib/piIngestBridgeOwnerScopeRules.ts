@@ -41,8 +41,7 @@ function isNonEmptyString(v: unknown): v is string {
 export function evaluateBridgeOwnerScope(
   input: EvaluateBridgeOwnerScopeInput,
 ): BridgeOwnerScopeResult {
-  const { credential, tentOwnerUserId } =
-    input ?? ({} as EvaluateBridgeOwnerScopeInput);
+  const { credential, tentOwnerUserId } = input ?? ({} as EvaluateBridgeOwnerScopeInput);
 
   if (!credential || !isNonEmptyString(credential.userId)) {
     return { ok: false, reason: "unknown_bridge" };

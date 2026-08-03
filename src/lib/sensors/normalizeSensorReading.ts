@@ -15,13 +15,7 @@
  */
 import { calculateVPD } from "./calculateVPD";
 
-export type SensorTruthSource =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid";
+export type SensorTruthSource = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 
 export type SensorSourceIdentity =
   | "manual_entry"
@@ -90,8 +84,8 @@ export interface NormalizedSensorReading {
 
 const DEFAULT_STALE_AFTER_MINUTES = 60;
 
-const C_TO_F = (c: number): number => Math.round((c * 9 / 5 + 32) * 100) / 100;
-const F_TO_C = (f: number): number => Math.round(((f - 32) * 5 / 9) * 100) / 100;
+const C_TO_F = (c: number): number => Math.round(((c * 9) / 5 + 32) * 100) / 100;
+const F_TO_C = (f: number): number => Math.round((((f - 32) * 5) / 9) * 100) / 100;
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
 function num(v: unknown): number | null {
@@ -105,7 +99,10 @@ function num(v: unknown): number | null {
   return null;
 }
 
-function pickNum(src: Record<string, unknown>, keys: readonly string[]): { key: string; value: number } | null {
+function pickNum(
+  src: Record<string, unknown>,
+  keys: readonly string[],
+): { key: string; value: number } | null {
   for (const k of keys) {
     if (k in src) {
       const n = num(src[k]);
@@ -157,7 +154,8 @@ export function normalizeSensorReading(
       ? options.staleAfterMinutes
       : DEFAULT_STALE_AFTER_MINUTES;
 
-  const received_at = (options.receivedAt && parseDate(options.receivedAt)?.toISOString()) || now.toISOString();
+  const received_at =
+    (options.receivedAt && parseDate(options.receivedAt)?.toISOString()) || now.toISOString();
 
   const capturedDate = parseDate(options.capturedAt ?? null);
   const captured_at = capturedDate ? capturedDate.toISOString() : null;

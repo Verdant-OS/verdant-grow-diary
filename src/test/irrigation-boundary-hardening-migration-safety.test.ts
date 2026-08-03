@@ -59,10 +59,15 @@ describe("irrigation boundary-hardening migration safety", () => {
 
   it("rejects a same-key different-request in BOTH the pre-check and the race handler", () => {
     // Pre-check uses IF FOUND AND ... so the pinned duplicate IF FOUND THEN block is untouched.
-    expect(sql).toMatch(/IF FOUND AND v_request_hash IS NOT NULL AND v_existing_hash IS NOT NULL AND v_existing_hash <> v_request_hash THEN/);
+    expect(sql).toMatch(
+      /IF FOUND AND v_request_hash IS NOT NULL AND v_existing_hash IS NOT NULL AND v_existing_hash <> v_request_hash THEN/,
+    );
     expect((sql.match(/'idempotency_key_conflict'/g) ?? []).length).toBeGreaterThanOrEqual(2);
     // Both the pre-check SELECT and the race re-read pull request_hash.
-    expect((sql.match(/SELECT grow_event_id, request_hash INTO v_existing, v_existing_hash/g) ?? []).length).toBe(2);
+    expect(
+      (sql.match(/SELECT grow_event_id, request_hash INTO v_existing, v_existing_hash/g) ?? [])
+        .length,
+    ).toBe(2);
   });
 
   it("sets the hash via a follow-on UPDATE, keeping the pinned 3-column INSERT", () => {
@@ -73,7 +78,9 @@ describe("irrigation boundary-hardening migration safety", () => {
       /UPDATE public\.quicklog_idempotency SET request_hash = v_request_hash\s*WHERE user_id = uid AND idempotency_key = p_idempotency_key/,
     );
     // No 4-column idempotency insert.
-    expect(sql).not.toMatch(/INSERT INTO public\.quicklog_idempotency \(user_id, idempotency_key, grow_event_id, request_hash\)/);
+    expect(sql).not.toMatch(
+      /INSERT INTO public\.quicklog_idempotency \(user_id, idempotency_key, grow_event_id, request_hash\)/,
+    );
   });
 
   it("adds stricter typed-payload validation under the single invalid_typed_payload code", () => {
@@ -90,10 +97,18 @@ describe("irrigation boundary-hardening migration safety", () => {
     const reasons = new Set(Array.from(sql.matchAll(/'reason', '([a-z_]+)'/g)).map((m) => m[1]));
     // Every reason code is either a pre-existing v2 code or one of the two new ones.
     const allowed = new Set([
-      "not_authenticated", "invalid_idempotency_key", "invalid_event_type",
-      "invalid_typed_payload", "grow_not_owned", "tent_not_in_grow",
-      "plant_not_in_grow", "plant_not_in_tent", "invalid_sensor_metric",
-      "invalid_sensor_source", "invalid_sensor_captured_at", "save_failed",
+      "not_authenticated",
+      "invalid_idempotency_key",
+      "invalid_event_type",
+      "invalid_typed_payload",
+      "grow_not_owned",
+      "tent_not_in_grow",
+      "plant_not_in_grow",
+      "plant_not_in_tent",
+      "invalid_sensor_metric",
+      "invalid_sensor_source",
+      "invalid_sensor_captured_at",
+      "save_failed",
       "idempotency_key_conflict",
     ]);
     for (const r of reasons) expect(allowed.has(r), `unexpected reason ${r}`).toBe(true);
@@ -101,7 +116,9 @@ describe("irrigation boundary-hardening migration safety", () => {
 
   it("introduces no device-control / fake-live / alert / action-queue surface", () => {
     const body = sql.match(/\$function\$([\s\S]*?)\$function\$/)![1];
-    expect(body).not.toMatch(/\b(actuator|relay|fan_on|light_on_cmd|pump|dose|valve|switch_on|switch_off|device_control)\b/i);
+    expect(body).not.toMatch(
+      /\b(actuator|relay|fan_on|light_on_cmd|pump|dose|valve|switch_on|switch_off|device_control)\b/i,
+    );
     expect(body).not.toMatch(/'live'|\bsynced\b|\bconnected\b/i);
     expect(body).not.toMatch(/\bpublic\.(alerts|action_queue|ai_doctor_sessions)\b/i);
     expect(body).not.toMatch(/\bSQLERRM\b/);

@@ -18,9 +18,7 @@ import type {
   AiDoctorDiagnosisResult,
 } from "@/lib/aiDoctorEnginePhase1Foundation";
 
-function emptyContext(
-  overrides: Partial<AiDoctorContextPayload> = {},
-): AiDoctorContextPayload {
+function emptyContext(overrides: Partial<AiDoctorContextPayload> = {}): AiDoctorContextPayload {
   return {
     grow_id: "g1",
     tent_id: "t1",
@@ -42,9 +40,7 @@ function emptyContext(
   };
 }
 
-function baseResult(
-  overrides: Partial<AiDoctorDiagnosisResult> = {},
-): AiDoctorDiagnosisResult {
+function baseResult(overrides: Partial<AiDoctorDiagnosisResult> = {}): AiDoctorDiagnosisResult {
   return {
     summary: "S",
     likely_issue: "L",

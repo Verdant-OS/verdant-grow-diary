@@ -17,11 +17,7 @@ import { render, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  deriveAlertWhyContext,
-  WHY_PREFIX,
-  type AlertLike,
-} from "@/lib/alertWhyContext";
+import { deriveAlertWhyContext, WHY_PREFIX, type AlertLike } from "@/lib/alertWhyContext";
 import {
   clearTemperatureUnitPreference,
   saveTemperatureUnitPreference,
@@ -42,8 +38,7 @@ const VEG_TEMP_HIGH: AlertLike = {
 const FLOWER_VPD_HIGH: AlertLike = {
   metric: "vpd",
   title: "VPD above stage range",
-  reason:
-    "VPD is above the flower target range. Observed 1.9 kPa (flower range 1 kPa–1.5 kPa).",
+  reason: "VPD is above the flower target range. Observed 1.9 kPa (flower range 1 kPa–1.5 kPa).",
 };
 
 const LATE_FLOWER_RH_HIGH: AlertLike = {
@@ -56,8 +51,7 @@ const LATE_FLOWER_RH_HIGH: AlertLike = {
 const LEGACY_GENERIC_TEMP: AlertLike = {
   metric: "temp",
   title: "Temperature above default range",
-  reason:
-    "Temperature is above the default safe range. Observed 33°C (default range 18°C–30°C).",
+  reason: "Temperature is above the default safe range. Observed 33°C (default range 18°C–30°C).",
 };
 
 const UNKNOWN_STAGE_ALERT: AlertLike = {
@@ -172,14 +166,8 @@ describe("AlertWhyContext presenter", () => {
 // --------------------------------------------------------------------------
 // Static safety contract
 // --------------------------------------------------------------------------
-const HELPER_SRC = readFileSync(
-  resolve(__dirname, "../lib/alertWhyContext.ts"),
-  "utf8",
-);
-const COMP_SRC = readFileSync(
-  resolve(__dirname, "../components/AlertWhyContext.tsx"),
-  "utf8",
-);
+const HELPER_SRC = readFileSync(resolve(__dirname, "../lib/alertWhyContext.ts"), "utf8");
+const COMP_SRC = readFileSync(resolve(__dirname, "../components/AlertWhyContext.tsx"), "utf8");
 
 describe("static safety", () => {
   for (const [name, src] of [

@@ -47,45 +47,27 @@ describe("buildSensorSnapshotEvidenceRefs — rejection paths", () => {
   it("returns [] for null/undefined/non-object input", () => {
     expect(buildSensorSnapshotEvidenceRefs(null)).toEqual([]);
     expect(buildSensorSnapshotEvidenceRefs(undefined)).toEqual([]);
-    expect(buildSensorSnapshotEvidenceRefs("nope" as unknown as never)).toEqual(
-      [],
-    );
+    expect(buildSensorSnapshotEvidenceRefs("nope" as unknown as never)).toEqual([]);
     expect(buildSensorSnapshotEvidenceRefs(42 as unknown as never)).toEqual([]);
     expect(buildSensorSnapshotEvidenceRefs([] as unknown as never)).toEqual([]);
   });
 
   it("returns [] when id is missing/empty/non-string", () => {
-    expect(
-      buildSensorSnapshotEvidenceRefs({ ...VALID, id: undefined }),
-    ).toEqual([]);
+    expect(buildSensorSnapshotEvidenceRefs({ ...VALID, id: undefined })).toEqual([]);
     expect(buildSensorSnapshotEvidenceRefs({ ...VALID, id: "" })).toEqual([]);
-    expect(buildSensorSnapshotEvidenceRefs({ ...VALID, id: "   " })).toEqual(
-      [],
-    );
-    expect(buildSensorSnapshotEvidenceRefs({ ...VALID, id: 12345 })).toEqual(
-      [],
-    );
+    expect(buildSensorSnapshotEvidenceRefs({ ...VALID, id: "   " })).toEqual([]);
+    expect(buildSensorSnapshotEvidenceRefs({ ...VALID, id: 12345 })).toEqual([]);
   });
 
   it("returns [] when captured_at is missing/empty/non-string", () => {
-    expect(
-      buildSensorSnapshotEvidenceRefs({ ...VALID, captured_at: undefined }),
-    ).toEqual([]);
-    expect(
-      buildSensorSnapshotEvidenceRefs({ ...VALID, captured_at: "" }),
-    ).toEqual([]);
-    expect(
-      buildSensorSnapshotEvidenceRefs({ ...VALID, captured_at: 0 }),
-    ).toEqual([]);
+    expect(buildSensorSnapshotEvidenceRefs({ ...VALID, captured_at: undefined })).toEqual([]);
+    expect(buildSensorSnapshotEvidenceRefs({ ...VALID, captured_at: "" })).toEqual([]);
+    expect(buildSensorSnapshotEvidenceRefs({ ...VALID, captured_at: 0 })).toEqual([]);
   });
 
   it("returns [] for non-truth sources (unavailable, empty)", () => {
-    expect(
-      buildSensorSnapshotEvidenceRefs({ ...VALID, source: "unavailable" }),
-    ).toEqual([]);
-    expect(buildSensorSnapshotEvidenceRefs({ ...VALID, source: "" })).toEqual(
-      [],
-    );
+    expect(buildSensorSnapshotEvidenceRefs({ ...VALID, source: "unavailable" })).toEqual([]);
+    expect(buildSensorSnapshotEvidenceRefs({ ...VALID, source: "" })).toEqual([]);
   });
 
   it("rejects entries that carry raw_payload or other forbidden fields", () => {
@@ -123,9 +105,7 @@ describe("buildSensorSnapshotEvidenceRefs — rejection paths", () => {
       { id: "x", captured_at: "y", source: { not: "string" } },
     ];
     for (const w of weird) {
-      expect(() =>
-        buildSensorSnapshotEvidenceRefs(w as never),
-      ).not.toThrow();
+      expect(() => buildSensorSnapshotEvidenceRefs(w as never)).not.toThrow();
     }
   });
 });
@@ -134,26 +114,16 @@ describe("buildSensorSnapshotLabel", () => {
   it("returns deterministic, diagnosis-free labels", () => {
     expect(buildSensorSnapshotLabel("vpd")).toBe("VPD sensor snapshot");
     expect(buildSensorSnapshotLabel("temp")).toBe("Temperature sensor snapshot");
-    expect(buildSensorSnapshotLabel("temperature")).toBe(
-      "Temperature sensor snapshot",
-    );
+    expect(buildSensorSnapshotLabel("temperature")).toBe("Temperature sensor snapshot");
     expect(buildSensorSnapshotLabel("rh")).toBe("Humidity sensor snapshot");
     expect(buildSensorSnapshotLabel("co2")).toBe("CO2 sensor snapshot");
     expect(buildSensorSnapshotLabel(undefined)).toBe("Sensor snapshot");
     expect(buildSensorSnapshotLabel(123 as unknown)).toBe("Sensor snapshot");
-    expect(buildSensorSnapshotLabel("totally-unknown-metric")).toBe(
-      "Sensor snapshot",
-    );
+    expect(buildSensorSnapshotLabel("totally-unknown-metric")).toBe("Sensor snapshot");
   });
 
   it("labels never contain certainty or diagnosis tokens", () => {
-    const banned = [
-      "guaranteed",
-      "definitely",
-      "certain",
-      "healthy",
-      "diagnos",
-    ];
+    const banned = ["guaranteed", "definitely", "certain", "healthy", "diagnos"];
     const samples = ["vpd", "temp", "rh", "co2", "ppfd", "soil", "ec", "x"];
     for (const s of samples) {
       const label = buildSensorSnapshotLabel(s).toLowerCase();

@@ -88,9 +88,7 @@ describe("EnvironmentStabilityCard presenter", () => {
       />,
     );
     const why = screen.getByTestId("card-why-context");
-    expect(why.textContent).toBe(
-      "Target for reference: Flower VPD target: 1.0–1.5 kPa",
-    );
+    expect(why.textContent).toBe("Target for reference: Flower VPD target: 1.0–1.5 kPa");
     expect(screen.getByTestId("card-inactive-note").textContent).toContain(
       "No directly measured VPD readings",
     );

@@ -23,8 +23,7 @@ export const COPY_TRACE_LINK_FAILURE_COPY = "Could not copy trace link";
 export const COPY_TRACE_LINK_TESTID = "copy-trace-link-button";
 export const COPY_TRACE_LINK_STATUS_TESTID = "copy-trace-link-status";
 
-const HIGHLIGHT_TOKEN_RE =
-  /^action-queue:([A-Za-z0-9_-]{1,64}):(approved|rejected)$/;
+const HIGHLIGHT_TOKEN_RE = /^action-queue:([A-Za-z0-9_-]{1,64}):(approved|rejected)$/;
 const HIGHLIGHT_PARAM = "highlight";
 
 export interface CopyableTraceLink {
@@ -62,10 +61,7 @@ function resolveOrigin(override?: string | null): string | null {
   return null;
 }
 
-function buildRelativePath(
-  highlight: string,
-  actionsReturn: string | null | undefined,
-): string {
+function buildRelativePath(highlight: string, actionsReturn: string | null | undefined): string {
   // If a safe actionsReturn is supplied, MERGE the highlight into it so
   // the operator returns to their exact /actions state AND the row
   // stays marked. Strip any pre-existing `highlight` so it cannot

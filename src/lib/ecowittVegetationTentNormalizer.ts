@@ -34,9 +34,7 @@ export function normalizeEcowittVegetationTentPayload(
 
   const airRaw = toNumberOrNull(payload[VEGETATION_TENT_CHANNEL_MAP.air_temp_f]);
   const humRaw = toNumberOrNull(payload[VEGETATION_TENT_CHANNEL_MAP.humidity_pct]);
-  const sm1Raw = toNumberOrNull(
-    payload[VEGETATION_TENT_CHANNEL_MAP.soil_moisture_pct_primary],
-  );
+  const sm1Raw = toNumberOrNull(payload[VEGETATION_TENT_CHANNEL_MAP.soil_moisture_pct_primary]);
 
   const air = inRangeOrNull(airRaw, -40, 200);
   const hum = inRangeOrNull(humRaw, 0, 100);
@@ -70,9 +68,7 @@ export function normalizeEcowittVegetationTentPayload(
   else source = "live";
 
   const captured_at_iso =
-    capturedAt !== null && Number.isFinite(capturedAt)
-      ? new Date(capturedAt).toISOString()
-      : null;
+    capturedAt !== null && Number.isFinite(capturedAt) ? new Date(capturedAt).toISOString() : null;
 
   return {
     source,

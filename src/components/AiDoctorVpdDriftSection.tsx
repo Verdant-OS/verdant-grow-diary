@@ -32,27 +32,12 @@ const TONE_CLASSES: Record<string, string> = {
 
 function StatusIcon({ status }: { status: AiDoctorVpdDriftPresenterStatus }) {
   if (status === "in_band") {
-    return (
-      <CheckCircle2
-        className="h-3.5 w-3.5 text-emerald-500 shrink-0"
-        aria-hidden="true"
-      />
-    );
+    return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" aria-hidden="true" />;
   }
   if (status === "sustained_high" || status === "sustained_low") {
-    return (
-      <AlertTriangle
-        className="h-3.5 w-3.5 text-amber-500 shrink-0"
-        aria-hidden="true"
-      />
-    );
+    return <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" aria-hidden="true" />;
   }
-  return (
-    <Info
-      className="h-3.5 w-3.5 text-muted-foreground shrink-0"
-      aria-hidden="true"
-    />
-  );
+  return <Info className="h-3.5 w-3.5 text-muted-foreground shrink-0" aria-hidden="true" />;
 }
 
 export default function AiDoctorVpdDriftSection({
@@ -72,10 +57,7 @@ export default function AiDoctorVpdDriftSection({
       className={`rounded-md border border-border/40 bg-background/30 p-3 space-y-1.5 ${className ?? ""}`.trim()}
     >
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h3
-          id={`${testId}-heading`}
-          className="text-xs font-semibold tracking-tight"
-        >
+        <h3 id={`${testId}-heading`} className="text-xs font-semibold tracking-tight">
           {vm.headingLabel}
         </h3>
         <span
@@ -93,22 +75,14 @@ export default function AiDoctorVpdDriftSection({
           {vm.currentVpdLabel ? (
             <>
               {" "}
-              ≈{" "}
-              <strong data-testid={`${testId}-current`}>
-                {vm.currentVpdLabel}
-              </strong>
+              ≈ <strong data-testid={`${testId}-current`}>{vm.currentVpdLabel}</strong>
             </>
           ) : (
-            <span data-testid={`${testId}-current-unavailable`}>
-              {" "}
-              — value unavailable
-            </span>
+            <span data-testid={`${testId}-current-unavailable`}> — value unavailable</span>
           )}
         </span>
         {vm.targetBandLabel ? (
-          <span data-testid={`${testId}-band`}>
-            target {vm.targetBandLabel}
-          </span>
+          <span data-testid={`${testId}-band`}>target {vm.targetBandLabel}</span>
         ) : null}
       </div>
 

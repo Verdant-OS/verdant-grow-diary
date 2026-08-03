@@ -56,11 +56,7 @@ export function evaluateBridgeTentScope(
   }
 
   const allowed = credential.allowedTentIds;
-  if (
-    !Array.isArray(allowed) ||
-    allowed.length === 0 ||
-    !allowed.includes(tentId)
-  ) {
+  if (!Array.isArray(allowed) || allowed.length === 0 || !allowed.includes(tentId)) {
     return { ok: false, reason: "tent_not_allowed" };
   }
 

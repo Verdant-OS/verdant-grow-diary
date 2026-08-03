@@ -41,9 +41,7 @@ import { classifySnapshotTrustBadge } from "@/lib/sensorSnapshotTrustBadgeRules"
 const NOW = new Date("2026-06-02T12:00:00Z");
 const FIVE_MIN_AGO = "2026-06-02T11:55:00Z";
 
-function strictSnap(
-  partial: Partial<StrictSensorSnapshot> = {},
-): StrictSensorSnapshot {
+function strictSnap(partial: Partial<StrictSensorSnapshot> = {}): StrictSensorSnapshot {
   return {
     ...EMPTY_SENSOR_SNAPSHOT,
     sensor_snapshot_id: "s1",

@@ -2,16 +2,11 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
-const SRC = readFileSync(
-  resolve(__dirname, "../pages/GrowRoomMode.tsx"),
-  "utf8",
-);
+const SRC = readFileSync(resolve(__dirname, "../pages/GrowRoomMode.tsx"), "utf8");
 
 describe("GrowRoomMode VPD stage-missing info badge", () => {
   it("still imports the canonical stage-aware VPD helper", () => {
-    expect(SRC).toMatch(
-      /classifyVpdAgainstStage[\s\S]*from\s+["']@\/lib\/vpdStageTargetRules["']/,
-    );
+    expect(SRC).toMatch(/classifyVpdAgainstStage[\s\S]*from\s+["']@\/lib\/vpdStageTargetRules["']/);
   });
 
   it("uses the shared VpdStageMissingBadge component", () => {

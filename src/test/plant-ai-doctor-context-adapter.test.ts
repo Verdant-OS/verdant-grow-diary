@@ -63,9 +63,7 @@ describe("plantAiDoctorContextAdapter", () => {
         grow_id: "g1",
         tent_id: "t1",
       },
-      diaryEntries: [
-        { entry_at: ago(12 * HOUR), entry_type: "watering" },
-      ],
+      diaryEntries: [{ entry_at: ago(12 * HOUR), entry_type: "watering" }],
       manualSensorLogs: [
         {
           capturedAt: ago(2 * HOUR),

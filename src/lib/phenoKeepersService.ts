@@ -20,10 +20,7 @@ import {
   type Channel,
 } from "@/lib/genetics/breedingReproductionRules";
 import { hasReversal } from "@/lib/phenoReversalsService";
-import {
-  sanitizeStabilityRuns,
-  type StabilityRun,
-} from "@/lib/phenoStabilityRunRules";
+import { sanitizeStabilityRuns, type StabilityRun } from "@/lib/phenoStabilityRunRules";
 
 export interface KeeperRow {
   readonly id: string;
@@ -185,7 +182,11 @@ export async function updateKeeperStabilityRuns(input: {
     .select("id")
     .maybeSingle();
   if (error) return { ok: false, error: error.message };
-  if (!data) return { ok: false, error: "Stability runs were not saved (keeper missing or write rejected)." };
+  if (!data)
+    return {
+      ok: false,
+      error: "Stability runs were not saved (keeper missing or write rejected).",
+    };
   return { ok: true, id: data.id as string };
 }
 

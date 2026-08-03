@@ -11,14 +11,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
-const PLANT_DETAIL = readFileSync(
-  resolve(ROOT, "src/pages/PlantDetail.tsx"),
-  "utf8",
-);
-const TENT_DETAIL = readFileSync(
-  resolve(ROOT, "src/pages/TentDetail.tsx"),
-  "utf8",
-);
+const PLANT_DETAIL = readFileSync(resolve(ROOT, "src/pages/PlantDetail.tsx"), "utf8");
+const TENT_DETAIL = readFileSync(resolve(ROOT, "src/pages/TentDetail.tsx"), "utf8");
 
 describe("PlantDetail tent relationship visibility", () => {
   it("renders the assigned tent name when a tent is present", () => {
@@ -65,9 +59,7 @@ describe("TentDetail plant cards + empty state", () => {
     // both in the header and the empty state — confirm at least one inside
     // the empty branch by checking ordering against the empty testid).
     const emptyIdx = TENT_DETAIL.indexOf('data-testid="tent-detail-plants-empty"');
-    const emptyCtaIdx = TENT_DETAIL.indexOf(
-      'data-testid="tent-detail-empty-add-plant"',
-    );
+    const emptyCtaIdx = TENT_DETAIL.indexOf('data-testid="tent-detail-empty-add-plant"');
     expect(emptyIdx).toBeGreaterThan(-1);
     expect(emptyCtaIdx).toBeGreaterThan(emptyIdx);
   });

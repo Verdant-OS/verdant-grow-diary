@@ -41,9 +41,7 @@ function isValidIsoDate(v: unknown): v is string {
  * Validate and normalize a sensor snapshot payload prior to embedding in a
  * Quick Log diary companion row.
  */
-export function validateQuickLogSensorSnapshot(
-  raw: unknown,
-): QuickLogSnapshotValidation {
+export function validateQuickLogSensorSnapshot(raw: unknown): QuickLogSnapshotValidation {
   if (raw === null || raw === undefined) {
     return { ok: true, snapshot: null };
   }

@@ -115,8 +115,7 @@ for (const step of STEPS) {
 
 console.log("\n=== EcoWitt V0 validation summary ===");
 for (const r of results) {
-  const mark =
-    r.status === "pass" ? "PASS" : r.status === "fail" ? "FAIL" : "SKIP";
+  const mark = r.status === "pass" ? "PASS" : r.status === "fail" ? "FAIL" : "SKIP";
   console.log(`[${mark}] ${r.name}${r.note ? ` (${r.note})` : ""}`);
 }
 

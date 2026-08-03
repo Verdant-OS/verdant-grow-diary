@@ -19,13 +19,11 @@ export const DAILY_CHECK_EMPTY_NO_PLANT_TITLE = "Add a plant first." as const;
 export const DAILY_CHECK_EMPTY_NO_PLANT_BODY =
   "Quick Log is plant-centered. Without a plant, missing context stays unknown — never marked healthy." as const;
 
-export const DAILY_CHECK_EMPTY_NO_SELECTED_PLANT_TITLE =
-  "Pick a plant to log against." as const;
+export const DAILY_CHECK_EMPTY_NO_SELECTED_PLANT_TITLE = "Pick a plant to log against." as const;
 export const DAILY_CHECK_EMPTY_NO_SELECTED_PLANT_BODY =
   "Choose a plant above. Missing plant context stays unknown — Quick Log will not infer plant health." as const;
 
-export const DAILY_CHECK_EMPTY_PLANT_NEEDS_TENT_TITLE =
-  "Assign a tent to this plant." as const;
+export const DAILY_CHECK_EMPTY_PLANT_NEEDS_TENT_TITLE = "Assign a tent to this plant." as const;
 export const DAILY_CHECK_EMPTY_PLANT_NEEDS_TENT_BODY =
   "Sensor snapshots need a tent assignment. Without one, manual readings can't be attached and missing data stays unknown." as const;
 

@@ -88,10 +88,7 @@ function BulletList({
     );
   }
   return (
-    <ul
-      className="list-disc pl-4 space-y-0.5 text-xs"
-      data-testid={testId}
-    >
+    <ul className="list-disc pl-4 space-y-0.5 text-xs" data-testid={testId}>
       {items.map((it, idx) => (
         <li key={`${idx}-${it}`}>{it}</li>
       ))}
@@ -145,18 +142,12 @@ function CopyPreviewSummary({
         {copied ? "Copied" : "Copy preview summary"}
       </Button>
       {copied && (
-        <span
-          className="text-xs text-emerald-300"
-          data-testid="ai-doctor-check-in-copy-success"
-        >
+        <span className="text-xs text-emerald-300" data-testid="ai-doctor-check-in-copy-success">
           Preview summary copied.
         </span>
       )}
       {copyError && (
-        <span
-          className="text-xs text-amber-300"
-          data-testid="ai-doctor-check-in-copy-error"
-        >
+        <span className="text-xs text-amber-300" data-testid="ai-doctor-check-in-copy-error">
           Copy unavailable. You can manually select the preview text.
         </span>
       )}
@@ -164,11 +155,7 @@ function CopyPreviewSummary({
   );
 }
 
-type SaveOutcome =
-  | { kind: "idle" }
-  | { kind: "saved" }
-  | { kind: "duplicate" }
-  | { kind: "error" };
+type SaveOutcome = { kind: "idle" } | { kind: "saved" } | { kind: "duplicate" } | { kind: "error" };
 
 function SavePreviewToDiary({
   view,
@@ -257,32 +244,21 @@ function SavePreviewToDiary({
           {confirmation.buttonLabel}
         </Button>
       </DialogTrigger>
-      <DialogContent
-        className="max-w-lg"
-        data-testid="ai-doctor-manual-save-confirmation-dialog"
-      >
+      <DialogContent className="max-w-lg" data-testid="ai-doctor-manual-save-confirmation-dialog">
         <DialogHeader>
           <DialogTitle>Save preview to diary</DialogTitle>
           <DialogDescription>{confirmation.copy.intro}</DialogDescription>
         </DialogHeader>
 
         {confirmation.status === "blocked" ? (
-          <div
-            className="space-y-2"
-            data-testid="ai-doctor-manual-save-blocked"
-          >
-            <p className="text-xs text-amber-300">
-              Cannot prepare a save draft yet.
-            </p>
+          <div className="space-y-2" data-testid="ai-doctor-manual-save-blocked">
+            <p className="text-xs text-amber-300">Cannot prepare a save draft yet.</p>
             <ul
               className="list-disc pl-4 text-xs space-y-0.5"
               data-testid="ai-doctor-manual-save-blocked-reasons"
             >
               {confirmation.reasons.map((r) => (
-                <li
-                  key={r}
-                  data-testid={`ai-doctor-manual-save-blocked-reason-${r}`}
-                >
+                <li key={r} data-testid={`ai-doctor-manual-save-blocked-reason-${r}`}>
                   {r}
                 </li>
               ))}
@@ -300,25 +276,18 @@ function SavePreviewToDiary({
             </div>
           </div>
         ) : (
-          <div
-            className="space-y-3 text-xs"
-            data-testid="ai-doctor-manual-save-ready"
-          >
+          <div className="space-y-3 text-xs" data-testid="ai-doctor-manual-save-ready">
             <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1">
               {confirmation.plant.name ? (
                 <>
                   <dt className="text-muted-foreground">Plant</dt>
-                  <dd data-testid="ai-doctor-manual-save-plant-name">
-                    {confirmation.plant.name}
-                  </dd>
+                  <dd data-testid="ai-doctor-manual-save-plant-name">{confirmation.plant.name}</dd>
                 </>
               ) : null}
               {confirmation.plant.id ? (
                 <>
                   <dt className="text-muted-foreground">Plant ID</dt>
-                  <dd data-testid="ai-doctor-manual-save-plant-id">
-                    {confirmation.plant.id}
-                  </dd>
+                  <dd data-testid="ai-doctor-manual-save-plant-id">{confirmation.plant.id}</dd>
                 </>
               ) : null}
               {confirmation.plant.stage ? (
@@ -330,26 +299,16 @@ function SavePreviewToDiary({
                 </>
               ) : null}
               <dt className="text-muted-foreground">Event type</dt>
-              <dd data-testid="ai-doctor-manual-save-event-type">
-                {confirmation.eventTypeLabel}
-              </dd>
+              <dd data-testid="ai-doctor-manual-save-event-type">{confirmation.eventTypeLabel}</dd>
               <dt className="text-muted-foreground">Source</dt>
-              <dd data-testid="ai-doctor-manual-save-source">
-                {confirmation.sourceLabel}
-              </dd>
+              <dd data-testid="ai-doctor-manual-save-source">{confirmation.sourceLabel}</dd>
               <dt className="text-muted-foreground">Idempotency</dt>
-              <dd
-                className="font-mono"
-                data-testid="ai-doctor-manual-save-idempotency"
-              >
+              <dd className="font-mono" data-testid="ai-doctor-manual-save-idempotency">
                 {confirmation.idempotencyKeyShort}
               </dd>
             </dl>
 
-            <div
-              className="flex flex-wrap gap-1"
-              data-testid="ai-doctor-manual-save-safety-labels"
-            >
+            <div className="flex flex-wrap gap-1" data-testid="ai-doctor-manual-save-safety-labels">
               {confirmation.safetyLabels.map((label) => (
                 <span
                   key={label}
@@ -368,10 +327,7 @@ function SavePreviewToDiary({
                 </p>
                 <ul className="list-disc pl-4 space-y-0.5">
                   {confirmation.limitations.map((l) => (
-                    <li
-                      key={l.code}
-                      data-testid={`ai-doctor-manual-save-limitation-${l.code}`}
-                    >
+                    <li key={l.code} data-testid={`ai-doctor-manual-save-limitation-${l.code}`}>
                       {l.message}
                     </li>
                   ))}
@@ -380,38 +336,23 @@ function SavePreviewToDiary({
             ) : null}
 
             <div className="space-y-1 text-muted-foreground">
-              <p data-testid="ai-doctor-manual-save-copy-no-model">
-                {confirmation.copy.noModel}
-              </p>
-              <p data-testid="ai-doctor-manual-save-copy-no-alerts">
-                {confirmation.copy.noAlerts}
-              </p>
-              <p data-testid="ai-doctor-manual-save-copy-cancel">
-                {confirmation.copy.cancel}
-              </p>
+              <p data-testid="ai-doctor-manual-save-copy-no-model">{confirmation.copy.noModel}</p>
+              <p data-testid="ai-doctor-manual-save-copy-no-alerts">{confirmation.copy.noAlerts}</p>
+              <p data-testid="ai-doctor-manual-save-copy-cancel">{confirmation.copy.cancel}</p>
             </div>
 
             {outcome.kind === "saved" ? (
-              <p
-                className="text-xs text-emerald-300"
-                data-testid="ai-doctor-manual-save-success"
-              >
+              <p className="text-xs text-emerald-300" data-testid="ai-doctor-manual-save-success">
                 {AI_DOCTOR_MANUAL_SAVE_SUCCESS_MESSAGE}
               </p>
             ) : null}
             {outcome.kind === "duplicate" ? (
-              <p
-                className="text-xs text-emerald-300"
-                data-testid="ai-doctor-manual-save-duplicate"
-              >
+              <p className="text-xs text-emerald-300" data-testid="ai-doctor-manual-save-duplicate">
                 {AI_DOCTOR_MANUAL_SAVE_DUPLICATE_MESSAGE}
               </p>
             ) : null}
             {outcome.kind === "error" ? (
-              <p
-                className="text-xs text-amber-300"
-                data-testid="ai-doctor-manual-save-error"
-              >
+              <p className="text-xs text-amber-300" data-testid="ai-doctor-manual-save-error">
                 {AI_DOCTOR_MANUAL_SAVE_FAILURE_MESSAGE}
               </p>
             ) : null}
@@ -430,11 +371,7 @@ function SavePreviewToDiary({
                 type="button"
                 size="sm"
                 onClick={handleConfirm}
-                disabled={
-                  saving ||
-                  outcome.kind === "saved" ||
-                  outcome.kind === "duplicate"
-                }
+                disabled={saving || outcome.kind === "saved" || outcome.kind === "duplicate"}
                 data-testid="ai-doctor-manual-save-confirm-button"
               >
                 {saving ? confirmation.savingLabel : confirmation.confirmLabel}
@@ -446,8 +383,6 @@ function SavePreviewToDiary({
     </Dialog>
   );
 }
-
-
 
 function PreviewBody({
   view,
@@ -503,9 +438,7 @@ function PreviewBody({
         {view.likelyIssue ? (
           <p className="text-xs">
             <span className="text-muted-foreground">Likely issue: </span>
-            <span data-testid="ai-doctor-check-in-preview-likely-issue">
-              {view.likelyIssue}
-            </span>
+            <span data-testid="ai-doctor-check-in-preview-likely-issue">{view.likelyIssue}</span>
           </p>
         ) : null}
       </Section>
@@ -518,10 +451,7 @@ function PreviewBody({
         />
       </Section>
 
-      <Section
-        title="Missing information"
-        testId="ai-doctor-check-in-preview-missing-section"
-      >
+      <Section title="Missing information" testId="ai-doctor-check-in-preview-missing-section">
         <BulletList
           items={view.missingInformation}
           testId="ai-doctor-check-in-preview-missing"
@@ -529,36 +459,18 @@ function PreviewBody({
         />
       </Section>
 
-      <Section
-        title="Possible causes"
-        testId="ai-doctor-check-in-preview-causes-section"
-      >
-        <BulletList
-          items={view.possibleCauses}
-          testId="ai-doctor-check-in-preview-causes"
-        />
+      <Section title="Possible causes" testId="ai-doctor-check-in-preview-causes-section">
+        <BulletList items={view.possibleCauses} testId="ai-doctor-check-in-preview-causes" />
       </Section>
 
-      <Section
-        title="Immediate action"
-        testId="ai-doctor-check-in-preview-immediate-section"
-      >
-        <p
-          className="text-xs"
-          data-testid="ai-doctor-check-in-preview-immediate"
-        >
+      <Section title="Immediate action" testId="ai-doctor-check-in-preview-immediate-section">
+        <p className="text-xs" data-testid="ai-doctor-check-in-preview-immediate">
           {view.immediateAction}
         </p>
       </Section>
 
-      <Section
-        title="What not to do"
-        testId="ai-doctor-check-in-preview-never-section"
-      >
-        <BulletList
-          items={view.whatNotToDo}
-          testId="ai-doctor-check-in-preview-never"
-        />
+      <Section title="What not to do" testId="ai-doctor-check-in-preview-never-section">
+        <BulletList items={view.whatNotToDo} testId="ai-doctor-check-in-preview-never" />
       </Section>
 
       <Section title="24-hour follow-up" testId="ai-doctor-check-in-preview-24h-section">
@@ -567,29 +479,20 @@ function PreviewBody({
         </p>
       </Section>
 
-      <Section
-        title="3-day recovery plan"
-        testId="ai-doctor-check-in-preview-3d-section"
-      >
+      <Section title="3-day recovery plan" testId="ai-doctor-check-in-preview-3d-section">
         <p className="text-xs" data-testid="ai-doctor-check-in-preview-3d">
           {view.recoveryPlan3Day}
         </p>
       </Section>
 
       {view.limitations.length > 0 ? (
-        <Section
-          title="Data limitations"
-          testId="ai-doctor-check-in-preview-limitations-section"
-        >
+        <Section title="Data limitations" testId="ai-doctor-check-in-preview-limitations-section">
           <ul
             className="list-disc pl-4 space-y-0.5 text-xs"
             data-testid="ai-doctor-check-in-preview-limitations"
           >
             {view.limitations.map((l) => (
-              <li
-                key={l.code}
-                data-testid={`ai-doctor-check-in-preview-limitation-${l.code}`}
-              >
+              <li key={l.code} data-testid={`ai-doctor-check-in-preview-limitation-${l.code}`}>
                 {l.message}
               </li>
             ))}
@@ -611,8 +514,7 @@ function PreviewBody({
             {view.actionQueueSuggestion.reason}
           </p>
           <p className="text-[10px] text-muted-foreground">
-            Status: {view.actionQueueSuggestion.status} · Type: advisory · Not
-            created.
+            Status: {view.actionQueueSuggestion.status} · Type: advisory · Not created.
           </p>
         </Section>
       ) : null}
@@ -622,10 +524,7 @@ function PreviewBody({
 
 function PreviewFallback() {
   return (
-    <p
-      className="text-xs text-muted-foreground"
-      data-testid="ai-doctor-check-in-preview-fallback"
-    >
+    <p className="text-xs text-muted-foreground" data-testid="ai-doctor-check-in-preview-fallback">
       AI Doctor preview is not available right now. Nothing was saved.
     </p>
   );
@@ -670,8 +569,8 @@ export default function AiDoctorCheckInPreviewPanel({
           <DialogHeader>
             <DialogTitle>Preview AI Doctor Check-In</DialogTitle>
             <DialogDescription>
-              Deterministic, local preview only. No diagnoses, alerts, or
-              Action Queue items are created.
+              Deterministic, local preview only. No diagnoses, alerts, or Action Queue items are
+              created.
             </DialogDescription>
           </DialogHeader>
           {view ? <PreviewBody view={view} context={context} /> : <PreviewFallback />}

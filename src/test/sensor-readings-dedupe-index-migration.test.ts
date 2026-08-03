@@ -11,9 +11,7 @@ const sql = readFileSync(MIGRATION_PATH, "utf8");
 
 describe("sensor_readings dedupe index + canonical source migration", () => {
   it("drops the existing partial unique index", () => {
-    expect(sql).toMatch(
-      /DROP INDEX IF EXISTS public\.sensor_readings_dedupe_uidx/,
-    );
+    expect(sql).toMatch(/DROP INDEX IF EXISTS public\.sensor_readings_dedupe_uidx/);
   });
 
   it("recreates sensor_readings_dedupe_uidx as a non-partial unique index", () => {
@@ -51,13 +49,7 @@ describe("sensor_readings dedupe index + canonical source migration", () => {
   });
 
   it("preserves back-compat source labels in validate_sensor_reading", () => {
-    for (const label of [
-      "ecowitt",
-      "mqtt",
-      "webhook",
-      "pi_bridge",
-      "webhook_generic",
-    ]) {
+    for (const label of ["ecowitt", "mqtt", "webhook", "pi_bridge", "webhook_generic"]) {
       expect(sql).toContain(`'${label}'`);
     }
   });

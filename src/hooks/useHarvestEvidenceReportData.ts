@@ -54,12 +54,9 @@ export function useHarvestEvidenceReportData(
     return [
       {
         plantId: plant.id,
-        plantName:
-          (plant as { name?: string | null }).name ?? null,
-        strain:
-          (plant as { strain?: string | null }).strain ?? null,
-        stage:
-          (plant as { stage?: string | null }).stage ?? null,
+        plantName: (plant as { name?: string | null }).name ?? null,
+        strain: (plant as { strain?: string | null }).strain ?? null,
+        stage: (plant as { stage?: string | null }).stage ?? null,
         // No explicit inspection windows yet — viewModel falls back to
         // weekly ISO buckets. Future slices can pass real windows.
         inspectionWindows: null,
@@ -73,8 +70,7 @@ export function useHarvestEvidenceReportData(
   const isEmpty =
     !isLoading &&
     !isError &&
-    (plantInputs.length === 0 ||
-      (plantInputs[0]?.rows?.length ?? 0) === 0);
+    (plantInputs.length === 0 || (plantInputs[0]?.rows?.length ?? 0) === 0);
 
   return { plantInputs, isLoading, isError, isEmpty };
 }

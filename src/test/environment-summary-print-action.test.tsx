@@ -105,9 +105,7 @@ vi.mock("@/integrations/supabase/client", () => {
               {
                 get(_t2, p2: string) {
                   supabaseCalls.count += 1;
-                  if (
-                    ["insert", "update", "delete", "upsert", "rpc"].includes(p2)
-                  ) {
+                  if (["insert", "update", "delete", "upsert", "rpc"].includes(p2)) {
                     throw new Error(`Forbidden Supabase write: ${p2}`);
                   }
                   return () => proxy;
@@ -137,10 +135,7 @@ function renderAt(path: string) {
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route
-            path="/diary/environment-summary"
-            element={<EnvironmentSummaryReportPage />}
-          />
+          <Route path="/diary/environment-summary" element={<EnvironmentSummaryReportPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -168,9 +163,7 @@ describe("EnvironmentSummaryReportPage — print/download action", () => {
     planMock.current = "pro";
     renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
     const btn = screen.getByTestId("env-report-download-pdf");
-    expect(btn.getAttribute("aria-label")).toBe(
-      "Download environment summary report PDF",
-    );
+    expect(btn.getAttribute("aria-label")).toBe("Download environment summary report PDF");
     expect(btn.getAttribute("data-filename")).toBe(
       "verdant-environment-summary-2026-06-01-to-2026-06-07.pdf",
     );
@@ -178,14 +171,10 @@ describe("EnvironmentSummaryReportPage — print/download action", () => {
 
   it("clicking Download PDF opens pre-print modal; confirm records audit + calls window.print", () => {
     planMock.current = "pro";
-    const printSpy = vi
-      .spyOn(window, "print")
-      .mockImplementation(() => undefined);
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch" as any)
-      .mockImplementation((() => {
-        throw new Error("fetch not allowed");
-      }) as any);
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => undefined);
+    const fetchSpy = vi.spyOn(globalThis, "fetch" as any).mockImplementation((() => {
+      throw new Error("fetch not allowed");
+    }) as any);
     renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
     const before = supabaseCalls.count;
     fireEvent.click(screen.getByTestId("env-report-download-pdf"));
@@ -208,9 +197,7 @@ describe("EnvironmentSummaryReportPage — print/download action", () => {
 
   it("cancelling pre-print modal does not record audit or call window.print", () => {
     planMock.current = "pro";
-    const printSpy = vi
-      .spyOn(window, "print")
-      .mockImplementation(() => undefined);
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => undefined);
     renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
     fireEvent.click(screen.getByTestId("env-report-download-pdf"));
     fireEvent.click(screen.getByTestId("env-report-pre-print-modal-cancel"));
@@ -227,9 +214,7 @@ describe("EnvironmentSummaryReportPage — print/download action", () => {
 
   it("printable section includes safety footer, DST-ambiguous and invalid labels", () => {
     planMock.current = "pro";
-    const { container } = renderAt(
-      "/diary/environment-summary?start=2026-06-01&end=2026-06-07",
-    );
+    const { container } = renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
     const section = container.querySelector(
       '[data-print-section="environment-summary-report"]',
     ) as HTMLElement;

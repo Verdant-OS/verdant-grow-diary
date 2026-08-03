@@ -17,10 +17,7 @@ import {
   OUTCOME_STATUSES,
   type OutcomeStatus,
 } from "@/lib/actionOutcomeRules";
-import {
-  OUTCOME_STATUS_LABEL,
-  UNKNOWN_OUTCOME_LABEL,
-} from "@/lib/relatedActionOutcomeRules";
+import { OUTCOME_STATUS_LABEL, UNKNOWN_OUTCOME_LABEL } from "@/lib/relatedActionOutcomeRules";
 
 // ---------------------------------------------------------------------------
 // Thresholds + labels
@@ -121,10 +118,7 @@ function nonEmptyString(v: unknown): string | null {
 }
 
 function isOutcomeStatus(v: unknown): v is OutcomeStatus {
-  return (
-    typeof v === "string" &&
-    (OUTCOME_STATUSES as readonly string[]).includes(v)
-  );
+  return typeof v === "string" && (OUTCOME_STATUSES as readonly string[]).includes(v);
 }
 
 function parseTs(v: unknown): number | null {
@@ -188,8 +182,7 @@ export function buildActionOutcomeLearningReport(
       ? Math.floor(options.exampleLimit as number)
       : 5;
   const groupThreshold =
-    Number.isFinite(options.groupSampleThreshold) &&
-    (options.groupSampleThreshold as number) > 0
+    Number.isFinite(options.groupSampleThreshold) && (options.groupSampleThreshold as number) > 0
       ? Math.floor(options.groupSampleThreshold as number)
       : LEARNING_GROUP_SAMPLE_THRESHOLD;
 
@@ -233,9 +226,7 @@ export function buildActionOutcomeLearningReport(
     .map((r) => {
       const d = r.details ?? {};
       const rawStatus = d.outcome_status;
-      const status: OutcomeStatus | "unknown" = isOutcomeStatus(rawStatus)
-        ? rawStatus
-        : "unknown";
+      const status: OutcomeStatus | "unknown" = isOutcomeStatus(rawStatus) ? rawStatus : "unknown";
       const label = isOutcomeStatus(rawStatus)
         ? OUTCOME_STATUS_LABEL[rawStatus]
         : UNKNOWN_OUTCOME_LABEL;

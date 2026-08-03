@@ -54,9 +54,7 @@ describe("resolveImportedSensorHistoryReadStatus", () => {
   });
 });
 
-function row(
-  overrides: Partial<ImportedSensorHistoryInputRow>,
-): ImportedSensorHistoryInputRow {
+function row(overrides: Partial<ImportedSensorHistoryInputRow>): ImportedSensorHistoryInputRow {
   return {
     tent_id: "tent-A",
     source: "csv",
@@ -81,11 +79,7 @@ describe("buildImportedSensorHistoryViewModel — empty + summary", () => {
 
   it("returns isEmpty when no CSV-sourced readings exist", () => {
     const vm = buildImportedSensorHistoryViewModel({
-      readings: [
-        row({ source: "live" }),
-        row({ source: "manual" }),
-        row({ source: "demo" }),
-      ],
+      readings: [row({ source: "live" }), row({ source: "manual" }), row({ source: "demo" })],
     });
     expect(vm.isEmpty).toBe(true);
   });
@@ -102,9 +96,7 @@ describe("buildImportedSensorHistoryViewModel — empty + summary", () => {
     expect(vm.totalCount).toBe(3);
     expect(vm.metrics).toEqual(["co2_ppm", "humidity_pct", "temperature_c"]);
     expect(
-      vm.recentRows.every((r) =>
-        ["temperature_c", "humidity_pct", "co2_ppm"].includes(r.metric),
-      ),
+      vm.recentRows.every((r) => ["temperature_c", "humidity_pct", "co2_ppm"].includes(r.metric)),
     ).toBe(true);
   });
 
@@ -262,12 +254,7 @@ describe("static safety — view model + panel files", () => {
       }
     });
     it(`${rel} never writes to alerts / action_queue / device control`, () => {
-      for (const banned of [
-        "action_queue",
-        "deviceControl",
-        "device_control",
-        "automation",
-      ]) {
+      for (const banned of ["action_queue", "deviceControl", "device_control", "automation"]) {
         expect(code).not.toContain(banned);
       }
       expect(code).not.toMatch(/from\(["']alerts["']\)/);

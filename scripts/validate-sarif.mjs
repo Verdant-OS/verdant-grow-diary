@@ -20,8 +20,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 const SARIF_SCHEMA_VERSION = "2.1.0";
-const SARIF_SCHEMA_URL_PREFIX =
-  "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/";
+const SARIF_SCHEMA_URL_PREFIX = "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/";
 
 const args = process.argv.slice(2);
 const jsonOut = args.includes("--json");
@@ -153,7 +152,10 @@ function validateResult(res, base, ruleIds) {
 
   // locations
   if (!Array.isArray(res.locations) || res.locations.length === 0) {
-    err(`${base}.locations`, "required non-empty array (GitHub needs a physicalLocation to anchor the alert)");
+    err(
+      `${base}.locations`,
+      "required non-empty array (GitHub needs a physicalLocation to anchor the alert)",
+    );
   } else {
     res.locations.forEach((loc, i) => validateLocation(loc, `${base}.locations[${i}]`));
   }

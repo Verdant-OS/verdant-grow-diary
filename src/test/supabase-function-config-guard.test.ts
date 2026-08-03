@@ -15,9 +15,7 @@ import {
 
 describe("parseSupabaseFunctionNames", () => {
   it("parses a basic [functions.foo] block", () => {
-    expect(parseSupabaseFunctionNames(`[functions.foo]\nverify_jwt = false\n`)).toEqual([
-      "foo",
-    ]);
+    expect(parseSupabaseFunctionNames(`[functions.foo]\nverify_jwt = false\n`)).toEqual(["foo"]);
   });
 
   it("tolerates whitespace inside brackets", () => {
@@ -87,12 +85,7 @@ verify_jwt = false
 # [functions.retired]
 [functions."delta-one"]
 `;
-    expect(parseSupabaseFunctionNames(toml)).toEqual([
-      "alpha",
-      "bravo",
-      "charlie",
-      "delta-one",
-    ]);
+    expect(parseSupabaseFunctionNames(toml)).toEqual(["alpha", "bravo", "charlie", "delta-one"]);
   });
 
   it("returns [] for empty input", () => {
@@ -171,9 +164,7 @@ verify_jwt = false
     });
     const webhook = missing.find((m) => m.name === "shelly-ht-webhook")!;
     expect(webhook.configPath).toBe("supabase/config.toml");
-    expect(webhook.expectedPath).toBe(
-      "supabase/functions/shelly-ht-webhook/index.ts",
-    );
+    expect(webhook.expectedPath).toBe("supabase/functions/shelly-ht-webhook/index.ts");
     expect(webhook.message).toBe(formatMissingSourceError("shelly-ht-webhook"));
   });
 
@@ -183,10 +174,7 @@ verify_jwt = false
       exists: () => false,
       filter: isShellyHtFunctionName,
     });
-    expect(missing.map((m) => m.name).sort()).toEqual([
-      "shelly-ht-status",
-      "shelly-ht-webhook",
-    ]);
+    expect(missing.map((m) => m.name).sort()).toEqual(["shelly-ht-status", "shelly-ht-webhook"]);
     expect(missing.find((m) => m.name === "unrelated")).toBeUndefined();
   });
 

@@ -18,10 +18,7 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import {
-  applyQuickLogV2Refresh,
-  type QuickLogV2RefreshClient,
-} from "@/lib/quickLogV2RefreshRules";
+import { applyQuickLogV2Refresh, type QuickLogV2RefreshClient } from "@/lib/quickLogV2RefreshRules";
 import { buildEnvironmentCheckDetails } from "@/lib/environmentCheckQuickLogRules";
 
 // ---------------------------------------------------------------------------
@@ -31,8 +28,7 @@ import { buildEnvironmentCheckDetails } from "@/lib/environmentCheckQuickLogRule
 function makeClient() {
   const invalidate = vi.fn();
   const client: QuickLogV2RefreshClient = {
-    invalidateQueries:
-      invalidate as unknown as QuickLogV2RefreshClient["invalidateQueries"],
+    invalidateQueries: invalidate as unknown as QuickLogV2RefreshClient["invalidateQueries"],
     getQueryCache: () => ({ findAll: () => [] }),
   };
   return { client, invalidate };
@@ -58,9 +54,7 @@ describe("Quick Log save refreshes timeline evidence", () => {
     expect(out).toContain(JSON.stringify(["timeline_memory"]));
     expect(out).toContain(JSON.stringify(["diary_entries"]));
     expect(out).toContain(JSON.stringify(["grow_events"]));
-    expect(out).toContain(
-      JSON.stringify(["plant_recent_activity", "plant-1"]),
-    );
+    expect(out).toContain(JSON.stringify(["plant_recent_activity", "plant-1"]));
   });
 
   it("tent target invalidates tent-scoped grouped timeline", () => {
@@ -71,9 +65,7 @@ describe("Quick Log save refreshes timeline evidence", () => {
       tentId: "tent-9",
     });
     const out = invalidatedHeads(invalidate);
-    expect(out).toContain(
-      JSON.stringify(["quick_log_grouped_timeline", "tent-9"]),
-    );
+    expect(out).toContain(JSON.stringify(["quick_log_grouped_timeline", "tent-9"]));
     expect(out).toContain(JSON.stringify(["tent_recent_activity", "tent-9"]));
   });
 });
@@ -139,9 +131,7 @@ describe("Quick Log v2 surface — diary-first safety boundaries", () => {
       expect(src).not.toMatch(
         /\bturn (on|off) (the )?(fan|light|pump|heater|humidifier|dehumidifier)/i,
       );
-      expect(src).not.toMatch(
-        /\bactivate (the )?(fan|light|pump|heater|humidifier|dehumidifier)/i,
-      );
+      expect(src).not.toMatch(/\bactivate (the )?(fan|light|pump|heater|humidifier|dehumidifier)/i);
     });
   }
 });

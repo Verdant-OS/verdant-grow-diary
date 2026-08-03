@@ -82,10 +82,7 @@ const baseCtx: CitationContext = {
 
 describe("aiDoctorEvidenceCitationRules", () => {
   it("maps a humidity recommendation to the accepted Env Check metric", () => {
-    const c = resolveEvidenceCitation(
-      "Review humidity trend before changing equipment.",
-      baseCtx,
-    );
+    const c = resolveEvidenceCitation("Review humidity trend before changing equipment.", baseCtx);
     expect(c.kind).toBe("env_metric");
     expect(c.healthy).toBe(true);
     expect(c.label).toMatch(/humidity_pct/);
@@ -103,10 +100,7 @@ describe("aiDoctorEvidenceCitationRules", () => {
   });
 
   it("maps a diary/photo recommendation to diary_photo_missing when none exist", () => {
-    const c = resolveEvidenceCitation(
-      "Monitor plant posture for 24 hours.",
-      baseCtx,
-    );
+    const c = resolveEvidenceCitation("Monitor plant posture for 24 hours.", baseCtx);
     expect(c.kind).toBe("diary_photo_missing");
     expect(c.label).toBe("Diary/Photos missing");
   });
@@ -132,11 +126,7 @@ describe("aiDoctorEvidenceCitationRules", () => {
   });
 
   it("never labels local Env Check evidence as Live in any citation", () => {
-    const recs = [
-      "Review humidity.",
-      "Check the temperature.",
-      "Review VPD trend.",
-    ];
+    const recs = ["Review humidity.", "Check the temperature.", "Review VPD trend."];
     const out = citeRecommendations(recs, baseCtx);
     for (const r of out) {
       expect(r.citation.label).not.toMatch(/\blive\b/i);
@@ -160,17 +150,9 @@ describe("AiDoctorDiagnosisPanel — accessibility + collapsible Evidence basis"
         hasRecentDiary: true,
       }),
     );
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={baseDiagnosis}
-        evidenceAlignment={alignment}
-      />,
-    );
+    render(<AiDoctorDiagnosisPanel diagnosis={baseDiagnosis} evidenceAlignment={alignment} />);
     const label = screen.getByTestId("ai-doctor-diagnosis-posture-label");
-    expect(label).toHaveAttribute(
-      "aria-label",
-      expect.stringContaining("Strong context"),
-    );
+    expect(label).toHaveAttribute("aria-label", expect.stringContaining("Strong context"));
     expect(label).toHaveTextContent("Strong context");
   });
 
@@ -181,12 +163,7 @@ describe("AiDoctorDiagnosisPanel — accessibility + collapsible Evidence basis"
         envCheckRejectedCount: 1,
       }),
     );
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={baseDiagnosis}
-        evidenceAlignment={alignment}
-      />,
-    );
+    render(<AiDoctorDiagnosisPanel diagnosis={baseDiagnosis} evidenceAlignment={alignment} />);
     const toggle = screen.getByTestId("ai-doctor-diagnosis-evidence-toggle");
     expect(toggle).toHaveAttribute("aria-expanded", "true"); // weak_context default open
     fireEvent.click(toggle);
@@ -200,28 +177,20 @@ describe("AiDoctorDiagnosisPanel — accessibility + collapsible Evidence basis"
         envCheckRejectedCount: 1,
       }),
     );
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={baseDiagnosis}
-        evidenceAlignment={alignment}
-      />,
+    render(<AiDoctorDiagnosisPanel diagnosis={baseDiagnosis} evidenceAlignment={alignment} />);
+    expect(screen.getByTestId("ai-doctor-diagnosis-evidence-toggle")).toHaveAttribute(
+      "aria-expanded",
+      "true",
     );
-    expect(
-      screen.getByTestId("ai-doctor-diagnosis-evidence-toggle"),
-    ).toHaveAttribute("aria-expanded", "true");
   });
 
   it("defaults open for insufficient_context", () => {
     const alignment = buildDiagnosisEvidenceAlignmentVM(alignmentInput());
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={baseDiagnosis}
-        evidenceAlignment={alignment}
-      />,
+    render(<AiDoctorDiagnosisPanel diagnosis={baseDiagnosis} evidenceAlignment={alignment} />);
+    expect(screen.getByTestId("ai-doctor-diagnosis-evidence-toggle")).toHaveAttribute(
+      "aria-expanded",
+      "true",
     );
-    expect(
-      screen.getByTestId("ai-doctor-diagnosis-evidence-toggle"),
-    ).toHaveAttribute("aria-expanded", "true");
   });
 
   it("defaults collapsed for moderate_context", () => {
@@ -231,15 +200,11 @@ describe("AiDoctorDiagnosisPanel — accessibility + collapsible Evidence basis"
         liveSensorUsable: true,
       }),
     );
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={baseDiagnosis}
-        evidenceAlignment={alignment}
-      />,
+    render(<AiDoctorDiagnosisPanel diagnosis={baseDiagnosis} evidenceAlignment={alignment} />);
+    expect(screen.getByTestId("ai-doctor-diagnosis-evidence-toggle")).toHaveAttribute(
+      "aria-expanded",
+      "false",
     );
-    expect(
-      screen.getByTestId("ai-doctor-diagnosis-evidence-toggle"),
-    ).toHaveAttribute("aria-expanded", "false");
   });
 
   it("defaults collapsed for strong_context", () => {
@@ -252,28 +217,17 @@ describe("AiDoctorDiagnosisPanel — accessibility + collapsible Evidence basis"
         hasRecentDiary: true,
       }),
     );
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={baseDiagnosis}
-        evidenceAlignment={alignment}
-      />,
+    render(<AiDoctorDiagnosisPanel diagnosis={baseDiagnosis} evidenceAlignment={alignment} />);
+    expect(screen.getByTestId("ai-doctor-diagnosis-evidence-toggle")).toHaveAttribute(
+      "aria-expanded",
+      "false",
     );
-    expect(
-      screen.getByTestId("ai-doctor-diagnosis-evidence-toggle"),
-    ).toHaveAttribute("aria-expanded", "false");
   });
 
   it("evidence-alignment section uses a semantic region with an accessible heading", () => {
     const alignment = buildDiagnosisEvidenceAlignmentVM(alignmentInput());
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={baseDiagnosis}
-        evidenceAlignment={alignment}
-      />,
-    );
-    const region = screen.getByTestId(
-      "ai-doctor-diagnosis-evidence-alignment",
-    );
+    render(<AiDoctorDiagnosisPanel diagnosis={baseDiagnosis} evidenceAlignment={alignment} />);
+    const region = screen.getByTestId("ai-doctor-diagnosis-evidence-alignment");
     expect(region).toHaveAttribute("role", "region");
     const headingId = region.getAttribute("aria-labelledby");
     expect(headingId).toBeTruthy();
@@ -283,12 +237,7 @@ describe("AiDoctorDiagnosisPanel — accessibility + collapsible Evidence basis"
 
   it("toggle has visible focus state utility classes", () => {
     const alignment = buildDiagnosisEvidenceAlignmentVM(alignmentInput());
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={baseDiagnosis}
-        evidenceAlignment={alignment}
-      />,
-    );
+    render(<AiDoctorDiagnosisPanel diagnosis={baseDiagnosis} evidenceAlignment={alignment} />);
     const toggle = screen.getByTestId("ai-doctor-diagnosis-evidence-toggle");
     expect(toggle.className).toMatch(/focus-visible:ring/);
   });
@@ -296,73 +245,36 @@ describe("AiDoctorDiagnosisPanel — accessibility + collapsible Evidence basis"
 
 describe("AiDoctorDiagnosisPanel — inline recommendation citations", () => {
   it("renders citation badge mapped to Env Check metric", () => {
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={baseDiagnosis}
-        citationContext={baseCtx}
-      />,
-    );
-    const citation = screen.getByTestId(
-      "ai-doctor-diagnosis-recommended-actions-citation-0",
-    );
+    render(<AiDoctorDiagnosisPanel diagnosis={baseDiagnosis} citationContext={baseCtx} />);
+    const citation = screen.getByTestId("ai-doctor-diagnosis-recommended-actions-citation-0");
     expect(citation).toHaveTextContent(/humidity_pct/);
     expect(citation).toHaveAttribute("data-citation-kind", "env_metric");
     expect(citation).toHaveAttribute("data-citation-healthy", "true");
   });
 
   it("renders missing-context citation for soil moisture", () => {
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={baseDiagnosis}
-        citationContext={baseCtx}
-      />,
-    );
-    const citation = screen.getByTestId(
-      "ai-doctor-diagnosis-recommended-actions-citation-1",
-    );
+    render(<AiDoctorDiagnosisPanel diagnosis={baseDiagnosis} citationContext={baseCtx} />);
+    const citation = screen.getByTestId("ai-doctor-diagnosis-recommended-actions-citation-1");
     expect(citation).toHaveTextContent(/Missing: soil_moisture_pct/);
     expect(citation).toHaveAttribute("data-citation-healthy", "false");
   });
 
   it("renders 'Needs more evidence' when no evidence supports the recommendation", () => {
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={baseDiagnosis}
-        citationContext={baseCtx}
-      />,
-    );
-    const citation = screen.getByTestId(
-      "ai-doctor-diagnosis-recommended-actions-citation-3",
-    );
+    render(<AiDoctorDiagnosisPanel diagnosis={baseDiagnosis} citationContext={baseCtx} />);
+    const citation = screen.getByTestId("ai-doctor-diagnosis-recommended-actions-citation-3");
     expect(citation).toHaveTextContent(/Needs more evidence/);
   });
 
   it("never says 'Live' in local Env Check citations", () => {
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={baseDiagnosis}
-        citationContext={baseCtx}
-      />,
-    );
-    const c0 = screen.getByTestId(
-      "ai-doctor-diagnosis-recommended-actions-citation-0",
-    );
+    render(<AiDoctorDiagnosisPanel diagnosis={baseDiagnosis} citationContext={baseCtx} />);
+    const c0 = screen.getByTestId("ai-doctor-diagnosis-recommended-actions-citation-0");
     expect(c0.textContent ?? "").not.toMatch(/\blive\b/i);
   });
 
   it("citation button points at the Evidence used target id", () => {
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={baseDiagnosis}
-        citationContext={baseCtx}
-      />,
-    );
-    const c1 = screen.getByTestId(
-      "ai-doctor-diagnosis-recommended-actions-citation-1",
-    );
-    expect(c1.getAttribute("data-citation-target")).toBe(
-      "evidence-missing-soil-moisture-pct",
-    );
+    render(<AiDoctorDiagnosisPanel diagnosis={baseDiagnosis} citationContext={baseCtx} />);
+    const c1 = screen.getByTestId("ai-doctor-diagnosis-recommended-actions-citation-1");
+    expect(c1.getAttribute("data-citation-target")).toBe("evidence-missing-soil-moisture-pct");
   });
 });
 
@@ -410,10 +322,7 @@ describe("aiDoctorReportRules — text report", () => {
         { key: "co2_ppm", label: "CO2", state: "needed" },
         { key: "humidity_pct", label: "Humidity", state: "complete" },
       ],
-      recommendations: citeRecommendations(
-        baseDiagnosis.recommended_actions,
-        baseCtx,
-      ),
+      recommendations: citeRecommendations(baseDiagnosis.recommended_actions, baseCtx),
     };
   }
 
@@ -434,9 +343,7 @@ describe("aiDoctorReportRules — text report", () => {
     expect(t).toMatch(/\[Env Check: humidity_pct\]/);
     expect(t).toMatch(/\[Missing: soil_moisture_pct\]/);
     expect(t).toMatch(/\[Needs more evidence\]/);
-    expect(t).toMatch(
-      /Local Environment Check evidence is not live telemetry/,
-    );
+    expect(t).toMatch(/Local Environment Check evidence is not live telemetry/);
     expect(t).toMatch(/Derived VPD is context only/);
   });
 
@@ -452,9 +359,7 @@ describe("aiDoctorReportRules — text report", () => {
     expect(cleaned).not.toMatch(/user_id/i);
     expect(cleaned).not.toMatch(/bearer/i);
     expect(cleaned).not.toMatch(/service_role/i);
-    expect(cleaned).not.toMatch(
-      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/,
-    );
+    expect(cleaned).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/);
     expect(cleaned).not.toMatch(/eyJ[a-z0-9_-]+\.eyJ/i);
   });
 
@@ -507,33 +412,17 @@ describe("AiDoctorDiagnosisPanel — download report action", () => {
 
   it("does not render the download button without reportInput", () => {
     render(<AiDoctorDiagnosisPanel diagnosis={baseDiagnosis} />);
-    expect(
-      screen.queryByTestId("ai-doctor-diagnosis-download-report"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-diagnosis-download-report")).toBeNull();
   });
 
   it("renders the download button when a diagnosis + reportInput exist", () => {
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={baseDiagnosis}
-        reportInput={reportInput()}
-      />,
-    );
-    expect(
-      screen.getByTestId("ai-doctor-diagnosis-download-report"),
-    ).toBeInTheDocument();
+    render(<AiDoctorDiagnosisPanel diagnosis={baseDiagnosis} reportInput={reportInput()} />);
+    expect(screen.getByTestId("ai-doctor-diagnosis-download-report")).toBeInTheDocument();
   });
 
   it("clicking the download button triggers a client-side download", async () => {
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={baseDiagnosis}
-        reportInput={reportInput()}
-      />,
-    );
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-diagnosis-download-report"),
-    );
+    render(<AiDoctorDiagnosisPanel diagnosis={baseDiagnosis} reportInput={reportInput()} />);
+    fireEvent.click(screen.getByTestId("ai-doctor-diagnosis-download-report"));
     await waitFor(() => {
       expect(clickSpy).toHaveBeenCalledTimes(1);
     });
@@ -544,10 +433,7 @@ describe("AiDoctorDiagnosisPanel — download report action", () => {
 describe("static safety scan — citation + report files", () => {
   it("no writes / fetch / functions.invoke / device-control strings", async () => {
     const fs = await import("node:fs/promises");
-    const files = [
-      "src/lib/aiDoctorEvidenceCitationRules.ts",
-      "src/lib/aiDoctorReportRules.ts",
-    ];
+    const files = ["src/lib/aiDoctorEvidenceCitationRules.ts", "src/lib/aiDoctorReportRules.ts"];
     for (const f of files) {
       const src = await fs.readFile(f, "utf8");
       expect(src).not.toMatch(/sensor_readings/);

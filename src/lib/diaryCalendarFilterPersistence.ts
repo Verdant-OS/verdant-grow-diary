@@ -21,8 +21,7 @@
  */
 import type { DiaryCalendarFilter } from "@/lib/diaryCalendarViewModel";
 
-export const DIARY_CALENDAR_FILTER_STORAGE_KEY =
-  "verdant.diaryCalendar.filter.v1";
+export const DIARY_CALENDAR_FILTER_STORAGE_KEY = "verdant.diaryCalendar.filter.v1";
 
 export const DIARY_CALENDAR_FILTER_PERSIST_VERSION = 1 as const;
 
@@ -94,9 +93,7 @@ export function readPersistedDiaryCalendarFilter(): DiaryCalendarFilter | null {
   return value;
 }
 
-export function writePersistedDiaryCalendarFilter(
-  value: DiaryCalendarFilter,
-): void {
+export function writePersistedDiaryCalendarFilter(value: DiaryCalendarFilter): void {
   if (!isDiaryCalendarFilter(value)) return;
   const s = safeStorage();
   if (!s) return;

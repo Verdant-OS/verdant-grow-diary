@@ -46,7 +46,9 @@ describe("Timeline — grow filter", () => {
   });
 
   it("introduces no device-control or service_role surface", () => {
-    expect(TIMELINE).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i);
+    expect(TIMELINE).not.toMatch(
+      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i,
+    );
   });
 
   it("does not call ai-coach", () => {

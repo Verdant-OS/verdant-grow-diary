@@ -45,16 +45,11 @@ describe("buildActionDrawerViewModel", () => {
 
   it("maps source to a human label, never the raw enum", () => {
     expect(buildActionDrawerViewModel(BASE).sourceLabel).toBe("AI Doctor");
-    expect(
-      buildActionDrawerViewModel({ ...BASE, source: "environment_alert" })
-        .sourceLabel,
-    ).toBe("Environment Alert");
-    expect(buildActionDrawerViewModel({ ...BASE, source: "manual" }).sourceLabel).toBe(
-      "Manual",
+    expect(buildActionDrawerViewModel({ ...BASE, source: "environment_alert" }).sourceLabel).toBe(
+      "Environment Alert",
     );
-    expect(buildActionDrawerViewModel({ ...BASE, source: "" }).sourceLabel).toBe(
-      "Unknown",
-    );
+    expect(buildActionDrawerViewModel({ ...BASE, source: "manual" }).sourceLabel).toBe("Manual");
+    expect(buildActionDrawerViewModel({ ...BASE, source: "" }).sourceLabel).toBe("Unknown");
   });
 
   it("returns risk and status labels rather than raw enums", () => {
@@ -88,9 +83,7 @@ describe("buildActionDrawerViewModel", () => {
     const vm = buildActionDrawerViewModel(BASE);
     expect(vm.safetyReminder).toBe(ACTION_DRAWER_SAFETY_REMINDER);
     expect(vm.safetyReminder.toLowerCase()).toContain("grower approves");
-    expect(vm.safetyReminder.toLowerCase()).toContain(
-      "no equipment is controlled",
-    );
+    expect(vm.safetyReminder.toLowerCase()).toContain("no equipment is controlled");
   });
 
   it("never surfaces internal id values in any visible field", () => {

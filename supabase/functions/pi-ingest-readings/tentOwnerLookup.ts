@@ -27,7 +27,10 @@ export type PiIngestTentOwnerLookupResponse = {
 
 export type PiIngestTentOwnerLookupQuery = {
   select: (columns: string) => {
-    eq: (column: string, value: string) => {
+    eq: (
+      column: string,
+      value: string,
+    ) => {
       limit: (count: number) => Promise<PiIngestTentOwnerLookupResponse>;
     };
   };
@@ -58,9 +61,7 @@ const FAILURE_MESSAGES: Record<PiIngestTentOwnerLookupFailureReason, string> = {
   tent_owner_lookup_failed: "tent owner lookup failed",
 };
 
-function failure(
-  reason: PiIngestTentOwnerLookupFailureReason,
-): PiIngestTentOwnerLookupResult {
+function failure(reason: PiIngestTentOwnerLookupFailureReason): PiIngestTentOwnerLookupResult {
   return { ok: false, reason, message: FAILURE_MESSAGES[reason] };
 }
 

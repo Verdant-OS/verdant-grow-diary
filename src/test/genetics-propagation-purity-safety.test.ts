@@ -19,7 +19,7 @@ const PURE_MODULES = [
 const FORBIDDEN = [
   "@/integrations/supabase",
   "supabase-js",
-  "from \"react\"",
+  'from "react"',
   "action-queue",
   "ActionQueue",
   "deviceControl",

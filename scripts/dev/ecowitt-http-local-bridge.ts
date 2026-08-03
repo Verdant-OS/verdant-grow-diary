@@ -155,9 +155,7 @@ export function buildMqttMessage(
     transport: TRANSPORT,
     topic,
   };
-  const metricKeys = Object.keys(parsed).filter(
-    (k) => typeof parsed[k] === "number",
-  );
+  const metricKeys = Object.keys(parsed).filter((k) => typeof parsed[k] === "number");
   return {
     topic,
     payload: JSON.stringify(message),
@@ -181,9 +179,7 @@ const defaultPublisherFactory: PublisherFactory = async (flags) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mqtt = await (Function("m", "return import(m)") as any)("mqtt");
   } catch {
-    throw new Error(
-      "mqtt package not installed. Run `bun add mqtt` or use --dry-run.",
-    );
+    throw new Error("mqtt package not installed. Run `bun add mqtt` or use --dry-run.");
   }
   const client = mqtt.connect(flags.mqttUrl, {
     username: flags.mqttUsername ?? undefined,
@@ -197,9 +193,7 @@ const defaultPublisherFactory: PublisherFactory = async (flags) => {
   return {
     publish: (topic, payload) =>
       new Promise<void>((resolve, reject) =>
-        client.publish(topic, payload, (e: Error | undefined) =>
-          e ? reject(e) : resolve(),
-        ),
+        client.publish(topic, payload, (e: Error | undefined) => (e ? reject(e) : resolve())),
       ),
     end: () => new Promise<void>((resolve) => client.end(false, {}, () => resolve())),
   };
@@ -218,7 +212,13 @@ export interface HandleResult {
  * provided publisher. Never touches Supabase, never calls fetch().
  */
 export async function handleRequest(
-  req: { method?: string; url?: string; headers: Record<string, string | string[] | undefined>; body: string; sourceIp?: string },
+  req: {
+    method?: string;
+    url?: string;
+    headers: Record<string, string | string[] | undefined>;
+    body: string;
+    sourceIp?: string;
+  },
   flags: BridgeFlags,
   publisher: MqttPublisher | null,
   now: Date = new Date(),
@@ -263,8 +263,16 @@ export async function handleRequest(
   try {
     await publisher.publish(msg.topic, msg.payload);
   } catch (e) {
-    safeLog("publish_error", { topic: flags.topic, error: e instanceof Error ? e.message : "unknown" });
-    return { status: 502, body: "mqtt_publish_failed", published: false, metricKeys: msg.metricKeys };
+    safeLog("publish_error", {
+      topic: flags.topic,
+      error: e instanceof Error ? e.message : "unknown",
+    });
+    return {
+      status: 502,
+      body: "mqtt_publish_failed",
+      published: false,
+      metricKeys: msg.metricKeys,
+    };
   }
   safeLog("published", {
     method,

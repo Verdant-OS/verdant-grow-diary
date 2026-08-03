@@ -167,8 +167,7 @@ export function buildLauncherFiles(repoRoot: string): Record<string, string> {
       header +
       `"C:\\Program Files\\mosquitto\\mosquitto_sub.exe" -h 127.0.0.1 -p 1883 -t "ecowitt/#" -v\r\n` +
       footer,
-    "02-start-http-bridge.cmd":
-      header + `${cd}\r\nbun run dev:ecowitt-http-bridge\r\n` + footer,
+    "02-start-http-bridge.cmd": header + `${cd}\r\nbun run dev:ecowitt-http-bridge\r\n` + footer,
     "03-test-http-bridge.cmd":
       header +
       `echo FAKE LOCAL TEST PAYLOAD -- not live data\r\n` +
@@ -219,7 +218,11 @@ export function buildLauncherFiles(repoRoot: string): Record<string, string> {
 function realResolve(p: string): string {
   const abs = resolve(p);
   if (existsSync(abs)) {
-    try { return realpathSync(abs); } catch { return abs; }
+    try {
+      return realpathSync(abs);
+    } catch {
+      return abs;
+    }
   }
   const parent = dirname(abs);
   if (parent === abs) return abs;
@@ -235,10 +238,7 @@ export interface LauncherWriteSummary {
   refused: number;
 }
 
-export function writeLaunchers(
-  outDir: string,
-  repoRoot: string,
-): LauncherWriteSummary {
+export function writeLaunchers(outDir: string, repoRoot: string): LauncherWriteSummary {
   // Safety: only ever write under <repo-root>/tmp/ecowitt-windows/.
   if (!isAbsolute(repoRoot)) {
     throw new Error(`refusing to write launchers: repoRoot must be absolute (got: ${repoRoot})`);
@@ -311,10 +311,7 @@ async function main(): Promise<void> {
 
   if (!packageJsonFound) {
     // eslint-disable-next-line no-console
-    console.error(
-      "[ecowitt-doctor] preflight FAILED — package.json not found in cwd:",
-      cwd,
-    );
+    console.error("[ecowitt-doctor] preflight FAILED — package.json not found in cwd:", cwd);
     process.exit(2);
   }
 

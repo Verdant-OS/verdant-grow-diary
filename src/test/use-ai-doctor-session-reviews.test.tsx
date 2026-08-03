@@ -174,24 +174,18 @@ describe("useAiDoctorSessionReviews", () => {
     expect(mockState.calls.select[0]).toContain("session_id");
     expect(mockState.calls.select[0]).toContain("event_type");
     expect(mockState.calls.select[0]).toContain("created_at");
-    expect(mockState.calls.order).toEqual([
-      { column: "created_at", opts: { ascending: true } },
-    ]);
+    expect(mockState.calls.order).toEqual([{ column: "created_at", opts: { ascending: true } }]);
     expect(mockState.calls.limit).toEqual([AI_DOCTOR_SESSION_REVIEWS_MAX_ROWS]);
     // No session-id scoping when called with no argument.
     expect(mockState.calls.in).toEqual([]);
   });
 
   it("projects reviewed status correctly", async () => {
-    mockState.data = [
-      reviewRow("a", SESSION_A, "marked_reviewed", "2026-05-01T10:00:00Z"),
-    ];
+    mockState.data = [reviewRow("a", SESSION_A, "marked_reviewed", "2026-05-01T10:00:00Z")];
     const { wrapper } = wrapperFactory();
     const { result } = renderHook(() => useAiDoctorSessionReviews(), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.stateBySession.get(SESSION_A)?.status).toBe(
-      "reviewed",
-    );
+    expect(result.current.data?.stateBySession.get(SESSION_A)?.status).toBe("reviewed");
   });
 
   it("projects needs_follow_up status correctly", async () => {
@@ -215,9 +209,7 @@ describe("useAiDoctorSessionReviews", () => {
     const { wrapper } = wrapperFactory();
     const { result } = renderHook(() => useAiDoctorSessionReviews(), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.stateBySession.get(SESSION_A)?.status).toBe(
-      "not_reviewed",
-    );
+    expect(result.current.data?.stateBySession.get(SESSION_A)?.status).toBe("not_reviewed");
   });
 
   it("handles multiple sessions independently", async () => {
@@ -229,26 +221,17 @@ describe("useAiDoctorSessionReviews", () => {
     const { wrapper } = wrapperFactory();
     const { result } = renderHook(() => useAiDoctorSessionReviews(), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.stateBySession.get(SESSION_A)?.status).toBe(
-      "needs_follow_up",
-    );
-    expect(result.current.data?.stateBySession.get(SESSION_B)?.status).toBe(
-      "reviewed",
-    );
+    expect(result.current.data?.stateBySession.get(SESSION_A)?.status).toBe("needs_follow_up");
+    expect(result.current.data?.stateBySession.get(SESSION_B)?.status).toBe("reviewed");
   });
 
   it("scopes the query by session IDs when provided", async () => {
     mockState.data = [];
     const { wrapper } = wrapperFactory();
-    renderHook(
-      () => useAiDoctorSessionReviews([SESSION_B, SESSION_A, SESSION_A]),
-      { wrapper },
-    );
+    renderHook(() => useAiDoctorSessionReviews([SESSION_B, SESSION_A, SESSION_A]), { wrapper });
     await waitFor(() => expect(mockState.calls.from.length).toBe(1));
     // De-duped + sorted for stable cache key.
-    expect(mockState.calls.in).toEqual([
-      { column: "session_id", values: [SESSION_A, SESSION_B] },
-    ]);
+    expect(mockState.calls.in).toEqual([{ column: "session_id", values: [SESSION_A, SESSION_B] }]);
   });
 
   it("skips fetching when scoped to an empty session list", async () => {
@@ -273,14 +256,9 @@ describe("useAiDoctorSessionReviews", () => {
   });
 
   it("never invokes write paths, RPC, or edge functions", async () => {
-    mockState.data = [
-      reviewRow("a", SESSION_A, "marked_reviewed", "2026-05-01T10:00:00Z"),
-    ];
+    mockState.data = [reviewRow("a", SESSION_A, "marked_reviewed", "2026-05-01T10:00:00Z")];
     const { wrapper } = wrapperFactory();
-    const { result } = renderHook(
-      () => useAiDoctorSessionReviews([SESSION_A]),
-      { wrapper },
-    );
+    const { result } = renderHook(() => useAiDoctorSessionReviews([SESSION_A]), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockState.calls.insert).toEqual([]);
     expect(mockState.calls.update).toEqual([]);
@@ -317,8 +295,7 @@ describe("static safety scan: useAiDoctorSessionReviews", () => {
   it("hook reads only from the review event table", () => {
     const fromCalls = hookSrc.match(/\.from\(["']([^"']+)["']/g) ?? [];
     // The string literal appears as "ai_doctor_session_reviews" as never).
-    const fromCallsLoose =
-      hookSrc.match(/\.from\(\s*["']([^"']+)["']/g) ?? [];
+    const fromCallsLoose = hookSrc.match(/\.from\(\s*["']([^"']+)["']/g) ?? [];
     const all = [...fromCalls, ...fromCallsLoose];
     for (const call of all) {
       expect(call).toContain("ai_doctor_session_reviews");

@@ -70,14 +70,10 @@ export const RELATIVE_TIMELINE_EMPTY_COPY =
 export const SENSORS_FALLBACK_ROUTE = "/sensors";
 
 /** Human-readable disabled reasons. Never leak IDs/tokens — copy only. */
-export const QUICKLOG_DISABLED_REASON =
-  "Open a plant to add a Quick Log to its timeline.";
-export const PHOTO_DISABLED_REASON =
-  "Open a plant to attach a photo to its timeline.";
+export const QUICKLOG_DISABLED_REASON = "Open a plant to add a Quick Log to its timeline.";
+export const PHOTO_DISABLED_REASON = "Open a plant to attach a photo to its timeline.";
 
-function prefillToDetail(
-  p: PlantQuickLogPrefill | null,
-): RelativeTimelineCtaEventDetail | null {
+function prefillToDetail(p: PlantQuickLogPrefill | null): RelativeTimelineCtaEventDetail | null {
   if (!p) return null;
   return {
     plantId: p.plantId,
@@ -185,4 +181,3 @@ export function buildRelativeTimelineEmptyState(
     ctas: [quicklog, snapshot, photo],
   };
 }
-

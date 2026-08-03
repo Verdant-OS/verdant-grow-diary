@@ -148,8 +148,7 @@ async function feedStatestreamEntity(args: {
     },
     timestamp: {
       topic: `${root}/last_updated`,
-      payloadText:
-        args.capturedAt === undefined ? "" : JSON.stringify(args.capturedAt),
+      payloadText: args.capturedAt === undefined ? "" : JSON.stringify(args.capturedAt),
       retained: false,
     },
   };
@@ -192,23 +191,13 @@ describe("ecowitt-mqtt-runner — HA dry-run VPD pairing", () => {
       }),
     });
     expect(rh.source).toBe("live");
-    expect(rh.readings.map((r) => r.metric)).toEqual([
-      "humidity_pct",
-      "vpd_kpa",
-    ]);
+    expect(rh.readings.map((r) => r.metric)).toEqual(["humidity_pct", "vpd_kpa"]);
 
     const vpd = rh.readings.find((r) => r.metric === "vpd_kpa");
     expect(vpd).toBeTruthy();
-    expect(vpd!.value).toBeCloseTo(
-      calculateAirVpdKpa({ tempF: 78.6, rhPercent: 56 })!,
-      3,
-    );
-    expect(vpd!.entity_id).toBe(
-      `vpd_derived:${TEMP_ENTITY}+${RH_ENTITY}`,
-    );
-    expect(vpd!.idempotency_key.startsWith(`${HA_IDEMPOTENCY_KEY_VERSION}|`)).toBe(
-      true,
-    );
+    expect(vpd!.value).toBeCloseTo(calculateAirVpdKpa({ tempF: 78.6, rhPercent: 56 })!, 3);
+    expect(vpd!.entity_id).toBe(`vpd_derived:${TEMP_ENTITY}+${RH_ENTITY}`);
+    expect(vpd!.idempotency_key.startsWith(`${HA_IDEMPOTENCY_KEY_VERSION}|`)).toBe(true);
     expect(state.readingsEmitted).toBe(3);
 
     const replay = await feed(cfg, state, {

@@ -111,9 +111,7 @@ describe("normalizeDiaryEntries", () => {
 
   it("accepts details as a JSON string when it is a valid object", () => {
     const [e] = normalizeDiaryEntries({
-      rawEntries: [
-        baseRow({ details: JSON.stringify({ ph: 6.5, watering_amount_l: 2 }) }),
-      ],
+      rawEntries: [baseRow({ details: JSON.stringify({ ph: 6.5, watering_amount_l: 2 }) })],
     });
     expect(e.details.ph).toBe(6.5);
     expect(e.details.wateringAmountMl).toBe(2000);
@@ -185,9 +183,7 @@ describe("normalizeDiaryEntries", () => {
 
   it("preserves unknown details keys under extras", () => {
     const [e] = normalizeDiaryEntries({
-      rawEntries: [
-        baseRow({ details: { ph: 6.5, future_field: "abc", meta: { ok: 1 } } }),
-      ],
+      rawEntries: [baseRow({ details: { ph: 6.5, future_field: "abc", meta: { ok: 1 } } })],
     });
     expect(e.details.extras).toEqual({ future_field: "abc", meta: { ok: 1 } });
   });
@@ -207,9 +203,7 @@ describe("normalizeDiaryEntries", () => {
       baseRow({ id: "c", entry_at: "2025-02-01T00:00:00Z" }),
       baseRow({ id: "d", entry_at: "not-a-date" }),
     ];
-    const sorted = sortDiaryEntriesNewestFirst(
-      normalizeDiaryEntries({ rawEntries: rows }),
-    );
+    const sorted = sortDiaryEntriesNewestFirst(normalizeDiaryEntries({ rawEntries: rows }));
     expect(sorted.map((e) => e.id)).toEqual(["c", "a", "b", "d"]);
   });
 
@@ -259,9 +253,7 @@ describe("normalizeDiaryEntries", () => {
 
   it("keeps top-level entry_type authoritative over details.event_type", () => {
     const [e] = normalizeDiaryEntries({
-      rawEntries: [
-        baseRow({ entry_type: "water", details: { event_type: "training" } }),
-      ],
+      rawEntries: [baseRow({ entry_type: "water", details: { event_type: "training" } })],
     });
     expect(e.eventType).toBe("water");
   });
@@ -279,9 +271,7 @@ describe("normalizeDiaryEntries", () => {
     });
     expect(e.eventType).toBe("note");
     const [f] = normalizeDiaryEntries({
-      rawEntries: [
-        baseRow({ entry_type: undefined, details: { event_type: "action_followup" } }),
-      ],
+      rawEntries: [baseRow({ entry_type: undefined, details: { event_type: "action_followup" } })],
     });
     expect(f.eventType).toBe("note");
   });

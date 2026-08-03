@@ -68,9 +68,8 @@ export default function SignOutConfirmDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Sign out?</AlertDialogTitle>
           <AlertDialogDescription>
-            You&apos;ll be returned to the Verdant home page. Your grow data,
-            logs, and start-screen preference stay safe — you can sign back in
-            at any time.
+            You&apos;ll be returned to the Verdant home page. Your grow data, logs, and start-screen
+            preference stay safe — you can sign back in at any time.
           </AlertDialogDescription>
         </AlertDialogHeader>
         {error ? (

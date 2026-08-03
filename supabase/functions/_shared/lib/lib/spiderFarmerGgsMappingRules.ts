@@ -21,11 +21,7 @@
  */
 
 export type SpiderFarmerGgsSource = "live" | "stale" | "invalid";
-export type SpiderFarmerGgsTransport =
-  | "mqtt"
-  | "home_assistant"
-  | "bridge"
-  | "unknown";
+export type SpiderFarmerGgsTransport = "mqtt" | "home_assistant" | "bridge" | "unknown";
 
 export const SPIDER_FARMER_GGS_PROVIDER = "spider_farmer_ggs" as const;
 
@@ -51,9 +47,7 @@ export type SpiderFarmerGgsReadingKey =
   | "soil_temp_c"
   | "ph";
 
-export type SpiderFarmerGgsReadings = Partial<
-  Record<SpiderFarmerGgsReadingKey, number>
->;
+export type SpiderFarmerGgsReadings = Partial<Record<SpiderFarmerGgsReadingKey, number>>;
 
 /** Fan/light/schedule state surfaced as CONTEXT ONLY. Never a command. */
 export interface SpiderFarmerGgsContext {
@@ -224,23 +218,13 @@ export function normalizeSpiderFarmerGgsPayload(
     if (inBounds(tC, SPIDER_FARMER_GGS_TEMP_C_BOUNDS)) readings.temp_c = tC;
     else warningSet.add("temp_c_out_of_range");
   }
-  if (
-    tC !== undefined &&
-    tF === undefined &&
-    unitHint === "c" &&
-    readings.temp_c !== undefined
-  ) {
+  if (tC !== undefined && tF === undefined && unitHint === "c" && readings.temp_c !== undefined) {
     const converted = Math.round(cToF(tC) * 100) / 100;
     if (inBounds(converted, SPIDER_FARMER_GGS_TEMP_F_BOUNDS)) {
       readings.temp_f = converted;
     }
   }
-  if (
-    tF !== undefined &&
-    tC === undefined &&
-    unitHint === "f" &&
-    readings.temp_f !== undefined
-  ) {
+  if (tF !== undefined && tC === undefined && unitHint === "f" && readings.temp_f !== undefined) {
     const converted = Math.round(fToC(tF) * 100) / 100;
     if (inBounds(converted, SPIDER_FARMER_GGS_TEMP_C_BOUNDS)) {
       readings.temp_c = converted;

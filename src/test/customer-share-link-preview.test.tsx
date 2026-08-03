@@ -17,15 +17,13 @@ function renderComponent(initial?: string) {
 describe("CustomerShareLinkPreview", () => {
   it("renders an input and the required disclaimers", () => {
     renderComponent();
-    expect(
-      screen.getByTestId("customer-share-link-preview-input"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("customer-share-link-preview-disclaimer"),
-    ).toHaveTextContent(/share-token publishing backend not yet available/i);
-    expect(
-      screen.getByTestId("customer-share-link-preview-public-only"),
-    ).toHaveTextContent(/only explicitly customer-facing content/i);
+    expect(screen.getByTestId("customer-share-link-preview-input")).toBeInTheDocument();
+    expect(screen.getByTestId("customer-share-link-preview-disclaimer")).toHaveTextContent(
+      /share-token publishing backend not yet available/i,
+    );
+    expect(screen.getByTestId("customer-share-link-preview-public-only")).toHaveTextContent(
+      /only explicitly customer-facing content/i,
+    );
   });
 
   it("disables the Open preview action when the input is empty", () => {
@@ -40,9 +38,9 @@ describe("CustomerShareLinkPreview", () => {
     fireEvent.change(screen.getByTestId("customer-share-link-preview-input"), {
       target: { value: "share-abc_42" },
     });
-    expect(
-      screen.getByTestId("customer-share-link-preview-url"),
-    ).toHaveTextContent("/customer/share-abc_42");
+    expect(screen.getByTestId("customer-share-link-preview-url")).toHaveTextContent(
+      "/customer/share-abc_42",
+    );
     const open = screen.getByTestId("customer-share-link-preview-open");
     expect(open.tagName).toBe("A");
     expect(open).toHaveAttribute("href", "/customer/share-abc_42");
@@ -53,8 +51,8 @@ describe("CustomerShareLinkPreview", () => {
     fireEvent.change(screen.getByTestId("customer-share-link-preview-input"), {
       target: { value: "  ab/cd?ef#gh ij " },
     });
-    expect(
-      screen.getByTestId("customer-share-link-preview-url"),
-    ).toHaveTextContent("/customer/abcdefghij");
+    expect(screen.getByTestId("customer-share-link-preview-url")).toHaveTextContent(
+      "/customer/abcdefghij",
+    );
   });
 });

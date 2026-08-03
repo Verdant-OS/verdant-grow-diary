@@ -97,8 +97,16 @@ function enumOrUndef<T extends string>(
   return (allowed as readonly string[]).includes(t) ? (t as T) : undefined;
 }
 
-interface NumOk { ok: true; value: number | undefined; error?: undefined }
-interface NumErr { ok: false; value?: undefined; error: DryPhaseFieldError }
+interface NumOk {
+  ok: true;
+  value: number | undefined;
+  error?: undefined;
+}
+interface NumErr {
+  ok: false;
+  value?: undefined;
+  error: DryPhaseFieldError;
+}
 type NumResult = NumOk | NumErr;
 
 function coerceNumber(v: number | string | null | undefined): NumResult {
@@ -127,7 +135,11 @@ export function validateDryPhaseCheckDetails(
   const feel = enumOrUndef(i.exterior_bud_feel, DRY_BUD_FEEL_VALUES);
   if (feel) value.exterior_bud_feel = feel;
 
-  if (i.airflow_observation !== undefined && i.airflow_observation !== null && i.airflow_observation !== "") {
+  if (
+    i.airflow_observation !== undefined &&
+    i.airflow_observation !== null &&
+    i.airflow_observation !== ""
+  ) {
     const af = enumOrUndef(i.airflow_observation, GROVE_BAG_AIRFLOW_OBSERVATIONS);
     if (af && af !== "unknown") value.airflow_observation = af;
   }
@@ -214,12 +226,9 @@ export function getDryPhaseStatusNotes(
   }
 
   const tempOut =
-    v.ambient_temp_c !== undefined &&
-    (v.ambient_temp_c < 10 || v.ambient_temp_c > 27);
-  const rhOut =
-    v.ambient_rh !== undefined && (v.ambient_rh < 45 || v.ambient_rh > 70);
-  const vpdOut =
-    v.vpd_kpa !== undefined && (v.vpd_kpa < 0.8 || v.vpd_kpa > 1.6);
+    v.ambient_temp_c !== undefined && (v.ambient_temp_c < 10 || v.ambient_temp_c > 27);
+  const rhOut = v.ambient_rh !== undefined && (v.ambient_rh < 45 || v.ambient_rh > 70);
+  const vpdOut = v.vpd_kpa !== undefined && (v.vpd_kpa < 0.8 || v.vpd_kpa > 1.6);
   if (tempOut || rhOut || vpdOut) {
     notes.push({ status: "needs_review", copy: DRY_PHASE_OUT_OF_RANGE_NOTE });
   }

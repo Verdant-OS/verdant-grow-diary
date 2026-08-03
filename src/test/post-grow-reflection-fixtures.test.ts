@@ -9,10 +9,16 @@ import {
 
 describe("post-grow reflection fixtures", () => {
   it("uses stable fixture identifiers", () => {
-    expect(createRichPhotoperiodReflectionContext().grow_id).toBe("grow-reflection-rich-sour-diesel-001");
+    expect(createRichPhotoperiodReflectionContext().grow_id).toBe(
+      "grow-reflection-rich-sour-diesel-001",
+    );
     expect(createThinAutoflowerReflectionContext().grow_id).toBe("grow-reflection-thin-auto-001");
-    expect(createConflictingSignalsReflectionContext().grow_id).toBe("grow-reflection-conflicting-001");
-    expect(createPostHarvestHeavyReflectionContext().grow_id).toBe("grow-reflection-post-harvest-heavy-001");
+    expect(createConflictingSignalsReflectionContext().grow_id).toBe(
+      "grow-reflection-conflicting-001",
+    );
+    expect(createPostHarvestHeavyReflectionContext().grow_id).toBe(
+      "grow-reflection-post-harvest-heavy-001",
+    );
   });
 
   it("rich photoperiod fixture includes harvest, dry, cure, quality, and sensor evidence", () => {
@@ -57,6 +63,8 @@ describe("post-grow reflection fixtures", () => {
     expect(rhCurve[0].jar_rh_pct).toBe(69);
     expect(rhCurve[0].smell_note).toContain("hay");
     expect(context.post_harvest_outcomes?.final_jar_rh_pct).toBe(60);
-    expect(context.post_harvest_outcomes?.flags_resolved).toContain("Initial hay smell improved after extended burping.");
+    expect(context.post_harvest_outcomes?.flags_resolved).toContain(
+      "Initial hay smell improved after extended burping.",
+    );
   });
 });

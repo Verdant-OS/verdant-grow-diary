@@ -32,9 +32,7 @@ describe("Shelly H&T edge source presence guard wiring", () => {
 
   it("CI workflow invokes the guard script as a dedicated step", () => {
     const ci = readFileSync(CI, "utf8");
-    expect(ci).toMatch(
-      new RegExp(`run:\\s*bun\\s+run\\s+${SCRIPT_NAME.replace(":", "\\:")}`),
-    );
+    expect(ci).toMatch(new RegExp(`run:\\s*bun\\s+run\\s+${SCRIPT_NAME.replace(":", "\\:")}`));
   });
 
   it("legacy .mjs guard script has been removed in favor of the .ts version", () => {

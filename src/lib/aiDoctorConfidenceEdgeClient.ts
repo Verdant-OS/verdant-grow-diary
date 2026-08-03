@@ -35,8 +35,7 @@ export interface ConfidenceEdgeClientOptions {
 export const CONSERVATIVE_FALLBACK: ConfidenceResult = Object.freeze({
   score: 40,
   level: "Low",
-  explanation:
-    "Automated scoring unavailable. Using conservative default.",
+  explanation: "Automated scoring unavailable. Using conservative default.",
 });
 
 function clampScore(n: unknown): number {
@@ -62,9 +61,7 @@ function normalize(raw: unknown): ConfidenceResult | null {
       ? r.explanation
       : "Automated confidence result.";
   const conflicts = Array.isArray(r.conflicts_detected)
-    ? (r.conflicts_detected.filter(
-        (x) => typeof x === "string",
-      ) as string[])
+    ? (r.conflicts_detected.filter((x) => typeof x === "string") as string[])
     : undefined;
   return {
     score,

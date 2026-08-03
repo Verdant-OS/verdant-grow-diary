@@ -23,7 +23,8 @@ async function walk(dir: URL, out: string[] = []): Promise<string[]> {
       entry.name === ".git" ||
       entry.name === "dist" ||
       entry.name === ".lovable"
-    ) continue;
+    )
+      continue;
     const child = new URL(entry.name + (entry.isDirectory ? "/" : ""), dir);
     if (entry.isDirectory) await walk(child, out);
     else out.push(child.pathname);
@@ -86,19 +87,17 @@ Deno.test("doc forbids lookup under src/lib", async () => {
 
 Deno.test("doc lists every required SELECT column", async () => {
   const d = await readText(DOC_URL);
-  for (
-    const col of [
-      "bridge_id",
-      "user_id",
-      "is_active",
-      "secret_ciphertext",
-      "secret_nonce",
-      "secret_key_version",
-      "secret_status",
-      "allowed_tent_ids",
-      "last_used_at",
-    ]
-  ) {
+  for (const col of [
+    "bridge_id",
+    "user_id",
+    "is_active",
+    "secret_ciphertext",
+    "secret_nonce",
+    "secret_key_version",
+    "secret_status",
+    "allowed_tent_ids",
+    "last_used_at",
+  ]) {
     assertStringIncludes(d, col);
   }
 });
@@ -185,12 +184,7 @@ Deno.test("only the sanctioned lookup file exists in Edge Function dir", async (
   // The sanctioned helper is bridgeCredentialLookup.ts (added once
   // global bridge_id uniqueness was enforced). Other variants remain
   // forbidden to keep the lookup surface single-sourced.
-  for (
-    const forbidden of [
-      "loadBridgeCredential.ts",
-      "credentialLookup.ts",
-    ]
-  ) {
+  for (const forbidden of ["loadBridgeCredential.ts", "credentialLookup.ts"]) {
     assert(!files.includes(forbidden), `${forbidden} must not exist`);
   }
 });
@@ -234,10 +228,7 @@ Deno.test("no service_role string in src/lib pi-ingest modules", async () => {
     if (!e.isFile) continue;
     if (!/^piIngest.*\.ts$/.test(e.name)) continue;
     const text = await Deno.readTextFile(new URL(e.name, libDir));
-    assert(
-      !/service_role/i.test(text),
-      `src/lib/${e.name} must not reference service_role`,
-    );
+    assert(!/service_role/i.test(text), `src/lib/${e.name} must not reference service_role`);
   }
 });
 
@@ -256,25 +247,21 @@ Deno.test("SUPABASE_SERVICE_ROLE_KEY runtime read is limited to index.ts", async
 
 Deno.test("index.ts may consume credential lookup but still fails closed with no ingestion writes", async () => {
   const raw = await readText(new URL("index.ts", HERE));
-  const text = raw
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  const text = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
   // Commit wiring is allowed; direct ingestion writes/RPCs are not.
 
   // No ingestion-side writes / RPCs (comments stripped to avoid false positives).
-  for (
-    const [label, re] of [
-      ["insert", /\.insert\s*\(/],
-      ["upsert", /\.upsert\s*\(/],
-      ["update", /\.update\s*\(/],
-      ["delete", /\.delete\s*\(/],
-      ["rpc", /\.rpc\s*\(/],
-      ["sensor_readings", /\bsensor_readings\b/],
-      ["pi_ingest_idempotency_keys", /\bpi_ingest_idempotency_keys\b/],
-      ["alerts from()", /from\(\s*["']alerts["']\s*\)/],
-      ["action_queue from()", /from\(\s*["']action_queue["']\s*\)/],
-    ] as Array<[string, RegExp]>
-  ) {
+  for (const [label, re] of [
+    ["insert", /\.insert\s*\(/],
+    ["upsert", /\.upsert\s*\(/],
+    ["update", /\.update\s*\(/],
+    ["delete", /\.delete\s*\(/],
+    ["rpc", /\.rpc\s*\(/],
+    ["sensor_readings", /\bsensor_readings\b/],
+    ["pi_ingest_idempotency_keys", /\bpi_ingest_idempotency_keys\b/],
+    ["alerts from()", /from\(\s*["']alerts["']\s*\)/],
+    ["action_queue from()", /from\(\s*["']action_queue["']\s*\)/],
+  ] as Array<[string, RegExp]>) {
     assert(!re.test(text), `index.ts must not contain forbidden ingestion surface: ${label}`);
   }
 });

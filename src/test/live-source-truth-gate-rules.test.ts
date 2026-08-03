@@ -15,9 +15,7 @@ import {
 const NOW = "2026-06-09T22:00:00Z";
 const RECENT = "2026-06-09T21:59:30Z";
 
-function ev(
-  overrides: Partial<LiveSourceTruthEvidence> = {},
-): LiveSourceTruthEvidence {
+function ev(overrides: Partial<LiveSourceTruthEvidence> = {}): LiveSourceTruthEvidence {
   return {
     source: "live",
     captured_at: RECENT,
@@ -36,11 +34,7 @@ function ev(
   };
 }
 
-const FORBIDDEN_COPY = [
-  /\bguaranteed\b/i,
-  /\bdefinitely\b/i,
-  /\bcertainly\b/i,
-];
+const FORBIDDEN_COPY = [/\bguaranteed\b/i, /\bdefinitely\b/i, /\bcertainly\b/i];
 
 describe("evaluateLiveSourceTruth — verified_live happy path", () => {
   it("returns verified_live with complete evidence and matching metrics", () => {
@@ -60,35 +54,26 @@ describe("evaluateLiveSourceTruth — verified_live happy path", () => {
         ],
       }),
     );
-    expect(r.metric_results.map((m) => m.key)).toEqual([
-      "temp_f",
-      "humidity_pct",
-    ]);
+    expect(r.metric_results.map((m) => m.key)).toEqual(["temp_f", "humidity_pct"]);
   });
 });
 
 describe("evaluateLiveSourceTruth — source-based verdicts", () => {
   it("live source without operator comparison returns unverified_live", () => {
-    const r = evaluateLiveSourceTruth(
-      ev({ operator_compared_controller: false }),
-    );
+    const r = evaluateLiveSourceTruth(ev({ operator_compared_controller: false }));
     expect(r.verdict).toBe("unverified_live");
     expect(r.is_live_proof).toBe(false);
     expect(r.confidence_label).toBe("medium");
   });
 
   it("demo source returns not_live_proof", () => {
-    const r = evaluateLiveSourceTruth(
-      ev({ source: "demo", operator_compared_controller: false }),
-    );
+    const r = evaluateLiveSourceTruth(ev({ source: "demo", operator_compared_controller: false }));
     expect(r.verdict).toBe("not_live_proof");
     expect(r.confidence_label).toBe("low");
   });
 
   it("csv source returns not_live_proof", () => {
-    const r = evaluateLiveSourceTruth(
-      ev({ source: "csv", operator_compared_controller: false }),
-    );
+    const r = evaluateLiveSourceTruth(ev({ source: "csv", operator_compared_controller: false }));
     expect(r.verdict).toBe("not_live_proof");
   });
 
@@ -106,9 +91,7 @@ describe("evaluateLiveSourceTruth — source-based verdicts", () => {
   });
 
   it("old captured_at returns stale", () => {
-    const old = new Date(
-      Date.parse(NOW) - LIVE_SOURCE_TRUTH_STALE_AFTER_MS - 60_000,
-    ).toISOString();
+    const old = new Date(Date.parse(NOW) - LIVE_SOURCE_TRUTH_STALE_AFTER_MS - 60_000).toISOString();
     const r = evaluateLiveSourceTruth(ev({ captured_at: old }));
     expect(r.verdict).toBe("stale");
   });
@@ -137,9 +120,7 @@ describe("evaluateLiveSourceTruth — source-based verdicts", () => {
   });
 
   it("missing normalized payload prevents verified_live", () => {
-    const r = evaluateLiveSourceTruth(
-      ev({ normalized_payload_present: false }),
-    );
+    const r = evaluateLiveSourceTruth(ev({ normalized_payload_present: false }));
     expect(r.verdict).not.toBe("verified_live");
   });
 });
@@ -148,9 +129,7 @@ describe("evaluateLiveSourceTruth — comparison & tolerance", () => {
   it("backend/controller mismatch returns mismatch", () => {
     const r = evaluateLiveSourceTruth(
       ev({
-        metrics: [
-          { key: "temp_f", backend_value: 75, controller_value: 90, unit: "F" },
-        ],
+        metrics: [{ key: "temp_f", backend_value: 75, controller_value: 90, unit: "F" }],
       }),
     );
     expect(r.verdict).toBe("mismatch");
@@ -178,9 +157,7 @@ describe("evaluateLiveSourceTruth — comparison & tolerance", () => {
   it("compared metric missing controller value yields unverified_live", () => {
     const r = evaluateLiveSourceTruth(
       ev({
-        metrics: [
-          { key: "temp_f", backend_value: 75, controller_value: null, unit: "F" },
-        ],
+        metrics: [{ key: "temp_f", backend_value: 75, controller_value: null, unit: "F" }],
       }),
     );
     expect(r.verdict).toBe("unverified_live");
@@ -190,9 +167,7 @@ describe("evaluateLiveSourceTruth — comparison & tolerance", () => {
   it("compared metric missing backend value returns invalid", () => {
     const r = evaluateLiveSourceTruth(
       ev({
-        metrics: [
-          { key: "temp_f", backend_value: null, controller_value: 75, unit: "F" },
-        ],
+        metrics: [{ key: "temp_f", backend_value: null, controller_value: 75, unit: "F" }],
       }),
     );
     expect(r.verdict).toBe("invalid");
@@ -202,38 +177,14 @@ describe("evaluateLiveSourceTruth — comparison & tolerance", () => {
 
 describe("evaluateLiveSourceTruth — suspicious values", () => {
   const cases: Array<[string, LiveSourceTruthMetricEvidence]> = [
-    [
-      "humidity 0",
-      { key: "humidity_pct", backend_value: 0, controller_value: 0 },
-    ],
-    [
-      "humidity 100",
-      { key: "humidity_pct", backend_value: 100, controller_value: 100 },
-    ],
-    [
-      "soil moisture 0",
-      { key: "soil_moisture_pct", backend_value: 0, controller_value: 0 },
-    ],
-    [
-      "soil moisture 100",
-      { key: "soil_moisture_pct", backend_value: 100, controller_value: 100 },
-    ],
-    [
-      "pH below range",
-      { key: "ph", backend_value: 2, controller_value: 2 },
-    ],
-    [
-      "pH above range",
-      { key: "ph", backend_value: 11, controller_value: 11 },
-    ],
-    [
-      "CO2 below range",
-      { key: "co2_ppm", backend_value: 100, controller_value: 100 },
-    ],
-    [
-      "CO2 above range",
-      { key: "co2_ppm", backend_value: 6000, controller_value: 6000 },
-    ],
+    ["humidity 0", { key: "humidity_pct", backend_value: 0, controller_value: 0 }],
+    ["humidity 100", { key: "humidity_pct", backend_value: 100, controller_value: 100 }],
+    ["soil moisture 0", { key: "soil_moisture_pct", backend_value: 0, controller_value: 0 }],
+    ["soil moisture 100", { key: "soil_moisture_pct", backend_value: 100, controller_value: 100 }],
+    ["pH below range", { key: "ph", backend_value: 2, controller_value: 2 }],
+    ["pH above range", { key: "ph", backend_value: 11, controller_value: 11 }],
+    ["CO2 below range", { key: "co2_ppm", backend_value: 100, controller_value: 100 }],
+    ["CO2 above range", { key: "co2_ppm", backend_value: 6000, controller_value: 6000 }],
   ];
 
   it.each(cases)("%s returns invalid", (_label, metric) => {
@@ -246,9 +197,7 @@ describe("evaluateLiveSourceTruth — unit-mismatch warnings", () => {
   it("Celsius-as-Fahrenheit warning blocks live proof on a compared metric", () => {
     const r = evaluateLiveSourceTruth(
       ev({
-        metrics: [
-          { key: "temp_f", backend_value: 35, controller_value: 35, unit: "F" },
-        ],
+        metrics: [{ key: "temp_f", backend_value: 35, controller_value: 35, unit: "F" }],
       }),
     );
     expect(r.verdict).toBe("invalid");
@@ -258,9 +207,7 @@ describe("evaluateLiveSourceTruth — unit-mismatch warnings", () => {
   it("µS/cm-as-mS/cm warning blocks live proof", () => {
     const r = evaluateLiveSourceTruth(
       ev({
-        metrics: [
-          { key: "soil_ec_ms_cm", backend_value: 50, controller_value: 50 },
-        ],
+        metrics: [{ key: "soil_ec_ms_cm", backend_value: 50, controller_value: 50 }],
       }),
     );
     expect(r.verdict).toBe("invalid");
@@ -270,9 +217,7 @@ describe("evaluateLiveSourceTruth — unit-mismatch warnings", () => {
   it("mS/cm-as-µS/cm warning blocks live proof", () => {
     const r = evaluateLiveSourceTruth(
       ev({
-        metrics: [
-          { key: "soil_ec_us_cm", backend_value: 5, controller_value: 5 },
-        ],
+        metrics: [{ key: "soil_ec_us_cm", backend_value: 5, controller_value: 5 }],
       }),
     );
     expect(r.verdict).toBe("invalid");
@@ -330,9 +275,7 @@ describe("evaluateLiveSourceTruth — precedence", () => {
         captured_at: new Date(
           Date.parse(NOW) - LIVE_SOURCE_TRUTH_STALE_AFTER_MS - 60_000,
         ).toISOString(),
-        metrics: [
-          { key: "temp_f", backend_value: 75, controller_value: 90, unit: "F" },
-        ],
+        metrics: [{ key: "temp_f", backend_value: 75, controller_value: 90, unit: "F" }],
       }),
     );
     expect(r.verdict).toBe("stale");
@@ -342,9 +285,7 @@ describe("evaluateLiveSourceTruth — precedence", () => {
     const r = evaluateLiveSourceTruth(
       ev({
         operator_compared_controller: false,
-        metrics: [
-          { key: "temp_f", backend_value: 75, controller_value: 90, unit: "F" },
-        ],
+        metrics: [{ key: "temp_f", backend_value: 75, controller_value: 90, unit: "F" }],
       }),
     );
     expect(r.verdict).toBe("mismatch");
@@ -382,9 +323,7 @@ describe("evaluateLiveSourceTruth — determinism & shape", () => {
       { source: "stale" },
       { source: "invalid" },
       {
-        metrics: [
-          { key: "temp_f", backend_value: 75, controller_value: 90, unit: "F" },
-        ],
+        metrics: [{ key: "temp_f", backend_value: 75, controller_value: 90, unit: "F" }],
       },
     ];
     for (const v of verdicts) {
@@ -410,9 +349,7 @@ describe("evaluateLiveSourceTruth — determinism & shape", () => {
       { source: "invalid" },
       { captured_at: null },
       {
-        metrics: [
-          { key: "temp_f", backend_value: 75, controller_value: 90, unit: "F" },
-        ],
+        metrics: [{ key: "temp_f", backend_value: 75, controller_value: 90, unit: "F" }],
       },
     ];
     for (const o of others) {
@@ -433,9 +370,7 @@ describe("liveSourceTruthGateRules — static safety", () => {
   );
   // Strip line + block comments so prose mentions of forbidden patterns
   // (e.g. "No Date.now()" in the file header) do not trigger the scanner.
-  const src = rawSrc
-    .replace(/\/\/.*$/gm, "")
-    .replace(/\/\*[\s\S]*?\*\//g, "");
+  const src = rawSrc.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
 
   it("does not import Supabase or model/edge clients", () => {
     expect(src).not.toMatch(/@\/integrations\/supabase/);

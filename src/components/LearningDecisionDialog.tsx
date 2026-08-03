@@ -58,9 +58,7 @@ export function LearningDecisionDialog({
   onSave,
   nowIso,
 }: LearningDecisionDialogProps) {
-  const [decision, setDecision] = useState<NextRunDecision | null>(
-    episode.learning.decision,
-  );
+  const [decision, setDecision] = useState<NextRunDecision | null>(episode.learning.decision);
   const [rationale, setRationale] = useState(episode.learning.rationale ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,8 +122,8 @@ export function LearningDecisionDialog({
         <DialogHeader>
           <DialogTitle>What should you do with this lesson next run?</DialogTitle>
           <DialogDescription>
-            This is your grower decision based on this run. Verdant is not claiming the
-            action caused the outcome.
+            This is your grower decision based on this run. Verdant is not claiming the action
+            caused the outcome.
           </DialogDescription>
         </DialogHeader>
 
@@ -144,9 +142,7 @@ export function LearningDecisionDialog({
               <RadioGroupItem value={option} id={`decision-${option}`} className="mt-1" />
               <span>
                 <span className="block font-medium">{NEXT_RUN_DECISION_LABELS[option]}</span>
-                <span className="block text-sm text-muted-foreground">
-                  {DECISION_HELP[option]}
-                </span>
+                <span className="block text-sm text-muted-foreground">{DECISION_HELP[option]}</span>
               </span>
             </label>
           ))}
@@ -165,8 +161,8 @@ export function LearningDecisionDialog({
             aria-describedby="decision-rationale-help"
           />
           <p id="decision-rationale-help" className="text-xs text-muted-foreground">
-            {rationaleTrimmed.length}/{LEARNING_RATIONALE_MAX_LENGTH} characters. Your own notes;
-            no automatic action is taken.
+            {rationaleTrimmed.length}/{LEARNING_RATIONALE_MAX_LENGTH} characters. Your own notes; no
+            automatic action is taken.
           </p>
         </div>
 

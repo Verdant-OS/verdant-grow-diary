@@ -9,13 +9,7 @@ const f = (type: string, size: number) => ({ type, size });
 
 describe("validatePlantProfilePhotoFile", () => {
   it("accepts the allowed image types", () => {
-    for (const type of [
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-      "image/heic",
-      "image/heif",
-    ]) {
+    for (const type of ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]) {
       const r = validatePlantProfilePhotoFile(f(type, 1024));
       expect(r.ok).toBe(true);
     }
@@ -49,13 +43,9 @@ describe("validatePlantProfilePhotoFile", () => {
   });
 
   it("accepts exactly 25 MB and rejects above", () => {
-    const ok = validatePlantProfilePhotoFile(
-      f("image/jpeg", PLANT_PROFILE_PHOTO_MAX_BYTES),
-    );
+    const ok = validatePlantProfilePhotoFile(f("image/jpeg", PLANT_PROFILE_PHOTO_MAX_BYTES));
     expect(ok.ok).toBe(true);
-    const over = validatePlantProfilePhotoFile(
-      f("image/jpeg", PLANT_PROFILE_PHOTO_MAX_BYTES + 1),
-    );
+    const over = validatePlantProfilePhotoFile(f("image/jpeg", PLANT_PROFILE_PHOTO_MAX_BYTES + 1));
     expect(over.ok).toBe(false);
     if (over.ok === false) expect(over.reason).toBe("too-large");
   });

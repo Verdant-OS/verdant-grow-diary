@@ -63,7 +63,6 @@ export interface NormalizedDiaryDetails {
   extras?: DiaryEntryDetailsExtras;
 }
 
-
 export interface NormalizedDiaryEntry {
   id: string;
   growId: string | null;
@@ -264,12 +263,8 @@ function normalizeTds(
   return n;
 }
 
-function normalizeWateringMl(
-  d: Record<string, unknown>,
-  warnings: string[],
-): number | undefined {
-  const mlRaw =
-    d.wateringAmountMl ?? d.watering_amount_ml ?? d.wateringAmount ?? d.watering_amount;
+function normalizeWateringMl(d: Record<string, unknown>, warnings: string[]): number | undefined {
+  const mlRaw = d.wateringAmountMl ?? d.watering_amount_ml ?? d.wateringAmount ?? d.watering_amount;
   const lRaw = d.wateringAmountL ?? d.watering_amount_l;
   if (lRaw != null) {
     const l = coerceFiniteNumber(lRaw);
@@ -322,7 +317,7 @@ function normalizeNutrients(
       const name = nonBlankString(r.name);
       if (!name) continue;
       const amountRaw = r.amount;
-      const amount = amountRaw == null ? undefined : coerceFiniteNumber(amountRaw) ?? undefined;
+      const amount = amountRaw == null ? undefined : (coerceFiniteNumber(amountRaw) ?? undefined);
       if (amountRaw != null && amount == null) {
         warnings.push("nutrients:invalid-amount");
       }
@@ -395,9 +390,13 @@ function collectExtras(d: Record<string, unknown>): DiaryEntryDetailsExtras | un
   for (const [k, v] of Object.entries(d)) {
     if (KNOWN_DETAIL_KEYS.has(k)) continue;
     if (typeof v === "function") continue;
-    if (v && typeof v === "object" && (v as { constructor?: { name?: string } }).constructor?.name &&
-        (v as { constructor: { name: string } }).constructor.name !== "Object" &&
-        !Array.isArray(v)) {
+    if (
+      v &&
+      typeof v === "object" &&
+      (v as { constructor?: { name?: string } }).constructor?.name &&
+      (v as { constructor: { name: string } }).constructor.name !== "Object" &&
+      !Array.isArray(v)
+    ) {
       continue;
     }
     out[k] = v;
@@ -448,23 +447,14 @@ export function normalizeDiaryEntry(
   // today's "note" default rather than leaking raw codes into type badges.
   const detailsParsed = safeParseDetails(r.details, warnings);
   const dv = detailsParsed.value;
-  const detailsEventTypeCandidate = nonBlankString(
-    pickFirst(dv?.event_type, dv?.eventType),
-  );
+  const detailsEventTypeCandidate = nonBlankString(pickFirst(dv?.event_type, dv?.eventType));
   const detailsEventType =
     detailsEventTypeCandidate !== null &&
     QUICK_LOG_DETAILS_EVENT_TYPES.has(detailsEventTypeCandidate)
       ? detailsEventTypeCandidate
       : null;
   const eventTypeRaw = nonBlankString(
-    pickFirst(
-      r.entry_type,
-      r.entryType,
-      r.event_type,
-      r.eventType,
-      r.type,
-      detailsEventType,
-    ),
+    pickFirst(r.entry_type, r.entryType, r.event_type, r.eventType, r.type, detailsEventType),
   );
   const eventType = eventTypeRaw ?? "note";
   if (!eventTypeRaw) warnings.push("event-type:missing");
@@ -493,9 +483,7 @@ export function normalizeDiaryEntry(
     refStarted.epoch != null &&
     createdParsed.epoch >= refStarted.epoch
   ) {
-    dayOfGrow = Math.floor(
-      (createdParsed.epoch - refStarted.epoch) / (24 * 60 * 60 * 1000),
-    );
+    dayOfGrow = Math.floor((createdParsed.epoch - refStarted.epoch) / (24 * 60 * 60 * 1000));
     weekOfGrow = Math.floor(dayOfGrow / 7);
   }
 
@@ -508,21 +496,9 @@ export function normalizeDiaryEntry(
     const ph = normalizePh(pickFirst(d.ph, d.pH), "ph", warnings);
     const ec = normalizeEc(pickFirst(d.ec, d.EC), "ec", warnings);
     const tds = normalizeTds(pickFirst(d.tds, d.TDS), "tds", warnings);
-    const runoffPh = normalizePh(
-      pickFirst(d.runoff_ph, d.runoffPh),
-      "runoff-ph",
-      warnings,
-    );
-    const runoffEc = normalizeEc(
-      pickFirst(d.runoff_ec, d.runoffEc),
-      "runoff-ec",
-      warnings,
-    );
-    const runoffTds = normalizeTds(
-      pickFirst(d.runoff_tds, d.runoffTds),
-      "runoff-tds",
-      warnings,
-    );
+    const runoffPh = normalizePh(pickFirst(d.runoff_ph, d.runoffPh), "runoff-ph", warnings);
+    const runoffEc = normalizeEc(pickFirst(d.runoff_ec, d.runoffEc), "runoff-ec", warnings);
+    const runoffTds = normalizeTds(pickFirst(d.runoff_tds, d.runoffTds), "runoff-tds", warnings);
     const wateringAmountMl = normalizeWateringMl(d, warnings);
     const nutrients = normalizeNutrients(d.nutrients, warnings);
     const trainingActions = normalizeStringArray(
@@ -536,10 +512,7 @@ export function normalizeDiaryEntry(
       pickFirst(d.sensor_snapshot, d.sensorSnapshot),
       warnings,
     );
-    const remindAt = normalizeRemindAt(
-      pickFirst(d.remind_at, d.remindAt),
-      warnings,
-    );
+    const remindAt = normalizeRemindAt(pickFirst(d.remind_at, d.remindAt), warnings);
     const extras = collectExtras(d);
 
     if (ph !== undefined) details.ph = ph;
@@ -561,7 +534,6 @@ export function normalizeDiaryEntry(
       details.declaredEventType = detailsEventTypeCandidate.toLowerCase().trim();
     }
     if (extras) details.extras = extras;
-
   }
 
   const isValidForAiContext =
@@ -594,9 +566,7 @@ export function normalizeDiaryEntry(
 // Bulk normalization + sort
 // ---------------------------------------------------------------------------
 
-export function normalizeDiaryEntries(
-  input: NormalizeDiaryInput,
-): NormalizedDiaryEntry[] {
+export function normalizeDiaryEntries(input: NormalizeDiaryInput): NormalizedDiaryEntry[] {
   if (!input || !Array.isArray(input.rawEntries)) return [];
   const out: NormalizedDiaryEntry[] = [];
   for (const raw of input.rawEntries) {

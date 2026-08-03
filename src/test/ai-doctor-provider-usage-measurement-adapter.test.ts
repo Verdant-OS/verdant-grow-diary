@@ -29,10 +29,7 @@ describe("attachProviderReportedUsageToAiDoctorPromptMeasurement", () => {
       total_tokens: 150,
     };
 
-    const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(
-      baseMeasurement,
-      usage,
-    );
+    const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(baseMeasurement, usage);
 
     expect(result.providerReportedTokens).toEqual({
       promptTokens: 100,
@@ -48,10 +45,7 @@ describe("attachProviderReportedUsageToAiDoctorPromptMeasurement", () => {
       totalTokens: 275,
     };
 
-    const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(
-      baseMeasurement,
-      usage,
-    );
+    const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(baseMeasurement, usage);
 
     expect(result.providerReportedTokens).toEqual({
       promptTokens: 200,
@@ -67,10 +61,7 @@ describe("attachProviderReportedUsageToAiDoctorPromptMeasurement", () => {
       total_tokens: 200,
     };
 
-    const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(
-      baseMeasurement,
-      usage,
-    );
+    const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(baseMeasurement, usage);
 
     // Provider-reported total (200) must be preserved, not derived (150)
     expect(result.providerReportedTokens?.totalTokens).toBe(200);
@@ -82,10 +73,7 @@ describe("attachProviderReportedUsageToAiDoctorPromptMeasurement", () => {
       completion_tokens: 20,
     };
 
-    const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(
-      baseMeasurement,
-      usage,
-    );
+    const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(baseMeasurement, usage);
 
     expect(result.providerReportedTokens).toEqual({
       promptTokens: 80,
@@ -109,10 +97,7 @@ describe("attachProviderReportedUsageToAiDoctorPromptMeasurement", () => {
       // missing completion_tokens
     };
 
-    const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(
-      baseMeasurement,
-      usage,
-    );
+    const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(baseMeasurement, usage);
 
     expect(result.providerReportedTokens).toBeNull();
   });
@@ -126,10 +111,7 @@ describe("attachProviderReportedUsageToAiDoctorPromptMeasurement", () => {
     ];
 
     for (const usage of usages) {
-      const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(
-        baseMeasurement,
-        usage,
-      );
+      const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(baseMeasurement, usage);
       expect(result.providerReportedTokens).toBeNull();
     }
   });
@@ -142,10 +124,7 @@ describe("attachProviderReportedUsageToAiDoctorPromptMeasurement", () => {
       total_tokens: 150,
     };
 
-    const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(
-      original,
-      usage,
-    );
+    const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(original, usage);
 
     // Original must remain unchanged
     expect(original.providerReportedTokens).toBeNull();
@@ -161,10 +140,7 @@ describe("attachProviderReportedUsageToAiDoctorPromptMeasurement", () => {
       headers: { authorization: "secret" },
     };
 
-    const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(
-      baseMeasurement,
-      usage,
-    );
+    const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(baseMeasurement, usage);
 
     expect(result.providerReportedTokens).toEqual({
       promptTokens: 100,
@@ -182,15 +158,10 @@ describe("attachProviderReportedUsageToAiDoctorPromptMeasurement", () => {
       total_tokens: 150,
     };
 
-    const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(
-      baseMeasurement,
-      usage,
-    );
+    const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(baseMeasurement, usage);
 
     expect(result.summaryByteSize).toBe(baseMeasurement.summaryByteSize);
-    expect(result.estimatedPromptTokens).toBe(
-      baseMeasurement.estimatedPromptTokens,
-    );
+    expect(result.estimatedPromptTokens).toBe(baseMeasurement.estimatedPromptTokens);
     expect(result.promptName).toBe(baseMeasurement.promptName);
     expect(result.rawHistoryFallback).toBe(baseMeasurement.rawHistoryFallback);
     expect(result.status).toBe(baseMeasurement.status);
@@ -204,14 +175,8 @@ describe("attachProviderReportedUsageToAiDoctorPromptMeasurement", () => {
       total_tokens: 150,
     };
 
-    const r1 = attachProviderReportedUsageToAiDoctorPromptMeasurement(
-      baseMeasurement,
-      usage,
-    );
-    const r2 = attachProviderReportedUsageToAiDoctorPromptMeasurement(
-      baseMeasurement,
-      usage,
-    );
+    const r1 = attachProviderReportedUsageToAiDoctorPromptMeasurement(baseMeasurement, usage);
+    const r2 = attachProviderReportedUsageToAiDoctorPromptMeasurement(baseMeasurement, usage);
 
     expect(r1).toEqual(r2);
   });
@@ -221,9 +186,7 @@ describe("attachProviderReportedUsageToAiDoctorPromptMeasurement", () => {
     // cost-domain files. No Supabase, fetch, React, or browser APIs.
     // Runtime verification is implicit: the function runs in this test
     // environment without any polyfills or network stubs.
-    expect(typeof attachProviderReportedUsageToAiDoctorPromptMeasurement).toBe(
-      "function",
-    );
+    expect(typeof attachProviderReportedUsageToAiDoctorPromptMeasurement).toBe("function");
   });
 
   it("clears existing providerReportedTokens when new usage is invalid", () => {
@@ -236,10 +199,9 @@ describe("attachProviderReportedUsageToAiDoctorPromptMeasurement", () => {
       },
     };
 
-    const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(
-      measurementWithUsage,
-      { bad: true },
-    );
+    const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(measurementWithUsage, {
+      bad: true,
+    });
 
     expect(result.providerReportedTokens).toBeNull();
   });
@@ -254,10 +216,11 @@ describe("attachProviderReportedUsageToAiDoctorPromptMeasurement", () => {
       },
     };
 
-    const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(
-      measurementWithUsage,
-      { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
-    );
+    const result = attachProviderReportedUsageToAiDoctorPromptMeasurement(measurementWithUsage, {
+      prompt_tokens: 10,
+      completion_tokens: 5,
+      total_tokens: 15,
+    });
 
     expect(result.providerReportedTokens).toEqual({
       promptTokens: 10,

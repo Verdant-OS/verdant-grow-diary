@@ -51,18 +51,12 @@ describe("ReportsHubOnboardingSection", () => {
       </MemoryRouter>,
     );
     expect(screen.getByTestId("reports-onboarding")).toBeInTheDocument();
+    expect(screen.getByTestId("reports-onboarding-card-add_plant")).toBeInTheDocument();
     expect(
-      screen.getByTestId("reports-onboarding-card-add_plant"),
-    ).toBeInTheDocument();
-    expect(
-      screen
-        .getByTestId("reports-onboarding-link-add_sensor_snapshot")
-        .getAttribute("href"),
+      screen.getByTestId("reports-onboarding-link-add_sensor_snapshot").getAttribute("href"),
     ).toBe("/sensors");
     expect(
-      screen
-        .getByTestId("reports-onboarding-link-review_action_outcome")
-        .getAttribute("href"),
+      screen.getByTestId("reports-onboarding-link-review_action_outcome").getAttribute("href"),
     ).toBe("/actions?growId=grow-1");
   });
 });

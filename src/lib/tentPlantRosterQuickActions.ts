@@ -40,7 +40,8 @@ export interface TentPlantRosterQuickActionPlantInput {
 }
 
 export interface TentPlantRosterQuickActionsInput
-  extends TentPlantRosterQuickActionPlantInput, TentPlantRosterQuickActionContext {
+  extends TentPlantRosterQuickActionPlantInput,
+    TentPlantRosterQuickActionContext {
   /**
    * Override for the photos anchor availability. Defaults to true now that
    * Plant Detail renders a dedicated `plant-photos` anchor. Tests/storybook

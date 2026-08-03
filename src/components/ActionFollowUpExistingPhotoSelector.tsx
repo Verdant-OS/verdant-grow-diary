@@ -36,10 +36,7 @@ function CandidateThumb({ reference }: { reference: string }) {
   const src = usePlantProfilePhotoSource(reference);
   if (src.isLoading) {
     return (
-      <div
-        className="h-12 w-12 rounded-md bg-secondary/40 animate-pulse"
-        aria-hidden="true"
-      />
+      <div className="h-12 w-12 rounded-md bg-secondary/40 animate-pulse" aria-hidden="true" />
     );
   }
   if (!src.displayUrl) {
@@ -53,12 +50,7 @@ function CandidateThumb({ reference }: { reference: string }) {
     );
   }
   return (
-    <img
-      src={src.displayUrl}
-      alt=""
-      className="h-12 w-12 rounded-md object-cover"
-      loading="lazy"
-    />
+    <img src={src.displayUrl} alt="" className="h-12 w-12 rounded-md object-cover" loading="lazy" />
   );
 }
 
@@ -102,20 +94,13 @@ export default function ActionFollowUpExistingPhotoSelector({
       )}
 
       {state.status === "loaded" && state.candidates.length === 0 && (
-        <p
-          className="text-xs text-muted-foreground"
-          data-testid="action-followup-photo-empty"
-        >
+        <p className="text-xs text-muted-foreground" data-testid="action-followup-photo-empty">
           No eligible existing photos are available for this action.
         </p>
       )}
 
       {(state.status === "loaded" || state.status === "loading") && (
-        <div
-          role="radiogroup"
-          aria-label="Attach an existing photo"
-          className="grid gap-2"
-        >
+        <div role="radiogroup" aria-label="Attach an existing photo" className="grid gap-2">
           <label
             htmlFor="action-followup-photo-none"
             className={cn(
@@ -166,9 +151,7 @@ export default function ActionFollowUpExistingPhotoSelector({
                   <CandidateThumb reference={c.durableReference} />
                   <div className="flex flex-col text-xs">
                     <span>{c.label ?? "Diary photo"}</span>
-                    <span className="text-muted-foreground">
-                      {formatCaptured(c.capturedAt)}
-                    </span>
+                    <span className="text-muted-foreground">{formatCaptured(c.capturedAt)}</span>
                   </div>
                 </label>
               );

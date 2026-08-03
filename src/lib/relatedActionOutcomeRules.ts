@@ -131,7 +131,9 @@ export function pickLatestOutcomeForAction(
     outcome_status: status,
     label,
     recorded_at:
-      nonEmptyString(d.recorded_at) ?? nonEmptyString(top.entry_at) ?? nonEmptyString(top.created_at),
+      nonEmptyString(d.recorded_at) ??
+      nonEmptyString(top.entry_at) ??
+      nonEmptyString(top.created_at),
     note: nonEmptyString(top.note),
   };
 }

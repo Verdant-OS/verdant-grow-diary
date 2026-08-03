@@ -93,18 +93,15 @@ Deno.test("malformed bridge token (too short) is rejected without DB call", asyn
   assertEquals(called, false);
 });
 
-Deno.test(
-  "missing service key while presenting bridge token returns server_misconfigured",
-  async () => {
-    const res = await authenticateBearer(validToken, {
-      serviceKeyAvailable: false,
-      lookupBridgeToken: async () => ({ data: makeRow(), error: null }),
-      verifyJwtClaims: async () => ({ sub: null }),
-    });
-    assert(!res.ok);
-    if (!res.ok) assertEquals(res.error, "server_misconfigured");
-  },
-);
+Deno.test("missing service key while presenting bridge token returns server_misconfigured", async () => {
+  const res = await authenticateBearer(validToken, {
+    serviceKeyAvailable: false,
+    lookupBridgeToken: async () => ({ data: makeRow(), error: null }),
+    verifyJwtClaims: async () => ({ sub: null }),
+  });
+  assert(!res.ok);
+  if (!res.ok) assertEquals(res.error, "server_misconfigured");
+});
 
 Deno.test("bridge token DB lookup error returns auth_lookup_failed", async () => {
   const res = await authenticateBearer(validToken, {

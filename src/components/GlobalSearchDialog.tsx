@@ -751,7 +751,11 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                               label: string;
                               testId: string;
                               fallbackType:
-                                "observation" | "watering" | "feeding" | "environment" | null;
+                                | "observation"
+                                | "watering"
+                                | "feeding"
+                                | "environment"
+                                | null;
                             }>
                           ).map(({ actionId, label, testId, fallbackType }) => (
                             <Button

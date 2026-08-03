@@ -175,15 +175,15 @@ describe("resolvePaddleCheckoutEnvironment", () => {
     expect(
       resolvePaddleCheckoutEnvironment({ token: null, hostname: "verdantgrowdiary.com" }),
     ).toBe("unavailable");
-    expect(
-      resolvePaddleCheckoutEnvironment({ token: "", hostname: "localhost" }),
-    ).toBe("unavailable");
+    expect(resolvePaddleCheckoutEnvironment({ token: "", hostname: "localhost" })).toBe(
+      "unavailable",
+    );
     expect(
       resolvePaddleCheckoutEnvironment({ token: "prod_abc", hostname: "verdantgrowdiary.com" }),
     ).toBe("unavailable");
-    expect(
-      resolvePaddleCheckoutEnvironment({ token: "test_", hostname: "localhost" }),
-    ).toBe("unavailable");
+    expect(resolvePaddleCheckoutEnvironment({ token: "test_", hostname: "localhost" })).toBe(
+      "unavailable",
+    );
     expect(
       resolvePaddleCheckoutEnvironment({ token: "live_", hostname: "verdantgrowdiary.com" }),
     ).toBe("unavailable");
@@ -194,13 +194,9 @@ describe("resolvePaddleCheckoutEnvironment", () => {
     // the token still runs; live+unknown host still resolves to live because
     // isLoopbackHostname(null) === false. We accept that: server-side / SSR
     // callers must pass a real hostname. Document the behavior explicitly.
-    expect(
-      resolvePaddleCheckoutEnvironment({ token: "live_abc", hostname: null }),
-    ).toBe("live");
+    expect(resolvePaddleCheckoutEnvironment({ token: "live_abc", hostname: null })).toBe("live");
     // And a sandbox token with unknown host still classifies as sandbox.
-    expect(
-      resolvePaddleCheckoutEnvironment({ token: "test_abc", hostname: null }),
-    ).toBe("sandbox");
+    expect(resolvePaddleCheckoutEnvironment({ token: "test_abc", hostname: null })).toBe("sandbox");
   });
 });
 

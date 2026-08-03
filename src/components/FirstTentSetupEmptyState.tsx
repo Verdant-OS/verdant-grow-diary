@@ -7,10 +7,7 @@
 import { Sprout } from "lucide-react";
 import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
-import {
-  buildFirstTentSetupCopy,
-  type FirstTentSetupSurface,
-} from "@/lib/firstTentSetupRules";
+import { buildFirstTentSetupCopy, type FirstTentSetupSurface } from "@/lib/firstTentSetupRules";
 
 interface Props {
   surface: FirstTentSetupSurface;
@@ -33,8 +30,7 @@ export default function FirstTentSetupEmptyState({
       data-testid={resolvedTestId}
       data-surface={surface}
       className={
-        "rounded-2xl border border-border/60 bg-secondary/30 p-4 space-y-2 " +
-        (className ?? "")
+        "rounded-2xl border border-border/60 bg-secondary/30 p-4 space-y-2 " + (className ?? "")
       }
     >
       <div className="flex items-center gap-2 text-sm font-medium">

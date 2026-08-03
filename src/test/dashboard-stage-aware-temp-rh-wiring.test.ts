@@ -7,10 +7,7 @@ const VM = readFileSync(
   resolve(__dirname, "../lib/dashboardEnvironmentSnapshotViewModel.ts"),
   "utf8",
 );
-const HELPER = readFileSync(
-  resolve(__dirname, "../lib/environmentStageTargetRules.ts"),
-  "utf8",
-);
+const HELPER = readFileSync(resolve(__dirname, "../lib/environmentStageTargetRules.ts"), "utf8");
 
 const DASH_AND_VM = DASH + "\n" + VM;
 const FORBIDDEN =
@@ -26,15 +23,11 @@ describe("Dashboard env strip — stage-aware Temp/RH wiring", () => {
   });
 
   it("Temperature uses classifyTempAgainstStage + environmentMetricChipStatus", () => {
-    expect(VM).toMatch(
-      /environmentMetricChipStatus\([\s\S]*classifyTempAgainstStage\(/,
-    );
+    expect(VM).toMatch(/environmentMetricChipStatus\([\s\S]*classifyTempAgainstStage\(/);
   });
 
   it("RH uses classifyRhAgainstStage + environmentMetricChipStatus", () => {
-    expect(VM).toMatch(
-      /environmentMetricChipStatus\([\s\S]*classifyRhAgainstStage\(/,
-    );
+    expect(VM).toMatch(/environmentMetricChipStatus\([\s\S]*classifyRhAgainstStage\(/);
   });
 
   it("removes hardcoded temp threshold expressions from JSX", () => {

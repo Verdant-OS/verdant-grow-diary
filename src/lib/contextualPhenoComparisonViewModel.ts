@@ -207,9 +207,7 @@ function aggregatePlant(input: ContextualPhenoPlantInput): PlantAggregation {
     }
 
     if (UNTRUSTED_SOURCES.has(source)) {
-      trustWarnings.add(
-        `Sensor reading marked "${source}" is not treated as trusted context.`,
-      );
+      trustWarnings.add(`Sensor reading marked "${source}" is not treated as trusted context.`);
       continue;
     }
 
@@ -247,13 +245,9 @@ function aggregatePlant(input: ContextualPhenoPlantInput): PlantAggregation {
   if (cleanString(input.strain) === null) missingContext.push("Strain unknown.");
   if (cleanString(input.stage) === null) missingContext.push("Stage unknown.");
 
-  const hasTrustedSensorContext =
-    sourceCounts.live + sourceCounts.manual + sourceCounts.csv > 0;
+  const hasTrustedSensorContext = sourceCounts.live + sourceCounts.manual + sourceCounts.csv > 0;
 
-  if (
-    sensorReadingCount > 0 &&
-    !hasTrustedSensorContext
-  ) {
+  if (sensorReadingCount > 0 && !hasTrustedSensorContext) {
     trustWarnings.add(
       "All sensor readings come from untrusted sources (demo/stale/invalid/unknown).",
     );
@@ -304,9 +298,7 @@ export function buildContextualPhenoComparisonView(
       error: "too_few_plants",
       caveat: CONTEXTUAL_PHENO_COMPARISON_CAVEAT,
       plants: [],
-      crossPlantMissingContext: [
-        `Select at least ${MIN_PLANTS} plants to compare.`,
-      ],
+      crossPlantMissingContext: [`Select at least ${MIN_PLANTS} plants to compare.`],
       sourceQualitySummary: emptySourceCounts(),
     };
   }
@@ -316,9 +308,7 @@ export function buildContextualPhenoComparisonView(
       error: "too_many_plants",
       caveat: CONTEXTUAL_PHENO_COMPARISON_CAVEAT,
       plants: [],
-      crossPlantMissingContext: [
-        `Compare at most ${MAX_PLANTS} plants at a time.`,
-      ],
+      crossPlantMissingContext: [`Compare at most ${MAX_PLANTS} plants at a time.`],
       sourceQualitySummary: emptySourceCounts(),
     };
   }
@@ -370,9 +360,7 @@ export function buildContextualPhenoComparisonView(
     crossPlantMissingContext.push("No sensor readings on any selected plant.");
   }
   if (plants.every((p) => !p.environmentSummary.hasTrustedSensorContext)) {
-    crossPlantMissingContext.push(
-      "No trusted sensor context on any selected plant.",
-    );
+    crossPlantMissingContext.push("No trusted sensor context on any selected plant.");
   }
   if (plants.every((p) => p.strain === null)) {
     crossPlantMissingContext.push("Strain unknown on every selected plant.");

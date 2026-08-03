@@ -121,9 +121,7 @@ describe("ecowitt-bridge env preflight", () => {
 
   it("emits a ready-to-run dry-run command using the fixture", () => {
     const r = checkBridgeEnv({ env: { VERDANT_TENT_ID: TENT }, mode: "dry-run" });
-    expect(r.dryRunCommand).toContain(
-      "scripts/ecowitt-live-soil-dry-run.ts",
-    );
+    expect(r.dryRunCommand).toContain("scripts/ecowitt-live-soil-dry-run.ts");
     expect(r.dryRunCommand).toContain("fixtures/ecowitt-live-soil-sample.json");
     expect(r.dryRunCommand).toContain("--dry-run");
     expect(r.dryRunCommand).not.toContain("vbt_");
@@ -131,10 +129,7 @@ describe("ecowitt-bridge env preflight", () => {
 });
 
 describe("ecowitt-bridge env-check script safety", () => {
-  const src = readFileSync(
-    resolve(__dirname, "../../scripts/ecowitt-bridge-env-check.ts"),
-    "utf8",
-  );
+  const src = readFileSync(resolve(__dirname, "../../scripts/ecowitt-bridge-env-check.ts"), "utf8");
   it("does not import supabase / service_role", () => {
     expect(src).not.toMatch(/@supabase\/supabase-js/);
     expect(src).not.toMatch(/service_role/i);

@@ -90,10 +90,7 @@ function ecowittRow(overrides: Record<string, unknown>): Record<string, unknown>
 // ---------------------------------------------------------------------------
 describe("buildEcowittSnapshotFromRows — pure wiring", () => {
   it("groups persisted EcoWitt rows into one snapshot for the selected tent", () => {
-    const vm = buildEcowittSnapshotFromRows(
-      [ecowittRow({})],
-      { tentId: TENT_A, now: NOW },
-    );
+    const vm = buildEcowittSnapshotFromRows([ecowittRow({})], { tentId: TENT_A, now: NOW });
     expect(vm?.hasReading).toBe(true);
     expect(vm?.metrics.temp_f).toBeCloseTo(77, 0);
     expect(vm?.metrics.humidity_pct).toBe(55);
@@ -133,7 +130,10 @@ describe("buildEcowittSnapshotFromRows — pure wiring", () => {
   it("filters by plant_id when provided", () => {
     const vm = buildEcowittSnapshotFromRows(
       [
-        ecowittRow({ plant_id: null, raw_payload: { vendor: "ecowitt", temp1f: 95, humidity1: 80, dateutc: FRESH_AT } }),
+        ecowittRow({
+          plant_id: null,
+          raw_payload: { vendor: "ecowitt", temp1f: 95, humidity1: 80, dateutc: FRESH_AT },
+        }),
         ecowittRow({ plant_id: PLANT_X }),
       ],
       { tentId: TENT_A, plantId: PLANT_X, now: NOW },
@@ -161,10 +161,10 @@ describe("buildEcowittSnapshotFromRows — pure wiring", () => {
   });
 
   it("manual EcoWitt row stays Manual, never Live", () => {
-    const vm = buildEcowittSnapshotFromRows(
-      [ecowittRow({ source: "manual" })],
-      { tentId: TENT_A, now: NOW },
-    );
+    const vm = buildEcowittSnapshotFromRows([ecowittRow({ source: "manual" })], {
+      tentId: TENT_A,
+      now: NOW,
+    });
     expect(vm?.sourceLabel?.label).toBe("Manual");
   });
 
@@ -214,9 +214,7 @@ describe("EcowittLatestSnapshotCard — render", () => {
     render(<EcowittLatestSnapshotCard tentId={TENT_A} now={NOW} />, {
       wrapper: wrap(),
     });
-    await waitFor(() =>
-      expect(screen.getByTestId("ecowitt-snapshot-empty")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("ecowitt-snapshot-empty")).toBeInTheDocument());
     expect(
       screen.getByText(
         "No EcoWitt readings yet. Send a local test payload to verify the integration.",
@@ -229,9 +227,7 @@ describe("EcowittLatestSnapshotCard — render", () => {
     render(<EcowittLatestSnapshotCard tentId={TENT_A} now={NOW} />, {
       wrapper: wrap(),
     });
-    await waitFor(() =>
-      expect(screen.getByTestId("ecowitt-snapshot-error")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("ecowitt-snapshot-error")).toBeInTheDocument());
     expect(screen.getByRole("alert").textContent).toMatch(/try again/i);
   });
 
@@ -240,15 +236,9 @@ describe("EcowittLatestSnapshotCard — render", () => {
     render(<EcowittLatestSnapshotCard tentId={TENT_A} now={NOW} />, {
       wrapper: wrap(),
     });
-    await waitFor(() =>
-      expect(screen.getByTestId("ecowitt-source-badge")).toBeInTheDocument(),
-    );
-    expect(screen.getByTestId("ecowitt-source-badge").textContent).toBe(
-      "Ecowitt",
-    );
-    expect(screen.getByTestId("ecowitt-metric-vpd_kpa").textContent).toMatch(
-      /kPa/,
-    );
+    await waitFor(() => expect(screen.getByTestId("ecowitt-source-badge")).toBeInTheDocument());
+    expect(screen.getByTestId("ecowitt-source-badge").textContent).toBe("Ecowitt");
+    expect(screen.getByTestId("ecowitt-metric-vpd_kpa").textContent).toMatch(/kPa/);
     expect(screen.getByText("Derived VPD")).toBeInTheDocument();
   });
 
@@ -268,9 +258,7 @@ describe("EcowittLatestSnapshotCard — render", () => {
       wrapper: wrap(),
     });
     await waitFor(() =>
-      expect(screen.getByTestId("ecowitt-source-badge").textContent).toBe(
-        "Stale",
-      ),
+      expect(screen.getByTestId("ecowitt-source-badge").textContent).toBe("Stale"),
     );
     expect(screen.queryByText(/^Live$/)).toBeNull();
   });
@@ -290,13 +278,9 @@ describe("EcowittLatestSnapshotCard — render", () => {
       wrapper: wrap(),
     });
     await waitFor(() =>
-      expect(
-        screen.getByTestId("ecowitt-snapshot-unavailable"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("ecowitt-snapshot-unavailable")).toBeInTheDocument(),
     );
-    expect(
-      screen.getByTestId("ecowitt-metric-vpd_kpa").textContent,
-    ).toBe("Unavailable");
+    expect(screen.getByTestId("ecowitt-metric-vpd_kpa").textContent).toBe("Unavailable");
   });
 
   it("manual EcoWitt row renders Manual badge, never Live", async () => {
@@ -305,22 +289,17 @@ describe("EcowittLatestSnapshotCard — render", () => {
       wrapper: wrap(),
     });
     await waitFor(() =>
-      expect(screen.getByTestId("ecowitt-source-badge").textContent).toBe(
-        "Manual",
-      ),
+      expect(screen.getByTestId("ecowitt-source-badge").textContent).toBe("Manual"),
     );
   });
 
   it("never renders 'Live VPD' or 'VPD Live'", async () => {
     rowsMock = [ecowittRow({})];
-    const { container } = render(
-      <EcowittLatestSnapshotCard tentId={TENT_A} now={NOW} />,
-      { wrapper: wrap() },
-    );
+    const { container } = render(<EcowittLatestSnapshotCard tentId={TENT_A} now={NOW} />, {
+      wrapper: wrap(),
+    });
     await waitFor(() =>
-      expect(
-        screen.getByTestId("ecowitt-latest-snapshot-card"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("ecowitt-latest-snapshot-card")).toBeInTheDocument(),
     );
     expect(container.textContent ?? "").not.toMatch(/Live VPD|VPD Live/i);
   });
@@ -364,9 +343,7 @@ describe("EcoWitt latest snapshot UI — source code safety", () => {
   it("card uses ECOWITT_DERIVED_VPD_LABEL and never renders Live-VPD strings", () => {
     expect(cardSrc).toContain("ECOWITT_DERIVED_VPD_LABEL");
     // Strip JSDoc/line comments before scanning for forbidden user-visible text.
-    const code = cardSrc
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/\/\/.*$/gm, "");
+    const code = cardSrc.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     expect(code).not.toMatch(/Live VPD|VPD Live/);
   });
 });

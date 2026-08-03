@@ -243,9 +243,7 @@ describe("buildGuidedActionChecklist", () => {
             id: "e3",
             plantId: "p2",
             eventType: "observation",
-            createdAt: new Date(
-              NOW - FLOWER_TRICHOME_CHECK_CADENCE_MS + 60_000,
-            ).toISOString(),
+            createdAt: new Date(NOW - FLOWER_TRICHOME_CHECK_CADENCE_MS + 60_000).toISOString(),
             note: "Trichomes mostly cloudy, some clear.",
           }),
         ],

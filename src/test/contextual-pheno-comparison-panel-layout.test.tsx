@@ -82,9 +82,9 @@ describe("ContextualPhenoComparisonPanel layout snapshots", () => {
       const view = buildContextualPhenoComparisonView(inputs);
       render(<ContextualPhenoComparisonPanel view={view} />);
       expect(plantCardLabels()).toEqual(["Alpha", "Bravo"]);
-      expect(
-        screen.getByTestId("contextual-pheno-comparison-plant-count").textContent,
-      ).toMatch(/2/);
+      expect(screen.getByTestId("contextual-pheno-comparison-plant-count").textContent).toMatch(
+        /2/,
+      );
     });
 
     it("supports a 4-plant layout snapshot", () => {
@@ -94,18 +94,10 @@ describe("ContextualPhenoComparisonPanel layout snapshots", () => {
         plantLabel: "Delta",
         comparisonNotes: [],
       };
-      const inputs = [
-        ...CONTEXTUAL_PHENO_COMPARISON_DEMO_PLANT_INPUTS,
-        fourth,
-      ];
+      const inputs = [...CONTEXTUAL_PHENO_COMPARISON_DEMO_PLANT_INPUTS, fourth];
       const view = buildContextualPhenoComparisonView(inputs);
       render(<ContextualPhenoComparisonPanel view={view} />);
-      expect(plantCardLabels()).toEqual([
-        "Alpha",
-        "Bravo",
-        "Charlie",
-        "Delta",
-      ]);
+      expect(plantCardLabels()).toEqual(["Alpha", "Bravo", "Charlie", "Delta"]);
     });
   });
 

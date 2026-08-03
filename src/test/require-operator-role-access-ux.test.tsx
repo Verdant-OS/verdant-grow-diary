@@ -32,7 +32,10 @@ function renderGuard() {
     <MemoryRouter initialEntries={["/operator/demo-preview"]}>
       <Routes>
         <Route element={<RequireOperatorRole />}>
-          <Route path="/operator/demo-preview" element={<div data-testid="granted-child">OK</div>} />
+          <Route
+            path="/operator/demo-preview"
+            element={<div data-testid="granted-child">OK</div>}
+          />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -68,7 +71,9 @@ describe("RequireOperatorRole — denied state", () => {
 
   it("renders signed-in email", () => {
     renderGuard();
-    expect(screen.getByTestId("require-operator-denied-email").textContent).toMatch(/user@example\.com/);
+    expect(screen.getByTestId("require-operator-denied-email").textContent).toMatch(
+      /user@example\.com/,
+    );
   });
 
   it("renders access guidance copy", () => {
@@ -94,7 +99,9 @@ describe("RequireOperatorRole — denied state", () => {
   it("falls back to a safe message when email is unavailable", () => {
     authState.user = { id: "abc", email: null };
     renderGuard();
-    expect(screen.getByTestId("require-operator-denied-email-missing").textContent).toMatch(/email is unavailable/i);
+    expect(screen.getByTestId("require-operator-denied-email-missing").textContent).toMatch(
+      /email is unavailable/i,
+    );
   });
 });
 

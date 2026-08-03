@@ -36,16 +36,13 @@ describe("EnvironmentSummaryReport", () => {
     });
     render(<EnvironmentSummaryReport report={report} />);
     expect(screen.getByTestId("env-report-empty")).toBeTruthy();
-    expect(screen.getByTestId("environment-summary-report").getAttribute("data-total-checks")).toBe("0");
+    expect(screen.getByTestId("environment-summary-report").getAttribute("data-total-checks")).toBe(
+      "0",
+    );
   });
 
   it("renders status counts and source breakdown", () => {
-    const checks = [
-      mkVm("a", "live"),
-      mkVm("b", "manual"),
-      mkVm("c", "stale"),
-      mkVm("d", "bogus"),
-    ];
+    const checks = [mkVm("a", "live"), mkVm("b", "manual"), mkVm("c", "stale"), mkVm("d", "bogus")];
     const report = buildEnvironmentSummaryReportViewModel({
       startDate: "2026-06-01",
       endDate: "2026-06-11",
@@ -83,7 +80,9 @@ describe("EnvironmentSummaryReport", () => {
       checks: [dstVm],
     });
     render(<EnvironmentSummaryReport report={report} />);
-    expect(screen.getByTestId("env-report-status-dst_ambiguous").getAttribute("data-count")).toBe("1");
+    expect(screen.getByTestId("env-report-status-dst_ambiguous").getAttribute("data-count")).toBe(
+      "1",
+    );
     expect(screen.getByTestId("env-report-status-valid").getAttribute("data-count")).toBe("0");
   });
 

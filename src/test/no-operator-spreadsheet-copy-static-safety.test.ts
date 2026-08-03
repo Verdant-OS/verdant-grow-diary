@@ -5,9 +5,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 
-const ROOTS = ["src/pages", "src/components"].map((p) =>
-  path.resolve(__dirname, "../..", p),
-);
+const ROOTS = ["src/pages", "src/components"].map((p) => path.resolve(__dirname, "../..", p));
 
 const FORBIDDEN = [
   /XLSX\s+import/i,

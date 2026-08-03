@@ -123,9 +123,7 @@ export default function FounderOwnerPrefsForm() {
 
     if (fnError || !data || (data as { ok?: boolean }).ok !== true) {
       const msg =
-        (data as { error?: string } | null)?.error ??
-        fnError?.message ??
-        "Could not save.";
+        (data as { error?: string } | null)?.error ?? fnError?.message ?? "Could not save.";
       setError(msg);
       toast({
         title: "Could not save Founder settings",
@@ -173,9 +171,7 @@ export default function FounderOwnerPrefsForm() {
             <Label htmlFor="founder-show-on-wall" className="text-sm font-medium">
               Show me on the Founders Wall
             </Label>
-            <p className="text-xs text-muted-foreground">
-              Off means you never appear publicly.
-            </p>
+            <p className="text-xs text-muted-foreground">Off means you never appear publicly.</p>
           </div>
           <Switch
             id="founder-show-on-wall"

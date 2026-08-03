@@ -27,13 +27,7 @@ const PROBE_SOURCES = [
   "csv_import_ac_infinity", // legacy AC Infinity writer tag
 ] as const;
 
-const PROBE_METRICS = [
-  "temperature_c",
-  "humidity_pct",
-  "vpd_kpa",
-  "co2_ppm",
-  "ppfd",
-] as const;
+const PROBE_METRICS = ["temperature_c", "humidity_pct", "vpd_kpa", "co2_ppm", "ppfd"] as const;
 
 interface ProbeResult {
   source: string;
@@ -48,11 +42,10 @@ function hasPgEnv(): boolean {
 
 function runPsql(sql: string): { ok: boolean; stderr: string; stdout: string } {
   try {
-    const stdout = execFileSync(
-      "psql",
-      ["-v", "ON_ERROR_STOP=1", "-At", "-c", sql],
-      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-    );
+    const stdout = execFileSync("psql", ["-v", "ON_ERROR_STOP=1", "-At", "-c", sql], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     return { ok: true, stdout, stderr: "" };
   } catch (e) {
     const err = e as { stderr?: Buffer; stdout?: Buffer; message?: string };
@@ -66,10 +59,13 @@ function runPsql(sql: string): { ok: boolean; stderr: string; stdout: string } {
 
 /** Compact a psql error message to a single short line. */
 function compactError(raw: string): string {
-  const line = raw
-    .split("\n")
-    .map((l) => l.trim())
-    .find((l) => l.startsWith("ERROR:")) ?? raw.split("\n")[0] ?? "";
+  const line =
+    raw
+      .split("\n")
+      .map((l) => l.trim())
+      .find((l) => l.startsWith("ERROR:")) ??
+    raw.split("\n")[0] ??
+    "";
   return line.slice(0, 240);
 }
 
@@ -137,26 +133,16 @@ function main(): void {
 
   // Verdict (informational; exit code stays 0 — this is an audit, not a gate).
   const csvAllRowsAccepted = (grouped.get("csv") ?? []).every((r) => r.accepted);
-  const legacyAcceptedAny = (grouped.get("csv_import_ac_infinity") ?? []).some(
-    (r) => r.accepted,
-  );
+  const legacyAcceptedAny = (grouped.get("csv_import_ac_infinity") ?? []).some((r) => r.accepted);
   console.log("\nverdict:");
   console.log(`  csv source → ${csvAllRowsAccepted ? "ACCEPTED" : "REJECTED"}`);
-  console.log(
-    `  csv_import_ac_infinity → ${legacyAcceptedAny ? "ACCEPTED" : "REJECTED"}`,
-  );
+  console.log(`  csv_import_ac_infinity → ${legacyAcceptedAny ? "ACCEPTED" : "REJECTED"}`);
   if (!csvAllRowsAccepted) {
-    console.log(
-      "  ⚠ Registry adapter source not fully accepted by deployed trigger.",
-    );
+    console.log("  ⚠ Registry adapter source not fully accepted by deployed trigger.");
   }
   if (!legacyAcceptedAny) {
-    console.log(
-      "  ⚠ Legacy AC Infinity writer source is rejected by deployed trigger;",
-    );
-    console.log(
-      "    the in-repo writer cannot persist successfully against production.",
-    );
+    console.log("  ⚠ Legacy AC Infinity writer source is rejected by deployed trigger;");
+    console.log("    the in-repo writer cannot persist successfully against production.");
   }
   if (anyRejection) {
     // Non-fatal so the harness can be run informationally in CI.

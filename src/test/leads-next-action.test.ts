@@ -8,10 +8,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  recommendNextAction,
-  priorityRank,
-} from "@/lib/leadNextActionRules";
+import { recommendNextAction, priorityRank } from "@/lib/leadNextActionRules";
 import type { LeadRow } from "@/hooks/useLeadsList";
 
 const readSrc = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
@@ -41,20 +38,14 @@ const baseLead: LeadRow = {
 
 describe("recommendNextAction — happy paths", () => {
   it("new lead under a day → Needs First Contact (medium)", () => {
-    const r = recommendNextAction(
-      { ...baseLead, created_at: "2026-05-10T08:00:00Z" },
-      NOW,
-    );
+    const r = recommendNextAction({ ...baseLead, created_at: "2026-05-10T08:00:00Z" }, NOW);
     expect(r.type).toBe("needs_first_contact");
     expect(r.priority).toBe("medium");
     expect(r.warning).toBeNull();
   });
 
   it("new lead older than a day → Needs First Contact (high)", () => {
-    const r = recommendNextAction(
-      { ...baseLead, created_at: "2026-05-01T08:00:00Z" },
-      NOW,
-    );
+    const r = recommendNextAction({ ...baseLead, created_at: "2026-05-01T08:00:00Z" }, NOW);
     expect(r.type).toBe("needs_first_contact");
     expect(r.priority).toBe("high");
   });
@@ -140,10 +131,7 @@ describe("recommendNextAction — safety and ambiguity", () => {
   });
 
   it("follow_up status without follow_up_at → Review Manually + warning", () => {
-    const r = recommendNextAction(
-      { ...baseLead, status: "follow_up", follow_up_at: null },
-      NOW,
-    );
+    const r = recommendNextAction({ ...baseLead, status: "follow_up", follow_up_at: null }, NOW);
     expect(r.type).toBe("review_manually");
     expect(r.warning).toMatch(/follow_up_at/);
   });
@@ -172,10 +160,7 @@ describe("recommendNextAction — safety and ambiguity", () => {
   });
 
   it("contacted status but missing contacted_at → Needs First Contact + warning", () => {
-    const r = recommendNextAction(
-      { ...baseLead, status: "contacted", contacted_at: null },
-      NOW,
-    );
+    const r = recommendNextAction({ ...baseLead, status: "contacted", contacted_at: null }, NOW);
     expect(r.type).toBe("needs_first_contact");
     expect(r.warning).toMatch(/contacted_at/);
   });
@@ -197,10 +182,7 @@ describe("recommendNextAction — determinism and ranking", () => {
       },
       NOW,
     );
-    const closed = recommendNextAction(
-      { ...baseLead, status: "closed" },
-      NOW,
-    );
+    const closed = recommendNextAction({ ...baseLead, status: "closed" }, NOW);
     expect(overdueFollowUp.sortWeight).toBeLessThan(closed.sortWeight);
   });
 

@@ -55,10 +55,7 @@ export function SensorSnapshotTruthStrip({
       className={`rounded-lg border border-border/60 p-3 text-sm space-y-2 ${className ?? ""}`}
       aria-label="Sensor snapshot truth"
     >
-      <div
-        className="flex flex-wrap gap-1.5"
-        data-testid={`${testId}-badges`}
-      >
+      <div className="flex flex-wrap gap-1.5" data-testid={`${testId}-badges`}>
         {model.badges.map((b) => (
           <Badge
             key={b.label}
@@ -70,10 +67,7 @@ export function SensorSnapshotTruthStrip({
         ))}
       </div>
 
-      <p
-        className="text-[11px] text-muted-foreground"
-        data-testid={`${testId}-captured`}
-      >
+      <p className="text-[11px] text-muted-foreground" data-testid={`${testId}-captured`}>
         {model.capturedAtLabel}
       </p>
 
@@ -100,17 +94,11 @@ export function SensorSnapshotTruthStrip({
         </p>
       ) : null}
 
-      <p
-        className="text-[11px] text-muted-foreground"
-        data-testid={`${testId}-preview-only`}
-      >
+      <p className="text-[11px] text-muted-foreground" data-testid={`${testId}-preview-only`}>
         {model.previewOnlyNote}
       </p>
 
-      <p
-        className="text-[11px] text-muted-foreground"
-        data-testid={`${testId}-raw-note`}
-      >
+      <p className="text-[11px] text-muted-foreground" data-testid={`${testId}-raw-note`}>
         {model.rawPayloadNote}
       </p>
     </section>

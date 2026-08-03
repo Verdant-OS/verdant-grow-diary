@@ -67,18 +67,24 @@ describe("validatePostGrowReflectionOutput", () => {
   });
 
   it("rejects outputs that do not include enough explicit evidence", () => {
-    const result = validatePostGrowReflectionOutput(createMissingEvidencePostGrowReflectionOutput(), {
-      minEvidenceReferences: 2,
-    });
+    const result = validatePostGrowReflectionOutput(
+      createMissingEvidencePostGrowReflectionOutput(),
+      {
+        minEvidenceReferences: 2,
+      },
+    );
 
     expect(result.ok).toBe(false);
     expect(codes(result.issues)).toContain("missing_evidence");
   });
 
   it("rejects unsafe automation and equipment-control language", () => {
-    const result = validatePostGrowReflectionOutput(createUnsafeAutomationPostGrowReflectionOutput(), {
-      sensorCoveragePct: 92,
-    });
+    const result = validatePostGrowReflectionOutput(
+      createUnsafeAutomationPostGrowReflectionOutput(),
+      {
+        sensorCoveragePct: 92,
+      },
+    );
 
     expect(result.ok).toBe(false);
     expect(codes(result.issues)).toContain("unsafe_language");

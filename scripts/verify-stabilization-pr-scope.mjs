@@ -25,11 +25,7 @@ import { execSync } from "node:child_process";
  * Allowed-by-default path prefixes/exact matches for harness work.
  * Conservative on purpose: when in doubt, BLOCK.
  */
-const ALLOWED_PREFIXES = [
-  "src/test/",
-  "tests/",
-  "scripts/",
-];
+const ALLOWED_PREFIXES = ["src/test/", "tests/", "scripts/"];
 
 const ALLOWED_EXACT = new Set([
   "package.json",
@@ -40,10 +36,7 @@ const ALLOWED_EXACT = new Set([
   "yarn.lock",
 ]);
 
-const ALLOWED_CONFIG_REGEXES = [
-  /^vitest\.config\.[cm]?[jt]s$/,
-  /^playwright\.config\.[cm]?[jt]s$/,
-];
+const ALLOWED_CONFIG_REGEXES = [/^vitest\.config\.[cm]?[jt]s$/, /^playwright\.config\.[cm]?[jt]s$/];
 
 /** Hard block prefixes — never allowed in a stabilization PR. */
 const BLOCKED_PREFIXES = [
@@ -71,11 +64,7 @@ const BLOCKED_EXACT = new Set([
  * Hard block prefixes for product modules whose filenames begin with
  * blocked tokens (e.g. harvestWatch*, harvestCure*, harvestEvidenceReport*).
  */
-const BLOCKED_FILENAME_PREFIXES_IN_LIB = [
-  "harvestWatch",
-  "harvestCure",
-  "harvestEvidenceReport",
-];
+const BLOCKED_FILENAME_PREFIXES_IN_LIB = ["harvestWatch", "harvestCure", "harvestEvidenceReport"];
 
 const BLOCKED_FILENAME_PREFIXES_IN_COMPONENTS = [
   "HarvestEvidenceReport",
@@ -162,10 +151,7 @@ export function classifyStabilizationPrFiles(files, options = {}) {
   const blocked = [];
   for (const f of files) {
     if (!f) continue;
-    if (
-      isBlockedStabilizationPath(f) ||
-      !isAllowedStabilizationPath(f, options)
-    ) {
+    if (isBlockedStabilizationPath(f) || !isAllowedStabilizationPath(f, options)) {
       blocked.push(f);
     } else {
       allowed.push(f);
@@ -230,10 +216,7 @@ function getChangedFiles(args) {
     return { mode: "staged", base: null, files: splitLines(out) };
   }
   const base = args.base ?? "origin/main";
-  const out = execSync(
-    `git diff --name-only ${shellEscape(base)}...HEAD`,
-    { encoding: "utf8" },
-  );
+  const out = execSync(`git diff --name-only ${shellEscape(base)}...HEAD`, { encoding: "utf8" });
   return { mode: "branch-diff", base, files: splitLines(out) };
 }
 

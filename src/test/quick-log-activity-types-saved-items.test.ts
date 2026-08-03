@@ -23,18 +23,15 @@ describe("buildDailyCheckSavedItems (v1a activity source extension)", () => {
     ["training", "training", "Training"],
     ["defoliation", "defoliation", "Defoliation"],
     ["issue_observation", "issue_observation", "Issue / observation"],
-  ] as const)(
-    "returns [%s] item on confirmed save",
-    (_name, source, label) => {
-      const items = buildDailyCheckSavedItems({
-        source: source as DailyCheckSavedSource,
-        submittedAt: TS,
-      });
-      expect(items).toHaveLength(1);
-      expect(items[0].key).toBe(source);
-      expect(items[0].label).toBe(label);
-    },
-  );
+  ] as const)("returns [%s] item on confirmed save", (_name, source, label) => {
+    const items = buildDailyCheckSavedItems({
+      source: source as DailyCheckSavedSource,
+      submittedAt: TS,
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0].key).toBe(source);
+    expect(items[0].label).toBe(label);
+  });
 
   it("manual sensor keeps manual/not-live wording", () => {
     const [item] = buildDailyCheckSavedItems({
@@ -70,12 +67,8 @@ describe("buildDailyCheckSavedItems (v1a activity source extension)", () => {
   });
 
   it("still gates on a finite submittedAt", () => {
-    expect(
-      buildDailyCheckSavedItems({ source: "feeding", submittedAt: null }),
-    ).toEqual([]);
-    expect(
-      buildDailyCheckSavedItems({ source: "training", submittedAt: NaN }),
-    ).toEqual([]);
+    expect(buildDailyCheckSavedItems({ source: "feeding", submittedAt: null })).toEqual([]);
+    expect(buildDailyCheckSavedItems({ source: "training", submittedAt: NaN })).toEqual([]);
   });
 
   it("no returned label contains recommendation/diagnosis/readiness language", () => {

@@ -17,12 +17,7 @@ import {
 } from "@/lib/latestSensorSnapshotRules";
 import { formatLastUpdatedAgo } from "@/lib/lastUpdatedAgo";
 
-export type SensorSnapshotPreviewStatus =
-  | "idle"
-  | "loading"
-  | "empty"
-  | "error"
-  | "ready";
+export type SensorSnapshotPreviewStatus = "idle" | "loading" | "empty" | "error" | "ready";
 
 interface Props {
   status: SensorSnapshotPreviewStatus;
@@ -108,10 +103,7 @@ export function SensorSnapshotPreview({
       className="rounded-lg border border-border/60 p-3 text-sm space-y-2"
     >
       <header className="flex items-center justify-between gap-2">
-        <h3
-          id="sensor-snapshot-preview-heading"
-          className="text-sm font-semibold"
-        >
+        <h3 id="sensor-snapshot-preview-heading" className="text-sm font-semibold">
           Sensor snapshot
         </h3>
         {status === "ready" ? (
@@ -133,8 +125,6 @@ export function SensorSnapshotPreview({
         {lastUpdatedLabel}
       </p>
 
-
-
       {status === "loading" ? (
         <p
           className="text-xs text-muted-foreground"
@@ -147,19 +137,13 @@ export function SensorSnapshotPreview({
       ) : null}
 
       {status === "idle" ? (
-        <p
-          className="text-xs text-muted-foreground"
-          data-testid="sensor-snapshot-preview-idle"
-        >
+        <p className="text-xs text-muted-foreground" data-testid="sensor-snapshot-preview-idle">
           Pick a plant or tent to see the latest sensor snapshot.
         </p>
       ) : null}
 
       {status === "empty" ? (
-        <p
-          className="text-xs text-muted-foreground"
-          data-testid="sensor-snapshot-preview-empty"
-        >
+        <p className="text-xs text-muted-foreground" data-testid="sensor-snapshot-preview-empty">
           No sensor readings yet for this tent.
         </p>
       ) : null}
@@ -180,40 +164,31 @@ export function SensorSnapshotPreview({
             className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs"
             data-testid="sensor-snapshot-preview-metrics"
           >
-            {(
-              [
-                "temp_f",
-                "humidity_pct",
-                "vpd_kpa",
-                "soil_moisture_pct",
-                "co2_ppm",
-              ] as const
-            ).map((key) => {
-              const v = snapshot.metrics[key];
-              if (key === "co2_ppm" && v === null) return null;
-              const detail = snapshot.metricDetails[key];
-              const tone =
-                v === null
-                  ? "text-muted-foreground"
-                  : !detail.valid
-                    ? "text-destructive"
-                    : detail.warn
-                      ? "text-amber-700"
-                      : "text-foreground";
-              return (
-                <div key={key} className="flex justify-between gap-2">
-                  <dt className="text-muted-foreground">{METRIC_LABELS[key]}</dt>
-                  <dd
-                    data-testid={`sensor-snapshot-preview-metric-${key}`}
-                    className={tone}
-                  >
-                    {formatMetric(key, v)}
-                    {v !== null && !detail.valid ? " · invalid" : ""}
-                    {v !== null && detail.valid && detail.warn ? " · watch" : ""}
-                  </dd>
-                </div>
-              );
-            })}
+            {(["temp_f", "humidity_pct", "vpd_kpa", "soil_moisture_pct", "co2_ppm"] as const).map(
+              (key) => {
+                const v = snapshot.metrics[key];
+                if (key === "co2_ppm" && v === null) return null;
+                const detail = snapshot.metricDetails[key];
+                const tone =
+                  v === null
+                    ? "text-muted-foreground"
+                    : !detail.valid
+                      ? "text-destructive"
+                      : detail.warn
+                        ? "text-amber-700"
+                        : "text-foreground";
+                return (
+                  <div key={key} className="flex justify-between gap-2">
+                    <dt className="text-muted-foreground">{METRIC_LABELS[key]}</dt>
+                    <dd data-testid={`sensor-snapshot-preview-metric-${key}`} className={tone}>
+                      {formatMetric(key, v)}
+                      {v !== null && !detail.valid ? " · invalid" : ""}
+                      {v !== null && detail.valid && detail.warn ? " · watch" : ""}
+                    </dd>
+                  </div>
+                );
+              },
+            )}
           </dl>
 
           <p
@@ -248,9 +223,7 @@ export function SensorSnapshotPreview({
           checked={attach}
           disabled={!canToggle}
           aria-label={
-            attach
-              ? "Do not attach sensor snapshot"
-              : "Attach sensor snapshot to this entry"
+            attach ? "Do not attach sensor snapshot" : "Attach sensor snapshot to this entry"
           }
           data-testid="sensor-snapshot-preview-attach-toggle"
           onChange={(e) => onToggleAttach?.(e.target.checked)}

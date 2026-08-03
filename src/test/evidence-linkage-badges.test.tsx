@@ -43,8 +43,18 @@ describe("EvidenceLinkageBadges presenter", () => {
 
   it("renders a source badge per linked event with id + source labels", () => {
     const events: OriginatingTimelineEventRef[] = [
-      { id: "diary-001", type: "diary_note", occurred_at: "2026-06-27T11:30:00.000Z", source: "manual" },
-      { id: "reading-stale-001", type: "sensor_reading", occurred_at: "2026-06-27T11:55:00.000Z", source: "stale" },
+      {
+        id: "diary-001",
+        type: "diary_note",
+        occurred_at: "2026-06-27T11:30:00.000Z",
+        source: "manual",
+      },
+      {
+        id: "reading-stale-001",
+        type: "sensor_reading",
+        occurred_at: "2026-06-27T11:55:00.000Z",
+        source: "stale",
+      },
     ];
     const { container } = render(<EvidenceLinkageBadges events={events} />);
     const items = screen.getAllByTestId("evidence-linkage-badges-item");
@@ -54,8 +64,12 @@ describe("EvidenceLinkageBadges presenter", () => {
     expect(items[1]).toHaveAttribute("data-source", "stale");
     expect(items[1]).toHaveAttribute("data-trusted", "false");
     expect(within(items[0]).getByText("diary-001")).toBeInTheDocument();
-    expect(within(items[0]).getByTestId("evidence-linkage-badges-source")).toHaveTextContent(/Manual/i);
-    expect(within(items[1]).getByTestId("evidence-linkage-badges-source")).toHaveTextContent(/Stale/i);
+    expect(within(items[0]).getByTestId("evidence-linkage-badges-source")).toHaveTextContent(
+      /Manual/i,
+    );
+    expect(within(items[1]).getByTestId("evidence-linkage-badges-source")).toHaveTextContent(
+      /Stale/i,
+    );
     expectNoForbiddenCopy(container);
   });
 
@@ -88,9 +102,7 @@ describe("EvidenceLinkageBadges presenter", () => {
   });
 
   it("renders 'Linked timeline event' label and pluralizes correctly", () => {
-    const { rerender } = render(
-      <EvidenceLinkageBadges events={[{ id: "a", source: "manual" }]} />,
-    );
+    const { rerender } = render(<EvidenceLinkageBadges events={[{ id: "a", source: "manual" }]} />);
     expect(screen.getByText(/Linked timeline event$/i)).toBeInTheDocument();
     rerender(
       <EvidenceLinkageBadges
@@ -106,8 +118,14 @@ describe("EvidenceLinkageBadges presenter", () => {
   it("renders the provenance-aware fallback copy for each mount surface", () => {
     const cases: Array<{ copy: string; surface: "alert-review" | "action-queue-suggestion" }> = [
       { copy: ALERT_REVIEW_EVIDENCE_NOT_LINKED_COPY, surface: "alert-review" },
-      { copy: ACTION_QUEUE_ALERT_DERIVED_EVIDENCE_NOT_LINKED_COPY, surface: "action-queue-suggestion" },
-      { copy: ACTION_QUEUE_AI_DOCTOR_DERIVED_EVIDENCE_NOT_LINKED_COPY, surface: "action-queue-suggestion" },
+      {
+        copy: ACTION_QUEUE_ALERT_DERIVED_EVIDENCE_NOT_LINKED_COPY,
+        surface: "action-queue-suggestion",
+      },
+      {
+        copy: ACTION_QUEUE_AI_DOCTOR_DERIVED_EVIDENCE_NOT_LINKED_COPY,
+        surface: "action-queue-suggestion",
+      },
     ];
     for (const { copy, surface } of cases) {
       const { container, unmount } = render(

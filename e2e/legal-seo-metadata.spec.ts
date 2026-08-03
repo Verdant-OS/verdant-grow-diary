@@ -26,9 +26,8 @@ for (const r of ROUTES) {
       'link[rel="canonical"]',
     );
 
-    const canonicals = await page.$$eval(
-      'link[rel="canonical"]',
-      (els) => els.map((e) => e.getAttribute("href")),
+    const canonicals = await page.$$eval('link[rel="canonical"]', (els) =>
+      els.map((e) => e.getAttribute("href")),
     );
     expect(canonicals).toEqual([url]);
 

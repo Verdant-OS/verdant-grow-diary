@@ -2,10 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-const SRC = readFileSync(
-  path.resolve(__dirname, "../components/TentBridgeTokensCard.tsx"),
-  "utf8",
-);
+const SRC = readFileSync(path.resolve(__dirname, "../components/TentBridgeTokensCard.tsx"), "utf8");
 
 describe("TentBridgeTokensCard — safe load failure handling", () => {
   it("does not leak raw DB error.message into the toast", () => {

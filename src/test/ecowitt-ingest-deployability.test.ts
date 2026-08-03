@@ -37,20 +37,13 @@ describe("ecowitt-ingest deployability — import boundaries", () => {
   });
 
   it("never imports from sibling supabase function folders", () => {
-    const bad = specs.filter((s) =>
-      /^\.\.\/(?!_shared\/)[a-z0-9_-]+\//i.test(s),
-    );
-    expect(bad, `forbidden sibling-function imports: ${bad.join(", ")}`).toEqual(
-      [],
-    );
+    const bad = specs.filter((s) => /^\.\.\/(?!_shared\/)[a-z0-9_-]+\//i.test(s));
+    expect(bad, `forbidden sibling-function imports: ${bad.join(", ")}`).toEqual([]);
   });
 
   it("never imports from the React app (`src/` or `@/`)", () => {
     const bad = specs.filter(
-      (s) =>
-        s.startsWith("@/") ||
-        s.includes("/src/") ||
-        /^\.\.\/\.\.\/\.\.\/src\//.test(s),
+      (s) => s.startsWith("@/") || s.includes("/src/") || /^\.\.\/\.\.\/\.\.\/src\//.test(s),
     );
     expect(bad, `forbidden app imports: ${bad.join(", ")}`).toEqual([]);
   });

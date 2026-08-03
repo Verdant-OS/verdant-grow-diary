@@ -30,8 +30,7 @@ export function AiDoctorImportedHistoryDisclosurePanel({
   context,
   viewModel,
 }: AiDoctorImportedHistoryDisclosurePanelProps): JSX.Element | null {
-  const vm =
-    viewModel ?? buildAiDoctorImportedHistoryDisclosureViewModel(context ?? null);
+  const vm = viewModel ?? buildAiDoctorImportedHistoryDisclosureViewModel(context ?? null);
   if (!vm.visible) return null;
 
   return (
@@ -46,51 +45,32 @@ export function AiDoctorImportedHistoryDisclosurePanel({
       <dl className="text-xs space-y-1">
         <div>
           <dt className="inline font-medium">Source label: </dt>
-          <dd
-            className="inline"
-            data-testid="ai-doctor-imported-history-source-label"
-          >
+          <dd className="inline" data-testid="ai-doctor-imported-history-source-label">
             {vm.sourceLabel}
           </dd>
         </div>
         <div>
           <dt className="inline font-medium">Vendors: </dt>
-          <dd
-            className="inline"
-            data-testid="ai-doctor-imported-history-vendors"
-          >
-            {vm.vendorLabels.length > 0
-              ? vm.vendorLabels.join(", ")
-              : "unknown vendor"}
+          <dd className="inline" data-testid="ai-doctor-imported-history-vendors">
+            {vm.vendorLabels.length > 0 ? vm.vendorLabels.join(", ") : "unknown vendor"}
           </dd>
         </div>
         <div>
           <dt className="inline font-medium">Date range: </dt>
-          <dd
-            className="inline"
-            data-testid="ai-doctor-imported-history-date-range"
-          >
-            {vm.dateRange
-              ? `${vm.dateRange.earliest} → ${vm.dateRange.latest}`
-              : "unknown"}
+          <dd className="inline" data-testid="ai-doctor-imported-history-date-range">
+            {vm.dateRange ? `${vm.dateRange.earliest} → ${vm.dateRange.latest}` : "unknown"}
           </dd>
         </div>
         <div>
           <dt className="inline font-medium">Total readings: </dt>
-          <dd
-            className="inline"
-            data-testid="ai-doctor-imported-history-total-readings"
-          >
+          <dd className="inline" data-testid="ai-doctor-imported-history-total-readings">
             {vm.totalReadings}
           </dd>
         </div>
         {vm.showSuspiciousFlags ? (
           <div>
             <dt className="inline font-medium">Suspicious flags: </dt>
-            <dd
-              className="inline"
-              data-testid="ai-doctor-imported-history-suspicious-flags"
-            >
+            <dd className="inline" data-testid="ai-doctor-imported-history-suspicious-flags">
               {vm.suspiciousFlagCount}
             </dd>
           </div>
@@ -98,9 +78,7 @@ export function AiDoctorImportedHistoryDisclosurePanel({
       </dl>
 
       <div>
-        <p className="text-xs font-medium text-muted-foreground">
-          Metrics summarized
-        </p>
+        <p className="text-xs font-medium text-muted-foreground">Metrics summarized</p>
         {vm.metrics.length === 0 ? (
           <p
             data-testid="ai-doctor-imported-history-metrics-empty"

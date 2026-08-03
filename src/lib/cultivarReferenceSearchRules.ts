@@ -64,10 +64,7 @@ export function filterCultivarReferenceProfiles(
       if (cultivar.publicationStatus !== "published") return false;
       if (difficulty !== "all" && cultivar.difficulty !== difficulty) return false;
       if (lifeCycle !== "all" && cultivar.lifeCycle !== lifeCycle) return false;
-      if (
-        verificationStatus !== "all" &&
-        cultivar.verificationStatus !== verificationStatus
-      ) {
+      if (verificationStatus !== "all" && cultivar.verificationStatus !== verificationStatus) {
         return false;
       }
       return true;

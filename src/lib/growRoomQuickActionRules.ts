@@ -13,10 +13,7 @@
  *  - Never produces an executable device command surface.
  */
 
-import {
-  buildQuickLogV2OpenIntent,
-  type QuickLogV2OpenIntent,
-} from "@/lib/quickLogV2OpenIntent";
+import { buildQuickLogV2OpenIntent, type QuickLogV2OpenIntent } from "@/lib/quickLogV2OpenIntent";
 
 export type QuickActionKind =
   | "quick_log"
@@ -88,9 +85,7 @@ export function getPrimaryPlantForTent(
 }
 
 /** A plant-scoped quick action is safe to open only when a real plant id is selected. */
-export function canOpenPlantScopedAction(
-  plant: QuickActionPlantLite | null | undefined,
-): boolean {
+export function canOpenPlantScopedAction(plant: QuickActionPlantLite | null | undefined): boolean {
   return !!plant && !plant.is_archived && typeof plant.id === "string" && plant.id.length > 0;
 }
 

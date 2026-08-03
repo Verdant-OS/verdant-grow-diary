@@ -8,9 +8,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 
-import {
-  RELEASE_RECEIPT_SCHEMA_VERSION,
-} from "@/lib/releaseReceiptParserContract";
+import { RELEASE_RECEIPT_SCHEMA_VERSION } from "@/lib/releaseReceiptParserContract";
 import {
   isReleaseReceiptArtifactV1,
   normalizeReleaseReceiptBlockers,
@@ -107,8 +105,6 @@ describe("releaseReceiptParser — rejection rules", () => {
       throw new Error("expected failure");
     }
     expect(r.errors.join(" ")).toMatch(/schema_version/);
-
-
   });
 
   it("rejects missing required fields", () => {
@@ -201,9 +197,7 @@ describe("releaseReceiptParser — rejection rules", () => {
   it("direct normalizers are pure functions of artifact", () => {
     const r = parseReleaseReceiptArtifact(ciBlocked);
     if (r.ok === false) throw new Error("expected ok");
-    expect(normalizeReleaseReceiptToEvidenceReceipt(r.artifact)).toEqual(
-      r.evidenceReceipt,
-    );
+    expect(normalizeReleaseReceiptToEvidenceReceipt(r.artifact)).toEqual(r.evidenceReceipt);
     expect(normalizeReleaseReceiptBlockers(r.artifact)).toEqual(r.blockers);
   });
 });
@@ -235,10 +229,7 @@ describe("releaseReceiptParser — posture integration", () => {
 });
 
 describe("releaseReceiptParser — static safety scan", () => {
-  const FILES = [
-    "src/lib/releaseReceiptParserContract.ts",
-    "src/lib/releaseReceiptParser.ts",
-  ];
+  const FILES = ["src/lib/releaseReceiptParserContract.ts", "src/lib/releaseReceiptParser.ts"];
   const FORBIDDEN_RUNTIME = [
     "fetch(",
     "functions.invoke",

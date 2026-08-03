@@ -42,18 +42,11 @@ describe("Insert payload builders ↔ diary EVENT_TYPES alignment", () => {
     FAST_ADD_ACTIONS.filter((a) => a.quickLogEventType !== null).map(
       (a) => [a.id, a.quickLogEventType!] as const,
     ),
-  )(
-    "Quick Log '%s' produces eventType '%s' which exists in EVENT_TYPES",
-    (_id, eventType) => {
-      expect(DIARY_VALUES.has(eventType)).toBe(true);
-    },
-  );
+  )("Quick Log '%s' produces eventType '%s' which exists in EVENT_TYPES", (_id, eventType) => {
+    expect(DIARY_VALUES.has(eventType)).toBe(true);
+  });
 
-  it.each(
-    SUPPORTED_LEGACY_EVENT_TYPES.filter((v) => v !== "note").map(
-      (v) => [v] as const,
-    ),
-  )(
+  it.each(SUPPORTED_LEGACY_EVENT_TYPES.filter((v) => v !== "note").map((v) => [v] as const))(
     "Legacy QuickLog save event '%s' is wired to a real EVENT_TYPES entry",
     (eventType) => {
       expect(DIARY_VALUES.has(eventType)).toBe(true);
@@ -89,12 +82,7 @@ describe("Timeline classification ↔ EVENT_TYPES coverage", () => {
 
 describe("Diary timeline rendering pages are mounted", () => {
   // Pages that surface the diary timeline / per-scope event feeds.
-  const TIMELINE_ROUTES = [
-    "/logs",
-    "/plants/:id",
-    "/tents/:id",
-    "/grows/:growId",
-  ] as const;
+  const TIMELINE_ROUTES = ["/logs", "/plants/:id", "/tents/:id", "/grows/:growId"] as const;
 
   it.each(TIMELINE_ROUTES.map((p) => [p] as const))(
     "route '%s' is mounted in APP_ROUTES",

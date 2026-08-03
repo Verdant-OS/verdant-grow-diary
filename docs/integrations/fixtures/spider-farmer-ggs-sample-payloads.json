@@ -9,7 +9,12 @@
         "source": "live",
         "transport": "mqtt",
         "readingsInclude": ["temp_f", "humidity", "vpd_kpa"],
-        "warningsExclude": ["reading_stale", "captured_at_missing", "captured_at_invalid", "no_readings_mapped"]
+        "warningsExclude": [
+          "reading_stale",
+          "captured_at_missing",
+          "captured_at_invalid",
+          "no_readings_mapped"
+        ]
       },
       "payload": {
         "provider": "spider_farmer_ggs",

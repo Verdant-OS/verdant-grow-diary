@@ -27,14 +27,15 @@ export const CHECKPOINT_TEST_MAP = [
   {
     id: 2,
     label: "Upgrade return path",
-    titles: [
-      "the CTA returnTo round-trips to /pricing",
-      "unsafe returnTo is rejected",
-    ],
+    titles: ["the CTA returnTo round-trips to /pricing", "unsafe returnTo is rejected"],
   },
   { id: 3, label: "Pro access and onboarding", titles: ["Pro user can load /pheno-hunts/new"] },
   { id: 4, label: "Founder access", titles: ["Founder user can load /pheno-hunts/new"] },
-  { id: 5, label: "Canceled/expired behavior", titles: ["Canceled user hitting /pheno-hunts/new sees gate"] },
+  {
+    id: 5,
+    label: "Canceled/expired behavior",
+    titles: ["Canceled user hitting /pheno-hunts/new sees gate"],
+  },
   { id: 6, label: "Hunt setup persistence", titles: [] },
   { id: 7, label: "Workspace status split", titles: ["workspace shows disabled Compare"] },
   {
@@ -47,13 +48,21 @@ export const CHECKPOINT_TEST_MAP = [
     label: "Missing-evidence navigation",
     titles: ["missing-evidence next-step anchor navigates within the workspace"],
   },
-  { id: 10, label: "Direct incomplete /compare", titles: ["direct /compare on incomplete hunt shows not-ready warning"] },
+  {
+    id: 10,
+    label: "Direct incomplete /compare",
+    titles: ["direct /compare on incomplete hunt shows not-ready warning"],
+  },
   {
     id: 11,
     label: "Comparison-ready flow",
     titles: ["workspace enables Compare and /compare renders substantive read-only comparison"],
   },
-  { id: 12, label: "Core Verdant regression", titles: ["dashboard route still resolves without a crash"] },
+  {
+    id: 12,
+    label: "Core Verdant regression",
+    titles: ["dashboard route still resolves without a crash"],
+  },
 ];
 
 /** Flatten a Playwright JSON report into [{ title, outcome }]. */

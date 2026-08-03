@@ -28,9 +28,7 @@ describe("buildEnvironmentSummaryReportUrl", () => {
         endDate: "2026-06-07",
         issueId: "climate.vpd",
       }),
-    ).toBe(
-      "/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=climate.vpd",
-    );
+    ).toBe("/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=climate.vpd");
   });
 
   it("ignores invalid date formats", () => {

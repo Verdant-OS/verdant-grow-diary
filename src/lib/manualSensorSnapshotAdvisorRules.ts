@@ -114,13 +114,9 @@ export function evaluateManualSnapshotAdvisor(
   // 2. Humidity unusually low or high.
   if (humidity !== null && humidity >= 0 && humidity <= 100) {
     if (humidity < 20) {
-      warnings.push(
-        `Humidity ${humidity}% is unusually low for a grow tent. ${DOUBLE_CHECK}`,
-      );
+      warnings.push(`Humidity ${humidity}% is unusually low for a grow tent. ${DOUBLE_CHECK}`);
     } else if (humidity > 90) {
-      warnings.push(
-        `Humidity ${humidity}% is unusually high for a grow tent. ${DOUBLE_CHECK}`,
-      );
+      warnings.push(`Humidity ${humidity}% is unusually high for a grow tent. ${DOUBLE_CHECK}`);
     }
   }
 
@@ -141,13 +137,9 @@ export function evaluateManualSnapshotAdvisor(
   // 4. CO2 below 300 ppm or above 2000 ppm.
   if (co2 !== null) {
     if (co2 < 300) {
-      warnings.push(
-        `CO₂ ${co2} ppm is below ambient (~400 ppm). ${DOUBLE_CHECK}`,
-      );
+      warnings.push(`CO₂ ${co2} ppm is below ambient (~400 ppm). ${DOUBLE_CHECK}`);
     } else if (co2 > 2000) {
-      warnings.push(
-        `CO₂ ${co2} ppm is above the safe enrichment ceiling. ${DOUBLE_CHECK}`,
-      );
+      warnings.push(`CO₂ ${co2} ppm is above the safe enrichment ceiling. ${DOUBLE_CHECK}`);
     }
   }
 
@@ -174,9 +166,7 @@ export function evaluateManualSnapshotAdvisor(
 
   // 7. Reservoir pH outside realistic 4.5–7.5 range.
   if (ph !== null && (ph < 4.5 || ph > 7.5)) {
-    warnings.push(
-      `Reservoir pH ${ph} is outside the realistic 4.5–7.5 range. ${DOUBLE_CHECK}`,
-    );
+    warnings.push(`Reservoir pH ${ph} is outside the realistic 4.5–7.5 range. ${DOUBLE_CHECK}`);
   }
 
   return { warnings, derivedVpdKpa };

@@ -106,7 +106,8 @@ export const HARD_FLAG_CODES: ReadonlySet<string> = new Set([
 ]);
 
 /** Keys we will never copy into raw_payload from the source row. */
-const FORBIDDEN_RAW_KEY = /token|secret|password|auth|bearer|api[_-]?key|user[_-]?id|service[_-]?role|cookie/i;
+const FORBIDDEN_RAW_KEY =
+  /token|secret|password|auth|bearer|api[_-]?key|user[_-]?id|service[_-]?role|cookie/i;
 
 export interface PreviewRowInput {
   rowIndex: number;
@@ -128,9 +129,7 @@ export interface OwnershipContext {
   userId: string | null;
   grow: { id: string; ownerUserId: string } | null;
   tent: { id: string; growId: string; ownerUserId: string } | null;
-  plant:
-    | { id: string; tentId: string; growId: string; ownerUserId: string }
-    | null;
+  plant: { id: string; tentId: string; growId: string; ownerUserId: string } | null;
 }
 
 export interface BuildCsvImportPlanInput {
@@ -310,9 +309,7 @@ function emptyPlan(
   };
 }
 
-function validateOwnership(
-  o: OwnershipContext,
-): HardBlockReason[] {
+function validateOwnership(o: OwnershipContext): HardBlockReason[] {
   const reasons: HardBlockReason[] = [];
   if (!o.authenticated || !o.userId) {
     reasons.push("unauthenticated");
@@ -368,9 +365,7 @@ export function buildCsvImportPlan(input: BuildCsvImportPlanInput): CsvImportPla
 
   // Excess hard-flag pre-check (>5% of supplied rows)
   if (input.rows.length > 0) {
-    const hardFlagged = input.rows.filter(
-      (r) => (r.hardFlags ?? []).some(isHardFlag),
-    ).length;
+    const hardFlagged = input.rows.filter((r) => (r.hardFlags ?? []).some(isHardFlag)).length;
     if (hardFlagged / input.rows.length > HARD_FLAG_BATCH_THRESHOLD) {
       hardBlocks.push("excess_hard_flags");
     }
@@ -444,9 +439,7 @@ export function buildCsvImportPlan(input: BuildCsvImportPlanInput): CsvImportPla
     // Plant-id attachment: only for plant-scoped metrics. Tent-scoped metrics
     // deterministically ignore any provided plant context.
     const plantId =
-      PLANT_SCOPED_METRICS.has(metric) && input.ownership.plant
-        ? input.ownership.plant.id
-        : null;
+      PLANT_SCOPED_METRICS.has(metric) && input.ownership.plant ? input.ownership.plant.id : null;
 
     accepted.push({
       grow_id: input.ownership.grow!.id,
@@ -494,9 +487,7 @@ export function buildCsvImportPlan(input: BuildCsvImportPlanInput): CsvImportPla
     // is for the same plant. Otherwise scope to tent only.
     const plantIds = new Set(accepted.map((w) => w.plant_id));
     const summaryPlantId =
-      plantIds.size === 1 && [...plantIds][0] !== null
-        ? ([...plantIds][0] as string)
-        : null;
+      plantIds.size === 1 && [...plantIds][0] !== null ? ([...plantIds][0] as string) : null;
 
     diarySummaryDraft = {
       grow_id: input.ownership.grow!.id,

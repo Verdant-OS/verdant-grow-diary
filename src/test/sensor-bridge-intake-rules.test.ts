@@ -10,9 +10,7 @@ const TENT = "11111111-1111-1111-1111-111111111111";
 const PLANT = "22222222-2222-2222-2222-222222222222";
 const NOW = Date.parse("2026-06-02T12:00:00.000Z");
 
-function payload(
-  overrides: Partial<BridgeIntakePayload> = {},
-): BridgeIntakePayload {
+function payload(overrides: Partial<BridgeIntakePayload> = {}): BridgeIntakePayload {
   return {
     tent_id: TENT,
     plant_id: PLANT,
@@ -50,37 +48,25 @@ describe("validateAndResolveBridgeIntake — structural rejection", () => {
   });
 
   it("rejects missing tent_id", () => {
-    const r = validateAndResolveBridgeIntake(
-      payload({ tent_id: undefined }),
-      { now: NOW },
-    );
+    const r = validateAndResolveBridgeIntake(payload({ tent_id: undefined }), { now: NOW });
     expect(r.ok).toBe(false);
     expect(r.reasons).toContain("tent_id_missing");
   });
 
   it("rejects missing captured_at", () => {
-    const r = validateAndResolveBridgeIntake(
-      payload({ captured_at: undefined }),
-      { now: NOW },
-    );
+    const r = validateAndResolveBridgeIntake(payload({ captured_at: undefined }), { now: NOW });
     expect(r.ok).toBe(false);
     expect(r.reasons).toContain("captured_at_missing");
   });
 
   it("rejects unparseable captured_at", () => {
-    const r = validateAndResolveBridgeIntake(
-      payload({ captured_at: "not-a-date" }),
-      { now: NOW },
-    );
+    const r = validateAndResolveBridgeIntake(payload({ captured_at: "not-a-date" }), { now: NOW });
     expect(r.ok).toBe(false);
     expect(r.reasons).toContain("captured_at_invalid");
   });
 
   it("rejects empty readings list", () => {
-    const r = validateAndResolveBridgeIntake(
-      payload({ readings: [] }),
-      { now: NOW },
-    );
+    const r = validateAndResolveBridgeIntake(payload({ readings: [] }), { now: NOW });
     expect(r.ok).toBe(false);
     expect(r.reasons).toContain("readings_empty");
   });
@@ -103,9 +89,7 @@ describe("validateAndResolveBridgeIntake — freshness downgrades", () => {
     const r = validateAndResolveBridgeIntake(
       payload({
         submitted_source: "manual",
-        captured_at: new Date(
-          NOW - BRIDGE_MANUAL_FRESH_MS - 60_000,
-        ).toISOString(),
+        captured_at: new Date(NOW - BRIDGE_MANUAL_FRESH_MS - 60_000).toISOString(),
       }),
       { now: NOW },
     );
@@ -127,37 +111,27 @@ describe("validateAndResolveBridgeIntake — freshness downgrades", () => {
 
 describe("validateAndResolveBridgeIntake — authentication gating", () => {
   it("downgrades unauthenticated live claim to stale", () => {
-    const r = validateAndResolveBridgeIntake(
-      payload({ authenticated: false }),
-      { now: NOW },
-    );
+    const r = validateAndResolveBridgeIntake(payload({ authenticated: false }), { now: NOW });
     expect(r.resolved_source).toBe("stale");
     expect(r.reasons).toContain("unauthenticated_live_claim");
     expect(r.suspicions).toContain("downgraded_live_unauthenticated");
   });
 
   it("unknown submitted source is never healthy", () => {
-    const r = validateAndResolveBridgeIntake(
-      payload({ submitted_source: "anything" }),
-      { now: NOW },
-    );
+    const r = validateAndResolveBridgeIntake(payload({ submitted_source: "anything" }), {
+      now: NOW,
+    });
     expect(r.resolved_source).toBe("invalid");
     expect(r.ok).toBe(false);
   });
 
   it("demo source stays demo even when authenticated and fresh", () => {
-    const r = validateAndResolveBridgeIntake(
-      payload({ submitted_source: "demo" }),
-      { now: NOW },
-    );
+    const r = validateAndResolveBridgeIntake(payload({ submitted_source: "demo" }), { now: NOW });
     expect(r.resolved_source).toBe("demo");
   });
 
   it("csv source stays csv", () => {
-    const r = validateAndResolveBridgeIntake(
-      payload({ submitted_source: "csv" }),
-      { now: NOW },
-    );
+    const r = validateAndResolveBridgeIntake(payload({ submitted_source: "csv" }), { now: NOW });
     expect(r.resolved_source).toBe("csv");
   });
 });
@@ -256,10 +230,9 @@ describe("validateAndResolveBridgeIntake — safety properties", () => {
   });
 
   it("never classifies unknown telemetry as healthy/live", () => {
-    const r = validateAndResolveBridgeIntake(
-      payload({ submitted_source: "unknown" }),
-      { now: NOW },
-    );
+    const r = validateAndResolveBridgeIntake(payload({ submitted_source: "unknown" }), {
+      now: NOW,
+    });
     expect(r.resolved_source).not.toBe("live");
   });
 

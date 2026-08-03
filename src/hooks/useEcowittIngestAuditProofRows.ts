@@ -34,8 +34,7 @@ export interface UseEcowittIngestAuditProofRowsOptions {
 const AUDIT_PROOF_LIMIT = 200;
 
 function classifyError(err: unknown): "blocked" | "error" {
-  const code =
-    (err as { code?: string | null } | null)?.code ?? null;
+  const code = (err as { code?: string | null } | null)?.code ?? null;
   const message =
     typeof (err as { message?: unknown } | null)?.message === "string"
       ? ((err as { message: string }).message ?? "").toLowerCase()
@@ -62,14 +61,10 @@ export function useEcowittIngestAuditProofRows(
     enabled,
     staleTime: 30_000,
     queryFn: async (): Promise<EcowittIngestAuditProofRow[]> => {
-      const windowStartIso = new Date(
-        Date.now() - ECOWITT_AUDIT_PROOF_WINDOW_MS,
-      ).toISOString();
+      const windowStartIso = new Date(Date.now() - ECOWITT_AUDIT_PROOF_WINDOW_MS).toISOString();
       const { data, error } = await supabase
         .from("sensor_ingest_audit_log")
-        .select(
-          "source, tent_id, rows_received, rows_inserted, captured_at, created_at",
-        )
+        .select("source, tent_id, rows_received, rows_inserted, captured_at, created_at")
         .eq("source", "ecowitt")
         .eq("tent_id", tentId as string)
         .gte("created_at", windowStartIso)

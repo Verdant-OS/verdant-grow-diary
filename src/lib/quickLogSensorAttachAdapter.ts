@@ -30,12 +30,7 @@ import {
   type RawSensorRow,
 } from "@/lib/latestSensorSnapshotRules";
 
-export type QuickLogSensorStripStatus =
-  | "no_data"
-  | "usable"
-  | "stale"
-  | "invalid"
-  | string;
+export type QuickLogSensorStripStatus = "no_data" | "usable" | "stale" | "invalid" | string;
 
 export interface BuildQuickLogSensorAttachInput {
   /** Dashboard-shaped snapshot from useLatestSensorSnapshot. */
@@ -50,9 +45,7 @@ export interface BuildQuickLogSensorAttachInput {
   now?: Date;
 }
 
-export type QuickLogSensorAttachPayload = ReturnType<
-  typeof buildSensorSnapshotSavePayload
->;
+export type QuickLogSensorAttachPayload = ReturnType<typeof buildSensorSnapshotSavePayload>;
 
 /**
  * Build the redacted `details.sensor` envelope for Quick Log. Returns null

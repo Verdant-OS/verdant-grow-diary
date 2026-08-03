@@ -57,12 +57,10 @@ function extractOperatorBlock(): string {
 }
 
 const OPERATOR_BLOCK = extractOperatorBlock();
-const ALL_OPERATOR_PATHS = [...APP.matchAll(/path="(\/operator\/[^"]+)"/g)].map(
+const ALL_OPERATOR_PATHS = [...APP.matchAll(/path="(\/operator\/[^"]+)"/g)].map((m) => m[1]);
+const GATED_OPERATOR_PATHS = [...OPERATOR_BLOCK.matchAll(/path="(\/operator\/[^"]+)"/g)].map(
   (m) => m[1],
 );
-const GATED_OPERATOR_PATHS = [
-  ...OPERATOR_BLOCK.matchAll(/path="(\/operator\/[^"]+)"/g),
-].map((m) => m[1]);
 
 describe("Slice A — Operator routes are role-gated", () => {
   it("App.tsx imports the RequireOperatorRole guard", () => {
@@ -75,17 +73,12 @@ describe("Slice A — Operator routes are role-gated", () => {
     expect(ALL_OPERATOR_PATHS.length).toBeGreaterThan(0);
   });
 
-  it.each(ALL_OPERATOR_PATHS)(
-    "%s is mounted inside the RequireOperatorRole wrapper",
-    (p) => {
-      expect(GATED_OPERATOR_PATHS).toContain(p);
-    },
-  );
+  it.each(ALL_OPERATOR_PATHS)("%s is mounted inside the RequireOperatorRole wrapper", (p) => {
+    expect(GATED_OPERATOR_PATHS).toContain(p);
+  });
 
   it("no /operator/* route is left outside the role-gated block", () => {
-    const ungated = ALL_OPERATOR_PATHS.filter(
-      (p) => !GATED_OPERATOR_PATHS.includes(p),
-    );
+    const ungated = ALL_OPERATOR_PATHS.filter((p) => !GATED_OPERATOR_PATHS.includes(p));
     expect(ungated).toEqual([]);
   });
 });
@@ -124,30 +117,15 @@ describe("Slice A — Denied state copy is calm and leak-free", () => {
     expect(start).toBeGreaterThan(-1);
     const end = GUARD.indexOf("return <Outlet", start);
     const denied = GUARD.slice(start, end);
-    expect(denied).not.toMatch(
-      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
-    );
-    for (const banned of [
-      "user_roles",
-      "has_role",
-      "service_role",
-      "jwt",
-      "auth.uid",
-      "token",
-    ]) {
+    expect(denied).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+    for (const banned of ["user_roles", "has_role", "service_role", "jwt", "auth.uid", "token"]) {
       expect(denied.toLowerCase()).not.toContain(banned.toLowerCase());
     }
   });
 });
 
 describe("Slice A — Public/customer routes remain unaffected", () => {
-  const PUBLIC = [
-    "/auth",
-    "/welcome",
-    "/pricing",
-    "/hardware-integrations",
-    "/billing/:plan",
-  ];
+  const PUBLIC = ["/auth", "/welcome", "/pricing", "/hardware-integrations", "/billing/:plan"];
   it.each(PUBLIC)("%s is not wrapped by RequireOperatorRole", (p) => {
     expect(OPERATOR_BLOCK).not.toContain(`path="${p}"`);
   });

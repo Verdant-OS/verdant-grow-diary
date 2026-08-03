@@ -34,10 +34,7 @@ export interface TentPlantTabOption {
   testId: string;
 }
 
-export type TentPlantTabsSelectionResetReason =
-  | "no-plants"
-  | "archived-hidden"
-  | "missing";
+export type TentPlantTabsSelectionResetReason = "no-plants" | "archived-hidden" | "missing";
 
 export interface TentPlantTabsViewModel {
   tabs: TentPlantTabOption[];
@@ -57,8 +54,7 @@ export interface TentPlantTabsViewModel {
 export const TENT_PLANT_TABS_ALL_COPY = "Viewing all plants in this tent.";
 export const TENT_PLANT_TABS_SHARED_ENV_COPY =
   "Tent environment is shared. Plant response is tracked per plant.";
-export const TENT_PLANT_TABS_EMPTY_NO_PLANTS_COPY =
-  "No plants assigned to this tent yet.";
+export const TENT_PLANT_TABS_EMPTY_NO_PLANTS_COPY = "No plants assigned to this tent yet.";
 export const TENT_PLANT_TABS_EMPTY_SELECTED_PLANT_COPY =
   "No plant-specific activity found for this plant yet.";
 export const TENT_PLANT_TABS_ALL_LABEL = "All plants";
@@ -72,16 +68,12 @@ function selectedPlantCopyFor(name: string): string {
   return `Viewing plant-specific activity for ${name}.`;
 }
 
-export function buildTentPlantTabsViewModel(
-  input: TentPlantTabsInput,
-): TentPlantTabsViewModel {
+export function buildTentPlantTabsViewModel(input: TentPlantTabsInput): TentPlantTabsViewModel {
   const includeArchived = input.includeArchived === true;
   const allPlants = Array.isArray(input.plants) ? input.plants : [];
 
   // Stable order preserved from caller; archived filtering only.
-  const visible = allPlants.filter((p) =>
-    includeArchived ? true : p.isArchived !== true,
-  );
+  const visible = allPlants.filter((p) => (includeArchived ? true : p.isArchived !== true));
 
   // Resolve selection deterministically.
   let resolvedSelection: string | null = null;
@@ -92,8 +84,7 @@ export function buildTentPlantTabsViewModel(
     resolvedSelection = null;
   } else {
     const inAll = allPlants.find((p) => p.id === input.selectedPlantId) ?? null;
-    const inVisible =
-      visible.find((p) => p.id === input.selectedPlantId) ?? null;
+    const inVisible = visible.find((p) => p.id === input.selectedPlantId) ?? null;
     if (inVisible) {
       resolvedSelection = input.selectedPlantId;
     } else if (inAll && inAll.isArchived === true && !includeArchived) {
@@ -131,17 +122,11 @@ export function buildTentPlantTabsViewModel(
   ];
 
   const selectedPlant =
-    resolvedSelection == null
-      ? null
-      : visible.find((p) => p.id === resolvedSelection) ?? null;
+    resolvedSelection == null ? null : (visible.find((p) => p.id === resolvedSelection) ?? null);
   const selectedPlantName = selectedPlant ? plantDisplayName(selectedPlant) : null;
 
   const filteredPlantIds =
-    resolvedSelection == null
-      ? visible.map((p) => p.id)
-      : selectedPlant
-        ? [selectedPlant.id]
-        : [];
+    resolvedSelection == null ? visible.map((p) => p.id) : selectedPlant ? [selectedPlant.id] : [];
 
   if (visible.length === 0 && allPlants.length === 0 && !selectionWasReset) {
     selectionResetReason = "no-plants";
@@ -153,9 +138,7 @@ export function buildTentPlantTabsViewModel(
     selectedPlantName,
     filteredPlantIds,
     allPlantsCopy: TENT_PLANT_TABS_ALL_COPY,
-    selectedPlantCopy: selectedPlantName
-      ? selectedPlantCopyFor(selectedPlantName)
-      : null,
+    selectedPlantCopy: selectedPlantName ? selectedPlantCopyFor(selectedPlantName) : null,
     sharedEnvironmentReminderCopy: TENT_PLANT_TABS_SHARED_ENV_COPY,
     emptyNoPlantsCopy: TENT_PLANT_TABS_EMPTY_NO_PLANTS_COPY,
     emptySelectedPlantActivityCopy: TENT_PLANT_TABS_EMPTY_SELECTED_PLANT_COPY,

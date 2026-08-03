@@ -12,18 +12,9 @@ import {
 import { fullJitterBackoffMs } from "@/lib/ecowittLiveSoilIngestRules";
 
 const ROOT = resolve(__dirname, "../..");
-const POLICY = readFileSync(
-  resolve(ROOT, "docs/product/retry-strategy-by-surface.md"),
-  "utf8",
-);
-const CREATE_RETRY = readFileSync(
-  resolve(ROOT, "src/lib/createDialogRetryRules.ts"),
-  "utf8",
-);
-const BRIDGE_DOC = readFileSync(
-  resolve(ROOT, "docs/bridge-client-retry-guidance.md"),
-  "utf8",
-);
+const POLICY = readFileSync(resolve(ROOT, "docs/product/retry-strategy-by-surface.md"), "utf8");
+const CREATE_RETRY = readFileSync(resolve(ROOT, "src/lib/createDialogRetryRules.ts"), "utf8");
+const BRIDGE_DOC = readFileSync(resolve(ROOT, "docs/bridge-client-retry-guidance.md"), "utf8");
 
 describe("retry strategy by surface", () => {
   it("create-dialog uses fixed cooldown + in-flight (not full jitter)", () => {

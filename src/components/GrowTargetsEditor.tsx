@@ -34,14 +34,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type Field =
-  | "temp"
-  | "rh"
-  | "vpd"
-  | "soil_wc"
-  | "soil_ec"
-  | "soil_temp"
-  | "ppfd";
+type Field = "temp" | "rh" | "vpd" | "soil_wc" | "soil_ec" | "soil_temp" | "ppfd";
 
 interface FieldDef {
   key: Field;
@@ -79,18 +72,12 @@ export function temperatureUnitSymbol(unit: TemperatureUnitPreference): string {
  */
 const TEMPERATURE_ROUND_TRIP_DIGITS = 2;
 
-export function celsiusToDisplayUnit(
-  celsius: number,
-  unit: TemperatureUnitPreference,
-): number {
+export function celsiusToDisplayUnit(celsius: number, unit: TemperatureUnitPreference): number {
   const displayed = unit === "fahrenheit" ? celsiusToFahrenheit(celsius) : celsius;
   return Number(displayed.toFixed(TEMPERATURE_ROUND_TRIP_DIGITS));
 }
 
-export function displayUnitToCelsius(
-  displayed: number,
-  unit: TemperatureUnitPreference,
-): number {
+export function displayUnitToCelsius(displayed: number, unit: TemperatureUnitPreference): number {
   const celsius = unit === "fahrenheit" ? fahrenheitToCelsius(displayed) : displayed;
   return Number(celsius.toFixed(TEMPERATURE_ROUND_TRIP_DIGITS));
 }
@@ -237,9 +224,8 @@ export default function GrowTargetsEditor({
         <DialogHeader>
           <DialogTitle>Edit grow targets</DialogTitle>
           <DialogDescription>
-            Manual ranges for {growName ?? "this grow"}. Leave a field empty
-            for "no target". Not advice — used only for the Target Comparison
-            card.
+            Manual ranges for {growName ?? "this grow"}. Leave a field empty for "no target". Not
+            advice — used only for the Target Comparison card.
           </DialogDescription>
         </DialogHeader>
 
@@ -248,10 +234,7 @@ export default function GrowTargetsEditor({
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto">
             {FIELDS.map((f) => (
-              <div
-                key={f.key}
-                className="rounded-lg border border-border/40 p-2"
-              >
+              <div key={f.key} className="rounded-lg border border-border/40 p-2">
                 <Label className="text-xs">
                   {f.label} ({f.isTemperature ? temperatureUnitSymbol(unit) : f.unit})
                 </Label>
@@ -291,16 +274,10 @@ export default function GrowTargetsEditor({
           </div>
         )}
 
-        {invalid && (
-          <p className="text-xs text-amber-600 mt-2">{invalid}</p>
-        )}
+        {invalid && <p className="text-xs text-amber-600 mt-2">{invalid}</p>}
 
         <DialogFooter>
-          <Button
-            variant="ghost"
-            onClick={() => onOpenChange(false)}
-            disabled={saving}
-          >
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={saving || loading || !!invalid}>

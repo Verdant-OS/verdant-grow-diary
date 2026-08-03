@@ -123,9 +123,7 @@ import { countsAsHealthyEvidence as contractCountsAsHealthyEvidence } from "@/li
  * `Classification` from the contract. Without one, the snapshot is
  * treated as `no_data` and excluded from healthy evidence.
  */
-function evaluateSensorEvidence(
-  input: PlantDetailAiDoctorReadinessInput,
-): AiDoctorSensorEvidence {
+function evaluateSensorEvidence(input: PlantDetailAiDoctorReadinessInput): AiDoctorSensorEvidence {
   const snap = input.sensorSnapshot ?? null;
   if (!snap) {
     // No structured Classification → never healthy, regardless of the
@@ -189,9 +187,7 @@ function countPresent(
   return count;
 }
 
-function buildMissing(
-  input: PlantDetailAiDoctorReadinessInput,
-): AiDoctorReadinessMissingBullet[] {
+function buildMissing(input: PlantDetailAiDoctorReadinessInput): AiDoctorReadinessMissingBullet[] {
   const out: AiDoctorReadinessMissingBullet[] = [];
   if (!isStageKnown(input.stage)) {
     out.push({ kind: "stage_unknown", label: MISSING_BULLETS.stage_unknown });

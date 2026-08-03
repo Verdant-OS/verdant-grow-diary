@@ -129,9 +129,7 @@ describe("validateManualSensorSnapshotFields", () => {
       { source: "manual", temperatureC: 24, humidityPct: 55, vpdKpa: 0.5 },
       { nowMs: NOW_MS },
     );
-    const warn = v.hints.find(
-      (h) => h.field === "vpdKpa" && h.severity === "warn",
-    );
+    const warn = v.hints.find((h) => h.field === "vpdKpa" && h.severity === "warn");
     expect(warn).toBeDefined();
     expect(VPD_CONFLICT_THRESHOLD_KPA).toBeGreaterThan(0);
   });

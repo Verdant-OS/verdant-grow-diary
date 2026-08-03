@@ -6,17 +6,13 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  listTsFilesCached,
-  readFileCached,
-} from "./helpers/cachedSrcTextScan";
+import { listTsFilesCached, readFileCached } from "./helpers/cachedSrcTextScan";
 
 // Standardised scanner guardrail timeout + slow-test telemetry.
 // Replaces the previous per-file vi.setConfig bump. No scanner pattern,
 // allowlist, or assertion is changed.
 import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
 installScannerGuardrail({ file: __filename });
-
 
 const ROOT = resolve(__dirname, "../..");
 const PLAN_PATH = resolve(ROOT, "docs/pi-ingest-secret-resolution-plan.md");
@@ -41,71 +37,26 @@ describe("pi-ingest secret resolution plan — required content", () => {
       "Edge Function is the only resolver",
       /Edge\s+Function\s+is\s+the\s+only\s+place[\s\S]{0,120}resolve\s+usable[\s\S]{0,40}bridge\s+secret/i,
     ],
-    [
-      "browser cannot read secret_hash",
-      /never[\s\S]{0,200}`?secret_hash`?/i,
-    ],
-    [
-      "browser cannot read secret_ciphertext",
-      /never[\s\S]{0,240}`?secret_ciphertext`?/i,
-    ],
-    [
-      "browser cannot read secret_nonce",
-      /never[\s\S]{0,280}`?secret_nonce`?/i,
-    ],
-    [
-      "browser cannot read secret_key_version",
-      /never[\s\S]{0,320}`?secret_key_version`?/i,
-    ],
-    [
-      "browser cannot read plaintext secret",
-      /never[\s\S]{0,400}plaintext\s+bridge\s+secret/i,
-    ],
+    ["browser cannot read secret_hash", /never[\s\S]{0,200}`?secret_hash`?/i],
+    ["browser cannot read secret_ciphertext", /never[\s\S]{0,240}`?secret_ciphertext`?/i],
+    ["browser cannot read secret_nonce", /never[\s\S]{0,280}`?secret_nonce`?/i],
+    ["browser cannot read secret_key_version", /never[\s\S]{0,320}`?secret_key_version`?/i],
+    ["browser cannot read plaintext secret", /never[\s\S]{0,400}plaintext\s+bridge\s+secret/i],
 
-    [
-      "base table has no client SELECT access",
-      /not have client SELECT access/i,
-    ],
-    [
-      "decryption key is server-only",
-      /decryption key[\s\S]{0,120}server-only/i,
-    ],
-    [
-      "decryption key never in client config",
-      /never[\s\S]{0,120}client config/i,
-    ],
-    [
-      "decrypted secret is memory-only",
-      /decrypted bridge secret is \*?\*?memory-only/i,
-    ],
-    [
-      "decrypted secret is never logged",
-      /decrypted secret must \*?\*?never be logged/i,
-    ],
+    ["base table has no client SELECT access", /not have client SELECT access/i],
+    ["decryption key is server-only", /decryption key[\s\S]{0,120}server-only/i],
+    ["decryption key never in client config", /never[\s\S]{0,120}client config/i],
+    ["decrypted secret is memory-only", /decrypted bridge secret is \*?\*?memory-only/i],
+    ["decrypted secret is never logged", /decrypted secret must \*?\*?never be logged/i],
     [
       "HMAC verification before writes",
       /HMAC verification happens \*?\*?before\*?\*? any sensor or idempotency write/i,
     ],
-    [
-      "auth failure inserts zero rows",
-      /Zero rows are inserted into[\s\S]{0,40}sensor_readings/i,
-    ],
-    [
-      "invalid payload inserts zero rows",
-      /Invalid-payload zero-write guarantee/i,
-    ],
-    [
-      "no alert persistence",
-      /must \*?\*?not\*?\*? create alerts/i,
-    ],
-    [
-      "no Action Queue items",
-      /must \*?\*?not\*?\*? create[\s\S]{0,40}action_queue/i,
-    ],
-    [
-      "no device control",
-      /must \*?\*?not\*?\*? call any device-control surface/i,
-    ],
+    ["auth failure inserts zero rows", /Zero rows are inserted into[\s\S]{0,40}sensor_readings/i],
+    ["invalid payload inserts zero rows", /Invalid-payload zero-write guarantee/i],
+    ["no alert persistence", /must \*?\*?not\*?\*? create alerts/i],
+    ["no Action Queue items", /must \*?\*?not\*?\*? create[\s\S]{0,40}action_queue/i],
+    ["no device control", /must \*?\*?not\*?\*? call any device-control surface/i],
     [
       "no secret_hash → secret mapping",
       /`?secret_hash`?[\s\S]{0,120}must \*?\*?not\*?\*? map[\s\S]{0,80}`?BridgeCredential\.secret`?/i,
@@ -118,14 +69,8 @@ describe("pi-ingest secret resolution plan — required content", () => {
       "decryption output is the only valid secret source",
       /only\*?\*? valid source of `?BridgeCredential\.secret`?/i,
     ],
-    [
-      "secret rotation deferred",
-      /Secret rotation[\s\S]{0,40}\*?\*?deferred\*?\*?/i,
-    ],
-    [
-      "metadata UI deferred",
-      /Metadata UI is \*?\*?deferred/i,
-    ],
+    ["secret rotation deferred", /Secret rotation[\s\S]{0,40}\*?\*?deferred\*?\*?/i],
+    ["metadata UI deferred", /Metadata UI is \*?\*?deferred/i],
   ])("plan documents: %s", (_label, re) => {
     expect(PLAN).toMatch(re);
   });
@@ -137,10 +82,7 @@ function srcTsFiles(): string[] {
 
 describe("pi-ingest secret resolution plan — repo guardrails", () => {
   it("no src/ file maps secret_hash to a secret field", () => {
-    const forbidden = [
-      /secret\s*:\s*[A-Za-z_.]*\.?secret_hash\b/,
-      /\bsecret_hash\s+as\s+secret\b/,
-    ];
+    const forbidden = [/secret\s*:\s*[A-Za-z_.]*\.?secret_hash\b/, /\bsecret_hash\s+as\s+secret\b/];
     for (const f of srcTsFiles()) {
       if (f.endsWith("piIngestSecretResolutionPlan.test.ts")) continue;
       if (f.endsWith("piIngestBridgeSecretStrategy.test.ts")) continue;
@@ -169,10 +111,7 @@ describe("pi-ingest secret resolution plan — repo guardrails", () => {
     const offenders: string[] = [];
     for (const f of srcTsFiles()) {
       const text = readFileCached(f);
-      if (
-        /crypto\.subtle\.decrypt\s*\(/.test(text) ||
-        /\bcreateDecipheriv\s*\(/.test(text)
-      ) {
+      if (/crypto\.subtle\.decrypt\s*\(/.test(text) || /\bcreateDecipheriv\s*\(/.test(text)) {
         offenders.push(f);
       }
     }
@@ -184,8 +123,9 @@ describe("pi-ingest secret resolution plan — repo guardrails", () => {
     for (const f of srcTsFiles()) {
       const text = readFileCached(f);
       if (
-        /from\s+["'][^"']*supabase\/functions\/pi-ingest-readings\/(secretResolver|crypto)["']/
-          .test(text)
+        /from\s+["'][^"']*supabase\/functions\/pi-ingest-readings\/(secretResolver|crypto)["']/.test(
+          text,
+        )
       ) {
         offenders.push(f);
       }

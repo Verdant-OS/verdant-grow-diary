@@ -117,9 +117,7 @@ export function useNavigate(): CompatNavigateFunction {
   }) as CompatNavigateFunction;
 }
 
-
-export interface CompatLinkProps
-  extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> {
+export interface CompatLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> {
   to: string;
   replace?: boolean;
   state?: unknown;
@@ -158,7 +156,8 @@ export const NavLink = forwardRef<HTMLAnchorElement, CompatNavLinkProps>(functio
   ref,
 ) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const isActive = end === true ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
+  const isActive =
+    end === true ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
   const renderProps = { isActive, isPending: false };
   const resolvedClassName = typeof className === "function" ? className(renderProps) : className;
   const resolvedChildren = typeof children === "function" ? children(renderProps) : children;

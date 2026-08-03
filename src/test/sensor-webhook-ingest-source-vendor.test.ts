@@ -69,10 +69,7 @@ describe("contract-aligned source vocabulary", () => {
   });
 
   it("rejects unsupported source (never defaults to live)", () => {
-    const r = normalizeWebhookIngestPayload(
-      base({ source: "autopilot" }) as never,
-      { now: NOW },
-    );
+    const r = normalizeWebhookIngestPayload(base({ source: "autopilot" }) as never, { now: NOW });
     expect(r.ok).toBe(false);
     expect(r.errors.join("|")).toMatch(/invalid source/);
     expect(r.rows).toEqual([]);
@@ -88,10 +85,9 @@ describe("contract-aligned source vocabulary", () => {
 
 describe("vendor lineage", () => {
   it("source=mqtt, vendor=ecowitt → row source stays mqtt, vendor preserved in raw_payload", () => {
-    const r = normalizeWebhookIngestPayload(
-      base({ source: "mqtt", vendor: "ecowitt" }) as never,
-      { now: NOW },
-    );
+    const r = normalizeWebhookIngestPayload(base({ source: "mqtt", vendor: "ecowitt" }) as never, {
+      now: NOW,
+    });
     expect(r.ok).toBe(true);
     expect(new Set(r.rows.map((row) => row.source))).toEqual(new Set(["mqtt"]));
     for (const row of r.rows) {
@@ -108,9 +104,7 @@ describe("vendor lineage", () => {
       { now: NOW },
     );
     expect(r.ok).toBe(true);
-    expect(new Set(r.rows.map((row) => row.source))).toEqual(
-      new Set(["webhook"]),
-    );
+    expect(new Set(r.rows.map((row) => row.source))).toEqual(new Set(["webhook"]));
     for (const row of r.rows) {
       const raw = row.raw_payload as Record<string, unknown>;
       expect(raw.vendor).toBe("home_assistant");
@@ -140,9 +134,7 @@ describe("vendor lineage", () => {
   });
 
   it("non-string vendor values are dropped from raw_payload", () => {
-    const sanitized = sanitizeRawPayload(
-      base({ vendor: { nested: "object" } }) as never,
-    );
+    const sanitized = sanitizeRawPayload(base({ vendor: { nested: "object" } }) as never);
     expect(sanitized.vendor).toBeUndefined();
 
     const sanitized2 = sanitizeRawPayload(base({ vendor: 42 }) as never);

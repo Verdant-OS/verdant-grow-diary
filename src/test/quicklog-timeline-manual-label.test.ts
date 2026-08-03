@@ -26,10 +26,7 @@ const PLANT_TIMELINE = readFileSync(
   resolve(ROOT, "src/components/PlantRelativeTimelineSection.tsx"),
   "utf8",
 );
-const DIARY_BADGES = readFileSync(
-  resolve(ROOT, "src/components/DiaryEntryBadges.tsx"),
-  "utf8",
-);
+const DIARY_BADGES = readFileSync(resolve(ROOT, "src/components/DiaryEntryBadges.tsx"), "utf8");
 const TIMELINE_RULES = readFileSync(
   resolve(ROOT, "src/lib/relativeTimelineProjectionRules.ts"),
   "utf8",
@@ -128,9 +125,9 @@ describe("classifyRelativeTimelineFilter · fallback contract", () => {
   });
 
   it("photo source wins regardless of event type", () => {
-    expect(
-      classifyRelativeTimelineFilter({ ...base, eventType: "", source: "photo" }),
-    ).toBe("photos");
+    expect(classifyRelativeTimelineFilter({ ...base, eventType: "", source: "photo" })).toBe(
+      "photos",
+    );
   });
 
   it("unknown / null event types fall back to notes", () => {

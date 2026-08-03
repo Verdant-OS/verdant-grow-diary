@@ -34,9 +34,7 @@ vi.mock("sonner", () => ({
 const entMode = vi.hoisted(() => ({ current: "free" as "free" | "pro" }));
 
 vi.mock("@/hooks/useMyEntitlements", async () => {
-  const { resolveEntitlements: resolve } = await import(
-    "@/lib/entitlements/resolveEntitlements"
-  );
+  const { resolveEntitlements: resolve } = await import("@/lib/entitlements/resolveEntitlements");
   const NOW = new Date("2026-08-01T00:00:00Z");
   return {
     useMyEntitlements: () => ({
@@ -152,9 +150,7 @@ describe("/pheno-hunts/new route entry gate", () => {
     mockGrowData();
     renderRoute();
 
-    await waitFor(() =>
-      expect(screen.getByTestId("pheno-hunt-onboarding")).toBeDefined(),
-    );
+    await waitFor(() => expect(screen.getByTestId("pheno-hunt-onboarding")).toBeDefined());
     expect(screen.queryByTestId("pheno-tracker-upgrade-gate")).toBeNull();
   });
 });

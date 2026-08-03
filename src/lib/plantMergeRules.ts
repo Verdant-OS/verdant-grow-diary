@@ -71,11 +71,7 @@ export interface PlantMergePreview {
   blockers: string[];
   /** True when no executable step exists (e.g. blocked or zero history). */
   previewOnly: boolean;
-  recommendedAction:
-    | "preview_only"
-    | "archive_source_after_review"
-    | "execute_via_rpc"
-    | "blocked";
+  recommendedAction: "preview_only" | "archive_source_after_review" | "execute_via_rpc" | "blocked";
 }
 
 export interface PlantMergeValidation {
@@ -164,9 +160,7 @@ export function validatePlantMerge(
     return { ok: false, reason: "Target plant is archived." };
   }
   const sameGrow =
-    source.grow_id != null &&
-    target.grow_id != null &&
-    source.grow_id === target.grow_id;
+    source.grow_id != null && target.grow_id != null && source.grow_id === target.grow_id;
   if (!sameGrow && !opts.allowCrossGrow) {
     return {
       ok: false,
@@ -218,9 +212,7 @@ export function buildPlantMergePreview(
   opts: { allowCrossGrow?: boolean } = {},
 ): PlantMergePreview {
   const sameGrow =
-    source.grow_id != null &&
-    target.grow_id != null &&
-    source.grow_id === target.grow_id;
+    source.grow_id != null && target.grow_id != null && source.grow_id === target.grow_id;
   const warnings: string[] = [];
   const blockers: string[] = [];
 

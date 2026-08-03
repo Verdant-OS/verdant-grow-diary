@@ -2,7 +2,10 @@
  * diaryEntryAuditFormatting — pure helpers for rendering diary audit rows.
  * No React, no clock reads, no Supabase. Injectable formatting only.
  */
-import type { DiaryEntryAuditFieldChange, DiaryEntryAuditRow } from "@/hooks/useDiaryEntryAuditTrail";
+import type {
+  DiaryEntryAuditFieldChange,
+  DiaryEntryAuditRow,
+} from "@/hooks/useDiaryEntryAuditTrail";
 
 export const AUDIT_FIELD_LABELS: Record<string, string> = {
   note: "Note",

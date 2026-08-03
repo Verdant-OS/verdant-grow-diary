@@ -72,22 +72,14 @@ export type DraftResult =
 /* Note templates                                                              */
 /* -------------------------------------------------------------------------- */
 
-const HIGH_RH_NOTE =
-  "Re-check RH in ~24h and confirm humidity stayed closer to target.";
-const LOW_RH_NOTE =
-  "Re-check RH in ~24h and confirm the room is not too dry.";
-const HIGH_TEMP_NOTE =
-  "Re-check temperature in ~24h and confirm heat load improved.";
-const LOW_TEMP_NOTE =
-  "Re-check temperature in ~24h and confirm the tent is staying warm enough.";
-const HIGH_VPD_NOTE =
-  "Re-check VPD in ~24h and confirm temp/RH balance improved.";
-const LOW_VPD_NOTE =
-  "Re-check VPD in ~24h and confirm humidity/airflow improved.";
-const CO2_NOTE =
-  "Re-check CO2 in ~24h as context only; do not optimize around CO2 alone.";
-const SOIL_NOTE =
-  "Re-check the root-zone reading in ~24h and compare against plant response.";
+const HIGH_RH_NOTE = "Re-check RH in ~24h and confirm humidity stayed closer to target.";
+const LOW_RH_NOTE = "Re-check RH in ~24h and confirm the room is not too dry.";
+const HIGH_TEMP_NOTE = "Re-check temperature in ~24h and confirm heat load improved.";
+const LOW_TEMP_NOTE = "Re-check temperature in ~24h and confirm the tent is staying warm enough.";
+const HIGH_VPD_NOTE = "Re-check VPD in ~24h and confirm temp/RH balance improved.";
+const LOW_VPD_NOTE = "Re-check VPD in ~24h and confirm humidity/airflow improved.";
+const CO2_NOTE = "Re-check CO2 in ~24h as context only; do not optimize around CO2 alone.";
+const SOIL_NOTE = "Re-check the root-zone reading in ~24h and compare against plant response.";
 const UNKNOWN_NOTE =
   "Re-check the related condition in ~24h and note whether the plant response improved.";
 
@@ -109,11 +101,7 @@ export function followupNoteForAction(
   }
   // Check soil / root-zone BEFORE temperature so "root_zone_temp_c" doesn't
   // get misclassified as a generic temperature metric.
-  if (
-    metric.includes("soil") ||
-    metric.includes("moisture") ||
-    metric.includes("root")
-  ) {
+  if (metric.includes("soil") || metric.includes("moisture") || metric.includes("root")) {
     return SOIL_NOTE;
   }
   if (metric.includes("temp")) {
@@ -211,7 +199,6 @@ export function followupMatchesAction(
   const id = nonEmptyString(actionId);
   if (!id) return false;
   return (
-    row.details.event_type === ACTION_FOLLOWUP_EVENT_TYPE &&
-    row.details.action_queue_id === id
+    row.details.event_type === ACTION_FOLLOWUP_EVENT_TYPE && row.details.action_queue_id === id
   );
 }

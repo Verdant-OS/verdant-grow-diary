@@ -27,11 +27,8 @@ const BASE_URL = configuredBaseUrl ?? "http://localhost:5173";
 // fast. Locally, retries stay at 0 so a failing test surfaces immediately.
 // Override with PLAYWRIGHT_RETRIES for one-off deeper investigations.
 const parsedRetries = Number.parseInt(process.env.PLAYWRIGHT_RETRIES ?? "", 10);
-const RETRIES = Number.isFinite(parsedRetries) && parsedRetries >= 0
-  ? parsedRetries
-  : process.env.CI
-    ? 1
-    : 0;
+const RETRIES =
+  Number.isFinite(parsedRetries) && parsedRetries >= 0 ? parsedRetries : process.env.CI ? 1 : 0;
 
 // Trace policy.
 //
@@ -42,8 +39,9 @@ const RETRIES = Number.isFinite(parsedRetries) && parsedRetries >= 0
 // bake the disposable test account's Supabase bearer/session tokens into a
 // publicly-downloadable CI artifact; those runs rely on screenshots + video
 // (pixels only, no headers) for triage.
-const TRACE_MODE: "off" | "on-first-retry" | "retain-on-failure" =
-  process.env.E2E_TEST_EMAIL ? "off" : "on-first-retry";
+const TRACE_MODE: "off" | "on-first-retry" | "retain-on-failure" = process.env.E2E_TEST_EMAIL
+  ? "off"
+  : "on-first-retry";
 
 export default defineConfig({
   testDir: "./e2e",

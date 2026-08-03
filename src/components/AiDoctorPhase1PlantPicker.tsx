@@ -23,9 +23,7 @@ export interface AiDoctorPhase1PlantPickerProps {
   onSelect: (plantId: string) => void;
 }
 
-export function AiDoctorPhase1PlantPicker(
-  props: AiDoctorPhase1PlantPickerProps,
-): JSX.Element {
+export function AiDoctorPhase1PlantPicker(props: AiDoctorPhase1PlantPickerProps): JSX.Element {
   const { plants, selectedPlantId, onSelect } = props;
 
   if (plants.length === 0) {

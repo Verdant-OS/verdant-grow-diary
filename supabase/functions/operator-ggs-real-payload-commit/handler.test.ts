@@ -366,32 +366,29 @@ Deno.test("duplicate canonical metrics fail the shared Edge trust invariant", ()
   );
 });
 
-Deno.test(
-  "an incomplete attempt writes nothing and a corrected same-sample retry stays eligible",
-  async () => {
-    const d = deps();
-    const incomplete = await handleOperatorGgsRealPayloadCommit(
-      request(body({ payload: payload({ soil_ec: undefined }) })),
-      d.value,
-    );
-    assertEquals(incomplete.status, 400);
-    assertEquals(await responseJson(incomplete), {
-      error: "incomplete_canonical_readings",
-    });
-    assertEquals(d.committed.length, 0);
+Deno.test("an incomplete attempt writes nothing and a corrected same-sample retry stays eligible", async () => {
+  const d = deps();
+  const incomplete = await handleOperatorGgsRealPayloadCommit(
+    request(body({ payload: payload({ soil_ec: undefined }) })),
+    d.value,
+  );
+  assertEquals(incomplete.status, 400);
+  assertEquals(await responseJson(incomplete), {
+    error: "incomplete_canonical_readings",
+  });
+  assertEquals(d.committed.length, 0);
 
-    const corrected = await handleOperatorGgsRealPayloadCommit(request(), d.value);
-    assertEquals(corrected.status, 200);
-    assertEquals(await responseJson(corrected), {
-      ok: true,
-      inserted: 3,
-      rejected: 0,
-    });
-    assertEquals(d.committed.length, 1);
-    assertEquals(d.committed[0].rows.length, 3);
-    assertEquals(new Set(d.committed[0].rows.map((row) => row.idempotency_key)).size, 3);
-  },
-);
+  const corrected = await handleOperatorGgsRealPayloadCommit(request(), d.value);
+  assertEquals(corrected.status, 200);
+  assertEquals(await responseJson(corrected), {
+    ok: true,
+    inserted: 3,
+    rejected: 0,
+  });
+  assertEquals(d.committed.length, 1);
+  assertEquals(d.committed[0].rows.length, 3);
+  assertEquals(new Set(d.committed[0].rows.map((row) => row.idempotency_key)).size, 3);
+});
 
 Deno.test("declared non-live payload is rejected with zero writes", async () => {
   const d = deps();
@@ -476,47 +473,44 @@ Deno.test("request deviceId is bound to the payload sensor identity", async () =
   }
 });
 
-Deno.test(
-  "verified UID overrides client userId and private commit occurs exactly once",
-  async () => {
-    const d = deps();
-    const response = await handleOperatorGgsRealPayloadCommit(
-      request(body({ userId: OTHER_USER_ID, rows: [{ source: "live" }] })),
-      d.value,
-    );
-    assertEquals(response.status, 200);
-    assertEquals(await responseJson(response), {
-      ok: true,
-      inserted: 3,
-      rejected: 0,
-    });
-    assertEquals(d.committed.length, 1);
-    assertEquals(d.committed[0].userId, USER_ID);
-    assertEquals(d.committed[0].bridgeId, BRIDGE_ID);
-    assertEquals(d.committed[0].tentId, TENT_ID);
-    assertEquals(
-      d.committed[0].rows.map((row) => row.metric),
-      ["soil_moisture_pct", "ec", "soil_temp_c"],
-    );
-    assertEquals(
-      d.committed[0].rows.every(
-        (row) =>
-          row.source === "manual" &&
-          row.quality === "ok" &&
-          row.device_id === "GGS-PROBE-001" &&
-          row.raw_payload.source_app === "spider_farmer_ggs" &&
-          row.raw_payload.device_id === "GGS-PROBE-001" &&
-          row.raw_payload.sensor_id === "GGS-PROBE-001" &&
-          row.raw_payload.provenance === "operator_attested_real_payload" &&
-          row.raw_payload.operator_attestation.attested === true &&
-          row.raw_payload.operator_attestation.attested_at === NOW.toISOString() &&
-          row.raw_payload.operator_attestation.boundary === "operator-ggs-real-payload-commit" &&
-          row.raw_payload.cohort_id === `ggs:GGS-PROBE-001:${row.captured_at}`,
-      ),
-      true,
-    );
-  },
-);
+Deno.test("verified UID overrides client userId and private commit occurs exactly once", async () => {
+  const d = deps();
+  const response = await handleOperatorGgsRealPayloadCommit(
+    request(body({ userId: OTHER_USER_ID, rows: [{ source: "live" }] })),
+    d.value,
+  );
+  assertEquals(response.status, 200);
+  assertEquals(await responseJson(response), {
+    ok: true,
+    inserted: 3,
+    rejected: 0,
+  });
+  assertEquals(d.committed.length, 1);
+  assertEquals(d.committed[0].userId, USER_ID);
+  assertEquals(d.committed[0].bridgeId, BRIDGE_ID);
+  assertEquals(d.committed[0].tentId, TENT_ID);
+  assertEquals(
+    d.committed[0].rows.map((row) => row.metric),
+    ["soil_moisture_pct", "ec", "soil_temp_c"],
+  );
+  assertEquals(
+    d.committed[0].rows.every(
+      (row) =>
+        row.source === "manual" &&
+        row.quality === "ok" &&
+        row.device_id === "GGS-PROBE-001" &&
+        row.raw_payload.source_app === "spider_farmer_ggs" &&
+        row.raw_payload.device_id === "GGS-PROBE-001" &&
+        row.raw_payload.sensor_id === "GGS-PROBE-001" &&
+        row.raw_payload.provenance === "operator_attested_real_payload" &&
+        row.raw_payload.operator_attestation.attested === true &&
+        row.raw_payload.operator_attestation.attested_at === NOW.toISOString() &&
+        row.raw_payload.operator_attestation.boundary === "operator-ggs-real-payload-commit" &&
+        row.raw_payload.cohort_id === `ggs:GGS-PROBE-001:${row.captured_at}`,
+    ),
+    true,
+  );
+});
 
 Deno.test("commit failures are sanitized", async () => {
   const secret = "service-role-secret-should-never-leak";
@@ -534,25 +528,22 @@ Deno.test("commit failures are sanitized", async () => {
   assertFalse(text.includes("sensor_readings"));
 });
 
-Deno.test(
-  "mixed, duplicate-only, fractional, and impossible commit counts are never success",
-  async () => {
-    for (const committed of [
-      { ok: true as const, inserted: 2, rejected: 1 },
-      { ok: true as const, inserted: 1, rejected: 2 },
-      { ok: true as const, inserted: 0, rejected: 3 },
-      { ok: true as const, inserted: 2.5, rejected: 0.5 },
-      { ok: true as const, inserted: 4, rejected: 0 },
-      { ok: true as const, inserted: 3, rejected: 1 },
-    ]) {
-      const d = deps({
-        commitBatch: async () => committed,
-      });
-      const response = await handleOperatorGgsRealPayloadCommit(request(), d.value);
-      assertEquals(response.status, 409);
-      assertEquals(await responseJson(response), {
-        error: "commit_not_confirmed",
-      });
-    }
-  },
-);
+Deno.test("mixed, duplicate-only, fractional, and impossible commit counts are never success", async () => {
+  for (const committed of [
+    { ok: true as const, inserted: 2, rejected: 1 },
+    { ok: true as const, inserted: 1, rejected: 2 },
+    { ok: true as const, inserted: 0, rejected: 3 },
+    { ok: true as const, inserted: 2.5, rejected: 0.5 },
+    { ok: true as const, inserted: 4, rejected: 0 },
+    { ok: true as const, inserted: 3, rejected: 1 },
+  ]) {
+    const d = deps({
+      commitBatch: async () => committed,
+    });
+    const response = await handleOperatorGgsRealPayloadCommit(request(), d.value);
+    assertEquals(response.status, 409);
+    assertEquals(await responseJson(response), {
+      error: "commit_not_confirmed",
+    });
+  }
+});

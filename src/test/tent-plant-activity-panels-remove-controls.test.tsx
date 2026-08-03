@@ -238,9 +238,7 @@ describe("TentPlantActivityPanels — remove behavior", () => {
     );
     fireEvent.click(screen.getByText("Remove photo log"));
     fireEvent.click(screen.getByTestId("diary-entry-remove-confirm"));
-    await waitFor(() =>
-      expect(deleteEq).toHaveBeenCalledWith("id", "photo-1"),
-    );
+    await waitFor(() => expect(deleteEq).toHaveBeenCalledWith("id", "photo-1"));
     expect(toastSuccess).toHaveBeenCalledWith("Photo log removed.");
   });
 });

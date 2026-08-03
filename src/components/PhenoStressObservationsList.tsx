@@ -102,8 +102,7 @@ function draftToUpdate(d: EditDraftState): PhenoStressUpdateInput {
   };
 }
 
-const inputClass =
-  "w-full rounded border border-border bg-background px-2 py-1 text-xs";
+const inputClass = "w-full rounded border border-border bg-background px-2 py-1 text-xs";
 
 export default function PhenoStressObservationsList({
   rows,
@@ -115,8 +114,7 @@ export default function PhenoStressObservationsList({
 }: Props) {
   const [status, setStatus] = useState<StressStatusFilter>("all");
   const [intensity, setIntensity] = useState<StressIntensityFilter>("all");
-  const [recommendation, setRecommendation] =
-    useState<StressRecommendationFilter>("all");
+  const [recommendation, setRecommendation] = useState<StressRecommendationFilter>("all");
   const [sortBy, setSortBy] = useState<StressSortKey>("newest");
   const [editId, setEditId] = useState<string | null>(null);
   const [draft, setDraft] = useState<EditDraftState | null>(null);
@@ -223,9 +221,7 @@ export default function PhenoStressObservationsList({
           <select
             data-testid="stress-filter-recommendation"
             value={recommendation}
-            onChange={(e) =>
-              setRecommendation(e.target.value as StressRecommendationFilter)
-            }
+            onChange={(e) => setRecommendation(e.target.value as StressRecommendationFilter)}
             className="rounded border border-border bg-background px-1 py-0.5"
           >
             <option value="all">all</option>
@@ -269,8 +265,7 @@ export default function PhenoStressObservationsList({
                   <div>
                     <span className="font-medium">{candidateLabel(row.plantId)}</span>
                     <span className="ml-2 text-muted-foreground">
-                      {row.stressFactor} · {row.status} · {row.intensity} ·{" "}
-                      {row.recommendation}
+                      {row.stressFactor} · {row.status} · {row.intensity} · {row.recommendation}
                     </span>
                     <div className="text-muted-foreground">
                       {row.startDate}
@@ -310,9 +305,7 @@ export default function PhenoStressObservationsList({
                           <select
                             data-testid={`stress-edit-plant-${row.id}`}
                             value={draft.plantId}
-                            onChange={(e) =>
-                              setDraft({ ...draft, plantId: e.target.value })
-                            }
+                            onChange={(e) => setDraft({ ...draft, plantId: e.target.value })}
                             className={inputClass}
                           >
                             {candidates.map((c) => (
@@ -328,9 +321,7 @@ export default function PhenoStressObservationsList({
                         <select
                           data-testid={`stress-edit-factor-${row.id}`}
                           value={draft.stressFactor}
-                          onChange={(e) =>
-                            setDraft({ ...draft, stressFactor: e.target.value })
-                          }
+                          onChange={(e) => setDraft({ ...draft, stressFactor: e.target.value })}
                           className={inputClass}
                         >
                           {PHENO_STRESS_FACTOR_OPTIONS.map((v) => (
@@ -345,9 +336,7 @@ export default function PhenoStressObservationsList({
                         <select
                           data-testid={`stress-edit-status-${row.id}`}
                           value={draft.status}
-                          onChange={(e) =>
-                            setDraft({ ...draft, status: e.target.value })
-                          }
+                          onChange={(e) => setDraft({ ...draft, status: e.target.value })}
                           className={inputClass}
                         >
                           {PHENO_STRESS_STATUS_OPTIONS.map((v) => (
@@ -362,9 +351,7 @@ export default function PhenoStressObservationsList({
                         <select
                           data-testid={`stress-edit-intensity-${row.id}`}
                           value={draft.intensity}
-                          onChange={(e) =>
-                            setDraft({ ...draft, intensity: e.target.value })
-                          }
+                          onChange={(e) => setDraft({ ...draft, intensity: e.target.value })}
                           className={inputClass}
                         >
                           {PHENO_STRESS_INTENSITY_OPTIONS.map((v) => (
@@ -379,9 +366,7 @@ export default function PhenoStressObservationsList({
                         <select
                           data-testid={`stress-edit-rec-${row.id}`}
                           value={draft.recommendation}
-                          onChange={(e) =>
-                            setDraft({ ...draft, recommendation: e.target.value })
-                          }
+                          onChange={(e) => setDraft({ ...draft, recommendation: e.target.value })}
                           className={inputClass}
                         >
                           {PHENO_STRESS_RECOMMENDATION_OPTIONS.map((v) => (
@@ -397,9 +382,7 @@ export default function PhenoStressObservationsList({
                           type="date"
                           data-testid={`stress-edit-start-${row.id}`}
                           value={draft.startDate}
-                          onChange={(e) =>
-                            setDraft({ ...draft, startDate: e.target.value })
-                          }
+                          onChange={(e) => setDraft({ ...draft, startDate: e.target.value })}
                           className={inputClass}
                         />
                       </label>
@@ -409,9 +392,7 @@ export default function PhenoStressObservationsList({
                           type="date"
                           data-testid={`stress-edit-end-${row.id}`}
                           value={draft.endDate}
-                          onChange={(e) =>
-                            setDraft({ ...draft, endDate: e.target.value })
-                          }
+                          onChange={(e) => setDraft({ ...draft, endDate: e.target.value })}
                           className={inputClass}
                         />
                       </label>
@@ -423,9 +404,7 @@ export default function PhenoStressObservationsList({
                         data-testid={`stress-edit-response-${row.id}`}
                         rows={2}
                         value={draft.plantResponse}
-                        onChange={(e) =>
-                          setDraft({ ...draft, plantResponse: e.target.value })
-                        }
+                        onChange={(e) => setDraft({ ...draft, plantResponse: e.target.value })}
                         className={inputClass}
                       />
                     </label>
@@ -435,9 +414,7 @@ export default function PhenoStressObservationsList({
                         data-testid={`stress-edit-recovery-${row.id}`}
                         rows={2}
                         value={draft.recoveryNotes}
-                        onChange={(e) =>
-                          setDraft({ ...draft, recoveryNotes: e.target.value })
-                        }
+                        onChange={(e) => setDraft({ ...draft, recoveryNotes: e.target.value })}
                         className={inputClass}
                       />
                     </label>
@@ -447,9 +424,7 @@ export default function PhenoStressObservationsList({
                         data-testid={`stress-edit-yield-${row.id}`}
                         rows={2}
                         value={draft.yieldImpactNotes}
-                        onChange={(e) =>
-                          setDraft({ ...draft, yieldImpactNotes: e.target.value })
-                        }
+                        onChange={(e) => setDraft({ ...draft, yieldImpactNotes: e.target.value })}
                         className={inputClass}
                       />
                     </label>
@@ -459,9 +434,7 @@ export default function PhenoStressObservationsList({
                         data-testid={`stress-edit-disease-${row.id}`}
                         rows={2}
                         value={draft.diseasePestNotes}
-                        onChange={(e) =>
-                          setDraft({ ...draft, diseasePestNotes: e.target.value })
-                        }
+                        onChange={(e) => setDraft({ ...draft, diseasePestNotes: e.target.value })}
                         className={inputClass}
                       />
                     </label>

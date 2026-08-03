@@ -28,13 +28,7 @@ export type RawHistoryFallbackState =
   | "summary_error";
 
 /** Source of a sensor reading for ingest-rate accounting. */
-export type IngestReadingSource =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid";
+export type IngestReadingSource = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 
 // ---------------------------------------------------------------------------
 // DB refresh measurement
@@ -148,7 +142,7 @@ export function detectCrossDomainViolations(
         : [];
   const violations: CrossDomainViolation[] = [];
   for (const key of forbidden) {
-    if (Object.prototype.hasOwnProperty.call(candidate, key)) {
+    if (Object.hasOwn(candidate, key)) {
       violations.push({ offendingKey: key, expectedDomain: domain });
     }
   }

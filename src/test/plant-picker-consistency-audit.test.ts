@@ -29,17 +29,14 @@ const PICKERS: Record<string, string> = {
 };
 
 describe("Plant picker consistency — no hardcoded list limits", () => {
-  it.each(Object.entries(PICKERS))(
-    "%s does not slice or .limit() the plant list",
-    (_name, src) => {
-      // Catch obvious truncators that could hide plants from a grower.
-      expect(src).not.toMatch(/plants\.slice\s*\(/);
-      expect(src).not.toMatch(/scopedPlants\.slice\s*\(/);
-      expect(src).not.toMatch(/filtered\.slice\s*\(/);
-      // Server-side hard limits on the plant list are likewise a smell here.
-      expect(src).not.toMatch(/\.from\(["']plants["']\)[\s\S]{0,400}?\.limit\s*\(/);
-    },
-  );
+  it.each(Object.entries(PICKERS))("%s does not slice or .limit() the plant list", (_name, src) => {
+    // Catch obvious truncators that could hide plants from a grower.
+    expect(src).not.toMatch(/plants\.slice\s*\(/);
+    expect(src).not.toMatch(/scopedPlants\.slice\s*\(/);
+    expect(src).not.toMatch(/filtered\.slice\s*\(/);
+    // Server-side hard limits on the plant list are likewise a smell here.
+    expect(src).not.toMatch(/\.from\(["']plants["']\)[\s\S]{0,400}?\.limit\s*\(/);
+  });
 
   it.each(Object.entries(PICKERS))(
     "%s has no privileged / device-control surface",
@@ -89,6 +86,8 @@ describe("Merge target picker — same-grow intent is visible to the user", () =
 
 describe("Add Existing Plant picker — eligibility stays transparent", () => {
   it("uses the eligibility rules helper", () => {
-    expect(PICKERS.AddExistingPlantDialog).toMatch(/plantDropdownEligibilityRules|plantDropdownReasonRules/);
+    expect(PICKERS.AddExistingPlantDialog).toMatch(
+      /plantDropdownEligibilityRules|plantDropdownReasonRules/,
+    );
   });
 });

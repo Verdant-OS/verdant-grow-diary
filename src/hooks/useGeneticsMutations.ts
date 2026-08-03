@@ -96,7 +96,10 @@ function useInvalidateGenetics() {
     // Invalidate the whole owner-scoped genetics namespace; keys are prefixed
     // ["genetics", ...] so a single predicate covers lists, trace, and evidence.
     void qc.invalidateQueries({
-      predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === "genetics" && q.queryKey.includes(ownerId ?? "anon"),
+      predicate: (q) =>
+        Array.isArray(q.queryKey) &&
+        q.queryKey[0] === "genetics" &&
+        q.queryKey.includes(ownerId ?? "anon"),
     });
   }, [qc, ownerId]);
 }
@@ -127,7 +130,11 @@ export function useUpsertBatch() {
 
 export function useAssignPlants() {
   const invalidate = useInvalidateGenetics();
-  return useIdempotentAction<{ batchId: string; plantIds: readonly string[]; reason: string | null }>(
+  return useIdempotentAction<{
+    batchId: string;
+    plantIds: readonly string[];
+    reason: string | null;
+  }>(
     ({ batchId, plantIds, reason }, key) => assignPlants(batchId, plantIds, reason, key),
     invalidate,
   );

@@ -24,9 +24,7 @@ describe("Diary Calendar — mobile filter chip bar", () => {
   it("renders all 6 chips including Training and Environment Check", () => {
     render(<DiaryCalendarSection rawEntries={MIXED_NO_ENV} />);
     for (const v of ["all", "watering", "feeding", "training", "diagnosis", "environment"]) {
-      expect(
-        screen.getByTestId(`diary-calendar-filter-${v}`),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId(`diary-calendar-filter-${v}`)).toBeInTheDocument();
     }
   });
 
@@ -55,20 +53,20 @@ describe("Diary Calendar — Environment Check empty state", () => {
     render(<DiaryCalendarSection rawEntries={MIXED_NO_ENV} />);
     fireEvent.click(screen.getByTestId("diary-calendar-filter-environment"));
     expect(screen.getByText(ENVIRONMENT_CHECK_EMPTY_TITLE)).toBeInTheDocument();
-    expect(
-      screen.getByTestId("diary-calendar-environment-empty-body"),
-    ).toHaveTextContent(ENVIRONMENT_CHECK_EMPTY_BODY);
-    expect(
-      screen.getByTestId("diary-calendar-environment-empty-cta"),
-    ).toHaveTextContent(ENVIRONMENT_CHECK_EMPTY_CTA);
+    expect(screen.getByTestId("diary-calendar-environment-empty-body")).toHaveTextContent(
+      ENVIRONMENT_CHECK_EMPTY_BODY,
+    );
+    expect(screen.getByTestId("diary-calendar-environment-empty-cta")).toHaveTextContent(
+      ENVIRONMENT_CHECK_EMPTY_CTA,
+    );
   });
 
   it("body contains the not-live disclaimer phrase", () => {
     render(<DiaryCalendarSection rawEntries={MIXED_NO_ENV} />);
     fireEvent.click(screen.getByTestId("diary-calendar-filter-environment"));
-    expect(
-      screen.getByTestId("diary-calendar-environment-empty-body"),
-    ).toHaveTextContent(/not live sensor telemetry/i);
+    expect(screen.getByTestId("diary-calendar-environment-empty-body")).toHaveTextContent(
+      /not live sensor telemetry/i,
+    );
   });
 
   it("CTA dispatches existing verdant:open-quicklog event with environment eventType", () => {
@@ -80,10 +78,7 @@ describe("Diary Calendar — Environment Check empty state", () => {
     try {
       fireEvent.click(screen.getByTestId("diary-calendar-environment-empty-cta"));
     } finally {
-      window.removeEventListener(
-        "verdant:open-quicklog",
-        handler as EventListener,
-      );
+      window.removeEventListener("verdant:open-quicklog", handler as EventListener);
     }
     expect(captured).toHaveLength(1);
     expect(captured[0].type).toBe("verdant:open-quicklog");
@@ -91,11 +86,9 @@ describe("Diary Calendar — Environment Check empty state", () => {
   });
 
   it("does not perform any direct writes (no fetch / no supabase calls)", () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch" as any)
-      .mockImplementation(() => {
-        throw new Error("no network calls allowed");
-      });
+    const fetchSpy = vi.spyOn(globalThis, "fetch" as any).mockImplementation(() => {
+      throw new Error("no network calls allowed");
+    });
     try {
       render(<DiaryCalendarSection rawEntries={MIXED_NO_ENV} />);
       fireEvent.click(screen.getByTestId("diary-calendar-filter-environment"));
@@ -109,19 +102,13 @@ describe("Diary Calendar — Environment Check empty state", () => {
   it("generic empty state remains for non-environment filters", () => {
     render(<DiaryCalendarSection rawEntries={[]} />);
     expect(screen.getByTestId("diary-calendar-empty")).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("diary-calendar-environment-empty-cta"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("diary-calendar-environment-empty-cta")).not.toBeInTheDocument();
   });
 });
 
 describe("Static safety: diary calendar presenter/view-model", () => {
   const root = path.resolve(__dirname, "..");
-  const forbidden = [
-    "@/integrations/supabase",
-    "supabase-js",
-    "service_role",
-  ];
+  const forbidden = ["@/integrations/supabase", "supabase-js", "service_role"];
   const files = [
     "components/DiaryCalendarSection.tsx",
     "lib/diaryCalendarViewModel.ts",

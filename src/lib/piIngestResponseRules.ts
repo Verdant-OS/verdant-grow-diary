@@ -10,10 +10,7 @@
  *  - Does NOT perform inserts. Does NOT decide auth. Does NOT track state.
  */
 
-import type {
-  PiIngestPipelineResult,
-  PiIngestPipelineStage,
-} from "./piIngestPipeline";
+import type { PiIngestPipelineResult, PiIngestPipelineStage } from "./piIngestPipeline";
 
 // ----------------------------- Types -----------------------------
 
@@ -61,15 +58,11 @@ function statusForStage(stage: PiIngestPipelineStage): number {
   }
 }
 
-function firstIssueCode(
-  result: Extract<PiIngestPipelineResult, { ok: false }>,
-): string {
+function firstIssueCode(result: Extract<PiIngestPipelineResult, { ok: false }>): string {
   return result.issues[0]?.code ?? `${result.stage}_error`;
 }
 
-function firstIssueMessage(
-  result: Extract<PiIngestPipelineResult, { ok: false }>,
-): string {
+function firstIssueMessage(result: Extract<PiIngestPipelineResult, { ok: false }>): string {
   return result.issues[0]?.message ?? `pi-ingest ${result.stage} failure`;
 }
 
@@ -128,14 +121,10 @@ export function shapePiIngestResponse(input: {
   readonly result: PiIngestPipelineResult;
   readonly inserted?: number;
   readonly rejected?: number;
-}):
-  | PiIngestHttpResponse<PiIngestSuccessBody>
-  | PiIngestHttpResponse<PiIngestFailureBody> {
+}): PiIngestHttpResponse<PiIngestSuccessBody> | PiIngestHttpResponse<PiIngestFailureBody> {
   if (input.result.ok === true) {
     if (input.inserted === undefined) {
-      throw new Error(
-        "shapePiIngestResponse: inserted count is required on success",
-      );
+      throw new Error("shapePiIngestResponse: inserted count is required on success");
     }
     return shapePiIngestSuccessResponse({
       inserted: input.inserted,

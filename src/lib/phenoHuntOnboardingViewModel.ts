@@ -35,15 +35,9 @@ export const PHENO_ONBOARDING_STEP_ORDER: ReadonlyArray<PhenoOnboardingStepId> =
   "confirmation",
 ];
 
-export type PhenoCandidateCountStatus =
-  | "none"
-  | "tracking_only"
-  | "comparison_eligible";
+export type PhenoCandidateCountStatus = "none" | "tracking_only" | "comparison_eligible";
 
-export type PhenoChecklistItemStatus =
-  | "ok"
-  | "missing"
-  | "pending";
+export type PhenoChecklistItemStatus = "ok" | "missing" | "pending";
 
 export interface PhenoChecklistItem {
   readonly id: string;
@@ -52,10 +46,7 @@ export interface PhenoChecklistItem {
   readonly detail: string;
 }
 
-export type PhenoOnboardingReadiness =
-  | "not_ready"
-  | "tracking_only"
-  | "comparison_ready";
+export type PhenoOnboardingReadiness = "not_ready" | "tracking_only" | "comparison_ready";
 
 export interface PhenoOnboardingDraft {
   readonly name: string;
@@ -164,11 +155,7 @@ export function computePhenoHuntOnboardingViewModel(
       id: "basics",
       label: STEP_LABEL.basics,
       complete: nameOk && growOk,
-      reason: !nameOk
-        ? "Hunt name is required"
-        : !growOk
-          ? "Linked grow is required"
-          : undefined,
+      reason: !nameOk ? "Hunt name is required" : !growOk ? "Linked grow is required" : undefined,
     },
     {
       id: "candidates",
@@ -187,8 +174,7 @@ export function computePhenoHuntOnboardingViewModel(
       // Preview is informational; completes as soon as candidates exist.
       label: STEP_LABEL.packet_preview,
       complete: candidateCount >= 1,
-      reason:
-        candidateCount === 0 ? "Add candidates to see the evidence packet map" : undefined,
+      reason: candidateCount === 0 ? "Add candidates to see the evidence packet map" : undefined,
     },
     {
       id: "checklist",
@@ -199,26 +185,22 @@ export function computePhenoHuntOnboardingViewModel(
       id: "confirmation",
       label: STEP_LABEL.confirmation,
       complete: !!draft.setupCompleted && nameOk && growOk && candidateCount >= 1 && goalsOk,
-      reason: draft.setupCompleted
-        ? undefined
-        : "Confirm setup to enter the workspace",
+      reason: draft.setupCompleted ? undefined : "Confirm setup to enter the workspace",
     },
   ];
 
-  const evidenceMap = new Map<string, NonNullable<PhenoOnboardingDraft["candidateEvidence"]>[number]>();
+  const evidenceMap = new Map<
+    string,
+    NonNullable<PhenoOnboardingDraft["candidateEvidence"]>[number]
+  >();
   for (const e of draft.candidateEvidence ?? []) {
     evidenceMap.set(e.candidateId, e);
   }
 
-  const anyPhenotypeNote = draft.candidateIds.some(
-    (id) => evidenceMap.get(id)?.hasPhenotypeNote,
-  );
+  const anyPhenotypeNote = draft.candidateIds.some((id) => evidenceMap.get(id)?.hasPhenotypeNote);
   const allHavePhenotypeNote =
-    candidateCount > 0 &&
-    draft.candidateIds.every((id) => evidenceMap.get(id)?.hasPhenotypeNote);
-  const anyPhoto = draft.candidateIds.some(
-    (id) => evidenceMap.get(id)?.hasPhotoOrObservation,
-  );
+    candidateCount > 0 && draft.candidateIds.every((id) => evidenceMap.get(id)?.hasPhenotypeNote);
+  const anyPhoto = draft.candidateIds.some((id) => evidenceMap.get(id)?.hasPhotoOrObservation);
   const anyLabel = draft.candidateIds.some((id) => evidenceMap.get(id)?.hasLabel);
 
   const checklist: PhenoChecklistItem[] = [

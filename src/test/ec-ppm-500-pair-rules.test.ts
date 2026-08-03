@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  PPM_500_PER_EC,
-  resolveEcPpm500Pair,
-  updateEcPpm500Pair,
-} from "@/lib/ecPpm500PairRules";
+import { PPM_500_PER_EC, resolveEcPpm500Pair, updateEcPpm500Pair } from "@/lib/ecPpm500PairRules";
 
 describe("updateEcPpm500Pair", () => {
   it("applies PPM ÷ 500 = EC", () => {

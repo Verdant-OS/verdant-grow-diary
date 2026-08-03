@@ -57,15 +57,11 @@ describe("InfoPopover", () => {
     const trigger = screen.getByTestId("info-popover-trigger-manual-snapshot");
     expect(trigger).toBeInTheDocument();
     // Popover content is not in the DOM until opened.
-    expect(
-      screen.queryByTestId("info-popover-content-manual-snapshot"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("info-popover-content-manual-snapshot")).not.toBeInTheDocument();
     fireEvent.click(trigger);
     const content = screen.getByTestId("info-popover-content-manual-snapshot");
     expect(content).toHaveTextContent(/manual snapshot/i);
-    expect(content).toHaveTextContent(
-      /not live connected sensor data/i,
-    );
+    expect(content).toHaveTextContent(/not live connected sensor data/i);
   });
 
   it("does not rely on hover-only behavior in source", () => {
@@ -75,14 +71,10 @@ describe("InfoPopover", () => {
 
 describe("HELP_COPY canonical strings", () => {
   it("manual snapshot says not live connected sensor data", () => {
-    expect(HELP_COPY.manualSnapshot).toMatch(
-      /not live connected sensor data/i,
-    );
+    expect(HELP_COPY.manualSnapshot).toMatch(/not live connected sensor data/i);
   });
   it("live sensor data describes connected sensor or bridge", () => {
-    expect(HELP_COPY.liveSensorData).toMatch(
-      /connected sensor or bridge/i,
-    );
+    expect(HELP_COPY.liveSensorData).toMatch(/connected sensor or bridge/i);
   });
   it("simulated data says test/demo and warns it is not real tent data", () => {
     expect(HELP_COPY.simulatedData).toMatch(/test\/demo data/i);
@@ -125,9 +117,9 @@ describe("GrowDataSourceDisclosure copy", () => {
         testId="plants-data-source-disclosure"
       />,
     );
-    expect(
-      screen.getByTestId("plants-data-source-disclosure"),
-    ).toHaveTextContent(/current grow data/i);
+    expect(screen.getByTestId("plants-data-source-disclosure")).toHaveTextContent(
+      /current grow data/i,
+    );
   });
 
   it("renders an InfoPopover that distinguishes app records from live sensors", () => {
@@ -139,13 +131,9 @@ describe("GrowDataSourceDisclosure copy", () => {
         testId="plants-data-source-disclosure"
       />,
     );
-    const trigger = screen.getByTestId(
-      "info-popover-trigger-plants-data-source-disclosure-source",
-    );
+    const trigger = screen.getByTestId("info-popover-trigger-plants-data-source-disclosure-source");
     fireEvent.click(trigger);
-    const content = screen.getByTestId(
-      "info-popover-content-plants-data-source-disclosure-source",
-    );
+    const content = screen.getByTestId("info-popover-content-plants-data-source-disclosure-source");
     expect(content).toHaveTextContent(/not a live sensor reading|not live/i);
   });
 });
@@ -209,9 +197,7 @@ describe("PlantPhoto placeholder copy", () => {
 
   it("renders 'Add photo' CTA copy", () => {
     renderWithQC(<PlantPhoto src={null} caption="No plant photo yet" />);
-    expect(screen.getByTestId("plant-photo-placeholder-cta")).toHaveTextContent(
-      /add photo/i,
-    );
+    expect(screen.getByTestId("plant-photo-placeholder-cta")).toHaveTextContent(/add photo/i);
   });
 
   it("PlantPhoto source still has no I/O and no writes", () => {

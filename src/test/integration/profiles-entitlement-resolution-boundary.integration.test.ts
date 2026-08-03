@@ -63,9 +63,7 @@ function instrumentClient(client: SupabaseClient) {
       if (prop === "from") {
         return (table: string) => {
           fromTables.push(table);
-          return (target as unknown as { from: (t: string) => unknown }).from(
-            table,
-          );
+          return (target as unknown as { from: (t: string) => unknown }).from(table);
         };
       }
       if (prop === "rpc") {
@@ -156,11 +154,7 @@ async function resolveViaRealPath(
 ) {
   const { client, fromTables, rpcNames } = instrumentClient(authedClient);
   const [byoRes, lovRes, roleRes] = await Promise.all([
-    client
-      .from("billing_subscriptions")
-      .select("*")
-      .eq("user_id", userId)
-      .maybeSingle(),
+    client.from("billing_subscriptions").select("*").eq("user_id", userId).maybeSingle(),
     client
       .from("subscriptions")
       .select("*")
@@ -176,12 +170,8 @@ async function resolveViaRealPath(
       .eq("role", "staff")
       .maybeSingle(),
   ]);
-  const byoRow = byoRes.error
-    ? null
-    : ((byoRes.data ?? null) as BillingSubscriptionRow | null);
-  const lovableRow = lovRes.error
-    ? null
-    : ((lovRes.data ?? null) as LovableSubscriptionRow | null);
+  const byoRow = byoRes.error ? null : ((byoRes.data ?? null) as BillingSubscriptionRow | null);
+  const lovableRow = lovRes.error ? null : ((lovRes.data ?? null) as LovableSubscriptionRow | null);
   const isStaff = !roleRes.error && roleRes.data != null;
 
   const entitlement = resolveUnionEntitlements({
@@ -217,10 +207,7 @@ d("profiles.tier entitlement-resolution boundary (local DB)", () => {
     const u = await createTestUser(admin, "free");
     try {
       const authed = await signIn(u);
-      const { entitlement, fromTables, rpcNames } = await resolveViaRealPath(
-        authed,
-        u.id,
-      );
+      const { entitlement, fromTables, rpcNames } = await resolveViaRealPath(authed, u.id);
       expect(entitlement.effectivePlanId).toBe("free");
       expect(entitlement.isActive).toBe(true);
       expect(entitlement.capabilities.multiTent).toBe(false);
@@ -235,10 +222,7 @@ d("profiles.tier entitlement-resolution boundary (local DB)", () => {
     try {
       await seedByo(admin, u.id, { plan_id: "pro_monthly", status: "active" });
       const authed = await signIn(u);
-      const { entitlement, fromTables, rpcNames } = await resolveViaRealPath(
-        authed,
-        u.id,
-      );
+      const { entitlement, fromTables, rpcNames } = await resolveViaRealPath(authed, u.id);
       expect(entitlement.effectivePlanId).toBe("pro_monthly");
       expect(entitlement.isActive).toBe(true);
       assertNoProfilesTouched(fromTables, rpcNames);
@@ -256,10 +240,7 @@ d("profiles.tier entitlement-resolution boundary (local DB)", () => {
         current_period_end: null,
       });
       const authed = await signIn(u);
-      const { entitlement, fromTables, rpcNames } = await resolveViaRealPath(
-        authed,
-        u.id,
-      );
+      const { entitlement, fromTables, rpcNames } = await resolveViaRealPath(authed, u.id);
       expect(entitlement.effectivePlanId).toBe("founder_lifetime");
       expect(entitlement.isActive).toBe(true);
       assertNoProfilesTouched(fromTables, rpcNames);
@@ -277,10 +258,7 @@ d("profiles.tier entitlement-resolution boundary (local DB)", () => {
         current_period_end: new Date(Date.now() - 24 * 3600_000).toISOString(),
       });
       const authed = await signIn(u);
-      const { entitlement, fromTables, rpcNames } = await resolveViaRealPath(
-        authed,
-        u.id,
-      );
+      const { entitlement, fromTables, rpcNames } = await resolveViaRealPath(authed, u.id);
       expect(entitlement.isActive).toBe(false);
       expect(entitlement.effectivePlanId).toBe("free");
       expect(entitlement.degraded).toBe(true);

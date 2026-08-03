@@ -92,9 +92,7 @@ export function provenanceBadgeAriaLabel(
   return `Sensor provenance: ${row.label}. ${row.description}`;
 }
 
-export function findProvenanceLegendRow(
-  kind: string,
-): PostGrowSensorProvenanceLegendRow | null {
+export function findProvenanceLegendRow(kind: string): PostGrowSensorProvenanceLegendRow | null {
   const normalized = normalizeReportSensorSource(kind);
   return POST_GROW_SENSOR_PROVENANCE_LEGEND.find((r) => r.kind === normalized) ?? null;
 }
@@ -165,22 +163,14 @@ export function isoDateOnly(d: Date): string {
  * Deterministic filename for the exported PDF. Uses grow name slug and
  * export date. Never includes ids, tokens, or user identifiers.
  */
-export function buildPdfExportFilename(
-  growName: unknown,
-  now: Date = new Date(),
-): string {
+export function buildPdfExportFilename(growName: unknown, now: Date = new Date()): string {
   return `verdant-post-grow-report-${slugifyGrowName(growName)}-${isoDateOnly(now)}.pdf`;
 }
 
 /** Deterministic document.title used before window.print(). */
-export function buildPdfExportTitle(
-  growName: unknown,
-  now: Date = new Date(),
-): string {
+export function buildPdfExportTitle(growName: unknown, now: Date = new Date()): string {
   const safeName =
-    typeof growName === "string" && growName.trim().length > 0
-      ? growName.trim()
-      : "Grow";
+    typeof growName === "string" && growName.trim().length > 0 ? growName.trim() : "Grow";
   return `Verdant — Post-Grow Report — ${redactSecrets(safeName)} — ${isoDateOnly(now)}`;
 }
 

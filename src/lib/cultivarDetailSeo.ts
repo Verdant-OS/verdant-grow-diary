@@ -38,9 +38,7 @@ function difficultyPhrase(difficulty: VerdantCultivarProfile["difficulty"]): str
  * Deterministic and pure. Only uses reported fields; never invents chemistry,
  * effects, or precision the profile does not carry.
  */
-export function buildCultivarFaqItems(
-  cultivar: VerdantCultivarProfile,
-): CultivarFaqItem[] {
+export function buildCultivarFaqItems(cultivar: VerdantCultivarProfile): CultivarFaqItem[] {
   const items: CultivarFaqItem[] = [];
 
   items.push({

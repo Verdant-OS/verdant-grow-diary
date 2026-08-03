@@ -46,12 +46,16 @@ describe("Strain Reference Library V1 static safety", () => {
     expect(PRODUCT_CONTRACT).toMatch(/must never auto-link to free-text `plants\.strain`/i);
     expect(PRODUCT_CONTRACT).toMatch(/not genotype proof for a commercial name/i);
     expect(PRODUCT_CONTRACT).toMatch(/human reviewer approves/i);
-    expect(PRODUCT_CONTRACT).not.toMatch(/runtime dependency for (hugging face|cannlytics|cannabisgdb|cannseek)/i);
+    expect(PRODUCT_CONTRACT).not.toMatch(
+      /runtime dependency for (hugging face|cannlytics|cannabisgdb|cannseek)/i,
+    );
   });
 
   it("blocks database cutover until content parity is proven", () => {
     expect(PRODUCT_CONTRACT).toMatch(/database cutover gate/i);
-    expect(PRODUCT_CONTRACT).toMatch(/must not switch to database reads until a parity check proves/i);
+    expect(PRODUCT_CONTRACT).toMatch(
+      /must not switch to database reads until a parity check proves/i,
+    );
     expect(PRODUCT_CONTRACT).toMatch(/migration remains unapplied to production/i);
     expect(PRODUCT_CONTRACT).toMatch(/no “database-backed public reads” or “shipped” claim/i);
   });

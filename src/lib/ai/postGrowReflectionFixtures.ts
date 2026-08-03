@@ -107,12 +107,18 @@ export function createRichPhotoperiodReflectionContext(): GrowContext {
     watering_feeding_summary: {
       watering_event_count: 28,
       feeding_event_count: 12,
-      consistency_notes: ["No missed watering events recorded in flower.", "Feed strength stayed moderate after week 4."],
+      consistency_notes: [
+        "No missed watering events recorded in flower.",
+        "Feed strength stayed moderate after week 4.",
+      ],
       known_gaps: [],
     },
     photo_summary: {
       photo_count: 64,
-      key_observations: ["Dense top colas documented on 2026-04-18.", "No unresolved pest flags in late flower photos."],
+      key_observations: [
+        "Dense top colas documented on 2026-04-18.",
+        "No unresolved pest flags in late flower photos.",
+      ],
       known_gaps: [],
     },
     quality_scores: {
@@ -138,7 +144,10 @@ export function createRichPhotoperiodReflectionContext(): GrowContext {
         { date: "2026-05-18", jar_rh_pct: 60, smell_note: "diesel citrus, no hay", burped: true },
       ],
       final_jar_rh_pct: 60,
-      smell_progression_notes: ["Green note faded by cure day 8.", "Diesel citrus aroma held through final assessment."],
+      smell_progression_notes: [
+        "Green note faded by cure day 8.",
+        "Diesel citrus aroma held through final assessment.",
+      ],
       flags_resolved: [],
     },
     user_notes: "The 11-day slow dry felt repeatable and protected aroma.",
@@ -196,7 +205,11 @@ export function createThinAutoflowerReflectionContext(): GrowContext {
     post_harvest_outcomes: undefined,
     user_notes: "First run, did not keep many notes.",
     previous_user_lessons: [],
-    known_gaps: ["Missing 18 days of VPD data.", "Missing all dry/cure checkpoint data.", "No final quality score."],
+    known_gaps: [
+      "Missing 18 days of VPD data.",
+      "Missing all dry/cure checkpoint data.",
+      "No final quality score.",
+    ],
   };
 }
 
@@ -222,7 +235,8 @@ export function createConflictingSignalsReflectionContext(): GrowContext {
         evidence: { recovery_lag_days: 5, user_note: "over-defoliated in week 4" },
       },
     ],
-    user_notes: "Environment was stable, but I over-defoliated in week 4 and plants took 5 days to recover.",
+    user_notes:
+      "Environment was stable, but I over-defoliated in week 4 and plants took 5 days to recover.",
     known_gaps: ["No side-by-side control plant for defoliation timing."],
   };
 }
@@ -238,7 +252,13 @@ export function createPostHarvestHeavyReflectionContext(): GrowContext {
       final_dry_yield_grams: 360,
       weight_loss_curve: [
         { day: 0, date: "2026-04-28", weight_grams: 1410, loss_pct_from_harvest_start: 0 },
-        { day: 1, date: "2026-04-29", weight_grams: 1156, loss_pct_from_previous: 18, loss_pct_from_harvest_start: 18 },
+        {
+          day: 1,
+          date: "2026-04-29",
+          weight_grams: 1156,
+          loss_pct_from_previous: 18,
+          loss_pct_from_harvest_start: 18,
+        },
         { day: 4, date: "2026-05-02", weight_grams: 610, loss_pct_from_harvest_start: 56.7 },
         { day: 7, date: "2026-05-05", weight_grams: 365, loss_pct_from_harvest_start: 74.1 },
       ],
@@ -248,7 +268,10 @@ export function createPostHarvestHeavyReflectionContext(): GrowContext {
         { date: "2026-05-18", jar_rh_pct: 60, smell_note: "diesel aroma returning", burped: true },
       ],
       final_jar_rh_pct: 60,
-      smell_progression_notes: ["Initial hay note after fast dry.", "Extended burping correlated with improved aroma by cure day 12."],
+      smell_progression_notes: [
+        "Initial hay note after fast dry.",
+        "Extended burping correlated with improved aroma by cure day 12.",
+      ],
       flags_resolved: ["Initial hay smell improved after extended burping."],
     },
     quality_scores: {

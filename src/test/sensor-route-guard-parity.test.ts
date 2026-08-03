@@ -105,19 +105,13 @@ describe("Verdant Sensor Route Guard Regression v1 — App.tsx structure", () =>
     expect(OPERATOR_OPEN).toBeGreaterThan(-1);
     expect(OPERATOR_BLOCK.length).toBeGreaterThan(0);
     // No second occurrence.
-    const secondOpen = APP.indexOf(
-      "<Route element={<RequireOperatorRole />}>",
-      OPERATOR_OPEN + 1,
-    );
+    const secondOpen = APP.indexOf("<Route element={<RequireOperatorRole />}>", OPERATOR_OPEN + 1);
     expect(secondOpen).toBe(-1);
   });
 });
 
 describe("Verdant Sensor Route Guard Regression v1 — required operator-gated sensor routes", () => {
-  const REQUIRED_OPERATOR_SENSOR_ROUTES = [
-    "/sensors/ecowitt-audit",
-    "/sensors/ingest-normalizer",
-  ];
+  const REQUIRED_OPERATOR_SENSOR_ROUTES = ["/sensors/ecowitt-audit", "/sensors/ingest-normalizer"];
 
   for (const p of REQUIRED_OPERATOR_SENSOR_ROUTES) {
     it(`${p} is mounted INSIDE <RequireOperatorRole />`, () => {
@@ -138,10 +132,9 @@ describe("Verdant Sensor Route Guard Regression v1 — generalized /sensors/* pa
   const sensorManifestRoutes = APP_ROUTES.filter((r) => r.path.startsWith("/sensors"));
 
   it("manifest contains every /sensors/* route mounted in App.tsx", () => {
-    const mountedSensorPaths = [
-      ...PATHS_IN_OPERATOR_BLOCK,
-      ...PATHS_OUTSIDE_OPERATOR_BLOCK,
-    ].filter((p) => p.startsWith("/sensors"));
+    const mountedSensorPaths = [...PATHS_IN_OPERATOR_BLOCK, ...PATHS_OUTSIDE_OPERATOR_BLOCK].filter(
+      (p) => p.startsWith("/sensors"),
+    );
     for (const p of mountedSensorPaths) {
       const entry = sensorManifestRoutes.find((r) => r.path === p);
       expect(entry, `mounted /sensors/* route ${p} missing from manifest`).toBeTruthy();

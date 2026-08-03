@@ -135,10 +135,7 @@ export default function SensorSourceSummaryWidget({
     <section
       data-testid="sensor-source-summary-widget"
       aria-label={title}
-      className={cn(
-        "rounded-2xl border border-border/50 bg-secondary/20 p-4",
-        className,
-      )}
+      className={cn("rounded-2xl border border-border/50 bg-secondary/20 p-4", className)}
     >
       <header className="mb-3 flex items-center justify-between gap-2 flex-wrap">
         <div>

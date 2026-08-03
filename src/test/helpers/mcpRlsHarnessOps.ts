@@ -209,7 +209,11 @@ export interface ManifestToolLike {
 }
 
 export type ParamKind =
-  "pagination-limit" | "pagination-cursor" | "boolean-filter" | "date-filter" | "scope-filter";
+  | "pagination-limit"
+  | "pagination-cursor"
+  | "boolean-filter"
+  | "date-filter"
+  | "scope-filter";
 
 export interface DerivedParam {
   name: string;

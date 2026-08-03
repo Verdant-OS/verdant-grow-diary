@@ -167,10 +167,7 @@ export default function AddExistingPlantDialog({ tentId, growId, trigger }: Prop
     setBusy(true);
     // ONLY update tent_id. RLS scopes the row to the owning user; we
     // never touch user_id / grow_id / strain / stage / notes here.
-    const { error } = await supabase
-      .from("plants")
-      .update({ tent_id: tentId })
-      .eq("id", selected);
+    const { error } = await supabase.from("plants").update({ tent_id: tentId }).eq("id", selected);
     setBusy(false);
     if (error) {
       toast.error(error.message);
@@ -198,36 +195,24 @@ export default function AddExistingPlantDialog({ tentId, growId, trigger }: Prop
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent
-        className="glass max-w-md"
-        data-testid="add-existing-plant-dialog"
-      >
+      <DialogContent className="glass max-w-md" data-testid="add-existing-plant-dialog">
         <DialogHeader>
           <DialogTitle className="font-display">Add existing plant</DialogTitle>
         </DialogHeader>
 
         {!hasGrowContext ? (
-          <p
-            className="text-sm text-muted-foreground"
-            data-testid="add-existing-plant-no-grow"
-          >
+          <p className="text-sm text-muted-foreground" data-testid="add-existing-plant-no-grow">
             Unable to load plants because this tent is missing grow context.
           </p>
         ) : isLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : eligibleCount === 0 ? (
-          <div
-            className="space-y-3"
-            data-testid="add-existing-plant-empty"
-          >
+          <div className="space-y-3" data-testid="add-existing-plant-empty">
             <p className="text-sm text-muted-foreground">
               {formatPlantDropdownEmptyState("add_existing_to_tent")}
             </p>
             {helperText && (
-              <p
-                className="text-xs text-muted-foreground"
-                data-testid="add-existing-plant-helper"
-              >
+              <p className="text-xs text-muted-foreground" data-testid="add-existing-plant-helper">
                 {helperText}
               </p>
             )}
@@ -278,9 +263,7 @@ export default function AddExistingPlantDialog({ tentId, growId, trigger }: Prop
                           >
                             <span>{renderLabel(p)}</span>
                             <span className="text-xs text-muted-foreground ml-1">
-                              {legacy
-                                ? "— unassigned · legacy plant"
-                                : "— unassigned"}
+                              {legacy ? "— unassigned · legacy plant" : "— unassigned"}
                             </span>
                           </SelectItem>
                         );
@@ -307,9 +290,7 @@ export default function AddExistingPlantDialog({ tentId, growId, trigger }: Prop
                           >
                             <span>{renderLabel(p)}</span>
                             <span className="text-xs text-muted-foreground ml-1">
-                              {legacy
-                                ? "— will move here · legacy plant"
-                                : "— will move here"}
+                              {legacy ? "— will move here · legacy plant" : "— will move here"}
                             </span>
                           </SelectItem>
                         );

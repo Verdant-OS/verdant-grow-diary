@@ -70,10 +70,7 @@ export function isPlantTentMovementEntry(raw: unknown): boolean {
 
 function pickOccurredAt(row: Record<string, unknown>): string | null {
   return (
-    safeString(row.entry_at) ??
-    safeString(row.created_at) ??
-    safeString(row.inserted_at) ??
-    null
+    safeString(row.entry_at) ?? safeString(row.created_at) ?? safeString(row.inserted_at) ?? null
   );
 }
 

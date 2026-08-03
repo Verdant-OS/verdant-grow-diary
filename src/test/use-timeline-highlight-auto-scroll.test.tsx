@@ -14,9 +14,7 @@ function makeNode() {
 function entry(id: string, key: string | null) {
   return {
     id,
-    details: key
-      ? { kind: "action_queue_trace", idempotency_key: key }
-      : null,
+    details: key ? { kind: "action_queue_trace", idempotency_key: key } : null,
   };
 }
 
@@ -32,13 +30,13 @@ describe("useTimelineHighlightAutoScroll", () => {
         }),
       { initialProps: { h: highlight, e: entries } },
     );
-    expect((node.scrollIntoView as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
-    expect((node.focus as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
+    expect(node.scrollIntoView as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(1);
+    expect(node.focus as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(1);
     // Re-render with same token must not steal focus again.
     rerender({ h: highlight, e: entries });
     rerender({ h: highlight, e: [...entries] });
-    expect((node.scrollIntoView as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
-    expect((node.focus as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
+    expect(node.scrollIntoView as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(1);
+    expect(node.focus as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(1);
   });
 
   it("re-scrolls when the highlight token changes", () => {
@@ -55,9 +53,9 @@ describe("useTimelineHighlightAutoScroll", () => {
         useTimelineHighlightAutoScroll(h, e, { getNodeById: lookup }),
       { initialProps: { h: h1, e: entries1 } },
     );
-    expect((node1.scrollIntoView as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
+    expect(node1.scrollIntoView as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(1);
     rerender({ h: h2, e: entries2 });
-    expect((node2.scrollIntoView as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
+    expect(node2.scrollIntoView as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(1);
   });
 
   it("does nothing for null highlight or unmatched entries", () => {
@@ -68,13 +66,13 @@ describe("useTimelineHighlightAutoScroll", () => {
         getNodeById: () => node,
       }),
     );
-    expect((node.scrollIntoView as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
+    expect(node.scrollIntoView as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
     renderHook(() =>
       useTimelineHighlightAutoScroll(highlight, [entry("d1", "action-queue:aq-OTHER:approved")], {
         getNodeById: () => node,
       }),
     );
-    expect((node.scrollIntoView as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
+    expect(node.scrollIntoView as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
   });
 
   it("does nothing for invalid highlight tokens", () => {
@@ -86,6 +84,6 @@ describe("useTimelineHighlightAutoScroll", () => {
       }),
     );
     expect(invalid).toBeNull();
-    expect((node.scrollIntoView as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
+    expect(node.scrollIntoView as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
   });
 });

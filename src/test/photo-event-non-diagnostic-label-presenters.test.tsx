@@ -62,9 +62,7 @@ describe("Photo non-diagnostic label — presenters", () => {
         details: {},
       },
     ];
-    const { getAllByTestId, getByText } = render(
-      <PhotoHistoryPanel rawEntries={raw} />,
-    );
+    const { getAllByTestId, getByText } = render(<PhotoHistoryPanel rawEntries={raw} />);
     expect(getAllByTestId(PHOTO_NON_DIAGNOSTIC_TESTID).length).toBe(1);
     expect(getByText(PHOTO_NON_DIAGNOSTIC_LABEL)).toBeTruthy();
   });

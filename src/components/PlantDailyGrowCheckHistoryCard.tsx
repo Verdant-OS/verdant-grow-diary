@@ -227,40 +227,43 @@ export default function PlantDailyGrowCheckHistoryCard({
               )}
             </div>
           )}
-        <ul
-          className="divide-y divide-border/40 rounded-md border border-border/40"
-          data-testid="plant-daily-grow-check-history-rows"
-        >
-          {rows.map((row) => (
-            <li
-              key={row.dayKey}
-              data-testid="plant-daily-grow-check-history-row"
-              data-day-key={row.dayKey}
-              data-kind={row.kind}
-              className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
-            >
-              <div className="min-w-0">
-                <div className="font-medium" data-testid="plant-daily-grow-check-history-day-label">
-                  {row.label}
-                </div>
-                {row.latestAt && (
-                  <div className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(row.latestAt), { addSuffix: true })}
-                    {" · "}
-                    {format(new Date(row.latestAt), "p")}
-                  </div>
-                )}
-              </div>
-              <Badge
-                variant="outline"
-                className={rowTone(row.kind)}
-                data-testid="plant-daily-grow-check-history-label"
+          <ul
+            className="divide-y divide-border/40 rounded-md border border-border/40"
+            data-testid="plant-daily-grow-check-history-rows"
+          >
+            {rows.map((row) => (
+              <li
+                key={row.dayKey}
+                data-testid="plant-daily-grow-check-history-row"
+                data-day-key={row.dayKey}
+                data-kind={row.kind}
+                className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
               >
-                {row.activityLabel}
-              </Badge>
-            </li>
-          ))}
-        </ul>
+                <div className="min-w-0">
+                  <div
+                    className="font-medium"
+                    data-testid="plant-daily-grow-check-history-day-label"
+                  >
+                    {row.label}
+                  </div>
+                  {row.latestAt && (
+                    <div className="text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(row.latestAt), { addSuffix: true })}
+                      {" · "}
+                      {format(new Date(row.latestAt), "p")}
+                    </div>
+                  )}
+                </div>
+                <Badge
+                  variant="outline"
+                  className={rowTone(row.kind)}
+                  data-testid="plant-daily-grow-check-history-label"
+                >
+                  {row.activityLabel}
+                </Badge>
+              </li>
+            ))}
+          </ul>
         </>
       )}
     </Card>

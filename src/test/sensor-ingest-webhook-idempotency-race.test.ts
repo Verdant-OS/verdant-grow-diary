@@ -61,9 +61,7 @@ describe("idempotency-race — static handler shape", () => {
 describe("idempotency-race — migration safety net", () => {
   const migrationsDir = resolve(__dirname, "../../supabase/migrations");
   const files = readdirSync(migrationsDir);
-  const combined = files
-    .map((f) => readFileSync(resolve(migrationsDir, f), "utf8"))
-    .join("\n");
+  const combined = files.map((f) => readFileSync(resolve(migrationsDir, f), "utf8")).join("\n");
 
   it("creates a partial unique index sensor_readings_dedupe_uidx", () => {
     expect(combined).toMatch(
@@ -102,8 +100,7 @@ type Row = {
  */
 function makeMockSensorTable() {
   const rows: Row[] = [];
-  const key = (r: Row) =>
-    `${r.user_id}|${r.tent_id}|${r.source}|${r.metric}|${r.captured_at}`;
+  const key = (r: Row) => `${r.user_id}|${r.tent_id}|${r.source}|${r.metric}|${r.captured_at}`;
   return {
     rows,
     async upsert(input: Row[], opts: { onConflict: string; ignoreDuplicates: boolean }) {
@@ -217,9 +214,12 @@ describe("idempotency-race — pure logic", () => {
   });
 
   it("upsert mock is called with the exact contract options every time", async () => {
-    const upsertSpy = vi.fn<(rows: Row[], opts: { onConflict: string; ignoreDuplicates: boolean }) => Promise<{ data: { id: string }[]; error: null }>>(
-      async () => ({ data: [{ id: "x" }], error: null }),
-    );
+    const upsertSpy = vi.fn<
+      (
+        rows: Row[],
+        opts: { onConflict: string; ignoreDuplicates: boolean },
+      ) => Promise<{ data: { id: string }[]; error: null }>
+    >(async () => ({ data: [{ id: "x" }], error: null }));
     await upsertSpy([baseRow()], {
       onConflict: "user_id,tent_id,source,metric,captured_at",
       ignoreDuplicates: true,

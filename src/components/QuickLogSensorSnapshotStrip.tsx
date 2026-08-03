@@ -30,7 +30,6 @@ import {
   type ManualCorrectionMetric,
 } from "@/lib/manualSensorCorrectionContext";
 
-
 interface Props {
   growId?: string | null | undefined;
   tentId: string | null | undefined;
@@ -89,7 +88,10 @@ const PILL_ARIA: Record<QuickLogSnapshotStripStatus, string> = {
 // label as the canonical badge, we suppress the pill text instead —
 // never the badge. The dedupe comparison is case-insensitive and
 // trim-normalized but does not change user-facing copy.
-function shouldRenderTrustBadge(_status: QuickLogSnapshotStripStatus, _trustLabel: string): boolean {
+function shouldRenderTrustBadge(
+  _status: QuickLogSnapshotStripStatus,
+  _trustLabel: string,
+): boolean {
   // Always render the canonical trust badge. See isPillRedundantWithBadge
   // for the inverse decision used to hide the duplicate pill label.
   return true;
@@ -139,12 +141,8 @@ export default function QuickLogSensorSnapshotStrip({
     }),
   );
   const advisory =
-    vm.display && vm.display.freshness === "fresh" ? null : vm.warning ?? vm.emptyCopy;
-  const advisoryKind = vm.display
-    ? vm.display.freshness
-    : vm.emptyCopy
-      ? "missing"
-      : null;
+    vm.display && vm.display.freshness === "fresh" ? null : (vm.warning ?? vm.emptyCopy);
+  const advisoryKind = vm.display ? vm.display.freshness : vm.emptyCopy ? "missing" : null;
   const showTrustBadge = shouldRenderTrustBadge(view.status, view.trustBadge.label);
   const pillIsRedundant = isPillRedundantWithBadge(view.status, view.trustBadge.label);
 
@@ -155,9 +153,7 @@ export default function QuickLogSensorSnapshotStrip({
   // tentId is missing, when IDs contain no real UUIDs, or when no
   // capturedAt is supplied.
   const correctionHref =
-    tentId &&
-    manualCapturedAt &&
-    hasCorrectableOriginalIds(manualReadingIds)
+    tentId && manualCapturedAt && hasCorrectableOriginalIds(manualReadingIds)
       ? `/sensors${encodeManualCorrectionHash({
           tentId,
           originalCapturedAt: manualCapturedAt,
@@ -165,8 +161,6 @@ export default function QuickLogSensorSnapshotStrip({
           originalValues: manualValues ?? {},
         })}`
       : null;
-
-
 
   return (
     <section
@@ -213,8 +207,6 @@ export default function QuickLogSensorSnapshotStrip({
           </span>
 
           {showTrustBadge && <SnapshotTrustBadge view={view.trustBadge} showProvider={false} />}
-
-
         </div>
       </div>
 
@@ -245,14 +237,16 @@ export default function QuickLogSensorSnapshotStrip({
             </span>
           )}
           {view.metrics.map((m) => (
-            <span key={m.label} data-testid={`quicklog-sensor-snapshot-metric-${m.label.toLowerCase()}`}>
+            <span
+              key={m.label}
+              data-testid={`quicklog-sensor-snapshot-metric-${m.label.toLowerCase()}`}
+            >
               <span className="text-muted-foreground/70">{m.label}</span>{" "}
               <span className="text-foreground">{m.value}</span>
             </span>
           ))}
         </div>
       )}
-
 
       {view.action.kind !== "none" && (
         <a

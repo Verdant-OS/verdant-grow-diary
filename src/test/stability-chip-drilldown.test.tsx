@@ -1,8 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import StabilityChipDrilldown, {
-  resolveCopyVariant,
-} from "@/components/StabilityChipDrilldown";
+import StabilityChipDrilldown, { resolveCopyVariant } from "@/components/StabilityChipDrilldown";
 import type { StabilityResult } from "@/lib/environmentStabilityRules";
 
 function makeResult(
@@ -45,11 +43,7 @@ describe("resolveCopyVariant", () => {
 describe("StabilityChipDrilldown", () => {
   it("renders chip as a button (not a link) for tap/click drilldown", () => {
     render(
-      <StabilityChipDrilldown
-        tentId="t1"
-        tentName="Tent A"
-        stability={makeResult("unstable")}
-      />,
+      <StabilityChipDrilldown tentId="t1" tentName="Tent A" stability={makeResult("unstable")} />,
     );
     const chip = screen.getByTestId("dashboard-stability-chip-t1");
     expect(chip.tagName).toBe("BUTTON");
@@ -57,26 +51,18 @@ describe("StabilityChipDrilldown", () => {
 
   it("opens a modal exposing the exact copy variant", () => {
     render(
-      <StabilityChipDrilldown
-        tentId="t1"
-        tentName="Tent A"
-        stability={makeResult("unstable")}
-      />,
+      <StabilityChipDrilldown tentId="t1" tentName="Tent A" stability={makeResult("unstable")} />,
     );
     fireEvent.click(screen.getByTestId("dashboard-stability-chip-t1"));
     expect(screen.getByTestId("dashboard-stability-drilldown-t1")).toBeTruthy();
-    expect(
-      screen.getByTestId("dashboard-stability-drilldown-t1-variant").textContent,
-    ).toBe("Outside 24h");
+    expect(screen.getByTestId("dashboard-stability-drilldown-t1-variant").textContent).toBe(
+      "Outside 24h",
+    );
   });
 
   it("shows last-24h numeric details (hours outside + considered + count)", () => {
     render(
-      <StabilityChipDrilldown
-        tentId="t1"
-        tentName="Tent A"
-        stability={makeResult("watch")}
-      />,
+      <StabilityChipDrilldown tentId="t1" tentName="Tent A" stability={makeResult("watch")} />,
     );
     fireEvent.click(screen.getByTestId("dashboard-stability-chip-t1"));
     const dialog = screen.getByTestId("dashboard-stability-drilldown-t1");
@@ -94,16 +80,12 @@ describe("StabilityChipDrilldown", () => {
     ];
     for (const [status, label] of cases) {
       const { unmount } = render(
-        <StabilityChipDrilldown
-          tentId="tx"
-          tentName="Tent X"
-          stability={makeResult(status)}
-        />,
+        <StabilityChipDrilldown tentId="tx" tentName="Tent X" stability={makeResult(status)} />,
       );
       fireEvent.click(screen.getByTestId("dashboard-stability-chip-tx"));
-      expect(
-        screen.getByTestId("dashboard-stability-drilldown-tx-variant").textContent,
-      ).toBe(label);
+      expect(screen.getByTestId("dashboard-stability-drilldown-tx-variant").textContent).toBe(
+        label,
+      );
       unmount();
     }
   });
@@ -112,11 +94,7 @@ describe("StabilityChipDrilldown", () => {
     const onParentClick = vi.fn();
     render(
       <a href="/tents/t1" onClick={onParentClick}>
-        <StabilityChipDrilldown
-          tentId="t1"
-          tentName="Tent A"
-          stability={makeResult("stable")}
-        />
+        <StabilityChipDrilldown tentId="t1" tentName="Tent A" stability={makeResult("stable")} />
       </a>,
     );
     fireEvent.click(screen.getByTestId("dashboard-stability-chip-t1"));
@@ -130,10 +108,7 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import { vi } from "vitest";
 
-const SRC = readFileSync(
-  resolve(__dirname, "../components/StabilityChipDrilldown.tsx"),
-  "utf8",
-);
+const SRC = readFileSync(resolve(__dirname, "../components/StabilityChipDrilldown.tsx"), "utf8");
 
 describe("StabilityChipDrilldown safety", () => {
   it("introduces no alert/queue/automation/device-control writes", () => {

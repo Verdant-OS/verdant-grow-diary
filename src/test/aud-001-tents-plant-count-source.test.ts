@@ -12,10 +12,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const SRC = readFileSync(
-  resolve(__dirname, "../pages/Tents.tsx"),
-  "utf8",
-);
+const SRC = readFileSync(resolve(__dirname, "../pages/Tents.tsx"), "utf8");
 
 describe("AUD-001 — Tents page uses real plants for plant count", () => {
   it("does NOT import usePlants from the mock data hook", () => {

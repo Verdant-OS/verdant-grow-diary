@@ -43,9 +43,7 @@ export const DIARY_TIMELINE_SECTION_ORDER: readonly DiaryTimelineSectionId[] = [
   "other",
 ] as const;
 
-export const DIARY_TIMELINE_SECTION_LABELS: Readonly<
-  Record<DiaryTimelineSectionId, string>
-> = {
+export const DIARY_TIMELINE_SECTION_LABELS: Readonly<Record<DiaryTimelineSectionId, string>> = {
   watering: "Watering",
   feeding: "Feeding",
   training: "Training",
@@ -55,9 +53,7 @@ export const DIARY_TIMELINE_SECTION_LABELS: Readonly<
   other: "Other diary entries",
 };
 
-export const DIARY_TIMELINE_SECTION_EMPTY_COPY: Readonly<
-  Record<DiaryTimelineSectionId, string>
-> = {
+export const DIARY_TIMELINE_SECTION_EMPTY_COPY: Readonly<Record<DiaryTimelineSectionId, string>> = {
   watering: "No watering entries in the current timeline view.",
   feeding: "No feeding entries in the current timeline view.",
   training: "No training entries in the current timeline view.",
@@ -82,9 +78,7 @@ export const DIARY_TIMELINE_SECTION_EMPTY_COPY: Readonly<
  *   reminder    → other
  *   notes       → other
  */
-function mapFilterCategoryToSection(
-  category: TimelineFilterCategory,
-): DiaryTimelineSectionId {
+function mapFilterCategoryToSection(category: TimelineFilterCategory): DiaryTimelineSectionId {
   switch (category) {
     case "photos":
       return "photos";
@@ -141,9 +135,9 @@ export interface DiaryTimelineSection<T> {
  * Empty input still returns all seven sections with `count: 0` so the
  * presenter can render empty copy and keep section headers reachable.
  */
-export function buildDiaryTimelineSections<
-  T extends ClassifyDiaryTimelineEntryInput,
->(items: readonly T[] | null | undefined): DiaryTimelineSection<T>[] {
+export function buildDiaryTimelineSections<T extends ClassifyDiaryTimelineEntryInput>(
+  items: readonly T[] | null | undefined,
+): DiaryTimelineSection<T>[] {
   const buckets: Record<DiaryTimelineSectionId, T[]> = {
     watering: [],
     feeding: [],

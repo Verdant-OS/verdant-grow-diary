@@ -109,8 +109,10 @@ describe("EcoWitt ingest dry-run", () => {
     const r = buildEcowittIngestDryRun(snap("flower", "valid"));
     const createObjectURL = vi.fn().mockReturnValue("blob:fake");
     const revokeObjectURL = vi.fn();
-    (URL as unknown as { createObjectURL: typeof createObjectURL }).createObjectURL = createObjectURL;
-    (URL as unknown as { revokeObjectURL: typeof revokeObjectURL }).revokeObjectURL = revokeObjectURL;
+    (URL as unknown as { createObjectURL: typeof createObjectURL }).createObjectURL =
+      createObjectURL;
+    (URL as unknown as { revokeObjectURL: typeof revokeObjectURL }).revokeObjectURL =
+      revokeObjectURL;
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     const fetchSpy = vi.spyOn(globalThis, "fetch" as any).mockImplementation(() => {
       throw new Error("network call attempted during dry-run export");

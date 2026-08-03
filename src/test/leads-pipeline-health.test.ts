@@ -90,10 +90,7 @@ describe("evaluatePipelineHealth — empty / healthy", () => {
     expect(w.some((x) => x.id === "pipeline_healthy")).toBe(true);
     expect(
       w.every(
-        (x) =>
-          x.severity === "info" ||
-          x.id === "pipeline_healthy" ||
-          x.id === "low_close_rate",
+        (x) => x.severity === "info" || x.id === "pipeline_healthy" || x.id === "low_close_rate",
       ),
     ).toBe(true);
   });
@@ -101,9 +98,7 @@ describe("evaluatePipelineHealth — empty / healthy", () => {
 
 describe("evaluatePipelineHealth — risk detection", () => {
   it("flags high first-contact backlog", () => {
-    const leads = Array.from({ length: 6 }, (_, i) =>
-      lead({ id: `n${i}`, status: "new" }),
-    );
+    const leads = Array.from({ length: 6 }, (_, i) => lead({ id: `n${i}`, status: "new" }));
     const w = evaluatePipelineHealth(leads, NOW);
     expect(w.some((x) => x.id === "high_first_contact")).toBe(true);
   });
@@ -122,9 +117,7 @@ describe("evaluatePipelineHealth — risk detection", () => {
   });
 
   it("flags low close percentage", () => {
-    const leads = Array.from({ length: 10 }, (_, i) =>
-      lead({ id: `n${i}`, status: "new" }),
-    );
+    const leads = Array.from({ length: 10 }, (_, i) => lead({ id: `n${i}`, status: "new" }));
     const w = evaluatePipelineHealth(leads, NOW);
     expect(w.some((x) => x.id === "low_close_rate")).toBe(true);
   });
@@ -201,9 +194,7 @@ describe("evaluatePipelineHealth — ordering and safety", () => {
   });
 
   it("is deterministic across repeated calls", () => {
-    const leads = Array.from({ length: 6 }, (_, i) =>
-      lead({ id: `n${i}`, status: "new" }),
-    );
+    const leads = Array.from({ length: 6 }, (_, i) => lead({ id: `n${i}`, status: "new" }));
     const a = evaluatePipelineHealth(leads, NOW);
     const b = evaluatePipelineHealth(leads, NOW);
     expect(a).toEqual(b);
@@ -218,13 +209,9 @@ describe("evaluatePipelineHealth — ordering and safety", () => {
 
 describe("compatibility with leadStatusSummaryRules", () => {
   it("threshold metrics match the underlying summary", () => {
-    const leads = Array.from({ length: 6 }, (_, i) =>
-      lead({ id: `n${i}`, status: "new" }),
-    );
+    const leads = Array.from({ length: 6 }, (_, i) => lead({ id: `n${i}`, status: "new" }));
     const summary = summarizeLeadStatuses(leads, NOW);
-    const w = evaluatePipelineHealth(leads, NOW).find(
-      (x) => x.id === "high_first_contact",
-    );
+    const w = evaluatePipelineHealth(leads, NOW).find((x) => x.id === "high_first_contact");
     expect(w).toBeDefined();
     // Expressed as a percentage; should equal summary's percentNeedingAction
     // when all leads are needs_first_contact.

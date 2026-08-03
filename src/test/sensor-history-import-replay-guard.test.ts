@@ -219,9 +219,7 @@ describe("buildSensorHistoryImportFingerprint", () => {
       csvText: SPIDER_FARMER_CSV,
     });
     const rows = toFingerprintRows(r.rows);
-    expect(
-      buildSensorHistoryImportFingerprint({ sourceAppId: "spider_farmer", rows }),
-    ).not.toEqual(
+    expect(buildSensorHistoryImportFingerprint({ sourceAppId: "spider_farmer", rows })).not.toEqual(
       buildSensorHistoryImportFingerprint({ sourceAppId: "vivosun", rows }),
     );
   });

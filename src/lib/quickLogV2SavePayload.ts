@@ -49,7 +49,8 @@ export interface BuildQuickLogV2PayloadInput {
 }
 
 export type BuildResult =
-  { ok: true; payload: QuickLogV2SavePayload } | { ok: false; reason: string };
+  | { ok: true; payload: QuickLogV2SavePayload }
+  | { ok: false; reason: string };
 
 function parseOptionalNumber(raw: string): number | null | "invalid" {
   const trimmed = raw?.trim?.() ?? "";

@@ -30,9 +30,7 @@ describe("parseActionQueueUrlState", () => {
   });
 
   it("falls back safely on invalid values", () => {
-    const state = parseActionQueueUrlState(
-      sp("status=bogus&trace=zzz&page=-7&pageSize=999"),
-    );
+    const state = parseActionQueueUrlState(sp("status=bogus&trace=zzz&page=-7&pageSize=999"));
     expect(state.status).toBe("all");
     expect(state.trace).toBe("all");
     expect(state.page).toBe(1);
@@ -49,18 +47,15 @@ describe("parseActionQueueUrlState", () => {
 
 describe("serializeActionQueueUrlState", () => {
   it("omits keys that match defaults", () => {
-    const out = serializeActionQueueUrlState(
-      sp(""),
-      ACTION_QUEUE_URL_DEFAULTS,
-    );
+    const out = serializeActionQueueUrlState(sp(""), ACTION_QUEUE_URL_DEFAULTS);
     expect(out.toString()).toBe("");
   });
 
   it("preserves unrelated params on the base", () => {
-    const out = serializeActionQueueUrlState(
-      sp("growId=g-1&focus=aq-1"),
-      { ...ACTION_QUEUE_URL_DEFAULTS, status: "approved" },
-    );
+    const out = serializeActionQueueUrlState(sp("growId=g-1&focus=aq-1"), {
+      ...ACTION_QUEUE_URL_DEFAULTS,
+      status: "approved",
+    });
     expect(out.get("growId")).toBe("g-1");
     expect(out.get("focus")).toBe("aq-1");
     expect(out.get("status")).toBe("approved");

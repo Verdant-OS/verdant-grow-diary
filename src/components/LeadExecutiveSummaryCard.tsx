@@ -31,13 +31,8 @@ export interface LeadExecutiveSummaryCardProps {
 /**
  * Read-only presenter for the executive summary. Performs no I/O.
  */
-export default function LeadExecutiveSummaryCard({
-  leads,
-}: LeadExecutiveSummaryCardProps) {
-  const summary: LeadExecutiveSummary = useMemo(
-    () => buildLeadExecutiveSummary(leads),
-    [leads],
-  );
+export default function LeadExecutiveSummaryCard({ leads }: LeadExecutiveSummaryCardProps) {
+  const summary: LeadExecutiveSummary = useMemo(() => buildLeadExecutiveSummary(leads), [leads]);
 
   return (
     <div
@@ -47,12 +42,8 @@ export default function LeadExecutiveSummaryCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-display text-lg font-semibold">
-            {summary.headline}
-          </h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {summary.subheadline}
-          </p>
+          <h3 className="font-display text-lg font-semibold">{summary.headline}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">{summary.subheadline}</p>
         </div>
         <Badge variant={STATE_VARIANT[summary.overallState]}>
           {STATE_LABEL[summary.overallState]}
@@ -61,12 +52,8 @@ export default function LeadExecutiveSummaryCard({
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div className="rounded-md border border-border/40 bg-card/30 p-2">
-          <div className="text-xs text-muted-foreground">
-            {summary.topMetricLabel}
-          </div>
-          <div className="mt-1 font-display text-2xl font-semibold">
-            {summary.topMetricValue}
-          </div>
+          <div className="text-xs text-muted-foreground">{summary.topMetricLabel}</div>
+          <div className="mt-1 font-display text-2xl font-semibold">{summary.topMetricValue}</div>
         </div>
         <div className="rounded-md border border-border/40 bg-card/30 p-2">
           <div className="text-xs text-muted-foreground">Recommended next</div>

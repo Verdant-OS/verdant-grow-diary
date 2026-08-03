@@ -47,8 +47,7 @@ function fail(msg, code = 1) {
 
 async function loadEmitter() {
   const mod = await import(
-    pathToFileURL(resolve(process.cwd(), "src/lib/releaseReceiptEmitter.ts"))
-      .href,
+    pathToFileURL(resolve(process.cwd(), "src/lib/releaseReceiptEmitter.ts")).href
   );
   return mod.emitReleaseReceiptArtifact;
 }
@@ -91,10 +90,7 @@ async function main() {
   mkdirSync(outDir, { recursive: true });
 
   // Step 1: compose input (deterministic; no clock for artifact_id beyond fixture path hash).
-  const totalFailed = commandResults.reduce(
-    (acc, c) => acc + (Number(c?.failed) || 0),
-    0,
-  );
+  const totalFailed = commandResults.reduce((acc, c) => acc + (Number(c?.failed) || 0), 0);
   const summary =
     totalFailed === 0
       ? `Dry-run: ${commandResults.length} commands green.`
@@ -120,18 +116,12 @@ async function main() {
   const emit = await loadEmitter();
   const result = emit(input);
   if (!result.ok) {
-    process.stderr.write(
-      "dry-run-release-receipt-workflow: emitter rejected input:\n",
-    );
+    process.stderr.write("dry-run-release-receipt-workflow: emitter rejected input:\n");
     for (const err of result.errors) process.stderr.write(`  - ${err}\n`);
     process.exit(2);
   }
   const artifactPath = resolve(outDir, "release-receipt.v1.dry-run.json");
-  writeFileSync(
-    artifactPath,
-    `${JSON.stringify(result.artifact, null, 2)}\n`,
-    "utf8",
-  );
+  writeFileSync(artifactPath, `${JSON.stringify(result.artifact, null, 2)}\n`, "utf8");
   process.stdout.write(`dry-run: wrote ${artifactPath}\n`);
 
   // Step 3: validate through trusted contract.
@@ -156,9 +146,7 @@ async function main() {
 
   // Step 5: simulate workflow failure-preservation — nonzero exit if any
   // upstream command failed or any active blocker is present.
-  const anyFail = commandResults.some(
-    (c) => c && (c.status === "fail" || c.status === "blocked"),
-  );
+  const anyFail = commandResults.some((c) => c && (c.status === "fail" || c.status === "blocked"));
   const anyActiveBlocker = blockers.some((b) => b && b.active === true);
   if (anyFail || anyActiveBlocker) {
     process.stderr.write(

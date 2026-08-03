@@ -27,7 +27,9 @@ export function createValidPostGrowReflectionOutput(): ReflectionOutput {
       "Repeat the photo cadence and add one labeled dry-room airflow note during the first 48 hours after harvest.",
     ],
     confidence: "High",
-    gaps: ["No major gaps were recorded in the fixture, but future plant-level pheno notes would improve selection confidence."],
+    gaps: [
+      "No major gaps were recorded in the fixture, but future plant-level pheno notes would improve selection confidence.",
+    ],
   };
 }
 

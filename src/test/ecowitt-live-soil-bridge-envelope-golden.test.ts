@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { spawnSync } from "node:child_process";
-import {
-  CONFIG_ERROR_FIX_HINTS,
-  runConfigValidate,
-} from "../../scripts/ecowitt-live-soil-bridge";
+import { CONFIG_ERROR_FIX_HINTS, runConfigValidate } from "../../scripts/ecowitt-live-soil-bridge";
 
 /**
  * Golden snapshots for the `config validate` failure envelope.
@@ -150,4 +147,3 @@ describe("`config validate` CLI — stderr JSON envelope golden shape", () => {
     expect(serialized).not.toContain(TENT_B);
   });
 });
-

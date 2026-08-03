@@ -63,11 +63,7 @@ describe("learning loop — full pipeline composition", () => {
   it("drives a completed action all the way to a closed episode and a PDF learning section", () => {
     // 1) Completed action, follow-up written, past due window, no outcome yet.
     let diaryRows: EpisodeDiaryRowInput[] = [
-      detailRow(
-        "fu-1",
-        { event_type: "action_followup", action_queue_id: ACTION.id },
-        3 * HOUR,
-      ),
+      detailRow("fu-1", { event_type: "action_followup", action_queue_id: ACTION.id }, 3 * HOUR),
     ];
 
     // now = 30h after completion → follow-up is due.
@@ -118,10 +114,7 @@ describe("learning loop — full pipeline composition", () => {
     expect(Object.keys(draftResult.draft)).not.toContain("user_id");
 
     // Simulate persistence: the decision becomes a diary row.
-    diaryRows = [
-      ...diaryRows,
-      detailRow("dec-1", { ...draftResult.draft.details }, 26 * HOUR),
-    ];
+    diaryRows = [...diaryRows, detailRow("dec-1", { ...draftResult.draft.details }, 26 * HOUR)];
     episodes = buildPlantMemoryEpisodes({ actions: [ACTION], diaryRows, now: T0 + 30 * HOUR });
 
     // 5) Plant/grow episode is now closed.
@@ -185,7 +178,11 @@ describe("learning loop — full pipeline composition", () => {
         26 * HOUR,
       ),
     ];
-    const episodes = buildPlantMemoryEpisodes({ actions: [ACTION], diaryRows, now: T0 + 30 * HOUR });
+    const episodes = buildPlantMemoryEpisodes({
+      actions: [ACTION],
+      diaryRows,
+      now: T0 + 30 * HOUR,
+    });
     const playbook = buildNextRunPlaybook(episodes);
     expect(playbook.groups.map((g) => g.section)).toEqual(["adjust"]);
     expect(playbook.groups.find((g) => g.section === "avoid")).toBeUndefined();

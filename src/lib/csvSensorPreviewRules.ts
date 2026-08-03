@@ -146,14 +146,16 @@ interface MappingRule {
 }
 
 function norm(h: string): string {
-  return h.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return h
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 const RULES: MappingRule[] = [
   {
     field: "captured_at",
-    match: (n) =>
-      /\b(timestamp|captured at|datetime|date time|time|date)\b/.test(n),
+    match: (n) => /\b(timestamp|captured at|datetime|date time|time|date)\b/.test(n),
     reason: "Matches timestamp/captured_at",
   },
   {
@@ -179,8 +181,7 @@ const RULES: MappingRule[] = [
   },
   {
     field: "vwc",
-    match: (n) =>
-      /\b(vwc|soil moisture|substrate moisture|soil water|soil wc|moisture)\b/.test(n),
+    match: (n) => /\b(vwc|soil moisture|substrate moisture|soil water|soil wc|moisture)\b/.test(n),
     reason: "Matches soil moisture / VWC",
   },
   {
@@ -527,7 +528,7 @@ export function applySensorMappingOverrides(
 ): CsvPreviewParseResult {
   if (!preview.ok) return preview;
   const next: FieldMapping[] = preview.mappings.map((m) => {
-    if (!Object.prototype.hasOwnProperty.call(overrides, m.header)) return m;
+    if (!Object.hasOwn(overrides, m.header)) return m;
     const v = overrides[m.header];
     return {
       header: m.header,
@@ -591,9 +592,7 @@ export function buildCsvTimelinePreviewRows(
  * Builds timeline rows from EVERY parsed row (not the 25-row sample).
  * Used as input to window-filter + sampling controls.
  */
-export function buildFullCsvTimelineRows(
-  result: CsvPreviewParseResult,
-): CsvTimelinePreviewRow[] {
+export function buildFullCsvTimelineRows(result: CsvPreviewParseResult): CsvTimelinePreviewRow[] {
   if (!result.ok) return [];
   return buildCsvTimelinePreviewRows(result, result.rows.length, result.rows);
 }
@@ -639,11 +638,7 @@ export function filterPreviewTimelineByWindow(
 
   const now = window.now ?? new Date();
   const ms =
-    window.kind === "24h"
-      ? 86_400_000
-      : window.kind === "7d"
-        ? 7 * 86_400_000
-        : 30 * 86_400_000;
+    window.kind === "24h" ? 86_400_000 : window.kind === "7d" ? 7 * 86_400_000 : 30 * 86_400_000;
   const cutoff = new Date(now.getTime() - ms);
   return timeline.filter((r) => {
     const d = parseDateSafe(r.capturedAt);
@@ -656,13 +651,7 @@ export function filterPreviewTimelineByWindow(
 // Sampling (deterministic, no randomness)
 // ---------------------------------------------------------------------------
 
-export type SamplingKind =
-  | "every"
-  | "nth5"
-  | "nth10"
-  | "nth25"
-  | "cap100"
-  | "cap500";
+export type SamplingKind = "every" | "nth5" | "nth10" | "nth25" | "cap100" | "cap500";
 
 export const SAMPLING_OPTIONS: readonly { kind: SamplingKind; label: string }[] = [
   { kind: "every", label: "Every row" },
@@ -681,10 +670,7 @@ export const TIME_WINDOW_OPTIONS: readonly { kind: TimeWindowKind; label: string
   { kind: "custom", label: "Custom range" },
 ] as const;
 
-export function samplePreviewTimeline<T>(
-  timeline: T[],
-  sampling: SamplingKind,
-): T[] {
+export function samplePreviewTimeline<T>(timeline: T[], sampling: SamplingKind): T[] {
   if (!Array.isArray(timeline) || timeline.length === 0) return [];
   switch (sampling) {
     case "every":
@@ -842,5 +828,3 @@ export function buildCsvPreviewSummaryCsv(
   }
   return lines.join("\n") + "\n";
 }
-
-

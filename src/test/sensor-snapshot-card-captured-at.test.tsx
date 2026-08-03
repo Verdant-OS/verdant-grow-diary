@@ -23,10 +23,7 @@ const SNAPSHOT: SensorSnapshot = {
 describe("SensorSnapshotCard captured timestamp", () => {
   it("renders Captured: <formatted> and exposes ISO via title + aria-label", () => {
     const { getByTestId } = render(
-      <SensorSnapshotCard
-        snapshot={SNAPSHOT}
-        classifyOptions={{ now: new Date(ISO).getTime() }}
-      />,
+      <SensorSnapshotCard snapshot={SNAPSHOT} classifyOptions={{ now: new Date(ISO).getTime() }} />,
     );
     const el = getByTestId("sensor-snapshot-card-captured-at");
     expect(el.textContent ?? "").toMatch(/^Captured:\s/);
@@ -36,10 +33,7 @@ describe("SensorSnapshotCard captured timestamp", () => {
 
   it("keeps MANUAL source label (never live)", () => {
     const { getByTestId } = render(
-      <SensorSnapshotCard
-        snapshot={SNAPSHOT}
-        classifyOptions={{ now: new Date(ISO).getTime() }}
-      />,
+      <SensorSnapshotCard snapshot={SNAPSHOT} classifyOptions={{ now: new Date(ISO).getTime() }} />,
     );
     const card = getByTestId("sensor-snapshot-card");
     expect(card.getAttribute("data-source")).toBe("manual");

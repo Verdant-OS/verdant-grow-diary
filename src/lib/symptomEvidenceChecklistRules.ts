@@ -157,7 +157,7 @@ function normalizeCanonicalEnvironmentSnapshot(
   if (!rawSnapshot || typeof rawSnapshot !== "object" || Array.isArray(rawSnapshot)) return null;
   const snapshot = rawSnapshot as Record<string, unknown>;
   const source = safeString(snapshot.source, 24)?.toLowerCase() ?? null;
-  if (!source || !Object.prototype.hasOwnProperty.call(SOURCE_LABELS, source)) return null;
+  if (!source || !Object.hasOwn(SOURCE_LABELS, source)) return null;
   const capturedAt = safeString(snapshot.captured_at, 64);
   const capturedMs = capturedAt ? Date.parse(capturedAt) : Number.NaN;
   if (!capturedAt || !Number.isFinite(capturedMs) || occurredMs === null) return null;
@@ -246,13 +246,11 @@ function safeDetails(value: unknown): Record<string, unknown> {
 }
 
 function hasCanonicalSnapshotEnvelope(details: Record<string, unknown>): boolean {
-  if (!Object.prototype.hasOwnProperty.call(details, "sensor_snapshot")) return false;
+  if (!Object.hasOwn(details, "sensor_snapshot")) return false;
   const rawSnapshot = details.sensor_snapshot;
   if (rawSnapshot === null || rawSnapshot === undefined) return false;
   if (typeof rawSnapshot !== "object" || Array.isArray(rawSnapshot)) return true;
-  return ["source", "captured_at", "metrics"].some((key) =>
-    Object.prototype.hasOwnProperty.call(rawSnapshot, key),
-  );
+  return ["source", "captured_at", "metrics"].some((key) => Object.hasOwn(rawSnapshot, key));
 }
 
 function normalizeEntry(entry: SymptomEvidenceRawEntry): NormalizedEntry {
@@ -326,11 +324,7 @@ function companionMatchesParent(
 
 function canSafelyMergeCompanionDetails(parent: SymptomEvidenceRawEntry): boolean {
   const parentSource = safeString(parent.source, 24)?.toLowerCase() ?? null;
-  return (
-    !parentSource ||
-    parentSource === "manual" ||
-    !Object.prototype.hasOwnProperty.call(SOURCE_LABELS, parentSource)
-  );
+  return !parentSource || parentSource === "manual" || !Object.hasOwn(SOURCE_LABELS, parentSource);
 }
 
 /**
@@ -473,9 +467,9 @@ function classifyEntryCategories(entry: NormalizedEntry): ReadonlyArray<SymptomE
   const environmentCheck = safeDetails(entry.details.environment_check);
   const hasQualitativeEnvironmentEvidence = Boolean(
     entry.note ||
-    safeString(entry.details.checkType, 64) ||
-    safeString(environmentCheck.checkType, 64) ||
-    safeString(environmentCheck.note, 220),
+      safeString(entry.details.checkType, 64) ||
+      safeString(environmentCheck.checkType, 64) ||
+      safeString(environmentCheck.note, 220),
   );
   if (
     entry.environmentSnapshot ||

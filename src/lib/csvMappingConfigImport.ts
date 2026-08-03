@@ -73,9 +73,7 @@ export interface CsvMappingImportApplied {
   ignoredKeys: string[];
 }
 
-export type CsvMappingImportResult =
-  | CsvMappingImportBlocked
-  | CsvMappingImportApplied;
+export type CsvMappingImportResult = CsvMappingImportBlocked | CsvMappingImportApplied;
 
 /** Top-level keys that the import will accept. Everything else is ignored. */
 const ALLOWED_TOP_LEVEL_KEYS = new Set<string>([
@@ -117,9 +115,7 @@ export interface ImportCsvMappingConfigArgs {
  * and keep their existing mapping. On `applied`, callers should swap in
  * `result.mapping` and surface `missingHeaders` / `ignoredKeys` in the UI.
  */
-export function importCsvMappingConfig(
-  args: ImportCsvMappingConfigArgs,
-): CsvMappingImportResult {
+export function importCsvMappingConfig(args: ImportCsvMappingConfigArgs): CsvMappingImportResult {
   const { input, headers } = args;
 
   let parsed: unknown;
@@ -138,35 +134,23 @@ export function importCsvMappingConfig(
   }
 
   if (parsed.data_context !== CSV_MAPPING_CONFIG_DATA_CONTEXT) {
-    return block(
-      "wrong_data_context",
-      "This file is not a Verdant CSV mapping preset.",
-    );
+    return block("wrong_data_context", "This file is not a Verdant CSV mapping preset.");
   }
 
   const versionRaw = parsed.schema_version;
   const version = typeof versionRaw === "number" ? versionRaw : NaN;
   if (!CSV_MAPPING_CONFIG_SUPPORTED_VERSIONS.includes(version)) {
-    return block(
-      "unsupported_schema_version",
-      "This mapping preset version is not supported.",
-    );
+    return block("unsupported_schema_version", "This mapping preset version is not supported.");
   }
 
   const mappingRaw = parsed.mapping;
   if (!isPlainObject(mappingRaw)) {
-    return block(
-      "missing_mapping_object",
-      "Mapping preset is missing the mapping object.",
-    );
+    return block("missing_mapping_object", "Mapping preset is missing the mapping object.");
   }
 
   const unitsRaw = parsed.units;
   if (!isPlainObject(unitsRaw)) {
-    return block(
-      "missing_units_object",
-      "Mapping preset is missing the units object.",
-    );
+    return block("missing_units_object", "Mapping preset is missing the units object.");
   }
 
   const airUnit = unitsRaw.air_temp;
@@ -177,10 +161,7 @@ export function importCsvMappingConfig(
     !VALID_TEMP_UNITS.has(String(subUnit)) ||
     !VALID_EC_UNITS.has(String(ecUnit))
   ) {
-    return block(
-      "invalid_unit_value",
-      "Mapping preset has an unsupported unit value.",
-    );
+    return block("invalid_unit_value", "Mapping preset has an unsupported unit value.");
   }
 
   // From here on, the config is structurally valid. Build a fresh mapping
@@ -197,9 +178,7 @@ export function importCsvMappingConfig(
   for (const f of REPRESENTATIVE_MAPPING_FIELDS) {
     const savedHeaderRaw = (mappingRaw as Record<string, unknown>)[f];
     const savedHeader =
-      typeof savedHeaderRaw === "string" && savedHeaderRaw.length > 0
-        ? savedHeaderRaw
-        : null;
+      typeof savedHeaderRaw === "string" && savedHeaderRaw.length > 0 ? savedHeaderRaw : null;
 
     if (savedHeader === null) {
       unmapped.push(f);
@@ -224,9 +203,7 @@ export function importCsvMappingConfig(
     }
   }
 
-  const ignoredKeys = Object.keys(parsed).filter(
-    (k) => !ALLOWED_TOP_LEVEL_KEYS.has(k),
-  );
+  const ignoredKeys = Object.keys(parsed).filter((k) => !ALLOWED_TOP_LEVEL_KEYS.has(k));
 
   return {
     status: "applied",

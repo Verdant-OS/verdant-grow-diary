@@ -265,9 +265,7 @@ describe("Timeline — raw internal detail-field leak guard", () => {
     await screen.findByText("Network-inspection retest: checking stretch evidence tagging.");
 
     expect(document.body.textContent ?? "").not.toContain("linked_grow_event_id");
-    expect(document.body.textContent ?? "").not.toContain(
-      "bf0a684e-a96e-472c-af8f-e38a54a8332c",
-    );
+    expect(document.body.textContent ?? "").not.toContain("bf0a684e-a96e-472c-af8f-e38a54a8332c");
     expect(document.body.textContent ?? "").not.toContain("quick_log_version");
     // Null-valued echo fields must not render as "feeding: null" / "watering: null".
     expect(document.body.textContent ?? "").not.toMatch(/feeding:\s*null/i);
@@ -277,9 +275,7 @@ describe("Timeline — raw internal detail-field leak guard", () => {
 
   it("opening entry details does not reveal the raw fields either", async () => {
     renderTimeline();
-    const body = await screen.findByText(
-      "Correct-save-path proof: stretch evidence via Save log.",
-    );
+    const body = await screen.findByText("Correct-save-path proof: stretch evidence via Save log.");
     fireEvent.click(body);
 
     for (const key of LEAKED_KEYS) {

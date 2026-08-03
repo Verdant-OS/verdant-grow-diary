@@ -3,8 +3,7 @@ import { verifySupabaseEnv, assertSupabaseEnv } from "./verifyEnv";
 
 const validEnv = {
   VITE_SUPABASE_URL: "https://abc123def456ghi789jk.supabase.co",
-  VITE_SUPABASE_PUBLISHABLE_KEY:
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.test.test.test",
+  VITE_SUPABASE_PUBLISHABLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.test.test.test",
   VITE_SUPABASE_PROJECT_ID: "knkwiiywfkbqznbxwqfh",
 } as const;
 
@@ -36,9 +35,7 @@ describe("verifySupabaseEnv", () => {
       VITE_SUPABASE_PUBLISHABLE_KEY: validEnv.VITE_SUPABASE_PUBLISHABLE_KEY,
     });
     expect(result.ok).toBe(false);
-    expect(result.errors.some((e) => e.includes("VITE_SUPABASE_URL"))).toBe(
-      true
-    );
+    expect(result.errors.some((e) => e.includes("VITE_SUPABASE_URL"))).toBe(true);
   });
 
   it("flags invalid publishable key format", () => {
@@ -47,24 +44,20 @@ describe("verifySupabaseEnv", () => {
       VITE_SUPABASE_PUBLISHABLE_KEY: "too-short",
     });
     expect(result.ok).toBe(false);
-    expect(
-      result.errors.some((e) => e.includes("VITE_SUPABASE_PUBLISHABLE_KEY"))
-    ).toBe(true);
+    expect(result.errors.some((e) => e.includes("VITE_SUPABASE_PUBLISHABLE_KEY"))).toBe(true);
   });
 });
 
 describe("assertSupabaseEnv", () => {
   it("throws in dev when env is invalid", () => {
-    expect(() => assertSupabaseEnv({}, true)).toThrow(
-      /Required Supabase environment variables/
-    );
+    expect(() => assertSupabaseEnv({}, true)).toThrow(/Required Supabase environment variables/);
   });
 
   it("does not throw in production (only logs)", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() => assertSupabaseEnv({}, false)).not.toThrow();
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Required Supabase environment variables")
+      expect.stringContaining("Required Supabase environment variables"),
     );
     consoleSpy.mockRestore();
   });

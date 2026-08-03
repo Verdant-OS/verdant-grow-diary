@@ -20,20 +20,14 @@
  * any new write/read path — wiring lives in callers.
  */
 
-import {
-  resolveSensorSourceLabel,
-  type ResolvedSourceLabel,
-} from "@/lib/sensorSourceLabelRules";
+import { resolveSensorSourceLabel, type ResolvedSourceLabel } from "@/lib/sensorSourceLabelRules";
 import {
   evaluateManualSensorSnapshotQuality,
   type ManualSensorSnapshotInput,
   type ManualSensorSnapshotQuality,
 } from "@/lib/manualSensorSnapshotQualityRules";
 import type { SensorReadingSource } from "@/mock";
-import {
-  SENSOR_FIELD_LABELS,
-  type SensorFieldKey,
-} from "@/constants/sensorFields";
+import { SENSOR_FIELD_LABELS, type SensorFieldKey } from "@/constants/sensorFields";
 
 /** Canonical metric keys allowed in a timeline snapshot summary. */
 export type TimelineSnapshotMetricKey = SensorFieldKey;
@@ -70,9 +64,7 @@ const METRIC_ORDER: ReadonlyArray<TimelineSnapshotMetricKey> = [
 ];
 
 /** Quality-rule field names → timeline metric keys (for warnings/invalid). */
-const QUALITY_FIELD_TO_METRIC: Readonly<
-  Record<string, TimelineSnapshotMetricKey>
-> = {
+const QUALITY_FIELD_TO_METRIC: Readonly<Record<string, TimelineSnapshotMetricKey>> = {
   temperature_c: "air_temp_c",
   humidity_pct: "humidity_pct",
   vpd_kpa: "vpd_kpa",
@@ -248,8 +240,7 @@ export function buildTimelineSnapshotSummary(
   // Trustworthy ONLY when:
   //  - source is live or manual (csv/demo/stale/invalid/unknown are not)
   //  - severity is ok
-  const trustworthy =
-    severity === "ok" && (source === "live" || source === "manual");
+  const trustworthy = severity === "ok" && (source === "live" || source === "manual");
 
   // Dedup warnings into stable order.
   const seen = new Set<string>();
@@ -279,8 +270,6 @@ export function buildTimelineSnapshotSummary(
  * to decide whether to render the metric grid or fall through to the
  * neutral "No sensor snapshot attached" empty state.
  */
-export function timelineSnapshotHasAnyMetric(
-  summary: TimelineSnapshotSummary,
-): boolean {
+export function timelineSnapshotHasAnyMetric(summary: TimelineSnapshotSummary): boolean {
   return summary.metrics.length > 0;
 }

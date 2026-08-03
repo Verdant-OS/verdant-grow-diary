@@ -66,9 +66,10 @@ function readDetails(row: DiaryTraceRowLike): {
   if (d.kind !== "action_queue_trace") {
     return { kind: null, idempotency_key: null, action_id: null };
   }
-  const trace_kind = d.trace_kind === "approved" || d.trace_kind === "rejected"
-    ? (d.trace_kind as ActionQueueTraceKind)
-    : null;
+  const trace_kind =
+    d.trace_kind === "approved" || d.trace_kind === "rejected"
+      ? (d.trace_kind as ActionQueueTraceKind)
+      : null;
   const idem = typeof d.idempotency_key === "string" ? d.idempotency_key : null;
   const action_id = typeof d.action_id === "string" ? d.action_id : null;
   return { kind: trace_kind, idempotency_key: idem, action_id };

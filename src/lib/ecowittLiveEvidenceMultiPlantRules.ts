@@ -65,9 +65,7 @@ const VERDICT_RANK: Record<LiveSourceTruthVerdict, number> = {
   verified_live: 1,
 };
 
-function pickOverallVerdict(
-  verdicts: readonly LiveSourceTruthVerdict[],
-): LiveSourceTruthVerdict {
+function pickOverallVerdict(verdicts: readonly LiveSourceTruthVerdict[]): LiveSourceTruthVerdict {
   if (verdicts.length === 0) return "invalid";
   // verified_live only if ALL are verified_live
   if (verdicts.every((v) => v === "verified_live")) return "verified_live";
@@ -85,15 +83,12 @@ function pickOverallVerdict(
 }
 
 const OVERALL_SUMMARY: Readonly<Record<LiveSourceTruthVerdict, string>> = {
-  verified_live:
-    "All per-plant evaluations support live proof from the same tent evidence.",
+  verified_live: "All per-plant evaluations support live proof from the same tent evidence.",
   unverified_live:
     "At least one per-plant evaluation is recent live-source evidence without complete controller comparison.",
-  not_live_proof:
-    "No per-plant evaluation proves live sensor truth from this evidence.",
+  not_live_proof: "No per-plant evaluation proves live sensor truth from this evidence.",
   stale: "At least one per-plant evaluation is too old to prove live conditions.",
-  invalid:
-    "At least one per-plant evaluation has missing, malformed, or suspicious evidence.",
+  invalid: "At least one per-plant evaluation has missing, malformed, or suspicious evidence.",
   mismatch:
     "At least one per-plant evaluation shows backend/controller disagreement beyond tolerance.",
 };
@@ -107,13 +102,10 @@ export function evaluateLiveEvidenceForPlants(
   input: EvaluateLiveEvidenceForPlantsInput,
 ): EcowittMultiPlantEvaluation {
   const plantIds = parsePlantIdEntries(input.plantIdsInput);
-  const unit_warnings = detectEcowittEvidenceUnitWarnings(
-    input.formState.metric_rows,
-  );
+  const unit_warnings = detectEcowittEvidenceUnitWarnings(input.formState.metric_rows);
 
   const baseBuilt = buildLiveSourceTruthEvidenceFromForm(input.formState);
-  const targets: Array<string | null> =
-    plantIds.length === 0 ? [null] : plantIds.slice();
+  const targets: Array<string | null> = plantIds.length === 0 ? [null] : plantIds.slice();
 
   const per_plant: EcowittPerPlantResult[] = targets.map((pid) => {
     const built = buildLiveSourceTruthEvidenceFromForm({

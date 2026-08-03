@@ -86,9 +86,7 @@ describe("checkoutOverlaySession — cancel routing", () => {
   });
 
   it("no active session → all events are safe no-ops", () => {
-    expect(() =>
-      handlePaddleCheckoutEvent({ name: "checkout.closed" }),
-    ).not.toThrow();
+    expect(() => handlePaddleCheckoutEvent({ name: "checkout.closed" })).not.toThrow();
     expect(_peekActiveSessionForTests()).toBeNull();
   });
 
@@ -96,8 +94,6 @@ describe("checkoutOverlaySession — cancel routing", () => {
     beginCheckoutSession(() => {
       throw new Error("navigation blew up");
     });
-    expect(() =>
-      handlePaddleCheckoutEvent({ name: "checkout.closed" }),
-    ).not.toThrow();
+    expect(() => handlePaddleCheckoutEvent({ name: "checkout.closed" })).not.toThrow();
   });
 });

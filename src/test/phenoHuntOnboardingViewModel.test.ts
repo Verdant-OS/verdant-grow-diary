@@ -172,8 +172,18 @@ describe("computePhenoHuntOnboardingViewModel", () => {
       draft({
         candidateIds: ["p1", "p2"],
         candidateEvidence: [
-          { candidateId: "p1", hasPhenotypeNote: true, hasPhotoOrObservation: true, hasLabel: true },
-          { candidateId: "p2", hasPhenotypeNote: true, hasPhotoOrObservation: true, hasLabel: true },
+          {
+            candidateId: "p1",
+            hasPhenotypeNote: true,
+            hasPhotoOrObservation: true,
+            hasLabel: true,
+          },
+          {
+            candidateId: "p2",
+            hasPhenotypeNote: true,
+            hasPhotoOrObservation: true,
+            hasLabel: true,
+          },
         ],
       }),
     );
@@ -197,8 +207,18 @@ describe("computePhenoHuntOnboardingViewModel", () => {
     const full = computePhenoHuntOnboardingViewModel(
       draft({
         candidateEvidence: [
-          { candidateId: "p1", hasPhenotypeNote: true, hasPhotoOrObservation: true, hasLabel: true },
-          { candidateId: "p2", hasPhenotypeNote: true, hasPhotoOrObservation: true, hasLabel: true },
+          {
+            candidateId: "p1",
+            hasPhenotypeNote: true,
+            hasPhotoOrObservation: true,
+            hasLabel: true,
+          },
+          {
+            candidateId: "p2",
+            hasPhenotypeNote: true,
+            hasPhotoOrObservation: true,
+            hasLabel: true,
+          },
         ],
       }),
     );

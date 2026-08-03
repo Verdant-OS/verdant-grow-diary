@@ -30,10 +30,7 @@ const PLANT_TIMELINE = readFileSync(
   resolve(ROOT, "src/components/PlantRelativeTimelineSection.tsx"),
   "utf8",
 );
-const RULES = readFileSync(
-  resolve(ROOT, "src/lib/relativeTimelineProjectionRules.ts"),
-  "utf8",
-);
+const RULES = readFileSync(resolve(ROOT, "src/lib/relativeTimelineProjectionRules.ts"), "utf8");
 
 describe("classifyTimelineEntry — existing QuickLog event types", () => {
   const cases: Array<[string, TimelineFilterCategory]> = [
@@ -53,12 +50,8 @@ describe("classifyTimelineEntry — existing QuickLog event types", () => {
   });
 
   it("is case-insensitive and trims whitespace", () => {
-    expect(classifyTimelineEntry({ eventType: " Watering ", source: "note" })).toBe(
-      "watering",
-    );
-    expect(classifyTimelineEntry({ eventType: "FEEDING", source: "note" })).toBe(
-      "feeding",
-    );
+    expect(classifyTimelineEntry({ eventType: " Watering ", source: "note" })).toBe("watering");
+    expect(classifyTimelineEntry({ eventType: "FEEDING", source: "note" })).toBe("feeding");
   });
 });
 
@@ -84,16 +77,12 @@ describe("classifyTimelineEntry — new event types", () => {
 
 describe("classifyTimelineEntry — fallback contract", () => {
   it("unknown event types fall back to notes", () => {
-    expect(classifyTimelineEntry({ eventType: "wat-a-mango", source: "note" })).toBe(
-      "notes",
-    );
+    expect(classifyTimelineEntry({ eventType: "wat-a-mango", source: "note" })).toBe("notes");
   });
   it("empty / null / undefined event types fall back to notes", () => {
     expect(classifyTimelineEntry({ eventType: "", source: "note" })).toBe("notes");
     expect(classifyTimelineEntry({ eventType: null, source: "note" })).toBe("notes");
-    expect(classifyTimelineEntry({ eventType: undefined, source: "note" })).toBe(
-      "notes",
-    );
+    expect(classifyTimelineEntry({ eventType: undefined, source: "note" })).toBe("notes");
     expect(classifyTimelineEntry(null)).toBe("notes");
     expect(classifyTimelineEntry(undefined)).toBe("notes");
   });
@@ -135,9 +124,7 @@ describe("classifyRelativeTimelineFilter delegates to shared helper", () => {
 
 describe("Shared helper wiring — no duplicated classification tables", () => {
   it("Timeline.tsx imports MEASUREMENT_DETAIL_KEYS from the shared helper", () => {
-    expect(TIMELINE_PAGE).toMatch(
-      /from\s+["']@\/lib\/timelineEntryClassification["']/,
-    );
+    expect(TIMELINE_PAGE).toMatch(/from\s+["']@\/lib\/timelineEntryClassification["']/);
     expect(TIMELINE_PAGE).toMatch(/MEASUREMENT_DETAIL_KEYS/);
   });
 
@@ -186,10 +173,10 @@ describe("Shared helper wiring — no duplicated classification tables", () => {
 
 describe("Static safety — no automation, device control, or service_role on the classification path", () => {
   const SOURCES: Array<readonly [string, string]> = [
-    ["timelineEntryClassification.ts", readFileSync(
-      resolve(ROOT, "src/lib/timelineEntryClassification.ts"),
-      "utf8",
-    )],
+    [
+      "timelineEntryClassification.ts",
+      readFileSync(resolve(ROOT, "src/lib/timelineEntryClassification.ts"), "utf8"),
+    ],
     ["relativeTimelineProjectionRules.ts", RULES],
     ["Timeline.tsx", TIMELINE_PAGE],
     ["PlantRelativeTimelineSection.tsx", PLANT_TIMELINE],
@@ -213,10 +200,7 @@ describe("Static safety — no automation, device control, or service_role on th
   }
 
   it("the shared helper performs no writes / RPC", () => {
-    const src = readFileSync(
-      resolve(ROOT, "src/lib/timelineEntryClassification.ts"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(ROOT, "src/lib/timelineEntryClassification.ts"), "utf8");
     for (const re of [/\.insert\(/, /\.update\(/, /\.delete\(/, /\.upsert\(/, /\.rpc\(/]) {
       expect(src).not.toMatch(re);
     }

@@ -54,8 +54,7 @@ export interface HarvestInspectionQuickLogPrefill {
   preset: HarvestInspectionPreset;
 }
 
-const CAUTION_EVIDENCE_ONLY =
-  "Harvest Watch is evidence-only. The grower decides.";
+const CAUTION_EVIDENCE_ONLY = "Harvest Watch is evidence-only. The grower decides.";
 const CAUTION_ONE_PHOTO = "Do not rely on one photo alone.";
 const CAUTION_DIRECT = "Record what you directly observed.";
 
@@ -125,10 +124,7 @@ const PRESETS: Record<
 };
 
 /** Stable preset labels for UI/test consumption. */
-export const HARVEST_INSPECTION_PRESET_LABEL: Record<
-  HarvestInspectionPreset,
-  string
-> = {
+export const HARVEST_INSPECTION_PRESET_LABEL: Record<HarvestInspectionPreset, string> = {
   trichome_inspection: PRESETS.trichome_inspection.label,
   pistil_recession: PRESETS.pistil_recession.label,
   bud_maturity: PRESETS.bud_maturity.label,
@@ -143,11 +139,7 @@ export const HARVEST_INSPECTION_PRESET_LABEL: Record<
 export function pickHarvestInspectionPreset(
   checklist: readonly HarvestEvidenceChecklistItem[],
 ): HarvestInspectionPreset {
-  const missing = new Set(
-    checklist
-      .filter((c) => c.status !== "present")
-      .map((c) => c.key),
-  );
+  const missing = new Set(checklist.filter((c) => c.status !== "present").map((c) => c.key));
   if (missing.has("trichome_inspection")) return "trichome_inspection";
   if (missing.has("pistil_observation")) return "pistil_recession";
   if (missing.has("bud_maturity_note")) return "bud_maturity";

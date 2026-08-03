@@ -51,10 +51,9 @@ describe("ecowitt-mqtt-runner — static safety", () => {
 
   it("redacts the bridge token in logs", () => {
     expect(SRC).toMatch(/redactBridgeToken\(/);
-    const rawTokenLogs =
-      ((CODE.match(/console\.log\([^)]*\benv\.token\b[^)]*\)/g) ?? []) as string[]).filter(
-        (l) => !l.includes("redactBridgeToken"),
-      );
+    const rawTokenLogs = (
+      (CODE.match(/console\.log\([^)]*\benv\.token\b[^)]*\)/g) ?? []) as string[]
+    ).filter((l) => !l.includes("redactBridgeToken"));
     expect(rawTokenLogs).toEqual([]);
   });
 
@@ -164,12 +163,10 @@ describe("ecowitt-mqtt-runner — runtime behavior", () => {
   it("valid sample builds canonical webhook body and posts only to env URL", async () => {
     const mod = await import("../../scripts/dev/ecowitt-mqtt-runner");
     const calls: Array<{ url: string; init: RequestInit }> = [];
-    const fakeFetch = vi
-      .fn()
-      .mockImplementation(async (url: string, init: RequestInit) => {
-        calls.push({ url, init });
-        return new Response("ok", { status: 202 });
-      });
+    const fakeFetch = vi.fn().mockImplementation(async (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return new Response("ok", { status: 202 });
+    });
     const env = {
       url: "https://example/functions/v1/sensor-ingest-webhook",
       token: "vbt_abcdef1234567890",
@@ -199,12 +196,8 @@ describe("ecowitt-mqtt-runner — runtime behavior", () => {
     expect(body.metadata.topic).toBe("ecowitt/grow");
     // Authorization header is Bearer + the raw token (sent to server)
     // but the runner never logs it plaintext (covered above).
-    expect((calls[0].init.headers as Record<string, string>).Authorization).toMatch(
-      /^Bearer vbt_/,
-    );
-    expect(
-      (calls[0].init.headers as Record<string, string>)["Idempotency-Key"],
-    ).toBeTruthy();
+    expect((calls[0].init.headers as Record<string, string>).Authorization).toMatch(/^Bearer vbt_/);
+    expect((calls[0].init.headers as Record<string, string>)["Idempotency-Key"]).toBeTruthy();
   });
 });
 

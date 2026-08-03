@@ -97,9 +97,7 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 function ParamProbe() {
   const [params] = useSearchParams();
-  return (
-    <span data-testid="probe-params" data-search={params.toString()} />
-  );
+  return <span data-testid="probe-params" data-search={params.toString()} />;
 }
 
 function renderAt(url: string) {
@@ -136,31 +134,23 @@ describe("Integrated — highlight + pagination preservation", () => {
       screen.getByTestId("action-queue-search-input"),
     )) as HTMLInputElement;
     expect(input.value).toBe("low");
-    const marker = await waitFor(() =>
-      screen.getByTestId("action-queue-highlighted-trace-row"),
-    );
+    const marker = await waitFor(() => screen.getByTestId("action-queue-highlighted-trace-row"));
     expect(marker).toBeTruthy();
     // No raw UUID in the highlighted marker text.
     expect(marker.textContent ?? "").not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/i);
   });
 
   it("preserves highlight across pagination + does not write to the DB", async () => {
-    renderAt(
-      "/actions?highlight=action-queue:aq-1:approved&pageSize=5&page=2",
-    );
+    renderAt("/actions?highlight=action-queue:aq-1:approved&pageSize=5&page=2");
     await waitFor(() =>
       expect(screen.getAllByTestId("action-queue-row").length).toBeGreaterThan(0),
     );
     const probe = screen.getByTestId("probe-params");
-    const params = new URLSearchParams(
-      probe.getAttribute("data-search") ?? "",
-    );
+    const params = new URLSearchParams(probe.getAttribute("data-search") ?? "");
     expect(params.get("highlight")).toBe("action-queue:aq-1:approved");
     expect(params.get("page")).toBe("2");
     // Jump link still works because highlight survived the page change.
-    expect(
-      screen.getByTestId("action-queue-jump-to-highlighted-trace"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("action-queue-jump-to-highlighted-trace")).toBeTruthy();
     // No status mutation triggered by pagination.
     expect(updateSpy).not.toHaveBeenCalled();
   });
@@ -189,4 +179,3 @@ describe("Integrated — highlight + pagination preservation", () => {
 //     `node.focus()` — never approve / reject / retry / complete /
 //     cancel handlers (verified by inspection + tsc).
 //   - Drawer render-on-click: existing drawer test files.
-

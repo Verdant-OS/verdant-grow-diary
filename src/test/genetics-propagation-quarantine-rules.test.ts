@@ -50,7 +50,15 @@ describe("quarantine clearance preview (advisory mirror of the RPC)", () => {
   it("will not clear from a superseded negative", () => {
     const r = evaluateRelease(episode, [
       negForSubject({ id: "s1" }),
-      { id: "s2", subjectType: "plant", subjectId: "plant-1", target: "HLVd", result: "positive", collectedDate: "2026-07-13", supersedesId: "s1" },
+      {
+        id: "s2",
+        subjectType: "plant",
+        subjectId: "plant-1",
+        target: "HLVd",
+        result: "positive",
+        collectedDate: "2026-07-13",
+        supersedesId: "s1",
+      },
     ]);
     expect(r.ok).toBe(false);
   });
@@ -58,7 +66,14 @@ describe("quarantine clearance preview (advisory mirror of the RPC)", () => {
   it("is blocked by newer/equal contradicting evidence", () => {
     const r = evaluateRelease(episode, [
       negForSubject({ id: "s1", collectedDate: "2026-07-12" }),
-      { id: "s3", subjectType: "plant", subjectId: "plant-1", target: "HLVd", result: "inconclusive", collectedDate: "2026-07-14" },
+      {
+        id: "s3",
+        subjectType: "plant",
+        subjectId: "plant-1",
+        target: "HLVd",
+        result: "inconclusive",
+        collectedDate: "2026-07-14",
+      },
     ]);
     expect(r.ok).toBe(false);
     if (r.ok === false) expect(r.reason).toBe("contradicting_or_newer_evidence");
@@ -75,7 +90,9 @@ describe("quarantine clearance preview (advisory mirror of the RPC)", () => {
     // The old negative (2026-07-12) predates the reopen → cannot clear.
     const stale = evaluateRelease(reopened, [negForSubject({ collectedDate: "2026-07-12" })]);
     expect(stale.ok).toBe(false);
-    const fresh = evaluateRelease(reopened, [negForSubject({ id: "s9", collectedDate: "2026-07-21" })]);
+    const fresh = evaluateRelease(reopened, [
+      negForSubject({ id: "s9", collectedDate: "2026-07-21" }),
+    ]);
     expect(fresh.ok).toBe(true);
   });
 });

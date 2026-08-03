@@ -15,10 +15,7 @@ export const INTERACTION_EVENT_TYPES = [
 
 export type InteractionEventType = (typeof INTERACTION_EVENT_TYPES)[number];
 
-export type LeadEventType =
-  | InteractionEventType
-  | "status_change"
-  | "follow_up_changed";
+export type LeadEventType = InteractionEventType | "status_change" | "follow_up_changed";
 
 export const INTERACTION_OPTIONS: ReadonlyArray<{
   value: InteractionEventType;

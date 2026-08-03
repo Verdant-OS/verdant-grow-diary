@@ -2,8 +2,7 @@ import { describe, it, expect } from "vitest";
 import { buildOperatorDemoPreviewViewModel } from "@/lib/operatorDemoPreviewViewModel";
 import { loadDemoEvidenceChainFixture } from "@/lib/demoEvidenceChainFixture";
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 describe("operatorDemoPreviewViewModel", () => {
   const vm = buildOperatorDemoPreviewViewModel();
@@ -27,9 +26,7 @@ describe("operatorDemoPreviewViewModel", () => {
   });
 
   it("action evidence refs are forwarded from alert refs", () => {
-    expect(vm.action.evidenceRefs).toEqual(
-      fx.action.originating_timeline_events,
-    );
+    expect(vm.action.evidenceRefs).toEqual(fx.action.originating_timeline_events);
     expect(vm.action.evidenceRefs[0].id).toBe(fx.alert.originating_timeline_events[0].id);
   });
 

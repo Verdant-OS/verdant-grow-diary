@@ -20,10 +20,7 @@
  *  - Does not return any other raw_payload fields (privacy).
  */
 
-export type CsvSourceApp =
-  | "ac_infinity"
-  | "spider_farmer"
-  | "vivosun";
+export type CsvSourceApp = "ac_infinity" | "spider_farmer" | "vivosun";
 
 const VENDOR_DISPLAY: Record<CsvSourceApp, string> = {
   ac_infinity: "AC Infinity",
@@ -39,9 +36,7 @@ export interface VendorLineage {
 }
 
 function asRecord(v: unknown): Record<string, unknown> | null {
-  return v && typeof v === "object" && !Array.isArray(v)
-    ? (v as Record<string, unknown>)
-    : null;
+  return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
 }
 
 function normalizeSourceApp(v: unknown): CsvSourceApp | null {

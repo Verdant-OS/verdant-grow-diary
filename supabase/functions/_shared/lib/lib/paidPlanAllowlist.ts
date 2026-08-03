@@ -91,9 +91,7 @@ export const SUBSCRIPTION_PLAN_IDS: ReadonlyArray<PaidPlanId> = PAID_PLAN_IDS.fi
  * Requires the entries to appear in the given order, separated by commas
  * and optional whitespace, inside a PAID_PLAN_ALLOWLIST literal.
  */
-export function buildPaidPlanAllowlistSourceRegex(
-  ids: readonly string[] = PAID_PLAN_IDS,
-): RegExp {
+export function buildPaidPlanAllowlistSourceRegex(ids: readonly string[] = PAID_PLAN_IDS): RegExp {
   // Separator tolerates whitespace AND intervening line comments (the credit-
   // pack block between founder_lifetime and credit_pack_50).
   const sep = ",[\\s\\S]{0,300}?";

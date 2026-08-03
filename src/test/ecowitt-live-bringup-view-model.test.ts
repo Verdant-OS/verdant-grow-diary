@@ -59,9 +59,7 @@ describe("buildEcowittLiveBringupViewModel — structure and determinism", () =>
     const step = vm.steps[7];
     expect(step.id).toBe("controller-vs-backend");
     expect(step.operator_action.toLowerCase()).toMatch(/controller/);
-    expect(step.expected_evidence.toLowerCase()).toMatch(
-      /controller|app/,
-    );
+    expect(step.expected_evidence.toLowerCase()).toMatch(/controller|app/);
     expect(step.blocked_if.toLowerCase()).toMatch(/physically|controller|app/);
   });
 
@@ -69,15 +67,16 @@ describe("buildEcowittLiveBringupViewModel — structure and determinism", () =>
     const vm = buildEcowittLiveBringupViewModel();
     const statuses = vm.go_no_go_rules.map((r) => r.status).sort();
     expect(statuses).toEqual(["blocked", "mismatch", "partial", "ready"]);
-    expect([...ECOWITT_BRINGUP_GO_NO_GO_IDS].sort()).toEqual(
-      ["blocked", "mismatch", "partial", "ready"],
-    );
+    expect([...ECOWITT_BRINGUP_GO_NO_GO_IDS].sort()).toEqual([
+      "blocked",
+      "mismatch",
+      "partial",
+      "ready",
+    ]);
   });
 
   it("commands include mosquitto, subscribe, valid/invalid senders, edge serve, health check", () => {
-    expect([...ECOWITT_BRINGUP_COMMAND_IDS].sort()).toEqual(
-      [...EXPECTED_COMMANDS].sort(),
-    );
+    expect([...ECOWITT_BRINGUP_COMMAND_IDS].sort()).toEqual([...EXPECTED_COMMANDS].sort());
   });
 
   it("commands do not include secrets, tokens, env values, or service role keys", () => {
@@ -130,9 +129,7 @@ describe("buildEcowittLiveBringupViewModel — structure and determinism", () =>
   it("uses the injected now for generated_at", () => {
     const vm = buildEcowittLiveBringupViewModel("2026-06-09T22:00:00Z");
     expect(vm.generated_at).toBe("2026-06-09T22:00:00Z");
-    const vm2 = buildEcowittLiveBringupViewModel(
-      new Date("2026-06-09T22:00:00Z"),
-    );
+    const vm2 = buildEcowittLiveBringupViewModel(new Date("2026-06-09T22:00:00Z"));
     expect(vm2.generated_at).toBe("2026-06-09T22:00:00.000Z");
   });
 

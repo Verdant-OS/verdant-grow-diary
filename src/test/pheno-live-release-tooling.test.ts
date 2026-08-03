@@ -52,9 +52,7 @@ const SECRET_EMAIL = "pheno-live-test@example.com";
 /** Parent env minus anything live-smoke related, so tests are hermetic. */
 function cleanEnv(): NodeJS.ProcessEnv {
   return Object.fromEntries(
-    Object.entries(process.env).filter(
-      ([key]) => !/^(E2E_|PHENO_|SUPABASE_)/i.test(key),
-    ),
+    Object.entries(process.env).filter(([key]) => !/^(E2E_|PHENO_|SUPABASE_)/i.test(key)),
   );
 }
 
@@ -188,7 +186,9 @@ describe("deployed-build fingerprint helpers (fetch-pheno-live-build-id.mjs)", (
   });
 
   it("falls back to any /assets/ script, then any script, then null", () => {
-    expect(extractMainBundle('<script src="/assets/app-xyz.mjs"></script>')).toBe("/assets/app-xyz.mjs");
+    expect(extractMainBundle('<script src="/assets/app-xyz.mjs"></script>')).toBe(
+      "/assets/app-xyz.mjs",
+    );
     expect(extractMainBundle('<script src="/main.js"></script>')).toBe("/main.js");
     expect(extractMainBundle("<p>no scripts</p>")).toBeNull();
   });
@@ -200,9 +200,9 @@ describe("deployed-build fingerprint helpers (fetch-pheno-live-build-id.mjs)", (
   });
 
   it("rejects absolute and protocol-relative bundle URLs on foreign origins", () => {
-    expect(() => resolveSameOriginBundleUrl("https://evil.example.com/assets/index-abc.js")).toThrow(
-      /unexpected origin/,
-    );
+    expect(() =>
+      resolveSameOriginBundleUrl("https://evil.example.com/assets/index-abc.js"),
+    ).toThrow(/unexpected origin/);
     expect(() => resolveSameOriginBundleUrl("//evil.example.com/assets/index-abc.js")).toThrow(
       /unexpected origin/,
     );
@@ -228,9 +228,7 @@ describe("deployed-build fingerprint helpers (fetch-pheno-live-build-id.mjs)", (
   });
 
   it("sha256Hex produces the known digest for a fixed input", () => {
-    expect(sha256Hex(Buffer.from("verdant"))).toBe(
-      sha256Hex(Buffer.from("verdant")),
-    );
+    expect(sha256Hex(Buffer.from("verdant"))).toBe(sha256Hex(Buffer.from("verdant")));
     expect(sha256Hex(Buffer.from(""))).toBe(
       "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     );
@@ -276,9 +274,7 @@ describe("live-smoke report module (pheno-live-smoke-report.mjs)", () => {
     const report = {
       suites: [
         {
-          suites: [
-            { specs: [{ title: "inner test", tests: [{ status: "expected" }] }] },
-          ],
+          suites: [{ specs: [{ title: "inner test", tests: [{ status: "expected" }] }] }],
           specs: [{ title: "outer test", tests: [{ status: "unexpected" }] }],
         },
       ],
@@ -357,12 +353,14 @@ describe("live-smoke report module (pheno-live-smoke-report.mjs)", () => {
 describe("release receipt writer (write-pheno-release-receipt.mjs)", () => {
   function goFixtures() {
     const sha = "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90";
-    const smokeCheckpoints = CHECKPOINT_TEST_MAP.map((c: { id: number; label: string; titles: string[] }) => ({
-      id: c.id,
-      label: c.label,
-      status: c.titles.length > 0 ? "PASS" : "PENDING",
-      evidence: c.titles.length > 0 ? "automated smoke" : "no automated proof in the live smoke",
-    }));
+    const smokeCheckpoints = CHECKPOINT_TEST_MAP.map(
+      (c: { id: number; label: string; titles: string[] }) => ({
+        id: c.id,
+        label: c.label,
+        status: c.titles.length > 0 ? "PASS" : "PENDING",
+        evidence: c.titles.length > 0 ? "automated smoke" : "no automated proof in the live smoke",
+      }),
+    );
     return {
       smoke: {
         generatedAt: "2026-07-10T00:00:00.000Z",
@@ -423,7 +421,9 @@ describe("release receipt writer (write-pheno-release-receipt.mjs)", () => {
   it("parseArgs: defaults, --allow-partial, custom paths, missing value throws", () => {
     const defaults = parseArgs([]);
     expect(defaults.allowPartial).toBe(false);
-    expect(defaults.out.replace(/\\/g, "/")).toContain("docs/releases/pheno-tracker-pro-release-receipt.md");
+    expect(defaults.out.replace(/\\/g, "/")).toContain(
+      "docs/releases/pheno-tracker-pro-release-receipt.md",
+    );
     const custom = parseArgs(["--allow-partial", "--build", "some/build.json"]);
     expect(custom.allowPartial).toBe(true);
     expect(custom.build.replace(/\\/g, "/")).toContain("some/build.json");
@@ -433,7 +433,9 @@ describe("release receipt writer (write-pheno-release-receipt.mjs)", () => {
   it("schemaResult requires 3 columns, exactly 1 entitlement function, 13 restrictive tables, owner SELECT", () => {
     expect(schemaResult(goFixtures().schema).pass).toBe(true);
     expect(schemaResult({ ...goFixtures().schema, entitlementFunctionCount: 2 }).pass).toBe(false);
-    expect(schemaResult({ ...goFixtures().schema, restrictivePolicyTableCount: 12 }).pass).toBe(false);
+    expect(schemaResult({ ...goFixtures().schema, restrictivePolicyTableCount: 12 }).pass).toBe(
+      false,
+    );
     expect(schemaResult({ ...goFixtures().schema, columns: ["notes"] }).pass).toBe(false);
     expect(schemaResult({ ...goFixtures().schema, ownerSelectVerified: false }).pass).toBe(false);
     expect(schemaResult(null).pass).toBe(false);
@@ -458,20 +460,90 @@ describe("release receipt writer (write-pheno-release-receipt.mjs)", () => {
   });
 
   it.each([
-    ["a failed test", (f: ReturnType<typeof goFixtures>) => { f.smoke.tests.failed = 1; }],
-    ["a skipped test", (f: ReturnType<typeof goFixtures>) => { f.smoke.tests.skipped = 1; }],
-    ["zero passed tests", (f: ReturnType<typeof goFixtures>) => { f.smoke.tests.passed = 0; }],
-    ["smoke final not PASS", (f: ReturnType<typeof goFixtures>) => { f.smoke.final = "HOLD"; }],
-    ["deployment unreachable", (f: ReturnType<typeof goFixtures>) => { f.smoke.deployment = "FAIL"; }],
-    ["fingerprint artifact FAIL", (f: ReturnType<typeof goFixtures>) => { f.build.status = "FAIL"; }],
-    ["expected build mismatch", (f: ReturnType<typeof goFixtures>) => { f.manual.expectedBuildId = "other"; }],
-    ["expected build not set", (f: ReturnType<typeof goFixtures>) => { f.manual.expectedBuildId = ""; }],
-    ["white-screen check missing", (f: ReturnType<typeof goFixtures>) => { f.manual.deployment.noWhiteScreen = "PENDING"; }],
-    ["console errors present", (f: ReturnType<typeof goFixtures>) => { f.manual.deployment.consoleErrors = "FAIL"; }],
-    ["schema check failing", (f: ReturnType<typeof goFixtures>) => { f.schema.restrictivePolicyTableCount = 12; }],
-    ["a PENDING checkpoint", (f: ReturnType<typeof goFixtures>) => { delete (f.manual.checkpoints as Record<string, unknown>)[6]; }],
-    ["billing unresolved", (f: ReturnType<typeof goFixtures>) => { f.manual.billing = { required: true, status: "PENDING", evidence: "" }; }],
-    ["incomplete rollback readiness", (f: ReturnType<typeof goFixtures>) => { f.manual.rollback.entryPointDisable = "PENDING"; }],
+    [
+      "a failed test",
+      (f: ReturnType<typeof goFixtures>) => {
+        f.smoke.tests.failed = 1;
+      },
+    ],
+    [
+      "a skipped test",
+      (f: ReturnType<typeof goFixtures>) => {
+        f.smoke.tests.skipped = 1;
+      },
+    ],
+    [
+      "zero passed tests",
+      (f: ReturnType<typeof goFixtures>) => {
+        f.smoke.tests.passed = 0;
+      },
+    ],
+    [
+      "smoke final not PASS",
+      (f: ReturnType<typeof goFixtures>) => {
+        f.smoke.final = "HOLD";
+      },
+    ],
+    [
+      "deployment unreachable",
+      (f: ReturnType<typeof goFixtures>) => {
+        f.smoke.deployment = "FAIL";
+      },
+    ],
+    [
+      "fingerprint artifact FAIL",
+      (f: ReturnType<typeof goFixtures>) => {
+        f.build.status = "FAIL";
+      },
+    ],
+    [
+      "expected build mismatch",
+      (f: ReturnType<typeof goFixtures>) => {
+        f.manual.expectedBuildId = "other";
+      },
+    ],
+    [
+      "expected build not set",
+      (f: ReturnType<typeof goFixtures>) => {
+        f.manual.expectedBuildId = "";
+      },
+    ],
+    [
+      "white-screen check missing",
+      (f: ReturnType<typeof goFixtures>) => {
+        f.manual.deployment.noWhiteScreen = "PENDING";
+      },
+    ],
+    [
+      "console errors present",
+      (f: ReturnType<typeof goFixtures>) => {
+        f.manual.deployment.consoleErrors = "FAIL";
+      },
+    ],
+    [
+      "schema check failing",
+      (f: ReturnType<typeof goFixtures>) => {
+        f.schema.restrictivePolicyTableCount = 12;
+      },
+    ],
+    [
+      "a PENDING checkpoint",
+      (f: ReturnType<typeof goFixtures>) => {
+        delete (f.manual.checkpoints as Record<string, unknown>)[6];
+      },
+    ],
+    [
+      "billing unresolved",
+      (f: ReturnType<typeof goFixtures>) => {
+        f.manual.billing = { required: true, status: "PENDING", evidence: "" };
+      },
+    ],
+    [
+      "incomplete rollback readiness",
+      (f: ReturnType<typeof goFixtures>) => {
+        f.manual.rollback.entryPointDisable = "PENDING";
+      },
+    ],
   ])("HOLDs on %s", (_label, mutate) => {
     const fixtures = goFixtures();
     mutate(fixtures);
@@ -485,7 +557,10 @@ describe("release receipt writer (write-pheno-release-receipt.mjs)", () => {
 
   it("manual checkpoint overrides beat smoke-derived statuses", () => {
     const fixtures = goFixtures();
-    (fixtures.manual.checkpoints as Record<string, unknown>)[1] = { status: "FAIL", evidence: "manual regression" };
+    (fixtures.manual.checkpoints as Record<string, unknown>)[1] = {
+      status: "FAIL",
+      evidence: "manual regression",
+    };
     expect(renderReceipt(fixtures).decision).toBe("HOLD");
   });
 
@@ -524,11 +599,16 @@ describe("release receipt writer (write-pheno-release-receipt.mjs)", () => {
 
     function receiptArgs(paths: ReturnType<typeof writeFixtures>, extra: string[] = []) {
       return [
-        "--smoke", paths.smoke,
-        "--schema", paths.schema,
-        "--build", paths.build,
-        "--manual", paths.manual,
-        "--out", paths.out,
+        "--smoke",
+        paths.smoke,
+        "--schema",
+        paths.schema,
+        "--build",
+        paths.build,
+        "--manual",
+        paths.manual,
+        "--out",
+        paths.out,
         ...extra,
       ];
     }
@@ -551,7 +631,17 @@ describe("release receipt writer (write-pheno-release-receipt.mjs)", () => {
       const out = path.join(dir, "partial-receipt.md");
       const result = runNode(
         RECEIPT_SCRIPT,
-        ["--smoke", missing, "--schema", missing, "--build", missing, "--out", out, "--allow-partial"],
+        [
+          "--smoke",
+          missing,
+          "--schema",
+          missing,
+          "--build",
+          missing,
+          "--out",
+          out,
+          "--allow-partial",
+        ],
         cleanEnv(),
       );
       expect(result.status).toBe(2);
@@ -647,7 +737,10 @@ describe("live release smoke runner (run-pheno-live-release-smoke.mjs)", () => {
       expect(result.status).toBe(1);
       const summary = JSON.parse(
         fs.readFileSync(
-          path.join(dir, "artifacts/release-readiness/pheno-tracker-live-smoke/live-smoke-summary.json"),
+          path.join(
+            dir,
+            "artifacts/release-readiness/pheno-tracker-live-smoke/live-smoke-summary.json",
+          ),
           "utf8",
         ),
       );

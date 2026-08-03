@@ -15,9 +15,7 @@
  */
 import fixtureJson from "../../fixtures/demo-evidence-chain.json";
 import { buildSensorSnapshotEvidenceRefs } from "@/lib/sensorSnapshotEvidenceRefRules";
-import {
-  forwardAlertRefsToActionQueue,
-} from "@/lib/originatingTimelineEventForwardRules";
+import { forwardAlertRefsToActionQueue } from "@/lib/originatingTimelineEventForwardRules";
 import type { OriginatingTimelineEventRef } from "@/lib/originatingTimelineEventRules";
 
 export interface DemoEvidenceChainFixture {
@@ -109,9 +107,7 @@ export function loadDemoEvidenceChainFixture(): DemoEvidenceChainFixture {
 
   const reading = raw.reading as DemoEvidenceChainFixture["reading"];
   if (reading.source !== "demo") {
-    throw new DemoEvidenceChainFixtureError(
-      "Demo reading source must be 'demo', never 'live'.",
-    );
+    throw new DemoEvidenceChainFixtureError("Demo reading source must be 'demo', never 'live'.");
   }
 
   // Refs must point at an id present in the readings set.

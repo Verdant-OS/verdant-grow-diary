@@ -28,14 +28,8 @@ import {
   type BridgeAuthResult,
   type BridgeCredential,
 } from "./piIngestAuthRules.ts";
-import {
-  validateBridgeBatchScope,
-  type BridgeBatchScopeResult,
-} from "./piIngestBridgeRules.ts";
-import {
-  evaluateBridgeAbuseGuard,
-  type BridgeAbuseGuardResult,
-} from "./piIngestRateLimitRules.ts";
+import { validateBridgeBatchScope, type BridgeBatchScopeResult } from "./piIngestBridgeRules.ts";
+import { evaluateBridgeAbuseGuard, type BridgeAbuseGuardResult } from "./piIngestRateLimitRules.ts";
 import {
   toExternalSensorIngestPayload,
   validatePiIngestRequestEnvelope,
@@ -50,9 +44,7 @@ import {
 
 export interface PiIngestPipelineInput {
   readonly authRequest: BridgeAuthRequest;
-  readonly credentials:
-    | readonly BridgeCredential[]
-    | ReadonlyMap<string, BridgeCredential>;
+  readonly credentials: readonly BridgeCredential[] | ReadonlyMap<string, BridgeCredential>;
   readonly parsedBody: unknown;
   readonly rateLimit: {
     readonly recentRequestTimestamps: ReadonlyArray<string | number | Date>;
@@ -102,9 +94,7 @@ function coerceMs(value: string | number | Date): number {
   return Date.parse(value);
 }
 
-function coerceTimestamps(
-  values: ReadonlyArray<string | number | Date>,
-): number[] {
+function coerceTimestamps(values: ReadonlyArray<string | number | Date>): number[] {
   const out: number[] = [];
   for (const v of values) {
     const ms = coerceMs(v);
@@ -123,18 +113,13 @@ export async function preparePiIngestReadings(
     return {
       ok: false,
       stage: "auth",
-      issues: [
-        { stage: "auth", code: "invalid_now", message: "now is not a valid time" },
-      ],
+      issues: [{ stage: "auth", code: "invalid_now", message: "now is not a valid time" }],
     };
   }
 
   // 1) Auth
   const authReq: BridgeAuthRequest = { ...input.authRequest, now: nowMs };
-  const auth: BridgeAuthResult = await verifyBridgeRequest(
-    authReq,
-    input.credentials,
-  );
+  const auth: BridgeAuthResult = await verifyBridgeRequest(authReq, input.credentials);
   if (auth.ok !== true) {
     return {
       ok: false,
@@ -144,10 +129,12 @@ export async function preparePiIngestReadings(
   }
 
   // 2) Envelope
-  const envelope: PiIngestRequestValidationResult =
-    validatePiIngestRequestEnvelope(input.parsedBody, {
+  const envelope: PiIngestRequestValidationResult = validatePiIngestRequestEnvelope(
+    input.parsedBody,
+    {
       now: new Date(nowMs),
-    });
+    },
+  );
   if (envelope.ok !== true) {
     return {
       ok: false,
@@ -170,8 +157,7 @@ export async function preparePiIngestReadings(
         {
           stage: "envelope",
           code: "tent_id_mismatch",
-          message:
-            "envelope tent_id does not match the tent authorized by the bridge credential",
+          message: "envelope tent_id does not match the tent authorized by the bridge credential",
         },
       ],
     };
@@ -181,9 +167,7 @@ export async function preparePiIngestReadings(
   const abuse: BridgeAbuseGuardResult = evaluateBridgeAbuseGuard({
     bridgeId: auth.bridgeId,
     now: nowMs,
-    recentRequestTimestamps: coerceTimestamps(
-      input.rateLimit.recentRequestTimestamps,
-    ),
+    recentRequestTimestamps: coerceTimestamps(input.rateLimit.recentRequestTimestamps),
     windowMs: input.rateLimit.windowMs,
     maxRequestsPerWindow: input.rateLimit.maxRequestsPerWindow,
     readingCount: envelope.envelope.readings.length,

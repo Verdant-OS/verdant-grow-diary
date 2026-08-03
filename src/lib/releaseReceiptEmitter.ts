@@ -78,9 +78,7 @@ export function deriveReleaseReceiptStatus(
   blockers: readonly ReleaseReceiptBlocker[],
 ): ReleaseReceiptStatus {
   if (commands.length === 0) return "unknown";
-  const activeReleaseBlocker = blockers.some(
-    (b) => b.active && b.severity === "release_blocker",
-  );
+  const activeReleaseBlocker = blockers.some((b) => b.active && b.severity === "release_blocker");
   if (activeReleaseBlocker) return "blocked";
   let sawFail = false;
   let sawBlocked = false;
@@ -135,4 +133,3 @@ export function emitReleaseReceiptArtifact(
   }
   return { ok: false, errors: (parsed as ParsedReleaseReceiptFailure).errors };
 }
-

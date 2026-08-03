@@ -118,13 +118,7 @@ export interface LatestEnvironmentCheckSectionVM {
   isLive: false;
   eventTitle: string;
   capturedAt: string | null;
-  selectedStatus:
-    | "accepted"
-    | "mixed"
-    | "weak"
-    | "rejected"
-    | "not_checked"
-    | "missing";
+  selectedStatus: "accepted" | "mixed" | "weak" | "rejected" | "not_checked" | "missing";
   selectedStatusLabel: string;
   isFallback: boolean;
   timelineHref: string | null;
@@ -247,18 +241,14 @@ function sourceLabelForSensor(
   }
 }
 
-function manualSourceLabel(
-  source: ManualSensorEvidenceInput["source"],
-): EvidenceSourceLabel {
+function manualSourceLabel(source: ManualSensorEvidenceInput["source"]): EvidenceSourceLabel {
   if (source === "demo") return "Demo";
   if (source === "stale") return "Stale";
   if (source === "invalid") return "Invalid";
   return "Manual";
 }
 
-function buildLiveGroup(
-  sensor: AiDoctorSensorContext | null,
-): EvidenceGroupVM {
+function buildLiveGroup(sensor: AiDoctorSensorContext | null): EvidenceGroupVM {
   const items: EvidenceItem[] = [];
   if (sensor && sensor.sourceState === "live") {
     items.push({
@@ -377,9 +367,7 @@ function buildCsvGroup(
   };
 }
 
-function statusToLabel(
-  s: string,
-): "Accepted" | "Rejected" | "Not checked" | "Unknown" {
+function statusToLabel(s: string): "Accepted" | "Rejected" | "Not checked" | "Unknown" {
   if (s === "Accepted" || s === "accepted") return "Accepted";
   if (s === "Rejected" || s === "rejected") return "Rejected";
   if (s === "Not checked" || s === "not_checked") return "Not checked";
@@ -428,9 +416,8 @@ function buildEnvCheckGroup(
       summary: ec.contextSummary,
       metricRows,
       warnings: [...ec.warnings, ...ec.derivedNotes],
-      timelineHref: typeof timelineHref === "string" && timelineHref.length > 0
-        ? timelineHref
-        : null,
+      timelineHref:
+        typeof timelineHref === "string" && timelineHref.length > 0 ? timelineHref : null,
       cautionCopy: caution,
     });
   }
@@ -456,9 +443,7 @@ function buildDiaryGroup(
         metricRows: [],
         warnings: [],
         timelineHref:
-          typeof d.timelineHref === "string" && d.timelineHref.length > 0
-            ? d.timelineHref
-            : null,
+          typeof d.timelineHref === "string" && d.timelineHref.length > 0 ? d.timelineHref : null,
         cautionCopy: "",
       }))
     : [];
@@ -511,10 +496,8 @@ function buildMissingList(args: {
       code: "no-environment-check",
       label: "No recent Environment Check.",
     });
-  if (!args.hasDiary)
-    out.push({ code: "no-diary-logs", label: "No recent diary logs." });
-  if (!args.hasPhotos)
-    out.push({ code: "no-recent-photos", label: "No recent photos." });
+  if (!args.hasDiary) out.push({ code: "no-diary-logs", label: "No recent diary logs." });
+  if (!args.hasPhotos) out.push({ code: "no-recent-photos", label: "No recent photos." });
   const hints = args.hints ?? {};
   if (hints.hasStage === false)
     out.push({ code: "missing-plant-stage", label: "Missing plant stage." });
@@ -532,16 +515,13 @@ function buildMissingList(args: {
 // Main entry
 // ---------------------------------------------------------------------------
 
-const CONSERVATIVE_COPY_NONE =
-  "More data is needed before AI Doctor can give strong guidance.";
+const CONSERVATIVE_COPY_NONE = "More data is needed before AI Doctor can give strong guidance.";
 const CONSERVATIVE_COPY_WEAK =
   "AI Doctor has limited evidence. Recommendations should stay conservative.";
 const CONSERVATIVE_COPY_ENVCHECK_ONLY =
   "Environment Check evidence is useful context, but it is not live telemetry.";
 
-export function buildAiDoctorEvidencePanelVM(
-  input: BuildEvidenceVMInput,
-): AiDoctorEvidencePanelVM {
+export function buildAiDoctorEvidencePanelVM(input: BuildEvidenceVMInput): AiDoctorEvidencePanelVM {
   const compiled = compileAiDoctorContext({
     sensorContext: input.sensorContext ?? null,
     environmentCheckEvents: input.environmentCheckEvents ?? null,
@@ -571,16 +551,10 @@ export function buildAiDoctorEvidencePanelVM(
     conservativeCopy = CONSERVATIVE_COPY_NONE;
   } else if (
     compiled.environmentCheck.kind === "present" &&
-    (compiled.environmentCheck.rejectedCount > 0 ||
-      compiled.environmentCheck.notCheckedCount > 0)
+    (compiled.environmentCheck.rejectedCount > 0 || compiled.environmentCheck.notCheckedCount > 0)
   ) {
     conservativeCopy = CONSERVATIVE_COPY_WEAK;
-  } else if (
-    !hasLiveSensor &&
-    manualGroup.isEmpty &&
-    csvGroup.isEmpty &&
-    hasEnvCheck
-  ) {
+  } else if (!hasLiveSensor && manualGroup.isEmpty && csvGroup.isEmpty && hasEnvCheck) {
     conservativeCopy = CONSERVATIVE_COPY_ENVCHECK_ONLY;
   }
 
@@ -621,15 +595,7 @@ export function buildAiDoctorEvidencePanelVM(
   });
 
   return {
-    groups: [
-      liveGroup,
-      manualGroup,
-      csvGroup,
-      envGroup,
-      diaryGroup,
-      photoGroup,
-      missingGroup,
-    ],
+    groups: [liveGroup, manualGroup, csvGroup, envGroup, diaryGroup, photoGroup, missingGroup],
     missing,
     conservativeRecommendationCopy: conservativeCopy,
     hasAnyEvidence,
@@ -667,9 +633,7 @@ const REQUIRED_METRIC_LABELS: Record<RequiredEnvironmentMetric, string> = {
   soil_moisture_pct: "Soil moisture (soil_moisture_pct)",
 };
 
-const DERIVED_REQUIRED: ReadonlySet<RequiredEnvironmentMetric> = new Set([
-  "vpd_kpa",
-]);
+const DERIVED_REQUIRED: ReadonlySet<RequiredEnvironmentMetric> = new Set(["vpd_kpa"]);
 
 function buildLatestEnvironmentCheckSection(args: {
   compiled: ReturnType<typeof compileAiDoctorContext>;
@@ -683,7 +647,10 @@ function buildLatestEnvironmentCheckSection(args: {
       : null;
 
   // Build per-required-metric rows from the selected event.
-  const parsedByKey = new Map<string, { status: string; value: number | null; reason: string; derived: boolean }>();
+  const parsedByKey = new Map<
+    string,
+    { status: string; value: number | null; reason: string; derived: boolean }
+  >();
   if (ec.kind === "present") {
     for (const m of ec.metrics) {
       if (!parsedByKey.has(m.key)) {
@@ -705,9 +672,7 @@ function buildLatestEnvironmentCheckSection(args: {
         key,
         label: REQUIRED_METRIC_LABELS[key],
         statusLabel: "Missing" as const,
-        contextLabel: isDerived
-          ? ("Derived context" as const)
-          : ("Missing" as const),
+        contextLabel: isDerived ? ("Derived context" as const) : ("Missing" as const),
         notHealthy: true,
         displayValue: null,
         reason: "Not captured.",
@@ -719,17 +684,15 @@ function buildLatestEnvironmentCheckSection(args: {
         : m.status === "rejected"
           ? ("Rejected" as const)
           : ("Not checked" as const);
-    const contextLabel = isDerived || m.derived
-      ? ("Derived context" as const)
-      : ("Test/Local validation" as const);
+    const contextLabel =
+      isDerived || m.derived ? ("Derived context" as const) : ("Test/Local validation" as const);
     return {
       key,
       label: REQUIRED_METRIC_LABELS[key],
       statusLabel,
       contextLabel,
       notHealthy: m.status !== "accepted",
-      displayValue:
-        m.value === null || !Number.isFinite(m.value) ? null : String(m.value),
+      displayValue: m.value === null || !Number.isFinite(m.value) ? null : String(m.value),
       reason: m.reason,
     };
   });

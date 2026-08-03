@@ -28,10 +28,7 @@ export const DEFAULT_ROBOTS_DIRECTIVE = "index, follow";
  * Allowed robots values. Any value outside this set (e.g. "none",
  * "noai", accidental empty string) fails validation immediately.
  */
-export const ALLOWED_ROBOTS_DIRECTIVES = Object.freeze([
-  "index, follow",
-  "noindex, follow",
-]);
+export const ALLOWED_ROBOTS_DIRECTIVES = Object.freeze(["index, follow", "noindex, follow"]);
 
 /**
  * Twitter handle assertions.

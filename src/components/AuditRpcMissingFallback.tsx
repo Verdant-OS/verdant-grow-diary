@@ -41,18 +41,14 @@ export function AuditRpcMissingFallback({
       className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 space-y-3"
     >
       <div className="flex items-start gap-2">
-        <AlertTriangle
-          className="h-5 w-5 shrink-0 text-amber-500 mt-0.5"
-          aria-hidden="true"
-        />
+        <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500 mt-0.5" aria-hidden="true" />
         <div className="space-y-1">
           <h3 className="text-sm font-semibold text-amber-700 dark:text-amber-300">
             {surfaceLabel} audit is temporarily unavailable
           </h3>
           <p className="text-xs text-muted-foreground">
-            The audit function powering this action isn't reachable from the
-            deployed schema right now, so nothing was written. Your plants,
-            grows, and prior entries are unchanged.
+            The audit function powering this action isn't reachable from the deployed schema right
+            now, so nothing was written. Your plants, grows, and prior entries are unchanged.
           </p>
         </div>
       </div>
@@ -62,14 +58,12 @@ export function AuditRpcMissingFallback({
         <ol className="text-xs text-muted-foreground list-decimal pl-4 space-y-0.5">
           <li>
             Confirm the migration that defines{" "}
-            <code className="rounded bg-muted px-1 py-0.5 text-[10px]">
-              {rpcName}
-            </code>{" "}
-            has been applied to production.
+            <code className="rounded bg-muted px-1 py-0.5 text-[10px]">{rpcName}</code> has been
+            applied to production.
           </li>
           <li>
-            Refresh the generated schema types so the client and backend agree
-            (<code className="rounded bg-muted px-1 py-0.5 text-[10px]">
+            Refresh the generated schema types so the client and backend agree (
+            <code className="rounded bg-muted px-1 py-0.5 text-[10px]">
               bun run sync-supabase-types
             </code>{" "}
             or equivalent).

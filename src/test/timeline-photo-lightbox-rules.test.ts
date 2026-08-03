@@ -10,10 +10,31 @@ import {
 } from "@/lib/timelinePhotoLightboxRules";
 
 const ROWS = [
-  { id: "a", photo_url: "https://x/a.jpg", entry_at: "2025-01-01T00:00:00Z", note: "n1", stage: "veg", details: { plant_name: "Blue Dream" } },
-  { id: "b", photo_url: null, entry_at: "2025-01-02T00:00:00Z", note: "no photo", stage: "veg", details: {} },
+  {
+    id: "a",
+    photo_url: "https://x/a.jpg",
+    entry_at: "2025-01-01T00:00:00Z",
+    note: "n1",
+    stage: "veg",
+    details: { plant_name: "Blue Dream" },
+  },
+  {
+    id: "b",
+    photo_url: null,
+    entry_at: "2025-01-02T00:00:00Z",
+    note: "no photo",
+    stage: "veg",
+    details: {},
+  },
   { id: "c", photo_url: "  ", entry_at: null, note: "blank", stage: null, details: {} },
-  { id: "d", photo_url: "https://x/d.jpg", entry_at: "2025-01-03T00:00:00Z", note: "n2", stage: "flower", details: {} },
+  {
+    id: "d",
+    photo_url: "https://x/d.jpg",
+    entry_at: "2025-01-03T00:00:00Z",
+    note: "n2",
+    stage: "flower",
+    details: {},
+  },
 ];
 
 describe("buildTimelinePhotoLightboxList", () => {

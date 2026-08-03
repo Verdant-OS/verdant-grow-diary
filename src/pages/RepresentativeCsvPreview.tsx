@@ -4,7 +4,6 @@ import {
   emptyRepresentativeMapping,
   previewRepresentativeCsv,
   parseCsv,
-
   type EcUnit,
   type RepresentativeColumnMapping,
   type RepresentativeDraftReading,
@@ -77,19 +76,42 @@ interface FieldDescriptor {
 }
 
 const FIELD_DESCRIPTORS: ReadonlyArray<FieldDescriptor> = [
-  { field: "timestamp", label: "Timestamp", helper: "Required. ISO-8601 or 'YYYY-MM-DD HH:MM:SS'." },
+  {
+    field: "timestamp",
+    label: "Timestamp",
+    helper: "Required. ISO-8601 or 'YYYY-MM-DD HH:MM:SS'.",
+  },
   { field: "sensor", label: "Sensor ID", helper: "Identifier for the probe/device." },
-  { field: "facility", label: "Facility (optional)", helper: "Preserved as context. Not a Verdant ID." },
+  {
+    field: "facility",
+    label: "Facility (optional)",
+    helper: "Preserved as context. Not a Verdant ID.",
+  },
   { field: "room", label: "Room (optional)", helper: "Preserved as context. Not a Verdant ID." },
   { field: "zone", label: "Zone (optional)", helper: "Preserved as context. Not a Verdant ID." },
-  { field: "air_temp", label: "Air temperature", helper: "Pick the source unit.", units: ["C", "F"] },
-  { field: "substrate_temp", label: "Substrate temperature", helper: "Pick the source unit.", units: ["C", "F"] },
+  {
+    field: "air_temp",
+    label: "Air temperature",
+    helper: "Pick the source unit.",
+    units: ["C", "F"],
+  },
+  {
+    field: "substrate_temp",
+    label: "Substrate temperature",
+    helper: "Pick the source unit.",
+    units: ["C", "F"],
+  },
   { field: "humidity", label: "Humidity (%)", helper: "Relative humidity 0–100." },
   { field: "vpd", label: "VPD (kPa)", helper: "Vapor pressure deficit." },
   { field: "co2", label: "CO₂ (ppm)", helper: "Parts per million." },
   { field: "ppfd", label: "PPFD (µmol)", helper: "Photosynthetic photon flux density." },
   { field: "vwc", label: "Substrate VWC (%)", helper: "Volumetric water content 0–100." },
-  { field: "substrate_ec", label: "Substrate EC", helper: "Pick the source unit.", units: ["mS/cm", "uS/cm"] },
+  {
+    field: "substrate_ec",
+    label: "Substrate EC",
+    helper: "Pick the source unit.",
+    units: ["mS/cm", "uS/cm"],
+  },
 ];
 
 const UNMAPPED = "__unmapped__";
@@ -103,7 +125,10 @@ export default function RepresentativeCsvPreview() {
   const [templateId, setTemplateId] = useState<CsvMappingTemplateId | null>(null);
   const [templateNotice, setTemplateNotice] = useState<string | null>(null);
   const [presetNotice, setPresetNotice] = useState<string | null>(null);
-  const [importNotice, setImportNotice] = useState<{ kind: "success" | "blocked"; message: string } | null>(null);
+  const [importNotice, setImportNotice] = useState<{
+    kind: "success" | "blocked";
+    message: string;
+  } | null>(null);
   const [hasSavedPreset, setHasSavedPreset] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
@@ -141,14 +166,10 @@ export default function RepresentativeCsvPreview() {
             `Auto-detected template "${tpl.name}" (${confidenceLabel}). Review before trusting.`,
           ];
           if (applied.ambiguousFields.length > 0) {
-            parts.push(
-              `Multiple headers matched — review: ${applied.ambiguousFields.join(", ")}.`,
-            );
+            parts.push(`Multiple headers matched — review: ${applied.ambiguousFields.join(", ")}.`);
           }
           if (applied.unmatchedFields.length > 0) {
-            parts.push(
-              `No header found for: ${applied.unmatchedFields.join(", ")}.`,
-            );
+            parts.push(`No header found for: ${applied.unmatchedFields.join(", ")}.`);
           }
           setTemplateNotice(parts.join(" "));
           return;
@@ -225,13 +246,11 @@ export default function RepresentativeCsvPreview() {
         </div>
         <h1 className="text-2xl font-semibold">Representative CSV preview</h1>
         <p className="text-sm text-muted-foreground">
-          Preview only. Nothing is saved. No data has been saved. CSV source, not live data.
-          Review units before trusting values. Rows with invalid timestamps
-          are blocked from canonical preview. Map your CSV headers to
-          Verdant fields and pick units. This is a synthetic shape used to
-          test Verdant&rsquo;s intake workflow — not a confirmed AROYA
-          importer. Facility, Room, and Zone are preserved as context and
-          are never used as Verdant tent or grow IDs.
+          Preview only. Nothing is saved. No data has been saved. CSV source, not live data. Review
+          units before trusting values. Rows with invalid timestamps are blocked from canonical
+          preview. Map your CSV headers to Verdant fields and pick units. This is a synthetic shape
+          used to test Verdant&rsquo;s intake workflow — not a confirmed AROYA importer. Facility,
+          Room, and Zone are preserved as context and are never used as Verdant tent or grow IDs.
         </p>
       </header>
 
@@ -312,9 +331,7 @@ export default function RepresentativeCsvPreview() {
                 }
                 setMapping(applied.mapping);
                 const parts: string[] = [
-                  tpl.isReset
-                    ? "Mapping cleared."
-                    : `Template "${tpl.name}" applied.`,
+                  tpl.isReset ? "Mapping cleared." : `Template "${tpl.name}" applied.`,
                 ];
                 if (applied.ambiguousFields.length > 0) {
                   parts.push(
@@ -322,9 +339,7 @@ export default function RepresentativeCsvPreview() {
                   );
                 }
                 if (applied.unmatchedFields.length > 0) {
-                  parts.push(
-                    `No header found for: ${applied.unmatchedFields.join(", ")}.`,
-                  );
+                  parts.push(`No header found for: ${applied.unmatchedFields.join(", ")}.`);
                 }
                 setTemplateNotice(parts.join(" "));
               }}
@@ -342,7 +357,9 @@ export default function RepresentativeCsvPreview() {
               variant="outline"
               onClick={() => {
                 const warnings: CsvMappingConfigWarning[] = [];
-                for (const field of (Object.keys(mapping) as Array<keyof RepresentativeColumnMapping>)) {
+                for (const field of Object.keys(mapping) as Array<
+                  keyof RepresentativeColumnMapping
+                >) {
                   const v = mapping[field];
                   const col = v === null ? null : typeof v === "string" ? v : v.column;
                   if (col === null) {
@@ -358,7 +375,7 @@ export default function RepresentativeCsvPreview() {
                   headers,
                   templateId,
                   templateName: templateId
-                    ? getCsvMappingTemplate(templateId)?.name ?? null
+                    ? (getCsvMappingTemplate(templateId)?.name ?? null)
                     : null,
                   warnings,
                 });
@@ -378,7 +395,6 @@ export default function RepresentativeCsvPreview() {
               Download mapping JSON
             </Button>
 
-
             <Button
               type="button"
               variant="outline"
@@ -389,15 +405,13 @@ export default function RepresentativeCsvPreview() {
                   headers,
                   templateId,
                   templateName: templateId
-                    ? getCsvMappingTemplate(templateId)?.name ?? null
+                    ? (getCsvMappingTemplate(templateId)?.name ?? null)
                     : null,
                 });
                 const ok = saveCsvMappingPreset(config);
                 setHasSavedPreset(ok);
                 setPresetNotice(
-                  ok
-                    ? "Preset saved in this browser."
-                    : "Could not save preset in this browser.",
+                  ok ? "Preset saved in this browser." : "Could not save preset in this browser.",
                 );
               }}
             >
@@ -433,9 +447,7 @@ export default function RepresentativeCsvPreview() {
                   );
                 }
                 if (result.ignoredKeys.length > 0) {
-                  parts.push(
-                    `Ignored unexpected keys: ${result.ignoredKeys.join(", ")}.`,
-                  );
+                  parts.push(`Ignored unexpected keys: ${result.ignoredKeys.join(", ")}.`);
                 }
                 setPresetNotice(parts.join(" "));
               }}
@@ -470,7 +482,10 @@ export default function RepresentativeCsvPreview() {
                 const fileText = await f.text();
                 const result = importCsvMappingConfig({ input: fileText, headers });
                 if (result.status === "blocked") {
-                  setImportNotice({ kind: "blocked", message: `Import blocked: ${result.message}` });
+                  setImportNotice({
+                    kind: "blocked",
+                    message: `Import blocked: ${result.message}`,
+                  });
                   return;
                 }
                 setMapping(result.mapping);
@@ -489,11 +504,7 @@ export default function RepresentativeCsvPreview() {
                 setImportNotice({ kind: "success", message: parts.join(" ") });
               }}
             />
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => importInputRef.current?.click()}
-            >
+            <Button type="button" variant="outline" onClick={() => importInputRef.current?.click()}>
               Import mapping JSON
             </Button>
           </div>
@@ -524,10 +535,7 @@ export default function RepresentativeCsvPreview() {
           <div className="grid gap-3 sm:grid-cols-2">
             {FIELD_DESCRIPTORS.map((desc) => (
               <div key={desc.field} className="rounded-md border p-3">
-                <label
-                  className="block text-sm font-medium"
-                  htmlFor={`map-${desc.field}`}
-                >
+                <label className="block text-sm font-medium" htmlFor={`map-${desc.field}`}>
                   {desc.label}
                 </label>
                 <p className="mb-2 text-xs text-muted-foreground">{desc.helper}</p>
@@ -595,10 +603,7 @@ function MappingCollisionNotices({ mapping }: { mapping: RepresentativeColumnMap
 
 function PreviewSummaryStrip({ result }: { result: RepresentativePreviewResult }) {
   return (
-    <section
-      aria-label="Preview summary"
-      className="grid grid-cols-2 gap-3 sm:grid-cols-4"
-    >
+    <section aria-label="Preview summary" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <SummaryCell label="Total rows" value={result.summary.total} />
       <SummaryCell label="Valid" value={result.summary.valid} />
       <SummaryCell label="Warnings" value={result.summary.warning} />
@@ -677,10 +682,7 @@ function PreviewRow({
   row: RepresentativeDraftReading;
   mapping: RepresentativeColumnMapping;
 }) {
-  const outcome = useMemo(
-    () => deriveCsvRowValidationHints({ row, mapping }),
-    [row, mapping],
-  );
+  const outcome = useMemo(() => deriveCsvRowValidationHints({ row, mapping }), [row, mapping]);
   return (
     <TableRow data-row-canonical-previewable={outcome.canonicalPreviewable}>
       <TableCell>{row.rowIndex + 1}</TableCell>
@@ -694,9 +696,7 @@ function PreviewRow({
       </TableCell>
       <TableCell>{row.captured_at ?? "—"}</TableCell>
       <TableCell>{row.sensor ?? "—"}</TableCell>
-      <TableCell>
-        {[row.room, row.zone].filter(Boolean).join(" / ") || "—"}
-      </TableCell>
+      <TableCell>{[row.room, row.zone].filter(Boolean).join(" / ") || "—"}</TableCell>
       <TableCell>{fmt(row.air_temp_c, 1)}</TableCell>
       <TableCell>{fmt(row.humidity_pct, 1)}</TableCell>
       <TableCell>{fmt(row.vpd_kpa, 2)}</TableCell>
@@ -711,7 +711,10 @@ function PreviewRow({
         ) : (
           <ul className="space-y-1">
             {outcome.hints.map((h) => (
-              <li key={`${h.code}-${h.field ?? "row"}`} className="flex flex-wrap items-center gap-1">
+              <li
+                key={`${h.code}-${h.field ?? "row"}`}
+                className="flex flex-wrap items-center gap-1"
+              >
                 <Badge variant={hintVariant(h.severity)}>{h.severity}</Badge>
                 <span className="text-muted-foreground">{h.message}</span>
               </li>
@@ -737,10 +740,7 @@ function TimelinePreviewSection({
     [result.rows, mapping],
   );
   return (
-    <section
-      aria-label="Timeline preview"
-      className="space-y-3 rounded-lg border p-4"
-    >
+    <section aria-label="Timeline preview" className="space-y-3 rounded-lg border p-4">
       <header className="space-y-1">
         <h2 className="text-lg font-semibold">Timeline preview</h2>
         <p className="text-xs text-muted-foreground">
@@ -767,9 +767,7 @@ function TimelinePreviewSection({
         </ul>
       )}
 
-      {timeline.reviewRows.length > 0 && (
-        <TimelineReviewSummary reviewRows={timeline.reviewRows} />
-      )}
+      {timeline.reviewRows.length > 0 && <TimelineReviewSummary reviewRows={timeline.reviewRows} />}
     </section>
   );
 }
@@ -785,12 +783,8 @@ function TimelineEventCard({ event }: { event: TimelinePreviewEvent }) {
       className="space-y-2 rounded-md border bg-card p-3 shadow-sm"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs font-medium text-muted-foreground">
-          Row #{event.rowIndex + 1}
-        </span>
-        <Badge variant={timelineSeverityVariant(event.severity)}>
-          {event.severity}
-        </Badge>
+        <span className="text-xs font-medium text-muted-foreground">Row #{event.rowIndex + 1}</span>
+        <Badge variant={timelineSeverityVariant(event.severity)}>{event.severity}</Badge>
       </div>
       <div className="text-sm font-semibold">{event.captured_at}</div>
       <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -812,9 +806,7 @@ function TimelineEventCard({ event }: { event: TimelinePreviewEvent }) {
       )}
       {(event.missingFields.length > 0 || event.ignoredFields.length > 0) && (
         <div className="space-y-1 border-t pt-2 text-[11px] text-muted-foreground">
-          {event.missingFields.length > 0 && (
-            <div>Missing: {event.missingFields.join(", ")}</div>
-          )}
+          {event.missingFields.length > 0 && <div>Missing: {event.missingFields.join(", ")}</div>}
           {event.ignoredFields.length > 0 && (
             <div>Ignored (unparseable): {event.ignoredFields.join(", ")}</div>
           )}
@@ -824,11 +816,7 @@ function TimelineEventCard({ event }: { event: TimelinePreviewEvent }) {
   );
 }
 
-function TimelineReviewSummary({
-  reviewRows,
-}: {
-  reviewRows: ReadonlyArray<TimelineReviewRow>;
-}) {
+function TimelineReviewSummary({ reviewRows }: { reviewRows: ReadonlyArray<TimelineReviewRow> }) {
   return (
     <div
       aria-label="Rows needing review"
@@ -843,9 +831,7 @@ function TimelineReviewSummary({
             {r.reasons.join("; ")}
           </li>
         ))}
-        {reviewRows.length > 10 && (
-          <li>…and {reviewRows.length - 10} more.</li>
-        )}
+        {reviewRows.length > 10 && <li>…and {reviewRows.length - 10} more.</li>}
       </ul>
     </div>
   );

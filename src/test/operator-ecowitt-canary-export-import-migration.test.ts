@@ -9,7 +9,11 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { clearLocalStorageForTest, getLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 import {
   WORKFLOW_BACKUP_KEY,
   WORKFLOW_MIGRATION_FLAG,
@@ -111,7 +115,7 @@ describe("Copy JSON parity (redacted only)", () => {
     // Page wires Copy JSON to the same source via buildVerdictExport
     expect(pageSrc).toMatch(/verdictJsonString\s*=\s*useMemo/);
     expect(pageSrc).toContain("buildVerdictExport(builtAudit)");
-    expect(pageSrc).toContain("data-testid=\"copy-verdict-json\"");
+    expect(pageSrc).toContain('data-testid="copy-verdict-json"');
   });
 });
 
@@ -179,7 +183,10 @@ describe("workflow snapshot migration (legacy → v1)", () => {
   });
 
   it("migrates legacy snapshot, backs up first, and tolerates malformed data", () => {
-    setLocalStorageItemForTest("operator.ecowitt.canary.workflow.v0", JSON.stringify({ saved_at: "old", cards: [{ key: "x" }] }));
+    setLocalStorageItemForTest(
+      "operator.ecowitt.canary.workflow.v0",
+      JSON.stringify({ saved_at: "old", cards: [{ key: "x" }] }),
+    );
     setLocalStorageItemForTest("operator.ecowitt.canary.workflow", "{not json");
     const out = migrateLegacyWorkflowSnapshots();
     expect(out.ran).toBe(true);
@@ -201,7 +208,10 @@ describe("workflow snapshot migration (legacy → v1)", () => {
   });
 
   it("migrateSnapshotToV1 normalizes minimal data with sane defaults", () => {
-    const out = migrateSnapshotToV1({ saved_at: "2025-01-01T00:00:00Z" }, { migratedFrom: "legacy" });
+    const out = migrateSnapshotToV1(
+      { saved_at: "2025-01-01T00:00:00Z" },
+      { migratedFrom: "legacy" },
+    );
     expect(out?.schemaVersion).toBe(1);
     expect(out?.source).toBe("localStorage-migration");
     expect(out?.metadata.migratedFrom).toBe("legacy");

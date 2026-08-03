@@ -67,8 +67,7 @@ export function validateEcoWittBridgeAuthorization(
   // we must fail closed BEFORE comparing anything, but only when the
   // caller actually presented credentials. A missing header without a
   // configured token is still unauthorized (no credentials offered).
-  const hasExpected =
-    typeof expectedToken === "string" && expectedToken.length > 0;
+  const hasExpected = typeof expectedToken === "string" && expectedToken.length > 0;
 
   if (headerValue == null || typeof headerValue !== "string") {
     return result("unauthorized", "missing_authorization_header");

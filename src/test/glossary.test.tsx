@@ -121,9 +121,7 @@ describe("Glossary page", () => {
     // A representative jump link exists.
     expect(screen.getByTestId("glossary-jump-A")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        /Glossary entries are educational reference content/i,
-      ),
+      screen.getByText(/Glossary entries are educational reference content/i),
     ).toBeInTheDocument();
     cleanup();
   });

@@ -18,12 +18,7 @@
 /* Types                                                                       */
 /* -------------------------------------------------------------------------- */
 
-export type ActionFollowUpOutcome =
-  | "improved"
-  | "unchanged"
-  | "declined"
-  | "too_soon"
-  | "unclear";
+export type ActionFollowUpOutcome = "improved" | "unchanged" | "declined" | "too_soon" | "unclear";
 
 export const ACTION_FOLLOWUP_OUTCOMES: readonly ActionFollowUpOutcome[] = [
   "improved",
@@ -93,13 +88,7 @@ export type ActionFollowUpDraftValidation =
 
 const NOTE_MAX = 1000;
 const REFERENCE_MAX = 500;
-const SIGNED_URL_PATTERNS = [
-  /^https?:\/\//i,
-  /^blob:/i,
-  /^data:/i,
-  /token=/i,
-  /signature=/i,
-];
+const SIGNED_URL_PATTERNS = [/^https?:\/\//i, /^blob:/i, /^data:/i, /token=/i, /signature=/i];
 
 function nonEmptyString(v: unknown): string | null {
   if (typeof v !== "string") return null;

@@ -12,16 +12,11 @@ import {
   resolveEcowittAuditSelectedTent,
 } from "@/lib/ecowittAuditTentSelectionRules";
 
-const TENTS = [
-  { id: "tent-seedling" },
-  { id: "tent-flower" },
-];
+const TENTS = [{ id: "tent-seedling" }, { id: "tent-flower" }];
 
 describe("ecowittAuditTentSelectionRules — URL read/write", () => {
   it("reads tentId from a query string", () => {
-    expect(readEcowittAuditTentIdFromSearch("?tentId=tent-flower")).toBe(
-      "tent-flower",
-    );
+    expect(readEcowittAuditTentIdFromSearch("?tentId=tent-flower")).toBe("tent-flower");
   });
 
   it("returns null when no tentId is present", () => {
@@ -33,9 +28,7 @@ describe("ecowittAuditTentSelectionRules — URL read/write", () => {
   it("ignores empty/oversize values and does not crash on malformed input", () => {
     expect(readEcowittAuditTentIdFromSearch("?tentId=")).toBeNull();
     expect(readEcowittAuditTentIdFromSearch("?tentId=   ")).toBeNull();
-    expect(
-      readEcowittAuditTentIdFromSearch(`?tentId=${"x".repeat(500)}`),
-    ).toBeNull();
+    expect(readEcowittAuditTentIdFromSearch(`?tentId=${"x".repeat(500)}`)).toBeNull();
     expect(() => readEcowittAuditTentIdFromSearch("%%%")).not.toThrow();
   });
 
@@ -47,18 +40,13 @@ describe("ecowittAuditTentSelectionRules — URL read/write", () => {
   });
 
   it("removes tentId when set to null/empty", () => {
-    const next = applyEcowittAuditTentIdToSearch(
-      "?tentId=tent-flower&foo=bar",
-      null,
-    );
+    const next = applyEcowittAuditTentIdToSearch("?tentId=tent-flower&foo=bar", null);
     expect(next.has(ECOWITT_AUDIT_TENT_QUERY_PARAM)).toBe(false);
     expect(next.get("foo")).toBe("bar");
   });
 
   it("buildEcowittAuditHref includes ?tentId=", () => {
-    expect(buildEcowittAuditHref("tent-flower")).toBe(
-      "/sensors/ecowitt-audit?tentId=tent-flower",
-    );
+    expect(buildEcowittAuditHref("tent-flower")).toBe("/sensors/ecowitt-audit?tentId=tent-flower");
     expect(buildEcowittAuditHref(null)).toBe("/sensors/ecowitt-audit");
     expect(buildEcowittAuditHref("   ")).toBe("/sensors/ecowitt-audit");
   });

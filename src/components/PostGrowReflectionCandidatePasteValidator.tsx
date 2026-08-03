@@ -195,8 +195,8 @@ export function PostGrowReflectionCandidatePasteValidator() {
           <Badge variant="outline">No live AI call</Badge>
         </div>
         <CardDescription>
-          Operator-only local validator — runs the same envelope and reflection contract checks
-          used by the dry-run adapter boundary. Nothing is saved or sent.
+          Operator-only local validator — runs the same envelope and reflection contract checks used
+          by the dry-run adapter boundary. Nothing is saved or sent.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

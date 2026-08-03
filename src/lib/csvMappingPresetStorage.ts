@@ -14,13 +14,9 @@
  */
 
 import type { CsvMappingConfig } from "@/lib/csvMappingConfig";
-import {
-  importCsvMappingConfig,
-  type CsvMappingImportResult,
-} from "@/lib/csvMappingConfigImport";
+import { importCsvMappingConfig, type CsvMappingImportResult } from "@/lib/csvMappingConfigImport";
 
-export const CSV_MAPPING_PRESET_STORAGE_KEY =
-  "verdant.csvPreview.mappingPreset.v1";
+export const CSV_MAPPING_PRESET_STORAGE_KEY = "verdant.csvPreview.mappingPreset.v1";
 
 function getStorage(): Storage | null {
   try {
@@ -54,10 +50,7 @@ export function loadCsvMappingPreset(): CsvMappingConfig | null {
       return null;
     }
     const p = parsed as Record<string, unknown>;
-    if (
-      typeof p.schema_version !== "number" ||
-      p.data_context !== "mapping_config"
-    ) {
+    if (typeof p.schema_version !== "number" || p.data_context !== "mapping_config") {
       return null;
     }
     return parsed as CsvMappingConfig;

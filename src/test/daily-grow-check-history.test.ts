@@ -5,10 +5,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  buildDailyGrowCheckHistory,
-  HISTORY_LABELS,
-} from "@/lib/dailyGrowCheckHistoryRules";
+import { buildDailyGrowCheckHistory, HISTORY_LABELS } from "@/lib/dailyGrowCheckHistoryRules";
 
 const NOW = new Date(2026, 4, 24, 15, 0, 0); // local May 24 2026 15:00
 const PLANT = "plant-1";
@@ -60,9 +57,7 @@ describe("buildDailyGrowCheckHistory · pure rules", () => {
       currentTentId: TENT,
       plantsInTentCount: 1,
       manualReadings: [],
-      diaryEntries: [
-        { entry_at: isoLocal(2026, 4, 24, 9), id: "d1", plant_id: PLANT },
-      ],
+      diaryEntries: [{ entry_at: isoLocal(2026, 4, 24, 9), id: "d1", plant_id: PLANT }],
     });
     expect(rows[0].kind).toBe("quicklog-only");
     expect(rows[0].activityLabel).toBe(HISTORY_LABELS.quickLogOnly);
@@ -75,9 +70,7 @@ describe("buildDailyGrowCheckHistory · pure rules", () => {
       plantId: PLANT,
       currentTentId: TENT,
       plantsInTentCount: 3,
-      manualReadings: [
-        { ts: isoLocal(2026, 4, 24, 10), id: "m1", tent_id: TENT },
-      ],
+      manualReadings: [{ ts: isoLocal(2026, 4, 24, 10), id: "m1", tent_id: TENT }],
       diaryEntries: [],
     });
     expect(rows[0].kind).toBe("tent-manual-only");
@@ -92,9 +85,7 @@ describe("buildDailyGrowCheckHistory · pure rules", () => {
       plantId: PLANT,
       currentTentId: TENT,
       plantsInTentCount: 1,
-      manualReadings: [
-        { ts: isoLocal(2026, 4, 24, 10), id: "m1", tent_id: TENT },
-      ],
+      manualReadings: [{ ts: isoLocal(2026, 4, 24, 10), id: "m1", tent_id: TENT }],
       diaryEntries: [],
     });
     expect(rows[0].kind).toBe("manual-only");
@@ -108,12 +99,8 @@ describe("buildDailyGrowCheckHistory · pure rules", () => {
       plantId: PLANT,
       currentTentId: TENT,
       plantsInTentCount: 1,
-      manualReadings: [
-        { ts: isoLocal(2026, 4, 24, 10, 0), id: "m1", tent_id: TENT },
-      ],
-      diaryEntries: [
-        { entry_at: isoLocal(2026, 4, 24, 10, 15), id: "d1", plant_id: PLANT },
-      ],
+      manualReadings: [{ ts: isoLocal(2026, 4, 24, 10, 0), id: "m1", tent_id: TENT }],
+      diaryEntries: [{ entry_at: isoLocal(2026, 4, 24, 10, 15), id: "d1", plant_id: PLANT }],
     });
     expect(rows[0].kind).toBe("both");
     expect(rows[0].activityLabel).toBe(HISTORY_LABELS.both);
@@ -132,9 +119,7 @@ describe("buildDailyGrowCheckHistory · pure rules", () => {
       plantId: PLANT,
       currentTentId: null,
       plantsInTentCount: 0,
-      manualReadings: [
-        { ts: isoLocal(2026, 4, 24, 10), id: "m1", tent_id: TENT },
-      ],
+      manualReadings: [{ ts: isoLocal(2026, 4, 24, 10), id: "m1", tent_id: TENT }],
       diaryEntries: [],
     });
     expect(rows[0].kind).toBe("none");
@@ -148,9 +133,7 @@ describe("buildDailyGrowCheckHistory · pure rules", () => {
       currentTentId: TENT,
       plantsInTentCount: 1,
       manualReadings: [],
-      diaryEntries: [
-        { entry_at: isoLocal(2026, 4, 24, 9), id: "d1", plant_id: "other" },
-      ],
+      diaryEntries: [{ entry_at: isoLocal(2026, 4, 24, 9), id: "d1", plant_id: "other" }],
     });
     expect(rows[0].kind).toBe("none");
   });
@@ -167,9 +150,7 @@ describe("buildDailyGrowCheckHistory · pure rules", () => {
         { ts: isoLocal(2026, 4, 24, 9), id: "m-old", tent_id: TENT },
         { ts: isoLocal(2026, 4, 24, 14), id: "m-new", tent_id: TENT },
       ],
-      diaryEntries: [
-        { entry_at: isoLocal(2026, 4, 24, 1), id: "d1", plant_id: PLANT },
-      ],
+      diaryEntries: [{ entry_at: isoLocal(2026, 4, 24, 1), id: "d1", plant_id: PLANT }],
     });
     // Manual newer than diary and > 5min apart → manual-only with manual latest time
     expect(rows[0].kind).toBe("manual-only");
@@ -183,10 +164,7 @@ describe("Daily Grow Check history · wiring + safety", () => {
     resolve(root, "src/components/PlantDailyGrowCheckHistoryCard.tsx"),
     "utf8",
   );
-  const rules = readFileSync(
-    resolve(root, "src/lib/dailyGrowCheckHistoryRules.ts"),
-    "utf8",
-  );
+  const rules = readFileSync(resolve(root, "src/lib/dailyGrowCheckHistoryRules.ts"), "utf8");
   const page = readFileSync(resolve(root, "src/pages/PlantDetail.tsx"), "utf8");
 
   it("Plant Detail renders the history card with plantId + currentTentId", () => {

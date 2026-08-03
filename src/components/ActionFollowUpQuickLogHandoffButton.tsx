@@ -66,9 +66,7 @@ export default function ActionFollowUpQuickLogHandoffButton({
     // an unsafe path through this component.
     if (!buildActionFollowUpReturnPath(action.actionId)) return;
     armed.current = true;
-    window.dispatchEvent(
-      new CustomEvent(ACTION_FOLLOWUP_QUICKLOG_EVENT, { detail: prefill }),
-    );
+    window.dispatchEvent(new CustomEvent(ACTION_FOLLOWUP_QUICKLOG_EVENT, { detail: prefill }));
   }, [action]);
 
   return (

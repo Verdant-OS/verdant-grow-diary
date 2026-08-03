@@ -18,16 +18,17 @@ const CSV_CLEAN = [
   "2026-06-01T10:05:00Z,22.6",
 ].join("\n");
 
-const CSV_ALL_BAD = [
-  "timestamp,temperature",
-  "not-a-date,22.5",
-  "still-bad,22.6",
-].join("\n");
+const CSV_ALL_BAD = ["timestamp,temperature", "not-a-date,22.5", "still-bad,22.6"].join("\n");
 
 describe("CSV Import Review UI v2 — empty-state polish", () => {
   it("diary attach: shows preview-mode empty copy when no existing entries", () => {
     render(
-      <CsvPreviewReviewGate previewResult={parse(CSV_CLEAN)} hasHardBlockedRows={false} hasAcceptedRows now={FIXED_NOW} />,
+      <CsvPreviewReviewGate
+        previewResult={parse(CSV_CLEAN)}
+        hasHardBlockedRows={false}
+        hasAcceptedRows
+        now={FIXED_NOW}
+      />,
     );
     const copy = screen.getByTestId("csv-gate-attach-existing-disabled-copy");
     expect(copy).toHaveTextContent(/Existing diary entry attach is not available in preview mode/);
@@ -39,7 +40,12 @@ describe("CSV Import Review UI v2 — empty-state polish", () => {
   it("sensor sample: shows empty copy when zero accepted drafts exist", () => {
     // All rows blocked → 0 accepted drafts but plan still renders
     render(
-      <CsvPreviewReviewGate previewResult={parse(CSV_ALL_BAD)} hasHardBlockedRows={false} hasAcceptedRows now={FIXED_NOW} />,
+      <CsvPreviewReviewGate
+        previewResult={parse(CSV_ALL_BAD)}
+        hasHardBlockedRows={false}
+        hasAcceptedRows
+        now={FIXED_NOW}
+      />,
     );
     const empty = screen.getByTestId("csv-gate-sensor-sample-empty");
     expect(empty).toHaveTextContent(/No accepted sensor write drafts to preview/);
@@ -52,7 +58,12 @@ describe("CSV Import Review UI v2 — empty-state polish", () => {
 
   it("blocked rows: shows calm empty copy when none are blocked", () => {
     render(
-      <CsvPreviewReviewGate previewResult={parse(CSV_CLEAN)} hasHardBlockedRows={false} hasAcceptedRows now={FIXED_NOW} />,
+      <CsvPreviewReviewGate
+        previewResult={parse(CSV_CLEAN)}
+        hasHardBlockedRows={false}
+        hasAcceptedRows
+        now={FIXED_NOW}
+      />,
     );
     const empty = screen.getByTestId("csv-import-plan-blocked-empty");
     expect(empty).toHaveTextContent(/No blocked rows detected/);

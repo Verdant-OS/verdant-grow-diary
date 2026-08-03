@@ -68,9 +68,9 @@ export function usePhenoHuntActivity(huntId: string | null | undefined): UsePhen
 
       const candidateLabelById: Record<string, string | null> = {};
       if (candRes.ok === true) {
+        // Include the candidate number when assigned ("#3 · Sour Zebra");
+        // otherwise preserve the "omit who when unlabeled" timeline contract.
         for (const c of candRes.candidates)
-          // Include the candidate number when assigned ("#3 · Sour Zebra");
-          // otherwise preserve the "omit who when unlabeled" timeline contract.
           candidateLabelById[c.candidateId] =
             c.candidateNumber != null ? phenoCandidateDisplayLabel(c) : (c.candidateLabel ?? null);
       }

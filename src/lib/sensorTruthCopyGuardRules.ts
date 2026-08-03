@@ -72,7 +72,10 @@ function normalizeStatus(
 }
 
 function build(
-  input: Omit<SensorTruthCopyGuard, "canDescribeAsLive" | "canDescribeAsCurrent" | "canDescribeAsHealthyLive">,
+  input: Omit<
+    SensorTruthCopyGuard,
+    "canDescribeAsLive" | "canDescribeAsCurrent" | "canDescribeAsHealthyLive"
+  >,
 ): SensorTruthCopyGuard {
   const canDescribeAsHealthyLive = input.verdict === "healthy_live";
   return {
@@ -83,9 +86,7 @@ function build(
   };
 }
 
-export function buildSensorTruthCopyGuard(
-  input: SensorTruthCopyGuardInput,
-): SensorTruthCopyGuard {
+export function buildSensorTruthCopyGuard(input: SensorTruthCopyGuardInput): SensorTruthCopyGuard {
   const sourceTone = normalizeSourceTone(input.sourceTone);
   const status = normalizeStatus(input.status);
 

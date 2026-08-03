@@ -16,7 +16,11 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { clearLocalStorageForTest, getLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 import {
   addView,
   buildView,
@@ -70,9 +74,7 @@ describe("validateView", () => {
     expect(validateView(base)?.id).toBe("a");
   });
   it("rejects invalid quickFilter values", () => {
-    expect(
-      validateView({ ...base, quickFilter: "not_a_filter" }),
-    ).toBeNull();
+    expect(validateView({ ...base, quickFilter: "not_a_filter" })).toBeNull();
   });
   it("rejects invalid sort values", () => {
     expect(validateView({ ...base, sort: "random" })).toBeNull();
@@ -206,14 +208,7 @@ describe("useLeadSavedViews — persistence", () => {
     });
     const raw = getLocalStorageItemForTest(STORAGE_KEY)!;
     const parsed = JSON.parse(raw);
-    const allowed = new Set([
-      "id",
-      "name",
-      "search",
-      "quickFilter",
-      "sort",
-      "createdAt",
-    ]);
+    const allowed = new Set(["id", "name", "search", "quickFilter", "sort", "createdAt"]);
     for (const v of parsed) {
       for (const k of Object.keys(v)) expect(allowed.has(k)).toBe(true);
     }
@@ -287,10 +282,7 @@ describe("serializeViews is deterministic", () => {
 describe("/leads renders saved views control + empty state", () => {
   const root = resolve(__dirname, "..", "..");
   const PAGE = readFileSync(resolve(root, "src/pages/Leads.tsx"), "utf8");
-  const MENU = readFileSync(
-    resolve(root, "src/components/LeadSavedViewsMenu.tsx"),
-    "utf8",
-  );
+  const MENU = readFileSync(resolve(root, "src/components/LeadSavedViewsMenu.tsx"), "utf8");
 
   it("/leads imports the saved-views menu and hook", () => {
     expect(PAGE).toMatch(/LeadSavedViewsMenu/);
@@ -346,9 +338,7 @@ describe("no new RLS policies for saved-views PR (localStorage only)", () => {
     const files = readdirSync(dir)
       .filter((f) => f.endsWith(".sql"))
       .sort();
-    const all = files
-      .map((f) => readFileSync(resolve(dir, f), "utf8"))
-      .join("\n");
+    const all = files.map((f) => readFileSync(resolve(dir, f), "utf8")).join("\n");
     // No table named saved_views, no policies for it.
     expect(all).not.toMatch(/saved_views/i);
     expect(all).not.toMatch(/lead_saved_views/i);

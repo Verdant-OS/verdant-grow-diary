@@ -16,10 +16,7 @@
  *   - Unknown sources resolve to a neutral "Unknown" badge — never
  *     "Live" / "Healthy".
  */
-import {
-  resolveSensorSourceLabel,
-  type SensorVendor,
-} from "./sensorSourceLabelRules";
+import { resolveSensorSourceLabel, type SensorVendor } from "./sensorSourceLabelRules";
 import {
   extractManualDeviceNote,
   normalizeManualSourceNote,
@@ -79,9 +76,7 @@ const DEGRADED_TONES: ReadonlySet<SourceBadgeTone> = new Set([
   "unknown",
 ]);
 
-function toneFromSource(
-  source: SensorReadingSource | null | undefined,
-): SourceBadgeTone {
+function toneFromSource(source: SensorReadingSource | null | undefined): SourceBadgeTone {
   switch (source) {
     case "live":
       return "live";
@@ -110,9 +105,7 @@ function toneFromSource(
  *   - Unknown sources collapse to tone "unknown" — never "live".
  *   - Demo / stale / invalid always carry `isDegraded: true`.
  */
-export function buildSensorSourceBadge(
-  input: BuildSensorSourceBadgeInput,
-): SensorSourceBadge {
+export function buildSensorSourceBadge(input: BuildSensorSourceBadgeInput): SensorSourceBadge {
   const source = input.source ?? null;
   const tone = toneFromSource(source);
   const truthCopyGuard = buildSensorTruthCopyGuard({
@@ -124,13 +117,13 @@ export function buildSensorSourceBadge(
     // Suppress vendor promotion for non-live readings so a "manual"
     // reading with a vendor hint never renders as "EcoWitt" (which
     // could be confused with live).
-    vendor: source === "live" ? input.vendor ?? null : null,
+    vendor: source === "live" ? (input.vendor ?? null) : null,
   });
 
   const manualDeviceNote =
     source === "manual"
-      ? normalizeManualSourceNote(input.manualDeviceNote ?? null) ??
-        extractManualDeviceNote(input.deviceId ?? null)
+      ? (normalizeManualSourceNote(input.manualDeviceNote ?? null) ??
+        extractManualDeviceNote(input.deviceId ?? null))
       : null;
 
   // Presenter-only badge copy. Underlying enum and

@@ -94,10 +94,7 @@ export function AiDoctorPhase1EvidenceShortcuts(
         className="rounded-md border border-border bg-card p-3 text-xs"
       >
         <div className="font-medium text-foreground">Recent diary evidence</div>
-        <p
-          data-testid="ai-doctor-phase1-diary-shortcuts-empty"
-          className="text-muted-foreground"
-        >
+        <p data-testid="ai-doctor-phase1-diary-shortcuts-empty" className="text-muted-foreground">
           No recent diary evidence available yet.
         </p>
       </section>

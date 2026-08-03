@@ -18,11 +18,7 @@
 // Public types
 // ---------------------------------------------------------------------------
 
-export type OneTentLoopProofStatus =
-  | "ready"
-  | "partial"
-  | "blocked"
-  | "not_started";
+export type OneTentLoopProofStatus = "ready" | "partial" | "blocked" | "not_started";
 
 export interface OneTentLoopProofStep {
   id: string;
@@ -94,9 +90,7 @@ const STEP_SEEDS: readonly StepSeed[] = [
       "Grow ownership scoped via RLS on grows table.",
     ],
     missing_pieces: [],
-    safety_notes: [
-      "Client never holds privileged credentials; ownership enforced server-side.",
-    ],
+    safety_notes: ["Client never holds privileged credentials; ownership enforced server-side."],
     next_fix: "No fix needed for V0 loop coverage.",
   },
   {
@@ -108,9 +102,7 @@ const STEP_SEEDS: readonly StepSeed[] = [
       "Tents are linked to a grow and ownership is enforced.",
     ],
     missing_pieces: [],
-    safety_notes: [
-      "Tent membership cannot be self-granted from the client.",
-    ],
+    safety_notes: ["Tent membership cannot be self-granted from the client."],
     next_fix: "No fix needed for V0 loop coverage.",
   },
   {
@@ -122,9 +114,7 @@ const STEP_SEEDS: readonly StepSeed[] = [
       "Plants are linked to a tent and inherit grow ownership.",
     ],
     missing_pieces: [],
-    safety_notes: [
-      "Plant context cannot leak across owners; verified by RLS.",
-    ],
+    safety_notes: ["Plant context cannot leak across owners; verified by RLS."],
     next_fix: "No fix needed for V0 loop coverage.",
   },
   {
@@ -171,8 +161,7 @@ const STEP_SEEDS: readonly StepSeed[] = [
       "Unknown or malformed telemetry must stay flagged, not classified as healthy.",
       "Live label is reserved for source=live with a fresh captured_at.",
     ],
-    next_fix:
-      "Wait for real tent/controller readings before claiming live sensor proof.",
+    next_fix: "Wait for real tent/controller readings before claiming live sensor proof.",
   },
   {
     id: "ai-doctor",
@@ -266,9 +255,7 @@ function buildStep(seed: StepSeed): OneTentLoopProofStep {
 /**
  * Pure deterministic builder. Same `now` → same output.
  */
-export function buildOneTentLoopProofViewModel(
-  now?: string | Date,
-): OneTentLoopProofViewModel {
+export function buildOneTentLoopProofViewModel(now?: string | Date): OneTentLoopProofViewModel {
   const steps: OneTentLoopProofStep[] = STEP_SEEDS.map(buildStep);
   const vm: OneTentLoopProofViewModel = {
     title: "One-Tent Loop — Internal Proof Checklist",
@@ -284,6 +271,4 @@ export function buildOneTentLoopProofViewModel(
 }
 
 /** Canonical step order — exported for tests and consumers. */
-export const ONE_TENT_LOOP_PROOF_STEP_IDS: readonly string[] = STEP_SEEDS.map(
-  (s) => s.id,
-);
+export const ONE_TENT_LOOP_PROOF_STEP_IDS: readonly string[] = STEP_SEEDS.map((s) => s.id);

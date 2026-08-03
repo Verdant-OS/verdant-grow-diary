@@ -9,10 +9,7 @@
  *    client body, sensor values, executable commands.
  */
 
-import type {
-  PiIngestPipelineResult,
-  PiIngestPipelineStage,
-} from "./piIngestPipeline";
+import type { PiIngestPipelineResult, PiIngestPipelineStage } from "./piIngestPipeline";
 import type { PiIngestInsertPartitionSummary } from "./piIngestInsertPlanRules";
 
 // ----------------------------- Types -----------------------------
@@ -95,9 +92,7 @@ const FORBIDDEN_KEYS: ReadonlySet<string> = new Set<string>([
  * untrusted record. Always returns a fresh object containing only the
  * allowed log fields.
  */
-export function redactPiIngestLogRecord(
-  record: Record<string, unknown>,
-): PiIngestAttemptLogRecord {
+export function redactPiIngestLogRecord(record: Record<string, unknown>): PiIngestAttemptLogRecord {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(record)) {
     if (FORBIDDEN_KEYS.has(k)) continue;

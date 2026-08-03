@@ -17,10 +17,7 @@
  *     nutrient, irrigation, or equipment/device recommendations.
  */
 
-import type {
-  AiDoctorVpdDriftContext,
-  VpdDriftClassification,
-} from "./vpdDriftRules";
+import type { AiDoctorVpdDriftContext, VpdDriftClassification } from "./vpdDriftRules";
 
 export type AiDoctorVpdDriftPresenterStatus =
   | "insufficient_data"
@@ -68,8 +65,7 @@ export const VPD_DRIFT_SAFETY_NOTE =
 export const VPD_DRIFT_INSUFFICIENT_COPY =
   "Not enough recent VPD data to identify a drift pattern.";
 
-export const VPD_DRIFT_IN_BAND_COPY =
-  "Recent derived VPD has stayed inside the stage target band.";
+export const VPD_DRIFT_IN_BAND_COPY = "Recent derived VPD has stayed inside the stage target band.";
 
 export const VPD_DRIFT_SUSTAINED_HIGH_COPY =
   "Derived VPD has stayed above the stage target band recently.";
@@ -77,15 +73,12 @@ export const VPD_DRIFT_SUSTAINED_HIGH_COPY =
 export const VPD_DRIFT_SUSTAINED_LOW_COPY =
   "Derived VPD has stayed below the stage target band recently.";
 
-export const VPD_DRIFT_UNAVAILABLE_COPY =
-  "Derived VPD drift could not be evaluated.";
+export const VPD_DRIFT_UNAVAILABLE_COPY = "Derived VPD drift could not be evaluated.";
 
 export const VPD_DRIFT_REVIEW_COPY =
   "Review temperature, humidity, airflow, and stage targets before making changes.";
 
-function classify(
-  ctx: AiDoctorVpdDriftContext,
-): AiDoctorVpdDriftPresenterStatus {
+function classify(ctx: AiDoctorVpdDriftContext): AiDoctorVpdDriftPresenterStatus {
   const c: VpdDriftClassification = ctx.classification;
   if (c === "insufficient") return "insufficient_data";
   if (c === "in_band") return "in_band";

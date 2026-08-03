@@ -71,8 +71,7 @@ function renderReset() {
 function getTabOrder(): HTMLElement[] {
   // Include disabled buttons — they still occupy a DOM order slot and we
   // want to assert ordering, not focusability.
-  const selector =
-    'a[href], button, input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  const selector = 'a[href], button, input:not([disabled]), [tabindex]:not([tabindex="-1"])';
   return Array.from(document.querySelectorAll<HTMLElement>(selector)).filter(
     (el) => !el.hasAttribute("aria-hidden"),
   );
@@ -218,9 +217,7 @@ describe("/reset-password — keyboard tab order & focus", () => {
     fireEvent.change(screen.getByLabelText(/^confirm new password$/i), {
       target: { value: "abcdefg1" },
     });
-    await waitFor(() =>
-      expect(screen.queryByText(/passwords do not match yet/i)).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByText(/passwords do not match yet/i)).toBeNull());
   });
 
   it("loading disables submit and the loading button stays visible", async () => {

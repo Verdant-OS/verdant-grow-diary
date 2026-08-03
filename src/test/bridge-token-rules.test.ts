@@ -18,7 +18,9 @@ describe("bridgeTokenRules", () => {
     expect(bridgeTokenStatus({ expires_at: future, revoked_at: null })).toBe("active");
   });
   it("status: revoked when revoked_at set", () => {
-    expect(bridgeTokenStatus({ expires_at: future, revoked_at: new Date().toISOString() })).toBe("revoked");
+    expect(bridgeTokenStatus({ expires_at: future, revoked_at: new Date().toISOString() })).toBe(
+      "revoked",
+    );
   });
   it("status: expired when expires_at in past", () => {
     expect(bridgeTokenStatus({ expires_at: past, revoked_at: null })).toBe("expired");
@@ -74,5 +76,5 @@ describe("bridgeTokenRules", () => {
   it("formatIngestCount: millions render with M suffix", () => {
     expect(formatIngestCount(1_500_000)).toBe("1.5M");
     expect(formatIngestCount(12_000_000)).toBe("12M");
-});
+  });
 });

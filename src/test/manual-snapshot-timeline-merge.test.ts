@@ -68,9 +68,7 @@ describe("mergeTimelineItems", () => {
   });
 
   it("returns an empty array when there is nothing to merge", () => {
-    expect(
-      mergeTimelineItems({ diaryEntries: [], manualSnapshots: [] }),
-    ).toEqual([]);
+    expect(mergeTimelineItems({ diaryEntries: [], manualSnapshots: [] })).toEqual([]);
   });
 
   it("does not invent or relabel diary entries", () => {

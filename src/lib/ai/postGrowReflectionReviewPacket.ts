@@ -49,25 +49,29 @@ export interface PostGrowReflectionReviewPacketEmpty extends PostGrowReflectionR
   sectionSummaries: null;
 }
 
-export interface PostGrowReflectionReviewPacketInvalidJson extends PostGrowReflectionReviewPacketBase {
+export interface PostGrowReflectionReviewPacketInvalidJson
+  extends PostGrowReflectionReviewPacketBase {
   status: "invalid_json";
   confidence: null;
   sectionSummaries: null;
 }
 
-export interface PostGrowReflectionReviewPacketEnvelopeRejected extends PostGrowReflectionReviewPacketBase {
+export interface PostGrowReflectionReviewPacketEnvelopeRejected
+  extends PostGrowReflectionReviewPacketBase {
   status: "envelope_rejected";
   confidence: null;
   sectionSummaries: null;
 }
 
-export interface PostGrowReflectionReviewPacketValidationFailed extends PostGrowReflectionReviewPacketBase {
+export interface PostGrowReflectionReviewPacketValidationFailed
+  extends PostGrowReflectionReviewPacketBase {
   status: "validation_failed";
   confidence: null;
   sectionSummaries: null;
 }
 
-export interface PostGrowReflectionReviewPacketValidated extends PostGrowReflectionReviewPacketBase {
+export interface PostGrowReflectionReviewPacketValidated
+  extends PostGrowReflectionReviewPacketBase {
   status: "validated";
   confidence: string;
   sectionSummaries: PostGrowReflectionReviewPacketSectionSummary[];

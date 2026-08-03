@@ -29,9 +29,11 @@ import {
 } from "@/lib/quickLogPhotoDiaryEntry";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 import * as supabaseModule from "@/integrations/supabase/client";
-const mock = (supabaseModule as unknown as {
-  __mock: { from: ReturnType<typeof vi.fn>; insert: ReturnType<typeof vi.fn> };
-}).__mock;
+const mock = (
+  supabaseModule as unknown as {
+    __mock: { from: ReturnType<typeof vi.fn>; insert: ReturnType<typeof vi.fn> };
+  }
+).__mock;
 
 const FIXED_NOW = new Date("2026-07-07T12:00:00.000Z");
 const now = () => FIXED_NOW;
@@ -94,9 +96,7 @@ describe("createQuickLogPhotoDiaryEntry", () => {
     expect(mock.from).toHaveBeenCalledTimes(1);
     expect(mock.from).toHaveBeenCalledWith("diary_entries");
     expect(mock.insert).toHaveBeenCalledTimes(1);
-    expect(mock.insert.mock.calls[0][0]).toEqual(
-      buildQuickLogPhotoDiaryEntryRow(baseInput),
-    );
+    expect(mock.insert.mock.calls[0][0]).toEqual(buildQuickLogPhotoDiaryEntryRow(baseInput));
   });
 
   it("returns a failure message on insert error and does not throw", async () => {
@@ -172,9 +172,7 @@ describe("QuickLogV2Sheet static safety — photo diary extraction", () => {
       join(process.cwd(), "src", "components", "QuickLogV2Sheet.tsx"),
       "utf8",
     );
-    const stripped = raw
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/\/\/.*$/gm, "");
+    const stripped = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     // storage.from is allowed (photo upload); .from( on its own must be gone.
     expect(stripped).not.toMatch(/[^.]supabase\.from\(/);
   });

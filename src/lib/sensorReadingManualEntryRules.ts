@@ -171,7 +171,13 @@ export function validateManualEntry(input: ManualEntryInput): ManualEntryValidat
   if (vpd !== null && vpd >= 0 && vpd > 2.5) {
     warnings.push(`VPD ${vpd} kPa is unusually high (> 2.5).`);
   }
-  if (vpd === null && airTemp.celsius !== null && humidity !== null && humidity >= 0 && humidity <= 100) {
+  if (
+    vpd === null &&
+    airTemp.celsius !== null &&
+    humidity !== null &&
+    humidity >= 0 &&
+    humidity <= 100
+  ) {
     warnings.push(
       "Air VPD estimate is preview-only and is not saved as verified VPD. Measure leaf temperature and complete calibration evidence before making a target claim.",
     );

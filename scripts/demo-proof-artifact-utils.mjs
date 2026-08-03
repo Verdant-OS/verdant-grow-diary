@@ -184,10 +184,18 @@ export function extractZip(zipPath, destDir) {
         try {
           data = inflateRawSync(raw);
         } catch (err) {
-          return { ok: false, error: new Error(`Inflate failed for ${name}: ${err.message}`), entries };
+          return {
+            ok: false,
+            error: new Error(`Inflate failed for ${name}: ${err.message}`),
+            entries,
+          };
         }
       } else {
-        return { ok: false, error: new Error(`Unsupported compression method ${method} for ${name}`), entries };
+        return {
+          ok: false,
+          error: new Error(`Unsupported compression method ${method} for ${name}`),
+          entries,
+        };
       }
       writeFileSync(outPath, data);
       entries.push({ name, type: "file", size: data.length });

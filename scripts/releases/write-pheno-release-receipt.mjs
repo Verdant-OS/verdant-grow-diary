@@ -71,7 +71,10 @@ function yes(value) {
 }
 
 function esc(value) {
-  return String(value ?? "").replaceAll("|", "\\|").replaceAll("\n", " ").trim();
+  return String(value ?? "")
+    .replaceAll("|", "\\|")
+    .replaceAll("\n", " ")
+    .trim();
 }
 
 // Same semantics as scripts/releases/fetch-pheno-live-build-id.mjs: the
@@ -140,10 +143,7 @@ const REQUIRED_EXCEPTION_FIELDS = [
 export function evaluateMigrationPosture(rollback) {
   const problems = [];
   const posture = rollback?.migrationPosture;
-  const legacyOnly =
-    !posture &&
-    rollback &&
-    Object.prototype.hasOwnProperty.call(rollback, "additiveMigrations");
+  const legacyOnly = !posture && rollback && Object.hasOwn(rollback, "additiveMigrations");
 
   if (!posture) {
     if (legacyOnly) {
@@ -166,7 +166,8 @@ export function evaluateMigrationPosture(rollback) {
   const classification = String(posture.classification ?? "").toUpperCase();
   const exceptions = Array.isArray(posture.exceptions) ? posture.exceptions : [];
 
-  if (status !== "PASS") problems.push(`migrationPosture.status must be PASS (got ${status || "empty"})`);
+  if (status !== "PASS")
+    problems.push(`migrationPosture.status must be PASS (got ${status || "empty"})`);
   if (!MIGRATION_POSTURE_CLASSIFICATIONS.includes(classification)) {
     problems.push(`migrationPosture.classification unsupported (got ${classification || "empty"})`);
   }
@@ -200,8 +201,6 @@ export function evaluateMigrationPosture(rollback) {
   };
 }
 
-
-
 function smokeCheckpointMap(smoke, manual) {
   const map = new Map();
   for (const item of Array.isArray(smoke?.checkpoints) ? smoke.checkpoints : []) {
@@ -212,9 +211,8 @@ function smokeCheckpointMap(smoke, manual) {
       });
     }
   }
-  const overrides = manual?.checkpoints && typeof manual.checkpoints === "object"
-    ? manual.checkpoints
-    : {};
+  const overrides =
+    manual?.checkpoints && typeof manual.checkpoints === "object" ? manual.checkpoints : {};
   for (const [id, item] of Object.entries(overrides)) {
     map.set(Number(id), {
       status: status(typeof item === "string" ? item : item?.status),
@@ -230,7 +228,11 @@ function smokeCheckpointMap(smoke, manual) {
  * render nothing here (no misleading empty table).
  */
 export function renderMigrationExceptionSection(postureCheck) {
-  if (!postureCheck || !Array.isArray(postureCheck.exceptions) || postureCheck.exceptions.length === 0) {
+  if (
+    !postureCheck ||
+    !Array.isArray(postureCheck.exceptions) ||
+    postureCheck.exceptions.length === 0
+  ) {
     return [];
   }
   const lines = [
@@ -251,7 +253,8 @@ export function renderMigrationExceptionSection(postureCheck) {
 export function renderReceipt({ smoke, schema, build, manual, allowPartial = false }) {
   const schemaCheck = schemaResult(schema);
   const buildMatch = expectedBuildMatches(build, manual);
-  const deploymentReachable = status(smoke?.deployment) === "PASS" && status(build?.status) === "PASS";
+  const deploymentReachable =
+    status(smoke?.deployment) === "PASS" && status(build?.status) === "PASS";
   const deploymentManualPass =
     status(manual?.deployment?.noWhiteScreen) === "PASS" &&
     status(manual?.deployment?.consoleErrors) === "PASS";
@@ -267,9 +270,10 @@ export function renderReceipt({ smoke, schema, build, manual, allowPartial = fal
   const allCheckpointsPass = CHECKPOINTS.every(([id]) => checkpointMap.get(id)?.status === "PASS");
 
   const billingStatus = status(manual?.billing?.status);
-  const billingResolved = manual?.billing?.required === false
-    ? billingStatus === "NOT_REQUIRED" || billingStatus === "PASS"
-    : billingStatus === "PASS";
+  const billingResolved =
+    manual?.billing?.required === false
+      ? billingStatus === "NOT_REQUIRED" || billingStatus === "PASS"
+      : billingStatus === "PASS";
 
   // GO also demands complete rollback readiness — a release without a
   // verified rollback path is not shippable, only reachable. The migration
@@ -392,7 +396,9 @@ function main() {
     ["smoke", smoke],
     ["schema", schema],
     ["build", build],
-  ].filter(([, value]) => !value).map(([name]) => name);
+  ]
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
 
   if (missing.length > 0 && !args.allowPartial) {
     console.error(`BLOCKED: missing release input artifact(s): ${missing.join(", ")}`);

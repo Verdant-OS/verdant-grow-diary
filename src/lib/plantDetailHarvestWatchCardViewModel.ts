@@ -122,7 +122,7 @@ export function buildPlantDetailHarvestWatchCardViewModel(params: {
   const { plant } = params;
   const now = params.now ?? new Date();
   const rows = params.recentActivityRows ?? [];
-  const photos = (params.hasPlantPhoto || !!plant.photo ? 1 : 0) + countActivityPhotos(rows);
+  const photos = (params.hasPlantPhoto || plant.photo ? 1 : 0) + countActivityPhotos(rows);
   const lastPhotoAt = latestPhotoAt(rows);
 
   // Plant Detail does not currently expose a true flower-start/flip date or
@@ -177,11 +177,7 @@ export function buildPlantDetailHarvestWatchCardViewModel(params: {
   const groupedRecent = groupHarvestRecentItems(recentForChecklist, {
     perGroupLimit: 5,
   });
-  const STRONG_KEYS = new Set([
-    "trichome_inspection",
-    "pistil_observation",
-    "bud_maturity_note",
-  ]);
+  const STRONG_KEYS = new Set(["trichome_inspection", "pistil_observation", "bud_maturity_note"]);
   const strongEvidenceCount = evidenceChecklist.filter(
     (i) => STRONG_KEYS.has(i.key) && i.status === "present",
   ).length;

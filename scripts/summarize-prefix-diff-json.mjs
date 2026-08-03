@@ -57,7 +57,8 @@ if (Array.isArray(data.expected) || Array.isArray(data.malformed)) {
       "| --- | --- |",
       ...malformed.slice(0, 10).map((m) => `| \`${m.file}\` | ${escapeCell(m.reason)} |`),
     );
-    if (malformed.length > 10) lines.push("", `_…and ${malformed.length - 10} more (see artifacts)._`);
+    if (malformed.length > 10)
+      lines.push("", `_…and ${malformed.length - 10} more (see artifacts)._`);
   }
   emit(lines.join("\n") + "\n");
   process.exit(0);
@@ -112,5 +113,7 @@ function emit(text) {
 }
 
 function escapeCell(v) {
-  return String(v ?? "").replace(/\|/g, "\\|").replace(/\n/g, " ");
+  return String(v ?? "")
+    .replace(/\|/g, "\\|")
+    .replace(/\n/g, " ");
 }

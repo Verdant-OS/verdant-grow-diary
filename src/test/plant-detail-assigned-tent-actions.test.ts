@@ -30,9 +30,7 @@ import {
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 
-function action(
-  overrides: Partial<AssignedTentActionInputRow> = {},
-): AssignedTentActionInputRow {
+function action(overrides: Partial<AssignedTentActionInputRow> = {}): AssignedTentActionInputRow {
   return {
     id: "act-1",
     grow_id: "g1",
@@ -52,9 +50,7 @@ function action(
 
 describe("extractAlertBackPointerId", () => {
   it("parses the [alert:<id>] token", () => {
-    expect(extractAlertBackPointerId("Humidity is high [alert:abc-123]")).toBe(
-      "abc-123",
-    );
+    expect(extractAlertBackPointerId("Humidity is high [alert:abc-123]")).toBe("abc-123");
   });
   it("returns null when no token present", () => {
     expect(extractAlertBackPointerId("no token")).toBeNull();
@@ -77,10 +73,7 @@ describe("buildAssignedTentActions (pure)", () => {
 
   it("filters to the assigned tent only — never leaks other tents", () => {
     const rows = buildAssignedTentActions(
-      [
-        action({ id: "a", tent_id: "t1" }),
-        action({ id: "b", tent_id: "t2" }),
-      ],
+      [action({ id: "a", tent_id: "t1" }), action({ id: "b", tent_id: "t2" })],
       { tentId: "t1" },
     );
     expect(rows.map((r) => r.id)).toEqual(["a"]);
@@ -144,10 +137,9 @@ describe("buildAssignedTentActions (pure)", () => {
   });
 
   it("links to assigned tent alerts via the [alert:<id>] back-pointer", () => {
-    const [row] = buildAssignedTentActions(
-      [action({ reason: "RH high [alert:al-42]" })],
-      { tentId: "t1" },
-    );
+    const [row] = buildAssignedTentActions([action({ reason: "RH high [alert:al-42]" })], {
+      tentId: "t1",
+    });
     expect(row.alertBackPointerId).toBe("al-42");
   });
 
@@ -182,11 +174,7 @@ describe("buildAssignedTentActions (pure)", () => {
 
   it("drops rows missing id or grow_id defensively", () => {
     const rows = buildAssignedTentActions(
-      [
-        action({ id: "" }),
-        action({ id: "ok", grow_id: null }),
-        action({ id: "good" }),
-      ],
+      [action({ id: "" }), action({ id: "ok", grow_id: null }), action({ id: "good" })],
       { tentId: "t1" },
     );
     expect(rows.map((r) => r.id)).toEqual(["good"]);
@@ -207,9 +195,7 @@ describe("Plant Detail wiring", () => {
     expect(PANEL).toMatch(/\/actions\/\$\{row\.id\}/);
   });
   it("panel shows the assigned-tent empty state copy", () => {
-    expect(PANEL).toContain(
-      "Assign this plant to a tent to see pending actions.",
-    );
+    expect(PANEL).toContain("Assign this plant to a tent to see pending actions.");
   });
   it("panel shows the no-pending-actions empty state copy", () => {
     expect(PANEL).toContain("No pending actions for this assigned tent.");
@@ -263,15 +249,15 @@ describe("Assigned Tent Action Queue safety", () => {
   });
 
   it("rules file has no React, no Supabase, no I/O", () => {
-    expect(RULES).not.toMatch(
-      /from\s+["']@\/integrations\/supabase\/client["']/,
-    );
+    expect(RULES).not.toMatch(/from\s+["']@\/integrations\/supabase\/client["']/);
     expect(RULES).not.toMatch(/from\s+["']react["']/);
     expect(RULES).not.toMatch(/fetch\(/);
   });
 
   it("panel performs no approve/reject/execute mutations", () => {
-    expect(PANEL).not.toMatch(/approveAction|rejectAction|executeAction|simulateAction|completeAction|cancelAction|action_queue_events|\.from\(["']action_queue["']\)/);
+    expect(PANEL).not.toMatch(
+      /approveAction|rejectAction|executeAction|simulateAction|completeAction|cancelAction|action_queue_events|\.from\(["']action_queue["']\)/,
+    );
   });
 });
 

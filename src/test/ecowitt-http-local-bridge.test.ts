@@ -47,7 +47,18 @@ describe("parseFlags", () => {
   });
   it("supports CLI overrides", () => {
     const f = parseFlags(
-      ["--port", "9090", "--endpoint", "/x", "--mqtt-url", "mqtt://h:1", "--topic", "t", "--dry-run", "--once"],
+      [
+        "--port",
+        "9090",
+        "--endpoint",
+        "/x",
+        "--mqtt-url",
+        "mqtt://h:1",
+        "--topic",
+        "t",
+        "--dry-run",
+        "--once",
+      ],
       {},
     );
     expect(f.port).toBe(9090);
@@ -134,7 +145,12 @@ describe("handleRequest", () => {
   it("accepts trailing-slash /data/report/", async () => {
     const { pub, calls } = fakePublisher();
     const res = await handleRequest(
-      { method: "POST", url: "/data/report/", headers: { "content-type": "application/x-www-form-urlencoded" }, body: "temp1f=70" },
+      {
+        method: "POST",
+        url: "/data/report/",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: "temp1f=70",
+      },
       baseFlags(),
       pub,
     );
@@ -166,7 +182,12 @@ describe("handleRequest", () => {
   it("returns 400 on malformed payload", async () => {
     const { pub, calls } = fakePublisher();
     const res = await handleRequest(
-      { method: "POST", url: "/data/report", headers: { "content-type": "application/json" }, body: "{not json" },
+      {
+        method: "POST",
+        url: "/data/report",
+        headers: { "content-type": "application/json" },
+        body: "{not json",
+      },
       baseFlags(),
       pub,
     );
@@ -177,7 +198,12 @@ describe("handleRequest", () => {
   it("dry-run parses and does NOT publish", async () => {
     const { pub, calls } = fakePublisher();
     const res = await handleRequest(
-      { method: "POST", url: "/data/report", headers: { "content-type": "application/x-www-form-urlencoded" }, body: "temp1f=77.4" },
+      {
+        method: "POST",
+        url: "/data/report",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: "temp1f=77.4",
+      },
       baseFlags({ dryRun: true }),
       pub,
     );
@@ -190,11 +216,19 @@ describe("handleRequest", () => {
     const { pub } = fakePublisher();
     const spy = vi.spyOn(console, "log").mockImplementation(() => {});
     await handleRequest(
-      { method: "POST", url: "/data/report", headers: { "content-type": "application/x-www-form-urlencoded" }, body: "temp1f=77.4&apikey=vbt_secret_should_never_appear" },
+      {
+        method: "POST",
+        url: "/data/report",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: "temp1f=77.4&apikey=vbt_secret_should_never_appear",
+      },
       baseFlags(),
       pub,
     );
-    const allLogs = spy.mock.calls.flat().map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ");
+    const allLogs = spy.mock.calls
+      .flat()
+      .map((a) => (typeof a === "string" ? a : JSON.stringify(a)))
+      .join(" ");
     spy.mockRestore();
     expect(allLogs).not.toMatch(/vbt_secret_should_never_appear/);
     expect(allLogs).toMatch(/temp1f/);
@@ -202,11 +236,18 @@ describe("handleRequest", () => {
 
   it("returns 502 if MQTT publish fails", async () => {
     const pub: MqttPublisher = {
-      publish: async () => { throw new Error("broker down"); },
+      publish: async () => {
+        throw new Error("broker down");
+      },
       end: async () => {},
     };
     const res = await handleRequest(
-      { method: "POST", url: "/data/report", headers: { "content-type": "application/x-www-form-urlencoded" }, body: "temp1f=70" },
+      {
+        method: "POST",
+        url: "/data/report",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: "temp1f=70",
+      },
       baseFlags(),
       pub,
     );

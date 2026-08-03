@@ -65,17 +65,14 @@ export interface OnboardingGuidance {
 }
 
 export const ONBOARDING_TITLE = "Set up your daily grow loop";
-export const ONBOARDING_INTRO_SUBTITLE =
-  "Start with one tent, one plant, and one manual snapshot.";
+export const ONBOARDING_INTRO_SUBTITLE = "Start with one tent, one plant, and one manual snapshot.";
 
 /**
  * Decide the single next-step guidance for a grower.
  *
  * Deterministic: identical inputs always yield identical outputs.
  */
-export function deriveDailyGrowCheckOnboarding(
-  input: OnboardingInput,
-): OnboardingGuidance {
+export function deriveDailyGrowCheckOnboarding(input: OnboardingInput): OnboardingGuidance {
   // 1. Active grow missing (only if caller passed an explicit boolean).
   if (input.hasActiveGrow === false) {
     return {
@@ -101,9 +98,7 @@ export function deriveDailyGrowCheckOnboarding(
   }
 
   // Prefer a focused tent for tent-scoped flows (add plant / add snapshot).
-  const tentScopedHref = input.focusedTentId
-    ? `/tents/${input.focusedTentId}`
-    : null;
+  const tentScopedHref = input.focusedTentId ? `/tents/${input.focusedTentId}` : null;
 
   // 3. No plants — route to the focused tent (where plants can be added)
   //    when known, otherwise the plants list.
@@ -120,20 +115,16 @@ export function deriveDailyGrowCheckOnboarding(
 
   // 4. Plant exists but no tent assigned. Route to the focused plant's
   //    detail page where the Assign Tent dialog lives.
-  const focusedPlantNeedsTent =
-    !!input.focusedPlantId && !input.focusedPlantTentId;
+  const focusedPlantNeedsTent = !!input.focusedPlantId && !input.focusedPlantTentId;
   const allPlantsUnassigned =
     input.plantsCount > 0 && input.plantsWithoutTentCount >= input.plantsCount;
   if (focusedPlantNeedsTent || allPlantsUnassigned) {
     return {
       step: "assign-plant",
       title: ONBOARDING_TITLE,
-      subtitle:
-        "Assign this plant to a tent so environment context follows it.",
+      subtitle: "Assign this plant to a tent so environment context follows it.",
       ctaLabel: "Assign Plant to Tent",
-      ctaHref: input.focusedPlantId
-        ? `/plants/${input.focusedPlantId}`
-        : "/plants",
+      ctaHref: input.focusedPlantId ? `/plants/${input.focusedPlantId}` : "/plants",
       isReady: false,
     };
   }
@@ -148,8 +139,7 @@ export function deriveDailyGrowCheckOnboarding(
     return {
       step: "add-manual-snapshot",
       title: ONBOARDING_TITLE,
-      subtitle:
-        "Add your first manual snapshot. This is not live sensor data.",
+      subtitle: "Add your first manual snapshot. This is not live sensor data.",
       ctaLabel: "Add Manual Snapshot",
       ctaHref: snapshotHref,
       isReady: false,
@@ -164,9 +154,7 @@ export function deriveDailyGrowCheckOnboarding(
       title: ONBOARDING_TITLE,
       subtitle: "Add a quick note so Verdant has plant memory.",
       ctaLabel: "Add Quick Log",
-      ctaHref: input.focusedPlantId
-        ? `/plants/${input.focusedPlantId}`
-        : "/daily-check",
+      ctaHref: input.focusedPlantId ? `/plants/${input.focusedPlantId}` : "/daily-check",
       isReady: false,
     };
   }

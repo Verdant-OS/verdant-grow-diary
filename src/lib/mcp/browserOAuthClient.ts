@@ -20,6 +20,21 @@ const SS_KEYS = {
 
 const SCOPE = "openid email profile";
 
+function resolveBrowserSessionStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function requireBrowserSessionStorage(): Storage {
+  const storage = resolveBrowserSessionStorage();
+  if (!storage) throw new Error("Browser session storage is unavailable");
+  return storage;
+}
+
 export type OAuthDiscovery = {
   issuer: string;
   authorization_endpoint: string;
@@ -90,8 +105,9 @@ type RegisteredClient = { client_id: string; redirect_uri: string };
 async function getOrRegisterClient(
   discovery: OAuthDiscovery,
   redirectUri: string,
+  storage: Storage,
 ): Promise<RegisteredClient> {
-  const raw = sessionStorage.getItem(SS_KEYS.client);
+  const raw = storage.getItem(SS_KEYS.client);
   if (raw) {
     try {
       const parsed = JSON.parse(raw) as RegisteredClient;
@@ -119,11 +135,14 @@ async function getOrRegisterClient(
   const body = (await res.json()) as { client_id?: string };
   if (!body.client_id) throw new Error("Client registration did not return a client_id");
   const rec: RegisteredClient = { client_id: body.client_id, redirect_uri: redirectUri };
-  sessionStorage.setItem(SS_KEYS.client, JSON.stringify(rec));
+  storage.setItem(SS_KEYS.client, JSON.stringify(rec));
   return rec;
 }
 
 export function sameOriginRedirect(path: string): string {
+  if (typeof window === "undefined") {
+    throw new Error("Browser OAuth is unavailable during server rendering");
+  }
   const url = new URL(path, window.location.origin);
   if (url.origin !== window.location.origin) {
     throw new Error("redirect_uri must be same-origin");
@@ -135,13 +154,14 @@ export async function startAuthorization(
   issuer: string,
   redirectPath: string,
 ): Promise<void> {
+  const storage = requireBrowserSessionStorage();
   const discovery = await fetchDiscovery(issuer);
   const redirectUri = sameOriginRedirect(redirectPath);
-  const client = await getOrRegisterClient(discovery, redirectUri);
+  const client = await getOrRegisterClient(discovery, redirectUri, storage);
   const verifier = randomString(32);
   const challenge = base64url(await sha256(verifier));
   const state = randomString(16);
-  sessionStorage.setItem(
+  storage.setItem(
     SS_KEYS.pkce,
     JSON.stringify({ verifier, state, redirect_uri: redirectUri, client_id: client.client_id }),
   );
@@ -170,7 +190,8 @@ export async function completeAuthorization(
   issuer: string,
   params: CallbackParams,
 ): Promise<void> {
-  const raw = sessionStorage.getItem(SS_KEYS.pkce);
+  const storage = requireBrowserSessionStorage();
+  const raw = storage.getItem(SS_KEYS.pkce);
   if (!raw) throw new Error("No pending authorization in this browser");
   const pending = JSON.parse(raw) as {
     verifier: string;
@@ -196,7 +217,7 @@ export async function completeAuthorization(
     body: body.toString(),
   });
   if (!res.ok) {
-    sessionStorage.removeItem(SS_KEYS.pkce);
+    storage.removeItem(SS_KEYS.pkce);
     throw new Error(`Token exchange failed (${res.status})`);
   }
   const tok = (await res.json()) as {
@@ -205,8 +226,8 @@ export async function completeAuthorization(
     expires_in?: number;
   };
   if (!tok.access_token) throw new Error("Token endpoint returned no access_token");
-  sessionStorage.removeItem(SS_KEYS.pkce);
-  sessionStorage.setItem(
+  storage.removeItem(SS_KEYS.pkce);
+  storage.setItem(
     SS_KEYS.token,
     JSON.stringify({
       access_token: tok.access_token,
@@ -217,9 +238,11 @@ export async function completeAuthorization(
 }
 
 export function hasStoredToken(): boolean {
-  const raw = sessionStorage.getItem(SS_KEYS.token);
-  if (!raw) return false;
+  const storage = resolveBrowserSessionStorage();
+  if (!storage) return false;
   try {
+    const raw = storage.getItem(SS_KEYS.token);
+    if (!raw) return false;
     const t = JSON.parse(raw) as { obtained_at: number; expires_in: number };
     const ageSec = (Date.now() - t.obtained_at) / 1000;
     return ageSec < t.expires_in - 30;
@@ -229,15 +252,23 @@ export function hasStoredToken(): boolean {
 }
 
 export function disconnect(): void {
-  sessionStorage.removeItem(SS_KEYS.token);
-  sessionStorage.removeItem(SS_KEYS.pkce);
-  sessionStorage.removeItem(SS_KEYS.client);
+  const storage = resolveBrowserSessionStorage();
+  if (!storage) return;
+  try {
+    storage.removeItem(SS_KEYS.token);
+    storage.removeItem(SS_KEYS.pkce);
+    storage.removeItem(SS_KEYS.client);
+  } catch {
+    // Storage can be blocked without affecting the signed-in Verdant session.
+  }
 }
 
 function readToken(): string | null {
-  const raw = sessionStorage.getItem(SS_KEYS.token);
-  if (!raw) return null;
+  const storage = resolveBrowserSessionStorage();
+  if (!storage) return null;
   try {
+    const raw = storage.getItem(SS_KEYS.token);
+    if (!raw) return null;
     return (JSON.parse(raw) as { access_token: string }).access_token ?? null;
   } catch {
     return null;
@@ -251,7 +282,13 @@ type JsonRpcResp<T = unknown> = {
   error?: { code: number; message: string };
 };
 
-async function mcpCall<T>(endpoint: string, token: string, method: string, params: unknown, id: number): Promise<JsonRpcResp<T>> {
+async function mcpCall<T>(
+  endpoint: string,
+  token: string,
+  method: string,
+  params: unknown,
+  id: number,
+): Promise<JsonRpcResp<T>> {
   const res = await fetch(endpoint, {
     method: "POST",
     headers: {
@@ -292,14 +329,24 @@ export async function probeTools(endpoint: string): Promise<ProbeResult> {
   }
   try {
     // 1) initialize
-    await mcpCall(endpoint, token, "initialize", {
-      protocolVersion: "2025-06-18",
-      capabilities: {},
-      clientInfo: { name: "verdant-browser-test", version: "0.1.0" },
-    }, 1);
+    await mcpCall(
+      endpoint,
+      token,
+      "initialize",
+      {
+        protocolVersion: "2025-06-18",
+        capabilities: {},
+        clientInfo: { name: "verdant-browser-test", version: "0.1.0" },
+      },
+      1,
+    );
     // 2) tools/list
     const list = await mcpCall<{ tools: Array<{ name: string }> }>(
-      endpoint, token, "tools/list", {}, 2,
+      endpoint,
+      token,
+      "tools/list",
+      {},
+      2,
     );
     if (list.error) throw new Error(list.error.message);
     const toolNames = (list.result?.tools ?? []).map((t) => t.name);
@@ -308,10 +355,16 @@ export async function probeTools(endpoint: string): Promise<ProbeResult> {
       content?: Array<{ type: string; text?: string }>;
       structuredContent?: { grows?: unknown[] };
       isError?: boolean;
-    }>(endpoint, token, "tools/call", {
-      name: "list_grows",
-      arguments: { limit: 1 },
-    }, 3);
+    }>(
+      endpoint,
+      token,
+      "tools/call",
+      {
+        name: "list_grows",
+        arguments: { limit: 1 },
+      },
+      3,
+    );
     if (call.error) throw new Error(call.error.message);
     let growCount: number | undefined;
     const sc = call.result?.structuredContent;
@@ -323,7 +376,9 @@ export async function probeTools(endpoint: string): Promise<ProbeResult> {
           const parsed = JSON.parse(t) as { grows?: unknown[] } | unknown[];
           growCount = Array.isArray(parsed)
             ? parsed.length
-            : Array.isArray(parsed.grows) ? parsed.grows.length : undefined;
+            : Array.isArray(parsed.grows)
+              ? parsed.grows.length
+              : undefined;
         } catch {
           /* ignore parse — count remains undefined */
         }
@@ -384,11 +439,17 @@ export async function callMcpTool(
   }
   try {
     // Ensure the session is initialized before the first call in a fresh tab.
-    await mcpCall(endpoint, token, "initialize", {
-      protocolVersion: "2025-06-18",
-      capabilities: {},
-      clientInfo: { name: "verdant-tool-explorer", version: "0.1.0" },
-    }, 1);
+    await mcpCall(
+      endpoint,
+      token,
+      "initialize",
+      {
+        protocolVersion: "2025-06-18",
+        capabilities: {},
+        clientInfo: { name: "verdant-tool-explorer", version: "0.1.0" },
+      },
+      1,
+    );
     const resp = await mcpCall<{
       content?: Array<{ type: string; text?: string }>;
       structuredContent?: unknown;
@@ -409,4 +470,3 @@ export async function callMcpTool(
     return { status: "error", message: "Tool call failed. Try again or reconnect." };
   }
 }
-

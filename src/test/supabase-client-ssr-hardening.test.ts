@@ -5,7 +5,10 @@ import { relative, resolve } from "node:path";
 import { listFilesCached, readFileCached } from "./helpers/cachedSrcTextScan";
 
 const { createClientMock } = vi.hoisted(() => ({
-  createClientMock: vi.fn(() => ({ auth: {}, from: vi.fn() })),
+  createClientMock: vi.fn((_url: string, _key: string, _options: unknown) => ({
+    auth: {},
+    from: vi.fn(),
+  })),
 }));
 
 vi.mock("@supabase/supabase-js", () => ({

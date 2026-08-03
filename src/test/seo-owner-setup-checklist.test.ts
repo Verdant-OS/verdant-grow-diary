@@ -49,18 +49,27 @@ describe("lighting analytics owner setup checklist", () => {
     expect(CHECKLIST).not.toMatch(/properties\/\d+/);
   });
 
-  it("records the owner-confirmed production stream without claiming property access", () => {
+  it("keeps the owner-confirmed stream distinct from the blocked current production tag", () => {
     expect(CHECKLIST).toMatch(/Production web data stream\s+\| `COMPLETE`/);
-    expect(CHECKLIST).toMatch(/Production hostname and deployed tag\s+\| `COMPLETE`/);
+    expect(CHECKLIST).toMatch(/Production hostname and deployed tag\s+\| `INCOMPLETE`/);
     expect(CHECKLIST).toMatch(/Correct GA4 property\s+\| `INCOMPLETE`/);
     expect(CHECKLIST).toMatch(/Read-only reporting access\s+\| `INCOMPLETE`/);
-    expect(CHECKLIST).toMatch(/property identity and authenticated reporting\s+access/);
+    expect(CHECKLIST).toMatch(
+      /GA4 property identity and authenticated\s+reporting access are still unavailable to Codex/,
+    );
+    expect(CHECKLIST).toContain("the current Squarespace placeholder has no Verdant tag");
+    expect(LAUNCH_VERIFICATION).toContain(
+      "the owner-confirmed stream tuple matched the last known Verdant release",
+    );
+    expect(LAUNCH_VERIFICATION).toContain("current production tag verification is **FAIL**");
   });
 
-  it("records the deployed structured-data repair without leaving a pending-publish handoff", () => {
-    expect(CHECKLIST).toContain("PR #624 structured-data ownership repair are live");
-    expect(CHECKLIST).toMatch(/eight-state\s+production browser matrix/);
-    expect(CHECKLIST).toContain("no further publication is required for that repair");
+  it("keeps historic structured-data evidence distinct from current production proof", () => {
+    expect(CHECKLIST).toMatch(
+      /PR #624 structured-data ownership repair were verified in the last known Verdant\s+release/,
+    );
+    expect(CHECKLIST).toContain("They are not current production proof.");
+    expect(CHECKLIST).toMatch(/current\s+Squarespace placeholder does not expose that tag\./);
     expect(CHECKLIST).not.toContain("local repair pending publish");
     expect(CHECKLIST).toContain(
       "https://developers.google.com/analytics/devguides/collection/ga4/views",
@@ -74,10 +83,10 @@ describe("lighting analytics owner setup checklist", () => {
       expect(document).toContain("15065867361");
       expect(document).toContain(GOOGLE_ANALYTICS_MEASUREMENT_ID);
     }
-    expect(LAUNCH_VERIFICATION).toContain(
-      "numeric property ID and authenticated reporting baseline remain unavailable",
+    expect(LAUNCH_VERIFICATION).toMatch(
+      /The numeric property ID and authenticated reporting baseline\s+remain unavailable to Codex\./,
     );
-    expect(MEASUREMENT_PLAN).toContain("The property ID is still unconfirmed");
+    expect(MEASUREMENT_PLAN).toMatch(/property ID is still unconfirmed/);
   });
 
   it("pins both exact lighting identities", () => {
@@ -114,6 +123,8 @@ describe("lighting analytics owner setup checklist", () => {
     expect(CHECKLIST).toContain("Tell Codex only that access is ready");
     expect(CHECKLIST).toMatch(/Enhanced measurement review\s+\| `BLOCKED_BY_ACCESS`/);
     expect(CHECKLIST).toContain("Page changes based on browser history events");
+    expect(CHECKLIST).toContain("one intentional `page_view` per navigation");
+    expect(CHECKLIST).toContain("zero duplicate automatic page views");
     expect(CHECKLIST).toContain("pushState");
     expect(CHECKLIST).toMatch(/Production hostname\s+\| `BLOCKED_BY_ACCESS`/);
   });
@@ -137,7 +148,7 @@ describe("lighting analytics owner setup checklist", () => {
   });
 
   it("stays concise and is linked from both launch documents", () => {
-    expect(CHECKLIST.length).toBeLessThan(13_000);
+    expect(CHECKLIST.length).toBeLessThan(15_000);
     expect(LAUNCH_VERIFICATION).toContain("./analytics-owner-setup-checklist.md");
     expect(MEASUREMENT_PLAN).toContain("./analytics-owner-setup-checklist.md");
   });

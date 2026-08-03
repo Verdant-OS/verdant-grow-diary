@@ -248,7 +248,7 @@ event or runtime behavior.
 
 - **GA4 baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
 - **GSC baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
-- **GA4 production stream identity:** PASS — owner-confirmed values match the deployed host and tag.
+- **GA4 production stream identity:** HISTORICAL_ONLY — the owner-confirmed stream tuple matched the last known Verdant release; the current Squarespace host has no Verdant tag, so current production tag verification is **FAIL**.
 - At `2026-08-02T02:08:43.179Z`, name-only GitHub secret listings found none of the expected GA4
   or GSC reporting secrets configured at repository scope or in the `verdant-production`,
   `verdant-sandbox`, and `copilot` environments; `.seo/gsc-token.local.json` is also absent. The

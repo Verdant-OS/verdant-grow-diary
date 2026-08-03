@@ -44,5 +44,22 @@ test.describe("GA4 tag smoke", () => {
         () => ((window as unknown as { dataLayer: unknown[] }).dataLayer ?? []).length,
       ),
     ).toBeGreaterThan(0);
+
+    // 4. The bootstrap `config` call targets this id and suppresses the
+    //    automatic initial hit, so the only page views are the explicit,
+    //    path-sanitized SPA events. A `config` without send_page_view:false
+    //    would emit an unsanitized view before the router ever runs.
+    const configCall = await page.evaluate(() => {
+      const layer = (window as unknown as { dataLayer?: unknown[] }).dataLayer ?? [];
+      const found = layer
+        .map((entry) => Array.from(entry as ArrayLike<unknown>))
+        .find((args) => args[0] === "config");
+      return found ? JSON.parse(JSON.stringify(found)) : null;
+    });
+
+    expect(configCall).not.toBeNull();
+    expect(configCall?.[1]).toBe(MEASUREMENT_ID);
+    expect(configCall?.[2]).toMatchObject({ send_page_view: false });
   });
 });
+

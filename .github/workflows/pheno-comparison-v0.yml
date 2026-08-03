@@ -79,16 +79,11 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
-      # Narrow lint step.
-      #
-      # WHY NARROW: repo-wide `bun run lint` currently reports pre-existing
-      # ESLint errors across unrelated files (see docs/eslint-cleanup-plan.md).
-      # Fixing those is out of scope for the pheno comparison slice. This step
-      # lints the exact pheno source + presenter-owned test/spec files this
-      # workflow protects, and MUST stay green on every PR.
+      # Narrow lint step (Biome). Scoped to pheno-owned files.
+      # Repo-wide gate is `bun run lint:ci` in lint.yml / ci.yml.
       - name: Lint — Pheno owned files
         run: |
-          bunx eslint \
+          bunx biome lint --diagnostic-level=error \
             src/components/PhenoComparisonView.tsx \
             src/pages/PhenoComparison.tsx \
             src/pages/PhenoExpressionShowcase.tsx \

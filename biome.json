@@ -1,0 +1,167 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.6/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "ignoreUnknown": true,
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/dist",
+      "!**/build",
+      "!**/.output",
+      "!**/.vinxi",
+      "!**/.wrangler",
+      "!**/coverage",
+      "!**/playwright-report",
+      "!**/test-results",
+      "!**/bun.lock",
+      "!**/bun.lockb",
+      "!**/package-lock.json",
+      "!**/src/routeTree.gen.ts",
+      "!**/src/generated",
+      "!**/src/integrations/supabase/types.ts",
+      "!**/supabase/functions/_shared/lib/integrations/supabase/types.ts",
+      "!**/docs/archive",
+      "!**/artifacts",
+      "!**/public/version.json",
+      "!**/*.min.js",
+      "!**/*.map"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100,
+    "lineEnding": "lf"
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "jsxQuoteStyle": "double",
+      "semicolons": "always",
+      "trailingCommas": "all",
+      "arrowParentheses": "always"
+    }
+  },
+  "json": {
+    "formatter": {
+      "trailingCommas": "none"
+    }
+  },
+  "css": {
+    "parser": {
+      "cssModules": true,
+      "tailwindDirectives": true
+    },
+    "linter": {
+      "enabled": true
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "complexity": {
+        "noUselessTypeConstraint": "off",
+        "useOptionalChain": "off",
+        "useLiteralKeys": "off",
+        "noUselessSwitchCase": "off",
+        "useArrowFunction": "off",
+        "noImportantStyles": "off"
+      },
+      "style": {
+        "noNonNullAssertion": "off",
+        "useImportType": "off",
+        "useNodejsImportProtocol": "off",
+        "useTemplate": "off",
+        "useExportType": "off"
+      },
+      "suspicious": {
+        "noExplicitAny": "warn",
+        "noControlCharactersInRegex": "off",
+        "noThenProperty": "off",
+        "noArrayIndexKey": "warn",
+        "noPrototypeBuiltins": "warn",
+        "noTemplateCurlyInString": "warn",
+        "useIterableCallbackReturn": "off",
+        "noAssignInExpressions": "warn",
+        "noImplicitAnyLet": "warn",
+        "noExportsInTest": "off",
+        "noTsIgnore": "warn",
+        "noGlobalIsFinite": "off",
+        "noGlobalIsNan": "off",
+        "noShadowRestrictedNames": "warn"
+      },
+      "correctness": {
+        "noUnusedVariables": "off",
+        "noUnusedImports": "off",
+        "noUnusedFunctionParameters": "off",
+        "useExhaustiveDependencies": "warn",
+        "useHookAtTopLevel": "warn",
+        "noUnknownMediaFeatureName": "off",
+        "noInvalidPositionAtImportRule": "off"
+      },
+      "a11y": {
+        "recommended": false
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "warn"
+      },
+      "performance": {
+        "noAccumulatingSpread": "off"
+      }
+    }
+  },
+  "assist": {
+    "enabled": false
+  },
+  "overrides": [
+    {
+      "includes": ["src/**/*.ts", "src/**/*.tsx"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "server-only": "TanStack Start does not use the Next.js `server-only` package. Rename the module to `*.server.ts` or mark it with `@tanstack/react-start/server-only`."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "supabase/functions/**",
+        "scripts/**",
+        "e2e/**",
+        "src/test/**",
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.spec.ts",
+        "**/*.spec.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off",
+            "noConsole": "off",
+            "noArrayIndexKey": "off"
+          },
+          "correctness": {
+            "useExhaustiveDependencies": "off",
+            "useHookAtTopLevel": "off"
+          }
+        }
+      }
+    }
+  ]
+}

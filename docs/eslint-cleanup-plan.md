@@ -1,5 +1,10 @@
 # Repo-wide ESLint cleanup plan
 
+> **Superseded for CI:** the PR lint gate is now **Biome** (`bun run lint` /
+> `bun run lint:ci`). See [`docs/biome-adoption.md`](./biome-adoption.md).
+> This document remains as historical ESLint cleanup context.
+
+
 ## Current status
 
 Repo-wide lint (`bun run lint` → `eslint .`) currently reports **73 errors across

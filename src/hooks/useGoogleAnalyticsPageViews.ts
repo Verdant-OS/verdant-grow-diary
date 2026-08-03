@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useLocation } from "@/lib/react-router-compat";
 import { GOOGLE_ANALYTICS_MEASUREMENT_ID } from "@/constants/analytics";
 import { buildSafeAnalyticsPageLocation, sanitizePagePath } from "@/lib/analyticsPageViewRules";
+import { readAnalyticsConsent } from "@/lib/analyticsConsent";
 
 export { sanitizePagePath } from "@/lib/analyticsPageViewRules";
 
@@ -17,6 +18,8 @@ declare global {
 
 function trackPageView(path: string, title: string) {
   if (typeof window === "undefined") return;
+  // Consent gate: no analytics call may run before an explicit "granted".
+  if (readAnalyticsConsent() !== "granted") return;
   if (typeof window.gtag !== "function") return;
   const safePath = sanitizePagePath(path);
   // Send an explicit page_view EVENT, not a repeat `config` call. index.html

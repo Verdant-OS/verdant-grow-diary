@@ -3,10 +3,14 @@
  * capture-ssr-head-snapshots-with-server
  *
  * Build-time counterpart to scripts/capture-ssr-head-snapshots.ts (which needs
- * an externally running app). Here the freshly built server bundle
- * (dist/server/index.mjs — a fetch-handler worker) is imported in-process and
- * every document in dist/seo-manifest.json is rendered through it, writing the
- * real SSR HTML to dist/<fileName> for the head-fidelity gate.
+ * an externally running app). Here the freshly built server bundle is imported
+ * in-process and every document in dist/seo-manifest.json is rendered through
+ * it, writing the real SSR HTML to dist/<fileName> for the head-fidelity gate.
+ *
+ * Server bundle resolution (see resolve-ssr-server-bundle.mjs):
+ *   1. SEO_SNAPSHOT_SERVER_BUNDLE / --server-bundle= explicit override
+ *   2. .output/server/index.mjs  (current Nitro / TanStack Start)
+ *   3. dist/server/index.mjs     (legacy layout)
  *
  * A bundle that cannot be loaded or a route that does not render is reported as
  * BLOCKED / a listed failure — never silently as passing head fidelity.
@@ -14,16 +18,36 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { formatBlockedMessage, resolveSsrServerBundle } from "./resolve-ssr-server-bundle.mjs";
 
 const distDir = resolve(process.argv[2] ?? "dist");
-const entry = join(distDir, "server", "index.mjs");
+
+function readExplicitBundleFlag() {
+  const fromEnv = process.env["SEO_SNAPSHOT_SERVER_BUNDLE"];
+  if (fromEnv && fromEnv.trim()) return fromEnv.trim();
+  for (const arg of process.argv.slice(2)) {
+    if (arg.startsWith("--server-bundle=")) {
+      return arg.slice("--server-bundle=".length);
+    }
+  }
+  return undefined;
+}
+
+const resolved = resolveSsrServerBundle({
+  cwd: process.cwd(),
+  distDir,
+  explicitPath: readExplicitBundleFlag(),
+});
+
+if (!resolved.ok) {
+  console.error(formatBlockedMessage(resolved));
+  process.exit(1);
+}
+
+const entry = resolved.path;
 const manifestPath = join(distDir, "seo-manifest.json");
 const origin = process.env["SEO_SNAPSHOT_ORIGIN"] ?? "https://verdantgrowdiary.com";
 
-if (!existsSync(entry)) {
-  console.error(`capture-ssr-head-snapshots-with-server: BLOCKED — no server bundle at ${entry}.`);
-  process.exit(1);
-}
 if (!existsSync(manifestPath)) {
   console.error(
     `capture-ssr-head-snapshots-with-server: BLOCKED — ${manifestPath} missing; run scripts/generate-seo-artifacts.ts first.`,
@@ -49,6 +73,10 @@ if (typeof handler?.fetch !== "function") {
   );
   process.exit(1);
 }
+
+console.log(
+  `capture-ssr-head-snapshots-with-server: using server bundle ${entry} (source=${resolved.source})`,
+);
 
 const ctx = { waitUntil() {}, passThroughOnException() {} };
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));

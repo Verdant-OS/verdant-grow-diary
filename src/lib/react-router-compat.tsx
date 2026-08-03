@@ -271,15 +271,20 @@ export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
  * Test / legacy shell: provide a real TanStack router so compat Link /
  * useNavigate / useSearchParams work under Vitest.
  *
- * Uses `RouterContextProvider` (not `RouterProvider`) so test children render
- * immediately — `RouterProvider` only mounts route-tree matches and would
- * blank the tree until an async `router.load()` completes.
+ * Uses `RouterContextProvider` (not `RouterProvider`):
+ * - Context injects the router instance so `useRouter()` / Link are non-null
+ *   (fixes `reading 'isServer'` when context is missing).
+ * - `RouterProvider` hardcodes children to `<Matches />` and never renders
+ *   arbitrary test UI. Even after `router.load()`, Matches would only mount
+ *   our null stub route components — not the caller's tree.
+ * - Matching/loading algorithms live in router-core (`router.load`).
+ *   `Matches`/`Transitioner` are the React wiring that subscribe to history
+ *   and render the match tree; we skip them and reimplement only the
+ *   history → `load` subscription so location/nav stay live.
  *
  * Application code should not use these — the Start route tree owns the
  * production provider. Hundreds of unit tests still wrap UI in
- * `<MemoryRouter>` / `<BrowserRouter>` from the react-router era; without a
- * real provider, TanStack Link throws `Cannot read properties of null
- * (reading 'isServer')`.
+ * `<MemoryRouter>` / `<BrowserRouter>` from the react-router era.
  */
 interface LegacyRouterShellProps {
   children?: ReactNode;
@@ -315,8 +320,8 @@ function normalizeInitialEntries(initialEntries: unknown): string[] {
 
 function createTestMemoryRouter(initialEntries: string[], initialIndex?: number) {
   // Root + index + splat so buildLocation/matchRoute can resolve any path.
-  // Components are unused under RouterContextProvider (we render test children
-  // ourselves); they exist only so the route tree is valid.
+  // Route `component`s are unused under RouterContextProvider (we render test
+  // children ourselves); they exist only so the route tree is valid for load().
   const rootRoute = createRootRoute({
     component: () => null,
   });
@@ -334,7 +339,7 @@ function createTestMemoryRouter(initialEntries: string[], initialIndex?: number)
     initialEntries,
     initialIndex: initialIndex ?? initialEntries.length - 1,
   });
-  const router = createRouter({
+  return createRouter({
     routeTree: rootRoute.addChildren([indexRoute, splatRoute]),
     history,
     // Vitest/jsdom has `document`, but be explicit so Link does not take the
@@ -343,10 +348,6 @@ function createTestMemoryRouter(initialEntries: string[], initialIndex?: number)
     defaultPendingMinMs: 0,
     defaultPendingMs: 0,
   });
-  // Best-effort match population for hooks that read match state. Location is
-  // already available from history before load resolves.
-  void router.load({ sync: true });
-  return router;
 }
 
 function MemoryRouterProvider({ children, initialEntries, initialIndex }: LegacyRouterShellProps) {
@@ -364,15 +365,13 @@ function MemoryRouterProvider({ children, initialEntries, initialIndex }: Legacy
     [entriesKey, index],
   );
 
-  // RouterProvider mounts Transitioner which subscribes to history and reloads
-  // matches. We only use RouterContextProvider (so test children render without
-  // waiting on Matches), so we must own that subscription ourselves or
-  // navigate / Link / history.back never update useLocation.
+  // Mirror Transitioner's history wiring (see @tanstack/react-router Transitioner):
+  //   history.subscribe(router.load) + initial load on mount.
+  // Without this, commitLocation sees zero history subscribers and may load
+  // once, but back/forward and some navigations won't refresh useRouterState.
   useEffect(() => {
-    const unsub = router.history.subscribe(() => {
-      void router.load();
-    });
-    void router.load({ sync: true });
+    const unsub = router.history.subscribe(router.load);
+    void router.load();
     return unsub;
   }, [router]);
 

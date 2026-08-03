@@ -1,4 +1,4 @@
-// Static-safety scans for the Vite Supabase auth hardening slice.
+// Static-safety scans for the Vite/TanStack Supabase auth hardening slice.
 // See docs/auth-security.md.
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -8,28 +8,36 @@ import { listFilesCached, readFileCached } from "./helpers/cachedSrcTextScan";
 const ROOT = resolve(__dirname, "../..");
 const SRC = resolve(ROOT, "src");
 const CLIENT = readFileSync(resolve(SRC, "integrations/supabase/client.ts"), "utf8");
+const AUTH_RUNTIME = readFileSync(resolve(SRC, "lib/supabaseAuthRuntime.ts"), "utf8");
 const AUTH_DOC = readFileSync(resolve(ROOT, "docs/auth-security.md"), "utf8");
 const RLS_DOC = readFileSync(resolve(ROOT, "docs/qa-rls-checklist.md"), "utf8");
 
-const SRC_FILES = listFilesCached(SRC).filter((p) =>
-  /\.(ts|tsx|js|jsx)$/.test(p),
-);
+const SRC_FILES = listFilesCached(SRC).filter((p) => /\.(ts|tsx|js|jsx)$/.test(p));
 const isSrcTestFile = (filePath: string) =>
   relative(SRC, filePath).replace(/\\/g, "/").startsWith("test/");
 
 describe("Supabase client storage", () => {
-  it("uses sessionStorage (not localStorage) for auth persistence", () => {
-    expect(CLIENT).toMatch(/storage:\s*sessionStorage/);
+  it("delegates auth storage and lifecycle flags to one runtime resolver", () => {
+    expect(CLIENT).toMatch(/createSupabaseAuthRuntime/);
+    expect(CLIENT).toMatch(/storage:\s*authRuntime\.storage/);
+    expect(CLIENT).toMatch(/persistSession:\s*authRuntime\.persistSession/);
+    expect(CLIENT).toMatch(/autoRefreshToken:\s*authRuntime\.autoRefreshToken/);
+    expect(CLIENT).toMatch(/detectSessionInUrl:\s*authRuntime\.detectSessionInUrl/);
     expect(CLIENT).not.toMatch(/storage:\s*localStorage/);
   });
 
-  it("keeps autoRefreshToken + persistSession enabled", () => {
-    expect(CLIENT).toMatch(/persistSession:\s*true/);
-    expect(CLIENT).toMatch(/autoRefreshToken:\s*true/);
+  it("uses sessionStorage in the browser and isolated memory when it is unavailable", () => {
+    expect(AUTH_RUNTIME).toMatch(/typeof window === "undefined"/);
+    expect(AUTH_RUNTIME).toMatch(/window\.sessionStorage/);
+    expect(AUTH_RUNTIME).toMatch(/createTransientMemoryStorage/);
+    expect(AUTH_RUNTIME).toMatch(/storageKind:\s*"server_memory"/);
+    expect(AUTH_RUNTIME).toMatch(/storageKind:\s*"browser_memory"/);
   });
 
-  it("documents the hardening edit in a comment", () => {
-    expect(CLIENT).toMatch(/MINIMAL HARDENING EDIT/);
+  it("disables persistence, refresh, and URL-session parsing on the server", () => {
+    expect(AUTH_RUNTIME).toMatch(
+      /storageKind:\s*"server_memory"[\s\S]*persistSession:\s*false[\s\S]*autoRefreshToken:\s*false[\s\S]*detectSessionInUrl:\s*false/,
+    );
   });
 });
 
@@ -96,9 +104,7 @@ describe("src/ static safety", () => {
     const offenders = SRC_FILES.filter((f) => {
       if (f.endsWith("auth-hardening-static-safety.test.ts")) return false;
       const body = readFileCached(f);
-      return /from\s+['"]@supabase\/ssr['"]|from\s+['"]next\/headers['"]/.test(
-        body,
-      );
+      return /from\s+['"]@supabase\/ssr['"]|from\s+['"]next\/headers['"]/.test(body);
     });
     expect(offenders).toEqual([]);
   });

@@ -3,20 +3,99 @@
 // from `localStorage` to `sessionStorage` as part of the Vite Supabase auth
 // hardening slice. See docs/auth-security.md for rationale and tradeoffs.
 // Do not regenerate this file without re-applying that single line change.
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from './types';
+//
+// Lazy loading (browser):
+//  A) sessionStorage is only read inside Storage methods (never at module eval).
+//  B) createClient runs on first property access via a Proxy singleton — bare
+//     `import { supabase }` does not construct the client. AuthProvider (and any
+//     first .auth / .from use) materializes the singleton once for the session.
+//
+// Server admin client lives in client.server.ts (Proxy + optional dynamic import).
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "./types";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
+/**
+ * Browser sessionStorage adapter that never reads `sessionStorage` at
+ * construction time — only inside method bodies, each guarded with try/catch.
+ * Returns `undefined` on Node/SSR (no window) so createClient skips persist.
+ */
+function createLazySessionStorage(): Storage | undefined {
+  if (typeof window === "undefined") return undefined;
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: {
-    // SSR/prerender safety: `sessionStorage` does not exist on the server.
-    storage: typeof window !== 'undefined' ? window.sessionStorage : undefined,
-    persistSession: typeof window !== 'undefined',
-    autoRefreshToken: typeof window !== 'undefined',
-  }
+  const read = (): Storage | null => {
+    try {
+      return window.sessionStorage;
+    } catch {
+      return null;
+    }
+  };
+
+  return {
+    get length() {
+      return read()?.length ?? 0;
+    },
+    clear() {
+      read()?.clear();
+    },
+    getItem(key: string) {
+      return read()?.getItem(key) ?? null;
+    },
+    key(index: number) {
+      return read()?.key(index) ?? null;
+    },
+    removeItem(key: string) {
+      read()?.removeItem(key);
+    },
+    setItem(key: string, value: string) {
+      read()?.setItem(key, value);
+    },
+  };
+}
+
+type BrowserSupabase = SupabaseClient<Database>;
+
+let _browserClient: BrowserSupabase | undefined;
+
+/**
+ * Materialize the browser Supabase singleton. Safe to call repeatedly.
+ * Prefer using the `supabase` proxy export; this is for tests and rare
+ * explicit init (e.g. AuthProvider warm-up).
+ */
+export function getSupabaseBrowserClient(): BrowserSupabase {
+  if (_browserClient) return _browserClient;
+
+  const isBrowser = typeof window !== "undefined";
+  const browserSessionStorage = createLazySessionStorage();
+
+  _browserClient = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: {
+      // Prefer sessionStorage (not localStorage) when a browser storage is available.
+      storage: browserSessionStorage,
+      persistSession: isBrowser && browserSessionStorage !== undefined,
+      autoRefreshToken: isBrowser && browserSessionStorage !== undefined,
+    },
+  });
+
+  return _browserClient;
+}
+
+/**
+ * Import the supabase client like this:
+ *   import { supabase } from "@/integrations/supabase/client";
+ *
+ * Proxy defers createClient until first property access (.from, .auth, …).
+ * Same export shape as a real client — no call-site changes required.
+ */
+export const supabase: BrowserSupabase = new Proxy({} as BrowserSupabase, {
+  get(_target, prop, _receiver) {
+    const client = getSupabaseBrowserClient();
+    const value = Reflect.get(client as object, prop, client);
+    if (typeof value === "function") {
+      return (value as (...args: unknown[]) => unknown).bind(client);
+    }
+    return value;
+  },
 });

@@ -11,25 +11,38 @@ const CLIENT = readFileSync(resolve(SRC, "integrations/supabase/client.ts"), "ut
 const AUTH_DOC = readFileSync(resolve(ROOT, "docs/auth-security.md"), "utf8");
 const RLS_DOC = readFileSync(resolve(ROOT, "docs/qa-rls-checklist.md"), "utf8");
 
-const SRC_FILES = listFilesCached(SRC).filter((p) =>
-  /\.(ts|tsx|js|jsx)$/.test(p),
-);
+const SRC_FILES = listFilesCached(SRC).filter((p) => /\.(ts|tsx|js|jsx)$/.test(p));
 const isSrcTestFile = (filePath: string) =>
   relative(SRC, filePath).replace(/\\/g, "/").startsWith("test/");
 
 describe("Supabase client storage", () => {
   it("uses sessionStorage (not localStorage) for auth persistence", () => {
-    expect(CLIENT).toMatch(/storage:\s*sessionStorage/);
+    // Lazy adapter wraps window.sessionStorage — never localStorage.
+    expect(CLIENT).toMatch(/sessionStorage/);
     expect(CLIENT).not.toMatch(/storage:\s*localStorage/);
+    expect(CLIENT).not.toMatch(/window\.localStorage/);
   });
 
-  it("keeps autoRefreshToken + persistSession enabled", () => {
-    expect(CLIENT).toMatch(/persistSession:\s*true/);
-    expect(CLIENT).toMatch(/autoRefreshToken:\s*true/);
+  it("keeps autoRefreshToken + persistSession enabled in the browser", () => {
+    // Browser path enables both; Node/SSR forces them off (inside factory).
+    expect(CLIENT).toMatch(/persistSession:\s*isBrowser/);
+    expect(CLIENT).toMatch(/autoRefreshToken:\s*isBrowser/);
   });
 
   it("documents the hardening edit in a comment", () => {
     expect(CLIENT).toMatch(/MINIMAL HARDENING EDIT/);
+  });
+
+  it("defers sessionStorage access behind a lazy adapter (SSR-safe import)", () => {
+    expect(CLIENT).toMatch(/createLazySessionStorage/);
+    expect(CLIENT).not.toMatch(/storage:\s*typeof window[\s\S]*window\.sessionStorage/);
+  });
+
+  it("defers createClient behind a Proxy singleton (strategy B)", () => {
+    expect(CLIENT).toMatch(/getSupabaseBrowserClient/);
+    expect(CLIENT).toMatch(/new Proxy/);
+    // Must not eagerly call createClient at module top-level export assignment.
+    expect(CLIENT).not.toMatch(/export const supabase = createClient/);
   });
 });
 
@@ -64,9 +77,14 @@ describe("Auth security docs", () => {
 });
 
 describe("src/ static safety", () => {
-  it("never imports the service role key into src/", () => {
+  it("never imports the service role key into client-bound src/", () => {
     const offenders = SRC_FILES.filter((f) => {
       if (isSrcTestFile(f)) return false; // guard tests assert absence
+      // Server-only admin module is allowed to read SUPABASE_SERVICE_ROLE_KEY.
+      // It must stay out of the browser graph (see client.server.ts banner).
+      if (f.replace(/\\/g, "/").endsWith("integrations/supabase/client.server.ts")) {
+        return false;
+      }
       const body = readFileCached(f);
       // Strip sanitizer-style references (regex literals + quoted string literals
       // naming the key, e.g. defensive redaction code). The real escalation
@@ -96,9 +114,7 @@ describe("src/ static safety", () => {
     const offenders = SRC_FILES.filter((f) => {
       if (f.endsWith("auth-hardening-static-safety.test.ts")) return false;
       const body = readFileCached(f);
-      return /from\s+['"]@supabase\/ssr['"]|from\s+['"]next\/headers['"]/.test(
-        body,
-      );
+      return /from\s+['"]@supabase\/ssr['"]|from\s+['"]next\/headers['"]/.test(body);
     });
     expect(offenders).toEqual([]);
   });

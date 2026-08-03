@@ -21,6 +21,12 @@ vi.mock("@/components/AppShell", () => ({
 vi.mock("@/pages/Dashboard", () => ({
   default: () => <div data-testid="dashboard">Private dashboard</div>,
 }));
+// App chrome (Grows/reconsent/payment) is lazy-loaded only for the signed-in
+// apex path; stub so tests don't need real GrowsProvider/router context.
+vi.mock("@/components/providers/AppDataProviders", () => ({
+  AppChromeProviders: ({ children }: { children?: ReactNode }) => <>{children}</>,
+  AppDataProviders: ({ children }: { children?: ReactNode }) => <>{children}</>,
+}));
 
 import RootEntry from "@/components/RootEntry";
 

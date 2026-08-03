@@ -1,23 +1,12 @@
 /// <reference types="vite/client" />
 import { Suspense } from "react";
-import {
-  HeadContent,
-  Outlet,
-  Scripts,
-  createRootRouteWithContext,
-} from "@tanstack/react-router";
+import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from "@tanstack/react-router";
 import type { QueryClient } from "@tanstack/react-query";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/store/auth";
-import { GrowsProvider } from "@/store/grows";
 import RootErrorBoundary from "@/components/RootErrorBoundary";
-import OAuthPostAuthRedirect from "@/components/OAuthPostAuthRedirect";
-import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
-import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 import { useGoogleAnalyticsPageViews } from "@/hooks/useGoogleAnalyticsPageViews";
-import { clearGrowDataMeta } from "@/hooks/useGrowData";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
 import { renderErrorPage } from "@/lib/error-page";
 import appCss from "@/styles.css?url";
@@ -126,21 +115,6 @@ function RootErrorComponent({ error }: { error: Error }) {
   );
 }
 
-/**
- * Defense in depth for every private query family. Owner-suffixed keys stop
- * cross-account reuse during render; clearing removes residual rows and
- * cancels active observers before AuthProvider exposes the next identity.
- * Source-disclosure metadata lives outside React Query and needs the same
- * identity fence so one grower's status cannot flash for the next account.
- */
-function useClearQueryCacheBeforeAuthIdentityChange() {
-  const { queryClient } = Route.useRouteContext();
-  return () => {
-    queryClient.clear();
-    clearGrowDataMeta();
-  };
-}
-
 function AnalyticsShell() {
   useGoogleAnalyticsPageViews();
   return null;
@@ -178,25 +152,24 @@ function RootDocument({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Global document shell only.
+ *
+ * Auth / Grows / reconsent / payment banners are NOT mounted here — they
+ * pull the browser Supabase client into every SSR graph. Session-aware
+ * surfaces opt in via PublicAuthProviders or AppDataProviders.
+ */
 function RootComponent() {
-  const onBeforeAuthIdentityChange = useClearQueryCacheBeforeAuthIdentityChange();
   return (
     <RootDocument>
       <RootErrorBoundary>
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <AuthProvider onBeforeAuthIdentityChange={onBeforeAuthIdentityChange}>
-            <OAuthPostAuthRedirect />
-            <GrowsProvider>
-              <PaymentTestModeBanner />
-              <AgreementReconsentGate />
-              <AnalyticsShell />
-              <Suspense fallback={<PageLoader />}>
-                <Outlet />
-              </Suspense>
-            </GrowsProvider>
-          </AuthProvider>
+          <AnalyticsShell />
+          <Suspense fallback={<PageLoader />}>
+            <Outlet />
+          </Suspense>
         </TooltipProvider>
       </RootErrorBoundary>
     </RootDocument>

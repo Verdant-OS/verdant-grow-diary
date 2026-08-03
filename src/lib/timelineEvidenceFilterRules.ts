@@ -14,6 +14,10 @@
  *  - Case-insensitive, trimmed. Empty query returns all rows.
  */
 import {
+  classifyTimelineEntry,
+  type TimelineFilterCategory,
+} from "@/lib/timelineEntryClassification";
+import {
   classifyTimelineSensorSource,
   type TimelineSensorSourceKind,
 } from "@/lib/timelineSensorSourceBadgeRules";
@@ -26,7 +30,31 @@ export interface TimelineEvidenceRow {
   tent_id: string | null | undefined;
   entry_at?: string | null;
   details?: Record<string, unknown> | null;
+  photo_url?: string | null;
 }
+
+/**
+ * Care-log category chips on the main Timeline (subset of
+ * `TimelineFilterCategory`). "Diagnoses" is the grower-facing label for
+ * the classification bucket `symptoms` (symptoms / pest_disease / diagnosis).
+ */
+export type TimelineCareCategoryFilter = "all" | "watering" | "feeding" | "training" | "symptoms";
+
+export const TIMELINE_CARE_CATEGORY_FILTERS: ReadonlyArray<TimelineCareCategoryFilter> = [
+  "all",
+  "watering",
+  "feeding",
+  "training",
+  "symptoms",
+];
+
+export const TIMELINE_CARE_CATEGORY_LABELS: Record<TimelineCareCategoryFilter, string> = {
+  all: "All care types",
+  watering: "Watering",
+  feeding: "Feeding",
+  training: "Training",
+  symptoms: "Diagnoses",
+};
 
 export interface TimelineEvidenceFilterInput {
   query?: string | null;
@@ -34,6 +62,11 @@ export interface TimelineEvidenceFilterInput {
   tentId?: string | null;
   /** Diary `event_type` token, e.g. "watering", "feeding", "note". */
   eventType?: string | null;
+  /**
+   * Care category chip: watering / feeding / training / diagnoses (symptoms).
+   * Uses `classifyTimelineEntry` so related event_type tokens group together.
+   */
+  careCategory?: TimelineCareCategoryFilter | null;
   /**
    * When non-empty, only sensor-derived rows whose canonical source kind
    * is in the set are kept. Non-sensor entries are hidden.
@@ -127,6 +160,31 @@ function rowEventType(row: TimelineEvidenceRow): string | null {
 }
 
 /**
+ * Classify a diary evidence row into the shared Timeline filter category.
+ * Care chips key off `event_type` only (not photo source) so a watering
+ * log that also has a photo still appears under Watering.
+ */
+export function classifyTimelineEvidenceRow(row: TimelineEvidenceRow): TimelineFilterCategory {
+  return classifyTimelineEntry({
+    eventType: rowEventType(row),
+    source: null,
+  });
+}
+
+function normalizeCareCategory(
+  value: TimelineCareCategoryFilter | string | null | undefined,
+): TimelineCareCategoryFilter | null {
+  if (value == null) return null;
+  const v = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (v === "" || v === "all") return null;
+  if (v === "watering" || v === "feeding" || v === "training" || v === "symptoms") {
+    return v;
+  }
+  if (v === "diagnoses" || v === "diagnosis") return "symptoms";
+  return null;
+}
+
+/**
  * Returns true if `row` matches every supplied filter dimension.
  * Missing/blank inputs are treated as "no constraint".
  */
@@ -153,6 +211,11 @@ export function timelineEvidenceRowMatches(
     const want = input.eventType.trim().toLowerCase();
     const got = (rowEventType(row) ?? "").toLowerCase();
     if (got !== want) return false;
+  }
+
+  const care = normalizeCareCategory(input.careCategory);
+  if (care !== null) {
+    if (classifyTimelineEvidenceRow(row) !== care) return false;
   }
 
   if (Array.isArray(input.sensorSources) && input.sensorSources.length > 0) {
@@ -185,10 +248,11 @@ export function filterTimelineEvidenceRows<T extends TimelineEvidenceRow>(
   const noPlant = !input.plantId || input.plantId.trim() === "";
   const noTent = !input.tentId || input.tentId.trim() === "";
   const noType = !input.eventType || input.eventType.trim() === "";
+  const noCare = normalizeCareCategory(input.careCategory) === null;
   const noSrc = !Array.isArray(input.sensorSources) || input.sensorSources.length === 0;
   const noDates =
     !isTimelineDateFilterValue(input.startDate) && !isTimelineDateFilterValue(input.endDate);
-  if (noQuery && noPlant && noTent && noType && noSrc && noDates) return [...rows];
+  if (noQuery && noPlant && noTent && noType && noCare && noSrc && noDates) return [...rows];
   return rows.filter((r) => timelineEvidenceRowMatches(r, input));
 }
 
@@ -295,6 +359,30 @@ export function deriveTimelineTentOptions(
 }
 
 /**
+ * Count rows per care-category chip (watering / feeding / training / diagnoses).
+ * Pure. Zero counts remain available so a selected empty chip can still be cleared.
+ */
+export function countTimelineCareCategoryBuckets(
+  rows: ReadonlyArray<TimelineEvidenceRow>,
+): Record<TimelineCareCategoryFilter, number> {
+  const counts: Record<TimelineCareCategoryFilter, number> = {
+    all: Array.isArray(rows) ? rows.length : 0,
+    watering: 0,
+    feeding: 0,
+    training: 0,
+    symptoms: 0,
+  };
+  if (!Array.isArray(rows)) return counts;
+  for (const row of rows) {
+    const cat = classifyTimelineEvidenceRow(row);
+    if (cat === "watering" || cat === "feeding" || cat === "training" || cat === "symptoms") {
+      counts[cat] += 1;
+    }
+  }
+  return counts;
+}
+
+/**
  * Derive distinct event-type options from the rows (already lower-cased
  * tokens such as "watering", "feeding", "note").
  */
@@ -317,6 +405,7 @@ export function isTimelineEvidenceFilterActive(input: TimelineEvidenceFilterInpu
   if (input.plantId && input.plantId.trim() !== "") return true;
   if (input.tentId && input.tentId.trim() !== "") return true;
   if (input.eventType && input.eventType.trim() !== "") return true;
+  if (normalizeCareCategory(input.careCategory) !== null) return true;
   if (Array.isArray(input.sensorSources) && input.sensorSources.length > 0) return true;
   if (isTimelineDateFilterValue(input.startDate)) return true;
   if (isTimelineDateFilterValue(input.endDate)) return true;

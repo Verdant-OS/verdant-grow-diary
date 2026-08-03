@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,23 +33,12 @@ const leadSchema = z.object({
   name: z.string().trim().max(100).optional().or(z.literal("")),
   email: z.string().trim().email("Enter a valid email").max(255),
   company: z.string().trim().max(120).optional().or(z.literal("")),
-  lead_type: z.enum([
-    "beta_user",
-    "hardware_partner",
-    "grower",
-    "investor",
-    "other",
-  ]),
+  lead_type: z.enum(["beta_user", "hardware_partner", "grower", "investor", "other"]),
   message: z.string().trim().max(2000).optional().or(z.literal("")),
 });
 
 export interface LeadCaptureFormProps {
-  defaultLeadType?:
-    | "beta_user"
-    | "hardware_partner"
-    | "grower"
-    | "investor"
-    | "other";
+  defaultLeadType?: "beta_user" | "hardware_partner" | "grower" | "investor" | "other";
 }
 
 export default function LeadCaptureForm({
@@ -79,6 +67,9 @@ export default function LeadCaptureForm({
       return;
     }
     setSubmitting(true);
+    // Dynamic import: avoid static Supabase client pull for marketing pages
+    // that only submit leads on demand.
+    const { supabase } = await import("@/integrations/supabase/client");
     const { error } = await supabase.from("leads").insert({
       name: parsed.data.name || null,
       email: parsed.data.email,

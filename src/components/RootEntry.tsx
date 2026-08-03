@@ -1,12 +1,17 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { useAuth } from "@/store/auth";
 import { resolveRootEntrySurface } from "@/lib/rootEntryRules";
 
-// Keep the signed-out apex light: the protected shell and dashboard chunks are
-// only requested after AuthProvider resolves an authenticated user.
+// Keep the signed-out apex light: the protected shell, dashboard, and app chrome
+// chunks are only requested after AuthProvider resolves an authenticated user.
 const AppShell = lazy(() => import("@/components/AppShell"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Landing = lazy(() => import("@/pages/Landing"));
+const AppChromeProviders = lazy(() =>
+  import("@/components/providers/AppDataProviders").then((m) => ({
+    default: m.AppChromeProviders as ComponentType<{ children: ReactNode }>,
+  })),
+);
 
 function RootEntryLoader() {
   return (
@@ -22,6 +27,10 @@ function RootEntryLoader() {
  * Signed-out visitors see the public acquisition page directly at `/`, with no
  * redirect through the private shell. Signed-in growers retain the existing
  * dashboard-at-apex behavior and the AppShell's server session revalidation.
+ *
+ * The signed-in branch lazy-mounts AppChromeProviders (Grows + reconsent +
+ * payment) under the outer PublicAuthProviders Auth shell — no nested
+ * AuthProvider, and no Grows import on the signed-out landing path.
  */
 export default function RootEntry() {
   const { user, loading } = useAuth();
@@ -53,9 +62,11 @@ export default function RootEntry() {
       ) : surface === "landing" ? (
         <Landing canonicalPath="/" />
       ) : (
-        <AppShell>
-          <Dashboard />
-        </AppShell>
+        <AppChromeProviders>
+          <AppShell>
+            <Dashboard />
+          </AppShell>
+        </AppChromeProviders>
       )}
     </Suspense>
   );

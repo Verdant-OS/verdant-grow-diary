@@ -24,7 +24,9 @@ interface Ctx {
 const AuthCtx = createContext<Ctx>({
   user: null,
   session: null,
-  loading: true,
+  // Outside AuthProvider (pure marketing SSR), treat as signed-out with no
+  // pending session probe — avoids infinite "loading" without a provider.
+  loading: false,
   signOut: async () => {},
 });
 
@@ -60,6 +62,9 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
   );
 
   useEffect(() => {
+    // First property access on `supabase` materializes the browser singleton
+    // (Proxy in client.ts). AuthProvider is the intentional warm path for the
+    // authenticated app shell mounted from __root.
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => applySession(s));
     supabase.auth
       .getSession()

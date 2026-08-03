@@ -20,24 +20,28 @@ beforeEach(() => {
 // outside RTL's tracking (manual createRoot/portals) doesn't retain DOM
 // nodes, listeners, or component state across files within the same
 // worker process. Cheap and idempotent; does not change test behavior.
+// Guard document/window so `@vitest-environment node` suites can load setup.
 afterEach(() => {
+  if (typeof document === "undefined") return;
   cleanup();
   document.body.replaceChildren();
 });
 
-Object.defineProperty(window, "matchMedia", {
-  writable: true,
-  value: (query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: () => {},
-    removeListener: () => {},
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    dispatchEvent: () => {},
-  }),
-});
+if (typeof window !== "undefined") {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => {},
+    }),
+  });
+}
 
 class ResizeObserverMock {
   observe() {}

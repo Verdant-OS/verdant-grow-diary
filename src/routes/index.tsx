@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import RootEntry from "@/components/RootEntry";
+import { PublicAuthProviders } from "@/components/providers/PublicAuthProviders";
 
 const SITE_URL = "https://verdantgrowdiary.com";
 
@@ -17,5 +18,9 @@ export const Route = createFileRoute("/")({
 });
 
 function RouteComponent() {
-  return <RootEntry />;
+  return (
+    <PublicAuthProviders>
+      <RootEntry />
+    </PublicAuthProviders>
+  );
 }

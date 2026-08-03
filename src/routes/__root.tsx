@@ -28,7 +28,7 @@ const SITE_NAME = "Verdant Grow Diary";
 const SITE_DESCRIPTION =
   "Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators.";
 const SITE_IMAGE = `${SITE_URL}/brand/verdant-logo-512.png`;
-const GA_MEASUREMENT_ID = "G-B3QRSZEM9S";
+const GA_MEASUREMENT_ID = "G-MCXQ9GVS5H";
 const FONT_HREF =
   "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap";
 

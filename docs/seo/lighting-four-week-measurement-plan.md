@@ -57,7 +57,7 @@ authenticated-access gates remain:
   count-bearing nine-state matrix. A preceding exploratory probe omitted `analytics.google.com` from
   its matcher and is excluded from this evidence; its transmission status is not asserted.
 - The owner-confirmed GA4 production stream is `Verdant Grow Diary`, stream URL
-  `https://verdantgrowdiary.com`, stream ID `15065867361`, and measurement ID `G-B3QRSZEM9S`;
+  `https://verdantgrowdiary.com`, stream ID `15065867361`, and measurement ID `G-MCXQ9GVS5H`;
   production loads and targets that exact measurement ID. The property ID is still unconfirmed.
 - The current public probe returns HTTP 200 for both guides, the sitemap, robots, and version
   manifest. The 51-URL sitemap contains each lighting route exactly once, and robots protects app

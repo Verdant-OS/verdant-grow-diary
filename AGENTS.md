@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-08-01.5**
+**Sentinel-Version: 2026-08-01.7**
 
 This is Verdant's universal Sentinel Code. Every agent inherits these durable product,
 engineering, data, safety, and release rules. Platform-specific bootstraps live at the
@@ -582,6 +582,7 @@ Use these values literally. Never turn a blocked or unmeasured verification into
 | `NO_BASELINE`    | No earlier measurement exists for comparison                         |
 | `NO_DATA`        | The authorized source was reachable but returned no data             |
 | `NOT_MEASURED`   | The metric was not measured; this is never a perfect score           |
+| `SKIPPED`        | The check was intentionally not run; report its reason separately   |
 | `NOT_APPLICABLE` | The check does not apply to this target                              |
 
 Never invent search volume, traffic, keyword difficulty, CPC, domain rating, backlink
@@ -629,8 +630,9 @@ snapshots can differ.
 - **Dev server.** `bun run dev -- --host 127.0.0.1 --port 8080`, then browse
   `http://127.0.0.1:8080`. Bind IPv4 (**`127.0.0.1`, not `localhost`**) and **port 8080,
   not 5173** explicitly — Vite's default host `::` is unreliable in this container.
-  Unauthenticated `/` client-side redirects to `/welcome` / `/auth`, so an HTTP 200 on
-  `/` is still just the SPA shell.
+  Signed-out `/` renders the public landing directly through `RootEntry`; signed-in growers
+  retain Dashboard inside the authenticated `AppShell`. An HTTP 200 on `/` therefore
+  represents the rendered public landing, not merely the SPA shell.
 - **Lint / typecheck / test / build.** `bun run lint` (expect 0 errors, many
   pre-existing warnings), `bun run typecheck`, `bun run build` (its postbuild step runs
   the SEO/JSON-LD validators). Unit path is `bunx vitest run <files>` — the full suite
@@ -649,7 +651,8 @@ snapshots can differ.
   e2e (`bun run e2e:one-tent:ui`) emits a `blocked` receipt and skips without a seeded
   session JSON / real Supabase login — that's expected, not a setup failure.
 - **Credential-free smoke surfaces.** Public interactive routes render real
-  functionality without login and are good smoke targets: `/quick-log` (Quick Log
+  functionality without login and are good smoke targets: `/` (public landing),
+  `/quick-log` (Quick Log
   starter — saves a draft locally), `/tools/vpd-calculator`, `/pheno-comparison`,
   `/welcome`, and `/internal/demo-proof-walkthrough`.
 - **Governance edit gate.** If you change **any** governance file (`AGENTS.md`,

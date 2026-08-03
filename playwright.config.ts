@@ -115,5 +115,16 @@ export default defineConfig({
       },
       testIgnore: /auth\.setup\.ts/,
     },
+    {
+      // Same mocked, credential-free contract as `chromium-mocked`, on WebKit.
+      // Used for cross-browser gates (currently the Google Analytics specs):
+      // the gtag bootstrap lives in the document head, so a Safari/WebKit-only
+      // regression would otherwise ship unnoticed.
+      name: "webkit-mocked",
+      use: {
+        ...devices["Desktop Safari"],
+      },
+      testIgnore: /auth\.setup\.ts/,
+    },
   ],
 });

@@ -1,8 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "@/lib/react-router-compat";
 import { GOOGLE_ANALYTICS_MEASUREMENT_ID } from "@/constants/analytics";
 import { buildSafeAnalyticsPageLocation, sanitizePagePath } from "@/lib/analyticsPageViewRules";
-import { readAnalyticsConsent } from "@/lib/analyticsConsent";
+import { readAnalyticsConsent, subscribeToAnalyticsConsent } from "@/lib/analyticsConsent";
 
 export { sanitizePagePath } from "@/lib/analyticsPageViewRules";
 
@@ -46,7 +46,12 @@ function trackPageView(path: string, title: string) {
 export function useGoogleAnalyticsPageViews() {
   const location = useLocation();
 
+  // Re-run when consent flips so the first view is sent right after Accept.
+  const [consent, setConsent] = useState(() => readAnalyticsConsent());
+  useEffect(() => subscribeToAnalyticsConsent(() => setConsent(readAnalyticsConsent())), []);
+
   useEffect(() => {
+    if (consent !== "granted") return;
     trackPageView(location.pathname, document.title);
-  }, [location.pathname]);
+  }, [location.pathname, consent]);
 }

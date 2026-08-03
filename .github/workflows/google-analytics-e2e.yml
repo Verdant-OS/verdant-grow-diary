@@ -1,0 +1,139 @@
+name: Google Analytics tag E2E (mocked)
+
+# Regression gate for the GA4 bootstrap declared in the TanStack root route
+# head (src/routes/__root.tsx).
+#
+# What it proves on every build:
+#  - Static contract: the measurement ID constant and the root-route head
+#    markup still carry G-MCXQ9GVS5H (vitest).
+#  - Runtime: the inline bootstrap actually executes in a browser on the main
+#    public routes and lands gtag('config', ..., { send_page_view: false })
+#    in window.dataLayer.
+#  - Navigation: client-side route transitions never reload the document and
+#    never re-issue or weaken that config call.
+#
+# SAFETY:
+#  - Mocked / non-destructive. Every spec aborts requests to
+#    googletagmanager.com, so no analytics hit ever leaves CI.
+#  - Public, credential-free routes only. No accounts, no secrets, no
+#    storageState, no elevated DB role, no writes.
+#  - Uses the safe pull_request event only (never pull_request_target).
+
+on:
+  push:
+    branches: [main, verdant-grow-diary]
+    paths:
+      - "e2e/google-analytics-*.spec.ts"
+      - "src/constants/analytics.ts"
+      - "src/routes/__root.tsx"
+      - "src/hooks/useGoogleAnalyticsPageViews.ts"
+      - "src/test/google-analytics-*.test.ts"
+      - "playwright.config.ts"
+      - ".github/workflows/google-analytics-e2e.yml"
+      - "package.json"
+      - "bun.lock"
+      - "bun.lockb"
+  pull_request:
+    branches: [main, verdant-grow-diary]
+    paths:
+      - "e2e/google-analytics-*.spec.ts"
+      - "src/constants/analytics.ts"
+      - "src/routes/__root.tsx"
+      - "src/hooks/useGoogleAnalyticsPageViews.ts"
+      - "src/test/google-analytics-*.test.ts"
+      - "playwright.config.ts"
+      - ".github/workflows/google-analytics-e2e.yml"
+      - "package.json"
+      - "bun.lock"
+      - "bun.lockb"
+  workflow_dispatch:
+
+concurrency:
+  group: google-analytics-e2e-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  google-analytics-e2e:
+    name: Google Analytics tag E2E (mocked)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('bun.lock', 'bun.lockb', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Install Chromium only (with deps)
+        run: bunx playwright install chromium --with-deps
+
+      # Static contract first: a wrong/missing measurement ID should fail in
+      # seconds rather than after a browser run.
+      - name: Run GA static contract tests (logged)
+        run: |
+          mkdir -p e2e/results
+          bun run test:ga-static --reporter=verbose 2>&1 | tee e2e/results/google-analytics-static.log
+
+      - name: Run GA Playwright specs (smoke + runtime config + client-side nav)
+        run: bun run e2e:ga:ci
+
+      - name: Upload GA static test log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: google-analytics-static-tests
+          path: e2e/results/google-analytics-static.log
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload Playwright report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: google-analytics-playwright-report
+          path: playwright-report
+          retention-days: 14
+          if-no-files-found: ignore
+
+      # Failure-only: screenshots / videos / traces produced by the retry
+      # policy in playwright.config.ts. Never published on green runs.
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: google-analytics-playwright-failure-artifacts
+          path: |
+            test-results/**/*.png
+            test-results/**/*.webm
+            test-results/**/trace.zip
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Job summary
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### Google Analytics tag E2E (mocked)";
+            echo "";
+            echo "- Mocked / non-destructive: **yes** (googletagmanager.com aborted in every spec)";
+            echo "- Static: measurement ID constant + \`__root.tsx\` head markup";
+            echo "- Runtime: \`gtag('config', ...)\` executes with \`send_page_view: false\`";
+            echo "- Navigation: config stays single-issue and unchanged across client-side transitions";
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -22,11 +22,13 @@ C:\dev\verdant-grow-diary   # Windows only
 On Linux/CI: clone normally — `bun install --frozen-lockfile` works fine there.
 
 Install bun if absent:
+
 ```bash
 curl -fsSL https://bun.sh/install | bash
 ```
 
 Install ripgrep (required by gamification static-scan tests):
+
 ```bash
 sudo apt-get install -y ripgrep   # Linux/CI only
 ```
@@ -41,6 +43,7 @@ bun run build
 ```
 
 Typecheck only (no emit):
+
 ```bash
 bun run typecheck
 ```
@@ -52,24 +55,27 @@ bun run typecheck
 Playwright is installed in the repo. Use it for headless screenshots and mocked flows; no real credentials needed for `chromium-mocked`.
 
 **One-shot screenshot script (no credentials required):**
+
 ```javascript
 // save as screenshot.mjs, run with: node screenshot.mjs
-import { chromium } from '@playwright/test';
+import { chromium } from "@playwright/test";
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-await page.goto('http://localhost:8080/', { waitUntil: 'networkidle' });
-await page.screenshot({ path: 'screenshot.png' });
-console.log('title:', await page.title()); // "Verdant Grow Diary"
+await page.goto("http://localhost:8080/", { waitUntil: "networkidle" });
+await page.screenshot({ path: "screenshot.png" });
+console.log("title:", await page.title()); // "Verdant Grow Diary"
 await browser.close();
 ```
 
 Run with the dev server already up:
+
 ```bash
 bun run dev &            # starts on port 8080
 node screenshot.mjs
 ```
 
 **Mocked Playwright suite (no credentials — intercepts all Supabase traffic):**
+
 ```bash
 E2E_BASE_URL=http://localhost:8080 bunx playwright test --project=chromium-mocked
 ```
@@ -79,6 +85,7 @@ Tests in `e2e/` that don't use `auth.setup.ts` run here. They use `page.route()`
 Expected output: ~65 passed, 6 pre-existing failures (`fixture-bootstrap.spec.ts` and `fixture-safety.spec.ts` need real DB credentials; 4 `auth-route-protection-mobile` failures are for routes not yet registered in `App.tsx`). These failures are pre-existing — treat a new failure as a regression.
 
 **Authenticated Playwright suite (needs real credentials):**
+
 ```bash
 E2E_TEST_EMAIL=you@example.com \
 E2E_TEST_PASSWORD=yourpass \
@@ -129,3 +136,4 @@ In CI the full suite runs as 36 parallel shards; see `docs/testing/ci-full-suite
 - **No local Supabase stack** — the app points to the hosted project (`knkwiiywfkbqznbxwqfh`). The mocked Playwright project intercepts all Supabase traffic so tests work without staging credentials.
 - **ripgrep missing on clean Linux** — static-scan tests shell out to `rg`. Install before running the full suite on a fresh runner.
 - **Playwright auto-starts a second dev server** — if `E2E_BASE_URL` is unset, Playwright tries to start `bunx vite --port 5173`. If a server is already up on 8080, set the env var to avoid the extra process.
+- **Primary CI contract traps** — route-manifest sort order, static create-dialog wiring tests, leaf-component hooks, Prettier-fragile copy matchers. See skill `ci-contract-hygiene` (`.claude/skills/ci-contract-hygiene/SKILL.md`).

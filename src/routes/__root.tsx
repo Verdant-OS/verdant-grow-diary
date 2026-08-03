@@ -188,9 +188,9 @@ function RootComponent() {
               <GrowsProvider>
                 <PaymentTestModeBanner />
                 <AgreementReconsentGate />
-                <AnalyticsShell />
                 <Suspense fallback={<PageLoader />}>
                   <Outlet />
+                  <AnalyticsShell />
                 </Suspense>
               </GrowsProvider>
             </AuthProvider>

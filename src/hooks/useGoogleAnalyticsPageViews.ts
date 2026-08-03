@@ -6,7 +6,7 @@ import { buildSafeAnalyticsPageLocation, sanitizePagePath } from "@/lib/analytic
 export { sanitizePagePath } from "@/lib/analyticsPageViewRules";
 
 /**
- * Declared global for the GA4 gtag function injected by the script in index.html.
+ * Declared global for the GA4 gtag function injected by the root-route head.
  */
 declare global {
   interface Window {
@@ -19,7 +19,7 @@ function trackPageView(path: string, title: string) {
   if (typeof window === "undefined") return;
   if (typeof window.gtag !== "function") return;
   const safePath = sanitizePagePath(path);
-  // Send an explicit page_view EVENT, not a repeat `config` call. index.html
+  // Send an explicit page_view EVENT, not a repeat `config` call. The root route
   // bootstraps this measurement id with `send_page_view: false` so the initial
   // automatic hit can never fire with an unsanitized URL. Settings passed to
   // `config` persist for that id, so a later `config` call is not a reliable
@@ -36,7 +36,7 @@ function trackPageView(path: string, title: string) {
 }
 
 /**
- * Mount once inside the React Router tree (below BrowserRouter).
+ * Mount once inside the settled TanStack Router tree.
  * Sends a GA4 page_view on initial load and on every subsequent route change.
  * No-ops safely when gtag is absent (tests, ad blockers, SSR-like envs).
  */

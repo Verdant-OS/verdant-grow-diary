@@ -1,30 +1,31 @@
 /**
- * Static test: confirms the Google tag script exists in index.html
+ * Static test: confirms the Google tag script exists in the root route
  * and uses the correct measurement ID.
  */
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 
-const INDEX_HTML = fs.readFileSync(path.resolve(process.cwd(), "index.html"), "utf-8");
+const ROOT_ROUTE = fs.readFileSync(path.resolve(process.cwd(), "src/routes/__root.tsx"), "utf-8");
 
-describe("Google Analytics tag presence in index.html", () => {
+describe("Google Analytics tag presence in the root route", () => {
   it("contains the Google tag gtag.js script", () => {
-    expect(INDEX_HTML).toContain("https://www.googletagmanager.com/gtag/js?id=G-B3QRSZEM9S");
+    expect(ROOT_ROUTE).toContain(
+      "https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}",
+    );
   });
 
   it("disables the raw-location initial page view", () => {
-    // Formatting-agnostic: prettier reflows quotes/whitespace in index.html.
-    expect(INDEX_HTML).toMatch(
-      /gtag\(\s*["']config["']\s*,\s*["']G-B3QRSZEM9S["']\s*,\s*\{\s*send_page_view:\s*false\s*\}\s*\)/,
+    expect(ROOT_ROUTE).toMatch(
+      /gtag\("config","\$\{GA_MEASUREMENT_ID\}",\{send_page_view:false\}\)/,
     );
   });
 
   it("contains the dataLayer bootstrap", () => {
-    expect(INDEX_HTML).toContain("window.dataLayer = window.dataLayer || []");
+    expect(ROOT_ROUTE).toContain("window.dataLayer=window.dataLayer||[]");
   });
 
   it("contains the gtag function definition", () => {
-    expect(INDEX_HTML).toMatch(/function gtag\(\)\s*\{\s*dataLayer\.push\(arguments\);?\s*\}/);
+    expect(ROOT_ROUTE).toContain("function gtag(){dataLayer.push(arguments);}");
   });
 });

@@ -1,0 +1,81 @@
+name: Google Analytics E2E (Chromium + WebKit)
+
+# Cross-browser gate for the GA4 tag contract.
+#
+# The gtag bootstrap lives in the document head (src/routes/__root.tsx) and the
+# SPA page_view events come from a React hook, so a regression can be
+# browser-specific. Both engines must pass or the build fails.
+#
+# SAFETY: every spec aborts outbound googletagmanager.com requests, so no real
+# analytics hit is ever sent from CI. All routes exercised are public and
+# credential-free — no secrets are required by this workflow.
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "e2e/google-analytics-*.spec.ts"
+      - "src/routes/__root.tsx"
+      - "src/constants/analytics.ts"
+      - "src/hooks/useGoogleAnalyticsPageViews.ts"
+      - "src/lib/analyticsPageViewRules.ts"
+      - "playwright.config.ts"
+      - "package.json"
+      - ".github/workflows/google-analytics-e2e.yml"
+  pull_request:
+    paths:
+      - "e2e/google-analytics-*.spec.ts"
+      - "src/routes/__root.tsx"
+      - "src/constants/analytics.ts"
+      - "src/hooks/useGoogleAnalyticsPageViews.ts"
+      - "src/lib/analyticsPageViewRules.ts"
+      - "playwright.config.ts"
+      - "package.json"
+      - ".github/workflows/google-analytics-e2e.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ga-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ga-e2e:
+    name: GA E2E (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      # Never cancel the sibling engine: a Chromium failure must not hide a
+      # WebKit-only regression (or vice versa) in the same run.
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright browser (${{ matrix.browser }})
+        run: bunx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Run GA Playwright suite (${{ matrix.browser }})
+        run: bun run e2e:ga:${{ matrix.browser }}
+
+      - name: Upload Playwright report (${{ matrix.browser }})
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ga-e2e-report-${{ matrix.browser }}
+          path: |
+            playwright-report/
+            test-results/
+            e2e/results/
+          if-no-files-found: ignore
+          retention-days: 7

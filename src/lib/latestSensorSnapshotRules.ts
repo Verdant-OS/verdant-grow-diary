@@ -27,11 +27,7 @@ export type SensorSnapshotStatus = "fresh_live" | "fresh_non_live" | "stale" | "
 export type SensorSnapshotFreshness = "fresh" | "stale" | "invalid" | "unknown";
 
 export type SensorMetricKey =
-  | "temp_f"
-  | "humidity_pct"
-  | "vpd_kpa"
-  | "soil_moisture_pct"
-  | "co2_ppm";
+  "temp_f" | "humidity_pct" | "vpd_kpa" | "soil_moisture_pct" | "co2_ppm";
 
 export const REQUIRED_SNAPSHOT_METRICS: readonly SensorMetricKey[] = ["temp_f", "humidity_pct"];
 
@@ -261,14 +257,16 @@ export function evaluateMetric(key: SensorMetricKey, value: number | null): Sens
   }
   switch (key) {
     case "temp_f": {
-      const valid = value >= 32 && value <= 120;
+      // Presentation realism (Sensor Truth #592): 40–110°F.
+      // Outside band is invalid; comfortable band 55–95 still warns.
+      const valid = value >= 40 && value <= 110;
       const warn = valid && (value < 55 || value > 95);
       return {
         value,
         valid,
         warn,
         reason: !valid
-          ? "Temperature outside plausible range (32–120°F)."
+          ? "Temperature outside plausible range (40–110°F)."
           : warn
             ? "Temperature outside comfortable range (55–95°F)."
             : null,

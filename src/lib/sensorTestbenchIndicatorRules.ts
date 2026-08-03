@@ -21,6 +21,7 @@
  */
 
 import { SENSOR_TESTBENCH_LIVE_WINDOW_MS } from "../constants/sensorTiming";
+import { RECEIVING_TRANSPORT_SOURCES } from "@/lib/sensorLiveMembership";
 export { SENSOR_TESTBENCH_LIVE_WINDOW_MS };
 
 // "receiving" was previously named "live" (#584): a fresh ingest from a
@@ -53,21 +54,8 @@ export interface SensorTestbenchClassification {
 
 // Machine-ingest pathways that count as "receiving" when fresh. Membership
 // here proves transport only — it never promotes a reading to verified live.
-const RECEIVING_SOURCES = new Set([
-  "live",
-  "ecowitt",
-  "webhook",
-  "webhook_generic",
-  "pi_bridge",
-  "node_red_bridge",
-  "home_assistant_bridge",
-  "ha_forwarded",
-  "esp32_arduino",
-  "esp32_arduino_sht31",
-  "esp32_esphome",
-  "esp32_mqtt_bridge",
-  "mqtt",
-]);
+// Shared with sensorLiveMembership (#584 residual / #592 source vocabulary).
+const RECEIVING_SOURCES = RECEIVING_TRANSPORT_SOURCES;
 
 function toDate(v: string | Date | null | undefined): Date | null {
   if (!v) return null;

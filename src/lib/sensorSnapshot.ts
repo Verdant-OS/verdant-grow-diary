@@ -19,6 +19,7 @@ import {
   LIVE_CURRENT_STATE_STALE_MS,
   resolveCurrentStateStaleWindowMs,
 } from "@/lib/sensorTruthCanon";
+import { isVerifiedSnapshotLiveRowSource } from "@/lib/sensorLiveMembership";
 
 import { SENSOR_SNAPSHOT_STALE_THRESHOLD_MS } from "../constants/sensorTiming";
 export type SnapshotSource =
@@ -243,9 +244,7 @@ export function snapshotFromReadings(rows: SensorReadingLike[]): SensorSnapshot 
   // promotion, and this card must not be looser than it.
   const allLive =
     latest.length > 0 &&
-    latest.every(
-      (r) => (r.source === "live" || r.source === "pi_bridge") && !isSensorTestbenchRow(r),
-    );
+    latest.every((r) => isVerifiedSnapshotLiveRowSource(r.source) && !isSensorTestbenchRow(r));
   // CSV history must never be promoted to "live". If every row at the
   // latest timestamp is CSV, classify as "csv". If CSV is mixed with
   // non-live sources but no manual, still prefer csv over live so

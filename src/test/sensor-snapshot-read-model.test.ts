@@ -41,6 +41,7 @@ function truth(overrides: Partial<SensorTruthAssessment> = {}): SensorTruthAsses
     suspiciousFields: [],
     stale: false,
     hasInvalid: false,
+    timestampInvalid: false,
     reasonChips: [],
     reasonCodes: [],
     ...overrides,
@@ -123,7 +124,10 @@ describe("buildSensorSnapshotReadModel", () => {
       snapshot: liveSnap({
         source: "csv",
         device_id: null,
-        csvVendor: { label: "AC Infinity", vendors: ["ac-infinity"] } as unknown as SensorSnapshot["csvVendor"],
+        csvVendor: {
+          label: "AC Infinity",
+          vendors: ["ac-infinity"],
+        } as unknown as SensorSnapshot["csvVendor"],
       }),
       now: NOW,
     });
@@ -150,10 +154,7 @@ describe("buildSensorSnapshotReadModel", () => {
 });
 
 describe("sensorSnapshotReadModel static safety", () => {
-  const src = readFileSync(
-    resolve(__dirname, "../lib/sensors/sensorSnapshotReadModel.ts"),
-    "utf8",
-  );
+  const src = readFileSync(resolve(__dirname, "../lib/sensors/sensorSnapshotReadModel.ts"), "utf8");
   const componentSrc = readFileSync(
     resolve(__dirname, "../components/SensorSnapshotTruthStrip.tsx"),
     "utf8",

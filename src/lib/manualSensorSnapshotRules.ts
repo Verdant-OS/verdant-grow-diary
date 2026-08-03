@@ -17,7 +17,7 @@
  *
  * Constraints enforced by tests:
  *  - Humidity outside 0..100 → invalid.
- *  - pH outside realistic 3.5..8.5 cultivation range → warning.
+ *  - pH outside soft cultivation range (4.5–8.5) → warning.
  *  - Reservoir EC entered as a number that looks like µS/cm (> 50 mS/cm
  *    when "mS/cm" was selected) → warning ("looks like µS/cm").
  *  - Air temp declared in °F but the numeric value is consistent with a
@@ -26,6 +26,12 @@
  *  - VPD helper returns "needs_inputs" when temp or RH is missing.
  *  - VPD helper output is deterministic and rounded to 3 decimal places.
  */
+
+import {
+  EC_MSCM_SUSPICIOUS_MAX,
+  PH_CULTIVATION_SOFT,
+  SOIL_MOISTURE_STUCK_VALUES as SOIL_MOISTURE_STUCK_FROM_CANON,
+} from "@/constants/sensorTruthRanges";
 
 // ---------- Public types ----------
 
@@ -68,8 +74,7 @@ export interface ManualSnapshotMetric {
 }
 
 export type VpdState =
-  | { state: "computed"; valueKpa: number }
-  | { state: "needs_inputs"; message: string };
+  { state: "computed"; valueKpa: number } | { state: "needs_inputs"; message: string };
 
 export interface ManualSnapshotValidation {
   /** OK when there are no hard errors AND at least one metric is present. */
@@ -83,16 +88,17 @@ export interface ManualSnapshotValidation {
 }
 
 // ---------- Constants ----------
+// Soft entry windows from Sensor Truth ranges (#592 residual). Presentation
+// nulling uses PH_PRESENTATION_REALISTIC (3–9) / EC_MSCM_UNIT_MISMATCH_AT (20).
 
-export const PH_REALISTIC_RANGE = { min: 3.5, max: 8.5 } as const;
-/** Reservoir EC expressed as mS/cm rarely exceeds this; higher values usually
- *  indicate the grower typed a µS/cm reading by mistake. */
-export const EC_SUSPICIOUS_MSCM_MAX = 50;
+export const PH_REALISTIC_RANGE = PH_CULTIVATION_SOFT;
+/** Soft EC warning when mS/cm selected but magnitude looks like µS/cm. */
+export const EC_SUSPICIOUS_MSCM_MAX = EC_MSCM_SUSPICIOUS_MAX;
 /** Air temp DECLARED in °F but numerically ≤ this is almost certainly a
  *  Celsius reading entered in the Fahrenheit field. 45°F is ~7°C — below
  *  any indoor cultivation environment. */
 export const FAHRENHEIT_LOOKS_LIKE_CELSIUS_MAX = 45;
-export const SOIL_MOISTURE_STUCK_VALUES = [0, 100] as const;
+export const SOIL_MOISTURE_STUCK_VALUES = SOIL_MOISTURE_STUCK_FROM_CANON;
 
 // ---------- Internals ----------
 
@@ -124,9 +130,7 @@ function usToMs(us: number): number {
  * Returns `{ state: "needs_inputs" }` when temp or RH is missing. Never
  * invents inputs.
  */
-export function computeVpdKpa(
-  args: { tempC: number | null; rhPct: number | null },
-): VpdState {
+export function computeVpdKpa(args: { tempC: number | null; rhPct: number | null }): VpdState {
   const { tempC, rhPct } = args;
   if (tempC === null || rhPct === null) {
     return { state: "needs_inputs", message: "Needs temperature and humidity." };
@@ -144,9 +148,7 @@ export function computeVpdKpa(
 
 // ---------- Validation ----------
 
-export function validateManualSnapshot(
-  input: ManualSnapshotInput,
-): ManualSnapshotValidation {
+export function validateManualSnapshot(input: ManualSnapshotInput): ManualSnapshotValidation {
   const errors: string[] = [];
   const warnings: string[] = [];
   const metrics: ManualSnapshotMetric[] = [];
@@ -193,7 +195,11 @@ export function validateManualSnapshot(
   // ----- Celsius-as-Fahrenheit warning -----
   // The grower picked °F but the entered number is too low to be a real
   // indoor-room °F — it almost certainly is a °C value.
-  if (airTempRaw !== null && airTempUnit === "F" && airTempRaw <= FAHRENHEIT_LOOKS_LIKE_CELSIUS_MAX) {
+  if (
+    airTempRaw !== null &&
+    airTempUnit === "F" &&
+    airTempRaw <= FAHRENHEIT_LOOKS_LIKE_CELSIUS_MAX
+  ) {
     warnings.push(
       `Air temp ${airTempRaw}°F looks like a Celsius reading entered in the Fahrenheit field.`,
     );

@@ -27,6 +27,7 @@
  */
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   EXPECTED_OG_TYPE,
   DEFAULT_ROBOTS_DIRECTIVE,
@@ -515,7 +516,7 @@ export function writeReports(distDir, report) {
 }
 
 // CLI entry
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const distDir = resolve(process.cwd(), process.argv[2] ?? "dist");
   const { ok, issues, report } = validateDist(distDir);
   const paths = report ? writeReports(distDir, report) : { jsonPath: null, mdPath: null };

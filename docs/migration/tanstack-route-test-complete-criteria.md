@@ -13,7 +13,7 @@ runtime migration. Orthogonal to PR #694 (SSR Supabase init).
 | C2 | `route-manifest-sync` green vs routeTree / routes FS | Harness rewritten (`routeManifestSyncHarness`); **27/27** tests green on local | ✅ harness |
 | C3 | Operator/sensor guard parity on `_app` + RequireOperatorRole | Layout tests rewritten; sensor/operator suites green | ✅ |
 | C4 | Full Vitest not dominated by ENOENT App.tsx | ENOENT eliminated; MemoryRouter preserves location.state; checkout funnel unit tests green | ⚠️ local green; Full Vitest CI on #699 TBD |
-| C5 | STATE.md Step 9 + prerender decision closed or scheduled | Step 9 open; prerender **scheduled** in STATE.md (not blocking C1–C4) | ⚠️ scheduled |
+| C5 | STATE.md Step 9 + prerender decision closed or scheduled | Step 9 **closed (0 errors)**; prerender **scheduled** (not blocking C1–C4) | ⚠️ Step9 ✅ / prerender scheduled |
 
 ---
 
@@ -171,7 +171,7 @@ C5 may ship **after** C1–C4 if product agrees route-test-complete ≠ full mig
 - [x] C2 vitest → green  
 - [x] C3 operator/sensor vitest → green  
 - [ ] C4 Full Vitest log → 0× ENOENT App.tsx (local batch green; Full CI TBD)  
-- [ ] C5 STATE.md decision recorded  
+- [x] C5 STATE.md decision recorded (Step 9 closed residual 0; prerender scheduled)  
 - [ ] PR description links this doc and shows before/after counts  
 
 **Migration test-complete** = C1 ∧ C2 ∧ C3 ∧ C4, with C5 either done or explicitly deferred in STATE.md.

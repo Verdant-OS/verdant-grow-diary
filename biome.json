@@ -109,7 +109,7 @@
         "noInvalidPositionAtImportRule": "off"
       },
       "a11y": {
-        "recommended": false
+        "preset": "none"
       },
       "security": {
         "noDangerouslySetInnerHtml": "warn"

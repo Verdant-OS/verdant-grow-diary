@@ -9,5 +9,6 @@
  */
 
 export * from "./sensorTiming";
+export * from "./sensorTruthRanges";
 export * from "./verdantCultivars";
 export * from "./verdantSeoCopy";

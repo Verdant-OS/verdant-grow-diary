@@ -9,7 +9,9 @@ describe("sensorSourceRules", () => {
   it("normalizes known aliases", () => {
     expect(normalizeSensorSource("LIVE")).toBe("live");
     expect(normalizeSensorSource("sensor")).toBe("live");
+    expect(normalizeSensorSource("pi_bridge")).toBe("live");
     expect(normalizeSensorSource("user")).toBe("manual");
+    expect(normalizeSensorSource("diary")).toBe("manual");
     expect(normalizeSensorSource("mock")).toBe("demo");
     expect(normalizeSensorSource("import")).toBe("csv");
   });

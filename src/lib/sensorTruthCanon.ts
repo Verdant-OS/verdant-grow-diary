@@ -21,6 +21,7 @@ import {
   SENSOR_FRESH_WINDOW_MINUTES,
   SENSOR_SNAPSHOT_STALE_THRESHOLD_MS,
 } from "@/constants/sensorTiming";
+import { LIVE_WINDOW_ALIASES } from "@/lib/sensorLiveMembership";
 
 /** Live current-state window (15 minutes). */
 export const LIVE_CURRENT_STATE_STALE_MS = SENSOR_SNAPSHOT_STALE_THRESHOLD_MS;
@@ -53,21 +54,7 @@ export type CurrentStateSourceKind =
   | "unavailable"
   | "unknown";
 
-const LIVE_ALIASES = new Set([
-  "live",
-  "pi_bridge",
-  "pi-bridge",
-  "mqtt",
-  "ecowitt",
-  "ecowitt_api",
-  "ecowitt_mqtt",
-  "bridge",
-  "webhook",
-  "ggs",
-  "ggs_controller",
-  "home_assistant",
-  "ha",
-]);
+const LIVE_ALIASES = LIVE_WINDOW_ALIASES;
 
 const MANUAL_ALIASES = new Set([
   "manual",

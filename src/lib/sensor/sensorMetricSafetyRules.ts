@@ -4,6 +4,7 @@
  * Flags telemetry that looks broken, mislabeled, or stuck. Never mutates
  * the values. Never silently treats suspicious data as healthy.
  */
+import { EC_MSCM_SUSPICIOUS_MAX, PH_PRESENTATION_REALISTIC } from "@/constants/sensorTruthRanges";
 import type { SensorMetrics } from "./sensorSnapshotFreshnessRules";
 
 export type MetricFlagCode =
@@ -84,24 +85,31 @@ export function detectSuspiciousMetrics(metrics: SensorMetrics): MetricFlag[] {
     }
   }
 
-  // pH: realistic range 3.0 – 9.0 for grow systems.
+  // pH: presentation realistic range from sensorTruthRanges.
   if (metrics.ph !== undefined) {
     if (metrics.ph === null) {
       push("missing_value", "ph", "Missing pH.");
     } else if (!isFiniteNumber(metrics.ph)) {
       push("non_finite_value", "ph", "pH is not a finite number.");
-    } else if (metrics.ph < 3 || metrics.ph > 9) {
-      push("ph_out_of_range", "ph", "pH outside realistic 3–9 range.");
+    } else if (
+      metrics.ph < PH_PRESENTATION_REALISTIC.min ||
+      metrics.ph > PH_PRESENTATION_REALISTIC.max
+    ) {
+      push(
+        "ph_out_of_range",
+        "ph",
+        `pH outside realistic ${PH_PRESENTATION_REALISTIC.min}–${PH_PRESENTATION_REALISTIC.max} range.`,
+      );
     }
   }
 
-  // EC: expected in mS/cm (typical 0.5–5). Values like 1450 likely µS/cm.
+  // EC: expected in mS/cm. Soft tier (≥ EC_MSCM_SUSPICIOUS_MAX) looks like µS.
   if (metrics.ec !== undefined) {
     if (metrics.ec === null) {
       push("missing_value", "ec", "Missing EC.");
     } else if (!isFiniteNumber(metrics.ec)) {
       push("non_finite_value", "ec", "EC is not a finite number.");
-    } else if (metrics.ec > 50) {
+    } else if (metrics.ec > EC_MSCM_SUSPICIOUS_MAX) {
       push(
         "ec_likely_microsiemens",
         "ec",

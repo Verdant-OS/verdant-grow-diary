@@ -19,44 +19,41 @@
  *   - Manual / live / stale / csv / demo / invalid labels stay distinct.
  *     This file does NOT collapse `source`; it only nulls numeric fields
  *     and exposes per-field reasons.
+ *
+ * Realism / EC thresholds live in `@/constants/sensorTruthRanges` (#592).
  */
 
+import {
+  AIR_TEMP_F_REALISTIC,
+  EC_MSCM_UNIT_MISMATCH_AT,
+  PH_PRESENTATION_REALISTIC,
+  RH_PCT_RANGE,
+  RH_STUCK_VALUES,
+  SENSOR_TRUTH_FUTURE_SKEW_MS,
+  SOIL_EC_MSCM_PLAUSIBLE,
+  SOIL_MOISTURE_PCT_RANGE,
+  SOIL_TEMP_F_REALISTIC,
+  VPD_KPA_REALISTIC,
+} from "@/constants/sensorTruthRanges";
 import { EMPTY_SNAPSHOT, isSnapshotStale, type SensorSnapshot } from "@/lib/sensorSnapshot";
 import { tempFFromC } from "@/lib/temperatureUnits";
 
-// ---------------------------------------------------------------------------
-// Grow-room realism ranges
-// ---------------------------------------------------------------------------
-
-/**
- * Realistic indoor grow-room *air* temperature window, expressed in
- * Fahrenheit per Verdant's display convention. Anything outside this
- * window is treated as invalid even if it parses cleanly as a number.
- *
- * 40°F ≈ 4.4°C  (no cultivar survives a tent at that air temp)
- * 110°F ≈ 43°C  (lights-off / runaway condition; never a healthy reading)
- */
-export const AIR_TEMP_F_REALISTIC = { min: 40, max: 110 } as const;
-
-/** Soil/substrate temperature realism (Fahrenheit). */
-export const SOIL_TEMP_F_REALISTIC = { min: 35, max: 100 } as const;
-
-/** Humidity percent, with stuck-extreme values flagged. */
-export const RH_PCT_RANGE = { min: 0, max: 100 } as const;
-export const RH_STUCK_VALUES = [0, 100] as const;
-
-/** VPD plausibility for living-plant rooms (kPa). */
-export const VPD_KPA_REALISTIC = { min: 0.2, max: 3.0 } as const;
-
-/** Soil volumetric water content (percent). */
-export const SOIL_MOISTURE_PCT_RANGE = { min: 0, max: 100 } as const;
+// Re-export presentation constants so existing imports keep working.
+export {
+  AIR_TEMP_F_REALISTIC,
+  SOIL_TEMP_F_REALISTIC,
+  RH_PCT_RANGE,
+  RH_STUCK_VALUES,
+  VPD_KPA_REALISTIC,
+  SOIL_MOISTURE_PCT_RANGE,
+};
 
 /** Soil EC sanity in mS/cm. Values >= this strongly suggest µS/cm. */
-export const SOIL_EC_MSCM_UNIT_MISMATCH_AT = 20;
-export const SOIL_EC_MSCM_RANGE = { min: 0, max: 8 } as const;
+export const SOIL_EC_MSCM_UNIT_MISMATCH_AT = EC_MSCM_UNIT_MISMATCH_AT;
+export const SOIL_EC_MSCM_RANGE = SOIL_EC_MSCM_PLAUSIBLE;
 
-/** pH realism for cultivation (chemical 0-14 but realistic 3-9). */
-export const PH_REALISTIC = { min: 3.0, max: 9.0 } as const;
+/** pH realism for cultivation (presentation). */
+export const PH_REALISTIC = PH_PRESENTATION_REALISTIC;
 
 // ---------------------------------------------------------------------------
 // Reason chips (UI-safe, short, never echoes user input)
@@ -73,7 +70,9 @@ export type TruthReasonCode =
   | "invalid_ph"
   | "unit_mismatch_suspected"
   | "humidity_stuck_extreme"
-  | "stale_reading";
+  | "stale_reading"
+  | "invalid_timestamp"
+  | "future_timestamp";
 
 export const TRUTH_REASON_CHIP: Record<TruthReasonCode, string> = {
   invalid_temp: "Invalid temp",
@@ -87,6 +86,8 @@ export const TRUTH_REASON_CHIP: Record<TruthReasonCode, string> = {
   unit_mismatch_suspected: "Unit mismatch suspected",
   humidity_stuck_extreme: "Humidity stuck",
   stale_reading: "Stale reading",
+  invalid_timestamp: "Invalid timestamp",
+  future_timestamp: "Future timestamp",
 };
 
 // ---------------------------------------------------------------------------
@@ -152,6 +153,23 @@ export function isPhRealistic(v: number | null | undefined): boolean {
   return finite(v) && v >= PH_REALISTIC.min && v <= PH_REALISTIC.max;
 }
 
+/**
+ * Classify snapshot timestamp for presentation truth.
+ * Spec (docs/sensor-truth-rules.md §5): missing / unparseable / future
+ * captured_at → invalid (never healthy current-state).
+ */
+export function classifySnapshotTimestamp(
+  ts: string | null | undefined,
+  now: number = Date.now(),
+  futureSkewMs: number = SENSOR_TRUTH_FUTURE_SKEW_MS,
+): "ok" | "missing" | "unparseable" | "future" {
+  if (ts == null || ts === "") return "missing";
+  const t = new Date(ts).getTime();
+  if (!Number.isFinite(t)) return "unparseable";
+  if (t - now > futureSkewMs) return "future";
+  return "ok";
+}
+
 // ---------------------------------------------------------------------------
 // Snapshot truth filter
 // ---------------------------------------------------------------------------
@@ -170,8 +188,13 @@ export interface SensorTruthAssessment {
   suspiciousFields: SnapshotMetricKey[];
   /** Whether the snapshot is stale per the standard threshold. */
   stale: boolean;
-  /** True if any invalid field exists. */
+  /** True if any invalid field exists OR timestamp is missing/future. */
   hasInvalid: boolean;
+  /**
+   * True when captured_at/ts is missing, unparseable, or future.
+   * Spec: never treat as healthy current-state evidence.
+   */
+  timestampInvalid: boolean;
   /** Stable, ordered list of UI reason chips. Never echoes raw values. */
   reasonChips: string[];
   /** Underlying reason codes (for tests / downstream programmatic use). */
@@ -184,14 +207,14 @@ export interface SensorTruthAssessment {
  * mutates the input.
  *
  * Rule wiring:
+ *   - missing / unparseable / future ts → invalid_timestamp / future_timestamp
  *   - air temp invalid             → drop temp + drop vpd (derived)
  *   - humidity invalid             → drop rh + drop vpd
  *   - humidity stuck at 0/100      → suspicious chip; rh kept
  *   - vpd invalid                  → drop vpd
  *   - soil moisture invalid        → drop soil
  *   - soil ec invalid              → drop soil_ec
- *   - soil ec unit-mismatch        → suspicious chip; value kept (caller
- *                                    decides whether to surface)
+ *   - soil ec unit-mismatch        → chip; value nulled when outside plausible
  *   - soil temp invalid            → drop soil_temp
  *
  * A snapshot whose `source === "unavailable"` returns immediately with no
@@ -208,6 +231,7 @@ export function classifySnapshotTruth(
       suspiciousFields: [],
       stale: false,
       hasInvalid: false,
+      timestampInvalid: false,
       reasonChips: [],
       reasonCodes: [],
     };
@@ -219,6 +243,17 @@ export function classifySnapshotTruth(
 
   const cleaned: SensorSnapshot = { ...snapshot };
 
+  // Timestamp gate (docs/sensor-truth-rules.md §5) — before metric chips.
+  const tsClass = classifySnapshotTimestamp(snapshot.ts, now);
+  let timestampInvalid = false;
+  if (tsClass === "missing" || tsClass === "unparseable") {
+    timestampInvalid = true;
+    codes.push("invalid_timestamp");
+  } else if (tsClass === "future") {
+    timestampInvalid = true;
+    codes.push("future_timestamp");
+  }
+
   if (!isAirTempCRealistic(cleaned.temp)) {
     invalid.push("temp");
     codes.push("invalid_temp");
@@ -229,6 +264,8 @@ export function classifySnapshotTruth(
     codes.push("invalid_rh");
     cleaned.rh = null;
   } else if (isHumidityStuckExtreme(cleaned.rh)) {
+    // Presentation severity: suspicious (value kept). Ingest/operator gates
+    // may block; current-state KPIs must still show the stuck flag.
     suspicious.push("rh");
     codes.push("humidity_stuck_extreme");
   }
@@ -261,6 +298,7 @@ export function classifySnapshotTruth(
     }
     cleaned.soil_ec = null;
   } else if (isSoilEcUnitMismatchSuspected(cleaned.soil_ec)) {
+    // Reachable only if plausible max ≥ mismatch floor (today max=8 < 20).
     suspicious.push("soil_ec");
     codes.push("unit_mismatch_suspected");
   }
@@ -271,7 +309,8 @@ export function classifySnapshotTruth(
     cleaned.soil_temp = null;
   }
 
-  const stale = isSnapshotStale(snapshot, now);
+  // Stale only when timestamp is parseable and in the past (not missing/future).
+  const stale = !timestampInvalid && isSnapshotStale(snapshot, now);
   if (stale) codes.push("stale_reading");
 
   // Dedupe codes preserving order.
@@ -289,7 +328,8 @@ export function classifySnapshotTruth(
     invalidFields: invalid,
     suspiciousFields: suspicious,
     stale,
-    hasInvalid: invalid.length > 0,
+    hasInvalid: invalid.length > 0 || timestampInvalid,
+    timestampInvalid,
     reasonChips: orderedCodes.map((c) => TRUTH_REASON_CHIP[c]),
     reasonCodes: orderedCodes,
   };

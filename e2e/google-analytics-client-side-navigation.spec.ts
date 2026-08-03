@@ -42,8 +42,9 @@ function configCalls(entries: DataLayerEntry[]): DataLayerEntry[] {
  */
 async function clientSideNavigate(page: Page, to: string): Promise<void> {
   await page.evaluate((target) => {
-    const router = (window as unknown as { __TSR_ROUTER__?: { navigate: (opts: { to: string }) => unknown } })
-      .__TSR_ROUTER__;
+    const router = (
+      window as unknown as { __TSR_ROUTER__?: { navigate: (opts: { to: string }) => unknown } }
+    ).__TSR_ROUTER__;
     if (router?.navigate) {
       void router.navigate({ to: target });
       return;
@@ -54,11 +55,9 @@ async function clientSideNavigate(page: Page, to: string): Promise<void> {
     window.dispatchEvent(new PopStateEvent("popstate"));
   }, to);
 
-  await page.waitForFunction(
-    (target) => window.location.pathname === target,
-    to,
-    { timeout: 10_000 },
-  );
+  await page.waitForFunction((target) => window.location.pathname === target, to, {
+    timeout: 10_000,
+  });
   await page.waitForLoadState("networkidle").catch(() => undefined);
 }
 

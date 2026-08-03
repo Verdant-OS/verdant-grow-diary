@@ -11,12 +11,11 @@ import { GOOGLE_ANALYTICS_MEASUREMENT_ID } from "@/constants/analytics";
  * path-sanitized `page_view` events instead of GA's automatic hit.
  */
 
-declare global {
-  interface Window {
-    gtag?: (...args: unknown[]) => void;
-    dataLayer?: unknown[];
-  }
-}
+type GtagWindow = Window & {
+  gtag?: (...args: unknown[]) => void;
+  dataLayer?: unknown[];
+};
+
 
 let loaded = false;
 

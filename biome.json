@@ -24,7 +24,7 @@
       "!**/src/routeTree.gen.ts",
       "!**/src/generated",
       "!**/src/integrations/supabase/types.ts",
-      "!**/supabase/functions/_shared/lib/integrations/supabase/types.ts",
+      "!**/supabase/functions/_shared/lib",
       "!**/docs/archive",
       "!**/artifacts",
       "!**/public/version.json",

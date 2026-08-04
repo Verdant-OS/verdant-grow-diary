@@ -1,12 +1,15 @@
 /**
- * Source-to-diagram contract for the bridge sensor PlantUML architecture pack.
- * Pins load-bearing truths only — not layout aesthetics.
+ * Source↔diagram contract for the bridge sensor PlantUML architecture pack.
+ *
+ * Assertions read both the diagram text and the live Edge/config/migration
+ * sources so handler drift fails this gate (not diagram self-consistency alone).
  */
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
-const ARCH = join(process.cwd(), "docs/plantuml/architecture");
+const ROOT = process.cwd();
+const ARCH = join(ROOT, "docs/plantuml/architecture");
 
 const REQUIRED_DIAGRAMS = [
   "bridge-token-mint-use-revoke-sequence.puml",
@@ -16,15 +19,34 @@ const REQUIRED_DIAGRAMS = [
   "ingest-auth-sibling-isolation.puml",
 ] as const;
 
-function read(name: string): string {
+const SRC = {
+  auth: "supabase/functions/_shared/sensorIngestAuth.ts",
+  freshness: "supabase/functions/_shared/sensorIngestFreshness.ts",
+  entitlement: "supabase/functions/_shared/liveSensorEntitlementGate.ts",
+  webhook: "supabase/functions/sensor-ingest-webhook/index.ts",
+  mint: "supabase/functions/mint-bridge-token/index.ts",
+  revoke: "supabase/functions/revoke-bridge-token/index.ts",
+  config: "supabase/config.toml",
+  pi: "supabase/functions/pi-ingest-readings/index.ts",
+  ecowitt: "supabase/functions/ecowitt-ingest/index.ts",
+  ecowittReal: "supabase/functions/ecowitt-real-ingest/index.ts",
+  revMig: "supabase/migrations/20260804213000_bridge_tokens_revocation_integrity.sql",
+  insertMig: "supabase/migrations/20260804220000_bridge_tokens_insert_integrity.sql",
+} as const;
+
+function readArch(name: string): string {
   return readFileSync(join(ARCH, name), "utf8");
 }
 
-function allDiagramText(): string {
-  return REQUIRED_DIAGRAMS.map((n) => read(n)).join("\n\n");
+function readSrc(rel: string): string {
+  return readFileSync(join(ROOT, rel), "utf8");
 }
 
-/** Affirmative side-effect patterns (not "No AI Doctor" safety prose). */
+function allDiagramText(): string {
+  return REQUIRED_DIAGRAMS.map((n) => readArch(n)).join("\n\n");
+}
+
+/** Affirmative side-effect patterns (not "No …" safety prose). */
 const FORBIDDEN_SIDE_EFFECT_ARROWS = [
   /(?<!No\s)(?<!no\s)AI Doctor\s*(invocation|->|→)/i,
   /->\s*[^:\n]*AI Doctor/i,
@@ -51,7 +73,7 @@ describe("bridge-sensor PlantUML architecture pack", () => {
 
   it("each diagram has @startuml/@enduml, relative style include, and a title", () => {
     for (const name of REQUIRED_DIAGRAMS) {
-      const text = read(name);
+      const text = readArch(name);
       expect(text, name).toMatch(/@startuml\b/);
       expect(text, name).toMatch(/@enduml\b/);
       expect(text, name).toContain("!include ../style.puml");
@@ -60,105 +82,196 @@ describe("bridge-sensor PlantUML architecture pack", () => {
     }
   });
 
-  it("pins load-bearing auth and storage facts", () => {
-    const seq = read("bridge-token-mint-use-revoke-sequence.puml");
-    const act = read("sensor-ingest-verification-activity.puml");
-    const life = read("bridge-token-lifecycle-state.puml");
-    const bounds = read("sensor-ingest-trust-boundaries-component.puml");
-    const siblings = read("ingest-auth-sibling-isolation.puml");
+  it("grounds load-bearing auth facts in both source and diagrams", () => {
+    const auth = readSrc(SRC.auth);
+    const webhook = readSrc(SRC.webhook);
+    const config = readSrc(SRC.config);
+    const mint = readSrc(SRC.mint);
+    const freshness = readSrc(SRC.freshness);
+
+    const seq = readArch("bridge-token-mint-use-revoke-sequence.puml");
+    const act = readArch("sensor-ingest-verification-activity.puml");
     const all = allDiagramText();
 
-    // Prefix + placeholders only
-    expect(all).toMatch(/vbt_/);
-    expect(seq).toMatch(/vbt_/);
+    // Source: prefix + allowJwt false on webhook
+    expect(auth).toMatch(/export const BRIDGE_PREFIX = "vbt_"/);
+    expect(webhook).toMatch(/allowJwt:\s*false/);
+    expect(mint).toMatch(/TOKEN_PREFIX = "vbt_"/);
+    expect(mint).toMatch(/getRandomValues|Uint8Array\(32\)/);
 
-    // JWT mint/revoke vs webhook
-    expect(seq).toMatch(/verify_jwt\s*=\s*true/);
-    expect(seq).toMatch(/verify_jwt\s*=\s*false/);
+    // Diagrams must state the same
+    expect(all).toMatch(/vbt_/);
     expect(seq).toMatch(/allowJwt:\s*false/);
     expect(act).toMatch(/allowJwt:\s*false/);
 
-    // Hash storage + once
-    expect(seq).toMatch(/SHA-256/i);
-    expect(seq).toMatch(/once/i);
-    expect(seq).toMatch(/32 random bytes|getRandomValues/i);
+    // verify_jwt posture in config and diagrams
+    expect(config).toMatch(/\[functions\.mint-bridge-token\]\s*\n\s*verify_jwt\s*=\s*true/);
+    expect(config).toMatch(/\[functions\.revoke-bridge-token\]\s*\n\s*verify_jwt\s*=\s*true/);
+    expect(config).toMatch(/\[functions\.sensor-ingest-webhook\]\s*\n\s*verify_jwt\s*=\s*false/);
+    expect(seq).toMatch(/verify_jwt\s*=\s*true/);
+    expect(seq).toMatch(/verify_jwt\s*=\s*false/);
 
-    // Entitlement separate
-    expect(seq).toMatch(/liveSensors|requireLiveSensorEntitlement|Entitlement/i);
-    expect(act).toMatch(/separate from token|Entitlement/i);
-    expect(act).toMatch(/upgrade_required/);
-
-    // Body user_id not ownership
-    expect(act).toMatch(/user_id not ownership|body user_id ignored/i);
-    expect(seq).toMatch(/body user_id ignored/i);
-
-    // Tent
-    expect(seq).toMatch(/tentScopeMatches|forbidden_tent/i);
-    expect(act).toMatch(/tentScopeMatches|forbidden_tent/i);
-
-    // 30-minute ingest window
+    // Freshness 30m both sides
+    expect(freshness).toMatch(/LIVE_INGEST_FRESHNESS_WINDOW_MS\s*=\s*30\s*\*\s*60\s*\*\s*1000/);
     expect(act).toMatch(/30/);
     expect(act).toMatch(/minute|60 \* 1000|FRESHNESS_WINDOW/i);
-    expect(seq).toMatch(/30 minute/i);
 
-    // Stale contract
+    // Hash + once
+    expect(mint).toMatch(/sha256Hex|SHA-256|subtle\.digest/);
+    expect(seq).toMatch(/SHA-256/i);
+    expect(seq).toMatch(/once/i);
+  });
+
+  it("grounds unauthorized / revoked / expired status mapping on activity diagram", () => {
+    const auth = readSrc(SRC.auth);
+    const webhook = readSrc(SRC.webhook);
+    const act = readArch("sensor-ingest-verification-activity.puml");
+
+    // Source error vocabulary
+    expect(auth).toMatch(/"unauthorized"/);
+    expect(auth).toMatch(/"bridge_required"/);
+    expect(auth).toMatch(/"token_revoked"/);
+    expect(auth).toMatch(/"token_expired"/);
+    expect(auth).toMatch(/rawToken\.length\s*<\s*BRIDGE_PREFIX\.length\s*\+\s*16/);
+
+    // Webhook maps bridge_required → 403, lookup fails → 503, else 401
+    expect(webhook).toMatch(/bridge_required[\s\S]{0,80}403/);
+    expect(webhook).toMatch(/auth_lookup_failed|server_misconfigured/);
+
+    // Diagram must include unauthorized for short/unknown vbt_ (not only missing Bearer)
+    expect(act).toMatch(/401 unauthorized/);
+    expect(act).toMatch(/too-short|unknown vbt_|missing hash|short token/i);
+    expect(act).toMatch(/403 bridge_required/);
+    expect(act).toMatch(/401 token_revoked/);
+    expect(act).toMatch(/401 token_expired/);
+  });
+
+  it("grounds usage bump + audit as webhook-handler side effects after upsert", () => {
+    const webhook = readSrc(SRC.webhook);
+    const bounds = readArch("sensor-ingest-trust-boundaries-component.puml");
+    const seq = readArch("bridge-token-mint-use-revoke-sequence.puml");
+    const act = readArch("sensor-ingest-verification-activity.puml");
+
+    // Source: bump only if insertedCount > 0, then audit insert
+    const bumpIdx = webhook.search(/bump_bridge_token_usage/);
+    const upsertIdx = webhook.search(/\.upsert\(/);
+    const auditIdx = webhook.search(/sensor_ingest_audit_log/);
+    expect(upsertIdx).toBeGreaterThanOrEqual(0);
+    expect(bumpIdx).toBeGreaterThan(upsertIdx);
+    expect(auditIdx).toBeGreaterThan(bumpIdx);
+    expect(webhook).toMatch(/if\s*\(\s*insertedCount\s*>\s*0\s*\)/);
+
+    // Diagrams: usage + audit owned by webhook/handler path, not DB-triggered
+    expect(bounds).toMatch(/Webhook\s*-->\s*Usage|webhook.*bump_bridge_token_usage/i);
+    expect(bounds).toMatch(/Webhook\s*-->\s*Audit|webhook.*audit/i);
+    expect(bounds).not.toMatch(/SR\s*-->\s*Usage/);
+    expect(bounds).not.toMatch(/Gates\s*-->\s*Audit/);
+    expect(seq).toMatch(/insertedCount\s*>\s*0/);
+    expect(act).toMatch(/insertedCount\s*>\s*0/);
+    expect(act).toMatch(/best-effort/i);
+  });
+
+  it("grounds lifecycle: Expired → Revoked allowed; Revoked → Active forbidden", () => {
+    const revoke = readSrc(SRC.revoke);
+    const auth = readSrc(SRC.auth);
+    const life = readArch("bridge-token-lifecycle-state.puml");
+    const revMig = readSrc(SRC.revMig);
+    const insertMig = readSrc(SRC.insertMig);
+
+    // Revoke only filters revoked_at IS NULL — no expires_at filter
+    expect(revoke).toMatch(/\.is\(\s*["']revoked_at["']\s*,\s*null\s*\)/);
+    expect(revoke).not.toMatch(/expires_at/);
+    expect(revoke).toMatch(/already_revoked/);
+
+    // Auth checks revoked before expired (runtime ifs, not type fields)
+    const revCheck = auth.search(/if\s*\(\s*data\.revoked_at\s*\)/);
+    const expCheck = auth.search(/new Date\(\s*data\.expires_at\s*\)|data\.expires_at\)\.getTime/);
+    expect(revCheck).toBeGreaterThanOrEqual(0);
+    expect(expCheck).toBeGreaterThan(revCheck);
+
+    // Diagram encodes Expired → Revoked and forbids reverse un-revoke
+    expect(life).toMatch(/Expired\s*-->\s*Revoked/);
+    expect(life).toMatch(/still revocable|NOT terminal|Expired is NOT terminal/i);
+    expect(life).not.toMatch(/Revoked\s*-->\s*(Active|NeverUsed|Used|Expired)/);
+    expect(life).toMatch(/Forbidden|one-way|Revoked → Active/i);
+    expect(life).toMatch(/born-clean/i);
+
+    // Migrations support one-way + born-clean claims
+    expect(revMig).toMatch(/revoked_at|one-way|immutab/i);
+    expect(insertMig).toMatch(/ingest_count|first_used_at|revoked_at/i);
+  });
+
+  it("grounds entitlement separation and stale accept:false contract", () => {
+    const entitlement = readSrc(SRC.entitlement);
+    const webhook = readSrc(SRC.webhook);
+    const act = readArch("sensor-ingest-verification-activity.puml");
+    const seq = readArch("bridge-token-mint-use-revoke-sequence.puml");
+
+    expect(entitlement).toMatch(/liveSensors/);
+    expect(entitlement).toMatch(/upgrade_required/);
+    expect(webhook).toMatch(/requireLiveSensorEntitlement/);
+    expect(webhook).toMatch(/accepted:\s*false|timestamp_stale/);
+    expect(webhook).toMatch(/classifyIngestTimestampFreshness/);
+
+    expect(act).toMatch(/upgrade_required/);
     expect(act).toMatch(/accepted:false/);
     expect(act).toMatch(/timestamp_stale|stale/i);
     expect(act).toMatch(/zero live writes/i);
+    expect(act).toMatch(/user_id not ownership|body user_id ignored/i);
+    expect(seq).toMatch(/body user_id ignored/i);
+    expect(webhook).toMatch(/Caller-supplied `user_id` in the body is ignored|user_id from auth/i);
+  });
 
-    // Service role persistence
-    expect(act).toMatch(/service_role/i);
-    expect(bounds).toMatch(/service_role/i);
+  it("grounds sibling isolation against Pi / EcoWitt sources", () => {
+    const pi = readSrc(SRC.pi);
+    const ecowitt = readSrc(SRC.ecowitt);
+    const ecowittReal = readSrc(SRC.ecowittReal);
+    const siblings = readArch("ingest-auth-sibling-isolation.puml");
 
-    // Usage condition
-    expect(seq).toMatch(/insertedCount\s*>\s*0/);
-    expect(act).toMatch(/insertedCount\s*>\s*0/);
-    expect(life).toMatch(/insertedCount\s*>\s*0/);
+    expect(pi).toMatch(/x-bridge-signature|HMAC/i);
+    expect(pi).not.toMatch(/allowJwt:\s*false/);
+    expect(ecowitt).toMatch(/allowJwt:\s*false|vbt_/);
+    expect(ecowittReal).toMatch(/validation-only|does not persist|ECOWITT_BRIDGE_TOKEN/i);
 
-    // Audit best-effort
-    expect(seq).toMatch(/best-effort/i);
-    expect(act).toMatch(/best-effort/i);
-
-    // One-way revoke
-    expect(seq).toMatch(/already_revoked|revoked_at IS NULL/i);
-    expect(life).toMatch(/Forbidden|one-way|Revoked → Active/i);
-    expect(life).not.toMatch(/Revoked\s*-->\s*(Active|NeverUsed|Used)/);
-
-    // Born-clean
-    expect(life).toMatch(/born-clean/i);
-
-    // Gateway note
-    expect(bounds).toMatch(/not public live-write/i);
-    expect(bounds).toMatch(/handler-owned bridge authentication/i);
-
-    // Sibling isolation
     expect(siblings).toMatch(/HMAC/i);
     expect(siblings).toMatch(/Do not mix Pi HMAC/i);
     expect(siblings).toMatch(/vbt_/);
     expect(siblings).toMatch(/validation-only|validate only|no sensor_readings write/i);
-
-    // Telemetry-only safety statement allowed
-    expect(bounds).toMatch(/No AI Doctor|Telemetry storage only/i);
   });
 
   it("preserves verification order: auth before entitlement before tent before freshness before persistence", () => {
-    const act = read("sensor-ingest-verification-activity.puml");
-    const idx = (re: RegExp) => {
-      const m = act.search(re);
+    const act = readArch("sensor-ingest-verification-activity.puml");
+    const webhook = readSrc(SRC.webhook);
+    const idx = (hay: string, re: RegExp) => {
+      const m = hay.search(re);
       expect(m, String(re)).toBeGreaterThanOrEqual(0);
       return m;
     };
-    const iAuth = idx(/1\.\s*Authenticate|authenticateBearer/);
-    const iEnt = idx(/2\.\s*Entitlement|requireLiveSensorEntitlement/);
-    const iParse = idx(/3\.\s*Parse|normalizeWebhookIngestPayload/);
-    const iTent = idx(/4\.\s*Tent|tentScopeMatches/);
-    const iFresh = idx(/5\.\s*Freshness|classifyIngestTimestampFreshness|30/);
-    const iPersist = idx(/6\.\s*Persistence|upsert sensor_readings/);
+    // Diagram order
+    const iAuth = idx(act, /1\.\s*Authenticate|authenticateBearer/);
+    const iEnt = idx(act, /2\.\s*Entitlement|requireLiveSensorEntitlement/);
+    const iParse = idx(act, /3\.\s*Parse|normalizeWebhookIngestPayload/);
+    const iTent = idx(act, /4\.\s*Tent|tentScopeMatches/);
+    const iFresh = idx(act, /5\.\s*Freshness|classifyIngestTimestampFreshness|30/);
+    const iPersist = idx(act, /6\.\s*Persistence|upsert sensor_readings/);
     expect(iAuth).toBeLessThan(iEnt);
     expect(iEnt).toBeLessThan(iParse);
     expect(iParse).toBeLessThan(iTent);
     expect(iTent).toBeLessThan(iFresh);
     expect(iFresh).toBeLessThan(iPersist);
+
+    // Source call order mirrors spine (match call sites, not imports)
+    const sAuth = idx(webhook, /authenticateBearer\(/);
+    const sEnt = idx(webhook, /requireLiveSensorEntitlement\(/);
+    const sNorm = idx(webhook, /normalizeWebhookIngestPayload\(/);
+    const sTent = idx(webhook, /tentScopeMatches\(/);
+    const sFresh = idx(webhook, /classifyIngestTimestampFreshness\(/);
+    const sUpsert = idx(webhook, /\.upsert\(/);
+    expect(sAuth).toBeLessThan(sEnt);
+    expect(sEnt).toBeLessThan(sNorm);
+    expect(sNorm).toBeLessThan(sTent);
+    expect(sTent).toBeLessThan(sFresh);
+    expect(sFresh).toBeLessThan(sUpsert);
   });
 
   it("rejects affirmative ingest side-effect arrows (allows textual No … bans)", () => {
@@ -166,31 +279,25 @@ describe("bridge-sensor PlantUML architecture pack", () => {
     for (const re of FORBIDDEN_SIDE_EFFECT_ARROWS) {
       expect(all, String(re)).not.toMatch(re);
     }
-    // Explicit ban prose is required somewhere
     expect(all).toMatch(/No AI Doctor/i);
     expect(all).toMatch(/Action Queue/i);
   });
 
   it("rejects secret-shaped content", () => {
     const all = allDiagramText();
-    // Real-looking vbt tokens: vbt_ + long base64url-ish run
     expect(all).not.toMatch(/vbt_[A-Za-z0-9_-]{20,}/);
-    // JWT-shaped triple base64
     expect(all).not.toMatch(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
-    // service_role jwt-ish or long secrets
     expect(all).not.toMatch(/service_role\s*[:=]\s*["']?[A-Za-z0-9._-]{20,}/i);
-    // Private IPv4
     expect(all).not.toMatch(/\b10\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/);
     expect(all).not.toMatch(/\b192\.168\.\d{1,3}\.\d{1,3}\b/);
-    // Placeholder JWT label is OK
     expect(all).toMatch(/<user JWT>|user JWT/i);
   });
 
   it("does not launder BLOCKED harness evidence as PASS", () => {
     const all = allDiagramText() + readFileSync(join(ARCH, "README.md"), "utf8");
     expect(all).toMatch(/BLOCKED/);
-    // Must not claim strict harness PASS
-    expect(all).not.toMatch(/strict[^\n]{0,40}PASS/i);
-    expect(all).not.toMatch(/zero-skip[^\n]{0,40}PASS/i);
+    expect(all).not.toMatch(/strict[^\n]{0,80}\bPASS\b(?![a-z])/i);
+    expect(all).not.toMatch(/zero-skip[^\n]{0,80}\bPASS\b(?![a-z])/i);
+    expect(all).not.toMatch(/BLOCKED[^\n]{0,40}\bas PASS\b/i);
   });
 });

@@ -31,13 +31,15 @@ state "Active" as Active {
 state Expired #FFE0B2
 Expired : revoked_at = null
 Expired : expires_at <= now\n(computed in authenticateBearer)
-Expired : 401 token_expired
+Expired : ingest → 401 token_expired
+Expired : still revocable by owner
 
 state Revoked #FFCDD2
 Revoked : revoked_at IS NOT NULL
 Revoked : one-way (DB immutability guard)
 Revoked : 401 token_revoked
 Revoked : re-revoke → already_revoked
+Revoked : terminal for un-revoke\n(not for other transitions into it)
 
 [*] --> NotIssued
 
@@ -46,7 +48,12 @@ NotIssued --> NeverUsed : mint-bridge-token\n[user JWT + liveSensors +\ntent own
 Active --> Expired : authenticateBearer\n[expires_at <= request now]\n(no scheduler required in model)
 Active --> Revoked : revoke-bridge-token\n[owner JWT]\n/ UPDATE WHERE revoked_at IS NULL
 
-Expired --> [*]
+' Revoke does not require expires_at > now — expired rows remain
+' revocable while revoked_at is null (revoke-bridge-token/index.ts).
+' Auth checks revoked_at before expires_at, so revoked-expired
+' presents as token_revoked thereafter.
+Expired --> Revoked : revoke-bridge-token\n[owner JWT]\n/ SET revoked_at\n(Expired is NOT terminal)
+
 Revoked --> [*]
 
 note right of Revoked
@@ -57,8 +64,8 @@ end note
 
 note left of Expired
   Expiry evaluated at request clock
-  unless a sweeper job is proven in source.
-  (None required for this model.)
+  (no sweeper required).
+  Owner may still revoke after expiry.
 end note
 
 note bottom of NeverUsed
@@ -73,8 +80,8 @@ legend right
   | Not issued | no row |
   | Active / never used | valid; ingest_count = 0 |
   | Active / used | valid; ingest_count >= 1 |
-  | Expired | expires_at <= now at auth |
-  | Revoked | revoked_at set (terminal) |
+  | Expired | expires_at <= now at auth; not revoked |
+  | Revoked | revoked_at set (un-revoke forbidden) |
 endlegend
 
 caption Implemented controls ≠ all runtime-proven.\nStrict DB harness may remain BLOCKED (zero-skip not yet green).

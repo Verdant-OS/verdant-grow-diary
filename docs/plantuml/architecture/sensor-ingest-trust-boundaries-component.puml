@@ -49,9 +49,10 @@ Webhook --> Auth
 Auth --> BT : hash lookup (service_role)
 Webhook --> Ent
 Webhook --> Gates
-Gates --> SR : service_role persistence\nowner from token row\nbody user_id ignored
-SR --> Usage : only if insertedCount > 0
-Gates --> Audit
+Webhook --> SR : service_role upsert\nowner from token row\nbody user_id ignored
+' Handler owns post-persist side effects (not DB triggers, not Gates):
+Webhook --> Usage : rpc bump_bridge_token_usage\nonly if insertedCount > 0\n(after sensor_readings upsert)
+Webhook --> Audit : best-effort insert\n(after successful upsert path)
 
 note right of Webhook
   **verify_jwt = false**

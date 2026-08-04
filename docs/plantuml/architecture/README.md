@@ -46,10 +46,23 @@ Do **not** use `!include docs/plantuml/style.puml` from this folder.
 | Implemented | Code path exists on product branch |
 | Statically proven | Evidence scripts / unit-edge tests |
 | Runtime proven | Live/local harness green |
-| **BLOCKED** | Strict zero-skip DB harness not yet green — **do not draw as PASS** |
+| **BLOCKED** | Strict zero-skip DB harness not yet green — keep the BLOCKED label; do not upgrade the verdict |
 | NOT_MEASURED | Not claimed |
 
-Strict database harness status is documented as **BLOCKED** in the bridge security checklist until `passed > 0, failed = 0, skipped = 0`.
+Strict database harness status is documented as **BLOCKED** in the bridge security checklist until the zero-skip criteria hold (nonzero successes, zero failures, zero skips).
+
+### Lifecycle correction note (#718 follow-up)
+
+- **Expired is not terminal.** Owner revoke filters only `revoked_at IS NULL` (no `expires_at` gate), so **Expired → Revoked** is allowed. Auth checks `revoked_at` before `expires_at`, so a revoked-expired token presents as `token_revoked`.
+- **Revoked → Active remains forbidden.**
+
+### Trust-boundary correction note
+
+- After a successful `sensor_readings` upsert, **the webhook handler** (not the DB or validation gates) calls `bump_bridge_token_usage` when `insertedCount > 0`, then best-effort inserts `sensor_ingest_audit_log`.
+
+### Auth outcome correction note
+
+- Too-short or unknown `vbt_` tokens map to **`401 unauthorized`** (not success). Non-`vbt_` bearers map to **`403 bridge_required`**.
 
 ## Safety non-goals (must not appear as ingest side effects)
 

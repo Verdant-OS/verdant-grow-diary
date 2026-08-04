@@ -594,10 +594,9 @@ jobs:
   # `test` job so the whole suite (~21k tests, jsdom-heavy) doesn't exceed the
   # 20-minute job timeout when run on a single runner.
   #
-  # 32 named gate shards. Each job runs TWO sequential vitest processes
-  # (`--shard=(2n-1)/64` then `--shard=(2n)/64`) so V8 heap resets mid-suite.
-  # Raised after #697: even 1/32 of files still climbed to ~7.3GB and OOM'd
-  # under a single long-lived maxWorkers=1 process (shard 30/32).
+  # 32 named gate shards. Each job runs FOUR sequential vitest processes
+  # (`--shard=(4n-3)..(4n)/128`) so V8 heap resets mid-suite. Raised after #697:
+  # even 1/64 still climbed to ~7.3GB and OOM'd (gate shard 30 half 59/64).
   #
   # History: the suite was briefly split into 36 shards to keep each worker
   # below an OOM. That OOM was NOT diffuse jsdom accumulation — it was a single
@@ -614,7 +613,7 @@ jobs:
   full-suite:
     name: Full test suite (shard ${{ matrix.shard }}/32)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     permissions:
       contents: read
     strategy:
@@ -682,16 +681,18 @@ jobs:
       - name: Install ripgrep
         run: sudo apt-get update && sudo apt-get install -y ripgrep
 
-      - name: Run test shard (two sequential half-shards)
+      - name: Run test shard (four sequential 1/128 processes)
         env:
           # Single worker + 8GB: multi-worker multiplies heap and OOMs (#697).
-          # Two sequential 1/64 processes restart V8 so accumulation resets.
+          # Four sequential 1/128 processes restart V8 so accumulation resets —
+          # even 1/64 still OOM'd on gate shard 30 half-shard 59/64.
           NODE_OPTIONS: --max-old-space-size=8192
         run: |
           set -euo pipefail
-          # Matrix shard N covers vitest partitions (2N-1)/64 and (2N)/64.
-          a=$(( (${{ matrix.shard }} - 1) * 2 + 1 ))
-          b=$(( a + 1 ))
-          echo "Running half-shards ${a}/64 then ${b}/64 for gate shard ${{ matrix.shard }}/32"
-          bunx vitest run --shard=${a}/64 --pool=forks --maxWorkers=1 --isolate
-          bunx vitest run --shard=${b}/64 --pool=forks --maxWorkers=1 --isolate
+          # Matrix shard N covers vitest partitions (4N-3)..(4N) of 128.
+          base=$(( (${{ matrix.shard }} - 1) * 4 ))
+          for i in 1 2 3 4; do
+            n=$(( base + i ))
+            echo "Running sub-shard ${n}/128 for gate shard ${{ matrix.shard }}/32"
+            bunx vitest run --shard=${n}/128 --pool=forks --maxWorkers=1 --isolate
+          done

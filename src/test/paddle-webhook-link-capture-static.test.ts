@@ -15,7 +15,7 @@ describe("paddle webhook billing customer link capture", () => {
     expect(WEBHOOK_SRC).toContain("captureBillingCustomerLink(supabase, recordedEvent)");
     expect(WEBHOOK_SRC).toContain("captureBillingCustomerLink(supabase, existingEvent)");
 
-    const eventInsertIdx = WEBHOOK_SRC.indexOf('.from("paddle_events").insert');
+    const eventInsertIdx = WEBHOOK_SRC.search(/\.from\(["']paddle_events["']\)\s*\.insert/);
     const processingIdx = WEBHOOK_SRC.indexOf("recordProcessing(supabase, recordedEvent)");
     const linkCaptureIdx = WEBHOOK_SRC.indexOf(
       "captureBillingCustomerLink(supabase, recordedEvent)",
@@ -64,7 +64,7 @@ describe("paddle webhook billing customer link capture", () => {
     const rawIdx = WEBHOOK_SRC.indexOf("req.text()");
     const verifyIdx = WEBHOOK_SRC.indexOf("await verifyPaddleWebhookSignature(");
     const parseIdx = WEBHOOK_SRC.indexOf("JSON.parse(rawBody)");
-    const eventInsertIdx = WEBHOOK_SRC.indexOf('.from("paddle_events").insert');
+    const eventInsertIdx = WEBHOOK_SRC.search(/\.from\(["']paddle_events["']\)\s*\.insert/);
     const processingIdx = WEBHOOK_SRC.indexOf("recordProcessing(supabase, recordedEvent)");
     const linkCaptureIdx = WEBHOOK_SRC.indexOf(
       "captureBillingCustomerLink(supabase, recordedEvent)",

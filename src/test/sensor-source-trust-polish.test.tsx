@@ -52,7 +52,7 @@ describe("TimelineCsvContextPanel read-only banner copy", () => {
     const src = read("src/components/TimelineCsvContextPanel.tsx");
     expect(src).toContain('data-testid="timeline-csv-context-readonly-banner"');
     expect(src).toMatch(/CSV context is read-only/);
-    expect(src).toMatch(/explicitly labeled csv/);
+    expect(src).toMatch(/explicitly\s+labeled\s+csv/i);
   });
 });
 

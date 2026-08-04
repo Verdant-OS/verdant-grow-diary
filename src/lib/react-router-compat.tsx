@@ -277,38 +277,30 @@ export type CompatSetSearchParams = (
  */
 export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
   const legacy = useContext(LegacyRouterContext);
-  if (legacy) {
-    const params = new URLSearchParams(legacy.location.search);
-    return [
-      params,
-      (next, options) => {
-        const resolved =
-          typeof next === "function" ? next(new URLSearchParams(legacy.location.search)) : next;
-        const serialized =
-          resolved instanceof URLSearchParams
-            ? resolved.toString()
-            : typeof resolved === "string"
-              ? resolved.replace(/^\?/, "")
-              : new URLSearchParams(resolved).toString();
-        legacy.navigate(
-          `${legacy.location.pathname}${serialized ? `?${serialized}` : ""}${legacy.location.hash}`,
-          options,
-        );
-      },
-    ];
-  }
-  const searchStr = useRouterState({ select: (state) => state.location.searchStr ?? "" });
+  // Always subscribe so hooks order is stable; prefer legacy MemoryRouter search when present.
+  const tanstackSearch = useRouterState({ select: (state) => state.location.searchStr ?? "" });
   const router = useRouter();
-  const params = new URLSearchParams(searchStr);
+  const searchRaw = legacy ? (legacy.location.search ?? "") : tanstackSearch;
+  const searchKey = searchRaw.startsWith("?") ? searchRaw.slice(1) : searchRaw;
+  // Stabilize identity: a fresh URLSearchParams every render breaks effects that
+  // depend on [searchParams] (infinite setState loops under MemoryRouter/TanStack).
+  const params = useMemo(() => new URLSearchParams(searchKey), [searchKey]);
 
   const setSearchParams: CompatSetSearchParams = (next, options) => {
-    const resolved = typeof next === "function" ? next(new URLSearchParams(searchStr)) : next;
+    const resolved = typeof next === "function" ? next(new URLSearchParams(searchKey)) : next;
     const serialized =
       resolved instanceof URLSearchParams
         ? resolved.toString()
         : typeof resolved === "string"
           ? resolved.replace(/^\?/, "")
           : new URLSearchParams(resolved).toString();
+    if (legacy) {
+      legacy.navigate(
+        `${legacy.location.pathname}${serialized ? `?${serialized}` : ""}${legacy.location.hash}`,
+        options,
+      );
+      return;
+    }
     const { pathname, hash } = router.state.location;
     const suffix = `${serialized ? `?${serialized}` : ""}${hash ? (hash.startsWith("#") ? hash : `#${hash}`) : ""}`;
     void router.navigate({

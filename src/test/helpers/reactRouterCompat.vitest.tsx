@@ -276,10 +276,11 @@ export type CompatSetSearchParams = (
 export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
   const searchStr = useRouterState({ select: (state) => state.location.searchStr ?? "" });
   const router = useRouter();
-  const params = new URLSearchParams(searchStr);
+  const searchKey = searchStr.startsWith("?") ? searchStr.slice(1) : searchStr;
+  const params = useMemo(() => new URLSearchParams(searchKey), [searchKey]);
 
   const setSearchParams: CompatSetSearchParams = (next, options) => {
-    const resolved = typeof next === "function" ? next(new URLSearchParams(searchStr)) : next;
+    const resolved = typeof next === "function" ? next(new URLSearchParams(searchKey)) : next;
     const serialized =
       resolved instanceof URLSearchParams
         ? resolved.toString()

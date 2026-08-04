@@ -75,13 +75,25 @@ function reportServerBundleProbe() {
   return probe;
 }
 
+const NONFATAL_VALUES = new Set(["1", "true", "yes", "on"]);
+const captureNonFatal = NONFATAL_VALUES.has(
+  (process.env["SEO_SNAPSHOT_CAPTURE_NONFATAL"] ?? "").trim().toLowerCase(),
+);
+
 function generateArtifacts() {
   run("bun", [resolve("scripts/generate-seo-artifacts.ts"), distDir]);
   const probe = reportServerBundleProbe();
   const captureArgs = [resolve("scripts/capture-ssr-head-snapshots-with-server.mjs"), distDir];
   if (probe.entry) captureArgs.push(probe.entry);
+  if (captureNonFatal) {
+    console.warn(
+      "run-postbuild-seo: SEO_SNAPSHOT_CAPTURE_NONFATAL is set — SSR head snapshot capture will WARN " +
+        "instead of failing the build. The snapshot-presence and head-fidelity gates below stay fatal.",
+    );
+  }
   run("node", captureArgs);
 }
+
 
 
 generateArtifacts();

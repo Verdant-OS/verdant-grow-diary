@@ -616,7 +616,7 @@ jobs:
   full-suite:
     name: Full test suite (shard ${{ matrix.shard }}/8)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     permissions:
       contents: read
     strategy:

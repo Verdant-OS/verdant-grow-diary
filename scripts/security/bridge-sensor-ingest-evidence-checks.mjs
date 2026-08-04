@@ -351,14 +351,17 @@ export const MIGRATION_CHECKS = [
       },
     ],
     // Role lists are parsed in full for both CREATE POLICY and role-changing
-    // ALTER POLICY statements: `TO authenticated, anon`, a later
-    // `ALTER POLICY ... TO PUBLIC`, and a CREATE POLICY with no TO clause
-    // (which defaults to PUBLIC, including anon) must all fail. An
-    // ALTER POLICY without a TO clause leaves roles unchanged, and
-    // `RENAME TO` is not a role list.
+    // ALTER POLICY statements, after SQL comments are stripped so commented
+    // history never classifies as active SQL. The declared role list must be
+    // exactly `authenticated` — one role, no additions in any order (`TO
+    // authenticated, anon`, `TO anon, authenticated`, `TO authenticated,
+    // service_role` all fail), and a CREATE POLICY with no TO clause fails
+    // because it defaults to PUBLIC (which includes anon). An ALTER POLICY
+    // without a TO clause leaves roles unchanged, and `RENAME TO` is not a
+    // role list.
     custom: (corpus) => {
       const failures = [];
-      const policyStatements = corpus
+      const policyStatements = stripSqlComments(corpus)
         .split(";")
         .map((s) => s.trim())
         .filter(
@@ -384,13 +387,10 @@ export const MIGRATION_CHECKS = [
           .split(",")
           .map((r) => r.trim().replace(/^"|"$/g, "").toLowerCase())
           .filter((r) => r.length > 0);
-        if (roles.length === 0 && isCreate) {
-          failures.push(`policy TO clause names no role: ${label}`);
-        }
-        for (const role of roles) {
-          if (role !== "authenticated") {
-            failures.push(`policy role "${role}" is not authenticated: ${label}`);
-          }
+        if (roles.length !== 1 || roles[0] !== "authenticated") {
+          failures.push(
+            `policy role list must be exactly [authenticated], found [${roles.join(", ")}]: ${label}`,
+          );
         }
       }
       return failures;
@@ -420,6 +420,16 @@ export const MIGRATION_CHECKS = [
     ],
   },
 ];
+
+/**
+ * Deterministic comment strip for migration classification: removes block
+ * comments, then `--` line comments. Deliberately NOT a SQL parser — string
+ * literals containing comment markers do not occur in this corpus, and the
+ * G3 runtime harness remains the effective-state authority.
+ */
+export function stripSqlComments(sql) {
+  return sql.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/--[^\n]*/g, " ");
+}
 
 export function readRepoFile(rel) {
   const p = resolve(REPO_ROOT, rel);
@@ -480,7 +490,10 @@ export function runAllChecks({ readFile = readRepoFile, migrations = bridgeMigra
       results.push({ id: check.id, ok: false, detail: "no migration mentions bridge_tokens" });
       continue;
     }
-    const failures = runExpectations(corpus, check.expect);
+    // Comments are stripped for every migration expectation: a commented-out
+    // protection must not satisfy a must-pattern, and a commented-out
+    // regression must not false-trip a forbidden one.
+    const failures = runExpectations(stripSqlComments(corpus), check.expect);
     if (check.custom) failures.push(...check.custom(corpus));
     results.push({
       id: check.id,

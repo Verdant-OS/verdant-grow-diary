@@ -1,0 +1,140 @@
+@startuml bridge_token_mint_sequence
+' Bridge token mint sequence — source: supabase/functions/mint-bridge-token/index.ts
+' + liveSensorEntitlementGate.ts + supabase/config.toml [functions.mint-bridge-token]
+'
+' Docs-only. No real token material. When docs/plantuml/style.puml lands (#716), prefer:
+'   !include docs/plantuml/style.puml
+' and drop the local skinparam block below.
+
+title Bridge token minting\nmint-bridge-token (verify_jwt = true)
+
+skinparam shadowing false
+skinparam sequence {
+  ArrowColor #1565C0
+  LifeLineBorderColor #90A4AE
+  ParticipantBackgroundColor #E3F2FD
+  ParticipantBorderColor #1565C0
+  ParticipantFontColor #0D47A1
+  ActorBackgroundColor #F3E5F5
+  ActorBorderColor #6A1B9A
+  DatabaseBackgroundColor #E0F7FA
+  DatabaseBorderColor #00838F
+  GroupBackgroundColor #F5F5F5
+  GroupBorderColor #78909C
+}
+
+actor "Grower\n(browser)" as Grower
+participant "Edge gateway\nverify_jwt = true" as GW
+participant "mint-bridge-token" as Mint
+participant "requireLiveSensor\nEntitlement" as Ent
+database "tents\n(caller JWT / RLS)" as Tents
+database "bridge_tokens\nhash only at rest" as BT
+
+== Request ==
+
+Grower -> GW : POST /functions/v1/mint-bridge-token\nAuthorization: Bearer <user JWT>\nContent-Type: application/json\n{ tent_id, name?, ttl_days? }
+GW -> Mint : JWT accepted at gateway\n(forward Authorization)
+
+activate Mint
+
+Mint -> Mint : OPTIONS already handled\n(method must be POST)
+Mint -> Mint : Require Authorization\nBearer prefix\nelse 401 unauthorized
+Mint -> Mint : auth.getClaims(JWT)\n→ userId = claims.sub\nelse 401 unauthorized
+
+note right of Mint
+  userId comes **only** from verified JWT.
+  Plan / capabilities in JSON body
+  are **never** read.
+end note
+
+== Entitlement (billing ≠ token) ==
+
+Mint -> Ent : requireLiveSensorEntitlement(\nuserId, billing env, now)
+activate Ent
+alt entitlement_lookup_failed
+  Ent --> Mint : fail
+  Mint --> Grower : 503 entitlement_lookup_failed
+  deactivate Ent
+  deactivate Mint
+else liveSensors !== true
+  Ent --> Mint : upgrade_required
+  Mint --> Grower : 403 upgrade_required
+  deactivate Mint
+else ok
+  Ent --> Mint : ok (effectivePlanId)
+  deactivate Ent
+end
+
+== Body + tent ownership ==
+
+Mint -> Mint : parse JSON\nelse 400 invalid_json
+Mint -> Mint : tent_id must be UUID\nelse 400 invalid_tent_id
+Mint -> Mint : name default "bridge"\n(slice 0..60)\nttl_days clamped [1h .. 365d]\ndefault 30d
+
+Mint -> Tents : select id, user_id\nwhere id = tent_id
+activate Tents
+alt tent_lookup_failed
+  Tents --> Mint : error
+  Mint --> Grower : 503 tent_lookup_failed
+  deactivate Tents
+  deactivate Mint
+else missing or user_id ≠ claims.sub
+  Tents --> Mint : not owner
+  Mint --> Grower : 403 forbidden_tent
+  deactivate Mint
+else owner
+  Tents --> Mint : owned tent
+  deactivate Tents
+end
+
+== Generate secret (once) ==
+
+Mint -> Mint : rand = 32 bytes\ncrypto.getRandomValues
+Mint -> Mint : plaintext = "vbt_" + base64url(rand)
+Mint -> Mint : token_hash = SHA-256(plaintext)\nhex lowercase
+Mint -> Mint : token_prefix = plaintext[0..12]\n(non-secret UI prefix)
+Mint -> Mint : expires_at = now + ttl_days
+
+note over Mint, BT
+  **At rest:** token_hash + token_prefix only.
+  **Never** store plaintext.
+  **Response:** plaintext returned **once**.
+end note
+
+== Persist + respond ==
+
+Mint -> BT : INSERT\nuser_id, tent_id, name,\ntoken_prefix, token_hash, expires_at
+activate BT
+alt insert_failed
+  BT --> Mint : error
+  Mint --> Grower : 400 insert_failed\n(sanitized; no PG leak)
+  deactivate BT
+  deactivate Mint
+else ok
+  BT --> Mint : id, name, token_prefix,\nexpires_at, created_at
+  deactivate BT
+  Mint --> Grower : 200 {\n  ok: true,\n  token: "vbt_…"  **once**,\n  record: { id, name,\n    token_prefix, expires_at,\n    created_at }\n}
+  deactivate Mint
+end
+
+note left of Grower
+  Client must store plaintext offline.
+  Server cannot re-show full secret.
+  Ingest later uses Bearer vbt_…
+  (separate diagram / webhook).
+end note
+
+legend right
+  |= Fact |= Source |
+  | verify_jwt = true | config.toml mint-bridge-token |
+  | BRIDGE / TOKEN prefix vbt_ | TOKEN_PREFIX |
+  | 32 random bytes | getRandomValues(Uint8Array(32)) |
+  | SHA-256 hex | sha256Hex(plaintext) |
+  | liveSensors gate | requireLiveSensorEntitlement |
+  | tent owner check | tents.user_id === sub |
+  | No plaintext column | insert token_hash only |
+endlegend
+
+caption docs-only · no runtime change · no real secrets · mint path only
+
+@enduml

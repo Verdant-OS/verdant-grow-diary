@@ -185,7 +185,11 @@ export default function FounderOwnerPrefsForm() {
           <Label htmlFor="founder-display-style">Display style</Label>
           <Select
             value={displayStyle}
-            onValueChange={(v) => setDisplayStyle(v as FounderDisplayStyle)}
+            onValueChange={(v) => {
+              // Radix can emit "" while remounting; never clobber a valid style with empty.
+              if (!v) return;
+              setDisplayStyle(v as FounderDisplayStyle);
+            }}
             disabled={isRefunded || saving}
           >
             <SelectTrigger id="founder-display-style">

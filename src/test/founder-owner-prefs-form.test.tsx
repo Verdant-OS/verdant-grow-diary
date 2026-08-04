@@ -70,6 +70,9 @@ describe("FounderOwnerPrefsForm — invoke happy path", () => {
     const user = userEvent.setup();
     render(<FounderOwnerPrefsForm />);
 
+    // Wait for row → form state hydration (display style Select is controlled).
+    await waitFor(() => expect(screen.getByLabelText(/Display name/i)).toHaveValue("Alice"));
+
     const link = screen.getByLabelText(/Optional link/i);
     await user.clear(link);
     await user.type(link, "  https://verdant.example/me  ");
@@ -94,6 +97,7 @@ describe("FounderOwnerPrefsForm — invoke happy path", () => {
   it("blocks non-https link client-side before invoke fires", async () => {
     const user = userEvent.setup();
     render(<FounderOwnerPrefsForm />);
+    await waitFor(() => expect(screen.getByLabelText(/Display name/i)).toHaveValue("Alice"));
 
     const link = screen.getByLabelText(/Optional link/i);
     await user.clear(link);
@@ -111,6 +115,7 @@ describe("FounderOwnerPrefsForm — invoke happy path", () => {
     });
     const user = userEvent.setup();
     render(<FounderOwnerPrefsForm />);
+    await waitFor(() => expect(screen.getByLabelText(/Display name/i)).toHaveValue("Alice"));
 
     await user.click(screen.getByRole("button", { name: /save founder settings/i }));
 

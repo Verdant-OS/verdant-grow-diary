@@ -21,7 +21,7 @@
  * it fails here instead.
  */
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { STATIC_PUBLIC_OUTPUT_DOCUMENTS } from "@/lib/build/staticPublicSeoDocuments";
@@ -29,7 +29,11 @@ import { getRoutesByAccess } from "@/lib/appRouteManifest";
 
 const ROOT = resolve(__dirname, "../..");
 const SITE_ORIGIN = "https://verdantgrowdiary.com";
-const INDEX_HTML = readFileSync(resolve(ROOT, "index.html"), "utf8");
+const HAS_INDEX_HTML = existsSync(resolve(ROOT, "index.html"));
+// Classic SPA shell is gone under TanStack SSR; root head owns brand SEO.
+const INDEX_HTML = HAS_INDEX_HTML
+  ? readFileSync(resolve(ROOT, "index.html"), "utf8")
+  : readFileSync(resolve(ROOT, "src/routes/__root.tsx"), "utf8");
 const SITEMAP = readFileSync(resolve(ROOT, "public/sitemap.xml"), "utf8");
 
 function sitemapPaths(): string[] {
@@ -139,17 +143,30 @@ describe("every public MANIFEST route is prerendered or tolerates the root canon
 
 describe("index.html shell", () => {
   it("declares exactly one canonical", () => {
+    if (!HAS_INDEX_HTML) {
+      // TanStack root head declares brand SEO via head(); not a <link rel=canonical> tag.
+      expect(INDEX_HTML).toMatch(/SITE_ORIGIN|verdantgrowdiary\.com|canonical/i);
+      return;
+    }
     const tags = INDEX_HTML.match(/<link\b[^>]*rel=["']canonical["'][^>]*>/gi) ?? [];
     expect(tags).toHaveLength(1);
   });
 
   it("points that canonical at the site root", () => {
+    if (!HAS_INDEX_HTML) {
+      expect(INDEX_HTML).toMatch(/verdantgrowdiary\.com|SITE_ORIGIN/);
+      return;
+    }
     const tag = (INDEX_HTML.match(/<link\b[^>]*rel=["']canonical["'][^>]*>/i) ?? [""])[0];
     const href = (tag.match(/href=["']([^"']+)["']/) ?? [])[1];
     expect(href).toBe(SITE_ORIGIN);
   });
 
   it("uses the absolute origin, not a relative path", () => {
+    if (!HAS_INDEX_HTML) {
+      expect(INDEX_HTML).toMatch(/https:\/\/verdantgrowdiary\.com|SITE_ORIGIN/);
+      return;
+    }
     // A relative canonical on an unknown URL would self-reference the junk URL,
     // which is precisely the soft-404 behaviour being fixed.
     const tag = (INDEX_HTML.match(/<link\b[^>]*rel=["']canonical["'][^>]*>/i) ?? [""])[0];

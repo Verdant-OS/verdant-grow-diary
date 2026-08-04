@@ -52,7 +52,8 @@ const PRIVATE_TABLES = [
 
 describe("/leads route", () => {
   it("registers /leads inside AppShell", () => {
-    expect(APP).toMatch(/import\(\s*["']\.\/pages\/Leads["']\s*\)/);
+    // TanStack file routes mount via static @/pages imports (not React.lazy).
+    expect(APP).toMatch(/from\s+["']@\/pages\/Leads["']/);
     expect(extractMountedAppRoutePaths()).toContain("/leads");
     expect(APP).toMatch(/Leads/);
   });

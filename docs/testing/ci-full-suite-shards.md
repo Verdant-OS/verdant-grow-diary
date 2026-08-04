@@ -24,8 +24,9 @@ Two jobs in `.github/workflows/ci.yml`:
 Each gate job covers 8/256 of the files (~11 files per process with ~2.7k
 files), and:
 
-- eight sequential processes keep wall-clock under the 45-minute job timeout
-  when individual sub-shards stay healthy, and
+- eight sequential processes usually finish under the 75-minute job timeout
+  when individual sub-shards stay healthy (raised from 45m after heavy shards
+  cancelled mid-run on #697), and
 - peak worker heap stays under the 8GB `NODE_OPTIONS` ceiling on 16GB runners.
 
 ## Memory — and the OOM that is now fixed

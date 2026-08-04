@@ -104,6 +104,7 @@ import { Route as AppPhenoHuntsNewRouteImport } from './routes/_app/pheno-hunts.
 import { Route as AppPlantsIdRouteImport } from './routes/_app/plants.$id'
 import { Route as AppReportsDiaryRangeRouteImport } from './routes/_app/reports.diary-range'
 import { Route as AppSettingsAgentIntegrationsRouteImport } from './routes/_app/settings.agent-integrations'
+import { Route as AppSettingsAnalyticsRouteImport } from './routes/_app/settings.analytics'
 import { Route as AppTentsIdRouteImport } from './routes/_app/tents.$id'
 import { Route as CustomerGuideOreozVsGelonadeComparisonRouteImport } from './routes/customer.guide.oreoz-vs-gelonade-comparison'
 import { Route as PhenoHuntsIdCompareRouteImport } from './routes/pheno-hunts.$id.compare'
@@ -632,6 +633,11 @@ const AppSettingsAgentIntegrationsRoute =
     path: '/agent-integrations',
     getParentRoute: () => AppSettingsRoute,
   } as any)
+const AppSettingsAnalyticsRoute = AppSettingsAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 const AppTentsIdRoute = AppTentsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -984,6 +990,7 @@ export interface FileRoutesByFullPath {
   '/plants/$id': typeof AppPlantsIdRoute
   '/reports/diary-range': typeof AppReportsDiaryRangeRoute
   '/settings/agent-integrations': typeof AppSettingsAgentIntegrationsRoute
+  '/settings/analytics': typeof AppSettingsAnalyticsRoute
   '/tents/$id': typeof AppTentsIdRoute
   '/customer/guide/oreoz-vs-gelonade-comparison': typeof CustomerGuideOreozVsGelonadeComparisonRoute
   '/pheno-hunts/$id/compare': typeof PhenoHuntsIdCompareRoute
@@ -1124,6 +1131,7 @@ export interface FileRoutesByTo {
   '/plants/$id': typeof AppPlantsIdRoute
   '/reports/diary-range': typeof AppReportsDiaryRangeRoute
   '/settings/agent-integrations': typeof AppSettingsAgentIntegrationsRoute
+  '/settings/analytics': typeof AppSettingsAnalyticsRoute
   '/tents/$id': typeof AppTentsIdRoute
   '/customer/guide/oreoz-vs-gelonade-comparison': typeof CustomerGuideOreozVsGelonadeComparisonRoute
   '/pheno-hunts/$id/compare': typeof PhenoHuntsIdCompareRoute
@@ -1267,6 +1275,7 @@ export interface FileRoutesById {
   '/_app/plants/$id': typeof AppPlantsIdRoute
   '/_app/reports/diary-range': typeof AppReportsDiaryRangeRoute
   '/_app/settings/agent-integrations': typeof AppSettingsAgentIntegrationsRoute
+  '/_app/settings/analytics': typeof AppSettingsAnalyticsRoute
   '/_app/tents/$id': typeof AppTentsIdRoute
   '/customer/guide/oreoz-vs-gelonade-comparison': typeof CustomerGuideOreozVsGelonadeComparisonRoute
   '/pheno-hunts/$id/compare': typeof PhenoHuntsIdCompareRoute
@@ -1409,6 +1418,7 @@ export interface FileRouteTypes {
     | '/plants/$id'
     | '/reports/diary-range'
     | '/settings/agent-integrations'
+    | '/settings/analytics'
     | '/tents/$id'
     | '/customer/guide/oreoz-vs-gelonade-comparison'
     | '/pheno-hunts/$id/compare'
@@ -1549,6 +1559,7 @@ export interface FileRouteTypes {
     | '/plants/$id'
     | '/reports/diary-range'
     | '/settings/agent-integrations'
+    | '/settings/analytics'
     | '/tents/$id'
     | '/customer/guide/oreoz-vs-gelonade-comparison'
     | '/pheno-hunts/$id/compare'
@@ -1691,6 +1702,7 @@ export interface FileRouteTypes {
     | '/_app/plants/$id'
     | '/_app/reports/diary-range'
     | '/_app/settings/agent-integrations'
+    | '/_app/settings/analytics'
     | '/_app/tents/$id'
     | '/customer/guide/oreoz-vs-gelonade-comparison'
     | '/pheno-hunts/$id/compare'
@@ -2462,6 +2474,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsAgentIntegrationsRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/_app/settings/analytics': {
+      id: '/_app/settings/analytics'
+      path: '/analytics'
+      fullPath: '/settings/analytics'
+      preLoaderRoute: typeof AppSettingsAnalyticsRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/_app/tents/$id': {
       id: '/_app/tents/$id'
       path: '/$id'
@@ -3028,10 +3047,12 @@ const AppReportsRouteWithChildren = AppReportsRoute._addFileChildren(
 
 interface AppSettingsRouteChildren {
   AppSettingsAgentIntegrationsRoute: typeof AppSettingsAgentIntegrationsRoute
+  AppSettingsAnalyticsRoute: typeof AppSettingsAnalyticsRoute
 }
 
 const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsAgentIntegrationsRoute: AppSettingsAgentIntegrationsRoute,
+  AppSettingsAnalyticsRoute: AppSettingsAnalyticsRoute,
 }
 
 const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import SeoBuildArtifactsDiagnostics from "@/pages/SeoBuildArtifactsDiagnostics";
 
-export const Route = createFileRoute("/_app/_operator/diagnostics/seo-artifacts")({
+export const Route = createFileRoute("/_app/_operator/diagnostics-seo-artifacts")({
   head: () => ({
     meta: [
       { title: "SEO build artifacts diagnostics | Verdant Grow Diary" },

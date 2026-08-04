@@ -113,7 +113,9 @@ describe("Cloud Canary panel — render states (Item 2)", () => {
   it("panel source contains a zero-mapped warning with caution copy pointing at mapping config", () => {
     expect(pageSrc).toContain('data-testid="cloud-canary-zero-mapped-warning"');
     expect(pageSrc).toMatch(/Mapping gap/);
-    expect(pageSrc).toMatch(/Readings present but none mapped to a tent — check mapping config\./);
+    expect(pageSrc).toMatch(
+      /Readings present but none mapped\s+to a tent — check mapping config\./,
+    );
   });
 
   it("panel source switches on previewVm.state from the view-model", () => {

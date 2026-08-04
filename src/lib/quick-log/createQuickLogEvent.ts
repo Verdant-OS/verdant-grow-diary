@@ -47,8 +47,7 @@ export const QUICK_LOG_EVENT_TYPE_MAP: Record<QuickLogEventType, string> = {
 };
 
 /** Quick Log UI event types that are stored as observations + kind tag. */
-export const QUICK_LOG_NOTE_LIKE_TYPES: ReadonlySet<QuickLogEventType> =
-  new Set(["note"]);
+export const QUICK_LOG_NOTE_LIKE_TYPES: ReadonlySet<QuickLogEventType> = new Set(["note"]);
 
 /** Build the optional `p_details` payload, or null when no tag is needed. */
 export function buildQuickLogDetails(
@@ -71,9 +70,7 @@ export interface QuickLogSaveResult {
   reused: boolean;
 }
 
-export async function createQuickLogEvent(
-  input: CreateQuickLogInput,
-): Promise<QuickLogSaveResult> {
+export async function createQuickLogEvent(input: CreateQuickLogInput): Promise<QuickLogSaveResult> {
   const canonicalType = QUICK_LOG_EVENT_TYPE_MAP[input.eventType];
   if (!canonicalType) {
     throw new Error(`Unknown quick log event type: ${String(input.eventType)}`);
@@ -83,9 +80,7 @@ export async function createQuickLogEvent(
   }
 
   // Best-effort sensor snapshot. Absence is a real signal — never faked.
-  const rawSnapshot = input.tentId
-    ? await fetchLatestSensorSnapshot(input.tentId)
-    : null;
+  const rawSnapshot = input.tentId ? await fetchLatestSensorSnapshot(input.tentId) : null;
 
   const snapshotValidation = validateQuickLogSensorSnapshot(rawSnapshot);
   if (snapshotValidation.ok === false) {

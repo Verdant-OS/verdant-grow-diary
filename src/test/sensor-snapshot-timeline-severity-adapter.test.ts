@@ -8,8 +8,7 @@ import { adaptSnapshotClassificationToTimelineSeverity } from "@/lib/sensorSnaps
 import { classifyAuditRow } from "@/lib/sensorSnapshotStatusContract";
 
 const NOW = new Date("2026-05-23T12:00:00Z");
-const minutesAgo = (m: number) =>
-  new Date(NOW.getTime() - m * 60_000).toISOString();
+const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60_000).toISOString();
 const hoursAgo = (h: number) => minutesAgo(h * 60);
 
 describe("adaptSnapshotClassificationToTimelineSeverity", () => {
@@ -67,10 +66,7 @@ describe("adaptSnapshotClassificationToTimelineSeverity", () => {
   });
 
   it("no_data and null → empty tone, isMissing", () => {
-    const c = classifyAuditRow(
-      { rowsReceived: 0, rowsAccepted: 0 },
-      { now: NOW },
-    );
+    const c = classifyAuditRow({ rowsReceived: 0, rowsAccepted: 0 }, { now: NOW });
     const a = adaptSnapshotClassificationToTimelineSeverity(c);
     expect(a.status).toBe("no_data");
     expect(a.tone).toBe("empty");
@@ -97,10 +93,7 @@ describe("adaptSnapshotClassificationToTimelineSeverity", () => {
         { rowsReceived: 5, rowsAccepted: 0, capturedAt: minutesAgo(1) },
         { now: NOW },
       ),
-      classifyAuditRow(
-        { rowsReceived: 0, rowsAccepted: 0 },
-        { now: NOW },
-      ),
+      classifyAuditRow({ rowsReceived: 0, rowsAccepted: 0 }, { now: NOW }),
     ];
     for (const c of classifications) {
       const s = adaptSnapshotClassificationToTimelineSeverity(c);

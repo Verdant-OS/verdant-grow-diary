@@ -24,7 +24,10 @@ const OWNER = "owner-user-1";
 const BRIDGE = "bridge-a";
 const TENT = "11111111-1111-1111-1111-111111111111";
 
-function makeDraft(i: number, opts?: Partial<NormalizedSensorReadingDraft>): NormalizedSensorReadingDraft {
+function makeDraft(
+  i: number,
+  opts?: Partial<NormalizedSensorReadingDraft>,
+): NormalizedSensorReadingDraft {
   return {
     user_id: OWNER,
     tent_id: TENT,
@@ -79,9 +82,7 @@ describe("buildPiIngestCommitPlan", () => {
     expect(plan.toInsertSensorRows).toEqual(drafts);
     expect(plan.duplicates).toEqual([]);
     expect(plan.summary).toEqual({ total: 3, toInsert: 3, duplicates: 0 });
-    expect(plan.toInsertIdempotencyRows.map((r) => r.idempotency_key)).toEqual(
-      keys,
-    );
+    expect(plan.toInsertIdempotencyRows.map((r) => r.idempotency_key)).toEqual(keys);
   });
 
   it("marks every reading as duplicate when all keys already exist", () => {
@@ -105,10 +106,7 @@ describe("buildPiIngestCommitPlan", () => {
       existingKeys: new Set(["k2", "k4"]),
     });
     expect(plan.toInsertSensorRows).toEqual([drafts[0], drafts[2]]);
-    expect(plan.toInsertIdempotencyRows.map((r) => r.idempotency_key)).toEqual([
-      "k1",
-      "k3",
-    ]);
+    expect(plan.toInsertIdempotencyRows.map((r) => r.idempotency_key)).toEqual(["k1", "k3"]);
     expect(plan.duplicates.map((d) => d.idempotencyKey)).toEqual(["k2", "k4"]);
     expect(plan.summary).toEqual({ total: 4, toInsert: 2, duplicates: 2 });
   });
@@ -180,9 +178,7 @@ describe("buildPiIngestCommitPlan", () => {
     const failure: PiIngestPipelineResult = {
       ok: false,
       stage: "auth",
-      issues: [
-        { stage: "auth", code: "missing_header", message: "no bridge id" },
-      ],
+      issues: [{ stage: "auth", code: "missing_header", message: "no bridge id" }],
     };
     expect(() =>
       buildPiIngestCommitPlan({
@@ -198,10 +194,7 @@ describe("buildPiIngestCommitPlan", () => {
       const d = { ...baseDrafts[0] } as Record<string, unknown>;
       delete d[field as string];
       return buildPiIngestCommitPlan({
-        pipelineResult: makeSuccess(
-          [d as NormalizedSensorReadingDraft],
-          ["k1"],
-        ),
+        pipelineResult: makeSuccess([d as NormalizedSensorReadingDraft], ["k1"]),
         existingKeys: new Set(),
       });
     };
@@ -227,10 +220,7 @@ describe("buildPiIngestCommitPlan", () => {
 // ----------------------- static safety guards -----------------------
 
 describe("piIngestCommitPlan static safety", () => {
-  const src = readFileSync(
-    resolve(__dirname, "../lib/piIngestCommitPlan.ts"),
-    "utf8",
-  );
+  const src = readFileSync(resolve(__dirname, "../lib/piIngestCommitPlan.ts"), "utf8");
 
   it("does not import Supabase, React, or any I/O surface", () => {
     expect(src).not.toMatch(/from\s+["']@\/integrations\/supabase\//);

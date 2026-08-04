@@ -5,6 +5,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import PhenoExpressionShowcase from "@/pages/PhenoExpressionShowcase";
 
 // The showcase is fixture-only — it must never touch supabase.
@@ -19,9 +20,17 @@ vi.mock("@/integrations/supabase/client", () => ({
   ),
 }));
 
+function renderShowcase() {
+  return render(
+    <MemoryRouter>
+      <PhenoExpressionShowcase />
+    </MemoryRouter>,
+  );
+}
+
 describe("PhenoExpressionShowcase", () => {
   it("renders the picker and the default selection side-by-side", () => {
-    render(<PhenoExpressionShowcase />);
+    renderShowcase();
     expect(screen.getByTestId("pheno-expression-showcase")).toBeInTheDocument();
     expect(screen.getByTestId("pheno-showcase-selected-count")).toHaveTextContent("4 selected");
     // default four candidates render
@@ -31,7 +40,7 @@ describe("PhenoExpressionShowcase", () => {
   });
 
   it("shows loud trait axes, aroma, smoke test and COA on the gas champion", () => {
-    render(<PhenoExpressionShowcase />);
+    renderShowcase();
     const gas = screen.getByTestId("pheno-candidate-ex-gas-champion");
     expect(
       within(gas).getByTestId("expression-trait-ex-gas-champion-nose_loudness"),
@@ -44,19 +53,19 @@ describe("PhenoExpressionShowcase", () => {
   });
 
   it("surfaces a suggest-only herm 'consider removing' flag on the herm pheno", () => {
-    render(<PhenoExpressionShowcase />);
+    renderShowcase();
     const herm = screen.getByTestId("pheno-candidate-ex-herm-prone-herm-flag");
     expect(herm).toHaveTextContent(/consider removing/i);
     expect(herm).toHaveTextContent(/never removes a plant for you/i);
   });
 
   it("does NOT warn apples-to-apples when the default cohort shares grow + tent", () => {
-    render(<PhenoExpressionShowcase />);
+    renderShowcase();
     expect(screen.queryByTestId("pheno-comparison-comparability-warning")).not.toBeInTheDocument();
   });
 
   it("warns apples-to-apples once a different-tent pheno is added", () => {
-    render(<PhenoExpressionShowcase />);
+    renderShowcase();
     fireEvent.click(screen.getByTestId("pheno-showcase-select-ex-purple")); // Flower Tent 2
     expect(screen.getByTestId("pheno-comparison-comparability-warning")).toHaveTextContent(
       /different tents/i,
@@ -64,7 +73,7 @@ describe("PhenoExpressionShowcase", () => {
   });
 
   it("mix-and-match: unticking a pheno removes its column and updates the count", () => {
-    render(<PhenoExpressionShowcase />);
+    renderShowcase();
     expect(screen.getByTestId("pheno-candidate-ex-dessert")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("pheno-showcase-select-ex-dessert"));
     expect(screen.queryByTestId("pheno-candidate-ex-dessert")).not.toBeInTheDocument();
@@ -72,7 +81,7 @@ describe("PhenoExpressionShowcase", () => {
   });
 
   it("shows the 'select at least two' state when fewer than two are selected", () => {
-    render(<PhenoExpressionShowcase />);
+    renderShowcase();
     for (const id of ["ex-dessert", "ex-fruit", "ex-herm-prone"]) {
       fireEvent.click(screen.getByTestId(`pheno-showcase-select-${id}`));
     }

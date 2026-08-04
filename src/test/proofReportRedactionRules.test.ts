@@ -7,9 +7,7 @@ import {
 
 describe("proofReportRedactionRules", () => {
   it("redacts UUIDs", () => {
-    const out = sanitizeProofReportMarkdown(
-      "alert 11111111-2222-3333-4444-555555555555 raised",
-    );
+    const out = sanitizeProofReportMarkdown("alert 11111111-2222-3333-4444-555555555555 raised");
     expect(out).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/i);
     expect(out).toContain(REDACTED_PLACEHOLDER);
   });
@@ -30,12 +28,7 @@ describe("proofReportRedactionRules", () => {
     const out = sanitizeProofReportMarkdown(
       "bridge_token=abc access_token=xyz refresh_token=qqq service_role=zzz",
     );
-    for (const k of [
-      "bridge_token",
-      "access_token",
-      "refresh_token",
-      "service_role",
-    ]) {
+    for (const k of ["bridge_token", "access_token", "refresh_token", "service_role"]) {
       expect(out).not.toMatch(new RegExp(k));
     }
   });
@@ -69,21 +62,16 @@ describe("proofReportRedactionRules", () => {
 
   it("returns empty string for empty/non-string input", () => {
     expect(sanitizeProofReportMarkdown("")).toBe("");
-    expect(
-      sanitizeProofReportMarkdown(null as unknown as string),
-    ).toBe("");
+    expect(sanitizeProofReportMarkdown(null as unknown as string)).toBe("");
   });
 
   it("preserves benign human-readable proof prose", () => {
-    const src =
-      "Step 3 — Sensor snapshot: source=manual, captured today (last hour).";
+    const src = "Step 3 — Sensor snapshot: source=manual, captured today (last hour).";
     expect(sanitizeProofReportMarkdown(src)).toBe(src);
   });
 
   it("exposes the UI notice copy", () => {
-    expect(PROOF_REPORT_REDACTION_NOTICE.join(" ")).toMatch(
-      /sanitized report/i,
-    );
+    expect(PROOF_REPORT_REDACTION_NOTICE.join(" ")).toMatch(/sanitized report/i);
     expect(PROOF_REPORT_REDACTION_NOTICE.join(" ")).toMatch(
       /Raw IDs, payloads, and secrets are excluded/i,
     );

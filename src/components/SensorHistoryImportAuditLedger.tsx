@@ -17,8 +17,7 @@ import {
 } from "@/lib/sensorHistoryImportAuditLog";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 
-export const SENSOR_HISTORY_IMPORT_AUDIT_LEDGER_TITLE =
-  "Imported history audit" as const;
+export const SENSOR_HISTORY_IMPORT_AUDIT_LEDGER_TITLE = "Imported history audit" as const;
 
 export const SENSOR_HISTORY_IMPORT_AUDIT_LEDGER_DISCLAIMER =
   "These records summarize local import activity and are not live telemetry." as const;
@@ -40,9 +39,7 @@ function fmtDate(iso: string | null | undefined): string {
   return iso.slice(0, 10);
 }
 
-export function SensorHistoryImportAuditLedger(
-  props: SensorHistoryImportAuditLedgerProps,
-) {
+export function SensorHistoryImportAuditLedger(props: SensorHistoryImportAuditLedgerProps) {
   const { limit = 10, options, refreshKey } = props;
   const [events, setEvents] = useState<SensorHistoryImportAuditEvent[]>(() =>
     getRecentSensorHistoryImportAuditEvents(limit, options),
@@ -92,60 +89,37 @@ export function SensorHistoryImportAuditLedger(
                 </span>
               </div>
               <div className="mt-1 text-muted-foreground">
-                <span data-testid="ledger-canonical-source">
-                  {evt.canonicalSourceLabel}
-                </span>
+                <span data-testid="ledger-canonical-source">{evt.canonicalSourceLabel}</span>
                 <span> · </span>
-                <span data-testid="ledger-file-type">
-                  {evt.fileType.toUpperCase()}
-                </span>
+                <span data-testid="ledger-file-type">{evt.fileType.toUpperCase()}</span>
               </div>
               <div className="mt-1">
-                <span data-testid="ledger-accepted-count">
-                  Accepted: {evt.acceptedRowCount}
-                </span>
+                <span data-testid="ledger-accepted-count">Accepted: {evt.acceptedRowCount}</span>
                 <span className="mx-1 text-muted-foreground">·</span>
-                <span data-testid="ledger-rejected-count">
-                  Rejected: {evt.rejectedRowCount}
-                </span>
+                <span data-testid="ledger-rejected-count">Rejected: {evt.rejectedRowCount}</span>
               </div>
               <div className="mt-1" data-testid="ledger-insert-summary">
                 <span data-testid="ledger-inserted-count">
-                  Inserted:{" "}
-                  {typeof evt.insertedRowCount === "number"
-                    ? evt.insertedRowCount
-                    : "—"}
+                  Inserted: {typeof evt.insertedRowCount === "number" ? evt.insertedRowCount : "—"}
                 </span>
                 <span className="mx-1 text-muted-foreground">·</span>
                 <span data-testid="ledger-duplicate-count">
                   Skipped duplicates:{" "}
-                  {typeof evt.duplicateRowCount === "number"
-                    ? evt.duplicateRowCount
-                    : "—"}
+                  {typeof evt.duplicateRowCount === "number" ? evt.duplicateRowCount : "—"}
                 </span>
               </div>
               {evt.dateRange ? (
-                <div
-                  data-testid="ledger-date-range"
-                  className="mt-1 text-muted-foreground"
-                >
-                  Range: {fmtDate(evt.dateRange.start)} →{" "}
-                  {fmtDate(evt.dateRange.end)}
+                <div data-testid="ledger-date-range" className="mt-1 text-muted-foreground">
+                  Range: {fmtDate(evt.dateRange.start)} → {fmtDate(evt.dateRange.end)}
                 </div>
               ) : null}
               {evt.mappedTentLabels.length > 0 ? (
-                <div
-                  data-testid="ledger-mapped-tents"
-                  className="mt-1 text-muted-foreground"
-                >
+                <div data-testid="ledger-mapped-tents" className="mt-1 text-muted-foreground">
                   Tents: {evt.mappedTentLabels.join(", ")}
                 </div>
               ) : null}
               {evt.mappedSensorGroups.length > 0 ? (
-                <div
-                  data-testid="ledger-mapped-groups"
-                  className="mt-1 text-muted-foreground"
-                >
+                <div data-testid="ledger-mapped-groups" className="mt-1 text-muted-foreground">
                   Sensor groups: {evt.mappedSensorGroups.join(", ")}
                 </div>
               ) : null}

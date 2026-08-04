@@ -213,8 +213,7 @@ export function buildForwardingStatusViewModel(
     ? {
         show: true,
         title: "EcoWitt ingest needs attention",
-        status:
-          s.last_forward_status == null ? "—" : String(s.last_forward_status),
+        status: s.last_forward_status == null ? "—" : String(s.last_forward_status),
         classification: s.last_forward_response_classification ?? "—",
         reason: s.last_forward_response_reason ?? "—",
         recommendedNextStep: recommended.text,

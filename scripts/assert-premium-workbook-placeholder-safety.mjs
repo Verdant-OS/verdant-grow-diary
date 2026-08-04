@@ -49,12 +49,18 @@ const REQUIRED_PRESENCE = [
 // surrounding context is premium-workbook-ish (within ~6 lines of a
 // "premium workbook" / "workbook copy" / placeholder reference).
 const REAL_URL_PATTERNS = [
-  { name: "google-sheets", re: /https?:\/\/(?:docs\.google\.com\/spreadsheets|sheets\.google\.com)\/\S+/i },
+  {
+    name: "google-sheets",
+    re: /https?:\/\/(?:docs\.google\.com\/spreadsheets|sheets\.google\.com)\/\S+/i,
+  },
   { name: "google-drive", re: /https?:\/\/drive\.google\.com\/\S+/i },
   { name: "notion", re: /https?:\/\/(?:[\w-]+\.)?notion\.so\/\S+/i },
   { name: "dropbox", re: /https?:\/\/(?:www\.)?dropbox\.com\/\S+/i },
   { name: "onedrive", re: /https?:\/\/(?:1drv\.ms|onedrive\.live\.com)\/\S+/i },
-  { name: "signed-url-token", re: /https?:\/\/\S+[?&](?:token|signature|sig|expires|x-amz-signature)=\S+/i },
+  {
+    name: "signed-url-token",
+    re: /https?:\/\/\S+[?&](?:token|signature|sig|expires|x-amz-signature)=\S+/i,
+  },
 ];
 
 const PREMIUM_CONTEXT_RE =
@@ -68,7 +74,10 @@ const PREMIUM_CONTEXT_RE =
 //     legitimately appear in security/architecture docs as guidance.
 const SECRET_PATTERNS_ALWAYS = [
   { name: "bearer-token", re: /\bBearer\s+[A-Za-z0-9._-]{16,}/ },
-  { name: "entitlement-token-literal", re: /\b(entitlement|premium|workbook)[_-]?(token|secret|key)\s*[:=]\s*['"][^'"\s]+['"]/i },
+  {
+    name: "entitlement-token-literal",
+    re: /\b(entitlement|premium|workbook)[_-]?(token|secret|key)\s*[:=]\s*['"][^'"\s]+['"]/i,
+  },
   { name: "service-role-literal", re: /SUPABASE_SERVICE_ROLE_KEY\s*=\s*['"]?[A-Za-z0-9._-]{20,}/i },
 ];
 const SECRET_PATTERNS_PREMIUM_ONLY = [

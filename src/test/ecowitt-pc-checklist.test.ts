@@ -4,8 +4,7 @@ import { resolve } from "node:path";
 
 const repoRoot = resolve(__dirname, "..", "..");
 const runbookRelativePath = "docs/ecowitt-live-soil-bridge.md";
-const canonicalDryRunCommand =
-  "bun run scripts/ecowitt-live-soil-bridge.ts --dry-run --once";
+const canonicalDryRunCommand = "bun run scripts/ecowitt-live-soil-bridge.ts --dry-run --once";
 const checklistRelativePath = "scripts/dev/print-ecowitt-pc-checklist.ts";
 const packageJsonPath = resolve(repoRoot, "package.json");
 const runbookPath = resolve(repoRoot, runbookRelativePath);
@@ -42,7 +41,9 @@ describe("Ecowitt PC checklist script", () => {
     expect(checklist).toMatch(/Ecowitt gateway[\s\S]*local PC bridge/i);
     expect(checklist).toMatch(/Mosquitto/i);
     expect(checklist).toMatch(/MQTT Explorer[\s\S]*payload/i);
-    expect(checklist).toMatch(/VERDANT_TENT_ID[\s\S]*ECOWITT_SOIL_CHANNEL_MAP_JSON[\s\S]*same one tent/i);
+    expect(checklist).toMatch(
+      /VERDANT_TENT_ID[\s\S]*ECOWITT_SOIL_CHANNEL_MAP_JSON[\s\S]*same one tent/i,
+    );
     expect(checklist).toContain(canonicalDryRunCommand);
     expect(checklist).not.toMatch(/dev:ecowitt-mqtt:dry-run/);
     expect(checklist).toMatch(/Verdant one-message dry-run/i);

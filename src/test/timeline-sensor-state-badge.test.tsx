@@ -147,7 +147,11 @@ describe("DiaryEntryBadges renders sensor-state badges", () => {
   });
 
   it("missing state / legacy snapshot → no sensor-state badge", () => {
-    render(<DiaryEntryBadges item={makeItem({ sensorSnapshotState: null, tags: ["sensor-snapshot"] })} />);
+    render(
+      <DiaryEntryBadges
+        item={makeItem({ sensorSnapshotState: null, tags: ["sensor-snapshot"] })}
+      />,
+    );
     expect(screen.queryByTestId(/diary-entry-sensor-badge/)).not.toBeInTheDocument();
   });
 

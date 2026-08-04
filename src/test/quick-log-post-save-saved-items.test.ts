@@ -14,11 +14,7 @@ import {
   buildDailyCheckSavedItems,
 } from "@/lib/dailyCheckPostSubmitRules";
 
-const FORBIDDEN = [
-  /\bhealthy\b/i,
-  /\bperfect\b/i,
-  /\bdiagnos/i,
-];
+const FORBIDDEN = [/\bhealthy\b/i, /\bperfect\b/i, /\bdiagnos/i];
 
 function assertSafeCopy(s: string) {
   for (const re of FORBIDDEN) {
@@ -28,18 +24,10 @@ function assertSafeCopy(s: string) {
 
 describe("buildDailyCheckSavedItems", () => {
   it("returns [] when no submit has been confirmed", () => {
-    expect(buildDailyCheckSavedItems({ source: null, submittedAt: null })).toEqual(
-      [],
-    );
-    expect(
-      buildDailyCheckSavedItems({ source: "note", submittedAt: null }),
-    ).toEqual([]);
-    expect(
-      buildDailyCheckSavedItems({ source: "sensor", submittedAt: undefined }),
-    ).toEqual([]);
-    expect(
-      buildDailyCheckSavedItems({ source: "note", submittedAt: NaN }),
-    ).toEqual([]);
+    expect(buildDailyCheckSavedItems({ source: null, submittedAt: null })).toEqual([]);
+    expect(buildDailyCheckSavedItems({ source: "note", submittedAt: null })).toEqual([]);
+    expect(buildDailyCheckSavedItems({ source: "sensor", submittedAt: undefined })).toEqual([]);
+    expect(buildDailyCheckSavedItems({ source: "note", submittedAt: NaN })).toEqual([]);
   });
 
   it("returns Plant note item when a note save is confirmed", () => {

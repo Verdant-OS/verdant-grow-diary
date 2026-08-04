@@ -23,10 +23,7 @@ export default function PhenoHuntOnboardingStepper({
 }: PhenoHuntOnboardingStepperProps) {
   const testId = rest["data-testid"] ?? "pheno-onboarding-stepper";
   return (
-    <ol
-      data-testid={testId}
-      className="flex flex-wrap items-center gap-2 text-xs"
-    >
+    <ol data-testid={testId} className="flex flex-wrap items-center gap-2 text-xs">
       {steps.map((s, idx) => {
         const isCurrent = s.id === currentStepId;
         const Icon = s.complete ? CheckCircle2 : Circle;
@@ -47,10 +44,7 @@ export default function PhenoHuntOnboardingStepper({
             >
               <Icon
                 aria-hidden="true"
-                className={
-                  "h-3.5 w-3.5 " +
-                  (s.complete ? "text-primary" : "text-muted-foreground")
-                }
+                className={"h-3.5 w-3.5 " + (s.complete ? "text-primary" : "text-muted-foreground")}
               />
               <span className="font-medium">{idx + 1}.</span>
               <span>{s.label}</span>

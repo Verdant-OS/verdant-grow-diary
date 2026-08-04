@@ -14,9 +14,7 @@ import type { AiDoctorCheckInPreviewView } from "@/lib/aiDoctorCheckInPreviewVie
 
 const NOW = new Date("2026-06-10T12:00:00.000Z");
 
-function makeView(
-  overrides: Partial<AiDoctorCheckInPreviewView> = {},
-): AiDoctorCheckInPreviewView {
+function makeView(overrides: Partial<AiDoctorCheckInPreviewView> = {}): AiDoctorCheckInPreviewView {
   return {
     notices: {
       previewOnly: "Preview only — not saved.",
@@ -185,7 +183,8 @@ describe("buildAiDoctorManualSaveDraft", () => {
       now: NOW,
     });
     expect(r.ok).toBe(false);
-    if (!isBlockedManualSaveDraft(r)) throw new Error("expected blocked"); const blocked = r;
+    if (!isBlockedManualSaveDraft(r)) throw new Error("expected blocked");
+    const blocked = r;
     expect(blocked.reasons).toContain("missing_plant_id");
     expect(blocked.reasons).toContain("missing_tent_id");
     expect(blocked.reasons).toContain("missing_grow_id");
@@ -199,7 +198,8 @@ describe("buildAiDoctorManualSaveDraft", () => {
       now: NOW,
     });
     expect(r.ok).toBe(false);
-    if (!isBlockedManualSaveDraft(r)) throw new Error("expected blocked"); const blocked = r;
+    if (!isBlockedManualSaveDraft(r)) throw new Error("expected blocked");
+    const blocked = r;
     expect(blocked.reasons).toContain("missing_note");
   });
 

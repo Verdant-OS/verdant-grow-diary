@@ -1,7 +1,10 @@
 /** Pure review model for the structured Quick Log Water form. */
 
 import type { QuickLogWateringFormState } from "./quickLogWateringFormViewModel";
-import { getTemperatureUnitSymbol, type TemperatureUnitPreference } from "./temperatureUnitPreference";
+import {
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "./temperatureUnitPreference";
 
 export const WATERING_REVIEW_TITLE = "Review watering record" as const;
 export const WATERING_REVIEW_NEEDS_INPUT =

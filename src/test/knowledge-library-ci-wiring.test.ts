@@ -65,8 +65,13 @@ describe("Knowledge Library required CI wiring", () => {
     );
     expect(resolver).toContain('git merge-base "$GITHUB_SHA" "$remote_base_ref"');
     expect(resolver).toContain("refs/heads/main|refs/heads/verdant-grow-diary)");
-    expect(resolver).toContain("workflow_dispatch is restricted to the protected target branches");
+    // Protected targets still use first-parent; feature-branch dispatch resolves
+    // the open PR base so required gate can run when pull_request events lag.
     expect(resolver).toContain('git rev-parse --verify "${GITHUB_SHA}^1"');
+    expect(resolver).toContain(
+      'gh api "repos/${GITHUB_REPOSITORY}/pulls?head=${GITHUB_REPOSITORY_OWNER}:${branch}&state=open"',
+    );
+    expect(resolver).toContain("GH_TOKEN: ${{ github.token }}");
     expect(resolver).toContain('git cat-file -e "${candidate}^{commit}"');
     expect(resolver).toContain('echo "base_revision=$resolved" >> "$GITHUB_OUTPUT"');
 

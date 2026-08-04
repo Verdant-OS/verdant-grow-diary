@@ -84,9 +84,7 @@ const inRangeTargets: TargetComparisonResult = {
 // ---------------------------------------------------------------------------
 describe("environmentAlertPersistence — pure rules", () => {
   it("rejects when snapshot is missing", () => {
-    expect(
-      isSnapshotPersistable({ snapshot: null, quality: "good", now: NOW }),
-    ).toBe(false);
+    expect(isSnapshotPersistable({ snapshot: null, quality: "good", now: NOW })).toBe(false);
   });
 
   it("rejects when snapshot.source is 'unavailable'", () => {
@@ -226,9 +224,10 @@ describe("environmentAlertPersistence — pure rules", () => {
       source: "target_comparison",
       createdAt: "",
     };
-    const out = dedupeAgainstOpen([a], [
-      { metric: "temp", source: "environment_alerts", title: a.title },
-    ]);
+    const out = dedupeAgainstOpen(
+      [a],
+      [{ metric: "temp", source: "environment_alerts", title: a.title }],
+    );
     expect(out).toHaveLength(0);
   });
 });
@@ -271,7 +270,6 @@ describe("usePersistEnvironmentAlerts — hook behaviour", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
-
 
   it("does not write when snapshot is missing", async () => {
     renderHook(() =>
@@ -427,10 +425,7 @@ describe("usePersistEnvironmentAlerts — hook behaviour", () => {
 // Static contracts
 // ---------------------------------------------------------------------------
 const ROOT = resolve(__dirname, "../..");
-const PERSIST_LIB = readFileSync(
-  resolve(ROOT, "src/lib/environmentAlertPersistence.ts"),
-  "utf8",
-);
+const PERSIST_LIB = readFileSync(resolve(ROOT, "src/lib/environmentAlertPersistence.ts"), "utf8");
 const PERSIST_HOOK = readFileSync(
   resolve(ROOT, "src/hooks/usePersistEnvironmentAlerts.ts"),
   "utf8",

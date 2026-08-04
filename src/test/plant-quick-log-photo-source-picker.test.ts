@@ -18,10 +18,7 @@ import { resolve } from "node:path";
 
 import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
 
-const SRC = readFileSync(
-  resolve(__dirname, "../components/PlantQuickLog.tsx"),
-  "utf8",
-);
+const SRC = readFileSync(resolve(__dirname, "../components/PlantQuickLog.tsx"), "utf8");
 
 function countMatches(re: RegExp): number {
   return SRC.match(re)?.length ?? 0;

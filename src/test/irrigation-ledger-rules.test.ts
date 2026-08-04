@@ -24,7 +24,18 @@ describe("irrigation ledger rules", () => {
     const rows = buildIrrigationLedger([
       watering(),
       watering({ id: "w-2", watering_events: null, note: "watered, forgot to measure" }),
-      { id: "f-1", event_type: "feeding", occurred_at: "2026-07-20T09:00:00Z", source: "manual", is_deleted: false, feeding_events: { ec_in: 2.0, ec_out: 2.4, products: [{ name: "CalMag", amount: 5, unit: "ml" }] } },
+      {
+        id: "f-1",
+        event_type: "feeding",
+        occurred_at: "2026-07-20T09:00:00Z",
+        source: "manual",
+        is_deleted: false,
+        feeding_events: {
+          ec_in: 2.0,
+          ec_out: 2.4,
+          products: [{ name: "CalMag", amount: 5, unit: "ml" }],
+        },
+      },
     ]);
     expect(rows).toHaveLength(3);
     const noteOnly = rows.find((r) => r.id === "w-2")!;
@@ -36,7 +47,12 @@ describe("irrigation ledger rules", () => {
   it("drops deleted rows and non-irrigation events only", () => {
     const rows = buildIrrigationLedger([
       watering({ id: "w-del", is_deleted: true }),
-      { id: "o-1", event_type: "observation", occurred_at: "2026-07-20T08:00:00Z", is_deleted: false },
+      {
+        id: "o-1",
+        event_type: "observation",
+        occurred_at: "2026-07-20T08:00:00Z",
+        is_deleted: false,
+      },
       watering({ id: "w-keep" }),
     ]);
     expect(rows.map((r) => r.id)).toEqual(["w-keep"]);
@@ -44,7 +60,14 @@ describe("irrigation ledger rules", () => {
 
   it("keeps EC canonical mS/cm and feeding input EC prefers ec_in", () => {
     const [feed] = buildIrrigationLedger([
-      { id: "f-1", event_type: "feeding", occurred_at: "2026-07-20T09:00:00Z", source: "manual", is_deleted: false, feeding_events: { ec_in: 2.0, ec_ms_cm: 9.9, ec_out: 2.4 } },
+      {
+        id: "f-1",
+        event_type: "feeding",
+        occurred_at: "2026-07-20T09:00:00Z",
+        source: "manual",
+        is_deleted: false,
+        feeding_events: { ec_in: 2.0, ec_ms_cm: 9.9, ec_out: 2.4 },
+      },
     ]);
     expect(feed.ecMsCm).toBe(2.0); // prefers ec_in over ec_ms_cm
     expect(feed.outputEcMsCm).toBe(2.4);
@@ -86,7 +109,10 @@ describe("irrigation ledger rules", () => {
   });
 
   it("keyset page reports no more when the raw set fits the page", () => {
-    const { hasMore, nextCursor } = buildKeysetPage([{ id: "r1", occurred_at: "2026-07-20T10:00:00Z" }], 2);
+    const { hasMore, nextCursor } = buildKeysetPage(
+      [{ id: "r1", occurred_at: "2026-07-20T10:00:00Z" }],
+      2,
+    );
     expect(hasMore).toBe(false);
     expect(nextCursor).toBeNull();
   });

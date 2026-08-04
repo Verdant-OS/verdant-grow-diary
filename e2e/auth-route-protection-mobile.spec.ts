@@ -38,6 +38,7 @@ const PROTECTED_TABLES = [
 const PROTECTED_MOBILE_ROUTES: string[] = [
   // operator
   "/diagnostics",
+  "/diagnostics-seo-artifacts",
   "/ingest-inspector",
   "/operator/ai-doctor-phase1",
   "/operator/billing-entitlement-resolution",

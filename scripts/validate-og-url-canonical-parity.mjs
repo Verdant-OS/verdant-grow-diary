@@ -47,8 +47,7 @@ export function collectHtmlFiles(dir) {
   return out;
 }
 
-const CANONICAL_LINK_REGEX =
-  /<link\s+[^>]*rel=["']canonical["'][^>]*>/gi;
+const CANONICAL_LINK_REGEX = /<link\s+[^>]*rel=["']canonical["'][^>]*>/gi;
 const HREF_ATTR_REGEX = /href=["']([^"']+)["']/i;
 
 /**
@@ -82,10 +81,16 @@ const URL_META_REGEX_REVERSED =
 export function extractUrlMetaTags(html) {
   const out = [];
   for (const match of html.matchAll(URL_META_REGEX)) {
-    out.push({ tag: /** @type {"og:url"|"twitter:url"} */ (match[1].toLowerCase()), url: match[2] });
+    out.push({
+      tag: /** @type {"og:url"|"twitter:url"} */ (match[1].toLowerCase()),
+      url: match[2],
+    });
   }
   for (const match of html.matchAll(URL_META_REGEX_REVERSED)) {
-    out.push({ tag: /** @type {"og:url"|"twitter:url"} */ (match[2].toLowerCase()), url: match[1] });
+    out.push({
+      tag: /** @type {"og:url"|"twitter:url"} */ (match[2].toLowerCase()),
+      url: match[1],
+    });
   }
   return out;
 }

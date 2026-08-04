@@ -145,8 +145,7 @@ interface QuickLogVideoMeta {
 }
 
 type QuickLogAttachmentWriteResult =
-  | { ok: true }
-  | { ok: false; message: string; ambiguous?: boolean };
+  { ok: true } | { ok: false; message: string; ambiguous?: boolean };
 
 interface LockedWateringSubmission {
   payload: WateringTypedEventInput;

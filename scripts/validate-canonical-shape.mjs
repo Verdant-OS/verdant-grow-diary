@@ -102,10 +102,14 @@ export function validateCanonicalHref(href, expectedOrigin = EXPECTED_ORIGIN) {
   }
 
   if (url.hash) {
-    errors.push(`canonical href "${href}" contains a fragment ("${url.hash}"); canonicals must not include #fragments`);
+    errors.push(
+      `canonical href "${href}" contains a fragment ("${url.hash}"); canonicals must not include #fragments`,
+    );
   }
   if (url.search) {
-    errors.push(`canonical href "${href}" contains a query string ("${url.search}"); canonicals must identify the document, not a query-scoped view`);
+    errors.push(
+      `canonical href "${href}" contains a query string ("${url.search}"); canonicals must identify the document, not a query-scoped view`,
+    );
   }
 
   // Duplicated slashes anywhere in the path (e.g. "//", "/a//b").
@@ -115,7 +119,9 @@ export function validateCanonicalHref(href, expectedOrigin = EXPECTED_ORIGIN) {
 
   // No trailing slash except for root "/".
   if (url.pathname.length > 1 && url.pathname.endsWith("/")) {
-    errors.push(`canonical href "${href}" pathname "${url.pathname}" has a trailing slash; use the non-slash form`);
+    errors.push(
+      `canonical href "${href}" pathname "${url.pathname}" has a trailing slash; use the non-slash form`,
+    );
   }
 
   // Detect raw duplicated slashes in the original href beyond the "https://"
@@ -150,7 +156,11 @@ export function validateCanonicalShape(distDir, opts = {}) {
 
     if (hrefs.length === 0) {
       if (isSpaFallback) continue; // runtime-canonical fallback
-      issues.push({ file: relFile, href: null, message: `document declares no <link rel="canonical">` });
+      issues.push({
+        file: relFile,
+        href: null,
+        message: `document declares no <link rel="canonical">`,
+      });
       continue;
     }
     if (hrefs.length > 1) {

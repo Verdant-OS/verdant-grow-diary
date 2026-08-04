@@ -117,10 +117,7 @@ describe("Add Existing Plant · legacy null-grow_id regression", () => {
 // ---------------------------------------------------------------------------
 
 const ROOT = resolve(__dirname, "../..");
-const DIALOG = readFileSync(
-  resolve(ROOT, "src/components/AddExistingPlantDialog.tsx"),
-  "utf8",
-);
+const DIALOG = readFileSync(resolve(ROOT, "src/components/AddExistingPlantDialog.tsx"), "utf8");
 
 describe("Add Existing Plant · visible reason labels", () => {
   it("preserves the three categorization labels", () => {

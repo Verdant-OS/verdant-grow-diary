@@ -82,10 +82,7 @@ const NON_GRANTING_TRANSACTION_EVENTS = new Set([
   "transaction.canceled",
 ]);
 
-const ADJUSTMENT_EVENTS = new Set([
-  "adjustment.created",
-  "adjustment.updated",
-]);
+const ADJUSTMENT_EVENTS = new Set(["adjustment.created", "adjustment.updated"]);
 
 type RecordedPaddleEventRow = {
   id: string;
@@ -153,9 +150,7 @@ function jsonResponse(body: unknown, status: number): Response {
 
 // Signature verifier helpers live in a shared module so the exact same
 // implementation is exercised by supabase/functions/paddle-webhook/security.test.ts.
-import {
-  verifyPaddleWebhookSignature,
-} from "./verifyPaddleSignature.ts";
+import { verifyPaddleWebhookSignature } from "./verifyPaddleSignature.ts";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -209,7 +204,10 @@ function payloadData(payload: Record<string, unknown>): Record<string, unknown> 
   return isRecord(payload.data) ? payload.data : payload;
 }
 
-function customDataCandidates(payload: Record<string, unknown>, data: Record<string, unknown>): Record<string, unknown>[] {
+function customDataCandidates(
+  payload: Record<string, unknown>,
+  data: Record<string, unknown>,
+): Record<string, unknown>[] {
   const candidates: Record<string, unknown>[] = [];
   const dataCustom = data.custom_data;
   if (isRecord(dataCustom)) candidates.push(dataCustom);
@@ -218,14 +216,25 @@ function customDataCandidates(payload: Record<string, unknown>, data: Record<str
   return candidates;
 }
 
-function metadataUserIds(payload: Record<string, unknown>, data: Record<string, unknown>): string[] {
+function metadataUserIds(
+  payload: Record<string, unknown>,
+  data: Record<string, unknown>,
+): string[] {
   const ids: Array<string | null> = [];
   for (const custom of customDataCandidates(payload, data)) {
     // "userId" (camelCase) is the key the live checkout actually sends
     // (usePaddleCheckout customData: { userId: user.id }); Paddle passes
     // custom_data through verbatim. Without it, paid events record but link
     // capture returns missing_user_id and the buyer gets no entitlement.
-    ids.push(firstStringPath(custom, [["verdant_user_id"], ["user_id"], ["userId"], ["auth_user_id"], ["verdant_auth_user_id"]]));
+    ids.push(
+      firstStringPath(custom, [
+        ["verdant_user_id"],
+        ["user_id"],
+        ["userId"],
+        ["auth_user_id"],
+        ["verdant_auth_user_id"],
+      ]),
+    );
   }
   return uniqueStrings(ids);
 }
@@ -261,12 +270,17 @@ function planFromPriceId(priceId: string): ProcessingPayload["candidate_plan_id"
   return null;
 }
 
-function selectPlan(data: Record<string, unknown>):
+function selectPlan(
+  data: Record<string, unknown>,
+):
   | { ok: true; priceId: string; planId: NonNullable<ProcessingPayload["candidate_plan_id"]> }
   | { ok: false; reason: "unknown_price_id" | "ambiguous_price_ids" } {
   const mapped = priceIdsFromObject(data)
     .map((priceId) => ({ priceId, planId: planFromPriceId(priceId) }))
-    .filter((x): x is { priceId: string; planId: NonNullable<ProcessingPayload["candidate_plan_id"]> } => x.planId !== null);
+    .filter(
+      (x): x is { priceId: string; planId: NonNullable<ProcessingPayload["candidate_plan_id"]> } =>
+        x.planId !== null,
+    );
 
   const uniquePlans = new Map<NonNullable<ProcessingPayload["candidate_plan_id"]>, string>();
   for (const item of mapped) uniquePlans.set(item.planId, item.priceId);
@@ -350,7 +364,8 @@ function failedProcessingPayload(row: RecordedPaddleEventRow, reason: string): P
 
 function buildProcessingPayload(row: RecordedPaddleEventRow): ProcessingPayload {
   if (row.signature_verified !== true) return blockedProcessingPayload(row, "event_not_verified");
-  if (row.environment !== "sandbox") return blockedProcessingPayload(row, "environment_not_allowed");
+  if (row.environment !== "sandbox")
+    return blockedProcessingPayload(row, "environment_not_allowed");
 
   const payload = row.payload;
   const payloadEventType = readString(payload.event_type);
@@ -394,11 +409,11 @@ function buildProcessingPayload(row: RecordedPaddleEventRow): ProcessingPayload 
     current_period_end: isFounderCandidate
       ? null
       : firstStringPath(data, [
-        ["current_billing_period", "ends_at"],
-        ["billing_period", "ends_at"],
-        ["next_billed_at"],
-        ["access_until"],
-      ]),
+          ["current_billing_period", "ends_at"],
+          ["billing_period", "ends_at"],
+          ["next_billed_at"],
+          ["access_until"],
+        ]),
     cancel_at_period_end: isFounderCandidate
       ? false
       : firstStringPath(data, [["scheduled_change", "action"]]) === "cancel",
@@ -406,7 +421,11 @@ function buildProcessingPayload(row: RecordedPaddleEventRow): ProcessingPayload 
   };
 }
 
-function buildLinkCapturePlan(row: RecordedPaddleEventRow): ReturnType<typeof buildBillingCustomerLinkCapturePlan> | { ok: false; reason: "ambiguous_user_id" } {
+function buildLinkCapturePlan(
+  row: RecordedPaddleEventRow,
+):
+  | ReturnType<typeof buildBillingCustomerLinkCapturePlan>
+  | { ok: false; reason: "ambiguous_user_id" } {
   const payload = row.payload;
   const data = payloadData(payload);
   const userIds = metadataUserIds(payload, data);
@@ -425,7 +444,9 @@ function buildLinkCapturePlan(row: RecordedPaddleEventRow): ReturnType<typeof bu
   });
 }
 
-function linkUpdatePatch(payload: BillingCustomerLinkInsertPayload): Partial<BillingCustomerLinkInsertPayload> {
+function linkUpdatePatch(
+  payload: BillingCustomerLinkInsertPayload,
+): Partial<BillingCustomerLinkInsertPayload> {
   return {
     provider_subscription_id: payload.provider_subscription_id ?? undefined,
     provider_checkout_id: payload.provider_checkout_id ?? undefined,
@@ -506,7 +527,10 @@ async function recordProcessing(
     return await insertProcessingPayload(supabase, buildProcessingPayload(row));
   } catch (error) {
     console.error("paddle-webhook processing_insert_failed", error);
-    return await insertProcessingPayload(supabase, failedProcessingPayload(row, "processing_insert_failed"));
+    return await insertProcessingPayload(
+      supabase,
+      failedProcessingPayload(row, "processing_insert_failed"),
+    );
   }
 }
 
@@ -558,7 +582,11 @@ async function captureBillingCustomerLink(
 }
 
 function linkCaptureReadyForSubscriptionUpdate(linkCapture: LinkCaptureResult): boolean {
-  return linkCapture.status === "captured" || linkCapture.status === "updated" || linkCapture.status === "duplicate";
+  return (
+    linkCapture.status === "captured" ||
+    linkCapture.status === "updated" ||
+    linkCapture.status === "duplicate"
+  );
 }
 
 async function applyPaddleSubscriptionUpdate(
@@ -671,8 +699,7 @@ Deno.serve(async (req) => {
   );
   if (!verification.ok) {
     const status =
-      verification.reason === "missing_header" ||
-      verification.reason === "invalid_signature_header"
+      verification.reason === "missing_header" || verification.reason === "invalid_signature_header"
         ? 400
         : 401;
     return jsonResponse({ error: verification.reason }, status);
@@ -686,8 +713,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "invalid_json" }, 400);
   }
 
-  const eventId: string | undefined =
-    typeof evt?.event_id === "string" ? evt.event_id : undefined;
+  const eventId: string | undefined = typeof evt?.event_id === "string" ? evt.event_id : undefined;
   const eventType: string | undefined =
     typeof evt?.event_type === "string" ? evt.event_type : undefined;
   if (!eventId || !eventType) {
@@ -701,13 +727,17 @@ Deno.serve(async (req) => {
   // Idempotent insert. If event_id already exists, treat as duplicate-OK and
   // re-use the existing recorded event row for processing-state, link capture,
   // and guarded recurring subscription update handoff.
-  const { data: insertedEvent, error } = await supabase.from("paddle_events").insert({
-    event_id: eventId,
-    event_type: eventType,
-    environment: PADDLE_ENVIRONMENT,
-    signature_verified: true,
-    payload: evt,
-  }).select("id,event_id,event_type,environment,signature_verified,payload").single();
+  const { data: insertedEvent, error } = await supabase
+    .from("paddle_events")
+    .insert({
+      event_id: eventId,
+      event_type: eventType,
+      environment: PADDLE_ENVIRONMENT,
+      signature_verified: true,
+      payload: evt,
+    })
+    .select("id,event_id,event_type,environment,signature_verified,payload")
+    .single();
 
   if (error) {
     const code = (error as { code?: string }).code;
@@ -717,13 +747,32 @@ Deno.serve(async (req) => {
       const processing = await recordProcessing(supabase, existingEvent);
       const linkCapture = await captureBillingCustomerLink(supabase, existingEvent);
       if (linkCapture.status === "failed") {
-        return jsonResponse({ error: "link_capture_failed", duplicate: true, processing, linkCapture }, 500);
+        return jsonResponse(
+          { error: "link_capture_failed", duplicate: true, processing, linkCapture },
+          500,
+        );
       }
-      const subscriptionUpdate = await applyPaddleSubscriptionUpdate(supabase, processing, linkCapture);
+      const subscriptionUpdate = await applyPaddleSubscriptionUpdate(
+        supabase,
+        processing,
+        linkCapture,
+      );
       if (subscriptionUpdate.status === "failed") {
-        return jsonResponse({ error: "subscription_update_failed", duplicate: true, processing, linkCapture, subscriptionUpdate }, 500);
+        return jsonResponse(
+          {
+            error: "subscription_update_failed",
+            duplicate: true,
+            processing,
+            linkCapture,
+            subscriptionUpdate,
+          },
+          500,
+        );
       }
-      return jsonResponse({ ok: true, duplicate: true, processing, linkCapture, subscriptionUpdate }, 200);
+      return jsonResponse(
+        { ok: true, duplicate: true, processing, linkCapture, subscriptionUpdate },
+        200,
+      );
     }
     console.error("paddle-webhook insert_failed", error);
     return jsonResponse({ error: "insert_failed" }, 500);
@@ -733,13 +782,28 @@ Deno.serve(async (req) => {
   const processing = await recordProcessing(supabase, recordedEvent);
   const linkCapture = await captureBillingCustomerLink(supabase, recordedEvent);
   if (linkCapture.status === "failed") {
-    return jsonResponse({ error: "link_capture_failed", recorded: true, processing, linkCapture }, 500);
+    return jsonResponse(
+      { error: "link_capture_failed", recorded: true, processing, linkCapture },
+      500,
+    );
   }
 
   const subscriptionUpdate = await applyPaddleSubscriptionUpdate(supabase, processing, linkCapture);
   if (subscriptionUpdate.status === "failed") {
-    return jsonResponse({ error: "subscription_update_failed", recorded: true, processing, linkCapture, subscriptionUpdate }, 500);
+    return jsonResponse(
+      {
+        error: "subscription_update_failed",
+        recorded: true,
+        processing,
+        linkCapture,
+        subscriptionUpdate,
+      },
+      500,
+    );
   }
 
-  return jsonResponse({ ok: true, recorded: true, processing, linkCapture, subscriptionUpdate }, 200);
+  return jsonResponse(
+    { ok: true, recorded: true, processing, linkCapture, subscriptionUpdate },
+    200,
+  );
 });

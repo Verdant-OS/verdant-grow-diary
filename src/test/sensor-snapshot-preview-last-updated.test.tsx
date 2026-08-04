@@ -14,10 +14,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { SensorSnapshotPreview } from "@/components/SensorSnapshotPreview";
-import {
-  EMPTY_SENSOR_SNAPSHOT,
-  buildSensorSnapshot,
-} from "@/lib/latestSensorSnapshotRules";
+import { EMPTY_SENSOR_SNAPSHOT, buildSensorSnapshot } from "@/lib/latestSensorSnapshotRules";
 import { formatLastUpdatedAgo } from "@/lib/lastUpdatedAgo";
 
 const NOW = new Date("2026-06-08T12:00:00.000Z");
@@ -27,13 +24,21 @@ function freshLiveSnap() {
   return buildSensorSnapshot(
     [
       {
-        id: "r1", tent_id: "t1", metric: "temp_f", value: 75,
-        source: "live", captured_at: "2026-06-08T11:55:00.000Z",
+        id: "r1",
+        tent_id: "t1",
+        metric: "temp_f",
+        value: 75,
+        source: "live",
+        captured_at: "2026-06-08T11:55:00.000Z",
         ts: "2026-06-08T11:55:00.000Z",
       } as any,
       {
-        id: "r2", tent_id: "t1", metric: "humidity_pct", value: 55,
-        source: "live", captured_at: "2026-06-08T11:55:00.000Z",
+        id: "r2",
+        tent_id: "t1",
+        metric: "humidity_pct",
+        value: 55,
+        source: "live",
+        captured_at: "2026-06-08T11:55:00.000Z",
         ts: "2026-06-08T11:55:00.000Z",
       } as any,
     ],
@@ -52,24 +57,14 @@ describe("formatLastUpdatedAgo", () => {
   });
 
   it("returns 'just now' inside 45s", () => {
-    expect(formatLastUpdatedAgo(NOW_MS - 5_000, NOW_MS)).toBe(
-      "Last updated: just now",
-    );
-    expect(formatLastUpdatedAgo(NOW_MS - 30_000, NOW_MS)).toBe(
-      "Last updated: just now",
-    );
+    expect(formatLastUpdatedAgo(NOW_MS - 5_000, NOW_MS)).toBe("Last updated: just now");
+    expect(formatLastUpdatedAgo(NOW_MS - 30_000, NOW_MS)).toBe("Last updated: just now");
   });
 
   it("returns minutes / hours / days for older timestamps", () => {
-    expect(formatLastUpdatedAgo(NOW_MS - 2 * 60_000, NOW_MS)).toBe(
-      "Last updated: 2 min ago",
-    );
-    expect(formatLastUpdatedAgo(NOW_MS - 3 * 3_600_000, NOW_MS)).toBe(
-      "Last updated: 3 hr ago",
-    );
-    expect(formatLastUpdatedAgo(NOW_MS - 2 * 86_400_000, NOW_MS)).toBe(
-      "Last updated: 2 d ago",
-    );
+    expect(formatLastUpdatedAgo(NOW_MS - 2 * 60_000, NOW_MS)).toBe("Last updated: 2 min ago");
+    expect(formatLastUpdatedAgo(NOW_MS - 3 * 3_600_000, NOW_MS)).toBe("Last updated: 3 hr ago");
+    expect(formatLastUpdatedAgo(NOW_MS - 2 * 86_400_000, NOW_MS)).toBe("Last updated: 2 d ago");
   });
 
   it("never contains the word 'Live'", () => {
@@ -106,9 +101,9 @@ describe("SensorSnapshotPreview — Last updated UI", () => {
         nowMs={NOW_MS}
       />,
     );
-    expect(
-      screen.getByTestId("sensor-snapshot-preview-last-updated").textContent,
-    ).toBe("Last updated: —");
+    expect(screen.getByTestId("sensor-snapshot-preview-last-updated").textContent).toBe(
+      "Last updated: —",
+    );
   });
 
   it("ignores captured_at when computing Last updated", () => {
@@ -123,9 +118,9 @@ describe("SensorSnapshotPreview — Last updated UI", () => {
         nowMs={NOW_MS}
       />,
     );
-    expect(
-      screen.getByTestId("sensor-snapshot-preview-last-updated").textContent,
-    ).toBe("Last updated: just now");
+    expect(screen.getByTestId("sensor-snapshot-preview-last-updated").textContent).toBe(
+      "Last updated: just now",
+    );
   });
 
   it("Last updated label is independent of freshness badge state", () => {
@@ -139,12 +134,10 @@ describe("SensorSnapshotPreview — Last updated UI", () => {
         nowMs={NOW_MS}
       />,
     );
-    expect(
-      screen.getByTestId("sensor-snapshot-preview-last-updated").textContent,
-    ).toBe("Last updated: 1 min ago");
+    expect(screen.getByTestId("sensor-snapshot-preview-last-updated").textContent).toBe(
+      "Last updated: 1 min ago",
+    );
     // Live/freshness badge only shows in "ready" state — never inferred here.
-    expect(
-      screen.queryByTestId("sensor-snapshot-preview-badge"),
-    ).toBeNull();
+    expect(screen.queryByTestId("sensor-snapshot-preview-badge")).toBeNull();
   });
 });

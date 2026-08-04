@@ -18,8 +18,7 @@ import {
   type BuildSensorSourceBadgeInput,
 } from "@/lib/sensorSourceLabelViewModel";
 
-export interface SensorSourceProvenanceBadgeProps
-  extends BuildSensorSourceBadgeInput {
+export interface SensorSourceProvenanceBadgeProps extends BuildSensorSourceBadgeInput {
   className?: string;
   /** Override testid. Default: "sensor-source-provenance-badge". */
   testId?: string;

@@ -18,9 +18,7 @@ describe("buildCanonicalSensorIngestUrl", () => {
   });
 
   it("supports staging/preview-style host shapes", () => {
-    expect(
-      buildCanonicalSensorIngestUrl("https://staging-abc.supabase.co"),
-    ).toBe(
+    expect(buildCanonicalSensorIngestUrl("https://staging-abc.supabase.co")).toBe(
       "https://staging-abc.supabase.co/functions/v1/sensor-ingest-webhook",
     );
   });

@@ -51,10 +51,7 @@ export function GgsSentinelEvidenceTimelineCard({
       <p className="text-xs text-muted-foreground">{subtitle}</p>
 
       {state && (
-        <p
-          className="text-xs text-muted-foreground"
-          data-testid="ggs-sentinel-evidence-state"
-        >
+        <p className="text-xs text-muted-foreground" data-testid="ggs-sentinel-evidence-state">
           State: <span className="font-mono">{state}</span>
         </p>
       )}

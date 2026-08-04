@@ -12,7 +12,9 @@ describe("Post-Grow Reflection provider candidate envelope static safety", () =>
   it("does not add runtime calls, persistence, schema, or equipment surfaces", () => {
     const all = [RULES, DOCS].join("\n");
 
-    expect(all).not.toMatch(/functions\.invoke|fetch\(|axios|XMLHttpRequest|EventSource|WebSocket/i);
+    expect(all).not.toMatch(
+      /functions\.invoke|fetch\(|axios|XMLHttpRequest|EventSource|WebSocket/i,
+    );
     expect(all).not.toMatch(/create table|alter table|enable row level security/i);
     expect(all).not.toMatch(/from\("action_queue"\)|\.insert\(|\.update\(|\.delete\(/i);
     expect(all).not.toMatch(/target_device|raw_payload|service_role|bridge_token/i);

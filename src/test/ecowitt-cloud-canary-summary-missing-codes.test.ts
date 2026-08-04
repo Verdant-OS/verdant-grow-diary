@@ -13,12 +13,9 @@ import {
 import fixtures from "../../fixtures/ecowitt-cloud-canary-payloads.json";
 
 const MAC_RE = /\b[0-9A-F]{2}(?::[0-9A-F]{2}){5}\b/i;
-const UUID_RE =
-  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;
+const UUID_RE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;
 
-const mapping = fixtures.mapping as unknown as Parameters<
-  typeof runEcowittCloudCanary
->[1];
+const mapping = fixtures.mapping as unknown as Parameters<typeof runEcowittCloudCanary>[1];
 const opts = { now: new Date(fixtures.now) };
 
 function run(id: string) {
@@ -116,18 +113,126 @@ describe("REGRESSION — all 12 fixtures: existing summary fields unchanged", ()
       ec_metric_invented: boolean;
     }
   > = {
-    happy_multi_channel: { mapped: 5, unmapped: 0, invalid: 0, stale: 0, live: 5, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
-    stale_only: { mapped: 2, unmapped: 0, invalid: 0, stale: 2, live: 0, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
-    invalid_humidity: { mapped: 2, unmapped: 0, invalid: 2, stale: 0, live: 0, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
-    stuck_soil_extreme: { mapped: 1, unmapped: 0, invalid: 0, stale: 0, live: 1, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
-    unmapped_channel: { mapped: 0, unmapped: 2, invalid: 0, stale: 0, live: 0, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
-    missing_metrics: { mapped: 0, unmapped: 0, invalid: 0, stale: 0, live: 0, missing_metric: true, pressure_unmapped: false, ec_metric_invented: false },
-    pressure_present: { mapped: 2, unmapped: 1, invalid: 0, stale: 0, live: 2, missing_metric: false, pressure_unmapped: true, ec_metric_invented: false },
-    celsius_looking_fahrenheit: { mapped: 2, unmapped: 0, invalid: 0, stale: 0, live: 2, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
-    captured_at_missing: { mapped: 3, unmapped: 0, invalid: 3, stale: 0, live: 0, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
-    missing_humidity_only: { mapped: 2, unmapped: 0, invalid: 0, stale: 0, live: 2, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
-    missing_temperature_only: { mapped: 2, unmapped: 0, invalid: 0, stale: 0, live: 2, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
-    missing_soil_only: { mapped: 2, unmapped: 0, invalid: 0, stale: 0, live: 2, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
+    happy_multi_channel: {
+      mapped: 5,
+      unmapped: 0,
+      invalid: 0,
+      stale: 0,
+      live: 5,
+      missing_metric: false,
+      pressure_unmapped: false,
+      ec_metric_invented: false,
+    },
+    stale_only: {
+      mapped: 2,
+      unmapped: 0,
+      invalid: 0,
+      stale: 2,
+      live: 0,
+      missing_metric: false,
+      pressure_unmapped: false,
+      ec_metric_invented: false,
+    },
+    invalid_humidity: {
+      mapped: 2,
+      unmapped: 0,
+      invalid: 2,
+      stale: 0,
+      live: 0,
+      missing_metric: false,
+      pressure_unmapped: false,
+      ec_metric_invented: false,
+    },
+    stuck_soil_extreme: {
+      mapped: 1,
+      unmapped: 0,
+      invalid: 0,
+      stale: 0,
+      live: 1,
+      missing_metric: false,
+      pressure_unmapped: false,
+      ec_metric_invented: false,
+    },
+    unmapped_channel: {
+      mapped: 0,
+      unmapped: 2,
+      invalid: 0,
+      stale: 0,
+      live: 0,
+      missing_metric: false,
+      pressure_unmapped: false,
+      ec_metric_invented: false,
+    },
+    missing_metrics: {
+      mapped: 0,
+      unmapped: 0,
+      invalid: 0,
+      stale: 0,
+      live: 0,
+      missing_metric: true,
+      pressure_unmapped: false,
+      ec_metric_invented: false,
+    },
+    pressure_present: {
+      mapped: 2,
+      unmapped: 1,
+      invalid: 0,
+      stale: 0,
+      live: 2,
+      missing_metric: false,
+      pressure_unmapped: true,
+      ec_metric_invented: false,
+    },
+    celsius_looking_fahrenheit: {
+      mapped: 2,
+      unmapped: 0,
+      invalid: 0,
+      stale: 0,
+      live: 2,
+      missing_metric: false,
+      pressure_unmapped: false,
+      ec_metric_invented: false,
+    },
+    captured_at_missing: {
+      mapped: 3,
+      unmapped: 0,
+      invalid: 3,
+      stale: 0,
+      live: 0,
+      missing_metric: false,
+      pressure_unmapped: false,
+      ec_metric_invented: false,
+    },
+    missing_humidity_only: {
+      mapped: 2,
+      unmapped: 0,
+      invalid: 0,
+      stale: 0,
+      live: 2,
+      missing_metric: false,
+      pressure_unmapped: false,
+      ec_metric_invented: false,
+    },
+    missing_temperature_only: {
+      mapped: 2,
+      unmapped: 0,
+      invalid: 0,
+      stale: 0,
+      live: 2,
+      missing_metric: false,
+      pressure_unmapped: false,
+      ec_metric_invented: false,
+    },
+    missing_soil_only: {
+      mapped: 2,
+      unmapped: 0,
+      invalid: 0,
+      stale: 0,
+      live: 2,
+      missing_metric: false,
+      pressure_unmapped: false,
+      ec_metric_invented: false,
+    },
   };
 
   const verdict = runEcowittCloudCanary(

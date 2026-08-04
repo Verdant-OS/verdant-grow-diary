@@ -62,3 +62,33 @@ crons, Deno-only deps). Artifact: `.lovable/migrate-to-tanstack/edge-function-cl
 4. Tailwind v4 scale renames unapplied (`shadow-sm`→`shadow-xs`, bare `ring`→`ring-3`,
    etc.). Bulk rewrite unsafe: the same words appear in grower-facing copy constants.
    1px visual drift, not a break.
+
+## Route test residual (C1–C4) — tracking on PR #699
+
+Landed on `chore/adopt-biome-lint` (not blocking SSR #694):
+
+- **C1–C3** route-manifest harness + App.tsx scrape rewire + operator/sensor layout asserts.
+- **C4 advance:** Vitest MemoryRouter alias (`reactRouterCompat.vitest.tsx`) preserves
+  `location.state`, strips TanStack internal state keys for RR parity; checkout-return
+  funnel unit tests green. Full Vitest Suite CI on PR #699 is the remaining C4 sign-off.
+- **Merge path:** merge #699 into `verdant-grow-diary` once required checks (esp. Full
+  Vitest + biome) are green — that clears base-owned App.tsx ENOENT for future proofs.
+
+## C5 decisions (2026-08-03) — scheduled, not closed
+
+### Step 9 typecheck
+
+- Residual remains open (~405 last measured in this file). **Not blocking** route
+  test-complete (C1–C4). Owner: migration follow-up PR after #699.
+- Acceptance: `bun run typecheck` → 0 errors **or** explicit residual count + issue links
+  recorded here.
+
+### Prerender / OG / seo-manifest
+
+- **Scheduled (not blocking C1–C4).** Re-express Classic postbuild OG pipeline against
+  TanStack `head()` + new `dist/` shape; restore `seo-manifest.json` consumers
+  (`check:jsonld`, `check:og-*`, head-fidelity).
+- Acceptance commands (when closed):
+  - `bun run build` + full `postbuild` chain green
+  - `bun run test:legal-seo` green
+- Recovered source pointer: `git show abb4ae428:vite.config.ts` (see deferred item 1 above).

@@ -11,17 +11,11 @@
  *  - Never classifies missing audit proof as a positive outcome.
  */
 
-
 export const ECOWITT_AUDIT_PROOF_WINDOW_MS = 24 * 60 * 60 * 1000;
 export const ECOWITT_AUDIT_PROOF_WINDOW_LABEL = "last 24 hours";
 
 export type EcowittIngestAuditProofStatus =
-  | "loaded"
-  | "no_audit_rows"
-  | "unavailable"
-  | "blocked"
-  | "loading"
-  | "error";
+  "loaded" | "no_audit_rows" | "unavailable" | "blocked" | "loading" | "error";
 
 export type EcowittIngestAuditProofTone = "ok" | "warn" | "neutral";
 
@@ -201,11 +195,7 @@ export function buildEcowittIngestAuditProof(
   }
 
   const hasRejected = rejected > 0;
-  const tone: EcowittIngestAuditProofTone = hasRejected
-    ? "warn"
-    : inserted > 0
-      ? "ok"
-      : "neutral";
+  const tone: EcowittIngestAuditProofTone = hasRejected ? "warn" : inserted > 0 ? "ok" : "neutral";
 
   const headline = hasRejected
     ? "EcoWitt ingest audit shows rejected or omitted rows"

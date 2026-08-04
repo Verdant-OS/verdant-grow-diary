@@ -49,7 +49,9 @@ describe("the refusal path disposes of the key", () => {
 
 describe("possible-duplicate warning", () => {
   it("is raised only via shouldWarnPossibleDuplicate", () => {
-    expect(SRC).toMatch(/shouldWarnPossibleDuplicate\([^)]*\)\s*\)\s*\{\s*setDuplicateRisk\(true\)/);
+    expect(SRC).toMatch(
+      /shouldWarnPossibleDuplicate\([^)]*\)\s*\)\s*\{\s*setDuplicateRisk\(true\)/,
+    );
   });
 
   it("resets at the start of every submit so it cannot outlive its cause", () => {

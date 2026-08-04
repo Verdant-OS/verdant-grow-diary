@@ -21,11 +21,7 @@ import { GROW_ROOM_MODE_STALE_MINUTES } from "../constants/sensorTiming";
 export type GrowRoomAlertSeverity = "info" | "watch" | "warning" | "critical";
 export type GrowRoomAlertStatus = "open" | "acknowledged" | "resolved" | "dismissed";
 export type GrowRoomActionStatus =
-  | "pending_approval"
-  | "approved"
-  | "rejected"
-  | "completed"
-  | "cancelled";
+  "pending_approval" | "approved" | "rejected" | "completed" | "cancelled";
 
 export interface GrowRoomTentInput {
   id: string;
@@ -76,10 +72,7 @@ export type SnapshotState = "live" | "manual" | "diary" | "stale" | "missing" | 
 export type DataHealth = "healthy" | "attention" | "warning" | "critical" | "stale" | "missing";
 
 export type PrimaryRecommendation =
-  | "review_alert"
-  | "review_action_queue"
-  | "check_stale_data"
-  | "no_action";
+  "review_alert" | "review_action_queue" | "check_stale_data" | "no_action";
 
 export type SeverityOrNone = GrowRoomAlertSeverity | "none";
 

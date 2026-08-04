@@ -26,11 +26,7 @@ import {
   VERDANT_SITE_ORIGIN,
 } from "../src/lib/build/staticPublicSeoDocuments";
 import { resolveStaticDocumentMetadata } from "../src/lib/build/staticRouteHead";
-import {
-  buildOgCardSvg,
-  ogImageSlugForPath,
-  OG_IMAGE_WIDTH,
-} from "../src/lib/build/ogImageCard";
+import { buildOgCardSvg, ogImageSlugForPath, OG_IMAGE_WIDTH } from "../src/lib/build/ogImageCard";
 
 const distDir = resolve(process.argv[2] ?? "dist");
 const clientDir = join(distDir, "client");

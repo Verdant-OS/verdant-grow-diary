@@ -2,10 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  featureFlags,
-  typedWateringWriteEnabled,
-} from "@/lib/featureFlags";
+import { featureFlags, typedWateringWriteEnabled } from "@/lib/featureFlags";
 import { writeWateringTypedEvent } from "@/lib/writeWateringTypedEvent";
 import { findMatches } from "./testFileSearchRules";
 
@@ -14,7 +11,6 @@ import { findMatches } from "./testFileSearchRules";
 // allowlist, or assertion is changed.
 import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
 installScannerGuardrail({ file: __filename });
-
 
 const REPO_ROOT = process.cwd();
 
@@ -59,20 +55,14 @@ describe("typed watering write — feature flag scaffold", () => {
   });
 
   it("helper module does not import the Supabase client", () => {
-    const src = readFileSync(
-      resolve(REPO_ROOT, "src/lib/writeWateringTypedEvent.ts"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(REPO_ROOT, "src/lib/writeWateringTypedEvent.ts"), "utf8");
     expect(src).not.toMatch(/from\s+["']@\/integrations\/supabase\/client["']/);
     expect(src).not.toMatch(/supabase\.rpc\s*\(/);
     expect(src).not.toMatch(/service_role/i);
   });
 
   it("featureFlags module does not reference service_role", () => {
-    const src = readFileSync(
-      resolve(REPO_ROOT, "src/lib/featureFlags.ts"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(REPO_ROOT, "src/lib/featureFlags.ts"), "utf8");
     expect(src).not.toMatch(/service_role/i);
   });
 
@@ -84,8 +74,9 @@ describe("typed watering write — feature flag scaffold", () => {
   });
 
   it("QuickLog code does not import or call the helper", () => {
-    const hits = findMatches(["src"], "writeWateringTypedEvent")
-      .filter((p) => /quick.?log/i.test(p));
+    const hits = findMatches(["src"], "writeWateringTypedEvent").filter((p) =>
+      /quick.?log/i.test(p),
+    );
     expect(hits).toEqual([]);
   });
 
@@ -93,18 +84,10 @@ describe("typed watering write — feature flag scaffold", () => {
     // While the flag is OFF the helper is `disabled` for every kind, which
     // is the strongest possible guarantee. Document the contract explicitly
     // so a future enable step cannot widen scope without updating this test.
-    for (const kind of [
-      "feeding",
-      "photo",
-      "observation",
-      "training",
-      "environment",
-    ] as const) {
+    for (const kind of ["feeding", "photo", "observation", "training", "environment"] as const) {
       const out = writeWateringTypedEvent({
         kind,
-        input: { kind, details: {} } as Parameters<
-          typeof writeWateringTypedEvent
-        >[0]["input"],
+        input: { kind, details: {} } as Parameters<typeof writeWateringTypedEvent>[0]["input"],
       });
       expect(out.ok).toBe(false);
       if (!out.ok) {

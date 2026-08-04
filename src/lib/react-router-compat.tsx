@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks -- dual LegacyRouterContext / TanStack path: hooks after legacy early-return is intentional for the vitest MemoryRouter shim */
 /**
  * react-router-dom compatibility layer over TanStack Router.
  *
@@ -11,7 +12,19 @@
  *
  * Read-only shim: no data access, no writes, no side effects beyond navigation.
  */
-import { forwardRef, type AnchorHTMLAttributes, type ReactNode } from "react";
+import {
+  Children,
+  createContext,
+  forwardRef,
+  isValidElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type AnchorHTMLAttributes,
+  type ReactNode,
+} from "react";
 import {
   Link as TanStackLink,
   Navigate as TanStackNavigate,
@@ -32,8 +45,29 @@ export interface CompatLocation {
   key: string;
 }
 
+interface LegacyRouterContextValue {
+  location: CompatLocation;
+  params: Record<string, string>;
+  navigate: (to: CompatTo | number, options?: CompatNavigateOptions) => void;
+}
+
+const LegacyRouterContext = createContext<LegacyRouterContextValue | null>(null);
+
+function parseLegacyLocation(entry: string): CompatLocation {
+  const url = new URL(entry, "https://verdant.test");
+  return {
+    pathname: url.pathname || "/",
+    search: url.search,
+    hash: url.hash,
+    state: null,
+    key: `${url.pathname}${url.search}${url.hash}`,
+  };
+}
+
 /** react-router `useLocation()` shape, sourced from the TanStack router state. */
 export function useLocation(): CompatLocation {
+  const legacy = useContext(LegacyRouterContext);
+  if (legacy) return legacy.location;
   return useRouterState({
     select: (state) => {
       const location = state.location;
@@ -50,6 +84,8 @@ export function useLocation(): CompatLocation {
 
 /** react-router `useParams()`. Non-strict so any route can read any param. */
 export function useParams<T extends Record<string, string | undefined>>(): T {
+  const legacy = useContext(LegacyRouterContext);
+  if (legacy) return legacy.params as T;
   // TanStack's non-strict overload is not expressible against the generated
   // route register without naming a `from`; the shim is intentionally
   // route-agnostic, so the options object is passed through untyped.
@@ -97,29 +133,32 @@ function flattenTo(to: CompatTo): string {
  * as `navigate(-1)`.
  */
 export function useNavigate(): CompatNavigateFunction {
+  const legacy = useContext(LegacyRouterContext);
+  if (legacy) return legacy.navigate;
   const navigate = useTanStackNavigate();
   const router = useRouter();
 
-  return ((to: CompatTo | number, options?: CompatNavigateOptions) => {
-    if (typeof to === "number") {
-      if (to === 0) return;
-      // TanStack's history exposes go/back/forward; -1 is the common case.
-      if (to < 0) router.history.back();
-      else router.history.forward();
-      return;
-    }
-    void navigate({
-      to: flattenTo(to),
-      replace: options?.replace ?? false,
-      ...(options?.state !== undefined ? { state: options.state as never } : {}),
-      resetScroll: options?.preventScrollReset !== true,
-    } as never);
-  }) as CompatNavigateFunction;
+  return useCallback(
+    ((to: CompatTo | number, options?: CompatNavigateOptions) => {
+      if (typeof to === "number") {
+        if (to === 0) return;
+        // TanStack's history exposes go/back/forward; -1 is the common case.
+        if (to < 0) router.history.back();
+        else router.history.forward();
+        return;
+      }
+      void navigate({
+        to: flattenTo(to),
+        replace: options?.replace ?? false,
+        ...(options?.state !== undefined ? { state: options.state as never } : {}),
+        resetScroll: options?.preventScrollReset !== true,
+      } as never);
+    }) as CompatNavigateFunction,
+    [navigate, router],
+  );
 }
 
-
-export interface CompatLinkProps
-  extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> {
+export interface CompatLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> {
   to: string;
   replace?: boolean;
   state?: unknown;
@@ -129,9 +168,34 @@ export interface CompatLinkProps
 
 /** react-router `<Link to="/path">` over the TanStack Link. */
 export const Link = forwardRef<HTMLAnchorElement, CompatLinkProps>(function Link(
-  { to, replace, state, preventScrollReset, children, ...rest },
+  { to, replace, state, preventScrollReset, children, onClick, ...rest },
   ref,
 ) {
+  const legacy = useContext(LegacyRouterContext);
+  if (legacy) {
+    return (
+      <a
+        ref={ref}
+        href={flattenTo(to)}
+        {...rest}
+        onClick={(event) => {
+          onClick?.(event);
+          if (
+            !event.defaultPrevented &&
+            event.button === 0 &&
+            !event.metaKey &&
+            !event.ctrlKey &&
+            !event.shiftKey
+          ) {
+            event.preventDefault();
+            legacy.navigate(to, { replace, state, preventScrollReset });
+          }
+        }}
+      >
+        {children}
+      </a>
+    );
+  }
   return (
     <TanStackLink
       ref={ref}
@@ -157,8 +221,9 @@ export const NavLink = forwardRef<HTMLAnchorElement, CompatNavLinkProps>(functio
   { to, className, children, end, ...rest },
   ref,
 ) {
-  const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const isActive = end === true ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
+  const pathname = useLocation().pathname;
+  const isActive =
+    end === true ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
   const renderProps = { isActive, isPending: false };
   const resolvedClassName = typeof className === "function" ? className(renderProps) : className;
   const resolvedChildren = typeof children === "function" ? children(renderProps) : children;
@@ -184,6 +249,11 @@ export interface CompatNavigateProps {
 
 /** react-router `<Navigate to="/path" replace />`. */
 export function Navigate({ to, replace, state }: CompatNavigateProps) {
+  const legacy = useContext(LegacyRouterContext);
+  useEffect(() => {
+    if (legacy) legacy.navigate(to, { replace, state });
+  }, [legacy, replace, state, to]);
+  if (legacy) return null;
   return (
     <TanStackNavigate
       to={to as never}
@@ -209,18 +279,31 @@ export type CompatSetSearchParams = (
  * react-router accepted (object, string, URLSearchParams, or updater fn).
  */
 export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
-  const searchStr = useRouterState({ select: (state) => state.location.searchStr ?? "" });
+  const legacy = useContext(LegacyRouterContext);
+  // Always subscribe so hooks order is stable; prefer legacy MemoryRouter search when present.
+  const tanstackSearch = useRouterState({ select: (state) => state.location.searchStr ?? "" });
   const router = useRouter();
-  const params = new URLSearchParams(searchStr);
+  const searchRaw = legacy ? (legacy.location.search ?? "") : tanstackSearch;
+  const searchKey = searchRaw.startsWith("?") ? searchRaw.slice(1) : searchRaw;
+  // Stabilize identity: a fresh URLSearchParams every render breaks effects that
+  // depend on [searchParams] (infinite setState loops under MemoryRouter/TanStack).
+  const params = useMemo(() => new URLSearchParams(searchKey), [searchKey]);
 
   const setSearchParams: CompatSetSearchParams = (next, options) => {
-    const resolved = typeof next === "function" ? next(new URLSearchParams(searchStr)) : next;
+    const resolved = typeof next === "function" ? next(new URLSearchParams(searchKey)) : next;
     const serialized =
       resolved instanceof URLSearchParams
         ? resolved.toString()
         : typeof resolved === "string"
           ? resolved.replace(/^\?/, "")
           : new URLSearchParams(resolved).toString();
+    if (legacy) {
+      legacy.navigate(
+        `${legacy.location.pathname}${serialized ? `?${serialized}` : ""}${legacy.location.hash}`,
+        options,
+      );
+      return;
+    }
     const { pathname, hash } = router.state.location;
     const suffix = `${serialized ? `?${serialized}` : ""}${hash ? (hash.startsWith("#") ? hash : `#${hash}`) : ""}`;
     void router.navigate({
@@ -256,13 +339,46 @@ interface LegacyRouterShellProps {
 }
 
 export function BrowserRouter({ children }: LegacyRouterShellProps) {
-  return <>{children}</>;
+  const entry =
+    typeof window === "undefined"
+      ? "/"
+      : `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  return <LegacyRouter initialEntry={entry}>{children}</LegacyRouter>;
 }
-export function MemoryRouter({ children }: LegacyRouterShellProps) {
-  return <>{children}</>;
+export function MemoryRouter({ children, initialEntries }: LegacyRouterShellProps) {
+  const entries = Array.isArray(initialEntries)
+    ? initialEntries.filter((entry): entry is string => typeof entry === "string")
+    : [];
+  return <LegacyRouter initialEntry={entries.at(-1) ?? "/"}>{children}</LegacyRouter>;
+}
+
+function LegacyRouter({ children, initialEntry }: { children?: ReactNode; initialEntry: string }) {
+  const [location, setLocation] = useState(() => parseLegacyLocation(initialEntry));
+  const navigate = useCallback<LegacyRouterContextValue["navigate"]>((to) => {
+    if (typeof to === "number") return;
+    setLocation(parseLegacyLocation(flattenTo(to)));
+  }, []);
+  const value = useMemo<LegacyRouterContextValue>(
+    () => ({ location, params: {}, navigate }),
+    [location, navigate],
+  );
+  return <LegacyRouterContext.Provider value={value}>{children}</LegacyRouterContext.Provider>;
 }
 export function Routes({ children }: { children?: ReactNode }) {
-  return <>{children}</>;
+  const legacy = useContext(LegacyRouterContext);
+  if (!legacy) return <>{children}</>;
+  for (const child of Children.toArray(children)) {
+    if (!isValidElement<{ path?: string; element?: ReactNode; children?: ReactNode }>(child))
+      continue;
+    const params = child.props.path ? matchOne(child.props.path, legacy.location.pathname) : {};
+    if (params === null) continue;
+    return (
+      <LegacyRouterContext.Provider value={{ ...legacy, params }}>
+        {child.props.element ?? child.props.children}
+      </LegacyRouterContext.Provider>
+    );
+  }
+  return null;
 }
 export function Route(_props: { path?: string; element?: ReactNode; children?: ReactNode }) {
   return null;

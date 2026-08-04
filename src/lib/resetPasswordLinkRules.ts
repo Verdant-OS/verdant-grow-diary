@@ -82,14 +82,12 @@ export function diagnoseResetLink(input: {
 }): ResetLinkDiagnosis {
   const params = mergeParams(parseFragment(input.hash), parseQuery(input.search));
 
-  const hasErrorSignal =
-    !!params.error || !!params.errorCode || !!params.errorDescription;
+  const hasErrorSignal = !!params.error || !!params.errorCode || !!params.errorDescription;
 
   if (hasErrorSignal) {
     const code = (params.errorCode ?? "").toLowerCase();
     const desc = (params.errorDescription ?? "").toLowerCase();
-    const looksExpired =
-      EXPIRED_CODES.has(code) || desc.includes("expired");
+    const looksExpired = EXPIRED_CODES.has(code) || desc.includes("expired");
     if (looksExpired) {
       return {
         status: "expired",

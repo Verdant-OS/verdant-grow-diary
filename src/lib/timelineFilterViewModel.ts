@@ -16,8 +16,7 @@ import {
   type TimelineMemoryItem,
 } from "@/lib/timelineFilterRules";
 
-export const TIMELINE_FILTER_EMPTY_STATE_COPY =
-  "No events match this filter." as const;
+export const TIMELINE_FILTER_EMPTY_STATE_COPY = "No events match this filter." as const;
 
 export interface TimelineFilterChip {
   key: TimelineFilterKey;

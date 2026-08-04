@@ -73,9 +73,7 @@ export function GeneticsBadge({
         >
           {vm.strainName}
           {vm.breeder ? (
-            <span className="ml-1.5 text-[11px] font-normal text-white/40">
-              · {vm.breeder}
-            </span>
+            <span className="ml-1.5 text-[11px] font-normal text-white/40">· {vm.breeder}</span>
           ) : null}
         </div>
       ) : null}
@@ -103,10 +101,7 @@ export function GeneticsBadge({
             </span>
           ))}
           {vm.hiddenLineageCount > 0 ? (
-            <span
-              data-testid="genetics-badge-hidden-count"
-              className="text-[10px] text-white/40"
-            >
+            <span data-testid="genetics-badge-hidden-count" className="text-[10px] text-white/40">
               +{vm.hiddenLineageCount} more
             </span>
           ) : null}

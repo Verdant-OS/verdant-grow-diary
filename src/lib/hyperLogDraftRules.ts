@@ -17,13 +17,7 @@ import type { QuickLogPrefill } from "@/components/QuickLog";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 export type QuickLogEventType =
-  | "observation"
-  | "watering"
-  | "feeding"
-  | "training"
-  | "photo"
-  | "environment"
-  | "harvest";
+  "observation" | "watering" | "feeding" | "training" | "photo" | "environment" | "harvest";
 
 export interface HyperLogPlantContext {
   plantId: string | null;
@@ -42,9 +36,7 @@ export interface BuildHyperLogPrefillInput {
 }
 
 /** Map a HyperLog action to the existing Quick Log event_type. */
-export function mapHyperLogActionToEventType(
-  action: HyperLogAction,
-): QuickLogEventType {
+export function mapHyperLogActionToEventType(action: HyperLogAction): QuickLogEventType {
   switch (action) {
     case "water":
       return "watering";

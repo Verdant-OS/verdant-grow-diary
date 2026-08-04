@@ -316,8 +316,7 @@ describeIfHarness("MCP local RLS integration", () => {
     expect(handler, `no local handler for manifest tool ${toolName}`).toBeTruthy();
     const res = await handler(args as never, makeCtx(caller ? caller.accessToken : null));
     const structured = (res as Record<string, unknown>).structuredContent as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     const rows = structured
       ? ((structured.grows ?? structured.entries ?? null) as unknown[] | null)
       : null;

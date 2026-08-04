@@ -42,11 +42,7 @@ import { normalizeKeeperDecision } from "@/lib/phenoKeeperDecisionModel";
  *  - `not_applicable`  — no clone recorded, but it is too early to matter,
  *                        or the grower recorded a cull decision.
  */
-export type CloneInsuranceStatus =
-  | "insured"
-  | "at_risk"
-  | "may_be_lost"
-  | "not_applicable";
+export type CloneInsuranceStatus = "insured" | "at_risk" | "may_be_lost" | "not_applicable";
 
 /**
  * The cloning window a candidate is in, driving the urgency of the copy.
@@ -58,11 +54,7 @@ export type CloneInsuranceStatus =
  *                        re-vegetate; getting late.
  *  - `past`            — harvested or later: likely too late.
  */
-export type CloneWindow =
-  | "before_flower"
-  | "prime_window"
-  | "closing_window"
-  | "past";
+export type CloneWindow = "before_flower" | "prime_window" | "closing_window" | "past";
 
 export interface CloneInsuranceInput {
   readonly candidateId: string;
@@ -101,14 +93,7 @@ export interface CloneInsuranceEvaluation {
 export const CLONE_INSURANCE_CAVEAT =
   "Verdant never takes, roots, or culls a clone for you. This only flags candidates with no clone recorded, from the notes you keep.";
 
-type CloningPhase =
-  | "seedling"
-  | "veg"
-  | "preflower"
-  | "flower"
-  | "harvest"
-  | "post"
-  | "unknown";
+type CloningPhase = "seedling" | "veg" | "preflower" | "flower" | "harvest" | "post" | "unknown";
 
 /**
  * Classify a free-text stage for the CLONING decision. This differs from
@@ -155,9 +140,7 @@ const LOST_DETAIL = (label: string) =>
 /**
  * Evaluate one candidate's clone insurance. Deterministic and null-safe.
  */
-export function evaluateCloneInsurance(
-  input: CloneInsuranceInput,
-): CloneInsuranceEvaluation {
+export function evaluateCloneInsurance(input: CloneInsuranceInput): CloneInsuranceEvaluation {
   const displayLabel = displayLabelOf(input);
   const candidateNumber =
     typeof input.candidateNumber === "number" &&
@@ -186,7 +169,12 @@ export function evaluateCloneInsurance(
     return {
       ...base,
       status: "insured",
-      window: phase === "flower" ? "closing_window" : phase === "harvest" || phase === "post" ? "past" : "before_flower",
+      window:
+        phase === "flower"
+          ? "closing_window"
+          : phase === "harvest" || phase === "post"
+            ? "past"
+            : "before_flower",
       isActionable: false,
       headline: "Clone on file",
       detail:

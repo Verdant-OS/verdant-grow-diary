@@ -182,11 +182,7 @@ describe("timeline → AI Doctor context: source-truth and adapter shape", () =>
   });
 
   it("buildAiDoctorContextInput is pure & deterministic for identical inputs (stable ordering)", () => {
-    const items = [
-      manualSnap(HOURS(2), "ok"),
-      note(HOURS(2)),
-      water(HOURS(2)),
-    ];
+    const items = [manualSnap(HOURS(2), "ok"), note(HOURS(2)), water(HOURS(2))];
     const a = buildAiDoctorContextInput({
       plant: PLANT,
       timelineItems: items,
@@ -223,8 +219,7 @@ describe("timeline → AI Doctor context: static safety", () => {
   const root = process.cwd();
   const stripComments = (s: string): string =>
     s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
-  const load = (rel: string): string =>
-    stripComments(readFileSync(join(root, rel), "utf8"));
+  const load = (rel: string): string => stripComments(readFileSync(join(root, rel), "utf8"));
   const files: Record<string, string> = {
     rules: load("src/lib/aiDoctorContextRules.ts"),
     vm: load("src/lib/aiDoctorContextViewModel.ts"),

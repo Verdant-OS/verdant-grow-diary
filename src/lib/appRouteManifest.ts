@@ -1,13 +1,13 @@
 /**
- * App route manifest — single source of truth for every route mounted in
- * `src/App.tsx`.
+ * App route manifest — single source of truth for every route *policy*
+ * (access, feature, nav) for URLs served by the TanStack file-route tree.
  *
  * Why this exists:
- *   The App router used to be reflected in `src/test/pricing.test.ts` via a
+ *   The router used to be reflected in `src/test/pricing.test.ts` via a
  *   hard-coded sorted list. Any new route silently went stale until the next
  *   test run. This manifest is the *expected* set; the test cross-checks it
- *   against the actual routes scraped from `App.tsx` so drift fails fast in
- *   either direction.
+ *   against mounted paths extracted from `src/routes` (see
+ *   `routeManifestSyncHarness`) so drift fails fast in either direction.
  *
  * Hard constraints (Slice P1):
  *   - Pure data + pure helpers. No React, no component imports.
@@ -139,6 +139,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Legacy operator one-tent live proof page.",
   },
   { path: "/diagnostics", access: "operator" },
+  {
+    path: "/diagnostics-seo-artifacts",
+    access: "operator",
+    description:
+      "Operator diagnostics: whether seo-manifest.json and generated static route documents exist in the current build output.",
+  },
   {
     path: "/diary/environment-summary",
     access: "auth",
@@ -469,6 +475,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     path: "/settings/agent-integrations",
     access: "auth",
     description: "Authenticated agent integrations settings.",
+  },
+  {
+    path: "/settings/analytics",
+    access: "auth",
+    description: "Browser-local analytics consent grant/revoke (grow data never sent).",
   },
   { path: "/signup", access: "redirect", description: "→ /auth" },
   {

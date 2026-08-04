@@ -98,7 +98,11 @@ if (!supabaseUrl || !serviceRole || !ownerEmail) {
 
 // Refuse to run against anything that looks like production.
 const host = (() => {
-  try { return new URL(supabaseUrl).host.toLowerCase(); } catch { return ""; }
+  try {
+    return new URL(supabaseUrl).host.toLowerCase();
+  } catch {
+    return "";
+  }
 })();
 const productionMarkers = ["supabase.co", "supabase.in", "lovable.app", "lovable.dev"];
 if (productionMarkers.some((m) => host.endsWith(m))) {
@@ -127,9 +131,7 @@ let ownerId = null;
       perPage: 200,
     });
     if (listErr) break;
-    ownerId =
-      data?.users?.find((u) => (u.email ?? "").toLowerCase() === wanted)?.id ??
-      null;
+    ownerId = data?.users?.find((u) => (u.email ?? "").toLowerCase() === wanted)?.id ?? null;
     if (!data?.users?.length || data.users.length < 200) break;
     page += 1;
   }
@@ -147,43 +149,84 @@ const FIXTURE_PREFIX = process.env.E2E_PHENO_FIXTURE_PREFIX || "e2e_pheno_paid_s
 
 async function upsertGrow() {
   const name = `${FIXTURE_PREFIX} grow`;
-  const { data } = await db.from("grows").select("id").eq("user_id", ownerId).eq("name", name).maybeSingle();
+  const { data } = await db
+    .from("grows")
+    .select("id")
+    .eq("user_id", ownerId)
+    .eq("name", name)
+    .maybeSingle();
   if (data?.id) return data.id;
-  const { data: created, error } = await db.from("grows")
-    .insert({ user_id: ownerId, name }).select("id").single();
+  const { data: created, error } = await db
+    .from("grows")
+    .insert({ user_id: ownerId, name })
+    .select("id")
+    .single();
   if (error) throw new Error(`grow insert failed: ${error.code}`);
   return created.id;
 }
 async function upsertTent(growId) {
   const name = `${FIXTURE_PREFIX} tent`;
-  const { data } = await db.from("tents").select("id").eq("user_id", ownerId).eq("name", name).maybeSingle();
+  const { data } = await db
+    .from("tents")
+    .select("id")
+    .eq("user_id", ownerId)
+    .eq("name", name)
+    .maybeSingle();
   if (data?.id) return data.id;
-  const { data: created, error } = await db.from("tents")
-    .insert({ user_id: ownerId, name }).select("id").single();
+  const { data: created, error } = await db
+    .from("tents")
+    .insert({ user_id: ownerId, name })
+    .select("id")
+    .single();
   if (error) throw new Error(`tent insert failed: ${error.code}`);
   return created.id;
 }
 async function upsertHunt(growId, tentId, suffix) {
   const name = `${FIXTURE_PREFIX} ${suffix}`;
-  const { data } = await db.from("pheno_hunts").select("id")
-    .eq("user_id", ownerId).eq("name", name).maybeSingle();
+  const { data } = await db
+    .from("pheno_hunts")
+    .select("id")
+    .eq("user_id", ownerId)
+    .eq("name", name)
+    .maybeSingle();
   if (data?.id) return data.id;
-  const { data: created, error } = await db.from("pheno_hunts")
-    .insert({ user_id: ownerId, grow_id: growId, tent_id: tentId, name, evidence_goals: ["yield", "aroma"] })
-    .select("id").single();
+  const { data: created, error } = await db
+    .from("pheno_hunts")
+    .insert({
+      user_id: ownerId,
+      grow_id: growId,
+      tent_id: tentId,
+      name,
+      evidence_goals: ["yield", "aroma"],
+    })
+    .select("id")
+    .single();
   if (error) throw new Error(`hunt insert failed: ${error.code}`);
   return created.id;
 }
 async function upsertCandidate(growId, tentId, huntId, label) {
   const name = `${FIXTURE_PREFIX} ${label}`;
-  const { data } = await db.from("plants").select("id")
-    .eq("user_id", ownerId).eq("pheno_hunt_id", huntId).eq("candidate_label", label).maybeSingle();
+  const { data } = await db
+    .from("plants")
+    .select("id")
+    .eq("user_id", ownerId)
+    .eq("pheno_hunt_id", huntId)
+    .eq("candidate_label", label)
+    .maybeSingle();
   if (data?.id) return data.id;
-  const { data: created, error } = await db.from("plants")
-    .insert({ user_id: ownerId, grow_id: growId, tent_id: tentId,
-             pheno_hunt_id: huntId, candidate_label: label,
-             name, stage: "flower" })
-    .select("id").single();
+  const { data: created, error } = await db
+    .from("plants")
+    .insert({
+      user_id: ownerId,
+      grow_id: growId,
+      tent_id: tentId,
+      pheno_hunt_id: huntId,
+      candidate_label: label,
+      name,
+      stage: "flower",
+    })
+    .select("id")
+    .single();
   if (error) throw new Error(`plant insert failed: ${error.code}`);
   return created.id;
 }
@@ -191,40 +234,60 @@ async function upsertScore(huntId, plantId, note, traits) {
   // upsert on (hunt_id, plant_id) — the pheno_candidate_scores table has one
   // score row per (hunt, plant). If a UNIQUE constraint isn't declared in
   // the local schema, fall back to select-then-insert.
-  const existing = await db.from("pheno_candidate_scores").select("id")
-    .eq("hunt_id", huntId).eq("plant_id", plantId).maybeSingle();
+  const existing = await db
+    .from("pheno_candidate_scores")
+    .select("id")
+    .eq("hunt_id", huntId)
+    .eq("plant_id", plantId)
+    .maybeSingle();
   if (existing.data?.id) return;
-  const { error } = await db.from("pheno_candidate_scores")
-    .insert({ user_id: ownerId, hunt_id: huntId, plant_id: plantId,
-              note, traits });
+  const { error } = await db
+    .from("pheno_candidate_scores")
+    .insert({ user_id: ownerId, hunt_id: huntId, plant_id: plantId, note, traits });
   if (error) throw new Error(`score insert failed: ${error.code}`);
 }
 async function upsertSmokeTest(huntId, plantId, verdict) {
-  const existing = await db.from("pheno_smoke_tests").select("id")
-    .eq("hunt_id", huntId).eq("plant_id", plantId).maybeSingle();
+  const existing = await db
+    .from("pheno_smoke_tests")
+    .select("id")
+    .eq("hunt_id", huntId)
+    .eq("plant_id", plantId)
+    .maybeSingle();
   if (existing.data?.id) return;
-  const { error } = await db.from("pheno_smoke_tests")
-    .insert({
-      user_id: ownerId, hunt_id: huntId, plant_id: plantId,
-      verdict,
-      flavor_descriptors: ["citrus", "pine"],
-      effect_descriptors: ["uplifting"],
-      // 1-5 CHECK ranges (pheno_smoke_tests_smoothness_range / _potency_range)
-      potency_impression: 4,
-      smoothness: 5,
-      tested_at: new Date().toISOString(),
-      note: "seeded post-cure smoke test",
-    });
+  const { error } = await db.from("pheno_smoke_tests").insert({
+    user_id: ownerId,
+    hunt_id: huntId,
+    plant_id: plantId,
+    verdict,
+    flavor_descriptors: ["citrus", "pine"],
+    effect_descriptors: ["uplifting"],
+    // 1-5 CHECK ranges (pheno_smoke_tests_smoothness_range / _potency_range)
+    potency_impression: 4,
+    smoothness: 5,
+    tested_at: new Date().toISOString(),
+    note: "seeded post-cure smoke test",
+  });
   if (error) throw new Error(`smoke test insert failed: ${error.code}`);
 }
 async function upsertLab(huntId, plantId, source = "estimate") {
-  const existing = await db.from("pheno_lab_results").select("id")
-    .eq("hunt_id", huntId).eq("plant_id", plantId).eq("source", source).maybeSingle();
+  const existing = await db
+    .from("pheno_lab_results")
+    .select("id")
+    .eq("hunt_id", huntId)
+    .eq("plant_id", plantId)
+    .eq("source", source)
+    .maybeSingle();
   if (existing.data?.id) return;
-  const { error } = await db.from("pheno_lab_results")
-    .insert({ user_id: ownerId, hunt_id: huntId, plant_id: plantId,
-              source, thc_pct: 20, cbd_pct: 0.5,
-              dominant_terpenes: ["limonene"], tested_at: new Date().toISOString() });
+  const { error } = await db.from("pheno_lab_results").insert({
+    user_id: ownerId,
+    hunt_id: huntId,
+    plant_id: plantId,
+    source,
+    thc_pct: 20,
+    cbd_pct: 0.5,
+    dominant_terpenes: ["limonene"],
+    tested_at: new Date().toISOString(),
+  });
   if (error) throw new Error(`lab insert failed: ${error.code}`);
 }
 

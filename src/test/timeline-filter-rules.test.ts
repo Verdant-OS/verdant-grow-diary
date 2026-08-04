@@ -29,9 +29,7 @@ function diary(overrides: Partial<TimelineDiaryItem> = {}): TimelineDiaryItem {
   };
 }
 
-function manualSnapshot(
-  overrides: Partial<ManualSnapshotRecord> = {},
-): TimelineManualSnapshotItem {
+function manualSnapshot(overrides: Partial<ManualSnapshotRecord> = {}): TimelineManualSnapshotItem {
   const rec: ManualSnapshotRecord = {
     id: overrides.id ?? "snap-1",
     capturedAt: overrides.capturedAt ?? "2026-01-02T10:00:00.000Z",

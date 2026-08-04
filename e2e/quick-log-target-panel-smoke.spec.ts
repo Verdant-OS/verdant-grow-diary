@@ -33,10 +33,7 @@ const FORBIDDEN_COMBINED_LABELS = [
 ];
 
 test.describe("Quick Log target panel — browser smoke", () => {
-  test.skip(
-    !PLANT_URL,
-    "Set E2E_GROW_1_PLANT_URL to a Grow #1 plant page to run this smoke test.",
-  );
+  test.skip(!PLANT_URL, "Set E2E_GROW_1_PLANT_URL to a Grow #1 plant page to run this smoke test.");
 
   test("target panel shows Grow / Tent / Plant / Strain as distinct labeled fields", async ({
     page,
@@ -96,10 +93,7 @@ test.describe("Quick Log target panel — browser smoke", () => {
       strainValue !== "—" &&
       strainValue.toLowerCase() !== "no strain recorded"
     ) {
-      expect(
-        plantValue,
-        "plant field must not embed the strain value",
-      ).not.toBe(strainValue);
+      expect(plantValue, "plant field must not embed the strain value").not.toBe(strainValue);
     }
 
     // Non-destructive: close without saving.

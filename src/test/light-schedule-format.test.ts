@@ -33,9 +33,7 @@ describe("lightScheduleFormat", () => {
 
   it("formats the tent card status line", () => {
     expect(formatTentLightStatus({ on: false, schedule: "12/12" })).toBe("Off");
-    expect(formatTentLightStatus({ on: true, schedule: "12/12" })).toBe(
-      "On · 12/12 (light/dark)",
-    );
+    expect(formatTentLightStatus({ on: true, schedule: "12/12" })).toBe("On · 12/12 (light/dark)");
     expect(formatTentLightStatus({ on: true, schedule: null })).toBe("On");
   });
 });

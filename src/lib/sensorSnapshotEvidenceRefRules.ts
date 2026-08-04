@@ -97,12 +97,10 @@ export function buildSensorSnapshotEvidenceRefs(
     const id = typeof input.id === "string" ? input.id.trim() : "";
     if (!id) return [];
 
-    const occurred_at =
-      typeof input.captured_at === "string" ? input.captured_at.trim() : "";
+    const occurred_at = typeof input.captured_at === "string" ? input.captured_at.trim() : "";
     if (!occurred_at) return [];
 
-    const rawSource =
-      typeof input.source === "string" ? input.source.trim().toLowerCase() : "";
+    const rawSource = typeof input.source === "string" ? input.source.trim().toLowerCase() : "";
     if (NON_TRUTH_SOURCES.has(rawSource)) return [];
 
     // Route through the shared normalizer so source labels and sort/dedupe

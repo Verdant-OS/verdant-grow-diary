@@ -82,9 +82,7 @@ describe("routeEcoWittPayloadToTents — Option C fan-out", () => {
       ]),
     );
     expect(byTent.get(tentSoil.tent_id)).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ metric: "soil_moisture_pct", value: 33 }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ metric: "soil_moisture_pct", value: 33 })]),
     );
   });
 

@@ -33,7 +33,8 @@ export function TraceabilityTree({ view, className }: TraceabilityTreeProps) {
         data-testid="traceability-empty"
         className="rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground"
       >
-        No lineage to show yet. Link a source accession or assign this plant to a propagation batch to build its trace.
+        No lineage to show yet. Link a source accession or assign this plant to a propagation batch
+        to build its trace.
       </div>
     );
   }
@@ -50,9 +51,13 @@ export function TraceabilityTree({ view, className }: TraceabilityTreeProps) {
       ) : null}
 
       {view.flags.length > 0 ? (
-        <details data-testid="traceability-gaps" className="mb-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+        <details
+          data-testid="traceability-gaps"
+          className="mb-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2"
+        >
           <summary className="cursor-pointer text-xs text-white/60">
-            {view.flags.length} lineage gap{view.flags.length === 1 ? "" : "s"} we can&apos;t back up
+            {view.flags.length} lineage gap{view.flags.length === 1 ? "" : "s"} we can&apos;t back
+            up
           </summary>
           <ul className="mt-2 space-y-1">
             {view.flags.map((f, i) => (
@@ -84,7 +89,10 @@ export function TraceabilityTree({ view, className }: TraceabilityTreeProps) {
                     <span className="shrink-0 rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-white/40">
                       {n.kindLabel}
                     </span>
-                    <span className="min-w-0 truncate text-sm font-medium text-white/80" title={n.label}>
+                    <span
+                      className="min-w-0 truncate text-sm font-medium text-white/80"
+                      title={n.label}
+                    >
                       {n.label}
                     </span>
                   </div>
@@ -93,7 +101,10 @@ export function TraceabilityTree({ view, className }: TraceabilityTreeProps) {
                       <span className="text-[11px] text-white/40 break-words">{n.edgeLabel}</span>
                     ) : null}
                     {n.evidence ? (
-                      <EvidenceStatePill state={n.evidence.state} openQuarantine={n.evidence.openQuarantine} />
+                      <EvidenceStatePill
+                        state={n.evidence.state}
+                        openQuarantine={n.evidence.openQuarantine}
+                      />
                     ) : null}
                     {n.gaps.map((g) => (
                       <UnknownStateChip key={g.code} kind={gapToKind(g.code)} />

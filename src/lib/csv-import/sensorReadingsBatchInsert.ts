@@ -35,9 +35,7 @@ export const SENSOR_READINGS_INSERT_ALLOWED_KEYS = Object.freeze([
   "value",
 ] as const);
 
-const ALLOWED_KEYS_SET: ReadonlySet<string> = new Set(
-  SENSOR_READINGS_INSERT_ALLOWED_KEYS,
-);
+const ALLOWED_KEYS_SET: ReadonlySet<string> = new Set(SENSOR_READINGS_INSERT_ALLOWED_KEYS);
 
 export interface ValidateInsertRowsResult {
   ok: boolean;
@@ -82,8 +80,7 @@ export function validateSensorReadingInsertRows(
     affected.length > 0
       ? ` Affected rows: ${sampleIndexes.join(", ")}${overflow > 0 ? ` (+${overflow} more)` : ""}.`
       : "";
-  const message =
-    `Import blocked before writing rows. Unsupported sensor_readings field(s): ${sortedKeys.join(", ")}.${indexHint} No rows were written. No live sensor data was created.`;
+  const message = `Import blocked before writing rows. Unsupported sensor_readings field(s): ${sortedKeys.join(", ")}.${indexHint} No rows were written. No live sensor data was created.`;
   return {
     ok: false,
     unknownKeys: sortedKeys,
@@ -233,23 +230,14 @@ export const CSV_HISTORY_DEDUPE_CONFLICT_COPY =
   "Import stopped because matching CSV history readings already exist for this tent under Verdant\u2019s dedupe key: user + tent + source + metric + captured timestamp. No live sensor data was created." as const;
 
 export function buildBatchFailureMessage(input: FailureDiagnosticInput): string {
-  const {
-    batchIndex,
-    totalBatches,
-    failedBatchSize,
-    insertedRows,
-    error,
-    vendorLabel,
-  } = input;
+  const { batchIndex, totalBatches, failedBatchSize, insertedRows, error, vendorLabel } = input;
 
   // Friendly dedupe-conflict copy when Postgres reports a unique-violation
   // on the audited tenant/tent-scoped index. Never claims another tenant's
   // rows caused the collision.
   const isDedupeConflict =
     error.code === "23505" &&
-    /sensor_readings_dedupe_uidx/i.test(
-      `${error.message ?? ""} ${error.details ?? ""}`,
-    );
+    /sensor_readings_dedupe_uidx/i.test(`${error.message ?? ""} ${error.details ?? ""}`);
   if (isDedupeConflict) {
     const parts: string[] = [
       `Import stopped on batch ${batchIndex} of ${totalBatches} (${failedBatchSize} ${vendorLabel} rows).`,
@@ -309,10 +297,7 @@ export interface InsertSensorReadingsInBatchesArgs<TRow> {
    * index. Must resolve to `{ error }` shaped like the Supabase
    * PostgrestError contract (or `{ error: null }` on success).
    */
-  insertBatch: (
-    batch: TRow[],
-    batchIndex: number,
-  ) => Promise<{ error: BatchInsertError | null }>;
+  insertBatch: (batch: TRow[], batchIndex: number) => Promise<{ error: BatchInsertError | null }>;
   /**
    * Optional short race-window recovery. Only consulted when a batch
    * fails with the deployed sensor_readings dedupe unique-violation
@@ -451,8 +436,7 @@ export const SENSOR_READINGS_DEDUPE_SELECT_COLUMNS = Object.freeze([
   "captured_at",
 ] as const);
 
-export const SENSOR_READINGS_DEDUPE_SELECT_CLAUSE =
-  SENSOR_READINGS_DEDUPE_SELECT_COLUMNS.join(",");
+export const SENSOR_READINGS_DEDUPE_SELECT_CLAUSE = SENSOR_READINGS_DEDUPE_SELECT_COLUMNS.join(",");
 
 export interface DedupeKeyParts {
   tent_id: string | null;
@@ -477,9 +461,7 @@ export interface DedupeKeyParts {
  *     rows and client rows normalize to the same precision.
  *   - Never throws.
  */
-export function normalizeCapturedAtForDedupe(
-  value: string | null | undefined,
-): string | null {
+export function normalizeCapturedAtForDedupe(value: string | null | undefined): string | null {
   if (value == null) return null;
   const trimmed = typeof value === "string" ? value.trim() : "";
   if (trimmed.length === 0) return null;
@@ -610,9 +592,7 @@ export interface DuplicateAwareSuccessCopyInput {
 export const CSV_HISTORY_NO_ROWS_SAFE_FALLBACK_COPY =
   "No CSV history readings were imported. No live sensor data was created." as const;
 
-export function buildDuplicateAwareSuccessMessage(
-  input: DuplicateAwareSuccessCopyInput,
-): string {
+export function buildDuplicateAwareSuccessMessage(input: DuplicateAwareSuccessCopyInput): string {
   const { vendorLabel, inserted, duplicates, totalBatches } = input;
   // Safe fallback: orchestration should prevent this state via empty-row
   // preflight, but the helper must never emit "Imported 0 new ...".
@@ -625,8 +605,7 @@ export function buildDuplicateAwareSuccessMessage(
   if (duplicates > 0) {
     return `Imported ${inserted} new ${vendorLabel} CSV history readings for this tent. Skipped ${duplicates} duplicate reading${duplicates === 1 ? "" : "s"} already present for this tent. No live sensor data was created.`;
   }
-  const batchPhrase =
-    totalBatches <= 1 ? "in 1 batch" : `across ${totalBatches} batches`;
+  const batchPhrase = totalBatches <= 1 ? "in 1 batch" : `across ${totalBatches} batches`;
   return `Imported ${inserted} new ${vendorLabel} CSV history readings for this tent ${batchPhrase}. No live sensor data was created.`;
 }
 
@@ -650,10 +629,7 @@ export interface DuplicateAwareImportArgs<TRow extends DedupeKeyParts> {
    * user_id.
    */
   fetchExistingKeys: (scope: ExistingKeysQueryScope) => Promise<Set<string>>;
-  insertBatch: (
-    batch: TRow[],
-    batchIndex: number,
-  ) => Promise<{ error: BatchInsertError | null }>;
+  insertBatch: (batch: TRow[], batchIndex: number) => Promise<{ error: BatchInsertError | null }>;
 }
 
 export interface DuplicateAwareImportResult<TRow> {
@@ -676,16 +652,12 @@ export interface DuplicateAwareImportResult<TRow> {
  * No Supabase types are imported here; callers provide the two thin
  * adapters so tests stay pure.
  */
-export async function runDuplicateAwareCsvHistoryImport<
-  TRow extends DedupeKeyParts,
->(
+export async function runDuplicateAwareCsvHistoryImport<TRow extends DedupeKeyParts>(
   args: DuplicateAwareImportArgs<TRow>,
 ): Promise<DuplicateAwareImportResult<TRow>> {
   const totalRows = args.rows.length;
   const scope = summarizeDedupeScope(args.rows);
-  const existingKeys = scope
-    ? await args.fetchExistingKeys(scope)
-    : new Set<string>();
+  const existingKeys = scope ? await args.fetchExistingKeys(scope) : new Set<string>();
   const { newRows, duplicateCount } = filterDuplicateRows({
     rows: args.rows,
     existingKeys,
@@ -767,8 +739,7 @@ export async function runDuplicateAwareCsvHistoryImport<
 
   // If the only inserts were race-window recoveries that fully resolved
   // to duplicates, treat the run as a duplicate-only no-op.
-  const allResolvedToDuplicates =
-    batchResult.insertedRows === 0 && totalDuplicates > 0;
+  const allResolvedToDuplicates = batchResult.insertedRows === 0 && totalDuplicates > 0;
 
   return {
     ok: true,

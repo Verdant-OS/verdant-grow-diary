@@ -66,23 +66,28 @@ describe("TimelineEvidenceReadinessPanel — counts & badges", () => {
       />,
     );
     expect(
-      screen.getByTestId("timeline-evidence-readiness-count-recent-logs")
+      screen
+        .getByTestId("timeline-evidence-readiness-count-recent-logs")
         .getAttribute("data-count"),
     ).toBe("3");
     expect(
-      screen.getByTestId("timeline-evidence-readiness-count-recent-watering")
+      screen
+        .getByTestId("timeline-evidence-readiness-count-recent-watering")
         .getAttribute("data-count"),
     ).toBe("1");
     expect(
-      screen.getByTestId("timeline-evidence-readiness-count-recent-feeding")
+      screen
+        .getByTestId("timeline-evidence-readiness-count-recent-feeding")
         .getAttribute("data-count"),
     ).toBe("1");
     expect(
-      screen.getByTestId("timeline-evidence-readiness-count-recent-photos")
+      screen
+        .getByTestId("timeline-evidence-readiness-count-recent-photos")
         .getAttribute("data-count"),
     ).toBe("2");
     expect(
-      screen.getByTestId("timeline-evidence-readiness-count-open-alerts")
+      screen
+        .getByTestId("timeline-evidence-readiness-count-open-alerts")
         .getAttribute("data-count"),
     ).toBe("1");
     // Sensor snapshot count present (engine derives the rolling group).
@@ -121,13 +126,9 @@ describe("TimelineEvidenceReadinessPanel — counts & badges", () => {
 describe("TimelineEvidenceReadinessPanel — missing flags & tone copy", () => {
   it("renders missing-photo / sensor / watering / feeding flags when absent", () => {
     render(<TimelineEvidenceReadinessPanel context={ctx({})} />);
+    expect(screen.getByTestId("timeline-evidence-readiness-missing-no_recent_photos")).toBeTruthy();
     expect(
-      screen.getByTestId("timeline-evidence-readiness-missing-no_recent_photos"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId(
-        "timeline-evidence-readiness-missing-no_recent_sensor_snapshot",
-      ),
+      screen.getByTestId("timeline-evidence-readiness-missing-no_recent_sensor_snapshot"),
     ).toBeTruthy();
     expect(
       screen.getByTestId("timeline-evidence-readiness-missing-no_recent_watering"),
@@ -144,24 +145,16 @@ describe("TimelineEvidenceReadinessPanel — missing flags & tone copy", () => {
         extras={{ mediumKnown: false, potSizeKnown: false }}
       />,
     );
-    expect(
-      screen.getByTestId("timeline-evidence-readiness-missing-unknown_stage"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("timeline-evidence-readiness-missing-unknown_medium"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("timeline-evidence-readiness-missing-unknown_pot_size"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("timeline-evidence-readiness-missing-unknown_stage")).toBeTruthy();
+    expect(screen.getByTestId("timeline-evidence-readiness-missing-unknown_medium")).toBeTruthy();
+    expect(screen.getByTestId("timeline-evidence-readiness-missing-unknown_pot_size")).toBeTruthy();
   });
 
   it("shows limited-confidence copy when context is thin but not untrusted", () => {
     render(
       <TimelineEvidenceReadinessPanel
         context={ctx({
-          growEvents: [
-            { occurred_at: ago(HOUR), event_type: "watering", source: "manual" },
-          ],
+          growEvents: [{ occurred_at: ago(HOUR), event_type: "watering", source: "manual" }],
           sensorReadings: [
             { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "manual" },
           ],
@@ -170,9 +163,9 @@ describe("TimelineEvidenceReadinessPanel — missing flags & tone copy", () => {
     );
     const panel = screen.getByTestId("timeline-evidence-readiness-panel");
     expect(panel.getAttribute("data-tone")).toBe("limited");
-    expect(
-      screen.getByTestId("timeline-evidence-readiness-headline").textContent,
-    ).toBe(READINESS_LIMITED_COPY);
+    expect(screen.getByTestId("timeline-evidence-readiness-headline").textContent).toBe(
+      READINESS_LIMITED_COPY,
+    );
   });
 
   it("shows ready copy when sensor + logs + photo are present", () => {
@@ -192,9 +185,9 @@ describe("TimelineEvidenceReadinessPanel — missing flags & tone copy", () => {
     );
     const panel = screen.getByTestId("timeline-evidence-readiness-panel");
     expect(panel.getAttribute("data-tone")).toBe("ready");
-    expect(
-      screen.getByTestId("timeline-evidence-readiness-headline").textContent,
-    ).toBe(READINESS_READY_COPY);
+    expect(screen.getByTestId("timeline-evidence-readiness-headline").textContent).toBe(
+      READINESS_READY_COPY,
+    );
   });
 
   it("shows untrusted caution copy and not-healthy treatment for stale/invalid/demo", () => {
@@ -210,9 +203,9 @@ describe("TimelineEvidenceReadinessPanel — missing flags & tone copy", () => {
     const panel = screen.getByTestId("timeline-evidence-readiness-panel");
     expect(panel.getAttribute("data-tone")).toBe("untrusted");
     expect(panel.getAttribute("data-untrusted")).toBe("true");
-    expect(
-      screen.getByTestId("timeline-evidence-readiness-headline").textContent,
-    ).toBe(READINESS_UNTRUSTED_COPY);
+    expect(screen.getByTestId("timeline-evidence-readiness-headline").textContent).toBe(
+      READINESS_UNTRUSTED_COPY,
+    );
     const badge = screen.getByTestId("timeline-evidence-readiness-source-stale");
     expect(badge.getAttribute("data-trustworthy")).toBe("false");
   });
@@ -234,12 +227,8 @@ describe("TimelineEvidenceReadinessPanel — safety", () => {
         vendor_metadata: { api_key: "k_live_xyz" },
       } as Record<string, unknown>),
     } as never;
-    render(
-      <TimelineEvidenceReadinessPanel context={context} extras={tainted} />,
-    );
-    const html = screen
-      .getByTestId("timeline-evidence-readiness-panel")
-      .outerHTML;
+    render(<TimelineEvidenceReadinessPanel context={context} extras={tainted} />);
+    const html = screen.getByTestId("timeline-evidence-readiness-panel").outerHTML;
     expect(html).not.toMatch(/raw_payload/i);
     expect(html).not.toMatch(/SECRET-TOKEN-123/);
     expect(html).not.toMatch(/private-user-id-abc/);

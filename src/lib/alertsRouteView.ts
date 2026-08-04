@@ -28,9 +28,7 @@ export const STATUS_LABEL: Record<AlertStatusRow, string> = {
  * short human-readable label. Unknown values fall back to "Sensor system"
  * so the row never shows a raw machine slug to the user.
  */
-export function formatAlertSourceLabel(
-  source: string | null | undefined,
-): string {
+export function formatAlertSourceLabel(source: string | null | undefined): string {
   if (!source) return "Sensor system";
   switch (source) {
     case "environment_alerts":

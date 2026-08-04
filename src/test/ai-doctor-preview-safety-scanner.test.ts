@@ -170,9 +170,7 @@ describe("allowlist config loader", () => {
   });
 
   it("fails closed when the file is missing", () => {
-    expect(() => loadAllowlist("/tmp/does-not-exist-xyz.json")).toThrow(
-      AllowlistConfigError,
-    );
+    expect(() => loadAllowlist("/tmp/does-not-exist-xyz.json")).toThrow(AllowlistConfigError);
   });
 
   it("fails closed on invalid JSON", () => {
@@ -201,10 +199,7 @@ describe("allowlist config loader", () => {
     const dir = makeTempRoot();
     try {
       const p = join(dir, "bad.json");
-      writeFileSync(
-        p,
-        JSON.stringify({ allowedPhrases: [""], allowedLineMarkers: ["m"] }),
-      );
+      writeFileSync(p, JSON.stringify({ allowedPhrases: [""], allowedLineMarkers: ["m"] }));
       expect(() => loadAllowlist(p)).toThrow(AllowlistConfigError);
     } finally {
       rmSync(dir, { recursive: true, force: true });

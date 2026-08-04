@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  DERIVED_LABEL,
-  formatSensorReading,
-  formatSensorValue,
-} from "@/lib/sensorFormat";
+import { DERIVED_LABEL, formatSensorReading, formatSensorValue } from "@/lib/sensorFormat";
 
 describe("sensorFormat precision", () => {
   it("rounds VPD to at most 2 decimals", () => {

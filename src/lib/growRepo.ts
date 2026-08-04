@@ -56,7 +56,10 @@ export async function fetchPlants(
     // legacy own-grow_id filter (never a silent empty grid).
     const { data: tents } = await supabase.from("tents").select("id").eq("grow_id", growId);
     q = q.or(
-      buildGrowScopedPlantsOrFilter(growId, (tents ?? []).map((t: { id: string }) => t.id)),
+      buildGrowScopedPlantsOrFilter(
+        growId,
+        (tents ?? []).map((t: { id: string }) => t.id),
+      ),
     );
   } else if (growId) {
     q = q.eq("grow_id", growId);

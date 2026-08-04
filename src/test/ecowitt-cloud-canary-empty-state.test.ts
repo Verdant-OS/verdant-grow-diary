@@ -12,10 +12,7 @@
  *    the export-meta + downloads STILL render — no regression.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  MAC_RE,
-  UUID_RE,
-} from "./operator-ecowitt-cloud-canary-per-fixture-table.test";
+import { MAC_RE, UUID_RE } from "./operator-ecowitt-cloud-canary-per-fixture-table.test";
 
 const BANNED = [
   "confirmed",
@@ -31,9 +28,7 @@ const BANNED = [
 async function renderPanelHtml(): Promise<string> {
   const React = await import("react");
   const { renderToString } = await import("react-dom/server");
-  const { CloudCanaryPreviewPanel } = await import(
-    "@/pages/OperatorEcowittCanary"
-  );
+  const { CloudCanaryPreviewPanel } = await import("@/pages/OperatorEcowittCanary");
   return renderToString(React.createElement(CloudCanaryPreviewPanel));
 }
 
@@ -53,9 +48,9 @@ describe("Cloud Canary empty-state — forced empty view-model", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.doMock("@/lib/ecowittCloudCanaryViewModel", async () => {
-      const actual = await vi.importActual<
-        typeof import("@/lib/ecowittCloudCanaryViewModel")
-      >("@/lib/ecowittCloudCanaryViewModel");
+      const actual = await vi.importActual<typeof import("@/lib/ecowittCloudCanaryViewModel")>(
+        "@/lib/ecowittCloudCanaryViewModel",
+      );
       return {
         ...actual,
         buildCloudCanaryPreviewViewModel: () => ({
@@ -85,21 +80,15 @@ describe("Cloud Canary empty-state — forced empty view-model", () => {
     expect(html).toContain('data-testid="cloud-canary-empty-state"');
     expect(html).toContain('data-preview-state="empty"');
     expect(html).toContain("No canary preview to show yet");
-    expect(html).toContain(
-      "No file is written until you choose a download option.",
-    );
+    expect(html).toContain("No file is written until you choose a download option.");
   });
 
   it("hides the export preview, meta, and download buttons in empty state", async () => {
     const html = await renderEmpty();
     expect(html).not.toContain('data-testid="cloud-canary-export-preview"');
     expect(html).not.toContain('data-testid="cloud-canary-export-meta"');
-    expect(html).not.toContain(
-      'data-testid="download-cloud-canary-summary-csv"',
-    );
-    expect(html).not.toContain(
-      'data-testid="download-cloud-canary-summary-json"',
-    );
+    expect(html).not.toContain('data-testid="download-cloud-canary-summary-csv"');
+    expect(html).not.toContain('data-testid="download-cloud-canary-summary-json"');
     expect(html).not.toContain('data-testid="cloud-canary-per-fixture-table"');
   });
 

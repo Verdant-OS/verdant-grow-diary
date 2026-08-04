@@ -24,9 +24,7 @@ describe("ActionQueueLoadingSkeleton", () => {
     const root = screen.getByTestId("action-queue-loading-skeleton");
     expect(root.getAttribute("aria-busy")).toBe("true");
     expect(screen.getAllByTestId("action-queue-loading-skeleton-card")).toHaveLength(2);
-    expect(
-      screen.getAllByTestId("action-queue-loading-skeleton-explain").length,
-    ).toBe(2);
+    expect(screen.getAllByTestId("action-queue-loading-skeleton-explain").length).toBe(2);
     // Renders no real action title / reason text — only placeholders.
     expect(root.textContent?.toLowerCase()).not.toContain("approve");
     expect(root.textContent?.toLowerCase()).not.toContain("reject");
@@ -45,21 +43,10 @@ describe("ActionQueueLoadingSkeleton", () => {
 
 describe("ActionQueueDetailDrawer — loading skeleton", () => {
   it("renders drawer skeleton instead of the body while loading", () => {
-    render(
-      <ActionQueueDetailDrawer
-        open
-        onOpenChange={() => {}}
-        row={ROW}
-        loading
-      />,
-    );
-    expect(
-      screen.getByTestId("action-queue-detail-drawer-skeleton"),
-    ).toBeTruthy();
+    render(<ActionQueueDetailDrawer open onOpenChange={() => {}} row={ROW} loading />);
+    expect(screen.getByTestId("action-queue-detail-drawer-skeleton")).toBeTruthy();
     // The body title is NOT rendered while loading.
-    expect(
-      screen.queryByTestId("action-queue-detail-drawer-title"),
-    ).toBeNull();
+    expect(screen.queryByTestId("action-queue-detail-drawer-title")).toBeNull();
     // No fake claims while loading.
     const text = (
       screen.getByTestId("action-queue-detail-drawer-skeleton").textContent ?? ""
@@ -72,17 +59,10 @@ describe("ActionQueueDetailDrawer — loading skeleton", () => {
 
 describe("ActionQueueDetailDrawer — status history section", () => {
   it("renders the calm empty-state copy when history is empty", () => {
-    render(
-      <ActionQueueDetailDrawer
-        open
-        onOpenChange={() => {}}
-        row={ROW}
-        statusHistory={[]}
-      />,
+    render(<ActionQueueDetailDrawer open onOpenChange={() => {}} row={ROW} statusHistory={[]} />);
+    expect(screen.getByTestId("action-queue-detail-drawer-history-empty").textContent).toBe(
+      "No status history found yet.",
     );
-    expect(
-      screen.getByTestId("action-queue-detail-drawer-history-empty").textContent,
-    ).toBe("No status history found yet.");
   });
 
   it("renders approve/reject transitions with timestamps", () => {
@@ -101,12 +81,7 @@ describe("ActionQueueDetailDrawer — status history section", () => {
       },
     ];
     render(
-      <ActionQueueDetailDrawer
-        open
-        onOpenChange={() => {}}
-        row={ROW}
-        statusHistory={history}
-      />,
+      <ActionQueueDetailDrawer open onOpenChange={() => {}} row={ROW} statusHistory={history} />,
     );
     const items = screen.getAllByTestId("action-queue-detail-drawer-history-item");
     expect(items).toHaveLength(2);
@@ -122,13 +97,7 @@ describe("ActionQueueDetailDrawer — status history section", () => {
 
 describe("ActionQueueDetailDrawer — Go to source link", () => {
   it("renders a safe alert link when source + token agree", () => {
-    render(
-      <ActionQueueDetailDrawer
-        open
-        onOpenChange={() => {}}
-        row={ROW}
-      />,
-    );
+    render(<ActionQueueDetailDrawer open onOpenChange={() => {}} row={ROW} />);
     const link = screen.getByTestId("action-queue-detail-drawer-source-link");
     expect(link.getAttribute("data-source-kind")).toBe("alert");
     expect(link.getAttribute("href")).toMatch(/\/alerts\//);
@@ -169,29 +138,17 @@ describe("ActionQueueDetailDrawer — Go to source link", () => {
         }}
       />,
     );
+    expect(screen.queryByTestId("action-queue-detail-drawer-source-link")).toBeNull();
     expect(
-      screen.queryByTestId("action-queue-detail-drawer-source-link"),
-    ).toBeNull();
-    expect(
-      screen.getByTestId(
-        "action-queue-detail-drawer-source-link-unavailable",
-      ).textContent,
+      screen.getByTestId("action-queue-detail-drawer-source-link-unavailable").textContent,
     ).toBe("Source link unavailable.");
   });
 });
 
 describe("ActionQueueDetailDrawer — trace failure + retry", () => {
   it("does not render the retry affordance when traceFailed is false", () => {
-    render(
-      <ActionQueueDetailDrawer
-        open
-        onOpenChange={() => {}}
-        row={ROW}
-      />,
-    );
-    expect(
-      screen.queryByTestId("action-queue-detail-drawer-trace-failure"),
-    ).toBeNull();
+    render(<ActionQueueDetailDrawer open onOpenChange={() => {}} row={ROW} />);
+    expect(screen.queryByTestId("action-queue-detail-drawer-trace-failure")).toBeNull();
   });
 
   it("renders a calm warning + retry button when traceFailed is true", () => {
@@ -207,43 +164,26 @@ describe("ActionQueueDetailDrawer — trace failure + retry", () => {
     );
     const banner = screen.getByTestId("action-queue-detail-drawer-trace-failure");
     expect(banner.textContent).toContain("Status was saved, but the diary trace did not save.");
-    expect(banner.textContent).toContain("Retry only repairs the diary trace. It will not approve/reject again.");
-
-    fireEvent.click(
-      screen.getByTestId("action-queue-detail-drawer-retry-trace"),
+    expect(banner.textContent).toContain(
+      "Retry only repairs the diary trace. It will not approve/reject again.",
     );
+
+    fireEvent.click(screen.getByTestId("action-queue-detail-drawer-retry-trace"));
     expect(retry).toHaveBeenCalledTimes(1);
     expect(retry).toHaveBeenCalledWith(ROW);
   });
 
   it("disables the retry button while retrying", () => {
-    render(
-      <ActionQueueDetailDrawer
-        open
-        onOpenChange={() => {}}
-        row={ROW}
-        traceFailed
-        retrying
-      />,
-    );
+    render(<ActionQueueDetailDrawer open onOpenChange={() => {}} row={ROW} traceFailed retrying />);
     expect(
-      screen
-        .getByTestId("action-queue-detail-drawer-retry-trace")
-        .hasAttribute("disabled"),
+      screen.getByTestId("action-queue-detail-drawer-retry-trace").hasAttribute("disabled"),
     ).toBe(true);
   });
 
   it("preserves the existing approval-required safety reminder", () => {
-    render(
-      <ActionQueueDetailDrawer
-        open
-        onOpenChange={() => {}}
-        row={ROW}
-        traceFailed
-      />,
+    render(<ActionQueueDetailDrawer open onOpenChange={() => {}} row={ROW} traceFailed />);
+    expect(screen.getByTestId("action-queue-detail-drawer-safety-reminder").textContent).toContain(
+      "Verdant suggests. Grower approves.",
     );
-    expect(
-      screen.getByTestId("action-queue-detail-drawer-safety-reminder").textContent,
-    ).toContain("Verdant suggests. Grower approves.");
   });
 });

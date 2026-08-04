@@ -16,11 +16,8 @@
 //     `bridge_id = ? AND idempotency_key IN (...)`.
 //   - Chunks large IN-lists to stay under PostgREST query-size limits.
 
-export const PI_INGEST_IDEMPOTENCY_LOOKUP_TABLE =
-  "pi_ingest_idempotency_keys" as const;
-export const PI_INGEST_IDEMPOTENCY_LOOKUP_COLUMNS = [
-  "idempotency_key",
-] as const;
+export const PI_INGEST_IDEMPOTENCY_LOOKUP_TABLE = "pi_ingest_idempotency_keys" as const;
+export const PI_INGEST_IDEMPOTENCY_LOOKUP_COLUMNS = ["idempotency_key"] as const;
 
 /** Max number of keys per IN(...) chunk. Keeps URL/query size safe. */
 export const PI_INGEST_IDEMPOTENCY_LOOKUP_CHUNK_SIZE = 200;
@@ -32,11 +29,11 @@ export type PiIngestIdempotencyLookupResponse = {
 
 export type PiIngestIdempotencyLookupQuery = {
   select: (columns: string) => {
-    eq: (column: string, value: string) => {
-      in: (
-        column: string,
-        values: readonly string[],
-      ) => Promise<PiIngestIdempotencyLookupResponse>;
+    eq: (
+      column: string,
+      value: string,
+    ) => {
+      in: (column: string, values: readonly string[]) => Promise<PiIngestIdempotencyLookupResponse>;
     };
   };
 };
@@ -45,9 +42,7 @@ export type PiIngestIdempotencyLookupClient = {
   from: (table: string) => PiIngestIdempotencyLookupQuery;
 };
 
-export type PiIngestIdempotencyLookupFailureReason =
-  | "missing_bridge_id"
-  | "lookup_failed";
+export type PiIngestIdempotencyLookupFailureReason = "missing_bridge_id" | "lookup_failed";
 
 export type PiIngestIdempotencyLookupResult =
   | { ok: true; existingKeys: ReadonlySet<string> }
@@ -57,17 +52,12 @@ export type PiIngestIdempotencyLookupResult =
       message: string;
     };
 
-const FAILURE_MESSAGES: Record<
-  PiIngestIdempotencyLookupFailureReason,
-  string
-> = {
+const FAILURE_MESSAGES: Record<PiIngestIdempotencyLookupFailureReason, string> = {
   missing_bridge_id: "bridge_id is required",
   lookup_failed: "idempotency lookup failed",
 };
 
-function failure(
-  reason: PiIngestIdempotencyLookupFailureReason,
-): PiIngestIdempotencyLookupResult {
+function failure(reason: PiIngestIdempotencyLookupFailureReason): PiIngestIdempotencyLookupResult {
   return { ok: false, reason, message: FAILURE_MESSAGES[reason] };
 }
 

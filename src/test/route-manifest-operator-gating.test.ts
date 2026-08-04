@@ -1,70 +1,23 @@
-// Route Guard Parity v1 — static parity between appRouteManifest and App.tsx.
+// Route Guard Parity v1 — static parity between appRouteManifest and file routes.
 //
-// Confirms every route in `src/lib/appRouteManifest.ts` with
-// access === "operator" | "internal" is mounted INSIDE the
-// `<Route element={<RequireOperatorRole />}>` block in `src/App.tsx`,
-// except for documented public/fixture-only exceptions that perform no
-// Supabase/auth/AI/writes.
+// Confirms every route in appRouteManifest with access === "operator" | "internal"
+// is mounted under the `/_app/_operator` layout (RequireOperatorRole),
+// except for documented public/fixture-only exceptions.
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
+import {
+  extractMountedAppRoutePaths,
+  isMountedUnderOperatorLayout,
+} from "./helpers/routeManifestSyncHarness";
 
-const APP = fs.readFileSync(path.resolve(__dirname, "../App.tsx"), "utf8");
-
-function tagOpenEnd(src: string, openIdx: number): number {
-  let i = openIdx + 1;
-  let braces = 0;
-  while (i < src.length) {
-    const ch = src[i];
-    if (ch === "{") braces += 1;
-    else if (ch === "}") braces -= 1;
-    else if (ch === ">" && braces === 0) return i;
-    i += 1;
-  }
-  return -1;
-}
-
-function sliceMatchingRouteBlock(src: string, openIdx: number): string {
-  const startEnd = tagOpenEnd(src, openIdx);
-  let depth = 1;
-  let i = startEnd + 1;
-  while (i < src.length && depth > 0) {
-    const nextOpen = src.indexOf("<Route", i);
-    const nextClose = src.indexOf("</Route>", i);
-    if (nextClose === -1) return "";
-    if (nextOpen !== -1 && nextOpen < nextClose) {
-      const end = tagOpenEnd(src, nextOpen);
-      if (end === -1) return "";
-      if (src[end - 1] !== "/") depth += 1;
-      i = end + 1;
-    } else {
-      depth -= 1;
-      if (depth === 0) return src.slice(openIdx, nextClose);
-      i = nextClose + "</Route>".length;
-    }
-  }
-  return "";
-}
-
-const operatorOpen = APP.indexOf("<Route element={<RequireOperatorRole />}>");
-expect(operatorOpen).toBeGreaterThan(-1);
-const operatorBlock = sliceMatchingRouteBlock(APP, operatorOpen);
-expect(operatorBlock.length).toBeGreaterThan(0);
+const MOUNTED = new Set(extractMountedAppRoutePaths());
 
 const OPERATOR_PROTECTED_PATHS = new Set(
-  [...operatorBlock.matchAll(/path="([^"]+)"/g)].map((m) => m[1]),
+  [...MOUNTED].filter((p) => isMountedUnderOperatorLayout(p)),
 );
 
-/**
- * Fixture-only demo presenters that are intentionally mounted outside the
- * operator-role gate (and outside AppShell) because they are read-only with
- * NO Supabase / AI / auth / write surface. These are linkable only by direct
- * URL. Route Metadata Truth v1: the manifest now labels them `public` so the
- * metadata matches their actual (publicly reachable) routing behavior —
- * matching how the other fixture-only demos (/pheno-comparison,
- * /pheno-expression-showcase) are declared.
- */
 const PUBLIC_FIXTURE_ONLY_DEMO_ROUTES = new Set<string>([
   "/internal/demo-proof-walkthrough",
   "/internal/contextual-pheno-comparison-demo",
@@ -73,19 +26,19 @@ const PUBLIC_FIXTURE_ONLY_DEMO_ROUTES = new Set<string>([
 /**
  * Deferred operator/internal manifest entries that are NOT covered by
  * Route Guard Parity v1. They are intentionally left as-is in this slice
- * because moving them under <RequireOperatorRole /> would change
+ * because moving them under /_app/_operator layout would change
  * grower-facing behavior, or was not part of the audited route set.
  * Tracked for a follow-up slice after a behavior review.
  *
  * Diagnostics Audience Split v1 — `/diagnostics` removed from this list
- * and is now mounted inside <RequireOperatorRole />.
+ * and is now mounted inside /_app/_operator layout.
  *
  * Grow Lineage Manifest Reclassification v1 — `/grow-lineage` removed
  * from this list and reclassified as `access: "auth"` in the manifest.
  * It is a grower-facing repair tool (Archive → Lineage Repair) that
  * reads owner-scoped tents/grows and only mutates the signed-in
  * grower's own `tents.grow_id` under existing RLS. Moving it under
- * <RequireOperatorRole /> would incorrectly hide grower UI.
+ * /_app/_operator layout would incorrectly hide grower UI.
  */
 const DEFERRED_OPERATOR_PARITY = new Set<string>([]);
 
@@ -104,7 +57,7 @@ describe("Route Guard Parity v1 — operator/internal manifest entries are role-
         expect(OPERATOR_PROTECTED_PATHS.has(r.path)).toBe(false);
       });
     } else {
-      it(`${r.path} is mounted inside <RequireOperatorRole />`, () => {
+      it(`${r.path} is mounted inside /_app/_operator layout`, () => {
         expect(OPERATOR_PROTECTED_PATHS.has(r.path)).toBe(true);
       });
     }
@@ -172,7 +125,7 @@ describe("Grow Lineage Manifest Reclassification v1 — /grow-lineage is grower-
     expect(entry?.access).toBe("auth");
   });
 
-  it("is NOT mounted inside <RequireOperatorRole />", () => {
+  it("is NOT mounted inside /_app/_operator layout", () => {
     expect(OPERATOR_PROTECTED_PATHS.has("/grow-lineage")).toBe(false);
   });
 });

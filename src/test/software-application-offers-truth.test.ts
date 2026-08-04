@@ -14,7 +14,11 @@ import { resolve } from "node:path";
 import { PRICING } from "@/constants/pricing";
 
 const ROOT = resolve(__dirname, "../..");
-const VITE_CONFIG = readFileSync(resolve(ROOT, "vite.config.ts"), "utf8");
+// Classic vite plugin offers block moved to sitewide JSON-LD under TanStack SSR.
+const OFFERS_SOURCE = readFileSync(
+  resolve(ROOT, "src/lib/build/siteSoftwareApplicationJsonLd.ts"),
+  "utf8",
+);
 const HEAD_INVARIANTS = readFileSync(
   resolve(ROOT, "scripts/public-route-head-invariants.config.mjs"),
   "utf8",
@@ -32,14 +36,14 @@ const EXPECTED_PUBLIC_OFFER_NAMES = [
 
 function extractOffersBlock(source: string): string {
   const start = source.indexOf("offers: [");
-  expect(start, "vite.config.ts must contain the offers block").toBeGreaterThan(-1);
+  expect(start, "siteSoftwareApplicationJsonLd must contain the offers block").toBeGreaterThan(-1);
   const end = source.indexOf("],", start);
   expect(end, "offers block must terminate").toBeGreaterThan(start);
   return source.slice(start, end);
 }
 
 describe("SoftwareApplication offers match the publicly purchasable SKU list", () => {
-  const offersBlock = extractOffersBlock(VITE_CONFIG);
+  const offersBlock = extractOffersBlock(OFFERS_SOURCE);
 
   it("advertises exactly the public plans, in order", () => {
     const names = [...offersBlock.matchAll(/name: "([^"]+)"/g)].map((m) => m[1]);

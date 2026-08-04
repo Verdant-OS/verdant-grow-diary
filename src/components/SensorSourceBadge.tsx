@@ -48,22 +48,16 @@ const STATUS_LABEL: Record<SnapshotStatus, string> = {
  * Visual tone per severity. Only `ok` may render in the green/healthy
  * treatment — every other tone is explicitly non-healthy.
  */
-const TONE_CLASS: Record<
-  ReturnType<typeof mapSensorSnapshotStatusToSeverity>,
-  string
-> = {
+const TONE_CLASS: Record<ReturnType<typeof mapSensorSnapshotStatusToSeverity>, string> = {
   ok: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  warning:
-    "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  warning: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
   danger: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300",
   empty: "border-muted-foreground/30 bg-muted/40 text-muted-foreground",
   unknown: "border-muted-foreground/30 bg-muted/40 text-muted-foreground",
 };
 
 /** Resolve `status` defensively. Missing → `needs_review`, never `usable`. */
-function resolveStatus(
-  status: SnapshotStatus | null | undefined,
-): SnapshotStatus {
+function resolveStatus(status: SnapshotStatus | null | undefined): SnapshotStatus {
   return status ?? "needs_review";
 }
 
@@ -78,9 +72,7 @@ export default function SensorSourceBadge({
   // Demo data is *always* visually flagged as non-healthy regardless of
   // any caller-supplied status. This is the core "no fake live data" gate.
   const severity =
-    source === "demo"
-      ? "warning"
-      : mapSensorSnapshotStatusToSeverity(resolvedStatus);
+    source === "demo" ? "warning" : mapSensorSnapshotStatusToSeverity(resolvedStatus);
   const resolved = resolveSensorSourceLabel({ source, vendor });
   const sourceLabel = resolved.label;
   const statusLabel = STATUS_LABEL[resolvedStatus];

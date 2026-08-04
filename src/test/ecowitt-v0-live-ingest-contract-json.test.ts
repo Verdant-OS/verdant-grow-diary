@@ -27,10 +27,7 @@ describe("ecowitt v0 machine-readable contract", () => {
   it("documents EcoWitt as transport/lineage with stored source=live", () => {
     expect(contract.transport_sources.ecowitt.stored_source_for_live_ecowitt).toBe("live");
     expect(contract.transport_sources.ecowitt.lineage_fields).toEqual(
-      expect.arrayContaining([
-        "raw_payload.vendor",
-        "raw_payload.metadata.transport_source",
-      ]),
+      expect.arrayContaining(["raw_payload.vendor", "raw_payload.metadata.transport_source"]),
     );
     expect(md).toContain("raw_payload.vendor");
     expect(md).toContain("transport_source");
@@ -52,9 +49,7 @@ describe("ecowitt v0 machine-readable contract", () => {
   it("forbids secret-shaped strings in its own JSON text", () => {
     expect(jsonText).not.toMatch(/Bearer\s+[A-Za-z0-9._-]{8,}/);
     expect(jsonText).not.toMatch(/vbt_[A-Za-z0-9]{6,}/);
-    expect(jsonText).not.toMatch(
-      /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,
-    );
+    expect(jsonText).not.toMatch(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/);
     // PASSKEY should appear only as a label in forbidden_render_strings, never
     // as `PASSKEY=value`.
     expect(jsonText).not.toMatch(/PASSKEY\s*[:=]\s*[A-Za-z0-9]/);

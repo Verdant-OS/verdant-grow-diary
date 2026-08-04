@@ -229,10 +229,7 @@ describe("documented non-deriving live ingest mappers", () => {
 
 describe("calculateAirVpdKpa usage guard (ingest mappers only)", () => {
   it("every ingest-mapper importer also emits the 'vpd_kpa' metric", () => {
-    const roots = [
-      resolve(ROOT, "src/lib"),
-      resolve(ROOT, "supabase/functions/_shared"),
-    ];
+    const roots = [resolve(ROOT, "src/lib"), resolve(ROOT, "supabase/functions/_shared")];
     // Display/presenter helpers may derive VPD for on-screen rendering
     // without emitting a persisted vpd_kpa metric. Those are legitimate
     // non-ingest uses and are skipped by this narrow guard.

@@ -1,12 +1,16 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 function read(path: string): string {
   return readFileSync(resolve(process.cwd(), path), "utf8");
 }
 
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 const MANIFEST = read("src/lib/appRouteManifest.ts");
 const PAGE = read("src/pages/AiDoctorContextCheck.tsx");
 const LANDING = read("src/pages/Landing.tsx");
@@ -16,7 +20,7 @@ const SEO_SMOKE = read("scripts/seo-runtime-smoke.mjs");
 
 describe("public AI Doctor context acquisition surface", () => {
   it("is public, discoverable, linked from owned surfaces, and runtime-smoked", () => {
-    expect(APP).toContain('path="/ai-doctor-readiness-check"');
+    expect(extractMountedAppRoutePaths()).toContain("/ai-doctor-readiness-check");
     expect(MANIFEST).toMatch(/path: "\/ai-doctor-readiness-check",\s+access: "public"/);
     expect(LANDING).toContain('to="/ai-doctor-readiness-check"');
     expect(EXPLAINER).toContain('to="/ai-doctor-readiness-check"');

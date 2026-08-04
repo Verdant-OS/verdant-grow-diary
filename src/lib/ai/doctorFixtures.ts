@@ -238,8 +238,7 @@ const autoflowerConservative: FixtureRecord = {
     evidence: ["RH 62% above target band (45–55%)"],
     missingInformation: ["Trichome inspection notes"],
     possibleCauses: ["Insufficient extraction", "Watering near canopy"],
-    immediateAction:
-      "Review extraction and dehumidification; make gradual changes only.",
+    immediateAction: "Review extraction and dehumidification; make gradual changes only.",
     whatNotToDo: [
       "Do not perform heavy defoliation",
       "Do not increase nutrient strength",
@@ -287,17 +286,10 @@ const lowConfidenceNoAction: FixtureRecord = {
     likelyIssue: "",
     confidence: 0.35,
     evidence: ["Single manual reading with limited history"],
-    missingInformation: [
-      "Multi-day sensor trend",
-      "Recent photos",
-      "Watering history",
-    ],
+    missingInformation: ["Multi-day sensor trend", "Recent photos", "Watering history"],
     possibleCauses: [],
     immediateAction: "Log additional readings and a photo over the next 24h.",
-    whatNotToDo: [
-      "Do not change equipment based on one manual reading",
-      "Do not adjust nutrients",
-    ],
+    whatNotToDo: ["Do not change equipment based on one manual reading", "Do not adjust nutrients"],
     followUp24h: "Capture 2 more sensor snapshots and a top-down photo.",
     followUp3d: "Reassess with 3 days of history.",
     riskLevel: "low",
@@ -342,8 +334,7 @@ const highHumidityFlower: FixtureRecord = {
       "Poor extraction",
       "Recent watering raising tent RH",
     ],
-    immediateAction:
-      "Review extraction and dehumidification; inspect canopy for mold.",
+    immediateAction: "Review extraction and dehumidification; inspect canopy for mold.",
     whatNotToDo: [
       "Do not spike temperature rapidly to compensate",
       "Do not skip canopy inspection",
@@ -356,8 +347,7 @@ const highHumidityFlower: FixtureRecord = {
       actionType: "advisory",
       status: "pending_approval",
       targetMetric: "humidity_pct",
-      suggestedChange:
-        "Review extraction and dehumidification capacity; inspect canopy for mold.",
+      suggestedChange: "Review extraction and dehumidification capacity; inspect canopy for mold.",
       reason: "RH 70% well above flower target band.",
       riskLevel: "high",
     },

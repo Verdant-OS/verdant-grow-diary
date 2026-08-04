@@ -61,11 +61,8 @@ export function buildAiDoctorSnapshotStalenessExplanation(
   const MAX_SAFE_DATE_MS = 8_640_000_000_000_000;
   const SAFE_LIMIT = MAX_SAFE_DATE_MS - AI_DOCTOR_SNAPSHOT_FRESH_MS;
   const isSafeNow = (value: unknown): value is number =>
-    typeof value === "number" &&
-    Number.isFinite(value) &&
-    Math.abs(value) <= SAFE_LIMIT;
-  const clock =
-    typeof args.nowFallback === "function" ? args.nowFallback : Date.now;
+    typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= SAFE_LIMIT;
+  const clock = typeof args.nowFallback === "function" ? args.nowFallback : Date.now;
   const nowCandidate = args.now;
   let now: number;
   if (isSafeNow(nowCandidate)) {

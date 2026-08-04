@@ -141,12 +141,14 @@ export function groupManualReadingsToSnapshots(
     }
     buckets.set(key, snap);
   }
-  return [...buckets.values()].sort(
-    (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime(),
-  );
+  return [...buckets.values()].sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
 }
 
-function formatDelta(key: ChangeContextMetric, latest: number, previous: number): ChangeContextDelta | null {
+function formatDelta(
+  key: ChangeContextMetric,
+  latest: number,
+  previous: number,
+): ChangeContextDelta | null {
   let delta: number;
   let label: string;
   let formatted: string;
@@ -197,8 +199,7 @@ function formatDelta(key: ChangeContextMetric, latest: number, previous: number)
     }
   }
   if (!Number.isFinite(delta)) return null;
-  const direction: ChangeContextDelta["direction"] =
-    delta > 0 ? "up" : delta < 0 ? "down" : "flat";
+  const direction: ChangeContextDelta["direction"] = delta > 0 ? "up" : delta < 0 ? "down" : "flat";
   return { key, label, delta, formatted, direction };
 }
 
@@ -228,11 +229,8 @@ export function buildManualSnapshotChangeContext(input: {
     const bTruth = classifyManualMetric(key, b);
     if (!aTruth.valid || !bTruth.valid) {
       const chip = (aTruth.chip ?? bTruth.chip) as string;
-      const side: ChangeContextSuppressedDelta["side"] = !aTruth.valid && !bTruth.valid
-        ? "both"
-        : !aTruth.valid
-          ? "current"
-          : "previous";
+      const side: ChangeContextSuppressedDelta["side"] =
+        !aTruth.valid && !bTruth.valid ? "both" : !aTruth.valid ? "current" : "previous";
       suppressedDeltas.push({
         key,
         label: METRIC_LABEL[key],

@@ -60,8 +60,7 @@ export interface QuickLogPhotoDiaryEntryRow {
   } & Record<string, string>;
 }
 
-export const QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE =
-  "Photo attached from Quick Log." as const;
+export const QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE = "Photo attached from Quick Log." as const;
 
 /**
  * Deterministic pure builder. Returns the exact row shape passed to
@@ -91,9 +90,7 @@ export function buildQuickLogPhotoDiaryEntryRow(
   };
 }
 
-export type QuickLogPhotoDiaryEntryResult =
-  | { ok: true }
-  | { ok: false; message: string };
+export type QuickLogPhotoDiaryEntryResult = { ok: true } | { ok: false; message: string };
 
 /**
  * Thin wrapper around the extracted `diary_entries.insert`. The caller
@@ -104,9 +101,7 @@ export async function createQuickLogPhotoDiaryEntry(
   input: QuickLogPhotoDiaryEntryInput,
 ): Promise<QuickLogPhotoDiaryEntryResult> {
   const row = buildQuickLogPhotoDiaryEntryRow(input);
-  const { error } = await supabase
-    .from("diary_entries")
-    .insert(row as never);
+  const { error } = await supabase.from("diary_entries").insert(row as never);
   if (error) {
     return { ok: false, message: `Photo diary entry failed: ${error.message}` };
   }

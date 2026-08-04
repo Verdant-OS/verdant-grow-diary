@@ -17,21 +17,10 @@
  */
 
 export type ActionStatus =
-  | "pending_approval"
-  | "approved"
-  | "rejected"
-  | "simulated"
-  | "completed"
-  | "cancelled";
+  "pending_approval" | "approved" | "rejected" | "simulated" | "completed" | "cancelled";
 
 export type ActionEventType =
-  | "created"
-  | "simulated"
-  | "approved"
-  | "rejected"
-  | "completed"
-  | "cancelled"
-  | "note";
+  "created" | "simulated" | "approved" | "rejected" | "completed" | "cancelled" | "note";
 
 export type TransitionKind = "approve" | "reject" | "simulate" | "complete" | "cancel";
 
@@ -58,8 +47,7 @@ export interface ActionQueueTransitionRpcFailure {
 }
 
 export type ActionQueueTransitionRpcResult =
-  | ActionQueueTransitionRpcSuccess
-  | ActionQueueTransitionRpcFailure;
+  ActionQueueTransitionRpcSuccess | ActionQueueTransitionRpcFailure;
 
 const ACTION_STATUS_VALUES: readonly ActionStatus[] = [
   "pending_approval",

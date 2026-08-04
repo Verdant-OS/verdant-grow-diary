@@ -38,13 +38,7 @@ export type SnapshotSource =
  * in sync if a new metric is added.
  */
 export type SensorSnapshotMetricRefKey =
-  | "temp"
-  | "rh"
-  | "vpd"
-  | "soil"
-  | "soil_ec"
-  | "soil_temp"
-  | "ppfd";
+  "temp" | "rh" | "vpd" | "soil" | "soil_ec" | "soil_temp" | "ppfd";
 
 /**
  * Provenance for a single metric in a snapshot. Carries ONLY the safe

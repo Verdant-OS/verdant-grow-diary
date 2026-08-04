@@ -39,8 +39,7 @@ export default function AiDoctorPhase1Preview(): JSX.Element {
     AI_DOCTOR_PHASE1_PREVIEW_DEFAULT_CASE_ID,
   );
   const current = getAiDoctorPhase1PreviewCase(selectedId);
-  const mappedScenarioId =
-    PREVIEW_CASE_TO_CONFIDENCE_SCENARIO[selectedId] ?? "demo-csv-only";
+  const mappedScenarioId = PREVIEW_CASE_TO_CONFIDENCE_SCENARIO[selectedId] ?? "demo-csv-only";
   const confidenceAuditHref = `/internal/ai-doctor-confidence-audit?scenario=${mappedScenarioId}`;
 
   return (
@@ -48,13 +47,11 @@ export default function AiDoctorPhase1Preview(): JSX.Element {
       <div className="rounded-md border border-border bg-muted/30 p-4 space-y-2">
         <h1 className="text-lg font-semibold">Internal preview</h1>
         <p className="text-sm text-muted-foreground">
-          Static demo data · No model calls · No database writes · No device
-          control
+          Static demo data · No model calls · No database writes · No device control
         </p>
         <p className="text-xs text-muted-foreground">
-          This preview renders a precomputed Phase 1 view model. It does not
-          run diagnosis, does not score confidence, does not write alerts, and
-          does not create Action Queue items.
+          This preview renders a precomputed Phase 1 view model. It does not run diagnosis, does not
+          score confidence, does not write alerts, and does not create Action Queue items.
         </p>
       </div>
 
@@ -63,10 +60,7 @@ export default function AiDoctorPhase1Preview(): JSX.Element {
         className="rounded-md border border-border bg-card p-4 space-y-2"
       >
         <div className="flex flex-wrap items-center gap-2">
-          <h2
-            data-testid="ai-doctor-confidence-audit-link-title"
-            className="text-sm font-semibold"
-          >
+          <h2 data-testid="ai-doctor-confidence-audit-link-title" className="text-sm font-semibold">
             View matching confidence audit
           </h2>
           <span className="rounded border border-border bg-background px-2 py-0.5 text-xs text-muted-foreground">
@@ -83,8 +77,7 @@ export default function AiDoctorPhase1Preview(): JSX.Element {
           data-testid="ai-doctor-confidence-audit-link-description"
           className="text-xs text-muted-foreground"
         >
-          Review the hard caps and safety flags that apply to this preview
-          scenario.
+          Review the hard caps and safety flags that apply to this preview scenario.
         </p>
         <p
           data-testid="ai-doctor-confidence-audit-link-mapped-scenario"

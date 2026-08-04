@@ -51,9 +51,7 @@ describe("AI Coach → action_queue_events 'created' audit", () => {
     expect(COACH).toMatch(
       /async\s+function\s+addToQueue[\s\S]*?action_queue_events[\s\S]*?\}\s*$/m,
     );
-    expect(COACH).not.toMatch(
-      /useEffect\([\s\S]{0,400}action_queue_events[\s\S]{0,200}\.insert\(/,
-    );
+    expect(COACH).not.toMatch(/useEffect\([\s\S]{0,400}action_queue_events[\s\S]{0,200}\.insert\(/);
   });
 
   it("ai-coach edge function is unchanged: does not write action_queue or audit events", () => {

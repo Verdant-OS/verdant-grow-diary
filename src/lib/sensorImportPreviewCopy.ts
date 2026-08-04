@@ -27,15 +27,16 @@ import {
  *   emits source = "csv" (accepted by the deployed validate_sensor_reading
  *   trigger as confirmed by csv-source-allow-list-audit on 2026-06-13).
  */
-export const PREVIEW_PERSISTENCE_ENABLED: ReadonlySet<SourceAppId> = new Set<
-  SourceAppId
->(["ac_infinity", "spider_farmer", "vivosun"]);
+export const PREVIEW_PERSISTENCE_ENABLED: ReadonlySet<SourceAppId> = new Set<SourceAppId>([
+  "ac_infinity",
+  "spider_farmer",
+  "vivosun",
+]);
 
 export const CANONICAL_SOURCE_COPY =
   "Imported rows will be labeled as CSV history, not live readings." as const;
 
-export const UNKNOWN_SOURCE_COPY =
-  "Unknown CSV source. Review mapping before importing." as const;
+export const UNKNOWN_SOURCE_COPY = "Unknown CSV source. Review mapping before importing." as const;
 
 export const SPIDER_FARMER_SENSOR_ONLY_COPY =
   "This Spider Farmer file appears to contain timestamps and device metadata only. No sensor readings will be imported." as const;
@@ -69,9 +70,7 @@ const CONFIDENCE_LABEL: Record<SourceAppPreview["confidence"], string> = {
   none: "No confident match",
 };
 
-export function buildSourceAppPreviewCopy(
-  preview: SourceAppPreview,
-): PreviewCopy {
+export function buildSourceAppPreviewCopy(preview: SourceAppPreview): PreviewCopy {
   const notices: string[] = [];
 
   if (preview.sourceApp === "unknown_source_app") {

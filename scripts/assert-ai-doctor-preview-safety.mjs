@@ -88,20 +88,17 @@ export const RULES = [
     name: "no-action-queue-write",
     pattern:
       /(supabase\s*\.\s*from\(\s*["'`]action_queue["'`]\s*\)|insert\s+action_queue|create[_\s-]?action[_\s-]?queue|send[_\s-]?action)/i,
-    explanation:
-      "Preview must never insert/create Action Queue rows or call action-write paths.",
+    explanation: "Preview must never insert/create Action Queue rows or call action-write paths.",
   },
   {
     name: "no-functions-invoke",
     pattern: /\bfunctions\s*\.\s*invoke\b/,
-    explanation:
-      "Preview must never invoke Edge Functions (no model/AI call from the preview).",
+    explanation: "Preview must never invoke Edge Functions (no model/AI call from the preview).",
   },
   {
     name: "no-service-role",
     pattern: /\b(service_role|SUPABASE_SERVICE_ROLE_KEY)\b/,
-    explanation:
-      "service_role must never appear in preview code paths.",
+    explanation: "service_role must never appear in preview code paths.",
   },
   {
     name: "no-mqtt-publish",
@@ -131,8 +128,7 @@ export const RULES = [
   {
     name: "no-set-temp-humidity",
     pattern: /\bset[\s_-]?(temp|temperature|humidity|rh|setpoint)\b/i,
-    explanation:
-      "Preview must never set temperature/humidity setpoints.",
+    explanation: "Preview must never set temperature/humidity setpoints.",
   },
   {
     name: "no-automation-enabled",
@@ -182,9 +178,7 @@ export function loadAllowlist(configPath = DEFAULT_ALLOWLIST_PATH) {
     );
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new AllowlistConfigError(
-      `Allowlist config must be a JSON object (${configPath}).`,
-    );
+    throw new AllowlistConfigError(`Allowlist config must be a JSON object (${configPath}).`);
   }
   const { allowedPhrases, allowedLineMarkers } = parsed;
   if (!Array.isArray(allowedPhrases) || !Array.isArray(allowedLineMarkers)) {
@@ -230,11 +224,7 @@ function isRegexLiteralLine(trimmed) {
 
 export function scanText(
   text,
-  {
-    isTestFile = false,
-    allowedPhrases = [],
-    allowedLineMarkers = [],
-  } = {},
+  { isTestFile = false, allowedPhrases = [], allowedLineMarkers = [] } = {},
 ) {
   if (isTestFile) return [];
   const lowerPhrases = allowedPhrases.map((p) => p.toLowerCase());
@@ -370,9 +360,7 @@ function main() {
     try {
       text = readFileSync(abs, "utf8");
     } catch (err) {
-      console.error(
-        `ai-doctor preview safety: cannot read ${rel} — ${err.message}`,
-      );
+      console.error(`ai-doctor preview safety: cannot read ${rel} — ${err.message}`);
       failed += 1;
       continue;
     }
@@ -398,9 +386,7 @@ function main() {
     );
     process.exit(1);
   }
-  console.log(
-    `AI Doctor preview safety: OK (${scanned} file(s) scanned).`,
-  );
+  console.log(`AI Doctor preview safety: OK (${scanned} file(s) scanned).`);
 }
 
 const invokedDirectly =

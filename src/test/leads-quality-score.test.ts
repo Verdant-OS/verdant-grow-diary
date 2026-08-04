@@ -107,10 +107,7 @@ describe("scoreLeadQuality — missing/ambiguous data lowers confidence", () => 
   });
 
   it("invalid created_at alone is flagged but still scored", () => {
-    const q = scoreLeadQuality(
-      lead({ created_at: "not-a-date" }),
-      NOW,
-    );
+    const q = scoreLeadQuality(lead({ created_at: "not-a-date" }), NOW);
     expect(q.warnings.join(" ")).toMatch(/created_at/);
     expect(q.grade).not.toBe("Unknown");
   });
@@ -118,10 +115,7 @@ describe("scoreLeadQuality — missing/ambiguous data lowers confidence", () => 
 
 describe("scoreLeadQuality — closed and lost outcomes", () => {
   it("closed lead still receives a grade based on completeness", () => {
-    const q = scoreLeadQuality(
-      lead({ status: "closed", operator_notes: "won" }),
-      NOW,
-    );
+    const q = scoreLeadQuality(lead({ status: "closed", operator_notes: "won" }), NOW);
     expect(q.grade).not.toBe("Unknown");
     expect(q.score).toBeGreaterThan(0);
   });

@@ -86,9 +86,8 @@ const STATUS_TONE: Record<AlertStatusRow, string> = {
 };
 
 export default function Alerts() {
-  const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } =
-    useScopedGrow();
-  const scopedGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
+  const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
+  const scopedGrowId = isValidScopedGrow ? (urlGrowId ?? undefined) : undefined;
   // A grow id was passed in the URL but doesn't map to a grow the viewer
   // owns. Showing every alert would be misleading — render a calm prompt.
   const hasInvalidScope = !!urlGrowId && !isValidScopedGrow;
@@ -108,9 +107,7 @@ export default function Alerts() {
     grows.map((g) => [g.id, (g as { stage?: string | null }).stage ?? null]),
   );
 
-  const headerStage = scopedGrowId
-    ? stageByGrow.get(scopedGrowId) ?? null
-    : null;
+  const headerStage = scopedGrowId ? (stageByGrow.get(scopedGrowId) ?? null) : null;
 
   // Pick the most relevant grow context for the Alerts header. Prefers
   // scoped → active → first available. Keeps the header useful even on
@@ -199,9 +196,7 @@ export default function Alerts() {
       });
       toast.success(`Alert ${label}d`);
     } catch (logErr) {
-      toast.warning(
-        `Alert ${label}d, but audit log failed: ${(logErr as Error).message}`,
-      );
+      toast.warning(`Alert ${label}d, but audit log failed: ${(logErr as Error).message}`);
     }
     reload();
   };
@@ -218,11 +213,7 @@ export default function Alerts() {
       {/* Side-effect only: evaluate latest valid snapshot vs grow targets
           and persist breaches into public.alerts. Renders nothing. */}
       {persistGrowIds.map((gid) => (
-        <AlertsAutoPersistForGrow
-          key={gid}
-          growId={gid}
-          stage={stageByGrow.get(gid) ?? null}
-        />
+        <AlertsAutoPersistForGrow key={gid} growId={gid} stage={stageByGrow.get(gid) ?? null} />
       ))}
       <GrowBreadcrumbs
         growId={urlGrowId}
@@ -274,15 +265,8 @@ export default function Alerts() {
         </div>
       )}
 
-
-
-
-
       <div className="flex flex-wrap gap-2 mb-4">
-        <Select
-          value={statusFilter}
-          onValueChange={(v) => setStatusFilter(v as StatusFilter)}
-        >
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
           <SelectTrigger className="w-[180px]" aria-label="Filter by status">
             <SelectValue />
           </SelectTrigger>
@@ -322,8 +306,8 @@ export default function Alerts() {
             Select a grow or tent to review alerts.
           </p>
           <p className="text-sm text-muted-foreground max-w-sm">
-            Alerts are scoped to a grow or tent so you only see warnings that
-            match what you’re working on.
+            Alerts are scoped to a grow or tent so you only see warnings that match what you’re
+            working on.
           </p>
         </div>
       ) : status === "loading" || status === "idle" ? (
@@ -335,26 +319,20 @@ export default function Alerts() {
           className="space-y-3"
           data-testid="alerts-loading-skeleton"
         >
-          <p className="text-sm text-muted-foreground font-medium">
-            Loading alerts…
-          </p>
+          <p className="text-sm text-muted-foreground font-medium">Loading alerts…</p>
           <div className="space-y-2">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="glass rounded-2xl p-4 flex flex-col gap-2"
-              aria-hidden="true"
-            >
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-4 w-40" />
-                <Skeleton className="ml-auto h-3 w-20" />
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="glass rounded-2xl p-4 flex flex-col gap-2" aria-hidden="true">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="ml-auto h-3 w-20" />
+                </div>
+                <Skeleton className="h-3 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
               </div>
-              <Skeleton className="h-3 w-3/4" />
-              <Skeleton className="h-3 w-1/2" />
-            </div>
-          ))}
+            ))}
           </div>
         </div>
       ) : status === "unavailable" ? (
@@ -365,12 +343,9 @@ export default function Alerts() {
         >
           <p className="font-medium">Alerts unavailable</p>
           <p className="text-muted-foreground">
-            We couldn’t load alerts right now. Check your connection and try
-            again.
+            We couldn’t load alerts right now. Check your connection and try again.
           </p>
-          {error ? (
-            <p className="text-[11px] text-muted-foreground/80">{error}</p>
-          ) : null}
+          {error ? <p className="text-[11px] text-muted-foreground/80">{error}</p> : null}
           <div>
             <Button
               size="sm"
@@ -441,9 +416,7 @@ export default function Alerts() {
               <section key={group.key} aria-label={`${group.label} alerts`}>
                 <h2 className="font-display font-semibold text-sm mb-2">
                   {group.label}{" "}
-                  <span className="text-xs text-muted-foreground">
-                    {items.length}
-                  </span>
+                  <span className="text-xs text-muted-foreground">{items.length}</span>
                 </h2>
                 <ul className="space-y-2">
                   {items.map((a) => (
@@ -498,17 +471,11 @@ function AlertHistory({ alertId }: { alertId: string }) {
   );
 }
 
-type AlertActionHandler = (
-  id: string,
-  growId: string,
-  prev: AlertStatusRow,
-) => void;
+type AlertActionHandler = (id: string, growId: string, prev: AlertStatusRow) => void;
 
 interface AlertCardProps {
   alert: AlertRow;
-  linkedSummary: ReturnType<
-    ReturnType<typeof useAlertsLinkedActionCounts>["get"]
-  >;
+  linkedSummary: ReturnType<ReturnType<typeof useAlertsLinkedActionCounts>["get"]>;
   onAcknowledge: AlertActionHandler;
   onResolve: AlertActionHandler;
   onDismiss: AlertActionHandler;
@@ -534,9 +501,7 @@ function AlertCard({
     firstSeenAt: a.first_seen_at,
   });
   const seenIso =
-    a.first_seen_at && Number.isFinite(Date.parse(a.first_seen_at))
-      ? a.first_seen_at
-      : undefined;
+    a.first_seen_at && Number.isFinite(Date.parse(a.first_seen_at)) ? a.first_seen_at : undefined;
   return (
     <li>
       <article

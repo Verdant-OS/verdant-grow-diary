@@ -33,10 +33,7 @@ import {
 import { calculateAirVpdKpa } from "./vpdRules.ts";
 
 export type EcoWittRoutedMetric =
-  | "temperature_c"
-  | "humidity_pct"
-  | "soil_moisture_pct"
-  | "vpd_kpa";
+  "temperature_c" | "humidity_pct" | "soil_moisture_pct" | "vpd_kpa";
 
 export type EcoWittTimestampSource = "ecowitt_dateutc" | "server_received_at";
 

@@ -37,7 +37,7 @@ describe("Plant/tent list route helper migration", () => {
     expect(tentsPath()).toBe("/tents");
   });
 
-  it("no simple `to=\"/plants\"` literals remain in src/pages or src/components", () => {
+  it('no simple `to="/plants"` literals remain in src/pages or src/components', () => {
     const offenders: string[] = [];
     for (const f of FILES) {
       const src = readFileSync(f, "utf8");
@@ -46,7 +46,7 @@ describe("Plant/tent list route helper migration", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("no simple `to=\"/tents\"` literals remain in src/pages or src/components", () => {
+  it('no simple `to="/tents"` literals remain in src/pages or src/components', () => {
     const offenders: string[] = [];
     for (const f of FILES) {
       const src = readFileSync(f, "utf8");

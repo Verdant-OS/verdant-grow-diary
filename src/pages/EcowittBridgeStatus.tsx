@@ -54,8 +54,7 @@ export default function EcowittBridgeStatus() {
       tentId: latest.tentId,
       plantId: latest.plantId,
       metricKeys: latest.metricKeys,
-      response:
-        latest.httpStatus !== null ? { status: latest.httpStatus, body: "" } : null,
+      response: latest.httpStatus !== null ? { status: latest.httpStatus, body: "" } : null,
       dryRun: latest.status === "dry_run",
       normalizerReasons: latest.reasons.length > 0 ? latest.reasons : undefined,
     });
@@ -92,19 +91,13 @@ export default function EcowittBridgeStatus() {
   const handleClear = useCallback(() => {
     setAttempts([]);
     if (typeof window !== "undefined") {
-      window.localStorage.removeItem(
-        "verdant.operator.ecowitt-bridge-attempts.v1",
-      );
+      window.localStorage.removeItem("verdant.operator.ecowitt-bridge-attempts.v1");
     }
   }, []);
 
   const handleCopyLatest = useCallback(() => {
     if (!latestReport) return;
-    const json = JSON.stringify(
-      buildRedactedReportForClipboard(latestReport),
-      null,
-      2,
-    );
+    const json = JSON.stringify(buildRedactedReportForClipboard(latestReport), null, 2);
     if (typeof navigator !== "undefined" && navigator.clipboard) {
       void navigator.clipboard.writeText(json);
       toast({ title: "Copied redacted report" });
@@ -119,8 +112,8 @@ export default function EcowittBridgeStatus() {
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">Ecowitt Bridge Status</h1>
         <p className="text-sm text-muted-foreground">
-          Read-only operator diagnostics for local Ecowitt bridge attempts.
-          Diagnostics are local/redacted. Bridge tokens are never shown.
+          Read-only operator diagnostics for local Ecowitt bridge attempts. Diagnostics are
+          local/redacted. Bridge tokens are never shown.
         </p>
       </header>
 
@@ -130,10 +123,7 @@ export default function EcowittBridgeStatus() {
         </CardHeader>
         <CardContent>
           {summary.total === 0 ? (
-            <p
-              className="text-sm text-muted-foreground"
-              data-testid="ecowitt-bridge-status-empty"
-            >
+            <p className="text-sm text-muted-foreground" data-testid="ecowitt-bridge-status-empty">
               No Ecowitt bridge attempts recorded in this browser yet.
             </p>
           ) : (
@@ -152,20 +142,13 @@ export default function EcowittBridgeStatus() {
                 value={summary.lastClassification ?? "—"}
                 testid="stat-last-classification"
               />
-              <Stat
-                label="Last reason"
-                value={summary.lastRejectionReason ?? "—"}
-              />
+              <Stat label="Last reason" value={summary.lastRejectionReason ?? "—"} />
               <Stat label="Provider" value={summary.lastProvider ?? "—"} />
               <Stat label="Transport" value={summary.lastTransport ?? "—"} />
               <Stat label="Topic" value={summary.lastTopic ?? "—"} />
               <Stat
                 label="Metric keys"
-                value={
-                  summary.lastMetricKeys.length > 0
-                    ? summary.lastMetricKeys.join(", ")
-                    : "—"
-                }
+                value={summary.lastMetricKeys.length > 0 ? summary.lastMetricKeys.join(", ") : "—"}
               />
             </dl>
           )}
@@ -224,8 +207,8 @@ export default function EcowittBridgeStatus() {
             </Button>
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Reports are stored only in this browser. Bridge tokens are
-            re-redacted on import and never persisted.
+            Reports are stored only in this browser. Bridge tokens are re-redacted on import and
+            never persisted.
           </p>
         </CardContent>
       </Card>

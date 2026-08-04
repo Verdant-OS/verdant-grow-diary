@@ -50,9 +50,9 @@ vi.mock("@/hooks/usePlantRecentActivity", () => ({
 // fabricating data sources. The real adapter is exercised by its own tests
 // and by the photo-only mount regression below (no override there).
 vi.mock("@/lib/plantDetailHarvestWatchCardViewModel", async () => {
-  const actual = await vi.importActual<
-    typeof import("@/lib/plantDetailHarvestWatchCardViewModel")
-  >("@/lib/plantDetailHarvestWatchCardViewModel");
+  const actual = await vi.importActual<typeof import("@/lib/plantDetailHarvestWatchCardViewModel")>(
+    "@/lib/plantDetailHarvestWatchCardViewModel",
+  );
   return {
     ...actual,
     buildPlantDetailHarvestWatchCardViewModel: (
@@ -134,9 +134,21 @@ function baseVm(state: HarvestWatchV0ReadinessState) {
       confidenceLabel: "Low",
       lastPhotoAgeDays: null,
       lastPhotoLabel: "No photos yet",
-      photoPrompt: { state: "ok", confidencePenalty: 0, missedDays: 0, tone: "neutral", message: "" },
+      photoPrompt: {
+        state: "ok",
+        confidencePenalty: 0,
+        missedDays: 0,
+        tone: "neutral",
+        message: "",
+      },
       trend: "unknown",
-      trichome: { state: "not_available", caption: "", visible: false, insight: null, confidence: "low" },
+      trichome: {
+        state: "not_available",
+        caption: "",
+        visible: false,
+        insight: null,
+        confidence: "low",
+      },
     } as unknown as ReturnType<
       typeof import("@/lib/harvestWatchViewModel").buildHarvestWatchRowViewModel
     >,
@@ -175,8 +187,7 @@ function baseVm(state: HarvestWatchV0ReadinessState) {
     },
     evidenceHistory: {
       groups: [],
-      caution:
-        "Harvest evidence history is diary evidence only — confirm with direct inspection.",
+      caution: "Harvest evidence history is diary evidence only — confirm with direct inspection.",
       totalCount: 0,
     },
   };
@@ -232,9 +243,7 @@ describe("Harvest Watch — accessibility", () => {
     const tri = screen.getByTestId("harvest-watch-checklist-trichome_inspection");
     expect(tri.textContent).toMatch(/Trichome inspection note/);
     expect(tri.textContent).toMatch(/Missing/);
-    const reason = screen.getByTestId(
-      "harvest-watch-checklist-trichome_inspection-reason",
-    );
+    const reason = screen.getByTestId("harvest-watch-checklist-trichome_inspection-reason");
     expect(reason.textContent).toMatch(/add a trichome inspection note/i);
   });
 });
@@ -333,9 +342,7 @@ describe("Harvest Watch — photo-only mounted regression", () => {
     expect(badge.textContent).not.toMatch(/Ready for manual review/);
 
     const caution = screen.getByTestId("plant-detail-harvest-watch-v0-caution");
-    expect(caution.textContent).not.toMatch(
-      /Evidence supports a manual harvest review/,
-    );
+    expect(caution.textContent).not.toMatch(/Evidence supports a manual harvest review/);
 
     // Trichome inspection must remain Missing (photo doesn't count).
     const tri = screen.getByTestId("harvest-watch-checklist-trichome_inspection");
@@ -357,16 +364,13 @@ describe("Harvest Watch — v0 state labels & cautions render exactly", () => {
   const EXPECTED_CAUTION: Record<HarvestWatchV0ReadinessState, string> = {
     not_enough_evidence:
       "Not enough harvest evidence yet. Add a trichome or flower inspection note.",
-    too_early_to_call:
-      "Too early to call. Keep logging plant response and flower development.",
+    too_early_to_call: "Too early to call. Keep logging plant response and flower development.",
     watch_window:
       "Approaching manual review window. Inspect trichomes, pistils, and recent plant response.",
-    ready_for_manual_review:
-      "Evidence supports a manual harvest review. The grower decides.",
+    ready_for_manual_review: "Evidence supports a manual harvest review. The grower decides.",
     past_expected_window:
       "Past expected window based on available dates. Re-check trichomes, pistils, and plant condition before deciding.",
-    unknown:
-      "Harvest Watch cannot determine a review state from the available information.",
+    unknown: "Harvest Watch cannot determine a review state from the available information.",
   };
 
   const EXPECTED_LABEL: Record<HarvestWatchV0ReadinessState, string> = {
@@ -384,20 +388,18 @@ describe("Harvest Watch — v0 state labels & cautions render exactly", () => {
       mocks.buildVm.mockReturnValue(baseVm(state));
       render(<PlantDetailHarvestWatchCard plantId="p1" />);
 
+      expect(screen.getByTestId("plant-detail-harvest-watch-v0-state").textContent).toBe(
+        EXPECTED_LABEL[state],
+      );
+      expect(screen.getByTestId("plant-detail-harvest-watch-v0-caution").textContent).toBe(
+        EXPECTED_CAUTION[state],
+      );
       expect(
-        screen.getByTestId("plant-detail-harvest-watch-v0-state").textContent,
-      ).toBe(EXPECTED_LABEL[state]);
-      expect(
-        screen.getByTestId("plant-detail-harvest-watch-v0-caution").textContent,
-      ).toBe(EXPECTED_CAUTION[state]);
-      expect(
-        screen.getByTestId("plant-detail-harvest-watch-evidence-only-caution")
-          .textContent,
+        screen.getByTestId("plant-detail-harvest-watch-evidence-only-caution").textContent,
       ).toContain(HARVEST_WATCH_V0_UNIVERSAL_CAUTION);
-      expect(
-        screen.getByTestId("plant-detail-harvest-watch-checklist-caution")
-          .textContent,
-      ).toBe(HARVEST_WATCH_V0_CHECKLIST_CAUTION);
+      expect(screen.getByTestId("plant-detail-harvest-watch-checklist-caution").textContent).toBe(
+        HARVEST_WATCH_V0_CHECKLIST_CAUTION,
+      );
     });
   }
 });

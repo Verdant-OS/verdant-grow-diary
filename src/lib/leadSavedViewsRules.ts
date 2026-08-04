@@ -149,28 +149,16 @@ export function buildView(
   });
 }
 
-export function addView(
-  views: LeadSavedView[],
-  view: LeadSavedView,
-): LeadSavedView[] {
+export function addView(views: LeadSavedView[], view: LeadSavedView): LeadSavedView[] {
   return sortViews([...views.filter((v) => v.id !== view.id), view]);
 }
 
-export function renameView(
-  views: LeadSavedView[],
-  id: string,
-  name: string,
-): LeadSavedView[] {
+export function renameView(views: LeadSavedView[], id: string, name: string): LeadSavedView[] {
   const next = sanitizeName(name);
   if (!next) return views;
-  return sortViews(
-    views.map((v) => (v.id === id ? { ...v, name: next } : v)),
-  );
+  return sortViews(views.map((v) => (v.id === id ? { ...v, name: next } : v)));
 }
 
-export function removeView(
-  views: LeadSavedView[],
-  id: string,
-): LeadSavedView[] {
+export function removeView(views: LeadSavedView[], id: string): LeadSavedView[] {
   return sortViews(views.filter((v) => v.id !== id));
 }

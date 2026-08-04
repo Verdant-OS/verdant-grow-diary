@@ -11,10 +11,7 @@
 
 import type { ResolveBridgeSecretInput } from "../_shared/lib/lib/piIngestServerSecretResolverTypes.ts";
 
-export type PiIngestBridgeSecretStatus =
-  | "pending_rotation"
-  | "active_encrypted"
-  | "disabled";
+export type PiIngestBridgeSecretStatus = "pending_rotation" | "active_encrypted" | "disabled";
 
 /**
  * Snake-case row shape, as it will arrive from a future server-side
@@ -58,10 +55,7 @@ const ALLOWED_STATUSES: ReadonlySet<PiIngestBridgeSecretStatus> = new Set([
 ]);
 
 function assertValidStatus(status: unknown): PiIngestBridgeSecretStatus {
-  if (
-    typeof status === "string" &&
-    ALLOWED_STATUSES.has(status as PiIngestBridgeSecretStatus)
-  ) {
+  if (typeof status === "string" && ALLOWED_STATUSES.has(status as PiIngestBridgeSecretStatus)) {
     return status as PiIngestBridgeSecretStatus;
   }
   throw new Error("invalid_secret_status");

@@ -16,6 +16,11 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  getRouteAliasRedirectTarget,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const REPO_ROOT = resolve(__dirname, "../..");
 
@@ -100,8 +105,9 @@ describe("public/demo copy safety scanner (Requirement 9)", () => {
 });
 
 describe("intentional /demo redirect is preserved", () => {
-  it("App.tsx redirects /demo → /welcome while preserving URL context", () => {
-    const app = readFileSync(resolve(REPO_ROOT, "src/App.tsx"), "utf8");
-    expect(app).toMatch(/path="\/demo"\s+element=\{<RouteAliasRedirect\s+to="\/welcome"\s*\/>\}/);
+  it("File routes redirect /demo → /welcome while preserving URL context", () => {
+    const app = readAllRouteModuleSources();
+    expect(extractMountedAppRoutePaths()).toContain("/demo");
+    expect(getRouteAliasRedirectTarget("/demo")).toBe("/welcome");
   });
 });

@@ -21,9 +21,7 @@ const SAFE_ALERT_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
  * `URLSearchParams.get` already URL-decodes, so percent-encoded UUIDs
  * resolve correctly before the charset check runs.
  */
-export function parseAlertContextParam(
-  raw: string | null | undefined,
-): string | null {
+export function parseAlertContextParam(raw: string | null | undefined): string | null {
   if (typeof raw !== "string") return null;
   const trimmed = raw.trim();
   if (!trimmed) return null;
@@ -35,9 +33,10 @@ export function parseAlertContextParam(
  * `[alert:<id>]` token in the row's `reason`. Returns the input list
  * unchanged when `alertId` is null/empty (no filter applied).
  */
-export function filterActionsByAlertContext<
-  R extends { reason?: string | null },
->(rows: readonly R[], alertId: string | null | undefined): R[] {
+export function filterActionsByAlertContext<R extends { reason?: string | null }>(
+  rows: readonly R[],
+  alertId: string | null | undefined,
+): R[] {
   if (!alertId) return [...rows];
   return rows.filter((r) => extractSourceAlertId(r.reason ?? null) === alertId);
 }

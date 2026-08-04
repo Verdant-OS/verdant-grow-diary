@@ -7,13 +7,14 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { readAllRouteModuleSources } from "./helpers/routeManifestSyncHarness";
 
 function read(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
 }
 
 const PAGE = read("src/pages/OperatorBillingSubscriptionUpdateAudit.tsx");
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 const PADDLE_PAGE = read("src/pages/OperatorPaddleProcessingAudit.tsx");
 
 describe("Operator subscription updater audit page — static safety", () => {

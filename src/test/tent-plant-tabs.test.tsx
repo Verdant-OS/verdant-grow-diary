@@ -89,10 +89,7 @@ describe("TentPlantTabs", () => {
 
   it("renders an archived label inside archived plant tabs", () => {
     const vm = buildTentPlantTabsViewModel({
-      plants: [
-        ...ACTIVE,
-        { id: "p3", name: "Gelato Auto", isArchived: true },
-      ],
+      plants: [...ACTIVE, { id: "p3", name: "Gelato Auto", isArchived: true }],
       includeArchived: true,
       selectedPlantId: null,
     });
@@ -110,9 +107,7 @@ describe("TentPlantTabs static safety", () => {
   ];
   for (const path of sources) {
     const raw = readFileSync(path, "utf8");
-    const content = raw
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+    const content = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
     it(`no Supabase write imports in ${path.split("/").slice(-2).join("/")}`, () => {
       expect(content).not.toMatch(/from\s+["']@\/integrations\/supabase/);
       expect(content).not.toMatch(/supabase\.from\(/);

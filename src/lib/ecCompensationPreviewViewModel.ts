@@ -11,19 +11,13 @@
  *
  * Audit reference: docs/audits/ec-temperature-compensation-feasibility.md
  */
-import {
-  computeEcCompensation,
-  type EcCompensationInput,
-} from "@/lib/ecCompensationRules";
+import { computeEcCompensation, type EcCompensationInput } from "@/lib/ecCompensationRules";
 import type { EcUnit } from "@/constants/units";
 
 export const EC_COMPENSATION_PREVIEW_LABEL = "EC @25°C preview" as const;
-export const EC_COMPENSATION_PREVIEW_UNAVAILABLE =
-  "EC compensation unavailable" as const;
-export const EC_COMPENSATION_PREVIEW_NEEDS_REVIEW =
-  "Needs unit review" as const;
-export const EC_COMPENSATION_PREVIEW_DISCLAIMER =
-  "Read-only estimate. Not stored." as const;
+export const EC_COMPENSATION_PREVIEW_UNAVAILABLE = "EC compensation unavailable" as const;
+export const EC_COMPENSATION_PREVIEW_NEEDS_REVIEW = "Needs unit review" as const;
+export const EC_COMPENSATION_PREVIEW_DISCLAIMER = "Read-only estimate. Not stored." as const;
 
 export type EcCompensationPreviewTone = "ok" | "review" | "unavailable";
 

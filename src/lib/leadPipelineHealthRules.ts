@@ -54,11 +54,9 @@ export function evaluatePipelineHealth(
       id: "no_leads",
       severity: "info",
       title: "No leads in current view",
-      message:
-        "There are no leads matching the active filters / search.",
+      message: "There are no leads matching the active filters / search.",
       metricValue: 0,
-      recommendation:
-        "Clear filters or broaden the search to see pipeline activity.",
+      recommendation: "Clear filters or broaden the search to see pipeline activity.",
       sortWeight: 10,
     });
     return sortHealthWarnings(out);
@@ -83,8 +81,7 @@ export function evaluatePipelineHealth(
       title: "Too many leads need first contact",
       message: `${summary.needsFirstContact}/${total} leads (${pctNeedsFirstContact}%) are awaiting first contact.`,
       metricValue: pctNeedsFirstContact,
-      recommendation:
-        "Reach out to the newest uncontacted leads to clear the backlog.",
+      recommendation: "Reach out to the newest uncontacted leads to clear the backlog.",
       sortWeight: 90 + Math.round(pctNeedsFirstContact),
     });
   }
@@ -97,8 +94,7 @@ export function evaluatePipelineHealth(
       title: "Many leads stuck in follow-up",
       message: `${summary.followUp}/${total} leads (${pctFollowUp}%) are in follow-up.`,
       metricValue: pctFollowUp,
-      recommendation:
-        "Review follow-up dates and decide which leads to close or escalate.",
+      recommendation: "Review follow-up dates and decide which leads to close or escalate.",
       sortWeight: 60 + Math.round(pctFollowUp),
     });
   }
@@ -111,8 +107,7 @@ export function evaluatePipelineHealth(
       title: "Low close rate",
       message: `Only ${summary.percentClosed}% of leads in view are closed.`,
       metricValue: summary.percentClosed,
-      recommendation:
-        "Check whether qualified leads are progressing to a close decision.",
+      recommendation: "Check whether qualified leads are progressing to a close decision.",
       sortWeight: 50 + Math.round(50 - summary.percentClosed),
     });
   }
@@ -125,8 +120,7 @@ export function evaluatePipelineHealth(
       title: "Many leads need manual review",
       message: `${summary.reviewManually}/${total} leads (${pctReview}%) need manual review.`,
       metricValue: pctReview,
-      recommendation:
-        "Inspect leads with ambiguous data and resolve their status.",
+      recommendation: "Inspect leads with ambiguous data and resolve their status.",
       sortWeight: 80 + Math.round(pctReview),
     });
   }
@@ -139,8 +133,7 @@ export function evaluatePipelineHealth(
       title: "High unknown source rate",
       message: `${unknownSourceCount}/${total} leads (${pctUnknownSource}%) have no source recorded.`,
       metricValue: pctUnknownSource,
-      recommendation:
-        "Capture the source on intake forms to improve channel reporting.",
+      recommendation: "Capture the source on intake forms to improve channel reporting.",
       sortWeight: 70 + Math.round(pctUnknownSource),
     });
   }
@@ -153,8 +146,7 @@ export function evaluatePipelineHealth(
       title: "High unknown lead-type rate",
       message: `${unknownTypeCount}/${total} leads (${pctUnknownType}%) have no lead type recorded.`,
       metricValue: pctUnknownType,
-      recommendation:
-        "Require a lead type at capture or set it during review.",
+      recommendation: "Require a lead type at capture or set it during review.",
       sortWeight: 70 + Math.round(pctUnknownType),
     });
   }
@@ -167,8 +159,7 @@ export function evaluatePipelineHealth(
       title: "Low average lead quality",
       message: `Average quality score is ${summary.averageQualityScore}/100.`,
       metricValue: summary.averageQualityScore,
-      recommendation:
-        "Improve intake completeness or revisit qualification criteria.",
+      recommendation: "Improve intake completeness or revisit qualification criteria.",
       sortWeight: 40 + Math.round(50 - summary.averageQualityScore),
     });
   }
@@ -180,8 +171,7 @@ export function evaluatePipelineHealth(
       title: "Pipeline looks healthy",
       message: `No risk thresholds tripped across ${total} leads in view.`,
       metricValue: total,
-      recommendation:
-        "Keep monitoring; revisit follow-ups and close decisions regularly.",
+      recommendation: "Keep monitoring; revisit follow-ups and close decisions regularly.",
       sortWeight: 5,
     });
   }

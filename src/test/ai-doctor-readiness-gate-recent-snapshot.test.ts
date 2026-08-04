@@ -27,9 +27,7 @@ describe("AI Doctor Readiness Gate — snapshot inside 48h fresh window", () => 
         { at: new Date(NOW - 6 * HOUR).toISOString(), category: "notes" },
         { at: new Date(NOW - 24 * HOUR).toISOString(), category: "watering" },
       ],
-      recentManualSnapshots: [
-        { at: new Date(NOW - 12 * HOUR).toISOString(), severity: "ok" },
-      ],
+      recentManualSnapshots: [{ at: new Date(NOW - 12 * HOUR).toISOString(), severity: "ok" }],
       now: NOW,
     });
 

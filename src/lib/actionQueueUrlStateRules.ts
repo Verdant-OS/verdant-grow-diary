@@ -24,13 +24,7 @@ import {
 } from "@/lib/actionQueuePaginationRules";
 
 export type ActionQueueStatusUrlValue =
-  | "all"
-  | "pending"
-  | "simulated"
-  | "approved"
-  | "rejected"
-  | "completed"
-  | "cancelled";
+  "all" | "pending" | "simulated" | "approved" | "rejected" | "completed" | "cancelled";
 
 export type ActionQueueTraceUrlValue = "all" | "failed";
 

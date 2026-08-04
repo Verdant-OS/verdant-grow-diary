@@ -6,19 +6,14 @@ import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const TEMPLATE_PATH = resolve(
-  __dirname,
-  "../../.github/pull_request_template.md",
-);
+const TEMPLATE_PATH = resolve(__dirname, "../../.github/pull_request_template.md");
 
 describe("GitHub pull request template", () => {
   it("exists at .github/pull_request_template.md", () => {
     expect(existsSync(TEMPLATE_PATH)).toBe(true);
   });
 
-  const content = existsSync(TEMPLATE_PATH)
-    ? readFileSync(TEMPLATE_PATH, "utf8")
-    : "";
+  const content = existsSync(TEMPLATE_PATH) ? readFileSync(TEMPLATE_PATH, "utf8") : "";
 
   it("references the security checklist", () => {
     expect(content).toContain("docs/security-checklist.md");

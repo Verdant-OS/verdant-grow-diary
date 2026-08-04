@@ -13,12 +13,7 @@
 // =========================================================================
 
 export type LiveSourceTruthVerdict =
-  | "verified_live"
-  | "unverified_live"
-  | "not_live_proof"
-  | "stale"
-  | "invalid"
-  | "mismatch";
+  "verified_live" | "unverified_live" | "not_live_proof" | "stale" | "invalid" | "mismatch";
 
 export type LiveSourceTruthSource = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 
@@ -59,12 +54,7 @@ export interface LiveSourceTruthEvidence {
 }
 
 export type LiveSourceTruthMetricStatus =
-  | "match"
-  | "missing_controller"
-  | "missing_backend"
-  | "mismatch"
-  | "invalid"
-  | "not_checked";
+  "match" | "missing_controller" | "missing_backend" | "mismatch" | "invalid" | "not_checked";
 
 export interface LiveSourceTruthMetricResult {
   readonly key: LiveSourceTruthMetricKey;

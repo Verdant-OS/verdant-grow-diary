@@ -10,10 +10,15 @@ import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { VERDANT_HERO } from "@/constants/verdantPositioningCopy";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+  getRouteAliasRedirectTarget,
+} from "./helpers/routeManifestSyncHarness";
 
 const readSrc = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 
-const APP = readSrc("App.tsx");
+const APP = readAllRouteModuleSources();
 const LANDING = readSrc("pages/Landing.tsx");
 const SHELL = readSrc("components/AppShell.tsx");
 
@@ -21,14 +26,18 @@ describe("Demo page + route removal", () => {
   it("pages/Demo.tsx is removed from the codebase", () => {
     expect(existsSync(resolve(__dirname, "..", "pages/Demo.tsx"))).toBe(false);
   });
-  it("App.tsx does not import a Demo page component", () => {
-    expect(APP).not.toMatch(/from\s+["']\.\/pages\/Demo["']/);
+  it("file routes do not import a Demo page component", () => {
+    expect(APP).not.toMatch(/from\s+["'][^"']*pages\/Demo["']/);
+    expect(APP).not.toMatch(/import\(\s*["'][^"']*pages\/Demo["']\s*\)/);
   });
   it("/demo route does not render a Demo component", () => {
-    expect(APP).not.toMatch(/element=\{<Demo\s*\/>\}/);
+    // Avoid matching DemoProofWalkthrough and similar names.
+    expect(APP).not.toMatch(/return\s+<Demo[\s/>]/);
+    expect(APP).not.toMatch(/from\s+["'][^"']*\/pages\/Demo["']/);
   });
   it("/demo redirects to the public landing (no broken bookmark)", () => {
-    expect(APP).toMatch(/path="\/demo"\s+element=\{<RouteAliasRedirect\s+to="\/welcome"\s*\/>\}/);
+    expect(extractMountedAppRoutePaths()).toContain("/demo");
+    expect(getRouteAliasRedirectTarget("/demo")).toBe("/welcome");
   });
 });
 

@@ -44,9 +44,7 @@ export function hasLinkedAiDoctorResult(details: unknown): boolean {
     d.ai_doctor_result_id,
     d.aiDoctorResultId,
   ];
-  return candidates.some(
-    (v) => typeof v === "string" && v.trim().length > 0,
-  );
+  return candidates.some((v) => typeof v === "string" && v.trim().length > 0);
 }
 
 export interface PhotoNonDiagnosticLabelInput {
@@ -61,9 +59,7 @@ export interface PhotoNonDiagnosticLabelInput {
  *   - linked to AI Doctor result     → false (req 4 — no duplicate/contradictory copy)
  *   - otherwise (photo present, no link) → true
  */
-export function shouldShowPhotoNonDiagnosticLabel(
-  input: PhotoNonDiagnosticLabelInput,
-): boolean {
+export function shouldShowPhotoNonDiagnosticLabel(input: PhotoNonDiagnosticLabelInput): boolean {
   if (!input.hasPhoto) return false;
   if (hasLinkedAiDoctorResult(input.details)) return false;
   return true;

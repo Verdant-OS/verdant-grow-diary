@@ -110,11 +110,19 @@ async function main() {
 
     // 5. Read another user's object is rejected.
     const cross = await aClient.storage.from(BUCKET).createSignedUrl(seededB, 60);
-    check("user A cannot read user B object", !!cross.error || !cross.data?.signedUrl, "unexpected success");
+    check(
+      "user A cannot read user B object",
+      !!cross.error || !cross.data?.signedUrl,
+      "unexpected success",
+    );
 
     // 6. UPDATE is denied (no policy granted).
     const upd = await aClient.storage.from(BUCKET).upload(ownPath, file, { upsert: true });
-    check("user A cannot update own object (no UPDATE policy granted)", !!upd.error, "unexpected success");
+    check(
+      "user A cannot update own object (no UPDATE policy granted)",
+      !!upd.error,
+      "unexpected success",
+    );
 
     // 7. DELETE is denied (no policy granted).
     const del = await aClient.storage.from(BUCKET).remove([ownPath]);
@@ -128,7 +136,11 @@ async function main() {
 
     // Cross-prove: user B can read their seeded object.
     const bRead = await bClient.storage.from(BUCKET).createSignedUrl(seededB, 60);
-    check("user B can read own seeded object", !bRead.error && !!bRead.data?.signedUrl, bRead.error?.message);
+    check(
+      "user B can read own seeded object",
+      !bRead.error && !!bRead.data?.signedUrl,
+      bRead.error?.message,
+    );
   } finally {
     if (paths.length) await admin.storage.from(BUCKET).remove(paths);
     await admin.auth.admin.deleteUser(userA.id);

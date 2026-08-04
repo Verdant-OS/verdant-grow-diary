@@ -128,9 +128,9 @@ describe("Diary Calendar — Environment Check polish", () => {
     render(<DiaryCalendarSection rawEntries={[MIXED[4]]} />);
     expect(screen.getByText(ENVIRONMENT_CHECK_NO_VALUES_COPY)).toBeInTheDocument();
     // Disclaimer must remain visible regardless of missing values.
-    expect(
-      screen.getByTestId("diary-calendar-event-subtitle"),
-    ).toHaveTextContent(/not live sensor telemetry/i);
+    expect(screen.getByTestId("diary-calendar-event-subtitle")).toHaveTextContent(
+      /not live sensor telemetry/i,
+    );
   });
 
   it("environment events are never marked as sensor_readings", () => {

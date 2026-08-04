@@ -16,12 +16,18 @@ describe("paddle webhook subscription update handoff", () => {
     expect(WEBHOOK_SRC).toMatch(
       /const rpcName = processing\.isFounderCandidate\s*\?\s*"allocate_founder_lifetime_with_audit"\s*:\s*"apply_paddle_subscription_update_with_audit";/,
     );
-    expect(WEBHOOK_SRC).toMatch(/await supabase\.rpc\(rpcName,\s*\{\s*p_processing_id: processing\.id,?\s*\}/);
+    expect(WEBHOOK_SRC).toMatch(
+      /await supabase\.rpc\(rpcName,\s*\{\s*p_processing_id: processing\.id,?\s*\}/,
+    );
 
-    const eventInsertIdx = WEBHOOK_SRC.indexOf('.from("paddle_events").insert');
+    const eventInsertIdx = WEBHOOK_SRC.search(/\.from\(["']paddle_events["']\)\s*\.insert/);
     const processingIdx = WEBHOOK_SRC.indexOf("recordProcessing(supabase, recordedEvent)");
-    const linkCaptureIdx = WEBHOOK_SRC.indexOf("captureBillingCustomerLink(supabase, recordedEvent)");
-    const updateIdx = WEBHOOK_SRC.lastIndexOf("applyPaddleSubscriptionUpdate(supabase, processing, linkCapture)");
+    const linkCaptureIdx = WEBHOOK_SRC.indexOf(
+      "captureBillingCustomerLink(supabase, recordedEvent)",
+    );
+    const updateIdx = WEBHOOK_SRC.lastIndexOf(
+      "applyPaddleSubscriptionUpdate(supabase, processing, linkCapture)",
+    );
 
     expect(eventInsertIdx).toBeGreaterThan(-1);
     expect(processingIdx).toBeGreaterThan(eventInsertIdx);
@@ -32,8 +38,12 @@ describe("paddle webhook subscription update handoff", () => {
   it("also preserves duplicate event ordering before updater handoff", () => {
     const duplicateFetchIdx = WEBHOOK_SRC.indexOf("fetchExistingPaddleEvent(supabase, eventId)");
     const processingIdx = WEBHOOK_SRC.indexOf("recordProcessing(supabase, existingEvent)");
-    const linkCaptureIdx = WEBHOOK_SRC.indexOf("captureBillingCustomerLink(supabase, existingEvent)");
-    const updateIdx = WEBHOOK_SRC.indexOf("applyPaddleSubscriptionUpdate(supabase, processing, linkCapture)");
+    const linkCaptureIdx = WEBHOOK_SRC.indexOf(
+      "captureBillingCustomerLink(supabase, existingEvent)",
+    );
+    const updateIdx = WEBHOOK_SRC.indexOf(
+      "applyPaddleSubscriptionUpdate(supabase, processing, linkCapture)",
+    );
 
     expect(duplicateFetchIdx).toBeGreaterThan(-1);
     expect(processingIdx).toBeGreaterThan(duplicateFetchIdx);
@@ -56,7 +66,9 @@ describe("paddle webhook subscription update handoff", () => {
     const rawIdx = WEBHOOK_SRC.indexOf("req.text()");
     const verifyIdx = WEBHOOK_SRC.indexOf("await verifyPaddleWebhookSignature(");
     const parseIdx = WEBHOOK_SRC.indexOf("JSON.parse(rawBody)");
-    const updateIdx = WEBHOOK_SRC.indexOf("applyPaddleSubscriptionUpdate(supabase, processing, linkCapture)");
+    const updateIdx = WEBHOOK_SRC.indexOf(
+      "applyPaddleSubscriptionUpdate(supabase, processing, linkCapture)",
+    );
 
     expect(sandboxIdx).toBeGreaterThan(-1);
     expect(rawIdx).toBeGreaterThan(sandboxIdx);

@@ -10,18 +10,12 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent } from "@testing-library/react";
 import StructuredDiagnosisCard from "@/components/StructuredDiagnosisCard";
-import {
-  CONFIDENCE_CEILING_CAPS,
-  CONFIDENCE_LIMITED_COPY,
-} from "@/lib/aiDoctorConfidenceRules";
+import { CONFIDENCE_CEILING_CAPS, CONFIDENCE_LIMITED_COPY } from "@/lib/aiDoctorConfidenceRules";
 import type { Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
 
 const ROOT = resolve(__dirname, "../..");
 const COACH = readFileSync(resolve(ROOT, "src/pages/Coach.tsx"), "utf8");
-const CARD = readFileSync(
-  resolve(ROOT, "src/components/StructuredDiagnosisCard.tsx"),
-  "utf8",
-);
+const CARD = readFileSync(resolve(ROOT, "src/components/StructuredDiagnosisCard.tsx"), "utf8");
 
 function base(overrides: Partial<Diagnosis> = {}): Diagnosis {
   return {
@@ -53,10 +47,7 @@ function base(overrides: Partial<Diagnosis> = {}): Diagnosis {
 describe("StructuredDiagnosisCard — confidence harmonization", () => {
   it("caps displayed confidence when context ceiling is medium", () => {
     render(
-      <StructuredDiagnosisCard
-        diagnosis={base({ confidence: 0.9 })}
-        contextCeiling="medium"
-      />,
+      <StructuredDiagnosisCard diagnosis={base({ confidence: 0.9 })} contextCeiling="medium" />,
     );
     const conf = screen.getByTestId("ai-doctor-diagnosis-confidence");
     const expectedPct = Math.round(CONFIDENCE_CEILING_CAPS.medium * 100);
@@ -67,30 +58,19 @@ describe("StructuredDiagnosisCard — confidence harmonization", () => {
 
   it("preserves confidence below the context ceiling", () => {
     render(
-      <StructuredDiagnosisCard
-        diagnosis={base({ confidence: 0.4 })}
-        contextCeiling="medium"
-      />,
+      <StructuredDiagnosisCard diagnosis={base({ confidence: 0.4 })} contextCeiling="medium" />,
     );
     const conf = screen.getByTestId("ai-doctor-diagnosis-confidence");
     expect(conf.textContent).toMatch(/40%/);
     expect(conf.getAttribute("data-capped")).toBe("false");
-    expect(
-      screen.queryByTestId("ai-doctor-diagnosis-confidence-limited-copy"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-diagnosis-confidence-limited-copy")).toBeNull();
   });
 
   it("renders the confidence-limited copy when capped", () => {
-    render(
-      <StructuredDiagnosisCard
-        diagnosis={base({ confidence: 0.95 })}
-        contextCeiling="low"
-      />,
+    render(<StructuredDiagnosisCard diagnosis={base({ confidence: 0.95 })} contextCeiling="low" />);
+    expect(screen.getByTestId("ai-doctor-diagnosis-confidence-limited-copy").textContent).toBe(
+      CONFIDENCE_LIMITED_COPY,
     );
-    expect(
-      screen.getByTestId("ai-doctor-diagnosis-confidence-limited-copy")
-        .textContent,
-    ).toBe(CONFIDENCE_LIMITED_COPY);
   });
 
   it("injects missing-information guidance when cap drops confidence below threshold", () => {
@@ -107,16 +87,10 @@ describe("StructuredDiagnosisCard — confidence harmonization", () => {
   it("still requires manual click for suggested actions", () => {
     const onAdd = vi.fn();
     render(
-      <StructuredDiagnosisCard
-        diagnosis={base()}
-        contextCeiling="medium"
-        onAddToQueue={onAdd}
-      />,
+      <StructuredDiagnosisCard diagnosis={base()} contextCeiling="medium" onAddToQueue={onAdd} />,
     );
     expect(onAdd).not.toHaveBeenCalled();
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-diagnosis-suggested-action-0-add-button"),
-    );
+    fireEvent.click(screen.getByTestId("ai-doctor-diagnosis-suggested-action-0-add-button"));
     expect(onAdd).toHaveBeenCalledTimes(1);
   });
 });
@@ -139,10 +113,7 @@ describe("Static safety", () => {
   });
 
   it("rules helper is pure (no fetch, supabase, or window)", () => {
-    const rules = readFileSync(
-      resolve(ROOT, "src/lib/aiDoctorConfidenceRules.ts"),
-      "utf8",
-    );
+    const rules = readFileSync(resolve(ROOT, "src/lib/aiDoctorConfidenceRules.ts"), "utf8");
     expect(rules).not.toMatch(/fetch\(|supabase|service_role|window\./);
   });
 });

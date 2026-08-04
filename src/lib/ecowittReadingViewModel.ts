@@ -19,10 +19,7 @@ import {
   type EcowittNormalizedSnapshot,
   type NormalizeEcowittOptions,
 } from "@/lib/ecowittPayloadRules";
-import {
-  resolveSensorSourceLabel,
-  type ResolvedSourceLabel,
-} from "@/lib/sensorSourceLabelRules";
+import { resolveSensorSourceLabel, type ResolvedSourceLabel } from "@/lib/sensorSourceLabelRules";
 import type { SensorReadingSource } from "@/mock";
 
 export interface EcowittCandidate {
@@ -59,7 +56,6 @@ export interface EcowittSnapshotViewModel {
   /** Calm copy describing why the snapshot is unavailable, or null. */
   unavailableReason: string | null;
 }
-
 
 const EMPTY_STATE_MESSAGE =
   "No EcoWitt readings yet. Send a local test payload to verify the integration.";
@@ -186,7 +182,6 @@ export function buildEcowittSnapshotViewModel(
       : null,
   };
 }
-
 
 export const ECOWITT_EMPTY_STATE_MESSAGE = EMPTY_STATE_MESSAGE;
 export const ECOWITT_DERIVED_VPD_LABEL = "Derived VPD";

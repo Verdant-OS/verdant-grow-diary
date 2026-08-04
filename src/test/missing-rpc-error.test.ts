@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  isMissingRpcError,
-  MissingAuditRpcError,
-} from "@/lib/rpcAvailability/missingRpcError";
+import { isMissingRpcError, MissingAuditRpcError } from "@/lib/rpcAvailability/missingRpcError";
 
 describe("isMissingRpcError", () => {
   const rpc = "breeding_log_save_event";
@@ -30,10 +27,7 @@ describe("isMissingRpcError", () => {
 
   it("detects the missing-RPC message text without a code", () => {
     expect(
-      isMissingRpcError(
-        { message: `Could not find the function public.${rpc}(...)` },
-        rpc,
-      ),
+      isMissingRpcError({ message: `Could not find the function public.${rpc}(...)` }, rpc),
     ).toBe(true);
   });
 
@@ -62,9 +56,7 @@ describe("isMissingRpcError", () => {
   });
 
   it("returns false for generic Supabase errors", () => {
-    expect(
-      isMissingRpcError({ code: "23505", message: "duplicate key value" }, rpc),
-    ).toBe(false);
+    expect(isMissingRpcError({ code: "23505", message: "duplicate key value" }, rpc)).toBe(false);
   });
 
   it("returns false for non-object inputs and cyclic guards", () => {

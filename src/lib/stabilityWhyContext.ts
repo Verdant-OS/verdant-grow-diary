@@ -8,11 +8,7 @@
  *   - Read-only derivation from VpdStage → display copy.
  *   - Reuses canonical band table via `getVpdTargetBand`.
  */
-import {
-  getVpdTargetBand,
-  normalizeVpdStage,
-  type VpdStage,
-} from "@/lib/vpdStageTargetRules";
+import { getVpdTargetBand, normalizeVpdStage, type VpdStage } from "@/lib/vpdStageTargetRules";
 
 export type StabilityWhyKind = "stage" | "context_only" | "unavailable";
 

@@ -17,8 +17,7 @@ import {
   type LayoutStorage,
 } from "@/lib/leadCommandCenterLayoutRules";
 
-const readSrc = (p: string) =>
-  readFileSync(resolve(__dirname, "..", p), "utf8");
+const readSrc = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 const RULES = readSrc("lib/leadCommandCenterLayoutRules.ts");
 const COMPONENT = readSrc("components/LeadCommandCenterLayoutControls.tsx");
 const PAGE = readSrc("pages/Leads.tsx");
@@ -44,9 +43,7 @@ describe("leadCommandCenterLayoutRules — safety", () => {
   });
 
   it("serialized payload contains only id/collapsed/order keys", () => {
-    const json = serializeLeadCommandCenterLayout(
-      defaultLeadCommandCenterLayout(),
-    );
+    const json = serializeLeadCommandCenterLayout(defaultLeadCommandCenterLayout());
     const parsed = JSON.parse(json);
     for (const s of parsed.sections) {
       expect(Object.keys(s).sort()).toEqual(["collapsed", "id", "order"]);
@@ -56,7 +53,9 @@ describe("leadCommandCenterLayoutRules — safety", () => {
   it("never persists lead data fields (no email/name/notes keys)", () => {
     const layout = defaultLeadCommandCenterLayout();
     const json = serializeLeadCommandCenterLayout(layout);
-    expect(json).not.toMatch(/\b(email|notes|phone|message|lead_type|created_at|operator_notes)\b/i);
+    expect(json).not.toMatch(
+      /\b(email|notes|phone|message|lead_type|created_at|operator_notes)\b/i,
+    );
   });
 
   it("is wired into Leads page", () => {
@@ -82,15 +81,11 @@ describe("layout defaults & sanitization", () => {
     const s = memStorage({
       [LEAD_COMMAND_CENTER_LAYOUT_STORAGE_KEY]: "{not json",
     });
-    expect(loadLeadCommandCenterLayout(s)).toEqual(
-      defaultLeadCommandCenterLayout(),
-    );
+    expect(loadLeadCommandCenterLayout(s)).toEqual(defaultLeadCommandCenterLayout());
   });
 
   it("empty localStorage falls back to defaults", () => {
-    expect(loadLeadCommandCenterLayout(memStorage())).toEqual(
-      defaultLeadCommandCenterLayout(),
-    );
+    expect(loadLeadCommandCenterLayout(memStorage())).toEqual(defaultLeadCommandCenterLayout());
   });
 
   it("drops unknown section ids", () => {
@@ -100,9 +95,7 @@ describe("layout defaults & sanitization", () => {
         { id: "totally_fake", collapsed: true, order: 1 },
       ],
     });
-    expect(out.sections.some((s) => s.id === ("totally_fake" as never))).toBe(
-      false,
-    );
+    expect(out.sections.some((s) => s.id === ("totally_fake" as never))).toBe(false);
   });
 
   it("removes duplicate section ids (first wins)", () => {
@@ -125,9 +118,7 @@ describe("layout defaults & sanitization", () => {
     expect(ids[0]).toBe("analytics");
     for (const id of DEFAULT_SECTION_ORDER) expect(ids).toContain(id);
     // order indices are contiguous
-    expect(out.sections.map((s) => s.order)).toEqual(
-      out.sections.map((_, i) => i),
-    );
+    expect(out.sections.map((s) => s.order)).toEqual(out.sections.map((_, i) => i));
   });
 
   it("toggle collapse is pure and round-trips", () => {
@@ -141,15 +132,10 @@ describe("layout defaults & sanitization", () => {
 
   it("save + load round-trips collapsed state deterministically", () => {
     const s = memStorage();
-    const toggled = toggleSectionCollapsed(
-      defaultLeadCommandCenterLayout(),
-      "analytics",
-    );
+    const toggled = toggleSectionCollapsed(defaultLeadCommandCenterLayout(), "analytics");
     saveLeadCommandCenterLayout(toggled, s);
     const loaded = loadLeadCommandCenterLayout(s);
-    expect(loaded.sections.find((x) => x.id === "analytics")?.collapsed).toBe(
-      true,
-    );
+    expect(loaded.sections.find((x) => x.id === "analytics")?.collapsed).toBe(true);
     const loaded2 = loadLeadCommandCenterLayout(s);
     expect(loaded).toEqual(loaded2);
   });
@@ -161,18 +147,12 @@ describe("layout defaults & sanitization", () => {
         { id: "guidance", collapsed: false, order: 0 },
       ],
     };
-    expect(sanitizeLeadCommandCenterLayout(input)).toEqual(
-      sanitizeLeadCommandCenterLayout(input),
-    );
+    expect(sanitizeLeadCommandCenterLayout(input)).toEqual(sanitizeLeadCommandCenterLayout(input));
   });
 
   it("non-object payloads yield defaults", () => {
-    expect(sanitizeLeadCommandCenterLayout(null)).toEqual(
-      defaultLeadCommandCenterLayout(),
-    );
-    expect(sanitizeLeadCommandCenterLayout(42)).toEqual(
-      defaultLeadCommandCenterLayout(),
-    );
+    expect(sanitizeLeadCommandCenterLayout(null)).toEqual(defaultLeadCommandCenterLayout());
+    expect(sanitizeLeadCommandCenterLayout(42)).toEqual(defaultLeadCommandCenterLayout());
     expect(sanitizeLeadCommandCenterLayout({ sections: "x" })).toEqual(
       defaultLeadCommandCenterLayout(),
     );

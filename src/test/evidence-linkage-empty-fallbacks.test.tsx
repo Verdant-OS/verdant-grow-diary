@@ -45,15 +45,13 @@ describe("originating timeline event adapter — empty/null/malformed safety", (
   });
 
   it("returns [] when the row field is null", () => {
-    expect(
-      adaptOriginatingTimelineEventsFromRow({ originating_timeline_events: null }),
-    ).toEqual([]);
+    expect(adaptOriginatingTimelineEventsFromRow({ originating_timeline_events: null })).toEqual(
+      [],
+    );
   });
 
   it("returns [] when the row field is an empty array", () => {
-    expect(
-      adaptOriginatingTimelineEventsFromRow({ originating_timeline_events: [] }),
-    ).toEqual([]);
+    expect(adaptOriginatingTimelineEventsFromRow({ originating_timeline_events: [] })).toEqual([]);
   });
 
   it("returns [] when the row field is malformed (not an array)", () => {
@@ -144,7 +142,9 @@ describe("EvidenceLinkageBadges — provenance-aware fallback rendering", () => 
         fallbackCopy={ALERT_REVIEW_EVIDENCE_NOT_LINKED_COPY}
       />,
     );
-    const text = (screen.getByTestId("evidence-linkage-badges-empty").textContent ?? "").toLowerCase();
+    const text = (
+      screen.getByTestId("evidence-linkage-badges-empty").textContent ?? ""
+    ).toLowerCase();
     for (const banned of [
       "raw_payload",
       "rawpayload",

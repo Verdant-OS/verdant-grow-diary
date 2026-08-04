@@ -26,8 +26,7 @@ vi.mock("@/hooks/usePaddleCheckout", () => ({
 }));
 
 vi.mock("@/lib/paddleConfig", async () => {
-  const actual =
-    await vi.importActual<typeof import("@/lib/paddleConfig")>("@/lib/paddleConfig");
+  const actual = await vi.importActual<typeof import("@/lib/paddleConfig")>("@/lib/paddleConfig");
   return {
     ...actual,
     resolvePaddleConfig: () => ({

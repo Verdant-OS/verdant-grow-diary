@@ -18,10 +18,7 @@
  *  - Source-honest wording only: no telemetry-state marketing language.
  */
 
-import {
-  validateManualSnapshot,
-  type ManualSnapshotInput,
-} from "@/lib/manualSensorSnapshotRules";
+import { validateManualSnapshot, type ManualSnapshotInput } from "@/lib/manualSensorSnapshotRules";
 import type { ManualSnapshotRecord } from "@/lib/manualSensorSnapshotViewModel";
 
 export const QUICKLOG_V2_ENV_EVENT_TYPE = "environment" as const;
@@ -44,8 +41,7 @@ export interface QuickLogV2EnvironmentRow {
 }
 
 export type QuickLogV2SnapshotScope =
-  | { kind: "plant"; plantId: string; tentId?: string | null }
-  | { kind: "tent"; tentId: string };
+  { kind: "plant"; plantId: string; tentId?: string | null } | { kind: "tent"; tentId: string };
 
 function finiteOrNull(v: unknown): number | null {
   if (v == null) return null;
@@ -100,9 +96,7 @@ export function filterQuickLogV2EnvironmentRowsByScope(
   });
 }
 
-function toValidatorInput(
-  env: QuickLogV2EnvironmentRow["environment"],
-): ManualSnapshotInput {
+function toValidatorInput(env: QuickLogV2EnvironmentRow["environment"]): ManualSnapshotInput {
   const input: ManualSnapshotInput = {};
   const tempC = finiteOrNull(env?.temperature_c);
   if (tempC !== null) {

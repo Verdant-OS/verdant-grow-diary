@@ -23,13 +23,7 @@
  */
 
 /** Canonical source vocabulary. Mirrors docs/data-labeling-spec.md. */
-export type GreenhouseSource =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid";
+export type GreenhouseSource = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 
 const CANONICAL_SOURCES: ReadonlySet<string> = new Set([
   "live",
@@ -73,11 +67,7 @@ export interface PpfdSample {
 }
 
 export type DliWindowStatus =
-  | "ok"
-  | "invalid_timezone"
-  | "dst_ambiguous"
-  | "insufficient_samples"
-  | "no_healthy_samples";
+  "ok" | "invalid_timezone" | "dst_ambiguous" | "insufficient_samples" | "no_healthy_samples";
 
 export interface AggregateDliInput {
   samples: ReadonlyArray<PpfdSample>;
@@ -323,9 +313,7 @@ export interface DarkCycleLeakResult {
  * command, and never schedules an action. It exists so a human can
  * verify whether the greenhouse went truly dark.
  */
-export function detectDarkCycleLeak(
-  input: DarkCycleLeakInput,
-): DarkCycleLeakResult {
+export function detectDarkCycleLeak(input: DarkCycleLeakInput): DarkCycleLeakResult {
   if (!isValidIanaTz(input?.tzIana)) {
     return {
       status: "invalid_window",

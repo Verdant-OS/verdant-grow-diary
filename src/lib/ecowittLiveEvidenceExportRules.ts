@@ -16,9 +16,7 @@
  *  - Does not mutate input.
  */
 
-import type {
-  EcowittLiveEvidenceFormState,
-} from "./ecowittLiveEvidenceFormRules";
+import type { EcowittLiveEvidenceFormState } from "./ecowittLiveEvidenceFormRules";
 import type { LiveSourceTruthGateResult } from "./liveSourceTruthGateRules";
 import type { EcowittPerPlantResult } from "./ecowittLiveEvidenceMultiPlantRules";
 import type { EcowittEvidenceUnitWarning } from "./ecowittLiveEvidenceUnitWarningRules";
@@ -27,11 +25,9 @@ import type { EcowittTonightModeViewModel } from "./ecowittTonightModeViewModel"
 export const ECOWITT_LIVE_EVIDENCE_EXPORT_SCHEMA_VERSION =
   "ecowitt-live-evidence-snapshot.v1" as const;
 
-export const ECOWITT_LIVE_EVIDENCE_EXPORT_TYPE =
-  "manual_operator_evidence" as const;
+export const ECOWITT_LIVE_EVIDENCE_EXPORT_TYPE = "manual_operator_evidence" as const;
 
-export const ECOWITT_LIVE_EVIDENCE_EXPORT_ROUTE =
-  "/operator/ecowitt-live-bringup" as const;
+export const ECOWITT_LIVE_EVIDENCE_EXPORT_ROUTE = "/operator/ecowitt-live-bringup" as const;
 
 export const ECOWITT_LIVE_EVIDENCE_EXPORT_WARNING =
   "This is a manual operator evidence snapshot. It is not database proof and does not prove live sensor truth by itself." as const;
@@ -39,17 +35,16 @@ export const ECOWITT_LIVE_EVIDENCE_EXPORT_WARNING =
 export const ECOWITT_LIVE_EVIDENCE_EXPORT_DISCLAIMER =
   "Only treat evidence as live proof after comparing real EcoWitt/controller values against backend evidence and confirming source, captured_at, payload presence, confidence, and units." as const;
 
-export const ECOWITT_LIVE_EVIDENCE_EXPORT_SAFETY_FLAGS: readonly string[] =
-  Object.freeze([
-    "manual_snapshot_only",
-    "not_database_proof",
-    "requires_controller_comparison",
-    "requires_device_identity_confirmation",
-    "requires_timestamp_sanity_check",
-    "no_device_control",
-    "approval_required_for_actions",
-    "do_not_use_demo_as_live",
-  ]);
+export const ECOWITT_LIVE_EVIDENCE_EXPORT_SAFETY_FLAGS: readonly string[] = Object.freeze([
+  "manual_snapshot_only",
+  "not_database_proof",
+  "requires_controller_comparison",
+  "requires_device_identity_confirmation",
+  "requires_timestamp_sanity_check",
+  "no_device_control",
+  "approval_required_for_actions",
+  "do_not_use_demo_as_live",
+]);
 
 export const ECOWITT_LIVE_EVIDENCE_EXPORT_EMPTY_NEXT_STEP =
   "No next steps were returned. Recheck evidence before treating data as live." as const;
@@ -163,9 +158,7 @@ function looksLikeTemplateState(form: EcowittLiveEvidenceFormState): boolean {
   const tent = (form.tent_id ?? "").trim().toLowerCase();
   const plant = (form.plant_id ?? "").trim().toLowerCase();
   return (
-    tent === "example-tent" ||
-    plant.startsWith("example-plant") ||
-    tent.startsWith("example-")
+    tent === "example-tent" || plant.startsWith("example-plant") || tent.startsWith("example-")
   );
 }
 
@@ -173,10 +166,7 @@ function looksLikeTemplateState(form: EcowittLiveEvidenceFormState): boolean {
 // Next steps assembly
 // ---------------------------------------------------------------------------
 
-function assembleNextSteps(
-  raw: readonly string[],
-  isTemplate: boolean,
-): readonly string[] {
+function assembleNextSteps(raw: readonly string[], isTemplate: boolean): readonly string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const s of raw) {
@@ -280,12 +270,9 @@ export function serializeEcowittLiveEvidenceSnapshotExport(
 }
 
 // ISO 8601 with required time portion and trailing Z.
-const ISO_RE =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
+const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
 
-export function buildEcowittLiveEvidenceSnapshotFilename(
-  generatedAt: string,
-): string {
+export function buildEcowittLiveEvidenceSnapshotFilename(generatedAt: string): string {
   if (typeof generatedAt !== "string" || !ISO_RE.test(generatedAt)) {
     return ECOWITT_LIVE_EVIDENCE_EXPORT_STATIC_FILENAME;
   }

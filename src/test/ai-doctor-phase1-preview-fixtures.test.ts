@@ -62,9 +62,7 @@ describe("aiDoctorPhase1PreviewFixtures", () => {
   });
 
   it("default case id resolves to a real case", () => {
-    const fallback = getAiDoctorPhase1PreviewCase(
-      AI_DOCTOR_PHASE1_PREVIEW_DEFAULT_CASE_ID,
-    );
+    const fallback = getAiDoctorPhase1PreviewCase(AI_DOCTOR_PHASE1_PREVIEW_DEFAULT_CASE_ID);
     expect(fallback).toBeTruthy();
     expect(fallback.id).toBe(AI_DOCTOR_PHASE1_PREVIEW_DEFAULT_CASE_ID);
   });
@@ -80,22 +78,16 @@ describe("aiDoctorPhase1PreviewFixtures", () => {
       expect(c.label.length).toBeGreaterThan(0);
       expect(c.description.length).toBeGreaterThan(0);
       expect(c.sourceMode).toBeTruthy();
-      expect(c.viewModel.summaryCard.confidence_label.toLowerCase()).toContain(
-        "low",
-      );
+      expect(c.viewModel.summaryCard.confidence_label.toLowerCase()).toContain("low");
       expect(c.viewModel.summaryCard.risk_level).toBe("low");
       expect(c.viewModel.debugMeta.displayed_confidence_level).toBe("low");
       expect(c.viewModel.debugMeta.has_live_data).toBe(false);
       expect(c.viewModel.debugMeta.source_counts.live_count).toBe(0);
-      expect(
-        c.viewModel.debugMeta.source_counts.has_recent_trustworthy_sensor_data,
-      ).toBe(false);
+      expect(c.viewModel.debugMeta.source_counts.has_recent_trustworthy_sensor_data).toBe(false);
       expect(c.viewModel.safetyPanel.overdiagnosis_warning).toMatch(
         /avoid treating this as a certain diagnosis/i,
       );
-      expect(c.viewModel.safetyPanel.automation_warning).toMatch(
-        /does not control equipment/i,
-      );
+      expect(c.viewModel.safetyPanel.automation_warning).toMatch(/does not control equipment/i);
       expect(c.viewModel.actionQueuePanel.should_show).toBe(true);
       expect(c.viewModel.actionQueuePanel.status).toBe("pending_approval");
       expect(c.viewModel.actionQueuePanel.action_type).toBe("advisory");
@@ -106,17 +98,13 @@ describe("aiDoctorPhase1PreviewFixtures", () => {
   it("demo-csv-only case carries source-truth warning and has_demo_or_csv_only", () => {
     const c = getAiDoctorPhase1PreviewCase("demo-csv-only");
     expect(c.viewModel.debugMeta.has_demo_or_csv_only).toBe(true);
-    expect(c.viewModel.safetyPanel.source_truth_warning ?? "").toMatch(
-      /demo or imported/i,
-    );
+    expect(c.viewModel.safetyPanel.source_truth_warning ?? "").toMatch(/demo or imported/i);
   });
 
   it("stale-invalid-only case carries source-truth warning and has_stale_or_invalid", () => {
     const c = getAiDoctorPhase1PreviewCase("stale-invalid-only");
     expect(c.viewModel.debugMeta.has_stale_or_invalid).toBe(true);
-    expect(c.viewModel.safetyPanel.source_truth_warning ?? "").toMatch(
-      /stale or invalid/i,
-    );
+    expect(c.viewModel.safetyPanel.source_truth_warning ?? "").toMatch(/stale or invalid/i);
   });
 
   it.each(AI_DOCTOR_PHASE1_PREVIEW_CASES.map((c) => [c.id, c] as const))(

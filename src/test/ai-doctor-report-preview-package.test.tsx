@@ -87,9 +87,7 @@ function reportInput(): Omit<AiDoctorReportInput, "recommendations"> {
         { key: "vpd_kpa", statusLabel: "Accepted", value: 1.1, derived: true },
       ],
     },
-    checklist: [
-      { key: "soil_moisture_pct", label: "Capture soil moisture", state: "needed" },
-    ],
+    checklist: [{ key: "soil_moisture_pct", label: "Capture soil moisture", state: "needed" }],
   };
 }
 
@@ -101,9 +99,7 @@ describe("CSV column order", () => {
       ...reportInput(),
       recommendations: [],
     });
-    expect(csv.contents.split("\n")[0]).toBe(
-      AI_DOCTOR_EVIDENCE_CSV_COLUMNS.join(","),
-    );
+    expect(csv.contents.split("\n")[0]).toBe(AI_DOCTOR_EVIDENCE_CSV_COLUMNS.join(","));
     expect(AI_DOCTOR_EVIDENCE_CSV_COLUMNS.indexOf("citation_type")).toBeLessThan(
       AI_DOCTOR_EVIDENCE_CSV_COLUMNS.indexOf("source_honesty_note"),
     );
@@ -115,9 +111,7 @@ describe("CSV column order", () => {
       recommendations: [],
     });
     const order = ["temp_f", "humidity_pct", "vpd_kpa", "co2_ppm", "soil_moisture_pct"];
-    const positions = order.map((k) =>
-      csv.contents.indexOf(`env_metric,${k},`),
-    );
+    const positions = order.map((k) => csv.contents.indexOf(`env_metric,${k},`));
     for (let i = 0; i < positions.length - 1; i++) {
       expect(positions[i]).toBeGreaterThan(-1);
       expect(positions[i]).toBeLessThan(positions[i + 1]);
@@ -138,9 +132,33 @@ describe("CSV column order", () => {
 
 describe("filterEvidenceSearchItems", () => {
   const items: EvidenceSearchItem[] = [
-    { id: "envcheck-humidity_pct", label: "Env Check: humidity_pct", metricKey: "humidity_pct", status: "Accepted", sourceLabel: "Test/Local validation", reason: null, citationKind: "env_metric" },
-    { id: "missing-soil_moisture_pct", label: "Missing: soil_moisture_pct", metricKey: "soil_moisture_pct", status: "Missing", sourceLabel: "Not captured", reason: null, citationKind: "missing_metric" },
-    { id: "envcheck-vpd_kpa", label: "Derived VPD context", metricKey: "vpd_kpa", status: "Accepted", sourceLabel: "Test/Local validation", reason: "derived", citationKind: "env_metric_derived" },
+    {
+      id: "envcheck-humidity_pct",
+      label: "Env Check: humidity_pct",
+      metricKey: "humidity_pct",
+      status: "Accepted",
+      sourceLabel: "Test/Local validation",
+      reason: null,
+      citationKind: "env_metric",
+    },
+    {
+      id: "missing-soil_moisture_pct",
+      label: "Missing: soil_moisture_pct",
+      metricKey: "soil_moisture_pct",
+      status: "Missing",
+      sourceLabel: "Not captured",
+      reason: null,
+      citationKind: "missing_metric",
+    },
+    {
+      id: "envcheck-vpd_kpa",
+      label: "Derived VPD context",
+      metricKey: "vpd_kpa",
+      status: "Accepted",
+      sourceLabel: "Test/Local validation",
+      reason: "derived",
+      citationKind: "env_metric_derived",
+    },
   ];
   it("matches metric key", () => {
     expect(filterEvidenceSearchItems(items, "humidity").length).toBe(1);
@@ -214,12 +232,8 @@ describe("AiDoctorDiagnosisPanel — preview / package / breadcrumb / search", (
         reportInput={reportInput()}
       />,
     );
-    expect(
-      screen.getByTestId("ai-doctor-diagnosis-preview-report"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-diagnosis-download-package"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-diagnosis-preview-report")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-diagnosis-download-package")).toBeTruthy();
   });
 
   it("Preview report renders summary, basis, recommendations, metric table, checklist", () => {
@@ -233,15 +247,9 @@ describe("AiDoctorDiagnosisPanel — preview / package / breadcrumb / search", (
     fireEvent.click(screen.getByTestId("ai-doctor-diagnosis-preview-report"));
     expect(screen.getByTestId("ai-doctor-diagnosis-preview-summary")).toBeTruthy();
     expect(screen.getByTestId("ai-doctor-diagnosis-preview-basis")).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-diagnosis-preview-recommendations"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-diagnosis-preview-metric-table"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-diagnosis-preview-checklist"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-diagnosis-preview-recommendations")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-diagnosis-preview-metric-table")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-diagnosis-preview-checklist")).toBeTruthy();
     const honesty = screen.getByTestId("ai-doctor-diagnosis-preview-honesty");
     expect(honesty.textContent).not.toMatch(/\bLive\b/);
   });
@@ -251,64 +259,40 @@ describe("AiDoctorDiagnosisPanel — preview / package / breadcrumb / search", (
       <AiDoctorDiagnosisPanel
         diagnosis={diag()}
         citationContext={ctx()}
-        evidenceAlignment={{
-          posture: "moderate_context",
-          postureLabel: "Moderate evidence",
-          postureCopy: "OK.",
-          basisCopy: [],
-          guardrailWarning: null,
-          moreDataReminder: null,
-          preferredVerbs: [],
-        } as any}
+        evidenceAlignment={
+          {
+            posture: "moderate_context",
+            postureLabel: "Moderate evidence",
+            postureCopy: "OK.",
+            basisCopy: [],
+            guardrailWarning: null,
+            moreDataReminder: null,
+            preferredVerbs: [],
+          } as any
+        }
       />,
     );
-    fireEvent.click(
-      screen.getByTestId(
-        "ai-doctor-diagnosis-recommended-actions-citation-0",
-      ),
-    );
-    const crumb = screen.getByTestId(
-      "ai-doctor-diagnosis-citation-modal-breadcrumb",
-    );
+    fireEvent.click(screen.getByTestId("ai-doctor-diagnosis-recommended-actions-citation-0"));
+    const crumb = screen.getByTestId("ai-doctor-diagnosis-citation-modal-breadcrumb");
     expect(crumb.textContent).toContain("AI Doctor");
     expect(crumb.textContent).toContain("Moderate evidence");
     expect(crumb.textContent).toContain("Recommendation 1");
   });
 
   it("Back to recommendation closes modal and restores focus", async () => {
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={diag()}
-        citationContext={ctx()}
-      />,
-    );
-    const trigger = screen.getByTestId(
-      "ai-doctor-diagnosis-recommended-actions-citation-0",
-    );
+    render(<AiDoctorDiagnosisPanel diagnosis={diag()} citationContext={ctx()} />);
+    const trigger = screen.getByTestId("ai-doctor-diagnosis-recommended-actions-citation-0");
     trigger.focus();
     fireEvent.click(trigger);
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-diagnosis-citation-modal-back"),
-    );
+    fireEvent.click(screen.getByTestId("ai-doctor-diagnosis-citation-modal-back"));
     await new Promise((r) => queueMicrotask(() => r(null)));
-    expect(
-      screen.queryByTestId("ai-doctor-diagnosis-citation-modal"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-diagnosis-citation-modal")).toBeNull();
     expect(document.activeElement).toBe(trigger);
   });
 
   it("citation modal search filters items and shows empty state", () => {
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={diag()}
-        citationContext={ctx()}
-      />,
-    );
-    fireEvent.click(
-      screen.getByTestId(
-        "ai-doctor-diagnosis-recommended-actions-citation-0",
-      ),
-    );
+    render(<AiDoctorDiagnosisPanel diagnosis={diag()} citationContext={ctx()} />);
+    fireEvent.click(screen.getByTestId("ai-doctor-diagnosis-recommended-actions-citation-0"));
     const input = screen.getByTestId(
       "ai-doctor-diagnosis-citation-modal-search",
     ) as HTMLInputElement;
@@ -320,31 +304,18 @@ describe("AiDoctorDiagnosisPanel — preview / package / breadcrumb / search", (
       ),
     ).toBeTruthy();
     fireEvent.change(input, { target: { value: "zzznomatch" } });
-    expect(
-      screen.getByTestId("ai-doctor-diagnosis-citation-modal-search-empty"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-diagnosis-citation-modal-search-empty")).toBeTruthy();
   });
 
   it("selecting a search result updates the modal detail", () => {
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={diag()}
-        citationContext={ctx()}
-      />,
-    );
-    fireEvent.click(
-      screen.getByTestId(
-        "ai-doctor-diagnosis-recommended-actions-citation-0",
-      ),
-    );
+    render(<AiDoctorDiagnosisPanel diagnosis={diag()} citationContext={ctx()} />);
+    fireEvent.click(screen.getByTestId("ai-doctor-diagnosis-recommended-actions-citation-0"));
     fireEvent.click(
       screen.getByTestId(
         "ai-doctor-diagnosis-citation-modal-search-item-missing-soil_moisture_pct",
       ),
     );
-    const kind = screen.getByTestId(
-      "ai-doctor-diagnosis-citation-modal-kind",
-    );
+    const kind = screen.getByTestId("ai-doctor-diagnosis-citation-modal-kind");
     expect(kind.textContent?.toLowerCase()).toContain("missing");
   });
 });

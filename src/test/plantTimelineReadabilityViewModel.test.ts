@@ -157,17 +157,14 @@ describe("buildPlantTimelinePrintSummary", () => {
       visibleEntries: 1,
       filterKey: "all",
       groupCount: 1,
-      plantName:
-        "Real Name 11111111-2222-3333-4444-555555555555 user_id raw_payload",
+      plantName: "Real Name 11111111-2222-3333-4444-555555555555 user_id raw_payload",
       tentName: null,
       growName: null,
     });
     const ctx = p.lines.find((l) => l.key === "context");
     expect(ctx).toBeDefined();
     expect(ctx!.label).toMatch(/Real Name/);
-    expect(ctx!.label).not.toMatch(
-      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
-    );
+    expect(ctx!.label).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
     expect(ctx!.label).not.toMatch(/user_id|raw_payload/i);
   });
 
@@ -191,10 +188,7 @@ describe("buildPlantTimelinePrintSummary", () => {
 });
 
 describe("static safety — plantTimelineReadabilityViewModel.ts", () => {
-  const source = readFileSync(
-    "src/lib/plantTimelineReadabilityViewModel.ts",
-    "utf8",
-  );
+  const source = readFileSync("src/lib/plantTimelineReadabilityViewModel.ts", "utf8");
 
   it("contains no Supabase, AI, fetch, automation, write, or storage tokens", () => {
     expect(source).not.toMatch(/from\s+["']@\/integrations\/supabase/);

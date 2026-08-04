@@ -42,10 +42,7 @@ import {
   isCo2PpmRealistic,
   classifyManualMetric,
 } from "@/lib/sensorTruthRules";
-import {
-  calculateAirVpdKpa,
-  fahrenheitToCelsius,
-} from "@/lib/vpdRules";
+import { calculateAirVpdKpa, fahrenheitToCelsius } from "@/lib/vpdRules";
 import {
   ECOWITT_MQTT_STALE_MS,
   ECOWITT_MQTT_FUTURE_TOLERANCE_MS,
@@ -64,20 +61,12 @@ export const HA_TRANSPORT = "mqtt" as const;
 
 export type HaBridge = "home_assistant" | "ecowitt2mqtt";
 export type HaUpstreamMode =
-  | "ha_core_ecowitt_push"
-  | "ha_ecowitt_iot_poll"
-  | "ecowitt_custom_upload"
-  | "unknown";
+  "ha_core_ecowitt_push" | "ha_ecowitt_iot_poll" | "ecowitt_custom_upload" | "unknown";
 
 export type HaAdapterMode = "ecowitt_raw" | "ha_json" | "ha_statestream";
 
 export type HaCanonicalMetric =
-  | "air_temp_f"
-  | "humidity_pct"
-  | "soil_moisture_pct"
-  | "soil_temp_f"
-  | "co2_ppm"
-  | "vpd_kpa";
+  "air_temp_f" | "humidity_pct" | "soil_moisture_pct" | "soil_temp_f" | "co2_ppm" | "vpd_kpa";
 
 /** VPD pairing window: same-tent temp + RH must land within this window. */
 export const HA_VPD_PAIRING_WINDOW_MS = 2 * 60 * 1000;
@@ -250,7 +239,7 @@ function normalizeUnit(u: unknown): string | null {
  */
 function toFahrenheit(value: number, unit: string | null): number | null {
   if (unit === "°F") return value;
-  if (unit === "°C") return value * 9 / 5 + 32;
+  if (unit === "°C") return (value * 9) / 5 + 32;
   return null;
 }
 
@@ -259,9 +248,7 @@ function isFinitePositiveWindow(ms: unknown): ms is number {
 }
 
 /** Canonical unit for each internal metric. Values are always stored in this unit. */
-export function canonicalUnitForMetric(
-  metric: HaCanonicalMetric,
-): "°F" | "%" | "ppm" | "kPa" {
+export function canonicalUnitForMetric(metric: HaCanonicalMetric): "°F" | "%" | "ppm" | "kPa" {
   switch (metric) {
     case "air_temp_f":
     case "soil_temp_f":
@@ -402,9 +389,7 @@ function classifyFreshness(args: {
   if (!capturedAtRaw) {
     return {
       source: "invalid",
-      reasons: retained
-        ? ["retained_without_source_timestamp"]
-        : ["missing_captured_at"],
+      reasons: retained ? ["retained_without_source_timestamp"] : ["missing_captured_at"],
       capturedAt: null,
     };
   }
@@ -478,11 +463,7 @@ export function parseHaJsonMessage(args: ParseHaJsonArgs): HaAdapterResult {
     raw: args.payload,
   });
 
-  if (
-    !args.payload ||
-    typeof args.payload !== "object" ||
-    Array.isArray(args.payload)
-  ) {
+  if (!args.payload || typeof args.payload !== "object" || Array.isArray(args.payload)) {
     return rejectResult(provenanceBase, ["malformed_payload"]);
   }
   const env = args.payload as HaJsonEnvelope;
@@ -505,8 +486,7 @@ export function parseHaJsonMessage(args: ParseHaJsonArgs): HaAdapterResult {
     return rejectResult(provenanceBase, ["unknown_or_unavailable_state"]);
   }
 
-  const rawUnit =
-    env.unit_of_measurement !== undefined ? env.unit_of_measurement : env.unit;
+  const rawUnit = env.unit_of_measurement !== undefined ? env.unit_of_measurement : env.unit;
   const unit = normalizeUnit(rawUnit);
   const validated = validateAndCoerce(mapEntry.metric, stateNum, unit);
   if ("reason" in validated) return rejectResult(provenanceBase, [validated.reason]);
@@ -607,9 +587,7 @@ interface StatestreamBuffer {
 }
 
 /** Deterministic (lexicographically key-sorted) shallow copy. */
-function sortedShallowCopy(
-  obj: Record<string, unknown>,
-): Record<string, unknown> {
+function sortedShallowCopy(obj: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const k of Object.keys(obj).sort()) out[k] = obj[k];
   return out;
@@ -733,9 +711,7 @@ export class HaStatestreamAssembler {
     }
   }
 
-  private decodeAttributesBlob(
-    payload: unknown,
-  ): Record<string, unknown> | null {
+  private decodeAttributesBlob(payload: unknown): Record<string, unknown> | null {
     if (typeof payload === "string") {
       try {
         const p = JSON.parse(payload) as unknown;
@@ -761,9 +737,7 @@ export interface ParseStatestreamArgs {
   now?: Date;
 }
 
-export function parseHaStatestreamMessage(
-  args: ParseStatestreamArgs,
-): HaAdapterResult {
+export function parseHaStatestreamMessage(args: ParseStatestreamArgs): HaAdapterResult {
   const now = args.now ?? new Date();
   const { assembled } = args;
   const topic = synthTopic(args.mapping.statestream_topic_prefix ?? "", assembled.entity_id);
@@ -785,9 +759,7 @@ export function parseHaStatestreamMessage(
   if (isControlShaped(assembled.entity_id)) {
     return rejectResult(provenanceBase, ["control_shaped_entity_dropped"]);
   }
-  const mapEntry = args.mapping.entities.find(
-    (e) => e.entity_id === assembled.entity_id,
-  );
+  const mapEntry = args.mapping.entities.find((e) => e.entity_id === assembled.entity_id);
   if (!mapEntry) return rejectResult(provenanceBase, ["unknown_entity"]);
 
   const stateNum = toNumber(assembled.state);
@@ -852,9 +824,10 @@ export interface ParseEcowittRawArgs {
  * provenance envelope so downstream tooling gets one uniform shape.
  * Behavior of the underlying normalizer is unchanged.
  */
-export function parseEcowittRawMessage(
-  args: ParseEcowittRawArgs,
-): { adapter: HaAdapterResult; legacy: EcowittMqttIngestResult } {
+export function parseEcowittRawMessage(args: ParseEcowittRawArgs): {
+  adapter: HaAdapterResult;
+  legacy: EcowittMqttIngestResult;
+} {
   const legacy = normalizeEcowittMqttPayload({
     payload: args.payload,
     tentId: firstTentIdFromMapping(args.mapping),
@@ -953,9 +926,7 @@ function firstTentIdFromMapping(m: HaMqttMappingFile): string | null {
   return m.entities[0]?.tent_id ?? null;
 }
 
-function legacyReasonsToAdapterReasons(
-  reasons: readonly string[],
-): HaAdapterReason[] {
+function legacyReasonsToAdapterReasons(reasons: readonly string[]): HaAdapterReason[] {
   const out: HaAdapterReason[] = [];
   for (const r of reasons) {
     if (r === "stale_reading") out.push("stale_reading");
@@ -1063,9 +1034,7 @@ function baseProvenance(args: {
     retained: args.retained,
     captured_at: null,
     received_at: args.receivedAt.toISOString(),
-    broker_received_at: args.brokerReceivedAt
-      ? args.brokerReceivedAt.toISOString()
-      : null,
+    broker_received_at: args.brokerReceivedAt ? args.brokerReceivedAt.toISOString() : null,
     tent_id: null,
     plant_id: null,
     confidence: 0,
@@ -1074,10 +1043,7 @@ function baseProvenance(args: {
   };
 }
 
-function rejectResult(
-  base: HaProvenanceEnvelope,
-  reasons: HaAdapterReason[],
-): HaAdapterResult {
+function rejectResult(base: HaProvenanceEnvelope, reasons: HaAdapterReason[]): HaAdapterResult {
   const provenance: HaProvenanceEnvelope = {
     ...base,
     source: "invalid",

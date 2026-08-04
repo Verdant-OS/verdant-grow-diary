@@ -63,7 +63,7 @@ describe("Environment Stability Summary v1 — safety + wiring", () => {
     );
     expect(SENSORS_SRC).toContain("sensors-derived-vpd-stability-note");
     expect(SENSORS_SRC).toMatch(
-      /A derived VPD estimate is available below; stability tracking requires\s+directly recorded VPD readings\./,
+      /A derived VPD estimate is available below;[\s\S]{0,40}stability tracking requires directly recorded/,
     );
   });
 

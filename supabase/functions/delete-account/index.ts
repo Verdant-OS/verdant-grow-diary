@@ -82,9 +82,7 @@ Deno.serve(async (req) => {
               .eq("user_id", userId),
             admin
               .from("billing_subscriptions")
-              .select(
-                "id,plan_id,status,provider,provider_customer_id,provider_subscription_id",
-              )
+              .select("id,plan_id,status,provider,provider_customer_id,provider_subscription_id")
               .eq("user_id", userId),
           ]);
           if (

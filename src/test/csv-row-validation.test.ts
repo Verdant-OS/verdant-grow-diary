@@ -14,14 +14,8 @@ import {
   type RepresentativeColumnMapping,
   type RepresentativeDraftReading,
 } from "@/lib/representativeCsvSensorPreviewRules";
-import {
-  deriveCsvRowValidationHints,
-  detectMappingCollisions,
-} from "@/lib/csvRowValidationRules";
-import {
-  PH_REALISTIC_RANGE,
-  EC_SUSPICIOUS_MSCM_MAX,
-} from "@/constants/csvValidationRanges";
+import { deriveCsvRowValidationHints, detectMappingCollisions } from "@/lib/csvRowValidationRules";
+import { PH_REALISTIC_RANGE, EC_SUSPICIOUS_MSCM_MAX } from "@/constants/csvValidationRanges";
 
 const HEADERS = ["Timestamp", "RH", "EC", "PH", "Temp", "CO2"];
 
@@ -39,10 +33,7 @@ function makeMapping(
   };
 }
 
-function buildRow(
-  cells: string[],
-  mapping = makeMapping(),
-): RepresentativeDraftReading {
+function buildRow(cells: string[], mapping = makeMapping()): RepresentativeDraftReading {
   return normalizeRepresentativeRow({
     headers: HEADERS,
     cells,
@@ -234,11 +225,18 @@ describe("row severity", () => {
       vwc: { column: "RH" },
     });
     const okRow = buildRow(["2026-05-01T10:00:00Z", "55", "2.5", "6.2", "24", "900"], fullMapping);
-    const warnRow = buildRow(["2026-05-01T10:00:00Z", "100", "2.5", "6.2", "24", "900"], fullMapping);
+    const warnRow = buildRow(
+      ["2026-05-01T10:00:00Z", "100", "2.5", "6.2", "24", "900"],
+      fullMapping,
+    );
     const badRow = buildRow(["bad", "100", "2.5", "6.2", "24", "900"], fullMapping);
     expect(deriveCsvRowValidationHints({ row: okRow, mapping: fullMapping }).severity).toBe("ok");
-    expect(deriveCsvRowValidationHints({ row: warnRow, mapping: fullMapping }).severity).toBe("warning");
-    expect(deriveCsvRowValidationHints({ row: badRow, mapping: fullMapping }).severity).toBe("invalid");
+    expect(deriveCsvRowValidationHints({ row: warnRow, mapping: fullMapping }).severity).toBe(
+      "warning",
+    );
+    expect(deriveCsvRowValidationHints({ row: badRow, mapping: fullMapping }).severity).toBe(
+      "invalid",
+    );
   });
 
   it("fully clean row with everything mapped + in-range returns ok", () => {

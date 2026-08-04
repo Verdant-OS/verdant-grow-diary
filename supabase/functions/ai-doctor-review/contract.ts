@@ -29,16 +29,10 @@ export interface AiDoctorReviewResult {
 }
 
 export type AiDoctorReviewValidation =
-  | { ok: true; result: AiDoctorReviewResult }
-  | { ok: false; reason: string };
+  { ok: true; result: AiDoctorReviewResult } | { ok: false; reason: string };
 
 const CONFIDENCE_VALUES: AiDoctorReviewConfidence[] = ["low", "medium", "high"];
-const RISK_VALUES: AiDoctorReviewRiskLevel[] = [
-  "low",
-  "watch",
-  "elevated",
-  "high",
-];
+const RISK_VALUES: AiDoctorReviewRiskLevel[] = ["low", "watch", "elevated", "high"];
 
 const REQUIRED_STRING_FIELDS = [
   "summary",
@@ -49,11 +43,7 @@ const REQUIRED_STRING_FIELDS = [
   "three_day_recovery_plan",
 ] as const;
 
-const CAPPED_ARRAY_FIELDS = [
-  "evidence",
-  "missing_information",
-  "possible_causes",
-] as const;
+const CAPPED_ARRAY_FIELDS = ["evidence", "missing_information", "possible_causes"] as const;
 
 const BANNED_WORDS = [
   "confirmed",
@@ -131,9 +121,7 @@ function sanitizeActionQueueSuggestion(
   return { ok: true, value: { title, rationale } };
 }
 
-export function validateAiDoctorReviewResult(
-  input: unknown,
-): AiDoctorReviewValidation {
+export function validateAiDoctorReviewResult(input: unknown): AiDoctorReviewValidation {
   if (!isPlainObject(input)) return { ok: false, reason: "shape" };
   const safe: Record<string, unknown> = {};
   for (const [k, val] of Object.entries(input)) {
@@ -158,10 +146,7 @@ export function validateAiDoctorReviewResult(
     return { ok: false, reason: "confidence_enum" };
   }
   const risk = safe.risk_level;
-  if (
-    typeof risk !== "string" ||
-    !RISK_VALUES.includes(risk as AiDoctorReviewRiskLevel)
-  ) {
+  if (typeof risk !== "string" || !RISK_VALUES.includes(risk as AiDoctorReviewRiskLevel)) {
     return { ok: false, reason: "risk_enum" };
   }
   const arrays: Record<string, string[]> = {

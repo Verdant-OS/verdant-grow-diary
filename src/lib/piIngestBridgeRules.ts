@@ -59,9 +59,7 @@ export type IdempotencyKeyResult =
     };
 
 export type BridgeResolveFailureCode =
-  | "missing_bridge_id"
-  | "unknown_bridge_id"
-  | "inactive_credential";
+  "missing_bridge_id" | "unknown_bridge_id" | "inactive_credential";
 
 export type ResolveBridgeResult =
   | { readonly ok: true; readonly credential: BridgeCredential }
@@ -71,9 +69,7 @@ export type ResolveBridgeResult =
       readonly message: string;
     };
 
-export type TentAuthorizationFailureCode =
-  | "missing_tent_id"
-  | "tent_not_allowed";
+export type TentAuthorizationFailureCode = "missing_tent_id" | "tent_not_allowed";
 
 export type TentAuthorizationResult =
   | { readonly ok: true; readonly tentId: string }
@@ -111,21 +107,15 @@ function fail<C extends string>(
   message: string,
   index?: number,
 ): { ok: false; code: C; message: string; index?: number } {
-  return index === undefined
-    ? { ok: false, code, message }
-    : { ok: false, code, message, index };
+  return index === undefined ? { ok: false, code, message } : { ok: false, code, message, index };
 }
 
 function resolveFromList(
   bridgeId: string,
-  credentials:
-    | readonly BridgeCredential[]
-    | ReadonlyMap<string, BridgeCredential>,
+  credentials: readonly BridgeCredential[] | ReadonlyMap<string, BridgeCredential>,
 ): BridgeCredential | undefined {
   if (Array.isArray(credentials)) {
-    return (credentials as readonly BridgeCredential[]).find(
-      (c) => c.bridgeId === bridgeId,
-    );
+    return (credentials as readonly BridgeCredential[]).find((c) => c.bridgeId === bridgeId);
   }
   return (credentials as ReadonlyMap<string, BridgeCredential>).get(bridgeId);
 }
@@ -141,16 +131,13 @@ function normalizeTimestamp(input: string): string | null {
 
 export function resolveBridgeCredential(
   bridgeId: string | null | undefined,
-  credentials:
-    | readonly BridgeCredential[]
-    | ReadonlyMap<string, BridgeCredential>,
+  credentials: readonly BridgeCredential[] | ReadonlyMap<string, BridgeCredential>,
 ): ResolveBridgeResult {
   const id = (bridgeId ?? "").trim();
   if (!id) return fail("missing_bridge_id", "bridgeId is required");
   const cred = resolveFromList(id, credentials);
   if (!cred) return fail("unknown_bridge_id", "Unknown bridge id");
-  if (!cred.isActive)
-    return fail("inactive_credential", "Bridge credential is inactive");
+  if (!cred.isActive) return fail("inactive_credential", "Bridge credential is inactive");
   return { ok: true, credential: cred };
 }
 
@@ -178,9 +165,7 @@ export function assertBridgeCanWriteTent(
  *   - sensor value (would defeat dedup)
  *   - raw_payload (opaque; would defeat dedup)
  */
-export function deriveReadingIdempotencyKey(
-  input: ReadingIdentityInput,
-): IdempotencyKeyResult {
+export function deriveReadingIdempotencyKey(input: ReadingIdentityInput): IdempotencyKeyResult {
   const bridgeId = (input.bridgeId ?? "").trim();
   if (!bridgeId) return fail("missing_bridge_id", "bridgeId is required");
   const tentId = (input.tentId ?? "").trim();
@@ -190,14 +175,9 @@ export function deriveReadingIdempotencyKey(
   const metric = (input.metric ?? "").trim();
   if (!metric) return fail("missing_metric", "metric is required");
   const capturedAtRaw = (input.capturedAt ?? "").trim();
-  if (!capturedAtRaw)
-    return fail("missing_captured_at", "captured_at is required");
+  if (!capturedAtRaw) return fail("missing_captured_at", "captured_at is required");
   const iso = normalizeTimestamp(capturedAtRaw);
-  if (!iso)
-    return fail(
-      "invalid_captured_at",
-      "captured_at must be a valid ISO 8601 timestamp",
-    );
+  if (!iso) return fail("invalid_captured_at", "captured_at must be a valid ISO 8601 timestamp");
   return { ok: true, key: `pi:${bridgeId}:${tentId}:${deviceId}:${metric}:${iso}` };
 }
 
@@ -216,8 +196,7 @@ export function deriveBatchIdempotencyKeys(
       readonly message: string;
       readonly index?: number;
     } {
-  if (!readings || readings.length === 0)
-    return fail("empty_batch", "readings batch is empty");
+  if (!readings || readings.length === 0) return fail("empty_batch", "readings batch is empty");
   const keys: string[] = [];
   const seen = new Set<string>();
   for (let i = 0; i < readings.length; i++) {
@@ -231,11 +210,7 @@ export function deriveBatchIdempotencyKeys(
     });
     if (res.ok !== true) return fail(res.code, res.message, i);
     if (seen.has(res.key))
-      return fail(
-        "duplicate_reading_in_batch",
-        `duplicate reading at index ${i}`,
-        i,
-      );
+      return fail("duplicate_reading_in_batch", `duplicate reading at index ${i}`, i);
     seen.add(res.key);
     keys.push(res.key);
   }
@@ -256,9 +231,7 @@ export function deriveBatchIdempotencyKeys(
  */
 export function validateBridgeBatchScope(
   input: BridgeBatchScopeInput,
-  credentials:
-    | readonly BridgeCredential[]
-    | ReadonlyMap<string, BridgeCredential>,
+  credentials: readonly BridgeCredential[] | ReadonlyMap<string, BridgeCredential>,
 ): BridgeBatchScopeResult {
   const resolved = resolveBridgeCredential(input.bridgeId, credentials);
   if (resolved.ok !== true) return resolved;
@@ -284,4 +257,3 @@ export function validateBridgeBatchScope(
     keys: keys.keys,
   };
 }
-

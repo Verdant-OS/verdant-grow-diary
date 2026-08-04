@@ -9,10 +9,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  buildPriorityQueue,
-  buildPriorityQueueItem,
-} from "@/lib/leadPriorityQueueRules";
+import { buildPriorityQueue, buildPriorityQueueItem } from "@/lib/leadPriorityQueueRules";
 import { recommendNextAction } from "@/lib/leadNextActionRules";
 import type { LeadRow } from "@/hooks/useLeadsList";
 
@@ -53,9 +50,7 @@ describe("buildPriorityQueue — happy-path ranking", () => {
     });
     const fresh = lead({ id: "b", status: "new" });
     const done = lead({ id: "c", status: "closed" });
-    const ranked = buildPriorityQueue([done, fresh, overdue], NOW).map(
-      (i) => i.leadId,
-    );
+    const ranked = buildPriorityQueue([done, fresh, overdue], NOW).map((i) => i.leadId);
     expect(ranked[0]).toBe("a");
     expect(ranked[ranked.length - 1]).toBe("c");
   });
@@ -94,10 +89,7 @@ describe("buildPriorityQueue — terminal states rank lowest", () => {
 
 describe("buildPriorityQueue — safety and ambiguity", () => {
   it("missing name falls back to email then to 'Unknown lead'", () => {
-    const i1 = buildPriorityQueueItem(
-      lead({ id: "a", name: null }),
-      NOW,
-    );
+    const i1 = buildPriorityQueueItem(lead({ id: "a", name: null }), NOW);
     expect(i1.label).toBe("ada@example.com");
     const i2 = buildPriorityQueueItem(
       lead({ id: "b", name: null, email: "" as unknown as string }),
@@ -154,9 +146,7 @@ describe("buildPriorityQueue — deterministic tie-breakers", () => {
       status: "new",
       created_at: "2026-05-08T12:00:00Z",
     });
-    const ranked = buildPriorityQueue([newer, older], NOW).map(
-      (i) => i.leadId,
-    );
+    const ranked = buildPriorityQueue([newer, older], NOW).map((i) => i.leadId);
     // older leads outrank newer ones at the same priority
     expect(ranked[0]).toBe("z-old");
   });

@@ -18,8 +18,7 @@ function read(rel: string): string | null {
 describe("Tent Plant Roster — no generic plant-row destructive control", () => {
   it("TentPlantRosterPanel does not import DiaryEntryRemoveButton", () => {
     const src =
-      read("src/components/TentPlantRosterPanel.tsx") ??
-      read("src/components/TentPlantRoster.tsx");
+      read("src/components/TentPlantRosterPanel.tsx") ?? read("src/components/TentPlantRoster.tsx");
     expect(src, "roster panel source not found").not.toBeNull();
     expect(src!).not.toMatch(/DiaryEntryRemoveButton/);
     expect(src!).not.toMatch(/useRemoveDiaryEntry/);

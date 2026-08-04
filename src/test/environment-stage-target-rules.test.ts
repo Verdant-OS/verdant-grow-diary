@@ -83,9 +83,15 @@ describe("classifyTempAgainstStage", () => {
 
   it("null / NaN / Infinity return unavailable", () => {
     expect(classifyTempAgainstStage(null, { stage: "veg" }).classification).toBe("unavailable");
-    expect(classifyTempAgainstStage(undefined, { stage: "veg" }).classification).toBe("unavailable");
-    expect(classifyTempAgainstStage(Number.NaN, { stage: "veg" }).classification).toBe("unavailable");
-    expect(classifyTempAgainstStage(Number.POSITIVE_INFINITY, { stage: "veg" }).classification).toBe("unavailable");
+    expect(classifyTempAgainstStage(undefined, { stage: "veg" }).classification).toBe(
+      "unavailable",
+    );
+    expect(classifyTempAgainstStage(Number.NaN, { stage: "veg" }).classification).toBe(
+      "unavailable",
+    );
+    expect(
+      classifyTempAgainstStage(Number.POSITIVE_INFINITY, { stage: "veg" }).classification,
+    ).toBe("unavailable");
   });
 
   it("stale readings never map to ok", () => {
@@ -121,7 +127,9 @@ describe("classifyRhAgainstStage", () => {
   it("null / NaN / Infinity return unavailable", () => {
     expect(classifyRhAgainstStage(null, { stage: "veg" }).classification).toBe("unavailable");
     expect(classifyRhAgainstStage(Number.NaN, { stage: "veg" }).classification).toBe("unavailable");
-    expect(classifyRhAgainstStage(Number.POSITIVE_INFINITY, { stage: "veg" }).classification).toBe("unavailable");
+    expect(classifyRhAgainstStage(Number.POSITIVE_INFINITY, { stage: "veg" }).classification).toBe(
+      "unavailable",
+    );
   });
 
   it("stale readings never map to ok", () => {
@@ -135,12 +143,20 @@ describe("environmentMetricChipStatus", () => {
     expect(environmentMetricChipStatus(classifyTempAgainstStage(25, { stage: "veg" }))).toBe("ok");
   });
   it("below/above -> warn", () => {
-    expect(environmentMetricChipStatus(classifyTempAgainstStage(10, { stage: "veg" }))).toBe("warn");
-    expect(environmentMetricChipStatus(classifyTempAgainstStage(40, { stage: "veg" }))).toBe("warn");
+    expect(environmentMetricChipStatus(classifyTempAgainstStage(10, { stage: "veg" }))).toBe(
+      "warn",
+    );
+    expect(environmentMetricChipStatus(classifyTempAgainstStage(40, { stage: "veg" }))).toBe(
+      "warn",
+    );
   });
   it("unavailable/stage_unknown/context_only -> warn (never ok)", () => {
-    expect(environmentMetricChipStatus(classifyTempAgainstStage(null, { stage: "veg" }))).toBe("warn");
+    expect(environmentMetricChipStatus(classifyTempAgainstStage(null, { stage: "veg" }))).toBe(
+      "warn",
+    );
     expect(environmentMetricChipStatus(classifyTempAgainstStage(25, { stage: null }))).toBe("warn");
-    expect(environmentMetricChipStatus(classifyTempAgainstStage(25, { stage: "harvest" }))).toBe("warn");
+    expect(environmentMetricChipStatus(classifyTempAgainstStage(25, { stage: "harvest" }))).toBe(
+      "warn",
+    );
   });
 });

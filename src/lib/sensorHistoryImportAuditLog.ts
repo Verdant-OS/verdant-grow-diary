@@ -12,18 +12,14 @@
  *  - Bounded ring buffer; corrupt storage resets safely.
  */
 
-export const SENSOR_HISTORY_IMPORT_AUDIT_STORAGE_KEY =
-  "verdant.sensorHistoryImportAudit.v1";
+export const SENSOR_HISTORY_IMPORT_AUDIT_STORAGE_KEY = "verdant.sensorHistoryImportAudit.v1";
 
 export const SENSOR_HISTORY_IMPORT_AUDIT_MAX_EVENTS = 50;
 
 export const SENSOR_HISTORY_CANONICAL_SOURCE_LABEL = "CSV history" as const;
 
 export type SensorHistoryImportSourceAppId =
-  | "spider_farmer"
-  | "vivosun"
-  | "verdant_genetics_xlsx"
-  | "ac_infinity";
+  "spider_farmer" | "vivosun" | "verdant_genetics_xlsx" | "ac_infinity";
 
 export const SENSOR_HISTORY_IMPORT_SOURCE_APP_LABELS: Record<
   SensorHistoryImportSourceAppId,
@@ -76,7 +72,6 @@ export interface RecordSensorHistoryImportAuditInput {
   mappedSensorGroups?: ReadonlyArray<string> | null;
 }
 
-
 function getStorage(opts?: SensorHistoryImportAuditOptions): Storage | null {
   if (opts && Object.prototype.hasOwnProperty.call(opts, "storage")) {
     return opts.storage ?? null;
@@ -102,9 +97,7 @@ function safeNonNegInt(n: unknown): number {
   return v < 0 ? 0 : v;
 }
 
-function sanitizeLabels(
-  list: ReadonlyArray<string> | null | undefined,
-): string[] {
+function sanitizeLabels(list: ReadonlyArray<string> | null | undefined): string[] {
   if (!list) return [];
   const seen = new Set<string>();
   const out: string[] = [];
@@ -179,9 +172,7 @@ export function readSensorHistoryImportAuditEvents(
     }
     return [];
   }
-  return parsed
-    .filter(isAuditEvent)
-    .slice(-SENSOR_HISTORY_IMPORT_AUDIT_MAX_EVENTS);
+  return parsed.filter(isAuditEvent).slice(-SENSOR_HISTORY_IMPORT_AUDIT_MAX_EVENTS);
 }
 
 export function recordSensorHistoryImportAuditEvent(
@@ -191,9 +182,7 @@ export function recordSensorHistoryImportAuditEvent(
   const storage = getStorage(opts);
   const now = (opts?.now ?? (() => new Date()))();
   const id = (opts?.idFactory ?? (() => defaultIdFactory(now)))();
-  const label =
-    SENSOR_HISTORY_IMPORT_SOURCE_APP_LABELS[input.sourceAppId] ??
-    "Unknown source";
+  const label = SENSOR_HISTORY_IMPORT_SOURCE_APP_LABELS[input.sourceAppId] ?? "Unknown source";
 
   const evt: SensorHistoryImportAuditEvent = {
     id,
@@ -217,23 +206,16 @@ export function recordSensorHistoryImportAuditEvent(
 
   if (!storage) return evt;
   const existing = readSensorHistoryImportAuditEvents(opts);
-  const next = [...existing, evt].slice(
-    -SENSOR_HISTORY_IMPORT_AUDIT_MAX_EVENTS,
-  );
+  const next = [...existing, evt].slice(-SENSOR_HISTORY_IMPORT_AUDIT_MAX_EVENTS);
   try {
-    storage.setItem(
-      SENSOR_HISTORY_IMPORT_AUDIT_STORAGE_KEY,
-      JSON.stringify(next),
-    );
+    storage.setItem(SENSOR_HISTORY_IMPORT_AUDIT_STORAGE_KEY, JSON.stringify(next));
   } catch {
     // swallow quota/unavailable; in-memory event still returned
   }
   return evt;
 }
 
-export function clearSensorHistoryImportAuditEvents(
-  opts?: SensorHistoryImportAuditOptions,
-): void {
+export function clearSensorHistoryImportAuditEvents(opts?: SensorHistoryImportAuditOptions): void {
   const storage = getStorage(opts);
   if (!storage) return;
   try {

@@ -1,19 +1,23 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 
 describe("Start your room — deploy wiring", () => {
-  const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+  const APP = readAllRouteModuleSources();
   const MANIFEST = readFileSync(resolve(ROOT, "src/lib/appRouteManifest.ts"), "utf8");
   const ONBOARD = readFileSync(resolve(ROOT, "src/pages/Onboarding.tsx"), "utf8");
   const PAGE = readFileSync(resolve(ROOT, "src/pages/StartYourRoom.tsx"), "utf8");
 
   it("registers lazy route /start-room", () => {
-    expect(APP).toMatch(/lazy\(\s*\(\)\s*=>\s*import\("\.\/pages\/StartYourRoom"\)\s*\)/);
-    expect(APP).toMatch(/path="\/start-room"/);
-    expect(APP).toMatch(/element=\{<StartYourRoom\s*\/>\}/);
+    expect(extractMountedAppRoutePaths()).toContain("/start-room");
+    expect(APP).toMatch(/StartYourRoom/);
+    expect(APP).toMatch(/start-room/);
   });
 
   it("manifest lists /start-room after /signup (sorted)", () => {

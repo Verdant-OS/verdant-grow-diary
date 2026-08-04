@@ -13,6 +13,13 @@ const operatorRoleState: {
   status: "loading" | "granted" | "denied" | "unauthenticated" | "error";
 } = { status: "denied" };
 
+/** Stable tent list — a fresh `[{...}]` every mock call re-fires Sensors'
+ *  tent-route reconciliation effect (depends on `tents` identity) and hangs
+ *  the Vitest worker under the MemoryRouter harness. */
+const STABLE_GROW_TENTS = [
+  { id: "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e6f", name: "Tent 1", growId: "g1" },
+] as const;
+
 const sensorPageState = {
   tentId: "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e6f",
   tentsLoading: false,
@@ -34,9 +41,7 @@ vi.mock("@/hooks/useHasRole", () => ({
 
 vi.mock("@/hooks/useGrowData", () => ({
   useGrowTents: () => ({
-    data: sensorPageState.tentsLoading
-      ? []
-      : [{ id: sensorPageState.tentId, name: "Tent 1", growId: "g1" }],
+    data: sensorPageState.tentsLoading ? [] : STABLE_GROW_TENTS,
     isLoading: sensorPageState.tentsLoading,
     isError: sensorPageState.tentsError,
     isSuccess: !sensorPageState.tentsLoading && !sensorPageState.tentsError,

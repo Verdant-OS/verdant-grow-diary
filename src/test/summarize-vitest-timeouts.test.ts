@@ -38,18 +38,12 @@ describe("summarize-vitest-timeouts", () => {
     expect(inferGuardType("create_watering_event RPC trust-boundary")).toBe(
       "RPC trust-boundary static guard",
     );
-    expect(inferGuardType("raw_payload leakage")).toBe(
-      "raw payload / secret leakage guard",
-    );
-    expect(inferGuardType("device-control language")).toBe(
-      "device-control language guard",
-    );
+    expect(inferGuardType("raw_payload leakage")).toBe("raw payload / secret leakage guard");
+    expect(inferGuardType("device-control language")).toBe("device-control language guard");
     expect(inferGuardType("sensor provenance csv")).toBe(
       "sensor provenance/static ownership guard",
     );
-    expect(inferGuardType("totally unrelated text")).toBe(
-      "unknown static scanner guard",
-    );
+    expect(inferGuardType("totally unrelated text")).toBe("unknown static scanner guard");
   });
 
   it("detects non-timeout assertion failures and refuses environmental-only verdict", () => {

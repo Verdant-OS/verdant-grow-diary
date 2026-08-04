@@ -32,8 +32,8 @@ describe("useTimelineHighlightAutoScroll — reduced motion", () => {
         prefersReducedMotion: true,
       }),
     );
-    expect((node.scrollIntoView as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
-    expect((node.focus as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
+    expect(node.scrollIntoView as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
+    expect(node.focus as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(1);
   });
 
   it("still scrolls when reduced motion is false", () => {
@@ -45,8 +45,8 @@ describe("useTimelineHighlightAutoScroll — reduced motion", () => {
         prefersReducedMotion: false,
       }),
     );
-    expect((node.scrollIntoView as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
-    expect((node.focus as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
+    expect(node.scrollIntoView as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(1);
+    expect(node.focus as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(1);
   });
 
   it("does not re-scroll on rerender with the same highlight token (reduced motion)", () => {
@@ -62,19 +62,15 @@ describe("useTimelineHighlightAutoScroll — reduced motion", () => {
       { initialProps: { h: highlight, e: entries } },
     );
     rerender({ h: highlight, e: [...entries] });
-    expect((node.scrollIntoView as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
-    expect((node.focus as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
+    expect(node.scrollIntoView as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
+    expect(node.focus as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(1);
   });
 
   it("relies on test-injected reduced motion (testid/aria-label invariants intact)", () => {
     // These constants are still consumed by Timeline.tsx to mark the
     // highlighted entry; ensure they remain present so reduced-motion
     // mode keeps the visual highlight discoverable.
-    expect(TIMELINE_HIGHLIGHT_TESTID).toBe(
-      "timeline-highlighted-action-queue-trace",
-    );
-    expect(TIMELINE_HIGHLIGHT_ARIA_LABEL).toBe(
-      "Highlighted Action Queue diary trace",
-    );
+    expect(TIMELINE_HIGHLIGHT_TESTID).toBe("timeline-highlighted-action-queue-trace");
+    expect(TIMELINE_HIGHLIGHT_ARIA_LABEL).toBe("Highlighted Action Queue diary trace");
   });
 });

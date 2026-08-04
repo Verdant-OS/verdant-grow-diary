@@ -23,11 +23,7 @@
 
 import { classifyTimelineEntry } from "@/lib/timelineEntryClassification";
 
-export type MissingActionCategory =
-  | "watering"
-  | "feeding"
-  | "training"
-  | "environment";
+export type MissingActionCategory = "watering" | "feeding" | "training" | "environment";
 
 /** Stable priority order used to break ties between equally-late categories. */
 export const MISSING_ACTION_CATEGORIES: ReadonlyArray<MissingActionCategory> = [
@@ -37,14 +33,13 @@ export const MISSING_ACTION_CATEGORIES: ReadonlyArray<MissingActionCategory> = [
   "training",
 ];
 
-export const MISSING_ACTION_CATEGORY_LABELS: Readonly<
-  Record<MissingActionCategory, string>
-> = Object.freeze({
-  watering: "Watering",
-  feeding: "Feeding",
-  training: "Training",
-  environment: "Environment check",
-});
+export const MISSING_ACTION_CATEGORY_LABELS: Readonly<Record<MissingActionCategory, string>> =
+  Object.freeze({
+    watering: "Watering",
+    feeding: "Feeding",
+    training: "Training",
+    environment: "Environment check",
+  });
 
 /** Minimum entries of a category before a rhythm is inferred at all. */
 export const MISSING_ACTION_MIN_SAMPLES = 3;
@@ -98,9 +93,7 @@ function rowEventType(row: MissingActionRow): string | null {
  * Resolve a row's care category, or null when the row is not a care
  * entry (notes, photos, symptoms, reminders, harvest, transplant).
  */
-export function resolveMissingActionCategory(
-  row: MissingActionRow,
-): MissingActionCategory | null {
+export function resolveMissingActionCategory(row: MissingActionRow): MissingActionCategory | null {
   const eventType = rowEventType(row);
   if (eventType === null) return null;
   // "environment" is the canonical Quick Log environment-check token; the
@@ -194,9 +187,7 @@ export function findNextMissingAction(
     }
   }
   if (best) return { status: "found", suggestion: best.suggestion };
-  return sawCadence
-    ? { status: "nothing_missing" }
-    : { status: "not_enough_history" };
+  return sawCadence ? { status: "nothing_missing" } : { status: "not_enough_history" };
 }
 
 /**
@@ -222,8 +213,7 @@ export function findNewestEntryIdForCategory(
 
 export function buildMissingActionCopy(s: MissingActionSuggestion): string {
   const days = s.daysSinceLast === 1 ? "1 day" : `${s.daysSinceLast} days`;
-  const gap =
-    s.typicalGapDays === 1 ? "every day" : `about every ${s.typicalGapDays} days`;
+  const gap = s.typicalGapDays === 1 ? "every day" : `about every ${s.typicalGapDays} days`;
   return `${s.categoryLabel} may be due — last logged ${days} ago; your logged rhythm is ${gap}.`;
 }
 

@@ -3,22 +3,14 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 function stripComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 }
 
 const VM = stripComments(
-  readFileSync(
-    join(process.cwd(), "src/lib/environmentCheckInsightsViewModel.ts"),
-    "utf8",
-  ),
+  readFileSync(join(process.cwd(), "src/lib/environmentCheckInsightsViewModel.ts"), "utf8"),
 );
 const PANEL = stripComments(
-  readFileSync(
-    join(process.cwd(), "src/components/EnvironmentCheckInsightsPanel.tsx"),
-    "utf8",
-  ),
+  readFileSync(join(process.cwd(), "src/components/EnvironmentCheckInsightsPanel.tsx"), "utf8"),
 );
 
 describe("Environment Check insights — static safety", () => {

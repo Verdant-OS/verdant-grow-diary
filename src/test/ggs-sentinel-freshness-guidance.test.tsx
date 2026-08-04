@@ -1,19 +1,28 @@
 import { describe, it, expect } from "vitest";
 import { render, within } from "@testing-library/react";
 import { GgsSentinelSmokeRunnerPanel } from "@/components/GgsSentinelSmokeRunnerPanel";
-import { runGgsSentinelSmoke, SPIDER_FARMER_GGS_AGING_MS, type SentinelSensorRow } from "@/lib/ggsSentinelSmokeRunner";
+import {
+  runGgsSentinelSmoke,
+  SPIDER_FARMER_GGS_AGING_MS,
+  type SentinelSensorRow,
+} from "@/lib/ggsSentinelSmokeRunner";
 import {
   FRESHNESS_EXPLANATORY_NOTE,
   buildGgsSentinelSmokeRunnerPanelViewModel,
 } from "@/lib/ggsSentinelSmokeRunnerViewModel";
-import { SPIDER_FARMER_GGS_PROVIDER, SPIDER_FARMER_GGS_STALE_MS } from "@/lib/spiderFarmerGgsMappingRules";
+import {
+  SPIDER_FARMER_GGS_PROVIDER,
+  SPIDER_FARMER_GGS_STALE_MS,
+} from "@/lib/spiderFarmerGgsMappingRules";
 
 const NOW = new Date("2026-06-17T12:00:00.000Z");
 const fresh = (offsetSec = 60) => new Date(NOW.getTime() - offsetSec * 1000).toISOString();
 const aging = () => new Date(NOW.getTime() - (SPIDER_FARMER_GGS_AGING_MS + 60_000)).toISOString();
 const stale = () => new Date(NOW.getTime() - (SPIDER_FARMER_GGS_STALE_MS + 60_000)).toISOString();
 
-function row(overrides: Partial<SentinelSensorRow> & Pick<SentinelSensorRow, "metric" | "value">): SentinelSensorRow {
+function row(
+  overrides: Partial<SentinelSensorRow> & Pick<SentinelSensorRow, "metric" | "value">,
+): SentinelSensorRow {
   return {
     source: SPIDER_FARMER_GGS_PROVIDER,
     quality: "live",
@@ -40,7 +49,9 @@ describe("GgsSentinelSmokeRunnerPanel — explanatory note", () => {
     const { getByTestId } = renderWithVerdict([]);
     const note = getByTestId("ggs-sentinel-freshness-note");
     expect(note.textContent).toContain("does not change Sentinel result priority");
-    expect(note.textContent).toContain("explains why each metric is fresh, aging, stale, or missing");
+    expect(note.textContent).toContain(
+      "explains why each metric is fresh, aging, stale, or missing",
+    );
   });
 });
 

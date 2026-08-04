@@ -28,33 +28,27 @@ describe("Quick Log → Timeline continuity copy", () => {
 describe("buildDailyCheckTimelineHref · preserves context, invents nothing", () => {
   it("returns bare /timeline when nothing is known", () => {
     expect(buildDailyCheckTimelineHref({ growId: null })).toBe("/timeline");
-    expect(
-      buildDailyCheckTimelineHref({ growId: "", plantId: "", tentId: "" }),
-    ).toBe("/timeline");
-    expect(
-      buildDailyCheckTimelineHref({ growId: "   ", plantId: "   " }),
-    ).toBe("/timeline");
+    expect(buildDailyCheckTimelineHref({ growId: "", plantId: "", tentId: "" })).toBe("/timeline");
+    expect(buildDailyCheckTimelineHref({ growId: "   ", plantId: "   " })).toBe("/timeline");
   });
 
   it("preserves growId when provided", () => {
-    expect(buildDailyCheckTimelineHref({ growId: "g-1" })).toBe(
-      "/timeline?growId=g-1",
-    );
+    expect(buildDailyCheckTimelineHref({ growId: "g-1" })).toBe("/timeline?growId=g-1");
   });
 
   it("preserves growId + plantId + tentId together", () => {
-    expect(
-      buildDailyCheckTimelineHref({ growId: "g-1", plantId: "p-2", tentId: "t-3" }),
-    ).toBe("/timeline?growId=g-1&plantId=p-2&tentId=t-3");
+    expect(buildDailyCheckTimelineHref({ growId: "g-1", plantId: "p-2", tentId: "t-3" })).toBe(
+      "/timeline?growId=g-1&plantId=p-2&tentId=t-3",
+    );
   });
 
   it("emits plantId/tentId even without growId — never invents IDs", () => {
     expect(buildDailyCheckTimelineHref({ growId: null, plantId: "p-2" })).toBe(
       "/timeline?plantId=p-2",
     );
-    expect(
-      buildDailyCheckTimelineHref({ growId: undefined, tentId: "t-3" }),
-    ).toBe("/timeline?tentId=t-3");
+    expect(buildDailyCheckTimelineHref({ growId: undefined, tentId: "t-3" })).toBe(
+      "/timeline?tentId=t-3",
+    );
   });
 
   it("is deterministic and trims whitespace", () => {

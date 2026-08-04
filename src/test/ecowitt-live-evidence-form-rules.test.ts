@@ -28,9 +28,7 @@ function withMetric(
 ): EcowittLiveEvidenceFormState {
   return {
     ...state,
-    metric_rows: state.metric_rows.map((r) =>
-      r.key === key ? { ...r, ...patch } : r,
-    ),
+    metric_rows: state.metric_rows.map((r) => (r.key === key ? { ...r, ...patch } : r)),
   };
 }
 
@@ -48,8 +46,7 @@ describe("buildLiveSourceTruthEvidenceFromForm", () => {
       backend_value: "72.5",
       controller_value: "72.6",
     });
-    const { evidence, form_warnings } =
-      buildLiveSourceTruthEvidenceFromForm(s);
+    const { evidence, form_warnings } = buildLiveSourceTruthEvidenceFromForm(s);
     expect(form_warnings).toEqual([]);
     expect(evidence.metrics).toEqual([
       {
@@ -94,8 +91,7 @@ describe("buildLiveSourceTruthEvidenceFromForm", () => {
       controller_value: "72",
       tolerance: "",
     });
-    const { evidence, form_warnings } =
-      buildLiveSourceTruthEvidenceFromForm(s);
+    const { evidence, form_warnings } = buildLiveSourceTruthEvidenceFromForm(s);
     expect(evidence.metrics?.[0].tolerance).toBeNull();
     expect(form_warnings).toEqual([]);
   });
@@ -108,8 +104,7 @@ describe("buildLiveSourceTruthEvidenceFromForm", () => {
       controller_value: "72",
       tolerance: "0.5",
     });
-    const { evidence, form_warnings } =
-      buildLiveSourceTruthEvidenceFromForm(s);
+    const { evidence, form_warnings } = buildLiveSourceTruthEvidenceFromForm(s);
     expect(evidence.metrics?.[0].tolerance).toBe(0.5);
     expect(form_warnings).toEqual([]);
   });
@@ -122,8 +117,7 @@ describe("buildLiveSourceTruthEvidenceFromForm", () => {
       controller_value: "72",
       tolerance: "-1",
     });
-    const { evidence, form_warnings } =
-      buildLiveSourceTruthEvidenceFromForm(s);
+    const { evidence, form_warnings } = buildLiveSourceTruthEvidenceFromForm(s);
     expect(evidence.metrics?.[0].tolerance).toBeNull();
     expect(form_warnings.join(" ")).toMatch(/negative/i);
   });
@@ -136,8 +130,7 @@ describe("buildLiveSourceTruthEvidenceFromForm", () => {
       controller_value: "72",
       tolerance: "abc",
     });
-    const { evidence, form_warnings } =
-      buildLiveSourceTruthEvidenceFromForm(s);
+    const { evidence, form_warnings } = buildLiveSourceTruthEvidenceFromForm(s);
     expect(evidence.metrics?.[0].tolerance).toBeNull();
     expect(form_warnings.join(" ")).toMatch(/not a valid number/i);
   });
@@ -146,7 +139,11 @@ describe("buildLiveSourceTruthEvidenceFromForm", () => {
     let s = createInitialEcowittLiveEvidenceFormState();
     s = withMetric(s, "ph", { enabled: true, backend_value: "6", controller_value: "6" });
     s = withMetric(s, "temp_f", { enabled: true, backend_value: "72", controller_value: "72" });
-    s = withMetric(s, "humidity_pct", { enabled: true, backend_value: "55", controller_value: "55" });
+    s = withMetric(s, "humidity_pct", {
+      enabled: true,
+      backend_value: "55",
+      controller_value: "55",
+    });
     // Shuffle the rows
     s = { ...s, metric_rows: [...s.metric_rows].reverse() };
     const { evidence } = buildLiveSourceTruthEvidenceFromForm(s);
@@ -191,9 +188,7 @@ describe("ecowittLiveEvidenceFormRules — static safety", () => {
     resolve(__dirname, "../../src/lib/ecowittLiveEvidenceFormRules.ts"),
     "utf8",
   );
-  const src = rawSrc
-    .replace(/\/\/.*$/gm, "")
-    .replace(/\/\*[\s\S]*?\*\//g, "");
+  const src = rawSrc.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
 
   it("does not call Date.now()", () => {
     expect(src).not.toMatch(/Date\.now\s*\(/);

@@ -106,11 +106,7 @@ export interface PublicQuickLogStarterInput {
 }
 
 export type PublicQuickLogStarterField =
-  | "plantNickname"
-  | "stage"
-  | "logType"
-  | "note"
-  | "wateringVolumeMl";
+  "plantNickname" | "stage" | "logType" | "note" | "wateringVolumeMl";
 
 /** Fields of a validated draft, ready for buildPublicQuickLogStarterDraft. */
 export interface PublicQuickLogStarterDraftFields {

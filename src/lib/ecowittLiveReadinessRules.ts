@@ -53,9 +53,7 @@ function missing(condition: boolean | undefined, label: string): string | null {
   return condition === true ? null : label;
 }
 
-function comparisonMismatch(
-  comparison: EcowittLiveMetricComparison,
-): string | null {
+function comparisonMismatch(comparison: EcowittLiveMetricComparison): string | null {
   if (comparison.controllerValue == null || comparison.backendValue == null) {
     return `${comparison.metric} missing controller or backend value`;
   }
@@ -153,7 +151,9 @@ export function evaluateEcowittLiveReadiness(
   }
 
   if (hasLocalPipeline && !input.realDeviceComparisonPresent) {
-    warnings.push("Local sender and backend path work, but real device comparison is still missing.");
+    warnings.push(
+      "Local sender and backend path work, but real device comparison is still missing.",
+    );
     return {
       verdict: "partial",
       label: "PARTIAL — bring-up in progress",
@@ -178,8 +178,7 @@ export function evaluateEcowittLiveReadiness(
     blockers,
     warnings,
     requiredEvidenceMissing,
-    operatorAction:
-      "Hold. Complete the missing evidence steps and retry the GO/NO-GO check.",
+    operatorAction: "Hold. Complete the missing evidence steps and retry the GO/NO-GO check.",
     canCallLive: false,
     canCreateAlerts: false,
     canCreateActionQueueItems: false,

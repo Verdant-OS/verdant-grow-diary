@@ -69,9 +69,7 @@ function normaliseVendor(v: string | null | undefined): SensorVendor | null {
  *    Invalid).
  *  - Missing/unrecognised source → "Unknown" (never "Live").
  */
-export function resolveSensorSourceLabel(
-  input: ResolveSourceLabelInput,
-): ResolvedSourceLabel {
+export function resolveSensorSourceLabel(input: ResolveSourceLabelInput): ResolvedSourceLabel {
   const vendor = normaliseVendor(input.vendor);
   const source = input.source;
 

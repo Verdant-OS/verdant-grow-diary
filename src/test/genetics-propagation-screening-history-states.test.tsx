@@ -26,7 +26,14 @@ type QueryLike = {
 };
 
 function q(over: Partial<QueryLike> = {}): QueryLike {
-  return { data: [], isLoading: false, isError: false, isSuccess: false, refetch: vi.fn(), ...over };
+  return {
+    data: [],
+    isLoading: false,
+    isError: false,
+    isSuccess: false,
+    refetch: vi.fn(),
+    ...over,
+  };
 }
 
 const mockScreening = vi.mocked(useSubjectScreening);

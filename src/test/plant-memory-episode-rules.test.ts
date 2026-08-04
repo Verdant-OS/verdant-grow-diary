@@ -43,7 +43,9 @@ function action(overrides: Partial<EpisodeActionInput> = {}): EpisodeActionInput
   };
 }
 
-function diaryRow(overrides: Partial<EpisodeDiaryRowInput> & { details?: Record<string, unknown> | null }): EpisodeDiaryRowInput {
+function diaryRow(
+  overrides: Partial<EpisodeDiaryRowInput> & { details?: Record<string, unknown> | null },
+): EpisodeDiaryRowInput {
   return {
     id: "row-1",
     grow_id: "grow-1",
@@ -209,10 +211,7 @@ describe("needs_review triggers (references must agree; nothing silently chosen)
   });
 
   it("duplicate outcomes: neither is chosen; state is needs_review", () => {
-    const ep = build(
-      [outcomeRow("improved"), outcomeRow("worsened", { id: "out-2" })],
-      26 * HOUR,
-    );
+    const ep = build([outcomeRow("improved"), outcomeRow("worsened", { id: "out-2" })], 26 * HOUR);
     expect(ep.state).toBe("needs_review");
     expect(ep.outcome.status).toBeNull();
     expect(ep.warnings.some((w) => w.code === "duplicate_outcomes")).toBe(true);
@@ -248,10 +247,7 @@ describe("needs_review triggers (references must agree; nothing silently chosen)
   });
 
   it("future outcome recorded_at → needs_review", () => {
-    const ep = build(
-      [outcomeRow("improved", {}, { recorded_at: iso(48 * HOUR) })],
-      26 * HOUR,
-    );
+    const ep = build([outcomeRow("improved", {}, { recorded_at: iso(48 * HOUR) })], 26 * HOUR);
     expect(ep.warnings.some((w) => w.code === "future_timestamp")).toBe(true);
   });
 
@@ -329,15 +325,30 @@ describe("evidence windows are time buckets, not causal claims", () => {
 describe("deterministic ordering", () => {
   it("orders needs_review, overdue, worsened-first, more-data, decision-pending, closed", () => {
     const overdue = build([], 30 * HOUR, { id: "a-overdue" });
-    const worsened = build([outcomeRow("worsened", {}, { action_queue_id: "a-worse" })], 30 * HOUR, { id: "a-worse" });
-    const moreData = build([outcomeRow("more_data_needed", {}, { action_queue_id: "a-more" })], 30 * HOUR, { id: "a-more" });
-    const pending = build([outcomeRow("improved", {}, { action_queue_id: "a-pend" })], 30 * HOUR, { id: "a-pend" });
+    const worsened = build(
+      [outcomeRow("worsened", {}, { action_queue_id: "a-worse" })],
+      30 * HOUR,
+      { id: "a-worse" },
+    );
+    const moreData = build(
+      [outcomeRow("more_data_needed", {}, { action_queue_id: "a-more" })],
+      30 * HOUR,
+      { id: "a-more" },
+    );
+    const pending = build([outcomeRow("improved", {}, { action_queue_id: "a-pend" })], 30 * HOUR, {
+      id: "a-pend",
+    });
     const closed = build(
-      [outcomeRow("improved", {}, { action_queue_id: "a-closed" }), decisionRow("repeat", {}, { action_queue_id: "a-closed" })],
+      [
+        outcomeRow("improved", {}, { action_queue_id: "a-closed" }),
+        decisionRow("repeat", {}, { action_queue_id: "a-closed" }),
+      ],
       30 * HOUR,
       { id: "a-closed" },
     );
-    const review = build([decisionRow("repeat", {}, { action_queue_id: "a-review" })], 30 * HOUR, { id: "a-review" });
+    const review = build([decisionRow("repeat", {}, { action_queue_id: "a-review" })], 30 * HOUR, {
+      id: "a-review",
+    });
 
     const sorted = [closed, pending, moreData, worsened, overdue, review].sort(
       comparePlantMemoryEpisodes,
@@ -397,10 +408,7 @@ describe("run_learning_decision draft", () => {
       }),
     ).toMatchObject({ ok: false, reason: "missing_outcome" });
 
-    const notGrower = build(
-      [outcomeRow("improved", {}, { recorded_by: "ai" })],
-      26 * HOUR,
-    );
+    const notGrower = build([outcomeRow("improved", {}, { recorded_by: "ai" })], 26 * HOUR);
     expect(
       buildRunLearningDecisionDraft(notGrower, {
         decision: "repeat",
@@ -467,11 +475,16 @@ describe("run_learning_decision draft", () => {
 
 describe("learningDecisionMatches (idempotency matcher)", () => {
   it("matches only the exact event type + action id", () => {
-    const row = { details: { event_type: RUN_LEARNING_DECISION_EVENT_TYPE, action_queue_id: "act-1" } };
+    const row = {
+      details: { event_type: RUN_LEARNING_DECISION_EVENT_TYPE, action_queue_id: "act-1" },
+    };
     expect(learningDecisionMatches(row, "act-1")).toBe(true);
     expect(learningDecisionMatches(row, "act-2")).toBe(false);
     expect(
-      learningDecisionMatches({ details: { event_type: "action_outcome", action_queue_id: "act-1" } }, "act-1"),
+      learningDecisionMatches(
+        { details: { event_type: "action_outcome", action_queue_id: "act-1" } },
+        "act-1",
+      ),
     ).toBe(false);
     expect(learningDecisionMatches(null, "act-1")).toBe(false);
     expect(learningDecisionMatches({ details: null }, "act-1")).toBe(false);

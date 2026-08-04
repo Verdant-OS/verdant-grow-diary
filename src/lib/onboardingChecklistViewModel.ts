@@ -36,11 +36,7 @@ import {
 import { dashboardPath } from "@/lib/routes";
 
 export type OnboardingStepKey =
-  | "create_grow"
-  | "add_tent"
-  | "add_plant"
-  | "first_log"
-  | "first_sensor_snapshot";
+  "create_grow" | "add_tent" | "add_plant" | "first_log" | "first_sensor_snapshot";
 
 export interface OnboardingStep {
   key: OnboardingStepKey;

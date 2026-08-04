@@ -23,9 +23,7 @@ describe("calculateVPD", () => {
     [25, -1],
     [25, 101],
   ])("returns null for invalid inputs (%p, %p)", (t, h) => {
-    expect(
-      calculateVPD(t as number | null | undefined, h as number | null | undefined),
-    ).toBeNull();
+    expect(calculateVPD(t as number | null | undefined, h as number | null | undefined)).toBeNull();
   });
 
   it("is deterministic and returns 2-decimal output", () => {

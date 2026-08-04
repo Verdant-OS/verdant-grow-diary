@@ -185,11 +185,9 @@ describe("aiDoctorDiagnosisEvidenceAlignmentRules — basis copy + guardrails", 
         envCheckAcceptedCount: 1,
       }),
     );
-    expect(
-      vm.basisCopy.some((b) =>
-        /No recent live sensor readings were available/i.test(b),
-      ),
-    ).toBe(true);
+    expect(vm.basisCopy.some((b) => /No recent live sensor readings were available/i.test(b))).toBe(
+      true,
+    );
   });
 
   it("weak/insufficient posture emits the aggressive-changes guardrail", () => {
@@ -218,17 +216,12 @@ describe("aiDoctorDiagnosisEvidenceAlignmentRules — basis copy + guardrails", 
     const moderate = buildDiagnosisEvidenceAlignmentVM(
       base({ hasLiveSensor: true, liveSensorUsable: true }),
     );
-    const text =
-      JSON.stringify(strong) + JSON.stringify(moderate);
-    expect(text).not.toMatch(
-      /turn_on|turn_off|toggleDevice|setOutletState|autopilot|automate/i,
-    );
+    const text = JSON.stringify(strong) + JSON.stringify(moderate);
+    expect(text).not.toMatch(/turn_on|turn_off|toggleDevice|setOutletState|autopilot|automate/i);
   });
 
   it("more-data-needed reminder appears with count when >0", () => {
-    const vm = buildDiagnosisEvidenceAlignmentVM(
-      base({ moreDataNeededCount: 3 }),
-    );
+    const vm = buildDiagnosisEvidenceAlignmentVM(base({ moreDataNeededCount: 3 }));
     expect(vm.moreDataReminder).toMatch(/3 items/);
     expect(vm.moreDataReminder).toMatch(/missing Environment Check metrics/i);
   });
@@ -238,9 +231,7 @@ describe("buildAiDoctorDiagnosisEvidenceAlignmentVM — wiring", () => {
   it("live + accepted env-check + diary maps to strong_context", () => {
     const vm = buildAiDoctorDiagnosisEvidenceAlignmentVM({
       sensorContext: liveSensor(),
-      environmentCheckEvents: [
-        { occurredAt: "2026-06-08T12:00:00.000Z", noteBody: ACCEPTED_NOTE },
-      ],
+      environmentCheckEvents: [{ occurredAt: "2026-06-08T12:00:00.000Z", noteBody: ACCEPTED_NOTE }],
       hasRecentDiary: true,
     });
     expect(vm.posture).toBe("strong_context");
@@ -249,9 +240,7 @@ describe("buildAiDoctorDiagnosisEvidenceAlignmentVM — wiring", () => {
   it("rejected env-check caps posture at weak_context even with live + diary", () => {
     const vm = buildAiDoctorDiagnosisEvidenceAlignmentVM({
       sensorContext: liveSensor(),
-      environmentCheckEvents: [
-        { occurredAt: "2026-06-08T12:00:00.000Z", noteBody: REJECTED_NOTE },
-      ],
+      environmentCheckEvents: [{ occurredAt: "2026-06-08T12:00:00.000Z", noteBody: REJECTED_NOTE }],
       hasRecentDiary: true,
     });
     expect(vm.posture).toBe("weak_context");
@@ -270,12 +259,7 @@ describe("AiDoctorDiagnosisPanel — evidence alignment rendering", () => {
         hasRecentDiary: true,
       }),
     );
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={stubDiagnosis}
-        evidenceAlignment={alignment}
-      />,
-    );
+    render(<AiDoctorDiagnosisPanel diagnosis={stubDiagnosis} evidenceAlignment={alignment} />);
     expect(screen.getByTestId("ai-doctor-diagnosis-posture-label")).toHaveTextContent(
       "Strong context",
     );
@@ -291,37 +275,23 @@ describe("AiDoctorDiagnosisPanel — evidence alignment rendering", () => {
         envCheckRejectedCount: 1,
       }),
     );
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={stubDiagnosis}
-        evidenceAlignment={alignment}
-      />,
+    render(<AiDoctorDiagnosisPanel diagnosis={stubDiagnosis} evidenceAlignment={alignment} />);
+    expect(screen.getByTestId("ai-doctor-diagnosis-guardrail-warning")).toHaveTextContent(
+      /Do not make aggressive nutrient, irrigation, or equipment changes/i,
     );
-    expect(
-      screen.getByTestId("ai-doctor-diagnosis-guardrail-warning"),
-    ).toHaveTextContent(/Do not make aggressive nutrient, irrigation, or equipment changes/i);
   });
 
   it("renders more-data-needed link when count > 0", () => {
-    const alignment = buildDiagnosisEvidenceAlignmentVM(
-      base({ moreDataNeededCount: 2 }),
+    const alignment = buildDiagnosisEvidenceAlignmentVM(base({ moreDataNeededCount: 2 }));
+    render(<AiDoctorDiagnosisPanel diagnosis={stubDiagnosis} evidenceAlignment={alignment} />);
+    expect(screen.getByTestId("ai-doctor-diagnosis-more-data-reminder")).toHaveTextContent(
+      /2 items/,
     );
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={stubDiagnosis}
-        evidenceAlignment={alignment}
-      />,
-    );
-    expect(
-      screen.getByTestId("ai-doctor-diagnosis-more-data-reminder"),
-    ).toHaveTextContent(/2 items/);
   });
 
   it("omits the evidence alignment section entirely when prop absent", () => {
     render(<AiDoctorDiagnosisPanel diagnosis={stubDiagnosis} />);
-    expect(
-      screen.queryByTestId("ai-doctor-diagnosis-evidence-alignment"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-diagnosis-evidence-alignment")).toBeNull();
   });
 
   it("visible alignment output does not expose tokens/auth/user_id/service_role", () => {
@@ -333,12 +303,7 @@ describe("AiDoctorDiagnosisPanel — evidence alignment rendering", () => {
         moreDataNeededCount: 1,
       }),
     );
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={stubDiagnosis}
-        evidenceAlignment={alignment}
-      />,
-    );
+    render(<AiDoctorDiagnosisPanel diagnosis={stubDiagnosis} evidenceAlignment={alignment} />);
     const text = document.body.textContent ?? "";
     expect(text).not.toMatch(
       /service_role|bridge_token|authorization|bearer\s|jwt|api_key|user_id/i,
@@ -359,9 +324,7 @@ describe("static safety scan — alignment files", () => {
       expect(src).not.toMatch(/sensor_readings/);
       expect(src).not.toMatch(/functions\.invoke/);
       expect(src).not.toMatch(/action_queue/);
-      expect(src).not.toMatch(
-        /turn_on|turn_off|device_control|toggleDevice|setOutletState/i,
-      );
+      expect(src).not.toMatch(/turn_on|turn_off|device_control|toggleDevice|setOutletState/i);
       expect(src).not.toMatch(/\.insert\(|\.update\(|\.delete\(/);
     }
   });

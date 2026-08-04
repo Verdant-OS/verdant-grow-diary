@@ -20,8 +20,8 @@ export default function OperatorMode() {
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Operator Mode</h1>
         <p className="text-sm text-muted-foreground">
-          Fast health check for the migrations that most often drift between the shipped
-          frontend and the live database.
+          Fast health check for the migrations that most often drift between the shipped frontend
+          and the live database.
         </p>
       </header>
       <OperatorModePanel />

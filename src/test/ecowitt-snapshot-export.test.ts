@@ -10,7 +10,10 @@ import { loadEcowittEvidenceSample } from "@/lib/ecowittLocalEvidence";
 
 const NOW = new Date("2026-06-16T12:00:00.000Z");
 
-function snap(tentKey: "flower" | "seedling" | "vegetation", sampleKey: Parameters<typeof loadEcowittEvidenceSample>[0]) {
+function snap(
+  tentKey: "flower" | "seedling" | "vegetation",
+  sampleKey: Parameters<typeof loadEcowittEvidenceSample>[0],
+) {
   const loaded = loadEcowittEvidenceSample(sampleKey, { now: NOW });
   return normalizeEcowittTentPayload(loaded.sample.payload, tentKey, {
     now: NOW,
@@ -21,8 +24,12 @@ function snap(tentKey: "flower" | "seedling" | "vegetation", sampleKey: Paramete
 describe("EcoWitt snapshot export", () => {
   it("filenames are deterministic per tent", () => {
     expect(ecowittExportFilenameFor("flower")).toBe("verdant-ecowitt-flower-tent-snapshot.json");
-    expect(ecowittExportFilenameFor("seedling")).toBe("verdant-ecowitt-seedling-tent-snapshot.json");
-    expect(ecowittExportFilenameFor("vegetation")).toBe("verdant-ecowitt-vegetation-tent-snapshot.json");
+    expect(ecowittExportFilenameFor("seedling")).toBe(
+      "verdant-ecowitt-seedling-tent-snapshot.json",
+    );
+    expect(ecowittExportFilenameFor("vegetation")).toBe(
+      "verdant-ecowitt-vegetation-tent-snapshot.json",
+    );
   });
 
   it.each(["flower", "seedling", "vegetation"] as const)(
@@ -86,9 +93,10 @@ describe("EcoWitt snapshot export", () => {
     // jsdom doesn't implement URL.createObjectURL by default — stub it.
     const createObjectURL = vi.fn().mockReturnValue("blob:fake");
     const revokeObjectURL = vi.fn();
-    (URL as unknown as { createObjectURL: typeof createObjectURL }).createObjectURL = createObjectURL;
-    (URL as unknown as { revokeObjectURL: typeof revokeObjectURL }).revokeObjectURL = revokeObjectURL;
-
+    (URL as unknown as { createObjectURL: typeof createObjectURL }).createObjectURL =
+      createObjectURL;
+    (URL as unknown as { revokeObjectURL: typeof revokeObjectURL }).revokeObjectURL =
+      revokeObjectURL;
 
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     const fetchSpy = vi.spyOn(globalThis, "fetch" as any).mockImplementation(() => {

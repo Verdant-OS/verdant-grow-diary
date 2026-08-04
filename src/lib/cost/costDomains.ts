@@ -22,19 +22,10 @@ export type MeasurementStatus = "success" | "error";
 
 /** Reason an AI Doctor prompt was assembled from raw history instead of a summary. */
 export type RawHistoryFallbackState =
-  | "summary_fresh"
-  | "summary_stale"
-  | "summary_missing"
-  | "summary_error";
+  "summary_fresh" | "summary_stale" | "summary_missing" | "summary_error";
 
 /** Source of a sensor reading for ingest-rate accounting. */
-export type IngestReadingSource =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid";
+export type IngestReadingSource = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 
 // ---------------------------------------------------------------------------
 // DB refresh measurement

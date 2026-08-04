@@ -32,9 +32,9 @@ describe("<EnvironmentCheckInsightsPanel />", () => {
     const toggle = screen.getByTestId("env-check-insights-toggle");
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     expect(screen.queryByTestId("env-check-insights-expanded")).toBeNull();
-    expect(
-      screen.getByTestId("env-check-insights-disclaimer-collapsed").textContent,
-    ).toBe(ENVIRONMENT_CHECK_INSIGHTS_DISCLAIMER);
+    expect(screen.getByTestId("env-check-insights-disclaimer-collapsed").textContent).toBe(
+      ENVIRONMENT_CHECK_INSIGHTS_DISCLAIMER,
+    );
   });
 
   it("shows 'not enough history' copy when fewer than 2 entries exist", () => {
@@ -65,12 +65,12 @@ describe("<EnvironmentCheckInsightsPanel />", () => {
     expect(screen.getByTestId("env-check-insights-expanded")).toBeInTheDocument();
     expect(screen.getByTestId("env-check-insights-latest")).toBeInTheDocument();
     expect(screen.getByTestId("env-check-insights-stats")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("env-check-insights-disclaimer-expanded").textContent,
-    ).toBe(ENVIRONMENT_CHECK_INSIGHTS_DISCLAIMER);
-    expect(
-      screen.getByTestId("env-check-insights-generic-targets").textContent,
-    ).toBe(ENVIRONMENT_CHECK_INSIGHTS_GENERIC_TARGETS);
+    expect(screen.getByTestId("env-check-insights-disclaimer-expanded").textContent).toBe(
+      ENVIRONMENT_CHECK_INSIGHTS_DISCLAIMER,
+    );
+    expect(screen.getByTestId("env-check-insights-generic-targets").textContent).toBe(
+      ENVIRONMENT_CHECK_INSIGHTS_GENERIC_TARGETS,
+    );
   });
 
   it("renders the cautious out-of-range chip when the latest value is outside the generic range", () => {
@@ -108,13 +108,9 @@ describe("<EnvironmentCheckInsightsPanel />", () => {
   it("toggle button exposes accessible aria-label + aria-controls", () => {
     render(<EnvironmentCheckInsightsPanel rawEntries={[]} />);
     const toggle = screen.getByTestId("env-check-insights-toggle");
-    expect(toggle.getAttribute("aria-label")).toBe(
-      ENVIRONMENT_CHECK_INSIGHTS_EXPAND_LABEL,
-    );
+    expect(toggle.getAttribute("aria-label")).toBe(ENVIRONMENT_CHECK_INSIGHTS_EXPAND_LABEL);
     expect(toggle.getAttribute("aria-controls")).toBe("env-check-insights-region");
     fireEvent.click(toggle);
-    expect(toggle.getAttribute("aria-label")).toBe(
-      ENVIRONMENT_CHECK_INSIGHTS_COLLAPSE_LABEL,
-    );
+    expect(toggle.getAttribute("aria-label")).toBe(ENVIRONMENT_CHECK_INSIGHTS_COLLAPSE_LABEL);
   });
 });

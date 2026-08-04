@@ -988,12 +988,9 @@ describe("production runner", () => {
       pins_production_after_bom_strip: false,
       pins_production_after_bom_strip_and_unquote: false,
     });
+    expect(describeDatabaseUrlRepairProbes(bomPrefixed).pins_production_after_bom_strip).toBe(true);
     expect(
-      describeDatabaseUrlRepairProbes(bomPrefixed).pins_production_after_bom_strip,
-    ).toBe(true);
-    expect(
-      describeDatabaseUrlRepairProbes(bomAndQuotes)
-        .pins_production_after_bom_strip_and_unquote,
+      describeDatabaseUrlRepairProbes(bomAndQuotes).pins_production_after_bom_strip_and_unquote,
     ).toBe(true);
 
     // A mis-set bare password yields only four booleans, all false-ish facts:

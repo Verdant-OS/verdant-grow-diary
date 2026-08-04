@@ -92,9 +92,7 @@ function actionStatusLabel(raw: string): string {
   return statusLabel(raw);
 }
 
-function buildEvidenceDisplayLabel(
-  metric: string | null | undefined,
-): string {
+function buildEvidenceDisplayLabel(metric: string | null | undefined): string {
   const m = (metric ?? "").trim().toLowerCase();
   if (m === "vpd") return "Sensor snapshot · Demo VPD reading";
   if (m === "temp" || m === "temperature") {

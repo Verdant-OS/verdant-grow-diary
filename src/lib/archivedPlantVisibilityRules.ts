@@ -88,9 +88,7 @@ export interface ArchivedPlantLabel {
   verbose: string;
 }
 
-export function getArchivedPlantLabel(
-  p: ArchivedPlantLike | null | undefined,
-): ArchivedPlantLabel {
+export function getArchivedPlantLabel(p: ArchivedPlantLike | null | undefined): ArchivedPlantLabel {
   if (!p) return { kind: "active", label: "", verbose: "" };
   const merged = isMergedPlant(p);
   const archived = isArchivedPlant(p);
@@ -115,9 +113,7 @@ export function getArchivedPlantLabel(
  * Extract the merge target plant id from `last_note`. Returns null if no
  * marker is present or the captured value is not a uuid.
  */
-export function getMergeTargetPlantId(
-  p: ArchivedPlantLike | null | undefined,
-): string | null {
+export function getMergeTargetPlantId(p: ArchivedPlantLike | null | undefined): string | null {
   if (!p) return null;
   const note = readLastNote(p);
   const m = note.match(MERGE_MARKER_RE);

@@ -28,9 +28,7 @@ describe("buildAiDoctorReadinessBlockedExplanation", () => {
       nextActionLabel: "Add sensor snapshot",
     });
     expect(r.blockingCodes).toEqual(["recent-manual-sensor-snapshot"]);
-    expect(r.blockingLabels).toEqual([
-      "a recent manual sensor snapshot (last 7 days)",
-    ]);
+    expect(r.blockingLabels).toEqual(["a recent manual sensor snapshot (last 7 days)"]);
     expect(r.sentence).toBe(
       'AI Doctor is blocked until you add a recent manual sensor snapshot (last 7 days). Tap "Add sensor snapshot" to add it now.',
     );
@@ -42,10 +40,7 @@ describe("buildAiDoctorReadinessBlockedExplanation", () => {
       missing: ["recent-timeline-activity", "recent-manual-sensor-snapshot"],
       nextActionLabel: "Quick log",
     });
-    expect(r.blockingCodes).toEqual([
-      "recent-timeline-activity",
-      "recent-manual-sensor-snapshot",
-    ]);
+    expect(r.blockingCodes).toEqual(["recent-timeline-activity", "recent-manual-sensor-snapshot"]);
     expect(r.sentence).toContain(
       "a recent note, watering, feeding, or photo (last 7 days) and a recent manual sensor snapshot (last 7 days)",
     );

@@ -75,10 +75,7 @@ export interface ManualSensorTrendOmission {
 }
 
 export type ManualSensorTrendState =
-  | "no_ppfd"
-  | "ppfd_only_no_environment"
-  | "stale_invalid_only"
-  | "ready";
+  "no_ppfd" | "ppfd_only_no_environment" | "stale_invalid_only" | "ready";
 
 export interface ManualSensorTrendChartViewModel {
   state: ManualSensorTrendState;

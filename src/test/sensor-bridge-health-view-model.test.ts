@@ -10,8 +10,7 @@ import {
 } from "@/lib/sensorBridgeHealthViewModel";
 
 const NOW = new Date("2026-05-23T12:00:00Z");
-const minutesAgo = (m: number) =>
-  new Date(NOW.getTime() - m * 60_000).toISOString();
+const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60_000).toISOString();
 const hoursAgo = (h: number) => minutesAgo(h * 60);
 
 describe("buildSensorBridgeHealthViewModel", () => {

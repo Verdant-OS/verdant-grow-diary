@@ -43,7 +43,6 @@ describe("aiDoctorPromptMeasurementCsvExport", () => {
     expect(csv).toContain("live|csv");
   });
 
-
   it("renders missing provider tokens as blank cells", () => {
     const store = createAiDoctorPromptMeasurementCaptureStore();
     store.capture(

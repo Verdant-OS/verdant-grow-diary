@@ -190,9 +190,7 @@ export function scanDiagnosisForUnsafePhrases(
  * empty string when there are no findings (callers may treat empty
  * output as PASS).
  */
-export function formatUnsafePhraseReport(
-  findings: readonly UnsafePhraseFinding[],
-): string {
+export function formatUnsafePhraseReport(findings: readonly UnsafePhraseFinding[]): string {
   if (findings.length === 0) return "";
   const groups = new Map<string, UnsafePhraseFinding[]>();
   for (const f of findings) {
@@ -239,11 +237,7 @@ export interface UnsafePhraseGitHubAnnotationOptions {
 
 /** Sanitize a value for inclusion in a single-line GitHub annotation. */
 function sanitizeAnnotationField(value: string): string {
-  return value
-    .replace(/\r/g, " ")
-    .replace(/\n/g, " ")
-    .replace(/::/g, ": ")
-    .trim();
+  return value.replace(/\r/g, " ").replace(/\n/g, " ").replace(/::/g, ": ").trim();
 }
 
 function shortenText(text: string, max: number): string {
@@ -268,9 +262,7 @@ export function formatUnsafePhraseGitHubAnnotations(
   const file = sanitizeAnnotationField(
     options.file ?? "src/test/ai-doctor-output-safety-scanner.test.ts",
   );
-  const title = sanitizeAnnotationField(
-    options.title ?? "AI Doctor unsafe phrase",
-  );
+  const title = sanitizeAnnotationField(options.title ?? "AI Doctor unsafe phrase");
   const maxTextLength = options.maxTextLength ?? 160;
   const lineAttr =
     typeof options.line === "number" && Number.isFinite(options.line)
@@ -284,9 +276,7 @@ export function formatUnsafePhraseGitHubAnnotations(
     const phrase = sanitizeAnnotationField(f.phrase);
     const text = sanitizeAnnotationField(shortenText(f.text, maxTextLength));
     const message = `Case ${caseId} at ${path} matched "${phrase}": ${text}`;
-    lines.push(
-      `::error file=${file}${lineAttr},title=${title}::${message}`,
-    );
+    lines.push(`::error file=${file}${lineAttr},title=${title}::${message}`);
   }
   return lines.join("\n");
 }

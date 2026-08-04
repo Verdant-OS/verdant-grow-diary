@@ -11,9 +11,7 @@ import {
   NO_TRUSTED_VALUE_LABEL,
 } from "@/lib/aiDoctorPhase1ResultViewModel";
 
-function ctx(
-  overrides: Partial<AiDoctorContextPayload> = {},
-): AiDoctorContextPayload {
+function ctx(overrides: Partial<AiDoctorContextPayload> = {}): AiDoctorContextPayload {
   return {
     grow_id: "g1",
     tent_id: "t1",
@@ -42,9 +40,7 @@ describe("AiDoctorSensorSummaryDrilldown", () => {
       expect(screen.getByTestId(`ai-doctor-metric-row-${m}`)).toBeTruthy();
     }
     const list = screen.getByTestId("ai-doctor-sensor-summary-metrics");
-    expect(list.getAttribute("data-metric-order")).toBe(
-      AI_DOCTOR_METRIC_ORDER.join(","),
-    );
+    expect(list.getAttribute("data-metric-order")).toBe(AI_DOCTOR_METRIC_ORDER.join(","));
   });
 
   it("renders value/source/captured_at when present", () => {
@@ -122,9 +118,9 @@ describe("AiDoctorSensorSummaryDrilldown", () => {
     expect(
       screen.getByTestId("ai-doctor-metric-row-humidity_pct").getAttribute("data-freshness"),
     ).toBe("stale");
-    expect(
-      screen.getByTestId("ai-doctor-metric-row-vpd_kpa").getAttribute("data-freshness"),
-    ).toBe("invalid");
+    expect(screen.getByTestId("ai-doctor-metric-row-vpd_kpa").getAttribute("data-freshness")).toBe(
+      "invalid",
+    );
     expect(
       screen.getByTestId("ai-doctor-metric-row-ppfd_umol").getAttribute("data-freshness"),
     ).toBe("degraded");
@@ -142,9 +138,7 @@ describe("AiDoctorSensorSummaryDrilldown", () => {
       />,
     );
     const breakdown = screen.getByTestId("ai-doctor-source-breakdown");
-    expect(breakdown.getAttribute("data-source-order")).toBe(
-      AI_DOCTOR_SOURCE_ORDER.join(","),
-    );
+    expect(breakdown.getAttribute("data-source-order")).toBe(AI_DOCTOR_SOURCE_ORDER.join(","));
     for (const s of AI_DOCTOR_SOURCE_ORDER) {
       expect(screen.getByTestId(`ai-doctor-source-row-${s}`)).toBeTruthy();
     }

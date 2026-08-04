@@ -36,7 +36,9 @@ export function useDiaryEntryAuditTrail(
     queryFn: async () => {
       const { data, error } = await supabase
         .from("diary_entry_audit_log")
-        .select("id, diary_entry_id, user_id, action, changed_at, actor_id, changed_fields, previous_snapshot")
+        .select(
+          "id, diary_entry_id, user_id, action, changed_at, actor_id, changed_fields, previous_snapshot",
+        )
         .eq("diary_entry_id", diaryEntryId as string)
         .order("changed_at", { ascending: false });
       if (error) throw new Error(error.message);

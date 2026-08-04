@@ -66,8 +66,7 @@ function coerceInput(entry: unknown): OriginatingTimelineEventInput | null {
         ? entry.type
         : null;
   const source = typeof entry.source === "string" ? entry.source : null;
-  const occurred_at =
-    typeof entry.occurred_at === "string" ? entry.occurred_at : null;
+  const occurred_at = typeof entry.occurred_at === "string" ? entry.occurred_at : null;
   return {
     id,
     type: kindRaw,
@@ -81,9 +80,7 @@ function coerceInput(entry: unknown): OriginatingTimelineEventInput | null {
  * deterministic list of badge-ready refs. Returns `[]` for any unsafe or
  * unrecognized input.
  */
-export function adaptOriginatingTimelineEventsColumn(
-  raw: unknown,
-): OriginatingTimelineEventRef[] {
+export function adaptOriginatingTimelineEventsColumn(raw: unknown): OriginatingTimelineEventRef[] {
   if (raw === null || raw === undefined) return [];
   if (!Array.isArray(raw)) return [];
   const cleaned: OriginatingTimelineEventInput[] = [];

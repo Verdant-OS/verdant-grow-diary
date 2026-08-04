@@ -22,9 +22,7 @@ function makeClient(cachedKeys: ReadonlyArray<readonly unknown[]> = []) {
     getQueryCache: () => ({
       findAll: ({ queryKey }: { queryKey: readonly unknown[] }) => {
         const head = JSON.stringify(queryKey[0]);
-        return cachedKeys.filter(
-          (k) => JSON.stringify(k[0]) === head,
-        ) as ReadonlyArray<unknown>;
+        return cachedKeys.filter((k) => JSON.stringify(k[0]) === head) as ReadonlyArray<unknown>;
       },
     }),
   };
@@ -90,9 +88,7 @@ describe("applyQuickLogV2Refresh — conditional Dashboard scoping", () => {
     const out = calls(invalidate);
     expect(out).toContain(JSON.stringify(["ai_doctor_readiness", "tent-3"]));
     expect(out).toContain(JSON.stringify(["ai_doctor_context", "tent-3"]));
-    expect(out).toContain(
-      JSON.stringify(["quick_log_grouped_timeline", "tent-3"]),
-    );
+    expect(out).toContain(JSON.stringify(["quick_log_grouped_timeline", "tent-3"]));
   });
 
   it("tent target invalidates tent-scoped readiness/context", () => {
@@ -124,15 +120,11 @@ describe("applyQuickLogV2Refresh — conditional Dashboard scoping", () => {
     const outB = calls(ib);
     expect(outA).toContain(JSON.stringify(["plant_recent_activity", "plant-A"]));
     expect(outB).toContain(JSON.stringify(["plant_recent_activity", "plant-B"]));
-    expect(outA).not.toContain(
-      JSON.stringify(["plant_recent_activity", "plant-B"]),
-    );
+    expect(outA).not.toContain(JSON.stringify(["plant_recent_activity", "plant-B"]));
   });
 
   it("exports the conditional prefix list with Dashboard keys", () => {
-    const flat = QUICK_LOG_V2_CONDITIONAL_REFRESH_KEY_PREFIXES.map((k) =>
-      JSON.stringify(k),
-    );
+    const flat = QUICK_LOG_V2_CONDITIONAL_REFRESH_KEY_PREFIXES.map((k) => JSON.stringify(k));
     expect(flat).toContain(JSON.stringify(["dashboard_recent_activity"]));
     expect(flat).toContain(JSON.stringify(["dashboard_memory"]));
   });

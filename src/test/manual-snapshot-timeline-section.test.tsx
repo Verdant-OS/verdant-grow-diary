@@ -125,14 +125,10 @@ describe("ManualSnapshotTimelineSection — plant scope", () => {
     };
     renderSection({ scope: "plant", plantId: "plant-1" });
     await waitFor(() =>
-      expect(
-        screen.getByTestId("manual-snapshot-timeline-section-list"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("manual-snapshot-timeline-section-list")).toBeInTheDocument(),
     );
     const cards = screen.getAllByTestId("manual-snapshot-timeline-card");
-    expect(cards.map((c) => c.getAttribute("data-card-id"))).toEqual([
-      "plant-1-snap-a",
-    ]);
+    expect(cards.map((c) => c.getAttribute("data-card-id"))).toEqual(["plant-1-snap-a"]);
     expect(lastFilter).toEqual({ column: "plant_id", value: "plant-1" });
   });
 
@@ -145,9 +141,7 @@ describe("ManualSnapshotTimelineSection — plant scope", () => {
     // Even though the DB stub returns plant-2 rows, the pure selector
     // rejects them because their plantId !== "plant-1".
     await waitFor(() =>
-      expect(
-        screen.getByTestId("manual-snapshot-timeline-section-empty"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("manual-snapshot-timeline-section-empty")).toBeInTheDocument(),
     );
   });
 });
@@ -160,9 +154,7 @@ describe("ManualSnapshotTimelineSection — tent scope", () => {
     };
     renderSection({ scope: "tent", tentId: "tent-1" });
     await waitFor(() =>
-      expect(
-        screen.getByTestId("manual-snapshot-timeline-section-list"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("manual-snapshot-timeline-section-list")).toBeInTheDocument(),
     );
     const ids = screen
       .getAllByTestId("manual-snapshot-timeline-card")
@@ -182,9 +174,7 @@ describe("ManualSnapshotTimelineSection — tent scope", () => {
     };
     renderSection({ scope: "tent", tentId: "tent-1" });
     await waitFor(() =>
-      expect(
-        screen.getByTestId("manual-snapshot-timeline-section-empty"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("manual-snapshot-timeline-section-empty")).toBeInTheDocument(),
     );
   });
 });
@@ -194,15 +184,12 @@ describe("ManualSnapshotTimelineSection — failure + empty", () => {
     nextResponse = { data: null, error: new Error("boom") };
     renderSection({ scope: "plant", plantId: "plant-1" });
     await waitFor(() =>
-      expect(
-        screen.getByTestId("manual-snapshot-timeline-section-error"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("manual-snapshot-timeline-section-error")).toBeInTheDocument(),
     );
     // The error notice does not throw past the boundary, and no live label
     // appears in the failure copy.
-    const text = screen
-      .getByTestId("manual-snapshot-timeline-section-error")
-      .textContent?.toLowerCase() ?? "";
+    const text =
+      screen.getByTestId("manual-snapshot-timeline-section-error").textContent?.toLowerCase() ?? "";
     expect(text).not.toMatch(/\blive\b/);
   });
 
@@ -210,16 +197,12 @@ describe("ManualSnapshotTimelineSection — failure + empty", () => {
     nextResponse = { data: [], error: null };
     renderSection({ scope: "tent", tentId: "tent-1" });
     await waitFor(() =>
-      expect(
-        screen.getByTestId("manual-snapshot-timeline-section-empty"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("manual-snapshot-timeline-section-empty")).toBeInTheDocument(),
     );
   });
 
   it("renders a no-scope placeholder when the id is missing", () => {
     renderSection({ scope: "plant", plantId: null });
-    expect(
-      screen.getByTestId("manual-snapshot-timeline-section-no-scope"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("manual-snapshot-timeline-section-no-scope")).toBeInTheDocument();
   });
 });

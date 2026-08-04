@@ -12,9 +12,7 @@ describe("buildSensorIngestAuditCsvFilename — deterministic & sanitized", () =
   });
 
   it("ignores the 'all' provider sentinel", () => {
-    expect(buildSensorIngestAuditCsvFilename({ provider: "all" })).toBe(
-      AUDIT_CSV_FILENAME,
-    );
+    expect(buildSensorIngestAuditCsvFilename({ provider: "all" })).toBe(AUDIT_CSV_FILENAME);
   });
 
   it("includes a sanitized provider", () => {
@@ -24,9 +22,9 @@ describe("buildSensorIngestAuditCsvFilename — deterministic & sanitized", () =
   });
 
   it("drops unsafe provider strings (spaces, slashes, etc.)", () => {
-    expect(
-      buildSensorIngestAuditCsvFilename({ provider: "ecowitt/secret token" }),
-    ).toBe(AUDIT_CSV_FILENAME);
+    expect(buildSensorIngestAuditCsvFilename({ provider: "ecowitt/secret token" })).toBe(
+      AUDIT_CSV_FILENAME,
+    );
   });
 
   it("includes from and to dates", () => {
@@ -39,12 +37,12 @@ describe("buildSensorIngestAuditCsvFilename — deterministic & sanitized", () =
   });
 
   it("includes only the present date when one is missing", () => {
-    expect(
-      buildSensorIngestAuditCsvFilename({ capturedFromIso: "2026-06-01" }),
-    ).toBe("verdant-sensor-ingest-audit_from-2026-06-01.csv");
-    expect(
-      buildSensorIngestAuditCsvFilename({ capturedToIso: "2026-06-19" }),
-    ).toBe("verdant-sensor-ingest-audit_to-2026-06-19.csv");
+    expect(buildSensorIngestAuditCsvFilename({ capturedFromIso: "2026-06-01" })).toBe(
+      "verdant-sensor-ingest-audit_from-2026-06-01.csv",
+    );
+    expect(buildSensorIngestAuditCsvFilename({ capturedToIso: "2026-06-19" })).toBe(
+      "verdant-sensor-ingest-audit_to-2026-06-19.csv",
+    );
   });
 
   it("omits an invalid date entirely", () => {
@@ -63,9 +61,7 @@ describe("buildSensorIngestAuditCsvFilename — deterministic & sanitized", () =
         capturedFromIso: "2026-06-01T00:00:00Z",
         capturedToIso: "2026-06-19T00:00:00Z",
       }),
-    ).toBe(
-      "verdant-sensor-ingest-audit_provider-ecowitt_from-2026-06-01_to-2026-06-19.csv",
-    );
+    ).toBe("verdant-sensor-ingest-audit_provider-ecowitt_from-2026-06-01_to-2026-06-19.csv");
   });
 
   it("never includes the device/station search text", () => {

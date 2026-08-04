@@ -67,10 +67,7 @@ export function resolveBaseline({ explicit, env = process.env } = {}) {
   }
   const eventName = (env.GITHUB_EVENT_NAME ?? "").trim();
   const baseRef = (env.GITHUB_BASE_REF ?? "").trim();
-  if (
-    (eventName === "pull_request" || eventName === "pull_request_target") &&
-    baseRef
-  ) {
+  if ((eventName === "pull_request" || eventName === "pull_request_target") && baseRef) {
     return {
       ref: `origin/${baseRef}`,
       source: `github:${eventName}(GITHUB_BASE_REF=${baseRef})`,
@@ -97,8 +94,13 @@ function parseArgs(argv) {
     else if (a.startsWith("--allow-file=")) {
       for (const entry of loadAllowFile(a.slice(13))) out.allow.push(entry);
     } else if (a === "--help" || a === "-h") {
-      // eslint-disable-next-line no-console
-      console.log(readFileSync(new URL(import.meta.url)).toString().split("\n").slice(1, 45).join("\n"));
+      console.log(
+        readFileSync(new URL(import.meta.url))
+          .toString()
+          .split("\n")
+          .slice(1, 45)
+          .join("\n"),
+      );
       process.exit(0);
     } else {
       fail(2, `unknown arg: ${a}`);
@@ -106,7 +108,6 @@ function parseArgs(argv) {
   }
   return out;
 }
-
 
 /**
  * Parse a single `--allow=<path>:<reason>` spec. Path is normalized so
@@ -158,10 +159,7 @@ function loadAllowFile(filePath) {
   }
   const list = Array.isArray(parsed) ? parsed : parsed?.allow;
   if (!Array.isArray(list)) {
-    fail(
-      2,
-      `--allow-file ${filePath} must be a JSON array or { "allow": [...] }`,
-    );
+    fail(2, `--allow-file ${filePath} must be a JSON array or { "allow": [...] }`);
   }
   return list.map((entry, i) => {
     if (!entry || typeof entry !== "object") {
@@ -171,17 +169,13 @@ function loadAllowFile(filePath) {
     const reason = String(entry.reason ?? "").trim();
     if (!path) fail(2, `--allow-file ${filePath} entry #${i} missing "path"`);
     if (!reason) {
-      fail(
-        2,
-        `--allow-file ${filePath} entry #${i} (${path}) missing non-empty "reason"`,
-      );
+      fail(2, `--allow-file ${filePath} entry #${i} (${path}) missing non-empty "reason"`);
     }
     return { path, reason };
   });
 }
 
 function fail(code, msg) {
-  // eslint-disable-next-line no-console
   console.error(`[verify-published-migration-integrity] ${msg}`);
   process.exit(code);
 }
@@ -190,10 +184,7 @@ function fail(code, msg) {
 function git(args, { allowFail = false } = {}) {
   const r = spawnSync("git", args, { encoding: "buffer" });
   if (r.status !== 0 && !allowFail) {
-    fail(
-      2,
-      `git ${args.join(" ")} failed (exit ${r.status}): ${r.stderr?.toString() ?? ""}`,
-    );
+    fail(2, `git ${args.join(" ")} failed (exit ${r.status}): ${r.stderr?.toString() ?? ""}`);
   }
   return { status: r.status ?? 0, stdout: r.stdout, stderr: r.stderr };
 }
@@ -258,7 +249,6 @@ function main() {
   args.baseline = resolved.ref;
   args.baseline_source = resolved.source;
   if (!args.json) {
-    // eslint-disable-next-line no-console
     console.error(
       `[verify-published-migration-integrity] baseline=${resolved.ref} source=${resolved.source}`,
     );
@@ -359,16 +349,13 @@ function main() {
     if (!allow.used) results.allowlist_unused.push({ path, reason: allow.reason });
   }
 
-  const realFailures =
-    results.edited.length + results.deleted.length + results.noop_stubs.length;
+  const realFailures = results.edited.length + results.deleted.length + results.noop_stubs.length;
   const strictFailures = args.strictAllowlist ? results.allowlist_unused.length : 0;
   const failures = realFailures + strictFailures;
 
   if (args.json) {
-    // eslint-disable-next-line no-console
     console.log(JSON.stringify({ ok: failures === 0, ...results }, null, 2));
   } else {
-    // eslint-disable-next-line no-console
     console.log(
       `\n[verify-published-migration-integrity] baseline=${args.baseline} (source=${args.baseline_source})`,
     );
@@ -380,9 +367,7 @@ function main() {
     console.log(`  deleted:         ${results.deleted.length}`);
     console.log(`  allowlisted:     ${results.allowlisted.length}`);
     console.log(`  allowlist unused:${results.allowlist_unused.length}`);
-    console.log(
-      `  new on branch:   ${results.new_on_branch.length} (additive, ok)\n`,
-    );
+    console.log(`  new on branch:   ${results.new_on_branch.length} (additive, ok)\n`);
     for (const e of results.edited) {
       console.log(
         `  EDITED   ${e.path}\n    baseline sha256: ${e.baseline_sha256} (${e.baseline_bytes} B)\n    current  sha256: ${e.current_sha256} (${e.current_bytes} B)`,
@@ -397,9 +382,7 @@ function main() {
       console.log(`  DELETED  ${e.path}`);
     }
     for (const e of results.allowlisted) {
-      console.log(
-        `  ALLOWED  ${e.path} [${e.kind}] — reason: ${e.reason}`,
-      );
+      console.log(`  ALLOWED  ${e.path} [${e.kind}] — reason: ${e.reason}`);
     }
     for (const e of results.allowlist_unused) {
       console.log(
@@ -413,7 +396,9 @@ function main() {
       failures === 0
         ? "\nOK — every published migration matches baseline (or is explicitly allowlisted).\n"
         : `\nFAIL — ${realFailures} unallowlisted divergence(s)` +
-            (strictFailures ? ` + ${strictFailures} unused allowlist entr(ies) under --strict-allowlist` : "") +
+            (strictFailures
+              ? ` + ${strictFailures} unused allowlist entr(ies) under --strict-allowlist`
+              : "") +
             `. Restore with:\n  git checkout ${args.baseline} -- <path>\nOr, if the edit is intentional, add:\n  --allow=<path>:"<justification>"\n`,
     );
   }
@@ -425,4 +410,3 @@ function main() {
 const invokedDirectly =
   process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href;
 if (invokedDirectly) main();
-

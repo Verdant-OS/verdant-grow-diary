@@ -75,10 +75,7 @@ export default function IngestAttemptReportPanel({ report, onCopy }: Props) {
             {report.description}
           </p>
         </div>
-        <Badge
-          variant={STATUS_VARIANT[report.status]}
-          data-testid="ingest-attempt-status-badge"
-        >
+        <Badge variant={STATUS_VARIANT[report.status]} data-testid="ingest-attempt-status-badge">
           {report.status.replace(/_/g, " ")}
         </Badge>
       </header>
@@ -97,7 +94,9 @@ export default function IngestAttemptReportPanel({ report, onCopy }: Props) {
         {report.url && (
           <div className="sm:col-span-2">
             <dt className="text-muted-foreground">Ingest URL</dt>
-            <dd className="break-all" data-testid="ingest-attempt-url">{report.url}</dd>
+            <dd className="break-all" data-testid="ingest-attempt-url">
+              {report.url}
+            </dd>
           </div>
         )}
         {report.tentId && (
@@ -119,9 +118,7 @@ export default function IngestAttemptReportPanel({ report, onCopy }: Props) {
         {report.metricKeys.length > 0 && (
           <div className="sm:col-span-2">
             <dt className="text-muted-foreground">Metric keys</dt>
-            <dd data-testid="ingest-attempt-metrics">
-              {report.metricKeys.join(", ")}
-            </dd>
+            <dd data-testid="ingest-attempt-metrics">{report.metricKeys.join(", ")}</dd>
           </div>
         )}
       </dl>
@@ -142,15 +139,13 @@ export default function IngestAttemptReportPanel({ report, onCopy }: Props) {
       )}
 
       <footer className="flex items-center justify-between gap-2 pt-2 border-t border-border/40">
-        <p className="text-[11px] text-muted-foreground" data-testid="ingest-attempt-storage-notice">
+        <p
+          className="text-[11px] text-muted-foreground"
+          data-testid="ingest-attempt-storage-notice"
+        >
           {report.storageNotice}
         </p>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={handleCopy}
-          data-testid="ingest-attempt-copy"
-        >
+        <Button size="sm" variant="outline" onClick={handleCopy} data-testid="ingest-attempt-copy">
           Copy redacted report
         </Button>
       </footer>

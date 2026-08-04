@@ -675,8 +675,7 @@ export function describeDatabaseUrlRepairProbes(value) {
   const withoutBom = (t) => (t.codePointAt(0) === 0xfeff ? t.slice(1) : null);
   const unquoted = withoutWrappingQuotes(text);
   const deBommed = withoutBom(text);
-  const deBommedUnquoted =
-    deBommed !== null ? withoutWrappingQuotes(deBommed) : null;
+  const deBommedUnquoted = deBommed !== null ? withoutWrappingQuotes(deBommed) : null;
   return Object.freeze({
     starts_with_postgres_scheme: /^postgres(?:ql)?:\/\//.test(text),
     pins_production_after_unquote: pinsProduction(unquoted),

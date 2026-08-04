@@ -87,9 +87,7 @@ describe("Sign-in verification-required UI", () => {
     );
     // Generic sign-in error is NOT shown in this branch.
     expect(screen.queryByText(/couldn['’]t sign you in/i)).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /resend verification email/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /resend verification email/i })).toBeInTheDocument();
   });
 
   it("resend success uses generic non-enumerating copy", async () => {

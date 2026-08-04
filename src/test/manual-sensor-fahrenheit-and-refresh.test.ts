@@ -132,7 +132,9 @@ describe("Static safety", () => {
       expect(src).not.toMatch(/autopilot/i);
       expect(src).not.toMatch(/writeWateringTypedEvent/);
       expect(src).not.toMatch(/from\(\s*['"]leads['"]\s*\)/);
-      expect(src).not.toMatch(/from\(\s*['"]action_queue['"]\s*\)\s*\.(insert|update|delete|upsert)/);
+      expect(src).not.toMatch(
+        /from\(\s*['"]action_queue['"]\s*\)\s*\.(insert|update|delete|upsert)/,
+      );
       expect(src).not.toMatch(/from\(\s*['"]alerts['"]\s*\)\s*\.(insert|update|delete|upsert)/);
     }
   });

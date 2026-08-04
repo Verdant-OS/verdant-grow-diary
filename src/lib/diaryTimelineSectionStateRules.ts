@@ -17,9 +17,7 @@ import {
 } from "@/lib/diaryTimelineSectionRules";
 
 /** Map of section id → expanded boolean. Always keyed only by known ids. */
-export type DiaryTimelineSectionExpandedState = Readonly<
-  Record<DiaryTimelineSectionId, boolean>
->;
+export type DiaryTimelineSectionExpandedState = Readonly<Record<DiaryTimelineSectionId, boolean>>;
 
 const KNOWN_SECTION_IDS: ReadonlySet<DiaryTimelineSectionId> = new Set(
   DIARY_TIMELINE_SECTION_ORDER,
@@ -144,9 +142,7 @@ export function buildDiaryTimelineSectionSummary<T>(
     `${nonEmptySections} ${nonEmptySections === 1 ? "section" : "sections"} with entries`,
   ];
   if (otherCount > 0) {
-    parts.push(
-      `${otherCount} in Other diary entries`,
-    );
+    parts.push(`${otherCount} in Other diary entries`);
   }
   return { totalEntries, nonEmptySections, otherCount, parts };
 }

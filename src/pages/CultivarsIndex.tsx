@@ -63,11 +63,7 @@ export default function CultivarsIndex() {
     DIFFICULTY_OPTIONS,
     "all",
   );
-  const lifeCycle = validOption(
-    searchParams.get("lifeCycle") ?? "all",
-    LIFE_CYCLE_OPTIONS,
-    "all",
-  );
+  const lifeCycle = validOption(searchParams.get("lifeCycle") ?? "all", LIFE_CYCLE_OPTIONS, "all");
   const verificationStatus = validOption(
     searchParams.get("verification") ?? "all",
     VERIFICATION_OPTIONS,
@@ -180,7 +176,10 @@ export default function CultivarsIndex() {
           onSubmit={(event) => event.preventDefault()}
         >
           <div>
-            <label htmlFor="cultivar-difficulty" className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground">
+            <label
+              htmlFor="cultivar-difficulty"
+              className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground"
+            >
               Difficulty
             </label>
             <select
@@ -198,7 +197,10 @@ export default function CultivarsIndex() {
           </div>
 
           <div>
-            <label htmlFor="cultivar-life-cycle" className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground">
+            <label
+              htmlFor="cultivar-life-cycle"
+              className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground"
+            >
               Life cycle
             </label>
             <select
@@ -216,7 +218,10 @@ export default function CultivarsIndex() {
           </div>
 
           <div>
-            <label htmlFor="cultivar-verification" className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground">
+            <label
+              htmlFor="cultivar-verification"
+              className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground"
+            >
               Evidence state
             </label>
             <select
@@ -286,8 +291,12 @@ export default function CultivarsIndex() {
                     {cultivar.breeder ? `${cultivar.breeder} · ` : "Breeder/source varies · "}
                     {cultivar.flowerWeeks}
                   </p>
-                  <p className="mt-3 line-clamp-4 text-sm text-muted-foreground">{cultivar.intro}</p>
-                  <p className="mt-auto pt-5 text-xs text-primary/90">Open source and guide evidence →</p>
+                  <p className="mt-3 line-clamp-4 text-sm text-muted-foreground">
+                    {cultivar.intro}
+                  </p>
+                  <p className="mt-auto pt-5 text-xs text-primary/90">
+                    Open source and guide evidence →
+                  </p>
                 </Link>
               </li>
             ))}

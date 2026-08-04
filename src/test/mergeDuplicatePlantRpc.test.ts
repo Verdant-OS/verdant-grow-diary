@@ -17,11 +17,7 @@ function findRpcMigration(): { path: string; sql: string } | null {
   for (const name of readdirSync(MIG_DIR)) {
     const p = join(MIG_DIR, name);
     const sql = readFileSync(p, "utf8");
-    if (
-      /CREATE\s+(OR\s+REPLACE\s+)?FUNCTION\s+public\.merge_duplicate_plant/i.test(
-        sql,
-      )
-    ) {
+    if (/CREATE\s+(OR\s+REPLACE\s+)?FUNCTION\s+public\.merge_duplicate_plant/i.test(sql)) {
       return { path: p, sql };
     }
   }
@@ -43,28 +39,16 @@ describe("merge_duplicate_plant RPC — signature & safety", () => {
     ["takes target_plant_id uuid", /target_plant_id\s+uuid/i],
     ["returns jsonb", /returns\s+jsonb/i],
     ["is SECURITY DEFINER", /security\s+definer/i],
-    [
-      "pins search_path to public, pg_temp",
-      /set\s+search_path\s*=\s*public\s*,\s*pg_temp/i,
-    ],
+    ["pins search_path to public, pg_temp", /set\s+search_path\s*=\s*public\s*,\s*pg_temp/i],
     ["resolves auth.uid()", /auth\.uid\(\)/i],
     ["raises not authenticated when uid is null", /not\s+authenticated/i],
     [
       "rejects same source and target",
       /source_plant_id\s*=\s*target_plant_id[\s\S]{0,200}must\s+differ/i,
     ],
-    [
-      "verifies source ownership",
-      /source\s+plant\s+not\s+found\s+or\s+not\s+owned\s+by\s+caller/i,
-    ],
-    [
-      "verifies target ownership",
-      /target\s+plant\s+not\s+found\s+or\s+not\s+owned\s+by\s+caller/i,
-    ],
-    [
-      "blocks cross-grow merges",
-      /cross-grow\s+merges\s+are\s+not\s+supported/i,
-    ],
+    ["verifies source ownership", /source\s+plant\s+not\s+found\s+or\s+not\s+owned\s+by\s+caller/i],
+    ["verifies target ownership", /target\s+plant\s+not\s+found\s+or\s+not\s+owned\s+by\s+caller/i],
+    ["blocks cross-grow merges", /cross-grow\s+merges\s+are\s+not\s+supported/i],
     ["rejects repeat merges", /plant_already_merged/i],
     [
       "reassigns grow_events.plant_id",
@@ -86,16 +70,10 @@ describe("merge_duplicate_plant RPC — signature & safety", () => {
       "archives source plant (sets is_archived = true)",
       /update\s+public\.plants[\s\S]{0,400}is_archived\s*=\s*true/i,
     ],
-    [
-      "returns a moved summary object",
-      /jsonb_build_object\([\s\S]{0,1500}'moved'/i,
-    ],
+    ["returns a moved summary object", /jsonb_build_object\([\s\S]{0,1500}'moved'/i],
     ["reports source_status archived_as_merged", /archived_as_merged/i],
     ["REVOKEs from anon", /revoke\s+all[\s\S]{0,200}from\s+anon/i],
-    [
-      "GRANTs EXECUTE to authenticated",
-      /grant\s+execute[\s\S]{0,200}to\s+authenticated/i,
-    ],
+    ["GRANTs EXECUTE to authenticated", /grant\s+execute[\s\S]{0,200}to\s+authenticated/i],
   ])("RPC migration %s", (_label, re) => {
     expect(sql).toMatch(re);
   });

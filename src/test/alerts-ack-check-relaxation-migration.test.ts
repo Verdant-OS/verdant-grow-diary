@@ -19,17 +19,13 @@ const sql = readFileSync(
 
 describe("alerts ack check relaxation migration", () => {
   it("drops the prior constraint", () => {
-    expect(sql).toMatch(
-      /DROP CONSTRAINT IF EXISTS alerts_acknowledged_at_status_check/i,
-    );
+    expect(sql).toMatch(/DROP CONSTRAINT IF EXISTS alerts_acknowledged_at_status_check/i);
   });
 
   it("re-adds the constraint allowing resolved/dismissed to keep acknowledged_at", () => {
     expect(sql).toMatch(/ADD CONSTRAINT alerts_acknowledged_at_status_check/i);
     expect(sql).toMatch(/status\s*=\s*'open'[\s\S]*acknowledged_at IS NULL/i);
-    expect(sql).toMatch(
-      /status\s*=\s*'acknowledged'[\s\S]*acknowledged_at IS NOT NULL/i,
-    );
+    expect(sql).toMatch(/status\s*=\s*'acknowledged'[\s\S]*acknowledged_at IS NOT NULL/i);
     expect(sql).toMatch(/status IN \('resolved',\s*'dismissed'\)/i);
   });
 

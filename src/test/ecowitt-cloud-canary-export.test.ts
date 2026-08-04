@@ -29,10 +29,7 @@ const ORDER = [
 
 // REUSE the shared ID-shaped regexes from the Item 4 render test so that
 // render, CSV, and JSON share ONE definition of "ID-shaped".
-import {
-  MAC_RE,
-  UUID_RE,
-} from "./operator-ecowitt-cloud-canary-per-fixture-table.test";
+import { MAC_RE, UUID_RE } from "./operator-ecowitt-cloud-canary-per-fixture-table.test";
 const TENT_ID_LIKE = /tent_id|plant_id|raw_payload|passkey|\bMAC\b/i;
 const BANNED = [
   "confirmed",
@@ -146,10 +143,8 @@ describe("ecowittCloudCanaryExport — pure serializer", () => {
         invalid_count: Number(cols[4]),
         unmapped_count: Number(cols[5]),
         row_state: cols[6],
-        suspicious_flag_codes:
-          cols[7] && cols[7].length > 0 ? cols[7].split("|") : [],
-        missing_metric_codes:
-          cols[8] && cols[8].length > 0 ? cols[8].split("|") : [],
+        suspicious_flag_codes: cols[7] && cols[7].length > 0 ? cols[7].split("|") : [],
+        missing_metric_codes: cols[8] && cols[8].length > 0 ? cols[8].split("|") : [],
       };
     });
     expect(csvRows).toEqual(json.rows);
@@ -255,12 +250,8 @@ describe("CloudCanaryPreviewPanel — export controls render (Item 3)", () => {
   );
 
   it("panel mounts both CSV and JSON download controls", () => {
-    expect(pageSrc).toContain(
-      'data-testid="download-cloud-canary-summary-csv"',
-    );
-    expect(pageSrc).toContain(
-      'data-testid="download-cloud-canary-summary-json"',
-    );
+    expect(pageSrc).toContain('data-testid="download-cloud-canary-summary-csv"');
+    expect(pageSrc).toContain('data-testid="download-cloud-canary-summary-json"');
     expect(pageSrc).toContain("Download Fixture Summary CSV");
     expect(pageSrc).toContain("Download Fixture Summary JSON");
   });
@@ -277,9 +268,7 @@ describe("CloudCanaryPreviewPanel — export controls render (Item 3)", () => {
   it("panel block contains none of the banned source-honesty words", async () => {
     const React = await import("react");
     const { renderToString } = await import("react-dom/server");
-    const { CloudCanaryPreviewPanel } = await import(
-      "@/pages/OperatorEcowittCanary"
-    );
+    const { CloudCanaryPreviewPanel } = await import("@/pages/OperatorEcowittCanary");
     const html = renderToString(React.createElement(CloudCanaryPreviewPanel));
     const lower = html.toLowerCase();
     for (const w of BANNED) expect(lower).not.toContain(w);
@@ -364,9 +353,7 @@ describe("CloudCanaryPreviewPanel — export controls render (Item 3)", () => {
       ...vm,
       suspicious_flag_codes: ["AA:BB:CC:DD:EE:01"] as never,
     };
-    expect(() => buildCloudCanaryExport(tainted)).toThrow(
-      /Unknown suspicious flag code/,
-    );
+    expect(() => buildCloudCanaryExport(tainted)).toThrow(/Unknown suspicious flag code/);
   });
 
   it("uses the literal export key 'fresh_class_count' in BOTH CSV header and JSON key (NOT 'fresh_count')", () => {

@@ -23,11 +23,7 @@ function findRpcMigration(): { path: string; sql: string } | null {
   for (const name of readdirSync(MIG_DIR)) {
     const p = join(MIG_DIR, name);
     const sql = readFileSync(p, "utf8");
-    if (
-      /CREATE\s+(OR\s+REPLACE\s+)?FUNCTION\s+public\.quicklog_save_manual/i.test(
-        sql,
-      )
-    ) {
+    if (/CREATE\s+(OR\s+REPLACE\s+)?FUNCTION\s+public\.quicklog_save_manual/i.test(sql)) {
       return { path: p, sql };
     }
   }
@@ -46,9 +42,7 @@ describe("quicklog_save_manual RPC — migration exists", () => {
 describe("quicklog_save_manual RPC — ownership boundary", () => {
   it("is SECURITY DEFINER with pinned search_path", () => {
     expect(sql).toMatch(/security\s+definer/i);
-    expect(sql).toMatch(
-      /set\s+search_path\s+to\s+'public'\s*,\s*'pg_temp'/i,
-    );
+    expect(sql).toMatch(/set\s+search_path\s+to\s+'public'\s*,\s*'pg_temp'/i);
   });
 
   it("derives caller identity from auth.uid(), not a client param", () => {
@@ -58,9 +52,7 @@ describe("quicklog_save_manual RPC — ownership boundary", () => {
   });
 
   it("rejects unauthenticated callers before any insert", () => {
-    expect(sql).toMatch(
-      /IF\s+uid\s+IS\s+NULL[\s\S]{0,200}'not_authenticated'/i,
-    );
+    expect(sql).toMatch(/IF\s+uid\s+IS\s+NULL[\s\S]{0,200}'not_authenticated'/i);
   });
 
   it("resolves selected plant target by id AND user_id = auth.uid()", () => {
@@ -76,9 +68,7 @@ describe("quicklog_save_manual RPC — ownership boundary", () => {
   });
 
   it("rejects target not owned by caller with a safe reason code", () => {
-    expect(sql).toMatch(
-      /IF\s+v_grow_id\s+IS\s+NULL[\s\S]{0,200}'target_not_owned'/i,
-    );
+    expect(sql).toMatch(/IF\s+v_grow_id\s+IS\s+NULL[\s\S]{0,200}'target_not_owned'/i);
   });
 
   it("defense-in-depth: verifies resolved grow ownership against auth.uid()", () => {
@@ -110,9 +100,7 @@ describe("quicklog_save_manual RPC — ownership boundary", () => {
   });
 
   it("parent grow_event insert uses uid (not a client-supplied user_id)", () => {
-    expect(sql).toMatch(
-      /INSERT\s+INTO\s+public\.grow_events[\s\S]{0,400}VALUES\s*\(\s*uid\s*,/i,
-    );
+    expect(sql).toMatch(/INSERT\s+INTO\s+public\.grow_events[\s\S]{0,400}VALUES\s*\(\s*uid\s*,/i);
   });
 
   it("environment parent + child inserts also use uid", () => {
@@ -123,24 +111,18 @@ describe("quicklog_save_manual RPC — ownership boundary", () => {
 
   it("environment parent is only inserted under the sensor branch", () => {
     // Sensor branch is gated on v_has_sensors.
-    expect(sql).toMatch(
-      /IF\s+v_has_sensors\s+THEN[\s\S]{0,600}'environment'/i,
-    );
+    expect(sql).toMatch(/IF\s+v_has_sensors\s+THEN[\s\S]{0,600}'environment'/i);
   });
 
   it("reason codes are short safe tokens — no SQL or table names leaked", () => {
-    const reasonMatches = Array.from(
-      sql.matchAll(/'reason'\s*,\s*'([^']+)'/g),
-    ).map((m) => m[1]);
+    const reasonMatches = Array.from(sql.matchAll(/'reason'\s*,\s*'([^']+)'/g)).map((m) => m[1]);
     expect(reasonMatches.length).toBeGreaterThan(0);
     for (const r of reasonMatches) {
       expect(r).toMatch(/^[a-z][a-z0-9_]{2,40}$/);
       expect(r).not.toMatch(/select|insert|update|delete|from|where/i);
       expect(r).not.toMatch(/public\.|auth\./i);
       // No UUID-shaped leakage.
-      expect(r).not.toMatch(
-        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
-      );
+      expect(r).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
     }
   });
 
@@ -166,9 +148,7 @@ describe("quicklog_save_manual RPC — static safety scope", () => {
   });
 
   it("does not write to ai_doctor_sessions", () => {
-    expect(sql).not.toMatch(
-      /INSERT\s+INTO\s+public\.ai_doctor_sessions\b/i,
-    );
+    expect(sql).not.toMatch(/INSERT\s+INTO\s+public\.ai_doctor_sessions\b/i);
   });
 
   it("contains no device-control language", () => {

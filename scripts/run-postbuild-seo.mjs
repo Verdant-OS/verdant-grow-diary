@@ -54,7 +54,11 @@ function artifactsPresent() {
 
 function generateArtifacts() {
   run("bun", [resolve("scripts/generate-seo-artifacts.ts"), distDir]);
-  run("node", [resolve("scripts/capture-ssr-head-snapshots-with-server.mjs"), distDir]);
+  run("node", [
+    resolve("scripts/capture-ssr-head-snapshots-with-server.mjs"),
+    distDir,
+    resolve(".output/server/index.mjs"),
+  ]);
 }
 
 generateArtifacts();

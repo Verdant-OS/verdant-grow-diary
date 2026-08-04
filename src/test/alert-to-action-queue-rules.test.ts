@@ -55,9 +55,7 @@ describe("alertToActionQueueRules — manual-sensor-aligned mappings", () => {
   });
 
   it("maps low humidity to gradual humidification copy", () => {
-    const t = recommendedActionForAlert(
-      alert({ reason: "Humidity is low (28% < 40%)" }),
-    );
+    const t = recommendedActionForAlert(alert({ reason: "Humidity is low (28% < 40%)" }));
     expect(t).toMatch(/humid/i);
     expect(t).not.toMatch(EXECUTABLE_VERBS);
   });
@@ -111,12 +109,8 @@ describe("alertToActionQueueRules — manual-sensor-aligned mappings", () => {
   });
 
   it("rejects synthetic 'data unavailable' alerts", () => {
-    expect(
-      buildActionQueueDraftFromAlert(alert({ id: "snapshot:unavailable" })).ok,
-    ).toBe(false);
-    expect(
-      buildActionQueueDraftFromAlert(alert({ metric: "snapshot" })).ok,
-    ).toBe(false);
+    expect(buildActionQueueDraftFromAlert(alert({ id: "snapshot:unavailable" })).ok).toBe(false);
+    expect(buildActionQueueDraftFromAlert(alert({ metric: "snapshot" })).ok).toBe(false);
   });
 
   it("draft is approval-required, advisory, and back-pointer-stamped", () => {
@@ -192,10 +186,7 @@ describe("alertToActionQueueRules — manual-sensor-aligned mappings", () => {
 });
 
 describe("alertToActionQueueRules — module-level static safety", () => {
-  const RULES = readFileSync(
-    resolve(__dirname, "../lib/alertToActionQueueRules.ts"),
-    "utf8",
-  );
+  const RULES = readFileSync(resolve(__dirname, "../lib/alertToActionQueueRules.ts"), "utf8");
 
   it("rules module references no sensitive backend / model surfaces", () => {
     expect(RULES).not.toMatch(/service_role/);

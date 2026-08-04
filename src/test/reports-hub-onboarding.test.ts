@@ -60,32 +60,21 @@ describe("buildReportsHubOnboarding", () => {
   });
 
   it("hides the section when any meaningful signal exists", () => {
-    expect(
-      buildReportsHubOnboarding({ ...base, diaryEntriesTotal: 1 }).visible,
-    ).toBe(false);
-    expect(
-      buildReportsHubOnboarding({ ...base, recentSensorReadingCount: 1 })
-        .visible,
-    ).toBe(false);
+    expect(buildReportsHubOnboarding({ ...base, diaryEntriesTotal: 1 }).visible).toBe(false);
+    expect(buildReportsHubOnboarding({ ...base, recentSensorReadingCount: 1 }).visible).toBe(false);
     expect(
       buildReportsHubOnboarding({
         ...base,
         latestSensorCapturedAt: new Date().toISOString(),
       }).visible,
     ).toBe(false);
-    expect(
-      buildReportsHubOnboarding({ ...base, outcomeTotal: 1 }).visible,
-    ).toBe(false);
-    expect(
-      buildReportsHubOnboarding({ ...base, alertsOpen: 1 }).visible,
-    ).toBe(false);
+    expect(buildReportsHubOnboarding({ ...base, outcomeTotal: 1 }).visible).toBe(false);
+    expect(buildReportsHubOnboarding({ ...base, alertsOpen: 1 }).visible).toBe(false);
   });
 
   it("hasMeaningfulReportsData mirrors visibility logic", () => {
     expect(hasMeaningfulReportsData(base)).toBe(false);
-    expect(
-      hasMeaningfulReportsData({ ...base, diaryEntriesTotal: 5 }),
-    ).toBe(true);
+    expect(hasMeaningfulReportsData({ ...base, diaryEntriesTotal: 5 })).toBe(true);
   });
 
   it("copy stays observational and never claims healthy/complete/fixed", () => {
@@ -105,8 +94,6 @@ describe("buildReportsHubOnboarding", () => {
     expect(SRC).not.toMatch(
       /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b/i,
     );
-    expect(SRC).not.toMatch(
-      /\.insert\(|\.update\(|\.delete\(|\.upsert\(|\.rpc\(/,
-    );
+    expect(SRC).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.upsert\(|\.rpc\(/);
   });
 });

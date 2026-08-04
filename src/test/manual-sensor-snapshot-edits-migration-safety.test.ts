@@ -33,8 +33,12 @@ describe("manual_sensor_snapshot_edits migration posture", () => {
   });
 
   it("references sensor_readings for original + replacement with FK safety", () => {
-    expect(sql).toMatch(/original_reading_id[^,]+references\s+public\.sensor_readings\(id\)\s+on\s+delete\s+cascade/i);
-    expect(sql).toMatch(/replacement_reading_id[^,]+references\s+public\.sensor_readings\(id\)\s+on\s+delete\s+set\s+null/i);
+    expect(sql).toMatch(
+      /original_reading_id[^,]+references\s+public\.sensor_readings\(id\)\s+on\s+delete\s+cascade/i,
+    );
+    expect(sql).toMatch(
+      /replacement_reading_id[^,]+references\s+public\.sensor_readings\(id\)\s+on\s+delete\s+set\s+null/i,
+    );
   });
 
   it("pins source_before and source_after to 'manual' via CHECK", () => {
@@ -43,12 +47,18 @@ describe("manual_sensor_snapshot_edits migration posture", () => {
   });
 
   it("enables RLS", () => {
-    expect(lower).toMatch(/alter\s+table\s+public\.manual_sensor_snapshot_edits\s+enable\s+row\s+level\s+security/);
+    expect(lower).toMatch(
+      /alter\s+table\s+public\.manual_sensor_snapshot_edits\s+enable\s+row\s+level\s+security/,
+    );
   });
 
   it("grants SELECT + INSERT to authenticated, ALL to service_role, no anon, no PUBLIC", () => {
-    expect(sql).toMatch(/grant\s+select\s*,\s*insert\s+on\s+public\.manual_sensor_snapshot_edits\s+to\s+authenticated/i);
-    expect(sql).toMatch(/grant\s+all\s+on\s+public\.manual_sensor_snapshot_edits\s+to\s+service_role/i);
+    expect(sql).toMatch(
+      /grant\s+select\s*,\s*insert\s+on\s+public\.manual_sensor_snapshot_edits\s+to\s+authenticated/i,
+    );
+    expect(sql).toMatch(
+      /grant\s+all\s+on\s+public\.manual_sensor_snapshot_edits\s+to\s+service_role/i,
+    );
     // No anon grant on this table.
     expect(sql).not.toMatch(/grant[^;]+on\s+public\.manual_sensor_snapshot_edits[^;]+to\s+anon/i);
     // No PUBLIC grant on this table.
@@ -56,7 +66,9 @@ describe("manual_sensor_snapshot_edits migration posture", () => {
   });
 
   it("has SELECT-own and INSERT-own policies only (no UPDATE, no DELETE)", () => {
-    expect(sql).toMatch(/create\s+policy[^;]+manual_sensor_snapshot_edits[^;]+for\s+select[^;]+auth\.uid\(\)\s*=\s*user_id/i);
+    expect(sql).toMatch(
+      /create\s+policy[^;]+manual_sensor_snapshot_edits[^;]+for\s+select[^;]+auth\.uid\(\)\s*=\s*user_id/i,
+    );
     expect(sql).toMatch(/create\s+policy[^;]+manual_sensor_snapshot_edits[^;]+for\s+insert/i);
     expect(sql).not.toMatch(/create\s+policy[^;]+manual_sensor_snapshot_edits[^;]+for\s+update/i);
     expect(sql).not.toMatch(/create\s+policy[^;]+manual_sensor_snapshot_edits[^;]+for\s+delete/i);
@@ -64,8 +76,12 @@ describe("manual_sensor_snapshot_edits migration posture", () => {
 
   it("insert policy validates ownership of original + replacement readings and manual source", () => {
     // Correlated EXISTS on sensor_readings with auth.uid() + source='manual'.
-    expect(sql).toMatch(/exists\s*\(\s*select\s+1\s+from\s+public\.sensor_readings\s+r\s+where\s+r\.id\s*=\s*original_reading_id[\s\S]+r\.user_id\s*=\s*auth\.uid\(\)[\s\S]+r\.source\s*=\s*'manual'/i);
-    expect(sql).toMatch(/replacement_reading_id\s+is\s+null[\s\S]+exists\s*\(\s*select\s+1\s+from\s+public\.sensor_readings\s+r2/i);
+    expect(sql).toMatch(
+      /exists\s*\(\s*select\s+1\s+from\s+public\.sensor_readings\s+r\s+where\s+r\.id\s*=\s*original_reading_id[\s\S]+r\.user_id\s*=\s*auth\.uid\(\)[\s\S]+r\.source\s*=\s*'manual'/i,
+    );
+    expect(sql).toMatch(
+      /replacement_reading_id\s+is\s+null[\s\S]+exists\s*\(\s*select\s+1\s+from\s+public\.sensor_readings\s+r2/i,
+    );
   });
 
   it("indexes user_id/changed_at and original_reading_id for owner reads", () => {

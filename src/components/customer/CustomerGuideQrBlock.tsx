@@ -23,8 +23,7 @@ export interface CustomerGuideQrBlockProps {
 }
 
 export const CUSTOMER_GUIDE_QR_LABEL = "Customer guide link";
-export const CUSTOMER_GUIDE_QR_UNAVAILABLE =
-  "Customer guide link unavailable.";
+export const CUSTOMER_GUIDE_QR_UNAVAILABLE = "Customer guide link unavailable.";
 
 function resolveOrigin(explicit: string | null | undefined): string | null {
   if (typeof explicit === "string" && explicit.length > 0) return explicit;
@@ -55,10 +54,7 @@ export default function CustomerGuideQrBlock({
         aria-labelledby="customer-guide-qr-heading"
         className="rounded-xl border border-border/60 bg-card/60 p-5"
       >
-        <h2
-          id="customer-guide-qr-heading"
-          className="text-base font-semibold tracking-tight"
-        >
+        <h2 id="customer-guide-qr-heading" className="text-base font-semibold tracking-tight">
           {CUSTOMER_GUIDE_QR_LABEL}
         </h2>
         <p
@@ -78,23 +74,12 @@ export default function CustomerGuideQrBlock({
       aria-labelledby="customer-guide-qr-heading"
       className="rounded-xl border border-border/60 bg-card/60 p-5"
     >
-      <h2
-        id="customer-guide-qr-heading"
-        className="text-base font-semibold tracking-tight"
-      >
+      <h2 id="customer-guide-qr-heading" className="text-base font-semibold tracking-tight">
         {CUSTOMER_GUIDE_QR_LABEL}
       </h2>
       <div className="mt-4 flex flex-col items-center gap-3">
-        <div
-          data-testid="customer-guide-qr-svg-wrap"
-          className="rounded-md bg-white p-3"
-        >
-          <QRCodeSVG
-            value={displayUrl}
-            size={160}
-            level="M"
-            includeMargin={false}
-          />
+        <div data-testid="customer-guide-qr-svg-wrap" className="rounded-md bg-white p-3">
+          <QRCodeSVG value={displayUrl} size={160} level="M" includeMargin={false} />
         </div>
         <p
           data-testid="customer-guide-qr-url"

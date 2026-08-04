@@ -36,7 +36,10 @@ export function NextRunPlaybook({ playbook }: NextRunPlaybookProps) {
   }
 
   return (
-    <section aria-labelledby="next-run-playbook-heading" className="glass rounded-2xl p-4 space-y-4">
+    <section
+      aria-labelledby="next-run-playbook-heading"
+      className="glass rounded-2xl p-4 space-y-4"
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="next-run-playbook-heading" className="text-lg font-semibold">
           Next Run Playbook

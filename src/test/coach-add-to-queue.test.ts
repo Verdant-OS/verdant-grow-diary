@@ -18,10 +18,7 @@ import { resolve } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
 const COACH = readFileSync(resolve(ROOT, "src/pages/Coach.tsx"), "utf8");
-const AI_COACH = readFileSync(
-  resolve(ROOT, "supabase/functions/ai-coach/index.ts"),
-  "utf8",
-);
+const AI_COACH = readFileSync(resolve(ROOT, "supabase/functions/ai-coach/index.ts"), "utf8");
 
 describe("AI Coach → Action Queue (manual, suggest-only)", () => {
   it("inserts into action_queue only from a named click handler, not on render", () => {
@@ -32,9 +29,7 @@ describe("AI Coach → Action Queue (manual, suggest-only)", () => {
     // The button wires it via onClick, not useEffect.
     expect(COACH).toMatch(/onClick=\{\(\)\s*=>\s*addToQueue\(/);
     // No top-level effect auto-creates queue rows.
-    expect(COACH).not.toMatch(
-      /useEffect\([\s\S]{0,400}action_queue[\s\S]{0,200}\.insert\(/,
-    );
+    expect(COACH).not.toMatch(/useEffect\([\s\S]{0,400}action_queue[\s\S]{0,200}\.insert\(/);
   });
 
   it("insert payload does NOT include user_id (DB default auth.uid() wins)", () => {

@@ -8,37 +8,24 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve, join } from "node:path";
 
-import {
-  calculateAirVpdKpa,
-  fahrenheitToCelsius,
-} from "@/lib/vpdRules";
+import { calculateAirVpdKpa, fahrenheitToCelsius } from "@/lib/vpdRules";
 import { evaluateVpdAgainstStageTarget } from "@/lib/vpdTargetRules";
 import { VPD_STAGE_TARGETS } from "@/constants/vpdTargets";
 
 describe("calculateAirVpdKpa", () => {
   it("calculates ~1.27 kPa for 25C / 60% RH", () => {
-    expect(calculateAirVpdKpa({ tempC: 25, rhPercent: 60 })).toBeCloseTo(
-      1.27,
-      2,
-    );
+    expect(calculateAirVpdKpa({ tempC: 25, rhPercent: 60 })).toBeCloseTo(1.27, 2);
   });
 
   it("converts Fahrenheit input correctly (77F ≈ 25C)", () => {
     expect(fahrenheitToCelsius(77)).toBeCloseTo(25, 5);
-    expect(calculateAirVpdKpa({ tempF: 77, rhPercent: 60 })).toBeCloseTo(
-      1.27,
-      2,
-    );
+    expect(calculateAirVpdKpa({ tempF: 77, rhPercent: 60 })).toBeCloseTo(1.27, 2);
   });
 
   it("returns null for missing temp or RH", () => {
     expect(calculateAirVpdKpa({ rhPercent: 60 } as never)).toBeNull();
-    expect(
-      calculateAirVpdKpa({ tempC: 25, rhPercent: null }),
-    ).toBeNull();
-    expect(
-      calculateAirVpdKpa({ tempC: null, rhPercent: 60 }),
-    ).toBeNull();
+    expect(calculateAirVpdKpa({ tempC: 25, rhPercent: null })).toBeNull();
+    expect(calculateAirVpdKpa({ tempC: null, rhPercent: 60 })).toBeNull();
   });
 
   it("returns null for RH outside 0..100", () => {
@@ -49,12 +36,8 @@ describe("calculateAirVpdKpa", () => {
   it("returns null for NaN / Infinity", () => {
     expect(calculateAirVpdKpa({ tempC: NaN, rhPercent: 60 })).toBeNull();
     expect(calculateAirVpdKpa({ tempC: 25, rhPercent: NaN })).toBeNull();
-    expect(
-      calculateAirVpdKpa({ tempC: Infinity, rhPercent: 60 }),
-    ).toBeNull();
-    expect(
-      calculateAirVpdKpa({ tempC: 25, rhPercent: Infinity }),
-    ).toBeNull();
+    expect(calculateAirVpdKpa({ tempC: Infinity, rhPercent: 60 })).toBeNull();
+    expect(calculateAirVpdKpa({ tempC: 25, rhPercent: Infinity })).toBeNull();
   });
 
   it("returns null for unrealistic temperatures", () => {
@@ -70,9 +53,7 @@ describe("calculateAirVpdKpa", () => {
 });
 
 describe("evaluateVpdAgainstStageTarget", () => {
-  for (const key of Object.keys(VPD_STAGE_TARGETS) as Array<
-    keyof typeof VPD_STAGE_TARGETS
-  >) {
+  for (const key of Object.keys(VPD_STAGE_TARGETS) as Array<keyof typeof VPD_STAGE_TARGETS>) {
     const t = VPD_STAGE_TARGETS[key];
     it(`classifies low / in_band / high for stage ${key}`, () => {
       const low = evaluateVpdAgainstStageTarget({
@@ -127,10 +108,7 @@ describe("evaluateVpdAgainstStageTarget", () => {
 });
 
 describe("no duplicated VPD target tables in JSX components", () => {
-  const componentRoots = [
-    resolve(__dirname, "../components"),
-    resolve(__dirname, "../pages"),
-  ];
+  const componentRoots = [resolve(__dirname, "../components"), resolve(__dirname, "../pages")];
   function walk(dir: string, out: string[] = []): string[] {
     for (const name of readdirSync(dir)) {
       const p = join(dir, name);

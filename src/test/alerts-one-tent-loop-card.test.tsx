@@ -29,31 +29,23 @@ describe("Alerts One-Tent Loop next-step card wiring", () => {
     expect(card.getAttribute("data-current-step")).toBe("alert");
     expect(card.getAttribute("data-next-step")).toBe("action-queue");
     expect(card.textContent ?? "").toMatch(/Action Queue/);
-    expect(
-      screen.getByTestId("alerts-one-tent-loop-next-step-card-cta"),
-    ).toHaveTextContent(/Add to Action Queue/i);
+    expect(screen.getByTestId("alerts-one-tent-loop-next-step-card-cta")).toHaveTextContent(
+      /Add to Action Queue/i,
+    );
   });
 
   it("renders the approval-required Action Queue helper copy", () => {
     renderCard(
-      <OneTentLoopNextStepCard
-        current="alert"
-        testId="alerts-one-tent-loop-next-step-card"
-      />,
+      <OneTentLoopNextStepCard current="alert" testId="alerts-one-tent-loop-next-step-card" />,
     );
-    expect(
-      screen.getByTestId("alerts-one-tent-loop-next-step-card-helper"),
-    ).toHaveTextContent(
+    expect(screen.getByTestId("alerts-one-tent-loop-next-step-card-helper")).toHaveTextContent(
       /Review the approval-required Action Queue before taking action\./,
     );
   });
 
   it("routes Add to Action Queue to the /actions surface (never back to /alerts)", () => {
     renderCard(
-      <OneTentLoopNextStepCard
-        current="alert"
-        testId="alerts-one-tent-loop-next-step-card"
-      />,
+      <OneTentLoopNextStepCard current="alert" testId="alerts-one-tent-loop-next-step-card" />,
     );
     const cta = screen.getByTestId("alerts-one-tent-loop-next-step-card-cta");
     expect(cta.getAttribute("href")).toBe("/actions");
@@ -77,20 +69,14 @@ describe("Alerts One-Tent Loop next-step card wiring", () => {
 
   it("does not call fetch on render", () => {
     renderCard(
-      <OneTentLoopNextStepCard
-        current="alert"
-        testId="alerts-one-tent-loop-next-step-card"
-      />,
+      <OneTentLoopNextStepCard current="alert" testId="alerts-one-tent-loop-next-step-card" />,
     );
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("does not introduce device-control or auto-execute wording", () => {
     renderCard(
-      <OneTentLoopNextStepCard
-        current="alert"
-        testId="alerts-one-tent-loop-next-step-card"
-      />,
+      <OneTentLoopNextStepCard current="alert" testId="alerts-one-tent-loop-next-step-card" />,
     );
     const text = (
       screen.getByTestId("alerts-one-tent-loop-next-step-card").textContent ?? ""
@@ -113,7 +99,9 @@ describe("Alerts One-Tent Loop next-step card wiring", () => {
   it("Alerts source imports the card and includes the approval-required note", async () => {
     const fs = await import("node:fs/promises");
     const src = await fs.readFile("src/pages/Alerts.tsx", "utf8");
-    expect(src).toContain('import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard"');
+    expect(src).toContain(
+      'import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard"',
+    );
     expect(src).toContain('current="alert"');
     expect(src).toContain('testId="alerts-one-tent-loop-next-step-card"');
     expect(src).toContain("Action Queue items are approval-required.");

@@ -114,10 +114,7 @@ describe("adaptDiagnosisResultToViewModel", () => {
 });
 
 describe("AI Doctor 2.0 diagnosis view-model — static safety", () => {
-  const SRC = readFileSync(
-    resolve(__dirname, "../lib/aiDoctorDiagnosisViewModel.ts"),
-    "utf8",
-  );
+  const SRC = readFileSync(resolve(__dirname, "../lib/aiDoctorDiagnosisViewModel.ts"), "utf8");
 
   it("contains no privileged service key references", () => {
     expect(SRC).not.toMatch(/service_role/i);

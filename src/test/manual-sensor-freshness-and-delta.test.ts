@@ -26,8 +26,7 @@ import { computeManualSensorDelta } from "@/lib/manualSensorDeltaRules";
 import { deriveLatestManualReadings } from "@/hooks/usePlantManualSensorHistory";
 
 const NOW = "2026-05-27T12:00:00Z";
-const hoursAgo = (h: number) =>
-  new Date(new Date(NOW).getTime() - h * 3_600_000).toISOString();
+const hoursAgo = (h: number) => new Date(new Date(NOW).getTime() - h * 3_600_000).toISOString();
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
@@ -86,11 +85,7 @@ describe("buildFreshnessSnapshots", () => {
     expect(byMetric.ec.state).toBe("missing");
   });
   it("buildFreshnessSnapshot exposes ageHours", () => {
-    const s = buildFreshnessSnapshot(
-      "temp_f",
-      { value: 77, loggedAt: hoursAgo(10) },
-      NOW,
-    );
+    const s = buildFreshnessSnapshot("temp_f", { value: 77, loggedAt: hoursAgo(10) }, NOW);
     expect(s.ageHours).toBeCloseTo(10, 5);
   });
 });
@@ -101,29 +96,17 @@ describe("computeFreshnessCta", () => {
     expect(computeFreshnessCta(snaps)).toBe("add_first");
   });
   it("returns 'update' when any metric is aging or stale", () => {
-    const aging = buildFreshnessSnapshots(
-      { temp_f: { value: 77, loggedAt: hoursAgo(30) } },
-      NOW,
-    );
+    const aging = buildFreshnessSnapshots({ temp_f: { value: 77, loggedAt: hoursAgo(30) } }, NOW);
     expect(computeFreshnessCta(aging)).toBe("update");
-    const stale = buildFreshnessSnapshots(
-      { ph: { value: 6.1, loggedAt: hoursAgo(72) } },
-      NOW,
-    );
+    const stale = buildFreshnessSnapshots({ ph: { value: 6.1, loggedAt: hoursAgo(72) } }, NOW);
     expect(computeFreshnessCta(stale)).toBe("update");
   });
   it("returns 'none' when all present metrics are fresh (mixed fresh + missing does not nag)", () => {
-    const snaps = buildFreshnessSnapshots(
-      { temp_f: { value: 77, loggedAt: hoursAgo(1) } },
-      NOW,
-    );
+    const snaps = buildFreshnessSnapshots({ temp_f: { value: 77, loggedAt: hoursAgo(1) } }, NOW);
     expect(computeFreshnessCta(snaps)).toBe("none");
   });
   it("prefers 'update' over 'add_first' when any non-missing metric is aging/stale", () => {
-    const snaps = buildFreshnessSnapshots(
-      { temp_f: { value: 77, loggedAt: hoursAgo(72) } },
-      NOW,
-    );
+    const snaps = buildFreshnessSnapshots({ temp_f: { value: 77, loggedAt: hoursAgo(72) } }, NOW);
     expect(computeFreshnessCta(snaps)).toBe("update");
   });
   it("returns 'none' on empty snapshot list", () => {
@@ -162,7 +145,7 @@ describe("computeManualSensorDelta", () => {
   });
   it("flat below per-metric epsilon", () => {
     expect(computeManualSensorDelta("ph", 6.0, 6.02)?.direction).toBe("flat");
-    expect(computeManualSensorDelta("ec", 1.40, 1.402)?.direction).toBe("flat");
+    expect(computeManualSensorDelta("ec", 1.4, 1.402)?.direction).toBe("flat");
     expect(computeManualSensorDelta("temp_f", 77, 77.2)?.direction).toBe("flat");
   });
   it("never returns 'good/bad' or recommendation text", () => {
@@ -236,10 +219,9 @@ describe("Gate 1B safety contract (source-level)", () => {
     ];
     for (const [name, src] of Object.entries(SOURCES)) {
       for (const t of forbidden) {
-        expect(
-          src,
-          `${name} should not reference table ${t}`,
-        ).not.toMatch(new RegExp(`\\.from\\(["']${t}["']\\)`));
+        expect(src, `${name} should not reference table ${t}`).not.toMatch(
+          new RegExp(`\\.from\\(["']${t}["']\\)`),
+        );
       }
     }
   });

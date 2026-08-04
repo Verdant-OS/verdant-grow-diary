@@ -74,8 +74,7 @@ export function useTimelineHighlightAutoScroll(
     const node = lookup(`timeline-entry-${match.id}`);
     if (!node) return;
     scrolledTokenRef.current = highlight.idempotencyKey;
-    const reducedMotion =
-      options.prefersReducedMotion ?? isReducedMotionPreferred();
+    const reducedMotion = options.prefersReducedMotion ?? isReducedMotionPreferred();
     if (!reducedMotion) {
       try {
         node.scrollIntoView({ behavior: "smooth", block: "center" });

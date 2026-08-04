@@ -122,11 +122,11 @@ describe("buildActionEvidenceViewModel", () => {
   });
 
   it("captured_at falls back to 'not recorded' when missing or unparseable", () => {
-    expect(buildActionEvidenceViewModel({ source: "manual" }).capturedAtLabel)
-      .toBe("Captured: not recorded");
+    expect(buildActionEvidenceViewModel({ source: "manual" }).capturedAtLabel).toBe(
+      "Captured: not recorded",
+    );
     expect(
-      buildActionEvidenceViewModel({ source: "manual", captured_at: "not-a-date" })
-        .capturedAtLabel,
+      buildActionEvidenceViewModel({ source: "manual", captured_at: "not-a-date" }).capturedAtLabel,
     ).toBe("Captured: not recorded");
   });
 
@@ -156,7 +156,6 @@ describe("buildActionEvidenceViewModel", () => {
     expect(blob).not.toMatch(/Bearer\s+ey/i);
     expect(blob).not.toMatch(/00000000-0000-0000-0000-000000000000/);
   });
-
 
   it("handles null/undefined input without throwing", () => {
     const a = buildActionEvidenceViewModel(null);

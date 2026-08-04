@@ -26,9 +26,7 @@ const MAX_ITEMS_PER_CATEGORY = 3;
 export type SymptomEvidenceCategoryId = "environment" | "watering" | "feeding" | "lighting";
 export type SymptomEvidenceStatus = "recorded" | "missing" | "limited";
 export type SymptomEvidenceOverallState =
-  | "ready_to_compare"
-  | "partial_evidence"
-  | "insufficient_evidence";
+  "ready_to_compare" | "partial_evidence" | "insufficient_evidence";
 
 export interface SymptomEvidenceRawEntry {
   readonly id?: unknown;

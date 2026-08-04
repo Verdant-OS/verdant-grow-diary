@@ -3,11 +3,22 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
-import { MemoryRouter } from "@/lib/react-router-compat";
-import React from "react";
 import { useGoogleAnalyticsPageViews, sanitizePagePath } from "@/hooks/useGoogleAnalyticsPageViews";
 import { buildSafeAnalyticsPageLocation } from "@/lib/analyticsPageViewRules";
 import { GOOGLE_ANALYTICS_MEASUREMENT_ID } from "@/constants/analytics";
+
+const locationState = vi.hoisted(() => ({ pathname: "/dashboard" }));
+
+vi.mock("@/lib/react-router-compat", () => ({
+  useLocation: () => ({ pathname: locationState.pathname }),
+}));
+
+vi.mock("@/lib/analyticsConsent", () => ({
+  readAnalyticsConsent: () => "granted",
+  subscribeToAnalyticsConsent: () => () => {},
+  writeAnalyticsConsent: () => {},
+  parseAnalyticsConsentValue: (v: string) => v,
+}));
 
 describe("sanitizePagePath", () => {
   it("leaves static paths unchanged", () => {
@@ -76,26 +87,24 @@ describe("useGoogleAnalyticsPageViews — gtag behavior", () => {
 
   beforeEach(() => {
     gtagMock = vi.fn();
-    (window as any).gtag = gtagMock;
+    window.gtag = gtagMock;
     vi.spyOn(document, "title", "get").mockReturnValue("Test Title");
+    locationState.pathname = "/dashboard";
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
     if (typeof window !== "undefined") {
-      delete (window as any).gtag;
+      delete window.gtag;
     }
   });
 
-  // index.html bootstraps the tag with `send_page_view: false`, and settings
+  // The root route bootstraps the tag with `send_page_view: false`, and settings
   // passed to `config` persist for that measurement id — so a repeat `config`
   // call is not a reliable way to emit a view. Regression guard for a change
   // that would have taken the whole property dark with a green suite.
   it("sends an explicit page_view event, not a repeat config call", () => {
-    const wrapper = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(MemoryRouter, { initialEntries: ["/dashboard"] }, children);
-
-    renderHook(() => useGoogleAnalyticsPageViews(), { wrapper });
+    renderHook(() => useGoogleAnalyticsPageViews());
 
     expect(gtagMock).toHaveBeenCalledWith("event", "page_view", {
       send_to: GOOGLE_ANALYTICS_MEASUREMENT_ID,
@@ -112,10 +121,9 @@ describe("useGoogleAnalyticsPageViews — gtag behavior", () => {
 
   it("sanitizes UUIDs before sending to gtag", () => {
     const uuid = "11111111-2222-3333-4444-555555555555";
-    const wrapper = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(MemoryRouter, { initialEntries: [`/plants/${uuid}`] }, children);
+    locationState.pathname = `/plants/${uuid}`;
 
-    renderHook(() => useGoogleAnalyticsPageViews(), { wrapper });
+    renderHook(() => useGoogleAnalyticsPageViews());
 
     expect(gtagMock).toHaveBeenCalledWith("event", "page_view", {
       send_to: GOOGLE_ANALYTICS_MEASUREMENT_ID,
@@ -127,10 +135,9 @@ describe("useGoogleAnalyticsPageViews — gtag behavior", () => {
 
   it("sends an individual public guide path to gtag", () => {
     const guidePath = "/guides/cannabis-grow-light-distance-and-schedule";
-    const wrapper = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(MemoryRouter, { initialEntries: [guidePath] }, children);
+    locationState.pathname = guidePath;
 
-    renderHook(() => useGoogleAnalyticsPageViews(), { wrapper });
+    renderHook(() => useGoogleAnalyticsPageViews());
 
     expect(gtagMock).toHaveBeenCalledWith("event", "page_view", {
       send_to: GOOGLE_ANALYTICS_MEASUREMENT_ID,
@@ -141,18 +148,10 @@ describe("useGoogleAnalyticsPageViews — gtag behavior", () => {
   });
 
   it("never sends route query values through page_path or page_location", () => {
-    const wrapper = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(
-        MemoryRouter,
-        {
-          initialEntries: [
-            "/auth?token=secret&email=grower%40example.com&redirectTo=%2Fplants%2Fprivate",
-          ],
-        },
-        children,
-      );
+    locationState.pathname =
+      "/auth?token=secret&email=grower%40example.com&redirectTo=%2Fplants%2Fprivate";
 
-    renderHook(() => useGoogleAnalyticsPageViews(), { wrapper });
+    renderHook(() => useGoogleAnalyticsPageViews());
 
     expect(gtagMock).toHaveBeenCalledWith("event", "page_view", {
       send_to: GOOGLE_ANALYTICS_MEASUREMENT_ID,
@@ -166,25 +165,48 @@ describe("useGoogleAnalyticsPageViews — gtag behavior", () => {
   });
 
   it("no-ops safely when window.gtag is missing", () => {
-    delete (window as any).gtag;
-
-    const wrapper = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(MemoryRouter, { initialEntries: ["/dashboard"] }, children);
+    delete window.gtag;
 
     // Should not throw
     expect(() => {
-      renderHook(() => useGoogleAnalyticsPageViews(), { wrapper });
+      renderHook(() => useGoogleAnalyticsPageViews());
     }).not.toThrow();
   });
 
   it("no-ops safely when gtag is missing on window", () => {
-    delete (window as any).gtag;
-
-    const wrapper = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(MemoryRouter, { initialEntries: ["/dashboard"] }, children);
+    delete window.gtag;
 
     expect(() => {
-      renderHook(() => useGoogleAnalyticsPageViews(), { wrapper });
+      renderHook(() => useGoogleAnalyticsPageViews());
     }).not.toThrow();
+  });
+
+  it("emits one explicit event for each settled route change", () => {
+    const { rerender } = renderHook(() => useGoogleAnalyticsPageViews());
+    locationState.pathname = "/guides/cannabis-light-stress-light-burn-bleaching-or-heat";
+    rerender();
+
+    expect(gtagMock.mock.calls).toEqual([
+      [
+        "event",
+        "page_view",
+        {
+          send_to: GOOGLE_ANALYTICS_MEASUREMENT_ID,
+          page_path: "/dashboard",
+          page_location: `${window.location.origin}/dashboard`,
+          page_title: "Test Title",
+        },
+      ],
+      [
+        "event",
+        "page_view",
+        {
+          send_to: GOOGLE_ANALYTICS_MEASUREMENT_ID,
+          page_path: "/guides/cannabis-light-stress-light-burn-bleaching-or-heat",
+          page_location: `${window.location.origin}/guides/cannabis-light-stress-light-burn-bleaching-or-heat`,
+          page_title: "Test Title",
+        },
+      ],
+    ]);
   });
 });

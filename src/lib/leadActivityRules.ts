@@ -35,7 +35,6 @@ function safeIso(value: string | null | undefined): string | null {
   return Number.isFinite(t) ? new Date(t).toISOString() : null;
 }
 
-
 function statusLabel(status: LeadStatus): string {
   switch (status) {
     case "new":
@@ -64,9 +63,7 @@ function statusLabel(status: LeadStatus): string {
  *   2. higher `order` weight wins (newer logical step)
  *   3. fallback to `type` ascending for full determinism
  */
-export function buildLeadActivityTimeline(
-  lead: LeadRow,
-): LeadActivityEvent[] {
+export function buildLeadActivityTimeline(lead: LeadRow): LeadActivityEvent[] {
   const events: LeadActivityEvent[] = [];
 
   const createdAt = safeIso(lead.created_at);
@@ -159,9 +156,7 @@ export function buildLeadActivityTimeline(
  * Deterministic newest-first sort with stable tie-breakers.
  * Exported so callers/tests can verify ordering on synthetic inputs.
  */
-export function sortActivityEvents(
-  events: LeadActivityEvent[],
-): LeadActivityEvent[] {
+export function sortActivityEvents(events: LeadActivityEvent[]): LeadActivityEvent[] {
   return [...events].sort((a, b) => {
     const aT = a.at ? new Date(a.at).getTime() : null;
     const bT = b.at ? new Date(b.at).getTime() : null;

@@ -64,8 +64,7 @@ export const CSV_MAPPING_TEMPLATES: ReadonlyArray<CsvMappingTemplate> = [
   {
     id: "generic_env",
     name: "Generic environment CSV",
-    description:
-      "Common timestamp + temperature + humidity + CO₂ headers used by simple loggers.",
+    description: "Common timestamp + temperature + humidity + CO₂ headers used by simple loggers.",
     fields: {
       timestamp: { synonyms: ["timestamp", "date", "time", "datetime"] },
       air_temp: {
@@ -79,8 +78,7 @@ export const CSV_MAPPING_TEMPLATES: ReadonlyArray<CsvMappingTemplate> = [
   {
     id: "ac_infinity",
     name: "AC Infinity-style",
-    description:
-      "Time/date with temperature, humidity, and optional VPD / CO₂ columns.",
+    description: "Time/date with temperature, humidity, and optional VPD / CO₂ columns.",
     fields: {
       timestamp: { synonyms: ["time", "date", "timestamp"] },
       air_temp: { synonyms: ["temperature"], unit: "C" },
@@ -161,14 +159,15 @@ export const CSV_MAPPING_TEMPLATES: ReadonlyArray<CsvMappingTemplate> = [
   },
 ];
 
-export function getCsvMappingTemplate(
-  id: CsvMappingTemplateId,
-): CsvMappingTemplate | null {
+export function getCsvMappingTemplate(id: CsvMappingTemplateId): CsvMappingTemplate | null {
   return CSV_MAPPING_TEMPLATES.find((t) => t.id === id) ?? null;
 }
 
 function normalizeHeader(raw: string): string {
-  return String(raw ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+  return String(raw ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export interface ApplyTemplateResult {
@@ -293,7 +292,9 @@ export interface BuildDownloadPayloadArgs {
   now?: () => Date;
 }
 
-function mappingHeaderFor(value: RepresentativeColumnMapping[keyof RepresentativeColumnMapping]): string | null {
+function mappingHeaderFor(
+  value: RepresentativeColumnMapping[keyof RepresentativeColumnMapping],
+): string | null {
   if (value === null) return null;
   if (typeof value === "string") return value;
   return value.column;
@@ -389,9 +390,7 @@ export function detectCsvMappingTemplate(
     if (tpl.isReset) continue;
 
     if (tpl.signature && tpl.signature.allOf.length > 0) {
-      const allPresent = tpl.signature.allOf.every((h) =>
-        normalized.has(normalizeHeader(h)),
-      );
+      const allPresent = tpl.signature.allOf.every((h) => normalized.has(normalizeHeader(h)));
       if (allPresent) {
         return {
           templateId: tpl.id,

@@ -2,10 +2,14 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (path: string) => readFileSync(resolve(ROOT, path), "utf8");
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 const MOBILE_ROUTE_SPEC = read("e2e/auth-route-protection-mobile.spec.ts");
 
 const BROKEN_BROWSER_ROUTE = "/operator/ggs-real-payload-ingest";
@@ -13,7 +17,7 @@ const BROKEN_BROWSER_ROUTE = "/operator/ggs-real-payload-ingest";
 describe("retired browser-only GGS payload commit route", () => {
   it("does not mount the operator page whose browser client cannot execute its service-role RPC", () => {
     expect(APP).not.toMatch(/import\(\s*["']\.\/pages\/OperatorGgsRealPayloadIngest["']\s*\)/);
-    expect(APP).not.toContain(`path="${BROKEN_BROWSER_ROUTE}"`);
+    expect(extractMountedAppRoutePaths()).not.toContain(BROKEN_BROWSER_ROUTE);
   });
 
   it("does not advertise the retired route in the canonical manifest", () => {

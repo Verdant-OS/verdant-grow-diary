@@ -203,11 +203,7 @@ export interface PhenoLabResultView {
 }
 
 export type PhenoExpressionMissingCode =
-  | "no_traits_scored"
-  | "no_nose"
-  | "no_smoke_test"
-  | "no_lab_result"
-  | "sex_unknown";
+  "no_traits_scored" | "no_nose" | "no_smoke_test" | "no_lab_result" | "sex_unknown";
 
 export interface PhenoExpressionMissingFlag {
   readonly code: PhenoExpressionMissingCode;

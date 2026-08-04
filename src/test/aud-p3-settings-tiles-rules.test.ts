@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  describeSettingsTile,
-  settingsTileAriaLabel,
-} from "@/lib/settingsTilesRules";
+import { describeSettingsTile, settingsTileAriaLabel } from "@/lib/settingsTilesRules";
 
 describe("settingsTilesRules", () => {
   it("labels available tiles as live", () => {
@@ -30,8 +27,6 @@ describe("settingsTilesRules", () => {
   });
 
   it("returns deterministic output for repeated calls", () => {
-    expect(describeSettingsTile("available")).toEqual(
-      describeSettingsTile("available"),
-    );
+    expect(describeSettingsTile("available")).toEqual(describeSettingsTile("available"));
   });
 });

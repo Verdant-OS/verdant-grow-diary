@@ -13,12 +13,12 @@ describe("detectSuspiciousMetrics", () => {
   });
 
   it("flags humidity stuck at 0 and 100", () => {
-    expect(
-      detectSuspiciousMetrics({ rh: 0 }).some((f) => f.code === "humidity_stuck_0"),
-    ).toBe(true);
-    expect(
-      detectSuspiciousMetrics({ rh: 100 }).some((f) => f.code === "humidity_stuck_100"),
-    ).toBe(true);
+    expect(detectSuspiciousMetrics({ rh: 0 }).some((f) => f.code === "humidity_stuck_0")).toBe(
+      true,
+    );
+    expect(detectSuspiciousMetrics({ rh: 100 }).some((f) => f.code === "humidity_stuck_100")).toBe(
+      true,
+    );
   });
 
   it("flags soil moisture stuck at 0 and 100", () => {
@@ -46,11 +46,11 @@ describe("detectSuspiciousMetrics", () => {
   });
 
   it("flags non-finite and missing values", () => {
-    expect(
-      detectSuspiciousMetrics({ rh: NaN }).some((f) => f.code === "non_finite_value"),
-    ).toBe(true);
-    expect(
-      detectSuspiciousMetrics({ ph: null }).some((f) => f.code === "missing_value"),
-    ).toBe(true);
+    expect(detectSuspiciousMetrics({ rh: NaN }).some((f) => f.code === "non_finite_value")).toBe(
+      true,
+    );
+    expect(detectSuspiciousMetrics({ ph: null }).some((f) => f.code === "missing_value")).toBe(
+      true,
+    );
   });
 });

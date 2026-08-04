@@ -1,7 +1,7 @@
 /**
  * Runtime redirect: /grow-room → / (main Dashboard).
  *
- * We render just the route element used in App.tsx inside a MemoryRouter
+ * We render just the route element used in file routes inside a MemoryRouter
  * to verify the scope-preserving redirect without booting the whole app shell.
  */
 import { describe, it, expect } from "vitest";

@@ -112,13 +112,7 @@ export interface PlaybookItem {
   readonly recordedAt: string | null;
 }
 
-export const PLAYBOOK_SECTIONS = [
-  "repeat",
-  "avoid",
-  "adjust",
-  "monitor",
-  "unresolved",
-] as const;
+export const PLAYBOOK_SECTIONS = ["repeat", "avoid", "adjust", "monitor", "unresolved"] as const;
 export type PlaybookSection = (typeof PLAYBOOK_SECTIONS)[number];
 
 export const PLAYBOOK_SECTION_LABELS: Record<PlaybookSection, string> = {
@@ -165,9 +159,7 @@ export interface NextRunPlaybook {
  * needing review, or with no outcome at all, are excluded entirely (they
  * are not yet a lesson).
  */
-export function buildNextRunPlaybook(
-  episodes: readonly PlantMemoryEpisode[],
-): NextRunPlaybook {
+export function buildNextRunPlaybook(episodes: readonly PlantMemoryEpisode[]): NextRunPlaybook {
   const bySection = new Map<PlaybookSection, PlaybookItem[]>();
   for (const section of PLAYBOOK_SECTIONS) bySection.set(section, []);
 
@@ -181,9 +173,10 @@ export function buildNextRunPlaybook(
       actionType: episode.action.actionType,
     });
     const evidence = evidenceCompleteness(episode);
-    const uncertaintyNote = evidence.hasUsableSensorEvidence || evidence.hasPhotoEvidence
-      ? "This is a grower-recorded observation. Other factors may have contributed."
-      : "Evidence is limited. Other factors may have contributed.";
+    const uncertaintyNote =
+      evidence.hasUsableSensorEvidence || evidence.hasPhotoEvidence
+        ? "This is a grower-recorded observation. Other factors may have contributed."
+        : "Evidence is limited. Other factors may have contributed.";
 
     const item: PlaybookItem = {
       episodeKey: episode.episodeKey,
@@ -231,9 +224,11 @@ export function buildNextRunPlaybook(
 
 /** Group playbook items by deterministic action category (for a
  *  category-first view). Categories with no items are omitted. */
-export function groupPlaybookItemsByCategory(
-  items: readonly PlaybookItem[],
-): ReadonlyArray<{ category: PlaybookActionCategory; label: string; items: readonly PlaybookItem[] }> {
+export function groupPlaybookItemsByCategory(items: readonly PlaybookItem[]): ReadonlyArray<{
+  category: PlaybookActionCategory;
+  label: string;
+  items: readonly PlaybookItem[];
+}> {
   const byCategory = new Map<PlaybookActionCategory, PlaybookItem[]>();
   for (const category of PLAYBOOK_ACTION_CATEGORIES) byCategory.set(category, []);
   for (const item of items) byCategory.get(item.category)!.push(item);

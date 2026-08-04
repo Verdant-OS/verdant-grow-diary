@@ -50,8 +50,7 @@ export interface EmitReleaseReceiptInput {
 }
 
 export type EmitReleaseReceiptResult =
-  | { ok: true; artifact: ReleaseReceiptArtifactV1 }
-  | { ok: false; errors: string[] };
+  { ok: true; artifact: ReleaseReceiptArtifactV1 } | { ok: false; errors: string[] };
 
 /** Sum command counts into a deterministic totals block. */
 export function deriveReleaseReceiptCounts(
@@ -78,9 +77,7 @@ export function deriveReleaseReceiptStatus(
   blockers: readonly ReleaseReceiptBlocker[],
 ): ReleaseReceiptStatus {
   if (commands.length === 0) return "unknown";
-  const activeReleaseBlocker = blockers.some(
-    (b) => b.active && b.severity === "release_blocker",
-  );
+  const activeReleaseBlocker = blockers.some((b) => b.active && b.severity === "release_blocker");
   if (activeReleaseBlocker) return "blocked";
   let sawFail = false;
   let sawBlocked = false;
@@ -135,4 +132,3 @@ export function emitReleaseReceiptArtifact(
   }
   return { ok: false, errors: (parsed as ParsedReleaseReceiptFailure).errors };
 }
-

@@ -12,8 +12,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const MIGRATION =
-  "supabase/migrations/20260720142000_genetics_traceability_batches.sql";
+const MIGRATION = "supabase/migrations/20260720142000_genetics_traceability_batches.sql";
 
 function read(p: string): string {
   return readFileSync(resolve(process.cwd(), p), "utf8");
@@ -25,9 +24,7 @@ describe("genetics propagation batches migration safety", () => {
   it("creates both tables and enables RLS on each", () => {
     expect(sql).toMatch(/CREATE TABLE public\.propagation_batches/);
     expect(sql).toMatch(/CREATE TABLE public\.propagation_batch_status_events/);
-    expect(sql).toMatch(
-      /ALTER TABLE public\.propagation_batches ENABLE ROW LEVEL SECURITY/,
-    );
+    expect(sql).toMatch(/ALTER TABLE public\.propagation_batches ENABLE ROW LEVEL SECURITY/);
     expect(sql).toMatch(
       /ALTER TABLE public\.propagation_batch_status_events ENABLE ROW LEVEL SECURITY/,
     );
@@ -35,9 +32,7 @@ describe("genetics propagation batches migration safety", () => {
 
   it("grants authenticated SELECT only (writes via RPC); status events are append-only", () => {
     for (const t of ["propagation_batches", "propagation_batch_status_events"]) {
-      const grant = sql.match(
-        new RegExp(`GRANT ([^;]*) ON public\\.${t} TO authenticated`),
-      );
+      const grant = sql.match(new RegExp(`GRANT ([^;]*) ON public\\.${t} TO authenticated`));
       expect(grant, `${t} grant present`).toBeTruthy();
       const cols = grant![1].toUpperCase();
       expect(cols).toMatch(/SELECT/);
@@ -61,9 +56,7 @@ describe("genetics propagation batches migration safety", () => {
       /propagation_batches_select_own[\s\S]*?FOR SELECT[\s\S]*?USING \(auth\.uid\(\) = user_id\)/,
     );
     expect(sql).not.toMatch(/GRANT[^;]*ON public\.propagation_batches TO anon/i);
-    expect(sql).not.toMatch(
-      /GRANT[^;]*ON public\.propagation_batch_status_events TO public/i,
-    );
+    expect(sql).not.toMatch(/GRANT[^;]*ON public\.propagation_batch_status_events TO public/i);
   });
 
   it("never defaults counts to zero or dates to now() (unknown stays explicit)", () => {
@@ -97,9 +90,7 @@ describe("genetics propagation batches migration safety", () => {
   });
 
   it("defines the shared lineage advisory-lock helper used by lineage RPCs", () => {
-    expect(sql).toMatch(
-      /CREATE OR REPLACE FUNCTION public\.genetics_lock_lineage/,
-    );
+    expect(sql).toMatch(/CREATE OR REPLACE FUNCTION public\.genetics_lock_lineage/);
     expect(sql).toMatch(
       /pg_advisory_xact_lock\(hashtext\('genetics_lineage:' \|\| p_owner::text\)\)/,
     );
@@ -138,9 +129,7 @@ describe("genetics propagation batches migration safety", () => {
   });
 
   it("revokes execute from PUBLIC and grants only authenticated + service_role", () => {
-    expect(sql).toMatch(
-      /REVOKE ALL ON FUNCTION public\.genetics_batch_upsert[\s\S]*?FROM PUBLIC/,
-    );
+    expect(sql).toMatch(/REVOKE ALL ON FUNCTION public\.genetics_batch_upsert[\s\S]*?FROM PUBLIC/);
     expect(sql).toMatch(
       /GRANT EXECUTE ON FUNCTION public\.genetics_batch_upsert[\s\S]*?TO authenticated, service_role/,
     );

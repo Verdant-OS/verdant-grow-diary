@@ -50,8 +50,6 @@ describe("one-tent-loop smoke test doc", () => {
   it("does not leak secret-shaped strings", () => {
     expect(body).not.toMatch(/Bearer\s+[A-Za-z0-9._-]{8,}/);
     expect(body).not.toMatch(/vbt_[A-Za-z0-9]{6,}/);
-    expect(body).not.toMatch(
-      /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,
-    );
+    expect(body).not.toMatch(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/);
   });
 });

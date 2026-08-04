@@ -17,9 +17,7 @@ function isValidIsoDate(s: unknown): s is string {
   return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
 }
 
-export function buildDiaryRangeReportUrl(
-  input: DiaryRangeReportUrlInput = {},
-): string {
+export function buildDiaryRangeReportUrl(input: DiaryRangeReportUrlInput = {}): string {
   const params: string[] = [];
   if (input.growId && typeof input.growId === "string") {
     params.push(`growId=${encodeURIComponent(input.growId)}`);
@@ -30,9 +28,7 @@ export function buildDiaryRangeReportUrl(
   if (isValidIsoDate(input.endDate)) {
     params.push(`end=${encodeURIComponent(input.endDate)}`);
   }
-  return params.length
-    ? `${DIARY_RANGE_REPORT_PATH}?${params.join("&")}`
-    : DIARY_RANGE_REPORT_PATH;
+  return params.length ? `${DIARY_RANGE_REPORT_PATH}?${params.join("&")}` : DIARY_RANGE_REPORT_PATH;
 }
 
 /** Pure default-range helper. Returns the last 30 days ending on `today`. */

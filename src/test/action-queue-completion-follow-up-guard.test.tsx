@@ -42,9 +42,7 @@ describe("Manual sensor save path", () => {
 });
 
 describe("Environment alert persistence path", () => {
-  const files = [
-    "src/hooks/usePersistEnvironmentAlerts.ts",
-  ];
+  const files = ["src/hooks/usePersistEnvironmentAlerts.ts"];
 
   it.each(files)("%s does not create action_followup diary entries", (rel) => {
     const src = readFile(rel);
@@ -55,8 +53,9 @@ describe("Environment alert persistence path", () => {
 
   it("usePersistEnvironmentAlerts does not write to action_queue", () => {
     const src = readFile("src/hooks/usePersistEnvironmentAlerts.ts");
-    expect(/from\(["']action_queue["']\)\s*\n?\s*\.(insert|upsert|update|delete)/.test(src))
-      .toBe(false);
+    expect(/from\(["']action_queue["']\)\s*\n?\s*\.(insert|upsert|update|delete)/.test(src)).toBe(
+      false,
+    );
   });
 });
 
@@ -80,16 +79,15 @@ describe("ActionDetail completion → follow-up wiring is idempotent and safe", 
   });
 
   it("does not write to sensor_readings during the completion path", () => {
-    expect(/from\(["']sensor_readings["']\)\s*\n?\s*\.(insert|upsert|update|delete)/.test(src))
-      .toBe(false);
+    expect(
+      /from\(["']sensor_readings["']\)\s*\n?\s*\.(insert|upsert|update|delete)/.test(src),
+    ).toBe(false);
   });
 });
 
 describe("actionFollowupRules helper safety scan", () => {
   const raw = readFile("src/lib/actionFollowupRules.ts");
-  const src = raw
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  const src = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 
   it("does not reference forbidden capabilities", () => {
     for (const forbidden of [

@@ -138,9 +138,20 @@ function runGh(args) {
 
 export function findLatestSuccessRunId({ repo, branch, workflow }) {
   const out = runGh([
-    "run", "list", "--repo", repo, "--workflow", workflow, "--branch", branch,
-    "--status", "success", "--limit", "1",
-    "--json", "databaseId",
+    "run",
+    "list",
+    "--repo",
+    repo,
+    "--workflow",
+    workflow,
+    "--branch",
+    branch,
+    "--status",
+    "success",
+    "--limit",
+    "1",
+    "--json",
+    "databaseId",
   ]);
   const arr = JSON.parse(out);
   return Array.isArray(arr) && arr[0] ? String(arr[0].databaseId) : null;
@@ -149,8 +160,15 @@ export function findLatestSuccessRunId({ repo, branch, workflow }) {
 export function downloadArtifact({ repo, runId, artifactName, targetDir }) {
   mkdirSync(targetDir, { recursive: true });
   runGh([
-    "run", "download", String(runId), "--repo", repo,
-    "--name", artifactName, "--dir", targetDir,
+    "run",
+    "download",
+    String(runId),
+    "--repo",
+    repo,
+    "--name",
+    artifactName,
+    "--dir",
+    targetDir,
   ]);
 }
 
@@ -183,9 +201,13 @@ export async function main(argv = process.argv.slice(2)) {
     const entry = { workflow, artifact, runId: null, proofFileName: null, pass: false };
     try {
       let runId =
-        workflow === "ci.yml" ? args.ciRunId :
-        workflow === "docs-safety.yml" ? args.docsRunId : null;
-      if (!runId) runId = findLatestSuccessRunId({ repo: args.repo, branch: args.branch, workflow });
+        workflow === "ci.yml"
+          ? args.ciRunId
+          : workflow === "docs-safety.yml"
+            ? args.docsRunId
+            : null;
+      if (!runId)
+        runId = findLatestSuccessRunId({ repo: args.repo, branch: args.branch, workflow });
       entry.runId = runId;
       if (!runId) throw new Error("no successful run found");
 

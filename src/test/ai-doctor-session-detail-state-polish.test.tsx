@@ -21,18 +21,9 @@ function block(label: string, regex: RegExp): string {
   return m[0];
 }
 
-const LOADING_BLOCK = block(
-  "loading",
-  /isLoading \? \([\s\S]*?\) : error \?/,
-);
-const ERROR_BLOCK = block(
-  "error",
-  /\) : error \? \([\s\S]*?\) : !data \?/,
-);
-const NOTFOUND_BLOCK = block(
-  "not-found",
-  /\) : !data \? \([\s\S]*?\) : \(/,
-);
+const LOADING_BLOCK = block("loading", /isLoading \? \([\s\S]*?\) : error \?/);
+const ERROR_BLOCK = block("error", /\) : error \? \([\s\S]*?\) : !data \?/);
+const NOTFOUND_BLOCK = block("not-found", /\) : !data \? \([\s\S]*?\) : \(/);
 
 describe("AiDoctorSessionDetail — loading state", () => {
   it("renders visible 'Loading AI Doctor session…' copy", () => {

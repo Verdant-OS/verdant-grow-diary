@@ -29,9 +29,7 @@ function renderAtRoute(path: string) {
 }
 
 function selectCase(id: string) {
-  const select = screen.getByTestId(
-    "ai-doctor-phase1-preview-case-select",
-  ) as HTMLSelectElement;
+  const select = screen.getByTestId("ai-doctor-phase1-preview-case-select") as HTMLSelectElement;
   fireEvent.change(select, { target: { value: id } });
 }
 
@@ -81,9 +79,9 @@ describe("AiDoctorPhase1Preview page — base render", () => {
 
   it("renders the preview panel in internal mode", () => {
     renderAtRoute("/internal/ai-doctor-phase1-preview");
-    expect(
-      screen.getByTestId("ai-doctor-phase1-preview-mode").textContent,
-    ).toBe("Internal preview");
+    expect(screen.getByTestId("ai-doctor-phase1-preview-mode").textContent).toBe(
+      "Internal preview",
+    );
   });
 
   it("renders all major sections for the default case", () => {
@@ -99,15 +97,13 @@ describe("AiDoctorPhase1Preview page — base render", () => {
 
   it("renders the confidence audit link card", () => {
     renderAtRoute("/internal/ai-doctor-phase1-preview");
-    expect(
-      screen.getByTestId("ai-doctor-confidence-audit-link-card"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("ai-doctor-confidence-audit-link-title"),
-    ).toHaveTextContent("View matching confidence audit");
-    expect(
-      screen.getByTestId("ai-doctor-confidence-audit-link-description"),
-    ).toHaveTextContent(/hard caps/);
+    expect(screen.getByTestId("ai-doctor-confidence-audit-link-card")).toBeInTheDocument();
+    expect(screen.getByTestId("ai-doctor-confidence-audit-link-title")).toHaveTextContent(
+      "View matching confidence audit",
+    );
+    expect(screen.getByTestId("ai-doctor-confidence-audit-link-description")).toHaveTextContent(
+      /hard caps/,
+    );
     const link = screen.getByTestId("ai-doctor-confidence-audit-link");
     // Default case maps to its matching scenario id
     expect(link).toHaveAttribute(
@@ -150,9 +146,9 @@ describe("AiDoctorPhase1Preview page — base render", () => {
 
   it("preserves safety warnings (automation, overdiagnosis) on default case", () => {
     renderAtRoute("/internal/ai-doctor-phase1-preview");
-    expect(
-      screen.getByTestId("ai-doctor-phase1-preview-automation-warning").textContent,
-    ).toMatch(/does not control equipment/i);
+    expect(screen.getByTestId("ai-doctor-phase1-preview-automation-warning").textContent).toMatch(
+      /does not control equipment/i,
+    );
     expect(
       screen.getByTestId("ai-doctor-phase1-preview-overdiagnosis-warning").textContent,
     ).toMatch(/avoid treating this as a certain diagnosis/i);
@@ -164,31 +160,27 @@ describe("AiDoctorPhase1Preview page — case selector", () => {
     renderAtRoute("/internal/ai-doctor-phase1-preview");
     expect(AI_DOCTOR_PHASE1_PREVIEW_CASES.length).toBe(7);
     for (const c of AI_DOCTOR_PHASE1_PREVIEW_CASES) {
-      expect(
-        screen.getByTestId(`ai-doctor-phase1-preview-case-option-${c.id}`),
-      ).toBeTruthy();
+      expect(screen.getByTestId(`ai-doctor-phase1-preview-case-option-${c.id}`)).toBeTruthy();
     }
   });
 
-  it.each(AI_DOCTOR_PHASE1_PREVIEW_CASES.map((c) => [c.id, c.viewModel.summaryCard.title] as const))(
-    "selecting case %s renders the matching title",
-    (id, expectedTitle) => {
-      renderAtRoute("/internal/ai-doctor-phase1-preview");
-      selectCase(id);
-      const summary = screen.getByTestId("ai-doctor-phase1-preview-summary");
-      expect(summary.textContent ?? "").toContain(expectedTitle);
-    },
-  );
+  it.each(
+    AI_DOCTOR_PHASE1_PREVIEW_CASES.map((c) => [c.id, c.viewModel.summaryCard.title] as const),
+  )("selecting case %s renders the matching title", (id, expectedTitle) => {
+    renderAtRoute("/internal/ai-doctor-phase1-preview");
+    selectCase(id);
+    const summary = screen.getByTestId("ai-doctor-phase1-preview-summary");
+    expect(summary.textContent ?? "").toContain(expectedTitle);
+  });
 
-  it.each(AI_DOCTOR_PHASE1_PREVIEW_CASES.map((c) => [c.id, c.viewModel.summaryCard.summary] as const))(
-    "selecting case %s renders the matching summary",
-    (id, expectedSummary) => {
-      renderAtRoute("/internal/ai-doctor-phase1-preview");
-      selectCase(id);
-      const summary = screen.getByTestId("ai-doctor-phase1-preview-summary");
-      expect(summary.textContent ?? "").toContain(expectedSummary);
-    },
-  );
+  it.each(
+    AI_DOCTOR_PHASE1_PREVIEW_CASES.map((c) => [c.id, c.viewModel.summaryCard.summary] as const),
+  )("selecting case %s renders the matching summary", (id, expectedSummary) => {
+    renderAtRoute("/internal/ai-doctor-phase1-preview");
+    selectCase(id);
+    const summary = screen.getByTestId("ai-doctor-phase1-preview-summary");
+    expect(summary.textContent ?? "").toContain(expectedSummary);
+  });
 
   it.each(AI_DOCTOR_PHASE1_PREVIEW_CASES.map((c) => [c.id] as const))(
     "case %s shows read-only / no-model / no-write / no-device labels",
@@ -221,9 +213,9 @@ describe("AiDoctorPhase1Preview page — case selector", () => {
     const text = debug.textContent ?? "";
     expect(text).toMatch(/has_live_data: false/);
     expect(text).toMatch(/has_demo_or_csv_only: true/);
-    expect(
-      screen.getByTestId("ai-doctor-phase1-preview-source-truth-warning").textContent,
-    ).toMatch(/demo or imported/i);
+    expect(screen.getByTestId("ai-doctor-phase1-preview-source-truth-warning").textContent).toMatch(
+      /demo or imported/i,
+    );
     const summary = screen.getByTestId("ai-doctor-phase1-preview-summary");
     // Must not positively claim live data (e.g. "live data", "live sensor", "real-time data")
     const summaryLower = (summary.textContent ?? "").toLowerCase();
@@ -237,9 +229,9 @@ describe("AiDoctorPhase1Preview page — case selector", () => {
     selectCase("stale-invalid-only");
     const debug = screen.getByTestId("ai-doctor-phase1-preview-debug");
     expect(debug.textContent ?? "").toMatch(/has_stale_or_invalid: true/);
-    expect(
-      screen.getByTestId("ai-doctor-phase1-preview-source-truth-warning").textContent,
-    ).toMatch(/stale or invalid/i);
+    expect(screen.getByTestId("ai-doctor-phase1-preview-source-truth-warning").textContent).toMatch(
+      /stale or invalid/i,
+    );
     const summary = screen.getByTestId("ai-doctor-phase1-preview-summary");
     const text = (summary.textContent ?? "").toLowerCase();
     expect(text).not.toMatch(/healthy/);

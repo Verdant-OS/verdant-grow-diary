@@ -84,10 +84,7 @@ describe("buildPhenoPedigree — edge cases", () => {
     expect(p.keepers[0].flags.map((f) => f.code)).toContain("origin_unrecorded");
   });
   it("drops rows with no id / no cross_type", () => {
-    const p = buildPhenoPedigree(
-      [{ id: "" } as never],
-      [{ id: "x", crossType: "" } as never],
-    );
+    const p = buildPhenoPedigree([{ id: "" } as never], [{ id: "x", crossType: "" } as never]);
     expect(p.keepers).toHaveLength(0);
     expect(p.crosses).toHaveLength(0);
   });

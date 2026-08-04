@@ -228,10 +228,7 @@ d("profiles gamification write protection (local DB)", () => {
       { tier: null, level: 0, nugs_total: 0 },
     ];
     for (const patch of attempts) {
-      const { error } = await userA.client
-        .from("profiles")
-        .update(patch)
-        .eq("user_id", userA.id);
+      const { error } = await userA.client.from("profiles").update(patch).eq("user_id", userA.id);
       // Either the trigger rejects, or CHECK constraints reject, or the
       // change is a no-op — but the persisted row must never change.
       expectSanitizedDbError(error);
@@ -244,10 +241,7 @@ d("profiles gamification write protection (local DB)", () => {
 
   it("F: authenticated user cannot DELETE own profile", async () => {
     expect(await profileExists(admin, userA.id)).toBe(true);
-    const { error } = await userA.client
-      .from("profiles")
-      .delete()
-      .eq("user_id", userA.id);
+    const { error } = await userA.client.from("profiles").delete().eq("user_id", userA.id);
     if (error) expectSanitizedDbError(error);
     expect(await profileExists(admin, userA.id)).toBe(true);
   });
@@ -298,18 +292,19 @@ d("profiles gamification write protection (local DB)", () => {
   it("J: RPC-triggered gamification update is blocked by trigger", async () => {
     if (!rpcAvailable) {
       // Explicitly BLOCKED, not passed: local stack lacks exec_sql DDL helper.
-      console.warn(
-        "[profiles gamification] RPC path BLOCKED — local exec_sql unavailable",
-      );
+      console.warn("[profiles gamification] RPC path BLOCKED — local exec_sql unavailable");
       return;
     }
     const before = await readProfileAsAdmin(admin, userA.id);
-    const { error } = await userA.client.rpc(TEST_RPC_NAME as never, {
-      _profile_user_id: userA.id,
-      _tier: "pro",
-      _level: 42,
-      _nugs: 10_000,
-    } as never);
+    const { error } = await userA.client.rpc(
+      TEST_RPC_NAME as never,
+      {
+        _profile_user_id: userA.id,
+        _tier: "pro",
+        _level: 42,
+        _nugs: 10_000,
+      } as never,
+    );
     expect(error).not.toBeNull();
     expectSanitizedDbError(error);
     const after = await readProfileAsAdmin(admin, userA.id);
@@ -329,7 +324,10 @@ d("profiles gamification write protection (local DB)", () => {
     }
     const before = await readProfileAsAdmin(admin, userA.id);
     const patches: Array<{ tag: string; args: Record<string, unknown> }> = [
-      { tag: "tier", args: { _profile_user_id: userA.id, _tier: "pro", _level: null, _nugs: null } },
+      {
+        tag: "tier",
+        args: { _profile_user_id: userA.id, _tier: "pro", _level: null, _nugs: null },
+      },
       { tag: "level", args: { _profile_user_id: userA.id, _tier: null, _level: 42, _nugs: null } },
       { tag: "nugs", args: { _profile_user_id: userA.id, _tier: null, _level: null, _nugs: 999 } },
     ];
@@ -351,16 +349,14 @@ d("profiles gamification write protection (local DB)", () => {
   it("K: mixed attack — atomic profile rejection + cross-user entitlement probe denial", async () => {
     // Seed user B with an active Pro row so a leak would be observable.
     const proEnd = new Date(Date.now() + 30 * 24 * 3600_000).toISOString();
-    const { error: seedErr } = await admin
-      .from("billing_subscriptions")
-      .upsert({
-        user_id: userB.id,
-        plan_id: "pro_monthly",
-        status: "active",
-        provider: "paddle",
-        current_period_end: proEnd,
-        cancel_at_period_end: false,
-      });
+    const { error: seedErr } = await admin.from("billing_subscriptions").upsert({
+      user_id: userB.id,
+      plan_id: "pro_monthly",
+      status: "active",
+      provider: "paddle",
+      current_period_end: proEnd,
+      cancel_at_period_end: false,
+    });
     if (seedErr) throw new Error("seed userB billing failed");
 
     try {

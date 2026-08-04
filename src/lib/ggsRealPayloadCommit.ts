@@ -21,8 +21,7 @@ export interface GgsRealPayloadCommitArgs {
 }
 
 export type GgsRealPayloadCommitResult =
-  | { ok: true; inserted: number; rejected: number }
-  | { ok: false; reason: string };
+  { ok: true; inserted: number; rejected: number } | { ok: false; reason: string };
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

@@ -17,12 +17,7 @@ export interface TentsQuerySnapshot {
 }
 
 export type TentsPlantsStatus =
-  | "not_needed"
-  | "loading"
-  | "error"
-  | "stale"
-  | "refreshing"
-  | "ready";
+  "not_needed" | "loading" | "error" | "stale" | "refreshing" | "ready";
 export type TentsSensorReadStatus = "loading" | "error" | "refresh_error" | "success";
 
 export interface TentsPageAsyncState {

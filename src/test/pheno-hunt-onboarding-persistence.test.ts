@@ -11,11 +11,7 @@
  */
 import { describe, it, expect } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  createPhenoHunt,
-  PhenoHuntError,
-  updatePhenoHuntSetup,
-} from "@/lib/phenoHuntService";
+import { createPhenoHunt, PhenoHuntError, updatePhenoHuntSetup } from "@/lib/phenoHuntService";
 
 interface Call {
   table: string;
@@ -32,13 +28,11 @@ function makeFakeClient(
     const call: Call = { table, op: "select", filters: [] };
     calls.push(call);
     const chain: Record<string, unknown> = {};
-    const setOp =
-      (op: Call["op"]) =>
-      (payload?: unknown) => {
-        call.op = op;
-        call.payload = payload;
-        return chain;
-      };
+    const setOp = (op: Call["op"]) => (payload?: unknown) => {
+      call.op = op;
+      call.payload = payload;
+      return chain;
+    };
     chain.insert = setOp("insert");
     chain.update = setOp("update");
     chain.delete = setOp("delete");
@@ -54,10 +48,8 @@ function makeFakeClient(
     }
     chain.single = () => Promise.resolve(respond(call));
     chain.maybeSingle = () => Promise.resolve(respond(call));
-    chain.then = (
-      onFulfilled: (v: unknown) => unknown,
-      onRejected?: (e: unknown) => unknown,
-    ) => Promise.resolve(respond(call)).then(onFulfilled, onRejected);
+    chain.then = (onFulfilled: (v: unknown) => unknown, onRejected?: (e: unknown) => unknown) =>
+      Promise.resolve(respond(call)).then(onFulfilled, onRejected);
     return chain;
   }
   const client = { from: builder } as unknown as SupabaseClient;
@@ -136,17 +128,14 @@ describe("updatePhenoHuntSetup persistence honesty", () => {
   it("a silently-filtered update (0 rows: lapsed plan or cross-user id) is NOT a success", async () => {
     const { client } = makeFakeClient(() => ({ data: null, error: null }));
     await expect(
-      updatePhenoHuntSetup(
-        { huntId: "someone-elses-hunt", markSetupComplete: true },
-        client,
-      ),
+      updatePhenoHuntSetup({ huntId: "someone-elses-hunt", markSetupComplete: true }, client),
     ).rejects.toBeInstanceOf(PhenoHuntError);
   });
 
   it("an explicit RLS rejection surfaces as PhenoHuntError", async () => {
     const { client } = makeFakeClient(() => ({ data: null, error: RLS_DENIAL }));
-    await expect(
-      updatePhenoHuntSetup({ huntId: "h1", notes: "x" }, client),
-    ).rejects.toBeInstanceOf(PhenoHuntError);
+    await expect(updatePhenoHuntSetup({ huntId: "h1", notes: "x" }, client)).rejects.toBeInstanceOf(
+      PhenoHuntError,
+    );
   });
 });

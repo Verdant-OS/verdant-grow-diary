@@ -48,8 +48,8 @@ function makeSelectClient(opts: {
                   call.in_values = values;
                   if (opts.error) return { data: null, error: opts.error };
                   const rows = opts.rowsPerChunk
-                    ? opts.rowsPerChunk[chunkIdx++] ?? []
-                    : opts.rows ?? [];
+                    ? (opts.rowsPerChunk[chunkIdx++] ?? [])
+                    : (opts.rows ?? []);
                   return { data: rows, error: null };
                 },
               };
@@ -131,10 +131,7 @@ describe("listExistingPiIngestIdempotencyKeys", () => {
 
   it("dedupes input keys and preserves input order in output", async () => {
     const { client, calls } = makeSelectClient({
-      rows: [
-        { idempotency_key: "b" },
-        { idempotency_key: "a" },
-      ],
+      rows: [{ idempotency_key: "b" }, { idempotency_key: "a" }],
     });
     const out = await listExistingPiIngestIdempotencyKeys(client, {
       userId: "u1",
@@ -171,9 +168,7 @@ describe("listExistingPiIngestIdempotencyKeys", () => {
         userId: "u1",
         keys: ["a"],
       }),
-    ).rejects.toThrow(
-      /piIngestIdempotencyRepo\.listExistingPiIngestIdempotencyKeys: boom/,
-    );
+    ).rejects.toThrow(/piIngestIdempotencyRepo\.listExistingPiIngestIdempotencyKeys: boom/);
   });
 
   it("tolerates null data from the client", async () => {
@@ -220,10 +215,7 @@ function makeRow(i: number): PiIngestIdempotencyInsert {
 describe("insertPiIngestIdempotencyKeys", () => {
   it("returns immediately on empty rows without touching the client", async () => {
     const from = vi.fn();
-    await insertPiIngestIdempotencyKeys(
-      { from } as unknown as PiIngestIdempotencySupabaseLike,
-      [],
-    );
+    await insertPiIngestIdempotencyKeys({ from } as unknown as PiIngestIdempotencySupabaseLike, []);
     expect(from).not.toHaveBeenCalled();
   });
 
@@ -247,9 +239,7 @@ describe("insertPiIngestIdempotencyKeys", () => {
 
   it("propagates insert errors with the repo namespace", async () => {
     const { client } = makeInsertClient({ error: { message: "denied" } });
-    await expect(
-      insertPiIngestIdempotencyKeys(client, [makeRow(1)]),
-    ).rejects.toThrow(
+    await expect(insertPiIngestIdempotencyKeys(client, [makeRow(1)])).rejects.toThrow(
       /piIngestIdempotencyRepo\.insertPiIngestIdempotencyKeys: denied/,
     );
   });
@@ -258,10 +248,7 @@ describe("insertPiIngestIdempotencyKeys", () => {
 // ----------------------- static safety guards -----------------------
 
 describe("piIngestIdempotencyRepo static safety", () => {
-  const src = readFileSync(
-    resolve(__dirname, "../lib/piIngestIdempotencyRepo.ts"),
-    "utf8",
-  );
+  const src = readFileSync(resolve(__dirname, "../lib/piIngestIdempotencyRepo.ts"), "utf8");
 
   it("references only the pi_ingest_idempotency_keys table", () => {
     const forbiddenTables = [
@@ -301,8 +288,6 @@ describe("piIngestIdempotencyRepo static safety", () => {
   });
 
   it("does not import the live Supabase client at module scope", () => {
-    expect(src).not.toMatch(
-      /from\s+["']@\/integrations\/supabase\/client["']/,
-    );
+    expect(src).not.toMatch(/from\s+["']@\/integrations\/supabase\/client["']/);
   });
 });

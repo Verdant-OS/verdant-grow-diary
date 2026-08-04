@@ -24,8 +24,7 @@ import {
 export const MANUAL_SNAPSHOT_TIMELINE_DEFAULT_LIMIT = 50;
 
 export type ManualSnapshotTimelineScope =
-  | { kind: "plant"; plantId: string }
-  | { kind: "tent"; tentId: string };
+  { kind: "plant"; plantId: string } | { kind: "tent"; tentId: string };
 
 async function fetchPlantRows(plantId: string, limit: number): Promise<ManualSnapshotDiaryRow[]> {
   const { data, error } = await supabase

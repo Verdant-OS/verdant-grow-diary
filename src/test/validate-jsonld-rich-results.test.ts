@@ -29,7 +29,9 @@ describe("validate-jsonld-rich-results", () => {
     const res = validateJsonLdObject({
       "@context": "https://schema.org",
       "@type": "FAQPage",
-      mainEntity: [{ "@type": "Question", name: "Q", acceptedAnswer: { "@type": "Answer", text: "" } }],
+      mainEntity: [
+        { "@type": "Question", name: "Q", acceptedAnswer: { "@type": "Answer", text: "" } },
+      ],
     });
     expect(res.issues.some((i) => i.message.includes('missing required field "text"'))).toBe(true);
   });
@@ -66,7 +68,11 @@ describe("validate-jsonld-rich-results", () => {
   });
 
   it("rejects wrong @context", () => {
-    const res = validateJsonLdObject({ "@context": "https://example.org", "@type": "Organization", name: "x" });
+    const res = validateJsonLdObject({
+      "@context": "https://example.org",
+      "@type": "Organization",
+      name: "x",
+    });
     expect(res.issues.some((i) => i.message.includes("@context"))).toBe(true);
   });
 
@@ -113,7 +119,6 @@ describe("validate-jsonld-rich-results", () => {
     expect(badRes.issues.some((i) => i.path.includes("@graph[0].url"))).toBe(true);
   });
 
-
   it("flags a partial </script sequence that would break HTML parsing if closed", () => {
     // Simulates a payload where a string contains "</scriptx" (no closing >).
     // Realistic </script> would prematurely close the outer <script> element,
@@ -122,7 +127,6 @@ describe("validate-jsonld-rich-results", () => {
     const res = validateHtmlDocument(html, "xss.html");
     expect(res.issues.some((i) => i.message.includes("</script"))).toBe(true);
   });
-
 
   it("returns clean result for well-formed multi-block HTML", () => {
     const html = `${wrap({
@@ -135,7 +139,12 @@ describe("validate-jsonld-rich-results", () => {
       "@type": "BreadcrumbList",
       itemListElement: [
         { "@type": "ListItem", position: 1, name: "Home", item: "https://verdantgrowdiary.com/" },
-        { "@type": "ListItem", position: 2, name: "Guides", item: "https://verdantgrowdiary.com/guides" },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: "Guides",
+          item: "https://verdantgrowdiary.com/guides",
+        },
       ],
     })}`;
     const res = validateHtmlDocument(html, "good.html");

@@ -6,10 +6,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { adaptDiaryForAiContext } from "@/lib/coachContextAdapter";
-import {
-  evaluateAiContextSufficiency,
-  type AiContextInput,
-} from "@/lib/aiContextSufficiencyRules";
+import { evaluateAiContextSufficiency, type AiContextInput } from "@/lib/aiContextSufficiencyRules";
 
 const ROOT = resolve(__dirname, "../..");
 const COACH = readFileSync(resolve(ROOT, "src/pages/Coach.tsx"), "utf8");
@@ -92,9 +89,7 @@ describe("adaptDiaryForAiContext", () => {
     // Entry itself becomes invalid for AI context due to "*:out-of-range".
     // (out-of-range is a warning, not :invalid, so entry is still valid;
     //  but pH/EC are absent.)
-    expect(
-      adapted.diaryDerivedSensors.find((s) => s.ph != null || s.ec != null),
-    ).toBeUndefined();
+    expect(adapted.diaryDerivedSensors.find((s) => s.ph != null || s.ec != null)).toBeUndefined();
   });
 
   it("flags valid photo from diary entry", () => {
@@ -244,8 +239,6 @@ describe("Coach page wiring of normalized diary context", () => {
 
   it("does not change ai-coach edge function payload shape", () => {
     // Still invokes ai-coach with the same body fields.
-    expect(COACH).toMatch(
-      /functions\.invoke\(\s*["']ai-coach["'][\s\S]*?\{\s*mode,\s*growId:/,
-    );
+    expect(COACH).toMatch(/functions\.invoke\(\s*["']ai-coach["'][\s\S]*?\{\s*mode,\s*growId:/);
   });
 });

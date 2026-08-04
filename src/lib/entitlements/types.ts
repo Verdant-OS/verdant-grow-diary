@@ -6,20 +6,10 @@
  */
 
 export type PlanId =
-  | "free"
-  | "pro_monthly"
-  | "pro_annual"
-  | "craft_monthly"
-  | "craft_annual"
-  | "founder_lifetime";
+  "free" | "pro_monthly" | "pro_annual" | "craft_monthly" | "craft_annual" | "founder_lifetime";
 
 export type SubscriptionStatus =
-  | "active"
-  | "trialing"
-  | "past_due"
-  | "canceled"
-  | "paused"
-  | "expired";
+  "active" | "trialing" | "past_due" | "canceled" | "paused" | "expired";
 
 export type BillingProvider = "stripe" | "paddle";
 

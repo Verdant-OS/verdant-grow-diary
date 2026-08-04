@@ -60,18 +60,12 @@ describe("buildLeadDetailSnapshot — happy path", () => {
 
 describe("buildLeadDetailSnapshot — safety", () => {
   it("falls back to email when name is missing", () => {
-    const s = buildLeadDetailSnapshot(
-      lead({ name: null }),
-      NOW,
-    );
+    const s = buildLeadDetailSnapshot(lead({ name: null }), NOW);
     expect(s.displayName).toBe("ada@example.com");
   });
 
   it("falls back to 'Unknown lead' when name and email are missing", () => {
-    const s = buildLeadDetailSnapshot(
-      lead({ name: null, email: "" as unknown as string }),
-      NOW,
-    );
+    const s = buildLeadDetailSnapshot(lead({ name: null, email: "" as unknown as string }), NOW);
     expect(s.displayName).toBe("Unknown lead");
   });
 
@@ -96,10 +90,7 @@ describe("buildLeadDetailSnapshot — safety", () => {
   });
 
   it("flags an invalid created_at safely", () => {
-    const s = buildLeadDetailSnapshot(
-      lead({ created_at: "not-a-date" }),
-      NOW,
-    );
+    const s = buildLeadDetailSnapshot(lead({ created_at: "not-a-date" }), NOW);
     expect(s.createdValid).toBe(false);
     expect(s.createdLabel).toMatch(/Invalid|Unknown/);
     expect(s.warnings.join(" ")).toMatch(/created_at/);

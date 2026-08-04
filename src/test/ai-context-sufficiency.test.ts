@@ -15,9 +15,7 @@ const completeReal = (over: Partial<AiContextInput> = {}): AiContextInput => ({
   plants: [{ id: "p1", stage: "veg", strain: "Blue Dream", medium: "soil" }],
   recentDiaryEntries: [{ at: recentAt, type: "note" }],
   recentWateringOrFeeding: [{ at: recentAt, type: "water" }],
-  recentSensorReadings: [
-    { at: recentAt, temp: 24, rh: 55, vpd: 1.0, ph: 6.2, ec: 1.4 },
-  ],
+  recentSensorReadings: [{ at: recentAt, temp: 24, rh: 55, vpd: 1.0, ph: 6.2, ec: 1.4 }],
   hasPhoto: true,
   sensorMeta: { dataSource: "supabase", isDemoData: false },
   contextMeta: { dataSource: "supabase", isDemoData: false },
@@ -146,9 +144,7 @@ describe("evaluateAiContextSufficiency", () => {
         recentSensorReadings: [{ at: recentAt, temp: 24, rh: 55, vpd: 1 }],
       }),
     );
-    expect(r.missing).toEqual(
-      expect.arrayContaining(["nutrient:ph", "nutrient:ec"]),
-    );
+    expect(r.missing).toEqual(expect.arrayContaining(["nutrient:ph", "nutrient:ec"]));
   });
 
   it("environment question without temp/RH/VPD flags all three", () => {
@@ -158,9 +154,7 @@ describe("evaluateAiContextSufficiency", () => {
         recentSensorReadings: [{ at: recentAt }],
       }),
     );
-    expect(r.missing).toEqual(
-      expect.arrayContaining(["env:temp", "env:rh", "env:vpd"]),
-    );
+    expect(r.missing).toEqual(expect.arrayContaining(["env:temp", "env:rh", "env:vpd"]));
   });
 
   it("invalid sensor timestamp produces warning, not silent drop", () => {

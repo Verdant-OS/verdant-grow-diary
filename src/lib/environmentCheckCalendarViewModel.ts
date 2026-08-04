@@ -42,9 +42,7 @@ export interface EnvironmentCheckCalendarDayGroup {
   count: number;
 }
 
-function toCalendarEvent(
-  vm: EnvironmentCheckTimelineViewModel,
-): EnvironmentCheckCalendarEvent {
+function toCalendarEvent(vm: EnvironmentCheckTimelineViewModel): EnvironmentCheckCalendarEvent {
   return {
     id: vm.entryId,
     occurredAt: vm.occurredAt,
@@ -63,10 +61,7 @@ function toCalendarEvent(
  * Pure & deterministic.
  */
 export function buildEnvironmentCheckCalendarGroups(
-  rawEntries:
-    | readonly EnvironmentCheckTimelineRawEntry[]
-    | null
-    | undefined,
+  rawEntries: readonly EnvironmentCheckTimelineRawEntry[] | null | undefined,
 ): EnvironmentCheckCalendarDayGroup[] {
   const list = buildEnvironmentCheckTimelineList(rawEntries);
   const byDate = new Map<string, EnvironmentCheckCalendarEvent[]>();

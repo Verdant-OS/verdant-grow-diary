@@ -33,19 +33,18 @@ interface Props {
 export default function PlantStatusStrip({ tentId, tentName, growId }: Props) {
   const hasTent = !!tentId;
   const { data: readings, isLoading: envLoading } = usePlantTentLatestReadings(
-    hasTent ? tentId ?? null : null,
+    hasTent ? (tentId ?? null) : null,
   );
-  const env = buildPlantTentEnvironmentView(hasTent ? readings ?? [] : []);
+  const env = buildPlantTentEnvironmentView(hasTent ? (readings ?? []) : []);
 
   const { rows: alertRows, status: alertStatus } = usePlantAssignedTentAlerts(
-    hasTent ? tentId ?? null : null,
+    hasTent ? (tentId ?? null) : null,
     growId ?? null,
   );
-  const { rows: actionRows, isLoading: actionsLoading } =
-    usePlantAssignedTentActions(
-      hasTent ? tentId ?? null : null,
-      growId ?? null,
-    );
+  const { rows: actionRows, isLoading: actionsLoading } = usePlantAssignedTentActions(
+    hasTent ? (tentId ?? null) : null,
+    growId ?? null,
+  );
 
   const envKnown = hasTent && !envLoading && env.hasReadings;
   const envLabel = !hasTent
@@ -56,7 +55,7 @@ export default function PlantStatusStrip({ tentId, tentName, growId }: Props) {
         ? "Unknown"
         : env.stale
           ? `Stale${env.sourceLabel ? ` · ${env.sourceLabel}` : ""}`
-          : env.sourceLabel ?? "Unknown";
+          : (env.sourceLabel ?? "Unknown");
 
   const alertsKnown = hasTent && alertStatus === "ok";
   const alertCount = alertsKnown ? alertRows.length : null;
@@ -64,10 +63,7 @@ export default function PlantStatusStrip({ tentId, tentName, growId }: Props) {
   const actionCount = actionsKnown ? actionRows.length : null;
 
   return (
-    <div
-      className="mb-3 grid grid-cols-2 sm:grid-cols-4 gap-2"
-      data-testid="plant-status-strip"
-    >
+    <div className="mb-3 grid grid-cols-2 sm:grid-cols-4 gap-2" data-testid="plant-status-strip">
       {/* Tent */}
       {hasTent && tentId ? (
         <Link
@@ -78,15 +74,10 @@ export default function PlantStatusStrip({ tentId, tentName, growId }: Props) {
           <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
             <Box className="h-3 w-3" /> Current Tent
           </div>
-          <div className="text-sm font-medium truncate mt-0.5">
-            {tentName ?? "Assigned"}
-          </div>
+          <div className="text-sm font-medium truncate mt-0.5">{tentName ?? "Assigned"}</div>
         </Link>
       ) : (
-        <div
-          className="rounded-lg border bg-card/40 p-2.5"
-          data-testid="plant-status-tent"
-        >
+        <div className="rounded-lg border bg-card/40 p-2.5" data-testid="plant-status-tent">
           <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
             <Box className="h-3 w-3" /> Current Tent
           </div>

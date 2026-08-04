@@ -21,9 +21,8 @@ export function AnalyticsConsentBanner() {
     >
       <div className="mx-auto flex max-w-3xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
-          We use Google Analytics to understand which parts of Verdant growers actually
-          use. Nothing loads until you accept, and your grow data is never sent to
-          analytics.
+          We use Google Analytics to understand which parts of Verdant growers actually use. Nothing
+          loads until you accept, and your grow data is never sent to analytics.
         </p>
         <div className="flex shrink-0 gap-2">
           <Button

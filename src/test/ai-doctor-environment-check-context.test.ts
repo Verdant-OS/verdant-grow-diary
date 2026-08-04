@@ -88,7 +88,9 @@ describe("aiDoctorEnvironmentCheckRules", () => {
       noteBody: REJECTED_NOTE,
     });
     if (ctx.kind !== "present") throw new Error("expected present");
-    expect(ctx.confidenceImpact === "severely-reduced" || ctx.confidenceImpact === "untrusted").toBe(true);
+    expect(
+      ctx.confidenceImpact === "severely-reduced" || ctx.confidenceImpact === "untrusted",
+    ).toBe(true);
     expect(ctx.safetyNotes.some((n) => /reject/i.test(n))).toBe(true);
     expect(ctx.safetyNotes.some((n) => /not_checked/i.test(n))).toBe(true);
   });
@@ -102,7 +104,9 @@ describe("aiDoctorEnvironmentCheckRules", () => {
     const vpd = ctx.metrics.find((m) => m.key === "vpd_kpa");
     expect(vpd?.derived).toBe(true);
     expect(ctx.derivedNotes.some((n) => /derived/i.test(n))).toBe(true);
-    expect(ctx.safetyNotes.some((n) => /derived vpd is included as context only/i.test(n))).toBe(true);
+    expect(ctx.safetyNotes.some((n) => /derived vpd is included as context only/i.test(n))).toBe(
+      true,
+    );
   });
 
   it("returns absent + cautious copy for missing/unparseable evidence", () => {
@@ -113,7 +117,8 @@ describe("aiDoctorEnvironmentCheckRules", () => {
 
     const b = buildAiDoctorEnvironmentCheckContext({
       occurredAt: "2026-06-08T12:00:00.000Z",
-      noteBody: "EcoWitt Environment Check\nSource: local EcoWitt validation\nPer-metric results:\n",
+      noteBody:
+        "EcoWitt Environment Check\nSource: local EcoWitt validation\nPer-metric results:\n",
     });
     expect(b.present).toBe(false);
   });
@@ -146,9 +151,7 @@ describe("compileAiDoctorContext + view model", () => {
     };
     const compiled = compileAiDoctorContext({
       sensorContext: sensor,
-      environmentCheckEvents: [
-        { occurredAt: "2026-06-08T12:00:00.000Z", noteBody: ACCEPTED_NOTE },
-      ],
+      environmentCheckEvents: [{ occurredAt: "2026-06-08T12:00:00.000Z", noteBody: ACCEPTED_NOTE }],
     });
     expect(compiled.sensor).toBe(sensor);
     expect(compiled.environmentCheck.present).toBe(true);
@@ -168,9 +171,7 @@ describe("compileAiDoctorContext + view model", () => {
   it("surfaces missing/weak context cautiously when env check is rejected", () => {
     const vm = buildAiDoctorViewModel({
       sensorContext: null,
-      environmentCheckEvents: [
-        { occurredAt: "2026-06-08T12:00:00.000Z", noteBody: REJECTED_NOTE },
-      ],
+      environmentCheckEvents: [{ occurredAt: "2026-06-08T12:00:00.000Z", noteBody: REJECTED_NOTE }],
     });
     expect(vm.environmentCheck.show).toBe(true);
     expect(vm.environmentCheck.evidenceBadge).toBe("Test/Local validation");

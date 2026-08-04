@@ -65,10 +65,7 @@ describe("buildGrowFilterOptions", () => {
   });
 
   it("renders zero-count grows cleanly", () => {
-    const opts = buildGrowFilterOptions(
-      [{ id: "g9", name: "Empty Grow" }],
-      [],
-    );
+    const opts = buildGrowFilterOptions([{ id: "g9", name: "Empty Grow" }], []);
     expect(opts[1].label).toBe("Empty Grow (0 plants)");
   });
 });
@@ -161,14 +158,16 @@ describe("grow attribution via tent index (BUG-A)", () => {
     expect(opts.find((o) => o.id === "g1")?.plantCount).toBe(2);
     expect(opts.find((o) => o.id === UNASSIGNED_GROW_FILTER_ID)?.plantCount).toBe(2);
     const all = opts.find((o) => o.id === "");
-    expect(
-      opts.filter((o) => o.id !== "").reduce((acc, o) => acc + o.plantCount, 0),
-    ).toBe(all?.plantCount);
+    expect(opts.filter((o) => o.id !== "").reduce((acc, o) => acc + o.plantCount, 0)).toBe(
+      all?.plantCount,
+    );
   });
 
   it("filterPlantsByGrow includes rollup plants and shrinks Unassigned to match", () => {
     expect(
-      filterPlantsByGrow(mixedPlants, "g1", tentGrowById).map((p) => p.id).sort(),
+      filterPlantsByGrow(mixedPlants, "g1", tentGrowById)
+        .map((p) => p.id)
+        .sort(),
     ).toEqual(["direct", "rollup"]);
     expect(
       filterPlantsByGrow(mixedPlants, UNASSIGNED_GROW_FILTER_ID, tentGrowById)
@@ -180,7 +179,9 @@ describe("grow attribution via tent index (BUG-A)", () => {
   it("omitting the index preserves the legacy own-grow_id behavior", () => {
     expect(filterPlantsByGrow(mixedPlants, "g1").map((p) => p.id)).toEqual(["direct"]);
     expect(
-      filterPlantsByGrow(mixedPlants, UNASSIGNED_GROW_FILTER_ID).map((p) => p.id).sort(),
+      filterPlantsByGrow(mixedPlants, UNASSIGNED_GROW_FILTER_ID)
+        .map((p) => p.id)
+        .sort(),
     ).toEqual(["loose", "orphan", "rollup"]);
   });
 });
@@ -208,11 +209,7 @@ describe("filterPlantsBySearch", () => {
     expect(r.map((p) => p.id)).toEqual(["p3"]);
   });
   it("tolerates missing fields", () => {
-    const r = filterPlantsBySearch(
-      [{ id: "x", growId: "g1" }, ...plants],
-      "sd",
-      tents,
-    );
+    const r = filterPlantsBySearch([{ id: "x", growId: "g1" }, ...plants], "sd", tents);
     expect(r.map((p) => p.id)).toEqual(["p1", "p2", "p3"]);
   });
 });
@@ -226,9 +223,7 @@ describe("summarizePlantsPageFilters / formatPlantsPageFilterSummary", () => {
     });
     expect(s.activeCount).toBe(4);
     expect(s.archivedHiddenCount).toBe(2);
-    expect(formatPlantsPageFilterSummary(s)).toBe(
-      "Showing 4 plants across all grows",
-    );
+    expect(formatPlantsPageFilterSummary(s)).toBe("Showing 4 plants across all grows");
   });
   it("summarizes 'in {Grow Name}' when a grow is selected", () => {
     const scoped = filterPlantsByGrow(plants, "g1");
@@ -238,9 +233,7 @@ describe("summarizePlantsPageFilters / formatPlantsPageFilterSummary", () => {
       search: "",
     });
     expect(s.activeCount).toBe(3);
-    expect(formatPlantsPageFilterSummary(s)).toBe(
-      "Showing 3 plants in Sour Diesel Auto",
-    );
+    expect(formatPlantsPageFilterSummary(s)).toBe("Showing 3 plants in Sour Diesel Auto");
   });
   it("falls back to 'in this grow' when name is unknown", () => {
     const s = summarizePlantsPageFilters([], {
@@ -248,9 +241,7 @@ describe("summarizePlantsPageFilters / formatPlantsPageFilterSummary", () => {
       selectedGrowName: null,
       search: "",
     });
-    expect(formatPlantsPageFilterSummary(s)).toBe(
-      "Showing 0 plants in this grow",
-    );
+    expect(formatPlantsPageFilterSummary(s)).toBe("Showing 0 plants in this grow");
   });
   it("pluralizes correctly for 1 plant", () => {
     const s = summarizePlantsPageFilters([plants[0]], {
@@ -258,9 +249,7 @@ describe("summarizePlantsPageFilters / formatPlantsPageFilterSummary", () => {
       selectedGrowName: null,
       search: "",
     });
-    expect(formatPlantsPageFilterSummary(s)).toBe(
-      "Showing 1 plant across all grows",
-    );
+    expect(formatPlantsPageFilterSummary(s)).toBe("Showing 1 plant across all grows");
   });
 });
 

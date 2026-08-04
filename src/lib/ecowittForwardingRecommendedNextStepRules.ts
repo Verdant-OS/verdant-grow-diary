@@ -16,16 +16,12 @@ const SHARE_REPORT = "Share the sanitized forwarding report only.";
 
 /** Public copy table — exported for tests/docs. */
 export const NEXT_STEP_COPY = {
-  offline:
-    "EcoWitt local bridge not reachable on localhost:8787. Start the listener and refresh.",
+  offline: "EcoWitt local bridge not reachable on localhost:8787. Start the listener and refresh.",
   forwarding_disabled:
     "Forwarding is disabled in the bridge config. Enable forwarding in local .env and restart the listener.",
-  ingest_url_missing:
-    "Set VERDANT_INGEST_URL in local .env and restart the listener.",
-  bridge_token_missing:
-    "Set VERDANT_BRIDGE_TOKEN in local .env and restart the listener.",
-  tent_id_missing:
-    "Set VERDANT_TENT_ID in local .env and restart the listener.",
+  ingest_url_missing: "Set VERDANT_INGEST_URL in local .env and restart the listener.",
+  bridge_token_missing: "Set VERDANT_BRIDGE_TOKEN in local .env and restart the listener.",
+  tent_id_missing: "Set VERDANT_TENT_ID in local .env and restart the listener.",
   tent_id_invalid:
     "VERDANT_TENT_ID is not a valid UUID. Replace it in local .env and restart the listener.",
   forwarding_not_ready:
@@ -46,10 +42,8 @@ export const NEXT_STEP_COPY = {
   insert_unknown: `Storage insert failed for an unknown sanitized reason. ${SHARE_REPORT}`,
   missing_reason:
     "Insert failed but no reason was returned. Confirm the deployed Edge Function is current and redeployed.",
-  generic_failure:
-    "Forwarding failed. Open the sanitized forwarding report below for next steps.",
-  healthy:
-    "Forwarding is healthy. Continue letting EcoWitt POST naturally.",
+  generic_failure: "Forwarding failed. Open the sanitized forwarding report below for next steps.",
+  healthy: "Forwarding is healthy. Continue letting EcoWitt POST naturally.",
 } as const;
 
 export type RecommendedNextStepKind = keyof typeof NEXT_STEP_COPY;
@@ -77,9 +71,7 @@ export function recommendForwardingNextStep(
   return recommendForStatus(s);
 }
 
-export function recommendForStatus(
-  s: LocalForwardingStatus,
-): RecommendedNextStep {
+export function recommendForStatus(s: LocalForwardingStatus): RecommendedNextStep {
   // Configuration gaps — surface before forwarding-specific errors.
   if (!s.forwarding_enabled) {
     return {

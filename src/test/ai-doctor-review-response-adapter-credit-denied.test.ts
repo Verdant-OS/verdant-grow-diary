@@ -28,15 +28,7 @@ describe("adaptCreditedAiResponse — credit_denied passthrough", () => {
   });
 
   it("regression guard: all legacy reasons still map unchanged", () => {
-    for (const reason of [
-      "config",
-      "http",
-      "timeout",
-      "parse",
-      "empty",
-      "invalid",
-      "shape",
-    ]) {
+    for (const reason of ["config", "http", "timeout", "parse", "empty", "invalid", "shape"]) {
       const out = adaptCreditedAiResponse({ ok: false, reason });
       expect(out.ok).toBe(false);
       if (out.ok === false) expect(out.reason).toBe(reason);

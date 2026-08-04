@@ -10,7 +10,10 @@
  *   - Missing values export blank, never fake zeroes.
  */
 
-export type SensorSnapshotDrawerCsvRow = Record<string, string | number | boolean | null | undefined>;
+export type SensorSnapshotDrawerCsvRow = Record<
+  string,
+  string | number | boolean | null | undefined
+>;
 
 export interface SensorSnapshotDrawerCsvSnapshot {
   snapshotId: string;

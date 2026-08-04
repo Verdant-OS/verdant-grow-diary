@@ -418,8 +418,8 @@ async function main(): Promise<void> {
   const saveArtifacts = argv.includes("--save-artifacts");
 
   const captured: { logs: string[]; errs: string[] } = { logs: [], errs: [] };
-  const log = json ? (l: string) => captured.logs.push(l) : (l: string) => console.log(l);  
-  const err = json ? (l: string) => captured.errs.push(l) : (l: string) => console.error(l);  
+  const log = json ? (l: string) => captured.logs.push(l) : (l: string) => console.log(l);
+  const err = json ? (l: string) => captured.errs.push(l) : (l: string) => console.error(l);
 
   const result = await runFastPath(
     { writeLaunchers: writeLaunchersFlag, verbose, json, saveArtifacts },
@@ -455,7 +455,6 @@ async function main(): Promise<void> {
     },
   );
   if (json) {
-     
     console.log(JSON.stringify(result, null, 2));
   }
   process.exit(result.exitCode);

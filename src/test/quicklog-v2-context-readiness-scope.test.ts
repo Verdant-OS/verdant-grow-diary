@@ -24,14 +24,9 @@ import {
   type QuickLogV2EnvironmentRow,
 } from "@/lib/quickLogV2ManualSnapshotAdapter";
 import { buildManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewModel";
-import {
-  evaluateAiDoctorContextFromSources,
-} from "@/lib/aiDoctorContextViewModel";
+import { evaluateAiDoctorContextFromSources } from "@/lib/aiDoctorContextViewModel";
 import { buildAiDoctorContextQuickActions } from "@/lib/aiDoctorContextQuickActionsViewModel";
-import type {
-  TimelineMemoryItem,
-  TimelineManualSnapshotItem,
-} from "@/lib/timelineFilterRules";
+import type { TimelineMemoryItem, TimelineManualSnapshotItem } from "@/lib/timelineFilterRules";
 import { AI_DOCTOR_CONTEXT_READINESS_CONFIG } from "@/constants/aiDoctorContextReadiness";
 
 const NOW = Date.UTC(2026, 5, 2, 12, 0, 0);
@@ -65,14 +60,35 @@ function asSnapshotItem(row: QuickLogV2EnvironmentRow): TimelineManualSnapshotIt
 
 function activity(extra: TimelineMemoryItem[] = []): TimelineMemoryItem[] {
   return [
-    { kind: "diary", key: "d1", occurredAt: isoAt(2 * HOUR), eventType: "watering", hasPhoto: false, note: "watered" },
-    { kind: "diary", key: "d2", occurredAt: isoAt(3 * HOUR), eventType: "note", hasPhoto: false, note: "ok" },
+    {
+      kind: "diary",
+      key: "d1",
+      occurredAt: isoAt(2 * HOUR),
+      eventType: "watering",
+      hasPhoto: false,
+      note: "watered",
+    },
+    {
+      kind: "diary",
+      key: "d2",
+      occurredAt: isoAt(3 * HOUR),
+      eventType: "note",
+      hasPhoto: false,
+      note: "ok",
+    },
     ...extra,
   ];
 }
 
 function plant() {
-  return { id: PLANT_ID, name: "P", strain: "OG", stage: "veg", medium: "coco", hasPlantPhoto: true };
+  return {
+    id: PLANT_ID,
+    name: "P",
+    strain: "OG",
+    stage: "veg",
+    medium: "coco",
+    hasPlantPhoto: true,
+  };
 }
 
 describe("QuickLog v2 scope predicate (extended)", () => {

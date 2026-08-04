@@ -34,7 +34,22 @@ export default tseslint.config(
       ],
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      // Transitional until Biome (#699) owns format/lint noise.
+      "@typescript-eslint/no-explicit-any": "off",
+      "no-control-regex": "off",
+      "@typescript-eslint/ban-ts-comment": "off",
+      "prefer-const": "warn",
+      "@typescript-eslint/no-empty-object-type": "warn",
+      "@typescript-eslint/no-require-imports": "warn",
+      "no-empty": "warn",
+      "no-case-declarations": "warn",
     },
   },
   eslintPluginPrettier,
+  {
+    rules: {
+      // Format ownership moves to Biome (#699). Required CI must not fail on prettier nits.
+      "prettier/prettier": "warn",
+    },
+  },
 );

@@ -12,22 +12,14 @@
  *     per-stage band table.
  */
 
-import {
-  evaluateVpdAgainstStageTarget,
-  type VpdTargetClassification,
-} from "@/lib/vpdTargetRules";
+import { evaluateVpdAgainstStageTarget, type VpdTargetClassification } from "@/lib/vpdTargetRules";
 import {
   normalizeToCanonicalVpdTargetStage,
   type CanonicalVpdTargetStage,
 } from "@/lib/vpdStageNormalizationRules";
 import { calculateAirVpdKpa } from "@/lib/vpdRules";
 
-export type VpdTimelineStatus =
-  | "low"
-  | "in_target"
-  | "high"
-  | "stage_unknown"
-  | "unavailable";
+export type VpdTimelineStatus = "low" | "in_target" | "high" | "stage_unknown" | "unavailable";
 
 export interface VpdTimelineStatusInput {
   /** Optional pre-derived VPD (kPa). */
@@ -80,8 +72,7 @@ export const VPD_TIMELINE_GUIDANCE: Record<VpdTimelineStatus, string> = {
   low: "Review humidity, temperature, and airflow before making changes.",
   in_target: "VPD is within the target band for this stage.",
   high: "Review temperature, humidity, airflow, and stage targets before making changes.",
-  stage_unknown:
-    "Stage target unavailable. Confirm plant stage before interpreting VPD.",
+  stage_unknown: "Stage target unavailable. Confirm plant stage before interpreting VPD.",
   unavailable: "VPD unavailable. Temp and humidity are needed.",
 };
 
@@ -142,8 +133,7 @@ export function buildVpdTimelineStatusViewModel(
 
   // Render only if we have enough context: either a stored/derived VPD,
   // or enough temp + RH to derive one.
-  const hasDerivable =
-    derived !== null || (rh !== null && (tempC !== null || tempF !== null));
+  const hasDerivable = derived !== null || (rh !== null && (tempC !== null || tempF !== null));
   const normalized = normalizeToCanonicalVpdTargetStage(input.stage);
   const shouldRender = hasDerivable;
 

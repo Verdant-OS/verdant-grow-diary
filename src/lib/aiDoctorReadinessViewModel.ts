@@ -14,11 +14,7 @@ import { assessContextStrength, type AiDoctorResult } from "@/lib/aiDoctorSafety
 import type { SensorSourceTag } from "@/lib/aiDoctorContextCompiler";
 
 export type AiDoctorReadinessState =
-  | "ready"
-  | "needs_more_context"
-  | "sensor_missing"
-  | "telemetry_limited"
-  | "demo_only";
+  "ready" | "needs_more_context" | "sensor_missing" | "telemetry_limited" | "demo_only";
 
 export const AI_DOCTOR_READINESS_STATE_LABELS: Record<AiDoctorReadinessState, string> =
   Object.freeze({

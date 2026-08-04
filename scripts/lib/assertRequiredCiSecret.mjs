@@ -42,12 +42,9 @@ export function assertRequiredCiSecret(input, io = defaultIo()) {
 
   const value = String(input.secretValue ?? "").trim();
   const logPrefix = input.logPrefix ?? "ci-secret-preflight";
-  const heading =
-    input.guardHeading?.trim() || `Required CI secret guard — ${secretName}`;
+  const heading = input.guardHeading?.trim() || `Required CI secret guard — ${secretName}`;
   const fixSteps =
-    input.fixSteps && input.fixSteps.length > 0
-      ? input.fixSteps
-      : defaultFixSteps(secretName);
+    input.fixSteps && input.fixSteps.length > 0 ? input.fixSteps : defaultFixSteps(secretName);
   const reasonLines = input.reasonLines ?? [];
 
   if (value.length > 0) {
@@ -112,9 +109,8 @@ function defaultFixSteps(secretName) {
 
 function defaultIo() {
   return {
-    // eslint-disable-next-line no-console
     log: (msg) => console.log(msg),
-    // eslint-disable-next-line no-console
+
     error: (msg) => console.error(msg),
   };
 }

@@ -76,10 +76,7 @@ describe("verify-release-workbooks --diff formatters", () => {
 
 describe("verify-release-workbooks --diff scanners", () => {
   it("detects access_token= and reports line number", () => {
-    const hits = scanFileForBlockedTokens(
-      "manifest.json",
-      "ok line\nbad access_token=abc\nfine\n",
-    );
+    const hits = scanFileForBlockedTokens("manifest.json", "ok line\nbad access_token=abc\nfine\n");
     expect(hits.length).toBeGreaterThan(0);
     expect(hits[0].line).toBe(2);
     expect(hits[0].pattern).toContain("access_token=");
@@ -97,9 +94,9 @@ describe("verify-release-workbooks --diff scanners", () => {
   });
 
   it("does not flag the correct placeholder", () => {
-    expect(
-      scanForPlaceholderTypos("spec.md", "Use {{PREMIUM_WORKBOOK_COPY_URL}} here.\n"),
-    ).toEqual([]);
+    expect(scanForPlaceholderTypos("spec.md", "Use {{PREMIUM_WORKBOOK_COPY_URL}} here.\n")).toEqual(
+      [],
+    );
   });
 });
 
@@ -147,6 +144,6 @@ describe("precommit-release-workbooks staged filter", () => {
   });
 
   it("returns empty when nothing relevant is staged", () => {
-    expect(pickRelevantStaged(["src/App.tsx", "README.md"])).toEqual([]);
+    expect(pickRelevantStaged(["src/routes/__root.tsx", "README.md"])).toEqual([]);
   });
 });

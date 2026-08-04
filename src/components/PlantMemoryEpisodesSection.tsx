@@ -17,10 +17,7 @@ export interface PlantMemoryEpisodesSectionProps {
   readonly plantId: string;
 }
 
-export function PlantMemoryEpisodesSection({
-  growId,
-  plantId,
-}: PlantMemoryEpisodesSectionProps) {
+export function PlantMemoryEpisodesSection({ growId, plantId }: PlantMemoryEpisodesSectionProps) {
   const { state, reload } = usePlantMemoryEpisodes({
     growId,
     plantId,

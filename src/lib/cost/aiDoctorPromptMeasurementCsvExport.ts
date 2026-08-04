@@ -11,10 +11,7 @@
  */
 
 import type { CapturedAiDoctorPromptMeasurement } from "./aiDoctorPromptMeasurementCaptureStore";
-import {
-  assertExportHeadersSafe,
-  assertExportSafe,
-} from "../exportRedactionRules";
+import { assertExportHeadersSafe, assertExportSafe } from "../exportRedactionRules";
 
 export const AI_DOCTOR_PROMPT_MEASUREMENT_CSV_COLUMNS = [
   "recordedAt",

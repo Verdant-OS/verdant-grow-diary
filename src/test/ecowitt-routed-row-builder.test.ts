@@ -20,11 +20,7 @@ const tentSoil: EcoWittRouterEligibleTent = {
   soil_channels: [3, 4],
 };
 
-const FORBIDDEN_RAW_VALUES = [
-  "AAAA-SECRET",
-  "AA:BB:CC:DD:EE:FF",
-  "client-supplied-uid",
-];
+const FORBIDDEN_RAW_VALUES = ["AAAA-SECRET", "AA:BB:CC:DD:EE:FF", "client-supplied-uid"];
 
 function assertRowSafety(rows: ReturnType<typeof buildEcoWittRoutedRows>["rows"]) {
   for (const r of rows) {
@@ -43,7 +39,14 @@ function assertRowSafety(rows: ReturnType<typeof buildEcoWittRoutedRows>["rows"]
       passkey_fingerprint: expect.stringMatching(/^ewfp_[0-9a-f]{24}$/),
     });
     expect(rpKeys.sort()).toEqual(
-      expect.arrayContaining(["channel", "mapping_type", "passkey_fingerprint", "provider", "raw_key", "raw_value"]),
+      expect.arrayContaining([
+        "channel",
+        "mapping_type",
+        "passkey_fingerprint",
+        "provider",
+        "raw_key",
+        "raw_value",
+      ]),
     );
   }
 }

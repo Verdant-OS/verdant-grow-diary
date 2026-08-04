@@ -29,15 +29,8 @@ export default function PhenoComparisonReadyChecklist({
 }: PhenoComparisonReadyChecklistProps) {
   const testId = rest["data-testid"] ?? "pheno-comparison-ready-checklist";
   return (
-    <section
-      data-testid={testId}
-      data-readiness={vm.readiness}
-      className="space-y-3"
-    >
-      <div
-        className="flex items-center gap-2 text-sm"
-        data-testid={`${testId}-readiness`}
-      >
+    <section data-testid={testId} data-readiness={vm.readiness} className="space-y-3">
+      <div className="flex items-center gap-2 text-sm" data-testid={`${testId}-readiness`}>
         <span className="font-medium">Readiness:</span>
         <span>{vm.readinessLabel}</span>
       </div>

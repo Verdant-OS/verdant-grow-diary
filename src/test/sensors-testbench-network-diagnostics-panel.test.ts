@@ -264,8 +264,7 @@ describe("Network diagnostics — evidence contract", () => {
 // -------------------------------------------------------------------------
 describe("Network diagnostics — negative control (no secret leakage)", () => {
   it("redacts a bridge token embedded in the ingest URL across all output surfaces", () => {
-    const tokenized =
-      `${SUPABASE_URL}/functions/v1/sensor-ingest-webhook?apikey=vbt_supersecrettoken123ABCxyz`;
+    const tokenized = `${SUPABASE_URL}/functions/v1/sensor-ingest-webhook?apikey=vbt_supersecrettoken123ABCxyz`;
     const d = buildSensorIngestNetworkDiagnostics({
       ingestUrl: tokenized,
       appOrigin: "https://app.verdant.example",
@@ -326,9 +325,7 @@ describe("Network diagnostics — negative control (no secret leakage)", () => {
       "supabaseUrl",
     ];
     for (const k of inputKeys) {
-      expect(/token|secret|bearer|service[_-]?role/i.test(k)).toBe(
-        k === "hasActiveToken",
-      );
+      expect(/token|secret|bearer|service[_-]?role/i.test(k)).toBe(k === "hasActiveToken");
     }
   });
 });

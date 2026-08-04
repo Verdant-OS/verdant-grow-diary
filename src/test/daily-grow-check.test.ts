@@ -32,7 +32,7 @@ const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 
 const PAGE = read("src/pages/DailyCheck.tsx");
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 const DASHBOARD = read("src/pages/Dashboard.tsx");
 const PLANT_DETAIL = read("src/pages/PlantDetail.tsx");
 const RULES = read("src/lib/dailyGrowCheckRules.ts");
@@ -169,7 +169,7 @@ describe("DailyCheck page — entry points and structure", () => {
     expect(PAGE).toMatch(/PlantAssignedTentActionsPanel/);
   });
   it("registers the /daily-check route", () => {
-    expect(APP).toMatch(/path="\/daily-check"/);
+    expect(extractMountedAppRoutePaths()).toContain("/daily-check");
     expect(APP).toMatch(/DailyCheck/);
   });
   it("Dashboard exposes a Daily Grow Check entry button", () => {
@@ -222,6 +222,10 @@ describe("DailyCheck — static safety audit", () => {
 });
 
 import { buildDailyGrowCheckReviewLinks, formatOutcomeLabel } from "@/lib/dailyGrowCheckRules";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 describe("buildDailyGrowCheckReviewLinks", () => {
   it("includes plant + tent + timeline when both are present", () => {

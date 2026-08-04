@@ -7,7 +7,9 @@ function readProjectFile(rel: string): string {
 }
 
 const HARNESS = readProjectFile("supabase/tests/paddle_subscription_update_rpc_harness.sql");
-const MIGRATION = readProjectFile("supabase/migrations/20260621015000_apply_paddle_subscription_update_rpc.sql");
+const MIGRATION = readProjectFile(
+  "supabase/migrations/20260621015000_apply_paddle_subscription_update_rpc.sql",
+);
 const WEBHOOK = readProjectFile("supabase/functions/paddle-webhook/index.ts");
 
 describe("Paddle subscription update runtime harness", () => {
@@ -37,10 +39,18 @@ describe("Paddle subscription update runtime harness", () => {
   });
 
   it("keeps the RPC service-role-only by migration grant posture", () => {
-    expect(MIGRATION).toContain("GRANT EXECUTE ON FUNCTION public.apply_paddle_subscription_update(uuid) TO service_role");
-    expect(MIGRATION).toContain("REVOKE ALL ON FUNCTION public.apply_paddle_subscription_update(uuid) FROM anon");
-    expect(MIGRATION).toContain("REVOKE ALL ON FUNCTION public.apply_paddle_subscription_update(uuid) FROM authenticated");
-    expect(MIGRATION).not.toMatch(/GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.apply_paddle_subscription_update\(uuid\)\s+TO\s+(anon|authenticated)/i);
+    expect(MIGRATION).toContain(
+      "GRANT EXECUTE ON FUNCTION public.apply_paddle_subscription_update(uuid) TO service_role",
+    );
+    expect(MIGRATION).toContain(
+      "REVOKE ALL ON FUNCTION public.apply_paddle_subscription_update(uuid) FROM anon",
+    );
+    expect(MIGRATION).toContain(
+      "REVOKE ALL ON FUNCTION public.apply_paddle_subscription_update(uuid) FROM authenticated",
+    );
+    expect(MIGRATION).not.toMatch(
+      /GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.apply_paddle_subscription_update\(uuid\)\s+TO\s+(anon|authenticated)/i,
+    );
   });
 
   it("does not touch grow-room operating-loop or device-control tables", () => {

@@ -10,10 +10,7 @@
  *  - Does not write to plants, diary_entries, sensor_readings,
  *    Action Queue, alerts, or any device control surface.
  */
-import {
-  normalizeDiaryEntries,
-  type NormalizedDiaryEntry,
-} from "@/lib/diaryEntryRules";
+import { normalizeDiaryEntries, type NormalizedDiaryEntry } from "@/lib/diaryEntryRules";
 import {
   calculatePlantRelativeDay,
   calculateStageRelativeDay,
@@ -161,12 +158,9 @@ export function buildRelativeTimelineProjection(
         : null;
     // Prefer the per-entry stage when available; fall back to the plant's
     // current stage. Never invent a stage if neither resolves.
-    const itemPreset =
-      resolveStagePreset(entry.stage) ?? stagePreset;
+    const itemPreset = resolveStagePreset(entry.stage) ?? stagePreset;
     const trimmedNote =
-      typeof entry.note === "string" && entry.note.trim().length > 0
-        ? entry.note.trim()
-        : null;
+      typeof entry.note === "string" && entry.note.trim().length > 0 ? entry.note.trim() : null;
     const harvest =
       entry.eventType === "harvest"
         ? readPersistedHarvestDetails(
@@ -274,8 +268,7 @@ export const RELATIVE_TIMELINE_FILTERS: readonly RelativeTimelineFilterDef[] = [
   {
     key: "all",
     label: "All",
-    emptyCopy:
-      "Your plant timeline starts with the first quick log, photo, or sensor snapshot.",
+    emptyCopy: "Your plant timeline starts with the first quick log, photo, or sensor snapshot.",
   },
   {
     key: "photos",
@@ -360,12 +353,9 @@ export function filterRelativeTimelineItems(
  * Empty-state copy for a given filter. Falls back to the "all" copy when
  * the key is unknown so the UI always renders safe wording.
  */
-export function getRelativeTimelineFilterEmptyState(
-  filterKey: RelativeTimelineFilterKey,
-): string {
+export function getRelativeTimelineFilterEmptyState(filterKey: RelativeTimelineFilterKey): string {
   const def =
-    RELATIVE_TIMELINE_FILTERS.find((f) => f.key === filterKey) ??
-    RELATIVE_TIMELINE_FILTERS[0];
+    RELATIVE_TIMELINE_FILTERS.find((f) => f.key === filterKey) ?? RELATIVE_TIMELINE_FILTERS[0];
   return def.emptyCopy;
 }
 
@@ -404,7 +394,6 @@ export function buildRelativeTimelineFilterChips(
     };
   });
 }
-
 
 // ---------------------------------------------------------------------------
 // Summary strip (read-only, derived from the FULL projected timeline)
@@ -478,7 +467,6 @@ function emptyCounts(): Record<RelativeTimelineCategoryKey, number> {
     notes: 0,
   };
 }
-
 
 function relativeDaysCopy(eventMs: number, nowMs: number): string {
   const MS_PER_DAY = 86_400_000;
@@ -579,9 +567,6 @@ export function formatRelativeTimelineSummary(
   return { chips, lastActivity };
 }
 
-
-
-
 // ---------------------------------------------------------------------------
 // Per-stage-group compact summary (read-only, filter-aware)
 // ---------------------------------------------------------------------------
@@ -608,15 +593,12 @@ export interface FormattedRelativeTimelineGroupSummary {
 export function formatRelativeTimelineGroupSummary(
   summary: RelativeTimelineSummary,
 ): FormattedRelativeTimelineGroupSummary {
-  const totalLabel =
-    summary.total > 0 ? pluralize(summary.total, "item", "items") : null;
+  const totalLabel = summary.total > 0 ? pluralize(summary.total, "item", "items") : null;
   const categoryLabels: string[] = [];
   for (const key of CATEGORY_KEYS) {
     const count = summary.counts[key];
     if (count === 0) continue;
-    categoryLabels.push(
-      pluralize(count, CATEGORY_SINGULAR[key], CATEGORY_PLURAL[key]),
-    );
+    categoryLabels.push(pluralize(count, CATEGORY_SINGULAR[key], CATEGORY_PLURAL[key]));
   }
   const lastActivityLabel = summary.lastActivityRelative
     ? `Last: ${summary.lastActivityRelative}`
@@ -705,12 +687,8 @@ export function formatRelativeTimelineEntryDetail(
   // that case as "no note" so the card shows muted fallback copy instead
   // of repeating the raw event type as a sentence.
   const looksLikeEventTypeFallback =
-    !rawTitle ||
-    (rawEventType !== null &&
-      rawTitle.toLowerCase() === rawEventType.toLowerCase());
-  const summary = looksLikeEventTypeFallback
-    ? SUMMARY_FALLBACK_COPY
-    : (rawTitle as string);
+    !rawTitle || (rawEventType !== null && rawTitle.toLowerCase() === rawEventType.toLowerCase());
+  const summary = looksLikeEventTypeFallback ? SUMMARY_FALLBACK_COPY : (rawTitle as string);
   const summaryIsFallback = looksLikeEventTypeFallback;
 
   const rawTs = nonBlankTrimmed(item.occurredAtLabel);
@@ -793,8 +771,8 @@ export function formatRelativeTimelineHeader(
     total === 0
       ? "0 timeline entries"
       : total === 1
-      ? "1 timeline entry"
-      : `${total} timeline entries`;
+        ? "1 timeline entry"
+        : `${total} timeline entries`;
 
   let lastUpdatedLabel: string;
   let lastUpdatedIsFallback = false;
@@ -819,4 +797,3 @@ export function formatRelativeTimelineHeader(
     compact: `${countLabel} · ${lastUpdatedLabel}`,
   };
 }
-

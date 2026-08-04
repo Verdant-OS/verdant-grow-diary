@@ -42,10 +42,7 @@ describe("realtime connection wording guardrail", () => {
     it(`${rel} contains no fake-live / heartbeat wording`, () => {
       const src = readFileSync(path.join(ROOT, rel), "utf-8");
       for (const re of FORBIDDEN) {
-        expect(
-          re.test(src),
-          `${rel} contains forbidden pattern ${re}`,
-        ).toBe(false);
+        expect(re.test(src), `${rel} contains forbidden pattern ${re}`).toBe(false);
       }
     });
   }
@@ -60,10 +57,7 @@ describe("realtime connection wording guardrail", () => {
   });
 
   it("SensorSnapshotPreview separates Last updated from captured_at meta", () => {
-    const src = readFileSync(
-      path.join(ROOT, "components/SensorSnapshotPreview.tsx"),
-      "utf-8",
-    );
+    const src = readFileSync(path.join(ROOT, "components/SensorSnapshotPreview.tsx"), "utf-8");
     expect(src).toMatch(/sensor-snapshot-preview-last-updated/);
     expect(src).toMatch(/sensor-snapshot-preview-meta/);
     // Live label must only come from snapshot.badge_label (resolver), not
@@ -75,17 +69,12 @@ describe("realtime connection wording guardrail", () => {
   it("scans all sensor-adjacent components for forbidden phrases", () => {
     const dir = path.join(ROOT, "components");
     const entries = readdirSync(dir).filter(
-      (f) =>
-        /sensor|quicklog/i.test(f) &&
-        (f.endsWith(".tsx") || f.endsWith(".ts")),
+      (f) => /sensor|quicklog/i.test(f) && (f.endsWith(".tsx") || f.endsWith(".ts")),
     );
     for (const f of entries) {
       const src = readFileSync(path.join(dir, f), "utf-8");
       for (const re of FORBIDDEN) {
-        expect(
-          re.test(src),
-          `components/${f} contains forbidden pattern ${re}`,
-        ).toBe(false);
+        expect(re.test(src), `components/${f} contains forbidden pattern ${re}`).toBe(false);
       }
     }
   });

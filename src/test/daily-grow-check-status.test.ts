@@ -5,10 +5,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  deriveDailyGrowCheckStatus,
-  DAILY_CHECK_LABELS,
-} from "@/lib/dailyGrowCheckStatusRules";
+import { deriveDailyGrowCheckStatus, DAILY_CHECK_LABELS } from "@/lib/dailyGrowCheckStatusRules";
 
 const NOW = new Date("2026-05-24T15:00:00Z");
 const TODAY_EARLIER = "2026-05-24T08:00:00Z";
@@ -32,9 +29,7 @@ describe("deriveDailyGrowCheckStatus · pure rules", () => {
   it("returns 'Manual snapshot added' when only manual reading today", () => {
     const s = deriveDailyGrowCheckStatus({
       now: NOW,
-      manualReadings: [
-        { ts: TODAY_EARLIER, id: "m1", tent_id: "tent-1" },
-      ],
+      manualReadings: [{ ts: TODAY_EARLIER, id: "m1", tent_id: "tent-1" }],
       diaryEntries: [],
     });
     expect(s.kind).toBe("manual-only");
@@ -46,9 +41,7 @@ describe("deriveDailyGrowCheckStatus · pure rules", () => {
     const s = deriveDailyGrowCheckStatus({
       now: NOW,
       manualReadings: [],
-      diaryEntries: [
-        { entry_at: TODAY_EARLIER, id: "d1", tent_id: "tent-2", plant_id: "p-1" },
-      ],
+      diaryEntries: [{ entry_at: TODAY_EARLIER, id: "d1", tent_id: "tent-2", plant_id: "p-1" }],
     });
     expect(s.kind).toBe("quicklog-only");
     expect(s.label).toBe(DAILY_CHECK_LABELS.quickLogOnly);
@@ -102,16 +95,10 @@ describe("deriveDailyGrowCheckStatus · pure rules", () => {
 
 describe("Daily Grow Check status · wiring", () => {
   const root = resolve(__dirname, "../..");
-  const card = readFileSync(
-    resolve(root, "src/components/DailyGrowCheckStatusCard.tsx"),
-    "utf8",
-  );
+  const card = readFileSync(resolve(root, "src/components/DailyGrowCheckStatusCard.tsx"), "utf8");
   const dash = readFileSync(resolve(root, "src/pages/Dashboard.tsx"), "utf8");
   const grow = readFileSync(resolve(root, "src/pages/GrowRoomMode.tsx"), "utf8");
-  const rules = readFileSync(
-    resolve(root, "src/lib/dailyGrowCheckStatusRules.ts"),
-    "utf8",
-  );
+  const rules = readFileSync(resolve(root, "src/lib/dailyGrowCheckStatusRules.ts"), "utf8");
 
   it("card file exists and exports default", () => {
     expect(existsSync(resolve(root, "src/components/DailyGrowCheckStatusCard.tsx"))).toBe(true);

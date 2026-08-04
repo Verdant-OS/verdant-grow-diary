@@ -61,19 +61,17 @@ function ctx(
 ) {
   return compileAiDoctorContextFromRows({
     plant: overrides.plantOverride ?? plant,
-    growEvents:
-      overrides.events ??
-      [{ occurred_at: ago(HOUR), event_type: "watering", source: "manual" }],
-    sensorReadings:
-      overrides.sensors ??
-      [
-        {
-          metric: "temperature_c",
-          value: 24,
-          captured_at: ago(HOUR),
-          source: "live",
-        },
-      ],
+    growEvents: overrides.events ?? [
+      { occurred_at: ago(HOUR), event_type: "watering", source: "manual" },
+    ],
+    sensorReadings: overrides.sensors ?? [
+      {
+        metric: "temperature_c",
+        value: 24,
+        captured_at: ago(HOUR),
+        source: "live",
+      },
+    ],
     now: NOW,
   });
 }
@@ -119,9 +117,9 @@ describe("AiDoctorCheckInPreviewPanel — confirmed manual save", () => {
     render(<AiDoctorCheckInPreviewPanel context={ctx()} />);
     openSaveAndConfirm();
     await waitFor(() =>
-      expect(
-        screen.getByTestId("ai-doctor-manual-save-success").textContent,
-      ).toMatch(/Saved to diary\./),
+      expect(screen.getByTestId("ai-doctor-manual-save-success").textContent).toMatch(
+        /Saved to diary\./,
+      ),
     );
   });
 
@@ -130,9 +128,9 @@ describe("AiDoctorCheckInPreviewPanel — confirmed manual save", () => {
     render(<AiDoctorCheckInPreviewPanel context={ctx()} />);
     openSaveAndConfirm();
     await waitFor(() =>
-      expect(
-        screen.getByTestId("ai-doctor-manual-save-duplicate").textContent,
-      ).toMatch(/Already saved to diary\./),
+      expect(screen.getByTestId("ai-doctor-manual-save-duplicate").textContent).toMatch(
+        /Already saved to diary\./,
+      ),
     );
   });
 
@@ -141,9 +139,9 @@ describe("AiDoctorCheckInPreviewPanel — confirmed manual save", () => {
     render(<AiDoctorCheckInPreviewPanel context={ctx()} />);
     openSaveAndConfirm();
     await waitFor(() =>
-      expect(
-        screen.getByTestId("ai-doctor-manual-save-error").textContent,
-      ).toMatch(/Could not save AI Doctor check-in\. Nothing else was changed\./),
+      expect(screen.getByTestId("ai-doctor-manual-save-error").textContent).toMatch(
+        /Could not save AI Doctor check-in\. Nothing else was changed\./,
+      ),
     );
     expect(saveMock).toHaveBeenCalledTimes(1);
   });
@@ -155,15 +153,11 @@ describe("AiDoctorCheckInPreviewPanel — confirmed manual save", () => {
       grow_id: null as unknown as string,
       tent_id: null as unknown as string,
     };
-    render(
-      <AiDoctorCheckInPreviewPanel context={ctx({ plantOverride: blockedPlant })} />,
-    );
+    render(<AiDoctorCheckInPreviewPanel context={ctx({ plantOverride: blockedPlant })} />);
     fireEvent.click(screen.getByTestId("ai-doctor-check-in-preview-button"));
     fireEvent.click(screen.getByTestId("ai-doctor-manual-save-open-button"));
     expect(screen.getByTestId("ai-doctor-manual-save-blocked")).toBeTruthy();
-    expect(
-      screen.queryByTestId("ai-doctor-manual-save-confirm-button"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-manual-save-confirm-button")).toBeNull();
     expect(saveMock).not.toHaveBeenCalled();
   });
 

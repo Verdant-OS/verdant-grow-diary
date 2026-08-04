@@ -18,12 +18,7 @@
 // ---------------------------------------------------------------------------
 
 /** pheno_score_rounds.round CHECK domain. */
-export type PhenoRound =
-  | "veg"
-  | "early_flower"
-  | "mid_flower"
-  | "late_flower"
-  | "post_cure";
+export type PhenoRound = "veg" | "early_flower" | "mid_flower" | "late_flower" | "post_cure";
 
 /** pheno_keeper_decisions.decision CHECK domain. */
 export type KeeperDecision = "keep" | "cull" | "hold" | "undecided";
@@ -202,7 +197,13 @@ export interface PhenoIdCandidateInput {
   mother_candidate?: boolean | null;
   cut_status?: string | null;
   pack?: { label?: string; index?: number; size?: number } | null;
-  capture?: { mode?: string; stack_id?: string; frame_index?: number; model_id?: string; model_version?: string } | null;
+  capture?: {
+    mode?: string;
+    stack_id?: string;
+    frame_index?: number;
+    model_id?: string;
+    model_version?: string;
+  } | null;
   scored_by?: string | null;
   loud_shortlist?: boolean | null;
   notes?: string | null;
@@ -262,7 +263,9 @@ export function buildPhenoidExtras(c: PhenoIdCandidateInput): PhenoidExtrasRow {
 }
 
 /** The core loud_traits object (nose direct 0–10; other axes rescaled 1–5). */
-export function buildCoreLoudTraits(loud: Partial<LoudAxes> | null | undefined): Record<string, number> {
+export function buildCoreLoudTraits(
+  loud: Partial<LoudAxes> | null | undefined,
+): Record<string, number> {
   const out: Record<string, number> = {};
   if (loud?.nose != null) out.nose_loudness = Math.min(10, Math.max(0, loud.nose));
   if (loud?.resin != null) out.resin = rescale0to10to1to5(loud.resin);

@@ -801,7 +801,11 @@ describe("remote applied-schema runner safety", () => {
         status,
         report: readFileSync(reportPath, "utf8"),
         audit: readFileSync(auditPath, "utf8"),
-        observable: [...lines, readFileSync(reportPath, "utf8"), readFileSync(auditPath, "utf8")].join("\n"),
+        observable: [
+          ...lines,
+          readFileSync(reportPath, "utf8"),
+          readFileSync(auditPath, "utf8"),
+        ].join("\n"),
         sentinel,
         url,
       };

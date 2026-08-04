@@ -7,7 +7,9 @@ export const Route = createFileRoute("/_app/diary/strains/$slug")({
 });
 
 function RouteComponent() {
-  return <PhenoTrackerUpgradeGate>
-                          <CultivarDiaryProfile />
-                        </PhenoTrackerUpgradeGate>;
+  return (
+    <PhenoTrackerUpgradeGate>
+      <CultivarDiaryProfile />
+    </PhenoTrackerUpgradeGate>
+  );
 }

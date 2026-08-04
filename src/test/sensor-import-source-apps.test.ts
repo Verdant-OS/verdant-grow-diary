@@ -21,8 +21,7 @@ import {
 import { parseCsv } from "@/lib/csvSensorImportRules";
 
 const ROOT = resolve(__dirname, "../..");
-const read = (rel: string) =>
-  readFileSync(resolve(ROOT, "fixtures/sensor-csv", rel), "utf8");
+const read = (rel: string) => readFileSync(resolve(ROOT, "fixtures/sensor-csv", rel), "utf8");
 
 const SPIDER_FULL = read("spider_farmer_primary_full_20260612214443.csv");
 const SPIDER_SPARSE = read("spider_farmer_primary_sparse_20260612214427.csv");
@@ -45,8 +44,10 @@ describe("BOM + header hygiene", () => {
     const d = detectSourceApp(parseCsv(SPIDER_FULL).headers);
     expect(d.id).toBe("spider_farmer");
     expect(stripBomAndTrim("\uFEFFTimestamp")).toBe("Timestamp");
-    expect(cleanHeaders(["\uFEFFdeviceSerialnum", " humidity "]))
-      .toEqual(["deviceSerialnum", "humidity"]);
+    expect(cleanHeaders(["\uFEFFdeviceSerialnum", " humidity "])).toEqual([
+      "deviceSerialnum",
+      "humidity",
+    ]);
   });
 });
 
@@ -211,8 +212,9 @@ describe("validation flags", () => {
   it("flags humidity stuck at 100", () => {
     const csv = [
       "Timestamp,Temperature (°F),Humidity (%)",
-      ...Array.from({ length: 10 }, (_, i) =>
-        `2026-05-26 14:${String(i).padStart(2, "0")}:00,77,100`,
+      ...Array.from(
+        { length: 10 },
+        (_, i) => `2026-05-26 14:${String(i).padStart(2, "0")}:00,77,100`,
       ),
     ].join("\n");
     const p = summarizeImportPreview(csv);
@@ -221,8 +223,9 @@ describe("validation flags", () => {
   it("flags humidity stuck at 0", () => {
     const csv = [
       "Timestamp,Temperature (°F),Humidity (%)",
-      ...Array.from({ length: 10 }, (_, i) =>
-        `2026-05-26 14:${String(i).padStart(2, "0")}:00,77,0`,
+      ...Array.from(
+        { length: 10 },
+        (_, i) => `2026-05-26 14:${String(i).padStart(2, "0")}:00,77,0`,
       ),
     ].join("\n");
     const p = summarizeImportPreview(csv);
@@ -231,8 +234,9 @@ describe("validation flags", () => {
   it("flags Celsius shown as Fahrenheit when °F column values look like °C", () => {
     const csv = [
       "Timestamp,Temperature (°F),Humidity (%)",
-      ...Array.from({ length: 10 }, (_, i) =>
-        `2026-05-26 14:${String(i).padStart(2, "0")}:00,24,50`,
+      ...Array.from(
+        { length: 10 },
+        (_, i) => `2026-05-26 14:${String(i).padStart(2, "0")}:00,24,50`,
       ),
     ].join("\n");
     const p = summarizeImportPreview(csv);
@@ -250,19 +254,13 @@ describe("validation flags", () => {
   it("flags soil moisture stuck at 100", () => {
     const csv = [
       "Timestamp,Soil Moisture (%)",
-      ...Array.from({ length: 10 }, (_, i) =>
-        `2026-05-26 14:${String(i).padStart(2, "0")}:00,100`,
-      ),
+      ...Array.from({ length: 10 }, (_, i) => `2026-05-26 14:${String(i).padStart(2, "0")}:00,100`),
     ].join("\n");
     const p = summarizeImportPreview(csv);
     expect(p.warnings.map((w) => w.code)).toContain("soil_moisture_stuck");
   });
   it("flags pH outside realistic 4.5–8.5", () => {
-    const csv = [
-      "Timestamp,pH",
-      "2026-05-26 14:00:00,2.1",
-      "2026-05-26 14:01:00,2.2",
-    ].join("\n");
+    const csv = ["Timestamp,pH", "2026-05-26 14:00:00,2.1", "2026-05-26 14:01:00,2.2"].join("\n");
     const p = summarizeImportPreview(csv);
     expect(p.warnings.map((w) => w.code)).toContain("ph_out_of_range");
   });
@@ -308,15 +306,14 @@ describe("mapColumnsForApp dispatcher", () => {
 });
 
 // ---------- Static safety contract for the new module ----------
-const MODULE_RAW = readFileSync(
-  resolve(ROOT, "src/lib/sensorImportSourceApps.ts"),
-  "utf8",
-);
+const MODULE_RAW = readFileSync(resolve(ROOT, "src/lib/sensorImportSourceApps.ts"), "utf8");
 
 describe("source-app registry safety contract", () => {
   it("no live API calls / device-control / alerts / Action Queue writes", () => {
     expect(MODULE_RAW).not.toMatch(/fetch\(\s*["']https?:/i);
-    expect(MODULE_RAW).not.toMatch(/\.from\(["'](alerts|alert_events|action_queue|action_queue_events|plants|tents)["']\)/);
+    expect(MODULE_RAW).not.toMatch(
+      /\.from\(["'](alerts|alert_events|action_queue|action_queue_events|plants|tents)["']\)/,
+    );
     expect(MODULE_RAW).not.toMatch(/openai|anthropic|ai[-_]?doctor/i);
     expect(MODULE_RAW).not.toMatch(/\bmqtt\b|home[\s_-]?assistant|webhook/i);
     expect(MODULE_RAW).not.toMatch(/\brelay\b|\bactuator\b|autopilot/i);

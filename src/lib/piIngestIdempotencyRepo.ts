@@ -33,8 +33,14 @@ export interface ListExistingPiIngestIdempotencyKeysInput {
 export interface PiIngestIdempotencySupabaseLike {
   from(table: "pi_ingest_idempotency_keys"): {
     select(columns: "idempotency_key"): {
-      eq(col: "user_id", value: string): {
-        in(col: "idempotency_key", values: readonly string[]): Promise<{
+      eq(
+        col: "user_id",
+        value: string,
+      ): {
+        in(
+          col: "idempotency_key",
+          values: readonly string[],
+        ): Promise<{
           data: Array<Pick<PiIngestIdempotencyRow, "idempotency_key">> | null;
           error: { message: string } | null;
         }>;
@@ -126,13 +132,9 @@ export async function insertPiIngestIdempotencyKeys(
 ): Promise<void> {
   if (!rows || rows.length === 0) return;
   for (const part of chunk(rows, INSERT_CHUNK_SIZE)) {
-    const { error } = await supabase
-      .from("pi_ingest_idempotency_keys")
-      .insert(part);
+    const { error } = await supabase.from("pi_ingest_idempotency_keys").insert(part);
     if (error) {
-      throw new Error(
-        `piIngestIdempotencyRepo.insertPiIngestIdempotencyKeys: ${error.message}`,
-      );
+      throw new Error(`piIngestIdempotencyRepo.insertPiIngestIdempotencyKeys: ${error.message}`);
     }
   }
 }

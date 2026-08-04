@@ -21,9 +21,7 @@ import { buildQuickLogTargetPanel } from "@/lib/quickLogTargetPanelViewModel";
 import { scrubExecutableSource } from "./utils/scrubExecutableSource";
 
 const FIXTURE = {
-  plants: [
-    { id: "p1", name: "Auto #1", strain: "Bruce Banner", tent_id: "t1", grow_id: "g1" },
-  ],
+  plants: [{ id: "p1", name: "Auto #1", strain: "Bruce Banner", tent_id: "t1", grow_id: "g1" }],
   tents: [{ id: "t1", name: "Tent A", grow_id: "g1" }],
   grows: [{ id: "g1", name: "Summer Run 2026" }],
 };
@@ -63,14 +61,8 @@ describe("QuickLog target panel — flattened-label regression", () => {
     }
   });
 
-  const PRESENTER_PATH = path.resolve(
-    __dirname,
-    "../components/QuickLogTargetPanel.tsx",
-  );
-  const VIEW_MODEL_PATH = path.resolve(
-    __dirname,
-    "../lib/quickLogTargetPanelViewModel.ts",
-  );
+  const PRESENTER_PATH = path.resolve(__dirname, "../components/QuickLogTargetPanel.tsx");
+  const VIEW_MODEL_PATH = path.resolve(__dirname, "../lib/quickLogTargetPanelViewModel.ts");
 
   it("presenter and view-model source do not build a combined '· ' target label", () => {
     for (const file of [PRESENTER_PATH, VIEW_MODEL_PATH]) {
@@ -104,11 +96,6 @@ describe("QuickLog target panel — flattened-label regression", () => {
     expect(dts.length).toBe(4);
     const dds = container.querySelectorAll("dd");
     expect(dds.length).toBe(4);
-    expect(Array.from(dts).map((n) => n.textContent)).toEqual([
-      "Grow",
-      "Tent",
-      "Plant",
-      "Strain",
-    ]);
+    expect(Array.from(dts).map((n) => n.textContent)).toEqual(["Grow", "Tent", "Plant", "Strain"]);
   });
 });

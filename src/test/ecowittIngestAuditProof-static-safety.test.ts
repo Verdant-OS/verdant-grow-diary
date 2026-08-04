@@ -33,14 +33,7 @@ describe("EcoWitt ingest audit proof — static safety", () => {
       .map((c) => c.trim())
       .filter(Boolean);
     expect(cols.sort()).toEqual(
-      [
-        "captured_at",
-        "created_at",
-        "rows_inserted",
-        "rows_received",
-        "source",
-        "tent_id",
-      ].sort(),
+      ["captured_at", "created_at", "rows_inserted", "rows_received", "source", "tent_id"].sort(),
     );
   });
 

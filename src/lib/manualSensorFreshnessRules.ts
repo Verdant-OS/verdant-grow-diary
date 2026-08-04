@@ -85,8 +85,7 @@ export function buildFreshnessSnapshot(
   }
   const nowMs = toMillis(now);
   const loggedMs = toMillis(reading.loggedAt);
-  const ageHours =
-    nowMs !== null && loggedMs !== null ? (nowMs - loggedMs) / 3_600_000 : null;
+  const ageHours = nowMs !== null && loggedMs !== null ? (nowMs - loggedMs) / 3_600_000 : null;
   return {
     metric,
     state,
@@ -104,9 +103,7 @@ export function buildFreshnessSnapshots(
   latest: Partial<Record<ManualSensorMetric, LatestManualReading | null>>,
   now: string | Date,
 ): FreshnessSnapshot[] {
-  return MANUAL_SENSOR_METRICS.map((m) =>
-    buildFreshnessSnapshot(m, latest[m] ?? null, now),
-  );
+  return MANUAL_SENSOR_METRICS.map((m) => buildFreshnessSnapshot(m, latest[m] ?? null, now));
 }
 
 /**
@@ -120,9 +117,7 @@ export function buildFreshnessSnapshots(
  */
 export type FreshnessCta = "add_first" | "update" | "none";
 
-export function computeFreshnessCta(
-  snapshots: ReadonlyArray<FreshnessSnapshot>,
-): FreshnessCta {
+export function computeFreshnessCta(snapshots: ReadonlyArray<FreshnessSnapshot>): FreshnessCta {
   if (snapshots.length === 0) return "none";
   if (snapshots.every((s) => s.state === "missing")) return "add_first";
   if (snapshots.some((s) => s.state === "aging" || s.state === "stale")) {

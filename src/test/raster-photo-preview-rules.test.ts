@@ -77,9 +77,12 @@ describe("calculateRasterPhotoCoverCrop", () => {
     [Number.NaN, 100, undefined, undefined],
     [100, Number.POSITIVE_INFINITY, undefined, undefined],
     [100, 100, -1, 720],
-  ] as Array<[number, number, number | undefined, number | undefined]>)("fails closed for invalid dimensions", (width, height, targetWidth, targetHeight) => {
-    expect(calculateRasterPhotoCoverCrop(width, height, targetWidth, targetHeight)).toBeNull();
-  });
+  ] as Array<[number, number, number | undefined, number | undefined]>)(
+    "fails closed for invalid dimensions",
+    (width, height, targetWidth, targetHeight) => {
+      expect(calculateRasterPhotoCoverCrop(width, height, targetWidth, targetHeight)).toBeNull();
+    },
+  );
 
   it("is deterministic for identical dimensions", () => {
     const first = calculateRasterPhotoCoverCrop(3024, 4032);

@@ -16,10 +16,7 @@
 import type { NormalizedDiaryEntry } from "@/lib/diaryEntryRules";
 
 export type GuidedActionItemKind =
-  | "sensor_context"
-  | "cadence"
-  | "alert_followup"
-  | "stage_transition";
+  "sensor_context" | "cadence" | "alert_followup" | "stage_transition";
 
 export interface GuidedActionItem {
   /** Stable, deterministic id — safe to use as a local-dismiss key. */
@@ -72,9 +69,7 @@ export interface BuildGuidedActionChecklistInput {
   /** Diary entries already scoped to the active grow. */
   diaryEntries: readonly NormalizedDiaryEntry[];
   /** Latest sensor reading per tent id. Missing key = no reading. */
-  latestReadingByTent: Readonly<
-    Record<string, GuidedChecklistSensorReading | null | undefined>
-  >;
+  latestReadingByTent: Readonly<Record<string, GuidedChecklistSensorReading | null | undefined>>;
   openAlerts: readonly GuidedChecklistAlert[];
   /** Locally-dismissed item ids that should be filtered out. */
   dismissedIds: readonly string[];
@@ -137,11 +132,7 @@ function isPhotoEntry(e: NormalizedDiaryEntry): boolean {
 function isTrichomeOrBudCheck(e: NormalizedDiaryEntry): boolean {
   const note = (e.note ?? "").toLowerCase();
   if (!note) return false;
-  return (
-    note.includes("trichome") ||
-    note.includes("pistil") ||
-    note.includes("bud")
-  );
+  return note.includes("trichome") || note.includes("pistil") || note.includes("bud");
 }
 
 function isFlowerStage(stage: string | null): boolean {
@@ -261,8 +252,7 @@ export function buildGuidedActionChecklist(
 
     const lastWatering = latestEntryTimestamp(plantEntries, isWateringEntry);
     if (lastWatering == null || now - lastWatering >= WATERING_CADENCE_MS) {
-      const age =
-        lastWatering == null ? "no log yet" : formatAge(now - lastWatering);
+      const age = lastWatering == null ? "no log yet" : formatAge(now - lastWatering);
       items.push({
         id: `cadence:water:${plant.id}`,
         kind: "cadence",
@@ -287,10 +277,7 @@ export function buildGuidedActionChecklist(
         kind: "cadence",
         priority: 3,
         title: `Capture a fresh photo of ${plant.name}`,
-        reason:
-          lastPhoto == null
-            ? "No photo captured for this plant yet."
-            : `No photo in ${age}.`,
+        reason: lastPhoto == null ? "No photo captured for this plant yet." : `No photo in ${age}.`,
         ctaLabel: "Quick Log",
         ctaHref: "/quick-log",
         plantId: plant.id,
@@ -300,16 +287,9 @@ export function buildGuidedActionChecklist(
 
     // 4) Stage transition — flower-stage trichome/pistil check cadence.
     if (isFlowerStage(plant.stage)) {
-      const lastCheck = latestEntryTimestamp(
-        plantEntries,
-        isTrichomeOrBudCheck,
-      );
-      if (
-        lastCheck == null ||
-        now - lastCheck >= FLOWER_TRICHOME_CHECK_CADENCE_MS
-      ) {
-        const age =
-          lastCheck == null ? "never logged" : formatAge(now - lastCheck);
+      const lastCheck = latestEntryTimestamp(plantEntries, isTrichomeOrBudCheck);
+      if (lastCheck == null || now - lastCheck >= FLOWER_TRICHOME_CHECK_CADENCE_MS) {
+        const age = lastCheck == null ? "never logged" : formatAge(now - lastCheck);
         items.push({
           id: `stage:trichome:${plant.id}`,
           kind: "stage_transition",
@@ -328,9 +308,7 @@ export function buildGuidedActionChecklist(
     }
   }
 
-  const visible = items
-    .filter((item) => !dismissed.has(item.id))
-    .sort(compareItems);
+  const visible = items.filter((item) => !dismissed.has(item.id)).sort(compareItems);
 
   return visible.slice(0, Math.max(0, maxItems));
 }

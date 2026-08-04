@@ -49,22 +49,14 @@ export default function DerivedVpdStatus({
         ) : (
           <span data-testid={`${testId}-unavailable`}>VPD unavailable</span>
         )}
-        <span
-          title={vm.helpCopy}
-          role="img"
-          aria-label="Derived VPD help"
-          className="inline-flex"
-        >
+        <span title={vm.helpCopy} role="img" aria-label="Derived VPD help" className="inline-flex">
           <Info className="h-3 w-3 opacity-60" />
         </span>
       </div>
       <div className={`flex items-center gap-1.5 ${toneClasses[vm.statusTone]}`}>
         <span data-testid={`${testId}-status`}>{vm.statusLabel}</span>
         {vm.targetBandLabel && vm.classification !== "stage_unknown" && (
-          <span
-            className="text-muted-foreground"
-            data-testid={`${testId}-band`}
-          >
+          <span className="text-muted-foreground" data-testid={`${testId}-band`}>
             (target {vm.targetBandLabel})
           </span>
         )}

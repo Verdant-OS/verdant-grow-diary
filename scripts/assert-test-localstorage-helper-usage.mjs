@@ -22,9 +22,7 @@ const ROOT = process.argv.includes("--root")
   ? process.argv[process.argv.indexOf("--root") + 1]
   : "src/test";
 
-const EXEMPT = new Set([
-  "src/test/helpers/localStorageTestHelper.ts",
-]);
+const EXEMPT = new Set(["src/test/helpers/localStorageTestHelper.ts"]);
 
 const PATTERNS = [
   { label: "window.localStorage.clear(", re: /window\.localStorage\.clear\(/ },
@@ -91,9 +89,7 @@ function main() {
   for (const v of violations) {
     console.error(`  ${v.file}:${v.line}  [${v.pattern}]  ${v.text}`);
   }
-  console.error(
-    "\nReplace with helpers from src/test/helpers/localStorageTestHelper.ts:",
-  );
+  console.error("\nReplace with helpers from src/test/helpers/localStorageTestHelper.ts:");
   console.error(
     "  clearLocalStorageForTest / setLocalStorageItemForTest / getLocalStorageItemForTest / removeLocalStorageItemForTest",
   );

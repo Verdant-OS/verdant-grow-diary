@@ -2,7 +2,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { clearLocalStorageForTest, setLocalStorageItemForTest, getLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  setLocalStorageItemForTest,
+  getLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 const harness = vi.hoisted(() => ({
   activeGrowId: "g1" as string | null,

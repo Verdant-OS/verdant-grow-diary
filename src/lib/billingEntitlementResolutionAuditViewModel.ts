@@ -13,24 +13,13 @@
  */
 
 export type BillingEntitlementResolutionAuditPlanId =
-  | "free"
-  | "pro_monthly"
-  | "pro_annual"
-  | "founder_lifetime";
+  "free" | "pro_monthly" | "pro_annual" | "founder_lifetime";
 
 export type BillingEntitlementResolutionAuditSubscriptionStatus =
-  | "active"
-  | "past_due"
-  | "canceled"
-  | "paused"
-  | "expired";
+  "active" | "past_due" | "canceled" | "paused" | "expired";
 
 export type BillingEntitlementResolutionAuditState =
-  | "active"
-  | "free_fallback"
-  | "expired_fallback"
-  | "blocked"
-  | "unknown";
+  "active" | "free_fallback" | "expired_fallback" | "blocked" | "unknown";
 
 export type BillingEntitlementResolutionAuditFallbackReason =
   | "unknown_plan_id"
@@ -52,9 +41,7 @@ export interface BillingEntitlementResolutionAuditCounts {
 
 export type BillingEntitlementResolutionAuditOperatorRow = {
   readonly plan_id: BillingEntitlementResolutionAuditPlanId | null;
-  readonly subscription_status:
-    | BillingEntitlementResolutionAuditSubscriptionStatus
-    | null;
+  readonly subscription_status: BillingEntitlementResolutionAuditSubscriptionStatus | null;
   readonly effective_entitlement_state: BillingEntitlementResolutionAuditState;
   readonly fallback_reason: BillingEntitlementResolutionAuditFallbackReason | null;
   readonly cancel_at_period_end: boolean;
@@ -70,9 +57,7 @@ export const BILLING_ENTITLEMENT_RESOLUTION_AUDIT_OPERATOR_ROW_KEYS = [
   "cancel_at_period_end",
   "current_period_end_present",
   "updated_at",
-] as const satisfies ReadonlyArray<
-  keyof BillingEntitlementResolutionAuditOperatorRow
->;
+] as const satisfies ReadonlyArray<keyof BillingEntitlementResolutionAuditOperatorRow>;
 
 export const BILLING_ENTITLEMENT_RESOLUTION_AUDIT_FORBIDDEN_KEYS = [
   "provider_customer_id",
@@ -89,21 +74,15 @@ export const BILLING_ENTITLEMENT_RESOLUTION_AUDIT_FORBIDDEN_KEYS = [
 ] as const;
 
 export type BillingEntitlementResolutionAuditForbiddenKey =
-  typeof BILLING_ENTITLEMENT_RESOLUTION_AUDIT_FORBIDDEN_KEYS[number];
+  (typeof BILLING_ENTITLEMENT_RESOLUTION_AUDIT_FORBIDDEN_KEYS)[number];
 
-type AssertNoForbiddenKeys<T> = Extract<
-  keyof T,
-  BillingEntitlementResolutionAuditForbiddenKey
-> extends never
-  ? true
-  : never;
+type AssertNoForbiddenKeys<T> =
+  Extract<keyof T, BillingEntitlementResolutionAuditForbiddenKey> extends never ? true : never;
 
 export interface BillingEntitlementResolutionAuditDisplayRow {
   planId: BillingEntitlementResolutionAuditPlanId | null;
   planLabel: string;
-  subscriptionStatus:
-    | BillingEntitlementResolutionAuditSubscriptionStatus
-    | null;
+  subscriptionStatus: BillingEntitlementResolutionAuditSubscriptionStatus | null;
   subscriptionStatusLabel: string;
   entitlementState: BillingEntitlementResolutionAuditState;
   entitlementStateLabel: string;
@@ -166,10 +145,7 @@ const STATE_LABELS: Record<BillingEntitlementResolutionAuditState, string> = {
   unknown: "Unknown",
 };
 
-const FALLBACK_REASON_LABELS: Record<
-  BillingEntitlementResolutionAuditFallbackReason,
-  string
-> = {
+const FALLBACK_REASON_LABELS: Record<BillingEntitlementResolutionAuditFallbackReason, string> = {
   unknown_plan_id: "Unknown plan id",
   unknown_status: "Unknown subscription status",
   period_elapsed: "Billing period elapsed",
@@ -179,10 +155,7 @@ const FALLBACK_REASON_LABELS: Record<
   paused: "Subscription paused",
 };
 
-const AI_CREDITS_PER_MONTH: Record<
-  BillingEntitlementResolutionAuditPlanId,
-  number
-> = {
+const AI_CREDITS_PER_MONTH: Record<BillingEntitlementResolutionAuditPlanId, number> = {
   free: 0,
   pro_monthly: 100,
   pro_annual: 100,
@@ -190,8 +163,7 @@ const AI_CREDITS_PER_MONTH: Record<
 };
 
 const TOP_REASON_LABELS: Record<string, string> = {
-  not_authenticated:
-    "Sign in required before viewing the entitlement resolution audit.",
+  not_authenticated: "Sign in required before viewing the entitlement resolution audit.",
   operator_required: "Operator role required.",
 };
 
@@ -200,24 +172,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function asNumber(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0
-    ? value
-    : 0;
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
 }
 
 function asString(value: unknown): string | null {
-  return typeof value === "string" && value.trim().length > 0
-    ? value.trim()
-    : null;
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
 function asBool(value: unknown): boolean {
   return value === true;
 }
 
-function asPlan(
-  value: unknown,
-): BillingEntitlementResolutionAuditPlanId | null {
+function asPlan(value: unknown): BillingEntitlementResolutionAuditPlanId | null {
   switch (value) {
     case "free":
     case "pro_monthly":
@@ -229,9 +195,7 @@ function asPlan(
   }
 }
 
-function asSubStatus(
-  value: unknown,
-): BillingEntitlementResolutionAuditSubscriptionStatus | null {
+function asSubStatus(value: unknown): BillingEntitlementResolutionAuditSubscriptionStatus | null {
   switch (value) {
     case "active":
     case "past_due":
@@ -257,9 +221,7 @@ function asState(value: unknown): BillingEntitlementResolutionAuditState {
   }
 }
 
-function asFallbackReason(
-  value: unknown,
-): BillingEntitlementResolutionAuditFallbackReason | null {
+function asFallbackReason(value: unknown): BillingEntitlementResolutionAuditFallbackReason | null {
   switch (value) {
     case "unknown_plan_id":
     case "unknown_status":
@@ -346,7 +308,7 @@ export function parseBillingEntitlementResolutionAuditResponse(
   const ok = input.ok === true;
   const reason = asString(input.reason) ?? (ok ? null : "unknown_response");
   const reasonLabel = reason
-    ? TOP_REASON_LABELS[reason] ?? "Audit reason recorded; label unavailable."
+    ? (TOP_REASON_LABELS[reason] ?? "Audit reason recorded; label unavailable.")
     : null;
 
   const countsRaw = isRecord(input.counts) ? input.counts : {};
@@ -379,10 +341,9 @@ export function parseBillingEntitlementResolutionAuditResponse(
         planId: operatorRow.plan_id,
         planLabel: formatBillingEntitlementResolutionPlan(operatorRow.plan_id),
         subscriptionStatus: operatorRow.subscription_status,
-        subscriptionStatusLabel:
-          formatBillingEntitlementResolutionSubscriptionStatus(
-            operatorRow.subscription_status,
-          ),
+        subscriptionStatusLabel: formatBillingEntitlementResolutionSubscriptionStatus(
+          operatorRow.subscription_status,
+        ),
         entitlementState: operatorRow.effective_entitlement_state,
         entitlementStateLabel: formatBillingEntitlementResolutionState(
           operatorRow.effective_entitlement_state,
@@ -391,10 +352,9 @@ export function parseBillingEntitlementResolutionAuditResponse(
         fallbackReasonLabel: formatBillingEntitlementResolutionFallbackReason(
           operatorRow.fallback_reason,
         ),
-        aiCreditsPerMonthLabel:
-          formatBillingEntitlementResolutionAiCreditsPerMonth(
-            operatorRow.plan_id,
-          ),
+        aiCreditsPerMonthLabel: formatBillingEntitlementResolutionAiCreditsPerMonth(
+          operatorRow.plan_id,
+        ),
         cancelAtPeriodEnd: operatorRow.cancel_at_period_end,
         currentPeriodEndPresent: operatorRow.current_period_end_present,
         updatedAtLabel: formatBillingEntitlementResolutionUpdatedAt(operatorRow),

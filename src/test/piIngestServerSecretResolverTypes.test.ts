@@ -20,10 +20,7 @@ import {
   type ResolvedBridgeSecret,
 } from "@/lib/piIngestServerSecretResolverTypes";
 
-const SRC = resolve(
-  __dirname,
-  "../../src/lib/piIngestServerSecretResolverTypes.ts",
-);
+const SRC = resolve(__dirname, "../../src/lib/piIngestServerSecretResolverTypes.ts");
 const TEXT = existsSync(SRC) ? readFileSync(SRC, "utf8") : "";
 
 describe("piIngestServerSecretResolverTypes — module existence", () => {
@@ -114,11 +111,7 @@ describe("piIngestServerSecretResolverTypes — shape compatibility", () => {
   });
 
   it("BridgeSecretStatus union admits only the documented values", () => {
-    const allowed: BridgeSecretStatus[] = [
-      "pending_rotation",
-      "active_encrypted",
-      "disabled",
-    ];
+    const allowed: BridgeSecretStatus[] = ["pending_rotation", "active_encrypted", "disabled"];
     expect(allowed).toHaveLength(3);
   });
 });

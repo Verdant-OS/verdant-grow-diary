@@ -25,12 +25,14 @@ const ROOT = resolve(__dirname, "../..");
 const ALERT_DETAIL = readFileSync(resolve(ROOT, "src/pages/AlertDetail.tsx"), "utf8");
 const RULES = readFileSync(resolve(ROOT, "src/lib/relatedActionOutcomeRules.ts"), "utf8");
 
-function outcomeRow(o: Partial<RawOutcomeDiaryRow["details"]> & {
-  id?: string;
-  entry_at?: string | null;
-  created_at?: string | null;
-  note?: string | null;
-}): RawOutcomeDiaryRow {
+function outcomeRow(
+  o: Partial<RawOutcomeDiaryRow["details"]> & {
+    id?: string;
+    entry_at?: string | null;
+    created_at?: string | null;
+    note?: string | null;
+  },
+): RawOutcomeDiaryRow {
   const { id, entry_at, created_at, note, ...details } = o;
   return {
     id: id ?? "diary-1",
@@ -209,9 +211,7 @@ describe("summarizeRelatedActionOutcomes", () => {
       { id: "a2", status: "completed" },
       { id: "a3", status: "pending_approval" },
     ];
-    const outcomes = [
-      outcomeRow({ action_queue_id: "a1", outcome_status: "improved" }),
-    ];
+    const outcomes = [outcomeRow({ action_queue_id: "a1", outcome_status: "improved" })];
     const s = summarizeRelatedActionOutcomes(actions, outcomes);
     expect(s.totalActions).toBe(3);
     expect(s.completedActions).toBe(2);

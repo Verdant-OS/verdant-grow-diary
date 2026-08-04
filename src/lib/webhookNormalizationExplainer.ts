@@ -198,7 +198,10 @@ export function explainWebhookNormalizationPayload(
 
     const numeric = coerceFiniteLocal(raw);
     if (numeric === null) {
-      skipped.push({ alias, reason: "value is null, empty, or non-finite — skipped (never persisted as 0)" });
+      skipped.push({
+        alias,
+        reason: "value is null, empty, or non-finite — skipped (never persisted as 0)",
+      });
       continue;
     }
 
@@ -228,9 +231,7 @@ export function explainWebhookNormalizationPayload(
   }
 
   // --- Top-level (non per-alias) payload errors --------------------------
-  const payloadErrors = result.errors.filter(
-    (e) => !aliasKeys.some((a) => e.startsWith(`${a}:`)),
-  );
+  const payloadErrors = result.errors.filter((e) => !aliasKeys.some((a) => e.startsWith(`${a}:`)));
 
   return {
     ok: result.ok,

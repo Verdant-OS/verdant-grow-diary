@@ -20,8 +20,15 @@ import { render, screen } from "@testing-library/react";
 // needing a real Router in every render() call. Keeps the test scope
 // presentation-only (no navigation is asserted via Router internals).
 vi.mock("@/lib/react-router-compat", () => ({
-  Link: ({ to, children, ...rest }: { to: string; children: React.ReactNode; [k: string]: unknown }) =>
-    React.createElement("a", { href: typeof to === "string" ? to : "", ...rest }, children),
+  Link: ({
+    to,
+    children,
+    ...rest
+  }: {
+    to: string;
+    children: React.ReactNode;
+    [k: string]: unknown;
+  }) => React.createElement("a", { href: typeof to === "string" ? to : "", ...rest }, children),
 }));
 
 import {
@@ -39,8 +46,7 @@ const read = (p: string) =>
 const RULES = read("src/lib/relativeTimelineProjectionRules.ts");
 const COMPONENT = read("src/components/PlantRelativeTimelineSection.tsx");
 const PLANT_DETAIL = read("src/pages/PlantDetail.tsx");
-const stripSafetyNegations = (src: string) =>
-  src.replace(/\bNo reminder scheduling\b/gi, "");
+const stripSafetyNegations = (src: string) => src.replace(/\bNo reminder scheduling\b/gi, "");
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -90,8 +96,12 @@ describe("relative timeline projection — static guardrails", () => {
     for (const src of [RULES, COMPONENT].map(stripSafetyNegations)) {
       expect(src).not.toMatch(/calendar_events/);
       expect(src).not.toMatch(/\bnotifications\b/);
-      expect(src).not.toMatch(/\b(schedule|scheduled|scheduling)\s+(a\s+|the\s+|new\s+)?reminders?\b/i);
-      expect(src).not.toMatch(/\breminders?\s+(schedule|scheduled|scheduling|system|engine|job|cron|notification|email)\b/i);
+      expect(src).not.toMatch(
+        /\b(schedule|scheduled|scheduling)\s+(a\s+|the\s+|new\s+)?reminders?\b/i,
+      );
+      expect(src).not.toMatch(
+        /\breminders?\s+(schedule|scheduled|scheduling|system|engine|job|cron|notification|email)\b/i,
+      );
       expect(src).not.toMatch(/resend|sendgrid|mailgun|postmark|twilio/i);
     }
   });
@@ -103,8 +113,12 @@ describe("relative timeline projection — static guardrails", () => {
       expect(src).not.toMatch(/calendar_events/);
       expect(src).not.toMatch(/\bnotifications\b/);
       expect(src).not.toMatch(/resend|sendgrid|mailgun|postmark|twilio/i);
-      expect(src).not.toMatch(/\b(schedule|scheduled|scheduling)\s+(a\s+|the\s+|new\s+)?reminders?\b/i);
-      expect(src).not.toMatch(/\breminders?\s+(schedule|scheduled|scheduling|system|engine|job|cron|notification|email)\b/i);
+      expect(src).not.toMatch(
+        /\b(schedule|scheduled|scheduling)\s+(a\s+|the\s+|new\s+)?reminders?\b/i,
+      );
+      expect(src).not.toMatch(
+        /\breminders?\s+(schedule|scheduled|scheduling|system|engine|job|cron|notification|email)\b/i,
+      );
       expect(src).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
     }
   });
@@ -544,9 +558,7 @@ describe("PlantRelativeTimelineSection — render", () => {
     // mutating control can sneak in.
     const buttons = Array.from(container.querySelectorAll("button"));
     for (const b of buttons) {
-      const isCategoryViewControl = !!b.closest(
-        '[data-testid="diary-timeline-category-sections"]',
-      );
+      const isCategoryViewControl = !!b.closest('[data-testid="diary-timeline-category-sections"]');
       if (!isCategoryViewControl) {
         expect(b.getAttribute("role")).toBe("radio");
       }
@@ -875,9 +887,7 @@ describe("buildRelativeTimelineFilterChips — pure rules", () => {
       tItem({ id: "p1", eventType: "photo", source: "photo" }),
     ];
     const chips = buildRelativeTimelineFilterChips(items, "all");
-    expect(chips.map((c) => c.key)).toEqual(
-      RELATIVE_TIMELINE_FILTERS.map((f) => f.key),
-    );
+    expect(chips.map((c) => c.key)).toEqual(RELATIVE_TIMELINE_FILTERS.map((f) => f.key));
     const byKey = Object.fromEntries(chips.map((c) => [c.key, c]));
     expect(byKey.all.count).toBe(4);
     expect(byKey.watering.count).toBe(2);
@@ -924,9 +934,7 @@ describe("PlantRelativeTimelineSection — chip counts + disabled state", () => 
     expect(feeding.getAttribute("data-count")).toBe("0");
     expect(feeding.getAttribute("data-disabled")).toBe("true");
     expect(all.getAttribute("data-disabled")).toBe("false");
-    expect(
-      screen.getByTestId("relative-timeline-filter-watering-count").textContent,
-    ).toBe("2");
+    expect(screen.getByTestId("relative-timeline-filter-watering-count").textContent).toBe("2");
   });
 
   it("clicking a zero-count chip surfaces the filter-specific empty copy", () => {
@@ -1444,10 +1452,11 @@ describe("formatRelativeTimelineEntryDetail — pure rules", () => {
   });
 
   it("ignores blank context strings", () => {
-    const view = formatRelativeTimelineEntryDetail(
-      tItem({ id: "c2", eventType: "note" }),
-      { plantName: "   ", tentName: "", growName: null },
-    )!;
+    const view = formatRelativeTimelineEntryDetail(tItem({ id: "c2", eventType: "note" }), {
+      plantName: "   ",
+      tentName: "",
+      growName: null,
+    })!;
     expect(view.hasContext).toBe(false);
   });
 
@@ -1523,9 +1532,7 @@ describe("PlantRelativeTimelineSection — entry detail polish render", () => {
     expect(screen.getByTestId("relative-timeline-context-plant")).toHaveTextContent(
       "Plant: Blueberry",
     );
-    expect(screen.getByTestId("relative-timeline-context-tent")).toHaveTextContent(
-      "Tent: Tent A",
-    );
+    expect(screen.getByTestId("relative-timeline-context-tent")).toHaveTextContent("Tent: Tent A");
   });
 
   it("does not render a context line when no names are provided", () => {
@@ -1584,7 +1591,9 @@ describe("entry detail — static safety", () => {
       expect(src).not.toMatch(/calendar_events/);
       expect(src).not.toMatch(/\bnotifications\b/);
       expect(src).not.toMatch(/resend|sendgrid|mailgun|postmark|twilio/i);
-      expect(src).not.toMatch(/\b(schedule|scheduled|scheduling)\s+(a\s+|the\s+|new\s+)?reminders?\b/i);
+      expect(src).not.toMatch(
+        /\b(schedule|scheduled|scheduling)\s+(a\s+|the\s+|new\s+)?reminders?\b/i,
+      );
       expect(src).not.toMatch(/mqtt|home[\s_-]?assistant|relay|actuator|device_command|autopilot/i);
     }
   });
@@ -1642,7 +1651,6 @@ describe("buildRelativeTimelineEmptyState — pure rules", () => {
     expect(q.eventDetail).toBeNull();
   });
 
-
   it("Manual sensor snapshot routes to /tents/:tentId when tent is known", () => {
     const v = buildRelativeTimelineEmptyState({ tentId: "tent-1" });
     const s = v.ctas.find((c) => c.key === "manual-snapshot")!;
@@ -1690,7 +1698,6 @@ describe("buildRelativeTimelineEmptyState — pure rules", () => {
     expect(s.route).toBe(SENSORS_FALLBACK_ROUTE);
   });
 
-
   it("never includes user_id, tokens, raw payloads, or provenance markers in event detail", () => {
     const v = buildRelativeTimelineEmptyState({
       plantId: "plant-uuid",
@@ -1726,9 +1733,9 @@ describe("PlantRelativeTimelineSection — first-log empty state render", () => 
     expect(screen.getByTestId("relative-timeline-empty-cta-quicklog")).toHaveTextContent(
       "Add Quick Log",
     );
-    expect(
-      screen.getByTestId("relative-timeline-empty-cta-manual-snapshot"),
-    ).toHaveTextContent("Add manual sensor snapshot");
+    expect(screen.getByTestId("relative-timeline-empty-cta-manual-snapshot")).toHaveTextContent(
+      "Add manual sensor snapshot",
+    );
     expect(screen.getByTestId("relative-timeline-empty-cta-photo")).toHaveTextContent(
       "Upload photo",
     );
@@ -1844,14 +1851,25 @@ describe("empty-state CTAs — static safety", () => {
     expect(EMPTY_RULES).not.toMatch(/calendar_events/);
     expect(EMPTY_RULES).not.toMatch(/\bnotifications\b/);
     expect(EMPTY_RULES).not.toMatch(/resend|sendgrid|mailgun|postmark|twilio/i);
-    expect(EMPTY_RULES).not.toMatch(/\b(schedule|scheduled|scheduling)\s+(a\s+|the\s+|new\s+)?reminders?\b/i);
-    expect(EMPTY_RULES).not.toMatch(/mqtt|home[\s_-]?assistant|relay|actuator|device_command|autopilot/i);
+    expect(EMPTY_RULES).not.toMatch(
+      /\b(schedule|scheduled|scheduling)\s+(a\s+|the\s+|new\s+)?reminders?\b/i,
+    );
+    expect(EMPTY_RULES).not.toMatch(
+      /mqtt|home[\s_-]?assistant|relay|actuator|device_command|autopilot/i,
+    );
     expect(EMPTY_RULES).not.toMatch(/supabase/i);
   });
 
   it("component empty-state additions perform no direct writes", () => {
     // CTAs are dispatch-only or <Link>-based; no Supabase calls.
-    for (const re of [/\.insert\(/, /\.update\(/, /\.delete\(/, /\.upsert\(/, /\.rpc\(/, /functions\.invoke/]) {
+    for (const re of [
+      /\.insert\(/,
+      /\.update\(/,
+      /\.delete\(/,
+      /\.upsert\(/,
+      /\.rpc\(/,
+      /functions\.invoke/,
+    ]) {
       expect(COMPONENT).not.toMatch(re);
     }
   });
@@ -2089,9 +2107,7 @@ describe("empty-state CTA disabled reasons — render", () => {
     );
     const cta = screen.getByTestId("relative-timeline-empty-cta-manual-snapshot");
     expect(cta.hasAttribute("disabled")).toBe(false);
-    expect(
-      screen.queryByTestId("relative-timeline-empty-cta-manual-snapshot-reason"),
-    ).toBeNull();
+    expect(screen.queryByTestId("relative-timeline-empty-cta-manual-snapshot-reason")).toBeNull();
     expect(cta.getAttribute("data-route")).toBe("/sensors");
   });
 
@@ -2107,20 +2123,16 @@ describe("empty-state CTA disabled reasons — render", () => {
         tentName="Tent A"
       />,
     );
-    expect(
-      screen.queryByTestId("relative-timeline-empty-cta-quicklog-reason"),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId("relative-timeline-empty-cta-photo-reason"),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId("relative-timeline-empty-cta-manual-snapshot-reason"),
-    ).toBeNull();
+    expect(screen.queryByTestId("relative-timeline-empty-cta-quicklog-reason")).toBeNull();
+    expect(screen.queryByTestId("relative-timeline-empty-cta-photo-reason")).toBeNull();
+    expect(screen.queryByTestId("relative-timeline-empty-cta-manual-snapshot-reason")).toBeNull();
   });
 
   it("disabled-reason copy never exposes IDs, tokens, raw payloads, or provenance markers", () => {
     for (const reason of [QUICKLOG_DISABLED_REASON, PHOTO_DISABLED_REASON]) {
-      expect(reason.toLowerCase()).not.toMatch(/uuid|token|raw_payload|provenance|user_id|service_role|bearer/);
+      expect(reason.toLowerCase()).not.toMatch(
+        /uuid|token|raw_payload|provenance|user_id|service_role|bearer/,
+      );
       expect(reason).toMatch(/[A-Za-z]/);
     }
   });

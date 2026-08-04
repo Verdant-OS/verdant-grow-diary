@@ -985,8 +985,7 @@ function validateConfidenceCalibration(
 ): void {
   const result = input.result as unknown as Record<string, unknown>;
   const readiness = (input.readiness as { readiness?: unknown } | null | undefined)?.readiness as
-    | AiDoctorContextReadiness
-    | undefined;
+    AiDoctorContextReadiness | undefined;
   const confidence = result.confidence;
   // Only an in-range confidence is calibrated; an out-of-range value is already
   // reported as invalid_confidence (Commit 1) and must not double-report here.

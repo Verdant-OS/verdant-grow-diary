@@ -1,7 +1,4 @@
-import {
-  assert,
-  assertEquals,
-} from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 
 import {
   commitPiIngestBatch,
@@ -17,9 +14,10 @@ type Call = {
   args: Record<string, unknown>;
 };
 
-function makeClient(
-  responses: Array<PiIngestCommitBatchResponse | Error>,
-): { client: PiIngestCommitBatchClient; calls: Call[] } {
+function makeClient(responses: Array<PiIngestCommitBatchResponse | Error>): {
+  client: PiIngestCommitBatchClient;
+  calls: Call[];
+} {
   const calls: Call[] = [];
   let i = 0;
   const client: PiIngestCommitBatchClient = {
@@ -37,13 +35,15 @@ const USER = "user-1";
 const BRIDGE = "bridge-1";
 const TENT = "tent-1";
 
-function makeRow(overrides: Partial<{
-  idempotencyKey: string;
-  device_id: string;
-  metric: string;
-  captured_at: string;
-  value: number;
-}> = {}): PiIngestCommitBatchRow {
+function makeRow(
+  overrides: Partial<{
+    idempotencyKey: string;
+    device_id: string;
+    metric: string;
+    captured_at: string;
+    value: number;
+  }> = {},
+): PiIngestCommitBatchRow {
   const idempotencyKey = overrides.idempotencyKey ?? "key-1";
   const device_id = overrides.device_id ?? "dev-1";
   const metric = overrides.metric ?? "temperature_c";
@@ -149,9 +149,7 @@ Deno.test("non-finite value or wrong source → missing_input", async () => {
 });
 
 Deno.test("happy path calls RPC with correct args and returns counts", async () => {
-  const { client, calls } = makeClient([
-    { data: [{ inserted: 2, rejected: 1 }], error: null },
-  ]);
+  const { client, calls } = makeClient([{ data: [{ inserted: 2, rejected: 1 }], error: null }]);
   const rows = [
     makeRow({ idempotencyKey: "k-a", device_id: "d-a" }),
     makeRow({ idempotencyKey: "k-b", device_id: "d-b", metric: "humidity_pct", value: 55 }),
@@ -185,9 +183,7 @@ Deno.test("happy path calls RPC with correct args and returns counts", async () 
 });
 
 Deno.test("defaults quality to 'ok' and raw_payload to null when omitted", async () => {
-  const { client, calls } = makeClient([
-    { data: [{ inserted: 1, rejected: 0 }], error: null },
-  ]);
+  const { client, calls } = makeClient([{ data: [{ inserted: 1, rejected: 0 }], error: null }]);
   const row = makeRow();
   delete (row.sensor as { quality?: string | null }).quality;
   delete (row.sensor as { raw_payload?: unknown }).raw_payload;
@@ -200,9 +196,7 @@ Deno.test("defaults quality to 'ok' and raw_payload to null when omitted", async
 
 Deno.test("RPC error → commit_failed with generic message (no raw text leak)", async () => {
   const secret = "PG-ERROR-SECRET-XYZ";
-  const { client } = makeClient([
-    { data: null, error: { message: secret } },
-  ]);
+  const { client } = makeClient([{ data: null, error: { message: secret } }]);
   const res = await commitPiIngestBatch(client, makeInput([makeRow()]));
   assertEquals(res.ok, false);
   if (!res.ok) {
@@ -229,7 +223,13 @@ Deno.test("malformed RPC response shapes → commit_failed", async () => {
     { data: [{ inserted: "x", rejected: 0 }], error: null },
     { data: [{ inserted: -1, rejected: 0 }], error: null },
     { data: [{ inserted: 1 }], error: null },
-    { data: [{ inserted: 1, rejected: 0 }, { inserted: 1, rejected: 0 }], error: null },
+    {
+      data: [
+        { inserted: 1, rejected: 0 },
+        { inserted: 1, rejected: 0 },
+      ],
+      error: null,
+    },
   ] as PiIngestCommitBatchResponse[]) {
     const { client } = makeClient([bad]);
     const res = await commitPiIngestBatch(client, makeInput([makeRow()]));
@@ -239,9 +239,7 @@ Deno.test("malformed RPC response shapes → commit_failed", async () => {
 });
 
 Deno.test("accepts single-object data shape (not wrapped in array)", async () => {
-  const { client } = makeClient([
-    { data: { inserted: 3, rejected: 0 }, error: null },
-  ]);
+  const { client } = makeClient([{ data: { inserted: 3, rejected: 0 }, error: null }]);
   const res = await commitPiIngestBatch(client, makeInput([makeRow()]));
   assert(res.ok);
   if (res.ok) {

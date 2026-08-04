@@ -18,19 +18,14 @@ import type { QuickLogTimelineEntry } from "@/lib/quickLogTimelineGroupingViewMo
 export const QUICK_LOG_AUDIT_EXPAND_LABEL = "Review grouped details";
 export const QUICK_LOG_AUDIT_COLLAPSE_LABEL = "Hide grouped details";
 export const QUICK_LOG_AUDIT_ACTION_SUBCARD_TITLE = "Action event";
-export const QUICK_LOG_AUDIT_ENVIRONMENT_SUBCARD_TITLE =
-  "Manual environment snapshot";
+export const QUICK_LOG_AUDIT_ENVIRONMENT_SUBCARD_TITLE = "Manual environment snapshot";
 
-export function isAuditableQuickLogEntry(
-  entry: QuickLogTimelineEntry,
-): boolean {
+export function isAuditableQuickLogEntry(entry: QuickLogTimelineEntry): boolean {
   return entry.kind === "grouped";
 }
 
 export function auditToggleLabel(expanded: boolean): string {
-  return expanded
-    ? QUICK_LOG_AUDIT_COLLAPSE_LABEL
-    : QUICK_LOG_AUDIT_EXPAND_LABEL;
+  return expanded ? QUICK_LOG_AUDIT_COLLAPSE_LABEL : QUICK_LOG_AUDIT_EXPAND_LABEL;
 }
 
 /**

@@ -26,12 +26,12 @@ describe("pi-ingest smoke runbook — required content", () => {
     expect(DOC).toContain(name);
   });
 
-  it.each([
-    ["PI_INGEST_SMOKE_DEVICE_ID"],
-    ["PI_INGEST_SMOKE_TIMESTAMP_MS"],
-  ])("mentions optional secret %s", (name) => {
-    expect(DOC).toContain(name);
-  });
+  it.each([["PI_INGEST_SMOKE_DEVICE_ID"], ["PI_INGEST_SMOKE_TIMESTAMP_MS"]])(
+    "mentions optional secret %s",
+    (name) => {
+      expect(DOC).toContain(name);
+    },
+  );
 
   it("explains manual GitHub Actions dispatch", () => {
     expect(DOC).toMatch(/GitHub Actions/i);
@@ -91,7 +91,6 @@ describe("pi-ingest smoke runbook — required content", () => {
     ["no log secrets", /must\s*\**\s*not\**\s*log[^.\n]*secret/i],
     ["no log signatures", /must\s*\**\s*not\**\s*log[^.\n]*signature/i],
     ["no log service-role", /must\s*\**\s*not\**\s*log[^.\n]*service-role/i],
-
   ])("safety: runbook says %s", (_label, re) => {
     expect(DOC).toMatch(re);
   });

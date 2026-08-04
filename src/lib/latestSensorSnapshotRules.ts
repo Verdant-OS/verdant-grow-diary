@@ -27,11 +27,7 @@ export type SensorSnapshotStatus = "fresh_live" | "fresh_non_live" | "stale" | "
 export type SensorSnapshotFreshness = "fresh" | "stale" | "invalid" | "unknown";
 
 export type SensorMetricKey =
-  | "temp_f"
-  | "humidity_pct"
-  | "vpd_kpa"
-  | "soil_moisture_pct"
-  | "co2_ppm";
+  "temp_f" | "humidity_pct" | "vpd_kpa" | "soil_moisture_pct" | "co2_ppm";
 
 export const REQUIRED_SNAPSHOT_METRICS: readonly SensorMetricKey[] = ["temp_f", "humidity_pct"];
 

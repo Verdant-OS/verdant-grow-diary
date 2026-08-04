@@ -9,21 +9,12 @@
  * - Defensive: unknown event types and malformed/null inputs never throw.
  */
 
-export type AiDoctorSessionReviewEventType =
-  | "marked_reviewed"
-  | "needs_follow_up"
-  | "cleared";
+export type AiDoctorSessionReviewEventType = "marked_reviewed" | "needs_follow_up" | "cleared";
 
-export type AiDoctorSessionReviewStatus =
-  | "not_reviewed"
-  | "reviewed"
-  | "needs_follow_up";
+export type AiDoctorSessionReviewStatus = "not_reviewed" | "reviewed" | "needs_follow_up";
 
 export type AiDoctorSessionReviewStatusFilter =
-  | "any"
-  | "not_reviewed"
-  | "reviewed"
-  | "needs_follow_up";
+  "any" | "not_reviewed" | "reviewed" | "needs_follow_up";
 
 export interface AiDoctorSessionReviewEvent {
   id: string;
@@ -58,9 +49,7 @@ export const DEFAULT_REVIEW_STATE: AiDoctorSessionReviewState = Object.freeze({
  * Map a single event type to its projected status. Unknown types fall back to
  * `not_reviewed` so old clients are forward-compatible with future event types.
  */
-export function eventTypeToStatus(
-  eventType: unknown,
-): AiDoctorSessionReviewStatus {
+export function eventTypeToStatus(eventType: unknown): AiDoctorSessionReviewStatus {
   switch (eventType) {
     case "marked_reviewed":
       return "reviewed";
@@ -120,10 +109,7 @@ function coerceEvent(input: unknown): AiDoctorSessionReviewEvent | null {
  * created_at is compared via Date.parse; if parsing fails for either side, we
  * fall back to lexical string comparison so ordering remains total.
  */
-function compareEvents(
-  a: AiDoctorSessionReviewEvent,
-  b: AiDoctorSessionReviewEvent,
-): number {
+function compareEvents(a: AiDoctorSessionReviewEvent, b: AiDoctorSessionReviewEvent): number {
   const ta = Date.parse(a.created_at);
   const tb = Date.parse(b.created_at);
   if (Number.isFinite(ta) && Number.isFinite(tb)) {
@@ -195,11 +181,7 @@ export function projectLatestReviewStateBySession(
 export function isReviewStatusFilterActive(
   filter: unknown,
 ): filter is Exclude<AiDoctorSessionReviewStatusFilter, "any"> {
-  return (
-    filter === "not_reviewed" ||
-    filter === "reviewed" ||
-    filter === "needs_follow_up"
-  );
+  return filter === "not_reviewed" || filter === "reviewed" || filter === "needs_follow_up";
 }
 
 /**
@@ -283,10 +265,7 @@ export function buildSessionReviewStatusIndicator(
  * Display labels for the projected review status. Centralized here so UI
  * components never embed status strings directly.
  */
-export const REVIEW_STATUS_DISPLAY_LABEL: Record<
-  AiDoctorSessionReviewStatus,
-  string
-> = {
+export const REVIEW_STATUS_DISPLAY_LABEL: Record<AiDoctorSessionReviewStatus, string> = {
   not_reviewed: "Not reviewed",
   reviewed: "Reviewed",
   needs_follow_up: "Needs follow-up",
@@ -303,10 +282,7 @@ export const REVIEW_STATUS_PANEL_TONE: Record<
   needs_follow_up: "amber",
 };
 
-const EVENT_TYPE_DISPLAY_LABEL: Record<
-  AiDoctorSessionReviewEventType,
-  string
-> = {
+const EVENT_TYPE_DISPLAY_LABEL: Record<AiDoctorSessionReviewEventType, string> = {
   marked_reviewed: "Marked reviewed",
   needs_follow_up: "Flagged: needs follow-up",
   cleared: "Cleared review status",
@@ -352,8 +328,7 @@ export function buildSessionReviewHistoryViewModel(
   coerced.sort(compareEvents); // ascending
   const newestFirst = coerced.slice().reverse();
 
-  const projected =
-    state ?? projectLatestReviewState(coerced);
+  const projected = state ?? projectLatestReviewState(coerced);
 
   const items: AiDoctorSessionReviewHistoryItem[] = newestFirst.map((e) => ({
     id: e.id,
@@ -416,15 +391,10 @@ export function buildSessionReviewActionsCopy(
     isMarkReviewedDisabledByStatus: isReviewed,
     isNeedsFollowUpDisabledByStatus: isNeedsFollowUp,
     isClearDisabledByStatus: isNotReviewed,
-    markReviewedDisabledReason: isReviewed
-      ? "Already marked as reviewed."
-      : null,
-    needsFollowUpDisabledReason: isNeedsFollowUp
-      ? "Already marked as needs follow-up."
-      : null,
+    markReviewedDisabledReason: isReviewed ? "Already marked as reviewed." : null,
+    needsFollowUpDisabledReason: isNeedsFollowUp ? "Already marked as needs follow-up." : null,
     clearDisabledReason: isNotReviewed ? "No review status is set." : null,
     appendOnlyHelperText: REVIEW_ACTIONS_APPEND_ONLY_HELPER_TEXT,
     noSideEffectsHelperText: REVIEW_ACTIONS_NO_SIDE_EFFECTS_HELPER_TEXT,
   };
 }
-

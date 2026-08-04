@@ -37,9 +37,7 @@ const FORBIDDEN = [
 ];
 
 function stripComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 }
 
 describe("video attachment static safety", () => {
@@ -47,10 +45,7 @@ describe("video attachment static safety", () => {
     it(`${f} contains no forbidden runtime references`, () => {
       const src = stripComments(read(f));
       for (const term of FORBIDDEN) {
-        expect(
-          src.includes(term),
-          `${f} unexpectedly references "${term}"`,
-        ).toBe(false);
+        expect(src.includes(term), `${f} unexpectedly references "${term}"`).toBe(false);
       }
     });
   }

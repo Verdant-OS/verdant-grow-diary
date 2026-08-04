@@ -27,12 +27,14 @@ import {
 import { validateAndResolveBridgeIntake } from "@/lib/sensorBridgeIntakeRules";
 
 const NOW = new Date("2026-05-23T12:00:00Z");
-const minutesAgo = (m: number) =>
-  new Date(NOW.getTime() - m * 60_000).toISOString();
+const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60_000).toISOString();
 const minutesAgoEcoWitt = (m: number) => {
   const d = new Date(NOW.getTime() - m * 60_000);
   // EcoWitt: "YYYY-MM-DD HH:MM:SS" UTC
-  return d.toISOString().replace("T", " ").replace(/\.\d+Z$/, "");
+  return d
+    .toISOString()
+    .replace("T", " ")
+    .replace(/\.\d+Z$/, "");
 };
 
 const TENT = "11111111-2222-3333-4444-555555555555";
@@ -72,9 +74,11 @@ describe("adaptEcoWittPayloadToBridgeInput — basic mapping", () => {
       co2: "612",
     });
     expect(r.ok).toBe(true);
-    expect(
-      (r.input.readings as Array<{ metric: string }>).map((m) => m.metric).sort(),
-    ).toEqual(["co2_ppm", "humidity_pct", "temperature_c"]);
+    expect((r.input.readings as Array<{ metric: string }>).map((m) => m.metric).sort()).toEqual([
+      "co2_ppm",
+      "humidity_pct",
+      "temperature_c",
+    ]);
   });
 
   it("warns when timestamp missing and never invents freshness", () => {
@@ -327,10 +331,7 @@ describe("EcoWitt adapter — handoff to sensorBridgeIntakeRules", () => {
 
 describe("EcoWitt adapter — static safety", () => {
   const ROOT = resolve(__dirname, "../..");
-  const SRC = readFileSync(
-    resolve(ROOT, "src/lib/ecowittPayloadAdapter.ts"),
-    "utf8",
-  );
+  const SRC = readFileSync(resolve(ROOT, "src/lib/ecowittPayloadAdapter.ts"), "utf8");
 
   it("contains no DB writes, no edge calls, no Supabase client usage", () => {
     expect(SRC).not.toMatch(/from\s*\(\s*["']/);

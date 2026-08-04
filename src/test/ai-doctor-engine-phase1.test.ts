@@ -17,8 +17,7 @@ import {
 } from "../lib/aiDoctorEngine";
 
 const NOW = new Date("2026-06-04T12:00:00Z");
-const iso = (offsetMs: number) =>
-  new Date(NOW.getTime() - offsetMs).toISOString();
+const iso = (offsetMs: number) => new Date(NOW.getTime() - offsetMs).toISOString();
 
 function fakeFile(): File {
   return new File([new Uint8Array([1, 2, 3])], "plant.jpg", {
@@ -97,16 +96,14 @@ function strongContext(): Phase1PlantContextPayload {
 
 describe("executeVisionAnalysisPhase1", () => {
   it("rejects a missing image", async () => {
-    await expect(
-      executeVisionAnalysisPhase1(undefined as unknown as File),
-    ).rejects.toThrow(/image file is required/i);
+    await expect(executeVisionAnalysisPhase1(undefined as unknown as File)).rejects.toThrow(
+      /image file is required/i,
+    );
   });
 
   it("rejects an empty image", async () => {
     const empty = new File([], "empty.jpg", { type: "image/jpeg" });
-    await expect(executeVisionAnalysisPhase1(empty)).rejects.toThrow(
-      /image file is empty/i,
-    );
+    await expect(executeVisionAnalysisPhase1(empty)).rejects.toThrow(/image file is empty/i);
   });
 
   it("returns a low-confidence, descriptive-only stub", async () => {
@@ -117,9 +114,7 @@ describe("executeVisionAnalysisPhase1", () => {
     expect(r.pest_disease_indicators).toEqual([]);
     expect(r.image_quality_notes.length).toBeGreaterThan(0);
     // No diagnosis-style language in stub output.
-    expect(r.visual_summary.toLowerCase()).not.toMatch(
-      /diagnos|recommend|increase|decrease/,
-    );
+    expect(r.visual_summary.toLowerCase()).not.toMatch(/diagnos|recommend|increase|decrease/);
   });
 });
 
@@ -129,22 +124,14 @@ describe("executeVisionAnalysisPhase1", () => {
 
 describe("generateMultimodalDiagnosisPhase1", () => {
   it("flags missing_information when context is weak", async () => {
-    const d = await generateMultimodalDiagnosisPhase1(
-      emptyVision(),
-      weakContext(),
-    );
+    const d = await generateMultimodalDiagnosisPhase1(emptyVision(), weakContext());
     expect(d.confidence).toBeLessThanOrEqual(0.2);
     expect(d.missing_information.length).toBeGreaterThan(0);
-    expect(d.missing_information.join(" ")).toMatch(
-      /live or manual sensor readings/i,
-    );
+    expect(d.missing_information.join(" ")).toMatch(/live or manual sensor readings/i);
   });
 
   it("does not emit device commands", async () => {
-    const d = await generateMultimodalDiagnosisPhase1(
-      emptyVision(),
-      strongContext(),
-    );
+    const d = await generateMultimodalDiagnosisPhase1(emptyVision(), strongContext());
     const all = [
       d.summary,
       d.immediate_action,
@@ -155,16 +142,11 @@ describe("generateMultimodalDiagnosisPhase1", () => {
     ]
       .join(" ")
       .toLowerCase();
-    expect(all).not.toMatch(
-      /turn on|turn off|switch on|switch off|setpoint|relay|actuate/,
-    );
+    expect(all).not.toMatch(/turn on|turn off|switch on|switch off|setpoint|relay|actuate/);
   });
 
   it("does not recommend nutrient or irrigation changes from weak evidence", async () => {
-    const d = await generateMultimodalDiagnosisPhase1(
-      emptyVision(),
-      weakContext(),
-    );
+    const d = await generateMultimodalDiagnosisPhase1(emptyVision(), weakContext());
     const positive = [
       d.summary,
       d.immediate_action,
@@ -220,14 +202,8 @@ describe("generateMultimodalDiagnosisPhase1", () => {
 // ---------------------------------------------------------------------------
 
 describe("ai-doctor engine Phase 1 — static safety", () => {
-  const ENGINE = readFileSync(
-    resolve(__dirname, "../lib/aiDoctorEngine.ts"),
-    "utf8",
-  );
-  const COMPILER = readFileSync(
-    resolve(__dirname, "../lib/aiDoctorContextCompiler.ts"),
-    "utf8",
-  );
+  const ENGINE = readFileSync(resolve(__dirname, "../lib/aiDoctorEngine.ts"), "utf8");
+  const COMPILER = readFileSync(resolve(__dirname, "../lib/aiDoctorContextCompiler.ts"), "utf8");
 
   it("contains no service_role", () => {
     expect(ENGINE).not.toMatch(/service_role/i);

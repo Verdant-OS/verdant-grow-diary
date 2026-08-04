@@ -47,20 +47,26 @@ t("defaults match Verdant repo + branch + out dir", () => {
   assert.equal(DEFAULT_BRANCH, "verdant-grow-diary");
   assert.equal(DEFAULT_OUT_DIR, "artifacts/client-secret-boundary-proof-check");
   assert.equal(ARTIFACTS.length, 2);
-  assert.deepEqual(
-    ARTIFACTS.map((a) => a.artifact).sort(),
-    ["client-secret-boundary-proof-ci", "client-secret-boundary-proof-docs-safety"],
-  );
+  assert.deepEqual(ARTIFACTS.map((a) => a.artifact).sort(), [
+    "client-secret-boundary-proof-ci",
+    "client-secret-boundary-proof-docs-safety",
+  ]);
 });
 
 t("parseArgs supports overrides + run ids", () => {
   const a = parseArgs([
-    "--repo=acme/x", "--branch=main", "--out-dir=tmp/x",
-    "--ci-run-id=111", "--docs-run-id=222",
+    "--repo=acme/x",
+    "--branch=main",
+    "--out-dir=tmp/x",
+    "--ci-run-id=111",
+    "--docs-run-id=222",
   ]);
   assert.deepEqual(a, {
-    repo: "acme/x", branch: "main", outDir: "tmp/x",
-    ciRunId: "111", docsRunId: "222",
+    repo: "acme/x",
+    branch: "main",
+    outDir: "tmp/x",
+    ciRunId: "111",
+    docsRunId: "222",
   });
 });
 
@@ -186,10 +192,14 @@ t("REQUIRED_MARKERS includes the six fixed proof keys", () => {
 t("FORBIDDEN_PATTERNS covers the documented contamination set", () => {
   const names = FORBIDDEN_PATTERNS.map((p) => p.name);
   for (const need of [
-    "JWT-shaped token", "Bearer token", "service_role assignment",
+    "JWT-shaped token",
+    "Bearer token",
+    "service_role assignment",
     "SUPABASE_SERVICE_ROLE_KEY assignment",
-    "secret_ciphertext column", "secret_nonce column",
-    "secret_hash column", "token_hash column",
+    "secret_ciphertext column",
+    "secret_nonce column",
+    "secret_hash column",
+    "token_hash column",
   ]) {
     assert.ok(names.includes(need), `missing forbidden pattern: ${need}`);
   }

@@ -102,7 +102,7 @@ describe("AI Doctor freshness — out-of-range `now`: unit cases return safe def
 
 describe("AI Doctor freshness — out-of-range `now`: property-based fuzz never throws", () => {
   it("200 random out-of-range now values produce safe defaults for both helpers", () => {
-    const rand = mulberry32(0xDEADBEEF);
+    const rand = mulberry32(0xdeadbeef);
     for (let i = 0; i < 200; i++) {
       // Uniform over (MAX_SAFE_DATE_MS, 1e18], flipped random sign.
       const magnitude = MAX_SAFE_DATE_MS + rand() * (1e18 - MAX_SAFE_DATE_MS);
@@ -152,9 +152,7 @@ describe("AI Doctor freshness — out-of-range `now`: property-based fuzz never 
       });
       // cutoff equals `new Date(n - 48h).toISOString()` — must be a real
       // ISO string, proving we did NOT force the fallback here.
-      expect(res.cutoffAtIso).toBe(
-        new Date(n - AI_DOCTOR_SNAPSHOT_FRESH_MS).toISOString(),
-      );
+      expect(res.cutoffAtIso).toBe(new Date(n - AI_DOCTOR_SNAPSHOT_FRESH_MS).toISOString());
     }
   });
 });

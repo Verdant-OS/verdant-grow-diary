@@ -36,7 +36,7 @@ describe("OperatorEcowittCanary — Windows run-command panel", () => {
   });
 
   it("warns operators not to paste curl commands into prompts", () => {
-    expect(src.toLowerCase()).toContain("do not paste curl commands");
+    expect(src.toLowerCase()).toMatch(/do not paste curl\s+commands/);
   });
 
   it("offers a copy-to-clipboard button per command (no auto-execution)", () => {

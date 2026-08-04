@@ -137,22 +137,14 @@ for (const f of files) {
 }
 
 if (offenders.length > 0) {
-  console.error(
-    "✗ VPD stage mapping ownership violated. The legacy→canonical table",
-  );
-  console.error(
-    "  must live ONLY in src/lib/vpdStageNormalizationRules.ts.",
-  );
+  console.error("✗ VPD stage mapping ownership violated. The legacy→canonical table");
+  console.error("  must live ONLY in src/lib/vpdStageNormalizationRules.ts.");
   console.error("  Duplicate mappings found:");
   for (const o of offenders) {
-    console.error(
-      `  ${o.file}:${o.lineNumber}  → ${o.legacy} -> ${o.canonical}`,
-    );
+    console.error(`  ${o.file}:${o.lineNumber}  → ${o.legacy} -> ${o.canonical}`);
     console.error(`      ${o.line}`);
   }
   process.exit(1);
 }
 
-console.log(
-  `✓ VPD stage mapping ownership OK — scanned ${files.length} files, no duplicates.`,
-);
+console.log(`✓ VPD stage mapping ownership OK — scanned ${files.length} files, no duplicates.`);

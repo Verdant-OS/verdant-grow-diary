@@ -82,10 +82,7 @@ describe("buildQuickLogSensorSnapshotViewModel", () => {
   });
 
   it("does not attach invalid readings (missing captured_at)", () => {
-    const vm = buildQuickLogSensorSnapshotViewModel(
-      { snapshot: { source: "live" } },
-      opts,
-    );
+    const vm = buildQuickLogSensorSnapshotViewModel({ snapshot: { source: "live" } }, opts);
     expect(vm.display?.effectiveSource).toBe("invalid");
     expect(vm.isAttachable).toBe(false);
     expect(vm.warning).toMatch(/invalid|missing/i);

@@ -46,10 +46,7 @@ export function DevOpsBackupEncryptionCard({ input }: Props) {
           <Badge variant="outline" data-testid="state-badge">
             {vm.stateBadge.label}
           </Badge>
-          <Badge
-            variant={riskVariant(vm.riskBadge.tone)}
-            data-testid="risk-badge"
-          >
+          <Badge variant={riskVariant(vm.riskBadge.tone)} data-testid="risk-badge">
             {vm.riskBadge.label}
           </Badge>
         </div>

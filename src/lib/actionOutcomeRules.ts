@@ -81,8 +81,7 @@ export interface ActionOutcomeDiaryDraft {
 }
 
 export type OutcomeDraftResult =
-  | { ok: true; draft: ActionOutcomeDiaryDraft }
-  | { ok: false; reason: string };
+  { ok: true; draft: ActionOutcomeDiaryDraft } | { ok: false; reason: string };
 
 // ---------------------------------------------------------------------------
 // Default notes (conservative, grower-recorded text only)

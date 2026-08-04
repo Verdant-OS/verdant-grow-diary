@@ -19,10 +19,7 @@
  *   - src/pages/ActionDetail.tsx    (origin panels: alert + AI Doctor)
  */
 
-import {
-  getActionQueueSourceKind,
-  type ActionQueueSource,
-} from "@/lib/actionQueueProvenanceRules";
+import { getActionQueueSourceKind, type ActionQueueSource } from "@/lib/actionQueueProvenanceRules";
 import {
   ENVIRONMENT_ALERT_FALLBACK_LABEL,
   formatEnvironmentAlertLabel,
@@ -38,15 +35,13 @@ import {
  * intent at the call-site. Identical signature/behavior to the underlying
  * `evaluateManualSensorSnapshotQuality` helper.
  */
-export const classifyManualSensorSnapshotQuality =
-  evaluateManualSensorSnapshotQuality;
+export const classifyManualSensorSnapshotQuality = evaluateManualSensorSnapshotQuality;
 
 export const ACTION_EVIDENCE_QUALITY_UNAVAILABLE_LABEL =
   "Evidence quality: not available from this action record";
 export const ACTION_EVIDENCE_QUALITY_UNAVAILABLE_SUMMARY =
   "No sanitized sensor snapshot is attached to this action record.";
-export const ACTION_EVIDENCE_REVIEW_ONLY_LABEL =
-  "Status: Grower review required";
+export const ACTION_EVIDENCE_REVIEW_ONLY_LABEL = "Status: Grower review required";
 export const ACTION_EVIDENCE_NO_AUTOMATION_NOTE =
   "Verdant will not send equipment commands automatically.";
 export const ACTION_EVIDENCE_HISTORICAL_NOTE =
@@ -57,8 +52,7 @@ export const ACTION_EVIDENCE_ORIGIN_FALLBACK = "Review evidence";
  * Centralized empty-state copy for the Action Queue "Needs Review" list.
  * Preserves the safety promise that nothing is auto-approved or auto-run.
  */
-export const ACTION_QUEUE_EMPTY_PENDING_TITLE =
-  "No actions need review right now.";
+export const ACTION_QUEUE_EMPTY_PENDING_TITLE = "No actions need review right now.";
 export const ACTION_QUEUE_EMPTY_PENDING_HELP =
   "New AI Doctor or alert suggestions will appear here for grower approval.";
 
@@ -81,7 +75,6 @@ export const ACTION_EVIDENCE_STATUS_UNAVAILABLE_HELP =
 export const ACTION_EVIDENCE_STATUS_MISSING_LABEL = "Evidence missing";
 export const ACTION_EVIDENCE_STATUS_MISSING_HELP =
   "Review the diary timeline and sensor history before approving.";
-
 
 const SOURCE_LABEL: Readonly<Record<ActionQueueSource, string>> = {
   environment_alert: "Environment Alert",
@@ -128,9 +121,7 @@ export interface ActionEvidenceViewModel {
   readonly rowEvidenceStatusTone: "neutral" | "caution" | "ok";
 }
 
-function formatCapturedAtLabel(
-  v: ActionEvidenceInput["captured_at"],
-): string {
+function formatCapturedAtLabel(v: ActionEvidenceInput["captured_at"]): string {
   if (v == null || v === "") return "Captured: not recorded";
   let ms: number;
   if (v instanceof Date) ms = v.getTime();
@@ -141,10 +132,7 @@ function formatCapturedAtLabel(
   return `Captured: ${new Date(ms).toISOString()}`;
 }
 
-function buildOriginLabel(
-  kind: ActionQueueSource,
-  alertType: string | null | undefined,
-): string {
+function buildOriginLabel(kind: ActionQueueSource, alertType: string | null | undefined): string {
   switch (kind) {
     case "environment_alert":
       // Always go through the safe label formatter; unknown alert type

@@ -30,9 +30,7 @@ function buildChecks(env: EnvOverrides, shadowAll: boolean): EnvCheck[] {
       // the local E2E lanes run the app against http://127.0.0.1:54321.
       validate: (val) =>
         (val.startsWith("https://") && val.includes(".supabase.co")) ||
-        /^http:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(
-          val.replace(/\/$/, ""),
-        ),
+        /^http:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(val.replace(/\/$/, "")),
       hint: "Must be a Supabase project URL (https://<ref>.supabase.co) or a local loopback stack (http://127.0.0.1:54321)",
     },
     {
@@ -63,9 +61,7 @@ export function verifySupabaseEnv(overrides?: EnvOverrides): {
   for (const c of buildChecks(overrides ?? {}, overrides !== undefined)) {
     if (!c.value || c.value.trim() === "") {
       if (c.required) {
-        errors.push(
-          `Missing required env var: ${c.name}. ${c.hint}`
-        );
+        errors.push(`Missing required env var: ${c.name}. ${c.hint}`);
       } else {
         warnings.push(`Optional env var missing: ${c.name}`);
       }

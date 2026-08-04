@@ -43,13 +43,7 @@ export const CURE_VENTILATION_METHODS = [
 ] as const;
 export type CureVentilationMethod = (typeof CURE_VENTILATION_METHODS)[number];
 
-export const CURE_BUFFERING_METHODS = [
-  "none",
-  "boveda",
-  "integra",
-  "other",
-  "unknown",
-] as const;
+export const CURE_BUFFERING_METHODS = ["none", "boveda", "integra", "other", "unknown"] as const;
 export type CureBufferingMethod = (typeof CURE_BUFFERING_METHODS)[number];
 
 /** Numeric bounds (presentation-only validation, not health scoring). */

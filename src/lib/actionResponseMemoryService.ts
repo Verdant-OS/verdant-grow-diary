@@ -45,8 +45,7 @@ export interface LoadActionResponseMemoriesArgs {
 }
 
 export type ActionResponseMemoryLoadResult =
-  | { status: "ok"; memories: ActionResponseMemory[] }
-  | { status: "failed"; reason: "query_failed" };
+  { status: "ok"; memories: ActionResponseMemory[] } | { status: "failed"; reason: "query_failed" };
 
 const FAILED: ActionResponseMemoryLoadResult = {
   status: "failed",

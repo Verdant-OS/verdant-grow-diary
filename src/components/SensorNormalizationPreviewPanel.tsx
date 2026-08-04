@@ -54,10 +54,7 @@ export function SensorNormalizationPreviewPanel({
         </p>
       </header>
 
-      <div
-        data-testid="sensor-normalization-preview-badges"
-        className="flex flex-wrap gap-1.5"
-      >
+      <div data-testid="sensor-normalization-preview-badges" className="flex flex-wrap gap-1.5">
         {vm.badges.map((b) => (
           <span
             key={b.label}
@@ -94,19 +91,14 @@ export function SensorNormalizationPreviewPanel({
         {!compact && (
           <div>
             <dt className="font-semibold text-foreground">Captured at</dt>
-            <dd data-testid="sensor-normalization-preview-captured-at">
-              {vm.capturedAtDisplay}
-            </dd>
+            <dd data-testid="sensor-normalization-preview-captured-at">{vm.capturedAtDisplay}</dd>
           </div>
         )}
         <div>
           <dt className="font-semibold text-foreground">Long-form rows</dt>
-          <dd data-testid="sensor-normalization-preview-row-count">
-            {vm.longFormRowCount}
-          </dd>
+          <dd data-testid="sensor-normalization-preview-row-count">{vm.longFormRowCount}</dd>
         </div>
       </dl>
-
 
       {vm.warnings.length > 0 && (
         <>
@@ -135,14 +127,13 @@ export function SensorNormalizationPreviewPanel({
             </summary>
             <div className="mt-2 space-y-2 text-muted-foreground">
               <p>
-                Warnings are data-quality signals. They mean Verdant noticed
-                missing context, stale data, suspicious units, or values that may
-                need review. They are not plant diagnosis and they do not save
-                sensor readings.
+                Warnings are data-quality signals. They mean Verdant noticed missing context, stale
+                data, suspicious units, or values that may need review. They are not plant diagnosis
+                and they do not save sensor readings.
               </p>
               <p>
-                When unsure, treat this preview as note-only until the source,
-                timestamp, tent context, and units are verified.
+                When unsure, treat this preview as note-only until the source, timestamp, tent
+                context, and units are verified.
               </p>
             </div>
           </details>
@@ -235,14 +226,14 @@ export function SensorNormalizationPreviewPanel({
           <p>{vm.emptyState ?? ""}</p>
           {vm.tentStatus !== "linked_verified" && (
             <p>
-              Metric summaries may still appear for review, but they are not
-              saved as sensor readings.
+              Metric summaries may still appear for review, but they are not saved as sensor
+              readings.
             </p>
           )}
           {vm.emptyState === SENSOR_NORMALIZATION_PREVIEW_NO_METRICS_EMPTY_STATE && (
             <p>
-              Check the input fields, CSV mapping, units, and timestamp before
-              treating this data as useful.
+              Check the input fields, CSV mapping, units, and timestamp before treating this data as
+              useful.
             </p>
           )}
         </div>

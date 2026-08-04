@@ -58,7 +58,6 @@ const WEAK_NOTE = (capturedAt: string) =>
     "  • humidity_pct: not_checked (value=—)",
   ].join("\n");
 
-
 describe("aiDoctorEnvironmentCheckRules — parser hardening", () => {
   it("does not throw on malformed / empty / null note bodies", () => {
     expect(() => parseEnvironmentCheckNote("")).not.toThrow();
@@ -148,10 +147,7 @@ describe("selectBestEnvironmentCheckEvent", () => {
   it("never throws on malformed event list", () => {
     expect(() => selectBestEnvironmentCheckEvent(null)).not.toThrow();
     expect(() =>
-      selectBestEnvironmentCheckEvent([
-        null as never,
-        { occurredAt: null, noteBody: undefined },
-      ]),
+      selectBestEnvironmentCheckEvent([null as never, { occurredAt: null, noteBody: undefined }]),
     ).not.toThrow();
   });
 });
@@ -188,9 +184,7 @@ describe("buildEnvironmentCheckChecklist", () => {
 
   it("covers all required metrics", () => {
     const c = buildEnvironmentCheckChecklist({ event: null, hasLiveSensorContext: false });
-    expect(c.items.map((i) => i.key).sort()).toEqual(
-      [...REQUIRED_ENVIRONMENT_METRICS].sort(),
-    );
+    expect(c.items.map((i) => i.key).sort()).toEqual([...REQUIRED_ENVIRONMENT_METRICS].sort());
     expect(c.items.every((i) => i.state === "needed")).toBe(true);
   });
 });
@@ -199,7 +193,10 @@ describe("Evidence panel — Latest EcoWitt Environment Check + checklist", () =
   it("renders section title, Test/Local validation, captured_at, per-metric rows, and Derived context for VPD", () => {
     const vm = buildAiDoctorEvidencePanelVM({
       environmentCheckEvents: [
-        { occurredAt: "2026-06-08T12:00:00Z", noteBody: FULL_ACCEPTED_NOTE("2026-06-08T12:00:00Z") },
+        {
+          occurredAt: "2026-06-08T12:00:00Z",
+          noteBody: FULL_ACCEPTED_NOTE("2026-06-08T12:00:00Z"),
+        },
       ],
       environmentCheckTimelineHref: "/timeline#ecowitt",
     });
@@ -216,7 +213,9 @@ describe("Evidence panel — Latest EcoWitt Environment Check + checklist", () =
     const vpdRow = screen.getByTestId("latest-env-check-row-vpd_kpa");
     expect(within(vpdRow).getByText("Derived context")).toBeInTheDocument();
     expect(
-      within(section).getByRole("link", { name: /view latest ecowitt environment check in timeline/i }),
+      within(section).getByRole("link", {
+        name: /view latest ecowitt environment check in timeline/i,
+      }),
     ).toHaveAttribute("href", "/timeline#ecowitt");
   });
 
@@ -249,20 +248,31 @@ describe("Evidence panel — Latest EcoWitt Environment Check + checklist", () =
       ],
     });
     render(<AiDoctorEvidencePanel vm={vm} />);
-    expect(within(screen.getByTestId("more-data-item-temp_f")).getByText("Complete")).toBeInTheDocument();
-    expect(within(screen.getByTestId("more-data-item-humidity_pct")).getByText("Needed")).toBeInTheDocument();
-    expect(within(screen.getByTestId("more-data-item-vpd_kpa")).getByText("Needed")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("more-data-item-temp_f")).getByText("Complete"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("more-data-item-humidity_pct")).getByText("Needed"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("more-data-item-vpd_kpa")).getByText("Needed"),
+    ).toBeInTheDocument();
   });
 
   it("does not expose tokens, user_id, service_role, bridge_token, or auth headers", () => {
     const vm = buildAiDoctorEvidencePanelVM({
       environmentCheckEvents: [
-        { occurredAt: "2026-06-08T12:00:00Z", noteBody: FULL_ACCEPTED_NOTE("2026-06-08T12:00:00Z") },
+        {
+          occurredAt: "2026-06-08T12:00:00Z",
+          noteBody: FULL_ACCEPTED_NOTE("2026-06-08T12:00:00Z"),
+        },
       ],
     });
     render(<AiDoctorEvidencePanel vm={vm} />);
     const text = document.body.textContent ?? "";
-    expect(text).not.toMatch(/service_role|bridge_token|authorization|bearer\s|jwt|api_key|user_id/i);
+    expect(text).not.toMatch(
+      /service_role|bridge_token|authorization|bearer\s|jwt|api_key|user_id/i,
+    );
   });
 
   it("static safety scan: no writes / functions.invoke / action_queue / device-control", async () => {

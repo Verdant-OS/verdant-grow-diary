@@ -30,7 +30,9 @@ describe("AssignTentDialog · same-grow tent assignment", () => {
 
   it("marks the current tent as disabled / labeled current", () => {
     expect(DIALOG).toContain("Current Tent");
-    expect(DIALOG).toMatch(/value=\{t\.id\}[\s\S]{0,80}disabled[\s\S]{0,200}assign-tent-option-current/);
+    expect(DIALOG).toMatch(
+      /value=\{t\.id\}[\s\S]{0,80}disabled[\s\S]{0,200}assign-tent-option-current/,
+    );
     expect(DIALOG).toContain("Plant is already in this tent");
   });
 
@@ -70,7 +72,9 @@ describe("AssignTentDialog · same-grow tent assignment", () => {
   });
 
   it("contains no automation / device-control / pi-ingest transport strings", () => {
-    expect(DIALOG).not.toMatch(/mqtt|home[\s_-]?assistant|relay|actuator|webhook|device_command|service_role/i);
+    expect(DIALOG).not.toMatch(
+      /mqtt|home[\s_-]?assistant|relay|actuator|webhook|device_command|service_role/i,
+    );
   });
 });
 

@@ -2,10 +2,7 @@
 
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import {
-  CULTIVAR_SOURCES,
-  VERDANT_CULTIVARS,
-} from "../src/constants/strainReferenceLibrary.ts";
+import { CULTIVAR_SOURCES, VERDANT_CULTIVARS } from "../src/constants/strainReferenceLibrary.ts";
 import {
   classifySourceUrl,
   validateCultivarSourcesStructural,
@@ -143,7 +140,7 @@ async function verifyNetworkSource(source) {
       get.error ??
       (get.status !== null
         ? `HTTP ${get.status}`
-        : head.error ?? (head.status !== null ? `HEAD HTTP ${head.status}` : "unreachable")),
+        : (head.error ?? (head.status !== null ? `HEAD HTTP ${head.status}` : "unreachable"))),
   };
 }
 
@@ -152,9 +149,7 @@ async function runNetworkChecks() {
 
   for (let index = 0; index < CULTIVAR_SOURCES.length; index += 1) {
     const source = CULTIVAR_SOURCES[index];
-    console.log(
-      `[network ${index + 1}/${CULTIVAR_SOURCES.length}] ${source.key} (${source.url})`,
-    );
+    console.log(`[network ${index + 1}/${CULTIVAR_SOURCES.length}] ${source.key} (${source.url})`);
     results.push(await verifyNetworkSource(source));
     if (index < CULTIVAR_SOURCES.length - 1) await sleep(NETWORK_DELAY_MS);
   }

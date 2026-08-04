@@ -194,11 +194,7 @@ export default function ManualSensorReadingCard({
   useEffect(() => {
     const nextTentId = correction?.tentId ?? defaultTentId;
     if (!nextTentId) return;
-    changeTentTarget(
-      nextTentId,
-      correctionToPrefill(correction, airTempUnit),
-      correctionIdentity,
-    );
+    changeTentTarget(nextTentId, correctionToPrefill(correction, airTempUnit), correctionIdentity);
   }, [airTempUnit, changeTentTarget, correction, correctionIdentity, defaultTentId]);
 
   // Switching the entry unit re-expresses what the grower already typed

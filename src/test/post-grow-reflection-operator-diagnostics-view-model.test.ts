@@ -34,7 +34,8 @@ describe("buildPostGrowReflectionOperatorDiagnosticsViewModel", () => {
       failureReasonLabel: "none",
     });
     expect(
-      viewModel.scenarios.find((scenario) => scenario.id === "rich-unsafe-automation-rejected")?.issueCodesLabel,
+      viewModel.scenarios.find((scenario) => scenario.id === "rich-unsafe-automation-rejected")
+        ?.issueCodesLabel,
     ).toContain("unsafe_language");
   });
 
@@ -56,6 +57,8 @@ describe("buildPostGrowReflectionOperatorDiagnosticsViewModel", () => {
 
     expect(viewModel.safetyRules.join("\n")).toMatch(/Operator-only route/i);
     expect(viewModel.safetyRules.join("\n")).toMatch(/Do not call a model or provider/i);
-    expect(viewModel.safetyRules.join("\n")).toMatch(/No database reads\/writes, persistence, schema, or report UI wiring/i);
+    expect(viewModel.safetyRules.join("\n")).toMatch(
+      /No database reads\/writes, persistence, schema, or report UI wiring/i,
+    );
   });
 });

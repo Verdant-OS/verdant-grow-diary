@@ -21,9 +21,7 @@ describe("deriveAlertReadingSource", () => {
   );
 
   it("returns null for non-enum alert.source like environment_alerts", () => {
-    expect(
-      deriveAlertReadingSource({ source: "environment_alerts", reason: "x" }),
-    ).toBeNull();
+    expect(deriveAlertReadingSource({ source: "environment_alerts", reason: "x" })).toBeNull();
   });
 
   it("falls back to [source:<value>] tag in reason", () => {
@@ -51,8 +49,6 @@ describe("deriveAlertReadingSource", () => {
   });
 
   it("never promotes manual to live (exact match only)", () => {
-    expect(
-      deriveAlertReadingSource({ source: "manual", reason: "[source:live]" }),
-    ).toBe("manual");
+    expect(deriveAlertReadingSource({ source: "manual", reason: "[source:live]" })).toBe("manual");
   });
 });

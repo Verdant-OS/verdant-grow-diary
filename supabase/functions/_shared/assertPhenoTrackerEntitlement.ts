@@ -16,8 +16,7 @@
 import { loadUnionEntitlement, resolveServerBillingEnvironment } from "./unionEntitlementLookup.ts";
 
 export type PhenoTrackerGateResult =
-  | { ok: true }
-  | { ok: false; status: 403; reason: "pheno_tracker_pro_required" };
+  { ok: true } | { ok: false; status: 403; reason: "pheno_tracker_pro_required" };
 
 // Every plan whose capabilities dominate Pro's. Craft is sold as "Everything
 // in Pro" and planCatalog defines it as a literal superset, so it belongs here

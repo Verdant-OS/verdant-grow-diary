@@ -15,10 +15,7 @@ export default defineTool({
     "List the signed-in Verdant grower's own grows (id, name, stage, " +
     "grow_type, archived flag, timestamps). Read-only.",
   inputSchema: {
-    includeArchived: z
-      .boolean()
-      .optional()
-      .describe("Include archived grows. Defaults to false."),
+    includeArchived: z.boolean().optional().describe("Include archived grows. Defaults to false."),
     limit: z
       .number()
       .int()

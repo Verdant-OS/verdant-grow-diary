@@ -64,8 +64,7 @@ export interface PhenoStressTestingSectionProps {
   })[];
 }
 
-const inputClass =
-  "w-full rounded border border-border bg-background px-2 py-1 text-sm";
+const inputClass = "w-full rounded border border-border bg-background px-2 py-1 text-sm";
 
 function Field({
   id,
@@ -92,15 +91,12 @@ function Field({
           {error}
         </span>
       )}
-      {hint && !error && (
-        <span className="mt-1 block text-xs text-muted-foreground">{hint}</span>
-      )}
+      {hint && !error && <span className="mt-1 block text-xs text-muted-foreground">{hint}</span>}
     </label>
   );
 }
 
-const nullIfBlank = (raw: string): string | null =>
-  raw.trim().length === 0 ? null : raw;
+const nullIfBlank = (raw: string): string | null => (raw.trim().length === 0 ? null : raw);
 
 export default function PhenoStressTestingSection({
   candidates,
@@ -108,9 +104,7 @@ export default function PhenoStressTestingSection({
   onPersist,
   summaries,
 }: PhenoStressTestingSectionProps) {
-  const [draft, setDraft] = useState<PhenoStressObservationDraft>(
-    PHENO_STRESS_DEFAULT_DRAFT,
-  );
+  const [draft, setDraft] = useState<PhenoStressObservationDraft>(PHENO_STRESS_DEFAULT_DRAFT);
   const [entries, setEntries] = useState<PhenoStressObservationDraft[]>([]);
   const [issues, setIssues] = useState<PhenoStressIssues>({});
   const [saving, setSaving] = useState(false);
@@ -212,10 +206,7 @@ export default function PhenoStressTestingSection({
       {summaryList.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold">Candidate stress status</h3>
-          <div
-            data-testid="pheno-stress-summary-grid"
-            className="mt-2 grid gap-2 md:grid-cols-2"
-          >
+          <div data-testid="pheno-stress-summary-grid" className="mt-2 grid gap-2 md:grid-cols-2">
             {summaryList.map((s) => (
               <PhenoStressSummaryCard
                 key={s.plantId}
@@ -227,16 +218,8 @@ export default function PhenoStressTestingSection({
         </div>
       )}
 
-      <form
-        data-testid="pheno-stress-form"
-        onSubmit={record}
-        className="grid gap-3 md:grid-cols-2"
-      >
-        <Field
-          id="pheno-stress-candidate"
-          label="Candidate ID"
-          error={issues.plantId}
-        >
+      <form data-testid="pheno-stress-form" onSubmit={record} className="grid gap-3 md:grid-cols-2">
+        <Field id="pheno-stress-candidate" label="Candidate ID" error={issues.plantId}>
           {candidates && candidates.length > 0 ? (
             <select
               id="pheno-stress-candidate"
@@ -264,11 +247,7 @@ export default function PhenoStressTestingSection({
           )}
         </Field>
 
-        <Field
-          id="pheno-stress-factor"
-          label="Stress factor"
-          error={issues.stressFactor}
-        >
+        <Field id="pheno-stress-factor" label="Stress factor" error={issues.stressFactor}>
           <select
             id="pheno-stress-factor"
             data-testid="pheno-stress-factor"
@@ -284,11 +263,7 @@ export default function PhenoStressTestingSection({
           </select>
         </Field>
 
-        <Field
-          id="pheno-stress-status"
-          label="Planned or observed"
-          error={issues.status}
-        >
+        <Field id="pheno-stress-status" label="Planned or observed" error={issues.status}>
           <select
             id="pheno-stress-status"
             data-testid="pheno-stress-status"
@@ -304,18 +279,12 @@ export default function PhenoStressTestingSection({
           </select>
         </Field>
 
-        <Field
-          id="pheno-stress-intensity"
-          label="Intensity"
-          error={issues.intensity}
-        >
+        <Field id="pheno-stress-intensity" label="Intensity" error={issues.intensity}>
           <select
             id="pheno-stress-intensity"
             data-testid="pheno-stress-intensity"
             value={draft.intensity}
-            onChange={(e) =>
-              patch("intensity", e.target.value as PhenoStressIntensity)
-            }
+            onChange={(e) => patch("intensity", e.target.value as PhenoStressIntensity)}
             className={inputClass}
           >
             {PHENO_STRESS_INTENSITY_OPTIONS.map((i) => (
@@ -326,11 +295,7 @@ export default function PhenoStressTestingSection({
           </select>
         </Field>
 
-        <Field
-          id="pheno-stress-start"
-          label="Start date"
-          error={issues.startDate}
-        >
+        <Field id="pheno-stress-start" label="Start date" error={issues.startDate}>
           <input
             id="pheno-stress-start"
             data-testid="pheno-stress-start"
@@ -416,12 +381,7 @@ export default function PhenoStressTestingSection({
             id="pheno-stress-recommendation"
             data-testid="pheno-stress-recommendation"
             value={draft.recommendation}
-            onChange={(e) =>
-              patch(
-                "recommendation",
-                e.target.value as PhenoStressRecommendation,
-              )
-            }
+            onChange={(e) => patch("recommendation", e.target.value as PhenoStressRecommendation)}
             className={inputClass}
           >
             {PHENO_STRESS_RECOMMENDATION_OPTIONS.map((r) => (
@@ -487,10 +447,7 @@ export default function PhenoStressTestingSection({
             {saving ? "Saving…" : "Record stress observation"}
           </button>
           {savedMessage && (
-            <span
-              data-testid="pheno-stress-saved"
-              className="text-xs text-emerald-600"
-            >
+            <span data-testid="pheno-stress-saved" className="text-xs text-emerald-600">
               {savedMessage}
             </span>
           )}
@@ -500,10 +457,7 @@ export default function PhenoStressTestingSection({
       {entries.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold">Recorded observations</h3>
-          <ul
-            data-testid="pheno-stress-entries"
-            className="mt-2 space-y-2 text-sm"
-          >
+          <ul data-testid="pheno-stress-entries" className="mt-2 space-y-2 text-sm">
             {entries.map((entry, i) => (
               <li
                 key={i}
@@ -516,8 +470,7 @@ export default function PhenoStressTestingSection({
                   {entry.candidateId} · {entry.factor}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {entry.status} · intensity {entry.intensity} · rec:{" "}
-                  {entry.recommendation}
+                  {entry.status} · intensity {entry.intensity} · rec: {entry.recommendation}
                 </div>
               </li>
             ))}

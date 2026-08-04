@@ -74,7 +74,9 @@ function basePayload(
   };
 }
 
-function processDetails(decision: NormalizedPaddleEntitlementProcessDecision): Record<string, unknown> {
+function processDetails(
+  decision: NormalizedPaddleEntitlementProcessDecision,
+): Record<string, unknown> {
   return {
     phase: "mapper_decision",
     decision_state: decision.state,
@@ -92,11 +94,12 @@ export function buildPaddleEventProcessingInsertPayload(
   source: RecordedPaddleEventProcessingSource,
   decision: NormalizedPaddleEntitlementDecision,
 ): PaddleEventProcessingInsertPayload {
-  const status: PaddleEventProcessingStatus = decision.state === "process"
-    ? "processed"
-    : decision.state === "ignore"
-      ? "ignored"
-      : "blocked";
+  const status: PaddleEventProcessingStatus =
+    decision.state === "process"
+      ? "processed"
+      : decision.state === "ignore"
+        ? "ignored"
+        : "blocked";
 
   const payload = basePayload(
     source,
@@ -105,12 +108,12 @@ export function buildPaddleEventProcessingInsertPayload(
     decision.state === "process"
       ? processDetails(decision)
       : {
-        phase: "mapper_decision",
-        decision_state: decision.state,
-        provider_event_id: decision.providerEventId,
-        provider_occurred_at: decision.providerOccurredAt,
-        event_type: decision.eventType,
-      },
+          phase: "mapper_decision",
+          decision_state: decision.state,
+          provider_event_id: decision.providerEventId,
+          provider_occurred_at: decision.providerOccurredAt,
+          event_type: decision.eventType,
+        },
   );
 
   if (decision.state !== "process") {

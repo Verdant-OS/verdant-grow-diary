@@ -11,9 +11,7 @@ import type {
   AiDoctorDiagnosisResult,
 } from "@/lib/aiDoctorEnginePhase1Foundation";
 
-function ctx(
-  overrides: Partial<AiDoctorContextPayload> = {},
-): AiDoctorContextPayload {
+function ctx(overrides: Partial<AiDoctorContextPayload> = {}): AiDoctorContextPayload {
   return {
     grow_id: "g1",
     tent_id: "t1",
@@ -35,9 +33,7 @@ function ctx(
   };
 }
 
-function result(
-  overrides: Partial<AiDoctorDiagnosisResult> = {},
-): AiDoctorDiagnosisResult {
+function result(overrides: Partial<AiDoctorDiagnosisResult> = {}): AiDoctorDiagnosisResult {
   return {
     summary: "Cautious observation summary.",
     likely_issue: "Sensor data quality issue.",
@@ -91,9 +87,7 @@ describe("AiDoctorPhase1ResultPanel", () => {
   });
 
   it("renders no write/save/attach/send/execute/run buttons", () => {
-    const { container } = render(
-      <AiDoctorPhase1ResultPanel context={ctx()} result={result()} />,
-    );
+    const { container } = render(<AiDoctorPhase1ResultPanel context={ctx()} result={result()} />);
     const forbidden = [
       /\bSave\b/i,
       /\bAttach\b/i,

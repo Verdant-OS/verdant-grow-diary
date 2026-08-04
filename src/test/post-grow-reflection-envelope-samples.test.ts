@@ -19,7 +19,9 @@ describe("post-grow reflection envelope samples", () => {
       "validated",
       "envelope_rejected",
     ]);
-    expect(buildPostGrowReflectionEnvelopeSamples()).toEqual(buildPostGrowReflectionEnvelopeSamples());
+    expect(buildPostGrowReflectionEnvelopeSamples()).toEqual(
+      buildPostGrowReflectionEnvelopeSamples(),
+    );
   });
 
   it("valid sample passes through the existing paste validator", () => {

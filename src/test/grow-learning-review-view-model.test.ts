@@ -151,8 +151,21 @@ describe("summarizeGrowLearning", () => {
 
 describe("filterGrowLearningEpisodes — deterministic AND semantics", () => {
   const episodes = [
-    episode({ id: "a", plantId: "p1", targetMetric: "humidity", outcome: "improved", decision: "repeat", usableSensor: true }),
-    episode({ id: "b", plantId: "p2", targetMetric: "ec", outcome: "worsened", decision: "adjust" }),
+    episode({
+      id: "a",
+      plantId: "p1",
+      targetMetric: "humidity",
+      outcome: "improved",
+      decision: "repeat",
+      usableSensor: true,
+    }),
+    episode({
+      id: "b",
+      plantId: "p2",
+      targetMetric: "ec",
+      outcome: "worsened",
+      decision: "adjust",
+    }),
   ];
 
   it("no filters returns everything", () => {

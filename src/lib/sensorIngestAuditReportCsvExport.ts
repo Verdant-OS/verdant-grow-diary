@@ -62,9 +62,7 @@ export interface AuditCsvFilenameFilters {
  *   verdant-sensor-ingest-audit_from-2026-06-01_to-2026-06-19.csv
  *   verdant-sensor-ingest-audit_provider-ecowitt_from-2026-06-01_to-2026-06-19.csv
  */
-export function buildSensorIngestAuditCsvFilename(
-  filters: AuditCsvFilenameFilters = {},
-): string {
+export function buildSensorIngestAuditCsvFilename(filters: AuditCsvFilenameFilters = {}): string {
   const parts: string[] = [AUDIT_CSV_FILENAME_BASE];
   const provider = sanitizeProviderForFilename(filters.provider ?? null);
   if (provider) parts.push(`provider-${provider}`);

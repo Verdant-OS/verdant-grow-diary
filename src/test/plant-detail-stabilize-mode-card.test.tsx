@@ -100,6 +100,8 @@ describe("Plant Detail Stabilize Mode card", () => {
     const text = container.textContent ?? "";
 
     expect(screen.getByTestId("plant-detail-stabilize-mode")).toBeInTheDocument();
-    expect(text).not.toMatch(/definitely|guaranteed|auto[- ]?run|execute|action queue|turn on|turn off/i);
+    expect(text).not.toMatch(
+      /definitely|guaranteed|auto[- ]?run|execute|action queue|turn on|turn off/i,
+    );
   });
 });

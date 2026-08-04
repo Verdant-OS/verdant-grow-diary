@@ -9,15 +9,9 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  classifyVpdAgainstStage,
-  vpdMetricChipStatus,
-} from "@/lib/vpdStageTargetRules";
+import { classifyVpdAgainstStage, vpdMetricChipStatus } from "@/lib/vpdStageTargetRules";
 
-const SRC = readFileSync(
-  resolve(__dirname, "../pages/GrowRoomMode.tsx"),
-  "utf8",
-);
+const SRC = readFileSync(resolve(__dirname, "../pages/GrowRoomMode.tsx"), "utf8");
 
 describe("GrowRoomMode — stage-aware VPD wiring (static)", () => {
   it("imports classifyVpdAgainstStage from the canonical rules module", () => {

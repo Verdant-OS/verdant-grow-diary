@@ -21,10 +21,7 @@
  * Read-only: never emits recommendations, alerts, action-queue items,
  * or automation. Labels and summaries only.
  */
-import type {
-  NormalizedDiaryDetails,
-  NormalizedDiaryEntry,
-} from "./diaryEntryRules";
+import type { NormalizedDiaryDetails, NormalizedDiaryEntry } from "./diaryEntryRules";
 import { classifyTimelineEntry } from "./timelineEntryClassification";
 
 /**
@@ -32,11 +29,7 @@ import { classifyTimelineEntry } from "./timelineEntryClassification";
  * whose real action type lives inside `details.declaredEventType`.
  * Lowercased for comparison.
  */
-const QUICK_LOG_WRAPPER_ENVELOPES: ReadonlySet<string> = new Set([
-  "quick_log",
-  "note",
-  "",
-]);
+const QUICK_LOG_WRAPPER_ENVELOPES: ReadonlySet<string> = new Set(["quick_log", "note", ""]);
 
 /**
  * Canonical Quick Log action types the resolver knows how to label and
@@ -229,8 +222,7 @@ export function resolveQuickLogEventIdentity(
   const envelope = normalizeType(entry?.eventType);
   const declared = normalizeType(entry?.details?.declaredEventType ?? null);
   const wrapper = QUICK_LOG_WRAPPER_ENVELOPES.has(envelope);
-  const promote =
-    wrapper && declared !== "" && QUICK_LOG_CANONICAL_EVENT_TYPES.has(declared);
+  const promote = wrapper && declared !== "" && QUICK_LOG_CANONICAL_EVENT_TYPES.has(declared);
   if (wrapper && declared !== "" && !promote && !isRecognizedDeclaredMarker(declared)) {
     // Rule 2: declared-but-unrecognized action. Neutral identity; no
     // summary is ever built for an unknown kind (nothing to honestly
@@ -244,8 +236,7 @@ export function resolveQuickLogEventIdentity(
   }
   const effective = promote ? declared : envelope || declared || "note";
   const label = DISPLAY_LABELS[effective] ?? titleCase(effective);
-  const fromQuickLog =
-    promote || (wrapper && envelope === "quick_log") || declared !== "";
+  const fromQuickLog = promote || (wrapper && envelope === "quick_log") || declared !== "";
   return {
     effectiveEventType: effective,
     displayLabel: label,

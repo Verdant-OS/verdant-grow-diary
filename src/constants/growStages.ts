@@ -8,11 +8,7 @@
  * Presenter / constants-only. No I/O. No React.
  */
 
-export type CanonicalGrowStage =
-  | "seedling"
-  | "vegetative"
-  | "flower"
-  | "harvest";
+export type CanonicalGrowStage = "seedling" | "vegetative" | "flower" | "harvest";
 
 export interface GrowStageDescriptor {
   /** Canonical lowercase identifier. */
@@ -48,25 +44,19 @@ const ALIAS_MAP: Record<string, CanonicalGrowStage> = {
  * Normalize any incoming stage string (case- and whitespace-insensitive)
  * to a canonical stage value, or null when unknown. Never invents.
  */
-export function normalizeGrowStage(
-  stage: string | null | undefined,
-): CanonicalGrowStage | null {
+export function normalizeGrowStage(stage: string | null | undefined): CanonicalGrowStage | null {
   if (!stage) return null;
   const k = stage.trim().toLowerCase();
   return ALIAS_MAP[k] ?? null;
 }
 
-export function formatGrowStageLabel(
-  stage: string | null | undefined,
-): string {
+export function formatGrowStageLabel(stage: string | null | undefined): string {
   const canon = normalizeGrowStage(stage);
   if (!canon) return "Unknown";
   return GROW_STAGES[canon].label;
 }
 
-export function formatGrowStageBadge(
-  stage: string | null | undefined,
-): string {
+export function formatGrowStageBadge(stage: string | null | undefined): string {
   const canon = normalizeGrowStage(stage);
   if (!canon) return "Unknown";
   return GROW_STAGES[canon].badge;

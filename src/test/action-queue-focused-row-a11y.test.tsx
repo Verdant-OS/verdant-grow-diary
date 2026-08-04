@@ -50,15 +50,11 @@ describe("Action Queue focused row a11y", () => {
       </ul>,
     );
     const li = getByTestId("row");
-    expect(li.getAttribute("aria-labelledby")).toBe(
-      `aq-pending-title-${row.id}`,
-    );
+    expect(li.getAttribute("aria-labelledby")).toBe(`aq-pending-title-${row.id}`);
     act(() => {
       li.focus();
     });
-    expect(li.getAttribute("aria-labelledby")).toBe(
-      `aq-pending-title-${row.id}`,
-    );
+    expect(li.getAttribute("aria-labelledby")).toBe(`aq-pending-title-${row.id}`);
     // Generic "Focused action" must NOT replace the accessible name.
     expect(li.getAttribute("aria-label")).toBeNull();
   });
@@ -76,9 +72,7 @@ describe("Action Queue focused row a11y", () => {
     const desc = li.getAttribute("aria-describedby") ?? "";
     expect(desc).toContain(`aq-pending-desc-${row.id}`);
     expect(desc).toContain(`aq-pending-desc-${row.id}-focused`);
-    const focusedSpan = container.querySelector(
-      `#aq-pending-desc-${row.id}-focused`,
-    );
+    const focusedSpan = container.querySelector(`#aq-pending-desc-${row.id}-focused`);
     expect(focusedSpan?.textContent).toBe("Focused");
   });
 
@@ -98,4 +92,3 @@ describe("Action Queue focused row a11y", () => {
     expect(li.getAttribute("aria-label")).toBeNull();
   });
 });
-

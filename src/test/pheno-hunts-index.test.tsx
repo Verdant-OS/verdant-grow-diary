@@ -156,9 +156,9 @@ describe("PhenoHuntsIndex — cross-keeper stability dashboard", () => {
     );
     // Aggregate counts present (1 holding, 1 drifting, 1 no-runs).
     const counts = screen.getByTestId("pheno-stability-dashboard-counts");
-    expect(within(counts).getByTestId("pheno-stability-dashboard-filter-holding")).toHaveTextContent(
-      "1",
-    );
+    expect(
+      within(counts).getByTestId("pheno-stability-dashboard-filter-holding"),
+    ).toHaveTextContent("1");
     expect(
       within(counts).getByTestId("pheno-stability-dashboard-filter-drifting"),
     ).toHaveTextContent("1");

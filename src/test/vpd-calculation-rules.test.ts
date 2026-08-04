@@ -58,9 +58,7 @@ describe("vpdCalculationRules", () => {
   });
 
   it("marks invalid temperature outside realistic range", () => {
-    expect(deriveVpd({ temperature: 200, humidity: 50 }).kind).toBe(
-      "invalid",
-    );
+    expect(deriveVpd({ temperature: 200, humidity: 50 }).kind).toBe("invalid");
   });
 
   it("exposes calm 'Needs temperature + humidity' label, not 'Unavailable'", () => {
@@ -70,17 +68,11 @@ describe("vpdCalculationRules", () => {
 
   it("saturation vapor pressure is deterministic and positive", () => {
     expect(saturationVaporPressureKpa(20)).toBeGreaterThan(0);
-    expect(saturationVaporPressureKpa(20)).toEqual(
-      saturationVaporPressureKpa(20),
-    );
+    expect(saturationVaporPressureKpa(20)).toEqual(saturationVaporPressureKpa(20));
   });
 });
 
-import {
-  formatVpdKpa,
-  VPD_DERIVED_NOTE,
-  VPD_ROUNDING_NOTE,
-} from "@/lib/vpdCalculationRules";
+import { formatVpdKpa, VPD_DERIVED_NOTE, VPD_ROUNDING_NOTE } from "@/lib/vpdCalculationRules";
 
 describe("formatVpdKpa", () => {
   it("formats 1.206 as '1.21 kPa'", () => {

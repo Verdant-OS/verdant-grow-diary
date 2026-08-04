@@ -16,7 +16,6 @@ type GtagWindow = Window & {
   dataLayer?: unknown[];
 };
 
-
 let loaded = false;
 
 /** Idempotent. Safe to call on every render / consent change. */
@@ -42,7 +41,6 @@ export function loadGoogleAnalytics(measurementId: string = GOOGLE_ANALYTICS_MEA
   w.gtag = gtag;
   gtag("js", new Date());
   gtag("config", measurementId, { send_page_view: false });
-
 }
 
 /** Test seam: has the loader already run in this document? */

@@ -55,7 +55,6 @@ export const FUNNEL_EVENTS = [
   "checkout_return_completed",
 ] as const;
 
-
 export type FunnelEventName = (typeof FUNNEL_EVENTS)[number];
 
 /**
@@ -89,7 +88,6 @@ export const FUNNEL_PARAM_KEYS = [
    */
   "length_bucket",
 ] as const;
-
 
 type FunnelParamKey = (typeof FUNNEL_PARAM_KEYS)[number];
 

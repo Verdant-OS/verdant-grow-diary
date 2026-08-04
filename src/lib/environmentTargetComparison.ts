@@ -7,18 +7,9 @@
 
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
 
-export type ComparisonStatus =
-  | "in_range"
-  | "out_of_range"
-  | "missing_targets"
-  | "unavailable";
+export type ComparisonStatus = "in_range" | "out_of_range" | "missing_targets" | "unavailable";
 
-export type MetricState =
-  | "in_range"
-  | "low"
-  | "high"
-  | "missing_value"
-  | "missing_target";
+export type MetricState = "in_range" | "low" | "high" | "missing_value" | "missing_target";
 
 export const STATUS_HEADLINE: Record<ComparisonStatus, string> = {
   in_range: "Within configured targets",
@@ -27,14 +18,7 @@ export const STATUS_HEADLINE: Record<ComparisonStatus, string> = {
   unavailable: "Unavailable",
 };
 
-export type MetricKey =
-  | "temp"
-  | "rh"
-  | "vpd"
-  | "soil"
-  | "soil_ec"
-  | "soil_temp"
-  | "ppfd";
+export type MetricKey = "temp" | "rh" | "vpd" | "soil" | "soil_ec" | "soil_temp" | "ppfd";
 
 export interface TargetRange {
   min: number | null;
@@ -69,15 +53,7 @@ export const METRIC_LABELS: Record<MetricKey, string> = {
   ppfd: "PPFD",
 };
 
-const METRIC_ORDER: MetricKey[] = [
-  "temp",
-  "rh",
-  "vpd",
-  "soil",
-  "soil_ec",
-  "soil_temp",
-  "ppfd",
-];
+const METRIC_ORDER: MetricKey[] = ["temp", "rh", "vpd", "soil", "soil_ec", "soil_temp", "ppfd"];
 
 function hasAnyTarget(targets: GrowTargets | null | undefined): boolean {
   if (!targets) return false;
@@ -87,10 +63,7 @@ function hasAnyTarget(targets: GrowTargets | null | undefined): boolean {
   });
 }
 
-function compareValue(
-  value: number | null,
-  target: TargetRange | null | undefined,
-): MetricState {
+function compareValue(value: number | null, target: TargetRange | null | undefined): MetricState {
   const hasTarget = !!target && (target.min !== null || target.max !== null);
   if (value === null) {
     return hasTarget ? "missing_value" : "missing_value";

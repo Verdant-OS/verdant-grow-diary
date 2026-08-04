@@ -18,11 +18,16 @@ import { resolve } from "node:path";
 
 import { actionsPath } from "@/lib/routes";
 import { buildPlantQuickStatusView } from "@/lib/plantQuickStatusRules";
+import {
+  extractMountedAppRoutePaths,
+  getRouteAliasRedirectTarget,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 const ACTIONS = read("src/pages/ActionQueue.tsx");
 
 describe("Action Queue route — quick link contract", () => {
@@ -48,14 +53,13 @@ describe("Action Queue route — quick link contract", () => {
     expect(v.actionsLink.disabledReason ?? "").toMatch(/grow/i);
   });
 
-  it("Action Queue route is registered in App.tsx (canonical + legacy alias)", () => {
-    expect(APP).toMatch(/path="\/actions"\s+element=\{<ActionQueue\s*\/>\}/);
-    expect(APP).toMatch(/import\(\s*["']\.\/pages\/ActionQueue["']\s*\)/);
+  it("Action Queue route is registered in file routes (canonical + legacy alias)", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/actions");
+    expect(extractMountedAppRoutePaths()).toContain("/action-queue");
+    expect(APP).toMatch(/ActionQueue|@\/pages\/ActionQueue|pages\/ActionQueue/);
     // Legacy /action-queue alias must redirect to canonical /actions while
     // preserving the current query string and hash.
-    expect(APP).toMatch(
-      /path="\/action-queue"\s+element=\{<RouteAliasRedirect\s+to="\/actions"\s*\/>\}/,
-    );
+    expect(getRouteAliasRedirectTarget("/action-queue")).toBe("/actions");
   });
 
   it("Action Queue route reads grow context from the URL (scoped grow hook)", () => {

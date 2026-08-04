@@ -235,7 +235,9 @@ describe("One-Tent Loop Evidence Handoff — chain invariants", () => {
     expect(ctx.sourceState).toBe("manual");
     expect(ctx.isStale).toBe(false);
     expect(ctx.isInvalid).toBe(false);
-    expect(ctx.safetyNotes.join(" ")).toMatch(/cannot confirm or deny plant health with certainty/i);
+    expect(ctx.safetyNotes.join(" ")).toMatch(
+      /cannot confirm or deny plant health with certainty/i,
+    );
   });
 
   it("stale reading → AI Doctor context flags stale and reduces confidence", () => {
@@ -410,8 +412,18 @@ describe("One-Tent Loop Evidence Handoff — chain invariants", () => {
       sensorContext: ctx,
       now: FIXED_NOW,
       originatingTimelineEvents: [
-        { id: "diary-001", type: "diary_note", occurred_at: "2026-06-27T11:30:00.000Z", source: "manual" },
-        { id: "manual-snap-001", type: "manual_snapshot", occurred_at: "2026-06-27T11:50:00.000Z", source: "manual" },
+        {
+          id: "diary-001",
+          type: "diary_note",
+          occurred_at: "2026-06-27T11:30:00.000Z",
+          source: "manual",
+        },
+        {
+          id: "manual-snap-001",
+          type: "manual_snapshot",
+          occurred_at: "2026-06-27T11:50:00.000Z",
+          source: "manual",
+        },
       ],
     });
     expect(result.ok).toBe(true);
@@ -456,9 +468,7 @@ describe("One-Tent Loop Evidence Handoff — chain invariants", () => {
     const result = createActionSuggestion({
       alert: openAlert("humidity_pct", "Humidity above target"),
       now: FIXED_NOW,
-      originatingTimelineEvents: [
-        { id: "x", source: "ecowitt" as unknown as never },
-      ],
+      originatingTimelineEvents: [{ id: "x", source: "ecowitt" as unknown as never }],
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -480,9 +490,7 @@ describe("One-Tent Loop Evidence Handoff — chain invariants", () => {
     expect(approval.ok).toBe(true);
     if (!approval.ok) return;
     expect(approval.queuedAction.status).toBe("queued_non_executable");
-    expect(approval.queuedAction.originatingTimelineEvents.map((e) => e.id)).toEqual([
-      "diary-001",
-    ]);
+    expect(approval.queuedAction.originatingTimelineEvents.map((e) => e.id)).toEqual(["diary-001"]);
     expectNoForbiddenFields(approval.queuedAction);
   });
 });

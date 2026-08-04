@@ -77,9 +77,7 @@ test.describe("GA4 gtag config executes on main app routes", () => {
 
   test("the measurement ID is configured exactly once per document", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
-    await expect
-      .poll(async () => Boolean(findConfigCall(await readDataLayer(page))))
-      .toBe(true);
+    await expect.poll(async () => Boolean(findConfigCall(await readDataLayer(page)))).toBe(true);
 
     const entries = await readDataLayer(page);
     const configCalls = entries.filter(

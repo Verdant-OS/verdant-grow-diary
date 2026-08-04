@@ -66,11 +66,19 @@ function AlertRowItem({ row }: { row: PlantAssignedTentAlertRow }) {
             {row.severityLabel}
           </span>
           {row.metric ? (
-            <Badge variant="outline" className="capitalize" data-testid="plant-assigned-tent-alert-metric">
+            <Badge
+              variant="outline"
+              className="capitalize"
+              data-testid="plant-assigned-tent-alert-metric"
+            >
               {row.metric}
             </Badge>
           ) : null}
-          <Badge variant="secondary" className="capitalize" data-testid="plant-assigned-tent-alert-status">
+          <Badge
+            variant="secondary"
+            className="capitalize"
+            data-testid="plant-assigned-tent-alert-status"
+          >
             {row.status}
           </Badge>
         </div>
@@ -104,10 +112,7 @@ function AlertRowItem({ row }: { row: PlantAssignedTentAlertRow }) {
 
 export default function PlantAssignedTentAlertsPanel({ tentId, tentName, growId }: Props) {
   const enabled = !!tentId;
-  const { status, rows } = usePlantAssignedTentAlerts(
-    tentId ?? null,
-    growId ?? null,
-  );
+  const { status, rows } = usePlantAssignedTentAlerts(tentId ?? null, growId ?? null);
 
   return (
     <Card data-testid="plant-assigned-tent-alerts-panel" className="mt-4">
@@ -143,17 +148,11 @@ export default function PlantAssignedTentAlertsPanel({ tentId, tentName, growId 
         ) : status === "loading" || status === "idle" ? (
           <p className="text-muted-foreground">Loading tent alerts…</p>
         ) : status === "unavailable" ? (
-          <p
-            className="text-muted-foreground"
-            data-testid="plant-assigned-tent-alerts-unavailable"
-          >
+          <p className="text-muted-foreground" data-testid="plant-assigned-tent-alerts-unavailable">
             Tent alerts are temporarily unavailable.
           </p>
         ) : rows.length === 0 ? (
-          <p
-            className="text-muted-foreground"
-            data-testid="plant-assigned-tent-alerts-empty"
-          >
+          <p className="text-muted-foreground" data-testid="plant-assigned-tent-alerts-empty">
             No open alerts for this assigned tent.
           </p>
         ) : (

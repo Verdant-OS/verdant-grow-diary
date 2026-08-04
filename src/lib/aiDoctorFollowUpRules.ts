@@ -47,13 +47,10 @@ export interface AiDoctorFollowUpInputs {
   now?: Date | null;
 }
 
-export type FollowUpEligibility =
-  | { ok: true }
-  | { ok: false; reason: FollowUpIneligibleReason };
+export type FollowUpEligibility = { ok: true } | { ok: false; reason: FollowUpIneligibleReason };
 
 export type FollowUpIneligibleReason =
-  | "missing_diagnosis"
-  | "missing_grow_or_plant_or_tent_context";
+  "missing_diagnosis" | "missing_grow_or_plant_or_tent_context";
 
 export const FOLLOWUP_INELIGIBLE_COPY: Record<FollowUpIneligibleReason, string> = {
   missing_diagnosis:
@@ -131,7 +128,11 @@ export function evaluateFollowUpEligibility(
   i: AiDoctorFollowUpInputs | null | undefined,
 ): FollowUpEligibility {
   if (!i) return { ok: false, reason: "missing_diagnosis" };
-  if (!nonEmpty(i.diagnosisSummary) && !nonEmpty(i.diagnosisId) && !nonEmpty(i.diagnosisCapturedAt)) {
+  if (
+    !nonEmpty(i.diagnosisSummary) &&
+    !nonEmpty(i.diagnosisId) &&
+    !nonEmpty(i.diagnosisCapturedAt)
+  ) {
     return { ok: false, reason: "missing_diagnosis" };
   }
   if (!nonEmpty(i.growId) && !nonEmpty(i.plantId) && !nonEmpty(i.tentId)) {
@@ -150,9 +151,7 @@ const BASE_CHECKLIST: readonly string[] = [
   "Note any change in watering response or soil feel.",
 ];
 
-export function buildAiDoctorFollowUpDraft(
-  i: AiDoctorFollowUpInputs,
-): AiDoctorFollowUpDraft {
+export function buildAiDoctorFollowUpDraft(i: AiDoctorFollowUpInputs): AiDoctorFollowUpDraft {
   const now = safeIsoNow(i.now);
   const dueAt = addHoursIso(now, AI_DOCTOR_FOLLOWUP_DEFAULT_HOURS);
 
@@ -174,9 +173,7 @@ export function buildAiDoctorFollowUpDraft(
     ? i.moreDataNeededLabels.filter((s) => nonEmpty(s)).map((s) => s.trim())
     : [];
   if (missing.length > 0) {
-    checklist.push(
-      `Capture missing Environment Check metrics: ${missing.join(", ")}.`,
-    );
+    checklist.push(`Capture missing Environment Check metrics: ${missing.join(", ")}.`);
   } else {
     checklist.push(
       "Capture updated temp_f, humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct if available.",
@@ -192,9 +189,7 @@ export function buildAiDoctorFollowUpDraft(
     guardrails.push(alignment?.guardrailWarning ?? AGGRESSIVE_CHANGES_GUARDRAIL);
   }
   if (posture === "insufficient_context") {
-    guardrails.push(
-      "More data is needed before giving high-confidence guidance — observe only.",
-    );
+    guardrails.push("More data is needed before giving high-confidence guidance — observe only.");
   }
 
   const sourceNotes: string[] = [];
@@ -204,9 +199,7 @@ export function buildAiDoctorFollowUpDraft(
   // Always reinforce source honesty when env-check context is present.
   if (alignment?.basisCopy.some((b) => /local EcoWitt/i.test(b))) {
     if (!sourceNotes.some((s) => /not live telemetry/i.test(s))) {
-      sourceNotes.push(
-        "Local/test EcoWitt Environment Check evidence — not live telemetry.",
-      );
+      sourceNotes.push("Local/test EcoWitt Environment Check evidence — not live telemetry.");
     }
   }
   if (alignment?.basisCopy.some((b) => /VPD was used as derived context/i.test(b))) {

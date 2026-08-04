@@ -106,11 +106,7 @@ const commandResults = COMMANDS.map((c) => {
 });
 
 const commandResultsPath = resolve(OUT_DIR, "command-results.json");
-writeFileSync(
-  commandResultsPath,
-  `${JSON.stringify(commandResults, null, 2)}\n`,
-  "utf8",
-);
+writeFileSync(commandResultsPath, `${JSON.stringify(commandResults, null, 2)}\n`, "utf8");
 
 // Build the EmitReleaseReceiptInput JSON consumed by emit-release-receipt.mjs.
 const runId = env("RUN_ID") || null;

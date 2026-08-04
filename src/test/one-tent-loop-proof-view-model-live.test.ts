@@ -55,7 +55,10 @@ describe("buildOneTentLoopLiveProofView", () => {
     expect(sensor.status).toBe("demo_only");
     // "healthy" is only allowed inside honest negations like "never shown as healthy".
     const dump = JSON.stringify(v).toLowerCase();
-    const positive = dump.replace(/never shown as healthy/g, "").replace(/not healthy/g, "").replace(/excluded from healthy/g, "");
+    const positive = dump
+      .replace(/never shown as healthy/g, "")
+      .replace(/not healthy/g, "")
+      .replace(/excluded from healthy/g, "");
     expect(positive).not.toMatch(/\bhealthy\b/);
   });
 
@@ -89,7 +92,10 @@ describe("buildOneTentLoopLiveProofView", () => {
       expect(text).not.toContain(forbidden);
     }
     // "healthy" only allowed inside honest negations
-    const positive = text.replace(/never shown as healthy/g, "").replace(/excluded from healthy/g, "").replace(/not healthy/g, "");
+    const positive = text
+      .replace(/never shown as healthy/g, "")
+      .replace(/excluded from healthy/g, "")
+      .replace(/not healthy/g, "");
     expect(positive).not.toMatch(/\bhealthy\b/);
   });
 

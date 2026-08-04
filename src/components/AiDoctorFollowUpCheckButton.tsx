@@ -59,10 +59,7 @@ export default function AiDoctorFollowUpCheckButton({
 }: AiDoctorFollowUpCheckButtonProps) {
   const tid = (s: string) => (testIdPrefix ? `${testIdPrefix}-${s}` : s);
 
-  const eligibility = useMemo(
-    () => evaluateFollowUpEligibility(inputs),
-    [inputs],
-  );
+  const eligibility = useMemo(() => evaluateFollowUpEligibility(inputs), [inputs]);
   const draft = useMemo<AiDoctorFollowUpDraft | null>(
     () => (eligibility.ok ? buildAiDoctorFollowUpDraft(inputs) : null),
     [eligibility.ok, inputs],
@@ -125,9 +122,7 @@ export default function AiDoctorFollowUpCheckButton({
       setLocalCreated(true);
       setOpen(false);
     } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Could not create follow-up. Try again.",
-      );
+      setError(e instanceof Error ? e.message : "Could not create follow-up. Try again.");
     } finally {
       setSubmitting(false);
     }
@@ -161,16 +156,10 @@ export default function AiDoctorFollowUpCheckButton({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent data-testid={tid("ai-doctor-follow-up-dialog")}>
           <DialogHeader>
-            <DialogTitle data-testid={tid("ai-doctor-follow-up-title")}>
-              {draft.title}
-            </DialogTitle>
-            <DialogDescription
-              data-testid={tid("ai-doctor-follow-up-due")}
-            >
+            <DialogTitle data-testid={tid("ai-doctor-follow-up-title")}>{draft.title}</DialogTitle>
+            <DialogDescription data-testid={tid("ai-doctor-follow-up-due")}>
               Planned recheck: {draft.dueAt} · Evidence basis:{" "}
-              <span data-testid={tid("ai-doctor-follow-up-posture")}>
-                {draft.postureLabel}
-              </span>
+              <span data-testid={tid("ai-doctor-follow-up-posture")}>{draft.postureLabel}</span>
             </DialogDescription>
           </DialogHeader>
 
@@ -211,8 +200,8 @@ export default function AiDoctorFollowUpCheckButton({
               className="text-[11px] text-muted-foreground"
               data-testid={tid("ai-doctor-follow-up-draft-only")}
             >
-              Draft-only mode — no diary or task write path is available yet.
-              Use Copy to save it manually.
+              Draft-only mode — no diary or task write path is available yet. Use Copy to save it
+              manually.
             </p>
           ) : null}
 

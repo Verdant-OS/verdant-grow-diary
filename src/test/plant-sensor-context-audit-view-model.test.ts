@@ -10,8 +10,7 @@ import type { ManualSensorLog } from "@/lib/manualSensorChronologyDeltaRules";
 
 const NOW = new Date("2026-06-12T12:00:00Z");
 const HOUR = 3_600_000;
-const ago = (h: number) =>
-  new Date(NOW.getTime() - h * HOUR).toISOString();
+const ago = (h: number) => new Date(NOW.getTime() - h * HOUR).toISOString();
 
 function log(
   capturedAt: string,
@@ -34,9 +33,7 @@ describe("buildPlantSensorContextAuditView", () => {
 
   it("returns missing for null/undefined/malformed input", () => {
     expect(buildPlantSensorContextAuditView(null, NOW).status).toBe("missing");
-    expect(buildPlantSensorContextAuditView(undefined, NOW).status).toBe(
-      "missing",
-    );
+    expect(buildPlantSensorContextAuditView(undefined, NOW).status).toBe("missing");
     // Malformed capturedAt entries get filtered out -> still missing
     const bad = [
       { capturedAt: "not-a-date", source: "manual", metrics: { temp_f: 72 } },
@@ -58,10 +55,7 @@ describe("buildPlantSensorContextAuditView", () => {
   });
 
   it("returns limited when only one environment metric is present", () => {
-    const v = buildPlantSensorContextAuditView(
-      [log(ago(2), { temp_f: 72 })],
-      NOW,
-    );
+    const v = buildPlantSensorContextAuditView([log(ago(2), { temp_f: 72 })], NOW);
     expect(v.status).toBe("limited");
     expect(v.metrics.map((m) => m.label)).toEqual(["Temperature"]);
   });
@@ -77,19 +71,13 @@ describe("buildPlantSensorContextAuditView", () => {
   });
 
   it("preserves source labels honestly and does not invent live/demo/csv", () => {
-    const v = buildPlantSensorContextAuditView(
-      [log(ago(1), { temp_f: 72 }, "manual")],
-      NOW,
-    );
+    const v = buildPlantSensorContextAuditView([log(ago(1), { temp_f: 72 }, "manual")], NOW);
     expect(v.sources).toEqual(["manual"]);
   });
 
   it("surfaces non-manual source labels only when actually present in the rows", () => {
     const v = buildPlantSensorContextAuditView(
-      [
-        log(ago(1), { temp_f: 72 }, "manual"),
-        log(ago(2), { humidity_percent: 50 }, "csv"),
-      ],
+      [log(ago(1), { temp_f: 72 }, "manual"), log(ago(2), { humidity_percent: 50 }, "csv")],
       NOW,
     );
     expect(v.sources.sort()).toEqual(["csv", "manual"]);

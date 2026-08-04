@@ -30,9 +30,7 @@ describe("parsePlantIdEntries", () => {
 
 describe("evaluateLiveEvidenceForPlants", () => {
   it("empty plant field produces a single tent-level result", () => {
-    const formState = getEcowittLiveEvidenceTemplate(
-      "live_verified_example",
-    )!.build();
+    const formState = getEcowittLiveEvidenceTemplate("live_verified_example")!.build();
     const out = evaluateLiveEvidenceForPlants({
       formState,
       plantIdsInput: "",
@@ -43,33 +41,23 @@ describe("evaluateLiveEvidenceForPlants", () => {
   });
 
   it("multiple plant IDs produce one verdict per plant", () => {
-    const formState = getEcowittLiveEvidenceTemplate(
-      "live_verified_example",
-    )!.build();
+    const formState = getEcowittLiveEvidenceTemplate("live_verified_example")!.build();
     const out = evaluateLiveEvidenceForPlants({
       formState,
       plantIdsInput: "plant-a, plant-b, plant-c",
     });
     expect(out.per_plant).toHaveLength(3);
-    expect(out.per_plant.map((p) => p.plant_id)).toEqual([
-      "plant-a",
-      "plant-b",
-      "plant-c",
-    ]);
+    expect(out.per_plant.map((p) => p.plant_id)).toEqual(["plant-a", "plant-b", "plant-c"]);
     expect(out.overall_verdict).toBe("verified_live");
   });
 
   it("overall uses most conservative verdict (mismatch dominates)", () => {
-    const base = getEcowittLiveEvidenceTemplate(
-      "live_verified_example",
-    )!.build();
+    const base = getEcowittLiveEvidenceTemplate("live_verified_example")!.build();
     // Introduce a mismatch by changing controller value
     const formState = {
       ...base,
       metric_rows: base.metric_rows.map((r) =>
-        r.key === "temp_f"
-          ? { ...r, controller_value: "100" }
-          : r,
+        r.key === "temp_f" ? { ...r, controller_value: "100" } : r,
       ),
     };
     const out = evaluateLiveEvidenceForPlants({
@@ -81,9 +69,7 @@ describe("evaluateLiveEvidenceForPlants", () => {
   });
 
   it("stale template yields stale overall", () => {
-    const formState = getEcowittLiveEvidenceTemplate(
-      "stale_evidence_example",
-    )!.build();
+    const formState = getEcowittLiveEvidenceTemplate("stale_evidence_example")!.build();
     const out = evaluateLiveEvidenceForPlants({
       formState,
       plantIdsInput: "p1, p2",
@@ -92,9 +78,7 @@ describe("evaluateLiveEvidenceForPlants", () => {
   });
 
   it("includes a note that per-plant verdicts are not plant-specific sensor proof", () => {
-    const formState = getEcowittLiveEvidenceTemplate(
-      "live_verified_example",
-    )!.build();
+    const formState = getEcowittLiveEvidenceTemplate("live_verified_example")!.build();
     const out = evaluateLiveEvidenceForPlants({
       formState,
       plantIdsInput: "p1, p2",
@@ -112,18 +96,17 @@ describe("evaluateLiveEvidenceForPlants", () => {
       raw_payload_present: true,
       normalized_payload_present: true,
       operator_compared_controller: true,
-      metric_rows: createInitialEcowittLiveEvidenceFormState().metric_rows.map(
-        (r) =>
-          r.key === "temp_f"
-            ? {
-                ...r,
-                enabled: true,
-                backend_value: "72",
-                controller_value: "22",
-                backend_unit: "F",
-                controller_unit: "C",
-              }
-            : r,
+      metric_rows: createInitialEcowittLiveEvidenceFormState().metric_rows.map((r) =>
+        r.key === "temp_f"
+          ? {
+              ...r,
+              enabled: true,
+              backend_value: "72",
+              controller_value: "22",
+              backend_unit: "F",
+              controller_unit: "C",
+            }
+          : r,
       ),
     };
     const out = evaluateLiveEvidenceForPlants({
@@ -131,8 +114,6 @@ describe("evaluateLiveEvidenceForPlants", () => {
       plantIdsInput: "",
     });
     expect(out.unit_warnings.length).toBeGreaterThan(0);
-    expect(
-      out.combined_next_steps.some((s) => /Unit mismatch/i.test(s)),
-    ).toBe(true);
+    expect(out.combined_next_steps.some((s) => /Unit mismatch/i.test(s))).toBe(true);
   });
 });

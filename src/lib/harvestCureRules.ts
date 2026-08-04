@@ -35,10 +35,7 @@ export const CURE_TEMP_MAX_F = 120;
 export const CURE_RH_MIN = 0;
 export const CURE_RH_MAX = 100;
 
-export type FieldError =
-  | "invalid_number"
-  | "negative_not_allowed"
-  | "invalid_range";
+export type FieldError = "invalid_number" | "negative_not_allowed" | "invalid_range";
 
 export interface HarvestDetailsInput {
   harvest_stage_note?: string | null;
@@ -107,8 +104,16 @@ function trimOrUndef(v: string | null | undefined): string | undefined {
   return t.length > 0 ? t : undefined;
 }
 
-interface CoerceOk { ok: true; value: number | undefined; error?: undefined }
-interface CoerceErr { ok: false; value?: undefined; error: FieldError }
+interface CoerceOk {
+  ok: true;
+  value: number | undefined;
+  error?: undefined;
+}
+interface CoerceErr {
+  ok: false;
+  value?: undefined;
+  error: FieldError;
+}
 type CoerceResult = CoerceOk | CoerceErr;
 
 function coerceNumber(v: number | string | null | undefined): CoerceResult {
@@ -215,7 +220,11 @@ export function validateCureCheckDetails(
   // Airflow is operator-entered context, not telemetry. Invalid / missing
   // input falls back to "unknown" and is intentionally NOT persisted —
   // only explicit observations are stored on details.
-  if (i.airflow_observation !== undefined && i.airflow_observation !== null && i.airflow_observation !== "") {
+  if (
+    i.airflow_observation !== undefined &&
+    i.airflow_observation !== null &&
+    i.airflow_observation !== ""
+  ) {
     const airflow = normalizeGroveBagAirflowObservation(i.airflow_observation);
     if (airflow !== "unknown") value.airflow_observation = airflow;
   }

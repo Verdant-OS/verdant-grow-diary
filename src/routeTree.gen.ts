@@ -100,6 +100,7 @@ import { Route as AppBreedingNewRouteImport } from './routes/_app/breeding.new'
 import { Route as AppDiaryEnvironmentSummaryRouteImport } from './routes/_app/diary.environment-summary'
 import { Route as AppDiaryPhenoExpressionComparisonRouteImport } from './routes/_app/diary.pheno-expression-comparison'
 import { Route as AppDoctorSessionsRouteImport } from './routes/_app/doctor.sessions'
+import { Route as AppGeneticsIndexRouteImport } from './routes/_app/genetics.index'
 import { Route as AppGrowsGrowIdRouteImport } from './routes/_app/grows.$growId'
 import { Route as AppPhenoHuntsNewRouteImport } from './routes/_app/pheno-hunts.new'
 import { Route as AppPlantsIdRouteImport } from './routes/_app/plants.$id'
@@ -614,6 +615,11 @@ const AppDoctorSessionsRoute = AppDoctorSessionsRouteImport.update({
   path: '/sessions',
   getParentRoute: () => AppDoctorRoute,
 } as any)
+const AppGeneticsIndexRoute = AppGeneticsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppGeneticsRoute,
+} as any)
 const AppGrowsGrowIdRoute = AppGrowsGrowIdRouteImport.update({
   id: '/$growId',
   path: '/$growId',
@@ -1003,6 +1009,7 @@ export interface FileRoutesByFullPath {
   '/customer/guide/oreoz-vs-gelonade-comparison': typeof CustomerGuideOreozVsGelonadeComparisonRoute
   '/pheno-hunts/$id/compare': typeof PhenoHuntsIdCompareRoute
   '/pheno-hunts/$id/showcase': typeof PhenoHuntsIdShowcaseRoute
+  '/genetics/': typeof AppGeneticsIndexRoute
   '/admin/leads': typeof AppOperatorAdminLeadsRoute
   '/demo/one-tent-live-proof': typeof AppOperatorDemoOneTentLiveProofRoute
   '/internal/ai-doctor-confidence-audit': typeof AppOperatorInternalAiDoctorConfidenceAuditRoute
@@ -1086,7 +1093,6 @@ export interface FileRoutesByTo {
   '/daily-check': typeof AppDailyCheckRoute
   '/dashboard': typeof AppDashboardRoute
   '/doctor': typeof AppDoctorRouteWithChildren
-  '/genetics': typeof AppGeneticsRouteWithChildren
   '/grow-lineage': typeof AppGrowLineageRoute
   '/grow-room': typeof AppGrowRoomRoute
   '/grows': typeof AppGrowsRouteWithChildren
@@ -1145,6 +1151,7 @@ export interface FileRoutesByTo {
   '/customer/guide/oreoz-vs-gelonade-comparison': typeof CustomerGuideOreozVsGelonadeComparisonRoute
   '/pheno-hunts/$id/compare': typeof PhenoHuntsIdCompareRoute
   '/pheno-hunts/$id/showcase': typeof PhenoHuntsIdShowcaseRoute
+  '/genetics': typeof AppGeneticsIndexRoute
   '/admin/leads': typeof AppOperatorAdminLeadsRoute
   '/demo/one-tent-live-proof': typeof AppOperatorDemoOneTentLiveProofRoute
   '/internal/ai-doctor-confidence-audit': typeof AppOperatorInternalAiDoctorConfidenceAuditRoute
@@ -1290,6 +1297,7 @@ export interface FileRoutesById {
   '/customer/guide/oreoz-vs-gelonade-comparison': typeof CustomerGuideOreozVsGelonadeComparisonRoute
   '/pheno-hunts/$id/compare': typeof PhenoHuntsIdCompareRoute
   '/pheno-hunts/$id/showcase': typeof PhenoHuntsIdShowcaseRoute
+  '/_app/genetics/': typeof AppGeneticsIndexRoute
   '/_app/_operator/admin/leads': typeof AppOperatorAdminLeadsRoute
   '/_app/_operator/demo/one-tent-live-proof': typeof AppOperatorDemoOneTentLiveProofRoute
   '/_app/_operator/internal/ai-doctor-confidence-audit': typeof AppOperatorInternalAiDoctorConfidenceAuditRoute
@@ -1434,6 +1442,7 @@ export interface FileRouteTypes {
     | '/customer/guide/oreoz-vs-gelonade-comparison'
     | '/pheno-hunts/$id/compare'
     | '/pheno-hunts/$id/showcase'
+    | '/genetics/'
     | '/admin/leads'
     | '/demo/one-tent-live-proof'
     | '/internal/ai-doctor-confidence-audit'
@@ -1517,7 +1526,6 @@ export interface FileRouteTypes {
     | '/daily-check'
     | '/dashboard'
     | '/doctor'
-    | '/genetics'
     | '/grow-lineage'
     | '/grow-room'
     | '/grows'
@@ -1576,6 +1584,7 @@ export interface FileRouteTypes {
     | '/customer/guide/oreoz-vs-gelonade-comparison'
     | '/pheno-hunts/$id/compare'
     | '/pheno-hunts/$id/showcase'
+    | '/genetics'
     | '/admin/leads'
     | '/demo/one-tent-live-proof'
     | '/internal/ai-doctor-confidence-audit'
@@ -1720,6 +1729,7 @@ export interface FileRouteTypes {
     | '/customer/guide/oreoz-vs-gelonade-comparison'
     | '/pheno-hunts/$id/compare'
     | '/pheno-hunts/$id/showcase'
+    | '/_app/genetics/'
     | '/_app/_operator/admin/leads'
     | '/_app/_operator/demo/one-tent-live-proof'
     | '/_app/_operator/internal/ai-doctor-confidence-audit'
@@ -2459,6 +2469,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDoctorSessionsRouteImport
       parentRoute: typeof AppDoctorRoute
     }
+    '/_app/genetics/': {
+      id: '/_app/genetics/'
+      path: '/'
+      fullPath: '/genetics/'
+      preLoaderRoute: typeof AppGeneticsIndexRouteImport
+      parentRoute: typeof AppGeneticsRoute
+    }
     '/_app/grows/$growId': {
       id: '/_app/grows/$growId'
       path: '/$growId'
@@ -2985,6 +3002,7 @@ const AppDoctorRouteWithChildren = AppDoctorRoute._addFileChildren(
 )
 
 interface AppGeneticsRouteChildren {
+  AppGeneticsIndexRoute: typeof AppGeneticsIndexRoute
   AppGeneticsAccessionsIdRoute: typeof AppGeneticsAccessionsIdRoute
   AppGeneticsBatchesIdRoute: typeof AppGeneticsBatchesIdRoute
   AppGeneticsHealthKindIdRoute: typeof AppGeneticsHealthKindIdRoute
@@ -2992,6 +3010,7 @@ interface AppGeneticsRouteChildren {
 }
 
 const AppGeneticsRouteChildren: AppGeneticsRouteChildren = {
+  AppGeneticsIndexRoute: AppGeneticsIndexRoute,
   AppGeneticsAccessionsIdRoute: AppGeneticsAccessionsIdRoute,
   AppGeneticsBatchesIdRoute: AppGeneticsBatchesIdRoute,
   AppGeneticsHealthKindIdRoute: AppGeneticsHealthKindIdRoute,

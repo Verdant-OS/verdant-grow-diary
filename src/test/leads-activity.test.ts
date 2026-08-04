@@ -74,9 +74,7 @@ describe("buildLeadActivityTimeline — happy path", () => {
 
   it("exposes current status as the status_current detail", () => {
     const lead: LeadRow = { ...baseLead, status: "follow_up" };
-    const ev = buildLeadActivityTimeline(lead).find(
-      (e) => e.type === "status_current",
-    );
+    const ev = buildLeadActivityTimeline(lead).find((e) => e.type === "status_current");
     expect(ev?.detail).toBe("Follow-up");
   });
 });

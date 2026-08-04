@@ -70,35 +70,21 @@ describe("Evidence Linkage Persistence v1 — static safety", () => {
   });
 
   it("never co-locates 'healthy' next to unsafe source labels in scanned files", () => {
-    const unsafeLabels = [
-      "invalid",
-      "stale",
-      "demo",
-      "csv",
-      "unknown",
-      "untrusted",
-    ];
+    const unsafeLabels = ["invalid", "stale", "demo", "csv", "unknown", "untrusted"];
     for (const file of SCANNED_FILES) {
       const src = read(file).toLowerCase();
       if (!src.includes("healthy")) continue;
       for (const label of unsafeLabels) {
         // Reject "healthy" appearing within 60 chars of any unsafe label.
-        const re = new RegExp(
-          `healthy[\\s\\S]{0,60}${label}|${label}[\\s\\S]{0,60}healthy`,
-          "i",
-        );
-        expect(re.test(src), `${file} co-locates healthy/${label}`).toBe(
-          false,
-        );
+        const re = new RegExp(`healthy[\\s\\S]{0,60}${label}|${label}[\\s\\S]{0,60}healthy`, "i");
+        expect(re.test(src), `${file} co-locates healthy/${label}`).toBe(false);
       }
     }
   });
 
   it("write paths persist refs from a safe source (explicit [] or forwarded via adapter)", () => {
     const alertDetail = read("src/pages/AlertDetail.tsx");
-    const aiHook = read(
-      "src/hooks/useAddAiDoctorSessionSuggestionToActionQueue.ts",
-    );
+    const aiHook = read("src/hooks/useAddAiDoctorSessionSuggestionToActionQueue.ts");
     // AlertDetail now forwards the alert's already-sanitized persisted refs
     // (Evidence Ref Population v1) via the shared adapter wrapper.
     expect(alertDetail).toMatch(
@@ -125,7 +111,6 @@ describe("Evidence Linkage Persistence v1 — static safety", () => {
       }
     }
   });
-
 
   it("Action Queue approval flow remains approval-required (no auto-execution language)", () => {
     const src = read("src/pages/ActionDetail.tsx").toLowerCase();

@@ -40,10 +40,7 @@ function fmt(n: number | null): string {
  * Celsius; conversion happens exactly once, here. The celsius preference
  * renders the legacy string unchanged; unknown stays "—".
  */
-function fmtWaterTemp(
-  n: number | null,
-  unit: TemperatureUnitPreference,
-): string {
+function fmtWaterTemp(n: number | null, unit: TemperatureUnitPreference): string {
   if (n === null) return "—";
   if (unit === "celsius") return String(n);
   return celsiusToFahrenheit(n).toFixed(1);
@@ -61,7 +58,9 @@ function LedgerRow({ row }: { row: IrrigationLedgerRow }) {
     ["Volume (ml)", fmt(row.volumeMl)],
     ["Input pH", fmt(row.ph)],
     ["Input EC (mS/cm)", fmt(row.ecMsCm)],
-    ...(row.kind === "feeding" ? ([["Output EC (mS/cm)", fmt(row.outputEcMsCm)]] as Array<[string, string]>) : []),
+    ...(row.kind === "feeding"
+      ? ([["Output EC (mS/cm)", fmt(row.outputEcMsCm)]] as Array<[string, string]>)
+      : []),
     ["Runoff (ml)", fmt(row.runoffMl)],
     ["Runoff pH", fmt(row.runoffPh)],
     ["Runoff EC (mS/cm)", fmt(row.runoffEcMsCm)],
@@ -83,7 +82,9 @@ function LedgerRow({ row }: { row: IrrigationLedgerRow }) {
           <FlaskConical className="h-4 w-4 shrink-0 text-emerald-300" aria-hidden />
         )}
         <span className="text-sm font-medium text-white/85 capitalize">{row.kind}</span>
-        <span className="min-w-0 truncate text-xs text-white/40">{occurredLabel(row.occurredAt)}</span>
+        <span className="min-w-0 truncate text-xs text-white/40">
+          {occurredLabel(row.occurredAt)}
+        </span>
         <span
           data-testid="irrigation-row-source"
           title="Log provenance — not live sensor data"
@@ -107,7 +108,10 @@ function LedgerRow({ row }: { row: IrrigationLedgerRow }) {
       {row.products.length > 0 ? (
         <div className="flex flex-wrap gap-1">
           {row.products.map((p, i) => (
-            <span key={i} className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 text-[11px] text-white/60">
+            <span
+              key={i}
+              className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 text-[11px] text-white/60"
+            >
               {p.name ?? "Product"} {p.amount !== null ? `· ${p.amount}${p.unit ?? ""}` : ""}
             </span>
           ))}
@@ -126,8 +130,16 @@ export function TentIrrigationHistoryPanel({
   className,
 }: TentIrrigationHistoryPanelProps) {
   void growId;
-  const { rows, isLoading, isError, isOlderError, isFetchingNextPage, hasNextPage, fetchNextPage, refetch } =
-    useTentIrrigationLedger({ tentId, plantId, pageSize });
+  const {
+    rows,
+    isLoading,
+    isError,
+    isOlderError,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    refetch,
+  } = useTentIrrigationLedger({ tentId, plantId, pageSize });
 
   return (
     <section className={cn("space-y-3 min-w-0", className)} data-testid="tent-irrigation-history">
@@ -143,8 +155,8 @@ export function TentIrrigationHistoryPanel({
           className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-6 text-center text-sm text-amber-200 space-y-3"
         >
           <p className="inline-flex items-center justify-center gap-2 break-words">
-            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden /> Irrigation history could not be loaded. This is
-            not the same as “none recorded.”
+            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden /> Irrigation history could not
+            be loaded. This is not the same as “none recorded.”
           </p>
           <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={refetch}>
             Try again
@@ -173,7 +185,13 @@ export function TentIrrigationHistoryPanel({
               <span className="min-w-0 break-words">
                 Could not load older entries — this ledger may be incomplete.
               </span>
-              <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={fetchNextPage}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="min-h-11"
+                onClick={fetchNextPage}
+              >
                 Retry
               </Button>
             </div>

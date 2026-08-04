@@ -80,9 +80,7 @@ describe("buildNetworkDiagnosticsExportJson", () => {
   });
 
   it("filename follows verdant-sensor-network-diagnostics-<timestamp>.json pattern", () => {
-    const name = buildNetworkDiagnosticsDownloadFilename(
-      new Date("2026-06-06T18:05:09Z"),
-    );
+    const name = buildNetworkDiagnosticsDownloadFilename(new Date("2026-06-06T18:05:09Z"));
     expect(name).toBe("verdant-sensor-network-diagnostics-20260606-180509.json");
   });
 });
@@ -209,23 +207,18 @@ describe("sensor diagnostics run history", () => {
       classification: "network_error",
       diagnostics: diag,
     });
-    const json = sensorDiagnosticsRunHistoryToJson(
-      [entry],
-      "2026-06-06T18:00:00Z",
-    );
+    const json = sensorDiagnosticsRunHistoryToJson([entry], "2026-06-06T18:00:00Z");
     expect(json).not.toContain(PLAINTEXT);
     expect(json).not.toMatch(/authorization/i);
     expect(json).not.toMatch(/service_role/i);
     const parsed = JSON.parse(json);
     expect(parsed.count).toBe(1);
-    expect(parsed.entries[0].diagnostics_status).toBe(
-      "likely_cors_or_preflight",
-    );
+    expect(parsed.entries[0].diagnostics_status).toBe("likely_cors_or_preflight");
   });
 
   it("history filename follows expected pattern", () => {
-    expect(
-      buildSensorDiagnosticsRunHistoryFilename(new Date("2026-06-06T18:05:09Z")),
-    ).toBe("verdant-sensor-network-diagnostics-history-20260606-180509.json");
+    expect(buildSensorDiagnosticsRunHistoryFilename(new Date("2026-06-06T18:05:09Z"))).toBe(
+      "verdant-sensor-network-diagnostics-history-20260606-180509.json",
+    );
   });
 });

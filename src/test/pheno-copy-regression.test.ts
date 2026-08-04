@@ -161,7 +161,6 @@ describe("Pheno copy regression", () => {
     }
   });
 
-
   it("PhenoHuntCompare renders an incomplete-evidence warning surface", () => {
     const src = read("src/pages/PhenoHuntCompare.tsx");
     expect(src).toMatch(/pheno-hunt-compare-readiness-warning/);

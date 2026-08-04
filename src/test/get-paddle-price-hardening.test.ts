@@ -9,10 +9,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  PAID_PLAN_IDS,
-  buildPaidPlanAllowlistSourceRegex,
-} from "@/lib/paidPlanAllowlist";
+import { PAID_PLAN_IDS, buildPaidPlanAllowlistSourceRegex } from "@/lib/paidPlanAllowlist";
 
 const SRC = readFileSync(
   resolve(process.cwd(), "supabase/functions/get-paddle-price/index.ts"),
@@ -29,9 +26,7 @@ describe("get-paddle-price — paid plan allowlist", () => {
     expect(SRC).toMatch(
       /from\s+["']@\/lib\/paidPlanAllowlist["']|from\s+["'][^"']*_shared\/lib\/lib\/paidPlanAllowlist(?:\.ts)?["']/,
     );
-    expect(stripped).not.toMatch(
-      /const\s+PAID_PLAN_ALLOWLIST\s*(?::\s*[^=]+)?=\s*new Set\(/,
-    );
+    expect(stripped).not.toMatch(/const\s+PAID_PLAN_ALLOWLIST\s*(?::\s*[^=]+)?=\s*new Set\(/);
     expect(SRC).toMatch(/PAID_PLAN_ALLOWLIST\.has\(requested\)/);
     expect(SRC).toMatch(/unknown_plan/);
     expect(stripped).not.toMatch(/\[a-z0-9_\]\{1,64\}/);
@@ -92,7 +87,6 @@ describe("get-paddle-price — server-controlled environment", () => {
     expect(stripped).not.toMatch(/if \(environment === 'live'\)/);
     expect(SRC).not.toMatch(/live_billing_not_enabled/);
   });
-
 });
 
 describe("get-paddle-price — founder sold-out pre-check (before payment)", () => {

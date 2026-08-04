@@ -70,9 +70,7 @@ describe("AiDoctorContextReadinessPanel", () => {
     expect(
       screen.getByTestId("ai-doctor-context-readiness-panel-count-open-alerts").textContent,
     ).toBe("2");
-    expect(
-      screen.getByTestId("ai-doctor-context-readiness-panel-source-live"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-context-readiness-panel-source-live")).toBeTruthy();
   });
 
   it("renders 'Sensor data missing' when no sensor readings exist", () => {
@@ -92,8 +90,20 @@ describe("AiDoctorContextReadinessPanel", () => {
     const context = ctx(
       [],
       [
-        { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live", quality: "stale" },
-        { metric: "humidity_pct", value: 55, captured_at: ago(HOUR), source: "live", quality: "invalid" },
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: ago(HOUR),
+          source: "live",
+          quality: "stale",
+        },
+        {
+          metric: "humidity_pct",
+          value: 55,
+          captured_at: ago(HOUR),
+          source: "live",
+          quality: "invalid",
+        },
       ],
     );
     render(<AiDoctorContextReadinessPanel context={context} />);
@@ -118,9 +128,7 @@ describe("AiDoctorContextReadinessPanel", () => {
     expect(demo.textContent).toContain("Demo");
     expect(demo.getAttribute("data-trustworthy")).toBe("false");
     // Never rendered as live
-    expect(
-      screen.queryByTestId("ai-doctor-context-readiness-panel-source-live"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-context-readiness-panel-source-live")).toBeNull();
   });
 
   it("renders manual and CSV source labels correctly", () => {
@@ -146,12 +154,10 @@ describe("AiDoctorContextReadinessPanel", () => {
       [{ metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live" }],
     );
     render(<AiDoctorContextReadinessPanel context={context} />);
-    expect(
-      screen.getByTestId("ai-doctor-context-readiness-panel-preview-notice").textContent,
-    ).toBe("Preview only — not saved.");
-    expect(
-      screen.getByTestId("ai-doctor-context-readiness-panel-preview"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-context-readiness-panel-preview-notice").textContent).toBe(
+      "Preview only — not saved.",
+    );
+    expect(screen.getByTestId("ai-doctor-context-readiness-panel-preview")).toBeTruthy();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -176,18 +182,14 @@ describe("AiDoctorContextReadinessPanel", () => {
       ],
     );
     render(<AiDoctorContextReadinessPanel context={context} />);
-    expect(
-      screen.getByTestId("ai-doctor-imported-history-disclosure"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-imported-history-source-label").textContent,
-    ).toContain("CSV history");
-    expect(
-      screen.getByTestId("ai-doctor-imported-history-vendors").textContent,
-    ).toContain("Spider Farmer");
-    expect(
-      screen.getByTestId("ai-doctor-imported-history-total-readings").textContent,
-    ).toBe("2");
+    expect(screen.getByTestId("ai-doctor-imported-history-disclosure")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-imported-history-source-label").textContent).toContain(
+      "CSV history",
+    );
+    expect(screen.getByTestId("ai-doctor-imported-history-vendors").textContent).toContain(
+      "Spider Farmer",
+    );
+    expect(screen.getByTestId("ai-doctor-imported-history-total-readings").textContent).toBe("2");
   });
 
   it("hides imported history disclosure when no CSV readings exist", () => {
@@ -199,9 +201,7 @@ describe("AiDoctorContextReadinessPanel", () => {
       ],
     );
     render(<AiDoctorContextReadinessPanel context={context} />);
-    expect(
-      screen.queryByTestId("ai-doctor-imported-history-disclosure"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-imported-history-disclosure")).toBeNull();
   });
 
   it("shows missing-live warning when no live readings are present", () => {
@@ -217,9 +217,7 @@ describe("AiDoctorContextReadinessPanel", () => {
       ],
     );
     render(<AiDoctorContextReadinessPanel context={context} />);
-    expect(
-      screen.getByTestId("ai-doctor-imported-history-missing-live-warning"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-imported-history-missing-live-warning")).toBeTruthy();
     expect(
       screen.getByTestId("ai-doctor-imported-history-missing-live-warning").textContent,
     ).toMatch(/Missing current live\/manual readings/i);
@@ -239,9 +237,7 @@ describe("AiDoctorContextReadinessPanel", () => {
       ],
     );
     render(<AiDoctorContextReadinessPanel context={context} />);
-    expect(
-      screen.queryByTestId("ai-doctor-imported-history-missing-live-warning"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-imported-history-missing-live-warning")).toBeNull();
   });
 
   it("never renders raw payload or private fields in imported history disclosure", () => {
@@ -280,10 +276,7 @@ describe("AiDoctorContextReadinessPanel", () => {
 
   it("static guard: panel source imports no Supabase/action-queue/write helpers", async () => {
     const { readFileSync } = await import("node:fs");
-    const src = readFileSync(
-      "src/components/AiDoctorContextReadinessPanel.tsx",
-      "utf8",
-    );
+    const src = readFileSync("src/components/AiDoctorContextReadinessPanel.tsx", "utf8");
     expect(src).not.toMatch(/integrations\/supabase/);
     expect(src).not.toMatch(/functions\s*\.\s*invoke/);
     expect(src).not.toMatch(/\bfetch\s*\(/);

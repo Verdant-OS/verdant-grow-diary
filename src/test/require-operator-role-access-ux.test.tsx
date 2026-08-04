@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 const roleState: { status: string } = { status: "denied" };
 const authState: { user: { id?: string; email?: string | null } | null } = {
@@ -24,20 +24,21 @@ vi.mock("@/hooks/useHasRole", () => ({
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: authState.user, session: null, loading: false, signOut: async () => {} }),
 }));
+// Flat MemoryRouter Routes do not support nested Outlet layouts; stub Outlet.
+vi.mock("@/lib/react-router-compat", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/react-router-compat")>();
+  return {
+    ...actual,
+    Outlet: () => <div data-testid="granted-child">OK</div>,
+  };
+});
 
 import { RequireOperatorRole } from "@/components/RequireOperatorRole";
 
 function renderGuard() {
   return render(
     <MemoryRouter initialEntries={["/operator/demo-preview"]}>
-      <Routes>
-        <Route element={<RequireOperatorRole />}>
-          <Route
-            path="/operator/demo-preview"
-            element={<div data-testid="granted-child">OK</div>}
-          />
-        </Route>
-      </Routes>
+      <RequireOperatorRole />
     </MemoryRouter>,
   );
 }

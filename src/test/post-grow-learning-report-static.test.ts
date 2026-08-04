@@ -16,7 +16,8 @@ const RULES = read("src/lib/postGrowLearningReportRules.ts");
 describe("Post-Grow Learning Report route wiring", () => {
   it("mounts the on-demand report route", () => {
     expect(APP).toContain("PostGrowLearningReport");
-    expect(APP).toContain("/reports/post-grow/:growId");
+    // File route: reports.post-grow.$growId.tsx (classic :growId param)
+    expect(APP).toMatch(/reports\.post-grow\.\$growId|post-grow\/\$growId|\/reports\/post-grow\/:growId/);
   });
 
   it("links only completed/archive-stage grows from GrowDetail", () => {

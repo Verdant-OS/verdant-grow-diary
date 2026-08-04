@@ -53,6 +53,8 @@ describe("Shelly H&T integration is fully retired", () => {
     it('no `supabase.functions.invoke("shelly-ht-*"` calls remain', () => {
       const hits: string[] = [];
       for (const f of srcFiles) {
+        // Guardrail tests themselves mention the forbidden invoke pattern.
+        if (/[\\/]test[\\/]|\.test\.tsx?$|\.spec\.tsx?$/.test(f)) continue;
         const body = readFileSync(f, "utf8");
         if (/functions\.invoke\(\s*["']shelly-ht-/i.test(body)) hits.push(f);
       }

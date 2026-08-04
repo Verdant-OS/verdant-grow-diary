@@ -18,9 +18,11 @@ const CONSTANTS = read("src/constants/analytics.ts");
 const HOOK = read("src/hooks/useGoogleAnalyticsPageViews.ts");
 
 describe("Google Analytics consent gate", () => {
-  it("declares the measurement ID in one place", () => {
-    expect(CONSTANTS).toMatch(/["']G-MCXQ9GVS5H["']/);
+  it("resolves the measurement ID in one place, from the connector env var", () => {
+    expect(CONSTANTS).toContain("VITE_LOVABLE_CONNECTOR_GOOGLE_ANALYTICS_API_KEY");
+    expect(CONSTANTS).toMatch(/GOOGLE_ANALYTICS_MEASUREMENT_ID_FALLBACK\s*=\s*["']G-[A-Z0-9]{10}["']/);
   });
+
 
   it("does not ship the gtag.js tag in the root head", () => {
     expect(ROOT_ROUTE).not.toContain("https://www.googletagmanager.com/gtag/js?id=");

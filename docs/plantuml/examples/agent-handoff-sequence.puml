@@ -1,0 +1,38 @@
+' Example: multi-agent handoff sequence with Verdant stereotypes
+
+@startuml verdant_agent_handoff_sequence
+!include docs/plantuml/style.puml
+
+title Agent handoff pipeline to Cheek
+
+actor "Cheek" as Cheek <<human>>
+participant "Grok\nResearch" as Grok <<packet>>
+participant "Claude\nSpecs" as Claude <<packet>>
+participant "Codex\nBuild" as Codex <<ok>>
+participant "Security" as Sec <<stop>>
+participant "Gemini\nQA" as Gemini <<packet>>
+participant "Council" as Council <<hold>>
+
+Grok -> Claude: HANDOFF research evidence
+Claude -> Codex: HANDOFF implementation-ready spec
+Codex -> Sec: HANDOFF slice + tests + SHA
+alt Security FAIL
+  Sec --> Codex: FAIL stop-ship
+else Security PASS
+  Sec -> Gemini: HANDOFF for QA audit
+  Gemini -> Council: HANDOFF release-risk view
+  Council -> Cheek: one recommendation\n+ single next_slice
+  Cheek --> Council: APPROVE | HOLD | REASSIGN | ...
+end
+
+note over Sec
+  <<stop>> stereotype = red participant
+  Security FAIL outranks other greens
+end note
+
+note over Cheek
+  Sole ship authority
+  (docs/agents/cheek-approval-workflow.md)
+end note
+
+@enduml

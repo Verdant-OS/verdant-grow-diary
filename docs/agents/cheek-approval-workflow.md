@@ -63,6 +63,8 @@ slice is a protocol failure — Cheek should reject “two agents both shipping 
 assumption that `main` is production parity. Findings and merges must name the
 ref.
 
+**Visual overview:** see [§12 Flow diagrams](#12-flow-diagrams) (Mermaid).
+
 ---
 
 ## 3. What Cheek is deciding
@@ -323,35 +325,121 @@ applies_to_prs:
 
 ---
 
-## 12. Flow diagram
+## 12. Flow diagrams
+
+### 12.1 End-to-end agent pipeline → Cheek
+
+```mermaid
+flowchart TB
+  subgraph pipeline [Multi-agent operating order]
+    Grok[Grok — Research]
+    Claude[Claude — Architecture / specs]
+    Codex[Codex — Build smallest slice]
+    Security[Security — Trust boundaries]
+    Gemini[Gemini — QA / release risk]
+    Council[Council Chair — One recommendation]
+    Grok --> Claude --> Codex --> Security --> Gemini --> Council
+  end
+
+  subgraph cheek_gate [Cheek approval — sole ship authority]
+    Packet[CHEEK_APPROVAL_PACKET<br/>+ required CI + security disposition]
+    Council --> Packet
+    SecFail{Security FAIL?}
+    Packet --> SecFail
+    SecFail -->|yes| StopShip[STOP-SHIP<br/>remediate before re-ask]
+    SecFail -->|no| Evidence{Required evidence OK?<br/>domain decided?<br/>no laundered BLOCKED?}
+    Evidence -->|no| Hold[HOLD or CHANGES_REQUESTED]
+    Evidence -->|yes| Ask{single_ask}
+    Ask -->|merge| Merge[Merge to verdant-grow-diary]
+    Ask -->|close| Close[CLOSE_SUPERSEDED]
+    Ask -->|reassign| Reassign[REASSIGN role / slice]
+    Ask -->|domain-decision| Domain[DOMAIN_DECISION recorded]
+    Merge --> Prod[Optional production verify<br/>CURRENT_STATE discipline]
+  end
+
+  Hold -.->|fix + new packet| Packet
+  StopShip -.->|remediate + new packet| Packet
+```
+
+### 12.2 Cheek decision core (packet in → outcome out)
+
+```mermaid
+flowchart LR
+  subgraph inputs [Inputs]
+    P[Approval packet]
+    CI[Required CI on PR head]
+    S[Security PASS/FAIL/BLOCKED]
+    C[Council rec or N/A]
+    D[Domain decisions]
+  end
+
+  subgraph decide [Cheek]
+    J{Decide}
+  end
+
+  subgraph out [Outcomes]
+    M[Approve and merge]
+    H[Hold]
+    R[Request changes]
+    X[Close superseded]
+    A[Reassign]
+    Z[Stop-ship]
+  end
+
+  P --> J
+  CI --> J
+  S --> J
+  C --> J
+  D --> J
+  J --> M
+  J --> H
+  J --> R
+  J --> X
+  J --> A
+  J --> Z
+```
+
+### 12.3 What is never a substitute for Cheek
+
+```mermaid
+flowchart TB
+  subgraph not_enough [Not ship authority alone]
+    LGTM[Agent LGTM]
+    CounRec[Council recommendation]
+    GreenCI[CI green]
+    Main[Green on main]
+    Local[Local tests no ref]
+  end
+  Cheek[Cheek approval]
+  Ship[Ship / merge to verdant-grow-diary]
+
+  LGTM -.->|insufficient| Cheek
+  CounRec -->|input only| Cheek
+  GreenCI -->|often necessary| Cheek
+  Main -.->|wrong branch| Cheek
+  Local -.->|not deploy finding| Cheek
+  Cheek -->|sole authority| Ship
+```
+
+### 12.4 Text fallback (decision core only)
 
 ```text
-                    ┌─────────────────────┐
-                    │  CHEEK_APPROVAL     │
-                    │  PACKET + CI + sec  │
-                    └──────────┬──────────┘
-                               ▼
-                    ┌─────────────────────┐
-                    │ Security FAIL?      │──yes──► STOP-SHIP
-                    └──────────┬──────────┘
-                               │ no
-                               ▼
-                    ┌─────────────────────┐
-                    │ Required evidence   │──no───► HOLD / CHANGES
-                    │ + domain OK?        │
-                    └──────────┬──────────┘
-                               │ yes
-                               ▼
-                    ┌─────────────────────┐
-                    │ single_ask          │
-                    │ merge / close / …   │
-                    └──────────┬──────────┘
-                               ▼
-                    ┌─────────────────────┐
-                    │ verdant-grow-diary  │
-                    │ + optional prod     │
-                    │ verification        │
-                    └─────────────────────┘
+  PACKET + CI + security
+            │
+            ▼
+     Security FAIL? ──yes──► STOP-SHIP
+            │ no
+            ▼
+   Evidence + domain OK? ──no──► HOLD / CHANGES
+            │ yes
+            ▼
+        single_ask
+       /    |    \
+   merge  close  reassign / domain
+      │
+      ▼
+ verdant-grow-diary
+ (+ optional prod verify)
 ```
 
 ---

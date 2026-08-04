@@ -128,7 +128,8 @@ export function formatServerBundleProbe(probe, prefix) {
       `       resolved from: ${candidate.source}`,
   );
   const resolution = probe.entry
-    ? `${prefix}: resolved server bundle -> ${probe.entry}`
+    ? `${prefix}: resolved server bundle -> ${probe.entry}\n       detected via: ${probe.detectedFrom}`
     : `${prefix}: BLOCKED — no server bundle found at any probed location.`;
+
   return [`${prefix}: probed server bundle locations (in order):`, ...lines, resolution].join("\n");
 }

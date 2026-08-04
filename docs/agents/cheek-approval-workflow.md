@@ -327,63 +327,90 @@ applies_to_prs:
 
 ## 12. Flow diagrams
 
-### 12.1 End-to-end agent pipeline → Cheek
+Diagrams use **GitHub-flavored Mermaid** fenced code blocks. In Markdown source
+they must look like this (language tag `mermaid` on the opening fence):
+
+````markdown
+```mermaid
+flowchart TB
+  A["Start"] --> B["End"]
+```
+````
+
+Do **not** use a plain ` ``` ` fence without the `mermaid` language tag, or
+GitHub will show source instead of a rendered chart. Labels with spaces,
+punctuation, or `?` should be wrapped in double quotes inside the diagram.
+
+### 12.1 End-to-end agent pipeline to Cheek
 
 ```mermaid
 flowchart TB
-  subgraph pipeline [Multi-agent operating order]
-    Grok[Grok — Research]
-    Claude[Claude — Architecture / specs]
-    Codex[Codex — Build smallest slice]
-    Security[Security — Trust boundaries]
-    Gemini[Gemini — QA / release risk]
-    Council[Council Chair — One recommendation]
-    Grok --> Claude --> Codex --> Security --> Gemini --> Council
+  subgraph pipeline["Multi-agent operating order"]
+    Grok["Grok - Research"]
+    Claude["Claude - Architecture / specs"]
+    Codex["Codex - Build smallest slice"]
+    Security["Security - Trust boundaries"]
+    Gemini["Gemini - QA / release risk"]
+    Council["Council Chair - One recommendation"]
+    Grok --> Claude
+    Claude --> Codex
+    Codex --> Security
+    Security --> Gemini
+    Gemini --> Council
   end
 
-  subgraph cheek_gate [Cheek approval — sole ship authority]
-    Packet[CHEEK_APPROVAL_PACKET<br/>+ required CI + security disposition]
-    Council --> Packet
-    SecFail{Security FAIL?}
-    Packet --> SecFail
-    SecFail -->|yes| StopShip[STOP-SHIP<br/>remediate before re-ask]
-    SecFail -->|no| Evidence{Required evidence OK?<br/>domain decided?<br/>no laundered BLOCKED?}
-    Evidence -->|no| Hold[HOLD or CHANGES_REQUESTED]
-    Evidence -->|yes| Ask{single_ask}
-    Ask -->|merge| Merge[Merge to verdant-grow-diary]
-    Ask -->|close| Close[CLOSE_SUPERSEDED]
-    Ask -->|reassign| Reassign[REASSIGN role / slice]
-    Ask -->|domain-decision| Domain[DOMAIN_DECISION recorded]
-    Merge --> Prod[Optional production verify<br/>CURRENT_STATE discipline]
+  subgraph cheek_gate["Cheek approval - sole ship authority"]
+    Packet["CHEEK_APPROVAL_PACKET + CI + security"]
+    SecFail{"Security FAIL?"}
+    Evidence{"Required evidence OK?"}
+    Ask{"single_ask"}
+    StopShip["STOP-SHIP - remediate before re-ask"]
+    Hold["HOLD or CHANGES_REQUESTED"]
+    Merge["Merge to verdant-grow-diary"]
+    Close["CLOSE_SUPERSEDED"]
+    Reassign["REASSIGN role / slice"]
+    Domain["DOMAIN_DECISION recorded"]
+    Prod["Optional production verify"]
   end
 
-  Hold -.->|fix + new packet| Packet
-  StopShip -.->|remediate + new packet| Packet
+  Council --> Packet
+  Packet --> SecFail
+  SecFail -->|yes| StopShip
+  SecFail -->|no| Evidence
+  Evidence -->|no| Hold
+  Evidence -->|yes| Ask
+  Ask -->|merge| Merge
+  Ask -->|close| Close
+  Ask -->|reassign| Reassign
+  Ask -->|domain-decision| Domain
+  Merge --> Prod
+  Hold -.->|fix and new packet| Packet
+  StopShip -.->|remediate and new packet| Packet
 ```
 
-### 12.2 Cheek decision core (packet in → outcome out)
+### 12.2 Cheek decision core (packet in to outcome out)
 
 ```mermaid
 flowchart LR
-  subgraph inputs [Inputs]
-    P[Approval packet]
-    CI[Required CI on PR head]
-    S[Security PASS/FAIL/BLOCKED]
-    C[Council rec or N/A]
-    D[Domain decisions]
+  subgraph inputs["Inputs"]
+    P["Approval packet"]
+    CI["Required CI on PR head"]
+    S["Security PASS / FAIL / BLOCKED"]
+    C["Council rec or N/A"]
+    D["Domain decisions"]
   end
 
-  subgraph decide [Cheek]
-    J{Decide}
+  subgraph decide["Cheek"]
+    J{"Decide"}
   end
 
-  subgraph out [Outcomes]
-    M[Approve and merge]
-    H[Hold]
-    R[Request changes]
-    X[Close superseded]
-    A[Reassign]
-    Z[Stop-ship]
+  subgraph out["Outcomes"]
+    M["Approve and merge"]
+    H["Hold"]
+    R["Request changes"]
+    X["Close superseded"]
+    A["Reassign"]
+    Z["Stop-ship"]
   end
 
   P --> J
@@ -403,15 +430,16 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-  subgraph not_enough [Not ship authority alone]
-    LGTM[Agent LGTM]
-    CounRec[Council recommendation]
-    GreenCI[CI green]
-    Main[Green on main]
-    Local[Local tests no ref]
+  subgraph not_enough["Not ship authority alone"]
+    LGTM["Agent LGTM"]
+    CounRec["Council recommendation"]
+    GreenCI["CI green"]
+    Main["Green on main"]
+    Local["Local tests no ref"]
   end
-  Cheek[Cheek approval]
-  Ship[Ship / merge to verdant-grow-diary]
+
+  Cheek["Cheek approval"]
+  Ship["Ship / merge to verdant-grow-diary"]
 
   LGTM -.->|insufficient| Cheek
   CounRec -->|input only| Cheek
@@ -425,19 +453,19 @@ flowchart TB
 
 ```text
   PACKET + CI + security
-            │
-            ▼
-     Security FAIL? ──yes──► STOP-SHIP
-            │ no
-            ▼
-   Evidence + domain OK? ──no──► HOLD / CHANGES
-            │ yes
-            ▼
+            |
+            v
+     Security FAIL? --yes--> STOP-SHIP
+            | no
+            v
+   Evidence + domain OK? --no--> HOLD / CHANGES
+            | yes
+            v
         single_ask
        /    |    \
    merge  close  reassign / domain
-      │
-      ▼
+      |
+      v
  verdant-grow-diary
  (+ optional prod verify)
 ```

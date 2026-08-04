@@ -84,6 +84,11 @@ run("node", [resolve("scripts/assert-ssr-head-snapshots-present.mjs"), distDir])
 // declared card resolution — file size alone cannot catch a broken render.
 run("node", [resolve("scripts/assert-og-card-dimensions.mjs"), distDir]);
 
+// Third-A precondition gate: every card referenced by the manifest must exist
+// under dist/client/og with the exact expected filename (case-sensitive), so a
+// case-insensitive local checkout cannot hide a 404 on the Linux host.
+run("node", [resolve("scripts/assert-manifest-og-card-filenames.mjs"), distDir]);
+
 // Fourth precondition gate: every document's twitter:image must resolve to a
 // PNG at the exact card resolution AND in an encoding X's scraper renders
 // (8-bit truecolour, non-interlaced, terminated IEND, under the 5 MB limit).

@@ -23,7 +23,7 @@ const NAV = read("lib/diaryRangeReportNavigationRules.ts");
 const HOOK = read("hooks/useDiaryRangeReportData.ts");
 const APP = readAllRouteModuleSources();
 const MANIFEST = read("lib/appRouteManifest.ts");
-const CSS = read("index.css");
+const CSS = read("styles.css");
 const GATE_HOOK = read("hooks/usePremiumExportServerGate.ts");
 const EDGE_FN = readFileSync(
   path.resolve(__dirname, "../../supabase/functions/premium-export-entitlement/index.ts"),
@@ -48,7 +48,7 @@ describe("route + manifest registration", () => {
 });
 
 describe("print wiring", () => {
-  it("index.css makes the diary-range print section visible", () => {
+  it("styles.css makes the diary-range print section visible", () => {
     expect(CSS).toContain('[data-print-section="diary-range-report"]');
   });
 

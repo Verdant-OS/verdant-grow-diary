@@ -17,13 +17,15 @@ const isSrcTestFile = (filePath: string) =>
 
 describe("Supabase client storage", () => {
   it("uses sessionStorage (not localStorage) for auth persistence", () => {
-    expect(CLIENT).toMatch(/storage:\s*sessionStorage/);
-    expect(CLIENT).not.toMatch(/storage:\s*localStorage/);
+    // SSR-safe: window.sessionStorage only when window exists (never localStorage).
+    expect(CLIENT).toMatch(/window\.sessionStorage|storage:\s*sessionStorage/);
+    expect(CLIENT).not.toMatch(/storage:\s*localStorage|window\.localStorage/);
   });
 
-  it("keeps autoRefreshToken + persistSession enabled", () => {
-    expect(CLIENT).toMatch(/persistSession:\s*true/);
-    expect(CLIENT).toMatch(/autoRefreshToken:\s*true/);
+  it("keeps autoRefreshToken + persistSession enabled in the browser", () => {
+    // Under TanStack SSR these are gated on `typeof window !== "undefined"`.
+    expect(CLIENT).toMatch(/persistSession:\s*(true|typeof window)/);
+    expect(CLIENT).toMatch(/autoRefreshToken:\s*(true|typeof window)/);
   });
 
   it("documents the hardening edit in a comment", () => {
@@ -63,8 +65,14 @@ describe("Auth security docs", () => {
 
 describe("src/ static safety", () => {
   it("never imports the service role key into src/", () => {
+    // client.server.ts is the intentional server-only service-role client
+    // (TanStack Start SSR). All other src files remain forbidden.
+    const SERVICE_ROLE_ALLOWLIST = new Set([
+      resolve(SRC, "integrations/supabase/client.server.ts"),
+    ]);
     const offenders = SRC_FILES.filter((f) => {
       if (isSrcTestFile(f)) return false; // guard tests assert absence
+      if (SERVICE_ROLE_ALLOWLIST.has(f)) return false;
       const body = readFileCached(f);
       // Strip sanitizer-style references (regex literals + quoted string literals
       // naming the key, e.g. defensive redaction code). The real escalation

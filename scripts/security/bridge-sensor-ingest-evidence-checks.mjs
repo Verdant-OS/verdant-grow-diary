@@ -325,13 +325,28 @@ export const CHECKS = [
       "mint and revoke handler e2e tests are ACTIVE in the Deno edge-test lane: live run-list arguments plus live path filters in both push and pull_request",
     expect: [],
     // Anchored as active lines (a commented-out `# supabase/...` or
-    // `# - "supabase/..."` never satisfies these), and the path filter must
-    // appear at least twice — once under push, once under pull_request.
+    // `# - "supabase/..."` never satisfies these), and each trigger section
+    // is validated independently — a filter duplicated twice under one
+    // event must NOT satisfy the other event's wiring.
     custom: (content) => {
       const failures = [];
       // Normalize CRLF so the $-anchored active-line patterns behave
       // identically on Windows working trees and Linux CI checkouts.
       const text = content.replace(/\r\n/g, "\n");
+      const sections = { push: [], pull_request: [] };
+      let current = null;
+      for (const line of text.split("\n")) {
+        const head = line.match(/^ {2}(push|pull_request):\s*$/);
+        if (head) {
+          current = head[1];
+          continue;
+        }
+        if (/^\S/.test(line) || /^ {2}\S/.test(line)) {
+          current = null;
+          continue;
+        }
+        if (current) sections[current].push(line);
+      }
       for (const fn of ["mint-bridge-token", "revoke-bridge-token"]) {
         const runLine = new RegExp(
           String.raw`^\s*supabase/functions/${fn}/handler_e2e_test\.ts \\$`,
@@ -340,12 +355,11 @@ export const CHECKS = [
         if (!runLine.test(text)) {
           failures.push(`${fn} e2e is not an active argument in the deno run list`);
         }
-        const filterLine = new RegExp(String.raw`^\s*- "supabase/functions/${fn}/\*\*"$`, "gm");
-        const filters = text.match(filterLine) ?? [];
-        if (filters.length < 2) {
-          failures.push(
-            `${fn} path filter must be active under both push and pull_request (found ${filters.length})`,
-          );
+        const filterLine = new RegExp(String.raw`^\s*- "supabase/functions/${fn}/\*\*"$`, "m");
+        for (const event of ["push", "pull_request"]) {
+          if (!filterLine.test(sections[event].join("\n"))) {
+            failures.push(`${fn} path filter is not active under ${event}.paths`);
+          }
         }
       }
       return failures;

@@ -62,6 +62,15 @@ const FILE_CUSTOM_TAMPERS = {
         /^\s*supabase\/functions\/revoke-bridge-token\/handler_e2e_test\.ts \\\n/m,
         "",
       ),
+    // Duplication/move bypass: keep TWO active revoke filter lines but both
+    // under push — pull_request loses its wiring while the raw count stays 2.
+    (real) => {
+      const t = lf(real);
+      const line = '      - "supabase/functions/revoke-bridge-token/**"';
+      const parts = t.split(`${line}\n`);
+      if (parts.length !== 3) return t; // unexpected shape: leave untampered (detector must then flag baseline drift)
+      return `${parts[0]}${line}\n${line}\n${parts[1]}${parts[2]}`;
+    },
   ],
 };
 

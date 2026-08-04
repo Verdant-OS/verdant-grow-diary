@@ -72,6 +72,10 @@ if (!artifactsPresent()) {
   }
 }
 
+// Hard precondition gate: no validator runs until the manifest is provably
+// present and non-empty, so a wiped dist can never read as "0 documents, OK".
+run("node", [resolve("scripts/assert-seo-manifest-present.mjs"), distDir]);
+
 const validators = [
   ["scripts/check-no-src-lib-imports.mjs", false],
   ["scripts/validate-jsonld-rich-results.mjs", true],
@@ -84,6 +88,7 @@ const validators = [
   ["scripts/validate-static-route-head-fidelity.mjs", true],
   ["scripts/validate-public-image-budget.mjs", true],
 ];
+
 
 for (const [script, takesDist] of validators) {
   if (takesDist && !artifactsPresent()) {

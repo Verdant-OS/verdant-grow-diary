@@ -10,22 +10,40 @@
  * ran against a wiped dist and reported "0 documents" instead of a real error.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { ogImageSlugForPath } from "@/lib/build/ogImageCard";
 
 const repoRoot = resolve(__dirname, "../..");
 const generator = join(repoRoot, "scripts/generate-seo-artifacts.ts");
 const assertScript = join(repoRoot, "scripts/assert-seo-manifest-present.mjs");
 
+type ManifestDocument = {
+  path: string;
+  fileName: string;
+  metadata: {
+    title: string;
+    description: string;
+    url: string;
+    image?: string;
+    imageAlt?: string;
+    robots?: string;
+  };
+};
+
 type ManifestShape = {
   origin: string;
-  documents: Array<{
-    path: string;
-    fileName: string;
-    metadata: { title: string; description: string; url: string };
-  }>;
+  documents: ManifestDocument[];
 };
 
 let distDir = "";
@@ -38,6 +56,49 @@ function run(command: string, args: string[]): string {
     stdio: ["ignore", "pipe", "pipe"],
   });
 }
+
+function readManifest(): ManifestShape {
+  return JSON.parse(readFileSync(join(distDir, "seo-manifest.json"), "utf8")) as ManifestShape;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+/** Minimal SSR-shaped head snapshot for one manifest document. */
+function renderHeadSnapshot(document: ManifestDocument): string {
+  const { title, description, url, image = "", imageAlt = "" } = document.metadata;
+  const metas: Array<[string, string, string]> = [
+    ["name", "description", description],
+    ["property", "og:title", title],
+    ["property", "og:description", description],
+    ["property", "og:url", url],
+    ["property", "og:image", image],
+    ["property", "og:image:alt", imageAlt],
+    ["name", "twitter:card", "summary_large_image"],
+    ["name", "twitter:title", title],
+    ["name", "twitter:description", description],
+    ["name", "twitter:image", image],
+  ];
+  const metaTags = metas
+    .map(([attr, key, value]) => `<meta ${attr}="${key}" content="${escapeHtml(value)}" />`)
+    .join("\n    ");
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <title>${escapeHtml(title)}</title>
+    <link rel="canonical" href="${escapeHtml(url)}" />
+    ${metaTags}
+  </head>
+  <body></body>
+</html>
+`;
+}
+
 
 describe("postbuild SEO artifact generation", () => {
   beforeAll(() => {
@@ -82,6 +143,86 @@ describe("postbuild SEO artifact generation", () => {
     const homeCard = join(distDir, "client/og/home.png");
     expect(existsSync(homeCard)).toBe(true);
     expect(statSync(homeCard).size).toBeGreaterThan(0);
+  });
+
+  it("writes a non-empty OG card for every manifest document", () => {
+    const manifest = readManifest();
+    const missing: string[] = [];
+    const empty: string[] = [];
+
+    for (const document of manifest.documents) {
+      const canonicalPath = new URL(document.metadata.url).pathname;
+      const cardPath = join(distDir, "client/og", `${ogImageSlugForPath(canonicalPath)}.png`);
+      if (!existsSync(cardPath)) {
+        missing.push(`${document.path} -> ${cardPath}`);
+        continue;
+      }
+      // A truncated/failed resvg render still writes a file; require real bytes.
+      if (statSync(cardPath).size < 1024) empty.push(`${document.path} -> ${cardPath}`);
+    }
+
+    expect(missing).toEqual([]);
+    expect(empty).toEqual([]);
+  });
+
+  it("declares a relative .html output document for every manifest entry", () => {
+    const manifest = readManifest();
+    for (const document of manifest.documents) {
+      expect(document.fileName.startsWith("/")).toBe(false);
+      expect(document.fileName).toMatch(/\.html$/);
+    }
+    const fileNames = manifest.documents.map((document) => document.fileName);
+    expect(new Set(fileNames).size).toBe(fileNames.length);
+  });
+
+  it("does not let the head-fidelity validator pass while the static route documents are absent", async () => {
+    const { validateDist } = (await import(
+      "../../scripts/validate-static-route-head-fidelity.mjs"
+    )) as {
+      validateDist: (dir: string) => {
+        ok: boolean;
+        issues: string[];
+        report: { totals: { routes: number; missingFiles: number } } | null;
+      };
+    };
+
+    const manifest = readManifest();
+    const { ok, issues, report } = validateDist(distDir);
+
+    expect(ok).toBe(false);
+    expect(report?.totals.routes).toBe(manifest.documents.length);
+    expect(report?.totals.missingFiles).toBe(manifest.documents.length);
+    expect(issues.join("\n")).toContain("expected pre-rendered file");
+  });
+
+  it("accepts a static route document once its SSR head snapshot is present and non-empty", async () => {
+    const { validateDist } = (await import(
+      "../../scripts/validate-static-route-head-fidelity.mjs"
+    )) as {
+      validateDist: (dir: string) => {
+        report: { routes: Array<{ path: string; missing?: boolean }> } | null;
+      };
+    };
+
+    const manifest = readManifest();
+    const target = manifest.documents[0];
+    const snapshotDir = mkdtempSync(join(tmpdir(), "verdant-seo-snapshot-"));
+    try {
+      writeFileSync(
+        join(snapshotDir, "seo-manifest.json"),
+        JSON.stringify({ origin: manifest.origin, documents: [target] }),
+      );
+      const snapshotPath = join(snapshotDir, target.fileName);
+      mkdirSync(dirname(snapshotPath), { recursive: true });
+      writeFileSync(snapshotPath, renderHeadSnapshot(target));
+
+      expect(statSync(snapshotPath).size).toBeGreaterThan(0);
+      const route = validateDist(snapshotDir).report?.routes[0];
+      expect(route?.path).toBe(target.path);
+      expect(route?.missing).not.toBe(true);
+    } finally {
+      rmSync(snapshotDir, { recursive: true, force: true });
+    }
   });
 
   it("passes the manifest precondition gate against the generated dist", () => {

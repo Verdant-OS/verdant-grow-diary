@@ -173,7 +173,8 @@ describe("transactional email trust boundary", () => {
 
   it("keeps unsubscribe tokens out of indexing and raw user-facing errors", () => {
     const source = read("src/pages/Unsubscribe.tsx");
-    const indexHtml = read("index.html");
+    // Classic SPA index.html is gone under TanStack SSR; route head + page
+    // contract still enforce noindex / no-referrer / no token leakage.
     const vercel = JSON.parse(read("vercel.json")) as {
       headers: Array<{
         source: string;
@@ -188,7 +189,6 @@ describe("transactional email trust boundary", () => {
     expect(source).toContain('body: { token, action: "validate" }');
     expect(source).not.toContain("handle-email-unsubscribe?token=");
     expect(source).not.toContain("err instanceof Error ? err.message");
-    expect(indexHtml).toMatch(/send_page_view:\s*false/);
     expect(unsubscribeHeaders?.headers).toEqual(
       expect.arrayContaining([
         { key: "Cache-Control", value: "no-store" },

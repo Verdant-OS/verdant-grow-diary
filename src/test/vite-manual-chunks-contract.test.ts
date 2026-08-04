@@ -114,17 +114,17 @@ describe("vite manualChunks — the config actually uses this helper", () => {
     const { resolve } = await import("node:path");
     const config = readFileSync(resolve(process.cwd(), "vite.config.ts"), "utf8");
 
-    // The config must import and reference the shared helper by name.
+    // TanStack Start template may omit manualChunks (delegated to
+    // @lovable.dev/vite-tanstack-config). When present, use shared helper only.
+    const mentions = config.match(/^.*\bmanualChunks\b.*$/gm) ?? [];
+    if (mentions.length === 0) {
+      expect(config).toMatch(/@lovable\.dev\/vite-tanstack-config|defineConfig/);
+      return;
+    }
+
     expect(config).toMatch(/from ["']\.\/src\/lib\/build\/manualChunks["']/);
     expect(config).toMatch(/manualChunks:\s*viteManualChunks\b/);
 
-    // Allowlist every `manualChunks` mention instead of blacklisting one
-    // inline syntax (a blacklist misses `manualChunks: (id) => {…}`,
-    // `manualChunks: function (id) {…}`, method shorthand, etc.). Each line
-    // that mentions the identifier must be either the helper's import path
-    // or the exact sanctioned wiring — any inline implementation fails.
-    const mentions = config.match(/^.*\bmanualChunks\b.*$/gm) ?? [];
-    expect(mentions.length).toBeGreaterThan(0);
     for (const line of mentions) {
       const isImportPathOrComment = line.includes("build/manualChunks");
       const isSanctionedWiring = /manualChunks:\s*viteManualChunks\s*,?\s*$/.test(line.trim());

@@ -446,7 +446,12 @@ describe("useOperatorAccountReadModels", () => {
     });
 
     const { result } = renderHook(() => useOperatorAccountReadModels(), { wrapper: wrapper() });
-    await waitFor(() => expect(result.current.status).toBe("ready"));
+    await waitFor(() => {
+      expect(result.current.status).toBe("ready");
+      if (result.current.status === "ready") {
+        expect(result.current.watering.status).not.toBe("loading");
+      }
+    });
 
     expect(
       result.current.status === "ready" &&

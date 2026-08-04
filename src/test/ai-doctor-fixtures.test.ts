@@ -62,9 +62,7 @@ describe("MockAIClient", () => {
 
   it("ProductionAIClient throws not-implemented", async () => {
     const ctx = getFixtureByName("within_target_no_action").context;
-    await expect(new ProductionAIClient().analyze(ctx)).rejects.toThrow(
-      /not implemented/i,
-    );
+    await expect(new ProductionAIClient().analyze(ctx)).rejects.toThrow(/not implemented/i);
   });
 });
 
@@ -117,9 +115,7 @@ describe("Doctor fixtures — safety invariants", () => {
       const src = f.context.snapshot.source;
       if (src === "stale" || src === "invalid") {
         expect(f.analysis.shouldCreateActionQueueItem).toBe(false);
-        expect(f.analysis.summary.toLowerCase()).not.toMatch(
-          /\b(healthy|normal|within target)\b/,
-        );
+        expect(f.analysis.summary.toLowerCase()).not.toMatch(/\b(healthy|normal|within target)\b/);
       }
     }
   });
@@ -148,9 +144,7 @@ describe("Doctor fixtures — safety invariants", () => {
   });
 
   it("autoflower fixtures keep recommendations conservative (no high-stress training, no nutrient changes)", () => {
-    const autoFixtures = DOCTOR_FIXTURES.filter(
-      (f) => f.context.plant?.isAutoflower === true,
-    );
+    const autoFixtures = DOCTOR_FIXTURES.filter((f) => f.context.plant?.isAutoflower === true);
     expect(autoFixtures.length).toBeGreaterThan(0);
     for (const f of autoFixtures) {
       const text = [
@@ -161,12 +155,12 @@ describe("Doctor fixtures — safety invariants", () => {
         .join(" ")
         .toLowerCase();
       // The actionable text should not propose high-stress changes.
-      expect(text).not.toMatch(/\b(topping|super[- ]?crop|defoliat\w*|transplant)\b.*(now|today|immediately)/);
+      expect(text).not.toMatch(
+        /\b(topping|super[- ]?crop|defoliat\w*|transplant)\b.*(now|today|immediately)/,
+      );
       // whatNotToDo should explicitly warn against high-stress or nutrient changes.
       const dontList = f.analysis.whatNotToDo.join(" ").toLowerCase();
-      expect(dontList).toMatch(
-        /defoliat|nutrient|transplant|high[- ]?stress|training/,
-      );
+      expect(dontList).toMatch(/defoliat|nutrient|transplant|high[- ]?stress|training/);
     }
   });
 

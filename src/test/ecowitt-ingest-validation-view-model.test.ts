@@ -7,9 +7,7 @@ import {
 const NOW = new Date("2026-06-07T12:00:00Z");
 const TENT = "11111111-2222-3333-4444-555555555555";
 
-function row(
-  overrides: Partial<EcowittIngestValidationRow> = {},
-): EcowittIngestValidationRow {
+function row(overrides: Partial<EcowittIngestValidationRow> = {}): EcowittIngestValidationRow {
   return {
     id: overrides.id ?? "row-1",
     source: overrides.source ?? "ecowitt",
@@ -69,9 +67,7 @@ describe("buildEcowittIngestValidationViewModel", () => {
     expect(vm.transportLabel).toBe("mqtt_local_test");
     expect(vm.vendorLabel).toBe("GW1200");
     expect(vm.sourceLabel).toBe("ecowitt");
-    const present = Object.fromEntries(
-      vm.metricChips.map((c) => [c.key, c.present]),
-    );
+    const present = Object.fromEntries(vm.metricChips.map((c) => [c.key, c.present]));
     expect(present).toEqual({
       temp_f: true,
       humidity_pct: true,

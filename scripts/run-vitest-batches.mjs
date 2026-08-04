@@ -71,9 +71,7 @@ function buildVitestArgs(files, opts) {
 
 function runVitest(label, files, opts) {
   const args = buildVitestArgs(files, opts);
-  console.log(
-    `\n▶ ${label}: ${files.length} files\n  $ bunx ${args.join(" ")}`,
-  );
+  console.log(`\n▶ ${label}: ${files.length} files\n  $ bunx ${args.join(" ")}`);
   const res = spawnSync("bunx", args, { stdio: "inherit", cwd: ROOT });
   const ok = res.status === 0;
   console.log(`◀ ${label}: ${ok ? "PASS" : "FAIL"} (exit ${res.status})`);
@@ -136,9 +134,7 @@ function runBatch(batchNumber, files, opts) {
       if (!opts.continueOnFail) break;
     }
   }
-  console.log(
-    `◀ Batch ${batchNumber}: ${allOk ? "PASS" : "FAIL"} (${chunks.length} chunk(s))`,
-  );
+  console.log(`◀ Batch ${batchNumber}: ${allOk ? "PASS" : "FAIL"} (${chunks.length} chunk(s))`);
   emitMarker("VERDANT_BATCH_END", {
     batch: batchNumber,
     status: allOk ? "pass" : "fail",

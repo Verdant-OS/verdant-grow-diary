@@ -30,11 +30,7 @@ import {
 } from "@/lib/temperatureUnitPreference";
 
 export type DiaryCalendarEventKind =
-  | "watering"
-  | "feeding"
-  | "training"
-  | "diagnosis"
-  | "environment";
+  "watering" | "feeding" | "training" | "diagnosis" | "environment";
 
 const ALLOWED_KINDS: ReadonlySet<string> = new Set([
   "watering",

@@ -26,14 +26,11 @@ export function buildAiDoctorPhase1InternalLink(input: {
   return `/operator/ai-doctor-phase1?${params.toString()}`;
 }
 
-export function AiDoctorPhase1InternalLink(
-  props: AiDoctorPhase1InternalLinkProps,
-): JSX.Element {
+export function AiDoctorPhase1InternalLink(props: AiDoctorPhase1InternalLinkProps): JSX.Element {
   const href = buildAiDoctorPhase1InternalLink(props);
   const [copied, setCopied] = React.useState<"idle" | "ok" | "unavailable">("idle");
 
-  const clipboard =
-    typeof navigator !== "undefined" ? navigator.clipboard : undefined;
+  const clipboard = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
   const canCopy = typeof clipboard?.writeText === "function";
 
   const onCopy = React.useCallback(async () => {

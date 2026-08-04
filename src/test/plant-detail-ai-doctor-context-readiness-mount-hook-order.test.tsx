@@ -26,11 +26,9 @@ vi.mock("@/integrations/supabase/client", () => ({
     },
   },
 }));
-const fetchSpy = vi
-  .spyOn(globalThis, "fetch" as never)
-  .mockImplementation((() => {
-    throw new Error("fetch not allowed in hook-order regression");
-  }) as never);
+const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
+  throw new Error("fetch not allowed in hook-order regression");
+}) as never);
 
 // Mutable hook state mirrors how the real page would re-render as
 // async data resolves.
@@ -98,9 +96,7 @@ describe("PlantDetailAiDoctorContextReadinessMount hook-order regression", () =>
   it("does not crash when re-rendering from context-available → loading", () => {
     recentActivityState = { data: [], isLoading: false };
     manualLogsState = { data: [], isLoading: false };
-    const { rerender } = render(
-      <PlantDetailAiDoctorContextReadinessMount {...baseProps} />,
-    );
+    const { rerender } = render(<PlantDetailAiDoctorContextReadinessMount {...baseProps} />);
 
     recentActivityState = { data: undefined, isLoading: true };
     manualLogsState = { data: undefined, isLoading: true };
@@ -110,9 +106,7 @@ describe("PlantDetailAiDoctorContextReadinessMount hook-order regression", () =>
   });
 
   it("survives a loading → fallback → context-available transition", () => {
-    const { rerender } = render(
-      <PlantDetailAiDoctorContextReadinessMount {...baseProps} />,
-    );
+    const { rerender } = render(<PlantDetailAiDoctorContextReadinessMount {...baseProps} />);
     // Flip to fallback (data settled but built.context absent is hard to
     // force; using empty data which still produces a valid context is fine —
     // the goal is to traverse all early-return branches without throwing).
@@ -132,9 +126,7 @@ describe("PlantDetailAiDoctorContextReadinessMount hook-order regression", () =>
   });
 
   it("never triggers an AI Doctor / network call during these transitions", () => {
-    const { rerender } = render(
-      <PlantDetailAiDoctorContextReadinessMount {...baseProps} />,
-    );
+    const { rerender } = render(<PlantDetailAiDoctorContextReadinessMount {...baseProps} />);
     recentActivityState = { data: [], isLoading: false };
     manualLogsState = { data: [], isLoading: false };
     rerender(<PlantDetailAiDoctorContextReadinessMount {...baseProps} />);

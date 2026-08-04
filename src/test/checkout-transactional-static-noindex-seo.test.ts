@@ -4,7 +4,7 @@
  * canonical fallback while explicitly prohibiting indexing.
  */
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { buildStaticSocialRouteHtml } from "@/lib/build/staticSocialRouteHtml";
@@ -16,7 +16,22 @@ import {
 } from "@/lib/build/staticPublicSeoDocuments";
 
 const ROOT = resolve(__dirname, "../..");
-const INDEX_HTML = readFileSync(resolve(ROOT, "index.html"), "utf8");
+const HAS_INDEX_HTML = existsSync(resolve(ROOT, "index.html"));
+// Classic SPA shell is gone under TanStack SSR; builder needs a titled meta shell.
+const INDEX_HTML = HAS_INDEX_HTML
+  ? readFileSync(resolve(ROOT, "index.html"), "utf8")
+  : `<!doctype html><html><head><title>Verdant</title>
+  <meta name="description" content="" />
+  <meta property="og:title" content="" />
+  <meta property="og:description" content="" />
+  <meta property="og:url" content="" />
+  <meta property="og:image" content="" />
+  <meta property="og:image:alt" content="" />
+  <meta name="twitter:title" content="" />
+  <meta name="twitter:description" content="" />
+  <meta name="twitter:image" content="" />
+  <meta name="robots" content="" />
+</head><body><div id="root"></div></body></html>`;
 const SITEMAP = readFileSync(resolve(ROOT, "public/sitemap.xml"), "utf8");
 
 const TRANSACTIONAL_PATHS = ["/checkout/success", "/checkout/cancel"] as const;

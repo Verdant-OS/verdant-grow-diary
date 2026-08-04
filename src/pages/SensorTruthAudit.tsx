@@ -23,19 +23,13 @@ function BulletList({
 }) {
   if (!items || items.length === 0) {
     return (
-      <p
-        data-testid={`${testId}-empty`}
-        className="text-xs italic text-muted-foreground"
-      >
+      <p data-testid={`${testId}-empty`} className="text-xs italic text-muted-foreground">
         {emptyMessage}
       </p>
     );
   }
   return (
-    <ul
-      data-testid={testId}
-      className="list-disc space-y-1 pl-5 text-sm text-foreground"
-    >
+    <ul data-testid={testId} className="list-disc space-y-1 pl-5 text-sm text-foreground">
       {items.map((item, i) => (
         <li key={`${testId}-${i}`}>{item}</li>
       ))}
@@ -50,9 +44,7 @@ function SourceRuleCard({ rule }: { rule: SensorTruthSourceRule }) {
       className="space-y-2 rounded-md border border-border bg-card p-4"
     >
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold capitalize text-foreground">
-          {rule.label}
-        </h3>
+        <h3 className="text-sm font-semibold capitalize text-foreground">{rule.label}</h3>
         <span
           data-testid={`sensor-truth-source-rule-${rule.label}-badge`}
           className="inline-block rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-foreground"
@@ -74,9 +66,7 @@ function SourceRuleCard({ rule }: { rule: SensorTruthSourceRule }) {
       </div>
 
       <div className="space-y-1">
-        <p className="text-xs font-medium text-muted-foreground">
-          Confidence impact
-        </p>
+        <p className="text-xs font-medium text-muted-foreground">Confidence impact</p>
         <p
           data-testid={`sensor-truth-source-rule-${rule.label}-confidence-impact`}
           className="text-sm text-foreground"
@@ -86,9 +76,7 @@ function SourceRuleCard({ rule }: { rule: SensorTruthSourceRule }) {
       </div>
 
       <div className="space-y-1">
-        <p className="text-xs font-medium text-muted-foreground">
-          UI label requirement
-        </p>
+        <p className="text-xs font-medium text-muted-foreground">UI label requirement</p>
         <p
           data-testid={`sensor-truth-source-rule-${rule.label}-ui-label`}
           className="text-sm text-foreground"
@@ -144,9 +132,7 @@ function SuspiciousCheckCard({ check }: { check: SensorTruthSuspiciousCheck }) {
       </div>
 
       <div className="space-y-1">
-        <p className="text-xs font-medium text-muted-foreground">
-          Expected handling
-        </p>
+        <p className="text-xs font-medium text-muted-foreground">Expected handling</p>
         <p
           data-testid={`sensor-truth-suspicious-check-${check.id}-handling`}
           className="text-sm text-foreground"
@@ -168,10 +154,7 @@ export default function SensorTruthAudit(): JSX.Element {
     >
       <header className="space-y-2 rounded-md border border-border bg-muted/30 p-4">
         <h1 className="text-lg font-semibold">{vm.title}</h1>
-        <p
-          data-testid="sensor-truth-audit-subtitle"
-          className="text-sm text-muted-foreground"
-        >
+        <p data-testid="sensor-truth-audit-subtitle" className="text-sm text-muted-foreground">
           {vm.subtitle}
         </p>
         <div className="flex flex-wrap gap-1">
@@ -185,10 +168,7 @@ export default function SensorTruthAudit(): JSX.Element {
             </span>
           ))}
         </div>
-        <p
-          data-testid="sensor-truth-audit-generated-at"
-          className="text-xs text-muted-foreground"
-        >
+        <p data-testid="sensor-truth-audit-generated-at" className="text-xs text-muted-foreground">
           Generated at: {vm.generated_at}
         </p>
       </header>
@@ -232,10 +212,7 @@ export default function SensorTruthAudit(): JSX.Element {
         className="space-y-2 rounded-md border border-border bg-card p-4"
       >
         <h2 className="text-sm font-semibold">Blocked live-data note</h2>
-        <p
-          data-testid="sensor-truth-audit-blocked-note-text"
-          className="text-sm text-foreground"
-        >
+        <p data-testid="sensor-truth-audit-blocked-note-text" className="text-sm text-foreground">
           {vm.blocked_live_data_note}
         </p>
       </section>

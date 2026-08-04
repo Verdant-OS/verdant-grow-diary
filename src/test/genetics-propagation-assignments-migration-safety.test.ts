@@ -16,8 +16,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const MIGRATION =
-  "supabase/migrations/20260720143000_genetics_traceability_assignments.sql";
+const MIGRATION = "supabase/migrations/20260720143000_genetics_traceability_assignments.sql";
 
 function read(p: string): string {
   return readFileSync(resolve(process.cwd(), p), "utf8");
@@ -29,9 +28,7 @@ describe("genetics plant-origin assignments migration safety", () => {
   it("creates both tables with RLS and one authoritative assignment per plant", () => {
     expect(sql).toMatch(/CREATE TABLE public\.plant_origin_assignments/);
     expect(sql).toMatch(/CREATE TABLE public\.plant_origin_assignment_events/);
-    expect(sql).toMatch(
-      /ALTER TABLE public\.plant_origin_assignments ENABLE ROW LEVEL SECURITY/,
-    );
+    expect(sql).toMatch(/ALTER TABLE public\.plant_origin_assignments ENABLE ROW LEVEL SECURITY/);
     expect(sql).toMatch(
       /ALTER TABLE public\.plant_origin_assignment_events ENABLE ROW LEVEL SECURITY/,
     );
@@ -124,9 +121,7 @@ describe("genetics plant-origin assignments migration safety", () => {
   });
 
   it("revokes execute from PUBLIC and grants only authenticated + service_role", () => {
-    expect(sql).toMatch(
-      /REVOKE ALL ON FUNCTION public\.genetics_assign_plants[\s\S]*?FROM PUBLIC/,
-    );
+    expect(sql).toMatch(/REVOKE ALL ON FUNCTION public\.genetics_assign_plants[\s\S]*?FROM PUBLIC/);
     expect(sql).toMatch(
       /GRANT EXECUTE ON FUNCTION public\.genetics_assign_plants[\s\S]*?TO authenticated, service_role/,
     );

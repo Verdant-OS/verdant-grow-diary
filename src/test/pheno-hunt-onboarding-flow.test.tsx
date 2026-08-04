@@ -239,8 +239,7 @@ describe("PhenoHuntNew onboarding flow", () => {
     fireEvent.click(screen.getByTestId("ph-save-btn"));
     await waitFor(() => expect(createPhenoHuntMock).toHaveBeenCalledTimes(1));
     const call = createPhenoHuntMock.mock.calls[0]?.[0] as
-      | { growId: string; plantIds: string[]; name: string }
-      | undefined;
+      { growId: string; plantIds: string[]; name: string } | undefined;
     expect(call).toBeDefined();
     expect(call!.growId).toBe("grow-1");
     expect(call!.plantIds).toEqual(["p1", "p2"]);

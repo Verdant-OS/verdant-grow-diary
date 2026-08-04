@@ -175,8 +175,7 @@ type JsonBodySource = {
 };
 
 export type BoundedJsonResult =
-  | { ok: true; value: unknown }
-  | { ok: false; reason: "body_too_large" | "invalid_json" };
+  { ok: true; value: unknown } | { ok: false; reason: "body_too_large" | "invalid_json" };
 
 export async function readBoundedJsonBody(
   source: JsonBodySource,
@@ -283,8 +282,7 @@ export function parseCultivarQaRequest(value: unknown): ParsedCultivarQaRequest 
 }
 
 export type CultivarQaAnswerResult =
-  | { ok: true; answer: string }
-  | { ok: false; reason: "no_answer" | "invalid_answer" };
+  { ok: true; answer: string } | { ok: false; reason: "no_answer" | "invalid_answer" };
 
 export function parseCultivarQaAnswer(value: unknown): CultivarQaAnswerResult {
   const payload = asObject(value);

@@ -78,7 +78,12 @@ function renderPage(url = "/reports/diary-range?growId=grow-1&start=2026-07-01&e
 beforeEach(() => {
   mockEntitlements.mockReturnValue(proEntitlement());
   mockData.mockReturnValue(READY_DATA);
-  mockCheck.mockResolvedValue({ ok: true, state: "allowed", reason: null, displayPlanId: "pro_monthly" });
+  mockCheck.mockResolvedValue({
+    ok: true,
+    state: "allowed",
+    reason: null,
+    displayPlanId: "pro_monthly",
+  });
 });
 
 afterEach(() => {
@@ -120,7 +125,9 @@ describe("gating", () => {
     await waitFor(() =>
       expect(screen.getByTestId("diary-range-report-page-locked")).toBeInTheDocument(),
     );
-    expect(screen.getByTestId("diary-range-report-page-locked").getAttribute("data-server-gate-status")).toBe("error");
+    expect(
+      screen.getByTestId("diary-range-report-page-locked").getAttribute("data-server-gate-status"),
+    ).toBe("error");
     expect(screen.queryByTestId("diary-range-report-paywall")).not.toBeInTheDocument();
     expect(screen.getByTestId("diary-range-report-entitlement-retry")).toBeInTheDocument();
   });
@@ -136,7 +143,9 @@ describe("gating", () => {
     await waitFor(() =>
       expect(screen.getByTestId("diary-range-report-page-locked")).toBeInTheDocument(),
     );
-    expect(screen.getByTestId("diary-range-report-page-locked").getAttribute("data-server-gate-status")).toBe("error");
+    expect(
+      screen.getByTestId("diary-range-report-page-locked").getAttribute("data-server-gate-status"),
+    ).toBe("error");
     expect(screen.queryByTestId("diary-range-report-paywall")).not.toBeInTheDocument();
     expect(screen.getByTestId("diary-range-report-entitlement-retry")).toBeInTheDocument();
   });
@@ -173,9 +182,7 @@ describe("gating", () => {
 describe("allowed rendering", () => {
   it("renders header, all six sections, photos, and the safety footer", async () => {
     renderPage();
-    await waitFor(() =>
-      expect(screen.getByTestId("diary-range-report-page")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("diary-range-report-page")).toBeInTheDocument());
     for (const id of [
       "diary-range-report-header",
       "diary-range-report-watering",
@@ -211,9 +218,7 @@ describe("allowed rendering", () => {
       });
       fireEvent.click(screen.getByTestId("diary-range-report-print"));
       expect(printSpy).toHaveBeenCalledTimes(1);
-      expect(titleDuringPrint).toBe(
-        "verdant-diary-report-blue-dream-2026-07-01-to-2026-07-10",
-      );
+      expect(titleDuringPrint).toBe("verdant-diary-report-blue-dream-2026-07-01-to-2026-07-10");
       await waitFor(() => expect(document.title).toBe(before));
     } finally {
       window.print = originalPrint;
@@ -222,9 +227,7 @@ describe("allowed rendering", () => {
 
   it("shows the range error and disables apply for an inverted draft range", async () => {
     renderPage();
-    await waitFor(() =>
-      expect(screen.getByTestId("diary-range-report-page")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("diary-range-report-page")).toBeInTheDocument());
     fireEvent.change(screen.getByTestId("diary-range-report-start-date"), {
       target: { value: "2026-07-20" },
     });

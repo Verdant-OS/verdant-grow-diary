@@ -77,14 +77,11 @@ function buildFixture(opts?: {
     const flowerF = 78 + (r % 5); // 78..82°F
     const flowerRh = 55 + (r % 7); // 55..61%
     const seedlingF = 75 + (r % 3);
-    const seedlingRh = opts?.seedlingHighRhRows?.includes(r)
-      ? 94 + (r % 4)
-      : 60 + (r % 8);
+    const seedlingRh = opts?.seedlingHighRhRows?.includes(r) ? 94 + (r % 4) : 60 + (r % 8);
     const vegF = 76 + (r % 4);
     const vegRh = 58 + (r % 6);
-    const vegSoil = r === opts?.suspiciousSoilZero ? 0
-      : r === opts?.suspiciousSoilFull ? 100
-      : 45 + (r % 10);
+    const vegSoil =
+      r === opts?.suspiciousSoilZero ? 0 : r === opts?.suspiciousSoilFull ? 100 : 45 + (r % 10);
     const flowerSoil1 = 40 + (r % 12);
     const flowerSoil2 = 42 + (r % 11);
     const soilTempF = 70 + (r % 4);
@@ -174,9 +171,7 @@ describe("verdantGeneticsXlsxParser — preview adapter", () => {
 
   it("calculates VPD from temp + RH and tags it as calculated", () => {
     const res = parseVerdantGeneticsXlsx(buildFixture());
-    const vpd = res.rows.find(
-      (r) => r.sensor_group === "Flower Tent" && r.metric === "vpd_kpa",
-    );
+    const vpd = res.rows.find((r) => r.sensor_group === "Flower Tent" && r.metric === "vpd_kpa");
     expect(vpd).toBeDefined();
     expect(vpd!.calculated).toBe(true);
     expect(vpd!.raw_payload.calculated).toBe(true);
@@ -187,9 +182,7 @@ describe("verdantGeneticsXlsxParser — preview adapter", () => {
   it("maps soil moisture columns → soil_moisture_pct", () => {
     const res = parseVerdantGeneticsXlsx(buildFixture());
     const groups = new Set(
-      res.rows
-        .filter((r) => r.metric === "soil_moisture_pct")
-        .map((r) => r.sensor_group),
+      res.rows.filter((r) => r.metric === "soil_moisture_pct").map((r) => r.sensor_group),
     );
     expect(groups.has("Vegetation Soil")).toBe(true);
     expect(groups.has("Flower Soil 1")).toBe(true);
@@ -278,14 +271,10 @@ describe("verdantGeneticsXlsxParser — preview adapter", () => {
     const res = parseVerdantGeneticsXlsx(buildFixture());
     // Battery is its own group, so it won't fold into another group's row.
     // Confirm no metric row was emitted for the Battery group.
-    const batteryMetricRows = res.rows.filter(
-      (r) => r.sensor_group === "Battery",
-    );
+    const batteryMetricRows = res.rows.filter((r) => r.sensor_group === "Battery");
     expect(batteryMetricRows.length).toBe(0);
     // And confirm the Battery column is rejected as battery_preserved_in_raw.
-    expect(
-      res.rejected.some((r) => r.reason === "battery_preserved_in_raw"),
-    ).toBe(true);
+    expect(res.rejected.some((r) => r.reason === "battery_preserved_in_raw")).toBe(true);
   });
 
   it("returns row-per-metric shape compatible with future sensor_readings inserts", () => {
@@ -295,9 +284,7 @@ describe("verdantGeneticsXlsxParser — preview adapter", () => {
         expect.objectContaining({
           captured_at: expect.any(String),
           sensor_group: expect.any(String),
-          metric: expect.stringMatching(
-            /^(temperature_c|humidity_pct|vpd_kpa|soil_moisture_pct)$/,
-          ),
+          metric: expect.stringMatching(/^(temperature_c|humidity_pct|vpd_kpa|soil_moisture_pct)$/),
           value: expect.any(Number),
           calculated: expect.any(Boolean),
           source: "csv",

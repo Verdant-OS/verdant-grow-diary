@@ -11,9 +11,7 @@ import {
 } from "@/lib/aiDoctorManualSaveConfirmationViewModel";
 import type { AiDoctorCheckInPreviewView } from "@/lib/aiDoctorCheckInPreviewViewModel";
 
-function makeView(
-  overrides: Partial<AiDoctorCheckInPreviewView> = {},
-): AiDoctorCheckInPreviewView {
+function makeView(overrides: Partial<AiDoctorCheckInPreviewView> = {}): AiDoctorCheckInPreviewView {
   return {
     notices: {
       previewOnly: "Preview only — not saved.",
@@ -97,10 +95,7 @@ describe("buildAiDoctorManualSaveConfirmationView", () => {
       now: NOW,
     });
     if (v.status !== "ready") throw new Error("expected ready");
-    expect(v.limitations.map((l) => l.code)).toEqual([
-      "demo_only",
-      "stale_or_invalid",
-    ]);
+    expect(v.limitations.map((l) => l.code)).toEqual(["demo_only", "stale_or_invalid"]);
   });
 
   it("returns blocked view with reasons when identity is missing", () => {
@@ -135,10 +130,7 @@ describe("buildAiDoctorManualSaveConfirmationView", () => {
 
   it("static guard: view model has no Supabase/write/model/alert/action-queue imports", async () => {
     const { readFileSync } = await import("node:fs");
-    const src = readFileSync(
-      "src/lib/aiDoctorManualSaveConfirmationViewModel.ts",
-      "utf8",
-    );
+    const src = readFileSync("src/lib/aiDoctorManualSaveConfirmationViewModel.ts", "utf8");
     expect(src).not.toMatch(/integrations\/supabase/);
     expect(src).not.toMatch(/\bfetch\s*\(/);
     expect(src).not.toMatch(/\.rpc\s*\(/);

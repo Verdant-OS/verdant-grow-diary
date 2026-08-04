@@ -17,7 +17,10 @@ describe("paddle webhook processing recorder", () => {
     const verifyIdx = WEBHOOK_SRC.indexOf("await verifyPaddleWebhookSignature(");
     const parseIdx = WEBHOOK_SRC.indexOf("JSON.parse(rawBody)");
     const clientIdx = WEBHOOK_SRC.indexOf("createClient(SUPABASE_URL, SERVICE_ROLE");
-    const eventInsertIdx = WEBHOOK_SRC.indexOf('.from("paddle_events").insert');
+    // Insert may be multi-line: .from("paddle_events")\n    .insert({
+    const eventInsertIdx = WEBHOOK_SRC.search(
+      /\.from\(["']paddle_events["']\)\s*\.insert/,
+    );
     const processingCallIdx = WEBHOOK_SRC.indexOf("recordProcessing(supabase, recordedEvent)");
 
     expect(rawIdx).toBeGreaterThan(-1);
@@ -60,11 +63,15 @@ describe("paddle webhook processing recorder", () => {
   it("requires explicit subscription IDs for transaction.completed recurring events", () => {
     expect(WEBHOOK_SRC).toContain("function subscriptionIdFromData");
     expect(WEBHOOK_SRC).toContain('eventType.startsWith("subscription.")');
-    expect(WEBHOOK_SRC).not.toContain('firstStringPath(data, [["subscription_id"], ["subscription", "id"], ["id"]])');
+    expect(WEBHOOK_SRC).not.toContain(
+      'firstStringPath(data, [["subscription_id"], ["subscription", "id"], ["id"]])',
+    );
 
     expect(MAPPER_SRC).toContain("function subscriptionIdFromData");
     expect(MAPPER_SRC).toContain('eventType.startsWith("subscription.")');
-    expect(MAPPER_SRC).not.toContain('firstStringPath(data, [["subscription_id"], ["subscription", "id"], ["id"]])');
+    expect(MAPPER_SRC).not.toContain(
+      'firstStringPath(data, [["subscription_id"], ["subscription", "id"], ["id"]])',
+    );
   });
 
   it("does not directly write entitlement source-of-truth rows", () => {

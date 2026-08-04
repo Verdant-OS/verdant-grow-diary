@@ -9,10 +9,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/store/auth";
-import {
-  loadPlantMemoryEpisodes,
-  type LoadEpisodesArgs,
-} from "@/lib/plantMemoryEpisodeService";
+import { loadPlantMemoryEpisodes, type LoadEpisodesArgs } from "@/lib/plantMemoryEpisodeService";
 import type { PlantMemoryEpisode } from "@/lib/plantMemoryEpisodeRules";
 
 export type PlantMemoryEpisodesState =
@@ -28,9 +25,10 @@ export interface UsePlantMemoryEpisodesArgs {
   readonly includeSensorEvidence?: boolean;
 }
 
-export function usePlantMemoryEpisodes(
-  args: UsePlantMemoryEpisodesArgs,
-): { state: PlantMemoryEpisodesState; reload: () => void } {
+export function usePlantMemoryEpisodes(args: UsePlantMemoryEpisodesArgs): {
+  state: PlantMemoryEpisodesState;
+  reload: () => void;
+} {
   const { user } = useAuth();
   const [state, setState] = useState<PlantMemoryEpisodesState>({ status: "idle" });
   const { growId, plantId, actionQueueId, includeSensorEvidence } = args;

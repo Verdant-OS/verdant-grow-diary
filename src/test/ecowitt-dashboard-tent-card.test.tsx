@@ -84,8 +84,7 @@ function ecowittRow(overrides: Record<string, unknown>): Record<string, unknown>
 // ---------------------------------------------------------------------------
 // Source-code wiring assertions
 // ---------------------------------------------------------------------------
-const readSrc = (p: string) =>
-  readFileSync(resolve(__dirname, "..", p), "utf8");
+const readSrc = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 
 const DASHBOARD_SRC = readSrc("pages/Dashboard.tsx");
 const TENT_DETAIL_SRC = readSrc("pages/TentDetail.tsx");
@@ -98,12 +97,10 @@ describe("Dashboard EcoWitt wiring — source code", () => {
   });
 
   it("renders the card with the selected tent id (not 'all')", () => {
-    expect(DASHBOARD_SRC).toContain('<EcowittLatestSnapshotCard');
-    expect(DASHBOARD_SRC).toContain('tentId={tentSelection}');
+    expect(DASHBOARD_SRC).toContain("<EcowittLatestSnapshotCard");
+    expect(DASHBOARD_SRC).toContain("tentId={tentSelection}");
     // Must not render the card when selection is "all" — instead show the calm copy.
-    expect(DASHBOARD_SRC).toMatch(
-      /tentSelection\s*===\s*["']all["']\s*\?/,
-    );
+    expect(DASHBOARD_SRC).toMatch(/tentSelection\s*===\s*["']all["']\s*\?/);
   });
 
   it("shows calm 'Select a tent' copy when no tent is selected", () => {
@@ -130,8 +127,8 @@ describe("TentDetail EcoWitt wiring — source code", () => {
   });
 
   it("renders the card with the viewed tent id", () => {
-    expect(TENT_DETAIL_SRC).toContain('<EcowittLatestSnapshotCard');
-    expect(TENT_DETAIL_SRC).toContain('tentId={id ?? null}');
+    expect(TENT_DETAIL_SRC).toContain("<EcowittLatestSnapshotCard");
+    expect(TENT_DETAIL_SRC).toContain("tentId={id ?? null}");
   });
 
   it("labels the section 'Latest EcoWitt Snapshot'", () => {
@@ -158,9 +155,7 @@ describe("EcowittLatestSnapshotCard — grower link and behavior", () => {
       </MemoryRouter>,
       { wrapper: wrap() },
     );
-    await waitFor(() =>
-      expect(screen.getByTestId("ecowitt-sensors-link")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("ecowitt-sensors-link")).toBeInTheDocument());
     const link = screen.getByTestId("ecowitt-sensors-link");
     expect(link.getAttribute("href")).toBe("/sensors");
     expect(link.textContent).toBe("View sensor history");
@@ -175,9 +170,7 @@ describe("EcowittLatestSnapshotCard — grower link and behavior", () => {
       </MemoryRouter>,
       { wrapper: wrap() },
     );
-    await waitFor(() =>
-      expect(screen.getByTestId("ecowitt-snapshot-empty")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("ecowitt-snapshot-empty")).toBeInTheDocument());
     expect(screen.getByTestId("ecowitt-sensors-link")).toBeInTheDocument();
   });
 
@@ -199,12 +192,8 @@ describe("EcowittLatestSnapshotCard — grower link and behavior", () => {
       </MemoryRouter>,
       { wrapper: wrap() },
     );
-    await waitFor(() =>
-      expect(screen.getByTestId("ecowitt-source-badge")).toBeInTheDocument(),
-    );
-    expect(screen.getByTestId("ecowitt-source-badge").textContent).toBe(
-      "Stale",
-    );
+    await waitFor(() => expect(screen.getByTestId("ecowitt-source-badge")).toBeInTheDocument());
+    expect(screen.getByTestId("ecowitt-source-badge").textContent).toBe("Stale");
     expect(screen.queryByText(/^Live$/)).toBeNull();
   });
 
@@ -216,12 +205,8 @@ describe("EcowittLatestSnapshotCard — grower link and behavior", () => {
       </MemoryRouter>,
       { wrapper: wrap() },
     );
-    await waitFor(() =>
-      expect(screen.getByTestId("ecowitt-source-badge")).toBeInTheDocument(),
-    );
-    expect(screen.getByTestId("ecowitt-source-badge").textContent).toBe(
-      "Manual",
-    );
+    await waitFor(() => expect(screen.getByTestId("ecowitt-source-badge")).toBeInTheDocument());
+    expect(screen.getByTestId("ecowitt-source-badge").textContent).toBe("Manual");
   });
 
   it("invalid reading renders Invalid / Unavailable and Derived VPD unavailable", async () => {
@@ -242,13 +227,9 @@ describe("EcowittLatestSnapshotCard — grower link and behavior", () => {
       { wrapper: wrap() },
     );
     await waitFor(() =>
-      expect(
-        screen.getByTestId("ecowitt-snapshot-unavailable"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("ecowitt-snapshot-unavailable")).toBeInTheDocument(),
     );
-    expect(
-      screen.getByTestId("ecowitt-metric-vpd_kpa").textContent,
-    ).toBe("Unavailable");
+    expect(screen.getByTestId("ecowitt-metric-vpd_kpa").textContent).toBe("Unavailable");
   });
 
   it("never renders 'Live VPD' or 'VPD Live'", async () => {
@@ -260,9 +241,7 @@ describe("EcowittLatestSnapshotCard — grower link and behavior", () => {
       { wrapper: wrap() },
     );
     await waitFor(() =>
-      expect(
-        screen.getByTestId("ecowitt-latest-snapshot-card"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("ecowitt-latest-snapshot-card")).toBeInTheDocument(),
     );
     expect(container.textContent ?? "").not.toMatch(/Live VPD|VPD Live/i);
   });
@@ -275,9 +254,7 @@ describe("EcowittLatestSnapshotCard — grower link and behavior", () => {
       </MemoryRouter>,
       { wrapper: wrap() },
     );
-    await waitFor(() =>
-      expect(screen.getByText("Derived VPD")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("Derived VPD")).toBeInTheDocument());
   });
 });
 

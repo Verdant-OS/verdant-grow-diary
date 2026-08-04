@@ -14,12 +14,7 @@
 import { isUuid } from "@/lib/isUuid";
 
 export type EnvironmentCheckContextSourceLabel =
-  | "manual"
-  | "demo"
-  | "live"
-  | "stale"
-  | "invalid"
-  | "unknown";
+  "manual" | "demo" | "live" | "stale" | "invalid" | "unknown";
 
 export interface EnvironmentCheckSensorContextInput {
   tentId?: string | null;
@@ -29,10 +24,7 @@ export interface EnvironmentCheckSensorContextInput {
 }
 
 export type EnvironmentCheckSensorContextStatus =
-  | "valid"
-  | "warning"
-  | "blocked"
-  | "not_applicable";
+  "valid" | "warning" | "blocked" | "not_applicable";
 
 export type EnvironmentCheckSensorContextReason =
   | "ok_verified_tent"
@@ -63,8 +55,7 @@ const COPY = {
   warnMsg:
     "This check can be saved as a diary note, but it will not be treated as verified sensor data.",
   missingTitle: "Select a real tent before linking sensor data",
-  missingMsg:
-    "Without a real tent context, this check is saved as a diary note only.",
+  missingMsg: "Without a real tent context, this check is saved as a diary note only.",
   demoTitle: "Demo tent context",
   demoMsg:
     "This Environment Check is tied to a demo context and is not stored as live sensor data.",
@@ -72,8 +63,7 @@ const COPY = {
   invalidMsg:
     "Recent sensor data for this tent is stale or invalid. This check will be saved as a diary note only.",
   noteOnlyTitle: "Environment Check note",
-  noteOnlyMsg:
-    "No measurements entered — this will be saved as a diary note.",
+  noteOnlyMsg: "No measurements entered — this will be saved as a diary note.",
 } as const;
 
 /** Pure: derive the pre-save sensor-context view for Environment Check. */

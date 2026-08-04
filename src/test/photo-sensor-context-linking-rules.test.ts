@@ -26,12 +26,9 @@ describe("photoSensorContextLinkingRules — attached wins", () => {
       captured_at: "2026-06-19T11:59:00.000Z",
       source: "manual" as const,
     };
-    const r = resolvePhotoSensorContext(
-      photo({ attachedSnapshot: attached }),
-      [
-        { id: "c1", captured_at: PHOTO_T, source: "live" },
-      ],
-    );
+    const r = resolvePhotoSensorContext(photo({ attachedSnapshot: attached }), [
+      { id: "c1", captured_at: PHOTO_T, source: "live" },
+    ]);
     expect(r.kind).toBe("attached");
     if (r.kind === "attached") expect(r.snapshot.id).toBe("attached-1");
   });
@@ -120,10 +117,9 @@ describe("photoSensorContextLinkingRules — empty / invalid input", () => {
     if (r.kind === "none") expect(r.reason).toBe("no_candidates");
   });
   it("unparseable photo time and no attachment → none with no_photo_time", () => {
-    const r = resolvePhotoSensorContext(
-      { id: "p", capturedAtIso: "garbage" },
-      [{ id: "x", captured_at: PHOTO_T, source: "live" }],
-    );
+    const r = resolvePhotoSensorContext({ id: "p", capturedAtIso: "garbage" }, [
+      { id: "x", captured_at: PHOTO_T, source: "live" },
+    ]);
     expect(r.kind).toBe("none");
     if (r.kind === "none") expect(r.reason).toBe("no_photo_time");
   });
@@ -133,19 +129,13 @@ describe("photoSensorContextLinkingRules — copy guarantees", () => {
   it("badge labels are non-AI / non-diagnostic", () => {
     expect(PHOTO_LOG_BADGE_LABEL).toBe("Photo log");
     expect(PHOTO_LOG_NON_AI_BADGE_LABEL.toLowerCase()).toContain("non-ai");
-    expect(NEAREST_CONTEXT_NON_DIAGNOSTIC_COPY.toLowerCase()).toContain(
-      "not a diagnosis",
-    );
-    expect(NEAREST_CONTEXT_NON_DIAGNOSTIC_COPY.toLowerCase()).toContain(
-      "do not infer cause",
-    );
+    expect(NEAREST_CONTEXT_NON_DIAGNOSTIC_COPY.toLowerCase()).toContain("not a diagnosis");
+    expect(NEAREST_CONTEXT_NON_DIAGNOSTIC_COPY.toLowerCase()).toContain("do not infer cause");
   });
 
   it("delta label is human-readable and direction-aware", () => {
     expect(formatPhotoContextDeltaLabel(0, "same")).toBe("at photo time");
     expect(formatPhotoContextDeltaLabel(5 * 60 * 1000, "after")).toBe("5m after photo");
-    expect(formatPhotoContextDeltaLabel(65 * 60 * 1000, "before")).toBe(
-      "1h 5m before photo",
-    );
+    expect(formatPhotoContextDeltaLabel(65 * 60 * 1000, "before")).toBe("1h 5m before photo");
   });
 });

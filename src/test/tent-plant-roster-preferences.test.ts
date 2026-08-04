@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { clearLocalStorageForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 import {
   readTentPlantRosterIncludeArchived,
   writeTentPlantRosterIncludeArchived,
@@ -65,9 +68,7 @@ describe("tentPlantRosterPreferences", () => {
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new Error("boom");
     });
-    expect(() =>
-      writeTentPlantRosterIncludeArchived("tent-a", true),
-    ).not.toThrow();
+    expect(() => writeTentPlantRosterIncludeArchived("tent-a", true)).not.toThrow();
     expect(readTentPlantRosterIncludeArchived("tent-a")).toBe(false);
     vi.restoreAllMocks();
     void original;
@@ -82,10 +83,7 @@ describe("tentPlantRosterPreferences", () => {
 });
 
 describe("tentPlantRosterPreferences static safety", () => {
-  const content = readFileSync(
-    resolve(__dirname, "../lib/tentPlantRosterPreferences.ts"),
-    "utf8",
-  );
+  const content = readFileSync(resolve(__dirname, "../lib/tentPlantRosterPreferences.ts"), "utf8");
 
   it("does not import Supabase clients", () => {
     expect(content).not.toMatch(/from\s+["']@\/integrations\/supabase/);

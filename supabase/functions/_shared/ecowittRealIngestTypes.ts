@@ -2,13 +2,7 @@
 // Keep behavior in parity with src/lib via ecowitt-real-ingest-edge-parity tests.
 // Do not add persistence, Supabase writes, network calls, alerts, Action Queue writes, AI calls, automation, or device control here.
 
-export type EcoWittRealIngestSource =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid";
+export type EcoWittRealIngestSource = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 
 export interface EcoWittRealIngestCandidate {
   tent_id: string;
@@ -84,8 +78,7 @@ export const ECOWITT_REAL_INGEST_BLOCKED_REASONS = [
   "suspicious_value:soil_moisture_stuck_0_or_100",
 ] as const;
 
-export type EcoWittRealIngestBlockedReason =
-  (typeof ECOWITT_REAL_INGEST_BLOCKED_REASONS)[number];
+export type EcoWittRealIngestBlockedReason = (typeof ECOWITT_REAL_INGEST_BLOCKED_REASONS)[number];
 
 export const ECOWITT_REAL_INGEST_WARNINGS = [
   "optional_metric_missing:vpd_kpa",
@@ -99,5 +92,4 @@ export const ECOWITT_REAL_INGEST_WARNINGS = [
   "confidence_defaulted",
 ] as const;
 
-export type EcoWittRealIngestWarning =
-  (typeof ECOWITT_REAL_INGEST_WARNINGS)[number];
+export type EcoWittRealIngestWarning = (typeof ECOWITT_REAL_INGEST_WARNINGS)[number];

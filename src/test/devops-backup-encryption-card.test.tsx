@@ -18,9 +18,7 @@ describe("DevOpsBackupEncryptionCard", () => {
       />,
     );
     expect(screen.getByTestId("risk-badge").textContent).toBe("Healthy");
-    expect(screen.getByTestId("status-message").textContent).toMatch(
-      /No secrets exposed/,
-    );
+    expect(screen.getByTestId("status-message").textContent).toMatch(/No secrets exposed/);
     expect(screen.getByText("Supabase Storage")).toBeTruthy();
   });
 

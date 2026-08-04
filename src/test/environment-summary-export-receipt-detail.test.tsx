@@ -44,13 +44,9 @@ describe("EnvironmentSummaryExportReceiptDetail", () => {
 
     expect(screen.getByTestId("env-report-receipt-dialog")).toBeTruthy();
     expect(screen.getByTestId("receipt-event-id").textContent).toBe("e1");
-    expect(screen.getByTestId("receipt-occurred-at").textContent).toBe(
-      "2026-06-08 14:30:00Z",
-    );
+    expect(screen.getByTestId("receipt-occurred-at").textContent).toBe("2026-06-08 14:30:00Z");
     expect(screen.getByTestId("receipt-mode").textContent).toBe("Full report");
-    expect(screen.getByTestId("receipt-range").textContent).toBe(
-      "2026-06-01 → 2026-06-07",
-    );
+    expect(screen.getByTestId("receipt-range").textContent).toBe("2026-06-01 → 2026-06-07");
     expect(screen.getByTestId("receipt-source").textContent).toBe("local_only");
   });
 
@@ -86,22 +82,13 @@ describe("EnvironmentSummaryExportReceiptDetail", () => {
     fireEvent.click(screen.getByTestId("env-report-export-history-details"));
 
     expect(screen.getByTestId("receipt-mode").textContent).toBe("Drilldown");
-    expect(screen.getByTestId("receipt-issue-label").textContent).toBe(
-      "Source review required",
-    );
-    expect(screen.getByTestId("receipt-issue-rule-id").textContent).toBe(
-      "source.review",
-    );
+    expect(screen.getByTestId("receipt-issue-label").textContent).toBe("Source review required");
+    expect(screen.getByTestId("receipt-issue-rule-id").textContent).toBe("source.review");
   });
 
   it("opening details does not create a new audit row", () => {
     const events = [evt({ id: "e1" })];
-    render(
-      <EnvironmentSummaryExportHistoryPanel
-        events={events}
-        onReopen={() => {}}
-      />,
-    );
+    render(<EnvironmentSummaryExportHistoryPanel events={events} onReopen={() => {}} />);
     fireEvent.click(screen.getByTestId("env-report-export-history-details"));
     // The panel receives events as props; it should never mutate or append.
     expect(events).toHaveLength(1);
@@ -144,21 +131,18 @@ describe("EnvironmentSummaryExportReceiptDetail", () => {
   });
 
   it("clipboard failure shows a safe fallback message and does not crash", async () => {
-    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) } });
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
+    });
 
     render(
-      <EnvironmentSummaryExportHistoryPanel
-        events={[evt({ id: "e1" })]}
-        onReopen={() => {}}
-      />,
+      <EnvironmentSummaryExportHistoryPanel events={[evt({ id: "e1" })]} onReopen={() => {}} />,
     );
     fireEvent.click(screen.getByTestId("env-report-export-history-details"));
     fireEvent.click(screen.getByTestId("env-report-receipt-copy-btn"));
 
     await waitFor(() => {
-      expect(
-        screen.getByTestId("env-report-receipt-copy-fallback"),
-      ).toBeTruthy();
+      expect(screen.getByTestId("env-report-receipt-copy-fallback")).toBeTruthy();
     });
 
     expect(screen.getByTestId("env-report-receipt-copy-fallback").textContent).toContain(
@@ -168,16 +152,11 @@ describe("EnvironmentSummaryExportReceiptDetail", () => {
 
   it("detail modal has print-hidden structure", () => {
     render(
-      <EnvironmentSummaryExportHistoryPanel
-        events={[evt({ id: "e1" })]}
-        onReopen={() => {}}
-      />,
+      <EnvironmentSummaryExportHistoryPanel events={[evt({ id: "e1" })]} onReopen={() => {}} />,
     );
     fireEvent.click(screen.getByTestId("env-report-export-history-details"));
 
-    const dialog = document.querySelector(
-      '[data-testid="env-report-receipt-dialog"]',
-    );
+    const dialog = document.querySelector('[data-testid="env-report-receipt-dialog"]');
     expect(dialog).toBeTruthy();
     expect(dialog?.classList.toString()).toMatch(/print-hidden/);
   });
@@ -193,10 +172,7 @@ describe("EnvironmentSummaryExportReceiptDetail", () => {
     expect(panelSrc).not.toMatch(/functions\.invoke/);
     expect(panelSrc).not.toMatch(/\.rpc\(/);
 
-    const receiptSrc = await fs.readFile(
-      "src/lib/environmentSummaryExportReceiptView.ts",
-      "utf8",
-    );
+    const receiptSrc = await fs.readFile("src/lib/environmentSummaryExportReceiptView.ts", "utf8");
     expect(receiptSrc).not.toMatch(/from\s+["']@\/integrations\/supabase/);
     expect(receiptSrc).not.toMatch(/fetch\(/);
     expect(receiptSrc).not.toMatch(/functions\.invoke/);

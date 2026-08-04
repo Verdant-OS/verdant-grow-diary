@@ -38,7 +38,10 @@ vi.mock("@/lib/quick-log/fetchLatestSensorSnapshot", () => ({
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
 vi.mock("sonner", () => ({
-  toast: { error: (...a: unknown[]) => toastError(...a), success: (...a: unknown[]) => toastSuccess(...a) },
+  toast: {
+    error: (...a: unknown[]) => toastError(...a),
+    success: (...a: unknown[]) => toastSuccess(...a),
+  },
 }));
 
 vi.mock("@/store/auth", () => ({
@@ -143,9 +146,7 @@ describe("QuickLogModal — save flow hardening", () => {
   it("disables Save while a save is in flight", async () => {
     // Slow save so we can observe the disabled state.
     let resolveSave: (v: unknown) => void = () => {};
-    createQuickLogEventMock.mockImplementation(
-      () => new Promise((res) => (resolveSave = res)),
-    );
+    createQuickLogEventMock.mockImplementation(() => new Promise((res) => (resolveSave = res)));
 
     renderModal();
     const saveBtn = screen.getByTestId("qlm-save") as HTMLButtonElement;
@@ -163,9 +164,7 @@ describe("QuickLogModal — save flow hardening", () => {
 
   it("does not double-submit when Save is clicked twice rapidly", async () => {
     let resolveSave: (v: unknown) => void = () => {};
-    createQuickLogEventMock.mockImplementation(
-      () => new Promise((res) => (resolveSave = res)),
-    );
+    createQuickLogEventMock.mockImplementation(() => new Promise((res) => (resolveSave = res)));
 
     renderModal();
     const saveBtn = screen.getByTestId("qlm-save") as HTMLButtonElement;

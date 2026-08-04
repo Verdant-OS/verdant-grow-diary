@@ -163,8 +163,7 @@ describe("ManualSensorReadingCard — PPFD save roundtrip", () => {
     expect(insertedRows.length).toBeGreaterThan(0);
     const flattenedRows = insertedRows.flatMap((row) => (Array.isArray(row) ? row : [row]));
     const ppfdRow = flattenedRows.find((r) => (r as Record<string, unknown>).metric === "ppfd") as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     expect(ppfdRow).toBeTruthy();
     expect(ppfdRow?.value).toBe(780);
     expect(ppfdRow?.source).toBe("manual");

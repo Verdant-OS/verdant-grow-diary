@@ -16,15 +16,27 @@ import { resolve } from "node:path";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { clearLocalStorageForTest, getLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 const rangeSpy = vi.fn(() => Promise.resolve({ data: [], error: null }));
 const orderSpy = vi.fn(() => ({ range: rangeSpy }));
 const chain: any = {
-  eq: vi.fn(function () { return chain; }),
-  not: vi.fn(function () { return chain; }),
-  gte: vi.fn(function () { return chain; }),
-  or: vi.fn(function () { return chain; }),
+  eq: vi.fn(function () {
+    return chain;
+  }),
+  not: vi.fn(function () {
+    return chain;
+  }),
+  gte: vi.fn(function () {
+    return chain;
+  }),
+  or: vi.fn(function () {
+    return chain;
+  }),
   order: orderSpy,
 };
 vi.mock("@/integrations/supabase/client", () => ({
@@ -94,10 +106,7 @@ describe("formatSavedViewSummary — pure", () => {
   });
   it("joins active filter labels with separators", () => {
     expect(
-      formatSavedViewSummary(
-        { ...DEFAULT_FILTERS, risk: "high", hasActions: "yes" },
-        0,
-      ),
+      formatSavedViewSummary({ ...DEFAULT_FILTERS, risk: "high", hasActions: "yes" }, 0),
     ).toContain("Risk: High");
   });
   it("appends page when > 0 (using 1-based display)", () => {
@@ -110,10 +119,9 @@ describe("AiDoctorSessionsIndex — delete confirmation dialog", () => {
   it("opens the confirmation dialog when delete is clicked", async () => {
     seedViews([VIEW_A]);
     renderPage();
-    fireEvent.change(
-      await screen.findByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: VIEW_A.id } },
-    );
+    fireEvent.change(await screen.findByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: VIEW_A.id },
+    });
     fireEvent.click(await screen.findByTestId("ai-doctor-sessions-saved-views-delete"));
     expect(
       await screen.findByTestId("ai-doctor-sessions-saved-views-delete-dialog"),
@@ -123,10 +131,9 @@ describe("AiDoctorSessionsIndex — delete confirmation dialog", () => {
   it("shows the saved view label and filter summary in the dialog", async () => {
     seedViews([VIEW_B]);
     renderPage();
-    fireEvent.change(
-      await screen.findByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: VIEW_B.id } },
-    );
+    fireEvent.change(await screen.findByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: VIEW_B.id },
+    });
     fireEvent.click(await screen.findByTestId("ai-doctor-sessions-saved-views-delete"));
     expect(
       await screen.findByTestId("ai-doctor-sessions-saved-views-delete-dialog-label"),
@@ -141,10 +148,9 @@ describe("AiDoctorSessionsIndex — delete confirmation dialog", () => {
   it("cancel keeps the saved view and closes the dialog", async () => {
     seedViews([VIEW_A]);
     renderPage();
-    fireEvent.change(
-      await screen.findByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: VIEW_A.id } },
-    );
+    fireEvent.change(await screen.findByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: VIEW_A.id },
+    });
     fireEvent.click(await screen.findByTestId("ai-doctor-sessions-saved-views-delete"));
     fireEvent.click(
       await screen.findByTestId("ai-doctor-sessions-saved-views-delete-dialog-cancel"),
@@ -161,10 +167,9 @@ describe("AiDoctorSessionsIndex — delete confirmation dialog", () => {
   it("confirm deletes exactly one saved view and closes the dialog", async () => {
     seedViews([VIEW_A, VIEW_B]);
     renderPage();
-    fireEvent.change(
-      await screen.findByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: VIEW_A.id } },
-    );
+    fireEvent.change(await screen.findByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: VIEW_A.id },
+    });
     fireEvent.click(await screen.findByTestId("ai-doctor-sessions-saved-views-delete"));
     fireEvent.click(
       await screen.findByTestId("ai-doctor-sessions-saved-views-delete-dialog-confirm"),
@@ -183,10 +188,9 @@ describe("AiDoctorSessionsIndex — delete confirmation dialog", () => {
   it("fails safely when the targeted view is no longer present at confirm time", async () => {
     seedViews([VIEW_A]);
     renderPage();
-    fireEvent.change(
-      await screen.findByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: VIEW_A.id } },
-    );
+    fireEvent.change(await screen.findByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: VIEW_A.id },
+    });
     fireEvent.click(await screen.findByTestId("ai-doctor-sessions-saved-views-delete"));
     // Simulate the view vanishing from another tab / external removal.
     setLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY, serializeSavedViews([]));
@@ -211,10 +215,9 @@ describe("AiDoctorSessionsIndex — delete confirmation dialog", () => {
     };
     seedViews([imported]);
     renderPage();
-    fireEvent.change(
-      await screen.findByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: imported.id } },
-    );
+    fireEvent.change(await screen.findByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: imported.id },
+    });
     fireEvent.click(await screen.findByTestId("ai-doctor-sessions-saved-views-delete"));
     fireEvent.click(
       await screen.findByTestId("ai-doctor-sessions-saved-views-delete-dialog-confirm"),

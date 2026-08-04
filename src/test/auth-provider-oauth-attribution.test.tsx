@@ -7,8 +7,7 @@ const mocks = vi.hoisted(() => ({
   onAuthStateChange: vi.fn(),
   rpc: vi.fn(),
   authListener: undefined as
-    | undefined
-    | ((event: string, session: { user: { id: string } } | null) => void),
+    undefined | ((event: string, session: { user: { id: string } } | null) => void),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({

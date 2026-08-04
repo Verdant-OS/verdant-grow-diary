@@ -121,9 +121,7 @@ describe("ecowittChannelLabelingRules — assignments and labels", () => {
       { soilmoisture1: 33 },
       { capturedAt: FRESH, now: NOW },
     );
-    expect(vm.groups[0].channels[0].assignmentLabel).toBe(
-      "Unassigned channel",
-    );
+    expect(vm.groups[0].channels[0].assignmentLabel).toBe("Unassigned channel");
     expect(vm.groups[0].channels[0].knownLabel).toBeNull();
   });
 
@@ -182,9 +180,9 @@ describe("EcowittDetectedChannelsPanel — UI", () => {
         options={{ capturedAt: FRESH, now: NOW }}
       />,
     );
-    expect(
-      screen.getByTestId("ecowitt-channels-readonly-notice").textContent,
-    ).toBe(READ_ONLY_CHANNEL_NOTICE);
+    expect(screen.getByTestId("ecowitt-channels-readonly-notice").textContent).toBe(
+      READ_ONLY_CHANNEL_NOTICE,
+    );
     expect(screen.queryByRole("button", { name: /save/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /assign/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /apply/i })).toBeNull();
@@ -199,9 +197,7 @@ describe("EcowittDetectedChannelsPanel — UI", () => {
     );
     const row = screen.getByTestId("ecowitt-channel-row-soilmoisture1");
     expect(within(row).getByText(/Channel 1/)).toBeInTheDocument();
-    expect(
-      screen.getByTestId("ecowitt-channel-value-soilmoisture1").textContent,
-    ).toBe("33%");
+    expect(screen.getByTestId("ecowitt-channel-value-soilmoisture1").textContent).toBe("33%");
     const group = screen.getByTestId("ecowitt-channel-group-soil_moisture");
     expect(within(group).getByText(/soil_moisture_pct/)).toBeInTheDocument();
   });

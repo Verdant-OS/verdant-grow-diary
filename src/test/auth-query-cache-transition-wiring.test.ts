@@ -1,21 +1,25 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { readAllRouteModuleSources } from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
-const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+const APP = readAllRouteModuleSources();
 const AUTH = readFileSync(resolve(ROOT, "src/store/auth.tsx"), "utf8").replace(/\r\n?/g, "\n");
 
 describe("auth identity query-cache transition fence", () => {
   it("wires the root QueryClient clear into AuthProvider identity transitions", () => {
     expect(APP).toMatch(
-      /function clearQueryCacheBeforeAuthIdentityChange\(\)[\s\S]{0,400}queryClient\.clear\(\)/,
+      /function useClearQueryCacheBeforeAuthIdentityChange\(\)[\s\S]{0,400}queryClient\.clear\(\)/,
     );
     expect(APP).toMatch(
-      /<AuthProvider\s+onBeforeAuthIdentityChange=\{clearQueryCacheBeforeAuthIdentityChange\}>/,
+      /<AuthProvider\s+onBeforeAuthIdentityChange=\{onBeforeAuthIdentityChange\}>/,
     );
     expect(APP).toMatch(
-      /function clearQueryCacheBeforeAuthIdentityChange\(\)[\s\S]{0,500}clearGrowDataMeta\(\)/,
+      /function useClearQueryCacheBeforeAuthIdentityChange\(\)[\s\S]{0,500}clearGrowDataMeta\(\)/,
+    );
+    expect(APP).toMatch(
+      /const onBeforeAuthIdentityChange = useClearQueryCacheBeforeAuthIdentityChange\(\)/,
     );
   });
 

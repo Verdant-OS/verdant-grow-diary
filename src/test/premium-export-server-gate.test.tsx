@@ -11,7 +11,7 @@
  *    renders the paywall copy on denial without crashing.
  */
 import { beforeEach, describe, it, expect, vi } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 
@@ -178,7 +178,10 @@ function reportInput(): AiDoctorReportInput {
 
 describe("AiDoctorDiagnosisPanel — premium export server-gate integration", () => {
   it("keeps the visible preview outside the global print whitelist before authorization", () => {
-    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const cssPath = resolve(process.cwd(), "src/index.css");
+    const css = existsSync(cssPath)
+      ? readFileSync(cssPath, "utf8")
+      : readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
     render(<AiDoctorDiagnosisPanel diagnosis={diag()} reportInput={reportInput()} />);
     fireEvent.click(screen.getByTestId("ai-doctor-diagnosis-preview-report"));
 
@@ -253,8 +256,7 @@ describe("AiDoctorDiagnosisPanel — premium export server-gate integration", ()
 
   it("keeps the print target mounted while the entitlement preflight is pending", async () => {
     let resolveGate:
-      | ((value: { data: { ok: true; display_plan_id: string }; error: null }) => void)
-      | null = null;
+      ((value: { data: { ok: true; display_plan_id: string }; error: null }) => void) | null = null;
     invokeMock.mockReturnValueOnce(
       new Promise((resolve) => {
         resolveGate = resolve;

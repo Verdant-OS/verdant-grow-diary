@@ -16,13 +16,9 @@ export const GROVE_BAG_AIRFLOW_OBSERVATIONS = [
   "unknown",
 ] as const;
 
-export type GroveBagAirflowObservation =
-  (typeof GROVE_BAG_AIRFLOW_OBSERVATIONS)[number];
+export type GroveBagAirflowObservation = (typeof GROVE_BAG_AIRFLOW_OBSERVATIONS)[number];
 
-export const GROVE_BAG_AIRFLOW_LABELS: Record<
-  GroveBagAirflowObservation,
-  string
-> = {
+export const GROVE_BAG_AIRFLOW_LABELS: Record<GroveBagAirflowObservation, string> = {
   gentle_indirect: "Gentle indirect airflow",
   stagnant: "Stagnant / dead air",
   strong_direct: "Strong direct airflow",

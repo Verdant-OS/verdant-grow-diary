@@ -14,8 +14,9 @@ const FIXED_NOW = new Date("2026-06-04T12:00:00.000Z");
 
 const CSV_CLEAN_MANY = [
   "timestamp,temperature",
-  ...Array.from({ length: 15 }, (_, i) =>
-    `2026-06-01T10:${String(i).padStart(2, "0")}:00Z,${22 + i * 0.1}`,
+  ...Array.from(
+    { length: 15 },
+    (_, i) => `2026-06-01T10:${String(i).padStart(2, "0")}:00Z,${22 + i * 0.1}`,
   ),
 ].join("\n");
 
@@ -32,7 +33,12 @@ describe("CSV Import Review UI v2", () => {
   describe("diary draft target controls", () => {
     it("renders diary date picker and exact draft fields", () => {
       render(
-        <CsvPreviewReviewGate previewResult={parse(CSV_CLEAN_MANY)} hasHardBlockedRows={false} hasAcceptedRows now={FIXED_NOW} />,
+        <CsvPreviewReviewGate
+          previewResult={parse(CSV_CLEAN_MANY)}
+          hasHardBlockedRows={false}
+          hasAcceptedRows
+          now={FIXED_NOW}
+        />,
       );
       expect(screen.getByTestId("csv-gate-diary-date")).toBeInTheDocument();
       expect(screen.getByTestId("csv-import-plan-diary-draft-fields")).toBeInTheDocument();
@@ -45,10 +51,17 @@ describe("CSV Import Review UI v2", () => {
 
     it("changing diary date updates the diary draft occurred_at in-memory only", () => {
       render(
-        <CsvPreviewReviewGate previewResult={parse(CSV_CLEAN_MANY)} hasHardBlockedRows={false} hasAcceptedRows now={FIXED_NOW} />,
+        <CsvPreviewReviewGate
+          previewResult={parse(CSV_CLEAN_MANY)}
+          hasHardBlockedRows={false}
+          hasAcceptedRows
+          now={FIXED_NOW}
+        />,
       );
       const before = screen.getByTestId("diary-field-occurred_at").textContent;
-      fireEvent.change(screen.getByTestId("csv-gate-diary-date"), { target: { value: "2026-07-15T09:30" } });
+      fireEvent.change(screen.getByTestId("csv-gate-diary-date"), {
+        target: { value: "2026-07-15T09:30" },
+      });
       const after = screen.getByTestId("diary-field-occurred_at").textContent;
       expect(after).not.toBe(before);
       expect(after).toBe(new Date(2026, 6, 15, 9, 30).toISOString());
@@ -56,7 +69,12 @@ describe("CSV Import Review UI v2", () => {
 
     it("existing-entry attach mode is disabled when no existing entries are provided", () => {
       render(
-        <CsvPreviewReviewGate previewResult={parse(CSV_CLEAN_MANY)} hasHardBlockedRows={false} hasAcceptedRows now={FIXED_NOW} />,
+        <CsvPreviewReviewGate
+          previewResult={parse(CSV_CLEAN_MANY)}
+          hasHardBlockedRows={false}
+          hasAcceptedRows
+          now={FIXED_NOW}
+        />,
       );
       const radio = screen.getByTestId("csv-gate-attach-existing") as HTMLInputElement;
       expect(radio.disabled).toBe(true);
@@ -70,9 +88,16 @@ describe("CSV Import Review UI v2", () => {
         throw new Error("fetch should not be called");
       }) as never);
       render(
-        <CsvPreviewReviewGate previewResult={parse(CSV_CLEAN_MANY)} hasHardBlockedRows={false} hasAcceptedRows now={FIXED_NOW} />,
+        <CsvPreviewReviewGate
+          previewResult={parse(CSV_CLEAN_MANY)}
+          hasHardBlockedRows={false}
+          hasAcceptedRows
+          now={FIXED_NOW}
+        />,
       );
-      fireEvent.change(screen.getByTestId("csv-gate-diary-date"), { target: { value: "2026-07-15T09:30" } });
+      fireEvent.change(screen.getByTestId("csv-gate-diary-date"), {
+        target: { value: "2026-07-15T09:30" },
+      });
       fireEvent.click(screen.getByTestId("csv-gate-attach-new"));
       expect(fetchSpy).not.toHaveBeenCalled();
       fetchSpy.mockRestore();
@@ -82,7 +107,12 @@ describe("CSV Import Review UI v2", () => {
   describe("sensor write draft preview (expandable)", () => {
     it("collapsed by default with grouped count copy", () => {
       render(
-        <CsvPreviewReviewGate previewResult={parse(CSV_CLEAN_MANY)} hasHardBlockedRows={false} hasAcceptedRows now={FIXED_NOW} />,
+        <CsvPreviewReviewGate
+          previewResult={parse(CSV_CLEAN_MANY)}
+          hasHardBlockedRows={false}
+          hasAcceptedRows
+          now={FIXED_NOW}
+        />,
       );
       expect(screen.getByTestId("csv-gate-sensor-sample-collapsed")).toBeInTheDocument();
       expect(screen.queryByTestId("csv-gate-sensor-sample-list")).not.toBeInTheDocument();
@@ -90,7 +120,12 @@ describe("CSV Import Review UI v2", () => {
 
     it("expand toggle reveals a capped sample (≤10 rows) with safe fields", () => {
       render(
-        <CsvPreviewReviewGate previewResult={parse(CSV_CLEAN_MANY)} hasHardBlockedRows={false} hasAcceptedRows now={FIXED_NOW} />,
+        <CsvPreviewReviewGate
+          previewResult={parse(CSV_CLEAN_MANY)}
+          hasHardBlockedRows={false}
+          hasAcceptedRows
+          now={FIXED_NOW}
+        />,
       );
       fireEvent.click(screen.getByTestId("csv-gate-toggle-sensor-sample"));
       const list = screen.getByTestId("csv-gate-sensor-sample-list");
@@ -107,7 +142,12 @@ describe("CSV Import Review UI v2", () => {
 
     it("Save CTA remains disabled after expanding sample", () => {
       render(
-        <CsvPreviewReviewGate previewResult={parse(CSV_CLEAN_MANY)} hasHardBlockedRows={false} hasAcceptedRows now={FIXED_NOW} />,
+        <CsvPreviewReviewGate
+          previewResult={parse(CSV_CLEAN_MANY)}
+          hasHardBlockedRows={false}
+          hasAcceptedRows
+          now={FIXED_NOW}
+        />,
       );
       fireEvent.click(screen.getByTestId("csv-gate-toggle-sensor-sample"));
       expect(screen.getByTestId("csv-gate-save-button")).toBeDisabled();
@@ -117,24 +157,41 @@ describe("CSV Import Review UI v2", () => {
   describe("blocked-row details by reason group", () => {
     it("renders groups with count + fix; samples appear only after expand and stay capped at ≤3", () => {
       render(
-        <CsvPreviewReviewGate previewResult={parse(CSV_BAD)} hasHardBlockedRows={false} hasAcceptedRows now={FIXED_NOW} />,
+        <CsvPreviewReviewGate
+          previewResult={parse(CSV_BAD)}
+          hasHardBlockedRows={false}
+          hasAcceptedRows
+          now={FIXED_NOW}
+        />,
       );
       const group = screen.getByTestId("csv-import-plan-blocked-group-unparseable_captured_at");
       expect(group).toBeInTheDocument();
       expect(group.getAttribute("data-expanded")).toBe("false");
-      expect(within(group).getByTestId("csv-import-plan-blocked-count-unparseable_captured_at")).toHaveTextContent("4");
-      expect(within(group).getByTestId("csv-import-plan-blocked-fix-unparseable_captured_at")).toHaveTextContent(/ISO-8601/);
+      expect(
+        within(group).getByTestId("csv-import-plan-blocked-count-unparseable_captured_at"),
+      ).toHaveTextContent("4");
+      expect(
+        within(group).getByTestId("csv-import-plan-blocked-fix-unparseable_captured_at"),
+      ).toHaveTextContent(/ISO-8601/);
       expect(
         within(group).queryByTestId("csv-import-plan-blocked-samples-unparseable_captured_at"),
       ).not.toBeInTheDocument();
-      fireEvent.click(within(group).getByTestId("csv-import-plan-blocked-toggle-unparseable_captured_at"));
-      const samples = within(group).getByTestId("csv-import-plan-blocked-samples-unparseable_captured_at");
+      fireEvent.click(
+        within(group).getByTestId("csv-import-plan-blocked-toggle-unparseable_captured_at"),
+      );
+      const samples = within(group).getByTestId(
+        "csv-import-plan-blocked-samples-unparseable_captured_at",
+      );
       expect(Number(samples.getAttribute("data-sample-count"))).toBeLessThanOrEqual(3);
       // Expanding one group should not expand another
-      const otherGroup = screen.getByTestId("csv-import-plan-blocked-group-captured_at_before_2020");
+      const otherGroup = screen.getByTestId(
+        "csv-import-plan-blocked-group-captured_at_before_2020",
+      );
       expect(otherGroup.getAttribute("data-expanded")).toBe("false");
       // Hide again
-      fireEvent.click(within(group).getByTestId("csv-import-plan-blocked-toggle-unparseable_captured_at"));
+      fireEvent.click(
+        within(group).getByTestId("csv-import-plan-blocked-toggle-unparseable_captured_at"),
+      );
       expect(
         within(group).queryByTestId("csv-import-plan-blocked-samples-unparseable_captured_at"),
       ).not.toBeInTheDocument();
@@ -142,7 +199,12 @@ describe("CSV Import Review UI v2", () => {
 
     it("renders explanations for old-date group", () => {
       render(
-        <CsvPreviewReviewGate previewResult={parse(CSV_BAD)} hasHardBlockedRows={false} hasAcceptedRows now={FIXED_NOW} />,
+        <CsvPreviewReviewGate
+          previewResult={parse(CSV_BAD)}
+          hasHardBlockedRows={false}
+          hasAcceptedRows
+          now={FIXED_NOW}
+        />,
       );
       const g = screen.getByTestId("csv-import-plan-blocked-group-captured_at_before_2020");
       expect(g.textContent).toMatch(/before 2020|too old/i);
@@ -158,15 +220,26 @@ describe("CSV Import Review UI v2", () => {
 
     it("renders the Download Import Plan button", () => {
       render(
-        <CsvPreviewReviewGate previewResult={parse(CSV_CLEAN_MANY)} hasHardBlockedRows={false} hasAcceptedRows now={FIXED_NOW} />,
+        <CsvPreviewReviewGate
+          previewResult={parse(CSV_CLEAN_MANY)}
+          hasHardBlockedRows={false}
+          hasAcceptedRows
+          now={FIXED_NOW}
+        />,
       );
       expect(screen.getByTestId("csv-gate-download-plan")).toBeInTheDocument();
     });
 
     it("clicking Download triggers a local Blob/object URL (no network)", () => {
-      const createObjectURL = (globalThis as unknown as { URL: typeof URL }).URL.createObjectURL as ReturnType<typeof vi.fn>;
+      const createObjectURL = (globalThis as unknown as { URL: typeof URL }).URL
+        .createObjectURL as ReturnType<typeof vi.fn>;
       render(
-        <CsvPreviewReviewGate previewResult={parse(CSV_CLEAN_MANY)} hasHardBlockedRows={false} hasAcceptedRows now={FIXED_NOW} />,
+        <CsvPreviewReviewGate
+          previewResult={parse(CSV_CLEAN_MANY)}
+          hasHardBlockedRows={false}
+          hasAcceptedRows
+          now={FIXED_NOW}
+        />,
       );
       fireEvent.click(screen.getByTestId("csv-gate-download-plan"));
       expect(createObjectURL).toHaveBeenCalledTimes(1);

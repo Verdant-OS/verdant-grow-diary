@@ -13,10 +13,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
-const SCRIPT = readFileSync(
-  resolve(ROOT, "scripts/send-ecowitt-test-payload.ts"),
-  "utf8",
-);
+const SCRIPT = readFileSync(resolve(ROOT, "scripts/send-ecowitt-test-payload.ts"), "utf8");
 
 describe("ecowitt local test sender — safety", () => {
   // Strip comments before scanning for forbidden runtime tokens so that
@@ -64,9 +61,9 @@ describe("ecowitt local test sender — safety", () => {
     expect(SCRIPT).toMatch(/redactBridgeToken\(token\)/);
     // The script must never console.log the raw `token` identifier
     // unwrapped — only the redacted form is permitted.
-    const rawTokenLogs = ((CODE.match(
-      /console\.log\([^)]*\btoken\b[^)]*\)/g,
-    ) ?? []) as string[]).filter((line) => !line.includes("redactBridgeToken"));
+    const rawTokenLogs = (
+      (CODE.match(/console\.log\([^)]*\btoken\b[^)]*\)/g) ?? []) as string[]
+    ).filter((line) => !line.includes("redactBridgeToken"));
     expect(rawTokenLogs).toEqual([]);
   });
 

@@ -50,26 +50,20 @@ function BucketCard({
           Total: <span data-testid={`${testId}-total`}>{bucket.total}</span>
         </p>
         <p>
-          Linked:{" "}
-          <span data-testid={`${testId}-linked`}>{bucket.linked}</span>
+          Linked: <span data-testid={`${testId}-linked`}>{bucket.linked}</span>
         </p>
         <p>
-          Fallback-only:{" "}
-          <span data-testid={`${testId}-fallback`}>{bucket.fallbackOnly}</span>
+          Fallback-only: <span data-testid={`${testId}-fallback`}>{bucket.fallbackOnly}</span>
         </p>
         <p>
-          Invalid refs:{" "}
-          <span data-testid={`${testId}-invalid`}>{bucket.invalidRefs}</span>
+          Invalid refs: <span data-testid={`${testId}-invalid`}>{bucket.invalidRefs}</span>
         </p>
       </CardContent>
     </Card>
   );
 }
 
-export function EvidenceCoveragePanel({
-  viewModel,
-  status = "ok",
-}: EvidenceCoveragePanelProps) {
+export function EvidenceCoveragePanel({ viewModel, status = "ok" }: EvidenceCoveragePanelProps) {
   return (
     <section
       aria-labelledby="evidence-coverage-heading"
@@ -85,47 +79,30 @@ export function EvidenceCoveragePanel({
         <Badge variant="outline">Read-only</Badge>
       </div>
 
-      {status === "loading" && (
-        <p className="text-sm text-muted-foreground">Loading coverage…</p>
-      )}
+      {status === "loading" && <p className="text-sm text-muted-foreground">Loading coverage…</p>}
       {status === "unavailable" && (
-        <p className="text-sm text-muted-foreground">
-          Coverage unavailable right now.
-        </p>
+        <p className="text-sm text-muted-foreground">Coverage unavailable right now.</p>
       )}
 
       <div className="grid gap-3 md:grid-cols-3">
-        <BucketCard
-          title="Alerts"
-          bucket={viewModel.alerts}
-          testId="evidence-coverage-alerts"
-        />
+        <BucketCard title="Alerts" bucket={viewModel.alerts} testId="evidence-coverage-alerts" />
         <BucketCard
           title="Action Queue"
           bucket={viewModel.actions}
           testId="evidence-coverage-actions"
         />
-        <BucketCard
-          title="Overall"
-          bucket={viewModel.overall}
-          testId="evidence-coverage-overall"
-        />
+        <BucketCard title="Overall" bucket={viewModel.overall} testId="evidence-coverage-overall" />
       </div>
 
       {viewModel.coverageHint && (
-        <Card
-          data-testid="evidence-coverage-hint"
-          className="border-muted bg-muted/40"
-        >
+        <Card data-testid="evidence-coverage-hint" className="border-muted bg-muted/40">
           <CardHeader className="pb-1">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Evidence coverage note
             </CardTitle>
           </CardHeader>
           <CardContent className="text-xs text-muted-foreground">
-            <p data-testid="evidence-coverage-hint-copy">
-              {viewModel.coverageHint}
-            </p>
+            <p data-testid="evidence-coverage-hint-copy">{viewModel.coverageHint}</p>
           </CardContent>
         </Card>
       )}
@@ -183,10 +160,7 @@ function BreakdownCard({
       </CardHeader>
       <CardContent>
         {rows.length === 0 ? (
-          <p
-            className="text-sm text-muted-foreground"
-            data-testid={`${testId}-empty`}
-          >
+          <p className="text-sm text-muted-foreground" data-testid={`${testId}-empty`}>
             {emptyLabel}
           </p>
         ) : (
@@ -203,10 +177,7 @@ function BreakdownCard({
             </TableHeader>
             <TableBody>
               {rows.map((row) => (
-                <TableRow
-                  key={row.label}
-                  data-testid={`${testId}-row-${row.label}`}
-                >
+                <TableRow key={row.label} data-testid={`${testId}-row-${row.label}`}>
                   <TableCell>{row.label}</TableCell>
                   <TableCell className="text-right">{row.total}</TableCell>
                   <TableCell className="text-right">{row.linked}</TableCell>

@@ -14,8 +14,7 @@
  */
 
 export const DIARY_LINK_TOLERANCE_MS = 60 * 1000;
-export const DIARY_LINK_EMPTY_LABEL =
-  "No matching diary or timeline items found." as const;
+export const DIARY_LINK_EMPTY_LABEL = "No matching diary or timeline items found." as const;
 export const DIARY_LINK_ATTEMPTED_FIELDS_LABEL =
   "Attempted match fields: snapshot_id, tent/plant, captured_at." as const;
 

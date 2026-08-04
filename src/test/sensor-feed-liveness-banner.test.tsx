@@ -73,9 +73,7 @@ describe("healthy and merely-late feeds stay quiet", () => {
   it("no banner for a stale-but-alive feed", () => {
     // 45 minutes: the card correctly says "stale". That is not an outage, and
     // firing here is what would train growers to ignore the banner.
-    renderCard(
-      vm({ latestAcceptedAtIso: new Date(NOW.getTime() - 45 * 60_000).toISOString() }),
-    );
+    renderCard(vm({ latestAcceptedAtIso: new Date(NOW.getTime() - 45 * 60_000).toISOString() }));
     expect(screen.queryByTestId("sensor-feed-liveness-banner")).toBeNull();
     expect(screen.getByTestId("sensor-bridge-health-state")).toHaveAttribute("data-state", "stale");
   });

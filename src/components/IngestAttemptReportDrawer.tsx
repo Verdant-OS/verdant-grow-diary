@@ -22,23 +22,14 @@ interface Props {
   onCopy?: (json: string) => void;
 }
 
-export default function IngestAttemptReportDrawer({
-  open,
-  onOpenChange,
-  report,
-  onCopy,
-}: Props) {
+export default function IngestAttemptReportDrawer({ open, onOpenChange, report, onCopy }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        data-testid="ingest-attempt-report-drawer"
-        className="max-w-xl"
-      >
+      <DialogContent data-testid="ingest-attempt-report-drawer" className="max-w-xl">
         <DialogHeader>
           <DialogTitle>Latest Ecowitt bridge ingest report</DialogTitle>
           <DialogDescription>
-            Read-only, redacted operator view. Nothing is sent or stored from
-            this drawer.
+            Read-only, redacted operator view. Nothing is sent or stored from this drawer.
           </DialogDescription>
         </DialogHeader>
         {report ? (

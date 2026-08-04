@@ -1,18 +1,30 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  VERDANT_GROWER_GUIDE_FAQ,
-  VERDANT_SEO_GUIDES,
-} from "@/constants/verdantSeoContent";
+import { VERDANT_GROWER_GUIDE_FAQ, VERDANT_SEO_GUIDES } from "@/constants/verdantSeoContent";
 import { STATIC_PUBLIC_SEO_DOCUMENTS } from "@/lib/build/staticPublicSeoDocuments";
 import { buildGuideQuickLogStarterHref } from "@/lib/quickLogStarterLinks";
 import { buildStaticSocialRouteHtml } from "@/lib/build/staticSocialRouteHtml";
 
 const ROOT = resolve(process.cwd());
-const INDEX_HTML = readFileSync(resolve(ROOT, "index.html"), "utf8");
+const HAS_INDEX_HTML = existsSync(resolve(ROOT, "index.html"));
+// Classic SPA shell is gone under TanStack SSR; builder needs a titled meta shell.
+const INDEX_HTML = HAS_INDEX_HTML
+  ? readFileSync(resolve(ROOT, "index.html"), "utf8")
+  : `<!doctype html><html><head><title>Verdant</title>
+  <meta name="description" content="" />
+  <meta property="og:title" content="" />
+  <meta property="og:description" content="" />
+  <meta property="og:url" content="" />
+  <meta property="og:image" content="" />
+  <meta property="og:image:alt" content="" />
+  <meta name="twitter:title" content="" />
+  <meta name="twitter:description" content="" />
+  <meta name="twitter:image" content="" />
+  <meta name="robots" content="" />
+</head><body><div id="root"></div></body></html>`;
 
 function documentAt(path: string) {
   const document = STATIC_PUBLIC_SEO_DOCUMENTS.find((candidate) => candidate.path === path);
@@ -125,8 +137,8 @@ describe("static guide body fallback", () => {
     expect(vpd).toContain('href="/tools/vpd-calculator"');
     expect(vpd).toContain("no upload, no diagnosis, and no device control");
 
-    const comparison = documentAt("/guides/oreoz-vs-gelonade-comparison").metadata
-      .bodyFallbackHtml ?? "";
+    const comparison =
+      documentAt("/guides/oreoz-vs-gelonade-comparison").metadata.bodyFallbackHtml ?? "";
     expect(comparison).toContain('href="/customer/guide/oreoz-vs-gelonade-comparison"');
     expect(comparison).toContain("does not load Operator grows, plants, diary entries, sensors");
 
@@ -135,9 +147,7 @@ describe("static guide body fallback", () => {
       expect(fallback).toContain('href="/guides"');
       expect(fallback).toContain('href="/welcome"');
       expect(fallback).toContain('href="/pricing"');
-      expect(fallback).toContain(
-        `href="${escapeHtml(buildGuideQuickLogStarterHref(guide.slug))}"`,
-      );
+      expect(fallback).toContain(`href="${escapeHtml(buildGuideQuickLogStarterHref(guide.slug))}"`);
     }
   });
 

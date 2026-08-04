@@ -12,12 +12,8 @@
  * never upgraded.
  */
 
-import {
-  redactEcoWittRawPayload,
-} from "./ecowittRealIngestRedaction";
-import {
-  buildEcoWittRealIngestDedupeKey,
-} from "./ecowittRealIngestDedupe";
+import { redactEcoWittRawPayload } from "./ecowittRealIngestRedaction";
+import { buildEcoWittRealIngestDedupeKey } from "./ecowittRealIngestDedupe";
 import type {
   EcoWittNormalizedReadings,
   EcoWittRealIngestCandidate,
@@ -32,8 +28,7 @@ import type {
 /** Small tolerance for clocks that drift slightly into the future. */
 const FUTURE_TIMESTAMP_TOLERANCE_MS = 60_000;
 
-const UUID_RX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const PLACEHOLDER_TENT_OR_PLANT_IDS: ReadonlySet<string> = new Set([
   "t1",
@@ -54,9 +49,14 @@ const PLACEHOLDER_DEVICE_IDS: ReadonlySet<string> = new Set([
   "test-device",
 ]);
 
-const VALID_SOURCES: ReadonlySet<EcoWittRealIngestSource> = new Set<
-  EcoWittRealIngestSource
->(["live", "manual", "csv", "demo", "stale", "invalid"]);
+const VALID_SOURCES: ReadonlySet<EcoWittRealIngestSource> = new Set<EcoWittRealIngestSource>([
+  "live",
+  "manual",
+  "csv",
+  "demo",
+  "stale",
+  "invalid",
+]);
 
 // Plausible Fahrenheit grow-room ranges. Outside these = reject.
 const AIR_TEMP_F_MIN = 40;
@@ -329,8 +329,7 @@ export function validateEcoWittRealIngestCandidate(
 
   // soil_water_content_pct (optional)
   {
-    const raw = (inboundReadings as Record<string, unknown>)
-      .soil_water_content_pct;
+    const raw = (inboundReadings as Record<string, unknown>).soil_water_content_pct;
     if (raw === undefined || raw === null) {
       push(warnings, "optional_metric_missing:soil_water_content_pct");
     } else {
@@ -429,8 +428,11 @@ export function validateEcoWittRealIngestCandidate(
     if (v !== null) metricKeys.push(k);
   }
   const dedupeKey =
-    tentId && capturedAt && nonEmptyString(c.device_identity) &&
-    nonEmptyString(c.source_identity) && metricKeys.length > 0
+    tentId &&
+    capturedAt &&
+    nonEmptyString(c.device_identity) &&
+    nonEmptyString(c.source_identity) &&
+    metricKeys.length > 0
       ? buildEcoWittRealIngestDedupeKey({
           tent_id: tentId,
           plant_id: plantId,

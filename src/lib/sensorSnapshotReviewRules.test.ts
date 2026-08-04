@@ -53,20 +53,14 @@ describe("reviewManualSensorSnapshot · blockers", () => {
     ["reservoir_ec_negative", { reservoirEc: -0.1 }],
     ["soil_ec_negative", { soilEc: -0.1 }],
   ])("emits blocker %s", (key, patch) => {
-    const r = reviewManualSensorSnapshot(
-      { ...VALID_INPUT, ...patch },
-      { now: NOW },
-    );
+    const r = reviewManualSensorSnapshot({ ...VALID_INPUT, ...patch }, { now: NOW });
     const found = r.findings.find((f) => f.key === key);
     expect(found?.severity).toBe("blocker");
     expect(r.canSave).toBe(false);
   });
 
   it("blocks when tentId is missing", () => {
-    const r = reviewManualSensorSnapshot(
-      { ...VALID_INPUT, tentId: null },
-      { now: NOW },
-    );
+    const r = reviewManualSensorSnapshot({ ...VALID_INPUT, tentId: null }, { now: NOW });
     expect(r.findings.some((f) => f.key === "tent_missing" && f.severity === "blocker")).toBe(true);
     expect(r.canSave).toBe(false);
   });
@@ -75,27 +69,31 @@ describe("reviewManualSensorSnapshot · blockers", () => {
     const missing = reviewManualSensorSnapshot({ ...VALID_INPUT, capturedAt: null }, { now: NOW });
     expect(missing.findings.some((f) => f.key === "captured_at_missing")).toBe(true);
 
-    const invalid = reviewManualSensorSnapshot({ ...VALID_INPUT, capturedAt: "not-a-date" }, { now: NOW });
+    const invalid = reviewManualSensorSnapshot(
+      { ...VALID_INPUT, capturedAt: "not-a-date" },
+      { now: NOW },
+    );
     expect(invalid.findings.some((f) => f.key === "captured_at_invalid")).toBe(true);
 
     const future = reviewManualSensorSnapshot(
       { ...VALID_INPUT, capturedAt: "2026-07-10T00:00:00.000Z" },
       { now: NOW },
     );
-    expect(future.findings.some((f) => f.key === "captured_at_future" && f.severity === "blocker")).toBe(true);
+    expect(
+      future.findings.some((f) => f.key === "captured_at_future" && f.severity === "blocker"),
+    ).toBe(true);
 
     const tooOld = reviewManualSensorSnapshot(
       { ...VALID_INPUT, capturedAt: "2026-07-07T00:00:00.000Z" },
       { now: NOW },
     );
-    expect(tooOld.findings.some((f) => f.key === "captured_at_too_old" && f.severity === "blocker")).toBe(true);
+    expect(
+      tooOld.findings.some((f) => f.key === "captured_at_too_old" && f.severity === "blocker"),
+    ).toBe(true);
   });
 
   it("blocks when no metrics are entered", () => {
-    const r = reviewManualSensorSnapshot(
-      { tentId: "tent-1", capturedAt: RECENT },
-      { now: NOW },
-    );
+    const r = reviewManualSensorSnapshot({ tentId: "tent-1", capturedAt: RECENT }, { now: NOW });
     expect(r.findings.some((f) => f.key === "no_metrics" && f.severity === "blocker")).toBe(true);
     expect(r.canSave).toBe(false);
   });
@@ -106,7 +104,9 @@ describe("reviewManualSensorSnapshot · warnings (suspicious but allowed)", () =
     for (const humidity of [0, 100]) {
       const r = reviewManualSensorSnapshot({ ...VALID_INPUT, humidity }, { now: NOW });
       expect(r.canSave).toBe(true);
-      expect(r.findings.some((f) => f.key === "humidity_stuck_rail" && f.severity === "warning")).toBe(true);
+      expect(
+        r.findings.some((f) => f.key === "humidity_stuck_rail" && f.severity === "warning"),
+      ).toBe(true);
       expect(r.confidence).toBe("low");
     }
   });
@@ -136,13 +136,15 @@ describe("reviewManualSensorSnapshot · warnings (suspicious but allowed)", () =
       { now: NOW },
     );
     const keys = r.findings.map((f) => f.key);
-    expect(keys).toEqual(expect.arrayContaining([
-      "vpd_high",
-      "reservoir_ec_atypical",
-      "reservoir_ph_atypical",
-      "ppfd_high",
-      "captured_at_stale",
-    ]));
+    expect(keys).toEqual(
+      expect.arrayContaining([
+        "vpd_high",
+        "reservoir_ec_atypical",
+        "reservoir_ph_atypical",
+        "ppfd_high",
+        "captured_at_stale",
+      ]),
+    );
     expect(r.canSave).toBe(true);
   });
 });

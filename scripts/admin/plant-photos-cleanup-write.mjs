@@ -18,14 +18,7 @@
  *    error internals — callers should sanitize the thrown message
  *    when printing.
  */
-import {
-  existsSync,
-  mkdirSync,
-  renameSync,
-  statSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { serializeCanonicalReport } from "./plant-photos-cleanup-report.mjs";
 
@@ -44,9 +37,7 @@ export function writeCanonicalReportFile(report, requestedPath, cwd = process.cw
   if (existsSync(absPath)) {
     const st = statSync(absPath);
     if (st.isDirectory()) {
-      throw new Error(
-        `report path resolves to a directory, not a file: ${requestedPath}`,
-      );
+      throw new Error(`report path resolves to a directory, not a file: ${requestedPath}`);
     }
   }
 

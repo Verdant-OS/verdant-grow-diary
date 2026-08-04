@@ -21,7 +21,6 @@ import {
   type NormalizeEcowittCloudOptions,
 } from "@/lib/ecowittPayloadRules";
 
-
 export interface EcowittCloudCanaryFixture {
   /** Stable id for the fixture (e.g. "happy_multi_channel"). Never a secret. */
   id: string;
@@ -137,8 +136,7 @@ export function runEcowittCloudCanary(
     { mapped: 0, unmapped: 0, invalid: 0, stale: 0, live: 0 },
   );
   const allCodes = new Set<string>();
-  for (const s of summaries)
-    for (const c of s.suspicious_flag_codes) allCodes.add(c);
+  for (const s of summaries) for (const c of s.suspicious_flag_codes) allCodes.add(c);
   return {
     summaries,
     totals,

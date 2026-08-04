@@ -17,13 +17,7 @@
 
 import { DEFAULT_AI_COACH_STALE_THRESHOLD_MS } from "../constants/sensorTiming";
 export type AiCoachSnapshotSource =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid"
-  | "unknown";
+  "live" | "manual" | "csv" | "demo" | "stale" | "invalid" | "unknown";
 
 export type AiCoachSnapshotTrust = "low" | "medium" | "high";
 

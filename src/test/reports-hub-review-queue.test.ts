@@ -96,9 +96,7 @@ describe("buildReportsReviewQueue", () => {
   it("surfaces a stale sensor card linking to the sensors route", () => {
     const { items } = buildReportsReviewQueue({
       ...base,
-      latestSensorCapturedAt: new Date(
-        NOW - STALE_SENSOR_THRESHOLD_MS - 60_000,
-      ).toISOString(),
+      latestSensorCapturedAt: new Date(NOW - STALE_SENSOR_THRESHOLD_MS - 60_000).toISOString(),
     });
     const item = items.find((i) => i.id === "stale_sensor");
     expect(item).toBeDefined();
@@ -175,9 +173,7 @@ describe("buildReportsReviewQueue", () => {
     expect(SRC).not.toMatch(
       /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b/i,
     );
-    expect(SRC).not.toMatch(
-      /\.insert\(|\.update\(|\.delete\(|\.upsert\(|\.rpc\(/,
-    );
+    expect(SRC).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.upsert\(|\.rpc\(/);
   });
 });
 
@@ -234,18 +230,14 @@ describe("buildReportsReviewQueue — explanation copy", () => {
   });
 
   it("renders calm empty copy that avoids forbidden claims", async () => {
-    const { REPORTS_REVIEW_QUEUE_EMPTY_COPY } = await import(
-      "@/lib/reportsHubReviewQueue"
-    );
+    const { REPORTS_REVIEW_QUEUE_EMPTY_COPY } = await import("@/lib/reportsHubReviewQueue");
     expect(REPORTS_REVIEW_QUEUE_EMPTY_COPY).toMatch(/no priority review items/i);
     const forbidden = /\b(fixed|guaranteed|healthy|caused|best|worst)\b/i;
     expect(forbidden.test(REPORTS_REVIEW_QUEUE_EMPTY_COPY)).toBe(false);
   });
 
   it("help text exists for every known review item id", async () => {
-    const { REVIEW_ITEM_HELP_TEXT } = await import(
-      "@/lib/reportsHubReviewQueue"
-    );
+    const { REVIEW_ITEM_HELP_TEXT } = await import("@/lib/reportsHubReviewQueue");
     for (const id of [
       "missing_outcome",
       "open_alerts",

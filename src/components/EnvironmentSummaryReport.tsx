@@ -84,10 +84,7 @@ export default function EnvironmentSummaryReport({
 
           <div>
             <h3 className="text-xs font-medium text-muted-foreground mb-1">Source breakdown</h3>
-            <div
-              data-testid="env-report-sources"
-              className="flex flex-wrap gap-1.5"
-            >
+            <div data-testid="env-report-sources" className="flex flex-wrap gap-1.5">
               {Object.entries(report.sourceCounts).map(([src, count]) => (
                 <span
                   key={src}
@@ -103,9 +100,7 @@ export default function EnvironmentSummaryReport({
 
           {report.metricCoverage.length > 0 && (
             <div>
-              <h3 className="text-xs font-medium text-muted-foreground mb-1">
-                Metric coverage
-              </h3>
+              <h3 className="text-xs font-medium text-muted-foreground mb-1">Metric coverage</h3>
               <ul data-testid="env-report-metrics" className="text-xs space-y-1">
                 {report.metricCoverage.map((m) => (
                   <li
@@ -115,8 +110,8 @@ export default function EnvironmentSummaryReport({
                   >
                     <span>{m.label}</span>
                     <span className="text-muted-foreground">
-                      {m.sampleCount} samples · {m.invalidCount} invalid ·{" "}
-                      {m.reviewRequiredCount} review
+                      {m.sampleCount} samples · {m.invalidCount} invalid · {m.reviewRequiredCount}{" "}
+                      review
                     </span>
                   </li>
                 ))}
@@ -150,9 +145,7 @@ export default function EnvironmentSummaryReport({
 
           {report.reviewPrompts.length > 0 && (
             <div>
-              <h3 className="text-xs font-medium text-muted-foreground mb-1">
-                Review prompts
-              </h3>
+              <h3 className="text-xs font-medium text-muted-foreground mb-1">Review prompts</h3>
               <ul
                 data-testid="env-report-review-prompts"
                 className="text-[11px] text-amber-300 space-y-0.5 list-disc pl-4"

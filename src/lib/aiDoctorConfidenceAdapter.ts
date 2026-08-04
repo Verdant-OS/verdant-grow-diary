@@ -70,13 +70,13 @@ function levelFromScore(score: number): AiDoctorConfidenceLevel {
   return "very_low";
 }
 
-function evaluateVisualContext(
-  vision: Phase1VisionAnalysisResult | null | undefined,
-): { has_visual_context: boolean; poor_quality: boolean } {
+function evaluateVisualContext(vision: Phase1VisionAnalysisResult | null | undefined): {
+  has_visual_context: boolean;
+  poor_quality: boolean;
+} {
   if (!vision) return { has_visual_context: false, poor_quality: true };
   const q =
-    typeof vision.image_quality_score === "number" &&
-    Number.isFinite(vision.image_quality_score)
+    typeof vision.image_quality_score === "number" && Number.isFinite(vision.image_quality_score)
       ? vision.image_quality_score
       : 0;
   const observationCount =
@@ -126,13 +126,13 @@ export function calculateAiDoctorConfidence(
     }
   }
 
-  const has_recent_trustworthy_sensor_data =
-    live_count > 0 || manual_count > 0;
+  const has_recent_trustworthy_sensor_data = live_count > 0 || manual_count > 0;
   const has_recent_grow_events = context.recent_grow_events.length > 0;
   const has_known_pot_size =
     typeof context.pot_size === "string" && context.pot_size.trim().length > 0;
-  const { has_visual_context, poor_quality: visual_poor } =
-    evaluateVisualContext(input.vision ?? null);
+  const { has_visual_context, poor_quality: visual_poor } = evaluateVisualContext(
+    input.vision ?? null,
+  );
 
   const source_quality: AiDoctorConfidenceSourceQuality = {
     live_count,
@@ -239,8 +239,7 @@ export function calculateAiDoctorConfidence(
     }
   }
 
-  const weakContext =
-    !has_recent_trustworthy_sensor_data && !has_recent_grow_events;
+  const weakContext = !has_recent_trustworthy_sensor_data && !has_recent_grow_events;
   if (weakContext) {
     flags.push("weak_context");
     flags.push("avoid_overdiagnosis");
@@ -316,12 +315,8 @@ function buildExplanation(
 ): string {
   const parts: string[] = [];
   parts.push(`Confidence ${level} (score ${score}/100).`);
-  parts.push(
-    `Trustworthy sensor data: ${sq.has_recent_trustworthy_sensor_data ? "yes" : "no"}.`,
-  );
-  parts.push(
-    `Recent grow events: ${sq.has_recent_grow_events ? "yes" : "no"}.`,
-  );
+  parts.push(`Trustworthy sensor data: ${sq.has_recent_trustworthy_sensor_data ? "yes" : "no"}.`);
+  parts.push(`Recent grow events: ${sq.has_recent_grow_events ? "yes" : "no"}.`);
   parts.push(`Useful visual context: ${sq.has_visual_context ? "yes" : "no"}.`);
   parts.push(`Pot size: ${hasKnownPotSize ? "known" : "unknown"}.`);
   parts.push(`Missing information items: ${missingCount}.`);

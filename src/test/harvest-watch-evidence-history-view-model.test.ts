@@ -17,9 +17,7 @@ import {
   type HarvestEvidenceClassifiableRow,
 } from "@/lib/harvestWatchEvidenceHistoryViewModel";
 
-function row(
-  o: Partial<HarvestEvidenceClassifiableRow> = {},
-): HarvestEvidenceClassifiableRow {
+function row(o: Partial<HarvestEvidenceClassifiableRow> = {}): HarvestEvidenceClassifiableRow {
   return {
     id: o.id ?? "e1",
     note: o.note ?? null,
@@ -33,30 +31,30 @@ function row(
 
 describe("classifyHarvestEvidenceRow", () => {
   it("classifies explicit trichome notes", () => {
-    expect(
-      classifyHarvestEvidenceRow(row({ note: "Trichome check: mostly cloudy" })),
-    ).toBe("trichome_inspection");
+    expect(classifyHarvestEvidenceRow(row({ note: "Trichome check: mostly cloudy" }))).toBe(
+      "trichome_inspection",
+    );
   });
 
   it("classifies explicit pistil / recession / hair notes", () => {
-    expect(
-      classifyHarvestEvidenceRow(row({ note: "Pistils 60% receded" })),
-    ).toBe("pistil_observation");
-    expect(
-      classifyHarvestEvidenceRow(row({ note: "Most hairs darkened" })),
-    ).toBe("pistil_observation");
-    expect(
-      classifyHarvestEvidenceRow(row({ note: "Noticed recession on tops" })),
-    ).toBe("pistil_observation");
+    expect(classifyHarvestEvidenceRow(row({ note: "Pistils 60% receded" }))).toBe(
+      "pistil_observation",
+    );
+    expect(classifyHarvestEvidenceRow(row({ note: "Most hairs darkened" }))).toBe(
+      "pistil_observation",
+    );
+    expect(classifyHarvestEvidenceRow(row({ note: "Noticed recession on tops" }))).toBe(
+      "pistil_observation",
+    );
   });
 
   it("classifies explicit bud maturity notes", () => {
-    expect(
-      classifyHarvestEvidenceRow(row({ note: "Bud calyx swelling on cola" })),
-    ).toBe("bud_maturity");
-    expect(
-      classifyHarvestEvidenceRow(row({ note: "Overall bud maturity looks good" })),
-    ).toBe("bud_maturity");
+    expect(classifyHarvestEvidenceRow(row({ note: "Bud calyx swelling on cola" }))).toBe(
+      "bud_maturity",
+    );
+    expect(classifyHarvestEvidenceRow(row({ note: "Overall bud maturity looks good" }))).toBe(
+      "bud_maturity",
+    );
   });
 
   it("classifies close flower photo presets as recent_flower_photo", () => {
@@ -72,17 +70,15 @@ describe("classifyHarvestEvidenceRow", () => {
   });
 
   it("does NOT classify generic photos as trichome evidence", () => {
-    expect(
-      classifyHarvestEvidenceRow(
-        row({ note: "", hasPhoto: true, eventType: "photo" }),
-      ),
-    ).toBe("recent_flower_photo");
+    expect(classifyHarvestEvidenceRow(row({ note: "", hasPhoto: true, eventType: "photo" }))).toBe(
+      "recent_flower_photo",
+    );
   });
 
   it("classifies generic harvest-related notes as other_harvest_note", () => {
-    expect(
-      classifyHarvestEvidenceRow(row({ note: "Approaching harvest window." })),
-    ).toBe("other_harvest_note");
+    expect(classifyHarvestEvidenceRow(row({ note: "Approaching harvest window." }))).toBe(
+      "other_harvest_note",
+    );
   });
 
   it("returns null for non-harvest notes", () => {
@@ -92,9 +88,7 @@ describe("classifyHarvestEvidenceRow", () => {
   it("never crashes on missing / malformed input", () => {
     expect(classifyHarvestEvidenceRow(null)).toBeNull();
     expect(classifyHarvestEvidenceRow(undefined)).toBeNull();
-    expect(
-      classifyHarvestEvidenceRow({} as HarvestEvidenceClassifiableRow),
-    ).toBeNull();
+    expect(classifyHarvestEvidenceRow({} as HarvestEvidenceClassifiableRow)).toBeNull();
     expect(
       classifyHarvestEvidenceRow({
         note: 42 as unknown as string,
@@ -103,9 +97,7 @@ describe("classifyHarvestEvidenceRow", () => {
   });
 
   it("isHarvestEvidenceDiaryItem mirrors the classifier", () => {
-    expect(
-      isHarvestEvidenceDiaryItem(row({ note: "Trichome check today" })),
-    ).toBe(true);
+    expect(isHarvestEvidenceDiaryItem(row({ note: "Trichome check today" }))).toBe(true);
     expect(isHarvestEvidenceDiaryItem(row({ note: "Watered" }))).toBe(false);
   });
 });
@@ -147,14 +139,18 @@ describe("buildHarvestEvidenceHistory", () => {
       expect(g.items).toEqual([]);
       expect(g.emptyCopy).toBe(HARVEST_EVIDENCE_CATEGORY_EMPTY[g.key]);
     }
-    expect(history.groups.find((g) => g.key === "trichome_inspection")!.emptyCopy)
-      .toBe("No trichome inspection notes yet.");
-    expect(history.groups.find((g) => g.key === "pistil_observation")!.emptyCopy)
-      .toBe("No pistil or recession notes yet.");
-    expect(history.groups.find((g) => g.key === "bud_maturity")!.emptyCopy)
-      .toBe("No bud maturity notes yet.");
-    expect(history.groups.find((g) => g.key === "recent_flower_photo")!.emptyCopy)
-      .toBe("No close flower photos yet.");
+    expect(history.groups.find((g) => g.key === "trichome_inspection")!.emptyCopy).toBe(
+      "No trichome inspection notes yet.",
+    );
+    expect(history.groups.find((g) => g.key === "pistil_observation")!.emptyCopy).toBe(
+      "No pistil or recession notes yet.",
+    );
+    expect(history.groups.find((g) => g.key === "bud_maturity")!.emptyCopy).toBe(
+      "No bud maturity notes yet.",
+    );
+    expect(history.groups.find((g) => g.key === "recent_flower_photo")!.emptyCopy).toBe(
+      "No close flower photos yet.",
+    );
   });
 
   it("surfaces the required caution copy", () => {
@@ -164,9 +160,12 @@ describe("buildHarvestEvidenceHistory", () => {
   });
 
   it("tolerates null / undefined / malformed rows without crashing", () => {
-    const history = buildHarvestEvidenceHistory(
-      [null, undefined, "junk", { id: "x", note: "Trichome" }] as unknown as HarvestEvidenceClassifiableRow[],
-    );
+    const history = buildHarvestEvidenceHistory([
+      null,
+      undefined,
+      "junk",
+      { id: "x", note: "Trichome" },
+    ] as unknown as HarvestEvidenceClassifiableRow[]);
     expect(history.totalCount).toBe(1);
   });
 });

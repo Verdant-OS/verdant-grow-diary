@@ -141,9 +141,7 @@ export function pickLatestFollowupForAction(
 ): PickedFollowup | null {
   const id = nonEmptyString(actionId);
   if (!id || !rows || rows.length === 0) return null;
-  const matched = rows.filter(
-    (r) => isActionFollowupRow(r) && r.details?.action_queue_id === id,
-  );
+  const matched = rows.filter((r) => isActionFollowupRow(r) && r.details?.action_queue_id === id);
   if (matched.length === 0) return null;
   matched.sort((a, b) => rowSortKey(b) - rowSortKey(a));
   return projectRow(matched[0]);

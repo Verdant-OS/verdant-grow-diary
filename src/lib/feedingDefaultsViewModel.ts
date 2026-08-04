@@ -30,13 +30,7 @@ import {
 
 export const FEEDING_DEFAULTS_LABEL = "Prefilled from last feeding" as const;
 
-const UNTRUSTED_PROVENANCE = new Set([
-  "demo",
-  "stale",
-  "invalid",
-  "fixture",
-  "mock",
-]);
+const UNTRUSTED_PROVENANCE = new Set(["demo", "stale", "invalid", "fixture", "mock"]);
 
 export type FeedingDefaultsScope = "plant" | "tent" | "grow";
 
@@ -53,9 +47,7 @@ export interface FeedingDefaultsResult {
    * populated. Caller merges with `EMPTY_QUICKLOG_FEEDING_FORM` to render.
    * `null` when no safe default exists.
    */
-  defaults:
-    | (Pick<QuickLogFeedingFormState, "lineId" | "products">)
-    | null;
+  defaults: Pick<QuickLogFeedingFormState, "lineId" | "products"> | null;
   scope: FeedingDefaultsScope | null;
   sourceEntryId: string | null;
   label: typeof FEEDING_DEFAULTS_LABEL | null;
@@ -120,18 +112,14 @@ function isUntrusted(entry: NormalizedDiaryEntry): boolean {
   return false;
 }
 
-function toProductRows(
-  entry: NormalizedDiaryEntry,
-): QuickLogFeedingFormProductRow[] {
+function toProductRows(entry: NormalizedDiaryEntry): QuickLogFeedingFormProductRow[] {
   const src = entry.details.nutrients ?? [];
   const rows: QuickLogFeedingFormProductRow[] = [];
   for (const n of src) {
     const name = pickString(n.name);
     if (!name) continue;
     const amount =
-      typeof n.amount === "number" && Number.isFinite(n.amount)
-        ? String(n.amount)
-        : "";
+      typeof n.amount === "number" && Number.isFinite(n.amount) ? String(n.amount) : "";
     const unit = pickString(n.unit) ?? FEEDING_FORM_DEFAULT_UNIT;
     rows.push({ name, amount, unit });
   }
@@ -154,9 +142,7 @@ function buildFromEntry(
   };
 }
 
-export function buildFeedingDefaults(
-  input: FeedingDefaultsInput,
-): FeedingDefaultsResult {
+export function buildFeedingDefaults(input: FeedingDefaultsInput): FeedingDefaultsResult {
   if (!input || !Array.isArray(input.rawEntries) || input.rawEntries.length === 0) {
     return EMPTY_RESULT;
   }

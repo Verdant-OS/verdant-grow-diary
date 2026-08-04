@@ -72,7 +72,8 @@ const OVERCONFIDENT_LANGUAGE_PATTERNS = [
   /\bcaused\b/i,
 ];
 
-const EVIDENCE_MARKER_PATTERN = /\b(?:evt-[a-z0-9-]+|20\d{2}-\d{2}-\d{2}|\d+(?:\.\d+)?\s?(?:%|kPa|RH|g|grams?|days?|readings?|photos?|events?|score)|\d+(?:\.\d+)?)\b/i;
+const EVIDENCE_MARKER_PATTERN =
+  /\b(?:evt-[a-z0-9-]+|20\d{2}-\d{2}-\d{2}|\d+(?:\.\d+)?\s?(?:%|kPa|RH|g|grams?|days?|readings?|photos?|events?|score)|\d+(?:\.\d+)?)\b/i;
 
 function issue(
   path: string,
@@ -87,7 +88,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function parseRawOutput(raw: unknown): { value: unknown; issues: PostGrowReflectionValidationIssue[] } {
+function parseRawOutput(raw: unknown): {
+  value: unknown;
+  issues: PostGrowReflectionValidationIssue[];
+} {
   if (typeof raw !== "string") return { value: raw, issues: [] };
   try {
     return { value: JSON.parse(raw), issues: [] };
@@ -116,7 +120,10 @@ function countEvidenceReferences(lines: string[]): number {
   return lines.filter((line) => EVIDENCE_MARKER_PATTERN.test(line)).length;
 }
 
-function validateTextSafety(output: ReflectionOutput, options: PostGrowReflectionValidationOptions): PostGrowReflectionValidationIssue[] {
+function validateTextSafety(
+  output: ReflectionOutput,
+  options: PostGrowReflectionValidationOptions,
+): PostGrowReflectionValidationIssue[] {
   const issues: PostGrowReflectionValidationIssue[] = [];
   const lines = flattenOutputText(output);
 
@@ -155,7 +162,10 @@ function validateTextSafety(output: ReflectionOutput, options: PostGrowReflectio
 
   const sensorCoveragePct = options.sensorCoveragePct ?? null;
   const knownGapCount = options.knownGapCount ?? 0;
-  if (output.confidence === "High" && ((sensorCoveragePct !== null && sensorCoveragePct < 70) || knownGapCount > 0)) {
+  if (
+    output.confidence === "High" &&
+    ((sensorCoveragePct !== null && sensorCoveragePct < 70) || knownGapCount > 0)
+  ) {
     issues.push(
       issue(
         "confidence",
@@ -207,15 +217,24 @@ export function validatePostGrowReflectionOutput(
     }
     for (const [index, value] of (record[field] as unknown[]).entries()) {
       if (typeof value !== "string") {
-        issues.push(issue(`${field}[${index}]`, "invalid_type", `${field}[${index}] must be a string.`));
+        issues.push(
+          issue(`${field}[${index}]`, "invalid_type", `${field}[${index}] must be a string.`),
+        );
       } else if (value.trim().length === 0) {
-        issues.push(issue(`${field}[${index}]`, "empty_text", `${field}[${index}] must not be empty.`));
+        issues.push(
+          issue(`${field}[${index}]`, "empty_text", `${field}[${index}] must not be empty.`),
+        );
       }
     }
   }
 
-  if (typeof record.confidence === "string" && !ALLOWED_CONFIDENCE.includes(record.confidence as ReflectionConfidence)) {
-    issues.push(issue("confidence", "invalid_confidence", "confidence must be Low, Medium, or High."));
+  if (
+    typeof record.confidence === "string" &&
+    !ALLOWED_CONFIDENCE.includes(record.confidence as ReflectionConfidence)
+  ) {
+    issues.push(
+      issue("confidence", "invalid_confidence", "confidence must be Low, Medium, or High."),
+    );
   }
 
   if (issues.some((item) => item.severity === "error")) return { ok: false, value: null, issues };

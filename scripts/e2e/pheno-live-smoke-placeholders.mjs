@@ -65,8 +65,10 @@ export function parseEnvFileContents(contents) {
     let value = line.slice(eq + 1);
     // strip surrounding matching quotes but do not print the value
     const q = value.trim();
-    if ((q.startsWith("\"") && q.endsWith("\"") && q.length >= 2) ||
-        (q.startsWith("'") && q.endsWith("'") && q.length >= 2)) {
+    if (
+      (q.startsWith('"') && q.endsWith('"') && q.length >= 2) ||
+      (q.startsWith("'") && q.endsWith("'") && q.length >= 2)
+    ) {
       value = q.slice(1, -1);
     }
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {

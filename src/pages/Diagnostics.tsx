@@ -12,6 +12,7 @@ import { useEvidenceCoverage } from "@/hooks/useEvidenceCoverage";
 import { BuildInfoPanel } from "@/components/BuildInfoPanel";
 import { ResourceHealthPanel } from "@/components/ResourceHealthPanel";
 import { LocalDataHealthPanel } from "@/components/LocalDataHealthPanel";
+import { AnalyticsDiagnosticsPanel } from "@/components/AnalyticsDiagnosticsPanel";
 
 type CheckStatus = "pending" | "running" | "pass" | "fail" | "skip";
 
@@ -191,6 +192,17 @@ export default function Diagnostics() {
       <ResourceHealthPanel />
 
       <LocalDataHealthPanel />
+
+      <AnalyticsDiagnosticsPanel />
+
+      <p className="text-sm text-muted-foreground">
+        <Link className="underline" to="/diagnostics-seo-artifacts">
+          SEO build artifacts
+        </Link>{" "}
+        — check whether seo-manifest.json and the generated static route documents exist in the
+        current build output.
+      </p>
+
 
       <Button onClick={runAll} disabled={running}>
         {running ? "Running…" : "Run checks"}

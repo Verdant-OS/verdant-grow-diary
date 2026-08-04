@@ -67,8 +67,12 @@ describe("<VpdTimelineStatusWidget /> rendering", () => {
   it("renders canonical stage label + target band + status", () => {
     render(<VpdTimelineStatusWidget vpdKpa={1.0} stage="late_veg" />);
     expect(screen.getByTestId("vpd-timeline-status-widget-stage").textContent).toMatch(/Late veg/);
-    expect(screen.getByTestId("vpd-timeline-status-widget-band").textContent).toMatch(/0\.90–1\.20 kPa/);
-    expect(screen.getByTestId("vpd-timeline-status-widget-status").textContent).toMatch(/In target/);
+    expect(screen.getByTestId("vpd-timeline-status-widget-band").textContent).toMatch(
+      /0\.90–1\.20 kPa/,
+    );
+    expect(screen.getByTestId("vpd-timeline-status-widget-status").textContent).toMatch(
+      /In target/,
+    );
   });
 
   it("renders low/high statuses", () => {
@@ -98,12 +102,14 @@ describe("<VpdTimelineStatusWidget /> rendering", () => {
 
   it("never renders nutrient / irrigation / equipment / device recommendations", () => {
     for (const stage of ["late_veg", "mystery"]) {
-      const { container, unmount } = render(
-        <VpdTimelineStatusWidget vpdKpa={1.6} stage={stage} />,
-      );
+      const { container, unmount } = render(<VpdTimelineStatusWidget vpdKpa={1.6} stage={stage} />);
       const text = container.textContent ?? "";
-      expect(text).not.toMatch(/nutrient|feed|fertilizer|irrigate|water now|water more|water less/i);
-      expect(text).not.toMatch(/turn on|turn off|switch on|switch off|relay|actuator|pump|dehumidifier|humidifier|fan/i);
+      expect(text).not.toMatch(
+        /nutrient|feed|fertilizer|irrigate|water now|water more|water less/i,
+      );
+      expect(text).not.toMatch(
+        /turn on|turn off|switch on|switch off|relay|actuator|pump|dehumidifier|humidifier|fan/i,
+      );
       expect(text).not.toMatch(/\bLive\b/);
       unmount();
     }
@@ -112,7 +118,10 @@ describe("<VpdTimelineStatusWidget /> rendering", () => {
 
 describe("static safety — VpdTimelineStatusWidget files", () => {
   const VM_SRC = readFileSync(resolve(ROOT, "src/lib/vpdTimelineStatusViewModel.ts"), "utf8");
-  const COMP_SRC = readFileSync(resolve(ROOT, "src/components/VpdTimelineStatusWidget.tsx"), "utf8");
+  const COMP_SRC = readFileSync(
+    resolve(ROOT, "src/components/VpdTimelineStatusWidget.tsx"),
+    "utf8",
+  );
 
   it("contain no I/O, Supabase, fetch, alert, action_queue, or device-control surface", () => {
     for (const src of [VM_SRC, COMP_SRC]) {
@@ -134,10 +143,8 @@ describe("static safety — VpdTimelineStatusWidget files", () => {
       expect(src).not.toMatch(/minKpa\s*:\s*0?\.\d/);
       // No legacy → canonical pair text in source.
       const hasVegPair = /["']veg["']/.test(src) && /["']late_veg["']/.test(src);
-      const hasFlowerPair =
-        /["']flower["']/.test(src) && /["']mid_late_flower["']/.test(src);
-      const hasPreflowerPair =
-        /["']preflower["']/.test(src) && /["']early_flower["']/.test(src);
+      const hasFlowerPair = /["']flower["']/.test(src) && /["']mid_late_flower["']/.test(src);
+      const hasPreflowerPair = /["']preflower["']/.test(src) && /["']early_flower["']/.test(src);
       expect(hasVegPair || hasFlowerPair || hasPreflowerPair).toBe(false);
     }
   });

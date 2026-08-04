@@ -76,12 +76,10 @@ describe("Timeline diary chips + photo strip enrichment", () => {
     expect(screen.getByTestId("timeline-diary-sensor-chip-temp_f")).toBeInTheDocument();
     expect(screen.getByTestId("timeline-diary-sensor-chip-rh")).toBeInTheDocument();
     expect(screen.getByTestId("timeline-diary-sensor-chip-vpd")).toBeInTheDocument();
-    expect(screen.getByTestId("timeline-diary-sensor-source").textContent).toBe(
-      "Manual",
+    expect(screen.getByTestId("timeline-diary-sensor-source").textContent).toBe("Manual");
+    expect(screen.getByTestId("timeline-diary-sensor-chips").getAttribute("data-is-live")).toBe(
+      "no",
     );
-    expect(
-      screen.getByTestId("timeline-diary-sensor-chips").getAttribute("data-is-live"),
-    ).toBe("no");
   });
 
   it("renders soil moisture and CO2 chips only when present", async () => {
@@ -104,9 +102,7 @@ describe("Timeline diary chips + photo strip enrichment", () => {
     };
     renderSection();
     await waitFor(() => screen.getByTestId("timeline-memory-diary-item"));
-    expect(
-      screen.getByTestId("timeline-diary-sensor-chip-soil_moisture"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-diary-sensor-chip-soil_moisture")).toBeInTheDocument();
     expect(screen.getByTestId("timeline-diary-sensor-chip-co2")).toBeInTheDocument();
   });
 
@@ -130,12 +126,8 @@ describe("Timeline diary chips + photo strip enrichment", () => {
     };
     renderSection();
     await waitFor(() => screen.getByTestId("timeline-memory-diary-item"));
-    expect(screen.getByTestId("timeline-diary-sensor-source").textContent).toBe(
-      "CSV",
-    );
-    const text =
-      screen.getByTestId("timeline-memory-diary-item").textContent?.toLowerCase() ??
-      "";
+    expect(screen.getByTestId("timeline-diary-sensor-source").textContent).toBe("CSV");
+    const text = screen.getByTestId("timeline-memory-diary-item").textContent?.toLowerCase() ?? "";
     expect(text).not.toMatch(/\blive\b/);
   });
 
@@ -159,12 +151,10 @@ describe("Timeline diary chips + photo strip enrichment", () => {
     };
     renderSection();
     await waitFor(() => screen.getByTestId("timeline-memory-diary-item"));
-    expect(
-      screen.getByTestId("timeline-diary-sensor-unavailable").textContent,
-    ).toMatch(/unavailable/i);
-    expect(
-      screen.queryByTestId("timeline-diary-sensor-chip-temp_f"),
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("timeline-diary-sensor-unavailable").textContent).toMatch(
+      /unavailable/i,
+    );
+    expect(screen.queryByTestId("timeline-diary-sensor-chip-temp_f")).not.toBeInTheDocument();
   });
 
   it("renders up to 3 photo thumbnails and +N more", async () => {
@@ -194,9 +184,7 @@ describe("Timeline diary chips + photo strip enrichment", () => {
     renderSection();
     await waitFor(() => screen.getByTestId("timeline-memory-diary-item"));
     expect(screen.getAllByTestId("timeline-diary-photo-thumb")).toHaveLength(3);
-    expect(screen.getByTestId("timeline-diary-photo-more").textContent).toBe(
-      "+2 more",
-    );
+    expect(screen.getByTestId("timeline-diary-photo-more").textContent).toBe("+2 more");
   });
 
   it("does not render broken images when photo URLs are missing/invalid", async () => {
@@ -219,12 +207,8 @@ describe("Timeline diary chips + photo strip enrichment", () => {
     };
     renderSection();
     await waitFor(() => screen.getByTestId("timeline-memory-diary-item"));
-    expect(
-      screen.queryByTestId("timeline-diary-photo-thumb"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("timeline-diary-photo-strip"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-diary-photo-thumb")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-diary-photo-strip")).not.toBeInTheDocument();
   });
 
   it("thumbnail alt text includes event type and occurredAt context", async () => {

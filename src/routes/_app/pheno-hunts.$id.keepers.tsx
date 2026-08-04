@@ -7,7 +7,9 @@ export const Route = createFileRoute("/_app/pheno-hunts/$id/keepers")({
 });
 
 function RouteComponent() {
-  return <PhenoTrackerUpgradeGate>
-                          <PhenoKeepersPage />
-                        </PhenoTrackerUpgradeGate>;
+  return (
+    <PhenoTrackerUpgradeGate>
+      <PhenoKeepersPage />
+    </PhenoTrackerUpgradeGate>
+  );
 }

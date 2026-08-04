@@ -35,18 +35,24 @@ describe("OperatorEcowittTentPreview — history + diary + export", () => {
     render(<OperatorEcowittTentPreview />);
     expect(screen.getByTestId("diary-attach-preview")).toBeTruthy();
     expect(screen.getByTestId("diary-preview-notice").textContent).toMatch(/Preview only/i);
-    expect(screen.getByTestId("diary-preview-title").textContent).toMatch(/EcoWitt snapshot preview/);
+    expect(screen.getByTestId("diary-preview-title").textContent).toMatch(
+      /EcoWitt snapshot preview/,
+    );
     const btn = screen.getByTestId("diary-preview-attach-button") as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
-    expect(screen.getByTestId("diary-preview-disabled-label").textContent).toMatch(/Save disabled in preview/);
+    expect(screen.getByTestId("diary-preview-disabled-label").textContent).toMatch(
+      /Save disabled in preview/,
+    );
   });
 
   it("export button triggers client-side download (no network)", () => {
     render(<OperatorEcowittTentPreview />);
     const createObjectURL = vi.fn().mockReturnValue("blob:fake");
     const revokeObjectURL = vi.fn();
-    (URL as unknown as { createObjectURL: typeof createObjectURL }).createObjectURL = createObjectURL;
-    (URL as unknown as { revokeObjectURL: typeof revokeObjectURL }).revokeObjectURL = revokeObjectURL;
+    (URL as unknown as { createObjectURL: typeof createObjectURL }).createObjectURL =
+      createObjectURL;
+    (URL as unknown as { revokeObjectURL: typeof revokeObjectURL }).revokeObjectURL =
+      revokeObjectURL;
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
 
     fireEvent.click(screen.getByTestId("export-snapshot-button"));

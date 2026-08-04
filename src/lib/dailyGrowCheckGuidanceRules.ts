@@ -12,10 +12,7 @@
 import type { ConsistencySummary } from "@/lib/dailyGrowCheckConsistencyRules";
 
 export type DailyCheckGuidanceState =
-  | "empty"
-  | "today-unchecked"
-  | "today-unchecked-inconsistent"
-  | "today-checked";
+  "empty" | "today-unchecked" | "today-unchecked-inconsistent" | "today-checked";
 
 export interface DailyCheckGuidance {
   state: DailyCheckGuidanceState;

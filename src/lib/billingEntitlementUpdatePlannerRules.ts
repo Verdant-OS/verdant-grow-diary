@@ -65,11 +65,16 @@ export interface BillingEntitlementUpdateBlocked {
 }
 
 export type BillingEntitlementUpdatePlannerResult =
-  | BillingEntitlementUpdatePlan
-  | BillingEntitlementUpdateBlocked;
+  BillingEntitlementUpdatePlan | BillingEntitlementUpdateBlocked;
 
 const RECURRING_PLANS = new Set<RecurringEntitlementPlanId>(["pro_monthly", "pro_annual"]);
-const STATUSES = new Set<SubscriptionStatus>(["active", "past_due", "canceled", "paused", "expired"]);
+const STATUSES = new Set<SubscriptionStatus>([
+  "active",
+  "past_due",
+  "canceled",
+  "paused",
+  "expired",
+]);
 
 function cleanString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
@@ -82,14 +87,14 @@ function cleanBoolean(value: unknown): boolean {
 function asRecurringPlan(value: unknown): RecurringEntitlementPlanId | null {
   const cleaned = cleanString(value);
   return cleaned && RECURRING_PLANS.has(cleaned as RecurringEntitlementPlanId)
-    ? cleaned as RecurringEntitlementPlanId
+    ? (cleaned as RecurringEntitlementPlanId)
     : null;
 }
 
 function asStatus(value: unknown): SubscriptionStatus | null {
   const cleaned = cleanString(value);
   return cleaned && STATUSES.has(cleaned as SubscriptionStatus)
-    ? cleaned as SubscriptionStatus
+    ? (cleaned as SubscriptionStatus)
     : null;
 }
 
@@ -136,7 +141,8 @@ export function planBillingEntitlementUpdate(
 
   const linkSubscriptionId = cleanString(link.provider_subscription_id);
   if (!linkSubscriptionId) return block("missing_link_provider_subscription_id");
-  if (linkSubscriptionId !== processingSubscriptionId) return block("provider_subscription_mismatch");
+  if (linkSubscriptionId !== processingSubscriptionId)
+    return block("provider_subscription_mismatch");
 
   return {
     ok: true,

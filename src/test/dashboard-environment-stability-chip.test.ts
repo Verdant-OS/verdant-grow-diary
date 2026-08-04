@@ -1,9 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
-import {
-  formatStabilityChipView,
-} from "@/lib/dashboardStabilityChipCopyRules";
+import { formatStabilityChipView } from "@/lib/dashboardStabilityChipCopyRules";
 import type { StabilityResult } from "@/lib/environmentStabilityRules";
 
 const SRC = readFileSync(resolve(__dirname, "../pages/Dashboard.tsx"), "utf8");
@@ -12,8 +10,7 @@ const HELPER_SRC = readFileSync(
   "utf8",
 );
 
-const FORBIDDEN =
-  /saveAlert|logAlertEvent|action_queue|service_role|insertAlert|device.control/i;
+const FORBIDDEN = /saveAlert|logAlertEvent|action_queue|service_role|insertAlert|device.control/i;
 
 function fixture(overrides: Partial<StabilityResult>): StabilityResult {
   return {
@@ -81,7 +78,6 @@ describe("Dashboard environment stability chip — wiring", () => {
     expect(block).not.toMatch(/service_role|action_queue|\bautomate\(|\bsetAutomation\b/i);
   });
 
-
   it("copy helper itself has no forbidden surface", () => {
     expect(HELPER_SRC).not.toMatch(FORBIDDEN);
     expect(HELPER_SRC).not.toMatch(/supabase|fetch\(|service_role/);
@@ -90,9 +86,7 @@ describe("Dashboard environment stability chip — wiring", () => {
 
 describe("formatStabilityChipView copy", () => {
   it("renders 'Outside 24h: Xh' for stable/watch/unstable", () => {
-    expect(formatStabilityChipView(fixture({ status: "stable" })).copy).toBe(
-      "Outside 24h: 0h",
-    );
+    expect(formatStabilityChipView(fixture({ status: "stable" })).copy).toBe("Outside 24h: 0h");
     expect(
       formatStabilityChipView(
         fixture({
@@ -137,28 +131,22 @@ describe("formatStabilityChipView copy", () => {
   });
 
   it("renders 'Set stage for VPD stability' when stage is missing", () => {
-    const v = formatStabilityChipView(
-      fixture({ status: "stage_unknown", stage: "unknown" }),
-    );
+    const v = formatStabilityChipView(fixture({ status: "stage_unknown", stage: "unknown" }));
     expect(v.copy).toBe("Set stage for VPD stability");
   });
 
   it("renders 'VPD context only' for harvest/drying", () => {
-    const v = formatStabilityChipView(
-      fixture({ status: "context_only", stage: "harvest" }),
-    );
+    const v = formatStabilityChipView(fixture({ status: "context_only", stage: "harvest" }));
     expect(v.copy).toBe("VPD context only");
   });
 
   it("uses destructive tone only for unstable", () => {
-    expect(
-      formatStabilityChipView(fixture({ status: "unstable" })).toneClass,
-    ).toMatch(/destructive/);
-    expect(
-      formatStabilityChipView(fixture({ status: "watch" })).toneClass,
-    ).toMatch(/warning/);
-    expect(
-      formatStabilityChipView(fixture({ status: "stable" })).toneClass,
-    ).not.toMatch(/destructive|warning/);
+    expect(formatStabilityChipView(fixture({ status: "unstable" })).toneClass).toMatch(
+      /destructive/,
+    );
+    expect(formatStabilityChipView(fixture({ status: "watch" })).toneClass).toMatch(/warning/);
+    expect(formatStabilityChipView(fixture({ status: "stable" })).toneClass).not.toMatch(
+      /destructive|warning/,
+    );
   });
 });

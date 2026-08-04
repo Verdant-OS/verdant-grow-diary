@@ -71,10 +71,7 @@ function ecLookingPayload() {
   };
 }
 
-function adapt(
-  payload: Record<string, unknown>,
-  opts: { stuckSoilCh?: number } = {},
-) {
+function adapt(payload: Record<string, unknown>, opts: { stuckSoilCh?: number } = {}) {
   const norm = normalizeEcowittCloudReadings(payload, MAPPING, {
     now: NOW,
     recentSoilMoisturePctByChannel: opts.stuckSoilCh
@@ -171,9 +168,7 @@ describe("ecowitt cloud → routed row parity", () => {
       expect(adapted.rows[i].tent_id).toBe(norm.rows[i].tent_id);
       expect(adapted.rows[i].captured_at).toBe(norm.rows[i].reading.captured_at);
       expect(adapted.rows[i].raw_payload.confidence).toBe(norm.rows[i].confidence);
-      expect(adapted.rows[i].raw_payload.suspicion_codes).toEqual(
-        norm.rows[i].suspicion_codes,
-      );
+      expect(adapted.rows[i].raw_payload.suspicion_codes).toEqual(norm.rows[i].suspicion_codes);
     }
   });
 

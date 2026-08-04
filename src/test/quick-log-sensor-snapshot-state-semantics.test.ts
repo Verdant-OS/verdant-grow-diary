@@ -9,9 +9,7 @@
  * Pure adapter/rule tests only. No I/O, no React, no Supabase.
  */
 import { describe, it, expect } from "vitest";
-import {
-  classifySnapshotTrustBadge,
-} from "@/lib/sensorSnapshotTrustBadgeRules";
+import { classifySnapshotTrustBadge } from "@/lib/sensorSnapshotTrustBadgeRules";
 import { buildQuickLogStripFromTentState } from "@/lib/quickLogSnapshotStripAdapter";
 import {
   EMPTY_SENSOR_SNAPSHOT,
@@ -179,7 +177,13 @@ describe("Quick Log sensor snapshot — state semantics", () => {
       snapshot: snap({
         status: "invalid",
         freshness: "invalid",
-        metrics: { temp_f: 9999, humidity_pct: 5, vpd_kpa: 20, soil_moisture_pct: null, co2_ppm: null },
+        metrics: {
+          temp_f: 9999,
+          humidity_pct: 5,
+          vpd_kpa: 20,
+          soil_moisture_pct: null,
+          co2_ppm: null,
+        },
       }),
       hasTent: true,
       now: NOW,

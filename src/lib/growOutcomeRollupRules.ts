@@ -15,10 +15,7 @@ import {
   OUTCOME_STATUSES,
   type OutcomeStatus,
 } from "@/lib/actionOutcomeRules";
-import {
-  OUTCOME_STATUS_LABEL,
-  UNKNOWN_OUTCOME_LABEL,
-} from "@/lib/relatedActionOutcomeRules";
+import { OUTCOME_STATUS_LABEL, UNKNOWN_OUTCOME_LABEL } from "@/lib/relatedActionOutcomeRules";
 
 // ---------------------------------------------------------------------------
 // Row shape

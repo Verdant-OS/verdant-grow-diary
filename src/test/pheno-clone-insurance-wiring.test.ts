@@ -13,14 +13,8 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-const HOOK = readFileSync(
-  path.resolve(__dirname, "../hooks/usePhenoHuntWorkspace.ts"),
-  "utf8",
-);
-const PAGE = readFileSync(
-  path.resolve(__dirname, "../pages/PhenoHuntWorkspace.tsx"),
-  "utf8",
-);
+const HOOK = readFileSync(path.resolve(__dirname, "../hooks/usePhenoHuntWorkspace.ts"), "utf8");
+const PAGE = readFileSync(path.resolve(__dirname, "../pages/PhenoHuntWorkspace.tsx"), "utf8");
 
 describe("hook — clonedPlantIds", () => {
   it("loads clones through the canonical keepers service", () => {

@@ -227,13 +227,7 @@ interface Entry {
 }
 
 type ActionEventType =
-  | "created"
-  | "simulated"
-  | "approved"
-  | "rejected"
-  | "completed"
-  | "cancelled"
-  | "note";
+  "created" | "simulated" | "approved" | "rejected" | "completed" | "cancelled" | "note";
 
 interface ActionQueueEvent {
   id: string;

@@ -3,10 +3,7 @@
 // Do not add persistence, Supabase writes, network calls, alerts, Action Queue writes, AI calls, automation, or device control here.
 
 export type EcoWittRealIngestAuthStatus =
-  | "authorized"
-  | "unauthorized"
-  | "forbidden"
-  | "not_configured";
+  "authorized" | "unauthorized" | "forbidden" | "not_configured";
 
 export interface EcoWittRealIngestAuthResult {
   status: EcoWittRealIngestAuthStatus;
@@ -41,8 +38,7 @@ export function validateEcoWittBridgeAuthorization(
   headerValue: string | null | undefined,
   expectedToken: string | null | undefined,
 ): EcoWittRealIngestAuthResult {
-  const hasExpected =
-    typeof expectedToken === "string" && expectedToken.length > 0;
+  const hasExpected = typeof expectedToken === "string" && expectedToken.length > 0;
 
   if (headerValue == null || typeof headerValue !== "string") {
     return result("unauthorized", "missing_authorization_header");

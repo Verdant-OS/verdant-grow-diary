@@ -17,8 +17,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const MIGRATION =
-  "supabase/migrations/20260720145000_genetics_traceability_quarantine.sql";
+const MIGRATION = "supabase/migrations/20260720145000_genetics_traceability_quarantine.sql";
 
 function read(p: string): string {
   return readFileSync(resolve(process.cwd(), p), "utf8");
@@ -47,7 +46,9 @@ describe("genetics quarantine migration safety", () => {
     expect(sql).toMatch(
       /status text NOT NULL[\s\S]*?CHECK \(status IN \('open', 'released', 'disposed'\)\)/,
     );
-    expect(sql).toMatch(/closure_kind[\s\S]*?CHECK \(closure_kind IN \('cleared', 'disposed', 'override'\)\)/);
+    expect(sql).toMatch(
+      /closure_kind[\s\S]*?CHECK \(closure_kind IN \('cleared', 'disposed', 'override'\)\)/,
+    );
   });
 
   it("transition events constrain action, override flag, and reason substance", () => {

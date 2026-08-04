@@ -46,8 +46,7 @@ vi.mock("@/integrations/supabase/client", () => {
   };
   return {
     supabase: {
-      from: (table: string) =>
-        table === "sensor_readings" ? makeReadings() : makeTents(),
+      from: (table: string) => (table === "sensor_readings" ? makeReadings() : makeTents()),
     },
   };
 });
@@ -102,7 +101,17 @@ describe("redactRawPayload helper", () => {
   });
 
   it("flags expected sensitive key substrings", () => {
-    for (const k of ["passkey", "PASSKEY", "password", "token", "secret", "mac", "stationid", "bridge_token", "api_key"]) {
+    for (const k of [
+      "passkey",
+      "PASSKEY",
+      "password",
+      "token",
+      "secret",
+      "mac",
+      "stationid",
+      "bridge_token",
+      "api_key",
+    ]) {
       expect(isSensitivePayloadKey(k)).toBe(true);
     }
     expect(isSensitivePayloadKey("temp_c")).toBe(false);
@@ -175,9 +184,7 @@ describe("EcowittIngestAudit page", () => {
         <EcowittIngestAudit />
       </Wrap>,
     );
-    await waitFor(() =>
-      expect(screen.getByTestId("ecowitt-audit-empty")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByTestId("ecowitt-audit-empty")).toBeTruthy());
   });
 
   it("renders rows with redacted payload + warnings for selected tent", async () => {
@@ -199,18 +206,16 @@ describe("EcowittIngestAudit page", () => {
         <EcowittIngestAudit />
       </Wrap>,
     );
-    await waitFor(() =>
-      expect(screen.getByTestId("ecowitt-audit-row-row-1")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByTestId("ecowitt-audit-row-row-1")).toBeTruthy());
     const payload = screen.getByTestId("ecowitt-audit-row-payload-row-1").textContent ?? "";
     expect(payload).not.toContain("AAAA-leaked-passkey");
     expect(payload).not.toContain("AA:BB:CC:DD:EE:FF");
     expect(payload).not.toContain("ST-12345");
     expect(payload).not.toContain("vbt_xxx");
     expect(payload).toContain("[redacted]");
-    expect(
-      screen.getByTestId("ecowitt-audit-row-warnings-row-1").textContent ?? "",
-    ).toContain("clamped:humidity_pct");
+    expect(screen.getByTestId("ecowitt-audit-row-warnings-row-1").textContent ?? "").toContain(
+      "clamped:humidity_pct",
+    );
   });
 
   it("renders error state when query fails", async () => {
@@ -221,24 +226,19 @@ describe("EcowittIngestAudit page", () => {
         <EcowittIngestAudit />
       </Wrap>,
     );
-    await waitFor(() =>
-      expect(screen.getByTestId("ecowitt-audit-error")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByTestId("ecowitt-audit-error")).toBeTruthy());
   });
 
   it("page source is read-only: no send/delete/control verbs or service_role", () => {
-    const src = readFileSync(
-      resolve(process.cwd(), "src/pages/EcowittIngestAudit.tsx"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(process.cwd(), "src/pages/EcowittIngestAudit.tsx"), "utf8");
     expect(src).not.toMatch(/\.delete\(/);
     expect(src).not.toMatch(/\.insert\(/);
     expect(src).not.toMatch(/\.update\(/);
     expect(src).not.toMatch(/\.upsert\(/);
     expect(src).not.toMatch(/service_role/);
     expect(src).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
-    const __forbid = ["switch","bot"].join("");
-      expect(src.toLowerCase()).not.toContain(__forbid);
+    const __forbid = ["switch", "bot"].join("");
+    expect(src.toLowerCase()).not.toContain(__forbid);
     expect(src).not.toMatch(/turn[_ ]?on|turn[_ ]?off/i);
     expect(src).not.toMatch(/from\(\s*['"]alerts['"]/);
     expect(src).not.toMatch(/from\(\s*['"]action_queue['"]/);

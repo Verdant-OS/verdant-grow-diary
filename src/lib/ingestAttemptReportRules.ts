@@ -16,11 +16,7 @@ import { redactBridgeToken } from "@/lib/ecowittLocalTestPayloadRules";
 import type { EcowittIngestEvidence } from "@/lib/ecowittMqttIngestRules";
 
 export type IngestAttemptStatus =
-  | "accepted"
-  | "rejected"
-  | "dry_run"
-  | "network_error"
-  | "unknown_response";
+  "accepted" | "rejected" | "dry_run" | "network_error" | "unknown_response";
 
 export type IngestAttemptClassification =
   | "accepted"

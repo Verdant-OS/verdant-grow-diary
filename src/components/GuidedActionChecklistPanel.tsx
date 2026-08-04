@@ -35,10 +35,7 @@ import {
   type GuidedActionItemKind,
   type GuidedChecklistSensorReading,
 } from "@/lib/guidedActionChecklistRules";
-import {
-  dismissItem,
-  readActiveDismissals,
-} from "@/lib/guidedActionChecklistDismissals";
+import { dismissItem, readActiveDismissals } from "@/lib/guidedActionChecklistDismissals";
 
 interface Props {
   scopedGrowId: string | null;
@@ -72,10 +69,7 @@ function priorityTone(priority: GuidedActionItem["priority"]): string {
   }
 }
 
-export default function GuidedActionChecklistPanel({
-  scopedGrowId,
-  className,
-}: Props) {
+export default function GuidedActionChecklistPanel({ scopedGrowId, className }: Props) {
   const plantsQuery = useGrowPlants(undefined, scopedGrowId ?? undefined);
   const tentsQuery = useGrowTents(scopedGrowId ?? undefined);
   const diaryQuery = useDiaryEntries();
@@ -115,10 +109,7 @@ export default function GuidedActionChecklistPanel({
 
     // Latest reading per tent (readings are ordered newest-first upstream;
     // we defend with an explicit compare in case that ever changes).
-    const latestReadingByTent: Record<
-      string,
-      GuidedChecklistSensorReading | null
-    > = {};
+    const latestReadingByTent: Record<string, GuidedChecklistSensorReading | null> = {};
     for (const t of tents) latestReadingByTent[t.id] = null;
     for (const r of rawReadings as ReadonlyArray<{
       tent_id?: string | null;
@@ -131,9 +122,7 @@ export default function GuidedActionChecklistPanel({
       if (!tentId || !(tentId in latestReadingByTent)) continue;
       const capturedAt = r.captured_at ?? r.created_at ?? null;
       const current = latestReadingByTent[tentId];
-      const currentT = current?.capturedAt
-        ? Date.parse(current.capturedAt)
-        : -Infinity;
+      const currentT = current?.capturedAt ? Date.parse(current.capturedAt) : -Infinity;
       const nextT = capturedAt ? Date.parse(capturedAt) : -Infinity;
       if (nextT > currentT) {
         latestReadingByTent[tentId] = {
@@ -187,10 +176,7 @@ export default function GuidedActionChecklistPanel({
   if (!scopedGrowId) return null;
 
   return (
-    <Card
-      className={cn("p-4 sm:p-5", className)}
-      data-testid="guided-action-checklist-panel"
-    >
+    <Card className={cn("p-4 sm:p-5", className)} data-testid="guided-action-checklist-panel">
       <header className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <ListChecks className="h-4 w-4 text-primary" aria-hidden="true" />
@@ -213,23 +199,17 @@ export default function GuidedActionChecklistPanel({
           className="flex items-start gap-2 rounded-md border border-border bg-muted/30 px-3 py-3 text-sm text-muted-foreground"
           data-testid="guided-action-checklist-empty"
         >
-          <CheckCircle2
-            className="mt-0.5 h-4 w-4 shrink-0 text-primary"
-            aria-hidden="true"
-          />
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
           <div>
             <p className="font-medium text-foreground">You're up to date.</p>
             <p className="mt-0.5 text-xs">
-              No overdue logs, stale sensor context, or open alerts. Verdant
-              will surface the next thing when it appears.
+              No overdue logs, stale sensor context, or open alerts. Verdant will surface the next
+              thing when it appears.
             </p>
           </div>
         </div>
       ) : (
-        <ul
-          className="space-y-2"
-          data-testid="guided-action-checklist-items"
-        >
+        <ul className="space-y-2" data-testid="guided-action-checklist-items">
           {items.map((item) => {
             const Icon = KIND_ICON[item.kind];
             return (
@@ -247,9 +227,7 @@ export default function GuidedActionChecklistPanel({
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="truncate text-sm font-medium text-foreground">
-                      {item.title}
-                    </p>
+                    <p className="truncate text-sm font-medium text-foreground">{item.title}</p>
                     <Badge
                       variant="outline"
                       className="h-4 px-1.5 text-[10px] uppercase tracking-wide"
@@ -257,25 +235,15 @@ export default function GuidedActionChecklistPanel({
                       {KIND_LABEL[item.kind]}
                     </Badge>
                   </div>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {item.reason}
-                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{item.reason}</p>
                   <div className="mt-2 flex items-center gap-2">
-                    <Button
-                      asChild
-                      size="sm"
-                      variant="secondary"
-                      className="h-7 px-2 text-xs"
-                    >
+                    <Button asChild size="sm" variant="secondary" className="h-7 px-2 text-xs">
                       <Link
                         to={item.ctaHref}
                         data-testid={`guided-action-checklist-cta-${item.id}`}
                       >
                         {item.ctaLabel}
-                        <ArrowRight
-                          className="ml-1 h-3 w-3"
-                          aria-hidden="true"
-                        />
+                        <ArrowRight className="ml-1 h-3 w-3" aria-hidden="true" />
                       </Link>
                     </Button>
                     <button

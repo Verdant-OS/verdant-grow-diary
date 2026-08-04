@@ -13,14 +13,7 @@ import fixtures from "../../fixtures/ecowitt-cloud-canary-payloads.json";
 
 const pageSrc = readFileSync(resolve(process.cwd(), "src/pages/OperatorEcowittCanary.tsx"), "utf8");
 
-const BANNED_UI_WORDS = [
-  "confirmed",
-  "certain",
-  "synced",
-  "connected",
-  "imported",
-  "guaranteed",
-];
+const BANNED_UI_WORDS = ["confirmed", "certain", "synced", "connected", "imported", "guaranteed"];
 
 const SECRET_LIKE_VALUES = [
   fixtures.payloads.happy_multi_channel.PASSKEY as string,
@@ -55,7 +48,16 @@ describe("CloudCanaryPreviewPanel — UI wiring", () => {
   });
 
   it("displays summary metric cells with data-metric attributes", () => {
-    for (const m of ["fixtures", "normalized", "unmapped", "invalid", "stale", "missing-metric", "ec-absence", "suspicious-flags"]) {
+    for (const m of [
+      "fixtures",
+      "normalized",
+      "unmapped",
+      "invalid",
+      "stale",
+      "missing-metric",
+      "ec-absence",
+      "suspicious-flags",
+    ]) {
       expect(pageSrc).toContain(`data-metric="${m}"`);
     }
   });
@@ -72,7 +74,7 @@ describe("CloudCanaryPreviewPanel — UI wiring", () => {
 
   it("imports runEcowittCloudCanary and cloudCanaryFixtures", () => {
     expect(pageSrc).toContain('from "@/lib/ecowittCloudCanaryVerdict"');
-    expect(pageSrc).toContain('import cloudCanaryFixtures');
+    expect(pageSrc).toContain("import cloudCanaryFixtures");
     expect(pageSrc).toContain("runEcowittCloudCanary");
   });
 
@@ -127,7 +129,7 @@ describe("CloudCanaryPreviewPanel — redaction + safety", () => {
 
   it("fixture-only label text is visible in component source", () => {
     expect(pageSrc).toContain("Fixture-only:");
-    expect(pageSrc).toContain("No real EcoWitt device is");
+    expect(pageSrc).toMatch(/No\s+real EcoWitt device is/);
   });
 
   it("no raw MAC, PASSKEY, or tent_id appears in component source", () => {

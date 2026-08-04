@@ -19,9 +19,7 @@ vi.mock("@/integrations/supabase/client", () => ({
     {},
     {
       get() {
-        throw new Error(
-          "PhenoComparison must not touch supabase (read-only preview).",
-        );
+        throw new Error("PhenoComparison must not touch supabase (read-only preview).");
       },
     },
   ),
@@ -45,8 +43,7 @@ function installNetworkTraps(): { calls: Call[]; restore: () => void } {
       throw new Error("XHR forbidden on /pheno-comparison");
     }
   }
-  (globalThis as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest =
-    TrapXHR;
+  (globalThis as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest = TrapXHR;
 
   const OriginalWS = globalThis.WebSocket;
   class TrapWS {
@@ -57,9 +54,7 @@ function installNetworkTraps(): { calls: Call[]; restore: () => void } {
   }
   (globalThis as unknown as { WebSocket: unknown }).WebSocket = TrapWS;
 
-
-  const OriginalES = (globalThis as unknown as { EventSource?: unknown })
-    .EventSource;
+  const OriginalES = (globalThis as unknown as { EventSource?: unknown }).EventSource;
   class TrapES {
     constructor(url: string | URL) {
       calls.push({ api: "eventsource", arg: String(url) });
@@ -70,30 +65,29 @@ function installNetworkTraps(): { calls: Call[]; restore: () => void } {
 
   const originalBeacon = navigator.sendBeacon?.bind(navigator);
   if (typeof navigator.sendBeacon === "function") {
-    (navigator as unknown as { sendBeacon: (u: string | URL) => boolean })
-      .sendBeacon = (url: string | URL) => {
+    (navigator as unknown as { sendBeacon: (u: string | URL) => boolean }).sendBeacon = (
+      url: string | URL,
+    ) => {
       calls.push({ api: "beacon", arg: String(url) });
       throw new Error("sendBeacon forbidden on /pheno-comparison");
     };
   }
 
-
   return {
     calls,
     restore() {
       globalThis.fetch = originalFetch;
-      (globalThis as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest =
-        OriginalXHR;
+      (globalThis as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest = OriginalXHR;
       (globalThis as unknown as { WebSocket: unknown }).WebSocket = OriginalWS;
-      (globalThis as unknown as { EventSource: unknown }).EventSource =
-        OriginalES;
+      (globalThis as unknown as { EventSource: unknown }).EventSource = OriginalES;
       if (originalBeacon) {
-        (navigator as unknown as {
-          sendBeacon: (u: string | URL) => boolean;
-        }).sendBeacon = originalBeacon;
+        (
+          navigator as unknown as {
+            sendBeacon: (u: string | URL) => boolean;
+          }
+        ).sendBeacon = originalBeacon;
       }
     },
-
   };
 }
 

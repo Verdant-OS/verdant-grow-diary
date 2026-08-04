@@ -1,12 +1,7 @@
 /// <reference types="vite/client" />
-import { Suspense } from "react";
-import {
-  HeadContent,
-  Outlet,
-  Scripts,
-  createRootRouteWithContext,
-} from "@tanstack/react-router";
-import type { QueryClient } from "@tanstack/react-query";
+import { Suspense, useEffect } from "react";
+import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from "@tanstack/react-router";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,6 +12,9 @@ import OAuthPostAuthRedirect from "@/components/OAuthPostAuthRedirect";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 import { useGoogleAnalyticsPageViews } from "@/hooks/useGoogleAnalyticsPageViews";
+import { useAnalyticsConsent } from "@/hooks/useAnalyticsConsent";
+import { loadGoogleAnalytics } from "@/lib/googleAnalyticsLoader";
+import { AnalyticsConsentBanner } from "@/components/AnalyticsConsentBanner";
 import { clearGrowDataMeta } from "@/hooks/useGrowData";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
 import { renderErrorPage } from "@/lib/error-page";
@@ -28,7 +26,6 @@ const SITE_NAME = "Verdant Grow Diary";
 const SITE_DESCRIPTION =
   "Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators.";
 const SITE_IMAGE = `${SITE_URL}/brand/verdant-logo-512.png`;
-const GA_MEASUREMENT_ID = "G-B3QRSZEM9S";
 const FONT_HREF =
   "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap";
 
@@ -96,13 +93,10 @@ export const Route = createRootRouteWithContext<RootRouteContext>()({
       { rel: "stylesheet", href: FONT_HREF },
     ],
     scripts: [
-      { src: `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`, async: true },
-      {
-        // React sends an explicit pathname-only page_location. GA's automatic
-        // initial view stays disabled so query tokens and hashes never become
-        // the browser-location fallback before the router mounts.
-        children: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());gtag("config","${GA_MEASUREMENT_ID}",{send_page_view:false});`,
-      },
+      // No gtag.js tag here on purpose. Analytics is consent-gated: the tag is
+      // injected by src/lib/googleAnalyticsLoader.ts only after the grower
+      // explicitly accepts in AnalyticsConsentBanner, still with
+      // send_page_view:false so the router owns every page_view.
       { type: "application/ld+json", children: JSON.stringify(SITE_JSON_LD) },
       {
         type: "application/ld+json",
@@ -142,8 +136,14 @@ function useClearQueryCacheBeforeAuthIdentityChange() {
 }
 
 function AnalyticsShell() {
+  const { decision } = useAnalyticsConsent();
+
+  useEffect(() => {
+    if (decision === "granted") loadGoogleAnalytics();
+  }, [decision]);
+
   useGoogleAnalyticsPageViews();
-  return null;
+  return <AnalyticsConsentBanner />;
 }
 
 /** Minimal, dependency-free fallback shown while a route chunk loads. */
@@ -179,25 +179,28 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  const { queryClient } = Route.useRouteContext();
   const onBeforeAuthIdentityChange = useClearQueryCacheBeforeAuthIdentityChange();
   return (
     <RootDocument>
       <RootErrorBoundary>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <AuthProvider onBeforeAuthIdentityChange={onBeforeAuthIdentityChange}>
-            <OAuthPostAuthRedirect />
-            <GrowsProvider>
-              <PaymentTestModeBanner />
-              <AgreementReconsentGate />
-              <AnalyticsShell />
-              <Suspense fallback={<PageLoader />}>
-                <Outlet />
-              </Suspense>
-            </GrowsProvider>
-          </AuthProvider>
-        </TooltipProvider>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <AuthProvider onBeforeAuthIdentityChange={onBeforeAuthIdentityChange}>
+              <OAuthPostAuthRedirect />
+              <GrowsProvider>
+                <PaymentTestModeBanner />
+                <AgreementReconsentGate />
+                <Suspense fallback={<PageLoader />}>
+                  <Outlet />
+                  <AnalyticsShell />
+                </Suspense>
+              </GrowsProvider>
+            </AuthProvider>
+          </TooltipProvider>
+        </QueryClientProvider>
       </RootErrorBoundary>
     </RootDocument>
   );

@@ -25,10 +25,7 @@ interface Props {
   showEmptyState?: boolean;
 }
 
-export default function ReportsReviewQueueSection({
-  items,
-  showEmptyState = false,
-}: Props) {
+export default function ReportsReviewQueueSection({ items, showEmptyState = false }: Props) {
   const hasItems = items && items.length > 0;
   if (!hasItems && !showEmptyState) return null;
   return (
@@ -41,9 +38,7 @@ export default function ReportsReviewQueueSection({
         <ClipboardCheck className="h-4 w-4 text-primary" />
         <div>
           <h2 className="text-sm font-semibold">{REPORTS_REVIEW_QUEUE_TITLE}</h2>
-          <p className="text-xs text-muted-foreground">
-            {REPORTS_REVIEW_QUEUE_SUBTITLE}
-          </p>
+          <p className="text-xs text-muted-foreground">{REPORTS_REVIEW_QUEUE_SUBTITLE}</p>
         </div>
       </header>
       {hasItems ? (
@@ -84,10 +79,7 @@ export default function ReportsReviewQueueSection({
           ))}
         </ul>
       ) : (
-        <p
-          className="text-xs text-muted-foreground"
-          data-testid="reports-review-empty"
-        >
+        <p className="text-xs text-muted-foreground" data-testid="reports-review-empty">
           {REPORTS_REVIEW_QUEUE_EMPTY_COPY}
         </p>
       )}

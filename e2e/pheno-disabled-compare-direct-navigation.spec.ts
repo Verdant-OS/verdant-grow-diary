@@ -91,30 +91,17 @@ for (const s of SCENARIOS) {
 
       // The shared comparison view is rendered in defense-in-depth mode:
       // no verdict/ranking/keeper conclusions may be exposed.
-      const view = page.locator('[data-allow-conclusions]');
+      const view = page.locator("[data-allow-conclusions]");
       if ((await view.count()) > 0) {
-        await expect(view.first()).toHaveAttribute(
-          "data-allow-conclusions",
-          "false",
-        );
+        await expect(view.first()).toHaveAttribute("data-allow-conclusions", "false");
       }
 
       // No active "Compare candidates" CTA anywhere on the route.
-      expect(
-        await page
-          .getByRole("link", { name: /compare candidates/i })
-          .count(),
-      ).toBe(0);
-      expect(
-        await page
-          .getByRole("button", { name: /compare candidates/i })
-          .count(),
-      ).toBe(0);
+      expect(await page.getByRole("link", { name: /compare candidates/i }).count()).toBe(0);
+      expect(await page.getByRole("button", { name: /compare candidates/i }).count()).toBe(0);
 
       // Back-to-workspace link exists and points at the workspace.
-      const backLink = page.getByTestId(
-        "pheno-hunt-compare-readiness-warning-workspace-link",
-      );
+      const backLink = page.getByTestId("pheno-hunt-compare-readiness-warning-workspace-link");
       await expect(backLink).toBeVisible();
       await expect(backLink).toHaveAttribute(
         "href",
@@ -122,10 +109,7 @@ for (const s of SCENARIOS) {
       );
 
       // DOM-wide forbidden-copy scan (visible + hidden panels).
-      await assertNoForbiddenComparisonCopy(
-        page,
-        `${s.label} direct /compare DOM`,
-      );
+      await assertNoForbiddenComparisonCopy(page, `${s.label} direct /compare DOM`);
 
       // 3. Navigate back to workspace — Compare still disabled with the
       //    same reason (navigation cannot flip readiness).
@@ -134,10 +118,7 @@ for (const s of SCENARIOS) {
       expect(after.helperText).toBe(before.helperText);
 
       // 4. Network assertions — nothing comparison-execution-y fired.
-      assertNoDisabledCompareNetworkSideEffects(
-        requests,
-        `${s.label} direct-nav flow`,
-      );
+      assertNoDisabledCompareNetworkSideEffects(requests, `${s.label} direct-nav flow`);
     });
   });
 }

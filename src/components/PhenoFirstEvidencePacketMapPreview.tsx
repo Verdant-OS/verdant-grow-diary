@@ -35,14 +35,13 @@ export default function PhenoFirstEvidencePacketMapPreview({
   }
 
   return (
-    <div
-      data-testid={testId}
-      className="overflow-x-auto rounded-md border"
-    >
+    <div data-testid={testId} className="overflow-x-auto rounded-md border">
       <table className="w-full text-sm">
         <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
-            <th scope="col" className="p-2 text-left font-medium">Candidate</th>
+            <th scope="col" className="p-2 text-left font-medium">
+              Candidate
+            </th>
             {selectedGoals.map((g) => (
               <th
                 key={g.id}

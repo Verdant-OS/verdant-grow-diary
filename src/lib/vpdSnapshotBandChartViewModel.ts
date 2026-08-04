@@ -12,10 +12,7 @@
  *     table or the per-stage band table.
  */
 
-import {
-  evaluateVpdAgainstStageTarget,
-  type VpdTargetClassification,
-} from "@/lib/vpdTargetRules";
+import { evaluateVpdAgainstStageTarget, type VpdTargetClassification } from "@/lib/vpdTargetRules";
 import {
   normalizeToCanonicalVpdTargetStage,
   type CanonicalVpdTargetStage,
@@ -33,11 +30,7 @@ export interface VpdSnapshotBandChartInput {
 }
 
 export type VpdSnapshotBandChartStatus =
-  | "low"
-  | "in_band"
-  | "high"
-  | "stage_unknown"
-  | "unavailable";
+  "low" | "in_band" | "high" | "stage_unknown" | "unavailable";
 
 export interface VpdSnapshotBandChartViewModel {
   /** Always "Derived VPD". Never "Live VPD". */
@@ -91,8 +84,7 @@ const VPD_BAND_CHART_GUIDANCE: Record<VpdSnapshotBandChartStatus, string> = {
   low: "Review humidity, temperature, and airflow before making changes.",
   in_band: "VPD is within the target band for this stage.",
   high: "Review temperature, humidity, airflow, and stage targets before making changes.",
-  stage_unknown:
-    "Stage target unavailable. Confirm plant stage before interpreting VPD.",
+  stage_unknown: "Stage target unavailable. Confirm plant stage before interpreting VPD.",
   unavailable: "VPD unavailable. Temp and humidity are needed.",
 };
 
@@ -123,14 +115,10 @@ export function buildVpdSnapshotBandChartViewModel(
 
   const status = evaluation.classification as VpdSnapshotBandChartStatus;
   const canonicalStage = normalized.known ? normalized.canonical : null;
-  const canonicalStageLabel = canonicalStage
-    ? CANONICAL_LABELS[canonicalStage]
-    : null;
+  const canonicalStageLabel = canonicalStage ? CANONICAL_LABELS[canonicalStage] : null;
 
   const currentVpdKpa =
-    typeof input.vpdKpa === "number" && Number.isFinite(input.vpdKpa)
-      ? input.vpdKpa
-      : null;
+    typeof input.vpdKpa === "number" && Number.isFinite(input.vpdKpa) ? input.vpdKpa : null;
 
   const targetMinKpa = evaluation.target?.minKpa ?? null;
   const targetMaxKpa = evaluation.target?.maxKpa ?? null;
@@ -142,8 +130,7 @@ export function buildVpdSnapshotBandChartViewModel(
   const renderable =
     status !== "stage_unknown" && status !== "unavailable" && currentVpdKpa !== null;
 
-  const markerPercent =
-    currentVpdKpa !== null ? kpaToPercent(currentVpdKpa) : null;
+  const markerPercent = currentVpdKpa !== null ? kpaToPercent(currentVpdKpa) : null;
   const bandStartPercent = targetMinKpa !== null ? kpaToPercent(targetMinKpa) : null;
   const bandEndPercent = targetMaxKpa !== null ? kpaToPercent(targetMaxKpa) : null;
 

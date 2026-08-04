@@ -16,9 +16,7 @@ export interface DualTempLabel {
 const TEMP_C_PLAUSIBLE_MIN = -10;
 const TEMP_C_PLAUSIBLE_MAX = 60;
 
-export function formatTempDualF(
-  celsius: number | null | undefined,
-): DualTempLabel {
+export function formatTempDualF(celsius: number | null | undefined): DualTempLabel {
   if (
     celsius === null ||
     celsius === undefined ||

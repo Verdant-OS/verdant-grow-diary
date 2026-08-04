@@ -12,7 +12,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, within, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import AiDoctorSessionDetail from "@/pages/AiDoctorSessionDetail";
@@ -181,7 +181,10 @@ describe("AiDoctorSessionDetail — loading skeletons", () => {
     expect(loading.getAttribute("aria-live")).toBe("polite");
     expect(loading.getAttribute("aria-busy")).toBe("true");
     expect(loading.textContent).toMatch(/loading ai doctor session/i);
-    expect(screen.getByTestId("ai-doctor-session-detail-loading-skeleton")).toBeTruthy();
+    // Skeleton is nested under the loading region; wait so it is not raced away.
+    await waitFor(() => {
+      expect(within(loading).getByTestId("ai-doctor-session-detail-loading-skeleton")).toBeTruthy();
+    });
   });
 
   it("does not render summary, linked actions, not-found or error copy while loading", () => {

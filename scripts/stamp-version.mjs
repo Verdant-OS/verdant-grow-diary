@@ -40,8 +40,14 @@ const pkgVersion = String(pkg.version ?? "0.0.0");
 
 const sha = process.env.GITHUB_SHA ?? safe(() => execSync("git rev-parse HEAD").toString().trim());
 const shortSha = sha === "unknown" ? "unknown" : sha.slice(0, 12);
-const ref = process.env.GITHUB_REF_NAME ?? safe(() => execSync("git rev-parse --abbrev-ref HEAD").toString().trim());
-const commitTime = safe(() => execSync(`git show -s --format=%cI ${sha === "unknown" ? "HEAD" : sha}`).toString().trim());
+const ref =
+  process.env.GITHUB_REF_NAME ??
+  safe(() => execSync("git rev-parse --abbrev-ref HEAD").toString().trim());
+const commitTime = safe(() =>
+  execSync(`git show -s --format=%cI ${sha === "unknown" ? "HEAD" : sha}`)
+    .toString()
+    .trim(),
+);
 
 // Dirty flag: unstaged/uncommitted changes at build time. Never
 // suppress — a dirty CI build is always a bug worth surfacing.

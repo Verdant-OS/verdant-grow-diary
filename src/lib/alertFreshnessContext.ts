@@ -29,11 +29,7 @@ export const STALE_THRESHOLD_MINUTES = Math.round(STALE_THRESHOLD_MS / 60_000);
 /** Short human label for the alert persistence window. */
 export const FRESHNESS_WINDOW_LABEL = `${STALE_THRESHOLD_MINUTES}-minute alert window`;
 
-export type LatestSnapshotFreshness =
-  | "fresh"
-  | "stale"
-  | "missing"
-  | "unavailable";
+export type LatestSnapshotFreshness = "fresh" | "stale" | "missing" | "unavailable";
 
 export interface ClassifyLatestSnapshotArgs {
   /** From useLatestSensorSnapshot — `"ok"` means data loaded successfully. */
@@ -73,9 +69,7 @@ export function classifyLatestSnapshotFreshness(
  * inside the persistable window. This is what we surface as "a recent
  * manual snapshot exists inside the N-minute alert window".
  */
-export function hasRecentManualSnapshot(
-  args: ClassifyLatestSnapshotArgs,
-): boolean {
+export function hasRecentManualSnapshot(args: ClassifyLatestSnapshotArgs): boolean {
   if (args.status !== "ok") return false;
   const snap = args.snapshot;
   if (!snap || snap.source !== "manual" || !snap.ts) return false;
@@ -88,9 +82,7 @@ export function hasRecentManualSnapshot(
  * snapshot can persist alerts only when status is loaded, source is
  * `live` or `manual`, and timestamp is inside the freshness window.
  */
-export function snapshotAlertsCanPersist(
-  args: ClassifyLatestSnapshotArgs,
-): boolean {
+export function snapshotAlertsCanPersist(args: ClassifyLatestSnapshotArgs): boolean {
   if (args.status !== "ok") return false;
   const snap = args.snapshot;
   if (!snap || !snap.ts) return false;
@@ -104,16 +96,13 @@ export function snapshotAlertsCanPersist(
  * `alertsCanPersist` and the snapshot source. Never implies persistence
  * for csv / diary / sim / unavailable / stale snapshots.
  */
-export function describeLatestSnapshotForAlerts(
-  args: ClassifyLatestSnapshotArgs,
-): string {
+export function describeLatestSnapshotForAlerts(args: ClassifyLatestSnapshotArgs): string {
   if (args.status !== "ok") return "Snapshot status unavailable.";
   const snap = args.snapshot;
   if (!snap || snap.source === "unavailable" || !snap.ts) {
     return "No snapshot available. Enter a manual snapshot to check alerts.";
   }
-  const persistableSource =
-    snap.source === "live" || snap.source === "manual";
+  const persistableSource = snap.source === "live" || snap.source === "manual";
   if (!persistableSource) {
     return "Latest snapshot is for context only. Alerts persist only from fresh manual or live readings.";
   }
@@ -280,10 +269,7 @@ const SOURCE_LABELS: Record<SnapshotSource, string> = {
 
 /** Deterministic relative-time helper. Pure: no Intl.RelativeTimeFormat
  * locale variance. Returns null for null/invalid timestamps. */
-export function formatCapturedAgo(
-  capturedAtMs: number | null,
-  now: number,
-): string | null {
+export function formatCapturedAgo(capturedAtMs: number | null, now: number): string | null {
   if (capturedAtMs === null || !Number.isFinite(capturedAtMs)) return null;
   const diffMs = now - capturedAtMs;
   const future = diffMs < 0;
@@ -352,12 +338,7 @@ export interface PickAlertsGrowContextArgs {
   growIdsWithOpenAlerts?: ReadonlyArray<string>;
 }
 
-export type AlertsGrowContextReason =
-  | "scoped"
-  | "active"
-  | "open-alerts"
-  | "most-recent"
-  | "first";
+export type AlertsGrowContextReason = "scoped" | "active" | "open-alerts" | "most-recent" | "first";
 
 export interface AlertsGrowContextSelection {
   growId: string;
@@ -384,7 +365,7 @@ export function pickAlertsGrowContext(
   if (grows.length === 0) return null;
 
   const findById = (id: string | null | undefined) =>
-    id ? grows.find((g) => g.id === id) ?? null : null;
+    id ? (grows.find((g) => g.id === id) ?? null) : null;
 
   const scoped = findById(args.scopedGrowId);
   if (scoped) return toSelection(scoped, "scoped", false);
@@ -454,9 +435,7 @@ export interface SourceChipViewModel {
   canPersist: boolean;
 }
 
-export function buildSourceChip(
-  args: ClassifyLatestSnapshotArgs,
-): SourceChipViewModel {
+export function buildSourceChip(args: ClassifyLatestSnapshotArgs): SourceChipViewModel {
   if (args.status !== "ok") {
     return { label: "Unknown", tone: "caution", qualifier: null, canPersist: false };
   }
@@ -518,8 +497,7 @@ export function emptyStateSnapshotCta(
   const snap = args.snapshot;
   if (!snap || snap.source === "unavailable" || !snap.ts) {
     return {
-      message:
-        "No snapshot available. Enter a fresh manual snapshot to check alerts.",
+      message: "No snapshot available. Enter a fresh manual snapshot to check alerts.",
       showAddManualSnapshot: true,
       kind: "missing",
     };
@@ -564,9 +542,7 @@ export interface DuplicateReassuranceArgs {
  * safe inference. Never claims a duplicate was prevented unless an open
  * alert is known to exist.
  */
-export function duplicateReassuranceCopy(
-  args: DuplicateReassuranceArgs,
-): string | null {
+export function duplicateReassuranceCopy(args: DuplicateReassuranceArgs): string | null {
   if (!args.canPersist) return null;
   if (args.hasMatchingOpenAlert) {
     return "Alert already exists for this latest snapshot. No duplicate was created.";

@@ -16,6 +16,10 @@ import {
 } from "@/lib/startYourRoomRules";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 
@@ -96,11 +100,11 @@ describe("startYourRoomRules", () => {
 
 describe("StartYourRoom page safety surface", () => {
   const PAGE = readFileSync(resolve(ROOT, "src/pages/StartYourRoom.tsx"), "utf8");
-  const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+  const APP = readAllRouteModuleSources();
   const ONBOARD = readFileSync(resolve(ROOT, "src/pages/Onboarding.tsx"), "utf8");
 
   it("is mounted at /start-room", () => {
-    expect(APP).toMatch(/path="\/start-room"/);
+    expect(extractMountedAppRoutePaths()).toContain("/start-room");
     expect(APP).toMatch(/StartYourRoom/);
   });
 

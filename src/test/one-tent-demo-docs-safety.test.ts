@@ -30,10 +30,7 @@ export const END_MARKER = "DEMO-SCRIPT-DO-NOT-SAY:END";
 
 export interface DemoDocsSafetyFailure {
   kind:
-    | "banned-outside-fence"
-    | "missing-end-marker"
-    | "missing-begin-marker"
-    | "unbalanced-markers";
+    "banned-outside-fence" | "missing-end-marker" | "missing-begin-marker" | "unbalanced-markers";
   phrase?: string;
   line?: number;
   detail: string;

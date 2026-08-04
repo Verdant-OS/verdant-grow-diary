@@ -11,10 +11,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
 import CoachContextSufficiencyPanel from "@/components/CoachContextSufficiencyPanel";
-import {
-  evaluateAiContextSufficiency,
-  type AiContextInput,
-} from "@/lib/aiContextSufficiencyRules";
+import { evaluateAiContextSufficiency, type AiContextInput } from "@/lib/aiContextSufficiencyRules";
 
 const ROOT = resolve(__dirname, "../..");
 const COACH = readFileSync(resolve(ROOT, "src/pages/Coach.tsx"), "utf8");
@@ -31,9 +28,7 @@ const baseReal = (over: Partial<AiContextInput> = {}): AiContextInput => ({
   plants: [{ id: "p1", stage: "veg", strain: "Blue Dream", medium: "soil" }],
   recentDiaryEntries: [{ at: recent, type: "note" }],
   recentWateringOrFeeding: [{ at: recent, type: "water" }],
-  recentSensorReadings: [
-    { at: recent, temp: 24, rh: 55, vpd: 1.0, ph: 6.2, ec: 1.4 },
-  ],
+  recentSensorReadings: [{ at: recent, temp: 24, rh: 55, vpd: 1.0, ph: 6.2, ec: 1.4 }],
   hasPhoto: true,
   sensorMeta: { dataSource: "supabase", isDemoData: false },
   contextMeta: { dataSource: "supabase", isDemoData: false },
@@ -85,44 +80,34 @@ describe("CoachContextSufficiencyPanel (presenter)", () => {
     const p = screen.getByTestId("coach-context-panel");
     expect(p.getAttribute("data-ceiling")).toBe("low");
     expect(p.getAttribute("data-trusted")).toBe("false");
-    expect(screen.getByTestId("coach-context-warnings")).toHaveTextContent(
-      /demo\/mock/i,
-    );
+    expect(screen.getByTestId("coach-context-warnings")).toHaveTextContent(/demo\/mock/i);
   });
 
   it("shows stale-sensor warning and caps ceiling below high", () => {
     const result = evaluateAiContextSufficiency(
       baseReal({
-        recentSensorReadings: [
-          { at: NOW - 999_999_999, temp: 24, rh: 55, vpd: 1 },
-        ],
+        recentSensorReadings: [{ at: NOW - 999_999_999, temp: 24, rh: 55, vpd: 1 }],
       }),
     );
     render(<CoachContextSufficiencyPanel result={result} />);
     const p = screen.getByTestId("coach-context-panel");
     expect(p.getAttribute("data-ceiling")).not.toBe("high");
-    expect(screen.getByTestId("coach-context-warnings")).toHaveTextContent(
-      /stale/i,
-    );
+    expect(screen.getByTestId("coach-context-warnings")).toHaveTextContent(/stale/i);
   });
 
   it("displays ceiling badge using friendly label", () => {
     const result = evaluateAiContextSufficiency(baseReal({ plants: [] }));
     render(<CoachContextSufficiencyPanel result={result} />);
-    expect(
-      screen
-        .getByTestId("coach-context-confidence-ceiling")
-        .getAttribute("data-label"),
-    ).toBe("low");
+    expect(screen.getByTestId("coach-context-confidence-ceiling").getAttribute("data-label")).toBe(
+      "low",
+    );
   });
 });
 
 describe("Coach page wiring", () => {
   it("imports the AI context sufficiency helper and presenter panel", () => {
     expect(COACH).toMatch(/from\s+["']@\/lib\/aiContextSufficiencyRules["']/);
-    expect(COACH).toMatch(
-      /from\s+["']@\/components\/CoachContextSufficiencyPanel["']/,
-    );
+    expect(COACH).toMatch(/from\s+["']@\/components\/CoachContextSufficiencyPanel["']/);
     expect(COACH).toMatch(/<CoachContextSufficiencyPanel/);
   });
 
@@ -147,9 +132,7 @@ describe("Coach page wiring", () => {
 
   it("Coach.tsx introduces no device-control surface or service_role", () => {
     expect(COACH).not.toMatch(/service_role/);
-    expect(COACH).not.toMatch(
-      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator/i,
-    );
+    expect(COACH).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator/i);
   });
 });
 

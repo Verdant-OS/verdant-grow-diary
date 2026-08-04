@@ -9,10 +9,7 @@
  * No React, no Supabase, no I/O. Pure functions only.
  */
 
-export type FirstTentSetupSurface =
-  | "sensor_pairing"
-  | "manual_sensor"
-  | "quicklog_snapshot";
+export type FirstTentSetupSurface = "sensor_pairing" | "manual_sensor" | "quicklog_snapshot";
 
 export interface FirstTentSetupCopy {
   title: string;
@@ -51,15 +48,12 @@ const BASE_COPY: Omit<FirstTentSetupCopy, "title" | "body" | "cta"> = {};
  * the surface argument lets us tune microcopy later without changing
  * call-sites.
  */
-export function buildFirstTentSetupCopy(
-  surface: FirstTentSetupSurface,
-): FirstTentSetupCopy {
+export function buildFirstTentSetupCopy(surface: FirstTentSetupSurface): FirstTentSetupCopy {
   void BASE_COPY;
   void surface;
   return {
     title: "Create a tent before adding sensor data",
-    body:
-      "Sensor readings need a grow-space anchor so Verdant can attach them to the right timeline, alerts, and AI Doctor context.",
+    body: "Sensor readings need a grow-space anchor so Verdant can attach them to the right timeline, alerts, and AI Doctor context.",
     cta: "Create first tent",
   };
 }

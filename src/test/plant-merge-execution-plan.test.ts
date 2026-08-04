@@ -55,12 +55,7 @@ describe("plant merge execution plan doc", () => {
 
   it("lists every plant-linked table that must be reassigned", () => {
     const doc = plan();
-    for (const table of [
-      "grow_events",
-      "diary_entries",
-      "alerts",
-      "action_queue",
-    ]) {
+    for (const table of ["grow_events", "diary_entries", "alerts", "action_queue"]) {
       expect(doc).toContain(table);
     }
   });

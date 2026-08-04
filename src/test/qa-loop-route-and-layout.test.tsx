@@ -6,6 +6,11 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-compat";
 import RouteAliasRedirect from "@/components/RouteAliasRedirect";
+import {
+  extractMountedAppRoutePaths,
+  getRouteAliasRedirectTarget,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 // Lightweight stand-in for the real Action Queue page to avoid pulling in its
 // data hooks. The redirect contract is what we're asserting.
@@ -46,12 +51,9 @@ describe("QA-LOOP-02 /action-queue legacy redirect", () => {
     expect(screen.getByTestId("actions-page")).toBeInTheDocument();
   });
 
-  it("confirms App.tsx wires the legacy alias to the scope-preserving redirect", async () => {
-    const fs = await import("node:fs");
-    const src = fs.readFileSync("src/App.tsx", "utf8");
-    expect(src).toMatch(
-      /path="\/action-queue"\s+element=\{<RouteAliasRedirect\s+to="\/actions"\s*\/>\}/,
-    );
+  it("confirms File routes wire the legacy alias to the scope-preserving redirect", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/action-queue");
+    expect(getRouteAliasRedirectTarget("/action-queue")).toBe("/actions");
   });
 });
 
@@ -99,11 +101,12 @@ describe("QA-LOOP-03 Settings mobile tile layout", () => {
     // account-preferences feature (735edc2a; covered by
     // account-preferences.test.tsx), plus the Delete account tile added with
     // the account-deletion feature (95cac1da6), plus the Referrals share-card
-    // tile added with the referral glue (a8459418a). The layout contract under
+    // tile added with the referral glue (a8459418a), plus Analytics consent
+    // from the base-branch consent settings page. The layout contract under
     // test is the badge positioning, not the tile inventory — pin the
     // current count so silent tile additions still surface here deliberately.
     const badges = screen.getAllByTestId("settings-tile-badge");
-    expect(badges).toHaveLength(9);
+    expect(badges).toHaveLength(10);
     for (const b of badges) {
       // Badge should be in-flow (no fixed/absolute) so the FAB cannot clip it.
       const cls = b.className;

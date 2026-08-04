@@ -35,19 +35,11 @@ describe("transpiration response golden fixtures", () => {
       const r = evaluateTranspirationWindow(c.input);
       expect(r.status).toBe(c.expected.status);
       expect(r.confidence).toBe(c.expected.confidence);
-      expect(r.waterLossRatePerVpdPerSize !== null).toBe(
-        c.expected.primaryMetricPresent,
-      );
-      expect(r.waterLossRatePerVpd !== null).toBe(
-        c.expected.supportingMetricPresent,
-      );
-      expect(r.moistureResponseProxy !== null).toBe(
-        c.expected.moistureProxyPresent,
-      );
+      expect(r.waterLossRatePerVpdPerSize !== null).toBe(c.expected.primaryMetricPresent);
+      expect(r.waterLossRatePerVpd !== null).toBe(c.expected.supportingMetricPresent);
+      expect(r.moistureResponseProxy !== null).toBe(c.expected.moistureProxyPresent);
       expect(r.warnings).toEqual([...c.expected.warnings].sort());
-      expect(r.confidenceReasons).toEqual(
-        [...c.expected.confidenceReasons].sort(),
-      );
+      expect(r.confidenceReasons).toEqual([...c.expected.confidenceReasons].sort());
     });
   }
 

@@ -168,15 +168,13 @@ describe("paddle event processing recorder rules", () => {
   });
 
   it("throws before building an invalid source payload", () => {
-    expect(() => buildPaddleEventProcessingInsertPayload(
-      { ...SOURCE, event_id: "" },
-      PROCESS_DECISION,
-    )).toThrow("paddle_event_processing_source_event_id_required");
+    expect(() =>
+      buildPaddleEventProcessingInsertPayload({ ...SOURCE, event_id: "" }, PROCESS_DECISION),
+    ).toThrow("paddle_event_processing_source_event_id_required");
 
-    expect(() => buildFailedPaddleEventProcessingInsertPayload(
-      SOURCE,
-      " ",
-    )).toThrow("paddle_event_processing_failed_reason_required");
+    expect(() => buildFailedPaddleEventProcessingInsertPayload(SOURCE, " ")).toThrow(
+      "paddle_event_processing_failed_reason_required",
+    );
   });
 
   it("is pure payload-building logic with no network, database, storage, or entitlement writes", () => {

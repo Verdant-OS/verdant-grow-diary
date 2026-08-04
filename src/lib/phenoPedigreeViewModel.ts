@@ -37,10 +37,7 @@ export interface PedigreeCrossInput {
 }
 
 export type ProvenanceCode =
-  | "unknown_pollen_parent"
-  | "parent_not_in_hunt"
-  | "generation_unrecorded"
-  | "origin_unrecorded";
+  "unknown_pollen_parent" | "parent_not_in_hunt" | "generation_unrecorded" | "origin_unrecorded";
 
 export interface ProvenanceFlag {
   readonly code: ProvenanceCode;
@@ -119,9 +116,7 @@ export function buildPhenoPedigree(
   keepers: readonly PedigreeKeeperInput[] | null | undefined,
   crosses: readonly PedigreeCrossInput[] | null | undefined,
 ): PhenoPedigree {
-  const keeperList = (Array.isArray(keepers) ? keepers : []).filter(
-    (k) => k && clean(k.id),
-  );
+  const keeperList = (Array.isArray(keepers) ? keepers : []).filter((k) => k && clean(k.id));
   const crossList = (Array.isArray(crosses) ? crosses : []).filter(
     (c) => c && clean(c.id) && clean(c.crossType),
   );
@@ -170,9 +165,11 @@ export function buildPhenoPedigree(
         nodeFlags.push(flag("unknown_pollen_parent"));
       }
       // Parents must be keepers in THIS hunt (else we can't verify the line).
-      if ((female != null && !idSet.has(female)) ||
-          (male != null && !idSet.has(male)) ||
-          (recurrent != null && !idSet.has(recurrent))) {
+      if (
+        (female != null && !idSet.has(female)) ||
+        (male != null && !idSet.has(male)) ||
+        (recurrent != null && !idSet.has(recurrent))
+      ) {
         nodeFlags.push(flag("parent_not_in_hunt"));
       }
       // Generation-bearing types need a recorded generation.
@@ -182,20 +179,22 @@ export function buildPhenoPedigree(
       allFlags.push(...nodeFlags);
 
       // Edges only for parents we can actually back up (in the keeper set).
-      if (female != null && idSet.has(female)) edges.push({ from: female, to: c.id, kind: "female" });
+      if (female != null && idSet.has(female))
+        edges.push({ from: female, to: c.id, kind: "female" });
       if (male != null && idSet.has(male)) edges.push({ from: male, to: c.id, kind: "male" });
-      if (recurrent != null && idSet.has(recurrent)) edges.push({ from: c.id, to: recurrent, kind: "backcross" });
+      if (recurrent != null && idSet.has(recurrent))
+        edges.push({ from: c.id, to: recurrent, kind: "backcross" });
 
       return {
         id: c.id,
         name: clean(c.crossName) ?? "Cross",
         badge: crossLineageBadge(type, gen, clean(c.channel)),
         femaleKeeperId: female,
-        femaleName: female != null ? nameById.get(female) ?? null : null,
+        femaleName: female != null ? (nameById.get(female) ?? null) : null,
         maleKeeperId: male,
         donorLabel: crossDonorLabel(
           { maleKeeperId: male, crossType: type },
-          male != null ? nameById.get(male) ?? null : null,
+          male != null ? (nameById.get(male) ?? null) : null,
         ),
         generation: gen,
         recurrentParentId: recurrent,

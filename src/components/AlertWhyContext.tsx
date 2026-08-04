@@ -24,8 +24,7 @@ export function AlertWhyContext({ alert, variant = "compact" }: AlertWhyContextP
         data-kind={why.kind}
         className="text-[11px] text-muted-foreground/90"
       >
-        <span className="font-medium">{WHY_PREFIX}</span>{" "}
-        <span>{why.text}</span>
+        <span className="font-medium">{WHY_PREFIX}</span> <span>{why.text}</span>
       </p>
     );
   }

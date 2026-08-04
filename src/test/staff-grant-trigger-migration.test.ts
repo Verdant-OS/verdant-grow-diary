@@ -21,7 +21,15 @@ function loadTriggerMigration(): string {
   const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql"));
   const matches = files
     .map((f) => ({ f, sql: readFileSync(path.join(MIGRATIONS_DIR, f), "utf8") }))
-    .filter((x) => x.sql.includes(TRIGGER_FN));
+    // Later REVOKE-only migrations also name the function; only migrations that
+    // define it carry the allow-list / trigger contract this gate asserts.
+    .filter(
+      (x) =>
+        x.sql.includes(TRIGGER_FN) &&
+        /CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\.grant_staff_role_for_verified_allowlist/i.test(
+          x.sql,
+        ),
+    );
   if (matches.length === 0) throw new Error(`no migration defines ${TRIGGER_FN}`);
   // Use the latest migration that defines the function.
   matches.sort((a, b) => a.f.localeCompare(b.f));
@@ -32,9 +40,7 @@ describe("staff-grant trigger migration", () => {
   const sql = loadTriggerMigration();
 
   it("defines the SECURITY DEFINER function", () => {
-    expect(sql).toMatch(
-      new RegExp(`CREATE OR REPLACE FUNCTION\\s+public\\.${TRIGGER_FN}`, "i"),
-    );
+    expect(sql).toMatch(new RegExp(`CREATE OR REPLACE FUNCTION\\s+public\\.${TRIGGER_FN}`, "i"));
     expect(sql).toMatch(/SECURITY DEFINER/i);
     expect(sql).toMatch(/SET search_path\s*=\s*public/i);
   });

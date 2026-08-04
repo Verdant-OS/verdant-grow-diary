@@ -38,19 +38,11 @@ describe("Today helpers (pure)", () => {
 
   it("newestMatchingDateKeyInMonth picks newest matching day under filter", () => {
     const groups = buildDiaryCalendarViewModel(ENTRIES);
-    expect(newestMatchingDateKeyInMonth(groups, "2026-06", "all")).toBe(
-      "2026-06-12",
-    );
-    expect(newestMatchingDateKeyInMonth(groups, "2026-06", "feeding")).toBe(
-      "2026-06-11",
-    );
-    expect(newestMatchingDateKeyInMonth(groups, "2026-06", "diagnosis")).toBe(
-      "2026-06-12",
-    );
+    expect(newestMatchingDateKeyInMonth(groups, "2026-06", "all")).toBe("2026-06-12");
+    expect(newestMatchingDateKeyInMonth(groups, "2026-06", "feeding")).toBe("2026-06-11");
+    expect(newestMatchingDateKeyInMonth(groups, "2026-06", "diagnosis")).toBe("2026-06-12");
     // April has no diagnosis under filter.
-    expect(newestMatchingDateKeyInMonth(groups, "2026-04", "diagnosis")).toBe(
-      null,
-    );
+    expect(newestMatchingDateKeyInMonth(groups, "2026-04", "diagnosis")).toBe(null);
     expect(newestMatchingDateKeyInMonth(groups, null, "all")).toBe(null);
   });
 });
@@ -60,13 +52,9 @@ describe("DiaryCalendarSection — Today button", () => {
     render(<DiaryCalendarSection rawEntries={ENTRIES} now={TODAY} />);
     fireEvent.click(screen.getByTestId("diary-calendar-month-prev")); // May
     fireEvent.click(screen.getByTestId("diary-calendar-month-prev")); // April
-    expect(screen.getByTestId("diary-calendar-month-label")).toHaveTextContent(
-      /April 2026/,
-    );
+    expect(screen.getByTestId("diary-calendar-month-label")).toHaveTextContent(/April 2026/);
     fireEvent.click(screen.getByTestId("diary-calendar-today"));
-    expect(screen.getByTestId("diary-calendar-month-label")).toHaveTextContent(
-      /June 2026/,
-    );
+    expect(screen.getByTestId("diary-calendar-month-label")).toHaveTextContent(/June 2026/);
   });
 
   it("keeps the active filter applied", () => {
@@ -74,12 +62,11 @@ describe("DiaryCalendarSection — Today button", () => {
     fireEvent.click(screen.getByTestId("diary-calendar-filter-feeding"));
     fireEvent.click(screen.getByTestId("diary-calendar-month-prev"));
     fireEvent.click(screen.getByTestId("diary-calendar-today"));
-    expect(
-      screen.getByTestId("diary-calendar-filter-feeding"),
-    ).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByTestId("diary-calendar-month-label")).toHaveTextContent(
-      /June 2026/,
+    expect(screen.getByTestId("diary-calendar-filter-feeding")).toHaveAttribute(
+      "aria-pressed",
+      "true",
     );
+    expect(screen.getByTestId("diary-calendar-month-label")).toHaveTextContent(/June 2026/);
     // Only June feeding visible (1 event on Jun 11).
     expect(screen.getAllByTestId("diary-calendar-event").length).toBe(1);
   });
@@ -97,9 +84,7 @@ describe("DiaryCalendarSection — Today button", () => {
     const future = new Date(Date.UTC(2026, 8, 1)); // 2026-09
     render(<DiaryCalendarSection rawEntries={ENTRIES} now={future} />);
     fireEvent.click(screen.getByTestId("diary-calendar-today"));
-    expect(screen.getByTestId("diary-calendar-month-label")).toHaveTextContent(
-      /September 2026/,
-    );
+    expect(screen.getByTestId("diary-calendar-month-label")).toHaveTextContent(/September 2026/);
     expect(screen.getByTestId("diary-calendar-empty")).toHaveTextContent(
       /No watering, feeding, training, diagnosis, or environment check events logged for September 2026\./,
     );
@@ -122,9 +107,7 @@ describe("DiaryCalendarSection — Today button", () => {
     // June: 4 supported events across 3 days; newest day (Jun 12) auto-expands → 2 events.
     expect(screen.getAllByTestId("diary-calendar-event").length).toBe(2);
     // 'photo' on Jun 15 must not appear and must not bump counts.
-    expect(
-      screen.getByTestId("diary-calendar-filter-all"),
-    ).toHaveTextContent("4");
+    expect(screen.getByTestId("diary-calendar-filter-all")).toHaveTextContent("4");
   });
 
   it("Today button is accessible by name", () => {
@@ -161,9 +144,7 @@ describe("DiaryCalendarSection — Today button", () => {
   });
 
   it("does not introduce Supabase write or Action Queue / device-control strings", () => {
-    const { container } = render(
-      <DiaryCalendarSection rawEntries={ENTRIES} now={TODAY} />,
-    );
+    const { container } = render(<DiaryCalendarSection rawEntries={ENTRIES} now={TODAY} />);
     fireEvent.click(screen.getByTestId("diary-calendar-today"));
     const html = container.innerHTML;
     expect(html).not.toMatch(/\.insert\(|\.update\(|\.upsert\(|\.delete\(/);

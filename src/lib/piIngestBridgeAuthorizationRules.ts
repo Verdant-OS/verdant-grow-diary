@@ -50,8 +50,7 @@ export type EvaluateBridgeAuthorizationInput = {
 export function evaluateBridgeAuthorization(
   input: EvaluateBridgeAuthorizationInput,
 ): BridgeAuthorizationResult {
-  const { credential, tentId, tentOwnerUserId } =
-    input ?? ({} as EvaluateBridgeAuthorizationInput);
+  const { credential, tentId, tentOwnerUserId } = input ?? ({} as EvaluateBridgeAuthorizationInput);
 
   const owner = evaluateBridgeOwnerScope({ credential, tentOwnerUserId });
   if (owner.ok === false) {

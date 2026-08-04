@@ -13,8 +13,7 @@
 
 import type { ManualReadingMetric } from "@/lib/sensorReadingManualEntryRules";
 
-const FAHRENHEIT_FROM_C = (c: number): number =>
-  Math.round((c * 9) / 5 + 32 + Number.EPSILON);
+const FAHRENHEIT_FROM_C = (c: number): number => Math.round((c * 9) / 5 + 32 + Number.EPSILON);
 
 /** Stable order for the success line. */
 const METRIC_DISPLAY_ORDER: ReadonlyArray<ManualReadingMetric["metric"]> = [
@@ -57,9 +56,7 @@ export function buildManualSaveSuccessLine(args: {
   metrics: ReadonlyArray<ManualReadingMetric>;
 }): string {
   const ordered = [...args.metrics].sort(
-    (a, b) =>
-      METRIC_DISPLAY_ORDER.indexOf(a.metric) -
-      METRIC_DISPLAY_ORDER.indexOf(b.metric),
+    (a, b) => METRIC_DISPLAY_ORDER.indexOf(a.metric) - METRIC_DISPLAY_ORDER.indexOf(b.metric),
   );
   const chips = ordered
     .map(formatMetricChip)
@@ -86,12 +83,7 @@ const SECRET_HINTS: RegExp[] = [
  * message. Never leaks secrets, internal IDs, or raw payloads.
  */
 export function mapManualSaveErrorToUserMessage(err: unknown): string {
-  const raw =
-    err instanceof Error
-      ? err.message
-      : typeof err === "string"
-        ? err
-        : "";
+  const raw = err instanceof Error ? err.message : typeof err === "string" ? err : "";
   const trimmed = raw.replace(/[\r\n]+/g, " ").trim();
   if (!trimmed) {
     return "Manual snapshot could not be saved. Check required fields and try again.";

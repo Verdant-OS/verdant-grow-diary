@@ -22,9 +22,7 @@ export interface PhaseOneFixture {
   freshness_window_ms: number;
   payload: Record<string, unknown>;
   /** Expected endpoint status (string), not an HTTP code. */
-  expected_status:
-    | "accepted_candidate"
-    | "rejected_candidate";
+  expected_status: "accepted_candidate" | "rejected_candidate";
   /** Subset of expected blocked-reason codes. Empty for accepted. */
   expected_blocked_reasons_subset: string[];
   /** Strings that MUST NOT appear anywhere in the serialized response. */
@@ -135,7 +133,4 @@ export const PHASE_ONE_FIXTURES: PhaseOneFixture[] = [
 ];
 
 /** Fake UUIDs the fixtures are allowed to use. */
-export const FIXTURE_ALLOWED_UUIDS: readonly string[] = [
-  FAKE_UUID_TENT,
-  FAKE_UUID_PLANT,
-];
+export const FIXTURE_ALLOWED_UUIDS: readonly string[] = [FAKE_UUID_TENT, FAKE_UUID_PLANT];

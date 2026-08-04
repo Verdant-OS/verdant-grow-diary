@@ -24,8 +24,7 @@ const ORDER = [
 ] as const;
 
 const MAC_RE = /[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}/;
-const UUID_RE =
-  /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/;
+const UUID_RE = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/;
 
 const BANNED_KEYS = new Set([
   "tent_id",
@@ -65,9 +64,7 @@ describe("buildCloudCanaryPreviewViewModel", () => {
     expect(vm.rows.map((r) => r.fixture_name)).toEqual([...ORDER]);
     // Re-run to confirm determinism
     const vm2 = buildCloudCanaryPreviewViewModel(verdict);
-    expect(vm2.rows.map((r) => r.fixture_name)).toEqual(
-      vm.rows.map((r) => r.fixture_name),
-    );
+    expect(vm2.rows.map((r) => r.fixture_name)).toEqual(vm.rows.map((r) => r.fixture_name));
   });
 
   it("carries the five count fields plus fixture_name and state, nothing else", () => {
@@ -104,9 +101,7 @@ describe("buildCloudCanaryPreviewViewModel", () => {
 
   it("mapped_count equals live + stale + invalid for every row (partition honesty)", () => {
     for (const row of vm.rows) {
-      expect(row.live_count + row.stale_count + row.invalid_count).toBe(
-        row.mapped_count,
-      );
+      expect(row.live_count + row.stale_count + row.invalid_count).toBe(row.mapped_count);
     }
   });
 

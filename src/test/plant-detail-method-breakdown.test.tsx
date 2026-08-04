@@ -96,9 +96,7 @@ describe("buildDailyMethodBreakdown — pure rule", () => {
 
   it("ignores manual snapshots from a different tent", () => {
     const s = summaryFor({
-      manualReadings: [
-        { ts: iso(2026, 4, 24, 11), id: "m1", tent_id: "other-tent" },
-      ],
+      manualReadings: [{ ts: iso(2026, 4, 24, 11), id: "m1", tent_id: "other-tent" }],
     });
     const today = buildDailyMethodBreakdown(s, "newest-first")[0];
     expect(today.method).toBe("missed");
@@ -148,10 +146,7 @@ function renderCard() {
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter>
-        <PlantDailyGrowCheckConsistencyCard
-          plantId={PLANT}
-          currentTentId={TENT}
-        />
+        <PlantDailyGrowCheckConsistencyCard plantId={PLANT} currentTentId={TENT} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -171,9 +166,7 @@ describe("PlantDailyGrowCheckConsistencyCard — 7-day method breakdown", () => 
     const region = screen.getByTestId("plant-daily-grow-check-method-breakdown");
     expect(region.getAttribute("data-order")).toBe("oldest-first");
     expect(region.getAttribute("data-day-count")).toBe("7");
-    const days = within(region).getAllByTestId(
-      "plant-daily-grow-check-method-breakdown-day",
-    );
+    const days = within(region).getAllByTestId("plant-daily-grow-check-method-breakdown-day");
     expect(days).toHaveLength(7);
     const methods = days.map((d) => d.getAttribute("data-method"));
     expect(methods.every((m) => ["note", "sensor", "both", "missed"].includes(m!))).toBe(true);
@@ -191,12 +184,8 @@ describe("PlantDailyGrowCheckConsistencyCard — 7-day method breakdown", () => 
 
   it("preserves the existing guidance + CTA", () => {
     renderCard();
-    expect(
-      screen.getByTestId("plant-daily-grow-check-guidance"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("plant-daily-grow-check-consistency-cta"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("plant-daily-grow-check-guidance")).toBeTruthy();
+    expect(screen.getByTestId("plant-daily-grow-check-consistency-cta")).toBeTruthy();
   });
 });
 

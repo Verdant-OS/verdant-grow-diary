@@ -87,6 +87,7 @@ import { Route as StrainsSlugRouteImport } from './routes/strains.$slug'
 import { Route as ToolsVpdCalculatorRouteImport } from './routes/tools.vpd-calculator'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as AppOperatorDiagnosticsRouteImport } from './routes/_app/_operator/diagnostics'
+import { Route as AppOperatorDiagnosticsSeoArtifactsRouteImport } from './routes/_app/_operator/diagnostics-seo-artifacts'
 import { Route as AppOperatorIngestInspectorRouteImport } from './routes/_app/_operator/ingest-inspector'
 import { Route as AppOperatorLeadsRouteImport } from './routes/_app/_operator/leads'
 import { Route as AppOperatorOneTentLoopProofRouteImport } from './routes/_app/_operator/one-tent-loop-proof'
@@ -99,11 +100,13 @@ import { Route as AppBreedingNewRouteImport } from './routes/_app/breeding.new'
 import { Route as AppDiaryEnvironmentSummaryRouteImport } from './routes/_app/diary.environment-summary'
 import { Route as AppDiaryPhenoExpressionComparisonRouteImport } from './routes/_app/diary.pheno-expression-comparison'
 import { Route as AppDoctorSessionsRouteImport } from './routes/_app/doctor.sessions'
+import { Route as AppGeneticsIndexRouteImport } from './routes/_app/genetics.index'
 import { Route as AppGrowsGrowIdRouteImport } from './routes/_app/grows.$growId'
 import { Route as AppPhenoHuntsNewRouteImport } from './routes/_app/pheno-hunts.new'
 import { Route as AppPlantsIdRouteImport } from './routes/_app/plants.$id'
 import { Route as AppReportsDiaryRangeRouteImport } from './routes/_app/reports.diary-range'
 import { Route as AppSettingsAgentIntegrationsRouteImport } from './routes/_app/settings.agent-integrations'
+import { Route as AppSettingsAnalyticsRouteImport } from './routes/_app/settings.analytics'
 import { Route as AppTentsIdRouteImport } from './routes/_app/tents.$id'
 import { Route as CustomerGuideOreozVsGelonadeComparisonRouteImport } from './routes/customer.guide.oreoz-vs-gelonade-comparison'
 import { Route as PhenoHuntsIdCompareRouteImport } from './routes/pheno-hunts.$id.compare'
@@ -541,6 +544,12 @@ const AppOperatorDiagnosticsRoute = AppOperatorDiagnosticsRouteImport.update({
   path: '/diagnostics',
   getParentRoute: () => AppOperatorRoute,
 } as any)
+const AppOperatorDiagnosticsSeoArtifactsRoute =
+  AppOperatorDiagnosticsSeoArtifactsRouteImport.update({
+    id: '/diagnostics-seo-artifacts',
+    path: '/diagnostics-seo-artifacts',
+    getParentRoute: () => AppOperatorRoute,
+  } as any)
 const AppOperatorIngestInspectorRoute =
   AppOperatorIngestInspectorRouteImport.update({
     id: '/ingest-inspector',
@@ -606,6 +615,11 @@ const AppDoctorSessionsRoute = AppDoctorSessionsRouteImport.update({
   path: '/sessions',
   getParentRoute: () => AppDoctorRoute,
 } as any)
+const AppGeneticsIndexRoute = AppGeneticsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppGeneticsRoute,
+} as any)
 const AppGrowsGrowIdRoute = AppGrowsGrowIdRouteImport.update({
   id: '/$growId',
   path: '/$growId',
@@ -632,6 +646,11 @@ const AppSettingsAgentIntegrationsRoute =
     path: '/agent-integrations',
     getParentRoute: () => AppSettingsRoute,
   } as any)
+const AppSettingsAnalyticsRoute = AppSettingsAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 const AppTentsIdRoute = AppTentsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -967,6 +986,7 @@ export interface FileRoutesByFullPath {
   '/strains/': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/diagnostics': typeof AppOperatorDiagnosticsRoute
+  '/diagnostics-seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
   '/ingest-inspector': typeof AppOperatorIngestInspectorRoute
   '/leads': typeof AppOperatorLeadsRoute
   '/one-tent-loop-proof': typeof AppOperatorOneTentLoopProofRoute
@@ -984,10 +1004,12 @@ export interface FileRoutesByFullPath {
   '/plants/$id': typeof AppPlantsIdRoute
   '/reports/diary-range': typeof AppReportsDiaryRangeRoute
   '/settings/agent-integrations': typeof AppSettingsAgentIntegrationsRoute
+  '/settings/analytics': typeof AppSettingsAnalyticsRoute
   '/tents/$id': typeof AppTentsIdRoute
   '/customer/guide/oreoz-vs-gelonade-comparison': typeof CustomerGuideOreozVsGelonadeComparisonRoute
   '/pheno-hunts/$id/compare': typeof PhenoHuntsIdCompareRoute
   '/pheno-hunts/$id/showcase': typeof PhenoHuntsIdShowcaseRoute
+  '/genetics/': typeof AppGeneticsIndexRoute
   '/admin/leads': typeof AppOperatorAdminLeadsRoute
   '/demo/one-tent-live-proof': typeof AppOperatorDemoOneTentLiveProofRoute
   '/internal/ai-doctor-confidence-audit': typeof AppOperatorInternalAiDoctorConfidenceAuditRoute
@@ -1071,7 +1093,6 @@ export interface FileRoutesByTo {
   '/daily-check': typeof AppDailyCheckRoute
   '/dashboard': typeof AppDashboardRoute
   '/doctor': typeof AppDoctorRouteWithChildren
-  '/genetics': typeof AppGeneticsRouteWithChildren
   '/grow-lineage': typeof AppGrowLineageRoute
   '/grow-room': typeof AppGrowRoomRoute
   '/grows': typeof AppGrowsRouteWithChildren
@@ -1107,6 +1128,7 @@ export interface FileRoutesByTo {
   '/strains': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/diagnostics': typeof AppOperatorDiagnosticsRoute
+  '/diagnostics-seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
   '/ingest-inspector': typeof AppOperatorIngestInspectorRoute
   '/leads': typeof AppOperatorLeadsRoute
   '/one-tent-loop-proof': typeof AppOperatorOneTentLoopProofRoute
@@ -1124,10 +1146,12 @@ export interface FileRoutesByTo {
   '/plants/$id': typeof AppPlantsIdRoute
   '/reports/diary-range': typeof AppReportsDiaryRangeRoute
   '/settings/agent-integrations': typeof AppSettingsAgentIntegrationsRoute
+  '/settings/analytics': typeof AppSettingsAnalyticsRoute
   '/tents/$id': typeof AppTentsIdRoute
   '/customer/guide/oreoz-vs-gelonade-comparison': typeof CustomerGuideOreozVsGelonadeComparisonRoute
   '/pheno-hunts/$id/compare': typeof PhenoHuntsIdCompareRoute
   '/pheno-hunts/$id/showcase': typeof PhenoHuntsIdShowcaseRoute
+  '/genetics': typeof AppGeneticsIndexRoute
   '/admin/leads': typeof AppOperatorAdminLeadsRoute
   '/demo/one-tent-live-proof': typeof AppOperatorDemoOneTentLiveProofRoute
   '/internal/ai-doctor-confidence-audit': typeof AppOperatorInternalAiDoctorConfidenceAuditRoute
@@ -1250,6 +1274,7 @@ export interface FileRoutesById {
   '/strains/': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/_app/_operator/diagnostics': typeof AppOperatorDiagnosticsRoute
+  '/_app/_operator/diagnostics-seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
   '/_app/_operator/ingest-inspector': typeof AppOperatorIngestInspectorRoute
   '/_app/_operator/leads': typeof AppOperatorLeadsRoute
   '/_app/_operator/one-tent-loop-proof': typeof AppOperatorOneTentLoopProofRoute
@@ -1267,10 +1292,12 @@ export interface FileRoutesById {
   '/_app/plants/$id': typeof AppPlantsIdRoute
   '/_app/reports/diary-range': typeof AppReportsDiaryRangeRoute
   '/_app/settings/agent-integrations': typeof AppSettingsAgentIntegrationsRoute
+  '/_app/settings/analytics': typeof AppSettingsAnalyticsRoute
   '/_app/tents/$id': typeof AppTentsIdRoute
   '/customer/guide/oreoz-vs-gelonade-comparison': typeof CustomerGuideOreozVsGelonadeComparisonRoute
   '/pheno-hunts/$id/compare': typeof PhenoHuntsIdCompareRoute
   '/pheno-hunts/$id/showcase': typeof PhenoHuntsIdShowcaseRoute
+  '/_app/genetics/': typeof AppGeneticsIndexRoute
   '/_app/_operator/admin/leads': typeof AppOperatorAdminLeadsRoute
   '/_app/_operator/demo/one-tent-live-proof': typeof AppOperatorDemoOneTentLiveProofRoute
   '/_app/_operator/internal/ai-doctor-confidence-audit': typeof AppOperatorInternalAiDoctorConfidenceAuditRoute
@@ -1392,6 +1419,7 @@ export interface FileRouteTypes {
     | '/strains/'
     | '/.lovable/oauth/consent'
     | '/diagnostics'
+    | '/diagnostics-seo-artifacts'
     | '/ingest-inspector'
     | '/leads'
     | '/one-tent-loop-proof'
@@ -1409,10 +1437,12 @@ export interface FileRouteTypes {
     | '/plants/$id'
     | '/reports/diary-range'
     | '/settings/agent-integrations'
+    | '/settings/analytics'
     | '/tents/$id'
     | '/customer/guide/oreoz-vs-gelonade-comparison'
     | '/pheno-hunts/$id/compare'
     | '/pheno-hunts/$id/showcase'
+    | '/genetics/'
     | '/admin/leads'
     | '/demo/one-tent-live-proof'
     | '/internal/ai-doctor-confidence-audit'
@@ -1496,7 +1526,6 @@ export interface FileRouteTypes {
     | '/daily-check'
     | '/dashboard'
     | '/doctor'
-    | '/genetics'
     | '/grow-lineage'
     | '/grow-room'
     | '/grows'
@@ -1532,6 +1561,7 @@ export interface FileRouteTypes {
     | '/strains'
     | '/.lovable/oauth/consent'
     | '/diagnostics'
+    | '/diagnostics-seo-artifacts'
     | '/ingest-inspector'
     | '/leads'
     | '/one-tent-loop-proof'
@@ -1549,10 +1579,12 @@ export interface FileRouteTypes {
     | '/plants/$id'
     | '/reports/diary-range'
     | '/settings/agent-integrations'
+    | '/settings/analytics'
     | '/tents/$id'
     | '/customer/guide/oreoz-vs-gelonade-comparison'
     | '/pheno-hunts/$id/compare'
     | '/pheno-hunts/$id/showcase'
+    | '/genetics'
     | '/admin/leads'
     | '/demo/one-tent-live-proof'
     | '/internal/ai-doctor-confidence-audit'
@@ -1674,6 +1706,7 @@ export interface FileRouteTypes {
     | '/strains/'
     | '/.lovable/oauth/consent'
     | '/_app/_operator/diagnostics'
+    | '/_app/_operator/diagnostics-seo-artifacts'
     | '/_app/_operator/ingest-inspector'
     | '/_app/_operator/leads'
     | '/_app/_operator/one-tent-loop-proof'
@@ -1691,10 +1724,12 @@ export interface FileRouteTypes {
     | '/_app/plants/$id'
     | '/_app/reports/diary-range'
     | '/_app/settings/agent-integrations'
+    | '/_app/settings/analytics'
     | '/_app/tents/$id'
     | '/customer/guide/oreoz-vs-gelonade-comparison'
     | '/pheno-hunts/$id/compare'
     | '/pheno-hunts/$id/showcase'
+    | '/_app/genetics/'
     | '/_app/_operator/admin/leads'
     | '/_app/_operator/demo/one-tent-live-proof'
     | '/_app/_operator/internal/ai-doctor-confidence-audit'
@@ -2343,6 +2378,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOperatorDiagnosticsRouteImport
       parentRoute: typeof AppOperatorRoute
     }
+    '/_app/_operator/diagnostics-seo-artifacts': {
+      id: '/_app/_operator/diagnostics-seo-artifacts'
+      path: '/diagnostics-seo-artifacts'
+      fullPath: '/diagnostics-seo-artifacts'
+      preLoaderRoute: typeof AppOperatorDiagnosticsSeoArtifactsRouteImport
+      parentRoute: typeof AppOperatorRoute
+    }
     '/_app/_operator/ingest-inspector': {
       id: '/_app/_operator/ingest-inspector'
       path: '/ingest-inspector'
@@ -2427,6 +2469,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDoctorSessionsRouteImport
       parentRoute: typeof AppDoctorRoute
     }
+    '/_app/genetics/': {
+      id: '/_app/genetics/'
+      path: '/'
+      fullPath: '/genetics/'
+      preLoaderRoute: typeof AppGeneticsIndexRouteImport
+      parentRoute: typeof AppGeneticsRoute
+    }
     '/_app/grows/$growId': {
       id: '/_app/grows/$growId'
       path: '/$growId'
@@ -2460,6 +2509,13 @@ declare module '@tanstack/react-router' {
       path: '/agent-integrations'
       fullPath: '/settings/agent-integrations'
       preLoaderRoute: typeof AppSettingsAgentIntegrationsRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/analytics': {
+      id: '/_app/settings/analytics'
+      path: '/analytics'
+      fullPath: '/settings/analytics'
+      preLoaderRoute: typeof AppSettingsAnalyticsRouteImport
       parentRoute: typeof AppSettingsRoute
     }
     '/_app/tents/$id': {
@@ -2782,6 +2838,7 @@ declare module '@tanstack/react-router' {
 
 interface AppOperatorRouteChildren {
   AppOperatorDiagnosticsRoute: typeof AppOperatorDiagnosticsRoute
+  AppOperatorDiagnosticsSeoArtifactsRoute: typeof AppOperatorDiagnosticsSeoArtifactsRoute
   AppOperatorIngestInspectorRoute: typeof AppOperatorIngestInspectorRoute
   AppOperatorLeadsRoute: typeof AppOperatorLeadsRoute
   AppOperatorOneTentLoopProofRoute: typeof AppOperatorOneTentLoopProofRoute
@@ -2820,6 +2877,8 @@ interface AppOperatorRouteChildren {
 
 const AppOperatorRouteChildren: AppOperatorRouteChildren = {
   AppOperatorDiagnosticsRoute: AppOperatorDiagnosticsRoute,
+  AppOperatorDiagnosticsSeoArtifactsRoute:
+    AppOperatorDiagnosticsSeoArtifactsRoute,
   AppOperatorIngestInspectorRoute: AppOperatorIngestInspectorRoute,
   AppOperatorLeadsRoute: AppOperatorLeadsRoute,
   AppOperatorOneTentLoopProofRoute: AppOperatorOneTentLoopProofRoute,
@@ -2943,6 +3002,7 @@ const AppDoctorRouteWithChildren = AppDoctorRoute._addFileChildren(
 )
 
 interface AppGeneticsRouteChildren {
+  AppGeneticsIndexRoute: typeof AppGeneticsIndexRoute
   AppGeneticsAccessionsIdRoute: typeof AppGeneticsAccessionsIdRoute
   AppGeneticsBatchesIdRoute: typeof AppGeneticsBatchesIdRoute
   AppGeneticsHealthKindIdRoute: typeof AppGeneticsHealthKindIdRoute
@@ -2950,6 +3010,7 @@ interface AppGeneticsRouteChildren {
 }
 
 const AppGeneticsRouteChildren: AppGeneticsRouteChildren = {
+  AppGeneticsIndexRoute: AppGeneticsIndexRoute,
   AppGeneticsAccessionsIdRoute: AppGeneticsAccessionsIdRoute,
   AppGeneticsBatchesIdRoute: AppGeneticsBatchesIdRoute,
   AppGeneticsHealthKindIdRoute: AppGeneticsHealthKindIdRoute,
@@ -3028,10 +3089,12 @@ const AppReportsRouteWithChildren = AppReportsRoute._addFileChildren(
 
 interface AppSettingsRouteChildren {
   AppSettingsAgentIntegrationsRoute: typeof AppSettingsAgentIntegrationsRoute
+  AppSettingsAnalyticsRoute: typeof AppSettingsAnalyticsRoute
 }
 
 const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsAgentIntegrationsRoute: AppSettingsAgentIntegrationsRoute,
+  AppSettingsAnalyticsRoute: AppSettingsAnalyticsRoute,
 }
 
 const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(

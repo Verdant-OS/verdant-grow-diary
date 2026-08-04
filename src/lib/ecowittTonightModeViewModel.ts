@@ -9,10 +9,7 @@
  * This module is presenter-only and must remain pure.
  */
 
-import type {
-  LiveSourceTruthGateResult,
-  LiveSourceTruthVerdict,
-} from "./liveSourceTruthGateRules";
+import type { LiveSourceTruthGateResult, LiveSourceTruthVerdict } from "./liveSourceTruthGateRules";
 import type { EcowittEvidenceUnitWarning } from "./ecowittLiveEvidenceUnitWarningRules";
 import type { EcowittPerPlantResult } from "./ecowittLiveEvidenceMultiPlantRules";
 
@@ -21,16 +18,9 @@ import type { EcowittPerPlantResult } from "./ecowittLiveEvidenceMultiPlantRules
 // ============================================================
 
 export type EcowittTonightModeStatus =
-  | "blocked"
-  | "needs_review"
-  | "ready_for_export"
-  | "live_proof_supported";
+  "blocked" | "needs_review" | "ready_for_export" | "live_proof_supported";
 
-export type EcowittTonightChecklistStatus =
-  | "done"
-  | "missing"
-  | "blocked"
-  | "needs_review";
+export type EcowittTonightChecklistStatus = "done" | "missing" | "blocked" | "needs_review";
 
 export interface EcowittTonightChecklistItem {
   readonly id: string;
@@ -80,18 +70,13 @@ const SAFETY_NOTE =
   "Tonight Mode summarizes local operator evidence only. It does not query sensors, write data, prove calibration, create alerts, create Action Queue items, or perform device control.";
 
 const VERDICT_NEXT_ACTION: Readonly<Record<LiveSourceTruthVerdict, string>> = {
-  verified_live:
-    "Export the evidence snapshot and repeat the check after 10–15 minutes.",
-  unverified_live:
-    "Add controller/app comparison values for enabled metrics.",
+  verified_live: "Export the evidence snapshot and repeat the check after 10–15 minutes.",
+  unverified_live: "Add controller/app comparison values for enabled metrics.",
   not_live_proof:
     "Replace demo/manual/imported evidence with real live EcoWitt evidence before claiming live proof.",
-  stale:
-    "Enter a recent captured_at value and confirm the device is sending current data.",
-  invalid:
-    "Fix missing, malformed, or suspicious evidence before trusting the reading.",
-  mismatch:
-    "Check units, channel mapping, and backend/controller values.",
+  stale: "Enter a recent captured_at value and confirm the device is sending current data.",
+  invalid: "Fix missing, malformed, or suspicious evidence before trusting the reading.",
+  mismatch: "Check units, channel mapping, and backend/controller values.",
 };
 
 const VERDICT_HEADLINE: Readonly<Record<LiveSourceTruthVerdict, string>> = {
@@ -121,9 +106,7 @@ function dedupeStable(values: readonly string[]): string[] {
   return out;
 }
 
-function gateState(
-  g: EcowittTonightOptionalGate | null | undefined,
-): EcowittTonightGateState {
+function gateState(g: EcowittTonightOptionalGate | null | undefined): EcowittTonightGateState {
   if (!g) return "unknown";
   if (g.state === "passed" || g.state === "blocked") return g.state;
   return "unknown";
@@ -144,12 +127,8 @@ export function buildEcowittTonightModeViewModel(
   const exportReady = input.export_ready === true;
   const snapshotExported = input.snapshot_exported === true;
 
-  const blockingUnitWarnings = unitWarnings.filter(
-    (w) => w.severity === "blocks_live_proof",
-  );
-  const nonBlockingUnitWarnings = unitWarnings.filter(
-    (w) => w.severity !== "blocks_live_proof",
-  );
+  const blockingUnitWarnings = unitWarnings.filter((w) => w.severity === "blocks_live_proof");
+  const nonBlockingUnitWarnings = unitWarnings.filter((w) => w.severity !== "blocks_live_proof");
 
   const tsState = gateState(input.timestamp_gate);
   const idState = gateState(input.device_identity_gate);
@@ -183,11 +162,7 @@ export function buildEcowittTonightModeViewModel(
       } else {
         status = "needs_review";
       }
-    } else if (
-      verdict === "invalid" ||
-      verdict === "mismatch" ||
-      verdict === "stale"
-    ) {
+    } else if (verdict === "invalid" || verdict === "mismatch" || verdict === "stale") {
       status = exportReady ? "ready_for_export" : "blocked";
     } else {
       // unverified_live, not_live_proof
@@ -243,11 +218,9 @@ export function buildEcowittTonightModeViewModel(
   // -------- Next best action --------
   let next_best_action: string;
   if (!result) {
-    next_best_action =
-      "Enter EcoWitt/MQTT/backend evidence and evaluate it locally.";
+    next_best_action = "Enter EcoWitt/MQTT/backend evidence and evaluate it locally.";
   } else if (status === "live_proof_supported") {
-    next_best_action =
-      "Export the evidence snapshot and repeat the check after 10–15 minutes.";
+    next_best_action = "Export the evidence snapshot and repeat the check after 10–15 minutes.";
   } else {
     next_best_action = VERDICT_NEXT_ACTION[result.verdict];
   }
@@ -257,12 +230,7 @@ export function buildEcowittTonightModeViewModel(
     {
       id: "network-checked",
       label: "Network checked",
-      status:
-        netState === "passed"
-          ? "done"
-          : netState === "blocked"
-            ? "blocked"
-            : "missing",
+      status: netState === "passed" ? "done" : netState === "blocked" ? "blocked" : "missing",
       helper:
         "Confirm the EcoWitt gateway and operator workstation are on the same local network before trusting bring-up.",
     },
@@ -302,8 +270,7 @@ export function buildEcowittTonightModeViewModel(
           : result.verdict === "unverified_live"
             ? "needs_review"
             : "missing",
-      helper:
-        "Add controller/app comparison values for enabled metrics to support live proof.",
+      helper: "Add controller/app comparison values for enabled metrics to support live proof.",
     },
     {
       id: "unit-warnings-clear",
@@ -314,15 +281,13 @@ export function buildEcowittTonightModeViewModel(
           : nonBlockingUnitWarnings.length > 0
             ? "needs_review"
             : "done",
-      helper:
-        "Backend and controller units/scales must agree before comparing values.",
+      helper: "Backend and controller units/scales must agree before comparing values.",
     },
     {
       id: "source-truth-evaluated",
       label: "Source truth evaluated",
       status: result ? "done" : "missing",
-      helper:
-        "The local Live Source Truth Gate must have produced a verdict.",
+      helper: "The local Live Source Truth Gate must have produced a verdict.",
     },
     {
       id: "snapshot-exported",

@@ -42,7 +42,6 @@ export type {
   ParsedReleaseReceiptSuccess,
 };
 
-
 // --- Type guards ---------------------------------------------------------
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -88,10 +87,7 @@ function validateSafeNullableString(
   return validateSafeString(field, v, errors);
 }
 
-function validateMetadata(
-  v: unknown,
-  errors: string[],
-): ReleaseReceiptMetadata | null {
+function validateMetadata(v: unknown, errors: string[]): ReleaseReceiptMetadata | null {
   if (!isPlainObject(v)) {
     errors.push("metadata must be an object");
     return null;
@@ -125,10 +121,7 @@ function validateMetadata(
   return out;
 }
 
-function validateCounts(
-  v: unknown,
-  errors: string[],
-): ReleaseReceiptCounts | null {
+function validateCounts(v: unknown, errors: string[]): ReleaseReceiptCounts | null {
   if (!isPlainObject(v)) {
     errors.push("counts must be an object");
     return null;
@@ -182,7 +175,11 @@ function validateCommand(
   }
   if (
     raw.duration_ms !== null &&
-    !(typeof raw.duration_ms === "number" && Number.isFinite(raw.duration_ms) && raw.duration_ms >= 0)
+    !(
+      typeof raw.duration_ms === "number" &&
+      Number.isFinite(raw.duration_ms) &&
+      raw.duration_ms >= 0
+    )
   ) {
     errors.push(`commands[${idx}].duration_ms must be null or a non-negative number`);
     return null;
@@ -199,11 +196,7 @@ function validateCommand(
   };
 }
 
-function validateBlocker(
-  idx: number,
-  v: unknown,
-  errors: string[],
-): ReleaseReceiptBlocker | null {
+function validateBlocker(idx: number, v: unknown, errors: string[]): ReleaseReceiptBlocker | null {
   if (!isPlainObject(v)) {
     errors.push(`blockers[${idx}] must be an object`);
     return null;
@@ -236,16 +229,12 @@ function validateBlocker(
 
 // --- Public API ----------------------------------------------------------
 
-export function isReleaseReceiptArtifactV1(
-  input: unknown,
-): input is ReleaseReceiptArtifactV1 {
+export function isReleaseReceiptArtifactV1(input: unknown): input is ReleaseReceiptArtifactV1 {
   const result = parseReleaseReceiptArtifact(input);
   return result.ok;
 }
 
-export function parseReleaseReceiptArtifact(
-  input: unknown,
-): ParsedReleaseReceiptResult {
+export function parseReleaseReceiptArtifact(input: unknown): ParsedReleaseReceiptResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -257,9 +246,7 @@ export function parseReleaseReceiptArtifact(
   if (raw.schema_version !== RELEASE_RECEIPT_SCHEMA_VERSION) {
     return {
       ok: false,
-      errors: [
-        `unknown schema_version (expected "${RELEASE_RECEIPT_SCHEMA_VERSION}")`,
-      ],
+      errors: [`unknown schema_version (expected "${RELEASE_RECEIPT_SCHEMA_VERSION}")`],
       warnings,
     };
   }
@@ -275,10 +262,7 @@ export function parseReleaseReceiptArtifact(
   if (!isIsoDateString(raw.generated_at)) {
     errors.push("generated_at must be a valid ISO datetime string");
   }
-  if (
-    typeof raw.source !== "string" ||
-    !RELEASE_RECEIPT_SOURCES.includes(raw.source as never)
-  ) {
+  if (typeof raw.source !== "string" || !RELEASE_RECEIPT_SOURCES.includes(raw.source as never)) {
     errors.push("source is invalid");
   }
   if (
@@ -287,18 +271,12 @@ export function parseReleaseReceiptArtifact(
   ) {
     errors.push("receipt_kind is invalid");
   }
-  if (
-    typeof raw.status !== "string" ||
-    !RELEASE_RECEIPT_STATUSES.includes(raw.status as never)
-  ) {
+  if (typeof raw.status !== "string" || !RELEASE_RECEIPT_STATUSES.includes(raw.status as never)) {
     errors.push("status is invalid");
   }
 
   // ci_full_suite cannot come from manual_import.
-  if (
-    raw.receipt_kind === "ci_full_suite" &&
-    raw.source === "manual_import"
-  ) {
+  if (raw.receipt_kind === "ci_full_suite" && raw.source === "manual_import") {
     errors.push("ci_full_suite artifacts cannot have source=manual_import");
   }
 
@@ -377,9 +355,7 @@ function kindToCategory(kind: ReleaseReceiptKind): ReceiptCategory {
   }
 }
 
-function statusToReceiptStatus(
-  s: ReleaseReceiptArtifactV1["status"],
-): ReceiptStatus {
+function statusToReceiptStatus(s: ReleaseReceiptArtifactV1["status"]): ReceiptStatus {
   // Both type sets share identical members.
   return s;
 }
@@ -403,11 +379,7 @@ export function normalizeReleaseReceiptToEvidenceReceipt(
 
   let blocksReleaseGo = false;
   if (artifact.receipt_kind === "ci_full_suite") {
-    if (
-      artifact.status === "fail" ||
-      artifact.status === "blocked" ||
-      hasActiveReleaseBlocker
-    ) {
+    if (artifact.status === "fail" || artifact.status === "blocked" || hasActiveReleaseBlocker) {
       blocksReleaseGo = true;
     }
   }

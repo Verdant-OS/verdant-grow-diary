@@ -54,17 +54,14 @@ export default function CultivarQaPanel({ cultivar }: Props) {
         data-testid="cultivar-qa-upsell"
         className="mt-10 rounded-xl border border-primary/30 bg-primary/5 p-5"
       >
-        <p className="text-xs font-semibold uppercase tracking-wide text-primary/80">
-          Pro feature
-        </p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-primary/80">Pro feature</p>
         <h2 className="mt-1 font-display text-xl font-semibold">
           Ask questions about {cultivar.name}
         </h2>
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-          Pro members can ask this reference profile questions and get concise,
-          source-grounded answers — never invented chemistry or guaranteed
-          outcomes. Your plant&apos;s own logs and sensors always stay
-          authoritative.
+          Pro members can ask this reference profile questions and get concise, source-grounded
+          answers — never invented chemistry or guaranteed outcomes. Your plant&apos;s own logs and
+          sensors always stay authoritative.
         </p>
         <Link
           to="/pricing"
@@ -88,9 +85,8 @@ export default function CultivarQaPanel({ cultivar }: Props) {
         Ask about {cultivar.name}
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Answers come only from this reference profile&apos;s sourced context.
-        Treat them as reported context — your plant&apos;s logs and sensors stay
-        authoritative.
+        Answers come only from this reference profile&apos;s sourced context. Treat them as reported
+        context — your plant&apos;s logs and sensors stay authoritative.
       </p>
       <form
         className="mt-4 flex flex-col gap-3"

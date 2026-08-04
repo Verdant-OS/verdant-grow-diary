@@ -147,21 +147,16 @@ describe("interaction rule helpers", () => {
     expect(followUpDidChange(null, null)).toBe(false);
     expect(followUpDidChange(null, "2026-06-01T10:00:00.000Z")).toBe(true);
     expect(followUpDidChange("2026-06-01T10:00:00.000Z", null)).toBe(true);
-    expect(
-      followUpDidChange(
-        "2026-06-01T10:00:00.000Z",
-        "2026-06-01T10:00:00Z",
-      ),
-    ).toBe(false);
+    expect(followUpDidChange("2026-06-01T10:00:00.000Z", "2026-06-01T10:00:00Z")).toBe(false);
     expect(normalizeFollowUp("bad-date")).toBe(null);
   });
 
   it("describes follow-up changes for the activity note", () => {
     expect(describeFollowUpChange(null, "2026-06-01T10:00:00Z")).toMatch(/set to/);
     expect(describeFollowUpChange("2026-06-01T10:00:00Z", null)).toMatch(/cleared/);
-    expect(
-      describeFollowUpChange("2026-06-01T10:00:00Z", "2026-06-02T10:00:00Z"),
-    ).toMatch(/moved to/);
+    expect(describeFollowUpChange("2026-06-01T10:00:00Z", "2026-06-02T10:00:00Z")).toMatch(
+      /moved to/,
+    );
   });
 });
 
@@ -197,9 +192,13 @@ describe("/leads UI exposes interaction logging", () => {
 
   it("does not duplicate event-writing logic across React components", () => {
     // The insert lives only in the dedicated hook.
-    const pageInserts = (PAGE.match(/from\(["']lead_events["']\)[\s\S]{0,80}\.insert/g) ?? []).length;
-    const hookInserts = (HOOK.match(/from\(["']lead_events["']\)[\s\S]{0,80}\.insert/g) ?? []).length;
-    const createInserts = (CREATE_HOOK.match(/from\(["']lead_events["']\)[\s\S]{0,80}\.insert/g) ?? []).length;
+    const pageInserts = (PAGE.match(/from\(["']lead_events["']\)[\s\S]{0,80}\.insert/g) ?? [])
+      .length;
+    const hookInserts = (HOOK.match(/from\(["']lead_events["']\)[\s\S]{0,80}\.insert/g) ?? [])
+      .length;
+    const createInserts = (
+      CREATE_HOOK.match(/from\(["']lead_events["']\)[\s\S]{0,80}\.insert/g) ?? []
+    ).length;
     expect(pageInserts).toBe(0);
     expect(hookInserts).toBe(0);
     expect(createInserts).toBeGreaterThan(0);
@@ -223,8 +222,7 @@ describe("useCreateLeadEvent hook safety", () => {
 
 describe("submission fields remain immutable through updateLead", () => {
   it("allow-list excludes original lead submission fields", () => {
-    const allowBlock =
-      HOOK.match(/const ALLOWED\s*=\s*\[[\s\S]*?\]\s+as const;/)?.[0] ?? "";
+    const allowBlock = HOOK.match(/const ALLOWED\s*=\s*\[[\s\S]*?\]\s+as const;/)?.[0] ?? "";
     for (const forbidden of [
       "email",
       "name",

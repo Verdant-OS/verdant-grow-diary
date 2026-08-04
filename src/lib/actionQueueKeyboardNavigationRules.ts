@@ -12,30 +12,18 @@
  *    pass that list; this module does not reach into global state.
  */
 
-export type ActionQueueNavigationKey =
-  | "ArrowDown"
-  | "ArrowUp"
-  | "Home"
-  | "End"
-  | "Enter";
+export type ActionQueueNavigationKey = "ArrowDown" | "ArrowUp" | "Home" | "End" | "Enter";
 
 export type ActionQueueNavigationIntent =
-  | { kind: "focus"; index: number }
-  | { kind: "open-drawer"; index: number };
+  { kind: "focus"; index: number } | { kind: "open-drawer"; index: number };
 
 /**
  * Returns true when a key is one the rules module knows how to handle.
  * Callers should use this to decide whether to `preventDefault()`.
  */
-export function isActionQueueNavigationKey(
-  key: string,
-): key is ActionQueueNavigationKey {
+export function isActionQueueNavigationKey(key: string): key is ActionQueueNavigationKey {
   return (
-    key === "ArrowDown" ||
-    key === "ArrowUp" ||
-    key === "Home" ||
-    key === "End" ||
-    key === "Enter"
+    key === "ArrowDown" || key === "ArrowUp" || key === "Home" || key === "End" || key === "Enter"
   );
 }
 

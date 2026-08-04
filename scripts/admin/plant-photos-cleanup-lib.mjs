@@ -93,12 +93,7 @@ export function parseCleanupArgs(argv) {
     } else if (a === "--report-file") {
       const v = argv[i + 1];
       i += 1;
-      if (
-        typeof v !== "string" ||
-        v === "" ||
-        v.trim() === "" ||
-        v.startsWith("--")
-      ) {
+      if (typeof v !== "string" || v === "" || v.trim() === "" || v.startsWith("--")) {
         return { ok: false, error: "--report-file requires a nonblank path" };
       }
       if (opts._reportFileSeen) {
@@ -137,17 +132,12 @@ export function parseCleanupArgs(argv) {
   };
 }
 
-
 /**
  * True iff both destructive flags are present AND dry-run is not set.
  * @param {CleanupOptions} options
  */
 export function isDestructiveMode(options) {
-  return !!(
-    options.execute &&
-    options.confirmDeleteOrphans &&
-    !options.dryRun
-  );
+  return !!(options.execute && options.confirmDeleteOrphans && !options.dryRun);
 }
 
 // ---------------------------------------------------------------
@@ -344,8 +334,7 @@ export async function planCleanup({ listReferences, listObjects, options, nowMs 
     deleted: 0,
     deleted_paths: [],
     scan_errors: [],
-    destructive_flags_present:
-      !!(options.execute && options.confirmDeleteOrphans),
+    destructive_flags_present: !!(options.execute && options.confirmDeleteOrphans),
   };
 
   let refs;
@@ -381,13 +370,7 @@ export async function planCleanup({ listReferences, listObjects, options, nowMs 
   const candidateBatch = [];
   for (const obj of listing.objects ?? []) {
     report.total_objects_scanned += 1;
-    const v = classifyObject(
-      obj,
-      referenced,
-      options.minAgeDays,
-      options.ownerFilter,
-      nowMs,
-    );
+    const v = classifyObject(obj, referenced, options.minAgeDays, options.ownerFilter, nowMs);
     switch (v.status) {
       case "referenced":
         report.referenced += 1;

@@ -17,8 +17,7 @@ import {
 } from "@/lib/sensorSnapshotStatusContract";
 
 const NOW = new Date("2026-05-23T12:00:00Z");
-const minutesAgo = (m: number) =>
-  new Date(NOW.getTime() - m * 60_000).toISOString();
+const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60_000).toISOString();
 const hoursAgo = (h: number) => minutesAgo(h * 60);
 
 afterEach(() => {
@@ -133,16 +132,8 @@ describe("classifyAuditRow", () => {
     expect(c.reason).toBeDefined();
     expect(c.status).not.toBe(c.reason);
     // Reason codes are not status variants.
-    const statuses: SnapshotStatus[] = [
-      "usable",
-      "stale",
-      "invalid",
-      "needs_review",
-      "no_data",
-    ];
-    expect(statuses).not.toContain(
-      c.reason as unknown as SnapshotStatus,
-    );
+    const statuses: SnapshotStatus[] = ["usable", "stale", "invalid", "needs_review", "no_data"];
+    expect(statuses).not.toContain(c.reason as unknown as SnapshotStatus);
   });
 });
 
@@ -174,12 +165,7 @@ describe("resolveStaleWindowMs", () => {
 describe("countsAsHealthyEvidence", () => {
   it("true for usable, false for stale/invalid/needs_review/no_data", () => {
     expect(countsAsHealthyEvidence("usable")).toBe(true);
-    for (const s of [
-      "stale",
-      "invalid",
-      "needs_review",
-      "no_data",
-    ] as SnapshotStatus[]) {
+    for (const s of ["stale", "invalid", "needs_review", "no_data"] as SnapshotStatus[]) {
       expect(countsAsHealthyEvidence(s)).toBe(false);
     }
     // Also works against a full Classification.

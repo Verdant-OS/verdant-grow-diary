@@ -99,8 +99,7 @@ export function summarizeLeadStatuses(
   }
 
   const total = leads.length;
-  const needingAction =
-    needsFirstContact + followUp + readyToClose + reviewManually;
+  const needingAction = needsFirstContact + followUp + readyToClose + reviewManually;
 
   const warnings: string[] = [];
   if (invalidStatusCount > 0) {

@@ -21,10 +21,16 @@ export default function LegalFooterLinks({ className }: { className?: string }) 
     <nav
       aria-label="Legal and support"
       data-testid="legal-footer-links"
-      className={className ?? "flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground"}
+      className={
+        className ?? "flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground"
+      }
     >
       {LEGAL_FOOTER_LINKS.map((l) => (
-        <Link key={l.to} to={l.to} className="hover:text-foreground underline-offset-2 hover:underline">
+        <Link
+          key={l.to}
+          to={l.to}
+          className="hover:text-foreground underline-offset-2 hover:underline"
+        >
           {l.label}
         </Link>
       ))}

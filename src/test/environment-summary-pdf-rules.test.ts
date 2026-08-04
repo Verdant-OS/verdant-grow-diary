@@ -47,9 +47,7 @@ describe("buildEnvironmentSummaryPdfPayload", () => {
     });
     expect(payload.dateRangeLabel).toBe("2026-06-01 — 2026-06-07");
     expect(payload.safetyFooter).toBe(PDF_SAFETY_FOOTER);
-    expect(payload.filename).toBe(
-      "verdant-environment-summary-2026-06-01-to-2026-06-07.pdf",
-    );
+    expect(payload.filename).toBe("verdant-environment-summary-2026-06-01-to-2026-06-07.pdf");
     expect(payload.title).toMatch(/Verdant/);
     expect(payload.generatedAtLabel).toBe("2026-06-08T00:00:00.000Z");
     expect(payload.sections.find((s) => s.heading === "Status counts")).toBeTruthy();
@@ -70,8 +68,6 @@ describe("buildEnvironmentSummaryPdfPayload", () => {
       selectedIssueId: selected.ruleId,
     });
     expect(payload.selectedIssue?.ruleId).toBe(selected.ruleId);
-    expect(
-      payload.sections.some((s) => s.heading.startsWith("Selected issue:")),
-    ).toBe(true);
+    expect(payload.sections.some((s) => s.heading.startsWith("Selected issue:"))).toBe(true);
   });
 });

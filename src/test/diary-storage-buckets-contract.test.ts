@@ -18,10 +18,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import {
-  ALLOWED_VIDEO_MIME_TYPES,
-  VIDEO_MAX_SIZE_BYTES,
-} from "@/lib/videoAttachmentRules";
+import { ALLOWED_VIDEO_MIME_TYPES, VIDEO_MAX_SIZE_BYTES } from "@/lib/videoAttachmentRules";
 
 // ---------------------------------------------------------------------------
 // Contract declarations — these must match backend console configuration.
@@ -48,13 +45,7 @@ const DIARY_PHOTOS_CONTRACT = {
   name: "diary-photos",
   public: false,
   fileSizeLimitBytes: 26_214_400, // 25 MB — well above phone HEIC/JPEG norms
-  allowedMimeTypes: [
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "image/heic",
-    "image/heif",
-  ] as const,
+  allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"] as const,
   ownerScopedRls: true,
 } as const;
 
@@ -65,20 +56,14 @@ const ALL_CONTRACTS = [DIARY_VIDEOS_CONTRACT, DIARY_PHOTOS_CONTRACT] as const;
 // ---------------------------------------------------------------------------
 
 describe("diary storage buckets — shared safety invariants", () => {
-  it.each(ALL_CONTRACTS)(
-    "$name must be private (owner-scoped, not public)",
-    (bucket) => {
-      expect(bucket.public).toBe(false);
-    },
-  );
+  it.each(ALL_CONTRACTS)("$name must be private (owner-scoped, not public)", (bucket) => {
+    expect(bucket.public).toBe(false);
+  });
 
-  it.each(ALL_CONTRACTS)(
-    "$name must declare a finite positive file_size_limit",
-    (bucket) => {
-      expect(Number.isFinite(bucket.fileSizeLimitBytes)).toBe(true);
-      expect(bucket.fileSizeLimitBytes).toBeGreaterThan(0);
-    },
-  );
+  it.each(ALL_CONTRACTS)("$name must declare a finite positive file_size_limit", (bucket) => {
+    expect(Number.isFinite(bucket.fileSizeLimitBytes)).toBe(true);
+    expect(bucket.fileSizeLimitBytes).toBeGreaterThan(0);
+  });
 
   it.each(ALL_CONTRACTS)(
     "$name must declare a non-empty allowed_mime_types allow-list",
@@ -90,12 +75,9 @@ describe("diary storage buckets — shared safety invariants", () => {
     },
   );
 
-  it.each(ALL_CONTRACTS)(
-    "$name must be owner-scoped via storage.objects RLS",
-    (bucket) => {
-      expect(bucket.ownerScopedRls).toBe(true);
-    },
-  );
+  it.each(ALL_CONTRACTS)("$name must be owner-scoped via storage.objects RLS", (bucket) => {
+    expect(bucket.ownerScopedRls).toBe(true);
+  });
 
   it("bucket names never collide", () => {
     const names = ALL_CONTRACTS.map((b) => b.name);
@@ -114,12 +96,8 @@ describe("diary-videos server-side contract", () => {
   });
 
   it("pins MIME allow-list to ALLOWED_VIDEO_MIME_TYPES", () => {
-    const server = [...DIARY_VIDEOS_CONTRACT.allowedMimeTypes]
-      .map((m) => m.toLowerCase())
-      .sort();
-    const client = [...ALLOWED_VIDEO_MIME_TYPES]
-      .map((m) => m.toLowerCase())
-      .sort();
+    const server = [...DIARY_VIDEOS_CONTRACT.allowedMimeTypes].map((m) => m.toLowerCase()).sort();
+    const client = [...ALLOWED_VIDEO_MIME_TYPES].map((m) => m.toLowerCase()).sort();
     expect(server).toEqual(client);
   });
 

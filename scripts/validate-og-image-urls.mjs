@@ -174,7 +174,6 @@ export function validateImageUrl({ distDir, file, tag, url }) {
     return issues;
   }
 
-
   const expectedCt = contentTypeForExtension(localPath);
   if (!expectedCt || !expectedCt.startsWith("image/")) {
     push(`extension ${extname(localPath)} is not a supported image content-type`);
@@ -192,9 +191,7 @@ export function validateImageUrl({ distDir, file, tag, url }) {
 
   const detectedCt = meta.format === "png" ? "image/png" : "image/jpeg";
   if (detectedCt !== expectedCt) {
-    push(
-      `content-type mismatch: extension says ${expectedCt} but magic bytes are ${detectedCt}`,
-    );
+    push(`content-type mismatch: extension says ${expectedCt} but magic bytes are ${detectedCt}`);
   }
 
   if (meta.width !== EXPECTED_WIDTH || meta.height !== EXPECTED_HEIGHT) {

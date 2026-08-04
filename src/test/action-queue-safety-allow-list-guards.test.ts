@@ -62,7 +62,6 @@ const FORBIDDEN_IN_ALLOW_LIST: ReadonlyArray<{ name: string; re: RegExp }> = [
   // negative-regression block below, which exercises the scanner's
   // banned regexes directly.
 
-
   // Secret / leakage tokens.
   { name: "service_role", re: /service_role/i },
   { name: "SUPABASE_SERVICE_ROLE_KEY", re: /SUPABASE_SERVICE_ROLE_KEY/i },

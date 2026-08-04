@@ -37,10 +37,7 @@ const AL = {
       expires_on: "2099-12-31",
     },
   ],
-  never_allowlist: [
-    "https://verdantgrowdiary.com/",
-    "https://verdantgrowdiary.com/pricing",
-  ],
+  never_allowlist: ["https://verdantgrowdiary.com/", "https://verdantgrowdiary.com/pricing"],
   _source: "test",
 };
 
@@ -110,11 +107,7 @@ test("applyAllowlist never suppresses issues on never_allowlist URLs", () => {
 
 test("applyAllowlist ignores expired entries", () => {
   const issues = [{ code: "not_indexed", message: "legacy: not indexed" }];
-  const { kept, suppressed } = applyAllowlist(
-    "https://verdantgrowdiary.com/legacy/x",
-    issues,
-    AL,
-  );
+  const { kept, suppressed } = applyAllowlist("https://verdantgrowdiary.com/legacy/x", issues, AL);
   assert.equal(kept.length, 1);
   assert.equal(suppressed.length, 0);
 });

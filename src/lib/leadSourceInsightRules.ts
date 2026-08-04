@@ -15,17 +15,9 @@ import {
 } from "@/lib/leadAnalyticsRules";
 import { auditLeadDataQuality } from "@/lib/leadDataQualityAuditRules";
 
-export type LeadSourceInsightCategory =
-  | "source"
-  | "lead_type"
-  | "data_quality"
-  | "sample_size";
+export type LeadSourceInsightCategory = "source" | "lead_type" | "data_quality" | "sample_size";
 
-export type LeadSourceInsightSeverity =
-  | "info"
-  | "watch"
-  | "warning"
-  | "positive";
+export type LeadSourceInsightSeverity = "info" | "watch" | "warning" | "positive";
 
 export interface LeadSourceInsight {
   id: string;
@@ -200,8 +192,7 @@ export function buildLeadSourceInsights(
       message: `${unknownSource.count}/${total} leads (${unknownSource.percentage}%) have no source recorded.`,
       metricLabel: "% unknown",
       metricValue: `${unknownSource.percentage}%`,
-      recommendation:
-        "Capture source on intake before trusting source performance.",
+      recommendation: "Capture source on intake before trusting source performance.",
       sortWeight: 70 + Math.round(unknownSource.percentage),
     });
   }
@@ -214,8 +205,7 @@ export function buildLeadSourceInsights(
       message: `${unknownType.count}/${total} leads (${unknownType.percentage}%) have no lead type recorded.`,
       metricLabel: "% unknown",
       metricValue: `${unknownType.percentage}%`,
-      recommendation:
-        "Set a lead type at intake before trusting lead-type performance.",
+      recommendation: "Set a lead type at intake before trusting lead-type performance.",
       sortWeight: 65 + Math.round(unknownType.percentage),
     });
   }
@@ -247,9 +237,7 @@ export function buildLeadSourceInsights(
   const weakTypeCandidates = knownTypes
     .filter(
       (t) =>
-        t.total >= SUFFICIENT_GROUP_SAMPLE &&
-        t.follow_up >= 2 &&
-        t.closed_rate < LOW_CLOSE_RATE,
+        t.total >= SUFFICIENT_GROUP_SAMPLE && t.follow_up >= 2 && t.closed_rate < LOW_CLOSE_RATE,
     )
     .sort((a, b) => {
       if (b.follow_up !== a.follow_up) return b.follow_up - a.follow_up;

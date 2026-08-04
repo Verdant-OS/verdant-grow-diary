@@ -9,14 +9,11 @@ import {
   enrichFinding,
 } from "../../scripts/lib/annotate-edge-shared-drift-parse.mjs";
 
-
 const MANIFEST = "supabase/functions/_shared/lib/.sync-manifest.json";
 
 describe("parseDrift", () => {
   it("parses MISSING committed mirror lines", () => {
-    const f = parseDrift(
-      "MISSING committed mirror: supabase/functions/_shared/lib/foo.ts",
-    );
+    const f = parseDrift("MISSING committed mirror: supabase/functions/_shared/lib/foo.ts");
     expect(f).toEqual({
       file: "supabase/functions/_shared/lib/foo.ts",
       title: "Edge mirror file missing",
@@ -46,9 +43,7 @@ describe("parseDrift", () => {
   });
 
   it("parses manifest sourceHashes drift as manifest file target", () => {
-    const f = parseDrift(
-      "DRIFT: .sync-manifest.json sourceHashes differ from generator",
-    );
+    const f = parseDrift("DRIFT: .sync-manifest.json sourceHashes differ from generator");
     expect(f?.file).toBe(MANIFEST);
     expect(f?.title).toBe("Edge mirror manifest drift");
   });
@@ -70,9 +65,7 @@ describe("parseDrift", () => {
   });
 
   it("strips a leading bullet ('- ') so bulleted checker output still parses", () => {
-    const f = parseDrift(
-      "  - MISSING committed mirror: supabase/functions/_shared/lib/qux.ts",
-    );
+    const f = parseDrift("  - MISSING committed mirror: supabase/functions/_shared/lib/qux.ts");
     expect(f?.file).toBe("supabase/functions/_shared/lib/qux.ts");
   });
 
@@ -88,9 +81,7 @@ describe("parseDrift", () => {
 
 describe("escapeWorkflowCommand", () => {
   it("percent-encodes %, CR, LF so annotations don't truncate", () => {
-    expect(escapeWorkflowCommand("100% done\r\nnext")).toBe(
-      "100%25 done%0D%0Anext",
-    );
+    expect(escapeWorkflowCommand("100% done\r\nnext")).toBe("100%25 done%0D%0Anext");
   });
 
   it("escapes % before newlines so the encoded %0A is not re-encoded", () => {
@@ -147,7 +138,6 @@ describe("formatAnnotation", () => {
   });
 });
 
-
 describe("collectFindings", () => {
   it("parses a full checker stderr block covering every drift shape", () => {
     const stderr = [
@@ -184,9 +174,7 @@ describe("collectFindings", () => {
   });
 
   it("returns [] for clean output", () => {
-    expect(collectFindings("OK — 81 mirrored files in sync with src/.")).toEqual(
-      [],
-    );
+    expect(collectFindings("OK — 81 mirrored files in sync with src/.")).toEqual([]);
     expect(collectFindings("")).toEqual([]);
     expect(collectFindings(null)).toEqual([]);
   });
@@ -251,15 +239,13 @@ describe("enrichFinding", () => {
       `ENTRY not rewritten: supabase/functions/foo/index.ts still imports "@/lib/thing"`,
     )!;
     const enriched = enrichFinding(finding, {
-      readFile: (rel) =>
-        rel === "supabase/functions/foo/index.ts" ? entryText : null,
+      readFile: (rel) => (rel === "supabase/functions/foo/index.ts" ? entryText : null),
     });
     // Line 3 = the `import { thing } from "@/lib/thing"` line.
     expect(enriched.line).toBe(3);
     // Col points at the start of the matched `from "..."` clause
     // (char 18 = the `f` in `from`, 1-based).
     expect(enriched.col).toBe(18);
-
   });
 
   it("prefers an actual import over a stray string literal in a comment", () => {
@@ -304,9 +290,7 @@ describe("enrichFinding", () => {
       "\n" +
       "export const value = 1;\n";
     const expected = actual.replace("value = 1", "value = 2");
-    const finding = parseDrift(
-      `DRIFT: ${MIRROR}/foo.ts differs from generator output`,
-    )!;
+    const finding = parseDrift(`DRIFT: ${MIRROR}/foo.ts differs from generator output`)!;
     const enriched = enrichFinding(finding, {
       readFile: (rel) => (rel === `${MIRROR}/foo.ts` ? actual : null),
       readExpected: (rel) => (rel === "foo.ts" ? expected : null),
@@ -317,9 +301,7 @@ describe("enrichFinding", () => {
   });
 
   it("leaves DRIFT unchanged when expected content is unavailable", () => {
-    const finding = parseDrift(
-      `DRIFT: ${MIRROR}/foo.ts differs from generator output`,
-    )!;
+    const finding = parseDrift(`DRIFT: ${MIRROR}/foo.ts differs from generator output`)!;
     const enriched = enrichFinding(finding, {
       readFile: () => "actual content",
       readExpected: () => null,

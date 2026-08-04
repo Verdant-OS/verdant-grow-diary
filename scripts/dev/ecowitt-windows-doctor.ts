@@ -167,8 +167,7 @@ export function buildLauncherFiles(repoRoot: string): Record<string, string> {
       header +
       `"C:\\Program Files\\mosquitto\\mosquitto_sub.exe" -h 127.0.0.1 -p 1883 -t "ecowitt/#" -v\r\n` +
       footer,
-    "02-start-http-bridge.cmd":
-      header + `${cd}\r\nbun run dev:ecowitt-http-bridge\r\n` + footer,
+    "02-start-http-bridge.cmd": header + `${cd}\r\nbun run dev:ecowitt-http-bridge\r\n` + footer,
     "03-test-http-bridge.cmd":
       header +
       `echo FAKE LOCAL TEST PAYLOAD -- not live data\r\n` +
@@ -219,7 +218,11 @@ export function buildLauncherFiles(repoRoot: string): Record<string, string> {
 function realResolve(p: string): string {
   const abs = resolve(p);
   if (existsSync(abs)) {
-    try { return realpathSync(abs); } catch { return abs; }
+    try {
+      return realpathSync(abs);
+    } catch {
+      return abs;
+    }
   }
   const parent = dirname(abs);
   if (parent === abs) return abs;
@@ -235,10 +238,7 @@ export interface LauncherWriteSummary {
   refused: number;
 }
 
-export function writeLaunchers(
-  outDir: string,
-  repoRoot: string,
-): LauncherWriteSummary {
+export function writeLaunchers(outDir: string, repoRoot: string): LauncherWriteSummary {
   // Safety: only ever write under <repo-root>/tmp/ecowitt-windows/.
   if (!isAbsolute(repoRoot)) {
     throw new Error(`refusing to write launchers: repoRoot must be absolute (got: ${repoRoot})`);
@@ -310,11 +310,7 @@ async function main(): Promise<void> {
   const packageJsonFound = existsSync(resolve(cwd, "package.json"));
 
   if (!packageJsonFound) {
-    // eslint-disable-next-line no-console
-    console.error(
-      "[ecowitt-doctor] preflight FAILED — package.json not found in cwd:",
-      cwd,
-    );
+    console.error("[ecowitt-doctor] preflight FAILED — package.json not found in cwd:", cwd);
     process.exit(2);
   }
 
@@ -325,41 +321,35 @@ async function main(): Promise<void> {
   });
 
   if (wantJson) {
-    // eslint-disable-next-line no-console
     console.log(JSON.stringify(report, null, 2));
   } else {
-    // eslint-disable-next-line no-console
     console.log("[ecowitt-doctor] cwd:", report.cwd);
-    // eslint-disable-next-line no-console
+
     console.log("[ecowitt-doctor] package.json:", report.packageJsonFound ? "OK" : "MISSING");
-    // eslint-disable-next-line no-console
+
     console.log("[ecowitt-doctor] bun:", report.bunVersion ?? "(not detected)");
-    // eslint-disable-next-line no-console
+
     console.log("[ecowitt-doctor] IPv4 candidates:");
     for (const c of report.ips) {
-      // eslint-disable-next-line no-console
       console.log(
         `  - ${c.address}  [${c.iface}]${c.recommended ? "  RECOMMENDED" : ""}${
           c.reason ? `  (${c.reason})` : ""
         }`,
       );
     }
-    // eslint-disable-next-line no-console
+
     console.log("[ecowitt-doctor] Mosquitto hints:");
     for (const h of report.mosquittoHints) {
-      // eslint-disable-next-line no-console
       console.log(`  - ${h}`);
     }
-    // eslint-disable-next-line no-console
+
     console.log("[ecowitt-doctor] Ecowitt app settings:");
     for (const [k, v] of Object.entries(report.ecowittAppSettings)) {
-      // eslint-disable-next-line no-console
       console.log(`  - ${k}: ${v}`);
     }
-    // eslint-disable-next-line no-console
+
     console.log("[ecowitt-doctor] Next commands:");
     for (const c of report.nextCommands) {
-      // eslint-disable-next-line no-console
       console.log(`  ${c}`);
     }
   }
@@ -367,12 +357,11 @@ async function main(): Promise<void> {
   if (wantLaunchers) {
     const outDir = resolve(cwd, "tmp/ecowitt-windows");
     const res = writeLaunchers(outDir, cwd);
-    // eslint-disable-next-line no-console
+
     console.log(
       `[ecowitt-doctor] launchers: created=${res.created} updated=${res.updated} unchanged=${res.unchanged} refused=${res.refused} dir=${res.outDir}`,
     );
     for (const p of res.written) {
-      // eslint-disable-next-line no-console
       console.log("  -", p);
     }
   }

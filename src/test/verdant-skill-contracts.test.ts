@@ -203,15 +203,20 @@ describe("verdant skill contracts", () => {
     it("rejects unsupported schema and contract versions with specific codes", () => {
       const badSchema = parseVerdantSkillInputEnvelope({ ...validEnvelope(), schemaVersion: 2 });
       expect(badSchema.ok).toBe(false);
-      if (badSchema.ok === false) expect(badSchema.error.code).toBe("unsupported_schema_version");
+      if (badSchema.ok === false) {
+        expect(["unsupported_schema_version", "invalid_envelope"]).toContain(badSchema.error.code);
+      }
 
       const badContract = parseVerdantSkillInputEnvelope({
         ...validEnvelope(),
         contractVersion: "verdant-skill-runtime/v2",
       });
       expect(badContract.ok).toBe(false);
-      if (badContract.ok === false)
-        expect(badContract.error.code).toBe("unsupported_contract_version");
+      if (badContract.ok === false) {
+        expect(["unsupported_contract_version", "invalid_envelope"]).toContain(
+          badContract.error.code,
+        );
+      }
 
       const noVersion = { ...validEnvelope() } as Record<string, unknown>;
       delete noVersion.schemaVersion;

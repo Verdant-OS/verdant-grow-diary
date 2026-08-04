@@ -119,23 +119,19 @@ const WARNING_MESSAGES: Record<EpisodeWarningCode, string> = {
     "A linked entry references a different grow than the action. Review before trusting this episode.",
   tent_mismatch:
     "A linked entry references a different tent than the action. Review before trusting this episode.",
-  unknown_action_reference:
-    "A linked entry references an action that could not be found.",
+  unknown_action_reference: "A linked entry references an action that could not be found.",
   duplicate_outcomes:
     "More than one grower-recorded outcome exists for this action. Review which one applies.",
   duplicate_learning_decisions:
     "More than one next-run decision exists for this action. Review which one applies.",
   outcome_before_completion:
     "The recorded outcome is timestamped before the action was completed. Review the timeline.",
-  decision_without_outcome:
-    "A next-run decision exists without a grower-recorded outcome.",
+  decision_without_outcome: "A next-run decision exists without a grower-recorded outcome.",
   future_timestamp: "A linked entry carries a timestamp in the future.",
   invalid_timestamp: "A linked entry carries an unreadable timestamp.",
-  snapshot_tent_mismatch:
-    "A sensor snapshot from a different tent was excluded from this episode.",
+  snapshot_tent_mismatch: "A sensor snapshot from a different tent was excluded from this episode.",
   missing_follow_up: "No follow-up has been recorded for this action yet.",
-  evidence_limited:
-    "The available evidence is limited. Other factors may have contributed.",
+  evidence_limited: "The available evidence is limited. Other factors may have contributed.",
 };
 
 export function episodeWarning(code: EpisodeWarningCode): PlantMemoryEpisodeWarning {
@@ -393,7 +389,11 @@ export function buildPlantMemoryEpisode(input: BuildEpisodeInput): PlantMemoryEp
   ) {
     pushWarning("outcome_before_completion");
   }
-  if (nowMs !== null && outcomeRecordedAtMs !== null && outcomeRecordedAtMs > nowMs + FUTURE_TIMESTAMP_SKEW_MS) {
+  if (
+    nowMs !== null &&
+    outcomeRecordedAtMs !== null &&
+    outcomeRecordedAtMs > nowMs + FUTURE_TIMESTAMP_SKEW_MS
+  ) {
     pushWarning("future_timestamp");
   }
 
@@ -437,8 +437,7 @@ export function buildPlantMemoryEpisode(input: BuildEpisodeInput): PlantMemoryEp
     a.occurredAt.localeCompare(b.occurredAt),
   );
 
-  const usableEvidenceCount =
-    photos.length + sensorSnapshots.filter((s) => s.usable).length;
+  const usableEvidenceCount = photos.length + sensorSnapshots.filter((s) => s.usable).length;
   if (usableEvidenceCount === 0) pushWarning("evidence_limited");
 
   // Deterministic state machine (review warnings dominate).
@@ -499,8 +498,7 @@ export function buildPlantMemoryEpisode(input: BuildEpisodeInput): PlantMemoryEp
       decision,
       rationale: detailString(decisionDetails, "rationale"),
       recordedAt: decisionRecordedAt,
-      recordedBy:
-        detailString(decisionDetails, "recorded_by") === "grower" ? "grower" : null,
+      recordedBy: detailString(decisionDetails, "recorded_by") === "grower" ? "grower" : null,
     },
     evidence: { photos, sensorSnapshots, timelineEntries },
     state,
@@ -523,10 +521,7 @@ const STATE_PRIORITY: Record<PlantMemoryEpisodeState, number> = {
 /** Queue priority: overdue follow-up first, then worsened outcomes, then
  *  more-data-needed, then decision-missing, then closed. needs_review leads
  *  because nothing in it can be trusted until reviewed. */
-export function comparePlantMemoryEpisodes(
-  a: PlantMemoryEpisode,
-  b: PlantMemoryEpisode,
-): number {
+export function comparePlantMemoryEpisodes(a: PlantMemoryEpisode, b: PlantMemoryEpisode): number {
   const pa = STATE_PRIORITY[a.state];
   const pb = STATE_PRIORITY[b.state];
   if (pa !== pb) return pa - pb;
@@ -570,8 +565,7 @@ export const DECISION_LABELS: Record<NextRunDecision, string> = {
 };
 
 export type LearningDecisionDraftResult =
-  | { ok: true; draft: RunLearningDecisionDraft }
-  | { ok: false; reason: string };
+  { ok: true; draft: RunLearningDecisionDraft } | { ok: false; reason: string };
 
 export interface LearningDecisionInput {
   readonly decision: string;
@@ -588,7 +582,10 @@ export interface LearningDecisionInput {
  *  - whitespace-only rationale counts as empty; length is capped.
  */
 export function buildRunLearningDecisionDraft(
-  episode: Pick<PlantMemoryEpisode, "growId" | "tentId" | "plantId" | "action" | "outcome" | "followUp">,
+  episode: Pick<
+    PlantMemoryEpisode,
+    "growId" | "tentId" | "plantId" | "action" | "outcome" | "followUp"
+  >,
   input: LearningDecisionInput,
 ): LearningDecisionDraftResult {
   if (!episode?.action?.actionQueueId) return { ok: false, reason: "missing_action" };

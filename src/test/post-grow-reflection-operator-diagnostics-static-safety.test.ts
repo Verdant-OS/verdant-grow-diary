@@ -4,6 +4,10 @@ import { resolve } from "node:path";
 
 import { getRoutesByAccess } from "@/lib/appRouteManifest";
 import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
+import {
   readDesktopGrowerNavigationSource,
   readMobileGrowerNavigationSource,
 } from "@/test/utils/growerNavigationSource";
@@ -11,7 +15,7 @@ import {
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
 
 const ROUTE = "/operator/post-grow-reflection-dry-run";
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 const MANIFEST = read("src/lib/appRouteManifest.ts");
 const PAGE = read("src/pages/OperatorPostGrowReflectionDryRun.tsx");
 const VIEW_MODEL = read("src/lib/ai/postGrowReflectionOperatorDiagnosticsViewModel.ts");
@@ -19,7 +23,7 @@ const DOCS = read("docs/post-grow-reflection-phase2e.md");
 
 describe("Post-Grow Reflection operator diagnostics static safety", () => {
   it("registers only the operator route and manifest entry", () => {
-    expect(APP).toContain(`path="${ROUTE}"`);
+    expect(extractMountedAppRoutePaths()).toContain(ROUTE);
     // Formatting-agnostic: prettier may reflow manifest entries with long
     // descriptions across lines. The structural checks below (via
     // getRoutesByAccess) carry the real access-gating contract.

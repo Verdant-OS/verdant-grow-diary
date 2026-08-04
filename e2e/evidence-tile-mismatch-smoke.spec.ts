@@ -15,8 +15,7 @@ import { test, expect } from "@playwright/test";
  * Skips when the fixture env is not provided so local/mocked and CI runs
  * without the smoke fixture stay green.
  */
-const PLANT_URL = process.env.E2E_EVIDENCE_TILE_PLANT_URL
-  ?? process.env.E2E_GROW_1_PLANT_URL;
+const PLANT_URL = process.env.E2E_EVIDENCE_TILE_PLANT_URL ?? process.env.E2E_GROW_1_PLANT_URL;
 
 test.describe("Evidence tile — mismatch traceability", () => {
   test.skip(

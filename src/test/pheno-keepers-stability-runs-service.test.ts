@@ -73,7 +73,12 @@ describe("listKeepersForHunt — stability_runs read", () => {
           created_at: null,
           stability_runs: [
             // one valid run, plus junk that must be dropped
-            { runLabel: "Run 1", observedAt: "2026-02-01", traits: { nose_loudness: 8, bogus: 3 }, note: "gassy" },
+            {
+              runLabel: "Run 1",
+              observedAt: "2026-02-01",
+              traits: { nose_loudness: 8, bogus: 3 },
+              note: "gassy",
+            },
             { runLabel: "   ", traits: { vigor: 4 } },
           ],
         },
@@ -108,7 +113,12 @@ describe("listKeeperStabilityForOwner — owner-wide read", () => {
           hunt_id: "h1",
           keeper_name: "Gas",
           stability_runs: [
-            { runLabel: "R1", observedAt: "2026-02-01", traits: { nose_loudness: 8, junk: 3 }, note: "x" },
+            {
+              runLabel: "R1",
+              observedAt: "2026-02-01",
+              traits: { nose_loudness: 8, junk: 3 },
+              note: "x",
+            },
           ],
         },
         { id: "k2", hunt_id: "h2", keeper_name: "Cake" }, // legacy: column absent
@@ -153,7 +163,9 @@ describe("updateKeeperStabilityRuns — write", () => {
     expect(res).toEqual({ ok: true, id: "k1" });
     // Sanitized payload written (unknown axis + label-less run removed).
     expect((updateChain.updateMock.mock.calls[0] as unknown[])[0]).toEqual({
-      stability_runs: [{ runLabel: "Run 1", observedAt: null, traits: { nose_loudness: 8 }, note: "x" }],
+      stability_runs: [
+        { runLabel: "Run 1", observedAt: null, traits: { nose_loudness: 8 }, note: "x" },
+      ],
     });
     // RLS scoping: keeper id AND owner id.
     expect(updateChain.updEq1Mock).toHaveBeenCalledWith("id", "k1");

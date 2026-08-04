@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  STATIC_PUBLIC_OUTPUT_DOCUMENTS,
-  STATIC_PUBLIC_SEO_DOCUMENTS,
-} from "@/lib/build/staticPublicSeoDocuments";
+import { STATIC_PUBLIC_SEO_DOCUMENTS } from "@/lib/build/staticPublicSeoDocuments";
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
 const VITE = read("vite.config.ts");
@@ -14,17 +11,14 @@ const VERCEL = JSON.parse(read("vercel.json")) as {
 };
 
 describe("Founder static social document build contract", () => {
-  it("emits every static SEO document, including founder/index.html, from the Vite-built index asset", () => {
-    expect(VITE).toContain("staticSocialRouteDocuments()");
-    expect(VITE).toContain("STATIC_PUBLIC_OUTPUT_DOCUMENTS");
-    expect(VITE).toContain("for (const document of STATIC_PUBLIC_OUTPUT_DOCUMENTS)");
-    expect(STATIC_PUBLIC_OUTPUT_DOCUMENTS.length).toBeGreaterThan(
-      STATIC_PUBLIC_SEO_DOCUMENTS.length,
+  it("captures every public SEO document from the production SSR bundle", () => {
+    const packageJson = read("package.json");
+    expect(packageJson).toContain(
+      "capture-ssr-head-snapshots-with-server.mjs dist .output/server/index.mjs",
     );
-    expect(VITE).toContain("const metadataWithOg = { ...document.metadata, image: ogImageUrl }");
-    expect(VITE).toContain("buildStaticSocialRouteHtml(indexAsset.source, metadataWithOg)");
-    expect(VITE).toContain("fileName: document.fileName");
-    expect(VITE).toContain('apply: "build"');
+    expect(VITE).toContain("tanstackStart");
+    expect(VITE).toContain('server: { entry: "server" }');
+    expect(STATIC_PUBLIC_SEO_DOCUMENTS.some((document) => document.path === "/founder")).toBe(true);
   });
 
   it("uses a filesystem-first static entry for /founder before the SPA fallback", () => {

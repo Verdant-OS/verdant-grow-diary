@@ -48,9 +48,7 @@ const passingCi = (over: Partial<EvidenceReceipt> = {}) =>
 
 describe("deriveReleaseEvidencePosture", () => {
   it("HOLD with only local targeted passes", () => {
-    const r = [
-      makeReceipt({ id: "a", category: "local_targeted", status: "pass" }),
-    ];
+    const r = [makeReceipt({ id: "a", category: "local_targeted", status: "pass" })];
     const p = deriveReleaseEvidencePosture(r, []);
     expect(p.posture).toBe("HOLD");
     expect(p.missingEvidence).toContain(RELEASE_GO_REQUIREMENT_COPY);
@@ -105,9 +103,7 @@ describe("deriveReleaseEvidencePosture", () => {
 
   it("HOLD with passing CI but an active blocker", () => {
     const r = [passingCi()];
-    const blockers: EvidenceBlocker[] = [
-      { id: "b", label: "Blocker", detail: "x" },
-    ];
+    const blockers: EvidenceBlocker[] = [{ id: "b", label: "Blocker", detail: "x" }];
     const p = deriveReleaseEvidencePosture(r, blockers);
     expect(p.posture).toBe("HOLD");
   });
@@ -148,9 +144,7 @@ describe("deriveReleaseEvidencePosture", () => {
   });
 
   it("groups receipts by category", () => {
-    const grouped = groupEvidenceReceipts(
-      RELEASE_READINESS_EVIDENCE_RECEIPTS,
-    );
+    const grouped = groupEvidenceReceipts(RELEASE_READINESS_EVIDENCE_RECEIPTS);
     expect(grouped.ci_full_suite.length).toBeGreaterThan(0);
     expect(grouped.local_targeted.length).toBeGreaterThan(0);
     expect(grouped.manual_operator_note.length).toBeGreaterThan(0);
@@ -165,8 +159,7 @@ describe("deriveReleaseEvidencePosture", () => {
     expect(p.missingEvidence).toHaveLength(0);
     expect(p.primaryReason.toLowerCase()).toMatch(/active blocker|blocking/);
     // PR #112 parser receipt is now a passing supporting receipt.
-    expect(p.supportingReceipts.some((r) => r.id === "ci-full-suite-pr-112"))
-      .toBe(true);
+    expect(p.supportingReceipts.some((r) => r.id === "ci-full-suite-pr-112")).toBe(true);
   });
 
   it("disclaimers are exposed for non-CI categories", () => {
@@ -180,12 +173,7 @@ describe("Release Readiness Evidence — static safety", () => {
     const fs = await import("node:fs");
     const path = await import("node:path");
     const src = fs.readFileSync(
-      path.resolve(
-        __dirname,
-        "..",
-        "lib",
-        "releaseReadinessEvidenceReceiptViewModel.ts",
-      ),
+      path.resolve(__dirname, "..", "lib", "releaseReadinessEvidenceReceiptViewModel.ts"),
       "utf8",
     );
     for (const term of [

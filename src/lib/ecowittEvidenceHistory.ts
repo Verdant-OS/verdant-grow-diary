@@ -12,9 +12,7 @@ import {
   normalizeEcowittTentPayload,
   SUPPORTED_TENT_KEYS,
 } from "./ecowittTentNormalizerRouter";
-import {
-  CanonicalEcowittTentSnapshot,
-} from "./ecowittTentSnapshot";
+import { CanonicalEcowittTentSnapshot } from "./ecowittTentSnapshot";
 import { ECOWITT_EVIDENCE_FRESHNESS_MS } from "./ecowittLocalEvidence";
 
 export interface EcowittEvidenceHistoryEntry {
@@ -45,21 +43,19 @@ export function buildEcowittEvidenceHistory(
   }
   const now = (params.now ?? new Date()).getTime();
   const freshness = params.freshness_ms ?? ECOWITT_EVIDENCE_FRESHNESS_MS;
-  const samples = (params.sampleKeys
-    ? ECOWITT_PREVIEW_SAMPLES.filter((s) => params.sampleKeys!.includes(s.key))
-    : ECOWITT_PREVIEW_SAMPLES) as readonly EcowittPreviewSample[];
+  const samples = (
+    params.sampleKeys
+      ? ECOWITT_PREVIEW_SAMPLES.filter((s) => params.sampleKeys!.includes(s.key))
+      : ECOWITT_PREVIEW_SAMPLES
+  ) as readonly EcowittPreviewSample[];
 
   const entries: EcowittEvidenceHistoryEntry[] = samples.map((sample) => {
     const captured_at_ms = now - sample.captured_age_ms;
-    const snapshot = normalizeEcowittTentPayload(
-      sample.payload,
-      params.tentKey,
-      {
-        now: new Date(now),
-        captured_at_ms,
-        max_age_ms: freshness,
-      },
-    );
+    const snapshot = normalizeEcowittTentPayload(sample.payload, params.tentKey, {
+      now: new Date(now),
+      captured_at_ms,
+      max_age_ms: freshness,
+    });
     return {
       id: `${params.tentKey}:${sample.key}`,
       tent_key: params.tentKey,

@@ -885,12 +885,14 @@ describe("Quick Log shared in-flight coordination", () => {
     expect(unit).toHaveTextContent("EC mS/cm");
   });
 
-  it("does not expose an unsupported legacy Reminder draft from a crafted prefill", async () => {
+  it("accepts a Reminder prefill and exposes the remind-at field", async () => {
+    // Reminder is a first-class Quick Log activity (remind-at datetime), not a
+    // stripped legacy draft. Prefill must land with the remind-at control.
     renderQuickLog({ plantId: "p1", growId: "g1", tentId: "t1", eventType: "reminder" });
     await waitFor(() =>
-      expect(mainForm().querySelector('input[type="datetime-local"]')).toBeNull(),
+      expect(mainForm().querySelector('input[type="datetime-local"]')).not.toBeNull(),
     );
-    expect(screen.getByRole("combobox", { name: "Event" })).not.toHaveTextContent("Reminder");
+    expect(mainForm().textContent ?? "").toMatch(/Remind me at/i);
     expect(harness.rpc).not.toHaveBeenCalled();
   });
 });

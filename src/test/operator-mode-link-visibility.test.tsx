@@ -38,7 +38,9 @@ function renderCallout() {
 }
 
 describe("OperatorModeLink", () => {
-  beforeEach(() => { roleState.status = "denied"; });
+  beforeEach(() => {
+    roleState.status = "denied";
+  });
 
   it("renders nothing for non-operator users", () => {
     renderLink();
@@ -71,7 +73,9 @@ describe("OperatorModeLink", () => {
 });
 
 describe("OperatorModeCallout", () => {
-  beforeEach(() => { roleState.status = "denied"; });
+  beforeEach(() => {
+    roleState.status = "denied";
+  });
 
   it("renders nothing for non-operator users", () => {
     renderCallout();

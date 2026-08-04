@@ -3,12 +3,14 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 const json = (b: unknown, s: number) =>
-  new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  new Response(JSON.stringify(b), {
+    status: s,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -27,7 +29,11 @@ Deno.serve(async (req) => {
   const userId = claimsData.claims.sub as string;
 
   let body: { id?: string };
-  try { body = await req.json(); } catch { return json({ error: "invalid_json" }, 400); }
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: "invalid_json" }, 400);
+  }
   const id = String(body.id || "");
   if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "invalid_id" }, 400);
 
@@ -38,7 +44,10 @@ Deno.serve(async (req) => {
     .eq("user_id", userId)
     .select("id")
     .maybeSingle();
-  if (updErr) { console.error("revoke-bridge-token update_failed", updErr); return json({ error: "update_failed" }, 400); }
+  if (updErr) {
+    console.error("revoke-bridge-token update_failed", updErr);
+    return json({ error: "update_failed" }, 400);
+  }
   if (!data) return json({ error: "not_found" }, 404);
   return json({ ok: true }, 200);
 });

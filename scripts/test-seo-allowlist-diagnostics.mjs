@@ -5,10 +5,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  simulateAllowlistForUrls,
-  findExpiredEntriesMatchingUrls,
-} from "./seo/seoAllowlist.mjs";
+import { simulateAllowlistForUrls, findExpiredEntriesMatchingUrls } from "./seo/seoAllowlist.mjs";
 
 const NOW = "2026-07-02T00:00:00Z";
 const AL = {
@@ -43,31 +40,19 @@ test("classification: never_allowlisted overrides everything", () => {
 });
 
 test("classification: suppressed when active allowlisted_issues match", () => {
-  const [s] = simulateAllowlistForUrls(
-    ["https://verdantgrowdiary.com/auth/callback"],
-    AL,
-    NOW,
-  );
+  const [s] = simulateAllowlistForUrls(["https://verdantgrowdiary.com/auth/callback"], AL, NOW);
   assert.equal(s.classification, "suppressed");
   assert.ok(s.reasons.some((r) => r.includes("auth-noindex")));
 });
 
 test("classification: expired_allowlist when only expired matches", () => {
-  const [s] = simulateAllowlistForUrls(
-    ["https://verdantgrowdiary.com/legacy/x"],
-    AL,
-    NOW,
-  );
+  const [s] = simulateAllowlistForUrls(["https://verdantgrowdiary.com/legacy/x"], AL, NOW);
   assert.equal(s.classification, "expired_allowlist");
   assert.equal(s.matched_expired_entries[0].id, "expired-legacy");
 });
 
 test("classification: no_match for unmatched URLs", () => {
-  const [s] = simulateAllowlistForUrls(
-    ["https://verdantgrowdiary.com/blog"],
-    AL,
-    NOW,
-  );
+  const [s] = simulateAllowlistForUrls(["https://verdantgrowdiary.com/blog"], AL, NOW);
   assert.equal(s.classification, "no_match");
 });
 
@@ -82,10 +67,6 @@ test("findExpiredEntriesMatchingUrls returns only expired entries covering URL",
 });
 
 test("findExpiredEntriesMatchingUrls returns empty when URLs unaffected", () => {
-  const covering = findExpiredEntriesMatchingUrls(
-    AL,
-    ["https://verdantgrowdiary.com/blog"],
-    NOW,
-  );
+  const covering = findExpiredEntriesMatchingUrls(AL, ["https://verdantgrowdiary.com/blog"], NOW);
   assert.deepEqual(covering, []);
 });

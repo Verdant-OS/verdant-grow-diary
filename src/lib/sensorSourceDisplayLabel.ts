@@ -17,10 +17,7 @@
  *   - Never returns or references raw_payload internals.
  */
 import { SOURCE_LABEL, type SnapshotSource } from "@/lib/sensorSnapshot";
-import {
-  type CsvSourceApp,
-  type CsvVendorSummary,
-} from "@/lib/sensorReadingVendorLineage";
+import { type CsvSourceApp, type CsvVendorSummary } from "@/lib/sensorReadingVendorLineage";
 
 export type { CsvVendorSummary };
 
@@ -35,9 +32,7 @@ const VENDOR_DISPLAY: Record<CsvSourceApp, string> = {
   vivosun: "Vivosun",
 };
 
-export function buildSensorSourceDisplayLabel(
-  input: SensorSourceDisplayInput,
-): string {
+export function buildSensorSourceDisplayLabel(input: SensorSourceDisplayInput): string {
   const source = input.source;
   if (source === "csv") {
     if (input.csvVendor === "multiple") {

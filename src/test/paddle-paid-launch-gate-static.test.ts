@@ -50,7 +50,9 @@ describe("ordering hardening — older events cannot overwrite newer state", () 
     expect(WEBHOOK).toMatch(
       /occurred_at: normalizeProviderTimestamp\(readString\(row\.payload\?\.occurred_at\)\)/,
     );
-    expect(WEBHOOK).toMatch(/function normalizeProviderTimestamp\(value: string \| null\): string \| null/);
+    expect(WEBHOOK).toMatch(
+      /function normalizeProviderTimestamp\(value: string \| null\): string \| null/,
+    );
     expect(WEBHOOK).toMatch(/if \(Number\.isNaN\(parsed\)\) return null;/);
   });
 
@@ -66,7 +68,9 @@ describe("ordering hardening — older events cannot overwrite newer state", () 
     expect(MIGRATION).toMatch(
       /v_processing\.occurred_at < v_existing\.last_provider_event_occurred_at/,
     );
-    expect(MIGRATION).toMatch(/last_provider_event_occurred_at = COALESCE\(v_processing\.occurred_at/);
+    expect(MIGRATION).toMatch(
+      /last_provider_event_occurred_at = COALESCE\(v_processing\.occurred_at/,
+    );
     // The original period-end guard is preserved, not replaced.
     expect(MIGRATION).toMatch(/stale_processing_row/);
   });
@@ -105,7 +109,9 @@ describe("founder lifetime — one-time, atomic, capped, idempotent", () => {
   });
 
   it("allocation is serialized by an advisory lock with the cap enforced in SQL", () => {
-    expect(MIGRATION).toMatch(/pg_advisory_xact_lock\(hashtext\('billing_subscriptions_founder_allocation'\)\)/);
+    expect(MIGRATION).toMatch(
+      /pg_advisory_xact_lock\(hashtext\('billing_subscriptions_founder_allocation'\)\)/,
+    );
     expect(MIGRATION).toMatch(/c_founder_cap constant integer := 75/);
     expect(MIGRATION).toMatch(/founder_cap_reached/);
   });
@@ -127,19 +133,33 @@ describe("founder lifetime — one-time, atomic, capped, idempotent", () => {
   });
 
   it("the webhook routes founder candidates to the founder RPC, others to the updater", () => {
-    expect(WEBHOOK).toMatch(/processing\.isFounderCandidate\s*\?\s*"allocate_founder_lifetime_with_audit"\s*:\s*"apply_paddle_subscription_update_with_audit"/);
+    expect(WEBHOOK).toMatch(
+      /processing\.isFounderCandidate\s*\?\s*"allocate_founder_lifetime_with_audit"\s*:\s*"apply_paddle_subscription_update_with_audit"/,
+    );
   });
 
   it("sold-out is blocked BEFORE payment via an aggregate-only availability RPC", () => {
     // The function exposes nothing but GREATEST(0, 75 - COUNT(*)) — no rows,
     // no ids, no PII. anon stays revoked; signed-in callers (the price
     // resolver runs as the verified caller) and service_role may read it.
-    expect(MIGRATION).toMatch(/CREATE OR REPLACE FUNCTION public\.founder_lifetime_slots_remaining\(\)\s*\nRETURNS integer/);
-    expect(MIGRATION).toMatch(/GREATEST\(\s*\n?\s*0,\s*\n?\s*75 - \(SELECT COUNT\(\*\)::int FROM public\.billing_subscriptions WHERE founder_number IS NOT NULL\)/);
-    expect(MIGRATION).toContain("REVOKE ALL ON FUNCTION public.founder_lifetime_slots_remaining() FROM PUBLIC;");
-    expect(MIGRATION).toContain("REVOKE ALL ON FUNCTION public.founder_lifetime_slots_remaining() FROM anon;");
-    expect(MIGRATION).toContain("GRANT EXECUTE ON FUNCTION public.founder_lifetime_slots_remaining() TO authenticated;");
-    expect(MIGRATION).toContain("GRANT EXECUTE ON FUNCTION public.founder_lifetime_slots_remaining() TO service_role;");
+    expect(MIGRATION).toMatch(
+      /CREATE OR REPLACE FUNCTION public\.founder_lifetime_slots_remaining\(\)\s*\nRETURNS integer/,
+    );
+    expect(MIGRATION).toMatch(
+      /GREATEST\(\s*\n?\s*0,\s*\n?\s*75 - \(SELECT COUNT\(\*\)::int FROM public\.billing_subscriptions WHERE founder_number IS NOT NULL\)/,
+    );
+    expect(MIGRATION).toContain(
+      "REVOKE ALL ON FUNCTION public.founder_lifetime_slots_remaining() FROM PUBLIC;",
+    );
+    expect(MIGRATION).toContain(
+      "REVOKE ALL ON FUNCTION public.founder_lifetime_slots_remaining() FROM anon;",
+    );
+    expect(MIGRATION).toContain(
+      "GRANT EXECUTE ON FUNCTION public.founder_lifetime_slots_remaining() TO authenticated;",
+    );
+    expect(MIGRATION).toContain(
+      "GRANT EXECUTE ON FUNCTION public.founder_lifetime_slots_remaining() TO service_role;",
+    );
     // And the price resolver actually consults it for founder_lifetime.
     const priceFn = read("supabase/functions/get-paddle-price/index.ts");
     expect(priceFn).toMatch(/founder_lifetime_slots_remaining/);
@@ -155,7 +175,9 @@ describe("founder lifetime — one-time, atomic, capped, idempotent", () => {
 
   it("founder allocation stays sandbox-only until live is explicitly approved", () => {
     const founderFn = MIGRATION.slice(MIGRATION.indexOf("allocate_founder_lifetime("));
-    expect(founderFn).toMatch(/v_processing\.environment <> 'sandbox' OR v_event\.environment <> 'sandbox'/);
+    expect(founderFn).toMatch(
+      /v_processing\.environment <> 'sandbox' OR v_event\.environment <> 'sandbox'/,
+    );
   });
 });
 
@@ -164,15 +186,21 @@ describe("review-hardening migration — supersedes, never edits, the merged gat
     // Same-buyer duplicate races must converge on the already_founder noop,
     // never a unique-violation 'failed' that forces a pointless retry.
     const lockIdx = HARDENING.indexOf("pg_advisory_xact_lock");
-    const existingReadIdx = HARDENING.indexOf("SELECT * INTO v_existing FROM public.billing_subscriptions");
+    const existingReadIdx = HARDENING.indexOf(
+      "SELECT * INTO v_existing FROM public.billing_subscriptions",
+    );
     const noopIdx = HARDENING.indexOf("'already_founder'");
     expect(lockIdx).toBeGreaterThan(-1);
     expect(existingReadIdx).toBeGreaterThan(-1);
     expect(lockIdx).toBeLessThan(existingReadIdx);
     expect(existingReadIdx).toBeLessThan(noopIdx);
     // The redefined function keeps the service_role-only posture.
-    expect(HARDENING).toContain("REVOKE ALL ON FUNCTION public.allocate_founder_lifetime(uuid) FROM authenticated;");
-    expect(HARDENING).toContain("GRANT EXECUTE ON FUNCTION public.allocate_founder_lifetime(uuid) TO service_role;");
+    expect(HARDENING).toContain(
+      "REVOKE ALL ON FUNCTION public.allocate_founder_lifetime(uuid) FROM authenticated;",
+    );
+    expect(HARDENING).toContain(
+      "GRANT EXECUTE ON FUNCTION public.allocate_founder_lifetime(uuid) TO service_role;",
+    );
     // Every guard from the gate version is preserved in the redefinition.
     for (const reason of [
       "event_not_verified",
@@ -189,7 +217,9 @@ describe("review-hardening migration — supersedes, never edits, the merged gat
   it("the append-only trigger permits ONLY null-only FK maintenance", () => {
     // processing_id / user_id are ON DELETE SET NULL: PostgreSQL applies that
     // as an UPDATE here, which must not be blocked — but nothing else may be.
-    expect(HARDENING).toMatch(/NEW\.user_id IS DISTINCT FROM OLD\.user_id OR NEW\.processing_id IS DISTINCT FROM OLD\.processing_id/);
+    expect(HARDENING).toMatch(
+      /NEW\.user_id IS DISTINCT FROM OLD\.user_id OR NEW\.processing_id IS DISTINCT FROM OLD\.processing_id/,
+    );
     expect(HARDENING).toMatch(/NEW\.result_status IS NOT DISTINCT FROM OLD\.result_status/);
     expect(HARDENING).toMatch(/NEW\.created_at IS NOT DISTINCT FROM OLD\.created_at/);
     expect(HARDENING).toMatch(/billing_subscription_update_audit is append-only/);
@@ -215,9 +245,7 @@ describe("audit history — append-only", () => {
     expect(MIGRATION).toMatch(/billing_subscription_update_audit_deny_update/);
     expect(MIGRATION).toMatch(/BEFORE UPDATE ON public\.billing_subscription_update_audit/);
     // Wrapper never writes provider ids or payloads into the audit row.
-    const wrapper = MIGRATION.slice(
-      MIGRATION.indexOf("allocate_founder_lifetime_with_audit("),
-    );
+    const wrapper = MIGRATION.slice(MIGRATION.indexOf("allocate_founder_lifetime_with_audit("));
     expect(wrapper).not.toMatch(/provider_customer_id|provider_subscription_id|payload/);
   });
 });
@@ -240,9 +268,7 @@ describe("launch posture — no live enable, no secrets, no client writes", () =
     for (const src of [MIGRATION, priceFn]) {
       expect(src).not.toMatch(/eyJ[A-Za-z0-9_-]{20,}/); // JWT-shaped literal
     }
-    const priceCode = priceFn
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+    const priceCode = priceFn.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
     expect(priceCode).not.toMatch(/SERVICE_ROLE/i);
   });
 });

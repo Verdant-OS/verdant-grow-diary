@@ -119,16 +119,18 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
   // when classifying so a stale cache cannot leak an archived target).
   const allCandidateInputs = useMemo(
     () =>
-      (allPlants as unknown as Array<{
-        id: string;
-        name: string;
-        strain?: string | null;
-        growId?: string | null;
-        tentId?: string | null;
-        startedAt?: string | null;
-        isArchived?: boolean | null;
-        lastNote?: string | null;
-      }>).map((p) => ({
+      (
+        allPlants as unknown as Array<{
+          id: string;
+          name: string;
+          strain?: string | null;
+          growId?: string | null;
+          tentId?: string | null;
+          startedAt?: string | null;
+          isArchived?: boolean | null;
+          lastNote?: string | null;
+        }>
+      ).map((p) => ({
         id: p.id,
         name: p.name,
         strain: p.strain ?? null,
@@ -149,10 +151,7 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
   );
 
   // Anything that should render in the picker: selectable + disabled.
-  const visibleOptions = useMemo(
-    () => classifications.filter((c) => !c.hidden),
-    [classifications],
-  );
+  const visibleOptions = useMemo(() => classifications.filter((c) => !c.hidden), [classifications]);
 
   // Backwards-compatible `candidates` list (PlantForMerge[]) used by
   // the preview/validation/RPC paths below. Only same-grow selectable
@@ -194,7 +193,6 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
     () => formatMergeTargetHelperText(targetVisibilitySummary),
     [targetVisibilitySummary],
   );
-
 
   // Counts: queried for preview; the actual merge runs server-side.
   const counts = useQuery({
@@ -238,9 +236,7 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
   const canExecuteRpc =
     !!preview && validation.ok && preview.recommendedAction === "execute_via_rpc";
   const canArchiveOnly =
-    !!preview &&
-    validation.ok &&
-    preview.recommendedAction === "archive_source_after_review";
+    !!preview && validation.ok && preview.recommendedAction === "archive_source_after_review";
 
   function invalidateAfterMerge(targetPlantId: string | null) {
     qc.invalidateQueries({ queryKey: ["plants"] });
@@ -340,16 +336,12 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent
-        className="glass max-w-lg"
-        data-testid="plant-merge-dialog"
-      >
+      <DialogContent className="glass max-w-lg" data-testid="plant-merge-dialog">
         <DialogHeader>
           <DialogTitle className="font-display">Merge duplicate plant</DialogTitle>
           <DialogDescription>
-            Choose the plant to keep. We show what would move before any change.
-            The source plant is never hard-deleted and logs, photos, and sensor
-            history are never deleted.
+            Choose the plant to keep. We show what would move before any change. The source plant is
+            never hard-deleted and logs, photos, and sensor history are never deleted.
           </DialogDescription>
         </DialogHeader>
 
@@ -367,9 +359,7 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
                 Source (duplicate)
               </div>
               <div className="font-medium">{source.name}</div>
-              <div className="text-xs text-muted-foreground">
-                {source.strain || "—"}
-              </div>
+              <div className="text-xs text-muted-foreground">{source.strain || "—"}</div>
             </div>
 
             {source.is_archived && (
@@ -394,7 +384,8 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="h-4 w-4 mt-0.5 text-destructive shrink-0" />
                   <p className="text-sm">
-                    This plant is missing grow context. Assign it to a tent in a grow before merging.
+                    This plant is missing grow context. Assign it to a tent in a grow before
+                    merging.
                   </p>
                 </div>
                 {sourceCanRepair && (
@@ -412,7 +403,6 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
             )}
 
             <div>
-
               <Label>Target plant to keep</Label>
               <Select value={targetId} onValueChange={setTargetId}>
                 <SelectTrigger data-testid="plant-merge-target-select">
@@ -446,16 +436,13 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
                         >
                           <span className="flex flex-col">
                             <span>{baseName}</span>
-                            <span className="text-[11px] text-muted-foreground">
-                              {reasonLabel}
-                            </span>
+                            <span className="text-[11px] text-muted-foreground">{reasonLabel}</span>
                           </span>
                         </SelectItem>
                       );
                     })}
                   </SelectGroup>
                 </SelectContent>
-
               </Select>
               {mergeHelperText && (
                 <p
@@ -512,9 +499,7 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
                         </span>
                         <span
                           className={
-                            l.mergeable
-                              ? "text-[hsl(var(--success))]"
-                              : "text-muted-foreground"
+                            l.mergeable ? "text-[hsl(var(--success))]" : "text-muted-foreground"
                           }
                         >
                           {l.mergeable ? "Will move" : "Stays put"}
@@ -527,9 +512,8 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
                   data-testid="plant-merge-execution-blocked-note"
                 >
                   <Info className="h-3 w-3 mt-0.5 shrink-0" />
-                  Merge runs as one server-side transaction. Sensor readings
-                  stay with the tent and are not moved. The source plant is
-                  archived, never hard-deleted.
+                  Merge runs as one server-side transaction. Sensor readings stay with the tent and
+                  are not moved. The source plant is archived, never hard-deleted.
                 </p>
               </div>
             )}
@@ -576,17 +560,16 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
               </AlertDialogTitle>
               <AlertDialogDescription>
                 <span className="block">
-                  The source plant <strong>{source.name}</strong> will be
-                  archived as a merged duplicate.
+                  The source plant <strong>{source.name}</strong> will be archived as a merged
+                  duplicate.
                 </span>
                 <span className="block mt-1">
-                  History will move to{" "}
-                  <strong>{target?.name ?? "the target"}</strong> through a
+                  History will move to <strong>{target?.name ?? "the target"}</strong> through a
                   single server-side transaction.
                 </span>
                 <span className="block mt-1">
-                  This cannot be partially completed client-side. Logs, photos,
-                  and sensor history will not be deleted.
+                  This cannot be partially completed client-side. Logs, photos, and sensor history
+                  will not be deleted.
                 </span>
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -615,10 +598,7 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
                 {target ? (
                   <>
                     "{source.name}" will be archived as a duplicate of{" "}
-                    <Link
-                      className="underline"
-                      to={plantDetailPath(target.id)}
-                    >
+                    <Link className="underline" to={plantDetailPath(target.id)}>
                       {target.name}
                     </Link>
                     . It is not hard-deleted. You can restore it later.
@@ -663,9 +643,7 @@ function MergeSuccessView({
         </div>
       </div>
       <div className="rounded-md border border-border/50 p-3 space-y-2">
-        <div className="text-xs uppercase tracking-wider text-muted-foreground">
-          Moved
-        </div>
+        <div className="text-xs uppercase tracking-wider text-muted-foreground">Moved</div>
         <ul className="text-sm space-y-1">
           <li
             className="flex items-center justify-between"
@@ -681,10 +659,7 @@ function MergeSuccessView({
             <span>Diary entries / Quick Logs</span>
             <span>{result.moved.diary_entries}</span>
           </li>
-          <li
-            className="flex items-center justify-between"
-            data-testid="plant-merge-moved-alerts"
-          >
+          <li className="flex items-center justify-between" data-testid="plant-merge-moved-alerts">
             <span>Alerts</span>
             <span>{result.moved.alerts}</span>
           </li>
@@ -711,20 +686,11 @@ function MergeSuccessView({
         </div>
       </div>
       <div className="flex justify-end gap-2">
-        <Button
-          variant="outline"
-          onClick={onClose}
-          data-testid="plant-merge-success-back"
-          asChild
-        >
+        <Button variant="outline" onClick={onClose} data-testid="plant-merge-success-back" asChild>
           <Link to={plantsPath()}>Back to Plants</Link>
         </Button>
         {target && (
-          <Button
-            onClick={onClose}
-            data-testid="plant-merge-success-view-target"
-            asChild
-          >
+          <Button onClick={onClose} data-testid="plant-merge-success-view-target" asChild>
             <Link to={plantDetailPath(target.id)}>View Target Plant</Link>
           </Button>
         )}

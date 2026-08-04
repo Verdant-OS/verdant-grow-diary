@@ -51,7 +51,12 @@ describe("planBillingEntitlementUpdate", () => {
   it("plans Pro Annual, past_due, canceled, paused, and expired statuses", () => {
     for (const status of ["past_due", "canceled", "paused", "expired"] as const) {
       const result = planBillingEntitlementUpdate(
-        { ...baseProcessing, candidate_plan_id: "pro_annual", candidate_status: status, cancel_at_period_end: true },
+        {
+          ...baseProcessing,
+          candidate_plan_id: "pro_annual",
+          candidate_status: status,
+          cancel_at_period_end: true,
+        },
         baseLink,
       );
 
@@ -64,8 +69,14 @@ describe("planBillingEntitlementUpdate", () => {
   });
 
   it("blocks missing inputs", () => {
-    expect(planBillingEntitlementUpdate(null, baseLink)).toEqual({ ok: false, reason: "missing_processing_row" });
-    expect(planBillingEntitlementUpdate(baseProcessing, null)).toEqual({ ok: false, reason: "missing_link_row" });
+    expect(planBillingEntitlementUpdate(null, baseLink)).toEqual({
+      ok: false,
+      reason: "missing_processing_row",
+    });
+    expect(planBillingEntitlementUpdate(baseProcessing, null)).toEqual({
+      ok: false,
+      reason: "missing_link_row",
+    });
   });
 
   it("blocks failed, blocked, or ignored processing rows", () => {
@@ -78,48 +89,69 @@ describe("planBillingEntitlementUpdate", () => {
   });
 
   it("blocks unknown and Founder plans", () => {
-    expect(planBillingEntitlementUpdate({ ...baseProcessing, candidate_plan_id: "free" }, baseLink)).toEqual({
+    expect(
+      planBillingEntitlementUpdate({ ...baseProcessing, candidate_plan_id: "free" }, baseLink),
+    ).toEqual({
       ok: false,
       reason: "unknown_plan",
     });
-    expect(planBillingEntitlementUpdate({ ...baseProcessing, candidate_plan_id: "founder_lifetime" }, baseLink)).toEqual({
+    expect(
+      planBillingEntitlementUpdate(
+        { ...baseProcessing, candidate_plan_id: "founder_lifetime" },
+        baseLink,
+      ),
+    ).toEqual({
       ok: false,
       reason: "founder_allocation_deferred",
     });
-    expect(planBillingEntitlementUpdate({ ...baseProcessing, is_founder_candidate: true }, baseLink)).toEqual({
+    expect(
+      planBillingEntitlementUpdate({ ...baseProcessing, is_founder_candidate: true }, baseLink),
+    ).toEqual({
       ok: false,
       reason: "founder_allocation_deferred",
     });
   });
 
   it("blocks unknown candidate status", () => {
-    expect(planBillingEntitlementUpdate({ ...baseProcessing, candidate_status: "trialing" }, baseLink)).toEqual({
+    expect(
+      planBillingEntitlementUpdate({ ...baseProcessing, candidate_status: "trialing" }, baseLink),
+    ).toEqual({
       ok: false,
       reason: "unknown_candidate_status",
     });
   });
 
   it("blocks missing processing provider identifiers", () => {
-    expect(planBillingEntitlementUpdate({ ...baseProcessing, provider_customer_id: null }, baseLink)).toEqual({
+    expect(
+      planBillingEntitlementUpdate({ ...baseProcessing, provider_customer_id: null }, baseLink),
+    ).toEqual({
       ok: false,
       reason: "missing_provider_customer_id",
     });
-    expect(planBillingEntitlementUpdate({ ...baseProcessing, provider_subscription_id: null }, baseLink)).toEqual({
+    expect(
+      planBillingEntitlementUpdate({ ...baseProcessing, provider_subscription_id: null }, baseLink),
+    ).toEqual({
       ok: false,
       reason: "missing_provider_subscription_id",
     });
   });
 
   it("blocks unsafe link state", () => {
-    expect(planBillingEntitlementUpdate(baseProcessing, { ...baseLink, link_status: "pending_review" })).toEqual({
+    expect(
+      planBillingEntitlementUpdate(baseProcessing, { ...baseLink, link_status: "pending_review" }),
+    ).toEqual({
       ok: false,
       reason: "link_not_linked",
     });
-    expect(planBillingEntitlementUpdate(baseProcessing, { ...baseLink, confidence: "review_required" })).toEqual({
+    expect(
+      planBillingEntitlementUpdate(baseProcessing, { ...baseLink, confidence: "review_required" }),
+    ).toEqual({
       ok: false,
       reason: "link_not_verified",
     });
-    expect(planBillingEntitlementUpdate(baseProcessing, { ...baseLink, provider: "stripe" })).toEqual({
+    expect(
+      planBillingEntitlementUpdate(baseProcessing, { ...baseLink, provider: "stripe" }),
+    ).toEqual({
       ok: false,
       reason: "link_provider_not_paddle",
     });
@@ -130,19 +162,33 @@ describe("planBillingEntitlementUpdate", () => {
       ok: false,
       reason: "missing_link_user_id",
     });
-    expect(planBillingEntitlementUpdate(baseProcessing, { ...baseLink, provider_customer_id: null })).toEqual({
+    expect(
+      planBillingEntitlementUpdate(baseProcessing, { ...baseLink, provider_customer_id: null }),
+    ).toEqual({
       ok: false,
       reason: "missing_link_provider_customer_id",
     });
-    expect(planBillingEntitlementUpdate(baseProcessing, { ...baseLink, provider_customer_id: "ctm_other" })).toEqual({
+    expect(
+      planBillingEntitlementUpdate(baseProcessing, {
+        ...baseLink,
+        provider_customer_id: "ctm_other",
+      }),
+    ).toEqual({
       ok: false,
       reason: "provider_customer_mismatch",
     });
-    expect(planBillingEntitlementUpdate(baseProcessing, { ...baseLink, provider_subscription_id: null })).toEqual({
+    expect(
+      planBillingEntitlementUpdate(baseProcessing, { ...baseLink, provider_subscription_id: null }),
+    ).toEqual({
       ok: false,
       reason: "missing_link_provider_subscription_id",
     });
-    expect(planBillingEntitlementUpdate(baseProcessing, { ...baseLink, provider_subscription_id: "sub_other" })).toEqual({
+    expect(
+      planBillingEntitlementUpdate(baseProcessing, {
+        ...baseLink,
+        provider_subscription_id: "sub_other",
+      }),
+    ).toEqual({
       ok: false,
       reason: "provider_subscription_mismatch",
     });
@@ -150,8 +196,18 @@ describe("planBillingEntitlementUpdate", () => {
 
   it("trims safe strings and treats missing period end as null", () => {
     const result = planBillingEntitlementUpdate(
-      { ...baseProcessing, provider_customer_id: " ctm_123 ", provider_subscription_id: " sub_123 ", current_period_end: " " },
-      { ...baseLink, user_id: " user_123 ", provider_customer_id: "ctm_123", provider_subscription_id: "sub_123" },
+      {
+        ...baseProcessing,
+        provider_customer_id: " ctm_123 ",
+        provider_subscription_id: " sub_123 ",
+        current_period_end: " ",
+      },
+      {
+        ...baseLink,
+        user_id: " user_123 ",
+        provider_customer_id: "ctm_123",
+        provider_subscription_id: "sub_123",
+      },
     );
 
     expect(result.ok).toBe(true);

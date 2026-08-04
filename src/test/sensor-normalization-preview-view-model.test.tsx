@@ -122,9 +122,7 @@ describe("sensorNormalizationPreviewViewModel", () => {
       payload: { soil_ec_us_cm: 1450 },
       options: { source: "csv", tentId: TENT, capturedAt: FRESH, now: NOW },
     });
-    expect(
-      ok.metricRows.find((r) => r.metric === "soil_ec_ms_cm")?.value,
-    ).toBeCloseTo(1.45, 2);
+    expect(ok.metricRows.find((r) => r.metric === "soil_ec_ms_cm")?.value).toBeCloseTo(1.45, 2);
 
     const warn = buildSensorNormalizationPreviewViewModel({
       payload: { soil_ec_ms_cm: 1450 },

@@ -53,14 +53,14 @@ export function deriveMissingContextCtas(
   if (haystack.includes("watering") || haystack.includes("feeding") || haystack.includes("diary")) {
     out.push({ id: "add-quick-log", label: "Add Quick Log", to: `${plantPath}${q}` });
   }
-  if (haystack.includes("sensor") || haystack.includes("snapshot") || haystack.includes("reading")) {
+  if (
+    haystack.includes("sensor") ||
+    haystack.includes("snapshot") ||
+    haystack.includes("reading")
+  ) {
     out.push({ id: "check-environment", label: "Check Environment", to: `/sensors${q}` });
   }
-  if (
-    haystack.includes("stage") ||
-    haystack.includes("medium") ||
-    haystack.includes("pot")
-  ) {
+  if (haystack.includes("stage") || haystack.includes("medium") || haystack.includes("pot")) {
     out.push({ id: "update-plant-context", label: "Update Plant Context", to: `${plantPath}${q}` });
   }
   return out;

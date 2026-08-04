@@ -15,9 +15,7 @@ import type {
 } from "@/lib/timelineFilterRules";
 import type { ManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewModel";
 
-const ctx = (
-  o: Partial<AiDoctorContextResult> = {},
-): AiDoctorContextResult => ({
+const ctx = (o: Partial<AiDoctorContextResult> = {}): AiDoctorContextResult => ({
   readiness: "strong",
   missing: [],
   evidence: ["fresh-manual-sensor-snapshot"],
@@ -92,12 +90,8 @@ describe("buildAiDoctorReviewRequestPacket", () => {
       potSize: "11L",
     });
     expect(packet.readiness.state).toBe("strong");
-    expect(packet.recentEvents.length).toBeLessThanOrEqual(
-      AI_DOCTOR_REVIEW_PACKET_EVENT_CAP,
-    );
-    expect(packet.recentSensorSnapshot?.capturedAt).toBe(
-      "2026-06-01T09:00:00Z",
-    );
+    expect(packet.recentEvents.length).toBeLessThanOrEqual(AI_DOCTOR_REVIEW_PACKET_EVENT_CAP);
+    expect(packet.recentSensorSnapshot?.capturedAt).toBe("2026-06-01T09:00:00Z");
     expect(packet.recentSensorSnapshot?.readings.length).toBe(2);
   });
 
@@ -112,9 +106,7 @@ describe("buildAiDoctorReviewRequestPacket", () => {
     });
     expect(packet.recentEvents.length).toBe(AI_DOCTOR_REVIEW_PACKET_EVENT_CAP);
     for (let i = 1; i < packet.recentEvents.length; i++) {
-      expect(packet.recentEvents[i - 1].at >= packet.recentEvents[i].at).toBe(
-        true,
-      );
+      expect(packet.recentEvents[i - 1].at >= packet.recentEvents[i].at).toBe(true);
     }
   });
 
@@ -129,9 +121,7 @@ describe("buildAiDoctorReviewRequestPacket", () => {
       timelineItems: items,
       context: ctx(),
     });
-    expect(packet.recentSensorSnapshot?.capturedAt).toBe(
-      "2026-06-02T10:00:00Z",
-    );
+    expect(packet.recentSensorSnapshot?.capturedAt).toBe("2026-06-02T10:00:00Z");
   });
 
   it("never serializes raw_payload / secrets / tokens / service_role keys", () => {
@@ -222,7 +212,12 @@ describe("buildAiDoctorReviewRequestPacket", () => {
     const card = snapshotCard("2026-06-01T09:55:00Z");
     (card as { severity: string }).severity = "invalid";
     const items: TimelineMemoryItem[] = [
-      { kind: "manual_sensor_snapshot", key: "s", occurredAt: card.capturedAt, card } as TimelineMemoryItem,
+      {
+        kind: "manual_sensor_snapshot",
+        key: "s",
+        occurredAt: card.capturedAt,
+        card,
+      } as TimelineMemoryItem,
     ];
     const packet = buildAiDoctorReviewRequestPacket({
       plant: null,
@@ -273,9 +268,18 @@ describe("buildAiDoctorReviewRequestPacket", () => {
       snapshot("2026-06-01T09:55:00Z"),
       diary(0, "2026-06-01T09:50:00Z"),
     ];
-    const a = buildAiDoctorReviewRequestPacket({ plant: null, timelineItems: items, context: ctx(), now: NOW });
-    const b = buildAiDoctorReviewRequestPacket({ plant: null, timelineItems: items, context: ctx(), now: NOW });
+    const a = buildAiDoctorReviewRequestPacket({
+      plant: null,
+      timelineItems: items,
+      context: ctx(),
+      now: NOW,
+    });
+    const b = buildAiDoctorReviewRequestPacket({
+      plant: null,
+      timelineItems: items,
+      context: ctx(),
+      now: NOW,
+    });
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
 });
-

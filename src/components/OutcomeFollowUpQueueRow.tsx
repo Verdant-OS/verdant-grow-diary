@@ -7,9 +7,7 @@ import { Link } from "@/lib/react-router-compat";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { actionDetailPath } from "@/lib/routes";
-import type {
-  OutcomeQueueRow,
-} from "@/lib/outcomeFollowUpQueueViewModel";
+import type { OutcomeQueueRow } from "@/lib/outcomeFollowUpQueueViewModel";
 import type { SafeEpisodeCta } from "@/lib/plantMemoryEpisodeViewModel";
 
 export interface OutcomeFollowUpQueueRowProps {

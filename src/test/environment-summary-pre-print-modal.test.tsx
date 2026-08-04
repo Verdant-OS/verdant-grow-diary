@@ -54,10 +54,7 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
         : null;
     return {
       loading: false,
-      entitlement: resolveEntitlements(
-        row as any,
-        new Date("2026-06-08T00:00:00Z"),
-      ),
+      entitlement: resolveEntitlements(row as any, new Date("2026-06-08T00:00:00Z")),
     };
   },
 }));
@@ -112,10 +109,7 @@ function renderAt(path: string) {
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route
-            path="/diary/environment-summary"
-            element={<EnvironmentSummaryReportPage />}
-          />
+          <Route path="/diary/environment-summary" element={<EnvironmentSummaryReportPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -134,20 +128,21 @@ describe("EnvironmentSummaryPrePrintModal — standalone", () => {
         onConfirm={() => undefined}
       />,
     );
-    expect(screen.getByTestId("env-report-pre-print-modal-title").textContent)
-      .toBe("Review before printing");
-    expect(
-      screen.getByTestId("env-report-pre-print-modal-summary").textContent,
-    ).toMatch(/full Environment Summary Report/);
-    expect(
-      screen.getByTestId("env-report-pre-print-modal-range").textContent,
-    ).toBe("2026-06-01 — 2026-06-07");
-    expect(
-      screen.getByTestId("env-report-pre-print-modal-generated").textContent,
-    ).toBe("2026-06-08T12:00:00.000Z");
-    expect(
-      screen.getByTestId("env-report-pre-print-modal-safety").textContent ?? "",
-    ).toMatch(/Read-only/);
+    expect(screen.getByTestId("env-report-pre-print-modal-title").textContent).toBe(
+      "Review before printing",
+    );
+    expect(screen.getByTestId("env-report-pre-print-modal-summary").textContent).toMatch(
+      /full Environment Summary Report/,
+    );
+    expect(screen.getByTestId("env-report-pre-print-modal-range").textContent).toBe(
+      "2026-06-01 — 2026-06-07",
+    );
+    expect(screen.getByTestId("env-report-pre-print-modal-generated").textContent).toBe(
+      "2026-06-08T12:00:00.000Z",
+    );
+    expect(screen.getByTestId("env-report-pre-print-modal-safety").textContent ?? "").toMatch(
+      /Read-only/,
+    );
   });
 
   it("drilldown mode shows selected issue + related count + drilldown summary", () => {
@@ -164,15 +159,13 @@ describe("EnvironmentSummaryPrePrintModal — standalone", () => {
         onConfirm={() => undefined}
       />,
     );
-    expect(
-      screen.getByTestId("env-report-pre-print-modal-summary").textContent,
-    ).toMatch(/selected issue drilldown/);
+    expect(screen.getByTestId("env-report-pre-print-modal-summary").textContent).toMatch(
+      /selected issue drilldown/,
+    );
     const issue = screen.getByTestId("env-report-pre-print-modal-issue");
     expect(issue.textContent).toMatch(/Source review required/);
     expect(issue.textContent).toMatch(/source\.review/);
-    expect(
-      screen.getByTestId("env-report-pre-print-modal-related-count").textContent,
-    ).toBe("3");
+    expect(screen.getByTestId("env-report-pre-print-modal-related-count").textContent).toBe("3");
   });
 });
 
@@ -183,9 +176,7 @@ describe("EnvironmentSummaryReportPage — pre-print modal integration", () => {
 
   it("non-premium users do not see print buttons or modal", () => {
     planMock.current = "free";
-    renderAt(
-      "/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review",
-    );
+    renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review");
     expect(screen.queryByTestId("env-report-download-pdf")).toBeNull();
     expect(screen.queryByTestId("env-report-download-drilldown-pdf")).toBeNull();
     expect(screen.queryByTestId("env-report-pre-print-modal")).toBeNull();
@@ -196,35 +187,25 @@ describe("EnvironmentSummaryReportPage — pre-print modal integration", () => {
     renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
     fireEvent.click(screen.getByTestId("env-report-download-pdf"));
     expect(screen.getByTestId("env-report-pre-print-modal")).toBeTruthy();
-    expect(
-      screen.getByTestId("env-report-pre-print-modal-mode").textContent,
-    ).toBe("Full report");
+    expect(screen.getByTestId("env-report-pre-print-modal-mode").textContent).toBe("Full report");
     expect(readEnvironmentSummaryExportAuditEvents()).toHaveLength(0);
   });
 
   it("drilldown button opens modal showing issue label/rule id and related count", () => {
     planMock.current = "pro";
-    renderAt(
-      "/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review",
-    );
+    renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review");
     fireEvent.click(screen.getByTestId("env-report-download-drilldown-pdf"));
     expect(screen.getByTestId("env-report-pre-print-modal")).toBeTruthy();
-    expect(
-      screen.getByTestId("env-report-pre-print-modal-mode").textContent,
-    ).toBe("Drilldown");
-    expect(
-      screen.getByTestId("env-report-pre-print-modal-issue").textContent,
-    ).toMatch(/source\.review/);
-    expect(
-      screen.getByTestId("env-report-pre-print-modal-related-count").textContent,
-    ).toBe("2");
+    expect(screen.getByTestId("env-report-pre-print-modal-mode").textContent).toBe("Drilldown");
+    expect(screen.getByTestId("env-report-pre-print-modal-issue").textContent).toMatch(
+      /source\.review/,
+    );
+    expect(screen.getByTestId("env-report-pre-print-modal-related-count").textContent).toBe("2");
   });
 
   it("cancel closes modal, no audit, no window.print", () => {
     planMock.current = "pro";
-    const printSpy = vi
-      .spyOn(window, "print")
-      .mockImplementation(() => undefined);
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => undefined);
     renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
     fireEvent.click(screen.getByTestId("env-report-download-pdf"));
     fireEvent.click(screen.getByTestId("env-report-pre-print-modal-cancel"));
@@ -236,9 +217,7 @@ describe("EnvironmentSummaryReportPage — pre-print modal integration", () => {
 
   it("Escape closes modal, no audit, no window.print", () => {
     planMock.current = "pro";
-    const printSpy = vi
-      .spyOn(window, "print")
-      .mockImplementation(() => undefined);
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => undefined);
     renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
     fireEvent.click(screen.getByTestId("env-report-download-pdf"));
     fireEvent.keyDown(document.activeElement ?? document.body, {
@@ -252,9 +231,7 @@ describe("EnvironmentSummaryReportPage — pre-print modal integration", () => {
 
   it("confirm records full report audit and calls window.print", () => {
     planMock.current = "pro";
-    const printSpy = vi
-      .spyOn(window, "print")
-      .mockImplementation(() => undefined);
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => undefined);
     renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
     fireEvent.click(screen.getByTestId("env-report-download-pdf"));
     fireEvent.click(screen.getByTestId("env-report-pre-print-modal-confirm"));
@@ -267,12 +244,8 @@ describe("EnvironmentSummaryReportPage — pre-print modal integration", () => {
 
   it("confirm records drilldown audit and calls window.print", () => {
     planMock.current = "pro";
-    const printSpy = vi
-      .spyOn(window, "print")
-      .mockImplementation(() => undefined);
-    renderAt(
-      "/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review",
-    );
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => undefined);
+    renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review");
     fireEvent.click(screen.getByTestId("env-report-download-drilldown-pdf"));
     fireEvent.click(screen.getByTestId("env-report-pre-print-modal-confirm"));
     expect(printSpy).toHaveBeenCalledTimes(1);
@@ -287,10 +260,7 @@ describe("EnvironmentSummaryReportPage — pre-print modal integration", () => {
 describe("EnvironmentSummaryPrePrintModal — static safety guard", () => {
   it("does not import Supabase, fetch wrappers, analytics, alerts, or action queue helpers", () => {
     const src = readFileSync(
-      path.resolve(
-        __dirname,
-        "../components/EnvironmentSummaryPrePrintModal.tsx",
-      ),
+      path.resolve(__dirname, "../components/EnvironmentSummaryPrePrintModal.tsx"),
       "utf8",
     );
     expect(src).not.toMatch(/integrations\/supabase/);

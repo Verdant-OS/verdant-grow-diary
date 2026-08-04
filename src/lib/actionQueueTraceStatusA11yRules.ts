@@ -14,14 +14,10 @@
 
 import type { ActionTraceBadgeState } from "@/lib/actionQueueTraceStatusRules";
 
-export const TRACE_STATUS_ANNOUNCEMENT_TESTID =
-  "action-queue-trace-status-announcer";
+export const TRACE_STATUS_ANNOUNCEMENT_TESTID = "action-queue-trace-status-announcer";
 
 /** Calm, neutral copy for each state. No IDs. No "safe"/"healthy". */
-export const TRACE_STATUS_ANNOUNCEMENT_COPY: Record<
-  ActionTraceBadgeState,
-  string
-> = {
+export const TRACE_STATUS_ANNOUNCEMENT_COPY: Record<ActionTraceBadgeState, string> = {
   idle: "Trace OK",
   retrying: "Retrying trace",
   failed: "Trace failed",

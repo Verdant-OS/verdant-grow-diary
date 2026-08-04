@@ -40,7 +40,9 @@ describe("evaluateEcowittLiveReadiness", () => {
     expect(result.canCallLive).toBe(false);
     expect(result.canCreateAlerts).toBe(false);
     expect(result.canCreateActionQueueItems).toBe(false);
-    expect(result.requiredEvidenceMissing).toContain("Real EcoWitt controller/app comparison present");
+    expect(result.requiredEvidenceMissing).toContain(
+      "Real EcoWitt controller/app comparison present",
+    );
   });
 
   it("returns partial when local pipeline works but real device comparison is missing", () => {

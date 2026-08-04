@@ -16,11 +16,7 @@ import type { ManualSensorLog } from "@/lib/manualSensorChronologyDeltaRules";
 export const PLANT_SENSOR_CONTEXT_STALE_HOURS = 72;
 const HOUR_MS = 3_600_000;
 
-export type PlantSensorContextStatus =
-  | "missing"
-  | "stale"
-  | "limited"
-  | "strong";
+export type PlantSensorContextStatus = "missing" | "stale" | "limited" | "strong";
 
 export interface PlantSensorContextMetric {
   key: string;
@@ -91,8 +87,7 @@ export function buildPlantSensorContextAuditView(
   rawLogs: ReadonlyArray<ManualSensorLog> | null | undefined,
   now: string | Date = new Date(),
 ): PlantSensorContextAuditView {
-  const nowMs =
-    now instanceof Date ? now.getTime() : parseMs(now as string) ?? Date.now();
+  const nowMs = now instanceof Date ? now.getTime() : (parseMs(now as string) ?? Date.now());
 
   const logs = Array.isArray(rawLogs) ? rawLogs : [];
   // Keep only logs with parseable capturedAt
@@ -122,9 +117,7 @@ export function buildPlantSensorContextAuditView(
   const sourceSet = new Set<string>();
   for (const { log } of dated) {
     const src =
-      typeof log.source === "string" && log.source.trim().length > 0
-        ? log.source.trim()
-        : null;
+      typeof log.source === "string" && log.source.trim().length > 0 ? log.source.trim() : null;
     if (src) sourceSet.add(src);
   }
   const sources = Array.from(sourceSet).sort();
@@ -162,8 +155,7 @@ export function buildPlantSensorContextAuditView(
   const labels = metrics.map((m) => m.label);
   const hasEnvironment = labels.some((l) => ENVIRONMENT_LABELS.has(l));
   const envCount = labels.filter((l) => ENVIRONMENT_LABELS.has(l)).length;
-  const hasTempOrHumidity =
-    labels.includes("Temperature") || labels.includes("Humidity");
+  const hasTempOrHumidity = labels.includes("Temperature") || labels.includes("Humidity");
   const hasRootZone = labels.some((l) => ROOT_ZONE_LABELS.has(l));
 
   let status: PlantSensorContextStatus;

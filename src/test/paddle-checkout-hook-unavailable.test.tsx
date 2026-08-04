@@ -20,7 +20,9 @@ import type { ReactNode } from "react";
 
 const navigateMock = vi.fn();
 vi.mock("@/lib/react-router-compat", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/react-router-compat")>("@/lib/react-router-compat");
+  const actual = await vi.importActual<typeof import("@/lib/react-router-compat")>(
+    "@/lib/react-router-compat",
+  );
   return { ...actual, useNavigate: () => navigateMock };
 });
 

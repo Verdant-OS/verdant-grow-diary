@@ -52,9 +52,7 @@ describe("PhenoHuntSetupProgressCard", () => {
     const card = screen.getByTestId("pheno-workspace-setup-progress");
     expect(card.getAttribute("data-setup-complete")).toBe("true");
     // Mark button is not rendered when complete.
-    expect(
-      screen.queryByTestId("pheno-workspace-setup-progress-mark-complete"),
-    ).toBeNull();
+    expect(screen.queryByTestId("pheno-workspace-setup-progress-mark-complete")).toBeNull();
   });
 
   it("Mark setup complete is disabled while no candidates or goals", () => {
@@ -83,9 +81,7 @@ describe("PhenoHuntSetupProgressCard", () => {
         onMarkComplete={onMarkComplete}
       />,
     );
-    fireEvent.click(
-      screen.getByTestId("pheno-workspace-setup-progress-mark-complete"),
-    );
+    fireEvent.click(screen.getByTestId("pheno-workspace-setup-progress-mark-complete"));
     expect(onMarkComplete).toHaveBeenCalledTimes(1);
   });
 
@@ -125,9 +121,7 @@ describe("PhenoHuntSetupProgressCard", () => {
       />,
     );
     expect(
-      screen
-        .getByTestId("pheno-workspace-setup-progress-comparison-status")
-        .textContent,
+      screen.getByTestId("pheno-workspace-setup-progress-comparison-status").textContent,
     ).toMatch(/Comparison-ready/);
 
     rerender(
@@ -138,9 +132,7 @@ describe("PhenoHuntSetupProgressCard", () => {
       />,
     );
     expect(
-      screen
-        .getByTestId("pheno-workspace-setup-progress-comparison-status")
-        .textContent,
+      screen.getByTestId("pheno-workspace-setup-progress-comparison-status").textContent,
     ).toMatch(/Pending until cure/);
   });
 

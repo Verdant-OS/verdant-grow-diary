@@ -29,9 +29,15 @@ describe("OperatorPostGrowReflectionDryRun", () => {
   it("renders scenario rows and safety reason codes", () => {
     render(<OperatorPostGrowReflectionDryRun />);
 
-    expect(screen.getByText("Rich photoperiod context with valid evidence-backed candidate")).toBeTruthy();
-    expect(screen.getByText("Thin autoflower context rejects high-confidence candidate")).toBeTruthy();
-    expect(screen.getByText("Rich context rejects unsafe equipment-control candidate")).toBeTruthy();
+    expect(
+      screen.getByText("Rich photoperiod context with valid evidence-backed candidate"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("Thin autoflower context rejects high-confidence candidate"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("Rich context rejects unsafe equipment-control candidate"),
+    ).toBeTruthy();
     expect(screen.getAllByText(/unsafe_language/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/high_confidence_with_thin_data/).length).toBeGreaterThan(0);
   });

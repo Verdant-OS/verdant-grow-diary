@@ -17,7 +17,9 @@ const PLANTS: AiDoctorPhase1PlantOption[] = [
 
 describe("AiDoctorPhase1PlantPicker", () => {
   it("renders plant name, strain, stage, and tent", () => {
-    render(<AiDoctorPhase1PlantPicker plants={PLANTS} selectedPlantId={null} onSelect={() => {}} />);
+    render(
+      <AiDoctorPhase1PlantPicker plants={PLANTS} selectedPlantId={null} onSelect={() => {}} />,
+    );
     expect(screen.getByText("Plant A")).toBeTruthy();
     expect(screen.getByText(/Strain A/)).toBeTruthy();
     expect(screen.getByText(/veg/)).toBeTruthy();
@@ -32,22 +34,22 @@ describe("AiDoctorPhase1PlantPicker", () => {
 
   it("calls onSelect when a plant is clicked", () => {
     const onSelect = vi.fn();
-    render(<AiDoctorPhase1PlantPicker plants={PLANTS} selectedPlantId={null} onSelect={onSelect} />);
+    render(
+      <AiDoctorPhase1PlantPicker plants={PLANTS} selectedPlantId={null} onSelect={onSelect} />,
+    );
     fireEvent.click(screen.getByTestId("ai-doctor-phase1-plant-option-plant-b"));
     expect(onSelect).toHaveBeenCalledWith("plant-b");
   });
 
   it("marks the selected plant", () => {
-    render(<AiDoctorPhase1PlantPicker plants={PLANTS} selectedPlantId="plant-a" onSelect={() => {}} />);
+    render(
+      <AiDoctorPhase1PlantPicker plants={PLANTS} selectedPlantId="plant-a" onSelect={() => {}} />,
+    );
     expect(
-      screen
-        .getByTestId("ai-doctor-phase1-plant-option-plant-a")
-        .getAttribute("data-selected"),
+      screen.getByTestId("ai-doctor-phase1-plant-option-plant-a").getAttribute("data-selected"),
     ).toBe("true");
     expect(
-      screen
-        .getByTestId("ai-doctor-phase1-plant-option-plant-b")
-        .getAttribute("data-selected"),
+      screen.getByTestId("ai-doctor-phase1-plant-option-plant-b").getAttribute("data-selected"),
     ).toBe("false");
   });
 });

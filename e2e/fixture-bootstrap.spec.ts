@@ -1,8 +1,5 @@
 import { test, expect } from "./lib/authedTest";
-import {
-  evaluateBootstrapGate,
-  bootstrapDisposableFixture,
-} from "./lib/fixtureBootstrap";
+import { evaluateBootstrapGate, bootstrapDisposableFixture } from "./lib/fixtureBootstrap";
 
 /**
  * Optional UI-only disposable E2E fixture bootstrap.
@@ -18,26 +15,18 @@ import {
  * Not wired into CI by default. The workflow runs it only when
  * `vars.E2E_ALLOW_FIXTURE_BOOTSTRAP == 'true'`.
  */
-test("optional disposable E2E fixture bootstrap (UI-only, idempotent)", async ({
-  page,
-}) => {
+test("optional disposable E2E fixture bootstrap (UI-only, idempotent)", async ({ page }) => {
   const env = {
     E2E_FIXTURE_MODE: process.env.E2E_FIXTURE_MODE,
     E2E_ALLOW_FIXTURE_BOOTSTRAP: process.env.E2E_ALLOW_FIXTURE_BOOTSTRAP,
-    E2E_FIXTURE_EXPECTED_GROW_NAME:
-      process.env.E2E_FIXTURE_EXPECTED_GROW_NAME,
-    E2E_FIXTURE_EXPECTED_TENT_NAME:
-      process.env.E2E_FIXTURE_EXPECTED_TENT_NAME,
-    E2E_FIXTURE_EXPECTED_PLANT_NAME:
-      process.env.E2E_FIXTURE_EXPECTED_PLANT_NAME,
+    E2E_FIXTURE_EXPECTED_GROW_NAME: process.env.E2E_FIXTURE_EXPECTED_GROW_NAME,
+    E2E_FIXTURE_EXPECTED_TENT_NAME: process.env.E2E_FIXTURE_EXPECTED_TENT_NAME,
+    E2E_FIXTURE_EXPECTED_PLANT_NAME: process.env.E2E_FIXTURE_EXPECTED_PLANT_NAME,
     E2E_GROW_1_PLANT_URL: process.env.E2E_GROW_1_PLANT_URL,
   };
 
   const gate = evaluateBootstrapGate(env);
-  expect(
-    gate.allowed,
-    `Bootstrap gate refused:\n - ${gate.errors.join("\n - ")}`,
-  ).toBe(true);
+  expect(gate.allowed, `Bootstrap gate refused:\n - ${gate.errors.join("\n - ")}`).toBe(true);
 
   const outcome = await bootstrapDisposableFixture(page, gate.expected, {
     baseUrl: process.env.E2E_BASE_URL,

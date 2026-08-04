@@ -43,7 +43,9 @@ describe("manualSensorCorrectionContext", () => {
   });
 
   it("rejects non-UUID tent_id", () => {
-    const bad = "#manual-reading?correct=1&tent_id=not-a-uuid&captured_at=2026-07-01T12:00:00.000Z&r_temperature_c=" + R_TEMP;
+    const bad =
+      "#manual-reading?correct=1&tent_id=not-a-uuid&captured_at=2026-07-01T12:00:00.000Z&r_temperature_c=" +
+      R_TEMP;
     expect(decodeManualCorrectionHash(bad)).toBeNull();
   });
 

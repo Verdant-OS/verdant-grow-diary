@@ -36,9 +36,7 @@ export function LegalPageShell({
     description,
     path,
   });
-  const jsonLd = safeJsonLdStringify(
-    buildLegalPageJsonLd({ path, name: title, description }),
-  );
+  const jsonLd = safeJsonLdStringify(buildLegalPageJsonLd({ path, name: title, description }));
   return (
     <>
       <script

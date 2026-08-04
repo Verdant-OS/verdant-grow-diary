@@ -51,10 +51,7 @@ describe("snapshotFromReadings — metric_refs population", () => {
   });
 
   it("omits metric_refs entirely when no row carries an id (back-compat)", () => {
-    const snap = snapshotFromReadings([
-      row("temperature_c", 24),
-      row("humidity_pct", 55),
-    ]);
+    const snap = snapshotFromReadings([row("temperature_c", 24), row("humidity_pct", 55)]);
     expect(snap!.metric_refs).toBeUndefined();
   });
 

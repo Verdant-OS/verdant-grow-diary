@@ -29,7 +29,9 @@ function row(goal: string): RawPhenoEvidenceDiaryRow {
   };
 }
 
-function packet(opts: { rows?: RawPhenoEvidenceDiaryRow[]; truncated?: boolean; unavailable?: boolean } = {}) {
+function packet(
+  opts: { rows?: RawPhenoEvidenceDiaryRow[]; truncated?: boolean; unavailable?: boolean } = {},
+) {
   return buildPhenoCandidateEvidencePacket({
     huntId: "hunt-1",
     plantId: "plant-a",
@@ -50,12 +52,14 @@ describe("PhenoCandidateEvidenceCoverage", () => {
     expect(screen.getByTestId("pheno-candidate-evidence-coverage-summary")).toHaveTextContent(
       "1 of 2 configured goals recorded",
     );
-    expect(
-      screen.getByTestId("pheno-candidate-evidence-coverage-goal-aroma"),
-    ).toHaveAttribute("data-recorded", "true");
-    expect(
-      screen.getByTestId("pheno-candidate-evidence-coverage-goal-structure"),
-    ).toHaveAttribute("data-recorded", "false");
+    expect(screen.getByTestId("pheno-candidate-evidence-coverage-goal-aroma")).toHaveAttribute(
+      "data-recorded",
+      "true",
+    );
+    expect(screen.getByTestId("pheno-candidate-evidence-coverage-goal-structure")).toHaveAttribute(
+      "data-recorded",
+      "false",
+    );
   });
 
   it("missing goal renders an explicit accessible record action when allowed", () => {
@@ -133,9 +137,7 @@ describe("PhenoCandidateEvidenceCoverage", () => {
     expect(summary).toHaveTextContent(/coverage unknown/i);
     expect(summary.textContent).not.toMatch(/0 of \d+/);
     // No per-goal "missing" chips either — missingness is unknown here.
-    expect(
-      screen.queryByTestId("pheno-candidate-evidence-coverage-goals"),
-    ).toBeNull();
+    expect(screen.queryByTestId("pheno-candidate-evidence-coverage-goals")).toBeNull();
   });
 
   it("loading renders a placeholder; disabled renders nothing", () => {

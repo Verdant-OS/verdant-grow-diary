@@ -31,10 +31,7 @@ export function highlightMatch(
       return (
         <mark
           key={index}
-          className={
-            options.markClassName ??
-            "rounded-sm bg-primary/25 px-0.5 text-foreground"
-          }
+          className={options.markClassName ?? "rounded-sm bg-primary/25 px-0.5 text-foreground"}
         >
           {part}
         </mark>

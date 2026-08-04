@@ -10,20 +10,10 @@
 export type AiDoctorSessionPersistenceFailureStage = "validation" | "insert" | "unexpected";
 
 export type AiDoctorSessionPersistenceFailureCategory =
-  | "validation"
-  | "rls"
-  | "permission"
-  | "auth"
-  | "constraint"
-  | "network"
-  | "insert"
-  | "unexpected";
+  "validation" | "rls" | "permission" | "auth" | "constraint" | "network" | "insert" | "unexpected";
 
 export type AiDoctorSessionPersistenceAuthResolution =
-  | "resolved"
-  | "anonymous"
-  | "unavailable"
-  | "lookup_failed";
+  "resolved" | "anonymous" | "unavailable" | "lookup_failed";
 
 export interface AiDoctorSessionPersistenceScopeContext {
   hasGrowScope: boolean;

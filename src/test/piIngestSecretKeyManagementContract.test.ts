@@ -14,7 +14,6 @@ import { listTsFilesCached, readFileCached } from "./helpers/cachedSrcTextScan";
 import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
 installScannerGuardrail({ file: __filename });
 
-
 const ROOT = resolve(__dirname, "../..");
 const DOC_PATH = resolve(ROOT, "docs/pi-ingest-secret-key-management.md");
 
@@ -32,14 +31,8 @@ describe("pi-ingest secret key management — contract doc", () => {
       "maps secret_key_version to env var version",
       /`?secret_key_version`?\s*=\s*1[\s\S]{0,40}PI_INGEST_SECRET_KEY_V1/,
     ],
-    [
-      "unknown key versions fail closed",
-      /unknown\s+key\s+versions?[\s\S]{0,80}fail\s+closed/i,
-    ],
-    [
-      "missing env key fails closed",
-      /missing\s+env\s+key[\s\S]{0,80}fail\s+closed/i,
-    ],
+    ["unknown key versions fail closed", /unknown\s+key\s+versions?[\s\S]{0,80}fail\s+closed/i],
+    ["missing env key fails closed", /missing\s+env\s+key[\s\S]{0,80}fail\s+closed/i],
     [
       "decryption may run only in Edge Function",
       /decryption[\s\S]{0,80}only[\s\S]{0,80}Edge\s+Function/i,
@@ -52,18 +45,12 @@ describe("pi-ingest secret key management — contract doc", () => {
       "pure src/lib modules may not decrypt secrets",
       /pure\s+modules[\s\S]{0,80}src\/lib[\s\S]{0,200}(must\s+not\s+decrypt|types\s+and\s+contracts\s+only)/i,
     ],
-    [
-      "forbids plaintext secret storage",
-      /Plaintext\s+bridge\s+secret\s+storage/i,
-    ],
+    ["forbids plaintext secret storage", /Plaintext\s+bridge\s+secret\s+storage/i],
     [
       "forbids returning decrypted secrets to client",
       /Returning\s+decrypted\s+secret\s+material\s+to\s+the\s+client/i,
     ],
-    [
-      "forbids logging decrypted secrets",
-      /Logging\s+decrypted\s+secrets/i,
-    ],
+    ["forbids logging decrypted secrets", /Logging\s+decrypted\s+secrets/i],
     [
       "forbids logging ciphertext/nonce/key material",
       /Logging\s+ciphertext,\s*nonce,\s*or\s+key\s+material/i,
@@ -87,31 +74,24 @@ describe("pi-ingest secret key management — contract doc", () => {
 const SELF = resolve(__dirname, "piIngestSecretKeyManagementContract.test.ts");
 
 describe("pi-ingest secret key management — repo guardrails", () => {
-  const srcFiles = listTsFilesCached(resolve(ROOT, "src")).filter(
-    (p) => p !== SELF,
-  );
+  const srcFiles = listTsFilesCached(resolve(ROOT, "src")).filter((p) => p !== SELF);
   const edgeRoot = resolve(ROOT, "supabase/functions/pi-ingest-readings");
   const edgeFiles = listTsFilesCached(resolve(ROOT, "supabase/functions"));
-  const allFiles = [...srcFiles, ...edgeFiles].filter(
-    (f) => !f.startsWith(edgeRoot) && f !== SELF,
-  );
+  const allFiles = [...srcFiles, ...edgeFiles].filter((f) => !f.startsWith(edgeRoot) && f !== SELF);
 
   it("no process.env.PI_INGEST_SECRET_KEY references in src/", () => {
     for (const f of srcFiles) {
       const text = readFileCached(f);
-      expect(text, `forbidden env read in ${f}`).not.toMatch(
-        /process\.env\.PI_INGEST_SECRET_KEY/,
-      );
+      expect(text, `forbidden env read in ${f}`).not.toMatch(/process\.env\.PI_INGEST_SECRET_KEY/);
     }
   });
 
-  it("no Deno.env.get(\"PI_INGEST_SECRET_KEY...\") outside future Edge Function paths", () => {
+  it('no Deno.env.get("PI_INGEST_SECRET_KEY...") outside future Edge Function paths', () => {
     for (const f of allFiles) {
       const text = readFileCached(f);
-      expect(
-        text,
-        `forbidden Deno.env.get PI_INGEST_SECRET_KEY in ${f}`,
-      ).not.toMatch(/Deno\.env\.get\(\s*["'`]PI_INGEST_SECRET_KEY/);
+      expect(text, `forbidden Deno.env.get PI_INGEST_SECRET_KEY in ${f}`).not.toMatch(
+        /Deno\.env\.get\(\s*["'`]PI_INGEST_SECRET_KEY/,
+      );
     }
   });
 
@@ -127,16 +107,12 @@ describe("pi-ingest secret key management — repo guardrails", () => {
   it("no createDecipheriv calls outside future Edge Function paths", () => {
     for (const f of allFiles) {
       const text = readFileCached(f);
-      expect(text, `forbidden createDecipheriv in ${f}`).not.toMatch(
-        /\bcreateDecipheriv\s*\(/,
-      );
+      expect(text, `forbidden createDecipheriv in ${f}`).not.toMatch(/\bcreateDecipheriv\s*\(/);
     }
   });
 
   it("no resolver module exists yet", () => {
-    expect(
-      existsSync(resolve(ROOT, "src/lib/piIngestBridgeCredentialResolver.ts")),
-    ).toBe(false);
+    expect(existsSync(resolve(ROOT, "src/lib/piIngestBridgeCredentialResolver.ts"))).toBe(false);
   });
 
   it("pi-ingest-readings Edge Function, if present, does not yet read PI_INGEST_SECRET_KEY", () => {
@@ -166,9 +142,7 @@ describe("pi-ingest secret key management — repo guardrails", () => {
         /secret\s*:\s*[A-Za-z_.]*\.?secret_ciphertext\b/,
         /\bsecret_ciphertext\s+as\s+secret\b/,
       ]) {
-        expect(text, `forbidden secret_ciphertext→secret in ${f}`).not.toMatch(
-          re,
-        );
+        expect(text, `forbidden secret_ciphertext→secret in ${f}`).not.toMatch(re);
       }
     }
   });

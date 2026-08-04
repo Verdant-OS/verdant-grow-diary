@@ -49,7 +49,11 @@ export function auditWorkflow(text) {
     if (!ok) errors.push(msg || name);
   };
 
-  check("workflow_dispatch present", /workflow_dispatch\s*:/.test(text), "Missing workflow_dispatch trigger.");
+  check(
+    "workflow_dispatch present",
+    /workflow_dispatch\s*:/.test(text),
+    "Missing workflow_dispatch trigger.",
+  );
 
   // Matrix must list all 16 indices 0..15.
   const matrixMatch = text.match(/batch\s*:\s*\[([^\]]*)\]/);
@@ -70,17 +74,22 @@ export function auditWorkflow(text) {
   );
 
   // batches=16 guard: a step that fails when inputs.batches != "16".
-  const hasGuard = /inputs\.batches\s*\}\}["']?\s*!=\s*["']?16/.test(text) ||
-    /!=\s*["']?16["']?\s*\]/.test(text);
+  const hasGuard =
+    /inputs\.batches\s*\}\}["']?\s*!=\s*["']?16/.test(text) || /!=\s*["']?16["']?\s*\]/.test(text);
   check("batches=16 guard present", hasGuard, "Missing guard that fails when batches != 16.");
 
   // Runner invocation flags.
   check(
     "runner passes --batches (inputs.batches or 16) with guard",
-    (/--batches=\$\{\{\s*inputs\.batches\s*\}\}/.test(text) || /--batches=16\b/.test(text)) && hasGuard,
+    (/--batches=\$\{\{\s*inputs\.batches\s*\}\}/.test(text) || /--batches=16\b/.test(text)) &&
+      hasGuard,
     "Runner must pass --batches=${{ inputs.batches }} (with the batches=16 guard) or --batches=16.",
   );
-  check("runner uses --strategy=round-robin", /--strategy=round-robin\b/.test(text), "Missing --strategy=round-robin.");
+  check(
+    "runner uses --strategy=round-robin",
+    /--strategy=round-robin\b/.test(text),
+    "Missing --strategy=round-robin.",
+  );
 
   const chunkMatch = text.match(/--chunk-size=(\d+)/);
   check(
@@ -98,12 +107,20 @@ export function auditWorkflow(text) {
   );
 
   for (const gate of REQUIRED_GATES) {
-    check(`safety gate present: ${gate}`, text.includes(gate), `Missing required safety gate: ${gate}`);
+    check(
+      `safety gate present: ${gate}`,
+      text.includes(gate),
+      `Missing required safety gate: ${gate}`,
+    );
   }
 
   for (const pat of FORBIDDEN) {
     const m = text.match(pat);
-    check(`no deploy/publish/migration command (${pat.source})`, !m, `Forbidden command present: ${m ? m[0] : pat.source}`);
+    check(
+      `no deploy/publish/migration command (${pat.source})`,
+      !m,
+      `Forbidden command present: ${m ? m[0] : pat.source}`,
+    );
   }
 
   return { ok: errors.length === 0, errors, checks };

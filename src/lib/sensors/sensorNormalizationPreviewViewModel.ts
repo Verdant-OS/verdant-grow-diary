@@ -48,11 +48,7 @@ export interface SensorNormalizationPreviewLongFormRow {
 }
 
 export type SensorNormalizationPreviewBadgeTone =
-  | "info"
-  | "neutral"
-  | "warning"
-  | "danger"
-  | "muted";
+  "info" | "neutral" | "warning" | "danger" | "muted";
 
 export interface SensorNormalizationPreviewBadge {
   label: string;
@@ -64,16 +60,10 @@ export interface SensorNormalizationPreviewWarning {
   label: string;
 }
 
-export type SensorNormalizationPreviewTentStatus =
-  | "linked_verified"
-  | "missing"
-  | "invalid";
+export type SensorNormalizationPreviewTentStatus = "linked_verified" | "missing" | "invalid";
 
 export type SensorNormalizationPreviewPlantStatus =
-  | "linked"
-  | "missing"
-  | "invalid"
-  | "not_applicable";
+  "linked" | "missing" | "invalid" | "not_applicable";
 
 export interface SensorNormalizationPreviewViewModel {
   writesEnabled: false;
@@ -158,9 +148,7 @@ function countObjectFields(input: unknown): number {
   return 0;
 }
 
-function buildBadges(
-  normalized: NormalizedSensorReading,
-): SensorNormalizationPreviewBadge[] {
+function buildBadges(normalized: NormalizedSensorReading): SensorNormalizationPreviewBadge[] {
   const badges: SensorNormalizationPreviewBadge[] = [
     { label: `Source: ${normalized.source}`, tone: SOURCE_TONE[normalized.source] },
     { label: `Identity: ${normalized.source_identity}`, tone: "muted" },
@@ -168,11 +156,7 @@ function buildBadges(
     {
       label: `Confidence: ${normalized.confidence}`,
       tone:
-        normalized.confidence >= 75
-          ? "info"
-          : normalized.confidence >= 40
-            ? "neutral"
-            : "warning",
+        normalized.confidence >= 75 ? "info" : normalized.confidence >= 40 ? "neutral" : "warning",
     },
   ];
   if (normalized.is_stale) badges.push({ label: "Stale", tone: "warning" });
@@ -192,9 +176,7 @@ function buildMetricRows(
   return out;
 }
 
-function buildWarnings(
-  normalized: NormalizedSensorReading,
-): SensorNormalizationPreviewWarning[] {
+function buildWarnings(normalized: NormalizedSensorReading): SensorNormalizationPreviewWarning[] {
   return normalized.warnings.map((code) => ({
     code,
     label: WARNING_LABELS[code] ?? code,
@@ -228,7 +210,11 @@ export function buildSensorNormalizationPreviewViewModel(
   const rawTentId = input.options.tentId;
   let tentStatus: SensorNormalizationPreviewTentStatus;
   let tentStatusLabel: string;
-  if (rawTentId === undefined || rawTentId === null || (typeof rawTentId === "string" && rawTentId.trim() === "")) {
+  if (
+    rawTentId === undefined ||
+    rawTentId === null ||
+    (typeof rawTentId === "string" && rawTentId.trim() === "")
+  ) {
     tentStatus = "missing";
     tentStatusLabel = "Missing tent ID";
   } else if (!isUuid(rawTentId)) {
@@ -257,8 +243,7 @@ export function buildSensorNormalizationPreviewViewModel(
     plantStatusLabel = "Linked plant present";
   }
 
-  const longFormPreview =
-    tentStatus === "linked_verified" ? buildLongFormRows(metricRowsAll) : [];
+  const longFormPreview = tentStatus === "linked_verified" ? buildLongFormRows(metricRowsAll) : [];
 
   let emptyState: string | null = null;
   if (normalized.source === "invalid") {

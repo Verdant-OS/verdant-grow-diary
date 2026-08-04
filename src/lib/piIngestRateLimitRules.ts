@@ -33,8 +33,7 @@ export interface BridgeBatchLimitInput {
 }
 
 export interface BridgeAbuseGuardInput
-  extends BridgeRateLimitInput,
-    Omit<BridgeBatchLimitInput, "bridgeId"> {}
+  extends BridgeRateLimitInput, Omit<BridgeBatchLimitInput, "bridgeId"> {}
 
 export type BridgeRateLimitFailureCode =
   | "missing_bridge_id"
@@ -49,9 +48,7 @@ export type BridgeBatchLimitFailureCode =
   | "invalid_max_readings_per_batch"
   | "batch_too_large";
 
-export type BridgeAbuseFailureCode =
-  | BridgeRateLimitFailureCode
-  | BridgeBatchLimitFailureCode;
+export type BridgeAbuseFailureCode = BridgeRateLimitFailureCode | BridgeBatchLimitFailureCode;
 
 export type BridgeRateLimitResult =
   | {
@@ -95,21 +92,14 @@ export type BridgeAbuseGuardResult =
 
 // ----------------------------- Rate limit -----------------------------
 
-export function evaluateBridgeRateLimit(
-  input: BridgeRateLimitInput,
-): BridgeRateLimitResult {
+export function evaluateBridgeRateLimit(input: BridgeRateLimitInput): BridgeRateLimitResult {
   const bridgeId = (input.bridgeId ?? "").trim();
-  if (!bridgeId)
-    return { ok: false, code: "missing_bridge_id", message: "bridgeId is required" };
+  if (!bridgeId) return { ok: false, code: "missing_bridge_id", message: "bridgeId is required" };
 
   if (typeof input.now !== "number" || !Number.isFinite(input.now))
     return { ok: false, code: "invalid_now", message: "now must be a finite number" };
 
-  if (
-    typeof input.windowMs !== "number" ||
-    !Number.isFinite(input.windowMs) ||
-    input.windowMs <= 0
-  )
+  if (typeof input.windowMs !== "number" || !Number.isFinite(input.windowMs) || input.windowMs <= 0)
     return {
       ok: false,
       code: "invalid_window_ms",
@@ -157,12 +147,9 @@ export function evaluateBridgeRateLimit(
 
 // ----------------------------- Batch limit -----------------------------
 
-export function evaluateBridgeBatchLimit(
-  input: BridgeBatchLimitInput,
-): BridgeBatchLimitResult {
+export function evaluateBridgeBatchLimit(input: BridgeBatchLimitInput): BridgeBatchLimitResult {
   const bridgeId = (input.bridgeId ?? "").trim();
-  if (!bridgeId)
-    return { ok: false, code: "missing_bridge_id", message: "bridgeId is required" };
+  if (!bridgeId) return { ok: false, code: "missing_bridge_id", message: "bridgeId is required" };
 
   if (
     typeof input.maxReadingsPerBatch !== "number" ||
@@ -198,9 +185,7 @@ export function evaluateBridgeBatchLimit(
 
 // ----------------------------- Abuse guard -----------------------------
 
-export function evaluateBridgeAbuseGuard(
-  input: BridgeAbuseGuardInput,
-): BridgeAbuseGuardResult {
+export function evaluateBridgeAbuseGuard(input: BridgeAbuseGuardInput): BridgeAbuseGuardResult {
   const rate = evaluateBridgeRateLimit({
     bridgeId: input.bridgeId,
     now: input.now,
@@ -218,9 +203,14 @@ export function evaluateBridgeAbuseGuard(
   let retryAfterMs: number | undefined;
 
   if (rate.ok !== true) {
-    const f: BridgeAbuseFailure = (rate as { retryAfterMs?: number }).retryAfterMs !== undefined
-      ? { code: rate.code, message: rate.message, retryAfterMs: (rate as { retryAfterMs: number }).retryAfterMs }
-      : { code: rate.code, message: rate.message };
+    const f: BridgeAbuseFailure =
+      (rate as { retryAfterMs?: number }).retryAfterMs !== undefined
+        ? {
+            code: rate.code,
+            message: rate.message,
+            retryAfterMs: (rate as { retryAfterMs: number }).retryAfterMs,
+          }
+        : { code: rate.code, message: rate.message };
     failures.push(f);
     if (f.retryAfterMs !== undefined) retryAfterMs = f.retryAfterMs;
   }

@@ -69,9 +69,7 @@ describe("evaluateAiDoctorContext", () => {
         { at: iso(-HOUR), category: "watering" },
         { at: iso(-2 * HOUR), category: "notes" },
       ],
-      recentManualSnapshots: [
-        { at: iso(-(AI_DOCTOR_SNAPSHOT_FRESH_MS + HOUR)), severity: "ok" },
-      ],
+      recentManualSnapshots: [{ at: iso(-(AI_DOCTOR_SNAPSHOT_FRESH_MS + HOUR)), severity: "ok" }],
       now: NOW,
     });
     expect(r.readiness).toBe("partial");
@@ -138,9 +136,7 @@ describe("evaluateAiDoctorContext", () => {
   it("ignores events older than the 7d window", () => {
     const r = evaluateAiDoctorContext({
       plant: strongPlant,
-      recentEvents: [
-        { at: iso(-(AI_DOCTOR_RECENT_WINDOW_MS + DAY)), category: "watering" },
-      ],
+      recentEvents: [{ at: iso(-(AI_DOCTOR_RECENT_WINDOW_MS + DAY)), category: "watering" }],
       recentManualSnapshots: [],
       now: NOW,
     });
@@ -175,9 +171,7 @@ describe("evaluateAiDoctorContext", () => {
       recentManualSnapshots: [{ at: iso(-HOUR), severity: "ok" }],
       now: NOW,
     });
-    expect(r.missing).toEqual(
-      expect.arrayContaining(["strain", "stage", "medium", "plant-photo"]),
-    );
+    expect(r.missing).toEqual(expect.arrayContaining(["strain", "stage", "medium", "plant-photo"]));
     expect(r.readiness).toBe("partial");
   });
 
@@ -207,9 +201,7 @@ describe("evaluateAiDoctorContext", () => {
   });
 
   it("exports the insufficient notice copy", () => {
-    expect(AI_DOCTOR_INSUFFICIENT_NOTICE).toMatch(
-      /More context needed before AI Doctor/,
-    );
+    expect(AI_DOCTOR_INSUFFICIENT_NOTICE).toMatch(/More context needed before AI Doctor/);
   });
 
   it("is deterministic for the same input", () => {
@@ -222,8 +214,6 @@ describe("evaluateAiDoctorContext", () => {
       recentManualSnapshots: [{ at: iso(-HOUR), severity: "ok" as const }],
       now: NOW,
     };
-    expect(evaluateAiDoctorContext(input)).toEqual(
-      evaluateAiDoctorContext(input),
-    );
+    expect(evaluateAiDoctorContext(input)).toEqual(evaluateAiDoctorContext(input));
   });
 });

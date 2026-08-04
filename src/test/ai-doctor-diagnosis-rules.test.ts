@@ -169,8 +169,7 @@ describe("validateAndSanitizeDiagnosis — safety clamps", () => {
   it("strips over-promising yield/recovery language", () => {
     const { diagnosis } = validateAndSanitizeDiagnosis({
       ...completeInput,
-      summary:
-        "This plant will fully recover and we guarantee maximize yield within days.",
+      summary: "This plant will fully recover and we guarantee maximize yield within days.",
       whatNotToDo: ["Do not 100% certain over-prune."],
     });
     expect(diagnosis!.summary).not.toMatch(/guarantee|will fully recover|maximize yield/i);

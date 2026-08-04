@@ -14,9 +14,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  buildPlantRecentActivity,
-} from "@/lib/plantRecentActivityRules";
+import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
@@ -97,10 +95,10 @@ describe("buildPlantRecentActivity (pure)", () => {
   });
 
   it("flags photo presence when photo_url is set", () => {
-    const [row] = buildPlantRecentActivity(
-      [entry({ photo_url: "user/x.jpg" })],
-      { plantId: "p1", now: NOW },
-    );
+    const [row] = buildPlantRecentActivity([entry({ photo_url: "user/x.jpg" })], {
+      plantId: "p1",
+      now: NOW,
+    });
     expect(row.hasPhoto).toBe(true);
   });
 
@@ -167,10 +165,7 @@ describe("buildPlantRecentActivity (pure)", () => {
   });
 
   it("does not show unknown telemetry as healthy — no zero fallbacks for missing sensors", () => {
-    const [row] = buildPlantRecentActivity(
-      [entry({ details: {} })],
-      { plantId: "p1", now: NOW },
-    );
+    const [row] = buildPlantRecentActivity([entry({ details: {} })], { plantId: "p1", now: NOW });
     expect(row.hasSnapshot).toBe(false);
     expect(row.snapshotAt).toBeNull();
     expect(row.snapshotStale).toBe(false);
@@ -179,10 +174,10 @@ describe("buildPlantRecentActivity (pure)", () => {
   });
 
   it("flags quick_log entries as manual entries for source-badge rendering", () => {
-    const [row] = buildPlantRecentActivity(
-      [entry({ event_type: "quick_log" })],
-      { plantId: "p1", now: NOW },
-    );
+    const [row] = buildPlantRecentActivity([entry({ event_type: "quick_log" })], {
+      plantId: "p1",
+      now: NOW,
+    });
     expect(row.isManualEntry).toBe(true);
   });
 

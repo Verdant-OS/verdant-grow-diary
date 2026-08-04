@@ -72,15 +72,13 @@ vi.mock("@/integrations/supabase/client", () => {
             },
           };
         }
-        if (prop === "auth")
-          return { getUser: () => Promise.resolve({ data: { user: null } }) };
+        if (prop === "auth") return { getUser: () => Promise.resolve({ data: { user: null } }) };
         return () => proxy;
       },
     },
   );
   return { supabase: proxy };
 });
-
 
 function renderAt(path: string) {
   const qc = new QueryClient({
@@ -90,10 +88,7 @@ function renderAt(path: string) {
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route
-            path="/diary/environment-summary"
-            element={<EnvironmentSummaryReportPage />}
-          />
+          <Route path="/diary/environment-summary" element={<EnvironmentSummaryReportPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -124,9 +119,7 @@ describe("EnvironmentSummaryReportPage", () => {
   it("download button has accessible label and deterministic filename", () => {
     renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
     const btn = screen.getByTestId("env-report-download-pdf");
-    expect(btn.getAttribute("aria-label")).toBe(
-      "Download environment summary report PDF",
-    );
+    expect(btn.getAttribute("aria-label")).toBe("Download environment summary report PDF");
     expect(btn.getAttribute("data-filename")).toBe(
       "verdant-environment-summary-2026-06-01-to-2026-06-07.pdf",
     );

@@ -54,21 +54,19 @@ export interface PackageResult {
 
 interface DownloadDeps {
   /** Inject a JSZip-like constructor for tests / opt-out. */
-  zipCtor?: (new () => {
-    file: (name: string, data: Uint8Array | string) => void;
-    generateAsync: (opts: { type: "uint8array" }) => Promise<Uint8Array>;
-  }) | null;
+  zipCtor?:
+    | (new () => {
+        file: (name: string, data: Uint8Array | string) => void;
+        generateAsync: (opts: { type: "uint8array" }) => Promise<Uint8Array>;
+      })
+    | null;
   /** Override raw downloaders for tests. */
   downloadPdf?: (bytes: Uint8Array, filename: string) => void;
   downloadCsv?: (csv: { filename: string; contents: string }) => void;
   downloadBlob?: (bytes: Uint8Array, filename: string, mime: string) => void;
 }
 
-function defaultDownloadBlob(
-  bytes: Uint8Array,
-  filename: string,
-  mime: string,
-): void {
+function defaultDownloadBlob(bytes: Uint8Array, filename: string, mime: string): void {
   if (typeof document === "undefined" || typeof URL === "undefined") return;
   const ab = bytes.buffer.slice(
     bytes.byteOffset,

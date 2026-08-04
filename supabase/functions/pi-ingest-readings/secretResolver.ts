@@ -32,9 +32,7 @@ import type {
  * Anything else (null/undefined/empty/wrong-length) is treated as a
  * missing env key and the resolver fails closed.
  */
-export type PiIngestSecretKeyProvider = (
-  version: number,
-) => string | Uint8Array | null | undefined;
+export type PiIngestSecretKeyProvider = (version: number) => string | Uint8Array | null | undefined;
 
 const KNOWN_KEY_VERSIONS: ReadonlySet<number> = new Set([1, 2]);
 
@@ -77,9 +75,7 @@ function base64ToBytes(b64: string): Uint8Array | null {
   }
 }
 
-function coerceInputBytes(
-  value: Uint8Array | string | null | undefined,
-): Uint8Array | null {
+function coerceInputBytes(value: Uint8Array | string | null | undefined): Uint8Array | null {
   if (value == null) return null;
   if (value instanceof Uint8Array) return value.byteLength > 0 ? value : null;
   if (typeof value === "string") {
@@ -90,9 +86,7 @@ function coerceInputBytes(
   return null;
 }
 
-function normalizeKeyBytes(
-  raw: string | Uint8Array | null | undefined,
-): Uint8Array | null {
+function normalizeKeyBytes(raw: string | Uint8Array | null | undefined): Uint8Array | null {
   if (raw == null) return null;
   if (raw instanceof Uint8Array) {
     return raw.byteLength === 32 ? raw : null;
@@ -124,11 +118,7 @@ export async function resolveBridgeSecret(
   input: ResolveBridgeSecretInput,
   keyProvider: PiIngestSecretKeyProvider = defaultEnvKeyProvider,
 ): Promise<BridgeSecretResolverResult> {
-  if (
-    !input ||
-    typeof input.bridgeId !== "string" ||
-    input.bridgeId.trim().length === 0
-  ) {
+  if (!input || typeof input.bridgeId !== "string" || input.bridgeId.trim().length === 0) {
     return fail("missing_credential", "missing credential");
   }
 
@@ -147,11 +137,7 @@ export async function resolveBridgeSecret(
   if (!nonce) return fail("missing_nonce", "missing nonce");
 
   const version = input.secretKeyVersion;
-  if (
-    typeof version !== "number" ||
-    !Number.isInteger(version) ||
-    version < 1
-  ) {
+  if (typeof version !== "number" || !Number.isInteger(version) || version < 1) {
     return fail("missing_key_version", "missing key version");
   }
 

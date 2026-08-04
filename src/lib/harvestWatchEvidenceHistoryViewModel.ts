@@ -23,10 +23,7 @@ export type HarvestEvidenceCategory =
   | "recent_flower_photo"
   | "other_harvest_note";
 
-export const HARVEST_EVIDENCE_CATEGORY_LABEL: Record<
-  HarvestEvidenceCategory,
-  string
-> = {
+export const HARVEST_EVIDENCE_CATEGORY_LABEL: Record<HarvestEvidenceCategory, string> = {
   trichome_inspection: "Trichome inspection",
   pistil_observation: "Pistil / recession",
   bud_maturity: "Bud maturity",
@@ -34,10 +31,7 @@ export const HARVEST_EVIDENCE_CATEGORY_LABEL: Record<
   other_harvest_note: "Other harvest note",
 };
 
-export const HARVEST_EVIDENCE_CATEGORY_EMPTY: Record<
-  HarvestEvidenceCategory,
-  string
-> = {
+export const HARVEST_EVIDENCE_CATEGORY_EMPTY: Record<HarvestEvidenceCategory, string> = {
   trichome_inspection: "No trichome inspection notes yet.",
   pistil_observation: "No pistil or recession notes yet.",
   bud_maturity: "No bud maturity notes yet.",
@@ -53,8 +47,7 @@ const TRICHOME_RE = /\btrich(ome|omes|y)\b/i;
 const PISTIL_RE = /\bpistil(s)?\b|\brecession\b|\bhairs?\b/i;
 const BUD_RE = /\bbud(s)?\b|\bcalyx(es)?\b|\bswell(ing)?\b|\bdense\b|\bmaturity\b/i;
 const CLOSE_PHOTO_RE = /\bclose[- ]?up\b|\bclose flower photo\b/i;
-const OTHER_HARVEST_RE =
-  /\bharvest\b|\bamber\b|\bcloudy\b|\bflower(ing|s)?\b|\bripen\w*\b/i;
+const OTHER_HARVEST_RE = /\bharvest\b|\bamber\b|\bcloudy\b|\bflower(ing|s)?\b|\bripen\w*\b/i;
 
 export interface HarvestEvidenceClassifiableRow {
   id?: string | null;
@@ -92,8 +85,7 @@ export function classifyHarvestEvidenceRow(
   if (!row || typeof row !== "object") return null;
   const note = readNote(row).trim();
   const hasPhoto = row.hasPhoto === true;
-  const eventType =
-    typeof row.eventType === "string" ? row.eventType.toLowerCase().trim() : "";
+  const eventType = typeof row.eventType === "string" ? row.eventType.toLowerCase().trim() : "";
 
   if (note) {
     if (TRICHOME_RE.test(note)) return "trichome_inspection";
@@ -149,10 +141,7 @@ function safeSummary(note: string, hasPhoto: boolean): string {
   return trimmed.slice(0, SUMMARY_MAX - 1).trimEnd() + "…";
 }
 
-function compareNewestFirst(
-  a: HarvestEvidenceHistoryItem,
-  b: HarvestEvidenceHistoryItem,
-): number {
+function compareNewestFirst(a: HarvestEvidenceHistoryItem, b: HarvestEvidenceHistoryItem): number {
   const aHas = typeof a.occurredAt === "string";
   const bHas = typeof b.occurredAt === "string";
   if (aHas && bHas) {
@@ -177,10 +166,7 @@ const CATEGORY_ORDER: readonly HarvestEvidenceCategory[] = [
  * Group diary/timeline rows into harvest evidence categories, newest first.
  */
 export function buildHarvestEvidenceHistory(
-  rows:
-    | readonly (PlantRecentActivityRow | HarvestEvidenceClassifiableRow)[]
-    | null
-    | undefined,
+  rows: readonly (PlantRecentActivityRow | HarvestEvidenceClassifiableRow)[] | null | undefined,
   opts?: { perGroupLimit?: number },
 ): HarvestEvidenceHistory {
   const limit = Math.max(1, opts?.perGroupLimit ?? 10);
@@ -201,11 +187,8 @@ export function buildHarvestEvidenceHistory(
       category: cat,
       occurredAt: typeof r.occurredAt === "string" ? r.occurredAt : null,
       occurredAtLabel:
-        typeof r.occurredAtLabel === "string" && r.occurredAtLabel
-          ? r.occurredAtLabel
-          : "",
-      eventType:
-        typeof r.eventType === "string" && r.eventType ? r.eventType : "note",
+        typeof r.occurredAtLabel === "string" && r.occurredAtLabel ? r.occurredAtLabel : "",
+      eventType: typeof r.eventType === "string" && r.eventType ? r.eventType : "note",
       summary: safeSummary(noteRaw, r.hasPhoto === true),
       hasPhoto: r.hasPhoto === true,
     };
@@ -214,10 +197,7 @@ export function buildHarvestEvidenceHistory(
   }
 
   const groups: HarvestEvidenceHistoryGroup[] = CATEGORY_ORDER.map((cat) => {
-    const items = (buckets.get(cat) ?? [])
-      .slice()
-      .sort(compareNewestFirst)
-      .slice(0, limit);
+    const items = (buckets.get(cat) ?? []).slice().sort(compareNewestFirst).slice(0, limit);
     return {
       key: cat,
       label: HARVEST_EVIDENCE_CATEGORY_LABEL[cat],

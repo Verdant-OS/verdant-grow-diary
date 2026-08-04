@@ -5,14 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { LeadRow, LeadStatus } from "@/hooks/useLeadsList";
 import type { LeadDetailViewModel } from "@/lib/leadDetailViewModel";
 
-const STATUSES: LeadStatus[] = [
-  "new",
-  "reviewed",
-  "contacted",
-  "follow_up",
-  "closed",
-  "spam",
-];
+const STATUSES: LeadStatus[] = ["new", "reviewed", "contacted", "follow_up", "closed", "spam"];
 
 const STATUS_LABEL: Record<LeadStatus, string> = {
   new: "New",

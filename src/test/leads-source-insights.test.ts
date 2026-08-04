@@ -5,15 +5,11 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  buildLeadSourceInsights,
-  sortInsights,
-} from "@/lib/leadSourceInsightRules";
+import { buildLeadSourceInsights, sortInsights } from "@/lib/leadSourceInsightRules";
 import { groupBySource } from "@/lib/leadAnalyticsRules";
 import type { LeadRow } from "@/hooks/useLeadsList";
 
-const readSrc = (p: string) =>
-  readFileSync(resolve(__dirname, "..", p), "utf8");
+const readSrc = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 const RULES = readSrc("lib/leadSourceInsightRules.ts");
 const COMPONENT = readSrc("components/LeadSourceInsightsPanel.tsx");
 const PAGE = readSrc("pages/Leads.tsx");
@@ -105,7 +101,9 @@ describe("buildLeadSourceInsights", () => {
       ),
     ];
     const r = buildLeadSourceInsights(leads, NOW);
-    expect(r.some((i) => i.id === "highest_close_rate_source" || i.id === "best_source_by_closed")).toBe(true);
+    expect(
+      r.some((i) => i.id === "highest_close_rate_source" || i.id === "best_source_by_closed"),
+    ).toBe(true);
   });
 
   it("high-volume low-close source flagged as warning", () => {

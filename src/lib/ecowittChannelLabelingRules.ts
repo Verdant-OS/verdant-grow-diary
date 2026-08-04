@@ -20,21 +20,10 @@ import { ECOWITT_CHANNEL_LABELING_STALE_AFTER_MS } from "../constants/sensorTimi
 export type EcowittChannelFamily = "soil_moisture" | "air_temperature" | "humidity" | "other";
 
 export type EcowittChannelStatus =
-  | "accepted"
-  | "rejected"
-  | "missing"
-  | "invalid"
-  | "stale"
-  | "not_checked";
+  "accepted" | "rejected" | "missing" | "invalid" | "stale" | "not_checked";
 
 export type EcowittEvidenceSource =
-  | "live"
-  | "local"
-  | "test"
-  | "manual"
-  | "csv"
-  | "stale"
-  | "unknown";
+  "live" | "local" | "test" | "manual" | "csv" | "stale" | "unknown";
 
 export type EcowittCanonicalMetric = "soil_moisture_pct" | "temp_f" | "humidity_pct";
 

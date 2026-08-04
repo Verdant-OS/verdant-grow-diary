@@ -41,7 +41,10 @@ function ensureGitignoreEntry() {
   }
   const current = readFileSync(GITIGNORE_PATH, "utf8");
   if (!current.split(/\r?\n/).some((l) => l.trim() === line || l.trim() === ".seo")) {
-    appendFileSync(GITIGNORE_PATH, `\n# Verdant SEO monitoring — local OAuth token cache\n${line}\n`);
+    appendFileSync(
+      GITIGNORE_PATH,
+      `\n# Verdant SEO monitoring — local OAuth token cache\n${line}\n`,
+    );
   }
 }
 

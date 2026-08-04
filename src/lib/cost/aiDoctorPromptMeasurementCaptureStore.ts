@@ -45,9 +45,7 @@ function assertSafeBundle(bundle: AiDoctorPromptMeasurementBundle): void {
   const top = bundle as unknown as Record<string, unknown>;
   for (const k of FORBIDDEN_BUNDLE_KEYS) {
     if (Object.prototype.hasOwnProperty.call(top, k)) {
-      throw new Error(
-        `aiDoctorPromptMeasurementCaptureStore rejected forbidden field: ${k}`,
-      );
+      throw new Error(`aiDoctorPromptMeasurementCaptureStore rejected forbidden field: ${k}`);
     }
   }
   const m = bundle.measurement as unknown as Record<string, unknown>;

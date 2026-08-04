@@ -80,8 +80,17 @@ describe("sanitizeAuthError", () => {
     const circular: Record<string, unknown> = { message: "Invalid login credentials" };
     circular.self = circular;
     const cases: unknown[] = [
-      undefined, null, {}, "", "Invalid login credentials",
-      42, 0, true, false, [], ["Invalid login credentials"],
+      undefined,
+      null,
+      {},
+      "",
+      "Invalid login credentials",
+      42,
+      0,
+      true,
+      false,
+      [],
+      ["Invalid login credentials"],
       () => "Invalid login credentials",
       new Error("Invalid login credentials"),
       { message: "Invalid login credentials" },
@@ -99,8 +108,11 @@ describe("sanitizeAuthError", () => {
     ];
     const contexts = ["signIn", "signUp", "forgotPassword", "resetPassword", "unknown"] as const;
     const APPROVED = new Set<string>([
-      SIGN_IN_FRIENDLY_ERROR, SIGN_UP_FRIENDLY_ERROR,
-      FORGOT_RATE_LIMIT_ERROR, RESET_FAILED_ERROR, UNKNOWN_AUTH_ERROR,
+      SIGN_IN_FRIENDLY_ERROR,
+      SIGN_UP_FRIENDLY_ERROR,
+      FORGOT_RATE_LIMIT_ERROR,
+      RESET_FAILED_ERROR,
+      UNKNOWN_AUTH_ERROR,
     ]);
     for (const ctx of contexts) {
       for (const input of cases) {

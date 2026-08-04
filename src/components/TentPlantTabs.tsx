@@ -38,22 +38,16 @@ export default function TentPlantTabs({
   }, [viewModel.selectionWasReset, viewModel.selectedPlantId]);
 
   function focusTabByIndex(index: number) {
-    const tabs = listRef.current?.querySelectorAll<HTMLButtonElement>(
-      '[role="tab"]',
-    );
+    const tabs = listRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
     if (!tabs || tabs.length === 0) return;
     const safe = ((index % tabs.length) + tabs.length) % tabs.length;
     tabs[safe]?.focus();
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    const tabs = listRef.current?.querySelectorAll<HTMLButtonElement>(
-      '[role="tab"]',
-    );
+    const tabs = listRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
     if (!tabs || tabs.length === 0) return;
-    const current = Array.from(tabs).indexOf(
-      document.activeElement as HTMLButtonElement,
-    );
+    const current = Array.from(tabs).indexOf(document.activeElement as HTMLButtonElement);
     if (e.key === "ArrowRight") {
       e.preventDefault();
       focusTabByIndex(current + 1);

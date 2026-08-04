@@ -11,10 +11,7 @@ import { resolve } from "node:path";
 const ROOT = resolve(__dirname, "../..");
 const SENSORS = readFileSync(resolve(ROOT, "src/pages/Sensors.tsx"), "utf8");
 const QUICK_LOG = readFileSync(resolve(ROOT, "src/components/QuickLog.tsx"), "utf8");
-const MANUAL = readFileSync(
-  resolve(ROOT, "src/components/ManualSensorReadingCard.tsx"),
-  "utf8",
-);
+const MANUAL = readFileSync(resolve(ROOT, "src/components/ManualSensorReadingCard.tsx"), "utf8");
 const EMPTY_STATE = readFileSync(
   resolve(ROOT, "src/components/FirstTentSetupEmptyState.tsx"),
   "utf8",

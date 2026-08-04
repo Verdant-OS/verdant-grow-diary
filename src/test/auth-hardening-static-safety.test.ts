@@ -11,21 +11,21 @@ const CLIENT = readFileSync(resolve(SRC, "integrations/supabase/client.ts"), "ut
 const AUTH_DOC = readFileSync(resolve(ROOT, "docs/auth-security.md"), "utf8");
 const RLS_DOC = readFileSync(resolve(ROOT, "docs/qa-rls-checklist.md"), "utf8");
 
-const SRC_FILES = listFilesCached(SRC).filter((p) =>
-  /\.(ts|tsx|js|jsx)$/.test(p),
-);
+const SRC_FILES = listFilesCached(SRC).filter((p) => /\.(ts|tsx|js|jsx)$/.test(p));
 const isSrcTestFile = (filePath: string) =>
   relative(SRC, filePath).replace(/\\/g, "/").startsWith("test/");
 
 describe("Supabase client storage", () => {
   it("uses sessionStorage (not localStorage) for auth persistence", () => {
-    expect(CLIENT).toMatch(/storage:\s*sessionStorage/);
-    expect(CLIENT).not.toMatch(/storage:\s*localStorage/);
+    // SSR-safe: window.sessionStorage only when window exists (never localStorage).
+    expect(CLIENT).toMatch(/window\.sessionStorage|storage:\s*sessionStorage/);
+    expect(CLIENT).not.toMatch(/storage:\s*localStorage|window\.localStorage/);
   });
 
-  it("keeps autoRefreshToken + persistSession enabled", () => {
-    expect(CLIENT).toMatch(/persistSession:\s*true/);
-    expect(CLIENT).toMatch(/autoRefreshToken:\s*true/);
+  it("keeps autoRefreshToken + persistSession enabled in the browser", () => {
+    // Under TanStack SSR these are gated on `typeof window !== "undefined"`.
+    expect(CLIENT).toMatch(/persistSession:\s*(true|typeof window)/);
+    expect(CLIENT).toMatch(/autoRefreshToken:\s*(true|typeof window)/);
   });
 
   it("documents the hardening edit in a comment", () => {
@@ -65,8 +65,14 @@ describe("Auth security docs", () => {
 
 describe("src/ static safety", () => {
   it("never imports the service role key into src/", () => {
+    // client.server.ts is the intentional server-only service-role client
+    // (TanStack Start SSR). All other src files remain forbidden.
+    const SERVICE_ROLE_ALLOWLIST = new Set([
+      resolve(SRC, "integrations/supabase/client.server.ts"),
+    ]);
     const offenders = SRC_FILES.filter((f) => {
       if (isSrcTestFile(f)) return false; // guard tests assert absence
+      if (SERVICE_ROLE_ALLOWLIST.has(f)) return false;
       const body = readFileCached(f);
       // Strip sanitizer-style references (regex literals + quoted string literals
       // naming the key, e.g. defensive redaction code). The real escalation
@@ -96,9 +102,7 @@ describe("src/ static safety", () => {
     const offenders = SRC_FILES.filter((f) => {
       if (f.endsWith("auth-hardening-static-safety.test.ts")) return false;
       const body = readFileCached(f);
-      return /from\s+['"]@supabase\/ssr['"]|from\s+['"]next\/headers['"]/.test(
-        body,
-      );
+      return /from\s+['"]@supabase\/ssr['"]|from\s+['"]next\/headers['"]/.test(body);
     });
     expect(offenders).toEqual([]);
   });

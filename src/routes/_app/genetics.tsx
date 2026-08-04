@@ -1,10 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import GeneticsLibrary from "@/pages/GeneticsLibrary";
+import { Outlet, createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_app/genetics")({
   component: RouteComponent,
 });
 
 function RouteComponent() {
-  return <GeneticsLibrary />;
+  return <Outlet />;
 }

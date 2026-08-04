@@ -12,13 +12,7 @@ import {
 } from "@/lib/csvParser";
 
 export type ImportPhase =
-  | "idle"
-  | "parsing"
-  | "unit_confirm"
-  | "preview"
-  | "inserting"
-  | "done"
-  | "error";
+  "idle" | "parsing" | "unit_confirm" | "preview" | "inserting" | "done" | "error";
 
 export interface ImportState {
   phase: ImportPhase;

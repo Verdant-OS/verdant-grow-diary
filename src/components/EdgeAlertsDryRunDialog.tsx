@@ -200,7 +200,7 @@ export default function EdgeAlertsDryRunDialog() {
             </div>
             {result.simulated ? (
               <p className="text-xs text-muted-foreground">
-                Injected {METRIC_LABELS[result.simulated.metric]} = {" "}
+                Injected {METRIC_LABELS[result.simulated.metric]} ={" "}
                 {formatValue(result.simulated.metric, result.simulated.value)} for{" "}
                 <code>{result.simulated.fn}</code> (threshold{" "}
                 {formatValue(result.simulated.metric, result.simulated.threshold)}).

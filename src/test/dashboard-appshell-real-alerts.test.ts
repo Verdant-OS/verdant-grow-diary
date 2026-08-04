@@ -18,11 +18,15 @@ const APPSHELL = readFileSync(resolve(ROOT, "src/components/AppShell.tsx"), "utf
 describe("Dashboard + AppShell · real persisted alert badge", () => {
   it("Dashboard does not import useAlerts from useMockData", () => {
     expect(DASHBOARD).not.toMatch(/useAlerts[^L][^a-zA-Z].*useMockData/);
-    expect(DASHBOARD).not.toMatch(/import\s*\{[^}]*\buseAlerts\b[^}]*\}\s*from\s*["']@\/hooks\/useMockData["']/);
+    expect(DASHBOARD).not.toMatch(
+      /import\s*\{[^}]*\buseAlerts\b[^}]*\}\s*from\s*["']@\/hooks\/useMockData["']/,
+    );
   });
 
   it("AppShell does not import useAlerts from useMockData", () => {
-    expect(APPSHELL).not.toMatch(/import\s*\{[^}]*\buseAlerts\b[^}]*\}\s*from\s*["']@\/hooks\/useMockData["']/);
+    expect(APPSHELL).not.toMatch(
+      /import\s*\{[^}]*\buseAlerts\b[^}]*\}\s*from\s*["']@\/hooks\/useMockData["']/,
+    );
   });
 
   it("Dashboard uses useAlertsList for the alert badge", () => {

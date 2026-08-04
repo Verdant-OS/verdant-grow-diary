@@ -102,7 +102,8 @@ function episode(outcome?: string, decision?: string) {
   return ep;
 }
 
-const CAUSAL = /\b(caused|fixed the plant|proved effective|guaranteed|cures?|autopilot|controls your grow|definitely worked)\b/i;
+const CAUSAL =
+  /\b(caused|fixed the plant|proved effective|guaranteed|cures?|autopilot|controls your grow|definitely worked)\b/i;
 
 describe("PlantMemoryEpisodeCard", () => {
   it("renders without crashing for a decision-pending episode", () => {

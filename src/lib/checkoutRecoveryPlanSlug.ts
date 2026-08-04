@@ -31,7 +31,6 @@
 import { PAID_PLAN_ALLOWLIST, type PaidPlanId } from "@/lib/paidPlanAllowlist";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 
-
 /** Stable fallback token — enum-like, no whitespace, funnel-sanitizer safe. */
 export const CHECKOUT_RECOVERY_UNKNOWN_PLAN_SLUG = "unknown_plan" as const;
 
@@ -83,7 +82,7 @@ function emitFallbackWarning(telemetry: UnknownPlanSlugFallbackTelemetry): void 
   try {
     // Single-line JSON keeps this easy to grep in browser devtools and CI
     // artifacts without dragging in a logger dependency.
-    // eslint-disable-next-line no-console
+
     console.warn(
       JSON.stringify({
         event: "checkout_recovery_plan_slug_fallback",
@@ -114,7 +113,6 @@ function emitFallbackAnalytics(telemetry: UnknownPlanSlugFallbackTelemetry): voi
   }
 }
 
-
 /**
  * Returns the input iff it is an exact member of the shared paid-plan
  * allowlist. Everything else — undefined, null, wrong type, unknown slug,
@@ -132,7 +130,6 @@ export function sanitizeCheckoutRecoveryPlanSlug(value: unknown): CheckoutRecove
   emitFallbackAnalytics(telemetry);
   return CHECKOUT_RECOVERY_UNKNOWN_PLAN_SLUG;
 }
-
 
 /** Total number of fallbacks observed since the last reset. */
 export function getUnknownPlanSlugFallbackCount(): number {

@@ -119,7 +119,10 @@ const PAID_SESSION = PRO_SESSION.path
   ? PRO_SESSION
   : FOUNDER_SESSION.path
     ? FOUNDER_SESSION
-    : { skipReason: "SKIPPED: neither E2E_PHENO_PRO_SESSION_FILE nor E2E_PHENO_FOUNDER_SESSION_FILE is set." };
+    : {
+        skipReason:
+          "SKIPPED: neither E2E_PHENO_PRO_SESSION_FILE nor E2E_PHENO_FOUNDER_SESSION_FILE is set.",
+      };
 
 async function assertNoForbiddenCopy(page: Page) {
   const body = (await page.locator("body").innerText()).toLowerCase();
@@ -151,7 +154,9 @@ test.describe("A. Free user gate", () => {
   test.skip(!FREE_SESSION.path, FREE_SESSION.skipReason ?? "SKIPPED: no Free session.");
   bindRoleSession(FREE_SESSION);
 
-  test("Free user sees the upgrade gate on /pheno-hunts/new and the CTA returnTo round-trips to /pricing", async ({ page }) => {
+  test("Free user sees the upgrade gate on /pheno-hunts/new and the CTA returnTo round-trips to /pricing", async ({
+    page,
+  }) => {
     await page.goto("/pheno-hunts/new");
     // A valid Free session must land on the gated page. An /auth bounce means
     // the session is broken — that is a FAIL, never a silent pass.
@@ -182,7 +187,9 @@ test.describe("B. CheckoutSuccess sanitizer", () => {
   // depends on the chromium-authed project's default user.json file.
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test("unsafe returnTo is rejected; safe returnTo does not auto-redirect anonymously", async ({ page }) => {
+  test("unsafe returnTo is rejected; safe returnTo does not auto-redirect anonymously", async ({
+    page,
+  }) => {
     await page.goto("/checkout/success?returnTo=https://evil.example/pwn");
     await expect(page.getByTestId("checkout-success-page")).toBeVisible();
     await page.waitForTimeout(400);
@@ -229,7 +236,9 @@ test.describe("C3. Canceled/expired blocked from paid pheno workspace", () => {
   test.skip(!CANCELED_SESSION.path, CANCELED_SESSION.skipReason ?? "SKIPPED: no Canceled session.");
   bindRoleSession(CANCELED_SESSION);
 
-  test("Canceled user hitting /pheno-hunts/new sees gate, not the create form", async ({ page }) => {
+  test("Canceled user hitting /pheno-hunts/new sees gate, not the create form", async ({
+    page,
+  }) => {
     await page.goto("/pheno-hunts/new");
     // The gate must affirmatively render; the onboarding surface must not.
     // (The old absence check targeted a testid that never existed in the
@@ -249,7 +258,9 @@ test.describe("D–F. Missing-evidence hunt", () => {
   );
   bindRoleSession(PAID_SESSION);
 
-  test("D+E. workspace shows disabled Compare with the exact not-ready reason", async ({ page }) => {
+  test("D+E. workspace shows disabled Compare with the exact not-ready reason", async ({
+    page,
+  }) => {
     await page.goto(`/pheno-hunts/${MISSING_EVIDENCE_HUNT}/workspace`);
     await expect(page).not.toHaveURL(/\/auth/);
     const action = page.getByTestId("pheno-workspace-compare-action");
@@ -281,7 +292,9 @@ test.describe("D–F. Missing-evidence hunt", () => {
     await assertNoForbiddenCopy(page);
   });
 
-  test("D+E. missing-evidence next-step anchor navigates within the workspace", async ({ page }) => {
+  test("D+E. missing-evidence next-step anchor navigates within the workspace", async ({
+    page,
+  }) => {
     const compareRequests: string[] = [];
     page.on("request", (req) => {
       if (COMPARE_EXECUTION_REQUEST.test(req.url())) compareRequests.push(req.url());
@@ -349,7 +362,9 @@ test.describe("D–F. Missing-evidence hunt", () => {
     ).toEqual([]);
   });
 
-  test("F. direct /compare on incomplete hunt shows not-ready warning and fires no compare requests", async ({ page }) => {
+  test("F. direct /compare on incomplete hunt shows not-ready warning and fires no compare requests", async ({
+    page,
+  }) => {
     const compareRequests: string[] = [];
     page.on("request", (req) => {
       if (COMPARE_EXECUTION_REQUEST.test(req.url())) compareRequests.push(req.url());
@@ -358,7 +373,9 @@ test.describe("D–F. Missing-evidence hunt", () => {
     expect(page.url()).not.toContain("/auth");
     await expect(page.locator("body")).toContainText(/not comparison[- ]ready/i);
     await assertNoForbiddenCopy(page);
-    expect(compareRequests, "no comparison-execution requests may fire on disabled state").toEqual([]);
+    expect(compareRequests, "no comparison-execution requests may fire on disabled state").toEqual(
+      [],
+    );
   });
 });
 
@@ -371,7 +388,9 @@ test.describe("G. Comparison-ready hunt", () => {
   );
   bindRoleSession(PAID_SESSION);
 
-  test("workspace enables Compare and /compare renders substantive read-only comparison", async ({ page }) => {
+  test("workspace enables Compare and /compare renders substantive read-only comparison", async ({
+    page,
+  }) => {
     await page.goto(`/pheno-hunts/${COMPARISON_READY_HUNT}/workspace`);
     await expect(page).not.toHaveURL(/\/auth/);
     const action = page.getByTestId("pheno-workspace-compare-action");
@@ -409,10 +428,9 @@ test.describe("G. Comparison-ready hunt", () => {
     ).toBe(true);
     // Candidate labels: each card's aria heading must be visible and non-empty.
     const labels = grid.locator('[id^="pheno-candidate-"][id$="-heading"]');
-    expect(
-      (await labels.count()) >= 2,
-      "every candidate card must expose a label heading",
-    ).toBe(true);
+    expect((await labels.count()) >= 2, "every candidate card must expose a label heading").toBe(
+      true,
+    );
     for (const label of [labels.nth(0), labels.nth(1)]) {
       await expect(label).toBeVisible();
       expect(
@@ -455,8 +473,7 @@ test.describe("I. Core one-tent regression", () => {
   }) => {
     await page.goto("/dashboard");
     await page.waitForURL(
-      (url) =>
-        url.pathname === "/welcome" && url.searchParams.get("redirectTo") === "/dashboard",
+      (url) => url.pathname === "/welcome" && url.searchParams.get("redirectTo") === "/dashboard",
     );
     const bodyText = await page.locator("body").innerText();
     expect(bodyText.length).toBeGreaterThan(0);

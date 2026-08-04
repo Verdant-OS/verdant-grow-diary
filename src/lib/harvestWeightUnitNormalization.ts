@@ -21,10 +21,7 @@
  *
  * Pure. Deterministic. Null-safe. No I/O.
  */
-import {
-  QUICK_LOG_WEIGHT_UNITS,
-  type QuickLogWeightUnit,
-} from "@/constants/quickLogActivityTypes";
+import { QUICK_LOG_WEIGHT_UNITS, type QuickLogWeightUnit } from "@/constants/quickLogActivityTypes";
 
 /**
  * Conversion factors to grams. Source: SI / imperial-avoirdupois defs.
@@ -50,9 +47,7 @@ export interface NormalizedHarvestWeight {
   grams: number;
 }
 
-function sanitizeUnit(
-  raw: string | null | undefined,
-): QuickLogWeightUnit | null {
+function sanitizeUnit(raw: string | null | undefined): QuickLogWeightUnit | null {
   if (typeof raw !== "string") return null;
   const t = raw.trim() as QuickLogWeightUnit;
   return QUICK_LOG_WEIGHT_UNITS.includes(t) ? t : null;
@@ -63,11 +58,7 @@ function sanitizeNumericValue(
 ): { text: string; num: number } | null {
   if (raw == null) return null;
   const text =
-    typeof raw === "number"
-      ? Number.isFinite(raw)
-        ? String(raw)
-        : ""
-      : String(raw).trim();
+    typeof raw === "number" ? (Number.isFinite(raw) ? String(raw) : "") : String(raw).trim();
   if (text.length === 0) return null;
   if (!/^\d+(\.\d+)?$/.test(text)) return null;
   const num = Number(text);

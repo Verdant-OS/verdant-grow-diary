@@ -58,13 +58,7 @@ export default function LeadDetailIntelligenceSection({
   );
 }
 
-function LeadActivity({
-  leadId,
-  refreshNonce,
-}: {
-  leadId: string;
-  refreshNonce: number;
-}) {
+function LeadActivity({ leadId, refreshNonce }: { leadId: string; refreshNonce: number }) {
   const { events, loading, error } = useLeadEvents(leadId, refreshNonce);
   if (loading) {
     return <p className="text-xs text-muted-foreground">Loading activity…</p>;
@@ -80,10 +74,7 @@ function LeadActivity({
     );
   }
   return (
-    <ol
-      className="space-y-2 text-xs text-muted-foreground"
-      data-testid="lead-activity"
-    >
+    <ol className="space-y-2 text-xs text-muted-foreground" data-testid="lead-activity">
       {events.map((ev) => {
         const label = labelForEventType(ev.event_type);
         const detail =
@@ -98,9 +89,7 @@ function LeadActivity({
           >
             <div className="flex items-center justify-between gap-2">
               <span className="font-medium text-foreground">{label}</span>
-              <span className="tabular-nums">
-                {new Date(ev.created_at).toLocaleString()}
-              </span>
+              <span className="tabular-nums">{new Date(ev.created_at).toLocaleString()}</span>
             </div>
             {detail && <div className="mt-1">{detail}</div>}
             {ev.note && <div className="mt-1">{ev.note}</div>}

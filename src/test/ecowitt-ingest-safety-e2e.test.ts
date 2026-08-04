@@ -350,9 +350,7 @@ describe("EcoWitt ingest — single-tent multi-channel fan-out", () => {
 
     // Only ch1 air metrics land (+ derived VPD).
     expect(rows.every((r) => r.tent_id === "tent-multi")).toBe(true);
-    const channels = new Set(
-      rows.map((r) => (r.raw_payload as { channel: number }).channel),
-    );
+    const channels = new Set(rows.map((r) => (r.raw_payload as { channel: number }).channel));
     expect(channels).toEqual(new Set([1]));
 
     const droppedKeys = summary.dropped
@@ -394,12 +392,7 @@ describe("EcoWitt ingest — single-tent multi-channel fan-out", () => {
       .filter((r) => (r.raw_payload as { channel: number }).channel === 2)
       .map((r) => r.metric)
       .sort();
-    expect(ch2).toEqual([
-      "humidity_pct",
-      "soil_moisture_pct",
-      "temperature_c",
-      "vpd_kpa",
-    ]);
+    expect(ch2).toEqual(["humidity_pct", "soil_moisture_pct", "temperature_c", "vpd_kpa"]);
 
     expect(
       summary.dropped.some(

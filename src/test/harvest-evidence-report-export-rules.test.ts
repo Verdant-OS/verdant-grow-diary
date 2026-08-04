@@ -35,20 +35,14 @@ describe("harvestEvidenceReportExportRules", () => {
   });
 
   it("builds a UTC ISO generated-at label without milliseconds", () => {
-    expect(buildHarvestEvidenceReportGeneratedAtLabel(NOW)).toBe(
-      "2026-06-18T12:34:56Z",
-    );
+    expect(buildHarvestEvidenceReportGeneratedAtLabel(NOW)).toBe("2026-06-18T12:34:56Z");
   });
 
   it("falls back to a generic scope label for empty report", () => {
-    expect(buildHarvestEvidenceReportScopeLabel(null)).toBe(
+    expect(buildHarvestEvidenceReportScopeLabel(null)).toBe("All plants in current view");
+    expect(buildHarvestEvidenceReportScopeLabel(buildHarvestEvidenceReport([]))).toBe(
       "All plants in current view",
     );
-    expect(
-      buildHarvestEvidenceReportScopeLabel(
-        buildHarvestEvidenceReport([]),
-      ),
-    ).toBe("All plants in current view");
   });
 
   it("uses plant names only (no ids) in scope label", () => {
@@ -64,10 +58,11 @@ describe("harvestEvidenceReportExportRules", () => {
   });
 
   it("collapses long scope lists", () => {
-    const inputs: HarvestEvidenceReportPlantInput[] = Array.from(
-      { length: 7 },
-      (_, i) => ({ plantId: `p${i}`, plantName: `Plant ${i}`, rows: [] }),
-    );
+    const inputs: HarvestEvidenceReportPlantInput[] = Array.from({ length: 7 }, (_, i) => ({
+      plantId: `p${i}`,
+      plantName: `Plant ${i}`,
+      rows: [],
+    }));
     const report = buildHarvestEvidenceReport(inputs);
     const label = buildHarvestEvidenceReportScopeLabel(report);
     expect(label).toMatch(/\+\d+ more$/);
@@ -75,15 +70,11 @@ describe("harvestEvidenceReportExportRules", () => {
 
   it("metadata bundles all required fields including footer", () => {
     const meta = buildHarvestEvidenceReportExportMetadata(
-      buildHarvestEvidenceReport([
-        { plantId: "p1", plantName: "Sour Diesel", rows: [] },
-      ]),
+      buildHarvestEvidenceReport([{ plantId: "p1", plantName: "Sour Diesel", rows: [] }]),
       NOW,
     );
     expect(meta.title).toBe("Verdant — Harvest Evidence Report — 2026-06-18");
-    expect(meta.filename).toBe(
-      "verdant-harvest-evidence-report-2026-06-18.pdf",
-    );
+    expect(meta.filename).toBe("verdant-harvest-evidence-report-2026-06-18.pdf");
     expect(meta.scopeLabel).toBe("Sour Diesel");
     expect(meta.generatedAtLabel).toBe("2026-06-18T12:34:56Z");
     expect(meta.footer).toBe(HARVEST_EVIDENCE_REPORT_EXPORT_FOOTER);

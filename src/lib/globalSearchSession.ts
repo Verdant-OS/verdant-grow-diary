@@ -35,9 +35,7 @@ function safeStorage(): Storage | null {
   }
 }
 
-function normalizeFilters(
-  input: unknown,
-): Record<GlobalSearchEntityType, boolean> {
+function normalizeFilters(input: unknown): Record<GlobalSearchEntityType, boolean> {
   const out: Record<GlobalSearchEntityType, boolean> = { ...ALL_ON };
   if (!input || typeof input !== "object") return out;
   const keys: GlobalSearchEntityType[] = ["grow", "tent", "plant", "cultivar"];
@@ -61,7 +59,7 @@ export function readGlobalSearchSession(): GlobalSearchSessionState {
     if (!parsed || typeof parsed !== "object") return fallback;
     const query =
       typeof (parsed as { query?: unknown }).query === "string"
-        ? ((parsed as { query: string }).query).slice(0, MAX_QUERY_LENGTH)
+        ? (parsed as { query: string }).query.slice(0, MAX_QUERY_LENGTH)
         : "";
     const filters = normalizeFilters((parsed as { filters?: unknown }).filters);
     return { query, filters };
@@ -70,9 +68,7 @@ export function readGlobalSearchSession(): GlobalSearchSessionState {
   }
 }
 
-export function writeGlobalSearchSession(
-  state: GlobalSearchSessionState,
-): void {
+export function writeGlobalSearchSession(state: GlobalSearchSessionState): void {
   const storage = safeStorage();
   if (!storage) return;
   try {
@@ -118,12 +114,7 @@ function sameFilters(
   a: Record<GlobalSearchEntityType, boolean>,
   b: Record<GlobalSearchEntityType, boolean>,
 ): boolean {
-  return (
-    a.grow === b.grow &&
-    a.tent === b.tent &&
-    a.plant === b.plant &&
-    a.cultivar === b.cultivar
-  );
+  return a.grow === b.grow && a.tent === b.tent && a.plant === b.plant && a.cultivar === b.cultivar;
 }
 
 export function readGlobalSearchHistory(): GlobalSearchHistoryEntry[] {
@@ -205,12 +196,7 @@ export interface GlobalSearchLastSelected {
 }
 
 const LAST_SELECTED_STORAGE_KEY = "verdant.globalSearch.lastSelected.v1";
-const VALID_TYPES: readonly GlobalSearchEntityType[] = [
-  "grow",
-  "tent",
-  "plant",
-  "cultivar",
-];
+const VALID_TYPES: readonly GlobalSearchEntityType[] = ["grow", "tent", "plant", "cultivar"];
 
 export function readGlobalSearchLastSelected(): GlobalSearchLastSelected | null {
   const storage = safeStorage();
@@ -270,5 +256,3 @@ export function clearGlobalSearchLastSelected(): void {
 }
 
 export const GLOBAL_SEARCH_LAST_SELECTED_STORAGE_KEY = LAST_SELECTED_STORAGE_KEY;
-
-

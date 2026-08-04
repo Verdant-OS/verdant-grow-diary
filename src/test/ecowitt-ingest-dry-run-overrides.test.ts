@@ -141,12 +141,8 @@ describe("EcoWitt ingest dry-run — canonical field map", () => {
       metrics: { ...base.metrics, air_temp_f: null, humidity_pct: null },
     };
     const map = buildEcowittIngestDryRunFieldMap(mutated);
-    expect(map.find((r) => r.ingest_key === "air_temp_f")!.status).toBe(
-      "missing_required",
-    );
-    expect(map.find((r) => r.ingest_key === "humidity_pct")!.status).toBe(
-      "missing_required",
-    );
+    expect(map.find((r) => r.ingest_key === "air_temp_f")!.status).toBe("missing_required");
+    expect(map.find((r) => r.ingest_key === "humidity_pct")!.status).toBe("missing_required");
   });
 
   it("shows optional metrics missing as missing_optional", () => {
@@ -156,9 +152,7 @@ describe("EcoWitt ingest dry-run — canonical field map", () => {
       metrics: { ...base.metrics, soil_temp_f: null },
     };
     const map = buildEcowittIngestDryRunFieldMap(mutated);
-    expect(map.find((r) => r.ingest_key === "soil_temp_f")!.status).toBe(
-      "missing_optional",
-    );
+    expect(map.find((r) => r.ingest_key === "soil_temp_f")!.status).toBe("missing_optional");
   });
 
   it("is deterministic given the same snapshot", () => {
@@ -218,8 +212,10 @@ describe("EcoWitt ingest dry-run — all-tent export", () => {
     const files = buildEcowittIngestDryRunExportFilesForTents(inputs());
     const createObjectURL = vi.fn().mockReturnValue("blob:fake");
     const revokeObjectURL = vi.fn();
-    (URL as unknown as { createObjectURL: typeof createObjectURL }).createObjectURL = createObjectURL;
-    (URL as unknown as { revokeObjectURL: typeof revokeObjectURL }).revokeObjectURL = revokeObjectURL;
+    (URL as unknown as { createObjectURL: typeof createObjectURL }).createObjectURL =
+      createObjectURL;
+    (URL as unknown as { revokeObjectURL: typeof revokeObjectURL }).revokeObjectURL =
+      revokeObjectURL;
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     const fetchSpy = vi.spyOn(globalThis, "fetch" as any).mockImplementation(() => {
       throw new Error("network call attempted");

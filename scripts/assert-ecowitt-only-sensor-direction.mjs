@@ -19,15 +19,7 @@ import { join, relative, sep } from "node:path";
 
 const ROOT = process.cwd();
 
-const SCAN_DIRS = [
-  "src",
-  "docs",
-  "scripts",
-  "fixtures",
-  "supabase",
-  "templates",
-  ".github",
-];
+const SCAN_DIRS = ["src", "docs", "scripts", "fixtures", "supabase", "templates", ".github"];
 
 const SCAN_EXTS = new Set([
   ".ts",
@@ -119,9 +111,7 @@ for (const f of files) {
 }
 
 if (offenders.length > 0) {
-  console.error(
-    "✗ EcoWitt-only sensor direction violated. Found SwitchBot reference(s):",
-  );
+  console.error("✗ EcoWitt-only sensor direction violated. Found SwitchBot reference(s):");
   for (const o of offenders) console.error("  " + o);
   console.error(
     "\nVerdant's active physical sensor path is EcoWitt-only. " +

@@ -44,17 +44,11 @@ function captureEvent(): Array<{ name: string; detail: unknown }> {
     const ce = e as CustomEvent<unknown>;
     captured.push({ name: e.type, detail: ce.detail });
   };
-  window.addEventListener(
-    PLANT_QUICKLOG_PREFILL_EVENT,
-    handler as EventListener,
-  );
+  window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler as EventListener);
   // Return both the captured array and a cleanup the test can ignore
   // (vitest will recreate window between tests via cleanup()).
   (captureEvent as unknown as { _last: () => void })._last = () =>
-    window.removeEventListener(
-      PLANT_QUICKLOG_PREFILL_EVENT,
-      handler as EventListener,
-    );
+    window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler as EventListener);
   return captured;
 }
 
@@ -88,9 +82,7 @@ describe("Harvest Watch — Quick Log handoff", () => {
     mocks.usePlantRecentActivity.mockReturnValue({ data: [], isLoading: false });
     const captured = captureEvent();
     render(<PlantDetailHarvestWatchCard plantId="p1" />);
-    fireEvent.click(
-      screen.getByTestId("plant-detail-harvest-watch-next-inspection-cta"),
-    );
+    fireEvent.click(screen.getByTestId("plant-detail-harvest-watch-next-inspection-cta"));
     expect(captured.length).toBe(1);
     const detail = captured[0].detail as Record<string, unknown>;
     expect(detail.preset).toBe("trichome_inspection");
@@ -114,9 +106,7 @@ describe("Harvest Watch — Quick Log handoff", () => {
     });
     const captured = captureEvent();
     render(<PlantDetailHarvestWatchCard plantId="p1" />);
-    fireEvent.click(
-      screen.getByTestId("plant-detail-harvest-watch-next-inspection-cta"),
-    );
+    fireEvent.click(screen.getByTestId("plant-detail-harvest-watch-next-inspection-cta"));
     const detail = captured[0].detail as Record<string, unknown>;
     expect(detail.preset).toBe("pistil_recession");
     expect(detail.eventType).toBe("observation");
@@ -133,9 +123,7 @@ describe("Harvest Watch — Quick Log handoff", () => {
     });
     const captured = captureEvent();
     render(<PlantDetailHarvestWatchCard plantId="p1" />);
-    fireEvent.click(
-      screen.getByTestId("plant-detail-harvest-watch-next-inspection-cta"),
-    );
+    fireEvent.click(screen.getByTestId("plant-detail-harvest-watch-next-inspection-cta"));
     const detail = captured[0].detail as Record<string, unknown>;
     expect(detail.preset).toBe("bud_maturity");
     expect(String(detail.note)).toMatch(/Bud maturity/i);
@@ -152,9 +140,7 @@ describe("Harvest Watch — Quick Log handoff", () => {
     });
     const captured = captureEvent();
     render(<PlantDetailHarvestWatchCard plantId="p1" />);
-    fireEvent.click(
-      screen.getByTestId("plant-detail-harvest-watch-next-inspection-cta"),
-    );
+    fireEvent.click(screen.getByTestId("plant-detail-harvest-watch-next-inspection-cta"));
     const detail = captured[0].detail as Record<string, unknown>;
     expect(detail.preset).toBe("close_flower_photo");
     expect(detail.eventType).toBe("photo");
@@ -165,9 +151,7 @@ describe("Harvest Watch — Quick Log handoff", () => {
     mocks.usePlantRecentActivity.mockReturnValue({ data: [], isLoading: false });
     const captured = captureEvent();
     render(<PlantDetailHarvestWatchCard plantId="p1" />);
-    fireEvent.click(
-      screen.getByTestId("plant-detail-harvest-watch-next-inspection-cta"),
-    );
+    fireEvent.click(screen.getByTestId("plant-detail-harvest-watch-next-inspection-cta"));
     expect(captured[0].name).toBe(PLANT_QUICKLOG_PREFILL_EVENT);
     expect(captured[0].name).toBe("verdant:open-quicklog");
   });

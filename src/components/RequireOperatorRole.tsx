@@ -46,9 +46,7 @@ export function RequireOperatorRole() {
             <CardTitle className="flex items-center gap-2 text-base">
               <ShieldAlert className="h-4 w-4" /> Access restricted
             </CardTitle>
-            <CardDescription>
-              This account does not have operator access.
-            </CardDescription>
+            <CardDescription>This account does not have operator access.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
             {email ? (
@@ -60,9 +58,7 @@ export function RequireOperatorRole() {
                 Signed in, but email is unavailable.
               </p>
             )}
-            <p>
-              Use an operator-role account or ask the project owner to grant operator access.
-            </p>
+            <p>Use an operator-role account or ask the project owner to grant operator access.</p>
             <p>No operator data was loaded.</p>
           </CardContent>
         </Card>

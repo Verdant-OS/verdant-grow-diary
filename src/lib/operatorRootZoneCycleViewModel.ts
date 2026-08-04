@@ -59,11 +59,7 @@ export interface OperatorRootZoneCycleMetricRow {
 }
 
 export type OperatorRootZoneCycleComparisonKey =
-  | "event_interval"
-  | "runoff_share"
-  | "runoff_ph_delta"
-  | "output_ec_delta"
-  | "runoff_ec_delta";
+  "event_interval" | "runoff_share" | "runoff_ph_delta" | "output_ec_delta" | "runoff_ec_delta";
 
 export interface OperatorRootZoneCycleComparisonRow {
   key: OperatorRootZoneCycleComparisonKey;
@@ -77,9 +73,7 @@ export interface OperatorRootZoneCycleProductRow {
 }
 
 export type OperatorRootZoneCycleManualObservationKey =
-  | "pot_weight_feel"
-  | "medium_surface"
-  | "drainage";
+  "pot_weight_feel" | "medium_surface" | "drainage";
 
 export interface OperatorRootZoneCycleManualObservationRow {
   key: OperatorRootZoneCycleManualObservationKey;

@@ -6,9 +6,7 @@
  * Pure/copy-only. No app/schema/RLS/Edge/AI/writes touched.
  */
 import { describe, it, expect } from "vitest";
-import {
-  buildAiDoctorSnapshotFreshnessStatus,
-} from "@/lib/aiDoctorSnapshotFreshnessStatusViewModel";
+import { buildAiDoctorSnapshotFreshnessStatus } from "@/lib/aiDoctorSnapshotFreshnessStatusViewModel";
 import { AI_DOCTOR_SNAPSHOT_FRESH_MS } from "@/lib/aiDoctorContextRules";
 
 const NOW = Date.parse("2026-06-01T12:00:00.000Z");
@@ -84,18 +82,15 @@ describe("buildAiDoctorSnapshotFreshnessStatus — age label formatting", () => 
     { msAgo: 60 * 60 * 1000, label: "Fresh · 1h ago", minutes: 60 },
     { msAgo: 47 * 60 * 60 * 1000, label: "Fresh · 47h ago", minutes: 47 * 60 },
   ];
-  it.each(cases)(
-    "renders '$label' for $msAgo ms ago (fresh side)",
-    ({ msAgo, label, minutes }) => {
-      const r = buildAiDoctorSnapshotFreshnessStatus({
-        latestSnapshotAtIso: iso(NOW - msAgo),
-        now: NOW,
-      });
-      expect(r.state).toBe("fresh");
-      expect(r.label).toBe(label);
-      expect(r.ageMinutes).toBe(minutes);
-    },
-  );
+  it.each(cases)("renders '$label' for $msAgo ms ago (fresh side)", ({ msAgo, label, minutes }) => {
+    const r = buildAiDoctorSnapshotFreshnessStatus({
+      latestSnapshotAtIso: iso(NOW - msAgo),
+      now: NOW,
+    });
+    expect(r.state).toBe("fresh");
+    expect(r.label).toBe(label);
+    expect(r.ageMinutes).toBe(minutes);
+  });
 
   it("uses days on the stale side once past 48h", () => {
     const threeDaysMs = 3 * 24 * 60 * 60 * 1000;

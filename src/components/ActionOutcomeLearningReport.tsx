@@ -52,22 +52,14 @@ export default function ActionOutcomeLearningReport({ report, status }: Props) {
       {status === "loading" ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : status === "unavailable" ? (
-        <p className="text-sm text-muted-foreground">
-          Outcome learning report unavailable.
-        </p>
+        <p className="text-sm text-muted-foreground">Outcome learning report unavailable.</p>
       ) : report.totals.total === 0 ? (
-        <p
-          className="text-sm text-muted-foreground"
-          data-testid="learning-empty"
-        >
+        <p className="text-sm text-muted-foreground" data-testid="learning-empty">
           No completed action outcomes recorded yet.
         </p>
       ) : (
         <div className="space-y-4">
-          <ul
-            className="flex flex-wrap gap-2"
-            data-testid="learning-total-chips"
-          >
+          <ul className="flex flex-wrap gap-2" data-testid="learning-total-chips">
             {TOTAL_LABELS.map(({ key, label }) => (
               <li
                 key={key}
@@ -85,10 +77,7 @@ export default function ActionOutcomeLearningReport({ report, status }: Props) {
           </ul>
 
           {report.needs_more_data && (
-            <p
-              className="text-xs text-muted-foreground"
-              data-testid="learning-needs-more-data"
-            >
+            <p className="text-xs text-muted-foreground" data-testid="learning-needs-more-data">
               Early pattern — more outcomes needed before drawing conclusions.
             </p>
           )}
@@ -121,8 +110,8 @@ export default function ActionOutcomeLearningReport({ report, status }: Props) {
                     )}
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
-                    Improved {group.totals.improved} · Unchanged{" "}
-                    {group.totals.unchanged} · Worsened {group.totals.worsened}
+                    Improved {group.totals.improved} · Unchanged {group.totals.unchanged} · Worsened{" "}
+                    {group.totals.worsened}
                     {" · More data "}
                     {group.totals.more_data_needed}
                   </div>
@@ -130,8 +119,8 @@ export default function ActionOutcomeLearningReport({ report, status }: Props) {
               ))}
             </ul>
             <p className="text-[10px] text-muted-foreground mt-2">
-              Groups need at least {LEARNING_GROUP_SAMPLE_THRESHOLD} recorded
-              outcomes before patterns are summarized.
+              Groups need at least {LEARNING_GROUP_SAMPLE_THRESHOLD} recorded outcomes before
+              patterns are summarized.
             </p>
           </div>
 
@@ -144,8 +133,7 @@ export default function ActionOutcomeLearningReport({ report, status }: Props) {
                 {report.examples.map((ex) => (
                   <li
                     key={
-                      ex.diary_entry_id ??
-                      `${ex.action_queue_id ?? "anon"}-${ex.recorded_at ?? ""}`
+                      ex.diary_entry_id ?? `${ex.action_queue_id ?? "anon"}-${ex.recorded_at ?? ""}`
                     }
                     className="rounded-lg border border-border/40 bg-secondary/20 p-2 text-sm"
                   >
@@ -159,20 +147,14 @@ export default function ActionOutcomeLearningReport({ report, status }: Props) {
                         </span>
                       )}
                       <span className="ml-auto text-xs text-muted-foreground">
-                        {ex.recorded_at
-                          ? new Date(ex.recorded_at).toLocaleString()
-                          : "—"}
+                        {ex.recorded_at ? new Date(ex.recorded_at).toLocaleString() : "—"}
                       </span>
                     </div>
                     {ex.suggested_change && (
-                      <p className="text-xs mt-1 text-foreground/80">
-                        {ex.suggested_change}
-                      </p>
+                      <p className="text-xs mt-1 text-foreground/80">{ex.suggested_change}</p>
                     )}
                     {ex.note_summary && (
-                      <p className="text-xs mt-1 italic text-muted-foreground">
-                        {ex.note_summary}
-                      </p>
+                      <p className="text-xs mt-1 italic text-muted-foreground">{ex.note_summary}</p>
                     )}
                     <div className="flex gap-3 mt-1 text-xs">
                       {ex.action_queue_id && (

@@ -22,10 +22,7 @@ import {
   type HarvestWatchInput,
 } from "@/lib/harvestWatchRules";
 
-const SOURCE = readFileSync(
-  resolve(__dirname, "../..", "src/lib/harvestWatchRules.ts"),
-  "utf8",
-);
+const SOURCE = readFileSync(resolve(__dirname, "../..", "src/lib/harvestWatchRules.ts"), "utf8");
 
 function baseInput(overrides: Partial<HarvestWatchInput> = {}): HarvestWatchInput {
   return {
@@ -121,9 +118,7 @@ describe("readiness 50/50 weighting", () => {
   });
 
   it("returns null when a component confidence is missing", () => {
-    const r = calculateReadinessScore(
-      baseInput({ drybackConfidence: null }),
-    );
+    const r = calculateReadinessScore(baseInput({ drybackConfidence: null }));
     expect(r.score).toBeNull();
   });
 });

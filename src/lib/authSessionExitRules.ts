@@ -38,9 +38,7 @@ export interface ClearAuthUiStateDeps {
 }
 
 export function clearAuthTransientUiState(deps: ClearAuthUiStateDeps = {}): void {
-  const ss =
-    deps.sessionStorage ??
-    (typeof window !== "undefined" ? window.sessionStorage : null);
+  const ss = deps.sessionStorage ?? (typeof window !== "undefined" ? window.sessionStorage : null);
   if (ss) {
     try {
       const toRemove: string[] = [];
@@ -65,9 +63,7 @@ export function clearAuthTransientUiState(deps: ClearAuthUiStateDeps = {}): void
 
 export function resolveSignOutRedirect(requested?: unknown): string {
   const value =
-    typeof requested === "string" && requested.length > 0
-      ? requested
-      : SAFE_SIGN_OUT_REDIRECT;
+    typeof requested === "string" && requested.length > 0 ? requested : SAFE_SIGN_OUT_REDIRECT;
   return sanitizeAuthRedirect(value, SAFE_SIGN_OUT_REDIRECT);
 }
 
@@ -77,8 +73,7 @@ export interface PerformSafeSignOutDeps {
 }
 
 export type SafeSignOutResult =
-  | { ok: true; redirectTo: string }
-  | { ok: false; redirectTo: string; message: string };
+  { ok: true; redirectTo: string } | { ok: false; redirectTo: string; message: string };
 
 export async function performSafeSignOut(
   deps: PerformSafeSignOutDeps,

@@ -56,8 +56,7 @@ export function AiDoctorPhase1SaveEvidenceButton({
 
   if (!isDraftOk) return null;
 
-  const disabled =
-    status === "saving" || status === "saved" || status === "duplicate";
+  const disabled = status === "saving" || status === "saved" || status === "duplicate";
 
   const buttonLabel = STATUS_COPY[status] ?? STATUS_COPY.idle;
 
@@ -67,8 +66,7 @@ export function AiDoctorPhase1SaveEvidenceButton({
       className="space-y-2 rounded-md border border-border bg-card p-3 text-sm"
     >
       <p className="text-muted-foreground">
-        Saves this AI Doctor result as plant evidence only. No Action Queue
-        item is created.
+        Saves this AI Doctor result as plant evidence only. No Action Queue item is created.
       </p>
       <button
         type="button"
@@ -107,9 +105,7 @@ export function AiDoctorPhase1SaveEvidenceButton({
           Could not save evidence. Nothing else was changed.
         </p>
       )}
-      <p className="text-xs text-muted-foreground">
-        {AI_DOCTOR_PHASE1_EVIDENCE_DISCLAIMER}
-      </p>
+      <p className="text-xs text-muted-foreground">{AI_DOCTOR_PHASE1_EVIDENCE_DISCLAIMER}</p>
     </section>
   );
 }

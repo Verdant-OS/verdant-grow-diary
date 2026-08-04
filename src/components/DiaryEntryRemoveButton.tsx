@@ -109,8 +109,8 @@ export default function DiaryEntryRemoveButton({
       followUpNote === null
         ? undefined
         : typeof followUpNote === "string"
-        ? followUpNote
-        : FOLLOW_UP_NOTE_PREFILL;
+          ? followUpNote
+          : FOLLOW_UP_NOTE_PREFILL;
     dispatchCorrectedQuickLogHandoff({
       tentId,
       // tentName is not passed by callers today; safe to omit.
@@ -175,10 +175,7 @@ export default function DiaryEntryRemoveButton({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel
-              data-testid="diary-entry-remove-cancel"
-              disabled={isRemoving}
-            >
+            <AlertDialogCancel data-testid="diary-entry-remove-cancel" disabled={isRemoving}>
               {REMOVE_LOG_DIALOG_CANCEL}
             </AlertDialogCancel>
             <AlertDialogAction
@@ -197,4 +194,3 @@ export default function DiaryEntryRemoveButton({
     </>
   );
 }
-

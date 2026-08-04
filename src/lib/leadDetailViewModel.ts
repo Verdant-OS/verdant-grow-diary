@@ -15,8 +15,7 @@ export interface LeadDetailViewModel {
   followUpInputValue: string;
 }
 
-const fmt = (iso: string | null | undefined) =>
-  iso ? new Date(iso).toLocaleString() : null;
+const fmt = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString() : null);
 
 function toLocalInputValue(iso: string | null | undefined): string {
   if (!iso) return "";

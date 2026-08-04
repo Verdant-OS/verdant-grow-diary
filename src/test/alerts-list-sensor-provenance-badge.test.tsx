@@ -111,17 +111,14 @@ describe("Alerts list — sensor provenance badge", () => {
     expect(el.textContent).toBe("Live sensor");
   });
 
-  it.each(["demo", "stale", "invalid"] as const)(
-    "renders %s as degraded, never as Live",
-    (src) => {
-      currentAlerts = [{ ...baseAlert, source: src }];
-      renderAlerts();
-      const el = screen.getByTestId(BADGE_ID);
-      expect(el.getAttribute("data-tone")).toBe(src);
-      expect(el.getAttribute("data-degraded")).toBe("true");
-      expect(el.textContent?.toLowerCase()).not.toContain("live");
-    },
-  );
+  it.each(["demo", "stale", "invalid"] as const)("renders %s as degraded, never as Live", (src) => {
+    currentAlerts = [{ ...baseAlert, source: src }];
+    renderAlerts();
+    const el = screen.getByTestId(BADGE_ID);
+    expect(el.getAttribute("data-tone")).toBe(src);
+    expect(el.getAttribute("data-degraded")).toBe("true");
+    expect(el.textContent?.toLowerCase()).not.toContain("live");
+  });
 
   it("omits the badge when source is unknown/unrecognized (avoids fake Unknown chip)", () => {
     currentAlerts = [{ ...baseAlert, source: "environment_alerts" }];

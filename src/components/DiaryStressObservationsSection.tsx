@@ -42,9 +42,7 @@ export default function DiaryStressObservationsSection({
   buildCandidateHref,
   preloaded,
 }: Props) {
-  const [rows, setRows] = useState<readonly PhenoStressObservationRow[]>(
-    preloaded ?? [],
-  );
+  const [rows, setRows] = useState<readonly PhenoStressObservationRow[]>(preloaded ?? []);
   const [loading, setLoading] = useState(preloaded == null);
   const [error, setError] = useState<string | null>(null);
 
@@ -124,10 +122,7 @@ export default function DiaryStressObservationsSection({
                 {r.endDate ? ` → ${r.endDate}` : ""}
               </div>
               {notesPreview(r) && (
-                <p
-                  data-testid={`diary-stress-preview-${r.id}`}
-                  className="mt-1 text-foreground/90"
-                >
+                <p data-testid={`diary-stress-preview-${r.id}`} className="mt-1 text-foreground/90">
                   {notesPreview(r)}
                 </p>
               )}

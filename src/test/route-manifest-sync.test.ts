@@ -2,7 +2,7 @@
  * Route manifest sync — shared harness coverage.
  *
  * Asserts:
- *   1. App.tsx ↔ APP_ROUTES bidirectional sync (with clear diffs).
+ *   1. TanStack file routes (`src/routes`) ↔ APP_ROUTES bidirectional sync.
  *   2. Manifest has no duplicate paths.
  *   3. Manifest paths stay in alphabetical order (matches manifest invariant).
  *   4. Every mounted `/operator/*` path exists in the manifest as `operator`
@@ -18,11 +18,27 @@ import {
   extractMountedAppRoutePaths,
   findAccessGroupMismatches,
   getMountedOperatorPaths,
+  isMountedUnderOperatorLayout,
+  tanstackRouteIdToClassicPath,
 } from "./helpers/routeManifestSyncHarness";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
 
+describe("tanstackRouteIdToClassicPath", () => {
+  it("strips pathless layouts and maps params", () => {
+    expect(tanstackRouteIdToClassicPath("/_app/dashboard")).toBe("/dashboard");
+    expect(tanstackRouteIdToClassicPath("/_app/_operator/operator/ecowitt")).toBe(
+      "/operator/ecowitt",
+    );
+    expect(tanstackRouteIdToClassicPath("/cultivars/$slug")).toBe("/cultivars/:slug");
+    expect(tanstackRouteIdToClassicPath("/cultivars/")).toBe("/cultivars");
+    expect(tanstackRouteIdToClassicPath("/$")).toBe("*");
+    expect(tanstackRouteIdToClassicPath("/_app")).toBeNull();
+    expect(tanstackRouteIdToClassicPath("/_app/_operator")).toBeNull();
+  });
+});
+
 describe("App route manifest sync", () => {
-  it("App.tsx routes and the manifest stay in sync (bidirectional)", () => {
+  it("file routes and the manifest stay in sync (bidirectional)", () => {
     const diff = diffAppRoutesAgainstManifest();
     expect(diff.missingFromManifest).toEqual([]);
     expect(diff.missingFromApp).toEqual([]);
@@ -77,15 +93,18 @@ describe("Operator route surface", () => {
     expect(entry).toBeDefined();
     expect(entry?.access).toBe("operator");
   });
+
+  it("operator-shaped routes sit under the /_app/_operator layout", () => {
+    for (const path of getMountedOperatorPaths()) {
+      expect(isMountedUnderOperatorLayout(path), path).toBe(true);
+    }
+  });
 });
 
 describe("Public SEO route surface", () => {
   /**
-   * Regression fence: every route mounted in App.tsx that looks like a
-   * public SEO surface (grower guides, pricing, welcome, hardware
-   * integrations) MUST appear in the manifest and
-   * MUST be marked `public`. This catches the class of drift where a new
-   * SEO page is added to App.tsx but the manifest is not updated.
+   * Regression fence: every mounted public SEO surface MUST appear in the
+   * manifest and MUST be marked `public`.
    */
   const PUBLIC_SEO_PATH_PATTERNS: ReadonlyArray<RegExp> = [
     /^\/guides(\/.*)?$/,

@@ -54,9 +54,7 @@ const T2 = "2026-05-24T09:00:00Z";
 describe("Tent history change context — audit", () => {
   it("TentDetail is the chosen tent-level history surface and mounts the change-context badge", () => {
     expect(TENT_DETAIL).toContain("TentManualSnapshotChangeContext");
-    expect(TENT_DETAIL).toMatch(
-      /from\s+["']@\/components\/TentManualSnapshotChangeContext["']/,
-    );
+    expect(TENT_DETAIL).toMatch(/from\s+["']@\/components\/TentManualSnapshotChangeContext["']/);
   });
 
   it("all delta/math logic lives outside JSX (uses the existing pure helper)", () => {
@@ -96,9 +94,7 @@ describe("Tent history change context — audit", () => {
 
 describe("TentManualSnapshotChangeContext — render", () => {
   it("renders nothing when there are no manual snapshots for the tent", () => {
-    const { container } = render(
-      <TentManualSnapshotChangeContext tentId={TENT_A} readings={[]} />,
-    );
+    const { container } = render(<TentManualSnapshotChangeContext tentId={TENT_A} readings={[]} />);
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -128,9 +124,7 @@ describe("TentManualSnapshotChangeContext — render", () => {
     const el = screen.getByTestId("tent-manual-snapshot-change-context");
     expect(el).toHaveAttribute("data-state", "changed");
     expect(el).toHaveTextContent(/Changed since previous snapshot/i);
-    const deltas = within(el).getAllByTestId(
-      "tent-manual-snapshot-change-context-delta",
-    );
+    const deltas = within(el).getAllByTestId("tent-manual-snapshot-change-context-delta");
     expect(deltas.map((d) => d.getAttribute("data-metric"))).toEqual([
       "temperature_c",
       "humidity_pct",
@@ -159,12 +153,8 @@ describe("TentManualSnapshotChangeContext — render", () => {
       row(T1, "humidity_pct", 55, "manual", TENT_A),
     ];
     render(<TentManualSnapshotChangeContext tentId={TENT_A} readings={readings} />);
-    const deltas = screen.getAllByTestId(
-      "tent-manual-snapshot-change-context-delta",
-    );
-    expect(deltas.map((d) => d.getAttribute("data-metric"))).toEqual([
-      "humidity_pct",
-    ]);
+    const deltas = screen.getAllByTestId("tent-manual-snapshot-change-context-delta");
+    expect(deltas.map((d) => d.getAttribute("data-metric"))).toEqual(["humidity_pct"]);
   });
 
   it("does not render context for QuickLog note-only / non-manual readings", () => {

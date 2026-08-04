@@ -49,22 +49,22 @@ export function csvEscape(value: unknown): string {
   return s;
 }
 
-function statusForRow(
-  row: EcowittDryRunFieldRow,
-  dry: EcowittIngestDryRunResult,
-): string {
+function statusForRow(row: EcowittDryRunFieldRow, dry: EcowittIngestDryRunResult): string {
   // blocking trigger?
-  const blocking = dry.blocked_reasons.find((b) =>
-    b === `missing_required_metric:${row.ingest_key}` ||
-    (row.ingest_key === "source" && b === "source_invalid") ||
-    (row.ingest_key === "metadata.invalid_reasons" && b.startsWith("invalid_reason:")) ||
-    (row.ingest_key === "captured_at" && b.startsWith("stale_snapshot:")),
+  const blocking = dry.blocked_reasons.find(
+    (b) =>
+      b === `missing_required_metric:${row.ingest_key}` ||
+      (row.ingest_key === "source" && b === "source_invalid") ||
+      (row.ingest_key === "metadata.invalid_reasons" && b.startsWith("invalid_reason:")) ||
+      (row.ingest_key === "captured_at" && b.startsWith("stale_snapshot:")),
   );
   if (blocking) return `blocking:${blocking}`;
-  const warning = dry.warnings.find((w) =>
-    (row.ingest_key === "source" && (w === "source_degraded" || w === "manual_or_csv_not_live")) ||
-    (row.ingest_key === "metadata.degraded_reasons" && w.startsWith("degraded_reason:")) ||
-    w === `optional_metric_missing:${row.ingest_key}`,
+  const warning = dry.warnings.find(
+    (w) =>
+      (row.ingest_key === "source" &&
+        (w === "source_degraded" || w === "manual_or_csv_not_live")) ||
+      (row.ingest_key === "metadata.degraded_reasons" && w.startsWith("degraded_reason:")) ||
+      w === `optional_metric_missing:${row.ingest_key}`,
   );
   if (warning) return `warning:${warning}`;
   if (row.status === "missing_required" || row.status === "blocked") {
@@ -85,8 +85,7 @@ export function buildEcowittIngestDryRunMetricsCsv(
   snap: CanonicalEcowittTentSnapshot,
   options: BuildDryRunCsvOptions = {},
 ): string {
-  const dry =
-    options.dryRunResult ?? buildEcowittIngestDryRun(snap, options);
+  const dry = options.dryRunResult ?? buildEcowittIngestDryRun(snap, options);
   const map = buildEcowittIngestDryRunFieldMap(snap);
 
   const rows: string[] = [];
@@ -114,15 +113,15 @@ export function buildEcowittIngestDryRunMetricsCsv(
 
 function safeSlug(s: string | null | undefined, fallback: string): string {
   if (!s) return fallback;
-  return s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || fallback;
+  return (
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || fallback
+  );
 }
 
-export function ecowittDryRunMetricsCsvFilename(
-  snap: CanonicalEcowittTentSnapshot,
-): string {
+export function ecowittDryRunMetricsCsvFilename(snap: CanonicalEcowittTentSnapshot): string {
   const tent = safeSlug(snap.tent_label, "tent");
   const captured = safeSlug(snap.captured_at, "no-captured-at");
   return `ecowitt-dry-run-metrics-${tent}-${captured}.csv`;

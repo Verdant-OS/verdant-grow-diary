@@ -15,8 +15,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const MIGRATION =
-  "supabase/migrations/20260720144000_genetics_traceability_screening.sql";
+const MIGRATION = "supabase/migrations/20260720144000_genetics_traceability_screening.sql";
 
 function read(p: string): string {
   return readFileSync(resolve(process.cwd(), p), "utf8");
@@ -27,12 +26,8 @@ describe("genetics screening ledger migration safety", () => {
 
   it("creates the ledger with RLS and is append-only", () => {
     expect(sql).toMatch(/CREATE TABLE public\.genetics_screening_results/);
-    expect(sql).toMatch(
-      /ALTER TABLE public\.genetics_screening_results ENABLE ROW LEVEL SECURITY/,
-    );
-    const grant = sql.match(
-      /GRANT ([^;]*) ON public\.genetics_screening_results TO authenticated/,
-    );
+    expect(sql).toMatch(/ALTER TABLE public\.genetics_screening_results ENABLE ROW LEVEL SECURITY/);
+    const grant = sql.match(/GRANT ([^;]*) ON public\.genetics_screening_results TO authenticated/);
     expect(grant).toBeTruthy();
     const cols = grant![1].toUpperCase();
     expect(cols).toMatch(/SELECT/);

@@ -90,8 +90,7 @@ function parseBridgeTokenContext(
 function parseCommitCounts(
   data: unknown,
 ):
-  | { ok: true; inserted: number; rejected: number }
-  | { ok: false; reason: "commit_not_confirmed" } {
+  { ok: true; inserted: number; rejected: number } | { ok: false; reason: "commit_not_confirmed" } {
   let row: Record<string, unknown> | null = null;
   if (Array.isArray(data)) {
     if (data.length !== 1 || !isPlainObject(data[0])) {

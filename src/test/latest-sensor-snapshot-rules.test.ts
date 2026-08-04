@@ -128,10 +128,7 @@ describe("buildSensorSnapshot", () => {
 
   it("reading older than 15 minutes → stale (not Live)", () => {
     const snap = buildSensorSnapshot(
-      [
-        row("temp_f", 75, ISO_STALE, "live"),
-        row("humidity_pct", 55, ISO_STALE, "live"),
-      ],
+      [row("temp_f", 75, ISO_STALE, "live"), row("humidity_pct", 55, ISO_STALE, "live")],
       { tentId: "t1", now: NOW },
     );
     expect(snap.status).toBe("stale");
@@ -141,36 +138,27 @@ describe("buildSensorSnapshot", () => {
 
   it("future-dated beyond +5 min → invalid", () => {
     const snap = buildSensorSnapshot(
-      [
-        row("temp_f", 75, ISO_FUTURE_BAD, "live"),
-        row("humidity_pct", 55, ISO_FUTURE_BAD, "live"),
-      ],
+      [row("temp_f", 75, ISO_FUTURE_BAD, "live"), row("humidity_pct", 55, ISO_FUTURE_BAD, "live")],
       { tentId: "t1", now: NOW },
     );
     expect(snap.status).toBe("invalid");
     expect(snap.usable).toBe(false);
   });
 
-  it.each(["manual", "csv", "demo"])(
-    "%s source never renders Live (fresh_non_live)",
-    (src) => {
-      const snap = buildSensorSnapshot(
-        [
-          row("temp_f", 75, ISO_FRESH, src),
-          row("humidity_pct", 55, ISO_FRESH, src),
-        ],
-        { tentId: "t1", now: NOW },
-      );
-      expect(snap.status).toBe("fresh_non_live");
-      expect(snap.badge_label).not.toMatch(/\bLive\b/);
-    },
-  );
-
-  it("missing metrics stay missing, not zero", () => {
+  it.each(["manual", "csv", "demo"])("%s source never renders Live (fresh_non_live)", (src) => {
     const snap = buildSensorSnapshot(
-      [row("temp_f", 75, ISO_FRESH, "live")],
+      [row("temp_f", 75, ISO_FRESH, src), row("humidity_pct", 55, ISO_FRESH, src)],
       { tentId: "t1", now: NOW },
     );
+    expect(snap.status).toBe("fresh_non_live");
+    expect(snap.badge_label).not.toMatch(/\bLive\b/);
+  });
+
+  it("missing metrics stay missing, not zero", () => {
+    const snap = buildSensorSnapshot([row("temp_f", 75, ISO_FRESH, "live")], {
+      tentId: "t1",
+      now: NOW,
+    });
     expect(snap.metrics.humidity_pct).toBeNull();
     expect(snap.metrics.vpd_kpa).toBeNull();
     expect(snap.metrics.soil_moisture_pct).toBeNull();
@@ -178,10 +166,7 @@ describe("buildSensorSnapshot", () => {
 
   it("invalid required metric → snapshot invalid (not healthy)", () => {
     const snap = buildSensorSnapshot(
-      [
-        row("temp_f", 250, ISO_FRESH, "live"),
-        row("humidity_pct", 55, ISO_FRESH, "live"),
-      ],
+      [row("temp_f", 250, ISO_FRESH, "live"), row("humidity_pct", 55, ISO_FRESH, "live")],
       { tentId: "t1", now: NOW },
     );
     expect(snap.status).toBe("invalid");
@@ -200,9 +185,7 @@ describe("buildSensorSnapshot", () => {
     // Optional metric is invalid → row stays usable but warning is recorded
     // and the metric itself is marked invalid (not healthy).
     expect(snap.metricDetails.soil_moisture_pct.valid).toBe(false);
-    expect(snap.warnings.some((w) => w.startsWith("soil_moisture_pct"))).toBe(
-      true,
-    );
+    expect(snap.warnings.some((w) => w.startsWith("soil_moisture_pct"))).toBe(true);
   });
 
   it("soil_moisture 0 and 100 warn but stay valid", () => {
@@ -265,9 +248,7 @@ describe("buildSensorSnapshotDetails (Quick Log save payload)", () => {
     expect(buildSensorSnapshotDetails(goodSnap, false)).toBeNull();
   });
   it("returns null when snapshot is empty", () => {
-    expect(
-      buildSensorSnapshotDetails(EMPTY_SENSOR_SNAPSHOT, true),
-    ).toBeNull();
+    expect(buildSensorSnapshotDetails(EMPTY_SENSOR_SNAPSHOT, true)).toBeNull();
   });
   it("returns null when snapshot is invalid", () => {
     const bad = buildSensorSnapshot(

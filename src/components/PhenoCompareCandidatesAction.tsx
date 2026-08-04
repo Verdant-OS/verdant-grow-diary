@@ -31,9 +31,7 @@ export default function PhenoCompareCandidatesAction({
 }: PhenoCompareCandidatesActionProps) {
   const testId = rest["data-testid"] ?? "pheno-workspace-compare-action";
   const helperId = useId();
-  const heading = state.enabled
-    ? "Compare candidates"
-    : PHENO_STATUS_LABELS.notComparisonReadyYet;
+  const heading = state.enabled ? "Compare candidates" : PHENO_STATUS_LABELS.notComparisonReadyYet;
 
   return (
     <section
@@ -66,31 +64,21 @@ export default function PhenoCompareCandidatesAction({
         )}
       </div>
       {state.enabled ? null : (
-        <div
-          id={helperId}
-          data-testid={`${testId}-helper`}
-          className="space-y-1"
-        >
+        <div id={helperId} data-testid={`${testId}-helper`} className="space-y-1">
           <p className="text-xs text-muted-foreground">
             <span data-testid={`${testId}-disabled-intro`}>{DISABLED_INTRO}</span>{" "}
             <span data-testid={`${testId}-reason`} className="font-medium">
               {state.reason || PHENO_COMPARISON_HELP_COPY}
             </span>
           </p>
-          <p className="text-xs text-muted-foreground">
-            {PHENO_COMPARISON_HELP_COPY}
-          </p>
+          <p className="text-xs text-muted-foreground">{PHENO_COMPARISON_HELP_COPY}</p>
           {state.missingEvidenceItems.length > 0 ? (
             <ul
               className="text-xs text-muted-foreground list-disc pl-4 space-y-0.5"
               data-testid={`${testId}-missing`}
             >
               {state.missingEvidenceItems.map((m) => (
-                <li
-                  key={m.id}
-                  data-testid={`${testId}-missing-item`}
-                  data-missing-id={m.id}
-                >
+                <li key={m.id} data-testid={`${testId}-missing-item`} data-missing-id={m.id}>
                   <span>{m.message}</span>
                   {m.nextStepTarget && m.nextStepLabel ? (
                     <>

@@ -2,10 +2,7 @@
  * Tests for growDiaryTimelineRules — pure timeline view-model builder.
  */
 import { describe, it, expect } from "vitest";
-import {
-  buildGrowDiaryTimeline,
-  toTimelineItem,
-} from "@/lib/growDiaryTimelineRules";
+import { buildGrowDiaryTimeline, toTimelineItem } from "@/lib/growDiaryTimelineRules";
 import { normalizeDiaryEntry } from "@/lib/diaryEntryRules";
 
 const NOW = 1_700_000_000_000;
@@ -125,8 +122,7 @@ describe("buildGrowDiaryTimeline", () => {
     // Only valid entries by default (no includeInvalid).
     expect(out.length).toBeGreaterThan(0);
     for (let i = 1; i < out.length; i += 1) {
-      expect((out[i - 1].timestamp ?? -Infinity) >=
-        (out[i].timestamp ?? -Infinity)).toBe(true);
+      expect((out[i - 1].timestamp ?? -Infinity) >= (out[i].timestamp ?? -Infinity)).toBe(true);
     }
     // Newest entry should be the watering (-1 day).
     expect(out[0].id).toBe("e-water");

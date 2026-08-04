@@ -56,9 +56,7 @@ describe("VerificationPendingBanner", () => {
   it("renders banner copy and resend button", () => {
     render(<VerificationPendingBanner email="x@example.invalid" />);
     expect(screen.getByText(VERIFICATION_PENDING_BANNER_MESSAGE)).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /resend verification email/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /resend verification email/i })).toBeInTheDocument();
   });
   it("calls supabase.auth.resend on click and shows generic success", async () => {
     resendMock.mockResolvedValue({ error: null });
@@ -102,9 +100,7 @@ describe("VerificationPendingBanner — a11y", () => {
 
   it("includes an accessible heading 'Verify your email'", () => {
     render(<VerificationPendingBanner email="x@example.invalid" />);
-    expect(
-      screen.getByRole("heading", { name: /verify your email/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /verify your email/i })).toBeInTheDocument();
   });
 
   it("resend button is keyboard reachable and has an accessible name", () => {
@@ -137,4 +133,3 @@ describe("VerificationPendingBanner — a11y", () => {
     expect(results.violations.map((v) => `${v.id}:${v.help}`)).toEqual([]);
   });
 });
-

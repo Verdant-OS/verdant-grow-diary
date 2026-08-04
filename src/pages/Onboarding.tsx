@@ -140,8 +140,8 @@ export default function Onboarding() {
               <div>
                 <h2 className="text-base font-display font-semibold">Start your room</h2>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Recommended for first session: create grow → tent → plant in one path so Quick
-                  Log works immediately.
+                  Recommended for first session: create grow → tent → plant in one path so Quick Log
+                  works immediately.
                 </p>
               </div>
             </div>

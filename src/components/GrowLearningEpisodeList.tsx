@@ -21,10 +21,7 @@ import {
   type GrowLearningFilters,
   type GrowLearningSortOrder,
 } from "@/lib/growLearningReviewViewModel";
-import {
-  PLAYBOOK_ACTION_CATEGORIES,
-  PLAYBOOK_CATEGORY_LABELS,
-} from "@/lib/nextRunPlaybookRules";
+import { PLAYBOOK_ACTION_CATEGORIES, PLAYBOOK_CATEGORY_LABELS } from "@/lib/nextRunPlaybookRules";
 import {
   GROWER_RESPONSE_LABELS,
   NEXT_RUN_DECISION_LABELS,
@@ -140,9 +137,7 @@ export function GrowLearningEpisodeList({ episodes }: GrowLearningEpisodeListPro
 
         <Select
           value={filters.outcomeStatus ?? ALL}
-          onValueChange={(v) =>
-            setFilters((f) => ({ ...f, outcomeStatus: v === ALL ? null : v }))
-          }
+          onValueChange={(v) => setFilters((f) => ({ ...f, outcomeStatus: v === ALL ? null : v }))}
         >
           <SelectTrigger className="w-[160px]" aria-label="Filter by outcome">
             <SelectValue placeholder="Outcome" />

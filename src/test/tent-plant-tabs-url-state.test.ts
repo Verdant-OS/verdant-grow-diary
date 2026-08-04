@@ -36,9 +36,7 @@ describe("tentPlantTabsUrlState — read", () => {
   it("ignores empty / whitespace / oversize values", () => {
     expect(readTentPlantTabsUrlPlantId("?plant=")).toBeNull();
     expect(readTentPlantTabsUrlPlantId("?plant=%20%20")).toBeNull();
-    expect(
-      readTentPlantTabsUrlPlantId(`?plant=${"x".repeat(500)}`),
-    ).toBeNull();
+    expect(readTentPlantTabsUrlPlantId(`?plant=${"x".repeat(500)}`)).toBeNull();
   });
 
   it("does not crash on malformed input", () => {
@@ -173,10 +171,7 @@ describe("tentPlantTabsUrlState — resolveInitialTentPlantTabsSelection", () =>
 });
 
 describe("tentPlantTabsUrlState static safety", () => {
-  const content = readFileSync(
-    resolve(__dirname, "../lib/tentPlantTabsUrlState.ts"),
-    "utf8",
-  );
+  const content = readFileSync(resolve(__dirname, "../lib/tentPlantTabsUrlState.ts"), "utf8");
 
   it("does not import Supabase clients", () => {
     expect(content).not.toMatch(/from\s+["']@\/integrations\/supabase/);

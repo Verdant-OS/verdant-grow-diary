@@ -46,7 +46,10 @@ export interface ManualSensorSnapshotFieldInput {
 export type DerivedVpd =
   | { readonly kind: "derived"; readonly vpdKpa: number }
   | { readonly kind: "entered"; readonly vpdKpa: number }
-  | { readonly kind: "missing"; readonly reason: "needs_temperature_and_humidity" | "invalid_inputs" };
+  | {
+      readonly kind: "missing";
+      readonly reason: "needs_temperature_and_humidity" | "invalid_inputs";
+    };
 
 export interface ManualSensorSnapshotFieldValidation {
   readonly hints: ReadonlyArray<FieldHint>;
@@ -128,10 +131,7 @@ export function validateManualSensorSnapshotFields(
   // -------- VPD (entered) --------
   const enteredVpd = input?.vpdKpa;
   if (isFinite(enteredVpd)) {
-    if (
-      enteredVpd < VPD_REALISTIC_RANGE.min ||
-      enteredVpd > VPD_REALISTIC_RANGE.max
-    ) {
+    if (enteredVpd < VPD_REALISTIC_RANGE.min || enteredVpd > VPD_REALISTIC_RANGE.max) {
       hints.push({
         field: "vpdKpa",
         severity: "block",

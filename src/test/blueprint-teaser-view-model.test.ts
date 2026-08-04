@@ -74,9 +74,10 @@ describe("buildBlueprintTeaserViewModel", () => {
   });
 
   it("normalizes real plants.stage values (cure → harvest, flush → late_flower)", () => {
-    expect(
-      keys(buildBlueprintTeaserViewModel({ stage: "cure" }, "celsius")),
-    ).toEqual(["tempC", "rh"]);
+    expect(keys(buildBlueprintTeaserViewModel({ stage: "cure" }, "celsius"))).toEqual([
+      "tempC",
+      "rh",
+    ]);
     const flush = buildBlueprintTeaserViewModel({ stage: "flush", isDay: true }, "celsius");
     expect(flush.stageLabel).toBe("Late flower / flush");
     expect(flush.targetCount).toBe(6); // 7 minus the omitted DLI

@@ -58,9 +58,7 @@ describe("diaryEntryMatchesHighlight", () => {
   it("matches only when details.idempotency_key equals the token", () => {
     const h = parseTimelineHighlightToken(KEY_APPROVED);
     expect(diaryEntryMatchesHighlight(entry(), h)).toBe(true);
-    expect(
-      diaryEntryMatchesHighlight(entry({ idempotency_key: KEY_REJECTED }), h),
-    ).toBe(false);
+    expect(diaryEntryMatchesHighlight(entry({ idempotency_key: KEY_REJECTED }), h)).toBe(false);
   });
 
   it("never matches by visible note text alone", () => {
@@ -78,7 +76,6 @@ describe("diaryEntryMatchesHighlight", () => {
       diaryEntryMatchesHighlight({ details: null }, parseTimelineHighlightToken(KEY_APPROVED)),
     ).toBe(false);
   });
-
 });
 
 describe("highlightIsMissingFromList", () => {
@@ -88,12 +85,7 @@ describe("highlightIsMissingFromList", () => {
   });
   it("returns true when highlight is set and nothing matches", () => {
     const h = parseTimelineHighlightToken(KEY_APPROVED);
-    expect(
-      highlightIsMissingFromList(
-        [entry({ idempotency_key: KEY_REJECTED })],
-        h,
-      ),
-    ).toBe(true);
+    expect(highlightIsMissingFromList([entry({ idempotency_key: KEY_REJECTED })], h)).toBe(true);
   });
   it("returns false when no highlight is requested", () => {
     expect(highlightIsMissingFromList([entry()], null)).toBe(false);

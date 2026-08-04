@@ -56,15 +56,8 @@ setLocalStorageItemForTest("a", "b");
 // --- Case 2: direct window.localStorage.getItem fails ---
 {
   const tmp = makeTmp();
-  write(
-    tmp,
-    "src/test/bad-window.test.ts",
-    `const v = window.localStorage.getItem("k");\n`,
-  );
-  const v = scanForDirectLocalStorageUsage(
-    path.join(tmp, "src/test"),
-    new Set(),
-  );
+  write(tmp, "src/test/bad-window.test.ts", `const v = window.localStorage.getItem("k");\n`);
+  const v = scanForDirectLocalStorageUsage(path.join(tmp, "src/test"), new Set());
   assert(
     v.some((x) => x.pattern === "window.localStorage.getItem("),
     "direct window.localStorage.getItem( is flagged",
@@ -74,15 +67,8 @@ setLocalStorageItemForTest("a", "b");
 // --- Case 3: bare localStorage.setItem fails ---
 {
   const tmp = makeTmp();
-  write(
-    tmp,
-    "src/test/bad-bare.test.ts",
-    `function go() { localStorage.setItem("k", "v"); }\n`,
-  );
-  const v = scanForDirectLocalStorageUsage(
-    path.join(tmp, "src/test"),
-    new Set(),
-  );
+  write(tmp, "src/test/bad-bare.test.ts", `function go() { localStorage.setItem("k", "v"); }\n`);
+  const v = scanForDirectLocalStorageUsage(path.join(tmp, "src/test"), new Set());
   assert(
     v.some((x) => x.pattern === "localStorage.setItem("),
     "bare localStorage.setItem( is flagged",
@@ -93,15 +79,8 @@ setLocalStorageItemForTest("a", "b");
 {
   const tmp = makeTmp();
   const rel = "src/test/helpers/localStorageTestHelper.ts";
-  write(
-    tmp,
-    rel,
-    `export function x() { return window.localStorage.getItem("k"); }\n`,
-  );
-  const v = scanForDirectLocalStorageUsage(
-    path.join(tmp, "src/test"),
-    new Set([rel]),
-  );
+  write(tmp, rel, `export function x() { return window.localStorage.getItem("k"); }\n`);
+  const v = scanForDirectLocalStorageUsage(path.join(tmp, "src/test"), new Set([rel]));
   assert(v.length === 0, "helper file is exempt from audit");
 }
 

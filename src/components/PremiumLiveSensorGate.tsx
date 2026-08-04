@@ -63,12 +63,8 @@ function PaywallBlock() {
       aria-label="Live sensor upgrade required"
       className="rounded-md border border-border bg-muted/40 p-4 text-sm"
     >
-      <h3 className="text-base font-semibold text-foreground">
-        {LIVE_SENSOR_PAYWALL_HEADLINE}
-      </h3>
-      <p className="mt-1 text-muted-foreground">
-        {LIVE_SENSOR_PAYWALL_UPGRADE_COPY}
-      </p>
+      <h3 className="text-base font-semibold text-foreground">{LIVE_SENSOR_PAYWALL_HEADLINE}</h3>
+      <p className="mt-1 text-muted-foreground">{LIVE_SENSOR_PAYWALL_UPGRADE_COPY}</p>
     </div>
   );
 }
@@ -97,12 +93,7 @@ function NetworkErrorBlock() {
 
 function LoadingBlock({ label }: { label: string }) {
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      aria-busy="true"
-      className="space-y-2"
-    >
+    <div role="status" aria-live="polite" aria-busy="true" className="space-y-2">
       <span className="sr-only">{label}</span>
       <Skeleton className="h-4 w-1/3" />
       <Skeleton className="h-20 w-full" />
@@ -121,13 +112,9 @@ export function PremiumLiveSensorGate({
 }: PremiumLiveSensorGateProps) {
   // When state is injected (tests/stories), don't run the hook.
   // Otherwise call the hook unconditionally to honor Rules of Hooks.
-  const hookValue = useLiveSensorServerGate(
-    surface,
-    injectedState ? {} : (scope ?? {}),
-  );
+  const hookValue = useLiveSensorServerGate(surface, injectedState ? {} : (scope ?? {}));
   const state: LiveSensorGateState = injectedState ?? hookValue.state;
-  const result: LiveSensorGateResult | null =
-    injectedResult ?? hookValue.result;
+  const result: LiveSensorGateResult | null = injectedResult ?? hookValue.result;
 
   if (state === "loading") return <LoadingBlock label={skeletonLabel} />;
   if (state === "allowed" && result?.ok === true) return <>{children}</>;

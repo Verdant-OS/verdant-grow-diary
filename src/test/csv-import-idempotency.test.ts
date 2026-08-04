@@ -15,9 +15,7 @@ const base = {
 
 describe("csvImportIdempotency — determinism", () => {
   it("same row → same key", () => {
-    expect(buildCsvImportRowIdempotencyKey(base)).toBe(
-      buildCsvImportRowIdempotencyKey(base),
-    );
+    expect(buildCsvImportRowIdempotencyKey(base)).toBe(buildCsvImportRowIdempotencyKey(base));
   });
 
   it("changed value → different key", () => {
@@ -27,9 +25,9 @@ describe("csvImportIdempotency — determinism", () => {
   });
 
   it("rounding to 4dp collapses sub-precision differences", () => {
-    expect(
-      buildCsvImportRowIdempotencyKey({ ...base, value: 22.50001 }),
-    ).toBe(buildCsvImportRowIdempotencyKey(base));
+    expect(buildCsvImportRowIdempotencyKey({ ...base, value: 22.50001 })).toBe(
+      buildCsvImportRowIdempotencyKey(base),
+    );
   });
 
   it("changed timestamp → different key", () => {
@@ -39,15 +37,15 @@ describe("csvImportIdempotency — determinism", () => {
   });
 
   it("changed metric → different key", () => {
-    expect(
-      buildCsvImportRowIdempotencyKey({ ...base, metric: "humidity" }),
-    ).not.toBe(buildCsvImportRowIdempotencyKey(base));
+    expect(buildCsvImportRowIdempotencyKey({ ...base, metric: "humidity" })).not.toBe(
+      buildCsvImportRowIdempotencyKey(base),
+    );
   });
 
   it("changed tent → different key", () => {
-    expect(
-      buildCsvImportRowIdempotencyKey({ ...base, tentId: "tent-2" }),
-    ).not.toBe(buildCsvImportRowIdempotencyKey(base));
+    expect(buildCsvImportRowIdempotencyKey({ ...base, tentId: "tent-2" })).not.toBe(
+      buildCsvImportRowIdempotencyKey(base),
+    );
   });
 
   it("device_id is hashed; raw filename never appears", () => {

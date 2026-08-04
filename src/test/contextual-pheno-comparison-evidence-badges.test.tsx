@@ -53,9 +53,7 @@ function renderInputs(inputs: readonly ContextualPhenoPlantInput[]) {
 }
 
 function badgeStates(card: HTMLElement): Array<[string, string, string]> {
-  return Array.from(
-    card.querySelectorAll<HTMLElement>("[data-evidence-type]"),
-  ).map((el) => [
+  return Array.from(card.querySelectorAll<HTMLElement>("[data-evidence-type]")).map((el) => [
     el.getAttribute("data-evidence-type") ?? "",
     el.getAttribute("data-evidence-state") ?? "",
     (el.textContent ?? "").trim(),
@@ -86,9 +84,7 @@ describe("v0.4 per-plant evidence-summary badges", () => {
       ["sensors", "present", "Sensors present"],
       ["trusted-environment", "present", "Trusted environment present"],
     ]);
-    expect(
-      within(card).queryByTestId("plant-evidence-badge-untrusted-evidence"),
-    ).toBeNull();
+    expect(within(card).queryByTestId("plant-evidence-badge-untrusted-evidence")).toBeNull();
   });
 
   it("partial plant: missing feeding + has untrusted-evidence badge for stale source", () => {
@@ -133,9 +129,9 @@ describe("v0.4 per-plant evidence-summary badges", () => {
     );
     expect(cards.length).toBe(4);
     cards.forEach((card) => {
-      const types = Array.from(
-        card.querySelectorAll<HTMLElement>("[data-evidence-type]"),
-      ).map((el) => el.getAttribute("data-evidence-type") ?? "");
+      const types = Array.from(card.querySelectorAll<HTMLElement>("[data-evidence-type]")).map(
+        (el) => el.getAttribute("data-evidence-type") ?? "",
+      );
       // First 6 are always in this locked order; optional untrusted-evidence
       // tail badge follows when applicable.
       expect(types.slice(0, 6)).toEqual([
@@ -154,14 +150,12 @@ describe("v0.4 per-plant evidence-summary badges", () => {
 
   it("badge labels never contain 'healthy' or ranking copy", () => {
     renderInputs(CONTEXTUAL_PHENO_COMPARISON_EMPTY_STATE_PLANT_INPUTS);
-    document
-      .querySelectorAll<HTMLElement>("[data-evidence-type]")
-      .forEach((el) => {
-        const txt = (el.textContent ?? "").toLowerCase();
-        for (const banned of BANNED_TOKENS) {
-          expect(txt.includes(banned), `badge contained: ${banned}`).toBe(false);
-        }
-      });
+    document.querySelectorAll<HTMLElement>("[data-evidence-type]").forEach((el) => {
+      const txt = (el.textContent ?? "").toLowerCase();
+      for (const banned of BANNED_TOKENS) {
+        expect(txt.includes(banned), `badge contained: ${banned}`).toBe(false);
+      }
+    });
   });
 
   it("desktop+mobile: untrusted card badge snapshot is stable", () => {
@@ -212,9 +206,7 @@ describe("v0.4 per-plant evidence-summary badges", () => {
 describe("v0.4 panel-level all-insufficient banner", () => {
   it("appears when every plant is insufficient/untrusted", () => {
     renderInputs(CONTEXTUAL_PHENO_COMPARISON_ALL_INSUFFICIENT_PLANT_INPUTS);
-    const banner = screen.getByTestId(
-      "contextual-pheno-comparison-all-insufficient",
-    );
+    const banner = screen.getByTestId("contextual-pheno-comparison-all-insufficient");
     expect(banner.textContent).toMatch(/all compared plants are missing important context/i);
     expect(banner.textContent).toMatch(/use this view as a checklist/i);
     expect(banner.textContent).toMatch(/not picking a phenotype/i);
@@ -223,24 +215,18 @@ describe("v0.4 panel-level all-insufficient banner", () => {
 
   it("does NOT appear when at least one plant has trusted context (empty-state fixtures include Full)", () => {
     renderInputs(CONTEXTUAL_PHENO_COMPARISON_EMPTY_STATE_PLANT_INPUTS);
-    expect(
-      screen.queryByTestId("contextual-pheno-comparison-all-insufficient"),
-    ).toBeNull();
+    expect(screen.queryByTestId("contextual-pheno-comparison-all-insufficient")).toBeNull();
   });
 
   it("plant cards still render alongside the all-insufficient banner", () => {
     renderInputs(CONTEXTUAL_PHENO_COMPARISON_ALL_INSUFFICIENT_PLANT_INPUTS);
     expect(plantCardLabels()).toEqual(["Sparse-A", "Untrusted-B"]);
-    expect(
-      screen.getByTestId("contextual-pheno-comparison-plant-grid"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("contextual-pheno-comparison-plant-grid")).toBeTruthy();
   });
 
   it("banner copy is non-ranking, non-AI, non-device-control", () => {
     renderInputs(CONTEXTUAL_PHENO_COMPARISON_ALL_INSUFFICIENT_PLANT_INPUTS);
-    const banner = screen.getByTestId(
-      "contextual-pheno-comparison-all-insufficient",
-    );
+    const banner = screen.getByTestId("contextual-pheno-comparison-all-insufficient");
     const txt = (banner.textContent || "").toLowerCase();
     for (const banned of BANNED_TOKENS) {
       expect(txt.includes(banned), `banner contained: ${banned}`).toBe(false);
@@ -288,21 +274,19 @@ describe("v0.4 mixed partial+untrusted layouts — banned word scan", () => {
     describe(layout.name, () => {
       it("renders demo banner and caveat", () => {
         renderInputs(layout.inputs);
-        expect(
-          screen.getByTestId("contextual-pheno-comparison-demo-banner")
-            .textContent,
-        ).toMatch(/demo comparison data/i);
-        expect(
-          screen.getByTestId("contextual-pheno-comparison-caveat").textContent,
-        ).toMatch(/does not pick a phenotype/i);
+        expect(screen.getByTestId("contextual-pheno-comparison-demo-banner").textContent).toMatch(
+          /demo comparison data/i,
+        );
+        expect(screen.getByTestId("contextual-pheno-comparison-caveat").textContent).toMatch(
+          /does not pick a phenotype/i,
+        );
       });
 
       it("contains no banned wording anywhere in panel text", () => {
         const { container } = renderInputs(layout.inputs);
         const txt = (container.textContent || "").toLowerCase();
         for (const banned of BANNED_TOKENS) {
-          expect(txt.includes(banned), `${layout.name} contained: ${banned}`)
-            .toBe(false);
+          expect(txt.includes(banned), `${layout.name} contained: ${banned}`).toBe(false);
         }
       });
 
@@ -314,11 +298,9 @@ describe("v0.4 mixed partial+untrusted layouts — banned word scan", () => {
       });
 
       it("does not call fetch or expose functions.invoke", () => {
-        const fetchSpy = vi
-          .spyOn(globalThis, "fetch" as never)
-          .mockImplementation(() => {
-            throw new Error("fetch must not be called");
-          });
+        const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation(() => {
+          throw new Error("fetch must not be called");
+        });
         const { container } = renderInputs(layout.inputs);
         expect(fetchSpy).not.toHaveBeenCalled();
         expect(container.innerHTML).not.toMatch(/functions\.invoke/i);

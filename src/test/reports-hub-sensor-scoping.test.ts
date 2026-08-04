@@ -115,7 +115,17 @@ describe("useReportsHubData — sensor query scoping (static wiring)", () => {
 describe("rawSensorSourceValuesFor — alias-table derivation", () => {
   it("covers every raw token the fence would admit and nothing demo/invalid", () => {
     const raws = rawSensorSourceValuesFor(["live", "manual", "csv"]);
-    for (const alias of ["live", "sensor", "realtime", "manual", "user", "entry", "log", "csv", "import"]) {
+    for (const alias of [
+      "live",
+      "sensor",
+      "realtime",
+      "manual",
+      "user",
+      "entry",
+      "log",
+      "csv",
+      "import",
+    ]) {
       expect(raws).toContain(alias);
     }
     for (const excluded of ["demo", "mock", "sample", "fixture", "stale", "invalid", "unknown"]) {
@@ -125,13 +135,11 @@ describe("rawSensorSourceValuesFor — alias-table derivation", () => {
 
   it("fence and pre-filter agree: every derived raw token passes the fence", () => {
     for (const raw of rawSensorSourceValuesFor(["live", "manual", "csv"])) {
-      expect(
-        isReportsHubSensorContextRow({ ts: "2026-07-17T10:00:00Z", source: raw }),
-      ).toBe(true);
+      expect(isReportsHubSensorContextRow({ ts: "2026-07-17T10:00:00Z", source: raw })).toBe(true);
     }
-    expect(
-      isReportsHubSensorContextRow({ ts: "2026-07-17T10:00:00Z", source: "demo" }),
-    ).toBe(false);
+    expect(isReportsHubSensorContextRow({ ts: "2026-07-17T10:00:00Z", source: "demo" })).toBe(
+      false,
+    );
   });
 });
 
@@ -149,12 +157,8 @@ describe("laterObservation — latest reading ignores database order", () => {
     expect(laterObservation(null, "2026-07-17T10:00:00Z")).toBe("2026-07-17T10:00:00Z");
     expect(laterObservation("2026-07-17T10:00:00Z", null)).toBe("2026-07-17T10:00:00Z");
     expect(laterObservation(null, null)).toBeNull();
-    expect(laterObservation("2026-07-17T10:00:00Z", "not-a-date")).toBe(
-      "2026-07-17T10:00:00Z",
-    );
-    expect(laterObservation("not-a-date", "2026-07-17T10:00:00Z")).toBe(
-      "2026-07-17T10:00:00Z",
-    );
+    expect(laterObservation("2026-07-17T10:00:00Z", "not-a-date")).toBe("2026-07-17T10:00:00Z");
+    expect(laterObservation("not-a-date", "2026-07-17T10:00:00Z")).toBe("2026-07-17T10:00:00Z");
   });
 
   it("summary loops accumulate via laterObservation, never first-row-wins", () => {

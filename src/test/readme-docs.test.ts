@@ -14,9 +14,7 @@ describe("README development & safety documentation", () => {
     expect(existsSync(README_PATH)).toBe(true);
   });
 
-  const content = existsSync(README_PATH)
-    ? readFileSync(README_PATH, "utf8")
-    : "";
+  const content = existsSync(README_PATH) ? readFileSync(README_PATH, "utf8") : "";
 
   it("references the security checklist", () => {
     expect(content).toContain("docs/security-checklist.md");

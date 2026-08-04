@@ -90,10 +90,7 @@ export function runChildScanner(name, scriptRelPath) {
     check: "scanner-exit-nonzero",
     expected: "scanner exit code 0",
     actual: `exit ${r.status ?? -1}`,
-    reason:
-      combined.length > 0
-        ? combined
-        : "Scanner exited non-zero with no captured output.",
+    reason: combined.length > 0 ? combined : "Scanner exited non-zero with no captured output.",
   };
   return {
     name,

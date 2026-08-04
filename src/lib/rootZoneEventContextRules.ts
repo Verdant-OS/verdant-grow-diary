@@ -29,10 +29,7 @@ export type RootZoneEventContextScope = (typeof ROOT_ZONE_EVENT_CONTEXT_SCOPES)[
 export type RootZoneContextConsistency =
   (typeof ROOT_ZONE_EVENT_CONTEXT_CONSISTENCY_STATES)[number];
 export type RootZoneStageProvenance =
-  | "plant_record"
-  | "tent_record"
-  | "grow_record"
-  | "not_recorded";
+  "plant_record" | "tent_record" | "grow_record" | "not_recorded";
 export type RootZoneAggregateProvenance = "plant_record" | "tent_plant_records" | "not_recorded";
 
 export interface RootZoneEventContextStageEnvelopeV1 {
@@ -131,10 +128,7 @@ export interface BuildRootZoneEventContextEnvelopeV1Input {
 }
 
 export type RootZoneEventContextBuildFailureReason =
-  | "invalid_captured_at"
-  | "invalid_scope"
-  | "scope_record_mismatch"
-  | "invalid_context_value";
+  "invalid_captured_at" | "invalid_scope" | "scope_record_mismatch" | "invalid_context_value";
 
 export type BuildRootZoneEventContextEnvelopeV1Result =
   | { ok: true; envelope: RootZoneEventContextEnvelopeV1 }
@@ -146,14 +140,10 @@ export type RootZoneEventContextProjection =
   | { status: "valid"; context: RootZoneEventContextV1 };
 
 type LabelResult =
-  | { status: "missing" }
-  | { status: "invalid" }
-  | { status: "valid"; value: string };
+  { status: "missing" } | { status: "invalid" } | { status: "valid"; value: string };
 
 type UniqueRecordResult<T> =
-  | { status: "missing" }
-  | { status: "duplicate" }
-  | { status: "found"; record: T };
+  { status: "missing" } | { status: "duplicate" } | { status: "found"; record: T };
 
 const CANONICAL_ISO_TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const SECRET_ASSIGNMENT_RE =

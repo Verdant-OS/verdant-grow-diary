@@ -213,8 +213,10 @@ describe("PlantDetailAiDoctorLiveReview — credit_denied branch", () => {
       "href",
       "/pricing?returnTo=%2Fplants%2Fp1%3FtentId%3Dtent-1%23plant-ai-doctor-review",
     );
-    expect(trackFunnelEvent.mock.calls.filter(([name]) => name === "paywall_viewed")).toHaveLength(
-      1,
+    await waitFor(() =>
+      expect(
+        trackFunnelEvent.mock.calls.filter(([name]) => name === "paywall_viewed"),
+      ).toHaveLength(1),
     );
     expect(trackFunnelEvent).toHaveBeenCalledWith("paywall_viewed", {
       surface: "ai_doctor_limit",

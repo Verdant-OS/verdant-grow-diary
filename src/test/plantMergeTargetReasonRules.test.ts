@@ -126,12 +126,8 @@ describe("formatMergeTargetReason copy", () => {
     expect(formatMergeTargetReason("legacy_same_grow")).toBe(
       "Legacy plant — grow derived from assigned tent",
     );
-    expect(formatMergeTargetReason("different_grow")).toBe(
-      "Different grow — cannot merge",
-    );
-    expect(formatMergeTargetReason("source_plant")).toBe(
-      "Source plant — cannot merge into itself",
-    );
+    expect(formatMergeTargetReason("different_grow")).toBe("Different grow — cannot merge");
+    expect(formatMergeTargetReason("source_plant")).toBe("Source plant — cannot merge into itself");
     expect(formatMergeTargetReason("archived_or_merged")).toBe(
       "Archived/merged — hidden by default",
     );
@@ -265,9 +261,7 @@ describe("formatMergeTargetHelperText", () => {
       sourcePlantExcluded: 0,
       selectable: 2,
     });
-    expect(text).toContain(
-      "Using tent assignment to derive grow context for 1 legacy plant.",
-    );
+    expect(text).toContain("Using tent assignment to derive grow context for 1 legacy plant.");
   });
 
   it("returns empty string when there is nothing notable", () => {
@@ -288,15 +282,11 @@ describe("formatMergeTargetHelperText", () => {
 
 describe("empty / missing source guidance copy", () => {
   it("empty state uses the spec wording", () => {
-    expect(MERGE_TARGET_EMPTY_STATE).toBe(
-      "No same-grow merge targets available.",
-    );
+    expect(MERGE_TARGET_EMPTY_STATE).toBe("No same-grow merge targets available.");
   });
 
   it("source-missing-grow-context guidance directs to tent assignment", () => {
-    expect(MERGE_TARGET_SOURCE_MISSING_GROW_CONTEXT).toContain(
-      "missing grow context",
-    );
+    expect(MERGE_TARGET_SOURCE_MISSING_GROW_CONTEXT).toContain("missing grow context");
     expect(MERGE_TARGET_SOURCE_MISSING_GROW_CONTEXT).toContain("tent in a grow");
   });
 });
@@ -306,14 +296,8 @@ describe("empty / missing source guidance copy", () => {
 // ---------------------------------------------------------------------------
 
 const ROOT = resolve(__dirname, "../..");
-const DIALOG = readFileSync(
-  resolve(ROOT, "src/components/PlantMergeDialog.tsx"),
-  "utf8",
-);
-const RULES = readFileSync(
-  resolve(ROOT, "src/lib/plantMergeTargetReasonRules.ts"),
-  "utf8",
-);
+const DIALOG = readFileSync(resolve(ROOT, "src/components/PlantMergeDialog.tsx"), "utf8");
+const RULES = readFileSync(resolve(ROOT, "src/lib/plantMergeTargetReasonRules.ts"), "utf8");
 
 describe("PlantMergeDialog target picker uses the new reason labels", () => {
   it("imports the merge-target reason rules", () => {

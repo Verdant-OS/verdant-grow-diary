@@ -25,11 +25,7 @@ export interface OperatorAccountTentOption {
 }
 
 export type OperatorAccountTentScopeStatus =
-  | "loading"
-  | "unavailable"
-  | "no_tents"
-  | "selection_required"
-  | "ready";
+  "loading" | "unavailable" | "no_tents" | "selection_required" | "ready";
 
 export interface OperatorSensorReadingInput {
   id: string;

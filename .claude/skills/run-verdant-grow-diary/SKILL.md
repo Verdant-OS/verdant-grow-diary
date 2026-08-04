@@ -83,18 +83,17 @@ The driver prints JSON and writes the PNG, e.g.:
 ```json
 {
   "requested": "http://127.0.0.1:8080/",
-  "finalUrl": "http://127.0.0.1:8080/auth",
+  "finalUrl": "http://127.0.0.1:8080/",
   "httpStatus": 200,
-  "title": "Sign in to Verdant Grow Diary",
+  "title": "Grow Diary & Grow Room Tracking App | Verdant Grow Diary",
   "screenshot": "home.png",
   "chromium": "/opt/pw-browsers/chromium-1228/chrome-linux/chrome"
 }
 ```
 
-Unauthenticated `/` client-side-redirects to `/auth` (`finalUrl` shows it): the
-rendered page is the sign-in screen — email/password, Sign in / Create account /
-Forgot password tabs, "Email me a sign-in link", and a "Payments are in **test
-mode** in this preview" banner. Override the origin with `BASE_URL=...`.
+Signed-out `/` renders the public Landing directly through `RootEntry`; it does not
+redirect to `/auth`. Signed-in growers retain the authenticated Dashboard at the same
+apex route. Override the origin with `BASE_URL=...`.
 
 ## Run (agent path) — mocked Playwright e2e for real UI flows
 
@@ -164,15 +163,17 @@ Targeted sub-suites exist (`bun run test:payments-security`,
 - **Port 8080, not 5173.** `vite.config.ts` hardcodes `port: 8080`. When reusing
   a running server for Playwright, set `E2E_BASE_URL=http://127.0.0.1:8080` so it
   doesn't spawn its own server on 5173.
-- **`/` redirects to `/auth` when unauthenticated.** The redirect is client-side
-  (SPA), so the HTTP status is 200 and only `page.url()` reveals it. Deep links
-  like `/dashboard` render the app's own 404/redirect without a session.
+- **`/` is session-aware.** Signed-out visitors render the public Landing directly;
+  signed-in growers retain the Dashboard inside `AppShell`. The HTTP status remains
+  200 because this is an SPA route. Deep links like `/dashboard` still require the
+  authenticated application shell.
 - **No local Supabase stack.** The app points at the hosted project; the mocked
   Playwright project intercepts all Supabase traffic so e2e works without
   staging credentials.
 - **Root `<title>` vs rendered title.** The static HTML `<title>` is "Verdant
-  Grow Diary", but after the SPA boots and redirects, the auth page title is
-  "Sign in to Verdant Grow Diary" — assert on the latter for a rendered page.
+  Grow Diary", but after the SPA boots a signed-out root renders Landing with
+  "Grow Diary & Grow Room Tracking App | Verdant Grow Diary". Assert on the
+  rendered title for the surface under test.
 - **Driver Chromium fallback.** Plain `chromium.launch()` works here, but the
   driver also probes `/opt/pw-browsers` and pins an explicit `executablePath`
   (defensive for containers whose pinned Playwright revision is absent). Override
@@ -192,6 +193,6 @@ Targeted sub-suites exist (`bun run test:payments-security`,
 - **Playwright can't find a browser / revision mismatch.** Set
   `CHROMIUM=/opt/pw-browsers/chromium-1228/chrome-linux/chrome` (the driver reads
   it) or `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers` for `bunx playwright test`.
-- **Driver connects but the screenshot is the sign-in page.** Expected without a
-  session — `/` redirects to `/auth`. Use the mocked e2e project (or real creds)
-  to reach authenticated screens.
+- **Driver connects but the screenshot is the public landing.** Expected without a
+  session — signed-out `/` renders Landing directly. Use `/auth` for the sign-in
+  surface, or the mocked e2e project (or real credentials) for authenticated screens.

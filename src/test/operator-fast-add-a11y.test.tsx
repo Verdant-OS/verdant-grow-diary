@@ -12,10 +12,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import GlobalFastAddButton from "@/components/GlobalFastAddButton";
-import {
-  FAST_ADD_ACTIONS,
-  FAST_ADD_NO_CONTEXT_COPY,
-} from "@/lib/fastAddActionRules";
+import { FAST_ADD_ACTIONS, FAST_ADD_NO_CONTEXT_COPY } from "@/lib/fastAddActionRules";
 
 // Force a mobile-shaped viewport on jsdom so any tap-target/visibility
 // assertions reflect the constrained surface.
@@ -56,9 +53,9 @@ describe("Global Quick Log — accessible names", () => {
     const menu = screen.getByRole("menu");
     expect(menu).toBeInTheDocument();
     expect(menu.getAttribute("aria-label")).toMatch(/quick log/i);
-    expect(
-      screen.getByTestId("global-fast-add-trigger").getAttribute("aria-expanded"),
-    ).toBe("true");
+    expect(screen.getByTestId("global-fast-add-trigger").getAttribute("aria-expanded")).toBe(
+      "true",
+    );
   });
 
   it.each(FAST_ADD_ACTIONS.map((a) => [a.id, a.label] as const))(
@@ -86,12 +83,8 @@ describe("Global Quick Log — gated helper text + CTAs (screen-reader reachable
     renderFastAdd();
     fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
     fireEvent.click(screen.getByTestId("global-fast-add-action-feeding"));
-    expect(
-      screen.getByRole("button", { name: /choose plant/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /choose tent/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /choose plant/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /choose tent/i })).toBeInTheDocument();
   });
 
   it("static sr-only helper text ships in the DOM for screen readers even before interaction", () => {

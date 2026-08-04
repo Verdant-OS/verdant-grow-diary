@@ -111,9 +111,7 @@ export const EMPTY_COUNTS: GrowCounts = {
 };
 
 export type RecentState =
-  | { status: "loading" }
-  | { status: "ok"; items: RecentItem[] }
-  | { status: "unavailable" };
+  { status: "loading" } | { status: "ok"; items: RecentItem[] } | { status: "unavailable" };
 
 export interface UseGrowDetailData {
   grow: GrowRow | null;
@@ -127,7 +125,6 @@ export interface UseGrowDetailData {
   growId: string | undefined;
   refetch: () => void;
 }
-
 
 export function useGrowDetailData(): UseGrowDetailData {
   const { growId } = useParams<{ growId: string }>();
@@ -268,7 +265,9 @@ export function useGrowDetailData(): UseGrowDetailData {
           .limit(ACTIVITY_MERGE_WINDOW),
         supabase
           .from("grow_events")
-          .select("id,tent_id,plant_id,event_type,occurred_at,created_at,source,is_deleted,deleted_at")
+          .select(
+            "id,tent_id,plant_id,event_type,occurred_at,created_at,source,is_deleted,deleted_at",
+          )
           .eq("grow_id", growId)
           .eq("source", "manual")
           .eq("is_deleted", false)
@@ -283,8 +282,7 @@ export function useGrowDetailData(): UseGrowDetailData {
           growEvents: spineRows,
         });
         const windowSaturated =
-          diaryRows.length >= ACTIVITY_MERGE_WINDOW ||
-          spineRows.length >= ACTIVITY_MERGE_WINDOW;
+          diaryRows.length >= ACTIVITY_MERGE_WINDOW || spineRows.length >= ACTIVITY_MERGE_WINDOW;
         diary = windowSaturated
           ? Math.max(
               merged,
@@ -539,5 +537,16 @@ export function useGrowDetailData(): UseGrowDetailData {
     load();
   }, [load]);
 
-  return { grow, loading, notFound, error, counts, recent, status, outcomes, growId, refetch: load };
+  return {
+    grow,
+    loading,
+    notFound,
+    error,
+    counts,
+    recent,
+    status,
+    outcomes,
+    growId,
+    refetch: load,
+  };
 }

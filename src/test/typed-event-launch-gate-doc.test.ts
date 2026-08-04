@@ -12,10 +12,7 @@ describe("typed event launch gate doc", () => {
   const doc = existsSync(DOC_PATH) ? readFileSync(DOC_PATH, "utf8") : "";
 
   const required: Array<[string, RegExp]> = [
-    [
-      "references the RLS checklist",
-      /docs\/testing\/typed-event-rls-checklist\.md/,
-    ],
+    ["references the RLS checklist", /docs\/testing\/typed-event-rls-checklist\.md/],
     ["requires live authenticated-user verification", /live authenticated-user verification/i],
     ["unauthenticated RPC rejection verified", /unauthenticated RPC rejection/i],
     ["owner can create for own grow", /owning user can create a watering event/i],
@@ -39,7 +36,10 @@ describe("typed event launch gate doc", () => {
       "typedWateringWriteEnabled defaults to false",
       /`typedWateringWriteEnabled` defaults to `false`/,
     ],
-    ["QuickLog diary_entries compatibility preserved", /QuickLog `?diary_entries`? compatibility is preserved/i],
+    [
+      "QuickLog diary_entries compatibility preserved",
+      /QuickLog `?diary_entries`? compatibility is preserved/i,
+    ],
     ["rollback plan documented", /## Rollback plan/],
     [
       "forbids non-watering typed writes until RPCs exist",
@@ -58,10 +58,7 @@ describe("typed event launch gate doc", () => {
       /Dual-writing without an atomic rollback strategy\*\* is forbidden/,
     ],
     ["sign-off table present", /## Sign-off/],
-    [
-      "flag stays false until sign-off",
-      /`typedWateringWriteEnabled` MUST remain `false`/,
-    ],
+    ["flag stays false until sign-off", /`typedWateringWriteEnabled` MUST remain `false`/],
     ["no Leads modification mentioned in scope", /Leads/],
   ];
 

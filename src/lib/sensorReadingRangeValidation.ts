@@ -70,7 +70,10 @@ export interface RangeValidateOptions {
   readonly futureSkewSeconds?: number;
 }
 
-const RANGES: Record<SensorReadingMetric, { min: number; max: number; label: string; unit: string }> = {
+const RANGES: Record<
+  SensorReadingMetric,
+  { min: number; max: number; label: string; unit: string }
+> = {
   temperature_c: { ...AIR_TEMP_C_RANGE, label: "Air temperature", unit: "°C" },
   humidity_pct: { ...HUMIDITY_RANGE, label: "Humidity", unit: "%" },
   vpd_kpa: { ...VPD_REALISTIC_RANGE, label: "VPD", unit: "kPa" },

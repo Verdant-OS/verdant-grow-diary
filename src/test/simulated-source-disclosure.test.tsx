@@ -2,9 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import {
-  classifyGrowDataSource,
-} from "@/lib/growDataSourceLabelRules";
+import { classifyGrowDataSource } from "@/lib/growDataSourceLabelRules";
 import GrowDataSourceBadge from "@/components/GrowDataSourceBadge";
 import DashboardDataSourceDisclosure from "@/components/DashboardDataSourceDisclosure";
 import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
@@ -31,26 +29,20 @@ describe("classifyGrowDataSource — Simulated label", () => {
   });
   it("preserves Live for sensor source", () => {
     expect(
-      classifyGrowDataSource(
-        { source: "sensor", value: 22, timestamp: FRESH_TS },
-        { now: NOW },
-      ).label,
+      classifyGrowDataSource({ source: "sensor", value: 22, timestamp: FRESH_TS }, { now: NOW })
+        .label,
     ).toBe("Live");
   });
   it("preserves Manual for manual source", () => {
     expect(
-      classifyGrowDataSource(
-        { source: "manual", value: 22, timestamp: FRESH_TS },
-        { now: NOW },
-      ).label,
+      classifyGrowDataSource({ source: "manual", value: 22, timestamp: FRESH_TS }, { now: NOW })
+        .label,
     ).toBe("Manual");
   });
   it("preserves Demo for mock source", () => {
     expect(
-      classifyGrowDataSource(
-        { source: "mock", value: 22, timestamp: FRESH_TS },
-        { now: NOW },
-      ).label,
+      classifyGrowDataSource({ source: "mock", value: 22, timestamp: FRESH_TS }, { now: NOW })
+        .label,
     ).toBe("Demo");
   });
   it("preserves Unavailable for missing source+value", () => {
@@ -85,9 +77,9 @@ describe("DashboardDataSourceDisclosure — simulated snapshot notice", () => {
     expect(notice.textContent?.toLowerCase()).toMatch(/simulated/);
     expect(notice.textContent?.toLowerCase()).toMatch(/test|demo/);
     expect(notice.textContent?.toLowerCase()).toMatch(/not.*real|not used/);
-    expect(
-      screen.getByTestId("dashboard-data-source-simulated-badge").textContent,
-    ).toBe("Simulated");
+    expect(screen.getByTestId("dashboard-data-source-simulated-badge").textContent).toBe(
+      "Simulated",
+    );
   });
   it("does NOT render simulated notice for non-sim sources", () => {
     render(
@@ -97,9 +89,7 @@ describe("DashboardDataSourceDisclosure — simulated snapshot notice", () => {
         snapshotSource="live"
       />,
     );
-    expect(
-      screen.queryByTestId("dashboard-data-source-simulated-notice"),
-    ).toBeNull();
+    expect(screen.queryByTestId("dashboard-data-source-simulated-notice")).toBeNull();
   });
 });
 
@@ -113,9 +103,7 @@ describe("GrowDataSourceDisclosure — simulated snapshot notice", () => {
         snapshotSource="sim"
       />,
     );
-    const notice = screen.getByTestId(
-      "grow-data-source-disclosure-simulated-notice",
-    );
+    const notice = screen.getByTestId("grow-data-source-disclosure-simulated-notice");
     expect(notice.textContent?.toLowerCase()).toMatch(/simulated/);
     expect(notice.textContent?.toLowerCase()).toMatch(/test|demo/);
   });
@@ -128,9 +116,7 @@ describe("GrowDataSourceDisclosure — simulated snapshot notice", () => {
         snapshotSource="manual"
       />,
     );
-    expect(
-      screen.queryByTestId("grow-data-source-disclosure-simulated-notice"),
-    ).toBeNull();
+    expect(screen.queryByTestId("grow-data-source-disclosure-simulated-notice")).toBeNull();
   });
 });
 

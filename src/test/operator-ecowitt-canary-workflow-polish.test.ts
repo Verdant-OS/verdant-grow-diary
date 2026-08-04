@@ -67,7 +67,9 @@ describe("detectSecretCategories", () => {
     expect(detectSecretCategories("vbt_live_AbCdEf0123456")).toContain("bridge token (vbt_)");
   });
   it("flags MAC address", () => {
-    expect(detectSecretCategories("device MAC AA:BB:CC:DD:EE:FF reported")).toContain("MAC address");
+    expect(detectSecretCategories("device MAC AA:BB:CC:DD:EE:FF reported")).toContain(
+      "MAC address",
+    );
   });
   it("flags JWT, sk_, service_role, api_key, application_key", () => {
     const t =
@@ -146,7 +148,10 @@ describe("buildDrillDown", () => {
   it("returns offending row for channel 9 fail", () => {
     const r = { ...goodReport, channel_9_count: 3 };
     const vv = computeVerdict({ preflight: null, report: r, logReviewed: true });
-    const d = buildDrillDown(vv.cards.find((c) => c.key === "ch9")!, r);
+    const d = buildDrillDown(
+      vv.cards.find((c) => c.key === "ch9")!,
+      r,
+    );
     expect(d.status).toBe("fail");
     expect(d.offending.join(",")).toContain("channel_9_count=3");
   });
@@ -157,7 +162,10 @@ describe("buildDrillDown", () => {
       malformed_row_counts: { humidity: 1, soil_moisture: 1, vpd_kpa: 1 },
     };
     const vv = computeVerdict({ preflight: null, report: r, logReviewed: true });
-    const d = buildDrillDown(vv.cards.find((c) => c.key === "sql_malformed")!, r);
+    const d = buildDrillDown(
+      vv.cards.find((c) => c.key === "sql_malformed")!,
+      r,
+    );
     expect(d.status).toBe("fail");
     expect(d.offending.join(",")).toContain("vpd_kpa");
   });
@@ -168,7 +176,10 @@ describe("buildDrillDown", () => {
       duplicate_replay_counts: { temperature_c: 2, humidity: 1, soil_moisture: 1, vpd_kpa: 1 },
     };
     const vv = computeVerdict({ preflight: null, report: r, logReviewed: true });
-    const d = buildDrillDown(vv.cards.find((c) => c.key === "dup")!, r);
+    const d = buildDrillDown(
+      vv.cards.find((c) => c.key === "dup")!,
+      r,
+    );
     expect(d.status).toBe("fail");
     expect(d.offending.some((o) => o.startsWith("temperature_c=2"))).toBe(true);
   });
@@ -252,9 +263,7 @@ describe("Operator page wiring (static source)", () => {
   });
 
   it("has no forbidden write/automation surfaces", () => {
-    const stripped = pageSrc
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+    const stripped = pageSrc.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
     for (const f of [".insert(", ".update(", ".delete(", ".upsert(", ".rpc(", "functions.invoke"]) {
       expect(stripped, `forbidden token ${f}`).not.toContain(f);
     }

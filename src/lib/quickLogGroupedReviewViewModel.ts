@@ -19,12 +19,9 @@ export const QUICK_LOG_REVIEW_OPEN_LABEL = "Review details";
 export const QUICK_LOG_REVIEW_CLOSE_LABEL = "Close details";
 export const QUICK_LOG_REVIEW_PANEL_TITLE = "Grouped timeline details";
 export const QUICK_LOG_REVIEW_ACTION_SECTION_TITLE = "QuickLog action";
-export const QUICK_LOG_REVIEW_ENVIRONMENT_SECTION_TITLE =
-  "Manual environment snapshot";
+export const QUICK_LOG_REVIEW_ENVIRONMENT_SECTION_TITLE = "Manual environment snapshot";
 
-export function isReviewableQuickLogEntry(
-  entry: QuickLogTimelineEntry,
-): boolean {
+export function isReviewableQuickLogEntry(entry: QuickLogTimelineEntry): boolean {
   return entry.kind === "grouped";
 }
 

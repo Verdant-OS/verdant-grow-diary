@@ -52,10 +52,7 @@ export function ManualSensorTrendChart({
       aria-labelledby={`${testId}-title`}
     >
       <header className="mb-3">
-        <h3
-          id={`${testId}-title`}
-          className="text-base font-semibold text-foreground"
-        >
+        <h3 id={`${testId}-title`} className="text-base font-semibold text-foreground">
           {vm.title}
         </h3>
         <p className="mt-1 text-sm text-muted-foreground">{vm.description}</p>
@@ -73,10 +70,7 @@ export function ManualSensorTrendChart({
 
       {vm.state === "ready" && (
         <div className="overflow-x-auto" data-testid={`${testId}-table-wrapper`}>
-          <table
-            data-testid={`${testId}-table`}
-            className="w-full text-left text-sm"
-          >
+          <table data-testid={`${testId}-table`} className="w-full text-left text-sm">
             <caption className="sr-only">
               {vm.title}: {vm.description}
             </caption>
@@ -92,10 +86,7 @@ export function ManualSensorTrendChart({
                     className="py-1 pr-3 font-medium"
                     data-testid={`${testId}-header-${s.metric}`}
                   >
-                    {s.label}{" "}
-                    <span className="text-xs text-muted-foreground">
-                      ({s.unit})
-                    </span>
+                    {s.label} <span className="text-xs text-muted-foreground">({s.unit})</span>
                   </th>
                 ))}
                 <th scope="col" className="py-1 font-medium">
@@ -105,14 +96,8 @@ export function ManualSensorTrendChart({
             </thead>
             <tbody>
               {buildRows(vm.series).map((row) => (
-                <tr
-                  key={row.key}
-                  className="border-t border-border"
-                  data-testid={`${testId}-row`}
-                >
-                  <td className="py-1 pr-3 text-foreground">
-                    {formatCapturedAt(row.capturedAt)}
-                  </td>
+                <tr key={row.key} className="border-t border-border" data-testid={`${testId}-row`}>
+                  <td className="py-1 pr-3 text-foreground">{formatCapturedAt(row.capturedAt)}</td>
                   {vm.series.map((s) => {
                     const cell = row.byMetric[s.metric];
                     return (
@@ -125,9 +110,7 @@ export function ManualSensorTrendChart({
                       </td>
                     );
                   })}
-                  <td className="py-1 text-foreground">
-                    {row.sourceLabel ?? row.source ?? "—"}
-                  </td>
+                  <td className="py-1 text-foreground">{row.sourceLabel ?? row.source ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -150,11 +133,8 @@ export function ManualSensorTrendChart({
                 data-testid={`${testId}-flagged-item`}
                 data-source={p.source}
               >
-                <span className="font-medium uppercase">{p.source}</span> ·{" "}
-                {p.metric} · {p.display} ·{" "}
-                <time dateTime={p.capturedAt}>
-                  {formatCapturedAt(p.capturedAt)}
-                </time>
+                <span className="font-medium uppercase">{p.source}</span> · {p.metric} · {p.display}{" "}
+                · <time dateTime={p.capturedAt}>{formatCapturedAt(p.capturedAt)}</time>
               </li>
             ))}
           </ul>
@@ -169,10 +149,7 @@ interface BuiltRow {
   capturedAt: string;
   source: string | null;
   sourceLabel: string | null;
-  byMetric: Record<
-    string,
-    { display: string } | undefined
-  >;
+  byMetric: Record<string, { display: string } | undefined>;
 }
 
 function buildRows(

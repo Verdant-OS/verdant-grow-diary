@@ -33,12 +33,7 @@ export interface BuildPlantTimelineReadabilitySummaryInput {
 }
 
 export interface PlantTimelineReadabilitySummaryPart {
-  key:
-    | "visible"
-    | "groups"
-    | "evidence-sections"
-    | "filter-active"
-    | "filter-cleared";
+  key: "visible" | "groups" | "evidence-sections" | "filter-active" | "filter-cleared";
   label: string;
 }
 
@@ -135,8 +130,7 @@ export function buildPlantTimelineReadabilitySummary(
 // Print-friendly summary
 // ---------------------------------------------------------------------------
 
-export interface BuildPlantTimelinePrintSummaryInput
-  extends BuildPlantTimelineReadabilitySummaryInput {
+export interface BuildPlantTimelinePrintSummaryInput extends BuildPlantTimelineReadabilitySummaryInput {
   /** Optional plant display name (no internal IDs). */
   plantName?: string | null;
   /** Optional tent display name (no internal IDs). */
@@ -146,14 +140,7 @@ export interface BuildPlantTimelinePrintSummaryInput
 }
 
 export interface PlantTimelinePrintSummaryLine {
-  key:
-    | "title"
-    | "context"
-    | "filter"
-    | "visible"
-    | "groups"
-    | "evidence-sections"
-    | "safety";
+  key: "title" | "context" | "filter" | "visible" | "groups" | "evidence-sections" | "safety";
   label: string;
 }
 
@@ -185,10 +172,7 @@ function stripPrivateTokens(value: string): string {
     }
   }
   // Strip UUID-like substrings (8-4-4-4-12 hex). Diary context only.
-  out = out.replace(
-    /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
-    "",
-  );
+  out = out.replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, "");
   return out.replace(/\s{2,}/g, " ").trim();
 }
 

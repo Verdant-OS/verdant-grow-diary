@@ -18,9 +18,7 @@ import {
   PLANT_PHOTO_STRIP_DEFAULT_LIMIT,
 } from "@/lib/plantPhotoPreviewStrip";
 
-export function usePlantGalleryPhotoCount(
-  plantId: string | null | undefined,
-): number {
+export function usePlantGalleryPhotoCount(plantId: string | null | undefined): number {
   const { data: rawDiary } = useDiaryEntries();
 
   return useMemo(() => {
@@ -29,8 +27,7 @@ export function usePlantGalleryPhotoCount(
       const r = (raw ?? {}) as Record<string, unknown>;
       if (r.entry_type || r.entryType || r.event_type || r.eventType) return r;
       const det = (r.details ?? null) as Record<string, unknown> | null;
-      const liftedType =
-        det && typeof det === "object" ? det.event_type : undefined;
+      const liftedType = det && typeof det === "object" ? det.event_type : undefined;
       return typeof liftedType === "string" && liftedType.length > 0
         ? { ...r, entry_type: liftedType }
         : r;

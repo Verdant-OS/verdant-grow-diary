@@ -22,11 +22,10 @@ if (!DB_URL) {
 }
 
 function psql(sql) {
-  const out = execFileSync(
-    "psql",
-    [DB_URL, "-X", "-A", "-t", "-F", "\u0001", "-c", sql],
-    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-  );
+  const out = execFileSync("psql", [DB_URL, "-X", "-A", "-t", "-F", "\u0001", "-c", sql], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
   return out
     .trim()
     .split("\n")
@@ -46,18 +45,9 @@ const policyRows = psql(
     "ORDER BY tablename, cmd, policyname;",
 );
 const inserts = policyRows.filter((r) => r[1] === "INSERT");
-expect(
-  "no INSERT policy on nug_events",
-  !inserts.some((r) => r[0] === "nug_events"),
-);
-expect(
-  "no INSERT policy on unlocks",
-  !inserts.some((r) => r[0] === "unlocks"),
-);
-expect(
-  "no INSERT policy on user_quests",
-  !inserts.some((r) => r[0] === "user_quests"),
-);
+expect("no INSERT policy on nug_events", !inserts.some((r) => r[0] === "nug_events"));
+expect("no INSERT policy on unlocks", !inserts.some((r) => r[0] === "unlocks"));
+expect("no INSERT policy on user_quests", !inserts.some((r) => r[0] === "user_quests"));
 
 // 2. Expected SELECT policies still present.
 const expectedSelect = {
@@ -66,9 +56,7 @@ const expectedSelect = {
   user_quests: "Users view own quests",
 };
 for (const [table, policy] of Object.entries(expectedSelect)) {
-  const found = policyRows.some(
-    (r) => r[0] === table && r[1] === "SELECT" && r[2] === policy,
-  );
+  const found = policyRows.some((r) => r[0] === table && r[1] === "SELECT" && r[2] === policy);
   expect(`SELECT policy "${policy}" present on ${table}`, found);
 }
 

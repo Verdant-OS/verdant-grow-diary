@@ -9,10 +9,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { MCP_MANIFEST, type MCPManifestView } from "@/lib/mcp/manifestView";
-import {
-  computeManifestHash,
-  shortenManifestHash,
-} from "@/lib/mcp/manifestHash";
+import { computeManifestHash, shortenManifestHash } from "@/lib/mcp/manifestHash";
 
 function clone(m: MCPManifestView): MCPManifestView {
   return JSON.parse(JSON.stringify(m));
@@ -53,9 +50,7 @@ describe("computeManifestHash", () => {
   it("changes when a required param flips to optional", () => {
     const before = computeManifestHash(MCP_MANIFEST);
     const mutated = clone(MCP_MANIFEST);
-    const withRequired = mutated.tools.find((t) =>
-      t.params.some((p) => p.required),
-    );
+    const withRequired = mutated.tools.find((t) => t.params.some((p) => p.required));
     expect(withRequired).toBeDefined();
     const p = withRequired!.params.find((pp) => pp.required)!;
     p.required = false;

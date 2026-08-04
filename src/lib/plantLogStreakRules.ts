@@ -69,9 +69,7 @@ function localDayKey(ms: number): number {
   return Math.floor((ms - d.getTimezoneOffset() * 60_000) / MS_PER_DAY);
 }
 
-export function buildPlantLogStreakView(
-  input: PlantLogStreakInput,
-): PlantLogStreakView {
+export function buildPlantLogStreakView(input: PlantLogStreakInput): PlantLogStreakView {
   const dayKeys = new Set<number>();
   for (const iso of input.entryAts ?? []) {
     if (typeof iso !== "string" || iso.length === 0) continue;
@@ -92,17 +90,11 @@ export function buildPlantLogStreakView(
     streakDays += 1;
   }
 
-  const statusLabel = !hasAny
-    ? "No logs yet"
-    : loggedToday
-      ? "Logged today"
-      : "No log yet today";
+  const statusLabel = !hasAny ? "No logs yet" : loggedToday ? "Logged today" : "No log yet today";
 
-  const streakLabel =
-    streakDays >= 2 ? `${streakDays}-day streak` : null;
+  const streakLabel = streakDays >= 2 ? `${streakDays}-day streak` : null;
 
-  const show =
-    input.isFreePlan === true && dayKeys.size >= PLANT_LOG_TEASER_MIN_DAYS;
+  const show = input.isFreePlan === true && dayKeys.size >= PLANT_LOG_TEASER_MIN_DAYS;
 
   return {
     hasAny,

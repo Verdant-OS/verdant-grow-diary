@@ -30,12 +30,8 @@ describe("Evidence Ref Population v1 — pure helper", () => {
     expect(forwardAlertRefsToActionQueue(null)).toEqual([]);
     expect(forwardAlertRefsToActionQueue(undefined)).toEqual([]);
     expect(forwardAlertRefsToActionQueue({})).toEqual([]);
-    expect(
-      forwardAlertRefsToActionQueue({ originating_timeline_events: null }),
-    ).toEqual([]);
-    expect(
-      forwardAlertRefsToActionQueue({ originating_timeline_events: "boom" }),
-    ).toEqual([]);
+    expect(forwardAlertRefsToActionQueue({ originating_timeline_events: null })).toEqual([]);
+    expect(forwardAlertRefsToActionQueue({ originating_timeline_events: "boom" })).toEqual([]);
   });
 
   it("forwards valid refs deterministically sorted by occurred_at then id", () => {
@@ -143,9 +139,7 @@ describe("Evidence Ref Population v1 — AlertDetail wiring", () => {
   const src = read("src/pages/AlertDetail.tsx");
 
   it("imports the forward helper", () => {
-    expect(src).toMatch(
-      /from\s+"@\/lib\/originatingTimelineEventForwardRules"/,
-    );
+    expect(src).toMatch(/from\s+"@\/lib\/originatingTimelineEventForwardRules"/);
     expect(src).toMatch(/forwardAlertRefsToActionQueue/);
   });
 
@@ -162,7 +156,6 @@ describe("Evidence Ref Population v1 — AlertDetail wiring", () => {
     expect(m, "alert→action_queue insert call not found").not.toBeNull();
     expect(m![0]).not.toMatch(/originating_timeline_events:\s*\[\]/);
   });
-
 
   it("never infers refs from alert id, prose, metric, or timestamps at the insert site", () => {
     const m = src.match(/\.from\("action_queue"\)\s*\.insert\(\{[\s\S]*?\}\)/);
@@ -193,7 +186,6 @@ describe("Evidence Ref Population v1 — AlertDetail wiring", () => {
       ).toBe(false);
     }
   });
-
 });
 
 // ---------------------------------------------------------------------------
@@ -201,9 +193,7 @@ describe("Evidence Ref Population v1 — AlertDetail wiring", () => {
 // ---------------------------------------------------------------------------
 
 describe("Evidence Ref Population v1 — AI Doctor session path stays []", () => {
-  const src = read(
-    "src/hooks/useAddAiDoctorSessionSuggestionToActionQueue.ts",
-  );
+  const src = read("src/hooks/useAddAiDoctorSessionSuggestionToActionQueue.ts");
 
   it("persists an explicit empty array (no typed refs at this boundary)", () => {
     expect(src).toMatch(/originating_timeline_events:\s*\[\]/);
@@ -242,9 +232,7 @@ describe("Evidence Ref Population v1 — saveAlert input contract", () => {
 
   it("normalizes refs before insert via the shared rules helper", () => {
     expect(src).toMatch(/normalizeOriginatingTimelineEvents\(/);
-    expect(src).toMatch(
-      /originating_timeline_events:\s*refs\s+as\s+unknown\s+as\s+never/,
-    );
+    expect(src).toMatch(/originating_timeline_events:\s*refs\s+as\s+unknown\s+as\s+never/);
   });
 
   it("SaveAlertInput exposes the refs field but never accepts raw payload", () => {

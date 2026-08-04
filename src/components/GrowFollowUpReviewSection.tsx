@@ -41,7 +41,8 @@ export function GrowFollowUpReviewSection({
 
   const episodes = state.status === "ok" ? state.episodes : [];
   const viewModel = useMemo(() => buildOutcomeFollowUpQueue(episodes), [episodes]);
-  const status = state.status === "ok" ? "ok" : state.status === "unavailable" ? "unavailable" : "loading";
+  const status =
+    state.status === "ok" ? "ok" : state.status === "unavailable" ? "unavailable" : "loading";
 
   const handleAction = (cta: SafeEpisodeCta, actionQueueId: string) => {
     if (cta === "choose_decision") {

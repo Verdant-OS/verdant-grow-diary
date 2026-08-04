@@ -7,9 +7,22 @@ import {
 describe("environmentCheckSensorSnapshotLinkRules", () => {
   it("matches by exact snapshot ID when present", () => {
     const r = linkEnvironmentCheckToSnapshot({
-      entry: { id: "e1", tentId: "t", sensorSnapshotId: "snap-1", capturedAt: "2026-06-19T12:00:00Z" },
+      entry: {
+        id: "e1",
+        tentId: "t",
+        sensorSnapshotId: "snap-1",
+        capturedAt: "2026-06-19T12:00:00Z",
+      },
       snapshots: [
-        { id: "snap-1", tentId: "t", capturedAt: "2026-06-19T12:00:00Z", vpdKpa: 1.1, source: "live", provider: "ecowitt", transport: "mqtt" },
+        {
+          id: "snap-1",
+          tentId: "t",
+          capturedAt: "2026-06-19T12:00:00Z",
+          vpdKpa: 1.1,
+          source: "live",
+          provider: "ecowitt",
+          transport: "mqtt",
+        },
       ],
     });
     expect(r.matchKind).toBe("exact_id");
@@ -22,7 +35,15 @@ describe("environmentCheckSensorSnapshotLinkRules", () => {
     const r = linkEnvironmentCheckToSnapshot({
       entry: { id: "e", tentId: "t", capturedAt: "2026-06-19T12:00:00Z" },
       snapshots: [
-        { id: "s", tentId: "t", capturedAt: "2026-06-19T12:00:30Z", source: "live", provider: "ecowitt", transport: "mqtt", vpdKpa: 1.0 },
+        {
+          id: "s",
+          tentId: "t",
+          capturedAt: "2026-06-19T12:00:30Z",
+          source: "live",
+          provider: "ecowitt",
+          transport: "mqtt",
+          vpdKpa: 1.0,
+        },
       ],
     });
     expect(r.matchKind).toBe("deterministic_keys");
@@ -66,7 +87,9 @@ describe("environmentCheckSensorSnapshotLinkRules", () => {
   it("propagates stale/invalid flag — never marked healthy", () => {
     const r = linkEnvironmentCheckToSnapshot({
       entry: { id: "e", tentId: "t", sensorSnapshotId: "s" },
-      snapshots: [{ id: "s", tentId: "t", capturedAt: "2026-06-19T12:00:00Z", isStaleOrInvalid: true }],
+      snapshots: [
+        { id: "s", tentId: "t", capturedAt: "2026-06-19T12:00:00Z", isStaleOrInvalid: true },
+      ],
     });
     expect(r.staleOrInvalid).toBe(true);
   });

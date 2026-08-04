@@ -113,7 +113,12 @@ export const BREEDING_SOP_STEPS: readonly BreedingSopStep[] = [
     selectionCriteria: [
       c("yield", 0.25, true, "Compare against P1 baselines, not against hype."),
       c("resin", 0.25, true, ""),
-      c("disease_resistance", 0.2, true, "Prefer plants that shrugged off pressure the whole cycle."),
+      c(
+        "disease_resistance",
+        0.2,
+        true,
+        "Prefer plants that shrugged off pressure the whole cycle.",
+      ),
       c("aroma", 0.15, false, ""),
       c("effects", 0.1, false, ""),
       c("flowering_time", 0.05, false, ""),

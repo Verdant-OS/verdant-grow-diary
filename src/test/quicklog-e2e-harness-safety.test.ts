@@ -42,9 +42,7 @@ function readAll(): ScannedFile[] {
         const body = fs.readFileSync(p, "utf8");
         // Only .ts/.tsx are executable; .md gets no scrub (kept verbatim
         // but never scanned by the identifier-usage checks below).
-        const scrubbed = /\.(ts|tsx)$/.test(entry.name)
-          ? scrubExecutableSource(body)
-          : body;
+        const scrubbed = /\.(ts|tsx)$/.test(entry.name) ? scrubExecutableSource(body) : body;
         out.push({ file: p, body, scrubbed });
       }
     }
@@ -74,8 +72,7 @@ describe("Quick Log Playwright harness safety", () => {
       // `service_role_in_browser_observed` (a safety-flag surface, not
       // a service_role credential use). Exempt those two files.
       const serviceRoleIdentifierExempt =
-        /oneTentBrowserProofReceipt/.test(file) ||
-        /one-tent-loop-golden-path-ui/.test(file);
+        /oneTentBrowserProofReceipt/.test(file) || /one-tent-loop-golden-path-ui/.test(file);
       if (!serviceRoleIdentifierExempt) {
         expect(scrubbed, `${file} must not reference service_role`).not.toMatch(/service_role/i);
       }

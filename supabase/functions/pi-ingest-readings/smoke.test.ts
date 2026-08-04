@@ -22,10 +22,7 @@
  */
 
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import {
-  buildSigningString,
-  computeHmacSha256Hex,
-} from "../_shared/lib/lib/piIngestAuthRules.ts";
+import { buildSigningString, computeHmacSha256Hex } from "../_shared/lib/lib/piIngestAuthRules.ts";
 
 const REQUIRED_ENV = [
   "PI_INGEST_SMOKE_FUNCTION_URL",
@@ -58,9 +55,7 @@ function readConfig(): SmokeConfig | null {
   const bridgeSecret = get("PI_INGEST_SMOKE_BRIDGE_SECRET");
   const tentId = get("PI_INGEST_SMOKE_TENT_ID");
   if (missing.length > 0) {
-    console.log(
-      `[pi-ingest-readings smoke] skipped — missing env: ${missing.join(", ")}`,
-    );
+    console.log(`[pi-ingest-readings smoke] skipped — missing env: ${missing.join(", ")}`);
     return null;
   }
   const tsOverride = Deno.env.get("PI_INGEST_SMOKE_TIMESTAMP_MS");
@@ -94,10 +89,7 @@ function buildEnvelope(cfg: SmokeConfig): string {
   });
 }
 
-async function signHeaders(
-  cfg: SmokeConfig,
-  rawBody: string,
-): Promise<Record<string, string>> {
+async function signHeaders(cfg: SmokeConfig, rawBody: string): Promise<Record<string, string>> {
   const u = new URL(cfg.url);
   const ts = String(Math.floor(cfg.nowMs / 1000));
   const signingString = buildSigningString("POST", u.pathname, ts, rawBody);
@@ -134,71 +126,71 @@ function assertNoLeak(json: unknown): void {
   }
 }
 
-Deno.test("pi-ingest-readings deployed smoke: full ingest → replay → tampered → unknown → invalid", async () => {
-  const cfg = readConfig();
-  if (!cfg) return;
+Deno.test(
+  "pi-ingest-readings deployed smoke: full ingest → replay → tampered → unknown → invalid",
+  async () => {
+    const cfg = readConfig();
+    if (!cfg) return;
 
-  const rawBody = buildEnvelope(cfg);
-  const headers = await signHeaders(cfg, rawBody);
+    const rawBody = buildEnvelope(cfg);
+    const headers = await signHeaders(cfg, rawBody);
 
-  // 1) Valid signed batch → 200 ok:true inserted=N rejected=0
-  const first = await post(cfg, headers, rawBody);
-  assertEquals(first.status, 200, `expected 200, got ${first.status}`);
-  const firstBody = first.json as {
-    ok?: boolean;
-    inserted?: number;
-    rejected?: number;
-  } | null;
-  assert(firstBody?.ok === true, "first call should be ok:true");
-  assertEquals(firstBody?.rejected, 0, "first call rejected must be 0");
-  const insertedCount = firstBody?.inserted ?? 0;
-  assert(insertedCount > 0, "first call inserted must be > 0");
+    // 1) Valid signed batch → 200 ok:true inserted=N rejected=0
+    const first = await post(cfg, headers, rawBody);
+    assertEquals(first.status, 200, `expected 200, got ${first.status}`);
+    const firstBody = first.json as {
+      ok?: boolean;
+      inserted?: number;
+      rejected?: number;
+    } | null;
+    assert(firstBody?.ok === true, "first call should be ok:true");
+    assertEquals(firstBody?.rejected, 0, "first call rejected must be 0");
+    const insertedCount = firstBody?.inserted ?? 0;
+    assert(insertedCount > 0, "first call inserted must be > 0");
 
-  // 2) Replay same body → 200 ok:true inserted=0 rejected=N
-  const replay = await post(cfg, headers, rawBody);
-  assertEquals(replay.status, 200, `replay expected 200, got ${replay.status}`);
-  const replayBody = replay.json as {
-    ok?: boolean;
-    inserted?: number;
-    rejected?: number;
-  } | null;
-  assert(replayBody?.ok === true, "replay should be ok:true");
-  assertEquals(replayBody?.inserted, 0, "replay inserted must be 0");
-  assert(
-    (replayBody?.rejected ?? 0) >= insertedCount,
-    "replay rejected must cover originally inserted rows",
-  );
+    // 2) Replay same body → 200 ok:true inserted=0 rejected=N
+    const replay = await post(cfg, headers, rawBody);
+    assertEquals(replay.status, 200, `replay expected 200, got ${replay.status}`);
+    const replayBody = replay.json as {
+      ok?: boolean;
+      inserted?: number;
+      rejected?: number;
+    } | null;
+    assert(replayBody?.ok === true, "replay should be ok:true");
+    assertEquals(replayBody?.inserted, 0, "replay inserted must be 0");
+    assert(
+      (replayBody?.rejected ?? 0) >= insertedCount,
+      "replay rejected must cover originally inserted rows",
+    );
 
-  // 3) Tampered signature → 401, no internals leaked
-  const tamperedSig = headers["x-bridge-signature"].slice(0, -1) +
-    (headers["x-bridge-signature"].endsWith("a") ? "b" : "a");
-  const tampered = await post(
-    cfg,
-    { ...headers, "x-bridge-signature": tamperedSig },
-    rawBody,
-  );
-  assertEquals(tampered.status, 401, `tampered expected 401, got ${tampered.status}`);
-  assertNoLeak(tampered.json);
+    // 3) Tampered signature → 401, no internals leaked
+    const tamperedSig =
+      headers["x-bridge-signature"].slice(0, -1) +
+      (headers["x-bridge-signature"].endsWith("a") ? "b" : "a");
+    const tampered = await post(cfg, { ...headers, "x-bridge-signature": tamperedSig }, rawBody);
+    assertEquals(tampered.status, 401, `tampered expected 401, got ${tampered.status}`);
+    assertNoLeak(tampered.json);
 
-  // 4) Unknown bridge → 401
-  const unknownHeaders = await signHeaders(
-    { ...cfg, bridgeId: `smoke-unknown-${cfg.nowMs}` },
-    rawBody,
-  );
-  const unknown = await post(cfg, unknownHeaders, rawBody);
-  assertEquals(unknown.status, 401, `unknown expected 401, got ${unknown.status}`);
-  assertNoLeak(unknown.json);
+    // 4) Unknown bridge → 401
+    const unknownHeaders = await signHeaders(
+      { ...cfg, bridgeId: `smoke-unknown-${cfg.nowMs}` },
+      rawBody,
+    );
+    const unknown = await post(cfg, unknownHeaders, rawBody);
+    assertEquals(unknown.status, 401, `unknown expected 401, got ${unknown.status}`);
+    assertNoLeak(unknown.json);
 
-  // 5) Invalid metric soil_ec → 400
-  const invalidBody = JSON.stringify({
-    tent_id: cfg.tentId,
-    device_id: cfg.deviceId,
-    captured_at: new Date(cfg.nowMs).toISOString(),
-    source: "pi_bridge",
-    readings: [{ metric: "soil_ec", value: 1.0, unit: "mS/cm" }],
-  });
-  const invalidHeaders = await signHeaders(cfg, invalidBody);
-  const invalid = await post(cfg, invalidHeaders, invalidBody);
-  assertEquals(invalid.status, 400, `invalid expected 400, got ${invalid.status}`);
-  assertNoLeak(invalid.json);
-});
+    // 5) Invalid metric soil_ec → 400
+    const invalidBody = JSON.stringify({
+      tent_id: cfg.tentId,
+      device_id: cfg.deviceId,
+      captured_at: new Date(cfg.nowMs).toISOString(),
+      source: "pi_bridge",
+      readings: [{ metric: "soil_ec", value: 1.0, unit: "mS/cm" }],
+    });
+    const invalidHeaders = await signHeaders(cfg, invalidBody);
+    const invalid = await post(cfg, invalidHeaders, invalidBody);
+    assertEquals(invalid.status, 400, `invalid expected 400, got ${invalid.status}`);
+    assertNoLeak(invalid.json);
+  },
+);

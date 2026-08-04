@@ -97,7 +97,9 @@ export default function QuickLogWateringForm({
   // entry-pinned unit (when a draft is in progress) so the label never
   // disagrees with what the write seam will actually save — mirrors
   // canonicalWaterTempC above.
-  const entryTemperatureUnitSymbol = getTemperatureUnitSymbol(entryTemperatureUnit ?? temperatureUnit);
+  const entryTemperatureUnitSymbol = getTemperatureUnitSymbol(
+    entryTemperatureUnit ?? temperatureUnit,
+  );
   const review = buildWateringReview(value, entryTemperatureUnit ?? temperatureUnit);
 
   return (
@@ -227,7 +229,9 @@ export default function QuickLogWateringForm({
             />
           </div>
           <div>
-            <Label htmlFor="qlv2-water-temp">Water temperature ({entryTemperatureUnitSymbol})</Label>
+            <Label htmlFor="qlv2-water-temp">
+              Water temperature ({entryTemperatureUnitSymbol})
+            </Label>
             <Input
               id="qlv2-water-temp"
               inputMode="decimal"

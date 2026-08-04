@@ -534,9 +534,7 @@ export function buildRootZoneObservationsFromRows(
   rows: readonly RootZoneGrowEventRowLike[] | null | undefined,
   cap: number = ROOT_ZONE_OBSERVATION_CAP,
   manualObservationDiaryRows:
-    | readonly RootZoneManualObservationDiaryRowLike[]
-    | null
-    | undefined = [],
+    readonly RootZoneManualObservationDiaryRowLike[] | null | undefined = [],
 ): RootZoneObservationV1[] {
   const companionIndex = buildRootZoneManualObservationCompanionIndex(manualObservationDiaryRows);
   const observations: RootZoneObservationV1[] = [];

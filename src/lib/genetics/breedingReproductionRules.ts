@@ -67,12 +67,7 @@ export type CrossType =
  * pollen. Stored on pheno_crosses.channel.
  */
 export type Channel =
-  | "natural_male"
-  | "colloidal_silver"
-  | "sts"
-  | "ga3"
-  | "rodelization"
-  | "open_pollination";
+  "natural_male" | "colloidal_silver" | "sts" | "ga3" | "rodelization" | "open_pollination";
 
 /** Reversal treatment methods a grower can record. */
 export type ReversalMethod = "sts" | "colloidal_silver" | "ga3" | "other";
@@ -295,8 +290,7 @@ export interface BreedingCrossInput {
 }
 
 export type BreedingCrossValidation =
-  | { ok: true; offspring: OffspringFeminization; label: string }
-  | { ok: false; reason: string };
+  { ok: true; offspring: OffspringFeminization; label: string } | { ok: false; reason: string };
 
 /**
  * Validate a fully-specified cross (way + channel + parents + generation) and

@@ -15,7 +15,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { BrowserRouter } from "@/lib/react-router-compat";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import Pricing from "@/pages/Pricing";
 import { PRICING, AI_CREDIT_EXPLAINER, TRUST_STRIP } from "@/constants/pricing";
 
@@ -25,18 +25,14 @@ vi.mock("@/lib/pricingAnalytics", () => ({
 }));
 
 // Founder Lifetime left the public pricing grid; it now renders only on an
-// explicit `?plan=founder_lifetime` deep link. BrowserRouter reads the real
-// location, so the deep-link cases set it before rendering.
+// explicit `?plan=founder_lifetime` deep link. MemoryRouter owns the entry so
+// useSearchParams sees the plan preselect (BrowserRouter history tricks flaked).
 function renderPricing({ founderDeepLink = false } = {}) {
-  window.history.replaceState(
-    {},
-    "",
-    founderDeepLink ? "/pricing?plan=founder_lifetime" : "/pricing",
-  );
+  const entry = founderDeepLink ? "/pricing?plan=founder_lifetime" : "/pricing";
   return render(
-    <BrowserRouter>
+    <MemoryRouter initialEntries={[entry]}>
       <Pricing />
-    </BrowserRouter>,
+    </MemoryRouter>,
   );
 }
 

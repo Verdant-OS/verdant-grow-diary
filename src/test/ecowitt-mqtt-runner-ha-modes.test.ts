@@ -339,19 +339,13 @@ describe("ecowitt-mqtt-runner — ha_json end-to-end (dry-run)", () => {
     );
     expect(viaAliases.outcome).toBe("reading");
     expect(viaAliases.readings).toEqual(canonical.readings);
-    expect(viaAliases.readings[0].idempotency_key).toBe(
-      canonical.readings[0].idempotency_key,
-    );
+    expect(viaAliases.readings[0].idempotency_key).toBe(canonical.readings[0].idempotency_key);
   });
 
   it("canonical fields win over aliases when both are present", () => {
     const config = jsonConfig();
     const state = createHaDryRunState(config);
-    const report = feedJson(
-      envelope({ value: "212", unit: "°C" }),
-      state,
-      config,
-    );
+    const report = feedJson(envelope({ value: "212", unit: "°C" }), state, config);
     expect(report.outcome).toBe("reading");
     expect(report.readings[0].value).toBeCloseTo(78.6, 2);
   });

@@ -79,9 +79,7 @@ describe("archivedPlantVisibilityRules", () => {
 
   it("filterVisiblePlants respects showArchived", () => {
     expect(filterVisiblePlants([ACTIVE, ARCHIVED, MERGED])).toEqual([ACTIVE]);
-    expect(
-      filterVisiblePlants([ACTIVE, ARCHIVED, MERGED], { showArchived: true }),
-    ).toHaveLength(3);
+    expect(filterVisiblePlants([ACTIVE, ARCHIVED, MERGED], { showArchived: true })).toHaveLength(3);
   });
 
   it("getActivePlantCount counts only active", () => {
@@ -107,9 +105,7 @@ describe("archivedPlantVisibilityRules", () => {
   });
 
   it("getMergeTargetPlantId extracts uuid from merge marker", () => {
-    expect(getMergeTargetPlantId(MERGED)).toBe(
-      "11111111-1111-1111-1111-111111111111",
-    );
+    expect(getMergeTargetPlantId(MERGED)).toBe("11111111-1111-1111-1111-111111111111");
     expect(getMergeTargetPlantId(ACTIVE)).toBeNull();
     expect(getMergeTargetPlantId({ last_note: "Merged into not-a-uuid" })).toBeNull();
   });
@@ -144,15 +140,11 @@ describe("plantMergeRules archived guards", () => {
   });
 
   it("buildPlantMergePreview emits blocker when source is archived", () => {
-    const p = buildPlantMergePreview(
-      { ...baseSource, is_archived: true },
-      baseTarget,
-      { diaryEntries: 3 },
-    );
+    const p = buildPlantMergePreview({ ...baseSource, is_archived: true }, baseTarget, {
+      diaryEntries: 3,
+    });
     expect(p.recommendedAction).toBe("blocked");
-    expect(p.blockers.some((b) => /already archived or merged/i.test(b))).toBe(
-      true,
-    );
+    expect(p.blockers.some((b) => /already archived or merged/i.test(b))).toBe(true);
   });
 });
 

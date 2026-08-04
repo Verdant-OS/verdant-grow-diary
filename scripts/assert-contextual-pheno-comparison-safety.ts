@@ -33,9 +33,7 @@ function parseArgs(argv: string[]) {
   const args = {
     mode: "changed" as "changed" | "stdin" | "files",
     files: [] as string[],
-    baseRef: process.env.GITHUB_BASE_REF
-      ? `origin/${process.env.GITHUB_BASE_REF}`
-      : "origin/main",
+    baseRef: process.env.GITHUB_BASE_REF ? `origin/${process.env.GITHUB_BASE_REF}` : "origin/main",
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -67,7 +65,10 @@ function getChangedFromGit(baseRef: string): string[] {
         encoding: "utf8",
         stdio: ["ignore", "pipe", "ignore"],
       });
-      return out.split("\n").map((s) => s.trim()).filter(Boolean);
+      return out
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean);
     } catch {
       // try next candidate
     }
@@ -78,7 +79,10 @@ function getChangedFromGit(baseRef: string): string[] {
 function readStdin(): string[] {
   try {
     const buf = readFileSync(0, "utf8");
-    return buf.split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
+    return buf
+      .split(/[,\n]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
   } catch {
     return [];
   }
@@ -96,16 +100,12 @@ if (relevant.length === 0) {
   process.exit(0);
 }
 
-console.log(
-  `Scanning ${relevant.length} changed Contextual Pheno Comparison file(s):`,
-);
+console.log(`Scanning ${relevant.length} changed Contextual Pheno Comparison file(s):`);
 for (const p of relevant) console.log(`  - ${p}`);
 
 const findings = scanChangedFiles(changed);
 if (findings.length === 0) {
-  console.log(
-    "Contextual Pheno Comparison static safety: PASS (changed-file mode).",
-  );
+  console.log("Contextual Pheno Comparison static safety: PASS (changed-file mode).");
   process.exit(0);
 }
 

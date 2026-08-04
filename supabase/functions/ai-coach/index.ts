@@ -79,8 +79,7 @@ function isBoundedTextList(value: unknown): value is string[] {
 }
 
 type ValidatedCoachResult =
-  | { ok: true; result: Record<string, unknown> }
-  | { ok: false; reason: string };
+  { ok: true; result: Record<string, unknown> } | { ok: false; reason: string };
 
 /**
  * Fail-closed parser for fresh and replayed AI Coach results. The provider is

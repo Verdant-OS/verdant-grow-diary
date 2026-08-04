@@ -525,8 +525,8 @@ describe("QuickLogV2Sheet — structured watering", () => {
 
   it("waits for a slow video check before locking and saving Water", async () => {
     let settleVideo:
-      | ((value: { ok: true; mime: string; sizeBytes: number; durationS: number }) => void)
-      | null = null;
+      ((value: { ok: true; mime: string; sizeBytes: number; durationS: number }) => void) | null =
+      null;
     videoValidationMock.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
@@ -561,8 +561,8 @@ describe("QuickLogV2Sheet — structured watering", () => {
 
   it("ignores a stale video probe after close, reopen, and target change", async () => {
     let settleVideo:
-      | ((value: { ok: true; mime: string; sizeBytes: number; durationS: number }) => void)
-      | null = null;
+      ((value: { ok: true; mime: string; sizeBytes: number; durationS: number }) => void) | null =
+      null;
     videoValidationMock.mockImplementationOnce(
       () =>
         new Promise((resolve) => {

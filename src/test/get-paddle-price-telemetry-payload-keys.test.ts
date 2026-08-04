@@ -25,10 +25,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-const SOURCE_PATH = path.resolve(
-  __dirname,
-  "../../supabase/functions/get-paddle-price/index.ts",
-);
+const SOURCE_PATH = path.resolve(__dirname, "../../supabase/functions/get-paddle-price/index.ts");
 const SOURCE = readFileSync(SOURCE_PATH, "utf8");
 
 // Isolate the emitter function body so assertions are scoped to it.
@@ -108,14 +105,7 @@ function extractEmittedKeys(emitterBody: string): string[] {
   return keys;
 }
 
-const EXPECTED_KEYS = [
-  "event",
-  "plan",
-  "reason",
-  "environment",
-  "env_var_configured",
-  "stage",
-];
+const EXPECTED_KEYS = ["event", "plan", "reason", "environment", "env_var_configured", "stage"];
 
 const REQUIRED_OPERATOR_KEYS = ["plan", "stage", "env_var_configured"];
 
@@ -197,12 +187,7 @@ describe("get-paddle-price logCatalogUnavailable — payload key-set guard", () 
     // console.warn once, nothing else — keeps log ingestion deterministic.
     const warnCount = (emitterBody.match(/console\.warn\s*\(/g) ?? []).length;
     expect(warnCount).toBe(1);
-    for (const forbidden of [
-      "console.log",
-      "console.error",
-      "console.info",
-      "console.debug",
-    ]) {
+    for (const forbidden of ["console.log", "console.error", "console.info", "console.debug"]) {
       expect(emitterBody).not.toContain(forbidden);
     }
   });

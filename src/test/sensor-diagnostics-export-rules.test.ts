@@ -43,7 +43,10 @@ describe("diagnostics export", () => {
   });
 
   it("JSON excludes plaintext token even when polluted via cast", () => {
-    const polluted = { ...EXPORT_INPUT, token: { ...EXPORT_INPUT.token, plaintext: PLAINTEXT } as any };
+    const polluted = {
+      ...EXPORT_INPUT,
+      token: { ...EXPORT_INPUT.token, plaintext: PLAINTEXT } as any,
+    };
     const json = diagnosticsExportToJson(polluted);
     expect(json).not.toContain(PLAINTEXT);
     expect(json).not.toContain("plaintext");

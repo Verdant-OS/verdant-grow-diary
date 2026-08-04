@@ -59,9 +59,7 @@ describe("isUuid", () => {
 
 describe("validateSensorReadingPayload UUID guard", () => {
   it("throws clear error for non-UUID tent_id", () => {
-    expect(() => validateSensorReadingPayload(basePayload("t1"))).toThrow(
-      /Select a real tent/,
-    );
+    expect(() => validateSensorReadingPayload(basePayload("t1"))).toThrow(/Select a real tent/);
   });
   it("accepts a real UUID tent_id", () => {
     expect(() => validateSensorReadingPayload(basePayload(REAL_UUID))).not.toThrow();

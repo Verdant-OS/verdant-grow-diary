@@ -22,12 +22,10 @@ export default function OperatorDemoEvidenceChainPreview({
       data-source-label={vm.sourceLabel}
     >
       <header className="space-y-1">
-        <h1 className="text-xl font-semibold">
-          One-Tent Evidence Chain Demo Preview
-        </h1>
+        <h1 className="text-xl font-semibold">One-Tent Evidence Chain Demo Preview</h1>
         <p className="text-sm text-muted-foreground">
-          Read-only operator preview using demo-labeled fixture data. No
-          database writes are performed.
+          Read-only operator preview using demo-labeled fixture data. No database writes are
+          performed.
         </p>
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <Badge
@@ -62,9 +60,7 @@ export default function OperatorDemoEvidenceChainPreview({
               captured {vm.sensorReading.capturedAtLabel}
             </span>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Demo data is not live telemetry.
-          </p>
+          <p className="text-xs text-muted-foreground">Demo data is not live telemetry.</p>
         </CardContent>
       </Card>
 
@@ -74,9 +70,7 @@ export default function OperatorDemoEvidenceChainPreview({
           <CardDescription>{vm.alert.title}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
-          <div className="text-xs text-muted-foreground">
-            Status: {vm.alert.statusLabel}
-          </div>
+          <div className="text-xs text-muted-foreground">Status: {vm.alert.statusLabel}</div>
           <EvidenceLinkageBadges
             events={vm.alert.evidenceRefs}
             surface="alert-review"
@@ -90,9 +84,7 @@ export default function OperatorDemoEvidenceChainPreview({
 
       <Card data-testid="operator-demo-preview-action">
         <CardHeader>
-          <CardTitle className="text-base">
-            Approval-required Action Queue item
-          </CardTitle>
+          <CardTitle className="text-base">Approval-required Action Queue item</CardTitle>
           <CardDescription>{vm.action.title}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
@@ -130,8 +122,7 @@ export default function OperatorDemoEvidenceChainPreview({
         </CardHeader>
         <CardContent className="space-y-1 text-sm">
           <div className="text-xs text-muted-foreground">
-            Stage: {vm.postGrow.growStageLabel} ·{" "}
-            {vm.postGrow.archived ? "Archived" : "Active"}
+            Stage: {vm.postGrow.growStageLabel} · {vm.postGrow.archived ? "Archived" : "Active"}
           </div>
           {vm.postGrow.harvestedAtLabel && (
             <div className="text-xs text-muted-foreground">
@@ -139,8 +130,7 @@ export default function OperatorDemoEvidenceChainPreview({
             </div>
           )}
           <p className="text-xs text-muted-foreground">
-            This fixture represents an eligible post-grow state for walkthrough
-            purposes.
+            This fixture represents an eligible post-grow state for walkthrough purposes.
           </p>
         </CardContent>
       </Card>

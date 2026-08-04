@@ -32,9 +32,7 @@ describe("scannerGuardrailHarness", () => {
   it("exposes the documented timeout + threshold constants", () => {
     expect(SCANNER_GUARDRAIL_TIMEOUT_MS).toBe(30_000);
     expect(SLOW_SCANNER_THRESHOLD_MS).toBe(5_000);
-    expect(SLOW_SCANNER_THRESHOLD_MS).toBeLessThan(
-      SCANNER_GUARDRAIL_TIMEOUT_MS,
-    );
+    expect(SLOW_SCANNER_THRESHOLD_MS).toBeLessThan(SCANNER_GUARDRAIL_TIMEOUT_MS);
   });
 
   it("exposes scannerIt as the scanner-suite test helper", () => {
@@ -100,10 +98,7 @@ describe("scannerGuardrailHarness", () => {
   it("normalizes absolute test file paths to stable repo-relative POSIX paths", () => {
     const row = buildScannerSlowTestReportRow({
       test: "contains zero unsafe references",
-      file: resolve(
-        process.cwd(),
-        "src/test/ecowitt-only-sensor-direction.test.ts",
-      ),
+      file: resolve(process.cwd(), "src/test/ecowitt-only-sensor-direction.test.ts"),
       durationMs: 5_123,
       recordedAt: "2026-06-16T00:00:00.000Z",
     });
@@ -123,10 +118,7 @@ describe("scannerGuardrailHarness", () => {
   });
 
   it("harness source file documents safety constraints", () => {
-    const src = readFileSync(
-      resolve(__dirname, "support/scannerGuardrailHarness.ts"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(__dirname, "support/scannerGuardrailHarness.ts"), "utf8");
     // Soft documentation guardrail — keeps the safety intent visible
     // in the source file itself, so future edits cannot quietly remove it.
     expect(src).toMatch(/INFORMATIONAL ONLY/);
@@ -140,9 +132,7 @@ describe("scannerGuardrailHarness", () => {
     );
     // Sanity: the directory is allowed to not exist yet (only created on
     // first slow test). Just confirm we don't accidentally write into src/.
-    expect(existsSync(resolve(__dirname, "../../src/test-results"))).toBe(
-      false,
-    );
+    expect(existsSync(resolve(__dirname, "../../src/test-results"))).toBe(false);
   });
 
   it("buildScannerSlowTestReportRow produces the stable JSONL row shape", () => {

@@ -26,10 +26,7 @@ describe("explainWebhookNormalizationPayload — source/vendor", () => {
     expect(res.vendor.canonical).toBe("ecowitt");
     expect(res.vendor.lineageOnly).toBe(true);
     expect(res.sanitizedRawPayload.vendor).toBe("ecowitt");
-    expect(res.acceptedMetrics.map((m) => m.alias).sort()).toEqual([
-      "humidity_pct",
-      "temp_c",
-    ]);
+    expect(res.acceptedMetrics.map((m) => m.alias).sort()).toEqual(["humidity_pct", "temp_c"]);
   });
 
   it("normalizes source: 'webhook' + vendor: 'home_assistant'", () => {
@@ -139,8 +136,7 @@ describe("explainWebhookNormalizationPayload — per-metric classification", () 
       captured_at: "2026-06-04T12:00:00Z",
       metrics: { temp_c: 999, humidity_pct: 55 },
     });
-    expect(res.rejectedMetrics.find((m) => m.alias === "temp_c")?.reason)
-      .toMatch(/out of range/);
+    expect(res.rejectedMetrics.find((m) => m.alias === "temp_c")?.reason).toMatch(/out of range/);
     expect(res.acceptedMetrics.map((m) => m.alias)).toContain("humidity_pct");
   });
 
@@ -151,8 +147,9 @@ describe("explainWebhookNormalizationPayload — per-metric classification", () 
       captured_at: "2026-06-04T12:00:00Z",
       metrics: { temp_c: 24, made_up_metric: 1 },
     });
-    expect(res.skippedMetrics.find((m) => m.alias === "made_up_metric")?.reason)
-      .toMatch(/unknown metric alias/i);
+    expect(res.skippedMetrics.find((m) => m.alias === "made_up_metric")?.reason).toMatch(
+      /unknown metric alias/i,
+    );
   });
 
   it("skips null / empty metric values without persisting 0", () => {

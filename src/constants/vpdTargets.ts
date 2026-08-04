@@ -18,18 +18,9 @@
  */
 
 export type CanonicalVpdStageKey =
-  | "seedling"
-  | "early_veg"
-  | "late_veg"
-  | "early_flower"
-  | "mid_late_flower"
-  | "ripening";
+  "seedling" | "early_veg" | "late_veg" | "early_flower" | "mid_late_flower" | "ripening";
 
-export type LegacyVpdStageKey =
-  | "veg"
-  | "preflower"
-  | "flower"
-  | "late_flower";
+export type LegacyVpdStageKey = "veg" | "preflower" | "flower" | "late_flower";
 
 export type VpdStageKey = CanonicalVpdStageKey | LegacyVpdStageKey;
 

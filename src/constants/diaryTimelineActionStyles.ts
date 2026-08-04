@@ -45,13 +45,7 @@ export type DiaryTimelineActionIconName =
  * hex/HSL values.
  */
 export type DiaryTimelineActionTone =
-  | "neutral"
-  | "info"
-  | "primary"
-  | "accent"
-  | "warning"
-  | "success"
-  | "destructive";
+  "neutral" | "info" | "primary" | "accent" | "warning" | "success" | "destructive";
 
 export interface DiaryTimelineActionStyle {
   kind: DiaryTimelineActionKind;
@@ -178,16 +172,15 @@ const STYLES: Record<DiaryTimelineActionKind, DiaryTimelineActionStyle> = {
 
 export const DIARY_TIMELINE_ACTION_STYLES = STYLES;
 
-export const DIARY_TIMELINE_TONE_CLASS: Record<DiaryTimelineActionTone, string> =
-  {
-    neutral: "text-muted-foreground",
-    info: "text-sky-400",
-    primary: "text-primary",
-    accent: "text-violet-400",
-    warning: "text-amber-400",
-    success: "text-emerald-400",
-    destructive: "text-destructive",
-  };
+export const DIARY_TIMELINE_TONE_CLASS: Record<DiaryTimelineActionTone, string> = {
+  neutral: "text-muted-foreground",
+  info: "text-sky-400",
+  primary: "text-primary",
+  accent: "text-violet-400",
+  warning: "text-amber-400",
+  success: "text-emerald-400",
+  destructive: "text-destructive",
+};
 
 export function getDiaryTimelineActionStyle(
   kind: string | null | undefined,

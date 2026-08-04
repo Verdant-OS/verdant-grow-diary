@@ -75,7 +75,9 @@ test.describe("checkoutRecoveryPlanSlug fallback telemetry (browser E2E)", () =>
     const INVALID_PLAN = "totally_bogus_plan_slug_not_in_allowlist";
 
     // Baseline: counter starts at 0 after the test-only reset.
-    const before = await page.evaluate(() => window.__sanitizerModule!.getUnknownPlanSlugFallbackCount());
+    const before = await page.evaluate(() =>
+      window.__sanitizerModule!.getUnknownPlanSlugFallbackCount(),
+    );
     expect(before).toBe(0);
 
     // First call with an invalid plan.

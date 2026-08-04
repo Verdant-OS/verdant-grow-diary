@@ -3,11 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const DOC = readFileSync(
-  join(
-    process.cwd(),
-    "docs",
-    "billing-level-two-supabase-sql-verification-checklist.md",
-  ),
+  join(process.cwd(), "docs", "billing-level-two-supabase-sql-verification-checklist.md"),
   "utf8",
 );
 
@@ -54,12 +50,8 @@ describe("billing level two supabase sql verification checklist doc", () => {
   });
 
   it("includes sanitized operator RPC example calls", () => {
-    expect(DOC).toContain(
-      "public.billing_subscription_update_operator_audit(50)",
-    );
-    expect(DOC).toContain(
-      "public.billing_entitlement_resolution_operator_audit(50)",
-    );
+    expect(DOC).toContain("public.billing_subscription_update_operator_audit(50)");
+    expect(DOC).toContain("public.billing_entitlement_resolution_operator_audit(50)");
   });
 
   it("lists all forbidden sanitized-output fields", () => {

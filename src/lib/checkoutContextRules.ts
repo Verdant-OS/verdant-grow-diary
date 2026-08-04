@@ -76,11 +76,7 @@ export function hasFreshCheckoutContext(
   return age >= 0 && age <= CHECKOUT_CONTEXT_MAX_AGE_MS;
 }
 
-export type CheckoutSuccessView =
-  | "confirmed"
-  | "confirming"
-  | "no_context"
-  | "verification_failed";
+export type CheckoutSuccessView = "confirmed" | "confirming" | "no_context" | "verification_failed";
 
 /**
  * Which state /checkout/success should render:

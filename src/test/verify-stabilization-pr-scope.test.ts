@@ -9,9 +9,7 @@ describe("isAllowedStabilizationPath", () => {
   it("allows harness files", () => {
     expect(isAllowedStabilizationPath("src/test/setup.ts")).toBe(true);
     expect(isAllowedStabilizationPath("vitest.config.ts")).toBe(true);
-    expect(isAllowedStabilizationPath("scripts/sensor-safety-check.mjs")).toBe(
-      true,
-    );
+    expect(isAllowedStabilizationPath("scripts/sensor-safety-check.mjs")).toBe(true);
     expect(isAllowedStabilizationPath("tests/foo.spec.ts")).toBe(true);
     expect(isAllowedStabilizationPath("package.json")).toBe(true);
     expect(isAllowedStabilizationPath("bun.lockb")).toBe(true);
@@ -20,9 +18,7 @@ describe("isAllowedStabilizationPath", () => {
 
   it("blocks docs by default and allows with allowDocs", () => {
     expect(isAllowedStabilizationPath("docs/foo.md")).toBe(false);
-    expect(
-      isAllowedStabilizationPath("docs/foo.md", { allowDocs: true }),
-    ).toBe(true);
+    expect(isAllowedStabilizationPath("docs/foo.md", { allowDocs: true })).toBe(true);
   });
 });
 
@@ -53,18 +49,14 @@ describe("isBlockedStabilizationPath", () => {
   });
 
   it("blocks generic product components", () => {
-    expect(
-      isAllowedStabilizationPath("src/components/SomeProductComponent.tsx"),
-    ).toBe(false);
+    expect(isAllowedStabilizationPath("src/components/SomeProductComponent.tsx")).toBe(false);
   });
 
   it("does not self-block the guard's own test file or script", () => {
-    expect(
-      isBlockedStabilizationPath("src/test/verify-stabilization-pr-scope.test.ts"),
-    ).toBe(false);
-    expect(
-      isBlockedStabilizationPath("scripts/verify-stabilization-pr-scope.mjs"),
-    ).toBe(false);
+    expect(isBlockedStabilizationPath("src/test/verify-stabilization-pr-scope.test.ts")).toBe(
+      false,
+    );
+    expect(isBlockedStabilizationPath("scripts/verify-stabilization-pr-scope.mjs")).toBe(false);
   });
 });
 
@@ -118,10 +110,7 @@ describe("classifyStabilizationPrFiles — staged-mode file lists", () => {
   });
 
   it("blocks a staged set that mixes harness + product page", () => {
-    const r = classifyStabilizationPrFiles([
-      "src/test/setup.ts",
-      "src/pages/PlantDetail.tsx",
-    ]);
+    const r = classifyStabilizationPrFiles(["src/test/setup.ts", "src/pages/PlantDetail.tsx"]);
     expect(r.verdict).toBe("stop-ship");
     expect(r.allowed).toEqual(["src/test/setup.ts"]);
     expect(r.blocked).toEqual(["src/pages/PlantDetail.tsx"]);
@@ -133,9 +122,7 @@ describe("classifyStabilizationPrFiles — staged-mode file lists", () => {
       "supabase/migrations/20260626000000_test.sql",
     ]);
     expect(r.verdict).toBe("stop-ship");
-    expect(r.blocked).toEqual([
-      "supabase/migrations/20260626000000_test.sql",
-    ]);
+    expect(r.blocked).toEqual(["supabase/migrations/20260626000000_test.sql"]);
   });
 
   it("blocks a staged harvest/cure file", () => {
@@ -151,39 +138,29 @@ describe("classifyStabilizationPrFiles — staged-mode file lists", () => {
   });
 
   it("allows staged docs only with allowDocs: true", () => {
-    const blocked = classifyStabilizationPrFiles([
-      "docs/test-stabilization-pr-runbook.md",
-    ]);
+    const blocked = classifyStabilizationPrFiles(["docs/test-stabilization-pr-runbook.md"]);
     expect(blocked.verdict).toBe("stop-ship");
-    const passed = classifyStabilizationPrFiles(
-      ["docs/test-stabilization-pr-runbook.md"],
-      { allowDocs: true },
-    );
+    const passed = classifyStabilizationPrFiles(["docs/test-stabilization-pr-runbook.md"], {
+      allowDocs: true,
+    });
     expect(passed.verdict).toBe("pass");
   });
 });
 
 describe("classifyStabilizationPrFiles — lockfile allowlist", () => {
-  it.each([
-    "package-lock.json",
-    "pnpm-lock.yaml",
-    "yarn.lock",
-    "bun.lock",
-    "bun.lockb",
-  ])("allows lockfile %s on its own", (lock) => {
-    const r = classifyStabilizationPrFiles([lock]);
-    expect(r.verdict).toBe("pass");
-    expect(r.allowed).toEqual([lock]);
-  });
+  it.each(["package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock", "bun.lockb"])(
+    "allows lockfile %s on its own",
+    (lock) => {
+      const r = classifyStabilizationPrFiles([lock]);
+      expect(r.verdict).toBe("pass");
+      expect(r.allowed).toEqual([lock]);
+    },
+  );
 
   it("blocks overall when a product file rides along with a lockfile", () => {
-    const r = classifyStabilizationPrFiles([
-      "package-lock.json",
-      "src/lib/harvestWatchRules.ts",
-    ]);
+    const r = classifyStabilizationPrFiles(["package-lock.json", "src/lib/harvestWatchRules.ts"]);
     expect(r.verdict).toBe("stop-ship");
     expect(r.allowed).toEqual(["package-lock.json"]);
     expect(r.blocked).toEqual(["src/lib/harvestWatchRules.ts"]);
   });
 });
-

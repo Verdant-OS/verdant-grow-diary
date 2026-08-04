@@ -69,8 +69,7 @@ export function findPendingOutcomeReviews(
   const threshold = Number.isFinite(input.thresholdMs as number)
     ? Math.max(0, input.thresholdMs as number)
     : PENDING_OUTCOME_REVIEW_THRESHOLD_MS;
-  const nowMs =
-    typeof input.now === "number" ? input.now : input.now.getTime();
+  const nowMs = typeof input.now === "number" ? input.now : input.now.getTime();
   if (!Number.isFinite(nowMs)) return [];
 
   const actions = input.completedActions ?? [];
@@ -94,8 +93,6 @@ export function findPendingOutcomeReviews(
       hours_since_completed: Math.floor(ageMs / (60 * 60 * 1000)),
     });
   }
-  reviews.sort(
-    (a, b) => Date.parse(a.completed_at) - Date.parse(b.completed_at),
-  );
+  reviews.sort((a, b) => Date.parse(a.completed_at) - Date.parse(b.completed_at));
   return reviews;
 }

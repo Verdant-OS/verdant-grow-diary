@@ -69,9 +69,9 @@ describe("buildCustomerShareAbsoluteUrl", () => {
   });
 
   it("strips a trailing slash on origin", () => {
-    expect(
-      buildCustomerShareAbsoluteUrl("share-abc", "https://example.com/"),
-    ).toBe("https://example.com/customer/share-abc");
+    expect(buildCustomerShareAbsoluteUrl("share-abc", "https://example.com/")).toBe(
+      "https://example.com/customer/share-abc",
+    );
   });
 
   it("returns null when shareId or origin is missing", () => {

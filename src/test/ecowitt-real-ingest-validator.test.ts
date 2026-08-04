@@ -62,10 +62,7 @@ describe("validateEcoWittRealIngestCandidate — identity rules", () => {
 
   it("rejects placeholder tent ID like t1 / demo-tent", () => {
     for (const id of ["t1", "demo-tent", "sample-tent"]) {
-      const r = validateEcoWittRealIngestCandidate(
-        { ...validCandidate(), tent_id: id },
-        OPTIONS,
-      );
+      const r = validateEcoWittRealIngestCandidate({ ...validCandidate(), tent_id: id }, OPTIONS);
       expect(r.blocked_reasons).toContain("non_uuid_tent_id");
     }
   });
@@ -149,10 +146,7 @@ describe("validateEcoWittRealIngestCandidate — identity strings", () => {
 describe("validateEcoWittRealIngestCandidate — source rules", () => {
   for (const src of ["manual", "csv", "demo", "stale", "invalid"] as const) {
     it(`rejects ${src} source for real ingest (never upgraded)`, () => {
-      const r = validateEcoWittRealIngestCandidate(
-        { ...validCandidate(), source: src },
-        OPTIONS,
-      );
+      const r = validateEcoWittRealIngestCandidate({ ...validCandidate(), source: src }, OPTIONS);
       expect(r.source).toBe(src);
       expect(r.accepted).toBe(false);
       expect(r.blocked_reasons).toContain("source_not_live");
@@ -191,7 +185,10 @@ describe("validateEcoWittRealIngestCandidate — required metrics", () => {
   });
 
   it("rejects invalid humidity_pct (>100)", () => {
-    const c = { ...validCandidate(), readings: { ...validCandidate().readings, humidity_pct: 150 } };
+    const c = {
+      ...validCandidate(),
+      readings: { ...validCandidate().readings, humidity_pct: 150 },
+    };
     const r = validateEcoWittRealIngestCandidate(c, OPTIONS);
     expect(r.blocked_reasons).toContain("invalid_metric:humidity_pct");
   });
@@ -205,14 +202,20 @@ describe("validateEcoWittRealIngestCandidate — suspicious values", () => {
   });
 
   it("flags humidity stuck at 100", () => {
-    const c = { ...validCandidate(), readings: { ...validCandidate().readings, humidity_pct: 100 } };
+    const c = {
+      ...validCandidate(),
+      readings: { ...validCandidate().readings, humidity_pct: 100 },
+    };
     const r = validateEcoWittRealIngestCandidate(c, OPTIONS);
     expect(r.blocked_reasons).toContain("suspicious_value:humidity_stuck_0_or_100");
   });
 
   it("flags soil moisture stuck at 0 or 100", () => {
     for (const v of [0, 100]) {
-      const c = { ...validCandidate(), readings: { ...validCandidate().readings, soil_water_content_pct: v } };
+      const c = {
+        ...validCandidate(),
+        readings: { ...validCandidate().readings, soil_water_content_pct: v },
+      };
       const r = validateEcoWittRealIngestCandidate(c, OPTIONS);
       expect(r.blocked_reasons).toContain("suspicious_value:soil_moisture_stuck_0_or_100");
     }
@@ -258,9 +261,7 @@ describe("validateEcoWittRealIngestCandidate — determinism / safety", () => {
   });
 
   it("returns blocked result for malformed input instead of throwing", () => {
-    expect(() =>
-      validateEcoWittRealIngestCandidate(null, OPTIONS),
-    ).not.toThrow();
+    expect(() => validateEcoWittRealIngestCandidate(null, OPTIONS)).not.toThrow();
     const r1 = validateEcoWittRealIngestCandidate(null, OPTIONS);
     expect(r1.accepted).toBe(false);
     expect(r1.blocked_reasons.length).toBeGreaterThan(0);

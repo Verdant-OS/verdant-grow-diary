@@ -31,11 +31,7 @@
 import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
 
 export type PlanIntentId =
-  | "pro_monthly"
-  | "pro_annual"
-  | "craft_monthly"
-  | "craft_annual"
-  | "founder_lifetime";
+  "pro_monthly" | "pro_annual" | "craft_monthly" | "craft_annual" | "founder_lifetime";
 
 const KNOWN_PLAN_INTENTS: ReadonlyArray<PlanIntentId> = [
   "pro_monthly",

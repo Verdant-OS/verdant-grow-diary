@@ -75,11 +75,7 @@ export interface FirstRunChecklistProps {
 }
 
 export default function FirstRunChecklist(props: FirstRunChecklistProps) {
-  const isDismissed = useSyncExternalStore(
-    subscribe,
-    readDismissed,
-    () => false,
-  );
+  const isDismissed = useSyncExternalStore(subscribe, readDismissed, () => false);
   const dismiss = useCallback(() => writeDismissed(true), []);
   const restore = useCallback(() => writeDismissed(false), []);
 
@@ -165,15 +161,9 @@ export default function FirstRunChecklist(props: FirstRunChecklistProps) {
               className="flex items-start gap-3 rounded-lg border border-border/40 bg-card/40 p-3"
             >
               {s.state === "complete" ? (
-                <CheckCircle2
-                  className="h-4 w-4 text-primary mt-0.5"
-                  aria-label="complete"
-                />
+                <CheckCircle2 className="h-4 w-4 text-primary mt-0.5" aria-label="complete" />
               ) : (
-                <Circle
-                  className="h-4 w-4 text-muted-foreground mt-0.5"
-                  aria-label="incomplete"
-                />
+                <Circle className="h-4 w-4 text-muted-foreground mt-0.5" aria-label="incomplete" />
               )}
               <div className="flex-1 min-w-0">
                 <div
@@ -186,9 +176,7 @@ export default function FirstRunChecklist(props: FirstRunChecklistProps) {
                     </span>
                   )}
                 </div>
-                <div className="text-xs text-muted-foreground mt-0.5">
-                  {s.description}
-                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">{s.description}</div>
               </div>
               {s.state !== "complete" && (
                 <Link to={s.href} className="shrink-0">

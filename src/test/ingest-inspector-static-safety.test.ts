@@ -9,6 +9,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { stripSourceComments } from "@/test/utils/stripSourceComments";
+import { readAllRouteModuleSources } from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => stripSourceComments(readFileSync(resolve(ROOT, p), "utf8"));
@@ -63,8 +64,8 @@ describe("ingest inspector — static safety", () => {
     expect(page).not.toContain("recent sensor webhook readings");
   });
 
-  it("App.tsx wires the /ingest-inspector route", () => {
-    const app = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+  it("File routes wire the /ingest-inspector route", () => {
+    const app = readAllRouteModuleSources();
     expect(app).toMatch(/\/ingest-inspector/);
     expect(app).toMatch(/IngestInspector/);
   });

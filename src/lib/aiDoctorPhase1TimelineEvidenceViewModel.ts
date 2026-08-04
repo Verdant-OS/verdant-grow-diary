@@ -4,14 +4,10 @@ import {
   AI_DOCTOR_PHASE1_TIMELINE_KIND,
 } from "@/lib/aiDoctorPhase1TimelineDraft";
 
-export const AI_DOCTOR_PHASE1_TIMELINE_BADGE_PRIMARY =
-  "AI Doctor Phase 1" as const;
-export const AI_DOCTOR_PHASE1_TIMELINE_BADGE_EVIDENCE_ONLY =
-  "Evidence only" as const;
-export const AI_DOCTOR_PHASE1_TIMELINE_SOURCE_LABEL =
-  "AI Doctor Phase 1" as const;
-export const AI_DOCTOR_PHASE1_TIMELINE_REVIEW_BASE_PATH =
-  "/operator/ai-doctor-phase1" as const;
+export const AI_DOCTOR_PHASE1_TIMELINE_BADGE_PRIMARY = "AI Doctor Phase 1" as const;
+export const AI_DOCTOR_PHASE1_TIMELINE_BADGE_EVIDENCE_ONLY = "Evidence only" as const;
+export const AI_DOCTOR_PHASE1_TIMELINE_SOURCE_LABEL = "AI Doctor Phase 1" as const;
+export const AI_DOCTOR_PHASE1_TIMELINE_REVIEW_BASE_PATH = "/operator/ai-doctor-phase1" as const;
 
 export interface AiDoctorPhase1TimelineEvidenceEventInput {
   id?: string | null;
@@ -75,9 +71,7 @@ function asStringArray(value: unknown): string[] {
   return out;
 }
 
-export function formatAiDoctorPhase1TimelineSavedAt(
-  iso: string | null | undefined,
-): string | null {
+export function formatAiDoctorPhase1TimelineSavedAt(iso: string | null | undefined): string | null {
   if (typeof iso !== "string" || iso.length === 0) return null;
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return null;
@@ -146,8 +140,7 @@ export function buildAiDoctorPhase1TimelineEvidenceViewModel(
   const plantId = asString(event!.plant_id);
   const growId = asString(event!.grow_id);
   const tentId = asString(event!.tent_id);
-  const occurredAt =
-    asString(event!.occurred_at) ?? asString(event!.entry_at) ?? null;
+  const occurredAt = asString(event!.occurred_at) ?? asString(event!.entry_at) ?? null;
   const savedAtLabel = formatAiDoctorPhase1TimelineSavedAt(occurredAt);
 
   return {

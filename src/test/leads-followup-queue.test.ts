@@ -52,9 +52,7 @@ describe("needs-action classification", () => {
     expect(isNeedsAction(lead({ id: "a", status: "new" }), NOW)).toBe(true);
   });
   it("status=reviewed with no contacted_at is needs action", () => {
-    expect(
-      isNeedsAction(lead({ id: "b", status: "reviewed" }), NOW),
-    ).toBe(true);
+    expect(isNeedsAction(lead({ id: "b", status: "reviewed" }), NOW)).toBe(true);
   });
   it("status=reviewed with contacted_at is NOT needs action", () => {
     expect(
@@ -97,9 +95,7 @@ describe("needs-action classification", () => {
     expect(isNeedsAction(lead({ id: "g", status: "spam" }), NOW)).toBe(false);
   });
   it("missing follow_up_at on follow_up is safe (not needs action)", () => {
-    expect(
-      isNeedsAction(lead({ id: "h", status: "follow_up" }), NOW),
-    ).toBe(false);
+    expect(isNeedsAction(lead({ id: "h", status: "follow_up" }), NOW)).toBe(false);
   });
 });
 
@@ -194,9 +190,7 @@ describe("summary + deterministic sorting", () => {
   it("All filter preserves newest-first by created_at", () => {
     const all = filterAndSortLeads(leads, "all", NOW);
     const created = all.map((l) => l.created_at);
-    const sorted = [...created].sort((a, b) =>
-      new Date(b).getTime() - new Date(a).getTime(),
-    );
+    const sorted = [...created].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
     expect(created).toEqual(sorted);
   });
 
@@ -205,7 +199,12 @@ describe("summary + deterministic sorting", () => {
     // Should be: overdue follow_up (id 3) first, then the two news (no follow_up_at) at end.
     expect(out[0].id).toBe("3");
     // News have no follow_up_at — they go after the dated one.
-    expect(out.slice(1).map((l) => l.id).sort()).toEqual(["1", "2"]);
+    expect(
+      out
+        .slice(1)
+        .map((l) => l.id)
+        .sort(),
+    ).toEqual(["1", "2"]);
   });
 
   it("Follow-Up filter sorts overdue, then due today, then upcoming, then missing", () => {
@@ -275,10 +274,11 @@ describe("no new RLS policies for the follow-up queue", () => {
       .filter((f) => f.endsWith(".sql"))
       .sort();
     // Capture all policies ever defined on leads; this PR must not add new ones.
-    const allPolicies = files
-      .map((f) => readFileSync(resolve(dir, f), "utf8"))
-      .join("\n")
-      .match(/CREATE POLICY[^;]*ON\s+public\.leads[^;]*;/gi) ?? [];
+    const allPolicies =
+      files
+        .map((f) => readFileSync(resolve(dir, f), "utf8"))
+        .join("\n")
+        .match(/CREATE POLICY[^;]*ON\s+public\.leads[^;]*;/gi) ?? [];
     // Sanity: prior PRs already established operator INSERT/SELECT/UPDATE policies.
     expect(allPolicies.length).toBeGreaterThan(0);
     for (const p of allPolicies) {

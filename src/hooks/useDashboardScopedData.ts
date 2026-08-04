@@ -57,9 +57,7 @@ export interface UseDashboardScopedData {
   pending: PendingState;
 }
 
-export function useDashboardScopedData(
-  growId: string | null | undefined,
-): UseDashboardScopedData {
+export function useDashboardScopedData(growId: string | null | undefined): UseDashboardScopedData {
   const { user } = useAuth();
   const [recent, setRecent] = useState<RecentState>({ status: "idle" });
   const [pending, setPending] = useState<PendingState>({ status: "idle" });
@@ -93,9 +91,7 @@ export function useDashboardScopedData(
           .limit(5),
         supabase
           .from("action_queue_events")
-          .select(
-            "id,action_queue_id,event_type,previous_status,new_status,note,created_at",
-          )
+          .select("id,action_queue_id,event_type,previous_status,new_status,note,created_at")
           .eq("grow_id", growId)
           .order("created_at", { ascending: false })
           .limit(5),
@@ -136,9 +132,7 @@ export function useDashboardScopedData(
         });
 
         const actionIds = Array.from(
-          new Set(
-            (eventsRes.data ?? []).map((e) => e.action_queue_id).filter(Boolean),
-          ),
+          new Set((eventsRes.data ?? []).map((e) => e.action_queue_id).filter(Boolean)),
         );
         let parents: Record<string, { suggested_change: string; reason: string }> = {};
         if (actionIds.length > 0) {
@@ -179,9 +173,7 @@ export function useDashboardScopedData(
     try {
       const { data, error } = await supabase
         .from("action_queue")
-        .select(
-          "id,risk_level,suggested_change,reason,created_at,status,tent_id,plant_id,source",
-        )
+        .select("id,risk_level,suggested_change,reason,created_at,status,tent_id,plant_id,source")
         .eq("grow_id", growId)
         .eq("status", "pending_approval")
         .order("created_at", { ascending: false })

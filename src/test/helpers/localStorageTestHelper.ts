@@ -46,8 +46,7 @@ function ensureLocalStorage(): Storage {
     );
   }
   try {
-    const existing = (window as unknown as { localStorage?: Storage })
-      .localStorage;
+    const existing = (window as unknown as { localStorage?: Storage }).localStorage;
     if (existing && typeof existing.setItem === "function") {
       return existing;
     }

@@ -51,9 +51,7 @@ export function evaluateCreateBindingRetryGate(input: {
       ? Math.max(0, Math.floor(input.cooldownMs))
       : CREATE_BINDING_RETRY_COOLDOWN_MS;
   const now =
-    typeof input.nowMs === "number" && Number.isFinite(input.nowMs)
-      ? Math.floor(input.nowMs)
-      : 0;
+    typeof input.nowMs === "number" && Number.isFinite(input.nowMs) ? Math.floor(input.nowMs) : 0;
 
   if (input.inFlight) {
     return {

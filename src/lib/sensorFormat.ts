@@ -88,9 +88,7 @@ export function formatSensorValue(
   }
   const digits = sensorFieldDecimals(field);
   const isTemp = TEMPERATURE_FIELDS.has(field as SensorFieldKey);
-  const unit = isTemp
-    ? getTemperatureUnitSymbol()
-    : (UNIT_BY_FIELD[field as SensorFieldKey] ?? "");
+  const unit = isTemp ? getTemperatureUnitSymbol() : (UNIT_BY_FIELD[field as SensorFieldKey] ?? "");
   const display = isTemp
     ? (convertCelsiusForDisplay(value as number) as number)
     : (value as number);

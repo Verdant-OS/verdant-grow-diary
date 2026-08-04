@@ -28,16 +28,19 @@ const SCRIPT_PATH = resolve(ROOT, "scripts/run-grow-tent-restore-verification.ts
 const DOC_PATH = resolve(ROOT, "docs/grow-tent-restore-verification.md");
 const LIB_PATH = resolve(ROOT, "src/lib/growTentRestoreVerification.ts");
 
-const FULL_COUNTS = Object.fromEntries(
-  VERIFICATION_COUNT_TABLES.map((t) => [t, 5]),
-) as Record<(typeof VERIFICATION_COUNT_TABLES)[number], number>;
+const FULL_COUNTS = Object.fromEntries(VERIFICATION_COUNT_TABLES.map((t) => [t, 5])) as Record<
+  (typeof VERIFICATION_COUNT_TABLES)[number],
+  number
+>;
 
 describe("growTentRestoreVerification — SQL builders are SELECT-only", () => {
   it("count SQL is SELECT-only and whitelisted", () => {
     for (const t of VERIFICATION_COUNT_TABLES) {
       const sql = buildCountSql(t);
       expect(sql).toMatch(new RegExp(`FROM public\\.${t}\\b`));
-      expect(sql).not.toMatch(/\b(INSERT|UPDATE|DELETE|UPSERT|TRUNCATE|ALTER|DROP|CREATE|GRANT)\b/i);
+      expect(sql).not.toMatch(
+        /\b(INSERT|UPDATE|DELETE|UPSERT|TRUNCATE|ALTER|DROP|CREATE|GRANT)\b/i,
+      );
     }
     // @ts-expect-error – runtime guard
     expect(() => buildCountSql("auth.users")).toThrow();
@@ -48,7 +51,9 @@ describe("growTentRestoreVerification — SQL builders are SELECT-only", () => {
       const sql = buildOrphanGrowSql(t);
       expect(sql).toMatch(/LEFT JOIN public\.grows/);
       expect(sql).toMatch(/g\.id IS NULL/);
-      expect(sql).not.toMatch(/\b(INSERT|UPDATE|DELETE|UPSERT|TRUNCATE|ALTER|DROP|CREATE|GRANT)\b/i);
+      expect(sql).not.toMatch(
+        /\b(INSERT|UPDATE|DELETE|UPSERT|TRUNCATE|ALTER|DROP|CREATE|GRANT)\b/i,
+      );
     }
   });
 
@@ -57,7 +62,9 @@ describe("growTentRestoreVerification — SQL builders are SELECT-only", () => {
       const sql = buildOrphanTentSql(t);
       expect(sql).toMatch(/LEFT JOIN public\.tents/);
       expect(sql).toMatch(/t\.id IS NULL/);
-      expect(sql).not.toMatch(/\b(INSERT|UPDATE|DELETE|UPSERT|TRUNCATE|ALTER|DROP|CREATE|GRANT)\b/i);
+      expect(sql).not.toMatch(
+        /\b(INSERT|UPDATE|DELETE|UPSERT|TRUNCATE|ALTER|DROP|CREATE|GRANT)\b/i,
+      );
     }
   });
 });

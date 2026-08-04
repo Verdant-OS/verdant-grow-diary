@@ -28,8 +28,7 @@ export interface LeadCommandCenterLayout {
   sections: LeadCommandCenterSection[];
 }
 
-export const LEAD_COMMAND_CENTER_LAYOUT_STORAGE_KEY =
-  "verdant.leads.commandCenterLayout.v1";
+export const LEAD_COMMAND_CENTER_LAYOUT_STORAGE_KEY = "verdant.leads.commandCenterLayout.v1";
 
 export const DEFAULT_SECTION_ORDER: readonly LeadCommandCenterSectionId[] = [
   "executive_summary",
@@ -81,9 +80,7 @@ interface RawSection {
  *  - repair missing sections by appending in default order
  *  - reset order indices contiguously
  */
-export function sanitizeLeadCommandCenterLayout(
-  raw: unknown,
-): LeadCommandCenterLayout {
+export function sanitizeLeadCommandCenterLayout(raw: unknown): LeadCommandCenterLayout {
   if (!raw || typeof raw !== "object") return defaultLeadCommandCenterLayout();
   const obj = raw as { sections?: unknown };
   if (!Array.isArray(obj.sections)) return defaultLeadCommandCenterLayout();
@@ -142,9 +139,7 @@ export function toggleSectionCollapsed(
   id: LeadCommandCenterSectionId,
 ): LeadCommandCenterLayout {
   return {
-    sections: layout.sections.map((s) =>
-      s.id === id ? { ...s, collapsed: !s.collapsed } : s,
-    ),
+    sections: layout.sections.map((s) => (s.id === id ? { ...s, collapsed: !s.collapsed } : s)),
   };
 }
 
@@ -176,9 +171,7 @@ export function loadLeadCommandCenterLayout(
  * Serialize ONLY UI layout preferences. Never includes lead data,
  * derived analytics, names, emails, notes, or any lead fields.
  */
-export function serializeLeadCommandCenterLayout(
-  layout: LeadCommandCenterLayout,
-): string {
+export function serializeLeadCommandCenterLayout(layout: LeadCommandCenterLayout): string {
   return JSON.stringify({
     sections: layout.sections.map((s) => ({
       id: s.id,

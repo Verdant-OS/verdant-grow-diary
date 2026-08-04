@@ -59,21 +59,13 @@ export interface LinkedActionsViewModel {
 }
 
 /** Statuses considered "open" for back-link surfacing on the session page. */
-export const OPEN_LINKED_ACTION_STATUSES = [
-  "pending_approval",
-  "approved",
-  "simulated",
-] as const;
+export const OPEN_LINKED_ACTION_STATUSES = ["pending_approval", "approved", "simulated"] as const;
 export type OpenLinkedActionStatus = (typeof OPEN_LINKED_ACTION_STATUSES)[number];
 
 export function isOpenLinkedActionStatus(
   status: string | null | undefined,
 ): status is OpenLinkedActionStatus {
-  return (
-    status === "pending_approval" ||
-    status === "approved" ||
-    status === "simulated"
-  );
+  return status === "pending_approval" || status === "approved" || status === "simulated";
 }
 
 export function buildFocusHref(actionId: string): string {

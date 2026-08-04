@@ -20,10 +20,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, within, cleanup } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import PhenoComparison from "@/pages/PhenoComparison";
-import {
-  PHENO_COMPARISON_SENSOR_SOURCES,
-  PHENO_SOURCE_LEGEND,
-} from "@/lib/phenoComparisonRules";
+import { PHENO_COMPARISON_SENSOR_SOURCES, PHENO_SOURCE_LEGEND } from "@/lib/phenoComparisonRules";
 
 // Safety: if the page ever tries to touch supabase, blow up loudly.
 vi.mock("@/integrations/supabase/client", () => ({
@@ -74,15 +71,11 @@ describe("PhenoComparison hardening", () => {
   it("renders missing-photo and missing-diary flags on incomplete candidates", () => {
     renderAt("/pheno-comparison");
     // Bravo lacks photos.
-    expect(
-      screen.getByTestId("pheno-candidate-demo-cand-bravo-no-photo"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("pheno-candidate-demo-cand-bravo-no-photo")).toBeInTheDocument();
     // Charlie lacks photos and diary entries.
     const charlie = screen.getByTestId("pheno-candidate-demo-cand-charlie");
     expect(
-      within(charlie).getByTestId(
-        "pheno-candidate-demo-cand-charlie-no-photo",
-      ),
+      within(charlie).getByTestId("pheno-candidate-demo-cand-charlie-no-photo"),
     ).toBeInTheDocument();
     expect(within(charlie).getByTestId("missing-no_diary")).toBeInTheDocument();
   });
@@ -91,9 +84,7 @@ describe("PhenoComparison hardening", () => {
     renderAt("/pheno-comparison");
     const bravo = screen.getByTestId("pheno-candidate-demo-cand-bravo");
     expect(within(bravo).getAllByText(/Stale/i).length).toBeGreaterThan(0);
-    expect(
-      within(bravo).getByTestId("snapshot-sn-b-2-missing-stale_reading"),
-    ).toBeInTheDocument();
+    expect(within(bravo).getByTestId("snapshot-sn-b-2-missing-stale_reading")).toBeInTheDocument();
 
     const charlie = screen.getByTestId("pheno-candidate-demo-cand-charlie");
     expect(within(charlie).getAllByText(/Invalid/i).length).toBeGreaterThan(0);
@@ -105,15 +96,11 @@ describe("PhenoComparison hardening", () => {
     expect(banner).toHaveTextContent(/demo/i);
     expect(banner).toHaveTextContent(/not live/i);
 
-    const caveat = screen.getByTestId(
-      "pheno-comparison-confidence-caveat",
-    );
+    const caveat = screen.getByTestId("pheno-comparison-confidence-caveat");
     expect(caveat).toHaveTextContent(/confidence/i);
     expect(caveat).toHaveTextContent(/evidence/i);
 
-    expect(
-      screen.getByTestId("pheno-comparison-read-only-badge"),
-    ).toHaveTextContent(/read-only/i);
+    expect(screen.getByTestId("pheno-comparison-read-only-badge")).toHaveTextContent(/read-only/i);
   });
 
   it("legend surfaces all six allowed sensor sources", () => {

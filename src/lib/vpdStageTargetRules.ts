@@ -26,21 +26,10 @@
 import { normalizePlantType, type PlantType } from "@/lib/plantTypeRules";
 
 export type VpdStage =
-  | "seedling"
-  | "veg"
-  | "preflower"
-  | "flower"
-  | "late_flower"
-  | "harvest"
-  | "unknown";
+  "seedling" | "veg" | "preflower" | "flower" | "late_flower" | "harvest" | "unknown";
 
 export type VpdClassification =
-  | "below_target"
-  | "in_target"
-  | "above_target"
-  | "unavailable"
-  | "stage_unknown"
-  | "context_only";
+  "below_target" | "in_target" | "above_target" | "unavailable" | "stage_unknown" | "context_only";
 
 export interface VpdTargetBand {
   stage: VpdStage;
@@ -87,7 +76,10 @@ const STAGE_LABEL: Record<VpdStage, string> = {
   unknown: "Stage unknown",
 };
 
-const BAND_TABLE: Record<VpdStage, { min: number | null; max: number | null; helper: string; contextOnly: boolean }> = {
+const BAND_TABLE: Record<
+  VpdStage,
+  { min: number | null; max: number | null; helper: string; contextOnly: boolean }
+> = {
   seedling: {
     min: 0.4,
     max: 0.8,
@@ -134,7 +126,10 @@ const BAND_TABLE: Record<VpdStage, { min: number | null; max: number | null; hel
 
 export function normalizeVpdStage(input: string | null | undefined | VpdStage): VpdStage {
   if (!input) return "unknown";
-  const s = String(input).trim().toLowerCase().replace(/[\s-]+/g, "_");
+  const s = String(input)
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
   switch (s) {
     case "seedling":
     case "seed":
@@ -279,9 +274,7 @@ export function classifyVpdAgainstStage(input: {
 }
 
 /** MetricChip-compatible status mapping. Stale -> warn (never "ok"). */
-export function vpdMetricChipStatus(
-  result: VpdClassificationResult,
-): "ok" | "warn" | "bad" {
+export function vpdMetricChipStatus(result: VpdClassificationResult): "ok" | "warn" | "bad" {
   if (result.stale) return "warn";
   switch (result.classification) {
     case "in_target":

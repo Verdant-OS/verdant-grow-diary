@@ -83,9 +83,7 @@ function isKnownTempUnit(u: unknown): u is TempUnit {
   return u === "C" || u === "F";
 }
 
-export function computeEcCompensation(
-  input: EcCompensationInput,
-): EcCompensationResult {
+export function computeEcCompensation(input: EcCompensationInput): EcCompensationResult {
   const warnings: string[] = [];
   const source = (input.sourceLabel ?? "").toLowerCase();
 

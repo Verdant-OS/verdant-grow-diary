@@ -25,34 +25,15 @@ export const RELEASE_RECEIPT_SCHEMA_VERSION = "release-receipt.v1" as const;
 
 export type ReleaseReceiptSchemaVersion = typeof RELEASE_RECEIPT_SCHEMA_VERSION;
 
-export type ReleaseReceiptSource =
-  | "github_actions"
-  | "local_parser"
-  | "manual_import";
+export type ReleaseReceiptSource = "github_actions" | "local_parser" | "manual_import";
 
-export type ReleaseReceiptKind =
-  | "ci_full_suite"
-  | "local_targeted"
-  | "manual_operator_note";
+export type ReleaseReceiptKind = "ci_full_suite" | "local_targeted" | "manual_operator_note";
 
-export type ReleaseReceiptStatus =
-  | "pass"
-  | "fail"
-  | "blocked"
-  | "pending"
-  | "unknown";
+export type ReleaseReceiptStatus = "pass" | "fail" | "blocked" | "pending" | "unknown";
 
-export type ReleaseReceiptCommandStatus =
-  | "pass"
-  | "fail"
-  | "blocked"
-  | "skipped"
-  | "unknown";
+export type ReleaseReceiptCommandStatus = "pass" | "fail" | "blocked" | "skipped" | "unknown";
 
-export type ReleaseReceiptBlockerSeverity =
-  | "release_blocker"
-  | "warning"
-  | "info";
+export type ReleaseReceiptBlockerSeverity = "release_blocker" | "warning" | "info";
 
 export interface ReleaseReceiptCommandResult {
   name: string;
@@ -150,11 +131,19 @@ export const RELEASE_RECEIPT_STATUSES: readonly ReleaseReceiptStatus[] = [
   "unknown",
 ];
 
-export const RELEASE_RECEIPT_COMMAND_STATUSES: readonly ReleaseReceiptCommandStatus[] =
-  ["pass", "fail", "blocked", "skipped", "unknown"];
+export const RELEASE_RECEIPT_COMMAND_STATUSES: readonly ReleaseReceiptCommandStatus[] = [
+  "pass",
+  "fail",
+  "blocked",
+  "skipped",
+  "unknown",
+];
 
-export const RELEASE_RECEIPT_BLOCKER_SEVERITIES: readonly ReleaseReceiptBlockerSeverity[] =
-  ["release_blocker", "warning", "info"];
+export const RELEASE_RECEIPT_BLOCKER_SEVERITIES: readonly ReleaseReceiptBlockerSeverity[] = [
+  "release_blocker",
+  "warning",
+  "info",
+];
 
 // ---------------------------------------------------------------------------
 // Parser result union (discriminated by `ok`).
@@ -186,7 +175,4 @@ export type ParsedReleaseReceiptFailure = {
   warnings: string[];
 };
 
-export type ParsedReleaseReceiptResult =
-  | ParsedReleaseReceiptSuccess
-  | ParsedReleaseReceiptFailure;
-
+export type ParsedReleaseReceiptResult = ParsedReleaseReceiptSuccess | ParsedReleaseReceiptFailure;

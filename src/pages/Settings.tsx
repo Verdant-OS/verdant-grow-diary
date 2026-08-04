@@ -617,7 +617,18 @@ export default function Settings() {
           </Button>
         </Tile>
 
+        <Tile name="Analytics consent" state="available">
+          <p className="text-sm text-muted-foreground mb-3">
+            See whether analytics is currently on for this browser, and grant or revoke it at
+            any time. Your grow data is never sent to analytics.
+          </p>
+          <Button asChild size="sm" data-testid="analytics-consent-settings-link">
+            <Link to="/settings/analytics">Open analytics consent</Link>
+          </Button>
+        </Tile>
+
         <DeleteAccountTile />
+
       </div>
     </div>
   );

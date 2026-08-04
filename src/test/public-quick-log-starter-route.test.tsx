@@ -1,36 +1,40 @@
 /**
  * Public Quick Log Starter — route / manifest / SEO-surface registration.
  *
- * Pins every list the /quick-log route must live in: App.tsx mounting
- * (public block, OUTSIDE AppShell), the route manifest (access "public"),
+ * Pins every list the /quick-log route must live in: file-route mounting
+ * (public block, OUTSIDE AppShell /_app), the route manifest (access "public"),
  * the mobile-e2e public list, sitemap.xml, llms.txt, and robots.txt
- * non-disallowal. Registration style mirrors pricing.test.ts.
+ * non-disallowal.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
+import {
+  extractMountedAppRoutePaths,
+  isMountedUnderAppShell,
+  readAllRouteModuleSources,
+  readRouteModuleSourceForPath,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
-const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+const APP = readAllRouteModuleSources();
 
-describe("App.tsx mounting", () => {
-  it("lazy-imports the starter page", () => {
-    expect(APP).toMatch(
-      /const QuickLogStarter = lazy\(\(\) => import\("\.\/pages\/QuickLogStarter"\)\);/,
-    );
+describe("file-route mounting", () => {
+  it("imports the starter page", () => {
+    const mod = readRouteModuleSourceForPath("/quick-log") ?? "";
+    expect(mod).toMatch(/QuickLogStarter|@\/pages\/QuickLogStarter|pages\/QuickLogStarter/);
   });
 
   it("mounts the literal /quick-log route", () => {
-    expect(APP).toMatch(/<Route path="\/quick-log" element={<QuickLogStarter \/>} \/>/);
+    expect(extractMountedAppRoutePaths()).toContain("/quick-log");
   });
 
   it("mounts it OUTSIDE the AppShell-protected block", () => {
-    const routeIdx = APP.indexOf('path="/quick-log"');
-    const shellIdx = APP.indexOf("<Route element={<AppShell />}>");
-    expect(routeIdx).toBeGreaterThan(-1);
-    expect(shellIdx).toBeGreaterThan(-1);
-    expect(routeIdx, "starter route must precede the AppShell block").toBeLessThan(shellIdx);
+    // Public routes live outside /_app layout.
+    expect(isMountedUnderAppShell("/quick-log")).toBe(false);
+    const mod = readRouteModuleSourceForPath("/quick-log") ?? "";
+    expect(mod).toMatch(/createFileRoute\(\s*["']\/quick-log["']\s*\)/);
   });
 });
 

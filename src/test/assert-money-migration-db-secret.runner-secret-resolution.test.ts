@@ -81,9 +81,7 @@ describe("SUPABASE_DB_URL_SANDBOX resolution — runner-shaped values", () => {
       it(`${label} → exits 1 and names SUPABASE_DB_URL_SANDBOX`, () => {
         const result = run(env);
         expect(result.status).toBe(1);
-        expect(result.stderr).toMatch(
-          /::error title=SUPABASE_DB_URL_SANDBOX missing::/,
-        );
+        expect(result.stderr).toMatch(/::error title=SUPABASE_DB_URL_SANDBOX missing::/);
         expect(result.stderr).toContain("SUPABASE_DB_URL_SANDBOX");
         expect(result.stderr).toContain("Do NOT deploy");
       });

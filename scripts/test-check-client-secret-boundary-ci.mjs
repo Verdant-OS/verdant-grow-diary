@@ -46,9 +46,7 @@ t("parseArgs falls back to defaults", () => {
 });
 
 t("sanitizeLine redacts JWT-shaped tokens", () => {
-  const out = sanitizeLine(
-    "auth: eyJabcdefghij.klmnopqrstuv.wxyz1234567890ZZZZ trailing",
-  );
+  const out = sanitizeLine("auth: eyJabcdefghij.klmnopqrstuv.wxyz1234567890ZZZZ trailing");
   assert.ok(out.includes("[redacted-jwt]"));
   assert.ok(!out.includes("eyJabcdefghij"));
 });
@@ -72,7 +70,12 @@ t("sanitizeLine clamps overly long lines", () => {
 t("summarizeRun PASSes only when run completed/success + both markers present", () => {
   const s = summarizeRun({
     workflow: "ci.yml",
-    run: { status: "completed", conclusion: "success", headSha: "abc123def4567890", url: "https://x" },
+    run: {
+      status: "completed",
+      conclusion: "success",
+      headSha: "abc123def4567890",
+      url: "https://x",
+    },
     hasGuardStep: true,
     hasGuardOk: true,
   });

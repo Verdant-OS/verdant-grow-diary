@@ -19,10 +19,7 @@ import {
   type ConsistencyInput,
   type TodayCheckMethod,
 } from "@/lib/dailyGrowCheckConsistencyRules";
-import {
-  isActivePlant,
-  type ArchivedPlantLike,
-} from "@/lib/archivedPlantVisibilityRules";
+import { isActivePlant, type ArchivedPlantLike } from "@/lib/archivedPlantVisibilityRules";
 
 export interface PanelPlantInput extends ArchivedPlantLike {
   id: string;
@@ -64,10 +61,7 @@ export interface DashboardDailyGrowCheckRow {
   showCta: boolean;
 }
 
-export type DashboardDailyGrowCheckEmptyVariant =
-  | "none"
-  | "no-plants-scoped"
-  | "no-plants-all";
+export type DashboardDailyGrowCheckEmptyVariant = "none" | "no-plants-scoped" | "no-plants-all";
 
 export interface DashboardDailyGrowCheckPanel {
   rows: DashboardDailyGrowCheckRow[];
@@ -94,10 +88,8 @@ const EMPTY_MESSAGE_ALL =
   "Daily Grow Checks appear here for the current grow. Add your first plant to start tracking notes and sensor snapshots day by day.";
 const EMPTY_CTA_HREF = "/plants";
 const EMPTY_CTA_LABEL = "Add a plant";
-const POSITIVE_ALL =
-  "Every active plant has a check logged today. Keep the rhythm going tomorrow.";
-const FIRST_RUN_HINT =
-  "Start with one plant note or sensor snapshot.";
+const POSITIVE_ALL = "Every active plant has a check logged today. Keep the rhythm going tomorrow.";
+const FIRST_RUN_HINT = "Start with one plant note or sensor snapshot.";
 
 function plantTentId(p: PanelPlantInput): string | null {
   return (p.tentId ?? p.tent_id ?? null) || null;
@@ -107,10 +99,7 @@ function plantGrowId(p: PanelPlantInput): string | null {
   return (p.growId ?? p.grow_id ?? null) || null;
 }
 
-function scopeToGrow(
-  plants: PanelPlantInput[],
-  scopedGrowId: string | null,
-): PanelPlantInput[] {
+function scopeToGrow(plants: PanelPlantInput[], scopedGrowId: string | null): PanelPlantInput[] {
   if (!scopedGrowId) return plants;
   return plants.filter((p) => {
     const g = plantGrowId(p);
@@ -138,12 +127,8 @@ export function buildDashboardDailyGrowCheckPanel(
       allChecked: false,
       isEmpty: true,
       emptyVariant: variant,
-      emptyTitle:
-        variant === "no-plants-scoped" ? EMPTY_TITLE_SCOPED : EMPTY_TITLE_ALL,
-      emptyMessage:
-        variant === "no-plants-scoped"
-          ? EMPTY_MESSAGE_SCOPED
-          : EMPTY_MESSAGE_ALL,
+      emptyTitle: variant === "no-plants-scoped" ? EMPTY_TITLE_SCOPED : EMPTY_TITLE_ALL,
+      emptyMessage: variant === "no-plants-scoped" ? EMPTY_MESSAGE_SCOPED : EMPTY_MESSAGE_ALL,
       emptyCtaHref: EMPTY_CTA_HREF,
       emptyCtaLabel: EMPTY_CTA_LABEL,
       positiveConfirmation: null,
@@ -184,8 +169,8 @@ export function buildDashboardDailyGrowCheckPanel(
         windowDays: 1,
         plantId: plant.id,
         currentTentId: tId,
-        plantsInTentCount: tId ? plantsPerTent.get(tId) ?? 1 : 0,
-        manualReadings: tId ? manualByTent.get(tId) ?? [] : [],
+        plantsInTentCount: tId ? (plantsPerTent.get(tId) ?? 1) : 0,
+        manualReadings: tId ? (manualByTent.get(tId) ?? []) : [],
         diaryEntries: input.diaryEntries,
       });
 
@@ -193,14 +178,14 @@ export function buildDashboardDailyGrowCheckPanel(
       const methodLabel = formatTodayCheckMethodLabel(summary.todayMethod);
 
       const shortGuidance = checkedToday
-        ? methodLabel ?? "Today's check is logged."
+        ? (methodLabel ?? "Today's check is logged.")
         : "No check logged for today yet.";
 
       const row: DashboardDailyGrowCheckRow = {
         plantId: plant.id,
         plantName: plant.name ?? "Unnamed plant",
         tentId: tId,
-        tentName: tId ? tentName.get(tId) ?? null : null,
+        tentName: tId ? (tentName.get(tId) ?? null) : null,
         checkedToday,
         shortGuidance,
         todayMethod: summary.todayMethod,
@@ -240,12 +225,7 @@ export function buildDashboardDailyGrowCheckPanel(
  * Filter values for the Dashboard "Today's Grow Checks" panel.
  * Read-only display filter — never affects the underlying summary calculation.
  */
-export type DashboardDailyGrowCheckFilter =
-  | "all"
-  | "needs"
-  | "note"
-  | "sensor-snapshot"
-  | "both";
+export type DashboardDailyGrowCheckFilter = "all" | "needs" | "note" | "sensor-snapshot" | "both";
 
 export const DASHBOARD_DAILY_GROW_CHECK_FILTER_OPTIONS: ReadonlyArray<{
   value: DashboardDailyGrowCheckFilter;
@@ -258,8 +238,7 @@ export const DASHBOARD_DAILY_GROW_CHECK_FILTER_OPTIONS: ReadonlyArray<{
   { value: "both", label: "Checked by both" },
 ];
 
-export const DASHBOARD_DAILY_GROW_CHECK_FILTER_EMPTY =
-  "No plants match this filter today.";
+export const DASHBOARD_DAILY_GROW_CHECK_FILTER_EMPTY = "No plants match this filter today.";
 
 /**
  * Pure filter applied to already-sorted panel rows. Preserves order.
@@ -275,9 +254,7 @@ export function filterDashboardDailyGrowCheckRows(
     case "note":
       return rows.filter((r) => r.checkedToday && r.todayMethod === "note");
     case "sensor-snapshot":
-      return rows.filter(
-        (r) => r.checkedToday && r.todayMethod === "sensor-snapshot",
-      );
+      return rows.filter((r) => r.checkedToday && r.todayMethod === "sensor-snapshot");
     case "both":
       return rows.filter((r) => r.checkedToday && r.todayMethod === "both");
     case "all":

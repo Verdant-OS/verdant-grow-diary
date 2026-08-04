@@ -11,7 +11,10 @@
  *  - `source` is always "manual".
  */
 import { supabase } from "@/integrations/supabase/client";
-import { validateSensorReadingPayload, type InsertSensorReadingPayload } from "@/hooks/useInsertSensorReading";
+import {
+  validateSensorReadingPayload,
+  type InsertSensorReadingPayload,
+} from "@/hooks/useInsertSensorReading";
 
 export interface InsertManualReturningIdResult {
   id: string;

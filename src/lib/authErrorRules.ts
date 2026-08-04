@@ -15,12 +15,7 @@ import {
   RESET_FAILED_ERROR,
 } from "@/lib/passwordResetRules";
 
-export type AuthErrorContext =
-  | "signIn"
-  | "signUp"
-  | "forgotPassword"
-  | "resetPassword"
-  | "unknown";
+export type AuthErrorContext = "signIn" | "signUp" | "forgotPassword" | "resetPassword" | "unknown";
 
 export const UNKNOWN_AUTH_ERROR = "Something went wrong. Try again in a moment.";
 
@@ -69,7 +64,12 @@ export type AuthErrorClass = "emailNotConfirmed" | "unknown";
  */
 export function classifyAuthError(error: unknown): AuthErrorClass {
   if (!error || typeof error !== "object") return "unknown";
-  const anyErr = error as { message?: unknown; code?: unknown; error_description?: unknown; name?: unknown };
+  const anyErr = error as {
+    message?: unknown;
+    code?: unknown;
+    error_description?: unknown;
+    name?: unknown;
+  };
   const parts: string[] = [];
   for (const v of [anyErr.message, anyErr.code, anyErr.error_description, anyErr.name]) {
     if (typeof v === "string") parts.push(v);
@@ -87,16 +87,12 @@ export function classifyAuthError(error: unknown): AuthErrorClass {
   return "unknown";
 }
 
-
 /**
  * Map any error (Supabase AuthError, generic Error, unknown object, null) to
  * an approved friendly copy string for the given UI context. Never returns
  * raw error fields.
  */
-export function sanitizeAuthError(
-  context: AuthErrorContext,
-  _error: unknown,
-): string {
+export function sanitizeAuthError(context: AuthErrorContext, _error: unknown): string {
   // We deliberately ignore _error's shape. The whole point is that no
   // attacker-controlled or server-controlled string flows to the UI.
   const ctx: AuthErrorContext =

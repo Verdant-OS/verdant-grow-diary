@@ -21,9 +21,7 @@ export const KNOWN_LEAD_STATUSES: ReadonlySet<string> = new Set<LeadStatus>([
 ]);
 
 /** True when value is a non-empty string after trimming. */
-export function isMeaningfulString(
-  value: string | null | undefined,
-): value is string {
+export function isMeaningfulString(value: string | null | undefined): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
@@ -32,9 +30,7 @@ export function isMeaningfulString(
  * Used wherever helpers must treat malformed timestamps as "unknown" rather
  * than silently coercing to 0 or now().
  */
-export function parseLeadTime(
-  iso: string | null | undefined,
-): number | null {
+export function parseLeadTime(iso: string | null | undefined): number | null {
   if (!iso) return null;
   const t = new Date(iso).getTime();
   return Number.isFinite(t) ? t : null;

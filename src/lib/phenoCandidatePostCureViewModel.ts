@@ -66,9 +66,7 @@ const PHASE_MATCHERS: ReadonlyArray<{
 );
 
 export type PhenoPostCureMissingCode =
-  | "no_post_cure_activity"
-  | "no_harvest_logged"
-  | "no_cure_notes";
+  "no_post_cure_activity" | "no_harvest_logged" | "no_cure_notes";
 
 export interface PhenoPostCureMissingFlag {
   readonly code: PhenoPostCureMissingCode;

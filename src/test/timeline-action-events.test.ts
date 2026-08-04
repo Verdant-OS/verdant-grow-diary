@@ -63,14 +63,7 @@ describe("Timeline — Action Queue events section", () => {
   });
 
   it("supports all required event_type labels", () => {
-    for (const t of [
-      "simulated",
-      "approved",
-      "rejected",
-      "completed",
-      "cancelled",
-      "note",
-    ]) {
+    for (const t of ["simulated", "approved", "rejected", "completed", "cancelled", "note"]) {
       expect(PAGE).toMatch(new RegExp(`["']${t}["']`));
     }
   });

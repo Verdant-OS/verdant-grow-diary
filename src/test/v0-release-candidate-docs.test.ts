@@ -67,15 +67,11 @@ describe("V0 release candidate · shared content contract", () => {
     expect(combined).toContain("docs/v0-release-checkpoint.md");
   });
 
-
   it.each([
     ["grow-room mode", /grow-room mode/],
     ["real sensor ingestion adapter", /sensor ingestion adapter/],
     ["AI Doctor context upgrade", /ai doctor context upgrade/],
-    [
-      "PPFD / soil EC / reservoir schema expansion",
-      /ppfd.*soil ec.*reservoir.*schema/,
-    ],
+    ["PPFD / soil EC / reservoir schema expansion", /ppfd.*soil ec.*reservoir.*schema/],
   ])("next build order includes %s", (_label, re) => {
     expect(combined).toMatch(re);
   });

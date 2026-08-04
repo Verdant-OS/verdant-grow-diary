@@ -1,14 +1,8 @@
 import { useMemo } from "react";
 import { Image as ImageIcon, AlertTriangle } from "lucide-react";
 
-import {
-  normalizeDiaryEntries,
-  type NormalizeDiaryInput,
-} from "@/lib/diaryEntryRules";
-import {
-  buildPhotoHistory,
-  type PhotoHistoryRow,
-} from "@/lib/photoHistoryRules";
+import { normalizeDiaryEntries, type NormalizeDiaryInput } from "@/lib/diaryEntryRules";
+import { buildPhotoHistory, type PhotoHistoryRow } from "@/lib/photoHistoryRules";
 import {
   PHOTO_NON_DIAGNOSTIC_LABEL,
   PHOTO_NON_DIAGNOSTIC_TESTID,
@@ -109,8 +103,7 @@ export default function PhotoHistoryPanel({
       const r = (raw ?? {}) as Record<string, unknown>;
       if (r.entry_type || r.entryType || r.event_type || r.eventType) return r;
       const det = (r.details ?? null) as Record<string, unknown> | null;
-      const liftedType =
-        det && typeof det === "object" ? det.event_type : undefined;
+      const liftedType = det && typeof det === "object" ? det.event_type : undefined;
       return typeof liftedType === "string" && liftedType.length > 0
         ? { ...r, entry_type: liftedType }
         : r;
@@ -121,21 +114,14 @@ export default function PhotoHistoryPanel({
   }, [rawEntries, limit]);
 
   return (
-    <section
-      className={"glass rounded-2xl p-4 " + (className ?? "")}
-      aria-label="Photo history"
-    >
+    <section className={"glass rounded-2xl p-4 " + (className ?? "")} aria-label="Photo history">
       <header className="flex items-center justify-between mb-3">
         <h2 className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           <ImageIcon className="h-3.5 w-3.5 text-primary" />
           Photo history
         </h2>
         <span className="text-[11px] text-muted-foreground">
-          {rows.length === 0
-            ? "0"
-            : rows.length === 1
-              ? "1 photo"
-              : `${rows.length} photos`}
+          {rows.length === 0 ? "0" : rows.length === 1 ? "1 photo" : `${rows.length} photos`}
         </span>
       </header>
 

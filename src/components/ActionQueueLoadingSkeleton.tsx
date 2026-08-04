@@ -52,28 +52,13 @@ export default function ActionQueueLoadingSkeleton({
         >
           {/* Title + status/risk badge row */}
           <div className="flex items-center gap-2">
-            <Skeleton
-              className="h-4 w-32"
-              data-testid="action-queue-loading-skeleton-title"
-            />
-            <Skeleton
-              className="h-4 w-16"
-              data-testid="action-queue-loading-skeleton-status"
-            />
-            <Skeleton
-              className="h-4 w-20"
-              data-testid="action-queue-loading-skeleton-risk"
-            />
+            <Skeleton className="h-4 w-32" data-testid="action-queue-loading-skeleton-title" />
+            <Skeleton className="h-4 w-16" data-testid="action-queue-loading-skeleton-status" />
+            <Skeleton className="h-4 w-20" data-testid="action-queue-loading-skeleton-risk" />
           </div>
           {/* Reason / source */}
-          <Skeleton
-            className="h-3 w-3/4"
-            data-testid="action-queue-loading-skeleton-reason"
-          />
-          <Skeleton
-            className="h-3 w-1/2"
-            data-testid="action-queue-loading-skeleton-source"
-          />
+          <Skeleton className="h-3 w-3/4" data-testid="action-queue-loading-skeleton-reason" />
+          <Skeleton className="h-3 w-1/2" data-testid="action-queue-loading-skeleton-source" />
           {/* Explain button area */}
           <div className="flex justify-end pt-1">
             <Skeleton

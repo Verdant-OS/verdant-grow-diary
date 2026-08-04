@@ -184,13 +184,7 @@ export function buildPlantDetailDoctorContextPreview(
     state: ageState(latestWFAt, now),
   };
 
-  const items: DoctorContextItem[] = [
-    stageItem,
-    timelineItem,
-    photoItem,
-    sensorItem,
-    wfItem,
-  ];
+  const items: DoctorContextItem[] = [stageItem, timelineItem, photoItem, sensorItem, wfItem];
 
   const alertsCount = safeCount(input.openAlertsCount);
   if (alertsCount != null) {

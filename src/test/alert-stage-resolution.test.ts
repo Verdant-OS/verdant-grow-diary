@@ -17,33 +17,43 @@ import { resolveAlertContextStage } from "@/lib/alertStageResolution";
 
 describe("resolveAlertContextStage — precedence", () => {
   it("audit repro: veg grow with a lagging seedling tent resolves to veg", () => {
-    expect(
-      resolveAlertContextStage({ growStage: "veg", tentStages: ["seedling"] }),
-    ).toEqual({ stage: "veg", normalizedStage: "veg", source: "grow" });
+    expect(resolveAlertContextStage({ growStage: "veg", tentStages: ["seedling"] })).toEqual({
+      stage: "veg",
+      normalizedStage: "veg",
+      source: "grow",
+    });
   });
 
   it("mirror case: seedling grow with a tent the grower advanced resolves to the tent stage", () => {
-    expect(
-      resolveAlertContextStage({ growStage: "seedling", tentStages: ["veg"] }),
-    ).toEqual({ stage: "veg", normalizedStage: "veg", source: "tent" });
+    expect(resolveAlertContextStage({ growStage: "seedling", tentStages: ["veg"] })).toEqual({
+      stage: "veg",
+      normalizedStage: "veg",
+      source: "tent",
+    });
   });
 
   it("agreement keeps the shared stage and credits the grow field", () => {
-    expect(
-      resolveAlertContextStage({ growStage: "flower", tentStages: ["flower"] }),
-    ).toEqual({ stage: "flower", normalizedStage: "flower", source: "grow" });
+    expect(resolveAlertContextStage({ growStage: "flower", tentStages: ["flower"] })).toEqual({
+      stage: "flower",
+      normalizedStage: "flower",
+      source: "grow",
+    });
   });
 
   it("rank ties keep the grow's own raw value (historical primacy)", () => {
-    expect(
-      resolveAlertContextStage({ growStage: "veg", tentStages: ["vegetative"] }),
-    ).toEqual({ stage: "veg", normalizedStage: "veg", source: "grow" });
+    expect(resolveAlertContextStage({ growStage: "veg", tentStages: ["vegetative"] })).toEqual({
+      stage: "veg",
+      normalizedStage: "veg",
+      source: "grow",
+    });
   });
 
   it("uses the tent stage when the grow stage is unknown or unrecognized", () => {
-    expect(
-      resolveAlertContextStage({ growStage: null, tentStages: ["flower"] }),
-    ).toEqual({ stage: "flower", normalizedStage: "flower", source: "tent" });
+    expect(resolveAlertContextStage({ growStage: null, tentStages: ["flower"] })).toEqual({
+      stage: "flower",
+      normalizedStage: "flower",
+      source: "tent",
+    });
     expect(
       resolveAlertContextStage({ growStage: "definitely-not-a-stage", tentStages: ["veg"] }),
     ).toEqual({ stage: "veg", normalizedStage: "veg", source: "tent" });
@@ -55,9 +65,11 @@ describe("resolveAlertContextStage — precedence", () => {
       normalizedStage: "veg",
       source: "grow",
     });
-    expect(
-      resolveAlertContextStage({ growStage: "veg", tentStages: [null, "", "??"] }),
-    ).toEqual({ stage: "veg", normalizedStage: "veg", source: "grow" });
+    expect(resolveAlertContextStage({ growStage: "veg", tentStages: [null, "", "??"] })).toEqual({
+      stage: "veg",
+      normalizedStage: "veg",
+      source: "grow",
+    });
     expect(resolveAlertContextStage({ growStage: "veg" })).toEqual({
       stage: "veg",
       normalizedStage: "veg",
@@ -71,17 +83,19 @@ describe("resolveAlertContextStage — precedence", () => {
       normalizedStage: "unknown",
       source: null,
     });
-    expect(
-      resolveAlertContextStage({ growStage: "", tentStages: [undefined, "nope"] }),
-    ).toEqual({ stage: null, normalizedStage: "unknown", source: null });
+    expect(resolveAlertContextStage({ growStage: "", tentStages: [undefined, "nope"] })).toEqual({
+      stage: null,
+      normalizedStage: "unknown",
+      source: null,
+    });
   });
 
   it("keeps the winner's RAW stored value for label-form fields", () => {
     // Downstream classifiers and header copy receive the stored token
     // exactly as the pre-resolver code passed it.
-    expect(
-      resolveAlertContextStage({ growStage: "Vegetative", tentStages: ["Seedling"] }),
-    ).toEqual({ stage: "Vegetative", normalizedStage: "veg", source: "grow" });
+    expect(resolveAlertContextStage({ growStage: "Vegetative", tentStages: ["Seedling"] })).toEqual(
+      { stage: "Vegetative", normalizedStage: "veg", source: "grow" },
+    );
   });
 
   it("recognizes the classifiers' legacy alias vocabulary (no drop regression)", () => {
@@ -109,9 +123,11 @@ describe("resolveAlertContextStage — precedence", () => {
       source: "grow",
     });
     // A legacy preflower grow with a lagging seedling tent stays preflower.
-    expect(
-      resolveAlertContextStage({ growStage: "preflower", tentStages: ["seedling"] }),
-    ).toEqual({ stage: "preflower", normalizedStage: "preflower", source: "grow" });
+    expect(resolveAlertContextStage({ growStage: "preflower", tentStages: ["seedling"] })).toEqual({
+      stage: "preflower",
+      normalizedStage: "preflower",
+      source: "grow",
+    });
   });
 
   it("mixed-stage tents abstain — the grow row's declared stage governs", () => {
@@ -124,9 +140,11 @@ describe("resolveAlertContextStage — precedence", () => {
       }),
     ).toEqual({ stage: "veg", normalizedStage: "veg", source: "grow" });
     // Disagreeing tents with an unknown grow resolve to null, same as before.
-    expect(
-      resolveAlertContextStage({ growStage: null, tentStages: ["veg", "flower"] }),
-    ).toEqual({ stage: null, normalizedStage: "unknown", source: null });
+    expect(resolveAlertContextStage({ growStage: null, tentStages: ["veg", "flower"] })).toEqual({
+      stage: null,
+      normalizedStage: "unknown",
+      source: null,
+    });
     // Agreement across vocab forms still counts as consensus.
     expect(
       resolveAlertContextStage({
@@ -141,19 +159,27 @@ describe("resolveAlertContextStage — precedence", () => {
     // tents.grow_id without resetting stage, so an active veg grow can
     // hold a tent still staged cure/harvest. The grow row's live decision
     // keeps governing — stage-band alerts stay on.
-    expect(
-      resolveAlertContextStage({ growStage: "veg", tentStages: ["cure"] }),
-    ).toEqual({ stage: "veg", normalizedStage: "veg", source: "grow" });
-    expect(
-      resolveAlertContextStage({ growStage: "flower", tentStages: ["harvest"] }),
-    ).toEqual({ stage: "flower", normalizedStage: "flower", source: "grow" });
+    expect(resolveAlertContextStage({ growStage: "veg", tentStages: ["cure"] })).toEqual({
+      stage: "veg",
+      normalizedStage: "veg",
+      source: "grow",
+    });
+    expect(resolveAlertContextStage({ growStage: "flower", tentStages: ["harvest"] })).toEqual({
+      stage: "flower",
+      normalizedStage: "flower",
+      source: "grow",
+    });
     // Closing out is the grow row's call: a harvest-stage grow governs...
-    expect(
-      resolveAlertContextStage({ growStage: "drying", tentStages: ["flower"] }),
-    ).toEqual({ stage: "drying", normalizedStage: "harvest", source: "grow" });
+    expect(resolveAlertContextStage({ growStage: "drying", tentStages: ["flower"] })).toEqual({
+      stage: "drying",
+      normalizedStage: "harvest",
+      source: "grow",
+    });
     // ...and with no grow signal at all, an agreeing harvest tent stands.
-    expect(
-      resolveAlertContextStage({ growStage: null, tentStages: ["harvest"] }),
-    ).toEqual({ stage: "harvest", normalizedStage: "harvest", source: "tent" });
+    expect(resolveAlertContextStage({ growStage: null, tentStages: ["harvest"] })).toEqual({
+      stage: "harvest",
+      normalizedStage: "harvest",
+      source: "tent",
+    });
   });
 });

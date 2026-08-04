@@ -20,10 +20,7 @@ const valid = {
 
 describe("evaluateManualSensorSnapshotQuality", () => {
   it("valid manual reading is usable and supports AI Doctor current context", () => {
-    const r = evaluateManualSensorSnapshotQuality(
-      { ...valid, source: "manual" },
-      { nowMs: NOW },
-    );
+    const r = evaluateManualSensorSnapshotQuality({ ...valid, source: "manual" }, { nowMs: NOW });
     expect(r.quality).toBe("usable");
     expect(r.sourceLabel).toBe("manual");
     expect(r.canSupportAiDoctorCurrentContext).toBe(true);
@@ -32,10 +29,7 @@ describe("evaluateManualSensorSnapshotQuality", () => {
   });
 
   it("valid live reading supports Action Queue preview", () => {
-    const r = evaluateManualSensorSnapshotQuality(
-      { ...valid, source: "live" },
-      { nowMs: NOW },
-    );
+    const r = evaluateManualSensorSnapshotQuality({ ...valid, source: "live" }, { nowMs: NOW });
     expect(r.quality).toBe("usable");
     expect(r.canSupportActionSuggestionPreview).toBe(true);
   });
@@ -52,10 +46,7 @@ describe("evaluateManualSensorSnapshotQuality", () => {
   });
 
   it("csv reading is history-only and cannot support current decisions", () => {
-    const r = evaluateManualSensorSnapshotQuality(
-      { ...valid, source: "csv" },
-      { nowMs: NOW },
-    );
+    const r = evaluateManualSensorSnapshotQuality({ ...valid, source: "csv" }, { nowMs: NOW });
     expect(r.quality).toBe("needs_review");
     expect(r.sourceLabel).toBe("csv");
     expect(r.canSupportAiDoctorCurrentContext).toBe(false);
@@ -64,19 +55,13 @@ describe("evaluateManualSensorSnapshotQuality", () => {
   });
 
   it("demo reading cannot support current-room decision", () => {
-    const r = evaluateManualSensorSnapshotQuality(
-      { ...valid, source: "demo" },
-      { nowMs: NOW },
-    );
+    const r = evaluateManualSensorSnapshotQuality({ ...valid, source: "demo" }, { nowMs: NOW });
     expect(r.canSupportAiDoctorCurrentContext).toBe(false);
     expect(r.reasons.join(" ")).toMatch(/Demo/);
   });
 
   it("stale source label cannot support current-room decision", () => {
-    const r = evaluateManualSensorSnapshotQuality(
-      { ...valid, source: "stale" },
-      { nowMs: NOW },
-    );
+    const r = evaluateManualSensorSnapshotQuality({ ...valid, source: "stale" }, { nowMs: NOW });
     expect(r.canSupportAiDoctorCurrentContext).toBe(false);
   });
 
@@ -154,14 +139,8 @@ describe("evaluateManualSensorSnapshotQuality", () => {
   });
 
   it("output is deterministic for same input", () => {
-    const a = evaluateManualSensorSnapshotQuality(
-      { ...valid, source: "manual" },
-      { nowMs: NOW },
-    );
-    const b = evaluateManualSensorSnapshotQuality(
-      { ...valid, source: "manual" },
-      { nowMs: NOW },
-    );
+    const a = evaluateManualSensorSnapshotQuality({ ...valid, source: "manual" }, { nowMs: NOW });
+    const b = evaluateManualSensorSnapshotQuality({ ...valid, source: "manual" }, { nowMs: NOW });
     expect(a).toEqual(b);
   });
 });

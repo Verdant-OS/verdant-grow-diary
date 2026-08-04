@@ -58,9 +58,9 @@ function plantCardLabels(): string[] {
 }
 
 function emptyStateIds(card: HTMLElement): string[] {
-  return Array.from(
-    card.querySelectorAll<HTMLElement>("[data-empty-state-id]"),
-  ).map((el) => el.getAttribute("data-empty-state-id") ?? "");
+  return Array.from(card.querySelectorAll<HTMLElement>("[data-empty-state-id]")).map(
+    (el) => el.getAttribute("data-empty-state-id") ?? "",
+  );
 }
 
 afterEach(() => {
@@ -71,17 +71,13 @@ afterEach(() => {
 describe("ContextualPhenoComparisonPanel v0.3 empty states", () => {
   it("renders no empty-state section for a fully-documented plant", () => {
     renderEmptyStatePanel();
-    const full = screen.getByTestId(
-      "contextual-pheno-comparison-plant-demo-empty-full",
-    );
+    const full = screen.getByTestId("contextual-pheno-comparison-plant-demo-empty-full");
     expect(within(full).queryByTestId("plant-empty-states")).toBeNull();
   });
 
   it("renders cautious copy for the sparse plant (no photos, no sensors, no feeding)", () => {
     renderEmptyStatePanel();
-    const sparse = screen.getByTestId(
-      "contextual-pheno-comparison-plant-demo-empty-sparse",
-    );
+    const sparse = screen.getByTestId("contextual-pheno-comparison-plant-demo-empty-sparse");
     const ids = emptyStateIds(sparse);
     // Deterministic, ordered subset of the locked rule order.
     expect(ids).toEqual([
@@ -92,23 +88,22 @@ describe("ContextualPhenoComparisonPanel v0.3 empty states", () => {
       "no-trusted-context",
       "environment-summary",
     ]);
-    expect(within(sparse).getByTestId("plant-empty-state-photos").textContent)
-      .toMatch(/no photos available/i);
-    expect(within(sparse).getByTestId("plant-empty-state-sensor").textContent)
-      .toMatch(/no sensor readings recorded/i);
-    expect(
-      within(sparse).getByTestId("plant-empty-state-environment-summary")
-        .textContent,
-    ).toMatch(/environment summary unavailable/i);
+    expect(within(sparse).getByTestId("plant-empty-state-photos").textContent).toMatch(
+      /no photos available/i,
+    );
+    expect(within(sparse).getByTestId("plant-empty-state-sensor").textContent).toMatch(
+      /no sensor readings recorded/i,
+    );
+    expect(within(sparse).getByTestId("plant-empty-state-environment-summary").textContent).toMatch(
+      /environment summary unavailable/i,
+    );
     // Sparse has a diary entry — do NOT show "no diary" empty state.
     expect(within(sparse).queryByTestId("plant-empty-state-diary")).toBeNull();
   });
 
   it("renders untrusted-only + unknown-metadata copy for the untrusted plant", () => {
     renderEmptyStatePanel();
-    const card = screen.getByTestId(
-      "contextual-pheno-comparison-plant-demo-empty-untrusted",
-    );
+    const card = screen.getByTestId("contextual-pheno-comparison-plant-demo-empty-untrusted");
     const ids = emptyStateIds(card);
     expect(ids).toEqual([
       "diary",
@@ -122,45 +117,38 @@ describe("ContextualPhenoComparisonPanel v0.3 empty states", () => {
       "strain",
       "status",
     ]);
-    expect(
-      within(card).getByTestId("plant-empty-state-untrusted-only").textContent,
-    ).toMatch(/untrusted sensor evidence only/i);
-    expect(
-      within(card).getByTestId("plant-empty-state-untrusted-only").textContent,
-    ).toMatch(/do not use as live context/i);
-    expect(within(card).getByTestId("plant-empty-state-stage").textContent)
-      .toMatch(/stage unknown/i);
-    expect(within(card).getByTestId("plant-empty-state-strain").textContent)
-      .toMatch(/strain/i);
-    expect(within(card).getByTestId("plant-empty-state-status").textContent)
-      .toMatch(/status unknown/i);
+    expect(within(card).getByTestId("plant-empty-state-untrusted-only").textContent).toMatch(
+      /untrusted sensor evidence only/i,
+    );
+    expect(within(card).getByTestId("plant-empty-state-untrusted-only").textContent).toMatch(
+      /do not use as live context/i,
+    );
+    expect(within(card).getByTestId("plant-empty-state-stage").textContent).toMatch(
+      /stage unknown/i,
+    );
+    expect(within(card).getByTestId("plant-empty-state-strain").textContent).toMatch(/strain/i);
+    expect(within(card).getByTestId("plant-empty-state-status").textContent).toMatch(
+      /status unknown/i,
+    );
   });
 
   it("never labels the untrusted plant as having trusted sensor context", () => {
     renderEmptyStatePanel();
-    const card = screen.getByTestId(
-      "contextual-pheno-comparison-plant-demo-empty-untrusted",
-    );
-    expect(
-      within(card).getByTestId("plant-trusted-context").textContent,
-    ).toBe("no");
+    const card = screen.getByTestId("contextual-pheno-comparison-plant-demo-empty-untrusted");
+    expect(within(card).getByTestId("plant-trusted-context").textContent).toBe("no");
     expect(card.textContent || "").not.toMatch(/healthy/i);
   });
 
   it("renders source badges as caution/untrusted for the untrusted plant", () => {
     renderEmptyStatePanel();
-    const card = screen.getByTestId(
-      "contextual-pheno-comparison-plant-demo-empty-untrusted",
-    );
+    const card = screen.getByTestId("contextual-pheno-comparison-plant-demo-empty-untrusted");
     // Unknown vendor strings are normalized to "unknown" by the view-model.
     const demo = within(card).getByTestId("plant-source-count-demo");
     const invalid = within(card).getByTestId("plant-source-count-invalid");
     const unknown = within(card).getByTestId("plant-source-count-unknown");
     for (const badge of [demo, invalid, unknown]) {
       expect(badge.getAttribute("data-untrusted")).toBe("true");
-      expect((badge.getAttribute("title") || "").toLowerCase()).toContain(
-        "caution",
-      );
+      expect((badge.getAttribute("title") || "").toLowerCase()).toContain("caution");
     }
     // And no live-styled badge slipped in.
     expect(within(card).queryByTestId("plant-source-count-live")).toBeNull();
@@ -170,19 +158,14 @@ describe("ContextualPhenoComparisonPanel v0.3 empty states", () => {
     const { container } = renderEmptyStatePanel();
     const txt = (container.textContent || "").toLowerCase();
     for (const banned of BANNED_TOKENS) {
-      expect(
-        txt.includes(banned),
-        `panel contained banned token: ${banned}`,
-      ).toBe(false);
+      expect(txt.includes(banned), `panel contained banned token: ${banned}`).toBe(false);
     }
   });
 
   it("does not call fetch during render of the empty-state panel", () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch" as never)
-      .mockImplementation(() => {
-        throw new Error("fetch must not be called");
-      });
+    const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation(() => {
+      throw new Error("fetch must not be called");
+    });
     renderEmptyStatePanel();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
@@ -204,12 +187,7 @@ describe("ContextualPhenoComparisonPanel v0.3 empty states", () => {
       renderEmptyStatePanel();
       // Fixture inputs are intentionally NOT in alphabetical input order to
       // prove the view-model sort, not input order, drives card layout.
-      expect(plantCardLabels()).toEqual([
-        "Full",
-        "Partial",
-        "Sparse",
-        "Untrusted",
-      ]);
+      expect(plantCardLabels()).toEqual(["Full", "Partial", "Sparse", "Untrusted"]);
     });
 
     it("repeated renders produce identical plant card ordering", () => {
@@ -233,9 +211,7 @@ describe("ContextualPhenoComparisonPanel v0.3 empty states", () => {
     });
 
     it("3-plant layout (full + partial + sparse) keeps deterministic order", () => {
-      renderEmptyStatePanel(
-        CONTEXTUAL_PHENO_COMPARISON_EMPTY_STATE_PLANT_INPUTS.slice(0, 3),
-      );
+      renderEmptyStatePanel(CONTEXTUAL_PHENO_COMPARISON_EMPTY_STATE_PLANT_INPUTS.slice(0, 3));
       expect(plantCardLabels()).toEqual(["Full", "Partial", "Sparse"]);
     });
 
@@ -272,12 +248,10 @@ describe("ContextualPhenoComparisonPanel v0.3 empty states", () => {
 
     it("desktop: untrusted-card empty-state text list snapshot", () => {
       renderEmptyStatePanel();
-      const card = screen.getByTestId(
-        "contextual-pheno-comparison-plant-demo-empty-untrusted",
+      const card = screen.getByTestId("contextual-pheno-comparison-plant-demo-empty-untrusted");
+      const texts = Array.from(card.querySelectorAll<HTMLElement>("[data-empty-state-id]")).map(
+        (el) => (el.textContent || "").trim(),
       );
-      const texts = Array.from(
-        card.querySelectorAll<HTMLElement>("[data-empty-state-id]"),
-      ).map((el) => (el.textContent || "").trim());
       expect(texts).toMatchInlineSnapshot(`
         [
           "No recent diary evidence yet.",

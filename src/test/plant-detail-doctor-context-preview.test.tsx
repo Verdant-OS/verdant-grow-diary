@@ -41,10 +41,7 @@ import type { PlantRecentActivityRow } from "@/lib/plantRecentActivityRules";
 import PlantDetailDoctorContextPreview from "@/components/PlantDetailDoctorContextPreview";
 
 const ROOT = resolve(__dirname, "../..");
-const HELPER = readFileSync(
-  resolve(ROOT, "src/lib/plantDetailDoctorContextPreview.ts"),
-  "utf8",
-);
+const HELPER = readFileSync(resolve(ROOT, "src/lib/plantDetailDoctorContextPreview.ts"), "utf8");
 const COMPONENT = readFileSync(
   resolve(ROOT, "src/components/PlantDetailDoctorContextPreview.tsx"),
   "utf8",
@@ -247,7 +244,9 @@ describe("<PlantDetailDoctorContextPreview />", () => {
     useRecentMock.mockReturnValue({ data: [], isLoading: false });
   });
 
-  function renderCard(props: Partial<React.ComponentProps<typeof PlantDetailDoctorContextPreview>> = {}) {
+  function renderCard(
+    props: Partial<React.ComponentProps<typeof PlantDetailDoctorContextPreview>> = {},
+  ) {
     return render(
       <MemoryRouter>
         <PlantDetailDoctorContextPreview
@@ -284,7 +283,9 @@ describe("<PlantDetailDoctorContextPreview />", () => {
   it("renders optional alerts/actions rows when counts are provided", () => {
     renderCard({ openAlertsCount: 1, pendingActionsCount: 0 });
     expect(screen.getByTestId("plant-detail-doctor-context-item-open_alerts")).toBeInTheDocument();
-    expect(screen.getByTestId("plant-detail-doctor-context-item-pending_actions")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("plant-detail-doctor-context-item-pending_actions"),
+    ).toBeInTheDocument();
   });
 
   it("renders an Ask Doctor trigger inside the CTA region", () => {

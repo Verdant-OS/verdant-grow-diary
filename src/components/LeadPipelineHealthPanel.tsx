@@ -26,9 +26,7 @@ export interface LeadPipelineHealthPanelProps {
  * Performs no I/O and no external communication. Scoped to whichever
  * leads list the caller passes in.
  */
-export default function LeadPipelineHealthPanel({
-  leads,
-}: LeadPipelineHealthPanelProps) {
+export default function LeadPipelineHealthPanel({ leads }: LeadPipelineHealthPanelProps) {
   const warnings = useMemo(() => evaluatePipelineHealth(leads), [leads]);
 
   return (
@@ -66,13 +64,10 @@ function HealthRow({ warning }: { warning: LeadPipelineHealthWarning }) {
           <div className="font-medium text-foreground">{warning.title}</div>
           <div className="text-xs text-muted-foreground">{warning.message}</div>
           <div className="mt-1 text-xs text-muted-foreground">
-            <span className="text-foreground">Suggested:</span>{" "}
-            {warning.recommendation}
+            <span className="text-foreground">Suggested:</span> {warning.recommendation}
           </div>
         </div>
-        <Badge variant={SEVERITY_VARIANT[warning.severity]}>
-          {warning.severity}
-        </Badge>
+        <Badge variant={SEVERITY_VARIANT[warning.severity]}>{warning.severity}</Badge>
       </div>
     </li>
   );

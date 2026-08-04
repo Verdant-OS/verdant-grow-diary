@@ -20,10 +20,10 @@ export const QUICK_LOG_EVENT_TYPE = "quick_log" as const;
 export const MANUAL_SENSOR_SOURCE = "manual" as const;
 
 export interface QuickLogSensorInput {
-  temp: string;     // °F as typed
+  temp: string; // °F as typed
   humidity: string; // % as typed
-  ph: string;       // free-text decimal
-  ec: string;       // free-text decimal
+  ph: string; // free-text decimal
+  ec: string; // free-text decimal
 }
 
 export interface ManualSensorSnapshot {
@@ -52,9 +52,7 @@ export function parseOptionalNumber(raw: string | null | undefined): number | nu
  * Build the manual sensor snapshot. Returns null if every field is empty —
  * so we never persist a snapshot of all-nulls.
  */
-export function buildManualSensorSnapshot(
-  input: QuickLogSensorInput,
-): ManualSensorSnapshot | null {
+export function buildManualSensorSnapshot(input: QuickLogSensorInput): ManualSensorSnapshot | null {
   const snap: ManualSensorSnapshot = {
     temp_f: parseOptionalNumber(input.temp),
     humidity_percent: parseOptionalNumber(input.humidity),
@@ -119,9 +117,7 @@ export interface BuildQuickLogInsertArgs {
   sensors: QuickLogSensorInput;
 }
 
-export type DraftResult =
-  | { ok: true; draft: QuickLogInsertDraft }
-  | { ok: false; reason: string };
+export type DraftResult = { ok: true; draft: QuickLogInsertDraft } | { ok: false; reason: string };
 
 /**
  * Build the diary_entries insert draft. Never includes `user_id` —

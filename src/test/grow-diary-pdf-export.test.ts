@@ -97,9 +97,7 @@ describe("growDiaryPdfExport — model", () => {
       chartHints: [{ label: "Log frequency", summary: "12 entries over 7 days" }],
       now: NOW,
     });
-    expect(m.charts).toEqual([
-      { label: "Log frequency", summary: "12 entries over 7 days" },
-    ]);
+    expect(m.charts).toEqual([{ label: "Log frequency", summary: "12 entries over 7 days" }]);
     expect(m.chartsUnavailableNote).toBeNull();
   });
 

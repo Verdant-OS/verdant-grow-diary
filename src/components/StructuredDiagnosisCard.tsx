@@ -38,10 +38,7 @@ export interface StructuredDiagnosisCardProps {
    * Action Queue insert. The card disables the button while the promise
    * is pending and marks the item as queued on success.
    */
-  onAddToQueue?: (
-    action: DiagnosisSuggestedAction,
-    index: number,
-  ) => Promise<void> | void;
+  onAddToQueue?: (action: DiagnosisSuggestedAction, index: number) => Promise<void> | void;
   /** Disables every queue button (e.g. no active grow). */
   disableQueueing?: boolean;
   /**
@@ -77,21 +74,11 @@ function riskTone(level: Diagnosis["riskLevel"]): string {
   }
 }
 
-function Section({
-  title,
-  items,
-  testId,
-}: {
-  title: string;
-  items: string[];
-  testId?: string;
-}) {
+function Section({ title, items, testId }: { title: string; items: string[]; testId?: string }) {
   if (!items?.length) return null;
   return (
     <div data-testid={testId}>
-      <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
-        {title}
-      </p>
+      <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">{title}</p>
       <ul className="list-disc list-inside space-y-0.5 text-sm">
         {items.map((it, i) => (
           <li key={i}>{it}</li>
@@ -115,9 +102,7 @@ function FollowUpBlock({
       data-testid={testId}
       className="rounded-lg border border-border/40 bg-secondary/10 p-2 text-xs"
     >
-      <p className="uppercase tracking-wider text-muted-foreground mb-1">
-        {title}
-      </p>
+      <p className="uppercase tracking-wider text-muted-foreground mb-1">{title}</p>
       <p className="text-sm">{followUp.summary}</p>
       {followUp.checklist.length > 0 && (
         <ul className="list-disc list-inside mt-1 space-y-0.5 text-muted-foreground">
@@ -151,7 +136,6 @@ export default function StructuredDiagnosisCard({
   // thread a session id back into state), so the card stays usable without
   // a QueryClientProvider in that path.
 
-
   async function handleClick(action: DiagnosisSuggestedAction, idx: number) {
     if (!onAddToQueue) return;
     if (queuedRef.current.has(idx) || inFlightRef.current.size > 0) return;
@@ -168,40 +152,28 @@ export default function StructuredDiagnosisCard({
   }
 
   // Harmonize the structured confidence with the legacy context ceiling.
-  const harmonized = harmonizeDiagnosisConfidence(
-    diagnosis.confidence,
-    contextCeiling ?? "high",
-  );
+  const harmonized = harmonizeDiagnosisConfidence(diagnosis.confidence, contextCeiling ?? "high");
   // If the cap pushed confidence below the low-confidence threshold and the
   // model did not already provide missing-information guidance, surface a
   // cautious default so the grower still sees what's missing.
   const displayedMissing =
-    diagnosis.missingInformation.length === 0 &&
-    isDisplayedConfidenceLow(harmonized)
+    diagnosis.missingInformation.length === 0 && isDisplayedConfidenceLow(harmonized)
       ? [
           "Evidence is limited — add a fresh photo, recent diary note, or sensor snapshot before acting.",
         ]
       : diagnosis.missingInformation;
 
   return (
-    <div
-      data-testid={testId}
-      className="glass rounded-2xl p-4 space-y-3 text-sm"
-    >
+    <div data-testid={testId} className="glass rounded-2xl p-4 space-y-3 text-sm">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Sparkles className="h-3 w-3 text-primary" />
         <span>AI Doctor</span>
-        <Badge
-          variant="outline"
-          className="text-[10px] uppercase border-muted-foreground"
-        >
+        <Badge variant="outline" className="text-[10px] uppercase border-muted-foreground">
           Structured v1
         </Badge>
         <Badge
           variant="outline"
-          className={`text-[10px] uppercase ml-auto ${riskTone(
-            diagnosis.riskLevel,
-          )}`}
+          className={`text-[10px] uppercase ml-auto ${riskTone(diagnosis.riskLevel)}`}
           data-testid={`${testId}-risk`}
         >
           Risk: {diagnosis.riskLevel}
@@ -248,17 +220,12 @@ export default function StructuredDiagnosisCard({
         <p className="font-medium">{diagnosis.summary}</p>
         {diagnosis.likelyIssue && (
           <p className="text-xs mt-1" data-testid={`${testId}-likely-issue`}>
-            <span className="text-muted-foreground">Likely issue:</span>{" "}
-            {diagnosis.likelyIssue}
+            <span className="text-muted-foreground">Likely issue:</span> {diagnosis.likelyIssue}
           </p>
         )}
       </div>
 
-      <Section
-        title="Evidence"
-        items={diagnosis.evidence}
-        testId={`${testId}-evidence`}
-      />
+      <Section title="Evidence" items={diagnosis.evidence} testId={`${testId}-evidence`} />
       <Section
         title="Missing information"
         items={displayedMissing}
@@ -318,9 +285,7 @@ export default function StructuredDiagnosisCard({
                   <div className="flex items-start gap-2">
                     <div className="flex-1">
                       <p className="font-medium text-sm">{a.title}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {a.detail}
-                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{a.detail}</p>
                       {a.reason && (
                         <p className="text-[11px] text-muted-foreground mt-0.5">
                           Reason: {a.reason}
@@ -337,12 +302,7 @@ export default function StructuredDiagnosisCard({
                       size="sm"
                       variant="outline"
                       className="h-7 px-2 shrink-0"
-                      disabled={
-                        !onAddToQueue ||
-                        !!disableQueueing ||
-                        isQueued ||
-                        busyIdx !== null
-                      }
+                      disabled={!onAddToQueue || !!disableQueueing || isQueued || busyIdx !== null}
                       onClick={() => handleClick(a, i)}
                       data-testid={`${testId}-suggested-action-${i}-add-button`}
                     >

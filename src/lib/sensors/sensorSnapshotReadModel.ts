@@ -19,12 +19,7 @@ import {
 } from "@/lib/sensorSnapshot";
 import type { SensorTruthAssessment } from "@/lib/sensorTruthRules";
 
-export type SensorSnapshotReadModelTone =
-  | "info"
-  | "neutral"
-  | "warning"
-  | "danger"
-  | "muted";
+export type SensorSnapshotReadModelTone = "info" | "neutral" | "warning" | "danger" | "muted";
 
 export interface SensorSnapshotReadModelBadge {
   label: string;
@@ -54,8 +49,7 @@ export interface SensorSnapshotReadModel {
 export const SENSOR_SNAPSHOT_PREVIEW_ONLY_NOTE =
   "Read-only — sensor snapshot. Bad or unknown telemetry is not treated as healthy." as const;
 
-export const SENSOR_SNAPSHOT_MISSING_EMPTY_STATE =
-  "No sensor snapshot is available yet." as const;
+export const SENSOR_SNAPSHOT_MISSING_EMPTY_STATE = "No sensor snapshot is available yet." as const;
 
 export const SENSOR_SNAPSHOT_STALE_NOTICE =
   "Latest sensor snapshot may be stale. Review timestamp and source before making decisions." as const;
@@ -63,8 +57,7 @@ export const SENSOR_SNAPSHOT_STALE_NOTICE =
 export const SENSOR_SNAPSHOT_INVALID_NOTICE =
   "Sensor snapshot could not be trusted. Review source, timestamp, and units before using it." as const;
 
-export const SENSOR_SNAPSHOT_RAW_PAYLOAD_NOTE =
-  "Raw payload is not shown here." as const;
+export const SENSOR_SNAPSHOT_RAW_PAYLOAD_NOTE = "Raw payload is not shown here." as const;
 
 const SOURCE_TONE: Record<SnapshotSource, SensorSnapshotReadModelTone> = {
   live: "info",

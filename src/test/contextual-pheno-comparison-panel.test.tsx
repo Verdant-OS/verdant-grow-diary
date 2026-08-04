@@ -17,9 +17,7 @@ afterEach(() => {
 });
 
 function renderPanel() {
-  const view = buildContextualPhenoComparisonView(
-    CONTEXTUAL_PHENO_COMPARISON_DEMO_PLANT_INPUTS,
-  );
+  const view = buildContextualPhenoComparisonView(CONTEXTUAL_PHENO_COMPARISON_DEMO_PLANT_INPUTS);
   return { view, ...render(<ContextualPhenoComparisonPanel view={view} />) };
 }
 
@@ -42,9 +40,7 @@ describe("ContextualPhenoComparisonPanel", () => {
     const cards = screen.getAllByTestId(/contextual-pheno-comparison-plant-/);
     // strip the panel-level test ids
     const plantCards = cards.filter((el) =>
-      el.getAttribute("data-testid")?.startsWith(
-        "contextual-pheno-comparison-plant-demo-plant-",
-      ),
+      el.getAttribute("data-testid")?.startsWith("contextual-pheno-comparison-plant-demo-plant-"),
     );
     expect(plantCards).toHaveLength(3);
     expect(plantCards.map((c) => c.getAttribute("data-plant-label"))).toEqual([
@@ -56,16 +52,12 @@ describe("ContextualPhenoComparisonPanel", () => {
 
   it("renders per-plant source quality counts separated by source", () => {
     renderPanel();
-    const alpha = screen.getByTestId(
-      "contextual-pheno-comparison-plant-demo-plant-alpha",
-    );
+    const alpha = screen.getByTestId("contextual-pheno-comparison-plant-demo-plant-alpha");
     expect(within(alpha).getByTestId("plant-source-count-live")).toBeTruthy();
     expect(within(alpha).getByTestId("plant-source-count-manual")).toBeTruthy();
     expect(within(alpha).queryByTestId("plant-source-count-demo")).toBeNull();
 
-    const charlie = screen.getByTestId(
-      "contextual-pheno-comparison-plant-demo-plant-charlie",
-    );
+    const charlie = screen.getByTestId("contextual-pheno-comparison-plant-demo-plant-charlie");
     expect(within(charlie).getByTestId("plant-source-count-demo")).toBeTruthy();
     expect(within(charlie).getByTestId("plant-source-count-invalid")).toBeTruthy();
   });
@@ -82,26 +74,19 @@ describe("ContextualPhenoComparisonPanel", () => {
 
   it("renders per-plant missing context for the under-documented plant", () => {
     renderPanel();
-    const charlie = screen.getByTestId(
-      "contextual-pheno-comparison-plant-demo-plant-charlie",
+    const charlie = screen.getByTestId("contextual-pheno-comparison-plant-demo-plant-charlie");
+    expect(within(charlie).getByTestId("plant-missing-context").textContent).toMatch(
+      /no diary entries/i,
     );
-    expect(within(charlie).getByTestId("plant-missing-context").textContent)
-      .toMatch(/no diary entries/i);
     // Cross-plant section only renders when *every* plant misses a slot.
     // Demo fixtures intentionally don't trigger cross-plant gaps.
-    expect(
-      screen.queryByTestId("contextual-pheno-comparison-cross-missing"),
-    ).toBeNull();
+    expect(screen.queryByTestId("contextual-pheno-comparison-cross-missing")).toBeNull();
   });
 
   it("renders trusted/untrusted yes/no marker without ever calling Charlie healthy", () => {
     renderPanel();
-    const charlie = screen.getByTestId(
-      "contextual-pheno-comparison-plant-demo-plant-charlie",
-    );
-    expect(within(charlie).getByTestId("plant-trusted-context").textContent).toBe(
-      "no",
-    );
+    const charlie = screen.getByTestId("contextual-pheno-comparison-plant-demo-plant-charlie");
+    expect(within(charlie).getByTestId("plant-trusted-context").textContent).toBe("no");
     expect(charlie.textContent || "").not.toMatch(/healthy/i);
   });
 
@@ -155,11 +140,9 @@ describe("ContextualPhenoComparisonPanel", () => {
   });
 
   it("does not call fetch or any global network primitive during render", () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation(
-      () => {
-        throw new Error("fetch must not be called");
-      },
-    );
+    const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation(() => {
+      throw new Error("fetch must not be called");
+    });
     renderPanel();
     expect(fetchSpy).not.toHaveBeenCalled();
   });

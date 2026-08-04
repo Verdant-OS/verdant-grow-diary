@@ -173,8 +173,7 @@ export interface LegacyQuickLogFormInput {
 }
 
 export type LegacyUnifiedBuildResult =
-  | { ok: true; payload: QuickLogV2SavePayload }
-  | { ok: false; reason: string; message: string };
+  { ok: true; payload: QuickLogV2SavePayload } | { ok: false; reason: string; message: string };
 
 function trimStr(value: string | undefined | null): string {
   return (value ?? "").toString().trim();

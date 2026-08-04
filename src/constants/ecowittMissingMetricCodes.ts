@@ -27,13 +27,10 @@ export const ECOWITT_MISSING_METRIC_CODES = [
   "soil_moisture_absent",
 ] as const;
 
-export type EcowittMissingMetricCode =
-  (typeof ECOWITT_MISSING_METRIC_CODES)[number];
+export type EcowittMissingMetricCode = (typeof ECOWITT_MISSING_METRIC_CODES)[number];
 
 const SET: ReadonlySet<string> = new Set(ECOWITT_MISSING_METRIC_CODES);
 
-export function isEcowittMissingMetricCode(
-  value: unknown,
-): value is EcowittMissingMetricCode {
+export function isEcowittMissingMetricCode(value: unknown): value is EcowittMissingMetricCode {
   return typeof value === "string" && SET.has(value);
 }

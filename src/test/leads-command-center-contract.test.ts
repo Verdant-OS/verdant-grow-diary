@@ -202,15 +202,12 @@ describe("Leads Command Center contract", () => {
       SENSITIVE.message,
       SENSITIVE.company,
     ];
-    it.each(SANITIZED_HELPERS)(
-      "$name output contains no raw sensitive fields",
-      ({ run }) => {
-        const blob = JSON.stringify(run(leads));
-        for (const needle of blacklist) {
-          expect(blob).not.toContain(needle);
-        }
-      },
-    );
+    it.each(SANITIZED_HELPERS)("$name output contains no raw sensitive fields", ({ run }) => {
+      const blob = JSON.stringify(run(leads));
+      for (const needle of blacklist) {
+        expect(blob).not.toContain(needle);
+      }
+    });
   });
 
   describe("unknown/malformed data surfaces as warnings, not silently dropped", () => {

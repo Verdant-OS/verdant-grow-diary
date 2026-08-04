@@ -30,9 +30,7 @@ const SUPPORTED_METRICS: ReadonlySet<VerdantGeneticsMetric> = new Set([
 ]);
 
 export type VerdantGeneticsXlsxRejectionReason =
-  | "missing_tent_mapping"
-  | "unsupported_metric"
-  | "non_numeric_value";
+  "missing_tent_mapping" | "unsupported_metric" | "non_numeric_value";
 
 export interface VerdantGeneticsXlsxInsertRawPayload {
   csv_import: true;
@@ -146,9 +144,7 @@ export function buildVerdantGeneticsXlsxInsertRows(
     // All rows rejected. If the dominant reason is missing tent mapping,
     // surface that as the blocker.
     const blockedReason: "missing_tent_mapping" | undefined =
-      (rejectionReasons.missing_tent_mapping ?? 0) > 0
-        ? "missing_tent_mapping"
-        : undefined;
+      (rejectionReasons.missing_tent_mapping ?? 0) > 0 ? "missing_tent_mapping" : undefined;
     return {
       rows: [],
       acceptedRowCount: 0,
@@ -172,10 +168,7 @@ function buildRawPayload(
   r: VerdantGeneticsPreviewMetricRow,
   importBatchId: string,
   growId: string | undefined,
-  flagIndex: Map<
-    string,
-    Array<{ kind: VerdantGeneticsSuspiciousFlag["kind"]; note: string }>
-  >,
+  flagIndex: Map<string, Array<{ kind: VerdantGeneticsSuspiciousFlag["kind"]; note: string }>>,
 ): VerdantGeneticsXlsxInsertRawPayload {
   const payload: VerdantGeneticsXlsxInsertRawPayload = {
     csv_import: true,

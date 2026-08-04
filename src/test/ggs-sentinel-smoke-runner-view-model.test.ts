@@ -5,15 +5,24 @@ import {
   formatAgeText,
   formatCapturedText,
 } from "@/lib/ggsSentinelSmokeRunnerViewModel";
-import { runGgsSentinelSmoke, SPIDER_FARMER_GGS_AGING_MS, type SentinelSensorRow } from "@/lib/ggsSentinelSmokeRunner";
-import { SPIDER_FARMER_GGS_PROVIDER, SPIDER_FARMER_GGS_STALE_MS } from "@/lib/spiderFarmerGgsMappingRules";
+import {
+  runGgsSentinelSmoke,
+  SPIDER_FARMER_GGS_AGING_MS,
+  type SentinelSensorRow,
+} from "@/lib/ggsSentinelSmokeRunner";
+import {
+  SPIDER_FARMER_GGS_PROVIDER,
+  SPIDER_FARMER_GGS_STALE_MS,
+} from "@/lib/spiderFarmerGgsMappingRules";
 
 const NOW = new Date("2026-06-17T12:00:00.000Z");
 const fresh = (offsetSec = 60) => new Date(NOW.getTime() - offsetSec * 1000).toISOString();
 const aging = () => new Date(NOW.getTime() - (SPIDER_FARMER_GGS_AGING_MS + 60_000)).toISOString();
 const stale = () => new Date(NOW.getTime() - (SPIDER_FARMER_GGS_STALE_MS + 60_000)).toISOString();
 
-function row(overrides: Partial<SentinelSensorRow> & Pick<SentinelSensorRow, "metric" | "value">): SentinelSensorRow {
+function row(
+  overrides: Partial<SentinelSensorRow> & Pick<SentinelSensorRow, "metric" | "value">,
+): SentinelSensorRow {
   return {
     source: SPIDER_FARMER_GGS_PROVIDER,
     quality: "live",
@@ -56,7 +65,9 @@ describe("buildGgsSentinelSmokeRunnerPanelViewModel", () => {
     const vm = buildGgsSentinelSmokeRunnerPanelViewModel(verdict);
     expect(vm.freshnessNote).toBe(FRESHNESS_EXPLANATORY_NOTE);
     expect(vm.freshnessNote).toContain("does not change Sentinel result priority");
-    expect(vm.freshnessNote).toContain("explains why each metric is fresh, aging, stale, or missing");
+    expect(vm.freshnessNote).toContain(
+      "explains why each metric is fresh, aging, stale, or missing",
+    );
   });
 
   it("emits exactly one row per required metric", () => {
@@ -107,10 +118,7 @@ describe("buildGgsSentinelSmokeRunnerPanelViewModel", () => {
 
   it("pill mirrors the verdict state (PASS gets primary, BLOCKED_* gets destructive)", () => {
     const passVerdict = runGgsSentinelSmoke({
-      rows: [
-        row({ metric: "soil_temp_c", value: 22 }),
-        row({ metric: "soil_ec", value: 1.8 }),
-      ],
+      rows: [row({ metric: "soil_temp_c", value: 22 }), row({ metric: "soil_ec", value: 1.8 })],
       now: NOW,
     });
     expect(buildGgsSentinelSmokeRunnerPanelViewModel(passVerdict).pill.tone).toBe("primary");
@@ -124,10 +132,7 @@ describe("buildGgsSentinelSmokeRunnerPanelViewModel", () => {
 
   it("is deterministic for the same verdict input", () => {
     const verdict = runGgsSentinelSmoke({
-      rows: [
-        row({ metric: "soil_temp_c", value: 22 }),
-        row({ metric: "soil_ec", value: 1.8 }),
-      ],
+      rows: [row({ metric: "soil_temp_c", value: 22 }), row({ metric: "soil_ec", value: 1.8 })],
       now: NOW,
     });
     const a = buildGgsSentinelSmokeRunnerPanelViewModel(verdict);

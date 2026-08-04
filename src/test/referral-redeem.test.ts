@@ -10,7 +10,10 @@ import {
   type ReferralRedeemClient,
 } from "@/lib/referralRedeem";
 import { OAUTH_REFERRAL_STORAGE_KEY } from "@/lib/oauthReferralCaptureRules";
-import { clearLocalStorageForTest, getLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 function fakeStorage(seed: Record<string, string> = {}) {
   const map = new Map(Object.entries(seed));

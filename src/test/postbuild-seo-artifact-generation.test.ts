@@ -10,7 +10,7 @@
  * ran against a wiped dist and reported "0 documents" instead of a real error.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -18,6 +18,15 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const repoRoot = resolve(__dirname, "../..");
 const generator = join(repoRoot, "scripts/generate-seo-artifacts.ts");
 const assertScript = join(repoRoot, "scripts/assert-seo-manifest-present.mjs");
+
+type ManifestShape = {
+  origin: string;
+  documents: Array<{
+    path: string;
+    fileName: string;
+    metadata: { title: string; description: string; url: string };
+  }>;
+};
 
 let distDir = "";
 let generatorOutput = "";

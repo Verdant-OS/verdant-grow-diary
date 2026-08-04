@@ -2,90 +2,49 @@ name: edge-shared-sync
 
 on:
   pull_request:
+    # Run on every PR — do not path-filter. A PR that only touches
+    # unrelated files can still regress edge-function imports (e.g. a
+    # merge of stale mirror state), so the gate must always run.
+  push:
+    branches: [main]
+
 
 jobs:
   verify:
-    name: Transfer Vitest-only router harness and restore normal gate
+    name: Verify _shared/lib mirror is in sync
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+      issues: write         # notify-edge-shared-drift.mjs opens/updates a tracking issue
+      pull-requests: write  # notify-edge-shared-drift.mjs posts a PR comment on drift
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 2
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-        with:
-          bun-version: "1.3.14"
-      - name: Transfer, validate, self-remove, and push
+          node-version: "22"
+      - name: Fail on any ../../../src/lib import in supabase/functions/*/index.ts
+        run: node scripts/check-no-src-lib-imports.mjs
+      - name: Verify committed edge shared-lib mirror matches src/ (with PR annotations)
+        id: verify-mirror
+        run: node scripts/annotate-edge-shared-drift.mjs
+      - name: Human-readable drift report (expected vs actual sha256)
+        if: always() && steps.verify-mirror.outcome == 'failure'
         env:
-          TARGET_BRANCH: codex/fix-ssr-head-snapshot-bundle-path-20260803
-          SOURCE_BRANCH: fix/ssr-supabase-init-hardening
-          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          git config user.name "Verdant CI Maintenance"
-          git config user.email "ci-maintenance@users.noreply.github.com"
-          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
-
-          git fetch --depth=1 origin \
-            "refs/heads/${SOURCE_BRANCH}:refs/remotes/origin/${SOURCE_BRANCH}"
-
-          mkdir -p src/test/helpers
-          git show "refs/remotes/origin/${SOURCE_BRANCH}:src/test/helpers/reactRouterCompat.vitest.tsx" \
-            > src/test/helpers/reactRouterCompat.vitest.tsx
-          git show "refs/remotes/origin/${SOURCE_BRANCH}:src/test/router-harness-memory-router.test.tsx" \
-            > src/test/router-harness-memory-router.test.tsx
-
-          node <<'NODE'
-          import { readFileSync, writeFileSync } from 'node:fs';
-          const file = 'vitest.config.ts';
-          let text = readFileSync(file, 'utf8');
-          if (!text.includes('const srcRoot = path.resolve(__dirname, "./src");')) {
-            text = text.replace(
-              'export default defineConfig({',
-              'const srcRoot = path.resolve(__dirname, "./src");\n\nexport default defineConfig({',
-            );
-          }
-          text = text.replace(
-            /resolve:\s*\{\s*alias:\s*\{\s*"@":\s*path\.resolve\(__dirname,\s*"\.\/src"\)\s*\}\s*,?\s*\}/m,
-            `resolve: {
-              alias: {
-                // Vitest-only router provider for legacy tests; production keeps the thin shim.
-                "@/lib/react-router-compat": path.resolve(
-                  srcRoot,
-                  "test/helpers/reactRouterCompat.vitest.tsx",
-                ),
-                "@": srcRoot,
-              },
-            }`,
-          );
-          if (!text.includes('test/helpers/reactRouterCompat.vitest.tsx')) {
-            throw new Error('Vitest-only router alias was not installed');
-          }
-          writeFileSync(file, text);
-          NODE
-
-          # Restore the normal read-only gate and remove the standalone transfer workflow.
-          git show HEAD^:.github/workflows/edge-shared-sync.yml \
-            > .github/workflows/edge-shared-sync.yml
-          git rm .github/workflows/codex-pr690-router-harness.yml
-
-          git add .github/workflows/edge-shared-sync.yml vitest.config.ts \
-            src/test/helpers/reactRouterCompat.vitest.tsx \
-            src/test/router-harness-memory-router.test.tsx
-          git diff --cached --check
-
-          bun install --frozen-lockfile
-          bun run typecheck:tsgo
-          bunx vitest run \
-            src/test/router-harness-memory-router.test.tsx \
-            src/test/ssr-head-snapshot-paths.test.ts \
-            src/test/vitest-config-react-plugin-contract.test.ts \
-            --reporter=dot
-          bun run build
-
-          git commit -m "test(router): isolate legacy MemoryRouter harness to Vitest"
-          git push \
-            --force-with-lease="refs/heads/${TARGET_BRANCH}:${EXPECTED_HEAD}" \
-            origin "HEAD:refs/heads/${TARGET_BRANCH}"
+          DRIFT_REPORT_OUT: edge-shared-drift-report.md
+        run: node scripts/report-edge-shared-drift.mjs
+      - name: Upload drift report artifact
+        if: always() && steps.verify-mirror.outcome == 'failure'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: edge-shared-drift-report
+          path: edge-shared-drift-report.md
+          if-no-files-found: ignore
+      # Immediate GitHub notification so drift is visible before the
+      # next build. Posts a PR comment on pull_request events, otherwise
+      # opens/updates a single tracking issue. Always exits 0.
+      - name: Notify on drift (PR comment or tracking issue)
+        if: always() && steps.verify-mirror.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRIFT_REPORT_PATH: edge-shared-drift-report.md
+        run: node scripts/notify-edge-shared-drift.mjs

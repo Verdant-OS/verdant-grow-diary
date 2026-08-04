@@ -120,7 +120,7 @@ note right
   Runtime DB harness evidence for
   some controls may remain **BLOCKED**
   until zero-skip strict runs succeed —
-  do not launder to PASS here.
+  do not launder BLOCKED evidence here.
 end note
 
 @enduml

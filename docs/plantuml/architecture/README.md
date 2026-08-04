@@ -175,7 +175,7 @@ OPTIONS short-circuit
 **Side-effect ban (text only; no arrows to these systems):**  
 Telemetry storage only. No AI Doctor. No alert creation. No Action Queue write. No automation. No device control.
 
-**Evidence honesty:** Client-role immutability and born-clean inserts are implemented in migrations `20260804213000` / `20260804220000`. Strict zero-skip DB harness runtime proof may still be **BLOCKED** — do not label that lane PASS on this diagram.
+**Evidence honesty:** Client-role immutability and born-clean inserts are implemented in migrations `20260804213000` / `20260804220000`. Strict zero-skip DB harness runtime proof may still be **BLOCKED** — do not promote that lane on this diagram.
 
 ---
 
@@ -220,10 +220,10 @@ Four **distinct** lanes (do not mix credentials or headers):
 | **Implemented** | Code path exists on product branch |
 | **Statically proven** | Evidence scripts / unit-edge tests green |
 | **Runtime proven** | Live/local harness green with real DB |
-| **BLOCKED** | Strict zero-skip DB harness not yet green — **never draw as PASS** |
+| **BLOCKED** | Strict zero-skip DB harness not yet green — keep the BLOCKED label; do not upgrade the verdict |
 | **NOT_MEASURED** | Not claimed |
 
-Strict database harness: **BLOCKED** until `passed > 0`, `failed = 0`, `skipped = 0` (checklist G3).
+Strict database harness remains **BLOCKED** until the zero-skip criteria hold: nonzero suite successes, zero failures, zero skips (checklist G3).
 
 ---
 

@@ -192,6 +192,8 @@ export default function Diagnostics() {
 
       <LocalDataHealthPanel />
 
+      <AnalyticsDiagnosticsPanel />
+
       <Button onClick={runAll} disabled={running}>
         {running ? "Running…" : "Run checks"}
       </Button>

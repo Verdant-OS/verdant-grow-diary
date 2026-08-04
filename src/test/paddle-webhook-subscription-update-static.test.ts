@@ -20,7 +20,7 @@ describe("paddle webhook subscription update handoff", () => {
       /await supabase\.rpc\(rpcName,\s*\{\s*p_processing_id: processing\.id,?\s*\}/,
     );
 
-    const eventInsertIdx = WEBHOOK_SRC.indexOf('.from("paddle_events").insert');
+    const eventInsertIdx = WEBHOOK_SRC.search(/\.from\(["']paddle_events["']\)\s*\.insert/);
     const processingIdx = WEBHOOK_SRC.indexOf("recordProcessing(supabase, recordedEvent)");
     const linkCaptureIdx = WEBHOOK_SRC.indexOf(
       "captureBillingCustomerLink(supabase, recordedEvent)",

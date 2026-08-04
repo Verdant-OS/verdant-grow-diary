@@ -608,7 +608,7 @@ jobs:
   # is ample. If the suite grows and a shard nears the timeout, raise the count
   # (update the matrix list AND the `/N` divisor together).
   #
-  # `NODE_OPTIONS=--max-old-space-size=3584` keeps total memory container-safe:
+  # `NODE_OPTIONS=--max-old-space-size=8192` keeps total memory container-safe on 16GB runners:
   # the forks pool runs ~4 workers on a 4-vCPU runner, so 4 x 3584 MB ≈ 14 GB,
   # under the 16 GB runner. A lower ceiling than the file load requires also
   # means any regression OOM fails fast instead of GC-thrashing to the timeout.
@@ -654,5 +654,5 @@ jobs:
 
       - name: Run test shard
         env:
-          NODE_OPTIONS: --max-old-space-size=3584
+          NODE_OPTIONS: --max-old-space-size=8192
         run: bunx vitest run --shard=${{ matrix.shard }}/8

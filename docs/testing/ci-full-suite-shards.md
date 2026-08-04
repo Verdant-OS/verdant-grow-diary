@@ -14,12 +14,12 @@ Two jobs in `.github/workflows/ci.yml`:
 - **`test`** — lint, typecheck, all stop-ship static-safety gates, the scanner
   guardrail sentinel, and `Build`. Fast; does not run the full suite, so it
   reaches `Build` and can go green on its own.
-- **`full-suite`** — a `matrix.shard: [1 … 8]` job. Each shard runs
-  `bunx vitest run --shard=<n>/8` on its own runner. Vitest partitions the file
+- **`full-suite`** — a `matrix.shard: [1 … 32]` job. Each shard runs
+  `bunx vitest run --shard=<n>/32 --pool=forks --maxWorkers=1 --isolate` on its own runner. Vitest partitions the file
   set deterministically (by path hash), so the 8 shards together cover 100% of
   the suite.
 
-Each shard covers ~1/8 of the files (~200), and:
+Each shard covers ~1/32 of the files (~80), and:
 
 - the vitest step runs in ~90s per shard (measured on Linux/Node 20), so total
   job time — checkout + install + ripgrep + vitest — stays far under the
@@ -38,13 +38,12 @@ worker's V8 heap. See #188.
 
 With that bug fixed, per-file memory is bounded (each file peaks at low hundreds
 of MB and is freed), so shard count is governed by **per-shard wall-clock**, not
-memory. 8 shards is ample; a two-shard sample run on Linux/Node 20 at the CI cap
+memory. 32 shards is the current #697 OOM-safe count (raised from 8→16→32); a two-shard sample run on Linux/Node 20 at the CI cap
 (`--max-old-space-size=3584`) completed ~200 files each in ~90s with no OOM and
 no cross-file failures.
 
-The shard command sets `NODE_OPTIONS=--max-old-space-size=3584`. The forks pool
-runs ~4 workers on the 4-vCPU runner, so 4 × 3584 MB ≈ 14 GB stays under the
-16 GB runner. A ceiling below the file load also makes any regression OOM fail
+The shard command sets `NODE_OPTIONS=--max-old-space-size=8192`. Shards use maxWorkers=1 so a single 8GB heap stays under the 16 GB runner
+without multi-worker multiply (see #697). A ceiling below the file load also makes any regression OOM fail
 fast rather than GC-thrash to the 20-minute timeout.
 
 > Note: cross-file `document.body` accumulation is separately mitigated by a

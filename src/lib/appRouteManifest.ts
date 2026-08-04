@@ -1,13 +1,13 @@
 /**
- * App route manifest — single source of truth for every route mounted in
- * `src/App.tsx`.
+ * App route manifest — single source of truth for every route *policy*
+ * (access, feature, nav) for URLs served by the TanStack file-route tree.
  *
  * Why this exists:
- *   The App router used to be reflected in `src/test/pricing.test.ts` via a
+ *   The router used to be reflected in `src/test/pricing.test.ts` via a
  *   hard-coded sorted list. Any new route silently went stale until the next
  *   test run. This manifest is the *expected* set; the test cross-checks it
- *   against the actual routes scraped from `App.tsx` so drift fails fast in
- *   either direction.
+ *   against mounted paths extracted from `src/routes` (see
+ *   `routeManifestSyncHarness`) so drift fails fast in either direction.
  *
  * Hard constraints (Slice P1):
  *   - Pure data + pure helpers. No React, no component imports.

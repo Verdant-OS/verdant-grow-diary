@@ -1,59 +1,147 @@
 /**
- * Shared harness for asserting that TanStack's generated route tree and the
- * `APP_ROUTES` manifest in `src/lib/appRouteManifest.ts` stay in sync.
+ * Shared harness for asserting that routes mounted in the TanStack file-route
+ * tree (src/routes, via createFileRoute) and the APP_ROUTES
+ * manifest in src/lib/appRouteManifest.ts stay in sync.
  *
  * Hard constraints:
  *   - Pure helpers. No React, no test framework imports.
- *   - Read-only on the repo: only reads `src/routeTree.gen.ts` from disk.
+ *   - Read-only on the repo: only reads route modules under src/routes from disk.
  *   - No route behavior is mutated by this file.
+ *
+ * Classic note: older tests referred to src/App.tsx path scrapes.
+ * That file is gone after the TanStack migration; this harness is the
+ * replacement source of truth for what is mounted.
  *
  * Returns structured diffs so test failures can name the offending side
  * (mounted-but-missing vs. manifest-but-not-mounted) and call out access-group
  * mismatches when they are detectable from the manifest data alone.
  */
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { APP_ROUTES, type AppRouteAccess, type AppRouteEntry } from "@/lib/appRouteManifest";
 
 const REPO_ROOT = resolve(__dirname, "..", "..", "..");
-const ROUTE_TREE_PATH = resolve(REPO_ROOT, "src/routeTree.gen.ts");
+const ROUTES_DIR = resolve(REPO_ROOT, "src/routes");
 
-/** Read the generated TanStack route tree checked into the repository. */
-export function readRouteTreeSource(): string {
-  return readFileSync(ROUTE_TREE_PATH, "utf8");
+/** @deprecated Classic App.tsx path — kept only so call sites fail loudly if used. */
+export const APP_TSX_PATH = resolve(REPO_ROOT, "src/App.tsx");
+
+const CREATE_FILE_ROUTE_RE = /createFileRoute\(\s*["']([^"']+)["']\s*\)/g;
+
+/**
+ * Pathless layout route ids — not URL destinations in the Classic manifest.
+ * Child URLs are attributed without these segments.
+ */
+const PATHLESS_LAYOUT_IDS = new Set(["/_app", "/_app/_operator"]);
+
+/**
+ * Convert a TanStack file-route id to the Classic URL path used in APP_ROUTES.
+ *
+ * Examples:
+ *   /_app/dashboard              → /dashboard
+ *   /_app/_operator/operator/ecowitt → /operator/ecowitt
+ *   /cultivars/$slug             → /cultivars/:slug
+ *   /cultivars/                  → /cultivars
+ *   /$                           → *
+ *   /_app and /_app/_operator    → null (layout only)
+ */
+export function tanstackRouteIdToClassicPath(routeId: string): string | null {
+  if (routeId === "/$") return "*";
+  if (PATHLESS_LAYOUT_IDS.has(routeId)) return null;
+
+  let path = routeId;
+  if (path.startsWith("/_app/_operator")) {
+    path = path.slice("/_app/_operator".length);
+    if (path === "") return null;
+  } else if (path.startsWith("/_app")) {
+    path = path.slice("/_app".length);
+    if (path === "") return null;
+  }
+
+  // TanStack $param → Classic :param
+  path = path.replace(/\$([A-Za-z0-9_]+)/g, ":$1");
+
+  // Index routes: /cultivars/ → /cultivars
+  if (path.length > 1 && path.endsWith("/")) {
+    path = path.slice(0, -1);
+  }
+
+  if (!path.startsWith("/")) {
+    path = `/${path}`;
+  }
+
+  return path;
 }
 
-function normalizeTanStackPath(path: string): string {
-  if (path === "/$") return "*";
-  const withoutIndexSlash = path.length > 1 ? path.replace(/\/$/, "") : path;
-  return withoutIndexSlash.replace(/\$([A-Za-z][A-Za-z0-9_]*)/g, ":$1");
+function listRouteTsxFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name);
+    const st = statSync(full);
+    if (st.isDirectory()) {
+      out.push(...listRouteTsxFiles(full));
+      continue;
+    }
+    if (name.endsWith(".tsx") && name !== "__root.tsx") {
+      out.push(full);
+    }
+  }
+  return out;
 }
 
-/** Extract every canonical full path emitted by the TanStack route generator. */
-export function extractMountedAppRoutePaths(routeTreeSource?: string): string[] {
-  const src = routeTreeSource ?? readRouteTreeSource();
-  return [
-    ...new Set(
-      [...src.matchAll(/fullPath:\s*'([^']+)'/g)].map((match) => normalizeTanStackPath(match[1])),
-    ),
-  ].sort();
+/** Read every createFileRoute("…") id under src/routes. */
+export function extractTanstackRouteIds(routesDir: string = ROUTES_DIR): string[] {
+  const ids: string[] = [];
+  for (const file of listRouteTsxFiles(routesDir)) {
+    const src = readFileSync(file, "utf8");
+    for (const match of src.matchAll(CREATE_FILE_ROUTE_RE)) {
+      ids.push(match[1]);
+    }
+  }
+  return ids;
+}
+
+/**
+ * @deprecated Use extractMountedAppRoutePaths (now file-route based).
+ * Kept for call sites that still import the Classic name.
+ */
+export function readAppTsxSource(): string {
+  throw new Error(
+    "readAppTsxSource() is retired: src/App.tsx no longer exists. " +
+      "Use extractMountedAppRoutePaths() / extractTanstackRouteIds() instead.",
+  );
+}
+
+/**
+ * Extract every mounted URL path in Classic manifest form.
+ *
+ * Optional appSource is ignored (legacy signature for App.tsx injection).
+ * Prefer omitting it so paths always come from src/routes.
+ */
+export function extractMountedAppRoutePaths(_appSource?: string): string[] {
+  const classic = new Set<string>();
+  for (const id of extractTanstackRouteIds()) {
+    const path = tanstackRouteIdToClassicPath(id);
+    if (path) classic.add(path);
+  }
+  return [...classic].sort();
 }
 
 export interface RouteManifestDiff {
-  /** Mounted in the generated route tree but absent from `APP_ROUTES`. */
+  /** Mounted in file routes but absent from APP_ROUTES. */
   missingFromManifest: string[];
-  /** Present in `APP_ROUTES` but not mounted in the generated route tree. */
+  /** Present in APP_ROUTES but not mounted in file routes. */
   missingFromApp: string[];
   /** Duplicate paths inside the manifest itself (should be empty). */
   duplicateManifestPaths: string[];
 }
 
 /**
- * Compute the bidirectional diff between mounted App routes and the manifest.
+ * Compute the bidirectional diff between mounted file routes and the manifest.
  * All arrays are sorted ascending for deterministic snapshots.
  */
-export function diffAppRoutesAgainstManifest(routeTreeSource?: string): RouteManifestDiff {
-  const appPaths = extractMountedAppRoutePaths(routeTreeSource);
+export function diffAppRoutesAgainstManifest(appSource?: string): RouteManifestDiff {
+  const appPaths = extractMountedAppRoutePaths(appSource);
   const appSet = new Set(appPaths);
   const manifestSet = new Set(APP_ROUTES.map((r) => r.path));
 
@@ -77,18 +165,15 @@ export function diffAppRoutesAgainstManifest(routeTreeSource?: string): RouteMan
 export interface AccessMismatch {
   path: string;
   manifestAccess: AppRouteAccess;
-  /** What we detected from route topology (best-effort). */
+  /** What we detected from path shape (best-effort). */
   detectedAccess: AppRouteAccess | "unknown";
 }
 
 /**
- * Best-effort access-group cross-check. Today this is conservative: we only
- * flag a mismatch when the manifest claims `operator` for a path that does
- * not begin with `/operator/`, `/diagnostics`, `/sensors/`, `/ingest-`,
- * `/imports/`, or `/pi-`, and vice versa for clearly operator-shaped paths
- * that aren't marked `operator` in the manifest. We do not parse JSX nesting
- * because that requires a real React parser; this heuristic is enough to
- * catch the realistic drift (a new `/operator/*` route shipped as `auth`).
+ * Best-effort access-group cross-check. Conservative: flag when the manifest
+ * claims operator for a path that does not begin with /operator/, and
+ * vice versa for clearly operator-shaped paths that aren't marked operator
+ * or internal in the manifest.
  */
 export function findAccessGroupMismatches(): AccessMismatch[] {
   const out: AccessMismatch[] = [];
@@ -126,4 +211,17 @@ export function getPricingManifestSnapshot(): ReadonlyArray<AppRouteEntry> {
 /** Mounted operator routes — used by the operator smoke test. */
 export function getMountedOperatorPaths(appSource?: string): string[] {
   return extractMountedAppRoutePaths(appSource).filter(isOperatorShapedPath).sort();
+}
+
+/**
+ * True when the classic path is served under the /_app/_operator layout
+ * (presentation RequireOperatorRole gate).
+ */
+export function isMountedUnderOperatorLayout(classicPath: string): boolean {
+  for (const id of extractTanstackRouteIds()) {
+    if (!id.startsWith("/_app/_operator/")) continue;
+    const mapped = tanstackRouteIdToClassicPath(id);
+    if (mapped === classicPath) return true;
+  }
+  return false;
 }

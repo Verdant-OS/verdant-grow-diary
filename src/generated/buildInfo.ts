@@ -17,15 +17,15 @@ export interface BuildInfo {
 }
 
 export const buildInfo: BuildInfo = {
-  "version": "0.0.0+20260802.6cc47cbb2fcd-dirty",
+  "version": "0.0.0+20260804.41248a21fd70",
   "packageVersion": "0.0.0",
-  "commit": "6cc47cbb2fcd2646b6d8ec10aa23ef9d8fa00778",
-  "shortCommit": "6cc47cbb2fcd",
-  "ref": "edit/edt-e7a4e709-7618-477c-ba24-1e93bf927c14",
+  "commit": "41248a21fd702bb8f8909002c5b1173a2fd7a05c",
+  "shortCommit": "41248a21fd70",
+  "ref": "edit/edt-e58371cc-5cc7-43c2-a4b0-2bed599acfc2",
   "tag": null,
-  "commitTime": "2026-08-02T12:31:42Z",
-  "buildTime": "2026-08-02T12:31:48.242Z",
-  "dirty": true,
+  "commitTime": "2026-08-04T04:56:15Z",
+  "buildTime": "2026-08-04T06:05:32.465Z",
+  "dirty": false,
   "ciRunId": null,
   "ciRunUrl": null
 } as const;

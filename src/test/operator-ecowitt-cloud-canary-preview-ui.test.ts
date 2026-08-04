@@ -129,7 +129,7 @@ describe("CloudCanaryPreviewPanel — redaction + safety", () => {
 
   it("fixture-only label text is visible in component source", () => {
     expect(pageSrc).toContain("Fixture-only:");
-    expect(pageSrc).toContain("No real EcoWitt device is");
+    expect(pageSrc).toMatch(/No\s+real EcoWitt device is/);
   });
 
   it("no raw MAC, PASSKEY, or tent_id appears in component source", () => {

@@ -92,9 +92,11 @@ describe("EditPlantDialog · native camera + library flow", () => {
   });
   it("communicates non-destructive replace/clear and does not delete objects here", () => {
     expect(EDIT_DIALOG).not.toMatch(/storage\.from\([^)]*\)\.remove/);
-    expect(EDIT_DIALOG).toMatch(/Replacing the profile photo does not delete\s+older diary photos/);
     expect(EDIT_DIALOG).toMatch(
-      /This updates the plant profile photo\. It does not add a\s+timeline log/,
+      /Replacing\s+the profile photo does not delete\s+older diary photos/,
+    );
+    expect(EDIT_DIALOG).toMatch(
+      /This updates the plant profile photo\.\s+It does not add a\s+timeline log/,
     );
   });
   it("cleans up an orphan upload if the plant row update fails", () => {

@@ -74,26 +74,46 @@ for (const check of CHECKS) {
 }
 
 // --- migration checks -----------------------------------------------------
+// Each check gets a tamper per failure mode: protections removed AND the
+// regression statement that would undo them injected after the real history.
 const { corpus } = bridgeMigrationCorpus();
 const MIGRATION_TAMPERS = {
-  E29: (c) =>
-    c.replace(/ALTER TABLE public\.bridge_tokens ENABLE ROW LEVEL SECURITY;/g, "-- TAMPERED"),
-  E30: (c) => `${c}\nGRANT SELECT ON public.bridge_tokens TO anon;\n`,
-  E31: (c) => c.replace(/token_hash text NOT NULL UNIQUE,/g, "token text NOT NULL,"),
-  E34: (c) =>
-    c.replace(
-      /REVOKE EXECUTE ON FUNCTION public\.bump_bridge_token_usage\(UUID, INTEGER\) FROM PUBLIC, anon, authenticated;/g,
-      "-- TAMPERED",
-    ),
+  E29: [
+    (c) =>
+      c.replace(/ALTER TABLE public\.bridge_tokens ENABLE ROW LEVEL SECURITY;/g, "-- TAMPERED"),
+    (c) => `${c}\nALTER TABLE public.bridge_tokens DISABLE ROW LEVEL SECURITY;\n`,
+  ],
+  E30: [
+    (c) => `${c}\nGRANT SELECT ON public.bridge_tokens TO anon;\n`,
+    // No TO clause: PostgreSQL defaults the policy to PUBLIC.
+    (c) =>
+      `${c}\nCREATE POLICY "sneaky_default" ON public.bridge_tokens FOR SELECT USING (true);\n`,
+    (c) =>
+      `${c}\nCREATE POLICY "sneaky_public" ON public.bridge_tokens FOR SELECT TO PUBLIC USING (true);\n`,
+  ],
+  E31: [(c) => c.replace(/token_hash text NOT NULL UNIQUE,/g, "token text NOT NULL,")],
+  E34: [
+    (c) =>
+      c.replace(
+        /REVOKE EXECUTE ON FUNCTION public\.bump_bridge_token_usage\(UUID, INTEGER\) FROM PUBLIC, anon, authenticated;/g,
+        "-- TAMPERED",
+      ),
+    (c) =>
+      `${c}\nGRANT EXECUTE ON FUNCTION public.bump_bridge_token_usage(UUID, INTEGER) TO authenticated;\n`,
+  ],
 };
 for (const check of MIGRATION_CHECKS) {
-  const tamper = MIGRATION_TAMPERS[check.id];
-  if (!tamper) {
+  const tampers = MIGRATION_TAMPERS[check.id];
+  if (!tampers?.length) {
     report(`${check.id} migration tamper fixture`, false, "no tamper defined");
     continue;
   }
-  const detects = runExpectations(tamper(corpus), check.expect).length > 0;
-  report(`${check.id} detects tampered migration corpus`, detects);
+  tampers.forEach((tamper, i) => {
+    const tampered = tamper(corpus);
+    const failures = runExpectations(tampered, check.expect);
+    if (check.custom) failures.push(...check.custom(tampered));
+    report(`${check.id} detects tampered migration corpus (#${i + 1})`, failures.length > 0);
+  });
 }
 
 // --- missing files are failures, never skips ------------------------------

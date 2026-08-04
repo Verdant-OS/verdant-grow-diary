@@ -301,8 +301,10 @@ export const CHECKS = [
   {
     id: "E27",
     file: "securityRegressionWorkflow",
-    description: "this evidence lane is wired into the Security regression workflow",
-    expect: [{ re: /test:bridge-sensor-ingest-evidence/, must: true }],
+    description: "this evidence lane is an active run step in the Security regression workflow",
+    // Anchored as a live YAML `run:` line: a commented-out `# run: ...`
+    // would not satisfy this, so the lane cannot be soft-disabled in place.
+    expect: [{ re: /^\s*run:\s*bun run test:bridge-sensor-ingest-evidence\s*$/m, must: true }],
   },
   {
     id: "E28",
@@ -319,30 +321,56 @@ export const CHECKS = [
 
 /**
  * Migration checks scan every file under supabase/migrations that mentions
- * bridge_tokens, in aggregate: later migrations may legitimately supersede
- * earlier ones, so expectations run against the concatenated history.
+ * bridge_tokens, in aggregate. Concatenated text alone cannot prove the
+ * *effective* final state (a later migration could undo an earlier one), so
+ * every "protection present" check is paired with a forbidden-regression
+ * tripwire for the statement that would undo it (DISABLE ROW LEVEL SECURITY,
+ * a re-GRANT, a PUBLIC/anon policy). Full effective-state proof belongs to
+ * the runtime bridge_tokens RLS harness tracked as checklist gap G3.
  */
 export const MIGRATION_CHECKS = [
   {
     id: "E29",
-    description: "bridge_tokens has Row Level Security enabled in migration history",
+    description: "bridge_tokens has RLS enabled and no migration ever disables it",
     expect: [
       {
         re: /ALTER TABLE (?:public\.)?bridge_tokens ENABLE ROW LEVEL SECURITY/i,
         must: true,
       },
+      { re: /(?:public\.)?bridge_tokens\s+DISABLE ROW LEVEL SECURITY/i, must: false },
     ],
   },
   {
     id: "E30",
-    description: "no bridge_tokens policy or grant is addressed to anon",
+    description:
+      "every bridge_tokens policy names authenticated explicitly; no policy or grant reaches anon or PUBLIC",
     expect: [
-      { re: /bridge_tokens[^;]{0,400}\bTO anon\b/is, must: false },
       {
-        re: /GRANT[^;]{0,200}ON (?:TABLE )?(?:public\.)?bridge_tokens[^;]{0,200}\bTO anon\b/is,
+        re: /GRANT[^;]{0,200}ON (?:TABLE )?(?:public\.)?bridge_tokens[^;]{0,200}\bTO[^;]{0,200}\b(anon|PUBLIC)\b/is,
         must: false,
       },
     ],
+    // A CREATE POLICY without a TO clause defaults to PUBLIC (which includes
+    // anon), so absence-of-"TO anon" is not enough: every policy statement on
+    // bridge_tokens must carry an explicit `TO authenticated`.
+    custom: (corpus) => {
+      const failures = [];
+      const policies = corpus
+        .split(";")
+        .map((s) => s.trim())
+        .filter((s) => /CREATE POLICY/i.test(s) && /ON\s+(?:public\.)?bridge_tokens\b/i.test(s));
+      if (policies.length === 0) failures.push("no bridge_tokens CREATE POLICY statements found");
+      for (const p of policies) {
+        const label = p.replace(/\s+/g, " ").slice(0, 70);
+        if (!/\bTO\s+authenticated\b/i.test(p)) {
+          failures.push(`policy lacks explicit "TO authenticated" (defaults to PUBLIC): ${label}`);
+        }
+        if (/\bTO\s+(?:PUBLIC|anon)\b/i.test(p)) {
+          failures.push(`policy addressed to PUBLIC/anon: ${label}`);
+        }
+      }
+      return failures;
+    },
   },
   {
     id: "E31",
@@ -355,11 +383,15 @@ export const MIGRATION_CHECKS = [
   {
     id: "E34",
     description:
-      "bump_bridge_token_usage (SECURITY DEFINER) is not executable by anon or authenticated",
+      "bump_bridge_token_usage (SECURITY DEFINER) is locked to service_role and never re-granted",
     expect: [
       {
         re: /REVOKE EXECUTE ON FUNCTION public\.bump_bridge_token_usage\(UUID, INTEGER\) FROM PUBLIC, anon, authenticated;/,
         must: true,
+      },
+      {
+        re: /GRANT EXECUTE ON FUNCTION public\.bump_bridge_token_usage[^;]*\bTO[^;]*\b(PUBLIC|anon|authenticated)\b/i,
+        must: false,
       },
     ],
   },
@@ -425,6 +457,7 @@ export function runAllChecks({ readFile = readRepoFile, migrations = bridgeMigra
       continue;
     }
     const failures = runExpectations(corpus, check.expect);
+    if (check.custom) failures.push(...check.custom(corpus));
     results.push({
       id: check.id,
       ok: failures.length === 0,

@@ -75,7 +75,9 @@ branch, never `main`.
       `auth.uid() = user_id`, with a `BEFORE UPDATE` trigger freezing
       `user_id`, `tent_id`, `token_hash`, `token_prefix`, `expires_at`,
       `created_at`. Any new policy or trigger change must keep every policy
-      owner-scoped and must not widen the mutable column set.
+      owner-scoped and must not widen the mutable column set. Note the
+      `SELECT` grant is table-wide and RLS is row-level, so owners can read
+      every column of their own rows, including `token_hash` (gap G10).
 
 ## 3. Presentation and verification (webhook auth)
 
@@ -146,7 +148,7 @@ branch, never `main`.
       this checklist and the evidence lane in the same PR — the value is
       deliberately load-bearing: the webhook's stale rejection is tied to the
       `sensor_readings` dedupe uniqueness key (`user_id, tent_id, source,
-    metric, captured_at`), so a window change is never a one-line edit.
+  metric, captured_at`), so a window change is never a one-line edit.
 - [ ] [runtime: `storageMapping` tests via the webhook vitest suites]
       Per-row provenance is demoted `live -> stale` at the same 30m boundary,
       so replayed packets cannot land as live.
@@ -284,10 +286,22 @@ accepted-risk entry in `docs/security-exceptions.md`.
   entry.
 - **G3 — no runtime RLS harness for `bridge_tokens`** (`missing evidence`).
   Unlike `sensor_readings`, storage, profiles, etc., no harness proves at
-  runtime that cross-user SELECT/UPDATE/DELETE is denied, that `token_hash`
-  is not client-recoverable after mint, or that the DELETE policy actually
-  functions (no `GRANT DELETE` exists in migrations; it depends on platform
-  default privileges — unverifiable from the repo).
+  runtime that cross-user SELECT/UPDATE/DELETE is denied, or that the DELETE
+  policy actually functions (no `GRANT DELETE` exists in migrations; it
+  depends on platform default privileges — unverifiable from the repo).
+  Note the harness cannot and should not try to prove `token_hash`
+  non-recoverability — see G10, that visibility is real under current
+  grants.
+- **G10 — owners can read their own `token_hash`** (established fact).
+  The founding migration grants table-wide `SELECT` to `authenticated` and
+  RLS filters rows, not columns, so an owner (or any code holding the
+  owner's session) can select their own rows' `token_hash` directly; the
+  migration's "hash is opaque" comment is design intent, not an enforced
+  control. Risk is bounded by SHA-256 preimage resistance — the plaintext
+  is never stored — and the exposure is same-owner-only. The one-time-reveal
+  guarantee (§11) applies to the plaintext, not the hash. Hardening
+  candidates: column-level privileges or a metadata-only view for client
+  reads.
 - **G4 — mint/revoke test coverage holes** (`missing evidence`).
   `mint-bridge-token/handler_e2e_test.ts` is wired to **no** CI workflow or
   package script (the Deno edge-tests workflow's run list and path filters

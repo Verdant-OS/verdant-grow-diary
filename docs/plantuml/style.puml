@@ -1,17 +1,19 @@
 ' =============================================================================
 ' Verdant PlantUML shared style
 ' -----------------------------------------------------------------------------
-' Usage (from this directory):
-'   !include style.puml
-' Usage (from repo root):
-'   !include docs/plantuml/style.puml
+' Include resolution: PlantUML resolves relative !include paths from the
+' DIAGRAM SOURCE FILE's directory — never from wherever the plantuml
+' process was launched.
+'   diagram in docs/plantuml/examples/  ->  !include ../style.puml
+'   diagram in docs/plantuml/           ->  !include style.puml
 '
-' Semantic colors (governance / trust diagrams):
-'   stop-ship  red    — Security FAIL, do not merge
-'   hold       amber  — missing evidence / CHANGES_REQUESTED
-'   merge      green  — Cheek APPROVE & merge
-'   packet     blue   — approval packet / process inputs
-'   neutral    slate  — default boxes, arrows
+' Semantic colors belong to OUTCOMES, never to agents/roles:
+'   stop-ship  red    — a Security FAIL result, do not merge
+'   hold       amber  — a HOLD / CHANGES_REQUESTED result
+'   merge      green  — a Cheek APPROVE & merge result
+'   packet     blue   — an approval packet / process input artifact
+'   human      purple — Cheek / human authority (the one identity color)
+'   neutral    slate  — default boxes, arrows, and EVERY agent participant
 '
 ' Docs-only asset. Does not affect app runtime CSS or Mermaid charts.
 ' Prefer Mermaid in GitHub-rendered agent docs when no render step exists.
@@ -65,16 +67,21 @@ skinparam sequence {
   DividerBorderColor #90A4AE
 }
 
-' Stereotypes for sequence participants
+' Outcome stereotypes for sequence elements. Apply them to RESULT artifacts
+' (notes, packets, decision boxes) — never as a permanent agent color.
+' Color alone must not carry status: pair every use with the literal
+' outcome word (FAIL, PASS, HOLD, CHANGES_REQUESTED, APPROVE).
 skinparam participant<<stop>> {
   BackgroundColor #FFCDD2
   BorderColor #C62828
   FontColor #B71C1C
 }
+' Hold text is #8A2C00 (contrast-tested ~7:1 on #FFE0B2 at 12px); the
+' brighter #E65100 fails 4.5:1 for normal text and is border-only.
 skinparam participant<<hold>> {
   BackgroundColor #FFE0B2
   BorderColor #EF6C00
-  FontColor #E65100
+  FontColor #8A2C00
 }
 skinparam participant<<ok>> {
   BackgroundColor #C8E6C9
@@ -86,7 +93,14 @@ skinparam participant<<packet>> {
   BorderColor #1565C0
   FontColor #0D47A1
 }
+' Cheek renders as an actor in sequence diagrams and occasionally as a
+' participant box — style BOTH element types so <<human>> works either way.
 skinparam participant<<human>> {
+  BackgroundColor #F3E5F5
+  BorderColor #6A1B9A
+  FontColor #4A148C
+}
+skinparam actor<<human>> {
   BackgroundColor #F3E5F5
   BorderColor #6A1B9A
   FontColor #4A148C
@@ -100,7 +114,7 @@ skinparam activity {
   FontSize 12
   DiamondBackgroundColor #FFF8E1
   DiamondBorderColor #F9A825
-  DiamondFontColor #E65100
+  DiamondFontColor #8A2C00
   StartColor #2E7D32
   EndColor #424242
   ArrowColor #546E7A
@@ -124,7 +138,7 @@ skinparam class<<entity>> {
 skinparam class<<edge>> {
   BackgroundColor #FFF3E0
   BorderColor #EF6C00
-  FontColor #E65100
+  FontColor #8A2C00
 }
 skinparam class<<unsafe>> {
   BackgroundColor #FFCDD2
@@ -146,7 +160,7 @@ skinparam component {
 skinparam component<<edge>> {
   BackgroundColor #FFF3E0
   BorderColor #EF6C00
-  FontColor #E65100
+  FontColor #8A2C00
 }
 
 skinparam database {

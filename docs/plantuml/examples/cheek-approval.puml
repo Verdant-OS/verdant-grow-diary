@@ -1,10 +1,10 @@
 ' Example: Cheek approval decision core (activity)
-' Render from repo root:
-'   plantuml docs/plantuml/examples/cheek-approval.puml
-' Or open in a PlantUML-capable editor with include path = repo root.
+' Render from any directory — the include below is resolved relative to
+' THIS file, not the plantuml launch directory:
+'   plantuml -tsvg docs/plantuml/examples/cheek-approval.puml
 
 @startuml cheek_approval_decision_core
-!include docs/plantuml/style.puml
+!include ../style.puml
 
 title Cheek approval decision core
 
@@ -42,9 +42,10 @@ legend right
 endlegend
 
 note right
-  Shared look: docs/plantuml/style.puml
-  GitHub-native docs still prefer Mermaid
-  (see docs/agents/cheek-approval-workflow.md).
+  Shared look: ../style.puml
+  Authority + handoff rules: AGENTS.md and
+  docs/agents/HANDOFF_PROTOCOL.md.
+  GitHub-native agent docs still prefer Mermaid.
 end note
 
 @enduml

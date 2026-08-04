@@ -1,38 +1,55 @@
-' Example: multi-agent handoff sequence with Verdant stereotypes
+' Example: multi-agent handoff sequence.
+' Agents are NEUTRAL participants — color belongs only to outcomes
+' (Security FAIL red, Security PASS green, Cheek HOLD amber, packet blue)
+' and to Cheek's human authority (purple). Color never carries status
+' alone: every outcome states its literal word.
+' Render from any directory — the include below is resolved relative to
+' THIS file, not the plantuml launch directory:
+'   plantuml -tsvg docs/plantuml/examples/agent-handoff-sequence.puml
 
 @startuml verdant_agent_handoff_sequence
-!include docs/plantuml/style.puml
+!include ../style.puml
 
 title Agent handoff pipeline to Cheek
 
 actor "Cheek" as Cheek <<human>>
-participant "Grok\nResearch" as Grok <<packet>>
-participant "Claude\nSpecs" as Claude <<packet>>
-participant "Codex\nBuild" as Codex <<ok>>
-participant "Security" as Sec <<stop>>
-participant "Gemini\nQA" as Gemini <<packet>>
-participant "Council" as Council <<hold>>
+participant "Grok\nResearch" as Grok
+participant "Claude\nSpecs" as Claude
+participant "Codex\nBuild" as Codex
+participant "Security" as Sec
+participant "Gemini\nQA" as Gemini
+participant "Council" as Council
 
 Grok -> Claude: HANDOFF research evidence
 Claude -> Codex: HANDOFF implementation-ready spec
 Codex -> Sec: HANDOFF slice + tests + SHA
 alt Security FAIL
-  Sec --> Codex: FAIL stop-ship
+  Sec -[#C62828]-> Codex: <color:#B71C1C>**FAIL** — stop-ship</color>
+  hnote over Sec #FFCDD2: <color:#B71C1C>Security **FAIL** outranks\nevery other green</color>
 else Security PASS
-  Sec -> Gemini: HANDOFF for QA audit
+  Sec -[#2E7D32]-> Gemini: <color:#1B5E20>**PASS** — HANDOFF for QA audit</color>
   Gemini -> Council: HANDOFF release-risk view
-  Council -> Cheek: one recommendation\n+ single next_slice
-  Cheek --> Council: APPROVE | HOLD | REASSIGN | ...
+  Council -[#1565C0]-> Cheek: <color:#0D47A1>**CHEEK_APPROVAL_PACKET**\none recommendation + single next_slice</color>
+  alt Cheek approves
+    Cheek -[#2E7D32]-> Council: <color:#1B5E20>**APPROVE** & merge</color>
+  else Cheek holds
+    Cheek -[#EF6C00]-> Council: <color:#8A2C00>**HOLD / CHANGES_REQUESTED**</color>
+    hnote over Council #FFE0B2: <color:#8A2C00>**HOLD** — evidence gap named,\nowner assigned, no merge</color>
+  end
 end
 
-note over Sec
-  <<stop>> stereotype = red participant
-  Security FAIL outranks other greens
-end note
+legend right
+  |= Color |= Outcome (never a role) |
+  | <#FFCDD2> | Security FAIL / stop-ship |
+  | <#C8E6C9> | Security PASS / APPROVE |
+  | <#FFE0B2> | Cheek HOLD / CHANGES_REQUESTED |
+  | <#BBDEFB> | approval packet / process input |
+  | <#F3E5F5> | Cheek — human authority |
+endlegend
 
 note over Cheek
-  Sole ship authority
-  (docs/agents/cheek-approval-workflow.md)
+  Sole ship authority — see AGENTS.md
+  and docs/agents/HANDOFF_PROTOCOL.md
 end note
 
 @enduml

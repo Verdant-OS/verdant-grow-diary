@@ -121,6 +121,9 @@ export default function Sensors() {
   // whether the requested tent belongs to this grower. Exact-match intents
   // remain active across tent-list refreshes until a grower explicitly picks
   // another owned tent. Ordinary intents preserve the prior safe fallback.
+  // Depend on tent *ids* (not array identity) so a referentially-new tents
+  // array from a render-scoped mock cannot re-fire this effect forever.
+  const tentsSyncKey = useMemo(() => tents.map((tent) => tent.id).join("\0"), [tents]);
   useEffect(() => {
     if (!tentsQuery.isSuccess) return;
 
@@ -141,12 +144,14 @@ export default function Sensors() {
       }),
     );
     setAppliedTentRouteIntentKey(sensorsTentRouteIntentKey);
+    // tents is read inside; tentsSyncKey gates re-runs on content.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- content key
   }, [
     appliedTentRouteIntentKey,
     explicitTentId,
     sensorsTentRouteIntent,
     sensorsTentRouteIntentKey,
-    tents,
+    tentsSyncKey,
     tentsQuery.isSuccess,
   ]);
 

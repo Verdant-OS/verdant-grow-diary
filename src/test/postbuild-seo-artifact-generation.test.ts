@@ -231,6 +231,135 @@ describe("postbuild SEO artifact generation", () => {
     expect(output).toContain("non-empty absolute canonical URL");
   });
 
+  describe("pre-rendered head snapshot gate", () => {
+    /** dist with a manifest whose every document has a valid head snapshot. */
+    function makeSnapshotDist(
+      documents: ManifestDocument[],
+      render: (document: ManifestDocument) => string | null = renderHeadSnapshot,
+    ): string {
+      const manifest = readManifest();
+      const dir = mkdtempSync(join(tmpdir(), "verdant-seo-heads-"));
+      writeFileSync(
+        join(dir, "seo-manifest.json"),
+        JSON.stringify({ origin: manifest.origin, documents }),
+      );
+      for (const document of documents) {
+        const html = render(document);
+        if (html === null) continue;
+        const filePath = join(dir, document.fileName);
+        mkdirSync(dirname(filePath), { recursive: true });
+        writeFileSync(filePath, html);
+      }
+      return dir;
+    }
+
+    it("accepts every manifest document when its snapshot is present, non-empty, and well-formed", () => {
+      const manifest = readManifest();
+      const dir = makeSnapshotDist(manifest.documents);
+      try {
+        const output = run("node", [headSnapshotScript, dir]);
+        expect(output).toContain("assert-ssr-head-snapshots-present: OK");
+        expect(output).toContain(
+          `${manifest.documents.length}/${manifest.documents.length} pre-rendered head snapshot(s)`,
+        );
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it("reports every manifest document whose snapshot file is missing", async () => {
+      const manifest = readManifest();
+      const { validateHeadSnapshots } = await importHeadSnapshotGate();
+      const result = validateHeadSnapshots(distDir);
+
+      expect(result.ok).toBe(false);
+      expect(result.checked).toBe(0);
+      expect(result.problems).toHaveLength(manifest.documents.length);
+      expect(result.problems.join("\n")).toContain("head snapshot missing at");
+    });
+
+    it("rejects an empty snapshot file", async () => {
+      const manifest = readManifest();
+      const target = manifest.documents[0];
+      const dir = makeSnapshotDist([target], () => "");
+      try {
+        const { validateHeadSnapshots } = await importHeadSnapshotGate();
+        const result = validateHeadSnapshots(dir);
+        expect(result.ok).toBe(false);
+        expect(result.problems.join("\n")).toContain("is empty (0 bytes)");
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it("rejects a truncated snapshot file", async () => {
+      const manifest = readManifest();
+      const target = manifest.documents[0];
+      const dir = makeSnapshotDist([target], () => "<!doctype html><html><head>");
+      try {
+        const { validateHeadSnapshots } = await importHeadSnapshotGate();
+        const result = validateHeadSnapshots(dir);
+        expect(result.ok).toBe(false);
+        expect(result.problems.join("\n")).toMatch(/byte\(s\); expected at least/);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it.each([
+      [
+        "a snapshot with no <title>",
+        (html: string) => html.replace(/<title>[\s\S]*?<\/title>/i, ""),
+        "has no <title>",
+      ],
+      [
+        "a snapshot with an empty <title>",
+        (html: string) => html.replace(/<title>[\s\S]*?<\/title>/i, "<title>   </title>"),
+        "<title> is empty",
+      ],
+      [
+        "a snapshot with no meta description",
+        (html: string) => html.replace(/<meta name="description"[^>]*>/i, ""),
+        "has no meta description",
+      ],
+      [
+        "a snapshot with no canonical link",
+        (html: string) => html.replace(/<link rel="canonical"[^>]*>/i, ""),
+        'has no <link rel="canonical">',
+      ],
+      [
+        "a snapshot whose canonical disagrees with the manifest",
+        (html: string) =>
+          html.replace(/<link rel="canonical" href="[^"]*"/i, '<link rel="canonical" href="/wrong"'),
+        "does not match manifest canonical",
+      ],
+      [
+        "a snapshot that is not an HTML document",
+        () => `{"note":"this is JSON, not a pre-rendered head snapshot"}`.padEnd(400, " "),
+        "not an HTML document",
+      ],
+    ])("rejects %s", async (_label, mutate, expectedProblem) => {
+      const manifest = readManifest();
+      const target = manifest.documents[0];
+      const dir = makeSnapshotDist([target], (document) =>
+        (mutate as (html: string) => string)(renderHeadSnapshot(document)),
+      );
+      try {
+        const { validateHeadSnapshots } = await importHeadSnapshotGate();
+        const result = validateHeadSnapshots(dir);
+        expect(result.ok).toBe(false);
+        expect(result.problems.join("\n")).toContain(expectedProblem);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it("exits non-zero from the CLI when a snapshot is missing", () => {
+      expect(() => run("node", [headSnapshotScript, distDir])).toThrow();
+    });
+  });
+
+
   it("fails the manifest precondition gate when dist has no manifest", () => {
     const emptyDir = mkdtempSync(join(tmpdir(), "verdant-seo-empty-"));
     try {

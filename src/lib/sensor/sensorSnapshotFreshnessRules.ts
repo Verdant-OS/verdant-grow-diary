@@ -10,7 +10,7 @@
  *    informs the age label but they are not promoted to "live".
  */
 import { normalizeSensorSource, type SensorSource } from "./sensorSourceRules";
-import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { LIVE_CURRENT_STATE_STALE_MS } from "../sensorTruthCanon";
 
 export type SensorMetrics = Partial<{
   temp_f: number | null;

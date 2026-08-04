@@ -102,11 +102,12 @@ jobs:
     needs: edge-shared-sync-preflight
     runs-on: ubuntu-latest
 
-    # This job runs the entire src/test vitest suite in one process (see the
-    # monolithic full-suite step below); 20 minutes was sized before the
-    # suite grew. 45 gives honest headroom so a timeout means "stuck", not
-    # "suite got bigger".
-    timeout-minutes: 45
+    # This job runs lint/typecheck/static scans + scanner guardrails + build.
+    # The monolithic full Vitest suite lives in `full-suite` below. 45 minutes
+    # was still too tight once scanner-guardrails:ci + ecowitt bridge validation
+    # stacked on top of typecheck/scans (#697 cancelled at ~45m on the scanner
+    # sentinel). 75 gives honest headroom so a timeout means "stuck".
+    timeout-minutes: 75
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -632,7 +633,12 @@ jobs:
   full-suite:
     name: Full test suite (shard ${{ matrix.shard }}/32)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Matrix shard N covers vitest partitions (8N-7)..(8N) of 256 (eight
+    # sequential 1/256 processes). Heavy shards (e.g. 6/32, 8/32) still
+    # approached the old 45m ceiling on ubuntu-latest (#697 cancelled at
+    # timeout with the test step still running). 75m is wall-clock headroom;
+    # residual OOM is handled by the 1/256 + maxWorkers=1 + 8GB heap setup.
+    timeout-minutes: 75
     permissions:
       contents: read
     strategy:

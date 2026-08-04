@@ -594,17 +594,17 @@ jobs:
   # `test` job so the whole suite (~21k tests, jsdom-heavy) doesn't exceed the
   # 20-minute job timeout when run on a single runner.
   #
-  # 32 shards on independent runners; each covers ~1/32 of the files via
-  # vitest's hash-based file distribution. Raised 8 → 16 → 32 after #697 OOM
-  # (shard 15 still hit ~7.3GB heap mid-suite under 16-way with maxWorkers=1).
-  # Half the files per process keeps V8 accumulation under the 8GB ceiling.
+  # 32 named gate shards. Each job runs TWO sequential vitest processes
+  # (`--shard=(2n-1)/64` then `--shard=(2n)/64`) so V8 heap resets mid-suite.
+  # Raised after #697: even 1/32 of files still climbed to ~7.3GB and OOM'd
+  # under a single long-lived maxWorkers=1 process (shard 30/32).
   #
   # History: the suite was briefly split into 36 shards to keep each worker
   # below an OOM. That OOM was NOT diffuse jsdom accumulation — it was a single
   # test file (ecowitt-bridge-status-page) whose unstable useToast mock spun an
   # unbounded render loop that exhausted the worker heap. With that fixed (#188),
   # wall-clock alone would allow fewer shards; residual cross-file heap growth
-  # under isolate still forces a higher N on this suite (#697).
+  # under isolate still forces process restarts on this suite (#697).
   #
   # `NODE_OPTIONS=--max-old-space-size=8192` with `--maxWorkers=1 --isolate` keeps
   # total memory container-safe on 16GB runners for heavy shards (see #697 OOM).
@@ -682,9 +682,16 @@ jobs:
       - name: Install ripgrep
         run: sudo apt-get update && sudo apt-get install -y ripgrep
 
-      - name: Run test shard
+      - name: Run test shard (two sequential half-shards)
         env:
           # Single worker + 8GB: multi-worker multiplies heap and OOMs (#697).
-          # 32 shards keep each process under the accumulation ceiling.
+          # Two sequential 1/64 processes restart V8 so accumulation resets.
           NODE_OPTIONS: --max-old-space-size=8192
-        run: bunx vitest run --shard=${{ matrix.shard }}/32 --pool=forks --maxWorkers=1 --isolate
+        run: |
+          set -euo pipefail
+          # Matrix shard N covers vitest partitions (2N-1)/64 and (2N)/64.
+          a=$(( (${{ matrix.shard }} - 1) * 2 + 1 ))
+          b=$(( a + 1 ))
+          echo "Running half-shards ${a}/64 then ${b}/64 for gate shard ${{ matrix.shard }}/32"
+          bunx vitest run --shard=${a}/64 --pool=forks --maxWorkers=1 --isolate
+          bunx vitest run --shard=${b}/64 --pool=forks --maxWorkers=1 --isolate

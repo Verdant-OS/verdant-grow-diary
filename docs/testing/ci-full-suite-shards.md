@@ -38,7 +38,7 @@ worker's V8 heap. See #188.
 
 With that bug fixed, per-file memory is bounded (each file peaks at low hundreds
 of MB and is freed), so shard count is governed by **per-shard wall-clock**, not
-memory. 32 shards is the current #697 OOM-safe count (raised from 8→16→32); a two-shard sample run on Linux/Node 20 at the CI cap
+memory. 32 named gate shards each run two sequential 1/64 half-shards so V8 restarts mid-suite (#697 OOM); a two-shard sample run on Linux/Node 20 at the CI cap
 (`--max-old-space-size=3584`) completed ~200 files each in ~90s with no OOM and
 no cross-file failures.
 

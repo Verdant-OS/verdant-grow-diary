@@ -46,9 +46,20 @@ jobs:
       - name: Guides + Glossary head-tag invariants (title, canonical, OG, Twitter)
         run: bunx vitest run src/test/verdant-guides-glossary-head-invariants.test.ts src/test/verdant-seo-guides.test.ts src/test/verdant-seo-guides-render.test.tsx src/test/verdant-seo-structured-data.test.ts src/test/verdant-seo-sitemap-robots.test.ts --reporter=dot
 
+      # Postbuild SEO artifact generation contract. Runs
+      # scripts/generate-seo-artifacts.ts into a throwaway dist and asserts the
+      # inputs the fidelity validators consume (seo-manifest.json with real
+      # canonicals, per-document OG cards, static route document declarations)
+      # exist and are non-empty. Runs BEFORE the build so a broken generator
+      # fails here with a precise message instead of surfacing later as a
+      # validator "0 documents" / missing-manifest error.
+      - name: Postbuild SEO artifact generation contract
+        run: bun run test:postbuild-seo-artifacts
+
       # Full production build; the postbuild hook runs
       # validate-static-route-head-fidelity.mjs and writes the
       # per-route diff report used below.
+
       - name: Build (runs postbuild head-fidelity validator)
         run: bun run build
 

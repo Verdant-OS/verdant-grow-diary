@@ -1,0 +1,204 @@
+name: reconcile-sensor-truth-stack
+
+on:
+  pull_request:
+
+jobs:
+  reconcile:
+    name: Validate and atomically reconcile #691 → #692
+    if: ${{ github.event.pull_request.number == 691 }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: "1.3.14"
+      - name: Reconcile only after both exact branches validate
+        env:
+          PARENT_BRANCH: grok/sensor-truth-canon-freshness-592
+          CHILD_BRANCH: grok/sensor-truth-canon-residual-592
+          PREREQ_BRANCH: codex/fix-ssr-head-snapshot-bundle-path-20260803
+          EXPECTED_PARENT: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_CHILD: 49db0b2e8cbc539ceb7fdc3c27f0a725cc14e884
+          EXPECTED_PREREQ: 94727a2d425e8906becaeefa39ed974ca9b958ab
+        run: |
+          set -euo pipefail
+          git config user.name "Verdant Stack Maintenance"
+          git config user.email "stack-maintenance@users.noreply.github.com"
+
+          normalize_edge_aliases() {
+            python3 - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              Path("src/lib/sensorTruthCanon.ts"): {
+                  'from "@/constants/sensorTiming";': 'from "../constants/sensorTiming";',
+                  'from "@/lib/sensorLiveMembership";': 'from "./sensorLiveMembership";',
+              },
+              Path("src/lib/sensor/sensorSnapshotFreshnessRules.ts"): {
+                  'from "@/lib/sensorTruthCanon";': 'from "../sensorTruthCanon";',
+              },
+          }
+          forbidden = (
+              "@/constants/sensorTiming",
+              "@/lib/sensorLiveMembership",
+              "@/lib/sensorTruthCanon",
+          )
+          for path, mapping in replacements.items():
+              text = path.read_text()
+              for old, new in mapping.items():
+                  text = text.replace(old, new)
+              path.write_text(text)
+              found = [token for token in forbidden if token in text]
+              if found:
+                  raise SystemExit(f"{path}: unresolved Edge alias(es): {found}")
+          PY
+          }
+
+          resolve_conflicts() {
+            local owned_file="$1"
+            mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
+            for file in "${conflicts[@]}"; do
+              case "$file" in
+                .github/workflows/edge-shared-sync.yml|.github/workflows/stack-reconcile-691-692.yml|vitest.config.ts|scripts/capture-ssr-head-snapshots-with-server.mjs|scripts/ssr-head-snapshot-paths.mjs|src/test/helpers/reactRouterCompat.vitest.tsx|src/test/router-harness-memory-router.test.tsx|src/test/ssr-head-snapshot-paths.test.ts|src/test/vitest-config-react-plugin-contract.test.ts|src/lib/react-router-compat.tsx)
+                  git checkout --theirs -- "$file" 2>/dev/null || git rm --ignore-unmatch -- "$file"
+                  ;;
+                supabase/functions/_shared/lib/*|supabase/functions/*/*.ts)
+                  git checkout --ours -- "$file"
+                  ;;
+                *)
+                  if grep -Fxq "$file" "$owned_file"; then
+                    git checkout --ours -- "$file"
+                  else
+                    git checkout --theirs -- "$file"
+                  fi
+                  ;;
+              esac
+              git add -A -- "$file"
+            done
+            test -z "$(git diff --name-only --diff-filter=U)"
+          }
+
+          capture_build_outputs() {
+            git add supabase/functions/mcp/index.ts
+            if ! git diff --cached --quiet; then
+              git commit --amend --no-edit
+            fi
+          }
+
+          reset_after_build() {
+            local commit="$1"
+            git reset --hard "$commit"
+            git clean -fd
+            git diff --quiet
+            git diff --cached --quiet
+          }
+
+          git fetch --no-tags origin \
+            "refs/heads/${CHILD_BRANCH}:refs/remotes/stack/child" \
+            "refs/heads/${PREREQ_BRANCH}:refs/remotes/stack/prereq"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_PARENT"
+          test "$(git rev-parse refs/remotes/stack/child)" = "$EXPECTED_CHILD"
+          test "$(git rev-parse refs/remotes/stack/prereq)" = "$EXPECTED_PREREQ"
+
+          # Parent: merge the shared test/postbuild prerequisite.
+          git checkout -B stack-parent "$EXPECTED_PARENT"
+          parent_merge_base="$(git merge-base HEAD refs/remotes/stack/prereq)"
+          git diff --name-only "$parent_merge_base"..HEAD > /tmp/parent-owned.txt
+          git merge --no-ff --no-commit refs/remotes/stack/prereq || resolve_conflicts /tmp/parent-owned.txt
+          git checkout refs/remotes/stack/prereq -- \
+            .github/workflows/edge-shared-sync.yml \
+            vitest.config.ts \
+            scripts/capture-ssr-head-snapshots-with-server.mjs \
+            scripts/ssr-head-snapshot-paths.mjs \
+            src/test/helpers/reactRouterCompat.vitest.tsx \
+            src/test/router-harness-memory-router.test.tsx \
+            src/test/ssr-head-snapshot-paths.test.ts \
+            src/test/vitest-config-react-plugin-contract.test.ts
+          git rm --ignore-unmatch .github/workflows/stack-reconcile-691-692.yml
+          normalize_edge_aliases
+          node scripts/sync-edge-shared.mjs
+          git add -A
+          git diff --cached --check
+          git commit -m "chore(stack): adopt shared Vitest and postbuild prerequisite"
+          parent_final="$(git rev-parse HEAD)"
+
+          bun install --frozen-lockfile
+          bun run typecheck:tsgo
+          bunx vitest run \
+            src/test/router-harness-memory-router.test.tsx \
+            src/test/ssr-head-snapshot-paths.test.ts \
+            src/test/vitest-config-react-plugin-contract.test.ts \
+            src/test/sensor-truth-canon.test.ts \
+            --reporter=dot
+          bun run build
+          capture_build_outputs
+          parent_final="$(git rev-parse HEAD)"
+          reset_after_build "$parent_final"
+
+          # Child: merge the exact refreshed parent and preserve residual logic.
+          child_merge_base="$(git merge-base refs/remotes/stack/child "$EXPECTED_PARENT")"
+          git diff --name-only "$child_merge_base"..refs/remotes/stack/child > /tmp/child-owned.txt
+          git checkout -B stack-child refs/remotes/stack/child
+          git merge --no-ff --no-commit "$parent_final" || resolve_conflicts /tmp/child-owned.txt
+          git checkout "$parent_final" -- \
+            .github/workflows/edge-shared-sync.yml \
+            src/lib/react-router-compat.tsx \
+            vitest.config.ts \
+            scripts/capture-ssr-head-snapshots-with-server.mjs \
+            scripts/ssr-head-snapshot-paths.mjs \
+            src/test/helpers/reactRouterCompat.vitest.tsx \
+            src/test/router-harness-memory-router.test.tsx \
+            src/test/ssr-head-snapshot-paths.test.ts \
+            src/test/vitest-config-react-plugin-contract.test.ts
+          git rm --ignore-unmatch .github/workflows/stack-reconcile-691-692.yml
+          normalize_edge_aliases
+          node scripts/sync-edge-shared.mjs
+          git add -A
+          git diff --cached --check
+          git commit -m "chore(stack): sync #691 into #692"
+          child_final="$(git rev-parse HEAD)"
+
+          bun run typecheck:tsgo
+          bunx vitest run \
+            src/test/router-harness-memory-router.test.tsx \
+            src/test/ssr-head-snapshot-paths.test.ts \
+            src/test/vitest-config-react-plugin-contract.test.ts \
+            src/test/sensor-truth-canon.test.ts \
+            src/test/sensor-truth-ranges-and-membership.test.ts \
+            src/test/sensor-source-rules.test.ts \
+            --reporter=dot
+          bun run build
+          capture_build_outputs
+          child_final="$(git rev-parse HEAD)"
+          reset_after_build "$child_final"
+
+          git merge-base --is-ancestor "$parent_final" "$child_final"
+          git push --atomic \
+            --force-with-lease="refs/heads/${PARENT_BRANCH}:${EXPECTED_PARENT}" \
+            --force-with-lease="refs/heads/${CHILD_BRANCH}:${EXPECTED_CHILD}" \
+            origin \
+            "${parent_final}:refs/heads/${PARENT_BRANCH}" \
+            "${child_final}:refs/heads/${CHILD_BRANCH}"
+
+          {
+            echo "parent_final=$parent_final"
+            echo "child_final=$child_final"
+            echo "parent_tree=$(git rev-parse "${parent_final}^{tree}")"
+            echo "child_tree=$(git rev-parse "${child_final}^{tree}")"
+          } | tee stack-sync-result.txt
+      - name: Upload stack authority
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: stack-691-692-sync-result
+          path: stack-sync-result.txt
+          if-no-files-found: ignore

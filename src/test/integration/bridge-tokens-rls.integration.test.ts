@@ -13,12 +13,17 @@
  *       moved); usage telemetry (last_used_at / first_used_at /
  *       ingest_count) server-maintained for client roles;
  *       `name` stays owner-mutable.
+ *   - Client inserts cannot seed telemetry either: the INSERT validator
+ *     rejects nonzero ingest_count / preset first_used_at / last_used_at
+ *     from client roles.
  *   - bump_bridge_token_usage: EXECUTE denied to authenticated; still
  *     works for service_role with the new guard in place (regression).
- *   - Effective DELETE privilege for authenticated is MEASURED via
- *     has_table_privilege and the observed behavior must match it —
- *     answering the repo-unverifiable platform-default question from
- *     checklist gap G3.
+ *   - Effective DELETE privilege for authenticated is MEASURED
+ *     behaviorally: the harness attempts the delete and asserts the
+ *     outcome is one of the two contractual states (owner-scoped success,
+ *     or clean denial with the row intact) — answering the
+ *     repo-unverifiable platform-default question from checklist gap G3
+ *     with whichever truth the environment gives.
  *
  * NEVER logs service_role keys, JWTs, token material, or user IDs.
  *
@@ -205,6 +210,37 @@ d("bridge_tokens RLS + revocation integrity (local DB)", () => {
       .eq("id", tokenId);
     expect(freezeErr, "expires_at must stay frozen").not.toBeNull();
     expectSanitizedDbError(freezeErr);
+  });
+
+  it("a normal mint-shaped insert succeeds and starts with clean telemetry", async () => {
+    const cleanId = await insertOwnerToken();
+    const { data: row } = await admin
+      .from("bridge_tokens")
+      .select("ingest_count, first_used_at, last_used_at, revoked_at")
+      .eq("id", cleanId)
+      .single();
+    expect(row?.ingest_count).toBe(0);
+    expect(row?.first_used_at).toBeNull();
+    expect(row?.last_used_at).toBeNull();
+    expect(row?.revoked_at).toBeNull();
+  });
+
+  it("owner cannot seed usage telemetry or pre-revoked state at insert time", async () => {
+    for (const poisoned of [
+      { ingest_count: 999_999 },
+      { first_used_at: new Date().toISOString() },
+      { last_used_at: new Date().toISOString() },
+      { revoked_at: new Date().toISOString() },
+    ]) {
+      const { error } = await owner.client
+        .from("bridge_tokens")
+        .insert({ ...fakeTokenRow(tentId, owner.id), ...poisoned });
+      expect(
+        error,
+        `client insert seeding ${Object.keys(poisoned)[0]} must be denied`,
+      ).not.toBeNull();
+      expectSanitizedDbError(error);
+    }
   });
 
   it("owner cannot rewrite usage telemetry (server-maintained)", async () => {

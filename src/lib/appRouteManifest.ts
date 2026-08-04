@@ -470,6 +470,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "auth",
     description: "Authenticated agent integrations settings.",
   },
+  {
+    path: "/settings/analytics",
+    access: "auth",
+    description: "Browser-local analytics consent grant/revoke (grow data never sent).",
+  },
   { path: "/signup", access: "redirect", description: "→ /auth" },
   {
     path: "/start-room",

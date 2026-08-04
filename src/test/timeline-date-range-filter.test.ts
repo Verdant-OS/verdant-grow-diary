@@ -193,8 +193,14 @@ describe("static wiring — src/pages/Timeline.tsx", () => {
     const lteCount = (src.match(/\.lte\("entry_at"/g) ?? []).length;
     expect(gteCount).toBeGreaterThanOrEqual(2);
     expect(lteCount).toBeGreaterThanOrEqual(2);
-    expect(src).toContain("T00:00:00.000Z");
-    expect(src).toContain("T23:59:59.999Z");
+    // Bounds come from the shared local-day helper, not an inline UTC
+    // string concatenation — a raw YYYY-MM-DD + "T00:00:00.000Z" ignores
+    // the grower's own timezone (issue #587).
+    expect(src).toMatch(/from "@\/lib\/timelineDateRangeRules"/);
+    expect(src).toContain("timelineDateRangeBounds.startIso");
+    expect(src).toContain("timelineDateRangeBounds.endIso");
+    expect(src).not.toContain("T00:00:00.000Z");
+    expect(src).not.toContain("T23:59:59.999Z");
   });
 
   it("threads the dates through the evidence filter input and clear action", () => {

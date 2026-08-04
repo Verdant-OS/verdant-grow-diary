@@ -94,7 +94,8 @@ jobs:
           }
 
           clean_ephemeral_build_outputs() {
-            rm -rf .output .wrangler
+            git status --short
+            git clean -fd
           }
 
           git fetch --no-tags origin \

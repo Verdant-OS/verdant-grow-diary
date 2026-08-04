@@ -76,6 +76,10 @@ if (!artifactsPresent()) {
 // present and non-empty, so a wiped dist can never read as "0 documents, OK".
 run("node", [resolve("scripts/assert-seo-manifest-present.mjs"), distDir]);
 
+// Second precondition gate: every manifest document must have its pre-rendered
+// SSR head snapshot on disk, non-empty, and in the expected HTML head shape.
+run("node", [resolve("scripts/assert-ssr-head-snapshots-present.mjs"), distDir]);
+
 const validators = [
   ["scripts/check-no-src-lib-imports.mjs", false],
   ["scripts/validate-jsonld-rich-results.mjs", true],

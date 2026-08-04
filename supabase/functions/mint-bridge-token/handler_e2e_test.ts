@@ -193,6 +193,11 @@ Deno.test("mint bridge token allows a paid owner and preserves tent ownership", 
   assertEquals(state.insertedTokens[0].user_id, USER_ID);
   assertEquals(state.insertedTokens[0].tent_id, TENT_ID);
   assert(!JSON.stringify(state.insertedTokens[0]).includes(JWT));
+  // Hash-only at rest: the stored row carries a SHA-256 hex hash and the
+  // non-secret prefix — never the plaintext returned to the caller.
+  assertMatch(String(state.insertedTokens[0].token_hash), /^[0-9a-f]{64}$/);
+  assertEquals("token" in state.insertedTokens[0], false);
+  assert(!JSON.stringify(state.insertedTokens[0]).includes(String(payload.token)));
   assertEquals(
     state.subscriptionFilters.some(
       (filter) => filter.column === "user_id" && filter.value === USER_ID,

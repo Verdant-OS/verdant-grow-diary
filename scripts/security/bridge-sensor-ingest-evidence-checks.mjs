@@ -36,6 +36,7 @@ export const FILES = {
   piIngest: "supabase/functions/pi-ingest-readings/index.ts",
   staticSecretScan: "scripts/security/static-client-secret-scan.mjs",
   securityRegressionWorkflow: ".github/workflows/security-regression.yml",
+  edgeTestsWorkflow: ".github/workflows/sensor-ingest-webhook-edge-tests.yml",
   packageJson: "package.json",
 };
 
@@ -317,6 +318,31 @@ export const CHECKS = [
       },
     ],
   },
+  {
+    id: "E36",
+    file: "edgeTestsWorkflow",
+    description:
+      "mint and revoke handler e2e tests are wired into the Deno edge-test lane (run list + path filters)",
+    expect: [
+      { re: /supabase\/functions\/mint-bridge-token\/handler_e2e_test\.ts/, must: true },
+      { re: /supabase\/functions\/revoke-bridge-token\/handler_e2e_test\.ts/, must: true },
+      { re: /"supabase\/functions\/mint-bridge-token\/\*\*"/, must: true },
+      { re: /"supabase\/functions\/revoke-bridge-token\/\*\*"/, must: true },
+    ],
+  },
+  {
+    id: "E37",
+    file: "packageJson",
+    description:
+      "the bridge_tokens runtime RLS harness is defined and chained into test:security-db-local",
+    expect: [
+      {
+        re: /"test:bridge-tokens-db-security":\s*"node scripts\/security\/run-bridge-tokens-db-security\.mjs"/,
+        must: true,
+      },
+      { re: /"test:security-db-local":\s*"[^"]*test:bridge-tokens-db-security[^"]*"/, must: true },
+    ],
+  },
 ];
 
 /**
@@ -417,6 +443,15 @@ export const MIGRATION_CHECKS = [
         re: /GRANT EXECUTE ON FUNCTION public\.bump_bridge_token_usage[^;]*\bTO[^;]*\b(PUBLIC|anon|authenticated)\b/i,
         must: false,
       },
+    ],
+  },
+  {
+    id: "E35",
+    description:
+      "revocation is one-way and usage telemetry is server-maintained for client roles (guard trigger)",
+    expect: [
+      { re: /RAISE EXCEPTION 'bridge_token revocation is one-way'/, must: true },
+      { re: /RAISE EXCEPTION 'bridge_token usage telemetry is server-maintained'/, must: true },
     ],
   },
 ];

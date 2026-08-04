@@ -93,6 +93,10 @@ jobs:
             fi
           }
 
+          clean_ephemeral_build_outputs() {
+            rm -rf .output .wrangler
+          }
+
           git fetch --no-tags origin \
             "refs/heads/${CHILD_BRANCH}:refs/remotes/stack/child" \
             "refs/heads/${PREREQ_BRANCH}:refs/remotes/stack/prereq"
@@ -151,6 +155,7 @@ jobs:
           capture_generated_mcp_bundle
           parent_final="$(git rev-parse HEAD)"
           git reset --hard "$parent_final"
+          clean_ephemeral_build_outputs
           test -z "$(git status --porcelain)"
 
           # ---------- Child (#692): merge refreshed parent, keep residuals ----------
@@ -216,6 +221,7 @@ jobs:
           capture_generated_mcp_bundle
           child_final="$(git rev-parse HEAD)"
           git reset --hard "$child_final"
+          clean_ephemeral_build_outputs
           test -z "$(git status --porcelain)"
 
           # No branch moves unless both complete validation stories passed.

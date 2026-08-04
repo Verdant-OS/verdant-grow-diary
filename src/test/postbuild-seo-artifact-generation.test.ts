@@ -476,13 +476,28 @@ function fakePng(width: number, height: number, bitDepth = 8): Buffer {
 }
 
 describe("generated OG cards match the expected image resolution", () => {
+  let ogDistDir = "";
+
+  beforeAll(() => {
+    ogDistDir = mkdtempSync(join(tmpdir(), "verdant-og-dist-"));
+    run("bun", [generator, ogDistDir]);
+  }, 180_000);
+
+  afterAll(() => {
+    if (ogDistDir) rmSync(ogDistDir, { recursive: true, force: true });
+  });
+
+  function readOgManifest(): ManifestShape {
+    return JSON.parse(readFileSync(join(ogDistDir, "seo-manifest.json"), "utf8")) as ManifestShape;
+  }
+
   it("renders every manifest OG card at exactly 1200x630", async () => {
     const { validateOgCardDimensions, EXPECTED_OG_WIDTH, EXPECTED_OG_HEIGHT } =
       await importOgDimensionGate();
     expect(EXPECTED_OG_WIDTH).toBe(1200);
     expect(EXPECTED_OG_HEIGHT).toBe(630);
 
-    const result = validateOgCardDimensions(distDir);
+    const result = validateOgCardDimensions(ogDistDir);
     expect(result.problems).toEqual([]);
     expect(result.ok).toBe(true);
     expect(result.checked).toBeGreaterThanOrEqual(5);
@@ -512,7 +527,7 @@ describe("generated OG cards match the expected image resolution", () => {
     const { validateOgCardDimensions } = await importOgDimensionGate();
     const brokenDir = mkdtempSync(join(tmpdir(), "verdant-og-broken-"));
     try {
-      const manifest = readManifest();
+      const manifest = readOgManifest();
       writeFileSync(join(brokenDir, "seo-manifest.json"), JSON.stringify(manifest));
       mkdirSync(join(brokenDir, "client/og"), { recursive: true });
       for (const document of manifest.documents) {
@@ -536,7 +551,7 @@ describe("generated OG cards match the expected image resolution", () => {
     try {
       writeFileSync(
         join(brokenDir, "seo-manifest.json"),
-        readFileSync(join(distDir, "seo-manifest.json"), "utf8"),
+        readFileSync(join(ogDistDir, "seo-manifest.json"), "utf8"),
       );
       mkdirSync(join(brokenDir, "client/og"), { recursive: true });
       const result = validateOgCardDimensions(brokenDir);
@@ -562,7 +577,7 @@ describe("generated OG cards match the expected image resolution", () => {
   it("fails the CLI gate with a non-zero exit for a broken render", () => {
     const brokenDir = mkdtempSync(join(tmpdir(), "verdant-og-cli-"));
     try {
-      const manifest = readManifest();
+      const manifest = readOgManifest();
       writeFileSync(join(brokenDir, "seo-manifest.json"), JSON.stringify(manifest));
       mkdirSync(join(brokenDir, "client/og"), { recursive: true });
       for (const document of manifest.documents) {

@@ -27,56 +27,56 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: "1.3.14"
-      - name: Restore parent workflow, merge parent into child, regenerate, validate, and push
+      - name: Rewind parent temp commits, merge parent into child, regenerate, validate, and push atomically
         env:
           PARENT_BRANCH: grok/sensor-truth-canon-freshness-592
           CHILD_BRANCH: grok/sensor-truth-canon-residual-592
-          EXPECTED_PARENT_TEMP: b56af8a47ff87e7d08fae0b752f9d46dd6690067
+          EXPECTED_PARENT_TEMP: ${{ github.event.pull_request.head.sha }}
+          DURABLE_PARENT: 9e5c99af849522d64fadef96df764bf46e05d334
           EXPECTED_CHILD: 49db0b2e8cbc539ceb7fdc3c27f0a725cc14e884
         run: |
           set -euo pipefail
           git config user.name "Verdant Stack Maintenance"
           git config user.email "stack-maintenance@users.noreply.github.com"
 
-          git fetch origin \
-            "refs/heads/${PARENT_BRANCH}:refs/remotes/origin/${PARENT_BRANCH}" \
-            "refs/heads/${CHILD_BRANCH}:refs/remotes/origin/${CHILD_BRANCH}"
-
           actual_parent="$(git rev-parse "refs/remotes/origin/${PARENT_BRANCH}")"
           actual_child="$(git rev-parse "refs/remotes/origin/${CHILD_BRANCH}")"
           test "$actual_parent" = "$EXPECTED_PARENT_TEMP"
           test "$actual_child" = "$EXPECTED_CHILD"
+          git merge-base --is-ancestor "$DURABLE_PARENT" "$actual_parent"
+          test "$(git show "${DURABLE_PARENT}:.github/workflows/edge-shared-sync.yml" | git hash-object --stdin)" = "d6a05b302bcc3b8dec6fe6231f1ee7f7ec6fb490"
 
-          # Restore the normal workflow on the parent branch from the commit
-          # immediately before this one-shot orchestration commit.
-          git checkout -B stack-parent "refs/remotes/origin/${PARENT_BRANCH}"
-          git show "${EXPECTED_PARENT_TEMP}^:.github/workflows/edge-shared-sync.yml" \
-            > .github/workflows/edge-shared-sync.yml
-          git add .github/workflows/edge-shared-sync.yml
-          git commit -m "chore(ci): remove temporary stack repair workflow"
-          parent_final="$(git rev-parse HEAD)"
-          git push \
-            --force-with-lease="refs/heads/${PARENT_BRANCH}:${EXPECTED_PARENT_TEMP}" \
-            origin "HEAD:refs/heads/${PARENT_BRANCH}"
+          parent_final="$DURABLE_PARENT"
 
-          # Merge the restored parent into the child. The child already carries
-          # the prerequisite and residual behavior, so choose the child for
-          # content conflicts, except for the workflow which must be restored.
           git checkout -B stack-child "refs/remotes/origin/${CHILD_BRANCH}"
           if ! git merge --no-ff --no-commit "$parent_final"; then
             mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
             for file in "${conflicts[@]}"; do
-              if [ "$file" = ".github/workflows/edge-shared-sync.yml" ]; then
-                git checkout "$parent_final" -- "$file"
-              else
-                git checkout --ours -- "$file"
-              fi
+              case "$file" in
+                .github/workflows/edge-shared-sync.yml)
+                  git checkout "$parent_final" -- "$file"
+                  ;;
+                supabase/functions/_shared/lib/*|supabase/functions/*/*.ts)
+                  git checkout --ours -- "$file"
+                  ;;
+                scripts/capture-ssr-head-snapshots-with-server.mjs|scripts/ssr-head-snapshot-paths.mjs|src/test/ssr-head-snapshot-paths.test.ts|src/test/vitest-config-react-plugin-contract.test.ts|vitest.config.ts|src/lib/sensor/sensorSnapshotFreshnessRules.ts)
+                  git checkout --ours -- "$file"
+                  ;;
+                *)
+                  echo "Unexpected stack conflict: $file" >&2
+                  exit 1
+                  ;;
+              esac
               git add "$file"
             done
           fi
+          test -z "$(git diff --name-only --diff-filter=U)"
 
-          # Canonical generator resolves every mirrored conflict and rewrites
-          # Edge entry imports. No generated file is hand-edited.
+          # The final child must carry the normal read-only mirror gate.
+          git checkout "$parent_final" -- .github/workflows/edge-shared-sync.yml
+
+          # Canonical generator resolves mirrored conflicts and rewrites Edge
+          # entry imports. No generated file is hand-edited.
           node scripts/sync-edge-shared.mjs
           git add \
             .github/workflows/edge-shared-sync.yml \
@@ -98,9 +98,12 @@ jobs:
           bun run build
           git reset --hard "$child_final"
 
-          git push \
+          git push --atomic \
+            --force-with-lease="refs/heads/${PARENT_BRANCH}:${EXPECTED_PARENT_TEMP}" \
             --force-with-lease="refs/heads/${CHILD_BRANCH}:${EXPECTED_CHILD}" \
-            origin "HEAD:refs/heads/${CHILD_BRANCH}"
+            origin \
+            "${parent_final}:refs/heads/${PARENT_BRANCH}" \
+            "${child_final}:refs/heads/${CHILD_BRANCH}"
 
           {
             echo "parent_final=$parent_final"

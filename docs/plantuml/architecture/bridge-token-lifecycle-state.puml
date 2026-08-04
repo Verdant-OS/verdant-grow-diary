@@ -1,0 +1,82 @@
+@startuml bridge_token_lifecycle_state
+!include ../style.puml
+!pragma layout smetana
+
+title Bridge token lifecycle states\nbridge_tokens + mint / revoke / usage RPC
+
+top to bottom direction
+
+state "Not issued" as NotIssued
+NotIssued : no bridge_tokens row
+NotIssued : no plaintext at rest
+
+state "Active" as Active {
+  [*] --> NeverUsed
+  state "Active / never used" as NeverUsed
+  NeverUsed : revoked_at = null
+  NeverUsed : expires_at > now (at auth)
+  NeverUsed : first_used_at = null
+  NeverUsed : ingest_count = 0
+  NeverUsed : born-clean insert\n(no seeded usage / not pre-revoked)
+
+  state "Active / used" as Used
+  Used : revoked_at = null
+  Used : expires_at > now (at auth)
+  Used : first_used_at set
+  Used : ingest_count >= 1
+
+  NeverUsed --> Used : successful live insert\n[insertedCount > 0]\n/ bump_bridge_token_usage
+}
+
+state Expired #FFE0B2
+Expired : revoked_at = null
+Expired : expires_at <= now\n(computed in authenticateBearer)
+Expired : 401 token_expired
+
+state Revoked #FFCDD2
+Revoked : revoked_at IS NOT NULL
+Revoked : one-way (DB immutability guard)
+Revoked : 401 token_revoked
+Revoked : re-revoke → already_revoked
+
+[*] --> NotIssued
+
+NotIssued --> NeverUsed : mint-bridge-token\n[user JWT + liveSensors +\ntent owner]\n/ 32 bytes → vbt_…\n/ store SHA-256 + prefix\n/ return plaintext once
+
+Active --> Expired : authenticateBearer\n[expires_at <= request now]\n(no scheduler required in model)
+Active --> Revoked : revoke-bridge-token\n[owner JWT]\n/ UPDATE WHERE revoked_at IS NULL
+
+Expired --> [*]
+Revoked --> [*]
+
+note right of Revoked
+  **Forbidden:** Revoked → Active
+  No edge drawn. Clearing revoked_at
+  is blocked for client roles.
+end note
+
+note left of Expired
+  Expiry evaluated at request clock
+  unless a sweeper job is proven in source.
+  (None required for this model.)
+end note
+
+note bottom of NeverUsed
+  **Does not transition on:**
+  • duplicate-only ingest (insertedCount = 0)
+  • stale 200 accepted:false (no write)
+  • entitlement 403 (token row unchanged)
+end note
+
+legend right
+  |= State |= Predicate |
+  | Not issued | no row |
+  | Active / never used | valid; ingest_count = 0 |
+  | Active / used | valid; ingest_count >= 1 |
+  | Expired | expires_at <= now at auth |
+  | Revoked | revoked_at set (terminal) |
+endlegend
+
+caption Implemented controls ≠ all runtime-proven.\nStrict DB harness may remain BLOCKED (zero-skip not yet green).
+
+@enduml

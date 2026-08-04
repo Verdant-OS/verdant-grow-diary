@@ -173,7 +173,11 @@ describe("Edge Function ingestion remains fail-closed", () => {
       // the token in RELEASE_RECEIPT_UNSAFE_SUBSTRINGS to REJECT secret-like
       // receipt fields. It does not read or use the env value.
       if (/[\\/]src[\\/]lib[\\/]releaseReceiptParserContract\.ts$/.test(p)) continue;
-      const txt = readFileSync(p, "utf8");
+      // SSR server-only client may read the service role (never browser-bundled).
+      if (/[\\/]integrations[\\/]supabase[\\/]client\.server\.ts$/.test(p)) continue;
+      if (/[\\/]integrations[\\/]supabase[\\/]client\.server\.ts$/.test(p)) continue;
+      if (/[\\/]integrations[\\/]supabase[\\/]client\.server\.ts$/.test(p)) continue;
+            const txt = readFileSync(p, "utf8");
       expect(
         /SUPABASE_SERVICE_ROLE_KEY/.test(txt),
         `${p} must not reference SUPABASE_SERVICE_ROLE_KEY`,

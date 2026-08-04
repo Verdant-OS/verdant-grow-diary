@@ -13,6 +13,13 @@ vi.mock("@/lib/react-router-compat", () => ({
   useLocation: () => ({ pathname: locationState.pathname }),
 }));
 
+vi.mock("@/lib/analyticsConsent", () => ({
+  readAnalyticsConsent: () => "granted",
+  subscribeToAnalyticsConsent: () => () => {},
+  writeAnalyticsConsent: () => {},
+  parseAnalyticsConsentValue: (v: string) => v,
+}));
+
 describe("sanitizePagePath", () => {
   it("leaves static paths unchanged", () => {
     expect(sanitizePagePath("/dashboard")).toBe("/dashboard");

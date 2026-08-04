@@ -116,8 +116,6 @@ export function shouldWarnPossibleDuplicate(
 }
 
 /** True when the stored attempt must be dropped so the next press mints a new key. */
-export function shouldRetireSubmissionKey(
-  disposition: BreedingSubmissionKeyDisposition,
-): boolean {
+export function shouldRetireSubmissionKey(disposition: BreedingSubmissionKeyDisposition): boolean {
   return disposition !== "reuse_key";
 }

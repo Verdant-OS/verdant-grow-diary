@@ -33,9 +33,9 @@ const WORKFLOW_PATH = resolve(
   "paddle-craft-catalog-preflight.yml",
 );
 const WORKFLOW = readFileSync(WORKFLOW_PATH, "utf8");
-const PACKAGE_JSON = JSON.parse(
-  readFileSync(resolve(process.cwd(), "package.json"), "utf8"),
-) as { scripts?: Record<string, string> };
+const PACKAGE_JSON = JSON.parse(readFileSync(resolve(process.cwd(), "package.json"), "utf8")) as {
+  scripts?: Record<string, string>;
+};
 
 /** The verifier's log shape for "keys unset, nothing checked". */
 const UNCONFIGURED_PARSE = {

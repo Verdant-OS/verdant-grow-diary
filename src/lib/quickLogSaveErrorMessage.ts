@@ -27,9 +27,7 @@ export type QuickLogSaveReason =
   | "save_failed"
   | (string & {});
 
-export function quickLogReasonToOperatorMessage(
-  reason: string | null | undefined,
-): string {
+export function quickLogReasonToOperatorMessage(reason: string | null | undefined): string {
   switch (reason) {
     case "no_selection":
     case "target_unresolved":

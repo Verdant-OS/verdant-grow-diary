@@ -18,9 +18,9 @@ function actionReference(line: string): string | null {
 
 describe("GitHub Actions reference policy", () => {
   it("recognizes both mapping and compact list-step uses syntax", () => {
-    expect(actionReference("      uses: owner/action@0123456789012345678901234567890123456789")).toBe(
-      "owner/action@0123456789012345678901234567890123456789",
-    );
+    expect(
+      actionReference("      uses: owner/action@0123456789012345678901234567890123456789"),
+    ).toBe("owner/action@0123456789012345678901234567890123456789");
     expect(
       actionReference(
         "      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4",

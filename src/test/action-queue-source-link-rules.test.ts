@@ -108,9 +108,7 @@ describe("buildActionQueueSourceLink — manual fallback", () => {
   });
 
   it("rejects unsafe / non-canonical id shapes", () => {
-    expect(
-      buildActionQueueSourceLink({ source: "manual", plant_id: "../etc/passwd" }),
-    ).toBeNull();
+    expect(buildActionQueueSourceLink({ source: "manual", plant_id: "../etc/passwd" })).toBeNull();
     expect(
       buildActionQueueSourceLink({
         source: "manual",

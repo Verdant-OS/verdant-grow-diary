@@ -34,8 +34,11 @@ import {
 import type { UseAiDoctorSessionReviewsResult } from "@/hooks/useAiDoctorSessionReviews";
 
 /** Allowed event types — narrower than the DB to keep the client honest. */
-export const ALLOWED_REVIEW_EVENT_TYPES: ReadonlySet<AiDoctorSessionReviewEventType> =
-  new Set(["marked_reviewed", "needs_follow_up", "cleared"]);
+export const ALLOWED_REVIEW_EVENT_TYPES: ReadonlySet<AiDoctorSessionReviewEventType> = new Set([
+  "marked_reviewed",
+  "needs_follow_up",
+  "cleared",
+]);
 
 export const REVIEW_NOTE_MAX_LENGTH = 1000;
 

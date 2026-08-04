@@ -41,7 +41,10 @@ const defaultDecodeProbe: PlantProfilePhotoDecodeProbe = (objectUrl) =>
     };
     img.onload = () => {
       if (typeof img.decode === "function") {
-        img.decode().then(() => done(true)).catch(() => done(false));
+        img
+          .decode()
+          .then(() => done(true))
+          .catch(() => done(false));
       } else {
         done(true);
       }
@@ -76,11 +79,8 @@ export function usePlantProfilePhotoPreview(
   input: UsePlantProfilePhotoPreviewInput,
   options: UsePlantProfilePhotoPreviewOptions = {},
 ): UsePlantProfilePhotoPreviewResult {
-  const create =
-    options.createObjectURL ??
-    ((b: Blob) => URL.createObjectURL(b));
-  const revoke =
-    options.revokeObjectURL ?? ((u: string) => URL.revokeObjectURL(u));
+  const create = options.createObjectURL ?? ((b: Blob) => URL.createObjectURL(b));
+  const revoke = options.revokeObjectURL ?? ((u: string) => URL.revokeObjectURL(u));
   const probe = options.decodeProbe ?? defaultDecodeProbe;
 
   const [preview, setPreview] = useState<PlantProfilePhotoPreviewState>({

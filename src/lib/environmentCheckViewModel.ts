@@ -28,27 +28,16 @@ import {
   type GreenhouseSource,
   type PpfdSample,
 } from "./greenhouseLightRules";
-import {
-  assessRootZoneEc,
-  type RootZoneEcInput,
-} from "./greenhouseRootZoneRules";
+import { assessRootZoneEc, type RootZoneEcInput } from "./greenhouseRootZoneRules";
 import {
   celsiusToFahrenheit,
   loadTemperatureUnitPreference,
   type TemperatureUnitPreference,
 } from "./temperatureUnitPreference";
 
-export type EnvironmentCheckDiaryStatus =
-  | "valid"
-  | "invalid"
-  | "dst_ambiguous"
-  | "review_required";
+export type EnvironmentCheckDiaryStatus = "valid" | "invalid" | "dst_ambiguous" | "review_required";
 
-export type EnvironmentCheckTone =
-  | "success"
-  | "warning"
-  | "danger"
-  | "neutral";
+export type EnvironmentCheckTone = "success" | "warning" | "danger" | "neutral";
 
 export interface EnvironmentCheckRuleAnnotation {
   ruleId: string;
@@ -122,10 +111,7 @@ const STATUS_RANK: Record<EnvironmentCheckDiaryStatus, number> = {
   invalid: 3,
 };
 
-const REVIEW_SOURCES: ReadonlySet<GreenhouseSource> = new Set<GreenhouseSource>([
-  "stale",
-  "demo",
-]);
+const REVIEW_SOURCES: ReadonlySet<GreenhouseSource> = new Set<GreenhouseSource>(["stale", "demo"]);
 
 export function isEnvironmentCheckKind(kind: string | null | undefined): boolean {
   if (!kind) return false;

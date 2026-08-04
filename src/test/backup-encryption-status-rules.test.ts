@@ -64,8 +64,7 @@ describe("classifyBackupEncryptionStatus", () => {
     const s = classifyBackupEncryptionStatus({
       state: "error",
       now: NOW,
-      errorMessage:
-        "failed with Bearer eyJabcdefghijklmnop and service_role key",
+      errorMessage: "failed with Bearer eyJabcdefghijklmnop and service_role key",
     });
     expect(s.risk).toBe("critical");
     expect(s.message).not.toMatch(/eyJabcdefghijklmnop/);

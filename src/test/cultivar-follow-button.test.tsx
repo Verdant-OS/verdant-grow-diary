@@ -69,7 +69,10 @@ describe("CultivarFollowButton", () => {
       expect(screen.getByTestId("cultivar-follow-button")).toHaveTextContent("Following"),
     );
     expect(upsertSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ cultivar_slug: "og-kush", seen_guide_version: cultivar.guideVersion }),
+      expect.objectContaining({
+        cultivar_slug: "og-kush",
+        seen_guide_version: cultivar.guideVersion,
+      }),
       expect.objectContaining({ onConflict: "user_id,cultivar_slug" }),
     );
   });

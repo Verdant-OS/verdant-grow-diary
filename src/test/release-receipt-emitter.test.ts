@@ -30,9 +30,7 @@ const baseCommand = {
   summary: "All batches green.",
 };
 
-function ciInput(
-  overrides: Partial<EmitReleaseReceiptInput> = {},
-): EmitReleaseReceiptInput {
+function ciInput(overrides: Partial<EmitReleaseReceiptInput> = {}): EmitReleaseReceiptInput {
   return {
     artifactId: "ci-full-suite-emitter-001",
     generatedAt: "2026-06-30T12:00:00.000Z",
@@ -99,18 +97,12 @@ describe("releaseReceiptEmitter — status derivation", () => {
   });
 
   it("blocked command without fail returns blocked", () => {
-    const s = deriveReleaseReceiptStatus(
-      [{ ...baseCommand, status: "blocked" }],
-      [],
-    );
+    const s = deriveReleaseReceiptStatus([{ ...baseCommand, status: "blocked" }], []);
     expect(s).toBe("blocked");
   });
 
   it("unknown command without fail/blocked returns unknown", () => {
-    const s = deriveReleaseReceiptStatus(
-      [{ ...baseCommand, status: "unknown" }],
-      [],
-    );
+    const s = deriveReleaseReceiptStatus([{ ...baseCommand, status: "unknown" }], []);
     expect(s).toBe("unknown");
   });
 
@@ -119,12 +111,7 @@ describe("releaseReceiptEmitter — status derivation", () => {
   });
 
   it("all-skipped commands return pending", () => {
-    expect(
-      deriveReleaseReceiptStatus(
-        [{ ...baseCommand, status: "skipped" }],
-        [],
-      ),
-    ).toBe("pending");
+    expect(deriveReleaseReceiptStatus([{ ...baseCommand, status: "skipped" }], [])).toBe("pending");
   });
 });
 
@@ -169,9 +156,7 @@ describe("releaseReceiptEmitter — emit + roundtrip", () => {
   });
 
   it("rejects ci_full_suite + manual_import via parser roundtrip", () => {
-    const r = emitReleaseReceiptArtifact(
-      ciInput({ source: "manual_import" }),
-    );
+    const r = emitReleaseReceiptArtifact(ciInput({ source: "manual_import" }));
     expect(r.ok).toBe(false);
     if (r.ok === true) throw new Error("expected failure");
     expect(r.errors.join(" ")).toMatch(/manual_import/);
@@ -185,16 +170,12 @@ describe("releaseReceiptEmitter — emit + roundtrip", () => {
   });
 
   it("rejects forbidden metadata keys", () => {
-    const r = emitReleaseReceiptArtifact(
-      ciInput({ metadata: { service_role: "x" } }),
-    );
+    const r = emitReleaseReceiptArtifact(ciInput({ metadata: { service_role: "x" } }));
     expect(r.ok).toBe(false);
   });
 
   it("rejects invalid generated_at", () => {
-    const r = emitReleaseReceiptArtifact(
-      ciInput({ generatedAt: "yesterday" }),
-    );
+    const r = emitReleaseReceiptArtifact(ciInput({ generatedAt: "yesterday" }));
     expect(r.ok).toBe(false);
   });
 
@@ -228,9 +209,9 @@ describe("releaseReceiptEmitter — static safety scan", () => {
     "https://api.github",
     "process.env",
     "import 'node:fs'",
-    "import \"node:fs\"",
+    'import "node:fs"',
     "from 'node:fs'",
-    "from \"node:fs\"",
+    'from "node:fs"',
     "child_process",
     "Date.now(",
     "new Date(",

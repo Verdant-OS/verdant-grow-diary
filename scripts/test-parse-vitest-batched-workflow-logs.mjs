@@ -9,10 +9,17 @@ import {
   summarizeGates,
 } from "./parse-vitest-batched-workflow-logs.mjs";
 
-let passed = 0, failed = 0;
+let passed = 0,
+  failed = 0;
 function t(name, fn) {
-  try { fn(); console.log(`  ✓ ${name}`); passed++; }
-  catch (e) { console.error(`  ✗ ${name}\n    ${e.message}`); failed++; }
+  try {
+    fn();
+    console.log(`  ✓ ${name}`);
+    passed++;
+  } catch (e) {
+    console.error(`  ✗ ${name}\n    ${e.message}`);
+    failed++;
+  }
 }
 
 console.log("parse-vitest-batched-workflow-logs");
@@ -101,7 +108,15 @@ const okGates = [
   { gate: "batches=16 guard", status: "success" },
 ];
 const mkBatches = (overrides = {}) =>
-  [...Array(16).keys()].map((i) => ({ batch: i, status: "pass", passed: 10, failed: 0, skipped: 0, oom: false, ...(overrides[i] || {}) }));
+  [...Array(16).keys()].map((i) => ({
+    batch: i,
+    status: "pass",
+    passed: 10,
+    failed: 0,
+    skipped: 0,
+    oom: false,
+    ...(overrides[i] || {}),
+  }));
 
 t("computeVerdict: GO when all 16 pass + gates green + success", () => {
   const v = computeVerdict({ conclusion: "success", batches: mkBatches(), gates: okGates });
@@ -127,17 +142,30 @@ t("computeVerdict: NO-GO on a failed test assertion", () => {
 });
 
 t("computeVerdict: NO-GO when batches are missing (cannot prove all ran)", () => {
-  const v = computeVerdict({ conclusion: "success", batches: mkBatches().slice(0, 8), gates: okGates });
+  const v = computeVerdict({
+    conclusion: "success",
+    batches: mkBatches().slice(0, 8),
+    gates: okGates,
+  });
   assert.equal(v.verdict, "NO-GO");
 });
 
 t("computeVerdict: NO-GO when a safety gate failed", () => {
-  const v = computeVerdict({ conclusion: "success", batches: mkBatches(), gates: [{ status: "failure" }] });
+  const v = computeVerdict({
+    conclusion: "success",
+    batches: mkBatches(),
+    gates: [{ status: "failure" }],
+  });
   assert.equal(v.verdict, "NO-GO");
 });
 
 t("computeVerdict: NO-GO when batch-utils self-test failed", () => {
-  const v = computeVerdict({ conclusion: "success", batches: mkBatches(), gates: okGates, selfTest: { status: "failure", passed: 25, failed: 1 } });
+  const v = computeVerdict({
+    conclusion: "success",
+    batches: mkBatches(),
+    gates: okGates,
+    selfTest: { status: "failure", passed: 25, failed: 1 },
+  });
   assert.equal(v.verdict, "NO-GO");
 });
 
@@ -160,13 +188,22 @@ t("computeVerdict: NO-GO when a matrix job log is missing", () => {
 });
 
 t("summarizeGates: fails closed when a gate fails on a non-first matrix leg", () => {
-  const ok = { name: "Batched Vitest (matrix) (0)", steps: [{ name: "Safety gates (typecheck + sensor + docs)", conclusion: "success" }] };
-  const bad = { name: "Batched Vitest (matrix) (1)", steps: [{ name: "Safety gates (typecheck + sensor + docs)", conclusion: "failure" }] };
+  const ok = {
+    name: "Batched Vitest (matrix) (0)",
+    steps: [{ name: "Safety gates (typecheck + sensor + docs)", conclusion: "success" }],
+  };
+  const bad = {
+    name: "Batched Vitest (matrix) (1)",
+    steps: [{ name: "Safety gates (typecheck + sensor + docs)", conclusion: "failure" }],
+  };
   const { gates } = summarizeGates([ok, bad]);
   const typecheck = gates.find((g) => /typecheck/.test(g.gate));
   assert.equal(typecheck.status, "failure");
   // and the verdict must be NO-GO, not blessed by the first (passing) leg
-  assert.equal(computeVerdict({ conclusion: "failure", batches: mkBatches(), gates }).verdict, "NO-GO");
+  assert.equal(
+    computeVerdict({ conclusion: "failure", batches: mkBatches(), gates }).verdict,
+    "NO-GO",
+  );
 });
 
 t("parseJobLog: empty log → logMissing true, status incomplete", () => {
@@ -202,7 +239,15 @@ t("buildReceipt: GO end-to-end across 16 passing matrix jobs", () => {
     steps,
     log: passLog(i),
   }));
-  const run = { workflowName: "Vitest Batched Full Suite (optional)", url: "u", headBranch: "claude/batched-runner-interleaving-v1", headSha: "deadbeef", conclusion: "success", createdAt: "a", updatedAt: "b" };
+  const run = {
+    workflowName: "Vitest Batched Full Suite (optional)",
+    url: "u",
+    headBranch: "claude/batched-runner-interleaving-v1",
+    headSha: "deadbeef",
+    conclusion: "success",
+    createdAt: "a",
+    updatedAt: "b",
+  };
   const receipt = buildReceipt({ run, jobs });
   assert.equal(receipt.verdict, "GO");
   assert.ok(receipt.markdown.includes("# Verdant CI Chunk Size 1 Receipt"));

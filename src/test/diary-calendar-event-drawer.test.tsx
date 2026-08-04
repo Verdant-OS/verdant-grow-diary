@@ -38,9 +38,7 @@ function firstEvent(raw: Parameters<typeof buildDiaryCalendarViewModel>[0]) {
   return buildDiaryCalendarViewModel(raw)[0].events[0];
 }
 
-function openFirstDrawer(
-  rawEntries: Parameters<typeof buildDiaryCalendarViewModel>[0],
-) {
+function openFirstDrawer(rawEntries: Parameters<typeof buildDiaryCalendarViewModel>[0]) {
   render(<DiaryCalendarSection rawEntries={rawEntries} />);
   const btns = screen.getAllByRole("button", {
     name: DIARY_CALENDAR_DRAWER_VIEW_LABEL,
@@ -184,9 +182,7 @@ describe("diaryCalendarEventDrawerViewModel — pure", () => {
       ppfd: 600,
     });
     const labels = model.measurements.fields.map((f) => f.label);
-    expect(labels).toEqual(
-      expect.arrayContaining(["Air temp", "Humidity", "VPD", "CO₂", "PPFD"]),
-    );
+    expect(labels).toEqual(expect.arrayContaining(["Air temp", "Humidity", "VPD", "CO₂", "PPFD"]));
   });
 
   it("diagnosis drawer summarizes summary/confidence/severity safely", () => {
@@ -303,9 +299,7 @@ describe("DiaryCalendarSection — event drawer UI", () => {
     expect(within(drawer).getByText("Plant memory")).toBeInTheDocument();
     expect(within(drawer).getByText("Attachments")).toBeInTheDocument();
     expect(within(drawer).getByText("Read-only diary event")).toBeInTheDocument();
-    expect(
-      within(drawer).getByText("Derived previews are not stored"),
-    ).toBeInTheDocument();
+    expect(within(drawer).getByText("Derived previews are not stored")).toBeInTheDocument();
   });
 
   it("closes drawer via accessible close control", () => {
@@ -361,9 +355,7 @@ describe("DiaryCalendarSection — event drawer UI", () => {
       },
     ]);
     const drawer = screen.getByTestId("diary-calendar-event-drawer");
-    expect(
-      within(drawer).getByText("Possible nitrogen deficiency"),
-    ).toBeInTheDocument();
+    expect(within(drawer).getByText("Possible nitrogen deficiency")).toBeInTheDocument();
     expect(within(drawer).getByText("62%")).toBeInTheDocument();
     expect(within(drawer).getByText("Medium")).toBeInTheDocument();
   });
@@ -378,12 +370,8 @@ describe("DiaryCalendarSection — event drawer UI", () => {
       },
     ]);
     const drawer = screen.getByTestId("diary-calendar-event-drawer");
-    expect(
-      within(drawer).getByText(DIARY_CALENDAR_DRAWER_PHOTO_EMPTY),
-    ).toBeInTheDocument();
-    expect(
-      within(drawer).getByText(DIARY_CALENDAR_DRAWER_SENSOR_EMPTY),
-    ).toBeInTheDocument();
+    expect(within(drawer).getByText(DIARY_CALENDAR_DRAWER_PHOTO_EMPTY)).toBeInTheDocument();
+    expect(within(drawer).getByText(DIARY_CALENDAR_DRAWER_SENSOR_EMPTY)).toBeInTheDocument();
   });
 
   it("keeps the open drawer's temperature reactive to a live unit-preference change (no stale cache)", () => {

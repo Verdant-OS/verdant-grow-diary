@@ -30,18 +30,13 @@ const STATUS: Record<GroveBagAirflowObservation, GroveBagAirflowStatus> = {
 
 const COPY: Record<GroveBagAirflowObservation, string> = {
   gentle_indirect: "Recorded: gentle indirect airflow.",
-  stagnant:
-    "Needs review: stagnant air may allow localized humidity buildup around bags.",
-  fluctuating:
-    "Needs review: changing airflow can make cure conditions less consistent.",
-  strong_direct:
-    "Caution: direct airflow can dry bags too quickly. Grower review required.",
+  stagnant: "Needs review: stagnant air may allow localized humidity buildup around bags.",
+  fluctuating: "Needs review: changing airflow can make cure conditions less consistent.",
+  strong_direct: "Caution: direct airflow can dry bags too quickly. Grower review required.",
   unknown: "Airflow observation not recorded.",
 };
 
-export function normalizeGroveBagAirflowObservation(
-  input: unknown,
-): GroveBagAirflowObservation {
+export function normalizeGroveBagAirflowObservation(input: unknown): GroveBagAirflowObservation {
   if (typeof input !== "string") return "unknown";
   const v = input.trim().toLowerCase();
   return (GROVE_BAG_AIRFLOW_OBSERVATIONS as readonly string[]).includes(v)
@@ -55,15 +50,11 @@ export function getGroveBagAirflowStatus(
   return STATUS[observation];
 }
 
-export function getGroveBagAirflowCopy(
-  observation: GroveBagAirflowObservation,
-): string {
+export function getGroveBagAirflowCopy(observation: GroveBagAirflowObservation): string {
   return COPY[observation];
 }
 
-export function getGroveBagAirflowLabel(
-  observation: GroveBagAirflowObservation,
-): string {
+export function getGroveBagAirflowLabel(observation: GroveBagAirflowObservation): string {
   return GROVE_BAG_AIRFLOW_LABELS[observation];
 }
 
@@ -76,9 +67,7 @@ export interface GroveBagAirflowViewModel {
   timelineLabel: string;
 }
 
-export function buildGroveBagAirflowViewModel(
-  input: unknown,
-): GroveBagAirflowViewModel {
+export function buildGroveBagAirflowViewModel(input: unknown): GroveBagAirflowViewModel {
   const observation = normalizeGroveBagAirflowObservation(input);
   const label = getGroveBagAirflowLabel(observation);
   return {

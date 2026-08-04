@@ -10,9 +10,30 @@ import TimelinePhotoLightbox from "@/components/TimelinePhotoLightbox";
 import type { TimelinePhotoLightboxItem } from "@/lib/timelinePhotoLightboxRules";
 
 const ITEMS: TimelinePhotoLightboxItem[] = [
-  { id: "a", photoUrl: "https://x/a.jpg", entryAt: "2025-01-01T00:00:00Z", note: "n1", stage: "veg", plantName: "Blue Dream" },
-  { id: "b", photoUrl: "https://x/b.jpg", entryAt: "2025-01-02T00:00:00Z", note: "n2", stage: "veg", plantName: "Northern Lights" },
-  { id: "c", photoUrl: "https://x/c.jpg", entryAt: "2025-01-03T00:00:00Z", note: "n3", stage: "flower", plantName: null },
+  {
+    id: "a",
+    photoUrl: "https://x/a.jpg",
+    entryAt: "2025-01-01T00:00:00Z",
+    note: "n1",
+    stage: "veg",
+    plantName: "Blue Dream",
+  },
+  {
+    id: "b",
+    photoUrl: "https://x/b.jpg",
+    entryAt: "2025-01-02T00:00:00Z",
+    note: "n2",
+    stage: "veg",
+    plantName: "Northern Lights",
+  },
+  {
+    id: "c",
+    photoUrl: "https://x/c.jpg",
+    entryAt: "2025-01-03T00:00:00Z",
+    note: "n3",
+    stage: "flower",
+    plantName: null,
+  },
 ];
 
 function Harness({ start = 0 }: { start?: number }) {
@@ -46,19 +67,33 @@ describe("TimelinePhotoLightbox", () => {
   it("Next navigates forward, Previous navigates back", () => {
     render(<Harness start={0} />);
     fireEvent.click(screen.getByTestId("timeline-photo-lightbox-next"));
-    expect((screen.getByTestId("timeline-photo-lightbox-image") as HTMLImageElement).src).toContain("b.jpg");
+    expect((screen.getByTestId("timeline-photo-lightbox-image") as HTMLImageElement).src).toContain(
+      "b.jpg",
+    );
     fireEvent.click(screen.getByTestId("timeline-photo-lightbox-prev"));
-    expect((screen.getByTestId("timeline-photo-lightbox-image") as HTMLImageElement).src).toContain("a.jpg");
+    expect((screen.getByTestId("timeline-photo-lightbox-image") as HTMLImageElement).src).toContain(
+      "a.jpg",
+    );
   });
 
   it("hides Previous at first and Next at last", () => {
     const { rerender } = render(
-      <TimelinePhotoLightbox items={ITEMS} activeIndex={0} onClose={() => {}} onNavigate={() => {}} />,
+      <TimelinePhotoLightbox
+        items={ITEMS}
+        activeIndex={0}
+        onClose={() => {}}
+        onNavigate={() => {}}
+      />,
     );
     expect(screen.queryByTestId("timeline-photo-lightbox-prev")).toBeNull();
     expect(screen.getByTestId("timeline-photo-lightbox-next")).toBeTruthy();
     rerender(
-      <TimelinePhotoLightbox items={ITEMS} activeIndex={ITEMS.length - 1} onClose={() => {}} onNavigate={() => {}} />,
+      <TimelinePhotoLightbox
+        items={ITEMS}
+        activeIndex={ITEMS.length - 1}
+        onClose={() => {}}
+        onNavigate={() => {}}
+      />,
     );
     expect(screen.queryByTestId("timeline-photo-lightbox-next")).toBeNull();
     expect(screen.getByTestId("timeline-photo-lightbox-prev")).toBeTruthy();
@@ -67,10 +102,14 @@ describe("TimelinePhotoLightbox", () => {
   it("Escape key closes; Arrow keys navigate", () => {
     render(<Harness start={1} />);
     fireEvent.keyDown(window, { key: "ArrowLeft" });
-    expect((screen.getByTestId("timeline-photo-lightbox-image") as HTMLImageElement).src).toContain("a.jpg");
+    expect((screen.getByTestId("timeline-photo-lightbox-image") as HTMLImageElement).src).toContain(
+      "a.jpg",
+    );
     fireEvent.keyDown(window, { key: "ArrowRight" });
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect((screen.getByTestId("timeline-photo-lightbox-image") as HTMLImageElement).src).toContain("c.jpg");
+    expect((screen.getByTestId("timeline-photo-lightbox-image") as HTMLImageElement).src).toContain(
+      "c.jpg",
+    );
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.getByTestId("closed")).toBeTruthy();
   });
@@ -91,12 +130,7 @@ describe("TimelinePhotoLightbox", () => {
 
   it("does not render when no active item", () => {
     const { container } = render(
-      <TimelinePhotoLightbox
-        items={[]}
-        activeIndex={0}
-        onClose={() => {}}
-        onNavigate={() => {}}
-      />,
+      <TimelinePhotoLightbox items={[]} activeIndex={0} onClose={() => {}} onNavigate={() => {}} />,
     );
     expect(container.querySelector("[data-testid='timeline-photo-lightbox']")).toBeNull();
   });

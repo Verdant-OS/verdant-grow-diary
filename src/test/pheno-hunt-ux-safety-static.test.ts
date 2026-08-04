@@ -17,16 +17,11 @@ const files = [
 ];
 
 function stripComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 }
 
 const sources = Object.fromEntries(
-  files.map((f) => [
-    f,
-    stripComments(readFileSync(resolve(process.cwd(), f), "utf8")),
-  ]),
+  files.map((f) => [f, stripComments(readFileSync(resolve(process.cwd(), f), "utf8"))]),
 ) as Record<string, string>;
 
 describe("pheno hunt slice — static safety", () => {

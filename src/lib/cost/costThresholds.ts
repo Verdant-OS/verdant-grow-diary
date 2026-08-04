@@ -48,10 +48,7 @@ export const COST_THRESHOLDS: ThresholdConfig = {
   },
 };
 
-const ALLOWED_MARKERS: ReadonlySet<string> = new Set([
-  "TBD_MEASURED",
-  "TBD_LOAD_TEST",
-]);
+const ALLOWED_MARKERS: ReadonlySet<string> = new Set(["TBD_MEASURED", "TBD_LOAD_TEST"]);
 
 /** True if every leaf of the config is a recognized TBD marker. */
 export function thresholdsAreAllTbd(cfg: ThresholdConfig): boolean {

@@ -6,7 +6,6 @@ import {
 import { buildPhenoComparisonView } from "@/lib/phenoComparisonViewModel";
 import { derivePhenoCompareReadinessFromCandidates } from "@/lib/phenoComparisonActionState";
 
-
 function plant(overrides: Partial<PhenoHuntCandidatePlantRow> = {}): PhenoHuntCandidatePlantRow {
   return {
     id: "p1",
@@ -261,8 +260,20 @@ describe("adaptPhenoHuntCandidates", () => {
         b: { traits: { nose_loudness: 6 }, note: "sweet" },
       },
       smokeTestByPlantId: {
-        a: { flavorDescriptors: ["gas"], effectDescriptors: [], smoothness: null, potencyImpression: null, verdict: "keep" },
-        b: { flavorDescriptors: ["citrus"], effectDescriptors: [], smoothness: null, potencyImpression: null, verdict: "keep" },
+        a: {
+          flavorDescriptors: ["gas"],
+          effectDescriptors: [],
+          smoothness: null,
+          potencyImpression: null,
+          verdict: "keep",
+        },
+        b: {
+          flavorDescriptors: ["citrus"],
+          effectDescriptors: [],
+          smoothness: null,
+          potencyImpression: null,
+          verdict: "keep",
+        },
       },
     });
     expect(derivePhenoCompareReadinessFromCandidates("h", inputs).readiness).toBe(
@@ -270,4 +281,3 @@ describe("adaptPhenoHuntCandidates", () => {
     );
   });
 });
-

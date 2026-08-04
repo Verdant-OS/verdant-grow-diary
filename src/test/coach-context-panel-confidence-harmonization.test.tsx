@@ -7,10 +7,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
 import CoachContextSufficiencyPanel from "@/components/CoachContextSufficiencyPanel";
-import {
-  CONFIDENCE_CEILING_CAPS,
-  CONFIDENCE_LIMITED_COPY,
-} from "@/lib/aiDoctorConfidenceRules";
+import { CONFIDENCE_CEILING_CAPS, CONFIDENCE_LIMITED_COPY } from "@/lib/aiDoctorConfidenceRules";
 import type { AiContextSufficiencyResult } from "@/lib/aiContextSufficiencyRules";
 
 const ROOT = resolve(__dirname, "../..");
@@ -35,18 +32,16 @@ function result(
 
 describe("CoachContextSufficiencyPanel — harmonized confidence copy", () => {
   it("reuses the shared CONFIDENCE_LIMITED_COPY constant from aiDoctorConfidenceRules", () => {
-    expect(PANEL_SRC).toMatch(
-      /from\s+["']@\/lib\/aiDoctorConfidenceRules["']/,
-    );
+    expect(PANEL_SRC).toMatch(/from\s+["']@\/lib\/aiDoctorConfidenceRules["']/);
     expect(PANEL_SRC).toMatch(/CONFIDENCE_LIMITED_COPY/);
     expect(PANEL_SRC).toMatch(/CONFIDENCE_CEILING_CAPS/);
   });
 
   it("renders limited-confidence copy for low ceiling", () => {
     render(<CoachContextSufficiencyPanel result={result("low")} />);
-    expect(
-      screen.getByTestId("coach-context-confidence-limited-copy").textContent,
-    ).toBe(CONFIDENCE_LIMITED_COPY);
+    expect(screen.getByTestId("coach-context-confidence-limited-copy").textContent).toBe(
+      CONFIDENCE_LIMITED_COPY,
+    );
     const badge = screen.getByTestId("coach-context-confidence-ceiling");
     expect(badge.getAttribute("data-ceiling-pct")).toBe(
       String(Math.round(CONFIDENCE_CEILING_CAPS.low * 100)),
@@ -56,12 +51,10 @@ describe("CoachContextSufficiencyPanel — harmonized confidence copy", () => {
 
   it("renders limited-confidence copy for medium ceiling", () => {
     render(<CoachContextSufficiencyPanel result={result("medium")} />);
-    expect(
-      screen.getByTestId("coach-context-confidence-limited-copy").textContent,
-    ).toBe(CONFIDENCE_LIMITED_COPY);
-    expect(
-      screen.getByTestId("coach-context-confidence-ceiling").textContent,
-    ).toMatch(/60%/);
+    expect(screen.getByTestId("coach-context-confidence-limited-copy").textContent).toBe(
+      CONFIDENCE_LIMITED_COPY,
+    );
+    expect(screen.getByTestId("coach-context-confidence-ceiling").textContent).toMatch(/60%/);
   });
 
   it("does not imply limitation for high ceiling", () => {
@@ -73,9 +66,7 @@ describe("CoachContextSufficiencyPanel — harmonized confidence copy", () => {
         })}
       />,
     );
-    expect(
-      screen.queryByTestId("coach-context-confidence-limited-copy"),
-    ).toBeNull();
+    expect(screen.queryByTestId("coach-context-confidence-limited-copy")).toBeNull();
     const badge = screen.getByTestId("coach-context-confidence-ceiling");
     expect(badge.getAttribute("data-ceiling-pct")).toBe("100");
     expect(badge.textContent).toMatch(/100%/);
@@ -90,12 +81,8 @@ describe("CoachContextSufficiencyPanel — harmonized confidence copy", () => {
         })}
       />,
     );
-    expect(screen.getByTestId("coach-context-missing").textContent).toMatch(
-      /plant stage/i,
-    );
-    expect(screen.getByTestId("coach-context-warnings").textContent).toMatch(
-      /demo\/mock/i,
-    );
+    expect(screen.getByTestId("coach-context-missing").textContent).toMatch(/plant stage/i);
+    expect(screen.getByTestId("coach-context-warnings").textContent).toMatch(/demo\/mock/i);
   });
 });
 

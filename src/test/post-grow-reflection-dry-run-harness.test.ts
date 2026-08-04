@@ -41,12 +41,14 @@ describe("runPostGrowReflectionDryRunHarness", () => {
         "unsafe_language",
       ]),
     );
-    expect(summary.scenarios.find((scenario) => scenario.id === "rich-unsafe-automation-rejected")?.issueCodes).toContain(
-      "unsafe_language",
-    );
-    expect(summary.scenarios.find((scenario) => scenario.id === "thin-high-confidence-rejected")?.issueCodes).toContain(
-      "high_confidence_with_thin_data",
-    );
+    expect(
+      summary.scenarios.find((scenario) => scenario.id === "rich-unsafe-automation-rejected")
+        ?.issueCodes,
+    ).toContain("unsafe_language");
+    expect(
+      summary.scenarios.find((scenario) => scenario.id === "thin-high-confidence-rejected")
+        ?.issueCodes,
+    ).toContain("high_confidence_with_thin_data");
   });
 
   it("keeps repeated runs byte-for-byte deterministic at object level", () => {
@@ -78,7 +80,9 @@ describe("runPostGrowReflectionDryRunHarness", () => {
 
   it("exposes validation options for operator smoke-test diagnostics", () => {
     const summary = runPostGrowReflectionDryRunHarness();
-    const thin = summary.scenarios.find((scenario) => scenario.id === "thin-high-confidence-rejected");
+    const thin = summary.scenarios.find(
+      (scenario) => scenario.id === "thin-high-confidence-rejected",
+    );
 
     expect(thin?.validationOptions).toEqual({
       sensorCoveragePct: 38,
@@ -93,7 +97,9 @@ describe("buildPostGrowReflectionDryRunScenarios", () => {
     const scenarios = buildPostGrowReflectionDryRunScenarios();
 
     expect(scenarios).toHaveLength(5);
-    expect(scenarios.every((scenario) => scenario.candidate.source === "dry_run_fixture")).toBe(true);
+    expect(scenarios.every((scenario) => scenario.candidate.source === "dry_run_fixture")).toBe(
+      true,
+    );
     expect(scenarios[0].context.grow_id).toBe("grow-reflection-rich-sour-diesel-001");
   });
 });

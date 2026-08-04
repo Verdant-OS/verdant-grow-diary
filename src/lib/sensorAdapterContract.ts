@@ -47,11 +47,7 @@ export type SensorAdapterValueOrigin = "observed" | "derived" | "source_reported
 export type SensorAdapterComparisonRole = "primary" | "reference";
 
 export type SensorAdapterIngestBoundaryStatus =
-  | "ready"
-  | "reference_only"
-  | "blocked_stale"
-  | "blocked_channel_collision"
-  | "invalid";
+  "ready" | "reference_only" | "blocked_stale" | "blocked_channel_collision" | "invalid";
 
 export interface SensorAdapterFreshnessPolicy {
   /** Expected publishing cadence; late-but-not-stale readings are degraded. */

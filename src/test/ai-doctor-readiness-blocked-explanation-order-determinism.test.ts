@@ -20,8 +20,7 @@ import {
   type AiDoctorReadinessBlockingCode,
 } from "@/lib/aiDoctorReadinessGateViewModel";
 
-const CANONICAL: readonly AiDoctorReadinessBlockingCode[] =
-  AI_DOCTOR_READINESS_BLOCKING_CODES;
+const CANONICAL: readonly AiDoctorReadinessBlockingCode[] = AI_DOCTOR_READINESS_BLOCKING_CODES;
 
 const CANONICAL_SENTENCE_FRAGMENT =
   "a plant profile, a recent note, watering, feeding, or photo (last 7 days), and a recent manual sensor snapshot (last 7 days)";
@@ -67,9 +66,7 @@ describe("buildAiDoctorReadinessBlockedExplanation — order determinism", () =>
       const expected = CANONICAL.filter((c) => pair.includes(c));
       expect(r.blockingCodes).toEqual(expected);
       // Joined with " and " and no trailing comma.
-      expect(r.sentence).toContain(
-        `${r.blockingLabels[0]} and ${r.blockingLabels[1]}`,
-      );
+      expect(r.sentence).toContain(`${r.blockingLabels[0]} and ${r.blockingLabels[1]}`);
     }
   });
 
@@ -112,11 +109,7 @@ describe("buildAiDoctorReadinessBlockedExplanation — order determinism", () =>
   it("produces byte-identical output across 50 repeated evaluations (stability)", () => {
     const args = {
       readiness: "insufficient" as const,
-      missing: [
-        "recent-manual-sensor-snapshot",
-        "plant-profile",
-        "recent-timeline-activity",
-      ],
+      missing: ["recent-manual-sensor-snapshot", "plant-profile", "recent-timeline-activity"],
       nextActionLabel: "Add context",
     };
     const first = buildAiDoctorReadinessBlockedExplanation(args);

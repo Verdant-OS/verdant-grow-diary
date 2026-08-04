@@ -55,10 +55,7 @@ export default function EnvironmentStabilityCard({
   // stage_unknown / context_only) the stage band is reference context only.
   // Prefixing it keeps the band from reading as a live classification of a
   // derived VPD estimate rendered elsewhere on the page.
-  const whyText =
-    inactive && why.kind === "stage"
-      ? `Target for reference: ${why.text}`
-      : why.text;
+  const whyText = inactive && why.kind === "stage" ? `Target for reference: ${why.text}` : why.text;
 
   return (
     <div

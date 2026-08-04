@@ -75,8 +75,7 @@ export function auditLeadDataQuality(
         count: 0,
         percentage: 0,
         affectedLeadIds: [],
-        recommendation:
-          "Clear filters or broaden the search to audit lead data.",
+        recommendation: "Clear filters or broaden the search to audit lead data.",
         sortWeight: 10,
       },
     ];
@@ -110,16 +109,11 @@ export function auditLeadDataQuality(
     // stale: created_at valid, not closed/spam, and older than threshold
     if (isValidIsoDate(l.created_at)) {
       const ageDays = (now - Date.parse(l.created_at)) / 86_400_000;
-      const stalled =
-        l.status !== "closed" &&
-        l.status !== "spam" &&
-        ageDays > STALE_DAYS;
+      const stalled = l.status !== "closed" && l.status !== "spam" && ageDays > STALE_DAYS;
       if (stalled) stale.push(id);
     }
 
-    const emailKey = isMeaningful(l.email)
-      ? l.email.trim().toLowerCase()
-      : "";
+    const emailKey = isMeaningful(l.email) ? l.email.trim().toLowerCase() : "";
     if (emailKey) {
       const arr = emailGroups.get(emailKey) ?? [];
       arr.push(id);
@@ -148,8 +142,7 @@ export function auditLeadDataQuality(
     title: "Leads with missing or unknown source",
     ids: missingSource,
     total,
-    recommendation:
-      "Capture source on intake forms to improve channel reporting.",
+    recommendation: "Capture source on intake forms to improve channel reporting.",
     sortWeight: 80,
   });
   pushFinding(findings, {
@@ -176,8 +169,7 @@ export function auditLeadDataQuality(
     title: "Leads with missing or invalid created_at",
     ids: invalidCreated,
     total,
-    recommendation:
-      "Check ingestion — created_at should always be a valid timestamp.",
+    recommendation: "Check ingestion — created_at should always be a valid timestamp.",
     sortWeight: 85,
   });
   pushFinding(findings, {
@@ -215,8 +207,7 @@ export function auditLeadDataQuality(
     title: "Stale leads with no resolution",
     ids: stale,
     total,
-    recommendation:
-      "Decide whether to close, escalate, or re-engage leads older than 30 days.",
+    recommendation: "Decide whether to close, escalate, or re-engage leads older than 30 days.",
     sortWeight: 65,
   });
 
@@ -261,9 +252,7 @@ function pushFinding(
   });
 }
 
-export function sortFindings(
-  findings: LeadDataQualityFinding[],
-): LeadDataQualityFinding[] {
+export function sortFindings(findings: LeadDataQualityFinding[]): LeadDataQualityFinding[] {
   return [...findings].sort((a, b) => {
     const sa = SEVERITY_WEIGHT[a.severity];
     const sb = SEVERITY_WEIGHT[b.severity];

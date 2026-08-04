@@ -23,11 +23,7 @@ export interface AiDoctorPhase1ResultPanelProps {
   result: AiDoctorDiagnosisResult;
 }
 
-function StringList(props: {
-  items: readonly string[];
-  testId: string;
-  emptyLabel: string;
-}) {
+function StringList(props: { items: readonly string[]; testId: string; emptyLabel: string }) {
   if (props.items.length === 0) {
     return (
       <p data-testid={`${props.testId}-empty`} className="text-xs text-muted-foreground">
@@ -44,14 +40,11 @@ function StringList(props: {
   );
 }
 
-export function AiDoctorPhase1ResultPanel(
-  props: AiDoctorPhase1ResultPanelProps,
-): JSX.Element {
-  const vm: AiDoctorPhase1ResultViewModel =
-    buildAiDoctorPhase1ResultViewModel({
-      context: props.context,
-      result: props.result,
-    });
+export function AiDoctorPhase1ResultPanel(props: AiDoctorPhase1ResultPanelProps): JSX.Element {
+  const vm: AiDoctorPhase1ResultViewModel = buildAiDoctorPhase1ResultViewModel({
+    context: props.context,
+    result: props.result,
+  });
 
   return (
     <article
@@ -94,7 +87,8 @@ export function AiDoctorPhase1ResultPanel(
             data-testid="ai-doctor-result-autoflower-caution"
             className="text-xs text-muted-foreground"
           >
-            Autoflower caution: avoid heavy defoliation, transplant, or high-stress recovery tactics.
+            Autoflower caution: avoid heavy defoliation, transplant, or high-stress recovery
+            tactics.
           </p>
         )}
       </section>

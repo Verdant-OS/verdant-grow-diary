@@ -15,24 +15,13 @@ import { stripSourceComments } from "./utils/stripSourceComments";
 const ROOT = resolve(__dirname, "../..");
 const DASH = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
 const DASH_EXEC = stripSourceComments(DASH);
-const PILL = readFileSync(
-  resolve(ROOT, "src/components/OnboardingProgressPill.tsx"),
-  "utf8",
-);
-const CARD = readFileSync(
-  resolve(ROOT, "src/components/OnboardingChecklistCard.tsx"),
-  "utf8",
-);
-const PREFS = readFileSync(
-  resolve(ROOT, "src/lib/localOnboardingPreferences.ts"),
-  "utf8",
-);
+const PILL = readFileSync(resolve(ROOT, "src/components/OnboardingProgressPill.tsx"), "utf8");
+const CARD = readFileSync(resolve(ROOT, "src/components/OnboardingChecklistCard.tsx"), "utf8");
+const PREFS = readFileSync(resolve(ROOT, "src/lib/localOnboardingPreferences.ts"), "utf8");
 
 describe("Dashboard wires the onboarding progress pill in the header", () => {
   it("imports OnboardingProgressPill", () => {
-    expect(DASH_EXEC).toMatch(
-      /from\s+["']@\/components\/OnboardingProgressPill["']/,
-    );
+    expect(DASH_EXEC).toMatch(/from\s+["']@\/components\/OnboardingProgressPill["']/);
   });
 
   it("renders the pill alongside the existing checklist card", () => {
@@ -69,7 +58,11 @@ describe("Onboarding pill + card + prefs — safety constraints", () => {
   });
 
   it("no device-control copy", () => {
-    for (const re of [/turn on/i, /turn off/i, /control your (fan|light|pump|heater|humidifier|dehumidifier)/i]) {
+    for (const re of [
+      /turn on/i,
+      /turn off/i,
+      /control your (fan|light|pump|heater|humidifier|dehumidifier)/i,
+    ]) {
       expect(ALL).not.toMatch(re);
     }
   });

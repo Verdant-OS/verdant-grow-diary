@@ -50,7 +50,13 @@ describe("buildEnvironmentSummaryReportViewModel", () => {
   it("aggregates valid/invalid/DST/review counts", () => {
     const checks = [
       vm({ id: "a", source: "live", vpdBand: { minKpa: 0.8, maxKpa: 1.5 } }), // valid
-      vm({ id: "b", source: "live", tempC: 30, rhPercent: 30, vpdBand: { minKpa: 0.8, maxKpa: 1.3 } }), // review
+      vm({
+        id: "b",
+        source: "live",
+        tempC: 30,
+        rhPercent: 30,
+        vpdBand: { minKpa: 0.8, maxKpa: 1.3 },
+      }), // review
       vm({ id: "c", source: "bogus" }), // invalid
       vm({ id: "d", source: "live", ppfdDst: true }), // dst_ambiguous
     ];
@@ -136,7 +142,6 @@ describe("buildEnvironmentSummaryReportViewModel", () => {
     expect(sourceReview.relatedEntryIds).toEqual(["stale-1"]);
     expect(sourceReview.relatedEntryIds).not.toContain("valid-1");
   });
-
 
   it("accumulates metric coverage from snapshot metrics", () => {
     const checks = [

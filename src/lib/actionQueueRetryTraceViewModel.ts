@@ -15,8 +15,7 @@
 export type RetryTraceUiState = "idle" | "failed" | "retrying";
 
 /** Primary explanation surfaced to the grower when trace insert failed. */
-export const RETRY_TRACE_EXPLAIN_PRIMARY =
-  "Status was saved, but the diary trace did not save.";
+export const RETRY_TRACE_EXPLAIN_PRIMARY = "Status was saved, but the diary trace did not save.";
 
 /** Secondary explanation: clarifies retry scope. */
 export const RETRY_TRACE_EXPLAIN_SECONDARY =
@@ -46,9 +45,7 @@ export interface RetryTraceViewModel {
   showFailureRegion: boolean;
 }
 
-export function buildRetryTraceViewModel(
-  input: RetryTraceViewModelInput,
-): RetryTraceViewModel {
+export function buildRetryTraceViewModel(input: RetryTraceViewModelInput): RetryTraceViewModel {
   const failed = !!input?.traceFailed;
   const retrying = !!input?.retrying;
   if (!failed) {
@@ -64,10 +61,7 @@ export function buildRetryTraceViewModel(
   if (retrying) {
     return {
       state: "retrying",
-      explanationLines: [
-        RETRY_TRACE_EXPLAIN_PRIMARY,
-        RETRY_TRACE_EXPLAIN_SECONDARY,
-      ],
+      explanationLines: [RETRY_TRACE_EXPLAIN_PRIMARY, RETRY_TRACE_EXPLAIN_SECONDARY],
       buttonLabel: RETRY_TRACE_BUTTON_LABEL_RETRYING,
       buttonDisabled: true,
       buttonHidden: false,
@@ -76,10 +70,7 @@ export function buildRetryTraceViewModel(
   }
   return {
     state: "failed",
-    explanationLines: [
-      RETRY_TRACE_EXPLAIN_PRIMARY,
-      RETRY_TRACE_EXPLAIN_SECONDARY,
-    ],
+    explanationLines: [RETRY_TRACE_EXPLAIN_PRIMARY, RETRY_TRACE_EXPLAIN_SECONDARY],
     buttonLabel: RETRY_TRACE_BUTTON_LABEL_IDLE,
     buttonDisabled: false,
     buttonHidden: false,

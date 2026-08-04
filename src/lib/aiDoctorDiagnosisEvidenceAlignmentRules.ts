@@ -13,10 +13,7 @@
  */
 
 export type RecommendationPosture =
-  | "strong_context"
-  | "moderate_context"
-  | "weak_context"
-  | "insufficient_context";
+  "strong_context" | "moderate_context" | "weak_context" | "insufficient_context";
 
 export interface DiagnosisEvidenceAlignmentInput {
   /** True when there is any live sensor evidence slot. */
@@ -61,12 +58,9 @@ export const POSTURE_LABELS: Record<RecommendationPosture, string> = {
 
 export const POSTURE_COPY: Record<RecommendationPosture, string> = {
   strong_context: "AI Doctor has multiple supporting evidence sources.",
-  moderate_context:
-    "AI Doctor has useful context, but live telemetry is limited or missing.",
-  weak_context:
-    "AI Doctor has limited or mixed evidence. Avoid aggressive changes.",
-  insufficient_context:
-    "More data is needed before giving strong guidance.",
+  moderate_context: "AI Doctor has useful context, but live telemetry is limited or missing.",
+  weak_context: "AI Doctor has limited or mixed evidence. Avoid aggressive changes.",
+  insufficient_context: "More data is needed before giving strong guidance.",
 };
 
 export const AGGRESSIVE_CHANGES_GUARDRAIL =
@@ -105,16 +99,10 @@ export function computeRecommendationPosture(
     i.envCheckRejectedCount === 0 &&
     i.envCheckNotCheckedCount === 0;
   const envMixedOrBad =
-    i.envCheckPresent &&
-    (i.envCheckRejectedCount > 0 || i.envCheckNotCheckedCount > 0);
+    i.envCheckPresent && (i.envCheckRejectedCount > 0 || i.envCheckNotCheckedCount > 0);
 
   // Insufficient: nothing usable at all.
-  if (
-    !i.liveSensorUsable &&
-    !i.envCheckPresent &&
-    !i.hasRecentDiary &&
-    !i.hasRecentPhotos
-  ) {
+  if (!i.liveSensorUsable && !i.envCheckPresent && !i.hasRecentDiary && !i.hasRecentPhotos) {
     return "insufficient_context";
   }
 
@@ -122,11 +110,7 @@ export function computeRecommendationPosture(
   if (envMixedOrBad) return "weak_context";
 
   // Strong: live + clean env check + at least one diary or photo signal.
-  if (
-    i.liveSensorUsable &&
-    envAcceptedClean &&
-    (i.hasRecentDiary || i.hasRecentPhotos)
-  ) {
+  if (i.liveSensorUsable && envAcceptedClean && (i.hasRecentDiary || i.hasRecentPhotos)) {
     return "strong_context";
   }
 
@@ -146,14 +130,9 @@ function buildBasisCopy(i: DiagnosisEvidenceAlignmentInput): string[] {
     out.push("No recent live sensor readings were available.");
   }
   if (i.envCheckPresent && !i.liveSensorUsable) {
-    out.push(
-      "This guidance is based on a local EcoWitt Environment Check, not live telemetry.",
-    );
+    out.push("This guidance is based on a local EcoWitt Environment Check, not live telemetry.");
   }
-  if (
-    i.envCheckPresent &&
-    (i.envCheckRejectedCount > 0 || i.envCheckNotCheckedCount > 0)
-  ) {
+  if (i.envCheckPresent && (i.envCheckRejectedCount > 0 || i.envCheckNotCheckedCount > 0)) {
     out.push(
       "Some metrics were rejected or not checked, so recommendations should stay conservative.",
     );

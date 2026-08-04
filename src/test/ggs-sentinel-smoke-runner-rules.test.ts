@@ -8,17 +8,19 @@ import {
   SPIDER_FARMER_GGS_AGING_MS,
   type SentinelSensorRow,
 } from "@/lib/ggsSentinelSmokeRunner";
-import { SPIDER_FARMER_GGS_PROVIDER, SPIDER_FARMER_GGS_STALE_MS } from "@/lib/spiderFarmerGgsMappingRules";
+import {
+  SPIDER_FARMER_GGS_PROVIDER,
+  SPIDER_FARMER_GGS_STALE_MS,
+} from "@/lib/spiderFarmerGgsMappingRules";
 
 const NOW = new Date("2026-06-17T12:00:00.000Z");
-const fresh = (offsetSec = 60) =>
-  new Date(NOW.getTime() - offsetSec * 1000).toISOString();
-const aging = () =>
-  new Date(NOW.getTime() - (SPIDER_FARMER_GGS_AGING_MS + 60_000)).toISOString();
-const stale = () =>
-  new Date(NOW.getTime() - (SPIDER_FARMER_GGS_STALE_MS + 60_000)).toISOString();
+const fresh = (offsetSec = 60) => new Date(NOW.getTime() - offsetSec * 1000).toISOString();
+const aging = () => new Date(NOW.getTime() - (SPIDER_FARMER_GGS_AGING_MS + 60_000)).toISOString();
+const stale = () => new Date(NOW.getTime() - (SPIDER_FARMER_GGS_STALE_MS + 60_000)).toISOString();
 
-function row(overrides: Partial<SentinelSensorRow> & Pick<SentinelSensorRow, "metric" | "value">): SentinelSensorRow {
+function row(
+  overrides: Partial<SentinelSensorRow> & Pick<SentinelSensorRow, "metric" | "value">,
+): SentinelSensorRow {
   return {
     source: SPIDER_FARMER_GGS_PROVIDER,
     quality: "live",
@@ -28,10 +30,7 @@ function row(overrides: Partial<SentinelSensorRow> & Pick<SentinelSensorRow, "me
 }
 
 function freshGgsBaseline(): SentinelSensorRow[] {
-  return [
-    row({ metric: "soil_temp_c", value: 22.4 }),
-    row({ metric: "soil_ec", value: 1.8 }),
-  ];
+  return [row({ metric: "soil_temp_c", value: 22.4 }), row({ metric: "soil_ec", value: 1.8 })];
 }
 
 describe("runGgsSentinelSmoke — happy path", () => {
@@ -197,7 +196,13 @@ describe("assessMetricFreshness — boundary behavior", () => {
 
   it("returns 'fresh' when ageMs <= aging threshold", () => {
     const a = assessMetricFreshness(
-      { metric: "soil_temp_c", value: 22, source: SPIDER_FARMER_GGS_PROVIDER, quality: "live", captured_at: fresh(30) },
+      {
+        metric: "soil_temp_c",
+        value: 22,
+        source: SPIDER_FARMER_GGS_PROVIDER,
+        quality: "live",
+        captured_at: fresh(30),
+      },
       "soil_temp_c",
       NOW,
     );
@@ -206,7 +211,13 @@ describe("assessMetricFreshness — boundary behavior", () => {
 
   it("returns 'fresh_but_aging' when aging < ageMs <= stale", () => {
     const a = assessMetricFreshness(
-      { metric: "soil_temp_c", value: 22, source: SPIDER_FARMER_GGS_PROVIDER, quality: "live", captured_at: aging() },
+      {
+        metric: "soil_temp_c",
+        value: 22,
+        source: SPIDER_FARMER_GGS_PROVIDER,
+        quality: "live",
+        captured_at: aging(),
+      },
       "soil_temp_c",
       NOW,
     );
@@ -215,7 +226,13 @@ describe("assessMetricFreshness — boundary behavior", () => {
 
   it("returns 'stale' when ageMs > stale threshold", () => {
     const a = assessMetricFreshness(
-      { metric: "soil_temp_c", value: 22, source: SPIDER_FARMER_GGS_PROVIDER, quality: "live", captured_at: stale() },
+      {
+        metric: "soil_temp_c",
+        value: 22,
+        source: SPIDER_FARMER_GGS_PROVIDER,
+        quality: "live",
+        captured_at: stale(),
+      },
       "soil_temp_c",
       NOW,
     );
@@ -260,7 +277,9 @@ describe("static safety scan — ggsSentinelSmokeRunner.ts", () => {
     });
   }
   it("does not export any command/control symbols", () => {
-    expect(src).not.toMatch(/export\s+(function|const)\s+\w*(command|control|setpoint|write|publish)/i);
+    expect(src).not.toMatch(
+      /export\s+(function|const)\s+\w*(command|control|setpoint|write|publish)/i,
+    );
   });
   it("does not surface raw_payload as a field on any exported type", () => {
     expect(src).not.toMatch(/raw_payload\s*[:?]/);

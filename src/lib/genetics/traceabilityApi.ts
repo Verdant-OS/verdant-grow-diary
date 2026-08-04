@@ -15,14 +15,12 @@ import { geneticsTraceabilityDb } from "@/integrations/supabase/geneticsTraceabi
 import type { Json } from "@/integrations/supabase/types";
 
 export type MutationResult<T = Record<string, unknown>> =
-  | { ok: true; data: T; reused: boolean }
-  | { ok: false; error: string };
+  { ok: true; data: T; reused: boolean } | { ok: false; error: string };
 
 export type GeneticsReadErrorCode = "authentication_failed" | "read_failed" | "unexpected_response";
 
 export type GeneticsReadResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: GeneticsReadErrorCode };
+  { ok: true; data: T } | { ok: false; error: GeneticsReadErrorCode };
 
 export class GeneticsReadError extends Error {
   readonly code: GeneticsReadErrorCode;

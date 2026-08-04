@@ -22,11 +22,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
 
-export type EnvironmentSummaryReportGateStatus =
-  | "loading"
-  | "allowed"
-  | "denied"
-  | "error";
+export type EnvironmentSummaryReportGateStatus = "loading" | "allowed" | "denied" | "error";
 
 export interface EnvironmentSummaryReportGateState {
   status: EnvironmentSummaryReportGateStatus;
@@ -34,8 +30,7 @@ export interface EnvironmentSummaryReportGateState {
   displayPlanId: string | null;
 }
 
-export interface EnvironmentSummaryReportGateResult
-  extends EnvironmentSummaryReportGateState {
+export interface EnvironmentSummaryReportGateResult extends EnvironmentSummaryReportGateState {
   retry: () => void;
 }
 
@@ -74,8 +69,7 @@ export function useEnvironmentSummaryReportServerGate(): EnvironmentSummaryRepor
           setState({
             status: "allowed",
             reason: null,
-            displayPlanId:
-              typeof d.display_plan_id === "string" ? d.display_plan_id : null,
+            displayPlanId: typeof d.display_plan_id === "string" ? d.display_plan_id : null,
           });
           return;
         }
@@ -86,9 +80,7 @@ export function useEnvironmentSummaryReportServerGate(): EnvironmentSummaryRepor
         const status = errAny?.context?.status;
         const denialData = data as Record<string, unknown> | null;
         const denialReason =
-          (denialData && typeof denialData.reason === "string"
-            ? denialData.reason
-            : null) ?? null;
+          (denialData && typeof denialData.reason === "string" ? denialData.reason : null) ?? null;
         const denialPlan =
           denialData && typeof denialData.display_plan_id === "string"
             ? denialData.display_plan_id

@@ -24,11 +24,7 @@ describe("growStatus.rankRisk", () => {
   });
   it("picks the highest of mixed risks", () => {
     expect(
-      rankRisk([
-        { risk_level: "low" },
-        { risk_level: "critical" },
-        { risk_level: "medium" },
-      ]),
+      rankRisk([{ risk_level: "low" }, { risk_level: "critical" }, { risk_level: "medium" }]),
     ).toBe("critical");
     expect(rankRisk([{ risk_level: "high" }, { risk_level: "medium" }])).toBe("high");
     expect(rankRisk([{ risk_level: "medium" }, { risk_level: "low" }])).toBe("medium");
@@ -41,7 +37,12 @@ describe("growStatus.rankRisk", () => {
 
 describe("growStatus.deriveStatus", () => {
   it("high pending risk → needs_review", () => {
-    const r = deriveStatus({ pending: 2, highestRisk: "high", lastDiaryAt: new Date(NOW).toISOString(), now: NOW });
+    const r = deriveStatus({
+      pending: 2,
+      highestRisk: "high",
+      lastDiaryAt: new Date(NOW).toISOString(),
+      now: NOW,
+    });
     expect(r.level).toBe("needs_review");
     expect(r.reason).toMatch(/high/);
   });
@@ -51,10 +52,20 @@ describe("growStatus.deriveStatus", () => {
   });
   it("low/medium pending → watch", () => {
     expect(
-      deriveStatus({ pending: 3, highestRisk: "medium", lastDiaryAt: new Date(NOW).toISOString(), now: NOW }).level,
+      deriveStatus({
+        pending: 3,
+        highestRisk: "medium",
+        lastDiaryAt: new Date(NOW).toISOString(),
+        now: NOW,
+      }).level,
     ).toBe("watch");
     expect(
-      deriveStatus({ pending: 1, highestRisk: "low", lastDiaryAt: new Date(NOW).toISOString(), now: NOW }).level,
+      deriveStatus({
+        pending: 1,
+        highestRisk: "low",
+        lastDiaryAt: new Date(NOW).toISOString(),
+        now: NOW,
+      }).level,
     ).toBe("watch");
   });
   it("no pending + recent diary → good", () => {
@@ -82,7 +93,12 @@ describe("growStatus.deriveStatus", () => {
     expect(r.reason).toMatch(/No diary/);
   });
   it("pending unavailable + risk unknown → unavailable", () => {
-    const r = deriveStatus({ pending: "unavailable", highestRisk: "unknown", lastDiaryAt: null, now: NOW });
+    const r = deriveStatus({
+      pending: "unavailable",
+      highestRisk: "unknown",
+      lastDiaryAt: null,
+      now: NOW,
+    });
     expect(r.level).toBe("unavailable");
     expect(r.reason).toBe("Status unavailable");
   });

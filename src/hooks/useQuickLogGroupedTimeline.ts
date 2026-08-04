@@ -45,8 +45,7 @@ import {
 export const QUICK_LOG_GROUPED_TIMELINE_DEFAULT_LIMIT = 200;
 
 export type QuickLogGroupedTimelineScope =
-  | { kind: "plant"; plantId: string; tentId: string | null }
-  | { kind: "tent"; tentId: string };
+  { kind: "plant"; plantId: string; tentId: string | null } | { kind: "tent"; tentId: string };
 
 export function buildQuickLogGroupedTimelineQueryKey(
   scope: QuickLogGroupedTimelineScope | null,

@@ -54,7 +54,10 @@ const results: CheckResult[] = [];
 const checkpointDir = process.env.CHECKPOINT_DIR?.trim() || "";
 const checkpointFiles = new Map<string, string>();
 function sectionSlug(section: string): string {
-  return section.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return section
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 function checkpointPathFor(section: string): string | null {
   if (!checkpointDir) return null;
@@ -114,7 +117,9 @@ function parseArgs(argv: string[]): { user: string; env: Environment } {
       }
       env = v;
     } else if (a === "--help" || a === "-h") {
-      console.log("Usage: bun run scripts/sandbox-credit-packs-smoke.ts --user <email-or-uuid> [--env sandbox|live]");
+      console.log(
+        "Usage: bun run scripts/sandbox-credit-packs-smoke.ts --user <email-or-uuid> [--env sandbox|live]",
+      );
       process.exit(0);
     }
   }
@@ -155,7 +160,9 @@ function psqlJson<T = unknown>(sql: string): T[] {
   }
 }
 
-async function resolveUserId(userArg: string): Promise<{ id: string; email: string | null } | null> {
+async function resolveUserId(
+  userArg: string,
+): Promise<{ id: string; email: string | null } | null> {
   if (!UUID_RE.test(userArg)) {
     // auth.users is not reachable via the read-only exec role; email lookup
     // isn't possible without service-role access. Ask for a UUID instead of
@@ -210,7 +217,10 @@ interface CreditPackGrant {
   meta: Record<string, unknown> | null;
 }
 
-async function checkCreditPackPurchase(userId: string, env: Environment): Promise<CreditPackGrant | null> {
+async function checkCreditPackPurchase(
+  userId: string,
+  env: Environment,
+): Promise<CreditPackGrant | null> {
   const section = "CREDIT PACK";
   beginCheckpoint(section);
   const rows = psqlJson<CreditPackGrant>(
@@ -225,7 +235,12 @@ async function checkCreditPackPurchase(userId: string, env: Environment): Promis
   );
   const latest = rows[0] ?? null;
   if (!latest) {
-    record(section, "credit_pack grant row exists", "fail", "no ai_credit_grants row with source='credit_pack'");
+    record(
+      section,
+      "credit_pack grant row exists",
+      "fail",
+      "no ai_credit_grants row with source='credit_pack'",
+    );
     return null;
   }
   record(
@@ -238,7 +253,9 @@ async function checkCreditPackPurchase(userId: string, env: Environment): Promis
     section,
     "grant is anchored to a Paddle transaction id",
     latest.paddle_transaction_id ? "pass" : "fail",
-    latest.paddle_transaction_id ? undefined : "paddle_transaction_id is NULL (idempotency anchor broken)",
+    latest.paddle_transaction_id
+      ? undefined
+      : "paddle_transaction_id is NULL (idempotency anchor broken)",
   );
   record(
     section,
@@ -304,7 +321,13 @@ async function checkOverflowSpend(userId: string, env: Environment): Promise<voi
   // Current UTC period key = YYYY-MM.
   const periodKey = new Date().toISOString().slice(0, 7);
 
-  const spendRows = psqlJson<{ period_key: string; feature: string; net: number; spent: number; refunded: number }>(
+  const spendRows = psqlJson<{
+    period_key: string;
+    feature: string;
+    net: number;
+    spent: number;
+    refunded: number;
+  }>(
     `SELECT
         period_key,
         feature,
@@ -319,7 +342,12 @@ async function checkOverflowSpend(userId: string, env: Environment): Promise<voi
   );
 
   if (spendRows.length === 0) {
-    record(section, "spend rows exist for current period", "skip", `no ai_credit_spends for ${periodKey}`);
+    record(
+      section,
+      "spend rows exist for current period",
+      "skip",
+      `no ai_credit_spends for ${periodKey}`,
+    );
     return;
   }
   for (const r of spendRows) {
@@ -410,14 +438,29 @@ async function checkReferralConversion(userId: string, env: Environment): Promis
     record(section, "referral row exists", "skip", "no referrals rows involving this user");
     return;
   }
-  record(section, "referral row exists", "pass", `as_referrer=${asReferrer.length} as_referee=${asReferee.length}`);
+  record(
+    section,
+    "referral row exists",
+    "pass",
+    `as_referrer=${asReferrer.length} as_referee=${asReferee.length}`,
+  );
 
   const converted = [...asReferrer, ...asReferee].filter((r) => r.status === "converted");
   if (converted.length === 0) {
-    record(section, "at least one referral is converted", "skip", "all rows still status='pending'");
+    record(
+      section,
+      "at least one referral is converted",
+      "skip",
+      "all rows still status='pending'",
+    );
     return;
   }
-  record(section, "at least one referral is converted", "pass", `converted_count=${converted.length}`);
+  record(
+    section,
+    "at least one referral is converted",
+    "pass",
+    `converted_count=${converted.length}`,
+  );
 
   // Each converted referral should have a matching source='referral' grant
   // for the user who is entitled to the credits (referrer for referrer_credits,
@@ -426,7 +469,12 @@ async function checkReferralConversion(userId: string, env: Environment): Promis
     const isReferrerSide = "referee_user_id" in r;
     const credits = isReferrerSide ? r.referrer_credits : r.referee_credits;
     if (credits === 0) {
-      record(section, `grant matches referral ${r.id.slice(0, 8)} (${isReferrerSide ? "referrer" : "referee"})`, "skip", "credits=0 on this side");
+      record(
+        section,
+        `grant matches referral ${r.id.slice(0, 8)} (${isReferrerSide ? "referrer" : "referee"})`,
+        "skip",
+        "credits=0 on this side",
+      );
       continue;
     }
     const grants = psqlJson<{ id: string; credits: number; grant_ref: string | null }>(
@@ -451,7 +499,12 @@ async function checkReferralConversion(userId: string, env: Environment): Promis
       const since = new Date(new Date(r.converted_at).getTime() - 60_000).toISOString();
       const logs = await fetchEdgeLogs("redeem-referral", since);
       if (!logs.ok) {
-        record(section, `redeem-referral log near conversion ${r.id.slice(0, 8)}`, "skip", logs.reason);
+        record(
+          section,
+          `redeem-referral log near conversion ${r.id.slice(0, 8)}`,
+          "skip",
+          logs.reason,
+        );
       } else {
         record(
           section,
@@ -487,7 +540,9 @@ async function main() {
 
   const resolved = await resolveUserId(user);
   if (!resolved) {
-    console.error(`Could not resolve user: ${redactEmail(user.includes("@") ? user : null) || user}`);
+    console.error(
+      `Could not resolve user: ${redactEmail(user.includes("@") ? user : null) || user}`,
+    );
     process.exit(2);
   }
   console.log(

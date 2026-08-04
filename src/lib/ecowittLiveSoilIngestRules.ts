@@ -473,9 +473,7 @@ export function parseEcowittSoilChannelMap(raw: unknown): EcowittSoilChannelMap 
  */
 export class EcowittBridgeConfigError extends Error {
   readonly code:
-    | "mixed_tent_channel_map"
-    | "channel_map_tent_mismatch"
-    | "invalid_channel_map_schema";
+    "mixed_tent_channel_map" | "channel_map_tent_mismatch" | "invalid_channel_map_schema";
   /**
    * Optional per-field diagnostic paths that pinpoint the exact offending
    * entries inside `ECOWITT_SOIL_CHANNEL_MAP_JSON` (e.g.

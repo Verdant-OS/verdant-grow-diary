@@ -7,19 +7,14 @@ import {
   isEcowittEvidenceStale,
   loadEcowittEvidenceSample,
 } from "./ecowittLocalEvidence";
-import {
-  EcowittTentKey,
-  normalizeEcowittTentPayload,
-} from "./ecowittTentNormalizerRouter";
+import { EcowittTentKey, normalizeEcowittTentPayload } from "./ecowittTentNormalizerRouter";
 import {
   buildEcowittTentPreviewViewModel,
   ECOWITT_TENT_PREVIEW_EVIDENCE_COPY,
   ECOWITT_TENT_PREVIEW_READ_ONLY_COPY,
   EcowittTentPreviewViewModel,
 } from "./ecowittTentPreviewViewModel";
-import {
-  EcowittPreviewSampleKey,
-} from "@/fixtures/ecowitt-preview-samples";
+import { EcowittPreviewSampleKey } from "@/fixtures/ecowitt-preview-samples";
 
 export const ECOWITT_LOCAL_EVIDENCE_STALE_COPY =
   "Stale evidence: payload age exceeds freshness window." as const;
@@ -52,15 +47,11 @@ export function buildEcowittLocalEvidencePreviewViewModel(
 ): EcowittLocalEvidencePreviewViewModel {
   const now = params.now ?? new Date();
   const loaded = loadEcowittEvidenceSample(params.sampleKey, { now });
-  const snapshot = normalizeEcowittTentPayload(
-    loaded.sample.payload,
-    params.tentKey,
-    {
-      now,
-      captured_at_ms: loaded.captured_at_ms,
-      max_age_ms: params.freshness_ms ?? ECOWITT_EVIDENCE_FRESHNESS_MS,
-    },
-  );
+  const snapshot = normalizeEcowittTentPayload(loaded.sample.payload, params.tentKey, {
+    now,
+    captured_at_ms: loaded.captured_at_ms,
+    max_age_ms: params.freshness_ms ?? ECOWITT_EVIDENCE_FRESHNESS_MS,
+  });
   const preview = buildEcowittTentPreviewViewModel(snapshot);
   const stale = isEcowittEvidenceStale(loaded, params.freshness_ms);
 

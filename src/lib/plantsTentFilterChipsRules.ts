@@ -17,10 +17,7 @@
  * Read-only. No I/O, no React, no Supabase, no schema, no RLS.
  */
 
-import {
-  filterVisiblePlants,
-  type ArchivedPlantLike,
-} from "./archivedPlantVisibilityRules";
+import { filterVisiblePlants, type ArchivedPlantLike } from "./archivedPlantVisibilityRules";
 import { filterPlantsBySearch } from "./plantsPageFilterRules";
 
 interface ChipPlantLike extends ArchivedPlantLike {

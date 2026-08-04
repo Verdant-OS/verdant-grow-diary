@@ -89,23 +89,52 @@ export function AccessionForm({ onSaved }: AccessionFormProps) {
         </div>
         <div className="space-y-1.5 min-w-0">
           <Label htmlFor="acc-cultivar">Cultivar / line</Label>
-          <Input id="acc-cultivar" className="min-h-11" value={cultivar} onChange={(e) => setCultivar(e.target.value)} placeholder="e.g. Blue Dream" />
+          <Input
+            id="acc-cultivar"
+            className="min-h-11"
+            value={cultivar}
+            onChange={(e) => setCultivar(e.target.value)}
+            placeholder="e.g. Blue Dream"
+          />
         </div>
         <div className="space-y-1.5 min-w-0">
           <Label htmlFor="acc-line">Line name</Label>
-          <Input id="acc-line" className="min-h-11" value={lineName} onChange={(e) => setLineName(e.target.value)} />
+          <Input
+            id="acc-line"
+            className="min-h-11"
+            value={lineName}
+            onChange={(e) => setLineName(e.target.value)}
+          />
         </div>
         <div className="space-y-1.5 min-w-0">
           <Label htmlFor="acc-party">Breeder / source</Label>
-          <Input id="acc-party" className="min-h-11" value={sourceParty} onChange={(e) => setSourceParty(e.target.value)} placeholder="Leave blank if unknown" />
+          <Input
+            id="acc-party"
+            className="min-h-11"
+            value={sourceParty}
+            onChange={(e) => setSourceParty(e.target.value)}
+            placeholder="Leave blank if unknown"
+          />
         </div>
         <div className="space-y-1.5 min-w-0">
           <Label htmlFor="acc-gen">Generation</Label>
-          <Input id="acc-gen" className="min-h-11" value={generation} onChange={(e) => setGeneration(e.target.value)} placeholder="e.g. F1, S1" />
+          <Input
+            id="acc-gen"
+            className="min-h-11"
+            value={generation}
+            onChange={(e) => setGeneration(e.target.value)}
+            placeholder="e.g. F1, S1"
+          />
         </div>
         <div className="space-y-1.5 min-w-0">
           <Label htmlFor="acc-date">Acquisition date (optional)</Label>
-          <Input id="acc-date" type="date" className="min-h-11" value={acquisitionDate} onChange={(e) => setAcquisitionDate(e.target.value)} />
+          <Input
+            id="acc-date"
+            type="date"
+            className="min-h-11"
+            value={acquisitionDate}
+            onChange={(e) => setAcquisitionDate(e.target.value)}
+          />
         </div>
       </div>
       <div className="space-y-1.5 min-w-0">

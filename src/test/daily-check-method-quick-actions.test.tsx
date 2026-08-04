@@ -41,9 +41,7 @@ describe("parseDailyCheckMethodHint", () => {
 
 describe("buildDailyCheckEntryHref", () => {
   it("remains backward-compatible without method/source", () => {
-    expect(buildDailyCheckEntryHref({ plantId: "p1" })).toBe(
-      "/daily-check?plantId=p1",
-    );
+    expect(buildDailyCheckEntryHref({ plantId: "p1" })).toBe("/daily-check?plantId=p1");
   });
   it("appends from and method when provided", () => {
     expect(
@@ -103,9 +101,7 @@ describe("Dashboard panel · quick method actions", () => {
     renderPanel();
     const rows = screen.getAllByTestId("dashboard-daily-grow-check-panel-row");
     const unchecked = rows.find((r) => r.getAttribute("data-plant-id") === "p2")!;
-    const actions = within(unchecked).getByTestId(
-      "dashboard-daily-grow-check-panel-row-actions",
-    );
+    const actions = within(unchecked).getByTestId("dashboard-daily-grow-check-panel-row-actions");
     expect(
       within(actions).getByTestId("dashboard-daily-grow-check-panel-row-action-note"),
     ).toBeTruthy();
@@ -118,18 +114,14 @@ describe("Dashboard panel · quick method actions", () => {
     renderPanel();
     const a = screen.getByTestId("dashboard-daily-grow-check-panel-row-action-note");
     const link = (a.tagName === "A" ? a : a.querySelector("a")) as HTMLAnchorElement;
-    expect(link.getAttribute("href")).toBe(
-      "/daily-check?plantId=p2&from=dashboard&method=note",
-    );
+    expect(link.getAttribute("href")).toBe("/daily-check?plantId=p2&from=dashboard&method=note");
   });
 
   it("Add sensor snapshot href carries method=sensor", () => {
     renderPanel();
     const a = screen.getByTestId("dashboard-daily-grow-check-panel-row-action-sensor");
     const link = (a.tagName === "A" ? a : a.querySelector("a")) as HTMLAnchorElement;
-    expect(link.getAttribute("href")).toBe(
-      "/daily-check?plantId=p2&from=dashboard&method=sensor",
-    );
+    expect(link.getAttribute("href")).toBe("/daily-check?plantId=p2&from=dashboard&method=sensor");
   });
 
   it("checked rows do not render quick-action buttons", () => {
@@ -144,8 +136,22 @@ describe("Dashboard panel · quick method actions", () => {
 
 // --- Daily Check page: parses ?method= -------------------------------------
 const mockPlants = [
-  { id: "p1", name: "Sour D", strain: "Sour Diesel", grow_id: "g1", tent_id: "t1", is_archived: false },
-  { id: "pNoTent", name: "Untented", strain: null, grow_id: "g1", tent_id: null, is_archived: false },
+  {
+    id: "p1",
+    name: "Sour D",
+    strain: "Sour Diesel",
+    grow_id: "g1",
+    tent_id: "t1",
+    is_archived: false,
+  },
+  {
+    id: "pNoTent",
+    name: "Untented",
+    strain: null,
+    grow_id: "g1",
+    tent_id: null,
+    is_archived: false,
+  },
 ];
 const mockTents = [{ id: "t1", name: "Tent A" }];
 
@@ -230,14 +236,14 @@ describe("DailyCheck · ?method= handling", () => {
     const choose = await screen.findByTestId("daily-grow-check-choose");
     expect(choose.getAttribute("data-method-hint")).toBe("");
     expect(
-      within(choose).getByTestId("daily-grow-check-choose-quicklog").getAttribute(
-        "data-method-focused",
-      ),
+      within(choose)
+        .getByTestId("daily-grow-check-choose-quicklog")
+        .getAttribute("data-method-focused"),
     ).toBe("0");
     expect(
-      within(choose).getByTestId("daily-grow-check-choose-snapshot").getAttribute(
-        "data-method-focused",
-      ),
+      within(choose)
+        .getByTestId("daily-grow-check-choose-snapshot")
+        .getAttribute("data-method-focused"),
     ).toBe("0");
     const ql = screen.getByTestId("mock-quicklog");
     expect(ql.getAttribute("data-open")).toBe("0");
@@ -260,9 +266,7 @@ describe("DailyCheck · ?method= handling", () => {
     renderRoute("/daily-check?plantId=p1");
     const choose = await screen.findByTestId("daily-grow-check-choose");
     expect(choose.getAttribute("data-method-hint")).toBe("");
-    expect(
-      screen.queryByTestId("daily-grow-check-plant-rejected"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("daily-grow-check-plant-rejected")).not.toBeInTheDocument();
   });
 });
 
@@ -296,7 +300,6 @@ describe("safety scans", () => {
       expect(src).not.toMatch(/sensor_ingest/i);
     }
   });
-
 
   it("DailyCheck never auto-submits based on method hint", () => {
     const page = readSrc("pages/DailyCheck.tsx");

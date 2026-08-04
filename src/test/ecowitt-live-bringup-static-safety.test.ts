@@ -61,11 +61,7 @@ const libTargets: Array<[string, string]> = [
   ["tonight mode view model", tonightNoComments],
 ];
 
-const targets: Array<[string, string]> = [
-  ["page", pageNoComments],
-  ...libTargets,
-];
-
+const targets: Array<[string, string]> = [["page", pageNoComments], ...libTargets];
 
 const FORBIDDEN_DEVICE_NAMES = [
   "controlDevice",
@@ -184,7 +180,6 @@ describe("ecowitt-live-bringup — static safety", () => {
     }
   });
 
-
   it("view model has no external imports", () => {
     const fromMatches = vmSrc.match(/from\s+["'][^"']+["']/g) || [];
     expect(fromMatches.length).toBe(0);
@@ -220,4 +215,3 @@ describe("ecowitt-live-bringup — static safety", () => {
     }
   });
 });
-

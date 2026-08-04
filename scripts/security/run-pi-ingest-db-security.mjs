@@ -59,8 +59,12 @@ if (!isLocalSupabaseUrl(process.env.SUPABASE_URL)) {
 import("node:child_process").then(({ spawn }) => {
   const child = spawn(
     process.execPath,
-    ["--experimental-vm-modules", "node_modules/vitest/vitest.mjs", "run",
-      "src/test/integration/pi-ingest-commit-batch-replay.integration.test.ts"],
+    [
+      "--experimental-vm-modules",
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "src/test/integration/pi-ingest-commit-batch-replay.integration.test.ts",
+    ],
     { stdio: "inherit", env: process.env },
   );
   child.on("exit", (code) => process.exit(code ?? 1));

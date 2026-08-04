@@ -60,10 +60,7 @@ function isPageSize(n: number): n is AuditReportPageSize {
  * the legacy cell unchanged. Raw payload previews, metric summaries, and
  * the CSV export stay canonical Celsius on purpose.
  */
-function fmtAuditTemp(
-  v: number | null,
-  unit: TemperatureUnitPreference,
-): string {
+function fmtAuditTemp(v: number | null, unit: TemperatureUnitPreference): string {
   if (typeof v !== "number" || !Number.isFinite(v)) return "";
   if (unit === "celsius") return String(v);
   return celsiusToFahrenheit(v).toFixed(1);
@@ -123,7 +120,7 @@ export default function SensorIngestAuditReport({
     initialStateRef.current = shouldPreferUrl
       ? initialFromUrl
       : operatorMode
-        ? readStoredAuditState() ?? initialFromUrl
+        ? (readStoredAuditState() ?? initialFromUrl)
         : initialFromUrl;
     hasInitialStateRef.current = true;
   }
@@ -133,18 +130,10 @@ export default function SensorIngestAuditReport({
     initialState?.pageSize ?? initialPageSize,
   );
   const [openRowId, setOpenRowId] = useState<string | null>(null);
-  const [providerFilter, setProviderFilter] = useState<string>(
-    initialState?.provider ?? "all",
-  );
-  const [capturedFrom, setCapturedFrom] = useState<string>(
-    initialState?.fromDateInput ?? "",
-  );
-  const [capturedTo, setCapturedTo] = useState<string>(
-    initialState?.toDateInput ?? "",
-  );
-  const [deviceQuery, setDeviceQuery] = useState<string>(
-    initialState?.deviceQuery ?? "",
-  );
+  const [providerFilter, setProviderFilter] = useState<string>(initialState?.provider ?? "all");
+  const [capturedFrom, setCapturedFrom] = useState<string>(initialState?.fromDateInput ?? "");
+  const [capturedTo, setCapturedTo] = useState<string>(initialState?.toDateInput ?? "");
+  const [deviceQuery, setDeviceQuery] = useState<string>(initialState?.deviceQuery ?? "");
 
   const filters: AuditReportFilters = {
     provider: providerFilter,
@@ -359,10 +348,14 @@ export default function SensorIngestAuditReport({
         >
           <p className="font-medium text-foreground">Operator summary</p>
           <p>
-            Current window: {vm.operatorSummary.shownRows} shown / {vm.operatorSummary.filteredRows} filtered.
+            Current window: {vm.operatorSummary.shownRows} shown / {vm.operatorSummary.filteredRows}{" "}
+            filtered.
           </p>
           <p>
-            Accepted persisted: {vm.operatorSummary.acceptedPersistedRows}; rejected visible: {vm.operatorSummary.rejectedVisibleRows}; rejected omitted: {vm.operatorSummary.rejectedAttemptsOmitted ? "yes" : "no"}; raw payloads omitted from CSV: {vm.operatorSummary.rawPayloadsOmittedFromCsv}.
+            Accepted persisted: {vm.operatorSummary.acceptedPersistedRows}; rejected visible:{" "}
+            {vm.operatorSummary.rejectedVisibleRows}; rejected omitted:{" "}
+            {vm.operatorSummary.rejectedAttemptsOmitted ? "yes" : "no"}; raw payloads omitted from
+            CSV: {vm.operatorSummary.rawPayloadsOmittedFromCsv}.
           </p>
           <div className="flex flex-wrap gap-1 pt-1">
             {[...CANONICAL_SOURCES, "unknown"].map((source) => (
@@ -388,10 +381,7 @@ export default function SensorIngestAuditReport({
         </div>
       )}
       {vm.isEmptyAfterFilters && (
-        <p
-          data-testid="audit-empty-after-filters"
-          className="text-xs text-muted-foreground"
-        >
+        <p data-testid="audit-empty-after-filters" className="text-xs text-muted-foreground">
           {AUDIT_REPORT_EMPTY_FILTERS}
         </p>
       )}

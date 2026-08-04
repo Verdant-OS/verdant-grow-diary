@@ -79,9 +79,9 @@ export function normalizeDiaryNoteText(raw: string | null | undefined): string {
   //    Non-label grower sentences that happen to repeat are preserved.
   const parts = text.split(/(?<=[.!?])\s+/);
   const labelPrefixRe = new RegExp(
-    `^(?:${DIARY_NOTE_SECTION_LABELS.map((l) =>
-      l.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-    ).join("|")})\\s*:`,
+    `^(?:${DIARY_NOTE_SECTION_LABELS.map((l) => l.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(
+      "|",
+    )})\\s*:`,
     "i",
   );
   const out: string[] = [];
@@ -181,9 +181,7 @@ export function parseDiaryNoteSections(
   const positions: Array<{ label: DiaryNoteSectionLabel; start: number; textStart: number }> = [];
   let m: RegExpExecArray | null;
   while ((m = labelRe.exec(normalized)) !== null) {
-    const label = DIARY_NOTE_SECTION_LABELS.find(
-      (l) => l.toLowerCase() === m![2].toLowerCase(),
-    );
+    const label = DIARY_NOTE_SECTION_LABELS.find((l) => l.toLowerCase() === m![2].toLowerCase());
     if (!label) continue;
     positions.push({
       label,
@@ -201,7 +199,11 @@ export function parseDiaryNoteSections(
   for (let i = 0; i < positions.length; i += 1) {
     const start = positions[i].textStart;
     const end = i + 1 < positions.length ? positions[i + 1].start : normalized.length;
-    const text = normalized.slice(start, end).trim().replace(/[.\s]+$/, ".").replace(/^\.$/, "");
+    const text = normalized
+      .slice(start, end)
+      .trim()
+      .replace(/[.\s]+$/, ".")
+      .replace(/^\.$/, "");
     if (!text) continue;
     const key = positions[i].label;
     if (!chunks[key]) chunks[key] = [];

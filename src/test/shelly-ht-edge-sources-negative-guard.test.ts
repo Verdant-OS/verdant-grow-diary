@@ -33,9 +33,7 @@ const CONFIG_TOML = readFileSync(resolve(ROOT, "supabase/config.toml"), "utf8");
 
 describe("Shelly H&T guard — current repo passes", () => {
   it("supabase/config.toml declares no Shelly H&T function blocks", () => {
-    const declared = parseSupabaseFunctionNames(CONFIG_TOML).filter(
-      isShellyHtFunctionName,
-    );
+    const declared = parseSupabaseFunctionNames(CONFIG_TOML).filter(isShellyHtFunctionName);
     expect(declared).toEqual([]);
   });
 

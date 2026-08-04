@@ -14,8 +14,7 @@ import {
 
 export const CONSISTENCY_WINDOW_DAYS = 7;
 
-export interface ConsistencyInput
-  extends Omit<DailyHistoryInput, "days"> {
+export interface ConsistencyInput extends Omit<DailyHistoryInput, "days"> {
   /** Window in days for the "X of last N days" metric. Defaults to 7. */
   windowDays?: number;
 }
@@ -49,9 +48,7 @@ export interface ConsistencySummary {
  * Short, grower-friendly method label. Returns null when nothing counts so
  * callers can fall back to existing "Needs check" wording.
  */
-export function formatTodayCheckMethodLabel(
-  method: TodayCheckMethod,
-): string | null {
+export function formatTodayCheckMethodLabel(method: TodayCheckMethod): string | null {
   switch (method) {
     case "note":
       return "Checked by note";
@@ -72,9 +69,7 @@ const ACTIVE_KINDS = new Set<DailyHistoryRow["kind"]>([
   "tent-manual-only",
 ]);
 
-export function buildDailyGrowCheckConsistency(
-  input: ConsistencyInput,
-): ConsistencySummary {
+export function buildDailyGrowCheckConsistency(input: ConsistencyInput): ConsistencySummary {
   const windowDays = Math.max(
     1,
     Math.min(14, Math.floor(input.windowDays ?? CONSISTENCY_WINDOW_DAYS)),
@@ -168,9 +163,7 @@ export function buildDailyMethodBreakdown(
   return days;
 }
 
-export function formatDailyMethodBreakdownLabel(
-  method: DailyMethodBreakdownMethod,
-): string {
+export function formatDailyMethodBreakdownLabel(method: DailyMethodBreakdownMethod): string {
   switch (method) {
     case "note":
       return "Note";
@@ -183,4 +176,3 @@ export function formatDailyMethodBreakdownLabel(
       return "Missed";
   }
 }
-

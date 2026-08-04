@@ -30,9 +30,7 @@ export function useLogAiDoctorReadinessToDiary() {
   const [logging, setLogging] = useState(false);
 
   const log = useCallback(
-    async (
-      args: BuildAiDoctorReadinessDiaryEntryArgs,
-    ): Promise<LogAiDoctorReadinessResult> => {
+    async (args: BuildAiDoctorReadinessDiaryEntryArgs): Promise<LogAiDoctorReadinessResult> => {
       setLogging(true);
       const built = buildAiDoctorReadinessDiaryEntry(args);
       if (!built.ok) {

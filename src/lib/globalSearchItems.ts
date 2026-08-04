@@ -36,7 +36,12 @@ export const GLOBAL_SEARCH_ITEMS: readonly GlobalSearchItem[] = [
   { label: "AI Doctor", to: "/doctor", group: "Insight", keywords: ["coach", "diagnosis"] },
   { label: "Reports", to: "/reports", group: "Insight", keywords: ["learning", "hub"] },
   // Advanced
-  { label: "Pheno Hunt", to: "/pheno-hunts", group: "Advanced", keywords: ["pheno", "phenotype", "breeding", "keeper", "hunt"] },
+  {
+    label: "Pheno Hunt",
+    to: "/pheno-hunts",
+    group: "Advanced",
+    keywords: ["pheno", "phenotype", "breeding", "keeper", "hunt"],
+  },
   { label: "Lineage Repair", to: "/grow-lineage", group: "Advanced" },
   // Account
   { label: "Settings", to: "/settings", group: "Account" },
@@ -57,9 +62,7 @@ export function filterGlobalSearchItems(
   const q = query.trim().toLowerCase();
   if (!q) return [...items];
   return items.filter((it) => {
-    const hay = [it.label, it.to, it.group, ...(it.keywords ?? [])]
-      .join(" ")
-      .toLowerCase();
+    const hay = [it.label, it.to, it.group, ...(it.keywords ?? [])].join(" ").toLowerCase();
     return hay.includes(q);
   });
 }

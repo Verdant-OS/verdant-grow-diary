@@ -75,11 +75,7 @@ export interface DedupeDecision {
   /** Grower-safe helper copy. Never leaks raw ids or tokens. */
   helper: string;
   /** Stable reason code for logs/tests. */
-  reasonCode:
-    | "ok_can_add"
-    | "already_pending"
-    | "alert_not_eligible"
-    | "missing_alert";
+  reasonCode: "ok_can_add" | "already_pending" | "alert_not_eligible" | "missing_alert";
 }
 
 /** True when a row is a non-terminal duplicate of the given alert. */
@@ -115,7 +111,9 @@ export function findExistingPendingAction(
   return null;
 }
 
-function blockedHelper(alert: AlertLike | null | undefined): Pick<DedupeDecision, "headline" | "helper"> {
+function blockedHelper(
+  alert: AlertLike | null | undefined,
+): Pick<DedupeDecision, "headline" | "helper"> {
   if (!alert) {
     return {
       headline: "No alert loaded",
@@ -125,7 +123,8 @@ function blockedHelper(alert: AlertLike | null | undefined): Pick<DedupeDecision
   if (alert.status !== "open") {
     return {
       headline: "Cannot queue this alert",
-      helper: "Only open alerts can be queued. Reopen the alert first if follow-up is still needed.",
+      helper:
+        "Only open alerts can be queued. Reopen the alert first if follow-up is still needed.",
     };
   }
   if (!alert.grow_id) {
@@ -137,7 +136,8 @@ function blockedHelper(alert: AlertLike | null | undefined): Pick<DedupeDecision
   if (!alert.metric || !alert.reason?.trim()) {
     return {
       headline: "Missing alert context",
-      helper: "This alert is missing metric or reason context, so Verdant cannot draft a safe action.",
+      helper:
+        "This alert is missing metric or reason context, so Verdant cannot draft a safe action.",
     };
   }
   return {
@@ -190,7 +190,8 @@ export function decideAddButtonState(input: {
     existingActionId: null,
     label: "Add to Action Queue",
     headline: "Ready for grower review",
-    helper: "This alert has enough context to prepare a review-only suggested action. Verdant will not execute equipment changes.",
+    helper:
+      "This alert has enough context to prepare a review-only suggested action. Verdant will not execute equipment changes.",
     reasonCode: "ok_can_add",
   };
 }

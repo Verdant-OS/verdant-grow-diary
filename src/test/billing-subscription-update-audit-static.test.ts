@@ -19,7 +19,9 @@ const WEBHOOK = readProjectFile("supabase/functions/paddle-webhook/index.ts");
 
 describe("billing_subscription_update_audit migration", () => {
   it("creates the audit table with the required sanitized columns", () => {
-    expect(MIGRATION).toContain("CREATE TABLE IF NOT EXISTS public.billing_subscription_update_audit");
+    expect(MIGRATION).toContain(
+      "CREATE TABLE IF NOT EXISTS public.billing_subscription_update_audit",
+    );
     for (const col of [
       "processing_id uuid",
       "user_id uuid",
@@ -37,30 +39,56 @@ describe("billing_subscription_update_audit migration", () => {
   it("constrains status/plan/subscription_status enums", () => {
     expect(MIGRATION).toContain("'created','updated','noop','blocked','failed','skipped'");
     expect(MIGRATION).toContain("'free','pro_monthly','pro_annual','founder_lifetime'");
-    expect(MIGRATION).toMatch(/candidate_status .*'active','past_due','canceled','paused','expired'/s);
-    expect(MIGRATION).toMatch(/subscription_status .*'active','past_due','canceled','paused','expired'/s);
+    expect(MIGRATION).toMatch(
+      /candidate_status .*'active','past_due','canceled','paused','expired'/s,
+    );
+    expect(MIGRATION).toMatch(
+      /subscription_status .*'active','past_due','canceled','paused','expired'/s,
+    );
   });
 
   it("locks direct table access to service_role only and enables RLS", () => {
-    expect(MIGRATION).toContain("REVOKE ALL ON public.billing_subscription_update_audit FROM PUBLIC");
+    expect(MIGRATION).toContain(
+      "REVOKE ALL ON public.billing_subscription_update_audit FROM PUBLIC",
+    );
     expect(MIGRATION).toContain("REVOKE ALL ON public.billing_subscription_update_audit FROM anon");
-    expect(MIGRATION).toContain("REVOKE ALL ON public.billing_subscription_update_audit FROM authenticated");
-    expect(MIGRATION).toContain("GRANT ALL ON public.billing_subscription_update_audit TO service_role");
-    expect(MIGRATION).toContain("ALTER TABLE public.billing_subscription_update_audit ENABLE ROW LEVEL SECURITY");
-    expect(MIGRATION).not.toMatch(/CREATE POLICY[\s\S]*billing_subscription_update_audit[\s\S]*(anon|authenticated)/i);
-    expect(MIGRATION).not.toMatch(/GRANT[^;]*ON public\.billing_subscription_update_audit[^;]*TO\s+(anon|authenticated)/i);
+    expect(MIGRATION).toContain(
+      "REVOKE ALL ON public.billing_subscription_update_audit FROM authenticated",
+    );
+    expect(MIGRATION).toContain(
+      "GRANT ALL ON public.billing_subscription_update_audit TO service_role",
+    );
+    expect(MIGRATION).toContain(
+      "ALTER TABLE public.billing_subscription_update_audit ENABLE ROW LEVEL SECURITY",
+    );
+    expect(MIGRATION).not.toMatch(
+      /CREATE POLICY[\s\S]*billing_subscription_update_audit[\s\S]*(anon|authenticated)/i,
+    );
+    expect(MIGRATION).not.toMatch(
+      /GRANT[^;]*ON public\.billing_subscription_update_audit[^;]*TO\s+(anon|authenticated)/i,
+    );
   });
 
   it("creates a service-role-only wrapper RPC that calls the existing updater", () => {
-    expect(MIGRATION).toContain("CREATE OR REPLACE FUNCTION public.apply_paddle_subscription_update_with_audit");
+    expect(MIGRATION).toContain(
+      "CREATE OR REPLACE FUNCTION public.apply_paddle_subscription_update_with_audit",
+    );
     expect(MIGRATION).toContain("SECURITY DEFINER");
     expect(MIGRATION).toContain("SET search_path = public, pg_temp");
     expect(MIGRATION).toContain("public.apply_paddle_subscription_update(p_processing_id)");
     expect(MIGRATION).toContain("INSERT INTO public.billing_subscription_update_audit");
-    expect(MIGRATION).toContain("REVOKE ALL ON FUNCTION public.apply_paddle_subscription_update_with_audit(uuid) FROM anon");
-    expect(MIGRATION).toContain("REVOKE ALL ON FUNCTION public.apply_paddle_subscription_update_with_audit(uuid) FROM authenticated");
-    expect(MIGRATION).toContain("GRANT EXECUTE ON FUNCTION public.apply_paddle_subscription_update_with_audit(uuid) TO service_role");
-    expect(MIGRATION).not.toMatch(/GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.apply_paddle_subscription_update_with_audit\(uuid\)\s+TO\s+(anon|authenticated)/i);
+    expect(MIGRATION).toContain(
+      "REVOKE ALL ON FUNCTION public.apply_paddle_subscription_update_with_audit(uuid) FROM anon",
+    );
+    expect(MIGRATION).toContain(
+      "REVOKE ALL ON FUNCTION public.apply_paddle_subscription_update_with_audit(uuid) FROM authenticated",
+    );
+    expect(MIGRATION).toContain(
+      "GRANT EXECUTE ON FUNCTION public.apply_paddle_subscription_update_with_audit(uuid) TO service_role",
+    );
+    expect(MIGRATION).not.toMatch(
+      /GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.apply_paddle_subscription_update_with_audit\(uuid\)\s+TO\s+(anon|authenticated)/i,
+    );
   });
 
   it("wrapper RPC does not persist raw provider IDs, prices, or payloads", () => {
@@ -77,7 +105,9 @@ describe("billing_subscription_update_audit migration", () => {
   });
 
   it("creates an operator-only read RPC that exposes only sanitized fields", () => {
-    expect(MIGRATION).toContain("CREATE OR REPLACE FUNCTION public.billing_subscription_update_operator_audit");
+    expect(MIGRATION).toContain(
+      "CREATE OR REPLACE FUNCTION public.billing_subscription_update_operator_audit",
+    );
     expect(MIGRATION).toContain("public.has_role(auth.uid(), 'operator'::public.app_role)");
     expect(MIGRATION).toContain("operator_required");
     expect(MIGRATION).toContain("LEAST(GREATEST(COALESCE(p_limit, 50), 1), 100)");
@@ -119,7 +149,9 @@ describe("paddle webhook -> audited wrapper handoff", () => {
     expect(WEBHOOK).toMatch(
       /const rpcName = processing\.isFounderCandidate\s*\?\s*"allocate_founder_lifetime_with_audit"\s*:\s*"apply_paddle_subscription_update_with_audit";/,
     );
-    expect(WEBHOOK).toMatch(/await supabase\.rpc\(rpcName,\s*\{\s*p_processing_id: processing\.id,?\s*\}/);
+    expect(WEBHOOK).toMatch(
+      /await supabase\.rpc\(rpcName,\s*\{\s*p_processing_id: processing\.id,?\s*\}/,
+    );
   });
 
   it("webhook does not call the raw updater RPC directly", () => {

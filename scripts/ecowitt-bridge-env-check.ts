@@ -17,8 +17,7 @@
 
 // Accept any UUID-shaped value (8-4-4-4-12 hex). Strict v1-5 enforcement
 // would reject legitimate Verdant tent/plant IDs.
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface EnvCheckInput {
   env: Record<string, string | undefined>;
@@ -81,8 +80,7 @@ export function checkBridgeEnv(input: EnvCheckInput): EnvCheckResult {
 
   if (input.mode === "send") {
     if (!url) errors.push("VERDANT_INGEST_URL is required for --send");
-    if (tokenPresence === "missing")
-      errors.push("VERDANT_BRIDGE_TOKEN is required for --send");
+    if (tokenPresence === "missing") errors.push("VERDANT_BRIDGE_TOKEN is required for --send");
   }
 
   // --- Optional: ECOWITT_SOIL_CHANNEL_MAP_JSON ---
@@ -152,7 +150,6 @@ async function main(): Promise<void> {
   const mode: "dry-run" | "send" = argv.includes("--send") ? "send" : "dry-run";
   const res = checkBridgeEnv({ env: process.env, mode });
 
-  // eslint-disable-next-line no-console
   console.log(`ecowitt-bridge env preflight — mode: ${res.mode}`);
   for (const l of res.lines) console.log(`  ${safeLine(l)}`);
   for (const w of res.warnings) console.log(`  WARN  ${w}`);

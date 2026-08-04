@@ -17,11 +17,7 @@ export const CSV_SOURCE_TAG = "csv" as const;
 export const MAX_CSV_BYTES = 25 * 1024 * 1024; // 25 MB
 
 export type ParseErrorCode =
-  | "wrong_file_type"
-  | "file_too_large"
-  | "empty_file"
-  | "damaged_file"
-  | "no_sensor_data";
+  "wrong_file_type" | "file_too_large" | "empty_file" | "damaged_file" | "no_sensor_data";
 
 export interface ParseError {
   code: ParseErrorCode;
@@ -82,9 +78,7 @@ export interface ParseEnvironmentCsvResult {
 
 // ---------- public API ----------
 
-export async function parseEnvironmentCSV(
-  file: File,
-): Promise<ParseEnvironmentCsvResult> {
+export async function parseEnvironmentCSV(file: File): Promise<ParseEnvironmentCsvResult> {
   const empty = emptyResult();
 
   if (!file || typeof file.name !== "string") {
@@ -131,9 +125,7 @@ async function readFileAsText(file: File): Promise<string> {
   });
 }
 
-export function parseEnvironmentCSVText(
-  text: string,
-): ParseEnvironmentCsvResult {
+export function parseEnvironmentCSVText(text: string): ParseEnvironmentCsvResult {
   const empty = emptyResult();
   if (!text || !text.trim()) {
     return withError(empty, "empty_file", "This CSV looks empty or damaged.");
@@ -162,11 +154,7 @@ export function parseEnvironmentCSVText(
     detected.co2 !== null ||
     detected.ppfd !== null;
   if (!hasTimeCol || !hasMetricCol) {
-    return withError(
-      empty,
-      "no_sensor_data",
-      "We couldn’t read sensor data from this file.",
-    );
+    return withError(empty, "no_sensor_data", "We couldn’t read sensor data from this file.");
   }
 
   // Unit detection: header-driven first, then sample values.
@@ -313,8 +301,7 @@ export function renormalizeWithUnit(
   if (!result.isAmbiguous) return result;
   const validRows = result.validRows.map((r) => {
     if (r.raw_temperature == null) return { ...r, raw_temp_unit: unit };
-    const tempC =
-      unit === "F" ? (r.raw_temperature - 32) * (5 / 9) : r.raw_temperature;
+    const tempC = unit === "F" ? (r.raw_temperature - 32) * (5 / 9) : r.raw_temperature;
     const vpd =
       r.vpd_source === "csv"
         ? r.vpd_kpa
@@ -440,7 +427,10 @@ function detectColumns(headers: string[]): DetectedColumns {
 
   for (const h of headers) {
     const k = normalizeHeader(h);
-    if (out.timestamp == null && /(^|[^a-z])timestamp([^a-z]|$)|^created.?at$|^recorded.?at$/.test(k)) {
+    if (
+      out.timestamp == null &&
+      /(^|[^a-z])timestamp([^a-z]|$)|^created.?at$|^recorded.?at$/.test(k)
+    ) {
       out.timestamp = h;
       continue;
     }
@@ -479,7 +469,10 @@ function detectColumns(headers: string[]): DetectedColumns {
 }
 
 function normalizeHeader(header: string): string {
-  return header.replace(/^\uFEFF/, "").toLowerCase().trim();
+  return header
+    .replace(/^\uFEFF/, "")
+    .toLowerCase()
+    .trim();
 }
 
 function chooseTemperatureColumn(candidates: readonly string[]): string | null {
@@ -524,10 +517,7 @@ function unitFromValues(sample: number[]): { unit: RawTempUnit; ambiguous: boole
   return { unit: "C", ambiguous: false };
 }
 
-function resolveCapturedAt(
-  rec: Record<string, string>,
-  detected: DetectedColumns,
-): string | null {
+function resolveCapturedAt(rec: Record<string, string>, detected: DetectedColumns): string | null {
   if (detected.timestamp) {
     const v = (rec[detected.timestamp] ?? "").trim();
     if (!v) return null;
@@ -551,9 +541,7 @@ function parseFlexibleDate(input: string): string | null {
   if (!input) return null;
 
   // Explicit Spider Farmer / common export format: YYYY-MM-DD HH:mm[:ss]
-  const ymd = input.match(
-    /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/,
-  );
+  const ymd = input.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
   if (ymd) {
     const [, yr, mo, da, hh, mm, ss] = ymd;
     const d = new Date(
@@ -574,21 +562,12 @@ function parseFlexibleDate(input: string): string | null {
   if (Number.isFinite(direct)) return new Date(direct).toISOString();
 
   // Try MM/DD/YYYY HH:mm[:ss]
-  const m = input.match(
-    /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/,
-  );
+  const m = input.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
   if (m) {
     const [, mo, da, yrStr, hh, mm, ss] = m;
     const yr = yrStr.length === 2 ? 2000 + Number(yrStr) : Number(yrStr);
     const d = new Date(
-      Date.UTC(
-        yr,
-        Number(mo) - 1,
-        Number(da),
-        Number(hh ?? 0),
-        Number(mm ?? 0),
-        Number(ss ?? 0),
-      ),
+      Date.UTC(yr, Number(mo) - 1, Number(da), Number(hh ?? 0), Number(mm ?? 0), Number(ss ?? 0)),
     );
     return Number.isFinite(d.getTime()) ? d.toISOString() : null;
   }
@@ -602,11 +581,7 @@ function parseNumber(input: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function parseMetric(
-  input: string | undefined,
-  min: number,
-  max: number,
-): number | null {
+function parseMetric(input: string | undefined, min: number, max: number): number | null {
   const n = parseNumber(input ?? "");
   if (n == null) return null;
   return n >= min && n <= max ? n : null;

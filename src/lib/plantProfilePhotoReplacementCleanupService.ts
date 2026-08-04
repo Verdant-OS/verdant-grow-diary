@@ -31,10 +31,7 @@ export type PreviousPhotoCleanupResult =
   | { status: "protected"; reason: "still_referenced" }
   | {
       status: "skipped_for_safety";
-      reason:
-        | "persistence_unconfirmed"
-        | "reference_check_failed"
-        | "ineligible_reference";
+      reason: "persistence_unconfirmed" | "reference_check_failed" | "ineligible_reference";
     }
   | { status: "remove_failed" };
 
@@ -44,7 +41,10 @@ export type PreviousPhotoCleanupResult =
 export interface CleanupSupabaseLike {
   from: (table: string) => {
     select: (cols: string) => {
-      eq: (col: string, val: string) => {
+      eq: (
+        col: string,
+        val: string,
+      ) => {
         eq?: (col: string, val: string) => unknown;
         limit?: (n: number) => unknown;
       } & PromiseLike<{ data: unknown; error: unknown }>;
@@ -53,8 +53,7 @@ export interface CleanupSupabaseLike {
   storage: typeof supabase.storage;
 }
 
-export interface RetirePreviousPlantPhotoInput
-  extends PreviousPhotoCleanupInput {
+export interface RetirePreviousPlantPhotoInput extends PreviousPhotoCleanupInput {
   /** Test seam. Defaults to the app's authenticated Supabase client. */
   client?: unknown;
   /** Test seam. Defaults to production remove helper. */
@@ -66,15 +65,9 @@ interface RowsResult {
   error: unknown;
 }
 
-async function selectByPhotoUrl(
-  client: any,
-  photoUrl: string,
-): Promise<RowsResult> {
+async function selectByPhotoUrl(client: any, photoUrl: string): Promise<RowsResult> {
   try {
-    const res = await client
-      .from("plants")
-      .select("id,photo_url")
-      .eq("photo_url", photoUrl);
+    const res = await client.from("plants").select("id,photo_url").eq("photo_url", photoUrl);
     return { data: (res?.data as any) ?? null, error: res?.error ?? null };
   } catch (err) {
     return { data: null, error: err };
@@ -87,10 +80,7 @@ async function confirmNewPersisted(
   newRef: string,
 ): Promise<"confirmed" | "unconfirmed" | "failed"> {
   try {
-    const res = await client
-      .from("plants")
-      .select("id,photo_url")
-      .eq("id", plantId);
+    const res = await client.from("plants").select("id,photo_url").eq("id", plantId);
     if (res?.error) return "failed";
     const rows = (res?.data as Array<{ photo_url?: string | null }>) ?? null;
     if (!rows || rows.length === 0) return "unconfirmed";
@@ -142,11 +132,7 @@ export async function retirePreviousPlantProfilePhoto(
   const client = (input.client ?? supabase) as any;
 
   // 1) Confirm the plant row now points at the new reference.
-  const persisted = await confirmNewPersisted(
-    client,
-    input.plantId,
-    input.newPhotoUrl,
-  );
+  const persisted = await confirmNewPersisted(client, input.plantId, input.newPhotoUrl);
   if (persisted === "failed" || persisted === "unconfirmed") {
     return {
       status: "skipped_for_safety",

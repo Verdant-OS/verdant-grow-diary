@@ -25,7 +25,6 @@ import {
 import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
 installScannerGuardrail({ file: __filename });
 
-
 const T1 = "2026-05-24T09:00:00Z";
 const T2 = "2026-05-24T15:00:00Z";
 
@@ -270,10 +269,7 @@ describe("DailyCheck post-submit — change context surfacing", () => {
 });
 
 describe("safety — change context adds no new writes or wording", () => {
-  const rules = readFileSync(
-    "src/lib/manualSensorSnapshotChangeContextRules.ts",
-    "utf8",
-  );
+  const rules = readFileSync("src/lib/manualSensorSnapshotChangeContextRules.ts", "utf8");
   const page = readFileSync("src/pages/DailyCheck.tsx", "utf8");
 
   it("no persistence, RPC, ingestion, alerts, action_queue, automation, device control, or service_role added", () => {

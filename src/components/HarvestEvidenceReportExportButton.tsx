@@ -85,9 +85,7 @@ export default function HarvestEvidenceReportExportButton({
         Export PDF
       </Button>
 
-      {report && (
-        <PrintSection report={report} metadata={metadata} />
-      )}
+      {report && <PrintSection report={report} metadata={metadata} />}
     </>
   );
 }
@@ -108,9 +106,7 @@ function PrintSection({
       aria-hidden="true"
     >
       <header style={{ marginBottom: "12px" }}>
-        <h1 style={{ fontSize: "20px", margin: 0 }}>
-          Harvest Evidence Report
-        </h1>
+        <h1 style={{ fontSize: "20px", margin: 0 }}>Harvest Evidence Report</h1>
         <p
           style={{ fontSize: "11px", margin: "4px 0 0" }}
           data-testid="harvest-evidence-report-print-generated-at"
@@ -125,13 +121,8 @@ function PrintSection({
         </p>
       </header>
 
-      <section
-        style={{ marginBottom: "10px" }}
-        data-testid="harvest-evidence-report-print-caution"
-      >
-        <p style={{ fontSize: "11px", margin: "0 0 4px" }}>
-          {report.caution}
-        </p>
+      <section style={{ marginBottom: "10px" }} data-testid="harvest-evidence-report-print-caution">
+        <p style={{ fontSize: "11px", margin: "0 0 4px" }}>{report.caution}</p>
         <p
           style={{ fontSize: "11px", margin: 0 }}
           data-testid="harvest-evidence-report-print-no-actions"
@@ -140,10 +131,7 @@ function PrintSection({
         </p>
       </section>
 
-      <section
-        style={{ marginBottom: "10px" }}
-        data-testid="harvest-evidence-report-print-totals"
-      >
+      <section style={{ marginBottom: "10px" }} data-testid="harvest-evidence-report-print-totals">
         <h2 style={{ fontSize: "13px", margin: "0 0 4px" }}>Summary totals</h2>
         <ul style={{ fontSize: "11px", margin: 0, paddingLeft: "16px" }}>
           <li>Plants represented: {t.plants}</li>
@@ -157,10 +145,7 @@ function PrintSection({
       </section>
 
       {report.isEmpty ? (
-        <p
-          style={{ fontSize: "12px" }}
-          data-testid="harvest-evidence-report-print-empty"
-        >
+        <p style={{ fontSize: "12px" }} data-testid="harvest-evidence-report-print-empty">
           {report.emptyCopy}
         </p>
       ) : (

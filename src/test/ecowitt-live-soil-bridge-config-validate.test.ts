@@ -85,15 +85,11 @@ describe("`config validate` CLI subcommand", () => {
   }
 
   const run = (env: Record<string, string | undefined>) =>
-    spawnSync(
-      "bun",
-      ["run", "scripts/ecowitt-live-soil-bridge.ts", "config", "validate"],
-      {
-        encoding: "utf8",
-        env: { ...process.env, ...env, ECOWITT_MQTT_URL: "mqtt://127.0.0.1:1" },
-        timeout: 15_000,
-      },
-    );
+    spawnSync("bun", ["run", "scripts/ecowitt-live-soil-bridge.ts", "config", "validate"], {
+      encoding: "utf8",
+      env: { ...process.env, ...env, ECOWITT_MQTT_URL: "mqtt://127.0.0.1:1" },
+      timeout: 15_000,
+    });
 
   it("exits 0 with config_ok on a valid tent-only config", () => {
     const r = run({
@@ -193,7 +189,11 @@ describe("`config validate --fix-hints` CLI", () => {
   });
 });
 
-import { buildRedactedEffectiveConfig, maskUuid, hostOnly } from "../../scripts/ecowitt-live-soil-bridge";
+import {
+  buildRedactedEffectiveConfig,
+  maskUuid,
+  hostOnly,
+} from "../../scripts/ecowitt-live-soil-bridge";
 
 describe("buildRedactedEffectiveConfig (pure)", () => {
   const TENT = "11111111-1111-4111-8111-111111111111";
@@ -254,7 +254,11 @@ describe("`config validate --dry-run` CLI", () => {
     const r = spawnSync(
       "bun",
       ["run", "scripts/ecowitt-live-soil-bridge.ts", "config", "validate", "--dry-run"],
-      { encoding: "utf8", env: { ...process.env, VERDANT_TENT_ID: TENT, ECOWITT_SOIL_CHANNEL_MAP_JSON: undefined }, timeout: 15_000 },
+      {
+        encoding: "utf8",
+        env: { ...process.env, VERDANT_TENT_ID: TENT, ECOWITT_SOIL_CHANNEL_MAP_JSON: undefined },
+        timeout: 15_000,
+      },
     );
     expect(r.status).toBe(0);
     expect(r.stdout).toContain('"event":"config_ok"');
@@ -309,129 +313,128 @@ describe("`config validate --help-errors` CLI", () => {
     expect(r.stdout).toContain("docs/ecowitt-bridge-startup-validation.md");
     // No validation error emitted despite missing VERDANT_TENT_ID.
     expect(r.stderr).not.toContain('"code":"missing_tent_id"');
-});
-
-describe("buildConfigDebugEnvelope (pure)", () => {
-  const TENT = "11111111-1111-4111-8111-111111111111";
-  const PLANT = "33333333-3333-4333-8333-333333333333";
-
-  it("masks tent_id and returns empty channel map when no ECOWITT_SOIL_CHANNEL_MAP_JSON is set", () => {
-    const env = buildConfigDebugEnvelope({ VERDANT_TENT_ID: TENT });
-    expect(env.event).toBe("config_debug");
-    expect(env.check).toBe("ecowitt-bridge");
-    expect(env.tent_id).toBe("uuid:…1111");
-    expect(env.channel_map.count).toBe(0);
-    expect(env.channel_map.channels).toEqual([]);
-    // Never leaks the raw UUID.
-    expect(JSON.stringify(env)).not.toContain(TENT);
   });
 
-  it("masks every channel entry and sorts channels in natural numeric order", () => {
-    const map = {
-      soilmoisture10: { tent_id: TENT },
-      soilmoisture2: { tent_id: TENT, plant_id: PLANT, label: "canopy-2" },
-      soilmoisture1: { tent_id: TENT, plant_id: PLANT },
-    };
-    const env = buildConfigDebugEnvelope({
-      VERDANT_TENT_ID: TENT,
-      ECOWITT_SOIL_CHANNEL_MAP_JSON: JSON.stringify(map),
+  describe("buildConfigDebugEnvelope (pure)", () => {
+    const TENT = "11111111-1111-4111-8111-111111111111";
+    const PLANT = "33333333-3333-4333-8333-333333333333";
+
+    it("masks tent_id and returns empty channel map when no ECOWITT_SOIL_CHANNEL_MAP_JSON is set", () => {
+      const env = buildConfigDebugEnvelope({ VERDANT_TENT_ID: TENT });
+      expect(env.event).toBe("config_debug");
+      expect(env.check).toBe("ecowitt-bridge");
+      expect(env.tent_id).toBe("uuid:…1111");
+      expect(env.channel_map.count).toBe(0);
+      expect(env.channel_map.channels).toEqual([]);
+      // Never leaks the raw UUID.
+      expect(JSON.stringify(env)).not.toContain(TENT);
     });
-    expect(env.channel_map.count).toBe(3);
-    expect(env.channel_map.channels.map((c) => c.channel)).toEqual([
-      "soilmoisture1",
-      "soilmoisture2",
-      "soilmoisture10",
-    ]);
-    for (const c of env.channel_map.channels) {
-      expect(c.tent_id).toBe("uuid:…1111");
-      if (c.plant_id) expect(c.plant_id).toBe("uuid:…3333");
+
+    it("masks every channel entry and sorts channels in natural numeric order", () => {
+      const map = {
+        soilmoisture10: { tent_id: TENT },
+        soilmoisture2: { tent_id: TENT, plant_id: PLANT, label: "canopy-2" },
+        soilmoisture1: { tent_id: TENT, plant_id: PLANT },
+      };
+      const env = buildConfigDebugEnvelope({
+        VERDANT_TENT_ID: TENT,
+        ECOWITT_SOIL_CHANNEL_MAP_JSON: JSON.stringify(map),
+      });
+      expect(env.channel_map.count).toBe(3);
+      expect(env.channel_map.channels.map((c) => c.channel)).toEqual([
+        "soilmoisture1",
+        "soilmoisture2",
+        "soilmoisture10",
+      ]);
+      for (const c of env.channel_map.channels) {
+        expect(c.tent_id).toBe("uuid:…1111");
+        if (c.plant_id) expect(c.plant_id).toBe("uuid:…3333");
+      }
+      // Never leaks raw UUIDs.
+      const serialized = JSON.stringify(env);
+      expect(serialized).not.toContain(TENT);
+      expect(serialized).not.toContain(PLANT);
+    });
+
+    it("returns tent_id: null when VERDANT_TENT_ID is absent", () => {
+      const env = buildConfigDebugEnvelope({});
+      expect(env.tent_id).toBeNull();
+    });
+  });
+
+  describe("`config validate --debug` CLI", () => {
+    if (!bunAvailable()) {
+      it.skip("skipped — bun runtime not available", () => {});
+      return;
     }
-    // Never leaks raw UUIDs.
-    const serialized = JSON.stringify(env);
-    expect(serialized).not.toContain(TENT);
-    expect(serialized).not.toContain(PLANT);
-  });
+    const TENT = "11111111-1111-4111-8111-111111111111";
+    const PLANT = "33333333-3333-4333-8333-333333333333";
 
-  it("returns tent_id: null when VERDANT_TENT_ID is absent", () => {
-    const env = buildConfigDebugEnvelope({});
-    expect(env.tent_id).toBeNull();
-  });
-});
-
-describe("`config validate --debug` CLI", () => {
-  if (!bunAvailable()) {
-    it.skip("skipped — bun runtime not available", () => {});
-    return;
-  }
-  const TENT = "11111111-1111-4111-8111-111111111111";
-  const PLANT = "33333333-3333-4333-8333-333333333333";
-
-  it("exits 0 and prints config_ok + config_debug (never config_effective) on success", () => {
-    const r = spawnSync(
-      "bun",
-      ["run", "scripts/ecowitt-live-soil-bridge.ts", "config", "validate", "--debug"],
-      {
-        encoding: "utf8",
-        env: {
-          ...process.env,
-          VERDANT_TENT_ID: TENT,
-          ECOWITT_SOIL_CHANNEL_MAP_JSON: JSON.stringify({
-            soilmoisture1: { tent_id: TENT, plant_id: PLANT, label: "A" },
-          }),
+    it("exits 0 and prints config_ok + config_debug (never config_effective) on success", () => {
+      const r = spawnSync(
+        "bun",
+        ["run", "scripts/ecowitt-live-soil-bridge.ts", "config", "validate", "--debug"],
+        {
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            VERDANT_TENT_ID: TENT,
+            ECOWITT_SOIL_CHANNEL_MAP_JSON: JSON.stringify({
+              soilmoisture1: { tent_id: TENT, plant_id: PLANT, label: "A" },
+            }),
+          },
+          timeout: 15_000,
         },
-        timeout: 15_000,
-      },
-    );
-    expect(r.status).toBe(0);
-    expect(r.stdout).toContain('"event":"config_ok"');
-    expect(r.stdout).toContain('"event":"config_debug"');
-    expect(r.stdout).toContain('"tent_id":"uuid:…1111"');
-    expect(r.stdout).toContain("[ecowitt-bridge] config_debug");
-    // Debug is a strict subset — no effective config unless --dry-run is added.
-    expect(r.stdout).not.toContain('"event":"config_effective"');
-    // Never leaks raw UUIDs.
-    expect(r.stdout).not.toContain(TENT);
-    expect(r.stdout).not.toContain(PLANT);
-    // Never imports mqtt or connects.
-    expect(r.stderr).not.toMatch(/mqtt_connected|ECONNREFUSED|Cannot find module/i);
-  });
+      );
+      expect(r.status).toBe(0);
+      expect(r.stdout).toContain('"event":"config_ok"');
+      expect(r.stdout).toContain('"event":"config_debug"');
+      expect(r.stdout).toContain('"tent_id":"uuid:…1111"');
+      expect(r.stdout).toContain("[ecowitt-bridge] config_debug");
+      // Debug is a strict subset — no effective config unless --dry-run is added.
+      expect(r.stdout).not.toContain('"event":"config_effective"');
+      // Never leaks raw UUIDs.
+      expect(r.stdout).not.toContain(TENT);
+      expect(r.stdout).not.toContain(PLANT);
+      // Never imports mqtt or connects.
+      expect(r.stderr).not.toMatch(/mqtt_connected|ECONNREFUSED|Cannot find module/i);
+    });
 
-  it("composes with --dry-run: emits config_ok, then config_debug, then config_effective in that order", () => {
-    const r = spawnSync(
-      "bun",
-      [
-        "run",
-        "scripts/ecowitt-live-soil-bridge.ts",
-        "config",
-        "validate",
-        "--debug",
-        "--dry-run",
-      ],
-      {
-        encoding: "utf8",
-        env: { ...process.env, VERDANT_TENT_ID: TENT, ECOWITT_SOIL_CHANNEL_MAP_JSON: undefined },
-        timeout: 15_000,
-      },
-    );
-    expect(r.status).toBe(0);
-    const okIdx = r.stdout.indexOf('"event":"config_ok"');
-    const dbgIdx = r.stdout.indexOf('"event":"config_debug"');
-    const effIdx = r.stdout.indexOf('"event":"config_effective"');
-    expect(okIdx).toBeGreaterThanOrEqual(0);
-    expect(dbgIdx).toBeGreaterThan(okIdx);
-    expect(effIdx).toBeGreaterThan(dbgIdx);
-  });
+    it("composes with --dry-run: emits config_ok, then config_debug, then config_effective in that order", () => {
+      const r = spawnSync(
+        "bun",
+        [
+          "run",
+          "scripts/ecowitt-live-soil-bridge.ts",
+          "config",
+          "validate",
+          "--debug",
+          "--dry-run",
+        ],
+        {
+          encoding: "utf8",
+          env: { ...process.env, VERDANT_TENT_ID: TENT, ECOWITT_SOIL_CHANNEL_MAP_JSON: undefined },
+          timeout: 15_000,
+        },
+      );
+      expect(r.status).toBe(0);
+      const okIdx = r.stdout.indexOf('"event":"config_ok"');
+      const dbgIdx = r.stdout.indexOf('"event":"config_debug"');
+      const effIdx = r.stdout.indexOf('"event":"config_effective"');
+      expect(okIdx).toBeGreaterThanOrEqual(0);
+      expect(dbgIdx).toBeGreaterThan(okIdx);
+      expect(effIdx).toBeGreaterThan(dbgIdx);
+    });
 
-  it("exits 2 without printing config_debug on failure", () => {
-    const r = spawnSync(
-      "bun",
-      ["run", "scripts/ecowitt-live-soil-bridge.ts", "config", "validate", "--debug"],
-      { encoding: "utf8", env: { ...process.env, VERDANT_TENT_ID: undefined }, timeout: 15_000 },
-    );
-    expect(r.status).toBe(2);
-    expect(r.stdout).not.toContain('"config_debug"');
-    expect(r.stderr).toContain('"code":"missing_tent_id"');
+    it("exits 2 without printing config_debug on failure", () => {
+      const r = spawnSync(
+        "bun",
+        ["run", "scripts/ecowitt-live-soil-bridge.ts", "config", "validate", "--debug"],
+        { encoding: "utf8", env: { ...process.env, VERDANT_TENT_ID: undefined }, timeout: 15_000 },
+      );
+      expect(r.status).toBe(2);
+      expect(r.stdout).not.toContain('"config_debug"');
+      expect(r.stderr).toContain('"code":"missing_tent_id"');
+    });
   });
-});
-
 });

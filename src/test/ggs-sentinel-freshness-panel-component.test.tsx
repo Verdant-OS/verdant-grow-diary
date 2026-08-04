@@ -4,9 +4,7 @@ import { render, screen, within } from "@testing-library/react";
 import { GgsSentinelFreshnessGuidanceList } from "@/components/GgsSentinelSmokeRunnerPanel";
 import type { GgsSentinelMetricFreshness } from "@/lib/ggsSentinelSmokeRunner";
 
-function freshness(
-  overrides: Partial<GgsSentinelMetricFreshness>,
-): GgsSentinelMetricFreshness {
+function freshness(overrides: Partial<GgsSentinelMetricFreshness>): GgsSentinelMetricFreshness {
   return {
     metric: "soil_temp_c",
     capturedAt: "2026-06-17T18:20:00.000Z",
@@ -51,7 +49,8 @@ describe("GgsSentinelFreshnessGuidanceList", () => {
             stale: true,
             fresh: false,
             ageLabel: "24m ago",
-            nextActionLabel: "Stale — captured 24m ago. Ingest a new real GGS reading to clear live Sentinel.",
+            nextActionLabel:
+              "Stale — captured 24m ago. Ingest a new real GGS reading to clear live Sentinel.",
           }),
         ]}
       />,
@@ -65,7 +64,9 @@ describe("GgsSentinelFreshnessGuidanceList", () => {
     expect(screen.getByText("4m ago")).toBeInTheDocument();
     expect(screen.getByText("13m ago")).toBeInTheDocument();
     expect(screen.getByText("24m ago")).toBeInTheDocument();
-    expect(screen.getByText("Fresh — captured 4m ago. Valid for live Sentinel.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Fresh — captured 4m ago. Valid for live Sentinel."),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Fresh but aging/)).toBeInTheDocument();
     expect(screen.getByText(/Ingest a new real GGS reading/)).toBeInTheDocument();
   });

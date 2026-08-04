@@ -19,13 +19,7 @@
  * No React. No I/O. No side effects.
  */
 
-export type SensorMetricKey =
-  | "temp"
-  | "rh"
-  | "vpd"
-  | "co2"
-  | "soil"
-  | "ppfd";
+export type SensorMetricKey = "temp" | "rh" | "vpd" | "co2" | "soil" | "ppfd";
 
 export type SensorMetricStateKind =
   | "live"
@@ -164,18 +158,10 @@ export function describeSoilMoistureStuckWindow(
 }
 
 /** Core metrics that are always expected from a working tent. */
-const CORE_METRICS: ReadonlySet<SensorMetricKey> = new Set([
-  "temp",
-  "rh",
-  "vpd",
-]);
+const CORE_METRICS: ReadonlySet<SensorMetricKey> = new Set(["temp", "rh", "vpd"]);
 
 /** Optional metrics that may simply not be connected — never alarm. */
-const OPTIONAL_METRICS: ReadonlySet<SensorMetricKey> = new Set([
-  "co2",
-  "ppfd",
-  "soil",
-]);
+const OPTIONAL_METRICS: ReadonlySet<SensorMetricKey> = new Set(["co2", "ppfd", "soil"]);
 
 const CALM_EMPTY_COPY: Record<SensorMetricKey, string> = {
   temp: "No temperature reading yet. Add a manual reading or connect a source.",
@@ -228,10 +214,7 @@ const KIND_LABEL: Record<SensorMetricStateKind, string> = {
   no_reading_yet: "No reading yet",
 };
 
-const CAUTION_KINDS: ReadonlySet<SensorMetricStateKind> = new Set([
-  "stale",
-  "invalid",
-]);
+const CAUTION_KINDS: ReadonlySet<SensorMetricStateKind> = new Set(["stale", "invalid"]);
 
 export function isOptionalMetric(metric: SensorMetricKey): boolean {
   return OPTIONAL_METRICS.has(metric);
@@ -248,46 +231,30 @@ export function isCoreMetric(metric: SensorMetricKey): boolean {
  * metrics that are simply not connected use a calm tone. Soil moisture
  * uses an optional `recentValues` history to detect stuck-at-bound.
  */
-export function classifySensorMetricState(
-  input: ClassifyMetricInput,
-): SensorMetricState {
+export function classifySensorMetricState(input: ClassifyMetricInput): SensorMetricState {
   const { metric, value, hasAnyReading } = input;
   const hasValue = typeof value === "number" && Number.isFinite(value);
 
   // Auto-detect invalid for optional metrics from value bounds.
-  const autoInvalid =
-    isOptionalMetric(metric) && isOptionalMetricInvalid(metric, value);
+  const autoInvalid = isOptionalMetric(metric) && isOptionalMetricInvalid(metric, value);
   // Soil moisture stuck-at-bound only triggers when caller provides
   // an explicit recent-values window with enough finite history.
   const stuckWindow =
-    metric === "soil"
-      ? describeSoilMoistureStuckWindow(input.recentValues)
-      : null;
+    metric === "soil" ? describeSoilMoistureStuckWindow(input.recentValues) : null;
 
   // Cautionary takes priority over "we have a value".
   if (input.isInvalid || autoInvalid) {
-    const copy =
-      INVALID_COPY[metric] ?? "Invalid telemetry detected.";
+    const copy = INVALID_COPY[metric] ?? "Invalid telemetry detected.";
     return makeState("invalid", metric, copy, false);
   }
   if (stuckWindow) {
     return makeState("invalid", metric, stuckWindow.message, true);
   }
   if (hasValue && input.isStale) {
-    return makeState(
-      "stale",
-      metric,
-      "Reading is older than the freshness window.",
-      true,
-    );
+    return makeState("stale", metric, "Reading is older than the freshness window.", true);
   }
   if (input.isDerived && hasValue) {
-    return makeState(
-      "derived",
-      metric,
-      "Calculated from temperature and humidity.",
-      true,
-    );
+    return makeState("derived", metric, "Calculated from temperature and humidity.", true);
   }
   if (hasValue) {
     const kind = sourceKind(normalizeSource(input.source)) ?? "demo";
@@ -320,8 +287,7 @@ function makeState(
     label: KIND_LABEL[kind],
     tone: CAUTION_KINDS.has(kind) ? "caution" : "calm",
     message,
-    isOptionalEmpty:
-      kind === "not_connected" || kind === "no_reading_yet",
+    isOptionalEmpty: kind === "not_connected" || kind === "no_reading_yet",
     showChart,
   };
 }

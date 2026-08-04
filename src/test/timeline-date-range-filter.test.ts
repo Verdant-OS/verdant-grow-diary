@@ -41,7 +41,15 @@ function row(id: string, entryAt: string | null | undefined): TimelineEvidenceRo
 describe("isTimelineDateFilterValue", () => {
   it("accepts only plain ISO calendar dates", () => {
     expect(isTimelineDateFilterValue("2026-07-01")).toBe(true);
-    for (const bad of ["2026-7-1", "07/01/2026", "2026-07-01T00:00:00Z", "", null, undefined, "not-a-date"]) {
+    for (const bad of [
+      "2026-7-1",
+      "07/01/2026",
+      "2026-07-01T00:00:00Z",
+      "",
+      null,
+      undefined,
+      "not-a-date",
+    ]) {
       expect(isTimelineDateFilterValue(bad as string | null | undefined)).toBe(false);
     }
   });
@@ -66,18 +74,18 @@ describe("date-range matching", () => {
   });
 
   it("supports open-ended ranges in either direction", () => {
-    expect(
-      filterTimelineEvidenceRows(rows, { startDate: "2026-07-05" }).map((r) => r.id),
-    ).toEqual(["inside", "end-day", "after"]);
-    expect(
-      filterTimelineEvidenceRows(rows, { endDate: "2026-06-30" }).map((r) => r.id),
-    ).toEqual(["before"]);
+    expect(filterTimelineEvidenceRows(rows, { startDate: "2026-07-05" }).map((r) => r.id)).toEqual([
+      "inside",
+      "end-day",
+      "after",
+    ]);
+    expect(filterTimelineEvidenceRows(rows, { endDate: "2026-06-30" }).map((r) => r.id)).toEqual([
+      "before",
+    ]);
   });
 
   it("hides rows without a parseable timestamp only while a bound is active", () => {
-    expect(
-      timelineEvidenceRowMatches(row("x", null), { startDate: "2026-07-01" }),
-    ).toBe(false);
+    expect(timelineEvidenceRowMatches(row("x", null), { startDate: "2026-07-01" })).toBe(false);
     expect(timelineEvidenceRowMatches(row("x", null), {})).toBe(true);
   });
 

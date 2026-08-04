@@ -24,12 +24,7 @@
  */
 export const PLANT_DETAIL_LOAD_TIMEOUT_MS = 8000;
 
-export type PlantDetailLoadState =
-  | "loading"
-  | "loading-slow"
-  | "error"
-  | "not-found"
-  | "ready";
+export type PlantDetailLoadState = "loading" | "loading-slow" | "error" | "not-found" | "ready";
 
 export interface ClassifyPlantDetailLoadInput {
   isLoading: boolean;

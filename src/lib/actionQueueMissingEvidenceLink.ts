@@ -26,11 +26,7 @@
  * - Does not fetch, mutate, approve, or trigger automation.
  */
 
-import {
-  plantDetailPath,
-  tentDetailPath,
-  timelinePath,
-} from "@/lib/routes";
+import { plantDetailPath, tentDetailPath, timelinePath } from "@/lib/routes";
 
 export interface MissingEvidenceContext {
   grow_id?: string | null;
@@ -55,10 +51,7 @@ export const ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL =
 export const ACTION_EVIDENCE_REVIEW_LINK_HELPER =
   "Open the related diary or sensor history before approving.";
 
-export const ACTION_EVIDENCE_REVIEW_SCOPE_LABELS: Record<
-  MissingEvidenceReviewScope,
-  string
-> = {
+export const ACTION_EVIDENCE_REVIEW_SCOPE_LABELS: Record<MissingEvidenceReviewScope, string> = {
   plant: "Plant timeline",
   tent: "Tent timeline",
   grow: "Grow timeline",

@@ -54,8 +54,7 @@ import { resolveTimelineDiaryEntryStage } from "@/lib/growDiaryTimelineRules";
 export const TIMELINE_MEMORY_DEFAULT_LIMIT = 100;
 
 export type TimelineMemoryScope =
-  | { kind: "plant"; plantId: string; tentId?: string | null }
-  | { kind: "tent"; tentId: string };
+  { kind: "plant"; plantId: string; tentId?: string | null } | { kind: "tent"; tentId: string };
 
 function readEventType(details: unknown): string | null {
   if (!details || typeof details !== "object") return null;

@@ -197,10 +197,7 @@ export default function TentAiDoctorSessionsPanel({ tentId }: Props) {
       </CardHeader>
       <CardContent className="text-sm">
         {!enabled ? (
-          <p
-            className="text-muted-foreground"
-            data-testid="tent-ai-doctor-sessions-empty-no-tent"
-          >
+          <p className="text-muted-foreground" data-testid="tent-ai-doctor-sessions-empty-no-tent">
             No tent selected.
           </p>
         ) : isLoading ? (
@@ -226,7 +223,9 @@ export default function TentAiDoctorSessionsPanel({ tentId }: Props) {
             </p>
             <button
               type="button"
-              onClick={() => { void refetch(); }}
+              onClick={() => {
+                void refetch();
+              }}
               disabled={isRefetching}
               data-testid="tent-ai-doctor-sessions-error-retry"
               className="inline-flex items-center rounded border bg-background px-2 py-1 text-xs hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
@@ -239,9 +238,7 @@ export default function TentAiDoctorSessionsPanel({ tentId }: Props) {
             className="rounded-lg border bg-muted/20 p-3 text-sm space-y-1"
             data-testid="tent-ai-doctor-sessions-empty"
           >
-            <p className="font-medium text-foreground">
-              No AI Doctor sessions for this tent yet.
-            </p>
+            <p className="font-medium text-foreground">No AI Doctor sessions for this tent yet.</p>
             <p className="text-xs text-muted-foreground">
               Saved diagnosis snapshots will appear here for you to review before acting.
             </p>

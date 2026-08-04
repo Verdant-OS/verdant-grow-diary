@@ -60,10 +60,7 @@ export default function Reports() {
   const learningGroups = data.outcomeLearning?.groups ?? [];
   const lowSampleGroups = learningGroups.filter((g) => g.needs_more_data);
   const lowSampleSmallestCount = lowSampleGroups.length
-    ? lowSampleGroups.reduce(
-        (min, g) => Math.min(min, g.totals?.total ?? Infinity),
-        Infinity,
-      )
+    ? lowSampleGroups.reduce((min, g) => Math.min(min, g.totals?.total ?? Infinity), Infinity)
     : null;
   const reviewQueue = grow
     ? buildReportsReviewQueue({
@@ -78,13 +75,10 @@ export default function Reports() {
         latestSensorCapturedAt: data.latestSensorCapturedAt,
         recentSensorReadingCount: data.recentSensorReadingCount,
         lowSampleLearningGroups: lowSampleGroups.length,
-        lowSampleSmallestCount:
-          lowSampleSmallestCount === Infinity ? null : lowSampleSmallestCount,
+        lowSampleSmallestCount: lowSampleSmallestCount === Infinity ? null : lowSampleSmallestCount,
         lowSampleThreshold: LEARNING_GROUP_SAMPLE_THRESHOLD,
       })
     : { items: [], empty: true };
-
-
 
   const onboarding = buildReportsHubOnboarding({
     growId: grow?.id ?? null,
@@ -100,10 +94,7 @@ export default function Reports() {
     !hasNoGrow && grow !== null && data.status === "ready" && onboarding.visible;
   const showEmptyState =
     hasNoGrow ||
-    (summary !== null &&
-      data.status === "ready" &&
-      summary.allEmpty &&
-      !showOnboarding);
+    (summary !== null && data.status === "ready" && summary.allEmpty && !showOnboarding);
 
   return (
     <div className="max-w-4xl mx-auto" data-testid="reports-page">
@@ -119,8 +110,7 @@ export default function Reports() {
           aria-label="Reports grow scope"
         >
           <span className="text-muted-foreground">
-            Showing reports for{" "}
-            <span className="text-foreground font-medium">{grow.name}</span>
+            Showing reports for <span className="text-foreground font-medium">{grow.name}</span>
           </span>
           <Link to={growDetailPath(grow.id)} className="text-primary hover:underline">
             Open grow detail
@@ -128,23 +118,15 @@ export default function Reports() {
         </div>
       )}
 
-      {showOnboarding && (
-        <ReportsHubOnboardingSection cards={onboarding.cards} />
-      )}
+      {showOnboarding && <ReportsHubOnboardingSection cards={onboarding.cards} />}
 
       {!showEmptyState && summary && !showOnboarding && (
-        <ReportsReviewQueueSection
-          items={reviewQueue.items}
-          showEmptyState={reviewQueue.empty}
-        />
+        <ReportsReviewQueueSection items={reviewQueue.items} showEmptyState={reviewQueue.empty} />
       )}
 
       {grow?.id && !showEmptyState && !showOnboarding && (
         <div className="mt-4 space-y-2">
-          <GrowFollowUpReviewSection
-            growId={grow.id}
-            heading="Unresolved learning work"
-          />
+          <GrowFollowUpReviewSection growId={grow.id} heading="Unresolved learning work" />
           <p className="text-xs text-muted-foreground">
             <Link
               to={growLearningPath(grow.id)}
@@ -203,9 +185,7 @@ function ReportsCard({ card }: { card: ReportsHubCard }) {
           ))}
         </div>
       )}
-      {card.caveat && (
-        <p className="text-[11px] text-muted-foreground">{card.caveat}</p>
-      )}
+      {card.caveat && <p className="text-[11px] text-muted-foreground">{card.caveat}</p>}
       <div className="mt-auto pt-2">
         <Link
           to={card.href}

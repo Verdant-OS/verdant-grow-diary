@@ -43,8 +43,10 @@ describe("OperatorEcowittTentPreview — CSV, copy, status, all-tents table", ()
 
     const createObjectURL = vi.fn().mockReturnValue("blob:fake");
     const revokeObjectURL = vi.fn();
-    (URL as unknown as { createObjectURL: typeof createObjectURL }).createObjectURL = createObjectURL;
-    (URL as unknown as { revokeObjectURL: typeof revokeObjectURL }).revokeObjectURL = revokeObjectURL;
+    (URL as unknown as { createObjectURL: typeof createObjectURL }).createObjectURL =
+      createObjectURL;
+    (URL as unknown as { revokeObjectURL: typeof revokeObjectURL }).revokeObjectURL =
+      revokeObjectURL;
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     const fetchSpy = vi.spyOn(globalThis, "fetch" as any).mockImplementation(() => {
       throw new Error("network call attempted");
@@ -95,9 +97,7 @@ describe("OperatorEcowittTentPreview — CSV, copy, status, all-tents table", ()
     });
     render(<OperatorEcowittTentPreview />);
     fireEvent.click(screen.getByTestId("copy-dry-run-payload-button"));
-    await waitFor(() =>
-      expect(screen.getByTestId("copy-dry-run-status-unavailable")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByTestId("copy-dry-run-status-unavailable")).toBeTruthy());
   });
 
   it("does not leak banned secret/network/device-control terms in new UI sections", () => {

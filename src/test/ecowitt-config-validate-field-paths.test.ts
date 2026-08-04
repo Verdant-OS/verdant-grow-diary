@@ -94,11 +94,7 @@ describe("assertEcowittSoilChannelMapJsonEnv — invalid_channel_map_schema fiel
     expect(err!.code).toBe("invalid_channel_map_schema");
     const paths = (err!.fields ?? []).map((f) => f.path).sort();
     expect(paths).toEqual(
-      [
-        "$.not_a_channel_key",
-        "$.soilmoisture1.label",
-        "$.soilmoisture1.tent_id",
-      ].sort(),
+      ["$.not_a_channel_key", "$.soilmoisture1.label", "$.soilmoisture1.tent_id"].sort(),
     );
   });
 });

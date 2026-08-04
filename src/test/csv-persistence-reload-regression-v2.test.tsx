@@ -24,13 +24,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import type React from "react";
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  cleanup,
-} from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 
 import { EnvironmentCsvImportModal } from "@/components/EnvironmentCsvImportModal";
 import {
@@ -69,25 +63,16 @@ async function runConfirmedImport(): Promise<{
       captured_at: String(r.captured_at ?? ""),
       tent_id: "tent-1",
       source: "csv",
-      temperature_c:
-        typeof r.temperature_c === "number" ? r.temperature_c : null,
+      temperature_c: typeof r.temperature_c === "number" ? r.temperature_c : null,
       humidity_pct: typeof r.humidity_pct === "number" ? r.humidity_pct : null,
       raw_payload: { source_app: "test-vendor" },
     }));
     return { insertedCount: captured.length, error: null };
   }) as unknown as React.ComponentProps<typeof EnvironmentCsvImportModal>["onConfirm"];
 
-  render(
-    <EnvironmentCsvImportModal
-      open
-      onOpenChange={() => {}}
-      onConfirm={onConfirm}
-    />,
-  );
+  render(<EnvironmentCsvImportModal open onOpenChange={() => {}} onConfirm={onConfirm} />);
 
-  const input = screen.getByTestId(
-    "csv-import-file-input",
-  ) as HTMLInputElement;
+  const input = screen.getByTestId("csv-import-file-input") as HTMLInputElement;
   Object.defineProperty(input, "files", {
     value: [new File([SAMPLE_CSV], "export.csv", { type: "text/csv" })],
   });
@@ -95,22 +80,17 @@ async function runConfirmedImport(): Promise<{
 
   await waitFor(() => {
     expect(
-      screen.queryByTestId("csv-import-preview") ||
-        screen.queryByTestId("csv-import-unit-confirm"),
+      screen.queryByTestId("csv-import-preview") || screen.queryByTestId("csv-import-unit-confirm"),
     ).toBeTruthy();
   });
   const unit = screen.queryByTestId("csv-import-unit-c");
   if (unit) {
     fireEvent.click(unit);
-    await waitFor(() =>
-      expect(screen.queryByTestId("csv-import-preview")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("csv-import-preview")).toBeTruthy());
   }
 
   fireEvent.click(screen.getByTestId("csv-import-confirm"));
-  await waitFor(() =>
-    expect(screen.queryByTestId("csv-import-done")).toBeTruthy(),
-  );
+  await waitFor(() => expect(screen.queryByTestId("csv-import-done")).toBeTruthy());
 
   expect(onConfirm).toHaveBeenCalledTimes(1);
   cleanup();
@@ -125,9 +105,7 @@ function ReadingCard({ row }: { row: PersistedCsvReading }) {
   const source: SensorSource = normalizeSensorSource(row.source);
   return (
     <div data-testid={`reading-${row.captured_at}`}>
-      <span data-testid="reading-source-label">
-        {sensorSourceLabel(source)}
-      </span>
+      <span data-testid="reading-source-label">{sensorSourceLabel(source)}</span>
       <span data-testid="reading-source-source">{source}</span>
       <span data-testid="reading-captured-at">{row.captured_at}</span>
     </div>
@@ -207,19 +185,9 @@ describe("CSV Persistence Reload Regression v2 — reload presenter", () => {
 
   it("modal done copy survives reload language and stays CSV-tagged", async () => {
     // Sanity: the done-state text from the modal also never says Live.
-    const onConfirm = vi
-      .fn()
-      .mockResolvedValue({ insertedCount: 3, error: null });
-    render(
-      <EnvironmentCsvImportModal
-        open
-        onOpenChange={() => {}}
-        onConfirm={onConfirm}
-      />,
-    );
-    const input = screen.getByTestId(
-      "csv-import-file-input",
-    ) as HTMLInputElement;
+    const onConfirm = vi.fn().mockResolvedValue({ insertedCount: 3, error: null });
+    render(<EnvironmentCsvImportModal open onOpenChange={() => {}} onConfirm={onConfirm} />);
+    const input = screen.getByTestId("csv-import-file-input") as HTMLInputElement;
     Object.defineProperty(input, "files", {
       value: [new File([SAMPLE_CSV], "export.csv", { type: "text/csv" })],
     });
@@ -233,17 +201,11 @@ describe("CSV Persistence Reload Regression v2 — reload presenter", () => {
     const unit = screen.queryByTestId("csv-import-unit-c");
     if (unit) {
       fireEvent.click(unit);
-      await waitFor(() =>
-        expect(screen.queryByTestId("csv-import-preview")).toBeTruthy(),
-      );
+      await waitFor(() => expect(screen.queryByTestId("csv-import-preview")).toBeTruthy());
     }
     fireEvent.click(screen.getByTestId("csv-import-confirm"));
-    await waitFor(() =>
-      expect(screen.queryByTestId("csv-import-done")).toBeTruthy(),
-    );
-    const done = (
-      screen.getByTestId("csv-import-done").textContent ?? ""
-    ).toLowerCase();
+    await waitFor(() => expect(screen.queryByTestId("csv-import-done")).toBeTruthy());
+    const done = (screen.getByTestId("csv-import-done").textContent ?? "").toLowerCase();
     expect(done).toContain("csv");
     // The done note deliberately says "not live telemetry" — a negation,
     // not a live claim. Strip that exact phrase, then keep banning any

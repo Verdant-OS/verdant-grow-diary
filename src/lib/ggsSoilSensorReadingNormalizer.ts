@@ -100,31 +100,16 @@ const SOIL_TEMP_C_ALIASES = [
   "soil_temp",
   "soilTemp",
 ] as const;
-const SOIL_EC_ALIASES = [
-  "soil_ec",
-  "soilEc",
-  "ec",
-  "soil_ec_mscm",
-  "soilEcMsCm",
-] as const;
+const SOIL_EC_ALIASES = ["soil_ec", "soilEc", "ec", "soil_ec_mscm", "soilEcMsCm"] as const;
 const TENT_ID_ALIASES = ["tent_id", "tentId"] as const;
 const PLANT_ID_ALIASES = ["plant_id", "plantId"] as const;
-const CAPTURED_AT_ALIASES = [
-  "captured_at",
-  "capturedAt",
-  "timestamp",
-  "ts",
-  "time",
-] as const;
+const CAPTURED_AT_ALIASES = ["captured_at", "capturedAt", "timestamp", "ts", "time"] as const;
 
 function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-function pickFirstDefined(
-  o: Record<string, unknown>,
-  keys: readonly string[],
-): unknown {
+function pickFirstDefined(o: Record<string, unknown>, keys: readonly string[]): unknown {
   for (const k of keys) {
     if (k in o && o[k] !== undefined && o[k] !== null && o[k] !== "") {
       return o[k];
@@ -193,11 +178,7 @@ export function normalizeGgsSoilSensorReading(
     delete canonical.ec;
   }
   // NaN / Infinity guard for any explicitly numeric field.
-  for (const key of [
-    ...SOIL_MOISTURE_ALIASES,
-    ...SOIL_TEMP_C_ALIASES,
-    ...SOIL_EC_ALIASES,
-  ]) {
+  for (const key of [...SOIL_MOISTURE_ALIASES, ...SOIL_TEMP_C_ALIASES, ...SOIL_EC_ALIASES]) {
     const v = raw[key];
     if (typeof v === "number" && !Number.isFinite(v)) {
       warnings.add("non_finite_value");

@@ -26,22 +26,10 @@ const EVENTS_SQL = readdirSync(MIGRATIONS_DIR)
   .filter((s) => /public\.alert_events\b/i.test(s))
   .join("\n\n-- BOUNDARY --\n\n");
 
-const ALERTS_LIB = readFileSync(
-  resolve(__dirname, "../lib/alerts.ts"),
-  "utf8",
-);
-const ALERT_PAGE = readFileSync(
-  resolve(__dirname, "../pages/Alerts.tsx"),
-  "utf8",
-);
-const DASHBOARD = readFileSync(
-  resolve(__dirname, "../pages/Dashboard.tsx"),
-  "utf8",
-);
-const USE_EVENTS_HOOK = readFileSync(
-  resolve(__dirname, "../hooks/useAlertEvents.ts"),
-  "utf8",
-);
+const ALERTS_LIB = readFileSync(resolve(__dirname, "../lib/alerts.ts"), "utf8");
+const ALERT_PAGE = readFileSync(resolve(__dirname, "../pages/Alerts.tsx"), "utf8");
+const DASHBOARD = readFileSync(resolve(__dirname, "../pages/Dashboard.tsx"), "utf8");
+const USE_EVENTS_HOOK = readFileSync(resolve(__dirname, "../hooks/useAlertEvents.ts"), "utf8");
 
 // ---------------------------------------------------------------------------
 // Migration shape
@@ -52,9 +40,7 @@ describe("alert_events migration", () => {
   });
 
   it("user_id defaults to auth.uid()", () => {
-    expect(EVENTS_SQL).toMatch(
-      /user_id\s+uuid\s+NOT\s+NULL\s+DEFAULT\s+auth\.uid\(\)/i,
-    );
+    expect(EVENTS_SQL).toMatch(/user_id\s+uuid\s+NOT\s+NULL\s+DEFAULT\s+auth\.uid\(\)/i);
   });
 
   it("alert_id references alerts ON DELETE CASCADE", () => {
@@ -91,12 +77,8 @@ describe("alert_events migration", () => {
   });
 
   it("declares SELECT and INSERT policies anchored on auth.uid() ownership", () => {
-    expect(EVENTS_SQL).toMatch(
-      /CREATE\s+POLICY[\s\S]*?alert_events[\s\S]*?FOR\s+SELECT/i,
-    );
-    expect(EVENTS_SQL).toMatch(
-      /CREATE\s+POLICY[\s\S]*?alert_events[\s\S]*?FOR\s+INSERT/i,
-    );
+    expect(EVENTS_SQL).toMatch(/CREATE\s+POLICY[\s\S]*?alert_events[\s\S]*?FOR\s+SELECT/i);
+    expect(EVENTS_SQL).toMatch(/CREATE\s+POLICY[\s\S]*?alert_events[\s\S]*?FOR\s+INSERT/i);
     expect(EVENTS_SQL).toMatch(/auth\.uid\(\)\s*=\s*user_id/);
     // INSERT WITH CHECK must require ownership of both the parent alert and grow.
     expect(EVENTS_SQL).toMatch(/FROM\s+public\.alerts\s+a/i);
@@ -106,15 +88,11 @@ describe("alert_events migration", () => {
   });
 
   it("declares NO UPDATE policy (append-only)", () => {
-    expect(EVENTS_SQL).not.toMatch(
-      /CREATE\s+POLICY[^;]*alert_events[^;]*FOR\s+UPDATE/i,
-    );
+    expect(EVENTS_SQL).not.toMatch(/CREATE\s+POLICY[^;]*alert_events[^;]*FOR\s+UPDATE/i);
   });
 
   it("declares NO DELETE policy (immutable history)", () => {
-    expect(EVENTS_SQL).not.toMatch(
-      /CREATE\s+POLICY[^;]*alert_events[^;]*FOR\s+DELETE/i,
-    );
+    expect(EVENTS_SQL).not.toMatch(/CREATE\s+POLICY[^;]*alert_events[^;]*FOR\s+DELETE/i);
   });
 });
 
@@ -202,9 +180,7 @@ describe("Alert Center audit wiring", () => {
     expect(ALERT_PAGE).toMatch(
       /import\s*\{[^}]*logAlertEvent[^}]*\}\s*from\s*["']@\/lib\/alerts["']/,
     );
-    expect(ALERT_PAGE).toMatch(
-      /from\s*["']@\/hooks\/useAlertEvents["']/,
-    );
+    expect(ALERT_PAGE).toMatch(/from\s*["']@\/hooks\/useAlertEvents["']/);
   });
 
   it("acknowledge/resolve/dismiss handlers append an audit event", () => {

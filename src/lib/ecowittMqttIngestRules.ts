@@ -108,11 +108,7 @@ export interface CanonicalSensorReadingDraft {
 }
 
 export type EcowittIngestReasonCode =
-  | TruthReasonCode
-  | "stale_reading"
-  | "malformed_payload"
-  | "missing_captured_at"
-  | "invalid_co2";
+  TruthReasonCode | "stale_reading" | "malformed_payload" | "missing_captured_at" | "invalid_co2";
 
 export interface EcowittMqttIngestResult {
   ok: boolean;

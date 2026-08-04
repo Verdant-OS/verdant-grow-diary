@@ -253,8 +253,7 @@ describe("AiDoctorDiagnosisPanel — premium export server-gate integration", ()
 
   it("keeps the print target mounted while the entitlement preflight is pending", async () => {
     let resolveGate:
-      | ((value: { data: { ok: true; display_plan_id: string }; error: null }) => void)
-      | null = null;
+      ((value: { data: { ok: true; display_plan_id: string }; error: null }) => void) | null = null;
     invokeMock.mockReturnValueOnce(
       new Promise((resolve) => {
         resolveGate = resolve;

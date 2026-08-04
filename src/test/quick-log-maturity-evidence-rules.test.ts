@@ -100,9 +100,11 @@ describe("quickLogMaturityEvidenceRules", () => {
   });
 
   it("has operator-safe helper copy", () => {
-    expect(quickLogMaturityEvidenceReasonToMessage("maturity_evidence_requires_plant_target")).toContain(
-      "plant",
+    expect(
+      quickLogMaturityEvidenceReasonToMessage("maturity_evidence_requires_plant_target"),
+    ).toContain("plant");
+    expect(quickLogMaturityEvidenceReasonToMessage("invalid_amber_pct")).toContain(
+      "between 0 and 100",
     );
-    expect(quickLogMaturityEvidenceReasonToMessage("invalid_amber_pct")).toContain("between 0 and 100");
   });
 });

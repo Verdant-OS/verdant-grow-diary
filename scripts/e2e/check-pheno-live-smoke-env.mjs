@@ -77,7 +77,10 @@ export function evaluatePhenoLiveSmokeEnv(env = process.env) {
     }
   }
 
-  if (typeof env.SUPABASE_SERVICE_ROLE_KEY === "string" && env.SUPABASE_SERVICE_ROLE_KEY.trim().length > 0) {
+  if (
+    typeof env.SUPABASE_SERVICE_ROLE_KEY === "string" &&
+    env.SUPABASE_SERVICE_ROLE_KEY.trim().length > 0
+  ) {
     warnings.push(
       "SUPABASE_SERVICE_ROLE_KEY is present but is not used by the live smoke; keep it out of browser-visible environments",
     );
@@ -115,8 +118,12 @@ export function printPhenoLiveSmokeChecklist(result, log = console.log) {
   log("  2. Set credentials only in the current shell or an ignored local env file.");
   log("  3. Use dedicated Free / Pro / Founder / Canceled production test accounts.");
   log("  4. Use existing production-safe test hunts; this flow never seeds production.");
-  log("  5. Keep service-role keys, passwords, JWTs, cookies, session files, and fixture ids out of logs and chat.");
-  log(`  6. Set E2E_PHENO_LIVE_SMOKE_CONFIRM=${PHENO_LIVE_CONFIRM_VALUE} only when ready to hit production.`);
+  log(
+    "  5. Keep service-role keys, passwords, JWTs, cookies, session files, and fixture ids out of logs and chat.",
+  );
+  log(
+    `  6. Set E2E_PHENO_LIVE_SMOKE_CONFIRM=${PHENO_LIVE_CONFIRM_VALUE} only when ready to hit production.`,
+  );
   log("  7. Run the deployed-build fingerprint, then the live smoke, then the receipt writer.");
 
   if (result.missing.length > 0) {

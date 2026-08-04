@@ -19,9 +19,7 @@ import {
 } from "@/constants/sensorIngestProvenance";
 
 export type SensorIngestProvenanceReason =
-  | "source_not_canonical"
-  | "source_app_not_allowed"
-  | "transport_not_allowed";
+  "source_not_canonical" | "source_app_not_allowed" | "transport_not_allowed";
 
 export interface SensorIngestProvenanceInput {
   source: unknown;

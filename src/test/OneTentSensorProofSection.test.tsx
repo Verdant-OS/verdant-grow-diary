@@ -67,9 +67,7 @@ describe("OneTentSensorProofSection", () => {
 
   it("renders the Sensors Operator shortcut preserving operator=1", () => {
     const { container } = renderWith("tent-1");
-    const anchor = container.querySelector(
-      'a[href="/sensors?operator=1"]',
-    );
+    const anchor = container.querySelector('a[href="/sensors?operator=1"]');
     expect(anchor).toBeTruthy();
   });
 

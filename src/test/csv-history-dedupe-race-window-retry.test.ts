@@ -33,19 +33,13 @@ interface Row extends DedupeKeyParts {
   value: number;
 }
 
-function row(
-  tent_id: string,
-  metric: string,
-  captured_at: string,
-  value = 1,
-): Row {
+function row(tent_id: string, metric: string, captured_at: string, value = 1): Row {
   return { source: "csv", tent_id, metric, captured_at, value };
 }
 
 const DEDUPE_ERROR: BatchInsertError = {
   code: "23505",
-  message:
-    'duplicate key value violates unique constraint "sensor_readings_dedupe_uidx"',
+  message: 'duplicate key value violates unique constraint "sensor_readings_dedupe_uidx"',
   details: "Key (user_id, tent_id, source, metric, captured_at)=(...) exists.",
   hint: null,
 };
@@ -69,9 +63,7 @@ describe("isSensorReadingsDedupeUniqueViolation", () => {
     expect(isSensorReadingsDedupeUniqueViolation(DEDUPE_ERROR)).toBe(true);
   });
   it("rejects other unique violations", () => {
-    expect(isSensorReadingsDedupeUniqueViolation(UNRELATED_UNIQUE_ERROR)).toBe(
-      false,
-    );
+    expect(isSensorReadingsDedupeUniqueViolation(UNRELATED_UNIQUE_ERROR)).toBe(false);
   });
   it("rejects non-23505 codes", () => {
     expect(isSensorReadingsDedupeUniqueViolation(UNKNOWN_ERROR)).toBe(false);
@@ -94,11 +86,7 @@ describe("runDuplicateAwareCsvHistoryImport — 23505 race-window recovery", () 
       fetchCall += 1;
       if (fetchCall === 1) return new Set<string>();
       // Re-query after the 23505 returns ALL rows present.
-      return new Set(
-        rows.map(
-          (r) => `${r.tent_id}|${r.source}|${r.metric}|${r.captured_at}`,
-        ),
-      );
+      return new Set(rows.map((r) => `${r.tent_id}|${r.source}|${r.metric}|${r.captured_at}`));
     });
     const insertBatch = vi.fn(async () => ({ error: DEDUPE_ERROR }));
     const out = await runDuplicateAwareCsvHistoryImport({

@@ -140,10 +140,7 @@ async function call(c: SupabaseClient, args: Record<string, unknown>): Promise<a
   return (c as any).rpc("quicklog_save_event", args);
 }
 
-async function countBy(
-  table: string,
-  filters: Record<string, string | null>,
-): Promise<number> {
+async function countBy(table: string, filters: Record<string, string | null>): Promise<number> {
   let q = admin.from(table).select("*", { count: "exact", head: true });
   for (const [k, v] of Object.entries(filters)) {
     if (v === null) q = q.is(k, null);
@@ -173,8 +170,11 @@ async function main() {
     // error.code === "PGRST203".
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const code = (error as any)?.code;
-    check("PostgREST resolves quicklog_save_event without PGRST203", code !== "PGRST203",
-      `code=${code ?? "none"} data=${JSON.stringify(data)}`);
+    check(
+      "PostgREST resolves quicklog_save_event without PGRST203",
+      code !== "PGRST203",
+      `code=${code ?? "none"} data=${JSON.stringify(data)}`,
+    );
   }
 
   console.log("→ seeding auth.user + grow/tent/plant");
@@ -191,8 +191,11 @@ async function main() {
         p_event_type: "observation",
         p_note: "legacy",
       });
-      check("legacy observation caller succeeds",
-        !error && data?.ok === true, error?.message ?? JSON.stringify(data));
+      check(
+        "legacy observation caller succeeds",
+        !error && data?.ok === true,
+        error?.message ?? JSON.stringify(data),
+      );
     }
 
     // 2. Legacy Harvest still works
@@ -203,8 +206,11 @@ async function main() {
         p_event_type: "harvest",
         p_note: "wet 120g",
       });
-      check("legacy harvest caller succeeds",
-        !error && data?.ok === true, error?.message ?? JSON.stringify(data));
+      check(
+        "legacy harvest caller succeeds",
+        !error && data?.ok === true,
+        error?.message ?? JSON.stringify(data),
+      );
     }
 
     // 3. Legacy cure_check still works
@@ -214,8 +220,11 @@ async function main() {
         p_grow_id: seed.growId,
         p_event_type: "cure_check",
       });
-      check("legacy cure_check caller succeeds",
-        !error && data?.ok === true, error?.message ?? JSON.stringify(data));
+      check(
+        "legacy cure_check caller succeeds",
+        !error && data?.ok === true,
+        error?.message ?? JSON.stringify(data),
+      );
     }
 
     // 4. Typed watering
@@ -229,8 +238,11 @@ async function main() {
         p_water: { volume_ml: 500, ph: 6.2 },
       });
       wateringEventId = data?.grow_event_id;
-      check("typed watering ok", !error && data?.ok === true,
-        error?.message ?? JSON.stringify(data));
+      check(
+        "typed watering ok",
+        !error && data?.ok === true,
+        error?.message ?? JSON.stringify(data),
+      );
       const subCount = wateringEventId
         ? await countBy("watering_events", { event_id: wateringEventId })
         : 0;
@@ -245,13 +257,15 @@ async function main() {
       const mirror = diary?.find(
         (d) =>
           d.details &&
-          (d.details as { linked_grow_event_id?: string }).linked_grow_event_id ===
-            wateringEventId,
+          (d.details as { linked_grow_event_id?: string }).linked_grow_event_id === wateringEventId,
       );
       const water = (mirror?.details as { watering?: { volume_ml?: number } } | undefined)
         ?.watering;
-      check("diary mirror includes details.watering.volume_ml = 500",
-        Number(water?.volume_ml) === 500, JSON.stringify(water));
+      check(
+        "diary mirror includes details.watering.volume_ml = 500",
+        Number(water?.volume_ml) === 500,
+        JSON.stringify(water),
+      );
     }
 
     // 5. Typed feeding
@@ -269,11 +283,12 @@ async function main() {
         },
       });
       const geId = data?.grow_event_id;
-      check("typed feeding ok", !error && data?.ok === true,
-        error?.message ?? JSON.stringify(data));
-      const subCount = geId
-        ? await countBy("feeding_events", { event_id: geId })
-        : 0;
+      check(
+        "typed feeding ok",
+        !error && data?.ok === true,
+        error?.message ?? JSON.stringify(data),
+      );
+      const subCount = geId ? await countBy("feeding_events", { event_id: geId }) : 0;
       check("feeding_events row linked to spine (1)", subCount === 1, `${subCount}`);
       const { data: diary } = await admin
         .from("diary_entries")
@@ -286,14 +301,18 @@ async function main() {
           d.details &&
           (d.details as { linked_grow_event_id?: string }).linked_grow_event_id === geId,
       );
-      const feed = (mirror?.details as { feeding?: Record<string, unknown> } | undefined)
-        ?.feeding;
-      check("diary mirror includes details.feeding.ec_in = 1.8",
+      const feed = (mirror?.details as { feeding?: Record<string, unknown> } | undefined)?.feeding;
+      check(
+        "diary mirror includes details.feeding.ec_in = 1.8",
         Number((feed as { ec_in?: number } | undefined)?.ec_in) === 1.8,
-        JSON.stringify(feed));
+        JSON.stringify(feed),
+      );
       const products = (feed as { products?: unknown } | undefined)?.products;
-      check("feeding products persisted as JSON array",
-        Array.isArray(products), JSON.stringify(products));
+      check(
+        "feeding products persisted as JSON array",
+        Array.isArray(products),
+        JSON.stringify(products),
+      );
     }
 
     // 6. Payload mismatch — p_water on observation
@@ -307,9 +326,11 @@ async function main() {
         p_event_type: "observation",
         p_water: { volume_ml: 100 },
       });
-      check("mismatch → reason=invalid_typed_payload",
+      check(
+        "mismatch → reason=invalid_typed_payload",
         data?.ok === false && data?.reason === "invalid_typed_payload",
-        JSON.stringify(data));
+        JSON.stringify(data),
+      );
       const geAfter = await countBy("grow_events", { user_id: uid });
       const deAfter = await countBy("diary_entries", { user_id: uid });
       const idAfter = await countBy("quicklog_idempotency", { user_id: uid });
@@ -335,11 +356,16 @@ async function main() {
         p_water: { volume_ml: 250 },
       });
       const afterCount = await countBy("watering_events", { user_id: uid });
-      check("replay returns original grow_event_id",
+      check(
+        "replay returns original grow_event_id",
         r1.data?.grow_event_id === r2.data?.grow_event_id,
-        `${r1.data?.grow_event_id} vs ${r2.data?.grow_event_id}`);
-      check("replay does not create a second watering_events row",
-        beforeCount === afterCount, `${beforeCount}→${afterCount}`);
+        `${r1.data?.grow_event_id} vs ${r2.data?.grow_event_id}`,
+      );
+      check(
+        "replay does not create a second watering_events row",
+        beforeCount === afterCount,
+        `${beforeCount}→${afterCount}`,
+      );
     }
 
     // 8. Atomicity — force trigger failure (ph out of range).
@@ -354,16 +380,35 @@ async function main() {
         p_event_type: "watering",
         p_water: { ph: 15 },
       });
-      check("subtype trigger failure surfaces as error (no ok:true)",
-        error !== null || data?.ok !== true, JSON.stringify(data ?? error));
+      check(
+        "subtype trigger failure surfaces as error (no ok:true)",
+        error !== null || data?.ok !== true,
+        JSON.stringify(data ?? error),
+      );
       const geAfter = await countBy("grow_events", { user_id: uid });
       const weAfter = await countBy("watering_events", { user_id: uid });
       const deAfter = await countBy("diary_entries", { user_id: uid });
       const idAfter = await countBy("quicklog_idempotency", { user_id: uid });
-      check("no orphan grow_events after subtype failure", geAfter === geBefore, `${geBefore}→${geAfter}`);
-      check("no orphan watering_events after failure", weAfter === weBefore, `${weBefore}→${weAfter}`);
-      check("no orphan diary_entries after failure", deAfter === deBefore, `${deBefore}→${deAfter}`);
-      check("no orphan idempotency row after failure", idAfter === idBefore, `${idBefore}→${idAfter}`);
+      check(
+        "no orphan grow_events after subtype failure",
+        geAfter === geBefore,
+        `${geBefore}→${geAfter}`,
+      );
+      check(
+        "no orphan watering_events after failure",
+        weAfter === weBefore,
+        `${weBefore}→${weAfter}`,
+      );
+      check(
+        "no orphan diary_entries after failure",
+        deAfter === deBefore,
+        `${deBefore}→${deAfter}`,
+      );
+      check(
+        "no orphan idempotency row after failure",
+        idAfter === idBefore,
+        `${idBefore}→${idAfter}`,
+      );
     }
 
     // 9. Invalid event type still fails safely.
@@ -373,9 +418,11 @@ async function main() {
         p_grow_id: seed.growId,
         p_event_type: "not_a_real_event",
       });
-      check("invalid event type → reason=invalid_event_type",
+      check(
+        "invalid event type → reason=invalid_event_type",
         data?.ok === false && data?.reason === "invalid_event_type",
-        JSON.stringify(data));
+        JSON.stringify(data),
+      );
     }
   } finally {
     await teardown(uid);

@@ -63,19 +63,20 @@ describe("buildCorrectedQuickLogHandoff", () => {
     expect(FOLLOW_UP_HELPER_COPY).toBe(
       "Open Quick Log and choose the correct plant for this entry.",
     );
-    expect(FOLLOW_UP_ACCESSIBLE_LABEL).toBe(
-      "Add corrected Quick Log to the correct plant",
-    );
-    expect(FOLLOW_UP_NOTE_PREFILL).toBe(
-      "Re-entering log after removing it from the wrong plant.",
-    );
+    expect(FOLLOW_UP_ACCESSIBLE_LABEL).toBe("Add corrected Quick Log to the correct plant");
+    expect(FOLLOW_UP_NOTE_PREFILL).toBe("Re-entering log after removing it from the wrong plant.");
   });
 });
 
 describe("dispatchCorrectedQuickLogHandoff", () => {
   it("dispatches the reused open-quicklog event with the built payload", () => {
     const listener = vi.fn();
-    const target = { dispatchEvent: vi.fn((ev: Event) => { listener(ev); return true; }) };
+    const target = {
+      dispatchEvent: vi.fn((ev: Event) => {
+        listener(ev);
+        return true;
+      }),
+    };
     const payload = dispatchCorrectedQuickLogHandoff(
       { tentId: "t1", growId: "g1", note: "n" },
       target,

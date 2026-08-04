@@ -30,8 +30,7 @@ export const MANUAL_SNAPSHOT_SOURCE_LABEL = "Manual" as const;
  * was fabricated, defaulted, or treated as healthy. Stays generic so
  * existing "no live/synced/connected/imported wording" guards still pass.
  */
-export const MISSING_SNAPSHOT_NOTE_LABEL =
-  "No sensor snapshot attached" as const;
+export const MISSING_SNAPSHOT_NOTE_LABEL = "No sensor snapshot attached" as const;
 
 export interface ManualSnapshotRecord {
   id: string;

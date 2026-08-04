@@ -20,8 +20,7 @@ import type {
 
 export const CSV_IMPORT_PLAN_REPORT_VERSION = "csv_import_plan_v1" as const;
 
-export const CSV_IMPORT_PLAN_STATUS_LABEL =
-  "Review-only — nothing saved. Preview only." as const;
+export const CSV_IMPORT_PLAN_STATUS_LABEL = "Review-only — nothing saved. Preview only." as const;
 
 export const CSV_IMPORT_PLAN_SAFETY_NOTE = [
   "No save.",
@@ -37,8 +36,13 @@ export const BLOCKED_SAMPLE_PER_REASON_MAX = 3;
 
 /** Plain-language explanation + suggested fix for each blocked-row reason. */
 export const BLOCKED_REASON_EXPLANATIONS: Record<
-  RowBlockReason | "ph_out_of_range" | "humidity_stuck" | "vwc_stuck"
-    | "ec_unit_ambiguous" | "lux_not_ppfd" | "temp_unit_ambiguous",
+  | RowBlockReason
+  | "ph_out_of_range"
+  | "humidity_stuck"
+  | "vwc_stuck"
+  | "ec_unit_ambiguous"
+  | "lux_not_ppfd"
+  | "temp_unit_ambiguous",
   { title: string; explanation: string; fix: string }
 > = {
   unparseable_captured_at: {
@@ -119,22 +123,87 @@ export const HARD_BLOCK_EXPLANATIONS: Record<
   HardBlockReason,
   { title: string; explanation: string; fix: string }
 > = {
-  empty_file: { title: "Empty file", explanation: "The uploaded file contains no rows.", fix: "Re-export with at least one data row." },
-  header_only: { title: "Header-only file", explanation: "The file has a header but no data rows.", fix: "Re-export including data." },
-  demo_fixture: { title: "Demo fixture blocked", explanation: "Demo / sample fixtures are never imported.", fix: "Use your own exported CSV/TSV." },
-  file_too_large: { title: "File too large", explanation: "The file exceeds the import size limit.", fix: "Split the export into smaller files." },
-  row_count_exceeded: { title: "Too many rows", explanation: "The file exceeds the per-import row limit.", fix: "Split the export into smaller batches." },
-  unauthenticated: { title: "Not signed in", explanation: "You must be signed in to import.", fix: "Sign in and try again." },
-  missing_grow_context: { title: "No grow selected", explanation: "Pick the grow this import belongs to.", fix: "Select a grow." },
-  missing_tent_context: { title: "No tent selected", explanation: "Pick the tent these readings belong to.", fix: "Select a tent." },
-  unowned_grow: { title: "Grow not yours", explanation: "The selected grow is not owned by your account.", fix: "Select a grow you own." },
-  unowned_tent: { title: "Tent not yours", explanation: "The selected tent is not owned by your account.", fix: "Select a tent you own." },
-  unowned_plant: { title: "Plant not yours", explanation: "The selected plant is not owned by your account.", fix: "Select a plant you own." },
-  plant_not_in_tent: { title: "Plant not in selected tent", explanation: "The plant does not belong to the selected tent/grow.", fix: "Pick a plant that lives in this tent." },
-  tent_not_in_grow: { title: "Tent not in selected grow", explanation: "The tent does not belong to the selected grow.", fix: "Pick a tent that belongs to the grow." },
-  excess_hard_flags: { title: "Too many suspicious rows", explanation: "More than 5% of rows have hard sensor-truth flags. The whole batch is blocked for safety.", fix: "Re-check the source data and re-export." },
-  invalid_source: { title: "Invalid source", explanation: "Source must be CSV or TSV.", fix: "Re-upload as CSV or TSV." },
-  invalid_clock: { title: "Invalid clock", explanation: "The import clock is invalid.", fix: "Reload the page and try again." },
+  empty_file: {
+    title: "Empty file",
+    explanation: "The uploaded file contains no rows.",
+    fix: "Re-export with at least one data row.",
+  },
+  header_only: {
+    title: "Header-only file",
+    explanation: "The file has a header but no data rows.",
+    fix: "Re-export including data.",
+  },
+  demo_fixture: {
+    title: "Demo fixture blocked",
+    explanation: "Demo / sample fixtures are never imported.",
+    fix: "Use your own exported CSV/TSV.",
+  },
+  file_too_large: {
+    title: "File too large",
+    explanation: "The file exceeds the import size limit.",
+    fix: "Split the export into smaller files.",
+  },
+  row_count_exceeded: {
+    title: "Too many rows",
+    explanation: "The file exceeds the per-import row limit.",
+    fix: "Split the export into smaller batches.",
+  },
+  unauthenticated: {
+    title: "Not signed in",
+    explanation: "You must be signed in to import.",
+    fix: "Sign in and try again.",
+  },
+  missing_grow_context: {
+    title: "No grow selected",
+    explanation: "Pick the grow this import belongs to.",
+    fix: "Select a grow.",
+  },
+  missing_tent_context: {
+    title: "No tent selected",
+    explanation: "Pick the tent these readings belong to.",
+    fix: "Select a tent.",
+  },
+  unowned_grow: {
+    title: "Grow not yours",
+    explanation: "The selected grow is not owned by your account.",
+    fix: "Select a grow you own.",
+  },
+  unowned_tent: {
+    title: "Tent not yours",
+    explanation: "The selected tent is not owned by your account.",
+    fix: "Select a tent you own.",
+  },
+  unowned_plant: {
+    title: "Plant not yours",
+    explanation: "The selected plant is not owned by your account.",
+    fix: "Select a plant you own.",
+  },
+  plant_not_in_tent: {
+    title: "Plant not in selected tent",
+    explanation: "The plant does not belong to the selected tent/grow.",
+    fix: "Pick a plant that lives in this tent.",
+  },
+  tent_not_in_grow: {
+    title: "Tent not in selected grow",
+    explanation: "The tent does not belong to the selected grow.",
+    fix: "Pick a tent that belongs to the grow.",
+  },
+  excess_hard_flags: {
+    title: "Too many suspicious rows",
+    explanation:
+      "More than 5% of rows have hard sensor-truth flags. The whole batch is blocked for safety.",
+    fix: "Re-check the source data and re-export.",
+  },
+  invalid_source: {
+    title: "Invalid source",
+    explanation: "Source must be CSV or TSV.",
+    fix: "Re-upload as CSV or TSV.",
+  },
+  invalid_clock: {
+    title: "Invalid clock",
+    explanation: "The import clock is invalid.",
+    fix: "Reload the page and try again.",
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -206,10 +275,20 @@ export function groupBlockedRowsByReason(
     for (const reason of row.reasons) {
       let g = byReason.get(reason);
       if (!g) {
-        const exp =
-          (BLOCKED_REASON_EXPLANATIONS as Record<string, { title: string; explanation: string; fix: string }>)[reason] ??
-          { title: reason, explanation: "Row blocked.", fix: "Review the source row." };
-        g = { reason, count: 0, title: exp.title, explanation: exp.explanation, fix: exp.fix, samples: [] };
+        const exp = (
+          BLOCKED_REASON_EXPLANATIONS as Record<
+            string,
+            { title: string; explanation: string; fix: string }
+          >
+        )[reason] ?? { title: reason, explanation: "Row blocked.", fix: "Review the source row." };
+        g = {
+          reason,
+          count: 0,
+          title: exp.title,
+          explanation: exp.explanation,
+          fix: exp.fix,
+          samples: [],
+        };
         byReason.set(reason, g);
       }
       g.count += 1;
@@ -292,11 +371,14 @@ export function buildCsvImportPlanReport(
   );
   const hardBlocks = plan.hardBlockReasons.map((r) => {
     const exp = HARD_BLOCK_EXPLANATIONS[r];
-    return { reason: r, title: exp?.title ?? r, explanation: exp?.explanation ?? "", fix: exp?.fix ?? "" };
+    return {
+      reason: r,
+      title: exp?.title ?? r,
+      explanation: exp?.explanation ?? "",
+      fix: exp?.fix ?? "",
+    };
   });
-  const duplicateKeyPrefixes = plan.duplicateSkipped.map((d) =>
-    d.idempotency_key.slice(0, 12),
-  );
+  const duplicateKeyPrefixes = plan.duplicateSkipped.map((d) => d.idempotency_key.slice(0, 12));
 
   return {
     reportVersion: CSV_IMPORT_PLAN_REPORT_VERSION,

@@ -1,11 +1,7 @@
 // Deno tests for the server-only bridge credential row contract.
 // Verifies pure mapping behavior, metadata hygiene (no secret
 // material), and that the module declares no forbidden surfaces.
-import {
-  assert,
-  assertEquals,
-  assertThrows,
-} from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assert, assertEquals, assertThrows } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   type PiIngestBridgeCredentialRow,
   toBridgeCredentialMetadata,
@@ -126,10 +122,7 @@ Deno.test("metadata JSON serialization contains no secret tokens", () => {
     "secret_key_version",
     "secret_hash",
   ]) {
-    assert(
-      !json.includes(forbidden),
-      `metadata JSON leaked forbidden token: ${forbidden}`,
-    );
+    assert(!json.includes(forbidden), `metadata JSON leaked forbidden token: ${forbidden}`);
   }
 });
 
@@ -152,9 +145,7 @@ Deno.test("metadata throws on invalid status", () => {
 // ---------- Source guardrails ----------
 
 Deno.test("bridgeCredentialRow.ts source contains no forbidden surfaces", async () => {
-  const src = await Deno.readTextFile(
-    new URL("./bridgeCredentialRow.ts", import.meta.url),
-  );
+  const src = await Deno.readTextFile(new URL("./bridgeCredentialRow.ts", import.meta.url));
   const forbidden: Array<[string, RegExp]> = [
     ["createClient", /\bcreateClient\s*\(/],
     ["service_role", /service_role/i],
@@ -182,4 +173,3 @@ Deno.test("index.ts imports bridgeCredentialRow + resolver behind auth gate", as
   assert(/from\s+["']\.\/bridgeCredentialRow(\.ts)?["']/.test(src));
   assert(/from\s+["']\.\/secretResolver(\.ts)?["']/.test(src));
 });
-

@@ -12,10 +12,7 @@ const TENT = "11111111-1111-1111-1111-111111111111";
 const TENT_B = "22222222-2222-2222-2222-222222222222";
 
 const FIXTURE = JSON.parse(
-  readFileSync(
-    resolve(__dirname, "../../fixtures/ecowitt-live-soil-sample.json"),
-    "utf8",
-  ),
+  readFileSync(resolve(__dirname, "../../fixtures/ecowitt-live-soil-sample.json"), "utf8"),
 ) as Record<string, unknown>;
 
 function cleanFixture(extra: Record<string, unknown> = {}) {

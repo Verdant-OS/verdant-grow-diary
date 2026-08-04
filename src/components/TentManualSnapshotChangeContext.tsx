@@ -33,9 +33,7 @@ export default function TentManualSnapshotChangeContext({ tentId, readings }: Pr
   }));
 
   // Only render anything if at least one manual snapshot exists for this tent.
-  const hasAnyManual = rows.some(
-    (r) => r.source === "manual" && r.tent_id === tentId,
-  );
+  const hasAnyManual = rows.some((r) => r.source === "manual" && r.tent_id === tentId);
   if (!hasAnyManual) return null;
 
   const ctx = deriveChangeContextFromReadings(rows, { tentId });

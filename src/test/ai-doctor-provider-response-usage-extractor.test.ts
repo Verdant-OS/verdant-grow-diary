@@ -70,9 +70,7 @@ describe("extractProviderReportedUsageCandidate", () => {
     });
 
     it("returns null when usage object has no recognized keys", () => {
-      expect(
-        extractProviderReportedUsageCandidate({ usage: { foo: 1, bar: 2 } }),
-      ).toBeNull();
+      expect(extractProviderReportedUsageCandidate({ usage: { foo: 1, bar: 2 } })).toBeNull();
     });
 
     it("returns null when response/data are not plain objects", () => {

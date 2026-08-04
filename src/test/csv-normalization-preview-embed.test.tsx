@@ -48,9 +48,9 @@ describe("CSV normalization preview embed", () => {
     );
     expect(screen.getByTestId("csv-normalization-preview-section")).toBeInTheDocument();
     expect(screen.getAllByText("CSV normalization preview").length).toBeGreaterThan(0);
-    expect(
-      screen.getByTestId("csv-normalization-preview-section-disclaimer"),
-    ).toHaveTextContent(/Preview only — no sensor readings will be saved\./);
+    expect(screen.getByTestId("csv-normalization-preview-section-disclaimer")).toHaveTextContent(
+      /Preview only — no sensor readings will be saved\./,
+    );
   });
 
   it("advertises data-writes-enabled=false on the section and inner panel", () => {
@@ -79,12 +79,16 @@ describe("CSV normalization preview embed", () => {
         now={FIXED_NOW}
       />,
     );
-    const badges = screen.getAllByTestId("sensor-normalization-preview-badge").map((n) => n.textContent);
-    expect(badges).toEqual(expect.arrayContaining([
-      expect.stringContaining("Source: csv"),
-      expect.stringContaining("Identity: csv_import"),
-      expect.stringContaining("Transport: csv"),
-    ]));
+    const badges = screen
+      .getAllByTestId("sensor-normalization-preview-badge")
+      .map((n) => n.textContent);
+    expect(badges).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("Source: csv"),
+        expect.stringContaining("Identity: csv_import"),
+        expect.stringContaining("Transport: csv"),
+      ]),
+    );
   });
 
   it("shows normalized metrics for a valid accepted row", () => {
@@ -96,7 +100,9 @@ describe("CSV normalization preview embed", () => {
         now={FIXED_NOW}
       />,
     );
-    const metrics = screen.getAllByTestId("sensor-normalization-preview-metric-row").map((r) => r.textContent || "");
+    const metrics = screen
+      .getAllByTestId("sensor-normalization-preview-metric-row")
+      .map((r) => r.textContent || "");
     expect(metrics.some((t) => t.includes("temperature_c"))).toBe(true);
     expect(metrics.some((t) => t.includes("humidity_pct"))).toBe(true);
   });
@@ -113,7 +119,9 @@ describe("CSV normalization preview embed", () => {
     fillTent(TENT_UUID);
     fillPlant(PLANT_UUID);
     expect(
-      screen.getByTestId("sensor-normalization-preview-tent-status").getAttribute("data-tent-status"),
+      screen
+        .getByTestId("sensor-normalization-preview-tent-status")
+        .getAttribute("data-tent-status"),
     ).toBe("linked_verified");
     expect(
       Number(screen.getByTestId("sensor-normalization-preview-row-count").textContent),
@@ -130,11 +138,13 @@ describe("CSV normalization preview embed", () => {
       />,
     );
     expect(
-      screen.getByTestId("sensor-normalization-preview-tent-status").getAttribute("data-tent-status"),
+      screen
+        .getByTestId("sensor-normalization-preview-tent-status")
+        .getAttribute("data-tent-status"),
     ).toBe("missing");
-    expect(
-      screen.getByTestId("sensor-normalization-preview-empty-state").textContent,
-    ).toMatch(/valid tent context is missing/);
+    expect(screen.getByTestId("sensor-normalization-preview-empty-state").textContent).toMatch(
+      /valid tent context is missing/,
+    );
   });
 
   it("shows CSV normalization empty state when no accepted rows exist", () => {

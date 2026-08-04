@@ -19,10 +19,7 @@ import {
 } from "@/lib/vpdStageTargetRules";
 
 const ROOT = resolve(__dirname, "../..");
-const HELPER = readFileSync(
-  resolve(ROOT, "src/lib/vpdStageTargetRules.ts"),
-  "utf8",
-);
+const HELPER = readFileSync(resolve(ROOT, "src/lib/vpdStageTargetRules.ts"), "utf8");
 
 const EXPECTED: Record<VpdStage, { min: number | null; max: number | null }> = {
   seedling: { min: 0.4, max: 0.8 },
@@ -80,14 +77,10 @@ describe("normalizeVpdStage", () => {
 
 describe("classifyVpdAgainstStage — boundaries + deadband", () => {
   it("min boundary is in_target", () => {
-    expect(
-      classifyVpdAgainstStage({ value: 0.8, stage: "veg" }).classification,
-    ).toBe("in_target");
+    expect(classifyVpdAgainstStage({ value: 0.8, stage: "veg" }).classification).toBe("in_target");
   });
   it("max boundary is in_target", () => {
-    expect(
-      classifyVpdAgainstStage({ value: 1.2, stage: "veg" }).classification,
-    ).toBe("in_target");
+    expect(classifyVpdAgainstStage({ value: 1.2, stage: "veg" }).classification).toBe("in_target");
   });
   it("deadband keeps values within +/- VPD_DEADBAND_KPA in_target", () => {
     expect(
@@ -118,22 +111,20 @@ describe("classifyVpdAgainstStage — boundaries + deadband", () => {
     ).toBe("above_target");
   });
   it("seedling lower edge with deadband", () => {
-    expect(
-      classifyVpdAgainstStage({ value: 0.4, stage: "seedling" }).classification,
-    ).toBe("in_target");
-    expect(
-      classifyVpdAgainstStage({ value: 0.3, stage: "seedling" }).classification,
-    ).toBe("below_target");
+    expect(classifyVpdAgainstStage({ value: 0.4, stage: "seedling" }).classification).toBe(
+      "in_target",
+    );
+    expect(classifyVpdAgainstStage({ value: 0.3, stage: "seedling" }).classification).toBe(
+      "below_target",
+    );
   });
   it("late_flower upper edge with deadband", () => {
-    expect(
-      classifyVpdAgainstStage({ value: 1.5, stage: "late_flower" })
-        .classification,
-    ).toBe("in_target");
-    expect(
-      classifyVpdAgainstStage({ value: 1.7, stage: "late_flower" })
-        .classification,
-    ).toBe("above_target");
+    expect(classifyVpdAgainstStage({ value: 1.5, stage: "late_flower" }).classification).toBe(
+      "in_target",
+    );
+    expect(classifyVpdAgainstStage({ value: 1.7, stage: "late_flower" }).classification).toBe(
+      "above_target",
+    );
   });
 });
 
@@ -144,12 +135,12 @@ describe("classifyVpdAgainstStage — special states", () => {
     expect(r.value).toBeNull();
   });
   it("NaN / Infinity -> unavailable", () => {
-    expect(
-      classifyVpdAgainstStage({ value: NaN, stage: "veg" }).classification,
-    ).toBe("unavailable");
-    expect(
-      classifyVpdAgainstStage({ value: Infinity, stage: "veg" }).classification,
-    ).toBe("unavailable");
+    expect(classifyVpdAgainstStage({ value: NaN, stage: "veg" }).classification).toBe(
+      "unavailable",
+    );
+    expect(classifyVpdAgainstStage({ value: Infinity, stage: "veg" }).classification).toBe(
+      "unavailable",
+    );
   });
   it("unknown stage -> stage_unknown even with value", () => {
     const r = classifyVpdAgainstStage({ value: 1.0, stage: null });
@@ -191,33 +182,17 @@ describe("vpdMetricChipStatus", () => {
     expect(vpdMetricChipStatus(r)).toBe("ok");
   });
   it("below/above -> warn", () => {
-    expect(
-      vpdMetricChipStatus(
-        classifyVpdAgainstStage({ value: 0.1, stage: "veg" }),
-      ),
-    ).toBe("warn");
-    expect(
-      vpdMetricChipStatus(
-        classifyVpdAgainstStage({ value: 3.0, stage: "veg" }),
-      ),
-    ).toBe("warn");
+    expect(vpdMetricChipStatus(classifyVpdAgainstStage({ value: 0.1, stage: "veg" }))).toBe("warn");
+    expect(vpdMetricChipStatus(classifyVpdAgainstStage({ value: 3.0, stage: "veg" }))).toBe("warn");
   });
   it("context_only / stage_unknown / unavailable -> warn", () => {
-    expect(
-      vpdMetricChipStatus(
-        classifyVpdAgainstStage({ value: 1.0, stage: "harvest" }),
-      ),
-    ).toBe("warn");
-    expect(
-      vpdMetricChipStatus(
-        classifyVpdAgainstStage({ value: 1.0, stage: null }),
-      ),
-    ).toBe("warn");
-    expect(
-      vpdMetricChipStatus(
-        classifyVpdAgainstStage({ value: null, stage: "veg" }),
-      ),
-    ).toBe("warn");
+    expect(vpdMetricChipStatus(classifyVpdAgainstStage({ value: 1.0, stage: "harvest" }))).toBe(
+      "warn",
+    );
+    expect(vpdMetricChipStatus(classifyVpdAgainstStage({ value: 1.0, stage: null }))).toBe("warn");
+    expect(vpdMetricChipStatus(classifyVpdAgainstStage({ value: null, stage: "veg" }))).toBe(
+      "warn",
+    );
   });
 });
 
@@ -236,9 +211,7 @@ describe("determinism + safety contract", () => {
     expect(HELPER).not.toMatch(/from\s+["']@\/integrations\/supabase/);
     expect(HELPER).not.toMatch(/\bfetch\(/);
     expect(HELPER).not.toMatch(/service_role/);
-    expect(HELPER).not.toMatch(
-      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i,
-    );
+    expect(HELPER).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i);
     expect(HELPER).not.toMatch(/ai[\s_-]?coach|ai_doctor/i);
     expect(HELPER).not.toMatch(/\.from\(["']action_queue["']\)/);
     expect(HELPER).not.toMatch(/\.from\(["']alerts["']\)/);

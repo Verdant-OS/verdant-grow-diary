@@ -37,10 +37,7 @@ const ROOT = resolve(__dirname, "../..");
 // assertions continue to hold no matter where the markup lives.
 const ACTION_QUEUE_SRC = [
   readFileSync(resolve(ROOT, "src/pages/ActionQueue.tsx"), "utf8"),
-  readFileSync(
-    resolve(ROOT, "src/components/ActionQueueLoadingSkeleton.tsx"),
-    "utf8",
-  ),
+  readFileSync(resolve(ROOT, "src/components/ActionQueueLoadingSkeleton.tsx"), "utf8"),
 ].join("\n\n/* --- joined for static scan --- */\n\n");
 const ACTION_DETAIL_SRC = readFileSync(resolve(ROOT, "src/pages/ActionDetail.tsx"), "utf8");
 
@@ -112,7 +109,9 @@ describe("Action Detail loading + missing-evidence states", () => {
   it("missing-evidence help is rendered via the centralized constant", () => {
     expect(ACTION_DETAIL_SRC).toContain("ACTION_EVIDENCE_MISSING_PANEL_HELP");
     expect(ACTION_DETAIL_SRC).toContain('data-testid="action-detail-evidence-missing-help"');
-    expect(ACTION_EVIDENCE_MISSING_PANEL_HELP).toMatch(/diary timeline|sensor history|before approving/i);
+    expect(ACTION_EVIDENCE_MISSING_PANEL_HELP).toMatch(
+      /diary timeline|sensor history|before approving/i,
+    );
     expect(ACTION_EVIDENCE_MISSING_PANEL_TITLE).toMatch(/not available/i);
     for (const re of UNSAFE_PATTERNS) {
       expect(ACTION_EVIDENCE_MISSING_PANEL_TITLE).not.toMatch(re);

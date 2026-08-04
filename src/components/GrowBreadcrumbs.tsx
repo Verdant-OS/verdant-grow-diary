@@ -111,10 +111,7 @@ function Sep() {
  * Build the destination route for switching to a new grow.
  * Action Detail intentionally routes to the scoped Actions list.
  */
-export function buildSwitcherTarget(
-  section: GrowBreadcrumbsSection,
-  newGrowId: string,
-): string {
+export function buildSwitcherTarget(section: GrowBreadcrumbsSection, newGrowId: string): string {
   switch (section) {
     case "logs":
       return logsPath(newGrowId);

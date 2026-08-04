@@ -48,9 +48,7 @@ describe("Timeline.tsx — no raw id/token leakage for learning-loop rows", () =
     // timelineDiaryEntryDetailPresentationRules.test.ts. This pin only
     // guards the WIRING: isLearningLoopEvent must still reach that module's
     // suppress option so loop rows render [] for `extra`.
-    expect(TIMELINE_SRC).toMatch(
-      /suppress:\s*isLearningLoopEvent\s*\|\|\s*isReadinessCheckEvent/,
-    );
+    expect(TIMELINE_SRC).toMatch(/suppress:\s*isLearningLoopEvent\s*\|\|\s*isReadinessCheckEvent/);
   });
 
   it("renders friendly back-links via route helpers, never raw ids as text", () => {

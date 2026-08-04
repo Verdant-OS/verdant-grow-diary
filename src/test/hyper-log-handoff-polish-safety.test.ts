@@ -29,9 +29,9 @@ const FORBIDDEN = [
   "@/integrations/supabase",
   "supabase-js",
   ".rpc(",
-  ".from(\"diary_entries\"",
+  '.from("diary_entries"',
   ".from('diary_entries'",
-  ".from(\"sensor_readings\"",
+  '.from("sensor_readings"',
   "ai-doctor",
   "ActionQueue",
   "action-queue",
@@ -61,9 +61,7 @@ describe("hyperlog handoff polish — static safety", () => {
   });
 
   it("HyperLogModal Environment Check carries the not-live copy", () => {
-    expect(MODAL).toContain(
-      "Environment Check is a Quick Log note, not a live sensor reading.",
-    );
+    expect(MODAL).toContain("Environment Check is a Quick Log note, not a live sensor reading.");
   });
 
   it("quickLogDraftPreviewViewModel exports never-live copy constants", () => {

@@ -12,8 +12,7 @@ import { resolve } from "node:path";
 import { stripSourceComments } from "@/test/utils/stripSourceComments";
 
 const ROOT = resolve(__dirname, "../..");
-const read = (p: string) =>
-  stripSourceComments(readFileSync(resolve(ROOT, p), "utf8"));
+const read = (p: string) => stripSourceComments(readFileSync(resolve(ROOT, p), "utf8"));
 
 const FILES = [
   "src/lib/aiDoctorReviewResultContract.ts",
@@ -59,12 +58,8 @@ describe("ai doctor review result — static safety", () => {
     const vm = read("src/lib/aiDoctorReviewResultViewModel.ts");
     const ui = read("src/components/AiDoctorReviewResultPreview.tsx");
     for (const src of [vm, ui]) {
-      expect(src).not.toMatch(
-        /\b(confirmed|certain|cured|guaranteed)\b/i,
-      );
-      expect(src).not.toMatch(
-        /['"](live|synced|connected|imported)['"]/,
-      );
+      expect(src).not.toMatch(/\b(confirmed|certain|cured|guaranteed)\b/i);
+      expect(src).not.toMatch(/['"](live|synced|connected|imported)['"]/);
     }
   });
 

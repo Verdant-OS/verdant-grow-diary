@@ -2,10 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  normalizeDiaryEntries,
-  type NormalizedDiaryEntry,
-} from "@/lib/diaryEntryRules";
+import { normalizeDiaryEntries, type NormalizedDiaryEntry } from "@/lib/diaryEntryRules";
 import { buildPhotoHistory } from "@/lib/photoHistoryRules";
 import { typedWateringWriteEnabled } from "@/lib/featureFlags";
 import { findMatches } from "./testFileSearchRules";
@@ -15,7 +12,6 @@ import { findMatches } from "./testFileSearchRules";
 // allowlist, or assertion is changed.
 import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
 installScannerGuardrail({ file: __filename });
-
 
 const REPO_ROOT = process.cwd();
 
@@ -168,10 +164,7 @@ describe("PhotoHistoryPanel runtime safety", () => {
   });
 
   it("PhotoHistoryPanel does not read raw diary details JSON or perform writes", () => {
-    const src = readFileSync(
-      resolve(REPO_ROOT, "src/components/PhotoHistoryPanel.tsx"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(REPO_ROOT, "src/components/PhotoHistoryPanel.tsx"), "utf8");
     expect(src).not.toMatch(/\.details\?\./);
     expect(src).not.toMatch(/\["details"\]/);
     expect(src).not.toMatch(/JSON\.parse/);

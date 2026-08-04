@@ -18,7 +18,9 @@ const root = resolve(process.argv[2] ?? "test-results");
 if (!existsSync(root)) {
   console.error(`Input path not found: ${root}`);
   console.error("Pass a path explicitly, e.g.:");
-  console.error("  node scripts/open-demo-proof-playwright-artifacts.mjs .artifacts/demo-proof-playwright-results");
+  console.error(
+    "  node scripts/open-demo-proof-playwright-artifacts.mjs .artifacts/demo-proof-playwright-results",
+  );
   process.exit(2);
 }
 let st;
@@ -63,7 +65,9 @@ const rel = (p) => relative(process.cwd(), p) || p;
 
 console.log(`Demo-Proof Playwright artifact inspection`);
 console.log(`  Root searched: ${rel(root)}`);
-console.log(`  Traces: ${traces.length} | Videos: ${videos.length} | Screenshots: ${screenshots.length}`);
+console.log(
+  `  Traces: ${traces.length} | Videos: ${videos.length} | Screenshots: ${screenshots.length}`,
+);
 
 if (traces.length + videos.length + screenshots.length === 0) {
   console.log("");

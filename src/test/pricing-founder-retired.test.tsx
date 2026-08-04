@@ -79,7 +79,8 @@ describe("Founder Lifetime retired from /pricing", () => {
       const graph = (p["@graph"] ?? p.itemListElement ?? []) as unknown[];
       const list = Array.isArray(graph) ? graph : [];
       return list.filter(
-        (n) => typeof n === "object" && n !== null && (n as { "@type"?: string })["@type"] === "Product",
+        (n) =>
+          typeof n === "object" && n !== null && (n as { "@type"?: string })["@type"] === "Product",
       );
     });
     // Non-triviality: the page must still describe SOME product, or this

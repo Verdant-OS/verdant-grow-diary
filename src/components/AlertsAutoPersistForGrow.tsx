@@ -57,9 +57,7 @@ export default function AlertsAutoPersistForGrow({ growId, stage }: Props) {
   usePersistEnvironmentAlerts({
     growId: safeGrowId,
     snapshot: sensorState.status === "ok" ? sensorState.snapshot : null,
-    quality: evaluateSensorQuality(
-      sensorState.status === "ok" ? sensorState.snapshot : null,
-    ),
+    quality: evaluateSensorQuality(sensorState.status === "ok" ? sensorState.snapshot : null),
     targets: compareSnapshotToTargets(
       sensorState.status === "ok" ? sensorState.snapshot : null,
       targetsState.status === "ok" ? targetsState.targets : null,

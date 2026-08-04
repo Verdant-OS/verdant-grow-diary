@@ -9,10 +9,7 @@ import PageHeader from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { usePiIngestStatus } from "@/hooks/usePiIngestStatus";
-import {
-  PI_INGEST_DISCLOSURE_LINES,
-  PI_INGEST_HEALTH_LABEL,
-} from "@/lib/piIngestStatusRules";
+import { PI_INGEST_DISCLOSURE_LINES, PI_INGEST_HEALTH_LABEL } from "@/lib/piIngestStatusRules";
 
 function healthVariant(
   h: "no_data" | "recently_active" | "stale",
@@ -45,47 +42,32 @@ export default function PiIngestStatus() {
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           {isLoading && <p className="text-muted-foreground">Loading…</p>}
-          {error && (
-            <p className="text-destructive">
-              Could not load ingest status.
-            </p>
-          )}
+          {error && <p className="text-destructive">Could not load ingest status.</p>}
           {data && (
             <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div>
                 <dt className="text-muted-foreground">Latest reading</dt>
                 <dd data-testid="pi-ingest-latest-at">
-                  {data.summary.latestAt
-                    ? data.summary.latestAt.toLocaleString()
-                    : "—"}
+                  {data.summary.latestAt ? data.summary.latestAt.toLocaleString() : "—"}
                 </dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">Latest tent</dt>
                 <dd data-testid="pi-ingest-latest-tent">
-                  {data.latestTentName ??
-                    data.summary.latestTentId ??
-                    "—"}
+                  {data.latestTentName ?? data.summary.latestTentId ?? "—"}
                 </dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">Readings (last 24h)</dt>
-                <dd data-testid="pi-ingest-count-24h">
-                  {data.summary.count24h}
-                </dd>
+                <dd data-testid="pi-ingest-count-24h">{data.summary.count24h}</dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">Readings (last 7d)</dt>
-                <dd data-testid="pi-ingest-count-7d">
-                  {data.summary.count7d}
-                </dd>
+                <dd data-testid="pi-ingest-count-7d">{data.summary.count7d}</dd>
               </div>
               <div className="sm:col-span-2">
                 <dt className="text-muted-foreground">Latest metrics</dt>
-                <dd
-                  data-testid="pi-ingest-latest-metrics"
-                  className="flex flex-wrap gap-1 pt-1"
-                >
+                <dd data-testid="pi-ingest-latest-metrics" className="flex flex-wrap gap-1 pt-1">
                   {data.summary.latestMetrics.length === 0 ? (
                     <span>—</span>
                   ) : (

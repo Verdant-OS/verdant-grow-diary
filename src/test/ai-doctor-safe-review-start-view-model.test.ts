@@ -14,9 +14,7 @@ import type { AiDoctorContextResult } from "@/lib/aiDoctorContextRules";
 const BANNED =
   /\b(diagnosis|diagnosed|confirmed|certain|cured|guaranteed|live|synced|connected|imported)\b/i;
 
-const baseResult = (
-  o: Partial<AiDoctorContextResult> = {},
-): AiDoctorContextResult => ({
+const baseResult = (o: Partial<AiDoctorContextResult> = {}): AiDoctorContextResult => ({
   readiness: "strong",
   missing: [],
   evidence: [],
@@ -53,13 +51,9 @@ describe("buildAiDoctorSafeReviewStart", () => {
     );
     expect(v.allowStart).toBe(true);
     expect(v.variant).toBe("partial");
-    expect(v.preparation?.readinessNotice).toBe(
-      AI_DOCTOR_SAFE_REVIEW_PARTIAL_NOTICE,
-    );
+    expect(v.preparation?.readinessNotice).toBe(AI_DOCTOR_SAFE_REVIEW_PARTIAL_NOTICE);
     expect(v.preparation?.title).toBe(AI_DOCTOR_SAFE_REVIEW_TITLE);
-    expect(v.preparation?.noRequestNotice).toBe(
-      AI_DOCTOR_SAFE_REVIEW_NO_REQUEST_NOTICE,
-    );
+    expect(v.preparation?.noRequestNotice).toBe(AI_DOCTOR_SAFE_REVIEW_NO_REQUEST_NOTICE);
   });
 
   it("allows strong review with strong-context copy", () => {
@@ -71,9 +65,7 @@ describe("buildAiDoctorSafeReviewStart", () => {
     );
     expect(v.allowStart).toBe(true);
     expect(v.variant).toBe("strong");
-    expect(v.preparation?.readinessNotice).toBe(
-      AI_DOCTOR_SAFE_REVIEW_STRONG_NOTICE,
-    );
+    expect(v.preparation?.readinessNotice).toBe(AI_DOCTOR_SAFE_REVIEW_STRONG_NOTICE);
   });
 
   it("includes evidence and missing information labels", () => {

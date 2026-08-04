@@ -114,21 +114,14 @@ export interface TimelineAiDoctorEvidenceItem {
   kind: "ai_doctor_sensor_evidence_audit";
   key: string;
   occurredAt: string;
-  status:
-    | "usable"
-    | "stale"
-    | "invalid"
-    | "needs_review"
-    | "no_data";
+  status: "usable" | "stale" | "invalid" | "needs_review" | "no_data";
   reasonCode: string | null;
   countsAsHealthyEvidence: boolean;
   mode: "healthy" | "cautionary" | "unsafe" | "missing";
 }
 
 export type TimelineMemoryItem =
-  | TimelineDiaryItem
-  | TimelineManualSnapshotItem
-  | TimelineAiDoctorEvidenceItem;
+  TimelineDiaryItem | TimelineManualSnapshotItem | TimelineAiDoctorEvidenceItem;
 
 /**
  * Map an item to the buckets it matches. An item can match multiple

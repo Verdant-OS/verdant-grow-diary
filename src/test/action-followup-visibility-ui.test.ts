@@ -78,7 +78,9 @@ describe("ActionDetail — view follow-up link", () => {
     // Assert it is NOT inside any rejected/cancelled/pending branch.
     expect(ACTION_DETAIL).not.toMatch(/row\.status === "rejected"[\s\S]{0,4000}followup-link/);
     expect(ACTION_DETAIL).not.toMatch(/row\.status === "cancelled"[\s\S]{0,4000}followup-link/);
-    expect(ACTION_DETAIL).not.toMatch(/row\.status === "pending_approval"[\s\S]{0,4000}followup-link/);
+    expect(ACTION_DETAIL).not.toMatch(
+      /row\.status === "pending_approval"[\s\S]{0,4000}followup-link/,
+    );
   });
 });
 

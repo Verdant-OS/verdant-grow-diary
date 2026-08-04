@@ -11,8 +11,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const MIGRATION =
-  "supabase/migrations/20260720141000_genetics_traceability_accessions.sql";
+const MIGRATION = "supabase/migrations/20260720141000_genetics_traceability_accessions.sql";
 
 function read(p: string): string {
   return readFileSync(resolve(process.cwd(), p), "utf8");
@@ -24,9 +23,7 @@ describe("genetics accessions migration safety", () => {
   it("creates both tables and enables row level security on each", () => {
     expect(sql).toMatch(/CREATE TABLE public\.genetics_accessions/);
     expect(sql).toMatch(/CREATE TABLE public\.genetics_mutation_idempotency/);
-    expect(sql).toMatch(
-      /ALTER TABLE public\.genetics_accessions ENABLE ROW LEVEL SECURITY/,
-    );
+    expect(sql).toMatch(/ALTER TABLE public\.genetics_accessions ENABLE ROW LEVEL SECURITY/);
     expect(sql).toMatch(
       /ALTER TABLE public\.genetics_mutation_idempotency ENABLE ROW LEVEL SECURITY/,
     );
@@ -34,9 +31,7 @@ describe("genetics accessions migration safety", () => {
 
   it("grants authenticated SELECT only on both tables (writes go through RPCs)", () => {
     for (const t of ["genetics_accessions", "genetics_mutation_idempotency"]) {
-      const grant = sql.match(
-        new RegExp(`GRANT ([^;]*) ON public\\.${t} TO authenticated`),
-      );
+      const grant = sql.match(new RegExp(`GRANT ([^;]*) ON public\\.${t} TO authenticated`));
       expect(grant, `${t} authenticated grant present`).toBeTruthy();
       const cols = grant![1].toUpperCase();
       expect(cols).toMatch(/SELECT/);
@@ -66,12 +61,8 @@ describe("genetics accessions migration safety", () => {
 
   it("grants nothing to anon or public", () => {
     expect(sql).not.toMatch(/GRANT[^;]*ON public\.genetics_accessions TO anon/i);
-    expect(sql).not.toMatch(
-      /GRANT[^;]*ON public\.genetics_accessions TO public/i,
-    );
-    expect(sql).not.toMatch(
-      /GRANT[^;]*ON public\.genetics_mutation_idempotency TO anon/i,
-    );
+    expect(sql).not.toMatch(/GRANT[^;]*ON public\.genetics_accessions TO public/i);
+    expect(sql).not.toMatch(/GRANT[^;]*ON public\.genetics_mutation_idempotency TO anon/i);
   });
 
   it("never defaults provenance dates to now() (unknown stays explicit NULL)", () => {
@@ -102,9 +93,7 @@ describe("genetics accessions migration safety", () => {
   it("distinguishes an idempotency replay from a domain unique violation", () => {
     // Only the named idempotency PK short-circuits to a replay; anything else re-raises.
     expect(sql).toMatch(/GET STACKED DIAGNOSTICS[\s\S]*?CONSTRAINT_NAME/);
-    expect(sql).toMatch(
-      /v_constraint = 'genetics_mutation_idempotency_pkey'/,
-    );
+    expect(sql).toMatch(/v_constraint = 'genetics_mutation_idempotency_pkey'/);
     expect(sql).toMatch(/'idempotency_key_conflict'/);
     // A bare re-raise guarantees a domain conflict is never laundered as reused.
     expect(sql).toMatch(/\n\s*RAISE;/);

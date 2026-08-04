@@ -48,7 +48,10 @@ export function PlantMemoryEpisodeCard({ episode, onDecisionSaved }: PlantMemory
           <CardTitle className="text-base">
             {episode.action.suggestedChange ?? "Completed action"}
           </CardTitle>
-          <Badge variant={badgeVariant} aria-label={`Episode status: ${EPISODE_STATE_LABELS[episode.state]}`}>
+          <Badge
+            variant={badgeVariant}
+            aria-label={`Episode status: ${EPISODE_STATE_LABELS[episode.state]}`}
+          >
             {EPISODE_STATE_LABELS[episode.state]}
           </Badge>
         </div>
@@ -94,8 +97,8 @@ export function PlantMemoryEpisodeCard({ episode, onDecisionSaved }: PlantMemory
               ) : null}
             </dl>
             <p className="mt-2 text-xs text-muted-foreground">
-              Manually completed by the grower. Verdant suggests; the grower approves and
-              completes every action.
+              Manually completed by the grower. Verdant suggests; the grower approves and completes
+              every action.
             </p>
           </CollapsibleContent>
         </Collapsible>
@@ -131,7 +134,10 @@ export function PlantMemoryEpisodeCard({ episode, onDecisionSaved }: PlantMemory
                 ) : null}
                 {episode.outcome.occurredAt ? (
                   <p className="text-xs text-muted-foreground">
-                    Recorded <time dateTime={episode.outcome.occurredAt}>{formatWhen(episode.outcome.occurredAt)}</time>
+                    Recorded{" "}
+                    <time dateTime={episode.outcome.occurredAt}>
+                      {formatWhen(episode.outcome.occurredAt)}
+                    </time>
                   </p>
                 ) : null}
               </>

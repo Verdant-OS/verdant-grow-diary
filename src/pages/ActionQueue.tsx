@@ -153,13 +153,7 @@ type Status = ActionStatus;
 type EventType = ActionEventType;
 
 type StatusFilter =
-  | "all"
-  | "pending"
-  | "simulated"
-  | "approved"
-  | "rejected"
-  | "completed"
-  | "cancelled";
+  "all" | "pending" | "simulated" | "approved" | "rejected" | "completed" | "cancelled";
 type RiskFilter = "all" | "low" | "medium" | "high" | "critical";
 type SourceFilter =
   | "all"

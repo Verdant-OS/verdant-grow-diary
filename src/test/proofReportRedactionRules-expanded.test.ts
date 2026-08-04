@@ -1,15 +1,7 @@
 import { describe, it, expect } from "vitest";
-import {
-  sanitizeProofReportMarkdown,
-  REDACTED_PLACEHOLDER,
-} from "@/lib/proofReportRedactionRules";
+import { sanitizeProofReportMarkdown, REDACTED_PLACEHOLDER } from "@/lib/proofReportRedactionRules";
 
-const FORBIDDEN_LITERALS = [
-  "supersecret",
-  "abc123token",
-  "myp4ssword",
-  "shouldNotLeak",
-];
+const FORBIDDEN_LITERALS = ["supersecret", "abc123token", "myp4ssword", "shouldNotLeak"];
 
 function expectRedacted(out: string) {
   for (const lit of FORBIDDEN_LITERALS) {
@@ -32,16 +24,14 @@ describe("proofReportRedactionRules — expanded coverage", () => {
   });
 
   it("redacts secrets inside inline backticks", () => {
-    const out = sanitizeProofReportMarkdown(
-      "set `service_role=supersecret` then continue",
-    );
+    const out = sanitizeProofReportMarkdown("set `service_role=supersecret` then continue");
     expectRedacted(out);
     expect(out).not.toMatch(/service_role/);
   });
 
   it("redacts shell export and $env: assignment variants", () => {
     const out = sanitizeProofReportMarkdown(
-      "export api_key=abc123token\n$env:password=\"myp4ssword\"",
+      'export api_key=abc123token\n$env:password="myp4ssword"',
     );
     expectRedacted(out);
   });
@@ -62,9 +52,7 @@ describe("proofReportRedactionRules — expanded coverage", () => {
   });
 
   it("redacts Authorization header pattern", () => {
-    const out = sanitizeProofReportMarkdown(
-      "Authorization: Bearer abc123token",
-    );
+    const out = sanitizeProofReportMarkdown("Authorization: Bearer abc123token");
     expectRedacted(out);
     expect(out).not.toMatch(/Bearer\s+[A-Za-z0-9]/);
   });

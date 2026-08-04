@@ -10,7 +10,9 @@ export const ANALYTICS_CONSENT_STORAGE_KEY = "verdant.analytics-consent.v1";
 export type AnalyticsConsentDecision = "granted" | "denied" | "unset";
 
 /** Narrow an untrusted stored string to a known decision. */
-export function parseAnalyticsConsentValue(raw: string | null | undefined): AnalyticsConsentDecision {
+export function parseAnalyticsConsentValue(
+  raw: string | null | undefined,
+): AnalyticsConsentDecision {
   if (raw === "granted") return "granted";
   if (raw === "denied") return "denied";
   return "unset";

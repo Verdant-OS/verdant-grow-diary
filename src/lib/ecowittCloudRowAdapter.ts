@@ -19,14 +19,9 @@
  *    downstream Verdant freshness/suspicion layer is not lied to.
  */
 
-import type {
-  EcowittCloudReadingRow,
-} from "@/lib/ecowittPayloadRules";
+import type { EcowittCloudReadingRow } from "@/lib/ecowittPayloadRules";
 
-export type EcowittCloudAdapterMetric =
-  | "temperature_c"
-  | "humidity_pct"
-  | "soil_moisture_pct";
+export type EcowittCloudAdapterMetric = "temperature_c" | "humidity_pct" | "soil_moisture_pct";
 
 export interface EcowittCloudAdapterRawPayload {
   provider: "ecowitt";
@@ -77,9 +72,12 @@ function macSuffix(mac: string): string {
   return clean.length >= 4 ? clean.slice(-4) : clean;
 }
 
-function pickMetric(
-  reading: EcowittCloudReadingRow["reading"],
-): { metric: EcowittCloudAdapterMetric; value: number; mappingType: "air" | "soil"; rawKey: (ch: number) => string } | null {
+function pickMetric(reading: EcowittCloudReadingRow["reading"]): {
+  metric: EcowittCloudAdapterMetric;
+  value: number;
+  mappingType: "air" | "soil";
+  rawKey: (ch: number) => string;
+} | null {
   if (reading.temperature_c !== null && reading.temperature_c !== undefined) {
     return {
       metric: "temperature_c",
@@ -133,11 +131,7 @@ export function adaptEcowittCloudRowsToRoutedShape(
       continue;
     }
     const quality: EcowittCloudAdapterRow["quality"] =
-      status === "invalid"
-        ? "invalid"
-        : row.suspicion_codes.length > 0
-          ? "suspect"
-          : "ok";
+      status === "invalid" ? "invalid" : row.suspicion_codes.length > 0 ? "suspect" : "ok";
 
     out.push({
       user_id: input.userId,

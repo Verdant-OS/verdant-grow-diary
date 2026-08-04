@@ -44,7 +44,6 @@ vi.mock("@/hooks/usePaddleCancelNotice", () => ({
   usePaddleCancelNotice: () => cancelNoticeMock,
 }));
 
-
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "u1", email: "u@example.com" }, signOut: vi.fn() }),
 }));
@@ -227,4 +226,3 @@ describe("Settings — Subscription tile", () => {
     expect(document.body.textContent).toMatch(/one-time purchase/i);
   });
 });
-

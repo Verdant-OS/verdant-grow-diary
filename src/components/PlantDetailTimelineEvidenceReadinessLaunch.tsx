@@ -36,10 +36,7 @@ import {
 } from "@/lib/plantQuickLogPrefillRules";
 import { sensorsPath } from "@/lib/routes";
 import type { PlantRowLike } from "@/lib/aiDoctorContextCompiler";
-import {
-  QUICK_LOG_V2_OPEN_EVENT,
-  buildQuickLogV2OpenIntent,
-} from "@/lib/quickLogV2OpenIntent";
+import { QUICK_LOG_V2_OPEN_EVENT, buildQuickLogV2OpenIntent } from "@/lib/quickLogV2OpenIntent";
 
 export interface PlantDetailTimelineEvidenceReadinessLaunchProps {
   plantId: string;

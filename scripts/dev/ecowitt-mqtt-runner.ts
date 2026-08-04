@@ -718,7 +718,7 @@ function printHaDryRunReport(report: HaDryRunReport): void {
   if (report.outcome === "reading" || report.outcome === "rejected") {
     printReport(buildHaAttemptReport(report));
   }
-   
+
   console.log("[ecowitt-mqtt-runner] ha dry-run detail", {
     mode: report.mode,
     dry_run: report.dry_run,
@@ -1008,14 +1008,13 @@ async function writeRedactedReport(
     await mkdir(path.dirname(out), { recursive: true });
     const payload = buildRedactedReportJson(report);
     await writeFile(out, JSON.stringify(payload, null, 2), "utf8");
-     
+
     console.log(
       "[ecowitt-mqtt-runner] redacted report written to",
       out,
       "— paste into /operator/ecowitt-bridge-status",
     );
   } catch (e) {
-     
     console.warn("[ecowitt-mqtt-runner] could not write redacted report:", e);
   }
 }
@@ -1042,7 +1041,7 @@ export function buildRedactedReportJson(
 
 function printReport(report: ReturnType<typeof buildIngestAttemptReport>): void {
   const e = report.evidence;
-   
+
   console.log("[ecowitt-mqtt-runner] consumed MQTT message", {
     title: report.title,
     status: report.status,
@@ -1079,7 +1078,6 @@ async function connectMqttClient(env: RuntimeEnv): Promise<any> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mqtt = await (Function("m", "return import(m)") as any)("mqtt");
   } catch {
-     
     console.error(
       "[ecowitt-mqtt-runner] mqtt package not installed. Run `bun add mqtt` or use --dry-run --sample.",
     );
@@ -1106,7 +1104,6 @@ async function runHaDryRunLoop(
   flags: CliFlags,
 ): Promise<void> {
   if (flags.sample || flags.invalid) {
-     
     console.error(
       "[ecowitt-mqtt-runner] --sample/--invalid build raw EcoWitt payloads and are ecowitt_raw-only. Refusing to start (fail closed).",
     );
@@ -1114,7 +1111,6 @@ async function runHaDryRunLoop(
     return;
   }
   if (flags.writeReport) {
-     
     console.log(
       "[ecowitt-mqtt-runner] --write-report is ecowitt_raw-only; HA dry-run evidence is printed to stdout instead.",
     );
@@ -1123,7 +1119,6 @@ async function runHaDryRunLoop(
   const topic = haSubscribeTopic(config, env);
   const client = await connectMqttClient(env);
   client.on("connect", () => {
-     
     console.log("[ecowitt-mqtt-runner] subscribed (ha dry-run)", topic);
     client.subscribe(topic);
   });
@@ -1165,7 +1160,6 @@ async function main(): Promise<void> {
       assertSingleTentHaMapping(modeConfig.mapping, env.tentId);
     }
   } catch (e) {
-     
     console.error(
       "[ecowitt-mqtt-runner] configuration error — refusing to start (fail closed):",
       e instanceof Error ? e.message : String(e),
@@ -1175,7 +1169,6 @@ async function main(): Promise<void> {
   }
 
   if (modeConfig.upstreamMode !== "ecowitt_raw") {
-     
     console.log("[ecowitt-mqtt-runner] startup", {
       upstream_mode: modeConfig.upstreamMode,
       mapping_path: modeConfig.mappingPath,
@@ -1202,7 +1195,6 @@ async function main(): Promise<void> {
     }
   }
 
-   
   console.log("[ecowitt-mqtt-runner] startup", {
     upstream_mode: modeConfig.upstreamMode,
     dryRun: flags.dryRun,
@@ -1231,7 +1223,6 @@ async function main(): Promise<void> {
   const client = await connectMqttClient(env);
 
   client.on("connect", () => {
-     
     console.log("[ecowitt-mqtt-runner] subscribed", env.mqttTopic);
     client.subscribe(env.mqttTopic);
   });

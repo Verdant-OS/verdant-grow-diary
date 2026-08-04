@@ -11,10 +11,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import DiaryCalendarSection from "@/components/DiaryCalendarSection";
-import {
-  buildDiaryCalendarViewModel,
-  DIARY_CALENDAR_FILTERS,
-} from "@/lib/diaryCalendarViewModel";
+import { buildDiaryCalendarViewModel, DIARY_CALENDAR_FILTERS } from "@/lib/diaryCalendarViewModel";
 import {
   clearTemperatureUnitPreference,
   saveTemperatureUnitPreference,
@@ -51,9 +48,7 @@ describe("Diary Calendar — Environment Check", () => {
     const events = screen.getAllByTestId("diary-calendar-event");
     expect(events).toHaveLength(1);
     expect(within(events[0]).getAllByText(/Environment Check/i).length).toBeGreaterThan(0);
-    expect(
-      screen.getByTestId("diary-calendar-event-subtitle"),
-    ).toHaveTextContent(
+    expect(screen.getByTestId("diary-calendar-event-subtitle")).toHaveTextContent(
       /Quick Log environment check — not live sensor telemetry/i,
     );
     expect(screen.getByText(/24\.6°C/)).toBeInTheDocument();
@@ -83,13 +78,10 @@ describe("Diary Calendar — Environment Check", () => {
     const events = screen.getAllByTestId("diary-calendar-event");
     expect(events).toHaveLength(1);
     expect(within(events[0]).getAllByText(/Environment Check/i).length).toBeGreaterThan(0);
-    expect(
-      screen.getByTestId("diary-calendar-event-subtitle"),
-    ).toHaveTextContent(
+    expect(screen.getByTestId("diary-calendar-event-subtitle")).toHaveTextContent(
       /not live sensor telemetry/i,
     );
   });
-
 
   it("preserves watering/feeding/diagnosis rendering alongside environment", () => {
     render(
@@ -129,19 +121,10 @@ describe("Diary Calendar — Environment Check", () => {
   });
 });
 
-
 describe("Static safety: diaryCalendarViewModel + envCheckCalendarViewModel", () => {
   const root = path.resolve(__dirname, "..");
-  const forbidden = [
-    "@/integrations/supabase",
-    "supabase-js",
-    "fetch(",
-    "service_role",
-  ];
-  const files = [
-    "lib/diaryCalendarViewModel.ts",
-    "lib/environmentCheckCalendarViewModel.ts",
-  ];
+  const forbidden = ["@/integrations/supabase", "supabase-js", "fetch(", "service_role"];
+  const files = ["lib/diaryCalendarViewModel.ts", "lib/environmentCheckCalendarViewModel.ts"];
   for (const rel of files) {
     it(`${rel} has no Supabase/client/write imports`, () => {
       const src = readFileSync(path.join(root, rel), "utf8");

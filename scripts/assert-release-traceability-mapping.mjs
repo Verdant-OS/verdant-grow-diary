@@ -23,11 +23,7 @@ const COMMERCIAL_SPEC = join(
   "docs",
   "commercial-release-review-traceability-workbook-spec.md",
 );
-const SEED_SPEC = join(
-  ROOT,
-  "docs",
-  "seed-production-tracking-workbook-spec.md",
-);
+const SEED_SPEC = join(ROOT, "docs", "seed-production-tracking-workbook-spec.md");
 
 export const REQUIRED_MAPPINGS = [
   {
@@ -42,7 +38,8 @@ export const REQUIRED_MAPPINGS = [
   },
   {
     label: "Commercial Release Review → Commercial Release Checklist",
-    fromRe: /commercial_release_review_traceability.*\bi linked commercial release checklist row\b/i,
+    fromRe:
+      /commercial_release_review_traceability.*\bi linked commercial release checklist row\b/i,
     toRe: /commercial_release_checklist.*row id.*checklist id/i,
   },
   {
@@ -52,7 +49,8 @@ export const REQUIRED_MAPPINGS = [
   },
   {
     label: "Commercial Release Review → F1 / Backcross / Stabilization",
-    fromRe: /commercial_release_review_traceability.*\bk linked f1 \/ backcross \/ stabilization row\(s\)/i,
+    fromRe:
+      /commercial_release_review_traceability.*\bk linked f1 \/ backcross \/ stabilization row\(s\)/i,
     toRe: /(f1_population_tracker.*project or row id|backcross_line_development.*backcross line id|f2_stabilization_tracker.*line id)/i,
   },
   {
@@ -77,7 +75,8 @@ export const REQUIRED_RULES = [
     re: /(exactly one|single|one)[\s*`]+seed lot id|reference[s]?[\s*]+exactly one[\s*`]+seed lot id/i,
   },
   {
-    label: "Multiple review rows per Seed Lot allowed only with unique Release Review ID + Review Date",
+    label:
+      "Multiple review rows per Seed Lot allowed only with unique Release Review ID + Review Date",
     re: /unique[^.]*release review id[^.]*review date|release review id[^.]*review date[^.]*unique/i,
   },
   {
@@ -112,9 +111,7 @@ export function checkMappings(commercialText) {
     // The mapping table rows are markdown rows; collapse the file to
     // single-line matchable chunks (pipe-delimited rows) and check
     // each row contains both `fromRe` and `toRe`.
-    const rows = commercialText
-      .split(/\r?\n/)
-      .filter((l) => l.trim().startsWith("|"));
+    const rows = commercialText.split(/\r?\n/).filter((l) => l.trim().startsWith("|"));
     const hit = rows.some((r) => m.fromRe.test(r) && m.toRe.test(r));
     if (!hit) missing.push(m.label);
   }
@@ -148,15 +145,11 @@ function main() {
   let failures = 0;
   for (const m of missingMappings) {
     failures++;
-    console.error(
-      `${relative(ROOT, COMMERCIAL_SPEC)}: missing required mapping — ${m}`,
-    );
+    console.error(`${relative(ROOT, COMMERCIAL_SPEC)}: missing required mapping — ${m}`);
   }
   for (const m of missingRules) {
     failures++;
-    console.error(
-      `release-traceability-mapping: missing required rule — ${m}`,
-    );
+    console.error(`release-traceability-mapping: missing required rule — ${m}`);
   }
 
   if (failures) {

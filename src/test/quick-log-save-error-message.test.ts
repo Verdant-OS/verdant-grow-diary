@@ -38,11 +38,7 @@ describe("quickLogReasonToOperatorMessage — canonical sensor bands", () => {
   });
 
   it("never echoes the raw reason code back to the operator", () => {
-    for (const code of [
-      "temperature_out_of_range",
-      "humidity_out_of_range",
-      "vpd_out_of_range",
-    ]) {
+    for (const code of ["temperature_out_of_range", "humidity_out_of_range", "vpd_out_of_range"]) {
       expect(quickLogReasonToOperatorMessage(code)).not.toContain(code);
     }
   });

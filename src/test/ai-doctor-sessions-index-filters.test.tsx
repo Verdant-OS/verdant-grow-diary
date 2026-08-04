@@ -92,7 +92,12 @@ describe("aiDoctorSessionsIndexFilters — pure helpers", () => {
 
   it("formatActiveFilterLabels returns visible labels", () => {
     expect(
-      formatActiveFilterLabels({ ...DEFAULT_FILTERS, risk: "high", hasActions: "yes", dateRange: "7d" }),
+      formatActiveFilterLabels({
+        ...DEFAULT_FILTERS,
+        risk: "high",
+        hasActions: "yes",
+        dateRange: "7d",
+      }),
     ).toEqual(["Risk: High", "Has suggested actions", "Last 7 days"]);
     expect(
       formatActiveFilterLabels({ ...DEFAULT_FILTERS, hasActions: "no", dateRange: "30d" }),
@@ -288,9 +293,7 @@ describe("AiDoctorSessionsIndex — filter UI", () => {
     fireEvent.change(screen.getByTestId("ai-doctor-sessions-index-filter-risk"), {
       target: { value: "high" },
     });
-    expect(
-      await screen.findByTestId("ai-doctor-sessions-index-empty-filtered"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-sessions-index-empty-filtered")).toBeTruthy();
     expect(screen.queryByTestId("ai-doctor-sessions-index-empty")).toBeNull();
   });
 });

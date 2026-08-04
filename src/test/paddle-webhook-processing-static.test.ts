@@ -60,11 +60,15 @@ describe("paddle webhook processing recorder", () => {
   it("requires explicit subscription IDs for transaction.completed recurring events", () => {
     expect(WEBHOOK_SRC).toContain("function subscriptionIdFromData");
     expect(WEBHOOK_SRC).toContain('eventType.startsWith("subscription.")');
-    expect(WEBHOOK_SRC).not.toContain('firstStringPath(data, [["subscription_id"], ["subscription", "id"], ["id"]])');
+    expect(WEBHOOK_SRC).not.toContain(
+      'firstStringPath(data, [["subscription_id"], ["subscription", "id"], ["id"]])',
+    );
 
     expect(MAPPER_SRC).toContain("function subscriptionIdFromData");
     expect(MAPPER_SRC).toContain('eventType.startsWith("subscription.")');
-    expect(MAPPER_SRC).not.toContain('firstStringPath(data, [["subscription_id"], ["subscription", "id"], ["id"]])');
+    expect(MAPPER_SRC).not.toContain(
+      'firstStringPath(data, [["subscription_id"], ["subscription", "id"], ["id"]])',
+    );
   });
 
   it("does not directly write entitlement source-of-truth rows", () => {

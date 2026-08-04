@@ -29,7 +29,6 @@ import {
   type PromptTokenEstimator,
 } from "./promptTokenEstimator.ts";
 
-
 /** Optional provider-reported token usage shape (already-available only). */
 export interface ProviderReportedTokenUsage {
   readonly promptTokens: number;
@@ -75,7 +74,6 @@ export interface BuildAiDoctorPromptMeasurementInput {
   /** Optional injected estimator. When omitted, the active singleton is used; if neither exists, tokens stay null. */
   readonly tokenEstimator?: PromptTokenEstimator | null;
 }
-
 
 /** Metadata kept beside the strict measurement (not part of llm_prompt schema). */
 export interface AiDoctorPromptMeasurementMetadata {
@@ -174,7 +172,6 @@ export function buildAiDoctorPromptMeasurement(
     ...(input.errorCode ? { errorCode: input.errorCode } : {}),
     recordedAt: input.recordedAt,
   });
-
 
   const metadata: AiDoctorPromptMeasurementMetadata = {
     charCount,

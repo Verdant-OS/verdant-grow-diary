@@ -10,10 +10,7 @@ import { summarizeLeadStatuses } from "@/lib/leadStatusSummaryRules";
 import { evaluatePipelineHealth } from "@/lib/leadPipelineHealthRules";
 import { isMeaningfulString as isMeaningful } from "@/lib/leadFieldUtils";
 
-export type LeadCommandCenterGuidanceState =
-  | "empty"
-  | "needs_attention"
-  | "healthy";
+export type LeadCommandCenterGuidanceState = "empty" | "needs_attention" | "healthy";
 
 export interface LeadCommandCenterGuidanceItem {
   id: string;
@@ -37,7 +34,6 @@ const STATE_WEIGHT: Record<LeadCommandCenterGuidanceState, number> = {
   empty: 2,
   healthy: 1,
 };
-
 
 function safePct(num: number, den: number): number {
   if (!den || den <= 0) return 0;
@@ -64,8 +60,7 @@ export function evaluateCommandCenterGuidance(
   if (list.length === 0) {
     const narrow =
       context.hasActiveFilters === true ||
-      (typeof context.totalUnfiltered === "number" &&
-        context.totalUnfiltered > 0);
+      (typeof context.totalUnfiltered === "number" && context.totalUnfiltered > 0);
     items.push({
       id: "no_leads_in_view",
       state: "empty",
@@ -87,8 +82,7 @@ export function evaluateCommandCenterGuidance(
         id: "filters_too_narrow",
         state: "empty",
         title: "Filters may be too narrow",
-        message:
-          "Try removing one or more filters to see more results.",
+        message: "Try removing one or more filters to see more results.",
         suggestedAction: "Reset filters to the default view.",
         reasons: ["Filtered view returned zero leads."],
         warnings: [],
@@ -219,9 +213,7 @@ export function evaluateCommandCenterGuidance(
   return { state: "needs_attention", items: sortItems(items) };
 }
 
-function sortItems(
-  items: LeadCommandCenterGuidanceItem[],
-): LeadCommandCenterGuidanceItem[] {
+function sortItems(items: LeadCommandCenterGuidanceItem[]): LeadCommandCenterGuidanceItem[] {
   return [...items].sort((a, b) => {
     const sa = STATE_WEIGHT[a.state];
     const sb = STATE_WEIGHT[b.state];

@@ -68,9 +68,7 @@ export function buildOperatorRootZoneRecordsFromRows(
   rows: readonly RootZoneGrowEventRowLike[] | null | undefined,
   cap: number = ROOT_ZONE_OBSERVATION_CAP,
   manualObservationDiaryRows:
-    | readonly RootZoneManualObservationDiaryRowLike[]
-    | null
-    | undefined = [],
+    readonly RootZoneManualObservationDiaryRowLike[] | null | undefined = [],
 ): OperatorRootZoneRecordV1[] {
   const boundedCap = Number.isFinite(cap)
     ? Math.max(0, Math.min(ROOT_ZONE_OBSERVATION_CAP, Math.floor(cap)))

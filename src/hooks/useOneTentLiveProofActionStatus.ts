@@ -84,8 +84,7 @@ export function useOneTentLiveProofActionStatus(
       const completed = matched.find((m) => m.status === "completed") ?? null;
       const linkedActionExists = matched.length > 0;
       const linkedActionCompleted = linkedActionExists ? !!completed : null;
-      const linkedActionId =
-        completed?.id ?? (matched.length === 1 ? matched[0].id : null);
+      const linkedActionId = completed?.id ?? (matched.length === 1 ? matched[0].id : null);
       setState({
         linkedActionExists,
         linkedActionCompleted,

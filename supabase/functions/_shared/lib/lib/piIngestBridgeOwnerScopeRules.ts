@@ -20,14 +20,10 @@
 import type { BridgeCredentialMetadata } from "./piIngestBridgeCredentialMetadataResolver.ts";
 
 export type BridgeOwnerScopeRejectionReason =
-  | "unknown_bridge"
-  | "inactive"
-  | "missing_tent_owner"
-  | "owner_mismatch";
+  "unknown_bridge" | "inactive" | "missing_tent_owner" | "owner_mismatch";
 
 export type BridgeOwnerScopeResult =
-  | { ok: true }
-  | { ok: false; reason: BridgeOwnerScopeRejectionReason };
+  { ok: true } | { ok: false; reason: BridgeOwnerScopeRejectionReason };
 
 export type EvaluateBridgeOwnerScopeInput = {
   credential: BridgeCredentialMetadata | null | undefined;
@@ -41,8 +37,7 @@ function isNonEmptyString(v: unknown): v is string {
 export function evaluateBridgeOwnerScope(
   input: EvaluateBridgeOwnerScopeInput,
 ): BridgeOwnerScopeResult {
-  const { credential, tentOwnerUserId } =
-    input ?? ({} as EvaluateBridgeOwnerScopeInput);
+  const { credential, tentOwnerUserId } = input ?? ({} as EvaluateBridgeOwnerScopeInput);
 
   if (!credential || !isNonEmptyString(credential.userId)) {
     return { ok: false, reason: "unknown_bridge" };

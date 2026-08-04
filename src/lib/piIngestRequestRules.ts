@@ -26,21 +26,12 @@ import type { ExternalSensorIngestPayload } from "./sensorIngestNormalizationRul
 // ----------------------------- Types -----------------------------
 
 export type PiIngestAllowedMetric =
-  | "temperature_c"
-  | "humidity_pct"
-  | "vpd_kpa"
-  | "co2_ppm"
-  | "soil_moisture_pct";
+  "temperature_c" | "humidity_pct" | "vpd_kpa" | "co2_ppm" | "soil_moisture_pct";
 
 export type PiIngestAllowedSource = "pi_bridge";
 
 /** Canonical unit string accepted by `sensorIngestNormalizationRules`. */
-export type CanonicalIngestUnit =
-  | "temperature_c"
-  | "temperature_f"
-  | "percent"
-  | "kPa"
-  | "ppm";
+export type CanonicalIngestUnit = "temperature_c" | "temperature_f" | "percent" | "kPa" | "ppm";
 
 export const PI_INGEST_ALLOWED_METRICS: readonly PiIngestAllowedMetric[] = [
   "temperature_c",
@@ -50,9 +41,7 @@ export const PI_INGEST_ALLOWED_METRICS: readonly PiIngestAllowedMetric[] = [
   "soil_moisture_pct",
 ] as const;
 
-export const PI_INGEST_ALLOWED_SOURCES: readonly PiIngestAllowedSource[] = [
-  "pi_bridge",
-] as const;
+export const PI_INGEST_ALLOWED_SOURCES: readonly PiIngestAllowedSource[] = ["pi_bridge"] as const;
 
 /** Explicitly forbidden metrics from the V0 contract. */
 export const PI_INGEST_FORBIDDEN_METRICS: readonly string[] = [
@@ -143,21 +132,15 @@ const FUTURE_TOLERANCE_MS = 5 * 60 * 1000;
 
 // ----------------------------- Allowlist helpers -----------------------------
 
-export function isAllowedPiIngestMetric(
-  metric: unknown,
-): metric is PiIngestAllowedMetric {
+export function isAllowedPiIngestMetric(metric: unknown): metric is PiIngestAllowedMetric {
   return (
-    typeof metric === "string" &&
-    (PI_INGEST_ALLOWED_METRICS as readonly string[]).includes(metric)
+    typeof metric === "string" && (PI_INGEST_ALLOWED_METRICS as readonly string[]).includes(metric)
   );
 }
 
-export function isAllowedPiIngestSource(
-  source: unknown,
-): source is PiIngestAllowedSource {
+export function isAllowedPiIngestSource(source: unknown): source is PiIngestAllowedSource {
   return (
-    typeof source === "string" &&
-    (PI_INGEST_ALLOWED_SOURCES as readonly string[]).includes(source)
+    typeof source === "string" && (PI_INGEST_ALLOWED_SOURCES as readonly string[]).includes(source)
   );
 }
 
@@ -176,15 +159,13 @@ function normalizeUnit(
   const lower = u.toLowerCase();
   switch (metric) {
     case "temperature_c":
-      if (lower === "c" || lower === "celsius" || lower === "temperature_c")
-        return "temperature_c";
+      if (lower === "c" || lower === "celsius" || lower === "temperature_c") return "temperature_c";
       if (lower === "f" || lower === "fahrenheit" || lower === "temperature_f")
         return "temperature_f";
       return null;
     case "humidity_pct":
     case "soil_moisture_pct":
-      if (lower === "%" || lower === "percent" || lower === "pct")
-        return "percent";
+      if (lower === "%" || lower === "percent" || lower === "pct") return "percent";
       return null;
     case "vpd_kpa":
       if (lower === "kpa") return "kPa";
@@ -195,10 +176,7 @@ function normalizeUnit(
   }
 }
 
-export function isAllowedPiIngestUnit(
-  metric: unknown,
-  unit: unknown,
-): boolean {
+export function isAllowedPiIngestUnit(metric: unknown, unit: unknown): boolean {
   if (!isAllowedPiIngestMetric(metric)) return false;
   return normalizeUnit(metric, unit) !== null;
 }
@@ -218,9 +196,7 @@ export function validatePiIngestRequestEnvelope(
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     return {
       ok: false,
-      issues: [
-        { code: "invalid_envelope", message: "request body must be a JSON object" },
-      ],
+      issues: [{ code: "invalid_envelope", message: "request body must be a JSON object" }],
     };
   }
 
@@ -321,9 +297,7 @@ export function validatePiIngestRequestEnvelope(
           message: `reading ${idx}: metric must be a string`,
           index: idx,
         });
-      } else if (
-        (PI_INGEST_FORBIDDEN_METRICS as readonly string[]).includes(metric)
-      ) {
+      } else if ((PI_INGEST_FORBIDDEN_METRICS as readonly string[]).includes(metric)) {
         issues.push({
           code: "forbidden_metric",
           message: `reading ${idx}: metric '${metric}' is not supported by V0`,
@@ -376,8 +350,7 @@ export function validatePiIngestRequestEnvelope(
             index: idx,
           });
         } else {
-          const quality =
-            typeof reading.quality === "string" ? reading.quality : undefined;
+          const quality = typeof reading.quality === "string" ? reading.quality : undefined;
           validatedReadings.push({
             metric,
             value: reading.value,

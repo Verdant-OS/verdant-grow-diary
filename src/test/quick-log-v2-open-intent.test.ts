@@ -51,9 +51,7 @@ describe("Quick Log v2 open intent", () => {
   });
 
   it("fails closed when a builder id or action is invalid", () => {
-    expect(
-      buildQuickLogV2OpenIntent({ plantId: " ", tentId: "", action: "water" }),
-    ).toBeNull();
+    expect(buildQuickLogV2OpenIntent({ plantId: " ", tentId: "", action: "water" })).toBeNull();
     expect(
       buildQuickLogV2OpenIntent({ plantId: "plant 1", tentId: null, action: "water" }),
     ).toBeNull();

@@ -65,10 +65,7 @@ describe("Spider Farmer GGS sample payload fixtures", () => {
     describe(`sample: ${sample.id}`, () => {
       it("includes every adapter-contract field", () => {
         for (const f of REQUIRED_CONTRACT_FIELDS) {
-          expect(
-            sample.payload,
-            `${sample.id} missing contract field ${f}`,
-          ).toHaveProperty(f);
+          expect(sample.payload, `${sample.id} missing contract field ${f}`).toHaveProperty(f);
         }
         expect(sample.payload.provider).toBe("spider_farmer_ggs");
       });

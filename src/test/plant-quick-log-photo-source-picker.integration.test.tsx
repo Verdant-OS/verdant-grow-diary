@@ -94,7 +94,9 @@ describe("PlantQuickLog action-first grower model", () => {
   it("renders action chips first and response checks second", () => {
     renderSheet();
     expect(screen.getByText("2. What changed?")).toBeTruthy();
-    expect(screen.getByText("Tap the grow action. This is the thing the plant will respond to.")).toBeTruthy();
+    expect(
+      screen.getByText("Tap the grow action. This is the thing the plant will respond to."),
+    ).toBeTruthy();
     expect(screen.getByRole("button", { name: /log action watered/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /log action fed/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /log action issue spotted/i })).toBeTruthy();
@@ -103,7 +105,9 @@ describe("PlantQuickLog action-first grower model", () => {
     expect(screen.getByRole("button", { name: /response check better/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /response check same/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /response check worse/i })).toBeTruthy();
-    expect(screen.getByText("Better/Same/Worse records the plant response, not the grow action.")).toBeTruthy();
+    expect(
+      screen.getByText("Better/Same/Worse records the plant response, not the grow action."),
+    ).toBeTruthy();
   });
 
   it("action chips update local note state without saving", () => {
@@ -187,7 +191,11 @@ describe("PlantQuickLog Gate 1 polish", () => {
   it("renders title, subtitle, section labels, save copy, and helper copy", () => {
     renderSheet();
     expect(screen.getByRole("heading", { name: "Quick Log" })).toBeTruthy();
-    expect(screen.getByText("Capture what changed. Better/Same/Worse is for the plant response afterward.")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Capture what changed. Better/Same/Worse is for the plant response afterward.",
+      ),
+    ).toBeTruthy();
     expect(screen.getByText("1. Plant")).toBeTruthy();
     expect(screen.getByText("2. What changed?")).toBeTruthy();
     expect(screen.getByText("3. Response follow-up")).toBeTruthy();
@@ -229,7 +237,9 @@ describe("PlantQuickLog photo source picker — accessible names + ARIA wiring",
   it("hidden inputs carry stable ids + aria-labels for assistive tech", () => {
     renderSheet();
     const camera = document.getElementById("plant-quick-log-photo-input") as HTMLInputElement;
-    const library = document.getElementById("plant-quick-log-photo-library-input") as HTMLInputElement;
+    const library = document.getElementById(
+      "plant-quick-log-photo-library-input",
+    ) as HTMLInputElement;
     expect(camera.getAttribute("aria-label")).toMatch(/camera/i);
     expect(library.getAttribute("aria-label")).toMatch(/library/i);
     expect(camera.getAttribute("accept")).toBe("image/*");
@@ -241,7 +251,9 @@ describe("PlantQuickLog photo source picker — accessible names + ARIA wiring",
   it("keeps file inputs visually hidden instead of display-none for mobile picker reliability", () => {
     renderSheet();
     const camera = document.getElementById("plant-quick-log-photo-input") as HTMLInputElement;
-    const library = document.getElementById("plant-quick-log-photo-library-input") as HTMLInputElement;
+    const library = document.getElementById(
+      "plant-quick-log-photo-library-input",
+    ) as HTMLInputElement;
     expect(camera.className).toContain("sr-only");
     expect(library.className).toContain("sr-only");
     expect(camera.className).not.toContain("hidden");
@@ -285,7 +297,9 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
 
   it("Choose from Library selection takes the identical preview + upload + insert path", async () => {
     renderSheet();
-    const library = document.getElementById("plant-quick-log-photo-library-input") as HTMLInputElement;
+    const library = document.getElementById(
+      "plant-quick-log-photo-library-input",
+    ) as HTMLInputElement;
     await pickFile(library, makeImage("gallery.png"));
 
     await waitFor(() => expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeTruthy());
@@ -307,7 +321,9 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
 
   it("saves a library photo without requiring typed notes", async () => {
     renderSheet();
-    const library = document.getElementById("plant-quick-log-photo-library-input") as HTMLInputElement;
+    const library = document.getElementById(
+      "plant-quick-log-photo-library-input",
+    ) as HTMLInputElement;
     await pickFile(library, makeImage("photo-only.jpg"));
 
     await waitFor(() => expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeTruthy());
@@ -358,7 +374,9 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
 
   it("resets the library input value after selection so the same photo can be picked again", async () => {
     renderSheet();
-    const library = document.getElementById("plant-quick-log-photo-library-input") as HTMLInputElement;
+    const library = document.getElementById(
+      "plant-quick-log-photo-library-input",
+    ) as HTMLInputElement;
     const galleryFile = makeImage("same-gallery-photo.jpg");
 
     await pickFile(library, galleryFile);

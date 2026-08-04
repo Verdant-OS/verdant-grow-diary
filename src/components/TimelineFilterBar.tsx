@@ -16,12 +16,7 @@ interface Props {
   resetKey: TimelineFilterKey;
 }
 
-export default function TimelineFilterBar({
-  chips,
-  selected,
-  onSelect,
-  resetKey,
-}: Props) {
+export default function TimelineFilterBar({ chips, selected, onSelect, resetKey }: Props) {
   const canReset = selected !== resetKey;
   return (
     <div

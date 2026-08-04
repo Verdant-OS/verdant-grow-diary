@@ -1,6 +1,6 @@
 /// <reference types="npm:@types/react@18.3.1" />
 
-import * as React from 'npm:react@18.3.1'
+import * as React from "npm:react@18.3.1";
 
 import {
   Body,
@@ -12,13 +12,13 @@ import {
   Link,
   Preview,
   Text,
-} from 'npm:@react-email/components@0.0.22'
+} from "npm:@react-email/components@0.0.22";
 
 interface SignupEmailProps {
-  siteName: string
-  siteUrl: string
-  recipient: string
-  confirmationUrl: string
+  siteName: string;
+  siteUrl: string;
+  recipient: string;
+  confirmationUrl: string;
 }
 
 export const SignupEmail = ({
@@ -34,7 +34,7 @@ export const SignupEmail = ({
       <Container style={container}>
         <Heading style={h1}>Confirm your email</Heading>
         <Text style={text}>
-          Thanks for signing up for{' '}
+          Thanks for signing up for{" "}
           <Link href={siteUrl} style={link}>
             <strong>{siteName}</strong>
           </Link>
@@ -56,31 +56,34 @@ export const SignupEmail = ({
       </Container>
     </Body>
   </Html>
-)
+);
 
-export default SignupEmail
+export default SignupEmail;
 
-const main = { backgroundColor: '#ffffff', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif' }
-const container = { padding: '20px 25px' }
+const main = {
+  backgroundColor: "#ffffff",
+  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
+};
+const container = { padding: "20px 25px" };
 const h1 = {
-  fontSize: '22px',
-  fontWeight: '600' as const,
-  color: 'hsl(150, 30%, 12%)',
-  margin: '0 0 20px',
-}
+  fontSize: "22px",
+  fontWeight: "600" as const,
+  color: "hsl(150, 30%, 12%)",
+  margin: "0 0 20px",
+};
 const text = {
-  fontSize: '14px',
-  color: 'hsl(150, 15%, 30%)',
-  lineHeight: '1.5',
-  margin: '0 0 25px',
-}
-const link = { color: 'inherit', textDecoration: 'underline' }
+  fontSize: "14px",
+  color: "hsl(150, 15%, 30%)",
+  lineHeight: "1.5",
+  margin: "0 0 25px",
+};
+const link = { color: "inherit", textDecoration: "underline" };
 const button = {
-  backgroundColor: 'hsl(95, 60%, 45%)',
-  color: 'hsl(150, 25%, 8%)',
-  fontSize: '14px',
-  borderRadius: '14px',
-  padding: '12px 20px',
-  textDecoration: 'none',
-}
-const footer = { fontSize: '12px', color: 'hsl(150, 10%, 50%)', margin: '30px 0 0' }
+  backgroundColor: "hsl(95, 60%, 45%)",
+  color: "hsl(150, 25%, 8%)",
+  fontSize: "14px",
+  borderRadius: "14px",
+  padding: "12px 20px",
+  textDecoration: "none",
+};
+const footer = { fontSize: "12px", color: "hsl(150, 10%, 50%)", margin: "30px 0 0" };

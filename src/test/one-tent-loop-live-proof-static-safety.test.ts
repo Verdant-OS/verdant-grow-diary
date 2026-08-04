@@ -17,10 +17,7 @@ const PRESENTER = fs.readFileSync(
   path.resolve(__dirname, "../pages/OneTentLoopLiveProof.tsx"),
   "utf8",
 );
-const RULES = fs.readFileSync(
-  path.resolve(__dirname, "../lib/oneTentLoopProofRules.ts"),
-  "utf8",
-);
+const RULES = fs.readFileSync(path.resolve(__dirname, "../lib/oneTentLoopProofRules.ts"), "utf8");
 const VM = fs.readFileSync(
   path.resolve(__dirname, "../lib/oneTentLoopLiveProofViewModel.ts"),
   "utf8",

@@ -19,12 +19,8 @@ type OAuthApi = {
   getAuthorizationDetails: (
     id: string,
   ) => Promise<{ data: any; error: { message: string } | null }>;
-  approveAuthorization: (
-    id: string,
-  ) => Promise<{ data: any; error: { message: string } | null }>;
-  denyAuthorization: (
-    id: string,
-  ) => Promise<{ data: any; error: { message: string } | null }>;
+  approveAuthorization: (id: string) => Promise<{ data: any; error: { message: string } | null }>;
+  denyAuthorization: (id: string) => Promise<{ data: any; error: { message: string } | null }>;
 };
 
 function getOAuthApi(): OAuthApi | null {
@@ -48,9 +44,7 @@ export default function OAuthConsent() {
       }
       const oauth = getOAuthApi();
       if (!oauth) {
-        setError(
-          "OAuth server is not enabled on this project. Please contact support.",
-        );
+        setError("OAuth server is not enabled on this project. Please contact support.");
         return;
       }
       const { data: sess } = await supabase.auth.getSession();
@@ -122,21 +116,14 @@ export default function OAuthConsent() {
     <main className="min-h-dvh flex items-center justify-center px-6 py-10">
       <div className="w-full max-w-md space-y-6 rounded-lg border p-6">
         <div className="space-y-2">
-          <h1 className="text-xl font-semibold">
-            Connect {clientName} to your Verdant account?
-          </h1>
+          <h1 className="text-xl font-semibold">Connect {clientName} to your Verdant account?</h1>
           <p className="text-sm text-muted-foreground">
-            {clientName} will be able to use Verdant Grow OS tools as you. All
-            available tools are read-only — no writes, no Action Queue
-            approvals, and no device control.
+            {clientName} will be able to use Verdant Grow OS tools as you. All available tools are
+            read-only — no writes, no Action Queue approvals, and no device control.
           </p>
         </div>
         <div className="flex gap-3">
-          <Button
-            disabled={busy}
-            onClick={() => decide(true)}
-            className="flex-1"
-          >
+          <Button disabled={busy} onClick={() => decide(true)} className="flex-1">
             Approve
           </Button>
           <Button

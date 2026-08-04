@@ -13,10 +13,7 @@ const validRef = {
 describe("EvidenceCoveragePanel", () => {
   it("renders heading and counts for alerts/actions/overall", () => {
     const vm = buildEvidenceCoverageViewModel({
-      alerts: [
-        { originating_timeline_events: [validRef] },
-        { originating_timeline_events: [] },
-      ],
+      alerts: [{ originating_timeline_events: [validRef] }, { originating_timeline_events: [] }],
       actions: [{ originating_timeline_events: [validRef] }],
     });
     render(<EvidenceCoveragePanel viewModel={vm} status="ok" />);
@@ -83,9 +80,7 @@ describe("EvidenceCoveragePanel", () => {
 
   it("renders loading and unavailable states without crashing", () => {
     const vm = buildEvidenceCoverageViewModel({ alerts: [], actions: [] });
-    const { rerender } = render(
-      <EvidenceCoveragePanel viewModel={vm} status="loading" />,
-    );
+    const { rerender } = render(<EvidenceCoveragePanel viewModel={vm} status="loading" />);
     expect(screen.getByText(/loading coverage/i)).toBeInTheDocument();
     rerender(<EvidenceCoveragePanel viewModel={vm} status="unavailable" />);
     expect(screen.getByText(/coverage unavailable/i)).toBeInTheDocument();

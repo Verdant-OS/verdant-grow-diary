@@ -55,10 +55,7 @@ describe("Auth page essentials", () => {
     expect(screen.getByRole("tab", { name: /sign in/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /create account/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /forgot password/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /back to home/i })).toHaveAttribute(
-      "href",
-      "/welcome",
-    );
+    expect(screen.getByRole("link", { name: /back to home/i })).toHaveAttribute("href", "/welcome");
   });
 
   it("renders product positioning copy", () => {
@@ -117,19 +114,14 @@ describe("Forgot password flow", () => {
     const [email, opts] = resetForEmailMock.mock.calls[0];
     expect(email).toBe("grower@verdant.app");
     expect(String(opts.redirectTo)).toMatch(/\/reset-password$/);
-    expect(
-      await screen.findByText(/if an account exists for that email/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/if an account exists for that email/i)).toBeInTheDocument();
   });
 });
 
 describe("Auth source — safety static checks", () => {
   const SRC = readFileSync(resolve(__dirname, "../pages/Auth.tsx"), "utf8");
   const RESET = readFileSync(resolve(__dirname, "../pages/ResetPassword.tsx"), "utf8");
-  const RULES = readFileSync(
-    resolve(__dirname, "../lib/passwordResetRules.ts"),
-    "utf8",
-  );
+  const RULES = readFileSync(resolve(__dirname, "../lib/passwordResetRules.ts"), "utf8");
   const ALL = SRC + RESET + RULES;
 
   it("does not import service_role", () => {

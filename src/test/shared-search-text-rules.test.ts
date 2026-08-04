@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  normalizeSharedSearchText,
-  sharedSearchTextIncludes,
-} from "@/lib/sharedSearchTextRules";
+import { normalizeSharedSearchText, sharedSearchTextIncludes } from "@/lib/sharedSearchTextRules";
 
 describe("sharedSearchTextRules", () => {
   it("normalizes punctuation, spacing, case, and accents deterministically", () => {

@@ -51,10 +51,9 @@ describe("ecowittReadingViewModel.buildEcowittSnapshotViewModel", () => {
   });
 
   it("labels a manual EcoWitt entry as Manual and never Live", () => {
-    const vm = buildEcowittSnapshotViewModel(
-      [{ payload: payload(FRESH_AT), source: "manual" }],
-      { now: NOW },
-    );
+    const vm = buildEcowittSnapshotViewModel([{ payload: payload(FRESH_AT), source: "manual" }], {
+      now: NOW,
+    });
     expect(vm.source).toBe("manual");
     expect(vm.sourceLabel?.label).toBe("Manual");
     expect(vm.sourceLabel?.vendorPromoted).toBe(false);
@@ -63,10 +62,9 @@ describe("ecowittReadingViewModel.buildEcowittSnapshotViewModel", () => {
   });
 
   it("demotes a stale listener reading to Stale, never Live", () => {
-    const vm = buildEcowittSnapshotViewModel(
-      [{ payload: payload(STALE_AT), source: "live" }],
-      { now: NOW },
-    );
+    const vm = buildEcowittSnapshotViewModel([{ payload: payload(STALE_AT), source: "live" }], {
+      now: NOW,
+    });
     expect(vm.freshness).toBe("stale");
     expect(vm.source).toBe("stale");
     expect(vm.sourceLabel?.label).toBe("Stale");
@@ -75,18 +73,15 @@ describe("ecowittReadingViewModel.buildEcowittSnapshotViewModel", () => {
   });
 
   it("exposes a derived VPD value labelled by the consumer (never Live)", () => {
-    const vm = buildEcowittSnapshotViewModel(
-      [{ payload: payload(FRESH_AT), source: "live" }],
-      { now: NOW },
-    );
+    const vm = buildEcowittSnapshotViewModel([{ payload: payload(FRESH_AT), source: "live" }], {
+      now: NOW,
+    });
     expect(vm.derivedVpdKpa).not.toBeNull();
     // VPD is now explicitly surfaced in the metrics map for presenter convenience.
     expect(vm.metrics.vpd_kpa).not.toBeNull();
     // Derived VPD lives in metrics.vpd_kpa and derivedVpdKpa, not inside snapshot.readings.
-    expect(
-      vm.snapshot?.readings.some(
-        (r) => (r as { metric: string }).metric === "vpd_kpa",
-      ),
-    ).toBe(false);
+    expect(vm.snapshot?.readings.some((r) => (r as { metric: string }).metric === "vpd_kpa")).toBe(
+      false,
+    );
   });
 });

@@ -20,16 +20,14 @@ function make(overrides: Partial<SensorSnapshot> = {}): SensorSnapshot {
 describe("SensorSnapshotCard", () => {
   it("labels demo snapshot as sample/demo, not live", () => {
     render(
-      <SensorSnapshotCard
-        snapshot={make({ source: "demo" })}
-        classifyOptions={{ now: NOW }}
-      />,
+      <SensorSnapshotCard snapshot={make({ source: "demo" })} classifyOptions={{ now: NOW }} />,
     );
     const card = screen.getByTestId("sensor-snapshot-card");
     expect(card.getAttribute("data-source")).toBe("demo");
     expect(card.getAttribute("data-degraded")).toBe("true");
-    expect(screen.getByTestId("sensor-snapshot-card-demo-notice").textContent)
-      .toMatch(/sample|demo/i);
+    expect(screen.getByTestId("sensor-snapshot-card-demo-notice").textContent).toMatch(
+      /sample|demo/i,
+    );
   });
 
   it("shows warnings for suspicious metrics", () => {
@@ -42,9 +40,7 @@ describe("SensorSnapshotCard", () => {
     expect(
       screen.getByTestId("sensor-snapshot-card-warning-temp_f_looks_celsius"),
     ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("sensor-snapshot-card-warning-humidity_stuck_0"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("sensor-snapshot-card-warning-humidity_stuck_0")).toBeInTheDocument();
     expect(
       screen.getByTestId("sensor-snapshot-card-warning-ec_likely_microsiemens"),
     ).toBeInTheDocument();
@@ -52,10 +48,7 @@ describe("SensorSnapshotCard", () => {
 
   it("invalid snapshot is degraded and never says healthy", () => {
     render(
-      <SensorSnapshotCard
-        snapshot={make({ captured_at: null })}
-        classifyOptions={{ now: NOW }}
-      />,
+      <SensorSnapshotCard snapshot={make({ captured_at: null })} classifyOptions={{ now: NOW }} />,
     );
     const card = screen.getByTestId("sensor-snapshot-card");
     expect(card.getAttribute("data-freshness")).toBe("invalid");

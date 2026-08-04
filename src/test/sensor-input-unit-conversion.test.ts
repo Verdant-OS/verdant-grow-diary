@@ -14,10 +14,7 @@ import {
   toFahrenheitInputString,
   TYPICAL_AIR_TEMP_RANGE,
 } from "@/lib/sensorInputUnitConversion";
-import {
-  resolveManualAirTemp,
-  validateManualEntry,
-} from "@/lib/sensorReadingManualEntryRules";
+import { resolveManualAirTemp, validateManualEntry } from "@/lib/sensorReadingManualEntryRules";
 import { evaluateManualSnapshotAdvisor } from "@/lib/manualSensorSnapshotAdvisorRules";
 
 describe("parseTemperatureInput", () => {

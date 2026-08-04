@@ -38,11 +38,7 @@ const TONE_ICON = {
   untrusted: <AlertTriangle className="h-4 w-4 text-destructive" aria-hidden />,
 } as const;
 
-export default function TimelineEvidenceReadinessPanel({
-  context,
-  extras,
-  className,
-}: Props) {
+export default function TimelineEvidenceReadinessPanel({ context, extras, className }: Props) {
   const view = buildTimelineEvidenceReadinessView(context, extras);
 
   return (
@@ -52,11 +48,7 @@ export default function TimelineEvidenceReadinessPanel({
       data-tone={view.tone}
       data-trustworthy={view.hasTrustworthySensorSource ? "true" : "false"}
       data-untrusted={view.hasUntrustedSensorSource ? "true" : "false"}
-      className={cn(
-        "rounded-md border p-3 space-y-3 text-xs",
-        TONE_CLASS[view.tone],
-        className,
-      )}
+      className={cn("rounded-md border p-3 space-y-3 text-xs", TONE_CLASS[view.tone], className)}
     >
       <header className="flex items-start gap-2">
         <span className="mt-0.5">{TONE_ICON[view.tone]}</span>
@@ -106,13 +98,8 @@ export default function TimelineEvidenceReadinessPanel({
 
       {view.sourceBadges.length > 0 && (
         <div>
-          <h4 className="text-[11px] font-medium text-muted-foreground mb-1">
-            Sensor sources
-          </h4>
-          <ul
-            className="flex flex-wrap gap-1.5"
-            data-testid="timeline-evidence-readiness-sources"
-          >
+          <h4 className="text-[11px] font-medium text-muted-foreground mb-1">Sensor sources</h4>
+          <ul className="flex flex-wrap gap-1.5" data-testid="timeline-evidence-readiness-sources">
             {view.sourceBadges.map((b) => (
               <li
                 key={b.source}
@@ -138,18 +125,13 @@ export default function TimelineEvidenceReadinessPanel({
 
       {view.missing.length > 0 && (
         <div>
-          <h4 className="text-[11px] font-medium text-muted-foreground mb-1">
-            Missing context
-          </h4>
+          <h4 className="text-[11px] font-medium text-muted-foreground mb-1">Missing context</h4>
           <ul
             className="space-y-0.5 list-disc pl-4"
             data-testid="timeline-evidence-readiness-missing"
           >
             {view.missing.map((m) => (
-              <li
-                key={m.code}
-                data-testid={`timeline-evidence-readiness-missing-${m.code}`}
-              >
+              <li key={m.code} data-testid={`timeline-evidence-readiness-missing-${m.code}`}>
                 {m.message}
               </li>
             ))}

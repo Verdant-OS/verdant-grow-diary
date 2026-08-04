@@ -89,8 +89,7 @@ export const EARLY_STAGE_AI_DOCTOR_CAUTION_GENTLE =
   "Seedlings recover slowly from aggressive changes — prefer stable environment over intervention.";
 
 export const EARLY_STAGE_AI_DOCTOR_MISSING_PHOTO = "Recent photo of the seedling";
-export const EARLY_STAGE_AI_DOCTOR_MISSING_SENSOR =
-  "Current sensor snapshot for the tent";
+export const EARLY_STAGE_AI_DOCTOR_MISSING_SENSOR = "Current sensor snapshot for the tent";
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -154,13 +153,9 @@ export function buildEarlyStageAiDoctorContext(
   collected.sort(compareEntriesDesc);
 
   const capped = collected.slice(0, EARLY_STAGE_AI_DOCTOR_MAX_ENTRIES);
-  const entries: EarlyStageMemoryEntry[] = capped.map(
-    ({ index: _index, ...entry }) => entry,
-  );
+  const entries: EarlyStageMemoryEntry[] = capped.map(({ index: _index, ...entry }) => entry);
   const latest = entries[0] ?? null;
-  const milestoneHistoryCount = entries.filter(
-    (e) => e.milestoneLabel !== null,
-  ).length;
+  const milestoneHistoryCount = entries.filter((e) => e.milestoneLabel !== null).length;
   const stageContextLabel =
     entries.find((e) => e.stageContextLabel !== null)?.stageContextLabel ?? null;
 
@@ -176,10 +171,7 @@ export function buildEarlyStageAiDoctorContext(
 
   const cautionNotes: string[] =
     entries.length > 0
-      ? [
-          EARLY_STAGE_AI_DOCTOR_CAUTION_REPEATED_OBS,
-          EARLY_STAGE_AI_DOCTOR_CAUTION_GENTLE,
-        ]
+      ? [EARLY_STAGE_AI_DOCTOR_CAUTION_REPEATED_OBS, EARLY_STAGE_AI_DOCTOR_CAUTION_GENTLE]
       : [];
 
   return {

@@ -12,10 +12,7 @@ import {
   buildAiCreditLimitNoticeViewModel,
   type AiCreditDenial,
 } from "@/lib/aiCreditLimitNoticeViewModel";
-import {
-  paywallCtaFindBannedWords,
-  paywallCtaViewModelText,
-} from "@/lib/paywallCtaViewModel";
+import { paywallCtaFindBannedWords, paywallCtaViewModelText } from "@/lib/paywallCtaViewModel";
 
 const denial = (plan_id: string | null | undefined): AiCreditDenial => ({
   ok: false,

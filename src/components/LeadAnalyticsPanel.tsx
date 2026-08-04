@@ -31,9 +31,7 @@ export default function LeadAnalyticsPanel({ leads, scopeLabel }: Props) {
         className="rounded-xl border border-border/50 bg-card/40 p-6 text-center"
         data-testid="lead-analytics-empty"
       >
-        <p className="text-sm text-muted-foreground">
-          No lead analytics available for this view.
-        </p>
+        <p className="text-sm text-muted-foreground">No lead analytics available for this view.</p>
       </div>
     );
   }
@@ -44,9 +42,7 @@ export default function LeadAnalyticsPanel({ leads, scopeLabel }: Props) {
         <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Lead analytics
         </h2>
-        <span className="text-xs text-muted-foreground">
-          Analytics for {scopeLabel}
-        </span>
+        <span className="text-xs text-muted-foreground">Analytics for {scopeLabel}</span>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -59,14 +55,9 @@ export default function LeadAnalyticsPanel({ leads, scopeLabel }: Props) {
             value: summary.most_common_lead_type,
           },
         ].map((c) => (
-          <div
-            key={c.label}
-            className="rounded-xl border border-border/50 bg-card/40 p-3"
-          >
+          <div key={c.label} className="rounded-xl border border-border/50 bg-card/40 p-3">
             <div className="text-xs text-muted-foreground">{c.label}</div>
-            <div className="mt-1 font-display text-lg font-semibold truncate">
-              {c.value ?? "—"}
-            </div>
+            <div className="mt-1 font-display text-lg font-semibold truncate">{c.value ?? "—"}</div>
           </div>
         ))}
       </div>
@@ -102,12 +93,8 @@ export default function LeadAnalyticsPanel({ leads, scopeLabel }: Props) {
                   <TableCell className="text-right">{s.closed}</TableCell>
                   <TableCell className="text-right">{s.spam}</TableCell>
                   <TableCell className="text-right">{s.needs_action}</TableCell>
-                  <TableCell className="text-right">
-                    {formatRate(s.closed_rate)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatRate(s.spam_rate)}
-                  </TableCell>
+                  <TableCell className="text-right">{formatRate(s.closed_rate)}</TableCell>
+                  <TableCell className="text-right">{formatRate(s.spam_rate)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -138,12 +125,8 @@ export default function LeadAnalyticsPanel({ leads, scopeLabel }: Props) {
                   <TableCell className="text-right">{s.follow_up}</TableCell>
                   <TableCell className="text-right">{s.closed}</TableCell>
                   <TableCell className="text-right">{s.spam}</TableCell>
-                  <TableCell className="text-right">
-                    {formatRate(s.contacted_rate)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatRate(s.closed_rate)}
-                  </TableCell>
+                  <TableCell className="text-right">{formatRate(s.contacted_rate)}</TableCell>
+                  <TableCell className="text-right">{formatRate(s.closed_rate)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

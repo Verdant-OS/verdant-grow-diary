@@ -21,10 +21,9 @@ describe("deriveMissingContextCtas", () => {
     expect(cs.find((c) => c.id === "add-photo")).toBeTruthy();
   });
   it("maps sensor/snapshot missing → Check Environment", () => {
-    const cs = deriveMissingContextCtas(
-      ["recent trustworthy sensor reading (7d)"],
-      { plantId: "p1" },
-    );
+    const cs = deriveMissingContextCtas(["recent trustworthy sensor reading (7d)"], {
+      plantId: "p1",
+    });
     expect(cs.find((c) => c.id === "check-environment")).toBeTruthy();
   });
   it("maps diary/watering missing → Add Quick Log", () => {
@@ -54,18 +53,11 @@ describe("deriveMissingContextCtas", () => {
 
 describe("AiDoctorPhase1EmptyStateActions — no-result", () => {
   it("renders the three navigation CTAs with plantId", () => {
-    wrap(
-      <AiDoctorPhase1EmptyStateActions
-        kind="no-result"
-        context={{ plantId: "p1" }}
-      />,
-    );
+    wrap(<AiDoctorPhase1EmptyStateActions kind="no-result" context={{ plantId: "p1" }} />);
     expect(screen.getByTestId("ai-doctor-phase1-cta-add-quick-log")).toBeTruthy();
     expect(screen.getByTestId("ai-doctor-phase1-cta-add-photo")).toBeTruthy();
     expect(screen.getByTestId("ai-doctor-phase1-cta-check-environment")).toBeTruthy();
-    const href = screen
-      .getByTestId("ai-doctor-phase1-cta-add-quick-log")
-      .getAttribute("href");
+    const href = screen.getByTestId("ai-doctor-phase1-cta-add-quick-log").getAttribute("href");
     expect(href).toContain("plantId=p1");
   });
 

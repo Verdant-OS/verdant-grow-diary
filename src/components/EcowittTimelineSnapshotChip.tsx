@@ -34,10 +34,7 @@ function fmt(v: number | null | undefined, digits = 1): string {
  * Celsius; conversion happens exactly once, here. The celsius preference
  * renders the legacy "25.0 °C" shape unchanged; invalid stays "—".
  */
-function fmtTemp(
-  v: number | null | undefined,
-  unit: TemperatureUnitPreference,
-): string {
+function fmtTemp(v: number | null | undefined, unit: TemperatureUnitPreference): string {
   const symbol = unit === "celsius" ? "°C" : "°F";
   if (v == null || !Number.isFinite(v)) return `— ${symbol}`;
   const shown = unit === "celsius" ? v : celsiusToFahrenheit(v);
@@ -62,9 +59,7 @@ function capturedLabel(iso: string | null | undefined): string {
   }
 }
 
-export function EcowittTimelineSnapshotChip(
-  props: EcowittTimelineSnapshotChipProps,
-) {
+export function EcowittTimelineSnapshotChip(props: EcowittTimelineSnapshotChipProps) {
   const { diaryEntryId, snapshot } = props;
   const temperatureUnit = useTemperatureUnitPreference();
   if (!snapshot || !snapshot.hasReading) return null;
@@ -96,9 +91,7 @@ export function EcowittTimelineSnapshotChip(
         {temp !== undefined ? (
           <div>
             <dt className="inline">Temp:</dt>{" "}
-            <dd className="inline text-foreground">
-              {fmtTemp(temp, temperatureUnit)}
-            </dd>
+            <dd className="inline text-foreground">{fmtTemp(temp, temperatureUnit)}</dd>
           </div>
         ) : null}
         {rh !== undefined ? (

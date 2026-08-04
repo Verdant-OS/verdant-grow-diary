@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { VERDANT_CULTIVARS } from "@/constants/verdantCultivars";
-import {
-  buildCultivarBreadcrumbItems,
-  buildCultivarFaqItems,
-} from "@/lib/cultivarDetailSeo";
+import { buildCultivarBreadcrumbItems, buildCultivarFaqItems } from "@/lib/cultivarDetailSeo";
 
 const withBreeder = VERDANT_CULTIVARS.find((c) => c.slug === "gg4")!;
 const withoutBreeder = VERDANT_CULTIVARS.find((c) => c.slug === "sour-diesel")!;
@@ -33,9 +30,7 @@ describe("buildCultivarFaqItems", () => {
   });
 
   it("frames reported ranges as variable, never fixed", () => {
-    const flower = buildCultivarFaqItems(withoutBreeder).find((i) =>
-      /flower/i.test(i.question),
-    )!;
+    const flower = buildCultivarFaqItems(withoutBreeder).find((i) => /flower/i.test(i.question))!;
     expect(flower.answer).toMatch(/reported range/i);
     expect(flower.answer).toMatch(/not a fixed/i);
   });

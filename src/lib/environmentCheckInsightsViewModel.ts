@@ -23,8 +23,7 @@ import {
   type TemperatureUnitPreference,
 } from "./temperatureUnitPreference";
 
-export const ENVIRONMENT_CHECK_INSIGHTS_TITLE =
-  "Environment Check insights" as const;
+export const ENVIRONMENT_CHECK_INSIGHTS_TITLE = "Environment Check insights" as const;
 
 export const ENVIRONMENT_CHECK_INSIGHTS_DISCLAIMER =
   "Diary evidence only — not live sensor telemetry." as const;
@@ -41,11 +40,7 @@ export const ENVIRONMENT_CHECK_INSIGHTS_GENERIC_TARGETS =
 export const ENVIRONMENT_CHECK_INSIGHTS_MISSING_DATA =
   "Some Environment Checks were missing values; those are omitted from the summary." as const;
 
-export type EnvironmentCheckInsightsMetricKey =
-  | "temp"
-  | "humidity"
-  | "vpd"
-  | "co2";
+export type EnvironmentCheckInsightsMetricKey = "temp" | "humidity" | "vpd" | "co2";
 
 export interface EnvironmentCheckInsightsTargetRange {
   min: number;
@@ -150,18 +145,13 @@ function extractSample(
   const tempC = asFiniteNumber(env.temp_c ?? env.tempC ?? env.air_temp_c);
   const tempF = asFiniteNumber(env.room_temp_f ?? env.tempF ?? env.air_temp_f);
   const tempCFinal =
-    tempC != null
-      ? tempC
-      : tempF != null
-        ? Math.round(((tempF - 32) * 5) / 9 * 100) / 100
-        : null;
+    tempC != null ? tempC : tempF != null ? Math.round((((tempF - 32) * 5) / 9) * 100) / 100 : null;
 
   const rh = asFiniteNumber(env.humidity_pct ?? env.rhPercent ?? env.rh_percent);
   const vpd = asFiniteNumber(env.vpd_kpa ?? env.vpdKpa);
   const co2 = asFiniteNumber(env.co2_ppm ?? env.co2Ppm ?? env.co2);
 
-  const anyValue =
-    tempCFinal != null || rh != null || vpd != null || co2 != null;
+  const anyValue = tempCFinal != null || rh != null || vpd != null || co2 != null;
   if (!anyValue) return null;
 
   return {
@@ -277,10 +267,7 @@ function statForDisplay(
   };
 }
 
-function buildSummary(
-  count: number,
-  metrics: EnvironmentCheckInsightsMetricStat[],
-): string {
+function buildSummary(count: number, metrics: EnvironmentCheckInsightsMetricStat[]): string {
   if (count < 2) return ENVIRONMENT_CHECK_INSIGHTS_NOT_ENOUGH;
   const head = `${count} Environment Checks logged in view`;
   const trendBits: string[] = [];
@@ -302,10 +289,7 @@ function buildSummary(
  * against the canonical °C samples/targets; conversion happens after.
  */
 export function buildEnvironmentCheckInsightsViewModel(
-  rawEntries:
-    | readonly EnvironmentCheckTimelineRawEntry[]
-    | null
-    | undefined,
+  rawEntries: readonly EnvironmentCheckTimelineRawEntry[] | null | undefined,
   options?: {
     targets?: EnvironmentCheckInsightsTargets;
     /** When true, generic-targets warning is suppressed (caller passed plant targets). */
@@ -314,8 +298,7 @@ export function buildEnvironmentCheckInsightsViewModel(
     tempUnit?: TemperatureUnitPreference;
   },
 ): EnvironmentCheckInsightsViewModel {
-  const targets =
-    options?.targets ?? ENVIRONMENT_CHECK_INSIGHTS_DEFAULT_TARGETS;
+  const targets = options?.targets ?? ENVIRONMENT_CHECK_INSIGHTS_DEFAULT_TARGETS;
   const usingGenericTargets = !options?.plantSpecificTargets;
   // Resolved once here (never inside loops); tests/callers may inject.
   const tempUnit = options?.tempUnit ?? loadTemperatureUnitPreference();
@@ -359,14 +342,10 @@ export function buildEnvironmentCheckInsightsViewModel(
   for (const vm of vmList) {
     const s = sampleById.get(vm.entryId);
     if (!s) continue;
-    if (s.temp_c != null)
-      tempSamples.push({ occurredAt: s.occurredAt, value: s.temp_c });
-    if (s.humidity_pct != null)
-      rhSamples.push({ occurredAt: s.occurredAt, value: s.humidity_pct });
-    if (s.vpd_kpa != null)
-      vpdSamples.push({ occurredAt: s.occurredAt, value: s.vpd_kpa });
-    if (s.co2_ppm != null)
-      co2Samples.push({ occurredAt: s.occurredAt, value: s.co2_ppm });
+    if (s.temp_c != null) tempSamples.push({ occurredAt: s.occurredAt, value: s.temp_c });
+    if (s.humidity_pct != null) rhSamples.push({ occurredAt: s.occurredAt, value: s.humidity_pct });
+    if (s.vpd_kpa != null) vpdSamples.push({ occurredAt: s.occurredAt, value: s.vpd_kpa });
+    if (s.co2_ppm != null) co2Samples.push({ occurredAt: s.occurredAt, value: s.co2_ppm });
   }
 
   const metrics: EnvironmentCheckInsightsMetricStat[] = [];
@@ -396,22 +375,36 @@ export function buildEnvironmentCheckInsightsViewModel(
           const values: EnvironmentCheckInsightsLatest["values"] = [];
           if (s) {
             if (s.temp_c != null)
-              values.push({ key: "temp", label: "Temp", value: formatLatestValue("temp", s.temp_c, tempUnit) });
+              values.push({
+                key: "temp",
+                label: "Temp",
+                value: formatLatestValue("temp", s.temp_c, tempUnit),
+              });
             if (s.humidity_pct != null)
-              values.push({ key: "humidity", label: "RH", value: formatLatestValue("humidity", s.humidity_pct, tempUnit) });
+              values.push({
+                key: "humidity",
+                label: "RH",
+                value: formatLatestValue("humidity", s.humidity_pct, tempUnit),
+              });
             if (s.vpd_kpa != null)
-              values.push({ key: "vpd", label: "VPD", value: formatLatestValue("vpd", s.vpd_kpa, tempUnit) });
+              values.push({
+                key: "vpd",
+                label: "VPD",
+                value: formatLatestValue("vpd", s.vpd_kpa, tempUnit),
+              });
             if (s.co2_ppm != null)
-              values.push({ key: "co2", label: "CO₂", value: formatLatestValue("co2", s.co2_ppm, tempUnit) });
+              values.push({
+                key: "co2",
+                label: "CO₂",
+                value: formatLatestValue("co2", s.co2_ppm, tempUnit),
+              });
           }
           return { occurredAt: newest.occurredAt, values };
         })()
       : null;
 
   const outOfRangeCount = metrics.filter((m) => m.outOfRange).length;
-  const outOfRangeNote = outOfRangeCount > 0
-    ? ENVIRONMENT_CHECK_INSIGHTS_OUT_OF_RANGE
-    : null;
+  const outOfRangeNote = outOfRangeCount > 0 ? ENVIRONMENT_CHECK_INSIGHTS_OUT_OF_RANGE : null;
 
   return {
     count,
@@ -419,11 +412,8 @@ export function buildEnvironmentCheckInsightsViewModel(
     summary: buildSummary(count, metrics),
     disclaimer: ENVIRONMENT_CHECK_INSIGHTS_DISCLAIMER,
     usingGenericTargets,
-    genericTargetsNote: usingGenericTargets
-      ? ENVIRONMENT_CHECK_INSIGHTS_GENERIC_TARGETS
-      : null,
-    missingDataNote:
-      missingDataCount > 0 ? ENVIRONMENT_CHECK_INSIGHTS_MISSING_DATA : null,
+    genericTargetsNote: usingGenericTargets ? ENVIRONMENT_CHECK_INSIGHTS_GENERIC_TARGETS : null,
+    missingDataNote: missingDataCount > 0 ? ENVIRONMENT_CHECK_INSIGHTS_MISSING_DATA : null,
     latest,
     metrics,
     outOfRangeNote,

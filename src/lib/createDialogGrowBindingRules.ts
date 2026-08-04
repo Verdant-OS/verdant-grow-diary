@@ -22,12 +22,7 @@ import {
 export type CreateBindingEntity = "tent" | "plant";
 
 export type CreateGrowBindingKind =
-  | "loading"
-  | "read_error"
-  | "no_setup"
-  | "requested_setup_unavailable"
-  | "choose_setup"
-  | "ready";
+  "loading" | "read_error" | "no_setup" | "requested_setup_unavailable" | "choose_setup" | "ready";
 
 export interface GrowListItem {
   id: string;
@@ -657,8 +652,7 @@ export function buildHardStopView(input: {
 }
 
 export type TentGrowCompatibilityCheck =
-  | { ok: true }
-  | { ok: false; reason: "missing_target" | "missing_setup" | "different_setup" };
+  { ok: true } | { ok: false; reason: "missing_target" | "missing_setup" | "different_setup" };
 
 /**
  * Task API: tent must share the resolved target grow.

@@ -29,9 +29,7 @@ function fnv1a64Hex(input: string): string {
     lo = loMul >>> 0;
     hi = (hiMul + Math.floor(loMul / 0x1_0000_0000)) >>> 0;
   }
-  return (
-    hi.toString(16).padStart(8, "0") + lo.toString(16).padStart(8, "0")
-  );
+  return hi.toString(16).padStart(8, "0") + lo.toString(16).padStart(8, "0");
 }
 
 /** Build a stable device_id for a CSV/TSV file. Filename is hashed, never raw. */
@@ -62,9 +60,7 @@ export interface CsvImportRowIdempotencyInput {
 }
 
 /** Deterministic per-row key. Excludes user_id, raw filename, and tokens. */
-export function buildCsvImportRowIdempotencyKey(
-  input: CsvImportRowIdempotencyInput,
-): string {
+export function buildCsvImportRowIdempotencyKey(input: CsvImportRowIdempotencyInput): string {
   const v = Number.isFinite(input.value) ? input.value : 0;
   const rounded = Math.round(v * 10_000) / 10_000;
   const composite = [

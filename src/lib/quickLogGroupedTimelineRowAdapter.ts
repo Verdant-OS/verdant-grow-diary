@@ -30,9 +30,7 @@ export interface RawGrowEventRow {
   is_deleted?: boolean | null;
   /** Optional nested children (Supabase select syntax). */
   watering_events?:
-    | { volume_ml: number | string | null }
-    | Array<{ volume_ml: number | string | null }>
-    | null;
+    { volume_ml: number | string | null } | Array<{ volume_ml: number | string | null }> | null;
   environment_events?:
     | {
         temperature_c: number | string | null;
@@ -67,16 +65,13 @@ function isManualRow(row: RawGrowEventRow): boolean {
   if (!row || typeof row !== "object") return false;
   if (row.is_deleted === true) return false;
   if (row.source !== "manual") return false;
-  if (typeof row.occurred_at !== "string" || row.occurred_at.length === 0)
-    return false;
+  if (typeof row.occurred_at !== "string" || row.occurred_at.length === 0) return false;
   if (Number.isNaN(Date.parse(row.occurred_at))) return false;
   if (typeof row.tent_id !== "string" || row.tent_id.length === 0) return false;
   return true;
 }
 
-export function rawRowToQuickLogActionEvent(
-  row: RawGrowEventRow,
-): QuickLogActionEvent | null {
+export function rawRowToQuickLogActionEvent(row: RawGrowEventRow): QuickLogActionEvent | null {
   if (!isManualRow(row)) return null;
   let kind: QuickLogActionEvent["kind"];
   if (row.event_type === "watering") kind = "water";
@@ -129,9 +124,7 @@ export interface PartitionedRows {
   environmentRows: QuickLogV2EnvironmentRow[];
 }
 
-export function partitionQuickLogRows(
-  rows: ReadonlyArray<RawGrowEventRow>,
-): PartitionedRows {
+export function partitionQuickLogRows(rows: ReadonlyArray<RawGrowEventRow>): PartitionedRows {
   const actions: QuickLogActionEvent[] = [];
   const environmentRows: QuickLogV2EnvironmentRow[] = [];
   for (const row of rows ?? []) {

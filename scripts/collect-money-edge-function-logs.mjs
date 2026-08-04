@@ -66,8 +66,7 @@ for (const fn of FUNCTIONS) {
     `# Collected at: ${new Date().toISOString()}\n` +
     `# CLI exit: ${result.status ?? "err"}\n`;
   const body =
-    (result.stdout ?? "") +
-    (result.stderr ? `\n----- stderr -----\n${result.stderr}` : "");
+    (result.stdout ?? "") + (result.stderr ? `\n----- stderr -----\n${result.stderr}` : "");
   writeFileSync(join(LOGS_DIR, `${fn}.log`), header + body);
   if (result.status !== 0) {
     console.error(`(warn) ${fn}: supabase CLI exited ${result.status}. See artifact.`);

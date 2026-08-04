@@ -38,10 +38,7 @@ function Section({
   testId: string;
 }) {
   return (
-    <section
-      data-testid={testId}
-      className="rounded-md border border-border bg-card p-4 space-y-2"
-    >
+    <section data-testid={testId} className="rounded-md border border-border bg-card p-4 space-y-2">
       <h3 className="text-sm font-semibold text-foreground">{heading}</h3>
       {children}
     </section>
@@ -99,18 +96,13 @@ export function AiDoctorPhase1PreviewPanel({
   const modeLabel = MODE_LABEL[mode];
 
   return (
-    <div
-      data-testid="ai-doctor-phase1-preview-panel"
-      className="space-y-4 text-foreground"
-    >
+    <div data-testid="ai-doctor-phase1-preview-panel" className="space-y-4 text-foreground">
       {/* Header banner — read-only / no model / no writes / no device control */}
       <header
         data-testid="ai-doctor-phase1-preview-header"
         className="rounded-md border border-border bg-muted/40 p-4 space-y-1"
       >
-        <h2 className="text-base font-semibold">
-          {title ?? "AI Doctor Phase 1 Preview"}
-        </h2>
+        <h2 className="text-base font-semibold">{title ?? "AI Doctor Phase 1 Preview"}</h2>
         <p className="text-xs text-muted-foreground">
           Read-only · No model calls · No database writes · No device control
         </p>
@@ -176,7 +168,10 @@ export function AiDoctorPhase1PreviewPanel({
       {/* Missing info */}
       <Section heading="Missing information" testId="ai-doctor-phase1-preview-missing-info">
         <p className="text-xs text-muted-foreground">
-          Severity: <span data-testid="ai-doctor-phase1-preview-missing-severity">{missingInfoPanel.severity}</span>
+          Severity:{" "}
+          <span data-testid="ai-doctor-phase1-preview-missing-severity">
+            {missingInfoPanel.severity}
+          </span>
         </p>
         <BulletList
           items={missingInfoPanel.items}
@@ -222,9 +217,7 @@ export function AiDoctorPhase1PreviewPanel({
           <p className="text-sm font-medium">Suggested advisory action</p>
           <p className="text-sm">{actionQueuePanel.label}</p>
           <p className="text-sm text-muted-foreground">{actionQueuePanel.reason}</p>
-          <p className="text-xs font-medium text-foreground">
-            Grower approval is required.
-          </p>
+          <p className="text-xs font-medium text-foreground">Grower approval is required.</p>
           {actionQueuePanel.disabled_reason ? (
             <p
               data-testid="ai-doctor-phase1-preview-action-disabled-reason"
@@ -238,25 +231,16 @@ export function AiDoctorPhase1PreviewPanel({
 
       {/* Safety */}
       <Section heading="Safety" testId="ai-doctor-phase1-preview-safety">
-        <p
-          data-testid="ai-doctor-phase1-preview-automation-warning"
-          className="text-sm"
-        >
+        <p data-testid="ai-doctor-phase1-preview-automation-warning" className="text-sm">
           {safetyPanel.automation_warning}
         </p>
         {safetyPanel.overdiagnosis_warning ? (
-          <p
-            data-testid="ai-doctor-phase1-preview-overdiagnosis-warning"
-            className="text-sm"
-          >
+          <p data-testid="ai-doctor-phase1-preview-overdiagnosis-warning" className="text-sm">
             {safetyPanel.overdiagnosis_warning}
           </p>
         ) : null}
         {safetyPanel.source_truth_warning ? (
-          <p
-            data-testid="ai-doctor-phase1-preview-source-truth-warning"
-            className="text-sm"
-          >
+          <p data-testid="ai-doctor-phase1-preview-source-truth-warning" className="text-sm">
             {safetyPanel.source_truth_warning}
           </p>
         ) : null}

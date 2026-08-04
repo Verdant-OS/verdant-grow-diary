@@ -24,7 +24,10 @@ const OWN: OwnershipContext = {
 };
 const NOW = new Date("2026-06-04T12:00:00.000Z");
 
-function mkInput(rows: PreviewRowInput[], o: Partial<BuildCsvImportPlanInput> = {}): BuildCsvImportPlanInput {
+function mkInput(
+  rows: PreviewRowInput[],
+  o: Partial<BuildCsvImportPlanInput> = {},
+): BuildCsvImportPlanInput {
   return {
     filename: "export.csv",
     fileSizeBytes: 1024,
@@ -64,7 +67,11 @@ describe("csvImportPlanReport — report builder", () => {
   it("counts, date range, metric breakdown, diary draft, sensor sample are present", () => {
     const rows = [rowAt(0), rowAt(1, "humidity", 55), rowAt(2, "vpd", 1.1)];
     const plan = buildCsvImportPlan(mkInput(rows));
-    const report = buildCsvImportPlanReport(plan, { fileName: "a.csv", sourceType: "csv" }, { generatedAt: NOW.toISOString() });
+    const report = buildCsvImportPlanReport(
+      plan,
+      { fileName: "a.csv", sourceType: "csv" },
+      { generatedAt: NOW.toISOString() },
+    );
     expect(report.counts.accepted).toBe(3);
     expect(report.counts.blocked).toBe(0);
     expect(report.counts.duplicateSkipped).toBe(0);
@@ -81,7 +88,11 @@ describe("csvImportPlanReport — report builder", () => {
   it("sample sensor drafts are capped at 10", () => {
     const rows = Array.from({ length: 25 }, (_, i) => rowAt(i));
     const plan = buildCsvImportPlan(mkInput(rows, { totalRowCount: 25 }));
-    const report = buildCsvImportPlanReport(plan, { fileName: "a.csv", sourceType: "csv" }, { generatedAt: NOW.toISOString() });
+    const report = buildCsvImportPlanReport(
+      plan,
+      { fileName: "a.csv", sourceType: "csv" },
+      { generatedAt: NOW.toISOString() },
+    );
     expect(report.sensorWriteDraftSample.length).toBe(10);
   });
 
@@ -120,7 +131,11 @@ describe("csvImportPlanReport — report builder", () => {
     const first = buildCsvImportPlan(mkInput(rows));
     const keys = new Set(first.acceptedWrites.map((w) => w.idempotency_key));
     const second = buildCsvImportPlan(mkInput(rows, { existingIdempotencyKeys: keys }));
-    const report = buildCsvImportPlanReport(second, { fileName: "a.csv", sourceType: "csv" }, { generatedAt: NOW.toISOString() });
+    const report = buildCsvImportPlanReport(
+      second,
+      { fileName: "a.csv", sourceType: "csv" },
+      { generatedAt: NOW.toISOString() },
+    );
     expect(report.duplicateInfo.count).toBe(1);
     expect(report.duplicateInfo.keyPrefixes[0].length).toBeLessThanOrEqual(12);
     // Full key must not appear in serialised JSON
@@ -131,7 +146,11 @@ describe("csvImportPlanReport — report builder", () => {
 
   it("safety note is present and lists no-save / no-automation / no-device-control", () => {
     const plan = buildCsvImportPlan(mkInput([rowAt(0)]));
-    const report = buildCsvImportPlanReport(plan, { fileName: "a.csv", sourceType: "csv" }, { generatedAt: NOW.toISOString() });
+    const report = buildCsvImportPlanReport(
+      plan,
+      { fileName: "a.csv", sourceType: "csv" },
+      { generatedAt: NOW.toISOString() },
+    );
     const joined = report.safetyNote.join(" ");
     expect(joined).toMatch(/No save/);
     expect(joined).toMatch(/No automation/);
@@ -158,7 +177,11 @@ describe("csvImportPlanReport — report builder", () => {
       },
     ];
     const plan = buildCsvImportPlan(mkInput(rows));
-    const report = buildCsvImportPlanReport(plan, { fileName: "a.csv", sourceType: "csv" }, { generatedAt: NOW.toISOString() });
+    const report = buildCsvImportPlanReport(
+      plan,
+      { fileName: "a.csv", sourceType: "csv" },
+      { generatedAt: NOW.toISOString() },
+    );
     const json = serializeCsvImportPlanReport(report);
     expect(json).not.toMatch(/leak1|leak2|leak3|leak4/);
     expect(json).not.toMatch(/service_role/i);
@@ -177,16 +200,32 @@ describe("csvImportPlanReport — report builder", () => {
 
   it("generatedAt is deterministic when injected", () => {
     const plan = buildCsvImportPlan(mkInput([rowAt(0)]));
-    const a = buildCsvImportPlanReport(plan, { fileName: "a.csv", sourceType: "csv" }, { generatedAt: NOW.toISOString() });
-    const b = buildCsvImportPlanReport(plan, { fileName: "a.csv", sourceType: "csv" }, { generatedAt: NOW.toISOString() });
+    const a = buildCsvImportPlanReport(
+      plan,
+      { fileName: "a.csv", sourceType: "csv" },
+      { generatedAt: NOW.toISOString() },
+    );
+    const b = buildCsvImportPlanReport(
+      plan,
+      { fileName: "a.csv", sourceType: "csv" },
+      { generatedAt: NOW.toISOString() },
+    );
     expect(a.generatedAt).toBe(b.generatedAt);
     expect(serializeCsvImportPlanReport(a)).toBe(serializeCsvImportPlanReport(b));
   });
 
   it("accepts an injected clock as Date or function (and report version stays csv_import_plan_v1)", () => {
     const plan = buildCsvImportPlan(mkInput([rowAt(0)]));
-    const asDate = buildCsvImportPlanReport(plan, { fileName: "a.csv", sourceType: "csv" }, { now: NOW });
-    const asFn = buildCsvImportPlanReport(plan, { fileName: "a.csv", sourceType: "csv" }, { now: () => NOW });
+    const asDate = buildCsvImportPlanReport(
+      plan,
+      { fileName: "a.csv", sourceType: "csv" },
+      { now: NOW },
+    );
+    const asFn = buildCsvImportPlanReport(
+      plan,
+      { fileName: "a.csv", sourceType: "csv" },
+      { now: () => NOW },
+    );
     expect(asDate.generatedAt).toBe(NOW.toISOString());
     expect(asFn.generatedAt).toBe(NOW.toISOString());
     expect(asDate.reportVersion).toBe("csv_import_plan_v1");

@@ -1,14 +1,15 @@
 import { describe, it, expect, vi } from "vitest";
 import { uploadPlantProfilePhoto } from "@/lib/plantProfilePhotoUploadService";
 
-function makeStorage(uploadImpl?: (path: string, body: unknown, opts: unknown) => Promise<{ error: unknown }>) {
+function makeStorage(
+  uploadImpl?: (path: string, body: unknown, opts: unknown) => Promise<{ error: unknown }>,
+) {
   const upload = vi.fn(uploadImpl ?? (async () => ({ error: null })));
   return {
     storage: {
       from: (bucket: string) => ({
         __bucket: bucket,
-        upload: (path: string, body: unknown, opts: unknown) =>
-          upload(path, body, opts),
+        upload: (path: string, body: unknown, opts: unknown) => upload(path, body, opts),
       }),
     } as any,
     upload,
@@ -34,11 +35,10 @@ describe("uploadPlantProfilePhoto", () => {
     expect(result.reference).toBe(
       "storage://diary-photos/user-1/grow-2/plant-profiles/plant-3/fixed.jpg",
     );
-    expect(s.upload).toHaveBeenCalledWith(
-      "user-1/grow-2/plant-profiles/plant-3/fixed.jpg",
-      file,
-      { contentType: "image/jpeg", upsert: false },
-    );
+    expect(s.upload).toHaveBeenCalledWith("user-1/grow-2/plant-profiles/plant-3/fixed.jpg", file, {
+      contentType: "image/jpeg",
+      upsert: false,
+    });
   });
 
   it("throws a sanitized error and never leaks raw provider text", async () => {

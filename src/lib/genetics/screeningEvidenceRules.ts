@@ -55,7 +55,9 @@ function laterThan(a: string | null, b: string | null): boolean {
  * Input is treated as untrusted; malformed rows are ignored, unknown result
  * values are dropped (never coerced to negative).
  */
-export function computeEvidence(rows: readonly ScreeningRowInput[] | null | undefined): EvidenceSummary {
+export function computeEvidence(
+  rows: readonly ScreeningRowInput[] | null | undefined,
+): EvidenceSummary {
   const list = Array.isArray(rows) ? rows : [];
 
   // Rows referenced by another row's supersedesId are no longer "current".
@@ -66,7 +68,10 @@ export function computeEvidence(rows: readonly ScreeningRowInput[] | null | unde
   }
 
   // Keep the latest current row per target.
-  const latestByTarget = new Map<string, { result: ScreeningResult; collectedDate: string | null; recordedAt: string | null }>();
+  const latestByTarget = new Map<
+    string,
+    { result: ScreeningResult; collectedDate: string | null; recordedAt: string | null }
+  >();
   for (const r of list) {
     const id = clean(r?.id);
     if (id && superseded.has(id)) continue;
@@ -90,7 +95,9 @@ export function computeEvidence(rows: readonly ScreeningRowInput[] | null | unde
     .sort((a, b) => (a.target < b.target ? -1 : a.target > b.target ? 1 : 0));
 
   const anyPositive = targets.some((t) => t.result === "positive");
-  const anyInconclusive = targets.some((t) => t.result === "inconclusive" || t.result === "not_tested");
+  const anyInconclusive = targets.some(
+    (t) => t.result === "inconclusive" || t.result === "not_tested",
+  );
   const anyNegative = targets.some((t) => t.result === "negative");
 
   const state: EvidenceState = anyPositive

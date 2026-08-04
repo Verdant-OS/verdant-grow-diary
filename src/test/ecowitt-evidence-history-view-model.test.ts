@@ -27,7 +27,10 @@ describe("EcoWitt evidence history view model", () => {
 
   it("stale badge only appears for stale samples", () => {
     const vm = buildEcowittEvidenceHistoryViewModel({ tentKey: "flower", now: NOW });
-    const stale = vm.rows.filter((r) => r.is_stale).map((r) => r.sample_key).sort();
+    const stale = vm.rows
+      .filter((r) => r.is_stale)
+      .map((r) => r.sample_key)
+      .sort();
     expect(stale).toEqual(["degraded", "just-stale"]);
     const justFresh = vm.rows.find((r) => r.sample_key === "just-fresh")!;
     expect(justFresh.is_stale).toBe(false);

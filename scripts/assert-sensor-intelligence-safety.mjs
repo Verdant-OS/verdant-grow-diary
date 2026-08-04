@@ -124,7 +124,8 @@ export function scanContent(relPath, content) {
   const isFrontend = relPath.startsWith(`src${sep}`) || relPath.startsWith("src/");
   const normalizedRelPath = relPath.replace(/\\/g, "/");
   const isServerOnlySource =
-    normalizedRelPath.startsWith("src/") && /\.server\.(ts|tsx|js|jsx|mjs|cjs)$/.test(normalizedRelPath);
+    normalizedRelPath.startsWith("src/") &&
+    /\.server\.(ts|tsx|js|jsx|mjs|cjs)$/.test(normalizedRelPath);
   const isTestFile =
     /[\\/](test|tests|__tests__|fixtures)[\\/]/.test(relPath) ||
     /\.test\.(t|j)sx?$/.test(relPath) ||
@@ -296,15 +297,13 @@ if (isMain) {
   const v = scanRepository();
   if (v.length === 0) {
     if (!quiet) {
-      // eslint-disable-next-line no-console
       console.log("✓ sensor-intelligence safety scan: 0 violations");
     }
     process.exit(0);
   }
-  // eslint-disable-next-line no-console
+
   console.error(`✗ sensor-intelligence safety scan: ${v.length} violation(s)`);
   for (const item of v) {
-    // eslint-disable-next-line no-console
     console.error(`  - [${item.rule}] ${item.message}`);
   }
   process.exit(1);

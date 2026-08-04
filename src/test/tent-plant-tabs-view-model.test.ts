@@ -69,9 +69,7 @@ describe("buildTentPlantTabsViewModel", () => {
     });
     expect(vm.selectedPlantId).toBe("p2");
     expect(vm.selectedPlantName).toBe("Plant B");
-    expect(vm.selectedPlantCopy).toBe(
-      "Viewing plant-specific activity for Plant B.",
-    );
+    expect(vm.selectedPlantCopy).toBe("Viewing plant-specific activity for Plant B.");
     expect(vm.filteredPlantIds).toEqual(["p2"]);
   });
 
@@ -106,9 +104,7 @@ describe("buildTentPlantTabsViewModel", () => {
     });
     expect(vm.sharedEnvironmentReminderCopy).toBe(TENT_PLANT_TABS_SHARED_ENV_COPY);
     expect(vm.emptyNoPlantsCopy).toBe(TENT_PLANT_TABS_EMPTY_NO_PLANTS_COPY);
-    expect(vm.emptySelectedPlantActivityCopy).toBe(
-      TENT_PLANT_TABS_EMPTY_SELECTED_PLANT_COPY,
-    );
+    expect(vm.emptySelectedPlantActivityCopy).toBe(TENT_PLANT_TABS_EMPTY_SELECTED_PLANT_COPY);
     expect(vm.tabs).toHaveLength(1);
     expect(vm.tabs[0].id).toBeNull();
     expect(vm.filteredPlantIds).toEqual([]);
@@ -135,18 +131,14 @@ describe("buildTentPlantTabsViewModel", () => {
       selectedPlantId: "p9",
     });
     expect(vm.tabs[1].label).toBe("Unnamed plant");
-    expect(vm.selectedPlantCopy).toBe(
-      "Viewing plant-specific activity for Unnamed plant.",
-    );
+    expect(vm.selectedPlantCopy).toBe("Viewing plant-specific activity for Unnamed plant.");
   });
 });
 
 describe("tentPlantTabsViewModel static safety", () => {
   const path = resolve(__dirname, "../lib/tentPlantTabsViewModel.ts");
   const raw = readFileSync(path, "utf8");
-  const content = raw
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  const content = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 
   it("does not import Supabase or write helpers", () => {
     expect(content).not.toMatch(/from\s+["']@\/integrations\/supabase/);

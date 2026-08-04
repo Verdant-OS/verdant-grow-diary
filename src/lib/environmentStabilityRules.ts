@@ -26,12 +26,7 @@ import {
 } from "@/lib/vpdStageTargetRules";
 
 export type StabilityStatus =
-  | "stable"
-  | "watch"
-  | "unstable"
-  | "unavailable"
-  | "context_only"
-  | "stage_unknown";
+  "stable" | "watch" | "unstable" | "unavailable" | "context_only" | "stage_unknown";
 
 export interface StabilityReadingInput {
   ts: string | number | Date;

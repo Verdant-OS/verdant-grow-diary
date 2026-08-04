@@ -67,9 +67,7 @@ describe("QuickLogV2Sheet — loading state", () => {
     plantsState.isLoading = true;
     renderSheet();
     expect(screen.getByTestId("qlv2-context-loading")).toBeTruthy();
-    expect(
-      (screen.getByTestId("qlv2-save") as HTMLButtonElement).disabled,
-    ).toBe(true);
+    expect((screen.getByTestId("qlv2-save") as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("loading status uses role=status (implicit polite announcement)", () => {
@@ -86,9 +84,7 @@ describe("QuickLogV2Sheet — fetch error state", () => {
     renderSheet();
     const err = screen.getByTestId("qlv2-context-error");
     expect(err.getAttribute("role")).toBe("alert");
-    expect(
-      (screen.getByTestId("qlv2-save") as HTMLButtonElement).disabled,
-    ).toBe(true);
+    expect((screen.getByTestId("qlv2-save") as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("Retry calls refetch on both plants and tents queries", () => {
@@ -105,12 +101,8 @@ describe("QuickLogV2Sheet — empty plant + tent lists", () => {
   it("shows clear empty-state with Add plant / Add tent CTAs", () => {
     renderSheet();
     expect(screen.getByTestId("qlv2-context-empty")).toBeTruthy();
-    const plantCta = screen.getByTestId(
-      "qlv2-context-empty-add-plant",
-    ) as HTMLAnchorElement;
-    const tentCta = screen.getByTestId(
-      "qlv2-context-empty-add-tent",
-    ) as HTMLAnchorElement;
+    const plantCta = screen.getByTestId("qlv2-context-empty-add-plant") as HTMLAnchorElement;
+    const tentCta = screen.getByTestId("qlv2-context-empty-add-tent") as HTMLAnchorElement;
     expect(plantCta.getAttribute("href")).toBe("/plants");
     expect(tentCta.getAttribute("href")).toBe("/tents");
     expect(plantCta.className).toMatch(/min-h-11/);
@@ -128,25 +120,19 @@ describe("QuickLogV2Sheet — empty plant + tent lists", () => {
 
 describe("QuickLogV2Sheet — happy path still enables Save", () => {
   it("with plants present and no error/loading, Save is enabled", () => {
-    plantsState.data = [
-      { id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" },
-    ];
+    plantsState.data = [{ id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" }];
     tentsState.data = [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }];
     renderSheet();
     expect(screen.queryByTestId("qlv2-context-loading")).toBeNull();
     expect(screen.queryByTestId("qlv2-context-error")).toBeNull();
     expect(screen.queryByTestId("qlv2-context-empty")).toBeNull();
-    expect(
-      (screen.getByTestId("qlv2-save") as HTMLButtonElement).disabled,
-    ).toBe(false);
+    expect((screen.getByTestId("qlv2-save") as HTMLButtonElement).disabled).toBe(false);
   });
 });
 
 describe("QuickLogV2Sheet — photo action removed, attachment inline", () => {
   beforeEach(() => {
-    plantsState.data = [
-      { id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" },
-    ];
+    plantsState.data = [{ id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" }];
     tentsState.data = [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }];
   });
 
@@ -180,9 +166,6 @@ describe("QuickLogV2Sheet — photo action removed, attachment inline", () => {
   it("Take Photo and Choose from Library buttons are reachable by visible name", () => {
     renderSheet();
     expect(screen.getByRole("button", { name: /^take photo$/i })).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: /^choose from library$/i }),
-    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^choose from library$/i })).toBeTruthy();
   });
 });
-

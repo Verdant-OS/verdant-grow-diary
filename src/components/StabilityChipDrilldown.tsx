@@ -19,15 +19,9 @@ import {
 } from "@/lib/dashboardStabilityChipCopyRules";
 import { deriveStabilityWhyContext } from "@/lib/stabilityWhyContext";
 
-export type StabilityCopyVariant =
-  | "unavailable"
-  | "stage_unknown"
-  | "context_only"
-  | "outside_24h";
+export type StabilityCopyVariant = "unavailable" | "stage_unknown" | "context_only" | "outside_24h";
 
-export function resolveCopyVariant(
-  result: StabilityResult,
-): StabilityCopyVariant {
+export function resolveCopyVariant(result: StabilityResult): StabilityCopyVariant {
   switch (result.status) {
     case "unavailable":
       return "unavailable";
@@ -102,8 +96,8 @@ export default function StabilityChipDrilldown({
         <DialogHeader>
           <DialogTitle>{tentName} — VPD stability</DialogTitle>
           <DialogDescription>
-            Read-only summary of the last 24h VPD window for this tent. No
-            alerts or device actions are triggered from this view.
+            Read-only summary of the last 24h VPD window for this tent. No alerts or device actions
+            are triggered from this view.
           </DialogDescription>
         </DialogHeader>
 
@@ -146,40 +140,29 @@ export default function StabilityChipDrilldown({
             {why.text}
           </div>
 
-
           <div className="rounded-lg border border-border/40 p-3 space-y-1.5">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Last 24h
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Hours outside band</span>
-              <span className="font-medium">
-                {formatHours(stability.last24h.hoursOutside)}
-              </span>
+              <span className="font-medium">{formatHours(stability.last24h.hoursOutside)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Hours considered</span>
-              <span className="font-medium">
-                {formatHours(stability.last24h.hoursConsidered)}
-              </span>
+              <span className="font-medium">{formatHours(stability.last24h.hoursConsidered)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Readings considered</span>
-              <span className="font-medium">
-                {stability.last24h.totalConsidered}
-              </span>
+              <span className="font-medium">{stability.last24h.totalConsidered}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Outside count</span>
-              <span className="font-medium">
-                {stability.last24h.outsideCount}
-              </span>
+              <span className="font-medium">{stability.last24h.outsideCount}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Sparse window</span>
-              <span className="font-medium">
-                {stability.sparse ? "yes" : "no"}
-              </span>
+              <span className="font-medium">{stability.sparse ? "yes" : "no"}</span>
             </div>
           </div>
 

@@ -29,7 +29,6 @@ import {
 } from "../src/lib/ecowittLocalTestPayloadRules";
 
 function fail(msg: string): never {
-  // eslint-disable-next-line no-console
   console.error(`[ecowitt-test-sender] ${msg}`);
   process.exit(2);
 }
@@ -53,16 +52,15 @@ const payload = buildEcowittLocalTestPayload({
   invalid,
 });
 
-// eslint-disable-next-line no-console
 console.log("[ecowitt-test-sender] target:", url ?? "(dry-run, no URL)");
-// eslint-disable-next-line no-console
+
 console.log("[ecowitt-test-sender] auth:", redactBridgeToken(token));
-// eslint-disable-next-line no-console
+
 console.log(
   "[ecowitt-test-sender] mode:",
   dryRun ? "DRY-RUN (no POST)" : invalid ? "INVALID (safety test)" : "valid",
 );
-// eslint-disable-next-line no-console
+
 console.log("[ecowitt-test-sender] payload summary:", {
   tent_id: payload.tent_id,
   source: payload.source,
@@ -72,7 +70,6 @@ console.log("[ecowitt-test-sender] payload summary:", {
 });
 
 if (dryRun) {
-  // eslint-disable-next-line no-console
   console.log("[ecowitt-test-sender] dry-run complete — no network call made.");
   process.exit(0);
 }
@@ -88,15 +85,15 @@ const res = await fetch(url!, {
 });
 
 const text = await res.text();
-// eslint-disable-next-line no-console
+
 console.log(`[ecowitt-test-sender] HTTP ${res.status}`);
-// eslint-disable-next-line no-console
+
 console.log("[ecowitt-test-sender] response:", text);
 
 if (!res.ok) {
   if (invalid) {
     // Expected when the route rejects the impossible payload.
-    // eslint-disable-next-line no-console
+
     console.log("[ecowitt-test-sender] invalid payload rejected as expected.");
     process.exit(0);
   }

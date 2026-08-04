@@ -4,8 +4,7 @@ export const POST_GROW_REFLECTION_ENVELOPE_SAMPLES_VERSION =
   "post-grow-reflection-envelope-samples-v1";
 
 export type PostGrowReflectionEnvelopeSampleId =
-  | "valid_envelope"
-  | "contract_rejected_missing_candidate";
+  "valid_envelope" | "contract_rejected_missing_candidate";
 
 export interface PostGrowReflectionEnvelopeSample {
   id: PostGrowReflectionEnvelopeSampleId;
@@ -44,7 +43,8 @@ export function buildContractRejectedPostGrowReflectionEnvelopeSample(): PostGro
   return {
     id: "contract_rejected_missing_candidate",
     label: "Rejected envelope sample",
-    description: "Rejected by the envelope contract before reflection validation because candidate is missing.",
+    description:
+      "Rejected by the envelope contract before reflection validation because candidate is missing.",
     expectedStatus: "envelope_rejected",
     jsonText: prettyJson({
       kind: ENVELOPE_KIND,

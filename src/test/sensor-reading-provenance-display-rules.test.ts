@@ -81,10 +81,12 @@ describe("sensor reading provenance display rules", () => {
   });
 
   it("normalizes invalid timestamps to null", () => {
-    expect(buildSensorReadingProvenanceDisplayModel({
-      source: "manual",
-      capturedAt: "not-a-date",
-    })?.capturedAt).toBeNull();
+    expect(
+      buildSensorReadingProvenanceDisplayModel({
+        source: "manual",
+        capturedAt: "not-a-date",
+      })?.capturedAt,
+    ).toBeNull();
   });
 
   it("keeps the display raw-key allow-list narrow", () => {

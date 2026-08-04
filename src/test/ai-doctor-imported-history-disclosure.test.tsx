@@ -13,8 +13,7 @@ import { compilePlantContextFromRows } from "@/lib/aiDoctorContextCompiler";
 import { AiDoctorImportedHistoryDisclosurePanel } from "@/components/AiDoctorImportedHistoryDisclosurePanel";
 
 const NOW = new Date("2026-06-13T12:00:00.000Z");
-const captured = (h: number) =>
-  new Date(NOW.getTime() - h * 60 * 60 * 1000).toISOString();
+const captured = (h: number) => new Date(NOW.getTime() - h * 60 * 60 * 1000).toISOString();
 
 function buildImportedContext() {
   return compilePlantContextFromRows({
@@ -69,16 +68,12 @@ describe("AiDoctorImportedHistoryDisclosurePanel", () => {
   });
 
   it("shows the panel title 'Imported history'", () => {
-    render(
-      <AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />,
-    );
+    render(<AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />);
     expect(screen.getByText("Imported history")).toBeTruthy();
   });
 
   it("states the data is not live telemetry and suggests adding current readings", () => {
-    render(
-      <AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />,
-    );
+    render(<AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />);
     expect(
       screen.getByText(
         "CSV/imported readings can give AI Doctor useful background, but they are not live telemetry. Add a current manual or live sensor snapshot before relying on this for current-room decisions.",
@@ -87,49 +82,34 @@ describe("AiDoctorImportedHistoryDisclosurePanel", () => {
   });
 
   it("displays 'CSV history' as the source label", () => {
-    render(
-      <AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />,
+    render(<AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />);
+    expect(screen.getByTestId("ai-doctor-imported-history-source-label").textContent).toBe(
+      "CSV history",
     );
-    expect(
-      screen.getByTestId("ai-doctor-imported-history-source-label").textContent,
-    ).toBe("CSV history");
   });
 
   it("displays both vendor labels", () => {
-    render(
-      <AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />,
-    );
-    const vendors = screen.getByTestId("ai-doctor-imported-history-vendors")
-      .textContent ?? "";
+    render(<AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />);
+    const vendors = screen.getByTestId("ai-doctor-imported-history-vendors").textContent ?? "";
     expect(vendors).toContain("Verdant Genetics XLSX");
     expect(vendors).toContain("Spider Farmer");
   });
 
   it("displays the date range", () => {
-    render(
-      <AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />,
-    );
-    const range = screen.getByTestId("ai-doctor-imported-history-date-range")
-      .textContent ?? "";
+    render(<AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />);
+    const range = screen.getByTestId("ai-doctor-imported-history-date-range").textContent ?? "";
     expect(range).toContain("→");
     expect(range.length).toBeGreaterThan(5);
   });
 
   it("displays total readings", () => {
-    render(
-      <AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />,
-    );
-    expect(
-      screen.getByTestId("ai-doctor-imported-history-total-readings").textContent,
-    ).toBe("2");
+    render(<AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />);
+    expect(screen.getByTestId("ai-doctor-imported-history-total-readings").textContent).toBe("2");
   });
 
   it("displays metric summaries", () => {
-    render(
-      <AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />,
-    );
-    const metrics = screen.getByTestId("ai-doctor-imported-history-metrics")
-      .textContent ?? "";
+    render(<AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />);
+    const metrics = screen.getByTestId("ai-doctor-imported-history-metrics").textContent ?? "";
     expect(metrics).toContain("temperature_c");
     expect(metrics).toContain("humidity_pct");
     expect(metrics).toContain("min=");
@@ -137,13 +117,8 @@ describe("AiDoctorImportedHistoryDisclosurePanel", () => {
   });
 
   it("shows suspicious flag count when greater than 0", () => {
-    render(
-      <AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />,
-    );
-    expect(
-      screen.getByTestId("ai-doctor-imported-history-suspicious-flags")
-        .textContent,
-    ).toBe("1");
+    render(<AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />);
+    expect(screen.getByTestId("ai-doctor-imported-history-suspicious-flags").textContent).toBe("1");
   });
 
   it("hides suspicious flag count when 0", () => {
@@ -162,37 +137,28 @@ describe("AiDoctorImportedHistoryDisclosurePanel", () => {
       now: NOW,
     });
     render(<AiDoctorImportedHistoryDisclosurePanel context={ctx} />);
-    expect(
-      screen.queryByTestId("ai-doctor-imported-history-suspicious-flags"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-imported-history-suspicious-flags")).toBeNull();
   });
 
   it("renders missing-live warning when missingLiveSensorReadings is true", () => {
-    render(
-      <AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />,
+    render(<AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />);
+    expect(screen.getByTestId("ai-doctor-imported-history-missing-live-warning").textContent).toBe(
+      "Missing current live/manual readings — diagnosis confidence should stay conservative.",
     );
-    expect(
-      screen.getByTestId("ai-doctor-imported-history-missing-live-warning")
-        .textContent,
-    ).toBe("Missing current live/manual readings — diagnosis confidence should stay conservative.");
   });
 
   it("does not render missing-live warning when live readings exist", () => {
     const ctx = buildImportedContext();
     const ctxWithLive = { ...ctx, missingLiveSensorReadings: false };
     render(<AiDoctorImportedHistoryDisclosurePanel context={ctxWithLive} />);
-    expect(
-      screen.queryByTestId("ai-doctor-imported-history-missing-live-warning"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-imported-history-missing-live-warning")).toBeNull();
   });
 
   it("renders invalid-note when panel is visible", () => {
-    render(
-      <AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />,
+    render(<AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />);
+    expect(screen.getByTestId("ai-doctor-imported-history-invalid-note").textContent).toBe(
+      "Invalid or unknown readings are shown for review only and are not treated as healthy.",
     );
-    expect(
-      screen.getByTestId("ai-doctor-imported-history-invalid-note").textContent,
-    ).toBe("Invalid or unknown readings are shown for review only and are not treated as healthy.");
   });
 
   it("renders nothing when no imported_sensor_history exists", () => {
@@ -202,9 +168,7 @@ describe("AiDoctorImportedHistoryDisclosurePanel", () => {
       sensorReadings: [],
       now: NOW,
     });
-    const { container } = render(
-      <AiDoctorImportedHistoryDisclosurePanel context={ctx} />,
-    );
+    const { container } = render(<AiDoctorImportedHistoryDisclosurePanel context={ctx} />);
     expect(container.firstChild).toBeNull();
   });
 

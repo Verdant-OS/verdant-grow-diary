@@ -50,9 +50,7 @@ describe("Settings start-screen — a11y", () => {
   it("Save and Reset have accessible names", () => {
     renderSettings();
     expect(screen.getByRole("button", { name: /^save$/i })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /diary-first default/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /diary-first default/i })).toBeInTheDocument();
   });
 
   it("saved confirmation uses role=status with aria-live=polite", () => {

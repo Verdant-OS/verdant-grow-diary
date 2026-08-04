@@ -16,19 +16,13 @@ function safeIsoDate(s: unknown): string {
 export const PRINT_SAFETY_FOOTER =
   "Read-only report. No device control, automation, alerts, or action queue changes were performed.";
 
-export function buildEnvironmentSummaryPrintTitle(
-  startDate: string,
-  endDate: string,
-): string {
+export function buildEnvironmentSummaryPrintTitle(startDate: string, endDate: string): string {
   const s = safeIsoDate(startDate);
   const e = safeIsoDate(endDate);
   return `Verdant — Environment Summary — ${s} to ${e}`;
 }
 
-export function buildEnvironmentSummaryPrintFilename(
-  startDate: string,
-  endDate: string,
-): string {
+export function buildEnvironmentSummaryPrintFilename(startDate: string, endDate: string): string {
   const s = safeIsoDate(startDate);
   const e = safeIsoDate(endDate);
   return `verdant-environment-summary-${s}-to-${e}.pdf`;
@@ -100,9 +94,7 @@ export function buildEnvironmentSummaryPrintMetadata(
       : typeof input.generatedAt === "string"
         ? new Date(input.generatedAt)
         : new Date();
-  const generatedLabel = Number.isFinite(generated.getTime())
-    ? generated.toISOString()
-    : "unknown";
+  const generatedLabel = Number.isFinite(generated.getTime()) ? generated.toISOString() : "unknown";
 
   return {
     title: buildEnvironmentSummaryPrintTitle(start, end),

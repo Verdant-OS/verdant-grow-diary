@@ -42,14 +42,26 @@ describe("pi_ingest_commit_batch RPC — signature & safety", () => {
     ["declares p_bridge_id text", /p_bridge_id\s+text/i],
     ["declares p_tent_id uuid", /p_tent_id\s+uuid/i],
     ["declares p_rows jsonb", /p_rows\s+jsonb/i],
-    ["returns inserted and rejected counts", /RETURNS\s+TABLE\s*\(\s*inserted\s+int\s*,\s*rejected\s+int\s*\)/i],
+    [
+      "returns inserted and rejected counts",
+      /RETURNS\s+TABLE\s*\(\s*inserted\s+int\s*,\s*rejected\s+int\s*\)/i,
+    ],
     ["is SECURITY DEFINER", /SECURITY\s+DEFINER/i],
     ["pins search_path", /SET\s+search_path\s*=\s*public\s*,\s*pg_temp/i],
     ["inserts into sensor_readings", /INSERT\s+INTO\s+public\.sensor_readings/i],
-    ["inserts into pi_ingest_idempotency_keys", /INSERT\s+INTO\s+public\.pi_ingest_idempotency_keys/i],
+    [
+      "inserts into pi_ingest_idempotency_keys",
+      /INSERT\s+INTO\s+public\.pi_ingest_idempotency_keys/i,
+    ],
     ["uses RETURNING id for sensor row linkage", /RETURNING\s+id\s+INTO\s+v_sensor_id/i],
-    ["links sensor_reading_id on the idempotency insert", /sensor_reading_id[\s\S]{0,400}v_sensor_id/i],
-    ["skips existing (user_id, idempotency_key) rows", /pi_ingest_idempotency_keys[\s\S]{0,200}idempotency_key/i],
+    [
+      "links sensor_reading_id on the idempotency insert",
+      /sensor_reading_id[\s\S]{0,400}v_sensor_id/i,
+    ],
+    [
+      "skips existing (user_id, idempotency_key) rows",
+      /pi_ingest_idempotency_keys[\s\S]{0,200}idempotency_key/i,
+    ],
     ["validates tent ownership", /tent\s+does\s+not\s+belong\s+to\s+user/i],
     ["REVOKEs from anon", /REVOKE\s+ALL[\s\S]{0,200}\bFROM\s+anon\b/i],
     ["REVOKEs from authenticated", /REVOKE\s+ALL[\s\S]{0,200}\bFROM\s+authenticated\b/i],
@@ -78,10 +90,7 @@ describe("pi_ingest_commit_batch RPC — signature & safety", () => {
 });
 
 describe("pi_ingest_commit_batch RPC — wired via server-only helper", () => {
-  const INDEX_PATH = resolve(
-    ROOT,
-    "supabase/functions/pi-ingest-readings/index.ts",
-  );
+  const INDEX_PATH = resolve(ROOT, "supabase/functions/pi-ingest-readings/index.ts");
   const src = existsSync(INDEX_PATH) ? readFileSync(INDEX_PATH, "utf8") : "";
 
   it("index.ts wires commitPiIngestBatch helper", () => {

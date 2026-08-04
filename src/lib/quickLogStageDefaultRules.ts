@@ -68,10 +68,7 @@ export function isKnownQuickLogStage(raw: unknown): boolean {
 }
 
 export type HarvestStageEligibilityReason =
-  | "eligible"
-  | "early_stage"
-  | "post_harvest"
-  | "unknown_stage";
+  "eligible" | "early_stage" | "post_harvest" | "unknown_stage";
 
 export interface HarvestStageEligibility {
   eligible: boolean;

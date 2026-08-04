@@ -25,11 +25,9 @@ vi.mock("@/lib/sensor", async (orig) => {
   const real = await orig<typeof import("@/lib/sensor")>();
   return {
     ...real,
-    useLatestTentSensorSnapshot: (...a: unknown[]) =>
-      mockUseLatestTentSensorSnapshot(...a),
+    useLatestTentSensorSnapshot: (...a: unknown[]) => mockUseLatestTentSensorSnapshot(...a),
   };
 });
-
 
 function ready(partial: Partial<StrictSensorSnapshot> = {}): LatestTentSensorSnapshotState {
   const snap: StrictSensorSnapshot = {
@@ -95,7 +93,6 @@ describe("QuickLogSensorSnapshotStrip — provider label, ARIA, mini-chart", () 
     );
   });
 
-
   it("hides provider chip when source is 'live'", () => {
     mockUseLatestTentSensorSnapshot.mockReturnValue(ready({ source: "live" }));
     render(<QuickLogSensorSnapshotStrip tentId="t1" />);
@@ -130,6 +127,4 @@ describe("QuickLogSensorSnapshotStrip — provider label, ARIA, mini-chart", () 
     expect(pill).toHaveAttribute("role", "status");
     expect(pill).toHaveAttribute("aria-label", "Sensor snapshot status: stale");
   });
-
 });
-

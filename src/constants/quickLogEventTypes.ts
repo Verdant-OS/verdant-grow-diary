@@ -21,38 +21,26 @@ export const QUICK_LOG_HARVEST_EVENT_TYPE = "harvest" as const;
 export const QUICK_LOG_CURE_CHECK_EVENT_TYPE = "cure_check" as const;
 
 export type QuickLogHarvestCureEventType =
-  | typeof QUICK_LOG_HARVEST_EVENT_TYPE
-  | typeof QUICK_LOG_CURE_CHECK_EVENT_TYPE;
+  typeof QUICK_LOG_HARVEST_EVENT_TYPE | typeof QUICK_LOG_CURE_CHECK_EVENT_TYPE;
 
-export const QUICK_LOG_HARVEST_CURE_EVENT_TYPES: readonly QuickLogHarvestCureEventType[] =
-  [QUICK_LOG_HARVEST_EVENT_TYPE, QUICK_LOG_CURE_CHECK_EVENT_TYPE] as const;
+export const QUICK_LOG_HARVEST_CURE_EVENT_TYPES: readonly QuickLogHarvestCureEventType[] = [
+  QUICK_LOG_HARVEST_EVENT_TYPE,
+  QUICK_LOG_CURE_CHECK_EVENT_TYPE,
+] as const;
 
-export const QUICK_LOG_HARVEST_CURE_LABELS: Record<
-  QuickLogHarvestCureEventType,
-  string
-> = {
+export const QUICK_LOG_HARVEST_CURE_LABELS: Record<QuickLogHarvestCureEventType, string> = {
   harvest: "Harvest",
   cure_check: "Cure check",
 };
 
-export const QUICK_LOG_TRIM_STYLES = [
-  "wet_trim",
-  "dry_trim",
-  "partial_trim",
-  "unknown",
-] as const;
+export const QUICK_LOG_TRIM_STYLES = ["wet_trim", "dry_trim", "partial_trim", "unknown"] as const;
 export type QuickLogTrimStyle = (typeof QUICK_LOG_TRIM_STYLES)[number];
 
 export const QUICK_LOG_KEEPER_STATUSES = ["yes", "no", "undecided"] as const;
 export type QuickLogKeeperStatus = (typeof QUICK_LOG_KEEPER_STATUSES)[number];
 
-export const QUICK_LOG_MOLD_CHECK_STATUSES = [
-  "clear",
-  "concern",
-  "unknown",
-] as const;
-export type QuickLogMoldCheckStatus =
-  (typeof QUICK_LOG_MOLD_CHECK_STATUSES)[number];
+export const QUICK_LOG_MOLD_CHECK_STATUSES = ["clear", "concern", "unknown"] as const;
+export type QuickLogMoldCheckStatus = (typeof QUICK_LOG_MOLD_CHECK_STATUSES)[number];
 
 export const QUICK_LOG_BURPED_VALUES = ["yes", "no"] as const;
 export type QuickLogBurpedValue = (typeof QUICK_LOG_BURPED_VALUES)[number];

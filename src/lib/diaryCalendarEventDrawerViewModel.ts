@@ -17,32 +17,22 @@ import {
   type EcCompensationPreviewModel,
 } from "@/lib/ecCompensationPreviewViewModel";
 import type { EcUnit } from "@/constants/units";
-import type {
-  DiaryCalendarEvent,
-  DiaryCalendarEventKind,
-} from "@/lib/diaryCalendarViewModel";
+import type { DiaryCalendarEvent, DiaryCalendarEventKind } from "@/lib/diaryCalendarViewModel";
 import {
   celsiusToFahrenheit,
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
 
-export const DIARY_CALENDAR_DRAWER_READ_ONLY_LABEL =
-  "Read-only diary event" as const;
-export const DIARY_CALENDAR_DRAWER_DERIVED_DISCLAIMER =
-  "Derived previews are not stored" as const;
+export const DIARY_CALENDAR_DRAWER_READ_ONLY_LABEL = "Read-only diary event" as const;
+export const DIARY_CALENDAR_DRAWER_DERIVED_DISCLAIMER = "Derived previews are not stored" as const;
 
 export const DIARY_CALENDAR_DRAWER_PHOTO_EMPTY = "No photo attached" as const;
-export const DIARY_CALENDAR_DRAWER_SENSOR_EMPTY =
-  "No linked sensor snapshot" as const;
-export const DIARY_CALENDAR_DRAWER_PHOTO_ATTACHED =
-  "Photo attached" as const;
-export const DIARY_CALENDAR_DRAWER_SENSOR_LINKED =
-  "Sensor snapshot linked" as const;
+export const DIARY_CALENDAR_DRAWER_SENSOR_EMPTY = "No linked sensor snapshot" as const;
+export const DIARY_CALENDAR_DRAWER_PHOTO_ATTACHED = "Photo attached" as const;
+export const DIARY_CALENDAR_DRAWER_SENSOR_LINKED = "Sensor snapshot linked" as const;
 
-export const DIARY_CALENDAR_DRAWER_VIEW_LABEL =
-  "View event details" as const;
-export const DIARY_CALENDAR_DRAWER_CLOSE_LABEL =
-  "Close event details" as const;
+export const DIARY_CALENDAR_DRAWER_VIEW_LABEL = "View event details" as const;
+export const DIARY_CALENDAR_DRAWER_CLOSE_LABEL = "Close event details" as const;
 export const DIARY_CALENDAR_DRAWER_DESCRIPTION =
   "Read-only details for this diary event, including recorded measurements and attachment status." as const;
 
@@ -92,10 +82,7 @@ function pickRecord(details: unknown): Record<string, unknown> | null {
   return details as Record<string, unknown>;
 }
 
-function pickFirstString(
-  d: Record<string, unknown>,
-  keys: readonly string[],
-): string | null {
+function pickFirstString(d: Record<string, unknown>, keys: readonly string[]): string | null {
   for (const k of keys) {
     const v = d[k];
     if (typeof v === "string") {
@@ -106,10 +93,7 @@ function pickFirstString(
   return null;
 }
 
-function pickFirstFiniteNumber(
-  d: Record<string, unknown>,
-  keys: readonly string[],
-): number | null {
+function pickFirstFiniteNumber(d: Record<string, unknown>, keys: readonly string[]): number | null {
   for (const k of keys) {
     const v = d[k];
     if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -224,12 +208,7 @@ function buildSummarySection(
     const method = pickFirstString(d, ["method", "watering_method", "wateringMethod"]);
     if (method) fields.push({ label: "Method", value: method });
   } else if (kind === "feeding") {
-    const recipe = pickFirstString(d, [
-      "nutrients",
-      "recipe",
-      "nutrient_line",
-      "nutrientLine",
-    ]);
+    const recipe = pickFirstString(d, ["nutrients", "recipe", "nutrient_line", "nutrientLine"]);
     if (recipe) fields.push({ label: "Nutrients", value: recipe });
     const brand = pickFirstString(d, ["nutrient_brand", "nutrientBrand", "brand"]);
     if (brand) fields.push({ label: "Brand", value: brand });
@@ -324,11 +303,7 @@ function buildPlantMemorySection(
     const lbl = STAGE_LABELS[stageRaw.toLowerCase()] ?? null;
     if (lbl) fields.push({ label: "Stage", value: lbl });
   }
-  const milestone = pickFirstString(d, [
-    "milestone",
-    "growth_milestone",
-    "growthMilestone",
-  ]);
+  const milestone = pickFirstString(d, ["milestone", "growth_milestone", "growthMilestone"]);
   if (milestone) fields.push({ label: "Milestone", value: milestone });
   const vigorRaw = pickFirstString(d, ["vigor", "vigor_rating", "vigorRating"]);
   if (vigorRaw) {
@@ -338,9 +313,7 @@ function buildPlantMemorySection(
   return fields;
 }
 
-function buildAttachments(
-  d: Record<string, unknown> | null,
-): DiaryCalendarDrawerAttachments {
+function buildAttachments(d: Record<string, unknown> | null): DiaryCalendarDrawerAttachments {
   const photoPresent = d ? hasAnyKey(d, PHOTO_PRESENCE_KEYS) : false;
   const sensorPresent = d ? hasAnyKey(d, SENSOR_PRESENCE_KEYS) : false;
   return {

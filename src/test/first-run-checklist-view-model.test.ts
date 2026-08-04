@@ -27,9 +27,7 @@ describe("firstRunChecklistViewModel", () => {
 
   it("marks Grow complete when grow exists", () => {
     const vm = buildFirstRunChecklistViewModel({ ...base, growCount: 1 });
-    expect(vm.steps.find((s) => s.key === "create_grow")!.state).toBe(
-      "complete",
-    );
+    expect(vm.steps.find((s) => s.key === "create_grow")!.state).toBe("complete");
   });
 
   it("marks Tent complete when tent exists", () => {
@@ -80,9 +78,7 @@ describe("firstRunChecklistViewModel", () => {
     expect(vm.steps.find((s) => s.key === "add_tent")!.href).toBe("/tents");
     expect(vm.steps.find((s) => s.key === "add_plant")!.href).toBe("/plants");
     expect(vm.steps.find((s) => s.key === "first_quick_log")!.href).toBe("/");
-    expect(
-      vm.steps.find((s) => s.key === "first_sensor_snapshot")!.href,
-    ).toBe("/sensors");
+    expect(vm.steps.find((s) => s.key === "first_sensor_snapshot")!.href).toBe("/sensors");
     expect(FIRST_RUN_ROUTES.add_plant).toBe("/plants");
   });
 
@@ -94,29 +90,19 @@ describe("firstRunChecklistViewModel", () => {
       quickLogCount: null,
       sensorSnapshotCount: null,
     });
-    expect(vm.steps.find((s) => s.key === "first_quick_log")!.state).toBe(
-      "recommended",
-    );
-    expect(
-      vm.steps.find((s) => s.key === "first_sensor_snapshot")!.state,
-    ).toBe("recommended");
+    expect(vm.steps.find((s) => s.key === "first_quick_log")!.state).toBe("recommended");
+    expect(vm.steps.find((s) => s.key === "first_sensor_snapshot")!.state).toBe("recommended");
   });
 
   it("Quick Log and Sensor are optional (not required)", () => {
     const vm = buildFirstRunChecklistViewModel(base);
-    expect(vm.steps.find((s) => s.key === "first_quick_log")!.required).toBe(
-      false,
-    );
-    expect(
-      vm.steps.find((s) => s.key === "first_sensor_snapshot")!.required,
-    ).toBe(false);
+    expect(vm.steps.find((s) => s.key === "first_quick_log")!.required).toBe(false);
+    expect(vm.steps.find((s) => s.key === "first_sensor_snapshot")!.required).toBe(false);
     expect(vm.requiredTotalCount).toBe(3);
   });
 
   it("uses a namespaced dismiss storage key", () => {
-    expect(FIRST_RUN_DISMISS_STORAGE_KEY).toBe(
-      "verdant:first-run-checklist-dismissed",
-    );
+    expect(FIRST_RUN_DISMISS_STORAGE_KEY).toBe("verdant:first-run-checklist-dismissed");
   });
 
   it("copy is cautious: no automation / device-control / live-required claims", () => {

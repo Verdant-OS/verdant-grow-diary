@@ -90,9 +90,7 @@ export default function VerificationPendingBanner({ email }: Props) {
       className="glass rounded-2xl p-5 mb-5 border border-border/40"
     >
       <h2 className="font-display font-semibold mb-1">Verify your email</h2>
-      <p className="text-sm text-muted-foreground mb-3">
-        {VERIFICATION_PENDING_BANNER_MESSAGE}
-      </p>
+      <p className="text-sm text-muted-foreground mb-3">{VERIFICATION_PENDING_BANNER_MESSAGE}</p>
       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
         <Button
           type="button"

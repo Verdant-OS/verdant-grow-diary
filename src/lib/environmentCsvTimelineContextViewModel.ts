@@ -85,9 +85,7 @@ function entryMs(e: DiaryEntryLike): number | null {
   return Number.isFinite(t) ? t : null;
 }
 
-export function buildCsvTimelineContext(
-  input: CsvTimelineContextInput,
-): CsvTimelineContextEntry[] {
+export function buildCsvTimelineContext(input: CsvTimelineContextInput): CsvTimelineContextEntry[] {
   const entries = Array.isArray(input.diaryEntries) ? input.diaryEntries : [];
   const rowsAll = Array.isArray(input.sensorReadings) ? input.sensorReadings : [];
   const { growId, tentId } = input;

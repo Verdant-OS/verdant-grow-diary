@@ -113,8 +113,14 @@ export default function QuickLogFeedingForm({
   // entry-pinned unit (when a draft is in progress) so the label never
   // disagrees with what the write seam will actually save — mirrors
   // canonicalWaterTempC above.
-  const entryTemperatureUnitSymbol = getTemperatureUnitSymbol(entryTemperatureUnit ?? temperatureUnit);
-  const review = buildFeedingReview(value, defaultsApplied, entryTemperatureUnit ?? temperatureUnit);
+  const entryTemperatureUnitSymbol = getTemperatureUnitSymbol(
+    entryTemperatureUnit ?? temperatureUnit,
+  );
+  const review = buildFeedingReview(
+    value,
+    defaultsApplied,
+    entryTemperatureUnit ?? temperatureUnit,
+  );
 
   return (
     <div className="space-y-4" data-testid="qlv2-feeding-form">

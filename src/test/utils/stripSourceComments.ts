@@ -16,12 +16,7 @@
  */
 
 type Mode =
-  | "code"
-  | "line-comment"
-  | "block-comment"
-  | "string-single"
-  | "string-double"
-  | "string-backtick";
+  "code" | "line-comment" | "block-comment" | "string-single" | "string-double" | "string-backtick";
 
 export function stripSourceComments(input: string): string {
   if (typeof input !== "string" || input.length === 0) return "";
@@ -98,7 +93,6 @@ export function stripSourceComments(input: string): string {
       continue;
     }
 
-
     // String modes — preserve content verbatim; handle escape pass-through
     // and matching closing delimiter.
     if (mode === "string-single" || mode === "string-double" || mode === "string-backtick") {
@@ -109,8 +103,7 @@ export function stripSourceComments(input: string): string {
         i += 2;
         continue;
       }
-      const closer =
-        mode === "string-single" ? "'" : mode === "string-double" ? '"' : "`";
+      const closer = mode === "string-single" ? "'" : mode === "string-double" ? '"' : "`";
       if (ch === closer) {
         mode = "code";
       }

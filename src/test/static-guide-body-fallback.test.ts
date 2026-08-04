@@ -3,10 +3,7 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  VERDANT_GROWER_GUIDE_FAQ,
-  VERDANT_SEO_GUIDES,
-} from "@/constants/verdantSeoContent";
+import { VERDANT_GROWER_GUIDE_FAQ, VERDANT_SEO_GUIDES } from "@/constants/verdantSeoContent";
 import { STATIC_PUBLIC_SEO_DOCUMENTS } from "@/lib/build/staticPublicSeoDocuments";
 import { buildGuideQuickLogStarterHref } from "@/lib/quickLogStarterLinks";
 import { buildStaticSocialRouteHtml } from "@/lib/build/staticSocialRouteHtml";
@@ -125,8 +122,8 @@ describe("static guide body fallback", () => {
     expect(vpd).toContain('href="/tools/vpd-calculator"');
     expect(vpd).toContain("no upload, no diagnosis, and no device control");
 
-    const comparison = documentAt("/guides/oreoz-vs-gelonade-comparison").metadata
-      .bodyFallbackHtml ?? "";
+    const comparison =
+      documentAt("/guides/oreoz-vs-gelonade-comparison").metadata.bodyFallbackHtml ?? "";
     expect(comparison).toContain('href="/customer/guide/oreoz-vs-gelonade-comparison"');
     expect(comparison).toContain("does not load Operator grows, plants, diary entries, sensors");
 
@@ -135,9 +132,7 @@ describe("static guide body fallback", () => {
       expect(fallback).toContain('href="/guides"');
       expect(fallback).toContain('href="/welcome"');
       expect(fallback).toContain('href="/pricing"');
-      expect(fallback).toContain(
-        `href="${escapeHtml(buildGuideQuickLogStarterHref(guide.slug))}"`,
-      );
+      expect(fallback).toContain(`href="${escapeHtml(buildGuideQuickLogStarterHref(guide.slug))}"`);
     }
   });
 

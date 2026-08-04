@@ -33,8 +33,7 @@ export const PLANT_PROFILE_PHOTO_FALLBACK_HEADING = "Photo selected";
 export const PLANT_PROFILE_PHOTO_FALLBACK_COPY = {
   browser_decode_unsupported:
     "Preview isn’t supported by this browser, but the original photo is ready to upload.",
-  preview_error:
-    "Preview could not be displayed, but the selected photo is still ready to upload.",
+  preview_error: "Preview could not be displayed, but the selected photo is still ready to upload.",
 } as const;
 
 /** Returns the HEIC/HEIF format badge label if applicable, else null. */

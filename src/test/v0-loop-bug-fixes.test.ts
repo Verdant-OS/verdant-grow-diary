@@ -28,15 +28,11 @@ describe("Bug 1 · QuickLog invalidates Recent Plant Activity caches", () => {
   });
 
   it("invalidates the plant_recent_activity query key after insert", () => {
-    expect(QUICKLOG).toMatch(
-      /invalidateQueries\(\{\s*queryKey:\s*\["plant_recent_activity"\]/,
-    );
+    expect(QUICKLOG).toMatch(/invalidateQueries\(\{\s*queryKey:\s*\["plant_recent_activity"\]/);
   });
 
   it("invalidates the shared diary_entries query key after insert", () => {
-    expect(QUICKLOG).toMatch(
-      /invalidateQueries\(\{\s*queryKey:\s*\["diary_entries"\]/,
-    );
+    expect(QUICKLOG).toMatch(/invalidateQueries\(\{\s*queryKey:\s*\["diary_entries"\]/);
   });
 
   it("routes saves through quicklog_save_manual RPC (no direct table inserts)", () => {

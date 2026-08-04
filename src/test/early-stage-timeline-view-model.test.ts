@@ -143,10 +143,7 @@ describe("buildEarlyStageTimelineViewModel — safe fallbacks", () => {
 describe("earlyStageTimelineViewModel — safety boundaries", () => {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = dirname(__filename);
-  const SRC = readFileSync(
-    resolve(__dirname, "../lib/earlyStageTimelineViewModel.ts"),
-    "utf8",
-  );
+  const SRC = readFileSync(resolve(__dirname, "../lib/earlyStageTimelineViewModel.ts"), "utf8");
 
   it("contains no Supabase / RPC / Action Queue / device-control code", () => {
     expect(SRC).not.toMatch(/from\s*\(\s*['"]/);

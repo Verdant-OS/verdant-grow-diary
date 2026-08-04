@@ -52,9 +52,9 @@ describe("Gated feature — Global Quick Log (no plant/tent selected)", () => {
 
   it("ships the calm needs-context copy in a static sr-only node for audits", () => {
     renderFastAddNoContext();
-    expect(
-      screen.getByTestId("global-fast-add-needs-context-copy"),
-    ).toHaveTextContent(FAST_ADD_NO_CONTEXT_COPY);
+    expect(screen.getByTestId("global-fast-add-needs-context-copy")).toHaveTextContent(
+      FAST_ADD_NO_CONTEXT_COPY,
+    );
   });
 
   it("CTA destinations point to /plants and /tents (mounted auth routes)", () => {

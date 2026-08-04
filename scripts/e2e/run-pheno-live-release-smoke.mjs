@@ -29,11 +29,7 @@ import {
   evaluatePhenoLiveSmokeEnv,
   printPhenoLiveSmokeChecklist,
 } from "./check-pheno-live-smoke-env.mjs";
-import {
-  statsFromReport,
-  evaluateStats,
-  deriveCheckpoints,
-} from "./pheno-live-smoke-report.mjs";
+import { statsFromReport, evaluateStats, deriveCheckpoints } from "./pheno-live-smoke-report.mjs";
 
 const LIVE_URL = "https://verdantgrowdiary.com";
 const FINGERPRINT_SCRIPT = "scripts/releases/fetch-pheno-live-build-id.mjs";
@@ -72,11 +68,13 @@ function section(title) {
 }
 
 function run(command, args, extraEnv = {}) {
-  return spawnSync(command, args, {
-    stdio: "inherit",
-    shell: false,
-    env: { ...process.env, ...extraEnv },
-  }).status ?? 1;
+  return (
+    spawnSync(command, args, {
+      stdio: "inherit",
+      shell: false,
+      env: { ...process.env, ...extraEnv },
+    }).status ?? 1
+  );
 }
 
 function readPlaywrightReport() {
@@ -127,7 +125,9 @@ function finish(code, finalStatus) {
   log(`  fingerprint ${summary.fingerprint}`);
   log(`  sessions    ${summary.sessions}`);
   log(`  playwright  ${summary.playwright}`);
-  log(`  tests       ${summary.tests.passed} passed / ${summary.tests.failed} failed / ${summary.tests.skipped} skipped / ${summary.tests.flaky} flaky`);
+  log(
+    `  tests       ${summary.tests.passed} passed / ${summary.tests.failed} failed / ${summary.tests.skipped} skipped / ${summary.tests.flaky} flaky`,
+  );
   log(`  final       ${summary.final}`);
   log(`  receipt     ${path.relative(process.cwd(), SUMMARY_MD_PATH)}`);
   process.exit(code);
@@ -254,7 +254,8 @@ async function main() {
 
 main().catch(() => {
   summary.final = "FAIL";
-  summary.playwright = summary.playwright === "PENDING" ? "FAIL (unexpected runner error)" : summary.playwright;
+  summary.playwright =
+    summary.playwright === "PENDING" ? "FAIL (unexpected runner error)" : summary.playwright;
   writeArtifacts();
   process.exit(1);
 });

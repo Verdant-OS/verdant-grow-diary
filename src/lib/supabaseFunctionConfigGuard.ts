@@ -101,9 +101,7 @@ export interface FindMissingOptions {
  * Compute the set of `[functions.<name>]` entries whose source file is
  * missing on disk. Pure: caller supplies `exists`.
  */
-export function findMissingFunctionSources(
-  opts: FindMissingOptions,
-): MissingFunctionSource[] {
+export function findMissingFunctionSources(opts: FindMissingOptions): MissingFunctionSource[] {
   const declared = parseSupabaseFunctionNames(opts.toml);
   const scoped = opts.filter ? declared.filter(opts.filter) : declared;
   const missing: MissingFunctionSource[] = [];
@@ -122,5 +120,4 @@ export function findMissingFunctionSources(
 }
 
 /** Predicate used by the Shelly H&T-scoped guard. */
-export const isShellyHtFunctionName = (name: string): boolean =>
-  name.startsWith("shelly-ht-");
+export const isShellyHtFunctionName = (name: string): boolean => name.startsWith("shelly-ht-");

@@ -29,13 +29,7 @@ export const VPD_REALISTIC_RANGE = { min: 0.2, max: 2.5 } as const;
 export type ManualSnapshotQuality = "usable" | "needs_review" | "invalid" | "missing";
 
 export type ManualSnapshotSourceLabel =
-  | "manual"
-  | "live"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid"
-  | "unknown";
+  "manual" | "live" | "csv" | "demo" | "stale" | "invalid" | "unknown";
 
 export interface ManualSensorSnapshotInput {
   readonly source?: string | null;

@@ -123,9 +123,7 @@ describe("AI credit grow-integrity runtime harness contracts", () => {
     expect(RECEIPT_HARNESS).toContain("hasIntactPair(pairAfterGrowDelete, args)");
     expect(RECEIPT_HARNESS).toContain("const { error: growDeleteError } = await owner");
     expect(RECEIPT_HARNESS).toContain('.eq("user_id", uidA)');
-    const growDeleteIndex = NORMALIZED_RECEIPT_HARNESS.indexOf(
-      'from("grows")\n      .delete()',
-    );
+    const growDeleteIndex = NORMALIZED_RECEIPT_HARNESS.indexOf('from("grows")\n      .delete()');
     const accountDeleteIndex = NORMALIZED_RECEIPT_HARNESS.indexOf(
       "admin.auth.admin.deleteUser(uidA)",
     );

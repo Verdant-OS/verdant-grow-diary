@@ -94,10 +94,9 @@ describe("TimelineSensorSnapshotSummary — source badges", () => {
     const root = screen.getByTestId("timeline-snapshot-summary");
     expect(root.getAttribute("data-source")).toBe("demo");
     expect(root.getAttribute("data-trustworthy")).toBe("false");
-    expect(
-      screen.getByTestId("timeline-snapshot-summary-not-trustworthy")
-        .textContent,
-    ).toContain(TIMELINE_SNAPSHOT_NOT_TRUSTWORTHY_LABEL);
+    expect(screen.getByTestId("timeline-snapshot-summary-not-trustworthy").textContent).toContain(
+      TIMELINE_SNAPSHOT_NOT_TRUSTWORTHY_LABEL,
+    );
     expect(root.textContent?.toLowerCase()).not.toMatch(/\blive\b/);
   });
 
@@ -114,9 +113,7 @@ describe("TimelineSensorSnapshotSummary — source badges", () => {
     const root = screen.getByTestId("timeline-snapshot-summary");
     expect(root.getAttribute("data-source")).toBe("stale");
     expect(root.getAttribute("data-trustworthy")).toBe("false");
-    expect(
-      screen.getByTestId("timeline-snapshot-summary-not-trustworthy"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("timeline-snapshot-summary-not-trustworthy")).toBeTruthy();
   });
 
   it("renders invalid badge with invalid severity and not-trustworthy treatment", () => {
@@ -132,9 +129,7 @@ describe("TimelineSensorSnapshotSummary — source badges", () => {
     const root = screen.getByTestId("timeline-snapshot-summary");
     expect(root.getAttribute("data-source")).toBe("invalid");
     expect(root.getAttribute("data-severity")).toBe("invalid");
-    expect(
-      screen.getByTestId("timeline-snapshot-summary-not-trustworthy"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("timeline-snapshot-summary-not-trustworthy")).toBeTruthy();
   });
 
   it("manual/csv/demo snapshots are NEVER labeled live", () => {
@@ -145,9 +140,7 @@ describe("TimelineSensorSnapshotSummary — source badges", () => {
         />,
       );
       const root = screen.getByTestId("timeline-snapshot-summary");
-      expect(root.getAttribute("data-source-label")?.toLowerCase()).not.toBe(
-        "live",
-      );
+      expect(root.getAttribute("data-source-label")?.toLowerCase()).not.toBe("live");
       unmount();
     }
   });
@@ -181,9 +174,9 @@ describe("TimelineSensorSnapshotSummary — metrics & missing state", () => {
 
   it("renders neutral missing-snapshot note when input is null", () => {
     render(<TimelineSensorSnapshotSummary input={null} />);
-    expect(
-      screen.getByTestId("timeline-snapshot-summary-missing").textContent,
-    ).toBe(MISSING_SNAPSHOT_NOTE_LABEL);
+    expect(screen.getByTestId("timeline-snapshot-summary-missing").textContent).toBe(
+      MISSING_SNAPSHOT_NOTE_LABEL,
+    );
     expect(screen.queryByTestId("timeline-snapshot-summary")).toBeNull();
   });
 
@@ -199,9 +192,9 @@ describe("TimelineSensorSnapshotSummary — metrics & missing state", () => {
     );
     const warnings = screen.getByTestId("timeline-snapshot-summary-warnings");
     expect(warnings.textContent?.toLowerCase()).toMatch(/stuck/);
-    const humidityCell = within(
-      screen.getByTestId("timeline-snapshot-summary-metrics"),
-    ).getByText("Humidity").closest("li");
+    const humidityCell = within(screen.getByTestId("timeline-snapshot-summary-metrics"))
+      .getByText("Humidity")
+      .closest("li");
     expect(humidityCell?.getAttribute("data-suspicious")).toBe("true");
   });
 });
@@ -241,19 +234,13 @@ describe("TimelineSensorSnapshotSummary — safety & layout", () => {
       </div>,
     );
     expect(
-      container.querySelector(
-        '[data-testid="timeline-snapshot-summary-source-badge"]',
-      ),
+      container.querySelector('[data-testid="timeline-snapshot-summary-source-badge"]'),
     ).toBeTruthy();
     expect(
-      container.querySelector(
-        '[data-testid="timeline-snapshot-summary-metrics"]',
-      ),
+      container.querySelector('[data-testid="timeline-snapshot-summary-metrics"]'),
     ).toBeTruthy();
     // Grid uses `grid-cols-2` baseline so two cells fit on a narrow row.
-    const grid = container.querySelector(
-      '[data-testid="timeline-snapshot-summary-metrics"]',
-    )!;
+    const grid = container.querySelector('[data-testid="timeline-snapshot-summary-metrics"]')!;
     expect(grid.className).toMatch(/grid-cols-2/);
   });
 });

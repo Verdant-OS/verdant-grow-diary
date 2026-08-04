@@ -93,13 +93,7 @@ export function propagationMethodLabel(v: unknown): string {
 }
 
 export type BatchStatus =
-  | "planned"
-  | "active"
-  | "rooting"
-  | "rooted"
-  | "completed"
-  | "failed"
-  | "archived";
+  "planned" | "active" | "rooting" | "rooted" | "completed" | "failed" | "archived";
 export const BATCH_STATUSES: readonly BatchStatus[] = [
   "planned",
   "active",

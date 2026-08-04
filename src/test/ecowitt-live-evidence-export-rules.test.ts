@@ -123,9 +123,7 @@ describe("buildEcowittLiveEvidenceSnapshotExport — shape & metadata", () => {
     expect(typeof snap.tonight_mode.status).toBe("string");
     expect(typeof snap.tonight_mode.can_export_snapshot).toBe("boolean");
     expect(typeof snap.tonight_mode.can_claim_live_proof).toBe("boolean");
-    expect(snap.source_truth_summary.tonight_mode_status).toBe(
-      snap.tonight_mode.status,
-    );
+    expect(snap.source_truth_summary.tonight_mode_status).toBe(snap.tonight_mode.status);
   });
 
   it("includes every safety flag", () => {
@@ -137,15 +135,11 @@ describe("buildEcowittLiveEvidenceSnapshotExport — shape & metadata", () => {
 
   it("source_truth_summary reflects overall result", () => {
     const snap = buildEcowittLiveEvidenceSnapshotExport(makeInput(baseFormState()));
-    expect(snap.source_truth_summary.overall_verdict).toBe(
-      snap.overall_result.verdict,
-    );
+    expect(snap.source_truth_summary.overall_verdict).toBe(snap.overall_result.verdict);
     expect(snap.source_truth_summary.overall_is_live_proof).toBe(
       snap.overall_result.is_live_proof === true,
     );
-    expect(snap.source_truth_summary.per_plant_count).toBe(
-      snap.plant_results.length,
-    );
+    expect(snap.source_truth_summary.per_plant_count).toBe(snap.plant_results.length);
   });
 
   it("freezes the snapshot output", () => {
@@ -168,9 +162,7 @@ describe("required_next_steps assembly", () => {
     const form = baseFormState();
     const input = makeInput(form, { required_next_steps: [] });
     const snap = buildEcowittLiveEvidenceSnapshotExport(input);
-    expect(snap.required_next_steps).toEqual([
-      ECOWITT_LIVE_EVIDENCE_EXPORT_EMPTY_NEXT_STEP,
-    ]);
+    expect(snap.required_next_steps).toEqual([ECOWITT_LIVE_EVIDENCE_EXPORT_EMPTY_NEXT_STEP]);
   });
 
   it("appends template-replacement note when form uses an example template", () => {
@@ -181,17 +173,13 @@ describe("required_next_steps assembly", () => {
       required_next_steps: ["other step"],
     });
     const snap = buildEcowittLiveEvidenceSnapshotExport(input);
-    expect(snap.required_next_steps).toContain(
-      ECOWITT_LIVE_EVIDENCE_EXPORT_TEMPLATE_NEXT_STEP,
-    );
+    expect(snap.required_next_steps).toContain(ECOWITT_LIVE_EVIDENCE_EXPORT_TEMPLATE_NEXT_STEP);
     expect(snap.required_next_steps).toContain("other step");
   });
 
   it("does NOT append template note for real (non-example) tent/plant IDs", () => {
     const snap = buildEcowittLiveEvidenceSnapshotExport(makeInput(baseFormState()));
-    expect(snap.required_next_steps).not.toContain(
-      ECOWITT_LIVE_EVIDENCE_EXPORT_TEMPLATE_NEXT_STEP,
-    );
+    expect(snap.required_next_steps).not.toContain(ECOWITT_LIVE_EVIDENCE_EXPORT_TEMPLATE_NEXT_STEP);
   });
 });
 
@@ -207,34 +195,24 @@ describe("recursive redaction", () => {
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzZXJ2aWNlX3JvbGUifQ.AAAAAAAAAAAAAAAAAAAAAAAAAA";
     const snap = snapWithFormWarning(`leaked ${jwt} here`);
     expect(snap.form_warnings[0]).not.toContain(jwt);
-    expect(snap.form_warnings[0]).toContain(
-      ECOWITT_LIVE_EVIDENCE_EXPORT_REDACTED,
-    );
+    expect(snap.form_warnings[0]).toContain(ECOWITT_LIVE_EVIDENCE_EXPORT_REDACTED);
   });
 
   it("redacts bridge-token-like values", () => {
-    const snap = snapWithFormWarning(
-      "BRIDGE_TOKEN=abc123def456ghi789jkl012mno345",
-    );
-    expect(snap.form_warnings[0]).toContain(
-      ECOWITT_LIVE_EVIDENCE_EXPORT_REDACTED,
-    );
+    const snap = snapWithFormWarning("BRIDGE_TOKEN=abc123def456ghi789jkl012mno345");
+    expect(snap.form_warnings[0]).toContain(ECOWITT_LIVE_EVIDENCE_EXPORT_REDACTED);
     expect(snap.form_warnings[0]).not.toContain("abc123def456ghi789jkl012mno345");
   });
 
   it("redacts OpenAI-style keys", () => {
     const snap = snapWithFormWarning("sk-ABCDEFGHIJKLMNOPQRSTUVWX1234567890");
-    expect(snap.form_warnings[0]).toContain(
-      ECOWITT_LIVE_EVIDENCE_EXPORT_REDACTED,
-    );
+    expect(snap.form_warnings[0]).toContain(ECOWITT_LIVE_EVIDENCE_EXPORT_REDACTED);
     expect(snap.form_warnings[0]).not.toMatch(/sk-[A-Za-z0-9]/);
   });
 
   it("redacts Bearer tokens", () => {
     const snap = snapWithFormWarning("Authorization: Bearer abcdef0123456789ABCDEF");
-    expect(snap.form_warnings[0]).toContain(
-      ECOWITT_LIVE_EVIDENCE_EXPORT_REDACTED,
-    );
+    expect(snap.form_warnings[0]).toContain(ECOWITT_LIVE_EVIDENCE_EXPORT_REDACTED);
     expect(snap.form_warnings[0]).not.toContain("abcdef0123456789ABCDEF");
   });
 
@@ -242,9 +220,7 @@ describe("recursive redaction", () => {
     const snap = snapWithFormWarning(
       "eyJABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
     );
-    expect(snap.form_warnings[0]).toContain(
-      ECOWITT_LIVE_EVIDENCE_EXPORT_REDACTED,
-    );
+    expect(snap.form_warnings[0]).toContain(ECOWITT_LIVE_EVIDENCE_EXPORT_REDACTED);
   });
 
   it("redacts inside nested form_state strings", () => {
@@ -253,9 +229,7 @@ describe("recursive redaction", () => {
       tent_id: "tent sk-ABCDEFGHIJKLMNOPQRSTUVWX1234567890",
     };
     const snap = buildEcowittLiveEvidenceSnapshotExport(makeInput(form));
-    expect(snap.form_state.tent_id).toContain(
-      ECOWITT_LIVE_EVIDENCE_EXPORT_REDACTED,
-    );
+    expect(snap.form_state.tent_id).toContain(ECOWITT_LIVE_EVIDENCE_EXPORT_REDACTED);
   });
 });
 
@@ -288,9 +262,9 @@ describe("buildEcowittLiveEvidenceSnapshotFilename", () => {
   });
 
   it("strips fractional seconds for filename stability", () => {
-    expect(
-      buildEcowittLiveEvidenceSnapshotFilename("2026-06-09T12:34:56.789Z"),
-    ).toBe("verdant-ecowitt-live-evidence-2026-06-09T12-34-56Z.json");
+    expect(buildEcowittLiveEvidenceSnapshotFilename("2026-06-09T12:34:56.789Z")).toBe(
+      "verdant-ecowitt-live-evidence-2026-06-09T12-34-56Z.json",
+    );
   });
 
   it("falls back to static filename for missing/invalid values", () => {
@@ -300,15 +274,13 @@ describe("buildEcowittLiveEvidenceSnapshotFilename", () => {
     expect(buildEcowittLiveEvidenceSnapshotFilename("not-a-date")).toBe(
       ECOWITT_LIVE_EVIDENCE_EXPORT_STATIC_FILENAME,
     );
-    expect(
-      buildEcowittLiveEvidenceSnapshotFilename(null as unknown as string),
-    ).toBe(ECOWITT_LIVE_EVIDENCE_EXPORT_STATIC_FILENAME);
+    expect(buildEcowittLiveEvidenceSnapshotFilename(null as unknown as string)).toBe(
+      ECOWITT_LIVE_EVIDENCE_EXPORT_STATIC_FILENAME,
+    );
   });
 
   it("never includes tent_id or plant_id in the filename", () => {
-    const name = buildEcowittLiveEvidenceSnapshotFilename(
-      "2026-06-09T12:34:56Z",
-    );
+    const name = buildEcowittLiveEvidenceSnapshotFilename("2026-06-09T12:34:56Z");
     expect(name).not.toContain("tent");
     expect(name).not.toContain("plant");
     expect(name).not.toMatch(/\s/);

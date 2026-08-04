@@ -36,8 +36,6 @@ describe("buildStaleSnapshotHelperCopy", () => {
     expect(buildStaleSnapshotHelperCopy(undefined)).toBe(
       `${STALE_HELPER_PREFIX} ${STALE_HELPER_SUFFIX}`,
     );
-    expect(buildStaleSnapshotHelperCopy("")).toBe(
-      `${STALE_HELPER_PREFIX} ${STALE_HELPER_SUFFIX}`,
-    );
+    expect(buildStaleSnapshotHelperCopy("")).toBe(`${STALE_HELPER_PREFIX} ${STALE_HELPER_SUFFIX}`);
   });
 });

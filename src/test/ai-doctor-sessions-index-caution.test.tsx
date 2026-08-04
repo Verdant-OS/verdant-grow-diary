@@ -101,55 +101,37 @@ describe("Pure helpers — index caution + limited context", () => {
     expect(isSessionLimitedContext(makeRow("a"))).toBe(false);
   });
   it("isSessionLimitedContext: true when no IDs and no evidence", () => {
-    const r = makeRow(
-      "a",
-      { evidence: [] },
-      { plant_id: null, tent_id: null, grow_id: null },
-    );
+    const r = makeRow("a", { evidence: [] }, { plant_id: null, tent_id: null, grow_id: null });
     expect(isSessionLimitedContext(r)).toBe(true);
   });
 });
 
 describe("AiDoctorSessionsIndex — caution / limited-context rendering", () => {
   it("shows caution indicator for low-confidence row", async () => {
-    currentRows = [
-      makeRow("low-conf", {}, { displayed_confidence: 0.3, raw_confidence: 0.3 }),
-    ];
+    currentRows = [makeRow("low-conf", {}, { displayed_confidence: 0.3, raw_confidence: 0.3 })];
     renderWithProviders(<AiDoctorSessionsIndex />);
-    expect(
-      await screen.findByTestId("ai-doctor-sessions-index-caution-indicator"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-sessions-index-caution-indicator")).toBeTruthy();
   });
 
   it("shows caution indicator for elevated-risk row", async () => {
     currentRows = [makeRow("high-risk", { riskLevel: "high" })];
     renderWithProviders(<AiDoctorSessionsIndex />);
-    expect(
-      await screen.findByTestId("ai-doctor-sessions-index-caution-indicator"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-sessions-index-caution-indicator")).toBeTruthy();
   });
 
   it("does not show caution for healthy/high-confidence row", async () => {
     currentRows = [makeRow("healthy")];
     renderWithProviders(<AiDoctorSessionsIndex />);
     await screen.findByTestId("ai-doctor-sessions-index-row");
-    expect(
-      screen.queryByTestId("ai-doctor-sessions-index-caution-indicator"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-sessions-index-caution-indicator")).toBeNull();
   });
 
   it("shows limited-context fallback when evidence/context is missing", async () => {
     currentRows = [
-      makeRow(
-        "sparse",
-        { evidence: [] },
-        { plant_id: null, tent_id: null, grow_id: null },
-      ),
+      makeRow("sparse", { evidence: [] }, { plant_id: null, tent_id: null, grow_id: null }),
     ];
     renderWithProviders(<AiDoctorSessionsIndex />);
-    const badge = await screen.findByTestId(
-      "ai-doctor-sessions-index-limited-context-indicator",
-    );
+    const badge = await screen.findByTestId("ai-doctor-sessions-index-limited-context-indicator");
     expect(badge.textContent).toMatch(new RegExp(LIMITED_CONTEXT_LABEL, "i"));
   });
 
@@ -158,15 +140,9 @@ describe("AiDoctorSessionsIndex — caution / limited-context rendering", () => 
     renderWithProviders(<AiDoctorSessionsIndex />);
     await screen.findAllByTestId("ai-doctor-sessions-index-row");
     expect(screen.getByTestId("ai-doctor-sessions-index-filter-risk")).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-sessions-index-filter-has-actions"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-sessions-index-filter-date-range"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-sessions-index-filter-needs-review"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-sessions-index-filter-has-actions")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-sessions-index-filter-date-range")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-sessions-index-filter-needs-review")).toBeTruthy();
     const viewLinks = screen.getAllByTestId("ai-doctor-sessions-index-view-link");
     expect(viewLinks.length).toBeGreaterThan(0);
     expect(viewLinks[0].getAttribute("href")).toMatch(/^\/doctor\/sessions\//);
@@ -175,14 +151,8 @@ describe("AiDoctorSessionsIndex — caution / limited-context rendering", () => 
 
 describe("Static safety scan — index caution slice", () => {
   const ROOT = resolve(__dirname, "../..");
-  const PAGE = readFileSync(
-    resolve(ROOT, "src/pages/AiDoctorSessionsIndex.tsx"),
-    "utf8",
-  );
-  const VM = readFileSync(
-    resolve(ROOT, "src/lib/aiDoctorSessionDetailViewModel.ts"),
-    "utf8",
-  );
+  const PAGE = readFileSync(resolve(ROOT, "src/pages/AiDoctorSessionsIndex.tsx"), "utf8");
+  const VM = readFileSync(resolve(ROOT, "src/lib/aiDoctorSessionDetailViewModel.ts"), "utf8");
   const ALL = [PAGE, VM].join("\n");
 
   it("no writes", () => {

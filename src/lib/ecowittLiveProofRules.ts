@@ -29,13 +29,7 @@ export const ECOWITT_PROOF_WINDOW_MS = 24 * 60 * 60 * 1000;
 export const ECOWITT_PROOF_FUTURE_SKEW_MS = 60_000;
 
 export type EcowittProofRowStatus =
-  | "live_confirmed"
-  | "testbench"
-  | "stale"
-  | "invalid"
-  | "unknown"
-  | "limited"
-  | "not_ecowitt";
+  "live_confirmed" | "testbench" | "stale" | "invalid" | "unknown" | "limited" | "not_ecowitt";
 
 export type EcowittProofSourceKind = "canonical_live" | "legacy_ecowitt" | "non_live" | "missing";
 

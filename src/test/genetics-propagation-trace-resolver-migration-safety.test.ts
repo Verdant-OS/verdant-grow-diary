@@ -16,8 +16,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const MIGRATION =
-  "supabase/migrations/20260720146000_genetics_traceability_trace_resolver.sql";
+const MIGRATION = "supabase/migrations/20260720146000_genetics_traceability_trace_resolver.sql";
 
 function read(p: string): string {
   return readFileSync(resolve(process.cwd(), p), "utf8");
@@ -48,7 +47,9 @@ describe("genetics trace resolver migration safety", () => {
     // Each JOIN to a far endpoint re-asserts ownership.
     expect(body).toMatch(/JOIN public\.plants p ON p\.id = [a-z_.]+ AND p\.user_id = uid/);
     expect(body).toMatch(/JOIN public\.pheno_keepers k ON k\.id = [a-z_.]+ AND k\.user_id = uid/);
-    expect(body).toMatch(/JOIN public\.genetics_accessions a ON a\.id = [a-z_.]+ AND a\.user_id = uid/);
+    expect(body).toMatch(
+      /JOIN public\.genetics_accessions a ON a\.id = [a-z_.]+ AND a\.user_id = uid/,
+    );
   });
 
   it("is deterministic: (kind,id) node identity with a matching DISTINCT ON prefix", () => {
@@ -81,15 +82,15 @@ describe("genetics trace resolver migration safety", () => {
       /NOT EXISTS \(\s*SELECT 1 FROM public\.genetics_screening_results s2\s*WHERE s2\.supersedes_id = r\.id/,
     );
     // worst-wins ordering: positive, then inconclusive/not_tested, then negative_scoped, else untested.
-    expect(body).toMatch(/'positive'[\s\S]*?'inconclusive'[\s\S]*?'negative_scoped'[\s\S]*?'untested'/);
+    expect(body).toMatch(
+      /'positive'[\s\S]*?'inconclusive'[\s\S]*?'negative_scoped'[\s\S]*?'untested'/,
+    );
     // never a "clean"/"pathogen_free" state.
     expect(body).not.toMatch(/pathogen_free|'clean'|'healthy'|'cleared'/i);
   });
 
   it("grants trace to authenticated, revokes from PUBLIC, no automation", () => {
-    expect(sql).toMatch(
-      /REVOKE ALL ON FUNCTION public\.genetics_trace_resolve[\s\S]*?FROM PUBLIC/,
-    );
+    expect(sql).toMatch(/REVOKE ALL ON FUNCTION public\.genetics_trace_resolve[\s\S]*?FROM PUBLIC/);
     expect(sql).toMatch(
       /GRANT EXECUTE ON FUNCTION public\.genetics_trace_resolve[\s\S]*?TO authenticated, service_role/,
     );

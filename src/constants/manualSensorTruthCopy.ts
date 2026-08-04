@@ -17,20 +17,16 @@
 
 export const MANUAL_SENSOR_TRUTH_TITLE = "Manual snapshot" as const;
 
-export const MANUAL_SENSOR_TRUTH_SOURCE_LINE =
-  "Saved as manual, not live sensor data." as const;
+export const MANUAL_SENSOR_TRUTH_SOURCE_LINE = "Saved as manual, not live sensor data." as const;
 
-export const MANUAL_SENSOR_TRUTH_NOT_DEVICE_CONTROL_LINE =
-  "Not live device control." as const;
+export const MANUAL_SENSOR_TRUTH_NOT_DEVICE_CONTROL_LINE = "Not live device control." as const;
 
-export const MANUAL_SENSOR_TRUTH_NOT_DIAGNOSIS_LINE =
-  "Not a plant-health diagnosis." as const;
+export const MANUAL_SENSOR_TRUTH_NOT_DIAGNOSIS_LINE = "Not a plant-health diagnosis." as const;
 
 export const MANUAL_SENSOR_TRUTH_MISSING_READINGS_LINE =
   "Missing readings will stay unknown, not healthy." as const;
 
-export const MANUAL_SENSOR_TRUTH_SUSPICIOUS_PREFIX =
-  "Check this value before saving:" as const;
+export const MANUAL_SENSOR_TRUTH_SUSPICIOUS_PREFIX = "Check this value before saving:" as const;
 
 export const MANUAL_SENSOR_TRUTH_LINES = [
   MANUAL_SENSOR_TRUTH_SOURCE_LINE,

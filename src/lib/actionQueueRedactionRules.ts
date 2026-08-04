@@ -37,9 +37,7 @@ export const SAFE_DEVICE_LABEL = "Grow-room equipment";
  * truncated/masked form of the original (no info leak via length, no
  * partial reveal).
  */
-export function redactDeviceIdentifierLabel(
-  value: string | null | undefined,
-): string | null {
+export function redactDeviceIdentifierLabel(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null;
   if (typeof value !== "string") return SAFE_DEVICE_LABEL;
   return value.trim().length === 0 ? null : SAFE_DEVICE_LABEL;
@@ -63,28 +61,26 @@ export interface SensitiveDevicePattern {
   regex: RegExp;
 }
 
-export const SENSITIVE_DEVICE_PATTERNS: ReadonlyArray<SensitiveDevicePattern> =
-  [
-    // MAC address — colon or dash separated
-    { name: "mac_address", regex: /\b[0-9A-Fa-f]{2}([:-][0-9A-Fa-f]{2}){5}\b/ },
-    // Bridge-token-like opaque string: brg_/bridge_/tok_/token_/sk_/secret_ prefix
-    // + >=12 chars from base62 plus _ and - (tokens commonly include separators).
-    {
-      name: "bridge_token",
-      regex:
-        /\b(?:brg|bridge|tok|token|sk|secret)[_-][A-Za-z0-9_-]{12,}\b/i,
-    },
-    // Vendor id-like: vendor_/vnd_/device_/dev_ prefix + alnum (with separators)
-    {
-      name: "vendor_or_device_id",
-      regex: /\b(?:vendor|vnd|device|dev)[_-][A-Za-z0-9][A-Za-z0-9_-]{2,}/i,
-    },
-    // Long opaque hex blob (>= 24 hex chars) — typical of payload signatures
-    { name: "long_hex_blob", regex: /\b[0-9a-fA-F]{24,}\b/ },
-    // Raw JSON key leaks — these should never appear in rendered text
-    { name: "raw_payload_key", regex: /\braw_payload\b/ },
-    { name: "target_device_key", regex: /\btarget_device\b/ },
-  ];
+export const SENSITIVE_DEVICE_PATTERNS: ReadonlyArray<SensitiveDevicePattern> = [
+  // MAC address — colon or dash separated
+  { name: "mac_address", regex: /\b[0-9A-Fa-f]{2}([:-][0-9A-Fa-f]{2}){5}\b/ },
+  // Bridge-token-like opaque string: brg_/bridge_/tok_/token_/sk_/secret_ prefix
+  // + >=12 chars from base62 plus _ and - (tokens commonly include separators).
+  {
+    name: "bridge_token",
+    regex: /\b(?:brg|bridge|tok|token|sk|secret)[_-][A-Za-z0-9_-]{12,}\b/i,
+  },
+  // Vendor id-like: vendor_/vnd_/device_/dev_ prefix + alnum (with separators)
+  {
+    name: "vendor_or_device_id",
+    regex: /\b(?:vendor|vnd|device|dev)[_-][A-Za-z0-9][A-Za-z0-9_-]{2,}/i,
+  },
+  // Long opaque hex blob (>= 24 hex chars) — typical of payload signatures
+  { name: "long_hex_blob", regex: /\b[0-9a-fA-F]{24,}\b/ },
+  // Raw JSON key leaks — these should never appear in rendered text
+  { name: "raw_payload_key", regex: /\braw_payload\b/ },
+  { name: "target_device_key", regex: /\btarget_device\b/ },
+];
 
 export interface DeviceIdentifierLeak {
   pattern: string;
@@ -95,15 +91,14 @@ export interface DeviceIdentifierLeak {
  * Scan a text blob for any sensitive device-identifier pattern.
  * Returns every distinct match. Empty array means "clean".
  */
-export function detectDeviceIdentifierLeaks(
-  text: string,
-): DeviceIdentifierLeak[] {
+export function detectDeviceIdentifierLeaks(text: string): DeviceIdentifierLeak[] {
   if (!text) return [];
   const found: DeviceIdentifierLeak[] = [];
   for (const { name, regex } of SENSITIVE_DEVICE_PATTERNS) {
-    const re = new RegExp(regex.source, regex.flags.includes("g")
-      ? regex.flags
-      : regex.flags + "g");
+    const re = new RegExp(
+      regex.source,
+      regex.flags.includes("g") ? regex.flags : regex.flags + "g",
+    );
     let m: RegExpExecArray | null;
     while ((m = re.exec(text)) !== null) {
       found.push({ pattern: name, match: m[0] });

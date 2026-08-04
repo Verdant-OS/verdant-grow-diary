@@ -37,8 +37,6 @@ import {
 } from "./plant-photos-cleanup-report.mjs";
 import { writeCanonicalReportFile } from "./plant-photos-cleanup-write.mjs";
 
-
-
 const HELP = `
 Plant Profile Photo orphan cleanup (admin, manual, dry-run by default)
 
@@ -76,7 +74,7 @@ async function listAllPlantReferences(supabase) {
   // Paginate deterministically by id so we can detect gaps.
   // If ANY page errors we return { complete: false } so the planner
   // fails closed.
-  // eslint-disable-next-line no-constant-condition
+
   while (true) {
     const { data, error } = await supabase
       .from("plants")
@@ -100,13 +98,11 @@ async function listAllPlantProfileObjects(supabase, ownerFilter) {
     const out = [];
     let offset = 0;
     while (true) {
-      const { data, error } = await supabase.storage
-        .from(PLANT_PROFILE_PHOTO_BUCKET)
-        .list(path, {
-          limit: PAGE,
-          offset,
-          sortBy: { column: "name", order: "asc" },
-        });
+      const { data, error } = await supabase.storage.from(PLANT_PROFILE_PHOTO_BUCKET).list(path, {
+        limit: PAGE,
+        offset,
+        sortBy: { column: "name", order: "asc" },
+      });
       if (error) throw new Error(error.message);
       if (!data) throw new Error("null listing");
       for (const item of data) out.push(item);
@@ -153,9 +149,7 @@ async function deleteBatch(supabase, paths) {
   const errors = [];
   for (let i = 0; i < paths.length; i += CHUNK) {
     const chunk = paths.slice(i, i + CHUNK);
-    const { data, error } = await supabase.storage
-      .from(PLANT_PROFILE_PHOTO_BUCKET)
-      .remove(chunk);
+    const { data, error } = await supabase.storage.from(PLANT_PROFILE_PHOTO_BUCKET).remove(chunk);
     if (error) {
       errors.push(error.message);
       continue;
@@ -286,16 +280,12 @@ async function main() {
 
   // Fail closed on incomplete scan under execute mode.
   if (destructive && !canonical.scan_complete) {
-    console.error(
-      "plant-photos-cleanup: execute aborted — scan was not complete.",
-    );
+    console.error("plant-photos-cleanup: execute aborted — scan was not complete.");
     process.exit(1);
   }
   if (reportWriteError) process.exit(1);
   process.exit(0);
 }
-
-
 
 main().catch((err) => {
   // Never leak service-role key material.

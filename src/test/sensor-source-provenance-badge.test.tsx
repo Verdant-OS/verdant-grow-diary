@@ -26,15 +26,8 @@ describe("SensorSourceProvenanceBadge", () => {
   });
 
   it("appends the manual device note when provided", () => {
-    render(
-      <SensorSourceProvenanceBadge
-        source="manual"
-        manualDeviceNote="EcoWitt WH45"
-      />,
-    );
-    expect(screen.getByTestId(TESTID).textContent).toBe(
-      "Manual reading · EcoWitt WH45",
-    );
+    render(<SensorSourceProvenanceBadge source="manual" manualDeviceNote="EcoWitt WH45" />);
+    expect(screen.getByTestId(TESTID).textContent).toBe("Manual reading · EcoWitt WH45");
   });
 
   it("renders Live sensor for live readings", () => {
@@ -58,16 +51,13 @@ describe("SensorSourceProvenanceBadge", () => {
     expect(txt).not.toMatch(/^Ecowitt$/);
   });
 
-  it.each(["demo", "stale", "invalid"] as const)(
-    "renders %s as degraded, not Live",
-    (src) => {
-      render(<SensorSourceProvenanceBadge source={src} />);
-      const el = screen.getByTestId(TESTID);
-      expect(el.getAttribute("data-tone")).toBe(src);
-      expect(el.getAttribute("data-degraded")).toBe("true");
-      expect(el.textContent?.toLowerCase()).not.toContain("live");
-    },
-  );
+  it.each(["demo", "stale", "invalid"] as const)("renders %s as degraded, not Live", (src) => {
+    render(<SensorSourceProvenanceBadge source={src} />);
+    const el = screen.getByTestId(TESTID);
+    expect(el.getAttribute("data-tone")).toBe(src);
+    expect(el.getAttribute("data-degraded")).toBe("true");
+    expect(el.textContent?.toLowerCase()).not.toContain("live");
+  });
 
   it("renders CSV with its csv tone (not Live, not degraded)", () => {
     render(<SensorSourceProvenanceBadge source="csv" />);

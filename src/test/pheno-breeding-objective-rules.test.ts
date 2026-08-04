@@ -103,8 +103,22 @@ describe("evaluateCandidateAgainstObjective", () => {
   it("evaluates each target against only this candidate's own traits", () => {
     const evals = evaluateCandidateAgainstObjective(targets, { nose_loudness: 8, stretch: 1 });
     expect(evals).toEqual([
-      { axisKey: "nose_loudness", axisLabel: "Nose loudness", comparator: "gte", threshold: 7, actualValue: 8, met: true },
-      { axisKey: "stretch", axisLabel: "Stretch", comparator: "lte", threshold: 2, actualValue: 1, met: true },
+      {
+        axisKey: "nose_loudness",
+        axisLabel: "Nose loudness",
+        comparator: "gte",
+        threshold: 7,
+        actualValue: 8,
+        met: true,
+      },
+      {
+        axisKey: "stretch",
+        axisLabel: "Stretch",
+        comparator: "lte",
+        threshold: 2,
+        actualValue: 1,
+        met: true,
+      },
     ]);
   });
 
@@ -130,7 +144,9 @@ describe("evaluateCandidateAgainstObjective", () => {
 describe("summarizeCandidateObjective", () => {
   it("allMet requires every target scored AND met; zero targets is never allMet", () => {
     expect(summarizeCandidateObjective([], {}).allMet).toBe(false);
-    const targets: BreedingObjectiveTarget[] = [{ axisKey: "vigor", comparator: "gte", threshold: 4 }];
+    const targets: BreedingObjectiveTarget[] = [
+      { axisKey: "vigor", comparator: "gte", threshold: 4 },
+    ];
     expect(summarizeCandidateObjective(targets, { vigor: 5 }).allMet).toBe(true);
     expect(summarizeCandidateObjective(targets, { vigor: 3 }).allMet).toBe(false);
     expect(summarizeCandidateObjective(targets, {}).allMet).toBe(false);
@@ -156,23 +172,27 @@ describe("candidateObjectiveCopy", () => {
       { axisKey: "vigor", comparator: "gte", threshold: 4 },
       { axisKey: "stretch", comparator: "lte", threshold: 2 },
     ];
-    expect(candidateObjectiveCopy(summarizeCandidateObjective([], {}))).toBe(BREEDING_OBJECTIVE_EMPTY_COPY);
+    expect(candidateObjectiveCopy(summarizeCandidateObjective([], {}))).toBe(
+      BREEDING_OBJECTIVE_EMPTY_COPY,
+    );
     expect(candidateObjectiveCopy(summarizeCandidateObjective(targets, {}))).toMatch(
       /Not yet scored against any of the 2 targets/,
     );
-    expect(candidateObjectiveCopy(summarizeCandidateObjective(targets, { vigor: 5, stretch: 1 }))).toBe(
-      "Meets 2 of 2 targets you set.",
-    );
-    expect(candidateObjectiveCopy(summarizeCandidateObjective(targets, { vigor: 3, stretch: 1 }))).toBe(
-      "Meets 1 of 2 targets you set.",
-    );
+    expect(
+      candidateObjectiveCopy(summarizeCandidateObjective(targets, { vigor: 5, stretch: 1 })),
+    ).toBe("Meets 2 of 2 targets you set.");
+    expect(
+      candidateObjectiveCopy(summarizeCandidateObjective(targets, { vigor: 3, stretch: 1 })),
+    ).toBe("Meets 1 of 2 targets you set.");
     expect(candidateObjectiveCopy(summarizeCandidateObjective(targets, { vigor: 5 }))).toBe(
       "Meets 1 of 2 targets you set (1 not yet scored).",
     );
   });
 
   it("singular target phrasing", () => {
-    const targets: BreedingObjectiveTarget[] = [{ axisKey: "vigor", comparator: "gte", threshold: 4 }];
+    const targets: BreedingObjectiveTarget[] = [
+      { axisKey: "vigor", comparator: "gte", threshold: 4 },
+    ];
     expect(candidateObjectiveCopy(summarizeCandidateObjective(targets, {}))).toBe(
       "Not yet scored against the target you set.",
     );
@@ -181,7 +201,9 @@ describe("candidateObjectiveCopy", () => {
 
 describe("summarizeHuntObjectiveCoverage — counts only, never an ordering", () => {
   it("tallies fully-scored and all-met counts across candidates", () => {
-    const targets: BreedingObjectiveTarget[] = [{ axisKey: "vigor", comparator: "gte", threshold: 4 }];
+    const targets: BreedingObjectiveTarget[] = [
+      { axisKey: "vigor", comparator: "gte", threshold: 4 },
+    ];
     const coverage = summarizeHuntObjectiveCoverage(targets, [
       { candidateId: "a", traits: { vigor: 5 } },
       { candidateId: "b", traits: { vigor: 2 } },
@@ -206,7 +228,9 @@ describe("summarizeHuntObjectiveCoverage — counts only, never an ordering", ()
 
 describe("availableObjectiveAxes", () => {
   it("excludes axes already used by existing targets", () => {
-    const existing: BreedingObjectiveTarget[] = [{ axisKey: "vigor", comparator: "gte", threshold: 3 }];
+    const existing: BreedingObjectiveTarget[] = [
+      { axisKey: "vigor", comparator: "gte", threshold: 3 },
+    ];
     const available = availableObjectiveAxes(existing);
     expect(available.some((a) => a.key === "vigor")).toBe(false);
     expect(available.length).toBe(LOUD_TRAIT_AXES.length - 1);

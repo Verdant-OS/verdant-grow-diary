@@ -32,10 +32,7 @@ export default function FoundersWall({ limit }: FoundersWallProps) {
 
   if (state.status === "error") {
     return (
-      <div
-        data-testid="founders-wall-error"
-        className="text-sm text-muted-foreground"
-      >
+      <div data-testid="founders-wall-error" className="text-sm text-muted-foreground">
         The Founders Wall is temporarily unavailable.
       </div>
     );
@@ -45,10 +42,7 @@ export default function FoundersWall({ limit }: FoundersWallProps) {
 
   if (rows.length === 0) {
     return (
-      <div
-        data-testid="founders-wall-empty"
-        className="text-sm text-muted-foreground"
-      >
+      <div data-testid="founders-wall-empty" className="text-sm text-muted-foreground">
         No founders have opted in to the public wall yet.
       </div>
     );

@@ -23,7 +23,9 @@ describe("sensor-ingest-webhook error leakage", () => {
     const code = SRC.replace(/\/\/[^\n]*/g, "");
     expect(code).not.toMatch(/detail:\s*insErr\.message/);
     // insErr.message must never be passed to json(...) response body.
-    const jsonBodies = [...code.matchAll(/json\(\s*(\{[\s\S]*?\})\s*,\s*\d+\s*\)/g)].map((m) => m[1]);
+    const jsonBodies = [...code.matchAll(/json\(\s*(\{[\s\S]*?\})\s*,\s*\d+\s*\)/g)].map(
+      (m) => m[1],
+    );
     for (const body of jsonBodies) {
       expect(body).not.toMatch(/insErr/);
     }
@@ -32,7 +34,9 @@ describe("sensor-ingest-webhook error leakage", () => {
   it("emits only the terse `insert_failed` error code (with sanitized reason) on insert failure", () => {
     // Response shape: { error: "insert_failed", reason: <enum> }. The reason
     // is a stable enum from classifyInsertError — never raw PG text.
-    expect(SRC).toMatch(/json\(\s*req\s*,\s*\{\s*error:\s*["']insert_failed["']\s*,\s*reason\s*\}\s*,\s*400\s*\)/);
+    expect(SRC).toMatch(
+      /json\(\s*req\s*,\s*\{\s*error:\s*["']insert_failed["']\s*,\s*reason\s*\}\s*,\s*400\s*\)/,
+    );
   });
 
   it("does not echo bridge token id, hash, or raw token in any response", () => {
@@ -59,9 +63,9 @@ describe("sensor-ingest-webhook error leakage", () => {
 
   it("logs insert failures to server console without raw insErr.message", () => {
     const code = SRC.replace(/\/\/[^\n]*/g, "");
-    const consoleCalls = [
-      ...code.matchAll(/console\.(?:error|warn|log)\(([\s\S]*?)\)\s*;/g),
-    ].map((m) => m[1]);
+    const consoleCalls = [...code.matchAll(/console\.(?:error|warn|log)\(([\s\S]*?)\)\s*;/g)].map(
+      (m) => m[1],
+    );
     for (const args of consoleCalls) {
       expect(args).not.toMatch(/insErr\.message/);
     }

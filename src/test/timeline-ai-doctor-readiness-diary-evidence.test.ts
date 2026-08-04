@@ -24,10 +24,7 @@ import {
   type SensorReadingRowLike,
 } from "@/lib/aiDoctorContextCompiler";
 import { buildAiDoctorReadinessView } from "@/lib/aiDoctorReadinessViewModel";
-import {
-  applyQuickLogV2Refresh,
-  type QuickLogV2RefreshClient,
-} from "@/lib/quickLogV2RefreshRules";
+import { applyQuickLogV2Refresh, type QuickLogV2RefreshClient } from "@/lib/quickLogV2RefreshRules";
 
 // ---------------------------------------------------------------------------
 // Fixtures — Quick Log-shaped grow_events rows (as written by the RPC).
@@ -79,9 +76,7 @@ describe("AI Doctor readiness — Quick Log diary evidence", () => {
     const view = buildAiDoctorReadinessView({ context: ctx });
     expect(view.counts.recentLogs).toBe(1);
     expect(view.evidenceFlags.hasRecentWatering).toBe(true);
-    expect(view.limitations.some((l) => l.code === "no_recent_events")).toBe(
-      false,
-    );
+    expect(view.limitations.some((l) => l.code === "no_recent_events")).toBe(false);
   });
 
   it("recent feeding Quick Log counts as recent feeding evidence", () => {
@@ -132,9 +127,7 @@ describe("AI Doctor readiness — Quick Log diary evidence", () => {
     const ctx = buildContextFromRows({ growEvents: [] });
     const view = buildAiDoctorReadinessView({ context: ctx });
     expect(view.counts.recentLogs).toBe(0);
-    expect(view.limitations.some((l) => l.code === "no_recent_events")).toBe(
-      true,
-    );
+    expect(view.limitations.some((l) => l.code === "no_recent_events")).toBe(true);
   });
 
   it("diary entries do not flip stale/invalid sensor status to healthy", () => {
@@ -162,9 +155,7 @@ describe("AI Doctor readiness — Quick Log diary evidence", () => {
     // Stale must not be promoted to live/trustworthy by the diary entry.
     expect(ctx.hasLiveSensorReadings).toBe(false);
     expect(view.sourceBadges.some((b) => b.source === "stale")).toBe(true);
-    expect(view.limitations.some((l) => l.code === "stale_or_invalid")).toBe(
-      true,
-    );
+    expect(view.limitations.some((l) => l.code === "stale_or_invalid")).toBe(true);
   });
 });
 
@@ -176,8 +167,7 @@ describe("Quick Log refresh re-evaluates AI Doctor readiness", () => {
   it("plant target refresh invalidates plant readiness + context keys", () => {
     const invalidate = vi.fn();
     const client: QuickLogV2RefreshClient = {
-      invalidateQueries:
-        invalidate as unknown as QuickLogV2RefreshClient["invalidateQueries"],
+      invalidateQueries: invalidate as unknown as QuickLogV2RefreshClient["invalidateQueries"],
       getQueryCache: () => ({ findAll: () => [] }),
     };
     applyQuickLogV2Refresh(client, {

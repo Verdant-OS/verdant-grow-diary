@@ -17,9 +17,7 @@ const TONE_NEUTRAL = "border-border/50 text-muted-foreground";
 const TONE_WATCH = "border-[hsl(var(--warning))] text-[hsl(var(--warning))]";
 const TONE_BAD = "border-destructive/60 text-destructive";
 
-export function formatStabilityChipView(
-  result: StabilityResult,
-): StabilityChipView {
+export function formatStabilityChipView(result: StabilityResult): StabilityChipView {
   switch (result.status) {
     case "stage_unknown":
       return { copy: "Set stage for VPD stability", toneClass: TONE_NEUTRAL };

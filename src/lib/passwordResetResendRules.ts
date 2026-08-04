@@ -30,10 +30,7 @@ export const canResendResetEmail = canResendVerification;
 export const resetEmailCooldownRemainingMs = verificationCooldownRemainingMs;
 export const formatResetEmailCooldown = formatVerificationCooldown;
 
-export function buildResetResendLabel(
-  isBusy: boolean,
-  cooldownRemainingMs: number,
-): string {
+export function buildResetResendLabel(isBusy: boolean, cooldownRemainingMs: number): string {
   if (isBusy) return "Sending reset email…";
   if (cooldownRemainingMs > 0) return formatResetEmailCooldown(cooldownRemainingMs);
   return "Resend reset email";

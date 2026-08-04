@@ -51,7 +51,10 @@ function lovable(over: Partial<LovableSubscriptionRow>): LovableSubscriptionRow 
   };
 }
 
-function premiumAllowed(byo: BillingSubscriptionRow | null, lv: LovableSubscriptionRow | null): boolean {
+function premiumAllowed(
+  byo: BillingSubscriptionRow | null,
+  lv: LovableSubscriptionRow | null,
+): boolean {
   const r = resolveUnionEntitlements({
     byoRow: byo,
     lovableRow: lv,

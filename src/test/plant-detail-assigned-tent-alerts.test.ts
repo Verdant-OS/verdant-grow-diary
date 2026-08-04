@@ -133,10 +133,7 @@ describe("buildAssignedTentAlerts (pure)", () => {
   });
 
   it("preserves available alert fields without fabrication", () => {
-    const [row] = buildAssignedTentAlerts(
-      [alert({ metric: null, reason: "" })],
-      { tentId: "t1" },
-    );
+    const [row] = buildAssignedTentAlerts([alert({ metric: null, reason: "" })], { tentId: "t1" });
     expect(row.metric).toBeNull();
     expect(row.reason).toBe("");
     expect(row.title).toBe("Temp high");

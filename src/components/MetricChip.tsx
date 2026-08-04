@@ -16,7 +16,13 @@ const map = {
 
 export default function MetricChip({ label, value, unit, status = "ok", className }: Props) {
   return (
-    <div className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs", map[status], className)}>
+    <div
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs",
+        map[status],
+        className,
+      )}
+    >
       <span className="text-[10px] uppercase tracking-wider opacity-70">{label}</span>
       <span className="font-semibold tabular-nums">
         {value}

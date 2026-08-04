@@ -64,10 +64,7 @@ describe("#21 Tent header VPD precision", () => {
     // the canonical sensor formatter (not raw .vpd, not toFixed(3)).
     const { readFileSync } = await import("node:fs");
     const { resolve } = await import("node:path");
-    const src = readFileSync(
-      resolve(__dirname, "../pages/TentDetail.tsx"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(__dirname, "../pages/TentDetail.tsx"), "utf8");
     expect(src).toMatch(/formatSensorValue\(["']vpd_kpa["']/);
     // The pre-patch shape `value={snap.vpd}` (raw) must not return.
     expect(src).not.toMatch(/value=\{snap\.vpd\}/);
@@ -106,10 +103,7 @@ describe("#18 Timeline memory raw-ISO timestamps", () => {
     // formatter and not render `{item.occurredAt}` as a bare string.
     const { readFileSync } = await import("node:fs");
     const { resolve } = await import("node:path");
-    const src = readFileSync(
-      resolve(__dirname, "../components/TimelineMemorySection.tsx"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(__dirname, "../components/TimelineMemorySection.tsx"), "utf8");
     expect(src).toMatch(/formatSnapshotTimestamp/);
     // No raw `{item.occurredAt}` inside JSX text content.
     expect(src).not.toMatch(/>\{item\.occurredAt\}</);

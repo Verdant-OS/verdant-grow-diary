@@ -25,14 +25,22 @@ function test(name, fn) {
   try {
     const r = fn();
     if (r && typeof r.then === "function") throw new Error("test must be sync");
-    passed++; console.log(`  ok  ${name}`);
+    passed++;
+    console.log(`  ok  ${name}`);
   } catch (e) {
-    failed++; console.log(`  FAIL ${name}: ${e instanceof Error ? e.message : e}`);
+    failed++;
+    console.log(`  FAIL ${name}: ${e instanceof Error ? e.message : e}`);
   }
 }
 async function testAsync(name, fn) {
-  try { await fn(); passed++; console.log(`  ok  ${name}`); }
-  catch (e) { failed++; console.log(`  FAIL ${name}: ${e instanceof Error ? e.message : e}`); }
+  try {
+    await fn();
+    passed++;
+    console.log(`  ok  ${name}`);
+  } catch (e) {
+    failed++;
+    console.log(`  FAIL ${name}: ${e instanceof Error ? e.message : e}`);
+  }
 }
 
 console.log("verify-pheno-paid-smoke-fixtures tests");
@@ -44,9 +52,15 @@ const { verifyComparisonReadyRows } = await import("./verify-pheno-paid-smoke-fi
 
 function makePlants(n) {
   return Array.from({ length: n }, (_, i) => ({
-    id: `plant-${i}`, name: `p${i}`, candidate_label: String.fromCharCode(65 + i),
-    strain: null, stage: "flower", grow_id: "g", tent_id: "t",
-    photo_url: null, is_archived: false,
+    id: `plant-${i}`,
+    name: `p${i}`,
+    candidate_label: String.fromCharCode(65 + i),
+    strain: null,
+    stage: "flower",
+    grow_id: "g",
+    tent_id: "t",
+    photo_url: null,
+    is_archived: false,
   }));
 }
 
@@ -56,8 +70,12 @@ test("HYDRATED when every candidate has score + smoke", () => {
     plants,
     scores: plants.map((p) => ({ plant_id: p.id, traits: {}, note: "dense resinous" })),
     smoke: plants.map((p) => ({
-      plant_id: p.id, flavor_descriptors: ["citrus"], effect_descriptors: ["uplifting"],
-      smoothness: 8, potency_impression: 7, verdict: "keeper",
+      plant_id: p.id,
+      flavor_descriptors: ["citrus"],
+      effect_descriptors: ["uplifting"],
+      smoothness: 8,
+      potency_impression: 7,
+      verdict: "keeper",
     })),
     labs: [],
   });
@@ -71,10 +89,16 @@ test("BLOCKED when a candidate has empty expression", () => {
   const out = verifyComparisonReadyRows("hunt", {
     plants,
     scores: [{ plant_id: plants[0].id, traits: {}, note: "note" }],
-    smoke: [{
-      plant_id: plants[0].id, flavor_descriptors: ["citrus"], effect_descriptors: [],
-      smoothness: null, potency_impression: null, verdict: "keeper",
-    }],
+    smoke: [
+      {
+        plant_id: plants[0].id,
+        flavor_descriptors: ["citrus"],
+        effect_descriptors: [],
+        smoothness: null,
+        potency_impression: null,
+        verdict: "keeper",
+      },
+    ],
     labs: [],
   });
   assert.equal(out.status, "BLOCKED");
@@ -85,10 +109,16 @@ test("BLOCKED when fewer than 2 candidates", () => {
   const out = verifyComparisonReadyRows("hunt", {
     plants,
     scores: [{ plant_id: plants[0].id, traits: {}, note: "n" }],
-    smoke: [{
-      plant_id: plants[0].id, flavor_descriptors: [], effect_descriptors: [],
-      smoothness: null, potency_impression: null, verdict: "keeper",
-    }],
+    smoke: [
+      {
+        plant_id: plants[0].id,
+        flavor_descriptors: [],
+        effect_descriptors: [],
+        smoothness: null,
+        potency_impression: null,
+        verdict: "keeper",
+      },
+    ],
     labs: [],
   });
   assert.equal(out.status, "BLOCKED");
@@ -100,10 +130,15 @@ test("BLOCKED when only raw lab rows exist and no phenotype signal", () => {
   // Seeder writes dominant_terpenes as string[], which is filtered out by the
   // adapter (needs {name, pct} objects), so this lab produces no expression.
   const out = verifyComparisonReadyRows("hunt", {
-    plants, scores: [], smoke: [],
+    plants,
+    scores: [],
+    smoke: [],
     labs: plants.map((p) => ({
-      plant_id: p.id, source: "estimate",
-      thc_pct: null, cbd_pct: null, total_cannabinoids_pct: null,
+      plant_id: p.id,
+      source: "estimate",
+      thc_pct: null,
+      cbd_pct: null,
+      total_cannabinoids_pct: null,
       dominant_terpenes: ["limonene"],
     })),
   });
@@ -116,7 +151,8 @@ test("BLOCKED when readiness != comparison_ready even with expressions", () => {
   const out = verifyComparisonReadyRows("hunt", {
     plants,
     scores: plants.map((p) => ({ plant_id: p.id, traits: {}, note: "dense" })),
-    smoke: [], labs: [],
+    smoke: [],
+    labs: [],
   });
   assert.equal(out.status, "BLOCKED");
   assert.notEqual(out.readiness, "comparison_ready");
@@ -131,7 +167,10 @@ function runNode(cmd, args, env) {
 
 await testAsync("verify CLI reports SKIPPED with empty env", async () => {
   const r = runNode("bunx", ["tsx", "scripts/e2e/verify-pheno-paid-smoke-fixtures.ts"], {
-    SUPABASE_URL: "", SUPABASE_SERVICE_ROLE_KEY: "", E2E_SUPABASE_URL: "", E2E_SUPABASE_SERVICE_ROLE_KEY: "",
+    SUPABASE_URL: "",
+    SUPABASE_SERVICE_ROLE_KEY: "",
+    E2E_SUPABASE_URL: "",
+    E2E_SUPABASE_SERVICE_ROLE_KEY: "",
     E2E_PHENO_HUNT_ID_COMPARISON_READY: "",
   });
   const out = (r.stdout || "") + (r.stderr || "");
@@ -143,7 +182,8 @@ await testAsync("verify CLI FAILs on hosted Supabase host", async () => {
   const r = runNode("bunx", ["tsx", "scripts/e2e/verify-pheno-paid-smoke-fixtures.ts"], {
     SUPABASE_URL: "https://knkwiiywfkbqznbxwqfh.supabase.co",
     SUPABASE_SERVICE_ROLE_KEY: "SUPER_SECRET_SERVICE_ROLE_VALUE",
-    E2E_SUPABASE_URL: "", E2E_SUPABASE_SERVICE_ROLE_KEY: "",
+    E2E_SUPABASE_URL: "",
+    E2E_SUPABASE_SERVICE_ROLE_KEY: "",
     E2E_PHENO_HUNT_ID_COMPARISON_READY: "",
   });
   const out = (r.stdout || "") + (r.stderr || "");
@@ -154,11 +194,16 @@ await testAsync("verify CLI FAILs on hosted Supabase host", async () => {
 
 await testAsync("orchestrator CLI is SKIPPED (exit 2) with no local env", async () => {
   const r = runNode("node", ["scripts/e2e/run-pheno-paid-smoke-local.mjs"], {
-    SUPABASE_URL: "", SUPABASE_SERVICE_ROLE_KEY: "",
-    E2E_PHENO_FREE_EMAIL: "", E2E_PHENO_FREE_PASSWORD: "",
-    E2E_PHENO_PRO_EMAIL: "", E2E_PHENO_PRO_PASSWORD: "",
-    E2E_PHENO_CANCELED_EMAIL: "", E2E_PHENO_CANCELED_PASSWORD: "",
-    E2E_PHENO_FOUNDER_EMAIL: "", E2E_PHENO_FOUNDER_PASSWORD: "",
+    SUPABASE_URL: "",
+    SUPABASE_SERVICE_ROLE_KEY: "",
+    E2E_PHENO_FREE_EMAIL: "",
+    E2E_PHENO_FREE_PASSWORD: "",
+    E2E_PHENO_PRO_EMAIL: "",
+    E2E_PHENO_PRO_PASSWORD: "",
+    E2E_PHENO_CANCELED_EMAIL: "",
+    E2E_PHENO_CANCELED_PASSWORD: "",
+    E2E_PHENO_FOUNDER_EMAIL: "",
+    E2E_PHENO_FOUNDER_PASSWORD: "",
   });
   const out = (r.stdout || "") + (r.stderr || "");
   assert.equal(r.status, 2, `expected exit 2, got ${r.status}: ${out}`);
@@ -170,9 +215,12 @@ await testAsync("orchestrator FAILs on hosted Supabase URL", async () => {
   const r = runNode("node", ["scripts/e2e/run-pheno-paid-smoke-local.mjs"], {
     SUPABASE_URL: "https://knkwiiywfkbqznbxwqfh.supabase.co",
     SUPABASE_SERVICE_ROLE_KEY: "SUPER_SECRET_SERVICE_ROLE_VALUE",
-    E2E_PHENO_FREE_EMAIL: "test@example.com", E2E_PHENO_FREE_PASSWORD: "super-secret-password",
-    E2E_PHENO_PRO_EMAIL: "test@example.com", E2E_PHENO_PRO_PASSWORD: "super-secret-password",
-    E2E_PHENO_CANCELED_EMAIL: "test@example.com", E2E_PHENO_CANCELED_PASSWORD: "super-secret-password",
+    E2E_PHENO_FREE_EMAIL: "test@example.com",
+    E2E_PHENO_FREE_PASSWORD: "super-secret-password",
+    E2E_PHENO_PRO_EMAIL: "test@example.com",
+    E2E_PHENO_PRO_PASSWORD: "super-secret-password",
+    E2E_PHENO_CANCELED_EMAIL: "test@example.com",
+    E2E_PHENO_CANCELED_PASSWORD: "super-secret-password",
   });
   const out = (r.stdout || "") + (r.stderr || "");
   assert.equal(r.status, 1);

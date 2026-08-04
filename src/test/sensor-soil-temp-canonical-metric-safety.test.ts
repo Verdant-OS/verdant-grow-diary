@@ -29,7 +29,7 @@ function walk(dir: string, acc: string[] = []): string[] {
 describe("sensor soil temperature canonical metric (safety)", () => {
   const files = walk(ROOT);
 
-  it("no app/lib code emits metric: \"soil_temperature_c\" as a string literal value", () => {
+  it('no app/lib code emits metric: "soil_temperature_c" as a string literal value', () => {
     const offenders: string[] = [];
     // Matches: metric: "soil_temperature_c"  or  metric: 'soil_temperature_c'
     const re = /metric\s*:\s*["']soil_temperature_c["']/;
@@ -41,10 +41,7 @@ describe("sensor soil temperature canonical metric (safety)", () => {
   });
 
   it("long-form converter emits canonical soil_temp_c, not soil_temperature_c", () => {
-    const src = readFileSync(
-      resolve(__dirname, "../lib/sensors/sensorReadingLongForm.ts"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(__dirname, "../lib/sensors/sensorReadingLongForm.ts"), "utf8");
     expect(src).toMatch(/["']soil_temp_c["']/);
     expect(src).not.toMatch(/\[\s*["']soil_temperature_c["']\s*,/);
   });

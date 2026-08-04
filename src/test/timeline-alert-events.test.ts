@@ -20,22 +20,10 @@ import { resolve } from "node:path";
 import { mergeRecent, type RecentItem } from "@/lib/growStatus";
 
 const ROOT = resolve(__dirname, "../..");
-const TIMELINE = readFileSync(
-  resolve(ROOT, "src/pages/Timeline.tsx"),
-  "utf8",
-);
-const HOOK = readFileSync(
-  resolve(ROOT, "src/hooks/useGrowDetailData.ts"),
-  "utf8",
-);
-const GROW_DETAIL = readFileSync(
-  resolve(ROOT, "src/pages/GrowDetail.tsx"),
-  "utf8",
-);
-const GROW_STATUS = readFileSync(
-  resolve(ROOT, "src/lib/growStatus.ts"),
-  "utf8",
-);
+const TIMELINE = readFileSync(resolve(ROOT, "src/pages/Timeline.tsx"), "utf8");
+const HOOK = readFileSync(resolve(ROOT, "src/hooks/useGrowDetailData.ts"), "utf8");
+const GROW_DETAIL = readFileSync(resolve(ROOT, "src/pages/GrowDetail.tsx"), "utf8");
+const GROW_STATUS = readFileSync(resolve(ROOT, "src/lib/growStatus.ts"), "utf8");
 
 const GROW_BUNDLE = `${GROW_DETAIL}\n${HOOK}\n${GROW_STATUS}`;
 
@@ -92,13 +80,7 @@ describe("Timeline — Alert events section", () => {
   });
 
   it("supports all alert event_type labels", () => {
-    for (const t of [
-      "created",
-      "acknowledged",
-      "resolved",
-      "dismissed",
-      "reopened",
-    ]) {
+    for (const t of ["created", "acknowledged", "resolved", "dismissed", "reopened"]) {
       expect(TIMELINE).toMatch(new RegExp(`["']${t}["']`));
     }
   });

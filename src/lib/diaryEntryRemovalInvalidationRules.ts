@@ -38,9 +38,7 @@ export type QueryKey = readonly unknown[];
  *
  * Deterministic ordering for test stability.
  */
-export function buildDiaryRemovalInvalidationKeys(
-  meta: DiaryEntryRemovalMetadata,
-): QueryKey[] {
+export function buildDiaryRemovalInvalidationKeys(meta: DiaryEntryRemovalMetadata): QueryKey[] {
   const keys: QueryKey[] = [];
 
   // Diary list — Timeline + simple diary-entries hook.

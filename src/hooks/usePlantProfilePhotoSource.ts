@@ -43,11 +43,7 @@ export function usePlantProfilePhotoSource(
 
   const query = useQuery({
     enabled,
-    queryKey: [
-      "plant-profile-photo-signed-url",
-      PLANT_PROFILE_PHOTO_BUCKET,
-      path,
-    ],
+    queryKey: ["plant-profile-photo-signed-url", PLANT_PROFILE_PHOTO_BUCKET, path],
     staleTime: SIGNED_URL_TTL_SECONDS * 1000 - REFRESH_BEFORE_EXPIRY_MS,
     gcTime: SIGNED_URL_TTL_SECONDS * 1000,
     retry: 1,

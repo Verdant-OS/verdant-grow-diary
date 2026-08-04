@@ -8,8 +8,7 @@
 
 export const AI_DOCTOR_CHECK_IN_KIND = "ai_doctor_check_in" as const;
 export const AI_DOCTOR_CHECK_IN_BADGE_LABEL = "AI Doctor check-in" as const;
-export const AI_DOCTOR_CHECK_IN_BADGE_ARIA_LABEL =
-  "Saved from AI Doctor check-in preview" as const;
+export const AI_DOCTOR_CHECK_IN_BADGE_ARIA_LABEL = "Saved from AI Doctor check-in preview" as const;
 
 /**
  * Loose shape — we deliberately do not import a domain type so this
@@ -31,6 +30,5 @@ export function isAiDoctorCheckInEvent(
   event: AiDoctorCheckInEventLike | null | undefined,
 ): boolean {
   if (!event || typeof event !== "object") return false;
-  return readKind((event as { details?: unknown }).details) ===
-    AI_DOCTOR_CHECK_IN_KIND;
+  return readKind((event as { details?: unknown }).details) === AI_DOCTOR_CHECK_IN_KIND;
 }

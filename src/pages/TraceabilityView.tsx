@@ -33,11 +33,7 @@ export default function TraceabilityView() {
         icon={<GitBranch className="h-5 w-5" />}
       />
 
-      <div
-        className="flex flex-wrap items-center gap-2"
-        role="group"
-        aria-label="Trace direction"
-      >
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Trace direction">
         {DIRECTIONS.map((d) => (
           <Button
             key={d.value}

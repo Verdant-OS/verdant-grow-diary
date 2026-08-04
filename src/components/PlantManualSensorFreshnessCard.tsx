@@ -127,9 +127,7 @@ function FreshnessTile({ snapshot }: { snapshot: FreshnessSnapshot }) {
     <div
       data-testid={`plant-manual-sensor-freshness-${metric}`}
       data-state={state}
-      className={cn(
-        "rounded-lg border border-border/50 bg-background/40 p-3 grid gap-0.5",
-      )}
+      className={cn("rounded-lg border border-border/50 bg-background/40 p-3 grid gap-0.5")}
     >
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">{label}</span>
@@ -152,9 +150,7 @@ function FreshnessTile({ snapshot }: { snapshot: FreshnessSnapshot }) {
         <>
           <span className={cn("text-base font-medium", STATE_STYLES[state])}>
             {formatValue(metric, value)}
-            {unit && (
-              <span className="text-xs text-muted-foreground ml-0.5">{unit}</span>
-            )}
+            {unit && <span className="text-xs text-muted-foreground ml-0.5">{unit}</span>}
           </span>
           {loggedAt && (
             <span

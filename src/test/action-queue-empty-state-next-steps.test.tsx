@@ -93,18 +93,14 @@ function renderPage() {
 describe("/actions empty-state — One-Tent Loop next-step links", () => {
   it("renders the 'View Timeline' link to /timeline", async () => {
     renderPage();
-    const link = await screen.findByTestId(
-      "action-queue-empty-next-steps-timeline",
-    );
+    const link = await screen.findByTestId("action-queue-empty-next-steps-timeline");
     expect(link.getAttribute("href")).toBe("/timeline");
     expect(link.textContent).toBe("View Timeline");
   });
 
   it("renders the 'Add Sensor Snapshot' link to /sensors", async () => {
     renderPage();
-    const link = await screen.findByTestId(
-      "action-queue-empty-next-steps-sensors",
-    );
+    const link = await screen.findByTestId("action-queue-empty-next-steps-sensors");
     expect(link.getAttribute("href")).toBe("/sensors");
     expect(link.textContent).toBe("Add Sensor Snapshot");
   });
@@ -126,12 +122,10 @@ describe("/actions empty-state — One-Tent Loop next-step links", () => {
   it("preserves the existing approval-required safety copy", async () => {
     renderPage();
     await screen.findByTestId("action-queue-empty-next-steps");
-    expect(
-      screen.getByText(/Verdant never sends commands to equipment/i),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("one-tent-loop-action-queue-landing-title").textContent,
-    ).toBe("Approval-required Action Queue");
+    expect(screen.getByText(/Verdant never sends commands to equipment/i)).toBeTruthy();
+    expect(screen.getByTestId("one-tent-loop-action-queue-landing-title").textContent).toBe(
+      "Approval-required Action Queue",
+    );
   });
 
   it("does NOT trigger inserts/updates/upserts/deletes on render", async () => {

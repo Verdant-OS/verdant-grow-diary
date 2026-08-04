@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  extractTimelineVideoSlot,
-  resolveTimelineVideoEntry,
-} from "@/lib/timelineVideoEntryRules";
+import { extractTimelineVideoSlot, resolveTimelineVideoEntry } from "@/lib/timelineVideoEntryRules";
 
 describe("timelineVideoEntryRules", () => {
   it("extracts video slot from valid details.video", () => {

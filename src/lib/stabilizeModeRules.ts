@@ -13,25 +13,14 @@
  *   - Deterministic for the same input.
  */
 
-export type StabilizeModeLevel =
-  | "off"
-  | "watch"
-  | "stabilize"
-  | "urgent_review";
+export type StabilizeModeLevel = "off" | "watch" | "stabilize" | "urgent_review";
 
 export type StabilizeModeConfidence = "low" | "medium" | "high";
 
 export type StabilizeAiConfidence = "low" | "medium" | "high" | "unknown";
 
 export type StabilizeSensorSourceSummary =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid"
-  | "mixed"
-  | "none";
+  "live" | "manual" | "csv" | "demo" | "stale" | "invalid" | "mixed" | "none";
 
 export interface StabilizeModeInput {
   /** Caller-injected current time (ISO string or epoch ms). */
@@ -73,16 +62,12 @@ const SAFE_NEXT_LOG_PROMPT_DEFAULT =
 
 const STACKED_CHANGES_WARNING =
   "Avoid stacking more changes until you can observe the plant response.";
-const SENSOR_NOT_LIVE_WARNING =
-  "Do not treat current telemetry as live proof.";
-const LOW_AI_CONFIDENCE_WARNING =
-  "Do not overdiagnose from weak context.";
+const SENSOR_NOT_LIVE_WARNING = "Do not treat current telemetry as live proof.";
+const LOW_AI_CONFIDENCE_WARNING = "Do not overdiagnose from weak context.";
 const AUTOFLOWER_LOW_STRESS_WARNING =
   "Avoid heavy defoliation, transplant, or high-stress training right now.";
-const NUTRIENT_RESTRAINT_WARNING =
-  "Do not chase nutrient or pH changes from weak evidence.";
-const DEVICE_RESTRAINT_WARNING =
-  "Do not change equipment setpoints based on this card.";
+const NUTRIENT_RESTRAINT_WARNING = "Do not chase nutrient or pH changes from weak evidence.";
+const DEVICE_RESTRAINT_WARNING = "Do not change equipment setpoints based on this card.";
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -108,10 +93,7 @@ function isRecoveringStatus(status: string | null | undefined): boolean {
   if (!status) return false;
   const s = status.toLowerCase();
   return (
-    s.includes("recover") ||
-    s.includes("stress") ||
-    s.includes("sick") ||
-    s.includes("damage")
+    s.includes("recover") || s.includes("stress") || s.includes("sick") || s.includes("damage")
   );
 }
 
@@ -127,9 +109,7 @@ function isAutoflowerLike(
  * Derive Stabilize Mode guidance from local context.
  * Deterministic; safe to call repeatedly with same input.
  */
-export function evaluateStabilizeMode(
-  input: StabilizeModeInput,
-): StabilizeModeResult {
+export function evaluateStabilizeMode(input: StabilizeModeInput): StabilizeModeResult {
   const nowMs = toMs(input.now) ?? 0;
   const lastLogMs = toMs(input.last_log_at ?? null);
 
@@ -140,9 +120,7 @@ export function evaluateStabilizeMode(
   const ai = input.ai_doctor_confidence_level ?? "unknown";
 
   const hoursSinceLastLog =
-    lastLogMs !== null && nowMs > 0
-      ? Math.max(0, (nowMs - lastLogMs) / HOUR_MS)
-      : null;
+    lastLogMs !== null && nowMs > 0 ? Math.max(0, (nowMs - lastLogMs) / HOUR_MS) : null;
 
   const missingLogs = hoursSinceLastLog === null || hoursSinceLastLog >= 36;
   const staleOrInvalid = !!input.has_stale_or_invalid_sensor_data;
@@ -170,9 +148,7 @@ export function evaluateStabilizeMode(
   evidence.push(`ai_doctor_confidence=${ai}`);
   evidence.push(`ai_doctor_missing_info=${missingInfo}`);
   evidence.push(
-    `hours_since_last_log=${
-      hoursSinceLastLog === null ? "unknown" : hoursSinceLastLog.toFixed(1)
-    }`,
+    `hours_since_last_log=${hoursSinceLastLog === null ? "unknown" : hoursSinceLastLog.toFixed(1)}`,
   );
   if (input.plant_stage) evidence.push(`plant_stage=${input.plant_stage}`);
   if (input.plant_status) evidence.push(`plant_status=${input.plant_status}`);
@@ -198,10 +174,8 @@ export function evaluateStabilizeMode(
   ) {
     level = "stabilize";
     if (stackedActions) why.push("Three or more actions in the last 48 hours.");
-    if (stackedMajors)
-      why.push("Two or more major changes in the last 48 hours.");
-    if (anyAlerts && aiWeak)
-      why.push("Active alert with weak or missing context.");
+    if (stackedMajors) why.push("Two or more major changes in the last 48 hours.");
+    if (anyAlerts && aiWeak) why.push("Active alert with weak or missing context.");
     if (staleOrInvalid && problemPeriod)
       why.push("Stale or invalid sensor data during a problem period.");
   } else if (
@@ -216,10 +190,8 @@ export function evaluateStabilizeMode(
   ) {
     level = "watch";
     if (missingLogs) why.push("No recent grower log in the last day or two.");
-    if (demoOrManualOnly)
-      why.push("Sensor context is demo or manual-only, not live.");
-    if (staleOrInvalid)
-      why.push("Sensor readings look stale or invalid.");
+    if (demoOrManualOnly) why.push("Sensor context is demo or manual-only, not live.");
+    if (staleOrInvalid) why.push("Sensor readings look stale or invalid.");
     if (aiWeak) why.push("AI Doctor context is weak or incomplete.");
     if (anyAlerts) why.push("There is an active alert to review.");
   } else {
@@ -232,12 +204,10 @@ export function evaluateStabilizeMode(
   if (level !== "off") {
     notTodo.push(DEVICE_RESTRAINT_WARNING);
     notTodo.push(NUTRIENT_RESTRAINT_WARNING);
-    if (stackedActions || stackedMajors)
-      notTodo.push(STACKED_CHANGES_WARNING);
+    if (stackedActions || stackedMajors) notTodo.push(STACKED_CHANGES_WARNING);
     if (sensorWeak) notTodo.push(SENSOR_NOT_LIVE_WARNING);
     if (aiWeak) notTodo.push(LOW_AI_CONFIDENCE_WARNING);
-    if (autoflowerLike || recovering)
-      notTodo.push(AUTOFLOWER_LOW_STRESS_WARNING);
+    if (autoflowerLike || recovering) notTodo.push(AUTOFLOWER_LOW_STRESS_WARNING);
   }
 
   // ----- Safe next log prompt -----
@@ -267,31 +237,25 @@ export function evaluateStabilizeMode(
       break;
     case "stabilize":
       headline = "Stabilize mode — pause changes and observe.";
-      watch =
-        "How the plant responds to changes already made in the last 48 hours.";
+      watch = "How the plant responds to changes already made in the last 48 hours.";
       wait = "Hold changes for 24 to 48 hours before adjusting anything else.";
       break;
     case "urgent_review":
       headline = "Urgent review — slow down and confirm context.";
-      watch =
-        "Confirm the active alert with a fresh photo and one calm observation.";
-      wait =
-        "Do not stack more changes. Re-evaluate after the next clean observation.";
+      watch = "Confirm the active alert with a fresh photo and one calm observation.";
+      wait = "Do not stack more changes. Re-evaluate after the next clean observation.";
       break;
   }
 
   // ----- Confidence -----
   let confidence: StabilizeModeConfidence = "medium";
   if (sensorWeak && aiWeak) confidence = "low";
-  else if (!sensorWeak && (ai === "high" || ai === "medium"))
-    confidence = "high";
+  else if (!sensorWeak && (ai === "high" || ai === "medium")) confidence = "high";
 
   const limitations: string[] = [];
-  if (sensorWeak)
-    limitations.push("Sensor context is not verified live.");
+  if (sensorWeak) limitations.push("Sensor context is not verified live.");
   if (aiWeak) limitations.push("AI Doctor context is weak or unknown.");
-  if (hoursSinceLastLog === null)
-    limitations.push("No recent grower log timestamp available.");
+  if (hoursSinceLastLog === null) limitations.push("No recent grower log timestamp available.");
 
   const safety_flags: string[] = [
     "no_device_control",
@@ -300,8 +264,7 @@ export function evaluateStabilizeMode(
     "read_only_advisory",
   ];
   if (level !== "off") safety_flags.push("avoid_aggressive_intervention");
-  if (autoflowerLike || recovering)
-    safety_flags.push("prefer_low_stress_path");
+  if (autoflowerLike || recovering) safety_flags.push("prefer_low_stress_path");
 
   return Object.freeze({
     level,

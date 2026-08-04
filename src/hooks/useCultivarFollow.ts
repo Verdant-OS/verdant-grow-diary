@@ -28,9 +28,7 @@ export interface UseCultivarFollowReturn {
   markSeen: () => Promise<void>;
 }
 
-export function useCultivarFollow(
-  cultivar: VerdantCultivarProfile,
-): UseCultivarFollowReturn {
+export function useCultivarFollow(cultivar: VerdantCultivarProfile): UseCultivarFollowReturn {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -109,7 +107,9 @@ export function useCultivarFollow(
   }, [user, isFollowing, cultivar.slug, cultivar.guideVersion]);
 
   const hasUpdate =
-    isFollowing && seenVersion != null && hasCultivarGuideUpdate(seenVersion, cultivar.guideVersion);
+    isFollowing &&
+    seenVersion != null &&
+    hasCultivarGuideUpdate(seenVersion, cultivar.guideVersion);
 
   return { loading, isFollowing, hasUpdate, follow, unfollow, markSeen };
 }

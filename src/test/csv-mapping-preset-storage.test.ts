@@ -13,7 +13,11 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { clearLocalStorageForTest, getLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 import {
   applySavedCsvMappingPreset,
@@ -57,11 +61,9 @@ describe("csv mapping preset storage — localStorage only", () => {
   });
 
   it("save preset writes only to localStorage", () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch" as never)
-      .mockImplementation((() => {
-        throw new Error("fetch must not be called");
-      }) as never);
+    const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
+      throw new Error("fetch must not be called");
+    }) as never);
     const config = buildTestConfig();
     expect(saveCsvMappingPreset(config)).toBe(true);
     const raw = getLocalStorageItemForTest(CSV_MAPPING_PRESET_STORAGE_KEY)!;
@@ -106,12 +108,7 @@ describe("csv mapping preset storage — localStorage only", () => {
   it("apply saved preset reuses import validator path", () => {
     const config = buildTestConfig();
     saveCsvMappingPreset(config);
-    const result = applySavedCsvMappingPreset([
-      "Timestamp",
-      "Air_F",
-      "RH",
-      "EC",
-    ]);
+    const result = applySavedCsvMappingPreset(["Timestamp", "Air_F", "RH", "EC"]);
     expect(result).not.toBeNull();
     expect(result!.status).toBe("applied");
   });
@@ -119,12 +116,7 @@ describe("csv mapping preset storage — localStorage only", () => {
   it("apply saved preset restores matching headers and units", () => {
     const config = buildTestConfig();
     saveCsvMappingPreset(config);
-    const result = applySavedCsvMappingPreset([
-      "Timestamp",
-      "Air_F",
-      "RH",
-      "EC",
-    ]);
+    const result = applySavedCsvMappingPreset(["Timestamp", "Air_F", "RH", "EC"]);
     expect(result!.status).toBe("applied");
     const m = (result as Extract<typeof result, { status: "applied" }>).mapping;
     expect(m.timestamp).toBe("Timestamp");
@@ -137,12 +129,7 @@ describe("csv mapping preset storage — localStorage only", () => {
   it("apply saved preset drops missing headers", () => {
     const config = buildTestConfig();
     saveCsvMappingPreset(config);
-    const result = applySavedCsvMappingPreset([
-      "Timestamp",
-      "Air_F",
-      "RH",
-      "EC_NEW",
-    ]);
+    const result = applySavedCsvMappingPreset(["Timestamp", "Air_F", "RH", "EC_NEW"]);
     expect(result!.status).toBe("applied");
     const m = (result as Extract<typeof result, { status: "applied" }>).mapping;
     expect(m.substrate_ec.column).toBeNull();
@@ -151,30 +138,16 @@ describe("csv mapping preset storage — localStorage only", () => {
   it("apply saved preset shows warning listing missing headers", () => {
     const config = buildTestConfig();
     saveCsvMappingPreset(config);
-    const result = applySavedCsvMappingPreset([
-      "Timestamp",
-      "Air_F",
-      "RH",
-      "EC_NEW",
-    ]);
+    const result = applySavedCsvMappingPreset(["Timestamp", "Air_F", "RH", "EC_NEW"]);
     expect(result!.status).toBe("applied");
     const missing = (result as Extract<typeof result, { status: "applied" }>).missingHeaders;
-    expect(
-      missing.some(
-        (m) => m.field === "substrate_ec" && m.header === "EC",
-      ),
-    ).toBe(true);
+    expect(missing.some((m) => m.field === "substrate_ec" && m.header === "EC")).toBe(true);
   });
 
   it("apply saved preset does not guess replacement headers", () => {
     const config = buildTestConfig();
     saveCsvMappingPreset(config);
-    const result = applySavedCsvMappingPreset([
-      "Timestamp",
-      "Air_F",
-      "RH",
-      "EC_NEW",
-    ]);
+    const result = applySavedCsvMappingPreset(["Timestamp", "Air_F", "RH", "EC_NEW"]);
     const m = (result as Extract<typeof result, { status: "applied" }>).mapping;
     expect(m.substrate_ec.column).toBeNull();
     expect(m.substrate_ec.unit).toBe("uS/cm");
@@ -186,16 +159,8 @@ describe("csv mapping preset storage — localStorage only", () => {
     const raw = getLocalStorageItemForTest(CSV_MAPPING_PRESET_STORAGE_KEY)!;
     const tampered = JSON.parse(raw);
     tampered.schema_version = 999;
-    setLocalStorageItemForTest(
-      CSV_MAPPING_PRESET_STORAGE_KEY,
-      JSON.stringify(tampered),
-    );
-    const result = applySavedCsvMappingPreset([
-      "Timestamp",
-      "Air_F",
-      "RH",
-      "EC",
-    ]);
+    setLocalStorageItemForTest(CSV_MAPPING_PRESET_STORAGE_KEY, JSON.stringify(tampered));
+    const result = applySavedCsvMappingPreset(["Timestamp", "Air_F", "RH", "EC"]);
     expect(result).not.toBeNull();
     expect(result!.status).toBe("blocked");
     expect((result as Extract<typeof result, { status: "blocked" }>).message).toMatch(
@@ -217,18 +182,10 @@ describe("csv mapping preset storage — localStorage only", () => {
     const raw = getLocalStorageItemForTest(CSV_MAPPING_PRESET_STORAGE_KEY)!;
     const tampered = JSON.parse(raw);
     tampered.schema_version = 999;
-    setLocalStorageItemForTest(
-      CSV_MAPPING_PRESET_STORAGE_KEY,
-      JSON.stringify(tampered),
-    );
+    setLocalStorageItemForTest(CSV_MAPPING_PRESET_STORAGE_KEY, JSON.stringify(tampered));
     const currentMapping = emptyRepresentativeMapping();
     currentMapping.timestamp = "Other";
-    const result = applySavedCsvMappingPreset([
-      "Timestamp",
-      "Air_F",
-      "RH",
-      "EC",
-    ]);
+    const result = applySavedCsvMappingPreset(["Timestamp", "Air_F", "RH", "EC"]);
     expect(result!.status).toBe("blocked");
     expect(currentMapping.timestamp).toBe("Other");
   });
@@ -244,12 +201,7 @@ describe("csv mapping preset storage — localStorage only", () => {
   it("saved preset apply does not introduce live labels", () => {
     const config = buildTestConfig();
     saveCsvMappingPreset(config);
-    const result = applySavedCsvMappingPreset([
-      "Timestamp",
-      "Air_F",
-      "RH",
-      "EC",
-    ]);
+    const result = applySavedCsvMappingPreset(["Timestamp", "Air_F", "RH", "EC"]);
     expect(result!.status).toBe("applied");
     const raw = JSON.stringify(result);
     expect(raw).not.toMatch(/=\s*['"]live['"]/);

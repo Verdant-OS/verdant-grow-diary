@@ -58,15 +58,13 @@ import TentDetail from "@/pages/TentDetail";
 
 describe("plantDetailPath tent context option", () => {
   it("appends ?tentId= when supplied and url-encodes it", () => {
-    expect(plantDetailPath("p1", { tentId: "tent 1/x" })).toBe(
-      "/plants/p1?tentId=tent+1%2Fx",
-    );
+    expect(plantDetailPath("p1", { tentId: "tent 1/x" })).toBe("/plants/p1?tentId=tent+1%2Fx");
   });
 
   it("supports the archived-timeline mode alongside tentId", () => {
-    expect(
-      plantDetailPath("p1", { tentId: "t1", mode: "archived-timeline" }),
-    ).toBe("/plants/p1?tentId=t1&mode=archived-timeline");
+    expect(plantDetailPath("p1", { tentId: "t1", mode: "archived-timeline" })).toBe(
+      "/plants/p1?tentId=t1&mode=archived-timeline",
+    );
   });
 
   it("remains canonical /plants/:id when no opts are supplied", () => {
@@ -94,8 +92,6 @@ describe("TentDetail plant card link", () => {
     expect(cards.length).toBeGreaterThan(0);
     const link = cards[0].querySelector("a");
     expect(link).not.toBeNull();
-    expect(link!.getAttribute("href")).toBe(
-      "/plants/plant-aaa?tentId=tent-77",
-    );
+    expect(link!.getAttribute("href")).toBe("/plants/plant-aaa?tentId=tent-77");
   });
 });

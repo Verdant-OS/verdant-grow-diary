@@ -35,9 +35,7 @@ export function buildPaddleSignatureHeader(input: PaddleSignatureInput): string 
   if (typeof rawBody !== "string") {
     throw new Error("rawBody must be a string (do not re-serialise)");
   }
-  const hex = createHmac("sha256", secret)
-    .update(`${timestamp}:${rawBody}`)
-    .digest("hex");
+  const hex = createHmac("sha256", secret).update(`${timestamp}:${rawBody}`).digest("hex");
   return `ts=${timestamp};h1=${hex}`;
 }
 
@@ -59,9 +57,7 @@ export async function verifyPaddleSignatureHeader(
     else if (k === "h1") h1 = v ?? "";
   }
   if (!ts || !h1) return false;
-  const expected = createHmac("sha256", secret)
-    .update(`${ts}:${rawBody}`)
-    .digest("hex");
+  const expected = createHmac("sha256", secret).update(`${ts}:${rawBody}`).digest("hex");
   if (expected.length !== h1.length) return false;
   let diff = 0;
   for (let i = 0; i < expected.length; i++) {

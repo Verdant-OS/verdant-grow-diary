@@ -80,12 +80,8 @@ describe("buildSoftwareApplicationJsonLd", () => {
   });
 
   it("throws when required fields are missing", () => {
-    expect(() =>
-      buildSoftwareApplicationJsonLd({ name: "", description: "x" }),
-    ).toThrow();
-    expect(() =>
-      buildSoftwareApplicationJsonLd({ name: "x", description: "" }),
-    ).toThrow();
+    expect(() => buildSoftwareApplicationJsonLd({ name: "", description: "x" })).toThrow();
+    expect(() => buildSoftwareApplicationJsonLd({ name: "x", description: "" })).toThrow();
   });
 });
 
@@ -98,9 +94,7 @@ describe("Landing FAQPage schema matches visible FAQ", () => {
     expect(doc.mainEntity).toHaveLength(VERDANT_LANDING_FAQ.length);
     for (let i = 0; i < VERDANT_LANDING_FAQ.length; i++) {
       expect(doc.mainEntity[i].name).toBe(VERDANT_LANDING_FAQ[i].question);
-      expect(doc.mainEntity[i].acceptedAnswer.text).toBe(
-        VERDANT_LANDING_FAQ[i].answer,
-      );
+      expect(doc.mainEntity[i].acceptedAnswer.text).toBe(VERDANT_LANDING_FAQ[i].answer);
     }
   });
 

@@ -141,9 +141,7 @@ describe("AssignTentDialog · movement timeline event", () => {
     expect(DIALOG).toMatch(
       /invalidateQueries\(\{\s*queryKey:\s*\["plant_recent_activity",\s*plantId\]/,
     );
-    expect(DIALOG).toMatch(
-      /invalidateQueries\(\{\s*queryKey:\s*\["diary_entries"\]/,
-    );
+    expect(DIALOG).toMatch(/invalidateQueries\(\{\s*queryKey:\s*\["diary_entries"\]/);
   });
 
   it("only updates plants.tent_id (no user_id / grow_id / strain / stage / notes)", () => {
@@ -214,9 +212,7 @@ describe("Add Tent / Add Plant flows exist and are grow-scoped", () => {
   it("CreateTentDialog inserts grow-scoped tents and never injects user_id", () => {
     expect(CREATE_TENT).toMatch(/\.from\(["']tents["']\)/);
     expect(CREATE_TENT).toMatch(/\.insert\(/);
-    const inserts = [
-      ...CREATE_TENT.matchAll(/\.insert\(\s*\{([^}]*)\}\s*\)/g),
-    ];
+    const inserts = [...CREATE_TENT.matchAll(/\.insert\(\s*\{([^}]*)\}\s*\)/g)];
     for (const m of inserts) {
       expect(m[1]).not.toMatch(/\buser_id\b/);
     }
@@ -224,9 +220,7 @@ describe("Add Tent / Add Plant flows exist and are grow-scoped", () => {
   it("CreatePlantDialog inserts grow-scoped plants and never injects user_id", () => {
     expect(CREATE_PLANT).toMatch(/\.from\(["']plants["']\)/);
     expect(CREATE_PLANT).toMatch(/\.insert\(/);
-    const inserts = [
-      ...CREATE_PLANT.matchAll(/\.insert\(\s*\{([^}]*)\}\s*\)/g),
-    ];
+    const inserts = [...CREATE_PLANT.matchAll(/\.insert\(\s*\{([^}]*)\}\s*\)/g)];
     for (const m of inserts) {
       expect(m[1]).not.toMatch(/\buser_id\b/);
     }

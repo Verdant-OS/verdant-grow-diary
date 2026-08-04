@@ -61,8 +61,7 @@ export function PlantMemoryEpisodeEvidence({
       ) : null}
       {windowPhotos.length > 0 ? (
         <p className="mt-1 text-sm text-muted-foreground">
-          {windowPhotos.length} photo{windowPhotos.length === 1 ? "" : "s"} recorded in this
-          window.
+          {windowPhotos.length} photo{windowPhotos.length === 1 ? "" : "s"} recorded in this window.
         </p>
       ) : null}
     </div>

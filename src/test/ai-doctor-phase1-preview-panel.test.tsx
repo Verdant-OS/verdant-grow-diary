@@ -160,16 +160,10 @@ describe("AiDoctorPhase1PreviewPanel", () => {
 
   it("renders mode labels for demo / manual / internal", () => {
     const vm = baseViewModel();
-    const { rerender } = render(
-      <AiDoctorPhase1PreviewPanel viewModel={vm} mode="demo" />,
-    );
-    expect(screen.getByTestId("ai-doctor-phase1-preview-mode").textContent).toBe(
-      "Demo preview",
-    );
+    const { rerender } = render(<AiDoctorPhase1PreviewPanel viewModel={vm} mode="demo" />);
+    expect(screen.getByTestId("ai-doctor-phase1-preview-mode").textContent).toBe("Demo preview");
     rerender(<AiDoctorPhase1PreviewPanel viewModel={vm} mode="manual" />);
-    expect(screen.getByTestId("ai-doctor-phase1-preview-mode").textContent).toBe(
-      "Manual preview",
-    );
+    expect(screen.getByTestId("ai-doctor-phase1-preview-mode").textContent).toBe("Manual preview");
     rerender(<AiDoctorPhase1PreviewPanel viewModel={vm} mode="internal" />);
     expect(screen.getByTestId("ai-doctor-phase1-preview-mode").textContent).toBe(
       "Internal preview",
@@ -198,15 +192,15 @@ describe("AiDoctorPhase1PreviewPanel", () => {
 
   it("renders safety warnings (automation, overdiagnosis, source truth) from VM", () => {
     render(<AiDoctorPhase1PreviewPanel viewModel={baseViewModel()} />);
-    expect(
-      screen.getByTestId("ai-doctor-phase1-preview-automation-warning").textContent,
-    ).toMatch(/does not control equipment/i);
+    expect(screen.getByTestId("ai-doctor-phase1-preview-automation-warning").textContent).toMatch(
+      /does not control equipment/i,
+    );
     expect(
       screen.getByTestId("ai-doctor-phase1-preview-overdiagnosis-warning").textContent,
     ).toMatch(/avoid treating this as a certain diagnosis/i);
-    expect(
-      screen.getByTestId("ai-doctor-phase1-preview-source-truth-warning").textContent,
-    ).toMatch(/demo or imported|stale or invalid/i);
+    expect(screen.getByTestId("ai-doctor-phase1-preview-source-truth-warning").textContent).toMatch(
+      /demo or imported|stale or invalid/i,
+    );
   });
 
   it("renders advisory Action Queue as approval-required with disabled reason and no execute buttons", () => {
@@ -228,9 +222,7 @@ describe("AiDoctorPhase1PreviewPanel", () => {
   });
 
   it("does not render forbidden device-control / overconfidence copy", () => {
-    const { container } = render(
-      <AiDoctorPhase1PreviewPanel viewModel={baseViewModel()} />,
-    );
+    const { container } = render(<AiDoctorPhase1PreviewPanel viewModel={baseViewModel()} />);
     const text = (container.textContent ?? "").toLowerCase();
     for (const forbidden of FORBIDDEN_COPY) {
       expect(text.includes(forbidden)).toBe(false);
@@ -244,25 +236,23 @@ describe("AiDoctorPhase1PreviewPanel", () => {
 
   it("renders harmless empty states when arrays are empty, keeps source/safety labels", () => {
     render(<AiDoctorPhase1PreviewPanel viewModel={emptyViewModel()} />);
-    expect(
-      screen.getByTestId("ai-doctor-phase1-preview-evidence-items-empty").textContent,
-    ).toMatch(/No evidence items supplied/i);
-    expect(
-      screen.getByTestId("ai-doctor-phase1-preview-context-items-empty").textContent,
-    ).toMatch(/No context items supplied/i);
-    expect(
-      screen.getByTestId("ai-doctor-phase1-preview-limitations-empty").textContent,
-    ).toMatch(/No limitations supplied/i);
-    expect(
-      screen.getByTestId("ai-doctor-phase1-preview-missing-items-empty").textContent,
-    ).toMatch(/No missing information listed/i);
-    expect(
-      screen.getByTestId("ai-doctor-phase1-preview-safety-flags-empty").textContent,
-    ).toMatch(/No safety flags supplied/i);
+    expect(screen.getByTestId("ai-doctor-phase1-preview-evidence-items-empty").textContent).toMatch(
+      /No evidence items supplied/i,
+    );
+    expect(screen.getByTestId("ai-doctor-phase1-preview-context-items-empty").textContent).toMatch(
+      /No context items supplied/i,
+    );
+    expect(screen.getByTestId("ai-doctor-phase1-preview-limitations-empty").textContent).toMatch(
+      /No limitations supplied/i,
+    );
+    expect(screen.getByTestId("ai-doctor-phase1-preview-missing-items-empty").textContent).toMatch(
+      /No missing information listed/i,
+    );
+    expect(screen.getByTestId("ai-doctor-phase1-preview-safety-flags-empty").textContent).toMatch(
+      /No safety flags supplied/i,
+    );
     // Automation warning is still rendered (never hidden).
-    expect(
-      screen.getByTestId("ai-doctor-phase1-preview-automation-warning"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-phase1-preview-automation-warning")).toBeTruthy();
   });
 
   it("preserves source-truth warning for demo/csv-only fixture", () => {
@@ -274,23 +264,22 @@ describe("AiDoctorPhase1PreviewPanel", () => {
     };
     vm.debugMeta = { ...vm.debugMeta, has_demo_or_csv_only: true, has_stale_or_invalid: false };
     render(<AiDoctorPhase1PreviewPanel viewModel={vm} />);
-    expect(
-      screen.getByTestId("ai-doctor-phase1-preview-source-truth-warning").textContent,
-    ).toMatch(/demo or imported/i);
+    expect(screen.getByTestId("ai-doctor-phase1-preview-source-truth-warning").textContent).toMatch(
+      /demo or imported/i,
+    );
   });
 
   it("preserves source-truth warning for stale/invalid-only fixture", () => {
     const vm = baseViewModel();
     vm.safetyPanel = {
       ...vm.safetyPanel,
-      source_truth_warning:
-        "Some readings are stale or invalid — not current and not reliable.",
+      source_truth_warning: "Some readings are stale or invalid — not current and not reliable.",
     };
     vm.debugMeta = { ...vm.debugMeta, has_demo_or_csv_only: false, has_stale_or_invalid: true };
     render(<AiDoctorPhase1PreviewPanel viewModel={vm} />);
-    expect(
-      screen.getByTestId("ai-doctor-phase1-preview-source-truth-warning").textContent,
-    ).toMatch(/stale or invalid/i);
+    expect(screen.getByTestId("ai-doctor-phase1-preview-source-truth-warning").textContent).toMatch(
+      /stale or invalid/i,
+    );
   });
 
   it("renders debug source counts from the view model", () => {
@@ -305,18 +294,16 @@ describe("AiDoctorPhase1PreviewPanel", () => {
 
   it("uses default title when none provided", () => {
     render(<AiDoctorPhase1PreviewPanel viewModel={baseViewModel()} />);
-    expect(
-      screen.getByTestId("ai-doctor-phase1-preview-header").textContent,
-    ).toMatch(/AI Doctor Phase 1 Preview/);
+    expect(screen.getByTestId("ai-doctor-phase1-preview-header").textContent).toMatch(
+      /AI Doctor Phase 1 Preview/,
+    );
   });
 
   it("uses custom title when provided", () => {
-    render(
-      <AiDoctorPhase1PreviewPanel viewModel={baseViewModel()} title="Internal QA View" />,
+    render(<AiDoctorPhase1PreviewPanel viewModel={baseViewModel()} title="Internal QA View" />);
+    expect(screen.getByTestId("ai-doctor-phase1-preview-header").textContent).toContain(
+      "Internal QA View",
     );
-    expect(
-      screen.getByTestId("ai-doctor-phase1-preview-header").textContent,
-    ).toContain("Internal QA View");
   });
 
   // ----- Static file scan: no forbidden imports / calls -----

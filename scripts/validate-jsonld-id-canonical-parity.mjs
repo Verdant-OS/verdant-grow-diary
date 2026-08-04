@@ -166,7 +166,7 @@ export function validateDocument({ file, html, distDir }) {
   blocks.forEach((raw, blockIdx) => {
     const trimmed = raw.trim();
     if (trimmed.length === 0) {
-      push(`jsonld[${blockIdx}]`, "empty <script type=\"application/ld+json\"> block");
+      push(`jsonld[${blockIdx}]`, 'empty <script type="application/ld+json"> block');
       return;
     }
     let parsed;
@@ -218,7 +218,6 @@ export function validateDocument({ file, html, distDir }) {
       }
     }
   });
-
 
   return issues;
 }

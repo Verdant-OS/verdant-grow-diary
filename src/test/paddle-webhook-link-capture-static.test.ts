@@ -17,7 +17,9 @@ describe("paddle webhook billing customer link capture", () => {
 
     const eventInsertIdx = WEBHOOK_SRC.indexOf('.from("paddle_events").insert');
     const processingIdx = WEBHOOK_SRC.indexOf("recordProcessing(supabase, recordedEvent)");
-    const linkCaptureIdx = WEBHOOK_SRC.indexOf("captureBillingCustomerLink(supabase, recordedEvent)");
+    const linkCaptureIdx = WEBHOOK_SRC.indexOf(
+      "captureBillingCustomerLink(supabase, recordedEvent)",
+    );
 
     expect(eventInsertIdx).toBeGreaterThan(-1);
     expect(processingIdx).toBeGreaterThan(eventInsertIdx);
@@ -29,8 +31,12 @@ describe("paddle webhook billing customer link capture", () => {
     expect(WEBHOOK_SRC).toContain("metadataUserIds");
     expect(WEBHOOK_SRC).toContain("verdant_user_id");
     expect(WEBHOOK_SRC).toContain("auth_user_id");
-    expect(WEBHOOK_SRC).toContain("providerCustomerId: firstStringPath(data, [[\"customer_id\"], [\"customer\", \"id\"]])");
-    expect(WEBHOOK_SRC).toContain("providerSubscriptionId: subscriptionIdFromData(data, row.event_type)");
+    expect(WEBHOOK_SRC).toContain(
+      'providerCustomerId: firstStringPath(data, [["customer_id"], ["customer", "id"]])',
+    );
+    expect(WEBHOOK_SRC).toContain(
+      "providerSubscriptionId: subscriptionIdFromData(data, row.event_type)",
+    );
     expect(WEBHOOK_SRC).toContain("providerCheckoutId: providerCheckoutIdFromData(data)");
 
     expect(WEBHOOK_SRC).not.toMatch(/email/i);
@@ -60,7 +66,9 @@ describe("paddle webhook billing customer link capture", () => {
     const parseIdx = WEBHOOK_SRC.indexOf("JSON.parse(rawBody)");
     const eventInsertIdx = WEBHOOK_SRC.indexOf('.from("paddle_events").insert');
     const processingIdx = WEBHOOK_SRC.indexOf("recordProcessing(supabase, recordedEvent)");
-    const linkCaptureIdx = WEBHOOK_SRC.indexOf("captureBillingCustomerLink(supabase, recordedEvent)");
+    const linkCaptureIdx = WEBHOOK_SRC.indexOf(
+      "captureBillingCustomerLink(supabase, recordedEvent)",
+    );
 
     expect(rawIdx).toBeGreaterThan(-1);
     expect(verifyIdx).toBeGreaterThan(rawIdx);

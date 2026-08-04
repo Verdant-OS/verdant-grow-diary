@@ -26,12 +26,7 @@
  */
 
 /** Family classification of an event type for scoped resets. */
-export type QuickLogActionFamily =
-  | "harvest"
-  | "feeding"
-  | "environment"
-  | "maturity"
-  | "other";
+export type QuickLogActionFamily = "harvest" | "feeding" | "environment" | "maturity" | "other";
 
 /**
  * Classify a raw event-type string into a scoped-reset family.

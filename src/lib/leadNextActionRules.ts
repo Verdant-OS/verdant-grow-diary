@@ -42,10 +42,7 @@ const DAY_MS = 24 * HOUR_MS;
  * Deterministic: same input always yields the same output (no Date.now()
  * unless `now` is supplied; tests pass a fixed `now`).
  */
-export function recommendNextAction(
-  lead: LeadRow,
-  now: number = Date.now(),
-): LeadNextAction {
+export function recommendNextAction(lead: LeadRow, now: number = Date.now()): LeadNextAction {
   const warnings: string[] = [];
 
   const statusRaw = (lead.status ?? "") as string;
@@ -109,8 +106,7 @@ export function recommendNextAction(
         type: "review_manually",
         label: "Review Manually",
         priority: "medium",
-        reason:
-          "Lead is in follow-up state but no follow_up_at is scheduled.",
+        reason: "Lead is in follow-up state but no follow_up_at is scheduled.",
         warning: [...warnings, "Missing follow_up_at"].join("; "),
         sortWeight: 40,
       };
@@ -150,8 +146,7 @@ export function recommendNextAction(
     lead.status === "reviewed" ||
     (lead.status === "contacted" && contactedAt === null)
   ) {
-    const ageDays =
-      createdAt === null ? null : (now - createdAt) / DAY_MS;
+    const ageDays = createdAt === null ? null : (now - createdAt) / DAY_MS;
     const aged = ageDays !== null && ageDays >= 1;
     const priority: LeadNextActionPriority = aged ? "high" : "medium";
     const extraWarn =

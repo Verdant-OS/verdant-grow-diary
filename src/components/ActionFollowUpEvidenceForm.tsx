@@ -256,11 +256,7 @@ export default function ActionFollowUpEvidenceForm({
         </p>
       )}
 
-      <div
-        aria-live="polite"
-        className="sr-only"
-        data-testid="action-followup-form-status"
-      >
+      <div aria-live="polite" className="sr-only" data-testid="action-followup-form-status">
         {saving ? "Saving follow-up…" : ""}
       </div>
 

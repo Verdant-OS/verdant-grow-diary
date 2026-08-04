@@ -136,8 +136,8 @@ const APP = readAllRouteModuleSources();
 
 describe("AI Doctor Session detail — routing & wiring", () => {
   it("App registers /doctor/sessions/:sessionId route", () => {
-    expect(APP).toMatch(/\/doctor\/sessions\/:sessionId/);
-    expect(APP).toContain("AiDoctorSessionDetail");
+    // File route lives at src/routes/_app/doctor.sessions.$sessionId.tsx
+    expect(APP).toMatch(/doctor\.sessions\.\$sessionId|sessions\/\$sessionId/);
   });
   it("hook exports useAiDoctorSession with maybeSingle by id", () => {
     expect(HOOK).toMatch(/export function useAiDoctorSession/);

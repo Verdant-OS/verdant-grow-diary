@@ -125,16 +125,19 @@ describe("account deletion workflow", () => {
 
   it("fails closed when a billable legacy row has no cancelable Paddle id", () => {
     expect(
-      compileAccountSubscriptions([], [
-        {
-          id: "legacy-1",
-          plan_id: "pro_annual",
-          status: "past_due",
-          provider: "stripe",
-          provider_customer_id: "ctm_legacy",
-          provider_subscription_id: "sub_legacy",
-        },
-      ]),
+      compileAccountSubscriptions(
+        [],
+        [
+          {
+            id: "legacy-1",
+            plan_id: "pro_annual",
+            status: "past_due",
+            provider: "stripe",
+            provider_customer_id: "ctm_legacy",
+            provider_subscription_id: "sub_legacy",
+          },
+        ],
+      ),
     ).toEqual({ ok: false });
   });
 

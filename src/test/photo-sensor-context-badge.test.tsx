@@ -58,9 +58,7 @@ describe("PhotoSensorContextBadge — selection paths", () => {
       />,
     );
     expect(getByTestId("photo-sensor-context-empty")).toBeTruthy();
-    expect(
-      getByText("No nearby sensor snapshot available for this photo."),
-    ).toBeTruthy();
+    expect(getByText("No nearby sensor snapshot available for this photo.")).toBeTruthy();
   });
 
   it("shows attached snapshot badge when one is attached", () => {
@@ -75,9 +73,7 @@ describe("PhotoSensorContextBadge — selection paths", () => {
             source: "manual",
           },
         }}
-        nearbyCandidates={[
-          { id: "c1", captured_at: PHOTO_T, source: "live" },
-        ]}
+        nearbyCandidates={[{ id: "c1", captured_at: PHOTO_T, source: "live" }]}
       />,
     );
     expect(getByTestId("photo-sensor-context-attached")).toBeTruthy();

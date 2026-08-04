@@ -20,11 +20,7 @@ export class SmokeChecklistReporter {
     this.steps.push({ step, label, status, evidence });
   }
 
-  async run(
-    step: number,
-    label: string,
-    fn: () => Promise<string | void>,
-  ): Promise<void> {
+  async run(step: number, label: string, fn: () => Promise<string | void>): Promise<void> {
     try {
       const result = await fn();
       const evidence = typeof result === "string" && result.length > 0 ? result : "ok";
@@ -63,8 +59,7 @@ export class SmokeChecklistReporter {
     lines.push("Quick Log Smoke Checklist");
     lines.push("=========================");
     for (const s of this.steps) {
-      const marker =
-        s.status === "pass" ? "✓" : s.status === "fail" ? "✗" : "·";
+      const marker = s.status === "pass" ? "✓" : s.status === "fail" ? "✗" : "·";
       lines.push(`${marker} [${s.step}] ${s.label} — ${s.evidence}`);
     }
     const j = this.toJSON();

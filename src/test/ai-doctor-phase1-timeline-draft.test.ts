@@ -60,15 +60,10 @@ describe("aiDoctorPhase1TimelineDraft", () => {
     expect(d.details.no_alert_write).toBe(true);
     expect(d.details.no_device_control).toBe(true);
     expect(d.details.no_live_ai_model).toBe(true);
-    expect(d.details.result.action_queue_suggestion_status).toBe(
-      "preview_only",
-    );
+    expect(d.details.result.action_queue_suggestion_status).toBe("preview_only");
     expect(d.details.result.risk_level).toBe("low");
     expect(d.details.result.confidence).toBe("low");
-    expect(d.details.result.missing_information).toEqual([
-      "Recent photo",
-      "Sensor snapshot",
-    ]);
+    expect(d.details.result.missing_information).toEqual(["Recent photo", "Sensor snapshot"]);
   });
 
   it("rejects missing plant_id", () => {

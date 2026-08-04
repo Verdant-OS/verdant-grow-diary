@@ -17,8 +17,7 @@ export function inferGuardType(text) {
   if (/device[- ]?control|equipment[- ]?command|automation/.test(t))
     return "device-control language guard";
   if (/route|helper|ownership/.test(t)) return "route/helper ownership guard";
-  if (/sensor|provenance|csv|telemetry/.test(t))
-    return "sensor provenance/static ownership guard";
+  if (/sensor|provenance|csv|telemetry/.test(t)) return "sensor provenance/static ownership guard";
   return "unknown static scanner guard";
 }
 
@@ -95,7 +94,9 @@ export function formatReport(summary) {
       out.push(`  ${f.file}${f.name ? ` > ${f.name}` : ""}`);
     }
   } else if (summary.total > 0) {
-    out.push("All parsed failures are timeout-only. Review environment speed before changing code.");
+    out.push(
+      "All parsed failures are timeout-only. Review environment speed before changing code.",
+    );
   } else {
     out.push("No failures parsed.");
   }

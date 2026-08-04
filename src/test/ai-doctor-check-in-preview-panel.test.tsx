@@ -75,12 +75,12 @@ describe("AiDoctorCheckInPreviewPanel", () => {
     );
     render(<AiDoctorCheckInPreviewPanel context={context} />);
     openPreview();
-    expect(
-      screen.getByTestId("ai-doctor-check-in-preview-notice").textContent,
-    ).toBe("Preview only — not saved.");
-    expect(
-      screen.getByTestId("ai-doctor-check-in-preview-no-model-notice").textContent,
-    ).toBe("No live AI model was called.");
+    expect(screen.getByTestId("ai-doctor-check-in-preview-notice").textContent).toBe(
+      "Preview only — not saved.",
+    );
+    expect(screen.getByTestId("ai-doctor-check-in-preview-no-model-notice").textContent).toBe(
+      "No live AI model was called.",
+    );
     expect(screen.getByTestId("ai-doctor-check-in-preview-summary")).toBeTruthy();
     expect(screen.getByTestId("ai-doctor-check-in-preview-immediate")).toBeTruthy();
     expect(screen.getByTestId("ai-doctor-check-in-preview-24h")).toBeTruthy();
@@ -95,13 +95,11 @@ describe("AiDoctorCheckInPreviewPanel", () => {
     expect(
       screen.getByTestId("ai-doctor-check-in-preview-body").getAttribute("data-context-weak"),
     ).toBe("true");
-    expect(
-      screen.getByTestId("ai-doctor-check-in-preview-confidence").textContent,
-    ).toContain("low");
+    expect(screen.getByTestId("ai-doctor-check-in-preview-confidence").textContent).toContain(
+      "low",
+    );
     expect(screen.getByTestId("ai-doctor-check-in-preview-missing")).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-check-in-preview-limitation-no_sensors"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-check-in-preview-limitation-no_sensors")).toBeTruthy();
   });
 
   it("labels demo-only telemetry as a demo-only limitation, not live", () => {
@@ -111,16 +109,20 @@ describe("AiDoctorCheckInPreviewPanel", () => {
     );
     render(<AiDoctorCheckInPreviewPanel context={context} />);
     openPreview();
-    expect(
-      screen.getByTestId("ai-doctor-check-in-preview-limitation-demo_only"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-check-in-preview-limitation-demo_only")).toBeTruthy();
   });
 
   it("flags stale/invalid telemetry as a limitation in the preview", () => {
     const context = ctx(
       [],
       [
-        { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live", quality: "stale" },
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: ago(HOUR),
+          source: "live",
+          quality: "stale",
+        },
       ],
     );
     render(<AiDoctorCheckInPreviewPanel context={context} />);
@@ -132,10 +134,7 @@ describe("AiDoctorCheckInPreviewPanel", () => {
 
   it("static guard: panel source has no write/model/API imports", async () => {
     const { readFileSync } = await import("node:fs");
-    const src = readFileSync(
-      "src/components/AiDoctorCheckInPreviewPanel.tsx",
-      "utf8",
-    );
+    const src = readFileSync("src/components/AiDoctorCheckInPreviewPanel.tsx", "utf8");
     expect(src).not.toMatch(/integrations\/supabase/);
     expect(src).not.toMatch(/functions\s*\.\s*invoke/);
     expect(src).not.toMatch(/\bfetch\s*\(/);
@@ -155,9 +154,7 @@ describe("AiDoctorCheckInPreviewPanel", () => {
     );
     render(<AiDoctorCheckInPreviewPanel context={context} />);
     openPreview();
-    expect(
-      screen.getByTestId("ai-doctor-check-in-copy-button"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-check-in-copy-button")).toBeTruthy();
   });
 
   it("clicking copy writes receipt text to clipboard and shows success message", async () => {

@@ -48,9 +48,7 @@ function redactTokens(input: string): string {
   return input.replace(TOKEN_PATTERN, "<redacted>");
 }
 
-export function buildDiagnosticsExport(
-  input: DiagnosticsExportInput,
-): DiagnosticsExportInput {
+export function buildDiagnosticsExport(input: DiagnosticsExportInput): DiagnosticsExportInput {
   // Re-shape into a plain object so callers can't accidentally extend with
   // a reveal field; also drops any prototype pollution surface.
   return {
@@ -286,9 +284,7 @@ export interface BuildPowerShellIngestInput {
  * Embeds the real token only when the caller passes the one-time reveal;
  * otherwise renders a safe placeholder.
  */
-export function buildPowerShellIngestTestScript(
-  input: BuildPowerShellIngestInput,
-): string {
+export function buildPowerShellIngestTestScript(input: BuildPowerShellIngestInput): string {
   const tent = input.tentId && input.tentId.length > 0 ? input.tentId : "<TENT-UUID>";
   const token =
     input.bridgeTokenPlaintext && input.bridgeTokenPlaintext.startsWith("vbt_")
@@ -326,9 +322,7 @@ export interface HistoryExport extends BuildHistoryExportInput {
   items: SensorIngestHistoryItem[];
 }
 
-export function buildHistoryExport(
-  input: BuildHistoryExportInput,
-): HistoryExport {
+export function buildHistoryExport(input: BuildHistoryExportInput): HistoryExport {
   return {
     generated_at: input.generated_at,
     tent_id: input.tent_id,
@@ -589,12 +583,7 @@ export function buildSafeResponseInspector(
 // Canonical ingest payload validation
 // ---------------------------------------------------------------------------
 
-export type CanonicalIngestField =
-  | "source"
-  | "captured_at"
-  | "tent_id"
-  | "confidence"
-  | "readings";
+export type CanonicalIngestField = "source" | "captured_at" | "tent_id" | "confidence" | "readings";
 
 export interface CanonicalIngestInvalid {
   field: CanonicalIngestField | "raw_payload";
@@ -616,9 +605,7 @@ export interface CanonicalIngestValidation {
  * raw_payload is optional — flagged invalid only if present and not an
  * object.
  */
-export function buildCanonicalIngestPayloadValidation(
-  payload: unknown,
-): CanonicalIngestValidation {
+export function buildCanonicalIngestPayloadValidation(payload: unknown): CanonicalIngestValidation {
   const present: CanonicalIngestField[] = [];
   const missing: CanonicalIngestField[] = [];
   const invalid: CanonicalIngestInvalid[] = [];
@@ -645,8 +632,7 @@ export function buildCanonicalIngestPayloadValidation(
     missing.push("source");
   }
 
-  const capturedAt =
-    p.captured_at ?? p.timestamp ?? meta.captured_at ?? meta.timestamp;
+  const capturedAt = p.captured_at ?? p.timestamp ?? meta.captured_at ?? meta.timestamp;
   if (typeof capturedAt === "string" && capturedAt.length > 0) {
     if (Number.isFinite(Date.parse(capturedAt))) {
       present.push("captured_at");
@@ -680,8 +666,7 @@ export function buildCanonicalIngestPayloadValidation(
       // Treat array entries as scalars; count valid ones.
       const validOnes = readings.filter(
         (v) =>
-          (typeof v === "number" && Number.isFinite(v)) ||
-          (typeof v === "string" && v.length > 0),
+          (typeof v === "number" && Number.isFinite(v)) || (typeof v === "string" && v.length > 0),
       );
       readingsCount = validOnes.length;
       if (validOnes.length > 0) present.push("readings");
@@ -694,8 +679,7 @@ export function buildCanonicalIngestPayloadValidation(
     } else {
       const validOnes = entries.filter(
         ([, v]) =>
-          (typeof v === "number" && Number.isFinite(v)) ||
-          (typeof v === "string" && v.length > 0),
+          (typeof v === "number" && Number.isFinite(v)) || (typeof v === "string" && v.length > 0),
       );
       readingsCount = validOnes.length;
       if (validOnes.length > 0) present.push("readings");
@@ -704,7 +688,6 @@ export function buildCanonicalIngestPayloadValidation(
   } else {
     invalid.push({ field: "readings", reason: "readings must be an object" });
   }
-
 
   const rawTop = p.raw_payload;
   if (rawTop !== undefined && rawTop !== null) {
@@ -794,10 +777,7 @@ export function buildSensorTestbenchValidationUiState(input: {
   }));
   const invalid: ValidationFieldEntry[] = validation.invalid.map((i) => ({
     field: i.field,
-    label:
-      i.field === "raw_payload"
-        ? "raw_payload"
-        : CANONICAL_FIELD_LABELS[i.field],
+    label: i.field === "raw_payload" ? "raw_payload" : CANONICAL_FIELD_LABELS[i.field],
     reason: i.reason,
   }));
 
@@ -806,9 +786,7 @@ export function buildSensorTestbenchValidationUiState(input: {
     // missing/invalid, name only that field.
     const blockers = [
       ...missing.map((m) => m.label),
-      ...invalid
-        .filter((i) => i.field !== "raw_payload")
-        .map((i) => `${i.label} (${i.reason})`),
+      ...invalid.filter((i) => i.field !== "raw_payload").map((i) => `${i.label} (${i.reason})`),
     ];
     let reason: string;
     if (blockers.length === 0) {
@@ -874,11 +852,7 @@ export function buildSensorTestbenchValidationUiState(input: {
 
 /** Deterministic preview of the .zip name produced by the bundle download. */
 export function buildDiagnosticsBundleFilenamePreview(date: Date): string {
-  return buildDownloadFilename(
-    "verdant-sensor-diagnostics-bundle",
-    "zip",
-    date,
-  );
+  return buildDownloadFilename("verdant-sensor-diagnostics-bundle", "zip", date);
 }
 
 // ---------------------------------------------------------------------------
@@ -891,9 +865,7 @@ export function buildDiagnosticsBundleFilenamePreview(date: Date): string {
  * redacted inspector output. A defensive token-redaction pass is applied as
  * belt-and-suspenders.
  */
-export function formatSafeResponseInspectorPlainText(
-  inspector: SafeResponseInspector,
-): string {
+export function formatSafeResponseInspectorPlainText(inspector: SafeResponseInspector): string {
   const lines: string[] = [];
   lines.push("Verdant sensor ingest — response inspector");
   lines.push(`HTTP ${inspector.http_status}`);
@@ -921,9 +893,7 @@ export function formatSafeResponseInspectorPlainText(
  * Always prefixed with "Canonical payload validation:" so the assistive
  * announcement is unambiguous regardless of surrounding context.
  */
-export function buildCanonicalValidationA11yLabel(input: {
-  status: ValidationUiStatus;
-}): string {
+export function buildCanonicalValidationA11yLabel(input: { status: ValidationUiStatus }): string {
   switch (input.status) {
     case "ready":
       return "Canonical payload validation: Ready";
@@ -959,16 +929,12 @@ export interface BuildDiagnosticsShareSummaryInput {
  * service_role/anon_key/api_key/secret values. Sensitive keys in the
  * inspector are already masked at source.
  */
-export function buildDiagnosticsShareSummary(
-  input: BuildDiagnosticsShareSummaryInput,
-): string {
+export function buildDiagnosticsShareSummary(input: BuildDiagnosticsShareSummaryInput): string {
   const { bundleFilename, validationUi, lastTestResult, inspectorPlainText } = input;
   const lines: string[] = [];
   lines.push("Verdant sensor diagnostics — share summary");
   lines.push(`bundle filename: ${bundleFilename}`);
-  lines.push(
-    `canonical validation: ${validationUi.statusLabel} (${validationUi.status})`,
-  );
+  lines.push(`canonical validation: ${validationUi.statusLabel} (${validationUi.status})`);
   if (lastTestResult) {
     lines.push(`last test HTTP status: ${lastTestResult.http_status}`);
     lines.push(`classification: ${lastTestResult.classification}`);
@@ -978,17 +944,13 @@ export function buildDiagnosticsShareSummary(
   const missing = validationUi.summary.missing;
   lines.push(
     `missing fields: ${
-      missing.length === 0
-        ? "—"
-        : missing.map((m) => `${m.label} (${m.reason})`).join(", ")
+      missing.length === 0 ? "—" : missing.map((m) => `${m.label} (${m.reason})`).join(", ")
     }`,
   );
   const invalid = validationUi.summary.invalid;
   lines.push(
     `invalid fields: ${
-      invalid.length === 0
-        ? "—"
-        : invalid.map((i) => `${i.label}: ${i.reason}`).join("; ")
+      invalid.length === 0 ? "—" : invalid.map((i) => `${i.label}: ${i.reason}`).join("; ")
     }`,
   );
   lines.push("");
@@ -1116,7 +1078,6 @@ export function buildCanonicalSensorIngestUrl(
   const trimmed = supabaseUrl.trim().replace(/\/+$/, "");
   if (!/^https?:\/\//i.test(trimmed)) return null;
   try {
-    // eslint-disable-next-line no-new
     new URL(trimmed);
   } catch {
     return null;
@@ -1154,8 +1115,7 @@ function classifyCanonical(
   supabaseStatus: "ok" | "missing" | "malformed";
   wrongPath: boolean;
 } {
-  const hasSupabase =
-    typeof supabaseUrl === "string" && supabaseUrl.trim().length > 0;
+  const hasSupabase = typeof supabaseUrl === "string" && supabaseUrl.trim().length > 0;
   const canonicalUrl = hasSupabase ? buildCanonicalSensorIngestUrl(supabaseUrl) : null;
   const canonical = canonicalUrl ?? "<unavailable>";
   let supabaseStatus: "ok" | "missing" | "malformed" = "ok";
@@ -1230,8 +1190,7 @@ function buildCorsObservability(
   return {
     optionsHeaders: "unknown",
     postHeaders: "unknown",
-    explanation:
-      "Browser blocked the response; verify with Edge Function tests or curl.",
+    explanation: "Browser blocked the response; verify with Edge Function tests or curl.",
   };
 }
 
@@ -1334,23 +1293,33 @@ export function buildSensorIngestNetworkDiagnostics(
     title = "Local/private ingest endpoint not reachable from this browser";
     summary =
       "The ingest URL points at a localhost or private-network address that this browser likely cannot reach from the current origin.";
-    checks.push(`Confirm the device serving ${ingest.host} is reachable from this machine and network.`);
-    checks.push("If using a Pi/PC bridge, verify the listener is running and the firewall allows the port.");
+    checks.push(
+      `Confirm the device serving ${ingest.host} is reachable from this machine and network.`,
+    );
+    checks.push(
+      "If using a Pi/PC bridge, verify the listener is running and the firewall allows the port.",
+    );
     checks.push("Open the ingest URL directly in a new browser tab to confirm reachability.");
   } else if (origin && origin.protocol === "https:" && ingest.protocol === "http:") {
     status = "likely_mixed_content";
     title = "Likely mixed-content block (HTTPS app calling HTTP endpoint)";
     summary =
       "Browsers block HTTP requests from HTTPS pages. The ingest endpoint must be served over HTTPS.";
-    checks.push("Serve the ingest endpoint over HTTPS, or run the app over HTTP for local testing only.");
+    checks.push(
+      "Serve the ingest endpoint over HTTPS, or run the app over HTTP for local testing only.",
+    );
     checks.push("Verify the ingest URL scheme in your environment configuration.");
   } else if (origin && origin.origin !== ingest.origin) {
     status = "likely_cors_or_preflight";
     title = "Likely CORS or preflight failure (cross-origin Failed to fetch)";
     summary =
       "The browser blocked the request before a response arrived. This usually means an OPTIONS preflight failed or CORS headers are missing.";
-    checks.push("Open DevTools → Network and look for a failed OPTIONS preflight request to the ingest URL.");
-    checks.push("Confirm the Edge Function returns Access-Control-Allow-Origin and Access-Control-Allow-Headers on OPTIONS and error responses.");
+    checks.push(
+      "Open DevTools → Network and look for a failed OPTIONS preflight request to the ingest URL.",
+    );
+    checks.push(
+      "Confirm the Edge Function returns Access-Control-Allow-Origin and Access-Control-Allow-Headers on OPTIONS and error responses.",
+    );
     checks.push("Verify the Edge Function is deployed and reachable at the configured URL.");
   } else {
     status = "needs_network_inspection";
@@ -1358,7 +1327,9 @@ export function buildSensorIngestNetworkDiagnostics(
     summary =
       "The browser did not receive an HTTP response. Inspect the network tab to identify whether the request was blocked, timed out, or never sent.";
     checks.push("Open DevTools → Network and re-run the test to see the failed request.");
-    checks.push("Confirm the Edge Function is deployed and responding to a manual curl/PowerShell request.");
+    checks.push(
+      "Confirm the Edge Function is deployed and responding to a manual curl/PowerShell request.",
+    );
     checks.push("Check for browser extensions, VPNs, or ad-blockers that may block the request.");
   }
 
@@ -1449,11 +1420,7 @@ export function buildNetworkDiagnosticsExportJson(
 
 /** Filename for the diagnostics JSON download. */
 export function buildNetworkDiagnosticsDownloadFilename(date: Date): string {
-  return buildDownloadFilename(
-    "verdant-sensor-network-diagnostics",
-    "json",
-    date,
-  );
+  return buildDownloadFilename("verdant-sensor-network-diagnostics", "json", date);
 }
 
 // ---------------------------------------------------------------------------
@@ -1490,9 +1457,7 @@ export function buildSensorIngestVerifyCommands(
   input: BuildSensorIngestVerifyCommandsInput,
 ): SensorIngestVerifyCommands {
   const ingestUrl =
-    typeof input.ingestUrl === "string" && input.ingestUrl.length > 0
-      ? input.ingestUrl
-      : "";
+    typeof input.ingestUrl === "string" && input.ingestUrl.length > 0 ? input.ingestUrl : "";
   const origin =
     typeof input.appOrigin === "string" && input.appOrigin.length > 0
       ? input.appOrigin
@@ -1585,7 +1550,8 @@ export function trimSensorDiagnosticsRunHistory(
   max: number = SENSOR_DIAGNOSTICS_RUN_HISTORY_MAX,
 ): SensorDiagnosticsRunHistoryEntry[] {
   if (!Array.isArray(entries)) return [];
-  const safeMax = Number.isFinite(max) && max > 0 ? Math.floor(max) : SENSOR_DIAGNOSTICS_RUN_HISTORY_MAX;
+  const safeMax =
+    Number.isFinite(max) && max > 0 ? Math.floor(max) : SENSOR_DIAGNOSTICS_RUN_HISTORY_MAX;
   return entries.slice(0, safeMax);
 }
 
@@ -1609,9 +1575,5 @@ export function sensorDiagnosticsRunHistoryToJson(
 
 /** Filename for the run history JSON download. */
 export function buildSensorDiagnosticsRunHistoryFilename(date: Date): string {
-  return buildDownloadFilename(
-    "verdant-sensor-network-diagnostics-history",
-    "json",
-    date,
-  );
+  return buildDownloadFilename("verdant-sensor-network-diagnostics-history", "json", date);
 }

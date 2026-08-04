@@ -50,9 +50,7 @@ const CRITICAL_CHECKS: readonly CriticalCheck[] = [
       "Adds the channel / lineage columns the Pheno-Hunt crosses list reads. Missing here causes Postgres 42703 in production.",
     migration: "20260707210000_pheno_crosses_full_taxonomy.sql",
     tables: ["pheno_crosses", "pheno_reversals"],
-    columns: [
-      { table: "pheno_crosses", column: "channel" },
-    ],
+    columns: [{ table: "pheno_crosses", column: "channel" }],
   },
   {
     id: "production-schema-reconciliation",
@@ -73,9 +71,7 @@ const CRITICAL_CHECKS: readonly CriticalCheck[] = [
 ] as const;
 
 const REQUIRED_MIGRATIONS = CRITICAL_CHECKS.map((c) => c.migration);
-const REQUIRED_TABLES = Array.from(
-  new Set(CRITICAL_CHECKS.flatMap((c) => c.tables ?? [])),
-);
+const REQUIRED_TABLES = Array.from(new Set(CRITICAL_CHECKS.flatMap((c) => c.tables ?? [])));
 const REQUIRED_COLUMNS = CRITICAL_CHECKS.flatMap((c) => c.columns ?? []);
 
 // ---------------------------------------------------------------------------
@@ -110,9 +106,7 @@ export function evaluateCriticalCheck(
   );
   const missingColumns = (check.columns ?? []).filter(
     (c) =>
-      !data.columns.find(
-        (row) => row.table === c.table && row.column === c.column && row.exists,
-      ),
+      !data.columns.find((row) => row.table === c.table && row.column === c.column && row.exists),
   );
   const status: CheckStatus =
     migrationApplied && missingTables.length === 0 && missingColumns.length === 0
@@ -200,7 +194,8 @@ export default function OperatorModePanel({ fetcher }: OperatorModePanelProps = 
   }, [load]);
 
   const evaluations = useMemo(
-    () => CRITICAL_CHECKS.map((check) => ({ check, evaluation: evaluateCriticalCheck(check, data) })),
+    () =>
+      CRITICAL_CHECKS.map((check) => ({ check, evaluation: evaluateCriticalCheck(check, data) })),
     [data],
   );
 
@@ -236,9 +231,7 @@ export default function OperatorModePanel({ fetcher }: OperatorModePanelProps = 
           <Badge
             variant="outline"
             className={
-              missingCount > 0
-                ? "border-destructive/50 text-destructive"
-                : "text-muted-foreground"
+              missingCount > 0 ? "border-destructive/50 text-destructive" : "text-muted-foreground"
             }
           >
             {missingCount} needs action
@@ -286,9 +279,7 @@ export default function OperatorModePanel({ fetcher }: OperatorModePanelProps = 
                     {evaluation.missingColumns.length > 0 ? (
                       <p className="mt-1 text-xs text-destructive">
                         Missing columns:{" "}
-                        {evaluation.missingColumns
-                          .map((c) => `${c.table}.${c.column}`)
-                          .join(", ")}
+                        {evaluation.missingColumns.map((c) => `${c.table}.${c.column}`).join(", ")}
                       </p>
                     ) : null}
                   </div>
@@ -313,8 +304,8 @@ export default function OperatorModePanel({ fetcher }: OperatorModePanelProps = 
           <Link to="/operator/schema-audit" className="underline">
             /operator/schema-audit
           </Link>
-          . Applying migrations must be dispatched from your operator workstation — this panel
-          never writes.
+          . Applying migrations must be dispatched from your operator workstation — this panel never
+          writes.
         </p>
       </CardContent>
     </Card>

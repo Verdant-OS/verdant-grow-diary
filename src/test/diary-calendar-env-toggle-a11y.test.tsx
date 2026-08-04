@@ -69,9 +69,7 @@ describe("Environment Check details toggle — a11y", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     expect(toggle).toHaveAccessibleName(ENVIRONMENT_CHECK_HIDE_DETAILS_ARIA);
     expect(toggle.textContent).toContain(ENVIRONMENT_CHECK_HIDE_DETAILS_LABEL);
-    const region = document.getElementById(
-      toggle.getAttribute("aria-controls") as string,
-    );
+    const region = document.getElementById(toggle.getAttribute("aria-controls") as string);
     expect(region).not.toBeNull();
     expect(region).toBe(screen.getByTestId("diary-calendar-env-expanded"));
   });
@@ -105,25 +103,20 @@ describe("Environment Check expanded layout polish", () => {
     );
     fireEvent.click(screen.getByTestId("diary-calendar-env-toggle"));
     const region = screen.getByTestId("diary-calendar-env-expanded");
-    const dts = within(region).getAllByRole("term").map((n) => n.textContent);
-    const dds = within(region).getAllByRole("definition").map((n) => n.textContent);
+    const dts = within(region)
+      .getAllByRole("term")
+      .map((n) => n.textContent);
+    const dds = within(region)
+      .getAllByRole("definition")
+      .map((n) => n.textContent);
     expect(dts.length).toBe(dds.length);
     // CO2 was not provided -> must be omitted.
     expect(dts.join("|").toLowerCase()).not.toContain("co");
   });
 
   it("renders the no-values copy when no environment fields are captured", () => {
-    render(
-      <DiaryCalendarSection
-        now={NOW}
-        rawEntries={[envEntry("env-5", {})]}
-      />,
-    );
-    expect(
-      screen.getByText(ENVIRONMENT_CHECK_NO_VALUES_LABEL),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("diary-calendar-env-compact"),
-    ).not.toBeInTheDocument();
+    render(<DiaryCalendarSection now={NOW} rawEntries={[envEntry("env-5", {})]} />);
+    expect(screen.getByText(ENVIRONMENT_CHECK_NO_VALUES_LABEL)).toBeInTheDocument();
+    expect(screen.queryByTestId("diary-calendar-env-compact")).not.toBeInTheDocument();
   });
 });

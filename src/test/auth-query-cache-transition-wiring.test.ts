@@ -10,13 +10,16 @@ const AUTH = readFileSync(resolve(ROOT, "src/store/auth.tsx"), "utf8").replace(/
 describe("auth identity query-cache transition fence", () => {
   it("wires the root QueryClient clear into AuthProvider identity transitions", () => {
     expect(APP).toMatch(
-      /function clearQueryCacheBeforeAuthIdentityChange\(\)[\s\S]{0,400}queryClient\.clear\(\)/,
+      /function useClearQueryCacheBeforeAuthIdentityChange\(\)[\s\S]{0,400}queryClient\.clear\(\)/,
     );
     expect(APP).toMatch(
-      /<AuthProvider\s+onBeforeAuthIdentityChange=\{clearQueryCacheBeforeAuthIdentityChange\}>/,
+      /<AuthProvider\s+onBeforeAuthIdentityChange=\{onBeforeAuthIdentityChange\}>/,
     );
     expect(APP).toMatch(
-      /function clearQueryCacheBeforeAuthIdentityChange\(\)[\s\S]{0,500}clearGrowDataMeta\(\)/,
+      /function useClearQueryCacheBeforeAuthIdentityChange\(\)[\s\S]{0,500}clearGrowDataMeta\(\)/,
+    );
+    expect(APP).toMatch(
+      /const onBeforeAuthIdentityChange = useClearQueryCacheBeforeAuthIdentityChange\(\)/,
     );
   });
 

@@ -65,10 +65,12 @@ export function buildPriorityQueueItem(
 ): LeadPriorityQueueItem {
   const rec = recommendNextAction(lead, now);
   const warnings = rec.warning
-    ? rec.warning.split(";").map((w) => w.trim()).filter(Boolean)
+    ? rec.warning
+        .split(";")
+        .map((w) => w.trim())
+        .filter(Boolean)
     : [];
-  const rankScore =
-    priorityWeight(rec.priority) * 1000 - rec.sortWeight;
+  const rankScore = priorityWeight(rec.priority) * 1000 - rec.sortWeight;
   return {
     leadId: lead.id,
     label: safeLabel(lead),
@@ -113,14 +115,9 @@ export function buildPriorityQueue(
     const pb = priorityWeight(b.item.priority);
     if (pa !== pb) return pb - pa;
     if (a.sortWeight !== b.sortWeight) return b.sortWeight - a.sortWeight;
-    if (a.item.rankScore !== b.item.rankScore)
-      return b.item.rankScore - a.item.rankScore;
+    if (a.item.rankScore !== b.item.rankScore) return b.item.rankScore - a.item.rankScore;
     if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
-    return a.item.leadId < b.item.leadId
-      ? -1
-      : a.item.leadId > b.item.leadId
-        ? 1
-        : 0;
+    return a.item.leadId < b.item.leadId ? -1 : a.item.leadId > b.item.leadId ? 1 : 0;
   });
 
   return enriched.map((e) => e.item);

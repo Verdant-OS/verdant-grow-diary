@@ -9,10 +9,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import {
-  evaluateVpdDriftEwma,
-  buildVpdDriftAiContext,
-} from "@/lib/vpdDriftRules";
+import { evaluateVpdDriftEwma, buildVpdDriftAiContext } from "@/lib/vpdDriftRules";
 import { mapSensorReadingToAiDoctorContext } from "@/lib/aiDoctorSensorContextRules";
 
 const ROOT = resolve(__dirname, "../..");
@@ -122,25 +119,37 @@ describe("buildVpdDriftAiContext", () => {
     expect(
       buildVpdDriftAiContext({
         classification: "in_band",
-        ewmaKpa: 1.2, sampleCount: 10, lowKpa: 1, highKpa: 1.5,
+        ewmaKpa: 1.2,
+        sampleCount: 10,
+        lowKpa: 1,
+        highKpa: 1.5,
       }).suggestReview,
     ).toBe(false);
     expect(
       buildVpdDriftAiContext({
         classification: "insufficient",
-        ewmaKpa: null, sampleCount: 2, lowKpa: 1, highKpa: 1.5,
+        ewmaKpa: null,
+        sampleCount: 2,
+        lowKpa: 1,
+        highKpa: 1.5,
       }).suggestReview,
     ).toBe(false);
     expect(
       buildVpdDriftAiContext({
         classification: "sustained_high",
-        ewmaKpa: 1.8, sampleCount: 10, lowKpa: 1, highKpa: 1.5,
+        ewmaKpa: 1.8,
+        sampleCount: 10,
+        lowKpa: 1,
+        highKpa: 1.5,
       }).suggestReview,
     ).toBe(true);
     expect(
       buildVpdDriftAiContext({
         classification: "sustained_low",
-        ewmaKpa: 0.6, sampleCount: 10, lowKpa: 1, highKpa: 1.5,
+        ewmaKpa: 0.6,
+        sampleCount: 10,
+        lowKpa: 1,
+        highKpa: 1.5,
       }).suggestReview,
     ).toBe(true);
   });

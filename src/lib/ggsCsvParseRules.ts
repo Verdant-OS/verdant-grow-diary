@@ -58,7 +58,6 @@ export interface GgsCsvReadingDraft {
   raw_payload: GgsCsvRawPayload;
 }
 
-
 export interface GgsCsvOriginalUnits {
   soil_moisture_pct?: "fraction_0_1" | "percent_0_100";
   ec?: "ms_cm" | "us_cm" | "unknown_large";
@@ -106,13 +105,7 @@ const DEVICE_ALIASES = [
   "probe_id",
   "probeId",
 ] as const;
-const CAPTURED_AT_ALIASES = [
-  "captured_at",
-  "capturedAt",
-  "timestamp",
-  "ts",
-  "time",
-] as const;
+const CAPTURED_AT_ALIASES = ["captured_at", "capturedAt", "timestamp", "ts", "time"] as const;
 const MOISTURE_ALIASES = [
   "moisture_vwc",
   "moistureVwc",
@@ -285,10 +278,7 @@ export function parseGgsCsvRow(
     }
   }
   if (parsedSoilTempC !== undefined) {
-    if (
-      parsedSoilTempC < GGS_SOIL_TEMP_C_MIN ||
-      parsedSoilTempC > GGS_SOIL_TEMP_C_MAX
-    ) {
+    if (parsedSoilTempC < GGS_SOIL_TEMP_C_MIN || parsedSoilTempC > GGS_SOIL_TEMP_C_MAX) {
       warnings.add("soil_temp_out_of_range");
       skipped.add("soil_temp_c");
     } else {
@@ -341,7 +331,6 @@ export function parseGgsCsvRow(
       raw_payload,
     });
   }
-
 
   const source: GgsCsvSource = drafts.length > 0 ? "csv" : "invalid";
 

@@ -33,24 +33,18 @@ const FLAT = SQL.replace(/\s+/g, " ");
 
 describe("action_queue lifecycle constraint migration", () => {
   it("drops the old narrow approved_at constraint name", () => {
-    expect(FLAT).toMatch(
-      /DROP\s+CONSTRAINT\s+IF\s+EXISTS\s+action_queue_approved_at_chk\b/i,
-    );
+    expect(FLAT).toMatch(/DROP\s+CONSTRAINT\s+IF\s+EXISTS\s+action_queue_approved_at_chk\b/i);
   });
 
   it("drops the old narrow rejected_at constraint name", () => {
-    expect(FLAT).toMatch(
-      /DROP\s+CONSTRAINT\s+IF\s+EXISTS\s+action_queue_rejected_at_chk\b/i,
-    );
+    expect(FLAT).toMatch(/DROP\s+CONSTRAINT\s+IF\s+EXISTS\s+action_queue_rejected_at_chk\b/i);
   });
 
   it("drops the new approved_at lifecycle constraint name before re-adding (idempotent)", () => {
     const dropIdx = FLAT.search(
       /DROP\s+CONSTRAINT\s+IF\s+EXISTS\s+action_queue_approved_at_lifecycle_chk\b/i,
     );
-    const addIdx = FLAT.search(
-      /ADD\s+CONSTRAINT\s+action_queue_approved_at_lifecycle_chk\b/i,
-    );
+    const addIdx = FLAT.search(/ADD\s+CONSTRAINT\s+action_queue_approved_at_lifecycle_chk\b/i);
     expect(dropIdx).toBeGreaterThanOrEqual(0);
     expect(addIdx).toBeGreaterThanOrEqual(0);
     expect(dropIdx).toBeLessThan(addIdx);
@@ -60,9 +54,7 @@ describe("action_queue lifecycle constraint migration", () => {
     const dropIdx = FLAT.search(
       /DROP\s+CONSTRAINT\s+IF\s+EXISTS\s+action_queue_rejected_at_lifecycle_chk\b/i,
     );
-    const addIdx = FLAT.search(
-      /ADD\s+CONSTRAINT\s+action_queue_rejected_at_lifecycle_chk\b/i,
-    );
+    const addIdx = FLAT.search(/ADD\s+CONSTRAINT\s+action_queue_rejected_at_lifecycle_chk\b/i);
     expect(dropIdx).toBeGreaterThanOrEqual(0);
     expect(addIdx).toBeGreaterThanOrEqual(0);
     expect(dropIdx).toBeLessThan(addIdx);

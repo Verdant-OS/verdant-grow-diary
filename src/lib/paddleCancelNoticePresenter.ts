@@ -36,12 +36,12 @@ export interface PaddleCancelNotice {
   /** Formatted for display in the app's locale/timezone; empty when hidden. */
   accessUntilLabel: string;
   /** Why the notice is showing (or null when hidden). */
-  reason: null | 'cancel_at_period_end' | 'scheduled_change_cancel';
+  reason: null | "cancel_at_period_end" | "scheduled_change_cancel";
 }
 
-function isCancelIntent(row: PaddleCancelNoticeInput): PaddleCancelNotice['reason'] {
-  if (row.scheduled_change_action === 'cancel') return 'scheduled_change_cancel';
-  if (row.cancel_at_period_end === true) return 'cancel_at_period_end';
+function isCancelIntent(row: PaddleCancelNoticeInput): PaddleCancelNotice["reason"] {
+  if (row.scheduled_change_action === "cancel") return "scheduled_change_cancel";
+  if (row.cancel_at_period_end === true) return "cancel_at_period_end";
   return null;
 }
 
@@ -54,9 +54,9 @@ function safeDate(iso: string | null | undefined): Date | null {
 function formatDate(d: Date, locale?: string): string {
   try {
     return d.toLocaleDateString(locale, {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
   } catch {
     return d.toISOString().slice(0, 10);
@@ -66,7 +66,7 @@ function formatDate(d: Date, locale?: string): string {
 const HIDDEN: PaddleCancelNotice = {
   visible: false,
   accessUntilIso: null,
-  accessUntilLabel: '',
+  accessUntilLabel: "",
   reason: null,
 };
 
@@ -76,8 +76,10 @@ export function derivePaddleCancelNotice(
 ): PaddleCancelNotice {
   if (!row) return HIDDEN;
   // Lifetime pseudo-rows never have cancel semantics.
-  if (typeof row.paddle_subscription_id === 'string' &&
-      row.paddle_subscription_id.startsWith('lifetime_')) {
+  if (
+    typeof row.paddle_subscription_id === "string" &&
+    row.paddle_subscription_id.startsWith("lifetime_")
+  ) {
     return HIDDEN;
   }
   // Already canceled + past-end rows: the entitlement resolver already
@@ -95,7 +97,7 @@ export function derivePaddleCancelNotice(
     return {
       visible: true,
       accessUntilIso: null,
-      accessUntilLabel: '',
+      accessUntilLabel: "",
       reason,
     };
   }

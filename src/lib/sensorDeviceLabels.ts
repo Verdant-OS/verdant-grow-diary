@@ -15,9 +15,7 @@
  */
 import { extractManualDeviceNote } from "@/lib/manualSensorSourceLabel";
 
-export function formatSensorDeviceDetail(
-  deviceId: string | null | undefined,
-): string | null {
+export function formatSensorDeviceDetail(deviceId: string | null | undefined): string | null {
   const manualNote = extractManualDeviceNote(deviceId);
   if (manualNote) return manualNote;
   return null;

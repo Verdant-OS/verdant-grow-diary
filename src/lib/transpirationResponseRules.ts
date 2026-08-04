@@ -16,38 +16,17 @@
  */
 
 export type TranspirationStage =
-  | "seedling"
-  | "vegetative"
-  | "transition"
-  | "flower_early"
-  | "flower_mid"
-  | "flower_late";
+  "seedling" | "vegetative" | "transition" | "flower_early" | "flower_mid" | "flower_late";
 
-export type TranspirationConfidence =
-  | "high"
-  | "medium"
-  | "low"
-  | "insufficient";
+export type TranspirationConfidence = "high" | "medium" | "low" | "insufficient";
 
-export type TranspirationWindowStatus =
-  | "valid"
-  | "invalid"
-  | "stale"
-  | "insufficient";
+export type TranspirationWindowStatus = "valid" | "invalid" | "stale" | "insufficient";
 
 export type SizeBasis = "plant_weight_kg" | "approved_proxy" | "none";
 
-export type WeightSource =
-  | "load_cell"
-  | "manual"
-  | "soil_moisture_proxy"
-  | "unknown";
+export type WeightSource = "load_cell" | "manual" | "soil_moisture_proxy" | "unknown";
 
-export type BoundarySource =
-  | "diary_event"
-  | "manual_baseline"
-  | "weight_jump_only"
-  | "unknown";
+export type BoundarySource = "diary_event" | "manual_baseline" | "weight_jump_only" | "unknown";
 
 export type TranspirationWindowInput = {
   windowId: string;
@@ -164,46 +143,23 @@ export function evaluateTranspirationWindow(
   if (input.weightSource === "soil_moisture_proxy") {
     warnings.push("soil_moisture_proxy_low_confidence");
     reasons.push("soil_moisture_proxy_not_supported_in_skeleton");
-    return emptyResult(
-      input,
-      "insufficient",
-      "insufficient",
-      warnings,
-      reasons,
-      sourceSummary,
-    );
+    return emptyResult(input, "insufficient", "insufficient", warnings, reasons, sourceSummary);
   }
 
   // Boundary source must be reliable.
   if (input.boundarySource === "weight_jump_only" || input.boundarySource === "unknown") {
     warnings.push("unreliable_boundary");
     reasons.push("boundary_source_not_diary_or_manual");
-    return emptyResult(
-      input,
-      "insufficient",
-      "insufficient",
-      warnings,
-      reasons,
-      sourceSummary,
-    );
+    return emptyResult(input, "insufficient", "insufficient", warnings, reasons, sourceSummary);
   }
 
   // Weight presence.
-  const hasStart =
-    typeof input.startWeightG === "number" && isFinite(input.startWeightG);
-  const hasEnd =
-    typeof input.endWeightG === "number" && isFinite(input.endWeightG);
+  const hasStart = typeof input.startWeightG === "number" && isFinite(input.startWeightG);
+  const hasEnd = typeof input.endWeightG === "number" && isFinite(input.endWeightG);
   if (!hasStart || !hasEnd) {
     warnings.push("missing_weight_reading");
     reasons.push("fewer_than_two_valid_weight_points");
-    return emptyResult(
-      input,
-      "insufficient",
-      "insufficient",
-      warnings,
-      reasons,
-      sourceSummary,
-    );
+    return emptyResult(input, "insufficient", "insufficient", warnings, reasons, sourceSummary);
   }
 
   const startWeight = input.startWeightG as number;
@@ -215,41 +171,20 @@ export function evaluateTranspirationWindow(
   if (startMs === null || endMs === null) {
     warnings.push("invalid_timestamp");
     reasons.push("unparseable_window_bounds");
-    return emptyResult(
-      input,
-      "invalid",
-      "insufficient",
-      warnings,
-      reasons,
-      sourceSummary,
-    );
+    return emptyResult(input, "invalid", "insufficient", warnings, reasons, sourceSummary);
   }
   const durationHours = (endMs - startMs) / 3_600_000;
   if (!(durationHours > 0)) {
     warnings.push("non_positive_duration");
     reasons.push("duration_hours_not_positive");
-    return emptyResult(
-      input,
-      "invalid",
-      "insufficient",
-      warnings,
-      reasons,
-      sourceSummary,
-    );
+    return emptyResult(input, "invalid", "insufficient", warnings, reasons, sourceSummary);
   }
 
   // Weight must strictly decrease (skeleton: no split/top-off accounting).
   if (endWeight >= startWeight) {
     warnings.push("end_weight_not_less_than_start");
     reasons.push("water_loss_non_positive");
-    return emptyResult(
-      input,
-      "invalid",
-      "insufficient",
-      warnings,
-      reasons,
-      sourceSummary,
-    );
+    return emptyResult(input, "invalid", "insufficient", warnings, reasons, sourceSummary);
   }
 
   // Staleness check.
@@ -260,14 +195,7 @@ export function evaluateTranspirationWindow(
       if (ageHours > opts.stalenessThresholdHours) {
         warnings.push("stale_weight");
         reasons.push("end_weight_exceeds_staleness_threshold");
-        return emptyResult(
-          input,
-          "stale",
-          "insufficient",
-          warnings,
-          reasons,
-          sourceSummary,
-        );
+        return emptyResult(input, "stale", "insufficient", warnings, reasons, sourceSummary);
       }
     }
   }
@@ -286,33 +214,15 @@ export function evaluateTranspirationWindow(
   if (vpdInWindow.length === 0) {
     warnings.push("missing_vpd");
     reasons.push("no_vpd_readings_in_window");
-    return emptyResult(
-      input,
-      "insufficient",
-      "insufficient",
-      warnings,
-      reasons,
-      sourceSummary,
-    );
+    return emptyResult(input, "insufficient", "insufficient", warnings, reasons, sourceSummary);
   }
 
-  const averageVpdKpa =
-    vpdInWindow.reduce((a, b) => a + b, 0) / vpdInWindow.length;
+  const averageVpdKpa = vpdInWindow.reduce((a, b) => a + b, 0) / vpdInWindow.length;
 
-  if (
-    !(averageVpdKpa > opts.minRealisticVpdKpa) ||
-    !(averageVpdKpa < opts.maxRealisticVpdKpa)
-  ) {
+  if (!(averageVpdKpa > opts.minRealisticVpdKpa) || !(averageVpdKpa < opts.maxRealisticVpdKpa)) {
     warnings.push("unrealistic_vpd");
     reasons.push("average_vpd_outside_realistic_band");
-    return emptyResult(
-      input,
-      "insufficient",
-      "insufficient",
-      warnings,
-      reasons,
-      sourceSummary,
-    );
+    return emptyResult(input, "insufficient", "insufficient", warnings, reasons, sourceSummary);
   }
 
   const sparseVpd = vpdInWindow.length < opts.minVpdReadings;
@@ -335,8 +245,7 @@ export function evaluateTranspirationWindow(
   let waterLossRatePerVpdPerSize: number | null = null;
   if (hasSize) {
     // Never default to 1; only compute when a real qualified size value exists.
-    waterLossRatePerVpdPerSize =
-      waterLossRatePerVpd / (input.sizeProxyValue as number);
+    waterLossRatePerVpdPerSize = waterLossRatePerVpd / (input.sizeProxyValue as number);
   } else {
     warnings.push("size_unnormalized");
     reasons.push("no_qualified_size_proxy");
@@ -348,8 +257,7 @@ export function evaluateTranspirationWindow(
     hasSize &&
     !sparseVpd &&
     input.weightSource === "load_cell" &&
-    (input.boundarySource === "diary_event" ||
-      input.boundarySource === "manual_baseline")
+    (input.boundarySource === "diary_event" || input.boundarySource === "manual_baseline")
   ) {
     confidence = "high";
     reasons.push("load_cell_with_size_and_adequate_vpd");
@@ -357,8 +265,7 @@ export function evaluateTranspirationWindow(
     hasSize &&
     !sparseVpd &&
     input.weightSource === "manual" &&
-    (input.boundarySource === "diary_event" ||
-      input.boundarySource === "manual_baseline")
+    (input.boundarySource === "diary_event" || input.boundarySource === "manual_baseline")
   ) {
     confidence = "medium";
     reasons.push("manual_weight_with_size_and_adequate_vpd");

@@ -81,7 +81,10 @@ describe("TentIrrigationHistoryPanel states", () => {
   });
 
   it("an unmeasured row is a truthful 'logged, no measurements' — not omitted", () => {
-    mockHook.mockReturnValue({ ...base, rows: [row({ id: "w-2", unmeasured: true, note: "watered" })] });
+    mockHook.mockReturnValue({
+      ...base,
+      rows: [row({ id: "w-2", unmeasured: true, note: "watered" })],
+    });
     render(<TentIrrigationHistoryPanel tentId="tent-1" />);
     expect(screen.getByText(/Logged — no measurements/)).toBeTruthy();
     expect(screen.queryByTestId("irrigation-empty")).toBeNull();

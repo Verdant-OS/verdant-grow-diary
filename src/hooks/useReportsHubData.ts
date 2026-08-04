@@ -35,10 +35,7 @@ import {
   findPendingOutcomeReviews,
   PENDING_OUTCOME_REVIEW_THRESHOLD_MS,
 } from "@/lib/pendingOutcomeReviewRules";
-import {
-  normalizeSensorSource,
-  rawSensorSourceValuesFor,
-} from "@/lib/sensor/sensorSourceRules";
+import { normalizeSensorSource, rawSensorSourceValuesFor } from "@/lib/sensor/sensorSourceRules";
 import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
 import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 import {
@@ -123,9 +120,9 @@ export function isReportsHubSensorContextRow(row: ReportsHubSensorRow): boolean 
  * Pure: dedupes, drops blanks, sorts for deterministic query keys.
  */
 export function resolveReportsHubSensorTentIds(
-  candidateTents:
-    | ReadonlyArray<{ id?: string | null; grow_id?: string | null } | null | undefined>
-    | null,
+  candidateTents: ReadonlyArray<
+    { id?: string | null; grow_id?: string | null } | null | undefined
+  > | null,
   growPlants: ReadonlyArray<{ tent_id?: string | null } | null | undefined> | null,
   growId: string,
 ): string[] {
@@ -272,10 +269,7 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
       // active plants, and a tent linked to another grow is never a
       // candidate — see resolveReportsHubSensorTentIds (live audit #16).
       const [tentRowsRes, plantTentRowsRes] = await Promise.all([
-        supabase
-          .from("tents")
-          .select("id,grow_id")
-          .or(`grow_id.eq.${growId},grow_id.is.null`),
+        supabase.from("tents").select("id,grow_id").or(`grow_id.eq.${growId},grow_id.is.null`),
         supabase
           .from("plants")
           .select("tent_id")
@@ -352,7 +346,9 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
           .limit(REPORTS_HUB_ACTIVITY_MERGE_WINDOW),
         supabase
           .from("grow_events")
-          .select("id,tent_id,plant_id,event_type,occurred_at,created_at,source,is_deleted,deleted_at")
+          .select(
+            "id,tent_id,plant_id,event_type,occurred_at,created_at,source,is_deleted,deleted_at",
+          )
           .eq("grow_id", growId)
           .eq("source", "manual")
           .eq("is_deleted", false)
@@ -408,9 +404,7 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
         diaryEntriesTotal = windowSaturated
           ? Math.max(mergedTotal, diaryEntriesTotal)
           : mergedTotal;
-        diaryEntriesLast7d = windowSaturated
-          ? Math.max(merged7d, diaryEntriesLast7d)
-          : merged7d;
+        diaryEntriesLast7d = windowSaturated ? Math.max(merged7d, diaryEntriesLast7d) : merged7d;
       }
       const pendingReviews = findPendingOutcomeReviews({
         completedActions: (completedActionsRes.data ?? []) as never,

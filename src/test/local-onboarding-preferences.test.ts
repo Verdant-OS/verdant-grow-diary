@@ -9,7 +9,10 @@
  *  - the storage key matches the documented scoped key
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { clearLocalStorageForTest, getLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 import {
   ONBOARDING_CHECKLIST_DISMISSED_KEY,
   dismissOnboardingChecklist,
@@ -31,9 +34,7 @@ afterEach(() => {
 
 describe("localOnboardingPreferences", () => {
   it("uses the documented scoped storage key", () => {
-    expect(ONBOARDING_CHECKLIST_DISMISSED_KEY).toBe(
-      "verdant:onboarding-checklist-dismissed:v1",
-    );
+    expect(ONBOARDING_CHECKLIST_DISMISSED_KEY).toBe("verdant:onboarding-checklist-dismissed:v1");
   });
 
   it("defaults to not dismissed", () => {
@@ -43,9 +44,7 @@ describe("localOnboardingPreferences", () => {
   it("dismiss persists across reads", () => {
     dismissOnboardingChecklist();
     expect(isOnboardingChecklistDismissed()).toBe(true);
-    expect(
-      getLocalStorageItemForTest(ONBOARDING_CHECKLIST_DISMISSED_KEY),
-    ).toBe("1");
+    expect(getLocalStorageItemForTest(ONBOARDING_CHECKLIST_DISMISSED_KEY)).toBe("1");
   });
 
   it("reset clears the preference", () => {
@@ -55,22 +54,18 @@ describe("localOnboardingPreferences", () => {
   });
 
   it("fails open when getItem throws (treats as visible)", () => {
-    const spy = vi
-      .spyOn(Storage.prototype, "getItem")
-      .mockImplementation(() => {
-        throw new Error("storage blocked");
-      });
+    const spy = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("storage blocked");
+    });
     expect(() => isOnboardingChecklistDismissed()).not.toThrow();
     expect(isOnboardingChecklistDismissed()).toBe(false);
     spy.mockRestore();
   });
 
   it("fails open when setItem throws (does not crash dismiss)", () => {
-    const spy = vi
-      .spyOn(Storage.prototype, "setItem")
-      .mockImplementation(() => {
-        throw new Error("quota");
-      });
+    const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("quota");
+    });
     expect(() => dismissOnboardingChecklist()).not.toThrow();
     spy.mockRestore();
   });

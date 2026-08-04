@@ -16,20 +16,17 @@ function read(rel: string): string {
   return readFileSync(join(ROOT, rel), "utf8");
 }
 function stripped(rel: string): string {
-  return read(rel)
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\/\/.*$/gm, "")
-    // Strip accessibility attributes so words like `aria-live` and
-    // `aria-connected` do not trip the forbidden-word scan.
-    .replace(/\baria-[a-z]+(?:=(?:"[^"]*"|'[^']*'|\{[^}]*\}))?/g, "");
+  return (
+    read(rel)
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "")
+      // Strip accessibility attributes so words like `aria-live` and
+      // `aria-connected` do not trip the forbidden-word scan.
+      .replace(/\baria-[a-z]+(?:=(?:"[^"]*"|'[^']*'|\{[^}]*\}))?/g, "")
+  );
 }
 
-const FORBIDDEN_WORDS = [
-  /\blive\b/i,
-  /\bsynced\b/i,
-  /\bconnected\b/i,
-  /\bimported\b/i,
-];
+const FORBIDDEN_WORDS = [/\blive\b/i, /\bsynced\b/i, /\bconnected\b/i, /\bimported\b/i];
 const DEVICE_WORDS = [
   /\bdevice control\b/i,
   /\bpump\b/i,

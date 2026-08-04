@@ -58,9 +58,7 @@ async function mapAllGroups() {
   ]) {
     const select = screen.getByTestId(`vg-xlsx-tent-select-${group}`);
     fireEvent.click(select);
-    const option = screen.getByTestId(
-      `vg-xlsx-tent-option-${group}-${tentId}`,
-    );
+    const option = screen.getByTestId(`vg-xlsx-tent-option-${group}-${tentId}`);
     fireEvent.click(option);
   }
 }
@@ -75,27 +73,17 @@ describe("VerdantGeneticsXlsxPreviewPanel — evidence summary after save", () =
   it("evidence panel appears after successful save", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     render(
-      <VerdantGeneticsXlsxPreviewPanel
-        grid={grid}
-        tentOptions={TENT_OPTIONS}
-        onSave={onSave}
-      />,
+      <VerdantGeneticsXlsxPreviewPanel grid={grid} tentOptions={TENT_OPTIONS} onSave={onSave} />,
     );
     await mapAllGroups();
     fireEvent.click(screen.getByTestId("vg-xlsx-save"));
-    await waitFor(() =>
-      expect(screen.getByTestId("vg-xlsx-evidence-panel")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("vg-xlsx-evidence-panel")).toBeInTheDocument());
   });
 
   it("shows accepted row count in evidence panel", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     render(
-      <VerdantGeneticsXlsxPreviewPanel
-        grid={grid}
-        tentOptions={TENT_OPTIONS}
-        onSave={onSave}
-      />,
+      <VerdantGeneticsXlsxPreviewPanel grid={grid} tentOptions={TENT_OPTIONS} onSave={onSave} />,
     );
     await mapAllGroups();
     fireEvent.click(screen.getByTestId("vg-xlsx-save"));
@@ -106,11 +94,7 @@ describe("VerdantGeneticsXlsxPreviewPanel — evidence summary after save", () =
   it("shows rejected row count in evidence panel", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     render(
-      <VerdantGeneticsXlsxPreviewPanel
-        grid={grid}
-        tentOptions={TENT_OPTIONS}
-        onSave={onSave}
-      />,
+      <VerdantGeneticsXlsxPreviewPanel grid={grid} tentOptions={TENT_OPTIONS} onSave={onSave} />,
     );
     await mapAllGroups();
     fireEvent.click(screen.getByTestId("vg-xlsx-save"));
@@ -121,11 +105,7 @@ describe("VerdantGeneticsXlsxPreviewPanel — evidence summary after save", () =
   it("shows mapped sensor groups", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     render(
-      <VerdantGeneticsXlsxPreviewPanel
-        grid={grid}
-        tentOptions={TENT_OPTIONS}
-        onSave={onSave}
-      />,
+      <VerdantGeneticsXlsxPreviewPanel grid={grid} tentOptions={TENT_OPTIONS} onSave={onSave} />,
     );
     await mapAllGroups();
     fireEvent.click(screen.getByTestId("vg-xlsx-save"));
@@ -138,11 +118,7 @@ describe("VerdantGeneticsXlsxPreviewPanel — evidence summary after save", () =
   it("shows mapped tent labels when provided", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     render(
-      <VerdantGeneticsXlsxPreviewPanel
-        grid={grid}
-        tentOptions={TENT_OPTIONS}
-        onSave={onSave}
-      />,
+      <VerdantGeneticsXlsxPreviewPanel grid={grid} tentOptions={TENT_OPTIONS} onSave={onSave} />,
     );
     await mapAllGroups();
     fireEvent.click(screen.getByTestId("vg-xlsx-save"));
@@ -155,11 +131,7 @@ describe("VerdantGeneticsXlsxPreviewPanel — evidence summary after save", () =
   it("shows date range imported", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     render(
-      <VerdantGeneticsXlsxPreviewPanel
-        grid={grid}
-        tentOptions={TENT_OPTIONS}
-        onSave={onSave}
-      />,
+      <VerdantGeneticsXlsxPreviewPanel grid={grid} tentOptions={TENT_OPTIONS} onSave={onSave} />,
     );
     await mapAllGroups();
     fireEvent.click(screen.getByTestId("vg-xlsx-save"));
@@ -170,11 +142,7 @@ describe("VerdantGeneticsXlsxPreviewPanel — evidence summary after save", () =
   it("shows metrics imported", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     render(
-      <VerdantGeneticsXlsxPreviewPanel
-        grid={grid}
-        tentOptions={TENT_OPTIONS}
-        onSave={onSave}
-      />,
+      <VerdantGeneticsXlsxPreviewPanel grid={grid} tentOptions={TENT_OPTIONS} onSave={onSave} />,
     );
     await mapAllGroups();
     fireEvent.click(screen.getByTestId("vg-xlsx-save"));
@@ -185,11 +153,7 @@ describe("VerdantGeneticsXlsxPreviewPanel — evidence summary after save", () =
   it("shows CSV history source label", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     render(
-      <VerdantGeneticsXlsxPreviewPanel
-        grid={grid}
-        tentOptions={TENT_OPTIONS}
-        onSave={onSave}
-      />,
+      <VerdantGeneticsXlsxPreviewPanel grid={grid} tentOptions={TENT_OPTIONS} onSave={onSave} />,
     );
     await mapAllGroups();
     fireEvent.click(screen.getByTestId("vg-xlsx-save"));
@@ -200,11 +164,7 @@ describe("VerdantGeneticsXlsxPreviewPanel — evidence summary after save", () =
   it("shows Verdant Genetics XLSX source app label", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     render(
-      <VerdantGeneticsXlsxPreviewPanel
-        grid={grid}
-        tentOptions={TENT_OPTIONS}
-        onSave={onSave}
-      />,
+      <VerdantGeneticsXlsxPreviewPanel grid={grid} tentOptions={TENT_OPTIONS} onSave={onSave} />,
     );
     await mapAllGroups();
     fireEvent.click(screen.getByTestId("vg-xlsx-save"));
@@ -215,11 +175,7 @@ describe("VerdantGeneticsXlsxPreviewPanel — evidence summary after save", () =
   it("shows Imported as CSV history copy", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     render(
-      <VerdantGeneticsXlsxPreviewPanel
-        grid={grid}
-        tentOptions={TENT_OPTIONS}
-        onSave={onSave}
-      />,
+      <VerdantGeneticsXlsxPreviewPanel grid={grid} tentOptions={TENT_OPTIONS} onSave={onSave} />,
     );
     await mapAllGroups();
     fireEvent.click(screen.getByTestId("vg-xlsx-save"));
@@ -230,28 +186,18 @@ describe("VerdantGeneticsXlsxPreviewPanel — evidence summary after save", () =
   it("does not show partial rejection warning when rejected count is 0", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     render(
-      <VerdantGeneticsXlsxPreviewPanel
-        grid={grid}
-        tentOptions={TENT_OPTIONS}
-        onSave={onSave}
-      />,
+      <VerdantGeneticsXlsxPreviewPanel grid={grid} tentOptions={TENT_OPTIONS} onSave={onSave} />,
     );
     await mapAllGroups();
     fireEvent.click(screen.getByTestId("vg-xlsx-save"));
     await screen.findByTestId("vg-xlsx-evidence-panel");
-    expect(
-      screen.queryByTestId("vg-xlsx-evidence-partial-rejection-warning"),
-    ).toBeNull();
+    expect(screen.queryByTestId("vg-xlsx-evidence-partial-rejection-warning")).toBeNull();
   });
 
   it("does not render raw payload internals in evidence panel", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     render(
-      <VerdantGeneticsXlsxPreviewPanel
-        grid={grid}
-        tentOptions={TENT_OPTIONS}
-        onSave={onSave}
-      />,
+      <VerdantGeneticsXlsxPreviewPanel grid={grid} tentOptions={TENT_OPTIONS} onSave={onSave} />,
     );
     await mapAllGroups();
     fireEvent.click(screen.getByTestId("vg-xlsx-save"));
@@ -265,11 +211,7 @@ describe("VerdantGeneticsXlsxPreviewPanel — evidence summary after save", () =
   it("does not create alerts or Action Queue items", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     render(
-      <VerdantGeneticsXlsxPreviewPanel
-        grid={grid}
-        tentOptions={TENT_OPTIONS}
-        onSave={onSave}
-      />,
+      <VerdantGeneticsXlsxPreviewPanel grid={grid} tentOptions={TENT_OPTIONS} onSave={onSave} />,
     );
     await mapAllGroups();
     fireEvent.click(screen.getByTestId("vg-xlsx-save"));
@@ -304,9 +246,7 @@ describe("buildVerdantGeneticsXlsxImportEvidenceViewModel — pure unit", () => 
     expect(vm.acceptedRowCount).toBe(2);
     expect(vm.rejectedRowCount).toBe(1);
     expect(vm.hasRejections).toBe(true);
-    expect(vm.mappedGroups).toEqual([
-      { sensorGroup: "Flower Tent", tentLabel: "Main Flower" },
-    ]);
+    expect(vm.mappedGroups).toEqual([{ sensorGroup: "Flower Tent", tentLabel: "Main Flower" }]);
     expect(vm.dateRangeLabel).toBe("2026-06-01 → 2026-06-03");
     expect(vm.metricsImported).toEqual(["humidity_pct", "temperature_c"]);
     expect(vm.sourceLabel).toBe(SOURCE_LABEL);

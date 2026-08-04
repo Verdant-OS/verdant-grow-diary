@@ -51,9 +51,7 @@ describe("onboarding dismiss store · static safety", () => {
     "utf8",
   );
   // Strip block + line comments so doc strings don't trip token scans.
-  const code = raw
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  const code = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 
   it("does not persist dismissals to storage", () => {
     expect(code).not.toMatch(/localStorage/);

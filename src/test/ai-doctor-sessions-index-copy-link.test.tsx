@@ -22,10 +22,18 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 const rangeSpy = vi.fn(() => Promise.resolve({ data: [], error: null }));
 const orderSpy = vi.fn(() => ({ range: rangeSpy }));
 const chain: any = {
-  eq: vi.fn(function () { return chain; }),
-  not: vi.fn(function () { return chain; }),
-  gte: vi.fn(function () { return chain; }),
-  or: vi.fn(function () { return chain; }),
+  eq: vi.fn(function () {
+    return chain;
+  }),
+  not: vi.fn(function () {
+    return chain;
+  }),
+  gte: vi.fn(function () {
+    return chain;
+  }),
+  or: vi.fn(function () {
+    return chain;
+  }),
   order: orderSpy,
 };
 vi.mock("@/integrations/supabase/client", () => ({

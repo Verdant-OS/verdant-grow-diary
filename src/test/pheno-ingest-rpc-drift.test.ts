@@ -9,11 +9,7 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve, join } from "node:path";
-import {
-  stageToRound,
-  rescale0to10to1to5,
-  verdictToDecision,
-} from "@/lib/phenoIdIngestMapping";
+import { stageToRound, rescale0to10to1to5, verdictToDecision } from "@/lib/phenoIdIngestMapping";
 
 const ROOT = resolve(__dirname, "../..");
 const MIG_DIR = resolve(ROOT, "supabase/migrations");

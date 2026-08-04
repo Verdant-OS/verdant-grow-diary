@@ -34,6 +34,16 @@ export default tseslint.config(
       ],
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      // Transitional: product still has residual `any` until Biome (#699) lands.
+      // Keep server-only import fence + hooks rules; demote any/control-regex noise.
+      "@typescript-eslint/no-explicit-any": "off",
+      "no-control-regex": "off",
+      "@typescript-eslint/ban-ts-comment": "off",
+      "prefer-const": "warn",
+      "@typescript-eslint/no-empty-object-type": "warn",
+      "@typescript-eslint/no-require-imports": "warn",
+      "no-empty": "warn",
+      "no-case-declarations": "warn",
     },
   },
   eslintPluginPrettier,

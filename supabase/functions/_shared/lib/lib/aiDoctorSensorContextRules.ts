@@ -43,12 +43,7 @@ import {
 // ---------------------------------------------------------------------------
 
 export type MetricName =
-  | "temperature_c"
-  | "humidity_pct"
-  | "vpd_kpa"
-  | "co2_ppm"
-  | "soil_moisture_pct"
-  | "ppfd_umol_m2s";
+  "temperature_c" | "humidity_pct" | "vpd_kpa" | "co2_ppm" | "soil_moisture_pct" | "ppfd_umol_m2s";
 
 /** Critical metrics whose invalidity blocks healthy/normal summaries. */
 const CRITICAL_METRICS: readonly MetricName[] = ["temperature_c", "humidity_pct", "vpd_kpa"];
@@ -135,8 +130,7 @@ function classifyMetrics(reading: NormalizedSensorReading): {
   // context even when its own numeric value happens to fall inside the
   // plausibility band. Demote it from usable → invalid so callers that
   // gate on `invalidMetrics` exclude it from AI Doctor input.
-  const tempOrRhInvalid =
-    invalid.includes("temperature_c") || invalid.includes("humidity_pct");
+  const tempOrRhInvalid = invalid.includes("temperature_c") || invalid.includes("humidity_pct");
   if (tempOrRhInvalid && usable.includes("vpd_kpa")) {
     const i = usable.indexOf("vpd_kpa");
     if (i >= 0) usable.splice(i, 1);

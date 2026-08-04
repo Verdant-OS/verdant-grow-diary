@@ -18,8 +18,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-const read = (rel: string): string =>
-  readFileSync(path.resolve(__dirname, "..", rel), "utf8");
+const read = (rel: string): string => readFileSync(path.resolve(__dirname, "..", rel), "utf8");
 
 const SERVICE = read("lib/phenoHuntService.ts");
 const SUMMARY_SERVICE = read("lib/phenoHuntCandidatesService.ts");
@@ -50,8 +49,12 @@ describe("persistence — one write path, reusing the existing setup-patch funct
       PAGE.indexOf("handleSaveBreedingObjective"),
       PAGE.indexOf("handleSaveBreedingObjective") + 700,
     );
-    expect(objectiveSaveFn).toMatch(/updatePhenoHuntSetup\(\{ huntId: ws\.hunt\.id, breedingObjective: targets \}\)/);
-    expect(objectiveSaveFn).not.toMatch(/\.from\(\s*["']pheno_hunts["']\s*\)\s*\.(update|upsert|insert)\(/);
+    expect(objectiveSaveFn).toMatch(
+      /updatePhenoHuntSetup\(\{ huntId: ws\.hunt\.id, breedingObjective: targets \}\)/,
+    );
+    expect(objectiveSaveFn).not.toMatch(
+      /\.from\(\s*["']pheno_hunts["']\s*\)\s*\.(update|upsert|insert)\(/,
+    );
   });
 });
 
@@ -87,7 +90,7 @@ describe("workspace page — editor mount + read-only per-candidate badge", () =
   });
 
   it("renders the per-candidate badge testid, and that region is read-only", () => {
-    const badgeTestidIdx = PAGE.indexOf('data-testid={`workspace-objective-${plantId}`}');
+    const badgeTestidIdx = PAGE.indexOf("data-testid={`workspace-objective-${plantId}`}");
     expect(badgeTestidIdx).toBeGreaterThan(0);
     const badgeRegion = PAGE.slice(badgeTestidIdx - 200, badgeTestidIdx + 300);
     expect(badgeRegion).not.toMatch(/onClick|\.insert\(|\.update\(|\.rpc\(|functions\.invoke/);

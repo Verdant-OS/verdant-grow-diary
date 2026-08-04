@@ -78,10 +78,7 @@ describe("buildTimelineFilterChips", () => {
   });
 
   it("marks the selected chip", () => {
-    const chips = buildTimelineFilterChips(
-      [diary({ eventType: "watering" })],
-      "watering",
-    );
+    const chips = buildTimelineFilterChips([diary({ eventType: "watering" })], "watering");
     const watering = chips.find((c) => c.key === "watering")!;
     expect(watering.selected).toBe(true);
     expect(chips.find((c) => c.key === "all")!.selected).toBe(false);

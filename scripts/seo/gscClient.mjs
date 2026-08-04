@@ -52,20 +52,19 @@ export async function getAccessToken({ clientId, clientSecret, refreshToken }) {
 }
 
 export async function inspectUrl({ accessToken, siteUrl, inspectionUrl }) {
-  const r = await fetch(
-    "https://searchconsole.googleapis.com/v1/urlInspection/index:inspect",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ inspectionUrl, siteUrl }),
+  const r = await fetch("https://searchconsole.googleapis.com/v1/urlInspection/index:inspect", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify({ inspectionUrl, siteUrl }),
+  });
   if (!r.ok) {
     const text = await r.text();
-    throw new Error(`URL Inspection failed for ${inspectionUrl}: HTTP ${r.status} ${text.slice(0, 200)}`);
+    throw new Error(
+      `URL Inspection failed for ${inspectionUrl}: HTTP ${r.status} ${text.slice(0, 200)}`,
+    );
   }
   return r.json();
 }
@@ -105,13 +104,25 @@ export function classifyIssues(summary, { expectedIndexable = true } = {}) {
       issues.push({ code: "not_indexed", message: `${url}: coverage=${summary.coverageState}` });
     }
     if (summary.robotsTxtState && summary.robotsTxtState !== "ALLOWED") {
-      issues.push({ code: "blocked_by_robots", message: `${url}: robots=${summary.robotsTxtState}` });
+      issues.push({
+        code: "blocked_by_robots",
+        message: `${url}: robots=${summary.robotsTxtState}`,
+      });
     }
-    if (summary.indexingState && /BLOCKED_BY_META_TAG|BLOCKED_BY_HTTP_HEADER/i.test(summary.indexingState)) {
-      issues.push({ code: "noindex_detected", message: `${url}: indexingState=${summary.indexingState}` });
+    if (
+      summary.indexingState &&
+      /BLOCKED_BY_META_TAG|BLOCKED_BY_HTTP_HEADER/i.test(summary.indexingState)
+    ) {
+      issues.push({
+        code: "noindex_detected",
+        message: `${url}: indexingState=${summary.indexingState}`,
+      });
     }
     if (summary.pageFetchState && summary.pageFetchState !== "SUCCESSFUL") {
-      issues.push({ code: "fetch_failed", message: `${url}: pageFetchState=${summary.pageFetchState}` });
+      issues.push({
+        code: "fetch_failed",
+        message: `${url}: pageFetchState=${summary.pageFetchState}`,
+      });
     }
     if (
       summary.userCanonical &&
@@ -124,8 +135,15 @@ export function classifyIssues(summary, { expectedIndexable = true } = {}) {
       });
     }
   }
-  if (summary.mobileVerdict && summary.mobileVerdict !== "PASS" && summary.mobileVerdict !== "VERDICT_UNSPECIFIED") {
-    issues.push({ code: "mobile_usability", message: `${url}: mobileVerdict=${summary.mobileVerdict}` });
+  if (
+    summary.mobileVerdict &&
+    summary.mobileVerdict !== "PASS" &&
+    summary.mobileVerdict !== "VERDICT_UNSPECIFIED"
+  ) {
+    issues.push({
+      code: "mobile_usability",
+      message: `${url}: mobileVerdict=${summary.mobileVerdict}`,
+    });
   }
   if (summary.richResultsVerdict && summary.richResultsVerdict === "FAIL") {
     issues.push({ code: "rich_results", message: `${url}: richResultsVerdict=FAIL` });

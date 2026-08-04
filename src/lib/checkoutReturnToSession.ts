@@ -21,8 +21,7 @@
 
 import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
 
-export const CHECKOUT_RETURN_TO_STORAGE_KEY =
-  "verdant.checkout.returnTo.v1";
+export const CHECKOUT_RETURN_TO_STORAGE_KEY = "verdant.checkout.returnTo.v1";
 
 interface StorageLike {
   getItem: (key: string) => string | null;
@@ -44,8 +43,7 @@ export function saveCheckoutReturnTo(
   opts?: { storage?: StorageLike | null },
 ): void {
   const safe = sanitizeCheckoutReturnTo(raw);
-  const storage =
-    opts && "storage" in opts ? opts.storage : safeStorage();
+  const storage = opts && "storage" in opts ? opts.storage : safeStorage();
   if (!storage) return;
   try {
     if (safe) {
@@ -63,11 +61,8 @@ export function saveCheckoutReturnTo(
  * follow-up navigation cannot re-use the same intent. Returns a
  * sanitized path or `null`.
  */
-export function consumeCheckoutReturnTo(
-  opts?: { storage?: StorageLike | null },
-): string | null {
-  const storage =
-    opts && "storage" in opts ? opts.storage : safeStorage();
+export function consumeCheckoutReturnTo(opts?: { storage?: StorageLike | null }): string | null {
+  const storage = opts && "storage" in opts ? opts.storage : safeStorage();
   if (!storage) return null;
   let raw: string | null = null;
   try {

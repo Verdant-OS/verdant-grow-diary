@@ -1,19 +1,16 @@
 import { describe, it, expect } from "vitest";
-import {
-  snapshotFromReadings,
-  SOURCE_LABEL,
-  type SensorReadingLike,
-} from "@/lib/sensorSnapshot";
+import { snapshotFromReadings, SOURCE_LABEL, type SensorReadingLike } from "@/lib/sensorSnapshot";
 import { isSnapshotPersistable } from "@/lib/environmentAlertPersistence";
 
 const NOW = new Date("2026-05-23T12:00:00Z").getTime();
 const TS = "2026-05-23T11:55:00Z";
 
-const row = (
-  metric: string,
-  value: number,
-  source: string,
-): SensorReadingLike => ({ ts: TS, metric, value, source });
+const row = (metric: string, value: number, source: string): SensorReadingLike => ({
+  ts: TS,
+  metric,
+  value,
+  source,
+});
 
 describe("snapshotFromReadings — source mapping", () => {
   it("maps manual rows to manual", () => {
@@ -136,8 +133,6 @@ describe("end-to-end: sim sensor readings never persist alerts", () => {
       row("humidity_pct", 90, "sim"),
     ]);
     expect(s?.source).toBe("sim");
-    expect(
-      isSnapshotPersistable({ snapshot: s, quality: "good", now: NOW }),
-    ).toBe(false);
+    expect(isSnapshotPersistable({ snapshot: s, quality: "good", now: NOW })).toBe(false);
   });
 });

@@ -9,13 +9,7 @@
 
 import { GROW_DATA_SOURCE_LABEL_STALE_MS } from "../constants/sensorTiming";
 export type GrowDataSourceLabel =
-  | "Live"
-  | "Manual"
-  | "CSV history"
-  | "Simulated"
-  | "Demo"
-  | "Stale"
-  | "Unavailable";
+  "Live" | "Manual" | "CSV history" | "Simulated" | "Demo" | "Stale" | "Unavailable";
 
 export type GrowDataSourceSeverity = "good" | "info" | "watch" | "warning";
 

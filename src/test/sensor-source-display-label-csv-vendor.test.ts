@@ -17,10 +17,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  buildSensorSourceDisplayLabel,
-  summarizeCsvVendor,
-} from "@/lib/sensorSourceDisplayLabel";
+import { buildSensorSourceDisplayLabel, summarizeCsvVendor } from "@/lib/sensorSourceDisplayLabel";
 import {
   snapshotFromReadings,
   isStale,
@@ -47,43 +44,39 @@ function csvRow(
 
 describe("buildSensorSourceDisplayLabel — CSV vendor badges", () => {
   it("renders CSV history · Spider Farmer", () => {
-    expect(
-      buildSensorSourceDisplayLabel({ source: "csv", csvVendor: "spider_farmer" }),
-    ).toBe("CSV history · Spider Farmer");
+    expect(buildSensorSourceDisplayLabel({ source: "csv", csvVendor: "spider_farmer" })).toBe(
+      "CSV history · Spider Farmer",
+    );
   });
 
   it("renders CSV history · Vivosun", () => {
-    expect(
-      buildSensorSourceDisplayLabel({ source: "csv", csvVendor: "vivosun" }),
-    ).toBe("CSV history · Vivosun");
+    expect(buildSensorSourceDisplayLabel({ source: "csv", csvVendor: "vivosun" })).toBe(
+      "CSV history · Vivosun",
+    );
   });
 
   it("renders CSV history · AC Infinity", () => {
-    expect(
-      buildSensorSourceDisplayLabel({ source: "csv", csvVendor: "ac_infinity" }),
-    ).toBe("CSV history · AC Infinity");
+    expect(buildSensorSourceDisplayLabel({ source: "csv", csvVendor: "ac_infinity" })).toBe(
+      "CSV history · AC Infinity",
+    );
   });
 
   it("renders CSV history when vendor unknown / null", () => {
     expect(buildSensorSourceDisplayLabel({ source: "csv" })).toBe("CSV history");
-    expect(
-      buildSensorSourceDisplayLabel({ source: "csv", csvVendor: null }),
-    ).toBe("CSV history");
+    expect(buildSensorSourceDisplayLabel({ source: "csv", csvVendor: null })).toBe("CSV history");
   });
 
   it("uses conservative 'Multiple sources' for mixed CSV vendors", () => {
-    expect(
-      buildSensorSourceDisplayLabel({ source: "csv", csvVendor: "multiple" }),
-    ).toBe("CSV history · Multiple sources");
+    expect(buildSensorSourceDisplayLabel({ source: "csv", csvVendor: "multiple" })).toBe(
+      "CSV history · Multiple sources",
+    );
   });
 
   it("preserves existing labels for manual / live / sim / diary", () => {
     expect(buildSensorSourceDisplayLabel({ source: "manual" })).toBe("Manual");
     expect(buildSensorSourceDisplayLabel({ source: "live" })).toBe("Live sensor");
     expect(buildSensorSourceDisplayLabel({ source: "sim" })).toBe("Simulated");
-    expect(buildSensorSourceDisplayLabel({ source: "diary" })).toBe(
-      "Diary snapshot",
-    );
+    expect(buildSensorSourceDisplayLabel({ source: "diary" })).toBe("Diary snapshot");
   });
 
   it("never promotes vendor lineage to Live", () => {
@@ -121,12 +114,8 @@ describe("summarizeCsvVendor", () => {
 
   it("returns null when no CSV rows carry a known vendor", () => {
     expect(summarizeCsvVendor([])).toBeNull();
-    expect(
-      summarizeCsvVendor([csvRow("temperature_c", 24, "unknown_brand")]),
-    ).toBeNull();
-    expect(
-      summarizeCsvVendor([{ source: "manual", raw_payload: {} }]),
-    ).toBeNull();
+    expect(summarizeCsvVendor([csvRow("temperature_c", 24, "unknown_brand")])).toBeNull();
+    expect(summarizeCsvVendor([{ source: "manual", raw_payload: {} }])).toBeNull();
   });
 });
 
@@ -219,10 +208,7 @@ describe("privacy — raw_payload fields never leak into display", () => {
 });
 
 describe("static safety — display helper", () => {
-  const helper = readFileSync(
-    resolve(__dirname, "../lib/sensorSourceDisplayLabel.ts"),
-    "utf8",
-  );
+  const helper = readFileSync(resolve(__dirname, "../lib/sensorSourceDisplayLabel.ts"), "utf8");
   const forbidden = [
     "action_queue",
     "alerts",

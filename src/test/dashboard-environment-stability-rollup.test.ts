@@ -1,9 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
-import {
-  computeStabilityRollup,
-} from "@/lib/dashboardStabilityRollupRules";
+import { computeStabilityRollup } from "@/lib/dashboardStabilityRollupRules";
 import type { StabilityResult } from "@/lib/environmentStabilityRules";
 
 const SRC = readFileSync(resolve(__dirname, "../pages/Dashboard.tsx"), "utf8");

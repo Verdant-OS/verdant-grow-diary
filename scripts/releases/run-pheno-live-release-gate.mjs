@@ -114,11 +114,12 @@ export function createDefaultDeps() {
       (spawnSync("git", ["status", "--short"], { encoding: "utf8" }).stdout ?? "")
         .split("\n")
         .filter(Boolean),
-    gitDiffCheck: () =>
-      (spawnSync("git", ["diff", "--check"], { encoding: "utf8" }).stdout ?? ""),
+    gitDiffCheck: () => spawnSync("git", ["diff", "--check"], { encoding: "utf8" }).stdout ?? "",
     gitTrackedSecretFiles: () =>
-      (spawnSync("git", ["ls-files", "e2e/.fixtures", "e2e/.auth"], { encoding: "utf8" })
-        .stdout ?? "")
+      (
+        spawnSync("git", ["ls-files", "e2e/.fixtures", "e2e/.auth"], { encoding: "utf8" }).stdout ??
+        ""
+      )
         .split("\n")
         .filter(Boolean),
     gitIsIgnored: (p) =>
@@ -306,10 +307,17 @@ export async function runGate(deps) {
   summary.sessions = smoke?.sessions === "PASS" ? "PASS" : "FAIL";
   // "Exit 0 but Playwright never launched" must never read as PASS.
   const verdict = evaluateStats(
-    stats ? { ...summary.playwright, total: Object.values(summary.playwright).reduce((a, b) => a + b, 0) } : null,
+    stats
+      ? {
+          ...summary.playwright,
+          total: Object.values(summary.playwright).reduce((a, b) => a + b, 0),
+        }
+      : null,
   );
   if (smokeCode !== 0 || smoke?.playwright !== "PASS" || smoke?.final !== "PASS" || !verdict.ok) {
-    summary.problems.push(`live smoke did not PASS (${verdict.ok ? "runner reported failure" : verdict.reason})`);
+    summary.problems.push(
+      `live smoke did not PASS (${verdict.ok ? "runner reported failure" : verdict.reason})`,
+    );
     return finish(1, "FAIL");
   }
 
@@ -331,8 +339,10 @@ export async function runGate(deps) {
     manualProblems.push("manual-release-checks.json missing");
     summary.checkpoint9Manual = "MISSING";
   } else {
-    if (!isPass(manual.deployment?.noWhiteScreen)) manualProblems.push("no-white-screen confirmation missing");
-    if (!isPass(manual.deployment?.consoleErrors)) manualProblems.push("console-error result missing");
+    if (!isPass(manual.deployment?.noWhiteScreen))
+      manualProblems.push("no-white-screen confirmation missing");
+    if (!isPass(manual.deployment?.consoleErrors))
+      manualProblems.push("console-error result missing");
     const billingStatus = String(manual.billing?.status ?? "").toUpperCase();
     const billingResolved =
       manual.billing?.required === false
@@ -357,7 +367,8 @@ export async function runGate(deps) {
       const pStatus = String(posture.status ?? "").toUpperCase();
       const pClass = String(posture.classification ?? "").toUpperCase();
       const exceptions = Array.isArray(posture.exceptions) ? posture.exceptions : [];
-      if (pStatus !== "PASS") manualProblems.push(`migrationPosture.status must be PASS (got ${pStatus || "empty"})`);
+      if (pStatus !== "PASS")
+        manualProblems.push(`migrationPosture.status must be PASS (got ${pStatus || "empty"})`);
       if (!["ADDITIVE", "NON_ADDITIVE_WITH_ROLLBACK_PLAN"].includes(pClass)) {
         manualProblems.push(`migrationPosture.classification unsupported (${pClass || "empty"})`);
       }
@@ -368,7 +379,14 @@ export async function runGate(deps) {
         manualProblems.push("NON_ADDITIVE_WITH_ROLLBACK_PLAN requires at least one exception");
       }
       for (const [idx, ex] of exceptions.entries()) {
-        for (const field of ["migration", "changeType", "scope", "description", "impact", "rollbackProcedure"]) {
+        for (const field of [
+          "migration",
+          "changeType",
+          "scope",
+          "description",
+          "impact",
+          "rollbackProcedure",
+        ]) {
           const v = ex?.[field];
           if (typeof v !== "string" || v.trim().length === 0) {
             manualProblems.push(`migrationPosture.exceptions[${idx}] missing ${field}`);

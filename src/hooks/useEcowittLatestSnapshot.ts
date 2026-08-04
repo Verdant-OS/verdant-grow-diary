@@ -45,8 +45,7 @@ export interface UseEcowittLatestSnapshotResult {
   errorMessage: string | null;
 }
 
-const ERROR_COPY =
-  "Couldn’t load EcoWitt readings. Check your connection and try again.";
+const ERROR_COPY = "Couldn’t load EcoWitt readings. Check your connection and try again.";
 
 /**
  * Pure transform — exported for tests that feed in fake rows without
@@ -72,12 +71,7 @@ export function useEcowittLatestSnapshot(
   const enabled = !!user && !!tentId;
 
   const query = useQuery<EcowittSensorReadingRow[]>({
-    queryKey: [
-      "ecowitt-latest-snapshot",
-      user?.id ?? "anon",
-      tentId ?? "none",
-      plantId ?? "none",
-    ],
+    queryKey: ["ecowitt-latest-snapshot", user?.id ?? "anon", tentId ?? "none", plantId ?? "none"],
     enabled,
     queryFn: async () => {
       // Newest first; oversample so the view-model can pick the newest

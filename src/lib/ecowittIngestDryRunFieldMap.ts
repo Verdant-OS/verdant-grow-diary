@@ -8,11 +8,7 @@
 import { CanonicalEcowittTentSnapshot } from "./ecowittTentSnapshot";
 
 export type EcowittDryRunFieldStatus =
-  | "mapped"
-  | "missing_required"
-  | "missing_optional"
-  | "blocked"
-  | "warning";
+  "mapped" | "missing_required" | "missing_optional" | "blocked" | "warning";
 
 export interface EcowittDryRunFieldRow {
   ingest_key: string;
@@ -96,11 +92,7 @@ export function buildEcowittIngestDryRunFieldMap(
       required: true,
       value: snap.source,
       status:
-        snap.source === "invalid"
-          ? "blocked"
-          : snap.source === "degraded"
-            ? "warning"
-            : "mapped",
+        snap.source === "invalid" ? "blocked" : snap.source === "degraded" ? "warning" : "mapped",
       note:
         snap.source === "invalid"
           ? "Invalid source blocks dry-run send."

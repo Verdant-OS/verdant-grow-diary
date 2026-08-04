@@ -105,10 +105,8 @@ export const ACTIONS_LINK_LABEL = "View pending actions";
 export const ALERTS_LINK_ARIA_LABEL = "View open alerts for this plant";
 export const ACTIONS_LINK_ARIA_LABEL = "View pending actions for this plant";
 export const VIEW_LATEST_ARIA_LABEL = "View latest timeline entry";
-export const ALERTS_LINK_DISABLED_REASON =
-  "Connect this plant to a grow to view alerts.";
-export const ACTIONS_LINK_DISABLED_REASON =
-  "Connect this plant to a grow to view pending actions.";
+export const ALERTS_LINK_DISABLED_REASON = "Connect this plant to a grow to view alerts.";
+export const ACTIONS_LINK_DISABLED_REASON = "Connect this plant to a grow to view pending actions.";
 
 function nonBlankTrimmed(v: unknown): string | null {
   return typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
@@ -142,10 +140,7 @@ function pluralize(count: number, singular: string, plural: string): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
-function countLabel(
-  kind: "alert" | "action",
-  count: number,
-): string {
+function countLabel(kind: "alert" | "action", count: number): string {
   if (count === 0) {
     return kind === "alert" ? ALERTS_NONE_LABEL : ACTIONS_NONE_LABEL;
   }
@@ -198,9 +193,7 @@ export function buildPlantQuickStatusView(
 
   const hasActionCount = !actionsLoading && isCountProvided(i.actionCount);
   const actionCount = hasActionCount ? (i.actionCount as number) : null;
-  const actionLabel = hasActionCount
-    ? countLabel("action", actionCount as number)
-    : null;
+  const actionLabel = hasActionCount ? countLabel("action", actionCount as number) : null;
 
   const alertsState: QuickStatusLoadState = alertsLoading
     ? "loading"
@@ -275,11 +268,7 @@ export function buildPlantQuickStatusView(
         disabledReason: VIEW_LATEST_DISABLED_REASON,
       };
 
-
-  const parts: string[] = [
-    `Stage: ${stage.label}`,
-    header.lastUpdatedLabel,
-  ];
+  const parts: string[] = [`Stage: ${stage.label}`, header.lastUpdatedLabel];
   if (alertLabel) parts.push(alertLabel);
   else if (alertsStatusLabel) parts.push(alertsStatusLabel);
   if (actionLabel) parts.push(actionLabel);

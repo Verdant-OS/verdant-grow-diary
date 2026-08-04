@@ -20,8 +20,7 @@ vi.mock("@/lib/sensor", async (orig) => {
   const real = await orig<typeof import("@/lib/sensor")>();
   return {
     ...real,
-    useLatestTentSensorSnapshot: (...a: unknown[]) =>
-      mockUseLatestTentSensorSnapshot(...a),
+    useLatestTentSensorSnapshot: (...a: unknown[]) => mockUseLatestTentSensorSnapshot(...a),
   };
 });
 
@@ -49,9 +48,7 @@ describe("QuickLogSensorSnapshotStrip — keyboard focus", () => {
   it("action link is a real <a href='/sensors'> and is focusable", () => {
     mockUseLatestTentSensorSnapshot.mockReturnValue(staleState());
     render(<QuickLogSensorSnapshotStrip tentId="t1" />);
-    const action = screen.getByTestId(
-      "quicklog-sensor-snapshot-action",
-    ) as HTMLAnchorElement;
+    const action = screen.getByTestId("quicklog-sensor-snapshot-action") as HTMLAnchorElement;
     expect(action.tagName).toBe("A");
     expect(action.getAttribute("href")).toBe("/sensors");
     expect(action.tabIndex).not.toBe(-1);
@@ -70,8 +67,6 @@ describe("QuickLogSensorSnapshotStrip — keyboard focus", () => {
     mockUseLatestTentSensorSnapshot.mockReturnValue(staleState());
     render(<QuickLogSensorSnapshotStrip tentId="t1" />);
     const action = screen.getByTestId("quicklog-sensor-snapshot-action");
-    expect(action.getAttribute("aria-label")).toMatch(
-      /opens sensors page/i,
-    );
+    expect(action.getAttribute("aria-label")).toMatch(/opens sensors page/i);
   });
 });

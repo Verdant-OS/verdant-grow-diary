@@ -2,10 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const PANEL = readFileSync(
-  resolve(__dirname, "../components/SensorsTestbenchPanel.tsx"),
-  "utf8",
-);
+const PANEL = readFileSync(resolve(__dirname, "../components/SensorsTestbenchPanel.tsx"), "utf8");
 
 describe("SensorsTestbenchPanel a11y + share-modal static safety", () => {
   it("readiness badge link uses aria-label and the focus helper", () => {

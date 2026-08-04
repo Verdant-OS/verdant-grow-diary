@@ -3,12 +3,7 @@
 // Used only by the read-only preview page. Never sent to any backend.
 
 export interface EcowittPreviewSample {
-  key:
-    | "valid"
-    | "degraded"
-    | "invalid"
-    | "just-fresh"
-    | "just-stale";
+  key: "valid" | "degraded" | "invalid" | "just-fresh" | "just-stale";
   label: string;
   description: string;
   /** Payload age in ms relative to "now" when normalizing. */
@@ -67,8 +62,7 @@ export const ECOWITT_PREVIEW_SAMPLES: readonly EcowittPreviewSample[] = [
   {
     key: "degraded",
     label: "Degraded EcoWitt sample",
-    description:
-      "Stale capture and a missing humidity channel for one tent.",
+    description: "Stale capture and a missing humidity channel for one tent.",
     // 1 hour old → trips freshness rule.
     captured_age_ms: 60 * 60 * 1000,
     payload: Object.freeze({
@@ -106,16 +100,14 @@ export const ECOWITT_PREVIEW_SAMPLES: readonly EcowittPreviewSample[] = [
   {
     key: "just-fresh",
     label: "Just-fresh boundary sample",
-    description:
-      "Captured exactly at the freshness boundary (age == window). Must NOT show stale.",
+    description: "Captured exactly at the freshness boundary (age == window). Must NOT show stale.",
     captured_age_ms: ECOWITT_EVIDENCE_FRESHNESS_WINDOW_MS,
     payload: BOUNDARY_PAYLOAD,
   },
   {
     key: "just-stale",
     label: "Just-stale boundary sample",
-    description:
-      "Captured one millisecond past the freshness boundary. Must show stale.",
+    description: "Captured one millisecond past the freshness boundary. Must show stale.",
     captured_age_ms: ECOWITT_EVIDENCE_FRESHNESS_WINDOW_MS + 1,
     payload: BOUNDARY_PAYLOAD,
   },
@@ -123,9 +115,7 @@ export const ECOWITT_PREVIEW_SAMPLES: readonly EcowittPreviewSample[] = [
 
 export type EcowittPreviewSampleKey = (typeof ECOWITT_PREVIEW_SAMPLES)[number]["key"];
 
-export function getEcowittPreviewSample(
-  key: EcowittPreviewSampleKey,
-): EcowittPreviewSample {
+export function getEcowittPreviewSample(key: EcowittPreviewSampleKey): EcowittPreviewSample {
   const found = ECOWITT_PREVIEW_SAMPLES.find((s) => s.key === key);
   if (!found) {
     // Defensive: should never happen — types narrow this. Fall back to valid.

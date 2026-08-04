@@ -146,10 +146,9 @@ const FUNCTION_CONTRACTS: FunctionContract[] = [
 const db = new SQL(DATABASE_URL, { max: 1 });
 
 async function checkTablePresent(qualified: string): Promise<boolean> {
-  const rows = (await db.unsafe(
-    `SELECT to_regclass($1) IS NOT NULL AS present`,
-    [qualified],
-  )) as unknown as Array<{ present: boolean }>;
+  const rows = (await db.unsafe(`SELECT to_regclass($1) IS NOT NULL AS present`, [
+    qualified,
+  ])) as unknown as Array<{ present: boolean }>;
   return rows[0]?.present === true;
 }
 
@@ -266,9 +265,7 @@ function renderTable(t: TableContract, actual: PrivMap | null): Finding[] {
     });
     return findings;
   }
-  console.log(
-    `  role                SELECT INSERT UPDATE DELETE  |  expected S I U D  | status`,
-  );
+  console.log(`  role                SELECT INSERT UPDATE DELETE  |  expected S I U D  | status`);
   for (const role of ROLES) {
     const got = actual[role];
     const want = t.expected[role];
@@ -314,7 +311,9 @@ function renderFunction(fn: FunctionContract, state: FunctionState): Finding[] {
       detail: `overloads=${state.overloadCount}`,
     });
   } else {
-    console.log(`  present (${state.overloadCount} overload${state.overloadCount === 1 ? "" : "s"})`);
+    console.log(
+      `  present (${state.overloadCount} overload${state.overloadCount === 1 ? "" : "s"})`,
+    );
   }
 
   console.log(`  role                EXECUTE  |  expected  | status`);
@@ -367,7 +366,9 @@ async function main(): Promise<void> {
   console.log(` database:       ${meta.database}`);
   console.log(` connected as:   ${meta.role}`);
   console.log(` server:         ${meta.version.split(" ").slice(0, 2).join(" ")}`);
-  console.log(` mode:           ${reportOnly ? "report-only (never fails)" : "strict (fails on drift)"}`);
+  console.log(
+    ` mode:           ${reportOnly ? "report-only (never fails)" : "strict (fails on drift)"}`,
+  );
   if (expectedProjectRef) {
     console.log(` expected ref:   ${expectedProjectRef} ✓ (hostname matched)`);
   } else {

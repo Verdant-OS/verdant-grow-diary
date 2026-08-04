@@ -29,8 +29,7 @@ const safeName = (n: string | null | undefined, fallback: string): string => {
 export function formatPlantTentMovementNote(input: PlantTentMovementInput): string {
   const next = safeName(input.nextTentName, "another tent");
   const hadPrev =
-    typeof input.previousTentName === "string" &&
-    input.previousTentName.trim().length > 0;
+    typeof input.previousTentName === "string" && input.previousTentName.trim().length > 0;
   if (!hadPrev) {
     return `Assigned plant to ${next}.`;
   }

@@ -17,14 +17,8 @@ import {
 import PlantDetailSectionNav from "@/components/PlantDetailSectionNav";
 
 const ROOT = resolve(__dirname, "../..");
-const HELPER = readFileSync(
-  resolve(ROOT, "src/lib/plantDetailSectionAnchors.ts"),
-  "utf8",
-);
-const COMPONENT = readFileSync(
-  resolve(ROOT, "src/components/PlantDetailSectionNav.tsx"),
-  "utf8",
-);
+const HELPER = readFileSync(resolve(ROOT, "src/lib/plantDetailSectionAnchors.ts"), "utf8");
+const COMPONENT = readFileSync(resolve(ROOT, "src/components/PlantDetailSectionNav.tsx"), "utf8");
 const PAGE = readFileSync(resolve(ROOT, "src/pages/PlantDetail.tsx"), "utf8");
 
 const FORBIDDEN = [
@@ -91,12 +85,7 @@ describe("buildPlantDetailSectionAnchors · ordering and completeness", () => {
 describe("PlantDetailSectionNav · render", () => {
   it("renders all available section jump links with accessible labels", () => {
     render(
-      <PlantDetailSectionNav
-        hasAlertsSection
-        hasActionsSection
-        hasDoctorSection
-        hasAssignedTent
-      />,
+      <PlantDetailSectionNav hasAlertsSection hasActionsSection hasDoctorSection hasAssignedTent />,
     );
     expect(
       screen.getByRole("navigation", {
@@ -120,12 +109,12 @@ describe("PlantDetailSectionNav · render", () => {
     const actions = screen.getByTestId("plant-detail-section-link-actions");
     expect(alerts).toBeDisabled();
     expect(actions).toBeDisabled();
-    expect(
-      screen.getByTestId("plant-detail-section-link-alerts-reason").textContent,
-    ).toMatch(/no tent/i);
-    expect(
-      screen.getByTestId("plant-detail-section-link-actions-reason").textContent,
-    ).toMatch(/no tent/i);
+    expect(screen.getByTestId("plant-detail-section-link-alerts-reason").textContent).toMatch(
+      /no tent/i,
+    );
+    expect(screen.getByTestId("plant-detail-section-link-actions-reason").textContent).toMatch(
+      /no tent/i,
+    );
   });
 
   it("Timeline click scrolls to and focuses the timeline anchor", () => {

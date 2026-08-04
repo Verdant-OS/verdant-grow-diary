@@ -10,8 +10,7 @@
  */
 
 export const ACTION_QUEUE_PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
-export type ActionQueuePageSize =
-  (typeof ACTION_QUEUE_PAGE_SIZE_OPTIONS)[number];
+export type ActionQueuePageSize = (typeof ACTION_QUEUE_PAGE_SIZE_OPTIONS)[number];
 
 export const ACTION_QUEUE_DEFAULT_PAGE_SIZE: ActionQueuePageSize = 25;
 export const ACTION_QUEUE_DEFAULT_PAGE = 1;

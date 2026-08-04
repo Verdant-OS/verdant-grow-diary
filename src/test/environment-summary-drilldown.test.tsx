@@ -49,9 +49,7 @@ describe("EnvironmentIssueDrilldown", () => {
     const issue = report.topIssues.find((i) => i.ruleId === "source.review")!;
     expect(issue.relatedEntryIds.sort()).toEqual(["e1", "e2"]);
     render(<EnvironmentIssueDrilldown issue={issue} relatedChecks={checks} />);
-    expect(screen.getByTestId("env-issue-drilldown-selected").textContent).toMatch(
-      /Selected:/,
-    );
+    expect(screen.getByTestId("env-issue-drilldown-selected").textContent).toMatch(/Selected:/);
     expect(screen.getByTestId("env-issue-drilldown-row-e1")).toBeTruthy();
     expect(screen.getByTestId("env-issue-drilldown-row-e2")).toBeTruthy();
   });

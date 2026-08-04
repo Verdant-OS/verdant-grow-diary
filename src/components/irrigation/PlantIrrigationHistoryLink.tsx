@@ -17,7 +17,11 @@ export interface PlantIrrigationHistoryLinkProps {
   className?: string;
 }
 
-export function PlantIrrigationHistoryLink({ plantId, onOpen, className }: PlantIrrigationHistoryLinkProps) {
+export function PlantIrrigationHistoryLink({
+  plantId,
+  onOpen,
+  className,
+}: PlantIrrigationHistoryLinkProps) {
   if (!plantId) return null;
   return (
     <Button

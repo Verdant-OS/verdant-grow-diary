@@ -123,10 +123,7 @@ describe("formatChartTooltipTimestamp", () => {
 });
 
 describe("SensorChart wires shared time-range + tooltip helpers", () => {
-  const SRC = readFileSync(
-    resolve(__dirname, "..", "components", "SensorChart.tsx"),
-    "utf8",
-  );
+  const SRC = readFileSync(resolve(__dirname, "..", "components", "SensorChart.tsx"), "utf8");
 
   it("imports the shared range + tooltip helpers", () => {
     expect(SRC).toMatch(/from\s+["']@\/lib\/sensorChartTimeRange["']/);

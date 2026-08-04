@@ -13,8 +13,7 @@ import { auditLeadDataQuality } from "@/lib/leadDataQualityAuditRules";
 import { buildLeadSourceInsights } from "@/lib/leadSourceInsightRules";
 import type { LeadRow } from "@/hooks/useLeadsList";
 
-const readSrc = (p: string) =>
-  readFileSync(resolve(__dirname, "..", p), "utf8");
+const readSrc = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 const RULES = readSrc("lib/leadExecutiveSummaryRules.ts");
 const COMPONENT = readSrc("components/LeadExecutiveSummaryCard.tsx");
 const PAGE = readSrc("pages/Leads.tsx");
@@ -104,9 +103,7 @@ describe("buildLeadExecutiveSummary", () => {
       lead({ id: `l${i}`, status: "new" }),
     );
     const r = buildLeadExecutiveSummary(leads, NOW);
-    expect(r.overallState === "needs_attention" || r.overallState === "risky").toBe(
-      true,
-    );
+    expect(r.overallState === "needs_attention" || r.overallState === "risky").toBe(true);
     expect(r.linkedSectionIds).toContain("priority_queue");
   });
 
@@ -134,9 +131,7 @@ describe("buildLeadExecutiveSummary", () => {
       }),
     );
     const r = buildLeadExecutiveSummary(leads, NOW);
-    expect(
-      r.warnings.some((w) => /confidence lowered/i.test(w)),
-    ).toBe(true);
+    expect(r.warnings.some((w) => /confidence lowered/i.test(w))).toBe(true);
     expect(r.linkedSectionIds).toContain("data_quality");
   });
 

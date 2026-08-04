@@ -77,25 +77,24 @@ describe("formatSensorMetricValue", () => {
 
 describe("legend / tooltip unit consistency", () => {
   it("legend label and tooltip value formatter use the same unit string for every chart metric", () => {
-    (Object.keys(SENSOR_CHART_METRIC_META) as Array<keyof typeof SENSOR_CHART_METRIC_META>).forEach((m) => {
-      const legend = sensorChartLegendLabel(m);
-      const tooltip = formatSensorChartTooltipValue(1, m);
-      const unit = SENSOR_CHART_METRIC_META[m].unit;
-      if (unit) {
-        expect(legend).toContain(unit);
-        expect(tooltip).toContain(unit);
-      }
-      // Extended helper must agree with the chart helper on the unit.
-      expect(getSensorMetricUnit(m)).toBe(unit);
-    });
+    (Object.keys(SENSOR_CHART_METRIC_META) as Array<keyof typeof SENSOR_CHART_METRIC_META>).forEach(
+      (m) => {
+        const legend = sensorChartLegendLabel(m);
+        const tooltip = formatSensorChartTooltipValue(1, m);
+        const unit = SENSOR_CHART_METRIC_META[m].unit;
+        if (unit) {
+          expect(legend).toContain(unit);
+          expect(tooltip).toContain(unit);
+        }
+        // Extended helper must agree with the chart helper on the unit.
+        expect(getSensorMetricUnit(m)).toBe(unit);
+      },
+    );
   });
 });
 
 describe("static guardrail: SensorChart.tsx does not duplicate the metric/unit table", () => {
-  const src = readFileSync(
-    join(process.cwd(), "src/components/SensorChart.tsx"),
-    "utf8",
-  );
+  const src = readFileSync(join(process.cwd(), "src/components/SensorChart.tsx"), "utf8");
 
   it("does not inline a metric → unit map inside SensorChart.tsx", () => {
     // No literal mapping like `temp: { unit: "°F" ... }` should live in JSX.
@@ -109,7 +108,7 @@ describe("static guardrail: SensorChart.tsx does not duplicate the metric/unit t
     expect(src).toContain("formatSensorChartTooltipValue");
   });
 
-  it("does not hand-roll unit suffixes like \"°F\" / \"kPa\" / \"ppm\" inside JSX strings", () => {
+  it('does not hand-roll unit suffixes like "°F" / "kPa" / "ppm" inside JSX strings', () => {
     // Allow inside imports/comments only — assert there are no bare
     // string literals carrying these unit suffixes in the component.
     expect(src).not.toMatch(/["'`][^"'`]*°F[^"'`]*["'`]/);

@@ -69,10 +69,7 @@ const SCENARIOS: readonly Scenario[] = [
 for (const s of SCENARIOS) {
   test.describe(`disabled Compare — ${s.name}`, () => {
     const huntId = process.env[s.envVar]?.trim() || "";
-    test.skip(
-      !huntId,
-      `Set ${s.envVar} to a hunt id whose workspace is in the "${s.name}" state`,
-    );
+    test.skip(!huntId, `Set ${s.envVar} to a hunt id whose workspace is in the "${s.name}" state`);
 
     test("desktop: renders disabled, accessible, inert; no verdict/keeper/ranking copy anywhere in DOM", async ({
       page,

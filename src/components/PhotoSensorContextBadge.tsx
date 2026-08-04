@@ -45,9 +45,7 @@ export interface PhotoSensorContextBadgeProps {
  * snapshot resolver. Only known-safe fields are forwarded; everything
  * else (raw_payload, vendor IDs, tokens) is dropped.
  */
-function toSnapshotInput(
-  snap: PhotoContextCandidateSnapshot,
-): SensorSnapshotInput {
+function toSnapshotInput(snap: PhotoContextCandidateSnapshot): SensorSnapshotInput {
   const capturedAt =
     typeof snap.capturedAtIso === "string"
       ? snap.capturedAtIso
@@ -60,9 +58,7 @@ function toSnapshotInput(
 
   const confidenceRaw = (snap as Record<string, unknown>).confidence;
   const confidence =
-    typeof confidenceRaw === "number" && Number.isFinite(confidenceRaw)
-      ? confidenceRaw
-      : null;
+    typeof confidenceRaw === "number" && Number.isFinite(confidenceRaw) ? confidenceRaw : null;
 
   const metricsRaw = (snap as Record<string, unknown>).metrics;
   const metrics = Array.isArray(metricsRaw)
@@ -93,19 +89,14 @@ export default function PhotoSensorContextBadge({
       data-result-kind={result.kind}
       className={cn("space-y-2 text-xs", className)}
     >
-      <div
-        data-testid={`${testId}-badge`}
-        className="flex flex-wrap items-center gap-1.5"
-      >
+      <div data-testid={`${testId}-badge`} className="flex flex-wrap items-center gap-1.5">
         <span className="rounded bg-muted px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           {PHOTO_LOG_BADGE_LABEL}
         </span>
         <span className="rounded border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
           {PHOTO_LOG_NON_AI_BADGE_LABEL}
         </span>
-        <span className="text-[10px] text-muted-foreground">
-          {PHOTO_LOG_BADGE_SUBLABEL}
-        </span>
+        <span className="text-[10px] text-muted-foreground">{PHOTO_LOG_BADGE_SUBLABEL}</span>
       </div>
 
       {result.kind === "none" ? (

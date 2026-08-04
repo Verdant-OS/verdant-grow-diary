@@ -54,8 +54,7 @@ export type FounderAllocationResult =
  * on paddle_transaction_id).
  */
 export type CreditPackAllocationResult =
-  | { ok: true; reason: "granted" | "idempotent" }
-  | { ok: false; reason: "invalid_input" | string };
+  { ok: true; reason: "granted" | "idempotent" } | { ok: false; reason: "invalid_input" | string };
 
 import type { EventLike } from "./eventProcessor.ts";
 

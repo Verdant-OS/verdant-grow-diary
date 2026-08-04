@@ -3,10 +3,7 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 
 const DASH = readFileSync(resolve(__dirname, "../pages/Dashboard.tsx"), "utf8");
-const HOOK = readFileSync(
-  resolve(__dirname, "../hooks/use-sensor-readings.ts"),
-  "utf8",
-);
+const HOOK = readFileSync(resolve(__dirname, "../hooks/use-sensor-readings.ts"), "utf8");
 
 const FORBIDDEN =
   /saveAlert\(|logAlertEvent\(|action_queue|service_role|insertAlert\(|device\.control|\bsetAutomation\b|\bautomate\(/i;

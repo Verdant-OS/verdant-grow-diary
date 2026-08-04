@@ -59,9 +59,7 @@ export function normalizeEcowittSeedlingTentPayload(
   else source = "live";
 
   const captured_at_iso =
-    capturedAt !== null && Number.isFinite(capturedAt)
-      ? new Date(capturedAt).toISOString()
-      : null;
+    capturedAt !== null && Number.isFinite(capturedAt) ? new Date(capturedAt).toISOString() : null;
 
   return {
     source,

@@ -67,11 +67,9 @@ describe("CSV Import Review UI (plan summary)", () => {
   });
 
   it("renders blocked-reason chips when rows are blocked", () => {
-    const bad = [
-      "timestamp,temperature",
-      "not-a-date,22.5",
-      "2010-01-01T00:00:00Z,22.6",
-    ].join("\n");
+    const bad = ["timestamp,temperature", "not-a-date,22.5", "2010-01-01T00:00:00Z,22.6"].join(
+      "\n",
+    );
     render(
       <CsvPreviewReviewGate
         previewResult={parse(bad)}
@@ -80,12 +78,8 @@ describe("CSV Import Review UI (plan summary)", () => {
       />,
     );
     expect(screen.getByTestId("csv-import-plan-blocked-reasons")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("csv-import-plan-block-unparseable_captured_at"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("csv-import-plan-block-captured_at_before_2020"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("csv-import-plan-block-unparseable_captured_at")).toBeInTheDocument();
+    expect(screen.getByTestId("csv-import-plan-block-captured_at_before_2020")).toBeInTheDocument();
   });
 
   it("CTA remains disabled even with full clean input + confirmation", () => {

@@ -17,11 +17,7 @@ import { auditLeadDataQuality } from "@/lib/leadDataQualityAuditRules";
 import { buildLeadSourceInsights } from "@/lib/leadSourceInsightRules";
 import type { LeadCommandCenterSectionId } from "@/lib/leadCommandCenterLayoutRules";
 
-export type LeadExecutiveSummaryState =
-  | "healthy"
-  | "needs_attention"
-  | "risky"
-  | "empty";
+export type LeadExecutiveSummaryState = "healthy" | "needs_attention" | "risky" | "empty";
 
 export interface LeadExecutiveSummary {
   headline: string;
@@ -58,8 +54,7 @@ export function buildLeadExecutiveSummary(
       overallState: "empty",
       topMetricLabel: "Leads",
       topMetricValue: "0",
-      primaryRecommendation:
-        "Clear filters or broaden the search to see pipeline activity.",
+      primaryRecommendation: "Clear filters or broaden the search to see pipeline activity.",
       supportingReasons: ["Filtered lead list is empty."],
       warnings: [],
       linkedSectionIds: ["saved_views", "guidance"],
@@ -74,27 +69,17 @@ export function buildLeadExecutiveSummary(
 
   const healthWarnings = health.filter((h) => h.severity === "warning");
   const healthWatches = health.filter((h) => h.severity === "watch");
-  const highPriorityQueueCount = queue.filter(
-    (i) => i.priority === "high",
-  ).length;
+  const highPriorityQueueCount = queue.filter((i) => i.priority === "high").length;
 
-  const qualityFindings = audit.filter(
-    (a) => a.id !== "no_leads" && a.id !== "healthy",
-  );
-  const qualityWarnings = qualityFindings.filter(
-    (a) => a.severity === "warning",
-  );
+  const qualityFindings = audit.filter((a) => a.id !== "no_leads" && a.id !== "healthy");
+  const qualityWarnings = qualityFindings.filter((a) => a.severity === "warning");
 
   const reasons: string[] = [];
   const warnings: string[] = [];
   const linked = new Set<LeadCommandCenterSectionId>();
 
-  reasons.push(
-    `${total} lead${total === 1 ? "" : "s"} in current view`,
-  );
-  reasons.push(
-    `Avg quality ${summary.averageQualityScore}/100, ${summary.percentClosed}% closed`,
-  );
+  reasons.push(`${total} lead${total === 1 ? "" : "s"} in current view`);
+  reasons.push(`Avg quality ${summary.averageQualityScore}/100, ${summary.percentClosed}% closed`);
 
   if (highPriorityQueueCount > 0) {
     reasons.push(
@@ -115,12 +100,8 @@ export function buildLeadExecutiveSummary(
   for (const h of healthWatches) linked.add("pipeline_health");
 
   // Source insight support
-  const positiveSource = insights.find(
-    (i) => i.severity === "positive" && i.category === "source",
-  );
-  const sourceWarning = insights.find(
-    (i) => i.severity === "warning" && i.category === "source",
-  );
+  const positiveSource = insights.find((i) => i.severity === "positive" && i.category === "source");
+  const sourceWarning = insights.find((i) => i.severity === "warning" && i.category === "source");
   if (positiveSource || sourceWarning) linked.add("source_insights");
   if (sourceWarning) warnings.push(sourceWarning.title);
 
@@ -153,8 +134,7 @@ export function buildLeadExecutiveSummary(
   if (overallState === "healthy") {
     headline = "Pipeline looks healthy";
     subheadline = `${total} leads tracked · avg quality ${summary.averageQualityScore}/100`;
-    primaryRecommendation =
-      "Keep monitoring follow-ups and close decisions.";
+    primaryRecommendation = "Keep monitoring follow-ups and close decisions.";
     topMetricLabel = "Avg quality";
     topMetricValue = `${summary.averageQualityScore}/100`;
     linked.add("status_summary");

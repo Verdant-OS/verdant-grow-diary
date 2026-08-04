@@ -86,7 +86,9 @@ export default function OperatorPostGrowReflectionDryRun() {
                     <td className="py-3 pr-3">{scenario.expectedStatus}</td>
                     <td className="py-3 pr-3">{scenario.actualStatus}</td>
                     <td className="py-3 pr-3">
-                      <Badge variant={scenario.passedLabel === "Pass" ? "secondary" : "destructive"}>
+                      <Badge
+                        variant={scenario.passedLabel === "Pass" ? "secondary" : "destructive"}
+                      >
                         {scenario.passedLabel}
                       </Badge>
                     </td>

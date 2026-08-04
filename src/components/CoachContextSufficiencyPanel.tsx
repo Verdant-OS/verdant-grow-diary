@@ -9,10 +9,7 @@ import { AlertTriangle, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { AiContextSufficiencyResult } from "@/lib/aiContextSufficiencyRules";
-import {
-  CONFIDENCE_CEILING_CAPS,
-  CONFIDENCE_LIMITED_COPY,
-} from "@/lib/aiDoctorConfidenceRules";
+import { CONFIDENCE_CEILING_CAPS, CONFIDENCE_LIMITED_COPY } from "@/lib/aiDoctorConfidenceRules";
 
 function ceilingPct(ceiling: AiContextSufficiencyResult["confidenceCeiling"]): number {
   return Math.round(CONFIDENCE_CEILING_CAPS[ceiling] * 100);
@@ -105,10 +102,7 @@ export default function CoachContextSufficiencyPanel({ result, className }: Prop
   };
 
   const Icon = confidenceCeiling === "low" ? ShieldAlert : AlertTriangle;
-  const iconClass =
-    confidenceCeiling === "low"
-      ? "text-destructive"
-      : "text-[hsl(var(--warning))]";
+  const iconClass = confidenceCeiling === "low" ? "text-destructive" : "text-[hsl(var(--warning))]";
 
   const isLimited = confidenceCeiling === "low" || confidenceCeiling === "medium";
 
@@ -122,9 +116,7 @@ export default function CoachContextSufficiencyPanel({ result, className }: Prop
     >
       <div className="flex items-center gap-2">
         <Icon className={cn("h-4 w-4", iconClass)} />
-        <p className="text-sm font-medium">
-          Limited grow context for AI Coach
-        </p>
+        <p className="text-sm font-medium">Limited grow context for AI Coach</p>
         <Badge
           variant={confidenceCeiling === "low" ? "destructive" : "secondary"}
           data-testid="coach-context-confidence-ceiling"
@@ -137,8 +129,8 @@ export default function CoachContextSufficiencyPanel({ result, className }: Prop
       </div>
 
       <p className="text-xs text-muted-foreground">
-        {headlineByCeiling[confidenceCeiling]} You can still ask, but answers will be
-        labeled as limited-context guidance.
+        {headlineByCeiling[confidenceCeiling]} You can still ask, but answers will be labeled as
+        limited-context guidance.
       </p>
 
       {isLimited && (
@@ -149,7 +141,6 @@ export default function CoachContextSufficiencyPanel({ result, className }: Prop
           {CONFIDENCE_LIMITED_COPY}
         </p>
       )}
-
 
       {missing.length > 0 && (
         <div data-testid="coach-context-missing">
@@ -168,9 +159,7 @@ export default function CoachContextSufficiencyPanel({ result, className }: Prop
 
       {warnings.length > 0 && (
         <div data-testid="coach-context-warnings">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
-            Warnings
-          </p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Warnings</p>
           <ul className="text-xs space-y-0.5 list-disc list-inside">
             {warnings.map((code) => (
               <li key={code} data-warning-code={code}>

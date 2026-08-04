@@ -2,10 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const SRC = readFileSync(
-  resolve(__dirname, "../../scripts/run-ecowitt-v0-validation.mjs"),
-  "utf8",
-);
+const SRC = readFileSync(resolve(__dirname, "../../scripts/run-ecowitt-v0-validation.mjs"), "utf8");
 
 describe("ecowitt v0 validation runner", () => {
   it("runs the required commands in order", () => {
@@ -47,9 +44,7 @@ describe("ecowitt v0 validation runner", () => {
     expect(SRC).not.toContain("service_role");
     expect(SRC).not.toMatch(/Bearer\s+[A-Za-z0-9._-]{8,}/);
     expect(SRC).not.toMatch(/vbt_[A-Za-z0-9]{6,}/);
-    expect(SRC).not.toMatch(
-      /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,
-    );
+    expect(SRC).not.toMatch(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/);
   });
 
   it("handles missing python3 cleanly via skipIfMissing", () => {

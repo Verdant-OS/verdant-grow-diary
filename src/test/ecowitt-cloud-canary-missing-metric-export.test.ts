@@ -19,10 +19,7 @@ import fixtures from "../../fixtures/ecowitt-cloud-canary-payloads.json";
 
 // Reuse the shared ID-shaped regexes from the Item 4 render test (single
 // definition of "ID-shaped" across render, CSV, and JSON).
-import {
-  MAC_RE,
-  UUID_RE,
-} from "./operator-ecowitt-cloud-canary-per-fixture-table.test";
+import { MAC_RE, UUID_RE } from "./operator-ecowitt-cloud-canary-per-fixture-table.test";
 const TENT_ID_LIKE = /tent_id|plant_id|raw_payload|passkey|\bMAC\b/i;
 const BANNED = [
   "confirmed",
@@ -135,8 +132,7 @@ describe("Slice B — CSV/JSON emit missing_metric_codes", () => {
     dataLines.forEach((l, i) => {
       const cols = l.split(",");
       const missingCell = cols[cols.length - 1];
-      const parsed =
-        missingCell && missingCell.length > 0 ? missingCell.split("|") : [];
+      const parsed = missingCell && missingCell.length > 0 ? missingCell.split("|") : [];
       expect(parsed).toEqual(json.rows[i].missing_metric_codes);
     });
   });
@@ -188,9 +184,7 @@ describe("Slice B — CSV/JSON emit missing_metric_codes", () => {
       ...vm,
       missing_metric_codes: ["totally_made_up_code"] as never,
     };
-    expect(() => buildCloudCanaryExport(tainted)).toThrow(
-      /Unknown missing metric code/,
-    );
+    expect(() => buildCloudCanaryExport(tainted)).toThrow(/Unknown missing metric code/);
   });
 });
 
@@ -198,9 +192,7 @@ describe("Slice B — preview render surfaces missing-metric codes safely", () =
   it("renderToString of CloudCanaryPreviewPanel emits no MAC/UUID and no banned words", async () => {
     const React = await import("react");
     const { renderToString } = await import("react-dom/server");
-    const { CloudCanaryPreviewPanel } = await import(
-      "@/pages/OperatorEcowittCanary"
-    );
+    const { CloudCanaryPreviewPanel } = await import("@/pages/OperatorEcowittCanary");
     const html = renderToString(React.createElement(CloudCanaryPreviewPanel));
     expect(MAC_RE.test(html)).toBe(false);
     expect(UUID_RE.test(html)).toBe(false);

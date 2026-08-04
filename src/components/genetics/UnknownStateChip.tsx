@@ -6,12 +6,7 @@
 import { cn } from "@/lib/utils";
 
 export type UnknownKind =
-  | "unknown"
-  | "unassigned"
-  | "not_tested"
-  | "inconclusive"
-  | "archived"
-  | "not_applicable";
+  "unknown" | "unassigned" | "not_tested" | "inconclusive" | "archived" | "not_applicable";
 
 const LABEL: Record<UnknownKind, string> = {
   unknown: "Unknown",

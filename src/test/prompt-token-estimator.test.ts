@@ -56,6 +56,5 @@ describe("promptTokenEstimator — guards against forbidden constants", () => {
     expect(src).not.toMatch(/(const|let|var)\s+\w*THRESHOLD/);
     expect(src).not.toMatch(/(const|let|var)\s+\w*TOKEN_LIMIT/);
     expect(src).not.toMatch(/(const|let|var)\s+\w*BUDGET/i);
-
   });
 });

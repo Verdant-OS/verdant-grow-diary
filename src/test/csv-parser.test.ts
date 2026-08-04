@@ -22,8 +22,7 @@ function makeFile(text: string, name = "export.csv", size?: number): File {
 
 describe("csvParser — dynamic header detection", () => {
   it("detects Date + Time columns and combines them (test 2)", () => {
-    const csv =
-      "Date,Time,Temp(°F),Humidity\n2026-06-01,10:00,77,55\n2026-06-01,11:00,78,54\n";
+    const csv = "Date,Time,Temp(°F),Humidity\n2026-06-01,10:00,77,55\n2026-06-01,11:00,78,54\n";
     const r = parseEnvironmentCSVText(csv);
     expect(r.errors).toEqual([]);
     expect(r.detectedColumns.date).toBe("Date");
@@ -98,7 +97,8 @@ describe("csvParser — unit normalization", () => {
   });
 
   it("infers Fahrenheit when temp > 45 and header is neutral (test 7)", () => {
-    const csv = "Timestamp,Temperature,RH\n2026-06-01T10:00:00Z,77,50\n2026-06-01T11:00:00Z,80,50\n";
+    const csv =
+      "Timestamp,Temperature,RH\n2026-06-01T10:00:00Z,77,50\n2026-06-01T11:00:00Z,80,50\n";
     const r = parseEnvironmentCSVText(csv);
     expect(r.validRows[0].raw_temp_unit).toBe("F");
     expect(r.validRows[0].temperature_c).toBeCloseTo(25, 0);
@@ -185,16 +185,12 @@ describe("csvParser — file-level errors", () => {
   });
 
   it("no recognizable sensor data (test 17)", async () => {
-    const r = await parseEnvironmentCSV(
-      makeFile("foo,bar\nabc,def\n", "x.csv"),
-    );
+    const r = await parseEnvironmentCSV(makeFile("foo,bar\nabc,def\n", "x.csv"));
     expect(r.errors[0].code).toBe("no_sensor_data");
   });
 
   it("file too large (test 18)", async () => {
-    const r = await parseEnvironmentCSV(
-      makeFile("x", "big.csv", MAX_CSV_BYTES + 1),
-    );
+    const r = await parseEnvironmentCSV(makeFile("x", "big.csv", MAX_CSV_BYTES + 1));
     expect(r.errors[0].code).toBe("file_too_large");
   });
 });

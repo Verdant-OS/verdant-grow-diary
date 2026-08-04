@@ -9,11 +9,7 @@
  */
 
 export type ActionQueueSource =
-  | "environment_alert"
-  | "ai_coach"
-  | "ai_doctor"
-  | "manual"
-  | "unknown";
+  "environment_alert" | "ai_coach" | "ai_doctor" | "manual" | "unknown";
 
 /** Persisted `source` values. UI imports these so it never inlines the strings. */
 export const ACTION_QUEUE_SOURCE_VALUES = {

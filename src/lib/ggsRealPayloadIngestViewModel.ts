@@ -167,9 +167,7 @@ export function buildGgsRealPayloadIngestViewModel(
 }
 
 export type GgsRealPayloadIngestRefusalReason =
-  | GgsRealPayloadRefusalReason
-  | "payload_unparseable"
-  | "payload_blank";
+  GgsRealPayloadRefusalReason | "payload_unparseable" | "payload_blank";
 
 export interface GgsRealPayloadCommitFailureFeedback {
   title: string;

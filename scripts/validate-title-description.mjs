@@ -44,8 +44,7 @@ export function collectHtmlFiles(dir) {
 }
 
 const TITLE_REGEX = /<title\b[^>]*>([\s\S]*?)<\/title>/gi;
-const DESCRIPTION_META_REGEX =
-  /<meta\s+[^>]*name=["']description["'][^>]*>/gi;
+const DESCRIPTION_META_REGEX = /<meta\s+[^>]*name=["']description["'][^>]*>/gi;
 const DESCRIPTION_META_REGEX_REVERSED =
   /<meta\s+[^>]*content=["'][^"']*["'][^>]*name=["']description["'][^>]*>/gi;
 const CONTENT_ATTR_REGEX = /content=["']([^"']*)["']/i;
@@ -107,7 +106,10 @@ export function validateDocument({ file, html, distDir }) {
     if (trimmed.length === 0) {
       push("title", "<title> is empty or whitespace-only");
     } else if (TEMPLATE_DEFAULT_TITLES.has(trimmed.toLowerCase())) {
-      push("title", `<title> is the Lovable template default ("${trimmed}"); replace with a real page title`);
+      push(
+        "title",
+        `<title> is the Lovable template default ("${trimmed}"); replace with a real page title`,
+      );
     }
   }
 
@@ -122,7 +124,7 @@ export function validateDocument({ file, html, distDir }) {
   } else {
     const trimmed = descriptions[0].trim();
     if (trimmed.length === 0) {
-      push("description", "<meta name=\"description\"> content is empty or whitespace-only");
+      push("description", '<meta name="description"> content is empty or whitespace-only');
     } else if (TEMPLATE_DEFAULT_DESCRIPTIONS.has(trimmed.toLowerCase())) {
       push(
         "description",

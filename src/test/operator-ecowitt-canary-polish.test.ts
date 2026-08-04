@@ -1,5 +1,8 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import { clearLocalStorageForTest, getLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 import {
   buildAuditReport,
   clearAuditFromLocalStorage,
@@ -174,7 +177,11 @@ describe("evidence checklist", () => {
 });
 
 describe("redacted JSON audit export", () => {
-  const verdict = computeVerdict({ preflight: goodPreflight, report: greenReport, logReviewed: true });
+  const verdict = computeVerdict({
+    preflight: goodPreflight,
+    report: greenReport,
+    logReviewed: true,
+  });
 
   it("includes report_version, verdict, cards, evidence, summaries", () => {
     const a = buildAuditReport({
@@ -225,9 +232,13 @@ describe("redacted JSON audit export", () => {
     // user_id / raw_payload should not appear as JSON keys with values
     expect(a.imported_report as unknown as Record<string, unknown>).not.toHaveProperty("passkey");
     expect(a.imported_report as unknown as Record<string, unknown>).not.toHaveProperty("mac");
-    expect(a.imported_report as unknown as Record<string, unknown>).not.toHaveProperty("bridge_token");
+    expect(a.imported_report as unknown as Record<string, unknown>).not.toHaveProperty(
+      "bridge_token",
+    );
     expect(a.imported_report as unknown as Record<string, unknown>).not.toHaveProperty("user_id");
-    expect(a.imported_report as unknown as Record<string, unknown>).not.toHaveProperty("raw_payload");
+    expect(a.imported_report as unknown as Record<string, unknown>).not.toHaveProperty(
+      "raw_payload",
+    );
   });
 
   it("redactReport strips secret-like strings deep", () => {
@@ -246,7 +257,11 @@ describe("localStorage save/restore/clear", () => {
     clearLocalStorageForTest();
   });
 
-  const verdict = computeVerdict({ preflight: goodPreflight, report: greenReport, logReviewed: true });
+  const verdict = computeVerdict({
+    preflight: goodPreflight,
+    report: greenReport,
+    logReviewed: true,
+  });
   const built = buildAuditReport({
     tent: { id: "t1", name: "Canary" },
     endpoint: "/functions/v1/ecowitt-ingest",

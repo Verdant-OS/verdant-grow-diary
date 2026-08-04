@@ -27,13 +27,17 @@ describe("SensorIngestAuditReport", () => {
         }}
       />,
     );
-    expect(screen.getByTestId("audit-rejected-note").textContent).toMatch(/Rejected ingest attempts/);
+    expect(screen.getByTestId("audit-rejected-note").textContent).toMatch(
+      /Rejected ingest attempts/,
+    );
     const row = screen.getByTestId("audit-row-row1");
     expect(row.getAttribute("data-source")).toBe("live");
     expect(row.getAttribute("data-provider")).toBe("ecowitt");
     expect(row.getAttribute("data-freshness")).toBe("fresh");
     expect(screen.getByTestId("audit-row-row1-vpd").textContent).toMatch(/1\.20/);
-    expect(screen.getByTestId("sensor-ingest-audit-report").textContent ?? "").not.toContain("ABCSECRET");
+    expect(screen.getByTestId("sensor-ingest-audit-report").textContent ?? "").not.toContain(
+      "ABCSECRET",
+    );
   });
 
   it("renders blank VPD when missing (not 0)", () => {

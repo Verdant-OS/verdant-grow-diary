@@ -77,10 +77,7 @@ export function OutcomeFollowUpQueue({
             </Badge>
           ) : null}
           {viewModel.needsReviewCount > 0 ? (
-            <Badge
-              variant="destructive"
-              aria-label={`${viewModel.needsReviewCount} need review`}
-            >
+            <Badge variant="destructive" aria-label={`${viewModel.needsReviewCount} need review`}>
               {viewModel.needsReviewCount} needs review
             </Badge>
           ) : null}

@@ -21,27 +21,18 @@ export default function PhenoEvidenceGoalsSelector({
   const testId = rest["data-testid"] ?? "pheno-evidence-goals";
   const set = new Set(selected);
   return (
-    <ul
-      data-testid={testId}
-      className="grid gap-2 sm:grid-cols-2"
-    >
+    <ul data-testid={testId} className="grid gap-2 sm:grid-cols-2">
       {PHENO_EVIDENCE_GOALS.map((g) => {
         const checked = set.has(g.id);
         return (
-          <li
-            key={g.id}
-            className="flex items-start gap-3 rounded-md border p-3"
-          >
+          <li key={g.id} className="flex items-start gap-3 rounded-md border p-3">
             <Checkbox
               id={`goal-${g.id}`}
               checked={checked}
               onCheckedChange={() => onToggle(g.id)}
               data-testid={`${testId}-toggle-${g.id}`}
             />
-            <label
-              htmlFor={`goal-${g.id}`}
-              className="flex-1 min-w-0 cursor-pointer"
-            >
+            <label htmlFor={`goal-${g.id}`} className="flex-1 min-w-0 cursor-pointer">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">{g.label}</span>
                 {g.startsPending ? (

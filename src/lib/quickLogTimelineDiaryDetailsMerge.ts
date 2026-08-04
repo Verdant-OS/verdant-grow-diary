@@ -42,10 +42,7 @@ export interface AiDoctorPhase1DiaryEvidenceEntry {
   details: unknown;
 }
 
-export type AiDoctorPhase1EvidenceIndex = ReadonlyMap<
-  string,
-  AiDoctorPhase1DiaryEvidenceEntry
->;
+export type AiDoctorPhase1EvidenceIndex = ReadonlyMap<string, AiDoctorPhase1DiaryEvidenceEntry>;
 
 function normalizeIso(value: string | null | undefined): string | null {
   if (typeof value !== "string" || value.length === 0) return null;
@@ -64,9 +61,7 @@ function indexKey(
 
 function isPhase1Details(value: unknown): boolean {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  return (
-    (value as Record<string, unknown>).kind === AI_DOCTOR_PHASE1_TIMELINE_KIND
-  );
+  return (value as Record<string, unknown>).kind === AI_DOCTOR_PHASE1_TIMELINE_KIND;
 }
 
 /**

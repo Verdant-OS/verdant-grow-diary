@@ -580,8 +580,7 @@ async function main() {
       ? await readMirrors(uidA, seedA.growId, reservedMarkerEventId)
       : [];
     const reservedMarkerMirrorDetails = reservedMarkerMirrors[0]?.details as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     check(
       "event object details preserve a grower field matching the internal marker name",
       !reservedMarkerDetails.error &&
@@ -621,8 +620,7 @@ async function main() {
       malformedLegacy.event.id as string,
     );
     const malformedLegacyMirrorDetails = malformedLegacyMirrors[0]?.details as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     check(
       "exact pre-migration retry reuses a malformed legacy logged_at",
       !malformedLegacyRetry.error &&
@@ -675,8 +673,7 @@ async function main() {
       futureLegacy.event.id as string,
     );
     const futureLegacyMirrorDetails = futureLegacyMirrors[0]?.details as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     check(
       "exact pre-migration retry reuses a now-future legacy logged_at",
       !futureLegacyRetry.error &&
@@ -714,8 +711,7 @@ async function main() {
       legacyMarker.event.id as string,
     );
     const legacyMarkerDetails = legacyMarkerMirrors[0]?.details as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     check(
       "exact legacy retry preserves a pre-existing grower detail matching the reserved marker",
       !legacyMarkerRetry.error &&

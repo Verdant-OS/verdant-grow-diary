@@ -73,8 +73,7 @@ export interface ManualSnapshotMetric {
 }
 
 export type VpdState =
-  | { state: "computed"; valueKpa: number }
-  | { state: "needs_inputs"; message: string };
+  { state: "computed"; valueKpa: number } | { state: "needs_inputs"; message: string };
 
 export interface ManualSnapshotValidation {
   /** OK when there are no hard errors AND at least one metric is present. */
@@ -129,9 +128,7 @@ function usToMs(us: number): number {
  * Returns `{ state: "needs_inputs" }` when temp or RH is missing. Never
  * invents inputs.
  */
-export function computeVpdKpa(
-  args: { tempC: number | null; rhPct: number | null },
-): VpdState {
+export function computeVpdKpa(args: { tempC: number | null; rhPct: number | null }): VpdState {
   const { tempC, rhPct } = args;
   if (tempC === null || rhPct === null) {
     return { state: "needs_inputs", message: "Needs temperature and humidity." };
@@ -149,9 +146,7 @@ export function computeVpdKpa(
 
 // ---------- Validation ----------
 
-export function validateManualSnapshot(
-  input: ManualSnapshotInput,
-): ManualSnapshotValidation {
+export function validateManualSnapshot(input: ManualSnapshotInput): ManualSnapshotValidation {
   const errors: string[] = [];
   const warnings: string[] = [];
   const metrics: ManualSnapshotMetric[] = [];
@@ -198,7 +193,11 @@ export function validateManualSnapshot(
   // ----- Celsius-as-Fahrenheit warning -----
   // The grower picked °F but the entered number is too low to be a real
   // indoor-room °F — it almost certainly is a °C value.
-  if (airTempRaw !== null && airTempUnit === "F" && airTempRaw <= FAHRENHEIT_LOOKS_LIKE_CELSIUS_MAX) {
+  if (
+    airTempRaw !== null &&
+    airTempUnit === "F" &&
+    airTempRaw <= FAHRENHEIT_LOOKS_LIKE_CELSIUS_MAX
+  ) {
     warnings.push(
       `Air temp ${airTempRaw}°F looks like a Celsius reading entered in the Fahrenheit field.`,
     );

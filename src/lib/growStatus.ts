@@ -42,9 +42,7 @@ export function formatCount(c: CountValue): string {
 }
 
 /** Highest risk_level across pending action_queue rows; "unknown" on failure. */
-export function rankRisk(
-  rows: Array<{ risk_level: string | null }> | null | undefined,
-): RiskRank {
+export function rankRisk(rows: Array<{ risk_level: string | null }> | null | undefined): RiskRank {
   if (!rows) return "unknown";
   const order = { critical: 4, high: 3, medium: 2, low: 1 } as const;
   let top = 0;
@@ -85,9 +83,7 @@ export function deriveStatus({
   now = Date.now(),
 }: DeriveStatusInput): { level: StatusLevel; reason: string } {
   const countsUnavailable = pending === "unavailable";
-  const ageDays = lastDiaryAt
-    ? (now - new Date(lastDiaryAt).getTime()) / 86400000
-    : null;
+  const ageDays = lastDiaryAt ? (now - new Date(lastDiaryAt).getTime()) / 86400000 : null;
 
   let level: StatusLevel;
   let reason: string;

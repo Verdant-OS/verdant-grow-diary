@@ -50,9 +50,7 @@ const FOCUS_CLASSES =
 
 function dispatchQuickLog(payload: GrowRoomQuickLogEventPayload | null) {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(
-    new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: payload }),
-  );
+  window.dispatchEvent(new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: payload }));
 }
 
 function ariaLabelFor(entry: GrowRoomLauncherEntry): string {
@@ -79,11 +77,7 @@ function renderButton(entry: GrowRoomLauncherEntry) {
 
   if (entry.disabled) {
     return (
-      <div
-        key={entry.kind}
-        data-testid={`${entry.testId}-disabled`}
-        className="space-y-1"
-      >
+      <div key={entry.kind} data-testid={`${entry.testId}-disabled`} className="space-y-1">
         <Button
           type="button"
           variant="outline"
@@ -154,8 +148,8 @@ export default function GrowRoomQuickActionsCard({
       <div>
         <h2 className="text-base font-semibold">Grow Room Mode</h2>
         <p className="text-xs text-muted-foreground">
-          Quick links to the actions you reach most in the grow room. Verdant
-          never executes equipment changes.
+          Quick links to the actions you reach most in the grow room. Verdant never executes
+          equipment changes.
         </p>
       </div>
       <div

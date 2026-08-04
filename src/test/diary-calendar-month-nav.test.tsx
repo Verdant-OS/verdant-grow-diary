@@ -86,9 +86,7 @@ describe("month-nav pure helpers", () => {
 describe("DiaryCalendarSection — month navigation UI", () => {
   it("defaults to the newest month with events and shows its label", () => {
     render(<DiaryCalendarSection rawEntries={MULTI_MONTH} />);
-    expect(screen.getByTestId("diary-calendar-month-label")).toHaveTextContent(
-      /June 2026/,
-    );
+    expect(screen.getByTestId("diary-calendar-month-label")).toHaveTextContent(/June 2026/);
     // June has 4 supported events: 2 watering + 1 feeding + 1 diagnosis.
     const events = screen.getAllByTestId("diary-calendar-event");
     expect(events.length).toBeGreaterThan(0);
@@ -97,29 +95,27 @@ describe("DiaryCalendarSection — month navigation UI", () => {
   it("previous month shows May events; next returns to June", () => {
     render(<DiaryCalendarSection rawEntries={MULTI_MONTH} />);
     fireEvent.click(screen.getByTestId("diary-calendar-month-prev"));
-    expect(screen.getByTestId("diary-calendar-month-label")).toHaveTextContent(
-      /May 2026/,
-    );
+    expect(screen.getByTestId("diary-calendar-month-label")).toHaveTextContent(/May 2026/);
     // May has 1 watering + 1 feeding on different days; only the newest
     // day auto-expands so 1 event is visible. Both days are listed.
     expect(screen.getAllByTestId("diary-calendar-day").length).toBe(2);
     expect(screen.getAllByTestId("diary-calendar-event").length).toBe(1);
     fireEvent.click(screen.getByTestId("diary-calendar-month-next"));
-    expect(screen.getByTestId("diary-calendar-month-label")).toHaveTextContent(
-      /June 2026/,
-    );
+    expect(screen.getByTestId("diary-calendar-month-label")).toHaveTextContent(/June 2026/);
   });
 
   it("selected filter remains applied across month changes", () => {
     render(<DiaryCalendarSection rawEntries={MULTI_MONTH} />);
     fireEvent.click(screen.getByTestId("diary-calendar-filter-watering"));
-    expect(
-      screen.getByTestId("diary-calendar-filter-watering"),
-    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("diary-calendar-filter-watering")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     fireEvent.click(screen.getByTestId("diary-calendar-month-prev"));
-    expect(
-      screen.getByTestId("diary-calendar-filter-watering"),
-    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("diary-calendar-filter-watering")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     // May watering only: 1 event.
     expect(screen.getAllByTestId("diary-calendar-event").length).toBe(1);
   });
@@ -127,20 +123,12 @@ describe("DiaryCalendarSection — month navigation UI", () => {
   it("count badges reflect the visible month", () => {
     render(<DiaryCalendarSection rawEntries={MULTI_MONTH} />);
     // June visible: 2 watering + 1 feeding + 1 diagnosis = 4.
-    expect(
-      screen.getByTestId("diary-calendar-filter-all"),
-    ).toHaveTextContent("4");
-    expect(
-      screen.getByTestId("diary-calendar-filter-watering"),
-    ).toHaveTextContent("2");
+    expect(screen.getByTestId("diary-calendar-filter-all")).toHaveTextContent("4");
+    expect(screen.getByTestId("diary-calendar-filter-watering")).toHaveTextContent("2");
     fireEvent.click(screen.getByTestId("diary-calendar-month-prev"));
     // May visible: 1 watering + 1 feeding + 0 diagnosis = 2.
-    expect(
-      screen.getByTestId("diary-calendar-filter-all"),
-    ).toHaveTextContent("2");
-    expect(
-      screen.getByTestId("diary-calendar-filter-diagnosis"),
-    ).toHaveTextContent("0");
+    expect(screen.getByTestId("diary-calendar-filter-all")).toHaveTextContent("2");
+    expect(screen.getByTestId("diary-calendar-filter-diagnosis")).toHaveTextContent("0");
   });
 
   it("empty state names the visible month and the active filter", () => {
@@ -191,14 +179,10 @@ describe("DiaryCalendarSection — month navigation UI", () => {
     // April observation entry must NOT create an April-only month.
     fireEvent.click(screen.getByTestId("diary-calendar-month-prev")); // May
     fireEvent.click(screen.getByTestId("diary-calendar-month-prev")); // April (empty)
-    expect(screen.getByTestId("diary-calendar-month-label")).toHaveTextContent(
-      /April 2026/,
-    );
+    expect(screen.getByTestId("diary-calendar-month-label")).toHaveTextContent(/April 2026/);
     expect(screen.getByTestId("diary-calendar-empty")).toBeInTheDocument();
     // All badges are zero in April.
-    expect(
-      screen.getByTestId("diary-calendar-filter-all"),
-    ).toHaveTextContent("0");
+    expect(screen.getByTestId("diary-calendar-filter-all")).toHaveTextContent("0");
   });
 
   it("prev/next buttons expose accessible names", () => {
@@ -208,9 +192,7 @@ describe("DiaryCalendarSection — month navigation UI", () => {
   });
 
   it("does not introduce Supabase write or Action Queue strings", () => {
-    const { container } = render(
-      <DiaryCalendarSection rawEntries={MULTI_MONTH} />,
-    );
+    const { container } = render(<DiaryCalendarSection rawEntries={MULTI_MONTH} />);
     const html = container.innerHTML;
     expect(html).not.toMatch(/\.insert\(|\.update\(|\.upsert\(|\.delete\(/);
     expect(html).not.toMatch(/action_queue|Action Queue|device.*control/i);

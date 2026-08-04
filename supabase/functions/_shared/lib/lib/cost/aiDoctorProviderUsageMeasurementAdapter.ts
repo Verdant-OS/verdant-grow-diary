@@ -25,9 +25,7 @@
 import { type AiDoctorPromptMeasurement } from "./costDomains.ts";
 import { normalizeProviderReportedTokenUsage } from "./aiDoctorProviderUsageRules.ts";
 
-export {
-  type AiDoctorPromptMeasurement,
-} from "./costDomains.ts";
+export { type AiDoctorPromptMeasurement } from "./costDomains.ts";
 
 /**
  * Attaches a provider-reported token usage object to an existing

@@ -2,14 +2,7 @@ import { describe, it, expect } from "vitest";
 import { runEcowittCloudCanary } from "@/lib/ecowittCloudCanaryVerdict";
 import fixtures from "../../fixtures/ecowitt-cloud-canary-payloads.json";
 
-const BANNED_UI_WORDS = [
-  "confirmed",
-  "certain",
-  "synced",
-  "connected",
-  "imported",
-  "guaranteed",
-];
+const BANNED_UI_WORDS = ["confirmed", "certain", "synced", "connected", "imported", "guaranteed"];
 
 const SECRET_LIKE_VALUES = [
   fixtures.payloads.happy_multi_channel.PASSKEY, // fixture-only marker

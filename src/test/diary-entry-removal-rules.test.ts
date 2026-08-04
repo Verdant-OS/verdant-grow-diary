@@ -24,12 +24,9 @@ const VIEWER = { currentUserId: "user-1" } as const;
 
 describe("canRemoveDiaryEntry", () => {
   it("allows owner to remove a normal diary entry", () => {
-    expect(
-      canRemoveDiaryEntry(
-        { id: "e1", ownerUserId: "user-1", kind: "diary" },
-        VIEWER,
-      ),
-    ).toBe(true);
+    expect(canRemoveDiaryEntry({ id: "e1", ownerUserId: "user-1", kind: "diary" }, VIEWER)).toBe(
+      true,
+    );
   });
 
   it("allows owner to remove a photo log entry", () => {
@@ -42,15 +39,11 @@ describe("canRemoveDiaryEntry", () => {
   });
 
   it("rejects sensor readings", () => {
-    expect(
-      canRemoveDiaryEntry({ id: "s1", kind: "sensor_reading" }, VIEWER),
-    ).toBe(false);
+    expect(canRemoveDiaryEntry({ id: "s1", kind: "sensor_reading" }, VIEWER)).toBe(false);
   });
 
   it("rejects imported telemetry", () => {
-    expect(
-      canRemoveDiaryEntry({ id: "i1", kind: "imported_telemetry" }, VIEWER),
-    ).toBe(false);
+    expect(canRemoveDiaryEntry({ id: "i1", kind: "imported_telemetry" }, VIEWER)).toBe(false);
   });
 
   it("rejects in customer / public mode", () => {
@@ -72,20 +65,12 @@ describe("canRemoveDiaryEntry", () => {
   });
 
   it("rejects when not signed in", () => {
-    expect(
-      canRemoveDiaryEntry(
-        { id: "e1", kind: "diary" },
-        { currentUserId: null },
-      ),
-    ).toBe(false);
+    expect(canRemoveDiaryEntry({ id: "e1", kind: "diary" }, { currentUserId: null })).toBe(false);
   });
 
   it("rejects when owner mismatch is known", () => {
     expect(
-      canRemoveDiaryEntry(
-        { id: "e1", ownerUserId: "other-user", kind: "diary" },
-        VIEWER,
-      ),
+      canRemoveDiaryEntry({ id: "e1", ownerUserId: "other-user", kind: "diary" }, VIEWER),
     ).toBe(false);
   });
 
@@ -119,12 +104,8 @@ describe("label/toast variants", () => {
     expect(getRemoveSuccessToast(true)).toBe(REMOVE_PHOTO_LOG_SUCCESS_TOAST);
   });
   it("aria-label includes plant name when present", () => {
-    expect(getRemoveButtonAriaLabel(false, "Plant A")).toBe(
-      "Remove log for Plant A",
-    );
-    expect(getRemoveButtonAriaLabel(true, "  Plant B  ")).toBe(
-      "Remove photo log for Plant B",
-    );
+    expect(getRemoveButtonAriaLabel(false, "Plant A")).toBe("Remove log for Plant A");
+    expect(getRemoveButtonAriaLabel(true, "  Plant B  ")).toBe("Remove photo log for Plant B");
     expect(getRemoveButtonAriaLabel(false, "")).toBe("Remove log");
     expect(getRemoveButtonAriaLabel(true, null)).toBe("Remove photo log");
   });
@@ -143,9 +124,7 @@ describe("required safety copy", () => {
     expect(REMOVE_LOG_DIALOG_CONFIRM).toBe("Remove log");
   });
   it("error toast never echoes raw DB internals", () => {
-    expect(REMOVE_LOG_ERROR_TOAST).toBe(
-      "Couldn't remove this log. Please try again.",
-    );
+    expect(REMOVE_LOG_ERROR_TOAST).toBe("Couldn't remove this log. Please try again.");
     expect(REMOVE_LOG_ERROR_TOAST.toLowerCase()).not.toMatch(
       /sql|postgres|constraint|rls|policy|bucket|storage|token/,
     );

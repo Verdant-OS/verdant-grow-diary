@@ -12,19 +12,11 @@
  * Pure rules only. No React, no Recharts, no I/O.
  */
 
-import {
-  SENSOR_CHART_METRIC_META,
-  type SensorChartMetricKey,
-} from "./sensorChartAxisRules";
+import { SENSOR_CHART_METRIC_META, type SensorChartMetricKey } from "./sensorChartAxisRules";
 
 /** Extended metric keys supported by the unit helper. */
 export type SensorMetricKey =
-  | SensorChartMetricKey
-  | "soil_moisture"
-  | "soil_ec"
-  | "res_ec"
-  | "res_ph"
-  | "ph";
+  SensorChartMetricKey | "soil_moisture" | "soil_ec" | "res_ec" | "res_ph" | "ph";
 
 interface SensorMetricUnitMeta {
   label: string;
@@ -41,10 +33,10 @@ const EXTRA_SENSOR_METRIC_META: Record<
   SensorMetricUnitMeta
 > = {
   soil_moisture: { label: "Soil moisture", unit: "%" },
-  soil_ec:       { label: "Soil EC",       unit: "mS/cm" },
-  res_ec:        { label: "Reservoir EC",  unit: "mS/cm" },
-  res_ph:        { label: "Reservoir pH",  unit: "" },
-  ph:            { label: "pH",            unit: "" },
+  soil_ec: { label: "Soil EC", unit: "mS/cm" },
+  res_ec: { label: "Reservoir EC", unit: "mS/cm" },
+  res_ph: { label: "Reservoir pH", unit: "" },
+  ph: { label: "pH", unit: "" },
 };
 
 function resolveMeta(metric: SensorMetricKey): SensorMetricUnitMeta {

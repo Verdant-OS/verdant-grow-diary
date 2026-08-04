@@ -8,11 +8,7 @@
  * that has been observed today.
  */
 
-export type DailyCheckActivityKind =
-  | "none"
-  | "manual-only"
-  | "quicklog-only"
-  | "both";
+export type DailyCheckActivityKind = "none" | "manual-only" | "quicklog-only" | "both";
 
 export interface DailyCheckManualInput {
   ts: string | null | undefined;
@@ -87,9 +83,7 @@ function sortNewestFirst<T extends { _primary: number; _created: number; _id: st
   });
 }
 
-export function deriveDailyGrowCheckStatus(
-  input: DailyCheckStatusInput,
-): DailyCheckStatus {
+export function deriveDailyGrowCheckStatus(input: DailyCheckStatusInput): DailyCheckStatus {
   const windowMs = Math.max(1, input.combineWindowMinutes ?? 60) * 60_000;
   const dayStart = startOfLocalDay(input.now);
 
@@ -173,9 +167,7 @@ export function deriveDailyGrowCheckStatus(
   }
 
   const newest =
-    (topManual?._primary ?? -Infinity) >= (topDiary?._primary ?? -Infinity)
-      ? topManual
-      : topDiary;
+    (topManual?._primary ?? -Infinity) >= (topDiary?._primary ?? -Infinity) ? topManual : topDiary;
 
   return {
     kind,

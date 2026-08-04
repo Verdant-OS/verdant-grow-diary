@@ -25,9 +25,13 @@ describe("buildPostGrowReflectionPrompt", () => {
 
     expect(prompt).toContain("Never claim causation from correlation");
     expect(prompt).toContain("coincided with");
-    expect(prompt).toContain("If data is thin, missing, stale, invalid, or conflicting, lower confidence");
+    expect(prompt).toContain(
+      "If data is thin, missing, stale, invalid, or conflicting, lower confidence",
+    );
     expect(prompt).toContain("For autoflowers, be extra cautious about stress");
-    expect(prompt).toContain("Do not suggest device control, autopilot behavior, or automated equipment execution");
+    expect(prompt).toContain(
+      "Do not suggest device control, autopilot behavior, or automated equipment execution",
+    );
   });
 
   it("injects the full stable context JSON with exact evidence numbers", () => {

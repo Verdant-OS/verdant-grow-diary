@@ -22,9 +22,7 @@ export const ECOWITT_SUSPICIOUS_FLAG_CODES = [
 
 const SET: ReadonlySet<string> = new Set(ECOWITT_SUSPICIOUS_FLAG_CODES);
 
-export function isEcowittSuspiciousFlagCode(
-  v: unknown,
-): v is EcowittSuspiciousFlagCode {
+export function isEcowittSuspiciousFlagCode(v: unknown): v is EcowittSuspiciousFlagCode {
   return typeof v === "string" && SET.has(v);
 }
 
@@ -32,10 +30,7 @@ export function isEcowittSuspiciousFlagCode(
  * Short, data-classification labels for display. NEVER connection/health
  * state. Lowercase, neutral phrasing only.
  */
-export const ECOWITT_SUSPICIOUS_FLAG_LABELS: Record<
-  EcowittSuspiciousFlagCode,
-  string
-> = {
+export const ECOWITT_SUSPICIOUS_FLAG_LABELS: Record<EcowittSuspiciousFlagCode, string> = {
   rh_out_of_range_invalid: "humidity out of range",
   temperature_implausible_invalid: "temperature out of range",
   humidity_stuck_extreme: "humidity stuck at extreme",

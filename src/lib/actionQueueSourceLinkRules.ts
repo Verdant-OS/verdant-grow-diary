@@ -16,10 +16,7 @@ import {
   extractSourceAlertId,
   extractSourceAiDoctorSessionId,
 } from "@/lib/actionQueueProvenanceRules";
-import {
-  alertDetailPath,
-  aiDoctorSessionDetailPath,
-} from "@/lib/routes";
+import { alertDetailPath, aiDoctorSessionDetailPath } from "@/lib/routes";
 
 export interface ActionQueueSourceLinkInput {
   source?: string | null;

@@ -50,8 +50,7 @@ describe("GrowLineageRepair — empty state", () => {
     );
     const empty = await waitFor(() => screen.getByTestId("grow-lineage-empty-state"));
     expect(empty.textContent).toMatch(/No lineage repairs needed/i);
-    const firstStep = screen.getByTestId("grow-lineage-empty-state-first-step")
-      .textContent ?? "";
+    const firstStep = screen.getByTestId("grow-lineage-empty-state-first-step").textContent ?? "";
     expect(firstStep).toMatch(/Harvest Archive/);
     expect(firstStep).toMatch(/approval/i);
   });

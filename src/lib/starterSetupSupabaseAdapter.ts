@@ -9,11 +9,7 @@
  * writes, and no edge-function calls.
  */
 import { supabase } from "@/integrations/supabase/client";
-import {
-  STARTER_GROW_NAME,
-  STARTER_PLANT_NAME,
-  STARTER_TENT_NAME,
-} from "@/lib/starterSetupRules";
+import { STARTER_GROW_NAME, STARTER_PLANT_NAME, STARTER_TENT_NAME } from "@/lib/starterSetupRules";
 import type { StarterSetupDataAccess } from "@/lib/starterSetupService";
 
 export const starterSetupSupabaseAdapter: StarterSetupDataAccess = {

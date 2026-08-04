@@ -44,7 +44,9 @@ describe("Strain Reference Library V1 migration", () => {
 
   it("is client read-only and keeps import staging server/admin-only", () => {
     expect(SQL).toContain("grant select on public.cultivars to anon, authenticated");
-    expect(SQL).toContain("revoke all on public.cultivar_import_batches from public, anon, authenticated");
+    expect(SQL).toContain(
+      "revoke all on public.cultivar_import_batches from public, anon, authenticated",
+    );
     expect(SQL).not.toMatch(/grant\s+(insert|update|delete|all).*to\s+(anon|authenticated)/i);
     expect(SQL).not.toMatch(/create policy[\s\S]{0,120}for\s+(insert|update|delete)/i);
   });

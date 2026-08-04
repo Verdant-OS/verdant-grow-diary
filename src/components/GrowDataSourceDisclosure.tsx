@@ -8,10 +8,7 @@
  */
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import {
-  combineGrowDataMeta,
-  type GrowDataSourceMeta,
-} from "@/hooks/useGrowData";
+import { combineGrowDataMeta, type GrowDataSourceMeta } from "@/hooks/useGrowData";
 import InfoPopover from "@/components/InfoPopover";
 import type { SnapshotSource } from "@/lib/sensorSnapshot";
 
@@ -144,11 +141,7 @@ export default function GrowDataSourceDisclosure({
         {badgeText[label]}
       </Badge>
       <span className="text-xs text-muted-foreground">{description[label]}</span>
-      <InfoPopover
-        title={help.title}
-        body={help.body}
-        testKey={`${testId}-source`}
-      />
+      <InfoPopover title={help.title} body={help.body} testKey={`${testId}-source`} />
       {isSimulated && (
         <>
           <Badge

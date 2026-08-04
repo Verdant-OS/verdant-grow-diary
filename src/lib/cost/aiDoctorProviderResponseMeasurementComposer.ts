@@ -43,8 +43,5 @@ export function attachProviderResponseUsageToAiDoctorPromptMeasurement(
   providerResponse: unknown,
 ): AiDoctorPromptMeasurement {
   const candidate = extractProviderReportedUsageCandidate(providerResponse);
-  return attachProviderReportedUsageToAiDoctorPromptMeasurement(
-    measurement,
-    candidate,
-  );
+  return attachProviderReportedUsageToAiDoctorPromptMeasurement(measurement, candidate);
 }

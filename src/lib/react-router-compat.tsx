@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks -- dual LegacyRouterContext / TanStack path: hooks after legacy early-return is intentional for the vitest MemoryRouter shim */
 /**
  * react-router-dom compatibility layer over TanStack Router.
  *

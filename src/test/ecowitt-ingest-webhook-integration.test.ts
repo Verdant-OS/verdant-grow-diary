@@ -25,9 +25,7 @@ const baseEnv = {
 
 describe("ecowitt → sensor-ingest-webhook (mocked fetch)", () => {
   it("builds normalized payload from sample MQTT JSON and POSTs canonical shape", async () => {
-    const fetchSpy = vi
-      .fn()
-      .mockResolvedValue(new Response("ok", { status: 202 }));
+    const fetchSpy = vi.fn().mockResolvedValue(new Response("ok", { status: 202 }));
 
     const payload = buildSamplePayload(false);
     const res = await handlePayload(

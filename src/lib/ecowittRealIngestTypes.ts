@@ -10,13 +10,7 @@
  * and never upgraded.
  */
 
-export type EcoWittRealIngestSource =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid";
+export type EcoWittRealIngestSource = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 
 /** Shape of an inbound real-ingest candidate (untrusted until validated). */
 export interface EcoWittRealIngestCandidate {
@@ -95,8 +89,7 @@ export const ECOWITT_REAL_INGEST_BLOCKED_REASONS = [
   "suspicious_value:soil_moisture_stuck_0_or_100",
 ] as const;
 
-export type EcoWittRealIngestBlockedReason =
-  (typeof ECOWITT_REAL_INGEST_BLOCKED_REASONS)[number];
+export type EcoWittRealIngestBlockedReason = (typeof ECOWITT_REAL_INGEST_BLOCKED_REASONS)[number];
 
 /** Closed vocabulary of warning codes used by the validator. */
 export const ECOWITT_REAL_INGEST_WARNINGS = [
@@ -111,5 +104,4 @@ export const ECOWITT_REAL_INGEST_WARNINGS = [
   "confidence_defaulted",
 ] as const;
 
-export type EcoWittRealIngestWarning =
-  (typeof ECOWITT_REAL_INGEST_WARNINGS)[number];
+export type EcoWittRealIngestWarning = (typeof ECOWITT_REAL_INGEST_WARNINGS)[number];

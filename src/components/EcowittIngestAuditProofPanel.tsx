@@ -51,9 +51,7 @@ function formatTimestamp(iso: string | null): string {
  * non-loaded states the VM already exposes — "blocked" (permission/RLS)
  * vs "error" (network/service). Logic and statuses are unchanged.
  */
-function detailFor(
-  vm: EcowittIngestAuditProofViewModel,
-): string {
+function detailFor(vm: EcowittIngestAuditProofViewModel): string {
   if (vm.status === "blocked") {
     return "Audit proof unavailable with current read permissions (RLS-denied).";
   }
@@ -96,34 +94,24 @@ export function EcowittIngestAuditProofPanel(
         {detailFor(vm)}
       </p>
 
-
       {vm.status === "loaded" ? (
         <>
           <dl className="mt-3 grid grid-cols-3 gap-3 text-xs">
             <div>
               <dt className="text-muted-foreground">Received</dt>
-              <dd
-                className="font-mono text-base"
-                data-testid="ecowitt-ingest-audit-proof-received"
-              >
+              <dd className="font-mono text-base" data-testid="ecowitt-ingest-audit-proof-received">
                 {vm.receivedCount}
               </dd>
             </div>
             <div>
               <dt className="text-muted-foreground">Inserted</dt>
-              <dd
-                className="font-mono text-base"
-                data-testid="ecowitt-ingest-audit-proof-inserted"
-              >
+              <dd className="font-mono text-base" data-testid="ecowitt-ingest-audit-proof-inserted">
                 {vm.insertedCount}
               </dd>
             </div>
             <div>
               <dt className="text-muted-foreground">Rejected / omitted</dt>
-              <dd
-                className="font-mono text-base"
-                data-testid="ecowitt-ingest-audit-proof-rejected"
-              >
+              <dd className="font-mono text-base" data-testid="ecowitt-ingest-audit-proof-rejected">
                 {vm.rejectedCount}
               </dd>
             </div>
@@ -131,19 +119,13 @@ export function EcowittIngestAuditProofPanel(
           <dl className="mt-3 grid grid-cols-2 gap-3 text-[11px] text-muted-foreground">
             <div>
               <dt>Last accepted</dt>
-              <dd
-                className="font-mono"
-                data-testid="ecowitt-ingest-audit-proof-last-accepted"
-              >
+              <dd className="font-mono" data-testid="ecowitt-ingest-audit-proof-last-accepted">
                 {formatTimestamp(vm.lastAcceptedAt)}
               </dd>
             </div>
             <div>
               <dt>Last rejected / omitted</dt>
-              <dd
-                className="font-mono"
-                data-testid="ecowitt-ingest-audit-proof-last-rejected"
-              >
+              <dd className="font-mono" data-testid="ecowitt-ingest-audit-proof-last-rejected">
                 {formatTimestamp(vm.lastRejectedAt)}
               </dd>
             </div>

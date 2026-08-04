@@ -107,10 +107,8 @@ import {
 import { normalizePlantType } from "./plantTypeRules.ts";
 
 /** Re-exported for back-compat. Source of truth lives in constants/. */
-export const AI_DOCTOR_RECENT_WINDOW_MS =
-  AI_DOCTOR_CONTEXT_READINESS_CONFIG.recentEventWindowMs;
-export const AI_DOCTOR_SNAPSHOT_FRESH_MS =
-  AI_DOCTOR_CONTEXT_READINESS_CONFIG.snapshotFreshMs;
+export const AI_DOCTOR_RECENT_WINDOW_MS = AI_DOCTOR_CONTEXT_READINESS_CONFIG.recentEventWindowMs;
+export const AI_DOCTOR_SNAPSHOT_FRESH_MS = AI_DOCTOR_CONTEXT_READINESS_CONFIG.snapshotFreshMs;
 
 const SAFE_NEXT_STEPS: Record<AiDoctorContextReadiness, string> = {
   insufficient: "Add a recent note, photo, and manual sensor snapshot.",
@@ -140,25 +138,19 @@ export function evaluateAiDoctorContext(
   input: AiDoctorContextInput | null | undefined,
 ): AiDoctorContextResult {
   const safe = input ?? { plant: null };
-  const now =
-    typeof safe.now === "number" && Number.isFinite(safe.now)
-      ? safe.now
-      : Date.now();
+  const now = typeof safe.now === "number" && Number.isFinite(safe.now) ? safe.now : Date.now();
   const recentWindowMs =
     typeof safe.config?.recentEventWindowMs === "number" &&
     Number.isFinite(safe.config.recentEventWindowMs)
       ? safe.config.recentEventWindowMs
       : AI_DOCTOR_RECENT_WINDOW_MS;
   const snapshotFreshMs =
-    typeof safe.config?.snapshotFreshMs === "number" &&
-    Number.isFinite(safe.config.snapshotFreshMs)
+    typeof safe.config?.snapshotFreshMs === "number" && Number.isFinite(safe.config.snapshotFreshMs)
       ? safe.config.snapshotFreshMs
       : AI_DOCTOR_SNAPSHOT_FRESH_MS;
 
   const events = Array.isArray(safe.recentEvents) ? safe.recentEvents : [];
-  const snaps = Array.isArray(safe.recentManualSnapshots)
-    ? safe.recentManualSnapshots
-    : [];
+  const snaps = Array.isArray(safe.recentManualSnapshots) ? safe.recentManualSnapshots : [];
 
   // --- Recent events within the 7d window -------------------------------
   const recent = events.filter((e) => {
@@ -255,14 +247,11 @@ export function evaluateAiDoctorContext(
   // --- Readiness --------------------------------------------------------
   const hasProfile = !!plant && plant.hasProfile;
   const hasStage = !!plant && nonBlank(plant.stage);
-  const hasKnownPlantType =
-    !!plant && normalizePlantType(plant.plantType ?? null) !== "unknown";
+  const hasKnownPlantType = !!plant && normalizePlantType(plant.plantType ?? null) !== "unknown";
   const hasRecentActivity = recent.length >= 2;
   const hasRecentSnap = recentSnaps > 0;
-  const freshSnap =
-    latestSnapAt != null && now - latestSnapAt <= snapshotFreshMs;
-  const hasPhotoOrWaterFeed =
-    (plant?.hasPlantPhoto ?? false) || recentWaterFeed > 0;
+  const freshSnap = latestSnapAt != null && now - latestSnapAt <= snapshotFreshMs;
+  const hasPhotoOrWaterFeed = (plant?.hasPlantPhoto ?? false) || recentWaterFeed > 0;
 
   let readiness: AiDoctorContextReadiness;
   if (!hasProfile || (!hasRecentActivity && !hasRecentSnap)) {

@@ -147,10 +147,7 @@ describe("OneTentProofRecord screen", () => {
 });
 
 describe("OneTentProofRecord safety scan (static)", () => {
-  const src = readFileSync(
-    resolve(process.cwd(), "src/pages/OneTentProofRecord.tsx"),
-    "utf8",
-  );
+  const src = readFileSync(resolve(process.cwd(), "src/pages/OneTentProofRecord.tsx"), "utf8");
 
   it("contains no Supabase writes or RPC/edge-function calls", () => {
     expect(src).not.toMatch(/\.insert\s*\(/);
@@ -165,9 +162,7 @@ describe("OneTentProofRecord safety scan (static)", () => {
   it("does not import Supabase client or auth headers", () => {
     // Strip comments so the doc-block words like "No Supabase reads..." don't
     // false-positive. The intent is: no Supabase IMPORTS or runtime usage.
-    const codeOnly = src
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/^\s*\/\/.*$/gm, "");
+    const codeOnly = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     expect(src).not.toMatch(/@\/integrations\/supabase/);
     expect(codeOnly).not.toMatch(/\bsupabase\./i);
     expect(codeOnly.toLowerCase()).not.toContain("service_role");

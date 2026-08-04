@@ -54,7 +54,6 @@ export interface EcowittLiveEvidenceMetricRow {
   readonly tolerance: string;
 }
 
-
 export interface EcowittLiveEvidenceFormState {
   readonly source: string;
   readonly captured_at: string;
@@ -124,9 +123,7 @@ export function buildLiveSourceTruthEvidenceFromForm(
     if (!backendBlank) {
       backend_value = parseNumber(row.backend_value);
       if (backend_value === null) {
-        warnings.push(
-          `Backend value for ${key} is not a valid number; treated as missing.`,
-        );
+        warnings.push(`Backend value for ${key} is not a valid number; treated as missing.`);
       }
     }
 
@@ -134,9 +131,7 @@ export function buildLiveSourceTruthEvidenceFromForm(
     if (!controllerBlank) {
       controller_value = parseNumber(row.controller_value);
       if (controller_value === null) {
-        warnings.push(
-          `Controller value for ${key} is not a valid number; treated as missing.`,
-        );
+        warnings.push(`Controller value for ${key} is not a valid number; treated as missing.`);
       }
     }
 
@@ -144,13 +139,9 @@ export function buildLiveSourceTruthEvidenceFromForm(
     if (!isBlank(row.tolerance)) {
       const t = parseNumber(row.tolerance);
       if (t === null) {
-        warnings.push(
-          `Tolerance for ${key} is not a valid number; default tolerance used.`,
-        );
+        warnings.push(`Tolerance for ${key} is not a valid number; default tolerance used.`);
       } else if (t < 0) {
-        warnings.push(
-          `Tolerance for ${key} is negative; default tolerance used.`,
-        );
+        warnings.push(`Tolerance for ${key} is negative; default tolerance used.`);
       } else {
         tolerance = t;
       }
@@ -178,7 +169,6 @@ export function buildLiveSourceTruthEvidenceFromForm(
       tolerance,
     });
   }
-
 
   const evidence: LiveSourceTruthEvidence = {
     source: (state.source ?? "") as LiveSourceTruthSource,

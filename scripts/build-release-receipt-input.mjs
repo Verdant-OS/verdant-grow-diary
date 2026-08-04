@@ -58,23 +58,9 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const ALLOWED_SOURCES = new Set([
-  "github_actions",
-  "local_parser",
-  "manual_import",
-]);
-const ALLOWED_KINDS = new Set([
-  "ci_full_suite",
-  "local_targeted",
-  "manual_operator_note",
-]);
-const ALLOWED_STATUSES = new Set([
-  "pass",
-  "fail",
-  "blocked",
-  "pending",
-  "unknown",
-]);
+const ALLOWED_SOURCES = new Set(["github_actions", "local_parser", "manual_import"]);
+const ALLOWED_KINDS = new Set(["ci_full_suite", "local_targeted", "manual_operator_note"]);
+const ALLOWED_STATUSES = new Set(["pass", "fail", "blocked", "pending", "unknown"]);
 
 function fail(msg, code = 1) {
   process.stderr.write(`build-release-receipt-input: ${msg}\n`);
@@ -141,15 +127,7 @@ export function buildEmitterInput(flags, commandResults, blockers, metadata) {
     if (!c || typeof c !== "object") {
       throw new Error(`command-results[${i}] must be an object`);
     }
-    for (const field of [
-      "name",
-      "command",
-      "status",
-      "passed",
-      "failed",
-      "skipped",
-      "summary",
-    ]) {
+    for (const field of ["name", "command", "status", "passed", "failed", "skipped", "summary"]) {
       if (!(field in c)) {
         throw new Error(`command-results[${i}] missing field \`${field}\``);
       }
@@ -193,8 +171,7 @@ export function buildEmitterInput(flags, commandResults, blockers, metadata) {
 
 async function loadEmitter() {
   const mod = await import(
-    pathToFileURL(resolve(process.cwd(), "src/lib/releaseReceiptEmitter.ts"))
-      .href
+    pathToFileURL(resolve(process.cwd(), "src/lib/releaseReceiptEmitter.ts")).href
   );
   return mod.emitReleaseReceiptArtifact;
 }
@@ -205,12 +182,8 @@ async function main() {
   if (!flags.commandResults) fail("missing --command-results <path>");
 
   const commandResults = readJson("--command-results", flags.commandResults);
-  const blockers = flags.blockers
-    ? readJson("--blockers", flags.blockers)
-    : undefined;
-  const metadata = flags.metadata
-    ? readJson("--metadata", flags.metadata)
-    : undefined;
+  const blockers = flags.blockers ? readJson("--blockers", flags.blockers) : undefined;
+  const metadata = flags.metadata ? readJson("--metadata", flags.metadata) : undefined;
 
   let emitterInput;
   try {
@@ -222,9 +195,7 @@ async function main() {
   const emit = await loadEmitter();
   const result = emit(emitterInput);
   if (!result.ok) {
-    process.stderr.write(
-      "build-release-receipt-input: rejected by parser contract:\n",
-    );
+    process.stderr.write("build-release-receipt-input: rejected by parser contract:\n");
     for (const err of result.errors) {
       process.stderr.write(`  - ${err}\n`);
     }
@@ -234,11 +205,7 @@ async function main() {
   const outPath = resolve(flags.out);
   try {
     mkdirSync(dirname(outPath), { recursive: true });
-    writeFileSync(
-      outPath,
-      `${JSON.stringify(result.artifact, null, 2)}\n`,
-      "utf8",
-    );
+    writeFileSync(outPath, `${JSON.stringify(result.artifact, null, 2)}\n`, "utf8");
   } catch (e) {
     fail(`could not write --out (${outPath}): ${e?.message ?? e}`);
   }
@@ -249,8 +216,7 @@ async function main() {
 }
 
 // Only run main when invoked as a CLI, not when imported by tests.
-const invokedDirectly =
-  import.meta.url === pathToFileURL(process.argv[1] ?? "").href;
+const invokedDirectly = import.meta.url === pathToFileURL(process.argv[1] ?? "").href;
 if (invokedDirectly) {
   main().catch((e) => fail(`unexpected: ${e?.message ?? e}`));
 }

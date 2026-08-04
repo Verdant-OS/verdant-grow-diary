@@ -81,7 +81,11 @@ describe("getVpdTargetBand with plantType", () => {
 
 describe("classifyVpdAgainstStage with plantType", () => {
   it("the same value can be in-target for photoperiod and above-target for autoflower", () => {
-    const photo = classifyVpdAgainstStage({ value: 1.45, stage: "flower", plantType: "photoperiod" });
+    const photo = classifyVpdAgainstStage({
+      value: 1.45,
+      stage: "flower",
+      plantType: "photoperiod",
+    });
     const auto = classifyVpdAgainstStage({ value: 1.45, stage: "flower", plantType: "autoflower" });
     expect(photo.classification).toBe("in_target");
     expect(auto.classification).toBe("above_target");

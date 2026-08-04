@@ -75,16 +75,11 @@ export default function ActionResponseMemoryCard({
 
       <p className="text-xs text-muted-foreground">
         {viewModel.recordedCopy} ·{" "}
-        <span data-testid="action-response-memory-recorded-at">
-          {viewModel.recordedAtLabel}
-        </span>
+        <span data-testid="action-response-memory-recorded-at">{viewModel.recordedAtLabel}</span>
       </p>
 
       {viewModel.actionSummary && (
-        <p
-          data-testid="action-response-memory-action-summary"
-          className="text-sm break-words"
-        >
+        <p data-testid="action-response-memory-action-summary" className="text-sm break-words">
           {viewModel.actionSummary}
         </p>
       )}
@@ -100,9 +95,7 @@ export default function ActionResponseMemoryCard({
 
       {viewModel.sensorLine && (
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <span data-testid="action-response-memory-sensor-line">
-            {viewModel.sensorLine}
-          </span>
+          <span data-testid="action-response-memory-sensor-line">{viewModel.sensorLine}</span>
           {viewModel.sensorState === "available" && (
             <SensorSourceBadge
               source={sensorBadgeSource(viewModel.sensorTrustState)}

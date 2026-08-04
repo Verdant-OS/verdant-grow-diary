@@ -1,8 +1,5 @@
 export type AiDoctorImportedHistoryRecoveryState =
-  | "loading"
-  | "ready"
-  | "decision_required"
-  | "omitted_by_choice";
+  "loading" | "ready" | "decision_required" | "omitted_by_choice";
 
 export interface AiDoctorImportedHistoryRecoveryInput {
   hasTentScope?: boolean | null;

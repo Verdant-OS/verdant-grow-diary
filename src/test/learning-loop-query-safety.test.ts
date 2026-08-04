@@ -40,7 +40,9 @@ describe("service query shape — no per-episode queries", () => {
   });
 
   it("does not fetch whole tables (no select('*') on the loop tables)", () => {
-    expect(SERVICE).not.toMatch(/from\(["'](action_queue|diary_entries|sensor_readings)["']\)\s*\.select\(["']\*["']\)/);
+    expect(SERVICE).not.toMatch(
+      /from\(["'](action_queue|diary_entries|sensor_readings)["']\)\s*\.select\(["']\*["']\)/,
+    );
   });
 });
 

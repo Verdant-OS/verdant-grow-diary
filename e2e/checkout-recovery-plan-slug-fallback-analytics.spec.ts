@@ -53,24 +53,24 @@ async function neutralizeBackend(page: Page) {
 
 async function captureAnalyticsEvents(page: Page) {
   await page.addInitScript(() => {
-    (window as unknown as { __verdantAnalyticsEvents: CapturedFunnelEvent[] })
-      .__verdantAnalyticsEvents = [];
+    (
+      window as unknown as { __verdantAnalyticsEvents: CapturedFunnelEvent[] }
+    ).__verdantAnalyticsEvents = [];
     window.addEventListener("verdant:analytics", (event) => {
       const detail = (event as CustomEvent<{ name: string; props?: Record<string, unknown> }>)
         .detail;
-      (window as unknown as { __verdantAnalyticsEvents: CapturedFunnelEvent[] })
-        .__verdantAnalyticsEvents.push({
-          name: detail?.name,
-          props: detail?.props ?? null,
-        });
+      (
+        window as unknown as { __verdantAnalyticsEvents: CapturedFunnelEvent[] }
+      ).__verdantAnalyticsEvents.push({
+        name: detail?.name,
+        props: detail?.props ?? null,
+      });
     });
   });
 }
 
 async function readFallbackEvents(page: Page): Promise<CapturedFunnelEvent[]> {
-  const all = await page.evaluate(
-    () => window.__verdantAnalyticsEvents ?? [],
-  );
+  const all = await page.evaluate(() => window.__verdantAnalyticsEvents ?? []);
   return all.filter((e) => e.name === FUNNEL_EVENT);
 }
 
@@ -107,10 +107,9 @@ test.describe("checkoutRecoveryPlanSlug fallback funnel event (browser E2E)", ()
     await page.waitForTimeout(50);
 
     const events = await readFallbackEvents(page);
-    expect(
-      events.length,
-      `expected exactly one ${FUNNEL_EVENT} event, saw ${events.length}`,
-    ).toBe(1);
+    expect(events.length, `expected exactly one ${FUNNEL_EVENT} event, saw ${events.length}`).toBe(
+      1,
+    );
 
     const props = events[0].props ?? {};
     expect(props.reason).toBe("not_in_allowlist");
@@ -150,15 +149,8 @@ test.describe("checkoutRecoveryPlanSlug fallback funnel event (browser E2E)", ()
       expect(typeof props.length_bucket).toBe("string");
     }
 
-    const reasons = events
-      .map((e) => (e.props as { reason: string }).reason)
-      .sort();
-    expect(reasons).toEqual([
-      "empty_string",
-      "missing",
-      "not_in_allowlist",
-      "wrong_type",
-    ]);
+    const reasons = events.map((e) => (e.props as { reason: string }).reason).sort();
+    expect(reasons).toEqual(["empty_string", "missing", "not_in_allowlist", "wrong_type"]);
   });
 
   test("allowlisted plan does not emit a fallback funnel event", async ({ page }) => {

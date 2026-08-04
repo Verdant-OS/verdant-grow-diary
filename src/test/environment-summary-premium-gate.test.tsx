@@ -80,9 +80,7 @@ vi.mock("@/integrations/supabase/client", () => {
     {
       get(target: any, prop) {
         if (prop in target) return target[prop];
-        throw new Error(
-          `Supabase access not allowed in premium gate test: ${String(prop)}`,
-        );
+        throw new Error(`Supabase access not allowed in premium gate test: ${String(prop)}`);
       },
     },
   );
@@ -97,10 +95,7 @@ function renderPage() {
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={["/diary/environment-summary"]}>
         <Routes>
-          <Route
-            path="/diary/environment-summary"
-            element={<EnvironmentSummaryReportPage />}
-          />
+          <Route path="/diary/environment-summary" element={<EnvironmentSummaryReportPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -131,9 +126,7 @@ describe("EnvironmentSummaryReportPage — premium gate", () => {
   it("premium user sees the report and Download PDF button once server gate allows", async () => {
     entitlementMock.current = "pro";
     renderPage();
-    expect(
-      await screen.findByTestId("environment-summary-report-page"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("environment-summary-report-page")).toBeTruthy();
     expect(screen.getByTestId("env-report-range-controls")).toBeTruthy();
     expect(screen.getByTestId("env-report-print-section")).toBeTruthy();
     expect(screen.getByTestId("env-report-download-pdf")).toBeTruthy();

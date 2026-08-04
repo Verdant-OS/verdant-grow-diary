@@ -11,18 +11,10 @@
  * - Report is evidence for human reviewers and pre-release metrics only.
  */
 
-import type {
-  CultivarSource,
-  VerdantCultivarProfile,
-} from "@/constants/strainReferenceLibrary";
+import type { CultivarSource, VerdantCultivarProfile } from "@/constants/strainReferenceLibrary";
 
 export type SourceUrlClass =
-  | "pubmed"
-  | "scholarly"
-  | "breeder"
-  | "community_profile"
-  | "generic_https"
-  | "invalid";
+  "pubmed" | "scholarly" | "breeder" | "community_profile" | "generic_https" | "invalid";
 
 export type SourceIssueSeverity = "error" | "warning";
 

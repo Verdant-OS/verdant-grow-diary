@@ -21,10 +21,7 @@
  * See docs/pi-ingest-server-secret-resolver-implementation-plan.md.
  */
 
-export type BridgeSecretStatus =
-  | "pending_rotation"
-  | "active_encrypted"
-  | "disabled";
+export type BridgeSecretStatus = "pending_rotation" | "active_encrypted" | "disabled";
 
 export type ResolveBridgeSecretInput = {
   bridgeId: string;
@@ -57,9 +54,7 @@ export type BridgeSecretResolverFailure = {
   message: string;
 };
 
-export type BridgeSecretResolverResult =
-  | ResolvedBridgeSecret
-  | BridgeSecretResolverFailure;
+export type BridgeSecretResolverResult = ResolvedBridgeSecret | BridgeSecretResolverFailure;
 
 /**
  * Runtime sentinel listing every failure reason in the union. Used by

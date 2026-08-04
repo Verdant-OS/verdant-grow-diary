@@ -17,8 +17,7 @@ import {
   type EnvironmentCheckTimelineRawEntry,
 } from "./environmentCheckTimelineViewModel";
 
-export const GROW_REPORT_ENVIRONMENT_CHECKS_TITLE =
-  "Environment Checks" as const;
+export const GROW_REPORT_ENVIRONMENT_CHECKS_TITLE = "Environment Checks" as const;
 
 export const GROW_REPORT_ENVIRONMENT_CHECKS_DISCLAIMER =
   "Environment Checks are grower-entered Quick Log notes, not canonical sensor readings." as const;
@@ -69,10 +68,7 @@ function pickTentName(details: unknown): string | null {
 }
 
 export function buildGrowReportEnvironmentCheckSection(
-  rawEntries:
-    | readonly EnvironmentCheckTimelineRawEntry[]
-    | null
-    | undefined,
+  rawEntries: readonly EnvironmentCheckTimelineRawEntry[] | null | undefined,
 ): GrowReportEnvironmentCheckSection {
   const list = buildEnvironmentCheckTimelineList(rawEntries);
   // Index raw entries by id for plant/tent context lookup (presenter-safe).

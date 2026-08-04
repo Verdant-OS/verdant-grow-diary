@@ -43,23 +43,23 @@ function buildRows(payload: Record<string, unknown>): StoredRow[] {
     typeof adapter.input.captured_at === "string"
       ? adapter.input.captured_at
       : "2026-06-04T12:30:00.000Z";
-  return (adapter.input.readings as Array<{ metric: string; value: number; unit?: string | null }>).map(
-    (r) => ({
-      user_id: USER,
-      tent_id: TENT,
-      source: "ecowitt",
-      metric: r.metric,
-      value: r.value,
-      captured_at: capturedAt,
-      quality: "ok",
-      raw_payload: {
-        vendor: "ecowitt",
-        station_type: adapter.metadata.station_type,
-        adapter_warnings: adapter.warnings,
-        unit: r.unit ?? null,
-      },
-    }),
-  );
+  return (
+    adapter.input.readings as Array<{ metric: string; value: number; unit?: string | null }>
+  ).map((r) => ({
+    user_id: USER,
+    tent_id: TENT,
+    source: "ecowitt",
+    metric: r.metric,
+    value: r.value,
+    captured_at: capturedAt,
+    quality: "ok",
+    raw_payload: {
+      vendor: "ecowitt",
+      station_type: adapter.metadata.station_type,
+      adapter_warnings: adapter.warnings,
+      unit: r.unit ?? null,
+    },
+  }));
 }
 
 /** In-memory store that enforces the same dedupe unique index. */
@@ -155,9 +155,7 @@ describe("EcoWitt ingest edge function — dedupe + safety source scan", () => {
 
   it("uses ignoreDuplicates with the dedupe onConflict key", () => {
     expect(src).toMatch(/ignoreDuplicates:\s*true/);
-    expect(src).toMatch(
-      /onConflict:\s*"user_id,tent_id,source,metric,captured_at"/,
-    );
+    expect(src).toMatch(/onConflict:\s*"user_id,tent_id,source,metric,captured_at"/);
   });
 
   it("never writes to alerts or action_queue", () => {
@@ -166,8 +164,8 @@ describe("EcoWitt ingest edge function — dedupe + safety source scan", () => {
   });
 
   it("does not mention legacy controller or device-control verbs", () => {
-    const __forbid = ["switch","bot"].join("");
-      expect(src.toLowerCase()).not.toContain(__forbid);
+    const __forbid = ["switch", "bot"].join("");
+    expect(src.toLowerCase()).not.toContain(__forbid);
     expect(src).not.toMatch(/turn[_ ]?on|turn[_ ]?off/i);
   });
 });

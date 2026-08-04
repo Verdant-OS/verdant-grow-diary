@@ -6,9 +6,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const FILES = [
-  "src/lib/quickLogV2ManualSnapshotAdapter.ts",
-];
+const FILES = ["src/lib/quickLogV2ManualSnapshotAdapter.ts"];
 
 function read(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -33,7 +31,9 @@ describe("QuickLog v2 context adapter — static safety", () => {
       expect(src).not.toMatch(/from\(['"]ai_doctor_sessions['"]\)/);
       expect(src).not.toMatch(/from\(['"]sensor_readings['"]\)/);
       // No device-control or automation language.
-      expect(src).not.toMatch(/\b(turn\s+on|turn\s+off|actuate|dose|pump|valve|relay|automation|autopilot)\b/i);
+      expect(src).not.toMatch(
+        /\b(turn\s+on|turn\s+off|actuate|dose|pump|valve|relay|automation|autopilot)\b/i,
+      );
       // Source-honest: never describe manual readings as live/synced/connected/imported.
       expect(src).not.toMatch(/\b(live|synced|connected|imported)\b/i);
     });

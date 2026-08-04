@@ -23,12 +23,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve, join, relative } from "node:path";
 
-export const SCAN_ROOTS = [
-  "src/components",
-  "src/pages",
-  "src/hooks",
-  "src/lib",
-];
+export const SCAN_ROOTS = ["src/components", "src/pages", "src/hooks", "src/lib"];
 
 export const BLOCKED_TERMS = ["SUPABASE_SERVICE_ROLE_KEY", "service_role"];
 
@@ -41,9 +36,7 @@ const FILE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs)$/;
 
 /** Strip /* ... *​/ block and // line comments. */
 function stripComments(src) {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
+  return src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
 }
 
 /** Strip "...", '...', `...` (incl. interpolations) and /.../ regex literals. */

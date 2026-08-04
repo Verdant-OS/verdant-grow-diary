@@ -23,9 +23,7 @@ export interface LeadDataQualityAuditPanelProps {
 /**
  * Read-only presenter for Lead Data Quality findings. No I/O.
  */
-export default function LeadDataQualityAuditPanel({
-  leads,
-}: LeadDataQualityAuditPanelProps) {
+export default function LeadDataQualityAuditPanel({ leads }: LeadDataQualityAuditPanelProps) {
   const findings = useMemo(() => auditLeadDataQuality(leads), [leads]);
 
   return (
@@ -65,13 +63,10 @@ function FindingRow({ finding }: { finding: LeadDataQualityFinding }) {
             {finding.count} lead{finding.count === 1 ? "" : "s"} ({finding.percentage}%)
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
-            <span className="text-foreground">Suggested:</span>{" "}
-            {finding.recommendation}
+            <span className="text-foreground">Suggested:</span> {finding.recommendation}
           </div>
         </div>
-        <Badge variant={SEVERITY_VARIANT[finding.severity]}>
-          {finding.severity}
-        </Badge>
+        <Badge variant={SEVERITY_VARIANT[finding.severity]}>{finding.severity}</Badge>
       </div>
     </li>
   );

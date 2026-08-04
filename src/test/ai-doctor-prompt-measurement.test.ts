@@ -92,9 +92,7 @@ describe("aiDoctorPromptMeasurement", () => {
         staleSummaryUsed: true,
       }),
     ).toBe("summary_missing");
-    expect(classifyRawHistoryFallback({ staleSummaryUsed: true })).toBe(
-      "summary_stale",
-    );
+    expect(classifyRawHistoryFallback({ staleSummaryUsed: true })).toBe("summary_stale");
     expect(classifyRawHistoryFallback({})).toBe("summary_fresh");
   });
 
@@ -142,10 +140,7 @@ describe("aiDoctorPromptMeasurement", () => {
     let text = (src as { default?: string } | null)?.default ?? "";
     if (!text) {
       const fs = await import("node:fs");
-      text = fs.readFileSync(
-        "src/lib/cost/aiDoctorPromptMeasurement.ts",
-        "utf8",
-      );
+      text = fs.readFileSync("src/lib/cost/aiDoctorPromptMeasurement.ts", "utf8");
     }
     // Strip comments and string literals where small numbers are legitimate
     // (e.g. ?? 0 default). Then assert no MAX_/LIMIT_/THRESHOLD_ token constants.

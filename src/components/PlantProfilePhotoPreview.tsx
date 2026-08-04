@@ -52,10 +52,7 @@ export default function PlantProfilePhotoPreview({
   }
 
   const badge = plantProfilePhotoFormatBadge(state.mimeType);
-  const displayName = safePlantProfilePhotoFileName(
-    state.fileName,
-    state.mimeType,
-  );
+  const displayName = safePlantProfilePhotoFileName(state.fileName, state.mimeType);
   const body = PLANT_PROFILE_PHOTO_FALLBACK_COPY[state.reason];
 
   return (

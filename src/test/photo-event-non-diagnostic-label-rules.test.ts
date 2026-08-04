@@ -47,9 +47,7 @@ describe("photoEventNonDiagnosticLabelRules", () => {
     });
 
     it("treats null/undefined/blank details as no link → still shows", () => {
-      expect(
-        shouldShowPhotoNonDiagnosticLabel({ hasPhoto: true, details: null }),
-      ).toBe(true);
+      expect(shouldShowPhotoNonDiagnosticLabel({ hasPhoto: true, details: null })).toBe(true);
       expect(
         shouldShowPhotoNonDiagnosticLabel({
           hasPhoto: true,
@@ -83,33 +81,21 @@ describe("photoEventNonDiagnosticLabelRules", () => {
 
   describe("label copy", () => {
     it("matches the spec string exactly", () => {
-      expect(getPhotoNonDiagnosticLabel()).toBe(
-        "Visual record · no AI analysis",
-      );
-      expect(PHOTO_NON_DIAGNOSTIC_LABEL).toBe(
-        "Visual record · no AI analysis",
-      );
+      expect(getPhotoNonDiagnosticLabel()).toBe("Visual record · no AI analysis");
+      expect(PHOTO_NON_DIAGNOSTIC_LABEL).toBe("Visual record · no AI analysis");
     });
 
     it("avoids all banned diagnostic wording (req 5)", () => {
-      expect(containsBannedDiagnosticWording(PHOTO_NON_DIAGNOSTIC_LABEL)).toBe(
-        false,
-      );
+      expect(containsBannedDiagnosticWording(PHOTO_NON_DIAGNOSTIC_LABEL)).toBe(false);
     });
 
     it("flags banned wording when present (sanity)", () => {
-      expect(containsBannedDiagnosticWording("Photo analyzed by AI")).toBe(
-        true,
-      );
-      expect(containsBannedDiagnosticWording("Diagnosis confirmed")).toBe(
-        true,
-      );
+      expect(containsBannedDiagnosticWording("Photo analyzed by AI")).toBe(true);
+      expect(containsBannedDiagnosticWording("Diagnosis confirmed")).toBe(true);
     });
 
     it("exposes a stable test id for UI assertions", () => {
-      expect(PHOTO_NON_DIAGNOSTIC_TESTID).toBe(
-        "photo-event-non-diagnostic-label",
-      );
+      expect(PHOTO_NON_DIAGNOSTIC_TESTID).toBe("photo-event-non-diagnostic-label");
     });
   });
 
@@ -117,11 +103,9 @@ describe("photoEventNonDiagnosticLabelRules", () => {
     it("invoking the rule never triggers AI / network side effects (req: no AI call)", () => {
       // The pure helpers must not touch globalThis.fetch. We assert by
       // spying on fetch and confirming zero invocations.
-      const spy = vi
-        .spyOn(globalThis, "fetch" as never)
-        .mockImplementation((() => {
-          throw new Error("fetch must not be called from pure rules");
-        }) as never);
+      const spy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
+        throw new Error("fetch must not be called from pure rules");
+      }) as never);
       shouldShowPhotoNonDiagnosticLabel({
         hasPhoto: true,
         details: { ai_doctor_session_id: null },

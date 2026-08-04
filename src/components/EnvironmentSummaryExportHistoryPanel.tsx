@@ -30,11 +30,7 @@ export interface EnvironmentSummaryExportHistoryPanelProps {
   events: EnvironmentSummaryExportAuditEvent[];
   /** Max number of recent events to show. Defaults to 5. */
   limit?: number;
-  onReopen: (input: {
-    startDate: string;
-    endDate: string;
-    issueRuleId?: string | null;
-  }) => void;
+  onReopen: (input: { startDate: string; endDate: string; issueRuleId?: string | null }) => void;
   "data-testid"?: string;
 }
 
@@ -62,8 +58,7 @@ export default function EnvironmentSummaryExportHistoryPanel({
   ...rest
 }: EnvironmentSummaryExportHistoryPanelProps) {
   const testId = rest["data-testid"] ?? "env-report-export-history";
-  const [selectedReceipt, setSelectedReceipt] =
-    useState<ExportReceiptViewModel | null>(null);
+  const [selectedReceipt, setSelectedReceipt] = useState<ExportReceiptViewModel | null>(null);
   const [copyFallback, setCopyFallback] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -95,9 +90,7 @@ export default function EnvironmentSummaryExportHistoryPanel({
         throw new Error("Clipboard API unavailable");
       }
     } catch {
-      setCopyFallback(
-        "Copy unavailable. Select and copy the receipt text manually.",
-      );
+      setCopyFallback("Copy unavailable. Select and copy the receipt text manually.");
       setCopied(false);
     }
   }, [selectedReceipt]);
@@ -111,21 +104,15 @@ export default function EnvironmentSummaryExportHistoryPanel({
       <header className="flex items-center gap-2 text-sm font-medium">
         <History className="h-4 w-4 text-muted-foreground" aria-hidden />
         <span>Recent exports</span>
-        <span
-          className="text-xs text-muted-foreground"
-          data-testid={`${testId}-count`}
-        >
+        <span className="text-xs text-muted-foreground" data-testid={`${testId}-count`}>
           ({events.length})
         </span>
       </header>
 
       {recent.length === 0 ? (
-        <p
-          className="text-xs text-muted-foreground"
-          data-testid={`${testId}-empty`}
-        >
-          No exports yet. Your last few print/save-as-PDF actions will appear
-          here so you can reopen the same date range.
+        <p className="text-xs text-muted-foreground" data-testid={`${testId}-empty`}>
+          No exports yet. Your last few print/save-as-PDF actions will appear here so you can reopen
+          the same date range.
         </p>
       ) : (
         <ul className="space-y-1 text-xs" data-testid={`${testId}-list`}>
@@ -134,9 +121,7 @@ export default function EnvironmentSummaryExportHistoryPanel({
             const when = formatOccurredAt(evt.occurredAt);
             const range = `${evt.dateRange.startDate} → ${evt.dateRange.endDate}`;
             const issueSuffix =
-              evt.reportMode === "drilldown" && evt.issueLabel
-                ? ` · ${evt.issueLabel}`
-                : "";
+              evt.reportMode === "drilldown" && evt.issueLabel ? ` · ${evt.issueLabel}` : "";
             return (
               <li
                 key={evt.id}
@@ -149,9 +134,7 @@ export default function EnvironmentSummaryExportHistoryPanel({
                     <span className="font-medium">{label}</span>
                     <span className="text-muted-foreground"> · {range}</span>
                     {issueSuffix ? (
-                      <span className="text-muted-foreground">
-                        {issueSuffix}
-                      </span>
+                      <span className="text-muted-foreground">{issueSuffix}</span>
                     ) : null}
                   </p>
                   <p className="text-[10px] text-muted-foreground">{when}</p>
@@ -175,9 +158,7 @@ export default function EnvironmentSummaryExportHistoryPanel({
                         startDate: evt.dateRange.startDate,
                         endDate: evt.dateRange.endDate,
                         issueRuleId:
-                          evt.reportMode === "drilldown"
-                            ? (evt.issueRuleId ?? null)
-                            : null,
+                          evt.reportMode === "drilldown" ? (evt.issueRuleId ?? null) : null,
                       })
                     }
                     data-testid={`${testId}-reopen`}
@@ -202,25 +183,51 @@ export default function EnvironmentSummaryExportHistoryPanel({
         <DialogContent className="print-hidden max-w-md" data-testid="env-report-receipt-dialog">
           <DialogHeader>
             <DialogTitle>Export Receipt</DialogTitle>
-            <DialogDescription>
-              Details for this browser-local export.
-            </DialogDescription>
+            <DialogDescription>Details for this browser-local export.</DialogDescription>
           </DialogHeader>
 
           {selectedReceipt && (
             <div className="space-y-3 text-sm" data-testid="env-report-receipt-content">
               <div className="rounded-md border border-border/40 bg-muted/30 p-3 space-y-2">
-                <ReceiptRow label="Event ID" value={selectedReceipt.eventId} testid="receipt-event-id" />
-                <ReceiptRow label="Exported at" value={selectedReceipt.occurredAtFormatted} testid="receipt-occurred-at" />
-                <ReceiptRow label="Report mode" value={selectedReceipt.reportModeLabel} testid="receipt-mode" />
-                <ReceiptRow label="Date range" value={selectedReceipt.dateRangeFormatted} testid="receipt-range" />
+                <ReceiptRow
+                  label="Event ID"
+                  value={selectedReceipt.eventId}
+                  testid="receipt-event-id"
+                />
+                <ReceiptRow
+                  label="Exported at"
+                  value={selectedReceipt.occurredAtFormatted}
+                  testid="receipt-occurred-at"
+                />
+                <ReceiptRow
+                  label="Report mode"
+                  value={selectedReceipt.reportModeLabel}
+                  testid="receipt-mode"
+                />
+                <ReceiptRow
+                  label="Date range"
+                  value={selectedReceipt.dateRangeFormatted}
+                  testid="receipt-range"
+                />
                 {selectedReceipt.issueLabel && (
-                  <ReceiptRow label="Issue filter" value={selectedReceipt.issueLabel} testid="receipt-issue-label" />
+                  <ReceiptRow
+                    label="Issue filter"
+                    value={selectedReceipt.issueLabel}
+                    testid="receipt-issue-label"
+                  />
                 )}
                 {selectedReceipt.issueRuleId && (
-                  <ReceiptRow label="Issue rule ID" value={selectedReceipt.issueRuleId} testid="receipt-issue-rule-id" />
+                  <ReceiptRow
+                    label="Issue rule ID"
+                    value={selectedReceipt.issueRuleId}
+                    testid="receipt-issue-rule-id"
+                  />
                 )}
-                <ReceiptRow label="Source" value={selectedReceipt.sourceLabel} testid="receipt-source" />
+                <ReceiptRow
+                  label="Source"
+                  value={selectedReceipt.sourceLabel}
+                  testid="receipt-source"
+                />
               </div>
 
               <p className="text-xs text-muted-foreground">
@@ -266,22 +273,11 @@ export default function EnvironmentSummaryExportHistoryPanel({
   );
 }
 
-function ReceiptRow({
-  label,
-  value,
-  testid,
-}: {
-  label: string;
-  value: string;
-  testid: string;
-}) {
+function ReceiptRow({ label, value, testid }: { label: string; value: string; testid: string }) {
   return (
     <div className="flex justify-between gap-3">
       <span className="text-muted-foreground text-xs shrink-0">{label}</span>
-      <span
-        className="font-mono text-xs text-right break-all"
-        data-testid={testid}
-      >
+      <span className="font-mono text-xs text-right break-all" data-testid={testid}>
         {value}
       </span>
     </div>

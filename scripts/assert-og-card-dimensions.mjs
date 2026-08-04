@@ -28,8 +28,30 @@ import { join, resolve } from "node:path";
 export const EXPECTED_OG_WIDTH = 1200;
 export const EXPECTED_OG_HEIGHT = 630;
 
+/**
+ * Encoding contract for the rasterized cards.
+ *
+ * resvg emits 8-bit RGBA (colour type 6). Colour type 2 (8-bit RGB) is also
+ * accepted because a lossless optimiser may legitimately drop a fully-opaque
+ * alpha channel. Everything else — palette (3), greyscale (0/4), or 16-bit
+ * channels — means the rasterizer fell back or a post-processing step
+ * re-encoded the card, which social scrapers render inconsistently.
+ */
+export const EXPECTED_OG_BIT_DEPTH = 8;
+export const ALLOWED_OG_COLOR_TYPES = [2, 6];
+
+/** Human labels for PNG colour types, used in failure messages. */
+export const PNG_COLOR_TYPE_LABELS = {
+  0: "greyscale",
+  2: "RGB",
+  3: "palette",
+  4: "greyscale+alpha",
+  6: "RGBA",
+};
+
 /** A real 1200×630 card is far larger; this only catches truncated writes. */
 const MINIMUM_CARD_BYTES = 1024;
+
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -119,6 +141,8 @@ export function validateOgCardDimensions(distDir) {
   }
 
   const seen = new Set();
+  /** encoding label -> card files using it, for the consistency assertion. */
+  const encodings = new Map();
   let checked = 0;
 
   for (const document of documents) {
@@ -169,18 +193,57 @@ export function validateOgCardDimensions(distDir) {
       continue;
     }
 
-    if (header.bitDepth < 8) {
+    if (header.bitDepth !== EXPECTED_OG_BIT_DEPTH) {
       problems.push(
-        `${label}: OG card bit depth is ${header.bitDepth}; expected at least 8 bits per channel.`,
+        `${label}: OG card bit depth is ${header.bitDepth}; expected exactly ` +
+          `${EXPECTED_OG_BIT_DEPTH} bits per channel. A non-8-bit card means the rasterizer ` +
+          `fell back or a re-encode changed the pixel format.`,
       );
       continue;
     }
 
+    if (!ALLOWED_OG_COLOR_TYPES.includes(header.colorType)) {
+      problems.push(
+        `${label}: OG card colour type is ${header.colorType} ` +
+          `(${PNG_COLOR_TYPE_LABELS[header.colorType] ?? "unknown"}); expected ` +
+          `${ALLOWED_OG_COLOR_TYPES.map((type) => `${type} (${PNG_COLOR_TYPE_LABELS[type]})`).join(" or ")}. ` +
+          `Palette and greyscale cards band the gradient and render inconsistently across scrapers.`,
+      );
+      continue;
+    }
+
+    const encoding = `${header.bitDepth}-bit ${PNG_COLOR_TYPE_LABELS[header.colorType]}`;
+    let group = encodings.get(encoding);
+    if (!group) {
+      group = [];
+      encodings.set(encoding, group);
+    }
+    group.push(`og/${slug}.png`);
+
     checked += 1;
   }
 
-  return { ok: problems.length === 0, checked, total: seen.size, problems };
+  // Consistency: every card comes from one rasterizer pass, so a split in pixel
+  // format means part of the set was produced or re-encoded by something else.
+  if (encodings.size > 1) {
+    const breakdown = [...encodings.entries()]
+      .map(([encoding, files]) => `${encoding} (${files.length}: ${files.slice(0, 3).join(", ")}${files.length > 3 ? ", …" : ""})`)
+      .join("; ");
+    problems.push(
+      `OG cards are not encoded consistently — ${encodings.size} distinct pixel formats found: ${breakdown}. ` +
+        `All cards must share one bit depth and colour type.`,
+    );
+  }
+
+  return {
+    ok: problems.length === 0,
+    checked,
+    total: seen.size,
+    problems,
+    encodings: Object.fromEntries([...encodings.entries()].map(([key, files]) => [key, files.length])),
+  };
 }
+
 
 const invokedDirectly =
   process.argv[1] !== undefined && import.meta.url.endsWith(process.argv[1].replaceAll("\\", "/"));
@@ -192,7 +255,7 @@ if (invokedDirectly) {
     fail(`build output directory missing at ${distDir}. Run \`bun run build\` first.`);
   }
 
-  const { ok, checked, total, problems } = validateOgCardDimensions(distDir);
+  const { ok, checked, total, problems, encodings } = validateOgCardDimensions(distDir);
 
   if (!ok) {
     fail(`${problems.length} OG card problem(s) in ${distDir}:\n  - ` + problems.join("\n  - "));
@@ -200,6 +263,7 @@ if (invokedDirectly) {
 
   console.log(
     `assert-og-card-dimensions: OK — ${checked}/${total} OG card(s) present at ` +
-      `${EXPECTED_OG_WIDTH}×${EXPECTED_OG_HEIGHT}.`,
+      `${EXPECTED_OG_WIDTH}×${EXPECTED_OG_HEIGHT}, all encoded as ` +
+      `${Object.keys(encodings).join(", ") || "(none)"}.`,
   );
 }

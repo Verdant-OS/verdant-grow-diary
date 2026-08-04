@@ -451,6 +451,7 @@ type OgDimensionGateResult = {
   checked: number;
   total: number;
   problems: string[];
+  encodings?: Record<string, number>;
 };
 
 function importOgDimensionGate(): Promise<{
@@ -458,12 +459,14 @@ function importOgDimensionGate(): Promise<{
   readPngHeader: (buffer: Buffer) => Record<string, unknown>;
   EXPECTED_OG_WIDTH: number;
   EXPECTED_OG_HEIGHT: number;
+  EXPECTED_OG_BIT_DEPTH: number;
+  ALLOWED_OG_COLOR_TYPES: number[];
 }> {
   return import("../../scripts/assert-og-card-dimensions.mjs") as never;
 }
 
 /** Builds a syntactically valid PNG header of the given size, padded past the byte floor. */
-function fakePng(width: number, height: number, bitDepth = 8): Buffer {
+function fakePng(width: number, height: number, bitDepth = 8, colorType = 6): Buffer {
   const header = Buffer.alloc(33);
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(header, 0);
   header.writeUInt32BE(13, 8);
@@ -471,7 +474,7 @@ function fakePng(width: number, height: number, bitDepth = 8): Buffer {
   header.writeUInt32BE(width, 16);
   header.writeUInt32BE(height, 20);
   header.writeUInt8(bitDepth, 24);
-  header.writeUInt8(6, 25);
+  header.writeUInt8(colorType, 25);
   return Buffer.concat([header, Buffer.alloc(2048)]);
 }
 
@@ -504,6 +507,43 @@ describe("generated OG cards match the expected image resolution", () => {
     expect(result.checked).toBe(result.total);
   });
 
+  it("renders every manifest OG card with one consistent 8-bit RGB/RGBA encoding", async () => {
+    const { validateOgCardDimensions, EXPECTED_OG_BIT_DEPTH, ALLOWED_OG_COLOR_TYPES } =
+      await importOgDimensionGate();
+    expect(EXPECTED_OG_BIT_DEPTH).toBe(8);
+    expect(ALLOWED_OG_COLOR_TYPES).toEqual([2, 6]);
+
+    const result = validateOgCardDimensions(ogDistDir);
+    expect(result.ok).toBe(true);
+    const encodings = Object.keys(result.encodings ?? {});
+    expect(encodings).toHaveLength(1);
+    expect(["8-bit RGB", "8-bit RGBA"]).toContain(encodings[0]);
+  });
+
+  it("fails the gate when cards are split across two pixel formats", async () => {
+    const { validateOgCardDimensions } = await importOgDimensionGate();
+    const brokenDir = mkdtempSync(join(tmpdir(), "verdant-og-mixed-"));
+    try {
+      const manifest = readOgManifest();
+      writeFileSync(join(brokenDir, "seo-manifest.json"), JSON.stringify(manifest));
+      mkdirSync(join(brokenDir, "client/og"), { recursive: true });
+      manifest.documents.forEach((document, index) => {
+        const slug = ogImageSlugForPath(new URL(document.metadata.url).pathname);
+        writeFileSync(
+          join(brokenDir, "client/og", `${slug}.png`),
+          fakePng(1200, 630, 8, index === 0 ? 2 : 6),
+        );
+      });
+
+      const result = validateOgCardDimensions(brokenDir);
+      expect(result.ok).toBe(false);
+      expect(result.problems.join("\n")).toMatch(/not encoded consistently/);
+      expect(result.problems.join("\n")).toMatch(/8-bit RGB/);
+    } finally {
+      rmSync(brokenDir, { recursive: true, force: true });
+    }
+  });
+
   it("reads PNG dimensions from the IHDR chunk", async () => {
     const { readPngHeader } = await importOgDimensionGate();
     expect(readPngHeader(fakePng(1200, 630))).toMatchObject({
@@ -520,7 +560,15 @@ describe("generated OG cards match the expected image resolution", () => {
     ["a 1x1 placeholder render", fakePng(1, 1), /is 1×1; expected 1200×630/],
     ["a half-resolution render", fakePng(600, 315), /is 600×315; expected 1200×630/],
     ["a transposed render", fakePng(630, 1200), /is 630×1200; expected 1200×630/],
-    ["a sub-8-bit render", fakePng(1200, 630, 4), /bit depth is 4/],
+    ["a sub-8-bit render", fakePng(1200, 630, 4), /bit depth is 4; expected exactly 8/],
+    ["a 16-bit render", fakePng(1200, 630, 16), /bit depth is 16; expected exactly 8/],
+    ["a palette render", fakePng(1200, 630, 8, 3), /colour type is 3 \(palette\)/],
+    ["a greyscale render", fakePng(1200, 630, 8, 0), /colour type is 0 \(greyscale\)/],
+    [
+      "a greyscale+alpha render",
+      fakePng(1200, 630, 8, 4),
+      /colour type is 4 \(greyscale\+alpha\)/,
+    ],
     ["a non-PNG payload", Buffer.alloc(2048, 0x20), /missing PNG signature/],
     ["a truncated render", Buffer.from("broken"), /bytes \(< 1024\)/],
   ])("fails the gate for %s", async (_label, bytes, expected) => {

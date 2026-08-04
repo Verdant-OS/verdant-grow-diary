@@ -22,6 +22,9 @@ describe("Lovable MCP codegen host safety", () => {
 
   it("checks Edge import portability before and after production builds", () => {
     expect(packageJson.scripts?.prebuild).toContain("check-no-src-lib-imports.mjs");
-    expect(packageJson.scripts?.postbuild).toContain("check-no-src-lib-imports.mjs");
+    // postbuild routes through run-postbuild-seo, which runs the same scanner.
+    expect(packageJson.scripts?.postbuild).toContain("run-postbuild-seo.mjs");
+    const postbuildRunner = readFileSync(resolve(root, "scripts/run-postbuild-seo.mjs"), "utf8");
+    expect(postbuildRunner).toContain("check-no-src-lib-imports.mjs");
   });
 });

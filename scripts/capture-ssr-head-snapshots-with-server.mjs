@@ -17,15 +17,27 @@ import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const distDir = resolve(process.argv[2] ?? "dist");
-// Nitro's production output is deliberately separate from the generated SEO
-// artifacts. Keep the bundle location explicit so the verifier never falls
-// back to an obsolete dist/server convention.
-const entry = resolve(process.argv[3] ?? ".output/server/index.mjs");
+// The server bundle location depends on the Nitro/Vite output layout, which has
+// moved between `.output/server` and `<dist>/server`. Probe the known locations
+// (explicit argument first) instead of hard-coding one, but never silently pass
+// when none of them exist.
+const entryCandidates = [
+  process.argv[3],
+  join(distDir, "server", "index.mjs"),
+  ".output/server/index.mjs",
+]
+  .filter(Boolean)
+  .map((candidate) => resolve(candidate));
 const manifestPath = join(distDir, "seo-manifest.json");
 const origin = process.env["SEO_SNAPSHOT_ORIGIN"] ?? "https://verdantgrowdiary.com";
 
-if (!existsSync(entry)) {
-  console.error(`capture-ssr-head-snapshots-with-server: BLOCKED — no server bundle at ${entry}.`);
+const entry = entryCandidates.find((candidate) => existsSync(candidate));
+if (!entry) {
+  console.error(
+    `capture-ssr-head-snapshots-with-server: BLOCKED — no server bundle found. Checked:\n${entryCandidates
+      .map((candidate) => `  - ${candidate}`)
+      .join("\n")}`,
+  );
   process.exit(1);
 }
 if (!existsSync(manifestPath)) {

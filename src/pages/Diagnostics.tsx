@@ -195,6 +195,15 @@ export default function Diagnostics() {
 
       <AnalyticsDiagnosticsPanel />
 
+      <p className="text-sm text-muted-foreground">
+        <Link className="underline" to="/diagnostics-seo-artifacts">
+          SEO build artifacts
+        </Link>{" "}
+        — check whether seo-manifest.json and the generated static route documents exist in the
+        current build output.
+      </p>
+
+
       <Button onClick={runAll} disabled={running}>
         {running ? "Running…" : "Run checks"}
       </Button>

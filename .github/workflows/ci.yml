@@ -608,10 +608,9 @@ jobs:
   # is ample. If the suite grows and a shard nears the timeout, raise the count
   # (update the matrix list AND the `/N` divisor together).
   #
-  # `NODE_OPTIONS=--max-old-space-size=8192` keeps total memory container-safe on 16GB runners:
-  # the forks pool runs ~4 workers on a 4-vCPU runner, so 4 x 3584 MB ≈ 14 GB,
-  # under the 16 GB runner. A lower ceiling than the file load requires also
-  # means any regression OOM fails fast instead of GC-thrashing to the timeout.
+  # `NODE_OPTIONS=--max-old-space-size=4096` with `--maxWorkers=2 --isolate` keeps
+  # total memory container-safe on 16GB runners: 2 x 4096 MB ≈ 8 GB under the
+  # ceiling. Uncapped workers + high heap still OOM'd heavy shards (see #697).
   #
   # `fail-fast: false` so one shard failing still reports the others.
   # See docs/testing/ci-full-suite-shards.md.
@@ -654,5 +653,7 @@ jobs:
 
       - name: Run test shard
         env:
-          NODE_OPTIONS: --max-old-space-size=8192
-        run: bunx vitest run --shard=${{ matrix.shard }}/8
+          # Cap workers so N * heap fits a 16GB runner. Uncapped forks + 8GB
+          # ceiling still OOM'd shard 8 (#697) via multi-worker accumulation.
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: bunx vitest run --shard=${{ matrix.shard }}/8 --pool=forks --maxWorkers=2 --isolate

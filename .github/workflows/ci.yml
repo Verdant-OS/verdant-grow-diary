@@ -594,9 +594,10 @@ jobs:
   # `test` job so the whole suite (~21k tests, jsdom-heavy) doesn't exceed the
   # 20-minute job timeout when run on a single runner.
   #
-  # 32 named gate shards. Each job runs FOUR sequential vitest processes
-  # (`--shard=(4n-3)..(4n)/128`) so V8 heap resets mid-suite. Raised after #697:
-  # even 1/64 still climbed to ~7.3GB and OOM'd (gate shard 30 half 59/64).
+  # 32 named gate shards (branch-protection contexts). Each job runs EIGHT
+  # sequential vitest processes (`--shard=(8n-7)..(8n)/256`) so V8 heap resets
+  # mid-suite. Raised after #697: even 1/128 still OOM'd on gate shard 30
+  # sub-shard 118/128 (~21 files, heap ~7.3GB before fatal).
   #
   # History: the suite was briefly split into 36 shards to keep each worker
   # below an OOM. That OOM was NOT diffuse jsdom accumulation — it was a single
@@ -613,7 +614,7 @@ jobs:
   full-suite:
     name: Full test suite (shard ${{ matrix.shard }}/32)
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     permissions:
       contents: read
     strategy:
@@ -681,18 +682,18 @@ jobs:
       - name: Install ripgrep
         run: sudo apt-get update && sudo apt-get install -y ripgrep
 
-      - name: Run test shard (four sequential 1/128 processes)
+      - name: Run test shard (eight sequential 1/256 processes)
         env:
           # Single worker + 8GB: multi-worker multiplies heap and OOMs (#697).
-          # Four sequential 1/128 processes restart V8 so accumulation resets —
-          # even 1/64 still OOM'd on gate shard 30 half-shard 59/64.
+          # Eight sequential 1/256 processes restart V8 so accumulation resets —
+          # even 1/128 still OOM'd on gate shard 30 sub-shard 118/128 (~7.3GB).
           NODE_OPTIONS: --max-old-space-size=8192
         run: |
           set -euo pipefail
-          # Matrix shard N covers vitest partitions (4N-3)..(4N) of 128.
-          base=$(( (${{ matrix.shard }} - 1) * 4 ))
-          for i in 1 2 3 4; do
+          # Matrix shard N covers vitest partitions (8N-7)..(8N) of 256.
+          base=$(( (${{ matrix.shard }} - 1) * 8 ))
+          for i in 1 2 3 4 5 6 7 8; do
             n=$(( base + i ))
-            echo "Running sub-shard ${n}/128 for gate shard ${{ matrix.shard }}/32"
-            bunx vitest run --shard=${n}/128 --pool=forks --maxWorkers=1 --isolate --passWithNoTests
+            echo "Running sub-shard ${n}/256 for gate shard ${{ matrix.shard }}/32"
+            bunx vitest run --shard=${n}/256 --pool=forks --maxWorkers=1 --isolate --passWithNoTests
           done

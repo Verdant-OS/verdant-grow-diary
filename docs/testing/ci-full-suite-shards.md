@@ -14,17 +14,19 @@ Two jobs in `.github/workflows/ci.yml`:
 - **`test`** — lint, typecheck, all stop-ship static-safety gates, the scanner
   guardrail sentinel, and `Build`. Fast; does not run the full suite, so it
   reaches `Build` and can go green on its own.
-- **`full-suite`** — a `matrix.shard: [1 … 32]` job. Each shard runs
-  `bunx vitest run --shard=<n>/32 --pool=forks --maxWorkers=1 --isolate` on its own runner. Vitest partitions the file
-  set deterministically (by path hash), so the 8 shards together cover 100% of
-  the suite.
+- **`full-suite`** — a `matrix.shard: [1 … 32]` job (branch-protection contexts).
+  Each gate job runs **eight sequential** vitest processes
+  (`--shard=(8N-7)..(8N)/256 --pool=forks --maxWorkers=1 --isolate
+--passWithNoTests`). Vitest partitions files deterministically (SHA-1 of path),
+  so the 256 sub-shards together cover 100% of the suite. Process restarts
+  reset V8 between sub-shards to avoid cross-file heap growth (#697).
 
-Each shard covers ~1/32 of the files (~80), and:
+Each gate job covers 8/256 of the files (~11 files per process with ~2.7k
+files), and:
 
-- the vitest step runs in ~90s per shard (measured on Linux/Node 20), so total
-  job time — checkout + install + ripgrep + vitest — stays far under the
-  20-minute cap, and
-- peak worker heap stays well below the memory ceiling.
+- eight sequential processes keep wall-clock under the 45-minute job timeout
+  when individual sub-shards stay healthy, and
+- peak worker heap stays under the 8GB `NODE_OPTIONS` ceiling on 16GB runners.
 
 ## Memory — and the OOM that is now fixed
 
@@ -36,11 +38,12 @@ fresh object every render; that spun an **unbounded render loop** in the
 auto-refreshing `EcowittLocalForwardingStatusWidget` it rendered, exhausting the
 worker's V8 heap. See #188.
 
-With that bug fixed, per-file memory is bounded (each file peaks at low hundreds
-of MB and is freed), so shard count is governed by **per-shard wall-clock**, not
-memory. 32 named gate shards each run two sequential 1/64 half-shards so V8 restarts mid-suite (#697 OOM); a two-shard sample run on Linux/Node 20 at the CI cap
-(`--max-old-space-size=3584`) completed ~200 files each in ~90s with no OOM and
-no cross-file failures.
+With that bug fixed, per-file memory is usually bounded, but residual cross-file
+heap growth under `--isolate` still forces **process restarts** on this suite.
+32 named gate shards each run eight sequential 1/256 sub-shards so V8 restarts
+mid-suite (#697 OOM). Even 1/128 (~21 files/process) still hit ~7.3GB and
+fatal OOM on gate shard 30 sub-shard 118/128; 1/256 (~11 files/process) is the
+current floor.
 
 The shard command sets `NODE_OPTIONS=--max-old-space-size=8192`. Shards use maxWorkers=1 so a single 8GB heap stays under the 16 GB runner
 without multi-worker multiply (see #697). A ceiling below the file load also makes any regression OOM fail

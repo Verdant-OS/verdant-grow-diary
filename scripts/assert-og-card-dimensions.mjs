@@ -28,8 +28,30 @@ import { join, resolve } from "node:path";
 export const EXPECTED_OG_WIDTH = 1200;
 export const EXPECTED_OG_HEIGHT = 630;
 
+/**
+ * Encoding contract for the rasterized cards.
+ *
+ * resvg emits 8-bit RGBA (colour type 6). Colour type 2 (8-bit RGB) is also
+ * accepted because a lossless optimiser may legitimately drop a fully-opaque
+ * alpha channel. Everything else — palette (3), greyscale (0/4), or 16-bit
+ * channels — means the rasterizer fell back or a post-processing step
+ * re-encoded the card, which social scrapers render inconsistently.
+ */
+export const EXPECTED_OG_BIT_DEPTH = 8;
+export const ALLOWED_OG_COLOR_TYPES = [2, 6];
+
+/** Human labels for PNG colour types, used in failure messages. */
+export const PNG_COLOR_TYPE_LABELS = {
+  0: "greyscale",
+  2: "RGB",
+  3: "palette",
+  4: "greyscale+alpha",
+  6: "RGBA",
+};
+
 /** A real 1200×630 card is far larger; this only catches truncated writes. */
 const MINIMUM_CARD_BYTES = 1024;
+
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 

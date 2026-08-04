@@ -7,6 +7,19 @@
   </head>
   <body style="margin: 0">
     <div id="root"></div>
+    <!--
+      React fast-refresh preamble. The Vite dev server used to inject this via
+      its HTML pipeline; since the TanStack Start migration the SSR catch-all
+      owns HTML navigation, so the e2e spec serves this document itself and
+      the preamble must be inline. Dev-server-only fixture — never shipped.
+    -->
+    <script type="module">
+      import RefreshRuntime from "/@react-refresh";
+      RefreshRuntime.injectIntoGlobalHook(window);
+      window.$RefreshReg$ = () => {};
+      window.$RefreshSig$ = () => (type) => type;
+      window.__vite_plugin_react_preamble_installed__ = true;
+    </script>
     <script type="module" src="./irrigation-overflow-entry.tsx"></script>
   </body>
 </html>

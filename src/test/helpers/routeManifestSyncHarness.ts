@@ -43,6 +43,7 @@ const PATHLESS_LAYOUT_IDS = new Set(["/_app", "/_app/_operator"]);
  *   /_app/_operator/operator/ecowitt → /operator/ecowitt
  *   /cultivars/$slug             → /cultivars/:slug
  *   /cultivars/                  → /cultivars
+ *   /_app/plants_/$id            → /plants/:id (trailing `_` = un-nested segment)
  *   /$                           → *
  *   /_app and /_app/_operator    → null (layout only)
  */
@@ -51,6 +52,11 @@ export function tanstackRouteIdToClassicPath(routeId: string): string | null {
   if (PATHLESS_LAYOUT_IDS.has(routeId)) return null;
 
   let path = routeId;
+
+  // TanStack un-nesting marker: a trailing `_` on a segment (e.g. `plants_`)
+  // keeps the URL segment `plants` but opts the route out of nesting under
+  // the `plants` parent route. The URL never contains the underscore.
+  path = path.replace(/_(?=\/|$)/g, "");
   if (path.startsWith("/_app/_operator")) {
     path = path.slice("/_app/_operator".length);
     if (path === "") return null;

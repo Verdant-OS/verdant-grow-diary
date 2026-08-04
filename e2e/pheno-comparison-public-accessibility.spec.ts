@@ -34,8 +34,12 @@ async function runFocusedAxe(page: Page): Promise<AxeViolation[]> {
   await page.addScriptTag({ path: AXE_PATH });
 
   return page.evaluate(async () => {
-    const root = document.querySelector("#root");
-    if (!root) throw new Error("Pheno accessibility check requires #root.");
+    // The TanStack Start document renders straight into <body> — there is no
+    // SPA "#root" mount node anymore. Anchor the focused scan on the pheno
+    // page container (already asserted visible before this runs).
+    const root = document.querySelector('[data-testid="pheno-comparison-page"]');
+    if (!root)
+      throw new Error("Pheno accessibility check requires the pheno-comparison-page container.");
 
     const axe = (
       window as typeof window & {

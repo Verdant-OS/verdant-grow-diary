@@ -1,5 +1,8 @@
 import { defineConfig, type Plugin } from "vitest/config";
-import react from "@vitejs/plugin-react-swc";
+// The TanStack Start stack ships `@vitejs/plugin-react` (Babel), not the SWC
+// variant the old Vite + React Router setup used. Importing the SWC plugin
+// here made every `vitest run` fail to load its config.
+import react from "@vitejs/plugin-react";
 import path from "path";
 
 /**

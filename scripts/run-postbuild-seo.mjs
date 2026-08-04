@@ -57,10 +57,32 @@ function artifactsPresent() {
   return existsSync(join(distDir, "seo-manifest.json")) && countHtmlDocuments(distDir) > 0;
 }
 
+function reportServerBundleProbe() {
+  // Print the probe table from the runner too, so the postbuild log shows which
+  // server-bundle locations were checked and how the expected path was derived
+  // even when the capture step exits before its own output is flushed.
+  const probe = probeServerBundleEntry(distDir, process.env["SEO_SERVER_BUNDLE_ENTRY"]);
+  const report = formatServerBundleProbe(probe, "run-postbuild-seo/server-bundle");
+  if (probe.entry) {
+    console.log(report);
+  } else {
+    console.error(report);
+    console.error(
+      "run-postbuild-seo/server-bundle: set SEO_SERVER_BUNDLE_ENTRY=<path to index.mjs> to override, " +
+        "or re-run the build so the SSR bundle is emitted before the postbuild SEO stage.",
+    );
+  }
+  return probe;
+}
+
 function generateArtifacts() {
   run("bun", [resolve("scripts/generate-seo-artifacts.ts"), distDir]);
-  run("node", [resolve("scripts/capture-ssr-head-snapshots-with-server.mjs"), distDir]);
+  const probe = reportServerBundleProbe();
+  const captureArgs = [resolve("scripts/capture-ssr-head-snapshots-with-server.mjs"), distDir];
+  if (probe.entry) captureArgs.push(probe.entry);
+  run("node", captureArgs);
 }
+
 
 generateArtifacts();
 

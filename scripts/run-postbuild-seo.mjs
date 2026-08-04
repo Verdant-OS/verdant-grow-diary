@@ -21,6 +21,11 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
+import {
+  formatServerBundleProbe,
+  probeServerBundleEntry,
+} from "./lib/serverBundleEntryProbe.mjs";
+
 
 const distDir = resolve(process.argv[2] ?? "dist");
 

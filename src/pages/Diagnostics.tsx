@@ -12,6 +12,7 @@ import { useEvidenceCoverage } from "@/hooks/useEvidenceCoverage";
 import { BuildInfoPanel } from "@/components/BuildInfoPanel";
 import { ResourceHealthPanel } from "@/components/ResourceHealthPanel";
 import { LocalDataHealthPanel } from "@/components/LocalDataHealthPanel";
+import { AnalyticsDiagnosticsPanel } from "@/components/AnalyticsDiagnosticsPanel";
 
 type CheckStatus = "pending" | "running" | "pass" | "fail" | "skip";
 
@@ -191,6 +192,8 @@ export default function Diagnostics() {
       <ResourceHealthPanel />
 
       <LocalDataHealthPanel />
+
+      <AnalyticsDiagnosticsPanel />
 
       <Button onClick={runAll} disabled={running}>
         {running ? "Running…" : "Run checks"}

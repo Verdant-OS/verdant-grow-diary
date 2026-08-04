@@ -11,6 +11,7 @@ on:
 jobs:
   verify:
     name: Adopt #690 and reconcile #691 → #692 atomically
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 703 }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -39,6 +40,58 @@ jobs:
           set -euo pipefail
           git config user.name "Verdant Stack Maintenance"
           git config user.email "stack-maintenance@users.noreply.github.com"
+
+          normalize_mcp_edge_imports() {
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from "node:fs";
+
+          const files = [
+            {
+              path: "src/lib/sensorTruthCanon.ts",
+              replacements: [
+                ['from "@/constants/sensorTiming";', 'from "../constants/sensorTiming";'],
+                ['from "@/lib/sensorLiveMembership";', 'from "./sensorLiveMembership";'],
+              ],
+            },
+            {
+              path: "src/lib/sensor/sensorSnapshotFreshnessRules.ts",
+              replacements: [
+                ['from "@/lib/sensorTruthCanon";', 'from "../sensorTruthCanon";'],
+              ],
+            },
+          ];
+
+          for (const file of files) {
+            let source = readFileSync(file.path, "utf8");
+            for (const [from, to] of file.replacements) {
+              source = source.replaceAll(from, to);
+            }
+            writeFileSync(file.path, source);
+          }
+
+          const forbidden = [
+            "@/constants/sensorTiming",
+            "@/lib/sensorLiveMembership",
+            "@/lib/sensorTruthCanon",
+          ];
+          const residuals = files.flatMap(({ path }) => {
+            const source = readFileSync(path, "utf8");
+            return forbidden
+              .filter((token) => source.includes(token))
+              .map((token) => `${path}: ${token}`);
+          });
+          if (residuals.length > 0) {
+            throw new Error(`Unresolved MCP Edge import alias(es):\n${residuals.join("\n")}`);
+          }
+          NODE
+          }
+
+          capture_generated_mcp_bundle() {
+            git add supabase/functions/mcp/index.ts
+            if ! git diff --cached --quiet; then
+              git commit --amend --no-edit
+            fi
+          }
 
           git fetch --no-tags origin \
             "refs/heads/${CHILD_BRANCH}:refs/remotes/stack/child" \
@@ -76,8 +129,11 @@ jobs:
           fi
           test -z "$(git diff --name-only --diff-filter=U)"
           git checkout refs/remotes/stack/prereq -- .github/workflows/edge-shared-sync.yml
+          normalize_mcp_edge_imports
           node scripts/sync-edge-shared.mjs
           git add .github/workflows/edge-shared-sync.yml \
+            src/lib/sensorTruthCanon.ts \
+            src/lib/sensor/sensorSnapshotFreshnessRules.ts \
             supabase/functions/_shared/lib supabase/functions/*/*.ts
           git diff --cached --check
           git commit -m "chore(stack): adopt shared Vitest and postbuild prerequisite"
@@ -92,6 +148,8 @@ jobs:
             src/test/sensor-truth-canon.test.ts \
             --reporter=dot
           bun run build
+          capture_generated_mcp_bundle
+          parent_final="$(git rev-parse HEAD)"
           git reset --hard "$parent_final"
           test -z "$(git status --porcelain)"
 
@@ -130,8 +188,11 @@ jobs:
             src/test/router-harness-memory-router.test.tsx \
             src/test/ssr-head-snapshot-paths.test.ts \
             src/test/vitest-config-react-plugin-contract.test.ts
+          normalize_mcp_edge_imports
           node scripts/sync-edge-shared.mjs
           git add .github/workflows/edge-shared-sync.yml src/lib/react-router-compat.tsx \
+            src/lib/sensorTruthCanon.ts \
+            src/lib/sensor/sensorSnapshotFreshnessRules.ts \
             vitest.config.ts scripts/capture-ssr-head-snapshots-with-server.mjs \
             scripts/ssr-head-snapshot-paths.mjs src/test/helpers/reactRouterCompat.vitest.tsx \
             src/test/router-harness-memory-router.test.tsx \
@@ -152,6 +213,8 @@ jobs:
             src/test/sensor-source-rules.test.ts \
             --reporter=dot
           bun run build
+          capture_generated_mcp_bundle
+          child_final="$(git rev-parse HEAD)"
           git reset --hard "$child_final"
           test -z "$(git status --porcelain)"
 

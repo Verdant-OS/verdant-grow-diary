@@ -594,8 +594,8 @@ jobs:
   # `test` job so the whole suite (~21k tests, jsdom-heavy) doesn't exceed the
   # 20-minute job timeout when run on a single runner.
   #
-  # 8 shards run on independent 16 GB runners; each covers ~1/8 of the files
-  # (~200) via vitest's hash-based file distribution. Measured on Linux/Node 20
+  # 16 shards run on independent 16 GB runners; each covers ~1/16 of the files
+  # via vitest's hash-based file distribution. Raised from 8 after #697 OOM. Measured on Linux/Node 20
   # at the cap below, a shard runs the vitest step in ~90s — well under the
   # 20-minute job timeout even with checkout + install + ripgrep setup — with
   # peak worker heap far below the ceiling.
@@ -614,15 +614,15 @@ jobs:
   # `fail-fast: false` so one shard failing still reports the others.
   # See docs/testing/ci-full-suite-shards.md.
   full-suite:
-    name: Full test suite (shard ${{ matrix.shard }}/8)
+    name: Full test suite (shard ${{ matrix.shard }}/16)
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 25
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -656,4 +656,4 @@ jobs:
           # worker alone approached the 4GB ceiling (~3.7GB). Sequential isolate
           # keeps total under the 16GB runner without multi-worker multiply.
           NODE_OPTIONS: --max-old-space-size=8192
-        run: bunx vitest run --shard=${{ matrix.shard }}/8 --pool=forks --maxWorkers=1 --isolate
+        run: bunx vitest run --shard=${{ matrix.shard }}/16 --pool=forks --maxWorkers=1 --isolate

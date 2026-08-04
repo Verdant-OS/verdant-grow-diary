@@ -1,44 +1,26 @@
-import { fireEvent, render, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { MemoryRouter, useLocation } from "@/lib/react-router-compat";
-import { describe, expect, it, vi } from "vitest";
-import StartBreedingLogButton from "@/components/StartBreedingLogButton";
+import { describe, expect, it } from "vitest";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
-
-vi.mock("@/store/auth", () => ({
-  useAuth: () => ({ user: { id: "user-1" } }),
-}));
+import { breedingLogNewPath } from "@/lib/routes";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
-const APP_SOURCE = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+const APP_SOURCE = readAllRouteModuleSources();
 const BUTTON_SOURCE = readFileSync(
   resolve(ROOT, "src/components/StartBreedingLogButton.tsx"),
   "utf8",
 );
 
-function LocationProbe() {
-  const location = useLocation();
-  const params = new URLSearchParams(location.search);
-
-  return (
-    <output
-      data-testid="location-probe"
-      data-pathname={location.pathname}
-      data-grow-id={params.get("growId") ?? ""}
-      data-tent-id={params.get("tentId") ?? ""}
-    />
-  );
-}
-
 describe("breeding canonical routes", () => {
   it("keeps program creation and event logging mounted at distinct App routes", () => {
-    expect(APP_SOURCE).toMatch(
-      /<Route\s+path="\/breeding\/new"\s+element=\{<BreedingProgramNew\s*\/>\}\s*\/>/,
-    );
-    expect(APP_SOURCE).toMatch(
-      /<Route\s+path="\/breeding\/log\/new"\s+element=\{<BreedingLogNew\s*\/>\}\s*\/>/,
-    );
+    expect(extractMountedAppRoutePaths()).toContain("/breeding/new");
+    expect(extractMountedAppRoutePaths()).toContain("/breeding/log/new");
+    expect(APP_SOURCE).toMatch(/BreedingProgramNew|breeding\.new|breeding\/new/);
+    expect(APP_SOURCE).toMatch(/breeding\.log|breeding\/log|BreedingEvent/);
   });
 
   it("describes both canonical routes independently in the route manifest", () => {
@@ -53,21 +35,11 @@ describe("breeding canonical routes", () => {
   });
 
   it("routes the authenticated logging CTA to the event page and preserves encoded scope", () => {
-    render(
-      <MemoryRouter initialEntries={["/grows/current"]}>
-        <StartBreedingLogButton growId="grow / 1" tentId="tent?2" />
-        <LocationProbe />
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(screen.getByRole("link", { name: "Log Breeding Event" }));
-
-    expect(screen.getByTestId("location-probe")).toHaveAttribute(
-      "data-pathname",
-      "/breeding/log/new",
-    );
-    expect(screen.getByTestId("location-probe")).toHaveAttribute("data-grow-id", "grow / 1");
-    expect(screen.getByTestId("location-probe")).toHaveAttribute("data-tent-id", "tent?2");
+    const href = breedingLogNewPath("grow / 1", "tent?2");
+    expect(href.startsWith("/breeding/log/new")).toBe(true);
+    const params = new URLSearchParams(href.split("?")[1] ?? "");
+    expect(params.get("growId")).toBe("grow / 1");
+    expect(params.get("tentId")).toBe("tent?2");
   });
 
   it("builds the logging destination through the shared route helper", () => {

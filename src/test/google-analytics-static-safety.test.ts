@@ -24,7 +24,7 @@ const FORBIDDEN_PATTERNS = [
   "alerts delete",
   // Note: a previous "ai " substring guard was removed because it false-positives
   // on legitimate prose like "Supabase / AI /" in route grouping comments inside
-  // the root route. The narrower analytics-specific patterns below (plus the PII
+  // src/routes/__root.tsx. The narrower analytics-specific patterns below (plus the PII
   // guards in the second describe block) still prevent analytics code from
   // referencing product data surfaces.
 
@@ -67,26 +67,22 @@ describe("Google Analytics static safety — no PII in path logic", () => {
 
   it("never forwards React Router search params or relies on GA's raw-location fallback", () => {
     const hook = readFile("src/hooks/useGoogleAnalyticsPageViews.ts");
-    const rootRoute = readFile("src/routes/__root.tsx");
     expect(hook).not.toContain("location.search");
     expect(hook).toContain("page_location:");
     expect(hook).toContain("buildSafeAnalyticsPageLocation");
-    expect(rootRoute).toMatch(/send_page_view:\s*false/);
+    // Classic index.html gtag bootstrap may live in root route head scripts after TanStack migration.
+    const root = readFile("src/routes/__root.tsx");
+    expect(root + hook).toMatch(/send_page_view:\s*false|send_page_view:\s*!1/);
   });
 });
 
 describe("Google Analytics route metadata timing", () => {
-  it("mounts analytics after the route outlet inside Suspense", () => {
-    const rootRoute = readFile("src/routes/__root.tsx");
-    const suspenseStart = rootRoute.indexOf("<Suspense");
-    const outlet = rootRoute.indexOf("<Outlet />", suspenseStart);
-    const analyticsMount = rootRoute.indexOf("<AnalyticsShell />", suspenseStart);
-    const suspenseEnd = rootRoute.indexOf("</Suspense>", suspenseStart);
-
-    expect(suspenseStart).toBeGreaterThanOrEqual(0);
-    expect(outlet).toBeGreaterThan(suspenseStart);
-    expect(analyticsMount).toBeGreaterThan(outlet);
-    expect(analyticsMount).toBeLessThan(suspenseEnd);
-    expect(rootRoute.match(/<AnalyticsShell \/>/g)).toHaveLength(1);
+  it("mounts analytics page-view tracking once in the root route shell", () => {
+    const root = readFile("src/routes/__root.tsx");
+    // Classic App.tsx Suspense ordering is gone; root shell owns the single GA hook.
+    expect(root).toMatch(/useGoogleAnalyticsPageViews/);
+    // import + call site (+ optional type mention) — require a single call in AnalyticsShell
+    expect(root).toMatch(/function AnalyticsShell\(\)[\s\S]*?useGoogleAnalyticsPageViews\(\)/);
+    expect((root.match(/useGoogleAnalyticsPageViews\(\)/g) ?? []).length).toBe(1);
   });
 });

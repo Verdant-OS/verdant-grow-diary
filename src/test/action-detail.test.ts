@@ -1,9 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
-const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+const APP = readAllRouteModuleSources();
 const DETAIL = readFileSync(resolve(ROOT, "src/pages/ActionDetail.tsx"), "utf8");
 
 // Only two RPC-invocation shapes are legitimate in this codebase (see
@@ -33,11 +37,10 @@ function resolveRpcCalls(src: string): Array<{ name: string; argsVar?: string }>
 }
 
 describe("Action Queue detail view", () => {
-  it("registers the /actions/:actionId route in App.tsx", () => {
-    expect(APP).toMatch(/path="\/actions\/:actionId"\s+element=\{<ActionDetail\s*\/>\}/);
-    expect(APP).toMatch(
-      /ActionDetail\s*=\s*lazy\(\(\)\s*=>\s*import\("\.\/pages\/ActionDetail"\)\)/,
-    );
+  it("registers the /actions/:actionId route in file routes", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/actions/:actionId");
+    expect(APP).toMatch(/ActionDetail/);
+    expect(APP).toMatch(/@\/pages\/ActionDetail|pages\/ActionDetail/);
   });
 
   it("uses the useParams actionId from the URL", () => {

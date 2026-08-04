@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- supabase chain mocks */
 /**
  * AI Doctor Session detail (historical, read-only) tests.
  */
@@ -13,6 +14,7 @@ import PlantAiDoctorSessionsPanel from "@/components/PlantAiDoctorSessionsPanel"
 import TentAiDoctorSessionsPanel from "@/components/TentAiDoctorSessionsPanel";
 import type { Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
 import type { AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
+import { readAllRouteModuleSources } from "./helpers/routeManifestSyncHarness";
 
 // Default supabase mock — no rows. Individual tests below re-mock the module.
 vi.mock("@/integrations/supabase/client", () => {
@@ -130,7 +132,7 @@ const PAGE = read("src/pages/AiDoctorSessionDetail.tsx");
 const HOOK = read("src/hooks/use-ai-doctor-sessions.ts");
 const PLANT_PANEL = read("src/components/PlantAiDoctorSessionsPanel.tsx");
 const TENT_PANEL = read("src/components/TentAiDoctorSessionsPanel.tsx");
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 
 describe("AI Doctor Session detail — routing & wiring", () => {
   it("App registers /doctor/sessions/:sessionId route", () => {

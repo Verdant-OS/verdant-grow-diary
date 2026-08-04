@@ -10,11 +10,14 @@
  *    slice (well-known paths still exist and still export the assertion).
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  readRouteModuleSourceForPath,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = process.cwd();
-const APP_TSX = readFileSync(join(ROOT, "src/App.tsx"), "utf8");
 
 const PUBLIC_DEMO_ROUTES = [
   "/pheno-comparison",
@@ -31,12 +34,18 @@ const GATED_ROUTES = [
 ];
 
 function routeBlock(routePath: string): string {
-  // Grab a slice around the route so we can check for a nearby Gate wrapper.
-  const idx = APP_TSX.indexOf(`path="${routePath}"`);
-  expect(idx, `route ${routePath} present in App.tsx`).toBeGreaterThan(-1);
-  const start = Math.max(0, idx - 200);
-  const end = Math.min(APP_TSX.length, idx + 400);
-  return APP_TSX.slice(start, end);
+  expect(extractMountedAppRoutePaths(), `route ${routePath} mounted`).toContain(routePath);
+  const src = readRouteModuleSourceForPath(routePath);
+  expect(src, `route module for ${routePath}`).toBeTruthy();
+  // Gate may live on the page component imported by the route module.
+  const pageImport = src!.match(/from\s+["']@\/pages\/([^"']+)["']/);
+  if (pageImport) {
+    const pagePath = join(ROOT, "src/pages", `${pageImport[1]}.tsx`);
+    if (existsSync(pagePath)) {
+      return src! + "\n" + readFileSync(pagePath, "utf8");
+    }
+  }
+  return src!;
 }
 
 describe("pheno route safety", () => {
@@ -69,11 +78,8 @@ describe("pheno route safety", () => {
   });
 
   it("RESTRICTIVE RLS enforcement migration is still present", () => {
-    // The enforcement migration references the has_pheno_tracker_entitlement
-    // function. Confirm at least one migration still declares it.
     const glob = readFileSync(join(ROOT, "supabase/config.toml"), "utf8");
     expect(glob.length).toBeGreaterThan(0);
-    // Cheap grep across migrations dir.
     const migrationsDir = join(ROOT, "supabase/migrations");
     const files = readdirSync(migrationsDir).filter((f) => f.endsWith(".sql"));
     const found = files.some((f) =>

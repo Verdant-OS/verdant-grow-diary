@@ -2,7 +2,7 @@
  * Grows index page — read-only browse with link to /grows/:growId.
  *
  * Asserts:
- *  - /grows route exists in App.tsx
+ *  - /grows route exists in file routes
  *  - Page queries grows via Supabase (through useGrows / GrowsProvider)
  *  - Each card links to /grows/:growId
  *  - Empty / error / loading states render
@@ -11,17 +11,22 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
-const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+const APP = readAllRouteModuleSources();
 const PAGE = readFileSync(resolve(ROOT, "src/pages/Grows.tsx"), "utf8");
 const STORE = readFileSync(resolve(ROOT, "src/store/grows.tsx"), "utf8");
 const COMBINED = PAGE + "\n" + STORE;
 
 describe("Grows index page", () => {
-  it("registers /grows route in App.tsx", () => {
-    expect(APP).toMatch(/path="\/grows"\s+element=\{<Grows\s*\/>\}/);
-    expect(APP).toMatch(/import\(\s*["']\.\/pages\/Grows["']\s*\)/);
+  it("registers /grows route in file routes", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/grows");
+    expect(APP).toMatch(/Grows/);
+    expect(APP).toMatch(/@\/pages\/Grows|pages\/Grows/);
   });
 
   it("queries grows via Supabase (provider + RLS)", () => {

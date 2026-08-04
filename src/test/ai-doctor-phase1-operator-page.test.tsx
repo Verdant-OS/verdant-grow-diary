@@ -172,7 +172,7 @@ describe("OperatorAiDoctorPhase1 — page + routing", () => {
 
 describe("Operator Mode navigation — AI Doctor Results", () => {
   const SIDEBAR_SRC = readFileSync(resolve(__dirname, "../components/AppSidebar.tsx"), "utf8");
-  const APP_SRC = readFileSync(resolve(__dirname, "../App.tsx"), "utf8");
+  const APP_SRC = readAllRouteModuleSources();
 
   it("sidebar exposes 'AI Doctor Results' linking to the new route", () => {
     expect(SIDEBAR_SRC).toMatch(/AI Doctor Results/);
@@ -225,6 +225,7 @@ describe("static safety — OperatorAiDoctorPhase1 page", () => {
 // ---------------------------------------------------------------------------
 
 import { mapPlantsToPickerOptions } from "@/pages/OperatorAiDoctorPhase1";
+import { readAllRouteModuleSources } from "./helpers/routeManifestSyncHarness";
 
 describe("OperatorAiDoctorPhase1 — deep link enrichment", () => {
   const ENRICHED: AiDoctorPhase1PlantOption[] = [

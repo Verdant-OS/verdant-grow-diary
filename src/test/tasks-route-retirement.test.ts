@@ -3,11 +3,16 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
 import { stripSourceComments } from "./utils/stripSourceComments";
+import {
+  extractMountedAppRoutePaths,
+  getRouteAliasRedirectTarget,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (path: string) => readFileSync(resolve(ROOT, path), "utf8");
 
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 const SIDEBAR = stripSourceComments(read("src/components/AppSidebar.tsx"));
 const MOBILE_NAV = stripSourceComments(read("src/components/MobileNav.tsx"));
 const GLOBAL_SEARCH = stripSourceComments(read("src/lib/globalSearchItems.ts"));
@@ -18,7 +23,8 @@ const ROBOTS = read("public/robots.txt");
 
 describe("retired standalone Tasks surface", () => {
   it("keeps /tasks as a context-preserving alias to the approval-required Action Queue", () => {
-    expect(APP).toMatch(/path="\/tasks"\s+element=\{<RouteAliasRedirect\s+to="\/actions"\s*\/>\}/);
+    expect(extractMountedAppRoutePaths()).toContain("/tasks");
+    expect(getRouteAliasRedirectTarget("/tasks")).toBe("/actions");
     expect(APP).not.toMatch(/import\(\s*["']\.\/pages\/Tasks["']\s*\)/);
 
     expect(APP_ROUTES.find((route) => route.path === "/tasks")).toMatchObject({

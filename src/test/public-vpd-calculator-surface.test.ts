@@ -1,12 +1,16 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 function read(path: string): string {
   return readFileSync(resolve(process.cwd(), path), "utf8");
 }
 
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 const MANIFEST = read("src/lib/appRouteManifest.ts");
 const PAGE = read("src/pages/PublicVpdCalculator.tsx");
 const RULES = read("src/lib/publicVpdCalculatorRules.ts");
@@ -25,7 +29,7 @@ const SIGNUP_SNAPSHOT = read(
 
 describe("public VPD acquisition surface", () => {
   it("is public, crawlable, linked from VPD content, and runtime-smoked", () => {
-    expect(APP).toContain('path="/tools/vpd-calculator"');
+    expect(extractMountedAppRoutePaths()).toContain("/tools/vpd-calculator");
     expect(MANIFEST).toMatch(/path: "\/tools\/vpd-calculator",\s+access: "public"/);
     expect(GUIDE).toContain('to="/tools/vpd-calculator"');
     expect(GUIDE_INDEX).toContain('to="/tools/vpd-calculator"');

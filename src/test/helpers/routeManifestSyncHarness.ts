@@ -17,7 +17,7 @@
  * mismatches when they are detectable from the manifest data alone.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { APP_ROUTES, type AppRouteAccess, type AppRouteEntry } from "@/lib/appRouteManifest";
 
 const REPO_ROOT = resolve(__dirname, "..", "..", "..");
@@ -27,6 +27,7 @@ const ROUTES_DIR = resolve(REPO_ROOT, "src/routes");
 export const APP_TSX_PATH = resolve(REPO_ROOT, "src/App.tsx");
 
 const CREATE_FILE_ROUTE_RE = /createFileRoute\(\s*["']([^"']+)["']\s*\)/g;
+const ALIAS_REDIRECT_TO_RE = /RouteAliasRedirect\s+to=["']([^"']+)["']/;
 
 /**
  * Pathless layout route ids — not URL destinations in the Classic manifest.
@@ -86,7 +87,12 @@ function listRouteTsxFiles(dir: string): string[] {
       out.push(full);
     }
   }
-  return out;
+  return out.sort();
+}
+
+/** Absolute paths of every route module under src/routes (excluding __root). */
+export function listRouteModuleFiles(routesDir: string = ROUTES_DIR): string[] {
+  return listRouteTsxFiles(routesDir);
 }
 
 /** Read every createFileRoute("…") id under src/routes. */
@@ -102,14 +108,67 @@ export function extractTanstackRouteIds(routesDir: string = ROUTES_DIR): string[
 }
 
 /**
+ * Concatenate all route module sources (plus __root) for static greps that
+ * formerly scanned Classic App.tsx (imports, redirect components, etc.).
+ */
+export function readAllRouteModuleSources(routesDir: string = ROUTES_DIR): string {
+  const parts: string[] = [];
+  const rootFile = join(routesDir, "__root.tsx");
+  try {
+    parts.push(readFileSync(rootFile, "utf8"));
+  } catch {
+    /* optional */
+  }
+  for (const file of listRouteTsxFiles(routesDir)) {
+    const rel = relative(REPO_ROOT, file).replace(/\\/g, "/");
+    parts.push(`\n/* === ${rel} === */\n`);
+    parts.push(readFileSync(file, "utf8"));
+  }
+  return parts.join("");
+}
+
+/**
+ * Source of the route module that owns a Classic path, or null if unmapped.
+ */
+export function readRouteModuleSourceForPath(
+  classicPath: string,
+  routesDir: string = ROUTES_DIR,
+): string | null {
+  for (const file of listRouteTsxFiles(routesDir)) {
+    const src = readFileSync(file, "utf8");
+    for (const match of src.matchAll(CREATE_FILE_ROUTE_RE)) {
+      if (tanstackRouteIdToClassicPath(match[1]) === classicPath) {
+        return src;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * If the route module for classicPath is a RouteAliasRedirect, return its `to`
+ * target. Otherwise null.
+ */
+export function getRouteAliasRedirectTarget(classicPath: string): string | null {
+  const src = readRouteModuleSourceForPath(classicPath);
+  if (!src) return null;
+  const m = src.match(ALIAS_REDIRECT_TO_RE);
+  return m?.[1] ?? null;
+}
+
+/** True if Classic path is mounted in the file-route tree. */
+export function isRouteMounted(classicPath: string): boolean {
+  return extractMountedAppRoutePaths().includes(classicPath);
+}
+
+/**
  * @deprecated Use extractMountedAppRoutePaths (now file-route based).
  * Kept for call sites that still import the Classic name.
  */
 export function readAppTsxSource(): string {
-  throw new Error(
-    "readAppTsxSource() is retired: src/App.tsx no longer exists. " +
-      "Use extractMountedAppRoutePaths() / extractTanstackRouteIds() instead.",
-  );
+  // Compatibility: return concatenated route sources so legacy scanners that
+  // still call this after a partial rewire do not crash mid-suite.
+  return readAllRouteModuleSources();
 }
 
 /**
@@ -220,6 +279,20 @@ export function getMountedOperatorPaths(appSource?: string): string[] {
 export function isMountedUnderOperatorLayout(classicPath: string): boolean {
   for (const id of extractTanstackRouteIds()) {
     if (!id.startsWith("/_app/_operator/")) continue;
+    const mapped = tanstackRouteIdToClassicPath(id);
+    if (mapped === classicPath) return true;
+  }
+  return false;
+}
+
+/**
+ * True when the classic path is served under the /_app layout (auth shell)
+ * but not under /_app/_operator.
+ */
+export function isMountedUnderAppShell(classicPath: string): boolean {
+  for (const id of extractTanstackRouteIds()) {
+    if (!id.startsWith("/_app/")) continue;
+    if (id.startsWith("/_app/_operator")) continue;
     const mapped = tanstackRouteIdToClassicPath(id);
     if (mapped === classicPath) return true;
   }

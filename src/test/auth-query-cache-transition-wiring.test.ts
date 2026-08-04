@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { readAllRouteModuleSources } from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
-const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+const APP = readAllRouteModuleSources();
 const AUTH = readFileSync(resolve(ROOT, "src/store/auth.tsx"), "utf8").replace(/\r\n?/g, "\n");
 
 describe("auth identity query-cache transition fence", () => {

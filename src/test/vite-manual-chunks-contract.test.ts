@@ -96,7 +96,7 @@ describe("vite manualChunks — leaf libraries stay split", () => {
 
 describe("vite manualChunks — app source is never forced into a vendor chunk", () => {
   const APP_IDS = [
-    "/Users/x/project/src/App.tsx",
+    "/Users/x/project/src/routes/__root.tsx",
     "/Users/x/project/src/pages/Dashboard.tsx",
     "/Users/x/project/src/lib/build/manualChunks.ts",
     "C:\\project\\src\\components\\AppShell.tsx",

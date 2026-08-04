@@ -232,6 +232,11 @@ export const AUTHENTICATED_CORE_CENSUS_ROUTES = [
     fieldPolicy: "audit-only",
   },
   {
+    path: "/settings/analytics",
+    label: "Analytics consent",
+    fieldPolicy: "audit-only",
+  },
+  {
     path: "/account/preferences",
     label: "Account preferences",
     fieldPolicy: "audit-only",

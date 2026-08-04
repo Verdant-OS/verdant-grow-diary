@@ -11,22 +11,36 @@ const CAPTURE_SCRIPT = readFileSync(
   "utf8",
 );
 const POSTBUILD_RUNNER = readFileSync(resolve(ROOT, "scripts/run-postbuild-seo.mjs"), "utf8");
+const PROBE_MODULE = readFileSync(resolve(ROOT, "scripts/lib/serverBundleEntryProbe.mjs"), "utf8");
 const NITRO_SERVER_ENTRY = ".output/server/index.mjs";
 const CAPTURE_COMMAND = `node scripts/capture-ssr-head-snapshots-with-server.mjs dist ${NITRO_SERVER_ENTRY}`;
 
+// The server bundle is no longer located by a hard-coded path: both the
+// postbuild runner and the capture script resolve it through the shared
+// scripts/lib/serverBundleEntryProbe.mjs (explicit override -> nitro.json ->
+// wrangler.json -> conventional layouts). These assertions pin that contract
+// so a regeneration or refactor cannot silently revert to a hard-coded or
+// retired bundle path, while the canonical Nitro entry stays the default for
+// the standalone command and a probe candidate.
 describe("SEO postbuild SSR snapshot wiring", () => {
-  it("routes postbuild through the SEO runner that captures via Nitro", () => {
+  it("routes postbuild through the SEO runner that captures via the probed server bundle", () => {
     expect(PACKAGE.scripts.postbuild).toContain("scripts/run-postbuild-seo.mjs");
     expect(POSTBUILD_RUNNER).toContain("capture-ssr-head-snapshots-with-server.mjs");
-    expect(POSTBUILD_RUNNER).toContain('resolve(".output/server/index.mjs")');
+    expect(POSTBUILD_RUNNER).toContain("probeServerBundleEntry");
+    expect(POSTBUILD_RUNNER).toContain("./lib/serverBundleEntryProbe.mjs");
   });
 
-  it("keeps the standalone snapshot command on the same server bundle", () => {
+  it("keeps the standalone snapshot command on the canonical Nitro server bundle", () => {
     expect(PACKAGE.scripts["seo:snapshots"]).toBe(CAPTURE_COMMAND);
   });
 
-  it("uses the explicit server bundle argument instead of the retired dist/server path", () => {
-    expect(CAPTURE_SCRIPT).toContain('process.argv[3] ?? ".output/server/index.mjs"');
+  it("resolves the server bundle through the shared probe with the explicit argument honored", () => {
+    expect(CAPTURE_SCRIPT).toContain("probeServerBundleEntry(distDir, process.argv[3])");
+    expect(CAPTURE_SCRIPT).toContain("./lib/serverBundleEntryProbe.mjs");
     expect(CAPTURE_SCRIPT).not.toContain('join(distDir, "server", "index.mjs")');
+  });
+
+  it("keeps the canonical Nitro entry as a probe candidate", () => {
+    expect(PROBE_MODULE).toContain(NITRO_SERVER_ENTRY);
   });
 });

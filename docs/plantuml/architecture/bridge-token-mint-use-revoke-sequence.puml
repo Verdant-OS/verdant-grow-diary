@@ -1,0 +1,153 @@
+@startuml bridge_token_mint_use_revoke
+!include ../style.puml
+
+title Bridge token trust chain: mint / use / revoke\nSource: mint-bridge-token, sensor-ingest-webhook, revoke-bridge-token
+
+actor "Grower" as Grower <<human>>
+participant "mint-bridge-token\nverify_jwt = true" as Mint
+participant "Entitlement\nliveSensors" as Ent
+database "tents" as Tents
+database "bridge_tokens\nhash only" as BT
+participant "Bridge\n(headless)" as Bridge
+participant "sensor-ingest-webhook\nverify_jwt = false\nallowJwt: false" as Ingest
+participant "authenticateBearer\nSHA-256 lookup" as Auth
+database "sensor_readings\nservice_role" as SR
+participant "bump_bridge_token_usage" as Bump
+database "sensor_ingest_audit_log" as Audit
+participant "revoke-bridge-token\nverify_jwt = true" as Revoke
+
+== 1. Mint (grower user JWT) ==
+
+group Mint
+  Grower -> Mint : Authorization: Bearer <user JWT>\nPOST { tent_id, name?, ttl_days? }
+  activate Mint
+  Mint -> Mint : auth.getClaims → userId\n(body plan never read)
+  Mint -> Ent : requireLiveSensorEntitlement(userId)
+  alt upgrade_required
+    Ent --> Mint : liveSensors false
+    Mint --> Grower : 403 upgrade_required
+  else entitlement_lookup_failed
+    Ent --> Mint : lookup fail
+    Mint --> Grower : 503 entitlement_lookup_failed
+  else ok
+    Ent --> Mint : ok
+    Mint -> Tents : select id, user_id
+    alt not owner
+      Mint --> Grower : 403 forbidden_tent
+    else owner
+      Mint -> Mint : 32 random bytes\ncrypto.getRandomValues
+      Mint -> Mint : plaintext = "vbt_" + base64url(rand)
+      Mint -> Mint : token_hash = SHA-256(plaintext)\ntoken_prefix = plaintext[0..12]
+      Mint -> BT : INSERT hash + prefix +\nuser_id, tent_id, expires_at\n(NO plaintext column)
+      Mint --> Grower : 200 { token: "vbt_…" **once**, record }
+      note right of Grower
+        Plaintext returned **once**.
+        Server stores SHA-256 hash only.
+      end note
+    end
+  end
+  deactivate Mint
+end
+
+== 2. Use (headless Bearer vbt_ only) ==
+
+group Live ingest
+  Bridge -> Ingest : Authorization: Bearer "vbt_…"\nPOST readings
+  activate Ingest
+  note over Ingest
+    verify_jwt = false at gateway
+    does **not** mean public writes.
+    Handler requires bridge token
+    (allowJwt: false).
+  end note
+
+  Ingest -> Auth : authenticateBearer(raw, allowJwt: false)
+  activate Auth
+  Auth -> Auth : must start with "vbt_"\nelse 403 bridge_required
+  Auth -> Auth : SHA-256(raw) → token_hash
+  Auth -> BT : lookup by token_hash (service_role)
+  alt revoked_at set
+    Auth --> Ingest : token_revoked
+    Ingest --> Bridge : 401 token_revoked
+  else expires_at <= now
+    Auth --> Ingest : token_expired
+    Ingest --> Bridge : 401 token_expired
+  else active
+    Auth --> Ingest : kind=bridge\n(userId, tentScope, tokenId)
+  end
+  deactivate Auth
+
+  Ingest -> Ent : re-check liveSensors\n(token ≠ billing authority)
+  alt not entitled
+    Ingest --> Bridge : 403 upgrade_required\nor 503 entitlement_lookup_failed
+  else entitled
+    Ingest -> Ingest : normalize payload\n(**body user_id ignored**)
+    Ingest -> Ingest : tentScopeMatches\nelse 403 forbidden_tent
+    Ingest -> Ingest : freshness window\n30 minutes server clock
+
+    alt timestamp stale
+      Ingest --> Bridge : 200 accepted:false\ninserted:0\nreason timestamp_stale\n**zero live writes**
+      note right of Ingest
+        No AI Doctor.
+        No alert creation.
+        No Action Queue write.
+        No automation.
+        No device control
+        on this path.
+      end note
+    else fresh
+      Ingest -> SR : upsert service_role\nowner = auth.userId
+      alt insert error
+        Ingest --> Bridge : 400 insert_failed\n(sanitized reason)
+      else ok
+        SR --> Ingest : insertedCount,\nskipped_duplicate
+        opt insertedCount > 0
+          Ingest -> Bump : rpc bump_bridge_token_usage
+          note right of Bump
+            Duplicate-only requests
+            do **not** bump usage.
+          end note
+        end
+        Ingest -> Audit : best-effort insert\n(never fails ingest)
+        Ingest --> Bridge : 200 inserted /\nskipped_duplicate
+      end
+    end
+  end
+  deactivate Ingest
+end
+
+== 3. Revoke (grower user JWT, one-way) ==
+
+group Revoke
+  Grower -> Revoke : Bearer <user JWT>\nPOST { id }
+  activate Revoke
+  Revoke -> Revoke : getClaims → userId
+  Revoke -> BT : UPDATE revoked_at\nWHERE id AND user_id\nAND revoked_at IS NULL
+  alt row updated
+    Revoke --> Grower : 200 { ok: true }
+  else already revoked
+    Revoke --> Grower : 200 { ok: true,\nalready_revoked: true }
+  else missing
+    Revoke --> Grower : 404 not_found
+  end
+  note over BT, Revoke
+    Revoked → Active is **forbidden**.
+    One-way revoked_at (handler + DB guard).
+  end note
+  deactivate Revoke
+end
+
+... later ...
+Bridge -> Ingest : Bearer "vbt_…" (revoked)
+Ingest --> Bridge : 401 token_revoked
+
+legend right
+  |= Fact |= Representation |
+  | Prefix | vbt_… placeholder only |
+  | Mint/revoke JWT | verify_jwt = true |
+  | Ingest | verify_jwt = false + allowJwt: false |
+  | Storage | SHA-256 hash + prefix |
+  | Usage | only when insertedCount > 0 |
+endlegend
+
+@enduml

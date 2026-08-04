@@ -141,6 +141,8 @@ export function validateOgCardDimensions(distDir) {
   }
 
   const seen = new Set();
+  /** encoding label -> card files using it, for the consistency assertion. */
+  const encodings = new Map();
   let checked = 0;
 
   for (const document of documents) {
@@ -253,7 +255,7 @@ if (invokedDirectly) {
     fail(`build output directory missing at ${distDir}. Run \`bun run build\` first.`);
   }
 
-  const { ok, checked, total, problems } = validateOgCardDimensions(distDir);
+  const { ok, checked, total, problems, encodings } = validateOgCardDimensions(distDir);
 
   if (!ok) {
     fail(`${problems.length} OG card problem(s) in ${distDir}:\n  - ` + problems.join("\n  - "));
@@ -261,6 +263,7 @@ if (invokedDirectly) {
 
   console.log(
     `assert-og-card-dimensions: OK — ${checked}/${total} OG card(s) present at ` +
-      `${EXPECTED_OG_WIDTH}×${EXPECTED_OG_HEIGHT}.`,
+      `${EXPECTED_OG_WIDTH}×${EXPECTED_OG_HEIGHT}, all encoded as ` +
+      `${Object.keys(encodings).join(", ") || "(none)"}.`,
   );
 }

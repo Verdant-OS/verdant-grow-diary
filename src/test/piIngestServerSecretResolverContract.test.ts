@@ -106,7 +106,10 @@ describe("pi-ingest server secret resolver — repo guardrails", () => {
   });
 
   it("no PI_INGEST_SECRET_KEY env reads anywhere in src/", () => {
-    const files = listTsFilesCached(resolve(ROOT, "src")).filter((p) => p !== SELF);
+    // Product/source only — src/test may mention the env name in titles/regexes.
+    const files = listTsFilesCached(resolve(ROOT, "src")).filter(
+      (p) => p !== SELF && !p.replace(/\\/g, "/").includes("/src/test/"),
+    );
     for (const f of files) {
       const text = readFileCached(f);
       expect(text, `env read in ${f}`).not.toMatch(

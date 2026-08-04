@@ -36,8 +36,8 @@ const PRIVATE_TABLES = [
 
 describe("/hardware-integrations route", () => {
   it("is registered as a public route", () => {
-    // Page is code-split (React.lazy dynamic import) rather than eagerly imported.
-    expect(APP).toMatch(/import\(\s*["']\.\/pages\/HardwareIntegrations["']\s*\)/);
+    // TanStack file routes mount pages via static @/pages imports (not React.lazy).
+    expect(APP).toMatch(/from\s+["']@\/pages\/HardwareIntegrations["']/);
     expect(extractMountedAppRoutePaths()).toContain("/hardware-integrations");
     expect(APP).toMatch(/HardwareIntegrations/);
   });

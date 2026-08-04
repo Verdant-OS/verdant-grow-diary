@@ -140,6 +140,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   },
   { path: "/diagnostics", access: "operator" },
   {
+    path: "/diagnostics-seo-artifacts",
+    access: "operator",
+    description:
+      "Operator diagnostics: whether seo-manifest.json and generated static route documents exist in the current build output.",
+  },
+  {
     path: "/diary/environment-summary",
     access: "auth",
     description: "Environment summary report (diary).",

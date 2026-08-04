@@ -39,8 +39,9 @@ vi.mock("@/integrations/supabase/client", () => {
   };
 });
 
+const toastSpy = vi.fn();
 vi.mock("@/components/ui/use-toast", () => ({
-  useToast: () => ({ toast: vi.fn() }),
+  useToast: () => ({ toast: toastSpy }),
 }));
 
 const FORBIDDEN_LEAK_TERMS = [
@@ -58,17 +59,24 @@ const FORBIDDEN_LEAK_TERMS = [
   "service_role",
 ];
 
+// Plaintext-token SHAPE (bridge audit gap G6): the metadata list may render
+// the short non-secret prefix ("vbt_" + 8 chars), but a full token body must
+// never reach the DOM outside the deliberate one-time reveal box.
+const PLAINTEXT_TOKEN_SHAPE = /vbt_[A-Za-z0-9_-]{16,}/;
+
 function assertNoLeaks() {
   const body = document.body.textContent ?? "";
   for (const term of FORBIDDEN_LEAK_TERMS) {
     expect(body).not.toContain(term);
   }
+  expect(body).not.toMatch(PLAINTEXT_TOKEN_SHAPE);
 }
 
 describe("TentBridgeTokensCard — page integration safety", () => {
   beforeEach(() => {
     bridgeTokensSelectSpy.mockReset();
     fromSpy.mockReset();
+    toastSpy.mockReset();
   });
 
   it("non-UUID fixture tent id ('t1') never queries bridge_tokens", async () => {
@@ -117,6 +125,28 @@ describe("TentBridgeTokensCard — page integration safety", () => {
     });
     render(<TentBridgeTokensCard tentId="22222222-2222-2222-2222-222222222222" />);
     await screen.findByText(/esp32-shelf-1/);
+    assertNoLeaks();
+  });
+
+  it("mint failure toasts fixed calm copy, never server-controlled text", async () => {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const POISON = "PostgrestError: insert on bridge_tokens blocked vbt_stolenTokenValue123456";
+    vi.mocked(supabase.functions.invoke).mockResolvedValueOnce({
+      data: { ok: false, error: "insert_failed", detail: POISON },
+      error: { message: POISON } as never,
+    } as never);
+    render(<TentBridgeTokensCard tentId="22222222-2222-2222-2222-222222222222" />);
+    await waitFor(() => expect(screen.queryByText(/Loading/i)).not.toBeInTheDocument());
+
+    screen.getByTestId("mint-bridge-token-btn").click();
+    await waitFor(() =>
+      expect(toastSpy).toHaveBeenCalledWith(expect.objectContaining({ title: "Mint failed" })),
+    );
+    const toastArgs = JSON.stringify(toastSpy.mock.calls);
+    expect(toastArgs).not.toContain(POISON);
+    expect(toastArgs).not.toContain("PostgrestError");
+    expect(toastArgs).not.toMatch(PLAINTEXT_TOKEN_SHAPE);
+    expect(toastArgs).toContain("The token could not be saved");
     assertNoLeaks();
   });
 });

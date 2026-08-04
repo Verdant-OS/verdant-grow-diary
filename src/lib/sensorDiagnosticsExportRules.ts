@@ -48,6 +48,16 @@ function redactTokens(input: string): string {
   return input.replace(TOKEN_PATTERN, "<redacted>");
 }
 
+/**
+ * On-screen twin of the export redaction (bridge audit gap G6): server
+ * response bodies rendered in the DOM must pass through this, exactly like
+ * the export builders — a token-echoing or malicious response must never
+ * put a vbt_-shaped string on screen.
+ */
+export function redactedResponseBodyJson(body: unknown): string {
+  return redactTokens(JSON.stringify(body, null, 2) ?? "null");
+}
+
 export function buildDiagnosticsExport(input: DiagnosticsExportInput): DiagnosticsExportInput {
   // Re-shape into a plain object so callers can't accidentally extend with
   // a reveal field; also drops any prototype pollution surface.
@@ -381,17 +391,31 @@ export interface PowerShellCopyWarningState {
  * will embed it. Operators must explicitly confirm before copying so the
  * snippet does not get pasted into tickets, chats, screenshots, or git.
  */
-export function buildPowerShellCopyWarningState(input: {
+/**
+ * Generic confirm-before-copy gate for ANY artifact that embeds the
+ * one-time token while the reveal is in memory (bridge audit gap G6: curl
+ * and the listener snippet previously copied the real token silently).
+ */
+export function buildTokenEmbeddingCopyWarningState(input: {
   hasTokenReveal: boolean;
+  artifactLabel: string;
 }): PowerShellCopyWarningState {
   if (input.hasTokenReveal) {
     return {
       requiresConfirmation: true,
-      message:
-        "This PowerShell script includes a one-time bridge token. Do not paste it into tickets, chats, screenshots, or shared docs. Continue copying?",
+      message: `This ${input.artifactLabel} includes a one-time bridge token. Do not paste it into tickets, chats, screenshots, or shared docs. Continue copying?`,
     };
   }
   return { requiresConfirmation: false, message: "" };
+}
+
+export function buildPowerShellCopyWarningState(input: {
+  hasTokenReveal: boolean;
+}): PowerShellCopyWarningState {
+  return buildTokenEmbeddingCopyWarningState({
+    hasTokenReveal: input.hasTokenReveal,
+    artifactLabel: "PowerShell script",
+  });
 }
 
 // ---------------------------------------------------------------------------

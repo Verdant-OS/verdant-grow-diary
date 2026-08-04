@@ -78,7 +78,6 @@ import {
   buildCanonicalSensorIngestUrl,
   buildSensorIngestNetworkDiagnostics,
   buildDownloadFilename,
-  buildPowerShellCopyWarningState,
   buildPowerShellIngestTestScript,
   buildRedactedPayloadPreview,
   buildSafeResponseInspector,
@@ -97,6 +96,8 @@ import {
   buildSensorDiagnosticsRunHistoryEntry,
   buildSensorDiagnosticsRunHistoryFilename,
   buildSensorIngestVerifyCommands,
+  buildTokenEmbeddingCopyWarningState,
+  redactedResponseBodyJson,
   sensorDiagnosticsRunHistoryToJson,
   trimSensorDiagnosticsRunHistory,
   type SensorDiagnosticsRunHistoryEntry,
@@ -376,15 +377,33 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     });
   }, []);
 
-  const powershell = useMemo(
+  // On-screen snippet is ALWAYS placeholder-only (bridge audit gap G6): the
+  // one-time reveal box is the single DOM location where the plaintext may
+  // appear. The real token is embedded only at copy time, behind an
+  // explicit confirmation.
+  const powershellDisplay = useMemo(
     () =>
       buildEcowittPowerShellSnippet({
         tentId,
-        bridgeTokenPlaintext: reveal,
+        bridgeTokenPlaintext: null,
         ingestUrl: INGEST_URL,
       }),
-    [tentId, reveal],
+    [tentId],
   );
+
+  /** Confirm-before-copy gate shared by every token-embedding artifact. */
+  function confirmTokenEmbeddingCopy(artifactLabel: string): boolean {
+    const warning = buildTokenEmbeddingCopyWarningState({
+      hasTokenReveal: !!reveal,
+      artifactLabel,
+    });
+    if (!warning.requiresConfirmation) return true;
+    const confirmFn =
+      typeof window !== "undefined" && typeof window.confirm === "function"
+        ? window.confirm.bind(window)
+        : null;
+    return !!confirmFn && confirmFn(warning.message);
+  }
 
   async function mint() {
     if (!tentId) return;
@@ -556,7 +575,16 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
   }
 
   async function copyPowerShell() {
-    await safeCopy(powershell, "PowerShell snippet");
+    // The copied listener snippet (unlike the placeholder-only display)
+    // embeds the revealed token — same confirmation gate as the other
+    // token-embedding artifacts.
+    if (!confirmTokenEmbeddingCopy("PowerShell listener config")) return;
+    const cmd = buildEcowittPowerShellSnippet({
+      tentId,
+      bridgeTokenPlaintext: reveal,
+      ingestUrl: INGEST_URL,
+    });
+    await safeCopy(cmd, "PowerShell snippet");
   }
 
   function downloadNetworkDiagnosticsJson() {
@@ -628,6 +656,9 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
   }
 
   async function copyCurl() {
+    // Same confirm gate as the PowerShell paths: the copied command embeds
+    // the revealed token (previously it copied silently — audit gap G6).
+    if (!confirmTokenEmbeddingCopy("curl command")) return;
     const cmd = buildSensorIngestCurl({
       ingestUrl: INGEST_URL,
       tentId,
@@ -642,14 +673,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     // Warn-and-confirm only when the one-time token reveal is in memory —
     // the script will embed the real token. If reveal is absent the
     // snippet is already token-free and copies without prompting.
-    const warning = buildPowerShellCopyWarningState({ hasTokenReveal: !!reveal });
-    if (warning.requiresConfirmation) {
-      const confirmFn =
-        typeof window !== "undefined" && typeof window.confirm === "function"
-          ? window.confirm.bind(window)
-          : null;
-      if (!confirmFn || !confirmFn(warning.message)) return;
-    }
+    if (!confirmTokenEmbeddingCopy("PowerShell ingest script")) return;
     const cmd = buildPowerShellIngestTestScript({
       ingestUrl: INGEST_URL,
       tentId,
@@ -994,12 +1018,22 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             role="alert"
             data-testid="sensors-testbench-token-reveal"
           >
-            <div className="text-xs font-medium mb-1">New token — shown once, copy now</div>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="text-xs font-medium">New token — shown once, copy now</div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setReveal(null)}
+                data-testid="sensors-testbench-token-dismiss"
+              >
+                Dismiss
+              </Button>
+            </div>
             <code className="text-xs break-all select-all">{reveal}</code>
             <p className="text-[11px] text-muted-foreground mt-1 flex items-start gap-1">
               <ShieldAlert className="size-3 mt-0.5 shrink-0" />
               Do not paste this token into chats, screenshots, or git. If it leaks, revoke it from
-              the tent detail page.
+              the tent detail page. Dismiss clears it from this page.
             </p>
           </div>
         )}
@@ -1016,8 +1050,12 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           className="text-[11px] bg-muted/40 rounded p-2 overflow-x-auto whitespace-pre"
           data-testid="sensors-testbench-powershell"
         >
-          {powershell}
+          {powershellDisplay}
         </pre>
+        <p className="text-[11px] text-muted-foreground mt-1">
+          The preview above never shows your token. Copy embeds the revealed token (with a
+          confirmation) while the one-time reveal is on screen.
+        </p>
         <p className="text-[11px] text-muted-foreground mt-2">
           EcoWitt gateway settings: <strong>Protocol</strong> Ecowitt · <strong>Host</strong> your
           PC IP · <strong>Port</strong> 8787 · <strong>Path</strong> /ecowitt. Tent:{" "}
@@ -1067,7 +1105,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
               {resultClass.detail}
             </div>
             <pre className="bg-muted/40 rounded p-2 overflow-x-auto whitespace-pre-wrap break-words">
-              {JSON.stringify(result.body, null, 2)}
+              {redactedResponseBodyJson(result.body)}
             </pre>
           </div>
         )}
@@ -1619,7 +1657,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
                       response body
                     </summary>
                     <pre className="bg-muted/40 rounded p-2 mt-1 overflow-x-auto whitespace-pre-wrap break-words">
-                      {JSON.stringify(h.body, null, 2)}
+                      {redactedResponseBodyJson(h.body)}
                     </pre>
                   </details>
                 </li>

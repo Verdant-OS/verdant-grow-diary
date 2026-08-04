@@ -163,7 +163,7 @@ Any failure **stops**. Later steps do not run.
 | Billing cannot be read | **503** | `entitlement_lookup_failed` |
 | Bad JSON or payload | **400** | `invalid_json` / `invalid_payload` |
 | Tent does not match token | **403** | `forbidden_tent` |
-| Reading older than 30 minutes | **200** | `accepted: false`, `inserted: 0`, reason `timestamp_stale` — **no write** |
+| Reading older than 30 minutes | **200** | `accepted:false`, `inserted: 0`, reason `timestamp_stale` — **no write** |
 | DB insert fails | **400** | `insert_failed` (sanitized) |
 | Happy path | **200** | `inserted` + `skipped_duplicate` |
 

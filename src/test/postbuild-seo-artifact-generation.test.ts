@@ -84,6 +84,86 @@ describe("postbuild SEO artifact generation", () => {
     expect(statSync(homeCard).size).toBeGreaterThan(0);
   });
 
+  it("writes a non-empty OG card for every manifest document", () => {
+    const manifest = readManifest();
+    const missing: string[] = [];
+    const empty: string[] = [];
+
+    for (const document of manifest.documents) {
+      const canonicalPath = new URL(document.metadata.url).pathname;
+      const cardPath = join(distDir, "client/og", `${ogImageSlugForPath(canonicalPath)}.png`);
+      if (!existsSync(cardPath)) {
+        missing.push(`${document.path} -> ${cardPath}`);
+        continue;
+      }
+      // A truncated/failed resvg render still writes a file; require real bytes.
+      if (statSync(cardPath).size < 1024) empty.push(`${document.path} -> ${cardPath}`);
+    }
+
+    expect(missing).toEqual([]);
+    expect(empty).toEqual([]);
+  });
+
+  it("declares a relative .html output document for every manifest entry", () => {
+    const manifest = readManifest();
+    for (const document of manifest.documents) {
+      expect(document.fileName.startsWith("/")).toBe(false);
+      expect(document.fileName).toMatch(/\.html$/);
+    }
+    const fileNames = manifest.documents.map((document) => document.fileName);
+    expect(new Set(fileNames).size).toBe(fileNames.length);
+  });
+
+  it("does not let the head-fidelity validator pass while the static route documents are absent", async () => {
+    const { validateDist } = (await import(
+      "../../scripts/validate-static-route-head-fidelity.mjs"
+    )) as {
+      validateDist: (dir: string) => {
+        ok: boolean;
+        issues: string[];
+        report: { totals: { routes: number; missingFiles: number } } | null;
+      };
+    };
+
+    const manifest = readManifest();
+    const { ok, issues, report } = validateDist(distDir);
+
+    expect(ok).toBe(false);
+    expect(report?.totals.routes).toBe(manifest.documents.length);
+    expect(report?.totals.missingFiles).toBe(manifest.documents.length);
+    expect(issues.join("\n")).toContain("expected pre-rendered file");
+  });
+
+  it("accepts a static route document once its SSR head snapshot is present and non-empty", async () => {
+    const { validateDist } = (await import(
+      "../../scripts/validate-static-route-head-fidelity.mjs"
+    )) as {
+      validateDist: (dir: string) => {
+        report: { routes: Array<{ path: string; missing?: boolean }> } | null;
+      };
+    };
+
+    const manifest = readManifest();
+    const target = manifest.documents[0];
+    const snapshotDir = mkdtempSync(join(tmpdir(), "verdant-seo-snapshot-"));
+    try {
+      writeFileSync(
+        join(snapshotDir, "seo-manifest.json"),
+        JSON.stringify({ origin: manifest.origin, documents: [target] }),
+      );
+      const snapshotPath = join(snapshotDir, target.fileName);
+      mkdirSync(dirname(snapshotPath), { recursive: true });
+      writeFileSync(snapshotPath, renderHeadSnapshot(target));
+
+      expect(statSync(snapshotPath).size).toBeGreaterThan(0);
+      const route = validateDist(snapshotDir).report?.routes[0];
+      expect(route?.path).toBe(target.path);
+      expect(route?.missing).not.toBe(true);
+    } finally {
+      rmSync(snapshotDir, { recursive: true, force: true });
+    }
+  });
+
   it("passes the manifest precondition gate against the generated dist", () => {
     const output = run("node", [assertScript, distDir]);
     expect(output).toContain("assert-seo-manifest-present: OK");

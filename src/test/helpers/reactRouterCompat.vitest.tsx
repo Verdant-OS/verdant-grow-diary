@@ -27,6 +27,7 @@ import {
   createContext,
   forwardRef,
   isValidElement,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -166,21 +167,27 @@ export function useNavigate(): CompatNavigateFunction {
   const navigate = useTanStackNavigate();
   const router = useRouter();
 
-  return ((to: CompatTo | number, options?: CompatNavigateOptions) => {
-    if (typeof to === "number") {
-      if (to === 0) return;
-      // TanStack's history exposes go/back/forward; -1 is the common case.
-      if (to < 0) router.history.back();
-      else router.history.forward();
-      return;
-    }
-    void navigate({
-      to: flattenTo(to),
-      replace: options?.replace ?? false,
-      ...(options?.state !== undefined ? { state: options.state as never } : {}),
-      resetScroll: options?.preventScrollReset !== true,
-    } as never);
-  }) as CompatNavigateFunction;
+  // Stable identity: a fresh function every render re-fires product effects that
+  // list `navigate` in their dep arrays (e.g. GlobalSearchDialog auth gate) and
+  // can cascade into max-update-depth / Vitest OOM under jsdom.
+  return useCallback(
+    ((to: CompatTo | number, options?: CompatNavigateOptions) => {
+      if (typeof to === "number") {
+        if (to === 0) return;
+        // TanStack's history exposes go/back/forward; -1 is the common case.
+        if (to < 0) router.history.back();
+        else router.history.forward();
+        return;
+      }
+      void navigate({
+        to: flattenTo(to),
+        replace: options?.replace ?? false,
+        ...(options?.state !== undefined ? { state: options.state as never } : {}),
+        resetScroll: options?.preventScrollReset !== true,
+      } as never);
+    }) as CompatNavigateFunction,
+    [navigate, router],
+  );
 }
 
 export interface CompatLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> {

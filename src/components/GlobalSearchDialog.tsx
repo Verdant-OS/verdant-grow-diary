@@ -205,10 +205,16 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     [results, enabledTypes],
   );
 
-  // Reset pagination whenever the query, filters, or new results arrive.
+  // Reset pagination whenever the query, filters, or result *contents* change.
+  // Depend on length + id signature — not `results` array identity — so a
+  // referentially-new empty array from a render-scoped mock cannot re-fire this
+  // effect forever.
+  const resultsSyncKey = `${results.length}:${results
+    .map((r) => `${r.entity_type}:${r.id}`)
+    .join(",")}`;
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE);
-  }, [query, results, enabledTypes]);
+  }, [query, resultsSyncKey, enabledTypes]);
 
   const visibleResults = useMemo(
     () => filteredResults.slice(0, visibleCount),
@@ -247,7 +253,15 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     if (!previewRow) return;
     const entry = { entity_type: previewRow.entity_type, id: previewRow.id };
     writeGlobalSearchLastSelected(entry);
-    setLastSelected({ ...entry, ts: Date.now() });
+    // Bail when only the timestamp would change — a fresh `{...entry, ts}` every
+    // time re-triggers the preview-sync effect (depends on lastSelected) and can
+    // spin a render loop under unstable result identities.
+    setLastSelected((prev) => {
+      if (prev && prev.id === entry.id && prev.entity_type === entry.entity_type) {
+        return prev;
+      }
+      return { ...entry, ts: Date.now() };
+    });
   }, [previewRow]);
 
   const grouped = useMemo(() => {

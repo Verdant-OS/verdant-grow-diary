@@ -13,6 +13,16 @@ const authMock = vi.hoisted(() => ({
   user: null as { id: string } | null,
 }));
 
+/** Stable empty-search payload — a fresh `results: []` each render retriggers
+ *  GlobalSearchDialog effects that depend on `results` identity and OOMs the
+ *  full Vitest worker (see CI gate shard OOM on this file). */
+const globalSearchMock = vi.hoisted(() => ({
+  results: [] as unknown[],
+  isLoading: false,
+  isError: false,
+  retry: vi.fn(),
+}));
+
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({
     loading: authMock.loading,
@@ -23,12 +33,7 @@ vi.mock("@/store/auth", () => ({
 }));
 
 vi.mock("@/hooks/useGlobalSearch", () => ({
-  useGlobalSearch: () => ({
-    results: [],
-    isLoading: false,
-    isError: false,
-    retry: vi.fn(),
-  }),
+  useGlobalSearch: () => globalSearchMock,
 }));
 
 const visitedLocations: Array<{ key: string; value: string }> = [];

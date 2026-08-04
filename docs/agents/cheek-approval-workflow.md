@@ -327,19 +327,39 @@ applies_to_prs:
 
 ## 12. Flow diagrams
 
-Diagrams use **GitHub-flavored Mermaid** fenced code blocks. In Markdown source
-they must look like this (language tag `mermaid` on the opening fence):
+### Mermaid code block syntax (required)
 
-````markdown
+GitHub and most Markdown previews only render a chart when the fence language
+tag is exactly `mermaid`.
+
+**Correct** (this is a real Mermaid fence — it should render as a tiny chart):
+
 ```mermaid
 flowchart TB
   A["Start"] --> B["End"]
 ```
-````
 
-Do **not** use a plain ` ``` ` fence without the `mermaid` language tag, or
-GitHub will show source instead of a rendered chart. Labels with spaces,
-punctuation, or `?` should be wrapped in double quotes inside the diagram.
+**Incorrect** (shows as plain code, not a chart):
+
+- Opening fence with **no** language tag
+- Fence tagged `text`, `js`, or anything other than `mermaid`
+- Opening fence indented under a list (keep ` ```mermaid ` at column 0)
+
+**Authoring rules used in this section:**
+
+| Rule | Form |
+|------|------|
+| Opening fence | ` ```mermaid ` alone on a line |
+| First line inside fence | `flowchart TB` or `flowchart LR` |
+| Node with spaces | `A["Cheek approval"]` |
+| Decision node | `Q{"Security FAIL?"}` |
+| Edge | `A --> B` or `A -->|yes| B` |
+| Subgraph | `subgraph id["Title"]` … `end` |
+| Closing fence | ` ``` ` alone on a line |
+| Labels | Double-quoted; no HTML `<br/>` |
+
+House style matches other repo docs (e.g. `docs/specs/daily-walk-closed-learning-loop.md`).
+§12.1–12.3 are live Mermaid. §12.4 is a plain-text fallback.
 
 ### 12.1 End-to-end agent pipeline to Cheek
 
@@ -450,6 +470,8 @@ flowchart TB
 ```
 
 ### 12.4 Text fallback (decision core only)
+
+For editors that do not render Mermaid:
 
 ```text
   PACKET + CI + security

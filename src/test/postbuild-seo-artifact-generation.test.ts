@@ -27,6 +27,22 @@ import { ogImageSlugForPath } from "@/lib/build/ogImageCard";
 const repoRoot = resolve(__dirname, "../..");
 const generator = join(repoRoot, "scripts/generate-seo-artifacts.ts");
 const assertScript = join(repoRoot, "scripts/assert-seo-manifest-present.mjs");
+const headSnapshotScript = join(repoRoot, "scripts/assert-ssr-head-snapshots-present.mjs");
+
+type HeadSnapshotGateResult = {
+  ok: boolean;
+  checked: number;
+  problems: string[];
+  total?: number;
+};
+
+function importHeadSnapshotGate(): Promise<{
+  validateHeadSnapshots: (distDir: string) => HeadSnapshotGateResult;
+}> {
+  return import("../../scripts/assert-ssr-head-snapshots-present.mjs") as Promise<{
+    validateHeadSnapshots: (distDir: string) => HeadSnapshotGateResult;
+  }>;
+}
 
 type ManifestDocument = {
   path: string;

@@ -694,5 +694,5 @@ jobs:
           for i in 1 2 3 4; do
             n=$(( base + i ))
             echo "Running sub-shard ${n}/128 for gate shard ${{ matrix.shard }}/32"
-            bunx vitest run --shard=${n}/128 --pool=forks --maxWorkers=1 --isolate
+            bunx vitest run --shard=${n}/128 --pool=forks --maxWorkers=1 --isolate --passWithNoTests
           done

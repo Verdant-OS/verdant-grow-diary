@@ -22,6 +22,7 @@ ROLE DOCUMENTS
 OPERATING STATE
   docs/agents/CURRENT_STATE.md   the changing shift report
   docs/agents/HANDOFF_PROTOCOL.md  handoff format and rules
+  docs/agents/cheek-approval-workflow.md  Cheek ship-authority decision workflow
 
 HISTORICAL — never active instructions
   docs/archive/legacy/verdant-master-prompt-legacy.md

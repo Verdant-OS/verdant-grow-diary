@@ -5,7 +5,7 @@
  * one result model, one GlobalSearchDialog — no second search system and no
  * client-side fetch-all of private data.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { VERDANT_CULTIVARS } from "@/constants/verdantCultivars";
@@ -27,6 +27,12 @@ export type {
 
 const DEBOUNCE_MS = 200;
 const MAX_RESULTS = 20;
+
+/** Stable empty list — a fresh `[]` each render re-fires dialog effects that
+ *  depend on `results` / derived array identity and can max-update-depth / OOM
+ *  Vitest when GlobalSearchDialog mounts under pages that also subscribe to
+ *  the router (e.g. CultivarsIndex + useSearchParams). */
+const EMPTY_RESULTS: GlobalSearchResult[] = [];
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -69,22 +75,28 @@ export function useGlobalSearch(query: string): UseGlobalSearchReturn {
   // stay available even if the private RPC is loading or fails — a private
   // failure must never be presented as a verified empty result.
   const cultivarResults = useMemo(
-    () => (enabled ? searchCultivarReferences(VERDANT_CULTIVARS, debounced, MAX_RESULTS) : []),
+    () =>
+      enabled ? searchCultivarReferences(VERDANT_CULTIVARS, debounced, MAX_RESULTS) : EMPTY_RESULTS,
     [enabled, debounced],
   );
 
-  const results = useMemo(
-    () => mergeGlobalSearchResults(data ?? [], cultivarResults),
+  const mergedResults = useMemo(
+    () => mergeGlobalSearchResults(data ?? EMPTY_RESULTS, cultivarResults),
     [data, cultivarResults],
   );
 
+  // When the query is empty, return a stable empty reference — not a fresh `[]`.
+  const results = enabled ? mergedResults : EMPTY_RESULTS;
+
+  const retry = useCallback(() => {
+    if (enabled) void refetch();
+  }, [enabled, refetch]);
+
   return {
-    results: enabled ? results : [],
+    results,
     // Show loading while debouncing a non-empty query, or while fetching.
     isLoading: enabled && (isLoading || isFetching || trimmed !== debounced),
     isError,
-    retry: () => {
-      if (enabled) void refetch();
-    },
+    retry,
   };
 }

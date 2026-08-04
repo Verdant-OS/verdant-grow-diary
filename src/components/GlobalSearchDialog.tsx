@@ -114,6 +114,11 @@ function routeFor(row: GlobalSearchResult): string {
 const INITIAL_VISIBLE = 10;
 const PAGE_SIZE = 10;
 
+/** Content signature for result rows — prefer over array identity in effect deps. */
+function resultsContentKey(rows: readonly GlobalSearchResult[]): string {
+  return `${rows.length}:${rows.map((r) => `${r.entity_type}:${r.id}`).join(",")}`;
+}
+
 export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -209,9 +214,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   // Depend on length + id signature — not `results` array identity — so a
   // referentially-new empty array from a render-scoped mock cannot re-fire this
   // effect forever.
-  const resultsSyncKey = `${results.length}:${results
-    .map((r) => `${r.entity_type}:${r.id}`)
-    .join(",")}`;
+  const resultsSyncKey = resultsContentKey(results);
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE);
   }, [query, resultsSyncKey, enabledTypes]);
@@ -221,12 +224,19 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     [filteredResults, visibleCount],
   );
 
+  // Content keys (not array / object identity) so unstable empty `results: []`
+  // from mocks or accidental fresh arrays cannot re-fire preview sync forever.
+  const visibleSyncKey = resultsContentKey(visibleResults);
+  const lastSelectedKey = lastSelected ? `${lastSelected.entity_type}:${lastSelected.id}` : "";
+
   // Keep the preview panel in sync: prefer the last-selected row (if still
   // visible), otherwise keep the current selection, otherwise fall back to the
   // first visible result. Clear when nothing is visible.
   useEffect(() => {
     if (visibleResults.length === 0) {
-      setPreviewRow(null);
+      // Functional bail when already null — setPreviewRow(null) is not always
+      // enough to stop a max-update-depth loop under jsdom + unstable deps.
+      setPreviewRow((prev) => (prev == null ? prev : null));
       return;
     }
     setPreviewRow((prev) => {
@@ -244,7 +254,9 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
       }
       return visibleResults[0];
     });
-  }, [visibleResults, lastSelected]);
+    // visibleResults / lastSelected are read inside; content keys gate re-runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- content keys
+  }, [visibleSyncKey, lastSelectedKey]);
 
   // Persist the row the user is previewing so reopening the palette restores
   // it. Only writes when the preview is a real row the user is actively

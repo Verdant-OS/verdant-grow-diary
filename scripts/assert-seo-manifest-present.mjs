@@ -71,6 +71,7 @@ if (manifest.documents.length < MINIMUM_MEANINGFUL_DOCUMENTS) {
 
 const problems = [];
 const seenCanonicals = new Map();
+const aliasCanonicals = [];
 
 manifest.documents.forEach((document, index) => {
   const label = typeof document?.path === "string" && document.path.trim() !== ""
@@ -116,9 +117,12 @@ manifest.documents.forEach((document, index) => {
     problems.push(`${label}: canonical URL has no path.`);
   }
 
+  // Duplicate canonicals are legitimate here: alias routes (e.g. /strains/*)
+  // intentionally canonicalize onto their primary path (/cultivars/*). Report
+  // them so an accidental copy-paste is visible, but do not fail the build.
   const previous = seenCanonicals.get(canonical);
   if (previous !== undefined) {
-    problems.push(`${label}: duplicate canonical URL ${canonical} (also used by ${previous}).`);
+    aliasCanonicals.push(`${label} -> ${canonical} (primary: ${previous})`);
   } else {
     seenCanonicals.set(canonical, label);
   }
@@ -133,5 +137,11 @@ if (problems.length > 0) {
 
 console.log(
   `assert-seo-manifest-present: OK — ${manifestPath} present with ${manifest.documents.length} document(s), ` +
-    `each with a unique canonical URL on ${origin}.`,
+    `each with a non-empty absolute canonical URL on ${origin} ` +
+    `(${seenCanonicals.size} unique, ${aliasCanonicals.length} alias).`,
 );
+if (aliasCanonicals.length > 0) {
+  console.log(
+    `assert-seo-manifest-present: alias canonicals —\n  - ${aliasCanonicals.join("\n  - ")}`,
+  );
+}

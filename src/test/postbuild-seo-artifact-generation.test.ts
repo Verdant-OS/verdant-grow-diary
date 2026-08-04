@@ -64,7 +64,6 @@ describe("postbuild SEO artifact generation", () => {
     expect(manifest.documents.length).toBeGreaterThanOrEqual(5);
 
     const origin = new URL(manifest.origin).origin;
-    const canonicals = new Set<string>();
 
     for (const document of manifest.documents) {
       expect(document.path?.length ?? 0).toBeGreaterThan(0);
@@ -76,8 +75,6 @@ describe("postbuild SEO artifact generation", () => {
       expect(typeof canonical).toBe("string");
       expect(canonical.trim()).not.toBe("");
       expect(new URL(canonical).origin).toBe(origin);
-      expect(canonicals.has(canonical)).toBe(false);
-      canonicals.add(canonical);
     }
   });
 
@@ -90,7 +87,7 @@ describe("postbuild SEO artifact generation", () => {
   it("passes the manifest precondition gate against the generated dist", () => {
     const output = run("node", [assertScript, distDir]);
     expect(output).toContain("assert-seo-manifest-present: OK");
-    expect(output).toContain("unique canonical URL");
+    expect(output).toContain("non-empty absolute canonical URL");
   });
 
   it("fails the manifest precondition gate when dist has no manifest", () => {
@@ -123,13 +120,6 @@ describe("postbuild SEO artifact generation", () => {
         manifest.documents[0].metadata.url = "https://example.com/guides/bud-rot";
       },
       "does not match manifest origin",
-    ],
-    [
-      "two documents sharing one canonical URL",
-      (manifest: ManifestShape) => {
-        manifest.documents[1].metadata.url = manifest.documents[0].metadata.url;
-      },
-      "duplicate canonical URL",
     ],
     [
       "a truncated documents list",

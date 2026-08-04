@@ -7,13 +7,13 @@ runtime migration. Orthogonal to PR #694 (SSR Supabase init).
 
 **Baseline (head `a28cd69`, 2026-08-03):**
 
-| #   | Criterion                                                    | Baseline                                                                                                                                 | Status                         |
-| --- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| C1  | Zero test files open `src/App.tsx`                           | **0 hard reads** (was 79); residual comments only                                                                                        | ✅                             |
-| C2  | `route-manifest-sync` green vs routeTree / routes FS         | Harness rewritten (`routeManifestSyncHarness`); **27/27** tests green on local                                                           | ✅ harness                     |
-| C3  | Operator/sensor guard parity on `_app` + RequireOperatorRole | Layout tests rewritten; sensor/operator suites green                                                                                     | ✅                             |
-| C4  | Full Vitest not dominated by ENOENT App.tsx                  | Hard ENOENT path eliminated in rewired static suites; Vitest MemoryRouter alias landed so render suites no longer die on null `isServer` | ⚠️ local verified; Full CI TBD |
-| C5  | STATE.md Step 9 + prerender decision closed or scheduled     | Step 9 open; prerender deferred undecided                                                                                                | ❌                             |
+| #   | Criterion                                                    | Baseline                                                                                   | Status                                     |
+| --- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------ |
+| C1  | Zero test files open `src/App.tsx`                           | **0 hard reads** (was 79); residual comments only                                          | ✅                                         |
+| C2  | `route-manifest-sync` green vs routeTree / routes FS         | Harness rewritten (`routeManifestSyncHarness`); **27/27** tests green on local             | ✅ harness                                 |
+| C3  | Operator/sensor guard parity on `_app` + RequireOperatorRole | Layout tests rewritten; sensor/operator suites green                                       | ✅                                         |
+| C4  | Full Vitest not dominated by ENOENT App.tsx                  | ENOENT eliminated; MemoryRouter preserves location.state; checkout funnel unit tests green | ⚠️ local green; Full Vitest CI on #699 TBD |
+| C5  | STATE.md Step 9 + prerender decision closed or scheduled     | Step 9 open; prerender **scheduled** in STATE.md (not blocking C1–C4)                      | ⚠️ scheduled                               |
 
 ---
 

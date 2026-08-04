@@ -13,6 +13,9 @@ function Probe() {
   return (
     <div>
       <div data-testid="path">{location.pathname}</div>
+      <div data-testid="state">
+        {location.state === null ? "null" : JSON.stringify(location.state)}
+      </div>
       <Link to="/next">Go next</Link>
       <button type="button" onClick={() => navigate("/via-nav")}>
         Navigate
@@ -41,5 +44,18 @@ describe("Vitest MemoryRouter harness", () => {
     );
     await user.click(screen.getByRole("button", { name: "Navigate" }));
     expect(await screen.findByTestId("path")).toHaveTextContent("/via-nav");
+  });
+
+  it("preserves location.state from initialEntries objects", () => {
+    render(
+      <MemoryRouter
+        initialEntries={[{ pathname: "/marked", state: { verdantCheckoutReturnSurface: "other" } }]}
+      >
+        <Probe />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId("path")).toHaveTextContent("/marked");
+    expect(screen.getByTestId("state")).toHaveTextContent("verdantCheckoutReturnSurface");
+    expect(screen.getByTestId("state")).toHaveTextContent("other");
   });
 });

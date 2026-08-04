@@ -44,14 +44,32 @@ import {
   createRoute,
   createRouter,
   useNavigate as useTanStackNavigate,
+  useParams as useTanStackParams,
   useRouter,
   useRouterState,
 } from "@tanstack/react-router";
 
 export { TanStackOutlet as Outlet };
 
-/** Params contributed by the legacy `<Routes>` matcher for unit tests. */
-const CompatParamsContext = createContext<Record<string, string> | null>(null);
+/**
+ * TanStack stamps internal fields onto history state (`key`, `__TSR_*`,
+ * `__hashScrollIntoViewOptions`, …). React Router exposes user state only
+ * and uses `null` when none remains — strip internals for parity.
+ */
+function isTanStackInternalStateKey(key: string): boolean {
+  return key === "key" || key.startsWith("__");
+}
+
+function compatLocationState(raw: unknown): unknown {
+  if (raw == null) return null;
+  if (typeof raw !== "object" || Array.isArray(raw)) return raw;
+  const rest: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (isTanStackInternalStateKey(k)) continue;
+    rest[k] = v;
+  }
+  return Object.keys(rest).length === 0 ? null : rest;
+}
 
 export interface CompatLocation {
   pathname: string;
@@ -70,12 +88,14 @@ export function useLocation(): CompatLocation {
         pathname: location.pathname,
         search: location.searchStr ?? "",
         hash: location.hash ? `#${location.hash.replace(/^#/, "")}` : "",
-        state: location.state,
+        state: compatLocationState(location.state),
         key: location.href,
       };
     },
   });
 }
+
+const CompatParamsContext = createContext<Record<string, string> | null>(null);
 
 /** react-router `useParams()`. Non-strict so any route can read any param. */
 export function useParams<T extends Record<string, string | undefined>>(): T {
@@ -309,27 +329,43 @@ interface LegacyRouterShellProps {
   future?: Record<string, boolean>;
 }
 
-function normalizeInitialEntries(initialEntries: unknown): string[] {
-  if (!Array.isArray(initialEntries) || initialEntries.length === 0) return ["/"];
+interface NormalizedMemoryEntry {
+  href: string;
+  /** react-router location.state for this entry (may be undefined). */
+  state: unknown;
+}
+
+function normalizeInitialEntries(initialEntries: unknown): NormalizedMemoryEntry[] {
+  if (!Array.isArray(initialEntries) || initialEntries.length === 0) {
+    return [{ href: "/", state: undefined }];
+  }
   return initialEntries.map((entry) => {
     if (typeof entry === "string") {
-      return entry.length > 0 ? entry : "/";
+      return { href: entry.length > 0 ? entry : "/", state: undefined };
     }
     if (entry && typeof entry === "object") {
-      const loc = entry as { pathname?: unknown; search?: unknown; hash?: unknown };
+      const loc = entry as {
+        pathname?: unknown;
+        search?: unknown;
+        hash?: unknown;
+        state?: unknown;
+      };
       const pathname =
         typeof loc.pathname === "string" && loc.pathname.length > 0 ? loc.pathname : "/";
       const rawSearch = typeof loc.search === "string" ? loc.search : "";
       const search = rawSearch ? (rawSearch.startsWith("?") ? rawSearch : `?${rawSearch}`) : "";
       const rawHash = typeof loc.hash === "string" ? loc.hash : "";
       const hash = rawHash ? (rawHash.startsWith("#") ? rawHash : `#${rawHash}`) : "";
-      return `${pathname}${search}${hash}`;
+      return {
+        href: `${pathname}${search}${hash}`,
+        state: "state" in loc ? loc.state : undefined,
+      };
     }
-    return "/";
+    return { href: "/", state: undefined };
   });
 }
 
-function createTestMemoryRouter(initialEntries: string[], initialIndex?: number) {
+function createTestMemoryRouter(entries: NormalizedMemoryEntry[], initialIndex?: number) {
   // Root + index + splat so buildLocation/matchRoute can resolve any path.
   // Route `component`s are unused under RouterContextProvider (we render test
   // children ourselves); they exist only so the route tree is valid for load().
@@ -346,10 +382,21 @@ function createTestMemoryRouter(initialEntries: string[], initialIndex?: number)
     path: "$",
     component: () => null,
   });
+  const hrefs = entries.map((e) => e.href);
+  const index = initialIndex ?? hrefs.length - 1;
   const history = createMemoryHistory({
-    initialEntries,
-    initialIndex: initialIndex ?? initialEntries.length - 1,
+    initialEntries: hrefs,
+    initialIndex: index,
   });
+
+  // createMemoryHistory only accepts string hrefs. Stamp react-router
+  // location.state onto the active entry so hooks that read location.state
+  // (checkout return markers, etc.) see the same payload RR would provide.
+  const active = entries[index];
+  if (active && active.state !== undefined) {
+    history.replace(active.href, active.state);
+  }
+
   return createRouter({
     routeTree: rootRoute.addChildren([indexRoute, splatRoute]),
     history,
@@ -365,16 +412,19 @@ function MemoryRouterProvider({ children, initialEntries, initialIndex }: Legacy
   // Serialize so inline `initialEntries={[...]}` arrays don't rebuild the router
   // on every parent render (would remount the whole tree mid-test).
   const entriesKey = useMemo(
-    () => normalizeInitialEntries(initialEntries).join("\0"),
+    () => JSON.stringify(normalizeInitialEntries(initialEntries)),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by serialized entries
     [JSON.stringify(initialEntries ?? null)],
   );
   const index = typeof initialIndex === "number" ? initialIndex : undefined;
 
-  const router = useMemo(
-    () => createTestMemoryRouter(entriesKey.length > 0 ? entriesKey.split("\0") : ["/"], index),
-    [entriesKey, index],
-  );
+  const router = useMemo(() => {
+    const entries = JSON.parse(entriesKey) as NormalizedMemoryEntry[];
+    return createTestMemoryRouter(
+      entries.length > 0 ? entries : [{ href: "/", state: undefined }],
+      index,
+    );
+  }, [entriesKey, index]);
 
   // Mirror Transitioner's history wiring (see @tanstack/react-router Transitioner):
   //   history.subscribe(router.load) + initial load on mount.
@@ -448,12 +498,12 @@ export function Routes({ children }: { children?: ReactNode }) {
     if (params == null) continue;
     const score = routeMatchScore(pattern);
     if (score > bestScore) {
-      bestScore = score;
       best = route;
       bestParams = params;
+      bestScore = score;
     }
   }
-  if (!best) return null;
+  if (!best?.props.element) return null;
   return (
     <CompatParamsContext.Provider value={bestParams}>
       {best.props.element}

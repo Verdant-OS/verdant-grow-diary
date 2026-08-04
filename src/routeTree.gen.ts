@@ -87,6 +87,7 @@ import { Route as StrainsSlugRouteImport } from './routes/strains.$slug'
 import { Route as ToolsVpdCalculatorRouteImport } from './routes/tools.vpd-calculator'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as AppOperatorDiagnosticsRouteImport } from './routes/_app/_operator/diagnostics'
+import { Route as AppOperatorDiagnosticsSeoArtifactsRouteImport } from './routes/_app/_operator/diagnostics-seo-artifacts'
 import { Route as AppOperatorIngestInspectorRouteImport } from './routes/_app/_operator/ingest-inspector'
 import { Route as AppOperatorLeadsRouteImport } from './routes/_app/_operator/leads'
 import { Route as AppOperatorOneTentLoopProofRouteImport } from './routes/_app/_operator/one-tent-loop-proof'
@@ -542,6 +543,12 @@ const AppOperatorDiagnosticsRoute = AppOperatorDiagnosticsRouteImport.update({
   path: '/diagnostics',
   getParentRoute: () => AppOperatorRoute,
 } as any)
+const AppOperatorDiagnosticsSeoArtifactsRoute =
+  AppOperatorDiagnosticsSeoArtifactsRouteImport.update({
+    id: '/diagnostics-seo-artifacts',
+    path: '/diagnostics-seo-artifacts',
+    getParentRoute: () => AppOperatorRoute,
+  } as any)
 const AppOperatorIngestInspectorRoute =
   AppOperatorIngestInspectorRouteImport.update({
     id: '/ingest-inspector',
@@ -973,6 +980,7 @@ export interface FileRoutesByFullPath {
   '/strains/': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/diagnostics': typeof AppOperatorDiagnosticsRoute
+  '/diagnostics-seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
   '/ingest-inspector': typeof AppOperatorIngestInspectorRoute
   '/leads': typeof AppOperatorLeadsRoute
   '/one-tent-loop-proof': typeof AppOperatorOneTentLoopProofRoute
@@ -1114,6 +1122,7 @@ export interface FileRoutesByTo {
   '/strains': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/diagnostics': typeof AppOperatorDiagnosticsRoute
+  '/diagnostics-seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
   '/ingest-inspector': typeof AppOperatorIngestInspectorRoute
   '/leads': typeof AppOperatorLeadsRoute
   '/one-tent-loop-proof': typeof AppOperatorOneTentLoopProofRoute
@@ -1258,6 +1267,7 @@ export interface FileRoutesById {
   '/strains/': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/_app/_operator/diagnostics': typeof AppOperatorDiagnosticsRoute
+  '/_app/_operator/diagnostics-seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
   '/_app/_operator/ingest-inspector': typeof AppOperatorIngestInspectorRoute
   '/_app/_operator/leads': typeof AppOperatorLeadsRoute
   '/_app/_operator/one-tent-loop-proof': typeof AppOperatorOneTentLoopProofRoute
@@ -1401,6 +1411,7 @@ export interface FileRouteTypes {
     | '/strains/'
     | '/.lovable/oauth/consent'
     | '/diagnostics'
+    | '/diagnostics-seo-artifacts'
     | '/ingest-inspector'
     | '/leads'
     | '/one-tent-loop-proof'
@@ -1542,6 +1553,7 @@ export interface FileRouteTypes {
     | '/strains'
     | '/.lovable/oauth/consent'
     | '/diagnostics'
+    | '/diagnostics-seo-artifacts'
     | '/ingest-inspector'
     | '/leads'
     | '/one-tent-loop-proof'
@@ -1685,6 +1697,7 @@ export interface FileRouteTypes {
     | '/strains/'
     | '/.lovable/oauth/consent'
     | '/_app/_operator/diagnostics'
+    | '/_app/_operator/diagnostics-seo-artifacts'
     | '/_app/_operator/ingest-inspector'
     | '/_app/_operator/leads'
     | '/_app/_operator/one-tent-loop-proof'
@@ -2355,6 +2368,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOperatorDiagnosticsRouteImport
       parentRoute: typeof AppOperatorRoute
     }
+    '/_app/_operator/diagnostics-seo-artifacts': {
+      id: '/_app/_operator/diagnostics-seo-artifacts'
+      path: '/diagnostics-seo-artifacts'
+      fullPath: '/diagnostics-seo-artifacts'
+      preLoaderRoute: typeof AppOperatorDiagnosticsSeoArtifactsRouteImport
+      parentRoute: typeof AppOperatorRoute
+    }
     '/_app/_operator/ingest-inspector': {
       id: '/_app/_operator/ingest-inspector'
       path: '/ingest-inspector'
@@ -2801,6 +2821,7 @@ declare module '@tanstack/react-router' {
 
 interface AppOperatorRouteChildren {
   AppOperatorDiagnosticsRoute: typeof AppOperatorDiagnosticsRoute
+  AppOperatorDiagnosticsSeoArtifactsRoute: typeof AppOperatorDiagnosticsSeoArtifactsRoute
   AppOperatorIngestInspectorRoute: typeof AppOperatorIngestInspectorRoute
   AppOperatorLeadsRoute: typeof AppOperatorLeadsRoute
   AppOperatorOneTentLoopProofRoute: typeof AppOperatorOneTentLoopProofRoute
@@ -2839,6 +2860,8 @@ interface AppOperatorRouteChildren {
 
 const AppOperatorRouteChildren: AppOperatorRouteChildren = {
   AppOperatorDiagnosticsRoute: AppOperatorDiagnosticsRoute,
+  AppOperatorDiagnosticsSeoArtifactsRoute:
+    AppOperatorDiagnosticsSeoArtifactsRoute,
   AppOperatorIngestInspectorRoute: AppOperatorIngestInspectorRoute,
   AppOperatorLeadsRoute: AppOperatorLeadsRoute,
   AppOperatorOneTentLoopProofRoute: AppOperatorOneTentLoopProofRoute,

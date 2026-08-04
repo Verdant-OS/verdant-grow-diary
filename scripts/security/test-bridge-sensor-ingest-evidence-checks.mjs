@@ -116,6 +116,14 @@ const MIGRATION_TAMPERS = {
     (c) =>
       `${c}\nGRANT EXECUTE ON FUNCTION public.bump_bridge_token_usage(UUID, INTEGER) TO authenticated;\n`,
   ],
+  E35: [
+    (c) => c.replace(/RAISE EXCEPTION 'bridge_token revocation is one-way';/g, "-- TAMPERED"),
+    (c) =>
+      c.replace(
+        /RAISE EXCEPTION 'bridge_token usage telemetry is server-maintained';/g,
+        "-- TAMPERED",
+      ),
+  ],
 };
 for (const check of MIGRATION_CHECKS) {
   const tampers = MIGRATION_TAMPERS[check.id];

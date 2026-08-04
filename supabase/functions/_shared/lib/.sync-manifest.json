@@ -25,7 +25,7 @@
     "src/lib/aiDoctorSensorContextRules.ts": "3f070272159b8b2596d4000b52500919ecc21a0e6d6a804fa640f7b7faf3f961",
     "src/lib/aiSensorSnapshotContextRules.ts": "40022508357caaeaa2dfb8369bdf26f740ce81e8421054b4b019ab0bf651bcac",
     "src/lib/billingCustomerLinkCaptureRules.ts": "18de37a055aadeebfc25ca9e0e24530e01789396a10ac56b96eb0c9d9a1d2917",
-    "src/lib/cost/aiDoctorPromptMeasurement.ts": "34c4111fa5bf001931e1270d61a19e14657f023b79d44631dcbb205dba32b769",
+    "src/lib/cost/aiDoctorPromptMeasurement.ts": "251a799ea8c4cbb9db7a8e18978ae31a53d53e99df8485d65bb747da10c06e14",
     "src/lib/cost/aiDoctorProviderResponseMeasurementComposer.ts": "a4aa174a683d4baf14004dcfed1ac5f4431a3c049cbc5c114b7604fc542d3f15",
     "src/lib/cost/aiDoctorProviderResponseUsageExtractor.ts": "f1c9404608cbd9a999d5c37ffbed82ae2f2c85f51c5247ada450a626c5dee5e6",
     "src/lib/cost/aiDoctorProviderUsageMeasurementAdapter.ts": "f6a45a0aceb0de7c1b3297864b4b68db5edb82079de261cd31707ed0bc84388e",

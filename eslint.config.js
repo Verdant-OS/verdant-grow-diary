@@ -34,8 +34,7 @@ export default tseslint.config(
       ],
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
-      // Transitional: product still has residual `any` until Biome (#699) lands.
-      // Keep server-only import fence + hooks rules; demote any/control-regex noise.
+      // Transitional until Biome (#699) owns format/lint noise.
       "@typescript-eslint/no-explicit-any": "off",
       "no-control-regex": "off",
       "@typescript-eslint/ban-ts-comment": "off",
@@ -47,4 +46,10 @@ export default tseslint.config(
     },
   },
   eslintPluginPrettier,
+  {
+    rules: {
+      // Format ownership moves to Biome (#699). Required CI must not fail on prettier nits.
+      "prettier/prettier": "warn",
+    },
+  },
 );

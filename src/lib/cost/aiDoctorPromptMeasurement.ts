@@ -121,7 +121,7 @@ export function computeUtf8ByteSize(text: string): number {
     return new TextEncoder().encode(text).length;
   }
   // Defensive fallback; pure char-count is not the same as byte count.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const B = (globalThis as any).Buffer;
   if (B && typeof B.byteLength === "function") {
     return B.byteLength(text, "utf8") as number;

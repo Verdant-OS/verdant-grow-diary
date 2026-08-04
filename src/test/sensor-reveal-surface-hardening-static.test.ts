@@ -23,6 +23,7 @@ import { resolve } from "node:path";
 import {
   BRIDGE_TOKEN_MINT_FAILED_FALLBACK,
   BRIDGE_TOKEN_REVOKE_FAILED_FALLBACK,
+  extractBridgeFailureCode,
   mintFailureDescription,
   revokeFailureDescription,
 } from "@/lib/bridgeTokenRules";
@@ -76,11 +77,13 @@ describe("SensorsTestbenchPanel — reveal surface hardening (static)", () => {
 });
 
 describe("TentBridgeTokensCard — toast + boundary hardening (static)", () => {
-  it("failure toasts never render server-controlled text", () => {
-    expect(CARD).not.toMatch(/error\??\.message/);
-    expect(CARD).not.toMatch(/data\??\.error\s*\?\?/);
-    expect(CARD).toMatch(/mintFailureDescription\(/);
-    expect(CARD).toMatch(/revokeFailureDescription\(/);
+  it("failure toasts never render server-controlled text (both components)", () => {
+    for (const source of [CARD, PANEL]) {
+      expect(source).not.toMatch(/error\??\.message/);
+      expect(source).not.toMatch(/data\??\.error\s*\?\?/);
+      expect(source).toMatch(/mintFailureDescription\(extractBridgeFailureCode\(/);
+    }
+    expect(CARD).toMatch(/revokeFailureDescription\(extractBridgeFailureCode\(/);
   });
 
   it("never touches storage, IndexedDB, or console", () => {
@@ -105,6 +108,11 @@ describe("bridge token failure copy mappers (pure)", () => {
       null,
       undefined,
       42,
+      // Prototype-chain probes must hit the fallback, not inherited members.
+      "__proto__",
+      "constructor",
+      "hasOwnProperty",
+      "toString",
     ]) {
       expect(mintFailureDescription(hostile)).toBe(BRIDGE_TOKEN_MINT_FAILED_FALLBACK);
       expect(revokeFailureDescription(hostile)).toBe(BRIDGE_TOKEN_REVOKE_FAILED_FALLBACK);
@@ -115,5 +123,33 @@ describe("bridge token failure copy mappers (pure)", () => {
     const hostile = "vbt_reflectedTokenValue1234567890";
     expect(mintFailureDescription(hostile)).not.toContain(hostile);
     expect(revokeFailureDescription(hostile)).not.toContain(hostile);
+  });
+});
+
+describe("extractBridgeFailureCode (pure)", () => {
+  it("prefers a 2xx data.error code", () => {
+    expect(extractBridgeFailureCode(null, { error: "insert_failed" })).toBe("insert_failed");
+  });
+
+  it("reads the code from FunctionsHttpError context (string and object bodies)", () => {
+    expect(
+      extractBridgeFailureCode(
+        { context: { body: JSON.stringify({ error: "upgrade_required" }) } },
+        null,
+      ),
+    ).toBe("upgrade_required");
+    expect(extractBridgeFailureCode({ context: { body: { error: "not_found" } } }, null)).toBe(
+      "not_found",
+    );
+  });
+
+  it("returns null (never throws, never fabricates) on hostile or absent shapes", () => {
+    expect(extractBridgeFailureCode(null, null)).toBeNull();
+    expect(extractBridgeFailureCode({ message: "boom" }, undefined)).toBeNull();
+    expect(extractBridgeFailureCode({ context: { body: "not json {" } }, null)).toBeNull();
+    expect(extractBridgeFailureCode({ context: { body: { error: 42 } } }, null)).toBeNull();
+    expect(
+      extractBridgeFailureCode({ context: { body: 7 } }, { error: { nested: true } }),
+    ).toBeNull();
   });
 });

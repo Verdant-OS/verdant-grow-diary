@@ -95,15 +95,46 @@ export const BRIDGE_TOKEN_MINT_FAILED_FALLBACK = "The token was not created. Try
 export const BRIDGE_TOKEN_REVOKE_FAILED_FALLBACK = "The token was not revoked. Try again shortly.";
 
 export function mintFailureDescription(code: unknown): string {
-  return (
-    (typeof code === "string" ? MINT_FAILURE_COPY[code] : undefined) ??
-    BRIDGE_TOKEN_MINT_FAILED_FALLBACK
-  );
+  // Own-property match only: hostile codes like "__proto__" or
+  // "constructor" must fall through to the fallback, never to inherited
+  // Object.prototype members.
+  if (typeof code === "string" && Object.hasOwn(MINT_FAILURE_COPY, code)) {
+    return MINT_FAILURE_COPY[code];
+  }
+  return BRIDGE_TOKEN_MINT_FAILED_FALLBACK;
 }
 
 export function revokeFailureDescription(code: unknown): string {
-  return (
-    (typeof code === "string" ? REVOKE_FAILURE_COPY[code] : undefined) ??
-    BRIDGE_TOKEN_REVOKE_FAILED_FALLBACK
-  );
+  if (typeof code === "string" && Object.hasOwn(REVOKE_FAILURE_COPY, code)) {
+    return REVOKE_FAILURE_COPY[code];
+  }
+  return BRIDGE_TOKEN_REVOKE_FAILED_FALLBACK;
+}
+
+/**
+ * Extract the edge function's stable reason code from a functions.invoke
+ * failure. Non-2xx responses arrive as FunctionsHttpError with `data: null`
+ * and the JSON body riding on `error.context` (house precedent:
+ * src/lib/customerPortal.ts). Returns the raw code string or null — callers
+ * MUST pass the result through the fixed-copy mappers above and never
+ * render it directly.
+ */
+export function extractBridgeFailureCode(error: unknown, data: unknown): string | null {
+  const dataCode = (data as { error?: unknown } | null | undefined)?.error;
+  if (typeof dataCode === "string") return dataCode;
+  const ctx = (error as { context?: { body?: unknown } } | null | undefined)?.context;
+  const body = ctx?.body;
+  if (typeof body === "string") {
+    try {
+      const parsed = JSON.parse(body) as { error?: unknown };
+      return typeof parsed?.error === "string" ? parsed.error : null;
+    } catch {
+      return null;
+    }
+  }
+  if (body && typeof body === "object") {
+    const code = (body as { error?: unknown }).error;
+    return typeof code === "string" ? code : null;
+  }
+  return null;
 }

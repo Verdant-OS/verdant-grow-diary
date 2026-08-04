@@ -149,4 +149,28 @@ describe("TentBridgeTokensCard — page integration safety", () => {
     expect(toastArgs).toContain("The token could not be saved");
     assertNoLeaks();
   });
+
+  it("FunctionsHttpError (non-2xx, data null) still maps to code-specific calm copy", async () => {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const POISON = "Edge Function returned a non-2xx status code vbt_leakedViaMessage1234567890";
+    vi.mocked(supabase.functions.invoke).mockResolvedValueOnce({
+      data: null,
+      error: {
+        message: POISON,
+        context: { body: JSON.stringify({ error: "upgrade_required" }) },
+      } as never,
+    } as never);
+    render(<TentBridgeTokensCard tentId="22222222-2222-2222-2222-222222222222" />);
+    await waitFor(() => expect(screen.queryByText(/Loading/i)).not.toBeInTheDocument());
+
+    screen.getByTestId("mint-bridge-token-btn").click();
+    await waitFor(() =>
+      expect(toastSpy).toHaveBeenCalledWith(expect.objectContaining({ title: "Mint failed" })),
+    );
+    const toastArgs = JSON.stringify(toastSpy.mock.calls);
+    expect(toastArgs).toContain("paid plan");
+    expect(toastArgs).not.toContain(POISON);
+    expect(toastArgs).not.toMatch(PLAINTEXT_TOKEN_SHAPE);
+    assertNoLeaks();
+  });
 });

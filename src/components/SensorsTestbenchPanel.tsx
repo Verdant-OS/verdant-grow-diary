@@ -60,8 +60,10 @@ import {
   BRIDGE_TOKEN_DEFAULT_TTL_DAYS,
   bridgeTokenStatus,
   clampTtlDays,
+  extractBridgeFailureCode,
   formatIngestCount,
   looksLikeBridgeToken,
+  mintFailureDescription,
   sanitizeTokenName,
   type BridgeTokenRow,
 } from "@/lib/bridgeTokenRules";
@@ -419,9 +421,12 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     });
     setMinting(false);
     if (error || !data?.ok || !looksLikeBridgeToken(data?.token ?? "")) {
+      // Fixed calm copy only (bridge audit gap G6): server/transport error
+      // text never renders on the reveal surface. Non-2xx responses carry
+      // the reason code on error.context, not data.
       toast({
         title: "Mint failed",
-        description: error?.message ?? data?.error ?? "Unknown error",
+        description: mintFailureDescription(extractBridgeFailureCode(error, data)),
         variant: "destructive",
       });
       return;

@@ -153,9 +153,10 @@ branch, never `main`.
 - [ ] [E25] The server ingest window is pinned at **30 minutes**
       (`LIVE_INGEST_FRESHNESS_WINDOW_MS`). Changing this value must update
       this checklist and the evidence lane in the same PR — the value is
-      deliberately load-bearing: the webhook's stale rejection is tied to the
-      `sensor_readings` dedupe uniqueness key (`user_id, tent_id, source,
-  metric, captured_at`), so a window change is never a one-line edit.
+      deliberately load-bearing: the webhook's stale rejection is tied to
+      the `sensor_readings` dedupe uniqueness key
+      `user_id, tent_id, source, metric, captured_at`, so a window change
+      is never a one-line edit.
 - [ ] [runtime: `storageMapping` tests via the webhook vitest suites]
       Per-row provenance is demoted `live -> stale` at the same 30m boundary,
       so replayed packets cannot land as live.

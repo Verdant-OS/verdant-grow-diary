@@ -80,6 +80,10 @@ run("node", [resolve("scripts/assert-seo-manifest-present.mjs"), distDir]);
 // SSR head snapshot on disk, non-empty, and in the expected HTML head shape.
 run("node", [resolve("scripts/assert-ssr-head-snapshots-present.mjs"), distDir]);
 
+// Third precondition gate: every OG card must be a real PNG at the exact
+// declared card resolution — file size alone cannot catch a broken render.
+run("node", [resolve("scripts/assert-og-card-dimensions.mjs"), distDir]);
+
 const validators = [
   ["scripts/check-no-src-lib-imports.mjs", false],
   ["scripts/validate-jsonld-rich-results.mjs", true],

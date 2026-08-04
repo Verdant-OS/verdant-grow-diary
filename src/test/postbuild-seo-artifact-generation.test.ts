@@ -445,3 +445,157 @@ describe("postbuild SEO artifact generation", () => {
   });
 });
 
+
+type OgDimensionGateResult = {
+  ok: boolean;
+  checked: number;
+  total: number;
+  problems: string[];
+};
+
+function importOgDimensionGate(): Promise<{
+  validateOgCardDimensions: (distDir: string) => OgDimensionGateResult;
+  readPngHeader: (buffer: Buffer) => Record<string, unknown>;
+  EXPECTED_OG_WIDTH: number;
+  EXPECTED_OG_HEIGHT: number;
+}> {
+  return import("../../scripts/assert-og-card-dimensions.mjs") as never;
+}
+
+/** Builds a syntactically valid PNG header of the given size, padded past the byte floor. */
+function fakePng(width: number, height: number, bitDepth = 8): Buffer {
+  const header = Buffer.alloc(33);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(header, 0);
+  header.writeUInt32BE(13, 8);
+  header.write("IHDR", 12, "ascii");
+  header.writeUInt32BE(width, 16);
+  header.writeUInt32BE(height, 20);
+  header.writeUInt8(bitDepth, 24);
+  header.writeUInt8(6, 25);
+  return Buffer.concat([header, Buffer.alloc(2048)]);
+}
+
+describe("generated OG cards match the expected image resolution", () => {
+  let ogDistDir = "";
+
+  beforeAll(() => {
+    ogDistDir = mkdtempSync(join(tmpdir(), "verdant-og-dist-"));
+    run("bun", [generator, ogDistDir]);
+  }, 180_000);
+
+  afterAll(() => {
+    if (ogDistDir) rmSync(ogDistDir, { recursive: true, force: true });
+  });
+
+  function readOgManifest(): ManifestShape {
+    return JSON.parse(readFileSync(join(ogDistDir, "seo-manifest.json"), "utf8")) as ManifestShape;
+  }
+
+  it("renders every manifest OG card at exactly 1200x630", async () => {
+    const { validateOgCardDimensions, EXPECTED_OG_WIDTH, EXPECTED_OG_HEIGHT } =
+      await importOgDimensionGate();
+    expect(EXPECTED_OG_WIDTH).toBe(1200);
+    expect(EXPECTED_OG_HEIGHT).toBe(630);
+
+    const result = validateOgCardDimensions(ogDistDir);
+    expect(result.problems).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.checked).toBeGreaterThanOrEqual(5);
+    expect(result.checked).toBe(result.total);
+  });
+
+  it("reads PNG dimensions from the IHDR chunk", async () => {
+    const { readPngHeader } = await importOgDimensionGate();
+    expect(readPngHeader(fakePng(1200, 630))).toMatchObject({
+      ok: true,
+      width: 1200,
+      height: 630,
+      bitDepth: 8,
+    });
+    expect(readPngHeader(Buffer.alloc(64))).toMatchObject({ ok: false });
+    expect(readPngHeader(Buffer.alloc(4))).toMatchObject({ ok: false });
+  });
+
+  it.each([
+    ["a 1x1 placeholder render", fakePng(1, 1), /is 1×1; expected 1200×630/],
+    ["a half-resolution render", fakePng(600, 315), /is 600×315; expected 1200×630/],
+    ["a transposed render", fakePng(630, 1200), /is 630×1200; expected 1200×630/],
+    ["a sub-8-bit render", fakePng(1200, 630, 4), /bit depth is 4/],
+    ["a non-PNG payload", Buffer.alloc(2048, 0x20), /missing PNG signature/],
+    ["a truncated render", Buffer.from("broken"), /bytes \(< 1024\)/],
+  ])("fails the gate for %s", async (_label, bytes, expected) => {
+    const { validateOgCardDimensions } = await importOgDimensionGate();
+    const brokenDir = mkdtempSync(join(tmpdir(), "verdant-og-broken-"));
+    try {
+      const manifest = readOgManifest();
+      writeFileSync(join(brokenDir, "seo-manifest.json"), JSON.stringify(manifest));
+      mkdirSync(join(brokenDir, "client/og"), { recursive: true });
+      for (const document of manifest.documents) {
+        const slug = ogImageSlugForPath(new URL(document.metadata.url).pathname);
+        writeFileSync(join(brokenDir, "client/og", `${slug}.png`), fakePng(1200, 630));
+      }
+      const firstSlug = ogImageSlugForPath(new URL(manifest.documents[0].metadata.url).pathname);
+      writeFileSync(join(brokenDir, "client/og", `${firstSlug}.png`), bytes);
+
+      const result = validateOgCardDimensions(brokenDir);
+      expect(result.ok).toBe(false);
+      expect(result.problems.join("\n")).toMatch(expected);
+    } finally {
+      rmSync(brokenDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails the gate when an OG card is missing entirely", async () => {
+    const { validateOgCardDimensions } = await importOgDimensionGate();
+    const brokenDir = mkdtempSync(join(tmpdir(), "verdant-og-missing-"));
+    try {
+      writeFileSync(
+        join(brokenDir, "seo-manifest.json"),
+        readFileSync(join(ogDistDir, "seo-manifest.json"), "utf8"),
+      );
+      mkdirSync(join(brokenDir, "client/og"), { recursive: true });
+      const result = validateOgCardDimensions(brokenDir);
+      expect(result.ok).toBe(false);
+      expect(result.problems.join("\n")).toMatch(/OG card missing/);
+    } finally {
+      rmSync(brokenDir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not vacuously pass against an empty dist", async () => {
+    const { validateOgCardDimensions } = await importOgDimensionGate();
+    const emptyDir = mkdtempSync(join(tmpdir(), "verdant-og-empty-"));
+    try {
+      const result = validateOgCardDimensions(emptyDir);
+      expect(result.ok).toBe(false);
+      expect(result.checked).toBe(0);
+    } finally {
+      rmSync(emptyDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails the CLI gate with a non-zero exit for a broken render", () => {
+    const brokenDir = mkdtempSync(join(tmpdir(), "verdant-og-cli-"));
+    try {
+      const manifest = readOgManifest();
+      writeFileSync(join(brokenDir, "seo-manifest.json"), JSON.stringify(manifest));
+      mkdirSync(join(brokenDir, "client/og"), { recursive: true });
+      for (const document of manifest.documents) {
+        const slug = ogImageSlugForPath(new URL(document.metadata.url).pathname);
+        writeFileSync(join(brokenDir, "client/og", `${slug}.png`), fakePng(600, 315));
+      }
+
+      let stderr = "";
+      try {
+        run("node", [join(repoRoot, "scripts/assert-og-card-dimensions.mjs"), brokenDir]);
+        throw new Error("expected the OG dimension gate to fail");
+      } catch (error) {
+        stderr = String((error as { stderr?: string }).stderr ?? (error as Error).message);
+      }
+      expect(stderr).toContain("assert-og-card-dimensions: FAIL");
+      expect(stderr).toContain("expected 1200×630");
+    } finally {
+      rmSync(brokenDir, { recursive: true, force: true });
+    }
+  });
+});

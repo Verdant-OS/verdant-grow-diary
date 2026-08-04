@@ -49,6 +49,26 @@ describe("bridge-sensor PlantUML architecture pack", () => {
     expect(puml.sort()).toEqual([...REQUIRED_DIAGRAMS].sort());
   });
 
+  it("README includes expanded text alternatives for all five diagrams", () => {
+    const readme = readFileSync(join(ARCH, "README.md"), "utf8");
+    expect(readme).toMatch(/Text alternatives/i);
+    // One section per diagram topic
+    expect(readme).toMatch(/Mint.*use.*revoke|Mint → use → revoke/i);
+    expect(readme).toMatch(/Verification activity/i);
+    expect(readme).toMatch(/Token lifecycle|lifecycle state/i);
+    expect(readme).toMatch(/Trust-boundary|Trust boundary/i);
+    expect(readme).toMatch(/Sibling isolation/i);
+    // Load-bearing prose (not only diagram source)
+    expect(readme).toMatch(/allowJwt:\s*false|allowJwt: false/);
+    expect(readme).toMatch(/30-minute|30 minutes/);
+    expect(readme).toMatch(/accepted:false/);
+    expect(readme).toMatch(/insertedCount\s*>\s*0/);
+    expect(readme).toMatch(/Do not mix Pi HMAC/i);
+    expect(readme).toMatch(/BLOCKED/);
+    expect(readme).toMatch(/#717|717/);
+    expect(readme).toMatch(/CLOSED|unmerged/i);
+  });
+
   it("each diagram has @startuml/@enduml, relative style include, and a title", () => {
     for (const name of REQUIRED_DIAGRAMS) {
       const text = read(name);

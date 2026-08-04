@@ -111,6 +111,7 @@ import { Route as PhenoHuntsIdCompareRouteImport } from './routes/pheno-hunts.$i
 import { Route as PhenoHuntsIdShowcaseRouteImport } from './routes/pheno-hunts.$id.showcase'
 import { Route as AppOperatorAdminLeadsRouteImport } from './routes/_app/_operator/admin.leads'
 import { Route as AppOperatorDemoOneTentLiveProofRouteImport } from './routes/_app/_operator/demo.one-tent-live-proof'
+import { Route as AppOperatorDiagnosticsSeoArtifactsRouteImport } from './routes/_app/_operator/diagnostics.seo-artifacts'
 import { Route as AppOperatorInternalAiDoctorConfidenceAuditRouteImport } from './routes/_app/_operator/internal.ai-doctor-confidence-audit'
 import { Route as AppOperatorInternalAiDoctorPhase1PreviewRouteImport } from './routes/_app/_operator/internal.ai-doctor-phase1-preview'
 import { Route as AppOperatorInternalOneTentLoopProofRouteImport } from './routes/_app/_operator/internal.one-tent-loop-proof'
@@ -670,6 +671,12 @@ const AppOperatorDemoOneTentLiveProofRoute =
     path: '/demo/one-tent-live-proof',
     getParentRoute: () => AppOperatorRoute,
   } as any)
+const AppOperatorDiagnosticsSeoArtifactsRoute =
+  AppOperatorDiagnosticsSeoArtifactsRouteImport.update({
+    id: '/seo-artifacts',
+    path: '/seo-artifacts',
+    getParentRoute: () => AppOperatorDiagnosticsRoute,
+  } as any)
 const AppOperatorInternalAiDoctorConfidenceAuditRoute =
   AppOperatorInternalAiDoctorConfidenceAuditRouteImport.update({
     id: '/internal/ai-doctor-confidence-audit',
@@ -972,7 +979,7 @@ export interface FileRoutesByFullPath {
   '/guides/': typeof GuidesIndexRoute
   '/strains/': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
-  '/diagnostics': typeof AppOperatorDiagnosticsRoute
+  '/diagnostics': typeof AppOperatorDiagnosticsRouteWithChildren
   '/ingest-inspector': typeof AppOperatorIngestInspectorRoute
   '/leads': typeof AppOperatorLeadsRoute
   '/one-tent-loop-proof': typeof AppOperatorOneTentLoopProofRoute
@@ -997,6 +1004,7 @@ export interface FileRoutesByFullPath {
   '/pheno-hunts/$id/showcase': typeof PhenoHuntsIdShowcaseRoute
   '/admin/leads': typeof AppOperatorAdminLeadsRoute
   '/demo/one-tent-live-proof': typeof AppOperatorDemoOneTentLiveProofRoute
+  '/diagnostics/seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
   '/internal/ai-doctor-confidence-audit': typeof AppOperatorInternalAiDoctorConfidenceAuditRoute
   '/internal/ai-doctor-phase1-preview': typeof AppOperatorInternalAiDoctorPhase1PreviewRoute
   '/internal/one-tent-loop-proof': typeof AppOperatorInternalOneTentLoopProofRoute
@@ -1113,7 +1121,7 @@ export interface FileRoutesByTo {
   '/guides': typeof GuidesIndexRoute
   '/strains': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
-  '/diagnostics': typeof AppOperatorDiagnosticsRoute
+  '/diagnostics': typeof AppOperatorDiagnosticsRouteWithChildren
   '/ingest-inspector': typeof AppOperatorIngestInspectorRoute
   '/leads': typeof AppOperatorLeadsRoute
   '/one-tent-loop-proof': typeof AppOperatorOneTentLoopProofRoute
@@ -1138,6 +1146,7 @@ export interface FileRoutesByTo {
   '/pheno-hunts/$id/showcase': typeof PhenoHuntsIdShowcaseRoute
   '/admin/leads': typeof AppOperatorAdminLeadsRoute
   '/demo/one-tent-live-proof': typeof AppOperatorDemoOneTentLiveProofRoute
+  '/diagnostics/seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
   '/internal/ai-doctor-confidence-audit': typeof AppOperatorInternalAiDoctorConfidenceAuditRoute
   '/internal/ai-doctor-phase1-preview': typeof AppOperatorInternalAiDoctorPhase1PreviewRoute
   '/internal/one-tent-loop-proof': typeof AppOperatorInternalOneTentLoopProofRoute
@@ -1257,7 +1266,7 @@ export interface FileRoutesById {
   '/guides/': typeof GuidesIndexRoute
   '/strains/': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
-  '/_app/_operator/diagnostics': typeof AppOperatorDiagnosticsRoute
+  '/_app/_operator/diagnostics': typeof AppOperatorDiagnosticsRouteWithChildren
   '/_app/_operator/ingest-inspector': typeof AppOperatorIngestInspectorRoute
   '/_app/_operator/leads': typeof AppOperatorLeadsRoute
   '/_app/_operator/one-tent-loop-proof': typeof AppOperatorOneTentLoopProofRoute
@@ -1282,6 +1291,7 @@ export interface FileRoutesById {
   '/pheno-hunts/$id/showcase': typeof PhenoHuntsIdShowcaseRoute
   '/_app/_operator/admin/leads': typeof AppOperatorAdminLeadsRoute
   '/_app/_operator/demo/one-tent-live-proof': typeof AppOperatorDemoOneTentLiveProofRoute
+  '/_app/_operator/diagnostics/seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
   '/_app/_operator/internal/ai-doctor-confidence-audit': typeof AppOperatorInternalAiDoctorConfidenceAuditRoute
   '/_app/_operator/internal/ai-doctor-phase1-preview': typeof AppOperatorInternalAiDoctorPhase1PreviewRoute
   '/_app/_operator/internal/one-tent-loop-proof': typeof AppOperatorInternalOneTentLoopProofRoute
@@ -1425,6 +1435,7 @@ export interface FileRouteTypes {
     | '/pheno-hunts/$id/showcase'
     | '/admin/leads'
     | '/demo/one-tent-live-proof'
+    | '/diagnostics/seo-artifacts'
     | '/internal/ai-doctor-confidence-audit'
     | '/internal/ai-doctor-phase1-preview'
     | '/internal/one-tent-loop-proof'
@@ -1566,6 +1577,7 @@ export interface FileRouteTypes {
     | '/pheno-hunts/$id/showcase'
     | '/admin/leads'
     | '/demo/one-tent-live-proof'
+    | '/diagnostics/seo-artifacts'
     | '/internal/ai-doctor-confidence-audit'
     | '/internal/ai-doctor-phase1-preview'
     | '/internal/one-tent-loop-proof'
@@ -1709,6 +1721,7 @@ export interface FileRouteTypes {
     | '/pheno-hunts/$id/showcase'
     | '/_app/_operator/admin/leads'
     | '/_app/_operator/demo/one-tent-live-proof'
+    | '/_app/_operator/diagnostics/seo-artifacts'
     | '/_app/_operator/internal/ai-doctor-confidence-audit'
     | '/_app/_operator/internal/ai-doctor-phase1-preview'
     | '/_app/_operator/internal/one-tent-loop-proof'
@@ -2523,6 +2536,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOperatorDemoOneTentLiveProofRouteImport
       parentRoute: typeof AppOperatorRoute
     }
+    '/_app/_operator/diagnostics/seo-artifacts': {
+      id: '/_app/_operator/diagnostics/seo-artifacts'
+      path: '/seo-artifacts'
+      fullPath: '/diagnostics/seo-artifacts'
+      preLoaderRoute: typeof AppOperatorDiagnosticsSeoArtifactsRouteImport
+      parentRoute: typeof AppOperatorDiagnosticsRoute
+    }
     '/_app/_operator/internal/ai-doctor-confidence-audit': {
       id: '/_app/_operator/internal/ai-doctor-confidence-audit'
       path: '/internal/ai-doctor-confidence-audit'
@@ -2799,8 +2819,23 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppOperatorDiagnosticsRouteChildren {
+  AppOperatorDiagnosticsSeoArtifactsRoute: typeof AppOperatorDiagnosticsSeoArtifactsRoute
+}
+
+const AppOperatorDiagnosticsRouteChildren: AppOperatorDiagnosticsRouteChildren =
+  {
+    AppOperatorDiagnosticsSeoArtifactsRoute:
+      AppOperatorDiagnosticsSeoArtifactsRoute,
+  }
+
+const AppOperatorDiagnosticsRouteWithChildren =
+  AppOperatorDiagnosticsRoute._addFileChildren(
+    AppOperatorDiagnosticsRouteChildren,
+  )
+
 interface AppOperatorRouteChildren {
-  AppOperatorDiagnosticsRoute: typeof AppOperatorDiagnosticsRoute
+  AppOperatorDiagnosticsRoute: typeof AppOperatorDiagnosticsRouteWithChildren
   AppOperatorIngestInspectorRoute: typeof AppOperatorIngestInspectorRoute
   AppOperatorLeadsRoute: typeof AppOperatorLeadsRoute
   AppOperatorOneTentLoopProofRoute: typeof AppOperatorOneTentLoopProofRoute
@@ -2838,7 +2873,7 @@ interface AppOperatorRouteChildren {
 }
 
 const AppOperatorRouteChildren: AppOperatorRouteChildren = {
-  AppOperatorDiagnosticsRoute: AppOperatorDiagnosticsRoute,
+  AppOperatorDiagnosticsRoute: AppOperatorDiagnosticsRouteWithChildren,
   AppOperatorIngestInspectorRoute: AppOperatorIngestInspectorRoute,
   AppOperatorLeadsRoute: AppOperatorLeadsRoute,
   AppOperatorOneTentLoopProofRoute: AppOperatorOneTentLoopProofRoute,

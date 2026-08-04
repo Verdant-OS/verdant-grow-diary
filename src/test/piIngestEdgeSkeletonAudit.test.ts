@@ -132,12 +132,7 @@ describe("pi-ingest edge skeleton audit — decryption confinement", () => {
       }
     }
     walk(resolve(ROOT, "src"));
-    // TanStack SSR may read the service role only in *.server.ts modules
-    // (never shipped to the browser bundle). Allowlist that boundary.
-    const allowed = offenders.filter(
-      (p) => !(p.endsWith(".server.ts") || p.endsWith("integrations/supabase/client.server.ts")),
-    );
-    expect(allowed).toEqual([]);
+    expect(offenders).toEqual([]);
   });
 
   it("crypto.ts is either absent or audit doc notes its absence", () => {

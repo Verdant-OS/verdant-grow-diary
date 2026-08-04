@@ -49,3 +49,20 @@ export function loadGoogleAnalytics(measurementId: string = GOOGLE_ANALYTICS_MEA
 export function isGoogleAnalyticsLoaded(): boolean {
   return loaded;
 }
+
+/**
+ * Honour a revoked decision for a document where the tag has already loaded.
+ *
+ * `gtag.js` cannot be unloaded, so GA's own kill switch is used: setting
+ * `window['ga-disable-<MEASUREMENT_ID>'] = true` stops the tag from sending
+ * any hit. Page-view emission is separately consent-gated in
+ * useGoogleAnalyticsPageViews; this is the belt-and-braces layer for calls
+ * made by the tag itself.
+ */
+export function setGoogleAnalyticsOptOut(
+  optedOut: boolean,
+  measurementId: string = GOOGLE_ANALYTICS_MEASUREMENT_ID,
+): void {
+  if (typeof window === "undefined") return;
+  (window as unknown as Record<string, unknown>)[`ga-disable-${measurementId}`] = optedOut;
+}

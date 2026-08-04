@@ -1,280 +1,345 @@
-# Bridge sensor trust chain — PlantUML architecture pack
+# Bridge sensor trust chain — architecture pack
 
-**Owner:** Grok (Staff Product Integrity / Diagram Truth)  
-**Audience:** security reviewers, Cheek release sign-off, engineers changing mint/revoke/ingest  
-**Authoritative branch:** `verdant-grow-diary`  
-**Pack landed:** merge commit `0818ca67205a2005fce71e44e7e4583cbd02cc91` (#718)  
-**PlantUML foundation:** `#716` @ `8a0c537c0cb9e613145855b7f8857a72a15d9162`  
-**Premature mint-only PR `#717`:** CLOSED / UNMERGED — **not authority** (ideas only if re-validated)
+Docs-only PlantUML for Verdant’s **bridge token + live sensor ingest** trust chain.  
+Read this file when you cannot render the diagrams (screen readers, raw GitHub, offline).
 
-**Style:** every diagram starts with source-relative:
+| | |
+|--|--|
+| **Owner** | Grok (diagram truth) |
+| **Branch** | `verdant-grow-diary` |
+| **Pack PR** | #718 @ `0818ca6` |
+| **Style foundation** | #716 @ `8a0c537` |
+| **#717 mint-only PR** | Closed, unmerged — **not** authority |
+
+Every `.puml` file starts with:
 
 ```plantuml
 !include ../style.puml
 ```
 
-Do **not** use `!include docs/plantuml/style.puml` from this folder.
+(That path is relative to the diagram file. Do not write `docs/plantuml/style.puml` here.)
 
 ---
 
-## Purpose
+## What this pack is for
 
-Document the **load-bearing trust chain** for Verdant’s hardware-neutral live sensor path:
+Answer four questions without opening Edge Function source:
 
-1. How a grower mints / revokes a tent-scoped bridge secret.  
-2. How a headless bridge authenticates and writes telemetry.  
-3. What is **forbidden** (JWT live write, body ownership, side effects, reverse-revoke).  
-4. How sibling ingest lanes stay isolated (generic `vbt_`, EcoWitt, Pi HMAC, validation-only).
+1. **Who** may mint, use, or revoke a bridge secret — and with which credential?  
+2. **In what order** does generic live ingest check a request?  
+3. **What states** can a token be in, and what can never happen?  
+4. **Which lanes** (generic / EcoWitt / Pi / validation-only) must stay separate?
 
-This pack is **docs + contract tests only**. It does not change handlers, migrations, RLS, or entitlements.
-
----
-
-## Diagrams (one question each)
-
-| File | Kind | Question |
-|------|------|----------|
-| [`bridge-token-mint-use-revoke-sequence.puml`](./bridge-token-mint-use-revoke-sequence.puml) | Sequence | Who mints, uses, and revokes — and with which credential? |
-| [`sensor-ingest-verification-activity.puml`](./sensor-ingest-verification-activity.puml) | Activity | What is the exact verify order and stable HTTP contract? |
-| [`bridge-token-lifecycle-state.puml`](./bridge-token-lifecycle-state.puml) | State | Which token modes exist, and which transitions are forbidden? |
-| [`sensor-ingest-trust-boundaries-component.puml`](./sensor-ingest-trust-boundaries-component.puml) | Component | Where do JWT, `vbt_`, and service_role boundaries sit? |
-| [`ingest-auth-sibling-isolation.puml`](./ingest-auth-sibling-isolation.puml) | Component | How do generic / EcoWitt / Pi / validation-only lanes differ? |
+This pack does **not** change runtime code, migrations, RLS, or entitlements.
 
 ---
 
-## Text alternatives (full prose)
+## Diagram index
 
-These sections are the **accessible source of truth** when diagrams are not rendered (GitHub raw view, screen readers, offline review). They must stay aligned with the `.puml` files and the Edge handlers.
-
-### 1. Mint → use → revoke sequence
-
-**Participants:** Grower (browser, user JWT) · `mint-bridge-token` · liveSensors entitlement · `tents` · `bridge_tokens` · headless Bridge · `sensor-ingest-webhook` · `authenticateBearer` · `sensor_readings` · `bump_bridge_token_usage` · `sensor_ingest_audit_log` · `revoke-bridge-token`.
-
-**Mint (user JWT, `verify_jwt = true`):**
-
-1. Grower sends `POST` with `Authorization: Bearer <user JWT>` and body `{ tent_id, name?, ttl_days? }`.  
-2. Gateway accepts a valid JWT; handler resolves `userId` from `auth.getClaims` (`claims.sub`). Plan fields in the body are never read.  
-3. `requireLiveSensorEntitlement(userId)` runs. Failures: `403 upgrade_required` or `503 entitlement_lookup_failed`.  
-4. Handler loads the tent; if missing or `user_id ≠ claims.sub` → `403 forbidden_tent`.  
-5. Handler generates **32** CSPRNG bytes, forms plaintext `vbt_` + base64url(rand), computes **SHA-256** hex hash and a short non-secret **prefix** (first 12 characters).  
-6. Inserts into `bridge_tokens`: hash, prefix, tent, owner, expiry — **no plaintext column**.  
-7. Returns `200` with `{ token: "vbt_…" **once**, record }`. Client must store plaintext offline; server cannot re-show it.
-
-**Use (headless bridge, Bearer `vbt_…`):**
-
-1. Bridge sends `POST` to `sensor-ingest-webhook` with `Authorization: Bearer "vbt_…"`.  
-2. Gateway has **`verify_jwt = false`**. That does **not** mean public live writes: the handler requires a bridge token (`allowJwt: false`).  
-3. `authenticateBearer`: must start with `vbt_`; hash lookup on `token_hash`; reject revoked (`401 token_revoked`), expired (`401 token_expired`), missing/short (`401 unauthorized`), non-bridge (`403 bridge_required`), config/lookup failure (`503`).  
-4. Entitlement is **re-checked** for the server-resolved owner (token is not billing authority).  
-5. Payload is normalized; **request body `user_id` is ignored**; tent must match token scope (`403 forbidden_tent` otherwise).  
-6. Freshness uses a **30-minute** server-clock window. Stale → `200 accepted:false`, `inserted:0`, **zero live writes**.  
-7. Fresh rows upsert via **service_role** into `sensor_readings` with owner from auth.  
-8. If `insertedCount > 0`, call `bump_bridge_token_usage`; duplicate-only skips the bump.  
-9. Best-effort insert into `sensor_ingest_audit_log` (must not fail the ingest).  
-10. Success `200` with inserted / skipped_duplicate counts. Sanitized errors only.
-
-**Revoke (user JWT, one-way):**
-
-1. Grower `POST` `{ id }` with user JWT (`verify_jwt = true`).  
-2. Owner-scoped `UPDATE … SET revoked_at WHERE revoked_at IS NULL`.  
-3. First success → `200 { ok: true }`. Already revoked → `200 { ok: true, already_revoked: true }`. Missing → `404`.  
-4. **Revoked → Active is forbidden** (handler + DB immutability guard).  
-5. Later ingest with that secret → `401 token_revoked`.
-
-**Safety note (no side-effect arrows):** No AI Doctor, no alert creation, no Action Queue write, no automation, no device control on the ingest path.
+| Diagram file | Kind | Question |
+|--------------|------|----------|
+| [bridge-token-mint-use-revoke-sequence.puml](./bridge-token-mint-use-revoke-sequence.puml) | Sequence | Who mints, uses, revokes — with which credential? |
+| [sensor-ingest-verification-activity.puml](./sensor-ingest-verification-activity.puml) | Activity | Exact check order + HTTP outcomes? |
+| [bridge-token-lifecycle-state.puml](./bridge-token-lifecycle-state.puml) | State | Token modes and forbidden transitions? |
+| [sensor-ingest-trust-boundaries-component.puml](./sensor-ingest-trust-boundaries-component.puml) | Component | Where JWT / `vbt_` / service_role meet? |
+| [ingest-auth-sibling-isolation.puml](./ingest-auth-sibling-isolation.puml) | Component | How sibling ingest lanes stay isolated? |
 
 ---
 
-### 2. Verification activity (ordered spine)
+## Text alternatives
 
-**Question answered:** What is the exact order of checks on one generic webhook request, and which stable HTTP outcomes apply?
+Each section below restates one diagram in plain language. Keep these in sync with the `.puml` files when source changes.
 
-**Order (load-bearing — later steps never run after a stop):**
+---
+
+### 1. Mint → use → revoke
+
+**Diagram:** sequence  
+**Question:** Who does what, with which secret?
+
+#### Actors
+
+| Who | Credential |
+|-----|------------|
+| Grower in the browser | User session JWT |
+| Headless bridge / device | Bridge secret `vbt_…` (shown once at mint) |
+| Edge functions | See each step |
+
+#### A. Mint a token
+
+**Function:** `mint-bridge-token` · gateway `verify_jwt = true`
+
+1. Grower calls mint with `Authorization: Bearer <user JWT>` and `{ tent_id, name?, ttl_days? }`.  
+2. Server reads **user id only from the JWT** (`claims.sub`). Plan fields in the JSON body are ignored.  
+3. Server checks **liveSensors** entitlement for that user.  
+   - No capability → `403 upgrade_required`  
+   - Billing lookup broken → `503 entitlement_lookup_failed`  
+4. Server checks the tent is owned by that user.  
+   - Not owned → `403 forbidden_tent`  
+5. Server creates a secret: **32 random bytes** → plaintext `vbt_` + base64url.  
+6. Server stores only **SHA-256 hash** + short **non-secret prefix** + tent + expiry. **No plaintext column.**  
+7. Response returns the plaintext **`vbt_…` once**. The client must save it; the server will not show it again.
+
+#### B. Use a token (live ingest)
+
+**Function:** `sensor-ingest-webhook` · gateway `verify_jwt = false` · handler `allowJwt: false`
+
+1. Bridge calls ingest with `Authorization: Bearer "vbt_…"`.  
+2. **Important:** `verify_jwt = false` means the gateway does not require a *user* JWT. It does **not** mean the endpoint is public. The handler still requires a valid bridge token.  
+3. Handler authenticates the bearer:  
+   - Must start with `vbt_` (otherwise `403 bridge_required` — user JWTs are rejected)  
+   - Lookup by SHA-256 hash  
+   - Revoked → `401 token_revoked`  
+   - Expired → `401 token_expired`  
+4. Handler re-checks **liveSensors** for the token’s owner (token ≠ plan).  
+5. Handler parses the body. **Body `user_id` is not ownership.** Owner comes from the token row.  
+6. Payload tent must match the token’s tent (`403 forbidden_tent` if not).  
+7. Timestamp must be within **30 minutes** on the server clock.  
+   - Too old → `200` with `accepted: false`, `inserted: 0`, **no live write**  
+8. Fresh rows are upserted with **service_role** into `sensor_readings`.  
+9. Usage telemetry (`bump_bridge_token_usage`) runs **only if** `insertedCount > 0`. Duplicates alone do not bump.  
+10. Audit log insert is **best-effort** (must not fail the request).  
+11. Success → `200` with insert / duplicate counts. Errors are sanitized (no secrets, no raw DB text).
+
+#### C. Revoke a token
+
+**Function:** `revoke-bridge-token` · gateway `verify_jwt = true`
+
+1. Grower calls revoke with user JWT and `{ id }`.  
+2. Server sets `revoked_at` only for rows owned by the caller and still unrevoked (`WHERE revoked_at IS NULL`).  
+3. First revoke → `200 { ok: true }`.  
+4. Already revoked → `200 { ok: true, already_revoked: true }` (calm retry).  
+5. **Cannot un-revoke.** There is no path from Revoked back to Active.  
+6. Later ingest with that secret → `401 token_revoked`.
+
+#### Forbidden on this path
+
+- Treating a user JWT as live-ingest auth  
+- Taking ownership from request JSON  
+- Storing stale samples as live  
+- Reverse-revoking a token  
+- Calling AI Doctor, creating alerts, writing Action Queue, automation, or device control from ingest  
+
+---
+
+### 2. Verification activity (one request)
+
+**Diagram:** activity  
+**Question:** What runs first, second, third — and what status codes mean?
+
+#### Order (must not be rearranged)
 
 ```text
-OPTIONS short-circuit
-→ method must be POST
-→ read Bearer
-→ authenticateBearer (allowJwt: false)
-→ auth.kind === bridge (defense-in-depth)
-→ requireLiveSensorEntitlement
-→ parse JSON + normalizeWebhookIngestPayload
-→ tentScopeMatches
-→ classifyIngestTimestampFreshness (30 minutes)
-→ service_role upsert sensor_readings
-→ if insertedCount > 0: bump_bridge_token_usage
-→ best-effort audit
-→ 200 success
+1. OPTIONS? → if yes, stop with 204 (no auth, no body, no DB)
+2. Method must be POST → else 405
+3. Bearer present? → else 401 unauthorized
+4. authenticateBearer with allowJwt: false
+5. auth must be kind "bridge"
+6. liveSensors entitlement
+7. Parse + normalize JSON body
+8. Tent scope match
+9. Freshness (30-minute server clock)
+10. Persist with service_role (if still allowed)
+11. Usage bump only if insertedCount > 0
+12. Best-effort audit
+13. 200 success
 ```
 
-**Stable outcomes:**
+Any failure **stops**. Later steps do not run.
 
-| Condition | Result |
-|-----------|--------|
-| OPTIONS | **204**, no auth / body / DB |
-| Wrong method | **405** `method_not_allowed` |
-| Missing Bearer | **401** `unauthorized` |
-| Non-`vbt_` bearer (e.g. user JWT) | **403** `bridge_required` |
-| Short / unknown hash | **401** `unauthorized` |
-| Revoked | **401** `token_revoked` |
-| Expired | **401** `token_expired` |
-| Auth config / lookup failure | **503** |
-| No `liveSensors` | **403** `upgrade_required` |
-| Billing lookup failure | **503** `entitlement_lookup_failed` |
-| Invalid JSON / payload | **400** |
-| Tent mismatch | **403** `forbidden_tent` |
-| Stale timestamp | **200** `accepted:false`, `inserted:0`, reason `timestamp_stale`, **no live write** |
-| Insert failure | **400** `insert_failed` (sanitized) |
-| Success | **200** `inserted` + `skipped_duplicate` |
+#### HTTP outcomes (stable contract)
 
-**Freshness note:** Ingest **acceptance** window is **30 minutes** (`LIVE_INGEST_FRESHNESS_WINDOW_MS`). UI / current-state “how old is this reading” presentation windows are **separate** and out of scope for this pack.
+| When | Status | Body idea |
+|------|--------|-----------|
+| CORS preflight OPTIONS | **204** | Empty; no auth |
+| GET / PUT / etc. | **405** | `method_not_allowed` |
+| No `Authorization: Bearer` | **401** | `unauthorized` |
+| Bearer is a user JWT or other non-`vbt_` | **403** | `bridge_required` |
+| Bad / unknown / too-short `vbt_` | **401** | `unauthorized` |
+| Token revoked | **401** | `token_revoked` |
+| Token expired | **401** | `token_expired` |
+| Server cannot look up token / misconfigured | **503** | config / lookup error |
+| Plan lacks liveSensors | **403** | `upgrade_required` |
+| Billing cannot be read | **503** | `entitlement_lookup_failed` |
+| Bad JSON or payload | **400** | `invalid_json` / `invalid_payload` |
+| Tent does not match token | **403** | `forbidden_tent` |
+| Reading older than 30 minutes | **200** | `accepted: false`, `inserted: 0`, reason `timestamp_stale` — **no write** |
+| DB insert fails | **400** | `insert_failed` (sanitized) |
+| Happy path | **200** | `inserted` + `skipped_duplicate` |
 
----
+#### Freshness note
 
-### 3. Token lifecycle state
-
-**States:**
-
-| State | Predicate |
-|-------|-----------|
-| **Not issued** | No `bridge_tokens` row; no plaintext at rest |
-| **Active / never used** | Row exists; `revoked_at` null; not expired at auth; `first_used_at` null; `ingest_count = 0`; born-clean insert (no seeded usage, not pre-revoked) |
-| **Active / used** | Same validity; `first_used_at` set; `ingest_count ≥ 1` |
-| **Expired** | `expires_at ≤ request now` at `authenticateBearer`; not revoked; **401 token_expired** |
-| **Revoked** | `revoked_at` set; terminal; **401 token_revoked**; re-revoke → `already_revoked` |
-
-**Transitions:**
-
-- Mint → Active / never used (JWT + entitlement + tent owner + hash store + plaintext once).  
-- Active / never used → Active / used only when a live insert succeeds with **`insertedCount > 0`** (usage RPC).  
-- Duplicate-only accepted request: remains in current Active substate; **no** usage increment.  
-- Stale `accepted:false` or entitlement 403: **token state unchanged**.  
-- Active → Expired when auth compares `expires_at` to request clock (**no scheduler invented**).  
-- Active → Revoked via owner JWT revoke.  
-- **Forbidden:** Revoked → Active (no edge).
+- **Ingest acceptance** window = **30 minutes** (this pack).  
+- **UI “how current is this reading?”** windows are separate product rules — not defined here.
 
 ---
 
-### 4. Trust-boundary component view
+### 3. Token lifecycle
 
-**Boundaries and flows:**
+**Diagram:** state  
+**Question:** What modes exist, and what transitions are allowed?
 
-| Boundary | What crosses it |
-|----------|-----------------|
-| Browser / user JWT | Mint and revoke only; session Bearer |
-| Headless bridge secret | Offline `vbt_…` plaintext held by device |
-| Supabase Edge gateway | `mint`/`revoke`: `verify_jwt=true`; `sensor-ingest-webhook`: `verify_jwt=false` |
-| Handler-owned bridge authentication | `authenticateBearer` + SHA-256 hash lookup; **not** public write |
-| Billing entitlement | Canonical `liveSensors` check (mint and every ingest) |
-| RLS-protected token metadata | Hash/prefix listing under caller JWT; clients cannot clear `revoked_at` or forge usage |
-| Service-role persistence | Upsert `sensor_readings`; usage RPC; audit log |
+#### States
 
-**Critical pairing:**  
-`verify_jwt = false` **and** handler-owned bridge authentication → **not** public live-write permission.
+| State | Meaning |
+|-------|---------|
+| **Not issued** | No row in `bridge_tokens`. Nothing to present. |
+| **Active / never used** | Valid row; not revoked; not expired at last auth; `ingest_count = 0`; never successfully inserted live data. |
+| **Active / used** | Same validity; at least one real insert (`ingest_count ≥ 1`). |
+| **Expired** | `expires_at` is in the past when auth runs. Ingest returns `token_expired`. |
+| **Revoked** | `revoked_at` is set. Terminal. Ingest returns `token_revoked`. |
 
-**Side-effect ban (text only; no arrows to these systems):**  
-Telemetry storage only. No AI Doctor. No alert creation. No Action Queue write. No automation. No device control.
+#### What moves the token
 
-**Evidence honesty:** Client-role immutability and born-clean inserts are implemented in migrations `20260804213000` / `20260804220000`. Strict zero-skip DB harness runtime proof may still be **BLOCKED** — do not promote that lane on this diagram.
+| Event | Result |
+|-------|--------|
+| Successful mint | Not issued → Active / never used |
+| Live insert with `insertedCount > 0` | Active / never used → Active / used |
+| Duplicate-only ingest (`insertedCount = 0`) | Stays Active; **usage does not increase** |
+| Stale ingest (`accepted: false`) | Token state unchanged; no live write |
+| Entitlement denied | Token state unchanged |
+| Auth sees `expires_at ≤ now` | Active → Expired (computed at request time; **no cron required**) |
+| Owner revoke | Active → Revoked |
+| Revoke again | Stays Revoked (`already_revoked`) |
+
+#### Forbidden
+
+```text
+Revoked → Active     (never)
+Revoked → never used (never)
+Revoked → used       (never)
+```
+
+Rows are born clean: no pre-revoked inserts, no seeded usage counters from the client.
+
+---
+
+### 4. Trust boundaries
+
+**Diagram:** component  
+**Question:** What sits on which side of the wall?
+
+```text
+[ Grower browser ]                    [ Headless bridge ]
+   user JWT                              vbt_… secret
+        |                                      |
+        v                                      v
++------------------+              +---------------------------+
+| mint / revoke    |              | sensor-ingest-webhook     |
+| verify_jwt=true  |              | verify_jwt=false          |
++--------+---------+              | handler allowJwt:false    |
+         |                        +-------------+-------------+
+         |                                      |
+         v                                      v
+   RLS metadata                         SHA-256 hash lookup
+   (list prefix only)                   entitlement re-check
+                                        tent + 30m freshness
+                                                |
+                                                v
+                                    service_role upsert
+                                    sensor_readings
+                                    usage RPC (if inserts)
+                                    best-effort audit
+```
+
+#### Rules in one line each
+
+| Rule | Meaning |
+|------|---------|
+| Mint / revoke use user JWT | Grower identity from session |
+| Ingest uses `vbt_…` only | User JWT cannot write live telemetry |
+| `verify_jwt = false` on webhook | Gateway skips user JWT; **handler still authenticates the bridge** |
+| Entitlement is separate | Holding a token ≠ paid plan |
+| Service role is server-only | Clients do not upsert live readings |
+| Telemetry only | No AI Doctor, no alerts, no Action Queue, no automation, no device control |
+
+#### Evidence honesty
+
+Migrations make revocation one-way and usage server-maintained.  
+The **strict local DB harness** may still be **BLOCKED** until it runs with nonzero successes and zero skips. Do not upgrade that verdict on these diagrams.
 
 ---
 
 ### 5. Sibling isolation
 
-Four **distinct** lanes (do not mix credentials or headers):
+**Diagram:** component lanes  
+**Question:** Can I reuse one auth model across all ingest endpoints? **No.**
 
-| Lane | Endpoint | Auth model | Live write? |
-|------|----------|------------|-------------|
-| **A — Generic webhook** | `sensor-ingest-webhook` | Bearer `vbt_…`, `allowJwt: false`, SHA-256 `bridge_tokens` | Yes, if entitled + fresh + tent match |
-| **B — EcoWitt sanctioned live** | `ecowitt-ingest` | Same shared bridge auth (`vbt_…`, `allowJwt: false`) | Yes, if entitled (vendor fields redacted; passkey may appear as fingerprint for routing only — not a second auth system) |
-| **C — Pi HMAC** | `pi-ingest-readings` | Headers `x-bridge-id`, `x-bridge-signature`, `x-bridge-timestamp`; HMAC over raw body; separate credential store | Yes, if HMAC + owner entitlement |
-| **D — EcoWitt validation-only** | `ecowitt-real-ingest` | Static env token `ECOWITT_BRIDGE_TOKEN` | **No** — validate + redacted accept/reject only; no `sensor_readings` write |
+| Lane | Endpoint | How it authenticates | Writes live readings? |
+|------|----------|----------------------|------------------------|
+| **A — Generic** | `sensor-ingest-webhook` | Bearer `vbt_…`, `allowJwt: false` | Yes, if checks pass |
+| **B — EcoWitt live** | `ecowitt-ingest` | Same shared `vbt_…` bridge auth | Yes, if checks pass |
+| **C — Pi** | `pi-ingest-readings` | HMAC headers: `x-bridge-id`, `x-bridge-signature`, `x-bridge-timestamp` | Yes, if HMAC + entitlement pass |
+| **D — EcoWitt validate-only** | `ecowitt-real-ingest` | Static env secret `ECOWITT_BRIDGE_TOKEN` | **No** — validate only |
 
-**Explicit rule:**  
-**Do not mix Pi HMAC headers with `vbt_` bearer semantics.**
+#### Hard rule
+
+> **Do not mix Pi HMAC headers with `vbt_` bearer semantics.**
+
+Pi never authenticates with `Authorization: Bearer vbt_…`.  
+Generic / EcoWitt live never authenticate with Pi HMAC headers.  
+EcoWitt “real ingest” is a validation endpoint, not a second live-write path.
+
+Passkey / vendor fields on EcoWitt may be used for **routing or redaction**, not as a replacement for bridge authentication on the live lane.
 
 ---
 
-## Source anchors
+## Status words (do not mix them up)
+
+| Word | Means |
+|------|--------|
+| **Implemented** | Code exists on the product branch |
+| **Statically proven** | Evidence scripts / unit tests green |
+| **Runtime proven** | Real DB harness green |
+| **BLOCKED** | Strict zero-skip harness not green yet — keep saying BLOCKED |
+| **NOT_MEASURED** | We did not claim it |
+
+---
+
+## Source files (for reviewers)
 
 - `supabase/functions/mint-bridge-token/index.ts`  
 - `supabase/functions/revoke-bridge-token/index.ts`  
 - `supabase/functions/sensor-ingest-webhook/index.ts`  
-- `supabase/functions/_shared/sensorIngestAuth.ts` (`BRIDGE_PREFIX`, `allowJwt`)  
-- `supabase/functions/_shared/sensorIngestFreshness.ts` (30 minutes)  
+- `supabase/functions/_shared/sensorIngestAuth.ts`  
+- `supabase/functions/_shared/sensorIngestFreshness.ts`  
 - `supabase/functions/_shared/liveSensorEntitlementGate.ts`  
 - `supabase/functions/ecowitt-ingest/index.ts`  
 - `supabase/functions/ecowitt-real-ingest/index.ts`  
 - `supabase/functions/pi-ingest-readings/index.ts`  
-- `supabase/config.toml` (`verify_jwt` per function)  
+- `supabase/config.toml`  
 - Migrations `20260804213000_*`, `20260804220000_*`  
 - `docs/bridge-sensor-ingest-security-audit-checklist.md`  
-- Evidence: `scripts/security/bridge-sensor-ingest-evidence-checks.mjs`
+- `scripts/security/bridge-sensor-ingest-evidence-checks.mjs`  
 
 ---
 
-## Honesty vocabulary
-
-| Label | Meaning |
-|-------|---------|
-| **Implemented** | Code path exists on product branch |
-| **Statically proven** | Evidence scripts / unit-edge tests green |
-| **Runtime proven** | Live/local harness green with real DB |
-| **BLOCKED** | Strict zero-skip DB harness not yet green — keep the BLOCKED label; do not upgrade the verdict |
-| **NOT_MEASURED** | Not claimed |
-
-Strict database harness remains **BLOCKED** until the zero-skip criteria hold: nonzero suite successes, zero failures, zero skips (checklist G3).
-
----
-
-## Safety non-goals
-
-Sensor ingest must not invoke or imply:
-
-- AI Doctor  
-- Alert creation  
-- Action Queue writes  
-- Automation  
-- Device control  
-- Irrigation / lighting commands  
-- Setpoint changes  
-
----
-
-## Contract tests
+## Tests and render
 
 ```bash
+# Contract: diagrams + text-alternative coverage in this README
 bunx vitest run src/test/bridge-sensor-plantuml-contract.test.ts
+
+# Foundation style pack safety (do not edit style.puml from this pack)
 bunx vitest run src/test/plantuml-docs-static-safety.test.ts
-```
 
-The architecture contract pins load-bearing strings in the five `.puml` files, verification order, sibling isolation, secret shape bans, and BLOCKED honesty. Foundation static safety owns `style.puml` / examples — do not edit those from this pack.
-
----
-
-## Render (local only — do not commit binaries)
-
-```bash
-# PlantUML 1.2024+; state/component diagrams use !pragma layout smetana
+# Optional local render — delete SVGs after inspect; never commit them
 java -jar plantuml.jar -tsvg docs/plantuml/architecture/*.puml
-# inspect SVGs, then delete them — generated binaries in git must remain 0
 ```
 
 ---
 
-## Update procedure (when source changes)
+## When source changes
 
-1. Re-read the Edge handlers, `config.toml`, and relevant migrations at the new tip.  
-2. Update the affected `.puml` **and** the matching text alternative above in the same PR.  
-3. Extend `bridge-sensor-plantuml-contract.test.ts` if a new load-bearing fact is introduced.  
-4. Re-run contract + evidence + edge tests.  
-5. Do **not** reopen `#717` or change foundation `style.puml` unless a foundation defect blocks all five diagrams (then stop and report).
+1. Re-read the handlers and migrations at the new tip.  
+2. Update the matching `.puml` **and** the matching text alternative above in the **same** PR.  
+3. Adjust the contract test if a new load-bearing fact appears.  
+4. Do not reopen #717. Do not edit `docs/plantuml/style.puml` unless the foundation is broken for all five diagrams (then stop and report).
 
 ---
 
-## Related
+## Related docs
 
-- Shared style: [`../style.puml`](../style.puml)  
-- Style pack README: [`../README.md`](../README.md)  
-- Bridge security checklist: [`../../bridge-sensor-ingest-security-audit-checklist.md`](../../bridge-sensor-ingest-security-audit-checklist.md)  
-- General security checklist: [`../../security-checklist.md`](../../security-checklist.md)
+- Style pack: [../style.puml](../style.puml) · [../README.md](../README.md)  
+- Bridge security checklist: [../../bridge-sensor-ingest-security-audit-checklist.md](../../bridge-sensor-ingest-security-audit-checklist.md)  
+- General security checklist: [../../security-checklist.md](../../security-checklist.md)

@@ -56,7 +56,7 @@ describe("bridge-sensor PlantUML architecture pack", () => {
     expect(readme).toMatch(/Mint.*use.*revoke|Mint → use → revoke/i);
     expect(readme).toMatch(/Verification activity/i);
     expect(readme).toMatch(/Token lifecycle|lifecycle state/i);
-    expect(readme).toMatch(/Trust-boundary|Trust boundary/i);
+    expect(readme).toMatch(/Trust-boundary|Trust boundary|Trust boundaries/i);
     expect(readme).toMatch(/Sibling isolation/i);
     // Load-bearing prose (not only diagram source)
     expect(readme).toMatch(/allowJwt:\s*false|allowJwt: false/);

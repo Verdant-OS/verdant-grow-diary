@@ -114,7 +114,23 @@ an entry in `docs/security-exceptions.md`.
 - [ ] The existing `public.has_role(uuid, app_role)` exception is the only
       currently accepted `SECURITY DEFINER` helper.
 
-## 13. Testing / validation commands
+## 13. Bridge sensor-ingest (`vbt_`) trust-chain requirements
+
+- [ ] Any PR touching `mint-bridge-token`, `revoke-bridge-token`,
+      `sensor-ingest-webhook`, `ecowitt-ingest`, the shared
+      `sensorIngestAuth` / `liveSensorEntitlementGate` /
+      `sensorIngestFreshness` modules, the `bridge_tokens` migrations, or a
+      client token surface is reviewed against
+      [`docs/bridge-sensor-ingest-security-audit-checklist.md`](./bridge-sensor-ingest-security-audit-checklist.md).
+- [ ] `bun run test:bridge-sensor-ingest-evidence` passes (also enforced in
+      the `Security regression` CI workflow; the lane's checks pin their own
+      CI wiring so it cannot be silently removed).
+- [ ] Bridge tokens stay hashed at rest (`token_hash` + non-secret
+      `token_prefix`, plaintext shown once at mint), ingest stays
+      bridge-only (`allowJwt: false`), entitlement is re-checked on every
+      use, and stale timestamps keep failing closed before persistence.
+
+## 14. Testing / validation commands
 
 Run all of the following before requesting review:
 
@@ -131,6 +147,7 @@ All 651+ existing tests must pass. New behavior must ship with new tests.
 ## References
 
 - [`docs/security-exceptions.md`](./security-exceptions.md)
+- [`docs/bridge-sensor-ingest-security-audit-checklist.md`](./bridge-sensor-ingest-security-audit-checklist.md)
 - [`src/test/ai-coach-security.test.ts`](../src/test/ai-coach-security.test.ts)
 - [`src/test/ai-coach-output-safety.test.ts`](../src/test/ai-coach-output-safety.test.ts)
 - [`src/test/action-queue-safety.test.ts`](../src/test/action-queue-safety.test.ts)

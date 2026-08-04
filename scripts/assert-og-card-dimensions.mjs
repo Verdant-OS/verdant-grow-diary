@@ -191,18 +191,57 @@ export function validateOgCardDimensions(distDir) {
       continue;
     }
 
-    if (header.bitDepth < 8) {
+    if (header.bitDepth !== EXPECTED_OG_BIT_DEPTH) {
       problems.push(
-        `${label}: OG card bit depth is ${header.bitDepth}; expected at least 8 bits per channel.`,
+        `${label}: OG card bit depth is ${header.bitDepth}; expected exactly ` +
+          `${EXPECTED_OG_BIT_DEPTH} bits per channel. A non-8-bit card means the rasterizer ` +
+          `fell back or a re-encode changed the pixel format.`,
       );
       continue;
     }
 
+    if (!ALLOWED_OG_COLOR_TYPES.includes(header.colorType)) {
+      problems.push(
+        `${label}: OG card colour type is ${header.colorType} ` +
+          `(${PNG_COLOR_TYPE_LABELS[header.colorType] ?? "unknown"}); expected ` +
+          `${ALLOWED_OG_COLOR_TYPES.map((type) => `${type} (${PNG_COLOR_TYPE_LABELS[type]})`).join(" or ")}. ` +
+          `Palette and greyscale cards band the gradient and render inconsistently across scrapers.`,
+      );
+      continue;
+    }
+
+    const encoding = `${header.bitDepth}-bit ${PNG_COLOR_TYPE_LABELS[header.colorType]}`;
+    let group = encodings.get(encoding);
+    if (!group) {
+      group = [];
+      encodings.set(encoding, group);
+    }
+    group.push(`og/${slug}.png`);
+
     checked += 1;
   }
 
-  return { ok: problems.length === 0, checked, total: seen.size, problems };
+  // Consistency: every card comes from one rasterizer pass, so a split in pixel
+  // format means part of the set was produced or re-encoded by something else.
+  if (encodings.size > 1) {
+    const breakdown = [...encodings.entries()]
+      .map(([encoding, files]) => `${encoding} (${files.length}: ${files.slice(0, 3).join(", ")}${files.length > 3 ? ", …" : ""})`)
+      .join("; ");
+    problems.push(
+      `OG cards are not encoded consistently — ${encodings.size} distinct pixel formats found: ${breakdown}. ` +
+        `All cards must share one bit depth and colour type.`,
+    );
+  }
+
+  return {
+    ok: problems.length === 0,
+    checked,
+    total: seen.size,
+    problems,
+    encodings: Object.fromEntries([...encodings.entries()].map(([key, files]) => [key, files.length])),
+  };
 }
+
 
 const invokedDirectly =
   process.argv[1] !== undefined && import.meta.url.endsWith(process.argv[1].replaceAll("\\", "/"));

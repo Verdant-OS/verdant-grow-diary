@@ -322,13 +322,48 @@ export const CHECKS = [
     id: "E36",
     file: "edgeTestsWorkflow",
     description:
-      "mint and revoke handler e2e tests are wired into the Deno edge-test lane (run list + path filters)",
-    expect: [
-      { re: /supabase\/functions\/mint-bridge-token\/handler_e2e_test\.ts/, must: true },
-      { re: /supabase\/functions\/revoke-bridge-token\/handler_e2e_test\.ts/, must: true },
-      { re: /"supabase\/functions\/mint-bridge-token\/\*\*"/, must: true },
-      { re: /"supabase\/functions\/revoke-bridge-token\/\*\*"/, must: true },
-    ],
+      "mint and revoke handler e2e tests are ACTIVE in the Deno edge-test lane: live run-list arguments plus live path filters in both push and pull_request",
+    expect: [],
+    // Anchored as active lines (a commented-out `# supabase/...` or
+    // `# - "supabase/..."` never satisfies these), and each trigger section
+    // is validated independently — a filter duplicated twice under one
+    // event must NOT satisfy the other event's wiring.
+    custom: (content) => {
+      const failures = [];
+      // Normalize CRLF so the $-anchored active-line patterns behave
+      // identically on Windows working trees and Linux CI checkouts.
+      const text = content.replace(/\r\n/g, "\n");
+      const sections = { push: [], pull_request: [] };
+      let current = null;
+      for (const line of text.split("\n")) {
+        const head = line.match(/^ {2}(push|pull_request):\s*$/);
+        if (head) {
+          current = head[1];
+          continue;
+        }
+        if (/^\S/.test(line) || /^ {2}\S/.test(line)) {
+          current = null;
+          continue;
+        }
+        if (current) sections[current].push(line);
+      }
+      for (const fn of ["mint-bridge-token", "revoke-bridge-token"]) {
+        const runLine = new RegExp(
+          String.raw`^\s*supabase/functions/${fn}/handler_e2e_test\.ts \\$`,
+          "m",
+        );
+        if (!runLine.test(text)) {
+          failures.push(`${fn} e2e is not an active argument in the deno run list`);
+        }
+        const filterLine = new RegExp(String.raw`^\s*- "supabase/functions/${fn}/\*\*"$`, "m");
+        for (const event of ["push", "pull_request"]) {
+          if (!filterLine.test(sections[event].join("\n"))) {
+            failures.push(`${fn} path filter is not active under ${event}.paths`);
+          }
+        }
+      }
+      return failures;
+    },
   },
   {
     id: "E37",
@@ -448,11 +483,23 @@ export const MIGRATION_CHECKS = [
   {
     id: "E35",
     description:
-      "revocation is one-way and usage telemetry is server-maintained for client roles (guard trigger)",
+      "revocation is one-way, telemetry is server-maintained on BOTH insert and update paths, and client rows are born unrevoked (guard triggers)",
     expect: [
       { re: /RAISE EXCEPTION 'bridge_token revocation is one-way'/, must: true },
-      { re: /RAISE EXCEPTION 'bridge_token usage telemetry is server-maintained'/, must: true },
+      { re: /RAISE EXCEPTION 'bridge_token rows must be created unrevoked'/, must: true },
     ],
+    // The telemetry guard must exist on the UPDATE path AND the INSERT
+    // path — one occurrence means a whole write path is unprotected.
+    custom: (corpus) => {
+      const n = (
+        stripSqlComments(corpus).match(
+          /RAISE EXCEPTION 'bridge_token usage telemetry is server-maintained'/g,
+        ) ?? []
+      ).length;
+      return n >= 2
+        ? []
+        : [`telemetry guard must exist on both UPDATE and INSERT paths (found ${n})`];
+    },
   },
 ];
 

@@ -32,6 +32,48 @@ function globalized(re) {
   return new RegExp(re.source, re.flags.includes("g") ? re.flags : `${re.flags}g`);
 }
 
+/** Per-check tampers for file-based custom detectors. Every bypass the
+ *  reviewer named gets its own case. */
+const lf = (s) => s.replace(/\r\n/g, "\n");
+const FILE_CUSTOM_TAMPERS = {
+  E15: [(real) => `${real}\nexport const driftedBehavior = () => 42;\n`],
+  E36: [
+    // Comment out the mint run-list argument (text still present in the file).
+    (real) =>
+      lf(real).replace(
+        /^(\s*)(supabase\/functions\/mint-bridge-token\/handler_e2e_test\.ts \\)$/m,
+        "$1# $2",
+      ),
+    // Comment out the revoke run-list argument.
+    (real) =>
+      lf(real).replace(
+        /^(\s*)(supabase\/functions\/revoke-bridge-token\/handler_e2e_test\.ts \\)$/m,
+        "$1# $2",
+      ),
+    // Comment out ONE of the two mint path filters (push or pull_request).
+    (real) =>
+      lf(real).replace(/^(\s*)(- "supabase\/functions\/mint-bridge-token\/\*\*")$/m, "$1# $2"),
+    // Comment out ONE of the two revoke path filters.
+    (real) =>
+      lf(real).replace(/^(\s*)(- "supabase\/functions\/revoke-bridge-token\/\*\*")$/m, "$1# $2"),
+    // Delete the revoke run-list argument outright.
+    (real) =>
+      lf(real).replace(
+        /^\s*supabase\/functions\/revoke-bridge-token\/handler_e2e_test\.ts \\\n/m,
+        "",
+      ),
+    // Duplication/move bypass: keep TWO active revoke filter lines but both
+    // under push — pull_request loses its wiring while the raw count stays 2.
+    (real) => {
+      const t = lf(real);
+      const line = '      - "supabase/functions/revoke-bridge-token/**"';
+      const parts = t.split(`${line}\n`);
+      if (parts.length !== 3) return t; // unexpected shape: leave untampered (detector must then flag baseline drift)
+      return `${parts[0]}${line}\n${line}\n${parts[1]}${parts[2]}`;
+    },
+  ],
+};
+
 /** Content snippets that satisfy each forbidden pattern, keyed by check id. */
 const FORBIDDEN_INJECTIONS = {
   E2: "const r = await deps.lookupBridgeToken(rawToken);",
@@ -68,9 +110,15 @@ for (const check of CHECKS) {
   }
 
   if (check.custom) {
-    const tampered = `${real}\nexport const driftedBehavior = () => 42;\n`;
-    const detects = check.custom(tampered).length > 0;
-    report(`${check.id} custom detector fires on added executable code`, detects);
+    const tampers = FILE_CUSTOM_TAMPERS[check.id];
+    if (!tampers?.length) {
+      report(`${check.id} custom tamper fixture`, false, "no custom tamper defined");
+      continue;
+    }
+    tampers.forEach((tamper, i) => {
+      const detects = check.custom(tamper(real)).length > 0;
+      report(`${check.id} custom detector fires (#${i + 1})`, detects);
+    });
   }
 }
 
@@ -118,11 +166,21 @@ const MIGRATION_TAMPERS = {
   ],
   E35: [
     (c) => c.replace(/RAISE EXCEPTION 'bridge_token revocation is one-way';/g, "-- TAMPERED"),
+    // Remove BOTH telemetry guards.
     (c) =>
       c.replace(
         /RAISE EXCEPTION 'bridge_token usage telemetry is server-maintained';/g,
         "-- TAMPERED",
       ),
+    // Remove only ONE telemetry guard (first match, non-global): a single
+    // unprotected write path must still fail the both-paths count.
+    (c) =>
+      c.replace(
+        /RAISE EXCEPTION 'bridge_token usage telemetry is server-maintained';/,
+        "-- TAMPERED",
+      ),
+    (c) =>
+      c.replace(/RAISE EXCEPTION 'bridge_token rows must be created unrevoked';/g, "-- TAMPERED"),
   ],
 };
 for (const check of MIGRATION_CHECKS) {

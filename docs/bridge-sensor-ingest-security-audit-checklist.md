@@ -155,7 +155,7 @@ branch, never `main`.
       this checklist and the evidence lane in the same PR — the value is
       deliberately load-bearing: the webhook's stale rejection is tied to the
       `sensor_readings` dedupe uniqueness key (`user_id, tent_id, source,
-metric, captured_at`), so a window change is never a one-line edit.
+    metric, captured_at`), so a window change is never a one-line edit.
 - [ ] [runtime: `storageMapping` tests via the webhook vitest suites]
       Per-row provenance is demoted `live -> stale` at the same 30m boundary,
       so replayed packets cannot land as live.
@@ -191,8 +191,10 @@ metric, captured_at`), so a window change is never a one-line edit.
       `user_id` ignored, and PG-error redaction are pinned at runtime.
 - [ ] [runtime: `src/test/integration/bridge-tokens-rls.integration.test.ts`
       via `bun run test:bridge-tokens-db-security` ([E37])] One-way
-      revocation, usage-telemetry freeze, cross-user denial, and the
-      effective DELETE privilege are proven against a real local database.
+      revocation, insert + update telemetry integrity, cross-user denial,
+      and the effective DELETE privilege — check this item only from a
+      strict-mode run with `passed > 0, failed = 0, skipped = 0`
+      (currently `BLOCKED`, see G3).
 
 ## 10. Error-response and log redaction
 
@@ -259,9 +261,10 @@ models. Isolation must hold in both directions.
       fields; best-effort, never fails the ingest) and bumps per-token usage
       via the locked-down `bump_bridge_token_usage` RPC.
 - [ ] [E35] Per-token counters (`ingest_count`, `first_used_at`,
-      `last_used_at`) are server-maintained: the guard trigger rejects
-      client-role writes (proven at runtime by the [E37] harness, including
-      the regression proof that the service-role bump still works).
+      `last_used_at`) are server-maintained on both write paths: the UPDATE
+      guard rejects client-role rewrites and the INSERT validator rejects
+      seeded values ([E35], static). Runtime proof rides the [E37] strict
+      harness — `BLOCKED` until it executes with zero skips (G3).
       Residual: an owner exercising a live DELETE privilege can still erase
       a token row wholesale; `sensor_ingest_audit_log` remains the
       durable record.
@@ -286,15 +289,20 @@ Recorded 2026-08-04 from a five-surface audit at `ef11737989e0`. These are
 **not** silently accepted; each needs either a hardening slice or an explicit
 accepted-risk entry in `docs/security-exceptions.md`.
 
-- **G1 — soft-revocation was client-reversible** — **RESOLVED 2026-08-04**
-  by migration `20260804213000_bridge_tokens_revocation_integrity`: the
-  guard trigger now makes `revoked_at` one-way and the usage counters
-  server-maintained for client roles ([E35]; runtime-proven by the [E37]
-  harness, which also proves the service-role `bump_bridge_token_usage`
-  path survived the change). Original finding: an owner session (e.g. XSS)
-  could UPDATE `revoked_at` back to `NULL` and rewrite usage counters.
-  Residual: a live owner DELETE privilege can still erase the row wholesale
-  (see G3's measurement); `name` remains owner-mutable by design.
+- **G1 — soft-revocation was client-reversible** — **hardening
+  IMPLEMENTED 2026-08-04; PASS is `BLOCKED` on runtime proof.** Migration
+  `20260804213000_bridge_tokens_revocation_integrity` makes `revoked_at`
+  one-way and the usage counters server-maintained for client roles on
+  **both write paths** — the UPDATE guard rejects rewrites, and the INSERT
+  validator rejects seeded telemetry and pre-revoked rows ([E35] pins both
+  guards statically). Original finding: an owner session (e.g. XSS) could
+  UPDATE `revoked_at` back to `NULL` and rewrite usage counters — and,
+  found in review, could equally have INSERTed forged counters. Do not
+  record PASS until the [E37] harness has actually executed against a real
+  database with zero skips (see G3); the harness includes the service-role
+  `bump_bridge_token_usage` regression proof. Residual: a live owner
+  DELETE privilege can still erase the row wholesale (see G3's
+  measurement); `name` remains owner-mutable by design.
 - **G2 — direct client INSERT bypasses mint's guarantees** (established
   fact). The INSERT policy lets an authenticated owner insert a
   `bridge_tokens` row with a self-chosen `token_hash`, skipping mint's
@@ -304,17 +312,23 @@ accepted-risk entry in `docs/security-exceptions.md`.
   weak self-chosen tokens become possible. Decision needed: tighten to
   service-role-only INSERT (preferred pattern) or accept with an exceptions
   entry.
-- **G3 — no runtime RLS harness for `bridge_tokens`** — **RESOLVED
-  2026-08-04**: `src/test/integration/bridge-tokens-rls.integration.test.ts`
-  (via `bun run test:bridge-tokens-db-security`, chained into
-  `test:security-db-local`, [E37]) proves cross-user SELECT/UPDATE/DELETE
-  denial, anon lockout, the column freezes, one-way revocation, and the
-  service-role bump regression at runtime, and **measures** the effective
+- **G3 — no runtime RLS harness for `bridge_tokens`** — **harness EXISTS;
+  status `BLOCKED` until it executes with zero skips.**
+  `src/test/integration/bridge-tokens-rls.integration.test.ts` (via
+  `bun run test:bridge-tokens-db-security`, chained into
+  `test:security-db-local`, [E37]) covers cross-user SELECT/UPDATE/DELETE
+  denial, anon lockout, the column freezes, clean-insert defaults,
+  insert-time forgery rejection, one-way revocation, and the service-role
+  bump regression, and behaviorally **measures** the effective
   authenticated DELETE privilege (the repo-unverifiable platform-default
-  question) — asserting behavior matches whichever answer the environment
-  gives. The harness deliberately does not claim `token_hash`
-  non-recoverability — see G10, that visibility is real under current
-  grants.
+  question). It has NOT yet executed against a real database — the local
+  replay is blocked by the known `email_queue_dispatch` base defect — so
+  no runtime claim is made. The `security-db-local` lane runs it in strict
+  mode (`BRIDGE_TOKENS_DB_SECURITY_REQUIRED=1`): unreachable DB or any
+  skipped test is a hard FAIL, and inspect the job/step result, never the
+  run-level rollup (`continue-on-error` masks it). The harness
+  deliberately does not claim `token_hash` non-recoverability — see G10,
+  that visibility is real under current grants.
 - **G10 — owners can read their own `token_hash`** (established fact).
   The founding migration grants table-wide `SELECT` to `authenticated` and
   RLS filters rows, not columns, so an owner (or any code holding the
@@ -325,8 +339,9 @@ accepted-risk entry in `docs/security-exceptions.md`.
   guarantee (§11) applies to the plaintext, not the hash. Hardening
   candidates: column-level privileges or a metadata-only view for client
   reads.
-- **G4 — mint/revoke test coverage holes** — **RESOLVED 2026-08-04**: the
-  Deno edge-test lane now runs `mint-bridge-token/handler_e2e_test.ts` and
+- **G4 — mint/revoke test coverage holes** — **PASS while the Deno
+  edge-test lane is green** (2026-08-04): the lane now runs
+  `mint-bridge-token/handler_e2e_test.ts` and
   the new `revoke-bridge-token/handler_e2e_test.ts` with matching path
   filters ([E36]), the mint suite positively asserts hash-only storage
   (64-hex `token_hash`, no `token` key, plaintext absent from the insert),

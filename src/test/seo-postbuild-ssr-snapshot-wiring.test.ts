@@ -26,7 +26,13 @@ describe("SEO postbuild SSR snapshot wiring", () => {
   it("routes postbuild through the SEO runner that captures via the probed server bundle", () => {
     expect(PACKAGE.scripts.postbuild).toContain("scripts/run-postbuild-seo.mjs");
     expect(POSTBUILD_RUNNER).toContain("capture-ssr-head-snapshots-with-server.mjs");
-    expect(POSTBUILD_RUNNER).toContain("probeServerBundleEntry");
+    // Pin the live call (env override honored) and that the probed entry is
+    // actually handed to the capture process — a dangling import plus a
+    // hard-coded capture argument must not satisfy this contract.
+    expect(POSTBUILD_RUNNER).toContain(
+      'probeServerBundleEntry(distDir, process.env["SEO_SERVER_BUNDLE_ENTRY"])',
+    );
+    expect(POSTBUILD_RUNNER).toContain("captureArgs.push(probe.entry)");
     expect(POSTBUILD_RUNNER).toContain("./lib/serverBundleEntryProbe.mjs");
   });
 
@@ -41,6 +47,9 @@ describe("SEO postbuild SSR snapshot wiring", () => {
   });
 
   it("keeps the canonical Nitro entry as a probe candidate", () => {
-    expect(PROBE_MODULE).toContain(NITRO_SERVER_ENTRY);
+    // Assert the candidate *expression*, not the bare literal — the literal
+    // also appears in the module's header comment, which would keep a
+    // deleted candidate green.
+    expect(PROBE_MODULE).toContain('resolve(".output", "server", "index.mjs")');
   });
 });

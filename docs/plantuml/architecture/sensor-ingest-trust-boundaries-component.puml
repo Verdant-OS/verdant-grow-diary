@@ -48,10 +48,10 @@ Secret --> Webhook : Bearer vbt_…
 Webhook --> Auth
 Auth --> BT : hash lookup (service_role)
 Webhook --> Ent
-Webhook --> Gates
-Gates --> SR : service_role persistence\nowner from token row\nbody user_id ignored
-SR --> Usage : only if insertedCount > 0
-Gates --> Audit
+Webhook --> Gates : checks only\n(no writes from Gates)
+Webhook --> SR : 1. service_role upsert\nowner from token row\nbody user_id ignored
+Webhook --> Usage : 2. after upsert,\nonly if insertedCount > 0
+Webhook --> Audit : 3. best-effort append\n(never fails the ingest)
 
 note right of Webhook
   **verify_jwt = false**

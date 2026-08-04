@@ -1,12 +1,29 @@
 /**
  * Source-to-diagram contract for the bridge sensor PlantUML architecture pack.
  * Pins load-bearing truths only — not layout aesthetics.
+ *
+ * Two-sided by design (review finding on #718): the "diagram claims" blocks
+ * pin the .puml text, and the "source grounding" block pins the SAME facts
+ * in the actual handler/auth/migration sources. If either side drifts —
+ * handler behavior changes, or a diagram quietly rewrites reality — one
+ * half of the pair fails and names the divergence.
  */
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 const ARCH = join(process.cwd(), "docs/plantuml/architecture");
+const SRC = {
+  webhook: "supabase/functions/sensor-ingest-webhook/index.ts",
+  sharedAuth: "supabase/functions/_shared/sensorIngestAuth.ts",
+  freshness: "supabase/functions/_shared/sensorIngestFreshness.ts",
+  revoke: "supabase/functions/revoke-bridge-token/index.ts",
+  mint: "supabase/functions/mint-bridge-token/index.ts",
+} as const;
+
+function readSource(rel: string): string {
+  return readFileSync(join(process.cwd(), rel), "utf8");
+}
 
 const REQUIRED_DIAGRAMS = [
   "bridge-token-mint-use-revoke-sequence.puml",
@@ -139,6 +156,77 @@ describe("bridge-sensor PlantUML architecture pack", () => {
 
     // Telemetry-only safety statement allowed
     expect(bounds).toMatch(/No AI Doctor|Telemetry storage only/i);
+  });
+
+  it("grounds every load-bearing diagram claim in the actual sources (drift on either side fails)", () => {
+    const webhook = readSource(SRC.webhook);
+    const auth = readSource(SRC.sharedAuth);
+    const freshness = readSource(SRC.freshness);
+    const revoke = readSource(SRC.revoke);
+    const mint = readSource(SRC.mint);
+    const act = read("sensor-ingest-verification-activity.puml");
+    const life = read("bridge-token-lifecycle-state.puml");
+    const bounds = read("sensor-ingest-trust-boundaries-component.puml");
+
+    // Bridge-only auth: source AND diagrams.
+    expect(webhook).toMatch(/allowJwt:\s*false/);
+    expect(webhook).toMatch(/auth\.kind !== "bridge"/);
+
+    // Status mapping: 403 bridge_required, 503 config/lookup, 401 otherwise
+    // (unauthorized / token_revoked / token_expired) — the diagram's outcome
+    // matrix must carry ALL of these branches, including plain unauthorized.
+    expect(webhook).toMatch(/bridge_required"\s*\?\s*403/);
+    expect(webhook).toMatch(/auth_lookup_failed"\s*\n?\s*\?\s*503/);
+    expect(auth).toMatch(/error: "unauthorized"/);
+    expect(act).toMatch(/401 unauthorized/);
+    expect(act).toMatch(/403 bridge_required/);
+    expect(act).toMatch(/503/);
+
+    // Freshness window: single source constant, diagram states the value.
+    expect(freshness).toMatch(/LIVE_INGEST_FRESHNESS_WINDOW_MS = 30 \* 60 \* 1000/);
+    expect(act).toMatch(/30 \* 60 \* 1000|30-minute|30 minute/);
+
+    // Persistence order in the handler: upsert -> usage bump -> audit.
+    const iUpsert = webhook.indexOf(".upsert(");
+    const iBump = webhook.indexOf("bump_bridge_token_usage");
+    const iAudit = webhook.indexOf("sensor_ingest_audit_log");
+    expect(iUpsert).toBeGreaterThan(-1);
+    expect(iBump).toBeGreaterThan(iUpsert);
+    expect(iAudit).toBeGreaterThan(iBump);
+    // The webhook handler owns those writes — the component diagram must
+    // attribute them to the webhook, never to the database or the checks.
+    expect(webhook).toMatch(/insertedCount > 0/);
+    expect(bounds).toMatch(/Webhook --> Usage/);
+    expect(bounds).toMatch(/Webhook --> Audit/);
+    expect(bounds).not.toMatch(/SR --> Usage/);
+    expect(bounds).not.toMatch(/Gates --> Audit/);
+    expect(bounds).not.toMatch(/Gates --> SR/);
+
+    // Verification order in the handler source mirrors the diagram order.
+    const at = (needle: string) => {
+      const i = webhook.indexOf(needle);
+      expect(i, needle).toBeGreaterThan(-1);
+      return i;
+    };
+    expect(at("authenticateBearer(")).toBeLessThan(at("requireLiveSensorEntitlement("));
+    expect(at("requireLiveSensorEntitlement(")).toBeLessThan(at("normalizeWebhookIngestPayload("));
+    expect(at("normalizeWebhookIngestPayload(")).toBeLessThan(at("tentScopeMatches("));
+    expect(at("tentScopeMatches(")).toBeLessThan(at("classifyIngestTimestampFreshness("));
+    expect(at("classifyIngestTimestampFreshness(")).toBeLessThan(iUpsert);
+
+    // Lifecycle: revoke filters only owner + revoked_at IS NULL — expiry
+    // does not block revocation, so Expired is NOT terminal; and auth
+    // checks revoked_at BEFORE expires_at.
+    expect(revoke).toMatch(/\.is\("revoked_at", null\)/);
+    expect(revoke).not.toMatch(/expires_at/);
+    expect(revoke).toMatch(/already_revoked/);
+    expect(auth.indexOf("token_revoked")).toBeLessThan(auth.indexOf("token_expired"));
+    expect(life).toMatch(/Expired --> Revoked/);
+    expect(life).not.toMatch(/Expired --> \[\*\]/);
+
+    // Mint: hash-only at rest, CSPRNG entropy.
+    expect(mint).toMatch(/token_hash: tokenHash/);
+    expect(mint).toMatch(/crypto\.getRandomValues/);
   });
 
   it("preserves verification order: auth before entitlement before tent before freshness before persistence", () => {

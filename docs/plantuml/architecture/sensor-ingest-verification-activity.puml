@@ -29,6 +29,9 @@ partition "1. Authenticate (allowJwt: false)" {
   if (auth outcome?) then (bridge_required)
     #FFCDD2:403 bridge_required\n(non-vbt_ / JWT blocked);
     stop
+  elseif (unauthorized) then
+    #FFCDD2:401 unauthorized\n(vbt_ too short, or hash\nmatches no bridge_tokens row);
+    stop
   elseif (token_revoked) then
     #FFCDD2:401 token_revoked;
     stop

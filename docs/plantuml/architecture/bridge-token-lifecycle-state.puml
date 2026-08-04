@@ -45,14 +45,19 @@ NotIssued --> NeverUsed : mint-bridge-token\n[user JWT + liveSensors +\ntent own
 
 Active --> Expired : authenticateBearer\n[expires_at <= request now]\n(no scheduler required in model)
 Active --> Revoked : revoke-bridge-token\n[owner JWT]\n/ UPDATE WHERE revoked_at IS NULL
+Expired --> Revoked : revoke-bridge-token\n[owner JWT]\n(expiry does not block revoke;\nfilter is only revoked_at IS NULL)
 
-Expired --> [*]
 Revoked --> [*]
 
 note right of Revoked
   **Forbidden:** Revoked → Active
   No edge drawn. Clearing revoked_at
   is blocked for client roles.
+  Revoked is the only terminal state:
+  authenticateBearer checks revoked_at
+  **before** expires_at, so a
+  revoked-and-expired token reports
+  401 token_revoked.
 end note
 
 note left of Expired
@@ -73,8 +78,8 @@ legend right
   | Not issued | no row |
   | Active / never used | valid; ingest_count = 0 |
   | Active / used | valid; ingest_count >= 1 |
-  | Expired | expires_at <= now at auth |
-  | Revoked | revoked_at set (terminal) |
+  | Expired | expires_at <= now at auth; still revocable |
+  | Revoked | revoked_at set (the terminal state) |
 endlegend
 
 caption Implemented controls ≠ all runtime-proven.\nStrict DB harness may remain BLOCKED (zero-skip not yet green).

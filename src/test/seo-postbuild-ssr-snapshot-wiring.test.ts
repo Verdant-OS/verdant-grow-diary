@@ -10,12 +10,15 @@ const CAPTURE_SCRIPT = readFileSync(
   resolve(ROOT, "scripts/capture-ssr-head-snapshots-with-server.mjs"),
   "utf8",
 );
+const POSTBUILD_RUNNER = readFileSync(resolve(ROOT, "scripts/run-postbuild-seo.mjs"), "utf8");
 const NITRO_SERVER_ENTRY = ".output/server/index.mjs";
 const CAPTURE_COMMAND = `node scripts/capture-ssr-head-snapshots-with-server.mjs dist ${NITRO_SERVER_ENTRY}`;
 
 describe("SEO postbuild SSR snapshot wiring", () => {
-  it("passes the current Nitro server bundle to the postbuild snapshot capture", () => {
-    expect(PACKAGE.scripts.postbuild).toContain(CAPTURE_COMMAND);
+  it("routes postbuild through the SEO runner that captures via Nitro", () => {
+    expect(PACKAGE.scripts.postbuild).toContain("scripts/run-postbuild-seo.mjs");
+    expect(POSTBUILD_RUNNER).toContain("capture-ssr-head-snapshots-with-server.mjs");
+    expect(POSTBUILD_RUNNER).toContain('resolve(".output/server/index.mjs")');
   });
 
   it("keeps the standalone snapshot command on the same server bundle", () => {

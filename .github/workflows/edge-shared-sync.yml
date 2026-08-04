@@ -22,6 +22,29 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
+      - name: Materialize #692 generated mirror and tree authority
+        run: |
+          git fetch --depth=1 origin \
+            refs/heads/grok/sensor-truth-canon-residual-592:refs/remotes/origin/grok/sensor-truth-canon-residual-592
+          rm -rf ../stack-692-tree stack-692-repair-material
+          git worktree add --detach ../stack-692-tree \
+            refs/remotes/origin/grok/sensor-truth-canon-residual-592
+          mkdir -p stack-692-repair-material/generated
+          (
+            cd ../stack-692-tree
+            SYNC_TMP_OUT="$GITHUB_WORKSPACE/stack-692-repair-material/generated" \
+              node scripts/sync-edge-shared.mjs --check || true
+          )
+          git -C ../stack-692-tree rev-parse HEAD \
+            > stack-692-repair-material/child-head.txt
+          git -C ../stack-692-tree rev-parse 'HEAD^{tree}' \
+            > stack-692-repair-material/child-tree.txt
+      - name: Upload #692 repair material
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: stack-692-repair-material
+          path: stack-692-repair-material/**
+          if-no-files-found: error
       - name: Fail on any ../../../src/lib import in supabase/functions/*/index.ts
         run: node scripts/check-no-src-lib-imports.mjs
       - name: Verify committed edge shared-lib mirror matches src/ (with PR annotations)

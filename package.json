@@ -10,6 +10,7 @@
     "stamp-version": "node scripts/stamp-version.mjs",
     "build": "vite build",
     "postbuild": "node scripts/run-postbuild-seo.mjs dist",
+    "test:postbuild-seo-artifacts": "vitest run src/test/postbuild-seo-artifact-generation.test.ts --reporter=dot --testTimeout=300000 --hookTimeout=300000",
     "build:dev": "vite build --mode development",
     "sync-edge-shared": "node scripts/sync-edge-shared.mjs",
     "verify-edge-shared-in-sync": "node scripts/verify-edge-shared-in-sync.mjs",

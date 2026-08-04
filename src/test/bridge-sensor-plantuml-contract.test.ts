@@ -209,8 +209,9 @@ describe("bridge-sensor PlantUML architecture pack", () => {
   it("does not launder BLOCKED harness evidence as PASS", () => {
     const all = allDiagramText() + readFileSync(join(ARCH, "README.md"), "utf8");
     expect(all).toMatch(/BLOCKED/);
-    // Must not claim strict harness PASS
-    expect(all).not.toMatch(/strict[^\n]{0,40}PASS/i);
-    expect(all).not.toMatch(/zero-skip[^\n]{0,40}PASS/i);
+    // Status word PASS only — do not trip on "passed > 0" evidence criteria.
+    expect(all).not.toMatch(/strict[^\n]{0,80}\bPASS\b(?![a-z])/i);
+    expect(all).not.toMatch(/zero-skip[^\n]{0,80}\bPASS\b(?![a-z])/i);
+    expect(all).not.toMatch(/BLOCKED[^\n]{0,40}\bas PASS\b/i);
   });
 });

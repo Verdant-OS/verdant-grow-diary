@@ -121,6 +121,7 @@ jobs:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           MERGE_GROUP_BASE_REF: ${{ github.event.merge_group.base_ref }}
           PUSH_BEFORE_SHA: ${{ github.event.before }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
@@ -149,16 +150,33 @@ jobs:
             workflow_dispatch)
               case "$GITHUB_REF" in
                 refs/heads/main|refs/heads/verdant-grow-diary)
+                  if ! candidate="$(git rev-parse --verify "${GITHUB_SHA}^1")"; then
+                    echo "::error title=Knowledge history base unavailable::workflow_dispatch requires a checked-out commit with a first parent"
+                    exit 1
+                  fi
                   ;;
                 *)
-                  echo "::error title=Knowledge history dispatch ref rejected::workflow_dispatch is restricted to the protected target branches"
-                  exit 1
+                  # Feature-branch dispatch (e.g. re-run required PR gate when
+                  # pull_request events are delayed): resolve the open PR base.
+                  branch="${GITHUB_REF#refs/heads/}"
+                  if ! command -v gh >/dev/null 2>&1; then
+                    echo "::error title=Knowledge history base unavailable::gh CLI required to resolve PR base on feature-branch workflow_dispatch"
+                    exit 1
+                  fi
+                  if ! candidate="$(gh api "repos/${GITHUB_REPOSITORY}/pulls?head=${GITHUB_REPOSITORY_OWNER}:${branch}&state=open" --jq '.[0].base.sha // empty')"; then
+                    echo "::error title=Knowledge history base unavailable::failed to query open PR base for ${branch}"
+                    exit 1
+                  fi
+                  if [[ -z "$candidate" ]]; then
+                    echo "::error title=Knowledge history base unavailable::no open PR found for head ${branch}; dispatch only on PR branches or protected targets"
+                    exit 1
+                  fi
+                  # Ensure the base commit object is present for later git show.
+                  if ! git cat-file -e "${candidate}^{commit}" 2>/dev/null; then
+                    git fetch --no-tags origin "$candidate" || true
+                  fi
                   ;;
               esac
-              if ! candidate="$(git rev-parse --verify "${GITHUB_SHA}^1")"; then
-                echo "::error title=Knowledge history base unavailable::workflow_dispatch requires a checked-out commit with a first parent"
-                exit 1
-              fi
               ;;
             *)
               echo "::error title=Knowledge history event unsupported::cannot resolve a base for $GITHUB_EVENT_NAME"

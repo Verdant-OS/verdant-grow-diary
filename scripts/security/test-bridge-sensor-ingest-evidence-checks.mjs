@@ -19,6 +19,7 @@ import {
   bridgeMigrationCorpus,
   runExpectations,
   runAllChecks,
+  stripSqlComments,
 } from "./bridge-sensor-ingest-evidence-checks.mjs";
 
 let failures = 0;
@@ -74,26 +75,94 @@ for (const check of CHECKS) {
 }
 
 // --- migration checks -----------------------------------------------------
+// Each check gets a tamper per failure mode: protections removed AND the
+// regression statement that would undo them injected after the real history.
 const { corpus } = bridgeMigrationCorpus();
 const MIGRATION_TAMPERS = {
-  E29: (c) =>
-    c.replace(/ALTER TABLE public\.bridge_tokens ENABLE ROW LEVEL SECURITY;/g, "-- TAMPERED"),
-  E30: (c) => `${c}\nGRANT SELECT ON public.bridge_tokens TO anon;\n`,
-  E31: (c) => c.replace(/token_hash text NOT NULL UNIQUE,/g, "token text NOT NULL,"),
-  E34: (c) =>
-    c.replace(
-      /REVOKE EXECUTE ON FUNCTION public\.bump_bridge_token_usage\(UUID, INTEGER\) FROM PUBLIC, anon, authenticated;/g,
-      "-- TAMPERED",
-    ),
+  E29: [
+    (c) =>
+      c.replace(/ALTER TABLE public\.bridge_tokens ENABLE ROW LEVEL SECURITY;/g, "-- TAMPERED"),
+    (c) => `${c}\nALTER TABLE public.bridge_tokens DISABLE ROW LEVEL SECURITY;\n`,
+  ],
+  E30: [
+    (c) => `${c}\nGRANT SELECT ON public.bridge_tokens TO anon;\n`,
+    // No TO clause: PostgreSQL defaults the policy to PUBLIC.
+    (c) =>
+      `${c}\nCREATE POLICY "sneaky_default" ON public.bridge_tokens FOR SELECT USING (true);\n`,
+    (c) =>
+      `${c}\nCREATE POLICY "sneaky_public" ON public.bridge_tokens FOR SELECT TO PUBLIC USING (true);\n`,
+    // Mixed role lists in every order, on both CREATE and ALTER.
+    (c) =>
+      `${c}\nCREATE POLICY "sneaky_mixed" ON public.bridge_tokens FOR SELECT TO authenticated, anon USING (true);\n`,
+    (c) =>
+      `${c}\nCREATE POLICY "sneaky_extra_role" ON public.bridge_tokens FOR SELECT TO authenticated, service_role USING (true);\n`,
+    // Role-changing ALTER POLICY in a later migration.
+    (c) => `${c}\nALTER POLICY "Users view own bridge_tokens" ON public.bridge_tokens TO PUBLIC;\n`,
+    (c) => `${c}\nALTER POLICY "Users view own bridge_tokens" ON public.bridge_tokens TO anon;\n`,
+    (c) =>
+      `${c}\nALTER POLICY "Users view own bridge_tokens" ON public.bridge_tokens TO authenticated, anon;\n`,
+    (c) =>
+      `${c}\nALTER POLICY "Users view own bridge_tokens" ON public.bridge_tokens TO anon, authenticated;\n`,
+    (c) =>
+      `${c}\nALTER POLICY "Users view own bridge_tokens" ON public.bridge_tokens TO authenticated, PUBLIC;\n`,
+  ],
+  E31: [(c) => c.replace(/token_hash text NOT NULL UNIQUE,/g, "token text NOT NULL,")],
+  E34: [
+    (c) =>
+      c.replace(
+        /REVOKE EXECUTE ON FUNCTION public\.bump_bridge_token_usage\(UUID, INTEGER\) FROM PUBLIC, anon, authenticated;/g,
+        "-- TAMPERED",
+      ),
+    (c) =>
+      `${c}\nGRANT EXECUTE ON FUNCTION public.bump_bridge_token_usage(UUID, INTEGER) TO authenticated;\n`,
+  ],
 };
 for (const check of MIGRATION_CHECKS) {
-  const tamper = MIGRATION_TAMPERS[check.id];
-  if (!tamper) {
+  const tampers = MIGRATION_TAMPERS[check.id];
+  if (!tampers?.length) {
     report(`${check.id} migration tamper fixture`, false, "no tamper defined");
     continue;
   }
-  const detects = runExpectations(tamper(corpus), check.expect).length > 0;
-  report(`${check.id} detects tampered migration corpus`, detects);
+  tampers.forEach((tamper, i) => {
+    // Mirror the production loop: comment-stripped for regex expectations,
+    // raw for custom (which strips internally).
+    const tampered = tamper(corpus);
+    const failures = runExpectations(stripSqlComments(tampered), check.expect);
+    if (check.custom) failures.push(...check.custom(tampered));
+    report(`${check.id} detects tampered migration corpus (#${i + 1})`, failures.length > 0);
+  });
+}
+
+// --- false-positive guards: benign content must NOT trip E30 --------------
+{
+  const e30 = MIGRATION_CHECKS.find((c) => c.id === "E30");
+  const evaluate = (content) => [
+    ...runExpectations(stripSqlComments(content), e30.expect),
+    ...e30.custom(content),
+  ];
+
+  const untouched = evaluate(corpus);
+  report(
+    "E30 passes the real untampered migration corpus",
+    untouched.length === 0,
+    untouched.join("; "),
+  );
+
+  const benign = `${corpus}\nALTER POLICY "Users view own bridge_tokens" ON public.bridge_tokens RENAME TO "Owners view own bridge_tokens";\nALTER POLICY "Users update own bridge_tokens" ON public.bridge_tokens USING (auth.uid() = user_id);\n`;
+  const spurious = evaluate(benign);
+  report(
+    "E30 stays quiet on benign RENAME TO / role-preserving ALTER POLICY",
+    spurious.length === 0,
+    spurious.join("; "),
+  );
+
+  const commented = `${corpus}\n-- ALTER POLICY "Users view own bridge_tokens" ON public.bridge_tokens TO PUBLIC;\n/* ALTER POLICY "Users view own bridge_tokens" ON public.bridge_tokens TO anon; */\n-- GRANT SELECT ON public.bridge_tokens TO anon;\n`;
+  const ghost = evaluate(commented);
+  report(
+    "E30 stays quiet on commented-out ALTER POLICY / GRANT regressions",
+    ghost.length === 0,
+    ghost.join("; "),
+  );
 }
 
 // --- missing files are failures, never skips ------------------------------

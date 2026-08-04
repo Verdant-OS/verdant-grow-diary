@@ -4,7 +4,7 @@ import { grantAnalyticsConsent } from "./utils/analyticsConsent";
 /**
  * End-to-end check: the GA4 bootstrap declared in the TanStack root route head
  * (src/routes/__root.tsx) actually EXECUTES in the browser on the main app
- * routes — i.e. `gtag('config', 'G-MCXQ9GVS5H', { send_page_view: false })`
+ * routes — i.e. `gtag('config', <resolved measurement id>, { send_page_view: false })`
  * lands in `window.dataLayer`.
  *
  * The static vitest check only proves the markup exists. This proves it runs.
@@ -16,7 +16,7 @@ import { grantAnalyticsConsent } from "./utils/analyticsConsent";
  *  - Public, credential-free routes only. No auth state, no writes.
  */
 
-const MEASUREMENT_ID = "G-MCXQ9GVS5H";
+import { EXPECTED_MEASUREMENT_ID as MEASUREMENT_ID } from "./utils/analyticsMeasurementId";
 
 // Public routes reachable without a session. `/` renders the signed-out
 // landing surface; the others are static public pages.

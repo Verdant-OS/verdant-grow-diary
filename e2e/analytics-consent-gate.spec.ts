@@ -6,7 +6,7 @@ import { ANALYTICS_CONSENT_STORAGE_KEY } from "./utils/analyticsConsent";
  * before the grower explicitly accepts. After Accept, the tag bootstraps once
  * and keeps `send_page_view: false`. After Decline, nothing loads.
  */
-const MEASUREMENT_ID = "G-MCXQ9GVS5H";
+import { EXPECTED_MEASUREMENT_ID as MEASUREMENT_ID } from "./utils/analyticsMeasurementId";
 const TAG_SELECTOR = `script[src*="googletagmanager.com/gtag/js"][src*="${MEASUREMENT_ID}"]`;
 
 test.describe("analytics consent gate", () => {

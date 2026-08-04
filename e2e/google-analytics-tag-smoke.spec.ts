@@ -15,7 +15,7 @@ import { grantAnalyticsConsent } from "./utils/analyticsConsent";
  * present either way.
  */
 
-const MEASUREMENT_ID = "G-MCXQ9GVS5H";
+import { EXPECTED_MEASUREMENT_ID as MEASUREMENT_ID } from "./utils/analyticsMeasurementId";
 
 test.describe("GA4 tag smoke", () => {
   test("script tag and dataLayer are present after load", async ({ page }) => {

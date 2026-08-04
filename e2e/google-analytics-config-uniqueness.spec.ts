@@ -18,7 +18,7 @@ import { grantAnalyticsConsent } from "./utils/analyticsConsent";
  *  - Public, credential-free routes only. No auth state, no writes.
  */
 
-const MEASUREMENT_ID = "G-MCXQ9GVS5H";
+import { EXPECTED_MEASUREMENT_ID as MEASUREMENT_ID } from "./utils/analyticsMeasurementId";
 
 // Public routes reachable without a session, walked in order and then back to
 // `/` so the loop covers a repeat visit to an already-seen route.

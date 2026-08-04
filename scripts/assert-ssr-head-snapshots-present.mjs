@@ -23,8 +23,18 @@
  *
  * Usage: node scripts/assert-ssr-head-snapshots-present.mjs [distDir]
  */
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
+
+import {
+  ALLOWED_OG_COLOR_TYPES,
+  EXPECTED_OG_BIT_DEPTH,
+  EXPECTED_OG_HEIGHT,
+  EXPECTED_OG_WIDTH,
+  PNG_COLOR_TYPE_LABELS,
+  ogSlugForPath,
+  readPngHeader,
+} from "./assert-og-card-dimensions.mjs";
 
 /** A real SSR head snapshot is far larger; this only catches empty/truncated writes. */
 const MINIMUM_SNAPSHOT_BYTES = 200;
@@ -43,6 +53,95 @@ function decodeHtmlEntities(value) {
     .replaceAll("&lt;", "<")
     .replaceAll("&gt;", ">")
     .replaceAll("&amp;", "&");
+}
+
+/**
+ * Expected OG card filename for a manifest document.
+ * Prefers the manifest canonical URL, falling back to the document path.
+ * @returns {string | null} `<slug>.png`, or null when no path can be resolved.
+ */
+export function expectedOgCardFileNameForDocument(document) {
+  const canonical = document?.metadata?.url;
+  let pathname = null;
+  if (typeof canonical === "string" && canonical.trim() !== "") {
+    try {
+      pathname = new URL(canonical).pathname;
+    } catch {
+      pathname = null;
+    }
+  }
+  if (pathname === null && typeof document?.path === "string" && document.path.startsWith("/")) {
+    pathname = document.path;
+  }
+  if (pathname === null) return null;
+  return `${ogSlugForPath(pathname)}.png`;
+}
+
+/**
+ * Basename of an og:image URL when it points at a generated card, else null.
+ * Documents are allowed to reference the brand logo instead of a card.
+ */
+export function ogCardBaseNameFromImageUrl(image) {
+  if (typeof image !== "string" || image.trim() === "") return null;
+  let pathname;
+  try {
+    pathname = new URL(image, "https://verdantgrowdiary.com").pathname;
+  } catch {
+    return null;
+  }
+  if (!pathname.includes("/og/")) return null;
+  return pathname.slice(pathname.lastIndexOf("/") + 1);
+}
+
+/**
+ * Assert a generated card exists at dist/client/og/<fileName> (exact case) and
+ * decodes as a card of the expected resolution and pixel format.
+ * @returns {string[]} problem descriptions (empty when the card is sound)
+ */
+export function inspectOgCardFile(distDir, fileName, ogListing) {
+  const problems = [];
+  if (ogListing === null) {
+    return [`dist/client/og is missing; og:image references ${fileName} but no cards were emitted.`];
+  }
+  if (!ogListing.has(fileName)) {
+    return [
+      `og:image references /og/${fileName}, but that file is not present in dist/client/og ` +
+        `(filenames are case-sensitive on the production host).`,
+    ];
+  }
+
+  const filePath = join(distDir, "client/og", fileName);
+  const header = readPngHeader(readFileSync(filePath));
+  if (!header.ok) {
+    return [`og:image card /og/${fileName} is not a readable PNG: ${header.reason}.`];
+  }
+  if (header.width !== EXPECTED_OG_WIDTH || header.height !== EXPECTED_OG_HEIGHT) {
+    problems.push(
+      `og:image card /og/${fileName} is ${header.width}x${header.height}; ` +
+        `expected ${EXPECTED_OG_WIDTH}x${EXPECTED_OG_HEIGHT}.`,
+    );
+  }
+  if (header.bitDepth !== EXPECTED_OG_BIT_DEPTH) {
+    problems.push(
+      `og:image card /og/${fileName} has bit depth ${header.bitDepth}; ` +
+        `expected ${EXPECTED_OG_BIT_DEPTH}.`,
+    );
+  }
+  if (!ALLOWED_OG_COLOR_TYPES.includes(header.colorType)) {
+    const label = PNG_COLOR_TYPE_LABELS[header.colorType] ?? "unknown";
+    problems.push(
+      `og:image card /og/${fileName} has colour type ${header.colorType} (${label}); ` +
+        `expected one of ${ALLOWED_OG_COLOR_TYPES.join(", ")}.`,
+    );
+  }
+  return problems;
+}
+
+/** Real, case-sensitive listing of dist/client/og, or null when absent. */
+function readOgListing(distDir) {
+  const ogDir = join(distDir, "client/og");
+  if (!existsSync(ogDir) || !statSync(ogDir).isDirectory()) return null;
+  return new Set(readdirSync(ogDir).filter((entry) => statSync(join(ogDir, entry)).isFile()));
 }
 
 /**
@@ -84,6 +183,7 @@ export function validateHeadSnapshots(distDir) {
   }
 
   let checked = 0;
+  const ogListing = readOgListing(distDir);
 
   for (const document of documents) {
     const label = typeof document?.path === "string" ? document.path : "(unnamed route)";
@@ -166,6 +266,43 @@ export function validateHeadSnapshots(distDir) {
         );
       }
     }
+
+    const ogImages = [
+      ...html.matchAll(
+        /<meta[^>]+property=["']og:image["'][^>]*content=["']([^"']*)["'][^>]*>/gi,
+      ),
+    ];
+    if (ogImages.length === 0) {
+      problems.push(`${label}: head snapshot has no <meta property="og:image">.`);
+    } else if (ogImages.length > 1) {
+      problems.push(
+        `${label}: head snapshot has ${ogImages.length} og:image tags; expected exactly 1.`,
+      );
+    } else {
+      const ogImage = decodeHtmlEntities(ogImages[0][1]).trim();
+      if (ogImage === "") {
+        problems.push(`${label}: head snapshot og:image is empty.`);
+      } else if (!/^https?:\/\//i.test(ogImage)) {
+        problems.push(
+          `${label}: og:image ${JSON.stringify(ogImage)} is not an absolute URL; ` +
+            `social scrapers cannot resolve relative image paths.`,
+        );
+      } else {
+        const referenced = ogCardBaseNameFromImageUrl(ogImage);
+        if (referenced !== null) {
+          const expectedCard = expectedOgCardFileNameForDocument(document);
+          if (expectedCard !== null && referenced !== expectedCard) {
+            problems.push(
+              `${label}: og:image points at /og/${referenced}, but this route's generated ` +
+                `card is /og/${expectedCard}.`,
+            );
+          }
+          for (const problem of inspectOgCardFile(distDir, referenced, ogListing)) {
+            problems.push(`${label}: ${problem}`);
+          }
+        }
+      }
+    }
   }
 
   return { ok: problems.length === 0, checked, problems, total: documents.length };
@@ -191,6 +328,7 @@ if (invokedDirectly) {
 
   console.log(
     `assert-ssr-head-snapshots-present: OK — ${checked}/${total} pre-rendered head snapshot(s) ` +
-      `present, non-empty, and well-formed (single title, meta description, matching canonical).`,
+      `present, non-empty, and well-formed (single title, meta description, matching canonical, ` +
+      `og:image resolving to a ${EXPECTED_OG_WIDTH}x${EXPECTED_OG_HEIGHT} card).`,
   );
 }

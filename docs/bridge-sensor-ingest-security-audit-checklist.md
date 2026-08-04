@@ -153,9 +153,10 @@ branch, never `main`.
 - [ ] [E25] The server ingest window is pinned at **30 minutes**
       (`LIVE_INGEST_FRESHNESS_WINDOW_MS`). Changing this value must update
       this checklist and the evidence lane in the same PR — the value is
-      deliberately load-bearing: the webhook's stale rejection is tied to the
-      `sensor_readings` dedupe uniqueness key (`user_id, tent_id, source,
-    metric, captured_at`), so a window change is never a one-line edit.
+      deliberately load-bearing: the webhook's stale rejection is tied to
+      the `sensor_readings` dedupe uniqueness key
+      `user_id, tent_id, source, metric, captured_at`, so a window change
+      is never a one-line edit.
 - [ ] [runtime: `storageMapping` tests via the webhook vitest suites]
       Per-row provenance is demoted `live -> stale` at the same 30m boundary,
       so replayed packets cannot land as live.
@@ -217,15 +218,26 @@ branch, never `main`.
       and never reads the browser session JWT.
 - [ ] [E26] The client/published secret scanner keeps forbidding
       bridge-token identifiers in `src/`, `public/`, and `dist/`.
+- [ ] [runtime: `src/test/sensor-reveal-surface-hardening-static.test.ts`]
+      The one-time reveal box is the SINGLE DOM location for the plaintext
+      (on-screen listener snippet is placeholder-only); the testbench
+      reveal has a Dismiss control; every token-embedding copy path goes
+      through the shared confirmation gate; on-screen response bodies
+      render only via `redactedResponseBodyJson`; failure toasts use the
+      fixed-copy mappers; neither token component touches storage,
+      IndexedDB, or `console.*` (whole-file pins).
+- [ ] [runtime: `tent-bridge-tokens-page-safety.test.tsx`] The DOM leak
+      scan rejects plaintext-token-shaped strings
+      (`vbt_[A-Za-z0-9_-]{16,}`) and proves mint-failure toasts never carry
+      server-controlled text.
 - [ ] MANUAL — the plaintext exists client-side only in component memory
       during the one-time reveal (`TentBridgeTokensCard`,
-      `SensorsTestbenchPanel`); any change must keep it out of storage
-      (`localStorage`/`sessionStorage`/IndexedDB), out of `console.*`, out of
-      analytics/error reporters, and out of persisted exports
-      (`sensorDiagnosticsExportRules` redaction).
+      `SensorsTestbenchPanel`); keep it out of analytics/error reporters
+      and persisted exports (`sensorDiagnosticsExportRules` redaction).
 - [ ] MANUAL — copy-to-clipboard of the plaintext is a deliberate,
-      warned-in-copy exposure; do not add new copy paths without a blocking
-      confirmation (see Known gaps G6 for the two unconfirmed legacy paths).
+      confirmed, warned-in-copy exposure; do not add new copy paths outside
+      the shared `buildTokenEmbeddingCopyWarningState` gate. The OS
+      clipboard is not auto-cleared (accepted residual, see G6).
 
 ## 12. Sibling isolation
 
@@ -357,16 +369,25 @@ accepted-risk entry in `docs/security-exceptions.md`.
   the 30m window to the dedupe uniqueness key, so server-side alignment is a
   deliberate slice, not a constant edit. This checklist pins the server value
   ([E25]) so any change is forced through review.
-- **G6 — client reveal-surface gaps** (established facts).
-  `SensorsTestbenchPanel`'s reveal has no Dismiss control (its own header
-  comment claims one); during reveal the plaintext renders in two DOM
-  locations (reveal box + always-rendered PowerShell listener snippet);
-  `copyCurl`/`copyPowerShell` embed the real token with no blocking
-  confirmation (only `copyPowerShellIngest` confirms); raw response bodies
-  render on-screen without `redactTokens` (exports are redacted, display is
-  not); the DOM leak-scan test's forbidden-terms list lacks a `/vbt_/`
-  pattern; mint/revoke failure toasts render server-controlled text
-  verbatim; nothing clears the clipboard after a copy.
+- **G6 — client reveal-surface gaps** — **RESOLVED 2026-08-04** (Phase C,
+  slot 3). All findings closed and pinned by
+  `src/test/sensor-reveal-surface-hardening-static.test.ts` plus the
+  strengthened `sensors-testbench-panel-diagnostics-static.test.ts` and
+  `tent-bridge-tokens-page-safety.test.tsx`: the testbench reveal has a
+  Dismiss control; the on-screen listener snippet is placeholder-only
+  (single DOM location for the plaintext — the reveal box); every
+  token-embedding copy path (curl, listener config, ingest script) goes
+  through the shared `buildTokenEmbeddingCopyWarningState` confirmation;
+  on-screen response bodies render via `redactedResponseBodyJson` (the
+  export redaction's DOM twin); the DOM leak scan now enforces a
+  plaintext-token-shape regex (`vbt_[A-Za-z0-9_-]{16,}` — prefixes still
+  render); mint/revoke toasts use fixed-copy mappers
+  (`mintFailureDescription`/`revokeFailureDescription` in
+  `bridgeTokenRules`) and never echo server-controlled text; both
+  components carry whole-file no-storage/no-console pins. Residual
+  (accepted): copy-to-clipboard remains a deliberate, confirmed,
+  warned-in-copy exposure — the OS clipboard is outside app control and is
+  not auto-cleared.
 - **G7 — no audience scoping between `vbt_` consumers** (practical
   observation). One token works on both `sensor-ingest-webhook` and
   `ecowitt-ingest`. Bounded by tent scope + per-request entitlement; record

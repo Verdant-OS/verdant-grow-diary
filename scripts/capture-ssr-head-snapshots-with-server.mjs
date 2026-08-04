@@ -100,11 +100,10 @@ for (const document of manifest.documents) {
 }
 
 if (failures.length > 0) {
-  console.error(
-    `capture-ssr-head-snapshots-with-server: ${failures.length} document(s) failed to render:`,
-  );
-  for (const failure of failures) console.error(`  - ${failure}`);
-  process.exit(1);
+  const log = nonFatal ? console.warn : console.error;
+  for (const failure of failures) log(`  - ${failure}`);
+  abort(`${failures.length} document(s) failed to render (see list above).`);
 }
+
 
 console.log(`capture-ssr-head-snapshots-with-server: ${written} SSR snapshot(s) -> ${distDir}`);

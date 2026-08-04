@@ -52,6 +52,20 @@ jobs:
       - name: Build (runs postbuild head-fidelity validator)
         run: bun run build
 
+      # Explicit, standalone precondition gate. The postbuild runner already
+      # asserts this, but re-checking here means a wiped or partially produced
+      # dist fails as a missing artifact rather than as validators vacuously
+      # reporting "0 documents".
+      - name: Assert dist/seo-manifest.json exists before SEO fidelity validators
+        run: node scripts/assert-seo-manifest-present.mjs dist
+
+      - name: Re-run SEO fidelity validators against the built dist
+        run: |
+          node scripts/validate-static-route-head-fidelity.mjs dist
+          node scripts/validate-canonical-singleton.mjs dist
+          node scripts/validate-title-description.mjs dist
+
+
       # Preserve the machine- and human-readable diff reports so
       # failed runs are debuggable without re-running the build.
       - name: Upload SEO head-fidelity report

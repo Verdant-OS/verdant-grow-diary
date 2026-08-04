@@ -343,30 +343,54 @@ export const MIGRATION_CHECKS = [
   {
     id: "E30",
     description:
-      "every bridge_tokens policy names authenticated explicitly; no policy or grant reaches anon or PUBLIC",
+      "every bridge_tokens policy (created or altered) grants only authenticated; no grant reaches anon or PUBLIC",
     expect: [
       {
         re: /GRANT[^;]{0,200}ON (?:TABLE )?(?:public\.)?bridge_tokens[^;]{0,200}\bTO[^;]{0,200}\b(anon|PUBLIC)\b/is,
         must: false,
       },
     ],
-    // A CREATE POLICY without a TO clause defaults to PUBLIC (which includes
-    // anon), so absence-of-"TO anon" is not enough: every policy statement on
-    // bridge_tokens must carry an explicit `TO authenticated`.
+    // Role lists are parsed in full for both CREATE POLICY and role-changing
+    // ALTER POLICY statements: `TO authenticated, anon`, a later
+    // `ALTER POLICY ... TO PUBLIC`, and a CREATE POLICY with no TO clause
+    // (which defaults to PUBLIC, including anon) must all fail. An
+    // ALTER POLICY without a TO clause leaves roles unchanged, and
+    // `RENAME TO` is not a role list.
     custom: (corpus) => {
       const failures = [];
-      const policies = corpus
+      const policyStatements = corpus
         .split(";")
         .map((s) => s.trim())
-        .filter((s) => /CREATE POLICY/i.test(s) && /ON\s+(?:public\.)?bridge_tokens\b/i.test(s));
-      if (policies.length === 0) failures.push("no bridge_tokens CREATE POLICY statements found");
-      for (const p of policies) {
-        const label = p.replace(/\s+/g, " ").slice(0, 70);
-        if (!/\bTO\s+authenticated\b/i.test(p)) {
-          failures.push(`policy lacks explicit "TO authenticated" (defaults to PUBLIC): ${label}`);
+        .filter(
+          (s) =>
+            /\b(?:CREATE|ALTER)\s+POLICY\b/i.test(s) &&
+            /\bON\s+(?:public\.)?bridge_tokens\b/i.test(s),
+        );
+      if (!policyStatements.some((s) => /\bCREATE\s+POLICY\b/i.test(s))) {
+        failures.push("no bridge_tokens CREATE POLICY statements found");
+      }
+      for (const raw of policyStatements) {
+        const label = raw.replace(/\s+/g, " ").slice(0, 70);
+        const stmt = raw.replace(/\bRENAME\s+TO\s+(?:"[^"]+"|\w+)/gi, "");
+        const toClause = stmt.match(/\bTO\s+([\w",\s]+?)(?=\s+(?:FOR|USING|WITH)\b|$)/i);
+        const isCreate = /\bCREATE\s+POLICY\b/i.test(stmt);
+        if (!toClause) {
+          if (isCreate) {
+            failures.push(`policy lacks explicit TO clause (defaults to PUBLIC): ${label}`);
+          }
+          continue;
         }
-        if (/\bTO\s+(?:PUBLIC|anon)\b/i.test(p)) {
-          failures.push(`policy addressed to PUBLIC/anon: ${label}`);
+        const roles = toClause[1]
+          .split(",")
+          .map((r) => r.trim().replace(/^"|"$/g, "").toLowerCase())
+          .filter((r) => r.length > 0);
+        if (roles.length === 0 && isCreate) {
+          failures.push(`policy TO clause names no role: ${label}`);
+        }
+        for (const role of roles) {
+          if (role !== "authenticated") {
+            failures.push(`policy role "${role}" is not authenticated: ${label}`);
+          }
         }
       }
       return failures;

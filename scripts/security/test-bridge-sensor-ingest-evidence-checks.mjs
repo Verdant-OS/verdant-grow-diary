@@ -90,6 +90,11 @@ const MIGRATION_TAMPERS = {
       `${c}\nCREATE POLICY "sneaky_default" ON public.bridge_tokens FOR SELECT USING (true);\n`,
     (c) =>
       `${c}\nCREATE POLICY "sneaky_public" ON public.bridge_tokens FOR SELECT TO PUBLIC USING (true);\n`,
+    // Mixed role list: authenticated present, anon smuggled in behind it.
+    (c) =>
+      `${c}\nCREATE POLICY "sneaky_mixed" ON public.bridge_tokens FOR SELECT TO authenticated, anon USING (true);\n`,
+    // Role-changing ALTER POLICY in a later migration.
+    (c) => `${c}\nALTER POLICY "Users view own bridge_tokens" ON public.bridge_tokens TO PUBLIC;\n`,
   ],
   E31: [(c) => c.replace(/token_hash text NOT NULL UNIQUE,/g, "token text NOT NULL,")],
   E34: [
@@ -114,6 +119,18 @@ for (const check of MIGRATION_CHECKS) {
     if (check.custom) failures.push(...check.custom(tampered));
     report(`${check.id} detects tampered migration corpus (#${i + 1})`, failures.length > 0);
   });
+}
+
+// --- false-positive guard: benign statements must NOT trip E30 ------------
+{
+  const e30 = MIGRATION_CHECKS.find((c) => c.id === "E30");
+  const benign = `${corpus}\nALTER POLICY "Users view own bridge_tokens" ON public.bridge_tokens RENAME TO "Owners view own bridge_tokens";\nALTER POLICY "Users update own bridge_tokens" ON public.bridge_tokens USING (auth.uid() = user_id);\n`;
+  const spurious = [...runExpectations(benign, e30.expect), ...e30.custom(benign)];
+  report(
+    "E30 stays quiet on benign RENAME TO / role-preserving ALTER POLICY",
+    spurious.length === 0,
+    spurious.join("; "),
+  );
 }
 
 // --- missing files are failures, never skips ------------------------------

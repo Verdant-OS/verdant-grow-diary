@@ -10,22 +10,40 @@
  * ran against a wiped dist and reported "0 documents" instead of a real error.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { ogImageSlugForPath } from "@/lib/build/ogImageCard";
 
 const repoRoot = resolve(__dirname, "../..");
 const generator = join(repoRoot, "scripts/generate-seo-artifacts.ts");
 const assertScript = join(repoRoot, "scripts/assert-seo-manifest-present.mjs");
 
+type ManifestDocument = {
+  path: string;
+  fileName: string;
+  metadata: {
+    title: string;
+    description: string;
+    url: string;
+    image?: string;
+    imageAlt?: string;
+    robots?: string;
+  };
+};
+
 type ManifestShape = {
   origin: string;
-  documents: Array<{
-    path: string;
-    fileName: string;
-    metadata: { title: string; description: string; url: string };
-  }>;
+  documents: ManifestDocument[];
 };
 
 let distDir = "";
@@ -38,6 +56,49 @@ function run(command: string, args: string[]): string {
     stdio: ["ignore", "pipe", "pipe"],
   });
 }
+
+function readManifest(): ManifestShape {
+  return JSON.parse(readFileSync(join(distDir, "seo-manifest.json"), "utf8")) as ManifestShape;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+/** Minimal SSR-shaped head snapshot for one manifest document. */
+function renderHeadSnapshot(document: ManifestDocument): string {
+  const { title, description, url, image = "", imageAlt = "" } = document.metadata;
+  const metas: Array<[string, string, string]> = [
+    ["name", "description", description],
+    ["property", "og:title", title],
+    ["property", "og:description", description],
+    ["property", "og:url", url],
+    ["property", "og:image", image],
+    ["property", "og:image:alt", imageAlt],
+    ["name", "twitter:card", "summary_large_image"],
+    ["name", "twitter:title", title],
+    ["name", "twitter:description", description],
+    ["name", "twitter:image", image],
+  ];
+  const metaTags = metas
+    .map(([attr, key, value]) => `<meta ${attr}="${key}" content="${escapeHtml(value)}" />`)
+    .join("\n    ");
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <title>${escapeHtml(title)}</title>
+    <link rel="canonical" href="${escapeHtml(url)}" />
+    ${metaTags}
+  </head>
+  <body></body>
+</html>
+`;
+}
+
 
 describe("postbuild SEO artifact generation", () => {
   beforeAll(() => {

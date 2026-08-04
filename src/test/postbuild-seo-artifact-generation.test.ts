@@ -259,7 +259,9 @@ describe("postbuild SEO artifact generation", () => {
         join(dir, "seo-manifest.json"),
         JSON.stringify({ origin: manifest.origin, documents }),
       );
+      mkdirSync(join(dir, "client/og"), { recursive: true });
       for (const document of documents) {
+        writeCardFor(dir, document);
         const html = render(document);
         if (html === null) continue;
         const filePath = join(dir, document.fileName);
@@ -267,6 +269,29 @@ describe("postbuild SEO artifact generation", () => {
         writeFileSync(filePath, html);
       }
       return dir;
+    }
+
+    /** Emits the generated OG card the document's og:image is expected to reference. */
+    function writeCardFor(
+      dir: string,
+      document: ManifestDocument,
+      png: Buffer = fakePng(1200, 630),
+    ): string | null {
+      const image = document.metadata.image;
+      if (typeof image !== "string" || !image.includes("/og/")) return null;
+      const fileName = new URL(image, "https://verdantgrowdiary.com").pathname.split("/").pop()!;
+      mkdirSync(join(dir, "client/og"), { recursive: true });
+      writeFileSync(join(dir, "client/og", fileName), png);
+      return fileName;
+    }
+
+    /** First manifest document whose og:image references a generated card. */
+    function cardBackedDocument(): ManifestDocument | undefined {
+      return readManifest().documents.find((document) =>
+        typeof document.metadata.image === "string"
+          ? document.metadata.image.includes("/og/")
+          : false,
+      );
     }
 
     it("accepts every manifest document when its snapshot is present, non-empty, and well-formed", () => {
@@ -350,6 +375,26 @@ describe("postbuild SEO artifact generation", () => {
         "does not match manifest canonical",
       ],
       [
+        "a snapshot with no og:image",
+        (html: string) => html.replace(/<meta property="og:image" [^>]*>/i, ""),
+        'has no <meta property="og:image">',
+      ],
+      [
+        "a snapshot with an empty og:image",
+        (html: string) =>
+          html.replace(/<meta property="og:image" content="[^"]*"/i, '<meta property="og:image" content=""'),
+        "og:image is empty",
+      ],
+      [
+        "a snapshot with a relative og:image",
+        (html: string) =>
+          html.replace(
+            /<meta property="og:image" content="[^"]*"/i,
+            '<meta property="og:image" content="/og/home.png"',
+          ),
+        "is not an absolute URL",
+      ],
+      [
         "a snapshot that is not an HTML document",
         () => `{"note":"this is JSON, not a pre-rendered head snapshot"}`.padEnd(400, " "),
         "not an HTML document",
@@ -372,6 +417,78 @@ describe("postbuild SEO artifact generation", () => {
 
     it("exits non-zero from the CLI when a snapshot is missing", () => {
       expect(() => run("node", [headSnapshotScript, distDir])).toThrow();
+    });
+
+    it("accepts a snapshot whose og:image resolves to a correctly sized card", async () => {
+      const target = cardBackedDocument();
+      if (!target) return;
+      const dir = makeSnapshotDist([target]);
+      try {
+        const { validateHeadSnapshots } = await importHeadSnapshotGate();
+        const result = validateHeadSnapshots(dir);
+        expect(result.problems).toEqual([]);
+        expect(result.ok).toBe(true);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it("rejects an og:image pointing at a card that was never emitted", async () => {
+      const target = cardBackedDocument();
+      if (!target) return;
+      const dir = makeSnapshotDist([target]);
+      try {
+        const fileName = new URL(target.metadata.image!, "https://verdantgrowdiary.com").pathname
+          .split("/")
+          .pop()!;
+        rmSync(join(dir, "client/og", fileName));
+        const { validateHeadSnapshots } = await importHeadSnapshotGate();
+        const result = validateHeadSnapshots(dir);
+        expect(result.ok).toBe(false);
+        expect(result.problems.join("\n")).toContain("not present in dist/client/og");
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it("rejects an og:image that references another route's card", async () => {
+      const target = cardBackedDocument();
+      if (!target) return;
+      const dir = makeSnapshotDist([target], (document) =>
+        renderHeadSnapshot(document).replace(
+          /<meta property="og:image" content="[^"]*"/i,
+          '<meta property="og:image" content="https://verdantgrowdiary.com/og/some-other-route.png"',
+        ),
+      );
+      try {
+        writeFileSync(join(dir, "client/og", "some-other-route.png"), fakePng(1200, 630));
+        const { validateHeadSnapshots } = await importHeadSnapshotGate();
+        const result = validateHeadSnapshots(dir);
+        expect(result.ok).toBe(false);
+        expect(result.problems.join("\n")).toContain("but this route's generated card is");
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it.each([
+      ["the wrong resolution", fakePng(600, 315), "expected 1200x630"],
+      ["a 16-bit encoding", fakePng(1200, 630, 16, 6), "bit depth 16"],
+      ["a palette encoding", fakePng(1200, 630, 8, 3), "colour type 3 (palette)"],
+      ["a non-PNG payload", Buffer.alloc(2048, 0x20), "is not a readable PNG"],
+    ])("rejects an og:image card with %s", async (_label, png, expected) => {
+      const target = cardBackedDocument();
+      if (!target) return;
+      const dir = makeSnapshotDist([target]);
+      try {
+        writeCardFor(dir, target, png as Buffer);
+        const { validateHeadSnapshots } = await importHeadSnapshotGate();
+        const result = validateHeadSnapshots(dir);
+        expect(result.ok).toBe(false);
+        expect(result.problems.join("\n")).toContain(expected as string);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
     });
   });
 

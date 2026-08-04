@@ -3,8 +3,9 @@
  * assert-seo-manifest-present
  *
  * Hard precondition gate for the SEO fidelity validators: fails loudly when
- * dist/seo-manifest.json is absent (or unreadable/empty), before any validator
- * runs. Without this, a wiped dist makes every validator report "0 documents"
+ * dist/seo-manifest.json is absent, unreadable, truncated, or structurally
+ * meaningless (documents lacking a unique absolute canonical URL, title, or
+ * description), before any validator runs. Without this, a wiped dist makes every validator report "0 documents"
  * and the real failure surfaces only as a confusing missing-manifest message
  * from the last validator in the chain.
  *
@@ -43,10 +44,94 @@ try {
   fail(`${manifestPath} is not valid JSON: ${error instanceof Error ? error.message : error}`);
 }
 
+const MINIMUM_MEANINGFUL_DOCUMENTS = 5;
+
 if (!Array.isArray(manifest?.documents) || manifest.documents.length === 0) {
   fail(`${manifestPath} lists no documents; the SEO validators would vacuously pass.`);
 }
 
+if (typeof manifest.origin !== "string" || manifest.origin.trim() === "") {
+  fail(`${manifestPath} has no origin; canonical URLs cannot be verified against it.`);
+}
+
+let origin;
+try {
+  origin = new URL(manifest.origin).origin;
+} catch {
+  fail(`${manifestPath} origin is not an absolute URL: ${JSON.stringify(manifest.origin)}`);
+}
+
+if (manifest.documents.length < MINIMUM_MEANINGFUL_DOCUMENTS) {
+  fail(
+    `${manifestPath} lists only ${manifest.documents.length} document(s); ` +
+      `at least ${MINIMUM_MEANINGFUL_DOCUMENTS} are expected for a complete build. ` +
+      `A truncated manifest lets the fidelity validators pass while most public routes go unchecked.`,
+  );
+}
+
+const problems = [];
+const seenCanonicals = new Map();
+
+manifest.documents.forEach((document, index) => {
+  const label = typeof document?.path === "string" && document.path.trim() !== ""
+    ? document.path
+    : `documents[${index}]`;
+
+  if (typeof document?.path !== "string" || document.path.trim() === "") {
+    problems.push(`${label}: missing route path.`);
+  }
+  if (typeof document?.fileName !== "string" || document.fileName.trim() === "") {
+    problems.push(`${label}: missing output fileName.`);
+  }
+
+  const title = document?.metadata?.title;
+  if (typeof title !== "string" || title.trim() === "") {
+    problems.push(`${label}: missing head title.`);
+  }
+  const description = document?.metadata?.description;
+  if (typeof description !== "string" || description.trim() === "") {
+    problems.push(`${label}: missing head description.`);
+  }
+
+  const canonical = document?.metadata?.url;
+  if (typeof canonical !== "string" || canonical.trim() === "") {
+    problems.push(`${label}: missing canonical URL.`);
+    return;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(canonical);
+  } catch {
+    problems.push(`${label}: canonical URL is not absolute: ${JSON.stringify(canonical)}`);
+    return;
+  }
+
+  if (parsed.origin !== origin) {
+    problems.push(
+      `${label}: canonical URL origin ${parsed.origin} does not match manifest origin ${origin}.`,
+    );
+  }
+  if (!parsed.pathname.startsWith("/")) {
+    problems.push(`${label}: canonical URL has no path.`);
+  }
+
+  const previous = seenCanonicals.get(canonical);
+  if (previous !== undefined) {
+    problems.push(`${label}: duplicate canonical URL ${canonical} (also used by ${previous}).`);
+  } else {
+    seenCanonicals.set(canonical, label);
+  }
+});
+
+if (problems.length > 0) {
+  fail(
+    `${manifestPath} has ${problems.length} invalid document entr${problems.length === 1 ? "y" : "ies"}:\n  - ` +
+      problems.join("\n  - "),
+  );
+}
+
 console.log(
-  `assert-seo-manifest-present: OK — ${manifestPath} present with ${manifest.documents.length} document(s).`,
+  `assert-seo-manifest-present: OK — ${manifestPath} present with ${manifest.documents.length} document(s), ` +
+    `each with a unique canonical URL on ${origin}.`,
 );

@@ -36,6 +36,8 @@ jobs:
         run: bun run check:supabase-security
       - name: Static client/published secret scan
         run: bun run test:security-static
+      - name: Bridge sensor-ingest trust-chain evidence
+        run: bun run test:bridge-sensor-ingest-evidence
       - name: Gamification direct-insert RLS scan
         run: bun run test:security-gamification
       - name: sensor_readings tent ownership RLS test

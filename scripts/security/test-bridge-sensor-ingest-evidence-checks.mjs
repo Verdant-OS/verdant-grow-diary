@@ -1,0 +1,112 @@
+#!/usr/bin/env node
+/**
+ * Self-test for scripts/security/bridge-sensor-ingest-evidence-checks.mjs.
+ *
+ * A green evidence lane is only meaningful if the detectors provably fire.
+ * For every check: take the real repo file, remove the protection the check
+ * pins (for required patterns) or inject the forbidden construct (for
+ * forbidden patterns), and assert the check FAILS on the tampered content.
+ * Also asserts a missing trust-chain file is a failure, never a skip.
+ *
+ * Mirrors the pattern of scripts/security/test-static-client-secret-scan.mjs:
+ * the package script runs this self-test first, then the real checks.
+ */
+import {
+  CHECKS,
+  MIGRATION_CHECKS,
+  FILES,
+  readRepoFile,
+  bridgeMigrationCorpus,
+  runExpectations,
+  runAllChecks,
+} from "./bridge-sensor-ingest-evidence-checks.mjs";
+
+let failures = 0;
+function report(name, ok, detail = "") {
+  console.log(`${ok ? "PASS" : "FAIL"} selftest ${name}${detail ? ` — ${detail}` : ""}`);
+  if (!ok) failures += 1;
+}
+
+function globalized(re) {
+  return new RegExp(re.source, re.flags.includes("g") ? re.flags : `${re.flags}g`);
+}
+
+/** Content snippets that satisfy each forbidden pattern, keyed by check id. */
+const FORBIDDEN_INJECTIONS = {
+  E2: "const r = await deps.lookupBridgeToken(rawToken);",
+  E12: "const spoofed = body.user_id;",
+  E20: 'await supabase.from("bridge_tokens").insert({ token: plaintext });',
+  E24: 'const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"); // SERVICE_ROLE',
+  E33: 'const auth = await authenticateBearer(req.headers.get("Authorization") ?? "", deps); // vbt_',
+};
+
+// --- file-based checks ----------------------------------------------------
+for (const check of CHECKS) {
+  const rel = FILES[check.file];
+  const real = readRepoFile(rel);
+  if (real === null) {
+    report(`${check.id} fixture`, false, `${rel} missing; cannot exercise detector`);
+    continue;
+  }
+
+  for (const ex of check.expect) {
+    if (ex.must) {
+      const tampered = real.replace(globalized(ex.re), "/* TAMPERED */");
+      const stillDetects = runExpectations(tampered, check.expect).length > 0;
+      report(`${check.id} detects removal of ${ex.re}`, stillDetects);
+    } else {
+      const injection = FORBIDDEN_INJECTIONS[check.id];
+      if (!injection) {
+        report(`${check.id} forbidden-injection fixture`, false, "no injection snippet defined");
+        continue;
+      }
+      const tampered = `${real}\n${injection}\n`;
+      const detects = runExpectations(tampered, check.expect).length > 0;
+      report(`${check.id} detects injection of forbidden construct`, detects);
+    }
+  }
+
+  if (check.custom) {
+    const tampered = `${real}\nexport const driftedBehavior = () => 42;\n`;
+    const detects = check.custom(tampered).length > 0;
+    report(`${check.id} custom detector fires on added executable code`, detects);
+  }
+}
+
+// --- migration checks -----------------------------------------------------
+const { corpus } = bridgeMigrationCorpus();
+const MIGRATION_TAMPERS = {
+  E29: (c) =>
+    c.replace(/ALTER TABLE public\.bridge_tokens ENABLE ROW LEVEL SECURITY;/g, "-- TAMPERED"),
+  E30: (c) => `${c}\nGRANT SELECT ON public.bridge_tokens TO anon;\n`,
+  E31: (c) => c.replace(/token_hash text NOT NULL UNIQUE,/g, "token text NOT NULL,"),
+  E34: (c) =>
+    c.replace(
+      /REVOKE EXECUTE ON FUNCTION public\.bump_bridge_token_usage\(UUID, INTEGER\) FROM PUBLIC, anon, authenticated;/g,
+      "-- TAMPERED",
+    ),
+};
+for (const check of MIGRATION_CHECKS) {
+  const tamper = MIGRATION_TAMPERS[check.id];
+  if (!tamper) {
+    report(`${check.id} migration tamper fixture`, false, "no tamper defined");
+    continue;
+  }
+  const detects = runExpectations(tamper(corpus), check.expect).length > 0;
+  report(`${check.id} detects tampered migration corpus`, detects);
+}
+
+// --- missing files are failures, never skips ------------------------------
+const missingFileRun = runAllChecks({
+  readFile: () => null,
+  migrations: () => ({ files: [], corpus: "" }),
+});
+report(
+  "missing trust-chain files fail closed",
+  missingFileRun.length > 0 && missingFileRun.every((r) => r.ok === false),
+);
+
+console.log(
+  `bridge-sensor-ingest evidence self-test: ${failures === 0 ? "all detectors fire" : `${failures} detector(s) dead`}`,
+);
+if (failures > 0) process.exit(1);

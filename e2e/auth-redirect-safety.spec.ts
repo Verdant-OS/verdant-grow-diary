@@ -80,6 +80,13 @@ test.describe("Auth redirect safety (mocked)", () => {
     });
     const origin = new URL(page.url()).origin;
     expect(origin).toBe(new URL(baseURL!).origin);
+    // URL alone is not proof the recovery worked: a navigation that never
+    // commits still updates the URL over the stale previous DOM (the silent
+    // freeze class fixed on the landing canonical). Require the destination's
+    // own DOM — every Plants surface state carries a plants-* testid.
+    await expect(page.locator('[data-testid^="plants-"]').first()).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test("authenticated Dashboard alias is restored with grow scope intact", async ({
@@ -96,6 +103,9 @@ test.describe("Auth redirect safety (mocked)", () => {
     expect(url.pathname).toBe("/dashboard");
     expect(url.searchParams.get("growId")).toBe("grow-1");
     await expect(page.getByText("Oops! Page not found")).toHaveCount(0);
+    // Positive destination DOM, not just the absence of the 404 copy — the
+    // dashboard root renders in every Dashboard state (loading/empty/loaded).
+    await expect(page.getByTestId("dashboard-root")).toBeVisible({ timeout: 15_000 });
   });
 
   test("off-origin redirectTo is ignored — stays on app origin", async ({ page, baseURL }) => {

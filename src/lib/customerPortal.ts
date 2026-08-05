@@ -11,18 +11,15 @@
  */
 import { useCallback, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { readEdgeFunctionErrorCode } from "@/lib/edgeFunctionError";
 
 export const PORTAL_UNAVAILABLE_MESSAGE =
   "We couldn't open the billing portal. Please try again in a moment or contact support.";
-export const PORTAL_NO_SUBSCRIPTION_MESSAGE =
-  "No active paid subscription found on this account.";
+export const PORTAL_NO_SUBSCRIPTION_MESSAGE = "No active paid subscription found on this account.";
 export const PORTAL_LIFETIME_ONLY_MESSAGE =
   "Founder Lifetime — one-time purchase, nothing to manage.";
 
-export type OpenPortalErrorCode =
-  | "unavailable"
-  | "no_subscription"
-  | "lifetime_only";
+export type OpenPortalErrorCode = "unavailable" | "no_subscription" | "lifetime_only";
 
 export interface OpenPortalResult {
   ok: boolean;
@@ -47,30 +44,23 @@ function messageForCode(code: OpenPortalErrorCode): string {
  */
 export async function openPaddleCustomerPortal(): Promise<OpenPortalResult> {
   try {
-    const { data, error } = await supabase.functions.invoke<
-      { url?: string; error?: string }
-    >("paddle-portal-session", { body: {} });
+    const { data, error } = await supabase.functions.invoke<{ url?: string; error?: string }>(
+      "paddle-portal-session",
+      { body: {} },
+    );
     if (error) {
-      // Supabase functions.invoke returns FunctionsHttpError on non-2xx.
-      // The response body (with our discriminating `error` code) still rides
-      // on error.context; prefer that over a bare HTTP status so lifetime-only
-      // accounts get the correct message instead of "no active subscription".
-      const ctx = (error as { context?: { status?: number; body?: unknown } })?.context;
-      const bodyCode = (() => {
-        const body = ctx?.body;
-        if (typeof body === "string") {
-          try { return (JSON.parse(body) as { error?: string })?.error ?? null; }
-          catch { return null; }
-        }
-        if (body && typeof body === "object") {
-          return (body as { error?: string }).error ?? null;
-        }
-        return null;
-      })();
+      // Supabase functions.invoke throws FunctionsHttpError on non-2xx, whose
+      // `context` IS the raw Response — the discriminating `error` code has to
+      // be read (and cloned) off its JSON body, not off a `{ body }` envelope.
+      // Body first, status second: the edge function answers 404 for
+      // lifetime_only too, so a status-first check would bury a paid-up
+      // Founder Lifetime customer under "no active subscription".
+      const bodyCode = await readEdgeFunctionErrorCode(error);
+      const status = (error as { context?: { status?: number } } | null)?.context?.status;
       if (bodyCode === "lifetime_only") {
         return { ok: false, code: "lifetime_only", error: PORTAL_LIFETIME_ONLY_MESSAGE };
       }
-      if (bodyCode === "no_subscription" || ctx?.status === 404) {
+      if (bodyCode === "no_subscription" || status === 404) {
         return { ok: false, code: "no_subscription", error: PORTAL_NO_SUBSCRIPTION_MESSAGE };
       }
       return { ok: false, code: "unavailable", error: PORTAL_UNAVAILABLE_MESSAGE };
@@ -94,7 +84,6 @@ export async function openPaddleCustomerPortal(): Promise<OpenPortalResult> {
 export function portalErrorMessage(code: OpenPortalErrorCode): string {
   return messageForCode(code);
 }
-
 
 /** Small hook to share opening / error state across CTAs on one screen. */
 export function useOpenCustomerPortalState() {

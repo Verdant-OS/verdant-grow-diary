@@ -21,9 +21,12 @@
  *     identically to Linux checkouts of the same content; binary files are
  *     hashed byte-exact, since git never smudges them and normalizing would
  *     collide distinct shipped bytes.
- *   - Test-only / docs-only changes outside the roots do not move the hash,
- *     so one hash may map to several commits with identical app content;
- *     the resolver reports every match rather than guessing.
+ *   - Changes outside the hashed roots (docs/, e2e/, .github/, etc.) do not
+ *     move the hash, so one hash may map to several commits; the resolver
+ *     reports every match rather than guessing. Changes INSIDE the roots
+ *     always move it — including test files under src/test and scripts/ —
+ *     a deliberate conservatism: distinct trees must never share a hash by
+ *     carve-out.
  *   - The generated stamp files are excluded, so stamping never perturbs
  *     the identity it reports.
  *

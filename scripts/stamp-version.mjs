@@ -95,12 +95,20 @@ const dirty = safe(() => run("git status --porcelain").toString().trim(), "") !=
 // a build over a hashing error — degrade to null instead.
 let treeHash = null;
 let treeHashShort = null;
+let treeHashError = null;
 try {
   const th = await computeTreeHash(process.cwd());
   treeHash = th.treeHash;
   treeHashShort = th.treeHashShort;
-} catch {
-  // leave null; commit/env identity may still be present
+} catch (error) {
+  // Degrade but never silently: an operator staring at a treeHash-less
+  // stamp needs to know why the content identity disappeared. Message is
+  // sanitized to printable chars and capped; no paths beyond what the
+  // error itself carries, no env, no secrets.
+  treeHashError = String(error?.message ?? error)
+    .replace(/[^\x20-\x7e]/g, " ")
+    .slice(0, 200);
+  console.warn(`stamp-version: treeHash unavailable — ${treeHashError}`);
 }
 
 // Lineage context for history-less builds: the stamp that was committed
@@ -116,7 +124,8 @@ if (commitSource === "none") {
       // influenceable content shipping into the client bundle. Formats are
       // enforced, free-text is length-capped and stripped of control chars.
       const iso = (v) =>
-        typeof v === "string" && /^\d{4}-\d{2}-\d{2}T[0-9:.]+(Z|[+-]\d{2}:\d{2})$/.test(v)
+        typeof v === "string" &&
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/.test(v)
           ? v
           : "unknown";
       const refText =
@@ -168,6 +177,7 @@ const record = {
   commitSource,
   treeHash,
   treeHashShort,
+  treeHashError,
   inherited,
 };
 
@@ -207,6 +217,7 @@ export interface BuildInfo {
   readonly commitSource: "github-env" | "git" | "none";
   readonly treeHash: string | null;
   readonly treeHashShort: string | null;
+  readonly treeHashError: string | null;
   readonly inherited: InheritedBuildInfo | null;
 }
 

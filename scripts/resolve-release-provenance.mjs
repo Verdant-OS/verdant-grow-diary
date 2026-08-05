@@ -5,21 +5,23 @@
  * Production builds published from history-less snapshots stamp
  * `commit: "unknown"` but always carry a `treeHash` (see
  * scripts/stamp-version.mjs). This resolver answers "which commit(s)
- * does that hash correspond to?" using two sources, in order:
+ * does that hash correspond to?" by consulting BOTH sources and
+ * reporting the deduplicated union:
  *
  *   1. Release tag annotations: auto-tag-release records
- *      `Tree-Hash: <hex>` in every tag it creates (fast path, no
- *      recomputation).
- *   2. Recomputation over recent deploy-branch commits: `git archive`
- *      each candidate into a scratch directory and recompute the hash
- *      with the same module the stamper uses.
+ *      `Tree-Hash: <hex>` in every tag it creates (cheap lookup; tags
+ *      created outside that workflow carry no annotation).
+ *   2. Recomputation over recent commits of --ref: each candidate's
+ *      tracked content is materialized git-natively (read-tree +
+ *      checkout-index into an isolated scratch index — no shell, no
+ *      tar) and hashed with the same module the stamper uses.
  *
  * One treeHash may map to several commits: changes outside the hashed
- * roots (tests, docs, workflows) do not move it. Every match is
- * reported — identical app content is identical app content.
+ * roots (docs, e2e, workflows) do not move it. Every match from both
+ * sources is reported — identical app content is identical app content.
  *
  * Usage:
- *   node scripts/resolve-release-provenance.mjs --hash <64-hex> [--scan N] [--ref origin/verdant-grow-diary]
+ *   node scripts/resolve-release-provenance.mjs --hash=<64-hex> [--scan=N] [--ref=origin/verdant-grow-diary]
  *
  * Read-only; no network. Run it from a checkout with real history.
  */
@@ -69,9 +71,15 @@ function tagMatches(hash) {
 }
 
 async function scanMatches(hash, ref, count) {
-  const shas = git(["rev-list", "-n", String(count), ref])
-    .split("\n")
-    .filter(Boolean);
+  let shas = [];
+  try {
+    shas = git(["rev-list", "-n", String(count), ref])
+      .split("\n")
+      .filter(Boolean);
+  } catch {
+    console.log(`Scan skipped: ref ${ref} is not resolvable in this checkout.`);
+    return [];
+  }
   const matches = [];
   for (const sha of shas) {
     const scratch = mkdtempSync(join(tmpdir(), "vgd-provenance-"));
@@ -111,21 +119,24 @@ async function main() {
     return;
   }
 
+  // Contract: report the deduplicated UNION of both sources. Tag matches
+  // alone would miss annotation-less commits with the same content (tags
+  // created outside auto-tag-release carry no Tree-Hash line).
   const viaTags = tagMatches(args.hash);
   if (viaTags.length > 0) {
     console.log(`MATCH via release-tag annotation (${viaTags.length}):`);
     for (const m of viaTags) console.log(`  ${m.commit}  (${m.tag})`);
-    return;
   }
 
-  console.log(
-    `No tag annotation carries this hash; recomputing over last ${args.scan} commits of ${args.ref}…`,
+  console.log(`Recomputing over last ${args.scan} commits of ${args.ref}…`);
+  const tagged = new Set(viaTags.map((m) => m.commit));
+  const viaScan = (await scanMatches(args.hash, args.ref, args.scan)).filter(
+    (m) => !tagged.has(m.commit),
   );
-  const viaScan = await scanMatches(args.hash, args.ref, args.scan);
   if (viaScan.length > 0) {
     console.log(`MATCH via recomputation (${viaScan.length}):`);
     for (const m of viaScan) console.log(`  ${m.commit}`);
-  } else {
+  } else if (viaTags.length === 0) {
     console.log(
       "NO_MATCH: no scanned commit reproduces this treeHash. The build may predate the scan window, or its content never matched any commit (editor-modified snapshot, or a publish pipeline that mutates hashed files such as bun.lock before prebuild).",
     );

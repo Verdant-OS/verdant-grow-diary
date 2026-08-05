@@ -249,6 +249,53 @@ describe("stamper with real git identity (legacy behavior preserved)", () => {
     expect(record.inherited).toBeNull();
   });
 
+  it("treats a set-but-empty or malformed GITHUB_SHA as absent (forgery regression)", () => {
+    // Regression: `??` alone let GITHUB_SHA="" through, stamping commit ""
+    // with a lying commitSource and an identity-free version string.
+    const unborn = makeSandbox();
+    git(unborn, ["init", "-q"]);
+    const emptyEnv = runStamper(unborn, { GITHUB_SHA: "" }).record;
+    expect(emptyEnv.commit).toBe("unknown");
+    expect(emptyEnv.commitSource).toBe("none");
+    expect(emptyEnv.version).toMatch(/\.t[0-9a-f]{12}$/);
+
+    const committed = makeSandbox();
+    git(committed, ["init", "-q"]);
+    git(committed, ["add", "-A"]);
+    git(committed, [
+      "-c",
+      "user.name=t",
+      "-c",
+      "user.email=t@example.invalid",
+      "commit",
+      "-qm",
+      "init",
+    ]);
+    const sha = git(committed, ["rev-parse", "HEAD"]);
+    const malformedEnv = runStamper(committed, { GITHUB_SHA: "nothex" }).record;
+    expect(malformedEnv.commit).toBe(sha);
+    expect(malformedEnv.commitSource).toBe("git");
+  });
+
+  it("rejects malformed inherited timestamps and reports healthy treeHash without error", () => {
+    const box = makeSandbox();
+    git(box, ["init", "-q"]);
+    writeFileSync(
+      join(box, "public/version.json"),
+      JSON.stringify({
+        commit: "c".repeat(40),
+        ref: "edit/edt-x",
+        commitTime: "2026-08-04T...Z",
+        buildTime: "not a time",
+      }) + "\n",
+    );
+    const { record } = runStamper(box);
+    const inherited = record.inherited as Record<string, unknown>;
+    expect(inherited.commitTime).toBe("unknown");
+    expect(inherited.buildTime).toBe("unknown");
+    expect(record.treeHashError).toBeNull();
+  });
+
   it("prefers GITHUB_* env identity and records commitSource github-env with CI run linkage", () => {
     const box = makeSandbox();
     git(box, ["init", "-q"]);
@@ -343,6 +390,38 @@ describe("resolve-release-provenance", () => {
     expect(out).toContain(headSha);
     expect(out).toContain("v2026.01.01-testtag");
     expect(out).not.toContain("v2026.01.02-other");
+  });
+
+  it("reports the union: tag-annotated commit AND annotation-less content twin", async () => {
+    const { box, headSha } = makeResolverSandbox();
+    const { treeHash } = await computeTreeHash(box);
+    // Annotate the first commit with its real hash…
+    git(box, [
+      "-c",
+      "user.name=t",
+      "-c",
+      "user.email=t@example.invalid",
+      "tag",
+      "-a",
+      "v2026.01.03-annotated",
+      "-m",
+      "tag",
+      "-m",
+      `Tree-Hash: ${treeHash}`,
+    ]);
+    // …then add a content twin: a commit changing only a file OUTSIDE the
+    // hashed roots, so it shares the treeHash but carries no annotation.
+    writeFileSync(join(box, "README.md"), "docs only\n");
+    git(box, ["add", "-A"]);
+    git(box, ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "docs"]);
+    const twinSha = git(box, ["rev-parse", "HEAD"]);
+
+    const { out, status } = runResolver(box, [`--hash=${treeHash}`, "--scan=2", "--ref=HEAD"]);
+    expect(status).toBe(0);
+    expect(out).toContain("MATCH via release-tag annotation");
+    expect(out).toContain(headSha);
+    expect(out).toContain("MATCH via recomputation");
+    expect(out).toContain(twinSha);
   });
 
   it("falls back to recomputation and matches HEAD content", async () => {

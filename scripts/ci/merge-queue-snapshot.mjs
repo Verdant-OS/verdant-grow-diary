@@ -10,14 +10,16 @@
  *   node scripts/ci/merge-queue-snapshot.mjs --json
  *   node scripts/ci/merge-queue-snapshot.mjs --alert
  *   node scripts/ci/merge-queue-snapshot.mjs --alert --json
+ *   node scripts/ci/merge-queue-snapshot.mjs --no-scale
  *   bun run merge-queue:snapshot
  *   bun run merge-queue:snapshot:alert
  *
  * Env:
  *   GITHUB_REPOSITORY              owner/name (default Verdant-OS/verdant-grow-diary)
  *   MERGE_QUEUE_BRANCH             branch name (default verdant-grow-diary)
- *   MERGE_QUEUE_THRESHOLDS_PATH    path to thresholds JSON (default scripts/ci/merge-queue-thresholds.json)
+ *   MERGE_QUEUE_THRESHOLDS_PATH    path to thresholds JSON
  *   MERGE_QUEUE_STRICT_MAX_DEPTH   legacy --strict depth ceiling (default 5)
+ *   MERGE_QUEUE_SCALE              "0" or "false" disables dynamic scaling
  *
  * Exit codes:
  *   0  snapshot ok; no critical alerts (warn-only still 0 unless --fail-on-warn)
@@ -42,6 +44,10 @@ const asJson = args.has("--json");
 const strict = args.has("--strict");
 const alertMode = args.has("--alert");
 const failOnWarn = args.has("--fail-on-warn");
+const noScaleCli = args.has("--no-scale");
+const scaleEnv = process.env.MERGE_QUEUE_SCALE;
+const scaleDisabled =
+  noScaleCli || scaleEnv === "0" || String(scaleEnv || "").toLowerCase() === "false";
 
 /** Built-in defaults if the JSON file is missing (kept in sync with merge-queue-thresholds.json). */
 export const DEFAULT_THRESHOLDS = {
@@ -53,6 +59,28 @@ export const DEFAULT_THRESHOLDS = {
   blocked_open_prs: { warn: 8, critical: 15 },
   auto_merge_waiting: { warn: 3, critical: 6 },
 };
+
+export const DEFAULT_SCALING = {
+  enabled: true,
+  baseline_open_prs: 10,
+  min_factor: 1.0,
+  max_factor: 2.5,
+  count_metrics: ["dirty_open_prs", "behind_open_prs", "blocked_open_prs", "auto_merge_waiting"],
+  depth_metrics: ["queue_depth"],
+  depth_max_cap: 5,
+  age_metrics: [],
+  ratio_alerts: {
+    enabled: true,
+    min_open_prs: 4,
+    dirty_ratio: { warn: 0.45, critical: 0.7 },
+    behind_ratio: { warn: 0.4, critical: 0.65 },
+  },
+};
+
+/** @param {number} n @param {number} lo @param {number} hi */
+export function clamp(n, lo, hi) {
+  return Math.min(hi, Math.max(lo, n));
+}
 
 /** @param {string[]} ghArgs */
 export function runGh(ghArgs, { timeoutMs = 60_000 } = {}) {
@@ -75,10 +103,15 @@ export function runGh(ghArgs, { timeoutMs = 60_000 } = {}) {
 export function loadThresholds(path = process.env.MERGE_QUEUE_THRESHOLDS_PATH || DEFAULT_THRESHOLDS_PATH) {
   const resolved = resolve(path);
   if (!existsSync(resolved)) {
-    return { source: "defaults", path: resolved, thresholds: { ...DEFAULT_THRESHOLDS } };
+    return {
+      source: "defaults",
+      path: resolved,
+      thresholds: structuredClone(DEFAULT_THRESHOLDS),
+      scaling: structuredClone(DEFAULT_SCALING),
+    };
   }
   const raw = JSON.parse(readFileSync(resolved, "utf8"));
-  const thresholds = { ...DEFAULT_THRESHOLDS };
+  const thresholds = structuredClone(DEFAULT_THRESHOLDS);
   for (const key of Object.keys(DEFAULT_THRESHOLDS)) {
     if (raw[key] && typeof raw[key] === "object") {
       thresholds[key] = {
@@ -87,7 +120,87 @@ export function loadThresholds(path = process.env.MERGE_QUEUE_THRESHOLDS_PATH ||
       };
     }
   }
-  return { source: "file", path: resolved, thresholds, meta: raw };
+  const scaling = structuredClone(DEFAULT_SCALING);
+  if (raw.scaling && typeof raw.scaling === "object") {
+    Object.assign(scaling, raw.scaling);
+    if (raw.scaling.ratio_alerts && typeof raw.scaling.ratio_alerts === "object") {
+      scaling.ratio_alerts = {
+        ...DEFAULT_SCALING.ratio_alerts,
+        ...raw.scaling.ratio_alerts,
+        dirty_ratio: {
+          ...DEFAULT_SCALING.ratio_alerts.dirty_ratio,
+          ...(raw.scaling.ratio_alerts.dirty_ratio || {}),
+        },
+        behind_ratio: {
+          ...DEFAULT_SCALING.ratio_alerts.behind_ratio,
+          ...(raw.scaling.ratio_alerts.behind_ratio || {}),
+        },
+      };
+    }
+  }
+  return { source: "file", path: resolved, thresholds, scaling, meta: raw };
+}
+
+/**
+ * Scale absolute count/depth thresholds by open-PR load.
+ * Ages stay fixed (timeout-bound). Never lowers floors below base (min_factor >= 1).
+ *
+ * factor = clamp(openPrTotal / baseline_open_prs, min_factor, max_factor)
+ *
+ * @param {typeof DEFAULT_THRESHOLDS} base
+ * @param {{ openPrTotal: number }} context
+ * @param {typeof DEFAULT_SCALING} scaling
+ * @param {{ disabled?: boolean }} [opts]
+ */
+export function scaleThresholds(base, context, scaling = DEFAULT_SCALING, opts = {}) {
+  const openPrTotal = Math.max(0, Number(context.openPrTotal) || 0);
+  const enabled = scaling?.enabled !== false && !opts.disabled;
+  const baseline = Math.max(1, Number(scaling.baseline_open_prs) || 10);
+  const minF = Number(scaling.min_factor) || 1;
+  const maxF = Number(scaling.max_factor) || 2.5;
+  const factor = enabled ? clamp(openPrTotal / baseline, minF, maxF) : 1;
+
+  /** @type {typeof DEFAULT_THRESHOLDS} */
+  const effective = structuredClone(base);
+  const scaledMetrics = [];
+
+  const countSet = new Set(scaling.count_metrics || DEFAULT_SCALING.count_metrics);
+  const depthSet = new Set(scaling.depth_metrics || DEFAULT_SCALING.depth_metrics);
+  const depthCap = Number(scaling.depth_max_cap) || 5;
+
+  for (const metric of Object.keys(effective)) {
+    if (!enabled || factor === 1) continue;
+    if (countSet.has(metric)) {
+      const b = base[metric];
+      let warn = Math.max(b.warn, Math.ceil(b.warn * factor));
+      let critical = Math.max(b.critical, Math.ceil(b.critical * factor));
+      if (critical <= warn) critical = warn + 1;
+      effective[metric] = { warn, critical };
+      scaledMetrics.push(metric);
+    } else if (depthSet.has(metric)) {
+      const b = base[metric];
+      // Mild scale; never exceed queue build capacity cap for critical
+      let warn = Math.max(b.warn, Math.min(depthCap, Math.ceil(b.warn * Math.min(factor, 1.5))));
+      let critical = Math.max(b.critical, Math.min(depthCap, Math.ceil(b.critical * Math.min(factor, 1.5))));
+      if (critical < warn) critical = warn;
+      // critical at least warn; if both hit cap, leave equal (depth at cap is already critical)
+      effective[metric] = { warn, critical };
+      scaledMetrics.push(metric);
+    }
+  }
+
+  return {
+    enabled,
+    factor: Math.round(factor * 1000) / 1000,
+    openPrTotal,
+    baseline_open_prs: baseline,
+    min_factor: minF,
+    max_factor: maxF,
+    scaledMetrics,
+    base,
+    effective,
+    scaling,
+  };
 }
 
 /**
@@ -176,18 +289,19 @@ export function summarizeQueue(queue, now = new Date()) {
 }
 
 /**
- * Evaluate snapshot metrics against thresholds.
+ * Evaluate snapshot metrics against (possibly scaled) thresholds + ratio bands.
  * Null metrics (e.g. empty queue ages) do not alert.
  *
- * @param {{ queue: { depth: number, maxAgeSec: number|null, medianAgeSec: number|null }, openPrs: { counts: Record<string, number>, autoMergeCount: number } }} snap
- * @param {typeof DEFAULT_THRESHOLDS} thresholds
+ * @param {{ queue: { depth: number, maxAgeSec: number|null, medianAgeSec: number|null }, openPrs: { total?: number, counts: Record<string, number>, autoMergeCount: number } }} snap
+ * @param {typeof DEFAULT_THRESHOLDS} thresholds effective thresholds
+ * @param {{ ratio_alerts?: typeof DEFAULT_SCALING.ratio_alerts }} [scaling]
  */
-export function evaluateAlerts(snap, thresholds = DEFAULT_THRESHOLDS) {
-  /** @type {Array<{ metric: string, severity: 'warn'|'critical', value: number, warn: number, critical: number, message: string }>} */
+export function evaluateAlerts(snap, thresholds = DEFAULT_THRESHOLDS, scaling = DEFAULT_SCALING) {
+  /** @type {Array<{ metric: string, severity: 'warn'|'critical', value: number, warn: number, critical: number, message: string, kind?: string }>} */
   const alerts = [];
 
-  /** @param {string} metric @param {number|null|undefined} value @param {{warn:number, critical:number}} band */
-  function check(metric, value, band) {
+  /** @param {string} metric @param {number|null|undefined} value @param {{warn:number, critical:number}} band @param {string} [kind] */
+  function check(metric, value, band, kind = "absolute") {
     if (value === null || value === undefined || !Number.isFinite(value)) return;
     const { warn, critical } = band;
     if (value >= critical) {
@@ -197,7 +311,8 @@ export function evaluateAlerts(snap, thresholds = DEFAULT_THRESHOLDS) {
         value,
         warn,
         critical,
-        message: `${metric}=${value} >= critical ${critical}`,
+        kind,
+        message: `${metric}=${value} >= critical ${critical} (${kind})`,
       });
     } else if (value >= warn) {
       alerts.push({
@@ -206,7 +321,8 @@ export function evaluateAlerts(snap, thresholds = DEFAULT_THRESHOLDS) {
         value,
         warn,
         critical,
-        message: `${metric}=${value} >= warn ${warn}`,
+        kind,
+        message: `${metric}=${value} >= warn ${warn} (${kind})`,
       });
     }
   }
@@ -218,6 +334,21 @@ export function evaluateAlerts(snap, thresholds = DEFAULT_THRESHOLDS) {
   check("behind_open_prs", snap.openPrs.counts.BEHIND ?? 0, thresholds.behind_open_prs);
   check("blocked_open_prs", snap.openPrs.counts.BLOCKED ?? 0, thresholds.blocked_open_prs);
   check("auto_merge_waiting", snap.openPrs.autoMergeCount ?? 0, thresholds.auto_merge_waiting);
+
+  const ratioCfg = scaling?.ratio_alerts;
+  const openTotal = snap.openPrs.total ?? Object.values(snap.openPrs.counts || {}).reduce((a, b) => a + b, 0);
+  if (ratioCfg?.enabled !== false && openTotal >= (ratioCfg?.min_open_prs ?? 4)) {
+    const dirty = snap.openPrs.counts.DIRTY ?? 0;
+    const behind = snap.openPrs.counts.BEHIND ?? 0;
+    const dirtyRatio = dirty / openTotal;
+    const behindRatio = behind / openTotal;
+    if (ratioCfg.dirty_ratio) {
+      check("dirty_ratio", Math.round(dirtyRatio * 1000) / 1000, ratioCfg.dirty_ratio, "ratio");
+    }
+    if (ratioCfg.behind_ratio) {
+      check("behind_ratio", Math.round(behindRatio * 1000) / 1000, ratioCfg.behind_ratio, "ratio");
+    }
+  }
 
   const critical = alerts.filter((a) => a.severity === "critical");
   const warn = alerts.filter((a) => a.severity === "warn");
@@ -313,6 +444,14 @@ query($owner:String!, $name:String!, $branch:String!) {
   const queueSummary = summarizeQueue(queue || { entries: { totalCount: 0, nodes: [] } }, now);
   const openSummary = summarizeOpenPrs(prs);
   const loaded = loadThresholds();
+  const openPrTotal = prs.length;
+  const scaled = scaleThresholds(
+    loaded.thresholds,
+    { openPrTotal },
+    loaded.scaling,
+    { disabled: scaleDisabled },
+  );
+
   const snap = {
     capturedAt: now.toISOString(),
     repository: REPO,
@@ -325,11 +464,22 @@ query($owner:String!, $name:String!, $branch:String!) {
     thresholds: {
       source: loaded.source,
       path: loaded.path,
-      values: loaded.thresholds,
+      base: scaled.base,
+      effective: scaled.effective,
+      scaling: {
+        enabled: scaled.enabled,
+        factor: scaled.factor,
+        openPrTotal: scaled.openPrTotal,
+        baseline_open_prs: scaled.baseline_open_prs,
+        min_factor: scaled.min_factor,
+        max_factor: scaled.max_factor,
+        scaledMetrics: scaled.scaledMetrics,
+        ratio_alerts: scaled.scaling.ratio_alerts,
+      },
     },
     queue: queueSummary,
     openPrs: {
-      total: prs.length,
+      total: openPrTotal,
       counts: Object.fromEntries(
         Object.entries(openSummary)
           .filter(([k]) => k !== "AUTO_MERGE")
@@ -350,7 +500,7 @@ query($owner:String!, $name:String!, $branch:String!) {
       ),
     },
   };
-  snap.alertEvaluation = evaluateAlerts(snap, loaded.thresholds);
+  snap.alertEvaluation = evaluateAlerts(snap, scaled.effective, scaled.scaling);
   return snap;
 }
 
@@ -396,16 +546,24 @@ function printText(snap) {
   }
 
   if (snap.thresholds) {
+    const sc = snap.thresholds.scaling;
     lines.push("");
     lines.push(
       `thresholds source=${snap.thresholds.source} path=${snap.thresholds.path}`,
     );
-    const t = snap.thresholds.values;
     lines.push(
-      `  queue_depth warn=${t.queue_depth.warn} crit=${t.queue_depth.critical} | max_age_sec warn=${t.max_age_sec.warn} crit=${t.max_age_sec.critical}`,
+      `scaling enabled=${sc.enabled} factor=${sc.factor} open=${sc.openPrTotal} baseline=${sc.baseline_open_prs} clamp=[${sc.min_factor},${sc.max_factor}] metrics=${(sc.scaledMetrics || []).join(",") || "(none)"}`,
+    );
+    const t = snap.thresholds.effective;
+    const b = snap.thresholds.base;
+    lines.push(
+      `  effective queue_depth warn=${t.queue_depth.warn} crit=${t.queue_depth.critical} (base ${b.queue_depth.warn}/${b.queue_depth.critical})`,
     );
     lines.push(
-      `  dirty_open_prs warn=${t.dirty_open_prs.warn} crit=${t.dirty_open_prs.critical} | behind warn=${t.behind_open_prs.warn} crit=${t.behind_open_prs.critical}`,
+      `  effective dirty_open_prs warn=${t.dirty_open_prs.warn} crit=${t.dirty_open_prs.critical} (base ${b.dirty_open_prs.warn}/${b.dirty_open_prs.critical})`,
+    );
+    lines.push(
+      `  ages (fixed) max_age_sec warn=${t.max_age_sec.warn} crit=${t.max_age_sec.critical}`,
     );
   }
 

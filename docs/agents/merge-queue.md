@@ -68,6 +68,41 @@ Empty queue + high `DIRTY` count is an **ownership/serialisation** signal, not q
 
 ## Alert thresholds
 
+## Dynamic threshold scaling
+
+Enabled by default via `scaling` in [`merge-queue-thresholds.json`](../../scripts/ci/merge-queue-thresholds.json).
+
+```text
+factor = clamp(open_pr_total / baseline_open_prs, min_factor, max_factor)
+```
+
+| Setting | Default | Role |
+|---------|--------:|------|
+| `baseline_open_prs` | 10 | Load reference |
+| `min_factor` | 1.0 | Never loosen floors below base |
+| `max_factor` | 2.5 | Cap inflation under large backlogs |
+| `count_metrics` | dirty/behind/blocked/auto_merge | Scale absolute counts |
+| `depth_metrics` | queue_depth | Mild scale, capped at `depth_max_cap` (5) |
+| age metrics | fixed | Stay timeout-bound (30m / 90m) |
+
+**Ratio alerts** (when `open >= min_open_prs`):
+
+| Ratio | Warn | Critical |
+|-------|-----:|---------:|
+| `dirty / open` | 0.45 | 0.70 |
+| `behind / open` | 0.40 | 0.65 |
+
+Disable scaling:
+
+```bash
+node scripts/ci/merge-queue-snapshot.mjs --no-scale
+MERGE_QUEUE_SCALE=0 bun run merge-queue:snapshot:alert
+```
+
+Example: 13 open PRs → factor ≈ 1.3 → `dirty_open_prs` warn rises from 5 → 7. Absolute `dirty=6` may clear while `dirty_ratio=0.46` still warns.
+
+
+
 Canonical config: [`scripts/ci/merge-queue-thresholds.json`](../../scripts/ci/merge-queue-thresholds.json)
 
 | Metric | Warn | Critical | Intent |

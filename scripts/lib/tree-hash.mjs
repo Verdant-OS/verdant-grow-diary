@@ -55,6 +55,10 @@ export const TREE_HASH_ROOTS = [
   "index.html",
   "package.json",
   "bun.lock",
+  // Compatibility lockfile: config/dependency-lockfile-transition.json keeps
+  // npm consumers (Vercel/preview) on package-lock.json, so a lock-only
+  // dependency change alters their built bundle and must move the hash.
+  "package-lock.json",
   "vite.config.ts",
   "tsconfig.json",
   "tsconfig.app.json",

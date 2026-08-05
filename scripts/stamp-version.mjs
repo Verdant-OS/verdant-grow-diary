@@ -123,9 +123,13 @@ if (commitSource === "none") {
       // Sanitize every carried field: the tracked stamp is attacker-
       // influenceable content shipping into the client bundle. Formats are
       // enforced, free-text is length-capped and stripped of control chars.
+      // Shape AND calendar validity: the strict ISO shape alone still
+      // admits values like 2026-02-31T00:00:00Z; Date.parse rejects
+      // out-of-range ISO components, so both checks together do.
       const iso = (v) =>
         typeof v === "string" &&
-        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/.test(v)
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/.test(v) &&
+        !Number.isNaN(Date.parse(v))
           ? v
           : "unknown";
       const refText =

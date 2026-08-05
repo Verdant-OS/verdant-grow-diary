@@ -244,6 +244,33 @@ describe("stamper in the proven Lovable history-less sandbox", () => {
     expect(record.inherited).toBeNull();
     expect(record.version).toMatch(/\.t[0-9a-f]{12}$/);
   });
+
+  it("degrades without dying when hashing itself throws: warn + treeHashError, exit 0", () => {
+    const box = makeSandbox();
+    git(box, ["init", "-q"]);
+    // Replace the copied hash module with one that always rejects — the
+    // prebuild contract must hold even then.
+    writeFileSync(
+      join(box, "scripts/lib/tree-hash.mjs"),
+      "export async function computeTreeHash() { throw new Error('boom \\u0007 disk'); }\n",
+    );
+    const result = execFileSync("node", ["scripts/stamp-version.mjs"], {
+      cwd: box,
+      encoding: "utf8",
+      env: cleanEnv(),
+    });
+    // execFileSync throwing would have failed the test: exit 0 held.
+    expect(result).toContain("Stamped version");
+    const record = JSON.parse(readFileSync(join(box, "public/version.json"), "utf8"));
+    expect(record.treeHash).toBeNull();
+    expect(record.treeHashShort).toBeNull();
+    expect(typeof record.treeHashError).toBe("string");
+    expect(record.treeHashError).toContain("boom");
+    // Sanitized: the control char must not survive into the record.
+    expect(record.treeHashError).not.toMatch(/[^\x20-\x7e]/);
+    // No git identity AND no hash: version falls back to the honest unknown.
+    expect(record.version).toMatch(/\.unknown$/);
+  });
 });
 
 describe("stamper with real git identity (legacy behavior preserved)", () => {
@@ -339,6 +366,22 @@ describe("release-tag treeHash mapping", () => {
     // Annotation line and summary line both carry the mapping.
     expect(workflow).toMatch(/-m "Tree-Hash: \$\{TREE_HASH\}"/);
     expect(workflow).toMatch(/Tree-Hash: \\`\$\{TREE_HASH\}\\`/);
+  });
+
+  it("computes the hash BEFORE the pre-tagged early exit and records it on that path", () => {
+    // Regression: hashing below the early exit meant pre-tagged commits got
+    // no recorded mapping at all. Pin the ordering, not just presence.
+    const workflow = readFileSync(AUTO_TAG_WORKFLOW, "utf8");
+    const hashIdx = workflow.indexOf("node scripts/lib/tree-hash.mjs");
+    const earlyExitIdx = workflow.indexOf("already tagged as");
+    expect(hashIdx).toBeGreaterThan(-1);
+    expect(earlyExitIdx).toBeGreaterThan(-1);
+    expect(hashIdx).toBeLessThan(earlyExitIdx);
+    // The early-exit block itself must write the mapping to the summary
+    // before its `exit 0`.
+    const exitIdx = workflow.indexOf("exit 0", earlyExitIdx);
+    const earlyBlock = workflow.slice(earlyExitIdx, exitIdx);
+    expect(earlyBlock).toMatch(/Tree-Hash: \\`\$\{TREE_HASH\}\\`/);
   });
 });
 

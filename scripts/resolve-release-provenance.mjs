@@ -58,7 +58,10 @@ function tagMatches(hash) {
     if (sep === -1) continue;
     const tag = block.slice(0, sep).trim();
     if (!tag) continue;
-    const m = block.slice(sep + 1).match(/Tree-Hash:\s*([0-9a-f]{64})/);
+    // Anchored to a complete line: prose or lookalikes such as
+    // "Previous-Tree-Hash: …" must never count as the authoritative
+    // workflow annotation.
+    const m = block.slice(sep + 1).match(/^Tree-Hash:[ \t]*([0-9a-f]{64})[ \t]*$/m);
     if (m && m[1] === hash) {
       try {
         matches.push({ tag, commit: git(["rev-list", "-n", "1", tag]) });
@@ -96,7 +99,27 @@ async function scanMatches(hash, ref, count) {
         stdio: ["ignore", "ignore", "pipe"],
       });
       const { treeHash } = await computeTreeHash(resolve(extract));
-      if (treeHash === hash) matches.push({ commit: sha });
+      if (treeHash === hash) {
+        matches.push({ commit: sha });
+      } else {
+        // Cross-era fallback: if the hash algorithm (roots, normalization)
+        // has changed since this candidate was committed, the current
+        // module cannot reproduce a stamp that candidate's OWN stamper
+        // emitted. Run the candidate's committed hash module, if present —
+        // this executes repo-committed code from that commit, which is the
+        // same trust domain as checking the commit out and building it.
+        try {
+          const eraModule = resolve(extract, "scripts/lib/tree-hash.mjs");
+          const eraHash = execFileSync("node", [eraModule, `--root=${resolve(extract)}`], {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+          }).trim();
+          if (eraHash === hash) matches.push({ commit: sha, era: "candidate-algorithm" });
+        } catch {
+          // Candidate predates the module or its CLI failed — no cross-era
+          // comparison possible for this commit.
+        }
+      }
     } finally {
       rmSync(scratch, { recursive: true, force: true });
     }

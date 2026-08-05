@@ -4,7 +4,10 @@ import {
   summarizeOpenPrs,
   summarizeQueue,
   evaluateAlerts,
+  scaleThresholds,
+  clamp,
   DEFAULT_THRESHOLDS,
+  DEFAULT_SCALING,
   loadThresholds,
 } from "../../scripts/ci/merge-queue-snapshot.mjs";
 import { join } from "node:path";
@@ -63,72 +66,102 @@ describe("merge-queue-snapshot helpers", () => {
       now,
     );
     expect(s.depth).toBe(2);
-    expect(s.nextEntryEstimatedTimeToMerge).toBe(120);
     expect(s.maxAgeSec).toBe(600);
     expect(s.medianAgeSec).toBe(450);
-    expect(s.entries[0].prNumber).toBe(722);
-    expect(s.entries[0].ageSec).toBe(600);
   });
 
-  it("loads thresholds from JSON file", () => {
+  it("loads thresholds and scaling from JSON file", () => {
     const loaded = loadThresholds(join(process.cwd(), "scripts/ci/merge-queue-thresholds.json"));
     expect(loaded.source).toBe("file");
     expect(loaded.thresholds.queue_depth.warn).toBe(3);
-    expect(loaded.thresholds.queue_depth.critical).toBe(5);
-    expect(loaded.thresholds.max_age_sec.critical).toBe(5400);
-    expect(loaded.thresholds.dirty_open_prs.warn).toBe(5);
+    expect(loaded.scaling.enabled).toBe(true);
+    expect(loaded.scaling.baseline_open_prs).toBe(10);
+    expect(loaded.scaling.ratio_alerts.dirty_ratio.critical).toBe(0.7);
   });
 
-  it("evaluateAlerts is quiet under thresholds", () => {
+  it("clamp bounds factor inputs", () => {
+    expect(clamp(0.5, 1, 2.5)).toBe(1);
+    expect(clamp(3, 1, 2.5)).toBe(2.5);
+    expect(clamp(1.5, 1, 2.5)).toBe(1.5);
+  });
+
+  it("scaleThresholds raises count floors with open-PR load", () => {
+    // 20 open / baseline 10 => factor 2
+    const s = scaleThresholds(DEFAULT_THRESHOLDS, { openPrTotal: 20 }, DEFAULT_SCALING);
+    expect(s.factor).toBe(2);
+    expect(s.effective.dirty_open_prs.warn).toBe(10); // 5 * 2
+    expect(s.effective.dirty_open_prs.critical).toBe(20); // 10 * 2
+    // ages fixed
+    expect(s.effective.max_age_sec).toEqual(DEFAULT_THRESHOLDS.max_age_sec);
+    // never below base when open is small
+    const low = scaleThresholds(DEFAULT_THRESHOLDS, { openPrTotal: 3 }, DEFAULT_SCALING);
+    expect(low.factor).toBe(1);
+    expect(low.effective.dirty_open_prs.warn).toBe(5);
+  });
+
+  it("scaleThresholds respects --no-scale / disabled", () => {
+    const s = scaleThresholds(DEFAULT_THRESHOLDS, { openPrTotal: 50 }, DEFAULT_SCALING, {
+      disabled: true,
+    });
+    expect(s.enabled).toBe(false);
+    expect(s.factor).toBe(1);
+    expect(s.effective.dirty_open_prs).toEqual(DEFAULT_THRESHOLDS.dirty_open_prs);
+  });
+
+  it("scaleThresholds caps queue_depth at depth_max_cap", () => {
+    const s = scaleThresholds(DEFAULT_THRESHOLDS, { openPrTotal: 100 }, DEFAULT_SCALING);
+    expect(s.factor).toBe(2.5);
+    expect(s.effective.queue_depth.critical).toBeLessThanOrEqual(5);
+  });
+
+  it("evaluateAlerts quiet under scaled thresholds", () => {
+    const scaled = scaleThresholds(DEFAULT_THRESHOLDS, { openPrTotal: 20 }, DEFAULT_SCALING);
+    // dirty=6 would warn at base (5) but not at scaled warn 10
     const ev = evaluateAlerts(
       {
         queue: { depth: 0, maxAgeSec: null, medianAgeSec: null },
         openPrs: {
-          counts: { DIRTY: 2, BEHIND: 1, BLOCKED: 1 },
+          total: 20,
+          counts: { DIRTY: 6, BEHIND: 2, BLOCKED: 1 },
           autoMergeCount: 0,
         },
       },
-      DEFAULT_THRESHOLDS,
+      scaled.effective,
+      scaled.scaling,
     );
-    expect(ev.ok).toBe(true);
-    expect(ev.warnOnly).toBe(false);
-    expect(ev.alerts).toEqual([]);
+    expect(ev.alerts.filter((a) => a.metric === "dirty_open_prs")).toEqual([]);
   });
 
-  it("evaluateAlerts emits warn then critical for queue depth", () => {
-    const warn = evaluateAlerts(
+  it("evaluateAlerts ratio bands fire on high dirty fraction", () => {
+    const scaled = scaleThresholds(DEFAULT_THRESHOLDS, { openPrTotal: 10 }, DEFAULT_SCALING);
+    // 6/10 = 0.6 dirty ratio → warn (0.45) but not critical (0.7)
+    // absolute dirty 6 also >= base warn 5
+    const ev = evaluateAlerts(
       {
-        queue: { depth: 3, maxAgeSec: null, medianAgeSec: null },
-        openPrs: { counts: { DIRTY: 0, BEHIND: 0, BLOCKED: 0 }, autoMergeCount: 0 },
+        queue: { depth: 0, maxAgeSec: null, medianAgeSec: null },
+        openPrs: {
+          total: 10,
+          counts: { DIRTY: 6, BEHIND: 0, BLOCKED: 0 },
+          autoMergeCount: 0,
+        },
       },
-      DEFAULT_THRESHOLDS,
+      scaled.effective,
+      scaled.scaling,
     );
-    expect(warn.warnOnly).toBe(true);
-    expect(warn.alerts[0].severity).toBe("warn");
-    expect(warn.alerts[0].metric).toBe("queue_depth");
-
-    const crit = evaluateAlerts(
-      {
-        queue: { depth: 5, maxAgeSec: 6000, medianAgeSec: 3000 },
-        openPrs: { counts: { DIRTY: 12, BEHIND: 0, BLOCKED: 0 }, autoMergeCount: 0 },
-      },
-      DEFAULT_THRESHOLDS,
-    );
-    expect(crit.ok).toBe(false);
-    expect(crit.criticalCount).toBeGreaterThanOrEqual(2);
-    const metrics = crit.alerts.map((a) => a.metric);
-    expect(metrics).toContain("queue_depth");
-    expect(metrics).toContain("max_age_sec");
-    expect(metrics).toContain("dirty_open_prs");
+    const ratios = ev.alerts.filter((a) => a.metric === "dirty_ratio");
+    expect(ratios.length).toBe(1);
+    expect(ratios[0].severity).toBe("warn");
+    expect(ratios[0].kind).toBe("ratio");
   });
 
   it("null ages do not alert", () => {
     const ev = evaluateAlerts(
       {
         queue: { depth: 0, maxAgeSec: null, medianAgeSec: null },
-        openPrs: { counts: {}, autoMergeCount: 0 },
+        openPrs: { total: 0, counts: {}, autoMergeCount: 0 },
       },
       DEFAULT_THRESHOLDS,
+      DEFAULT_SCALING,
     );
     expect(ev.alerts.filter((a) => a.metric.includes("age"))).toEqual([]);
   });

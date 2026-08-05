@@ -5,6 +5,7 @@ import { Bell, LogOut, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/store/auth";
+import { useHydrated } from "@/hooks/useHydrated";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { buildSignedOutRedirect } from "@/lib/authRedirectRules";
 import { useAlertsList } from "@/hooks/useAlertsList";
@@ -35,6 +36,7 @@ import {
 
 export default function AppShell({ children }: { children?: ReactNode }) {
   const { user, loading } = useAuth();
+  const hydrated = useHydrated();
   const location = useLocation();
   const previousNavigationKeyRef = useRef(location.key);
   // Protected-route boundary: re-validate session against the auth server.
@@ -173,7 +175,12 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     setStructuredOpenIntent(null);
   }, [location.key]);
 
-  if (loading)
+  // SSR/hydration contract (same rule as /auth): the server always renders
+  // this loading state (no session exists server-side), so the client's
+  // hydration render must too — even when the sessionStorage restore resolves
+  // before this lazy route subtree hydrates. Without the `hydrated` gate that
+  // race makes React discard the SSR tree and regenerate client-side.
+  if (!hydrated || loading)
     return (
       <div className="min-h-screen flex items-center justify-center text-muted-foreground">
         Loading…

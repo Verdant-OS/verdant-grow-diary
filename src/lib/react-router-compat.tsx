@@ -34,6 +34,7 @@ import {
   useRouter,
   useRouterState,
 } from "@tanstack/react-router";
+import { selectCommittedLocation } from "@/lib/routerCommittedLocation";
 
 export { TanStackOutlet as Outlet };
 
@@ -73,10 +74,7 @@ export function useLocation(): CompatLocation {
       // Same pending-navigation rule as useSearchParams below: while a
       // navigation is in flight, `state.location` is the TARGET; the pages
       // still on screen must keep seeing the committed (resolved) location.
-      const location =
-        state.status === "pending" && state.resolvedLocation
-          ? state.resolvedLocation
-          : state.location;
+      const location = selectCommittedLocation(state);
       return {
         pathname: location.pathname,
         search: location.searchStr ?? "",
@@ -294,10 +292,7 @@ export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
   // sees the location it was rendered for). Prefer `resolvedLocation` (the
   // committed location) while a navigation is pending.
   const tanstackSearch = useRouterState({
-    select: (state) =>
-      (state.status === "pending" && state.resolvedLocation
-        ? state.resolvedLocation.searchStr
-        : state.location.searchStr) ?? "",
+    select: (state) => selectCommittedLocation(state).searchStr ?? "",
   });
   const router = useRouter();
   const searchRaw = legacy ? (legacy.location.search ?? "") : tanstackSearch;
@@ -321,7 +316,10 @@ export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
       );
       return;
     }
-    const { pathname, hash } = router.state.location;
+    // Setter operates from the COMMITTED page location too: while a
+    // navigation is pending, building the next URL from the in-flight
+    // target would move the wrong page's search params.
+    const { pathname, hash } = selectCommittedLocation(router.state);
     const suffix = `${serialized ? `?${serialized}` : ""}${hash ? (hash.startsWith("#") ? hash : `#${hash}`) : ""}`;
     void router.navigate({
       to: `${pathname}${suffix}` as never,

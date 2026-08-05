@@ -18,7 +18,15 @@
  */
 import { describe, expect, it, afterAll } from "vitest";
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { computeTreeHash, isBinary, normalizeCrlf } from "../../scripts/lib/tree-hash.mjs";
@@ -185,6 +193,20 @@ describe("tree-hash content identity", () => {
     const after = await computeTreeHash(root);
     expect(after.treeHash).not.toBe(before.treeHash);
   });
+
+  it("changes when a committed Vite env file changes (inlined VITE_* values ship)", async () => {
+    // Regression (Codex review on #735): env-only commits produce different
+    // shipped JS and must not share a hash with their parent.
+    const root = makeTempRoot();
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, "src/a.ts"), "app\n");
+    writeFileSync(join(root, ".env"), "VITE_SUPABASE_URL=https://one.example\n");
+    const before = await computeTreeHash(root);
+    writeFileSync(join(root, ".env"), "VITE_SUPABASE_URL=https://two.example\n");
+    const after = await computeTreeHash(root);
+    expect(after.treeHash).not.toBe(before.treeHash);
+    expect(after.fileCount).toBe(before.fileCount);
+  });
 });
 
 describe("stamper in the proven Lovable history-less sandbox", () => {
@@ -230,6 +252,33 @@ describe("stamper in the proven Lovable history-less sandbox", () => {
     expect(record.inherited).toBeNull();
     expect(record.version).toMatch(/\.t[0-9a-f]{12}$/);
   });
+
+  it("degrades without dying when hashing itself throws: warn + treeHashError, exit 0", () => {
+    const box = makeSandbox();
+    git(box, ["init", "-q"]);
+    // Replace the copied hash module with one that always rejects — the
+    // prebuild contract must hold even then.
+    writeFileSync(
+      join(box, "scripts/lib/tree-hash.mjs"),
+      "export async function computeTreeHash() { throw new Error('boom \\u0007 disk'); }\n",
+    );
+    const result = execFileSync("node", ["scripts/stamp-version.mjs"], {
+      cwd: box,
+      encoding: "utf8",
+      env: cleanEnv(),
+    });
+    // execFileSync throwing would have failed the test: exit 0 held.
+    expect(result).toContain("Stamped version");
+    const record = JSON.parse(readFileSync(join(box, "public/version.json"), "utf8"));
+    expect(record.treeHash).toBeNull();
+    expect(record.treeHashShort).toBeNull();
+    expect(typeof record.treeHashError).toBe("string");
+    expect(record.treeHashError).toContain("boom");
+    // Sanitized: the control char must not survive into the record.
+    expect(record.treeHashError).not.toMatch(/[^\x20-\x7e]/);
+    // No git identity AND no hash: version falls back to the honest unknown.
+    expect(record.version).toMatch(/\.unknown$/);
+  });
 });
 
 describe("stamper with real git identity (legacy behavior preserved)", () => {
@@ -247,6 +296,53 @@ describe("stamper with real git identity (legacy behavior preserved)", () => {
     expect(record.version).toMatch(new RegExp(`^0\\.0\\.0\\+\\d{8}\\.${sha.slice(0, 12)}`));
     expect(record.treeHash).toMatch(/^[0-9a-f]{64}$/);
     expect(record.inherited).toBeNull();
+  });
+
+  it("treats a set-but-empty or malformed GITHUB_SHA as absent (forgery regression)", () => {
+    // Regression: `??` alone let GITHUB_SHA="" through, stamping commit ""
+    // with a lying commitSource and an identity-free version string.
+    const unborn = makeSandbox();
+    git(unborn, ["init", "-q"]);
+    const emptyEnv = runStamper(unborn, { GITHUB_SHA: "" }).record;
+    expect(emptyEnv.commit).toBe("unknown");
+    expect(emptyEnv.commitSource).toBe("none");
+    expect(emptyEnv.version).toMatch(/\.t[0-9a-f]{12}$/);
+
+    const committed = makeSandbox();
+    git(committed, ["init", "-q"]);
+    git(committed, ["add", "-A"]);
+    git(committed, [
+      "-c",
+      "user.name=t",
+      "-c",
+      "user.email=t@example.invalid",
+      "commit",
+      "-qm",
+      "init",
+    ]);
+    const sha = git(committed, ["rev-parse", "HEAD"]);
+    const malformedEnv = runStamper(committed, { GITHUB_SHA: "nothex" }).record;
+    expect(malformedEnv.commit).toBe(sha);
+    expect(malformedEnv.commitSource).toBe("git");
+  });
+
+  it("rejects malformed inherited timestamps and reports healthy treeHash without error", () => {
+    const box = makeSandbox();
+    git(box, ["init", "-q"]);
+    writeFileSync(
+      join(box, "public/version.json"),
+      JSON.stringify({
+        commit: "c".repeat(40),
+        ref: "edit/edt-x",
+        commitTime: "2026-08-04T...Z",
+        buildTime: "not a time",
+      }) + "\n",
+    );
+    const { record } = runStamper(box);
+    const inherited = record.inherited as Record<string, unknown>;
+    expect(inherited.commitTime).toBe("unknown");
+    expect(inherited.buildTime).toBe("unknown");
+    expect(record.treeHashError).toBeNull();
   });
 
   it("prefers GITHUB_* env identity and records commitSource github-env with CI run linkage", () => {
@@ -279,6 +375,22 @@ describe("release-tag treeHash mapping", () => {
     expect(workflow).toMatch(/-m "Tree-Hash: \$\{TREE_HASH\}"/);
     expect(workflow).toMatch(/Tree-Hash: \\`\$\{TREE_HASH\}\\`/);
   });
+
+  it("computes the hash BEFORE the pre-tagged early exit and records it on that path", () => {
+    // Regression: hashing below the early exit meant pre-tagged commits got
+    // no recorded mapping at all. Pin the ordering, not just presence.
+    const workflow = readFileSync(AUTO_TAG_WORKFLOW, "utf8");
+    const hashIdx = workflow.indexOf("node scripts/lib/tree-hash.mjs");
+    const earlyExitIdx = workflow.indexOf("already tagged as");
+    expect(hashIdx).toBeGreaterThan(-1);
+    expect(earlyExitIdx).toBeGreaterThan(-1);
+    expect(hashIdx).toBeLessThan(earlyExitIdx);
+    // The early-exit block itself must write the mapping to the summary
+    // before its `exit 0`.
+    const exitIdx = workflow.indexOf("exit 0", earlyExitIdx);
+    const earlyBlock = workflow.slice(earlyExitIdx, exitIdx);
+    expect(earlyBlock).toMatch(/Tree-Hash: \\`\$\{TREE_HASH\}\\`/);
+  });
 });
 
 describe("resolve-release-provenance", () => {
@@ -294,12 +406,16 @@ describe("resolve-release-provenance", () => {
     return { box, headSha: git(box, ["rev-parse", "HEAD"]) };
   }
 
-  function runResolver(cwd: string, args: string[]): { out: string; status: number } {
+  function runResolver(
+    cwd: string,
+    args: string[],
+    envOverrides: Record<string, string> = {},
+  ): { out: string; status: number } {
     try {
       const out = execFileSync("node", ["scripts/resolve-release-provenance.mjs", ...args], {
         cwd,
         encoding: "utf8",
-        env: cleanEnv(),
+        env: cleanEnv(envOverrides),
       });
       return { out, status: 0 };
     } catch (error) {
@@ -345,6 +461,38 @@ describe("resolve-release-provenance", () => {
     expect(out).not.toContain("v2026.01.02-other");
   });
 
+  it("reports the union: tag-annotated commit AND annotation-less content twin", async () => {
+    const { box, headSha } = makeResolverSandbox();
+    const { treeHash } = await computeTreeHash(box);
+    // Annotate the first commit with its real hash…
+    git(box, [
+      "-c",
+      "user.name=t",
+      "-c",
+      "user.email=t@example.invalid",
+      "tag",
+      "-a",
+      "v2026.01.03-annotated",
+      "-m",
+      "tag",
+      "-m",
+      `Tree-Hash: ${treeHash}`,
+    ]);
+    // …then add a content twin: a commit changing only a file OUTSIDE the
+    // hashed roots, so it shares the treeHash but carries no annotation.
+    writeFileSync(join(box, "README.md"), "docs only\n");
+    git(box, ["add", "-A"]);
+    git(box, ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "docs"]);
+    const twinSha = git(box, ["rev-parse", "HEAD"]);
+
+    const { out, status } = runResolver(box, [`--hash=${treeHash}`, "--scan=2", "--ref=HEAD"]);
+    expect(status).toBe(0);
+    expect(out).toContain("MATCH via release-tag annotation");
+    expect(out).toContain(headSha);
+    expect(out).toContain("MATCH via recomputation");
+    expect(out).toContain(twinSha);
+  });
+
   it("falls back to recomputation and matches HEAD content", async () => {
     const { box, headSha } = makeResolverSandbox();
     // Clean checkout ⇒ working-tree hash equals the committed content's hash.
@@ -353,6 +501,53 @@ describe("resolve-release-provenance", () => {
     expect(status).toBe(0);
     expect(out).toContain("MATCH via recomputation");
     expect(out).toContain(headSha);
+  });
+
+  it("never executes candidate code from commits outside the trust ref, and scrubs env when it does run", async () => {
+    // Security regression (Cursor review on #737): the cross-era fallback
+    // executes a candidate commit's own tree-hash module. That must happen
+    // ONLY for commits that are ancestors of the protected release branch
+    // (--trust-ref), and with a secret-free child environment.
+    const { box } = makeResolverSandbox();
+    const fakeHash = "cd".repeat(32);
+    const canary = join(box, "canary.json").replaceAll("\\", "\\\\");
+    writeFileSync(
+      join(box, "scripts/lib/tree-hash.mjs"),
+      `import { writeFileSync } from "node:fs";\n` +
+        `writeFileSync("${canary}", JSON.stringify(Object.keys(process.env)));\n` +
+        `console.log("${fakeHash}");\n`,
+    );
+    git(box, ["add", "-A"]);
+    git(box, ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "evil"]);
+    // The evil module must exist only in the COMMIT being scanned: restore
+    // the real module in the working tree, since the resolver imports its
+    // own lib from there at startup.
+    cpSync(TREE_HASH_LIB, join(box, "scripts/lib/tree-hash.mjs"));
+
+    // Untrusted: trust-ref names a branch that does NOT contain the commit.
+    git(box, ["branch", "trusted-base", "HEAD~1"]);
+    const blocked = runResolver(box, [
+      `--hash=${fakeHash}`,
+      "--scan=1",
+      "--ref=HEAD",
+      "--trust-ref=trusted-base",
+    ]);
+    expect(blocked.status).toBe(1);
+    expect(blocked.out).toContain("NO_MATCH");
+    expect(existsSync(join(box, "canary.json"))).toBe(false);
+
+    // Trusted: the commit IS an ancestor of trust-ref — module runs, but in
+    // a scrubbed environment with no secrets to exfiltrate.
+    const allowed = runResolver(
+      box,
+      [`--hash=${fakeHash}`, "--scan=1", "--ref=HEAD", "--trust-ref=HEAD"],
+      { SECRET_CANARY: "do-not-leak" },
+    );
+    expect(allowed.status).toBe(0);
+    expect(allowed.out).toContain("MATCH via recomputation");
+    expect(existsSync(join(box, "canary.json"))).toBe(true);
+    const leakedKeys = JSON.parse(readFileSync(join(box, "canary.json"), "utf8")) as string[];
+    expect(leakedKeys).not.toContain("SECRET_CANARY");
   });
 
   it("reports NO_MATCH with the canary hint and exits 1 for an unknown hash", () => {

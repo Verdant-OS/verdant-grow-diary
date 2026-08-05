@@ -5,21 +5,23 @@
  * Production builds published from history-less snapshots stamp
  * `commit: "unknown"` but always carry a `treeHash` (see
  * scripts/stamp-version.mjs). This resolver answers "which commit(s)
- * does that hash correspond to?" using two sources, in order:
+ * does that hash correspond to?" by consulting BOTH sources and
+ * reporting the deduplicated union:
  *
  *   1. Release tag annotations: auto-tag-release records
- *      `Tree-Hash: <hex>` in every tag it creates (fast path, no
- *      recomputation).
- *   2. Recomputation over recent deploy-branch commits: `git archive`
- *      each candidate into a scratch directory and recompute the hash
- *      with the same module the stamper uses.
+ *      `Tree-Hash: <hex>` in every tag it creates (cheap lookup; tags
+ *      created outside that workflow carry no annotation).
+ *   2. Recomputation over recent commits of --ref: each candidate's
+ *      tracked content is materialized git-natively (read-tree +
+ *      checkout-index into an isolated scratch index — no shell, no
+ *      tar) and hashed with the same module the stamper uses.
  *
  * One treeHash may map to several commits: changes outside the hashed
- * roots (tests, docs, workflows) do not move it. Every match is
- * reported — identical app content is identical app content.
+ * roots (docs, e2e, workflows) do not move it. Every match from both
+ * sources is reported — identical app content is identical app content.
  *
  * Usage:
- *   node scripts/resolve-release-provenance.mjs --hash <64-hex> [--scan N] [--ref origin/verdant-grow-diary]
+ *   node scripts/resolve-release-provenance.mjs --hash=<64-hex> [--scan=N] [--ref=origin/verdant-grow-diary]
  *
  * Read-only; no network. Run it from a checkout with real history.
  */
@@ -34,11 +36,17 @@ function git(args, opts = {}) {
 }
 
 function parseArgs(argv) {
-  const args = { hash: null, scan: 30, ref: "origin/verdant-grow-diary" };
+  const args = {
+    hash: null,
+    scan: 30,
+    ref: "origin/verdant-grow-diary",
+    trustRef: "origin/verdant-grow-diary",
+  };
   for (const a of argv.slice(2)) {
     if (a.startsWith("--hash=")) args.hash = a.slice(7).toLowerCase();
     else if (a.startsWith("--scan=")) args.scan = Number(a.slice(7));
     else if (a.startsWith("--ref=")) args.ref = a.slice(6);
+    else if (a.startsWith("--trust-ref=")) args.trustRef = a.slice(12);
     else if (a === "--help" || a === "-h") args.help = true;
     else throw new Error(`Unknown argument: ${a}`);
   }
@@ -56,7 +64,10 @@ function tagMatches(hash) {
     if (sep === -1) continue;
     const tag = block.slice(0, sep).trim();
     if (!tag) continue;
-    const m = block.slice(sep + 1).match(/Tree-Hash:\s*([0-9a-f]{64})/);
+    // Anchored to a complete line: prose or lookalikes such as
+    // "Previous-Tree-Hash: …" must never count as the authoritative
+    // workflow annotation.
+    const m = block.slice(sep + 1).match(/^Tree-Hash:[ \t]*([0-9a-f]{64})[ \t]*$/m);
     if (m && m[1] === hash) {
       try {
         matches.push({ tag, commit: git(["rev-list", "-n", "1", tag]) });
@@ -68,10 +79,41 @@ function tagMatches(hash) {
   return matches;
 }
 
-async function scanMatches(hash, ref, count) {
-  const shas = git(["rev-list", "-n", String(count), ref])
-    .split("\n")
-    .filter(Boolean);
+/** Ancestor-of-release-branch check: the trust boundary for running a
+ * candidate commit's own code. Anything merged through the protected
+ * branch's queue qualifies; an arbitrary scanned ref does not. */
+function isTrustedCommit(sha, trustRef) {
+  try {
+    execFileSync("git", ["merge-base", "--is-ancestor", sha, trustRef], {
+      stdio: ["ignore", "ignore", "ignore"],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Minimal child environment for candidate-code execution: enough for node
+ * to start on Windows/Linux, nothing secret-bearing. */
+function scrubbedEnv() {
+  const keep = ["PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "HOME", "USERPROFILE"];
+  const env = {};
+  for (const k of keep) {
+    if (process.env[k] !== undefined) env[k] = process.env[k];
+  }
+  return env;
+}
+
+async function scanMatches(hash, ref, count, trustRef) {
+  let shas = [];
+  try {
+    shas = git(["rev-list", "-n", String(count), ref])
+      .split("\n")
+      .filter(Boolean);
+  } catch {
+    console.log(`Scan skipped: ref ${ref} is not resolvable in this checkout.`);
+    return [];
+  }
   const matches = [];
   for (const sha of shas) {
     const scratch = mkdtempSync(join(tmpdir(), "vgd-provenance-"));
@@ -88,7 +130,31 @@ async function scanMatches(hash, ref, count) {
         stdio: ["ignore", "ignore", "pipe"],
       });
       const { treeHash } = await computeTreeHash(resolve(extract));
-      if (treeHash === hash) matches.push({ commit: sha });
+      if (treeHash === hash) {
+        matches.push({ commit: sha });
+      } else if (isTrustedCommit(sha, trustRef)) {
+        // Cross-era fallback: if the hash algorithm (roots, normalization)
+        // has changed since this candidate was committed, the current
+        // module cannot reproduce a stamp that candidate's OWN stamper
+        // emitted. This EXECUTES the candidate's committed hash module, so
+        // it is gated to commits that are ancestors of the protected
+        // release branch (--trust-ref): only code that passed the merge
+        // queue runs, never code from an arbitrary scanned ref. The child
+        // gets a scrubbed environment — no secrets to exfiltrate.
+        try {
+          const eraModule = resolve(extract, "scripts/lib/tree-hash.mjs");
+          const eraHash = execFileSync("node", [eraModule, `--root=${resolve(extract)}`], {
+            encoding: "utf8",
+            cwd: resolve(extract),
+            env: scrubbedEnv(),
+            stdio: ["ignore", "pipe", "ignore"],
+          }).trim();
+          if (eraHash === hash) matches.push({ commit: sha, era: "candidate-algorithm" });
+        } catch {
+          // Candidate predates the module or its CLI failed — no cross-era
+          // comparison possible for this commit.
+        }
+      }
     } finally {
       rmSync(scratch, { recursive: true, force: true });
     }
@@ -111,21 +177,24 @@ async function main() {
     return;
   }
 
+  // Contract: report the deduplicated UNION of both sources. Tag matches
+  // alone would miss annotation-less commits with the same content (tags
+  // created outside auto-tag-release carry no Tree-Hash line).
   const viaTags = tagMatches(args.hash);
   if (viaTags.length > 0) {
     console.log(`MATCH via release-tag annotation (${viaTags.length}):`);
     for (const m of viaTags) console.log(`  ${m.commit}  (${m.tag})`);
-    return;
   }
 
-  console.log(
-    `No tag annotation carries this hash; recomputing over last ${args.scan} commits of ${args.ref}…`,
+  console.log(`Recomputing over last ${args.scan} commits of ${args.ref}…`);
+  const tagged = new Set(viaTags.map((m) => m.commit));
+  const viaScan = (await scanMatches(args.hash, args.ref, args.scan, args.trustRef)).filter(
+    (m) => !tagged.has(m.commit),
   );
-  const viaScan = await scanMatches(args.hash, args.ref, args.scan);
   if (viaScan.length > 0) {
     console.log(`MATCH via recomputation (${viaScan.length}):`);
     for (const m of viaScan) console.log(`  ${m.commit}`);
-  } else {
+  } else if (viaTags.length === 0) {
     console.log(
       "NO_MATCH: no scanned commit reproduces this treeHash. The build may predate the scan window, or its content never matched any commit (editor-modified snapshot, or a publish pipeline that mutates hashed files such as bun.lock before prebuild).",
     );

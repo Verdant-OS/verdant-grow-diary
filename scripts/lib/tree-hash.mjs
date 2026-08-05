@@ -21,9 +21,12 @@
  *     identically to Linux checkouts of the same content; binary files are
  *     hashed byte-exact, since git never smudges them and normalizing would
  *     collide distinct shipped bytes.
- *   - Test-only / docs-only changes outside the roots do not move the hash,
- *     so one hash may map to several commits with identical app content;
- *     the resolver reports every match rather than guessing.
+ *   - Changes outside the hashed roots (docs/, e2e/, .github/, etc.) do not
+ *     move the hash, so one hash may map to several commits; the resolver
+ *     reports every match rather than guessing. Changes INSIDE the roots
+ *     always move it — including test files under src/test and scripts/ —
+ *     a deliberate conservatism: distinct trees must never share a hash by
+ *     carve-out.
  *   - The generated stamp files are excluded, so stamping never perturbs
  *     the identity it reports.
  *
@@ -43,9 +46,19 @@ export const TREE_HASH_ROOTS = [
   "supabase",
   "scripts",
   "config",
+  // Committed Vite env files: VITE_* values are inlined into shipped JS, so
+  // an env-only commit produces different app bytes and must move the hash.
+  ".env",
+  ".env.development",
+  ".env.example",
+  ".env.production",
   "index.html",
   "package.json",
   "bun.lock",
+  // Compatibility lockfile: config/dependency-lockfile-transition.json keeps
+  // npm consumers (Vercel/preview) on package-lock.json, so a lock-only
+  // dependency change alters their built bundle and must move the hash.
+  "package-lock.json",
   "vite.config.ts",
   "tsconfig.json",
   "tsconfig.app.json",

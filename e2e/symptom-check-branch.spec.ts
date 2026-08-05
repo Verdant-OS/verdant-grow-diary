@@ -282,6 +282,17 @@ test.describe("Plant Detail Symptom Check — local mocked branch proof", () => 
     await seedClearlyFakeSession(page);
     await installFailClosedNetworkMock(page, state);
 
+    // SSR/first-hydration guard: this navigation restores a session BEFORE the
+    // protected route hydrates — the exact race where a server render
+    // (loading state) and a client render (resolved shell) can diverge. React
+    // recovers from such a mismatch by discarding the SSR tree, so the page
+    // still "works" and no assertion below would notice; the pageerror stream
+    // is the only reliable signal. Guards AppShell's hydration gate.
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      pageErrors.push(String(error && error.message ? error.message : error));
+    });
+
     await page.goto(`/plants/${FAKE_PLANT_ID}`);
     await acceptReconsentGateIfShown(page);
 
@@ -289,6 +300,11 @@ test.describe("Plant Detail Symptom Check — local mocked branch proof", () => 
     await expect(
       page.getByRole("heading", { name: "This page ran into an unexpected error", exact: true }),
     ).not.toBeVisible();
+
+    const hydrationErrors = pageErrors.filter((message) => /hydrat/i.test(message));
+    expect(hydrationErrors, "recoverable hydration mismatches must not occur").toEqual([]);
+    const updateDepthErrors = pageErrors.filter((message) => /Maximum update depth/i.test(message));
+    expect(updateDepthErrors, "render/navigation loops must not occur").toEqual([]);
   });
 
   test("saves one confirmed Symptom Check and follows it to the Timeline evidence card", async ({

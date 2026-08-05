@@ -37,7 +37,6 @@ import {
 } from "react";
 import {
   Link as TanStackLink,
-  Navigate as TanStackNavigate,
   Outlet as TanStackOutlet,
   RouterContextProvider,
   createMemoryHistory,
@@ -258,14 +257,20 @@ export interface CompatNavigateProps {
 }
 
 /** react-router `<Navigate to="/path" replace />`. */
+// Mirrors the product shim: an input-keyed effect, NOT TanStack's <Navigate>
+// (which re-issues per router-state re-render and loops mid-transition — see
+// src/lib/react-router-compat.tsx Navigate docblock). Keeping the vitest
+// double behaviorally aligned means unit tests exercise the same navigation
+// semantics the product ships.
 export function Navigate({ to, replace, state }: CompatNavigateProps) {
-  return (
-    <TanStackNavigate
-      to={to as never}
-      replace={replace ?? false}
-      {...(state !== undefined ? { state: state as never } : {})}
-    />
-  );
+  const nav = useNavigate();
+  useEffect(() => {
+    nav(to, {
+      replace: replace ?? false,
+      ...(state !== undefined ? { state } : {}),
+    });
+  }, [nav, to, replace, state]);
+  return null;
 }
 
 export type CompatSetSearchParams = (

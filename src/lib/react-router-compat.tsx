@@ -253,31 +253,30 @@ export interface CompatNavigateProps {
 /**
  * react-router `<Navigate to="/path" replace />`.
  *
- * Implemented as a `to`-keyed effect rather than TanStack's `<Navigate>`:
- * that component re-issues its navigation on every router-state re-render,
- * and while its own navigation is pending the still-mounted source route
- * re-renders per state change — each re-issue restarts the transition, which
- * loops until React throws "Maximum update depth exceeded" (observed on the
- * /features → /welcome alias). react-router semantics are per-`to`: navigate
- * on mount, and again only if the destination itself changes.
+ * Implemented as an input-keyed effect rather than TanStack's `<Navigate>`:
+ * that component re-navigates whenever its props OBJECT identity changes, and
+ * a wrapper necessarily builds fresh props every render. While the issued
+ * navigation is pending, the still-mounted source route re-renders per
+ * router-state change (e.g. RouteAliasRedirect subscribes via useLocation),
+ * so each re-render re-issued the navigation and restarted the transition —
+ * looping until React threw "Maximum update depth exceeded" (observed on the
+ * /features → /welcome alias; regression-tested in
+ * src/test/react-router-compat-navigate-real.test.tsx). react-router
+ * semantics: navigate on mount, and again only when a navigation input
+ * (`to`/`replace`/`state`) changes — router-state re-renders change none.
+ *
+ * Uses this module's own `useNavigate()` so the legacy
+ * MemoryRouter/BrowserRouter context keeps working without a TanStack
+ * provider (the compat hook early-returns `legacy.navigate` there).
  */
 export function Navigate({ to, replace, state }: CompatNavigateProps) {
-  const legacy = useContext(LegacyRouterContext);
-  const navigate = useTanStackNavigate();
+  const nav = useNavigate();
   useEffect(() => {
-    if (legacy) {
-      legacy.navigate(to, { replace, state });
-      return;
-    }
-    void navigate({
-      to: to as never,
+    nav(to, {
       replace: replace ?? false,
-      ...(state !== undefined ? { state: state as never } : {}),
-    } as never);
-    // Re-navigate only when the destination changes — never on router-state
-    // re-renders of the (still mounted, mid-transition) source route.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [legacy, to]);
+      ...(state !== undefined ? { state } : {}),
+    });
+  }, [nav, to, replace, state]);
   return null;
 }
 

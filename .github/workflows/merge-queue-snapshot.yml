@@ -1,0 +1,61 @@
+# Scheduled merge-queue + open-PR backlog snapshot with threshold alerts.
+# Read-only (gh api / gh pr list). Does not merge or mutate rulesets.
+name: Merge queue snapshot
+
+on:
+  schedule:
+    # 14:05 UTC daily — after US morning CI churn
+    - cron: "5 14 * * *"
+  workflow_dispatch:
+    inputs:
+      fail_on_warn:
+        description: "Fail the job on warn-level threshold breaches"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  snapshot:
+    name: merge-queue snapshot + thresholds
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Snapshot with alerts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          MERGE_QUEUE_BRANCH: verdant-grow-diary
+        run: |
+          set -euo pipefail
+          EXTRA=()
+          if [ "${{ github.event.inputs.fail_on_warn || 'false' }}" = "true" ]; then
+            EXTRA+=(--fail-on-warn)
+          fi
+          node scripts/ci/merge-queue-snapshot.mjs --alert --json "${EXTRA[@]}" | tee merge-queue-snapshot.json
+          node scripts/ci/merge-queue-snapshot.mjs --alert "${EXTRA[@]}" | tee merge-queue-snapshot.txt
+
+      - name: Upload snapshot artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: merge-queue-snapshot
+          path: |
+            merge-queue-snapshot.txt
+            merge-queue-snapshot.json
+          if-no-files-found: ignore
+          retention-days: 14

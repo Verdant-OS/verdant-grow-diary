@@ -1,0 +1,45 @@
+{
+  "$comment": "Alert thresholds for scripts/ci/merge-queue-snapshot.mjs — tune without code changes",
+  "queue_depth": {
+    "warn": 3,
+    "critical": 5,
+    "unit": "entries",
+    "why": "Serial queue (max_entries_to_merge=1); depth>3 is sustained backlog"
+  },
+  "max_age_sec": {
+    "warn": 1800,
+    "critical": 5400,
+    "unit": "seconds",
+    "why": "Warn at 30m; critical near 90m ruleset check timeout"
+  },
+  "median_age_sec": {
+    "warn": 900,
+    "critical": 2700,
+    "unit": "seconds",
+    "why": "Typical green docs PR should clear well under 15–45m once required CI is green"
+  },
+  "dirty_open_prs": {
+    "warn": 5,
+    "critical": 10,
+    "unit": "prs",
+    "why": "Content conflicts never enter the queue — ownership/serialisation smell"
+  },
+  "behind_open_prs": {
+    "warn": 5,
+    "critical": 12,
+    "unit": "prs",
+    "why": "Stale heads need update-branch; not a queue latency problem"
+  },
+  "blocked_open_prs": {
+    "warn": 8,
+    "critical": 15,
+    "unit": "prs",
+    "why": "Required checks/reviews stuck across many PRs"
+  },
+  "auto_merge_waiting": {
+    "warn": 3,
+    "critical": 6,
+    "unit": "prs",
+    "why": "Many auto-merge/queue requests waiting often means required gates never go green"
+  }
+}

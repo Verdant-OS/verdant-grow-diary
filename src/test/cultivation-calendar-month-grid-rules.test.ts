@@ -63,7 +63,10 @@ describe("buildCultivationCalendarMonthGrid", () => {
     expect(grid.days.filter((day) => day.isInMonth)).toHaveLength(29);
   });
 
-  it("uses only the injected UTC today value and never a local or ambient clock", () => {
+  it("resolves a zoned today string to its wall-clock day, never the UTC day", () => {
+    // 2028-03-01T01:30 at +02:00 is 2028-02-29T23:30 UTC. The grower's wall
+    // clock says March 1st, so the ring must sit on 2028-03-01 (live audit
+    // #13 — the old UTC projection highlighted the wrong day).
     const grid = buildCultivationCalendarMonthGrid({
       monthKey: "2028-02",
       loggedGroups: [],
@@ -72,7 +75,7 @@ describe("buildCultivationCalendarMonthGrid", () => {
     });
 
     expect(grid.days.filter((day) => day.isToday).map((day) => day.dateKey)).toEqual([
-      "2028-02-29",
+      "2028-03-01",
     ]);
     expect(
       buildCultivationCalendarMonthGrid({
@@ -90,6 +93,42 @@ describe("buildCultivationCalendarMonthGrid", () => {
         today: "2028-02-29T23:00:00",
       }).days.some((day) => day.isToday),
     ).toBe(false);
+  });
+
+  it("resolves a today Date to the viewer's local calendar day, not the UTC day", () => {
+    // Simulate an evening viewer behind UTC (e.g. UTC-7): the instant is
+    // already 2028-03-01 in UTC while the grower's wall clock still says
+    // 2028-02-29. Local getters are overridden so this holds on any CI zone.
+    class ShiftedDate extends Date {
+      private readonly offsetMinutes: number;
+      constructor(iso: string, offsetMinutes: number) {
+        super(iso);
+        this.offsetMinutes = offsetMinutes;
+      }
+      private shifted(): Date {
+        return new Date(this.getTime() + this.offsetMinutes * 60_000);
+      }
+      override getFullYear(): number {
+        return this.shifted().getUTCFullYear();
+      }
+      override getMonth(): number {
+        return this.shifted().getUTCMonth();
+      }
+      override getDate(): number {
+        return this.shifted().getUTCDate();
+      }
+    }
+
+    const grid = buildCultivationCalendarMonthGrid({
+      monthKey: "2028-02",
+      loggedGroups: [],
+      projectedReviews: [],
+      today: new ShiftedDate("2028-03-01T02:00:00.000Z", -7 * 60),
+    });
+
+    expect(grid.days.filter((day) => day.isToday).map((day) => day.dateKey)).toEqual([
+      "2028-02-29",
+    ]);
   });
 
   it("fails closed for malformed or impossible month keys", () => {

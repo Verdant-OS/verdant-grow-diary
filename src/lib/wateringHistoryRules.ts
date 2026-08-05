@@ -8,6 +8,7 @@
  * output of this module and MUST NOT reach into raw `details` JSON.
  */
 import type { NormalizedDiaryEntry } from "./diaryEntryRules";
+import { repairDiaryNoteSentenceSpacing } from "./diaryNoteFormatting";
 import {
   normalizeRootZoneSource,
   rootZoneSourceLabel,
@@ -77,7 +78,9 @@ function pickWaterTempC(entry: NormalizedDiaryEntry): number | null {
 }
 
 function previewNote(note: string): string {
-  const trimmed = (note ?? "").trim();
+  // Display-only repair of glued sentences in stored notes
+  // ("Watered today.Full watering to runoff") — the row itself stays as-is.
+  const trimmed = repairDiaryNoteSentenceSpacing(note ?? "").trim();
   if (trimmed.length <= NOTE_PREVIEW_MAX) return trimmed;
   return trimmed.slice(0, NOTE_PREVIEW_MAX - 1).trimEnd() + "…";
 }

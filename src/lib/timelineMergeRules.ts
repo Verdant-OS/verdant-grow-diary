@@ -26,6 +26,8 @@
  *     are passed through as `null` when missing.
  */
 
+import { dedupeMergedManualGrowActivityRows } from "@/lib/connectedOneTentActivationRules";
+
 // ---------------------------------------------------------------------------
 // Input row shapes (loose by design — accept upstream variations)
 // ---------------------------------------------------------------------------
@@ -198,6 +200,133 @@ function compareMergedEntries(a: MergedTimelineEntry, b: MergedTimelineEntry): n
   if (a.source_id < b.source_id) return -1;
   if (a.source_id > b.source_id) return 1;
   return 0;
+}
+
+// ---------------------------------------------------------------------------
+// Quick Log save fan-out collapse
+// ---------------------------------------------------------------------------
+//
+// One confirmed Quick Log save can persist up to three rows: a manual
+// watering/observation `grow_events` spine row, a same-instant sibling
+// `environment` grow_event when sensor values are present, and a
+// `diary_entries` companion when structured details exist. Readers that feed
+// all three into `mergeTimelineSources` render one save as two or three
+// activities (live audit #9/#10). This helper applies the shared manual-save
+// dedupe (`dedupeMergedManualGrowActivityRows`) to the raw source arrays
+// while keeping rows that are outside that contract (non-manual grow events,
+// rows without a parsable timestamp) flowing through untouched.
+//
+// Dropped companions are returned keyed by their surviving spine row so the
+// caller can re-attach companion-only details (sensor snapshots,
+// environment_check envelopes, plant_name) to the spine and keep rendering
+// them exactly once.
+
+export interface CollapseQuickLogSaveFanOutResult<
+  D extends DiaryEntryRowInput,
+  G extends GrowEventRowInput,
+> {
+  diaryEntries: D[];
+  growEvents: G[];
+  /** Companion diary rows removed by the collapse, keyed by surviving spine id. */
+  droppedCompanionsBySpineId: Map<string, D[]>;
+}
+
+function fanOutEpochMs(primary: unknown, fallback: unknown): number | null {
+  for (const value of [primary, fallback]) {
+    if (typeof value !== "string" || value.trim().length === 0) continue;
+    const epoch = Date.parse(value);
+    if (Number.isFinite(epoch)) return epoch;
+  }
+  return null;
+}
+
+function fanOutPairKey(plantId: unknown, epochMs: number): string {
+  const plant = typeof plantId === "string" && plantId.trim().length > 0 ? plantId.trim() : "";
+  return `${plant}|${epochMs}`;
+}
+
+export function collapseQuickLogSaveFanOut<
+  D extends DiaryEntryRowInput,
+  G extends GrowEventRowInput,
+>(input: {
+  diaryEntries: ReadonlyArray<D>;
+  growEvents: ReadonlyArray<G>;
+}): CollapseQuickLogSaveFanOutResult<D, G> {
+  const survivors = dedupeMergedManualGrowActivityRows({
+    diaryEntries: input.diaryEntries,
+    growEvents: input.growEvents,
+  });
+  const survivorSpineIds = new Set(
+    survivors.growEvents.map((row) => row.id).filter((id): id is string => typeof id === "string"),
+  );
+  const survivorDiaryIds = new Set(
+    survivors.diaryEntries
+      .map((row) => row.id)
+      .filter((id): id is string => typeof id === "string"),
+  );
+
+  // Surviving spine rows by (plant, instant) pair — the attachment target for
+  // unlinked companions written by quicklog_save_manual. First-in-input wins
+  // so attachment stays deterministic.
+  const spineIdByPairKey = new Map<string, string>();
+  const growEvents: G[] = [];
+  for (const row of input.growEvents) {
+    if (!row || typeof row.id !== "string" || row.id.trim().length === 0) {
+      continue;
+    }
+    const epochMs = fanOutEpochMs(row.occurred_at, row.entry_at);
+    const inManualContract = row.source === "manual" && row.is_deleted !== true && epochMs !== null;
+    if (inManualContract && !survivorSpineIds.has(row.id)) {
+      // The only manual, timestamped, non-deleted rows the shared dedupe
+      // removes are same-instant environment siblings of a watering /
+      // observation spine (and exact id duplicates). One sensor-carrying
+      // save must count once.
+      continue;
+    }
+    if (inManualContract && epochMs !== null) {
+      const key = fanOutPairKey(row.plant_id, epochMs);
+      if (!spineIdByPairKey.has(key)) spineIdByPairKey.set(key, row.id);
+    }
+    growEvents.push(row);
+  }
+
+  const diaryEntries: D[] = [];
+  const droppedCompanionsBySpineId = new Map<string, D[]>();
+  const attachCompanion = (spineId: string | null, row: D) => {
+    if (!spineId || !survivorSpineIds.has(spineId)) return;
+    const bucket = droppedCompanionsBySpineId.get(spineId);
+    if (bucket) bucket.push(row);
+    else droppedCompanionsBySpineId.set(spineId, [row]);
+  };
+  for (const row of input.diaryEntries) {
+    if (!row || typeof row.id !== "string" || row.id.trim().length === 0) {
+      diaryEntries.push(row);
+      continue;
+    }
+    if (survivorDiaryIds.has(row.id)) {
+      diaryEntries.push(row);
+      continue;
+    }
+    const logicalLink = pickLogicalGrowEventLink(row);
+    const epochMs = fanOutEpochMs(row.entry_at, row.occurred_at);
+    if (logicalLink) {
+      // A linked companion always belongs to its grow_events parent — even a
+      // deleted or out-of-window parent must not resurrect as a second row.
+      attachCompanion(logicalLink, row);
+      continue;
+    }
+    if (epochMs === null) {
+      // Untimestamped rows fall outside the pair contract; the merge sorts
+      // them last rather than hiding them.
+      diaryEntries.push(row);
+      continue;
+    }
+    // Unlinked companion sharing the exact (plant, instant) pair with a
+    // manual spine row — conservatively the same logical save.
+    attachCompanion(spineIdByPairKey.get(fanOutPairKey(row.plant_id, epochMs)) ?? null, row);
+  }
+
+  return { diaryEntries, growEvents, droppedCompanionsBySpineId };
 }
 
 // ---------------------------------------------------------------------------

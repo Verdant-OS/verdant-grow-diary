@@ -35,6 +35,19 @@ export const DIARY_NOTE_SECTION_LABELS = [
 export type DiaryNoteSectionLabel = (typeof DIARY_NOTE_SECTION_LABELS)[number];
 
 /**
+ * Repair missing spaces after sentence-ending punctuation
+ * ("Watered today.Full watering to runoff" → "Watered today. Full watering
+ * to runoff"). Letter-to-letter only, so decimals ("6.2") and file-ish
+ * tokens with digits stay intact. Shared by presenters that render stored
+ * note text verbatim (calendar snippets, watering history previews) — the
+ * stored row is never mutated.
+ */
+export function repairDiaryNoteSentenceSpacing(raw: string | null | undefined): string {
+  if (typeof raw !== "string") return "";
+  return raw.replace(/([A-Za-z])([.!?])([A-Za-z])/g, "$1$2 $3");
+}
+
+/**
  * Normalize a diary note for display:
  *   - Repair missing spaces after sentence-ending punctuation ("a.B" → "a. B").
  *   - Collapse runs of whitespace into single spaces.
@@ -54,7 +67,7 @@ export function normalizeDiaryNoteText(raw: string | null | undefined): string {
   // 1. Repair "a.B" / "a!B" / "a?B" → "a. B" (no space after sentence end).
   //    Skip common decimal / abbreviation cases by requiring the preceding
   //    char to be a letter, not a digit.
-  text = text.replace(/([A-Za-z])([.!?])([A-Za-z])/g, "$1$2 $3");
+  text = repairDiaryNoteSentenceSpacing(text);
 
   // 2. Collapse doubled section labels (case-insensitive), e.g.
   //    "Response check: Response check: Better." → "Response check: Better."
@@ -79,9 +92,9 @@ export function normalizeDiaryNoteText(raw: string | null | undefined): string {
   //    Non-label grower sentences that happen to repeat are preserved.
   const parts = text.split(/(?<=[.!?])\s+/);
   const labelPrefixRe = new RegExp(
-    `^(?:${DIARY_NOTE_SECTION_LABELS.map((l) =>
-      l.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-    ).join("|")})\\s*:`,
+    `^(?:${DIARY_NOTE_SECTION_LABELS.map((l) => l.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(
+      "|",
+    )})\\s*:`,
     "i",
   );
   const out: string[] = [];
@@ -181,9 +194,7 @@ export function parseDiaryNoteSections(
   const positions: Array<{ label: DiaryNoteSectionLabel; start: number; textStart: number }> = [];
   let m: RegExpExecArray | null;
   while ((m = labelRe.exec(normalized)) !== null) {
-    const label = DIARY_NOTE_SECTION_LABELS.find(
-      (l) => l.toLowerCase() === m![2].toLowerCase(),
-    );
+    const label = DIARY_NOTE_SECTION_LABELS.find((l) => l.toLowerCase() === m![2].toLowerCase());
     if (!label) continue;
     positions.push({
       label,
@@ -201,7 +212,11 @@ export function parseDiaryNoteSections(
   for (let i = 0; i < positions.length; i += 1) {
     const start = positions[i].textStart;
     const end = i + 1 < positions.length ? positions[i + 1].start : normalized.length;
-    const text = normalized.slice(start, end).trim().replace(/[.\s]+$/, ".").replace(/^\.$/, "");
+    const text = normalized
+      .slice(start, end)
+      .trim()
+      .replace(/[.\s]+$/, ".")
+      .replace(/^\.$/, "");
     if (!text) continue;
     const key = positions[i].label;
     if (!chunks[key]) chunks[key] = [];

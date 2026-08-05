@@ -1,12 +1,15 @@
 /**
- * cultivationCalendarMonthGridRules — a deterministic, UTC-only month-grid
+ * cultivationCalendarMonthGridRules — a deterministic, UTC-keyed month-grid
  * projection for the read-only cultivation calendar.
  *
  * The model keeps historical facts and history-derived review suggestions in
  * separate arrays. A suggestion is never promoted to a logged event, task,
  * due item, Action Queue item, or automatic action.
  *
- * Pure: no I/O, no ambient clock, no local-time APIs, and no writes.
+ * Pure: no I/O, no ambient clock, and no writes. The single deliberate
+ * local-time read is the injected `today` instant: the "today" ring must
+ * match the grower's wall-clock calendar day, not the UTC day (a viewer
+ * behind UTC otherwise sees tomorrow highlighted every evening).
  */
 import {
   CULTIVATION_CALENDAR_HISTORY_CATEGORIES,
@@ -37,7 +40,7 @@ export interface CultivationCalendarMonthGridInput {
   loggedGroups: readonly CultivationCalendarMonthGridLoggedGroup[] | null | undefined;
   /** Advisory blocks from the conservative cadence projector. */
   projectedReviews: readonly CultivationCalendarProjectedReviewBlock[] | null | undefined;
-  /** Optional injected instant used only to identify today's UTC cell. */
+  /** Optional injected instant used only to identify the grower's today cell. */
   today?: Date | string | null | undefined;
 }
 
@@ -48,7 +51,7 @@ export interface CultivationCalendarMonthGridDay {
   dayOfMonth: number;
   /** Whether the cell belongs to the requested month rather than its padding. */
   isInMonth: boolean;
-  /** True only when the injected UTC today value matches this cell. */
+  /** True only when the injected today instant's local calendar day matches this cell. */
   isToday: boolean;
   /** Historical care facts. These are never inferred from suggestions. */
   loggedFacts: readonly CultivationCalendarMonthGridLoggedFact[];
@@ -138,12 +141,30 @@ function parseMonthKey(value: unknown): ParsedMonthKey | null {
   return { year, monthIndex: month - 1, monthKey: `${match[1]}-${match[2]}` };
 }
 
+function formatLocalDateKey(date: Date): string | null {
+  const timestamp = date.getTime();
+  if (!Number.isFinite(timestamp)) return null;
+
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  if (year < 1000 || year > 9999) return null;
+
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 /**
- * Convert an explicit instant to its UTC day. Bare local-time strings are
- * deliberately rejected so the model cannot vary with the browser timezone.
+ * Convert the injected "today" instant to the calendar day the grower would
+ * call today (live audit #13 — the UTC day highlighted tomorrow for viewers
+ * behind UTC):
+ *  - Date instances use the environment's local calendar day.
+ *  - Bare YYYY-MM-DD strings are explicit days, used as-is.
+ *  - ISO strings with an explicit zone use the wall-clock date as written,
+ *    so string inputs stay deterministic and never read the ambient zone.
+ *  - Bare local-time strings are still rejected as ambiguous.
  */
-function utcDateKeyFromInstant(value: unknown): string | null {
-  if (value instanceof Date) return formatUtcDateKey(value);
+function todayDateKeyFromInstant(value: unknown): string | null {
+  if (value instanceof Date) return formatLocalDateKey(value);
   if (typeof value !== "string") return null;
 
   const trimmed = value.trim();
@@ -153,7 +174,7 @@ function utcDateKeyFromInstant(value: unknown): string | null {
 
   const timestamp = Date.parse(trimmed);
   if (!Number.isFinite(timestamp)) return null;
-  return formatUtcDateKey(new Date(timestamp));
+  return normalizeDateKey(trimmed.slice(0, 10));
 }
 
 function utcIsoFromInstant(value: unknown): string | null {
@@ -263,8 +284,9 @@ function normalizeProjectedReview(value: unknown): CultivationCalendarProjectedR
 
 /**
  * Build a Sunday-first six-week grid for a month. For a valid month it always
- * returns 42 UTC cells. The caller must inject `today`; this pure helper never
- * reads the current clock and therefore has no implicit timezone behavior.
+ * returns 42 UTC-keyed cells. The caller must inject `today`; this pure helper
+ * never reads the current clock. A `today` Date is resolved to the viewer's
+ * local calendar day so the ring matches the grower's wall clock.
  */
 export function buildCultivationCalendarMonthGrid(
   input: CultivationCalendarMonthGridInput,
@@ -274,7 +296,7 @@ export function buildCultivationCalendarMonthGrid(
 
   const firstOfMonth = new Date(Date.UTC(month.year, month.monthIndex, 1));
   const gridStartMs = firstOfMonth.getTime() - firstOfMonth.getUTCDay() * DAY_MS;
-  const todayKey = utcDateKeyFromInstant(input?.today);
+  const todayKey = todayDateKeyFromInstant(input?.today);
 
   const cells: Array<{
     dateKey: string;

@@ -26,7 +26,7 @@ export interface CultivationCalendarMonthGridProps {
   projectedReviews?: readonly CultivationCalendarProjectedReviewBlock[] | null;
   /** The current manually logged grow stage, shown in the badge and legend only. */
   activeStage?: string | null;
-  /** Injectable instant for UTC today highlighting. Defaults to the current instant. */
+  /** Injectable instant for the local-day today highlight. Defaults to the current instant. */
   now?: Date | string | null;
   /** Opens the existing detail view for a logged fact only. */
   onOpenEvent?: (event: DiaryCalendarEvent) => void;

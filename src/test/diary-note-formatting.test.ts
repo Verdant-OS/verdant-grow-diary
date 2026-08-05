@@ -8,13 +8,38 @@ import {
   normalizeDiaryNoteText,
   formatDiaryNoteForLabeledContainer,
   parseDiaryNoteSections,
+  repairDiaryNoteSentenceSpacing,
 } from "@/lib/diaryNoteFormatting";
+
+describe("repairDiaryNoteSentenceSpacing — shared glued-sentence repair", () => {
+  it("repairs the audited calendar pattern ('Watered today.Full watering to runoff')", () => {
+    expect(repairDiaryNoteSentenceSpacing("Watered today.Full watering to runoff")).toBe(
+      "Watered today. Full watering to runoff",
+    );
+  });
+
+  it("leaves decimals, ellipses, and already-spaced prose untouched", () => {
+    expect(repairDiaryNoteSentenceSpacing("pH 6.2 at runoff. EC 1.4.")).toBe(
+      "pH 6.2 at runoff. EC 1.4.",
+    );
+    expect(repairDiaryNoteSentenceSpacing("Waiting... still dry")).toBe("Waiting... still dry");
+  });
+
+  it("preserves newlines (unlike the full display normalizer)", () => {
+    expect(repairDiaryNoteSentenceSpacing("Watered today.\n\npH: 6.2")).toBe(
+      "Watered today.\n\npH: 6.2",
+    );
+  });
+
+  it("returns empty string for non-string input", () => {
+    expect(repairDiaryNoteSentenceSpacing(null)).toBe("");
+    expect(repairDiaryNoteSentenceSpacing(undefined)).toBe("");
+  });
+});
 
 describe("normalizeDiaryNoteText — repeated labels + missing spaces", () => {
   it("collapses a doubled 'Response check:' prefix", () => {
-    const out = normalizeDiaryNoteText(
-      "Response check: Response check: Better. Nats gone.",
-    );
+    const out = normalizeDiaryNoteText("Response check: Response check: Better. Nats gone.");
     expect(out).toBe("Response check: Better. Nats gone.");
   });
 
@@ -26,12 +51,8 @@ describe("normalizeDiaryNoteText — repeated labels + missing spaces", () => {
   });
 
   it("repairs a missing space after a period ('Nats.Response' → 'Nats. Response')", () => {
-    const out = normalizeDiaryNoteText(
-      "Hard dry back eliminated Nats.Response check: Better.",
-    );
-    expect(out).toBe(
-      "Hard dry back eliminated Nats. Response check: Better.",
-    );
+    const out = normalizeDiaryNoteText("Hard dry back eliminated Nats.Response check: Better.");
+    expect(out).toBe("Hard dry back eliminated Nats. Response check: Better.");
   });
 
   it("cleans the full reported bad pattern end-to-end", () => {
@@ -39,9 +60,7 @@ describe("normalizeDiaryNoteText — repeated labels + missing spaces", () => {
       "Response check: Better. Hard, dry back eliminated Nats.Response check: Better.Nats seem gone.";
     const out = normalizeDiaryNoteText(raw);
     // Both duplicates + missing spaces are repaired; grower content preserved.
-    expect(out).toBe(
-      "Response check: Better. Hard, dry back eliminated Nats. Nats seem gone.",
-    );
+    expect(out).toBe("Response check: Better. Hard, dry back eliminated Nats. Nats seem gone.");
     // No doubled label anywhere.
     expect(out).not.toMatch(/Response check:\s*Response check:/i);
     // No period-then-letter without a space.
@@ -66,8 +85,7 @@ describe("normalizeDiaryNoteText — repeated labels + missing spaces", () => {
   });
 
   it("does not remove non-duplicate meaningful content that looks similar", () => {
-    const raw =
-      "Response check: Better. Response check: Same. Response check: Worse.";
+    const raw = "Response check: Better. Response check: Same. Response check: Worse.";
     // Distinct statuses are NOT duplicates — all three must survive.
     const out = normalizeDiaryNoteText(raw);
     expect(out).toContain("Better");
@@ -91,17 +109,14 @@ describe("formatDiaryNoteForLabeledContainer — no duplicated UI labels", () =>
   });
 
   it("also strips a leading 'Response:' when the container label is 'Response'", () => {
-    const out = formatDiaryNoteForLabeledContainer(
-      "Response: Nats gone.",
-      "Response",
-    );
+    const out = formatDiaryNoteForLabeledContainer("Response: Nats gone.", "Response");
     expect(out).toBe("Nats gone.");
   });
 
   it("leaves the note alone when there is no matching leading label", () => {
-    expect(
-      formatDiaryNoteForLabeledContainer("Better. Nats gone.", "Response"),
-    ).toBe("Better. Nats gone.");
+    expect(formatDiaryNoteForLabeledContainer("Better. Nats gone.", "Response")).toBe(
+      "Better. Nats gone.",
+    );
   });
 
   it("still normalizes duplicated labels inside the value", () => {
@@ -117,9 +132,7 @@ describe("formatDiaryNoteForLabeledContainer — no duplicated UI labels", () =>
       "Response check: Better. Hard, dry back eliminated Nats.Response check: Better.Nats seem gone.",
       "Response",
     );
-    expect(out).toBe(
-      "Better. Hard, dry back eliminated Nats. Nats seem gone.",
-    );
+    expect(out).toBe("Better. Hard, dry back eliminated Nats. Nats seem gone.");
     expect(out).not.toMatch(/Response check:/i);
   });
 
@@ -129,9 +142,9 @@ describe("formatDiaryNoteForLabeledContainer — no duplicated UI labels", () =>
   });
 
   it("is case-insensitive on the container label match", () => {
-    expect(
-      formatDiaryNoteForLabeledContainer("Response check: Better.", "response"),
-    ).toBe("Better.");
+    expect(formatDiaryNoteForLabeledContainer("Response check: Better.", "response")).toBe(
+      "Better.",
+    );
   });
 });
 
@@ -156,8 +169,7 @@ describe("parseDiaryNoteSections — structured section extraction", () => {
   });
 
   it("omits empty sections and dedupes exact-duplicate entries in one section", () => {
-    const raw =
-      "Response check: Better. Response check: Better. Observation: Droopy fans.";
+    const raw = "Response check: Better. Response check: Better. Observation: Droopy fans.";
     const { sections } = parseDiaryNoteSections(raw);
     const labels = sections.map((s) => s.label);
     expect(labels).toContain("Observation");

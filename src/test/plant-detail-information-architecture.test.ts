@@ -23,32 +23,27 @@ const FRESHNESS_E2E_PATH = "e2e/ai-doctor-freshness-gate.spec.ts";
 const FRESHNESS_E2E = readFileSync(resolve(ROOT, FRESHNESS_E2E_PATH), "utf8");
 
 /**
- * The test ids the mocked AI Doctor freshness lane needs just to REACH its
- * subject — precisely the set its shared `openAiDoctorContextPanel` helper
- * waits on before any scenario runs. If any one of these cannot render, every
- * scenario in the lane fails identically and for a reason that has nothing to
- * do with the 48h rule.
+ * Test ids the mocked AI Doctor freshness lane needs Plant Detail to be able
+ * to render. A Playwright lane cannot defend itself: when a6972773d unmounted
+ * PlantDetailDoctorContextPreview, it silently orphaned every id that spec
+ * drove, and the lane just failed on a helper line until someone re-pointed it
+ * by hand. Nothing said "the page no longer mounts your subject".
  *
- * Scoped to the helper on purpose. Scenario-level ids
- * (`plant-ai-doctor-context-notice`, `-latest-snapshot`) are left out: they are
- * asserted positively in some scenarios and negatively (`toHaveCount(0)`) in
- * others, so pinning them here would both misstate them as always-required and
- * make ordinary edits to a scenario fail a test in a different directory.
+ * The two assertions below say exactly that, in ~100ms of vitest: these ids
+ * must be reachable from Plant Detail's real import graph, and the spec must
+ * still reference them, so neither side drifts away from the other unnoticed.
  *
- * This list exists because a Playwright lane cannot defend itself. Commit
- * a6972773d unmounted PlantDetailDoctorContextPreview from Plant Detail, which
- * silently orphaned PlantDetailDoctorLaunchDialog and every test id the lane
- * drove. Nothing caught it, because the lane only triggered on dependency
- * files and no PR touched one for eleven days. The two assertions below close
- * that gap: these ids must be reachable from Plant Detail's real mount graph,
- * and the spec must still use them, so neither side can drift unnoticed.
+ * Scoped to ids the spec asserts POSITIVELY somewhere. `plant-ai-doctor-live-review`
+ * is absent in the blocked scenario but visible in the other two, so it must
+ * still be renderable. Ids only ever asserted absent are excluded — requiring
+ * those to be mountable would invert their meaning.
  */
 const FRESHNESS_E2E_REQUIRED_TEST_IDS = [
   "plant-detail-disclosure-ai-trigger",
   "plant-detail-disclosure-ai-content",
   "plant-ai-doctor-context-panel",
-  "plant-ai-doctor-context-evidence",
-  "plant-ai-doctor-context-missing",
+  "plant-ai-doctor-live-review",
+  "plant-ai-doctor-live-review-start",
 ] as const;
 
 /** Resolve a `@/…` specifier to a real file under src/. */
@@ -86,24 +81,33 @@ function collectMountedSources(entry: string): string[] {
   return sources;
 }
 
+function escapeRegExp(literal: string): string {
+  return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
- * Can this mount graph render `testId`? Handles the three shapes the repo
- * uses: a literal attribute, a template attribute
- * (`data-testid={`plant-detail-disclosure-${group}-trigger`}`), and a
- * `const SOMETHING_TEST_ID = "…"` indirection.
+ * Can this mount graph render `testId`? Covers the four shapes the repo uses:
+ * a literal attribute, a `const SOMETHING_TEST_ID = "…"` indirection, a
+ * template attribute (`data-testid={`plant-detail-disclosure-${group}-trigger`}`),
+ * and a computed expression — PlantDetailAiDoctorLiveReview picks between
+ * `-start` and `-retry` with a ternary inside `data-testid={…}`.
  */
 function canRenderTestId(sources: string[], testId: string): boolean {
+  const escaped = escapeRegExp(testId);
+  const literalAttr = `data-testid="${testId}"`;
+  const constAssignment = new RegExp(`_TEST_ID\\s*=\\s*"${escaped}"`);
+  // `[^}]*` spans newlines (negated class), so a multi-line ternary matches.
+  const computedAttr = new RegExp(`data-testid=\\{[^}]*"${escaped}"`);
+
   for (const source of sources) {
-    if (source.includes(`data-testid="${testId}"`)) return true;
-    if (new RegExp(`_TEST_ID\\s*=\\s*"${testId}"`).test(source)) return true;
+    if (source.includes(literalAttr)) return true;
+    if (constAssignment.test(source)) return true;
+    if (computedAttr.test(source)) return true;
 
     for (const match of source.matchAll(/data-testid=\{`([^`]+)`\}/g)) {
       // Split on the interpolations, escape the literal chunks, and let each
       // `${…}` stand for one test-id segment.
-      const pattern = match[1]
-        .split(/\$\{[^}]*\}/)
-        .map((literal) => literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-        .join("[a-z0-9-]+");
+      const pattern = match[1].split(/\$\{[^}]*\}/).map(escapeRegExp).join("[a-z0-9-]+");
       if (new RegExp(`^${pattern}$`).test(testId)) return true;
     }
   }
@@ -169,8 +173,8 @@ describe("Plant Detail information architecture", () => {
   it("keeps every test id the freshness e2e drives reachable from the real mount graph", () => {
     const mounted = collectMountedSources(resolve(ROOT, "src/pages/PlantDetail.tsx"));
 
-    // Sanity-check the walker itself, so a resolver regression that silently
-    // returned an empty graph cannot make the real assertion vacuously pass.
+    // Sanity-check the walker, so a resolver regression that silently returned
+    // an empty graph cannot make the real assertion vacuously pass.
     expect(mounted.length).toBeGreaterThan(1);
 
     const unreachable = FRESHNESS_E2E_REQUIRED_TEST_IDS.filter(

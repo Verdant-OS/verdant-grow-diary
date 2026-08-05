@@ -4,6 +4,7 @@ import path from "node:path";
 import type { Locator, Request } from "@playwright/test";
 import { SmokeChecklistReporter } from "./lib/smokeChecklistReporter";
 import { validateQuickLogFixturePage } from "./lib/fixtureSafety";
+import { ANALYTICS_CONSENT_STORAGE_KEY } from "../src/lib/analyticsConsent";
 
 /**
  * Authenticated Quick Log smoke checklist.
@@ -148,6 +149,25 @@ async function acceptReconsentGateIfShown(page: import("@playwright/test").Page)
 
 test.describe("Quick Log smoke checklist", () => {
   test.skip(!PLANT_URL, "Set E2E_GROW_1_PLANT_URL to a Grow #1 plant page to run this smoke test.");
+
+  test.beforeEach(async ({ page }) => {
+    // The analytics consent banner renders as role="dialog" (fixed bottom,
+    // z-[100]) whenever no decision is stored. It collides with this smoke's
+    // strict getByRole("dialog") Quick Log assertions ("resolved to 2
+    // elements") and can intercept bottom-viewport clicks. The smoke audits
+    // Quick Log, not the consent flow — pre-store a "denied" decision (loads
+    // no analytics), the same seeding the browser census harness uses.
+    await page.addInitScript(
+      ({ key }) => {
+        try {
+          localStorage.setItem(key, "denied");
+        } catch {
+          // Storage blocked: the banner may render and the smoke will say so.
+        }
+      },
+      { key: ANALYTICS_CONSENT_STORAGE_KEY },
+    );
+  });
 
   test("authenticated end-to-end checklist", async ({ page }, testInfo) => {
     const report = new SmokeChecklistReporter();

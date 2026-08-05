@@ -46,6 +46,12 @@ export const TREE_HASH_ROOTS = [
   "supabase",
   "scripts",
   "config",
+  // Committed Vite env files: VITE_* values are inlined into shipped JS, so
+  // an env-only commit produces different app bytes and must move the hash.
+  ".env",
+  ".env.development",
+  ".env.example",
+  ".env.production",
   "index.html",
   "package.json",
   "bun.lock",

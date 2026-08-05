@@ -185,6 +185,20 @@ describe("tree-hash content identity", () => {
     const after = await computeTreeHash(root);
     expect(after.treeHash).not.toBe(before.treeHash);
   });
+
+  it("changes when a committed Vite env file changes (inlined VITE_* values ship)", async () => {
+    // Regression (Codex review on #735): env-only commits produce different
+    // shipped JS and must not share a hash with their parent.
+    const root = makeTempRoot();
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, "src/a.ts"), "app\n");
+    writeFileSync(join(root, ".env"), "VITE_SUPABASE_URL=https://one.example\n");
+    const before = await computeTreeHash(root);
+    writeFileSync(join(root, ".env"), "VITE_SUPABASE_URL=https://two.example\n");
+    const after = await computeTreeHash(root);
+    expect(after.treeHash).not.toBe(before.treeHash);
+    expect(after.fileCount).toBe(before.fileCount);
+  });
 });
 
 describe("stamper in the proven Lovable history-less sandbox", () => {
